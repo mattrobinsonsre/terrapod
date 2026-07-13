@@ -1,0 +1,2621 @@
+{
+  "nav": {
+    "workspaces": "ワークスペース",
+    "estate": "エステート",
+    "registry": "レジストリ",
+    "modules": "モジュール",
+    "providers": "プロバイダー",
+    "catalog": "カタログ",
+    "agentPools": "エージェントプール",
+    "admin": "管理",
+    "users": "ユーザー",
+    "roles": "ロール",
+    "vcsConnections": "VCS接続",
+    "variableSets": "変数セット",
+    "autodiscovery": "自動検出",
+    "bulkUpdate": "一括更新",
+    "executionHooks": "実行フック",
+    "policySets": "ポリシーセット",
+    "providerTemplates": "プロバイダーテンプレート",
+    "catalogAdmin": "カタログ管理",
+    "cache": "キャッシュ",
+    "auditLog": "監査ログ",
+    "help": "ヘルプ",
+    "apiReference": "APIリファレンス",
+    "docs": "ドキュメント",
+    "account": "アカウント",
+    "apiTokens": "APIトークン",
+    "sessions": "セッション",
+    "logOut": "ログアウト",
+    "menu": "メニュー",
+    "openMenu": "メニューを開く",
+    "openAccountMenu": "アカウントメニューを開く",
+    "closeMenu": "メニューを閉じる"
+  },
+  "switcher": {
+    "language": "言語",
+    "changeLanguage": "言語を変更"
+  },
+  "workspaces": {
+    "title": "ワークスペース",
+    "description": "Terraformのワークスペース、状態、実行を管理します",
+    "new": "新規ワークスペース",
+    "cancel": "キャンセル",
+    "create": "ワークスペースを作成",
+    "creating": "作成中…",
+    "loadFailed": "ワークスペースの読み込みに失敗しました",
+    "createFailed": "ワークスペースの作成に失敗しました",
+    "form": {
+      "name": "名前",
+      "namePattern": "使用できるのは英字、数字、ハイフン、アンダースコアのみです。先頭は英字または数字である必要があります。",
+      "namePlaceholder": "my-workspace",
+      "executionMode": "実行モード",
+      "local": "ローカル",
+      "agent": "エージェント",
+      "executionBackend": "実行バックエンド",
+      "version": "バージョン",
+      "versionTitle": "X.YまたはX.Y.Z形式のバージョン（例: 1.11 または 1.11.5）",
+      "versionPlaceholder": "例: 1.11 または 1.11.5",
+      "cpuRequest": "CPUリクエスト",
+      "cpuTitle": "KubernetesのCPU量: コア数（1, 2）またはミリコア（500m, 100m）",
+      "cpuHint": "例: 1, 0.5, 500m",
+      "memoryRequest": "メモリリクエスト",
+      "memoryTitle": "Kubernetesのメモリ量: バイト（1000）または接尾辞付き（512Mi, 2Gi, 1Ti）",
+      "memoryHint": "例: 2Gi, 512Mi, 1Ti",
+      "agentPool": "エージェントプール",
+      "none": "なし",
+      "autoApply": "自動適用",
+      "enabled": "有効",
+      "workingDirectory": "作業ディレクトリ",
+      "workingDirectoryPlaceholder": "例: environments/dev",
+      "workingDirectoryHint": ".tfファイルを含むリポジトリ内のサブディレクトリ",
+      "vcsConnection": "VCS接続",
+      "vcsRepoUrl": "VCSリポジトリURL",
+      "vcsRepoUrlTitle": "HTTPまたはHTTPSのURLである必要があります",
+      "vcsRepoUrlPlaceholder": "https://github.com/org/repo",
+      "vcsBranch": "VCSブランチ",
+      "vcsBranchPlaceholder": "main（デフォルト）"
+    },
+    "stats": {
+      "total": "合計",
+      "health": "ヘルス",
+      "locked": "ロック済み",
+      "clearAllFilters": "すべてのフィルターをクリア",
+      "clearHealthFilter": "ヘルスの問題フィルターをクリア",
+      "filterHealth": "ヘルスに問題のあるワークスペースで絞り込み",
+      "clearLockedFilter": "ロックフィルターをクリア",
+      "filterLocked": "ロック済みのワークスペースで絞り込み"
+    },
+    "filter": {
+      "placeholder": "名前、ラベル、ステータスで絞り込み — 例: \"eu1\"、\"env:prod\"、\"status:errored\"",
+      "ariaLabel": "ワークスペースを絞り込む",
+      "clear": "クリア",
+      "status": "ステータス",
+      "label": "ラベル",
+      "back": "戻る",
+      "valueCount": "{count, plural, one {# 個の値} other {# 個の値}}",
+      "removeTerm": "この条件を削除",
+      "showing": "{total} 件中 {filtered} 件を表示",
+      "termName": "名前: {value}",
+      "termStatus": "ステータス: {value}",
+      "termLabelAny": "{key}: （すべて）",
+      "termLabel": "{key}: {value}",
+      "hintStatus": "ステータス",
+      "hintHealth": "ヘルス",
+      "hintLabel": "ラベル",
+      "hintLabelKey": "ラベルキー",
+      "hintName": "名前"
+    },
+    "row": {
+      "removeLabelFilter": "クリックしてフィルターから削除",
+      "addLabelFilter": "クリックしてこのラベルで絞り込み"
+    },
+    "table": {
+      "name": "名前",
+      "mode": "モード",
+      "pool": "プール",
+      "resources": "リソース",
+      "status": "ステータス",
+      "created": "作成日時",
+      "resourcesValue": "{cpu} CPU / {memory}"
+    },
+    "empty": {
+      "none": "ワークスペースがまだありません。作成して始めましょう。",
+      "noMatch": "このフィルターに一致するワークスペースはありません。"
+    }
+  },
+  "status": {
+    "state-diverged": "状態の乖離",
+    "vcs-error": "VCSエラー",
+    "drifted": "ドリフト",
+    "errored": "エラー",
+    "needs-confirm": "確認が必要",
+    "planning": "プラン実行中",
+    "applying": "適用中",
+    "canceling": "キャンセル中",
+    "confirmed": "確認済み",
+    "queued": "キュー待ち",
+    "pending": "保留中",
+    "applied": "適用済み",
+    "planned": "プラン完了",
+    "canceled": "キャンセル済み",
+    "discarded": "破棄済み",
+    "pendingDeletion": "削除保留中",
+    "archived": "アーカイブ済み"
+  },
+  "auth": {
+    "loading": "読み込み中...",
+    "subtitle": "サインインしてインフラを管理します",
+    "subtitleCli": "サインインしてCLIを認可します",
+    "emailLabel": "メールアドレス",
+    "passwordLabel": "パスワード",
+    "signIn": "サインイン",
+    "signingIn": "サインイン中...",
+    "signInWith": "{provider} でサインイン",
+    "or": "または",
+    "noProviders": "認証プロバイダーが設定されていません",
+    "completingSignIn": "サインインを完了しています...",
+    "callbackFailedTitle": "認証に失敗しました",
+    "tryAgain": "再試行",
+    "errors": {
+      "loadProviders": "プロバイダーの読み込みに失敗しました",
+      "authenticationFailed": "認証に失敗しました（{status}）",
+      "tokenExchangeFailed": "トークン交換に失敗しました（{status}）",
+      "loginFailed": "ログインに失敗しました",
+      "startLoginFailed": "ログインの開始に失敗しました",
+      "missingCodeOrState": "認可コードまたはstateがありません",
+      "stateMismatch": "stateの不一致 — CSRF攻撃の可能性があります",
+      "missingVerifier": "PKCE verifierがありません — もう一度ログインしてください"
+    }
+  },
+  "estate": {
+    "title": "エステートトポロジー",
+    "description": "表示可能なすべてのワークスペースと、それらが使用するモジュールを、実行トリガー、リモート状態、モジュールリンクで接続して表示します。エステートに合った任意の軸でグループ化できます — プラットフォームはラベル規約を強制しません。",
+    "errors": {
+      "load": "エステートグラフの読み込みに失敗しました。"
+    },
+    "groupBy": {
+      "label": "グループ化"
+    },
+    "view": {
+      "graph": "グラフ",
+      "table": "テーブル"
+    },
+    "counts": {
+      "workspaces": "{count, plural, one {# 個のワークスペース} other {# 個のワークスペース}}",
+      "modules": "{count, plural, one {# 個のモジュール} other {# 個のモジュール}}",
+      "dependencies": "{count, plural, one {# 個の依存関係} other {# 個の依存関係}}"
+    },
+    "legend": {
+      "registryModule": "レジストリモジュール"
+    },
+    "detail": {
+      "moduleImpact": "{count, plural, one {ワークスペースがこれを使用しています — 更新すると再プランされます} other {ワークスペースがこれを使用しています — 更新するとすべて再プランされます}}",
+      "dependOnThis": "{count, plural, one {これに依存} other {これに依存}}"
+    },
+    "table": {
+      "workspaces": {
+        "heading": "ワークスペース",
+        "col": {
+          "workspace": "ワークスペース",
+          "group": "グループ",
+          "agentPool": "エージェントプール",
+          "dependedOnBy": "依存されている",
+          "modulesUsed": "使用中のモジュール"
+        },
+        "noModules": "—"
+      },
+      "modules": {
+        "heading": "モジュール",
+        "col": {
+          "module": "モジュール",
+          "usedBy": "使用元（ワークスペース）"
+        }
+      }
+    }
+  },
+  "labels": {
+    "title": "ラベル",
+    "description": "ワークスペース、エージェントプール、レジストリモジュール、レジストリプロバイダー全体で使用されているラベルを参照します。読み取り専用です — ラベルは各エンティティのページで編集します。",
+    "none": "なし。",
+    "emptyKeys": "使用中のラベルがまだありません。ワークスペース、エージェントプール、レジストリモジュール、レジストリプロバイダーにラベルを付けると、ここでグループ化を始められます。",
+    "emptyValues": "「{key}」に対する値がありません。このラベルを持つ読み取り可能なエンティティが存在しないか、前回の表示以降に削除された可能性があります。",
+    "loadKeysFailed": "ラベルの読み込みに失敗しました（{status}）",
+    "loadValuesFailed": "{key} の値の読み込みに失敗しました（{status}）",
+    "loadEntitiesFailed": "エンティティの読み込みに失敗しました（{status}）",
+    "columns": {
+      "labelKey": "ラベルキー",
+      "distinctValues": "個別の値",
+      "value": "値",
+      "total": "合計"
+    },
+    "entity": {
+      "workspaces": "ワークスペース",
+      "agentPools": "エージェントプール",
+      "modules": "モジュール",
+      "providers": "プロバイダー"
+    },
+    "deprecated": {
+      "badge": "非推奨・サポート対象外です。",
+      "body": "ラベルブラウザはメインナビゲーションから削除され、今後のリリースで廃止されます。代わりに<workspacesLink>ワークスペース</workspacesLink>ページでラベルによる絞り込みを行ってください。このページに依存している場合は、<issueLink>Issueを作成</issueLink>してください。"
+    }
+  },
+  "settings": {
+    "tokens": {
+      "title": "APIトークン",
+      "description": "CLIおよび自動化のための認証トークンを管理します",
+      "descriptionAll": "全ユーザーのすべてのトークン",
+      "myTokens": "自分のトークン",
+      "allTokens": "すべてのトークン",
+      "createToken": "トークンを作成",
+      "cancel": "キャンセル",
+      "tokenReady": "トークンの準備ができました",
+      "tokenReadyHelp": "このトークンを今すぐコピーしてください — 二度と表示されません。",
+      "dismissToken": "トークンを閉じる",
+      "hide": "非表示",
+      "show": "表示",
+      "copy": "コピー",
+      "empty": "APIトークンがまだありません。",
+      "noDescription": "説明なし",
+      "detached": "デタッチ済み",
+      "never": "なし",
+      "selected": "{count, plural, one {# 個のトークンを選択中} other {# 個のトークンを選択中}}",
+      "revokeSelected": "選択項目を取り消す",
+      "revoking": "取り消し中...",
+      "clearSelection": "選択をクリア",
+      "rotate": "ローテーション",
+      "rotating": "ローテーション中...",
+      "revoke": "取り消す",
+      "confirmRotate": "このトークンをローテーションしますか？現在のシークレットは直ちに無効になり、新しいものが発行されます。",
+      "confirmBulkRevoke": "{count, plural, one {# 個のトークンを取り消しますか？} other {# 個のトークンを取り消しますか？}}",
+      "kinds": {
+        "interactive": {
+          "label": "パーソナル",
+          "help": "CLIやその場限りの自動化のためのパーソナルトークンです。あなたの現在の全権限を持ちます。"
+        },
+        "service_bound": {
+          "label": "サービス・バインド",
+          "help": "あなたのロールのサブセットにスコープされたサービストークンです。そのアクセス権はそれらのロールとあなた自身のアクセス権の共通部分となり、あなたのアカウントが削除されると無効になります。"
+        },
+        "service_detached": {
+          "label": "サービス・デタッチ",
+          "help": "絶対的に固定されたスコープを持ち、どのユーザーにもバインドされない、管理者管理のサービストークンです。特定の一人がいなくなっても存続する必要がある重要なマシン間自動化に使用します。"
+        }
+      },
+      "lifespans": {
+        "720": "30日",
+        "2160": "90日",
+        "4320": "180日",
+        "8760": "1年"
+      },
+      "filter": {
+        "all": "すべての種別"
+      },
+      "form": {
+        "description": "説明",
+        "descriptionPlaceholder": "CI/CDパイプライントークン",
+        "kind": "種別",
+        "lifespan": "有効期間",
+        "create": "作成",
+        "creating": "作成中...",
+        "pinnedRoles": "固定ロール",
+        "pinnedRolesHelp": "— このトークンが制限されるスコープ",
+        "pinnedRolesCapped": "（あなた自身のアクセス権に制限されます）",
+        "noCustomRoles": "カスタムロールが定義されていません。まず「管理 → ロール」でロールを作成してください。",
+        "noScopedRoles": "固定できるスコープ付きロールを保持していません。このトークンはアクセス権を持ちません。"
+      },
+      "columns": {
+        "description": "説明",
+        "kind": "種別",
+        "boundTo": "バインド先",
+        "created": "作成日時",
+        "lastUsed": "最終使用",
+        "expires": "有効期限",
+        "actions": "操作"
+      },
+      "errors": {
+        "load": "トークンの読み込みに失敗しました",
+        "create": "トークンの作成に失敗しました（{status}）",
+        "createGeneric": "トークンの作成に失敗しました",
+        "rotate": "トークンのローテーションに失敗しました（{status}）",
+        "rotateGeneric": "トークンのローテーションに失敗しました",
+        "revoke": "トークンの取り消しに失敗しました（{status}）",
+        "revokeGeneric": "トークンの取り消しに失敗しました",
+        "bulkRevoke": "トークンの取り消しに失敗しました"
+      }
+    },
+    "sessions": {
+      "title": "セッション",
+      "description": "アクティブなセッション",
+      "descriptionAll": "プラットフォーム全体のすべてのアクティブなセッション",
+      "empty": "アクティブなセッションはありません。",
+      "revokeAll": "すべて取り消す",
+      "current": "現在",
+      "columns": {
+        "provider": "プロバイダー",
+        "created": "作成日時",
+        "expires": "有効期限",
+        "lastActive": "最終アクティブ",
+        "token": "トークン"
+      },
+      "errors": {
+        "load": "セッションの読み込みに失敗しました",
+        "revoke": "セッションの取り消しに失敗しました（{status}）",
+        "revokeGeneric": "セッションの取り消しに失敗しました"
+      }
+    }
+  },
+  "registry": {
+    "modules": {
+      "title": "モジュール",
+      "description": "プライベートTerraformモジュールレジストリ",
+      "cancel": "キャンセル",
+      "createModule": "モジュールを作成",
+      "empty": "モジュールがまだありません。作成して始めましょう。",
+      "providerLabel": "プロバイダー: {provider}",
+      "versionCount": "{count, plural, one {# 個のバージョン} other {# 個のバージョン}}",
+      "loadFailed": "モジュールの読み込みに失敗しました",
+      "createFailed": "モジュールの作成に失敗しました",
+      "createFailedStatus": "モジュールの作成に失敗しました（{status}）",
+      "form": {
+        "name": "名前",
+        "provider": "プロバイダー",
+        "slugTitle": "使用できるのは小文字の英字、数字、ハイフンのみです。先頭は小文字の英字である必要があります。",
+        "addressNote": "名前とプロバイダーはモジュールのレジストリアドレスを構成し、作成後は変更できません。",
+        "vcsConnectionOptional": "VCS接続（任意）",
+        "noneUploadManually": "なし — バージョンを手動でアップロード",
+        "repositoryUrl": "リポジトリURL",
+        "branchOptional": "ブランチ（任意）",
+        "branchPlaceholder": "main（空欄でデフォルト）",
+        "tagPattern": "タグパターン",
+        "tagPatternHint": "このパターンに一致するタグのみがバージョンを作成します（例: v1.0.0）",
+        "labelsOptional": "ラベル（任意）",
+        "creating": "作成中...",
+        "create": "作成"
+      }
+    },
+    "providers": {
+      "title": "プロバイダー",
+      "description": "プライベートTerraformプロバイダーレジストリ",
+      "cancel": "キャンセル",
+      "createProvider": "プロバイダーを作成",
+      "empty": "プロバイダーがまだありません。作成して始めましょう。",
+      "loadFailed": "プロバイダーの読み込みに失敗しました",
+      "createFailed": "プロバイダーの作成に失敗しました",
+      "createFailedStatus": "プロバイダーの作成に失敗しました（{status}）",
+      "form": {
+        "name": "名前",
+        "slugTitle": "使用できるのは小文字の英字、数字、ハイフンのみです。先頭は小文字の英字である必要があります。",
+        "creating": "作成中...",
+        "create": "作成"
+      }
+    },
+    "meta": {
+      "title": "メタデータ",
+      "edit": "編集",
+      "cancel": "キャンセル",
+      "save": "保存",
+      "saving": "保存中...",
+      "saveAnyway": "そのまま保存",
+      "revertLabels": "ラベルを元に戻す",
+      "owner": "オーナー",
+      "ownerNone": "なし",
+      "ownerPlaceholder": "user@example.com",
+      "labels": "ラベル"
+    },
+    "moduleDetail": {
+      "notFound": "モジュールが見つかりません",
+      "loadFailed": "モジュールの読み込みに失敗しました",
+      "updateFailed": "モジュールの更新に失敗しました",
+      "labelLockoutDefault": "このラベル変更によりあなたのアクセス権が低下します。",
+      "providerLabel": "プロバイダー: {provider}",
+      "cancel": "キャンセル",
+      "uploadVersion": "バージョンをアップロード",
+      "vcsConnected": "VCS接続済み",
+      "connectVcs": "VCSを接続",
+      "deleteModule": "モジュールを削除",
+      "linkFailed": "ワークスペースのリンクに失敗しました",
+      "linkFailedStatus": "リンクに失敗しました（{status}）",
+      "unlinkConfirm": "このワークスペースをモジュールからリンク解除しますか？影響分析は実行されなくなります。",
+      "unlinkFailed": "ワークスペースのリンク解除に失敗しました",
+      "unlinkFailedStatus": "リンク解除に失敗しました（{status}）",
+      "uploadFailed": "アップロードに失敗しました",
+      "uploadFailedStatus": "アップロードに失敗しました（{status}）",
+      "saveVcsFailed": "VCS設定の保存に失敗しました",
+      "saveVcsFailedStatus": "VCS設定の保存に失敗しました（{status}）",
+      "disableVcsFailed": "VCSの無効化に失敗しました",
+      "disableVcsFailedStatus": "VCSの無効化に失敗しました（{status}）",
+      "deleteFailed": "削除に失敗しました",
+      "deleteFailedStatus": "削除に失敗しました（{status}）",
+      "upload": {
+        "intro": "Terraformモジュールファイルを含むディレクトリを選択してください。tarballにパッケージ化されてアップロードされます。",
+        "version": "バージョン",
+        "moduleDirectory": "モジュールディレクトリ",
+        "selectDirectory": "ディレクトリを選択",
+        "fileCount": "{count, plural, one {# 個のファイル} other {# 個のファイル}}",
+        "filesToInclude": "{count, plural, one {含めるファイル # 個:} other {含めるファイル # 個:}}",
+        "andMore": "...他 {count} 個",
+        "uploading": "アップロード中...",
+        "upload": "アップロード"
+      },
+      "vcs": {
+        "intro": "このモジュールをVCSリポジトリに接続します。タグパターンに一致するsemverタグがプッシュされると、新しいバージョンが自動的に公開されます。ブランチへのコミットだけではバージョンは作成されません。",
+        "connection": "VCS接続",
+        "selectConnection": "接続を選択...",
+        "repositoryUrl": "リポジトリURL",
+        "branchOptional": "ブランチ（任意）",
+        "branchPlaceholder": "main（空欄でデフォルト）",
+        "tagPattern": "タグパターン",
+        "tagPatternHint": "このパターンに一致するタグのみがバージョンを作成します（例: v1.0.0）",
+        "saving": "保存中...",
+        "saveConfiguration": "VCS設定を保存",
+        "disconnect": "VCSを切断"
+      },
+      "vcsStatus": {
+        "connected": "VCS接続済み:",
+        "lastTag": "最終タグ: {tag}",
+        "firstVersionHint": "タグパターンに一致するsemverタグ（例: <code>v1.0.0</code>）をプッシュして最初のバージョンを公開してください。"
+      },
+      "links": {
+        "title": "リンク済みワークスペース",
+        "linkWorkspace": "ワークスペースをリンク",
+        "description": "リンクされたワークスペースは、このモジュールに対してPRが作成されると投機的プランを受け取り、新しいバージョンが公開されると通常の実行を受け取ります。",
+        "searchPlaceholder": "リンクするワークスペースを検索…",
+        "empty": "リンク済みのワークスペースがまだありません。",
+        "unlinkTitle": "ワークスペースのリンクを解除"
+      },
+      "interface": {
+        "title": "入力と出力",
+        "counts": "入力 {inputs} 個、出力 {outputs} 個",
+        "versionLabel": "バージョン:",
+        "noData": "このバージョンにはインターフェースデータがありません。",
+        "inputs": "入力",
+        "outputs": "出力",
+        "name": "名前",
+        "type": "型",
+        "description": "説明",
+        "default": "デフォルト",
+        "required": "必須",
+        "sensitive": "機密",
+        "requiredBadge": "必須",
+        "optionalBadge": "任意",
+        "sensitiveBadge": "機密",
+        "noneDeclared": "このモジュールバージョンには入力も出力も宣言されていません。"
+      },
+      "versions": {
+        "title": "バージョン",
+        "count": "{count, plural, one {# 個のバージョン} other {# 個のバージョン}}",
+        "emptyVcs": "バージョンがまだありません。接続されたリポジトリに「{pattern}」に一致するsemverタグをプッシュしてバージョンを公開してください。",
+        "emptyUpload": "バージョンがまだありません。モジュールをアップロードするか、VCSを接続して始めましょう。",
+        "version": "バージョン",
+        "status": "ステータス",
+        "source": "ソース",
+        "actions": "操作",
+        "manualUpload": "手動アップロード",
+        "delete": "削除"
+      },
+      "deleteDialog": {
+        "title": "削除の確認",
+        "moduleBody": "このモジュールとそのすべてのバージョンを完全に削除します。",
+        "versionBody": "バージョン {version} を完全に削除します。",
+        "cancel": "キャンセル",
+        "confirm": "削除"
+      }
+    },
+    "providerDetail": {
+      "description": "プロバイダーレジストリ",
+      "deleteProvider": "プロバイダーを削除",
+      "publishNote": "プロバイダーのバージョンは<code>terrapod-publish</code> CLIで公開され、バイナリはクライアント側で署名されます。ブラウザからのプロバイダーバイナリのアップロードと署名はサポートされなくなりました。このページはバージョンとプラットフォームについて読み取り専用です。",
+      "empty": "バージョンがまだありません。terrapod-publish CLIで公開して始めましょう。",
+      "loadVersionsFailed": "バージョンの読み込みに失敗しました",
+      "updateFailed": "プロバイダーの更新に失敗しました",
+      "labelLockoutDefault": "このラベル変更によりあなたのアクセス権が低下します。",
+      "deleteFailed": "削除に失敗しました",
+      "deleteFailedStatus": "削除に失敗しました（{status}）",
+      "platformCount": "{count, plural, one {# 個のプラットフォーム} other {# 個のプラットフォーム}}",
+      "delete": "削除",
+      "os": "OS",
+      "arch": "アーキテクチャ",
+      "filename": "ファイル名",
+      "actions": "操作",
+      "deleteDialog": {
+        "title": "削除の確認",
+        "providerBody": "このプロバイダーとそのすべてのバージョンを完全に削除します。",
+        "versionBody": "バージョン {version} とそのプラットフォームを完全に削除します。",
+        "platformBody": "{os}/{arch} プラットフォームを完全に削除します。",
+        "cancel": "キャンセル",
+        "confirm": "削除"
+      }
+    }
+  },
+  "adminUsers": {
+    "title": "ユーザー",
+    "description": "ローカルユーザーアカウントを管理します",
+    "empty": "ユーザーが見つかりません。",
+    "columns": {
+      "email": "メールアドレス",
+      "displayName": "表示名",
+      "status": "ステータス",
+      "lastLogin": "最終ログイン",
+      "created": "作成日時",
+      "actions": "操作"
+    },
+    "form": {
+      "email": "メールアドレス",
+      "displayName": "表示名",
+      "displayNamePlaceholder": "Jane Doe",
+      "passwordOptional": "パスワード（任意）",
+      "passwordPlaceholder": "強力なパスワードを入力してください"
+    },
+    "reset": {
+      "title": "{email} のパスワードをリセット",
+      "newPassword": "新しいパスワード"
+    },
+    "password": {
+      "score": {
+        "veryWeak": "非常に弱い",
+        "weak": "弱い",
+        "fair": "普通",
+        "good": "良い",
+        "strong": "強い"
+      }
+    },
+    "status": {
+      "active": "有効",
+      "inactive": "無効",
+      "never": "なし"
+    },
+    "actions": {
+      "cancel": "キャンセル",
+      "save": "保存",
+      "saving": "保存中...",
+      "createUser": "ユーザーを作成",
+      "creating": "作成中...",
+      "resetPassword": "パスワードをリセット",
+      "edit": "編集",
+      "delete": "削除",
+      "resetPw": "PWリセット",
+      "setPw": "PW設定",
+      "cancelPw": "PWキャンセル"
+    },
+    "confirm": {
+      "activate": "ユーザー「{email}」を有効化しますか？",
+      "deactivate": "ユーザー「{email}」を無効化しますか？",
+      "delete": "ユーザー「{email}」を削除しますか？この操作は元に戻せません。"
+    },
+    "success": {
+      "created": "ユーザー「{email}」を作成しました",
+      "updated": "ユーザー「{email}」を更新しました",
+      "activated": "ユーザー「{email}」を有効化しました",
+      "deactivated": "ユーザー「{email}」を無効化しました",
+      "passwordReset": "「{email}」のパスワードをリセットしました",
+      "deleted": "ユーザー「{email}」を削除しました"
+    },
+    "errors": {
+      "load": "ユーザーの読み込みに失敗しました",
+      "create": "ユーザーの作成に失敗しました",
+      "createStatus": "ユーザーの作成に失敗しました（{status}）",
+      "update": "ユーザーの更新に失敗しました",
+      "resetPassword": "パスワードのリセットに失敗しました",
+      "delete": "ユーザーの削除に失敗しました"
+    }
+  },
+  "adminRoles": {
+    "title": "ロールと割り当て",
+    "description": "RBACロールとユーザーへのロール割り当てを管理します",
+    "builtIn": "組み込み",
+    "emptyRoles": "定義されたロールがありません。",
+    "emptyAssignments": "ロールの割り当てがありません。",
+    "tabs": {
+      "roles": "ロール",
+      "assignments": "割り当て"
+    },
+    "columns": {
+      "provider": "プロバイダー",
+      "email": "メールアドレス",
+      "role": "ロール",
+      "created": "作成日時",
+      "actions": "操作"
+    },
+    "form": {
+      "name": "名前",
+      "namePattern": "使用できるのは英字、数字、ハイフン、アンダースコアのみです。先頭は英字または数字である必要があります。",
+      "workspacePermission": "ワークスペース権限",
+      "poolPermission": "プール権限",
+      "registryPermission": "レジストリ権限",
+      "catalogPermission": "カタログ権限",
+      "descriptionLabel": "説明",
+      "descriptionPlaceholder": "開発者アクセス",
+      "allowLabels": "許可ラベル（key=value、カンマ区切り）",
+      "allowNames": "許可名（カンマ区切り）",
+      "denyLabels": "拒否ラベル（key=value、カンマ区切り）",
+      "denyNames": "拒否名（カンマ区切り）",
+      "allowLabelsShort": "許可ラベル",
+      "allowNamesShort": "許可名",
+      "denyLabelsShort": "拒否ラベル",
+      "denyNamesShort": "拒否名"
+    },
+    "assignForm": {
+      "provider": "プロバイダー",
+      "email": "メールアドレス",
+      "roles": "ロール"
+    },
+    "caps": {
+      "selected": "{count, plural, one {# 個の機能} other {# 個の機能}}を選択中",
+      "count": "{count, plural, one {# 個の機能} other {# 個の機能}}",
+      "custom": "カスタム",
+      "matchesPresets": "プリセットに一致",
+      "advanced": "詳細 — 機能",
+      "otherPreserved": "その他の機能（保存時に維持されます）",
+      "presetHelp": {
+        "before": "上のプリセットを選択すると、その機能が事前にチェックされます。プリセットを超えてボックスをチェックまたはチェック解除すると、ロールは",
+        "after": "としてマークされ、その付与は明示的な機能セットとして送信されます。"
+      },
+      "groups": {
+        "workspace": "ワークスペース",
+        "run": "実行",
+        "state": "状態",
+        "var": "変数",
+        "config": "設定",
+        "drift": "ドリフト",
+        "run-task": "実行タスク",
+        "notification": "通知",
+        "run-trigger": "実行トリガー",
+        "pool": "エージェントプール",
+        "registry": "レジストリ",
+        "catalog": "サービスカタログ"
+      }
+    },
+    "display": {
+      "allow": "許可: {value}",
+      "allowNames": "許可名: {value}",
+      "deny": "拒否: {value}",
+      "denyNames": "拒否名: {value}"
+    },
+    "actions": {
+      "cancel": "キャンセル",
+      "save": "保存",
+      "saving": "保存中...",
+      "edit": "編集",
+      "delete": "削除",
+      "remove": "削除",
+      "createRole": "ロールを作成",
+      "creating": "作成中...",
+      "addAssignment": "割り当てを追加",
+      "setRoles": "ロールを設定"
+    },
+    "confirm": {
+      "deleteRole": "ロール「{name}」を削除しますか？これを参照するすべての割り当てが影響を受けます。",
+      "removeAssignment": "{email} からロール「{roleName}」を削除しますか？"
+    },
+    "success": {
+      "roleCreated": "ロール「{name}」を作成しました",
+      "roleUpdated": "ロール「{name}」を更新しました",
+      "roleDeleted": "ロール「{name}」を削除しました",
+      "rolesAssigned": "{email} にロールを割り当てました",
+      "assignmentRemoved": "割り当てを削除しました"
+    },
+    "errors": {
+      "loadRoles": "ロールの読み込みに失敗しました",
+      "loadAssignments": "割り当ての読み込みに失敗しました",
+      "createRole": "ロールの作成に失敗しました",
+      "createRoleStatus": "ロールの作成に失敗しました（{status}）",
+      "updateRole": "ロールの更新に失敗しました",
+      "deleteRole": "ロールの削除に失敗しました",
+      "setAssignment": "割り当ての設定に失敗しました",
+      "setAssignmentStatus": "割り当ての設定に失敗しました（{status}）",
+      "deleteAssignment": "割り当ての削除に失敗しました"
+    }
+  },
+  "adminVcs": {
+    "title": "VCS接続",
+    "description": "バージョン管理システムの統合を管理します",
+    "empty": "設定されたVCS接続はありません。",
+    "actions": {
+      "new": "新規接続",
+      "cancel": "キャンセル",
+      "edit": "編集",
+      "delete": "削除"
+    },
+    "confirmDelete": "このVCS接続を削除しますか？これを使用しているワークスペースはVCS統合を失います。この操作は元に戻せません。",
+    "form": {
+      "name": "名前",
+      "namePattern": "使用できるのは英字、数字、ハイフン、アンダースコアのみです。先頭は英字または数字である必要があります。",
+      "provider": "プロバイダー",
+      "providerImmutable": "プロバイダーは変更できません — 変更するには削除して再作成してください",
+      "serverUrl": "サーバーURL（任意）",
+      "serverUrlHint": "HTTPまたはHTTPSのURLである必要があります（例: https://github.mycompany.com）",
+      "appId": "App ID",
+      "appIdHint": "GitHub App ID — 数字のみ",
+      "installationId": "Installation ID",
+      "installationIdHint": "GitHub App Installation ID — 数字のみ",
+      "privateKey": "秘密鍵（PEM）",
+      "browse": "参照...",
+      "privateKeyKeep": "現在の鍵を維持する場合は空欄のままにしてください — ローテーションするには新しいPEMを貼り付けてください",
+      "privateKeyPlaceholder": "-----BEGIN RSA PRIVATE KEY-----\n...\n\n.pemファイルをここにドロップするか、「参照」をクリックしてください",
+      "webhookSecret": "Webhookシークレット",
+      "optional": "（任意）",
+      "webhookSecretSet": "設定済み — 維持する場合は空欄のまま、ローテーションするには新しい値を入力してください",
+      "webhookSecretGlobal": "グローバルWebhookシークレットを使用する場合は空欄のままにしてください",
+      "webhookSecretHelp": "このインストールのWebhook用のコネクションごとのHMACシークレットです。未設定の場合はグローバルシークレットが使用されます。",
+      "accessToken": "アクセストークン",
+      "accessTokenKeep": "現在のトークンを維持する場合は空欄のままにしてください",
+      "saving": "保存中...",
+      "creating": "作成中...",
+      "saveChanges": "変更を保存",
+      "createConnection": "接続を作成"
+    },
+    "table": {
+      "name": "名前",
+      "provider": "プロバイダー",
+      "serverUrl": "サーバーURL",
+      "status": "ステータス",
+      "created": "作成日時",
+      "actions": "操作"
+    },
+    "success": {
+      "created": "VCS接続「{name}」を作成しました",
+      "updated": "VCS接続「{name}」を更新しました",
+      "deleted": "VCS接続を削除しました"
+    },
+    "errors": {
+      "load": "VCS接続の読み込みに失敗しました",
+      "save": "接続の保存に失敗しました",
+      "delete": "接続の削除に失敗しました",
+      "createStatus": "接続の作成に失敗しました（{status}）",
+      "updateStatus": "接続の更新に失敗しました（{status}）"
+    }
+  },
+  "adminVariableSets": {
+    "title": "変数セット",
+    "description": "ワークスペースグループ向けの組織スコープの変数セットを管理します",
+    "empty": "設定された変数セットはありません。",
+    "none": "-",
+    "actions": {
+      "new": "新規変数セット",
+      "cancel": "キャンセル"
+    },
+    "form": {
+      "name": "名前",
+      "namePattern": "使用できるのは英字、数字、ハイフン、アンダースコアのみです。先頭は英字または数字である必要があります。",
+      "descriptionLabel": "説明",
+      "descriptionPlaceholder": "すべてのワークスペース向けのAWS認証情報",
+      "global": "グローバル（すべてのワークスペースに適用）",
+      "priority": "優先（ワークスペース変数を上書き）",
+      "creating": "作成中...",
+      "create": "変数セットを作成"
+    },
+    "table": {
+      "name": "名前",
+      "description": "説明",
+      "scope": "スコープ",
+      "variables": "変数",
+      "created": "作成日時"
+    },
+    "scope": {
+      "global": "グローバル",
+      "priority": "優先",
+      "standard": "標準"
+    },
+    "errors": {
+      "load": "変数セットの読み込みに失敗しました",
+      "create": "変数セットの作成に失敗しました",
+      "createStatus": "変数セットの作成に失敗しました（{status}）"
+    },
+    "detail": {
+      "back": "変数セットに戻る",
+      "headerFallback": "変数セット",
+      "notFound": "変数セットが見つかりません",
+      "global": "グローバル",
+      "priority": "優先",
+      "yes": "はい",
+      "no": "いいえ",
+      "edit": "編集",
+      "cancel": "キャンセル",
+      "save": "保存",
+      "saving": "保存中...",
+      "delete": "削除",
+      "deleting": "削除中...",
+      "confirmDelete": "削除の確認",
+      "deleteTitle": "変数セットを削除",
+      "deleteDescription": "この変数セットとそのすべての変数を完全に削除します。",
+      "tabs": {
+        "settings": "設定",
+        "variables": "変数",
+        "workspaces": "ワークスペース"
+      },
+      "addVariable": "変数を追加",
+      "adding": "追加中...",
+      "varKey": "キー",
+      "varValue": "値",
+      "varCategory": "カテゴリ",
+      "categoryTerraform": "Terraform",
+      "categoryEnv": "環境",
+      "sensitive": "機密",
+      "sensAbbr": "機密",
+      "enterNewValue": "新しい値を入力",
+      "empty": "空",
+      "emptyVars": "このセットには変数がありません。",
+      "actions": "操作",
+      "remove": "削除",
+      "add": "追加",
+      "addWorkspace": "ワークスペースを追加",
+      "workspace": "ワークスペース",
+      "selectWorkspace": "ワークスペースを選択...",
+      "globalBanner": "この変数セットはグローバルで、すべてのワークスペースに自動的に適用されます。",
+      "emptyWorkspaces": "この変数セットに割り当てられたワークスペースはありません。",
+      "confirmDeleteVar": "この変数を削除しますか？この操作は元に戻せません。",
+      "confirmRemoveWorkspace": "このワークスペースを変数セットから削除しますか？その変数はこのワークスペースに適用されなくなります。",
+      "success": {
+        "updated": "変数セットを更新しました",
+        "workspaceAdded": "ワークスペースを追加しました",
+        "workspaceRemoved": "ワークスペースを削除しました"
+      },
+      "errors": {
+        "load": "変数セットの読み込みに失敗しました",
+        "update": "変数セットの更新に失敗しました",
+        "delete": "変数セットの削除に失敗しました",
+        "loadVars": "変数の読み込みに失敗しました",
+        "loadWorkspaces": "ワークスペースの読み込みに失敗しました",
+        "addVar": "変数の追加に失敗しました",
+        "addVarStatus": "変数の追加に失敗しました（{status}）",
+        "updateVar": "変数の更新に失敗しました",
+        "deleteVar": "変数の削除に失敗しました",
+        "addWorkspace": "ワークスペースの追加に失敗しました",
+        "removeWorkspace": "ワークスペースの削除に失敗しました"
+      }
+    }
+  },
+  "adminAutodiscovery": {
+    "title": "自動検出",
+    "description": "PRが一致するパスに変更を加えたときに、モノレポ内でワークスペースを自動作成します",
+    "empty": "自動検出ルールがまだありません。作成して、モノレポ内のPRからワークスペースの自動プロビジョニングを始めましょう。",
+    "unsavedRule": "（未保存のルール）",
+    "actions": {
+      "newRule": "新規ルール",
+      "cancel": "キャンセル",
+      "create": "作成",
+      "update": "更新",
+      "preview": "プレビュー",
+      "edit": "編集",
+      "delete": "削除",
+      "close": "閉じる"
+    },
+    "status": {
+      "enabled": "有効",
+      "disabled": "無効"
+    },
+    "form": {
+      "createTitle": "ルールを作成",
+      "editTitle": "ルールを編集",
+      "name": "名前",
+      "vcsConnection": "VCS接続",
+      "selectConnection": "接続を選択",
+      "repoUrl": "リポジトリURL",
+      "branch": "ブランチ（空欄 = デフォルト）",
+      "matchPattern": "一致パターン",
+      "matchPatternHint": "gitignore形式のglobです。<code>**</code>はパスセグメントをまたいで一致します。<code>*.tf*</code>ファイルのみが自動検出をトリガーします。",
+      "ignorePatterns": "無視パターン（1行に1つ）",
+      "nameTemplate": "ワークスペース名テンプレート（任意）",
+      "nameTemplateHint": "<code>/</code>を<code>-</code>に置き換えたディレクトリには<path></path>を、そのままのディレクトリには<root></root>を使用します。空欄 = デフォルト（ダッシュ区切りのパスのみ）。",
+      "templateDefaults": "ワークスペーステンプレートのデフォルト値",
+      "executionMode": "実行モード",
+      "executionModeHint": "自動検出はVCS駆動です。エージェント実行のみサポートされています。",
+      "agentPool": "エージェントプール",
+      "none": "（なし）",
+      "executionBackend": "実行バックエンド",
+      "terraformVersion": "Terraformバージョン",
+      "cpuRequest": "CPUリクエスト",
+      "memoryRequest": "メモリリクエスト",
+      "ownerEmail": "オーナーのメールアドレス",
+      "autoApply": "自動適用",
+      "enabled": "有効",
+      "onDirectoryDelete": "ディレクトリ削除時",
+      "onDeleteFlag": "フラグ（安全 — 削除保留としてマークし、手動操作が必要）",
+      "onDeleteDestroy": "破棄（危険 — インフラを解体してからワークスペースをアーカイブ）",
+      "onDirectoryDeleteHint": "追跡ブランチでディレクトリが削除されたときに、自動検出されたワークスペースがどうなるかを指定します。",
+      "onDeleteDestroyWarning": "追跡ブランチでディレクトリが削除されると、ワークスペースに対して実際にterraform destroyが実行されます。",
+      "labels": "ラベル（作成されるワークスペースに継承）",
+      "varFiles": "変数ファイル（作成されるワークスペースに継承）",
+      "varFilesHint": "plan/applyに渡される相対的な<code>.tfvars</code>パスです。",
+      "addVarFile": "変数ファイルを追加",
+      "executionHooks": "実行フック（各新規ワークスペースに関連付け）",
+      "executionHooksHint": "<page>実行フック</page>管理ページで定義されたフックから選択します — 選択した各フックは、このルールが作成するすべてのワークスペースに関連付けられます。",
+      "noHooks": "実行フックがまだ定義されていません。まず実行フック管理ページで作成してください。",
+      "hookDisabled": "（無効）",
+      "hookNotInLibrary": "（ライブラリにありません — チェックを外して削除）",
+      "runTaskTemplates": "実行タスクテンプレート（各新規ワークスペースに作成）",
+      "notificationTemplates": "通知テンプレート（各新規ワークスペースに作成）",
+      "saving": "保存中...",
+      "previewTitle": "リポジトリを走査し、このルールが作成するであろうワークスペースをプレビューします — 永続化なし"
+    },
+    "table": {
+      "name": "名前",
+      "repo": "リポジトリ",
+      "pattern": "パターン",
+      "enabled": "有効",
+      "created": "作成日時",
+      "previewTitle": "リポジトリを走査し、このルールが作成するワークスペースをプレビューします"
+    },
+    "deleteModal": {
+      "title": "ルールを削除しますか？",
+      "body": "このルールで自動作成されたワークスペースは引き続き機能します。今後、このルールの下で新しいパスに変更を加えるPRは、追加のワークスペースを自動作成しなくなります。"
+    },
+    "preview": {
+      "title": "プレビュー: {ruleName}",
+      "walkedFiles": "<refspan>{ref}</refspan> 上で <files>{count}</files> 個のファイルを走査しました",
+      "walking": "リポジトリを走査中…",
+      "noMatches": "このリポジトリ内にルールのパターンに一致するディレクトリはありません。作成対象はありません。",
+      "colWorkspace": "ワークスペース",
+      "colDirectory": "ディレクトリ",
+      "colAction": "アクション",
+      "repoRoot": "（リポジトリルート）",
+      "actionCreate": "作成",
+      "skipDiscovered": "スキップ（検出済み）",
+      "skipDiscoveredTitle": "このルールで既に作成済み",
+      "skipCollision": "スキップ（名前の衝突）",
+      "skipCollisionTitle": "この名前のワークスペースが別の理由で既に存在します",
+      "willCreate": "{count, plural, one {# 個のワークスペースが作成されます。} other {# 個のワークスペースが作成されます。}}既存のワークスペース（衝突）はそのまま維持されます。",
+      "provision": "{count, plural, one {# 個のワークスペースをプロビジョニング} other {# 個のワークスペースをプロビジョニング}}",
+      "provisioning": "プロビジョニング中…",
+      "saveToProvision": "これらのワークスペースをプロビジョニングするにはルールを保存してください。"
+    },
+    "success": {
+      "created": "{name} を作成しました",
+      "updated": "{name} を更新しました",
+      "deleted": "ルールを削除しました",
+      "provisioned": "{count, plural, one {「{ruleName}」から # 個のワークスペースを作成しました} other {「{ruleName}」から # 個のワークスペースを作成しました}}"
+    },
+    "errors": {
+      "loadRules": "自動検出ルールの読み込みに失敗しました",
+      "load": "読み込みに失敗しました",
+      "createFailed": "作成に失敗しました: {status} {detail}",
+      "updateFailed": "更新に失敗しました: {status} {detail}",
+      "save": "保存に失敗しました",
+      "deleteRule": "ルールの削除に失敗しました",
+      "delete": "削除に失敗しました",
+      "previewFailed": "プレビューに失敗しました（{status}）",
+      "preview": "プレビューに失敗しました",
+      "previewPrereq": "プレビューの前にVCS接続、リポジトリURL、パターンを設定してください",
+      "scanFailed": "スキャンに失敗しました（{status}）",
+      "scan": "スキャンに失敗しました"
+    }
+  },
+  "adminBulkUpdate": {
+    "title": "一括更新",
+    "description": "フィルターでワークスペースを選択し、それらすべてに設定変更を適用します",
+    "none": "（なし）",
+    "anyOption": "（すべて）",
+    "unchanged": "（変更なし）",
+    "unchangedOption": "（変更なし）",
+    "filter": {
+      "heading": "1. ワークスペースを選択",
+      "matchAll": "<strong>すべて</strong>のワークスペースに一致（下記のフィルターを無視）",
+      "namePrefix": "名前のプレフィックス",
+      "executionBackend": "実行バックエンド",
+      "ownerEmail": "オーナーのメールアドレス",
+      "agentPool": "エージェントプール",
+      "vcsConnection": "VCS接続",
+      "labels": "ラベル",
+      "search": "検索",
+      "searching": "検索中..."
+    },
+    "results": {
+      "matched": "<strong>{count}</strong> {count, plural, one {個のワークスペース} other {個のワークスペース}}に一致しました。",
+      "noMatch": "このフィルターに一致するワークスペースはありません。",
+      "colName": "名前",
+      "colMode": "モード",
+      "colBackend": "バックエンド",
+      "colTfVersion": "TFバージョン",
+      "colLabels": "ラベル"
+    },
+    "update": {
+      "heading": "2. 変更を適用",
+      "hint": "以下で設定したフィールドのみが変更されます。上記のフィルターで、どのワークスペースが変更を受けるかを選択します。",
+      "terraformVersion": "Terraformバージョン",
+      "executionBackend": "実行バックエンド",
+      "executionMode": "実行モード",
+      "autoApply": "自動適用",
+      "agentPool": "エージェントプール",
+      "cpuRequest": "CPUリクエスト",
+      "memoryRequest": "メモリリクエスト",
+      "setLabels": "ラベルを設定（一致したすべてのワークスペースのラベルマップを置き換えます）",
+      "setVarFiles": "変数ファイルを設定",
+      "addVarFile": "変数ファイルを追加",
+      "setRunTasks": "実行タスクを設定（一致したすべてのワークスペースで名前によりupsert）",
+      "setNotifications": "通知設定を設定（名前によりupsert）",
+      "dryRun": "ドライラン（プレビューのみ — 変更は書き込まれません）",
+      "confirmWarning": "これは一致したすべてのワークスペースに変更を書き込みます。",
+      "confirmApply": "適用を確認",
+      "applying": "適用中...",
+      "cancel": "キャンセル",
+      "working": "処理中...",
+      "previewDryRun": "プレビュー（ドライラン）",
+      "applyChanges": "変更を適用"
+    },
+    "diff": {
+      "colWorkspace": "ワークスペース",
+      "colChanges": "変更"
+    },
+    "dryResult": {
+      "heading": "ドライランの結果",
+      "summary": "<strong>{matched}</strong> 件に一致、<strong>{wouldChange}</strong> 件が変更され、{unchanged} 件は変更なしとなります。何も書き込まれませんでした。",
+      "wouldChange": "変更される",
+      "noChange": "この更新で変更されるワークスペースはありません。"
+    },
+    "applyResult": {
+      "heading": "適用の結果",
+      "summary": "<strong>{matched}</strong> 件に一致、<appliedstrong>{applied}</appliedstrong> 件を適用、{unchanged} 件は変更なし、{errors, plural, one {# 件のエラー} other {# 件のエラー}}。",
+      "applied": "適用済み",
+      "unnamedWorkspace": "（ワークスペース）",
+      "noChange": "変更されたワークスペースはありません。"
+    },
+    "errors": {
+      "searchFailed": "検索に失敗しました（{status}）",
+      "search": "検索に失敗しました",
+      "bulkUpdateFailed": "一括更新に失敗しました（{status}）",
+      "bulkUpdate": "一括更新に失敗しました"
+    }
+  },
+  "adminExecutionHooks": {
+    "title": "実行フック",
+    "description": "ランナーJob内のpre/post-plan/applyの各ポイントで実行されるカスタムシェルステップで、ワークスペースに関連付けられます",
+    "empty": "設定された実行フックはありません。",
+    "actions": {
+      "cancel": "キャンセル",
+      "new": "新規実行フック",
+      "creating": "作成中...",
+      "create": "実行フックを作成"
+    },
+    "badges": {
+      "disabled": "無効",
+      "enabled": "有効"
+    },
+    "columns": {
+      "name": "名前",
+      "hookPoint": "フックポイント",
+      "enabled": "有効",
+      "priority": "優先度",
+      "workspaces": "ワークスペース"
+    },
+    "form": {
+      "name": "名前",
+      "namePatternTitle": "使用できるのは英字、数字、ハイフン、アンダースコアのみです。先頭は英字または数字である必要があります。",
+      "description": "説明",
+      "descriptionPlaceholder": "init前に内部ホストのエントリを追加",
+      "hookPoint": "フックポイント",
+      "priority": "優先度",
+      "priorityTitle": "複数のフックが同じポイントを共有する場合、値が小さいものが先に実行されます（同点の場合は名前で決定）。",
+      "scriptLabel": "スクリプト（<code>/bin/sh -c</code>）",
+      "scriptHelp": "ランナーのクラウドアイデンティティで実行されます。ゼロ以外の終了コードは実行を失敗させます。シークレットはここにインラインで書くのではなく、ワークスペース変数から取得すべきです。"
+    },
+    "errors": {
+      "load": "実行フックの読み込みに失敗しました",
+      "createStatus": "実行フックの作成に失敗しました（{status}）",
+      "create": "実行フックの作成に失敗しました"
+    }
+  },
+  "adminPolicySets": {
+    "title": "ポリシーセット",
+    "description": "ラベルでワークスペースにスコープされる、OPAによるPolicy-as-Codeの適用",
+    "empty": "設定されたポリシーセットはありません。",
+    "actions": {
+      "cancel": "キャンセル",
+      "new": "新規ポリシーセット",
+      "creating": "作成中...",
+      "create": "ポリシーセットを作成"
+    },
+    "badges": {
+      "disabled": "無効",
+      "mandatory": "必須",
+      "advisory": "勧告",
+      "global": "グローバル",
+      "labelScoped": "ラベルスコープ"
+    },
+    "columns": {
+      "name": "名前",
+      "description": "説明",
+      "enforcement": "適用レベル",
+      "scope": "スコープ",
+      "policies": "ポリシー"
+    },
+    "form": {
+      "name": "名前",
+      "namePatternTitle": "使用できるのは英字、数字、ハイフン、アンダースコアのみです。先頭は英字または数字である必要があります。",
+      "description": "説明",
+      "descriptionPlaceholder": "本番ワークスペース向けの必須ガードレール",
+      "enforcement": "適用レベル",
+      "enforcementAdvisory": "勧告（警告のみ、ブロックしない）",
+      "enforcementMandatory": "必須（失敗時に適用をブロック）",
+      "globalScope": "グローバル（すべてのワークスペースに適用）",
+      "sourceInline": "インライン（UIでポリシーを管理）",
+      "sourceVcs": "VCSリポジトリから",
+      "vcsConnection": "VCS接続",
+      "selectConnection": "接続を選択...",
+      "repoUrl": "リポジトリURL",
+      "branch": "ブランチ",
+      "branchPlaceholder": "main（デフォルト）",
+      "policyPath": "ポリシーパス",
+      "policyPathPlaceholder": "policies/（.regoファイルを含むディレクトリ）",
+      "helpVcs": "ポリシーはリポジトリから自動的に同期されます。",
+      "helpInline": "セットの作成後にポリシーの追加とラベルスコープの調整を行います。"
+    },
+    "errors": {
+      "load": "ポリシーセットの読み込みに失敗しました",
+      "createStatus": "ポリシーセットの作成に失敗しました（{status}）",
+      "create": "ポリシーセットの作成に失敗しました"
+    }
+  },
+  "adminCatalog": {
+    "title": "カタログ管理",
+    "description": "サービスカタログ項目を管理します",
+    "notEnabled": "サービスカタログは有効になっていません。",
+    "empty": "カタログ項目がまだありません。",
+    "actions": {
+      "new": "新規カタログ項目",
+      "cancel": "キャンセル",
+      "create": "カタログ項目を作成",
+      "creating": "作成中…",
+      "saveChanges": "変更を保存",
+      "saving": "保存中…",
+      "edit": "編集",
+      "delete": "削除"
+    },
+    "form": {
+      "name": "名前",
+      "nameTitle": "使用できるのは英字、数字、ハイフン、アンダースコアのみです。先頭は英字または数字である必要があります。",
+      "module": "モジュール",
+      "moduleSelect": "モジュールを選択…",
+      "moduleImmutable": "モジュールは作成後変更できません",
+      "displayName": "表示名",
+      "displayNamePlaceholder": "標準S3バケット",
+      "versionPin": "デフォルトのバージョン固定",
+      "versionPinPlaceholder": "例: 1.2.0（空欄 = 最新）",
+      "descriptionLabel": "説明",
+      "descriptionPlaceholder": "このカタログ項目がプロビジョニングする内容…",
+      "enabled": "有効（参照用カタログに表示）",
+      "providerTemplates": "プロバイダーテンプレート",
+      "noProviderTemplates": "定義されたプロバイダーテンプレートはありません。",
+      "restrictPools": "特定のエージェントプールに制限",
+      "noAgentPools": "利用可能なエージェントプールはありません。",
+      "anyPool": "任意のエージェントプールを使用できます。",
+      "labels": "ラベル",
+      "variableOptions": "変数オプション（詳細設定、JSON）",
+      "variableOptionsHint": "入力ごとのオーバーライド（options、hidden、default）です。使用しない場合は<code>[]</code>のままにしてください。"
+    },
+    "table": {
+      "name": "名前",
+      "module": "モジュール",
+      "enabled": "有効",
+      "actions": "操作"
+    },
+    "badge": {
+      "enabled": "有効",
+      "disabled": "無効"
+    },
+    "confirm": {
+      "delete": "このカタログ項目を削除しますか？既存のプロビジョニング済みインスタンスには影響しません。"
+    },
+    "success": {
+      "created": "カタログ項目「{name}」を作成しました",
+      "updated": "カタログ項目「{name}」を更新しました",
+      "deleted": "カタログ項目を削除しました"
+    },
+    "errors": {
+      "load": "カタログ項目の読み込みに失敗しました",
+      "save": "カタログ項目の保存に失敗しました",
+      "createStatus": "カタログ項目の作成に失敗しました（{status}）",
+      "updateStatus": "カタログ項目の更新に失敗しました（{status}）",
+      "delete": "カタログ項目の削除に失敗しました",
+      "deleteConflict": "削除できません: このカタログ項目にはプロビジョニング済みインスタンスがあります。",
+      "varOptsInvalidJson": "変数オプションは有効なJSON（配列）である必要があります。",
+      "varOptsNotArray": "変数オプションはJSON配列である必要があります。"
+    }
+  },
+  "adminProviderTemplates": {
+    "title": "プロバイダーテンプレート",
+    "description": "カタログ項目向けの再利用可能なプロバイダー設定ブロック",
+    "notEnabled": "サービスカタログは有効になっていません。",
+    "empty": "プロバイダーテンプレートがまだありません。",
+    "actions": {
+      "new": "新規テンプレート",
+      "cancel": "キャンセル",
+      "create": "テンプレートを作成",
+      "creating": "作成中…",
+      "saveChanges": "変更を保存",
+      "saving": "保存中…",
+      "edit": "編集",
+      "delete": "削除"
+    },
+    "form": {
+      "name": "名前",
+      "providerType": "プロバイダー種別",
+      "body": "本体（HCL）",
+      "parameters": "パラメーター（詳細設定、JSON）",
+      "parametersHint": "各パラメーターはプロビジョニングフォームのフィールドになります。使用しない場合は<code>[]</code>のままにしてください。",
+      "labels": "ラベル"
+    },
+    "table": {
+      "name": "名前",
+      "providerType": "プロバイダー種別",
+      "parameters": "パラメーター",
+      "actions": "操作"
+    },
+    "confirm": {
+      "delete": "このプロバイダーテンプレートを削除しますか？これを参照するカタログ項目はプロビジョニングに失敗します。この操作は元に戻せません。"
+    },
+    "success": {
+      "created": "プロバイダーテンプレート「{name}」を作成しました",
+      "updated": "プロバイダーテンプレート「{name}」を更新しました",
+      "deleted": "プロバイダーテンプレートを削除しました"
+    },
+    "errors": {
+      "load": "プロバイダーテンプレートの読み込みに失敗しました",
+      "save": "プロバイダーテンプレートの保存に失敗しました",
+      "createStatus": "テンプレートの作成に失敗しました（{status}）",
+      "updateStatus": "テンプレートの更新に失敗しました（{status}）",
+      "delete": "プロバイダーテンプレートの削除に失敗しました",
+      "deleteConflict": "削除できません: このテンプレートはカタログ項目から参照されています。",
+      "paramsInvalidJson": "パラメーターは有効なJSON（配列）である必要があります。",
+      "paramsNotArray": "パラメーターはJSON配列である必要があります。"
+    }
+  },
+  "adminAgentPools": {
+    "title": "エージェントプール",
+    "description": "ランナーのエージェントプールとそのリスナーを管理します",
+    "empty": "設定されたエージェントプールはありません。",
+    "actions": {
+      "newPool": "新規プール",
+      "createPool": "プールを作成",
+      "creating": "作成中...",
+      "cancel": "キャンセル",
+      "edit": "編集",
+      "save": "保存",
+      "saving": "保存中...",
+      "delete": "削除",
+      "deleting": "削除中...",
+      "confirmDelete": "削除の確認"
+    },
+    "form": {
+      "name": "名前",
+      "namePattern": "使用できるのは英字、数字、ハイフン、アンダースコアのみです。先頭は英字または数字である必要があります。",
+      "description": "説明",
+      "descriptionPlaceholder": "本番AWSランナー",
+      "labels": "ラベル"
+    },
+    "columns": {
+      "name": "名前",
+      "description": "説明",
+      "status": "ステータス",
+      "created": "作成日時"
+    },
+    "badges": {
+      "default": "デフォルト",
+      "degradedTooltip": "リスナーはハートビートを送信していますが、証明書の有効期限が切れています — 実行の起動に失敗します。",
+      "status": {
+        "online": "オンライン",
+        "offline": "オフライン",
+        "degraded": "劣化"
+      }
+    },
+    "detail": {
+      "back": "エージェントプールに戻る",
+      "defaultDescription": "エージェントプール"
+    },
+    "tabs": {
+      "settings": "設定",
+      "tokens": "トークン",
+      "listeners": "リスナー"
+    },
+    "settings": {
+      "title": "プール設定",
+      "fields": {
+        "name": "名前",
+        "description": "説明",
+        "created": "作成日時",
+        "owner": "オーナー",
+        "yourPermission": "あなたの権限",
+        "labels": "ラベル"
+      },
+      "permissions": {
+        "read": "読み取り",
+        "write": "書き込み",
+        "admin": "管理"
+      }
+    },
+    "danger": {
+      "title": "プールを削除",
+      "description": "このエージェントプールと関連するすべてのトークンを完全に削除します。"
+    },
+    "tokens": {
+      "create": "トークンを作成",
+      "empty": "このプールのトークンはありません。",
+      "revoke": "取り消す",
+      "created": {
+        "title": "トークンが正常に作成されました",
+        "copyNow": "このトークンを今すぐコピーしてください — 二度と表示されません。",
+        "copy": "コピー"
+      },
+      "form": {
+        "description": "説明",
+        "descriptionPlaceholder": "本番リスナートークン",
+        "maxUses": "最大使用回数",
+        "maxUsesHint": "デフォルトは2 — リスナーレプリカ間での1回のブートストラップ競合のリトライを許容します。",
+        "expiresAt": "有効期限",
+        "expiresAtHint": "デフォルトは現在から1時間後。"
+      },
+      "columns": {
+        "description": "説明",
+        "uses": "使用回数",
+        "expires": "有効期限",
+        "status": "ステータス",
+        "createdBy": "作成者",
+        "actions": "操作"
+      },
+      "badges": {
+        "revoked": "取り消し済み",
+        "active": "有効"
+      }
+    },
+    "listeners": {
+      "empty": "このプールに登録されたリスナーはありません。",
+      "columns": {
+        "name": "名前",
+        "status": "ステータス",
+        "replicas": "レプリカ",
+        "certExpires": "証明書有効期限",
+        "actions": "操作"
+      },
+      "status": {
+        "online": "オンライン",
+        "offline": "オフライン",
+        "degraded": "劣化",
+        "cert-expired": "証明書期限切れ"
+      },
+      "tooltips": {
+        "certExpired": "リスナーはハートビートを送信していますが、証明書の有効期限が切れています — 証明書認証を伴うすべての呼び出し（実行のクレーム、更新、runner-token）が失敗します。最も可能性の高い原因: APIが最新の証明書を登録しなかったか、更新前に証明書のTTLが経過したことです。",
+        "degraded": "リスナーはハートビートを送信していますが、証明書の有効期限が切れています — 実行の起動に失敗します。"
+      }
+    },
+    "confirm": {
+      "revokeToken": "この参加トークンを取り消しますか？これを使用しているリスナーは参加できなくなり、この操作は元に戻せません。",
+      "deleteListener": "このリスナーを削除しますか？Podがまだ実行中の場合、次のハートビートで再登録されます。"
+    },
+    "success": {
+      "poolUpdated": "プールを更新しました",
+      "tokenRevoked": "トークンを取り消しました",
+      "listenerDeleted": "リスナーを削除しました"
+    },
+    "errors": {
+      "loadPools": "エージェントプールの読み込みに失敗しました",
+      "loadPool": "プールの読み込みに失敗しました",
+      "loadTokens": "トークンの読み込みに失敗しました",
+      "loadListeners": "リスナーの読み込みに失敗しました",
+      "createPool": "プールの作成に失敗しました",
+      "createStatus": "プールの作成に失敗しました（{status}）",
+      "updatePool": "プールの更新に失敗しました",
+      "deletePool": "プールの削除に失敗しました",
+      "poolNotFound": "プールが見つかりません",
+      "createToken": "トークンの作成に失敗しました",
+      "createTokenStatus": "トークンの作成に失敗しました（{status}）",
+      "revokeToken": "トークンの取り消しに失敗しました",
+      "deleteListener": "リスナーの削除に失敗しました"
+    }
+  },
+  "adminAuditLog": {
+    "title": "監査ログ",
+    "description": "すべてのAPIリクエストの不変ログ",
+    "empty": "監査ログのエントリが見つかりません。",
+    "errors": {
+      "load": "監査ログの読み込みに失敗しました"
+    },
+    "filters": {
+      "actorEmail": "実行者のメールアドレス",
+      "actorPlaceholder": "user@example.com",
+      "resourceType": "リソース種別",
+      "resourceTypePlaceholder": "workspaces",
+      "method": "メソッド",
+      "methodAll": "すべて",
+      "since": "開始日時",
+      "until": "終了日時",
+      "clear": "クリア",
+      "apply": "フィルターを適用"
+    },
+    "columns": {
+      "timestamp": "タイムスタンプ",
+      "actor": "実行者",
+      "action": "アクション",
+      "resourceType": "リソース種別",
+      "resourceId": "リソースID",
+      "status": "ステータス",
+      "duration": "所要時間"
+    },
+    "pagination": {
+      "summary": "{total} ページ中 {current} ページ（{count, plural, one {# 件のエントリ} other {# 件のエントリ}}）",
+      "previous": "前へ",
+      "next": "次へ"
+    }
+  },
+  "adminBinaryCache": {
+    "title": "キャッシュ",
+    "description": "CLIバイナリとプロバイダーのキャッシュ管理",
+    "errors": {
+      "loadBinary": "バイナリキャッシュの読み込みに失敗しました",
+      "loadCache": "キャッシュの読み込みに失敗しました"
+    },
+    "sections": {
+      "cliBinaries": "CLIバイナリ",
+      "providerBinaries": "プロバイダーバイナリ"
+    },
+    "empty": {
+      "binaries": "キャッシュされたCLIバイナリがまだありません。",
+      "providers": "キャッシュされたプロバイダーバイナリがまだありません。"
+    },
+    "columns": {
+      "tool": "ツール",
+      "version": "バージョン",
+      "os": "OS",
+      "arch": "アーキテクチャ",
+      "cachedAt": "キャッシュ日時",
+      "provider": "プロバイダー",
+      "hostname": "ホスト名",
+      "actions": "操作"
+    },
+    "warm": {
+      "heading": "キャッシュのウォームアップ",
+      "hide": "非表示",
+      "prePopulate": "事前投入…",
+      "help": "バイナリとプロバイダープラットフォームを事前にキャッシュへ取り込みます（1行に1つ）。末尾の<code>os/arch</code>トークンは任意です — 省略すると設定済みのデフォルトプラットフォームが使用されます。",
+      "binariesLabel": "バイナリ",
+      "providersLabel": "プロバイダー",
+      "warm": "ウォームアップ",
+      "warming": "ウォームアップ中…",
+      "confirm": "選択したキャッシュエントリを今すぐウォームアップしますか？",
+      "errorEmpty": "ウォームアップするバイナリまたはプロバイダーの行を少なくとも1つ追加してください。",
+      "errorFailedStatus": "ウォームアップに失敗しました（{status}）",
+      "errorFailed": "キャッシュのウォームアップに失敗しました",
+      "success": "{total} 件中 {succeeded} 件をウォームアップしました（{failed} 件失敗）"
+    },
+    "purge": {
+      "button": "パージ",
+      "confirmBinary": "{tool} {version} をキャッシュからパージしますか？次回のリクエスト時に上流から再取得されます。",
+      "confirmProvider": "{provider} {version} をプロバイダーキャッシュからパージしますか？次回のリクエスト時に上流から再取得されます。",
+      "successBinary": "{tool} {version} の {count} 件のエントリをパージしました",
+      "successProvider": "{provider} {version} の {count} 件のエントリをパージしました",
+      "errorStatus": "パージに失敗しました（{status}）",
+      "error": "パージに失敗しました",
+      "errorProvider": "プロバイダーのパージに失敗しました",
+      "errorProviders": "プロバイダーのパージに失敗しました"
+    },
+    "batchPurge": {
+      "purging": "パージ中...",
+      "purgeSelected": "選択項目をパージ（{count}）",
+      "confirmBinary": "選択したすべてのバイナリキャッシュエントリをパージしますか？次回のリクエスト時に上流から再取得されます。",
+      "confirmProvider": "選択したすべてのプロバイダーキャッシュエントリをパージしますか？次回のリクエスト時に上流から再取得されます。",
+      "errorBinaryItem": "{tool} {version} のパージに失敗しました",
+      "errorProviderItem": "{provider} {version} のパージに失敗しました",
+      "successBinary": "{count} 件のバイナリキャッシュエントリをパージしました",
+      "successProvider": "{count} 件のプロバイダーキャッシュエントリをパージしました"
+    }
+  },
+  "catalog": {
+    "title": "サービスカタログ",
+    "description": "厳選されたモジュールからセルフサービスでインフラをプロビジョニングします",
+    "notEnabled": "サービスカタログは有効になっていません。",
+    "empty": "利用可能なカタログ項目はありません。",
+    "card": {
+      "pinned": "固定 {version}",
+      "latest": "最新"
+    },
+    "errors": {
+      "loadItems": "カタログ項目の読み込みに失敗しました"
+    }
+  },
+  "catalogDetail": {
+    "backLink": "← カタログ",
+    "backToCatalog": "カタログに戻る",
+    "fallbackTitle": "カタログ項目",
+    "notFound": "カタログ項目が見つからないか、サービスカタログが有効になっていません。",
+    "common": {
+      "cancel": "キャンセル"
+    },
+    "info": {
+      "module": "モジュール:",
+      "resolvedVersion": "解決されたバージョン:",
+      "latest": "最新",
+      "disabled": "無効"
+    },
+    "pending": {
+      "banner": "<strong>{name}</strong> の実行はプラン完了し、レビュー待ちです。確認して適用するか、破棄してください。",
+      "working": "処理中…",
+      "confirmApply": "確認して適用",
+      "discard": "破棄"
+    },
+    "field": {
+      "select": "選択…"
+    },
+    "provision": {
+      "title": "プロビジョニング",
+      "workspaceName": "ワークスペース名",
+      "workspaceNameTitle": "使用できるのは英字、数字、ハイフン、アンダースコアのみです。先頭は英字または数字である必要があります。",
+      "workspaceNamePlaceholder": "my-instance",
+      "agentPool": "エージェントプール",
+      "selectPool": "プールを選択…",
+      "noPoolsAvailable": "利用可能なエージェントプールがありません。プロビジョニングにはエージェントプールへの書き込みアクセスが必要です — 管理者に付与を依頼してください。",
+      "noPoolsAllowed": "アクセス可能なエージェントプールのうち、このカタログ項目で許可されているものはありません。管理者に項目の許可プールを拡大してもらうか、いずれかへのアクセス権を付与してもらってください。",
+      "version": "バージョン",
+      "latestFloat": "最新（フロート）",
+      "defaultPinOption": "{version}（デフォルト固定）",
+      "labelsOptional": "ラベル（任意）",
+      "autoApplyHint": "自動適用は手動のレビューステップなしに変更を適用します。",
+      "provisioning": "プロビジョニング中…",
+      "submit": "プロビジョニング"
+    },
+    "instances": {
+      "title": "インスタンス",
+      "empty": "この項目からプロビジョニングされたインスタンスはまだありません。",
+      "colName": "名前",
+      "colVersion": "バージョン",
+      "colPool": "プール",
+      "colActions": "操作",
+      "reconfigure": "再構成",
+      "destroy": "破棄",
+      "orphan": "孤立化…",
+      "orphanTitle": "インフラを破棄せずにカタログレコードを削除します（非推奨）"
+    },
+    "reconfigure": {
+      "title": "{name} を再構成",
+      "description": "入力やバージョンを更新してから実行をキューに追加します。",
+      "currentOption": "{version}（現在）",
+      "queuing": "キューに追加中…",
+      "queueRun": "実行をキューに追加"
+    },
+    "destroy": {
+      "title": "{name} を破棄",
+      "heading": "{name} を破棄しますか？",
+      "description": "これはこのインスタンスのインフラを解体する破棄実行をキューに追加します。適用が成功すると、ワークスペースはアーカイブされます。この操作は元に戻せません。",
+      "autoApplyHint": "自動適用はレビューなしに直ちに解体します。"
+    },
+    "orphan": {
+      "title": "{name} を孤立化",
+      "heading": "{name} を孤立化しますか？",
+      "description": "これはカタログインスタンスレコードを削除しますが、そのインフラを破棄<warn>しません</warn> — プロビジョニングされたリソースは<warn>追跡されず、管理されない</warn>まま稼働し続けます。これは非推奨です。インフラを回収するには、キャンセルして代わりに<emph>破棄</emph>を使用してください。",
+      "confirmPrompt": "確認のためインスタンス名 <mono>{name}</mono> を入力してください:",
+      "orphaning": "孤立化中…",
+      "submit": "孤立化してインフラを放棄"
+    },
+    "actions": {
+      "confirmed": "実行を確認しました — 適用中です。",
+      "discarded": "実行を破棄しました。",
+      "provisioned": "{name} をプロビジョニングしました — プランのレビュー準備ができました。",
+      "reconfigureQueued": "再構成をキューに追加しました — 実行が作成されました。",
+      "reconfigureQueuedStatus": "再構成をキューに追加しました — 実行は {status} です。",
+      "destroyQueued": "破棄をキューに追加しました — 実行が作成されました。",
+      "destroyQueuedStatus": "破棄をキューに追加しました — 実行は {status} です。",
+      "orphaned": "{name} を孤立化しました — カタログレコードは削除され、そのインフラは追跡されず管理されないまま稼働し続けます。"
+    },
+    "errors": {
+      "loadItem": "カタログ項目の読み込みに失敗しました",
+      "confirm": "確認に失敗しました",
+      "confirmStatus": "確認に失敗しました（{status}）",
+      "discard": "破棄に失敗しました",
+      "discardStatus": "破棄に失敗しました（{status}）",
+      "provision": "プロビジョニングに失敗しました",
+      "provisionStatus": "プロビジョニングに失敗しました（{status}）",
+      "reconfigure": "再構成に失敗しました",
+      "reconfigureStatus": "再構成に失敗しました（{status}）",
+      "destroy": "破棄に失敗しました",
+      "destroyStatus": "破棄に失敗しました（{status}）",
+      "orphan": "孤立化に失敗しました",
+      "orphanStatus": "孤立化に失敗しました（{status}）"
+    }
+  },
+  "common": {
+    "connection": {
+      "reconnecting": "再接続中…"
+    },
+    "sessionExpiry": {
+      "banner": "セッションは {minutes, plural, one {# 分} other {# 分}}で期限切れになります — <link>再認証</link>"
+    },
+    "tokenExpiry": {
+      "withinDays": "{count, plural, one {# 個のサービストークン} other {# 個のサービストークン}}が {days, plural, one {# 日} other {# 日}}以内に期限切れになります — <link>確認</link>",
+      "soon": "{count, plural, one {# 個のサービストークン} other {# 個のサービストークン}}がまもなく期限切れになります — <link>確認</link>",
+      "dismissAria": "トークン期限切れ警告を閉じる"
+    },
+    "resourceUsage": {
+      "title": "リソース使用状況",
+      "oomKilled": "OOMキル",
+      "killedLikelyOom": "強制終了（OOMの可能性）",
+      "memory": "メモリ",
+      "requested": "リクエスト {value}",
+      "limit": "上限 {value}"
+    },
+    "labelsEditor": {
+      "none": "なし",
+      "removeAria": "{key} を削除",
+      "keyPlaceholder": "キー",
+      "valuePlaceholder": "値",
+      "add": "追加"
+    },
+    "sensitiveInput": {
+      "hide": "非表示",
+      "show": "表示",
+      "hideAria": "値を非表示",
+      "showAria": "値を表示"
+    },
+    "workspacePicker": {
+      "searchPlaceholder": "ワークスペースを検索…",
+      "loading": "読み込み中…",
+      "empty": "ワークスペースが見つかりません",
+      "adding": "追加中…"
+    },
+    "templateEditors": {
+      "remove": "削除",
+      "add": "追加",
+      "valuePlaceholder": "値",
+      "name": "名前",
+      "url": "URL",
+      "hmacKey": "HMACキー（任意）",
+      "hmacKeyPlaceholder": "共有シークレット",
+      "stage": "ステージ",
+      "enforcement": "適用レベル",
+      "enabled": "有効",
+      "runTaskNamePlaceholder": "security-scan",
+      "runTaskUrlPlaceholder": "https://hooks.example.com/task",
+      "addRunTask": "実行タスクを追加",
+      "destinationType": "宛先種別",
+      "token": "トークン（任意）",
+      "tokenPlaceholder": "HMAC / 認証トークン",
+      "notificationNamePlaceholder": "slack-alerts",
+      "notificationUrlPlaceholder": "https://hooks.slack.com/services/...",
+      "emailAddresses": "メールアドレス",
+      "emailPlaceholder": "ops@example.com",
+      "addEmail": "メールを追加",
+      "triggers": "トリガー",
+      "addNotification": "通知を追加"
+    }
+  },
+  "planSummary": {
+    "aiGenerated": "AI生成",
+    "heading": {
+      "planSummary": "プランサマリー",
+      "failureAnalysis": "障害分析"
+    },
+    "errors": {
+      "status": "HTTP {status}"
+    },
+    "regenerate": {
+      "label": "再生成",
+      "queueing": "キューに追加中…",
+      "tooltip": "同じプラン入力に対してAIサマリーを再実行します",
+      "ariaLabel": "AIサマリーを再生成",
+      "confirm": "AI分析を再生成しますか？モデルが再度実行されます。",
+      "error": "再生成できませんでした: <mono>{detail}</mono>"
+    },
+    "pending": {
+      "summarisingPlan": "プランを要約中…",
+      "analysingFailure": "障害を分析中…"
+    },
+    "skipped": {
+      "fallback": "この実行ではサマリーがスキップされました。"
+    },
+    "errored": {
+      "heading": "サマライザーが失敗しました"
+    },
+    "riskFactors": {
+      "heading": "リスク要因",
+      "suggestedFixes": "推奨される修正"
+    },
+    "tokens": "入力 {input} / 出力 {output} トークン",
+    "risk": {
+      "low": "低",
+      "medium": "中",
+      "high": "高",
+      "critical": "重大",
+      "unknown": "不明"
+    },
+    "badges": {
+      "noChanges": "変更なし",
+      "noChangesLower": "変更なし",
+      "noChangesTitle": "プランはリソースの変更がないと報告しました",
+      "toAdd": "{count, plural, one {# 件追加} other {# 件追加}}",
+      "toChange": "{count, plural, one {# 件変更} other {# 件変更}}",
+      "toDestroy": "{count, plural, one {# 件破棄} other {# 件破棄}}",
+      "toReplace": "{count, plural, one {# 件置換} other {# 件置換}}",
+      "toImport": "{count, plural, one {# 件インポート} other {# 件インポート}}"
+    },
+    "chat": {
+      "heading": "フォローアップ",
+      "sharedThreadNote": "1つの共有スレッドで、ワークスペースの読み取り権限を持つ全員に表示されます。",
+      "placeholder": "このプランについてフォローアップの質問をする…（⌘/Ctrl + Enter で送信）",
+      "send": "送信",
+      "thinking": "思考中…",
+      "you": "あなた",
+      "assistant": "アシスタント"
+    },
+    "translatedNote": "お使いの言語に自動翻訳されています。正式なサマリーは原文です。",
+    "translating": "翻訳中…"
+  },
+  "runDetail": {
+    "notFound": "実行が見つかりません",
+    "runSection": "実行セクション",
+    "workspaceFallback": "ワークスペース",
+    "backTo": "{name} に戻る",
+    "errorHeading": "エラー",
+    "discardedHeading": "破棄済み — 再プランが必要",
+    "common": {
+      "yes": "はい",
+      "no": "いいえ"
+    },
+    "header": {
+      "title": "実行 {id}",
+      "titleWithWorkspace": "{workspace} — 実行 {id}",
+      "description": "{source} による実行"
+    },
+    "relTime": {
+      "justNow": "たった今",
+      "minutesAgo": "{count, plural, one {# 分前} other {# 分前}}",
+      "hoursAgo": "{count, plural, one {# 時間前} other {# 時間前}}",
+      "daysAgo": "{count, plural, one {# 日前} other {# 日前}}"
+    },
+    "status": {
+      "pending": "保留中",
+      "queued": "キュー待ち",
+      "planning": "プラン実行中",
+      "planned": "プラン完了",
+      "confirmed": "確認済み",
+      "applying": "適用中",
+      "canceling": "キャンセル中",
+      "applied": "適用済み",
+      "errored": "エラー",
+      "canceled": "キャンセル済み",
+      "discarded": "破棄済み"
+    },
+    "activity": {
+      "pending": "実行を準備中",
+      "queued": "利用可能なエージェントを待機中",
+      "planning": "terraform planを実行中",
+      "plannedConfirmable": "確認と適用の待機中",
+      "plannedSpeculative": "投機的プランが完了しました",
+      "plannedComplete": "プランが完了しました",
+      "confirmed": "適用を開始中",
+      "applying": "terraform applyを実行中",
+      "canceling": "実行を停止中",
+      "applied": "適用が完了しました",
+      "errored": "実行が失敗しました",
+      "canceled": "実行がキャンセルされました",
+      "discarded": "プランが破棄されました",
+      "elapsedTitle": "このフェーズの経過時間"
+    },
+    "badge": {
+      "destroy": "破棄",
+      "planOnly": "プランのみ"
+    },
+    "actions": {
+      "retryShort": "再試行",
+      "retryFull": "実行を再試行",
+      "retrying": "再試行中…",
+      "confirmShort": "適用",
+      "confirmFull": "確認して適用",
+      "confirming": "確認中…",
+      "discard": "破棄",
+      "discarding": "破棄中…",
+      "cancelShort": "キャンセル",
+      "cancelFull": "実行をキャンセル",
+      "canceling": "キャンセル中…"
+    },
+    "confirm": {
+      "apply": "この実行を適用しますか？プランが適用され、インフラが変更されます。",
+      "discard": "このプランを破棄しますか？",
+      "cancel": "この実行をキャンセルしますか？",
+      "retry": "この実行を再試行しますか？"
+    },
+    "errors": {
+      "loadRun": "実行の読み込みに失敗しました",
+      "action": {
+        "confirm": "実行の確認に失敗しました",
+        "discard": "実行の破棄に失敗しました",
+        "cancel": "実行のキャンセルに失敗しました",
+        "retry": "実行の再試行に失敗しました"
+      }
+    },
+    "tabs": {
+      "overview": "概要",
+      "ai": "AI",
+      "aiFull": "AI分析",
+      "opa": "OPA",
+      "opaFull": "OPAポリシー",
+      "impact": "影響",
+      "impactFull": "影響グラフ",
+      "planLabel": "プラン<log>ログ</log>",
+      "applyLabel": "適用<log>ログ</log>",
+      "planFull": "プランログ",
+      "applyFull": "適用ログ",
+      "details": "詳細"
+    },
+    "banner": {
+      "destroy": "これは<strong>破棄</strong>実行です — 適用するとすべての管理対象リソースが破棄されます。",
+      "planOnlyCli": "これは、VCS接続されたワークスペースでCLIから開始された<strong>プランのみ</strong>の実行です。CLIでアップロードされたコードには適用できません — 適用できるのはVCS管理下のコードのみです。",
+      "moduleOverridesPrefix": "この実行は<strong>モジュールオーバーライド</strong>を使用します",
+      "moduleOverridesFromPr": "PR #{number} から",
+      "moduleOverridesSuffix": "は公開されたレジストリバージョンではなく、PRブランチから取得されます。"
+    },
+    "cards": {
+      "changes": "変更",
+      "aiAnalysis": "AI分析",
+      "policyChecks": "ポリシーチェック",
+      "resources": "リソース"
+    },
+    "changes": {
+      "noChanges": "変更なし",
+      "planning": "プラン実行中…",
+      "toAdd": "追加",
+      "toChange": "変更",
+      "toDestroy": "破棄",
+      "toReplace": "置換",
+      "toImport": "インポート"
+    },
+    "ai": {
+      "notAvailable": "利用不可",
+      "ready": "準備完了",
+      "riskSub": "リスク {risk}",
+      "generating": "生成中…",
+      "skipped": "スキップ済み",
+      "failed": "失敗",
+      "available": "利用可能"
+    },
+    "policy": {
+      "none": "なし",
+      "blocked": "ブロック済み",
+      "failedSub": "{count, plural, one {# 件失敗} other {# 件失敗}}",
+      "advisoryIssues": "勧告的な問題",
+      "passedSub": "{total} 件中 {passed} 件が合格",
+      "passed": "合格"
+    },
+    "resources": {
+      "overLimit": "上限超過",
+      "oomKilled": "OOMキル",
+      "recorded": "記録済み",
+      "nearLimit": "上限に近い",
+      "high": "高",
+      "withinLimits": "上限内"
+    },
+    "details": {
+      "heading": "詳細",
+      "executionBackend": "実行バックエンド",
+      "source": "ソース",
+      "autoApply": "自動適用",
+      "planOnly": "プランのみ",
+      "triggeredBy": "トリガー元",
+      "created": "作成日時",
+      "commit": "コミット",
+      "branch": "ブランチ",
+      "prMr": "PR/MR",
+      "stateVersion": "状態バージョン",
+      "viewState": "状態を表示",
+      "runOptions": "実行オプション"
+    },
+    "timeline": {
+      "heading": "タイムライン",
+      "queued": "キュー待ち",
+      "planningStarted": "プラン開始",
+      "planComplete": "プラン完了",
+      "confirmed": "確認済み",
+      "applyingStarted": "適用開始",
+      "applied": "適用済み",
+      "errored": "エラー",
+      "canceled": "キャンセル済み",
+      "discarded": "破棄済み"
+    },
+    "log": {
+      "color": "カラー",
+      "colorOnTitle": "ANSIカラーを表示中 — クリックでプレーンテキスト",
+      "colorOffTitle": "プレーンテキストを表示中 — クリックでカラー",
+      "refresh": "更新",
+      "refreshTitle": "ログを更新",
+      "copy": "コピー",
+      "copied": "コピーしました！",
+      "copyTitle": "プレーンテキストをクリップボードにコピー",
+      "copyAria": "ログをクリップボードにコピー",
+      "download": "ダウンロード",
+      "downloadColorTitle": "ログをダウンロード（ANSIカラーコード付き）",
+      "downloadPlainTitle": "ログをダウンロード（プレーンテキスト）",
+      "downloadAria": "ログをダウンロード",
+      "follow": "追従",
+      "followOnTitle": "ライブ末尾を追従中 — クリックで停止",
+      "followOffTitle": "ライブ末尾を追従",
+      "end": "末尾",
+      "endTitle": "ログの末尾へ移動",
+      "planEmpty": "まだプラン出力がありません。",
+      "applyEmpty": "まだ適用出力がありません。"
+    },
+    "policyPanel": {
+      "heading": "ポリシーチェック",
+      "passedCount": "{total} 件中 {passed} 件が合格",
+      "blockedMessage": "この実行は<strong>必須ポリシーセットによってブロックされています</strong>。失敗が解決されるか、管理者がオーバーライドするまで適用されません。",
+      "overriding": "オーバーライド中...",
+      "overrideContinue": "オーバーライドして続行",
+      "overrideFailed": "オーバーライドに失敗しました",
+      "overrideFailedStatus": "オーバーライドに失敗しました（{status}）",
+      "overriddenBy": "{by} によりオーバーライド",
+      "policyPassed": "合格",
+      "noDenyMessage": "ポリシーはdenyメッセージやエラー出力を生成せずに失敗しました",
+      "enforcement": {
+        "mandatory": "必須",
+        "advisory": "勧告"
+      },
+      "outcome": {
+        "passed": "合格",
+        "failed": "失敗",
+        "errored": "エラー"
+      }
+    }
+  },
+  "workspaceDetail": {
+    "notFound": "ワークスペースが見つかりません",
+    "common": {
+      "enabled": "有効",
+      "disabled": "無効",
+      "none": "なし",
+      "default": "デフォルト",
+      "never": "なし",
+      "actions": "操作",
+      "workspaceLocked": "ワークスペースはロックされています"
+    },
+    "actions": {
+      "edit": "編集",
+      "cancel": "キャンセル",
+      "save": "保存",
+      "saving": "保存中…",
+      "savingEllipsis": "保存中...",
+      "delete": "削除",
+      "deleting": "削除中...",
+      "add": "追加",
+      "adding": "追加中...",
+      "remove": "削除",
+      "download": "ダウンロード",
+      "rollback": "ロールバック",
+      "close": "閉じる",
+      "hide": "非表示",
+      "enable": "有効化",
+      "disable": "無効化",
+      "creating": "作成中...",
+      "sending": "送信中...",
+      "processing": "処理中...",
+      "queuing": "キューに追加中...",
+      "loading": "読み込み中...",
+      "loadingLower": "読み込み中…"
+    },
+    "header": {
+      "executionMode": "{mode} 実行モード"
+    },
+    "tabs": {
+      "overview": "概要",
+      "variables": "変数",
+      "runs": "実行",
+      "state": "状態",
+      "stateGraph": "状態グラフ",
+      "configurations": "設定",
+      "notifications": "通知",
+      "runTasks": "実行タスク",
+      "runTriggers": "実行トリガー",
+      "sharing": "共有",
+      "selectLabel": "ワークスペースセクション"
+    },
+    "lifecycle": {
+      "pendingDeletion": "削除保留中",
+      "pendingDeletionDefault": "このワークスペースは削除対象としてマークされており、手動操作が必要です。",
+      "archived": "アーカイブ済み",
+      "archivedDefault": "このワークスペースはアーカイブされました。"
+    },
+    "runQueuedBanner": {
+      "message": "実行が正常にキューに追加されました。",
+      "viewRun": "実行を表示"
+    },
+    "settings": {
+      "title": "設定",
+      "saveChanges": "変更を保存",
+      "renamedNotice": "ワークスペースの名前を変更しました。<cloud></cloud>ブロック内の<name></name>フィールドを一致するように更新してください。"
+    },
+    "fields": {
+      "name": "名前",
+      "nameTitle": "英字、数字、ハイフン、アンダースコア。先頭は英字または数字である必要があります。",
+      "executionMode": "実行モード",
+      "execModeLocal": "ローカル",
+      "execModeAgent": "エージェント",
+      "autoApply": "自動適用",
+      "cpuRequest": "CPUリクエスト",
+      "cpuRequestTitle": "KubernetesのCPU量: コア数（1, 2）またはミリコア（500m, 100m）",
+      "memoryRequest": "メモリリクエスト",
+      "memoryRequestTitle": "Kubernetesのメモリ量: バイト（1000）または接尾辞付き（512Mi, 2Gi, 1Ti）",
+      "executionBackend": "実行バックエンド",
+      "version": "バージョン",
+      "versionPlaceholder": "例: 1.11 または 1.11.5",
+      "versionTitle": "X.YまたはX.Y.Z形式のバージョン（例: 1.11 または 1.11.5）",
+      "terragruntEnabledAgent": "有効（エージェントモード）",
+      "terragruntEnabledVersion": "有効（v{version}）",
+      "terragruntVersionPlaceholder": "例: 1.0",
+      "terragruntVersionTitle": "X.YまたはX.Y.Z形式のTerragruntバージョン（例: 1.0）",
+      "workingDirectory": "作業ディレクトリ",
+      "workingDirectoryPlaceholder": "例: environments/dev",
+      "agentPool": "エージェントプール",
+      "owner": "オーナー",
+      "vcsConnection": "VCS接続",
+      "vcsRepository": "VCSリポジトリ",
+      "vcsRepositoryTitle": "HTTPまたはHTTPSのURLである必要があります",
+      "vcsBranch": "VCSブランチ",
+      "vcsBranchPlaceholder": "main（デフォルト）",
+      "vcsWorkflow": "VCSワークフロー",
+      "vcsWorkflowMergeThenApply": "merge_then_apply（デフォルト — TFE / HCP標準）",
+      "vcsWorkflowApplyThenMerge": "apply_then_merge（Atlantis標準 — オプトイン）",
+      "autoMerge": "適用後に自動マージ",
+      "autoMergeStrategy": "自動マージ戦略",
+      "vcsPolling": "VCSポーリング",
+      "labels": "ラベル（タグ）",
+      "labelsTitle": "ワークスペースラベルは二重の役割を果たします: ラベルベースのRBACマッチングと、terraform/tofuのcloud '{' workspaces '{' tags = ... '}' '}' ブロックで一致する「tags」としての役割です。",
+      "varFiles": "変数ファイル",
+      "varFilesPlaceholder": "例: envs/dev.tfvars",
+      "triggerPrefixes": "トリガープレフィックス",
+      "triggerPrefixesHint": "実行をトリガーするディレクトリです。設定されると作業ディレクトリのフィルタリングを上書きします。",
+      "triggerPrefixesPlaceholder": "例: modules",
+      "triggerPrefixesNone": "なし（作業ディレクトリを使用）",
+      "driftIgnoreRules": "ドリフト無視ルール",
+      "driftIgnoreRulesHint": "ドリフト分類器によって抑制される、glob対応のTerraformアドレス + 属性パスです。<star></star>は非<dot></dot>文字の0個以上に一致します（<n></n>個のインデックスにまたがります）。<starIdx></starIdx>は任意の括弧付きインデックスに一致します。属性の接尾辞なしの単なるアドレスは、そのリソースへのあらゆる変更（破棄を含む）を抑制します。ドリフトのみに影響し、通常のplan/applyには影響しません。完全な文法については<docs>drift-ignore-rules.md</docs>を参照してください。",
+      "driftIgnoreRulesNone": "なし（すべてのプラン差分がドリフトとして扱われます）"
+    },
+    "vcsWorkflowWarning": {
+      "title": "認可はVCSリポジトリに委譲されます。",
+      "rbac": "PRをマージできる者は誰でも適用できます。ブランチ保護ルール（必須レビュー、ステータスチェック、コードオーナーの承認）がゲートになります。このモードでは、Terrapodのロール/ラベルRBACはコメント駆動のアクションに<em>適用されません</em>。",
+      "recommended": "<strong>推奨:</strong> 線形履歴を要求してください（マージ前にrebase/squash）。これにより、適用するコミットが実際に取り込まれるコミットになります。",
+      "credit": "クレジット: このワークフローは<atlantis>Atlantis</atlantis>をモデルにしています。AtlantisはPRコメント駆動の適用のみを望み、プラットフォームUIを不要とするチームにとって、依然として適切なツールです。"
+    },
+    "vcsPolling": {
+      "error": "エラー",
+      "ok": "OK（{time}）",
+      "notPolled": "まだポーリングされていません"
+    },
+    "lockout": {
+      "revertLabels": "ラベルを元に戻す",
+      "saveAnyway": "そのまま保存"
+    },
+    "lock": {
+      "title": "ロック状態",
+      "lockedDesc": "このワークスペースはロックされています。プランや適用は実行できません。",
+      "unlockedDesc": "このワークスペースはロック解除されており、実行の準備ができています。",
+      "lock": "ロック",
+      "unlock": "ロック解除",
+      "lockConfirm": "このワークスペースをロックしますか？",
+      "unlockConfirm": "このワークスペースをロック解除しますか？"
+    },
+    "drift": {
+      "title": "ドリフト検出",
+      "checkInterval": "チェック間隔",
+      "status": "ステータス",
+      "statusNoDrift": "ドリフトなし",
+      "statusDrifted": "ドリフトあり",
+      "statusErrored": "エラー",
+      "statusUnchecked": "未チェック",
+      "dismiss": "解除",
+      "dismissing": "解除中…",
+      "dismissTitle": "報告されたドリフト状態をクリアします。次回のスケジュールされたチェックが実際の状態から再取得します。",
+      "lastChecked": "最終チェック",
+      "checkNow": "今すぐチェック",
+      "checkNowTitle": "ドリフトをチェックするためのプランのみの実行をキューに追加します",
+      "checkNowTitleDisabled": "まずドリフト検出を有効にしてください"
+    },
+    "intervals": {
+      "disabled": "無効",
+      "1hour": "1時間",
+      "4hours": "4時間",
+      "12hours": "12時間",
+      "24hours": "24時間",
+      "48hours": "48時間",
+      "3days": "3日",
+      "7days": "7日"
+    },
+    "planExpiry": {
+      "title": "プラン有効期限",
+      "description": "未確認のプランがこの期間より古くなると自動的に破棄します。これにより、状況が変化した後に古いプランが適用されるのを防ぎます。デフォルトではオフで、その場合プランは再実行が必要です。（適用可能な実行にのみ適用されます。）",
+      "expireAfter": "有効期限"
+    },
+    "aiSummary": {
+      "title": "AIプランサマリー",
+      "description": "このワークスペースのすべてのプランフェーズの結果に対する、LLMによる自動生成の変更サマリー、リスク評価、障害分析です。",
+      "mode": "モード",
+      "modeDefault": "デプロイメントのデフォルトに従う",
+      "modeEnabled": "常に要約する",
+      "modeDisabled": "要約しない",
+      "contextLabel": "ワークスペースコンテキスト",
+      "contextLabelSuffix": "（任意、追加）",
+      "contextPlaceholder": "AIがこのワークスペース固有の点として知っておくべき事実。例: 「サービスXのVaultのフロントを担っています — KMSキーを破棄するとグローバル障害が発生します。」",
+      "noContext": "ワークスペースコンテキストが設定されていません。",
+      "contextHint": "デプロイメント全体のコンテキストに追加されます。最大4000文字。"
+    },
+    "slack": {
+      "title": "Slack通知",
+      "description": "このワークスペースをSlackの実行通知（承認リクエスト、適用、エラー、ドリフト）にオプトインします。チャンネルを空欄のままにすると、このワークスペースは通知しません（デプロイメント全体への一斉配信はありません）。管理者によるSlackアプリの有効化が必要です。",
+      "channel": "チャンネル",
+      "channelPlaceholder": "#deploys またはチャンネルID（例: C0123ABCD）",
+      "notSet": "未設定 — 通知なし。",
+      "hint": "Slackアプリがあらかじめそのチャンネルのメンバーになっている必要があります。"
+    },
+    "delete": {
+      "title": "ワークスペースを削除",
+      "description": "このワークスペースと、関連するすべての状態、変数、実行を完全に削除します。",
+      "confirm": "削除の確認"
+    },
+    "variables": {
+      "addVariable": "変数を追加",
+      "key": "キー",
+      "value": "値",
+      "category": "カテゴリ",
+      "categoryEnv": "環境",
+      "sensitive": "機密",
+      "empty": "このワークスペースには変数が設定されていません。",
+      "emptyValue": "空",
+      "enterNewValue": "新しい値を入力",
+      "deleteConfirm": "変数「{key}」を削除しますか？"
+    },
+    "runs": {
+      "options": "オプション",
+      "hideOptions": "オプションを非表示",
+      "queueDestroy": "破棄をキューに追加",
+      "queueDestroyTitle": "破棄プランをキューに追加",
+      "destroyAllConfirm": "すべてのリソースを破棄しますか？",
+      "confirmDestroy": "破棄の確認",
+      "queuePlan": "プランをキューに追加",
+      "queueRun": "実行をキューに追加",
+      "queuePlanConfirm": "このワークスペースの投機的プランをキューに追加しますか？",
+      "queueApplyConfirm": "plan + apply の実行をキューに追加しますか？これによりインフラが変更される可能性があります。",
+      "planOptions": "プランオプション",
+      "targetResources": "対象リソース",
+      "replaceResources": "置換リソース",
+      "commaSeparated": "（カンマ区切り）",
+      "planOnly": "プランのみ",
+      "refreshOnly": "リフレッシュのみ",
+      "skipRefresh": "リフレッシュをスキップ",
+      "allowEmptyApply": "空の適用を許可",
+      "vcsRef": "VCSリファレンス",
+      "branch": "ブランチ",
+      "tag": "タグ",
+      "defaultBranch": "デフォルト（{branch}）",
+      "nonDefaultRefNote": "デフォルト以外のリファレンスが選択されています — 実行はプランのみになります",
+      "empty": "このワークスペースの実行はまだありません。",
+      "runId": "実行ID",
+      "status": "ステータス",
+      "type": "種別",
+      "changes": "変更",
+      "source": "ソース",
+      "triggeredBy": "トリガー元",
+      "created": "作成日時",
+      "needsConfirm": "確認が必要",
+      "typeDestroy": "破棄",
+      "typePlanOnly": "プランのみ",
+      "typePlanApply": "plan + apply",
+      "sourceModuleTest": "モジュールテスト",
+      "sourceModulePublish": "モジュール公開"
+    },
+    "state": {
+      "deleteConfirm": "状態バージョン #{serial} を削除しますか？この操作は元に戻せません。",
+      "rollbackConfirm": "状態バージョン #{serial} にロールバックしますか？同じ内容で新しいバージョンが作成されます。",
+      "confirmDelete": "削除の確認",
+      "confirmRollback": "ロールバックの確認",
+      "uploadState": "状態をアップロード",
+      "empty": "このワークスペースの状態バージョンはまだありません。",
+      "serial": "シリアル",
+      "createdBy": "作成者",
+      "run": "実行",
+      "size": "サイズ",
+      "created": "作成日時",
+      "runner": "ランナー",
+      "latest": "最新"
+    },
+    "configurations": {
+      "description": "このワークスペースにアップロードされたソースアーカイブ（新しい順）です。2つの行を選択して比較できます。",
+      "selectedCount": "{count}/2 選択中",
+      "compare": "比較",
+      "comparing": "比較中…",
+      "empty": "設定バージョンがまだありません。`terraform plan`がアップロードするか、VCSプッシュが実行をトリガーすると、すぐにここに表示されます。",
+      "id": "ID",
+      "source": "ソース",
+      "status": "ステータス",
+      "created": "作成日時",
+      "current": "現在",
+      "selectForCompare": "比較のために {id} を選択",
+      "compareLabel": "比較",
+      "diff": "差分",
+      "filesChanged": "{count} 個のファイルが変更されました",
+      "oversized": "{count, plural, one {# 個のサイズ超過ファイル} other {# 個のサイズ超過ファイル}}をスキップしました: {files}",
+      "noDiff": "これらのバージョン間に内容の差分はありません。",
+      "binaryChanged": "バイナリファイルが変更されました — 差分は表示されません。",
+      "diffType": {
+        "added": "追加",
+        "removed": "削除",
+        "modified": "変更",
+        "binary-changed": "バイナリ"
+      }
+    },
+    "notifications": {
+      "addNotification": "通知を追加",
+      "name": "名前",
+      "namePlaceholder": "デプロイ通知",
+      "destinationType": "宛先種別",
+      "typeGeneric": "汎用Webhook",
+      "typeEmail": "メール",
+      "url": "URL",
+      "hmacToken": "HMACトークン（任意）",
+      "signingSecret": "署名シークレット",
+      "emailAddresses": "メールアドレス（カンマ区切り）",
+      "triggerEvents": "トリガーイベント",
+      "createNotification": "通知を作成",
+      "empty": "このワークスペースには通知設定がありません。",
+      "ok": "OK",
+      "err": "エラー {status}",
+      "fail": "失敗",
+      "http": "HTTP {status}",
+      "verify": "検証",
+      "history": "履歴",
+      "deliveryHistory": "配信履歴",
+      "enableConfirm": "この通知を有効にしますか？",
+      "disableConfirm": "この通知を無効にしますか？",
+      "deleteConfirm": "通知「{name}」を削除しますか？"
+    },
+    "runTasks": {
+      "addRunTask": "実行タスクを追加",
+      "name": "名前",
+      "namePlaceholder": "OPAポリシーチェック",
+      "webhookUrl": "Webhook URL",
+      "stage": "ステージ",
+      "enforcementLevel": "適用レベル",
+      "hmacKey": "HMACキー（任意）",
+      "hmacKeyPlaceholder": "Webhook検証用の署名シークレット",
+      "createRunTask": "実行タスクを作成",
+      "empty": "このワークスペースには実行タスクが設定されていません。",
+      "enableConfirm": "この実行タスクを有効にしますか？",
+      "disableConfirm": "この実行タスクを無効にしますか？",
+      "deleteConfirm": "実行タスク「{name}」を削除しますか？"
+    },
+    "runTriggers": {
+      "title": "実行トリガー",
+      "description": "ソースワークスペースが適用を完了すると、下流のワークスペースに新しい実行が自動的にキュー追加されます。宛先ごとに最大20個のソースワークスペースを指定できます。",
+      "inboundHeading": "ここで実行をトリガーするソースワークスペース",
+      "inboundEmpty": "このワークスペースで実行をトリガーするソースワークスペースはありません。",
+      "pickerPlaceholder": "ソースとして追加するワークスペースを検索…",
+      "outboundHeading": "このワークスペースがトリガーする宛先ワークスペース",
+      "outboundEmpty": "このワークスペースは他のどのワークスペースでも実行をトリガーしません。",
+      "destinationNote": "（宛先。そちらから削除してください）",
+      "removeConfirm": "この実行トリガーを削除しますか？"
+    },
+    "sharing": {
+      "title": "リモート状態の共有",
+      "description": "ワークスペース間の<code></code>のための、プロデューサー制御の許可リストです。状態データは機密を含みます — 慎重に付与してください。<docs>ドキュメント</docs>",
+      "outboundHeading": "このワークスペースの状態の読み取りが認可されたワークスペース",
+      "outboundEmpty": "このワークスペースの状態は他のどのワークスペースとも共有されていません。",
+      "grantedBy": "{by} により付与",
+      "revoke": "取り消す",
+      "revokeConfirm": "このリモート状態の共有を削除しますか？コンシューマーはこの状態へのアクセスを失います。",
+      "pickerPlaceholder": "コンシューマーとして認可するワークスペースを検索…",
+      "inboundHeading": "このワークスペースが状態の読み取りを認可されているワークスペース",
+      "inboundEmpty": "このワークスペースは、terraform_remote_state経由で他のどのワークスペースからも状態を読み取ることを認可されていません。",
+      "producerNote": "（プロデューサー。そちらから取り消してください）"
+    },
+    "runMessages": {
+      "manualDriftCheck": "UIからの手動ドリフトチェック",
+      "queued": "UIからキューに追加",
+      "queuedSpeculative": "UIからキューに追加（投機的）",
+      "destroyQueued": "UIから破棄をキューに追加"
+    },
+    "errors": {
+      "loadWorkspace": "ワークスペースの読み込みに失敗しました",
+      "loadRuns": "実行の読み込みに失敗しました",
+      "loadVariables": "変数の読み込みに失敗しました",
+      "loadStateVersions": "状態バージョンの読み込みに失敗しました",
+      "loadConfigurations": "設定バージョンの読み込みに失敗しました",
+      "loadNotifications": "通知の読み込みに失敗しました",
+      "loadOutboundConsumers": "アウトバウンドのリモート状態コンシューマーの読み込みに失敗しました",
+      "loadInboundConsumers": "インバウンドのリモート状態コンシューマーの読み込みに失敗しました",
+      "loadConsumers": "リモート状態コンシューマーの読み込みに失敗しました",
+      "loadInboundTriggers": "インバウンドの実行トリガーの読み込みに失敗しました",
+      "loadOutboundTriggers": "アウトバウンドの実行トリガーの読み込みに失敗しました",
+      "loadTriggers": "実行トリガーの読み込みに失敗しました",
+      "loadRunTasks": "実行タスクの読み込みに失敗しました",
+      "downloadStateFile": "状態ファイルのダウンロードに失敗しました",
+      "downloadFailed": "ダウンロードに失敗しました",
+      "downloadFailedStatus": "ダウンロードに失敗しました（{status}）",
+      "downloadTicketMissingUrl": "ダウンロードチケットのレスポンスにURLがありません",
+      "diffFailed": "差分の取得に失敗しました",
+      "diffFailedStatus": "差分の取得に失敗しました（{status}）",
+      "authorizeConsumer": "コンシューマーの認可に失敗しました",
+      "revoke": "取り消しに失敗しました",
+      "revokeConsumer": "コンシューマーの取り消しに失敗しました",
+      "addTrigger": "実行トリガーの追加に失敗しました",
+      "removeTrigger": "実行トリガーの削除に失敗しました",
+      "createRunTask": "実行タスクの作成に失敗しました",
+      "createRunTaskStatus": "実行タスクの作成に失敗しました（{status}）",
+      "update": "更新に失敗しました",
+      "toggleRunTask": "実行タスクの切り替えに失敗しました",
+      "delete": "削除に失敗しました",
+      "deleteRunTask": "実行タスクの削除に失敗しました",
+      "labelLockout": "このラベル変更によりあなたのアクセス権が低下します。",
+      "updateWorkspace": "ワークスペースの更新に失敗しました",
+      "lockWorkspace": "ワークスペースのロックに失敗しました",
+      "unlockWorkspace": "ワークスペースのロック解除に失敗しました",
+      "updateAiSummary": "AIサマリー設定の更新に失敗しました",
+      "updateSlackChannel": "Slackチャンネルの更新に失敗しました",
+      "updateDriftSettings": "ドリフト設定の更新に失敗しました",
+      "updateDriftInterval": "ドリフト間隔の更新に失敗しました",
+      "updatePlanExpiry": "プラン有効期限の更新に失敗しました",
+      "queueDriftCheck": "ドリフトチェックのキュー追加に失敗しました",
+      "queueDriftCheckStatus": "ドリフトチェックのキュー追加に失敗しました（{status}）",
+      "dismissDrift": "ドリフトの解除に失敗しました",
+      "dismissDriftStatus": "ドリフトの解除に失敗しました（{status}）",
+      "deleteWorkspace": "ワークスペースの削除に失敗しました",
+      "addVariable": "変数の追加に失敗しました",
+      "addVariableStatus": "変数の追加に失敗しました（{status}）",
+      "deleteVariable": "変数の削除に失敗しました",
+      "updateVariable": "変数の更新に失敗しました",
+      "queuePlan": "プランのキュー追加に失敗しました",
+      "queuePlanStatus": "プランのキュー追加に失敗しました（{status}）",
+      "queueDestroy": "破棄のキュー追加に失敗しました",
+      "queueDestroyStatus": "破棄のキュー追加に失敗しました（{status}）",
+      "createNotification": "通知の作成に失敗しました",
+      "createNotificationStatus": "通知の作成に失敗しました（{status}）",
+      "toggleNotification": "通知の切り替えに失敗しました",
+      "deleteNotification": "通知の削除に失敗しました",
+      "verificationFailed": "検証に失敗しました",
+      "verificationDeliveryFailed": "検証の配信に失敗しました: {detail}",
+      "unknownError": "不明なエラー",
+      "failed": "失敗しました",
+      "deleteStateVersion": "状態バージョンの削除に失敗しました",
+      "rollbackStateVersion": "状態バージョンのロールバックに失敗しました",
+      "stateActionFailed": "状態操作に失敗しました",
+      "uploadState": "状態のアップロードに失敗しました",
+      "uploadStateFile": "状態ファイルのアップロードに失敗しました"
+    }
+  },
+  "graphs": {
+    "stateTab": {
+      "loadError": "状態グラフの読み込みに失敗しました。",
+      "emptyState": "状態がまだありません — planとapplyを実行するか、状態をアップロードすると、このグラフに情報が表示されます。",
+      "stateVersionLabel": "状態バージョン",
+      "currentSuffix": "（現在）",
+      "colorByLabel": "色分けの基準",
+      "viewGraph": "グラフ",
+      "viewTable": "テーブル",
+      "resourceCount": "{count, plural, one {# 個のリソース} other {# 個のリソース}}",
+      "dependencyCount": "{count, plural, one {# 個の依存関係} other {# 個の依存関係}}",
+      "truncated": "{total} 個のリソースのうち最初の {shown} 個を表示しています — グラフは可読性のため上限が設けられています。",
+      "colResource": "リソース",
+      "colType": "型",
+      "colMode": "モード",
+      "colModule": "モジュール",
+      "colDependedOnBy": "依存されている",
+      "rootModule": "（ルート）"
+    },
+    "impact": {
+      "notAvailable": "この実行では影響グラフは利用できません。",
+      "title": "影響グラフ",
+      "subtitle": "{count, plural, one {# 個のリソース} other {# 個のリソース}}のプラン",
+      "hint": "各球はリソースを表し、各矢印は依存先を指しています。ノードをクリックすると → その推移的な<b>影響</b>（下流のすべて）がハイライトされます。",
+      "downstreamAffected": "下流への影響",
+      "action": {
+        "create": "作成",
+        "update": "更新",
+        "replace": "置換",
+        "destroy": "破棄",
+        "unchanged": "変更なし"
+      }
+    },
+    "estate": {
+      "navHint": "ドラッグで回転 · スクロールでズーム · 右ドラッグでパン · <em>ノードをクリックしてその周りを周回</em>"
+    },
+    "state3d": {
+      "title": "状態グラフ",
+      "hint": "各球はリソースを表し、各矢印は依存先を指しています。ノードをクリックすると → それに推移的に<b>依存する</b>リソースがハイライトされます。",
+      "dataSource": "データソース",
+      "managed": "管理対象",
+      "dependOnThis": "これに依存"
+    },
+    "resource3d": {
+      "resetView": "ビューをリセット",
+      "clear": "クリア",
+      "key": "凡例",
+      "resources": "リソース",
+      "hideKey": "凡例を非表示",
+      "hideResources": "リソースを非表示",
+      "resourcesCount": "リソース（{count}）",
+      "filterPlaceholder": "リソースを絞り込む…",
+      "navHint": "ドラッグで回転 · スクロールでズーム · 右ドラッグでパン · <em>リソースをクリックしてその周りを周回</em>"
+    }
+  },
+  "execHookDetail": {
+    "backLink": "実行フックに戻る",
+    "defaultDescription": "実行フック",
+    "notFound": "実行フックが見つかりません",
+    "scriptEmpty": "（空）",
+    "tabs": {
+      "settings": "設定",
+      "workspaces": "ワークスペース"
+    },
+    "common": {
+      "yes": "はい",
+      "no": "いいえ"
+    },
+    "actions": {
+      "edit": "編集",
+      "cancel": "キャンセル",
+      "save": "保存",
+      "saving": "保存中...",
+      "delete": "削除",
+      "deleting": "削除中...",
+      "confirmDelete": "削除の確認",
+      "add": "追加",
+      "adding": "追加中...",
+      "remove": "削除"
+    },
+    "settings": {
+      "heading": "設定"
+    },
+    "fields": {
+      "name": "名前",
+      "description": "説明",
+      "hookPoint": "フックポイント",
+      "priority": "優先度",
+      "enabled": "有効",
+      "script": "スクリプト（<code>/bin/sh -c</code>）"
+    },
+    "delete": {
+      "heading": "実行フックを削除",
+      "description": "このフックを完全に削除し、すべてのワークスペースから削除します。"
+    },
+    "workspaces": {
+      "scopeNote": "このフックは以下で関連付けられたワークスペースでのみ実行されます。グローバルスコープはありません。",
+      "associate": "ワークスペースを関連付け",
+      "workspaceLabel": "ワークスペース",
+      "selectPlaceholder": "ワークスペースを選択...",
+      "empty": "このフックに関連付けられたワークスペースはありません。",
+      "colWorkspace": "ワークスペース",
+      "colActions": "操作"
+    },
+    "confirm": {
+      "removeWorkspace": "このワークスペースをフックから削除しますか？フックはこのワークスペースで実行されなくなります。"
+    },
+    "success": {
+      "updated": "実行フックを更新しました",
+      "workspaceAssociated": "ワークスペースを関連付けました",
+      "workspaceRemoved": "ワークスペースを削除しました"
+    },
+    "errors": {
+      "load": "実行フックの読み込みに失敗しました",
+      "update": "実行フックの更新に失敗しました",
+      "delete": "実行フックの削除に失敗しました",
+      "addWorkspace": "ワークスペースの追加に失敗しました",
+      "removeWorkspace": "ワークスペースの削除に失敗しました"
+    }
+  },
+  "policySetDetail": {
+    "backLink": "ポリシーセット",
+    "notFound": "見つかりません",
+    "unknown": "不明",
+    "subtitle": "OPAポリシーセット · {createdBy} により作成",
+    "settings": {
+      "heading": "設定"
+    },
+    "fields": {
+      "description": "説明",
+      "enforcement": "適用レベル",
+      "enabled": "有効",
+      "globalScope": "グローバル（すべてのワークスペース）"
+    },
+    "enforcement": {
+      "advisory": "勧告（警告）",
+      "mandatory": "必須（適用をブロック）"
+    },
+    "scope": {
+      "allowLabels": "許可ラベル（key: v1, v2）",
+      "allowLabelsPlaceholder": "env: prod, staging",
+      "allowNames": "許可名（1行に1つ）",
+      "denyLabels": "拒否ラベル（key: v1, v2）",
+      "denyNames": "拒否名（1行に1つ）"
+    },
+    "vcs": {
+      "heading": "VCS設定",
+      "repoUrl": "リポジトリURL",
+      "branch": "ブランチ",
+      "branchPlaceholder": "main（デフォルト）",
+      "policyPath": "ポリシーパス"
+    },
+    "vcsBanner": {
+      "syncedFrom": "ポリシーの同期元:",
+      "at": "（ブランチ:",
+      "lastSynced": "最終同期 {time}",
+      "commit": "（コミット {sha}）",
+      "syncError": "同期エラー: {error}"
+    },
+    "policies": {
+      "heading": "ポリシー（{count}）",
+      "vcsManaged": "リポジトリで管理 — PR経由で変更をプッシュしてください",
+      "empty": "このセットにはまだポリシーがありません。"
+    },
+    "addPolicy": {
+      "namePlaceholder": "ポリシー名",
+      "descPlaceholder": "説明（任意）",
+      "regoHint": "Rego v1。<code>package terrapod</code>を宣言し、<code>deny</code>セットで違反を表現する必要があります。プランは<code>input</code>、Terrapodコンテキストは<code>data.terrapod_context</code>です。"
+    },
+    "actions": {
+      "saving": "保存中...",
+      "saveSettings": "設定を保存",
+      "syncNow": "今すぐ同期",
+      "cancel": "キャンセル",
+      "addPolicy": "ポリシーを追加",
+      "deleteSet": "セットを削除",
+      "validatingRego": "Regoを検証中...",
+      "delete": "削除",
+      "savePolicy": "ポリシーを保存"
+    },
+    "confirm": {
+      "deleteSet": "このポリシーセットとそのすべてのポリシーを削除しますか？記録された実行評価は保持されます。",
+      "deletePolicy": "ポリシー「{name}」を削除しますか？"
+    },
+    "errors": {
+      "load": "ポリシーセットの読み込みに失敗しました",
+      "save": "ポリシーセットの保存に失敗しました",
+      "saveStatus": "保存に失敗しました（{status}）",
+      "delete": "ポリシーセットの削除に失敗しました",
+      "deleteStatus": "削除に失敗しました（{status}）",
+      "addPolicy": "ポリシーの追加に失敗しました",
+      "addPolicyStatus": "ポリシーの追加に失敗しました（{status}）",
+      "savePolicy": "ポリシーの保存に失敗しました",
+      "savePolicyStatus": "ポリシーの保存に失敗しました（{status}）",
+      "deletePolicy": "ポリシーの削除に失敗しました",
+      "deletePolicyStatus": "削除に失敗しました（{status}）"
+    }
+  },
+  "slackLink": {
+    "title": "SlackをTerrapodに接続",
+    "loading": "読み込み中…",
+    "checking": "リンクを確認中…",
+    "linking": "Slackアカウントをリンク中…",
+    "unknown": "不明",
+    "confirm": {
+      "prompt": "このSlackアカウントを<em>あなたの</em>Terrapodアイデンティティにリンクしますか？今後のすべてのSlackアクション（承認/破棄）は、このTerrapodユーザーとしてその権限で実行されます。",
+      "slackUser": "Slackユーザー",
+      "slackTeam": "Slackチーム",
+      "terrapodAccount": "Terrapodアカウント",
+      "warning": "このリンクをSlackから自分で開始した場合にのみ続行してください。そうでない場合は、このタブを閉じてリンクしないでください — これにより上記のSlackアカウントが<em>あなたの</em>Terrapodアイデンティティにバインドされます。",
+      "button": "確認してリンク"
+    },
+    "success": {
+      "message": "SlackアカウントがTerrapodにリンクされました。",
+      "linkedAs": "<em>{email}</em> としてリンクされました。このタブを閉じてSlackに戻れます。"
+    },
+    "errors": {
+      "missingLink": "リンクがないか無効です。SlackでTerrapodのlinkコマンドを使って最初からやり直してください。",
+      "invalidLink": "このリンクは無効か、期限切れか、既に使用済みです。Slackから再度リンクを開始してください。",
+      "linkingFailed": "リンクに失敗しました。"
+    }
+  },
+  "cliComplete": {
+    "loading": "読み込み中...",
+    "completing": "認証を完了しています...",
+    "invalid": {
+      "title": "無効なリクエスト",
+      "description": "必須パラメーターがありません。"
+    },
+    "success": {
+      "title": "ログインに成功しました",
+      "complete": "APIトークンが作成されました。このタブを閉じることができます。"
+    },
+    "fallback": {
+      "description": "CLIに自動的に到達できませんでした。",
+      "button": "手動で完了するにはここをクリック"
+    },
+    "timeout": {
+      "description": "CLIがトークン交換を完了していない可能性があります。ターミナルを確認してください。"
+    }
+  },
+  "apiDocs": {
+    "view": "表示:",
+    "redocTitle": "ReDoc APIドキュメント"
+  }
+}

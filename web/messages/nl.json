@@ -1,0 +1,2621 @@
+{
+  "nav": {
+    "workspaces": "Workspaces",
+    "estate": "Landschap",
+    "registry": "Registry",
+    "modules": "Modules",
+    "providers": "Providers",
+    "catalog": "Catalogus",
+    "agentPools": "Agent-pools",
+    "admin": "Beheer",
+    "users": "Gebruikers",
+    "roles": "Rollen",
+    "vcsConnections": "VCS-verbindingen",
+    "variableSets": "Variabelensets",
+    "autodiscovery": "Autodetectie",
+    "bulkUpdate": "Bulkupdate",
+    "executionHooks": "Uitvoerings-hooks",
+    "policySets": "Beleidssets",
+    "providerTemplates": "Providersjablonen",
+    "catalogAdmin": "Catalogusbeheer",
+    "cache": "Cache",
+    "auditLog": "Auditlogboek",
+    "help": "Help",
+    "apiReference": "API-referentie",
+    "docs": "Documentatie",
+    "account": "Account",
+    "apiTokens": "API-tokens",
+    "sessions": "Sessies",
+    "logOut": "Afmelden",
+    "menu": "Menu",
+    "openMenu": "Menu openen",
+    "openAccountMenu": "Accountmenu openen",
+    "closeMenu": "Menu sluiten"
+  },
+  "switcher": {
+    "language": "Taal",
+    "changeLanguage": "Taal wijzigen"
+  },
+  "workspaces": {
+    "title": "Workspaces",
+    "description": "Beheer Terraform-workspaces, state en uitvoeringen",
+    "new": "Nieuwe workspace",
+    "cancel": "Annuleren",
+    "create": "Workspace aanmaken",
+    "creating": "Bezig met aanmaken…",
+    "loadFailed": "Kan workspaces niet laden",
+    "createFailed": "Kan workspace niet aanmaken",
+    "form": {
+      "name": "Naam",
+      "namePattern": "Alleen letters, cijfers, koppeltekens en underscores. Moet met een letter of cijfer beginnen.",
+      "namePlaceholder": "my-workspace",
+      "executionMode": "Uitvoeringsmodus",
+      "local": "Lokaal",
+      "agent": "Agent",
+      "executionBackend": "Uitvoeringsbackend",
+      "version": "Versie",
+      "versionTitle": "Versie in het formaat X.Y of X.Y.Z (bijv. 1.11 of 1.11.5)",
+      "versionPlaceholder": "bijv. 1.11 of 1.11.5",
+      "cpuRequest": "CPU-aanvraag",
+      "cpuTitle": "Kubernetes-CPU-hoeveelheid: hele cores (1, 2) of millicores (500m, 100m)",
+      "cpuHint": "bijv. 1, 0.5, 500m",
+      "memoryRequest": "Geheugenaanvraag",
+      "memoryTitle": "Kubernetes-geheugenhoeveelheid: bytes (1000) of met achtervoegsel (512Mi, 2Gi, 1Ti)",
+      "memoryHint": "bijv. 2Gi, 512Mi, 1Ti",
+      "agentPool": "Agent-pool",
+      "none": "Geen",
+      "autoApply": "Automatisch toepassen",
+      "enabled": "Ingeschakeld",
+      "workingDirectory": "Werkmap",
+      "workingDirectoryPlaceholder": "bijv. environments/dev",
+      "workingDirectoryHint": "Submap binnen de repo met .tf-bestanden",
+      "vcsConnection": "VCS-verbinding",
+      "vcsRepoUrl": "VCS-repository-URL",
+      "vcsRepoUrlTitle": "Moet een HTTP- of HTTPS-URL zijn",
+      "vcsRepoUrlPlaceholder": "https://github.com/org/repo",
+      "vcsBranch": "VCS-branch",
+      "vcsBranchPlaceholder": "main (standaard)"
+    },
+    "stats": {
+      "total": "Totaal",
+      "health": "Toestand",
+      "locked": "Vergrendeld",
+      "clearAllFilters": "Alle filters wissen",
+      "clearHealthFilter": "Toestandsfilter wissen",
+      "filterHealth": "Filteren op workspaces met toestandsproblemen",
+      "clearLockedFilter": "Vergrendelingsfilter wissen",
+      "filterLocked": "Filteren op vergrendelde workspaces"
+    },
+    "filter": {
+      "placeholder": "Filteren op naam, label of status — bijv. \"eu1\", \"env:prod\", \"status:errored\"",
+      "ariaLabel": "Workspaces filteren",
+      "clear": "Wissen",
+      "status": "Status",
+      "label": "Label",
+      "back": "terug",
+      "valueCount": "{count, plural, one {# waarde} other {# waarden}}",
+      "removeTerm": "Deze term verwijderen",
+      "showing": "{filtered} van {total} weergegeven",
+      "termName": "name: {value}",
+      "termStatus": "status: {value}",
+      "termLabelAny": "{key}: (elke)",
+      "termLabel": "{key}: {value}",
+      "hintStatus": "status",
+      "hintHealth": "toestand",
+      "hintLabel": "label",
+      "hintLabelKey": "labelsleutel",
+      "hintName": "naam"
+    },
+    "row": {
+      "removeLabelFilter": "Klik om uit het filter te verwijderen",
+      "addLabelFilter": "Klik om op dit label te filteren"
+    },
+    "table": {
+      "name": "Naam",
+      "mode": "Modus",
+      "pool": "Pool",
+      "resources": "Resources",
+      "status": "Status",
+      "created": "Aangemaakt",
+      "resourcesValue": "{cpu} CPU / {memory}"
+    },
+    "empty": {
+      "none": "Nog geen workspaces. Maak er een aan om te beginnen.",
+      "noMatch": "Geen workspaces komen overeen met dit filter."
+    }
+  },
+  "status": {
+    "state-diverged": "State afgeweken",
+    "vcs-error": "VCS-fout",
+    "drifted": "Afgedreven",
+    "errored": "Mislukt",
+    "needs-confirm": "Bevestiging vereist",
+    "planning": "Bezig met plannen",
+    "applying": "Bezig met toepassen",
+    "canceling": "Bezig met annuleren",
+    "confirmed": "Bevestigd",
+    "queued": "In wachtrij",
+    "pending": "In afwachting",
+    "applied": "Toegepast",
+    "planned": "Gepland",
+    "canceled": "Geannuleerd",
+    "discarded": "Verworpen",
+    "pendingDeletion": "In afwachting van verwijdering",
+    "archived": "Gearchiveerd"
+  },
+  "auth": {
+    "loading": "Bezig met laden...",
+    "subtitle": "Meld u aan om uw infrastructuur te beheren",
+    "subtitleCli": "Meld u aan om de CLI te autoriseren",
+    "emailLabel": "E-mail",
+    "passwordLabel": "Wachtwoord",
+    "signIn": "Aanmelden",
+    "signingIn": "Bezig met aanmelden...",
+    "signInWith": "Aanmelden met {provider}",
+    "or": "of",
+    "noProviders": "Geen authenticatieproviders geconfigureerd",
+    "completingSignIn": "Aanmelding voltooien...",
+    "callbackFailedTitle": "Authenticatie mislukt",
+    "tryAgain": "Opnieuw proberen",
+    "errors": {
+      "loadProviders": "Kan providers niet laden",
+      "authenticationFailed": "Authenticatie mislukt ({status})",
+      "tokenExchangeFailed": "Tokenuitwisseling mislukt ({status})",
+      "loginFailed": "Aanmelden mislukt",
+      "startLoginFailed": "Kan aanmelding niet starten",
+      "missingCodeOrState": "Autorisatiecode of state ontbreekt",
+      "stateMismatch": "State komt niet overeen — mogelijke CSRF-aanval",
+      "missingVerifier": "PKCE-verifier ontbreekt — probeer opnieuw aan te melden"
+    }
+  },
+  "estate": {
+    "title": "Landschapstopologie",
+    "description": "Elke workspace die u kunt zien en de modules die ze gebruiken, verbonden via run-triggers, remote-state en modulekoppelingen. Groepeer op elke as die bij uw landschap past — het platform dwingt geen labelconventie af.",
+    "errors": {
+      "load": "Kan de landschapsgrafiek niet laden."
+    },
+    "groupBy": {
+      "label": "Groeperen op"
+    },
+    "view": {
+      "graph": "Grafiek",
+      "table": "Tabel"
+    },
+    "counts": {
+      "workspaces": "{count, plural, one {# workspace} other {# workspaces}}",
+      "modules": "{count, plural, one {# module} other {# modules}}",
+      "dependencies": "{count, plural, one {# afhankelijkheid} other {# afhankelijkheden}}"
+    },
+    "legend": {
+      "registryModule": "registrymodule"
+    },
+    "detail": {
+      "moduleImpact": "{count, plural, one {workspace gebruikt dit — verhogen plant deze opnieuw} other {workspaces gebruiken dit — verhogen plant ze allemaal opnieuw}}",
+      "dependOnThis": "{count, plural, one {is hiervan afhankelijk} other {zijn hiervan afhankelijk}}"
+    },
+    "table": {
+      "workspaces": {
+        "heading": "Workspaces",
+        "col": {
+          "workspace": "Workspace",
+          "group": "Groep",
+          "agentPool": "Agent-pool",
+          "dependedOnBy": "Afhankelijk gemaakt door",
+          "modulesUsed": "Gebruikte modules"
+        },
+        "noModules": "—"
+      },
+      "modules": {
+        "heading": "Modules",
+        "col": {
+          "module": "Module",
+          "usedBy": "Gebruikt door (workspaces)"
+        }
+      }
+    }
+  },
+  "labels": {
+    "title": "Labels",
+    "description": "Blader door labels die in gebruik zijn in workspaces, agent-pools, registrymodules en registryproviders. Alleen-lezen — labels worden bewerkt op de pagina van elke entiteit zelf.",
+    "none": "Geen.",
+    "emptyKeys": "Nog geen labels in gebruik. Label een workspace, agent-pool, registrymodule of registryprovider om hier te beginnen met groeperen.",
+    "emptyValues": "Geen waarden voor \"{key}\". Ofwel draagt geen leesbare entiteit dit label, ofwel is het sinds de laatste weergave verwijderd.",
+    "loadKeysFailed": "Kan labels niet laden ({status})",
+    "loadValuesFailed": "Kan waarden voor {key} niet laden ({status})",
+    "loadEntitiesFailed": "Kan entiteiten niet laden ({status})",
+    "columns": {
+      "labelKey": "Labelsleutel",
+      "distinctValues": "Unieke waarden",
+      "value": "Waarde",
+      "total": "Totaal"
+    },
+    "entity": {
+      "workspaces": "Workspaces",
+      "agentPools": "Agent-pools",
+      "modules": "Modules",
+      "providers": "Providers"
+    },
+    "deprecated": {
+      "badge": "Verouderd en niet ondersteund.",
+      "body": "De Labels-browser staat niet meer in de hoofdnavigatie en wordt in een toekomstige release verwijderd. Filter in plaats daarvan op label vanaf de pagina <workspacesLink>Workspaces</workspacesLink>. Als u afhankelijk bent van deze pagina, <issueLink>open dan een issue</issueLink>."
+    }
+  },
+  "settings": {
+    "tokens": {
+      "title": "API-tokens",
+      "description": "Beheer authenticatietokens voor CLI en automatisering",
+      "descriptionAll": "Alle tokens van alle gebruikers",
+      "myTokens": "Mijn tokens",
+      "allTokens": "Alle tokens",
+      "createToken": "Token aanmaken",
+      "cancel": "Annuleren",
+      "tokenReady": "Token gereed",
+      "tokenReadyHelp": "Kopieer deze token nu — hij wordt niet opnieuw getoond.",
+      "dismissToken": "Token sluiten",
+      "hide": "Verbergen",
+      "show": "Tonen",
+      "copy": "Kopiëren",
+      "empty": "Nog geen API-tokens.",
+      "noDescription": "Geen beschrijving",
+      "detached": "losgekoppeld",
+      "never": "Nooit",
+      "selected": "{count, plural, one {# token geselecteerd} other {# tokens geselecteerd}}",
+      "revokeSelected": "Geselecteerde intrekken",
+      "revoking": "Bezig met intrekken...",
+      "clearSelection": "Selectie wissen",
+      "rotate": "Roteren",
+      "rotating": "Bezig met roteren...",
+      "revoke": "Intrekken",
+      "confirmRotate": "Deze token roteren? Het huidige geheim werkt onmiddellijk niet meer en er wordt een nieuw geheim uitgegeven.",
+      "confirmBulkRevoke": "{count, plural, one {# token intrekken?} other {# tokens intrekken?}}",
+      "kinds": {
+        "interactive": {
+          "label": "Persoonlijk",
+          "help": "Een persoonlijke token voor de CLI en ad-hocautomatisering. Draagt uw volledige actuele rechten."
+        },
+        "service_bound": {
+          "label": "Service · gebonden",
+          "help": "Een servicetoken beperkt tot een deel van uw rollen. De toegang is de doorsnede van die rollen en die van uzelf — en de token werkt niet meer als uw account wordt verwijderd."
+        },
+        "service_detached": {
+          "label": "Service · losgekoppeld",
+          "help": "Een door de beheerder beheerde servicetoken met een absoluut vastgepind bereik, aan geen enkele gebruiker gebonden. Gebruik dit voor kritische machine-to-machineautomatisering die het vertrek van één persoon moet overleven."
+        }
+      },
+      "lifespans": {
+        "720": "30 dagen",
+        "2160": "90 dagen",
+        "4320": "180 dagen",
+        "8760": "1 jaar"
+      },
+      "filter": {
+        "all": "Alle soorten"
+      },
+      "form": {
+        "description": "Beschrijving",
+        "descriptionPlaceholder": "CI/CD-pipelinetoken",
+        "kind": "Soort",
+        "lifespan": "Levensduur",
+        "create": "Aanmaken",
+        "creating": "Bezig met aanmaken...",
+        "pinnedRoles": "Vastgepinde rollen",
+        "pinnedRolesHelp": "— het bereik waartoe deze token beperkt is",
+        "pinnedRolesCapped": "(begrensd tot uw eigen toegang)",
+        "noCustomRoles": "Geen aangepaste rollen gedefinieerd. Maak eerst rollen aan onder Beheer → Rollen.",
+        "noScopedRoles": "U hebt geen beperkte rollen om vast te pinnen. Deze token zou geen toegang hebben."
+      },
+      "columns": {
+        "description": "Beschrijving",
+        "kind": "Soort",
+        "boundTo": "Gebonden aan",
+        "created": "Aangemaakt",
+        "lastUsed": "Laatst gebruikt",
+        "expires": "Verloopt",
+        "actions": "Acties"
+      },
+      "errors": {
+        "load": "Kan tokens niet laden",
+        "create": "Kan token niet aanmaken ({status})",
+        "createGeneric": "Kan token niet aanmaken",
+        "rotate": "Kan token niet roteren ({status})",
+        "rotateGeneric": "Kan token niet roteren",
+        "revoke": "Kan token niet intrekken ({status})",
+        "revokeGeneric": "Kan token niet intrekken",
+        "bulkRevoke": "Kan tokens niet intrekken"
+      }
+    },
+    "sessions": {
+      "title": "Sessies",
+      "description": "Uw actieve sessies",
+      "descriptionAll": "Alle actieve sessies op het platform",
+      "empty": "Geen actieve sessies.",
+      "revokeAll": "Alle intrekken",
+      "current": "Huidige",
+      "columns": {
+        "provider": "Provider",
+        "created": "Aangemaakt",
+        "expires": "Verloopt",
+        "lastActive": "Laatst actief",
+        "token": "Token"
+      },
+      "errors": {
+        "load": "Kan sessies niet laden",
+        "revoke": "Kan sessies niet intrekken ({status})",
+        "revokeGeneric": "Kan sessies niet intrekken"
+      }
+    }
+  },
+  "registry": {
+    "modules": {
+      "title": "Modules",
+      "description": "Privé Terraform-moduleregistry",
+      "cancel": "Annuleren",
+      "createModule": "Module aanmaken",
+      "empty": "Nog geen modules. Maak er een aan om te beginnen.",
+      "providerLabel": "Provider: {provider}",
+      "versionCount": "{count, plural, one {# versie} other {# versies}}",
+      "loadFailed": "Kan modules niet laden",
+      "createFailed": "Kan module niet aanmaken",
+      "createFailedStatus": "Kan module niet aanmaken ({status})",
+      "form": {
+        "name": "Naam",
+        "provider": "Provider",
+        "slugTitle": "Alleen kleine letters, cijfers en koppeltekens. Moet met een kleine letter beginnen.",
+        "addressNote": "Naam en provider vormen het registryadres van de module en kunnen na aanmaak niet worden gewijzigd.",
+        "vcsConnectionOptional": "VCS-verbinding (optioneel)",
+        "noneUploadManually": "Geen — versies handmatig uploaden",
+        "repositoryUrl": "Repository-URL",
+        "branchOptional": "Branch (optioneel)",
+        "branchPlaceholder": "main (leeg laten voor standaard)",
+        "tagPattern": "Tag-patroon",
+        "tagPatternHint": "Alleen tags die aan dit patroon voldoen maken versies aan (bijv. v1.0.0)",
+        "labelsOptional": "Labels (optioneel)",
+        "creating": "Bezig met aanmaken...",
+        "create": "Aanmaken"
+      }
+    },
+    "providers": {
+      "title": "Providers",
+      "description": "Privé Terraform-providerregistry",
+      "cancel": "Annuleren",
+      "createProvider": "Provider aanmaken",
+      "empty": "Nog geen providers. Maak er een aan om te beginnen.",
+      "loadFailed": "Kan providers niet laden",
+      "createFailed": "Kan provider niet aanmaken",
+      "createFailedStatus": "Kan provider niet aanmaken ({status})",
+      "form": {
+        "name": "Naam",
+        "slugTitle": "Alleen kleine letters, cijfers en koppeltekens. Moet met een kleine letter beginnen.",
+        "creating": "Bezig met aanmaken...",
+        "create": "Aanmaken"
+      }
+    },
+    "meta": {
+      "title": "Metadata",
+      "edit": "Bewerken",
+      "cancel": "Annuleren",
+      "save": "Opslaan",
+      "saving": "Bezig met opslaan...",
+      "saveAnyway": "Toch opslaan",
+      "revertLabels": "Labels terugzetten",
+      "owner": "Eigenaar",
+      "ownerNone": "Geen",
+      "ownerPlaceholder": "user@example.com",
+      "labels": "Labels"
+    },
+    "moduleDetail": {
+      "notFound": "Module niet gevonden",
+      "loadFailed": "Kan module niet laden",
+      "updateFailed": "Kan module niet bijwerken",
+      "labelLockoutDefault": "Deze labelwijziging zou uw toegang verminderen.",
+      "providerLabel": "Provider: {provider}",
+      "cancel": "Annuleren",
+      "uploadVersion": "Versie uploaden",
+      "vcsConnected": "VCS verbonden",
+      "connectVcs": "VCS verbinden",
+      "deleteModule": "Module verwijderen",
+      "linkFailed": "Kan workspace niet koppelen",
+      "linkFailedStatus": "Koppelen mislukt ({status})",
+      "unlinkConfirm": "Deze workspace ontkoppelen van de module? Er wordt geen impactanalyse meer voor uitgevoerd.",
+      "unlinkFailed": "Kan workspace niet ontkoppelen",
+      "unlinkFailedStatus": "Ontkoppelen mislukt ({status})",
+      "uploadFailed": "Uploaden mislukt",
+      "uploadFailedStatus": "Uploaden mislukt ({status})",
+      "saveVcsFailed": "Kan VCS-configuratie niet opslaan",
+      "saveVcsFailedStatus": "Kan VCS-configuratie niet opslaan ({status})",
+      "disableVcsFailed": "Kan VCS niet uitschakelen",
+      "disableVcsFailedStatus": "Kan VCS niet uitschakelen ({status})",
+      "deleteFailed": "Verwijderen mislukt",
+      "deleteFailedStatus": "Verwijderen mislukt ({status})",
+      "upload": {
+        "intro": "Selecteer een map met uw Terraform-modulebestanden. Ze worden verpakt in een tarball en geüpload.",
+        "version": "Versie",
+        "moduleDirectory": "Modulemap",
+        "selectDirectory": "Map selecteren",
+        "fileCount": "{count, plural, one {# bestand} other {# bestanden}}",
+        "filesToInclude": "{count, plural, one {# bestand om op te nemen:} other {# bestanden om op te nemen:}}",
+        "andMore": "...en {count} meer",
+        "uploading": "Bezig met uploaden...",
+        "upload": "Uploaden"
+      },
+      "vcs": {
+        "intro": "Verbind deze module met een VCS-repository. Nieuwe versies worden automatisch gepubliceerd wanneer semver-tags die aan het tag-patroon voldoen worden gepusht. Branch-commits alleen maken geen versies aan.",
+        "connection": "VCS-verbinding",
+        "selectConnection": "Selecteer een verbinding...",
+        "repositoryUrl": "Repository-URL",
+        "branchOptional": "Branch (optioneel)",
+        "branchPlaceholder": "main (leeg laten voor standaard)",
+        "tagPattern": "Tag-patroon",
+        "tagPatternHint": "Alleen tags die aan dit patroon voldoen maken versies aan (bijv. v1.0.0)",
+        "saving": "Bezig met opslaan...",
+        "saveConfiguration": "VCS-configuratie opslaan",
+        "disconnect": "VCS ontkoppelen"
+      },
+      "vcsStatus": {
+        "connected": "VCS verbonden:",
+        "lastTag": "Laatste tag: {tag}",
+        "firstVersionHint": "Push een semver-tag (bijv. <code>v1.0.0</code>) die aan het tag-patroon voldoet om de eerste versie te publiceren."
+      },
+      "links": {
+        "title": "Gekoppelde workspaces",
+        "linkWorkspace": "Workspace koppelen",
+        "description": "Gekoppelde workspaces krijgen speculatieve plannen wanneer PR's tegen deze module worden geopend, en standaarduitvoeringen wanneer nieuwe versies worden gepubliceerd.",
+        "searchPlaceholder": "Zoek workspaces om te koppelen…",
+        "empty": "Nog geen workspaces gekoppeld.",
+        "unlinkTitle": "Workspace ontkoppelen"
+      },
+      "interface": {
+        "title": "Inputs & outputs",
+        "counts": "{inputs} inputs, {outputs} outputs",
+        "versionLabel": "Versie:",
+        "noData": "Geen interfacegegevens beschikbaar voor deze versie.",
+        "inputs": "Inputs",
+        "outputs": "Outputs",
+        "name": "Naam",
+        "type": "Type",
+        "description": "Beschrijving",
+        "default": "Standaard",
+        "required": "Vereist",
+        "sensitive": "Gevoelig",
+        "requiredBadge": "vereist",
+        "optionalBadge": "optioneel",
+        "sensitiveBadge": "gevoelig",
+        "noneDeclared": "Deze moduleversie declareert geen inputs of outputs."
+      },
+      "versions": {
+        "title": "Versies",
+        "count": "{count, plural, one {# versie} other {# versies}}",
+        "emptyVcs": "Nog geen versies. Push een semver-tag die aan \"{pattern}\" voldoet naar de verbonden repository om een versie te publiceren.",
+        "emptyUpload": "Nog geen versies. Upload een module of verbind VCS om te beginnen.",
+        "version": "Versie",
+        "status": "Status",
+        "source": "Bron",
+        "actions": "Acties",
+        "manualUpload": "handmatige upload",
+        "delete": "Verwijderen"
+      },
+      "deleteDialog": {
+        "title": "Verwijderen bevestigen",
+        "moduleBody": "Hiermee worden deze module en al zijn versies permanent verwijderd.",
+        "versionBody": "Hiermee wordt versie {version} permanent verwijderd.",
+        "cancel": "Annuleren",
+        "confirm": "Verwijderen"
+      }
+    },
+    "providerDetail": {
+      "description": "Providerregistry",
+      "deleteProvider": "Provider verwijderen",
+      "publishNote": "Providerversies worden gepubliceerd met de <code>terrapod-publish</code>-CLI, die de binaries client-side ondertekent. Het uploaden en ondertekenen van providerbinaries vanuit de browser wordt niet meer ondersteund. Deze pagina is alleen-lezen voor versies en platforms.",
+      "empty": "Nog geen versies. Publiceer met de terrapod-publish-CLI om te beginnen.",
+      "loadVersionsFailed": "Kan versies niet laden",
+      "updateFailed": "Kan provider niet bijwerken",
+      "labelLockoutDefault": "Deze labelwijziging zou uw toegang verminderen.",
+      "deleteFailed": "Verwijderen mislukt",
+      "deleteFailedStatus": "Verwijderen mislukt ({status})",
+      "platformCount": "{count, plural, one {# platform} other {# platforms}}",
+      "delete": "Verwijderen",
+      "os": "OS",
+      "arch": "Arch",
+      "filename": "Bestandsnaam",
+      "actions": "Acties",
+      "deleteDialog": {
+        "title": "Verwijderen bevestigen",
+        "providerBody": "Hiermee worden deze provider en al zijn versies permanent verwijderd.",
+        "versionBody": "Hiermee worden versie {version} en de bijbehorende platforms permanent verwijderd.",
+        "platformBody": "Hiermee wordt het platform {os}/{arch} permanent verwijderd.",
+        "cancel": "Annuleren",
+        "confirm": "Verwijderen"
+      }
+    }
+  },
+  "adminUsers": {
+    "title": "Gebruikers",
+    "description": "Beheer lokale gebruikersaccounts",
+    "empty": "Geen gebruikers gevonden.",
+    "columns": {
+      "email": "E-mail",
+      "displayName": "Weergavenaam",
+      "status": "Status",
+      "lastLogin": "Laatste aanmelding",
+      "created": "Aangemaakt",
+      "actions": "Acties"
+    },
+    "form": {
+      "email": "E-mail",
+      "displayName": "Weergavenaam",
+      "displayNamePlaceholder": "Jan Jansen",
+      "passwordOptional": "Wachtwoord (optioneel)",
+      "passwordPlaceholder": "Voer een sterk wachtwoord in"
+    },
+    "reset": {
+      "title": "Wachtwoord opnieuw instellen voor {email}",
+      "newPassword": "Nieuw wachtwoord"
+    },
+    "password": {
+      "score": {
+        "veryWeak": "Zeer zwak",
+        "weak": "Zwak",
+        "fair": "Redelijk",
+        "good": "Goed",
+        "strong": "Sterk"
+      }
+    },
+    "status": {
+      "active": "Actief",
+      "inactive": "Inactief",
+      "never": "Nooit"
+    },
+    "actions": {
+      "cancel": "Annuleren",
+      "save": "Opslaan",
+      "saving": "Bezig met opslaan...",
+      "createUser": "Gebruiker aanmaken",
+      "creating": "Bezig met aanmaken...",
+      "resetPassword": "Wachtwoord opnieuw instellen",
+      "edit": "Bewerken",
+      "delete": "Verwijderen",
+      "resetPw": "Wachtwoord resetten",
+      "setPw": "Wachtwoord instellen",
+      "cancelPw": "Wachtwoord annuleren"
+    },
+    "confirm": {
+      "activate": "Gebruiker \"{email}\" activeren?",
+      "deactivate": "Gebruiker \"{email}\" deactiveren?",
+      "delete": "Gebruiker \"{email}\" verwijderen? Dit kan niet ongedaan worden gemaakt."
+    },
+    "success": {
+      "created": "Gebruiker \"{email}\" aangemaakt",
+      "updated": "Gebruiker \"{email}\" bijgewerkt",
+      "activated": "Gebruiker \"{email}\" geactiveerd",
+      "deactivated": "Gebruiker \"{email}\" gedeactiveerd",
+      "passwordReset": "Wachtwoord opnieuw ingesteld voor \"{email}\"",
+      "deleted": "Gebruiker \"{email}\" verwijderd"
+    },
+    "errors": {
+      "load": "Kan gebruikers niet laden",
+      "create": "Kan gebruiker niet aanmaken",
+      "createStatus": "Kan gebruiker niet aanmaken ({status})",
+      "update": "Kan gebruiker niet bijwerken",
+      "resetPassword": "Kan wachtwoord niet opnieuw instellen",
+      "delete": "Kan gebruiker niet verwijderen"
+    }
+  },
+  "adminRoles": {
+    "title": "Rollen & toewijzingen",
+    "description": "Beheer RBAC-rollen en roltoewijzingen van gebruikers",
+    "builtIn": "ingebouwd",
+    "emptyRoles": "Geen rollen gedefinieerd.",
+    "emptyAssignments": "Geen roltoewijzingen.",
+    "tabs": {
+      "roles": "Rollen",
+      "assignments": "Toewijzingen"
+    },
+    "columns": {
+      "provider": "Provider",
+      "email": "E-mail",
+      "role": "Rol",
+      "created": "Aangemaakt",
+      "actions": "Acties"
+    },
+    "form": {
+      "name": "Naam",
+      "namePattern": "Alleen letters, cijfers, koppeltekens en underscores. Moet met een letter of cijfer beginnen.",
+      "workspacePermission": "Workspace-machtiging",
+      "poolPermission": "Pool-machtiging",
+      "registryPermission": "Registry-machtiging",
+      "catalogPermission": "Catalogus-machtiging",
+      "descriptionLabel": "Beschrijving",
+      "descriptionPlaceholder": "Ontwikkelaarstoegang",
+      "allowLabels": "Labels toestaan (key=value, kommagescheiden)",
+      "allowNames": "Namen toestaan (kommagescheiden)",
+      "denyLabels": "Labels weigeren (key=value, kommagescheiden)",
+      "denyNames": "Namen weigeren (kommagescheiden)",
+      "allowLabelsShort": "Labels toestaan",
+      "allowNamesShort": "Namen toestaan",
+      "denyLabelsShort": "Labels weigeren",
+      "denyNamesShort": "Namen weigeren"
+    },
+    "assignForm": {
+      "provider": "Provider",
+      "email": "E-mail",
+      "roles": "Rollen"
+    },
+    "caps": {
+      "selected": "{count, plural, one {# capability} other {# capabilities}} geselecteerd",
+      "count": "{count, plural, one {# capability} other {# capabilities}}",
+      "custom": "Aangepast",
+      "matchesPresets": "Komt overeen met presets",
+      "advanced": "Geavanceerd — capabilities",
+      "otherPreserved": "Overige capabilities (behouden bij opslaan)",
+      "presetHelp": {
+        "before": "Het selecteren van een preset hierboven vinkt de bijbehorende capabilities vooraf aan. Een selectievakje voorbij een preset aan- of uitvinken markeert de rol als",
+        "after": "en de toekenning wordt verzonden als een expliciete capabilityset."
+      },
+      "groups": {
+        "workspace": "Workspace",
+        "run": "Uitvoering",
+        "state": "State",
+        "var": "Variabelen",
+        "config": "Config",
+        "drift": "Drift",
+        "run-task": "Run-tasks",
+        "notification": "Notificaties",
+        "run-trigger": "Run-triggers",
+        "pool": "Agent-pools",
+        "registry": "Registry",
+        "catalog": "Servicecatalogus"
+      }
+    },
+    "display": {
+      "allow": "Toestaan: {value}",
+      "allowNames": "Namen toestaan: {value}",
+      "deny": "Weigeren: {value}",
+      "denyNames": "Namen weigeren: {value}"
+    },
+    "actions": {
+      "cancel": "Annuleren",
+      "save": "Opslaan",
+      "saving": "Bezig met opslaan...",
+      "edit": "Bewerken",
+      "delete": "Verwijderen",
+      "remove": "Verwijderen",
+      "createRole": "Rol aanmaken",
+      "creating": "Bezig met aanmaken...",
+      "addAssignment": "Toewijzing toevoegen",
+      "setRoles": "Rollen instellen"
+    },
+    "confirm": {
+      "deleteRole": "Rol \"{name}\" verwijderen? Alle toewijzingen die ernaar verwijzen worden beïnvloed.",
+      "removeAssignment": "Rol \"{roleName}\" verwijderen van {email}?"
+    },
+    "success": {
+      "roleCreated": "Rol \"{name}\" aangemaakt",
+      "roleUpdated": "Rol \"{name}\" bijgewerkt",
+      "roleDeleted": "Rol \"{name}\" verwijderd",
+      "rolesAssigned": "Rollen toegewezen aan {email}",
+      "assignmentRemoved": "Toewijzing verwijderd"
+    },
+    "errors": {
+      "loadRoles": "Kan rollen niet laden",
+      "loadAssignments": "Kan toewijzingen niet laden",
+      "createRole": "Kan rol niet aanmaken",
+      "createRoleStatus": "Kan rol niet aanmaken ({status})",
+      "updateRole": "Kan rol niet bijwerken",
+      "deleteRole": "Kan rol niet verwijderen",
+      "setAssignment": "Kan toewijzing niet instellen",
+      "setAssignmentStatus": "Kan toewijzing niet instellen ({status})",
+      "deleteAssignment": "Kan toewijzing niet verwijderen"
+    }
+  },
+  "adminVcs": {
+    "title": "VCS-verbindingen",
+    "description": "Beheer integraties met versiebeheersystemen",
+    "empty": "Geen VCS-verbindingen geconfigureerd.",
+    "actions": {
+      "new": "Nieuwe verbinding",
+      "cancel": "Annuleren",
+      "edit": "Bewerken",
+      "delete": "Verwijderen"
+    },
+    "confirmDelete": "Deze VCS-verbinding verwijderen? Workspaces die deze gebruiken verliezen hun VCS-integratie. Dit kan niet ongedaan worden gemaakt.",
+    "form": {
+      "name": "Naam",
+      "namePattern": "Alleen letters, cijfers, koppeltekens en underscores. Moet met een letter of cijfer beginnen.",
+      "provider": "Provider",
+      "providerImmutable": "Provider is onveranderlijk — verwijder en maak opnieuw aan om deze te wijzigen",
+      "serverUrl": "Server-URL (optioneel)",
+      "serverUrlHint": "Moet een HTTP- of HTTPS-URL zijn (bijv. https://github.mycompany.com)",
+      "appId": "App-ID",
+      "appIdHint": "GitHub App-ID — alleen numerieke cijfers",
+      "installationId": "Installatie-ID",
+      "installationIdHint": "GitHub App-installatie-ID — alleen numerieke cijfers",
+      "privateKey": "Privésleutel (PEM)",
+      "browse": "Bladeren...",
+      "privateKeyKeep": "Leeg laten om de huidige sleutel te behouden — plak een nieuwe PEM om te roteren",
+      "privateKeyPlaceholder": "-----BEGIN RSA PRIVATE KEY-----\n...\n\nSleep hier een .pem-bestand naartoe of klik op Bladeren",
+      "webhookSecret": "Webhook-geheim",
+      "optional": "(optioneel)",
+      "webhookSecretSet": "Ingesteld — leeg laten om te behouden, voer een nieuwe waarde in om te roteren",
+      "webhookSecretGlobal": "Leeg laten om het globale webhook-geheim te gebruiken",
+      "webhookSecretHelp": "HMAC-geheim per verbinding voor de webhooks van deze installatie. Wanneer niet ingesteld, wordt het globale geheim gebruikt.",
+      "accessToken": "Toegangstoken",
+      "accessTokenKeep": "Leeg laten om de huidige token te behouden",
+      "saving": "Bezig met opslaan...",
+      "creating": "Bezig met aanmaken...",
+      "saveChanges": "Wijzigingen opslaan",
+      "createConnection": "Verbinding aanmaken"
+    },
+    "table": {
+      "name": "Naam",
+      "provider": "Provider",
+      "serverUrl": "Server-URL",
+      "status": "Status",
+      "created": "Aangemaakt",
+      "actions": "Acties"
+    },
+    "success": {
+      "created": "VCS-verbinding \"{name}\" aangemaakt",
+      "updated": "VCS-verbinding \"{name}\" bijgewerkt",
+      "deleted": "VCS-verbinding verwijderd"
+    },
+    "errors": {
+      "load": "Kan VCS-verbindingen niet laden",
+      "save": "Kan verbinding niet opslaan",
+      "delete": "Kan verbinding niet verwijderen",
+      "createStatus": "Kan verbinding niet aanmaken ({status})",
+      "updateStatus": "Kan verbinding niet bijwerken ({status})"
+    }
+  },
+  "adminVariableSets": {
+    "title": "Variabelensets",
+    "description": "Beheer org-brede variabelensets voor workspacegroepen",
+    "empty": "Geen variabelensets geconfigureerd.",
+    "none": "-",
+    "actions": {
+      "new": "Nieuwe variabelenset",
+      "cancel": "Annuleren"
+    },
+    "form": {
+      "name": "Naam",
+      "namePattern": "Alleen letters, cijfers, koppeltekens en underscores. Moet met een letter of cijfer beginnen.",
+      "descriptionLabel": "Beschrijving",
+      "descriptionPlaceholder": "AWS-inloggegevens voor alle workspaces",
+      "global": "Globaal (toepassen op alle workspaces)",
+      "priority": "Prioriteit (workspacevariabelen overschrijven)",
+      "creating": "Bezig met aanmaken...",
+      "create": "Variabelenset aanmaken"
+    },
+    "table": {
+      "name": "Naam",
+      "description": "Beschrijving",
+      "scope": "Bereik",
+      "variables": "Variabelen",
+      "created": "Aangemaakt"
+    },
+    "scope": {
+      "global": "Globaal",
+      "priority": "Prioriteit",
+      "standard": "Standaard"
+    },
+    "errors": {
+      "load": "Kan variabelensets niet laden",
+      "create": "Kan variabelenset niet aanmaken",
+      "createStatus": "Kan variabelenset niet aanmaken ({status})"
+    },
+    "detail": {
+      "back": "Terug naar variabelensets",
+      "headerFallback": "Variabelenset",
+      "notFound": "Variabelenset niet gevonden",
+      "global": "Globaal",
+      "priority": "Prioriteit",
+      "yes": "Ja",
+      "no": "Nee",
+      "edit": "Bewerken",
+      "cancel": "Annuleren",
+      "save": "Opslaan",
+      "saving": "Bezig met opslaan...",
+      "delete": "Verwijderen",
+      "deleting": "Bezig met verwijderen...",
+      "confirmDelete": "Verwijderen bevestigen",
+      "deleteTitle": "Variabelenset verwijderen",
+      "deleteDescription": "Verwijder deze variabelenset en al zijn variabelen permanent.",
+      "tabs": {
+        "settings": "Instellingen",
+        "variables": "Variabelen",
+        "workspaces": "Workspaces"
+      },
+      "addVariable": "Variabele toevoegen",
+      "adding": "Bezig met toevoegen...",
+      "varKey": "Sleutel",
+      "varValue": "Waarde",
+      "varCategory": "Categorie",
+      "categoryTerraform": "Terraform",
+      "categoryEnv": "Omgeving",
+      "sensitive": "Gevoelig",
+      "sensAbbr": "Gev.",
+      "enterNewValue": "Voer nieuwe waarde in",
+      "empty": "leeg",
+      "emptyVars": "Geen variabelen in deze set.",
+      "actions": "Acties",
+      "remove": "Verwijderen",
+      "add": "Toevoegen",
+      "addWorkspace": "Workspace toevoegen",
+      "workspace": "Workspace",
+      "selectWorkspace": "Selecteer een workspace...",
+      "globalBanner": "Deze variabelenset is globaal en wordt automatisch op alle workspaces toegepast.",
+      "emptyWorkspaces": "Geen workspaces toegewezen aan deze variabelenset.",
+      "confirmDeleteVar": "Deze variabele verwijderen? Dit kan niet ongedaan worden gemaakt.",
+      "confirmRemoveWorkspace": "Deze workspace uit de variabelenset verwijderen? De variabelen zijn dan niet meer van toepassing op die workspace.",
+      "success": {
+        "updated": "Variabelenset bijgewerkt",
+        "workspaceAdded": "Workspace toegevoegd",
+        "workspaceRemoved": "Workspace verwijderd"
+      },
+      "errors": {
+        "load": "Kan variabelenset niet laden",
+        "update": "Kan variabelenset niet bijwerken",
+        "delete": "Kan variabelenset niet verwijderen",
+        "loadVars": "Kan variabelen niet laden",
+        "loadWorkspaces": "Kan workspaces niet laden",
+        "addVar": "Kan variabele niet toevoegen",
+        "addVarStatus": "Kan variabele niet toevoegen ({status})",
+        "updateVar": "Kan variabele niet bijwerken",
+        "deleteVar": "Kan variabele niet verwijderen",
+        "addWorkspace": "Kan workspace niet toevoegen",
+        "removeWorkspace": "Kan workspace niet verwijderen"
+      }
+    }
+  },
+  "adminAutodiscovery": {
+    "title": "Autodetectie",
+    "description": "Maak automatisch workspaces aan in monorepo's wanneer PR's overeenkomende paden raken",
+    "empty": "Nog geen autodetectieregels. Maak er een aan om automatisch workspaces te provisioneren vanuit PR's in uw monorepo.",
+    "unsavedRule": "(niet-opgeslagen regel)",
+    "actions": {
+      "newRule": "Nieuwe regel",
+      "cancel": "Annuleren",
+      "create": "Aanmaken",
+      "update": "Bijwerken",
+      "preview": "Voorbeeld",
+      "edit": "Bewerken",
+      "delete": "Verwijderen",
+      "close": "Sluiten"
+    },
+    "status": {
+      "enabled": "ingeschakeld",
+      "disabled": "uitgeschakeld"
+    },
+    "form": {
+      "createTitle": "Regel aanmaken",
+      "editTitle": "Regel bewerken",
+      "name": "Naam",
+      "vcsConnection": "VCS-verbinding",
+      "selectConnection": "Verbinding selecteren",
+      "repoUrl": "Repo-URL",
+      "branch": "Branch (leeg = standaard)",
+      "matchPattern": "Overeenkomstpatroon",
+      "matchPatternHint": "Gitignore-achtige globs. <code>**</code> komt overeen over padsegmenten heen. Alleen <code>*.tf*</code>-bestanden activeren autodetectie.",
+      "ignorePatterns": "Negeerpatronen (één per regel)",
+      "nameTemplate": "Sjabloon voor workspacenaam (optioneel)",
+      "nameTemplateHint": "Gebruik <path></path> voor de map met <code>/</code> vervangen door <code>-</code>, of <root></root> voor de map ongewijzigd. Leeg = standaard (alleen het pad met streepjes).",
+      "templateDefaults": "Standaardwaarden voor workspacesjabloon",
+      "executionMode": "Uitvoeringsmodus",
+      "executionModeHint": "Autodetectie is VCS-gestuurd; alleen agentuitvoering wordt ondersteund.",
+      "agentPool": "Agent-pool",
+      "none": "(geen)",
+      "executionBackend": "Uitvoeringsbackend",
+      "terraformVersion": "Terraform-versie",
+      "cpuRequest": "CPU-aanvraag",
+      "memoryRequest": "Geheugenaanvraag",
+      "ownerEmail": "E-mail eigenaar",
+      "autoApply": "Automatisch toepassen",
+      "enabled": "Ingeschakeld",
+      "onDirectoryDelete": "Bij verwijderen van map",
+      "onDeleteFlag": "Markeren (veilig — markeert als in afwachting van verwijdering, vereist handmatige actie)",
+      "onDeleteDestroy": "Vernietigen (GEVAAR — breekt infrastructuur af en archiveert vervolgens de workspace)",
+      "onDirectoryDeleteHint": "Wat er met een automatisch gedetecteerde workspace gebeurt wanneer de bijbehorende map op de gevolgde branch wordt verwijderd.",
+      "onDeleteDestroyWarning": "Hiermee wordt een echte terraform destroy op de workspace uitgevoerd wanneer de bijbehorende map op de gevolgde branch wordt verwijderd.",
+      "labels": "Labels (overgenomen door aangemaakte workspaces)",
+      "varFiles": "Var-bestanden (overgenomen door aangemaakte workspaces)",
+      "varFilesHint": "Relatieve <code>.tfvars</code>-paden die aan plan/apply worden doorgegeven.",
+      "addVarFile": "Var-bestand toevoegen",
+      "executionHooks": "Uitvoerings-hooks (gekoppeld aan elke nieuwe workspace)",
+      "executionHooksHint": "Kies uit hooks die zijn gedefinieerd op de beheerpagina <page>Uitvoerings-hooks</page> — elke geselecteerde hook wordt gekoppeld aan elke workspace die deze regel aanmaakt.",
+      "noHooks": "Nog geen uitvoerings-hooks gedefinieerd. Maak er eerst een aan op de beheerpagina Uitvoerings-hooks.",
+      "hookDisabled": "(uitgeschakeld)",
+      "hookNotInLibrary": "(niet in bibliotheek — vink uit om te verwijderen)",
+      "runTaskTemplates": "Run-tasksjablonen (aangemaakt op elke nieuwe workspace)",
+      "notificationTemplates": "Notificatiesjablonen (aangemaakt op elke nieuwe workspace)",
+      "saving": "Bezig met opslaan...",
+      "previewTitle": "Doorloop de repo en bekijk welke workspaces deze regel ZOU aanmaken — zonder persistentie"
+    },
+    "table": {
+      "name": "Naam",
+      "repo": "Repo",
+      "pattern": "Patroon",
+      "enabled": "Ingeschakeld",
+      "created": "Aangemaakt",
+      "previewTitle": "Doorloop de repo en bekijk welke workspaces deze regel zou aanmaken"
+    },
+    "deleteModal": {
+      "title": "Regel verwijderen?",
+      "body": "Workspaces die automatisch door deze regel zijn aangemaakt, blijven werken. Toekomstige PR's die nieuwe paden onder deze regel raken, maken geen extra workspaces meer aan."
+    },
+    "preview": {
+      "title": "Voorbeeld: {ruleName}",
+      "walkedFiles": "<files>{count}</files> bestanden doorlopen op <refspan>{ref}</refspan>",
+      "walking": "Bezig met doorlopen van repository…",
+      "noMatches": "Geen mappen in deze repo komen overeen met het patroon van de regel. Niets om aan te maken.",
+      "colWorkspace": "Workspace",
+      "colDirectory": "Map",
+      "colAction": "Actie",
+      "repoRoot": "(repo-root)",
+      "actionCreate": "Aanmaken",
+      "skipDiscovered": "Overslaan (al gedetecteerd)",
+      "skipDiscoveredTitle": "Al aangemaakt door deze regel",
+      "skipCollision": "Overslaan (naambotsing)",
+      "skipCollisionTitle": "Er bestaat om een andere reden al een workspace met deze naam",
+      "willCreate": "{count, plural, one {# workspace wordt aangemaakt.} other {# workspaces worden aangemaakt.}} Bestaande workspaces (botsingen) blijven ongewijzigd.",
+      "provision": "{count, plural, one {# workspace provisioneren} other {# workspaces provisioneren}}",
+      "provisioning": "Bezig met provisioneren…",
+      "saveToProvision": "Sla de regel op om deze workspaces te provisioneren."
+    },
+    "success": {
+      "created": "{name} aangemaakt",
+      "updated": "{name} bijgewerkt",
+      "deleted": "Regel verwijderd",
+      "provisioned": "{count, plural, one {# workspace aangemaakt vanuit \"{ruleName}\"} other {# workspaces aangemaakt vanuit \"{ruleName}\"}}"
+    },
+    "errors": {
+      "loadRules": "Kan autodetectieregels niet laden",
+      "load": "Laden mislukt",
+      "createFailed": "Aanmaken mislukt: {status} {detail}",
+      "updateFailed": "Bijwerken mislukt: {status} {detail}",
+      "save": "Opslaan mislukt",
+      "deleteRule": "Kan regel niet verwijderen",
+      "delete": "Verwijderen mislukt",
+      "previewFailed": "Voorbeeld mislukt ({status})",
+      "preview": "Voorbeeld mislukt",
+      "previewPrereq": "Stel VCS-verbinding, repo-URL en patroon in voordat u een voorbeeld bekijkt",
+      "scanFailed": "Scan mislukt ({status})",
+      "scan": "Scan mislukt"
+    }
+  },
+  "adminBulkUpdate": {
+    "title": "Bulkupdate",
+    "description": "Selecteer workspaces op filter en pas vervolgens een instellingswijziging op ze allemaal toe",
+    "none": "(geen)",
+    "anyOption": "(elke)",
+    "unchanged": "(ongewijzigd)",
+    "unchangedOption": "(ongewijzigd)",
+    "filter": {
+      "heading": "1. Workspaces selecteren",
+      "matchAll": "Overeenkomen met <strong>alle</strong> workspaces (negeert de onderstaande filters)",
+      "namePrefix": "Naamvoorvoegsel",
+      "executionBackend": "Uitvoeringsbackend",
+      "ownerEmail": "E-mail eigenaar",
+      "agentPool": "Agent-pool",
+      "vcsConnection": "VCS-verbinding",
+      "labels": "Labels",
+      "search": "Zoeken",
+      "searching": "Bezig met zoeken..."
+    },
+    "results": {
+      "matched": "<strong>{count}</strong> {count, plural, one {workspace} other {workspaces}} overeengekomen.",
+      "noMatch": "Geen workspaces komen overeen met dit filter.",
+      "colName": "Naam",
+      "colMode": "Modus",
+      "colBackend": "Backend",
+      "colTfVersion": "TF-versie",
+      "colLabels": "Labels"
+    },
+    "update": {
+      "heading": "2. Wijzigingen toepassen",
+      "hint": "Alleen velden die u hieronder instelt, worden gewijzigd. Het bovenstaande filter selecteert welke workspaces de wijziging ontvangen.",
+      "terraformVersion": "Terraform-versie",
+      "executionBackend": "Uitvoeringsbackend",
+      "executionMode": "Uitvoeringsmodus",
+      "autoApply": "Automatisch toepassen",
+      "agentPool": "Agent-pool",
+      "cpuRequest": "CPU-aanvraag",
+      "memoryRequest": "Geheugenaanvraag",
+      "setLabels": "Labels instellen (vervangt de labelmap op elke overeengekomen workspace)",
+      "setVarFiles": "Var-bestanden instellen",
+      "addVarFile": "Var-bestand toevoegen",
+      "setRunTasks": "Run-tasks instellen (op naam bijgewerkt of toegevoegd op elke overeengekomen workspace)",
+      "setNotifications": "Notificatieconfiguraties instellen (op naam bijgewerkt of toegevoegd)",
+      "dryRun": "Proefdraaien (alleen voorbeeld — geen wijzigingen weggeschreven)",
+      "confirmWarning": "Hiermee worden wijzigingen naar elke overeengekomen workspace weggeschreven.",
+      "confirmApply": "Toepassen bevestigen",
+      "applying": "Bezig met toepassen...",
+      "cancel": "Annuleren",
+      "working": "Bezig...",
+      "previewDryRun": "Voorbeeld (proefdraaien)",
+      "applyChanges": "Wijzigingen toepassen"
+    },
+    "diff": {
+      "colWorkspace": "Workspace",
+      "colChanges": "Wijzigingen"
+    },
+    "dryResult": {
+      "heading": "Resultaat proefdraaien",
+      "summary": "<strong>{matched}</strong> overeengekomen; <strong>{wouldChange}</strong> zou wijzigen; {unchanged} ongewijzigd. Er is niets weggeschreven.",
+      "wouldChange": "Zou wijzigen",
+      "noChange": "Geen workspaces zouden met deze update wijzigen."
+    },
+    "applyResult": {
+      "heading": "Resultaat toepassen",
+      "summary": "<strong>{matched}</strong> overeengekomen; <appliedstrong>{applied}</appliedstrong> toegepast; {unchanged} ongewijzigd; {errors, plural, one {# fout} other {# fouten}}.",
+      "applied": "Toegepast",
+      "unnamedWorkspace": "(workspace)",
+      "noChange": "Geen workspaces gewijzigd."
+    },
+    "errors": {
+      "searchFailed": "Zoeken mislukt ({status})",
+      "search": "Zoeken mislukt",
+      "bulkUpdateFailed": "Bulkupdate mislukt ({status})",
+      "bulkUpdate": "Bulkupdate mislukt"
+    }
+  },
+  "adminExecutionHooks": {
+    "title": "Uitvoerings-hooks",
+    "description": "Aangepaste shell-stappen die binnen runner-Jobs worden uitgevoerd op pre/post-plan/apply-punten, gekoppeld aan workspaces",
+    "empty": "Geen uitvoerings-hooks geconfigureerd.",
+    "actions": {
+      "cancel": "Annuleren",
+      "new": "Nieuwe uitvoerings-hook",
+      "creating": "Bezig met aanmaken...",
+      "create": "Uitvoerings-hook aanmaken"
+    },
+    "badges": {
+      "disabled": "Uitgeschakeld",
+      "enabled": "Ingeschakeld"
+    },
+    "columns": {
+      "name": "Naam",
+      "hookPoint": "Hook-punt",
+      "enabled": "Ingeschakeld",
+      "priority": "Prioriteit",
+      "workspaces": "Workspaces"
+    },
+    "form": {
+      "name": "Naam",
+      "namePatternTitle": "Alleen letters, cijfers, koppeltekens en underscores. Moet met een letter of cijfer beginnen.",
+      "description": "Beschrijving",
+      "descriptionPlaceholder": "Voeg vóór init een interne hosts-vermelding toe",
+      "hookPoint": "Hook-punt",
+      "priority": "Prioriteit",
+      "priorityTitle": "Lager wordt eerst uitgevoerd wanneer meerdere hooks hetzelfde punt delen (gelijkspel wordt op naam beslecht).",
+      "scriptLabel": "Script (<code>/bin/sh -c</code>)",
+      "scriptHelp": "Wordt uitgevoerd met de cloudidentiteit van de runner. Een niet-nul exit laat de uitvoering mislukken. Geheimen moeten uit workspacevariabelen komen, niet hier inline."
+    },
+    "errors": {
+      "load": "Kan uitvoerings-hooks niet laden",
+      "createStatus": "Kan uitvoerings-hook niet aanmaken ({status})",
+      "create": "Kan uitvoerings-hook niet aanmaken"
+    }
+  },
+  "adminPolicySets": {
+    "title": "Beleidssets",
+    "description": "OPA policy-as-code-handhaving, per label beperkt tot workspaces",
+    "empty": "Geen beleidssets geconfigureerd.",
+    "actions": {
+      "cancel": "Annuleren",
+      "new": "Nieuwe beleidsset",
+      "creating": "Bezig met aanmaken...",
+      "create": "Beleidsset aanmaken"
+    },
+    "badges": {
+      "disabled": "Uitgeschakeld",
+      "mandatory": "Verplicht",
+      "advisory": "Adviserend",
+      "global": "Globaal",
+      "labelScoped": "Op label beperkt"
+    },
+    "columns": {
+      "name": "Naam",
+      "description": "Beschrijving",
+      "enforcement": "Handhaving",
+      "scope": "Bereik",
+      "policies": "Beleidsregels"
+    },
+    "form": {
+      "name": "Naam",
+      "namePatternTitle": "Alleen letters, cijfers, koppeltekens en underscores. Moet met een letter of cijfer beginnen.",
+      "description": "Beschrijving",
+      "descriptionPlaceholder": "Verplichte guardrails voor productieworkspaces",
+      "enforcement": "Handhaving",
+      "enforcementAdvisory": "Adviserend (waarschuwen, niet blokkeren)",
+      "enforcementMandatory": "Verplicht (apply blokkeren bij falen)",
+      "globalScope": "Globaal (toepassen op elke workspace)",
+      "sourceInline": "Inline (beleidsregels beheren in UI)",
+      "sourceVcs": "Uit VCS-repository",
+      "vcsConnection": "VCS-verbinding",
+      "selectConnection": "Verbinding selecteren...",
+      "repoUrl": "Repository-URL",
+      "branch": "Branch",
+      "branchPlaceholder": "main (standaard)",
+      "policyPath": "Beleidspad",
+      "policyPathPlaceholder": "policies/ (map met .rego-bestanden)",
+      "helpVcs": "Beleidsregels worden automatisch vanuit de repository gesynchroniseerd.",
+      "helpInline": "Voeg beleidsregels toe en verfijn de labelbeperking na het aanmaken van de set."
+    },
+    "errors": {
+      "load": "Kan beleidssets niet laden",
+      "createStatus": "Kan beleidsset niet aanmaken ({status})",
+      "create": "Kan beleidsset niet aanmaken"
+    }
+  },
+  "adminCatalog": {
+    "title": "Catalogusbeheer",
+    "description": "Beheer servicecatalogusitems",
+    "notEnabled": "Servicecatalogus is niet ingeschakeld.",
+    "empty": "Nog geen catalogusitems.",
+    "actions": {
+      "new": "Nieuw catalogusitem",
+      "cancel": "Annuleren",
+      "create": "Catalogusitem aanmaken",
+      "creating": "Bezig met aanmaken…",
+      "saveChanges": "Wijzigingen opslaan",
+      "saving": "Bezig met opslaan…",
+      "edit": "Bewerken",
+      "delete": "Verwijderen"
+    },
+    "form": {
+      "name": "Naam",
+      "nameTitle": "Alleen letters, cijfers, koppeltekens en underscores. Moet met een letter of cijfer beginnen.",
+      "module": "Module",
+      "moduleSelect": "Selecteer een module…",
+      "moduleImmutable": "Module is onveranderlijk na aanmaak",
+      "displayName": "Weergavenaam",
+      "displayNamePlaceholder": "Standaard S3-bucket",
+      "versionPin": "Standaard versievastpinning",
+      "versionPinPlaceholder": "bijv. 1.2.0 (leeg = nieuwste)",
+      "descriptionLabel": "Beschrijving",
+      "descriptionPlaceholder": "Wat dit catalogusitem provisioneert…",
+      "enabled": "Ingeschakeld (zichtbaar in de bladercatalogus)",
+      "providerTemplates": "Providersjablonen",
+      "noProviderTemplates": "Geen providersjablonen gedefinieerd.",
+      "restrictPools": "Beperken tot specifieke agent-pools",
+      "noAgentPools": "Geen agent-pools beschikbaar.",
+      "anyPool": "Elke agent-pool mag worden gebruikt.",
+      "labels": "Labels",
+      "variableOptions": "Variabeleopties (geavanceerd, JSON)",
+      "variableOptionsHint": "Overschrijvingen per input (opties, verborgen, standaard). Laat <code>[]</code> staan indien niet gebruikt."
+    },
+    "table": {
+      "name": "Naam",
+      "module": "Module",
+      "enabled": "Ingeschakeld",
+      "actions": "Acties"
+    },
+    "badge": {
+      "enabled": "ingeschakeld",
+      "disabled": "uitgeschakeld"
+    },
+    "confirm": {
+      "delete": "Dit catalogusitem verwijderen? Bestaande geprovisioneerde instanties worden niet beïnvloed."
+    },
+    "success": {
+      "created": "Catalogusitem \"{name}\" aangemaakt",
+      "updated": "Catalogusitem \"{name}\" bijgewerkt",
+      "deleted": "Catalogusitem verwijderd"
+    },
+    "errors": {
+      "load": "Kan catalogusitems niet laden",
+      "save": "Kan catalogusitem niet opslaan",
+      "createStatus": "Kan catalogusitem niet aanmaken ({status})",
+      "updateStatus": "Kan catalogusitem niet bijwerken ({status})",
+      "delete": "Kan catalogusitem niet verwijderen",
+      "deleteConflict": "Kan niet verwijderen: dit catalogusitem heeft geprovisioneerde instanties.",
+      "varOptsInvalidJson": "Variabeleopties moeten geldige JSON zijn (een array).",
+      "varOptsNotArray": "Variabeleopties moeten een JSON-array zijn."
+    }
+  },
+  "adminProviderTemplates": {
+    "title": "Providersjablonen",
+    "description": "Herbruikbare providerconfiguratieblokken voor catalogusitems",
+    "notEnabled": "Servicecatalogus is niet ingeschakeld.",
+    "empty": "Nog geen providersjablonen.",
+    "actions": {
+      "new": "Nieuw sjabloon",
+      "cancel": "Annuleren",
+      "create": "Sjabloon aanmaken",
+      "creating": "Bezig met aanmaken…",
+      "saveChanges": "Wijzigingen opslaan",
+      "saving": "Bezig met opslaan…",
+      "edit": "Bewerken",
+      "delete": "Verwijderen"
+    },
+    "form": {
+      "name": "Naam",
+      "providerType": "Providertype",
+      "body": "Body (HCL)",
+      "parameters": "Parameters (geavanceerd, JSON)",
+      "parametersHint": "Elke parameter wordt een veld in het provisioneringsformulier. Laat <code>[]</code> staan indien niet gebruikt.",
+      "labels": "Labels"
+    },
+    "table": {
+      "name": "Naam",
+      "providerType": "Providertype",
+      "parameters": "Parameters",
+      "actions": "Acties"
+    },
+    "confirm": {
+      "delete": "Dit providersjabloon verwijderen? Catalogusitems die ernaar verwijzen kunnen niet worden geprovisioneerd. Dit kan niet ongedaan worden gemaakt."
+    },
+    "success": {
+      "created": "Providersjabloon \"{name}\" aangemaakt",
+      "updated": "Providersjabloon \"{name}\" bijgewerkt",
+      "deleted": "Providersjabloon verwijderd"
+    },
+    "errors": {
+      "load": "Kan providersjablonen niet laden",
+      "save": "Kan providersjabloon niet opslaan",
+      "createStatus": "Kan sjabloon niet aanmaken ({status})",
+      "updateStatus": "Kan sjabloon niet bijwerken ({status})",
+      "delete": "Kan providersjabloon niet verwijderen",
+      "deleteConflict": "Kan niet verwijderen: naar dit sjabloon wordt verwezen door een catalogusitem.",
+      "paramsInvalidJson": "Parameters moeten geldige JSON zijn (een array).",
+      "paramsNotArray": "Parameters moeten een JSON-array zijn."
+    }
+  },
+  "adminAgentPools": {
+    "title": "Agent-pools",
+    "description": "Beheer runner-agent-pools en hun listeners",
+    "empty": "Geen agent-pools geconfigureerd.",
+    "actions": {
+      "newPool": "Nieuwe pool",
+      "createPool": "Pool aanmaken",
+      "creating": "Bezig met aanmaken...",
+      "cancel": "Annuleren",
+      "edit": "Bewerken",
+      "save": "Opslaan",
+      "saving": "Bezig met opslaan...",
+      "delete": "Verwijderen",
+      "deleting": "Bezig met verwijderen...",
+      "confirmDelete": "Verwijderen bevestigen"
+    },
+    "form": {
+      "name": "Naam",
+      "namePattern": "Alleen letters, cijfers, koppeltekens en underscores. Moet met een letter of cijfer beginnen.",
+      "description": "Beschrijving",
+      "descriptionPlaceholder": "AWS-runners voor productie",
+      "labels": "Labels"
+    },
+    "columns": {
+      "name": "Naam",
+      "description": "Beschrijving",
+      "status": "Status",
+      "created": "Aangemaakt"
+    },
+    "badges": {
+      "default": "standaard",
+      "degradedTooltip": "Listeners sturen heartbeats maar hun certificaten zijn verlopen — uitvoeringen kunnen niet worden gestart.",
+      "status": {
+        "online": "online",
+        "offline": "offline",
+        "degraded": "gedegradeerd"
+      }
+    },
+    "detail": {
+      "back": "Terug naar agent-pools",
+      "defaultDescription": "Agent-pool"
+    },
+    "tabs": {
+      "settings": "Instellingen",
+      "tokens": "Tokens",
+      "listeners": "Listeners"
+    },
+    "settings": {
+      "title": "Poolinstellingen",
+      "fields": {
+        "name": "Naam",
+        "description": "Beschrijving",
+        "created": "Aangemaakt",
+        "owner": "Eigenaar",
+        "yourPermission": "Uw machtiging",
+        "labels": "Labels"
+      },
+      "permissions": {
+        "read": "lezen",
+        "write": "schrijven",
+        "admin": "beheerder"
+      }
+    },
+    "danger": {
+      "title": "Pool verwijderen",
+      "description": "Verwijder deze agent-pool en alle bijbehorende tokens permanent."
+    },
+    "tokens": {
+      "create": "Token aanmaken",
+      "empty": "Geen tokens voor deze pool.",
+      "revoke": "Intrekken",
+      "created": {
+        "title": "Token succesvol aangemaakt",
+        "copyNow": "Kopieer deze token nu — hij wordt niet opnieuw getoond.",
+        "copy": "Kopiëren"
+      },
+      "form": {
+        "description": "Beschrijving",
+        "descriptionPlaceholder": "Listenertoken voor productie",
+        "maxUses": "Max. gebruik",
+        "maxUsesHint": "Standaard 2 — tolereert één bootstrap-race-herhaling over listenerreplica's heen.",
+        "expiresAt": "Verloopt op",
+        "expiresAtHint": "Standaard 1 uur vanaf nu."
+      },
+      "columns": {
+        "description": "Beschrijving",
+        "uses": "Gebruik",
+        "expires": "Verloopt",
+        "status": "Status",
+        "createdBy": "Aangemaakt door",
+        "actions": "Acties"
+      },
+      "badges": {
+        "revoked": "Ingetrokken",
+        "active": "Actief"
+      }
+    },
+    "listeners": {
+      "empty": "Geen listeners geregistreerd voor deze pool.",
+      "columns": {
+        "name": "Naam",
+        "status": "Status",
+        "replicas": "Replica's",
+        "certExpires": "Certificaat verloopt",
+        "actions": "Acties"
+      },
+      "status": {
+        "online": "online",
+        "offline": "offline",
+        "degraded": "gedegradeerd",
+        "cert-expired": "certificaat-verlopen"
+      },
+      "tooltips": {
+        "certExpired": "Listener stuurt heartbeats maar het certificaat is verlopen — elke certificaat-geauthenticeerde aanroep (uitvoering claimen, verlengen, runner-token) zal mislukken. Meest waarschijnlijke oorzaak: de API heeft het nieuwste certificaat nooit geregistreerd, of de certificaat-TTL is verstreken vóór verlenging.",
+        "degraded": "Listeners sturen heartbeats maar hun certificaten zijn verlopen — uitvoeringen kunnen niet worden gestart."
+      }
+    },
+    "confirm": {
+      "revokeToken": "Deze join-token intrekken? Listeners die deze gebruiken kunnen niet meer toetreden, en dit kan niet ongedaan worden gemaakt.",
+      "deleteListener": "Deze listener verwijderen? Hij registreert zich opnieuw bij zijn volgende heartbeat als de pod nog draait."
+    },
+    "success": {
+      "poolUpdated": "Pool bijgewerkt",
+      "tokenRevoked": "Token ingetrokken",
+      "listenerDeleted": "Listener verwijderd"
+    },
+    "errors": {
+      "loadPools": "Kan agent-pools niet laden",
+      "loadPool": "Kan pool niet laden",
+      "loadTokens": "Kan tokens niet laden",
+      "loadListeners": "Kan listeners niet laden",
+      "createPool": "Kan pool niet aanmaken",
+      "createStatus": "Kan pool niet aanmaken ({status})",
+      "updatePool": "Kan pool niet bijwerken",
+      "deletePool": "Kan pool niet verwijderen",
+      "poolNotFound": "Pool niet gevonden",
+      "createToken": "Kan token niet aanmaken",
+      "createTokenStatus": "Kan token niet aanmaken ({status})",
+      "revokeToken": "Kan token niet intrekken",
+      "deleteListener": "Kan listener niet verwijderen"
+    }
+  },
+  "adminAuditLog": {
+    "title": "Auditlogboek",
+    "description": "Onveranderlijk logboek van alle API-verzoeken",
+    "empty": "Geen auditlogboekvermeldingen gevonden.",
+    "errors": {
+      "load": "Kan auditlogboek niet laden"
+    },
+    "filters": {
+      "actorEmail": "E-mail actor",
+      "actorPlaceholder": "user@example.com",
+      "resourceType": "Resourcetype",
+      "resourceTypePlaceholder": "workspaces",
+      "method": "Methode",
+      "methodAll": "Alle",
+      "since": "Vanaf",
+      "until": "Tot",
+      "clear": "Wissen",
+      "apply": "Filters toepassen"
+    },
+    "columns": {
+      "timestamp": "Tijdstempel",
+      "actor": "Actor",
+      "action": "Actie",
+      "resourceType": "Resourcetype",
+      "resourceId": "Resource-ID",
+      "status": "Status",
+      "duration": "Duur"
+    },
+    "pagination": {
+      "summary": "Pagina {current} van {total} ({count, plural, one {# vermelding} other {# vermeldingen}})",
+      "previous": "Vorige",
+      "next": "Volgende"
+    }
+  },
+  "adminBinaryCache": {
+    "title": "Cache",
+    "description": "Beheer van CLI-binary- en providercache",
+    "errors": {
+      "loadBinary": "Kan binarycache niet laden",
+      "loadCache": "Kan cache niet laden"
+    },
+    "sections": {
+      "cliBinaries": "CLI-binaries",
+      "providerBinaries": "Providerbinaries"
+    },
+    "empty": {
+      "binaries": "Nog geen gecachte CLI-binaries.",
+      "providers": "Nog geen gecachte providerbinaries."
+    },
+    "columns": {
+      "tool": "Tool",
+      "version": "Versie",
+      "os": "OS",
+      "arch": "Arch",
+      "cachedAt": "Gecacht op",
+      "provider": "Provider",
+      "hostname": "Hostnaam",
+      "actions": "Acties"
+    },
+    "warm": {
+      "heading": "Cache opwarmen",
+      "hide": "Verbergen",
+      "prePopulate": "Vooraf vullen…",
+      "help": "Trek vooraf binaries en providerplatforms de cache in (één per regel). Achterliggende <code>os/arch</code>-tokens zijn optioneel — laat ze weg om de geconfigureerde standaardplatforms te gebruiken.",
+      "binariesLabel": "Binaries",
+      "providersLabel": "Providers",
+      "warm": "Opwarmen",
+      "warming": "Bezig met opwarmen…",
+      "confirm": "De geselecteerde cachevermeldingen nu opwarmen?",
+      "errorEmpty": "Voeg minstens één binary- of providerregel toe om op te warmen.",
+      "errorFailedStatus": "Opwarmen mislukt ({status})",
+      "errorFailed": "Kan cache niet opwarmen",
+      "success": "{succeeded}/{total} opgewarmd ({failed} mislukt)"
+    },
+    "purge": {
+      "button": "Wissen",
+      "confirmBinary": "{tool} {version} uit de cache wissen? Het wordt bij het volgende verzoek opnieuw van upstream opgehaald.",
+      "confirmProvider": "{provider} {version} uit de providercache wissen? Het wordt bij het volgende verzoek opnieuw van upstream opgehaald.",
+      "successBinary": "{count} vermeldingen gewist voor {tool} {version}",
+      "successProvider": "{count} vermeldingen gewist voor {provider} {version}",
+      "errorStatus": "Wissen mislukt ({status})",
+      "error": "Kan niet wissen",
+      "errorProvider": "Kan provider niet wissen",
+      "errorProviders": "Kan providers niet wissen"
+    },
+    "batchPurge": {
+      "purging": "Bezig met wissen...",
+      "purgeSelected": "Geselecteerde wissen ({count})",
+      "confirmBinary": "Alle geselecteerde binarycachevermeldingen wissen? Ze worden bij het volgende verzoek opnieuw van upstream opgehaald.",
+      "confirmProvider": "Alle geselecteerde providercachevermeldingen wissen? Ze worden bij het volgende verzoek opnieuw van upstream opgehaald.",
+      "errorBinaryItem": "Wissen mislukt voor {tool} {version}",
+      "errorProviderItem": "Wissen mislukt voor {provider} {version}",
+      "successBinary": "{count} binarycachevermeldingen gewist",
+      "successProvider": "{count} providercachevermeldingen gewist"
+    }
+  },
+  "catalog": {
+    "title": "Servicecatalogus",
+    "description": "Provisioneer selfservice-infrastructuur vanuit samengestelde modules",
+    "notEnabled": "Servicecatalogus is niet ingeschakeld.",
+    "empty": "Geen catalogusitems beschikbaar.",
+    "card": {
+      "pinned": "vastgepind {version}",
+      "latest": "nieuwste"
+    },
+    "errors": {
+      "loadItems": "Kan catalogusitems niet laden"
+    }
+  },
+  "catalogDetail": {
+    "backLink": "← Catalogus",
+    "backToCatalog": "Terug naar catalogus",
+    "fallbackTitle": "Catalogusitem",
+    "notFound": "Catalogusitem niet gevonden, of de servicecatalogus is niet ingeschakeld.",
+    "common": {
+      "cancel": "Annuleren"
+    },
+    "info": {
+      "module": "Module:",
+      "resolvedVersion": "Opgeloste versie:",
+      "latest": "nieuwste",
+      "disabled": "uitgeschakeld"
+    },
+    "pending": {
+      "banner": "De uitvoering voor <strong>{name}</strong> is gepland en wacht op beoordeling. Bevestig om toe te passen, of verwerp.",
+      "working": "Bezig…",
+      "confirmApply": "Bevestigen & toepassen",
+      "discard": "Verwerpen"
+    },
+    "field": {
+      "select": "Selecteren…"
+    },
+    "provision": {
+      "title": "Provisioneren",
+      "workspaceName": "Workspacenaam",
+      "workspaceNameTitle": "Alleen letters, cijfers, koppeltekens en underscores. Moet met een letter of cijfer beginnen.",
+      "workspaceNamePlaceholder": "my-instance",
+      "agentPool": "Agent-pool",
+      "selectPool": "Selecteer een pool…",
+      "noPoolsAvailable": "Er zijn geen agent-pools voor u beschikbaar. U hebt schrijftoegang tot een agent-pool nodig om te provisioneren — vraag een beheerder om deze toe te kennen.",
+      "noPoolsAllowed": "Geen van de agent-pools waartoe u toegang hebt, is toegestaan door dit catalogusitem. Vraag een beheerder om de toegestane pools van het item te verbreden of om u toegang tot een ervan te geven.",
+      "version": "Versie",
+      "latestFloat": "Nieuwste (drijvend)",
+      "defaultPinOption": "{version} (standaard vastpinning)",
+      "labelsOptional": "Labels (optioneel)",
+      "autoApplyHint": "Automatisch toepassen past wijzigingen toe zonder een handmatige beoordelingsstap.",
+      "provisioning": "Bezig met provisioneren…",
+      "submit": "Provisioneren"
+    },
+    "instances": {
+      "title": "Instanties",
+      "empty": "Nog geen instanties geprovisioneerd vanuit dit item.",
+      "colName": "Naam",
+      "colVersion": "Versie",
+      "colPool": "Pool",
+      "colActions": "Acties",
+      "reconfigure": "Herconfigureren",
+      "destroy": "Vernietigen",
+      "orphan": "Verwezen…",
+      "orphanTitle": "Verwijder de catalogusregistratie zonder de infrastructuur te vernietigen (afgeraden)"
+    },
+    "reconfigure": {
+      "title": "{name} herconfigureren",
+      "description": "Werk inputs en/of versie bij en zet vervolgens een uitvoering in de wachtrij.",
+      "currentOption": "{version} (huidig)",
+      "queuing": "In wachtrij zetten…",
+      "queueRun": "Uitvoering in wachtrij zetten"
+    },
+    "destroy": {
+      "title": "{name} vernietigen",
+      "heading": "{name} vernietigen?",
+      "description": "Hiermee wordt een destroy-uitvoering in de wachtrij gezet die de infrastructuur van deze instantie afbreekt. Bij een succesvolle apply wordt de workspace gearchiveerd. Dit kan niet ongedaan worden gemaakt.",
+      "autoApplyHint": "Automatisch toepassen breekt onmiddellijk af zonder beoordeling."
+    },
+    "orphan": {
+      "title": "{name} verwezen",
+      "heading": "{name} verwezen?",
+      "description": "Hiermee wordt de catalogusinstantieregistratie verwijderd maar wordt de infrastructuur <warn>niet</warn> vernietigd — de geprovisioneerde resources blijven draaien, <warn>niet-gevolgd en onbeheerd</warn>. Dit wordt afgeraden. Om de infrastructuur terug te winnen, annuleer en gebruik in plaats daarvan <emph>Vernietigen</emph>.",
+      "confirmPrompt": "Typ de instantienaam <mono>{name}</mono> om te bevestigen:",
+      "orphaning": "Bezig met verwezen…",
+      "submit": "Verwezen & infrastructuur achterlaten"
+    },
+    "actions": {
+      "confirmed": "Uitvoering bevestigd — bezig met toepassen.",
+      "discarded": "Uitvoering verworpen.",
+      "provisioned": "{name} geprovisioneerd — plan is klaar voor beoordeling.",
+      "reconfigureQueued": "Herconfiguratie in wachtrij — uitvoering aangemaakt.",
+      "reconfigureQueuedStatus": "Herconfiguratie in wachtrij — uitvoering is {status}.",
+      "destroyQueued": "Vernietiging in wachtrij — uitvoering aangemaakt.",
+      "destroyQueuedStatus": "Vernietiging in wachtrij — uitvoering is {status}.",
+      "orphaned": "{name} verwezen — catalogusregistratie verwijderd; de infrastructuur blijft draaien, niet-gevolgd en onbeheerd."
+    },
+    "errors": {
+      "loadItem": "Kan catalogusitem niet laden",
+      "confirm": "Kan niet bevestigen",
+      "confirmStatus": "Kan niet bevestigen ({status})",
+      "discard": "Kan niet verwerpen",
+      "discardStatus": "Kan niet verwerpen ({status})",
+      "provision": "Kan niet provisioneren",
+      "provisionStatus": "Kan niet provisioneren ({status})",
+      "reconfigure": "Kan niet herconfigureren",
+      "reconfigureStatus": "Kan niet herconfigureren ({status})",
+      "destroy": "Kan niet vernietigen",
+      "destroyStatus": "Kan niet vernietigen ({status})",
+      "orphan": "Kan niet verwezen",
+      "orphanStatus": "Kan niet verwezen ({status})"
+    }
+  },
+  "common": {
+    "connection": {
+      "reconnecting": "Opnieuw verbinden…"
+    },
+    "sessionExpiry": {
+      "banner": "Sessie verloopt over {minutes, plural, one {# minuut} other {# minuten}} — <link>opnieuw authenticeren</link>"
+    },
+    "tokenExpiry": {
+      "withinDays": "{count, plural, one {# servicetoken} other {# servicetokens}} verloopt binnen {days, plural, one {# dag} other {# dagen}} — <link>bekijken</link>",
+      "soon": "{count, plural, one {# servicetoken} other {# servicetokens}} verloopt binnenkort — <link>bekijken</link>",
+      "dismissAria": "Waarschuwing over tokenvervaldatum sluiten"
+    },
+    "resourceUsage": {
+      "title": "Resourcegebruik",
+      "oomKilled": "Door OOM beëindigd",
+      "killedLikelyOom": "Beëindigd (waarschijnlijk OOM)",
+      "memory": "Geheugen",
+      "requested": "Aangevraagd {value}",
+      "limit": "Limiet {value}"
+    },
+    "labelsEditor": {
+      "none": "Geen",
+      "removeAria": "{key} verwijderen",
+      "keyPlaceholder": "sleutel",
+      "valuePlaceholder": "waarde",
+      "add": "Toevoegen"
+    },
+    "sensitiveInput": {
+      "hide": "Verbergen",
+      "show": "Tonen",
+      "hideAria": "Waarde verbergen",
+      "showAria": "Waarde tonen"
+    },
+    "workspacePicker": {
+      "searchPlaceholder": "Zoek workspaces…",
+      "loading": "Bezig met laden…",
+      "empty": "Geen workspaces gevonden",
+      "adding": "Bezig met toevoegen…"
+    },
+    "templateEditors": {
+      "remove": "Verwijderen",
+      "add": "Toevoegen",
+      "valuePlaceholder": "waarde",
+      "name": "Naam",
+      "url": "URL",
+      "hmacKey": "HMAC-sleutel (optioneel)",
+      "hmacKeyPlaceholder": "gedeeld geheim",
+      "stage": "Fase",
+      "enforcement": "Handhaving",
+      "enabled": "Ingeschakeld",
+      "runTaskNamePlaceholder": "security-scan",
+      "runTaskUrlPlaceholder": "https://hooks.example.com/task",
+      "addRunTask": "Run-task toevoegen",
+      "destinationType": "Bestemmingstype",
+      "token": "Token (optioneel)",
+      "tokenPlaceholder": "HMAC-/authtoken",
+      "notificationNamePlaceholder": "slack-alerts",
+      "notificationUrlPlaceholder": "https://hooks.slack.com/services/...",
+      "emailAddresses": "E-mailadressen",
+      "emailPlaceholder": "ops@example.com",
+      "addEmail": "E-mail toevoegen",
+      "triggers": "Triggers",
+      "addNotification": "Notificatie toevoegen"
+    }
+  },
+  "planSummary": {
+    "aiGenerated": "Door AI gegenereerd",
+    "heading": {
+      "planSummary": "Plansamenvatting",
+      "failureAnalysis": "Foutanalyse"
+    },
+    "errors": {
+      "status": "HTTP {status}"
+    },
+    "regenerate": {
+      "label": "Opnieuw genereren",
+      "queueing": "In wachtrij zetten…",
+      "tooltip": "De AI-samenvatting opnieuw uitvoeren tegen dezelfde plan-inputs",
+      "ariaLabel": "AI-samenvatting opnieuw genereren",
+      "confirm": "De AI-analyse opnieuw genereren? Hiermee wordt het model opnieuw uitgevoerd.",
+      "error": "Kan niet opnieuw genereren: <mono>{detail}</mono>"
+    },
+    "pending": {
+      "summarisingPlan": "Plan samenvatten…",
+      "analysingFailure": "Fout analyseren…"
+    },
+    "skipped": {
+      "fallback": "Samenvatting overgeslagen voor deze uitvoering."
+    },
+    "errored": {
+      "heading": "Samenvatter mislukt"
+    },
+    "riskFactors": {
+      "heading": "Risicofactoren",
+      "suggestedFixes": "Voorgestelde oplossingen"
+    },
+    "tokens": "{input} in / {output} uit tokens",
+    "risk": {
+      "low": "laag",
+      "medium": "gemiddeld",
+      "high": "hoog",
+      "critical": "kritiek",
+      "unknown": "onbekend"
+    },
+    "badges": {
+      "noChanges": "Geen wijzigingen",
+      "noChangesLower": "geen wijzigingen",
+      "noChangesTitle": "Plan rapporteerde geen resourcewijzigingen",
+      "toAdd": "{count, plural, one {# toe te voegen} other {# toe te voegen}}",
+      "toChange": "{count, plural, one {# te wijzigen} other {# te wijzigen}}",
+      "toDestroy": "{count, plural, one {# te vernietigen} other {# te vernietigen}}",
+      "toReplace": "{count, plural, one {# te vervangen} other {# te vervangen}}",
+      "toImport": "{count, plural, one {# te importeren} other {# te importeren}}"
+    },
+    "chat": {
+      "heading": "Vervolgvraag",
+      "sharedThreadNote": "Eén gedeelde thread, zichtbaar voor iedereen met leestoegang tot de workspace.",
+      "placeholder": "Stel een vervolgvraag over dit plan… (⌘/Ctrl + Enter om te verzenden)",
+      "send": "Verzenden",
+      "thinking": "Bezig met nadenken…",
+      "you": "U",
+      "assistant": "Assistent"
+    },
+    "translatedNote": "Automatisch vertaald naar uw taal. De gezaghebbende samenvatting is het origineel.",
+    "translating": "Bezig met vertalen…"
+  },
+  "runDetail": {
+    "notFound": "Uitvoering niet gevonden",
+    "runSection": "Uitvoeringssectie",
+    "workspaceFallback": "workspace",
+    "backTo": "Terug naar {name}",
+    "errorHeading": "Fout",
+    "discardedHeading": "Verworpen — opnieuw plannen vereist",
+    "common": {
+      "yes": "Ja",
+      "no": "Nee"
+    },
+    "header": {
+      "title": "Uitvoering {id}",
+      "titleWithWorkspace": "{workspace} — uitvoering {id}",
+      "description": "{source}-uitvoering"
+    },
+    "relTime": {
+      "justNow": "zojuist",
+      "minutesAgo": "{count, plural, one {# minuut geleden} other {# minuten geleden}}",
+      "hoursAgo": "{count, plural, one {# uur geleden} other {# uur geleden}}",
+      "daysAgo": "{count, plural, one {# dag geleden} other {# dagen geleden}}"
+    },
+    "status": {
+      "pending": "In afwachting",
+      "queued": "In wachtrij",
+      "planning": "Bezig met plannen",
+      "planned": "Gepland",
+      "confirmed": "Bevestigd",
+      "applying": "Bezig met toepassen",
+      "canceling": "Bezig met annuleren",
+      "applied": "Toegepast",
+      "errored": "Mislukt",
+      "canceled": "Geannuleerd",
+      "discarded": "Verworpen"
+    },
+    "activity": {
+      "pending": "Uitvoering voorbereiden",
+      "queued": "Wachten op een beschikbare agent",
+      "planning": "terraform plan uitvoeren",
+      "plannedConfirmable": "Wachten tot u bevestigt & toepast",
+      "plannedSpeculative": "Speculatief plan voltooid",
+      "plannedComplete": "Plan voltooid",
+      "confirmed": "Apply starten",
+      "applying": "terraform apply uitvoeren",
+      "canceling": "De uitvoering stoppen",
+      "applied": "Apply voltooid",
+      "errored": "Uitvoering mislukt",
+      "canceled": "Uitvoering geannuleerd",
+      "discarded": "Plan verworpen",
+      "elapsedTitle": "Verstreken in deze fase"
+    },
+    "badge": {
+      "destroy": "vernietigen",
+      "planOnly": "alleen plan"
+    },
+    "actions": {
+      "retryShort": "Opnieuw",
+      "retryFull": "Uitvoering opnieuw proberen",
+      "retrying": "Bezig met opnieuw proberen…",
+      "confirmShort": "Toepassen",
+      "confirmFull": "Bevestigen & toepassen",
+      "confirming": "Bezig met bevestigen…",
+      "discard": "Verwerpen",
+      "discarding": "Bezig met verwerpen…",
+      "cancelShort": "Annuleren",
+      "cancelFull": "Uitvoering annuleren",
+      "canceling": "Bezig met annuleren…"
+    },
+    "confirm": {
+      "apply": "Deze uitvoering toepassen? Hiermee wordt het plan toegepast en infrastructuur gewijzigd.",
+      "discard": "Dit plan verwerpen?",
+      "cancel": "Deze uitvoering annuleren?",
+      "retry": "Deze uitvoering opnieuw proberen?"
+    },
+    "errors": {
+      "loadRun": "Kan uitvoering niet laden",
+      "action": {
+        "confirm": "Kan uitvoering niet bevestigen",
+        "discard": "Kan uitvoering niet verwerpen",
+        "cancel": "Kan uitvoering niet annuleren",
+        "retry": "Kan uitvoering niet opnieuw proberen"
+      }
+    },
+    "tabs": {
+      "overview": "Overzicht",
+      "ai": "AI",
+      "aiFull": "AI-analyse",
+      "opa": "OPA",
+      "opaFull": "OPA-beleidsregels",
+      "impact": "Impact",
+      "impactFull": "Impactgrafiek",
+      "planLabel": "Plan<log>-logboek</log>",
+      "applyLabel": "Apply<log>-logboek</log>",
+      "planFull": "Plan-logboek",
+      "applyFull": "Apply-logboek",
+      "details": "Details"
+    },
+    "banner": {
+      "destroy": "Dit is een <strong>destroy</strong>-uitvoering — alle beheerde resources worden vernietigd bij toepassing.",
+      "planOnlyCli": "Dit is een uitvoering met <strong>alleen plan</strong>, gestart vanuit de CLI op een VCS-verbonden workspace. Apply is niet beschikbaar voor via CLI geüploade code — alleen VCS-beheerde code kan worden toegepast.",
+      "moduleOverridesPrefix": "Deze uitvoering gebruikt <strong>module-overschrijvingen</strong>",
+      "moduleOverridesFromPr": "uit PR #{number}",
+      "moduleOverridesSuffix": "worden opgehaald uit de PR-branch in plaats van uit de gepubliceerde registryversie."
+    },
+    "cards": {
+      "changes": "Wijzigingen",
+      "aiAnalysis": "AI-analyse",
+      "policyChecks": "Beleidscontroles",
+      "resources": "Resources"
+    },
+    "changes": {
+      "noChanges": "Geen wijzigingen",
+      "planning": "Bezig met plannen…",
+      "toAdd": "toe te voegen",
+      "toChange": "te wijzigen",
+      "toDestroy": "te vernietigen",
+      "toReplace": "te vervangen",
+      "toImport": "te importeren"
+    },
+    "ai": {
+      "notAvailable": "Niet beschikbaar",
+      "ready": "Gereed",
+      "riskSub": "{risk} risico",
+      "generating": "Bezig met genereren…",
+      "skipped": "Overgeslagen",
+      "failed": "Mislukt",
+      "available": "Beschikbaar"
+    },
+    "policy": {
+      "none": "Geen",
+      "blocked": "Geblokkeerd",
+      "failedSub": "{count, plural, one {# mislukt} other {# mislukt}}",
+      "advisoryIssues": "Adviserende problemen",
+      "passedSub": "{passed}/{total} geslaagd",
+      "passed": "Geslaagd"
+    },
+    "resources": {
+      "overLimit": "Boven limiet",
+      "oomKilled": "Door OOM beëindigd",
+      "recorded": "Vastgelegd",
+      "nearLimit": "Bij limiet",
+      "high": "Hoog",
+      "withinLimits": "Binnen limieten"
+    },
+    "details": {
+      "heading": "Details",
+      "executionBackend": "Uitvoeringsbackend",
+      "source": "Bron",
+      "autoApply": "Automatisch toepassen",
+      "planOnly": "Alleen plan",
+      "triggeredBy": "Geactiveerd door",
+      "created": "Aangemaakt",
+      "commit": "Commit",
+      "branch": "Branch",
+      "prMr": "PR/MR",
+      "stateVersion": "State-versie",
+      "viewState": "State bekijken",
+      "runOptions": "Uitvoeringsopties"
+    },
+    "timeline": {
+      "heading": "Tijdlijn",
+      "queued": "In wachtrij",
+      "planningStarted": "Plannen gestart",
+      "planComplete": "Plan voltooid",
+      "confirmed": "Bevestigd",
+      "applyingStarted": "Toepassen gestart",
+      "applied": "Toegepast",
+      "errored": "Mislukt",
+      "canceled": "Geannuleerd",
+      "discarded": "Verworpen"
+    },
+    "log": {
+      "color": "Kleur",
+      "colorOnTitle": "ANSI-kleuren weergeven — klik voor platte tekst",
+      "colorOffTitle": "Platte tekst weergeven — klik voor kleuren",
+      "refresh": "Vernieuwen",
+      "refreshTitle": "Logboek vernieuwen",
+      "copy": "Kopiëren",
+      "copied": "Gekopieerd!",
+      "copyTitle": "Platte tekst naar klembord kopiëren",
+      "copyAria": "Logboek naar klembord kopiëren",
+      "download": "Downloaden",
+      "downloadColorTitle": "Logboek downloaden (met ANSI-kleurcodes)",
+      "downloadPlainTitle": "Logboek downloaden (platte tekst)",
+      "downloadAria": "Logboek downloaden",
+      "follow": "Volgen",
+      "followOnTitle": "De live tail volgen — klik om te stoppen",
+      "followOffTitle": "De live tail volgen",
+      "end": "Einde",
+      "endTitle": "Naar het einde van het logboek springen",
+      "planEmpty": "Nog geen planuitvoer beschikbaar.",
+      "applyEmpty": "Nog geen applyuitvoer beschikbaar."
+    },
+    "policyPanel": {
+      "heading": "Beleidscontroles",
+      "passedCount": "{passed}/{total} geslaagd",
+      "blockedMessage": "Deze uitvoering wordt <strong>geblokkeerd door een verplichte beleidsset</strong>. Ze wordt niet toegepast totdat de fout is opgelost of een beheerder ze overschrijft.",
+      "overriding": "Bezig met overschrijven...",
+      "overrideContinue": "Overschrijven & doorgaan",
+      "overrideFailed": "Overschrijven mislukt",
+      "overrideFailedStatus": "Overschrijven mislukt ({status})",
+      "overriddenBy": "overschreven door {by}",
+      "policyPassed": "geslaagd",
+      "noDenyMessage": "Beleidsregel mislukte zonder een deny-bericht of foutuitvoer te produceren",
+      "enforcement": {
+        "mandatory": "verplicht",
+        "advisory": "adviserend"
+      },
+      "outcome": {
+        "passed": "geslaagd",
+        "failed": "mislukt",
+        "errored": "fout"
+      }
+    }
+  },
+  "workspaceDetail": {
+    "notFound": "Workspace niet gevonden",
+    "common": {
+      "enabled": "Ingeschakeld",
+      "disabled": "Uitgeschakeld",
+      "none": "Geen",
+      "default": "Standaard",
+      "never": "Nooit",
+      "actions": "Acties",
+      "workspaceLocked": "Workspace is vergrendeld"
+    },
+    "actions": {
+      "edit": "Bewerken",
+      "cancel": "Annuleren",
+      "save": "Opslaan",
+      "saving": "Bezig met opslaan…",
+      "savingEllipsis": "Bezig met opslaan...",
+      "delete": "Verwijderen",
+      "deleting": "Bezig met verwijderen...",
+      "add": "Toevoegen",
+      "adding": "Bezig met toevoegen...",
+      "remove": "Verwijderen",
+      "download": "Downloaden",
+      "rollback": "Terugdraaien",
+      "close": "Sluiten",
+      "hide": "Verbergen",
+      "enable": "Inschakelen",
+      "disable": "Uitschakelen",
+      "creating": "Bezig met aanmaken...",
+      "sending": "Bezig met verzenden...",
+      "processing": "Bezig met verwerken...",
+      "queuing": "In wachtrij zetten...",
+      "loading": "Bezig met laden...",
+      "loadingLower": "bezig met laden…"
+    },
+    "header": {
+      "executionMode": "{mode}-uitvoeringsmodus"
+    },
+    "tabs": {
+      "overview": "Overzicht",
+      "variables": "Variabelen",
+      "runs": "Uitvoeringen",
+      "state": "State",
+      "stateGraph": "State-grafiek",
+      "configurations": "Configuraties",
+      "notifications": "Notificaties",
+      "runTasks": "Run-tasks",
+      "runTriggers": "Run-triggers",
+      "sharing": "Delen",
+      "selectLabel": "Workspacesectie"
+    },
+    "lifecycle": {
+      "pendingDeletion": "In afwachting van verwijdering",
+      "pendingDeletionDefault": "Deze workspace is gemarkeerd voor verwijdering en vereist handmatige actie.",
+      "archived": "Gearchiveerd",
+      "archivedDefault": "Deze workspace is gearchiveerd."
+    },
+    "runQueuedBanner": {
+      "message": "Uitvoering succesvol in de wachtrij gezet.",
+      "viewRun": "Uitvoering bekijken"
+    },
+    "settings": {
+      "title": "Instellingen",
+      "saveChanges": "Wijzigingen opslaan",
+      "renamedNotice": "Workspace hernoemd. Werk het veld <name></name> in uw <cloud></cloud>-blok bij zodat het overeenkomt."
+    },
+    "fields": {
+      "name": "Naam",
+      "nameTitle": "Letters, cijfers, koppeltekens, underscores. Moet met een letter of cijfer beginnen.",
+      "executionMode": "Uitvoeringsmodus",
+      "execModeLocal": "Lokaal",
+      "execModeAgent": "Agent",
+      "autoApply": "Automatisch toepassen",
+      "cpuRequest": "CPU-aanvraag",
+      "cpuRequestTitle": "Kubernetes-CPU-hoeveelheid: hele cores (1, 2) of millicores (500m, 100m)",
+      "memoryRequest": "Geheugenaanvraag",
+      "memoryRequestTitle": "Kubernetes-geheugenhoeveelheid: bytes (1000) of met achtervoegsel (512Mi, 2Gi, 1Ti)",
+      "executionBackend": "Uitvoeringsbackend",
+      "version": "Versie",
+      "versionPlaceholder": "bijv. 1.11 of 1.11.5",
+      "versionTitle": "Versie in het formaat X.Y of X.Y.Z (bijv. 1.11 of 1.11.5)",
+      "terragruntEnabledAgent": "Ingeschakeld (agentmodus)",
+      "terragruntEnabledVersion": "Ingeschakeld (v{version})",
+      "terragruntVersionPlaceholder": "bijv. 1.0",
+      "terragruntVersionTitle": "Terragrunt-versie in het formaat X.Y of X.Y.Z (bijv. 1.0)",
+      "workingDirectory": "Werkmap",
+      "workingDirectoryPlaceholder": "bijv. environments/dev",
+      "agentPool": "Agent-pool",
+      "owner": "Eigenaar",
+      "vcsConnection": "VCS-verbinding",
+      "vcsRepository": "VCS-repository",
+      "vcsRepositoryTitle": "Moet een HTTP- of HTTPS-URL zijn",
+      "vcsBranch": "VCS-branch",
+      "vcsBranchPlaceholder": "main (standaard)",
+      "vcsWorkflow": "VCS-workflow",
+      "vcsWorkflowMergeThenApply": "merge_then_apply (standaard — TFE / HCP-standaard)",
+      "vcsWorkflowApplyThenMerge": "apply_then_merge (Atlantis-standaard — opt-in)",
+      "autoMerge": "Automatisch samenvoegen na apply",
+      "autoMergeStrategy": "Strategie voor automatisch samenvoegen",
+      "vcsPolling": "VCS-polling",
+      "labels": "Labels (tags)",
+      "labelsTitle": "Workspacelabels doen dubbel werk: matching voor label-gebaseerde RBAC, en als de \"tags\" die worden gematcht door terraform/tofu cloud '{' workspaces '{' tags = ... '}' '}'-blokken.",
+      "varFiles": "Var-bestanden",
+      "varFilesPlaceholder": "bijv. envs/dev.tfvars",
+      "triggerPrefixes": "Trigger-voorvoegsels",
+      "triggerPrefixesHint": "Mappen die uitvoeringen activeren. Overschrijft werkmapfiltering wanneer ingesteld.",
+      "triggerPrefixesPlaceholder": "bijv. modules",
+      "triggerPrefixesNone": "Geen (gebruikt werkmap)",
+      "driftIgnoreRules": "Drift-negeerregels",
+      "driftIgnoreRulesHint": "Glob-bewuste Terraform-adres- + attribuutpaden die door de drift-classificator worden onderdrukt. <star></star> komt overeen met nul of meer niet-<dot></dot>-tekens (overspant <n></n> indices); <starIdx></starIdx> komt overeen met elke index tussen haakjes. Een kaal adres zonder attribuutachtervoegsel dempt elke wijziging aan die resource — inclusief destroys. Beïnvloedt alleen drift, niet gewone plan/apply. Zie <docs>drift-ignore-rules.md</docs> voor de volledige grammatica.",
+      "driftIgnoreRulesNone": "Geen (elk planverschil telt als drift)"
+    },
+    "vcsWorkflowWarning": {
+      "title": "Autorisatie gedelegeerd aan uw VCS-repository.",
+      "rbac": "Iedereen die de PR kan samenvoegen, kan toepassen. Branch-beschermingsregels (vereiste beoordelingen, statuscontroles, goedkeuring van code-eigenaar) worden de poort. Terrapod-rol-/label-RBAC is in deze modus<em>niet</em> van toepassing op comment-gestuurde acties.",
+      "recommended": "<strong>Aanbevolen:</strong> vereis lineaire geschiedenis (rebase/squash vóór samenvoegen) zodat de commit die u toepast de commit is die landt.",
+      "credit": "Met dank: deze workflow is gemodelleerd naar <atlantis>Atlantis</atlantis>. Atlantis blijft de juiste tool voor teams die alleen PR-comment-gestuurde applies willen en geen platform-UI."
+    },
+    "vcsPolling": {
+      "error": "Fout",
+      "ok": "OK ({time})",
+      "notPolled": "Nog niet gepolld"
+    },
+    "lockout": {
+      "revertLabels": "Labels terugzetten",
+      "saveAnyway": "Toch opslaan"
+    },
+    "lock": {
+      "title": "Vergrendelingsstatus",
+      "lockedDesc": "Deze workspace is vergrendeld. Er kunnen geen plannen of applies worden uitgevoerd.",
+      "unlockedDesc": "Deze workspace is ontgrendeld en klaar voor uitvoeringen.",
+      "lock": "Vergrendelen",
+      "unlock": "Ontgrendelen",
+      "lockConfirm": "Deze workspace vergrendelen?",
+      "unlockConfirm": "Deze workspace ontgrendelen?"
+    },
+    "drift": {
+      "title": "Driftdetectie",
+      "checkInterval": "Controle-interval",
+      "status": "Status",
+      "statusNoDrift": "Geen drift",
+      "statusDrifted": "Afgedreven",
+      "statusErrored": "Mislukt",
+      "statusUnchecked": "Niet gecontroleerd",
+      "dismiss": "Sluiten",
+      "dismissing": "Bezig met sluiten…",
+      "dismissTitle": "Wis de gerapporteerde driftstatus. De volgende geplande controle vult deze opnieuw op basis van de werkelijkheid.",
+      "lastChecked": "Laatst gecontroleerd",
+      "checkNow": "Nu controleren",
+      "checkNowTitle": "Zet een uitvoering met alleen plan in de wachtrij om op drift te controleren",
+      "checkNowTitleDisabled": "Schakel eerst driftdetectie in"
+    },
+    "intervals": {
+      "disabled": "Uitgeschakeld",
+      "1hour": "1 uur",
+      "4hours": "4 uur",
+      "12hours": "12 uur",
+      "24hours": "24 uur",
+      "48hours": "48 uur",
+      "3days": "3 dagen",
+      "7days": "7 dagen"
+    },
+    "planExpiry": {
+      "title": "Planverval",
+      "description": "Verwerp een onbevestigd plan automatisch zodra het ouder is dan dit, zodat een verouderd plan niet kan worden toegepast op een veranderde wereld. Standaard uit; het plan moet dan opnieuw worden uitgevoerd. (Alleen van toepassing op apply-capabele uitvoeringen.)",
+      "expireAfter": "Verloopt na"
+    },
+    "aiSummary": {
+      "title": "AI-plansamenvatting",
+      "description": "Automatische, door LLM gegenereerde wijzigingssamenvatting, risicobeoordeling en foutanalyse bij elke uitkomst van de planfase voor deze workspace.",
+      "mode": "Modus",
+      "modeDefault": "Standaard van deployment volgen",
+      "modeEnabled": "Altijd samenvatten",
+      "modeDisabled": "Nooit samenvatten",
+      "contextLabel": "Workspacecontext",
+      "contextLabelSuffix": "(optioneel, aanvullend)",
+      "contextPlaceholder": "Feiten die de AI specifiek over deze workspace moet weten. Bijv. 'Fungeert als voorkant van de vault voor service X — het vernietigen van de KMS-sleutel veroorzaakt een wereldwijde storing.'",
+      "noContext": "Geen workspacecontext ingesteld.",
+      "contextHint": "Toegevoegd bovenop de deployment-brede context. Maximaal 4000 tekens."
+    },
+    "slack": {
+      "title": "Slack-notificaties",
+      "description": "Meld deze workspace aan voor Slack-uitvoeringsnotificaties — goedkeuringsverzoeken, applies, fouten en drift. Laat het kanaal leeg en deze workspace blijft stil (er is geen deployment-brede fan-out). Vereist dat de Slack-app door een beheerder is ingeschakeld.",
+      "channel": "Kanaal",
+      "channelPlaceholder": "#deploys of een kanaal-ID (bijv. C0123ABCD)",
+      "notSet": "Niet ingesteld — stil.",
+      "hint": "De Slack-app moet al lid zijn van het kanaal."
+    },
+    "delete": {
+      "title": "Workspace verwijderen",
+      "description": "Verwijder deze workspace en alle bijbehorende state, variabelen en uitvoeringen permanent.",
+      "confirm": "Verwijderen bevestigen"
+    },
+    "variables": {
+      "addVariable": "Variabele toevoegen",
+      "key": "Sleutel",
+      "value": "Waarde",
+      "category": "Categorie",
+      "categoryEnv": "Omgeving",
+      "sensitive": "Gevoelig",
+      "empty": "Geen variabelen geconfigureerd voor deze workspace.",
+      "emptyValue": "leeg",
+      "enterNewValue": "Voer nieuwe waarde in",
+      "deleteConfirm": "Variabele \"{key}\" verwijderen?"
+    },
+    "runs": {
+      "options": "Opties",
+      "hideOptions": "Opties verbergen",
+      "queueDestroy": "Destroy in wachtrij zetten",
+      "queueDestroyTitle": "Zet een destroy-plan in de wachtrij",
+      "destroyAllConfirm": "Alle resources vernietigen?",
+      "confirmDestroy": "Vernietigen bevestigen",
+      "queuePlan": "Plan in wachtrij zetten",
+      "queueRun": "Uitvoering in wachtrij zetten",
+      "queuePlanConfirm": "Een speculatief plan voor deze workspace in de wachtrij zetten?",
+      "queueApplyConfirm": "Een plan + apply-uitvoering in de wachtrij zetten? Dit kan infrastructuur wijzigen.",
+      "planOptions": "Planopties",
+      "targetResources": "Doelresources",
+      "replaceResources": "Resources vervangen",
+      "commaSeparated": "(kommagescheiden)",
+      "planOnly": "Alleen plan",
+      "refreshOnly": "Alleen refresh",
+      "skipRefresh": "Refresh overslaan",
+      "allowEmptyApply": "Lege apply toestaan",
+      "vcsRef": "VCS-ref",
+      "branch": "Branch",
+      "tag": "Tag",
+      "defaultBranch": "Standaard ({branch})",
+      "nonDefaultRefNote": "Niet-standaard ref geselecteerd — uitvoering is alleen plan",
+      "empty": "Nog geen uitvoeringen voor deze workspace.",
+      "runId": "Uitvoerings-ID",
+      "status": "Status",
+      "type": "Type",
+      "changes": "Wijzigingen",
+      "source": "Bron",
+      "triggeredBy": "Geactiveerd door",
+      "created": "Aangemaakt",
+      "needsConfirm": "bevestiging vereist",
+      "typeDestroy": "vernietigen",
+      "typePlanOnly": "alleen plan",
+      "typePlanApply": "plan + apply",
+      "sourceModuleTest": "moduletest",
+      "sourceModulePublish": "modulepublicatie"
+    },
+    "state": {
+      "deleteConfirm": "State-versie #{serial} verwijderen? Dit kan niet ongedaan worden gemaakt.",
+      "rollbackConfirm": "Terugdraaien naar state-versie #{serial}? Er wordt een nieuwe versie met dezelfde inhoud aangemaakt.",
+      "confirmDelete": "Verwijderen bevestigen",
+      "confirmRollback": "Terugdraaien bevestigen",
+      "uploadState": "State uploaden",
+      "empty": "Nog geen state-versies voor deze workspace.",
+      "serial": "Serienummer",
+      "createdBy": "Aangemaakt door",
+      "run": "Uitvoering",
+      "size": "Grootte",
+      "created": "Aangemaakt",
+      "runner": "runner",
+      "latest": "nieuwste"
+    },
+    "configurations": {
+      "description": "Geüploade bronarchieven voor deze workspace, nieuwste eerst. Kies twee rijen om te vergelijken.",
+      "selectedCount": "{count}/2 geselecteerd",
+      "compare": "Vergelijken",
+      "comparing": "Bezig met vergelijken…",
+      "empty": "Nog geen configuratieversies. Ze verschijnen hier zodra een `terraform plan` uploadt of een VCS-push een uitvoering activeert.",
+      "id": "ID",
+      "source": "Bron",
+      "status": "Status",
+      "created": "Aangemaakt",
+      "current": "huidige",
+      "selectForCompare": "{id} selecteren om te vergelijken",
+      "compareLabel": "Vergelijken",
+      "diff": "Diff",
+      "filesChanged": "{count} bestanden gewijzigd",
+      "oversized": "{count, plural, one {# te groot bestand overgeslagen} other {# te grote bestanden overgeslagen}}: {files}",
+      "noDiff": "Geen inhoudsverschillen tussen deze versies.",
+      "binaryChanged": "Binair bestand gewijzigd — diff niet weergegeven.",
+      "diffType": {
+        "added": "toegevoegd",
+        "removed": "verwijderd",
+        "modified": "gewijzigd",
+        "binary-changed": "binair"
+      }
+    },
+    "notifications": {
+      "addNotification": "Notificatie toevoegen",
+      "name": "Naam",
+      "namePlaceholder": "Deploy-notificaties",
+      "destinationType": "Bestemmingstype",
+      "typeGeneric": "Generieke webhook",
+      "typeEmail": "E-mail",
+      "url": "URL",
+      "hmacToken": "HMAC-token (optioneel)",
+      "signingSecret": "Ondertekeningsgeheim",
+      "emailAddresses": "E-mailadressen (kommagescheiden)",
+      "triggerEvents": "Triggergebeurtenissen",
+      "createNotification": "Notificatie aanmaken",
+      "empty": "Geen notificatieconfiguraties voor deze workspace.",
+      "ok": "OK",
+      "err": "Fout {status}",
+      "fail": "MISLUKT",
+      "http": "HTTP {status}",
+      "verify": "Verifiëren",
+      "history": "Geschiedenis",
+      "deliveryHistory": "Bezorggeschiedenis",
+      "enableConfirm": "Deze notificatie inschakelen?",
+      "disableConfirm": "Deze notificatie uitschakelen?",
+      "deleteConfirm": "Notificatie \"{name}\" verwijderen?"
+    },
+    "runTasks": {
+      "addRunTask": "Run-task toevoegen",
+      "name": "Naam",
+      "namePlaceholder": "OPA-beleidscontrole",
+      "webhookUrl": "Webhook-URL",
+      "stage": "Fase",
+      "enforcementLevel": "Handhavingsniveau",
+      "hmacKey": "HMAC-sleutel (optioneel)",
+      "hmacKeyPlaceholder": "Ondertekeningsgeheim voor webhookverificatie",
+      "createRunTask": "Run-task aanmaken",
+      "empty": "Geen run-tasks geconfigureerd voor deze workspace.",
+      "enableConfirm": "Deze run-task inschakelen?",
+      "disableConfirm": "Deze run-task uitschakelen?",
+      "deleteConfirm": "Run-task \"{name}\" verwijderen?"
+    },
+    "runTriggers": {
+      "title": "Run-triggers",
+      "description": "Wanneer een bronworkspace een apply voltooit, krijgen downstream-workspaces automatisch een nieuwe uitvoering in de wachtrij. Tot 20 bronworkspaces per bestemming.",
+      "inboundHeading": "Bronworkspaces die hier uitvoeringen activeren",
+      "inboundEmpty": "Geen bronworkspaces activeren uitvoeringen op deze workspace.",
+      "pickerPlaceholder": "Zoek workspaces om als bron toe te voegen…",
+      "outboundHeading": "Bestemmingsworkspaces die deze workspace activeert",
+      "outboundEmpty": "Deze workspace activeert geen uitvoeringen op een andere workspace.",
+      "destinationNote": "(bestemming; verwijder daar)",
+      "removeConfirm": "Deze run-trigger verwijderen?"
+    },
+    "sharing": {
+      "title": "Remote state delen",
+      "description": "Door de producent gecontroleerde toegestane lijst voor cross-workspace <code></code>. State-gegevens dragen geheimen — ken deze bewust toe. <docs>Documentatie</docs>",
+      "outboundHeading": "Workspaces die geautoriseerd zijn om de state van deze workspace te lezen",
+      "outboundEmpty": "De state van deze workspace wordt met geen enkele andere workspace gedeeld.",
+      "grantedBy": "toegekend door {by}",
+      "revoke": "Intrekken",
+      "revokeConfirm": "Dit remote state delen verwijderen? De consument verliest de toegang tot deze state.",
+      "pickerPlaceholder": "Zoek workspaces om als consument te autoriseren…",
+      "inboundHeading": "Workspaces waarvan deze workspace geautoriseerd is om state te lezen",
+      "inboundEmpty": "Deze workspace is niet geautoriseerd om via terraform_remote_state state van een andere workspace te lezen.",
+      "producerNote": "(producent; trek daar in)"
+    },
+    "runMessages": {
+      "manualDriftCheck": "Handmatige driftcontrole vanuit UI",
+      "queued": "In wachtrij gezet vanuit UI",
+      "queuedSpeculative": "In wachtrij gezet vanuit UI (speculatief)",
+      "destroyQueued": "Destroy in wachtrij gezet vanuit UI"
+    },
+    "errors": {
+      "loadWorkspace": "Kan workspace niet laden",
+      "loadRuns": "Kan uitvoeringen niet laden",
+      "loadVariables": "Kan variabelen niet laden",
+      "loadStateVersions": "Kan state-versies niet laden",
+      "loadConfigurations": "Kan configuratieversies niet laden",
+      "loadNotifications": "Kan notificaties niet laden",
+      "loadOutboundConsumers": "Kan uitgaande remote-state-consumenten niet laden",
+      "loadInboundConsumers": "Kan inkomende remote-state-consumenten niet laden",
+      "loadConsumers": "Kan remote-state-consumenten niet laden",
+      "loadInboundTriggers": "Kan inkomende run-triggers niet laden",
+      "loadOutboundTriggers": "Kan uitgaande run-triggers niet laden",
+      "loadTriggers": "Kan run-triggers niet laden",
+      "loadRunTasks": "Kan run-tasks niet laden",
+      "downloadStateFile": "Kan state-bestand niet downloaden",
+      "downloadFailed": "Downloaden mislukt",
+      "downloadFailedStatus": "Downloaden mislukt ({status})",
+      "downloadTicketMissingUrl": "URL ontbreekt in downloadticketreactie",
+      "diffFailed": "Diff mislukt",
+      "diffFailedStatus": "Diff mislukt ({status})",
+      "authorizeConsumer": "Kan consument niet autoriseren",
+      "revoke": "Kan niet intrekken",
+      "revokeConsumer": "Kan consument niet intrekken",
+      "addTrigger": "Kan run-trigger niet toevoegen",
+      "removeTrigger": "Kan run-trigger niet verwijderen",
+      "createRunTask": "Kan run-task niet aanmaken",
+      "createRunTaskStatus": "Kan run-task niet aanmaken ({status})",
+      "update": "Kan niet bijwerken",
+      "toggleRunTask": "Kan run-task niet omschakelen",
+      "delete": "Kan niet verwijderen",
+      "deleteRunTask": "Kan run-task niet verwijderen",
+      "labelLockout": "Deze labelwijziging zou uw toegang verminderen.",
+      "updateWorkspace": "Kan workspace niet bijwerken",
+      "lockWorkspace": "Kan workspace niet vergrendelen",
+      "unlockWorkspace": "Kan workspace niet ontgrendelen",
+      "updateAiSummary": "Kan AI-samenvattingsinstellingen niet bijwerken",
+      "updateSlackChannel": "Kan Slack-kanaal niet bijwerken",
+      "updateDriftSettings": "Kan driftinstellingen niet bijwerken",
+      "updateDriftInterval": "Kan drift-interval niet bijwerken",
+      "updatePlanExpiry": "Kan planverval niet bijwerken",
+      "queueDriftCheck": "Kan driftcontrole niet in wachtrij zetten",
+      "queueDriftCheckStatus": "Kan driftcontrole niet in wachtrij zetten ({status})",
+      "dismissDrift": "Kan drift niet sluiten",
+      "dismissDriftStatus": "Kan drift niet sluiten ({status})",
+      "deleteWorkspace": "Kan workspace niet verwijderen",
+      "addVariable": "Kan variabele niet toevoegen",
+      "addVariableStatus": "Kan variabele niet toevoegen ({status})",
+      "deleteVariable": "Kan variabele niet verwijderen",
+      "updateVariable": "Kan variabele niet bijwerken",
+      "queuePlan": "Kan plan niet in wachtrij zetten",
+      "queuePlanStatus": "Kan plan niet in wachtrij zetten ({status})",
+      "queueDestroy": "Kan destroy niet in wachtrij zetten",
+      "queueDestroyStatus": "Kan destroy niet in wachtrij zetten ({status})",
+      "createNotification": "Kan notificatie niet aanmaken",
+      "createNotificationStatus": "Kan notificatie niet aanmaken ({status})",
+      "toggleNotification": "Kan notificatie niet omschakelen",
+      "deleteNotification": "Kan notificatie niet verwijderen",
+      "verificationFailed": "Verificatie mislukt",
+      "verificationDeliveryFailed": "Verificatiebezorging mislukt: {detail}",
+      "unknownError": "Onbekende fout",
+      "failed": "Mislukt",
+      "deleteStateVersion": "Kan state-versie niet verwijderen",
+      "rollbackStateVersion": "Kan state-versie niet terugdraaien",
+      "stateActionFailed": "State-actie mislukt",
+      "uploadState": "Kan state niet uploaden",
+      "uploadStateFile": "Kan state-bestand niet uploaden"
+    }
+  },
+  "graphs": {
+    "stateTab": {
+      "loadError": "Kan de state-grafiek niet laden.",
+      "emptyState": "Nog geen state — voer een plan en apply uit, of upload state, dan wordt deze grafiek gevuld.",
+      "stateVersionLabel": "State-versie",
+      "currentSuffix": "(huidige)",
+      "colorByLabel": "Kleuren op",
+      "viewGraph": "Grafiek",
+      "viewTable": "Tabel",
+      "resourceCount": "{count, plural, one {# resource} other {# resources}}",
+      "dependencyCount": "{count, plural, one {# afhankelijkheid} other {# afhankelijkheden}}",
+      "truncated": "De eerste {shown} van {total} resources worden weergegeven — de grafiek is begrensd voor leesbaarheid.",
+      "colResource": "Resource",
+      "colType": "Type",
+      "colMode": "Modus",
+      "colModule": "Module",
+      "colDependedOnBy": "Afhankelijk gemaakt door",
+      "rootModule": "(root)"
+    },
+    "impact": {
+      "notAvailable": "Impactgrafiek is niet beschikbaar voor deze uitvoering.",
+      "title": "Impactgrafiek",
+      "subtitle": "plan van {count, plural, one {# resource} other {# resources}}",
+      "hint": "Elke bol is een resource; elke pijl wijst naar waar deze van afhankelijk is. Klik op een node → de transitieve <b>impact</b> (alles downstream) licht op.",
+      "downstreamAffected": "downstream beïnvloed",
+      "action": {
+        "create": "aanmaken",
+        "update": "bijwerken",
+        "replace": "vervangen",
+        "destroy": "vernietigen",
+        "unchanged": "ongewijzigd"
+      }
+    },
+    "estate": {
+      "navHint": "Sleep om te draaien · scroll om te zoomen · rechtsslepen om te pannen · <em>klik op een node om er omheen te draaien</em>"
+    },
+    "state3d": {
+      "title": "State-grafiek",
+      "hint": "Elke bol is een resource; elke pijl wijst naar waar deze van afhankelijk is. Klik op een node → de resources die er transitief <b>van afhankelijk zijn</b> lichten op.",
+      "dataSource": "databron",
+      "managed": "beheerd",
+      "dependOnThis": "zijn hiervan afhankelijk"
+    },
+    "resource3d": {
+      "resetView": "Weergave resetten",
+      "clear": "Wissen",
+      "key": "Legenda",
+      "resources": "Resources",
+      "hideKey": "Legenda verbergen",
+      "hideResources": "Resources verbergen",
+      "resourcesCount": "Resources ({count})",
+      "filterPlaceholder": "Resources filteren…",
+      "navHint": "Sleep om te draaien · scroll om te zoomen · rechtsslepen om te pannen · <em>klik op een resource om er omheen te draaien</em>"
+    }
+  },
+  "execHookDetail": {
+    "backLink": "Terug naar uitvoerings-hooks",
+    "defaultDescription": "Uitvoerings-hook",
+    "notFound": "Uitvoerings-hook niet gevonden",
+    "scriptEmpty": "(leeg)",
+    "tabs": {
+      "settings": "Instellingen",
+      "workspaces": "Workspaces"
+    },
+    "common": {
+      "yes": "Ja",
+      "no": "Nee"
+    },
+    "actions": {
+      "edit": "Bewerken",
+      "cancel": "Annuleren",
+      "save": "Opslaan",
+      "saving": "Bezig met opslaan...",
+      "delete": "Verwijderen",
+      "deleting": "Bezig met verwijderen...",
+      "confirmDelete": "Verwijderen bevestigen",
+      "add": "Toevoegen",
+      "adding": "Bezig met toevoegen...",
+      "remove": "Verwijderen"
+    },
+    "settings": {
+      "heading": "Instellingen"
+    },
+    "fields": {
+      "name": "Naam",
+      "description": "Beschrijving",
+      "hookPoint": "Hook-punt",
+      "priority": "Prioriteit",
+      "enabled": "Ingeschakeld",
+      "script": "Script (<code>/bin/sh -c</code>)"
+    },
+    "delete": {
+      "heading": "Uitvoerings-hook verwijderen",
+      "description": "Verwijder deze hook permanent en verwijder hem van alle workspaces."
+    },
+    "workspaces": {
+      "scopeNote": "Deze hook wordt alleen uitgevoerd op de hieronder gekoppelde workspaces. Er is geen globaal bereik.",
+      "associate": "Workspace koppelen",
+      "workspaceLabel": "Workspace",
+      "selectPlaceholder": "Selecteer een workspace...",
+      "empty": "Geen workspaces gekoppeld aan deze hook.",
+      "colWorkspace": "Workspace",
+      "colActions": "Acties"
+    },
+    "confirm": {
+      "removeWorkspace": "Deze workspace van de hook verwijderen? De hook wordt er niet meer voor uitgevoerd."
+    },
+    "success": {
+      "updated": "Uitvoerings-hook bijgewerkt",
+      "workspaceAssociated": "Workspace gekoppeld",
+      "workspaceRemoved": "Workspace verwijderd"
+    },
+    "errors": {
+      "load": "Kan uitvoerings-hook niet laden",
+      "update": "Kan uitvoerings-hook niet bijwerken",
+      "delete": "Kan uitvoerings-hook niet verwijderen",
+      "addWorkspace": "Kan workspace niet toevoegen",
+      "removeWorkspace": "Kan workspace niet verwijderen"
+    }
+  },
+  "policySetDetail": {
+    "backLink": "Beleidssets",
+    "notFound": "Niet gevonden",
+    "unknown": "onbekend",
+    "subtitle": "OPA-beleidsset · aangemaakt door {createdBy}",
+    "settings": {
+      "heading": "Instellingen"
+    },
+    "fields": {
+      "description": "Beschrijving",
+      "enforcement": "Handhaving",
+      "enabled": "Ingeschakeld",
+      "globalScope": "Globaal (elke workspace)"
+    },
+    "enforcement": {
+      "advisory": "Adviserend (waarschuwen)",
+      "mandatory": "Verplicht (apply blokkeren)"
+    },
+    "scope": {
+      "allowLabels": "Labels toestaan (key: v1, v2)",
+      "allowLabelsPlaceholder": "env: prod, staging",
+      "allowNames": "Namen toestaan (één per regel)",
+      "denyLabels": "Labels weigeren (key: v1, v2)",
+      "denyNames": "Namen weigeren (één per regel)"
+    },
+    "vcs": {
+      "heading": "VCS-configuratie",
+      "repoUrl": "Repository-URL",
+      "branch": "Branch",
+      "branchPlaceholder": "main (standaard)",
+      "policyPath": "Beleidspad"
+    },
+    "vcsBanner": {
+      "syncedFrom": "Beleidsregels gesynchroniseerd vanuit",
+      "at": "om",
+      "lastSynced": "Laatst gesynchroniseerd {time}",
+      "commit": "(commit {sha})",
+      "syncError": "Synchronisatiefout: {error}"
+    },
+    "policies": {
+      "heading": "Beleidsregels ({count})",
+      "vcsManaged": "Beheerd door repository — push wijzigingen via PR",
+      "empty": "Nog geen beleidsregels in deze set."
+    },
+    "addPolicy": {
+      "namePlaceholder": "Beleidsnaam",
+      "descPlaceholder": "Beschrijving (optioneel)",
+      "regoHint": "Rego v1. Moet <code>package terrapod</code> declareren en overtredingen uitdrukken via een <code>deny</code>-set. Het plan is <code>input</code>; Terrapod-context is <code>data.terrapod_context</code>."
+    },
+    "actions": {
+      "saving": "Bezig met opslaan...",
+      "saveSettings": "Instellingen opslaan",
+      "syncNow": "Nu synchroniseren",
+      "cancel": "Annuleren",
+      "addPolicy": "Beleidsregel toevoegen",
+      "deleteSet": "Set verwijderen",
+      "validatingRego": "Rego valideren...",
+      "delete": "Verwijderen",
+      "savePolicy": "Beleidsregel opslaan"
+    },
+    "confirm": {
+      "deleteSet": "Deze beleidsset en al zijn beleidsregels verwijderen? Vastgelegde uitvoeringsevaluaties blijven behouden.",
+      "deletePolicy": "Beleidsregel \"{name}\" verwijderen?"
+    },
+    "errors": {
+      "load": "Kan beleidsset niet laden",
+      "save": "Kan beleidsset niet opslaan",
+      "saveStatus": "Kan niet opslaan ({status})",
+      "delete": "Kan beleidsset niet verwijderen",
+      "deleteStatus": "Kan niet verwijderen ({status})",
+      "addPolicy": "Kan beleidsregel niet toevoegen",
+      "addPolicyStatus": "Kan beleidsregel niet toevoegen ({status})",
+      "savePolicy": "Kan beleidsregel niet opslaan",
+      "savePolicyStatus": "Kan beleidsregel niet opslaan ({status})",
+      "deletePolicy": "Kan beleidsregel niet verwijderen",
+      "deletePolicyStatus": "Kan niet verwijderen ({status})"
+    }
+  },
+  "slackLink": {
+    "title": "Slack verbinden met Terrapod",
+    "loading": "Bezig met laden…",
+    "checking": "Uw koppeling controleren…",
+    "linking": "Uw Slack-account koppelen…",
+    "unknown": "onbekend",
+    "confirm": {
+      "prompt": "Dit Slack-account koppelen aan <em>uw</em> Terrapod-identiteit? Elke toekomstige Slack-actie (goedkeuren/verwerpen) wordt uitgevoerd als deze Terrapod-gebruiker met diens rechten.",
+      "slackUser": "Slack-gebruiker",
+      "slackTeam": "Slack-team",
+      "terrapodAccount": "Terrapod-account",
+      "warning": "Ga alleen verder als u deze koppeling zojuist zelf vanuit Slack hebt gestart. Als dat niet zo is, sluit dit tabblad en koppel niet — hiermee wordt het bovenstaande Slack-account aan <em>uw</em> Terrapod-identiteit gebonden.",
+      "button": "Bevestigen & koppelen"
+    },
+    "success": {
+      "message": "Uw Slack-account is nu gekoppeld aan Terrapod.",
+      "linkedAs": "Gekoppeld als <em>{email}</em>. U kunt dit tabblad sluiten en terugkeren naar Slack."
+    },
+    "errors": {
+      "missingLink": "Koppeling ontbreekt of is ongeldig. Begin opnieuw met de Terrapod-koppelopdracht in Slack.",
+      "invalidLink": "Deze koppeling is ongeldig, verlopen of al gebruikt. Start de koppeling opnieuw vanuit Slack.",
+      "linkingFailed": "Koppelen mislukt."
+    }
+  },
+  "cliComplete": {
+    "loading": "Bezig met laden...",
+    "completing": "Authenticatie voltooien...",
+    "invalid": {
+      "title": "Ongeldig verzoek",
+      "description": "Vereiste parameters ontbreken."
+    },
+    "success": {
+      "title": "Aanmelding geslaagd",
+      "complete": "API-token aangemaakt. U kunt dit tabblad sluiten."
+    },
+    "fallback": {
+      "description": "Kon de CLI niet automatisch bereiken.",
+      "button": "Klik hier om handmatig te voltooien"
+    },
+    "timeout": {
+      "description": "De CLI heeft de tokenuitwisseling mogelijk niet voltooid. Controleer uw terminal."
+    }
+  },
+  "apiDocs": {
+    "view": "Weergave:",
+    "redocTitle": "ReDoc API-documentatie"
+  }
+}
