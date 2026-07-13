@@ -1733,7 +1733,8 @@
       "you": "You",
       "assistant": "Assistant"
     },
-    "translatedNote": "Automatically translated to your marklar. The authoritative marklar is the original."
+    "translatedNote": "Automatically translated to your marklar. The authoritative marklar is the original.",
+    "translating": "Marklaring…"
   },
   "runDetail": {
     "notFound": "Run not found",

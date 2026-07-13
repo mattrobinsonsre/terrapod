@@ -1733,7 +1733,8 @@
       "you": "Vous",
       "assistant": "Assistant"
     },
-    "translatedNote": "Traduit automatiquement dans votre langue. Le résumé faisant foi est l'original."
+    "translatedNote": "Traduit automatiquement dans votre langue. Le résumé faisant foi est l'original.",
+    "translating": "Traduction en cours…"
   },
   "runDetail": {
     "notFound": "Exécution introuvable",

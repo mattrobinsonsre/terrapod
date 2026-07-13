@@ -110,6 +110,8 @@ jobs:
         run: npm run lint
       - name: TypeScript type-check
         run: npm run type-check
+      - name: i18n completeness (every offered locale is 100% or it is not offered — #767)
+        run: npm run i18n:check
 
   # ── Provider Lint ─────────────────────────────────────
   provider-lint:

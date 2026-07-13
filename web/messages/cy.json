@@ -1733,7 +1733,8 @@
       "you": "Chi",
       "assistant": "Cynorthwyydd"
     },
-    "translatedNote": "Cyfieithwyd yn awtomatig i'ch iaith. Y crynodeb awdurdodol yw'r gwreiddiol."
+    "translatedNote": "Cyfieithwyd yn awtomatig i'ch iaith. Y crynodeb awdurdodol yw'r gwreiddiol.",
+    "translating": "Yn cyfieithu…"
   },
   "runDetail": {
     "notFound": "Ni chanfuwyd y rhediad",

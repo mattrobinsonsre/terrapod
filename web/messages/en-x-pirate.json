@@ -1733,7 +1733,8 @@
       "you": "Ye",
       "assistant": "Assistant"
     },
-    "translatedNote": "Automatically translated to yer language. The authoritative summary be the original."
+    "translatedNote": "Automatically translated to yer language. The authoritative summary be the original.",
+    "translating": "Translatin', arr…"
   },
   "runDetail": {
     "notFound": "Voyage not found",

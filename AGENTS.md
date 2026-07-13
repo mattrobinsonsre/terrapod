@@ -302,12 +302,20 @@ multi-language implementation ships in the same PR**:
   JSX. **Do** leave code identifiers, terraform/HCL keywords, resource
   addresses, product names, env vars, and CLI flags untranslated (they're not
   UX copy).
-- **Add the key to `web/messages/en.json`** (the source) for every new string,
-  and provide the **German** translation in `web/messages/de.json` — `de` is the
-  maintained reference locale and is kept 100% complete. The other locales
-  (`en-GB`, `cy`, `es`, `fr`, `la`, `tlh`, and the `en-x-*` fun locales) may be
-  filled in bulk; they fall back to English until then, but the string must at
-  least exist in `en.json`.
+- **A locale is complete or it is not offered — no partial locales ship.** Add
+  the key to `web/messages/en.json` (the source), then to **every offered
+  locale** (`web/messages/<code>.json` for each code in `locales` in
+  `src/i18n/config.ts`). The `i18n:check` gate (`npm run i18n:check`, run in CI)
+  fails the build if any offered locale is missing a key or has an extra one, so
+  a half-translated language can never merge. English deep-merge stays only as a
+  crash guard (never render `MISSING_KEY`), **not** as a licence to ship a
+  partial language. If you can't translate a new string into every offered
+  locale, either translate it (the catalogs are machine-translatable in bulk —
+  see the fill pipeline) or drop that locale from `locales` until it is caught
+  up. `de` is the maintained reference; **`en-GB` is the one exception** — a
+  British dialect *override* that carries only the spelling deltas from the
+  American source (the shared strings are genuinely identical, not a gap), so it
+  is gated as a subset, not full parity.
 - **Preserve ICU + tags.** Placeholders (`{name}`, `{count, plural, one {…}
   other {…}}`, `#`, escaped `'{'`/`'}'`) and rich-text tag names (`<code>`,
   `<strong>`, `<link>`, …) are structural — translate only the human words

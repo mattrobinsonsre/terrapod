@@ -1733,7 +1733,8 @@
       "you": "U",
       "assistant": "Assistant"
     },
-    "translatedNote": "Automatically translated to yur tung. Teh authoritative summary iz teh original."
+    "translatedNote": "Automatically translated to yur tung. Teh authoritative summary iz teh original.",
+    "translating": "Tranzlatin…"
   },
   "runDetail": {
     "notFound": "Runz not found",

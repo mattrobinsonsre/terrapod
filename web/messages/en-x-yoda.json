@@ -1733,7 +1733,8 @@
       "you": "You",
       "assistant": "Assistant"
     },
-    "translatedNote": "To your language, automatically translated. The original, the authoritative summary is."
+    "translatedNote": "To your language, automatically translated. The original, the authoritative summary is.",
+    "translating": "Translating, I am…"
   },
   "runDetail": {
     "notFound": "Found, the run was not",

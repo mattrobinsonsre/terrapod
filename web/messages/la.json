@@ -1733,7 +1733,8 @@
       "you": "Tu",
       "assistant": "Adiutor"
     },
-    "translatedNote": "Automatice in linguam tuam translatum. Summarium auctoritativum est originale."
+    "translatedNote": "Automatice in linguam tuam translatum. Summarium auctoritativum est originale.",
+    "translating": "Vertens…"
   },
   "runDetail": {
     "notFound": "Exsecutio non inventa",

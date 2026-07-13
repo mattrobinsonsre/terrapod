@@ -1733,7 +1733,8 @@
       "you": "Usted",
       "assistant": "Asistente"
     },
-    "translatedNote": "Traducido automáticamente a su idioma. El resumen de referencia es el original."
+    "translatedNote": "Traducido automáticamente a su idioma. El resumen de referencia es el original.",
+    "translating": "Traduciendo…"
   },
   "runDetail": {
     "notFound": "Ejecución no encontrada",
