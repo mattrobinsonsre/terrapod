@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useLayoutEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
-import { useTranslations } from 'next-intl'
+import { useTranslations, useLocale } from 'next-intl'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import Convert from 'ansi-to-html'
@@ -542,6 +542,7 @@ export default function RunDetailPage() {
 
 function RunDetailPageInner() {
   const t = useTranslations('runDetail')
+  const locale = useLocale()
   const router = useRouter()
   const params = useParams()
   const workspaceId = params.id as string
@@ -1284,8 +1285,15 @@ function RunDetailPageInner() {
 
         {/* AI analysis tab (#401) — its own full panel; the tab only appears
             when the run has an AI summary. */}
+        {/* key={locale}: remount on language change so the summary + chat
+            refetch in the new locale even if the effect's locale dep doesn't
+            re-fire — no manual reload needed (#767). */}
         {view === 'ai' && (
-          <PlanAiSummary runId={runId.replace(/^run-/, '')} refreshKey={aiSummaryRefresh} />
+          <PlanAiSummary
+            key={locale}
+            runId={runId.replace(/^run-/, '')}
+            refreshKey={aiSummaryRefresh}
+          />
         )}
 
         {/* OPA policy tab (#343) — full evaluations + admin override; the tab

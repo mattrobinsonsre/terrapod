@@ -281,6 +281,43 @@ staged plan live in issue **#719**; the rules a contributor must follow:
   and **must not** break the mobile guard. Breaking the mobile guard fails CI
   — that is the gate.
 
+## Internationalisation — every UX string is translated (hard requirement)
+
+The web UI is fully internationalised with **next-intl** (#767). Locale is
+resolved per-request from the `NEXT_LOCALE` cookie → `Accept-Language` → `en`
+(no `/[locale]/` URL segment); the nav globe switcher writes the cookie. `en`
+(US English) is the **source** catalog (`web/messages/en.json`); every other
+locale deep-merges over it, so a partial catalog always renders (English
+fallback, never a `MISSING_KEY`). The AI plan-summary/chat is translated at
+**view time** by the model (locale-agnostic — works for every locale without a
+catalog entry).
+
+The rule a contributor must follow — **a UX change is not accepted unless its
+multi-language implementation ships in the same PR**:
+
+- **No hardcoded user-facing strings.** Every label, button, heading,
+  placeholder, `<option>`, table header, empty state, toast/error/success
+  message, `confirm()` text, tooltip, and badge word goes through
+  `useTranslations(...)`/`getTranslations(...)` — never a raw English literal in
+  JSX. **Do** leave code identifiers, terraform/HCL keywords, resource
+  addresses, product names, env vars, and CLI flags untranslated (they're not
+  UX copy).
+- **Add the key to `web/messages/en.json`** (the source) for every new string,
+  and provide the **German** translation in `web/messages/de.json` — `de` is the
+  maintained reference locale and is kept 100% complete. The other locales
+  (`en-GB`, `cy`, `es`, `fr`, `la`, `tlh`, and the `en-x-*` fun locales) may be
+  filled in bulk; they fall back to English until then, but the string must at
+  least exist in `en.json`.
+- **Preserve ICU + tags.** Placeholders (`{name}`, `{count, plural, one {…}
+  other {…}}`, `#`, escaped `'{'`/`'}'`) and rich-text tag names (`<code>`,
+  `<strong>`, `<link>`, …) are structural — translate only the human words
+  between them. A lone `'` in a value starts an ICU quote; escape a literal
+  apostrophe as `''`. Every catalog string must parse as valid ICU.
+- **A new frontend page/component ships its i18n in the same PR** as the
+  component itself — the same way it ships its responsive assertion and its E2E
+  spec. A page with raw English literals is an incomplete change, not a done
+  one.
+
 ## Conventions
 
 - **Issue-first** — every change beyond a genuinely trivial tweak (a typo, a

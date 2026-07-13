@@ -170,7 +170,7 @@
   },
   "estate": {
     "title": "Estate topology",
-    "description": "Every workspace you can see and the modules they use, wired by run-triggers, remote-state, and module links. Group by whatever axis fits your estate — the platform enforces no labelling convention.",
+    "description": "Every workspace you can see and the modules they use, wired by run-triggers, remote-state, and module links. Group by whatever axis fits your estate — the platform enforces no labeling convention.",
     "errors": {
       "load": "Failed to load the estate graph."
     },
@@ -1693,14 +1693,14 @@
       "error": "Could not regenerate: <mono>{detail}</mono>"
     },
     "pending": {
-      "summarisingPlan": "Summarising plan…",
+      "summarisingPlan": "Summarizing plan…",
       "analysingFailure": "Analysing failure…"
     },
     "skipped": {
       "fallback": "Summary skipped for this run."
     },
     "errored": {
-      "heading": "Summariser failed"
+      "heading": "Summarizer failed"
     },
     "riskFactors": {
       "heading": "Risk factors",
@@ -1908,8 +1908,8 @@
     },
     "log": {
       "color": "Color",
-      "colorOnTitle": "Showing ANSI colours — click for plain text",
-      "colorOffTitle": "Showing plain text — click for colours",
+      "colorOnTitle": "Showing ANSI colors — click for plain text",
+      "colorOffTitle": "Showing plain text — click for colors",
       "refresh": "Refresh",
       "refreshTitle": "Refresh log",
       "copy": "Copy",
@@ -1917,7 +1917,7 @@
       "copyTitle": "Copy plain text to clipboard",
       "copyAria": "Copy log to clipboard",
       "download": "Download",
-      "downloadColorTitle": "Download log (with ANSI colour codes)",
+      "downloadColorTitle": "Download log (with ANSI color codes)",
       "downloadPlainTitle": "Download log (plain text)",
       "downloadAria": "Download log",
       "follow": "Follow",
@@ -2122,8 +2122,8 @@
       "description": "Automatic LLM-generated change summary, risk assessment, and failure analysis on every plan-phase outcome for this workspace.",
       "mode": "Mode",
       "modeDefault": "Follow deployment default",
-      "modeEnabled": "Always summarise",
-      "modeDisabled": "Never summarise",
+      "modeEnabled": "Always summarize",
+      "modeDisabled": "Never summarize",
       "contextLabel": "Workspace context",
       "contextLabelSuffix": "(optional, additive)",
       "contextPlaceholder": "Facts the AI should know about this workspace specifically. e.g. 'Fronts the vault for service X — destroying the KMS key causes a global outage.'",
