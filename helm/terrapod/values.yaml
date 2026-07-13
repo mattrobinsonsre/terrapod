@@ -447,6 +447,13 @@ api:
       # Optional base URL override (vLLM, LiteLLM proxy, custom Azure).
       # Leave empty for vendor providers — LiteLLM knows the defaults.
       api_base: ""
+      # Deployment-wide authoritative language the AI writes summaries,
+      # failure analyses, and chat in (#767). Stored verbatim and sent
+      # as-is to Slack / PR comments; the web UI translates on view into
+      # the reader's locale (Redis-cached, never persisted). One of the
+      # UI's real languages: en (default), en-GB, cy, de, es, fr, la.
+      # No per-workspace override (single-org product).
+      summary_language: "en"
       # Upper bound on model response tokens. Cap, not a target: the
       # model emits what it needs and stops on a natural stop token.
       # 16384 leaves comfortable headroom for very large plans (100+

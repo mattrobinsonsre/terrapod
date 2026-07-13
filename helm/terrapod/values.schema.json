@@ -871,6 +871,7 @@
             "enabled": { "type": "boolean" },
             "model": { "type": "string" },
             "api_base": { "type": "string" },
+            "summary_language": { "type": "string" },
             "max_output_tokens": { "type": "integer", "minimum": 1 },
             "request_timeout_seconds": { "type": "integer", "minimum": 1 },
             "daily_token_budget": { "type": "integer", "minimum": 0 },

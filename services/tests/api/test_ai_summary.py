@@ -188,6 +188,86 @@ class TestGetPlanSummary:
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
     @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
+    async def test_no_locale_serves_canonical_untranslated(self, mock_resolve, *mocks):
+        """Without ?locale the stored (canonical) text is served, translated=false (#767)."""
+        mock_resolve.return_value = caps_for_level("read")
+        run = _mock_run()
+        ws = _mock_workspace(ws_id=run.workspace_id)
+        summary = _mock_summary(run.id, description="canonical text")
+
+        app, mock_db = _make_app(_user())
+        mock_db.execute = AsyncMock(
+            side_effect=[
+                MagicMock(scalar_one_or_none=MagicMock(return_value=run)),
+                MagicMock(scalar_one_or_none=MagicMock(return_value=summary)),
+            ]
+        )
+        mock_db.get = AsyncMock(return_value=ws)
+
+        with patch(
+            "terrapod.services.summary_translation.translate_summary", new_callable=AsyncMock
+        ) as tr:
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+                resp = await c.get(
+                    f"/api/terrapod/v1/runs/run-{run.id}/plan-summary", headers=_AUTH
+                )
+
+        assert resp.status_code == 200
+        attrs = resp.json()["data"]["attributes"]
+        assert attrs["description"] == "canonical text"
+        assert attrs["translated"] is False
+        assert "language" in attrs
+        tr.assert_not_called()  # no locale → no translation attempt
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
+    async def test_locale_translates_summary_on_view(self, mock_resolve, *mocks):
+        """?locale=de translates description + risk factors, sets translated=true (#767)."""
+        mock_resolve.return_value = caps_for_level("read")
+        run = _mock_run()
+        ws = _mock_workspace(ws_id=run.workspace_id)
+        summary = _mock_summary(
+            run.id,
+            description="English description",
+            risk_factors=[{"severity": "high", "title": "T", "detail": "D"}],
+        )
+
+        app, mock_db = _make_app(_user())
+        mock_db.execute = AsyncMock(
+            side_effect=[
+                MagicMock(scalar_one_or_none=MagicMock(return_value=run)),
+                MagicMock(scalar_one_or_none=MagicMock(return_value=summary)),
+            ]
+        )
+        mock_db.get = AsyncMock(return_value=ws)
+
+        translated = {
+            "description": "Deutsche Beschreibung",
+            "risk_factors": [{"severity": "high", "title": "Titel", "detail": "Detail"}],
+        }
+        with patch(
+            "terrapod.services.summary_translation.translate_summary",
+            new_callable=AsyncMock,
+            return_value=translated,
+        ) as tr:
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+                resp = await c.get(
+                    f"/api/terrapod/v1/runs/run-{run.id}/plan-summary?locale=de", headers=_AUTH
+                )
+
+        assert resp.status_code == 200
+        attrs = resp.json()["data"]["attributes"]
+        assert attrs["description"] == "Deutsche Beschreibung"
+        assert attrs["risk-factors"][0]["title"] == "Titel"
+        assert attrs["translated"] is True
+        tr.assert_awaited_once()
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
     async def test_plan_response_includes_ai_summary_url(self, mock_resolve, *mocks):
         """GET /plans/{id} advertises the ai-summary-url even when no row exists yet."""
         mock_resolve.return_value = caps_for_level("read")

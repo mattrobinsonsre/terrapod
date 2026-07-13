@@ -943,6 +943,7 @@ async def show_plan_by_id(
 @extensions_router.get("/runs/{run_id}/plan-summary")
 async def show_plan_summary(
     run_id: str = Path(...),
+    locale: str | None = Query(None),
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
@@ -955,6 +956,14 @@ async def show_plan_summary(
     "not summarised" signal (vs a `pending` row which means "in flight").
     The response shape is the same for both ``kind`` values; the UI
     branches on the ``kind`` attribute.
+
+    The stored text is authoritative and in the deployment's
+    ``ai_summary.summary_language`` (#767). When the caller passes a
+    ``?locale=`` for a different real language, the description and risk
+    factors are translated on view (Redis-cached, 7-day sliding TTL) and
+    ``translated``/``language`` attributes reflect that. Translation is
+    best-effort: on failure or budget exhaustion the canonical text is
+    served with ``translated=false``.
     """
     run = await _get_run(run_id, db)
     await _require_run_ws_capability(run, cap.RUN_READ, user, db)
@@ -965,6 +974,24 @@ async def show_plan_summary(
     if summary is None:
         raise HTTPException(status_code=404, detail="no summary for this plan")
 
+    canonical_language = settings.ai_summary.summary_language
+    description = summary.description
+    risk_factors = summary.risk_factors
+    translated = False
+    if summary.status == "ready" and locale:
+        from terrapod.services import summary_translation
+
+        result = await summary_translation.translate_summary(
+            summary_id=str(summary.id),
+            description=summary.description,
+            risk_factors=summary.risk_factors,
+            reader_locale=locale,
+        )
+        if result is not None:
+            description = result["description"]
+            risk_factors = result["risk_factors"]
+            translated = True
+
     return JSONResponse(
         content={
             "data": {
@@ -973,9 +1000,11 @@ async def show_plan_summary(
                 "attributes": {
                     "kind": summary.kind,
                     "status": summary.status,
-                    "description": summary.description,
+                    "description": description,
                     "risk-level": summary.risk_level,
-                    "risk-factors": summary.risk_factors,
+                    "risk-factors": risk_factors,
+                    "language": canonical_language,
+                    "translated": translated,
                     "model": summary.model,
                     "input-tokens": summary.input_tokens,
                     "output-tokens": summary.output_tokens,

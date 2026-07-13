@@ -455,11 +455,13 @@
     "error-message",
     "input-tokens",
     "kind",
+    "language",
     "model",
     "output-tokens",
     "risk-factors",
     "risk-level",
     "status",
+    "translated",
     "updated-at"
   ],
   "tfe_v2._state_version_json": [
