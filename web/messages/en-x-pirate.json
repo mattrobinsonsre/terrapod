@@ -1,0 +1,2621 @@
+{
+  "nav": {
+    "workspaces": "Work Decks",
+    "estate": "Yer Fleet",
+    "registry": "Ship's Ledger",
+    "modules": "Riggin's",
+    "providers": "Merchants",
+    "catalog": "Treasure Map",
+    "agentPools": "Crews",
+    "admin": "Cap'n's Quarters",
+    "users": "Hands",
+    "roles": "Ranks",
+    "vcsConnections": "VCS Moorin's",
+    "variableSets": "Sacks o' Booty",
+    "autodiscovery": "Spyglass",
+    "bulkUpdate": "Broadside Update",
+    "executionHooks": "Grapplin' Hooks",
+    "policySets": "The Pirate Code",
+    "providerTemplates": "Merchant Charts",
+    "catalogAdmin": "Map Room",
+    "cache": "The Hold",
+    "auditLog": "Log Book",
+    "help": "Help, Matey",
+    "apiReference": "API Charts",
+    "docs": "Scrolls",
+    "account": "Yer Berth",
+    "apiTokens": "API Doubloons",
+    "sessions": "Voyages",
+    "logOut": "Abandon Ship",
+    "menu": "The Manifest",
+    "openMenu": "Open the Manifest",
+    "openAccountMenu": "Open yer Berth",
+    "closeMenu": "Batten the Hatches"
+  },
+  "switcher": {
+    "language": "Tongue",
+    "changeLanguage": "Change yer Tongue"
+  },
+  "workspaces": {
+    "title": "Work decks",
+    "description": "Command Terraform work decks, ship''s log, an'' voyages",
+    "new": "New Work deck",
+    "cancel": "Belay",
+    "create": "Forge Work deck",
+    "creating": "Forgin''…",
+    "loadFailed": "Couldn''t haul in work decks",
+    "createFailed": "Couldn''t forge work deck",
+    "form": {
+      "name": "Name",
+      "namePattern": "Letters, numbers, hyphens, an'' underscores only. Must set sail wi'' a letter or number.",
+      "namePlaceholder": "my-workspace",
+      "executionMode": "sailin'' mode",
+      "local": "Local",
+      "agent": "Agent",
+      "executionBackend": "sailin'' backend",
+      "version": "Mark",
+      "versionTitle": "Mark in X.Y or X.Y.Z format (e.g. 1.11 or 1.11.5)",
+      "versionPlaceholder": "e.g. 1.11 or 1.11.5",
+      "cpuRequest": "CPU Askin''",
+      "cpuTitle": "Kubernetes CPU quantity: whole cores (1, 2) or millicores (500m, 100m)",
+      "cpuHint": "e.g. 1, 0.5, 500m",
+      "memoryRequest": "Memory Askin''",
+      "memoryTitle": "Kubernetes memory quantity: bytes (1000) or wi'' suffix (512Mi, 2Gi, 1Ti)",
+      "memoryHint": "e.g. 2Gi, 512Mi, 1Ti",
+      "agentPool": "crew",
+      "none": "Nary a one",
+      "autoApply": "Auto Lay down",
+      "enabled": "Aye, hoisted",
+      "workingDirectory": "working deck",
+      "workingDirectoryPlaceholder": "e.g. environments/dev",
+      "workingDirectoryHint": "Subdirectory within repo containing .tf files",
+      "vcsConnection": "VCS Moorin''",
+      "vcsRepoUrl": "VCS Port URL",
+      "vcsRepoUrlTitle": "Must be an HTTP or HTTPS URL",
+      "vcsRepoUrlPlaceholder": "https://github.com/org/repo",
+      "vcsBranch": "VCS Channel",
+      "vcsBranchPlaceholder": "main (default)"
+    },
+    "stats": {
+      "total": "Total",
+      "health": "Health",
+      "locked": "Chained",
+      "clearAllFilters": "Clear all sifts",
+      "clearHealthFilter": "Clear health issues sift",
+      "filterHealth": "Sift to work decks wi'' health issues",
+      "clearLockedFilter": "Clear chained sift",
+      "filterLocked": "Sift to chained work decks"
+    },
+    "filter": {
+      "placeholder": "Sift by name, mark, or status — e.g. \"eu1\", \"env:prod\", \"status:errored\"",
+      "ariaLabel": "Sift work decks",
+      "clear": "Clear",
+      "status": "Status",
+      "label": "Mark",
+      "back": "back",
+      "valueCount": "{count, plural, one {# worth} other {# worths}}",
+      "removeTerm": "Cast off this term",
+      "showing": "Showing {filtered} o'' {total}",
+      "termName": "name: {value}",
+      "termStatus": "status: {value}",
+      "termLabelAny": "{key}: (any)",
+      "termLabel": "{key}: {value}",
+      "hintStatus": "status",
+      "hintHealth": "health",
+      "hintLabel": "mark",
+      "hintLabelKey": "mark key",
+      "hintName": "name"
+    },
+    "row": {
+      "removeLabelFilter": "Click to cast off from sift",
+      "addLabelFilter": "Click to sift by this mark"
+    },
+    "table": {
+      "name": "Name",
+      "mode": "Mode",
+      "pool": "Pool",
+      "resources": "Spoils",
+      "status": "Status",
+      "created": "Forged",
+      "resourcesValue": "{cpu} CPU / {memory}"
+    },
+    "empty": {
+      "none": "Nay work decks yet. Forge one to set sail.",
+      "noMatch": "Nay work decks match this sift."
+    }
+  },
+  "status": {
+    "state-diverged": "Ship''s log Diverged",
+    "vcs-error": "VCS Trouble",
+    "drifted": "Adrift",
+    "errored": "Errored",
+    "needs-confirm": "Needs Give the nod",
+    "planning": "Chartin''",
+    "applying": "Layin'' down",
+    "canceling": "Belayin''",
+    "confirmed": "Given the nod",
+    "queued": "Lined up",
+    "pending": "Awaitin''",
+    "applied": "Laid down",
+    "planned": "Charted",
+    "canceled": "Belayed",
+    "discarded": "Discarded",
+    "pendingDeletion": "Awaitin'' deletion",
+    "archived": "Archived"
+  },
+  "auth": {
+    "loading": "Haulin'' in...",
+    "subtitle": "Come aboard to command yer infrastructure",
+    "subtitleCli": "Come aboard to authorize the CLI",
+    "emailLabel": "Message",
+    "passwordLabel": "Secret word",
+    "signIn": "Come aboard",
+    "signingIn": "Signing in...",
+    "signInWith": "Come aboard wi'' {provider}",
+    "or": "or",
+    "noProviders": "Nay papers check merchants configured",
+    "completingSignIn": "Completing come aboard...",
+    "callbackFailedTitle": "Papers check Went awry",
+    "tryAgain": "Try Again, matey",
+    "errors": {
+      "loadProviders": "Couldn''t haul in merchants",
+      "authenticationFailed": "Papers check went awry ({status})",
+      "tokenExchangeFailed": "Doubloon exchange went awry ({status})",
+      "loginFailed": "Boardin'' went awry",
+      "startLoginFailed": "Couldn''t set sail boardin''",
+      "missingCodeOrState": "Missing authorization code or ship''s log",
+      "stateMismatch": "Ship''s log mismatch — possible CSRF attack",
+      "missingVerifier": "Missing PKCE verifier — pray try logging in again, matey"
+    }
+  },
+  "estate": {
+    "title": "Yer fleet topology",
+    "description": "Every work deck ye can see an'' the riggin''s they use, wired by run-triggers, remote-state, an'' riggin'' links. Group by whatever axis fits yer yer fleet — the platform enforces nay labeling convention.",
+    "errors": {
+      "load": "Couldn''t haul in the yer fleet graph."
+    },
+    "groupBy": {
+      "label": "Group by"
+    },
+    "view": {
+      "graph": "Graph",
+      "table": "Table"
+    },
+    "counts": {
+      "workspaces": "{count, plural, one {# work deck} other {# work decks}}",
+      "modules": "{count, plural, one {# riggin''} other {# riggin''s}}",
+      "dependencies": "{count, plural, one {# dependency} other {# dependencies}}"
+    },
+    "legend": {
+      "registryModule": "ship''s ledger riggin''"
+    },
+    "detail": {
+      "moduleImpact": "{count, plural, one {work deck uses this — bumping it re-plans it} other {work decks use this — bumping it re-plans them all}}",
+      "dependOnThis": "{count, plural, one {depends on this} other {depend on this}}"
+    },
+    "table": {
+      "workspaces": {
+        "heading": "Work decks",
+        "col": {
+          "workspace": "Work deck",
+          "group": "Group",
+          "agentPool": "Crew",
+          "dependedOnBy": "Depended on by",
+          "modulesUsed": "Riggin''s used"
+        },
+        "noModules": "—"
+      },
+      "modules": {
+        "heading": "Riggin''s",
+        "col": {
+          "module": "Riggin''",
+          "usedBy": "Used by (work decks)"
+        }
+      }
+    }
+  },
+  "labels": {
+    "title": "Marks",
+    "description": "Browse marks in use across work decks, crews, ship''s ledger riggin''s, an'' ship''s ledger merchants. Read-only — marks be edited on each entity''s own page.",
+    "none": "Nary a one.",
+    "emptyKeys": "Nay marks in use yet. Mark any work deck, crew, ship''s ledger riggin'', or ship''s ledger merchant to set sail grouping things here.",
+    "emptyValues": "Nay worths fer \"{key}\". Either nay readable entity carries this mark, or it were cast off since the last spy.",
+    "loadKeysFailed": "Couldn''t haul in marks ({status})",
+    "loadValuesFailed": "Couldn''t haul in worths fer {key} ({status})",
+    "loadEntitiesFailed": "Couldn''t haul in entities ({status})",
+    "columns": {
+      "labelKey": "Mark key",
+      "distinctValues": "Distinct worths",
+      "value": "Worth",
+      "total": "Total"
+    },
+    "entity": {
+      "workspaces": "Work decks",
+      "agentPools": "Crews",
+      "modules": "Riggin''s",
+      "providers": "Merchants"
+    },
+    "deprecated": {
+      "badge": "Deprecated & unsupported.",
+      "body": "The Marks browser be nay longer in the main navigation an'' shall be cast off in a future release. Sift by mark from the <workspacesLink>Work decks</workspacesLink> page instead. If ye rely on this page, pray <issueLink>open an issue</issueLink>."
+    }
+  },
+  "settings": {
+    "tokens": {
+      "title": "API doubloons",
+      "description": "Command papers check doubloons fer CLI an'' automation",
+      "descriptionAll": "All doubloons across all hands",
+      "myTokens": "My Doubloons",
+      "allTokens": "All Doubloons",
+      "createToken": "Forge Doubloon",
+      "cancel": "Belay",
+      "tokenReady": "Doubloon ready",
+      "tokenReadyHelp": "Copy this doubloon now — it shall not be shown again, matey.",
+      "dismissToken": "Wave off doubloon",
+      "hide": "Hide",
+      "show": "Show",
+      "copy": "Copy",
+      "empty": "Nay API doubloons yet.",
+      "noDescription": "Nay yarn",
+      "detached": "detached",
+      "never": "Never",
+      "selected": "{count, plural, one {# doubloon picked} other {# doubloons picked}}",
+      "revokeSelected": "Reclaim Picked",
+      "revoking": "Revoking...",
+      "clearSelection": "Clear selection",
+      "rotate": "Rotate",
+      "rotating": "Rotating...",
+      "revoke": "Reclaim",
+      "confirmRotate": "Rotate this doubloon? The current secret stops working immediately an'' a new one be issued.",
+      "confirmBulkRevoke": "{count, plural, one {Reclaim # doubloon?} other {Reclaim # doubloons?}}",
+      "kinds": {
+        "interactive": {
+          "label": "Personal",
+          "help": "A personal doubloon fer the CLI an'' ad-hoc automation. Carries yer full live permissions."
+        },
+        "service_bound": {
+          "label": "Service · bound",
+          "help": "A service doubloon scoped to a subset o'' yer ranks. Its access be the intersection o'' those ranks an'' yer own — an'' it stops working if yer berth be cast off."
+        },
+        "service_detached": {
+          "label": "Service · detached",
+          "help": "An admin-managed service doubloon wi'' an absolute pinned scope, bound to nay hand. Use fer critical machine-to-machine automation that must survive any one person leaving."
+        }
+      },
+      "lifespans": {
+        "720": "30 days",
+        "2160": "90 days",
+        "4320": "180 days",
+        "8760": "1 year"
+      },
+      "filter": {
+        "all": "All kinds"
+      },
+      "form": {
+        "description": "Yarn",
+        "descriptionPlaceholder": "CI/CD pipeline doubloon",
+        "kind": "Kind",
+        "lifespan": "Lifespan",
+        "create": "Forge",
+        "creating": "Forgin''...",
+        "pinnedRoles": "Pinned ranks",
+        "pinnedRolesHelp": "— the scope this doubloon be limited to",
+        "pinnedRolesCapped": "(capped to yer own access)",
+        "noCustomRoles": "Nay custom ranks defined. Forge ranks under Cap''n → Ranks first.",
+        "noScopedRoles": "Ye hold nay scoped ranks to pin. This doubloon would have nay access."
+      },
+      "columns": {
+        "description": "Yarn",
+        "kind": "Kind",
+        "boundTo": "Bound To",
+        "created": "Forged",
+        "lastUsed": "Last Used",
+        "expires": "Runs dry",
+        "actions": "Deeds"
+      },
+      "errors": {
+        "load": "Couldn''t haul in doubloons",
+        "create": "Couldn''t forge doubloon ({status})",
+        "createGeneric": "Couldn''t forge doubloon",
+        "rotate": "Couldn''t rotate doubloon ({status})",
+        "rotateGeneric": "Couldn''t rotate doubloon",
+        "revoke": "Couldn''t reclaim doubloon ({status})",
+        "revokeGeneric": "Couldn''t reclaim doubloon",
+        "bulkRevoke": "Couldn''t reclaim doubloons"
+      }
+    },
+    "sessions": {
+      "title": "Voyages",
+      "description": "Yer sailin'' voyages",
+      "descriptionAll": "All sailin'' voyages across the platform",
+      "empty": "Nay sailin'' voyages.",
+      "revokeAll": "Reclaim All",
+      "current": "Current",
+      "columns": {
+        "provider": "Merchant",
+        "created": "Forged",
+        "expires": "Runs dry",
+        "lastActive": "Last Sailin''",
+        "token": "Doubloon"
+      },
+      "errors": {
+        "load": "Couldn''t haul in voyages",
+        "revoke": "Couldn''t reclaim voyages ({status})",
+        "revokeGeneric": "Couldn''t reclaim voyages"
+      }
+    }
+  },
+  "registry": {
+    "modules": {
+      "title": "Riggin''s",
+      "description": "Private Terraform riggin'' ship''s ledger",
+      "cancel": "Belay",
+      "createModule": "Forge Riggin''",
+      "empty": "Nay riggin''s yet. Forge one to set sail.",
+      "providerLabel": "Merchant: {provider}",
+      "versionCount": "{count, plural, one {# mark} other {# marks}}",
+      "loadFailed": "Couldn''t haul in riggin''s",
+      "createFailed": "Couldn''t forge riggin''",
+      "createFailedStatus": "Couldn''t forge riggin'' ({status})",
+      "form": {
+        "name": "Name",
+        "provider": "Merchant",
+        "slugTitle": "Lowercase letters, numbers, an'' hyphens only. Must set sail wi'' a lowercase letter.",
+        "addressNote": "Name an'' merchant form the module''s ship''s ledger address an'' cannot be changed after creation.",
+        "vcsConnectionOptional": "VCS Moorin'' (if ye fancy)",
+        "noneUploadManually": "Nary a one — haul up marks manually",
+        "repositoryUrl": "Port URL",
+        "branchOptional": "Channel (if ye fancy)",
+        "branchPlaceholder": "main (part ways empty fer default)",
+        "tagPattern": "Tag Pattern",
+        "tagPatternHint": "Only tags matching this pattern forge marks (e.g. v1.0.0)",
+        "labelsOptional": "Marks (if ye fancy)",
+        "creating": "Forgin''...",
+        "create": "Forge"
+      }
+    },
+    "providers": {
+      "title": "Merchants",
+      "description": "Private Terraform merchant ship''s ledger",
+      "cancel": "Belay",
+      "createProvider": "Forge Merchant",
+      "empty": "Nay merchants yet. Forge one to set sail.",
+      "loadFailed": "Couldn''t haul in merchants",
+      "createFailed": "Couldn''t forge merchant",
+      "createFailedStatus": "Couldn''t forge merchant ({status})",
+      "form": {
+        "name": "Name",
+        "slugTitle": "Lowercase letters, numbers, an'' hyphens only. Must set sail wi'' a lowercase letter.",
+        "creating": "Forgin''...",
+        "create": "Forge"
+      }
+    },
+    "meta": {
+      "title": "Metadata",
+      "edit": "Amend",
+      "cancel": "Belay",
+      "save": "Stow",
+      "saving": "Stowin''...",
+      "saveAnyway": "Stow Anyway",
+      "revertLabels": "Revert Marks",
+      "owner": "Owner",
+      "ownerNone": "Nary a one",
+      "ownerPlaceholder": "user@example.com",
+      "labels": "Marks"
+    },
+    "moduleDetail": {
+      "notFound": "Riggin'' not found",
+      "loadFailed": "Couldn''t haul in riggin''",
+      "updateFailed": "Couldn''t refit riggin''",
+      "labelLockoutDefault": "This mark change would reduce yer access.",
+      "providerLabel": "Merchant: {provider}",
+      "cancel": "Belay",
+      "uploadVersion": "Haul up Mark",
+      "vcsConnected": "VCS Moored",
+      "connectVcs": "Moor VCS",
+      "deleteModule": "Scuttle Riggin''",
+      "linkFailed": "Couldn''t link work deck",
+      "linkFailedStatus": "Link went awry ({status})",
+      "unlinkConfirm": "Unlink this work deck from the riggin''? Impact analysis shall nay longer voyage fer it.",
+      "unlinkFailed": "Couldn''t unlink work deck",
+      "unlinkFailedStatus": "Unlink went awry ({status})",
+      "uploadFailed": "Haul up went awry",
+      "uploadFailedStatus": "Haul up went awry ({status})",
+      "saveVcsFailed": "Couldn''t stow VCS config",
+      "saveVcsFailedStatus": "Couldn''t stow VCS config ({status})",
+      "disableVcsFailed": "Couldn''t lower VCS",
+      "disableVcsFailedStatus": "Couldn''t lower VCS ({status})",
+      "deleteFailed": "Scuttle went awry",
+      "deleteFailedStatus": "Scuttle went awry ({status})",
+      "upload": {
+        "intro": "Pick a directory containing yer Terraform riggin'' files. They shall be packaged into a tarball an'' uploaded.",
+        "version": "Mark",
+        "moduleDirectory": "Riggin'' Directory",
+        "selectDirectory": "Pick Directory",
+        "fileCount": "{count, plural, one {# file} other {# files}}",
+        "filesToInclude": "{count, plural, one {# file to include:} other {# files to include:}}",
+        "andMore": "...an'' {count} more",
+        "uploading": "Uploading...",
+        "upload": "Haul up"
+      },
+      "vcs": {
+        "intro": "Moor this riggin'' to a VCS port. New marks be hoisted automatically when semver tags matching the tag pattern be pushed. Channel log entries alone do not forge marks.",
+        "connection": "VCS Moorin''",
+        "selectConnection": "Pick a moorin''...",
+        "repositoryUrl": "Port URL",
+        "branchOptional": "Channel (if ye fancy)",
+        "branchPlaceholder": "main (part ways empty fer default)",
+        "tagPattern": "Tag Pattern",
+        "tagPatternHint": "Only tags matching this pattern forge marks (e.g. v1.0.0)",
+        "saving": "Stowin''...",
+        "saveConfiguration": "Stow VCS Configuration",
+        "disconnect": "Cast off VCS"
+      },
+      "vcsStatus": {
+        "connected": "VCS moored:",
+        "lastTag": "Last tag: {tag}",
+        "firstVersionHint": "Push a semver tag (e.g. <code>v1.0.0</code>) matching the tag pattern to hoist the colours the first mark."
+      },
+      "links": {
+        "title": "Linked Work decks",
+        "linkWorkspace": "Link Work deck",
+        "description": "Linked work decks receive speculative charts when PRs be opened against this riggin'', an'' standard voyages when new marks be hoisted.",
+        "searchPlaceholder": "Scout work decks to link…",
+        "empty": "Nay work decks linked yet.",
+        "unlinkTitle": "Unlink work deck"
+      },
+      "interface": {
+        "title": "Inputs & Outputs",
+        "counts": "{inputs} inputs, {outputs} outputs",
+        "versionLabel": "Mark:",
+        "noData": "Nay interface data at the ready fer this mark.",
+        "inputs": "Inputs",
+        "outputs": "Outputs",
+        "name": "Name",
+        "type": "Sort",
+        "description": "Yarn",
+        "default": "Default",
+        "required": "Be needed",
+        "sensitive": "Sensitive",
+        "requiredBadge": "be needed",
+        "optionalBadge": "if ye fancy",
+        "sensitiveBadge": "sensitive",
+        "noneDeclared": "This riggin'' mark declares nay inputs or outputs."
+      },
+      "versions": {
+        "title": "Marks",
+        "count": "{count, plural, one {# mark} other {# marks}}",
+        "emptyVcs": "Nay marks yet. Push a semver tag matching \"{pattern}\" to the moored port to hoist the colours a mark.",
+        "emptyUpload": "Nay marks yet. Haul up a riggin'' or moor VCS to set sail.",
+        "version": "Mark",
+        "status": "Status",
+        "source": "Source",
+        "actions": "Deeds",
+        "manualUpload": "manual haul up",
+        "delete": "Scuttle"
+      },
+      "deleteDialog": {
+        "title": "Give the nod Scuttle",
+        "moduleBody": "This shall permanently scuttle this riggin'' an'' all its marks.",
+        "versionBody": "This shall permanently scuttle mark {version}.",
+        "cancel": "Belay",
+        "confirm": "Scuttle"
+      }
+    },
+    "providerDetail": {
+      "description": "Merchant ship''s ledger",
+      "deleteProvider": "Scuttle Merchant",
+      "publishNote": "Merchant marks be hoisted wi'' the <code>terrapod-publish</code> CLI, which client-signs the binaries. Uploading an'' signing merchant binaries from the browser be nay longer supported. This page be read-only fer marks an'' platforms.",
+      "empty": "Nay marks yet. Hoist the colours wi'' the terrapod-publish CLI to set sail.",
+      "loadVersionsFailed": "Couldn''t haul in marks",
+      "updateFailed": "Couldn''t refit merchant",
+      "labelLockoutDefault": "This mark change would reduce yer access.",
+      "deleteFailed": "Scuttle went awry",
+      "deleteFailedStatus": "Scuttle went awry ({status})",
+      "platformCount": "{count, plural, one {# platform} other {# platforms}}",
+      "delete": "Scuttle",
+      "os": "OS",
+      "arch": "Arch",
+      "filename": "Filename",
+      "actions": "Deeds",
+      "deleteDialog": {
+        "title": "Give the nod Scuttle",
+        "providerBody": "This shall permanently scuttle this merchant an'' all its marks.",
+        "versionBody": "This shall permanently scuttle mark {version} an'' its platforms.",
+        "platformBody": "This shall permanently scuttle the {os}/{arch} platform.",
+        "cancel": "Belay",
+        "confirm": "Scuttle"
+      }
+    }
+  },
+  "adminUsers": {
+    "title": "Hands",
+    "description": "Command local hand accounts",
+    "empty": "Nay hands found.",
+    "columns": {
+      "email": "Message",
+      "displayName": "Display Name",
+      "status": "Status",
+      "lastLogin": "Last Boardin''",
+      "created": "Forged",
+      "actions": "Deeds"
+    },
+    "form": {
+      "email": "Message",
+      "displayName": "Display Name",
+      "displayNamePlaceholder": "Jane Doe",
+      "passwordOptional": "Secret word (if ye fancy)",
+      "passwordPlaceholder": "Enter a strong secret word"
+    },
+    "reset": {
+      "title": "Reset secret word fer {email}",
+      "newPassword": "New Secret word"
+    },
+    "password": {
+      "score": {
+        "veryWeak": "Very weak",
+        "weak": "Weak",
+        "fair": "Fair",
+        "good": "Good",
+        "strong": "Strong"
+      }
+    },
+    "status": {
+      "active": "Sailin''",
+      "inactive": "Beached",
+      "never": "Never"
+    },
+    "actions": {
+      "cancel": "Belay",
+      "save": "Stow",
+      "saving": "Stowin''...",
+      "createUser": "Forge Hand",
+      "creating": "Forgin''...",
+      "resetPassword": "Reset Secret word",
+      "edit": "Amend",
+      "delete": "Scuttle",
+      "resetPw": "Reset PW",
+      "setPw": "Set PW",
+      "cancelPw": "Belay PW"
+    },
+    "confirm": {
+      "activate": "Activate hand \"{email}\"?",
+      "deactivate": "Deactivate hand \"{email}\"?",
+      "delete": "Scuttle hand \"{email}\"? This cannot be undone."
+    },
+    "success": {
+      "created": "Hand \"{email}\" forged",
+      "updated": "Hand \"{email}\" refitted",
+      "activated": "Hand \"{email}\" activated",
+      "deactivated": "Hand \"{email}\" deactivated",
+      "passwordReset": "Secret word reset fer \"{email}\"",
+      "deleted": "Hand \"{email}\" scuttled"
+    },
+    "errors": {
+      "load": "Couldn''t haul in hands",
+      "create": "Couldn''t forge hand",
+      "createStatus": "Couldn''t forge hand ({status})",
+      "update": "Couldn''t refit hand",
+      "resetPassword": "Couldn''t reset secret word",
+      "delete": "Couldn''t scuttle hand"
+    }
+  },
+  "adminRoles": {
+    "title": "Ranks & Assignments",
+    "description": "Command RBAC ranks an'' hand rank assignments",
+    "builtIn": "built-in",
+    "emptyRoles": "Nay ranks defined.",
+    "emptyAssignments": "Nay rank assignments.",
+    "tabs": {
+      "roles": "Ranks",
+      "assignments": "Assignments"
+    },
+    "columns": {
+      "provider": "Merchant",
+      "email": "Message",
+      "role": "Rank",
+      "created": "Forged",
+      "actions": "Deeds"
+    },
+    "form": {
+      "name": "Name",
+      "namePattern": "Letters, numbers, hyphens, an'' underscores only. Must set sail wi'' a letter or number.",
+      "workspacePermission": "Work deck Permission",
+      "poolPermission": "Pool Permission",
+      "registryPermission": "Ship''s ledger Permission",
+      "catalogPermission": "Treasure map Permission",
+      "descriptionLabel": "Yarn",
+      "descriptionPlaceholder": "Developer access",
+      "allowLabels": "Allow Marks (key=worth, comma-separated)",
+      "allowNames": "Allow Names (comma-separated)",
+      "denyLabels": "Deny Marks (key=worth, comma-separated)",
+      "denyNames": "Deny Names (comma-separated)",
+      "allowLabelsShort": "Allow Marks",
+      "allowNamesShort": "Allow Names",
+      "denyLabelsShort": "Deny Marks",
+      "denyNamesShort": "Deny Names"
+    },
+    "assignForm": {
+      "provider": "Merchant",
+      "email": "Message",
+      "roles": "Ranks"
+    },
+    "caps": {
+      "selected": "{count, plural, one {# capability} other {# capabilities}} picked",
+      "count": "{count, plural, one {# capability} other {# capabilities}}",
+      "custom": "Custom",
+      "matchesPresets": "Matches presets",
+      "advanced": "Advanced — capabilities",
+      "otherPreserved": "Other capabilities (preserved on stow)",
+      "presetHelp": {
+        "before": "Selecting a preset above pre-checks its capabilities. Ticking or unticking a box past a preset marks the rank",
+        "after": "an'' its grant be sent as an explicit capability set."
+      },
+      "groups": {
+        "workspace": "Work deck",
+        "run": "Voyage",
+        "state": "Ship''s log",
+        "var": "Variables",
+        "config": "Config",
+        "drift": "Adrift",
+        "run-task": "Voyage tasks",
+        "notification": "Messages in a bottle",
+        "run-trigger": "Voyage sparks",
+        "pool": "Crews",
+        "registry": "Ship''s ledger",
+        "catalog": "Service treasure map"
+      }
+    },
+    "display": {
+      "allow": "Allow: {value}",
+      "allowNames": "Allow names: {value}",
+      "deny": "Deny: {value}",
+      "denyNames": "Deny names: {value}"
+    },
+    "actions": {
+      "cancel": "Belay",
+      "save": "Stow",
+      "saving": "Stowin''...",
+      "edit": "Amend",
+      "delete": "Scuttle",
+      "remove": "Cast off",
+      "createRole": "Forge Rank",
+      "creating": "Forgin''...",
+      "addAssignment": "Muster Assignment",
+      "setRoles": "Set Ranks"
+    },
+    "confirm": {
+      "deleteRole": "Scuttle rank \"{name}\"? Any assignments referencing it be affected.",
+      "removeAssignment": "Cast off rank \"{roleName}\" from {email}?"
+    },
+    "success": {
+      "roleCreated": "Rank \"{name}\" forged",
+      "roleUpdated": "Rank \"{name}\" refitted",
+      "roleDeleted": "Rank \"{name}\" scuttled",
+      "rolesAssigned": "Ranks posted to {email}",
+      "assignmentRemoved": "Assignment cast off"
+    },
+    "errors": {
+      "loadRoles": "Couldn''t haul in ranks",
+      "loadAssignments": "Couldn''t haul in assignments",
+      "createRole": "Couldn''t forge rank",
+      "createRoleStatus": "Couldn''t forge rank ({status})",
+      "updateRole": "Couldn''t refit rank",
+      "deleteRole": "Couldn''t scuttle rank",
+      "setAssignment": "Couldn''t set assignment",
+      "setAssignmentStatus": "Couldn''t set assignment ({status})",
+      "deleteAssignment": "Couldn''t scuttle assignment"
+    }
+  },
+  "adminVcs": {
+    "title": "VCS Moorin''s",
+    "description": "Command mark control system integrations",
+    "empty": "Nay VCS moorin''s configured.",
+    "actions": {
+      "new": "New Moorin''",
+      "cancel": "Belay",
+      "edit": "Amend",
+      "delete": "Scuttle"
+    },
+    "confirmDelete": "Scuttle this VCS moorin''? Work decks using it shall lose VCS integration. This cannot be undone.",
+    "form": {
+      "name": "Name",
+      "namePattern": "Letters, numbers, hyphens, an'' underscores only. Must set sail wi'' a letter or number.",
+      "provider": "Merchant",
+      "providerImmutable": "Merchant be immutable — scuttle an'' recreate to change it",
+      "serverUrl": "Server URL (if ye fancy)",
+      "serverUrlHint": "Must be an HTTP or HTTPS URL (e.g. https://github.mycompany.com)",
+      "appId": "App ID",
+      "appIdHint": "GitHub App ID — numeric digits only",
+      "installationId": "Installation ID",
+      "installationIdHint": "GitHub App Installation ID — numeric digits only",
+      "privateKey": "Private Key (PEM)",
+      "browse": "Browse...",
+      "privateKeyKeep": "Part ways blank to keep the current key — paste a new PEM to rotate",
+      "privateKeyPlaceholder": "-----BEGIN RSA PRIVATE KEY-----\n...\n\nDrop a .pem file here or click Browse",
+      "webhookSecret": "Webhook Secret",
+      "optional": "(if ye fancy)",
+      "webhookSecretSet": "Set — part ways blank to keep, enter a new worth to rotate",
+      "webhookSecretGlobal": "Part ways blank to use the global webhook secret",
+      "webhookSecretHelp": "Per-connection HMAC secret fer this installation''s webhooks. When unset, the global secret be used.",
+      "accessToken": "Access Doubloon",
+      "accessTokenKeep": "Part ways blank to keep the current doubloon",
+      "saving": "Stowin''...",
+      "creating": "Forgin''...",
+      "saveChanges": "Stow Changes",
+      "createConnection": "Forge Moorin''"
+    },
+    "table": {
+      "name": "Name",
+      "provider": "Merchant",
+      "serverUrl": "Server URL",
+      "status": "Status",
+      "created": "Forged",
+      "actions": "Deeds"
+    },
+    "success": {
+      "created": "VCS moorin'' \"{name}\" forged",
+      "updated": "VCS moorin'' \"{name}\" refitted",
+      "deleted": "VCS moorin'' scuttled"
+    },
+    "errors": {
+      "load": "Couldn''t haul in VCS moorin''s",
+      "save": "Couldn''t stow moorin''",
+      "delete": "Couldn''t scuttle moorin''",
+      "createStatus": "Couldn''t forge moorin'' ({status})",
+      "updateStatus": "Couldn''t refit moorin'' ({status})"
+    }
+  },
+  "adminVariableSets": {
+    "title": "sacks o'' booty",
+    "description": "Command org-scoped sacks o'' booty fer work deck groups",
+    "empty": "Nay sacks o'' booty configured.",
+    "none": "-",
+    "actions": {
+      "new": "New sack o'' booty",
+      "cancel": "Belay"
+    },
+    "form": {
+      "name": "Name",
+      "namePattern": "Letters, numbers, hyphens, an'' underscores only. Must set sail wi'' a letter or number.",
+      "descriptionLabel": "Yarn",
+      "descriptionPlaceholder": "AWS credentials fer all work decks",
+      "global": "Global (lay down to all work decks)",
+      "priority": "Priority (override work deck vars)",
+      "creating": "Forgin''...",
+      "create": "Forge sack o'' booty"
+    },
+    "table": {
+      "name": "Name",
+      "description": "Yarn",
+      "scope": "Scope",
+      "variables": "Variables",
+      "created": "Forged"
+    },
+    "scope": {
+      "global": "Global",
+      "priority": "Priority",
+      "standard": "Standard"
+    },
+    "errors": {
+      "load": "Couldn''t haul in sacks o'' booty",
+      "create": "Couldn''t forge sack o'' booty",
+      "createStatus": "Couldn''t forge sack o'' booty ({status})"
+    },
+    "detail": {
+      "back": "Back to sacks o'' booty",
+      "headerFallback": "Sack o'' booty",
+      "notFound": "Sack o'' booty not found",
+      "global": "Global",
+      "priority": "Priority",
+      "yes": "Aye",
+      "no": "Nay",
+      "edit": "Amend",
+      "cancel": "Belay",
+      "save": "Stow",
+      "saving": "Stowin''...",
+      "delete": "Scuttle",
+      "deleting": "Scuttlin''...",
+      "confirmDelete": "Give the nod Scuttle",
+      "deleteTitle": "Scuttle sack o'' booty",
+      "deleteDescription": "Permanently scuttle this sack o'' booty an'' all its variables.",
+      "tabs": {
+        "settings": "Riggin'' o'' the ship",
+        "variables": "Variables",
+        "workspaces": "Work decks"
+      },
+      "addVariable": "Muster Variable",
+      "adding": "Musterin''...",
+      "varKey": "Key",
+      "varValue": "Worth",
+      "varCategory": "Category",
+      "categoryTerraform": "Terraform",
+      "categoryEnv": "Environment",
+      "sensitive": "Sensitive",
+      "sensAbbr": "Sens.",
+      "enterNewValue": "Enter new worth",
+      "empty": "empty",
+      "emptyVars": "Nay variables in this set.",
+      "actions": "Deeds",
+      "remove": "Cast off",
+      "add": "Muster",
+      "addWorkspace": "Muster Work deck",
+      "workspace": "Work deck",
+      "selectWorkspace": "Pick a work deck...",
+      "globalBanner": "This sack o'' booty be global an'' applies to all work decks automatically.",
+      "emptyWorkspaces": "Nay work decks posted to this sack o'' booty.",
+      "confirmDeleteVar": "Scuttle this variable? This cannot be undone.",
+      "confirmRemoveWorkspace": "Cast off this work deck from the sack o'' booty? Its variables shall nay longer lay down to that work deck.",
+      "success": {
+        "updated": "Sack o'' booty refitted",
+        "workspaceAdded": "Work deck mustered",
+        "workspaceRemoved": "Work deck cast off"
+      },
+      "errors": {
+        "load": "Couldn''t haul in sack o'' booty",
+        "update": "Couldn''t refit sack o'' booty",
+        "delete": "Couldn''t scuttle sack o'' booty",
+        "loadVars": "Couldn''t haul in variables",
+        "loadWorkspaces": "Couldn''t haul in work decks",
+        "addVar": "Couldn''t muster variable",
+        "addVarStatus": "Couldn''t muster variable ({status})",
+        "updateVar": "Couldn''t refit variable",
+        "deleteVar": "Couldn''t scuttle variable",
+        "addWorkspace": "Couldn''t muster work deck",
+        "removeWorkspace": "Couldn''t cast off work deck"
+      }
+    }
+  },
+  "adminAutodiscovery": {
+    "title": "Autodiscovery",
+    "description": "Auto-create work decks in monorepos when PRs touch matching paths",
+    "empty": "Nay autodiscovery rules yet. Forge one to set sail auto-provisioning work decks from PRs in yer monorepo.",
+    "unsavedRule": "(unsaved rule)",
+    "actions": {
+      "newRule": "New Rule",
+      "cancel": "Belay",
+      "create": "Forge",
+      "update": "Refit",
+      "preview": "Preview",
+      "edit": "Amend",
+      "delete": "Scuttle",
+      "close": "Batten"
+    },
+    "status": {
+      "enabled": "aye, hoisted",
+      "disabled": "nay, lowered"
+    },
+    "form": {
+      "createTitle": "Forge rule",
+      "editTitle": "Amend rule",
+      "name": "Name",
+      "vcsConnection": "VCS moorin''",
+      "selectConnection": "Pick moorin''",
+      "repoUrl": "Repo URL",
+      "branch": "Channel (empty = default)",
+      "matchPattern": "Match pattern",
+      "matchPatternHint": "Gitignore-style globs. <code>**</code> matches across path segments. Only <code>*.tf*</code> files spark autodiscovery.",
+      "ignorePatterns": "Ignore patterns (one per line)",
+      "nameTemplate": "Work deck name template (if ye fancy)",
+      "nameTemplateHint": "Use <path></path> fer the directory wi'' <code>/</code> replaced by <code>-</code>, or <root></root> fer the directory as-is. Empty = default (just the dashed path).",
+      "templateDefaults": "Work deck template defaults",
+      "executionMode": "Sailin'' mode",
+      "executionModeHint": "Autodiscovery be VCS-driven; only agent execution be supported.",
+      "agentPool": "Crew",
+      "none": "(nary a one)",
+      "executionBackend": "Sailin'' backend",
+      "terraformVersion": "Terraform mark",
+      "cpuRequest": "CPU askin''",
+      "memoryRequest": "Memory askin''",
+      "ownerEmail": "Owner message",
+      "autoApply": "Auto-apply",
+      "enabled": "Aye, hoisted",
+      "onDirectoryDelete": "On directory scuttle",
+      "onDeleteFlag": "Flag (safe — mark awaitin'' deletion, requires manual deed)",
+      "onDeleteDestroy": "Send to Davy Jones (DANGER — tears down infrastructure then archives the work deck)",
+      "onDirectoryDeleteHint": "What happens to an autodiscovered work deck when its directory be cast off on the tracked channel.",
+      "onDeleteDestroyWarning": "This shall voyage a real terraform send to Davy Jones on the work deck when its directory be cast off on the tracked channel.",
+      "labels": "Marks (inherited by forged work decks)",
+      "varFiles": "Var files (inherited by forged work decks)",
+      "varFilesHint": "Relative <code>.tfvars</code> paths passed to chart/lay down.",
+      "addVarFile": "Muster var file",
+      "executionHooks": "Execution hooks (associated wi'' each new work deck)",
+      "executionHooksHint": "Pick from hooks defined on the <page>Execution Hooks</page> cap''n page — each picked hook be associated wi'' every work deck this rule creates.",
+      "noHooks": "Nay execution hooks defined yet. Forge one on the Execution Hooks cap''n page first.",
+      "hookDisabled": "(nay, lowered)",
+      "hookNotInLibrary": "(not in library — untick to cast off)",
+      "runTaskTemplates": "Voyage task templates (forged on each new work deck)",
+      "notificationTemplates": "Message in a bottle templates (forged on each new work deck)",
+      "saving": "Stowin''...",
+      "previewTitle": "Walk the repo an'' preview which work decks this rule WOULD forge — nay persistence"
+    },
+    "table": {
+      "name": "Name",
+      "repo": "Repo",
+      "pattern": "Pattern",
+      "enabled": "Aye, hoisted",
+      "created": "Forged",
+      "previewTitle": "Walk the repo an'' preview which work decks this rule would forge"
+    },
+    "deleteModal": {
+      "title": "Scuttle rule?",
+      "body": "Work decks auto-created by this rule keep working. Future PRs touching new paths under this rule won''t auto-create more work decks."
+    },
+    "preview": {
+      "title": "Preview: {ruleName}",
+      "walkedFiles": "Walked <files>{count}</files> files on <refspan>{ref}</refspan>",
+      "walking": "Walking port…",
+      "noMatches": "Nay directories in this repo match the rule''s pattern. Nothing to forge.",
+      "colWorkspace": "Work deck",
+      "colDirectory": "Directory",
+      "colAction": "Deed",
+      "repoRoot": "(repo root)",
+      "actionCreate": "Forge",
+      "skipDiscovered": "Skip (already discovered)",
+      "skipDiscoveredTitle": "Already forged by this rule",
+      "skipCollision": "Skip (name collision)",
+      "skipCollisionTitle": "A work deck wi'' this name already exists fer another reason",
+      "willCreate": "{count, plural, one {# work deck shall be forged.} other {# work decks shall be forged.}} Existing work decks (collisions) be left untouched.",
+      "provision": "{count, plural, one {Rig up # work deck} other {Rig up # work decks}}",
+      "provisioning": "Riggin'' up…",
+      "saveToProvision": "Stow the rule to rig up these work decks."
+    },
+    "success": {
+      "created": "Forged {name}",
+      "updated": "Refitted {name}",
+      "deleted": "Scuttled rule",
+      "provisioned": "{count, plural, one {Forged # work deck from \"{ruleName}\"} other {Forged # work decks from \"{ruleName}\"}}"
+    },
+    "errors": {
+      "loadRules": "Couldn''t haul in autodiscovery rules",
+      "load": "Couldn''t haul in",
+      "createFailed": "Forge went awry: {status} {detail}",
+      "updateFailed": "Refit went awry: {status} {detail}",
+      "save": "Couldn''t stow",
+      "deleteRule": "Couldn''t scuttle rule",
+      "delete": "Couldn''t scuttle",
+      "previewFailed": "Preview went awry ({status})",
+      "preview": "Preview went awry",
+      "previewPrereq": "Set VCS moorin'', repo URL, an'' pattern before previewing",
+      "scanFailed": "Scan went awry ({status})",
+      "scan": "Scan went awry"
+    }
+  },
+  "adminBulkUpdate": {
+    "title": "Bulk Refit",
+    "description": "Pick work decks by sift, then lay down a riggin'' o'' the ship change across all o'' them",
+    "none": "(nary a one)",
+    "anyOption": "(any)",
+    "unchanged": "(unchanged)",
+    "unchangedOption": "(unchanged)",
+    "filter": {
+      "heading": "1. Pick work decks",
+      "matchAll": "Match <strong>all</strong> work decks (ignores the sifts below)",
+      "namePrefix": "Name prefix",
+      "executionBackend": "Sailin'' backend",
+      "ownerEmail": "Owner message",
+      "agentPool": "Crew",
+      "vcsConnection": "VCS moorin''",
+      "labels": "Marks",
+      "search": "Scout",
+      "searching": "Scoutin''..."
+    },
+    "results": {
+      "matched": "Matched <strong>{count}</strong> {count, plural, one {work deck} other {work decks}}.",
+      "noMatch": "Nay work decks matched this sift.",
+      "colName": "Name",
+      "colMode": "Mode",
+      "colBackend": "Backend",
+      "colTfVersion": "TF mark",
+      "colLabels": "Marks"
+    },
+    "update": {
+      "heading": "2. Lay down changes",
+      "hint": "Only fields ye set below be changed. The sift above selects which work decks receive the change.",
+      "terraformVersion": "Terraform mark",
+      "executionBackend": "Sailin'' backend",
+      "executionMode": "Sailin'' mode",
+      "autoApply": "Auto-apply",
+      "agentPool": "Crew",
+      "cpuRequest": "CPU askin''",
+      "memoryRequest": "Memory askin''",
+      "setLabels": "Set marks (replaces the marks map on every matched work deck)",
+      "setVarFiles": "Set var files",
+      "addVarFile": "Muster var file",
+      "setRunTasks": "Set voyage tasks (upserted by name on every matched work deck)",
+      "setNotifications": "Set message in a bottle configurations (upserted by name)",
+      "dryRun": "Dry voyage (preview only — nay changes written)",
+      "confirmWarning": "This writes changes to every matched work deck.",
+      "confirmApply": "Give the nod lay down",
+      "applying": "Layin'' down...",
+      "cancel": "Belay",
+      "working": "Working...",
+      "previewDryRun": "Preview (dry voyage)",
+      "applyChanges": "Lay down changes"
+    },
+    "diff": {
+      "colWorkspace": "Work deck",
+      "colChanges": "Changes"
+    },
+    "dryResult": {
+      "heading": "Dry voyage result",
+      "summary": "Matched <strong>{matched}</strong>; <strong>{wouldChange}</strong> would change; {unchanged} unchanged. Nothing were written.",
+      "wouldChange": "Would change",
+      "noChange": "Nay work decks would change wi'' this refit."
+    },
+    "applyResult": {
+      "heading": "Lay down result",
+      "summary": "Matched <strong>{matched}</strong>; <appliedstrong>{applied}</appliedstrong> laid down; {unchanged} unchanged; {errors, plural, one {# trouble} other {# troubles}}.",
+      "applied": "Laid down",
+      "unnamedWorkspace": "(work deck)",
+      "noChange": "Nay work decks changed."
+    },
+    "errors": {
+      "searchFailed": "Scout went awry ({status})",
+      "search": "Scout went awry",
+      "bulkUpdateFailed": "Bulk refit went awry ({status})",
+      "bulkUpdate": "Bulk refit went awry"
+    }
+  },
+  "adminExecutionHooks": {
+    "title": "Execution Hooks",
+    "description": "Custom shell steps voyage inside runner Jobs at pre/post-plan/apply points, associated wi'' work decks",
+    "empty": "Nay execution hooks configured.",
+    "actions": {
+      "cancel": "Belay",
+      "new": "New Execution Hook",
+      "creating": "Forgin''...",
+      "create": "Forge Execution Hook"
+    },
+    "badges": {
+      "disabled": "Nay, lowered",
+      "enabled": "Aye, hoisted"
+    },
+    "columns": {
+      "name": "Name",
+      "hookPoint": "Hook Point",
+      "enabled": "Aye, hoisted",
+      "priority": "Priority",
+      "workspaces": "Work decks"
+    },
+    "form": {
+      "name": "Name",
+      "namePatternTitle": "Letters, numbers, hyphens, an'' underscores only. Must set sail wi'' a letter or number.",
+      "description": "Yarn",
+      "descriptionPlaceholder": "Muster an internal hosts entry before init",
+      "hookPoint": "Hook Point",
+      "priority": "Priority",
+      "priorityTitle": "Lower voyages first when several hooks share a point (ties broken by name).",
+      "scriptLabel": "Script (<code>/bin/sh -c</code>)",
+      "scriptHelp": "Voyages wi'' the runner''s cloud identity. A non-zero exit goes awry the voyage. Secrets should come from work deck variables, not inline here."
+    },
+    "errors": {
+      "load": "Couldn''t haul in execution hooks",
+      "createStatus": "Couldn''t forge execution hook ({status})",
+      "create": "Couldn''t forge execution hook"
+    }
+  },
+  "adminPolicySets": {
+    "title": "codes o'' conduct",
+    "description": "OPA policy-as-code enforcement, scoped to work decks by mark",
+    "empty": "Nay codes o'' conduct configured.",
+    "actions": {
+      "cancel": "Belay",
+      "new": "New code o'' conduct",
+      "creating": "Forgin''...",
+      "create": "Forge code o'' conduct"
+    },
+    "badges": {
+      "disabled": "Nay, lowered",
+      "mandatory": "Mandatory",
+      "advisory": "Advisory",
+      "global": "Global",
+      "labelScoped": "Label-scoped"
+    },
+    "columns": {
+      "name": "Name",
+      "description": "Yarn",
+      "enforcement": "Enforcement",
+      "scope": "Scope",
+      "policies": "Codes"
+    },
+    "form": {
+      "name": "Name",
+      "namePatternTitle": "Letters, numbers, hyphens, an'' underscores only. Must set sail wi'' a letter or number.",
+      "description": "Yarn",
+      "descriptionPlaceholder": "Mandatory guardrails fer production work decks",
+      "enforcement": "Enforcement",
+      "enforcementAdvisory": "Advisory (warn, do not block)",
+      "enforcementMandatory": "Mandatory (block lay down on wreck)",
+      "globalScope": "Global (lay down to every work deck)",
+      "sourceInline": "Inline (command codes in UI)",
+      "sourceVcs": "From VCS Port",
+      "vcsConnection": "VCS Moorin''",
+      "selectConnection": "Pick moorin''...",
+      "repoUrl": "Port URL",
+      "branch": "Channel",
+      "branchPlaceholder": "main (default)",
+      "policyPath": "Code Path",
+      "policyPathPlaceholder": "codes/ (directory containing .rego files)",
+      "helpVcs": "Codes shall be synced from the port automatically.",
+      "helpInline": "Muster codes an'' refine mark scoping after forgin'' the set."
+    },
+    "errors": {
+      "load": "Couldn''t haul in codes o'' conduct",
+      "createStatus": "Couldn''t forge code o'' conduct ({status})",
+      "create": "Couldn''t forge code o'' conduct"
+    }
+  },
+  "adminCatalog": {
+    "title": "Treasure map Cap''n",
+    "description": "Command service treasure map items",
+    "notEnabled": "Service treasure map be not aye, hoisted.",
+    "empty": "Nay treasure map items yet.",
+    "actions": {
+      "new": "New Treasure map Item",
+      "cancel": "Belay",
+      "create": "Forge Treasure map Item",
+      "creating": "Forgin''…",
+      "saveChanges": "Stow Changes",
+      "saving": "Stowin''…",
+      "edit": "Amend",
+      "delete": "Scuttle"
+    },
+    "form": {
+      "name": "Name",
+      "nameTitle": "Letters, numbers, hyphens, an'' underscores only. Must set sail wi'' a letter or number.",
+      "module": "Riggin''",
+      "moduleSelect": "Pick a riggin''…",
+      "moduleImmutable": "Riggin'' be immutable after creation",
+      "displayName": "Display name",
+      "displayNamePlaceholder": "Standard S3 Bucket",
+      "versionPin": "Default mark pin",
+      "versionPinPlaceholder": "e.g. 1.2.0 (empty = latest)",
+      "descriptionLabel": "Yarn",
+      "descriptionPlaceholder": "What this treasure map item provisions…",
+      "enabled": "Aye, hoisted (visible in the browse treasure map)",
+      "providerTemplates": "Merchant templates",
+      "noProviderTemplates": "Nay merchant templates defined.",
+      "restrictPools": "Restrict to specific crews",
+      "noAgentPools": "Nay crews at the ready.",
+      "anyPool": "Any crew may be used.",
+      "labels": "Marks",
+      "variableOptions": "Variable options (advanced, JSON)",
+      "variableOptionsHint": "Per-input overrides (options, hidden, default). Part ways as <code>[]</code> if unused."
+    },
+    "table": {
+      "name": "Name",
+      "module": "Riggin''",
+      "enabled": "Aye, hoisted",
+      "actions": "Deeds"
+    },
+    "badge": {
+      "enabled": "aye, hoisted",
+      "disabled": "nay, lowered"
+    },
+    "confirm": {
+      "delete": "Scuttle this treasure map item? Existing rigged up instances be unaffected."
+    },
+    "success": {
+      "created": "Treasure map item \"{name}\" forged",
+      "updated": "Treasure map item \"{name}\" refitted",
+      "deleted": "Treasure map item scuttled"
+    },
+    "errors": {
+      "load": "Couldn''t haul in treasure map items",
+      "save": "Couldn''t stow treasure map item",
+      "createStatus": "Couldn''t forge treasure map item ({status})",
+      "updateStatus": "Couldn''t refit treasure map item ({status})",
+      "delete": "Couldn''t scuttle treasure map item",
+      "deleteConflict": "Cannot scuttle: this treasure map item has rigged up instances.",
+      "varOptsInvalidJson": "Variable options must be shipshape JSON (an array).",
+      "varOptsNotArray": "Variable options must be a JSON array."
+    }
+  },
+  "adminProviderTemplates": {
+    "title": "Merchant Templates",
+    "description": "Reusable merchant configuration blocks fer treasure map items",
+    "notEnabled": "Service treasure map be not aye, hoisted.",
+    "empty": "Nay merchant templates yet.",
+    "actions": {
+      "new": "New Template",
+      "cancel": "Belay",
+      "create": "Forge Template",
+      "creating": "Forgin''…",
+      "saveChanges": "Stow Changes",
+      "saving": "Stowin''…",
+      "edit": "Amend",
+      "delete": "Scuttle"
+    },
+    "form": {
+      "name": "Name",
+      "providerType": "Merchant sort",
+      "body": "Body (HCL)",
+      "parameters": "Parameters (advanced, JSON)",
+      "parametersHint": "Each parameter becomes a rig up form field. Part ways as <code>[]</code> if unused.",
+      "labels": "Marks"
+    },
+    "table": {
+      "name": "Name",
+      "providerType": "Merchant sort",
+      "parameters": "Parameters",
+      "actions": "Deeds"
+    },
+    "confirm": {
+      "delete": "Scuttle this merchant template? Treasure map items referencing it shall go awry to rig up. This cannot be undone."
+    },
+    "success": {
+      "created": "Merchant template \"{name}\" forged",
+      "updated": "Merchant template \"{name}\" refitted",
+      "deleted": "Merchant template scuttled"
+    },
+    "errors": {
+      "load": "Couldn''t haul in merchant templates",
+      "save": "Couldn''t stow merchant template",
+      "createStatus": "Couldn''t forge template ({status})",
+      "updateStatus": "Couldn''t refit template ({status})",
+      "delete": "Couldn''t scuttle merchant template",
+      "deleteConflict": "Cannot scuttle: this template be referenced by a treasure map item.",
+      "paramsInvalidJson": "Parameters must be shipshape JSON (an array).",
+      "paramsNotArray": "Parameters must be a JSON array."
+    }
+  },
+  "adminAgentPools": {
+    "title": "crews",
+    "description": "Command runner crews an'' their listeners",
+    "empty": "Nay crews configured.",
+    "actions": {
+      "newPool": "New Pool",
+      "createPool": "Forge Pool",
+      "creating": "Forgin''...",
+      "cancel": "Belay",
+      "edit": "Amend",
+      "save": "Stow",
+      "saving": "Stowin''...",
+      "delete": "Scuttle",
+      "deleting": "Scuttlin''...",
+      "confirmDelete": "Give the nod Scuttle"
+    },
+    "form": {
+      "name": "Name",
+      "namePattern": "Letters, numbers, hyphens, an'' underscores only. Must set sail wi'' a letter or number.",
+      "description": "Yarn",
+      "descriptionPlaceholder": "Production AWS runners",
+      "labels": "Marks"
+    },
+    "columns": {
+      "name": "Name",
+      "description": "Yarn",
+      "status": "Status",
+      "created": "Forged"
+    },
+    "badges": {
+      "default": "default",
+      "degradedTooltip": "Listeners be heartbeating but their certificates have run dry — voyages shall go awry to launch.",
+      "status": {
+        "online": "online",
+        "offline": "offline",
+        "degraded": "degraded"
+      }
+    },
+    "detail": {
+      "back": "Back to crews",
+      "defaultDescription": "Crew"
+    },
+    "tabs": {
+      "settings": "Riggin'' o'' the ship",
+      "tokens": "Doubloons",
+      "listeners": "Listeners"
+    },
+    "settings": {
+      "title": "Pool Riggin'' o'' the ship",
+      "fields": {
+        "name": "Name",
+        "description": "Yarn",
+        "created": "Forged",
+        "owner": "Owner",
+        "yourPermission": "Yer Permission",
+        "labels": "Marks"
+      },
+      "permissions": {
+        "read": "read",
+        "write": "write",
+        "admin": "cap''n"
+      }
+    },
+    "danger": {
+      "title": "Scuttle Pool",
+      "description": "Permanently scuttle this crew an'' all associated doubloons."
+    },
+    "tokens": {
+      "create": "Forge Doubloon",
+      "empty": "Nay doubloons fer this pool.",
+      "revoke": "Reclaim",
+      "created": {
+        "title": "Doubloon forged with flyin'' colours",
+        "copyNow": "Copy this doubloon now — it shall not be shown again, matey.",
+        "copy": "Copy"
+      },
+      "form": {
+        "description": "Yarn",
+        "descriptionPlaceholder": "Production listener doubloon",
+        "maxUses": "Max Uses",
+        "maxUsesHint": "Default 2 — tolerates one bootstrap-race try again, matey across listener replicas.",
+        "expiresAt": "Runs dry At",
+        "expiresAtHint": "Default 1 hour from now."
+      },
+      "columns": {
+        "description": "Yarn",
+        "uses": "Uses",
+        "expires": "Runs dry",
+        "status": "Status",
+        "createdBy": "Forged By",
+        "actions": "Deeds"
+      },
+      "badges": {
+        "revoked": "Reclaimed",
+        "active": "Sailin''"
+      }
+    },
+    "listeners": {
+      "empty": "Nay listeners registered fer this pool.",
+      "columns": {
+        "name": "Name",
+        "status": "Status",
+        "replicas": "Replicas",
+        "certExpires": "Cert Runs dry",
+        "actions": "Deeds"
+      },
+      "status": {
+        "online": "online",
+        "offline": "offline",
+        "degraded": "degraded",
+        "cert-expired": "cert-expired"
+      },
+      "tooltips": {
+        "certExpired": "Listener be heartbeating but its certificate has run dry — every cert-authenticated call (claim voyage, renew, runner-token) shall go awry. Most likely cause: the API never registered the latest cert, or the cert TTL elapsed before renewal.",
+        "degraded": "Listeners be heartbeating but their certificates have run dry — voyages shall go awry to launch."
+      }
+    },
+    "confirm": {
+      "revokeToken": "Reclaim this sign the articles doubloon? Listeners using it can nay longer sign the articles, an'' this cannot be undone.",
+      "deleteListener": "Scuttle this listener? It shall re-register on its next heartbeat if the pod be still running."
+    },
+    "success": {
+      "poolUpdated": "Pool refitted",
+      "tokenRevoked": "Doubloon reclaimed",
+      "listenerDeleted": "Listener scuttled"
+    },
+    "errors": {
+      "loadPools": "Couldn''t haul in crews",
+      "loadPool": "Couldn''t haul in pool",
+      "loadTokens": "Couldn''t haul in doubloons",
+      "loadListeners": "Couldn''t haul in listeners",
+      "createPool": "Couldn''t forge pool",
+      "createStatus": "Couldn''t forge pool ({status})",
+      "updatePool": "Couldn''t refit pool",
+      "deletePool": "Couldn''t scuttle pool",
+      "poolNotFound": "Pool not found",
+      "createToken": "Couldn''t forge doubloon",
+      "createTokenStatus": "Couldn''t forge doubloon ({status})",
+      "revokeToken": "Couldn''t reclaim doubloon",
+      "deleteListener": "Couldn''t scuttle listener"
+    }
+  },
+  "adminAuditLog": {
+    "title": "log book",
+    "description": "Immutable log o'' all API askin''s",
+    "empty": "Nay log book entries found.",
+    "errors": {
+      "load": "Couldn''t haul in log book"
+    },
+    "filters": {
+      "actorEmail": "Actor Message",
+      "actorPlaceholder": "user@example.com",
+      "resourceType": "Spoil Sort",
+      "resourceTypePlaceholder": "work decks",
+      "method": "Method",
+      "methodAll": "All",
+      "since": "Since",
+      "until": "Until",
+      "clear": "Clear",
+      "apply": "Lay down Sifts"
+    },
+    "columns": {
+      "timestamp": "Timestamp",
+      "actor": "Actor",
+      "action": "Deed",
+      "resourceType": "Spoil Sort",
+      "resourceId": "Spoil ID",
+      "status": "Status",
+      "duration": "Duration"
+    },
+    "pagination": {
+      "summary": "Page {current} o'' {total} ({count, plural, one {# entry} other {# entries}})",
+      "previous": "Previous",
+      "next": "Next"
+    }
+  },
+  "adminBinaryCache": {
+    "title": "The hold",
+    "description": "CLI binary an'' merchant the hold management",
+    "errors": {
+      "loadBinary": "Couldn''t haul in binary the hold",
+      "loadCache": "Couldn''t haul in the hold"
+    },
+    "sections": {
+      "cliBinaries": "CLI Binaries",
+      "providerBinaries": "Merchant Binaries"
+    },
+    "empty": {
+      "binaries": "Nay cached CLI binaries yet.",
+      "providers": "Nay cached merchant binaries yet."
+    },
+    "columns": {
+      "tool": "Tool",
+      "version": "Mark",
+      "os": "OS",
+      "arch": "Arch",
+      "cachedAt": "Cached At",
+      "provider": "Merchant",
+      "hostname": "Hostname",
+      "actions": "Deeds"
+    },
+    "warm": {
+      "heading": "Warm the hold",
+      "hide": "Hide",
+      "prePopulate": "Pre-populate…",
+      "help": "Pre-pull binaries an'' merchant platforms into the the hold (one per line). Trailing <code>os/arch</code> doubloons be if ye fancy — omit them to use the configured default platforms.",
+      "binariesLabel": "Binaries",
+      "providersLabel": "Merchants",
+      "warm": "Warm",
+      "warming": "Warming…",
+      "confirm": "Warm the picked the hold entries now?",
+      "errorEmpty": "Muster at least one binary or merchant line to warm.",
+      "errorFailedStatus": "Warm went awry ({status})",
+      "errorFailed": "Couldn''t warm the hold",
+      "success": "Warmed {succeeded}/{total} ({failed} went awry)"
+    },
+    "purge": {
+      "button": "Purge",
+      "confirmBinary": "Purge {tool} {version} from the the hold? It shall be re-fetched from upstream on the next askin''.",
+      "confirmProvider": "Purge {provider} {version} from the merchant the hold? It shall be re-fetched from upstream on the next askin''.",
+      "successBinary": "Purged {count} entries fer {tool} {version}",
+      "successProvider": "Purged {count} entries fer {provider} {version}",
+      "errorStatus": "Purge went awry ({status})",
+      "error": "Couldn''t purge",
+      "errorProvider": "Couldn''t purge merchant",
+      "errorProviders": "Couldn''t purge merchants"
+    },
+    "batchPurge": {
+      "purging": "Purging...",
+      "purgeSelected": "Purge Picked ({count})",
+      "confirmBinary": "Purge all picked binary the hold entries? They shall be re-fetched from upstream on the next askin''.",
+      "confirmProvider": "Purge all picked merchant the hold entries? They shall be re-fetched from upstream on the next askin''.",
+      "errorBinaryItem": "Purge went awry fer {tool} {version}",
+      "errorProviderItem": "Purge went awry fer {provider} {version}",
+      "successBinary": "Purged {count} binary the hold entries",
+      "successProvider": "Purged {count} merchant the hold entries"
+    }
+  },
+  "catalog": {
+    "title": "Service Treasure map",
+    "description": "Rig up self-service infrastructure from curated riggin''s",
+    "notEnabled": "Service treasure map be not aye, hoisted.",
+    "empty": "Nay treasure map items at the ready.",
+    "card": {
+      "pinned": "pinned {version}",
+      "latest": "latest"
+    },
+    "errors": {
+      "loadItems": "Couldn''t haul in treasure map items"
+    }
+  },
+  "catalogDetail": {
+    "backLink": "← Treasure map",
+    "backToCatalog": "Back to treasure map",
+    "fallbackTitle": "Treasure map item",
+    "notFound": "Treasure map item not found, or the service treasure map be not aye, hoisted.",
+    "common": {
+      "cancel": "Belay"
+    },
+    "info": {
+      "module": "Riggin'':",
+      "resolvedVersion": "Resolved mark:",
+      "latest": "latest",
+      "disabled": "nay, lowered"
+    },
+    "pending": {
+      "banner": "The voyage fer <strong>{name}</strong> be charted an'' waiting fer eye over. Give the nod to lay down, or discard.",
+      "working": "Working…",
+      "confirmApply": "Give the nod & lay down",
+      "discard": "Discard"
+    },
+    "field": {
+      "select": "Pick…"
+    },
+    "provision": {
+      "title": "Rig up",
+      "workspaceName": "Work deck name",
+      "workspaceNameTitle": "Letters, numbers, hyphens, an'' underscores only. Must set sail wi'' a letter or number.",
+      "workspaceNamePlaceholder": "my-instance",
+      "agentPool": "Crew",
+      "selectPool": "Pick a pool…",
+      "noPoolsAvailable": "Nay crews be at the ready to ye. Ye need write access to an crew to rig up — ask an cap''n to grant it.",
+      "noPoolsAllowed": "Nary a one o'' the crews ye can access be allowed by this treasure map item. Ask an cap''n to widen the item’s allowed pools or grant ye access to one o'' them.",
+      "version": "Mark",
+      "latestFloat": "Latest (float)",
+      "defaultPinOption": "{version} (default pin)",
+      "labelsOptional": "Marks (if ye fancy)",
+      "autoApplyHint": "Auto-apply applies changes without a manual eye over step.",
+      "provisioning": "Riggin'' up…",
+      "submit": "Rig up"
+    },
+    "instances": {
+      "title": "Instances",
+      "empty": "Nay instances rigged up from this item yet.",
+      "colName": "Name",
+      "colVersion": "Mark",
+      "colPool": "Pool",
+      "colActions": "Deeds",
+      "reconfigure": "Reconfigure",
+      "destroy": "Send to Davy Jones",
+      "orphan": "Orphan…",
+      "orphanTitle": "Scuttle the treasure map record without sendin'' to Davy Jones its infrastructure (discouraged)"
+    },
+    "reconfigure": {
+      "title": "Reconfigure {name}",
+      "description": "Refit inputs an''/or mark, then line up a voyage.",
+      "currentOption": "{version} (current)",
+      "queuing": "Queuing…",
+      "queueRun": "Line up voyage"
+    },
+    "destroy": {
+      "title": "Send to Davy Jones {name}",
+      "heading": "Send to Davy Jones {name}?",
+      "description": "This queues a send to Davy Jones voyage that tears down this instance''s infrastructure. On a victorious lay down the work deck be archived. This cannot be undone.",
+      "autoApplyHint": "Auto-apply tears down immediately without eye over."
+    },
+    "orphan": {
+      "title": "Orphan {name}",
+      "heading": "Orphan {name}?",
+      "description": "This deletes the treasure map instance record but does <warn>not</warn> send to Davy Jones its infrastructure — the rigged up spoils keep running, <warn>untracked an'' unmanaged</warn>. This be discouraged. To reclaim the infrastructure, belay an'' use <emph>Send to Davy Jones</emph> instead.",
+      "confirmPrompt": "Sort the instance name <mono>{name}</mono> to give the nod:",
+      "orphaning": "Orphaning…",
+      "submit": "Orphan & abandon infrastructure"
+    },
+    "actions": {
+      "confirmed": "Voyage given the nod — layin'' down.",
+      "discarded": "Voyage discarded.",
+      "provisioned": "Rigged up {name} — chart be ready fer eye over.",
+      "reconfigureQueued": "Reconfigure lined up — voyage forged.",
+      "reconfigureQueuedStatus": "Reconfigure lined up — voyage be {status}.",
+      "destroyQueued": "Send to Davy Jones lined up — voyage forged.",
+      "destroyQueuedStatus": "Send to Davy Jones lined up — voyage be {status}.",
+      "orphaned": "Orphaned {name} — treasure map record scuttled; its infrastructure be left running, untracked an'' unmanaged."
+    },
+    "errors": {
+      "loadItem": "Couldn''t haul in treasure map item",
+      "confirm": "Couldn''t give the nod",
+      "confirmStatus": "Couldn''t give the nod ({status})",
+      "discard": "Couldn''t discard",
+      "discardStatus": "Couldn''t discard ({status})",
+      "provision": "Couldn''t rig up",
+      "provisionStatus": "Couldn''t rig up ({status})",
+      "reconfigure": "Couldn''t reconfigure",
+      "reconfigureStatus": "Couldn''t reconfigure ({status})",
+      "destroy": "Couldn''t send to Davy Jones",
+      "destroyStatus": "Couldn''t send to Davy Jones ({status})",
+      "orphan": "Couldn''t orphan",
+      "orphanStatus": "Couldn''t orphan ({status})"
+    }
+  },
+  "common": {
+    "connection": {
+      "reconnecting": "Hailin'' again…"
+    },
+    "sessionExpiry": {
+      "banner": "Voyage runs dry in {minutes, plural, one {# minute} other {# minutes}} — <link>re-authenticate</link>"
+    },
+    "tokenExpiry": {
+      "withinDays": "{count, plural, one {# service doubloon} other {# service doubloons}} expiring within {days, plural, one {# day} other {# days}} — <link>eye over</link>",
+      "soon": "{count, plural, one {# service doubloon} other {# service doubloons}} expiring soon — <link>eye over</link>",
+      "dismissAria": "Wave off doubloon expiry avast"
+    },
+    "resourceUsage": {
+      "title": "Spoil usage",
+      "oomKilled": "OOM-killed",
+      "killedLikelyOom": "Killed (likely OOM)",
+      "memory": "Memory",
+      "requested": "Asked {value}",
+      "limit": "Limit {value}"
+    },
+    "labelsEditor": {
+      "none": "Nary a one",
+      "removeAria": "Cast off {key}",
+      "keyPlaceholder": "key",
+      "valuePlaceholder": "worth",
+      "add": "Muster"
+    },
+    "sensitiveInput": {
+      "hide": "Hide",
+      "show": "Show",
+      "hideAria": "Hide worth",
+      "showAria": "Show worth"
+    },
+    "workspacePicker": {
+      "searchPlaceholder": "Scout work decks…",
+      "loading": "Haulin'' in…",
+      "empty": "Nay work decks found",
+      "adding": "Musterin''…"
+    },
+    "templateEditors": {
+      "remove": "Cast off",
+      "add": "Muster",
+      "valuePlaceholder": "worth",
+      "name": "Name",
+      "url": "URL",
+      "hmacKey": "HMAC key (if ye fancy)",
+      "hmacKeyPlaceholder": "shared secret",
+      "stage": "Stage",
+      "enforcement": "Enforcement",
+      "enabled": "Aye, hoisted",
+      "runTaskNamePlaceholder": "security-scan",
+      "runTaskUrlPlaceholder": "https://hooks.example.com/task",
+      "addRunTask": "Muster voyage task",
+      "destinationType": "Destination sort",
+      "token": "Doubloon (if ye fancy)",
+      "tokenPlaceholder": "HMAC / auth doubloon",
+      "notificationNamePlaceholder": "slack-alerts",
+      "notificationUrlPlaceholder": "https://hooks.slack.com/services/...",
+      "emailAddresses": "Message addresses",
+      "emailPlaceholder": "ops@example.com",
+      "addEmail": "Muster message",
+      "triggers": "Sparks",
+      "addNotification": "Muster message in a bottle"
+    }
+  },
+  "planSummary": {
+    "aiGenerated": "AI generated",
+    "heading": {
+      "planSummary": "Chart summary",
+      "failureAnalysis": "Wreck analysis"
+    },
+    "errors": {
+      "status": "HTTP {status}"
+    },
+    "regenerate": {
+      "label": "Regenerate",
+      "queueing": "Queueing…",
+      "tooltip": "Re-run the AI summary against the same chart inputs",
+      "ariaLabel": "Regenerate AI summary",
+      "confirm": "Regenerate the AI analysis? This voyages the model again, matey.",
+      "error": "Could not regenerate: <mono>{detail}</mono>"
+    },
+    "pending": {
+      "summarisingPlan": "Summarizin'' chart…",
+      "analysingFailure": "Eyein'' wreck…"
+    },
+    "skipped": {
+      "fallback": "Summary skipped fer this voyage."
+    },
+    "errored": {
+      "heading": "Summarizer went awry"
+    },
+    "riskFactors": {
+      "heading": "Risk factors",
+      "suggestedFixes": "Suggested fixes"
+    },
+    "tokens": "{input} in / {output} out doubloons",
+    "risk": {
+      "low": "low",
+      "medium": "medium",
+      "high": "high",
+      "critical": "critical",
+      "unknown": "unknown to us"
+    },
+    "badges": {
+      "noChanges": "Nay changes",
+      "noChangesLower": "nay changes",
+      "noChangesTitle": "Chart reported nay spoil changes",
+      "toAdd": "{count, plural, one {# to muster} other {# to muster}}",
+      "toChange": "{count, plural, one {# to change} other {# to change}}",
+      "toDestroy": "{count, plural, one {# to send to Davy Jones} other {# to send to Davy Jones}}",
+      "toReplace": "{count, plural, one {# to swap out} other {# to swap out}}",
+      "toImport": "{count, plural, one {# to bring aboard} other {# to bring aboard}}"
+    },
+    "chat": {
+      "heading": "Follow-up",
+      "sharedThreadNote": "One shared thread, visible to anyone wi'' work deck read.",
+      "placeholder": "Ask a follow-up question about this chart… (⌘/Ctrl + Enter to send)",
+      "send": "Send",
+      "thinking": "Thinking…",
+      "you": "Ye",
+      "assistant": "Assistant"
+    },
+    "translatedNote": "Automatically translated to yer language. The authoritative summary be the original.",
+    "translating": "Translatin', arr…"
+  },
+  "runDetail": {
+    "notFound": "Voyage not found",
+    "runSection": "Voyage section",
+    "workspaceFallback": "work deck",
+    "backTo": "Back to {name}",
+    "errorHeading": "Trouble",
+    "discardedHeading": "Discarded — re-plan be needed",
+    "common": {
+      "yes": "Aye",
+      "no": "Nay"
+    },
+    "header": {
+      "title": "Voyage {id}",
+      "titleWithWorkspace": "{workspace} — voyage {id}",
+      "description": "{source} voyage"
+    },
+    "relTime": {
+      "justNow": "just now",
+      "minutesAgo": "{count, plural, one {# minute ago} other {# minutes ago}}",
+      "hoursAgo": "{count, plural, one {# hour ago} other {# hours ago}}",
+      "daysAgo": "{count, plural, one {# day ago} other {# days ago}}"
+    },
+    "status": {
+      "pending": "Awaitin''",
+      "queued": "Lined up",
+      "planning": "Chartin''",
+      "planned": "Charted",
+      "confirmed": "Given the nod",
+      "applying": "Layin'' down",
+      "canceling": "Belayin''",
+      "applied": "Laid down",
+      "errored": "Errored",
+      "canceled": "Belayed",
+      "discarded": "Discarded"
+    },
+    "activity": {
+      "pending": "Preparing the voyage",
+      "queued": "Waiting fer an at the ready agent",
+      "planning": "Running terraform chart",
+      "plannedConfirmable": "Waiting fer ye to give the nod & lay down",
+      "plannedSpeculative": "Speculative chart complete",
+      "plannedComplete": "Chart complete",
+      "confirmed": "Settin'' sail lay down",
+      "applying": "Running terraform lay down",
+      "canceling": "Stopping the voyage",
+      "applied": "Lay down complete",
+      "errored": "Voyage went awry",
+      "canceled": "Voyage belayed",
+      "discarded": "Chart discarded",
+      "elapsedTitle": "Elapsed in this phase"
+    },
+    "badge": {
+      "destroy": "send to Davy Jones",
+      "planOnly": "chart only"
+    },
+    "actions": {
+      "retryShort": "Try again, matey",
+      "retryFull": "Try again, matey Voyage",
+      "retrying": "Retrying…",
+      "confirmShort": "Lay down",
+      "confirmFull": "Give the nod & Lay down",
+      "confirming": "Confirming…",
+      "discard": "Discard",
+      "discarding": "Discarding…",
+      "cancelShort": "Belay",
+      "cancelFull": "Belay Voyage",
+      "canceling": "Belayin''…"
+    },
+    "confirm": {
+      "apply": "Lay down this voyage? This applies the chart an'' changes infrastructure.",
+      "discard": "Discard this chart?",
+      "cancel": "Belay this voyage?",
+      "retry": "Try again, matey this voyage?"
+    },
+    "errors": {
+      "loadRun": "Couldn''t haul in voyage",
+      "action": {
+        "confirm": "Couldn''t give the nod voyage",
+        "discard": "Couldn''t discard voyage",
+        "cancel": "Couldn''t belay voyage",
+        "retry": "Couldn''t try again, matey voyage"
+      }
+    },
+    "tabs": {
+      "overview": "Overview",
+      "ai": "AI",
+      "aiFull": "AI analysis",
+      "opa": "OPA",
+      "opaFull": "OPA codes",
+      "impact": "Impact",
+      "impactFull": "Impact graph",
+      "planLabel": "Chart<log>Log</log>",
+      "applyLabel": "Lay down<log>Log</log>",
+      "planFull": "Chart log",
+      "applyFull": "Lay down log",
+      "details": "Details"
+    },
+    "banner": {
+      "destroy": "This be a <strong>send to Davy Jones</strong> voyage — all commanded spoils shall be sent to Davy Jones when laid down.",
+      "planOnlyCli": "This be a <strong>plan-only</strong> voyage initiated from the CLI on a VCS-connected work deck. Lay down be not at the ready fer CLI-uploaded code — only VCS-managed code can be laid down.",
+      "moduleOverridesPrefix": "This voyage uses <strong>riggin'' overrides</strong>",
+      "moduleOverridesFromPr": "from PR #{number}",
+      "moduleOverridesSuffix": "shall be fetched from the PR channel instead o'' the hoisted ship''s ledger mark."
+    },
+    "cards": {
+      "changes": "Changes",
+      "aiAnalysis": "AI analysis",
+      "policyChecks": "Code checks",
+      "resources": "Spoils"
+    },
+    "changes": {
+      "noChanges": "Nay changes",
+      "planning": "Chartin''…",
+      "toAdd": "to muster",
+      "toChange": "to change",
+      "toDestroy": "to send to Davy Jones",
+      "toReplace": "to swap out",
+      "toImport": "to bring aboard"
+    },
+    "ai": {
+      "notAvailable": "Not at the ready",
+      "ready": "Ready",
+      "riskSub": "{risk} risk",
+      "generating": "Generating…",
+      "skipped": "Skipped",
+      "failed": "Went awry",
+      "available": "At the ready"
+    },
+    "policy": {
+      "none": "Nary a one",
+      "blocked": "Blocked",
+      "failedSub": "{count, plural, one {# went awry} other {# went awry}}",
+      "advisoryIssues": "Advisory issues",
+      "passedSub": "{passed}/{total} passed",
+      "passed": "Passed"
+    },
+    "resources": {
+      "overLimit": "Over limit",
+      "oomKilled": "OOM-killed",
+      "recorded": "Recorded",
+      "nearLimit": "Near limit",
+      "high": "High",
+      "withinLimits": "Within limits"
+    },
+    "details": {
+      "heading": "Details",
+      "executionBackend": "sailin'' backend",
+      "source": "Source",
+      "autoApply": "Auto Lay down",
+      "planOnly": "Chart Only",
+      "triggeredBy": "Sparked By",
+      "created": "Forged",
+      "commit": "Log entry",
+      "branch": "Channel",
+      "prMr": "PR/MR",
+      "stateVersion": "Ship''s log Mark",
+      "viewState": "Spy Ship''s log",
+      "runOptions": "Voyage Options"
+    },
+    "timeline": {
+      "heading": "Timeline",
+      "queued": "Lined up",
+      "planningStarted": "Chartin'' set sail",
+      "planComplete": "Chart complete",
+      "confirmed": "Given the nod",
+      "applyingStarted": "Layin'' down set sail",
+      "applied": "Laid down",
+      "errored": "Errored",
+      "canceled": "Belayed",
+      "discarded": "Discarded"
+    },
+    "log": {
+      "color": "Color",
+      "colorOnTitle": "Showing ANSI colors — click fer plain text",
+      "colorOffTitle": "Showing plain text — click fer colors",
+      "refresh": "Refresh",
+      "refreshTitle": "Refresh log",
+      "copy": "Copy",
+      "copied": "Copied!",
+      "copyTitle": "Copy plain text to clipboard",
+      "copyAria": "Copy log to clipboard",
+      "download": "Haul down",
+      "downloadColorTitle": "Haul down log (wi'' ANSI color codes)",
+      "downloadPlainTitle": "Haul down log (plain text)",
+      "downloadAria": "Haul down log",
+      "follow": "Follow",
+      "followOnTitle": "Following the live tail — click to drop anchor",
+      "followOffTitle": "Follow the live tail",
+      "end": "End",
+      "endTitle": "Jump to the end o'' the log",
+      "planEmpty": "Nay chart output at the ready yet.",
+      "applyEmpty": "Nay lay down output at the ready yet."
+    },
+    "policyPanel": {
+      "heading": "Code Checks",
+      "passedCount": "{passed}/{total} passed",
+      "blockedMessage": "This voyage be <strong>blocked by a mandatory code o'' conduct</strong>. It shall not lay down until the wreck be resolved or an cap''n overrides it.",
+      "overriding": "Overriding...",
+      "overrideContinue": "Override & Continue",
+      "overrideFailed": "Override went awry",
+      "overrideFailedStatus": "Override went awry ({status})",
+      "overriddenBy": "overridden by {by}",
+      "policyPassed": "passed",
+      "noDenyMessage": "Code went awry without producing a deny message or trouble output",
+      "enforcement": {
+        "mandatory": "mandatory",
+        "advisory": "advisory"
+      },
+      "outcome": {
+        "passed": "passed",
+        "failed": "went awry",
+        "errored": "errored"
+      }
+    }
+  },
+  "workspaceDetail": {
+    "notFound": "Work deck not found",
+    "common": {
+      "enabled": "Aye, hoisted",
+      "disabled": "Nay, lowered",
+      "none": "Nary a one",
+      "default": "Default",
+      "never": "Never",
+      "actions": "Deeds",
+      "workspaceLocked": "Work deck be chained"
+    },
+    "actions": {
+      "edit": "Amend",
+      "cancel": "Belay",
+      "save": "Stow",
+      "saving": "Stowin''…",
+      "savingEllipsis": "Stowin''...",
+      "delete": "Scuttle",
+      "deleting": "Scuttlin''...",
+      "add": "Muster",
+      "adding": "Musterin''...",
+      "remove": "Cast off",
+      "download": "Haul down",
+      "rollback": "Haul back",
+      "close": "Batten",
+      "hide": "Hide",
+      "enable": "Hoist",
+      "disable": "Lower",
+      "creating": "Forgin''...",
+      "sending": "Sending...",
+      "processing": "Processing...",
+      "queuing": "Queuing...",
+      "loading": "Haulin'' in...",
+      "loadingLower": "haulin'' in…"
+    },
+    "header": {
+      "executionMode": "{mode} sailin'' mode"
+    },
+    "tabs": {
+      "overview": "Overview",
+      "variables": "Variables",
+      "runs": "Voyages",
+      "state": "Ship''s log",
+      "stateGraph": "Ship''s log Graph",
+      "configurations": "Configurations",
+      "notifications": "Messages in a bottle",
+      "runTasks": "Voyage Tasks",
+      "runTriggers": "Voyage Sparks",
+      "sharing": "Sharing",
+      "selectLabel": "Work deck section"
+    },
+    "lifecycle": {
+      "pendingDeletion": "Awaitin'' deletion",
+      "pendingDeletionDefault": "This work deck be marked fer deletion an'' requires manual deed.",
+      "archived": "Archived",
+      "archivedDefault": "This work deck has been archived."
+    },
+    "runQueuedBanner": {
+      "message": "Voyage lined up with flyin'' colours.",
+      "viewRun": "Spy Voyage"
+    },
+    "settings": {
+      "title": "Riggin'' o'' the ship",
+      "saveChanges": "Stow changes",
+      "renamedNotice": "Work deck renamed. Refit the <name></name> field in yer <cloud></cloud> block to match."
+    },
+    "fields": {
+      "name": "Name",
+      "nameTitle": "Letters, numbers, hyphens, underscores. Must set sail wi'' a letter or number.",
+      "executionMode": "sailin'' mode",
+      "execModeLocal": "Local",
+      "execModeAgent": "Agent",
+      "autoApply": "Auto Lay down",
+      "cpuRequest": "CPU Askin''",
+      "cpuRequestTitle": "Kubernetes CPU quantity: whole cores (1, 2) or millicores (500m, 100m)",
+      "memoryRequest": "Memory Askin''",
+      "memoryRequestTitle": "Kubernetes memory quantity: bytes (1000) or wi'' suffix (512Mi, 2Gi, 1Ti)",
+      "executionBackend": "sailin'' backend",
+      "version": "Mark",
+      "versionPlaceholder": "e.g. 1.11 or 1.11.5",
+      "versionTitle": "Mark in X.Y or X.Y.Z format (e.g. 1.11 or 1.11.5)",
+      "terragruntEnabledAgent": "Aye, hoisted (agent mode)",
+      "terragruntEnabledVersion": "Aye, hoisted (v{version})",
+      "terragruntVersionPlaceholder": "e.g. 1.0",
+      "terragruntVersionTitle": "Terragrunt mark in X.Y or X.Y.Z format (e.g. 1.0)",
+      "workingDirectory": "working deck",
+      "workingDirectoryPlaceholder": "e.g. environments/dev",
+      "agentPool": "crew",
+      "owner": "Owner",
+      "vcsConnection": "VCS Moorin''",
+      "vcsRepository": "VCS Port",
+      "vcsRepositoryTitle": "Must be an HTTP or HTTPS URL",
+      "vcsBranch": "VCS Channel",
+      "vcsBranchPlaceholder": "main (default)",
+      "vcsWorkflow": "VCS Workflow",
+      "vcsWorkflowMergeThenApply": "merge_then_apply (default — TFE / HCP standard)",
+      "vcsWorkflowApplyThenMerge": "apply_then_merge (Atlantis standard — opt-in)",
+      "autoMerge": "Auto-merge after lay down",
+      "autoMergeStrategy": "Auto-merge Strategy",
+      "vcsPolling": "VCS Polling",
+      "labels": "Marks (tags)",
+      "labelsTitle": "Work deck marks do double duty: label-based RBAC matching, an'' as the \"tags\" matched by terraform/tofu cloud '{' work decks '{' tags = ... '}' '}' blocks.",
+      "varFiles": "Var Files",
+      "varFilesPlaceholder": "e.g. envs/dev.tfvars",
+      "triggerPrefixes": "Spark Prefixes",
+      "triggerPrefixesHint": "Directories that spark voyages. Overrides working deck filtering when set.",
+      "triggerPrefixesPlaceholder": "e.g. riggin''s",
+      "triggerPrefixesNone": "Nary a one (uses working deck)",
+      "driftIgnoreRules": "Adrift Ignore Rules",
+      "driftIgnoreRulesHint": "Glob-aware Terraform address + attribute paths suppressed by the adrift classifier. <star></star> matches zero or more non-<dot></dot> chars (spans <n></n> indices); <starIdx></starIdx> matches any bracketed index. A bare address wi'' nay attribute suffix silences any change to that spoil — including destroys. Affects adrift only, not regular chart/lay down. See <docs>drift-ignore-rules.md</docs> fer the full grammar.",
+      "driftIgnoreRulesNone": "Nary a one (every chart diff counts as adrift)"
+    },
+    "vcsWorkflowWarning": {
+      "title": "Authorization delegated to yer VCS port.",
+      "rbac": "Anyone who can merge the PR can lay down. Channel protection rules (be needed reviews, status checks, code owner approval) become the gate. Terrapod rank/mark RBAC does<em>not</em> lay down to comment-driven deeds in this mode.",
+      "recommended": "<strong>Recommended:</strong> require linear history (rebase/squash before merge) so the log entry ye lay down be the log entry that lands.",
+      "credit": "Credit: this workflow be modelled on <atlantis>Atlantis</atlantis>. Atlantis remains the right tool fer crews who only want PR-comment-driven applies an'' nay platform UI."
+    },
+    "vcsPolling": {
+      "error": "Trouble",
+      "ok": "OK ({time})",
+      "notPolled": "Not polled yet"
+    },
+    "lockout": {
+      "revertLabels": "Revert Marks",
+      "saveAnyway": "Stow Anyway"
+    },
+    "lock": {
+      "title": "Chain Status",
+      "lockedDesc": "This work deck be chained. Nay charts or applies can voyage.",
+      "unlockedDesc": "This work deck be unchained an'' ready fer voyages.",
+      "lock": "Chain",
+      "unlock": "Unchain",
+      "lockConfirm": "Chain this work deck?",
+      "unlockConfirm": "Unchain this work deck?"
+    },
+    "drift": {
+      "title": "Adrift Detection",
+      "checkInterval": "Check Interval",
+      "status": "Status",
+      "statusNoDrift": "Nay Adrift",
+      "statusDrifted": "Adrift",
+      "statusErrored": "Errored",
+      "statusUnchecked": "Unchecked",
+      "dismiss": "Wave off",
+      "dismissing": "Dismissing…",
+      "dismissTitle": "Clear the reported adrift ship''s log. The next scheduled check shall repopulate it from reality.",
+      "lastChecked": "Last Checked",
+      "checkNow": "Check Now",
+      "checkNowTitle": "Line up a plan-only voyage to check fer adrift",
+      "checkNowTitleDisabled": "Hoist adrift detection first"
+    },
+    "intervals": {
+      "disabled": "Nay, lowered",
+      "1hour": "1 hour",
+      "4hours": "4 hours",
+      "12hours": "12 hours",
+      "24hours": "24 hours",
+      "48hours": "48 hours",
+      "3days": "3 days",
+      "7days": "7 days"
+    },
+    "planExpiry": {
+      "title": "Chart Expiry",
+      "description": "Auto-discard an unconfirmed chart once it be older than this, so a stale chart can''t be laid down against a moved world. Off by default; the chart must then be re-run. (Applies to apply-capable voyages only.)",
+      "expireAfter": "Run dry after"
+    },
+    "aiSummary": {
+      "title": "AI Chart Summary",
+      "description": "Automatic LLM-generated change summary, risk assessment, an'' wreck analysis on every plan-phase outcome fer this work deck.",
+      "mode": "Mode",
+      "modeDefault": "Follow deployment default",
+      "modeEnabled": "Always summarize",
+      "modeDisabled": "Never summarize",
+      "contextLabel": "Work deck context",
+      "contextLabelSuffix": "(if ye fancy, additive)",
+      "contextPlaceholder": "Facts the AI should know about this work deck specifically. e.g. ''Fronts the vault fer service X — sendin'' to Davy Jones the KMS key causes a global outage.''",
+      "noContext": "Nay work deck context set.",
+      "contextHint": "Mustered on top o'' deployment-wide context. Max 4000 characters."
+    },
+    "slack": {
+      "title": "Slack messages in a bottle",
+      "description": "Opt this work deck into Slack voyage messages in a bottle — approval askin''s, applies, troubles, an'' adrift. Part ways the channel empty an'' this work deck stays silent (yonder be nay deployment-wide fan-out). Requires the Slack app to be aye, hoisted by an cap''n.",
+      "channel": "Channel",
+      "channelPlaceholder": "#deploys or a channel ID (e.g. C0123ABCD)",
+      "notSet": "Not set — silent.",
+      "hint": "The Slack app must already be a crewmate o'' the channel."
+    },
+    "delete": {
+      "title": "Scuttle Work deck",
+      "description": "Permanently scuttle this work deck an'' all associated ship''s log, variables, an'' voyages.",
+      "confirm": "Give the nod Scuttle"
+    },
+    "variables": {
+      "addVariable": "Muster Variable",
+      "key": "Key",
+      "value": "Worth",
+      "category": "Category",
+      "categoryEnv": "Environment",
+      "sensitive": "Sensitive",
+      "empty": "Nay variables configured fer this work deck.",
+      "emptyValue": "empty",
+      "enterNewValue": "Enter new worth",
+      "deleteConfirm": "Scuttle variable \"{key}\"?"
+    },
+    "runs": {
+      "options": "Options",
+      "hideOptions": "Hide Options",
+      "queueDestroy": "Line up Send to Davy Jones",
+      "queueDestroyTitle": "Line up a send to Davy Jones chart",
+      "destroyAllConfirm": "Send to Davy Jones all spoils?",
+      "confirmDestroy": "Give the nod Send to Davy Jones",
+      "queuePlan": "Line up Chart",
+      "queueRun": "Line up Voyage",
+      "queuePlanConfirm": "Line up a speculative chart fer this work deck?",
+      "queueApplyConfirm": "Line up a chart + lay down voyage? This can change infrastructure.",
+      "planOptions": "Chart Options",
+      "targetResources": "Target spoils",
+      "replaceResources": "Swap out spoils",
+      "commaSeparated": "(comma-separated)",
+      "planOnly": "Chart Only",
+      "refreshOnly": "Refresh Only",
+      "skipRefresh": "Skip Refresh",
+      "allowEmptyApply": "Allow Empty Lay down",
+      "vcsRef": "VCS Ref",
+      "branch": "Channel",
+      "tag": "Tag",
+      "defaultBranch": "Default ({branch})",
+      "nonDefaultRefNote": "Non-default ref picked — voyage shall be plan-only",
+      "empty": "Nay voyages yet fer this work deck.",
+      "runId": "Voyage ID",
+      "status": "Status",
+      "type": "Sort",
+      "changes": "Changes",
+      "source": "Source",
+      "triggeredBy": "Sparked By",
+      "created": "Forged",
+      "needsConfirm": "needs give the nod",
+      "typeDestroy": "send to Davy Jones",
+      "typePlanOnly": "chart only",
+      "typePlanApply": "chart + lay down",
+      "sourceModuleTest": "riggin'' test",
+      "sourceModulePublish": "riggin'' hoist the colours"
+    },
+    "state": {
+      "deleteConfirm": "Scuttle ship''s log mark #{serial}? This cannot be undone.",
+      "rollbackConfirm": "Haul back to ship''s log mark #{serial}? A new mark shall be forged wi'' the same content.",
+      "confirmDelete": "Give the nod Scuttle",
+      "confirmRollback": "Give the nod Haul back",
+      "uploadState": "Haul up Ship''s log",
+      "empty": "Nay ship''s log marks yet fer this work deck.",
+      "serial": "Serial",
+      "createdBy": "Forged By",
+      "run": "Voyage",
+      "size": "Size",
+      "created": "Forged",
+      "runner": "runner",
+      "latest": "latest"
+    },
+    "configurations": {
+      "description": "Uploaded source archives fer this work deck, newest first. Pick two rows to compare.",
+      "selectedCount": "{count}/2 picked",
+      "compare": "Compare",
+      "comparing": "Comparing…",
+      "empty": "Nay configuration marks yet. They appear here as soon as a `terraform chart` uploads or a VCS push sparks a voyage.",
+      "id": "ID",
+      "source": "Source",
+      "status": "Status",
+      "created": "Forged",
+      "current": "current",
+      "selectForCompare": "Pick {id} fer compare",
+      "compareLabel": "Compare",
+      "diff": "Diff",
+      "filesChanged": "{count} files changed",
+      "oversized": "Skipped {count, plural, one {# oversized file} other {# oversized files}}: {files}",
+      "noDiff": "Nay content differences between these marks.",
+      "binaryChanged": "Binary file changed — diff not rendered.",
+      "diffType": {
+        "added": "mustered",
+        "removed": "cast off",
+        "modified": "modified",
+        "binary-changed": "binary"
+      }
+    },
+    "notifications": {
+      "addNotification": "Muster Message in a bottle",
+      "name": "Name",
+      "namePlaceholder": "Deploy messages in a bottle",
+      "destinationType": "Destination Sort",
+      "typeGeneric": "Generic Webhook",
+      "typeEmail": "Message",
+      "url": "URL",
+      "hmacToken": "HMAC Doubloon (if ye fancy)",
+      "signingSecret": "Signing secret",
+      "emailAddresses": "Message Addresses (comma-separated)",
+      "triggerEvents": "Spark Events",
+      "createNotification": "Forge Message in a bottle",
+      "empty": "Nay message in a bottle configurations fer this work deck.",
+      "ok": "OK",
+      "err": "Err {status}",
+      "fail": "FAIL",
+      "http": "HTTP {status}",
+      "verify": "Vouch fer",
+      "history": "History",
+      "deliveryHistory": "Delivery History",
+      "enableConfirm": "Hoist this message in a bottle?",
+      "disableConfirm": "Lower this message in a bottle?",
+      "deleteConfirm": "Scuttle message in a bottle \"{name}\"?"
+    },
+    "runTasks": {
+      "addRunTask": "Muster Voyage Task",
+      "name": "Name",
+      "namePlaceholder": "OPA Code Check",
+      "webhookUrl": "Webhook URL",
+      "stage": "Stage",
+      "enforcementLevel": "Enforcement Level",
+      "hmacKey": "HMAC Key (if ye fancy)",
+      "hmacKeyPlaceholder": "Signing secret fer webhook verification",
+      "createRunTask": "Forge Voyage Task",
+      "empty": "Nay voyage tasks configured fer this work deck.",
+      "enableConfirm": "Hoist this voyage task?",
+      "disableConfirm": "Lower this voyage task?",
+      "deleteConfirm": "Scuttle voyage task \"{name}\"?"
+    },
+    "runTriggers": {
+      "title": "Voyage Sparks",
+      "description": "When a source work deck completes an lay down, downstream work decks get a new voyage lined up automatically. Up to 20 source work decks per destination.",
+      "inboundHeading": "Source work decks that spark voyages here",
+      "inboundEmpty": "Nay source work decks spark voyages on this work deck.",
+      "pickerPlaceholder": "Scout work decks to muster as a source…",
+      "outboundHeading": "Destination work decks this work deck sparks",
+      "outboundEmpty": "This work deck does not spark voyages on any other work deck.",
+      "destinationNote": "(destination; cast off from yonder)",
+      "removeConfirm": "Cast off this voyage spark?"
+    },
+    "sharing": {
+      "title": "Remote Ship''s log Sharing",
+      "description": "Producer-controlled allowlist fer cross-workspace <code></code>. Ship''s log data be secret-bearing — grant deliberately. <docs>Scrolls</docs>",
+      "outboundHeading": "Work decks authorized to read this workspace''s ship''s log",
+      "outboundEmpty": "This workspace''s ship''s log be not shared wi'' any other work deck.",
+      "grantedBy": "granted by {by}",
+      "revoke": "Reclaim",
+      "revokeConfirm": "Cast off this remote ship''s log sharing? The consumer shall lose access to this ship''s log.",
+      "pickerPlaceholder": "Scout work decks to authorize as a consumer…",
+      "inboundHeading": "Work decks this work deck be authorized to read ship''s log from",
+      "inboundEmpty": "This work deck be not authorized to read ship''s log from any other work deck via terraform_remote_state.",
+      "producerNote": "(producer; reclaim from yonder)"
+    },
+    "runMessages": {
+      "manualDriftCheck": "Manual adrift check from UI",
+      "queued": "Lined up from UI",
+      "queuedSpeculative": "Lined up from UI (speculative)",
+      "destroyQueued": "Send to Davy Jones lined up from UI"
+    },
+    "errors": {
+      "loadWorkspace": "Couldn''t haul in work deck",
+      "loadRuns": "Couldn''t haul in voyages",
+      "loadVariables": "Couldn''t haul in variables",
+      "loadStateVersions": "Couldn''t haul in ship''s log marks",
+      "loadConfigurations": "Couldn''t haul in configuration marks",
+      "loadNotifications": "Couldn''t haul in messages in a bottle",
+      "loadOutboundConsumers": "Couldn''t haul in outbound remote-state consumers",
+      "loadInboundConsumers": "Couldn''t haul in inbound remote-state consumers",
+      "loadConsumers": "Couldn''t haul in remote-state consumers",
+      "loadInboundTriggers": "Couldn''t haul in inbound voyage sparks",
+      "loadOutboundTriggers": "Couldn''t haul in outbound voyage sparks",
+      "loadTriggers": "Couldn''t haul in voyage sparks",
+      "loadRunTasks": "Couldn''t haul in voyage tasks",
+      "downloadStateFile": "Couldn''t haul down ship''s log file",
+      "downloadFailed": "Haul down went awry",
+      "downloadFailedStatus": "Haul down went awry ({status})",
+      "downloadTicketMissingUrl": "Haul down ticket response missing URL",
+      "diffFailed": "Diff went awry",
+      "diffFailedStatus": "Diff went awry ({status})",
+      "authorizeConsumer": "Couldn''t authorize consumer",
+      "revoke": "Couldn''t reclaim",
+      "revokeConsumer": "Couldn''t reclaim consumer",
+      "addTrigger": "Couldn''t muster voyage spark",
+      "removeTrigger": "Couldn''t cast off voyage spark",
+      "createRunTask": "Couldn''t forge voyage task",
+      "createRunTaskStatus": "Couldn''t forge voyage task ({status})",
+      "update": "Couldn''t refit",
+      "toggleRunTask": "Couldn''t toggle voyage task",
+      "delete": "Couldn''t scuttle",
+      "deleteRunTask": "Couldn''t scuttle voyage task",
+      "labelLockout": "This mark change would reduce yer access.",
+      "updateWorkspace": "Couldn''t refit work deck",
+      "lockWorkspace": "Couldn''t chain work deck",
+      "unlockWorkspace": "Couldn''t unchain work deck",
+      "updateAiSummary": "Couldn''t refit AI summary riggin'' o'' the ship",
+      "updateSlackChannel": "Couldn''t refit Slack channel",
+      "updateDriftSettings": "Couldn''t refit adrift riggin'' o'' the ship",
+      "updateDriftInterval": "Couldn''t refit adrift interval",
+      "updatePlanExpiry": "Couldn''t refit chart expiry",
+      "queueDriftCheck": "Couldn''t line up adrift check",
+      "queueDriftCheckStatus": "Couldn''t line up adrift check ({status})",
+      "dismissDrift": "Couldn''t wave off adrift",
+      "dismissDriftStatus": "Couldn''t wave off adrift ({status})",
+      "deleteWorkspace": "Couldn''t scuttle work deck",
+      "addVariable": "Couldn''t muster variable",
+      "addVariableStatus": "Couldn''t muster variable ({status})",
+      "deleteVariable": "Couldn''t scuttle variable",
+      "updateVariable": "Couldn''t refit variable",
+      "queuePlan": "Couldn''t line up chart",
+      "queuePlanStatus": "Couldn''t line up chart ({status})",
+      "queueDestroy": "Couldn''t line up send to Davy Jones",
+      "queueDestroyStatus": "Couldn''t line up send to Davy Jones ({status})",
+      "createNotification": "Couldn''t forge message in a bottle",
+      "createNotificationStatus": "Couldn''t forge message in a bottle ({status})",
+      "toggleNotification": "Couldn''t toggle message in a bottle",
+      "deleteNotification": "Couldn''t scuttle message in a bottle",
+      "verificationFailed": "Verification went awry",
+      "verificationDeliveryFailed": "Verification delivery went awry: {detail}",
+      "unknownError": "Unknown to us trouble",
+      "failed": "Went awry",
+      "deleteStateVersion": "Couldn''t scuttle ship''s log mark",
+      "rollbackStateVersion": "Couldn''t haul back ship''s log mark",
+      "stateActionFailed": "Ship''s log deed went awry",
+      "uploadState": "Couldn''t haul up ship''s log",
+      "uploadStateFile": "Couldn''t haul up ship''s log file"
+    }
+  },
+  "graphs": {
+    "stateTab": {
+      "loadError": "Couldn''t haul in the ship''s log graph.",
+      "emptyState": "Nay ship''s log yet — voyage a chart an'' lay down, or haul up ship''s log, then this graph shall populate.",
+      "stateVersionLabel": "Ship''s log mark",
+      "currentSuffix": "(current)",
+      "colorByLabel": "Color by",
+      "viewGraph": "Graph",
+      "viewTable": "Table",
+      "resourceCount": "{count, plural, one {# spoil} other {# spoils}}",
+      "dependencyCount": "{count, plural, one {# dependency} other {# dependencies}}",
+      "truncated": "Showing the first {shown} o'' {total} spoils — the graph be capped fer legibility.",
+      "colResource": "Spoil",
+      "colType": "Sort",
+      "colMode": "Mode",
+      "colModule": "Riggin''",
+      "colDependedOnBy": "Depended on by",
+      "rootModule": "(root)"
+    },
+    "impact": {
+      "notAvailable": "Impact graph be not at the ready fer this voyage.",
+      "title": "Impact graph",
+      "subtitle": "chart o'' {count, plural, one {# spoil} other {# spoils}}",
+      "hint": "Each sphere be a spoil; each arrow points to what it depends on. Click a node → its transitive <b>impact</b> (everything downstream) lights up.",
+      "downstreamAffected": "downstream affected",
+      "action": {
+        "create": "forge",
+        "update": "refit",
+        "replace": "swap out",
+        "destroy": "send to Davy Jones",
+        "unchanged": "unchanged"
+      }
+    },
+    "estate": {
+      "navHint": "Drag to rotate · scroll to zoom · right-drag to pan · <em>click a node to orbit around it</em>"
+    },
+    "state3d": {
+      "title": "Ship''s log graph",
+      "hint": "Each sphere be a spoil; each arrow points to what it depends on. Click a node → the spoils that transitively <b>depend on it</b> light up.",
+      "dataSource": "data source",
+      "managed": "commanded",
+      "dependOnThis": "depend on this"
+    },
+    "resource3d": {
+      "resetView": "Reset spy",
+      "clear": "Clear",
+      "key": "Key",
+      "resources": "Spoils",
+      "hideKey": "Hide key",
+      "hideResources": "Hide spoils",
+      "resourcesCount": "Spoils ({count})",
+      "filterPlaceholder": "Sift spoils…",
+      "navHint": "Drag to rotate · scroll to zoom · right-drag to pan · <em>click a spoil to orbit around it</em>"
+    }
+  },
+  "execHookDetail": {
+    "backLink": "Back to execution hooks",
+    "defaultDescription": "Execution hook",
+    "notFound": "Execution hook not found",
+    "scriptEmpty": "(empty)",
+    "tabs": {
+      "settings": "Riggin'' o'' the ship",
+      "workspaces": "Work decks"
+    },
+    "common": {
+      "yes": "Aye",
+      "no": "Nay"
+    },
+    "actions": {
+      "edit": "Amend",
+      "cancel": "Belay",
+      "save": "Stow",
+      "saving": "Stowin''...",
+      "delete": "Scuttle",
+      "deleting": "Scuttlin''...",
+      "confirmDelete": "Give the nod Scuttle",
+      "add": "Muster",
+      "adding": "Musterin''...",
+      "remove": "Cast off"
+    },
+    "settings": {
+      "heading": "Riggin'' o'' the ship"
+    },
+    "fields": {
+      "name": "Name",
+      "description": "Yarn",
+      "hookPoint": "Hook Point",
+      "priority": "Priority",
+      "enabled": "Aye, hoisted",
+      "script": "Script (<code>/bin/sh -c</code>)"
+    },
+    "delete": {
+      "heading": "Scuttle Execution Hook",
+      "description": "Permanently scuttle this hook an'' cast off it from all work decks."
+    },
+    "workspaces": {
+      "scopeNote": "This hook voyages only on the work decks associated below. Yonder be nay global scope.",
+      "associate": "Associate Work deck",
+      "workspaceLabel": "Work deck",
+      "selectPlaceholder": "Pick a work deck...",
+      "empty": "Nay work decks associated wi'' this hook.",
+      "colWorkspace": "Work deck",
+      "colActions": "Deeds"
+    },
+    "confirm": {
+      "removeWorkspace": "Cast off this work deck from the hook? The hook shall nay longer voyage fer it."
+    },
+    "success": {
+      "updated": "Execution hook refitted",
+      "workspaceAssociated": "Work deck associated",
+      "workspaceRemoved": "Work deck cast off"
+    },
+    "errors": {
+      "load": "Couldn''t haul in execution hook",
+      "update": "Couldn''t refit execution hook",
+      "delete": "Couldn''t scuttle execution hook",
+      "addWorkspace": "Couldn''t muster work deck",
+      "removeWorkspace": "Couldn''t cast off work deck"
+    }
+  },
+  "policySetDetail": {
+    "backLink": "codes o'' conduct",
+    "notFound": "Not found",
+    "unknown": "unknown to us",
+    "subtitle": "OPA code o'' conduct · forged by {createdBy}",
+    "settings": {
+      "heading": "Riggin'' o'' the ship"
+    },
+    "fields": {
+      "description": "Yarn",
+      "enforcement": "Enforcement",
+      "enabled": "Aye, hoisted",
+      "globalScope": "Global (every work deck)"
+    },
+    "enforcement": {
+      "advisory": "Advisory (warn)",
+      "mandatory": "Mandatory (block lay down)"
+    },
+    "scope": {
+      "allowLabels": "Allow marks (key: v1, v2)",
+      "allowLabelsPlaceholder": "env: prod, staging",
+      "allowNames": "Allow names (one per line)",
+      "denyLabels": "Deny marks (key: v1, v2)",
+      "denyNames": "Deny names (one per line)"
+    },
+    "vcs": {
+      "heading": "VCS Configuration",
+      "repoUrl": "Port URL",
+      "branch": "Channel",
+      "branchPlaceholder": "main (default)",
+      "policyPath": "Code Path"
+    },
+    "vcsBanner": {
+      "syncedFrom": "Codes synced from",
+      "at": "at",
+      "lastSynced": "Last synced {time}",
+      "commit": "(log entry {sha})",
+      "syncError": "Sync trouble: {error}"
+    },
+    "policies": {
+      "heading": "Codes ({count})",
+      "vcsManaged": "Commanded by port — push changes via PR",
+      "empty": "Nay codes in this set yet."
+    },
+    "addPolicy": {
+      "namePlaceholder": "Code name",
+      "descPlaceholder": "Yarn (if ye fancy)",
+      "regoHint": "Rego v1. Must declare <code>package terrapod</code> an'' express violations via a <code>deny</code> set. The chart be <code>input</code>; Terrapod context be <code>data.terrapod_context</code>."
+    },
+    "actions": {
+      "saving": "Stowin''...",
+      "saveSettings": "Stow Riggin'' o'' the ship",
+      "syncNow": "Sync Now",
+      "cancel": "Belay",
+      "addPolicy": "Muster Code",
+      "deleteSet": "Scuttle Set",
+      "validatingRego": "Validating Rego...",
+      "delete": "Scuttle",
+      "savePolicy": "Stow Code"
+    },
+    "confirm": {
+      "deleteSet": "Scuttle this code o'' conduct an'' all its codes? Recorded voyage evaluations be kept.",
+      "deletePolicy": "Scuttle code \"{name}\"?"
+    },
+    "errors": {
+      "load": "Couldn''t haul in code o'' conduct",
+      "save": "Couldn''t stow code o'' conduct",
+      "saveStatus": "Couldn''t stow ({status})",
+      "delete": "Couldn''t scuttle code o'' conduct",
+      "deleteStatus": "Couldn''t scuttle ({status})",
+      "addPolicy": "Couldn''t muster code",
+      "addPolicyStatus": "Couldn''t muster code ({status})",
+      "savePolicy": "Couldn''t stow code",
+      "savePolicyStatus": "Couldn''t stow code ({status})",
+      "deletePolicy": "Couldn''t scuttle code",
+      "deletePolicyStatus": "Couldn''t scuttle ({status})"
+    }
+  },
+  "slackLink": {
+    "title": "Moor Slack to Terrapod",
+    "loading": "Haulin'' in…",
+    "checking": "Checking yer link…",
+    "linking": "Linking yer Slack berth…",
+    "unknown": "unknown to us",
+    "confirm": {
+      "prompt": "Link this Slack berth to <em>yer</em> Terrapod identity? Every future Slack deed (approve/discard) shall voyage as this Terrapod hand wi'' their permissions.",
+      "slackUser": "Slack hand",
+      "slackTeam": "Slack crew",
+      "terrapodAccount": "Terrapod berth",
+      "warning": "Only continue if ye just set sail this link from Slack yerself. If ye didn''t, batten this tab an'' don''t link — this binds the Slack berth above to <em>yer</em> Terrapod identity.",
+      "button": "Give the nod & link"
+    },
+    "success": {
+      "message": "Yer Slack berth be now linked to Terrapod.",
+      "linkedAs": "Linked as <em>{email}</em>. Ye can batten this tab an'' return to Slack."
+    },
+    "errors": {
+      "missingLink": "Missing or not shipshape link. Set sail again, matey wi'' the Terrapod link command in Slack.",
+      "invalidLink": "This link be not shipshape, run dry, or already used. Set sail the link again, matey from Slack.",
+      "linkingFailed": "Linking went awry."
+    }
+  },
+  "cliComplete": {
+    "loading": "Haulin'' in...",
+    "completing": "Completing papers check...",
+    "invalid": {
+      "title": "Not shipshape Askin''",
+      "description": "Missing be needed parameters."
+    },
+    "success": {
+      "title": "Boardin'' Victorious",
+      "complete": "API doubloon forged. Ye can batten this tab."
+    },
+    "fallback": {
+      "description": "Could not reach the CLI automatically.",
+      "button": "Click here to complete manually"
+    },
+    "timeout": {
+      "description": "The CLI may not have completed the doubloon exchange. Check yer terminal."
+    }
+  },
+  "apiDocs": {
+    "view": "Spy:",
+    "redocTitle": "ReDoc API Scrolls"
+  }
+}

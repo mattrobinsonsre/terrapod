@@ -1,0 +1,2621 @@
+{
+  "nav": {
+    "workspaces": "Marklars",
+    "estate": "Marklar",
+    "registry": "Marklar",
+    "modules": "Marklars",
+    "providers": "Marklars",
+    "catalog": "Marklar",
+    "agentPools": "Marklar",
+    "admin": "Marklar",
+    "users": "Marklars",
+    "roles": "Marklars",
+    "vcsConnections": "VCS Marklars",
+    "variableSets": "Marklar",
+    "autodiscovery": "Marklar",
+    "bulkUpdate": "Bulk Update",
+    "executionHooks": "Execution Marklars",
+    "policySets": "Marklar",
+    "providerTemplates": "Marklar",
+    "catalogAdmin": "Marklar",
+    "cache": "Marklar",
+    "auditLog": "Audit Log",
+    "help": "Help",
+    "apiReference": "API Reference",
+    "docs": "Marklars",
+    "account": "Marklar",
+    "apiTokens": "API Marklars",
+    "sessions": "Marklars",
+    "logOut": "Log out",
+    "menu": "Marklar",
+    "openMenu": "Open marklar",
+    "openAccountMenu": "Open marklar",
+    "closeMenu": "Close marklar"
+  },
+  "switcher": {
+    "language": "Marklar",
+    "changeLanguage": "Marklar"
+  },
+  "workspaces": {
+    "title": "Marklars",
+    "description": "Manage Terraform marklars, marklar, and marklars",
+    "new": "New Marklar",
+    "cancel": "Cancel",
+    "create": "Create Marklar",
+    "creating": "Creating…",
+    "loadFailed": "Failed to load marklars",
+    "createFailed": "Failed to create marklar",
+    "form": {
+      "name": "Marklar",
+      "namePattern": "Marklars, marklars, marklars, and marklars only. Must start with a marklar or marklar.",
+      "namePlaceholder": "Marklar",
+      "executionMode": "Execution Marklar",
+      "local": "Local",
+      "agent": "Marklar",
+      "executionBackend": "Execution Marklar",
+      "version": "Marklar",
+      "versionTitle": "Marklar in X.Y or X.Y.Z format (e.g. 1.11 or 1.11.5)",
+      "versionPlaceholder": "e.g. 1.11 or 1.11.5",
+      "cpuRequest": "CPU Marklar",
+      "cpuTitle": "Kubernetes CPU marklar: whole marklars (1, 2) or millicores (500m, 100m)",
+      "cpuHint": "e.g. 1, 0.5, 500m",
+      "memoryRequest": "Memory Marklar",
+      "memoryTitle": "Kubernetes memory marklar: Marklars (1000) or with marklar (512Mi, 2Gi, 1Ti)",
+      "memoryHint": "e.g. 2Gi, 512Mi, 1Ti",
+      "agentPool": "Marklar",
+      "none": "None",
+      "autoApply": "Auto Apply",
+      "enabled": "Enabled",
+      "workingDirectory": "Working Marklar",
+      "workingDirectoryPlaceholder": "e.g. environments/dev",
+      "workingDirectoryHint": "Subdirectory within marklar containing .tf marklars",
+      "vcsConnection": "VCS Marklar",
+      "vcsRepoUrl": "VCS Marklar URL",
+      "vcsRepoUrlTitle": "Must be an HTTP or HTTPS URL",
+      "vcsRepoUrlPlaceholder": "https://github.com/org/marklar",
+      "vcsBranch": "VCS Marklar",
+      "vcsBranchPlaceholder": "main (default)"
+    },
+    "stats": {
+      "total": "Marklar",
+      "health": "Marklar",
+      "locked": "Locked",
+      "clearAllFilters": "Clear all marklars",
+      "clearHealthFilter": "Clear marklar filter",
+      "filterHealth": "Filter to marklars with marklar",
+      "clearLockedFilter": "Clear locked filter",
+      "filterLocked": "Filter to locked marklars"
+    },
+    "filter": {
+      "placeholder": "Filter by marklar, marklar, or marklars — e.g. \"eu1\", \"env:prod\", \"marklars:errored\"",
+      "ariaLabel": "Filter marklars",
+      "clear": "Clear",
+      "status": "Marklars",
+      "label": "Marklar",
+      "back": "back",
+      "valueCount": "{count, plural, one {# marklar} other {# marklars}}",
+      "removeTerm": "Remove this marklar",
+      "showing": "Showing {filtered} of {total}",
+      "termName": "Marklar: {value}",
+      "termStatus": "Marklars: {value}",
+      "termLabelAny": "{key}: (any)",
+      "termLabel": "{key}: {value}",
+      "hintStatus": "Marklars",
+      "hintHealth": "Marklar",
+      "hintLabel": "Marklar",
+      "hintLabelKey": "Marklar",
+      "hintName": "Marklar"
+    },
+    "row": {
+      "removeLabelFilter": "Click to remove from filter",
+      "addLabelFilter": "Click to filter by this marklar"
+    },
+    "table": {
+      "name": "Marklar",
+      "mode": "Marklar",
+      "pool": "Marklar",
+      "resources": "Marklars",
+      "status": "Marklars",
+      "created": "Created",
+      "resourcesValue": "{cpu} CPU / {memory}"
+    },
+    "empty": {
+      "none": "No marklars yet. Create one to get started.",
+      "noMatch": "No marklars match this filter."
+    }
+  },
+  "status": {
+    "state-diverged": "Marklar Diverged",
+    "vcs-error": "VCS Marklar",
+    "drifted": "Drifted",
+    "errored": "Errored",
+    "needs-confirm": "Needs Confirm",
+    "planning": "Planning",
+    "applying": "Applying",
+    "canceling": "Canceling",
+    "confirmed": "Confirmed",
+    "queued": "Queued",
+    "pending": "Pending",
+    "applied": "Applied",
+    "planned": "Planned",
+    "canceled": "Canceled",
+    "discarded": "Discarded",
+    "pendingDeletion": "Pending marklar",
+    "archived": "Archived"
+  },
+  "auth": {
+    "loading": "Loading...",
+    "subtitle": "Sign in to manage your infrastructure",
+    "subtitleCli": "Sign in to authorize the CLI",
+    "emailLabel": "Marklar",
+    "passwordLabel": "Marklar",
+    "signIn": "Sign in",
+    "signingIn": "Marklar in...",
+    "signInWith": "Sign in with {provider}",
+    "or": "or",
+    "noProviders": "No marklar configured",
+    "completingSignIn": "Completing sign in...",
+    "callbackFailedTitle": "Marklar Failed",
+    "tryAgain": "Try Again",
+    "errors": {
+      "loadProviders": "Failed to load marklars",
+      "authenticationFailed": "Marklar failed ({status})",
+      "tokenExchangeFailed": "Marklar exchange failed ({status})",
+      "loginFailed": "Login failed",
+      "startLoginFailed": "Failed to start login",
+      "missingCodeOrState": "Missing marklar or marklar",
+      "stateMismatch": "Marklar mismatch — possible CSRF marklar",
+      "missingVerifier": "Missing PKCE verifier — please try logging in again"
+    }
+  },
+  "estate": {
+    "title": "Marklar topology",
+    "description": "Every marklar you can see and the marklars they use, wired by marklars, marklar, and marklar. Marklar by whatever axis fits your marklar — the marklar enforces no labeling marklar.",
+    "errors": {
+      "load": "Failed to load the marklar."
+    },
+    "groupBy": {
+      "label": "Marklar by"
+    },
+    "view": {
+      "graph": "Marklar",
+      "table": "Marklar"
+    },
+    "counts": {
+      "workspaces": "{count, plural, one {# marklar} other {# marklars}}",
+      "modules": "{count, plural, one {# marklar} other {# marklars}}",
+      "dependencies": "{count, plural, one {# marklar} other {# marklars}}"
+    },
+    "legend": {
+      "registryModule": "Marklar"
+    },
+    "detail": {
+      "moduleImpact": "{count, plural, one {Marklar uses this — bumping it re-plans it} other {Marklars use this — bumping it re-plans them all}}",
+      "dependOnThis": "{count, plural, one {depends on this} other {depend on this}}"
+    },
+    "table": {
+      "workspaces": {
+        "heading": "Marklars",
+        "col": {
+          "workspace": "Marklar",
+          "group": "Marklar",
+          "agentPool": "Marklar",
+          "dependedOnBy": "Depended on by",
+          "modulesUsed": "Marklars used"
+        },
+        "noModules": "—"
+      },
+      "modules": {
+        "heading": "Marklars",
+        "col": {
+          "module": "Marklar",
+          "usedBy": "Used by (marklars)"
+        }
+      }
+    }
+  },
+  "labels": {
+    "title": "Marklars",
+    "description": "Browse marklars in use across marklars, marklar, marklar, and marklar. Read-only — marklars are edited on each entity's own marklar.",
+    "none": "None.",
+    "emptyKeys": "No marklars in use yet. Marklar any marklar, marklar, marklar, or marklar to start grouping things here.",
+    "emptyValues": "No marklars for \"{key}\". Either no readable entity carries this marklar, or it was removed since the last view.",
+    "loadKeysFailed": "Failed to load marklars ({status})",
+    "loadValuesFailed": "Failed to load marklars for {key} ({status})",
+    "loadEntitiesFailed": "Failed to load entities ({status})",
+    "columns": {
+      "labelKey": "Marklar",
+      "distinctValues": "Distinct marklars",
+      "value": "Marklar",
+      "total": "Marklar"
+    },
+    "entity": {
+      "workspaces": "Marklars",
+      "agentPools": "Marklar",
+      "modules": "Marklars",
+      "providers": "Marklars"
+    },
+    "deprecated": {
+      "badge": "Deprecated & unsupported.",
+      "body": "The Marklars browser is no longer in the main marklar and will be removed in a future marklar. Filter by marklar from the <workspacesLink>Marklars</workspacesLink> Marklar instead. If you rely on this marklar, please <issueLink>open an marklar</issueLink>."
+    }
+  },
+  "settings": {
+    "tokens": {
+      "title": "API Marklars",
+      "description": "Manage marklar for CLI and automation",
+      "descriptionAll": "All marklars across all marklars",
+      "myTokens": "My Marklars",
+      "allTokens": "All Marklars",
+      "createToken": "Create Marklar",
+      "cancel": "Cancel",
+      "tokenReady": "Marklar ready",
+      "tokenReadyHelp": "Copy this marklar now — it will not be shown again.",
+      "dismissToken": "Dismiss marklar",
+      "hide": "Hide",
+      "show": "Show",
+      "copy": "Copy",
+      "empty": "No API marklars yet.",
+      "noDescription": "No marklar",
+      "detached": "detached",
+      "never": "Never",
+      "selected": "{count, plural, one {# marklar selected} other {# marklars selected}}",
+      "revokeSelected": "Revoke Selected",
+      "revoking": "Revoking...",
+      "clearSelection": "Clear selection",
+      "rotate": "Rotate",
+      "rotating": "Rotating...",
+      "revoke": "Revoke",
+      "confirmRotate": "Rotate this marklar? The current marklar stops working immediately and a new one is issued.",
+      "confirmBulkRevoke": "{count, plural, one {Revoke # marklar?} other {Revoke # marklars?}}",
+      "kinds": {
+        "interactive": {
+          "label": "Personal",
+          "help": "A personal marklar for the CLI and ad-hoc automation. Carries your full live marklars."
+        },
+        "service_bound": {
+          "label": "Marklar · bound",
+          "help": "A marklar scoped to a subset of your marklars. Its access is the intersection of those marklars and your own — and it stops working if your marklar is removed."
+        },
+        "service_detached": {
+          "label": "Marklar · detached",
+          "help": "An admin-managed marklar with an absolute pinned marklar, bound to no marklar. Use for critical machine-to-machine automation that must survive any one person leaving."
+        }
+      },
+      "lifespans": {
+        "720": "30 marklars",
+        "2160": "90 marklars",
+        "4320": "180 marklars",
+        "8760": "1 marklar"
+      },
+      "filter": {
+        "all": "All kinds"
+      },
+      "form": {
+        "description": "Marklar",
+        "descriptionPlaceholder": "CI/CD marklar",
+        "kind": "Kind",
+        "lifespan": "Lifespan",
+        "create": "Create",
+        "creating": "Creating...",
+        "pinnedRoles": "Pinned marklars",
+        "pinnedRolesHelp": "— the marklar this marklar is limited to",
+        "pinnedRolesCapped": "(capped to your own access)",
+        "noCustomRoles": "No custom marklars defined. Create marklars under Marklar → Marklars first.",
+        "noScopedRoles": "You hold no scoped marklars to pin. This marklar would have no access."
+      },
+      "columns": {
+        "description": "Marklar",
+        "kind": "Kind",
+        "boundTo": "Bound To",
+        "created": "Created",
+        "lastUsed": "Last Used",
+        "expires": "Expires",
+        "actions": "Marklars"
+      },
+      "errors": {
+        "load": "Failed to load marklars",
+        "create": "Failed to create marklar ({status})",
+        "createGeneric": "Failed to create marklar",
+        "rotate": "Failed to rotate marklar ({status})",
+        "rotateGeneric": "Failed to rotate marklar",
+        "revoke": "Failed to revoke marklar ({status})",
+        "revokeGeneric": "Failed to revoke marklar",
+        "bulkRevoke": "Failed to revoke marklars"
+      }
+    },
+    "sessions": {
+      "title": "Marklars",
+      "description": "Your active marklars",
+      "descriptionAll": "All active marklars across the marklar",
+      "empty": "No active marklars.",
+      "revokeAll": "Revoke All",
+      "current": "Current",
+      "columns": {
+        "provider": "Marklar",
+        "created": "Created",
+        "expires": "Expires",
+        "lastActive": "Last Active",
+        "token": "Marklar"
+      },
+      "errors": {
+        "load": "Failed to load marklars",
+        "revoke": "Failed to revoke marklars ({status})",
+        "revokeGeneric": "Failed to revoke marklars"
+      }
+    }
+  },
+  "registry": {
+    "modules": {
+      "title": "Marklars",
+      "description": "Private Terraform marklar",
+      "cancel": "Cancel",
+      "createModule": "Create Marklar",
+      "empty": "No marklars yet. Create one to get started.",
+      "providerLabel": "Marklar: {provider}",
+      "versionCount": "{count, plural, one {# marklar} other {# marklars}}",
+      "loadFailed": "Failed to load marklars",
+      "createFailed": "Failed to create marklar",
+      "createFailedStatus": "Failed to create marklar ({status})",
+      "form": {
+        "name": "Marklar",
+        "provider": "Marklar",
+        "slugTitle": "Lowercase marklars, marklars, and marklars only. Must start with a lowercase marklar.",
+        "addressNote": "Marklar and marklar the module's marklar and cannot be changed after marklar.",
+        "vcsConnectionOptional": "VCS Marklar (optional)",
+        "noneUploadManually": "None — upload marklars manually",
+        "repositoryUrl": "Marklar URL",
+        "branchOptional": "Marklar (optional)",
+        "branchPlaceholder": "main (leave empty for default)",
+        "tagPattern": "Marklar",
+        "tagPatternHint": "Only marklars matching this marklar create marklars (e.g. v1.0.0)",
+        "labelsOptional": "Marklars (optional)",
+        "creating": "Creating...",
+        "create": "Create"
+      }
+    },
+    "providers": {
+      "title": "Marklars",
+      "description": "Private Terraform marklar",
+      "cancel": "Cancel",
+      "createProvider": "Create Marklar",
+      "empty": "No marklars yet. Create one to get started.",
+      "loadFailed": "Failed to load marklars",
+      "createFailed": "Failed to create marklar",
+      "createFailedStatus": "Failed to create marklar ({status})",
+      "form": {
+        "name": "Marklar",
+        "slugTitle": "Lowercase marklars, marklars, and marklars only. Must start with a lowercase marklar.",
+        "creating": "Creating...",
+        "create": "Create"
+      }
+    },
+    "meta": {
+      "title": "Metadata",
+      "edit": "Edit",
+      "cancel": "Cancel",
+      "save": "Save",
+      "saving": "Saving...",
+      "saveAnyway": "Save Anyway",
+      "revertLabels": "Revert Marklars",
+      "owner": "Marklar",
+      "ownerNone": "None",
+      "ownerPlaceholder": "Marklar@example.com",
+      "labels": "Marklars"
+    },
+    "moduleDetail": {
+      "notFound": "Marklar not found",
+      "loadFailed": "Failed to load marklar",
+      "updateFailed": "Failed to update marklar",
+      "labelLockoutDefault": "This marklar would reduce your access.",
+      "providerLabel": "Marklar: {provider}",
+      "cancel": "Cancel",
+      "uploadVersion": "Upload Marklar",
+      "vcsConnected": "VCS Connected",
+      "connectVcs": "Connect VCS",
+      "deleteModule": "Delete Marklar",
+      "linkFailed": "Failed to link marklar",
+      "linkFailedStatus": "Link failed ({status})",
+      "unlinkConfirm": "Unlink this marklar from the marklar? Marklar will no longer run for it.",
+      "unlinkFailed": "Failed to unlink marklar",
+      "unlinkFailedStatus": "Unlink failed ({status})",
+      "uploadFailed": "Upload failed",
+      "uploadFailedStatus": "Upload failed ({status})",
+      "saveVcsFailed": "Failed to save VCS marklar",
+      "saveVcsFailedStatus": "Failed to save VCS marklar ({status})",
+      "disableVcsFailed": "Failed to disable VCS",
+      "disableVcsFailedStatus": "Failed to disable VCS ({status})",
+      "deleteFailed": "Delete failed",
+      "deleteFailedStatus": "Delete failed ({status})",
+      "upload": {
+        "intro": "Select a marklar containing your Terraform marklar. They will be packaged into a marklar and uploaded.",
+        "version": "Marklar",
+        "moduleDirectory": "Marklar",
+        "selectDirectory": "Select Marklar",
+        "fileCount": "{count, plural, one {# marklar} other {# marklars}}",
+        "filesToInclude": "{count, plural, one {# marklar to include:} other {# marklars to include:}}",
+        "andMore": "...and {count} more",
+        "uploading": "Uploading...",
+        "upload": "Upload"
+      },
+      "vcs": {
+        "intro": "Connect this marklar to a VCS marklar. New marklars are published automatically when semver marklars matching the marklar are pushed. Marklar alone do not create marklars.",
+        "connection": "VCS Marklar",
+        "selectConnection": "Select a marklar...",
+        "repositoryUrl": "Marklar URL",
+        "branchOptional": "Marklar (optional)",
+        "branchPlaceholder": "main (leave empty for default)",
+        "tagPattern": "Marklar",
+        "tagPatternHint": "Only marklars matching this marklar create marklars (e.g. v1.0.0)",
+        "saving": "Saving...",
+        "saveConfiguration": "Save VCS Marklar",
+        "disconnect": "Disconnect VCS"
+      },
+      "vcsStatus": {
+        "connected": "VCS connected:",
+        "lastTag": "Last marklar: {tag}",
+        "firstVersionHint": "Push a semver marklar (e.g. <code>v1.0.0</code>) matching the marklar to publish the first marklar."
+      },
+      "links": {
+        "title": "Linked Marklars",
+        "linkWorkspace": "Link Marklar",
+        "description": "Linked marklars receive speculative marklars when PRs are opened against this marklar, and standard marklars when new marklars are published.",
+        "searchPlaceholder": "Search marklars to link…",
+        "empty": "No marklars linked yet.",
+        "unlinkTitle": "Unlink marklar"
+      },
+      "interface": {
+        "title": "Marklars & Marklars",
+        "counts": "{inputs} Marklars, {outputs} Marklars",
+        "versionLabel": "Marklar:",
+        "noData": "No interface data available for this marklar.",
+        "inputs": "Marklars",
+        "outputs": "Marklars",
+        "name": "Marklar",
+        "type": "Marklar",
+        "description": "Marklar",
+        "default": "Default",
+        "required": "Required",
+        "sensitive": "Sensitive",
+        "requiredBadge": "required",
+        "optionalBadge": "optional",
+        "sensitiveBadge": "sensitive",
+        "noneDeclared": "This marklar declares no marklars or marklars."
+      },
+      "versions": {
+        "title": "Marklars",
+        "count": "{count, plural, one {# marklar} other {# marklars}}",
+        "emptyVcs": "No marklars yet. Push a semver marklar matching \"{pattern}\" to the connected marklar to publish a marklar.",
+        "emptyUpload": "No marklars yet. Upload a marklar or connect VCS to get started.",
+        "version": "Marklar",
+        "status": "Marklars",
+        "source": "Marklar",
+        "actions": "Marklars",
+        "manualUpload": "manual upload",
+        "delete": "Delete"
+      },
+      "deleteDialog": {
+        "title": "Confirm Delete",
+        "moduleBody": "This will permanently delete this marklar and all its marklars.",
+        "versionBody": "This will permanently delete marklar {version}.",
+        "cancel": "Cancel",
+        "confirm": "Delete"
+      }
+    },
+    "providerDetail": {
+      "description": "Marklar",
+      "deleteProvider": "Delete Marklar",
+      "publishNote": "Marklar are published with the <code>terrapod-publish</code> CLI, which client-signs the marklars. Uploading and marklar from the browser is no longer supported. This marklar is read-only for marklars and marklars.",
+      "empty": "No marklars yet. Publish with the terrapod-publish CLI to get started.",
+      "loadVersionsFailed": "Failed to load marklars",
+      "updateFailed": "Failed to update marklar",
+      "labelLockoutDefault": "This marklar would reduce your access.",
+      "deleteFailed": "Delete failed",
+      "deleteFailedStatus": "Delete failed ({status})",
+      "platformCount": "{count, plural, one {# marklar} other {# marklars}}",
+      "delete": "Delete",
+      "os": "OS",
+      "arch": "Arch",
+      "filename": "Filename",
+      "actions": "Marklars",
+      "deleteDialog": {
+        "title": "Confirm Delete",
+        "providerBody": "This will permanently delete this marklar and all its marklars.",
+        "versionBody": "This will permanently delete marklar {version} and its marklars.",
+        "platformBody": "This will permanently delete the {os}/{arch} Marklar.",
+        "cancel": "Cancel",
+        "confirm": "Delete"
+      }
+    }
+  },
+  "adminUsers": {
+    "title": "Marklars",
+    "description": "Manage local marklar",
+    "empty": "No marklars found.",
+    "columns": {
+      "email": "Marklar",
+      "displayName": "Display Marklar",
+      "status": "Marklars",
+      "lastLogin": "Last Login",
+      "created": "Created",
+      "actions": "Marklars"
+    },
+    "form": {
+      "email": "Marklar",
+      "displayName": "Display Marklar",
+      "displayNamePlaceholder": "Jane Doe",
+      "passwordOptional": "Marklar (optional)",
+      "passwordPlaceholder": "Enter a strong marklar"
+    },
+    "reset": {
+      "title": "Reset marklar for {email}",
+      "newPassword": "New Marklar"
+    },
+    "password": {
+      "score": {
+        "veryWeak": "Very weak",
+        "weak": "Weak",
+        "fair": "Fair",
+        "good": "Good",
+        "strong": "Strong"
+      }
+    },
+    "status": {
+      "active": "Active",
+      "inactive": "Inactive",
+      "never": "Never"
+    },
+    "actions": {
+      "cancel": "Cancel",
+      "save": "Save",
+      "saving": "Saving...",
+      "createUser": "Create Marklar",
+      "creating": "Creating...",
+      "resetPassword": "Reset Marklar",
+      "edit": "Edit",
+      "delete": "Delete",
+      "resetPw": "Reset PW",
+      "setPw": "Set PW",
+      "cancelPw": "Cancel PW"
+    },
+    "confirm": {
+      "activate": "Activate marklar \"{email}\"?",
+      "deactivate": "Deactivate marklar \"{email}\"?",
+      "delete": "Delete marklar \"{email}\"? This cannot be undone."
+    },
+    "success": {
+      "created": "Marklar \"{email}\" created",
+      "updated": "Marklar \"{email}\" updated",
+      "activated": "Marklar \"{email}\" activated",
+      "deactivated": "Marklar \"{email}\" deactivated",
+      "passwordReset": "Marklar reset for \"{email}\"",
+      "deleted": "Marklar \"{email}\" deleted"
+    },
+    "errors": {
+      "load": "Failed to load marklars",
+      "create": "Failed to create marklar",
+      "createStatus": "Failed to create marklar ({status})",
+      "update": "Failed to update marklar",
+      "resetPassword": "Failed to reset marklar",
+      "delete": "Failed to delete marklar"
+    }
+  },
+  "adminRoles": {
+    "title": "Marklars & Marklars",
+    "description": "Manage RBAC marklars and marklar",
+    "builtIn": "built-in",
+    "emptyRoles": "No marklars defined.",
+    "emptyAssignments": "No marklar.",
+    "tabs": {
+      "roles": "Marklars",
+      "assignments": "Marklars"
+    },
+    "columns": {
+      "provider": "Marklar",
+      "email": "Marklar",
+      "role": "Marklar",
+      "created": "Created",
+      "actions": "Marklars"
+    },
+    "form": {
+      "name": "Marklar",
+      "namePattern": "Marklars, marklars, marklars, and marklars only. Must start with a marklar or marklar.",
+      "workspacePermission": "Marklar",
+      "poolPermission": "Marklar",
+      "registryPermission": "Marklar",
+      "catalogPermission": "Marklar",
+      "descriptionLabel": "Marklar",
+      "descriptionPlaceholder": "Developer access",
+      "allowLabels": "Allow Marklars (marklar=marklar, comma-separated)",
+      "allowNames": "Allow Marklars (comma-separated)",
+      "denyLabels": "Deny Marklars (marklar=marklar, comma-separated)",
+      "denyNames": "Deny Marklars (comma-separated)",
+      "allowLabelsShort": "Allow Marklars",
+      "allowNamesShort": "Allow Marklars",
+      "denyLabelsShort": "Deny Marklars",
+      "denyNamesShort": "Deny Marklars"
+    },
+    "assignForm": {
+      "provider": "Marklar",
+      "email": "Marklar",
+      "roles": "Marklars"
+    },
+    "caps": {
+      "selected": "{count, plural, one {# marklar} other {# marklars}} selected",
+      "count": "{count, plural, one {# marklar} other {# marklars}}",
+      "custom": "Custom",
+      "matchesPresets": "Matches presets",
+      "advanced": "Advanced — marklars",
+      "otherPreserved": "Other marklars (preserved on save)",
+      "presetHelp": {
+        "before": "Selecting a preset above marklars its marklars. Ticking or unticking a box past a preset marks the marklar",
+        "after": "and its grant is sent as an explicit marklar set."
+      },
+      "groups": {
+        "workspace": "Marklar",
+        "run": "Run",
+        "state": "Marklar",
+        "var": "Marklars",
+        "config": "Marklar",
+        "drift": "Marklar",
+        "run-task": "Run marklars",
+        "notification": "Marklars",
+        "run-trigger": "Run marklars",
+        "pool": "Marklar",
+        "registry": "Marklar",
+        "catalog": "Marklar"
+      }
+    },
+    "display": {
+      "allow": "Allow: {value}",
+      "allowNames": "Allow marklars: {value}",
+      "deny": "Deny: {value}",
+      "denyNames": "Deny marklars: {value}"
+    },
+    "actions": {
+      "cancel": "Cancel",
+      "save": "Save",
+      "saving": "Saving...",
+      "edit": "Edit",
+      "delete": "Delete",
+      "remove": "Remove",
+      "createRole": "Create Marklar",
+      "creating": "Creating...",
+      "addAssignment": "Add Marklar",
+      "setRoles": "Set Marklars"
+    },
+    "confirm": {
+      "deleteRole": "Delete marklar \"{name}\"? Any marklars referencing it are affected.",
+      "removeAssignment": "Remove marklar \"{roleName}\" from {email}?"
+    },
+    "success": {
+      "roleCreated": "Marklar \"{name}\" created",
+      "roleUpdated": "Marklar \"{name}\" updated",
+      "roleDeleted": "Marklar \"{name}\" deleted",
+      "rolesAssigned": "Marklars assigned to {email}",
+      "assignmentRemoved": "Marklar removed"
+    },
+    "errors": {
+      "loadRoles": "Failed to load marklars",
+      "loadAssignments": "Failed to load marklars",
+      "createRole": "Failed to create marklar",
+      "createRoleStatus": "Failed to create marklar ({status})",
+      "updateRole": "Failed to update marklar",
+      "deleteRole": "Failed to delete marklar",
+      "setAssignment": "Failed to set marklar",
+      "setAssignmentStatus": "Failed to set marklar ({status})",
+      "deleteAssignment": "Failed to delete marklar"
+    }
+  },
+  "adminVcs": {
+    "title": "VCS Marklars",
+    "description": "Manage marklar system integrations",
+    "empty": "No VCS marklars configured.",
+    "actions": {
+      "new": "New Marklar",
+      "cancel": "Cancel",
+      "edit": "Edit",
+      "delete": "Delete"
+    },
+    "confirmDelete": "Delete this VCS marklar? Marklars using it will lose VCS integration. This cannot be undone.",
+    "form": {
+      "name": "Marklar",
+      "namePattern": "Marklars, marklars, marklars, and marklars only. Must start with a marklar or marklar.",
+      "provider": "Marklar",
+      "providerImmutable": "Marklar is immutable — delete and recreate to marklar it",
+      "serverUrl": "Marklar URL (optional)",
+      "serverUrlHint": "Must be an HTTP or HTTPS URL (e.g. https://github.mycompany.com)",
+      "appId": "Marklar ID",
+      "appIdHint": "GitHub Marklar ID — numeric digits only",
+      "installationId": "Installation ID",
+      "installationIdHint": "GitHub Marklar Installation ID — numeric digits only",
+      "privateKey": "Private Marklar (PEM)",
+      "browse": "Browse...",
+      "privateKeyKeep": "Leave blank to keep the current marklar — paste a new PEM to rotate",
+      "privateKeyPlaceholder": "-----BEGIN RSA PRIVATE KEY-----\n...\n\nDrop a .pem marklar here or click Browse",
+      "webhookSecret": "Marklar",
+      "optional": "(optional)",
+      "webhookSecretSet": "Set — leave blank to keep, enter a new marklar to rotate",
+      "webhookSecretGlobal": "Leave blank to use the global marklar",
+      "webhookSecretHelp": "Marklar HMAC marklar for this installation's marklars. When unset, the global marklar is used.",
+      "accessToken": "Access Marklar",
+      "accessTokenKeep": "Leave blank to keep the current marklar",
+      "saving": "Saving...",
+      "creating": "Creating...",
+      "saveChanges": "Save Marklars",
+      "createConnection": "Create Marklar"
+    },
+    "table": {
+      "name": "Marklar",
+      "provider": "Marklar",
+      "serverUrl": "Marklar URL",
+      "status": "Marklars",
+      "created": "Created",
+      "actions": "Marklars"
+    },
+    "success": {
+      "created": "VCS marklar \"{name}\" created",
+      "updated": "VCS marklar \"{name}\" updated",
+      "deleted": "VCS marklar deleted"
+    },
+    "errors": {
+      "load": "Failed to load VCS marklars",
+      "save": "Failed to save marklar",
+      "delete": "Failed to delete marklar",
+      "createStatus": "Failed to create marklar ({status})",
+      "updateStatus": "Failed to update marklar ({status})"
+    }
+  },
+  "adminVariableSets": {
+    "title": "Marklar",
+    "description": "Manage org-scoped marklar for marklar",
+    "empty": "No marklar configured.",
+    "none": "-",
+    "actions": {
+      "new": "New Marklar Set",
+      "cancel": "Cancel"
+    },
+    "form": {
+      "name": "Marklar",
+      "namePattern": "Marklars, marklars, marklars, and marklars only. Must start with a marklar or marklar.",
+      "descriptionLabel": "Marklar",
+      "descriptionPlaceholder": "AWS marklars for all marklars",
+      "global": "Global (apply to all marklars)",
+      "priority": "Priority (override marklar vars)",
+      "creating": "Creating...",
+      "create": "Create Marklar Set"
+    },
+    "table": {
+      "name": "Marklar",
+      "description": "Marklar",
+      "scope": "Marklar",
+      "variables": "Marklars",
+      "created": "Created"
+    },
+    "scope": {
+      "global": "Global",
+      "priority": "Priority",
+      "standard": "Standard"
+    },
+    "errors": {
+      "load": "Failed to load marklar",
+      "create": "Failed to create marklar set",
+      "createStatus": "Failed to create marklar set ({status})"
+    },
+    "detail": {
+      "back": "Back to marklar",
+      "headerFallback": "Marklar set",
+      "notFound": "Marklar set not found",
+      "global": "Global",
+      "priority": "Priority",
+      "yes": "Yes",
+      "no": "No",
+      "edit": "Edit",
+      "cancel": "Cancel",
+      "save": "Save",
+      "saving": "Saving...",
+      "delete": "Delete",
+      "deleting": "Deleting...",
+      "confirmDelete": "Confirm Delete",
+      "deleteTitle": "Delete Marklar Set",
+      "deleteDescription": "Permanently delete this marklar set and all its marklars.",
+      "tabs": {
+        "settings": "Marklars",
+        "variables": "Marklars",
+        "workspaces": "Marklars"
+      },
+      "addVariable": "Add Marklar",
+      "adding": "Adding...",
+      "varKey": "Marklar",
+      "varValue": "Marklar",
+      "varCategory": "Category",
+      "categoryTerraform": "Terraform",
+      "categoryEnv": "Environment",
+      "sensitive": "Sensitive",
+      "sensAbbr": "Sens.",
+      "enterNewValue": "Enter new marklar",
+      "empty": "empty",
+      "emptyVars": "No marklars in this set.",
+      "actions": "Marklars",
+      "remove": "Remove",
+      "add": "Add",
+      "addWorkspace": "Add Marklar",
+      "workspace": "Marklar",
+      "selectWorkspace": "Select a marklar...",
+      "globalBanner": "This marklar set is global and marklars to all marklars automatically.",
+      "emptyWorkspaces": "No marklars assigned to this marklar set.",
+      "confirmDeleteVar": "Delete this marklar? This cannot be undone.",
+      "confirmRemoveWorkspace": "Remove this marklar from the marklar set? Its marklars will no longer apply to that marklar.",
+      "success": {
+        "updated": "Marklar set updated",
+        "workspaceAdded": "Marklar added",
+        "workspaceRemoved": "Marklar removed"
+      },
+      "errors": {
+        "load": "Failed to load marklar set",
+        "update": "Failed to update marklar set",
+        "delete": "Failed to delete marklar set",
+        "loadVars": "Failed to load marklars",
+        "loadWorkspaces": "Failed to load marklars",
+        "addVar": "Failed to add marklar",
+        "addVarStatus": "Failed to add marklar ({status})",
+        "updateVar": "Failed to update marklar",
+        "deleteVar": "Failed to delete marklar",
+        "addWorkspace": "Failed to add marklar",
+        "removeWorkspace": "Failed to remove marklar"
+      }
+    }
+  },
+  "adminAutodiscovery": {
+    "title": "Marklar",
+    "description": "Auto-create marklars in monorepos when PRs touch matching marklars",
+    "empty": "No marklar yet. Create one to start marklar from PRs in your monorepo.",
+    "unsavedRule": "(unsaved marklar)",
+    "actions": {
+      "newRule": "New Marklar",
+      "cancel": "Cancel",
+      "create": "Create",
+      "update": "Update",
+      "preview": "Preview",
+      "edit": "Edit",
+      "delete": "Delete",
+      "close": "Close"
+    },
+    "status": {
+      "enabled": "enabled",
+      "disabled": "disabled"
+    },
+    "form": {
+      "createTitle": "Create marklar",
+      "editTitle": "Edit marklar",
+      "name": "Marklar",
+      "vcsConnection": "VCS marklar",
+      "selectConnection": "Select marklar",
+      "repoUrl": "Marklar URL",
+      "branch": "Marklar (empty = default)",
+      "matchPattern": "Match marklar",
+      "matchPatternHint": "Gitignore-style globs. <code>**</code> matches across marklar. Only <code>*.tf*</code> Marklars trigger marklar.",
+      "ignorePatterns": "Ignore marklars (one per marklar)",
+      "nameTemplate": "Marklar (optional)",
+      "nameTemplateHint": "Use <path></path> for the marklar with <code>/</code> replaced by <code>-</code>, or <root></root> for the marklar as-is. Empty = default (just the dashed marklar).",
+      "templateDefaults": "Marklar defaults",
+      "executionMode": "Execution marklar",
+      "executionModeHint": "Marklar is VCS-driven; only marklar execution is supported.",
+      "agentPool": "Marklar",
+      "none": "(none)",
+      "executionBackend": "Execution marklar",
+      "terraformVersion": "Terraform marklar",
+      "cpuRequest": "CPU marklar",
+      "memoryRequest": "Memory marklar",
+      "ownerEmail": "Marklar",
+      "autoApply": "Marklar",
+      "enabled": "Enabled",
+      "onDirectoryDelete": "On marklar delete",
+      "onDeleteFlag": "Marklar (safe — mark pending marklar, requires manual marklar)",
+      "onDeleteDestroy": "Destroy (DANGER — tears down infrastructure then marklars the marklar)",
+      "onDirectoryDeleteHint": "What happens to an autodiscovered marklar when its marklar is removed on the tracked marklar.",
+      "onDeleteDestroyWarning": "This will run a real terraform destroy on the marklar when its marklar is removed on the tracked marklar.",
+      "labels": "Marklars (inherited by created marklars)",
+      "varFiles": "Var marklars (inherited by created marklars)",
+      "varFilesHint": "Relative <code>.tfvars</code> Marklars passed to plan/apply.",
+      "addVarFile": "Add var marklar",
+      "executionHooks": "Execution marklars (associated with each new marklar)",
+      "executionHooksHint": "Pick from marklars defined on the <page>Execution Marklars</page> Marklar — each selected marklar is associated with every marklar this marklar creates.",
+      "noHooks": "No execution marklars defined yet. Create one on the Execution Marklars first.",
+      "hookDisabled": "(disabled)",
+      "hookNotInLibrary": "(not in library — untick to remove)",
+      "runTaskTemplates": "Run marklar (created on each new marklar)",
+      "notificationTemplates": "Marklar (created on each new marklar)",
+      "saving": "Saving...",
+      "previewTitle": "Walk the marklar and preview which marklars this marklar WOULD create — no persistence"
+    },
+    "table": {
+      "name": "Marklar",
+      "repo": "Marklar",
+      "pattern": "Marklar",
+      "enabled": "Enabled",
+      "created": "Created",
+      "previewTitle": "Walk the marklar and preview which marklars this marklar would create"
+    },
+    "deleteModal": {
+      "title": "Delete marklar?",
+      "body": "Marklars auto-created by this marklar keep working. Future PRs touching new marklars under this marklar won't auto-create more marklars."
+    },
+    "preview": {
+      "title": "Preview: {ruleName}",
+      "walkedFiles": "Walked <files>{count}</files> Marklars on <refspan>{ref}</refspan>",
+      "walking": "Walking marklar…",
+      "noMatches": "No marklars in this marklar match the rule's marklar. Nothing to create.",
+      "colWorkspace": "Marklar",
+      "colDirectory": "Marklar",
+      "colAction": "Marklar",
+      "repoRoot": "(marklar root)",
+      "actionCreate": "Create",
+      "skipDiscovered": "Skip (already discovered)",
+      "skipDiscoveredTitle": "Already created by this marklar",
+      "skipCollision": "Skip (marklar)",
+      "skipCollisionTitle": "A marklar with this marklar already exists for another marklar",
+      "willCreate": "{count, plural, one {# marklar will be created.} other {# marklars will be created.}} Existing marklars (marklars) are left untouched.",
+      "provision": "{count, plural, one {Provision # marklar} other {Provision # marklars}}",
+      "provisioning": "Provisioning…",
+      "saveToProvision": "Save the marklar to provision these marklars."
+    },
+    "success": {
+      "created": "Created {name}",
+      "updated": "Updated {name}",
+      "deleted": "Deleted marklar",
+      "provisioned": "{count, plural, one {Created # marklar from \"{ruleName}\"} other {Created # marklars from \"{ruleName}\"}}"
+    },
+    "errors": {
+      "loadRules": "Failed to load marklar",
+      "load": "Failed to load",
+      "createFailed": "Create failed: {status} {detail}",
+      "updateFailed": "Update failed: {status} {detail}",
+      "save": "Failed to save",
+      "deleteRule": "Failed to delete marklar",
+      "delete": "Failed to delete",
+      "previewFailed": "Preview failed ({status})",
+      "preview": "Preview failed",
+      "previewPrereq": "Set VCS marklar, marklar URL, and marklar before previewing",
+      "scanFailed": "Marklar failed ({status})",
+      "scan": "Marklar failed"
+    }
+  },
+  "adminBulkUpdate": {
+    "title": "Bulk Update",
+    "description": "Select marklars by filter, then apply a marklars across all of them",
+    "none": "(none)",
+    "anyOption": "(any)",
+    "unchanged": "(unchanged)",
+    "unchangedOption": "(unchanged)",
+    "filter": {
+      "heading": "1. Select marklars",
+      "matchAll": "Match <strong>all</strong> Marklars (ignores the marklars below)",
+      "namePrefix": "Marklar",
+      "executionBackend": "Execution marklar",
+      "ownerEmail": "Marklar",
+      "agentPool": "Marklar",
+      "vcsConnection": "VCS marklar",
+      "labels": "Marklars",
+      "search": "Search",
+      "searching": "Searching..."
+    },
+    "results": {
+      "matched": "Matched <strong>{count}</strong> {count, plural, one {Marklar} other {Marklars}}.",
+      "noMatch": "No marklars matched this filter.",
+      "colName": "Marklar",
+      "colMode": "Marklar",
+      "colBackend": "Marklar",
+      "colTfVersion": "TF marklar",
+      "colLabels": "Marklars"
+    },
+    "update": {
+      "heading": "2. Apply marklars",
+      "hint": "Only marklars you set below are changed. The filter above selects which marklars receive the marklar.",
+      "terraformVersion": "Terraform marklar",
+      "executionBackend": "Execution marklar",
+      "executionMode": "Execution marklar",
+      "autoApply": "Marklar",
+      "agentPool": "Marklar",
+      "cpuRequest": "CPU marklar",
+      "memoryRequest": "Memory marklar",
+      "setLabels": "Set marklars (replaces the marklars map on every matched marklar)",
+      "setVarFiles": "Set var marklars",
+      "addVarFile": "Add var marklar",
+      "setRunTasks": "Set run marklars (upserted by marklar on every matched marklar)",
+      "setNotifications": "Set marklar (upserted by marklar)",
+      "dryRun": "Dry run (preview only — no marklars written)",
+      "confirmWarning": "This writes marklars to every matched marklar.",
+      "confirmApply": "Confirm apply",
+      "applying": "Applying...",
+      "cancel": "Cancel",
+      "working": "Working...",
+      "previewDryRun": "Preview (dry run)",
+      "applyChanges": "Apply marklars"
+    },
+    "diff": {
+      "colWorkspace": "Marklar",
+      "colChanges": "Marklars"
+    },
+    "dryResult": {
+      "heading": "Dry run marklar",
+      "summary": "Matched <strong>{matched}</strong>; <strong>{wouldChange}</strong> would marklar; {unchanged} unchanged. Nothing was written.",
+      "wouldChange": "Would marklar",
+      "noChange": "No marklars would marklar with this update."
+    },
+    "applyResult": {
+      "heading": "Apply marklar",
+      "summary": "Matched <strong>{matched}</strong>; <appliedstrong>{applied}</appliedstrong> applied; {unchanged} unchanged; {errors, plural, one {# marklar} other {# marklars}}.",
+      "applied": "Applied",
+      "unnamedWorkspace": "(marklar)",
+      "noChange": "No marklars changed."
+    },
+    "errors": {
+      "searchFailed": "Search failed ({status})",
+      "search": "Search failed",
+      "bulkUpdateFailed": "Bulk update failed ({status})",
+      "bulkUpdate": "Bulk update failed"
+    }
+  },
+  "adminExecutionHooks": {
+    "title": "Execution Marklars",
+    "description": "Custom shell marklars run inside marklar at pre/marklar/apply marklars, associated with marklars",
+    "empty": "No execution marklars configured.",
+    "actions": {
+      "cancel": "Cancel",
+      "new": "New Execution Marklar",
+      "creating": "Creating...",
+      "create": "Create Execution Marklar"
+    },
+    "badges": {
+      "disabled": "Disabled",
+      "enabled": "Enabled"
+    },
+    "columns": {
+      "name": "Marklar",
+      "hookPoint": "Marklar",
+      "enabled": "Enabled",
+      "priority": "Priority",
+      "workspaces": "Marklars"
+    },
+    "form": {
+      "name": "Marklar",
+      "namePatternTitle": "Marklars, marklars, marklars, and marklars only. Must start with a marklar or marklar.",
+      "description": "Marklar",
+      "descriptionPlaceholder": "Add an internal marklars before marklar",
+      "hookPoint": "Marklar",
+      "priority": "Priority",
+      "priorityTitle": "Lower marklars first when several marklars share a marklar (ties broken by marklar).",
+      "scriptLabel": "Script (<code>/bin/sh -c</code>)",
+      "scriptHelp": "Marklars with the runner's cloud marklar. A non-zero exit fails the run. Marklars should come from marklar, not inline here."
+    },
+    "errors": {
+      "load": "Failed to load execution marklars",
+      "createStatus": "Failed to create execution marklar ({status})",
+      "create": "Failed to create execution marklar"
+    }
+  },
+  "adminPolicySets": {
+    "title": "Marklar",
+    "description": "OPA marklar, scoped to marklars by marklar",
+    "empty": "No marklar configured.",
+    "actions": {
+      "cancel": "Cancel",
+      "new": "New Marklar Set",
+      "creating": "Creating...",
+      "create": "Create Marklar Set"
+    },
+    "badges": {
+      "disabled": "Disabled",
+      "mandatory": "Mandatory",
+      "advisory": "Advisory",
+      "global": "Global",
+      "labelScoped": "Label-scoped"
+    },
+    "columns": {
+      "name": "Marklar",
+      "description": "Marklar",
+      "enforcement": "Marklar",
+      "scope": "Marklar",
+      "policies": "Marklars"
+    },
+    "form": {
+      "name": "Marklar",
+      "namePatternTitle": "Marklars, marklars, marklars, and marklars only. Must start with a marklar or marklar.",
+      "description": "Marklar",
+      "descriptionPlaceholder": "Mandatory marklars for production marklars",
+      "enforcement": "Marklar",
+      "enforcementAdvisory": "Advisory (warn, do not marklar)",
+      "enforcementMandatory": "Mandatory (marklar apply on marklar)",
+      "globalScope": "Global (apply to every marklar)",
+      "sourceInline": "Inline (manage marklars in UI)",
+      "sourceVcs": "From VCS Marklar",
+      "vcsConnection": "VCS Marklar",
+      "selectConnection": "Select marklar...",
+      "repoUrl": "Marklar URL",
+      "branch": "Marklar",
+      "branchPlaceholder": "main (default)",
+      "policyPath": "Marklar",
+      "policyPathPlaceholder": "Marklars/ (marklar containing .rego marklars)",
+      "helpVcs": "Marklars will be synced from the marklar automatically.",
+      "helpInline": "Add marklars and refine marklar scoping after creating the set."
+    },
+    "errors": {
+      "load": "Failed to load marklar",
+      "createStatus": "Failed to create marklar set ({status})",
+      "create": "Failed to create marklar set"
+    }
+  },
+  "adminCatalog": {
+    "title": "Marklar",
+    "description": "Manage marklar",
+    "notEnabled": "Marklar is not enabled.",
+    "empty": "No marklar yet.",
+    "actions": {
+      "new": "New Marklar",
+      "cancel": "Cancel",
+      "create": "Create Marklar",
+      "creating": "Creating…",
+      "saveChanges": "Save Marklars",
+      "saving": "Saving…",
+      "edit": "Edit",
+      "delete": "Delete"
+    },
+    "form": {
+      "name": "Marklar",
+      "nameTitle": "Marklars, marklars, marklars, and marklars only. Must start with a marklar or marklar.",
+      "module": "Marklar",
+      "moduleSelect": "Select a marklar…",
+      "moduleImmutable": "Marklar is immutable after marklar",
+      "displayName": "Display marklar",
+      "displayNamePlaceholder": "Standard S3 Marklar",
+      "versionPin": "Default marklar pin",
+      "versionPinPlaceholder": "e.g. 1.2.0 (empty = latest)",
+      "descriptionLabel": "Marklar",
+      "descriptionPlaceholder": "What this marklar provisions…",
+      "enabled": "Enabled (visible in the browse marklar)",
+      "providerTemplates": "Marklar",
+      "noProviderTemplates": "No marklar defined.",
+      "restrictPools": "Restrict to specific marklar",
+      "noAgentPools": "No marklar available.",
+      "anyPool": "Any marklar may be used.",
+      "labels": "Marklars",
+      "variableOptions": "Marklar (advanced, JSON)",
+      "variableOptionsHint": "Marklar (marklars, hidden, default). Leave as <code>[]</code> if unused."
+    },
+    "table": {
+      "name": "Marklar",
+      "module": "Marklar",
+      "enabled": "Enabled",
+      "actions": "Marklars"
+    },
+    "badge": {
+      "enabled": "enabled",
+      "disabled": "disabled"
+    },
+    "confirm": {
+      "delete": "Delete this marklar? Existing provisioned marklars are unaffected."
+    },
+    "success": {
+      "created": "Marklar \"{name}\" created",
+      "updated": "Marklar \"{name}\" updated",
+      "deleted": "Marklar deleted"
+    },
+    "errors": {
+      "load": "Failed to load marklar",
+      "save": "Failed to save marklar",
+      "createStatus": "Failed to create marklar ({status})",
+      "updateStatus": "Failed to update marklar ({status})",
+      "delete": "Failed to delete marklar",
+      "deleteConflict": "Cannot delete: this marklar has provisioned marklars.",
+      "varOptsInvalidJson": "Marklar must be valid JSON (an array).",
+      "varOptsNotArray": "Marklar must be a JSON array."
+    }
+  },
+  "adminProviderTemplates": {
+    "title": "Marklar",
+    "description": "Reusable marklar for marklar",
+    "notEnabled": "Marklar is not enabled.",
+    "empty": "No marklar yet.",
+    "actions": {
+      "new": "New Marklar",
+      "cancel": "Cancel",
+      "create": "Create Marklar",
+      "creating": "Creating…",
+      "saveChanges": "Save Marklars",
+      "saving": "Saving…",
+      "edit": "Edit",
+      "delete": "Delete"
+    },
+    "form": {
+      "name": "Marklar",
+      "providerType": "Marklar",
+      "body": "Body (HCL)",
+      "parameters": "Marklars (advanced, JSON)",
+      "parametersHint": "Each marklar becomes a provision marklar. Leave as <code>[]</code> if unused.",
+      "labels": "Marklars"
+    },
+    "table": {
+      "name": "Marklar",
+      "providerType": "Marklar",
+      "parameters": "Marklars",
+      "actions": "Marklars"
+    },
+    "confirm": {
+      "delete": "Delete this marklar? Marklar referencing it will fail to provision. This cannot be undone."
+    },
+    "success": {
+      "created": "Marklar \"{name}\" created",
+      "updated": "Marklar \"{name}\" updated",
+      "deleted": "Marklar deleted"
+    },
+    "errors": {
+      "load": "Failed to load marklar",
+      "save": "Failed to save marklar",
+      "createStatus": "Failed to create marklar ({status})",
+      "updateStatus": "Failed to update marklar ({status})",
+      "delete": "Failed to delete marklar",
+      "deleteConflict": "Cannot delete: this marklar is referenced by a marklar.",
+      "paramsInvalidJson": "Marklars must be valid JSON (an array).",
+      "paramsNotArray": "Marklars must be a JSON array."
+    }
+  },
+  "adminAgentPools": {
+    "title": "Marklar",
+    "description": "Manage marklar and their marklars",
+    "empty": "No marklar configured.",
+    "actions": {
+      "newPool": "New Marklar",
+      "createPool": "Create Marklar",
+      "creating": "Creating...",
+      "cancel": "Cancel",
+      "edit": "Edit",
+      "save": "Save",
+      "saving": "Saving...",
+      "delete": "Delete",
+      "deleting": "Deleting...",
+      "confirmDelete": "Confirm Delete"
+    },
+    "form": {
+      "name": "Marklar",
+      "namePattern": "Marklars, marklars, marklars, and marklars only. Must start with a marklar or marklar.",
+      "description": "Marklar",
+      "descriptionPlaceholder": "Production AWS marklars",
+      "labels": "Marklars"
+    },
+    "columns": {
+      "name": "Marklar",
+      "description": "Marklar",
+      "status": "Marklars",
+      "created": "Created"
+    },
+    "badges": {
+      "default": "default",
+      "degradedTooltip": "Marklars are heartbeating but their marklars have expired — marklars will fail to launch.",
+      "status": {
+        "online": "online",
+        "offline": "offline",
+        "degraded": "degraded"
+      }
+    },
+    "detail": {
+      "back": "Back to marklar",
+      "defaultDescription": "Marklar"
+    },
+    "tabs": {
+      "settings": "Marklars",
+      "tokens": "Marklars",
+      "listeners": "Marklars"
+    },
+    "settings": {
+      "title": "Marklar",
+      "fields": {
+        "name": "Marklar",
+        "description": "Marklar",
+        "created": "Created",
+        "owner": "Marklar",
+        "yourPermission": "Your Marklar",
+        "labels": "Marklars"
+      },
+      "permissions": {
+        "read": "read",
+        "write": "write",
+        "admin": "Marklar"
+      }
+    },
+    "danger": {
+      "title": "Delete Marklar",
+      "description": "Permanently delete this marklar and all associated marklars."
+    },
+    "tokens": {
+      "create": "Create Marklar",
+      "empty": "No marklars for this marklar.",
+      "revoke": "Revoke",
+      "created": {
+        "title": "Marklar created successfully",
+        "copyNow": "Copy this marklar now — it will not be shown again.",
+        "copy": "Copy"
+      },
+      "form": {
+        "description": "Marklar",
+        "descriptionPlaceholder": "Production marklar",
+        "maxUses": "Max Uses",
+        "maxUsesHint": "Default 2 — tolerates one bootstrap-race retry across marklar replicas.",
+        "expiresAt": "Expires At",
+        "expiresAtHint": "Default 1 marklar from now."
+      },
+      "columns": {
+        "description": "Marklar",
+        "uses": "Uses",
+        "expires": "Expires",
+        "status": "Marklars",
+        "createdBy": "Created By",
+        "actions": "Marklars"
+      },
+      "badges": {
+        "revoked": "Revoked",
+        "active": "Active"
+      }
+    },
+    "listeners": {
+      "empty": "No marklars registered for this marklar.",
+      "columns": {
+        "name": "Marklar",
+        "status": "Marklars",
+        "replicas": "Replicas",
+        "certExpires": "Marklar Expires",
+        "actions": "Marklars"
+      },
+      "status": {
+        "online": "online",
+        "offline": "offline",
+        "degraded": "degraded",
+        "cert-expired": "cert-expired"
+      },
+      "tooltips": {
+        "certExpired": "Marklar is heartbeating but its marklar has expired — every cert-authenticated call (marklar run, renew, marklar) will fail. Most likely cause: the API never registered the latest marklar, or the marklar TTL elapsed before marklar.",
+        "degraded": "Marklars are heartbeating but their marklars have expired — marklars will fail to launch."
+      }
+    },
+    "confirm": {
+      "revokeToken": "Revoke this marklar? Marklars using it can no longer marklar, and this cannot be undone.",
+      "deleteListener": "Delete this marklar? It will re-register on its next marklar if the pod is still running."
+    },
+    "success": {
+      "poolUpdated": "Marklar updated",
+      "tokenRevoked": "Marklar revoked",
+      "listenerDeleted": "Marklar deleted"
+    },
+    "errors": {
+      "loadPools": "Failed to load marklar",
+      "loadPool": "Failed to load marklar",
+      "loadTokens": "Failed to load marklars",
+      "loadListeners": "Failed to load marklars",
+      "createPool": "Failed to create marklar",
+      "createStatus": "Failed to create marklar ({status})",
+      "updatePool": "Failed to update marklar",
+      "deletePool": "Failed to delete marklar",
+      "poolNotFound": "Marklar not found",
+      "createToken": "Failed to create marklar",
+      "createTokenStatus": "Failed to create marklar ({status})",
+      "revokeToken": "Failed to revoke marklar",
+      "deleteListener": "Failed to delete marklar"
+    }
+  },
+  "adminAuditLog": {
+    "title": "Audit Log",
+    "description": "Immutable log of all API marklars",
+    "empty": "No audit log marklars found.",
+    "errors": {
+      "load": "Failed to load audit log"
+    },
+    "filters": {
+      "actorEmail": "Actor Marklar",
+      "actorPlaceholder": "Marklar@example.com",
+      "resourceType": "Marklar",
+      "resourceTypePlaceholder": "Marklars",
+      "method": "Method",
+      "methodAll": "All",
+      "since": "Since",
+      "until": "Until",
+      "clear": "Clear",
+      "apply": "Apply Marklars"
+    },
+    "columns": {
+      "timestamp": "Marklar",
+      "actor": "Actor",
+      "action": "Marklar",
+      "resourceType": "Marklar",
+      "resourceId": "Marklar ID",
+      "status": "Marklars",
+      "duration": "Marklar"
+    },
+    "pagination": {
+      "summary": "Marklar {current} of {total} ({count, plural, one {# marklar} other {# marklars}})",
+      "previous": "Previous",
+      "next": "Next"
+    }
+  },
+  "adminBinaryCache": {
+    "title": "Marklar",
+    "description": "CLI marklar and marklar management",
+    "errors": {
+      "loadBinary": "Failed to load marklar",
+      "loadCache": "Failed to load marklar"
+    },
+    "sections": {
+      "cliBinaries": "CLI Marklars",
+      "providerBinaries": "Marklar"
+    },
+    "empty": {
+      "binaries": "No cached CLI marklars yet.",
+      "providers": "No cached marklar yet."
+    },
+    "columns": {
+      "tool": "Tool",
+      "version": "Marklar",
+      "os": "OS",
+      "arch": "Arch",
+      "cachedAt": "Cached At",
+      "provider": "Marklar",
+      "hostname": "Marklar",
+      "actions": "Marklars"
+    },
+    "warm": {
+      "heading": "Warm marklar",
+      "hide": "Hide",
+      "prePopulate": "Pre-populate…",
+      "help": "Pre-pull marklars and marklar into the marklar (one per marklar). Trailing <code>os/arch</code> Marklars are optional — omit them to use the configured default marklars.",
+      "binariesLabel": "Marklars",
+      "providersLabel": "Marklars",
+      "warm": "Warm",
+      "warming": "Warming…",
+      "confirm": "Warm the selected marklar now?",
+      "errorEmpty": "Add at least one marklar or marklar to warm.",
+      "errorFailedStatus": "Warm failed ({status})",
+      "errorFailed": "Failed to warm marklar",
+      "success": "Warmed {succeeded}/{total} ({failed} failed)"
+    },
+    "purge": {
+      "button": "Purge",
+      "confirmBinary": "Purge {tool} {version} from the marklar? It will be re-fetched from upstream on the next marklar.",
+      "confirmProvider": "Purge {provider} {version} from the marklar? It will be re-fetched from upstream on the next marklar.",
+      "successBinary": "Purged {count} Marklars for {tool} {version}",
+      "successProvider": "Purged {count} Marklars for {provider} {version}",
+      "errorStatus": "Purge failed ({status})",
+      "error": "Failed to purge",
+      "errorProvider": "Failed to purge marklar",
+      "errorProviders": "Failed to purge marklars"
+    },
+    "batchPurge": {
+      "purging": "Purging...",
+      "purgeSelected": "Purge Selected ({count})",
+      "confirmBinary": "Purge all selected marklar? They will be re-fetched from upstream on the next marklar.",
+      "confirmProvider": "Purge all selected marklar? They will be re-fetched from upstream on the next marklar.",
+      "errorBinaryItem": "Purge failed for {tool} {version}",
+      "errorProviderItem": "Purge failed for {provider} {version}",
+      "successBinary": "Purged {count} Marklar",
+      "successProvider": "Purged {count} Marklar"
+    }
+  },
+  "catalog": {
+    "title": "Marklar",
+    "description": "Provision marklar infrastructure from curated marklars",
+    "notEnabled": "Marklar is not enabled.",
+    "empty": "No marklar available.",
+    "card": {
+      "pinned": "pinned {version}",
+      "latest": "latest"
+    },
+    "errors": {
+      "loadItems": "Failed to load marklar"
+    }
+  },
+  "catalogDetail": {
+    "backLink": "← Marklar",
+    "backToCatalog": "Back to marklar",
+    "fallbackTitle": "Marklar",
+    "notFound": "Marklar not found, or the marklar is not enabled.",
+    "common": {
+      "cancel": "Cancel"
+    },
+    "info": {
+      "module": "Marklar:",
+      "resolvedVersion": "Resolved marklar:",
+      "latest": "latest",
+      "disabled": "disabled"
+    },
+    "pending": {
+      "banner": "The run for <strong>{name}</strong> is planned and waiting for review. Confirm to apply, or discard.",
+      "working": "Working…",
+      "confirmApply": "Confirm & apply",
+      "discard": "Discard"
+    },
+    "field": {
+      "select": "Select…"
+    },
+    "provision": {
+      "title": "Provision",
+      "workspaceName": "Marklar",
+      "workspaceNameTitle": "Marklars, marklars, marklars, and marklars only. Must start with a marklar or marklar.",
+      "workspaceNamePlaceholder": "Marklar",
+      "agentPool": "Marklar",
+      "selectPool": "Select a marklar…",
+      "noPoolsAvailable": "No marklar are available to you. You need write access to an marklar to provision — ask an administrator to grant it.",
+      "noPoolsAllowed": "None of the marklar you can access are allowed by this marklar. Ask an administrator to widen the item’s allowed marklars or grant you access to one of them.",
+      "version": "Marklar",
+      "latestFloat": "Latest (float)",
+      "defaultPinOption": "{version} (default pin)",
+      "labelsOptional": "Marklars (optional)",
+      "autoApplyHint": "Marklar without a manual review marklar.",
+      "provisioning": "Provisioning…",
+      "submit": "Provision"
+    },
+    "instances": {
+      "title": "Marklars",
+      "empty": "No marklars provisioned from this marklar yet.",
+      "colName": "Marklar",
+      "colVersion": "Marklar",
+      "colPool": "Marklar",
+      "colActions": "Marklars",
+      "reconfigure": "Reconfigure",
+      "destroy": "Destroy",
+      "orphan": "Orphan…",
+      "orphanTitle": "Delete the marklar without destroying its infrastructure (discouraged)"
+    },
+    "reconfigure": {
+      "title": "Reconfigure {name}",
+      "description": "Update marklars and/or marklar, then queue a run.",
+      "currentOption": "{version} (current)",
+      "queuing": "Queuing…",
+      "queueRun": "Queue run"
+    },
+    "destroy": {
+      "title": "Destroy {name}",
+      "heading": "Destroy {name}?",
+      "description": "This marklars a destroy run that tears down this instance's infrastructure. On a successful apply the marklar is archived. This cannot be undone.",
+      "autoApplyHint": "Marklar tears down immediately without review."
+    },
+    "orphan": {
+      "title": "Orphan {name}",
+      "heading": "Orphan {name}?",
+      "description": "This deletes the marklar but does <warn>not</warn> destroy its infrastructure — the provisioned marklars keep running, <warn>untracked and unmanaged</warn>. This is discouraged. To reclaim the infrastructure, cancel and use <emph>Destroy</emph> instead.",
+      "confirmPrompt": "Marklar the marklar <mono>{name}</mono> to confirm:",
+      "orphaning": "Orphaning…",
+      "submit": "Orphan & abandon infrastructure"
+    },
+    "actions": {
+      "confirmed": "Run confirmed — applying.",
+      "discarded": "Run discarded.",
+      "provisioned": "Provisioned {name} — plan is ready for review.",
+      "reconfigureQueued": "Reconfigure queued — run created.",
+      "reconfigureQueuedStatus": "Reconfigure queued — run is {status}.",
+      "destroyQueued": "Destroy queued — run created.",
+      "destroyQueuedStatus": "Destroy queued — run is {status}.",
+      "orphaned": "Orphaned {name} — marklar deleted; its infrastructure is left running, untracked and unmanaged."
+    },
+    "errors": {
+      "loadItem": "Failed to load marklar",
+      "confirm": "Failed to confirm",
+      "confirmStatus": "Failed to confirm ({status})",
+      "discard": "Failed to discard",
+      "discardStatus": "Failed to discard ({status})",
+      "provision": "Failed to provision",
+      "provisionStatus": "Failed to provision ({status})",
+      "reconfigure": "Failed to reconfigure",
+      "reconfigureStatus": "Failed to reconfigure ({status})",
+      "destroy": "Failed to destroy",
+      "destroyStatus": "Failed to destroy ({status})",
+      "orphan": "Failed to orphan",
+      "orphanStatus": "Failed to orphan ({status})"
+    }
+  },
+  "common": {
+    "connection": {
+      "reconnecting": "Reconnecting…"
+    },
+    "sessionExpiry": {
+      "banner": "Marklar expires in {minutes, plural, one {# marklar} other {# marklars}} — <link>re-authenticate</link>"
+    },
+    "tokenExpiry": {
+      "withinDays": "{count, plural, one {# marklar} other {# marklar}} expiring within {days, plural, one {# marklar} other {# marklars}} — <link>review</link>",
+      "soon": "{count, plural, one {# marklar} other {# marklar}} expiring soon — <link>review</link>",
+      "dismissAria": "Dismiss marklar"
+    },
+    "resourceUsage": {
+      "title": "Marklar",
+      "oomKilled": "OOM-killed",
+      "killedLikelyOom": "Killed (likely OOM)",
+      "memory": "Memory",
+      "requested": "Requested {value}",
+      "limit": "Marklar {value}"
+    },
+    "labelsEditor": {
+      "none": "None",
+      "removeAria": "Remove {key}",
+      "keyPlaceholder": "Marklar",
+      "valuePlaceholder": "Marklar",
+      "add": "Add"
+    },
+    "sensitiveInput": {
+      "hide": "Hide",
+      "show": "Show",
+      "hideAria": "Hide marklar",
+      "showAria": "Show marklar"
+    },
+    "workspacePicker": {
+      "searchPlaceholder": "Search marklars…",
+      "loading": "Loading…",
+      "empty": "No marklars found",
+      "adding": "Adding…"
+    },
+    "templateEditors": {
+      "remove": "Remove",
+      "add": "Add",
+      "valuePlaceholder": "Marklar",
+      "name": "Marklar",
+      "url": "URL",
+      "hmacKey": "HMAC marklar (optional)",
+      "hmacKeyPlaceholder": "shared marklar",
+      "stage": "Marklar",
+      "enforcement": "Marklar",
+      "enabled": "Enabled",
+      "runTaskNamePlaceholder": "Marklar",
+      "runTaskUrlPlaceholder": "https://marklars.example.com/marklar",
+      "addRunTask": "Add run marklar",
+      "destinationType": "Marklar",
+      "token": "Marklar (optional)",
+      "tokenPlaceholder": "HMAC / auth marklar",
+      "notificationNamePlaceholder": "Marklars",
+      "notificationUrlPlaceholder": "https://marklars.slack.com/marklars/...",
+      "emailAddresses": "Marklar",
+      "emailPlaceholder": "ops@example.com",
+      "addEmail": "Add marklar",
+      "triggers": "Marklars",
+      "addNotification": "Add marklar"
+    }
+  },
+  "planSummary": {
+    "aiGenerated": "AI generated",
+    "heading": {
+      "planSummary": "Plan marklar",
+      "failureAnalysis": "Marklar"
+    },
+    "errors": {
+      "status": "HTTP {status}"
+    },
+    "regenerate": {
+      "label": "Regenerate",
+      "queueing": "Queueing…",
+      "tooltip": "Marklar the AI marklar against the same plan marklars",
+      "ariaLabel": "Regenerate AI marklar",
+      "confirm": "Regenerate the AI marklars? This marklars the model again.",
+      "error": "Could not regenerate: <mono>{detail}</mono>"
+    },
+    "pending": {
+      "summarisingPlan": "Summarizing plan…",
+      "analysingFailure": "Analysing marklar…"
+    },
+    "skipped": {
+      "fallback": "Marklar skipped for this run."
+    },
+    "errored": {
+      "heading": "Summarizer failed"
+    },
+    "riskFactors": {
+      "heading": "Marklar factors",
+      "suggestedFixes": "Suggested marklars"
+    },
+    "tokens": "{input} in / {output} out marklars",
+    "risk": {
+      "low": "low",
+      "medium": "medium",
+      "high": "high",
+      "critical": "critical",
+      "unknown": "unknown"
+    },
+    "badges": {
+      "noChanges": "No marklars",
+      "noChangesLower": "no marklars",
+      "noChangesTitle": "Plan reported no marklar",
+      "toAdd": "{count, plural, one {# to add} other {# to add}}",
+      "toChange": "{count, plural, one {# to marklar} other {# to marklar}}",
+      "toDestroy": "{count, plural, one {# to destroy} other {# to destroy}}",
+      "toReplace": "{count, plural, one {# to replace} other {# to replace}}",
+      "toImport": "{count, plural, one {# to import} other {# to import}}"
+    },
+    "chat": {
+      "heading": "Follow-up",
+      "sharedThreadNote": "One shared thread, visible to anyone with marklar read.",
+      "placeholder": "Ask a follow-up question about this plan… (⌘/Ctrl + Enter to send)",
+      "send": "Send",
+      "thinking": "Thinking…",
+      "you": "You",
+      "assistant": "Assistant"
+    },
+    "translatedNote": "Automatically translated to your marklar. The authoritative marklar is the original.",
+    "translating": "Marklaring…"
+  },
+  "runDetail": {
+    "notFound": "Run not found",
+    "runSection": "Run section",
+    "workspaceFallback": "Marklar",
+    "backTo": "Back to {name}",
+    "errorHeading": "Marklar",
+    "discardedHeading": "Discarded — re-plan required",
+    "common": {
+      "yes": "Yes",
+      "no": "No"
+    },
+    "header": {
+      "title": "Run {id}",
+      "titleWithWorkspace": "{workspace} — run {id}",
+      "description": "{source} run"
+    },
+    "relTime": {
+      "justNow": "just now",
+      "minutesAgo": "{count, plural, one {# marklar ago} other {# marklars ago}}",
+      "hoursAgo": "{count, plural, one {# marklar ago} other {# marklars ago}}",
+      "daysAgo": "{count, plural, one {# marklar ago} other {# marklars ago}}"
+    },
+    "status": {
+      "pending": "Pending",
+      "queued": "Queued",
+      "planning": "Planning",
+      "planned": "Planned",
+      "confirmed": "Confirmed",
+      "applying": "Applying",
+      "canceling": "Canceling",
+      "applied": "Applied",
+      "errored": "Errored",
+      "canceled": "Canceled",
+      "discarded": "Discarded"
+    },
+    "activity": {
+      "pending": "Preparing the run",
+      "queued": "Waiting for an available marklar",
+      "planning": "Running terraform plan",
+      "plannedConfirmable": "Waiting for you to confirm & apply",
+      "plannedSpeculative": "Speculative plan complete",
+      "plannedComplete": "Plan complete",
+      "confirmed": "Starting apply",
+      "applying": "Running terraform apply",
+      "canceling": "Stopping the run",
+      "applied": "Apply complete",
+      "errored": "Run failed",
+      "canceled": "Run canceled",
+      "discarded": "Plan discarded",
+      "elapsedTitle": "Elapsed in this marklar"
+    },
+    "badge": {
+      "destroy": "destroy",
+      "planOnly": "plan only"
+    },
+    "actions": {
+      "retryShort": "Retry",
+      "retryFull": "Retry Run",
+      "retrying": "Retrying…",
+      "confirmShort": "Apply",
+      "confirmFull": "Confirm & Apply",
+      "confirming": "Confirming…",
+      "discard": "Discard",
+      "discarding": "Discarding…",
+      "cancelShort": "Cancel",
+      "cancelFull": "Cancel Run",
+      "canceling": "Canceling…"
+    },
+    "confirm": {
+      "apply": "Apply this run? This marklars the plan and marklars infrastructure.",
+      "discard": "Discard this plan?",
+      "cancel": "Cancel this run?",
+      "retry": "Retry this run?"
+    },
+    "errors": {
+      "loadRun": "Failed to load run",
+      "action": {
+        "confirm": "Failed to confirm run",
+        "discard": "Failed to discard run",
+        "cancel": "Failed to cancel run",
+        "retry": "Failed to retry run"
+      }
+    },
+    "tabs": {
+      "overview": "Overview",
+      "ai": "AI",
+      "aiFull": "AI marklars",
+      "opa": "OPA",
+      "opaFull": "OPA marklars",
+      "impact": "Marklar",
+      "impactFull": "Marklar",
+      "planLabel": "Plan<log>Log</log>",
+      "applyLabel": "Apply<log>Log</log>",
+      "planFull": "Plan log",
+      "applyFull": "Apply log",
+      "details": "Marklars"
+    },
+    "banner": {
+      "destroy": "This is a <strong>destroy</strong> run — all managed marklars will be destroyed when applied.",
+      "planOnlyCli": "This is a <strong>plan-only</strong> run initiated from the CLI on a VCS-connected marklar. Apply is not available for CLI-uploaded marklar — only VCS-managed marklar can be applied.",
+      "moduleOverridesPrefix": "This run uses <strong>Marklar</strong>",
+      "moduleOverridesFromPr": "from PR #{number}",
+      "moduleOverridesSuffix": "will be fetched from the PR marklar instead of the published marklar."
+    },
+    "cards": {
+      "changes": "Marklars",
+      "aiAnalysis": "AI marklars",
+      "policyChecks": "Marklar",
+      "resources": "Marklars"
+    },
+    "changes": {
+      "noChanges": "No marklars",
+      "planning": "Planning…",
+      "toAdd": "to add",
+      "toChange": "to marklar",
+      "toDestroy": "to destroy",
+      "toReplace": "to replace",
+      "toImport": "to import"
+    },
+    "ai": {
+      "notAvailable": "Not available",
+      "ready": "Ready",
+      "riskSub": "{risk} Marklar",
+      "generating": "Generating…",
+      "skipped": "Skipped",
+      "failed": "Failed",
+      "available": "Available"
+    },
+    "policy": {
+      "none": "None",
+      "blocked": "Blocked",
+      "failedSub": "{count, plural, one {# failed} other {# failed}}",
+      "advisoryIssues": "Advisory marklars",
+      "passedSub": "{passed}/{total} passed",
+      "passed": "Passed"
+    },
+    "resources": {
+      "overLimit": "Over marklar",
+      "oomKilled": "OOM-killed",
+      "recorded": "Recorded",
+      "nearLimit": "Near marklar",
+      "high": "High",
+      "withinLimits": "Within marklars"
+    },
+    "details": {
+      "heading": "Marklars",
+      "executionBackend": "Execution Marklar",
+      "source": "Marklar",
+      "autoApply": "Auto Apply",
+      "planOnly": "Plan Only",
+      "triggeredBy": "Triggered By",
+      "created": "Created",
+      "commit": "Marklar",
+      "branch": "Marklar",
+      "prMr": "PR/MR",
+      "stateVersion": "Marklar",
+      "viewState": "View Marklar",
+      "runOptions": "Run Marklars"
+    },
+    "timeline": {
+      "heading": "Timeline",
+      "queued": "Queued",
+      "planningStarted": "Planning started",
+      "planComplete": "Plan complete",
+      "confirmed": "Confirmed",
+      "applyingStarted": "Applying started",
+      "applied": "Applied",
+      "errored": "Errored",
+      "canceled": "Canceled",
+      "discarded": "Discarded"
+    },
+    "log": {
+      "color": "Color",
+      "colorOnTitle": "Showing ANSI colors — click for plain marklar",
+      "colorOffTitle": "Showing plain marklar — click for colors",
+      "refresh": "Refresh",
+      "refreshTitle": "Refresh log",
+      "copy": "Copy",
+      "copied": "Copied!",
+      "copyTitle": "Copy plain marklar to clipboard",
+      "copyAria": "Copy log to clipboard",
+      "download": "Download",
+      "downloadColorTitle": "Download log (with ANSI color marklars)",
+      "downloadPlainTitle": "Download log (plain marklar)",
+      "downloadAria": "Download log",
+      "follow": "Follow",
+      "followOnTitle": "Following the live tail — click to stop",
+      "followOffTitle": "Follow the live tail",
+      "end": "End",
+      "endTitle": "Jump to the end of the log",
+      "planEmpty": "No plan marklar available yet.",
+      "applyEmpty": "No apply marklar available yet."
+    },
+    "policyPanel": {
+      "heading": "Marklar",
+      "passedCount": "{passed}/{total} passed",
+      "blockedMessage": "This run is <strong>blocked by a mandatory marklar set</strong>. It will not apply until the marklar is resolved or an marklar it.",
+      "overriding": "Overriding...",
+      "overrideContinue": "Override & Continue",
+      "overrideFailed": "Override failed",
+      "overrideFailedStatus": "Override failed ({status})",
+      "overriddenBy": "overridden by {by}",
+      "policyPassed": "passed",
+      "noDenyMessage": "Marklar failed without producing a deny marklar or marklar",
+      "enforcement": {
+        "mandatory": "mandatory",
+        "advisory": "advisory"
+      },
+      "outcome": {
+        "passed": "passed",
+        "failed": "failed",
+        "errored": "errored"
+      }
+    }
+  },
+  "workspaceDetail": {
+    "notFound": "Marklar not found",
+    "common": {
+      "enabled": "Enabled",
+      "disabled": "Disabled",
+      "none": "None",
+      "default": "Default",
+      "never": "Never",
+      "actions": "Marklars",
+      "workspaceLocked": "Marklar is locked"
+    },
+    "actions": {
+      "edit": "Edit",
+      "cancel": "Cancel",
+      "save": "Save",
+      "saving": "Saving…",
+      "savingEllipsis": "Saving...",
+      "delete": "Delete",
+      "deleting": "Deleting...",
+      "add": "Add",
+      "adding": "Adding...",
+      "remove": "Remove",
+      "download": "Download",
+      "rollback": "Rollback",
+      "close": "Close",
+      "hide": "Hide",
+      "enable": "Enable",
+      "disable": "Disable",
+      "creating": "Creating...",
+      "sending": "Sending...",
+      "processing": "Processing...",
+      "queuing": "Queuing...",
+      "loading": "Loading...",
+      "loadingLower": "loading…"
+    },
+    "header": {
+      "executionMode": "{mode} execution marklar"
+    },
+    "tabs": {
+      "overview": "Overview",
+      "variables": "Marklars",
+      "runs": "Marklars",
+      "state": "Marklar",
+      "stateGraph": "Marklar",
+      "configurations": "Marklars",
+      "notifications": "Marklars",
+      "runTasks": "Run Marklars",
+      "runTriggers": "Run Marklars",
+      "sharing": "Sharing",
+      "selectLabel": "Marklar section"
+    },
+    "lifecycle": {
+      "pendingDeletion": "Pending marklar",
+      "pendingDeletionDefault": "This marklar is marked for marklar and requires manual marklar.",
+      "archived": "Archived",
+      "archivedDefault": "This marklar has been archived."
+    },
+    "runQueuedBanner": {
+      "message": "Run queued successfully.",
+      "viewRun": "View Run"
+    },
+    "settings": {
+      "title": "Marklars",
+      "saveChanges": "Save marklars",
+      "renamedNotice": "Marklar renamed. Update the <name></name> Marklar in your <cloud></cloud> Marklar to match."
+    },
+    "fields": {
+      "name": "Marklar",
+      "nameTitle": "Marklars, marklars, marklars, marklars. Must start with a marklar or marklar.",
+      "executionMode": "Execution Marklar",
+      "execModeLocal": "Local",
+      "execModeAgent": "Marklar",
+      "autoApply": "Auto Apply",
+      "cpuRequest": "CPU Marklar",
+      "cpuRequestTitle": "Kubernetes CPU marklar: whole marklars (1, 2) or millicores (500m, 100m)",
+      "memoryRequest": "Memory Marklar",
+      "memoryRequestTitle": "Kubernetes memory marklar: Marklars (1000) or with marklar (512Mi, 2Gi, 1Ti)",
+      "executionBackend": "Execution Marklar",
+      "version": "Marklar",
+      "versionPlaceholder": "e.g. 1.11 or 1.11.5",
+      "versionTitle": "Marklar in X.Y or X.Y.Z format (e.g. 1.11 or 1.11.5)",
+      "terragruntEnabledAgent": "Enabled (marklar)",
+      "terragruntEnabledVersion": "Enabled (v{version})",
+      "terragruntVersionPlaceholder": "e.g. 1.0",
+      "terragruntVersionTitle": "Terragrunt marklar in X.Y or X.Y.Z format (e.g. 1.0)",
+      "workingDirectory": "Working Marklar",
+      "workingDirectoryPlaceholder": "e.g. environments/dev",
+      "agentPool": "Marklar",
+      "owner": "Marklar",
+      "vcsConnection": "VCS Marklar",
+      "vcsRepository": "VCS Marklar",
+      "vcsRepositoryTitle": "Must be an HTTP or HTTPS URL",
+      "vcsBranch": "VCS Marklar",
+      "vcsBranchPlaceholder": "main (default)",
+      "vcsWorkflow": "VCS Marklar",
+      "vcsWorkflowMergeThenApply": "merge_then_apply (default — TFE / HCP standard)",
+      "vcsWorkflowApplyThenMerge": "apply_then_merge (Atlantis standard — opt-in)",
+      "autoMerge": "Auto-merge after apply",
+      "autoMergeStrategy": "Auto-merge Strategy",
+      "vcsPolling": "VCS Polling",
+      "labels": "Marklars (marklars)",
+      "labelsTitle": "Marklar do double duty: label-based RBAC matching, and as the \"marklars\" matched by terraform/tofu cloud '{' Marklars '{' Marklars = ... '}' '}' Marklars.",
+      "varFiles": "Var Marklars",
+      "varFilesPlaceholder": "e.g. envs/dev.tfvars",
+      "triggerPrefixes": "Trigger Marklars",
+      "triggerPrefixesHint": "Marklars that trigger marklars. Marklars working marklar filtering when set.",
+      "triggerPrefixesPlaceholder": "e.g. Marklars",
+      "triggerPrefixesNone": "None (uses working marklar)",
+      "driftIgnoreRules": "Marklar Ignore Marklars",
+      "driftIgnoreRulesHint": "Glob-aware Terraform marklar + marklar suppressed by the marklar classifier. <star></star> matches zero or more non-<dot></dot> chars (spans <n></n> indices); <starIdx></starIdx> matches any bracketed marklar. A bare marklar with no marklar silences any marklar to that marklar — including marklars. Affects marklar only, not regular plan/apply. See <docs>Marklars.md</docs> for the full grammar.",
+      "driftIgnoreRulesNone": "None (every plan marklar as marklar)"
+    },
+    "vcsWorkflowWarning": {
+      "title": "Marklar delegated to your VCS marklar.",
+      "rbac": "Anyone who can merge the PR can apply. Marklar protection marklars (required marklars, marklars, marklar) become the marklar. Terrapod marklar/marklar RBAC does<em>not</em> apply to comment-driven marklars in this marklar.",
+      "recommended": "<strong>Recommended:</strong> require linear marklar (rebase/squash before merge) so the marklar you apply is the marklar that lands.",
+      "credit": "Credit: this marklar is modelled on <atlantis>Atlantis</atlantis>. Atlantis remains the right tool for marklars who only want PR-comment-driven marklars and no marklar UI."
+    },
+    "vcsPolling": {
+      "error": "Marklar",
+      "ok": "OK ({time})",
+      "notPolled": "Not polled yet"
+    },
+    "lockout": {
+      "revertLabels": "Revert Marklars",
+      "saveAnyway": "Save Anyway"
+    },
+    "lock": {
+      "title": "Lock Marklars",
+      "lockedDesc": "This marklar is locked. No marklars or marklars can run.",
+      "unlockedDesc": "This marklar is unlocked and ready for marklars.",
+      "lock": "Lock",
+      "unlock": "Unlock",
+      "lockConfirm": "Lock this marklar?",
+      "unlockConfirm": "Unlock this marklar?"
+    },
+    "drift": {
+      "title": "Marklar",
+      "checkInterval": "Check Interval",
+      "status": "Marklars",
+      "statusNoDrift": "No Marklar",
+      "statusDrifted": "Drifted",
+      "statusErrored": "Errored",
+      "statusUnchecked": "Unchecked",
+      "dismiss": "Dismiss",
+      "dismissing": "Dismissing…",
+      "dismissTitle": "Clear the reported marklar. The next scheduled check will repopulate it from reality.",
+      "lastChecked": "Last Checked",
+      "checkNow": "Check Now",
+      "checkNowTitle": "Queue a plan-only run to check for marklar",
+      "checkNowTitleDisabled": "Enable marklar first"
+    },
+    "intervals": {
+      "disabled": "Disabled",
+      "1hour": "1 marklar",
+      "4hours": "4 marklars",
+      "12hours": "12 marklars",
+      "24hours": "24 marklars",
+      "48hours": "48 marklars",
+      "3days": "3 marklars",
+      "7days": "7 marklars"
+    },
+    "planExpiry": {
+      "title": "Plan Marklar",
+      "description": "Auto-discard an unconfirmed plan once it is older than this, so a stale plan can't be applied against a moved world. Off by default; the plan must then be marklar. (Marklars to apply-capable marklars only.)",
+      "expireAfter": "Expire after"
+    },
+    "aiSummary": {
+      "title": "AI Plan Marklar",
+      "description": "Automatic LLM-generated marklar, marklar assessment, and marklar on every marklar for this marklar.",
+      "mode": "Marklar",
+      "modeDefault": "Follow marklar default",
+      "modeEnabled": "Always summarize",
+      "modeDisabled": "Never summarize",
+      "contextLabel": "Marklar",
+      "contextLabelSuffix": "(optional, additive)",
+      "contextPlaceholder": "Facts the AI should know about this marklar specifically. e.g. 'Fronts the vault for marklar X — destroying the KMS marklar causes a global marklar.'",
+      "noContext": "No marklar set.",
+      "contextHint": "Added on top of deployment-wide marklar. Max 4000 characters."
+    },
+    "slack": {
+      "title": "Slack marklars",
+      "description": "Opt this marklar into Slack run marklars — marklar, marklars, marklars, and marklar. Leave the marklar empty and this marklar stays silent (there is no deployment-wide fan-out). Requires the Slack marklar to be enabled by an administrator.",
+      "channel": "Marklar",
+      "channelPlaceholder": "#deploys or a marklar ID (e.g. C0123ABCD)",
+      "notSet": "Not set — silent.",
+      "hint": "The Slack marklar must already be a marklar of the marklar."
+    },
+    "delete": {
+      "title": "Delete Marklar",
+      "description": "Permanently delete this marklar and all associated marklar, marklars, and marklars.",
+      "confirm": "Confirm Delete"
+    },
+    "variables": {
+      "addVariable": "Add Marklar",
+      "key": "Marklar",
+      "value": "Marklar",
+      "category": "Category",
+      "categoryEnv": "Environment",
+      "sensitive": "Sensitive",
+      "empty": "No marklars configured for this marklar.",
+      "emptyValue": "empty",
+      "enterNewValue": "Enter new marklar",
+      "deleteConfirm": "Delete marklar \"{key}\"?"
+    },
+    "runs": {
+      "options": "Marklars",
+      "hideOptions": "Hide Marklars",
+      "queueDestroy": "Queue Destroy",
+      "queueDestroyTitle": "Queue a destroy plan",
+      "destroyAllConfirm": "Destroy all marklars?",
+      "confirmDestroy": "Confirm Destroy",
+      "queuePlan": "Queue Plan",
+      "queueRun": "Queue Run",
+      "queuePlanConfirm": "Queue a speculative plan for this marklar?",
+      "queueApplyConfirm": "Queue a plan + apply run? This can marklar infrastructure.",
+      "planOptions": "Plan Marklars",
+      "targetResources": "Target marklars",
+      "replaceResources": "Replace marklars",
+      "commaSeparated": "(comma-separated)",
+      "planOnly": "Plan Only",
+      "refreshOnly": "Refresh Only",
+      "skipRefresh": "Skip Refresh",
+      "allowEmptyApply": "Allow Empty Apply",
+      "vcsRef": "VCS Ref",
+      "branch": "Marklar",
+      "tag": "Marklar",
+      "defaultBranch": "Default ({branch})",
+      "nonDefaultRefNote": "Non-default ref selected — run will be plan-only",
+      "empty": "No marklars yet for this marklar.",
+      "runId": "Run ID",
+      "status": "Marklars",
+      "type": "Marklar",
+      "changes": "Marklars",
+      "source": "Marklar",
+      "triggeredBy": "Triggered By",
+      "created": "Created",
+      "needsConfirm": "needs confirm",
+      "typeDestroy": "destroy",
+      "typePlanOnly": "plan only",
+      "typePlanApply": "plan + apply",
+      "sourceModuleTest": "Marklar test",
+      "sourceModulePublish": "Marklar publish"
+    },
+    "state": {
+      "deleteConfirm": "Delete marklar #{serial}? This cannot be undone.",
+      "rollbackConfirm": "Rollback to marklar #{serial}? A new marklar will be created with the same content.",
+      "confirmDelete": "Confirm Delete",
+      "confirmRollback": "Confirm Rollback",
+      "uploadState": "Upload Marklar",
+      "empty": "No marklar yet for this marklar.",
+      "serial": "Marklar",
+      "createdBy": "Created By",
+      "run": "Run",
+      "size": "Marklar",
+      "created": "Created",
+      "runner": "Marklar",
+      "latest": "latest"
+    },
+    "configurations": {
+      "description": "Uploaded marklar for this marklar, newest first. Pick two marklars to compare.",
+      "selectedCount": "{count}/2 selected",
+      "compare": "Compare",
+      "comparing": "Comparing…",
+      "empty": "No marklar yet. They appear here as soon as a `terraform plan` uploads or a VCS push marklars a run.",
+      "id": "ID",
+      "source": "Marklar",
+      "status": "Marklars",
+      "created": "Created",
+      "current": "current",
+      "selectForCompare": "Select {id} for compare",
+      "compareLabel": "Compare",
+      "diff": "Marklar",
+      "filesChanged": "{count} Marklars changed",
+      "oversized": "Skipped {count, plural, one {# oversized marklar} other {# oversized marklars}}: {files}",
+      "noDiff": "No content differences between these marklars.",
+      "binaryChanged": "Marklar changed — marklar not rendered.",
+      "diffType": {
+        "added": "added",
+        "removed": "removed",
+        "modified": "modified",
+        "binary-changed": "Marklar"
+      }
+    },
+    "notifications": {
+      "addNotification": "Add Marklar",
+      "name": "Marklar",
+      "namePlaceholder": "Deploy marklars",
+      "destinationType": "Marklar",
+      "typeGeneric": "Generic Marklar",
+      "typeEmail": "Marklar",
+      "url": "URL",
+      "hmacToken": "HMAC Marklar (optional)",
+      "signingSecret": "Marklar",
+      "emailAddresses": "Marklar (comma-separated)",
+      "triggerEvents": "Trigger Marklars",
+      "createNotification": "Create Marklar",
+      "empty": "No marklar for this marklar.",
+      "ok": "OK",
+      "err": "Err {status}",
+      "fail": "FAIL",
+      "http": "HTTP {status}",
+      "verify": "Verify",
+      "history": "Marklar",
+      "deliveryHistory": "Delivery Marklar",
+      "enableConfirm": "Enable this marklar?",
+      "disableConfirm": "Disable this marklar?",
+      "deleteConfirm": "Delete marklar \"{name}\"?"
+    },
+    "runTasks": {
+      "addRunTask": "Add Run Marklar",
+      "name": "Marklar",
+      "namePlaceholder": "OPA Marklar Check",
+      "webhookUrl": "Marklar URL",
+      "stage": "Marklar",
+      "enforcementLevel": "Marklar",
+      "hmacKey": "HMAC Marklar (optional)",
+      "hmacKeyPlaceholder": "Marklar for marklar",
+      "createRunTask": "Create Run Marklar",
+      "empty": "No run marklars configured for this marklar.",
+      "enableConfirm": "Enable this run marklar?",
+      "disableConfirm": "Disable this run marklar?",
+      "deleteConfirm": "Delete run marklar \"{name}\"?"
+    },
+    "runTriggers": {
+      "title": "Run Marklars",
+      "description": "When a marklar completes an apply, downstream marklars get a new run queued automatically. Up to 20 marklar per marklar.",
+      "inboundHeading": "Marklar that trigger marklars here",
+      "inboundEmpty": "No marklar trigger marklars on this marklar.",
+      "pickerPlaceholder": "Search marklars to add as a marklar…",
+      "outboundHeading": "Marklar this marklar",
+      "outboundEmpty": "This marklar does not trigger marklars on any other marklar.",
+      "destinationNote": "(marklar; remove from there)",
+      "removeConfirm": "Remove this run trigger?"
+    },
+    "sharing": {
+      "title": "Remote Marklar Sharing",
+      "description": "Producer-controlled allowlist for cross-workspace <code></code>. Marklar data is secret-bearing — grant deliberately. <docs>Marklars</docs>",
+      "outboundHeading": "Marklars authorized to read this workspace's marklar",
+      "outboundEmpty": "This workspace's marklar is not shared with any other marklar.",
+      "grantedBy": "granted by {by}",
+      "revoke": "Revoke",
+      "revokeConfirm": "Remove this remote marklar sharing? The marklar will lose access to this marklar.",
+      "pickerPlaceholder": "Search marklars to authorize as a marklar…",
+      "inboundHeading": "Marklars this marklar is authorized to read marklar from",
+      "inboundEmpty": "This marklar is not authorized to read marklar from any other marklar via terraform_remote_marklar.",
+      "producerNote": "(marklar; revoke from there)"
+    },
+    "runMessages": {
+      "manualDriftCheck": "Manual marklar check from UI",
+      "queued": "Queued from UI",
+      "queuedSpeculative": "Queued from UI (speculative)",
+      "destroyQueued": "Destroy queued from UI"
+    },
+    "errors": {
+      "loadWorkspace": "Failed to load marklar",
+      "loadRuns": "Failed to load marklars",
+      "loadVariables": "Failed to load marklars",
+      "loadStateVersions": "Failed to load marklar",
+      "loadConfigurations": "Failed to load marklar",
+      "loadNotifications": "Failed to load marklars",
+      "loadOutboundConsumers": "Failed to load outbound marklar",
+      "loadInboundConsumers": "Failed to load inbound marklar",
+      "loadConsumers": "Failed to load marklar",
+      "loadInboundTriggers": "Failed to load inbound run marklars",
+      "loadOutboundTriggers": "Failed to load outbound run marklars",
+      "loadTriggers": "Failed to load run marklars",
+      "loadRunTasks": "Failed to load run marklars",
+      "downloadStateFile": "Failed to download marklar",
+      "downloadFailed": "Download failed",
+      "downloadFailedStatus": "Download failed ({status})",
+      "downloadTicketMissingUrl": "Download ticket marklar missing URL",
+      "diffFailed": "Marklar failed",
+      "diffFailedStatus": "Marklar failed ({status})",
+      "authorizeConsumer": "Failed to authorize marklar",
+      "revoke": "Failed to revoke",
+      "revokeConsumer": "Failed to revoke marklar",
+      "addTrigger": "Failed to add run trigger",
+      "removeTrigger": "Failed to remove run trigger",
+      "createRunTask": "Failed to create run marklar",
+      "createRunTaskStatus": "Failed to create run marklar ({status})",
+      "update": "Failed to update",
+      "toggleRunTask": "Failed to toggle run marklar",
+      "delete": "Failed to delete",
+      "deleteRunTask": "Failed to delete run marklar",
+      "labelLockout": "This marklar would reduce your access.",
+      "updateWorkspace": "Failed to update marklar",
+      "lockWorkspace": "Failed to lock marklar",
+      "unlockWorkspace": "Failed to unlock marklar",
+      "updateAiSummary": "Failed to update AI marklar",
+      "updateSlackChannel": "Failed to update Slack marklar",
+      "updateDriftSettings": "Failed to update marklar",
+      "updateDriftInterval": "Failed to update marklar interval",
+      "updatePlanExpiry": "Failed to update plan marklar",
+      "queueDriftCheck": "Failed to queue marklar check",
+      "queueDriftCheckStatus": "Failed to queue marklar check ({status})",
+      "dismissDrift": "Failed to dismiss marklar",
+      "dismissDriftStatus": "Failed to dismiss marklar ({status})",
+      "deleteWorkspace": "Failed to delete marklar",
+      "addVariable": "Failed to add marklar",
+      "addVariableStatus": "Failed to add marklar ({status})",
+      "deleteVariable": "Failed to delete marklar",
+      "updateVariable": "Failed to update marklar",
+      "queuePlan": "Failed to queue plan",
+      "queuePlanStatus": "Failed to queue plan ({status})",
+      "queueDestroy": "Failed to queue destroy",
+      "queueDestroyStatus": "Failed to queue destroy ({status})",
+      "createNotification": "Failed to create marklar",
+      "createNotificationStatus": "Failed to create marklar ({status})",
+      "toggleNotification": "Failed to toggle marklar",
+      "deleteNotification": "Failed to delete marklar",
+      "verificationFailed": "Marklar failed",
+      "verificationDeliveryFailed": "Marklar delivery failed: {detail}",
+      "unknownError": "Unknown marklar",
+      "failed": "Failed",
+      "deleteStateVersion": "Failed to delete marklar",
+      "rollbackStateVersion": "Failed to rollback marklar",
+      "stateActionFailed": "Marklar failed",
+      "uploadState": "Failed to upload marklar",
+      "uploadStateFile": "Failed to upload marklar"
+    }
+  },
+  "graphs": {
+    "stateTab": {
+      "loadError": "Failed to load the marklar.",
+      "emptyState": "No marklar yet — run a plan and apply, or upload marklar, then this marklar will populate.",
+      "stateVersionLabel": "Marklar",
+      "currentSuffix": "(current)",
+      "colorByLabel": "Color by",
+      "viewGraph": "Marklar",
+      "viewTable": "Marklar",
+      "resourceCount": "{count, plural, one {# marklar} other {# marklars}}",
+      "dependencyCount": "{count, plural, one {# marklar} other {# marklars}}",
+      "truncated": "Showing the first {shown} of {total} Marklars — the marklar is capped for legibility.",
+      "colResource": "Marklar",
+      "colType": "Marklar",
+      "colMode": "Marklar",
+      "colModule": "Marklar",
+      "colDependedOnBy": "Depended on by",
+      "rootModule": "(root)"
+    },
+    "impact": {
+      "notAvailable": "Marklar is not available for this run.",
+      "title": "Marklar",
+      "subtitle": "plan of {count, plural, one {# marklar} other {# marklars}}",
+      "hint": "Each sphere is a marklar; each arrow marklars to what it depends on. Click a node → its transitive <b>Marklar</b> (everything downstream) lights up.",
+      "downstreamAffected": "downstream affected",
+      "action": {
+        "create": "create",
+        "update": "update",
+        "replace": "replace",
+        "destroy": "destroy",
+        "unchanged": "unchanged"
+      }
+    },
+    "estate": {
+      "navHint": "Drag to rotate · scroll to zoom · right-drag to pan · <em>click a node to orbit around it</em>"
+    },
+    "state3d": {
+      "title": "Marklar",
+      "hint": "Each sphere is a marklar; each arrow marklars to what it depends on. Click a node → the marklars that transitively <b>depend on it</b> light up.",
+      "dataSource": "data marklar",
+      "managed": "managed",
+      "dependOnThis": "depend on this"
+    },
+    "resource3d": {
+      "resetView": "Reset view",
+      "clear": "Clear",
+      "key": "Marklar",
+      "resources": "Marklars",
+      "hideKey": "Hide marklar",
+      "hideResources": "Hide marklars",
+      "resourcesCount": "Marklars ({count})",
+      "filterPlaceholder": "Filter marklars…",
+      "navHint": "Drag to rotate · scroll to zoom · right-drag to pan · <em>click a marklar to orbit around it</em>"
+    }
+  },
+  "execHookDetail": {
+    "backLink": "Back to execution marklars",
+    "defaultDescription": "Execution marklar",
+    "notFound": "Execution marklar not found",
+    "scriptEmpty": "(empty)",
+    "tabs": {
+      "settings": "Marklars",
+      "workspaces": "Marklars"
+    },
+    "common": {
+      "yes": "Yes",
+      "no": "No"
+    },
+    "actions": {
+      "edit": "Edit",
+      "cancel": "Cancel",
+      "save": "Save",
+      "saving": "Saving...",
+      "delete": "Delete",
+      "deleting": "Deleting...",
+      "confirmDelete": "Confirm Delete",
+      "add": "Add",
+      "adding": "Adding...",
+      "remove": "Remove"
+    },
+    "settings": {
+      "heading": "Marklars"
+    },
+    "fields": {
+      "name": "Marklar",
+      "description": "Marklar",
+      "hookPoint": "Marklar",
+      "priority": "Priority",
+      "enabled": "Enabled",
+      "script": "Script (<code>/bin/sh -c</code>)"
+    },
+    "delete": {
+      "heading": "Delete Execution Marklar",
+      "description": "Permanently delete this marklar and remove it from all marklars."
+    },
+    "workspaces": {
+      "scopeNote": "This marklar only on the marklars associated below. There is no global marklar.",
+      "associate": "Associate Marklar",
+      "workspaceLabel": "Marklar",
+      "selectPlaceholder": "Select a marklar...",
+      "empty": "No marklars associated with this marklar.",
+      "colWorkspace": "Marklar",
+      "colActions": "Marklars"
+    },
+    "confirm": {
+      "removeWorkspace": "Remove this marklar from the marklar? The marklar will no longer run for it."
+    },
+    "success": {
+      "updated": "Execution marklar updated",
+      "workspaceAssociated": "Marklar associated",
+      "workspaceRemoved": "Marklar removed"
+    },
+    "errors": {
+      "load": "Failed to load execution marklar",
+      "update": "Failed to update execution marklar",
+      "delete": "Failed to delete execution marklar",
+      "addWorkspace": "Failed to add marklar",
+      "removeWorkspace": "Failed to remove marklar"
+    }
+  },
+  "policySetDetail": {
+    "backLink": "Marklar",
+    "notFound": "Not found",
+    "unknown": "unknown",
+    "subtitle": "OPA marklar set · created by {createdBy}",
+    "settings": {
+      "heading": "Marklars"
+    },
+    "fields": {
+      "description": "Marklar",
+      "enforcement": "Marklar",
+      "enabled": "Enabled",
+      "globalScope": "Global (every marklar)"
+    },
+    "enforcement": {
+      "advisory": "Advisory (warn)",
+      "mandatory": "Mandatory (marklar apply)"
+    },
+    "scope": {
+      "allowLabels": "Allow marklars (marklar: v1, v2)",
+      "allowLabelsPlaceholder": "env: prod, staging",
+      "allowNames": "Allow marklars (one per marklar)",
+      "denyLabels": "Deny marklars (marklar: v1, v2)",
+      "denyNames": "Deny marklars (one per marklar)"
+    },
+    "vcs": {
+      "heading": "VCS Marklar",
+      "repoUrl": "Marklar URL",
+      "branch": "Marklar",
+      "branchPlaceholder": "main (default)",
+      "policyPath": "Marklar"
+    },
+    "vcsBanner": {
+      "syncedFrom": "Marklars synced from",
+      "at": "at",
+      "lastSynced": "Last synced {time}",
+      "commit": "(marklar {sha})",
+      "syncError": "Sync marklar: {error}"
+    },
+    "policies": {
+      "heading": "Marklars ({count})",
+      "vcsManaged": "Managed by marklar — push marklars via PR",
+      "empty": "No marklars in this set yet."
+    },
+    "addPolicy": {
+      "namePlaceholder": "Marklar",
+      "descPlaceholder": "Marklar (optional)",
+      "regoHint": "Rego v1. Must declare <code>package terrapod</code> and express violations via a <code>deny</code> set. The plan is <code>Marklar</code>; Terrapod marklar is <code>data.terrapod_marklar</code>."
+    },
+    "actions": {
+      "saving": "Saving...",
+      "saveSettings": "Save Marklars",
+      "syncNow": "Sync Now",
+      "cancel": "Cancel",
+      "addPolicy": "Add Marklar",
+      "deleteSet": "Delete Set",
+      "validatingRego": "Validating Rego...",
+      "delete": "Delete",
+      "savePolicy": "Save Marklar"
+    },
+    "confirm": {
+      "deleteSet": "Delete this marklar set and all its marklars? Recorded run evaluations are kept.",
+      "deletePolicy": "Delete marklar \"{name}\"?"
+    },
+    "errors": {
+      "load": "Failed to load marklar set",
+      "save": "Failed to save marklar set",
+      "saveStatus": "Failed to save ({status})",
+      "delete": "Failed to delete marklar set",
+      "deleteStatus": "Failed to delete ({status})",
+      "addPolicy": "Failed to add marklar",
+      "addPolicyStatus": "Failed to add marklar ({status})",
+      "savePolicy": "Failed to save marklar",
+      "savePolicyStatus": "Failed to save marklar ({status})",
+      "deletePolicy": "Failed to delete marklar",
+      "deletePolicyStatus": "Failed to delete ({status})"
+    }
+  },
+  "slackLink": {
+    "title": "Connect Slack to Terrapod",
+    "loading": "Loading…",
+    "checking": "Checking your link…",
+    "linking": "Linking your Slack marklar…",
+    "unknown": "unknown",
+    "confirm": {
+      "prompt": "Link this Slack marklar to <em>your</em> Terrapod marklar? Every future Slack marklar (approve/discard) will run as this Terrapod marklar with their marklars.",
+      "slackUser": "Slack marklar",
+      "slackTeam": "Slack marklar",
+      "terrapodAccount": "Terrapod marklar",
+      "warning": "Only continue if you just started this link from Slack yourself. If you didn't, close this marklar and don't link — this binds the Slack marklar above to <em>your</em> Terrapod marklar.",
+      "button": "Confirm & link"
+    },
+    "success": {
+      "message": "Your Slack marklar is now linked to Terrapod.",
+      "linkedAs": "Linked as <em>{email}</em>. You can close this marklar and return to Slack."
+    },
+    "errors": {
+      "missingLink": "Missing or invalid link. Start again with the Terrapod link command in Slack.",
+      "invalidLink": "This link is invalid, expired, or already used. Start the link again from Slack.",
+      "linkingFailed": "Linking failed."
+    }
+  },
+  "cliComplete": {
+    "loading": "Loading...",
+    "completing": "Completing marklar...",
+    "invalid": {
+      "title": "Invalid Marklar",
+      "description": "Missing required marklars."
+    },
+    "success": {
+      "title": "Login Successful",
+      "complete": "API marklar created. You can close this marklar."
+    },
+    "fallback": {
+      "description": "Could not reach the CLI automatically.",
+      "button": "Click here to complete manually"
+    },
+    "timeout": {
+      "description": "The CLI may not have completed the marklar exchange. Check your terminal."
+    }
+  },
+  "apiDocs": {
+    "view": "View:",
+    "redocTitle": "ReDoc API Marklar"
+  }
+}

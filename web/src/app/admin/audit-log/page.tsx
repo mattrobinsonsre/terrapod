@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import NavBar from '@/components/nav-bar'
 import { PageHeader } from '@/components/page-header'
 import { LoadingSpinner } from '@/components/loading-spinner'
@@ -44,6 +45,7 @@ function statusColor(code: number): string {
 }
 
 export default function AuditLogPage() {
+  const t = useTranslations('adminAuditLog')
   const router = useRouter()
   const [entries, setEntries] = useState<AuditEntry[]>([])
   const [loading, setLoading] = useState(true)
@@ -114,12 +116,12 @@ export default function AuditLogPage() {
       if (until) params.set('filter[until]', new Date(until).toISOString())
 
       const res = await apiFetch(`/api/terrapod/v1/admin/audit-log?${params.toString()}`)
-      if (!res.ok) throw new Error('Failed to load audit log')
+      if (!res.ok) throw new Error(t('errors.load'))
       const data = await res.json()
       setEntries(data.data || [])
       setPagination(data.meta?.pagination || null)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load audit log')
+      setError(err instanceof Error ? err.message : t('errors.load'))
     } finally {
       setLoading(false)
     }
@@ -150,8 +152,8 @@ export default function AuditLogPage() {
       <NavBar />
       <main className="px-4 sm:px-6 lg:px-8 py-8 max-w-7xl mx-auto">
         <PageHeader
-          title="Audit Log"
-          description="Immutable log of all API requests"
+          title={t('title')}
+          description={t('description')}
         />
 
         {error && <ErrorBanner message={error} />}
@@ -160,36 +162,36 @@ export default function AuditLogPage() {
         <form onSubmit={handleApplyFilters} className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-4 mb-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
             <div>
-              <label htmlFor="f-actor" className="block text-xs font-medium text-slate-400 mb-1">Actor Email</label>
+              <label htmlFor="f-actor" className="block text-xs font-medium text-slate-400 mb-1">{t('filters.actorEmail')}</label>
               <input
                 id="f-actor"
                 type="text"
                 value={filterActor}
                 onChange={(e) => setFilterActor(e.target.value)}
-                placeholder="user@example.com"
+                placeholder={t('filters.actorPlaceholder')}
                 className="w-full px-3 py-1.5 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
               />
             </div>
             <div>
-              <label htmlFor="f-resource" className="block text-xs font-medium text-slate-400 mb-1">Resource Type</label>
+              <label htmlFor="f-resource" className="block text-xs font-medium text-slate-400 mb-1">{t('filters.resourceType')}</label>
               <input
                 id="f-resource"
                 type="text"
                 value={filterResourceType}
                 onChange={(e) => setFilterResourceType(e.target.value)}
-                placeholder="workspaces"
+                placeholder={t('filters.resourceTypePlaceholder')}
                 className="w-full px-3 py-1.5 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
               />
             </div>
             <div>
-              <label htmlFor="f-action" className="block text-xs font-medium text-slate-400 mb-1">Method</label>
+              <label htmlFor="f-action" className="block text-xs font-medium text-slate-400 mb-1">{t('filters.method')}</label>
               <select
                 id="f-action"
                 value={filterAction}
                 onChange={(e) => setFilterAction(e.target.value)}
                 className="w-full px-3 py-1.5 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
               >
-                <option value="">All</option>
+                <option value="">{t('filters.methodAll')}</option>
                 <option value="GET">GET</option>
                 <option value="POST">POST</option>
                 <option value="PATCH">PATCH</option>
@@ -198,7 +200,7 @@ export default function AuditLogPage() {
               </select>
             </div>
             <div>
-              <label htmlFor="f-since" className="block text-xs font-medium text-slate-400 mb-1">Since</label>
+              <label htmlFor="f-since" className="block text-xs font-medium text-slate-400 mb-1">{t('filters.since')}</label>
               <input
                 id="f-since"
                 type="datetime-local"
@@ -208,7 +210,7 @@ export default function AuditLogPage() {
               />
             </div>
             <div>
-              <label htmlFor="f-until" className="block text-xs font-medium text-slate-400 mb-1">Until</label>
+              <label htmlFor="f-until" className="block text-xs font-medium text-slate-400 mb-1">{t('filters.until')}</label>
               <input
                 id="f-until"
                 type="datetime-local"
@@ -224,13 +226,13 @@ export default function AuditLogPage() {
               onClick={handleClearFilters}
               className="px-3 py-1.5 text-sm text-slate-400 hover:text-slate-200 transition-colors"
             >
-              Clear
+              {t('filters.clear')}
             </button>
             <button
               type="submit"
               className="px-4 py-1.5 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors"
             >
-              Apply Filters
+              {t('filters.apply')}
             </button>
           </div>
         </form>
@@ -238,7 +240,7 @@ export default function AuditLogPage() {
         {loading ? (
           <LoadingSpinner />
         ) : entries.length === 0 ? (
-          <EmptyState message="No audit log entries found." />
+          <EmptyState message={t('empty')} />
         ) : (
           <>
             <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-hidden">
@@ -246,13 +248,13 @@ export default function AuditLogPage() {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-slate-700/50">
-                      <SortableHeader label="Timestamp" sortKey="timestamp" sortState={sortState} onSort={toggleSort} />
-                      <SortableHeader label="Actor" sortKey="actor" sortState={sortState} onSort={toggleSort} />
-                      <SortableHeader label="Action" sortKey="action" sortState={sortState} onSort={toggleSort} />
-                      <SortableHeader label="Resource Type" sortKey="resourceType" sortState={sortState} onSort={toggleSort} />
-                      <SortableHeader label="Resource ID" sortKey="resourceId" sortState={sortState} onSort={toggleSort} className="hidden lg:table-cell" />
-                      <SortableHeader label="Status" sortKey="status" sortState={sortState} onSort={toggleSort} />
-                      <SortableHeader label="Duration" sortKey="duration" sortState={sortState} onSort={toggleSort} className="hidden md:table-cell" />
+                      <SortableHeader label={t('columns.timestamp')} sortKey="timestamp" sortState={sortState} onSort={toggleSort} />
+                      <SortableHeader label={t('columns.actor')} sortKey="actor" sortState={sortState} onSort={toggleSort} />
+                      <SortableHeader label={t('columns.action')} sortKey="action" sortState={sortState} onSort={toggleSort} />
+                      <SortableHeader label={t('columns.resourceType')} sortKey="resourceType" sortState={sortState} onSort={toggleSort} />
+                      <SortableHeader label={t('columns.resourceId')} sortKey="resourceId" sortState={sortState} onSort={toggleSort} className="hidden lg:table-cell" />
+                      <SortableHeader label={t('columns.status')} sortKey="status" sortState={sortState} onSort={toggleSort} />
+                      <SortableHeader label={t('columns.duration')} sortKey="duration" sortState={sortState} onSort={toggleSort} className="hidden md:table-cell" />
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-700/30">
@@ -295,7 +297,11 @@ export default function AuditLogPage() {
             {pagination && pagination['total-pages'] > 1 && (
               <div className="flex items-center justify-between mt-4">
                 <span className="text-sm text-slate-400">
-                  Page {pagination['current-page']} of {pagination['total-pages']} ({pagination['total-count']} entries)
+                  {t('pagination.summary', {
+                    current: pagination['current-page'],
+                    total: pagination['total-pages'],
+                    count: pagination['total-count'],
+                  })}
                 </span>
                 <div className="flex gap-2">
                   <button
@@ -303,14 +309,14 @@ export default function AuditLogPage() {
                     disabled={page <= 1}
                     className="px-3 py-1.5 rounded-lg text-sm font-medium bg-slate-700 hover:bg-slate-600 disabled:bg-slate-800 disabled:text-slate-600 text-slate-200 transition-colors"
                   >
-                    Previous
+                    {t('pagination.previous')}
                   </button>
                   <button
                     onClick={() => setPage(page + 1)}
                     disabled={page >= pagination['total-pages']}
                     className="px-3 py-1.5 rounded-lg text-sm font-medium bg-slate-700 hover:bg-slate-600 disabled:bg-slate-800 disabled:text-slate-600 text-slate-200 transition-colors"
                   >
-                    Next
+                    {t('pagination.next')}
                   </button>
                 </div>
               </div>

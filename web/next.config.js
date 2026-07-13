@@ -1,5 +1,12 @@
 /** @type {import('next').NextConfig} */
 
+// next-intl (#767) — the plugin points at the per-request locale/message
+// resolver (src/i18n/request.ts). We use next-intl WITHOUT i18n routing (no
+// `/[locale]/` URL segment): the locale comes from a cookie, so every existing
+// route + BFF path is untouched.
+const createNextIntlPlugin = require('next-intl/plugin')
+const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts')
+
 // HSTS (Strict-Transport-Security). Tells browsers to remember "always
 // use HTTPS for THIS hostname" for max-age, so subsequent visits to
 // http://hostname auto-upgrade to https:// without trying port 80.
@@ -62,4 +69,4 @@ const nextConfig = {
   },
 }
 
-module.exports = nextConfig
+module.exports = withNextIntl(nextConfig)

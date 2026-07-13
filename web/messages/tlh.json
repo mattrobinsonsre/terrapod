@@ -1,0 +1,2621 @@
+{
+  "nav": {
+    "workspaces": "Qumwo'mey",
+    "estate": "Sep",
+    "registry": "nughmey teywI'",
+    "modules": "Segh",
+    "providers": "nobwI'pu'",
+    "catalog": "tetlh",
+    "agentPools": "Duy bIQ'a'mey",
+    "admin": "che'wI'",
+    "users": "lo'wI'pu'",
+    "roles": "patlhmey",
+    "vcsConnections": "VCS rarmey",
+    "variableSets": "choHlaH Segh",
+    "autodiscovery": "tlhoS tu'",
+    "bulkUpdate": "tlhoy' choH",
+    "executionHooks": "vangmeH ghItlhmey",
+    "policySets": "chut Segh",
+    "providerTemplates": "nobwI' De'wI'",
+    "catalogAdmin": "tetlh che'wI'",
+    "cache": "nge'wI'",
+    "auditLog": "nItebHa' teywI'",
+    "help": "QaH",
+    "apiReference": "API ngoDHom",
+    "docs": "ghItlhmey",
+    "account": "lo'wI' De'",
+    "apiTokens": "API tokenmey",
+    "sessions": "jojmey",
+    "logOut": "mej",
+    "menu": "tetlh",
+    "openMenu": "tetlh poSmoH",
+    "openAccountMenu": "lo'wI' tetlh poSmoH",
+    "closeMenu": "tetlh SoQmoH"
+  },
+  "switcher": {
+    "language": "Hol",
+    "changeLanguage": "Hol choH"
+  },
+  "workspaces": {
+    "title": "Qumwo'mey",
+    "description": "Terraform Qumwo'mey, Dotlh, vangmey je Sar",
+    "new": "Qumwo' chu'",
+    "cancel": "qIl",
+    "create": "Qumwo' chenmoH",
+    "creating": "chenmoHtaH…",
+    "loadFailed": "Qumwo'mey ghelmeH lujpu'",
+    "createFailed": "Qumwo' chenmoHmeH lujpu'",
+    "form": {
+      "name": "pong",
+      "namePattern": "ghItlh mI' HIvje' je neH. ghItlh mI' joq taghnIS.",
+      "namePlaceholder": "my-workspace",
+      "executionMode": "vangmeH mIw",
+      "local": "pa'Daq",
+      "agent": "Duy",
+      "executionBackend": "vangmeH tool",
+      "version": "mI'mey",
+      "versionTitle": "X.Y joq X.Y.Z mI' (Da 1.11 joq 1.11.5)",
+      "versionPlaceholder": "Da 1.11 joq 1.11.5",
+      "cpuRequest": "CPU tlhob",
+      "cpuTitle": "Kubernetes CPU tIq: naQ (1, 2) joq millicore (500m, 100m)",
+      "cpuHint": "Da 1, 0.5, 500m",
+      "memoryRequest": "qawHaqllj tlhob",
+      "memoryTitle": "Kubernetes qawHaq tIq: byte (1000) joq ghItlh (512Mi, 2Gi, 1Ti)",
+      "memoryHint": "Da 2Gi, 512Mi, 1Ti",
+      "agentPool": "Duy bIQ'a'",
+      "none": "pagh",
+      "autoApply": "tlhoS lo'",
+      "enabled": "chu'lu'pu'",
+      "workingDirectory": "vum tetlh",
+      "workingDirectoryPlaceholder": "Da environments/dev",
+      "workingDirectoryHint": ".tf teywI'mey ghajbogh repo tetlhHom",
+      "vcsConnection": "VCS rar",
+      "vcsRepoUrl": "VCS repo URL",
+      "vcsRepoUrlTitle": "HTTP joq HTTPS URL taHnIS",
+      "vcsRepoUrlPlaceholder": "https://github.com/org/repo",
+      "vcsBranch": "VCS paQ",
+      "vcsBranchPlaceholder": "main (motlh)"
+    },
+    "stats": {
+      "total": "naQ",
+      "health": "pIvlaw'",
+      "locked": "ngaQ",
+      "clearAllFilters": "Hoch DarSeH teq",
+      "clearHealthFilter": "pIvlaw' DarSeH teq",
+      "filterHealth": "pIvHa' Qumwo'meyDaq DarSeH",
+      "clearLockedFilter": "ngaQ DarSeH teq",
+      "filterLocked": "ngaQbogh Qumwo'meyDaq DarSeH"
+    },
+    "filter": {
+      "placeholder": "pong, per, joq Dotlh DarSeH — Da \"eu1\", \"env:prod\", \"status:errored\"",
+      "ariaLabel": "Qumwo'mey DarSeH",
+      "clear": "teq",
+      "status": "Dotlh",
+      "label": "per",
+      "back": "chegh",
+      "valueCount": "{count, plural, one {# nap} other {# napmey}}",
+      "removeTerm": "mu' vam teq",
+      "showing": "{total} ghUved {filtered} 'angtaH",
+      "termName": "pong: {value}",
+      "termStatus": "Dotlh: {value}",
+      "termLabelAny": "{key}: (vay')",
+      "termLabel": "{key}: {value}",
+      "hintStatus": "Dotlh",
+      "hintHealth": "pIvlaw'",
+      "hintLabel": "per",
+      "hintLabelKey": "per ngaQHa'wI'",
+      "hintName": "pong"
+    },
+    "row": {
+      "removeLabelFilter": "DarSeHvo' teqmeH qIp",
+      "addLabelFilter": "per vam lo'meH DarSeH"
+    },
+    "table": {
+      "name": "pong",
+      "mode": "mIw",
+      "pool": "bIQ'a'",
+      "resources": "Sep",
+      "status": "Dotlh",
+      "created": "chenmoHlu'pu'",
+      "resourcesValue": "{cpu} CPU / {memory}"
+    },
+    "empty": {
+      "none": "Qumwo' tu'be'lu'. wa' chenmoH 'ej taghlaH.",
+      "noMatch": "DarSeHvam rurbogh Qumwo' tu'be'lu'."
+    }
+  },
+  "status": {
+    "state-diverged": "Dotlh chevlu'",
+    "vcs-error": "VCS Qagh",
+    "drifted": "tlhotlhpu'",
+    "errored": "Qaghpu'",
+    "needs-confirm": "tobnIS",
+    "planning": "nabtaH",
+    "applying": "lo'taH",
+    "canceling": "qIltaH",
+    "confirmed": "tobpu'",
+    "queued": "tlhamDaq",
+    "pending": "loStaH",
+    "applied": "lo'pu'",
+    "planned": "nabpu'",
+    "canceled": "qIlpu'",
+    "discarded": "woDlu'pu'",
+    "pendingDeletion": "Qaw' loStaH",
+    "archived": "polpu'"
+  },
+  "auth": {
+    "loading": "gheltaH...",
+    "subtitle": "nISwI' Da'ochmeH 'el",
+    "subtitleCli": "CLI Dachaw'meH 'el",
+    "emailLabel": "QIn Sum",
+    "passwordLabel": "mu'qaD",
+    "signIn": "'el",
+    "signingIn": "'eltaH...",
+    "signInWith": "{provider} lo'taHvIS 'el",
+    "or": "joq",
+    "noProviders": "numtaH nobwI' tu'be'lu'",
+    "completingSignIn": "'el rInmoHtaH...",
+    "callbackFailedTitle": "numtaH lujpu'",
+    "tryAgain": "nID je",
+    "errors": {
+      "loadProviders": "nobwI'pu' ghelmeH lujpu'",
+      "authenticationFailed": "numtaH lujpu' ({status})",
+      "tokenExchangeFailed": "token je'meH lujpu' ({status})",
+      "loginFailed": "'el lujpu'",
+      "startLoginFailed": "'el taghmeH lujpu'",
+      "missingCodeOrState": "chu'wI' De' joq Dotlh Hutlh",
+      "stateMismatch": "Dotlh rurHa' — CSRF HIvlaw'",
+      "missingVerifier": "PKCE tobwI' Hutlh — 'el nID je qatlh'a'"
+    }
+  },
+  "estate": {
+    "title": "Sep 'aqroS",
+    "description": "Qumwo'mey Hoch legh'a'bogh je Seghmey lo'bogh, run-trigger, remote-state, Segh rarmey je rarlu'. Sep DaghajmeH tlhegh vay' tlhegh — pat per mIw ra'be'.",
+    "errors": {
+      "load": "Sep chart ghelmeH lujpu'."
+    },
+    "groupBy": {
+      "label": "tlhegh"
+    },
+    "view": {
+      "graph": "chart",
+      "table": "tetlh"
+    },
+    "counts": {
+      "workspaces": "{count, plural, one {# Qumwo''} other {# Qumwo''mey}}",
+      "modules": "{count, plural, one {# Segh} other {# Seghmey}}",
+      "dependencies": "{count, plural, one {# lIntagh} other {# lIntaghmey}}"
+    },
+    "legend": {
+      "registryModule": "nughmey teywI' Segh"
+    },
+    "detail": {
+      "moduleImpact": "{count, plural, one {Qumwo' lo' vam — DunmoHDI' nab je} other {Qumwo'mey lo' vam — DunmoHDI' Hoch nab je}}",
+      "dependOnThis": "{count, plural, one {vam lIntagh} other {vam lIntagh}}"
+    },
+    "table": {
+      "workspaces": {
+        "heading": "Qumwo'mey",
+        "col": {
+          "workspace": "Qumwo'",
+          "group": "tlhegh",
+          "agentPool": "Duy bIQ'a'",
+          "dependedOnBy": "lIntagh ghaj",
+          "modulesUsed": "Seghmey lo'lu'"
+        },
+        "noModules": "—"
+      },
+      "modules": {
+        "heading": "Seghmey",
+        "col": {
+          "module": "Segh",
+          "usedBy": "lo'wI' (Qumwo'mey)"
+        }
+      }
+    }
+  },
+  "labels": {
+    "title": "permey",
+    "description": "Qumwo'mey, Duy bIQ'a'mey, nughmey teywI' Seghmey, nughmey teywI' nobwI'pu' je lo'lu'bogh permey yIlegh. laDmeH neH — Doch Hoch chenmoHmeH ghItlhDaq permey choHlu'.",
+    "none": "pagh.",
+    "emptyKeys": "per lo'lu'be'. Qumwo', Duy bIQ'a', nughmey teywI' Segh, joq nobwI' per 'ej naDev Doch tlheghmeH tagh.",
+    "emptyValues": "\"{key}\" napmey Hutlh. pagh Doch laDlaHbogh per vam ghaj, joq legh QaSpu' teqlu'.",
+    "loadKeysFailed": "permey ghelmeH lujpu' ({status})",
+    "loadValuesFailed": "{key} napmey ghelmeH lujpu' ({status})",
+    "loadEntitiesFailed": "Dochmey ghelmeH lujpu' ({status})",
+    "columns": {
+      "labelKey": "per ngaQHa'wI'",
+      "distinctValues": "pImbogh napmey",
+      "value": "nap",
+      "total": "naQ"
+    },
+    "entity": {
+      "workspaces": "Qumwo'mey",
+      "agentPools": "Duy bIQ'a'mey",
+      "modules": "Seghmey",
+      "providers": "nobwI'pu'"
+    },
+    "deprecated": {
+      "badge": "lo'Ha'lu' 'ej QaHbe'lu'.",
+      "body": "permey laDwI' nav 'oHbe' 'ej vorgh teqlu'. <workspacesLink>Qumwo'mey</workspacesLink> navvo' per DarSeH. nav vam DalulmeH, <issueLink>Qagh yISum</issueLink>."
+    }
+  },
+  "settings": {
+    "tokens": {
+      "title": "API tokenmey",
+      "description": "CLI je pat vangmeH numtaH tokenmey vu'",
+      "descriptionAll": "Hoch lo'wI'pu' Hoch tokenmey",
+      "myTokens": "tokenwIj",
+      "allTokens": "Hoch tokenmey",
+      "createToken": "token chenmoH",
+      "cancel": "qIl",
+      "tokenReady": "token ghuHpu'",
+      "tokenReadyHelp": "DaH token vam yIveb — 'angqa'be'lu'.",
+      "dismissToken": "token woD",
+      "hide": "So'",
+      "show": "'ang",
+      "copy": "velqa'",
+      "empty": "API token Hutlh.",
+      "noDescription": "QIj Hutlh",
+      "detached": "chevlu'pu'",
+      "never": "not",
+      "selected": "{count, plural, one {# token wIvlu''} other {# tokenmey wIvlu''}}",
+      "revokeSelected": "wIvlu'bogh naghmoH",
+      "revoking": "naghmoHtaH...",
+      "clearSelection": "wIv teq",
+      "rotate": "choHqa'",
+      "rotating": "choHqa'taH...",
+      "revoke": "naghmoH",
+      "confirmRotate": "token vam DachoHqa''a'? DaH pegh vIHtaH mev 'ej chu' noblu'.",
+      "confirmBulkRevoke": "{count, plural, one {# token DanaghmoH'a'?} other {# tokenmey DanaghmoH'a'?}}",
+      "kinds": {
+        "interactive": {
+          "label": "lo'wI'",
+          "help": "CLI je vangmeH lo'wI' token. chaw' naQlIj qem."
+        },
+        "service_bound": {
+          "label": "vum · rarlu'",
+          "help": "patlhmeylIj tlhoy'Homvo' vum token. chaw'Daj 'oH patlhmeyvam 'ej SoH chaw' jojvam — 'ej lo'wI' De'lIj teqlu'chugh mev."
+        },
+        "service_detached": {
+          "label": "vum · chevlu'",
+          "help": "che'wI' vu'bogh vum token, tlhoy' ngaQ ghajbogh, lo'wI' rarbe'. vum machine-to-machine vangmeH lo', taHnISbogh 'e' lo'wI' mejchugh vay'."
+        }
+      },
+      "lifespans": {
+        "720": "30 jaj",
+        "2160": "90 jaj",
+        "4320": "180 jaj",
+        "8760": "1 DIS"
+      },
+      "filter": {
+        "all": "Hoch Segh"
+      },
+      "form": {
+        "description": "QIj",
+        "descriptionPlaceholder": "CI/CD pipeline token",
+        "kind": "Segh",
+        "lifespan": "yIntaHghach",
+        "create": "chenmoH",
+        "creating": "chenmoHtaH...",
+        "pinnedRoles": "ngaQmoHlu'bogh patlhmey",
+        "pinnedRolesHelp": "— token vam tlhoy'",
+        "pinnedRolesCapped": "(chaw'lIjDaq poDlu')",
+        "noCustomRoles": "choHlu'bogh patlh Hutlh. che'wI' → patlhmey lojDaq patlhmey chenmoH.",
+        "noScopedRoles": "ngaQmoHlaHbogh patlh DaghajHa'. chaw' ghajbe' token vam."
+      },
+      "columns": {
+        "description": "QIj",
+        "kind": "Segh",
+        "boundTo": "rarlu'",
+        "created": "chenmoHlu'pu'",
+        "lastUsed": "lo' Qav",
+        "expires": "mevbej",
+        "actions": "vangmey"
+      },
+      "errors": {
+        "load": "tokenmey ghelmeH lujpu'",
+        "create": "token chenmoHmeH lujpu' ({status})",
+        "createGeneric": "token chenmoHmeH lujpu'",
+        "rotate": "token choHqa'meH lujpu' ({status})",
+        "rotateGeneric": "token choHqa'meH lujpu'",
+        "revoke": "token naghmoHmeH lujpu' ({status})",
+        "revokeGeneric": "token naghmoHmeH lujpu'",
+        "bulkRevoke": "tokenmey naghmoHmeH lujpu'"
+      }
+    },
+    "sessions": {
+      "title": "jojmey",
+      "description": "vumtaHbogh jojmeylIj",
+      "descriptionAll": "pat Hoch vumtaHbogh jojmey",
+      "empty": "vumtaHbogh joj Hutlh.",
+      "revokeAll": "Hoch naghmoH",
+      "current": "DaHjaj",
+      "columns": {
+        "provider": "nobwI'",
+        "created": "chenmoHlu'pu'",
+        "expires": "mevbej",
+        "lastActive": "vum Qav",
+        "token": "token"
+      },
+      "errors": {
+        "load": "jojmey ghelmeH lujpu'",
+        "revoke": "jojmey naghmoHmeH lujpu' ({status})",
+        "revokeGeneric": "jojmey naghmoHmeH lujpu'"
+      }
+    }
+  },
+  "registry": {
+    "modules": {
+      "title": "Seghmey",
+      "description": "pegh Terraform Segh nughmey teywI'",
+      "cancel": "qIl",
+      "createModule": "Segh chenmoH",
+      "empty": "Segh Hutlh. wa' chenmoH 'ej taghlaH.",
+      "providerLabel": "nobwI': {provider}",
+      "versionCount": "{count, plural, one {# mI''} other {# mI''mey}}",
+      "loadFailed": "Seghmey ghelmeH lujpu'",
+      "createFailed": "Segh chenmoHmeH lujpu'",
+      "createFailedStatus": "Segh chenmoHmeH lujpu' ({status})",
+      "form": {
+        "name": "pong",
+        "provider": "nobwI'",
+        "slugTitle": "ghItlhHom mI' HIvje' neH. ghItlhHom taghnIS.",
+        "addressNote": "pong nobwI' je chen Segh nughmey teywI' Sum 'ej chenmoHlu'pu'DI' choHlaHbe'.",
+        "vcsConnectionOptional": "VCS rar (DaH DIch)",
+        "noneUploadManually": "pagh — mI'mey Ha'DIbaH lI'",
+        "repositoryUrl": "repo URL",
+        "branchOptional": "paQ (DaH DIch)",
+        "branchPlaceholder": "main (motlh vaj chImmoH)",
+        "tagPattern": "per rur",
+        "tagPatternHint": "vam rurbogh permey neH mI'mey chenmoH (Da v1.0.0)",
+        "labelsOptional": "permey (DaH DIch)",
+        "creating": "chenmoHtaH...",
+        "create": "chenmoH"
+      }
+    },
+    "providers": {
+      "title": "nobwI'pu'",
+      "description": "pegh Terraform nobwI' nughmey teywI'",
+      "cancel": "qIl",
+      "createProvider": "nobwI' chenmoH",
+      "empty": "nobwI' Hutlh. wa' chenmoH 'ej taghlaH.",
+      "loadFailed": "nobwI'pu' ghelmeH lujpu'",
+      "createFailed": "nobwI' chenmoHmeH lujpu'",
+      "createFailedStatus": "nobwI' chenmoHmeH lujpu' ({status})",
+      "form": {
+        "name": "pong",
+        "slugTitle": "ghItlhHom mI' HIvje' neH. ghItlhHom taghnIS.",
+        "creating": "chenmoHtaH...",
+        "create": "chenmoH"
+      }
+    },
+    "meta": {
+      "title": "De'De'",
+      "edit": "choH",
+      "cancel": "qIl",
+      "save": "pol",
+      "saving": "poltaH...",
+      "saveAnyway": "pol qoj",
+      "revertLabels": "permey chegh",
+      "owner": "ghajwI'",
+      "ownerNone": "pagh",
+      "ownerPlaceholder": "user@example.com",
+      "labels": "permey"
+    },
+    "moduleDetail": {
+      "notFound": "Segh tu'be'lu'",
+      "loadFailed": "Segh ghelmeH lujpu'",
+      "updateFailed": "Segh choHmeH lujpu'",
+      "labelLockoutDefault": "chaw'lIj DIvI' per choHvam.",
+      "providerLabel": "nobwI': {provider}",
+      "cancel": "qIl",
+      "uploadVersion": "mI' lI'",
+      "vcsConnected": "VCS rarlu'",
+      "connectVcs": "VCS rar",
+      "deleteModule": "Segh Qaw'",
+      "linkFailed": "Qumwo' rarmeH lujpu'",
+      "linkFailedStatus": "rar lujpu' ({status})",
+      "unlinkConfirm": "SeghDaq Qumwo'vam rar teq'a'? 'oHvaD tlho'ren nughmey vangbe'.",
+      "unlinkFailed": "Qumwo' rar teqmeH lujpu'",
+      "unlinkFailedStatus": "rar teq lujpu' ({status})",
+      "uploadFailed": "lI' lujpu'",
+      "uploadFailedStatus": "lI' lujpu' ({status})",
+      "saveVcsFailed": "VCS numtaH polmeH lujpu'",
+      "saveVcsFailedStatus": "VCS numtaH polmeH lujpu' ({status})",
+      "disableVcsFailed": "VCS chu'Ha'meH lujpu'",
+      "disableVcsFailedStatus": "VCS chu'Ha'meH lujpu' ({status})",
+      "deleteFailed": "Qaw' lujpu'",
+      "deleteFailedStatus": "Qaw' lujpu' ({status})",
+      "upload": {
+        "intro": "Terraform Segh teywI'mey ghajbogh tetlh wIv. tar chenmoHlu' 'ej lI'lu'.",
+        "version": "mI'",
+        "moduleDirectory": "Segh tetlh",
+        "selectDirectory": "tetlh wIv",
+        "fileCount": "{count, plural, one {# teywI''} other {# teywI''mey}}",
+        "filesToInclude": "{count, plural, one {# teywI' chelnIS:} other {# teywI'mey chelnIS:}}",
+        "andMore": "...je {count} latlh",
+        "uploading": "lI'taH...",
+        "upload": "lI'"
+      },
+      "vcs": {
+        "intro": "VCS repoDaq Segh vam rar. vam rurbogh semver permey chumlu'DI', tlhoS mI'mey chumlu'. paQ QIn'e' neH mI' chenmoHbe'.",
+        "connection": "VCS rar",
+        "selectConnection": "rar wIv...",
+        "repositoryUrl": "repo URL",
+        "branchOptional": "paQ (DaH DIch)",
+        "branchPlaceholder": "main (motlh vaj chImmoH)",
+        "tagPattern": "per rur",
+        "tagPatternHint": "vam rurbogh permey neH mI'mey chenmoH (Da v1.0.0)",
+        "saving": "poltaH...",
+        "saveConfiguration": "VCS numtaH pol",
+        "disconnect": "VCS rar teq"
+      },
+      "vcsStatus": {
+        "connected": "VCS rarlu':",
+        "lastTag": "per Qav: {tag}",
+        "firstVersionHint": "per rurbogh semver per (Da <code>v1.0.0</code>) chum 'ej wa'DIch mI' chum."
+      },
+      "links": {
+        "title": "rarlu'bogh Qumwo'mey",
+        "linkWorkspace": "Qumwo' rar",
+        "description": "SeghvaD PR poSmoHlu'DI' rarlu'bogh Qumwo'mey Hech nab Hev, 'ej mI' chu' chumlu'DI' motlh Sar Hev.",
+        "searchPlaceholder": "rarmeH Qumwo'mey nej…",
+        "empty": "Qumwo' rarlu'be'.",
+        "unlinkTitle": "Qumwo' rar teq"
+      },
+      "interface": {
+        "title": "'elmey chelmey je",
+        "counts": "{inputs} 'elmey, {outputs} chelmey",
+        "versionLabel": "mI':",
+        "noData": "mI'vam interface De' tu'be'lu'.",
+        "inputs": "'elmey",
+        "outputs": "chelmey",
+        "name": "pong",
+        "type": "Segh",
+        "description": "QIj",
+        "default": "motlh",
+        "required": "poQlu'",
+        "sensitive": "pegh",
+        "requiredBadge": "poQlu'",
+        "optionalBadge": "DIch",
+        "sensitiveBadge": "pegh",
+        "noneDeclared": "Segh mI'vam 'elmey chelmey je maQbe'."
+      },
+      "versions": {
+        "title": "mI'mey",
+        "count": "{count, plural, one {# mI''} other {# mI''mey}}",
+        "emptyVcs": "mI' Hutlh. mI' chummeH \"{pattern}\" rurbogh semver per rarlu'bogh repoDaq chum.",
+        "emptyUpload": "mI' Hutlh. Segh lI' joq VCS rar 'ej taghlaH.",
+        "version": "mI'",
+        "status": "Dotlh",
+        "source": "mung",
+        "actions": "vangmey",
+        "manualUpload": "ghop lI'",
+        "delete": "Qaw'"
+      },
+      "deleteDialog": {
+        "title": "Qaw' tob",
+        "moduleBody": "Segh vam Hoch mI'mey je reH Qaw'vam.",
+        "versionBody": "mI' {version} reH Qaw'vam.",
+        "cancel": "qIl",
+        "confirm": "Qaw'"
+      }
+    },
+    "providerDetail": {
+      "description": "nobwI' nughmey teywI'",
+      "deleteProvider": "nobwI' Qaw'",
+      "publishNote": "<code>terrapod-publish</code> CLI lo'taHvIS nobwI' mI'mey chumlu', HaqwI' qIttamoH. reH so'wI'vo' nobwI' HaqwI'mey lI' 'ej qIttamoH lo'laHbe'lu'. mI'mey qawmey je nav vam laDmeH neH.",
+      "empty": "mI' Hutlh. terrapod-publish CLI lo' 'ej taghlaH.",
+      "loadVersionsFailed": "mI'mey ghelmeH lujpu'",
+      "updateFailed": "nobwI' choHmeH lujpu'",
+      "labelLockoutDefault": "chaw'lIj DIvI' per choHvam.",
+      "deleteFailed": "Qaw' lujpu'",
+      "deleteFailedStatus": "Qaw' lujpu' ({status})",
+      "platformCount": "{count, plural, one {# qach} other {# qachmey}}",
+      "delete": "Qaw'",
+      "os": "OS",
+      "arch": "Arch",
+      "filename": "teywI' pong",
+      "actions": "vangmey",
+      "deleteDialog": {
+        "title": "Qaw' tob",
+        "providerBody": "nobwI' vam Hoch mI'mey je reH Qaw'vam.",
+        "versionBody": "mI' {version} qachmey je reH Qaw'vam.",
+        "platformBody": "{os}/{arch} qach reH Qaw'vam.",
+        "cancel": "qIl",
+        "confirm": "Qaw'"
+      }
+    }
+  },
+  "adminUsers": {
+    "title": "lo'wI'pu'",
+    "description": "pa'Daq lo'wI' De'wI'mey vu'",
+    "empty": "lo'wI' tu'be'lu'.",
+    "columns": {
+      "email": "QIn Sum",
+      "displayName": "'angmeH pong",
+      "status": "Dotlh",
+      "lastLogin": "'el Qav",
+      "created": "chenmoHlu'pu'",
+      "actions": "vangmey"
+    },
+    "form": {
+      "email": "QIn Sum",
+      "displayName": "'angmeH pong",
+      "displayNamePlaceholder": "Jane Doe",
+      "passwordOptional": "mu'qaD (DaH DIch)",
+      "passwordPlaceholder": "mu'qaD HoS 'el"
+    },
+    "reset": {
+      "title": "{email} mu'qaD chu'moH",
+      "newPassword": "mu'qaD chu'"
+    },
+    "password": {
+      "score": {
+        "veryWeak": "tIqHa' 'ej pujqu'",
+        "weak": "puj",
+        "fair": "QIvHa'",
+        "good": "QaQ",
+        "strong": "HoS"
+      }
+    },
+    "status": {
+      "active": "vangtaH",
+      "inactive": "vangbe'",
+      "never": "not"
+    },
+    "actions": {
+      "cancel": "qIl",
+      "save": "pol",
+      "saving": "poltaH...",
+      "createUser": "lo'wI' chenmoH",
+      "creating": "chenmoHtaH...",
+      "resetPassword": "mu'qaD chu'moH",
+      "edit": "choH",
+      "delete": "Qaw'",
+      "resetPw": "mu'qaD chu'",
+      "setPw": "mu'qaD choq",
+      "cancelPw": "mu'qaD qIl"
+    },
+    "confirm": {
+      "activate": "lo'wI' \"{email}\" vangmoH'a'?",
+      "deactivate": "lo'wI' \"{email}\" vangHa'moH'a'?",
+      "delete": "lo'wI' \"{email}\" Qaw''a'? choHlaHbe'lu'."
+    },
+    "success": {
+      "created": "lo'wI' \"{email}\" chenmoHlu'pu'",
+      "updated": "lo'wI' \"{email}\" choHlu'pu'",
+      "activated": "lo'wI' \"{email}\" vangmoHlu'pu'",
+      "deactivated": "lo'wI' \"{email}\" vangHa'moHlu'pu'",
+      "passwordReset": "\"{email}\" mu'qaD chu'moHlu'pu'",
+      "deleted": "lo'wI' \"{email}\" Qaw'lu'pu'"
+    },
+    "errors": {
+      "load": "lo'wI'pu' ghelmeH lujpu'",
+      "create": "lo'wI' chenmoHmeH lujpu'",
+      "createStatus": "lo'wI' chenmoHmeH lujpu' ({status})",
+      "update": "lo'wI' choHmeH lujpu'",
+      "resetPassword": "mu'qaD chu'moHmeH lujpu'",
+      "delete": "lo'wI' Qaw'meH lujpu'"
+    }
+  },
+  "adminRoles": {
+    "title": "patlhmey ch'ammey je",
+    "description": "RBAC patlhmey je lo'wI' patlh ch'ammey vu'",
+    "builtIn": "chenmoHlu'pu'",
+    "emptyRoles": "patlh maQbe'.",
+    "emptyAssignments": "patlh ch'am Hutlh.",
+    "tabs": {
+      "roles": "patlhmey",
+      "assignments": "ch'ammey"
+    },
+    "columns": {
+      "provider": "nobwI'",
+      "email": "QIn Sum",
+      "role": "patlh",
+      "created": "chenmoHlu'pu'",
+      "actions": "vangmey"
+    },
+    "form": {
+      "name": "pong",
+      "namePattern": "ghItlh mI' HIvje' je neH. ghItlh mI' joq taghnIS.",
+      "workspacePermission": "Qumwo' chaw'",
+      "poolPermission": "bIQ'a' chaw'",
+      "registryPermission": "nughmey teywI' chaw'",
+      "catalogPermission": "tetlh chaw'",
+      "descriptionLabel": "QIj",
+      "descriptionPlaceholder": "chenmoHwI' chaw'",
+      "allowLabels": "chaw'lu'bogh permey (key=value, HIvje' chevlu')",
+      "allowNames": "chaw'lu'bogh pongmey (HIvje' chevlu')",
+      "denyLabels": "tuHlu'bogh permey (key=value, HIvje' chevlu')",
+      "denyNames": "tuHlu'bogh pongmey (HIvje' chevlu')",
+      "allowLabelsShort": "chaw' permey",
+      "allowNamesShort": "chaw' pongmey",
+      "denyLabelsShort": "tuH permey",
+      "denyNamesShort": "tuH pongmey"
+    },
+    "assignForm": {
+      "provider": "nobwI'",
+      "email": "QIn Sum",
+      "roles": "patlhmey"
+    },
+    "caps": {
+      "selected": "{count, plural, one {# laH} other {# laHmey}} wIvlu'",
+      "count": "{count, plural, one {# laH} other {# laHmey}}",
+      "custom": "choHlu'",
+      "matchesPresets": "nabpu' rur",
+      "advanced": "Dun — laHmey",
+      "otherPreserved": "latlh laHmey (polDI' pollu')",
+      "presetHelp": {
+        "before": "Dung nab wIvDI' laHmeyDaj tobHa'moH. nab veb HIvje' choqDI' joq teqDI' patlh choHlu'",
+        "after": "'ej bID laHmey nobbogh nobmoHlu'."
+      },
+      "groups": {
+        "workspace": "Qumwo'",
+        "run": "Sar",
+        "state": "Dotlh",
+        "var": "choHlaHmey",
+        "config": "numtaH",
+        "drift": "tlhotlh",
+        "run-task": "Sar Qu'mey",
+        "notification": "QInmey",
+        "run-trigger": "Sar taghwI'mey",
+        "pool": "Duy bIQ'a'mey",
+        "registry": "nughmey teywI'",
+        "catalog": "vum tetlh"
+      }
+    },
+    "display": {
+      "allow": "chaw': {value}",
+      "allowNames": "chaw' pongmey: {value}",
+      "deny": "tuH: {value}",
+      "denyNames": "tuH pongmey: {value}"
+    },
+    "actions": {
+      "cancel": "qIl",
+      "save": "pol",
+      "saving": "poltaH...",
+      "edit": "choH",
+      "delete": "Qaw'",
+      "remove": "teq",
+      "createRole": "patlh chenmoH",
+      "creating": "chenmoHtaH...",
+      "addAssignment": "ch'am chel",
+      "setRoles": "patlhmey choq"
+    },
+    "confirm": {
+      "deleteRole": "patlh \"{name}\" Qaw''a'? DalulHa'bogh ch'ammey Hoch qaS.",
+      "removeAssignment": "{email}vo' patlh \"{roleName}\" teq'a'?"
+    },
+    "success": {
+      "roleCreated": "patlh \"{name}\" chenmoHlu'pu'",
+      "roleUpdated": "patlh \"{name}\" choHlu'pu'",
+      "roleDeleted": "patlh \"{name}\" Qaw'lu'pu'",
+      "rolesAssigned": "{email}vaD patlhmey ch'amlu'pu'",
+      "assignmentRemoved": "ch'am teqlu'pu'"
+    },
+    "errors": {
+      "loadRoles": "patlhmey ghelmeH lujpu'",
+      "loadAssignments": "ch'ammey ghelmeH lujpu'",
+      "createRole": "patlh chenmoHmeH lujpu'",
+      "createRoleStatus": "patlh chenmoHmeH lujpu' ({status})",
+      "updateRole": "patlh choHmeH lujpu'",
+      "deleteRole": "patlh Qaw'meH lujpu'",
+      "setAssignment": "ch'am choqmeH lujpu'",
+      "setAssignmentStatus": "ch'am choqmeH lujpu' ({status})",
+      "deleteAssignment": "ch'am Qaw'meH lujpu'"
+    }
+  },
+  "adminVcs": {
+    "title": "VCS rarmey",
+    "description": "mI'mey SeHmeH pat rarmey vu'",
+    "empty": "VCS rar numtaHbe'lu'.",
+    "actions": {
+      "new": "rar chu'",
+      "cancel": "qIl",
+      "edit": "choH",
+      "delete": "Qaw'"
+    },
+    "confirmDelete": "VCS rar vam Qaw''a'? 'oH lo'bogh Qumwo'mey VCS numtaH Hutlh. choHlaHbe'lu'.",
+    "form": {
+      "name": "pong",
+      "namePattern": "ghItlh mI' HIvje' je neH. ghItlh mI' joq taghnIS.",
+      "provider": "nobwI'",
+      "providerImmutable": "nobwI' choHlaHbe' — choHmeH Qaw' 'ej chenmoHqa'",
+      "serverUrl": "server URL (DaH DIch)",
+      "serverUrlHint": "HTTP joq HTTPS URL taHnIS (Da https://github.mycompany.com)",
+      "appId": "App ID",
+      "appIdHint": "GitHub App ID — mI' neH",
+      "installationId": "Installation ID",
+      "installationIdHint": "GitHub App Installation ID — mI' neH",
+      "privateKey": "pegh ngaQHa'wI' (PEM)",
+      "browse": "nej...",
+      "privateKeyKeep": "DaH ngaQHa'wI' polmeH chImmoH — choHqa'meH PEM chu' lI'",
+      "privateKeyPlaceholder": "-----BEGIN RSA PRIVATE KEY-----\n...\n\nnaDev .pem teywI' pum joq nej qIp",
+      "webhookSecret": "webhook pegh",
+      "optional": "(DaH DIch)",
+      "webhookSecretSet": "choqlu' — polmeH chImmoH, choHqa'meH nap chu' 'el",
+      "webhookSecretGlobal": "tera' hoch webhook pegh lo'meH chImmoH",
+      "webhookSecretHelp": "numtaHvam webhookmey HMAC pegh. choqlu'be'DI', tera' hoch pegh lo'lu'.",
+      "accessToken": "chaw' token",
+      "accessTokenKeep": "DaH token polmeH chImmoH",
+      "saving": "poltaH...",
+      "creating": "chenmoHtaH...",
+      "saveChanges": "choHmey pol",
+      "createConnection": "rar chenmoH"
+    },
+    "table": {
+      "name": "pong",
+      "provider": "nobwI'",
+      "serverUrl": "server URL",
+      "status": "Dotlh",
+      "created": "chenmoHlu'pu'",
+      "actions": "vangmey"
+    },
+    "success": {
+      "created": "VCS rar \"{name}\" chenmoHlu'pu'",
+      "updated": "VCS rar \"{name}\" choHlu'pu'",
+      "deleted": "VCS rar Qaw'lu'pu'"
+    },
+    "errors": {
+      "load": "VCS rarmey ghelmeH lujpu'",
+      "save": "rar polmeH lujpu'",
+      "delete": "rar Qaw'meH lujpu'",
+      "createStatus": "rar chenmoHmeH lujpu' ({status})",
+      "updateStatus": "rar choHmeH lujpu' ({status})"
+    }
+  },
+  "adminVariableSets": {
+    "title": "choHlaH Segh",
+    "description": "Qumwo' tlheghmey org tlhoy' choHlaH Segh vu'",
+    "empty": "choHlaH Segh numtaHbe'lu'.",
+    "none": "-",
+    "actions": {
+      "new": "choHlaH Segh chu'",
+      "cancel": "qIl"
+    },
+    "form": {
+      "name": "pong",
+      "namePattern": "ghItlh mI' HIvje' je neH. ghItlh mI' joq taghnIS.",
+      "descriptionLabel": "QIj",
+      "descriptionPlaceholder": "Hoch Qumwo'mey AWS chaw'mey",
+      "global": "tera' hoch (Hoch Qumwo'meyDaq lo')",
+      "priority": "potlh (Qumwo' choHlaHmey DIvI')",
+      "creating": "chenmoHtaH...",
+      "create": "choHlaH Segh chenmoH"
+    },
+    "table": {
+      "name": "pong",
+      "description": "QIj",
+      "scope": "tlhoy'",
+      "variables": "choHlaHmey",
+      "created": "chenmoHlu'pu'"
+    },
+    "scope": {
+      "global": "tera' hoch",
+      "priority": "potlh",
+      "standard": "motlh"
+    },
+    "errors": {
+      "load": "choHlaH Segh ghelmeH lujpu'",
+      "create": "choHlaH Segh chenmoHmeH lujpu'",
+      "createStatus": "choHlaH Segh chenmoHmeH lujpu' ({status})"
+    },
+    "detail": {
+      "back": "choHlaH SeghDaq chegh",
+      "headerFallback": "choHlaH Segh",
+      "notFound": "choHlaH Segh tu'be'lu'",
+      "global": "tera' hoch",
+      "priority": "potlh",
+      "yes": "HISlaH",
+      "no": "ghobe'",
+      "edit": "choH",
+      "cancel": "qIl",
+      "save": "pol",
+      "saving": "poltaH...",
+      "delete": "Qaw'",
+      "deleting": "Qaw'taH...",
+      "confirmDelete": "Qaw' tob",
+      "deleteTitle": "choHlaH Segh Qaw'",
+      "deleteDescription": "choHlaH Segh vam Hoch choHlaHmey je reH Qaw'.",
+      "tabs": {
+        "settings": "numtaHmey",
+        "variables": "choHlaHmey",
+        "workspaces": "Qumwo'mey"
+      },
+      "addVariable": "choHlaH chel",
+      "adding": "cheltaH...",
+      "varKey": "ngaQHa'wI'",
+      "varValue": "nap",
+      "varCategory": "Segh",
+      "categoryTerraform": "Terraform",
+      "categoryEnv": "Dat",
+      "sensitive": "pegh",
+      "sensAbbr": "pegh",
+      "enterNewValue": "nap chu' 'el",
+      "empty": "chIm",
+      "emptyVars": "Segh vamDaq choHlaH Hutlh.",
+      "actions": "vangmey",
+      "remove": "teq",
+      "add": "chel",
+      "addWorkspace": "Qumwo' chel",
+      "workspace": "Qumwo'",
+      "selectWorkspace": "Qumwo' wIv...",
+      "globalBanner": "tera' hoch choHlaH Segh vam 'ej tlhoS Hoch Qumwo'meyDaq lo'.",
+      "emptyWorkspaces": "choHlaH Segh vamvaD Qumwo' ch'amlu'be'.",
+      "confirmDeleteVar": "choHlaHvam Qaw''a'? choHlaHbe'lu'.",
+      "confirmRemoveWorkspace": "choHlaH Segh vamvo' Qumwo'vam teq'a'? choHlaHmeyDaj Qumwo'vamDaq lo'be'.",
+      "success": {
+        "updated": "choHlaH Segh choHlu'pu'",
+        "workspaceAdded": "Qumwo' chellu'pu'",
+        "workspaceRemoved": "Qumwo' teqlu'pu'"
+      },
+      "errors": {
+        "load": "choHlaH Segh ghelmeH lujpu'",
+        "update": "choHlaH Segh choHmeH lujpu'",
+        "delete": "choHlaH Segh Qaw'meH lujpu'",
+        "loadVars": "choHlaHmey ghelmeH lujpu'",
+        "loadWorkspaces": "Qumwo'mey ghelmeH lujpu'",
+        "addVar": "choHlaH chelmeH lujpu'",
+        "addVarStatus": "choHlaH chelmeH lujpu' ({status})",
+        "updateVar": "choHlaH choHmeH lujpu'",
+        "deleteVar": "choHlaH Qaw'meH lujpu'",
+        "addWorkspace": "Qumwo' chelmeH lujpu'",
+        "removeWorkspace": "Qumwo' teqmeH lujpu'"
+      }
+    }
+  },
+  "adminAutodiscovery": {
+    "title": "tlhoS tu'",
+    "description": "vam rurbogh Hemmey qaSmoHbogh PR, monorepoDaq tlhoS Qumwo'mey chenmoH",
+    "empty": "tlhoS tu' chut Hutlh. wa' chenmoH 'ej monorepolIj PRmeyvo' tlhoS Qumwo'mey chenmoHmeH tagh.",
+    "unsavedRule": "(chut polbe'lu')",
+    "actions": {
+      "newRule": "chut chu'",
+      "cancel": "qIl",
+      "create": "chenmoH",
+      "update": "choH",
+      "preview": "tI'ang",
+      "edit": "choH",
+      "delete": "Qaw'",
+      "close": "SoQmoH"
+    },
+    "status": {
+      "enabled": "chu'lu'pu'",
+      "disabled": "chu'Ha'lu'pu'"
+    },
+    "form": {
+      "createTitle": "chut chenmoH",
+      "editTitle": "chut choH",
+      "name": "pong",
+      "vcsConnection": "VCS rar",
+      "selectConnection": "rar wIv",
+      "repoUrl": "repo URL",
+      "branch": "paQ (chIm = motlh)",
+      "matchPattern": "rur mIw",
+      "matchPatternHint": "gitignore-rur globmey. <code>**</code> He 'ay'mey rur. <code>*.tf*</code> teywI'mey neH tlhoS tu' taghmoH.",
+      "ignorePatterns": "buSHa' mIwmey (wa' per HuH)",
+      "nameTemplate": "Qumwo' pong De'wI' (DaH DIch)",
+      "nameTemplateHint": "tetlh lo'meH <path></path> lo', <code>/</code> <code>-</code>moHlu', joq tetlh 'oH'e' lo'meH <root></root>. chIm = motlh (He pI' neH).",
+      "templateDefaults": "Qumwo' De'wI' motlhmey",
+      "executionMode": "vangmeH mIw",
+      "executionModeHint": "VCS ra' tlhoS tu'; Duy vangmeH neH QaplaH.",
+      "agentPool": "Duy bIQ'a'",
+      "none": "(pagh)",
+      "executionBackend": "vangmeH tool",
+      "terraformVersion": "Terraform mI'",
+      "cpuRequest": "CPU tlhob",
+      "memoryRequest": "qawHaq tlhob",
+      "ownerEmail": "ghajwI' QIn Sum",
+      "autoApply": "tlhoS lo'",
+      "enabled": "chu'lu'pu'",
+      "onDirectoryDelete": "tetlh Qaw'DI'",
+      "onDeleteFlag": "per (Qanpu' — Qaw' loStaH per, ghop vang poQ)",
+      "onDeleteDestroy": "Qaw' (Qob — nISwI' Qaw' 'ej Qumwo' pol)",
+      "onDirectoryDeleteHint": "tlhoS tu' Qumwo'Daq nuq qaS, tlhamlu'bogh paQDaq tetlhDaj teqlu'DI'.",
+      "onDeleteDestroyWarning": "tlhamlu'bogh paQDaq tetlhDaj teqlu'DI', Qumwo'Daq teH terraform destroy vangvam.",
+      "labels": "permey (Qumwo'mey chenmoHlu'bogh Hev)",
+      "varFiles": "choHlaH teywI'mey (Qumwo'mey chenmoHlu'bogh Hev)",
+      "varFilesHint": "nab/lo' nobbogh <code>.tfvars</code> Hemmey.",
+      "addVarFile": "choHlaH teywI' chel",
+      "executionHooks": "vangmeH ghItlhmey (Qumwo' chu' Hoch rarlu')",
+      "executionHooksHint": "<page>vangmeH ghItlhmey</page> che'wI' navDaq maQlu'bogh ghItlhmeyvo' wIv — wIvlu'bogh ghItlh Hoch chut vam chenmoHbogh Qumwo' rarlu'.",
+      "noHooks": "vangmeH ghItlh maQbe'lu'. vangmeH ghItlhmey che'wI' navDaq wa' chenmoH.",
+      "hookDisabled": "(chu'Ha'lu'pu')",
+      "hookNotInLibrary": "(paqmeyDaq Hutlh — teqmeH choqHa')",
+      "runTaskTemplates": "Sar Qu' De'wI'mey (Qumwo' chu' Hoch chenmoHlu')",
+      "notificationTemplates": "QIn De'wI'mey (Qumwo' chu' Hoch chenmoHlu')",
+      "saving": "poltaH...",
+      "previewTitle": "repo yIt 'ej chut vam chenmoHlaHbogh Qumwo'mey tI'ang — polbe'lu'"
+    },
+    "table": {
+      "name": "pong",
+      "repo": "repo",
+      "pattern": "mIw",
+      "enabled": "chu'lu'pu'",
+      "created": "chenmoHlu'pu'",
+      "previewTitle": "repo yIt 'ej chut vam chenmoHbogh Qumwo'mey tI'ang"
+    },
+    "deleteModal": {
+      "title": "chut Qaw''a'?",
+      "body": "chut vam tlhoS chenmoHlu'bogh Qumwo'mey vumtaH. chut vam bIng Hem chu'mey qaSmoHbogh PR veb tlhoS Qumwo'mey chenmoHqa'be'."
+    },
+    "preview": {
+      "title": "tI'ang: {ruleName}",
+      "walkedFiles": "<refspan>{ref}</refspan>Daq <files>{count}</files> teywI'mey yItlu'pu'",
+      "walking": "repo yItlu'taH…",
+      "noMatches": "chut mIw rurbogh tetlh Hutlh repovamDaq. pagh chenmoHnIS.",
+      "colWorkspace": "Qumwo'",
+      "colDirectory": "tetlh",
+      "colAction": "vang",
+      "repoRoot": "(repo Hal)",
+      "actionCreate": "chenmoH",
+      "skipDiscovered": "jump (tu'ta'lu')",
+      "skipDiscoveredTitle": "chut vam chenmoHpu'",
+      "skipCollision": "jump (pong lolchu')",
+      "skipCollisionTitle": "latlh meqmo' pong vam ghajbogh Qumwo' tu'lu'",
+      "willCreate": "{count, plural, one {# Qumwo' chenmoHlu'.} other {# Qumwo'mey chenmoHlu'.}} tu'lu'bogh Qumwo'mey (lolchu'mey) HarghHa'lu'.",
+      "provision": "{count, plural, one {# Qumwo' cha'moH} other {# Qumwo'mey cha'moH}}",
+      "provisioning": "cha'moHtaH…",
+      "saveToProvision": "Qumwo'mey vam cha'moHmeH chut pol."
+    },
+    "success": {
+      "created": "{name} chenmoHlu'pu'",
+      "updated": "{name} choHlu'pu'",
+      "deleted": "chut Qaw'lu'pu'",
+      "provisioned": "{count, plural, one {\"{ruleName}\"vo'' # Qumwo'' chenmoHlu''pu''} other {\"{ruleName}\"vo'' # Qumwo''mey chenmoHlu''pu''}}"
+    },
+    "errors": {
+      "loadRules": "tlhoS tu' chutmey ghelmeH lujpu'",
+      "load": "ghelmeH lujpu'",
+      "createFailed": "chenmoH lujpu': {status} {detail}",
+      "updateFailed": "choH lujpu': {status} {detail}",
+      "save": "polmeH lujpu'",
+      "deleteRule": "chut Qaw'meH lujpu'",
+      "delete": "Qaw' lujpu'",
+      "previewFailed": "tI'ang lujpu' ({status})",
+      "preview": "tI'ang lujpu'",
+      "previewPrereq": "tI'ang pa' VCS rar, repo URL, mIw je choq",
+      "scanFailed": "legh lujpu' ({status})",
+      "scan": "legh lujpu'"
+    }
+  },
+  "adminBulkUpdate": {
+    "title": "tlhoy' choH",
+    "description": "DarSeHmo' Qumwo'mey wIv, vaj Hoch numtaH choH lo'",
+    "none": "(pagh)",
+    "anyOption": "(vay')",
+    "unchanged": "(choHbe'lu')",
+    "unchangedOption": "(choHbe'lu')",
+    "filter": {
+      "heading": "1. Qumwo'mey wIv",
+      "matchAll": "Hoch Qumwo'mey <strong>Hoch</strong> rur (bIng DarSeHmey buSHa')",
+      "namePrefix": "pong Hem",
+      "executionBackend": "vangmeH tool",
+      "ownerEmail": "ghajwI' QIn Sum",
+      "agentPool": "Duy bIQ'a'",
+      "vcsConnection": "VCS rar",
+      "labels": "permey",
+      "search": "nej",
+      "searching": "nejtaH..."
+    },
+    "results": {
+      "matched": "<strong>{count}</strong> {count, plural, one {Qumwo''} other {Qumwo''mey}} rurpu''.",
+      "noMatch": "DarSeHvam rurbogh Qumwo' Hutlh.",
+      "colName": "pong",
+      "colMode": "mIw",
+      "colBackend": "tool",
+      "colTfVersion": "TF mI'",
+      "colLabels": "permey"
+    },
+    "update": {
+      "heading": "2. choHmey lo'",
+      "hint": "bIng Dachoqbogh Sepmey neH choHlu'. Dung DarSeH wIv Qumwo'mey Hev choHvam.",
+      "terraformVersion": "Terraform mI'",
+      "executionBackend": "vangmeH tool",
+      "executionMode": "vangmeH mIw",
+      "autoApply": "tlhoS lo'",
+      "agentPool": "Duy bIQ'a'",
+      "cpuRequest": "CPU tlhob",
+      "memoryRequest": "qawHaq tlhob",
+      "setLabels": "permey choq (Hoch rurbogh Qumwo' permey chartlh DIvI')",
+      "setVarFiles": "choHlaH teywI'mey choq",
+      "addVarFile": "choHlaH teywI' chel",
+      "setRunTasks": "Sar Qu'mey choq (Hoch rurbogh Qumwo' pongmo' choHlu')",
+      "setNotifications": "QIn numtaHmey choq (pongmo' choHlu')",
+      "dryRun": "QaD Sar (tI'ang neH — choH ghItlhbe'lu')",
+      "confirmWarning": "Hoch rurbogh Qumwo'Daq choHmey ghItlhvam.",
+      "confirmApply": "lo' tob",
+      "applying": "lo'taH...",
+      "cancel": "qIl",
+      "working": "vumtaH...",
+      "previewDryRun": "tI'ang (QaD Sar)",
+      "applyChanges": "choHmey lo'"
+    },
+    "diff": {
+      "colWorkspace": "Qumwo'",
+      "colChanges": "choHmey"
+    },
+    "dryResult": {
+      "heading": "QaD Sar wanI'",
+      "summary": "<strong>{matched}</strong> rurpu'; <strong>{wouldChange}</strong> choHlaw'; {unchanged} choHbe'. pagh ghItlhlu'pu'.",
+      "wouldChange": "choHlaw'",
+      "noChange": "choHvammo' pagh Qumwo' choHlaw'."
+    },
+    "applyResult": {
+      "heading": "lo' wanI'",
+      "summary": "<strong>{matched}</strong> rurpu'; <appliedstrong>{applied}</appliedstrong> lo'lu'pu'; {unchanged} choHbe'; {errors, plural, one {# Qagh} other {# Qaghmey}}.",
+      "applied": "lo'lu'pu'",
+      "unnamedWorkspace": "(Qumwo')",
+      "noChange": "pagh Qumwo' choHlu'pu'."
+    },
+    "errors": {
+      "searchFailed": "nej lujpu' ({status})",
+      "search": "nej lujpu'",
+      "bulkUpdateFailed": "tlhoy' choH lujpu' ({status})",
+      "bulkUpdate": "tlhoy' choH lujpu'"
+    }
+  },
+  "adminExecutionHooks": {
+    "title": "vangmeH ghItlhmey",
+    "description": "Sar Qu'meyDaq nab/lo' Dung/bIng vangmeH ghItlhHom mIwmey, Qumwo'mey rarlu'",
+    "empty": "vangmeH ghItlh numtaHbe'lu'.",
+    "actions": {
+      "cancel": "qIl",
+      "new": "vangmeH ghItlh chu'",
+      "creating": "chenmoHtaH...",
+      "create": "vangmeH ghItlh chenmoH"
+    },
+    "badges": {
+      "disabled": "chu'Ha'lu'pu'",
+      "enabled": "chu'lu'pu'"
+    },
+    "columns": {
+      "name": "pong",
+      "hookPoint": "ghItlh Daq",
+      "enabled": "chu'lu'pu'",
+      "priority": "potlh",
+      "workspaces": "Qumwo'mey"
+    },
+    "form": {
+      "name": "pong",
+      "namePatternTitle": "ghItlh mI' HIvje' je neH. ghItlh mI' joq taghnIS.",
+      "description": "QIj",
+      "descriptionPlaceholder": "init pa' internal hosts chel",
+      "hookPoint": "ghItlh Daq",
+      "priority": "potlh",
+      "priorityTitle": "pIvchem law' wa' Daq lo'DI', wa'DIch vangbe' machwI' (pongmo' lolchu' Sovlu').",
+      "scriptLabel": "ghItlhHom (<code>/bin/sh -c</code>)",
+      "scriptHelp": "vangwI' cloud numvo' vangtaH. mej mI' pagh Qagh SarDaq. Qumwo' choHlaHmeyvo' peghmey Hev, naDev Hutlh."
+    },
+    "errors": {
+      "load": "vangmeH ghItlhmey ghelmeH lujpu'",
+      "createStatus": "vangmeH ghItlh chenmoHmeH lujpu' ({status})",
+      "create": "vangmeH ghItlh chenmoHmeH lujpu'"
+    }
+  },
+  "adminPolicySets": {
+    "title": "chut Segh",
+    "description": "OPA chut-DaH-chutmey ra'meH, permo' Qumwo'meyDaq tlhoy'lu'",
+    "empty": "chut Segh numtaHbe'lu'.",
+    "actions": {
+      "cancel": "qIl",
+      "new": "chut Segh chu'",
+      "creating": "chenmoHtaH...",
+      "create": "chut Segh chenmoH"
+    },
+    "badges": {
+      "disabled": "chu'Ha'lu'pu'",
+      "mandatory": "poQlu'",
+      "advisory": "qeSwI'",
+      "global": "tera' hoch",
+      "labelScoped": "per tlhoy'"
+    },
+    "columns": {
+      "name": "pong",
+      "description": "QIj",
+      "enforcement": "ra'",
+      "scope": "tlhoy'",
+      "policies": "chutmey"
+    },
+    "form": {
+      "name": "pong",
+      "namePatternTitle": "ghItlh mI' HIvje' je neH. ghItlh mI' joq taghnIS.",
+      "description": "QIj",
+      "descriptionPlaceholder": "prod Qumwo'meyvaD poQlu'bogh 'avwI'mey",
+      "enforcement": "ra'",
+      "enforcementAdvisory": "qeSwI' (ghuHmoH, botbe')",
+      "enforcementMandatory": "poQlu' (lujDI' lo' bot)",
+      "globalScope": "tera' hoch (Hoch QumwoDaq lo')",
+      "sourceInline": "laHDaq (UIDaq chutmey vu')",
+      "sourceVcs": "VCS repovo'",
+      "vcsConnection": "VCS rar",
+      "selectConnection": "rar wIv...",
+      "repoUrl": "repo URL",
+      "branch": "paQ",
+      "branchPlaceholder": "main (motlh)",
+      "policyPath": "chut He",
+      "policyPathPlaceholder": "policies/ (.rego teywI'mey ghajbogh tetlh)",
+      "helpVcs": "repovo' tlhoS chutmey chumlu'.",
+      "helpInline": "Segh chenmoHpu'DI' chutmey chel 'ej per tlhoy' Qijmey choH."
+    },
+    "errors": {
+      "load": "chut Segh ghelmeH lujpu'",
+      "createStatus": "chut Segh chenmoHmeH lujpu' ({status})",
+      "create": "chut Segh chenmoHmeH lujpu'"
+    }
+  },
+  "adminCatalog": {
+    "title": "tetlh che'wI'",
+    "description": "vum tetlh Dochmey vu'",
+    "notEnabled": "vum tetlh chu'be'lu'.",
+    "empty": "tetlh Doch Hutlh.",
+    "actions": {
+      "new": "tetlh Doch chu'",
+      "cancel": "qIl",
+      "create": "tetlh Doch chenmoH",
+      "creating": "chenmoHtaH…",
+      "saveChanges": "choHmey pol",
+      "saving": "poltaH…",
+      "edit": "choH",
+      "delete": "Qaw'"
+    },
+    "form": {
+      "name": "pong",
+      "nameTitle": "ghItlh mI' HIvje' je neH. ghItlh mI' joq taghnIS.",
+      "module": "Segh",
+      "moduleSelect": "Segh wIv…",
+      "moduleImmutable": "chenmoHlu'pu'DI' Segh choHlaHbe'",
+      "displayName": "'angmeH pong",
+      "displayNamePlaceholder": "motlh S3 Bucket",
+      "versionPin": "motlh mI' ngaQmoH",
+      "versionPinPlaceholder": "Da 1.2.0 (chIm = ram)",
+      "descriptionLabel": "QIj",
+      "descriptionPlaceholder": "tetlh Doch vam cha'moHbogh…",
+      "enabled": "chu'lu'pu' (laDmeH tetlhDaq legh)",
+      "providerTemplates": "nobwI' De'wI'mey",
+      "noProviderTemplates": "nobwI' De'wI' maQbe'.",
+      "restrictPools": "Duy bIQ'a'mey papDaq tlhoy'",
+      "noAgentPools": "Duy bIQ'a' Hutlh.",
+      "anyPool": "Duy bIQ'a' vay' lo'laH.",
+      "labels": "permey",
+      "variableOptions": "choHlaH wIvmey (Dun, JSON)",
+      "variableOptionsHint": "'el Hoch DIvI'mey (wIvmey, So', motlh). lo'be'lu'chugh <code>[]</code> pol."
+    },
+    "table": {
+      "name": "pong",
+      "module": "Segh",
+      "enabled": "chu'lu'pu'",
+      "actions": "vangmey"
+    },
+    "badge": {
+      "enabled": "chu'lu'pu'",
+      "disabled": "chu'Ha'lu'pu'"
+    },
+    "confirm": {
+      "delete": "tetlh Doch vam Qaw''a'? cha'moHlu'pu'bogh Dochmey qaSbe'moHlu'."
+    },
+    "success": {
+      "created": "tetlh Doch \"{name}\" chenmoHlu'pu'",
+      "updated": "tetlh Doch \"{name}\" choHlu'pu'",
+      "deleted": "tetlh Doch Qaw'lu'pu'"
+    },
+    "errors": {
+      "load": "tetlh Dochmey ghelmeH lujpu'",
+      "save": "tetlh Doch polmeH lujpu'",
+      "createStatus": "tetlh Doch chenmoHmeH lujpu' ({status})",
+      "updateStatus": "tetlh Doch choHmeH lujpu' ({status})",
+      "delete": "tetlh Doch Qaw'meH lujpu'",
+      "deleteConflict": "Qaw'laHbe': tetlh Doch vam cha'moHlu'pu'bogh Dochmey ghaj.",
+      "varOptsInvalidJson": "choHlaH wIvmey teH JSON taHnIS (chetvI').",
+      "varOptsNotArray": "choHlaH wIvmey JSON chetvI' taHnIS."
+    }
+  },
+  "adminProviderTemplates": {
+    "title": "nobwI' De'wI'mey",
+    "description": "tetlh Dochmey lo'qa'laHbogh nobwI' numtaH 'ay'mey",
+    "notEnabled": "vum tetlh chu'be'lu'.",
+    "empty": "nobwI' De'wI' Hutlh.",
+    "actions": {
+      "new": "De'wI' chu'",
+      "cancel": "qIl",
+      "create": "De'wI' chenmoH",
+      "creating": "chenmoHtaH…",
+      "saveChanges": "choHmey pol",
+      "saving": "poltaH…",
+      "edit": "choH",
+      "delete": "Qaw'"
+    },
+    "form": {
+      "name": "pong",
+      "providerType": "nobwI' Segh",
+      "body": "porgh (HCL)",
+      "parameters": "DIvI'mey (Dun, JSON)",
+      "parametersHint": "Hoch DIvI' cha'moH ghItlh Sep moj. lo'be'lu'chugh <code>[]</code> pol.",
+      "labels": "permey"
+    },
+    "table": {
+      "name": "pong",
+      "providerType": "nobwI' Segh",
+      "parameters": "DIvI'mey",
+      "actions": "vangmey"
+    },
+    "confirm": {
+      "delete": "nobwI' De'wI' vam Qaw''a'? 'oH DalulHa'bogh tetlh Dochmey cha'moHlaHbe'. choHlaHbe'lu'."
+    },
+    "success": {
+      "created": "nobwI' De'wI' \"{name}\" chenmoHlu'pu'",
+      "updated": "nobwI' De'wI' \"{name}\" choHlu'pu'",
+      "deleted": "nobwI' De'wI' Qaw'lu'pu'"
+    },
+    "errors": {
+      "load": "nobwI' De'wI'mey ghelmeH lujpu'",
+      "save": "nobwI' De'wI' polmeH lujpu'",
+      "createStatus": "De'wI' chenmoHmeH lujpu' ({status})",
+      "updateStatus": "De'wI' choHmeH lujpu' ({status})",
+      "delete": "nobwI' De'wI' Qaw'meH lujpu'",
+      "deleteConflict": "Qaw'laHbe': tetlh Doch De'wI' vam lul.",
+      "paramsInvalidJson": "DIvI'mey teH JSON taHnIS (chetvI').",
+      "paramsNotArray": "DIvI'mey JSON chetvI' taHnIS."
+    }
+  },
+  "adminAgentPools": {
+    "title": "Duy bIQ'a'mey",
+    "description": "vangwI' Duy bIQ'a'mey je 'IjwI'meyDaj vu'",
+    "empty": "Duy bIQ'a' numtaHbe'lu'.",
+    "actions": {
+      "newPool": "bIQ'a' chu'",
+      "createPool": "bIQ'a' chenmoH",
+      "creating": "chenmoHtaH...",
+      "cancel": "qIl",
+      "edit": "choH",
+      "save": "pol",
+      "saving": "poltaH...",
+      "delete": "Qaw'",
+      "deleting": "Qaw'taH...",
+      "confirmDelete": "Qaw' tob"
+    },
+    "form": {
+      "name": "pong",
+      "namePattern": "ghItlh mI' HIvje' je neH. ghItlh mI' joq taghnIS.",
+      "description": "QIj",
+      "descriptionPlaceholder": "prod AWS vangwI'pu'",
+      "labels": "permey"
+    },
+    "columns": {
+      "name": "pong",
+      "description": "QIj",
+      "status": "Dotlh",
+      "created": "chenmoHlu'pu'"
+    },
+    "badges": {
+      "default": "motlh",
+      "degradedTooltip": "'IjwI'pu' tIqDu'taH 'ach qIttamlIj mevbejpu' — Sarmey taghlaHbe'.",
+      "status": {
+        "online": "yIntaH",
+        "offline": "yIntaHbe'",
+        "degraded": "pujmoHlu'"
+      }
+    },
+    "detail": {
+      "back": "Duy bIQ'a'meyDaq chegh",
+      "defaultDescription": "Duy bIQ'a'"
+    },
+    "tabs": {
+      "settings": "numtaHmey",
+      "tokens": "tokenmey",
+      "listeners": "'IjwI'pu'"
+    },
+    "settings": {
+      "title": "bIQ'a' numtaHmey",
+      "fields": {
+        "name": "pong",
+        "description": "QIj",
+        "created": "chenmoHlu'pu'",
+        "owner": "ghajwI'",
+        "yourPermission": "chaw'lIj",
+        "labels": "permey"
+      },
+      "permissions": {
+        "read": "laD",
+        "write": "ghItlh",
+        "admin": "che'wI'"
+      }
+    },
+    "danger": {
+      "title": "bIQ'a' Qaw'",
+      "description": "Duy bIQ'a' vam Hoch rarlu'bogh tokenmey je reH Qaw'."
+    },
+    "tokens": {
+      "create": "token chenmoH",
+      "empty": "bIQ'a' vamvaD token Hutlh.",
+      "revoke": "naghmoH",
+      "created": {
+        "title": "token chenmoHlu'pu' 'ej Qappu'",
+        "copyNow": "DaH token vam yIveb — 'angqa'be'lu'.",
+        "copy": "velqa'"
+      },
+      "form": {
+        "description": "QIj",
+        "descriptionPlaceholder": "prod 'IjwI' token",
+        "maxUses": "lo' HeH",
+        "maxUsesHint": "motlh 2 — 'IjwI' rurmeyDaq wa' taghmeH-Qatlh nID SIQ.",
+        "expiresAt": "mevbejDI'",
+        "expiresAtHint": "motlh DaH rep wa' vorgh."
+      },
+      "columns": {
+        "description": "QIj",
+        "uses": "lo'mey",
+        "expires": "mevbej",
+        "status": "Dotlh",
+        "createdBy": "chenmoHwI'",
+        "actions": "vangmey"
+      },
+      "badges": {
+        "revoked": "naghmoHlu'pu'",
+        "active": "vangtaH"
+      }
+    },
+    "listeners": {
+      "empty": "bIQ'a' vamvaD 'IjwI' tlhamlu'be'.",
+      "columns": {
+        "name": "pong",
+        "status": "Dotlh",
+        "replicas": "velmey",
+        "certExpires": "qIttam mevbej",
+        "actions": "vangmey"
+      },
+      "status": {
+        "online": "yIntaH",
+        "offline": "yIntaHbe'",
+        "degraded": "pujmoHlu'",
+        "cert-expired": "qIttam mevbej"
+      },
+      "tooltips": {
+        "certExpired": "'IjwI' tIq'a'taH 'ach qIttamDaj mevbejpu' — Hoch qIttam-numtaHbogh Sor (Sar tlham, choHqa', vangwI'-token) luj. meq motlh: qIttam Qav numbe' API, joq choHqa' pa' qIttam TTL rInpu'.",
+        "degraded": "'IjwI'pu' tIqDu'taH 'ach qIttamlIj mevbejpu' — Sarmey taghlaHbe'."
+      }
+    },
+    "confirm": {
+      "revokeToken": "rarmeH token vam naghmoH'a'? 'IjwI'pu' 'oH lo'bogh rarlaHbe'qa' 'ej choHlaHbe'lu'.",
+      "deleteListener": "'IjwI' vam Qaw''a'? por yIntaHchugh, tIq'a'Daj vebDaq tlhamqa'."
+    },
+    "success": {
+      "poolUpdated": "bIQ'a' choHlu'pu'",
+      "tokenRevoked": "token naghmoHlu'pu'",
+      "listenerDeleted": "'IjwI' Qaw'lu'pu'"
+    },
+    "errors": {
+      "loadPools": "Duy bIQ'a'mey ghelmeH lujpu'",
+      "loadPool": "bIQ'a' ghelmeH lujpu'",
+      "loadTokens": "tokenmey ghelmeH lujpu'",
+      "loadListeners": "'IjwI'pu' ghelmeH lujpu'",
+      "createPool": "bIQ'a' chenmoHmeH lujpu'",
+      "createStatus": "bIQ'a' chenmoHmeH lujpu' ({status})",
+      "updatePool": "bIQ'a' choHmeH lujpu'",
+      "deletePool": "bIQ'a' Qaw'meH lujpu'",
+      "poolNotFound": "bIQ'a' tu'be'lu'",
+      "createToken": "token chenmoHmeH lujpu'",
+      "createTokenStatus": "token chenmoHmeH lujpu' ({status})",
+      "revokeToken": "token naghmoHmeH lujpu'",
+      "deleteListener": "'IjwI' Qaw'meH lujpu'"
+    }
+  },
+  "adminAuditLog": {
+    "title": "nItebHa' teywI'",
+    "description": "Hoch API tlhobmey choHlaHbe' teywI'",
+    "empty": "nItebHa' teywI' 'el tu'be'lu'.",
+    "errors": {
+      "load": "nItebHa' teywI' ghelmeH lujpu'"
+    },
+    "filters": {
+      "actorEmail": "vangwI' QIn Sum",
+      "actorPlaceholder": "user@example.com",
+      "resourceType": "Sep Segh",
+      "resourceTypePlaceholder": "workspaces",
+      "method": "mIw",
+      "methodAll": "Hoch",
+      "since": "tagh",
+      "until": "paS",
+      "clear": "teq",
+      "apply": "DarSeHmey lo'"
+    },
+    "columns": {
+      "timestamp": "poH",
+      "actor": "vangwI'",
+      "action": "vang",
+      "resourceType": "Sep Segh",
+      "resourceId": "Sep ID",
+      "status": "Dotlh",
+      "duration": "poH nI'"
+    },
+    "pagination": {
+      "summary": "nav {current}, {total} ghom ({count, plural, one {# 'el} other {# 'elmey}})",
+      "previous": "wa'Hu'",
+      "next": "veb"
+    }
+  },
+  "adminBinaryCache": {
+    "title": "nge'wI'",
+    "description": "CLI HaqwI' je nobwI' nge'wI' vu'",
+    "errors": {
+      "loadBinary": "HaqwI' nge'wI' ghelmeH lujpu'",
+      "loadCache": "nge'wI' ghelmeH lujpu'"
+    },
+    "sections": {
+      "cliBinaries": "CLI HaqwI'mey",
+      "providerBinaries": "nobwI' HaqwI'mey"
+    },
+    "empty": {
+      "binaries": "nge'lu'pu'bogh CLI HaqwI' Hutlh.",
+      "providers": "nge'lu'pu'bogh nobwI' HaqwI' Hutlh."
+    },
+    "columns": {
+      "tool": "tool",
+      "version": "mI'",
+      "os": "OS",
+      "arch": "Arch",
+      "cachedAt": "nge'lu'pu'DI'",
+      "provider": "nobwI'",
+      "hostname": "host pong",
+      "actions": "vangmey"
+    },
+    "warm": {
+      "heading": "nge'wI' tujmoH",
+      "hide": "So'",
+      "prePopulate": "Dung buy'moH…",
+      "help": "nge'wI'Daq HaqwI'mey je nobwI' qachmey Dung Suq (wa' per HuH). Qav <code>os/arch</code> mu'mey DIchlu' — numtaHlu'bogh motlh qachmey lo'meH tImev.",
+      "binariesLabel": "HaqwI'mey",
+      "providersLabel": "nobwI'pu'",
+      "warm": "tujmoH",
+      "warming": "tujmoHtaH…",
+      "confirm": "DaH wIvlu'bogh nge'wI' 'elmey tujmoH'a'?",
+      "errorEmpty": "tujmoHmeH wa'maH HaqwI' joq nobwI' per chel.",
+      "errorFailedStatus": "tujmoH lujpu' ({status})",
+      "errorFailed": "nge'wI' tujmoHmeH lujpu'",
+      "success": "{total} ghUved {succeeded} tujmoHlu'pu' ({failed} lujpu')"
+    },
+    "purge": {
+      "button": "tlhIl",
+      "confirmBinary": "nge'wI'vo' {tool} {version} tlhIl'a'? tlhob veb, mungvo' Hevqa'lu'.",
+      "confirmProvider": "nobwI' nge'wI'vo' {provider} {version} tlhIl'a'? tlhob veb, mungvo' Hevqa'lu'.",
+      "successBinary": "{tool} {version} {count} 'elmey tlhIllu'pu'",
+      "successProvider": "{provider} {version} {count} 'elmey tlhIllu'pu'",
+      "errorStatus": "tlhIl lujpu' ({status})",
+      "error": "tlhIlmeH lujpu'",
+      "errorProvider": "nobwI' tlhIlmeH lujpu'",
+      "errorProviders": "nobwI'pu' tlhIlmeH lujpu'"
+    },
+    "batchPurge": {
+      "purging": "tlhIltaH...",
+      "purgeSelected": "wIvlu'bogh tlhIl ({count})",
+      "confirmBinary": "Hoch wIvlu'bogh HaqwI' nge'wI' 'elmey tlhIl'a'? tlhob veb, mungvo' Hevqa'lu'.",
+      "confirmProvider": "Hoch wIvlu'bogh nobwI' nge'wI' 'elmey tlhIl'a'? tlhob veb, mungvo' Hevqa'lu'.",
+      "errorBinaryItem": "{tool} {version} tlhIl lujpu'",
+      "errorProviderItem": "{provider} {version} tlhIl lujpu'",
+      "successBinary": "{count} HaqwI' nge'wI' 'elmey tlhIllu'pu'",
+      "successProvider": "{count} nobwI' nge'wI' 'elmey tlhIllu'pu'"
+    }
+  },
+  "catalog": {
+    "title": "vum tetlh",
+    "description": "wIvlu'pu'bogh Seghmeyvo' bIt-vum nISwI' cha'moH",
+    "notEnabled": "vum tetlh chu'be'lu'.",
+    "empty": "tetlh Doch Hutlh.",
+    "card": {
+      "pinned": "ngaQmoHlu' {version}",
+      "latest": "ram"
+    },
+    "errors": {
+      "loadItems": "tetlh Dochmey ghelmeH lujpu'"
+    }
+  },
+  "catalogDetail": {
+    "backLink": "← tetlh",
+    "backToCatalog": "tetlhDaq chegh",
+    "fallbackTitle": "tetlh Doch",
+    "notFound": "tetlh Doch tu'be'lu', joq vum tetlh chu'be'lu'.",
+    "common": {
+      "cancel": "qIl"
+    },
+    "info": {
+      "module": "Segh:",
+      "resolvedVersion": "wIvlu'pu'bogh mI':",
+      "latest": "ram",
+      "disabled": "chu'Ha'lu'pu'"
+    },
+    "pending": {
+      "banner": "<strong>{name}</strong> Sar nabpu' 'ej laDmeH loStaH. lo'meH tob, joq woD.",
+      "working": "vumtaH…",
+      "confirmApply": "tob 'ej lo'",
+      "discard": "woD"
+    },
+    "field": {
+      "select": "wIv…"
+    },
+    "provision": {
+      "title": "cha'moH",
+      "workspaceName": "Qumwo' pong",
+      "workspaceNameTitle": "ghItlh mI' HIvje' je neH. ghItlh mI' joq taghnIS.",
+      "workspaceNamePlaceholder": "my-instance",
+      "agentPool": "Duy bIQ'a'",
+      "selectPool": "bIQ'a' wIv…",
+      "noPoolsAvailable": "SoHvaD Duy bIQ'a' lo'laH pagh. cha'moHmeH Duy bIQ'a'Daq ghItlh chaw' DaghajnIS — che'wI' vaD tlhob.",
+      "noPoolsAllowed": "tetlh Doch vam chaw'bogh Duy bIQ'a'mey lo'laHbe' vay'. che'wI'vaD tetlh Doch chaw'bogh bIQ'a'mey QIvmoH joq wa' chaw'meH tlhob.",
+      "version": "mI'",
+      "latestFloat": "ram (voq)",
+      "defaultPinOption": "{version} (motlh ngaQmoH)",
+      "labelsOptional": "permey (DaH DIch)",
+      "autoApplyHint": "laDmeH ghopHa' vangbe'DI', tlhoS lo' choHmey lo'.",
+      "provisioning": "cha'moHtaH…",
+      "submit": "cha'moH"
+    },
+    "instances": {
+      "title": "Dochmey",
+      "empty": "Doch vamvo' Doch cha'moHlu'be'.",
+      "colName": "pong",
+      "colVersion": "mI'",
+      "colPool": "bIQ'a'",
+      "colActions": "vangmey",
+      "reconfigure": "numtaHqa'",
+      "destroy": "Qaw'",
+      "orphan": "woDroS…",
+      "orphanTitle": "nISwI'Daj Qaw'be'taHvIS tetlh teywI' Qaw' (qeSbe'lu')"
+    },
+    "reconfigure": {
+      "title": "{name} numtaHqa'",
+      "description": "'elmey joq mI' choH, vaj Sar tlham.",
+      "currentOption": "{version} (DaHjaj)",
+      "queuing": "tlhamDaq…",
+      "queueRun": "Sar tlham"
+    },
+    "destroy": {
+      "title": "{name} Qaw'",
+      "heading": "{name} Qaw''a'?",
+      "description": "Doch vam nISwI' Qaw'bogh Qaw' Sar tlham vam. lo' Qapchugh, Qumwo' pollu'. choHlaHbe'lu'.",
+      "autoApplyHint": "laDbe'taHvIS tlhoS lo' SIbI' Qaw'."
+    },
+    "orphan": {
+      "title": "{name} woDroS",
+      "heading": "{name} woDroS'a'?",
+      "description": "tetlh Doch teywI'' Qaw''vam ''ach nISwI''Daj <warn>Qaw''be''</warn> — cha''moHlu''pu''bogh Sepmey yIntaHtaH, <warn>tlhamlu''be'' ''ej vu''lu''be''</warn>. qeSbe''lu''. nISwI'' Suqqa''meH, qIl ''ej <emph>Qaw''</emph> lo''.",
+      "confirmPrompt": "tobmeH Doch pong <mono>{name}</mono> ghItlh:",
+      "orphaning": "woDroStaH…",
+      "submit": "woDroS 'ej nISwI' woD"
+    },
+    "actions": {
+      "confirmed": "Sar toblu'pu' — lo'taH.",
+      "discarded": "Sar woDlu'pu'.",
+      "provisioned": "{name} cha'moHlu'pu' — laDmeH nab ghuHpu'.",
+      "reconfigureQueued": "numtaHqa' tlhamDaq — Sar chenmoHlu'pu'.",
+      "reconfigureQueuedStatus": "numtaHqa' tlhamDaq — Sar {status}.",
+      "destroyQueued": "Qaw' tlhamDaq — Sar chenmoHlu'pu'.",
+      "destroyQueuedStatus": "Qaw' tlhamDaq — Sar {status}.",
+      "orphaned": "{name} woDroSlu'pu' — tetlh teywI' Qaw'lu'pu'; nISwI'Daj yIntaHtaH, tlhamlu'be' 'ej vu'lu'be'."
+    },
+    "errors": {
+      "loadItem": "tetlh Doch ghelmeH lujpu'",
+      "confirm": "tobmeH lujpu'",
+      "confirmStatus": "tobmeH lujpu' ({status})",
+      "discard": "woDmeH lujpu'",
+      "discardStatus": "woDmeH lujpu' ({status})",
+      "provision": "cha'moHmeH lujpu'",
+      "provisionStatus": "cha'moHmeH lujpu' ({status})",
+      "reconfigure": "numtaHqa'meH lujpu'",
+      "reconfigureStatus": "numtaHqa'meH lujpu' ({status})",
+      "destroy": "Qaw'meH lujpu'",
+      "destroyStatus": "Qaw'meH lujpu' ({status})",
+      "orphan": "woDroSmeH lujpu'",
+      "orphanStatus": "woDroSmeH lujpu' ({status})"
+    }
+  },
+  "common": {
+    "connection": {
+      "reconnecting": "rarqa'taH…"
+    },
+    "sessionExpiry": {
+      "banner": "{minutes, plural, one {# tup} other {# tupmey}} joj mevbej — <link>numqa''</link>"
+    },
+    "tokenExpiry": {
+      "withinDays": "{count, plural, one {# vum token} other {# vum tokenmey}} {days, plural, one {# jaj} other {# jajmey}} mevbej — <link>yIlegh</link>",
+      "soon": "{count, plural, one {# vum token} other {# vum tokenmey}} tugh mevbej — <link>yIlegh</link>",
+      "dismissAria": "token mevbej ghuHmoH woD"
+    },
+    "resourceUsage": {
+      "title": "Sep lo'",
+      "oomKilled": "OOM-HoHlu'",
+      "killedLikelyOom": "HoHlu' (OOMlaw')",
+      "memory": "qawHaq",
+      "requested": "tlhoblu'pu' {value}",
+      "limit": "veH {value}"
+    },
+    "labelsEditor": {
+      "none": "pagh",
+      "removeAria": "{key} teq",
+      "keyPlaceholder": "ngaQHa'wI'",
+      "valuePlaceholder": "nap",
+      "add": "chel"
+    },
+    "sensitiveInput": {
+      "hide": "So'",
+      "show": "'ang",
+      "hideAria": "nap So'",
+      "showAria": "nap 'ang"
+    },
+    "workspacePicker": {
+      "searchPlaceholder": "Qumwo'mey nej…",
+      "loading": "gheltaH…",
+      "empty": "Qumwo' tu'be'lu'",
+      "adding": "cheltaH…"
+    },
+    "templateEditors": {
+      "remove": "teq",
+      "add": "chel",
+      "valuePlaceholder": "nap",
+      "name": "pong",
+      "url": "URL",
+      "hmacKey": "HMAC ngaQHa'wI' (DaH DIch)",
+      "hmacKeyPlaceholder": "HuvmeH pegh",
+      "stage": "'ay'",
+      "enforcement": "ra'",
+      "enabled": "chu'lu'pu'",
+      "runTaskNamePlaceholder": "security-scan",
+      "runTaskUrlPlaceholder": "https://hooks.example.com/task",
+      "addRunTask": "Sar Qu' chel",
+      "destinationType": "paw' Segh",
+      "token": "token (DaH DIch)",
+      "tokenPlaceholder": "HMAC / numtaH token",
+      "notificationNamePlaceholder": "slack-alerts",
+      "notificationUrlPlaceholder": "https://hooks.slack.com/services/...",
+      "emailAddresses": "QIn Summey",
+      "emailPlaceholder": "ops@example.com",
+      "addEmail": "QIn Sum chel",
+      "triggers": "taghwI'mey",
+      "addNotification": "QIn chel"
+    }
+  },
+  "planSummary": {
+    "aiGenerated": "AI chenmoHlu'pu'",
+    "heading": {
+      "planSummary": "nab tlhoS",
+      "failureAnalysis": "luj Qel"
+    },
+    "errors": {
+      "status": "HTTP {status}"
+    },
+    "regenerate": {
+      "label": "chenmoHqa'",
+      "queueing": "tlhamDaq…",
+      "tooltip": "rap nab 'el AI tlhoS vangqa'",
+      "ariaLabel": "AI tlhoS chenmoHqa'",
+      "confirm": "AI Qel chenmoHqa''a'? model vangqa'vam.",
+      "error": "chenmoHqa'laHbe': <mono>{detail}</mono>"
+    },
+    "pending": {
+      "summarisingPlan": "nab tlhoStaH…",
+      "analysingFailure": "luj Qeltaħ…"
+    },
+    "skipped": {
+      "fallback": "Sar vamvaD tlhoS jumlu'pu'."
+    },
+    "errored": {
+      "heading": "tlhoSwI' lujpu'"
+    },
+    "riskFactors": {
+      "heading": "Qob meqmey",
+      "suggestedFixes": "chImmeH qeSmey"
+    },
+    "tokens": "{input} 'el / {output} chel tokenmey",
+    "risk": {
+      "low": "puj",
+      "medium": "botlh",
+      "high": "jen",
+      "critical": "Qob'a'",
+      "unknown": "Sovbe'"
+    },
+    "badges": {
+      "noChanges": "choHbe'lu'",
+      "noChangesLower": "choHbe'lu'",
+      "noChangesTitle": "Sep choHmey ghajbe' 'e' nab maq",
+      "toAdd": "{count, plural, one {# chelnIS} other {# chelnIS}}",
+      "toChange": "{count, plural, one {# choHnIS} other {# choHnIS}}",
+      "toDestroy": "{count, plural, one {# Qaw'nIS} other {# Qaw'nIS}}",
+      "toReplace": "{count, plural, one {# chartlhnIS} other {# chartlhnIS}}",
+      "toImport": "{count, plural, one {# 'elnIS} other {# 'elnIS}}"
+    },
+    "chat": {
+      "heading": "tlha'meH",
+      "sharedThreadNote": "wa' hurgh HuvmoHlu', Qumwo' laD ghajwI' Hoch legh.",
+      "placeholder": "nab vam tlha'meH yu' yIghel… (⌘/Ctrl + Enter ngeHmeH)",
+      "send": "ngeH",
+      "thinking": "QubtaH…",
+      "you": "SoH",
+      "assistant": "QaHwI'"
+    },
+    "translatedNote": "HollIjDaq tlhoS mughlu'pu'. tlhoS ghItlh potlh 'oH mung'e'.",
+    "translating": "mughtaH…"
+  },
+  "runDetail": {
+    "notFound": "Sar tu'be'lu'",
+    "runSection": "Sar 'ay'",
+    "workspaceFallback": "Qumwo'",
+    "backTo": "{name}Daq chegh",
+    "errorHeading": "Qagh",
+    "discardedHeading": "woDlu'pu' — nab qa'nISlu'",
+    "common": {
+      "yes": "HISlaH",
+      "no": "ghobe'"
+    },
+    "header": {
+      "title": "Sar {id}",
+      "titleWithWorkspace": "{workspace} — Sar {id}",
+      "description": "{source} Sar"
+    },
+    "relTime": {
+      "justNow": "DaH",
+      "minutesAgo": "{count, plural, one {# tup ret} other {# tupmey ret}}",
+      "hoursAgo": "{count, plural, one {# rep ret} other {# repmey ret}}",
+      "daysAgo": "{count, plural, one {# jaj ret} other {# jajmey ret}}"
+    },
+    "status": {
+      "pending": "loStaH",
+      "queued": "tlhamDaq",
+      "planning": "nabtaH",
+      "planned": "nabpu'",
+      "confirmed": "tobpu'",
+      "applying": "lo'taH",
+      "canceling": "qIltaH",
+      "applied": "lo'pu'",
+      "errored": "Qaghpu'",
+      "canceled": "qIlpu'",
+      "discarded": "woDlu'pu'"
+    },
+    "activity": {
+      "pending": "Sar ghuHmoHtaH",
+      "queued": "Duy lo'laH loStaH",
+      "planning": "terraform plan vangtaH",
+      "plannedConfirmable": "tob 'ej lo' 'e' loStaH",
+      "plannedSpeculative": "Hech nab rInpu'",
+      "plannedComplete": "nab rInpu'",
+      "confirmed": "lo' taghtaH",
+      "applying": "terraform apply vangtaH",
+      "canceling": "Sar mevmoHtaH",
+      "applied": "lo' rInpu'",
+      "errored": "Sar lujpu'",
+      "canceled": "Sar qIlpu'",
+      "discarded": "nab woDlu'pu'",
+      "elapsedTitle": "'ay' vamDaq poH ret"
+    },
+    "badge": {
+      "destroy": "Qaw'",
+      "planOnly": "nab neH"
+    },
+    "actions": {
+      "retryShort": "nID",
+      "retryFull": "Sar nID",
+      "retrying": "nIDtaH…",
+      "confirmShort": "lo'",
+      "confirmFull": "tob 'ej lo'",
+      "confirming": "tobtaH…",
+      "discard": "woD",
+      "discarding": "woDtaH…",
+      "cancelShort": "qIl",
+      "cancelFull": "Sar qIl",
+      "canceling": "qIltaH…"
+    },
+    "confirm": {
+      "apply": "Sar vam lo''a'? nab lo'vam 'ej nISwI' choHvam.",
+      "discard": "nab vam woD'a'?",
+      "cancel": "Sar vam qIl'a'?",
+      "retry": "Sar vam nID je'a'?"
+    },
+    "errors": {
+      "loadRun": "Sar ghelmeH lujpu'",
+      "action": {
+        "confirm": "Sar tobmeH lujpu'",
+        "discard": "Sar woDmeH lujpu'",
+        "cancel": "Sar qIlmeH lujpu'",
+        "retry": "Sar nID jemeH lujpu'"
+      }
+    },
+    "tabs": {
+      "overview": "'aqroS",
+      "ai": "AI",
+      "aiFull": "AI Qel",
+      "opa": "OPA",
+      "opaFull": "OPA chutmey",
+      "impact": "'ang",
+      "impactFull": "'ang chart",
+      "planLabel": "nab<log>teywI''</log>",
+      "applyLabel": "lo''<log>teywI''</log>",
+      "planFull": "nab teywI'",
+      "applyFull": "lo' teywI'",
+      "details": "De'De'"
+    },
+    "banner": {
+      "destroy": "<strong>Qaw''</strong> Sar vam — lo''lu''DI'' vu''lu''bogh Sepmey Hoch Qaw''lu''.",
+      "planOnlyCli": "VCS-rarlu'bogh QumwoDaq CLIvo' taghlu'pu'bogh <strong>nab-neH</strong> Sar vam. CLI-lI'lu'bogh code lo'laHbe' — VCS-vu'lu'bogh code neH lo'laH.",
+      "moduleOverridesPrefix": "Sar vam <strong>Segh DIvI'mey</strong> lo'",
+      "moduleOverridesFromPr": "PR #{number}vo'",
+      "moduleOverridesSuffix": "chumlu'pu'bogh nughmey teywI' mI' DIvI'taHvIS PR paQvo' Hevlu'."
+    },
+    "cards": {
+      "changes": "choHmey",
+      "aiAnalysis": "AI Qel",
+      "policyChecks": "chut toblu'mey",
+      "resources": "Sep"
+    },
+    "changes": {
+      "noChanges": "choHbe'lu'",
+      "planning": "nabtaH…",
+      "toAdd": "chelnIS",
+      "toChange": "choHnIS",
+      "toDestroy": "Qaw'nIS",
+      "toReplace": "chartlhnIS",
+      "toImport": "'elnIS"
+    },
+    "ai": {
+      "notAvailable": "lo'laHbe'",
+      "ready": "ghuHpu'",
+      "riskSub": "{risk} Qob",
+      "generating": "chenmoHtaH…",
+      "skipped": "jumlu'pu'",
+      "failed": "lujpu'",
+      "available": "lo'laH"
+    },
+    "policy": {
+      "none": "pagh",
+      "blocked": "botlu'pu'",
+      "failedSub": "{count, plural, one {# lujpu''} other {# lujpu''}}",
+      "advisoryIssues": "qeSwI' Qaghmey",
+      "passedSub": "{passed}/{total} Qappu'",
+      "passed": "Qappu'"
+    },
+    "resources": {
+      "overLimit": "veH yopqu'",
+      "oomKilled": "OOM-HoHlu'",
+      "recorded": "qonlu'pu'",
+      "nearLimit": "veHDaq Sum",
+      "high": "jen",
+      "withinLimits": "veHDaq"
+    },
+    "details": {
+      "heading": "De'De'",
+      "executionBackend": "vangmeH tool",
+      "source": "mung",
+      "autoApply": "tlhoS lo'",
+      "planOnly": "nab neH",
+      "triggeredBy": "taghmoHwI'",
+      "created": "chenmoHlu'pu'",
+      "commit": "chum",
+      "branch": "paQ",
+      "prMr": "PR/MR",
+      "stateVersion": "Dotlh mI'",
+      "viewState": "Dotlh legh",
+      "runOptions": "Sar wIvmey"
+    },
+    "timeline": {
+      "heading": "poH tlhegh",
+      "queued": "tlhamDaq",
+      "planningStarted": "nab taghpu'",
+      "planComplete": "nab rInpu'",
+      "confirmed": "tobpu'",
+      "applyingStarted": "lo' taghpu'",
+      "applied": "lo'pu'",
+      "errored": "Qaghpu'",
+      "canceled": "qIlpu'",
+      "discarded": "woDlu'pu'"
+    },
+    "log": {
+      "color": "rItlh",
+      "colorOnTitle": "ANSI rItlhmey 'angtaH — ghItlh SaSmoH 'e' qIp",
+      "colorOffTitle": "ghItlh SaS 'angtaH — rItlhmey 'angmeH qIp",
+      "refresh": "tI'ang qa'",
+      "refreshTitle": "teywI' tI'ang qa'",
+      "copy": "velqa'",
+      "copied": "vellu'pu'!",
+      "copyTitle": "ghItlh SaS velmeH velHaqDaq",
+      "copyAria": "teywI' velHaqDaq vel",
+      "download": "pol",
+      "downloadColorTitle": "teywI' pol (ANSI rItlh mI'mey qem)",
+      "downloadPlainTitle": "teywI' pol (ghItlh SaS)",
+      "downloadAria": "teywI' pol",
+      "follow": "tlha'",
+      "followOnTitle": "yInbogh Qav tlha'taH — mevmeH qIp",
+      "followOffTitle": "yInbogh Qav tlha'",
+      "end": "Qav",
+      "endTitle": "teywI' Qav Sup",
+      "planEmpty": "nab chel tu'be'lu' DaH.",
+      "applyEmpty": "lo' chel tu'be'lu' DaH."
+    },
+    "policyPanel": {
+      "heading": "chut toblu'mey",
+      "passedCount": "{passed}/{total} Qappu'",
+      "blockedMessage": "Sar vam <strong>poQlu''bogh chut Segh botlu''</strong>. luj SeHlu'' joq che''wI'' DIvI''moHchugh neH lo''.",
+      "overriding": "DIvI'moHtaH...",
+      "overrideContinue": "DIvI'moH 'ej taH",
+      "overrideFailed": "DIvI'moH lujpu'",
+      "overrideFailedStatus": "DIvI'moH lujpu' ({status})",
+      "overriddenBy": "{by} DIvI'moHlu'pu'",
+      "policyPassed": "Qappu'",
+      "noDenyMessage": "tuH QIn joq Qagh chel chenmoHbe'taHvIS chut lujpu'",
+      "enforcement": {
+        "mandatory": "poQlu'",
+        "advisory": "qeSwI'"
+      },
+      "outcome": {
+        "passed": "Qappu'",
+        "failed": "lujpu'",
+        "errored": "Qaghpu'"
+      }
+    }
+  },
+  "workspaceDetail": {
+    "notFound": "Qumwo' tu'be'lu'",
+    "common": {
+      "enabled": "chu'lu'pu'",
+      "disabled": "chu'Ha'lu'pu'",
+      "none": "pagh",
+      "default": "motlh",
+      "never": "not",
+      "actions": "vangmey",
+      "workspaceLocked": "Qumwo' ngaQlu'"
+    },
+    "actions": {
+      "edit": "choH",
+      "cancel": "qIl",
+      "save": "pol",
+      "saving": "poltaH…",
+      "savingEllipsis": "poltaH...",
+      "delete": "Qaw'",
+      "deleting": "Qaw'taH...",
+      "add": "chel",
+      "adding": "cheltaH...",
+      "remove": "teq",
+      "download": "pol",
+      "rollback": "chegh",
+      "close": "SoQmoH",
+      "hide": "So'",
+      "enable": "chu'",
+      "disable": "chu'Ha'",
+      "creating": "chenmoHtaH...",
+      "sending": "ngeHtaH...",
+      "processing": "vumtaH...",
+      "queuing": "tlhamDaq...",
+      "loading": "gheltaH...",
+      "loadingLower": "gheltaH…"
+    },
+    "header": {
+      "executionMode": "{mode} vangmeH mIw"
+    },
+    "tabs": {
+      "overview": "'aqroS",
+      "variables": "choHlaHmey",
+      "runs": "Sarmey",
+      "state": "Dotlh",
+      "stateGraph": "Dotlh chart",
+      "configurations": "numtaHmey",
+      "notifications": "QInmey",
+      "runTasks": "Sar Qu'mey",
+      "runTriggers": "Sar taghwI'mey",
+      "sharing": "HuvmoH",
+      "selectLabel": "Qumwo' 'ay'"
+    },
+    "lifecycle": {
+      "pendingDeletion": "Qaw' loStaH",
+      "pendingDeletionDefault": "Qaw'meH per Qumwo'vam 'ej ghop vang poQ.",
+      "archived": "polpu'",
+      "archivedDefault": "Qumwo'vam pollu'pu'."
+    },
+    "runQueuedBanner": {
+      "message": "Sar tlhamDaq Qappu'.",
+      "viewRun": "Sar legh"
+    },
+    "settings": {
+      "title": "numtaHmey",
+      "saveChanges": "choHmey pol",
+      "renamedNotice": "Qumwo' pongqa'lu'pu'. <cloud></cloud> 'ay'lIjDaq <name></name> Sep choH 'ej rurmoH."
+    },
+    "fields": {
+      "name": "pong",
+      "nameTitle": "ghItlh mI' HIvje' je. ghItlh mI' joq taghnIS.",
+      "executionMode": "vangmeH mIw",
+      "execModeLocal": "pa'Daq",
+      "execModeAgent": "Duy",
+      "autoApply": "tlhoS lo'",
+      "cpuRequest": "CPU tlhob",
+      "cpuRequestTitle": "Kubernetes CPU tIq: naQ (1, 2) joq millicore (500m, 100m)",
+      "memoryRequest": "qawHaq tlhob",
+      "memoryRequestTitle": "Kubernetes qawHaq tIq: byte (1000) joq ghItlh (512Mi, 2Gi, 1Ti)",
+      "executionBackend": "vangmeH tool",
+      "version": "mI'",
+      "versionPlaceholder": "Da 1.11 joq 1.11.5",
+      "versionTitle": "X.Y joq X.Y.Z mI' (Da 1.11 joq 1.11.5)",
+      "terragruntEnabledAgent": "chu'lu'pu' (Duy mIw)",
+      "terragruntEnabledVersion": "chu'lu'pu' (v{version})",
+      "terragruntVersionPlaceholder": "Da 1.0",
+      "terragruntVersionTitle": "X.Y joq X.Y.Z mI'Daq Terragrunt mI' (Da 1.0)",
+      "workingDirectory": "vum tetlh",
+      "workingDirectoryPlaceholder": "Da environments/dev",
+      "agentPool": "Duy bIQ'a'",
+      "owner": "ghajwI'",
+      "vcsConnection": "VCS rar",
+      "vcsRepository": "VCS repo",
+      "vcsRepositoryTitle": "HTTP joq HTTPS URL taHnIS",
+      "vcsBranch": "VCS paQ",
+      "vcsBranchPlaceholder": "main (motlh)",
+      "vcsWorkflow": "VCS Qu'mIw",
+      "vcsWorkflowMergeThenApply": "merge_then_apply (motlh — TFE / HCP motlh)",
+      "vcsWorkflowApplyThenMerge": "apply_then_merge (Atlantis motlh — 'elmeH wIv)",
+      "autoMerge": "lo'DI' tlhoS merge",
+      "autoMergeStrategy": "tlhoS merge mIw",
+      "vcsPolling": "VCS ghelqa'",
+      "labels": "permey (permey)",
+      "labelsTitle": "Qumwo' permey cha' Qu' ta': label-RBAC rurmoHmeH, 'ej terraform/tofu cloud '{' workspaces '{' tags = ... '}' '}' 'ay'mey rurbogh \"tags\" moj.",
+      "varFiles": "choHlaH teywI'mey",
+      "varFilesPlaceholder": "Da envs/dev.tfvars",
+      "triggerPrefixes": "taghwI' Hemmey",
+      "triggerPrefixesHint": "Sarmey taghmoHbogh tetlhmey. choqlu'DI', vum tetlh DarSeH DIvI'.",
+      "triggerPrefixesPlaceholder": "Da modules",
+      "triggerPrefixesNone": "pagh (vum tetlh lo')",
+      "driftIgnoreRules": "tlhotlh buSHa' chutmey",
+      "driftIgnoreRulesHint": "glob-Sovbogh Terraform Sum + Sep Hemmey, tlhotlh chevwI' So'lu'. <star></star> pagh joq law' <dot></dot>-Hutlhbogh ghItlhmey rur (<n></n> Summey Suq); <starIdx></starIdx> HIvje' Sum vay' rur. Sep neH ghajbogh Sum tuHHa' Sep vaH Doch — Qaw'mey je. tlhotlh neH qaS, motlh nab/lo' qaSbe'. tlhegh naQ legh <docs>drift-ignore-rules.md</docs>.",
+      "driftIgnoreRulesNone": "pagh (Hoch nab pImmoH tlhotlh moj)"
+    },
+    "vcsWorkflowWarning": {
+      "title": "VCS repolIjDaq chaw'moH nobbogh.",
+      "rbac": "PR merge laHbogh Hoch lo''laH. paQ ''avmeH chutmey (poQlu''bogh laDmey, Dotlh toblu''mey, code ghajwI'' chaw'') moj lojmIt. mIwvamDaq QIn-ra''lu''bogh vangmeyDaq Terrapod patlh/per RBAC <em>lo''be''</em>.",
+      "recommended": "<strong>qeSlu':</strong> tlhegh nIH poQ (merge pa' rebase/squash) vaj lo'lu'bogh chum 'oH pumbogh chum'e'.",
+      "credit": "tlho': <atlantis>Atlantis</atlantis>Daq Qu'mIwvam patlhlu'. PR-QIn-ra'lu'bogh lo'mey neH 'ej pat UI Hutlh neHbogh ghommeyvaD reH Atlantis 'oH tool nIH'e'."
+    },
+    "vcsPolling": {
+      "error": "Qagh",
+      "ok": "lugh ({time})",
+      "notPolled": "ghelqa'be' DaH"
+    },
+    "lockout": {
+      "revertLabels": "permey chegh",
+      "saveAnyway": "pol qoj"
+    },
+    "lock": {
+      "title": "ngaQ Dotlh",
+      "lockedDesc": "Qumwo'vam ngaQlu'. nab joq lo' vanglaHbe'.",
+      "unlockedDesc": "Qumwo'vam poSlu' 'ej Sarmey ghuHpu'.",
+      "lock": "ngaQmoH",
+      "unlock": "poSmoH",
+      "lockConfirm": "Qumwo'vam ngaQmoH'a'?",
+      "unlockConfirm": "Qumwo'vam poSmoH'a'?"
+    },
+    "drift": {
+      "title": "tlhotlh tu'",
+      "checkInterval": "toblu' poH",
+      "status": "Dotlh",
+      "statusNoDrift": "tlhotlh Hutlh",
+      "statusDrifted": "tlhotlhpu'",
+      "statusErrored": "Qaghpu'",
+      "statusUnchecked": "toblu'be'",
+      "dismiss": "woD",
+      "dismissing": "woDtaH…",
+      "dismissTitle": "maqlu'bogh tlhotlh Dotlh teq. tob veb tlhamlu'bogh 'oH buy'qa'moH teHvo'.",
+      "lastChecked": "toblu' Qav",
+      "checkNow": "DaH tob",
+      "checkNowTitle": "tlhotlh tobmeH nab-neH Sar tlham",
+      "checkNowTitleDisabled": "tlhotlh tu' wa'DIch chu'"
+    },
+    "intervals": {
+      "disabled": "chu'Ha'lu'pu'",
+      "1hour": "1 rep",
+      "4hours": "4 rep",
+      "12hours": "12 rep",
+      "24hours": "24 rep",
+      "48hours": "48 rep",
+      "3days": "3 jaj",
+      "7days": "7 jaj"
+    },
+    "planExpiry": {
+      "title": "nab mevbej",
+      "description": "tobbe'lu'bogh nab qan law'DI' tlhoS woD, vaj nab qan lo'lu'be' choHpu'bogh qo'Daq. motlh chu'Ha'; vaj nab qa'nISlu'. (lo'laHbogh Sarmey neH lo'.)",
+      "expireAfter": "mevbejmeH poH"
+    },
+    "aiSummary": {
+      "title": "AI nab tlhoS",
+      "description": "Qumwo'vam Hoch nab-'ay' wanI'Daq tlhoS LLM-chenmoHlu'bogh choH tlhoS, Qob nab, je luj Qel.",
+      "mode": "mIw",
+      "modeDefault": "nISwI' motlh tlha'",
+      "modeEnabled": "reH tlhoS",
+      "modeDisabled": "not tlhoS",
+      "contextLabel": "Qumwo' De'",
+      "contextLabelSuffix": "(DaH DIch, chelmeH)",
+      "contextPlaceholder": "Qumwo'vam neH AI SovnISbogh ngoDmey. Da 'service X vaultDaq HeghmoH — KMS ngaQHa'wI' Qaw'DI' Hoch nISwI' 'oS.'",
+      "noContext": "Qumwo' De' choqbe'lu'.",
+      "contextHint": "nISwI'-naQ De'Daq chellu'. veH 4000 ghItlhmey."
+    },
+    "slack": {
+      "title": "Slack QInmey",
+      "description": "Slack Sar QInmeyDaq Qumwo'vam 'el — chaw' tlhobmey, lo'mey, Qaghmey, je tlhotlh. HIvjeH chImmoH 'ej Qumwo'vam tammoHqa' (nISwI'-naQ ghommey Hutlh). che'wI' Slack app chu' poQ.",
+      "channel": "HIvjeH",
+      "channelPlaceholder": "#deploys joq HIvjeH ID (Da C0123ABCD)",
+      "notSet": "choqbe'lu' — tam.",
+      "hint": "HIvjeH tlhejwI' moj Slack app fltH."
+    },
+    "delete": {
+      "title": "Qumwo' Qaw'",
+      "description": "Qumwo'vam Hoch rarlu'bogh Dotlh, choHlaHmey, je Sarmey reH Qaw'.",
+      "confirm": "Qaw' tob"
+    },
+    "variables": {
+      "addVariable": "choHlaH chel",
+      "key": "ngaQHa'wI'",
+      "value": "nap",
+      "category": "Segh",
+      "categoryEnv": "Dat",
+      "sensitive": "pegh",
+      "empty": "Qumwo'vamvaD choHlaH numtaHbe'lu'.",
+      "emptyValue": "chIm",
+      "enterNewValue": "nap chu' 'el",
+      "deleteConfirm": "choHlaH \"{key}\" Qaw''a'?"
+    },
+    "runs": {
+      "options": "wIvmey",
+      "hideOptions": "wIvmey So'",
+      "queueDestroy": "Qaw' tlham",
+      "queueDestroyTitle": "Qaw' nab tlham",
+      "destroyAllConfirm": "Hoch Sepmey Qaw''a'?",
+      "confirmDestroy": "Qaw' tob",
+      "queuePlan": "nab tlham",
+      "queueRun": "Sar tlham",
+      "queuePlanConfirm": "Qumwo'vamvaD Hech nab tlham'a'?",
+      "queueApplyConfirm": "nab + lo' Sar tlham'a'? nISwI' choHlaH vam.",
+      "planOptions": "nab wIvmey",
+      "targetResources": "DoS Sepmey",
+      "replaceResources": "Sepmey chartlh",
+      "commaSeparated": "(HIvje' chevlu')",
+      "planOnly": "nab neH",
+      "refreshOnly": "tI'ang qa' neH",
+      "skipRefresh": "tI'ang qa' jump",
+      "allowEmptyApply": "chIm lo' chaw'",
+      "vcsRef": "VCS Sum",
+      "branch": "paQ",
+      "tag": "per",
+      "defaultBranch": "motlh ({branch})",
+      "nonDefaultRefNote": "motlhHa' Sum wIvlu' — nab-neH Sar moj",
+      "empty": "Qumwo'vamvaD Sar Hutlh DaH.",
+      "runId": "Sar ID",
+      "status": "Dotlh",
+      "type": "Segh",
+      "changes": "choHmey",
+      "source": "mung",
+      "triggeredBy": "taghmoHwI'",
+      "created": "chenmoHlu'pu'",
+      "needsConfirm": "tobnIS",
+      "typeDestroy": "Qaw'",
+      "typePlanOnly": "nab neH",
+      "typePlanApply": "nab + lo'",
+      "sourceModuleTest": "Segh toblu'",
+      "sourceModulePublish": "Segh chum"
+    },
+    "state": {
+      "deleteConfirm": "Dotlh mI' #{serial} Qaw''a'? choHlaHbe'lu'.",
+      "rollbackConfirm": "Dotlh mI' #{serial}Daq chegh'a'? rap ngutlhbogh mI' chu' chenmoHlu'.",
+      "confirmDelete": "Qaw' tob",
+      "confirmRollback": "chegh tob",
+      "uploadState": "Dotlh lI'",
+      "empty": "Qumwo'vamvaD Dotlh mI' Hutlh DaH.",
+      "serial": "mI'Hom",
+      "createdBy": "chenmoHwI'",
+      "run": "Sar",
+      "size": "tIq",
+      "created": "chenmoHlu'pu'",
+      "runner": "vangwI'",
+      "latest": "ram"
+    },
+    "configurations": {
+      "description": "Qumwo'vamvaD lI'lu'pu'bogh mung teywI'mey, chu' wa'DIch. rItlhmeH cha' tlhegh wIv.",
+      "selectedCount": "{count}/2 wIvlu'",
+      "compare": "rItlh",
+      "comparing": "rItlhtaH…",
+      "empty": "numtaH mI' Hutlh DaH. `terraform plan` lI'DI' joq VCS pum Sar taghmoHDI' naDev 'ang.",
+      "id": "ID",
+      "source": "mung",
+      "status": "Dotlh",
+      "created": "chenmoHlu'pu'",
+      "current": "DaHjaj",
+      "selectForCompare": "rItlhmeH {id} wIv",
+      "compareLabel": "rItlh",
+      "diff": "pIm",
+      "filesChanged": "{count} teywI'mey choHlu'pu'",
+      "oversized": "jump {count, plural, one {# tInqu''bogh teywI''} other {# tInqu''bogh teywI''mey}}: {files}",
+      "noDiff": "mI'meyvam pImHa'.",
+      "binaryChanged": "HaqwI' teywI' choHlu'pu' — pIm 'angbe'lu'.",
+      "diffType": {
+        "added": "chellu'pu'",
+        "removed": "teqlu'pu'",
+        "modified": "choHlu'pu'",
+        "binary-changed": "HaqwI'"
+      }
+    },
+    "notifications": {
+      "addNotification": "QIn chel",
+      "name": "pong",
+      "namePlaceholder": "lo' QInmey",
+      "destinationType": "paw' Segh",
+      "typeGeneric": "motlh Webhook",
+      "typeEmail": "QIn",
+      "url": "URL",
+      "hmacToken": "HMAC token (DaH DIch)",
+      "signingSecret": "qIttamoHmeH pegh",
+      "emailAddresses": "QIn Summey (HIvje' chevlu')",
+      "triggerEvents": "taghwI' wanI'mey",
+      "createNotification": "QIn chenmoH",
+      "empty": "Qumwo'vamvaD QIn numtaH Hutlh.",
+      "ok": "lugh",
+      "err": "Qagh {status}",
+      "fail": "LUJ",
+      "http": "HTTP {status}",
+      "verify": "tob",
+      "history": "qun",
+      "deliveryHistory": "paw qun",
+      "enableConfirm": "QIn vam chu''a'?",
+      "disableConfirm": "QIn vam chu'Ha''a'?",
+      "deleteConfirm": "QIn \"{name}\" Qaw''a'?"
+    },
+    "runTasks": {
+      "addRunTask": "Sar Qu' chel",
+      "name": "pong",
+      "namePlaceholder": "OPA chut toblu'",
+      "webhookUrl": "Webhook URL",
+      "stage": "'ay'",
+      "enforcementLevel": "ra' patlh",
+      "hmacKey": "HMAC ngaQHa'wI' (DaH DIch)",
+      "hmacKeyPlaceholder": "webhook tobmeH qIttamoHmeH pegh",
+      "createRunTask": "Sar Qu' chenmoH",
+      "empty": "Qumwo'vamvaD Sar Qu' numtaHbe'lu'.",
+      "enableConfirm": "Sar Qu' vam chu''a'?",
+      "disableConfirm": "Sar Qu' vam chu'Ha''a'?",
+      "deleteConfirm": "Sar Qu' \"{name}\" Qaw''a'?"
+    },
+    "runTriggers": {
+      "title": "Sar taghwI'mey",
+      "description": "mung Qumwo' lo' rInmoHDI', bIng Qumwo'mey Sar chu' tlhoS Hev. Hoch paw'vaD 20 mung Qumwo'mey veH.",
+      "inboundHeading": "naDev Sarmey taghmoHbogh mung Qumwo'mey",
+      "inboundEmpty": "Qumwo'vamDaq Sarmey taghmoHbogh mung Qumwo' Hutlh.",
+      "pickerPlaceholder": "mung moj chelmeH Qumwo'mey nej…",
+      "outboundHeading": "Qumwo'vam taghmoHbogh paw' Qumwo'mey",
+      "outboundEmpty": "latlh QumwoDaq Sarmey taghmoHbe' Qumwo'vam.",
+      "destinationNote": "(paw'; pa'vo' teq)",
+      "removeConfirm": "Sar taghwI' vam teq'a'?"
+    },
+    "sharing": {
+      "title": "chuq Dotlh HuvmoH",
+      "description": "Qumwo'-chuq <code></code>vaD chenmoHwI'-SeHlu'bogh chaw' tetlh. Dotlh De' pegh qem — DIvbej nob. <docs>ghItlhmey</docs>",
+      "outboundHeading": "Qumwo'vam Dotlh laDmeH chaw'lu'bogh Qumwo'mey",
+      "outboundEmpty": "latlh QumwoDaq HuvmoHbe' Qumwo'vam Dotlh.",
+      "grantedBy": "{by} nobpu'",
+      "revoke": "naghmoH",
+      "revokeConfirm": "chuq Dotlh HuvmoHvam teq'a'? Dotlhvam chaw'Ha' HevwI'.",
+      "pickerPlaceholder": "HevwI' moj chaw'meH Qumwo'mey nej…",
+      "inboundHeading": "Qumwo'vam DotlhDaj laDmeH chaw'lu'bogh Qumwo'mey",
+      "inboundEmpty": "terraform_remote_state lo'taHvIS latlh QumwoDaq Dotlh laDmeH chaw'be' Qumwo'vam.",
+      "producerNote": "(chenmoHwI'; pa'vo' naghmoH)"
+    },
+    "runMessages": {
+      "manualDriftCheck": "UIvo' ghop tlhotlh toblu'",
+      "queued": "UIvo' tlhamDaq",
+      "queuedSpeculative": "UIvo' tlhamDaq (Hech)",
+      "destroyQueued": "UIvo' Qaw' tlhamDaq"
+    },
+    "errors": {
+      "loadWorkspace": "Qumwo' ghelmeH lujpu'",
+      "loadRuns": "Sarmey ghelmeH lujpu'",
+      "loadVariables": "choHlaHmey ghelmeH lujpu'",
+      "loadStateVersions": "Dotlh mI'mey ghelmeH lujpu'",
+      "loadConfigurations": "numtaH mI'mey ghelmeH lujpu'",
+      "loadNotifications": "QInmey ghelmeH lujpu'",
+      "loadOutboundConsumers": "paw' chuq-Dotlh HevwI'pu' ghelmeH lujpu'",
+      "loadInboundConsumers": "naDev chuq-Dotlh HevwI'pu' ghelmeH lujpu'",
+      "loadConsumers": "chuq-Dotlh HevwI'pu' ghelmeH lujpu'",
+      "loadInboundTriggers": "naDev Sar taghwI'mey ghelmeH lujpu'",
+      "loadOutboundTriggers": "paw' Sar taghwI'mey ghelmeH lujpu'",
+      "loadTriggers": "Sar taghwI'mey ghelmeH lujpu'",
+      "loadRunTasks": "Sar Qu'mey ghelmeH lujpu'",
+      "downloadStateFile": "Dotlh teywI' polmeH lujpu'",
+      "downloadFailed": "pol lujpu'",
+      "downloadFailedStatus": "pol lujpu' ({status})",
+      "downloadTicketMissingUrl": "pol paq QInDaq URL Hutlh",
+      "diffFailed": "pIm lujpu'",
+      "diffFailedStatus": "pIm lujpu' ({status})",
+      "authorizeConsumer": "HevwI' chaw'meH lujpu'",
+      "revoke": "naghmoHmeH lujpu'",
+      "revokeConsumer": "HevwI' naghmoHmeH lujpu'",
+      "addTrigger": "Sar taghwI' chelmeH lujpu'",
+      "removeTrigger": "Sar taghwI' teqmeH lujpu'",
+      "createRunTask": "Sar Qu' chenmoHmeH lujpu'",
+      "createRunTaskStatus": "Sar Qu' chenmoHmeH lujpu' ({status})",
+      "update": "choHmeH lujpu'",
+      "toggleRunTask": "Sar Qu' choHmeH lujpu'",
+      "delete": "Qaw'meH lujpu'",
+      "deleteRunTask": "Sar Qu' Qaw'meH lujpu'",
+      "labelLockout": "chaw'lIj DIvI' per choHvam.",
+      "updateWorkspace": "Qumwo' choHmeH lujpu'",
+      "lockWorkspace": "Qumwo' ngaQmoHmeH lujpu'",
+      "unlockWorkspace": "Qumwo' poSmoHmeH lujpu'",
+      "updateAiSummary": "AI tlhoS numtaHmey choHmeH lujpu'",
+      "updateSlackChannel": "Slack HIvjeH choHmeH lujpu'",
+      "updateDriftSettings": "tlhotlh numtaHmey choHmeH lujpu'",
+      "updateDriftInterval": "tlhotlh poH choHmeH lujpu'",
+      "updatePlanExpiry": "nab mevbej choHmeH lujpu'",
+      "queueDriftCheck": "tlhotlh toblu' tlhammeH lujpu'",
+      "queueDriftCheckStatus": "tlhotlh toblu' tlhammeH lujpu' ({status})",
+      "dismissDrift": "tlhotlh woDmeH lujpu'",
+      "dismissDriftStatus": "tlhotlh woDmeH lujpu' ({status})",
+      "deleteWorkspace": "Qumwo' Qaw'meH lujpu'",
+      "addVariable": "choHlaH chelmeH lujpu'",
+      "addVariableStatus": "choHlaH chelmeH lujpu' ({status})",
+      "deleteVariable": "choHlaH Qaw'meH lujpu'",
+      "updateVariable": "choHlaH choHmeH lujpu'",
+      "queuePlan": "nab tlhammeH lujpu'",
+      "queuePlanStatus": "nab tlhammeH lujpu' ({status})",
+      "queueDestroy": "Qaw' tlhammeH lujpu'",
+      "queueDestroyStatus": "Qaw' tlhammeH lujpu' ({status})",
+      "createNotification": "QIn chenmoHmeH lujpu'",
+      "createNotificationStatus": "QIn chenmoHmeH lujpu' ({status})",
+      "toggleNotification": "QIn choHmeH lujpu'",
+      "deleteNotification": "QIn Qaw'meH lujpu'",
+      "verificationFailed": "toblu' lujpu'",
+      "verificationDeliveryFailed": "toblu' paw lujpu': {detail}",
+      "unknownError": "Qagh Sovbe'",
+      "failed": "lujpu'",
+      "deleteStateVersion": "Dotlh mI' Qaw'meH lujpu'",
+      "rollbackStateVersion": "Dotlh mI'Daq cheghmeH lujpu'",
+      "stateActionFailed": "Dotlh vang lujpu'",
+      "uploadState": "Dotlh lI'meH lujpu'",
+      "uploadStateFile": "Dotlh teywI' lI'meH lujpu'"
+    }
+  },
+  "graphs": {
+    "stateTab": {
+      "loadError": "Dotlh chart ghelmeH lujpu'.",
+      "emptyState": "Dotlh Hutlh DaH — nab 'ej lo' vang, joq Dotlh lI', vaj chartvam buy'qa'moHlu'.",
+      "stateVersionLabel": "Dotlh mI'",
+      "currentSuffix": "(DaHjaj)",
+      "colorByLabel": "rItlhmoHwI'",
+      "viewGraph": "chart",
+      "viewTable": "tetlh",
+      "resourceCount": "{count, plural, one {# Sep} other {# Sepmey}}",
+      "dependencyCount": "{count, plural, one {# lIntagh} other {# lIntaghmey}}",
+      "truncated": "{total} Sepmey ghUved wa'DIch {shown} 'angtaH — legh QaQmeH chart poDlu'.",
+      "colResource": "Sep",
+      "colType": "Segh",
+      "colMode": "mIw",
+      "colModule": "Segh",
+      "colDependedOnBy": "lIntagh ghaj",
+      "rootModule": "(Hal)"
+    },
+    "impact": {
+      "notAvailable": "Sar vamvaD 'ang chart lo'laHbe'.",
+      "title": "'ang chart",
+      "subtitle": "{count, plural, one {# Sep} other {# Sepmey}} nab",
+      "hint": "Hoch bal Sep 'oH; Hoch naQjej lIntaghDaj 'ang. node qIp → transitive <b>'ang</b>Daj (bIng Hoch) wewmoH.",
+      "downstreamAffected": "bIng qaS",
+      "action": {
+        "create": "chenmoH",
+        "update": "choH",
+        "replace": "chartlh",
+        "destroy": "Qaw'",
+        "unchanged": "choHbe'lu'"
+      }
+    },
+    "estate": {
+      "navHint": "tlhe'meH luH · zoommeH SIH · pan cha'DIch-luH · <em>node vam SumtaHmeH qIp</em>"
+    },
+    "state3d": {
+      "title": "Dotlh chart",
+      "hint": "Hoch bal Sep 'oH; Hoch naQjej lIntaghDaj 'ang. node qIp → transitive 'oHDaq <b>lIntaghbogh</b> Sepmey wewmoH.",
+      "dataSource": "De' mung",
+      "managed": "vu'lu'",
+      "dependOnThis": "vam lIntagh"
+    },
+    "resource3d": {
+      "resetView": "legh choH qa'",
+      "clear": "teq",
+      "key": "ngutlh",
+      "resources": "Sepmey",
+      "hideKey": "ngutlh So'",
+      "hideResources": "Sepmey So'",
+      "resourcesCount": "Sepmey ({count})",
+      "filterPlaceholder": "Sepmey DarSeH…",
+      "navHint": "tlhe'meH luH · zoommeH SIH · pan cha'DIch-luH · <em>Sep vam SumtaHmeH qIp</em>"
+    }
+  },
+  "execHookDetail": {
+    "backLink": "vangmeH ghItlhmeyDaq chegh",
+    "defaultDescription": "vangmeH ghItlh",
+    "notFound": "vangmeH ghItlh tu'be'lu'",
+    "scriptEmpty": "(chIm)",
+    "tabs": {
+      "settings": "numtaHmey",
+      "workspaces": "Qumwo'mey"
+    },
+    "common": {
+      "yes": "HISlaH",
+      "no": "ghobe'"
+    },
+    "actions": {
+      "edit": "choH",
+      "cancel": "qIl",
+      "save": "pol",
+      "saving": "poltaH...",
+      "delete": "Qaw'",
+      "deleting": "Qaw'taH...",
+      "confirmDelete": "Qaw' tob",
+      "add": "chel",
+      "adding": "cheltaH...",
+      "remove": "teq"
+    },
+    "settings": {
+      "heading": "numtaHmey"
+    },
+    "fields": {
+      "name": "pong",
+      "description": "QIj",
+      "hookPoint": "ghItlh Daq",
+      "priority": "potlh",
+      "enabled": "chu'lu'pu'",
+      "script": "ghItlhHom (<code>/bin/sh -c</code>)"
+    },
+    "delete": {
+      "heading": "vangmeH ghItlh Qaw'",
+      "description": "ghItlhvam reH Qaw' 'ej Hoch Qumwo'meyvo' teq."
+    },
+    "workspaces": {
+      "scopeNote": "bIng rarlu'bogh Qumwo'mey neH ghItlhvam vangtaH. tera' hoch tlhoy' Hutlh.",
+      "associate": "Qumwo' rar",
+      "workspaceLabel": "Qumwo'",
+      "selectPlaceholder": "Qumwo' wIv...",
+      "empty": "ghItlhvamvaD Qumwo' rarlu'be'.",
+      "colWorkspace": "Qumwo'",
+      "colActions": "vangmey"
+    },
+    "confirm": {
+      "removeWorkspace": "ghItlhvo' Qumwo'vam teq'a'? 'oHvaD ghItlh vangbe'qa'."
+    },
+    "success": {
+      "updated": "vangmeH ghItlh choHlu'pu'",
+      "workspaceAssociated": "Qumwo' rarlu'pu'",
+      "workspaceRemoved": "Qumwo' teqlu'pu'"
+    },
+    "errors": {
+      "load": "vangmeH ghItlh ghelmeH lujpu'",
+      "update": "vangmeH ghItlh choHmeH lujpu'",
+      "delete": "vangmeH ghItlh Qaw'meH lujpu'",
+      "addWorkspace": "Qumwo' chelmeH lujpu'",
+      "removeWorkspace": "Qumwo' teqmeH lujpu'"
+    }
+  },
+  "policySetDetail": {
+    "backLink": "chut Segh",
+    "notFound": "tu'be'lu'",
+    "unknown": "Sovbe'",
+    "subtitle": "OPA chut Segh · {createdBy} chenmoHlu'pu'",
+    "settings": {
+      "heading": "numtaHmey"
+    },
+    "fields": {
+      "description": "QIj",
+      "enforcement": "ra'",
+      "enabled": "chu'lu'pu'",
+      "globalScope": "tera' hoch (Hoch Qumwo')"
+    },
+    "enforcement": {
+      "advisory": "qeSwI' (ghuHmoH)",
+      "mandatory": "poQlu' (lo' bot)"
+    },
+    "scope": {
+      "allowLabels": "chaw' permey (ngaQHa'wI': v1, v2)",
+      "allowLabelsPlaceholder": "env: prod, staging",
+      "allowNames": "chaw' pongmey (wa' per HuH)",
+      "denyLabels": "tuH permey (ngaQHa'wI': v1, v2)",
+      "denyNames": "tuH pongmey (wa' per HuH)"
+    },
+    "vcs": {
+      "heading": "VCS numtaH",
+      "repoUrl": "repo URL",
+      "branch": "paQ",
+      "branchPlaceholder": "main (motlh)",
+      "policyPath": "chut He"
+    },
+    "vcsBanner": {
+      "syncedFrom": "chutmey chumlu'pu'",
+      "at": "Daq",
+      "lastSynced": "chum Qav {time}",
+      "commit": "(chum {sha})",
+      "syncError": "chum Qagh: {error}"
+    },
+    "policies": {
+      "heading": "chutmey ({count})",
+      "vcsManaged": "repo vu' — PRvo' choHmey chum",
+      "empty": "Seghvam chut Hutlh DaH."
+    },
+    "addPolicy": {
+      "namePlaceholder": "chut pong",
+      "descPlaceholder": "QIj (DaH DIch)",
+      "regoHint": "Rego v1. <code>package terrapod</code> maqnIS 'ej <code>deny</code> Seghmo' DIvbe'mey 'angnIS. nab 'oH <code>input</code>'e'; Terrapod De' 'oH <code>data.terrapod_context</code>'e'."
+    },
+    "actions": {
+      "saving": "poltaH...",
+      "saveSettings": "numtaHmey pol",
+      "syncNow": "DaH chum",
+      "cancel": "qIl",
+      "addPolicy": "chut chel",
+      "deleteSet": "Segh Qaw'",
+      "validatingRego": "Rego tobtaH...",
+      "delete": "Qaw'",
+      "savePolicy": "chut pol"
+    },
+    "confirm": {
+      "deleteSet": "chut Segh vam Hoch chutmey je Qaw''a'? qonlu'pu'bogh Sar toblu'mey pollu'.",
+      "deletePolicy": "chut \"{name}\" Qaw''a'?"
+    },
+    "errors": {
+      "load": "chut Segh ghelmeH lujpu'",
+      "save": "chut Segh polmeH lujpu'",
+      "saveStatus": "polmeH lujpu' ({status})",
+      "delete": "chut Segh Qaw'meH lujpu'",
+      "deleteStatus": "Qaw'meH lujpu' ({status})",
+      "addPolicy": "chut chelmeH lujpu'",
+      "addPolicyStatus": "chut chelmeH lujpu' ({status})",
+      "savePolicy": "chut polmeH lujpu'",
+      "savePolicyStatus": "chut polmeH lujpu' ({status})",
+      "deletePolicy": "chut Qaw'meH lujpu'",
+      "deletePolicyStatus": "Qaw'meH lujpu' ({status})"
+    }
+  },
+  "slackLink": {
+    "title": "TerrapodDaq Slack rar",
+    "loading": "gheltaH…",
+    "checking": "rarlIj toltaH…",
+    "linking": "Slack lo'wI' De'lIj rartaH…",
+    "unknown": "Sovbe'",
+    "confirm": {
+      "prompt": "<em>SoH</em> Terrapod De'lIjDaq Slack lo'wI' De' vam rar'a'? Slack vang veb Hoch (chaw'/woD) chaw'meyDaj ghajbogh Terrapod lo'wI' vam moj.",
+      "slackUser": "Slack lo'wI'",
+      "slackTeam": "Slack ghom",
+      "terrapodAccount": "Terrapod lo' De'",
+      "warning": "SlackvaD rarvam Dataghpu'chugh neH taH. DaghajHa'chugh, tabvam SoQmoH 'ej rarQo' — Dung Slack lo' De' <em>SoH</em> Terrapod De'lIjDaq rarvam.",
+      "button": "tob 'ej rar"
+    },
+    "success": {
+      "message": "DaH TerrapodDaq Slack lo' De'lIj rarlu'.",
+      "linkedAs": "<em>{email}</em> rarlu'pu'. tabvam SoQmoH 'ej SlackDaq chegh."
+    },
+    "errors": {
+      "missingLink": "rar Hutlh joq DIvI'. SlackDaq Terrapod rar ra'wI'mo' taghqa'.",
+      "invalidLink": "rarvam DIvI', mevbejpu', joq lo'ta'lu'pu'. Slackvo' rarvam taghqa'.",
+      "linkingFailed": "rar lujpu'."
+    }
+  },
+  "cliComplete": {
+    "loading": "gheltaH...",
+    "completing": "numtaH rInmoHtaH...",
+    "invalid": {
+      "title": "tlhob DIvI'",
+      "description": "poQlu'bogh DIvI'mey Hutlh."
+    },
+    "success": {
+      "title": "'el Qappu'",
+      "complete": "API token chenmoHlu'pu'. tabvam SoQmoHlaH."
+    },
+    "fallback": {
+      "description": "tlhoS CLI SIchlaHbe'.",
+      "button": "ghop rInmoHmeH naDev qIp"
+    },
+    "timeout": {
+      "description": "token je' rInmoHbe'law' CLI. terminallIj yIlegh."
+    }
+  },
+  "apiDocs": {
+    "view": "legh:",
+    "redocTitle": "ReDoc API ghItlhmey"
+  }
+}

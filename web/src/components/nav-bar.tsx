@@ -35,9 +35,11 @@ import {
   ChevronDown,
   type LucideIcon,
 } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import { clearAuth, isAdmin, isAdminOrAudit, getAuthState } from '@/lib/auth'
 import { SessionExpiryBanner } from '@/components/session-expiry-banner'
 import { TokenExpiryBanner } from '@/components/token-expiry-banner'
+import { LocaleSwitcher } from '@/components/locale-switcher'
 
 /**
  * Navigation is one DRY, viewport-driven component (#719). The link model
@@ -55,49 +57,51 @@ import { TokenExpiryBanner } from '@/components/token-expiry-banner'
 
 type NavItem = {
   href: string
-  label: string
+  // i18n key under the `nav` namespace (#767) — resolved at render via
+  // useTranslations('nav'), never a hardcoded display string.
+  labelKey: string
   icon: LucideIcon
   external?: boolean
 }
 
 // Registry destinations (behind Registry▾ on desktop, a section on mobile).
 const REGISTRY_ITEMS: NavItem[] = [
-  { href: '/registry/modules', label: 'Modules', icon: Package },
-  { href: '/registry/providers', label: 'Providers', icon: Blocks },
+  { href: '/registry/modules', labelKey: 'modules', icon: Package },
+  { href: '/registry/providers', labelKey: 'providers', icon: Blocks },
 ]
 
 // Admin destinations (admin only). Audit Log is appended separately because
 // it is visible to the audit role too.
 const ADMIN_ITEMS: NavItem[] = [
-  { href: '/admin/users', label: 'Users', icon: Users },
-  { href: '/admin/roles', label: 'Roles', icon: Shield },
-  { href: '/admin/vcs-connections', label: 'VCS Connections', icon: GitBranch },
-  { href: '/admin/variable-sets', label: 'Variable Sets', icon: Variable },
-  { href: '/admin/autodiscovery', label: 'Autodiscovery', icon: Compass },
-  { href: '/admin/bulk-update', label: 'Bulk Update', icon: Wrench },
-  { href: '/admin/execution-hooks', label: 'Execution Hooks', icon: TerminalSquare },
-  { href: '/admin/policy-sets', label: 'Policy Sets', icon: ScrollText },
-  { href: '/admin/provider-templates', label: 'Provider Templates', icon: Code },
-  { href: '/admin/catalog', label: 'Catalog Admin', icon: Boxes },
-  { href: '/admin/binary-cache', label: 'Cache', icon: HardDrive },
+  { href: '/admin/users', labelKey: 'users', icon: Users },
+  { href: '/admin/roles', labelKey: 'roles', icon: Shield },
+  { href: '/admin/vcs-connections', labelKey: 'vcsConnections', icon: GitBranch },
+  { href: '/admin/variable-sets', labelKey: 'variableSets', icon: Variable },
+  { href: '/admin/autodiscovery', labelKey: 'autodiscovery', icon: Compass },
+  { href: '/admin/bulk-update', labelKey: 'bulkUpdate', icon: Wrench },
+  { href: '/admin/execution-hooks', labelKey: 'executionHooks', icon: TerminalSquare },
+  { href: '/admin/policy-sets', labelKey: 'policySets', icon: ScrollText },
+  { href: '/admin/provider-templates', labelKey: 'providerTemplates', icon: Code },
+  { href: '/admin/catalog', labelKey: 'catalogAdmin', icon: Boxes },
+  { href: '/admin/binary-cache', labelKey: 'cache', icon: HardDrive },
 ]
 
-const AUDIT_ITEM: NavItem = { href: '/admin/audit-log', label: 'Audit Log', icon: FileText }
+const AUDIT_ITEM: NavItem = { href: '/admin/audit-log', labelKey: 'auditLog', icon: FileText }
 
 // Personal / session destinations (behind the Account menu). Logout is
 // rendered separately (it is an action, not a link).
 const ACCOUNT_ITEMS: NavItem[] = [
-  { href: '/settings/tokens', label: 'API Tokens', icon: Key },
-  { href: '/settings/sessions', label: 'Sessions', icon: Activity },
+  { href: '/settings/tokens', labelKey: 'apiTokens', icon: Key },
+  { href: '/settings/sessions', labelKey: 'sessions', icon: Activity },
 ]
 
 // Help / reference destinations — NOT account items. Grouped separately so
 // the Account menu stays personal (tokens, sessions, log out).
 const HELP_ITEMS: NavItem[] = [
-  { href: '/api-docs', label: 'API Reference', icon: Code },
+  { href: '/api-docs', labelKey: 'apiReference', icon: Code },
   {
     href: 'https://github.com/mattrobinsonsre/terrapod/blob/main/docs/index.md',
-    label: 'Docs',
+    labelKey: 'docs',
     icon: BookOpen,
     external: true,
   },
@@ -198,6 +202,7 @@ const MenuLink = forwardRef<
   { item: NavItem } & React.AnchorHTMLAttributes<HTMLAnchorElement>
 >(function MenuLink({ item, className, ...rest }, ref) {
   const pathname = usePathname()
+  const t = useTranslations('nav')
   const Icon = item.icon
   const cls =
     'flex items-center gap-2 px-3 py-2 rounded-md text-sm cursor-pointer outline-none transition-colors data-[highlighted]:bg-slate-700 data-[highlighted]:text-slate-100'
@@ -212,7 +217,7 @@ const MenuLink = forwardRef<
         {...rest}
       >
         <Icon size={16} />
-        {item.label}
+        {t(item.labelKey)}
       </a>
     )
   }
@@ -225,7 +230,7 @@ const MenuLink = forwardRef<
       {...rest}
     >
       <Icon size={16} />
-      {item.label}
+      {t(item.labelKey)}
     </Link>
   )
 })
@@ -242,6 +247,7 @@ function MobileSection({ label }: { label: string }) {
 /** A single link row in the mobile sheet (44px tap target). */
 function MobileLink({ item, onClick }: { item: NavItem; onClick: () => void }) {
   const pathname = usePathname()
+  const t = useTranslations('nav')
   const Icon = item.icon
   const active = !item.external && isPathActive(pathname, item.href)
   const cls =
@@ -256,7 +262,7 @@ function MobileLink({ item, onClick }: { item: NavItem; onClick: () => void }) {
         className={`${cls} text-slate-400 hover:text-slate-200 hover:bg-slate-800`}
       >
         <Icon size={18} />
-        {item.label}
+        {t(item.labelKey)}
       </a>
     )
   }
@@ -269,7 +275,7 @@ function MobileLink({ item, onClick }: { item: NavItem; onClick: () => void }) {
       }`}
     >
       <Icon size={18} />
-      {item.label}
+      {t(item.labelKey)}
     </Link>
   )
 }
@@ -292,6 +298,7 @@ function MobileDrawer({
   onClose: () => void
   children: React.ReactNode
 }) {
+  const t = useTranslations('nav')
   return (
     <div
       id={id}
@@ -301,7 +308,7 @@ function MobileDrawer({
         <span className="font-bold text-lg text-slate-100">{title}</span>
         <button
           onClick={onClose}
-          aria-label="Close menu"
+          aria-label={t('closeMenu')}
           className="p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
         >
           <X size={22} />
@@ -316,6 +323,7 @@ function MobileDrawer({
 
 export default function NavBar() {
   const router = useRouter()
+  const t = useTranslations('nav')
   const noopSubscribe = () => () => {}
   const admin = useSyncExternalStore(noopSubscribe, isAdmin, () => false)
   const adminOrAudit = useSyncExternalStore(noopSubscribe, isAdminOrAudit, () => false)
@@ -378,7 +386,7 @@ export default function NavBar() {
   const helpActive = HELP_ITEMS.some((i) => !i.external && isPathActive(pathname, i.href))
   const accountActive = ACCOUNT_ITEMS.some((i) => !i.external && isPathActive(pathname, i.href))
 
-  const accountLabel = email || 'Account'
+  const accountLabel = email || t('account')
 
   return (
     <>
@@ -394,16 +402,17 @@ export default function NavBar() {
               {version && <span className="text-xs text-slate-500 font-normal">{version}</span>}
             </Link>
             <div className="flex items-center gap-1 flex-wrap flex-1">
-              <NavLink href="/workspaces" icon={Layers} label="Workspaces" />
-              <NavLink href="/estate" icon={Network} label="Estate" />
-              <NavDropdown label="Registry" icon={Library} items={REGISTRY_ITEMS} active={registryActive} />
-              <NavLink href="/catalog" icon={LayoutGrid} label="Catalog" />
-              <NavLink href="/admin/agent-pools" icon={Server} label="Agent Pools" />
+              <NavLink href="/workspaces" icon={Layers} label={t('workspaces')} />
+              <NavLink href="/estate" icon={Network} label={t('estate')} />
+              <NavDropdown label={t('registry')} icon={Library} items={REGISTRY_ITEMS} active={registryActive} />
+              <NavLink href="/catalog" icon={LayoutGrid} label={t('catalog')} />
+              <NavLink href="/admin/agent-pools" icon={Server} label={t('agentPools')} />
             </div>
             {adminOrAudit && (
-              <NavDropdown label="Admin" icon={Cog} items={adminMenuItems} active={adminActive} align="end" />
+              <NavDropdown label={t('admin')} icon={Cog} items={adminMenuItems} active={adminActive} align="end" />
             )}
-            <NavDropdown label="Help" icon={BookOpen} items={HELP_ITEMS} active={helpActive} align="end" />
+            <LocaleSwitcher />
+            <NavDropdown label={t('help')} icon={BookOpen} items={HELP_ITEMS} active={helpActive} align="end" />
             <NavDropdown
               label={accountLabel}
               icon={User}
@@ -420,7 +429,7 @@ export default function NavBar() {
                       className="flex w-full items-center gap-2 px-3 py-2 rounded-md text-sm text-slate-300 cursor-pointer outline-none transition-colors data-[highlighted]:bg-slate-700 data-[highlighted]:text-slate-100"
                     >
                       <LogOut size={16} />
-                      Log out
+                      {t('logOut')}
                     </button>
                   </DropdownMenu.Item>
                 </>
@@ -441,7 +450,7 @@ export default function NavBar() {
                   setAccountOpen(true)
                   setMenuOpen(false)
                 }}
-                aria-label="Open account menu"
+                aria-label={t('openAccountMenu')}
                 aria-expanded={accountOpen}
                 aria-controls="mobile-account-menu"
                 className="p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
@@ -453,7 +462,7 @@ export default function NavBar() {
                   setMenuOpen(true)
                   setAccountOpen(false)
                 }}
-                aria-label="Open menu"
+                aria-label={t('openMenu')}
                 aria-expanded={menuOpen}
                 aria-controls="mobile-nav-menu"
                 className="p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
@@ -467,30 +476,30 @@ export default function NavBar() {
               Help sections. Account is deliberately NOT here — it has its own
               trigger + drawer. */}
           {menuOpen && (
-            <MobileDrawer id="mobile-nav-menu" title="Menu" onClose={closeDrawers}>
-              <MobileLink item={{ href: '/workspaces', label: 'Workspaces', icon: Layers }} onClick={closeDrawers} />
-              <MobileLink item={{ href: '/estate', label: 'Estate', icon: Network }} onClick={closeDrawers} />
-              <MobileLink item={{ href: '/catalog', label: 'Catalog', icon: LayoutGrid }} onClick={closeDrawers} />
+            <MobileDrawer id="mobile-nav-menu" title={t('menu')} onClose={closeDrawers}>
+              <MobileLink item={{ href: '/workspaces', labelKey: 'workspaces', icon: Layers }} onClick={closeDrawers} />
+              <MobileLink item={{ href: '/estate', labelKey: 'estate', icon: Network }} onClick={closeDrawers} />
+              <MobileLink item={{ href: '/catalog', labelKey: 'catalog', icon: LayoutGrid }} onClick={closeDrawers} />
               <MobileLink
-                item={{ href: '/admin/agent-pools', label: 'Agent Pools', icon: Server }}
+                item={{ href: '/admin/agent-pools', labelKey: 'agentPools', icon: Server }}
                 onClick={closeDrawers}
               />
 
-              <MobileSection label="Registry" />
+              <MobileSection label={t('registry')} />
               {REGISTRY_ITEMS.map((it) => (
                 <MobileLink key={it.href} item={it} onClick={closeDrawers} />
               ))}
 
               {adminOrAudit && (
                 <>
-                  <MobileSection label="Admin" />
+                  <MobileSection label={t('admin')} />
                   {adminMenuItems.map((it) => (
                     <MobileLink key={it.href} item={it} onClick={closeDrawers} />
                   ))}
                 </>
               )}
 
-              <MobileSection label="Help" />
+              <MobileSection label={t('help')} />
               {HELP_ITEMS.map((it) => (
                 <MobileLink key={it.href} item={it} onClick={closeDrawers} />
               ))}
@@ -499,8 +508,11 @@ export default function NavBar() {
 
           {/* Mobile account drawer — personal / session, opened by the User icon */}
           {accountOpen && (
-            <MobileDrawer id="mobile-account-menu" title="Account" onClose={closeDrawers}>
+            <MobileDrawer id="mobile-account-menu" title={t('account')} onClose={closeDrawers}>
               {email && <div className="px-3 pb-2 text-sm text-slate-400 truncate">{email}</div>}
+              <div className="px-3 pb-2">
+                <LocaleSwitcher />
+              </div>
               {ACCOUNT_ITEMS.map((it) => (
                 <MobileLink key={it.href} item={it} onClick={closeDrawers} />
               ))}
@@ -509,7 +521,7 @@ export default function NavBar() {
                 className="flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium min-h-[44px] text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
               >
                 <LogOut size={18} />
-                Log out
+                {t('logOut')}
               </button>
             </MobileDrawer>
           )}

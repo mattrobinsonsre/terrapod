@@ -1,3 +1,5 @@
+'use client'
+
 /**
  * Compact resource-change summary for a planned run.
  *
@@ -8,6 +10,8 @@
  * which is signalled by `summary == null` — the caller renders nothing in
  * that case).
  */
+
+import { useTranslations } from 'next-intl'
 
 interface PlanSummary {
   add: number
@@ -23,6 +27,7 @@ interface Props {
 }
 
 export function PlanSummaryBadges({ summary, size = 'md' }: Props) {
+  const t = useTranslations('planSummary')
   const { add, change, destroy, replace, import: imports } = summary
   const total = add + change + destroy + replace + imports
 
@@ -35,9 +40,9 @@ export function PlanSummaryBadges({ summary, size = 'md' }: Props) {
       return (
         <span
           className="inline-flex items-center rounded-full bg-slate-700/40 text-slate-300 px-2 py-0.5 text-xs"
-          title="Plan reported no resource changes"
+          title={t('badges.noChangesTitle')}
         >
-          no changes
+          {t('badges.noChangesLower')}
         </span>
       )
     }
@@ -45,9 +50,9 @@ export function PlanSummaryBadges({ summary, size = 'md' }: Props) {
       <div className={containerCls}>
         <span
           className="inline-flex items-center rounded-full bg-slate-700/40 text-slate-300 px-2.5 py-1 text-sm"
-          title="Plan reported no resource changes"
+          title={t('badges.noChangesTitle')}
         >
-          No changes
+          {t('badges.noChanges')}
         </span>
       </div>
     )
@@ -61,30 +66,30 @@ export function PlanSummaryBadges({ summary, size = 'md' }: Props) {
   return (
     <div className={containerCls}>
       {add > 0 && (
-        <span className={`${cls} bg-green-900/40 text-green-300`} title={`${add} to add`}>
+        <span className={`${cls} bg-green-900/40 text-green-300`} title={t('badges.toAdd', { count: add })}>
           +{add}
         </span>
       )}
       {change > 0 && (
-        <span className={`${cls} bg-amber-900/40 text-amber-300`} title={`${change} to change`}>
+        <span className={`${cls} bg-amber-900/40 text-amber-300`} title={t('badges.toChange', { count: change })}>
           ~{change}
         </span>
       )}
       {destroy > 0 && (
-        <span className={`${cls} bg-red-900/40 text-red-300`} title={`${destroy} to destroy`}>
+        <span className={`${cls} bg-red-900/40 text-red-300`} title={t('badges.toDestroy', { count: destroy })}>
           -{destroy}
         </span>
       )}
       {replace > 0 && (
         <span
           className={`${cls} bg-purple-900/40 text-purple-300`}
-          title={`${replace} to replace`}
+          title={t('badges.toReplace', { count: replace })}
         >
           ⟳{replace}
         </span>
       )}
       {imports > 0 && (
-        <span className={`${cls} bg-blue-900/40 text-blue-300`} title={`${imports} to import`}>
+        <span className={`${cls} bg-blue-900/40 text-blue-300`} title={t('badges.toImport', { count: imports })}>
           ↓{imports}
         </span>
       )}

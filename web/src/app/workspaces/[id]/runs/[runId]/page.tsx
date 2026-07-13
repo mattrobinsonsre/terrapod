@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useLayoutEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import Convert from 'ansi-to-html'
@@ -133,17 +134,17 @@ function fmtDuration(ms: number): string {
   return `${h}h ${m % 60}m`
 }
 
-function relTime(iso: string, now: number): string {
-  const t = Date.parse(iso)
-  if (Number.isNaN(t)) return ''
-  const s = Math.floor((now - t) / 1000)
-  if (s < 60) return 'just now'
+function relTime(iso: string, now: number, t: ReturnType<typeof useTranslations>): string {
+  const ts = Date.parse(iso)
+  if (Number.isNaN(ts)) return ''
+  const s = Math.floor((now - ts) / 1000)
+  if (s < 60) return t('relTime.justNow')
   const m = Math.floor(s / 60)
-  if (m < 60) return `${m} minute${m === 1 ? '' : 's'} ago`
+  if (m < 60) return t('relTime.minutesAgo', { count: m })
   const h = Math.floor(m / 60)
-  if (h < 24) return `${h} hour${h === 1 ? '' : 's'} ago`
+  if (h < 24) return t('relTime.hoursAgo', { count: h })
   const d = Math.floor(h / 24)
-  return `${d} day${d === 1 ? '' : 's'} ago`
+  return t('relTime.daysAgo', { count: d })
 }
 
 // The "at a glance" strip at the top of Overview (#721) — the run's current
@@ -160,6 +161,7 @@ function RunActivityHeader({
   planOnly: boolean
   isConfirmable: boolean
 }) {
+  const t = useTranslations('runDetail')
   const live = ['pending', 'queued', 'planning', 'confirmed', 'applying', 'canceling'].includes(status)
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
@@ -170,23 +172,23 @@ function RunActivityHeader({
 
   type Info = { label: string; activity: string; dot: string; card: string; sinceKey?: string }
   const map: Record<string, Info> = {
-    pending: { label: 'Pending', activity: 'Preparing the run', dot: 'bg-slate-400', card: 'border-slate-700/50 bg-slate-800/40' },
-    queued: { label: 'Queued', activity: 'Waiting for an available agent', dot: 'bg-yellow-400', card: 'border-yellow-800/40 bg-yellow-900/10', sinceKey: 'queued-at' },
-    planning: { label: 'Planning', activity: 'Running terraform plan', dot: 'bg-yellow-400', card: 'border-yellow-800/40 bg-yellow-900/10', sinceKey: 'planning-at' },
+    pending: { label: t('status.pending'), activity: t('activity.pending'), dot: 'bg-slate-400', card: 'border-slate-700/50 bg-slate-800/40' },
+    queued: { label: t('status.queued'), activity: t('activity.queued'), dot: 'bg-yellow-400', card: 'border-yellow-800/40 bg-yellow-900/10', sinceKey: 'queued-at' },
+    planning: { label: t('status.planning'), activity: t('activity.planning'), dot: 'bg-yellow-400', card: 'border-yellow-800/40 bg-yellow-900/10', sinceKey: 'planning-at' },
     planned: {
-      label: 'Planned',
-      activity: isConfirmable ? 'Waiting for you to confirm & apply' : planOnly ? 'Speculative plan complete' : 'Plan complete',
+      label: t('status.planned'),
+      activity: isConfirmable ? t('activity.plannedConfirmable') : planOnly ? t('activity.plannedSpeculative') : t('activity.plannedComplete'),
       dot: 'bg-blue-400',
       card: isConfirmable ? 'border-blue-800/40 bg-blue-900/10' : 'border-slate-700/50 bg-slate-800/40',
       sinceKey: 'planned-at',
     },
-    confirmed: { label: 'Confirmed', activity: 'Starting apply', dot: 'bg-blue-400', card: 'border-blue-800/40 bg-blue-900/10', sinceKey: 'confirmed-at' },
-    applying: { label: 'Applying', activity: 'Running terraform apply', dot: 'bg-yellow-400', card: 'border-yellow-800/40 bg-yellow-900/10', sinceKey: 'applying-at' },
-    canceling: { label: 'Canceling', activity: 'Stopping the run', dot: 'bg-yellow-400', card: 'border-yellow-800/40 bg-yellow-900/10' },
-    applied: { label: 'Applied', activity: 'Apply complete', dot: 'bg-green-400', card: 'border-green-800/40 bg-green-900/10', sinceKey: 'applied-at' },
-    errored: { label: 'Errored', activity: 'Run failed', dot: 'bg-red-400', card: 'border-red-800/40 bg-red-900/10', sinceKey: 'errored-at' },
-    canceled: { label: 'Canceled', activity: 'Run canceled', dot: 'bg-slate-400', card: 'border-slate-700/50 bg-slate-800/40', sinceKey: 'canceled-at' },
-    discarded: { label: 'Discarded', activity: 'Plan discarded', dot: 'bg-slate-400', card: 'border-slate-700/50 bg-slate-800/40', sinceKey: 'discarded-at' },
+    confirmed: { label: t('status.confirmed'), activity: t('activity.confirmed'), dot: 'bg-blue-400', card: 'border-blue-800/40 bg-blue-900/10', sinceKey: 'confirmed-at' },
+    applying: { label: t('status.applying'), activity: t('activity.applying'), dot: 'bg-yellow-400', card: 'border-yellow-800/40 bg-yellow-900/10', sinceKey: 'applying-at' },
+    canceling: { label: t('status.canceling'), activity: t('activity.canceling'), dot: 'bg-yellow-400', card: 'border-yellow-800/40 bg-yellow-900/10' },
+    applied: { label: t('status.applied'), activity: t('activity.applied'), dot: 'bg-green-400', card: 'border-green-800/40 bg-green-900/10', sinceKey: 'applied-at' },
+    errored: { label: t('status.errored'), activity: t('activity.errored'), dot: 'bg-red-400', card: 'border-red-800/40 bg-red-900/10', sinceKey: 'errored-at' },
+    canceled: { label: t('status.canceled'), activity: t('activity.canceled'), dot: 'bg-slate-400', card: 'border-slate-700/50 bg-slate-800/40', sinceKey: 'canceled-at' },
+    discarded: { label: t('status.discarded'), activity: t('activity.discarded'), dot: 'bg-slate-400', card: 'border-slate-700/50 bg-slate-800/40', sinceKey: 'discarded-at' },
   }
   const info = map[status] ?? { label: status, activity: '', dot: 'bg-slate-400', card: 'border-slate-700/50 bg-slate-800/40' }
   const sinceTs = info.sinceKey ? timestamps[info.sinceKey] : undefined
@@ -206,12 +208,12 @@ function RunActivityHeader({
         {info.activity && <span className="text-sm text-slate-400"> — {info.activity}</span>}
       </div>
       {live && elapsed !== undefined && (
-        <span className="text-xs text-slate-400 tabular-nums flex-shrink-0" title="Elapsed in this phase">
+        <span className="text-xs text-slate-400 tabular-nums flex-shrink-0" title={t('activity.elapsedTitle')}>
           {fmtDuration(elapsed)}
         </span>
       )}
       {!live && sinceTs && (
-        <span className="text-xs text-slate-500 flex-shrink-0">{relTime(sinceTs, now)}</span>
+        <span className="text-xs text-slate-500 flex-shrink-0">{relTime(sinceTs, now, t)}</span>
       )}
     </div>
   )
@@ -308,6 +310,7 @@ function LogPanel({
   // scroll region is a touch trap regardless of how wide the screen is, so a
   // touch tablet/foldable page-scrolls too, while a mouse (any width) keeps the
   // inner pane. Mirrors the CSS `fine:` overflow on the <pre> below.
+  const t = useTranslations('runDetail')
   const isTouch = useIsTouch()
   const [colorMode, setColorMode] = useState(true)
   // Follow the tail by default while streaming; a static (finished) log opens
@@ -403,10 +406,10 @@ function LogPanel({
                 ? 'bg-brand-600 text-white'
                 : 'bg-slate-700 text-slate-400 hover:text-slate-200'
             }`}
-            title={colorMode ? 'Showing ANSI colours — click for plain text' : 'Showing plain text — click for colours'}
+            title={colorMode ? t('log.colorOnTitle') : t('log.colorOffTitle')}
           >
             <Palette className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Color</span>
+            <span className="hidden sm:inline">{t('log.color')}</span>
           </button>
         </div>
         {/* Two groups: utility icons (refresh/copy/download — icon-only on a
@@ -419,11 +422,11 @@ function LogPanel({
               <button
                 onClick={onRefresh}
                 className="px-2 py-1 text-xs rounded font-medium bg-slate-700 text-slate-400 hover:text-slate-200 transition-colors inline-flex items-center gap-1"
-                title="Refresh log"
-                aria-label="Refresh log"
+                title={t('log.refreshTitle')}
+                aria-label={t('log.refreshTitle')}
               >
                 <RefreshCw className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Refresh</span>
+                <span className="hidden sm:inline">{t('log.refresh')}</span>
               </button>
             )}
             {plainContent && (
@@ -434,11 +437,11 @@ function LogPanel({
                   setTimeout(() => setCopied(false), 2000)
                 }}
                 className="px-2 py-1 text-xs rounded font-medium bg-slate-700 text-slate-400 hover:text-slate-200 transition-colors inline-flex items-center gap-1"
-                title="Copy plain text to clipboard"
-                aria-label="Copy log to clipboard"
+                title={t('log.copyTitle')}
+                aria-label={t('log.copyAria')}
               >
                 {copied ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
-                <span className="hidden sm:inline">{copied ? 'Copied!' : 'Copy'}</span>
+                <span className="hidden sm:inline">{copied ? t('log.copied') : t('log.copy')}</span>
               </button>
             )}
             {/* One download button — the current Color/Plain mode decides what
@@ -451,11 +454,11 @@ function LogPanel({
                   : downloadFile(plainContent, `${shortId}-${phase}-plain.log`)
               }
               className="px-2 py-1 text-xs rounded font-medium bg-slate-700 text-slate-400 hover:text-slate-200 transition-colors inline-flex items-center gap-1"
-              title={colorMode ? 'Download log (with ANSI colour codes)' : 'Download log (plain text)'}
-              aria-label="Download log"
+              title={colorMode ? t('log.downloadColorTitle') : t('log.downloadPlainTitle')}
+              aria-label={t('log.downloadAria')}
             >
               <Download className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Download</span>
+              <span className="hidden sm:inline">{t('log.download')}</span>
             </button>
           </div>
           {/* Scroll-nav group, divider-separated from the utilities. Both keep
@@ -477,10 +480,10 @@ function LogPanel({
                     ? 'bg-green-600/20 text-green-300'
                     : 'bg-slate-700 text-slate-400 hover:text-slate-200'
                 }`}
-                title={following ? 'Following the live tail — click to stop' : 'Follow the live tail'}
+                title={following ? t('log.followOnTitle') : t('log.followOffTitle')}
               >
                 <span className={`w-1.5 h-1.5 rounded-full bg-green-400 ${following ? 'animate-pulse' : ''}`} />
-                Follow
+                {t('log.follow')}
               </button>
             )}
             {/* "End" jumps to the tail (one-shot). Distinct from Follow: End is a
@@ -489,10 +492,10 @@ function LogPanel({
             <button
               onClick={() => scrollToBottom(true)}
               className="px-2 py-1 text-xs rounded font-medium bg-slate-700 text-slate-400 hover:text-slate-200 transition-colors inline-flex items-center gap-1"
-              title="Jump to the end of the log"
+              title={t('log.endTitle')}
             >
               <ArrowDownToLine className="w-3.5 h-3.5" />
-              End
+              {t('log.end')}
             </button>
           </div>
         </div>
@@ -538,6 +541,7 @@ export default function RunDetailPage() {
 }
 
 function RunDetailPageInner() {
+  const t = useTranslations('runDetail')
   const router = useRouter()
   const params = useParams()
   const workspaceId = params.id as string
@@ -615,15 +619,15 @@ function RunDetailPageInner() {
   const loadRun = useCallback(async () => {
     try {
       const res = await apiFetch(`/api/v2/runs/${runId}`)
-      if (!res.ok) throw new Error('Failed to load run')
+      if (!res.ok) throw new Error(t('errors.loadRun'))
       const data = await res.json()
       setRun(data.data)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load run')
+      setError(err instanceof Error ? err.message : t('errors.loadRun'))
     } finally {
       setLoading(false)
     }
-  }, [runId])
+  }, [runId, t])
 
   // Overview rollups for AI + policy (see aiInfo/policyInfo above).
   const loadAiInfo = useCallback(async () => {
@@ -830,7 +834,7 @@ function RunDetailPageInner() {
       const res = await apiFetch(`${prefix}/runs/${runId}/actions/${apiAction}`, { method: 'POST' })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        throw new Error(data.detail || `Failed to ${action} run`)
+        throw new Error(data.detail || t(`errors.action.${action}`))
       }
       if (action === 'retry') {
         const data = await res.json()
@@ -847,7 +851,7 @@ function RunDetailPageInner() {
       }
       await loadRun()
     } catch (err) {
-      setError(err instanceof Error ? err.message : `Failed to ${action} run`)
+      setError(err instanceof Error ? err.message : t(`errors.action.${action}`))
     } finally {
       setActionLoading('')
     }
@@ -861,10 +865,10 @@ function RunDetailPageInner() {
   function requestAction(action: 'confirm' | 'discard' | 'cancel' | 'retry') {
     if (isTouch) {
       const prompts: Record<string, string> = {
-        confirm: 'Apply this run? This applies the plan and changes infrastructure.',
-        discard: 'Discard this plan?',
-        cancel: 'Cancel this run?',
-        retry: 'Retry this run?',
+        confirm: t('confirm.apply'),
+        discard: t('confirm.discard'),
+        cancel: t('confirm.cancel'),
+        retry: t('confirm.retry'),
       }
       if (!window.confirm(prompts[action])) return
     }
@@ -889,7 +893,7 @@ function RunDetailPageInner() {
   }
 
   if (loading) return <><NavBar /><main className="px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto"><LoadingSpinner /></main></>
-  if (!run) return <><NavBar /><main className="px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto"><ErrorBanner message="Run not found" /></main></>
+  if (!run) return <><NavBar /><main className="px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto"><ErrorBanner message={t('notFound')} /></main></>
 
   const attrs = run.attributes
   const actions = attrs.actions
@@ -901,28 +905,24 @@ function RunDetailPageInner() {
   // Labels shorten below `md` so all six tabs need less horizontal scroll on a
   // phone ("Plan"/"Apply" vs "Plan Log"/"Apply Log"); desktop keeps the full
   // words. The " Log" suffix is CSS-hidden on mobile — one DRY label.
-  const planLabel = (
-    <>
-      Plan<span className="hidden md:inline"> Log</span>
-    </>
-  )
-  const applyLabel = (
-    <>
-      Apply<span className="hidden md:inline"> Log</span>
-    </>
-  )
+  const planLabel = t.rich('tabs.planLabel', {
+    log: (chunks) => <span className="hidden md:inline"> {chunks}</span>,
+  })
+  const applyLabel = t.rich('tabs.applyLabel', {
+    log: (chunks) => <span className="hidden md:inline"> {chunks}</span>,
+  })
   // Each tab carries a rich label (for the desktop bar) AND a plain-text label
   // (for the mobile <select>, whose <option>s can't hold JSX).
   const tabs: [RunView, React.ReactNode, string][] = [
-    ['overview', 'Overview', 'Overview'],
-    ...((aiInfo?.present ? [['ai', 'AI', 'AI analysis']] : []) as [RunView, React.ReactNode, string][]),
-    ...((policyInfo?.present ? [['opa', 'OPA', 'OPA policies']] : []) as [RunView, React.ReactNode, string][]),
+    ['overview', t('tabs.overview'), t('tabs.overview')],
+    ...((aiInfo?.present ? [['ai', t('tabs.ai'), t('tabs.aiFull')]] : []) as [RunView, React.ReactNode, string][]),
+    ...((policyInfo?.present ? [['opa', t('tabs.opa'), t('tabs.opaFull')]] : []) as [RunView, React.ReactNode, string][]),
     ...((attrs['has-json-output']
-      ? [['impact', 'Impact', 'Impact graph']]
+      ? [['impact', t('tabs.impact'), t('tabs.impactFull')]]
       : []) as [RunView, React.ReactNode, string][]),
-    ['plan', planLabel, 'Plan log'],
-    ...((attrs['plan-only'] ? [] : [['apply', applyLabel, 'Apply log']]) as [RunView, React.ReactNode, string][]),
-    ['details', 'Details', 'Details'],
+    ['plan', planLabel, t('tabs.planFull')],
+    ...((attrs['plan-only'] ? [] : [['apply', applyLabel, t('tabs.applyFull')]]) as [RunView, React.ReactNode, string][]),
+    ['details', t('tabs.details'), t('tabs.details')],
   ]
   const availableViews = new Set(tabs.map((t) => t[0]))
   const view: RunView = availableViews.has(activeView) ? activeView : 'overview'
@@ -931,20 +931,20 @@ function RunDetailPageInner() {
   const ps = attrs['plan-summary']
   const changeCard: { value: React.ReactNode; sub?: string; tone: CardTone } = (() => {
     if (attrs['has-changes'] === false && !attrs['plan-only'] && ['planned', 'applied'].includes(attrs.status)) {
-      return { value: 'No changes', tone: 'neutral' }
+      return { value: t('changes.noChanges'), tone: 'neutral' }
     }
     if (ps) {
       // Colour-coded counts (add=green, change=amber, destroy=red,
       // replace=orange, import=blue) read far faster than a flat "+2 ~1 -3",
       // with a plain-English breakdown underneath now there's room for it.
       const segs: { k: string; sym: string; n: number; cls: string; word: string }[] = [
-        { k: 'add', sym: '+', n: ps.add, cls: 'text-green-400', word: 'to add' },
-        { k: 'change', sym: '~', n: ps.change, cls: 'text-amber-400', word: 'to change' },
-        { k: 'destroy', sym: '−', n: ps.destroy, cls: 'text-red-400', word: 'to destroy' },
-        { k: 'replace', sym: '±', n: ps.replace, cls: 'text-orange-400', word: 'to replace' },
-        { k: 'import', sym: '↓', n: ps.import, cls: 'text-blue-400', word: 'to import' },
+        { k: 'add', sym: '+', n: ps.add, cls: 'text-green-400', word: t('changes.toAdd') },
+        { k: 'change', sym: '~', n: ps.change, cls: 'text-amber-400', word: t('changes.toChange') },
+        { k: 'destroy', sym: '−', n: ps.destroy, cls: 'text-red-400', word: t('changes.toDestroy') },
+        { k: 'replace', sym: '±', n: ps.replace, cls: 'text-orange-400', word: t('changes.toReplace') },
+        { k: 'import', sym: '↓', n: ps.import, cls: 'text-blue-400', word: t('changes.toImport') },
       ].filter((s) => s.n > 0)
-      if (segs.length === 0) return { value: 'No changes', tone: 'neutral' }
+      if (segs.length === 0) return { value: t('changes.noChanges'), tone: 'neutral' }
       return {
         value: (
           <span className="flex flex-wrap gap-x-3 gap-y-0.5 tabular-nums">
@@ -960,50 +960,50 @@ function RunDetailPageInner() {
         tone: 'neutral',
       }
     }
-    if (['pending', 'queued', 'planning'].includes(attrs.status)) return { value: 'Planning…', tone: 'neutral' }
+    if (['pending', 'queued', 'planning'].includes(attrs.status)) return { value: t('changes.planning'), tone: 'neutral' }
     return { value: '—', tone: 'neutral' }
   })()
 
   const aiCard: { value: string; sub?: string; tone: CardTone; clickable: boolean } = (() => {
     if (!aiInfo) return { value: '…', tone: 'neutral', clickable: false }
-    if (!aiInfo.present) return { value: 'Not available', tone: 'neutral', clickable: false }
+    if (!aiInfo.present) return { value: t('ai.notAvailable'), tone: 'neutral', clickable: false }
     switch (aiInfo.status) {
       case 'ready':
         return {
-          value: 'Ready',
-          sub: aiInfo.risk ? `${aiInfo.risk} risk` : undefined,
+          value: t('ai.ready'),
+          sub: aiInfo.risk ? t('ai.riskSub', { risk: aiInfo.risk }) : undefined,
           tone: aiInfo.risk === 'high' || aiInfo.risk === 'critical' ? 'bad' : aiInfo.risk === 'medium' ? 'warn' : 'good',
           clickable: true,
         }
       case 'pending':
-        return { value: 'Generating…', tone: 'active', clickable: true }
+        return { value: t('ai.generating'), tone: 'active', clickable: true }
       case 'skipped':
-        return { value: 'Skipped', tone: 'neutral', clickable: true }
+        return { value: t('ai.skipped'), tone: 'neutral', clickable: true }
       case 'errored':
-        return { value: 'Failed', tone: 'bad', clickable: true }
+        return { value: t('ai.failed'), tone: 'bad', clickable: true }
       default:
-        return { value: aiInfo.status ?? 'Available', tone: 'neutral', clickable: true }
+        return { value: aiInfo.status ?? t('ai.available'), tone: 'neutral', clickable: true }
     }
   })()
 
   const policyCard: { value: string; sub?: string; tone: CardTone; clickable: boolean } = (() => {
     if (!policyInfo) return { value: '…', tone: 'neutral', clickable: false }
-    if (!policyInfo.present) return { value: 'None', tone: 'neutral', clickable: false }
-    if (policyInfo.status === 'blocked') return { value: 'Blocked', sub: `${policyInfo.failed ?? 0} failed`, tone: 'bad', clickable: true }
+    if (!policyInfo.present) return { value: t('policy.none'), tone: 'neutral', clickable: false }
+    if (policyInfo.status === 'blocked') return { value: t('policy.blocked'), sub: t('policy.failedSub', { count: policyInfo.failed ?? 0 }), tone: 'bad', clickable: true }
     if ((policyInfo.failed ?? 0) > 0)
-      return { value: 'Advisory issues', sub: `${policyInfo.passed}/${policyInfo.total} passed`, tone: 'warn', clickable: true }
-    return { value: 'Passed', sub: `${policyInfo.passed}/${policyInfo.total}`, tone: 'good', clickable: true }
+      return { value: t('policy.advisoryIssues'), sub: t('policy.passedSub', { passed: policyInfo.passed ?? 0, total: policyInfo.total ?? 0 }), tone: 'warn', clickable: true }
+    return { value: t('policy.passed'), sub: `${policyInfo.passed}/${policyInfo.total}`, tone: 'good', clickable: true }
   })()
 
   const resourceCard: { value: string; sub?: string; tone: CardTone } = (() => {
     const exit = attrs['runner-exit-status']
     const peak = attrs['peak-memory-bytes']
-    if (exit === 'oom' || exit === 'killed') return { value: 'Over limit', sub: 'OOM-killed', tone: 'bad' }
+    if (exit === 'oom' || exit === 'killed') return { value: t('resources.overLimit'), sub: t('resources.oomKilled'), tone: 'bad' }
     if (peak != null) {
       const limit = parseMemoryToBytes(attrs['resource-memory']) * 2
       const pct = Number.isFinite(limit) && limit > 0 ? Math.round((peak / limit) * 100) : null
       const tone: CardTone = pct == null ? 'neutral' : pct >= 95 ? 'bad' : pct >= 80 ? 'warn' : 'good'
-      const label = pct == null ? 'Recorded' : pct >= 95 ? 'Near limit' : pct >= 80 ? 'High' : 'Within limits'
+      const label = pct == null ? t('resources.recorded') : pct >= 95 ? t('resources.nearLimit') : pct >= 80 ? t('resources.high') : t('resources.withinLimits')
       return { value: label, sub: `${humanBytes(peak)}${pct != null ? ` · ${pct}%` : ''}`, tone }
     }
     return { value: '—', tone: 'neutral' }
@@ -1021,16 +1021,16 @@ function RunDetailPageInner() {
     <>
       {attrs['is-destroy'] && (
         <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-900/50 text-red-300">
-          destroy
+          {t('badge.destroy')}
         </span>
       )}
       {attrs['plan-only'] && !attrs['is-destroy'] && (
         <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-cyan-900/50 text-cyan-300">
-          plan only
+          {t('badge.planOnly')}
         </span>
       )}
       <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${statusColor(attrs.status)}`}>
-        {attrs.status}
+        {t.has(`status.${attrs.status}`) ? t(`status.${attrs.status}`) : attrs.status}
       </span>
     </>
   )
@@ -1047,10 +1047,10 @@ function RunDetailPageInner() {
           disabled={!!actionLoading}
           className="px-3 md:px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors"
         >
-          {actionLoading === 'retry' ? 'Retrying…' : (
+          {actionLoading === 'retry' ? t('actions.retrying') : (
             <>
-              <span className="md:hidden">Retry</span>
-              <span className="hidden md:inline">Retry Run</span>
+              <span className="md:hidden">{t('actions.retryShort')}</span>
+              <span className="hidden md:inline">{t('actions.retryFull')}</span>
             </>
           )}
         </button>
@@ -1061,10 +1061,10 @@ function RunDetailPageInner() {
           disabled={!!actionLoading}
           className="px-3 md:px-4 py-2 rounded-lg text-sm font-medium bg-green-600 hover:bg-green-500 disabled:bg-green-800 disabled:text-green-400 text-white transition-colors"
         >
-          {actionLoading === 'confirm' ? 'Confirming…' : (
+          {actionLoading === 'confirm' ? t('actions.confirming') : (
             <>
-              <span className="md:hidden">Apply</span>
-              <span className="hidden md:inline">Confirm &amp; Apply</span>
+              <span className="md:hidden">{t('actions.confirmShort')}</span>
+              <span className="hidden md:inline">{t('actions.confirmFull')}</span>
             </>
           )}
         </button>
@@ -1075,7 +1075,7 @@ function RunDetailPageInner() {
           disabled={!!actionLoading}
           className="px-3 md:px-4 py-2 rounded-lg text-sm font-medium bg-slate-600 hover:bg-slate-500 disabled:bg-slate-700 disabled:text-slate-400 text-white transition-colors"
         >
-          {actionLoading === 'discard' ? 'Discarding…' : 'Discard'}
+          {actionLoading === 'discard' ? t('actions.discarding') : t('actions.discard')}
         </button>
       )}
       {actions['is-cancelable'] && (
@@ -1084,10 +1084,10 @@ function RunDetailPageInner() {
           disabled={!!actionLoading}
           className="px-3 md:px-4 py-2 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-500 disabled:bg-red-800 disabled:text-red-400 text-white transition-colors"
         >
-          {actionLoading === 'cancel' ? 'Canceling…' : (
+          {actionLoading === 'cancel' ? t('actions.canceling') : (
             <>
-              <span className="md:hidden">Cancel</span>
-              <span className="hidden md:inline">Cancel Run</span>
+              <span className="md:hidden">{t('actions.cancelShort')}</span>
+              <span className="hidden md:inline">{t('actions.cancelFull')}</span>
             </>
           )}
         </button>
@@ -1101,17 +1101,17 @@ function RunDetailPageInner() {
       <main className="px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto">
         <div className="mb-4">
           <Link href={`/workspaces/${workspaceId}?tab=runs`} className="text-sm text-slate-400 hover:text-slate-200">
-            &larr; Back to {attrs['workspace-name'] || 'workspace'}
+            &larr; {t('backTo', { name: attrs['workspace-name'] || t('workspaceFallback') })}
           </Link>
         </div>
 
         <PageHeader
           title={
             attrs['workspace-name']
-              ? `${attrs['workspace-name']} — run ${run.id.replace(/^run-/, '').split('-').pop()}`
-              : `Run ${run.id.replace(/^run-/, '').split('-').pop()}`
+              ? t('header.titleWithWorkspace', { workspace: attrs['workspace-name'], id: run.id.replace(/^run-/, '').split('-').pop() ?? '' })
+              : t('header.title', { id: run.id.replace(/^run-/, '').split('-').pop() ?? '' })
           }
-          description={attrs.message || `${attrs.source} run`}
+          description={attrs.message || t('header.description', { source: attrs.source })}
           actions={
             <div className="flex items-center gap-2">
               <ConnectionStatus connected={sseConnected} />
@@ -1156,7 +1156,7 @@ function RunDetailPageInner() {
             switchView either way. */}
         <div className="mb-6 md:hidden">
           <label htmlFor="run-view-select" className="sr-only">
-            Run section
+            {t('runSection')}
           </label>
           <select
             id="run-view-select"
@@ -1204,7 +1204,7 @@ function RunDetailPageInner() {
         {attrs['is-destroy'] && (
           <div className="mb-6 p-4 bg-red-900/20 rounded-lg border border-red-800/50">
             <p className="text-sm text-red-300">
-              This is a <strong>destroy</strong>{' '}run &mdash; all managed resources will be destroyed when applied.
+              {t.rich('banner.destroy', { strong: (chunks) => <strong>{chunks}</strong> })}
             </p>
           </div>
         )}
@@ -1213,7 +1213,7 @@ function RunDetailPageInner() {
         {attrs['plan-only'] && attrs.source === 'tfe-api' && attrs['workspace-has-vcs'] && run.relationships?.['configuration-version']?.data && (
           <div className="mb-6 p-4 bg-cyan-900/20 rounded-lg border border-cyan-800/50">
             <p className="text-sm text-cyan-300">
-              This is a <strong>plan-only</strong>{' '}run initiated from the CLI on a VCS-connected workspace. Apply is not available for CLI-uploaded code &mdash; only VCS-managed code can be applied.
+              {t.rich('banner.planOnlyCli', { strong: (chunks) => <strong>{chunks}</strong> })}
             </p>
           </div>
         )}
@@ -1222,12 +1222,12 @@ function RunDetailPageInner() {
         {attrs['module-overrides'] && (
           <div className="mb-6 p-4 bg-purple-900/20 rounded-lg border border-purple-800/50">
             <p className="text-sm text-purple-300">
-              This run uses <strong>module overrides</strong>
-              {attrs['vcs-pull-request-number'] && <> from PR #{attrs['vcs-pull-request-number']}</>}
+              {t.rich('banner.moduleOverridesPrefix', { strong: (chunks) => <strong>{chunks}</strong> })}
+              {attrs['vcs-pull-request-number'] && <> {t('banner.moduleOverridesFromPr', { number: attrs['vcs-pull-request-number'] })}</>}
               {' '}&mdash; {Object.keys(attrs['module-overrides']).map(coord => (
                 <code key={coord} className="bg-purple-900/50 px-1.5 py-0.5 rounded text-xs font-mono">{coord}</code>
               ))}
-              {' '}will be fetched from the PR branch instead of the published registry version.
+              {' '}{t('banner.moduleOverridesSuffix')}
             </p>
           </div>
         )}
@@ -1235,7 +1235,7 @@ function RunDetailPageInner() {
         {/* Error message */}
         {attrs['error-message'] && (
           <div className="mb-6 p-4 bg-red-900/20 rounded-lg border border-red-800/50">
-            <h3 className="text-sm font-medium text-red-400 mb-1">Error</h3>
+            <h3 className="text-sm font-medium text-red-400 mb-1">{t('errorHeading')}</h3>
             <pre className="text-sm text-red-300 whitespace-pre-wrap font-mono">{attrs['error-message']}</pre>
           </div>
         )}
@@ -1243,7 +1243,7 @@ function RunDetailPageInner() {
         {/* Discard reason (#646/#647): why a discarded plan can no longer apply. */}
         {attrs.status === 'discarded' && attrs['discard-reason'] && (
           <div className="mb-6 p-4 bg-amber-900/20 rounded-lg border border-amber-800/50">
-            <h3 className="text-sm font-medium text-amber-400 mb-1">Discarded — re-plan required</h3>
+            <h3 className="text-sm font-medium text-amber-400 mb-1">{t('discardedHeading')}</h3>
             <p className="text-sm text-amber-200">{attrs['discard-reason']}</p>
           </div>
         )}
@@ -1251,28 +1251,28 @@ function RunDetailPageInner() {
         {/* At-a-glance summary cards (#721) — each drills into its own tab. */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
           <SummaryCard
-            label="Changes"
+            label={t('cards.changes')}
             value={changeCard.value}
             sub={changeCard.sub}
             tone={changeCard.tone}
             onClick={() => switchView('plan')}
           />
           <SummaryCard
-            label="AI analysis"
+            label={t('cards.aiAnalysis')}
             value={aiCard.value}
             sub={aiCard.sub}
             tone={aiCard.tone}
             onClick={aiCard.clickable ? () => switchView('ai') : undefined}
           />
           <SummaryCard
-            label="Policy checks"
+            label={t('cards.policyChecks')}
             value={policyCard.value}
             sub={policyCard.sub}
             tone={policyCard.tone}
             onClick={policyCard.clickable ? () => switchView('opa') : undefined}
           />
           <SummaryCard
-            label="Resources"
+            label={t('cards.resources')}
             value={resourceCard.value}
             sub={resourceCard.sub}
             tone={resourceCard.tone}
@@ -1321,58 +1321,58 @@ function RunDetailPageInner() {
 
         {/* Run metadata */}
         <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-6 mb-6">
-          <h3 className="text-sm font-medium text-slate-300 mb-4">Details</h3>
+          <h3 className="text-sm font-medium text-slate-300 mb-4">{t('details.heading')}</h3>
           <dl className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
             <div>
-              <dt className="text-xs text-slate-500">Execution Backend</dt>
+              <dt className="text-xs text-slate-500">{t('details.executionBackend')}</dt>
               <dd className="mt-1 text-sm text-slate-200">{attrs['execution-backend'] === 'terraform' ? 'Terraform' : 'OpenTofu'}</dd>
             </div>
             <div>
-              <dt className="text-xs text-slate-500">Source</dt>
+              <dt className="text-xs text-slate-500">{t('details.source')}</dt>
               <dd className="mt-1 text-sm text-slate-200">{attrs.source}</dd>
             </div>
             <div>
-              <dt className="text-xs text-slate-500">Auto Apply</dt>
-              <dd className="mt-1 text-sm text-slate-200">{attrs['auto-apply'] ? 'Yes' : 'No'}</dd>
+              <dt className="text-xs text-slate-500">{t('details.autoApply')}</dt>
+              <dd className="mt-1 text-sm text-slate-200">{attrs['auto-apply'] ? t('common.yes') : t('common.no')}</dd>
             </div>
             <div>
-              <dt className="text-xs text-slate-500">Plan Only</dt>
-              <dd className="mt-1 text-sm text-slate-200">{attrs['plan-only'] ? 'Yes' : 'No'}</dd>
+              <dt className="text-xs text-slate-500">{t('details.planOnly')}</dt>
+              <dd className="mt-1 text-sm text-slate-200">{attrs['plan-only'] ? t('common.yes') : t('common.no')}</dd>
             </div>
             {attrs['created-by'] && (
               <div>
-                <dt className="text-xs text-slate-500">Triggered By</dt>
+                <dt className="text-xs text-slate-500">{t('details.triggeredBy')}</dt>
                 <dd className="mt-1 text-sm text-slate-200">{attrs['created-by']}</dd>
               </div>
             )}
             <div>
-              <dt className="text-xs text-slate-500">Created</dt>
+              <dt className="text-xs text-slate-500">{t('details.created')}</dt>
               <dd className="mt-1 text-sm text-slate-200">{formatTimestamp(attrs['created-at'])}</dd>
             </div>
             {attrs['vcs-commit-sha'] && (
               <div>
-                <dt className="text-xs text-slate-500">Commit</dt>
+                <dt className="text-xs text-slate-500">{t('details.commit')}</dt>
                 <dd className="mt-1 text-sm text-slate-200 font-mono">{attrs['vcs-commit-sha'].slice(0, 8)}</dd>
               </div>
             )}
             {attrs['vcs-branch'] && (
               <div>
-                <dt className="text-xs text-slate-500">Branch</dt>
+                <dt className="text-xs text-slate-500">{t('details.branch')}</dt>
                 <dd className="mt-1 text-sm text-slate-200">{attrs['vcs-branch']}</dd>
               </div>
             )}
             {attrs['vcs-pull-request-number'] && (
               <div>
-                <dt className="text-xs text-slate-500">PR/MR</dt>
+                <dt className="text-xs text-slate-500">{t('details.prMr')}</dt>
                 <dd className="mt-1 text-sm text-slate-200">#{attrs['vcs-pull-request-number']}</dd>
               </div>
             )}
             {(run.relationships?.['created-state-version'] as { data: { id: string } | null } | undefined)?.data && (
               <div>
-                <dt className="text-xs text-slate-500">State Version</dt>
+                <dt className="text-xs text-slate-500">{t('details.stateVersion')}</dt>
                 <dd className="mt-1 text-sm">
                   <Link href={`/workspaces/${workspaceId}?tab=state`} className="text-brand-400 hover:text-brand-300">
-                    View State
+                    {t('details.viewState')}
                   </Link>
                 </dd>
               </div>
@@ -1382,7 +1382,7 @@ function RunDetailPageInner() {
           {/* Run options (only show when non-default) */}
           {(attrs['target-addrs']?.length > 0 || attrs['replace-addrs']?.length > 0 || attrs['refresh-only'] || !attrs['refresh'] || attrs['allow-empty-apply']) && (
             <div className="mt-4 pt-4 border-t border-slate-700/50">
-              <h4 className="text-xs text-slate-500 mb-2">Run Options</h4>
+              <h4 className="text-xs text-slate-500 mb-2">{t('details.runOptions')}</h4>
               <div className="flex flex-wrap gap-2">
                 {attrs['target-addrs']?.map((addr: string) => (
                   <span key={addr} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono bg-amber-900/40 text-amber-300 border border-amber-800/50">
@@ -1416,18 +1416,18 @@ function RunDetailPageInner() {
 
         {/* Status timeline */}
         <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-6 mb-6">
-          <h3 className="text-sm font-medium text-slate-300 mb-4">Timeline</h3>
+          <h3 className="text-sm font-medium text-slate-300 mb-4">{t('timeline.heading')}</h3>
           <div className="space-y-2">
             {[
-              ['queued-at', 'Queued'],
-              ['planning-at', 'Planning started'],
-              ['planned-at', 'Plan complete'],
-              ['confirmed-at', 'Confirmed'],
-              ['applying-at', 'Applying started'],
-              ['applied-at', 'Applied'],
-              ['errored-at', 'Errored'],
-              ['canceled-at', 'Canceled'],
-              ['discarded-at', 'Discarded'],
+              ['queued-at', t('timeline.queued')],
+              ['planning-at', t('timeline.planningStarted')],
+              ['planned-at', t('timeline.planComplete')],
+              ['confirmed-at', t('timeline.confirmed')],
+              ['applying-at', t('timeline.applyingStarted')],
+              ['applied-at', t('timeline.applied')],
+              ['errored-at', t('timeline.errored')],
+              ['canceled-at', t('timeline.canceled')],
+              ['discarded-at', t('timeline.discarded')],
             ]
               .filter(([key]) => timestamps[key as string])
               .map(([key, label]) => (
@@ -1448,7 +1448,7 @@ function RunDetailPageInner() {
             log={planLog}
             precomputedHtml={planHtml}
             loading={planLogLoading}
-            emptyMessage="No plan output available yet."
+            emptyMessage={t('log.planEmpty')}
             phase="plan"
             runId={runId}
             isStreaming={attrs.status === 'planning'}
@@ -1462,7 +1462,7 @@ function RunDetailPageInner() {
             log={applyLog}
             precomputedHtml={applyHtml}
             loading={applyLogLoading}
-            emptyMessage="No apply output available yet."
+            emptyMessage={t('log.applyEmpty')}
             phase="apply"
             runId={runId}
             isStreaming={attrs.status === 'applying'}
@@ -1517,6 +1517,7 @@ function PolicyPanel({
   runStatus: string
   onChanged: () => void
 }) {
+  const t = useTranslations('runDetail')
   const [evals, setEvals] = useState<PolicyEval[]>([])
   const [summary, setSummary] = useState<PolicySummary | null>(null)
   const [loaded, setLoaded] = useState(false)
@@ -1572,12 +1573,12 @@ function PolicyPanel({
       })
       if (!res.ok) {
         const d = await res.json().catch(() => ({}))
-        throw new Error(d.detail || `Override failed (${res.status})`)
+        throw new Error(d.detail || t('policyPanel.overrideFailedStatus', { status: res.status }))
       }
       await load()
       onChanged()
     } catch (e) {
-      setErr(e instanceof Error ? e.message : 'Override failed')
+      setErr(e instanceof Error ? e.message : t('policyPanel.overrideFailed'))
     } finally {
       setOverriding(false)
     }
@@ -1586,10 +1587,10 @@ function PolicyPanel({
   return (
     <div className="mb-6 bg-slate-800/50 rounded-lg border border-slate-700/50 p-4">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-semibold text-slate-200">Policy Checks</h3>
+        <h3 className="text-sm font-semibold text-slate-200">{t('policyPanel.heading')}</h3>
         {summary && (
           <span className="text-xs text-slate-400">
-            {summary.passed}/{summary.total} passed
+            {t('policyPanel.passedCount', { passed: summary.passed, total: summary.total })}
           </span>
         )}
       </div>
@@ -1597,8 +1598,7 @@ function PolicyPanel({
       {blocked && (
         <div className="mb-3 p-3 bg-red-900/20 rounded-lg border border-red-800/50">
           <p className="text-sm text-red-300">
-            This run is <strong>blocked by a mandatory policy set</strong>. It will not apply until
-            the failure is resolved or an admin overrides it.
+            {t.rich('policyPanel.blockedMessage', { strong: (chunks) => <strong>{chunks}</strong> })}
           </p>
           {isAdmin() && (
             <button
@@ -1606,7 +1606,7 @@ function PolicyPanel({
               disabled={overriding}
               className="mt-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-red-900/60 hover:bg-red-800 disabled:opacity-50 text-red-100 transition-colors"
             >
-              {overriding ? 'Overriding...' : 'Override & Continue'}
+              {overriding ? t('policyPanel.overriding') : t('policyPanel.overrideContinue')}
             </button>
           )}
         </div>
@@ -1628,15 +1628,15 @@ function PolicyPanel({
                       : 'bg-amber-900/40 text-amber-300'
                   }`}
                 >
-                  {a['enforcement-level']}
+                  {t.has(`policyPanel.enforcement.${a['enforcement-level']}`) ? t(`policyPanel.enforcement.${a['enforcement-level']}`) : a['enforcement-level']}
                 </span>
                 <span
                   className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${outcomeBadge(a.outcome)}`}
                 >
-                  {a.outcome}
+                  {t.has(`policyPanel.outcome.${a.outcome}`) ? t(`policyPanel.outcome.${a.outcome}`) : a.outcome}
                 </span>
                 {a['overridden-by'] && (
-                  <span className="text-xs text-slate-500">overridden by {a['overridden-by']}</span>
+                  <span className="text-xs text-slate-500">{t('policyPanel.overriddenBy', { by: a['overridden-by'] })}</span>
                 )}
               </div>
               {a.result?.error && (
@@ -1653,7 +1653,7 @@ function PolicyPanel({
                           {p.passed ? '✓' : p.error ? '⚠' : '✗'}
                         </span>
                         <span className="text-slate-200 font-medium">{p.policy}</span>
-                        {p.passed && <span className="text-green-500">passed</span>}
+                        {p.passed && <span className="text-green-500">{t('policyPanel.policyPassed')}</span>}
                       </div>
                       {p.error && (
                         <div className="mt-1 ml-5 p-2 bg-amber-900/20 rounded border border-amber-800/40">
@@ -1661,7 +1661,7 @@ function PolicyPanel({
                         </div>
                       )}
                       {!p.passed && !p.error && (!p.violations || p.violations.length === 0) && (
-                        <p className="mt-1 ml-5 text-slate-400 italic">Policy failed without producing a deny message or error output</p>
+                        <p className="mt-1 ml-5 text-slate-400 italic">{t('policyPanel.noDenyMessage')}</p>
                       )}
                       {p.violations && p.violations.length > 0 && (
                         <ul className="mt-1 ml-5 space-y-0.5">

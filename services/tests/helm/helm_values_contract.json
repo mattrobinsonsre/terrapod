@@ -26,6 +26,7 @@
   "api.config.ai_summary.model",
   "api.config.ai_summary.plan_json_max_bytes",
   "api.config.ai_summary.request_timeout_seconds",
+  "api.config.ai_summary.summary_language",
   "api.config.artifact_retention.batch_size",
   "api.config.artifact_retention.binary_cache_retention_days",
   "api.config.artifact_retention.config_versions_retention_days",

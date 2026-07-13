@@ -463,6 +463,7 @@ def render_prompt(
     prompt_suffix: str = "",
     state_diverged: bool = False,
     drift_detection: bool = False,
+    output_language: str = "",
 ) -> tuple[str, str]:
     """Render the system + user messages for the Chat Completions request.
 
@@ -493,6 +494,17 @@ def render_prompt(
     parts.append(skill)
     if prompt_suffix.strip():
         parts.append(prompt_suffix.strip())
+    if output_language.strip() and output_language.strip().lower() != "english":
+        # Canonical-language directive (#767): the deployment writes summaries in
+        # one authoritative language. Identifiers stay verbatim so the output is
+        # still actionable; only the natural-language prose is in this language.
+        parts.append(
+            f"OUTPUT_LANGUAGE: Write every natural-language field you emit — the "
+            f"description and each risk factor's title and detail — in "
+            f"{output_language.strip()}. Keep all identifiers verbatim and "
+            f"untranslated: resource addresses, provider and module names, HCL "
+            f"keywords, CLI flags, file paths, and anything inside backticks."
+        )
     system_message = "\n\n".join(parts)
 
     user_parts: list[str] = []

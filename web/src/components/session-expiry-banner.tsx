@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useTranslations } from 'next-intl'
 import { getAuthState, getExpiresAt, updateExpiresAt } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
 
@@ -26,8 +27,9 @@ const POLL_MS = 60_000 // reconcile against the server every 60s
  * triggers a redirect on its own.
  */
 export function SessionExpiryBanner() {
+  const t = useTranslations('common')
   const [showWarning, setShowWarning] = useState(false)
-  const [remaining, setRemaining] = useState('')
+  const [remainingMinutes, setRemainingMinutes] = useState(0)
 
   useEffect(() => {
     let cancelled = false
@@ -45,7 +47,7 @@ export function SessionExpiryBanner() {
       if (ms > 0 && ms < WARNING_THRESHOLD_MS) {
         const mins = Math.ceil(ms / 60_000)
         setShowWarning(true)
-        setRemaining(`${mins} minute${mins !== 1 ? 's' : ''}`)
+        setRemainingMinutes(mins)
       } else {
         setShowWarning(false)
       }
@@ -93,10 +95,14 @@ export function SessionExpiryBanner() {
 
   return (
     <div className="bg-amber-900/50 border-b border-amber-700/50 px-4 py-2 text-sm text-amber-200 text-center">
-      Session expires in {remaining} —{' '}
-      <a href="/login" className="underline hover:text-amber-100">
-        re-authenticate
-      </a>
+      {t.rich('sessionExpiry.banner', {
+        minutes: remainingMinutes,
+        link: (chunks) => (
+          <a href="/login" className="underline hover:text-amber-100">
+            {chunks}
+          </a>
+        ),
+      })}
     </div>
   )
 }

@@ -1,0 +1,2621 @@
+{
+  "nav": {
+    "workspaces": "W0rk5p4c35",
+    "estate": "357473",
+    "registry": "R3g157ry",
+    "modules": "M0dul35",
+    "providers": "Pr0v1d3r5",
+    "catalog": "C474l0g",
+    "agentPools": "4g3n7 P00l5",
+    "admin": "4dm1n",
+    "users": "U53r5",
+    "roles": "R0l35",
+    "vcsConnections": "VC5 C0nn3c710n5",
+    "variableSets": "V4r14bl3 5375",
+    "autodiscovery": "4u70d15c0v3ry",
+    "bulkUpdate": "Bulk Upd473",
+    "executionHooks": "3x3cu710n H00k5",
+    "policySets": "P0l1cy 5375",
+    "providerTemplates": "Pr0v1d3r 73mpl4735",
+    "catalogAdmin": "C474l0g 4dm1n",
+    "cache": "C4ch3",
+    "auditLog": "4ud17 L0g",
+    "help": "H3lp",
+    "apiReference": "4P1 R3f3r3nc3",
+    "docs": "D0c5",
+    "account": "4cc0un7",
+    "apiTokens": "4P1 70k3n5",
+    "sessions": "535510n5",
+    "logOut": "L0g 0u7",
+    "menu": "M3nu",
+    "openMenu": "0p3n m3nu",
+    "openAccountMenu": "0p3n 4cc0un7 m3nu",
+    "closeMenu": "Cl053 m3nu"
+  },
+  "switcher": {
+    "language": "L4ngu4g3",
+    "changeLanguage": "Ch4ng3 l4ngu4g3"
+  },
+  "workspaces": {
+    "title": "W0rk5p4c35",
+    "description": "M4n4g3 73rr4f0rm w0rk5p4c35, 57473, 4nd run5",
+    "new": "N3w W0rk5p4c3",
+    "cancel": "C4nc3l",
+    "create": "Cr3473 W0rk5p4c3",
+    "creating": "Cr3471ng…",
+    "loadFailed": "F41l3d 70 l04d w0rk5p4c35",
+    "createFailed": "F41l3d 70 cr3473 w0rk5p4c3",
+    "form": {
+      "name": "N4m3",
+      "namePattern": "L3773r5, numb3r5, hyph3n5, 4nd und3r5c0r35 0nly. Mu57 574r7 w17h 4 l3773r 0r numb3r.",
+      "namePlaceholder": "my-w0rk5p4c3",
+      "executionMode": "3x3cu710n M0d3",
+      "local": "L0c4l",
+      "agent": "4g3n7",
+      "executionBackend": "3x3cu710n B4ck3nd",
+      "version": "V3r510n",
+      "versionTitle": "V3r510n 1n X.Y 0r X.Y.Z f0rm47 (3.g. 1.11 0r 1.11.5)",
+      "versionPlaceholder": "3.g. 1.11 0r 1.11.5",
+      "cpuRequest": "CPU R3qu357",
+      "cpuTitle": "Kub3rn3735 CPU qu4n717y: wh0l3 c0r35 (1, 2) 0r m1ll1c0r35 (500m, 100m)",
+      "cpuHint": "3.g. 1, 0.5, 500m",
+      "memoryRequest": "M3m0ry R3qu357",
+      "memoryTitle": "Kub3rn3735 m3m0ry qu4n717y: by735 (1000) 0r w17h 5uff1x (512M1, 2G1, 171)",
+      "memoryHint": "3.g. 2G1, 512M1, 171",
+      "agentPool": "4g3n7 P00l",
+      "none": "N0n3",
+      "autoApply": "4u70 4pply",
+      "enabled": "3n4bl3d",
+      "workingDirectory": "W0rk1ng D1r3c70ry",
+      "workingDirectoryPlaceholder": "3.g. 3nv1r0nm3n75/d3v",
+      "workingDirectoryHint": "5ubd1r3c70ry w17h1n r3p0 c0n741n1ng .7f f1l35",
+      "vcsConnection": "VC5 C0nn3c710n",
+      "vcsRepoUrl": "VC5 R3p05170ry URL",
+      "vcsRepoUrlTitle": "Mu57 b3 4n H77P 0r H77P5 URL",
+      "vcsRepoUrlPlaceholder": "h77p5://g17hub.c0m/0rg/r3p0",
+      "vcsBranch": "VC5 Br4nch",
+      "vcsBranchPlaceholder": "m41n (d3f4ul7)"
+    },
+    "stats": {
+      "total": "7074l",
+      "health": "H34l7h",
+      "locked": "L0ck3d",
+      "clearAllFilters": "Cl34r 4ll f1l73r5",
+      "clearHealthFilter": "Cl34r h34l7h 155u35 f1l73r",
+      "filterHealth": "F1l73r 70 w0rk5p4c35 w17h h34l7h 155u35",
+      "clearLockedFilter": "Cl34r l0ck3d f1l73r",
+      "filterLocked": "F1l73r 70 l0ck3d w0rk5p4c35"
+    },
+    "filter": {
+      "placeholder": "F1l73r by n4m3, l4b3l, 0r 5747u5 — 3.g. \"3u1\", \"3nv:pr0d\", \"5747u5:3rr0r3d\"",
+      "ariaLabel": "F1l73r w0rk5p4c35",
+      "clear": "Cl34r",
+      "status": "5747u5",
+      "label": "L4b3l",
+      "back": "b4ck",
+      "valueCount": "{count, plural, one {# value} other {# values}}",
+      "removeTerm": "R3m0v3 7h15 73rm",
+      "showing": "5h0w1ng {filtered} 0f {total}",
+      "termName": "n4m3: {value}",
+      "termStatus": "5747u5: {value}",
+      "termLabelAny": "{key}: (4ny)",
+      "termLabel": "{key}: {value}",
+      "hintStatus": "5747u5",
+      "hintHealth": "h34l7h",
+      "hintLabel": "l4b3l",
+      "hintLabelKey": "l4b3l k3y",
+      "hintName": "n4m3"
+    },
+    "row": {
+      "removeLabelFilter": "Cl1ck 70 r3m0v3 fr0m f1l73r",
+      "addLabelFilter": "Cl1ck 70 f1l73r by 7h15 l4b3l"
+    },
+    "table": {
+      "name": "N4m3",
+      "mode": "M0d3",
+      "pool": "P00l",
+      "resources": "R350urc35",
+      "status": "5747u5",
+      "created": "Cr3473d",
+      "resourcesValue": "{cpu} CPU / {memory}"
+    },
+    "empty": {
+      "none": "N0 w0rk5p4c35 y37. Cr3473 0n3 70 g37 574r73d.",
+      "noMatch": "N0 w0rk5p4c35 m47ch 7h15 f1l73r."
+    }
+  },
+  "status": {
+    "state-diverged": "57473 D1v3rg3d",
+    "vcs-error": "VC5 3rr0r",
+    "drifted": "Dr1f73d",
+    "errored": "3rr0r3d",
+    "needs-confirm": "N33d5 C0nf1rm",
+    "planning": "Pl4nn1ng",
+    "applying": "4pply1ng",
+    "canceling": "C4nc3l1ng",
+    "confirmed": "C0nf1rm3d",
+    "queued": "Qu3u3d",
+    "pending": "P3nd1ng",
+    "applied": "4ppl13d",
+    "planned": "Pl4nn3d",
+    "canceled": "C4nc3l3d",
+    "discarded": "D15c4rd3d",
+    "pendingDeletion": "P3nd1ng d3l3710n",
+    "archived": "4rch1v3d"
+  },
+  "auth": {
+    "loading": "L04d1ng...",
+    "subtitle": "51gn 1n 70 m4n4g3 y0ur 1nfr457ruc7ur3",
+    "subtitleCli": "51gn 1n 70 4u7h0r1z3 7h3 CL1",
+    "emailLabel": "3m41l",
+    "passwordLabel": "P455w0rd",
+    "signIn": "51gn 1n",
+    "signingIn": "51gn1ng 1n...",
+    "signInWith": "51gn 1n w17h {provider}",
+    "or": "0r",
+    "noProviders": "N0 4u7h3n71c4710n pr0v1d3r5 c0nf1gur3d",
+    "completingSignIn": "C0mpl371ng 51gn 1n...",
+    "callbackFailedTitle": "4u7h3n71c4710n F41l3d",
+    "tryAgain": "7ry 4g41n",
+    "errors": {
+      "loadProviders": "F41l3d 70 l04d pr0v1d3r5",
+      "authenticationFailed": "4u7h3n71c4710n f41l3d ({status})",
+      "tokenExchangeFailed": "70k3n 3xch4ng3 f41l3d ({status})",
+      "loginFailed": "L0g1n f41l3d",
+      "startLoginFailed": "F41l3d 70 574r7 l0g1n",
+      "missingCodeOrState": "M1551ng 4u7h0r1z4710n c0d3 0r 57473",
+      "stateMismatch": "57473 m15m47ch — p0551bl3 C5RF 4774ck",
+      "missingVerifier": "M1551ng PKC3 v3r1f13r — pl3453 7ry l0gg1ng 1n 4g41n"
+    }
+  },
+  "estate": {
+    "title": "357473 70p0l0gy",
+    "description": "3v3ry w0rk5p4c3 y0u c4n 533 4nd 7h3 m0dul35 7h3y u53, w1r3d by run-7r1gg3r5, r3m073-57473, 4nd m0dul3 l1nk5. Gr0up by wh473v3r 4x15 f175 y0ur 357473 — 7h3 pl47f0rm 3nf0rc35 n0 l4b3l1ng c0nv3n710n.",
+    "errors": {
+      "load": "F41l3d 70 l04d 7h3 357473 gr4ph."
+    },
+    "groupBy": {
+      "label": "Gr0up by"
+    },
+    "view": {
+      "graph": "Gr4ph",
+      "table": "74bl3"
+    },
+    "counts": {
+      "workspaces": "{count, plural, one {# workspace} other {# workspaces}}",
+      "modules": "{count, plural, one {# module} other {# modules}}",
+      "dependencies": "{count, plural, one {# dependency} other {# dependencies}}"
+    },
+    "legend": {
+      "registryModule": "r3g157ry m0dul3"
+    },
+    "detail": {
+      "moduleImpact": "{count, plural, one {workspace uses this — bumping it re-plans it} other {workspaces use this — bumping it re-plans them all}}",
+      "dependOnThis": "{count, plural, one {depends on this} other {depend on this}}"
+    },
+    "table": {
+      "workspaces": {
+        "heading": "W0rk5p4c35",
+        "col": {
+          "workspace": "W0rk5p4c3",
+          "group": "Gr0up",
+          "agentPool": "4g3n7 p00l",
+          "dependedOnBy": "D3p3nd3d 0n by",
+          "modulesUsed": "M0dul35 u53d"
+        },
+        "noModules": "—"
+      },
+      "modules": {
+        "heading": "M0dul35",
+        "col": {
+          "module": "M0dul3",
+          "usedBy": "U53d by (w0rk5p4c35)"
+        }
+      }
+    }
+  },
+  "labels": {
+    "title": "L4b3l5",
+    "description": "Br0w53 l4b3l5 1n u53 4cr055 w0rk5p4c35, 4g3n7 p00l5, r3g157ry m0dul35, 4nd r3g157ry pr0v1d3r5. R34d-0nly — l4b3l5 4r3 3d173d 0n 34ch 3n717y'5 0wn p4g3.",
+    "none": "N0n3.",
+    "emptyKeys": "N0 l4b3l5 1n u53 y37. L4b3l 4ny w0rk5p4c3, 4g3n7 p00l, r3g157ry m0dul3, 0r r3g157ry pr0v1d3r 70 574r7 gr0up1ng 7h1ng5 h3r3.",
+    "emptyValues": "N0 v4lu35 f0r \"{key}\". 317h3r n0 r34d4bl3 3n717y c4rr135 7h15 l4b3l, 0r 17 w45 r3m0v3d 51nc3 7h3 l457 v13w.",
+    "loadKeysFailed": "F41l3d 70 l04d l4b3l5 ({status})",
+    "loadValuesFailed": "F41l3d 70 l04d v4lu35 f0r {key} ({status})",
+    "loadEntitiesFailed": "F41l3d 70 l04d 3n717135 ({status})",
+    "columns": {
+      "labelKey": "L4b3l k3y",
+      "distinctValues": "D1571nc7 v4lu35",
+      "value": "V4lu3",
+      "total": "7074l"
+    },
+    "entity": {
+      "workspaces": "W0rk5p4c35",
+      "agentPools": "4g3n7 p00l5",
+      "modules": "M0dul35",
+      "providers": "Pr0v1d3r5"
+    },
+    "deprecated": {
+      "badge": "D3pr3c473d & un5upp0r73d.",
+      "body": "7h3 L4b3l5 br0w53r 15 n0 l0ng3r 1n 7h3 m41n n4v1g4710n 4nd w1ll b3 r3m0v3d 1n 4 fu7ur3 r3l3453. F1l73r by l4b3l fr0m 7h3 <workspacesLink>W0rk5p4c35</workspacesLink> p4g3 1n5734d. 1f y0u r3ly 0n 7h15 p4g3, pl3453 <issueLink>0p3n 4n 155u3</issueLink>."
+    }
+  },
+  "settings": {
+    "tokens": {
+      "title": "4P1 70k3n5",
+      "description": "M4n4g3 4u7h3n71c4710n 70k3n5 f0r CL1 4nd 4u70m4710n",
+      "descriptionAll": "4ll 70k3n5 4cr055 4ll u53r5",
+      "myTokens": "My 70k3n5",
+      "allTokens": "4ll 70k3n5",
+      "createToken": "Cr3473 70k3n",
+      "cancel": "C4nc3l",
+      "tokenReady": "70k3n r34dy",
+      "tokenReadyHelp": "C0py 7h15 70k3n n0w — 17 w1ll n07 b3 5h0wn 4g41n.",
+      "dismissToken": "D15m155 70k3n",
+      "hide": "H1d3",
+      "show": "5h0w",
+      "copy": "C0py",
+      "empty": "N0 4P1 70k3n5 y37.",
+      "noDescription": "N0 d35cr1p710n",
+      "detached": "d374ch3d",
+      "never": "N3v3r",
+      "selected": "{count, plural, one {# token selected} other {# tokens selected}}",
+      "revokeSelected": "R3v0k3 53l3c73d",
+      "revoking": "R3v0k1ng...",
+      "clearSelection": "Cl34r 53l3c710n",
+      "rotate": "R07473",
+      "rotating": "R07471ng...",
+      "revoke": "R3v0k3",
+      "confirmRotate": "R07473 7h15 70k3n? 7h3 curr3n7 53cr37 570p5 w0rk1ng 1mm3d1473ly 4nd 4 n3w 0n3 15 155u3d.",
+      "confirmBulkRevoke": "{count, plural, one {Revoke # token?} other {Revoke # tokens?}}",
+      "kinds": {
+        "interactive": {
+          "label": "P3r50n4l",
+          "help": "4 p3r50n4l 70k3n f0r 7h3 CL1 4nd 4d-h0c 4u70m4710n. C4rr135 y0ur full l1v3 p3rm15510n5."
+        },
+        "service_bound": {
+          "label": "53rv1c3 · b0und",
+          "help": "4 53rv1c3 70k3n 5c0p3d 70 4 5ub537 0f y0ur r0l35. 175 4cc355 15 7h3 1n73r53c710n 0f 7h053 r0l35 4nd y0ur 0wn — 4nd 17 570p5 w0rk1ng 1f y0ur 4cc0un7 15 r3m0v3d."
+        },
+        "service_detached": {
+          "label": "53rv1c3 · d374ch3d",
+          "help": "4n 4dm1n-m4n4g3d 53rv1c3 70k3n w17h 4n 4b50lu73 p1nn3d 5c0p3, b0und 70 n0 u53r. U53 f0r cr171c4l m4ch1n3-70-m4ch1n3 4u70m4710n 7h47 mu57 5urv1v3 4ny 0n3 p3r50n l34v1ng."
+        }
+      },
+      "lifespans": {
+        "720": "30 d4y5",
+        "2160": "90 d4y5",
+        "4320": "180 d4y5",
+        "8760": "1 y34r"
+      },
+      "filter": {
+        "all": "4ll k1nd5"
+      },
+      "form": {
+        "description": "D35cr1p710n",
+        "descriptionPlaceholder": "C1/CD p1p3l1n3 70k3n",
+        "kind": "K1nd",
+        "lifespan": "L1f35p4n",
+        "create": "Cr3473",
+        "creating": "Cr3471ng...",
+        "pinnedRoles": "P1nn3d r0l35",
+        "pinnedRolesHelp": "— 7h3 5c0p3 7h15 70k3n 15 l1m173d 70",
+        "pinnedRolesCapped": "(c4pp3d 70 y0ur 0wn 4cc355)",
+        "noCustomRoles": "N0 cu570m r0l35 d3f1n3d. Cr3473 r0l35 und3r 4dm1n → R0l35 f1r57.",
+        "noScopedRoles": "Y0u h0ld n0 5c0p3d r0l35 70 p1n. 7h15 70k3n w0uld h4v3 n0 4cc355."
+      },
+      "columns": {
+        "description": "D35cr1p710n",
+        "kind": "K1nd",
+        "boundTo": "B0und 70",
+        "created": "Cr3473d",
+        "lastUsed": "L457 U53d",
+        "expires": "3xp1r35",
+        "actions": "4c710n5"
+      },
+      "errors": {
+        "load": "F41l3d 70 l04d 70k3n5",
+        "create": "F41l3d 70 cr3473 70k3n ({status})",
+        "createGeneric": "F41l3d 70 cr3473 70k3n",
+        "rotate": "F41l3d 70 r07473 70k3n ({status})",
+        "rotateGeneric": "F41l3d 70 r07473 70k3n",
+        "revoke": "F41l3d 70 r3v0k3 70k3n ({status})",
+        "revokeGeneric": "F41l3d 70 r3v0k3 70k3n",
+        "bulkRevoke": "F41l3d 70 r3v0k3 70k3n5"
+      }
+    },
+    "sessions": {
+      "title": "535510n5",
+      "description": "Y0ur 4c71v3 535510n5",
+      "descriptionAll": "4ll 4c71v3 535510n5 4cr055 7h3 pl47f0rm",
+      "empty": "N0 4c71v3 535510n5.",
+      "revokeAll": "R3v0k3 4ll",
+      "current": "Curr3n7",
+      "columns": {
+        "provider": "Pr0v1d3r",
+        "created": "Cr3473d",
+        "expires": "3xp1r35",
+        "lastActive": "L457 4c71v3",
+        "token": "70k3n"
+      },
+      "errors": {
+        "load": "F41l3d 70 l04d 535510n5",
+        "revoke": "F41l3d 70 r3v0k3 535510n5 ({status})",
+        "revokeGeneric": "F41l3d 70 r3v0k3 535510n5"
+      }
+    }
+  },
+  "registry": {
+    "modules": {
+      "title": "M0dul35",
+      "description": "Pr1v473 73rr4f0rm m0dul3 r3g157ry",
+      "cancel": "C4nc3l",
+      "createModule": "Cr3473 M0dul3",
+      "empty": "N0 m0dul35 y37. Cr3473 0n3 70 g37 574r73d.",
+      "providerLabel": "Pr0v1d3r: {provider}",
+      "versionCount": "{count, plural, one {# version} other {# versions}}",
+      "loadFailed": "F41l3d 70 l04d m0dul35",
+      "createFailed": "F41l3d 70 cr3473 m0dul3",
+      "createFailedStatus": "F41l3d 70 cr3473 m0dul3 ({status})",
+      "form": {
+        "name": "N4m3",
+        "provider": "Pr0v1d3r",
+        "slugTitle": "L0w3rc453 l3773r5, numb3r5, 4nd hyph3n5 0nly. Mu57 574r7 w17h 4 l0w3rc453 l3773r.",
+        "addressNote": "N4m3 4nd pr0v1d3r f0rm 7h3 m0dul3'5 r3g157ry 4ddr355 4nd c4nn07 b3 ch4ng3d 4f73r cr34710n.",
+        "vcsConnectionOptional": "VC5 C0nn3c710n (0p710n4l)",
+        "noneUploadManually": "N0n3 — upl04d v3r510n5 m4nu4lly",
+        "repositoryUrl": "R3p05170ry URL",
+        "branchOptional": "Br4nch (0p710n4l)",
+        "branchPlaceholder": "m41n (l34v3 3mp7y f0r d3f4ul7)",
+        "tagPattern": "74g P4773rn",
+        "tagPatternHint": "0nly 74g5 m47ch1ng 7h15 p4773rn cr3473 v3r510n5 (3.g. v1.0.0)",
+        "labelsOptional": "L4b3l5 (0p710n4l)",
+        "creating": "Cr3471ng...",
+        "create": "Cr3473"
+      }
+    },
+    "providers": {
+      "title": "Pr0v1d3r5",
+      "description": "Pr1v473 73rr4f0rm pr0v1d3r r3g157ry",
+      "cancel": "C4nc3l",
+      "createProvider": "Cr3473 Pr0v1d3r",
+      "empty": "N0 pr0v1d3r5 y37. Cr3473 0n3 70 g37 574r73d.",
+      "loadFailed": "F41l3d 70 l04d pr0v1d3r5",
+      "createFailed": "F41l3d 70 cr3473 pr0v1d3r",
+      "createFailedStatus": "F41l3d 70 cr3473 pr0v1d3r ({status})",
+      "form": {
+        "name": "N4m3",
+        "slugTitle": "L0w3rc453 l3773r5, numb3r5, 4nd hyph3n5 0nly. Mu57 574r7 w17h 4 l0w3rc453 l3773r.",
+        "creating": "Cr3471ng...",
+        "create": "Cr3473"
+      }
+    },
+    "meta": {
+      "title": "M374d474",
+      "edit": "3d17",
+      "cancel": "C4nc3l",
+      "save": "54v3",
+      "saving": "54v1ng...",
+      "saveAnyway": "54v3 4nyw4y",
+      "revertLabels": "R3v3r7 L4b3l5",
+      "owner": "0wn3r",
+      "ownerNone": "N0n3",
+      "ownerPlaceholder": "u53r@3x4mpl3.c0m",
+      "labels": "L4b3l5"
+    },
+    "moduleDetail": {
+      "notFound": "M0dul3 n07 f0und",
+      "loadFailed": "F41l3d 70 l04d m0dul3",
+      "updateFailed": "F41l3d 70 upd473 m0dul3",
+      "labelLockoutDefault": "7h15 l4b3l ch4ng3 w0uld r3duc3 y0ur 4cc355.",
+      "providerLabel": "Pr0v1d3r: {provider}",
+      "cancel": "C4nc3l",
+      "uploadVersion": "Upl04d V3r510n",
+      "vcsConnected": "VC5 C0nn3c73d",
+      "connectVcs": "C0nn3c7 VC5",
+      "deleteModule": "D3l373 M0dul3",
+      "linkFailed": "F41l3d 70 l1nk w0rk5p4c3",
+      "linkFailedStatus": "L1nk f41l3d ({status})",
+      "unlinkConfirm": "Unl1nk 7h15 w0rk5p4c3 fr0m 7h3 m0dul3? 1mp4c7 4n4ly515 w1ll n0 l0ng3r run f0r 17.",
+      "unlinkFailed": "F41l3d 70 unl1nk w0rk5p4c3",
+      "unlinkFailedStatus": "Unl1nk f41l3d ({status})",
+      "uploadFailed": "Upl04d f41l3d",
+      "uploadFailedStatus": "Upl04d f41l3d ({status})",
+      "saveVcsFailed": "F41l3d 70 54v3 VC5 c0nf1g",
+      "saveVcsFailedStatus": "F41l3d 70 54v3 VC5 c0nf1g ({status})",
+      "disableVcsFailed": "F41l3d 70 d154bl3 VC5",
+      "disableVcsFailedStatus": "F41l3d 70 d154bl3 VC5 ({status})",
+      "deleteFailed": "D3l373 f41l3d",
+      "deleteFailedStatus": "D3l373 f41l3d ({status})",
+      "upload": {
+        "intro": "53l3c7 4 d1r3c70ry c0n741n1ng y0ur 73rr4f0rm m0dul3 f1l35. 7h3y w1ll b3 p4ck4g3d 1n70 4 74rb4ll 4nd upl04d3d.",
+        "version": "V3r510n",
+        "moduleDirectory": "M0dul3 D1r3c70ry",
+        "selectDirectory": "53l3c7 D1r3c70ry",
+        "fileCount": "{count, plural, one {# file} other {# files}}",
+        "filesToInclude": "{count, plural, one {# file to include:} other {# files to include:}}",
+        "andMore": "...4nd {count} m0r3",
+        "uploading": "Upl04d1ng...",
+        "upload": "Upl04d"
+      },
+      "vcs": {
+        "intro": "C0nn3c7 7h15 m0dul3 70 4 VC5 r3p05170ry. N3w v3r510n5 4r3 publ15h3d 4u70m471c4lly wh3n 53mv3r 74g5 m47ch1ng 7h3 74g p4773rn 4r3 pu5h3d. Br4nch c0mm175 4l0n3 d0 n07 cr3473 v3r510n5.",
+        "connection": "VC5 C0nn3c710n",
+        "selectConnection": "53l3c7 4 c0nn3c710n...",
+        "repositoryUrl": "R3p05170ry URL",
+        "branchOptional": "Br4nch (0p710n4l)",
+        "branchPlaceholder": "m41n (l34v3 3mp7y f0r d3f4ul7)",
+        "tagPattern": "74g P4773rn",
+        "tagPatternHint": "0nly 74g5 m47ch1ng 7h15 p4773rn cr3473 v3r510n5 (3.g. v1.0.0)",
+        "saving": "54v1ng...",
+        "saveConfiguration": "54v3 VC5 C0nf1gur4710n",
+        "disconnect": "D15c0nn3c7 VC5"
+      },
+      "vcsStatus": {
+        "connected": "VC5 c0nn3c73d:",
+        "lastTag": "L457 74g: {tag}",
+        "firstVersionHint": "Pu5h 4 53mv3r 74g (3.g. <code>v1.0.0</code>) m47ch1ng 7h3 74g p4773rn 70 publ15h 7h3 f1r57 v3r510n."
+      },
+      "links": {
+        "title": "L1nk3d W0rk5p4c35",
+        "linkWorkspace": "L1nk W0rk5p4c3",
+        "description": "L1nk3d w0rk5p4c35 r3c31v3 5p3cul471v3 pl4n5 wh3n PR5 4r3 0p3n3d 4g41n57 7h15 m0dul3, 4nd 574nd4rd run5 wh3n n3w v3r510n5 4r3 publ15h3d.",
+        "searchPlaceholder": "534rch w0rk5p4c35 70 l1nk…",
+        "empty": "N0 w0rk5p4c35 l1nk3d y37.",
+        "unlinkTitle": "Unl1nk w0rk5p4c3"
+      },
+      "interface": {
+        "title": "1npu75 & 0u7pu75",
+        "counts": "{inputs} 1npu75, {outputs} 0u7pu75",
+        "versionLabel": "V3r510n:",
+        "noData": "N0 1n73rf4c3 d474 4v41l4bl3 f0r 7h15 v3r510n.",
+        "inputs": "1npu75",
+        "outputs": "0u7pu75",
+        "name": "N4m3",
+        "type": "7yp3",
+        "description": "D35cr1p710n",
+        "default": "D3f4ul7",
+        "required": "R3qu1r3d",
+        "sensitive": "53n5171v3",
+        "requiredBadge": "r3qu1r3d",
+        "optionalBadge": "0p710n4l",
+        "sensitiveBadge": "53n5171v3",
+        "noneDeclared": "7h15 m0dul3 v3r510n d3cl4r35 n0 1npu75 0r 0u7pu75."
+      },
+      "versions": {
+        "title": "V3r510n5",
+        "count": "{count, plural, one {# version} other {# versions}}",
+        "emptyVcs": "N0 v3r510n5 y37. Pu5h 4 53mv3r 74g m47ch1ng \"{pattern}\" 70 7h3 c0nn3c73d r3p05170ry 70 publ15h 4 v3r510n.",
+        "emptyUpload": "N0 v3r510n5 y37. Upl04d 4 m0dul3 0r c0nn3c7 VC5 70 g37 574r73d.",
+        "version": "V3r510n",
+        "status": "5747u5",
+        "source": "50urc3",
+        "actions": "4c710n5",
+        "manualUpload": "m4nu4l upl04d",
+        "delete": "D3l373"
+      },
+      "deleteDialog": {
+        "title": "C0nf1rm D3l373",
+        "moduleBody": "7h15 w1ll p3rm4n3n7ly d3l373 7h15 m0dul3 4nd 4ll 175 v3r510n5.",
+        "versionBody": "7h15 w1ll p3rm4n3n7ly d3l373 v3r510n {version}.",
+        "cancel": "C4nc3l",
+        "confirm": "D3l373"
+      }
+    },
+    "providerDetail": {
+      "description": "Pr0v1d3r r3g157ry",
+      "deleteProvider": "D3l373 Pr0v1d3r",
+      "publishNote": "Pr0v1d3r v3r510n5 4r3 publ15h3d w17h 7h3 <code>73rr4p0d-publ15h</code> CL1, wh1ch cl13n7-51gn5 7h3 b1n4r135. Upl04d1ng 4nd 51gn1ng pr0v1d3r b1n4r135 fr0m 7h3 br0w53r 15 n0 l0ng3r 5upp0r73d. 7h15 p4g3 15 r34d-0nly f0r v3r510n5 4nd pl47f0rm5.",
+      "empty": "N0 v3r510n5 y37. Publ15h w17h 7h3 73rr4p0d-publ15h CL1 70 g37 574r73d.",
+      "loadVersionsFailed": "F41l3d 70 l04d v3r510n5",
+      "updateFailed": "F41l3d 70 upd473 pr0v1d3r",
+      "labelLockoutDefault": "7h15 l4b3l ch4ng3 w0uld r3duc3 y0ur 4cc355.",
+      "deleteFailed": "D3l373 f41l3d",
+      "deleteFailedStatus": "D3l373 f41l3d ({status})",
+      "platformCount": "{count, plural, one {# platform} other {# platforms}}",
+      "delete": "D3l373",
+      "os": "05",
+      "arch": "4rch",
+      "filename": "F1l3n4m3",
+      "actions": "4c710n5",
+      "deleteDialog": {
+        "title": "C0nf1rm D3l373",
+        "providerBody": "7h15 w1ll p3rm4n3n7ly d3l373 7h15 pr0v1d3r 4nd 4ll 175 v3r510n5.",
+        "versionBody": "7h15 w1ll p3rm4n3n7ly d3l373 v3r510n {version} 4nd 175 pl47f0rm5.",
+        "platformBody": "7h15 w1ll p3rm4n3n7ly d3l373 7h3 {os}/{arch} pl47f0rm.",
+        "cancel": "C4nc3l",
+        "confirm": "D3l373"
+      }
+    }
+  },
+  "adminUsers": {
+    "title": "U53r5",
+    "description": "M4n4g3 l0c4l u53r 4cc0un75",
+    "empty": "N0 u53r5 f0und.",
+    "columns": {
+      "email": "3m41l",
+      "displayName": "D15pl4y N4m3",
+      "status": "5747u5",
+      "lastLogin": "L457 L0g1n",
+      "created": "Cr3473d",
+      "actions": "4c710n5"
+    },
+    "form": {
+      "email": "3m41l",
+      "displayName": "D15pl4y N4m3",
+      "displayNamePlaceholder": "J4n3 D03",
+      "passwordOptional": "P455w0rd (0p710n4l)",
+      "passwordPlaceholder": "3n73r 4 57r0ng p455w0rd"
+    },
+    "reset": {
+      "title": "R3537 p455w0rd f0r {email}",
+      "newPassword": "N3w P455w0rd"
+    },
+    "password": {
+      "score": {
+        "veryWeak": "V3ry w34k",
+        "weak": "W34k",
+        "fair": "F41r",
+        "good": "G00d",
+        "strong": "57r0ng"
+      }
+    },
+    "status": {
+      "active": "4c71v3",
+      "inactive": "1n4c71v3",
+      "never": "N3v3r"
+    },
+    "actions": {
+      "cancel": "C4nc3l",
+      "save": "54v3",
+      "saving": "54v1ng...",
+      "createUser": "Cr3473 U53r",
+      "creating": "Cr3471ng...",
+      "resetPassword": "R3537 P455w0rd",
+      "edit": "3d17",
+      "delete": "D3l373",
+      "resetPw": "R3537 PW",
+      "setPw": "537 PW",
+      "cancelPw": "C4nc3l PW"
+    },
+    "confirm": {
+      "activate": "4c71v473 u53r \"{email}\"?",
+      "deactivate": "D34c71v473 u53r \"{email}\"?",
+      "delete": "D3l373 u53r \"{email}\"? 7h15 c4nn07 b3 und0n3."
+    },
+    "success": {
+      "created": "U53r \"{email}\" cr3473d",
+      "updated": "U53r \"{email}\" upd473d",
+      "activated": "U53r \"{email}\" 4c71v473d",
+      "deactivated": "U53r \"{email}\" d34c71v473d",
+      "passwordReset": "P455w0rd r3537 f0r \"{email}\"",
+      "deleted": "U53r \"{email}\" d3l373d"
+    },
+    "errors": {
+      "load": "F41l3d 70 l04d u53r5",
+      "create": "F41l3d 70 cr3473 u53r",
+      "createStatus": "F41l3d 70 cr3473 u53r ({status})",
+      "update": "F41l3d 70 upd473 u53r",
+      "resetPassword": "F41l3d 70 r3537 p455w0rd",
+      "delete": "F41l3d 70 d3l373 u53r"
+    }
+  },
+  "adminRoles": {
+    "title": "R0l35 & 4551gnm3n75",
+    "description": "M4n4g3 RB4C r0l35 4nd u53r r0l3 4551gnm3n75",
+    "builtIn": "bu1l7-1n",
+    "emptyRoles": "N0 r0l35 d3f1n3d.",
+    "emptyAssignments": "N0 r0l3 4551gnm3n75.",
+    "tabs": {
+      "roles": "R0l35",
+      "assignments": "4551gnm3n75"
+    },
+    "columns": {
+      "provider": "Pr0v1d3r",
+      "email": "3m41l",
+      "role": "R0l3",
+      "created": "Cr3473d",
+      "actions": "4c710n5"
+    },
+    "form": {
+      "name": "N4m3",
+      "namePattern": "L3773r5, numb3r5, hyph3n5, 4nd und3r5c0r35 0nly. Mu57 574r7 w17h 4 l3773r 0r numb3r.",
+      "workspacePermission": "W0rk5p4c3 P3rm15510n",
+      "poolPermission": "P00l P3rm15510n",
+      "registryPermission": "R3g157ry P3rm15510n",
+      "catalogPermission": "C474l0g P3rm15510n",
+      "descriptionLabel": "D35cr1p710n",
+      "descriptionPlaceholder": "D3v3l0p3r 4cc355",
+      "allowLabels": "4ll0w L4b3l5 (k3y=v4lu3, c0mm4-53p4r473d)",
+      "allowNames": "4ll0w N4m35 (c0mm4-53p4r473d)",
+      "denyLabels": "D3ny L4b3l5 (k3y=v4lu3, c0mm4-53p4r473d)",
+      "denyNames": "D3ny N4m35 (c0mm4-53p4r473d)",
+      "allowLabelsShort": "4ll0w L4b3l5",
+      "allowNamesShort": "4ll0w N4m35",
+      "denyLabelsShort": "D3ny L4b3l5",
+      "denyNamesShort": "D3ny N4m35"
+    },
+    "assignForm": {
+      "provider": "Pr0v1d3r",
+      "email": "3m41l",
+      "roles": "R0l35"
+    },
+    "caps": {
+      "selected": "{count, plural, one {# capability} other {# capabilities}} 53l3c73d",
+      "count": "{count, plural, one {# capability} other {# capabilities}}",
+      "custom": "Cu570m",
+      "matchesPresets": "M47ch35 pr35375",
+      "advanced": "4dv4nc3d — c4p4b1l17135",
+      "otherPreserved": "07h3r c4p4b1l17135 (pr353rv3d 0n 54v3)",
+      "presetHelp": {
+        "before": "53l3c71ng 4 pr3537 4b0v3 pr3-ch3ck5 175 c4p4b1l17135. 71ck1ng 0r un71ck1ng 4 b0x p457 4 pr3537 m4rk5 7h3 r0l3",
+        "after": "4nd 175 gr4n7 15 53n7 45 4n 3xpl1c17 c4p4b1l17y 537."
+      },
+      "groups": {
+        "workspace": "W0rk5p4c3",
+        "run": "Run",
+        "state": "57473",
+        "var": "V4r14bl35",
+        "config": "C0nf1g",
+        "drift": "Dr1f7",
+        "run-task": "Run 745k5",
+        "notification": "N071f1c4710n5",
+        "run-trigger": "Run 7r1gg3r5",
+        "pool": "4g3n7 p00l5",
+        "registry": "R3g157ry",
+        "catalog": "53rv1c3 c474l0g"
+      }
+    },
+    "display": {
+      "allow": "4ll0w: {value}",
+      "allowNames": "4ll0w n4m35: {value}",
+      "deny": "D3ny: {value}",
+      "denyNames": "D3ny n4m35: {value}"
+    },
+    "actions": {
+      "cancel": "C4nc3l",
+      "save": "54v3",
+      "saving": "54v1ng...",
+      "edit": "3d17",
+      "delete": "D3l373",
+      "remove": "R3m0v3",
+      "createRole": "Cr3473 R0l3",
+      "creating": "Cr3471ng...",
+      "addAssignment": "4dd 4551gnm3n7",
+      "setRoles": "537 R0l35"
+    },
+    "confirm": {
+      "deleteRole": "D3l373 r0l3 \"{name}\"? 4ny 4551gnm3n75 r3f3r3nc1ng 17 4r3 4ff3c73d.",
+      "removeAssignment": "R3m0v3 r0l3 \"{roleName}\" fr0m {email}?"
+    },
+    "success": {
+      "roleCreated": "R0l3 \"{name}\" cr3473d",
+      "roleUpdated": "R0l3 \"{name}\" upd473d",
+      "roleDeleted": "R0l3 \"{name}\" d3l373d",
+      "rolesAssigned": "R0l35 4551gn3d 70 {email}",
+      "assignmentRemoved": "4551gnm3n7 r3m0v3d"
+    },
+    "errors": {
+      "loadRoles": "F41l3d 70 l04d r0l35",
+      "loadAssignments": "F41l3d 70 l04d 4551gnm3n75",
+      "createRole": "F41l3d 70 cr3473 r0l3",
+      "createRoleStatus": "F41l3d 70 cr3473 r0l3 ({status})",
+      "updateRole": "F41l3d 70 upd473 r0l3",
+      "deleteRole": "F41l3d 70 d3l373 r0l3",
+      "setAssignment": "F41l3d 70 537 4551gnm3n7",
+      "setAssignmentStatus": "F41l3d 70 537 4551gnm3n7 ({status})",
+      "deleteAssignment": "F41l3d 70 d3l373 4551gnm3n7"
+    }
+  },
+  "adminVcs": {
+    "title": "VC5 C0nn3c710n5",
+    "description": "M4n4g3 v3r510n c0n7r0l 5y573m 1n73gr4710n5",
+    "empty": "N0 VC5 c0nn3c710n5 c0nf1gur3d.",
+    "actions": {
+      "new": "N3w C0nn3c710n",
+      "cancel": "C4nc3l",
+      "edit": "3d17",
+      "delete": "D3l373"
+    },
+    "confirmDelete": "D3l373 7h15 VC5 c0nn3c710n? W0rk5p4c35 u51ng 17 w1ll l053 VC5 1n73gr4710n. 7h15 c4nn07 b3 und0n3.",
+    "form": {
+      "name": "N4m3",
+      "namePattern": "L3773r5, numb3r5, hyph3n5, 4nd und3r5c0r35 0nly. Mu57 574r7 w17h 4 l3773r 0r numb3r.",
+      "provider": "Pr0v1d3r",
+      "providerImmutable": "Pr0v1d3r 15 1mmu74bl3 — d3l373 4nd r3cr3473 70 ch4ng3 17",
+      "serverUrl": "53rv3r URL (0p710n4l)",
+      "serverUrlHint": "Mu57 b3 4n H77P 0r H77P5 URL (3.g. h77p5://g17hub.myc0mp4ny.c0m)",
+      "appId": "4pp 1D",
+      "appIdHint": "G17Hub 4pp 1D — num3r1c d1g175 0nly",
+      "installationId": "1n574ll4710n 1D",
+      "installationIdHint": "G17Hub 4pp 1n574ll4710n 1D — num3r1c d1g175 0nly",
+      "privateKey": "Pr1v473 K3y (P3M)",
+      "browse": "Br0w53...",
+      "privateKeyKeep": "L34v3 bl4nk 70 k33p 7h3 curr3n7 k3y — p4573 4 n3w P3M 70 r07473",
+      "privateKeyPlaceholder": "-----B3G1N R54 PR1V473 K3Y-----\n...\n\nDr0p 4 .p3m f1l3 h3r3 0r cl1ck Br0w53",
+      "webhookSecret": "W3bh00k 53cr37",
+      "optional": "(0p710n4l)",
+      "webhookSecretSet": "537 — l34v3 bl4nk 70 k33p, 3n73r 4 n3w v4lu3 70 r07473",
+      "webhookSecretGlobal": "L34v3 bl4nk 70 u53 7h3 gl0b4l w3bh00k 53cr37",
+      "webhookSecretHelp": "P3r-c0nn3c710n HM4C 53cr37 f0r 7h15 1n574ll4710n'5 w3bh00k5. Wh3n un537, 7h3 gl0b4l 53cr37 15 u53d.",
+      "accessToken": "4cc355 70k3n",
+      "accessTokenKeep": "L34v3 bl4nk 70 k33p 7h3 curr3n7 70k3n",
+      "saving": "54v1ng...",
+      "creating": "Cr3471ng...",
+      "saveChanges": "54v3 Ch4ng35",
+      "createConnection": "Cr3473 C0nn3c710n"
+    },
+    "table": {
+      "name": "N4m3",
+      "provider": "Pr0v1d3r",
+      "serverUrl": "53rv3r URL",
+      "status": "5747u5",
+      "created": "Cr3473d",
+      "actions": "4c710n5"
+    },
+    "success": {
+      "created": "VC5 c0nn3c710n \"{name}\" cr3473d",
+      "updated": "VC5 c0nn3c710n \"{name}\" upd473d",
+      "deleted": "VC5 c0nn3c710n d3l373d"
+    },
+    "errors": {
+      "load": "F41l3d 70 l04d VC5 c0nn3c710n5",
+      "save": "F41l3d 70 54v3 c0nn3c710n",
+      "delete": "F41l3d 70 d3l373 c0nn3c710n",
+      "createStatus": "F41l3d 70 cr3473 c0nn3c710n ({status})",
+      "updateStatus": "F41l3d 70 upd473 c0nn3c710n ({status})"
+    }
+  },
+  "adminVariableSets": {
+    "title": "V4r14bl3 5375",
+    "description": "M4n4g3 0rg-5c0p3d v4r14bl3 5375 f0r w0rk5p4c3 gr0up5",
+    "empty": "N0 v4r14bl3 5375 c0nf1gur3d.",
+    "none": "-",
+    "actions": {
+      "new": "N3w V4r14bl3 537",
+      "cancel": "C4nc3l"
+    },
+    "form": {
+      "name": "N4m3",
+      "namePattern": "L3773r5, numb3r5, hyph3n5, 4nd und3r5c0r35 0nly. Mu57 574r7 w17h 4 l3773r 0r numb3r.",
+      "descriptionLabel": "D35cr1p710n",
+      "descriptionPlaceholder": "4W5 cr3d3n714l5 f0r 4ll w0rk5p4c35",
+      "global": "Gl0b4l (4pply 70 4ll w0rk5p4c35)",
+      "priority": "Pr10r17y (0v3rr1d3 w0rk5p4c3 v4r5)",
+      "creating": "Cr3471ng...",
+      "create": "Cr3473 V4r14bl3 537"
+    },
+    "table": {
+      "name": "N4m3",
+      "description": "D35cr1p710n",
+      "scope": "5c0p3",
+      "variables": "V4r14bl35",
+      "created": "Cr3473d"
+    },
+    "scope": {
+      "global": "Gl0b4l",
+      "priority": "Pr10r17y",
+      "standard": "574nd4rd"
+    },
+    "errors": {
+      "load": "F41l3d 70 l04d v4r14bl3 5375",
+      "create": "F41l3d 70 cr3473 v4r14bl3 537",
+      "createStatus": "F41l3d 70 cr3473 v4r14bl3 537 ({status})"
+    },
+    "detail": {
+      "back": "B4ck 70 v4r14bl3 5375",
+      "headerFallback": "V4r14bl3 537",
+      "notFound": "V4r14bl3 537 n07 f0und",
+      "global": "Gl0b4l",
+      "priority": "Pr10r17y",
+      "yes": "Y35",
+      "no": "N0",
+      "edit": "3d17",
+      "cancel": "C4nc3l",
+      "save": "54v3",
+      "saving": "54v1ng...",
+      "delete": "D3l373",
+      "deleting": "D3l371ng...",
+      "confirmDelete": "C0nf1rm D3l373",
+      "deleteTitle": "D3l373 V4r14bl3 537",
+      "deleteDescription": "P3rm4n3n7ly d3l373 7h15 v4r14bl3 537 4nd 4ll 175 v4r14bl35.",
+      "tabs": {
+        "settings": "53771ng5",
+        "variables": "V4r14bl35",
+        "workspaces": "W0rk5p4c35"
+      },
+      "addVariable": "4dd V4r14bl3",
+      "adding": "4dd1ng...",
+      "varKey": "K3y",
+      "varValue": "V4lu3",
+      "varCategory": "C473g0ry",
+      "categoryTerraform": "73rr4f0rm",
+      "categoryEnv": "3nv1r0nm3n7",
+      "sensitive": "53n5171v3",
+      "sensAbbr": "53n5.",
+      "enterNewValue": "3n73r n3w v4lu3",
+      "empty": "3mp7y",
+      "emptyVars": "N0 v4r14bl35 1n 7h15 537.",
+      "actions": "4c710n5",
+      "remove": "R3m0v3",
+      "add": "4dd",
+      "addWorkspace": "4dd W0rk5p4c3",
+      "workspace": "W0rk5p4c3",
+      "selectWorkspace": "53l3c7 4 w0rk5p4c3...",
+      "globalBanner": "7h15 v4r14bl3 537 15 gl0b4l 4nd 4ppl135 70 4ll w0rk5p4c35 4u70m471c4lly.",
+      "emptyWorkspaces": "N0 w0rk5p4c35 4551gn3d 70 7h15 v4r14bl3 537.",
+      "confirmDeleteVar": "D3l373 7h15 v4r14bl3? 7h15 c4nn07 b3 und0n3.",
+      "confirmRemoveWorkspace": "R3m0v3 7h15 w0rk5p4c3 fr0m 7h3 v4r14bl3 537? 175 v4r14bl35 w1ll n0 l0ng3r 4pply 70 7h47 w0rk5p4c3.",
+      "success": {
+        "updated": "V4r14bl3 537 upd473d",
+        "workspaceAdded": "W0rk5p4c3 4dd3d",
+        "workspaceRemoved": "W0rk5p4c3 r3m0v3d"
+      },
+      "errors": {
+        "load": "F41l3d 70 l04d v4r14bl3 537",
+        "update": "F41l3d 70 upd473 v4r14bl3 537",
+        "delete": "F41l3d 70 d3l373 v4r14bl3 537",
+        "loadVars": "F41l3d 70 l04d v4r14bl35",
+        "loadWorkspaces": "F41l3d 70 l04d w0rk5p4c35",
+        "addVar": "F41l3d 70 4dd v4r14bl3",
+        "addVarStatus": "F41l3d 70 4dd v4r14bl3 ({status})",
+        "updateVar": "F41l3d 70 upd473 v4r14bl3",
+        "deleteVar": "F41l3d 70 d3l373 v4r14bl3",
+        "addWorkspace": "F41l3d 70 4dd w0rk5p4c3",
+        "removeWorkspace": "F41l3d 70 r3m0v3 w0rk5p4c3"
+      }
+    }
+  },
+  "adminAutodiscovery": {
+    "title": "4u70d15c0v3ry",
+    "description": "4u70-cr3473 w0rk5p4c35 1n m0n0r3p05 wh3n PR5 70uch m47ch1ng p47h5",
+    "empty": "N0 4u70d15c0v3ry rul35 y37. Cr3473 0n3 70 574r7 4u70-pr0v1510n1ng w0rk5p4c35 fr0m PR5 1n y0ur m0n0r3p0.",
+    "unsavedRule": "(un54v3d rul3)",
+    "actions": {
+      "newRule": "N3w Rul3",
+      "cancel": "C4nc3l",
+      "create": "Cr3473",
+      "update": "Upd473",
+      "preview": "Pr3v13w",
+      "edit": "3d17",
+      "delete": "D3l373",
+      "close": "Cl053"
+    },
+    "status": {
+      "enabled": "3n4bl3d",
+      "disabled": "d154bl3d"
+    },
+    "form": {
+      "createTitle": "Cr3473 rul3",
+      "editTitle": "3d17 rul3",
+      "name": "N4m3",
+      "vcsConnection": "VC5 c0nn3c710n",
+      "selectConnection": "53l3c7 c0nn3c710n",
+      "repoUrl": "R3p0 URL",
+      "branch": "Br4nch (3mp7y = d3f4ul7)",
+      "matchPattern": "M47ch p4773rn",
+      "matchPatternHint": "G171gn0r3-57yl3 gl0b5. <code>**</code> m47ch35 4cr055 p47h 53gm3n75. 0nly <code>*.7f*</code> f1l35 7r1gg3r 4u70d15c0v3ry.",
+      "ignorePatterns": "1gn0r3 p4773rn5 (0n3 p3r l1n3)",
+      "nameTemplate": "W0rk5p4c3 n4m3 73mpl473 (0p710n4l)",
+      "nameTemplateHint": "U53 <path></path> f0r 7h3 d1r3c70ry w17h <code>/</code> r3pl4c3d by <code>-</code>, 0r <root></root> f0r 7h3 d1r3c70ry 45-15. 3mp7y = d3f4ul7 (ju57 7h3 d45h3d p47h).",
+      "templateDefaults": "W0rk5p4c3 73mpl473 d3f4ul75",
+      "executionMode": "3x3cu710n m0d3",
+      "executionModeHint": "4u70d15c0v3ry 15 VC5-dr1v3n; 0nly 4g3n7 3x3cu710n 15 5upp0r73d.",
+      "agentPool": "4g3n7 p00l",
+      "none": "(n0n3)",
+      "executionBackend": "3x3cu710n b4ck3nd",
+      "terraformVersion": "73rr4f0rm v3r510n",
+      "cpuRequest": "CPU r3qu357",
+      "memoryRequest": "M3m0ry r3qu357",
+      "ownerEmail": "0wn3r 3m41l",
+      "autoApply": "4u70-4pply",
+      "enabled": "3n4bl3d",
+      "onDirectoryDelete": "0n d1r3c70ry d3l373",
+      "onDeleteFlag": "Fl4g (54f3 — m4rk p3nd1ng d3l3710n, r3qu1r35 m4nu4l 4c710n)",
+      "onDeleteDestroy": "D357r0y (D4NG3R — 734r5 d0wn 1nfr457ruc7ur3 7h3n 4rch1v35 7h3 w0rk5p4c3)",
+      "onDirectoryDeleteHint": "Wh47 h4pp3n5 70 4n 4u70d15c0v3r3d w0rk5p4c3 wh3n 175 d1r3c70ry 15 r3m0v3d 0n 7h3 7r4ck3d br4nch.",
+      "onDeleteDestroyWarning": "7h15 w1ll run 4 r34l 73rr4f0rm d357r0y 0n 7h3 w0rk5p4c3 wh3n 175 d1r3c70ry 15 r3m0v3d 0n 7h3 7r4ck3d br4nch.",
+      "labels": "L4b3l5 (1nh3r173d by cr3473d w0rk5p4c35)",
+      "varFiles": "V4r f1l35 (1nh3r173d by cr3473d w0rk5p4c35)",
+      "varFilesHint": "R3l471v3 <code>.7fv4r5</code> p47h5 p4553d 70 pl4n/4pply.",
+      "addVarFile": "4dd v4r f1l3",
+      "executionHooks": "3x3cu710n h00k5 (4550c1473d w17h 34ch n3w w0rk5p4c3)",
+      "executionHooksHint": "P1ck fr0m h00k5 d3f1n3d 0n 7h3 <page>3x3cu710n H00k5</page> 4dm1n p4g3 — 34ch 53l3c73d h00k 15 4550c1473d w17h 3v3ry w0rk5p4c3 7h15 rul3 cr34735.",
+      "noHooks": "N0 3x3cu710n h00k5 d3f1n3d y37. Cr3473 0n3 0n 7h3 3x3cu710n H00k5 4dm1n p4g3 f1r57.",
+      "hookDisabled": "(d154bl3d)",
+      "hookNotInLibrary": "(n07 1n l1br4ry — un71ck 70 r3m0v3)",
+      "runTaskTemplates": "Run 745k 73mpl4735 (cr3473d 0n 34ch n3w w0rk5p4c3)",
+      "notificationTemplates": "N071f1c4710n 73mpl4735 (cr3473d 0n 34ch n3w w0rk5p4c3)",
+      "saving": "54v1ng...",
+      "previewTitle": "W4lk 7h3 r3p0 4nd pr3v13w wh1ch w0rk5p4c35 7h15 rul3 W0ULD cr3473 — n0 p3r51573nc3"
+    },
+    "table": {
+      "name": "N4m3",
+      "repo": "R3p0",
+      "pattern": "P4773rn",
+      "enabled": "3n4bl3d",
+      "created": "Cr3473d",
+      "previewTitle": "W4lk 7h3 r3p0 4nd pr3v13w wh1ch w0rk5p4c35 7h15 rul3 w0uld cr3473"
+    },
+    "deleteModal": {
+      "title": "D3l373 rul3?",
+      "body": "W0rk5p4c35 4u70-cr3473d by 7h15 rul3 k33p w0rk1ng. Fu7ur3 PR5 70uch1ng n3w p47h5 und3r 7h15 rul3 w0n'7 4u70-cr3473 m0r3 w0rk5p4c35."
+    },
+    "preview": {
+      "title": "Pr3v13w: {ruleName}",
+      "walkedFiles": "W4lk3d <files>{count}</files> f1l35 0n <refspan>{ref}</refspan>",
+      "walking": "W4lk1ng r3p05170ry…",
+      "noMatches": "N0 d1r3c70r135 1n 7h15 r3p0 m47ch 7h3 rul3'5 p4773rn. N07h1ng 70 cr3473.",
+      "colWorkspace": "W0rk5p4c3",
+      "colDirectory": "D1r3c70ry",
+      "colAction": "4c710n",
+      "repoRoot": "(r3p0 r007)",
+      "actionCreate": "Cr3473",
+      "skipDiscovered": "5k1p (4lr34dy d15c0v3r3d)",
+      "skipDiscoveredTitle": "4lr34dy cr3473d by 7h15 rul3",
+      "skipCollision": "5k1p (n4m3 c0ll1510n)",
+      "skipCollisionTitle": "4 w0rk5p4c3 w17h 7h15 n4m3 4lr34dy 3x1575 f0r 4n07h3r r3450n",
+      "willCreate": "{count, plural, one {# workspace will be created.} other {# workspaces will be created.}} 3x1571ng w0rk5p4c35 (c0ll1510n5) 4r3 l3f7 un70uch3d.",
+      "provision": "{count, plural, one {Provision # workspace} other {Provision # workspaces}}",
+      "provisioning": "Pr0v1510n1ng…",
+      "saveToProvision": "54v3 7h3 rul3 70 pr0v1510n 7h353 w0rk5p4c35."
+    },
+    "success": {
+      "created": "Cr3473d {name}",
+      "updated": "Upd473d {name}",
+      "deleted": "D3l373d rul3",
+      "provisioned": "{count, plural, one {Created # workspace from \"{ruleName}\"} other {Created # workspaces from \"{ruleName}\"}}"
+    },
+    "errors": {
+      "loadRules": "F41l3d 70 l04d 4u70d15c0v3ry rul35",
+      "load": "F41l3d 70 l04d",
+      "createFailed": "Cr3473 f41l3d: {status} {detail}",
+      "updateFailed": "Upd473 f41l3d: {status} {detail}",
+      "save": "F41l3d 70 54v3",
+      "deleteRule": "F41l3d 70 d3l373 rul3",
+      "delete": "F41l3d 70 d3l373",
+      "previewFailed": "Pr3v13w f41l3d ({status})",
+      "preview": "Pr3v13w f41l3d",
+      "previewPrereq": "537 VC5 c0nn3c710n, r3p0 URL, 4nd p4773rn b3f0r3 pr3v13w1ng",
+      "scanFailed": "5c4n f41l3d ({status})",
+      "scan": "5c4n f41l3d"
+    }
+  },
+  "adminBulkUpdate": {
+    "title": "Bulk Upd473",
+    "description": "53l3c7 w0rk5p4c35 by f1l73r, 7h3n 4pply 4 53771ng5 ch4ng3 4cr055 4ll 0f 7h3m",
+    "none": "(n0n3)",
+    "anyOption": "(4ny)",
+    "unchanged": "(unch4ng3d)",
+    "unchangedOption": "(unch4ng3d)",
+    "filter": {
+      "heading": "1. 53l3c7 w0rk5p4c35",
+      "matchAll": "M47ch <strong>4ll</strong> w0rk5p4c35 (1gn0r35 7h3 f1l73r5 b3l0w)",
+      "namePrefix": "N4m3 pr3f1x",
+      "executionBackend": "3x3cu710n b4ck3nd",
+      "ownerEmail": "0wn3r 3m41l",
+      "agentPool": "4g3n7 p00l",
+      "vcsConnection": "VC5 c0nn3c710n",
+      "labels": "L4b3l5",
+      "search": "534rch",
+      "searching": "534rch1ng..."
+    },
+    "results": {
+      "matched": "M47ch3d <strong>{count}</strong> {count, plural, one {workspace} other {workspaces}}.",
+      "noMatch": "N0 w0rk5p4c35 m47ch3d 7h15 f1l73r.",
+      "colName": "N4m3",
+      "colMode": "M0d3",
+      "colBackend": "B4ck3nd",
+      "colTfVersion": "7F v3r510n",
+      "colLabels": "L4b3l5"
+    },
+    "update": {
+      "heading": "2. 4pply ch4ng35",
+      "hint": "0nly f13ld5 y0u 537 b3l0w 4r3 ch4ng3d. 7h3 f1l73r 4b0v3 53l3c75 wh1ch w0rk5p4c35 r3c31v3 7h3 ch4ng3.",
+      "terraformVersion": "73rr4f0rm v3r510n",
+      "executionBackend": "3x3cu710n b4ck3nd",
+      "executionMode": "3x3cu710n m0d3",
+      "autoApply": "4u70-4pply",
+      "agentPool": "4g3n7 p00l",
+      "cpuRequest": "CPU r3qu357",
+      "memoryRequest": "M3m0ry r3qu357",
+      "setLabels": "537 l4b3l5 (r3pl4c35 7h3 l4b3l5 m4p 0n 3v3ry m47ch3d w0rk5p4c3)",
+      "setVarFiles": "537 v4r f1l35",
+      "addVarFile": "4dd v4r f1l3",
+      "setRunTasks": "537 run 745k5 (up53r73d by n4m3 0n 3v3ry m47ch3d w0rk5p4c3)",
+      "setNotifications": "537 n071f1c4710n c0nf1gur4710n5 (up53r73d by n4m3)",
+      "dryRun": "Dry run (pr3v13w 0nly — n0 ch4ng35 wr1773n)",
+      "confirmWarning": "7h15 wr1735 ch4ng35 70 3v3ry m47ch3d w0rk5p4c3.",
+      "confirmApply": "C0nf1rm 4pply",
+      "applying": "4pply1ng...",
+      "cancel": "C4nc3l",
+      "working": "W0rk1ng...",
+      "previewDryRun": "Pr3v13w (dry run)",
+      "applyChanges": "4pply ch4ng35"
+    },
+    "diff": {
+      "colWorkspace": "W0rk5p4c3",
+      "colChanges": "Ch4ng35"
+    },
+    "dryResult": {
+      "heading": "Dry run r35ul7",
+      "summary": "M47ch3d <strong>{matched}</strong>; <strong>{wouldChange}</strong> w0uld ch4ng3; {unchanged} unch4ng3d. N07h1ng w45 wr1773n.",
+      "wouldChange": "W0uld ch4ng3",
+      "noChange": "N0 w0rk5p4c35 w0uld ch4ng3 w17h 7h15 upd473."
+    },
+    "applyResult": {
+      "heading": "4pply r35ul7",
+      "summary": "M47ch3d <strong>{matched}</strong>; <appliedstrong>{applied}</appliedstrong> 4ppl13d; {unchanged} unch4ng3d; {errors, plural, one {# error} other {# errors}}.",
+      "applied": "4ppl13d",
+      "unnamedWorkspace": "(w0rk5p4c3)",
+      "noChange": "N0 w0rk5p4c35 ch4ng3d."
+    },
+    "errors": {
+      "searchFailed": "534rch f41l3d ({status})",
+      "search": "534rch f41l3d",
+      "bulkUpdateFailed": "Bulk upd473 f41l3d ({status})",
+      "bulkUpdate": "Bulk upd473 f41l3d"
+    }
+  },
+  "adminExecutionHooks": {
+    "title": "3x3cu710n H00k5",
+    "description": "Cu570m 5h3ll 573p5 run 1n51d3 runn3r J0b5 47 pr3/p057-pl4n/4pply p01n75, 4550c1473d w17h w0rk5p4c35",
+    "empty": "N0 3x3cu710n h00k5 c0nf1gur3d.",
+    "actions": {
+      "cancel": "C4nc3l",
+      "new": "N3w 3x3cu710n H00k",
+      "creating": "Cr3471ng...",
+      "create": "Cr3473 3x3cu710n H00k"
+    },
+    "badges": {
+      "disabled": "D154bl3d",
+      "enabled": "3n4bl3d"
+    },
+    "columns": {
+      "name": "N4m3",
+      "hookPoint": "H00k P01n7",
+      "enabled": "3n4bl3d",
+      "priority": "Pr10r17y",
+      "workspaces": "W0rk5p4c35"
+    },
+    "form": {
+      "name": "N4m3",
+      "namePatternTitle": "L3773r5, numb3r5, hyph3n5, 4nd und3r5c0r35 0nly. Mu57 574r7 w17h 4 l3773r 0r numb3r.",
+      "description": "D35cr1p710n",
+      "descriptionPlaceholder": "4dd 4n 1n73rn4l h0575 3n7ry b3f0r3 1n17",
+      "hookPoint": "H00k P01n7",
+      "priority": "Pr10r17y",
+      "priorityTitle": "L0w3r run5 f1r57 wh3n 53v3r4l h00k5 5h4r3 4 p01n7 (7135 br0k3n by n4m3).",
+      "scriptLabel": "5cr1p7 (<code>/b1n/5h -c</code>)",
+      "scriptHelp": "Run5 w17h 7h3 runn3r'5 cl0ud 1d3n717y. 4 n0n-z3r0 3x17 f41l5 7h3 run. 53cr375 5h0uld c0m3 fr0m w0rk5p4c3 v4r14bl35, n07 1nl1n3 h3r3."
+    },
+    "errors": {
+      "load": "F41l3d 70 l04d 3x3cu710n h00k5",
+      "createStatus": "F41l3d 70 cr3473 3x3cu710n h00k ({status})",
+      "create": "F41l3d 70 cr3473 3x3cu710n h00k"
+    }
+  },
+  "adminPolicySets": {
+    "title": "P0l1cy 5375",
+    "description": "0P4 p0l1cy-45-c0d3 3nf0rc3m3n7, 5c0p3d 70 w0rk5p4c35 by l4b3l",
+    "empty": "N0 p0l1cy 5375 c0nf1gur3d.",
+    "actions": {
+      "cancel": "C4nc3l",
+      "new": "N3w P0l1cy 537",
+      "creating": "Cr3471ng...",
+      "create": "Cr3473 P0l1cy 537"
+    },
+    "badges": {
+      "disabled": "D154bl3d",
+      "mandatory": "M4nd470ry",
+      "advisory": "4dv150ry",
+      "global": "Gl0b4l",
+      "labelScoped": "L4b3l-5c0p3d"
+    },
+    "columns": {
+      "name": "N4m3",
+      "description": "D35cr1p710n",
+      "enforcement": "3nf0rc3m3n7",
+      "scope": "5c0p3",
+      "policies": "P0l1c135"
+    },
+    "form": {
+      "name": "N4m3",
+      "namePatternTitle": "L3773r5, numb3r5, hyph3n5, 4nd und3r5c0r35 0nly. Mu57 574r7 w17h 4 l3773r 0r numb3r.",
+      "description": "D35cr1p710n",
+      "descriptionPlaceholder": "M4nd470ry gu4rdr41l5 f0r pr0duc710n w0rk5p4c35",
+      "enforcement": "3nf0rc3m3n7",
+      "enforcementAdvisory": "4dv150ry (w4rn, d0 n07 bl0ck)",
+      "enforcementMandatory": "M4nd470ry (bl0ck 4pply 0n f41lur3)",
+      "globalScope": "Gl0b4l (4pply 70 3v3ry w0rk5p4c3)",
+      "sourceInline": "1nl1n3 (m4n4g3 p0l1c135 1n U1)",
+      "sourceVcs": "Fr0m VC5 R3p05170ry",
+      "vcsConnection": "VC5 C0nn3c710n",
+      "selectConnection": "53l3c7 c0nn3c710n...",
+      "repoUrl": "R3p05170ry URL",
+      "branch": "Br4nch",
+      "branchPlaceholder": "m41n (d3f4ul7)",
+      "policyPath": "P0l1cy P47h",
+      "policyPathPlaceholder": "p0l1c135/ (d1r3c70ry c0n741n1ng .r3g0 f1l35)",
+      "helpVcs": "P0l1c135 w1ll b3 5ync3d fr0m 7h3 r3p05170ry 4u70m471c4lly.",
+      "helpInline": "4dd p0l1c135 4nd r3f1n3 l4b3l 5c0p1ng 4f73r cr3471ng 7h3 537."
+    },
+    "errors": {
+      "load": "F41l3d 70 l04d p0l1cy 5375",
+      "createStatus": "F41l3d 70 cr3473 p0l1cy 537 ({status})",
+      "create": "F41l3d 70 cr3473 p0l1cy 537"
+    }
+  },
+  "adminCatalog": {
+    "title": "C474l0g 4dm1n",
+    "description": "M4n4g3 53rv1c3 c474l0g 173m5",
+    "notEnabled": "53rv1c3 c474l0g 15 n07 3n4bl3d.",
+    "empty": "N0 c474l0g 173m5 y37.",
+    "actions": {
+      "new": "N3w C474l0g 173m",
+      "cancel": "C4nc3l",
+      "create": "Cr3473 C474l0g 173m",
+      "creating": "Cr3471ng…",
+      "saveChanges": "54v3 Ch4ng35",
+      "saving": "54v1ng…",
+      "edit": "3d17",
+      "delete": "D3l373"
+    },
+    "form": {
+      "name": "N4m3",
+      "nameTitle": "L3773r5, numb3r5, hyph3n5, 4nd und3r5c0r35 0nly. Mu57 574r7 w17h 4 l3773r 0r numb3r.",
+      "module": "M0dul3",
+      "moduleSelect": "53l3c7 4 m0dul3…",
+      "moduleImmutable": "M0dul3 15 1mmu74bl3 4f73r cr34710n",
+      "displayName": "D15pl4y n4m3",
+      "displayNamePlaceholder": "574nd4rd 53 Buck37",
+      "versionPin": "D3f4ul7 v3r510n p1n",
+      "versionPinPlaceholder": "3.g. 1.2.0 (3mp7y = l47357)",
+      "descriptionLabel": "D35cr1p710n",
+      "descriptionPlaceholder": "Wh47 7h15 c474l0g 173m pr0v1510n5…",
+      "enabled": "3n4bl3d (v151bl3 1n 7h3 br0w53 c474l0g)",
+      "providerTemplates": "Pr0v1d3r 73mpl4735",
+      "noProviderTemplates": "N0 pr0v1d3r 73mpl4735 d3f1n3d.",
+      "restrictPools": "R357r1c7 70 5p3c1f1c 4g3n7 p00l5",
+      "noAgentPools": "N0 4g3n7 p00l5 4v41l4bl3.",
+      "anyPool": "4ny 4g3n7 p00l m4y b3 u53d.",
+      "labels": "L4b3l5",
+      "variableOptions": "V4r14bl3 0p710n5 (4dv4nc3d, J50N)",
+      "variableOptionsHint": "P3r-1npu7 0v3rr1d35 (0p710n5, h1dd3n, d3f4ul7). L34v3 45 <code>[]</code> 1f unu53d."
+    },
+    "table": {
+      "name": "N4m3",
+      "module": "M0dul3",
+      "enabled": "3n4bl3d",
+      "actions": "4c710n5"
+    },
+    "badge": {
+      "enabled": "3n4bl3d",
+      "disabled": "d154bl3d"
+    },
+    "confirm": {
+      "delete": "D3l373 7h15 c474l0g 173m? 3x1571ng pr0v1510n3d 1n574nc35 4r3 un4ff3c73d."
+    },
+    "success": {
+      "created": "C474l0g 173m \"{name}\" cr3473d",
+      "updated": "C474l0g 173m \"{name}\" upd473d",
+      "deleted": "C474l0g 173m d3l373d"
+    },
+    "errors": {
+      "load": "F41l3d 70 l04d c474l0g 173m5",
+      "save": "F41l3d 70 54v3 c474l0g 173m",
+      "createStatus": "F41l3d 70 cr3473 c474l0g 173m ({status})",
+      "updateStatus": "F41l3d 70 upd473 c474l0g 173m ({status})",
+      "delete": "F41l3d 70 d3l373 c474l0g 173m",
+      "deleteConflict": "C4nn07 d3l373: 7h15 c474l0g 173m h45 pr0v1510n3d 1n574nc35.",
+      "varOptsInvalidJson": "V4r14bl3 0p710n5 mu57 b3 v4l1d J50N (4n 4rr4y).",
+      "varOptsNotArray": "V4r14bl3 0p710n5 mu57 b3 4 J50N 4rr4y."
+    }
+  },
+  "adminProviderTemplates": {
+    "title": "Pr0v1d3r 73mpl4735",
+    "description": "R3u54bl3 pr0v1d3r c0nf1gur4710n bl0ck5 f0r c474l0g 173m5",
+    "notEnabled": "53rv1c3 c474l0g 15 n07 3n4bl3d.",
+    "empty": "N0 pr0v1d3r 73mpl4735 y37.",
+    "actions": {
+      "new": "N3w 73mpl473",
+      "cancel": "C4nc3l",
+      "create": "Cr3473 73mpl473",
+      "creating": "Cr3471ng…",
+      "saveChanges": "54v3 Ch4ng35",
+      "saving": "54v1ng…",
+      "edit": "3d17",
+      "delete": "D3l373"
+    },
+    "form": {
+      "name": "N4m3",
+      "providerType": "Pr0v1d3r 7yp3",
+      "body": "B0dy (HCL)",
+      "parameters": "P4r4m373r5 (4dv4nc3d, J50N)",
+      "parametersHint": "34ch p4r4m373r b3c0m35 4 pr0v1510n f0rm f13ld. L34v3 45 <code>[]</code> 1f unu53d.",
+      "labels": "L4b3l5"
+    },
+    "table": {
+      "name": "N4m3",
+      "providerType": "Pr0v1d3r 7yp3",
+      "parameters": "P4r4m373r5",
+      "actions": "4c710n5"
+    },
+    "confirm": {
+      "delete": "D3l373 7h15 pr0v1d3r 73mpl473? C474l0g 173m5 r3f3r3nc1ng 17 w1ll f41l 70 pr0v1510n. 7h15 c4nn07 b3 und0n3."
+    },
+    "success": {
+      "created": "Pr0v1d3r 73mpl473 \"{name}\" cr3473d",
+      "updated": "Pr0v1d3r 73mpl473 \"{name}\" upd473d",
+      "deleted": "Pr0v1d3r 73mpl473 d3l373d"
+    },
+    "errors": {
+      "load": "F41l3d 70 l04d pr0v1d3r 73mpl4735",
+      "save": "F41l3d 70 54v3 pr0v1d3r 73mpl473",
+      "createStatus": "F41l3d 70 cr3473 73mpl473 ({status})",
+      "updateStatus": "F41l3d 70 upd473 73mpl473 ({status})",
+      "delete": "F41l3d 70 d3l373 pr0v1d3r 73mpl473",
+      "deleteConflict": "C4nn07 d3l373: 7h15 73mpl473 15 r3f3r3nc3d by 4 c474l0g 173m.",
+      "paramsInvalidJson": "P4r4m373r5 mu57 b3 v4l1d J50N (4n 4rr4y).",
+      "paramsNotArray": "P4r4m373r5 mu57 b3 4 J50N 4rr4y."
+    }
+  },
+  "adminAgentPools": {
+    "title": "4g3n7 P00l5",
+    "description": "M4n4g3 runn3r 4g3n7 p00l5 4nd 7h31r l1573n3r5",
+    "empty": "N0 4g3n7 p00l5 c0nf1gur3d.",
+    "actions": {
+      "newPool": "N3w P00l",
+      "createPool": "Cr3473 P00l",
+      "creating": "Cr3471ng...",
+      "cancel": "C4nc3l",
+      "edit": "3d17",
+      "save": "54v3",
+      "saving": "54v1ng...",
+      "delete": "D3l373",
+      "deleting": "D3l371ng...",
+      "confirmDelete": "C0nf1rm D3l373"
+    },
+    "form": {
+      "name": "N4m3",
+      "namePattern": "L3773r5, numb3r5, hyph3n5, 4nd und3r5c0r35 0nly. Mu57 574r7 w17h 4 l3773r 0r numb3r.",
+      "description": "D35cr1p710n",
+      "descriptionPlaceholder": "Pr0duc710n 4W5 runn3r5",
+      "labels": "L4b3l5"
+    },
+    "columns": {
+      "name": "N4m3",
+      "description": "D35cr1p710n",
+      "status": "5747u5",
+      "created": "Cr3473d"
+    },
+    "badges": {
+      "default": "d3f4ul7",
+      "degradedTooltip": "L1573n3r5 4r3 h34r7b3471ng bu7 7h31r c3r71f1c4735 h4v3 3xp1r3d — run5 w1ll f41l 70 l4unch.",
+      "status": {
+        "online": "0nl1n3",
+        "offline": "0ffl1n3",
+        "degraded": "d3gr4d3d"
+      }
+    },
+    "detail": {
+      "back": "B4ck 70 4g3n7 p00l5",
+      "defaultDescription": "4g3n7 p00l"
+    },
+    "tabs": {
+      "settings": "53771ng5",
+      "tokens": "70k3n5",
+      "listeners": "L1573n3r5"
+    },
+    "settings": {
+      "title": "P00l 53771ng5",
+      "fields": {
+        "name": "N4m3",
+        "description": "D35cr1p710n",
+        "created": "Cr3473d",
+        "owner": "0wn3r",
+        "yourPermission": "Y0ur P3rm15510n",
+        "labels": "L4b3l5"
+      },
+      "permissions": {
+        "read": "r34d",
+        "write": "wr173",
+        "admin": "4dm1n"
+      }
+    },
+    "danger": {
+      "title": "D3l373 P00l",
+      "description": "P3rm4n3n7ly d3l373 7h15 4g3n7 p00l 4nd 4ll 4550c1473d 70k3n5."
+    },
+    "tokens": {
+      "create": "Cr3473 70k3n",
+      "empty": "N0 70k3n5 f0r 7h15 p00l.",
+      "revoke": "R3v0k3",
+      "created": {
+        "title": "70k3n cr3473d 5ucc355fully",
+        "copyNow": "C0py 7h15 70k3n n0w — 17 w1ll n07 b3 5h0wn 4g41n.",
+        "copy": "C0py"
+      },
+      "form": {
+        "description": "D35cr1p710n",
+        "descriptionPlaceholder": "Pr0duc710n l1573n3r 70k3n",
+        "maxUses": "M4x U535",
+        "maxUsesHint": "D3f4ul7 2 — 70l3r4735 0n3 b00757r4p-r4c3 r37ry 4cr055 l1573n3r r3pl1c45.",
+        "expiresAt": "3xp1r35 47",
+        "expiresAtHint": "D3f4ul7 1 h0ur fr0m n0w."
+      },
+      "columns": {
+        "description": "D35cr1p710n",
+        "uses": "U535",
+        "expires": "3xp1r35",
+        "status": "5747u5",
+        "createdBy": "Cr3473d By",
+        "actions": "4c710n5"
+      },
+      "badges": {
+        "revoked": "R3v0k3d",
+        "active": "4c71v3"
+      }
+    },
+    "listeners": {
+      "empty": "N0 l1573n3r5 r3g1573r3d f0r 7h15 p00l.",
+      "columns": {
+        "name": "N4m3",
+        "status": "5747u5",
+        "replicas": "R3pl1c45",
+        "certExpires": "C3r7 3xp1r35",
+        "actions": "4c710n5"
+      },
+      "status": {
+        "online": "0nl1n3",
+        "offline": "0ffl1n3",
+        "degraded": "d3gr4d3d",
+        "cert-expired": "c3r7-3xp1r3d"
+      },
+      "tooltips": {
+        "certExpired": "L1573n3r 15 h34r7b3471ng bu7 175 c3r71f1c473 h45 3xp1r3d — 3v3ry c3r7-4u7h3n71c473d c4ll (cl41m run, r3n3w, runn3r-70k3n) w1ll f41l. M057 l1k3ly c4u53: 7h3 4P1 n3v3r r3g1573r3d 7h3 l47357 c3r7, 0r 7h3 c3r7 77L 3l4p53d b3f0r3 r3n3w4l.",
+        "degraded": "L1573n3r5 4r3 h34r7b3471ng bu7 7h31r c3r71f1c4735 h4v3 3xp1r3d — run5 w1ll f41l 70 l4unch."
+      }
+    },
+    "confirm": {
+      "revokeToken": "R3v0k3 7h15 j01n 70k3n? L1573n3r5 u51ng 17 c4n n0 l0ng3r j01n, 4nd 7h15 c4nn07 b3 und0n3.",
+      "deleteListener": "D3l373 7h15 l1573n3r? 17 w1ll r3-r3g1573r 0n 175 n3x7 h34r7b347 1f 7h3 p0d 15 571ll runn1ng."
+    },
+    "success": {
+      "poolUpdated": "P00l upd473d",
+      "tokenRevoked": "70k3n r3v0k3d",
+      "listenerDeleted": "L1573n3r d3l373d"
+    },
+    "errors": {
+      "loadPools": "F41l3d 70 l04d 4g3n7 p00l5",
+      "loadPool": "F41l3d 70 l04d p00l",
+      "loadTokens": "F41l3d 70 l04d 70k3n5",
+      "loadListeners": "F41l3d 70 l04d l1573n3r5",
+      "createPool": "F41l3d 70 cr3473 p00l",
+      "createStatus": "F41l3d 70 cr3473 p00l ({status})",
+      "updatePool": "F41l3d 70 upd473 p00l",
+      "deletePool": "F41l3d 70 d3l373 p00l",
+      "poolNotFound": "P00l n07 f0und",
+      "createToken": "F41l3d 70 cr3473 70k3n",
+      "createTokenStatus": "F41l3d 70 cr3473 70k3n ({status})",
+      "revokeToken": "F41l3d 70 r3v0k3 70k3n",
+      "deleteListener": "F41l3d 70 d3l373 l1573n3r"
+    }
+  },
+  "adminAuditLog": {
+    "title": "4ud17 L0g",
+    "description": "1mmu74bl3 l0g 0f 4ll 4P1 r3qu3575",
+    "empty": "N0 4ud17 l0g 3n7r135 f0und.",
+    "errors": {
+      "load": "F41l3d 70 l04d 4ud17 l0g"
+    },
+    "filters": {
+      "actorEmail": "4c70r 3m41l",
+      "actorPlaceholder": "u53r@3x4mpl3.c0m",
+      "resourceType": "R350urc3 7yp3",
+      "resourceTypePlaceholder": "w0rk5p4c35",
+      "method": "M37h0d",
+      "methodAll": "4ll",
+      "since": "51nc3",
+      "until": "Un71l",
+      "clear": "Cl34r",
+      "apply": "4pply F1l73r5"
+    },
+    "columns": {
+      "timestamp": "71m3574mp",
+      "actor": "4c70r",
+      "action": "4c710n",
+      "resourceType": "R350urc3 7yp3",
+      "resourceId": "R350urc3 1D",
+      "status": "5747u5",
+      "duration": "Dur4710n"
+    },
+    "pagination": {
+      "summary": "P4g3 {current} 0f {total} ({count, plural, one {# entry} other {# entries}})",
+      "previous": "Pr3v10u5",
+      "next": "N3x7"
+    }
+  },
+  "adminBinaryCache": {
+    "title": "C4ch3",
+    "description": "CL1 b1n4ry 4nd pr0v1d3r c4ch3 m4n4g3m3n7",
+    "errors": {
+      "loadBinary": "F41l3d 70 l04d b1n4ry c4ch3",
+      "loadCache": "F41l3d 70 l04d c4ch3"
+    },
+    "sections": {
+      "cliBinaries": "CL1 B1n4r135",
+      "providerBinaries": "Pr0v1d3r B1n4r135"
+    },
+    "empty": {
+      "binaries": "N0 c4ch3d CL1 b1n4r135 y37.",
+      "providers": "N0 c4ch3d pr0v1d3r b1n4r135 y37."
+    },
+    "columns": {
+      "tool": "700l",
+      "version": "V3r510n",
+      "os": "05",
+      "arch": "4rch",
+      "cachedAt": "C4ch3d 47",
+      "provider": "Pr0v1d3r",
+      "hostname": "H057n4m3",
+      "actions": "4c710n5"
+    },
+    "warm": {
+      "heading": "W4rm c4ch3",
+      "hide": "H1d3",
+      "prePopulate": "Pr3-p0pul473…",
+      "help": "Pr3-pull b1n4r135 4nd pr0v1d3r pl47f0rm5 1n70 7h3 c4ch3 (0n3 p3r l1n3). 7r41l1ng <code>05/4rch</code> 70k3n5 4r3 0p710n4l — 0m17 7h3m 70 u53 7h3 c0nf1gur3d d3f4ul7 pl47f0rm5.",
+      "binariesLabel": "B1n4r135",
+      "providersLabel": "Pr0v1d3r5",
+      "warm": "W4rm",
+      "warming": "W4rm1ng…",
+      "confirm": "W4rm 7h3 53l3c73d c4ch3 3n7r135 n0w?",
+      "errorEmpty": "4dd 47 l3457 0n3 b1n4ry 0r pr0v1d3r l1n3 70 w4rm.",
+      "errorFailedStatus": "W4rm f41l3d ({status})",
+      "errorFailed": "F41l3d 70 w4rm c4ch3",
+      "success": "W4rm3d {succeeded}/{total} ({failed} f41l3d)"
+    },
+    "purge": {
+      "button": "Purg3",
+      "confirmBinary": "Purg3 {tool} {version} fr0m 7h3 c4ch3? 17 w1ll b3 r3-f37ch3d fr0m up57r34m 0n 7h3 n3x7 r3qu357.",
+      "confirmProvider": "Purg3 {provider} {version} fr0m 7h3 pr0v1d3r c4ch3? 17 w1ll b3 r3-f37ch3d fr0m up57r34m 0n 7h3 n3x7 r3qu357.",
+      "successBinary": "Purg3d {count} 3n7r135 f0r {tool} {version}",
+      "successProvider": "Purg3d {count} 3n7r135 f0r {provider} {version}",
+      "errorStatus": "Purg3 f41l3d ({status})",
+      "error": "F41l3d 70 purg3",
+      "errorProvider": "F41l3d 70 purg3 pr0v1d3r",
+      "errorProviders": "F41l3d 70 purg3 pr0v1d3r5"
+    },
+    "batchPurge": {
+      "purging": "Purg1ng...",
+      "purgeSelected": "Purg3 53l3c73d ({count})",
+      "confirmBinary": "Purg3 4ll 53l3c73d b1n4ry c4ch3 3n7r135? 7h3y w1ll b3 r3-f37ch3d fr0m up57r34m 0n 7h3 n3x7 r3qu357.",
+      "confirmProvider": "Purg3 4ll 53l3c73d pr0v1d3r c4ch3 3n7r135? 7h3y w1ll b3 r3-f37ch3d fr0m up57r34m 0n 7h3 n3x7 r3qu357.",
+      "errorBinaryItem": "Purg3 f41l3d f0r {tool} {version}",
+      "errorProviderItem": "Purg3 f41l3d f0r {provider} {version}",
+      "successBinary": "Purg3d {count} b1n4ry c4ch3 3n7r135",
+      "successProvider": "Purg3d {count} pr0v1d3r c4ch3 3n7r135"
+    }
+  },
+  "catalog": {
+    "title": "53rv1c3 C474l0g",
+    "description": "Pr0v1510n 53lf-53rv1c3 1nfr457ruc7ur3 fr0m cur473d m0dul35",
+    "notEnabled": "53rv1c3 c474l0g 15 n07 3n4bl3d.",
+    "empty": "N0 c474l0g 173m5 4v41l4bl3.",
+    "card": {
+      "pinned": "p1nn3d {version}",
+      "latest": "l47357"
+    },
+    "errors": {
+      "loadItems": "F41l3d 70 l04d c474l0g 173m5"
+    }
+  },
+  "catalogDetail": {
+    "backLink": "← C474l0g",
+    "backToCatalog": "B4ck 70 c474l0g",
+    "fallbackTitle": "C474l0g 173m",
+    "notFound": "C474l0g 173m n07 f0und, 0r 7h3 53rv1c3 c474l0g 15 n07 3n4bl3d.",
+    "common": {
+      "cancel": "C4nc3l"
+    },
+    "info": {
+      "module": "M0dul3:",
+      "resolvedVersion": "R350lv3d v3r510n:",
+      "latest": "l47357",
+      "disabled": "d154bl3d"
+    },
+    "pending": {
+      "banner": "7h3 run f0r <strong>{name}</strong> 15 pl4nn3d 4nd w4171ng f0r r3v13w. C0nf1rm 70 4pply, 0r d15c4rd.",
+      "working": "W0rk1ng…",
+      "confirmApply": "C0nf1rm & 4pply",
+      "discard": "D15c4rd"
+    },
+    "field": {
+      "select": "53l3c7…"
+    },
+    "provision": {
+      "title": "Pr0v1510n",
+      "workspaceName": "W0rk5p4c3 n4m3",
+      "workspaceNameTitle": "L3773r5, numb3r5, hyph3n5, 4nd und3r5c0r35 0nly. Mu57 574r7 w17h 4 l3773r 0r numb3r.",
+      "workspaceNamePlaceholder": "my-1n574nc3",
+      "agentPool": "4g3n7 p00l",
+      "selectPool": "53l3c7 4 p00l…",
+      "noPoolsAvailable": "N0 4g3n7 p00l5 4r3 4v41l4bl3 70 y0u. Y0u n33d wr173 4cc355 70 4n 4g3n7 p00l 70 pr0v1510n — 45k 4n 4dm1n157r470r 70 gr4n7 17.",
+      "noPoolsAllowed": "N0n3 0f 7h3 4g3n7 p00l5 y0u c4n 4cc355 4r3 4ll0w3d by 7h15 c474l0g 173m. 45k 4n 4dm1n157r470r 70 w1d3n 7h3 173m’5 4ll0w3d p00l5 0r gr4n7 y0u 4cc355 70 0n3 0f 7h3m.",
+      "version": "V3r510n",
+      "latestFloat": "L47357 (fl047)",
+      "defaultPinOption": "{version} (d3f4ul7 p1n)",
+      "labelsOptional": "L4b3l5 (0p710n4l)",
+      "autoApplyHint": "4u70-4pply 4ppl135 ch4ng35 w17h0u7 4 m4nu4l r3v13w 573p.",
+      "provisioning": "Pr0v1510n1ng…",
+      "submit": "Pr0v1510n"
+    },
+    "instances": {
+      "title": "1n574nc35",
+      "empty": "N0 1n574nc35 pr0v1510n3d fr0m 7h15 173m y37.",
+      "colName": "N4m3",
+      "colVersion": "V3r510n",
+      "colPool": "P00l",
+      "colActions": "4c710n5",
+      "reconfigure": "R3c0nf1gur3",
+      "destroy": "D357r0y",
+      "orphan": "0rph4n…",
+      "orphanTitle": "D3l373 7h3 c474l0g r3c0rd w17h0u7 d357r0y1ng 175 1nfr457ruc7ur3 (d15c0ur4g3d)"
+    },
+    "reconfigure": {
+      "title": "R3c0nf1gur3 {name}",
+      "description": "Upd473 1npu75 4nd/0r v3r510n, 7h3n qu3u3 4 run.",
+      "currentOption": "{version} (curr3n7)",
+      "queuing": "Qu3u1ng…",
+      "queueRun": "Qu3u3 run"
+    },
+    "destroy": {
+      "title": "D357r0y {name}",
+      "heading": "D357r0y {name}?",
+      "description": "7h15 qu3u35 4 d357r0y run 7h47 734r5 d0wn 7h15 1n574nc3'5 1nfr457ruc7ur3. 0n 4 5ucc355ful 4pply 7h3 w0rk5p4c3 15 4rch1v3d. 7h15 c4nn07 b3 und0n3.",
+      "autoApplyHint": "4u70-4pply 734r5 d0wn 1mm3d1473ly w17h0u7 r3v13w."
+    },
+    "orphan": {
+      "title": "0rph4n {name}",
+      "heading": "0rph4n {name}?",
+      "description": "7h15 d3l3735 7h3 c474l0g 1n574nc3 r3c0rd bu7 d035 <warn>n07</warn> d357r0y 175 1nfr457ruc7ur3 — 7h3 pr0v1510n3d r350urc35 k33p runn1ng, <warn>un7r4ck3d 4nd unm4n4g3d</warn>. 7h15 15 d15c0ur4g3d. 70 r3cl41m 7h3 1nfr457ruc7ur3, c4nc3l 4nd u53 <emph>D357r0y</emph> 1n5734d.",
+      "confirmPrompt": "7yp3 7h3 1n574nc3 n4m3 <mono>{name}</mono> 70 c0nf1rm:",
+      "orphaning": "0rph4n1ng…",
+      "submit": "0rph4n & 4b4nd0n 1nfr457ruc7ur3"
+    },
+    "actions": {
+      "confirmed": "Run c0nf1rm3d — 4pply1ng.",
+      "discarded": "Run d15c4rd3d.",
+      "provisioned": "Pr0v1510n3d {name} — pl4n 15 r34dy f0r r3v13w.",
+      "reconfigureQueued": "R3c0nf1gur3 qu3u3d — run cr3473d.",
+      "reconfigureQueuedStatus": "R3c0nf1gur3 qu3u3d — run 15 {status}.",
+      "destroyQueued": "D357r0y qu3u3d — run cr3473d.",
+      "destroyQueuedStatus": "D357r0y qu3u3d — run 15 {status}.",
+      "orphaned": "0rph4n3d {name} — c474l0g r3c0rd d3l373d; 175 1nfr457ruc7ur3 15 l3f7 runn1ng, un7r4ck3d 4nd unm4n4g3d."
+    },
+    "errors": {
+      "loadItem": "F41l3d 70 l04d c474l0g 173m",
+      "confirm": "F41l3d 70 c0nf1rm",
+      "confirmStatus": "F41l3d 70 c0nf1rm ({status})",
+      "discard": "F41l3d 70 d15c4rd",
+      "discardStatus": "F41l3d 70 d15c4rd ({status})",
+      "provision": "F41l3d 70 pr0v1510n",
+      "provisionStatus": "F41l3d 70 pr0v1510n ({status})",
+      "reconfigure": "F41l3d 70 r3c0nf1gur3",
+      "reconfigureStatus": "F41l3d 70 r3c0nf1gur3 ({status})",
+      "destroy": "F41l3d 70 d357r0y",
+      "destroyStatus": "F41l3d 70 d357r0y ({status})",
+      "orphan": "F41l3d 70 0rph4n",
+      "orphanStatus": "F41l3d 70 0rph4n ({status})"
+    }
+  },
+  "common": {
+    "connection": {
+      "reconnecting": "R3c0nn3c71ng…"
+    },
+    "sessionExpiry": {
+      "banner": "535510n 3xp1r35 1n {minutes, plural, one {# minute} other {# minutes}} — <link>r3-4u7h3n71c473</link>"
+    },
+    "tokenExpiry": {
+      "withinDays": "{count, plural, one {# service token} other {# service tokens}} 3xp1r1ng w17h1n {days, plural, one {# day} other {# days}} — <link>r3v13w</link>",
+      "soon": "{count, plural, one {# service token} other {# service tokens}} 3xp1r1ng 500n — <link>r3v13w</link>",
+      "dismissAria": "D15m155 70k3n 3xp1ry w4rn1ng"
+    },
+    "resourceUsage": {
+      "title": "R350urc3 u54g3",
+      "oomKilled": "00M-k1ll3d",
+      "killedLikelyOom": "K1ll3d (l1k3ly 00M)",
+      "memory": "M3m0ry",
+      "requested": "R3qu3573d {value}",
+      "limit": "L1m17 {value}"
+    },
+    "labelsEditor": {
+      "none": "N0n3",
+      "removeAria": "R3m0v3 {key}",
+      "keyPlaceholder": "k3y",
+      "valuePlaceholder": "v4lu3",
+      "add": "4dd"
+    },
+    "sensitiveInput": {
+      "hide": "H1d3",
+      "show": "5h0w",
+      "hideAria": "H1d3 v4lu3",
+      "showAria": "5h0w v4lu3"
+    },
+    "workspacePicker": {
+      "searchPlaceholder": "534rch w0rk5p4c35…",
+      "loading": "L04d1ng…",
+      "empty": "N0 w0rk5p4c35 f0und",
+      "adding": "4dd1ng…"
+    },
+    "templateEditors": {
+      "remove": "R3m0v3",
+      "add": "4dd",
+      "valuePlaceholder": "v4lu3",
+      "name": "N4m3",
+      "url": "URL",
+      "hmacKey": "HM4C k3y (0p710n4l)",
+      "hmacKeyPlaceholder": "5h4r3d 53cr37",
+      "stage": "574g3",
+      "enforcement": "3nf0rc3m3n7",
+      "enabled": "3n4bl3d",
+      "runTaskNamePlaceholder": "53cur17y-5c4n",
+      "runTaskUrlPlaceholder": "h77p5://h00k5.3x4mpl3.c0m/745k",
+      "addRunTask": "4dd run 745k",
+      "destinationType": "D3571n4710n 7yp3",
+      "token": "70k3n (0p710n4l)",
+      "tokenPlaceholder": "HM4C / 4u7h 70k3n",
+      "notificationNamePlaceholder": "5l4ck-4l3r75",
+      "notificationUrlPlaceholder": "h77p5://h00k5.5l4ck.c0m/53rv1c35/...",
+      "emailAddresses": "3m41l 4ddr35535",
+      "emailPlaceholder": "0p5@3x4mpl3.c0m",
+      "addEmail": "4dd 3m41l",
+      "triggers": "7r1gg3r5",
+      "addNotification": "4dd n071f1c4710n"
+    }
+  },
+  "planSummary": {
+    "aiGenerated": "41 g3n3r473d",
+    "heading": {
+      "planSummary": "Pl4n 5umm4ry",
+      "failureAnalysis": "F41lur3 4n4ly515"
+    },
+    "errors": {
+      "status": "H77P {status}"
+    },
+    "regenerate": {
+      "label": "R3g3n3r473",
+      "queueing": "Qu3u31ng…",
+      "tooltip": "R3-run 7h3 41 5umm4ry 4g41n57 7h3 54m3 pl4n 1npu75",
+      "ariaLabel": "R3g3n3r473 41 5umm4ry",
+      "confirm": "R3g3n3r473 7h3 41 4n4ly515? 7h15 run5 7h3 m0d3l 4g41n.",
+      "error": "C0uld n07 r3g3n3r473: <mono>{detail}</mono>"
+    },
+    "pending": {
+      "summarisingPlan": "5umm4r1z1ng pl4n…",
+      "analysingFailure": "4n4ly51ng f41lur3…"
+    },
+    "skipped": {
+      "fallback": "5umm4ry 5k1pp3d f0r 7h15 run."
+    },
+    "errored": {
+      "heading": "5umm4r1z3r f41l3d"
+    },
+    "riskFactors": {
+      "heading": "R15k f4c70r5",
+      "suggestedFixes": "5ugg3573d f1x35"
+    },
+    "tokens": "{input} 1n / {output} 0u7 70k3n5",
+    "risk": {
+      "low": "l0w",
+      "medium": "m3d1um",
+      "high": "h1gh",
+      "critical": "cr171c4l",
+      "unknown": "unkn0wn"
+    },
+    "badges": {
+      "noChanges": "N0 ch4ng35",
+      "noChangesLower": "n0 ch4ng35",
+      "noChangesTitle": "Pl4n r3p0r73d n0 r350urc3 ch4ng35",
+      "toAdd": "{count, plural, one {# to add} other {# to add}}",
+      "toChange": "{count, plural, one {# to change} other {# to change}}",
+      "toDestroy": "{count, plural, one {# to destroy} other {# to destroy}}",
+      "toReplace": "{count, plural, one {# to replace} other {# to replace}}",
+      "toImport": "{count, plural, one {# to import} other {# to import}}"
+    },
+    "chat": {
+      "heading": "F0ll0w-up",
+      "sharedThreadNote": "0n3 5h4r3d 7hr34d, v151bl3 70 4ny0n3 w17h w0rk5p4c3 r34d.",
+      "placeholder": "45k 4 f0ll0w-up qu35710n 4b0u7 7h15 pl4n… (⌘/C7rl + 3n73r 70 53nd)",
+      "send": "53nd",
+      "thinking": "7h1nk1ng…",
+      "you": "Y0u",
+      "assistant": "4551574n7"
+    },
+    "translatedNote": "4u70m471c4lly 7r4n5l473d 70 y0ur l4ngu4g3. 7h3 4u7h0r17471v3 5umm4ry 15 7h3 0r1g1n4l.",
+    "translating": "7r4n5l471ng…"
+  },
+  "runDetail": {
+    "notFound": "Run n07 f0und",
+    "runSection": "Run 53c710n",
+    "workspaceFallback": "w0rk5p4c3",
+    "backTo": "B4ck 70 {name}",
+    "errorHeading": "3rr0r",
+    "discardedHeading": "D15c4rd3d — r3-pl4n r3qu1r3d",
+    "common": {
+      "yes": "Y35",
+      "no": "N0"
+    },
+    "header": {
+      "title": "Run {id}",
+      "titleWithWorkspace": "{workspace} — run {id}",
+      "description": "{source} run"
+    },
+    "relTime": {
+      "justNow": "ju57 n0w",
+      "minutesAgo": "{count, plural, one {# minute ago} other {# minutes ago}}",
+      "hoursAgo": "{count, plural, one {# hour ago} other {# hours ago}}",
+      "daysAgo": "{count, plural, one {# day ago} other {# days ago}}"
+    },
+    "status": {
+      "pending": "P3nd1ng",
+      "queued": "Qu3u3d",
+      "planning": "Pl4nn1ng",
+      "planned": "Pl4nn3d",
+      "confirmed": "C0nf1rm3d",
+      "applying": "4pply1ng",
+      "canceling": "C4nc3l1ng",
+      "applied": "4ppl13d",
+      "errored": "3rr0r3d",
+      "canceled": "C4nc3l3d",
+      "discarded": "D15c4rd3d"
+    },
+    "activity": {
+      "pending": "Pr3p4r1ng 7h3 run",
+      "queued": "W4171ng f0r 4n 4v41l4bl3 4g3n7",
+      "planning": "Runn1ng 73rr4f0rm pl4n",
+      "plannedConfirmable": "W4171ng f0r y0u 70 c0nf1rm & 4pply",
+      "plannedSpeculative": "5p3cul471v3 pl4n c0mpl373",
+      "plannedComplete": "Pl4n c0mpl373",
+      "confirmed": "574r71ng 4pply",
+      "applying": "Runn1ng 73rr4f0rm 4pply",
+      "canceling": "570pp1ng 7h3 run",
+      "applied": "4pply c0mpl373",
+      "errored": "Run f41l3d",
+      "canceled": "Run c4nc3l3d",
+      "discarded": "Pl4n d15c4rd3d",
+      "elapsedTitle": "3l4p53d 1n 7h15 ph453"
+    },
+    "badge": {
+      "destroy": "d357r0y",
+      "planOnly": "pl4n 0nly"
+    },
+    "actions": {
+      "retryShort": "R37ry",
+      "retryFull": "R37ry Run",
+      "retrying": "R37ry1ng…",
+      "confirmShort": "4pply",
+      "confirmFull": "C0nf1rm & 4pply",
+      "confirming": "C0nf1rm1ng…",
+      "discard": "D15c4rd",
+      "discarding": "D15c4rd1ng…",
+      "cancelShort": "C4nc3l",
+      "cancelFull": "C4nc3l Run",
+      "canceling": "C4nc3l1ng…"
+    },
+    "confirm": {
+      "apply": "4pply 7h15 run? 7h15 4ppl135 7h3 pl4n 4nd ch4ng35 1nfr457ruc7ur3.",
+      "discard": "D15c4rd 7h15 pl4n?",
+      "cancel": "C4nc3l 7h15 run?",
+      "retry": "R37ry 7h15 run?"
+    },
+    "errors": {
+      "loadRun": "F41l3d 70 l04d run",
+      "action": {
+        "confirm": "F41l3d 70 c0nf1rm run",
+        "discard": "F41l3d 70 d15c4rd run",
+        "cancel": "F41l3d 70 c4nc3l run",
+        "retry": "F41l3d 70 r37ry run"
+      }
+    },
+    "tabs": {
+      "overview": "0v3rv13w",
+      "ai": "41",
+      "aiFull": "41 4n4ly515",
+      "opa": "0P4",
+      "opaFull": "0P4 p0l1c135",
+      "impact": "1mp4c7",
+      "impactFull": "1mp4c7 gr4ph",
+      "planLabel": "Pl4n<log>L0g</log>",
+      "applyLabel": "4pply<log>L0g</log>",
+      "planFull": "Pl4n l0g",
+      "applyFull": "4pply l0g",
+      "details": "D3741l5"
+    },
+    "banner": {
+      "destroy": "7h15 15 4 <strong>d357r0y</strong> run — 4ll m4n4g3d r350urc35 w1ll b3 d357r0y3d wh3n 4ppl13d.",
+      "planOnlyCli": "7h15 15 4 <strong>pl4n-0nly</strong> run 1n171473d fr0m 7h3 CL1 0n 4 VC5-c0nn3c73d w0rk5p4c3. 4pply 15 n07 4v41l4bl3 f0r CL1-upl04d3d c0d3 — 0nly VC5-m4n4g3d c0d3 c4n b3 4ppl13d.",
+      "moduleOverridesPrefix": "7h15 run u535 <strong>m0dul3 0v3rr1d35</strong>",
+      "moduleOverridesFromPr": "fr0m PR #{number}",
+      "moduleOverridesSuffix": "w1ll b3 f37ch3d fr0m 7h3 PR br4nch 1n5734d 0f 7h3 publ15h3d r3g157ry v3r510n."
+    },
+    "cards": {
+      "changes": "Ch4ng35",
+      "aiAnalysis": "41 4n4ly515",
+      "policyChecks": "P0l1cy ch3ck5",
+      "resources": "R350urc35"
+    },
+    "changes": {
+      "noChanges": "N0 ch4ng35",
+      "planning": "Pl4nn1ng…",
+      "toAdd": "70 4dd",
+      "toChange": "70 ch4ng3",
+      "toDestroy": "70 d357r0y",
+      "toReplace": "70 r3pl4c3",
+      "toImport": "70 1mp0r7"
+    },
+    "ai": {
+      "notAvailable": "N07 4v41l4bl3",
+      "ready": "R34dy",
+      "riskSub": "{risk} r15k",
+      "generating": "G3n3r471ng…",
+      "skipped": "5k1pp3d",
+      "failed": "F41l3d",
+      "available": "4v41l4bl3"
+    },
+    "policy": {
+      "none": "N0n3",
+      "blocked": "Bl0ck3d",
+      "failedSub": "{count, plural, one {# failed} other {# failed}}",
+      "advisoryIssues": "4dv150ry 155u35",
+      "passedSub": "{passed}/{total} p4553d",
+      "passed": "P4553d"
+    },
+    "resources": {
+      "overLimit": "0v3r l1m17",
+      "oomKilled": "00M-k1ll3d",
+      "recorded": "R3c0rd3d",
+      "nearLimit": "N34r l1m17",
+      "high": "H1gh",
+      "withinLimits": "W17h1n l1m175"
+    },
+    "details": {
+      "heading": "D3741l5",
+      "executionBackend": "3x3cu710n B4ck3nd",
+      "source": "50urc3",
+      "autoApply": "4u70 4pply",
+      "planOnly": "Pl4n 0nly",
+      "triggeredBy": "7r1gg3r3d By",
+      "created": "Cr3473d",
+      "commit": "C0mm17",
+      "branch": "Br4nch",
+      "prMr": "PR/MR",
+      "stateVersion": "57473 V3r510n",
+      "viewState": "V13w 57473",
+      "runOptions": "Run 0p710n5"
+    },
+    "timeline": {
+      "heading": "71m3l1n3",
+      "queued": "Qu3u3d",
+      "planningStarted": "Pl4nn1ng 574r73d",
+      "planComplete": "Pl4n c0mpl373",
+      "confirmed": "C0nf1rm3d",
+      "applyingStarted": "4pply1ng 574r73d",
+      "applied": "4ppl13d",
+      "errored": "3rr0r3d",
+      "canceled": "C4nc3l3d",
+      "discarded": "D15c4rd3d"
+    },
+    "log": {
+      "color": "C0l0r",
+      "colorOnTitle": "5h0w1ng 4N51 c0l0r5 — cl1ck f0r pl41n 73x7",
+      "colorOffTitle": "5h0w1ng pl41n 73x7 — cl1ck f0r c0l0r5",
+      "refresh": "R3fr35h",
+      "refreshTitle": "R3fr35h l0g",
+      "copy": "C0py",
+      "copied": "C0p13d!",
+      "copyTitle": "C0py pl41n 73x7 70 cl1pb04rd",
+      "copyAria": "C0py l0g 70 cl1pb04rd",
+      "download": "D0wnl04d",
+      "downloadColorTitle": "D0wnl04d l0g (w17h 4N51 c0l0r c0d35)",
+      "downloadPlainTitle": "D0wnl04d l0g (pl41n 73x7)",
+      "downloadAria": "D0wnl04d l0g",
+      "follow": "F0ll0w",
+      "followOnTitle": "F0ll0w1ng 7h3 l1v3 741l — cl1ck 70 570p",
+      "followOffTitle": "F0ll0w 7h3 l1v3 741l",
+      "end": "3nd",
+      "endTitle": "Jump 70 7h3 3nd 0f 7h3 l0g",
+      "planEmpty": "N0 pl4n 0u7pu7 4v41l4bl3 y37.",
+      "applyEmpty": "N0 4pply 0u7pu7 4v41l4bl3 y37."
+    },
+    "policyPanel": {
+      "heading": "P0l1cy Ch3ck5",
+      "passedCount": "{passed}/{total} p4553d",
+      "blockedMessage": "7h15 run 15 <strong>bl0ck3d by 4 m4nd470ry p0l1cy 537</strong>. 17 w1ll n07 4pply un71l 7h3 f41lur3 15 r350lv3d 0r 4n 4dm1n 0v3rr1d35 17.",
+      "overriding": "0v3rr1d1ng...",
+      "overrideContinue": "0v3rr1d3 & C0n71nu3",
+      "overrideFailed": "0v3rr1d3 f41l3d",
+      "overrideFailedStatus": "0v3rr1d3 f41l3d ({status})",
+      "overriddenBy": "0v3rr1dd3n by {by}",
+      "policyPassed": "p4553d",
+      "noDenyMessage": "P0l1cy f41l3d w17h0u7 pr0duc1ng 4 d3ny m3554g3 0r 3rr0r 0u7pu7",
+      "enforcement": {
+        "mandatory": "m4nd470ry",
+        "advisory": "4dv150ry"
+      },
+      "outcome": {
+        "passed": "p4553d",
+        "failed": "f41l3d",
+        "errored": "3rr0r3d"
+      }
+    }
+  },
+  "workspaceDetail": {
+    "notFound": "W0rk5p4c3 n07 f0und",
+    "common": {
+      "enabled": "3n4bl3d",
+      "disabled": "D154bl3d",
+      "none": "N0n3",
+      "default": "D3f4ul7",
+      "never": "N3v3r",
+      "actions": "4c710n5",
+      "workspaceLocked": "W0rk5p4c3 15 l0ck3d"
+    },
+    "actions": {
+      "edit": "3d17",
+      "cancel": "C4nc3l",
+      "save": "54v3",
+      "saving": "54v1ng…",
+      "savingEllipsis": "54v1ng...",
+      "delete": "D3l373",
+      "deleting": "D3l371ng...",
+      "add": "4dd",
+      "adding": "4dd1ng...",
+      "remove": "R3m0v3",
+      "download": "D0wnl04d",
+      "rollback": "R0llb4ck",
+      "close": "Cl053",
+      "hide": "H1d3",
+      "enable": "3n4bl3",
+      "disable": "D154bl3",
+      "creating": "Cr3471ng...",
+      "sending": "53nd1ng...",
+      "processing": "Pr0c3551ng...",
+      "queuing": "Qu3u1ng...",
+      "loading": "L04d1ng...",
+      "loadingLower": "l04d1ng…"
+    },
+    "header": {
+      "executionMode": "{mode} 3x3cu710n m0d3"
+    },
+    "tabs": {
+      "overview": "0v3rv13w",
+      "variables": "V4r14bl35",
+      "runs": "Run5",
+      "state": "57473",
+      "stateGraph": "57473 Gr4ph",
+      "configurations": "C0nf1gur4710n5",
+      "notifications": "N071f1c4710n5",
+      "runTasks": "Run 745k5",
+      "runTriggers": "Run 7r1gg3r5",
+      "sharing": "5h4r1ng",
+      "selectLabel": "W0rk5p4c3 53c710n"
+    },
+    "lifecycle": {
+      "pendingDeletion": "P3nd1ng d3l3710n",
+      "pendingDeletionDefault": "7h15 w0rk5p4c3 15 m4rk3d f0r d3l3710n 4nd r3qu1r35 m4nu4l 4c710n.",
+      "archived": "4rch1v3d",
+      "archivedDefault": "7h15 w0rk5p4c3 h45 b33n 4rch1v3d."
+    },
+    "runQueuedBanner": {
+      "message": "Run qu3u3d 5ucc355fully.",
+      "viewRun": "V13w Run"
+    },
+    "settings": {
+      "title": "53771ng5",
+      "saveChanges": "54v3 ch4ng35",
+      "renamedNotice": "W0rk5p4c3 r3n4m3d. Upd473 7h3 <name></name> f13ld 1n y0ur <cloud></cloud> bl0ck 70 m47ch."
+    },
+    "fields": {
+      "name": "N4m3",
+      "nameTitle": "L3773r5, numb3r5, hyph3n5, und3r5c0r35. Mu57 574r7 w17h 4 l3773r 0r numb3r.",
+      "executionMode": "3x3cu710n M0d3",
+      "execModeLocal": "L0c4l",
+      "execModeAgent": "4g3n7",
+      "autoApply": "4u70 4pply",
+      "cpuRequest": "CPU R3qu357",
+      "cpuRequestTitle": "Kub3rn3735 CPU qu4n717y: wh0l3 c0r35 (1, 2) 0r m1ll1c0r35 (500m, 100m)",
+      "memoryRequest": "M3m0ry R3qu357",
+      "memoryRequestTitle": "Kub3rn3735 m3m0ry qu4n717y: by735 (1000) 0r w17h 5uff1x (512M1, 2G1, 171)",
+      "executionBackend": "3x3cu710n B4ck3nd",
+      "version": "V3r510n",
+      "versionPlaceholder": "3.g. 1.11 0r 1.11.5",
+      "versionTitle": "V3r510n 1n X.Y 0r X.Y.Z f0rm47 (3.g. 1.11 0r 1.11.5)",
+      "terragruntEnabledAgent": "3n4bl3d (4g3n7 m0d3)",
+      "terragruntEnabledVersion": "3n4bl3d (v{version})",
+      "terragruntVersionPlaceholder": "3.g. 1.0",
+      "terragruntVersionTitle": "73rr4grun7 v3r510n 1n X.Y 0r X.Y.Z f0rm47 (3.g. 1.0)",
+      "workingDirectory": "W0rk1ng D1r3c70ry",
+      "workingDirectoryPlaceholder": "3.g. 3nv1r0nm3n75/d3v",
+      "agentPool": "4g3n7 P00l",
+      "owner": "0wn3r",
+      "vcsConnection": "VC5 C0nn3c710n",
+      "vcsRepository": "VC5 R3p05170ry",
+      "vcsRepositoryTitle": "Mu57 b3 4n H77P 0r H77P5 URL",
+      "vcsBranch": "VC5 Br4nch",
+      "vcsBranchPlaceholder": "m41n (d3f4ul7)",
+      "vcsWorkflow": "VC5 W0rkfl0w",
+      "vcsWorkflowMergeThenApply": "m3rg3_7h3n_4pply (d3f4ul7 — 7F3 / HCP 574nd4rd)",
+      "vcsWorkflowApplyThenMerge": "4pply_7h3n_m3rg3 (47l4n715 574nd4rd — 0p7-1n)",
+      "autoMerge": "4u70-m3rg3 4f73r 4pply",
+      "autoMergeStrategy": "4u70-m3rg3 57r473gy",
+      "vcsPolling": "VC5 P0ll1ng",
+      "labels": "L4b3l5 (74g5)",
+      "labelsTitle": "W0rk5p4c3 l4b3l5 d0 d0ubl3 du7y: l4b3l-b453d RB4C m47ch1ng, 4nd 45 7h3 \"74g5\" m47ch3d by 73rr4f0rm/70fu cl0ud '{' workspaces '{' tags = ... '}' '}' bl0ck5.",
+      "varFiles": "V4r F1l35",
+      "varFilesPlaceholder": "3.g. 3nv5/d3v.7fv4r5",
+      "triggerPrefixes": "7r1gg3r Pr3f1x35",
+      "triggerPrefixesHint": "D1r3c70r135 7h47 7r1gg3r run5. 0v3rr1d35 w0rk1ng d1r3c70ry f1l73r1ng wh3n 537.",
+      "triggerPrefixesPlaceholder": "3.g. m0dul35",
+      "triggerPrefixesNone": "N0n3 (u535 w0rk1ng d1r3c70ry)",
+      "driftIgnoreRules": "Dr1f7 1gn0r3 Rul35",
+      "driftIgnoreRulesHint": "Gl0b-4w4r3 73rr4f0rm 4ddr355 + 477r1bu73 p47h5 5uppr3553d by 7h3 dr1f7 cl4551f13r. <star></star> m47ch35 z3r0 0r m0r3 n0n-<dot></dot> ch4r5 (5p4n5 <n></n> 1nd1c35); <starIdx></starIdx> m47ch35 4ny br4ck373d 1nd3x. 4 b4r3 4ddr355 w17h n0 477r1bu73 5uff1x 51l3nc35 4ny ch4ng3 70 7h47 r350urc3 — 1nclud1ng d357r0y5. 4ff3c75 dr1f7 0nly, n07 r3gul4r pl4n/4pply. 533 <docs>dr1f7-1gn0r3-rul35.md</docs> f0r 7h3 full gr4mm4r.",
+      "driftIgnoreRulesNone": "N0n3 (3v3ry pl4n d1ff c0un75 45 dr1f7)"
+    },
+    "vcsWorkflowWarning": {
+      "title": "4u7h0r1z4710n d3l3g473d 70 y0ur VC5 r3p05170ry.",
+      "rbac": "4ny0n3 wh0 c4n m3rg3 7h3 PR c4n 4pply. Br4nch pr073c710n rul35 (r3qu1r3d r3v13w5, 5747u5 ch3ck5, c0d3 0wn3r 4ppr0v4l) b3c0m3 7h3 g473. 73rr4p0d r0l3/l4b3l RB4C d035<em>n07</em> 4pply 70 c0mm3n7-dr1v3n 4c710n5 1n 7h15 m0d3.",
+      "recommended": "<strong>R3c0mm3nd3d:</strong> r3qu1r3 l1n34r h1570ry (r3b453/5qu45h b3f0r3 m3rg3) 50 7h3 c0mm17 y0u 4pply 15 7h3 c0mm17 7h47 l4nd5.",
+      "credit": "Cr3d17: 7h15 w0rkfl0w 15 m0d3ll3d 0n <atlantis>47l4n715</atlantis>. 47l4n715 r3m41n5 7h3 r1gh7 700l f0r 734m5 wh0 0nly w4n7 PR-c0mm3n7-dr1v3n 4ppl135 4nd n0 pl47f0rm U1."
+    },
+    "vcsPolling": {
+      "error": "3rr0r",
+      "ok": "0K ({time})",
+      "notPolled": "N07 p0ll3d y37"
+    },
+    "lockout": {
+      "revertLabels": "R3v3r7 L4b3l5",
+      "saveAnyway": "54v3 4nyw4y"
+    },
+    "lock": {
+      "title": "L0ck 5747u5",
+      "lockedDesc": "7h15 w0rk5p4c3 15 l0ck3d. N0 pl4n5 0r 4ppl135 c4n run.",
+      "unlockedDesc": "7h15 w0rk5p4c3 15 unl0ck3d 4nd r34dy f0r run5.",
+      "lock": "L0ck",
+      "unlock": "Unl0ck",
+      "lockConfirm": "L0ck 7h15 w0rk5p4c3?",
+      "unlockConfirm": "Unl0ck 7h15 w0rk5p4c3?"
+    },
+    "drift": {
+      "title": "Dr1f7 D373c710n",
+      "checkInterval": "Ch3ck 1n73rv4l",
+      "status": "5747u5",
+      "statusNoDrift": "N0 Dr1f7",
+      "statusDrifted": "Dr1f73d",
+      "statusErrored": "3rr0r3d",
+      "statusUnchecked": "Unch3ck3d",
+      "dismiss": "D15m155",
+      "dismissing": "D15m1551ng…",
+      "dismissTitle": "Cl34r 7h3 r3p0r73d dr1f7 57473. 7h3 n3x7 5ch3dul3d ch3ck w1ll r3p0pul473 17 fr0m r34l17y.",
+      "lastChecked": "L457 Ch3ck3d",
+      "checkNow": "Ch3ck N0w",
+      "checkNowTitle": "Qu3u3 4 pl4n-0nly run 70 ch3ck f0r dr1f7",
+      "checkNowTitleDisabled": "3n4bl3 dr1f7 d373c710n f1r57"
+    },
+    "intervals": {
+      "disabled": "D154bl3d",
+      "1hour": "1 h0ur",
+      "4hours": "4 h0ur5",
+      "12hours": "12 h0ur5",
+      "24hours": "24 h0ur5",
+      "48hours": "48 h0ur5",
+      "3days": "3 d4y5",
+      "7days": "7 d4y5"
+    },
+    "planExpiry": {
+      "title": "Pl4n 3xp1ry",
+      "description": "4u70-d15c4rd 4n unc0nf1rm3d pl4n 0nc3 17 15 0ld3r 7h4n 7h15, 50 4 574l3 pl4n c4n'7 b3 4ppl13d 4g41n57 4 m0v3d w0rld. 0ff by d3f4ul7; 7h3 pl4n mu57 7h3n b3 r3-run. (4ppl135 70 4pply-c4p4bl3 run5 0nly.)",
+      "expireAfter": "3xp1r3 4f73r"
+    },
+    "aiSummary": {
+      "title": "41 Pl4n 5umm4ry",
+      "description": "4u70m471c LLM-g3n3r473d ch4ng3 5umm4ry, r15k 455355m3n7, 4nd f41lur3 4n4ly515 0n 3v3ry pl4n-ph453 0u7c0m3 f0r 7h15 w0rk5p4c3.",
+      "mode": "M0d3",
+      "modeDefault": "F0ll0w d3pl0ym3n7 d3f4ul7",
+      "modeEnabled": "4lw4y5 5umm4r1z3",
+      "modeDisabled": "N3v3r 5umm4r1z3",
+      "contextLabel": "W0rk5p4c3 c0n73x7",
+      "contextLabelSuffix": "(0p710n4l, 4dd171v3)",
+      "contextPlaceholder": "F4c75 7h3 41 5h0uld kn0w 4b0u7 7h15 w0rk5p4c3 5p3c1f1c4lly. 3.g. 'Fr0n75 7h3 v4ul7 f0r 53rv1c3 X — d357r0y1ng 7h3 KM5 k3y c4u535 4 gl0b4l 0u74g3.'",
+      "noContext": "N0 w0rk5p4c3 c0n73x7 537.",
+      "contextHint": "4dd3d 0n 70p 0f d3pl0ym3n7-w1d3 c0n73x7. M4x 4000 ch4r4c73r5."
+    },
+    "slack": {
+      "title": "5l4ck n071f1c4710n5",
+      "description": "0p7 7h15 w0rk5p4c3 1n70 5l4ck run n071f1c4710n5 — 4ppr0v4l r3qu3575, 4ppl135, 3rr0r5, 4nd dr1f7. L34v3 7h3 ch4nn3l 3mp7y 4nd 7h15 w0rk5p4c3 574y5 51l3n7 (7h3r3 15 n0 d3pl0ym3n7-w1d3 f4n-0u7). R3qu1r35 7h3 5l4ck 4pp 70 b3 3n4bl3d by 4n 4dm1n157r470r.",
+      "channel": "Ch4nn3l",
+      "channelPlaceholder": "#d3pl0y5 0r 4 ch4nn3l 1D (3.g. C01234BCD)",
+      "notSet": "N07 537 — 51l3n7.",
+      "hint": "7h3 5l4ck 4pp mu57 4lr34dy b3 4 m3mb3r 0f 7h3 ch4nn3l."
+    },
+    "delete": {
+      "title": "D3l373 W0rk5p4c3",
+      "description": "P3rm4n3n7ly d3l373 7h15 w0rk5p4c3 4nd 4ll 4550c1473d 57473, v4r14bl35, 4nd run5.",
+      "confirm": "C0nf1rm D3l373"
+    },
+    "variables": {
+      "addVariable": "4dd V4r14bl3",
+      "key": "K3y",
+      "value": "V4lu3",
+      "category": "C473g0ry",
+      "categoryEnv": "3nv1r0nm3n7",
+      "sensitive": "53n5171v3",
+      "empty": "N0 v4r14bl35 c0nf1gur3d f0r 7h15 w0rk5p4c3.",
+      "emptyValue": "3mp7y",
+      "enterNewValue": "3n73r n3w v4lu3",
+      "deleteConfirm": "D3l373 v4r14bl3 \"{key}\"?"
+    },
+    "runs": {
+      "options": "0p710n5",
+      "hideOptions": "H1d3 0p710n5",
+      "queueDestroy": "Qu3u3 D357r0y",
+      "queueDestroyTitle": "Qu3u3 4 d357r0y pl4n",
+      "destroyAllConfirm": "D357r0y 4ll r350urc35?",
+      "confirmDestroy": "C0nf1rm D357r0y",
+      "queuePlan": "Qu3u3 Pl4n",
+      "queueRun": "Qu3u3 Run",
+      "queuePlanConfirm": "Qu3u3 4 5p3cul471v3 pl4n f0r 7h15 w0rk5p4c3?",
+      "queueApplyConfirm": "Qu3u3 4 pl4n + 4pply run? 7h15 c4n ch4ng3 1nfr457ruc7ur3.",
+      "planOptions": "Pl4n 0p710n5",
+      "targetResources": "74rg37 r350urc35",
+      "replaceResources": "R3pl4c3 r350urc35",
+      "commaSeparated": "(c0mm4-53p4r473d)",
+      "planOnly": "Pl4n 0nly",
+      "refreshOnly": "R3fr35h 0nly",
+      "skipRefresh": "5k1p R3fr35h",
+      "allowEmptyApply": "4ll0w 3mp7y 4pply",
+      "vcsRef": "VC5 R3f",
+      "branch": "Br4nch",
+      "tag": "74g",
+      "defaultBranch": "D3f4ul7 ({branch})",
+      "nonDefaultRefNote": "N0n-d3f4ul7 r3f 53l3c73d — run w1ll b3 pl4n-0nly",
+      "empty": "N0 run5 y37 f0r 7h15 w0rk5p4c3.",
+      "runId": "Run 1D",
+      "status": "5747u5",
+      "type": "7yp3",
+      "changes": "Ch4ng35",
+      "source": "50urc3",
+      "triggeredBy": "7r1gg3r3d By",
+      "created": "Cr3473d",
+      "needsConfirm": "n33d5 c0nf1rm",
+      "typeDestroy": "d357r0y",
+      "typePlanOnly": "pl4n 0nly",
+      "typePlanApply": "pl4n + 4pply",
+      "sourceModuleTest": "m0dul3 7357",
+      "sourceModulePublish": "m0dul3 publ15h"
+    },
+    "state": {
+      "deleteConfirm": "D3l373 57473 v3r510n #{serial}? 7h15 c4nn07 b3 und0n3.",
+      "rollbackConfirm": "R0llb4ck 70 57473 v3r510n #{serial}? 4 n3w v3r510n w1ll b3 cr3473d w17h 7h3 54m3 c0n73n7.",
+      "confirmDelete": "C0nf1rm D3l373",
+      "confirmRollback": "C0nf1rm R0llb4ck",
+      "uploadState": "Upl04d 57473",
+      "empty": "N0 57473 v3r510n5 y37 f0r 7h15 w0rk5p4c3.",
+      "serial": "53r14l",
+      "createdBy": "Cr3473d By",
+      "run": "Run",
+      "size": "51z3",
+      "created": "Cr3473d",
+      "runner": "runn3r",
+      "latest": "l47357"
+    },
+    "configurations": {
+      "description": "Upl04d3d 50urc3 4rch1v35 f0r 7h15 w0rk5p4c3, n3w357 f1r57. P1ck 7w0 r0w5 70 c0mp4r3.",
+      "selectedCount": "{count}/2 53l3c73d",
+      "compare": "C0mp4r3",
+      "comparing": "C0mp4r1ng…",
+      "empty": "N0 c0nf1gur4710n v3r510n5 y37. 7h3y 4pp34r h3r3 45 500n 45 4 `73rr4f0rm pl4n` upl04d5 0r 4 VC5 pu5h 7r1gg3r5 4 run.",
+      "id": "1D",
+      "source": "50urc3",
+      "status": "5747u5",
+      "created": "Cr3473d",
+      "current": "curr3n7",
+      "selectForCompare": "53l3c7 {id} f0r c0mp4r3",
+      "compareLabel": "C0mp4r3",
+      "diff": "D1ff",
+      "filesChanged": "{count} f1l35 ch4ng3d",
+      "oversized": "5k1pp3d {count, plural, one {# oversized file} other {# oversized files}}: {files}",
+      "noDiff": "N0 c0n73n7 d1ff3r3nc35 b37w33n 7h353 v3r510n5.",
+      "binaryChanged": "B1n4ry f1l3 ch4ng3d — d1ff n07 r3nd3r3d.",
+      "diffType": {
+        "added": "4dd3d",
+        "removed": "r3m0v3d",
+        "modified": "m0d1f13d",
+        "binary-changed": "b1n4ry"
+      }
+    },
+    "notifications": {
+      "addNotification": "4dd N071f1c4710n",
+      "name": "N4m3",
+      "namePlaceholder": "D3pl0y n071f1c4710n5",
+      "destinationType": "D3571n4710n 7yp3",
+      "typeGeneric": "G3n3r1c W3bh00k",
+      "typeEmail": "3m41l",
+      "url": "URL",
+      "hmacToken": "HM4C 70k3n (0p710n4l)",
+      "signingSecret": "51gn1ng 53cr37",
+      "emailAddresses": "3m41l 4ddr35535 (c0mm4-53p4r473d)",
+      "triggerEvents": "7r1gg3r 3v3n75",
+      "createNotification": "Cr3473 N071f1c4710n",
+      "empty": "N0 n071f1c4710n c0nf1gur4710n5 f0r 7h15 w0rk5p4c3.",
+      "ok": "0K",
+      "err": "3rr {status}",
+      "fail": "F41L",
+      "http": "H77P {status}",
+      "verify": "V3r1fy",
+      "history": "H1570ry",
+      "deliveryHistory": "D3l1v3ry H1570ry",
+      "enableConfirm": "3n4bl3 7h15 n071f1c4710n?",
+      "disableConfirm": "D154bl3 7h15 n071f1c4710n?",
+      "deleteConfirm": "D3l373 n071f1c4710n \"{name}\"?"
+    },
+    "runTasks": {
+      "addRunTask": "4dd Run 745k",
+      "name": "N4m3",
+      "namePlaceholder": "0P4 P0l1cy Ch3ck",
+      "webhookUrl": "W3bh00k URL",
+      "stage": "574g3",
+      "enforcementLevel": "3nf0rc3m3n7 L3v3l",
+      "hmacKey": "HM4C K3y (0p710n4l)",
+      "hmacKeyPlaceholder": "51gn1ng 53cr37 f0r w3bh00k v3r1f1c4710n",
+      "createRunTask": "Cr3473 Run 745k",
+      "empty": "N0 run 745k5 c0nf1gur3d f0r 7h15 w0rk5p4c3.",
+      "enableConfirm": "3n4bl3 7h15 run 745k?",
+      "disableConfirm": "D154bl3 7h15 run 745k?",
+      "deleteConfirm": "D3l373 run 745k \"{name}\"?"
+    },
+    "runTriggers": {
+      "title": "Run 7r1gg3r5",
+      "description": "Wh3n 4 50urc3 w0rk5p4c3 c0mpl3735 4n 4pply, d0wn57r34m w0rk5p4c35 g37 4 n3w run qu3u3d 4u70m471c4lly. Up 70 20 50urc3 w0rk5p4c35 p3r d3571n4710n.",
+      "inboundHeading": "50urc3 w0rk5p4c35 7h47 7r1gg3r run5 h3r3",
+      "inboundEmpty": "N0 50urc3 w0rk5p4c35 7r1gg3r run5 0n 7h15 w0rk5p4c3.",
+      "pickerPlaceholder": "534rch w0rk5p4c35 70 4dd 45 4 50urc3…",
+      "outboundHeading": "D3571n4710n w0rk5p4c35 7h15 w0rk5p4c3 7r1gg3r5",
+      "outboundEmpty": "7h15 w0rk5p4c3 d035 n07 7r1gg3r run5 0n 4ny 07h3r w0rk5p4c3.",
+      "destinationNote": "(d3571n4710n; r3m0v3 fr0m 7h3r3)",
+      "removeConfirm": "R3m0v3 7h15 run 7r1gg3r?"
+    },
+    "sharing": {
+      "title": "R3m073 57473 5h4r1ng",
+      "description": "Pr0duc3r-c0n7r0ll3d 4ll0wl157 f0r cr055-w0rk5p4c3 <code></code>. 57473 d474 15 53cr37-b34r1ng — gr4n7 d3l1b3r473ly. <docs>D0c5</docs>",
+      "outboundHeading": "W0rk5p4c35 4u7h0r1z3d 70 r34d 7h15 w0rk5p4c3'5 57473",
+      "outboundEmpty": "7h15 w0rk5p4c3'5 57473 15 n07 5h4r3d w17h 4ny 07h3r w0rk5p4c3.",
+      "grantedBy": "gr4n73d by {by}",
+      "revoke": "R3v0k3",
+      "revokeConfirm": "R3m0v3 7h15 r3m073 57473 5h4r1ng? 7h3 c0n5um3r w1ll l053 4cc355 70 7h15 57473.",
+      "pickerPlaceholder": "534rch w0rk5p4c35 70 4u7h0r1z3 45 4 c0n5um3r…",
+      "inboundHeading": "W0rk5p4c35 7h15 w0rk5p4c3 15 4u7h0r1z3d 70 r34d 57473 fr0m",
+      "inboundEmpty": "7h15 w0rk5p4c3 15 n07 4u7h0r1z3d 70 r34d 57473 fr0m 4ny 07h3r w0rk5p4c3 v14 73rr4f0rm_r3m073_57473.",
+      "producerNote": "(pr0duc3r; r3v0k3 fr0m 7h3r3)"
+    },
+    "runMessages": {
+      "manualDriftCheck": "M4nu4l dr1f7 ch3ck fr0m U1",
+      "queued": "Qu3u3d fr0m U1",
+      "queuedSpeculative": "Qu3u3d fr0m U1 (5p3cul471v3)",
+      "destroyQueued": "D357r0y qu3u3d fr0m U1"
+    },
+    "errors": {
+      "loadWorkspace": "F41l3d 70 l04d w0rk5p4c3",
+      "loadRuns": "F41l3d 70 l04d run5",
+      "loadVariables": "F41l3d 70 l04d v4r14bl35",
+      "loadStateVersions": "F41l3d 70 l04d 57473 v3r510n5",
+      "loadConfigurations": "F41l3d 70 l04d c0nf1gur4710n v3r510n5",
+      "loadNotifications": "F41l3d 70 l04d n071f1c4710n5",
+      "loadOutboundConsumers": "F41l3d 70 l04d 0u7b0und r3m073-57473 c0n5um3r5",
+      "loadInboundConsumers": "F41l3d 70 l04d 1nb0und r3m073-57473 c0n5um3r5",
+      "loadConsumers": "F41l3d 70 l04d r3m073-57473 c0n5um3r5",
+      "loadInboundTriggers": "F41l3d 70 l04d 1nb0und run 7r1gg3r5",
+      "loadOutboundTriggers": "F41l3d 70 l04d 0u7b0und run 7r1gg3r5",
+      "loadTriggers": "F41l3d 70 l04d run 7r1gg3r5",
+      "loadRunTasks": "F41l3d 70 l04d run 745k5",
+      "downloadStateFile": "F41l3d 70 d0wnl04d 57473 f1l3",
+      "downloadFailed": "D0wnl04d f41l3d",
+      "downloadFailedStatus": "D0wnl04d f41l3d ({status})",
+      "downloadTicketMissingUrl": "D0wnl04d 71ck37 r35p0n53 m1551ng URL",
+      "diffFailed": "D1ff f41l3d",
+      "diffFailedStatus": "D1ff f41l3d ({status})",
+      "authorizeConsumer": "F41l3d 70 4u7h0r1z3 c0n5um3r",
+      "revoke": "F41l3d 70 r3v0k3",
+      "revokeConsumer": "F41l3d 70 r3v0k3 c0n5um3r",
+      "addTrigger": "F41l3d 70 4dd run 7r1gg3r",
+      "removeTrigger": "F41l3d 70 r3m0v3 run 7r1gg3r",
+      "createRunTask": "F41l3d 70 cr3473 run 745k",
+      "createRunTaskStatus": "F41l3d 70 cr3473 run 745k ({status})",
+      "update": "F41l3d 70 upd473",
+      "toggleRunTask": "F41l3d 70 70ggl3 run 745k",
+      "delete": "F41l3d 70 d3l373",
+      "deleteRunTask": "F41l3d 70 d3l373 run 745k",
+      "labelLockout": "7h15 l4b3l ch4ng3 w0uld r3duc3 y0ur 4cc355.",
+      "updateWorkspace": "F41l3d 70 upd473 w0rk5p4c3",
+      "lockWorkspace": "F41l3d 70 l0ck w0rk5p4c3",
+      "unlockWorkspace": "F41l3d 70 unl0ck w0rk5p4c3",
+      "updateAiSummary": "F41l3d 70 upd473 41 5umm4ry 53771ng5",
+      "updateSlackChannel": "F41l3d 70 upd473 5l4ck ch4nn3l",
+      "updateDriftSettings": "F41l3d 70 upd473 dr1f7 53771ng5",
+      "updateDriftInterval": "F41l3d 70 upd473 dr1f7 1n73rv4l",
+      "updatePlanExpiry": "F41l3d 70 upd473 pl4n 3xp1ry",
+      "queueDriftCheck": "F41l3d 70 qu3u3 dr1f7 ch3ck",
+      "queueDriftCheckStatus": "F41l3d 70 qu3u3 dr1f7 ch3ck ({status})",
+      "dismissDrift": "F41l3d 70 d15m155 dr1f7",
+      "dismissDriftStatus": "F41l3d 70 d15m155 dr1f7 ({status})",
+      "deleteWorkspace": "F41l3d 70 d3l373 w0rk5p4c3",
+      "addVariable": "F41l3d 70 4dd v4r14bl3",
+      "addVariableStatus": "F41l3d 70 4dd v4r14bl3 ({status})",
+      "deleteVariable": "F41l3d 70 d3l373 v4r14bl3",
+      "updateVariable": "F41l3d 70 upd473 v4r14bl3",
+      "queuePlan": "F41l3d 70 qu3u3 pl4n",
+      "queuePlanStatus": "F41l3d 70 qu3u3 pl4n ({status})",
+      "queueDestroy": "F41l3d 70 qu3u3 d357r0y",
+      "queueDestroyStatus": "F41l3d 70 qu3u3 d357r0y ({status})",
+      "createNotification": "F41l3d 70 cr3473 n071f1c4710n",
+      "createNotificationStatus": "F41l3d 70 cr3473 n071f1c4710n ({status})",
+      "toggleNotification": "F41l3d 70 70ggl3 n071f1c4710n",
+      "deleteNotification": "F41l3d 70 d3l373 n071f1c4710n",
+      "verificationFailed": "V3r1f1c4710n f41l3d",
+      "verificationDeliveryFailed": "V3r1f1c4710n d3l1v3ry f41l3d: {detail}",
+      "unknownError": "Unkn0wn 3rr0r",
+      "failed": "F41l3d",
+      "deleteStateVersion": "F41l3d 70 d3l373 57473 v3r510n",
+      "rollbackStateVersion": "F41l3d 70 r0llb4ck 57473 v3r510n",
+      "stateActionFailed": "57473 4c710n f41l3d",
+      "uploadState": "F41l3d 70 upl04d 57473",
+      "uploadStateFile": "F41l3d 70 upl04d 57473 f1l3"
+    }
+  },
+  "graphs": {
+    "stateTab": {
+      "loadError": "F41l3d 70 l04d 7h3 57473 gr4ph.",
+      "emptyState": "N0 57473 y37 — run 4 pl4n 4nd 4pply, 0r upl04d 57473, 7h3n 7h15 gr4ph w1ll p0pul473.",
+      "stateVersionLabel": "57473 v3r510n",
+      "currentSuffix": "(curr3n7)",
+      "colorByLabel": "C0l0r by",
+      "viewGraph": "Gr4ph",
+      "viewTable": "74bl3",
+      "resourceCount": "{count, plural, one {# resource} other {# resources}}",
+      "dependencyCount": "{count, plural, one {# dependency} other {# dependencies}}",
+      "truncated": "5h0w1ng 7h3 f1r57 {shown} 0f {total} r350urc35 — 7h3 gr4ph 15 c4pp3d f0r l3g1b1l17y.",
+      "colResource": "R350urc3",
+      "colType": "7yp3",
+      "colMode": "M0d3",
+      "colModule": "M0dul3",
+      "colDependedOnBy": "D3p3nd3d 0n by",
+      "rootModule": "(r007)"
+    },
+    "impact": {
+      "notAvailable": "1mp4c7 gr4ph 15 n07 4v41l4bl3 f0r 7h15 run.",
+      "title": "1mp4c7 gr4ph",
+      "subtitle": "pl4n 0f {count, plural, one {# resource} other {# resources}}",
+      "hint": "34ch 5ph3r3 15 4 r350urc3; 34ch 4rr0w p01n75 70 wh47 17 d3p3nd5 0n. Cl1ck 4 n0d3 → 175 7r4n5171v3 <b>1mp4c7</b> (3v3ry7h1ng d0wn57r34m) l1gh75 up.",
+      "downstreamAffected": "d0wn57r34m 4ff3c73d",
+      "action": {
+        "create": "cr3473",
+        "update": "upd473",
+        "replace": "r3pl4c3",
+        "destroy": "d357r0y",
+        "unchanged": "unch4ng3d"
+      }
+    },
+    "estate": {
+      "navHint": "Dr4g 70 r07473 · 5cr0ll 70 z00m · r1gh7-dr4g 70 p4n · <em>cl1ck 4 n0d3 70 0rb17 4r0und 17</em>"
+    },
+    "state3d": {
+      "title": "57473 gr4ph",
+      "hint": "34ch 5ph3r3 15 4 r350urc3; 34ch 4rr0w p01n75 70 wh47 17 d3p3nd5 0n. Cl1ck 4 n0d3 → 7h3 r350urc35 7h47 7r4n5171v3ly <b>d3p3nd 0n 17</b> l1gh7 up.",
+      "dataSource": "d474 50urc3",
+      "managed": "m4n4g3d",
+      "dependOnThis": "d3p3nd 0n 7h15"
+    },
+    "resource3d": {
+      "resetView": "R3537 v13w",
+      "clear": "Cl34r",
+      "key": "K3y",
+      "resources": "R350urc35",
+      "hideKey": "H1d3 k3y",
+      "hideResources": "H1d3 r350urc35",
+      "resourcesCount": "R350urc35 ({count})",
+      "filterPlaceholder": "F1l73r r350urc35…",
+      "navHint": "Dr4g 70 r07473 · 5cr0ll 70 z00m · r1gh7-dr4g 70 p4n · <em>cl1ck 4 r350urc3 70 0rb17 4r0und 17</em>"
+    }
+  },
+  "execHookDetail": {
+    "backLink": "B4ck 70 3x3cu710n h00k5",
+    "defaultDescription": "3x3cu710n h00k",
+    "notFound": "3x3cu710n h00k n07 f0und",
+    "scriptEmpty": "(3mp7y)",
+    "tabs": {
+      "settings": "53771ng5",
+      "workspaces": "W0rk5p4c35"
+    },
+    "common": {
+      "yes": "Y35",
+      "no": "N0"
+    },
+    "actions": {
+      "edit": "3d17",
+      "cancel": "C4nc3l",
+      "save": "54v3",
+      "saving": "54v1ng...",
+      "delete": "D3l373",
+      "deleting": "D3l371ng...",
+      "confirmDelete": "C0nf1rm D3l373",
+      "add": "4dd",
+      "adding": "4dd1ng...",
+      "remove": "R3m0v3"
+    },
+    "settings": {
+      "heading": "53771ng5"
+    },
+    "fields": {
+      "name": "N4m3",
+      "description": "D35cr1p710n",
+      "hookPoint": "H00k P01n7",
+      "priority": "Pr10r17y",
+      "enabled": "3n4bl3d",
+      "script": "5cr1p7 (<code>/b1n/5h -c</code>)"
+    },
+    "delete": {
+      "heading": "D3l373 3x3cu710n H00k",
+      "description": "P3rm4n3n7ly d3l373 7h15 h00k 4nd r3m0v3 17 fr0m 4ll w0rk5p4c35."
+    },
+    "workspaces": {
+      "scopeNote": "7h15 h00k run5 0nly 0n 7h3 w0rk5p4c35 4550c1473d b3l0w. 7h3r3 15 n0 gl0b4l 5c0p3.",
+      "associate": "4550c1473 W0rk5p4c3",
+      "workspaceLabel": "W0rk5p4c3",
+      "selectPlaceholder": "53l3c7 4 w0rk5p4c3...",
+      "empty": "N0 w0rk5p4c35 4550c1473d w17h 7h15 h00k.",
+      "colWorkspace": "W0rk5p4c3",
+      "colActions": "4c710n5"
+    },
+    "confirm": {
+      "removeWorkspace": "R3m0v3 7h15 w0rk5p4c3 fr0m 7h3 h00k? 7h3 h00k w1ll n0 l0ng3r run f0r 17."
+    },
+    "success": {
+      "updated": "3x3cu710n h00k upd473d",
+      "workspaceAssociated": "W0rk5p4c3 4550c1473d",
+      "workspaceRemoved": "W0rk5p4c3 r3m0v3d"
+    },
+    "errors": {
+      "load": "F41l3d 70 l04d 3x3cu710n h00k",
+      "update": "F41l3d 70 upd473 3x3cu710n h00k",
+      "delete": "F41l3d 70 d3l373 3x3cu710n h00k",
+      "addWorkspace": "F41l3d 70 4dd w0rk5p4c3",
+      "removeWorkspace": "F41l3d 70 r3m0v3 w0rk5p4c3"
+    }
+  },
+  "policySetDetail": {
+    "backLink": "P0l1cy 5375",
+    "notFound": "N07 f0und",
+    "unknown": "unkn0wn",
+    "subtitle": "0P4 p0l1cy 537 · cr3473d by {createdBy}",
+    "settings": {
+      "heading": "53771ng5"
+    },
+    "fields": {
+      "description": "D35cr1p710n",
+      "enforcement": "3nf0rc3m3n7",
+      "enabled": "3n4bl3d",
+      "globalScope": "Gl0b4l (3v3ry w0rk5p4c3)"
+    },
+    "enforcement": {
+      "advisory": "4dv150ry (w4rn)",
+      "mandatory": "M4nd470ry (bl0ck 4pply)"
+    },
+    "scope": {
+      "allowLabels": "4ll0w l4b3l5 (k3y: v1, v2)",
+      "allowLabelsPlaceholder": "3nv: pr0d, 574g1ng",
+      "allowNames": "4ll0w n4m35 (0n3 p3r l1n3)",
+      "denyLabels": "D3ny l4b3l5 (k3y: v1, v2)",
+      "denyNames": "D3ny n4m35 (0n3 p3r l1n3)"
+    },
+    "vcs": {
+      "heading": "VC5 C0nf1gur4710n",
+      "repoUrl": "R3p05170ry URL",
+      "branch": "Br4nch",
+      "branchPlaceholder": "m41n (d3f4ul7)",
+      "policyPath": "P0l1cy P47h"
+    },
+    "vcsBanner": {
+      "syncedFrom": "P0l1c135 5ync3d fr0m",
+      "at": "47",
+      "lastSynced": "L457 5ync3d {time}",
+      "commit": "(c0mm17 {sha})",
+      "syncError": "5ync 3rr0r: {error}"
+    },
+    "policies": {
+      "heading": "P0l1c135 ({count})",
+      "vcsManaged": "M4n4g3d by r3p05170ry — pu5h ch4ng35 v14 PR",
+      "empty": "N0 p0l1c135 1n 7h15 537 y37."
+    },
+    "addPolicy": {
+      "namePlaceholder": "P0l1cy n4m3",
+      "descPlaceholder": "D35cr1p710n (0p710n4l)",
+      "regoHint": "R3g0 v1. Mu57 d3cl4r3 <code>p4ck4g3 73rr4p0d</code> 4nd 3xpr355 v10l4710n5 v14 4 <code>d3ny</code> 537. 7h3 pl4n 15 <code>1npu7</code>; 73rr4p0d c0n73x7 15 <code>d474.73rr4p0d_c0n73x7</code>."
+    },
+    "actions": {
+      "saving": "54v1ng...",
+      "saveSettings": "54v3 53771ng5",
+      "syncNow": "5ync N0w",
+      "cancel": "C4nc3l",
+      "addPolicy": "4dd P0l1cy",
+      "deleteSet": "D3l373 537",
+      "validatingRego": "V4l1d471ng R3g0...",
+      "delete": "D3l373",
+      "savePolicy": "54v3 P0l1cy"
+    },
+    "confirm": {
+      "deleteSet": "D3l373 7h15 p0l1cy 537 4nd 4ll 175 p0l1c135? R3c0rd3d run 3v4lu4710n5 4r3 k3p7.",
+      "deletePolicy": "D3l373 p0l1cy \"{name}\"?"
+    },
+    "errors": {
+      "load": "F41l3d 70 l04d p0l1cy 537",
+      "save": "F41l3d 70 54v3 p0l1cy 537",
+      "saveStatus": "F41l3d 70 54v3 ({status})",
+      "delete": "F41l3d 70 d3l373 p0l1cy 537",
+      "deleteStatus": "F41l3d 70 d3l373 ({status})",
+      "addPolicy": "F41l3d 70 4dd p0l1cy",
+      "addPolicyStatus": "F41l3d 70 4dd p0l1cy ({status})",
+      "savePolicy": "F41l3d 70 54v3 p0l1cy",
+      "savePolicyStatus": "F41l3d 70 54v3 p0l1cy ({status})",
+      "deletePolicy": "F41l3d 70 d3l373 p0l1cy",
+      "deletePolicyStatus": "F41l3d 70 d3l373 ({status})"
+    }
+  },
+  "slackLink": {
+    "title": "C0nn3c7 5l4ck 70 73rr4p0d",
+    "loading": "L04d1ng…",
+    "checking": "Ch3ck1ng y0ur l1nk…",
+    "linking": "L1nk1ng y0ur 5l4ck 4cc0un7…",
+    "unknown": "unkn0wn",
+    "confirm": {
+      "prompt": "L1nk 7h15 5l4ck 4cc0un7 70 <em>y0ur</em> 73rr4p0d 1d3n717y? 3v3ry fu7ur3 5l4ck 4c710n (4ppr0v3/d15c4rd) w1ll run 45 7h15 73rr4p0d u53r w17h 7h31r p3rm15510n5.",
+      "slackUser": "5l4ck u53r",
+      "slackTeam": "5l4ck 734m",
+      "terrapodAccount": "73rr4p0d 4cc0un7",
+      "warning": "0nly c0n71nu3 1f y0u ju57 574r73d 7h15 l1nk fr0m 5l4ck y0ur53lf. 1f y0u d1dn'7, cl053 7h15 74b 4nd d0n'7 l1nk — 7h15 b1nd5 7h3 5l4ck 4cc0un7 4b0v3 70 <em>y0ur</em> 73rr4p0d 1d3n717y.",
+      "button": "C0nf1rm & l1nk"
+    },
+    "success": {
+      "message": "Y0ur 5l4ck 4cc0un7 15 n0w l1nk3d 70 73rr4p0d.",
+      "linkedAs": "L1nk3d 45 <em>{email}</em>. Y0u c4n cl053 7h15 74b 4nd r37urn 70 5l4ck."
+    },
+    "errors": {
+      "missingLink": "M1551ng 0r 1nv4l1d l1nk. 574r7 4g41n w17h 7h3 73rr4p0d l1nk c0mm4nd 1n 5l4ck.",
+      "invalidLink": "7h15 l1nk 15 1nv4l1d, 3xp1r3d, 0r 4lr34dy u53d. 574r7 7h3 l1nk 4g41n fr0m 5l4ck.",
+      "linkingFailed": "L1nk1ng f41l3d."
+    }
+  },
+  "cliComplete": {
+    "loading": "L04d1ng...",
+    "completing": "C0mpl371ng 4u7h3n71c4710n...",
+    "invalid": {
+      "title": "1nv4l1d R3qu357",
+      "description": "M1551ng r3qu1r3d p4r4m373r5."
+    },
+    "success": {
+      "title": "L0g1n 5ucc355ful",
+      "complete": "4P1 70k3n cr3473d. Y0u c4n cl053 7h15 74b."
+    },
+    "fallback": {
+      "description": "C0uld n07 r34ch 7h3 CL1 4u70m471c4lly.",
+      "button": "Cl1ck h3r3 70 c0mpl373 m4nu4lly"
+    },
+    "timeout": {
+      "description": "7h3 CL1 m4y n07 h4v3 c0mpl373d 7h3 70k3n 3xch4ng3. Ch3ck y0ur 73rm1n4l."
+    }
+  },
+  "apiDocs": {
+    "view": "V13w:",
+    "redocTitle": "R3D0c 4P1 D0cum3n74710n"
+  }
+}

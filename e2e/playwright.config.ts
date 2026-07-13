@@ -172,5 +172,13 @@ export default defineConfig({
       testMatch: 'responsive.spec.ts',
       use: { ...devices['Pixel 7'], storageState: ADMIN_AUTH },
     },
+    {
+      // i18n language switcher (#767): proves the nav globe dropdown flips
+      // strings through the real BFF chain (German full catalog + Spanish
+      // fallback + a joke locale), with no MISSING_MESSAGE leak.
+      name: 'i18n',
+      testMatch: 'i18n.spec.ts',
+      use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
+    },
   ],
 });

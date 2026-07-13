@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start --port 3000",
     "lint": "eslint src/",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "i18n:check": "node scripts/check-i18n-completeness.mjs",
+    "i18n:lint": "node scripts/check-no-hardcoded-strings.mjs"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.18",
@@ -21,6 +23,7 @@
     "fflate": "^0.8.3",
     "lucide-react": "^1.24.0",
     "next": "^16.2.10",
+    "next-intl": "^4.13.2",
     "prom-client": "^15.1.3",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",

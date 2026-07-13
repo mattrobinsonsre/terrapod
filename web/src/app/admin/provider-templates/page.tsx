@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import NavBar from '@/components/nav-bar'
 import { PageHeader } from '@/components/page-header'
 import { LoadingSpinner } from '@/components/loading-spinner'
@@ -33,6 +34,7 @@ const EMPTY_FORM = {
 }
 
 export default function ProviderTemplatesPage() {
+  const tr = useTranslations('adminProviderTemplates')
   const router = useRouter()
   const { confirmDelete } = useConfirm()
   const [templates, setTemplates] = useState<ProviderTemplate[]>([])
@@ -61,12 +63,12 @@ export default function ProviderTemplatesPage() {
         setTemplates([])
         return
       }
-      if (!res.ok) throw new Error('Failed to load provider templates')
+      if (!res.ok) throw new Error(tr('errors.load'))
       const data = await res.json()
       setDisabled(false)
       setTemplates(data.data || [])
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load provider templates')
+      setError(err instanceof Error ? err.message : tr('errors.load'))
     } finally {
       setLoading(false)
     }
@@ -108,10 +110,10 @@ export default function ProviderTemplatesPage() {
       try {
         parameters = JSON.parse(f.parametersJson || '[]')
       } catch {
-        throw new Error('Parameters must be valid JSON (an array).')
+        throw new Error(tr('errors.paramsInvalidJson'))
       }
       if (!Array.isArray(parameters)) {
-        throw new Error('Parameters must be a JSON array.')
+        throw new Error(tr('errors.paramsNotArray'))
       }
 
       const attrs: Record<string, unknown> = {
@@ -132,33 +134,37 @@ export default function ProviderTemplatesPage() {
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        throw new Error(data.detail || `Failed to ${editing ? 'update' : 'create'} template (${res.status})`)
+        throw new Error(data.detail || (editing
+          ? tr('errors.updateStatus', { status: res.status })
+          : tr('errors.createStatus', { status: res.status })))
       }
-      setSuccess(`Provider template "${f.name}" ${editing ? 'updated' : 'created'}`)
+      setSuccess(editing
+        ? tr('success.updated', { name: f.name })
+        : tr('success.created', { name: f.name }))
       resetForm()
       setShowForm(false)
       await loadTemplates()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save provider template')
+      setError(err instanceof Error ? err.message : tr('errors.save'))
     } finally {
       setSaving(false)
     }
   }
 
   async function handleDelete(id: string) {
-    if (!confirmDelete('Delete this provider template? Catalog items referencing it will fail to provision. This cannot be undone.')) return
+    if (!confirmDelete(tr('confirm.delete'))) return
     setError(''); setSuccess('')
     try {
       const res = await apiFetch(`/api/terrapod/v1/provider-templates/${id}`, { method: 'DELETE' })
       if (res.status === 409) {
         const data = await res.json().catch(() => ({}))
-        throw new Error(data.detail || 'Cannot delete: this template is referenced by a catalog item.')
+        throw new Error(data.detail || tr('errors.deleteConflict'))
       }
-      if (!res.ok) throw new Error('Failed to delete provider template')
-      setSuccess('Provider template deleted')
+      if (!res.ok) throw new Error(tr('errors.delete'))
+      setSuccess(tr('success.deleted'))
       await loadTemplates()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete provider template')
+      setError(err instanceof Error ? err.message : tr('errors.delete'))
     }
   }
 
@@ -167,14 +173,14 @@ export default function ProviderTemplatesPage() {
       <NavBar />
       <main className="px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto">
         <PageHeader
-          title="Provider Templates"
-          description="Reusable provider configuration blocks for catalog items"
+          title={tr('title')}
+          description={tr('description')}
           actions={!disabled ? (
             <button
               onClick={() => { if (showForm) { setShowForm(false); resetForm() } else startCreate() }}
               className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors btn-smoke"
             >
-              {showForm ? 'Cancel' : 'New Template'}
+              {showForm ? tr('actions.cancel') : tr('actions.new')}
             </button>
           ) : undefined}
         />
@@ -186,7 +192,7 @@ export default function ProviderTemplatesPage() {
 
         {disabled ? (
           <div className="p-4 bg-slate-800/50 text-slate-400 rounded-lg text-sm border border-slate-700/50">
-            Service catalog is not enabled.
+            {tr('notEnabled')}
           </div>
         ) : (
           <>
@@ -194,14 +200,14 @@ export default function ProviderTemplatesPage() {
               <form onSubmit={handleSubmit} className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-4 mb-6 space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label htmlFor="pt-name" className="block text-sm font-medium text-slate-300 mb-1">Name</label>
+                    <label htmlFor="pt-name" className="block text-sm font-medium text-slate-300 mb-1">{tr('form.name')}</label>
                     <input id="pt-name" type="text" value={f.name}
                       onChange={(e) => setF({ ...f, name: e.target.value })} required
                       placeholder="aws-default"
                       className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
                   </div>
                   <div>
-                    <label htmlFor="pt-type" className="block text-sm font-medium text-slate-300 mb-1">Provider type</label>
+                    <label htmlFor="pt-type" className="block text-sm font-medium text-slate-300 mb-1">{tr('form.providerType')}</label>
                     <input id="pt-type" type="text" value={f.providerType}
                       onChange={(e) => setF({ ...f, providerType: e.target.value })} required
                       placeholder="aws"
@@ -210,7 +216,7 @@ export default function ProviderTemplatesPage() {
                 </div>
 
                 <div>
-                  <label htmlFor="pt-body" className="block text-sm font-medium text-slate-300 mb-1">Body (HCL)</label>
+                  <label htmlFor="pt-body" className="block text-sm font-medium text-slate-300 mb-1">{tr('form.body')}</label>
                   <textarea id="pt-body" value={f.body} rows={8}
                     onChange={(e) => setF({ ...f, body: e.target.value })} required
                     placeholder={'provider "aws" {\n  region = var.region\n}'}
@@ -218,22 +224,22 @@ export default function ProviderTemplatesPage() {
                 </div>
 
                 <div>
-                  <label htmlFor="pt-params" className="block text-sm font-medium text-slate-300 mb-1">Parameters (advanced, JSON)</label>
+                  <label htmlFor="pt-params" className="block text-sm font-medium text-slate-300 mb-1">{tr('form.parameters')}</label>
                   <textarea id="pt-params" value={f.parametersJson} rows={5}
                     onChange={(e) => setF({ ...f, parametersJson: e.target.value })}
                     placeholder='[{"name": "region", "type": "string", "required": true}]'
                     className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
-                  <p className="mt-1 text-xs text-slate-500">Each parameter becomes a provision form field. Leave as <code>[]</code> if unused.</p>
+                  <p className="mt-1 text-xs text-slate-500">{tr.rich('form.parametersHint', { code: (chunks) => <code>{chunks}</code> })}</p>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1">Labels</label>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">{tr('form.labels')}</label>
                   <LabelsEditor labels={f.labels} onChange={(labels) => setF({ ...f, labels })} />
                 </div>
 
                 <button type="submit" disabled={saving}
                   className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors">
-                  {saving ? (editId !== null ? 'Saving…' : 'Creating…') : (editId !== null ? 'Save Changes' : 'Create Template')}
+                  {saving ? (editId !== null ? tr('actions.saving') : tr('actions.creating')) : (editId !== null ? tr('actions.saveChanges') : tr('actions.create'))}
                 </button>
               </form>
             )}
@@ -241,16 +247,16 @@ export default function ProviderTemplatesPage() {
             {loading ? (
               <LoadingSpinner />
             ) : templates.length === 0 ? (
-              <EmptyState message="No provider templates yet." />
+              <EmptyState message={tr('empty')} />
             ) : (
               <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-x-auto">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-slate-700/50">
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Name</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider hidden sm:table-cell">Provider type</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider hidden md:table-cell">Parameters</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">Actions</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">{tr('table.name')}</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider hidden sm:table-cell">{tr('table.providerType')}</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider hidden md:table-cell">{tr('table.parameters')}</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">{tr('table.actions')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-700/30">
@@ -267,8 +273,8 @@ export default function ProviderTemplatesPage() {
                         </td>
                         <td className="px-4 py-3 text-right">
                           <div className="flex justify-end gap-2">
-                            <button onClick={() => startEdit(t)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors">Edit</button>
-                            <button onClick={() => handleDelete(t.id)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300 transition-colors">Delete</button>
+                            <button onClick={() => startEdit(t)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors">{tr('actions.edit')}</button>
+                            <button onClick={() => handleDelete(t.id)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300 transition-colors">{tr('actions.delete')}</button>
                           </div>
                         </td>
                       </tr>

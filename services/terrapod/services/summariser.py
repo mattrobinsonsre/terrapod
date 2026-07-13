@@ -796,6 +796,14 @@ def _apply_anthropic_cache_markers(messages: list[dict]) -> list[dict]:
     return out
 
 
+def _output_language() -> str:
+    """Canonical language name to author summaries in, or '' for English/default (#767)."""
+    from terrapod.services.summary_translation import language_name
+
+    name = language_name(settings.ai_summary.summary_language)
+    return name if name and name != "English" else ""
+
+
 def _build_litellm_kwargs(
     *,
     kind: str,
@@ -1320,6 +1328,7 @@ async def _summarise_one(payload: dict, _slack: dict) -> None:
             prompt_suffix=cfg.context.prompt_suffix,
             state_diverged=bool(ws.state_diverged),
             drift_detection=bool(run.is_drift_detection),
+            output_language=_output_language(),
         )
 
         try:
@@ -1698,6 +1707,7 @@ async def post_followup(
         prompt_prefix=cfg.context.prompt_prefix,
         prompt_suffix=cfg.context.prompt_suffix,
         state_diverged=bool(workspace.state_diverged),
+        output_language=_output_language(),
     )
     history = await _build_followup_history(db, plan_summary, text)
 

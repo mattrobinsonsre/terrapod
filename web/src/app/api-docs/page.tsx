@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import NavBar from '@/components/nav-bar'
 import { getAuthState } from '@/lib/auth'
 
 type DocView = 'redoc' | 'swagger'
 
 export default function ApiDocsPage() {
+  const t = useTranslations('apiDocs')
   const router = useRouter()
   const [view, setView] = useState<DocView>('redoc')
 
@@ -24,7 +26,7 @@ export default function ApiDocsPage() {
       <NavBar />
       <div className="flex flex-col" style={{ height: 'calc(100dvh - 57px)' }}>
         <div className="flex items-center gap-2 px-4 py-2 border-b border-slate-800 bg-slate-900/60">
-          <span className="text-sm font-medium text-slate-400 mr-2">View:</span>
+          <span className="text-sm font-medium text-slate-400 mr-2">{t('view')}</span>
           <button
             onClick={() => setView('redoc')}
             className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
@@ -58,7 +60,7 @@ export default function ApiDocsPage() {
           key={src}
           src={src}
           className="flex-1 w-full border-0"
-          title={view === 'swagger' ? 'Swagger UI' : 'ReDoc API Documentation'}
+          title={view === 'swagger' ? 'Swagger UI' : t('redocTitle')}
         />
       </div>
     </>

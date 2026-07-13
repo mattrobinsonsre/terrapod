@@ -2,7 +2,9 @@
 
 import { Suspense, useEffect, useRef, useState, useCallback, useMemo, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import Link from 'next/link'
+import { useFormat } from '@/lib/format'
 import NavBar from '@/components/nav-bar'
 import { PageHeader } from '@/components/page-header'
 import { ConnectionStatus } from '@/components/connection-status'
@@ -74,6 +76,20 @@ interface Workspace {
 function WorkspacesPageInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const t = useTranslations('workspaces')
+  const ts = useTranslations('status')
+  const fmt = useFormat()
+  // Translate a filter-suggestion's category hint (its stable English key stays
+  // the internal value; only the displayed label is localized).
+  const hintLabel = (hint: string) => {
+    switch (hint) {
+      case 'status': return t('filter.hintStatus')
+      case 'health': return t('filter.hintHealth')
+      case 'label': return t('filter.hintLabel')
+      case 'label key': return t('filter.hintLabelKey')
+      default: return t('filter.hintName')
+    }
+  }
   const [workspaces, setWorkspaces] = useState<Workspace[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -445,11 +461,11 @@ function WorkspacesPageInner() {
   async function loadWorkspaces() {
     try {
       const res = await apiFetch('/api/v2/organizations/default/workspaces')
-      if (!res.ok) throw new Error('Failed to load workspaces')
+      if (!res.ok) throw new Error(t('loadFailed'))
       const data = await res.json()
       setWorkspaces(data.data || [])
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load workspaces')
+      setError(err instanceof Error ? err.message : t('loadFailed'))
     } finally {
       setLoading(false)
     }
@@ -491,7 +507,7 @@ function WorkspacesPageInner() {
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        throw new Error(data.detail || `Failed to create workspace (${res.status})`)
+        throw new Error(data.detail || `${t('createFailed')} (${res.status})`)
       }
       setNewName('')
       setNewExecMode('local')
@@ -508,7 +524,7 @@ function WorkspacesPageInner() {
       setShowCreate(false)
       await loadWorkspaces()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create workspace')
+      setError(err instanceof Error ? err.message : t('createFailed'))
     } finally {
       setCreating(false)
     }
@@ -519,8 +535,8 @@ function WorkspacesPageInner() {
       <NavBar />
       <main className="px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto">
         <PageHeader
-          title="Workspaces"
-          description="Manage Terraform workspaces, state, and runs"
+          title={t('title')}
+          description={t('description')}
           actions={
             <div className="flex items-center gap-3">
               <ConnectionStatus connected={sseConnected} />
@@ -528,7 +544,7 @@ function WorkspacesPageInner() {
                 onClick={() => setShowCreate(!showCreate)}
                 className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors btn-smoke"
               >
-                {showCreate ? 'Cancel' : 'New Workspace'}
+                {showCreate ? t('cancel') : t('new')}
               </button>
             </div>
           }
@@ -540,7 +556,7 @@ function WorkspacesPageInner() {
           <form onSubmit={handleCreate} className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-4 mb-6 space-y-3">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               <div>
-                <label htmlFor="ws-name" className="block text-sm font-medium text-slate-300 mb-1">Name</label>
+                <label htmlFor="ws-name" className="block text-sm font-medium text-slate-300 mb-1">{t('form.name')}</label>
                 <input
                   id="ws-name"
                   type="text"
@@ -548,25 +564,25 @@ function WorkspacesPageInner() {
                   onChange={(e) => setNewName(e.target.value)}
                   required
                   pattern="[a-zA-Z0-9][a-zA-Z0-9_\-]*"
-                  title="Letters, numbers, hyphens, and underscores only. Must start with a letter or number."
-                  placeholder="my-workspace"
+                  title={t('form.namePattern')}
+                  placeholder={t('form.namePlaceholder')}
                   className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                 />
               </div>
               <div>
-                <label htmlFor="ws-exec" className="block text-sm font-medium text-slate-300 mb-1">Execution Mode</label>
+                <label htmlFor="ws-exec" className="block text-sm font-medium text-slate-300 mb-1">{t('form.executionMode')}</label>
                 <select
                   id="ws-exec"
                   value={newExecMode}
                   onChange={(e) => setNewExecMode(e.target.value)}
                   className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                 >
-                  <option value="local">Local</option>
-                  <option value="agent">Agent</option>
+                  <option value="local">{t('form.local')}</option>
+                  <option value="agent">{t('form.agent')}</option>
                 </select>
               </div>
               <div>
-                <label htmlFor="ws-backend" className="block text-sm font-medium text-slate-300 mb-1">Execution Backend</label>
+                <label htmlFor="ws-backend" className="block text-sm font-medium text-slate-300 mb-1">{t('form.executionBackend')}</label>
                 <select
                   id="ws-backend"
                   value={newBackend}
@@ -578,7 +594,7 @@ function WorkspacesPageInner() {
                 </select>
               </div>
               <div>
-                <label htmlFor="ws-version" className="block text-sm font-medium text-slate-300 mb-1">Version</label>
+                <label htmlFor="ws-version" className="block text-sm font-medium text-slate-300 mb-1">{t('form.version')}</label>
                 <input
                   id="ws-version"
                   type="text"
@@ -586,8 +602,8 @@ function WorkspacesPageInner() {
                   value={newVersion}
                   onChange={(e) => setNewVersion(e.target.value)}
                   pattern="[0-9]+\.[0-9]+(\.[0-9]+)?"
-                  title="Version in X.Y or X.Y.Z format (e.g. 1.11 or 1.11.5)"
-                  placeholder="e.g. 1.11 or 1.11.5"
+                  title={t('form.versionTitle')}
+                  placeholder={t('form.versionPlaceholder')}
                   className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                 />
                 <datalist id="version-suggestions">
@@ -597,43 +613,43 @@ function WorkspacesPageInner() {
                 </datalist>
               </div>
               <div>
-                <label htmlFor="ws-cpu" className="block text-sm font-medium text-slate-300 mb-1">CPU Request</label>
+                <label htmlFor="ws-cpu" className="block text-sm font-medium text-slate-300 mb-1">{t('form.cpuRequest')}</label>
                 <input
                   id="ws-cpu"
                   type="text"
                   value={newCpu}
                   onChange={(e) => setNewCpu(e.target.value)}
                   pattern="[0-9]+m|[0-9]+(\.[0-9]+)?"
-                  title="Kubernetes CPU quantity: whole cores (1, 2) or millicores (500m, 100m)"
+                  title={t('form.cpuTitle')}
                   placeholder="1"
                   className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                 />
-                <p className="mt-1 text-xs text-slate-500">e.g. 1, 0.5, 500m</p>
+                <p className="mt-1 text-xs text-slate-500">{t('form.cpuHint')}</p>
               </div>
               <div>
-                <label htmlFor="ws-mem" className="block text-sm font-medium text-slate-300 mb-1">Memory Request</label>
+                <label htmlFor="ws-mem" className="block text-sm font-medium text-slate-300 mb-1">{t('form.memoryRequest')}</label>
                 <input
                   id="ws-mem"
                   type="text"
                   value={newMemory}
                   onChange={(e) => setNewMemory(e.target.value)}
                   pattern="[0-9]+(Ki|Mi|Gi|Ti|Pi|Ei|k|M|G|T|P|E|m)?"
-                  title="Kubernetes memory quantity: bytes (1000) or with suffix (512Mi, 2Gi, 1Ti)"
+                  title={t('form.memoryTitle')}
                   placeholder="2Gi"
                   className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                 />
-                <p className="mt-1 text-xs text-slate-500">e.g. 2Gi, 512Mi, 1Ti</p>
+                <p className="mt-1 text-xs text-slate-500">{t('form.memoryHint')}</p>
               </div>
               {newExecMode === 'agent' && (
               <div>
-                <label htmlFor="ws-pool" className="block text-sm font-medium text-slate-300 mb-1">Agent Pool</label>
+                <label htmlFor="ws-pool" className="block text-sm font-medium text-slate-300 mb-1">{t('form.agentPool')}</label>
                 <select
                   id="ws-pool"
                   value={newAgentPoolId}
                   onChange={(e) => setNewAgentPoolId(e.target.value)}
                   className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                 >
-                  <option value="">None</option>
+                  <option value="">{t('form.none')}</option>
                   {agentPools.map((p) => (
                     <option key={p.id} value={p.id}>{p.attributes.name}</option>
                   ))}
@@ -641,7 +657,7 @@ function WorkspacesPageInner() {
               </div>
               )}
               <div>
-                <span className="block text-sm font-medium text-slate-300 mb-1">Auto Apply</span>
+                <span className="block text-sm font-medium text-slate-300 mb-1">{t('form.autoApply')}</span>
                 <label className="flex items-center gap-2 h-[42px] px-3 cursor-pointer border border-slate-600 rounded-lg bg-slate-700">
                   <input
                     type="checkbox"
@@ -649,58 +665,58 @@ function WorkspacesPageInner() {
                     onChange={(e) => setNewAutoApply(e.target.checked)}
                     className="rounded border-slate-600 bg-slate-700 text-brand-600 focus:ring-brand-500"
                   />
-                  <span className="text-sm text-slate-300">Enabled</span>
+                  <span className="text-sm text-slate-300">{t('form.enabled')}</span>
                 </label>
               </div>
               <div>
-                <label htmlFor="ws-workdir" className="block text-sm font-medium text-slate-300 mb-1">Working Directory</label>
+                <label htmlFor="ws-workdir" className="block text-sm font-medium text-slate-300 mb-1">{t('form.workingDirectory')}</label>
                 <input
                   id="ws-workdir"
                   type="text"
                   value={newWorkingDir}
                   onChange={(e) => setNewWorkingDir(e.target.value)}
-                  placeholder="e.g. environments/dev"
+                  placeholder={t('form.workingDirectoryPlaceholder')}
                   className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                 />
-                <p className="mt-1 text-xs text-slate-500">Subdirectory within repo containing .tf files</p>
+                <p className="mt-1 text-xs text-slate-500">{t('form.workingDirectoryHint')}</p>
               </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               <div>
-                <label htmlFor="ws-vcs-conn" className="block text-sm font-medium text-slate-300 mb-1">VCS Connection</label>
+                <label htmlFor="ws-vcs-conn" className="block text-sm font-medium text-slate-300 mb-1">{t('form.vcsConnection')}</label>
                 <select
                   id="ws-vcs-conn"
                   value={newVcsConnectionId}
                   onChange={(e) => setNewVcsConnectionId(e.target.value)}
                   className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                 >
-                  <option value="">None</option>
+                  <option value="">{t('form.none')}</option>
                   {vcsConnections.map((c) => (
                     <option key={c.id} value={c.id}>{c.attributes.name} ({c.attributes.provider})</option>
                   ))}
                 </select>
               </div>
               <div>
-                <label htmlFor="ws-vcs-repo" className="block text-sm font-medium text-slate-300 mb-1">VCS Repository URL</label>
+                <label htmlFor="ws-vcs-repo" className="block text-sm font-medium text-slate-300 mb-1">{t('form.vcsRepoUrl')}</label>
                 <input
                   id="ws-vcs-repo"
                   type="text"
                   value={newVcsRepoUrl}
                   onChange={(e) => setNewVcsRepoUrl(e.target.value)}
                   pattern="https?://.+"
-                  title="Must be an HTTP or HTTPS URL"
-                  placeholder="https://github.com/org/repo"
+                  title={t('form.vcsRepoUrlTitle')}
+                  placeholder={t('form.vcsRepoUrlPlaceholder')}
                   className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                 />
               </div>
               <div>
-                <label htmlFor="ws-vcs-branch" className="block text-sm font-medium text-slate-300 mb-1">VCS Branch</label>
+                <label htmlFor="ws-vcs-branch" className="block text-sm font-medium text-slate-300 mb-1">{t('form.vcsBranch')}</label>
                 <input
                   id="ws-vcs-branch"
                   type="text"
                   value={newVcsBranch}
                   onChange={(e) => setNewVcsBranch(e.target.value)}
-                  placeholder="main (default)"
+                  placeholder={t('form.vcsBranchPlaceholder')}
                   className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                 />
               </div>
@@ -710,7 +726,7 @@ function WorkspacesPageInner() {
               disabled={creating}
               className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors"
             >
-              {creating ? 'Creating...' : 'Create Workspace'}
+              {creating ? t('creating') : t('create')}
             </button>
           </form>
         )}
@@ -725,8 +741,8 @@ function WorkspacesPageInner() {
             t => t.kind === 'status' && t.value !== HEALTH_ISSUE_STATUS && t.value !== LOCKED_STATUS,
           ).length
           const healthLabel = healthFilterActive
-            ? 'Clear health issues filter'
-            : 'Filter to workspaces with health issues'
+            ? t('stats.clearHealthFilter')
+            : t('stats.filterHealth')
           return (
             <div className="mb-4">
               {/* Compact toolbar (#719): stat chips + Status/Label share one
@@ -736,14 +752,14 @@ function WorkspacesPageInner() {
                   `status:unhealthy` filter. No big stat cards on any viewport. */}
               <div className="flex flex-wrap items-center gap-2">
                 <StatChip
-                  label="Total"
+                  label={t('stats.total')}
                   value={total}
                   onClick={parsedFilter.terms.length > 0 ? () => setFilterInput('') : undefined}
-                  ariaLabel="Clear all filters"
+                  ariaLabel={t('stats.clearAllFilters')}
                   className="order-1 max-sm:hidden"
                 />
                 <StatChip
-                  label="Health"
+                  label={t('stats.health')}
                   value={withConditions}
                   valueClassName={withConditions > 0 ? 'text-red-400' : 'text-slate-300'}
                   onClick={withConditions > 0 ? toggleHealth : undefined}
@@ -752,13 +768,13 @@ function WorkspacesPageInner() {
                   className="order-2"
                 />
                 <StatChip
-                  label="Locked"
+                  label={t('stats.locked')}
                   value={locked}
                   valueClassName={locked > 0 ? 'text-amber-400' : undefined}
                   onClick={locked > 0 ? toggleLocked : undefined}
                   active={lockedFilterActive}
                   activeClassName="bg-amber-500/10 border-amber-500/50"
-                  ariaLabel={lockedFilterActive ? 'Clear locked filter' : 'Filter to locked workspaces'}
+                  ariaLabel={lockedFilterActive ? t('stats.clearLockedFilter') : t('stats.filterLocked')}
                   className="order-3 max-sm:hidden"
                 />
                 <div className="order-4 flex-1 min-w-0" />
@@ -773,8 +789,8 @@ function WorkspacesPageInner() {
                     onFocus={() => { if (currentToken.trim()) setSuggestOpen(true) }}
                     onKeyDown={onFilterKeyDown}
                     ref={filterInputRef}
-                    placeholder='Filter by name, label, or status — e.g. "eu1", "env:prod", "status:errored"'
-                    aria-label="Filter workspaces"
+                    placeholder={t('filter.placeholder')}
+                    aria-label={t('filter.ariaLabel')}
                     role="combobox"
                     aria-expanded={suggestOpen && suggestions.length > 0}
                     aria-autocomplete="list"
@@ -813,7 +829,7 @@ function WorkspacesPageInner() {
                           {typeof s.count === 'number' && (
                             <span className="text-[10px] text-slate-500">{s.count}</span>
                           )}
-                          <span className="text-[10px] uppercase tracking-wide text-slate-500">{s.hint}</span>
+                          <span className="text-[10px] uppercase tracking-wide text-slate-500">{hintLabel(s.hint)}</span>
                         </button>
                       ))}
                     </div>
@@ -825,7 +841,7 @@ function WorkspacesPageInner() {
                       onClick={() => setFilterInput('')}
                       className="px-3 py-2 rounded-lg text-sm text-slate-400 hover:text-slate-200 transition-colors whitespace-nowrap flex-shrink-0"
                     >
-                      Clear
+                      {t('filter.clear')}
                     </button>
                   )}
                 </div>
@@ -845,7 +861,7 @@ function WorkspacesPageInner() {
                         : 'bg-slate-800/50 text-slate-300 border-slate-700/50 hover:bg-slate-700/60')
                     }
                   >
-                    <span>Status</span>
+                    <span>{t('filter.status')}</span>
                     {activeStatusCount > 0 && (
                       <span className="inline-flex items-center justify-center min-w-5 px-1.5 rounded-full text-[10px] font-semibold bg-brand-600 text-white">
                         {activeStatusCount}
@@ -881,7 +897,7 @@ function WorkspacesPageInner() {
                               {active ? '✓' : ''}
                             </span>
                             <span className={'w-1.5 h-1.5 rounded-full ' + opt.dot} />
-                            <span className="flex-1 text-left">{opt.label}</span>
+                            <span className="flex-1 text-left">{ts(opt.filter)}</span>
                             <span className={'text-xs ' + (count > 0 ? 'text-slate-400' : 'text-slate-600')}>{count}</span>
                           </button>
                         )
@@ -914,7 +930,7 @@ function WorkspacesPageInner() {
                               : 'bg-slate-800/50 text-slate-300 border-slate-700/50 hover:bg-slate-700/60')
                           }
                         >
-                          <span>Label</span>
+                          <span>{t('filter.label')}</span>
                           {activeLabelCount > 0 && (
                             <span className="inline-flex items-center justify-center min-w-5 px-1.5 rounded-full text-[10px] font-semibold bg-brand-600 text-white">
                               {activeLabelCount}
@@ -935,7 +951,7 @@ function WorkspacesPageInner() {
                                 className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-700/40 transition-colors"
                               >
                                 <span className="flex-1 text-left font-mono text-xs">{k}</span>
-                                <span className="text-xs text-slate-500">{labelIndex.get(k)?.size || 0} value{(labelIndex.get(k)?.size || 0) === 1 ? '' : 's'}</span>
+                                <span className="text-xs text-slate-500">{t('filter.valueCount', { count: labelIndex.get(k)?.size || 0 })}</span>
                                 <span aria-hidden className="text-slate-500">›</span>
                               </button>
                             ))}
@@ -949,7 +965,7 @@ function WorkspacesPageInner() {
                               className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-slate-400 hover:bg-slate-700/40 transition-colors border-b border-slate-700/50"
                             >
                               <span aria-hidden>‹</span>
-                              <span>back</span>
+                              <span>{t('filter.back')}</span>
                               <span className="ml-auto font-mono text-slate-500">{labelMenuKey}</span>
                             </button>
                             {Array.from(labelIndex.get(labelMenuKey)?.entries() || [])
@@ -988,19 +1004,19 @@ function WorkspacesPageInner() {
                   {parsedFilter.terms.map((term, i) => {
                     const label =
                       term.kind === 'name'
-                        ? `name: ${term.value}`
+                        ? t('filter.termName', { value: term.value })
                         : term.kind === 'status'
-                          ? `status: ${term.value}`
+                          ? t('filter.termStatus', { value: term.value })
                           : term.value === null
-                            ? `${term.key}: (any)`
-                            : `${term.key}: ${term.value}`
+                            ? t('filter.termLabelAny', { key: term.key })
+                            : t('filter.termLabel', { key: term.key, value: term.value })
                     return (
                       <button
                         type="button"
                         key={`${i}-${label}`}
                         onClick={() => setFilterInput(serializeFilter(removeTerm(parsedFilter, i)))}
                         className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-slate-700/50 text-slate-300 hover:bg-slate-700 transition-colors"
-                        title="Remove this term"
+                        title={t('filter.removeTerm')}
                       >
                         <span>{label}</span>
                         <span aria-hidden className="text-slate-500">×</span>
@@ -1008,7 +1024,7 @@ function WorkspacesPageInner() {
                     )
                   })}
                   <span className="text-xs text-slate-500 self-center">
-                    Showing {filteredWorkspaces.length} of {workspaces.length}
+                    {t('filter.showing', { filtered: filteredWorkspaces.length, total: workspaces.length })}
                   </span>
                 </div>
               )}
@@ -1019,20 +1035,20 @@ function WorkspacesPageInner() {
         {loading ? (
           <LoadingSpinner />
         ) : workspaces.length === 0 ? (
-          <EmptyState message="No workspaces yet. Create one to get started." />
+          <EmptyState message={t('empty.none')} />
         ) : filteredWorkspaces.length === 0 ? (
-          <EmptyState message="No workspaces match this filter." />
+          <EmptyState message={t('empty.noMatch')} />
         ) : (
           <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-hidden">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-slate-700/50">
-                  <SortableHeader label="Name" sortKey="name" sortState={sortState} onSort={toggleSort} />
-                  <SortableHeader label="Mode" sortKey="mode" sortState={sortState} onSort={toggleSort} className="hidden sm:table-cell" />
-                  <SortableHeader label="Pool" sortKey="pool" sortState={sortState} onSort={toggleSort} className="hidden md:table-cell" />
-                  <SortableHeader label="Resources" sortKey="resources" sortState={sortState} onSort={toggleSort} className="hidden lg:table-cell" />
-                  <SortableHeader label="Status" sortKey="status" sortState={sortState} onSort={toggleSort} className="hidden lg:table-cell" />
-                  <SortableHeader label="Created" sortKey="created" sortState={sortState} onSort={toggleSort} className="hidden xl:table-cell" />
+                  <SortableHeader label={t('table.name')} sortKey="name" sortState={sortState} onSort={toggleSort} />
+                  <SortableHeader label={t('table.mode')} sortKey="mode" sortState={sortState} onSort={toggleSort} className="hidden sm:table-cell" />
+                  <SortableHeader label={t('table.pool')} sortKey="pool" sortState={sortState} onSort={toggleSort} className="hidden md:table-cell" />
+                  <SortableHeader label={t('table.resources')} sortKey="resources" sortState={sortState} onSort={toggleSort} className="hidden lg:table-cell" />
+                  <SortableHeader label={t('table.status')} sortKey="status" sortState={sortState} onSort={toggleSort} className="hidden lg:table-cell" />
+                  <SortableHeader label={t('table.created')} sortKey="created" sortState={sortState} onSort={toggleSort} className="hidden xl:table-cell" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-700/30">
@@ -1063,7 +1079,7 @@ function WorkspacesPageInner() {
                                       ? 'bg-brand-700/60 text-brand-100 hover:bg-brand-700'
                                       : 'bg-slate-700/40 text-slate-400 hover:bg-slate-700/80 hover:text-slate-200')
                                   }
-                                  title={active ? 'Click to remove from filter' : 'Click to filter by this label'}
+                                  title={active ? t('row.removeLabelFilter') : t('row.addLabelFilter')}
                                 >
                                   <span className="text-slate-500">{k}:</span>
                                   <span className="ml-0.5">{v}</span>
@@ -1100,7 +1116,7 @@ function WorkspacesPageInner() {
                     </td>
                     <td className="px-4 py-3 hidden lg:table-cell">
                       <span className="text-xs text-slate-400">
-                        {ws.attributes['resource-cpu']} CPU / {ws.attributes['resource-memory']}
+                        {t('table.resourcesValue', { cpu: ws.attributes['resource-cpu'], memory: ws.attributes['resource-memory'] })}
                       </span>
                     </td>
                     <td className="px-4 py-3 hidden lg:table-cell">
@@ -1113,7 +1129,7 @@ function WorkspacesPageInner() {
                     </td>
                     <td className="px-4 py-3 hidden xl:table-cell">
                       <span className="text-xs text-slate-500">
-                        {ws.attributes['created-at'] ? new Date(ws.attributes['created-at']).toLocaleDateString() : ''}
+                        {fmt.date(ws.attributes['created-at'])}
                       </span>
                     </td>
                   </tr>

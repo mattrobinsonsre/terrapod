@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import NavBar from '@/components/nav-bar'
 import { PageHeader } from '@/components/page-header'
 import { ErrorBanner } from '@/components/error-banner'
@@ -68,14 +69,15 @@ const inputCls =
   'w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent'
 const labelCls = 'block text-sm font-medium text-slate-300 mb-1'
 
-function fmtVal(v: unknown): string {
-  if (v === null || v === undefined) return '(none)'
+function fmtVal(v: unknown, noneLabel: string): string {
+  if (v === null || v === undefined) return noneLabel
   if (typeof v === 'object') return JSON.stringify(v)
   return String(v)
 }
 
 export default function BulkUpdatePage() {
   const router = useRouter()
+  const t = useTranslations('adminBulkUpdate')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [pools, setPools] = useState<AgentPool[]>([])
@@ -185,11 +187,11 @@ export default function BulkUpdatePage() {
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        throw new Error(data.detail || `Search failed (${res.status})`)
+        throw new Error(data.detail || t('errors.searchFailed', { status: res.status }))
       }
       setSearchResult(await res.json())
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Search failed')
+      setError(err instanceof Error ? err.message : t('errors.search'))
     } finally {
       setSearching(false)
     }
@@ -212,13 +214,13 @@ export default function BulkUpdatePage() {
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        throw new Error(data.detail || `Bulk update failed (${res.status})`)
+        throw new Error(data.detail || t('errors.bulkUpdateFailed', { status: res.status }))
       }
       const json = await res.json()
       if (json.dry_run) setDryResult(json as DryRunResult)
       else setApplyResult(json as ApplyResult)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Bulk update failed')
+      setError(err instanceof Error ? err.message : t('errors.bulkUpdate'))
     } finally {
       setSubmitting(false)
       setConfirmApply(false)
@@ -250,8 +252,8 @@ export default function BulkUpdatePage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-700/50 text-left text-xs text-slate-400 uppercase">
-                <th className="px-4 py-2">Workspace</th>
-                <th className="px-4 py-2">Changes</th>
+                <th className="px-4 py-2">{t('diff.colWorkspace')}</th>
+                <th className="px-4 py-2">{t('diff.colChanges')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-700/30">
@@ -272,12 +274,12 @@ export default function BulkUpdatePage() {
                             <span className="text-slate-400">{k}</span>:{' '}
                             {isFromTo ? (
                               <>
-                                <span className="text-red-300">{fmtVal(fv.from)}</span>
+                                <span className="text-red-300">{fmtVal(fv.from, t('none'))}</span>
                                 <span className="text-slate-500"> &rarr; </span>
-                                <span className="text-green-300">{fmtVal(fv.to)}</span>
+                                <span className="text-green-300">{fmtVal(fv.to, t('none'))}</span>
                               </>
                             ) : (
-                              <span className="text-green-300">{fmtVal(v)}</span>
+                              <span className="text-green-300">{fmtVal(v, t('none'))}</span>
                             )}
                           </li>
                         )
@@ -298,8 +300,8 @@ export default function BulkUpdatePage() {
       <NavBar />
       <main className="px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto">
         <PageHeader
-          title="Bulk Update"
-          description="Select workspaces by filter, then apply a settings change across all of them"
+          title={t('title')}
+          description={t('description')}
         />
 
         {error && <ErrorBanner message={error} />}
@@ -309,14 +311,14 @@ export default function BulkUpdatePage() {
           onSubmit={handleSearch}
           className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-4 mb-6 space-y-3"
         >
-          <h2 className="text-lg font-semibold text-slate-100">1. Select workspaces</h2>
+          <h2 className="text-lg font-semibold text-slate-100">{t('filter.heading')}</h2>
           <label className="flex items-center gap-2 text-sm text-slate-300">
             <input
               type="checkbox"
               checked={fAll}
               onChange={(e) => setFAll(e.target.checked)}
             />
-            Match <strong>all</strong> workspaces (ignores the filters below)
+            {t.rich('filter.matchAll', { strong: (c) => <strong>{c}</strong> })}
           </label>
           <fieldset
             disabled={fAll}
@@ -324,7 +326,7 @@ export default function BulkUpdatePage() {
           >
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
-                <label className={labelCls}>Name prefix</label>
+                <label className={labelCls}>{t('filter.namePrefix')}</label>
                 <input
                   type="text"
                   value={fNamePrefix}
@@ -334,19 +336,19 @@ export default function BulkUpdatePage() {
                 />
               </div>
               <div>
-                <label className={labelCls}>Execution backend</label>
+                <label className={labelCls}>{t('filter.executionBackend')}</label>
                 <select
                   value={fExecBackend}
                   onChange={(e) => setFExecBackend(e.target.value)}
                   className={inputCls}
                 >
-                  <option value="">(any)</option>
+                  <option value="">{t('anyOption')}</option>
                   <option value="tofu">tofu</option>
                   <option value="terraform">terraform</option>
                 </select>
               </div>
               <div>
-                <label className={labelCls}>Owner email</label>
+                <label className={labelCls}>{t('filter.ownerEmail')}</label>
                 <input
                   type="text"
                   value={fOwnerEmail}
@@ -356,13 +358,13 @@ export default function BulkUpdatePage() {
                 />
               </div>
               <div>
-                <label className={labelCls}>Agent pool</label>
+                <label className={labelCls}>{t('filter.agentPool')}</label>
                 <select
                   value={fAgentPoolId}
                   onChange={(e) => setFAgentPoolId(e.target.value)}
                   className={inputCls}
                 >
-                  <option value="">(any)</option>
+                  <option value="">{t('anyOption')}</option>
                   {pools.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.attributes.name}
@@ -371,13 +373,13 @@ export default function BulkUpdatePage() {
                 </select>
               </div>
               <div>
-                <label className={labelCls}>VCS connection</label>
+                <label className={labelCls}>{t('filter.vcsConnection')}</label>
                 <select
                   value={fVcsConnId}
                   onChange={(e) => setFVcsConnId(e.target.value)}
                   className={inputCls}
                 >
-                  <option value="">(any)</option>
+                  <option value="">{t('anyOption')}</option>
                   {connections.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.attributes.name} ({c.attributes.provider})
@@ -387,7 +389,7 @@ export default function BulkUpdatePage() {
               </div>
             </div>
             <div>
-              <label className={labelCls}>Labels</label>
+              <label className={labelCls}>{t('filter.labels')}</label>
               <LabelsEditor labels={fLabels} onChange={setFLabels} />
             </div>
           </fieldset>
@@ -396,28 +398,30 @@ export default function BulkUpdatePage() {
             disabled={searching || loading}
             className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors"
           >
-            {searching ? 'Searching...' : 'Search'}
+            {searching ? t('filter.searching') : t('filter.search')}
           </button>
         </form>
 
         {searchResult && (
           <div className="mb-6">
             <p className="text-sm text-slate-400 mb-2">
-              Matched <strong className="text-slate-200">{searchResult.matched}</strong>{' '}
-              workspace(s).
+              {t.rich('results.matched', {
+                count: searchResult.matched,
+                strong: (c) => <strong className="text-slate-200">{c}</strong>,
+              })}
             </p>
             {searchResult.workspaces.length === 0 ? (
-              <EmptyState message="No workspaces matched this filter." />
+              <EmptyState message={t('results.noMatch')} />
             ) : (
               <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-slate-700/50 text-left text-xs text-slate-400 uppercase">
-                      <th className="px-4 py-2">Name</th>
-                      <th className="px-4 py-2">Mode</th>
-                      <th className="px-4 py-2">Backend</th>
-                      <th className="px-4 py-2 hidden sm:table-cell">TF version</th>
-                      <th className="px-4 py-2 hidden md:table-cell">Labels</th>
+                      <th className="px-4 py-2">{t('results.colName')}</th>
+                      <th className="px-4 py-2">{t('results.colMode')}</th>
+                      <th className="px-4 py-2">{t('results.colBackend')}</th>
+                      <th className="px-4 py-2 hidden sm:table-cell">{t('results.colTfVersion')}</th>
+                      <th className="px-4 py-2 hidden md:table-cell">{t('results.colLabels')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-700/30">
@@ -446,67 +450,66 @@ export default function BulkUpdatePage() {
           onSubmit={handleSubmit}
           className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-4 mb-6 space-y-4"
         >
-          <h2 className="text-lg font-semibold text-slate-100">2. Apply changes</h2>
+          <h2 className="text-lg font-semibold text-slate-100">{t('update.heading')}</h2>
           <p className="text-xs text-slate-500">
-            Only fields you set below are changed. The filter above selects which
-            workspaces receive the change.
+            {t('update.hint')}
           </p>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
-              <label className={labelCls}>Terraform version</label>
+              <label className={labelCls}>{t('update.terraformVersion')}</label>
               <input
                 type="text"
                 value={uTfVersion}
                 onChange={(e) => setUTfVersion(e.target.value)}
-                placeholder="(unchanged)"
+                placeholder={t('unchanged')}
                 className={inputCls}
               />
             </div>
             <div>
-              <label className={labelCls}>Execution backend</label>
+              <label className={labelCls}>{t('update.executionBackend')}</label>
               <select
                 value={uExecBackend}
                 onChange={(e) => setUExecBackend(e.target.value)}
                 className={inputCls}
               >
-                <option value="">(unchanged)</option>
+                <option value="">{t('unchangedOption')}</option>
                 <option value="tofu">tofu</option>
                 <option value="terraform">terraform</option>
               </select>
             </div>
             <div>
-              <label className={labelCls}>Execution mode</label>
+              <label className={labelCls}>{t('update.executionMode')}</label>
               <select
                 value={uExecMode}
                 onChange={(e) => setUExecMode(e.target.value)}
                 className={inputCls}
               >
-                <option value="">(unchanged)</option>
+                <option value="">{t('unchangedOption')}</option>
                 <option value="local">local</option>
                 <option value="agent">agent</option>
               </select>
             </div>
             <div>
-              <label className={labelCls}>Auto-apply</label>
+              <label className={labelCls}>{t('update.autoApply')}</label>
               <select
                 value={uAutoApply}
                 onChange={(e) => setUAutoApply(e.target.value)}
                 className={inputCls}
               >
-                <option value="">(unchanged)</option>
+                <option value="">{t('unchangedOption')}</option>
                 <option value="true">true</option>
                 <option value="false">false</option>
               </select>
             </div>
             <div>
-              <label className={labelCls}>Agent pool</label>
+              <label className={labelCls}>{t('update.agentPool')}</label>
               <select
                 value={uAgentPoolId}
                 onChange={(e) => setUAgentPoolId(e.target.value)}
                 className={inputCls}
               >
-                <option value="">(unchanged)</option>
+                <option value="">{t('unchangedOption')}</option>
                 {pools.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.attributes.name}
@@ -515,22 +518,22 @@ export default function BulkUpdatePage() {
               </select>
             </div>
             <div>
-              <label className={labelCls}>CPU request</label>
+              <label className={labelCls}>{t('update.cpuRequest')}</label>
               <input
                 type="text"
                 value={uResourceCpu}
                 onChange={(e) => setUResourceCpu(e.target.value)}
-                placeholder="(unchanged)"
+                placeholder={t('unchanged')}
                 className={inputCls}
               />
             </div>
             <div>
-              <label className={labelCls}>Memory request</label>
+              <label className={labelCls}>{t('update.memoryRequest')}</label>
               <input
                 type="text"
                 value={uResourceMemory}
                 onChange={(e) => setUResourceMemory(e.target.value)}
-                placeholder="(unchanged)"
+                placeholder={t('unchanged')}
                 className={inputCls}
               />
             </div>
@@ -543,7 +546,7 @@ export default function BulkUpdatePage() {
                 checked={uSetLabels}
                 onChange={(e) => setUSetLabels(e.target.checked)}
               />
-              Set labels (replaces the labels map on every matched workspace)
+              {t('update.setLabels')}
             </label>
             {uSetLabels && <LabelsEditor labels={uLabels} onChange={setULabels} />}
           </div>
@@ -555,14 +558,14 @@ export default function BulkUpdatePage() {
                 checked={uSetVarFiles}
                 onChange={(e) => setUSetVarFiles(e.target.checked)}
               />
-              Set var files
+              {t('update.setVarFiles')}
             </label>
             {uSetVarFiles && (
               <StringListEditor
                 values={uVarFiles}
                 onChange={setUVarFiles}
                 placeholder="env/prod.tfvars"
-                addLabel="Add var file"
+                addLabel={t('update.addVarFile')}
               />
             )}
           </div>
@@ -574,7 +577,7 @@ export default function BulkUpdatePage() {
                 checked={uSetRunTasks}
                 onChange={(e) => setUSetRunTasks(e.target.checked)}
               />
-              Set run tasks (upserted by name on every matched workspace)
+              {t('update.setRunTasks')}
             </label>
             {uSetRunTasks && (
               <RunTaskTemplatesEditor items={uRunTasks} onChange={setURunTasks} />
@@ -588,7 +591,7 @@ export default function BulkUpdatePage() {
                 checked={uSetNotifications}
                 onChange={(e) => setUSetNotifications(e.target.checked)}
               />
-              Set notification configurations (upserted by name)
+              {t('update.setNotifications')}
             </label>
             {uSetNotifications && (
               <NotificationTemplatesEditor
@@ -608,26 +611,26 @@ export default function BulkUpdatePage() {
                   setConfirmApply(false)
                 }}
               />
-              Dry run (preview only — no changes written)
+              {t('update.dryRun')}
             </label>
             {!dryRun && confirmApply ? (
               <div className="flex items-center gap-2">
                 <span className="text-sm text-amber-300">
-                  This writes changes to every matched workspace.
+                  {t('update.confirmWarning')}
                 </span>
                 <button
                   type="submit"
                   disabled={submitting}
                   className="px-4 py-2 rounded-lg text-sm font-medium bg-red-700 hover:bg-red-600 disabled:opacity-50 text-white transition-colors"
                 >
-                  {submitting ? 'Applying...' : 'Confirm apply'}
+                  {submitting ? t('update.applying') : t('update.confirmApply')}
                 </button>
                 <button
                   type="button"
                   onClick={() => setConfirmApply(false)}
                   className="px-3 py-2 rounded-lg text-sm bg-slate-700 hover:bg-slate-600 text-slate-200"
                 >
-                  Cancel
+                  {t('update.cancel')}
                 </button>
               </div>
             ) : (
@@ -641,10 +644,10 @@ export default function BulkUpdatePage() {
                 }`}
               >
                 {submitting
-                  ? 'Working...'
+                  ? t('update.working')
                   : dryRun
-                    ? 'Preview (dry run)'
-                    : 'Apply changes'}
+                    ? t('update.previewDryRun')
+                    : t('update.applyChanges')}
               </button>
             )}
           </div>
@@ -652,42 +655,49 @@ export default function BulkUpdatePage() {
 
         {dryResult && (
           <div className="mb-6">
-            <h2 className="text-lg font-semibold text-slate-100 mb-1">Dry run result</h2>
+            <h2 className="text-lg font-semibold text-slate-100 mb-1">{t('dryResult.heading')}</h2>
             <p className="text-sm text-slate-400 mb-3">
-              Matched <strong className="text-slate-200">{dryResult.matched}</strong>;{' '}
-              <strong className="text-slate-200">{dryResult.would_change.length}</strong>{' '}
-              would change; {dryResult.unchanged.length} unchanged. Nothing was written.
+              {t.rich('dryResult.summary', {
+                matched: dryResult.matched,
+                wouldChange: dryResult.would_change.length,
+                unchanged: dryResult.unchanged.length,
+                strong: (c) => <strong className="text-slate-200">{c}</strong>,
+              })}
             </p>
-            {renderDiffTable(dryResult.would_change, 'Would change')}
+            {renderDiffTable(dryResult.would_change, t('dryResult.wouldChange'))}
             {dryResult.would_change.length === 0 && (
-              <EmptyState message="No workspaces would change with this update." />
+              <EmptyState message={t('dryResult.noChange')} />
             )}
           </div>
         )}
 
         {applyResult && (
           <div className="mb-6">
-            <h2 className="text-lg font-semibold text-slate-100 mb-1">Apply result</h2>
+            <h2 className="text-lg font-semibold text-slate-100 mb-1">{t('applyResult.heading')}</h2>
             <p className="text-sm text-slate-400 mb-3">
-              Matched <strong className="text-slate-200">{applyResult.matched}</strong>;{' '}
-              <strong className="text-green-300">{applyResult.applied}</strong> applied;{' '}
-              {applyResult.unchanged.length} unchanged;{' '}
-              {applyResult.errors.length} error(s).
+              {t.rich('applyResult.summary', {
+                matched: applyResult.matched,
+                applied: applyResult.applied,
+                unchanged: applyResult.unchanged.length,
+                errors: applyResult.errors.length,
+                strong: (c) => <strong className="text-slate-200">{c}</strong>,
+                appliedstrong: (c) => <strong className="text-green-300">{c}</strong>,
+              })}
             </p>
             {applyResult.errors.length > 0 && (
               <div className="mb-4 p-3 bg-red-900/30 text-red-300 rounded-lg text-sm border border-red-800/50">
                 <ul className="space-y-1">
                   {applyResult.errors.map((er, i) => (
                     <li key={i}>
-                      {er.name || er.id || '(workspace)'}: {er.error}
+                      {er.name || er.id || t('applyResult.unnamedWorkspace')}: {er.error}
                     </li>
                   ))}
                 </ul>
               </div>
             )}
-            {renderDiffTable(applyResult.changes, 'Applied')}
+            {renderDiffTable(applyResult.changes, t('applyResult.applied'))}
             {applyResult.applied === 0 && applyResult.errors.length === 0 && (
-              <EmptyState message="No workspaces changed." />
+              <EmptyState message={t('applyResult.noChange')} />
             )}
           </div>
         )}

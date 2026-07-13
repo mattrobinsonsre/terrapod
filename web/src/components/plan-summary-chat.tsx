@@ -22,6 +22,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useTranslations, useLocale } from 'next-intl'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { MessageCircle, Send, User, Sparkles } from 'lucide-react'
@@ -48,6 +49,8 @@ interface Props {
 }
 
 export function PlanSummaryChat({ runId, refreshKey }: Props) {
+  const t = useTranslations('planSummary')
+  const locale = useLocale()
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [loaded, setLoaded] = useState(false)
   const [input, setInput] = useState('')
@@ -59,14 +62,14 @@ export function PlanSummaryChat({ runId, refreshKey }: Props) {
   const load = useCallback(async () => {
     try {
       const res = await apiFetch(
-        `/api/terrapod/v1/runs/run-${runId}/plan-summary/messages`,
+        `/api/terrapod/v1/runs/run-${runId}/plan-summary/messages?locale=${encodeURIComponent(locale)}`,
       )
       if (res.status === 404) {
         // Parent summary missing — caller hides this component.
         return
       }
       if (!res.ok) {
-        setError(`HTTP ${res.status}`)
+        setError(t('errors.status', { status: res.status }))
         return
       }
       const body = await res.json()
@@ -75,7 +78,7 @@ export function PlanSummaryChat({ runId, refreshKey }: Props) {
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     }
-  }, [runId])
+  }, [runId, t, locale])
 
   useEffect(() => {
     load()
@@ -123,13 +126,17 @@ export function PlanSummaryChat({ runId, refreshKey }: Props) {
           method: 'POST',
           headers: { 'Content-Type': 'application/vnd.api+json' },
           body: JSON.stringify({
-            data: { attributes: { content: text } },
+            // locale rides in the body (it's request payload, not a query
+            // string): the server normalises the prompt into the system
+            // language before it joins the thread, then translates the reply
+            // back for display (#767).
+            data: { attributes: { content: text, locale } },
           }),
         },
       )
 
       if (!res.ok) {
-        let detail = `HTTP ${res.status}`
+        let detail = t('errors.status', { status: res.status })
         try {
           const body = await res.json()
           if (body?.detail) detail = body.detail
@@ -162,7 +169,7 @@ export function PlanSummaryChat({ runId, refreshKey }: Props) {
     } finally {
       setSending(false)
     }
-  }, [input, runId, sending, load])
+  }, [input, runId, sending, load, t, locale])
 
   if (!loaded && messages.length === 0) {
     // First load — silent until we know whether there's a thread.
@@ -173,9 +180,9 @@ export function PlanSummaryChat({ runId, refreshKey }: Props) {
     <div className="mt-6 pt-5 border-t border-slate-700/50">
       <div className="flex items-center gap-2 mb-3">
         <MessageCircle className="w-3.5 h-3.5 text-slate-400" aria-hidden="true" />
-        <h4 className="text-xs font-medium text-slate-400">Follow-up</h4>
+        <h4 className="text-xs font-medium text-slate-400">{t('chat.heading')}</h4>
         <span className="text-[0.65rem] text-slate-500 italic">
-          One shared thread, visible to anyone with workspace read.
+          {t('chat.sharedThreadNote')}
         </span>
       </div>
 
@@ -213,7 +220,7 @@ export function PlanSummaryChat({ runId, refreshKey }: Props) {
             }}
             disabled={sending}
             rows={2}
-            placeholder="Ask a follow-up question about this plan… (⌘/Ctrl + Enter to send)"
+            placeholder={t('chat.placeholder')}
             className="flex-1 text-sm bg-slate-900/60 border border-slate-700 focus:border-brand-500 focus:outline-none rounded p-2 text-slate-200 placeholder-slate-500 resize-y min-h-[3rem] max-h-40"
           />
           <button
@@ -223,7 +230,7 @@ export function PlanSummaryChat({ runId, refreshKey }: Props) {
             className="inline-flex items-center gap-1.5 text-xs text-slate-200 bg-brand-600 hover:bg-brand-500 disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed px-3 py-2 rounded"
           >
             {sending ? <LoadingSpinner /> : <Send className="w-3.5 h-3.5" />}
-            {sending ? 'Thinking…' : 'Send'}
+            {sending ? t('chat.thinking') : t('chat.send')}
           </button>
         </div>
       )}
@@ -232,6 +239,7 @@ export function PlanSummaryChat({ runId, refreshKey }: Props) {
 }
 
 function ChatRow({ msg }: { msg: ChatMessage }) {
+  const t = useTranslations('planSummary')
   const isUser = msg.attributes.role === 'user'
   const Icon = isUser ? User : Sparkles
   const hasError = !!msg.attributes['error-message']
@@ -245,7 +253,7 @@ function ChatRow({ msg }: { msg: ChatMessage }) {
       />
       <div className="min-w-0 flex-1">
         <div className="text-[0.65rem] text-slate-500 uppercase tracking-wide mb-0.5">
-          {isUser ? 'You' : 'Assistant'}
+          {isUser ? t('chat.you') : t('chat.assistant')}
         </div>
         {hasError ? (
           <div className="text-xs text-red-300 font-mono whitespace-pre-wrap">

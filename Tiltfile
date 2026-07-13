@@ -136,6 +136,7 @@ docker_build(
     live_update=[
         sync('./web/src', '/app/src'),
         sync('./web/public', '/app/public'),
+        sync('./web/messages', '/app/messages'),
         sync('./web/next.config.js', '/app/next.config.js'),
     ],
 )

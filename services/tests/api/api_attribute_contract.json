@@ -432,9 +432,17 @@
     "workspace-has-vcs",
     "workspace-name"
   ],
+  "runs.list_plan_summary_messages": [
+    "content",
+    "translated"
+  ],
   "runs.list_run_events": [
     "action",
     "created-at"
+  ],
+  "runs.post_plan_summary_message": [
+    "content",
+    "translated"
   ],
   "runs.regenerate_plan_summary": [
     "created-at",
@@ -455,11 +463,13 @@
     "error-message",
     "input-tokens",
     "kind",
+    "language",
     "model",
     "output-tokens",
     "risk-factors",
     "risk-level",
     "status",
+    "translated",
     "updated-at"
   ],
   "tfe_v2._state_version_json": [

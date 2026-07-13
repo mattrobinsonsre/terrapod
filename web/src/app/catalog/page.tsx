@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import Link from 'next/link'
 import NavBar from '@/components/nav-bar'
 import { PageHeader } from '@/components/page-header'
@@ -28,6 +29,7 @@ interface CatalogItem {
 }
 
 export default function CatalogPage() {
+  const t = useTranslations('catalog')
   const router = useRouter()
   const [items, setItems] = useState<CatalogItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -51,12 +53,12 @@ export default function CatalogPage() {
         setItems([])
         return
       }
-      if (!res.ok) throw new Error('Failed to load catalog items')
+      if (!res.ok) throw new Error(t('errors.loadItems'))
       const data = await res.json()
       setDisabled(false)
       setItems(data.data || [])
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load catalog items')
+      setError(err instanceof Error ? err.message : t('errors.loadItems'))
     } finally {
       setLoading(false)
     }
@@ -71,8 +73,8 @@ export default function CatalogPage() {
       <NavBar />
       <main className="px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto">
         <PageHeader
-          title="Service Catalog"
-          description="Provision self-service infrastructure from curated modules"
+          title={t('title')}
+          description={t('description')}
         />
 
         {error && <ErrorBanner message={error} />}
@@ -81,10 +83,10 @@ export default function CatalogPage() {
           <LoadingSpinner />
         ) : disabled ? (
           <div className="p-4 bg-slate-800/50 text-slate-400 rounded-lg text-sm border border-slate-700/50">
-            Service catalog is not enabled.
+            {t('notEnabled')}
           </div>
         ) : enabledItems.length === 0 ? (
-          <EmptyState message="No catalog items available." />
+          <EmptyState message={t('empty')} />
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {enabledItems.map((item) => {
@@ -110,8 +112,8 @@ export default function CatalogPage() {
                     )}
                     <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-brand-900/50 text-brand-300">
                       {a['default-version-pin']
-                        ? `pinned ${a['default-version-pin']}`
-                        : 'latest'}
+                        ? t('card.pinned', { version: a['default-version-pin'] })
+                        : t('card.latest')}
                     </span>
                   </div>
                 </Link>

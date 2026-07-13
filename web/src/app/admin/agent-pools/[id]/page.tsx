@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import Link from 'next/link'
 import NavBar from '@/components/nav-bar'
 import { PageHeader } from '@/components/page-header'
@@ -34,10 +35,12 @@ function statusDotClass(status: string | undefined): string {
   return 'bg-slate-500'
 }
 
-function statusTitle(status: string | undefined): string | undefined {
-  if (status === 'cert-expired') return 'Listener is heartbeating but its certificate has expired — every cert-authenticated call (claim run, renew, runner-token) will fail. Most likely cause: the API never registered the latest cert, or the cert TTL elapsed before renewal.'
-  if (status === 'degraded') return 'Listeners are heartbeating but their certificates have expired — runs will fail to launch.'
-  return undefined
+// Maps a listener status to the catalog key of its explanatory tooltip, or
+// null when the status has no tooltip. The caller resolves the key via `t`.
+function statusTitleKey(status: string | undefined): string | null {
+  if (status === 'cert-expired') return 'listeners.tooltips.certExpired'
+  if (status === 'degraded') return 'listeners.tooltips.degraded'
+  return null
 }
 
 function defaultExpiryLocal(): string {
@@ -84,6 +87,7 @@ type Tab = 'settings' | 'tokens' | 'listeners'
 
 export default function AgentPoolDetailPage() {
   const router = useRouter()
+  const t = useTranslations('adminAgentPools')
   const params = useParams()
   const poolId = params.id as string
   const { confirmDelete } = useConfirm()
@@ -128,15 +132,15 @@ export default function AgentPoolDetailPage() {
   const loadPool = useCallback(async () => {
     try {
       const res = await apiFetch(`/api/terrapod/v1/agent-pools/${poolId}`)
-      if (!res.ok) throw new Error('Failed to load pool')
+      if (!res.ok) throw new Error(t('errors.loadPool'))
       const data = await res.json()
       setPool(data.data)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load pool')
+      setError(err instanceof Error ? err.message : t('errors.loadPool'))
     } finally {
       setLoading(false)
     }
-  }, [poolId])
+  }, [poolId, t])
 
   useEffect(() => {
     if (!getAuthState()) { router.push('/login'); return }
@@ -152,11 +156,11 @@ export default function AgentPoolDetailPage() {
   async function loadTokens() {
     try {
       const res = await apiFetch(`/api/terrapod/v1/agent-pools/${poolId}/tokens`)
-      if (!res.ok) throw new Error('Failed to load tokens')
+      if (!res.ok) throw new Error(t('errors.loadTokens'))
       const data = await res.json()
       setTokens(data.data || [])
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load tokens')
+      setError(err instanceof Error ? err.message : t('errors.loadTokens'))
     } finally {
       setTokensLoading(false)
     }
@@ -165,15 +169,15 @@ export default function AgentPoolDetailPage() {
   const loadListeners = useCallback(async () => {
     try {
       const res = await apiFetch(`/api/terrapod/v1/agent-pools/${poolId}/listeners`)
-      if (!res.ok) throw new Error('Failed to load listeners')
+      if (!res.ok) throw new Error(t('errors.loadListeners'))
       const data = await res.json()
       setListeners(data.data || [])
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load listeners')
+      setError(err instanceof Error ? err.message : t('errors.loadListeners'))
     } finally {
       setListenersLoading(false)
     }
-  }, [poolId])
+  }, [poolId, t])
 
   // Real-time listener updates via SSE (heartbeats, joins)
   const { connected: poolConnected } = usePoolEvents(poolId, useCallback(() => {
@@ -212,13 +216,13 @@ export default function AgentPoolDetailPage() {
           },
         }),
       })
-      if (!res.ok) throw new Error('Failed to update pool')
+      if (!res.ok) throw new Error(t('errors.updatePool'))
       const data = await res.json()
       setPool(data.data)
       setEditing(false)
-      setSuccess('Pool updated')
+      setSuccess(t('success.poolUpdated'))
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update pool')
+      setError(err instanceof Error ? err.message : t('errors.updatePool'))
     } finally {
       setSaving(false)
     }
@@ -228,10 +232,10 @@ export default function AgentPoolDetailPage() {
     setDeleting(true)
     try {
       const res = await apiFetch(`/api/terrapod/v1/agent-pools/${poolId}`, { method: 'DELETE' })
-      if (!res.ok) throw new Error('Failed to delete pool')
+      if (!res.ok) throw new Error(t('errors.deletePool'))
       router.push('/admin/agent-pools')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete pool')
+      setError(err instanceof Error ? err.message : t('errors.deletePool'))
       setDeleting(false)
     }
   }
@@ -254,7 +258,7 @@ export default function AgentPoolDetailPage() {
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        throw new Error(data.detail || `Failed to create token (${res.status})`)
+        throw new Error(data.detail || t('errors.createTokenStatus', { status: res.status }))
       }
       const data = await res.json()
       setCreatedToken(data.data?.attributes?.token || null)
@@ -264,37 +268,37 @@ export default function AgentPoolDetailPage() {
       setShowCreateToken(false)
       await loadTokens()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create token')
+      setError(err instanceof Error ? err.message : t('errors.createToken'))
     } finally {
       setCreatingToken(false)
     }
   }
 
   async function handleRevokeToken(tokenId: string) {
-    if (!confirmDelete('Revoke this join token? Listeners using it can no longer join, and this cannot be undone.')) return
+    if (!confirmDelete(t('confirm.revokeToken'))) return
     setError('')
     setSuccess('')
     try {
       const res = await apiFetch(`/api/terrapod/v1/agent-pools/${poolId}/tokens/${tokenId}`, { method: 'DELETE' })
-      if (!res.ok) throw new Error('Failed to revoke token')
-      setSuccess('Token revoked')
+      if (!res.ok) throw new Error(t('errors.revokeToken'))
+      setSuccess(t('success.tokenRevoked'))
       await loadTokens()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to revoke token')
+      setError(err instanceof Error ? err.message : t('errors.revokeToken'))
     }
   }
 
   async function handleDeleteListener(listenerId: string) {
-    if (!confirmDelete('Delete this listener? It will re-register on its next heartbeat if the pod is still running.')) return
+    if (!confirmDelete(t('confirm.deleteListener'))) return
     setError('')
     setSuccess('')
     try {
       const res = await apiFetch(`/api/terrapod/v1/listeners/${listenerId}`, { method: 'DELETE' })
-      if (!res.ok) throw new Error('Failed to delete listener')
-      setSuccess('Listener deleted')
+      if (!res.ok) throw new Error(t('errors.deleteListener'))
+      setSuccess(t('success.listenerDeleted'))
       await loadListeners()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete listener')
+      setError(err instanceof Error ? err.message : t('errors.deleteListener'))
     }
   }
 
@@ -310,13 +314,13 @@ export default function AgentPoolDetailPage() {
   const isPoolAdmin = poolPerm === 'admin'
 
   const tabs: { key: Tab; label: string }[] = [
-    { key: 'settings', label: 'Settings' },
-    ...(isPoolAdmin ? [{ key: 'tokens' as Tab, label: 'Tokens' }] : []),
-    { key: 'listeners', label: 'Listeners' },
+    { key: 'settings', label: t('tabs.settings') },
+    ...(isPoolAdmin ? [{ key: 'tokens' as Tab, label: t('tabs.tokens') }] : []),
+    { key: 'listeners', label: t('tabs.listeners') },
   ]
 
   if (loading) return <><NavBar /><main className="px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto"><LoadingSpinner /></main></>
-  if (!pool) return <><NavBar /><main className="px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto"><ErrorBanner message="Pool not found" /></main></>
+  if (!pool) return <><NavBar /><main className="px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto"><ErrorBanner message={t('errors.poolNotFound')} /></main></>
 
   return (
     <>
@@ -324,13 +328,13 @@ export default function AgentPoolDetailPage() {
       <main className="px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto">
         <div className="mb-4">
           <Link href="/admin/agent-pools" className="text-sm text-slate-400 hover:text-slate-200">
-            &larr; Back to agent pools
+            &larr; {t('detail.back')}
           </Link>
         </div>
 
         <PageHeader
           title={pool.attributes.name}
-          description={pool.attributes.description || 'Agent pool'}
+          description={pool.attributes.description || t('detail.defaultDescription')}
           actions={<ConnectionStatus connected={poolConnected} />}
         />
 
@@ -341,8 +345,8 @@ export default function AgentPoolDetailPage() {
 
         {createdToken && (
           <div className="mb-6 p-4 bg-green-900/30 rounded-lg border border-green-800/50">
-            <p className="text-sm text-green-300 font-medium mb-1">Token created successfully</p>
-            <p className="text-xs text-green-400 mb-2">Copy this token now — it will not be shown again.</p>
+            <p className="text-sm text-green-300 font-medium mb-1">{t('tokens.created.title')}</p>
+            <p className="text-xs text-green-400 mb-2">{t('tokens.created.copyNow')}</p>
             <div className="flex items-center gap-2">
               <code className="flex-1 text-sm text-green-200 bg-green-900/30 p-2 rounded font-mono overflow-x-auto">
                 {createdToken}
@@ -351,7 +355,7 @@ export default function AgentPoolDetailPage() {
                 onClick={() => navigator.clipboard.writeText(createdToken)}
                 className="px-3 py-1 rounded text-xs font-medium bg-green-800/50 hover:bg-green-700/50 text-green-200 transition-colors flex-shrink-0"
               >
-                Copy
+                {t('tokens.created.copy')}
               </button>
             </div>
           </div>
@@ -381,32 +385,32 @@ export default function AgentPoolDetailPage() {
           <div className="space-y-6">
             <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-6">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-medium text-slate-300">Pool Settings</h3>
+                <h3 className="text-sm font-medium text-slate-300">{t('settings.title')}</h3>
                 {isPoolAdmin && (!editing ? (
-                  <button onClick={startEditing} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors">Edit</button>
+                  <button onClick={startEditing} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors">{t('actions.edit')}</button>
                 ) : (
                   <div className="flex gap-2">
-                    <button onClick={() => setEditing(false)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors">Cancel</button>
+                    <button onClick={() => setEditing(false)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors">{t('actions.cancel')}</button>
                     <button onClick={handleSave} disabled={saving} className="px-2.5 py-1 rounded-md text-xs font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors disabled:opacity-50">
-                      {saving ? 'Saving...' : 'Save'}
+                      {saving ? t('actions.saving') : t('actions.save')}
                     </button>
                   </div>
                 ))}
               </div>
               <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <dt className="text-xs text-slate-500">Name</dt>
+                  <dt className="text-xs text-slate-500">{t('settings.fields.name')}</dt>
                   {editing ? (
                     <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)}
                       pattern="[a-zA-Z0-9][a-zA-Z0-9_\-]*"
-                      title="Letters, numbers, hyphens, and underscores only. Must start with a letter or number."
+                      title={t('form.namePattern')}
                       className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500" />
                   ) : (
                     <dd className="mt-1 text-sm text-slate-200">{pool.attributes.name}</dd>
                   )}
                 </div>
                 <div>
-                  <dt className="text-xs text-slate-500">Description</dt>
+                  <dt className="text-xs text-slate-500">{t('settings.fields.description')}</dt>
                   {editing ? (
                     <input type="text" value={editDesc} onChange={(e) => setEditDesc(e.target.value)}
                       className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500" />
@@ -415,11 +419,11 @@ export default function AgentPoolDetailPage() {
                   )}
                 </div>
                 <div>
-                  <dt className="text-xs text-slate-500">Created</dt>
+                  <dt className="text-xs text-slate-500">{t('settings.fields.created')}</dt>
                   <dd className="mt-1 text-sm text-slate-200">{formatDate(pool.attributes['created-at'])}</dd>
                 </div>
                 <div>
-                  <dt className="text-xs text-slate-500">Owner</dt>
+                  <dt className="text-xs text-slate-500">{t('settings.fields.owner')}</dt>
                   {editing ? (
                     <input type="email" value={editOwner} onChange={(e) => setEditOwner(e.target.value)}
                       placeholder="user@example.com"
@@ -429,17 +433,17 @@ export default function AgentPoolDetailPage() {
                   )}
                 </div>
                 <div>
-                  <dt className="text-xs text-slate-500">Your Permission</dt>
+                  <dt className="text-xs text-slate-500">{t('settings.fields.yourPermission')}</dt>
                   <dd className="mt-1">
                     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                       poolPerm === 'admin' ? 'bg-purple-900/50 text-purple-300' :
                       poolPerm === 'write' ? 'bg-blue-900/50 text-blue-300' :
                       'bg-slate-700/50 text-slate-300'
-                    }`}>{poolPerm}</span>
+                    }`}>{t(`settings.permissions.${poolPerm}`)}</span>
                   </dd>
                 </div>
                 <div className="sm:col-span-2">
-                  <dt className="text-xs text-slate-500 mb-1">Labels</dt>
+                  <dt className="text-xs text-slate-500 mb-1">{t('settings.fields.labels')}</dt>
                   <dd>
                     <LabelsEditor
                       labels={editing ? editLabels : (pool.attributes.labels || {})}
@@ -455,20 +459,20 @@ export default function AgentPoolDetailPage() {
               <div className="bg-slate-800/50 rounded-lg border border-red-900/30 p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-sm font-medium text-red-400">Delete Pool</h3>
-                    <p className="text-sm text-slate-400 mt-1">Permanently delete this agent pool and all associated tokens.</p>
+                    <h3 className="text-sm font-medium text-red-400">{t('danger.title')}</h3>
+                    <p className="text-sm text-slate-400 mt-1">{t('danger.description')}</p>
                   </div>
                   {!showDeleteConfirm ? (
                     <button onClick={() => setShowDeleteConfirm(true)}
                       className="px-3 py-1.5 rounded-lg text-sm font-medium bg-red-600/20 hover:bg-red-600/40 text-red-400 transition-colors">
-                      Delete
+                      {t('actions.delete')}
                     </button>
                   ) : (
                     <div className="flex gap-2">
-                      <button onClick={() => setShowDeleteConfirm(false)} className="px-3 py-1.5 rounded-lg text-sm font-medium text-slate-400 hover:text-slate-200">Cancel</button>
+                      <button onClick={() => setShowDeleteConfirm(false)} className="px-3 py-1.5 rounded-lg text-sm font-medium text-slate-400 hover:text-slate-200">{t('actions.cancel')}</button>
                       <button onClick={handleDelete} disabled={deleting}
                         className="px-3 py-1.5 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-500 text-white transition-colors">
-                        {deleting ? 'Deleting...' : 'Confirm Delete'}
+                        {deleting ? t('actions.deleting') : t('actions.confirmDelete')}
                       </button>
                     </div>
                   )}
@@ -486,7 +490,7 @@ export default function AgentPoolDetailPage() {
                 onClick={() => { setShowCreateToken(!showCreateToken); setCreatedToken(null) }}
                 className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors"
               >
-                {showCreateToken ? 'Cancel' : 'Create Token'}
+                {showCreateToken ? t('actions.cancel') : t('tokens.create')}
               </button>
             </div>
 
@@ -494,29 +498,29 @@ export default function AgentPoolDetailPage() {
               <form onSubmit={handleCreateToken} className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-4 mb-6 space-y-3">
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
-                    <label htmlFor="tok-desc" className="block text-sm font-medium text-slate-300 mb-1">Description</label>
+                    <label htmlFor="tok-desc" className="block text-sm font-medium text-slate-300 mb-1">{t('tokens.form.description')}</label>
                     <input id="tok-desc" type="text" value={tokenDesc} onChange={(e) => setTokenDesc(e.target.value)}
-                      placeholder="Production listener token"
+                      placeholder={t('tokens.form.descriptionPlaceholder')}
                       className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
                   </div>
                   <div>
-                    <label htmlFor="tok-max" className="block text-sm font-medium text-slate-300 mb-1">Max Uses</label>
+                    <label htmlFor="tok-max" className="block text-sm font-medium text-slate-300 mb-1">{t('tokens.form.maxUses')}</label>
                     <input id="tok-max" type="number" value={tokenMaxUses} onChange={(e) => setTokenMaxUses(e.target.value)}
                       min="1"
                       step="1"
                       className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
-                    <p className="mt-1 text-xs text-slate-500">Default 2 — tolerates one bootstrap-race retry across listener replicas.</p>
+                    <p className="mt-1 text-xs text-slate-500">{t('tokens.form.maxUsesHint')}</p>
                   </div>
                   <div>
-                    <label htmlFor="tok-exp" className="block text-sm font-medium text-slate-300 mb-1">Expires At</label>
+                    <label htmlFor="tok-exp" className="block text-sm font-medium text-slate-300 mb-1">{t('tokens.form.expiresAt')}</label>
                     <input id="tok-exp" type="datetime-local" value={tokenExpiry} onChange={(e) => setTokenExpiry(e.target.value)}
                       className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
-                    <p className="mt-1 text-xs text-slate-500">Default 1 hour from now.</p>
+                    <p className="mt-1 text-xs text-slate-500">{t('tokens.form.expiresAtHint')}</p>
                   </div>
                 </div>
                 <button type="submit" disabled={creatingToken}
                   className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors">
-                  {creatingToken ? 'Creating...' : 'Create Token'}
+                  {creatingToken ? t('actions.creating') : t('tokens.create')}
                 </button>
               </form>
             )}
@@ -524,18 +528,18 @@ export default function AgentPoolDetailPage() {
             {tokensLoading ? (
               <LoadingSpinner />
             ) : tokens.length === 0 ? (
-              <EmptyState message="No tokens for this pool." />
+              <EmptyState message={t('tokens.empty')} />
             ) : (
               <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-x-auto">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-slate-700/50">
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Description</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider hidden sm:table-cell">Uses</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider hidden md:table-cell">Expires</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider hidden md:table-cell">Status</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider hidden lg:table-cell">Created By</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">Actions</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">{t('tokens.columns.description')}</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider hidden sm:table-cell">{t('tokens.columns.uses')}</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider hidden md:table-cell">{t('tokens.columns.expires')}</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider hidden md:table-cell">{t('tokens.columns.status')}</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider hidden lg:table-cell">{t('tokens.columns.createdBy')}</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">{t('tokens.columns.actions')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-700/30">
@@ -552,13 +556,13 @@ export default function AgentPoolDetailPage() {
                           <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                             tok.attributes.revoked ? 'bg-red-900/50 text-red-300' : 'bg-green-900/50 text-green-300'
                           }`}>
-                            {tok.attributes.revoked ? 'Revoked' : 'Active'}
+                            {tok.attributes.revoked ? t('tokens.badges.revoked') : t('tokens.badges.active')}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-xs text-slate-400 hidden lg:table-cell">{tok.attributes['created-by']}</td>
                         <td className="px-4 py-3 text-right">
                           {!tok.attributes.revoked && (
-                            <button onClick={() => handleRevokeToken(tok.id)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300 transition-colors">Revoke</button>
+                            <button onClick={() => handleRevokeToken(tok.id)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300 transition-colors">{t('tokens.revoke')}</button>
                           )}
                         </td>
                       </tr>
@@ -576,17 +580,17 @@ export default function AgentPoolDetailPage() {
             {listenersLoading ? (
               <LoadingSpinner />
             ) : listeners.length === 0 ? (
-              <EmptyState message="No listeners registered for this pool." />
+              <EmptyState message={t('listeners.empty')} />
             ) : (
               <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-x-auto">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-slate-700/50">
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Name</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Status</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Replicas</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider hidden md:table-cell">Cert Expires</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">Actions</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">{t('listeners.columns.name')}</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">{t('listeners.columns.status')}</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">{t('listeners.columns.replicas')}</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider hidden md:table-cell">{t('listeners.columns.certExpires')}</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">{t('listeners.columns.actions')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-700/30">
@@ -594,9 +598,9 @@ export default function AgentPoolDetailPage() {
                       <tr key={l.id} className="hover:bg-slate-700/20 transition-colors">
                         <td className="px-4 py-3 text-sm text-slate-200">{l.attributes.name}</td>
                         <td className="px-4 py-3">
-                          <span className="flex items-center gap-1.5" title={statusTitle(l.attributes.status)}>
+                          <span className="flex items-center gap-1.5" title={(() => { const k = statusTitleKey(l.attributes.status); return k ? t(k) : undefined })()}>
                             <span className={`w-2 h-2 rounded-full ${statusDotClass(l.attributes.status)}`} />
-                            <span className="text-xs text-slate-400">{l.attributes.status}</span>
+                            <span className="text-xs text-slate-400">{t(`listeners.status.${l.attributes.status}`)}</span>
                           </span>
                         </td>
                         <td className="px-4 py-3 text-xs text-slate-300">
@@ -613,7 +617,7 @@ export default function AgentPoolDetailPage() {
                           {formatDate(l.attributes['certificate-expires-at'])}
                         </td>
                         <td className="px-4 py-3 text-right">
-                          <button onClick={() => handleDeleteListener(l.id)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300 transition-colors">Delete</button>
+                          <button onClick={() => handleDeleteListener(l.id)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300 transition-colors">{t('actions.delete')}</button>
                         </td>
                       </tr>
                     ))}

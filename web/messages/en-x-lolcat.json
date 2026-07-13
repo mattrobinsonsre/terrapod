@@ -1,0 +1,2621 @@
+{
+  "nav": {
+    "workspaces": "Wurkspaces",
+    "estate": "Estate",
+    "registry": "Registry",
+    "modules": "Modules",
+    "providers": "Providurs",
+    "catalog": "Catalog",
+    "agentPools": "Agent Pools",
+    "admin": "Admin",
+    "users": "Hoomans",
+    "roles": "Roles",
+    "vcsConnections": "VCS Konekshuns",
+    "variableSets": "Variable Sets",
+    "autodiscovery": "Autodiscovery",
+    "bulkUpdate": "Bulk Update",
+    "executionHooks": "Execution Hooks",
+    "policySets": "Polisy Sets",
+    "providerTemplates": "Provydur Templates",
+    "catalogAdmin": "Catalog Admin",
+    "cache": "Cache",
+    "auditLog": "Audit Log",
+    "help": "Halp",
+    "apiReference": "API Reference",
+    "docs": "Docs",
+    "account": "Akownt",
+    "apiTokens": "API Tokuns",
+    "sessions": "Sessions",
+    "logOut": "Log out",
+    "menu": "Menu",
+    "openMenu": "Open menu",
+    "openAccountMenu": "Open akownt menu",
+    "closeMenu": "Close menu"
+  },
+  "switcher": {
+    "language": "Tung",
+    "changeLanguage": "Change tung"
+  },
+  "workspaces": {
+    "title": "Wurkspaces",
+    "description": "Manij Terraform wurkspaces, state, an runz",
+    "new": "Nu Wurkspace",
+    "cancel": "Nvm",
+    "create": "Maek Wurkspace",
+    "creating": "Makin…",
+    "loadFailed": "Borked to gets wurkspaces",
+    "createFailed": "Borked to maek wurkspace",
+    "form": {
+      "name": "Naem",
+      "namePattern": "Letters, numbers, hyphens, an underscores only. Must startz wif a letter or number.",
+      "namePlaceholder": "my-wurkspace",
+      "executionMode": "Execution Mode",
+      "local": "Local",
+      "agent": "Agent",
+      "executionBackend": "Execution Backend",
+      "version": "Vershun",
+      "versionTitle": "Vershun in X.Y or X.Y.Z format (e.g. 1.11 or 1.11.5)",
+      "versionPlaceholder": "e.g. 1.11 or 1.11.5",
+      "cpuRequest": "CPU Request",
+      "cpuTitle": "Kubernetes CPU quantity: whole cores (1, 2) or millicores (500m, 100m)",
+      "cpuHint": "e.g. 1, 0.5, 500m",
+      "memoryRequest": "Memory Request",
+      "memoryTitle": "Kubernetes memory quantity: bytes (1000) or wif suffix (512Mi, 2Gi, 1Ti)",
+      "memoryHint": "e.g. 2Gi, 512Mi, 1Ti",
+      "agentPool": "Agent Pool",
+      "none": "None",
+      "autoApply": "Auto Apply",
+      "enabled": "On",
+      "workingDirectory": "Working Directory",
+      "workingDirectoryPlaceholder": "e.g. environments/dev",
+      "workingDirectoryHint": "Subdirectory within repo containing .tf files",
+      "vcsConnection": "VCS Konekshun",
+      "vcsRepoUrl": "VCS Repository URL",
+      "vcsRepoUrlTitle": "Must bee an HTTP or HTTPS URL",
+      "vcsRepoUrlPlaceholder": "https://github.com/org/repo",
+      "vcsBranch": "VCS Branch",
+      "vcsBranchPlaceholder": "main (default)"
+    },
+    "stats": {
+      "total": "Total",
+      "health": "Health",
+      "locked": "Locked",
+      "clearAllFilters": "Clear all filters",
+      "clearHealthFilter": "Clear health issues filter",
+      "filterHealth": "Filter to wurkspaces wif health issues",
+      "clearLockedFilter": "Clear locked filter",
+      "filterLocked": "Filter to locked wurkspaces"
+    },
+    "filter": {
+      "placeholder": "Filter by naem, label, or statuz — e.g. \"eu1\", \"env:prod\", \"statuz:errored\"",
+      "ariaLabel": "Filter wurkspaces",
+      "clear": "Clear",
+      "status": "Statuz",
+      "label": "Label",
+      "back": "back",
+      "valueCount": "{count, plural, one {# valyoo} other {# valyooz}}",
+      "removeTerm": "Yeet dis term",
+      "showing": "Showing {filtered} ov {total}",
+      "termName": "naem: {value}",
+      "termStatus": "statuz: {value}",
+      "termLabelAny": "{key}: (any)",
+      "termLabel": "{key}: {value}",
+      "hintStatus": "statuz",
+      "hintHealth": "health",
+      "hintLabel": "label",
+      "hintLabelKey": "label key",
+      "hintName": "naem"
+    },
+    "row": {
+      "removeLabelFilter": "Click to yeet from filter",
+      "addLabelFilter": "Click to filter by dis label"
+    },
+    "table": {
+      "name": "Naem",
+      "mode": "Mode",
+      "pool": "Pool",
+      "resources": "Rezorces",
+      "status": "Statuz",
+      "created": "Maded",
+      "resourcesValue": "{cpu} CPU / {memory}"
+    },
+    "empty": {
+      "none": "No wurkspaces yet. Maek one to get startd.",
+      "noMatch": "No wurkspaces match dis filter."
+    }
+  },
+  "status": {
+    "state-diverged": "State Diverged",
+    "vcs-error": "VCS Error",
+    "drifted": "Drifted",
+    "errored": "Errored",
+    "needs-confirm": "Needs Srsly",
+    "planning": "Planning",
+    "applying": "Applying",
+    "canceling": "Canceling",
+    "confirmed": "Confirmed",
+    "queued": "Queued",
+    "pending": "Pending",
+    "applied": "Applied",
+    "planned": "Planned",
+    "canceled": "Canceled",
+    "discarded": "Discarded",
+    "pendingDeletion": "Pending deletion",
+    "archived": "Archived"
+  },
+  "auth": {
+    "loading": "Gettin...",
+    "subtitle": "Sign in to manij yur infrastructure",
+    "subtitleCli": "Sign in to authorize teh CLI",
+    "emailLabel": "Email",
+    "passwordLabel": "Sekrit werd",
+    "signIn": "Sign in",
+    "signingIn": "Signing in...",
+    "signInWith": "Sign in wif {provider}",
+    "or": "or",
+    "noProviders": "No authentication provydurs configured",
+    "completingSignIn": "Completing sign in...",
+    "callbackFailedTitle": "Authentication Borked",
+    "tryAgain": "Try Agin",
+    "errors": {
+      "loadProviders": "Borked to gets provydurs",
+      "authenticationFailed": "Authentication borked ({status})",
+      "tokenExchangeFailed": "Tokun exchange borked ({status})",
+      "loginFailed": "Login borked",
+      "startLoginFailed": "Borked to startz login",
+      "missingCodeOrState": "Missing authorization code or state",
+      "stateMismatch": "State mismatch — possible CSRF attack",
+      "missingVerifier": "Missing PKCE verifier — plz try logging in agin"
+    }
+  },
+  "estate": {
+    "title": "Estate topology",
+    "description": "Every wurkspace u can see an teh modules dey use, wired by runz-triggers, remote-state, an module links. Group by whatever axis fits yur estate — teh platform enforces no labeling convention.",
+    "errors": {
+      "load": "Borked to gets teh estate graph."
+    },
+    "groupBy": {
+      "label": "Group by"
+    },
+    "view": {
+      "graph": "Graph",
+      "table": "Table"
+    },
+    "counts": {
+      "workspaces": "{count, plural, one {# wurkspace} other {# wurkspaces}}",
+      "modules": "{count, plural, one {# module} other {# modules}}",
+      "dependencies": "{count, plural, one {# dependency} other {# dependencies}}"
+    },
+    "legend": {
+      "registryModule": "registry module"
+    },
+    "detail": {
+      "moduleImpact": "{count, plural, one {wurkspace uses dis — bumping it re-plans it} other {wurkspaces use dis — bumping it re-plans dem all}}",
+      "dependOnThis": "{count, plural, one {depends on dis} other {depend on dis}}"
+    },
+    "table": {
+      "workspaces": {
+        "heading": "Wurkspaces",
+        "col": {
+          "workspace": "Wurkspace",
+          "group": "Group",
+          "agentPool": "Agent pool",
+          "dependedOnBy": "Depended on by",
+          "modulesUsed": "Modules used"
+        },
+        "noModules": "—"
+      },
+      "modules": {
+        "heading": "Modules",
+        "col": {
+          "module": "Module",
+          "usedBy": "Used by (wurkspaces)"
+        }
+      }
+    }
+  },
+  "labels": {
+    "title": "Labels",
+    "description": "Browse labels in use across wurkspaces, agent pools, registry modules, an registry provydurs. Read-only — labels iz edited on each entity's own page.",
+    "none": "None.",
+    "emptyKeys": "No labels in use yet. Label any wurkspace, agent pool, registry module, or registry provydur to startz grouping things heer.",
+    "emptyValues": "No valyooz fur \"{key}\". Either no readable entity carries dis label, or it wuz removed since teh last view.",
+    "loadKeysFailed": "Borked to gets labels ({status})",
+    "loadValuesFailed": "Borked to gets valyooz fur {key} ({status})",
+    "loadEntitiesFailed": "Borked to gets entities ({status})",
+    "columns": {
+      "labelKey": "Label key",
+      "distinctValues": "Distinct valyooz",
+      "value": "Valyoo",
+      "total": "Total"
+    },
+    "entity": {
+      "workspaces": "Wurkspaces",
+      "agentPools": "Agent pools",
+      "modules": "Modules",
+      "providers": "Providurs"
+    },
+    "deprecated": {
+      "badge": "Deprecated & unsupported.",
+      "body": "Teh Labels browser iz no longer in teh main navigation an wil bee removed in a future release. Filter by label from teh <workspacesLink>Wurkspaces</workspacesLink> page instead. If u rely on dis page, plz <issueLink>open an issue</issueLink>."
+    }
+  },
+  "settings": {
+    "tokens": {
+      "title": "API Tokuns",
+      "description": "Manij authentication tokuns fur CLI an automation",
+      "descriptionAll": "All tokuns across all hoomans",
+      "myTokens": "My Tokuns",
+      "allTokens": "All Tokuns",
+      "createToken": "Maek Tokun",
+      "cancel": "Nvm",
+      "tokenReady": "Tokun ready",
+      "tokenReadyHelp": "Copy dis tokun nao — it wil not bee shown agin.",
+      "dismissToken": "Dismiss tokun",
+      "hide": "Hide",
+      "show": "Show",
+      "copy": "Copy",
+      "empty": "No API tokuns yet.",
+      "noDescription": "No wut it duz",
+      "detached": "detached",
+      "never": "Never",
+      "selected": "{count, plural, one {# tokun selected} other {# tokuns selected}}",
+      "revokeSelected": "Revoke Selected",
+      "revoking": "Revoking...",
+      "clearSelection": "Clear selection",
+      "rotate": "Rotate",
+      "rotating": "Rotating...",
+      "revoke": "Revoke",
+      "confirmRotate": "Rotate dis tokun? Teh current secret stops working immediately an a nu one iz issued.",
+      "confirmBulkRevoke": "{count, plural, one {Revoke # tokun?} other {Revoke # tokuns?}}",
+      "kinds": {
+        "interactive": {
+          "label": "Personal",
+          "help": "A personal tokun fur teh CLI an ad-hoc automation. Carries yur full live permissions."
+        },
+        "service_bound": {
+          "label": "Service · bound",
+          "help": "A service tokun scoped to a subset ov yur roles. Its access iz teh intersection ov doze roles an yur own — an it stops working if yur akownt iz removed."
+        },
+        "service_detached": {
+          "label": "Service · detached",
+          "help": "An admin-managed service tokun wif an absolute pinned scope, bound to no hooman. Use fur critical machine-to-machine automation dat must survive any one person leaving."
+        }
+      },
+      "lifespans": {
+        "720": "30 days",
+        "2160": "90 days",
+        "4320": "180 days",
+        "8760": "1 year"
+      },
+      "filter": {
+        "all": "All kinds"
+      },
+      "form": {
+        "description": "Wut it duz",
+        "descriptionPlaceholder": "CI/CD pipeline tokun",
+        "kind": "Kind",
+        "lifespan": "Lifespan",
+        "create": "Maek",
+        "creating": "Makin...",
+        "pinnedRoles": "Pinned roles",
+        "pinnedRolesHelp": "— teh scope dis tokun iz limited to",
+        "pinnedRolesCapped": "(capped to yur own access)",
+        "noCustomRoles": "No custom roles defined. Maek roles under Admin → Roles first.",
+        "noScopedRoles": "U hold no scoped roles to pin. Dis tokun wud haz no access."
+      },
+      "columns": {
+        "description": "Wut it duz",
+        "kind": "Kind",
+        "boundTo": "Bound To",
+        "created": "Maded",
+        "lastUsed": "Last Used",
+        "expires": "Expires",
+        "actions": "Stuffs"
+      },
+      "errors": {
+        "load": "Borked to gets tokuns",
+        "create": "Borked to maek tokun ({status})",
+        "createGeneric": "Borked to maek tokun",
+        "rotate": "Borked to rotate tokun ({status})",
+        "rotateGeneric": "Borked to rotate tokun",
+        "revoke": "Borked to revoke tokun ({status})",
+        "revokeGeneric": "Borked to revoke tokun",
+        "bulkRevoke": "Borked to revoke tokuns"
+      }
+    },
+    "sessions": {
+      "title": "Sessions",
+      "description": "Yur active sessions",
+      "descriptionAll": "All active sessions across teh platform",
+      "empty": "No active sessions.",
+      "revokeAll": "Revoke All",
+      "current": "Current",
+      "columns": {
+        "provider": "Provydur",
+        "created": "Maded",
+        "expires": "Expires",
+        "lastActive": "Last Active",
+        "token": "Tokun"
+      },
+      "errors": {
+        "load": "Borked to gets sessions",
+        "revoke": "Borked to revoke sessions ({status})",
+        "revokeGeneric": "Borked to revoke sessions"
+      }
+    }
+  },
+  "registry": {
+    "modules": {
+      "title": "Modules",
+      "description": "Private Terraform module registry",
+      "cancel": "Nvm",
+      "createModule": "Maek Module",
+      "empty": "No modules yet. Maek one to get startd.",
+      "providerLabel": "Provydur: {provider}",
+      "versionCount": "{count, plural, one {# vershun} other {# vershuns}}",
+      "loadFailed": "Borked to gets modules",
+      "createFailed": "Borked to maek module",
+      "createFailedStatus": "Borked to maek module ({status})",
+      "form": {
+        "name": "Naem",
+        "provider": "Provydur",
+        "slugTitle": "Lowercase letters, numbers, an hyphens only. Must startz wif a lowercase letter.",
+        "addressNote": "Naem an provydur form teh module's registry address an kant bee changed after creation.",
+        "vcsConnectionOptional": "VCS Konekshun (optional)",
+        "noneUploadManually": "None — uplode vershuns manually",
+        "repositoryUrl": "Repository URL",
+        "branchOptional": "Branch (optional)",
+        "branchPlaceholder": "main (leave empty fur default)",
+        "tagPattern": "Tag Pattern",
+        "tagPatternHint": "Only tags matching dis pattern maek vershuns (e.g. v1.0.0)",
+        "labelsOptional": "Labels (optional)",
+        "creating": "Makin...",
+        "create": "Maek"
+      }
+    },
+    "providers": {
+      "title": "Providurs",
+      "description": "Private Terraform provydur registry",
+      "cancel": "Nvm",
+      "createProvider": "Maek Provydur",
+      "empty": "No provydurs yet. Maek one to get startd.",
+      "loadFailed": "Borked to gets provydurs",
+      "createFailed": "Borked to maek provydur",
+      "createFailedStatus": "Borked to maek provydur ({status})",
+      "form": {
+        "name": "Naem",
+        "slugTitle": "Lowercase letters, numbers, an hyphens only. Must startz wif a lowercase letter.",
+        "creating": "Makin...",
+        "create": "Maek"
+      }
+    },
+    "meta": {
+      "title": "Metadata",
+      "edit": "Eddit",
+      "cancel": "Nvm",
+      "save": "Sav",
+      "saving": "Savin...",
+      "saveAnyway": "Sav Anyway",
+      "revertLabels": "Revert Labels",
+      "owner": "Ownr",
+      "ownerNone": "None",
+      "ownerPlaceholder": "hooman@example.com",
+      "labels": "Labels"
+    },
+    "moduleDetail": {
+      "notFound": "Module not found",
+      "loadFailed": "Borked to gets module",
+      "updateFailed": "Borked to update module",
+      "labelLockoutDefault": "Dis label change wud reduce yur access.",
+      "providerLabel": "Provydur: {provider}",
+      "cancel": "Nvm",
+      "uploadVersion": "Uplode Vershun",
+      "vcsConnected": "VCS Connected",
+      "connectVcs": "Connect VCS",
+      "deleteModule": "Delet Module",
+      "linkFailed": "Borked to link wurkspace",
+      "linkFailedStatus": "Link borked ({status})",
+      "unlinkConfirm": "Unlink dis wurkspace from teh module? Impact analysis wil no longer runz fur it.",
+      "unlinkFailed": "Borked to unlink wurkspace",
+      "unlinkFailedStatus": "Unlink borked ({status})",
+      "uploadFailed": "Uplode borked",
+      "uploadFailedStatus": "Uplode borked ({status})",
+      "saveVcsFailed": "Borked to sav VCS config",
+      "saveVcsFailedStatus": "Borked to sav VCS config ({status})",
+      "disableVcsFailed": "Borked to turn off VCS",
+      "disableVcsFailedStatus": "Borked to turn off VCS ({status})",
+      "deleteFailed": "Delet borked",
+      "deleteFailedStatus": "Delet borked ({status})",
+      "upload": {
+        "intro": "Pik a directory containing yur Terraform module files. Dey wil bee packaged into a tarball an uploded.",
+        "version": "Vershun",
+        "moduleDirectory": "Module Directory",
+        "selectDirectory": "Pik Directory",
+        "fileCount": "{count, plural, one {# file} other {# files}}",
+        "filesToInclude": "{count, plural, one {# file to include:} other {# files to include:}}",
+        "andMore": "...an {count} moar",
+        "uploading": "Uplodin...",
+        "upload": "Uplode"
+      },
+      "vcs": {
+        "intro": "Connect dis module to a VCS repository. Nu vershuns iz published automatically wen semver tags matching teh tag pattern iz pushed. Branch commits alone do not maek vershuns.",
+        "connection": "VCS Konekshun",
+        "selectConnection": "Pik a konekshun...",
+        "repositoryUrl": "Repository URL",
+        "branchOptional": "Branch (optional)",
+        "branchPlaceholder": "main (leave empty fur default)",
+        "tagPattern": "Tag Pattern",
+        "tagPatternHint": "Only tags matching dis pattern maek vershuns (e.g. v1.0.0)",
+        "saving": "Savin...",
+        "saveConfiguration": "Sav VCS Configuration",
+        "disconnect": "Disconnect VCS"
+      },
+      "vcsStatus": {
+        "connected": "VCS connected:",
+        "lastTag": "Last tag: {tag}",
+        "firstVersionHint": "Push a semver tag (e.g. <code>v1.0.0</code>) matching teh tag pattern to publish teh first vershun."
+      },
+      "links": {
+        "title": "Linked Wurkspaces",
+        "linkWorkspace": "Link Wurkspace",
+        "description": "Linked wurkspaces receive speculative plans wen PRs iz opened against dis module, an standard runz wen nu vershuns iz published.",
+        "searchPlaceholder": "Luk fur wurkspaces to link…",
+        "empty": "No wurkspaces linked yet.",
+        "unlinkTitle": "Unlink wurkspace"
+      },
+      "interface": {
+        "title": "Inputs & Outputs",
+        "counts": "{inputs} inputs, {outputs} outputs",
+        "versionLabel": "Vershun:",
+        "noData": "No interface data availbul fur dis vershun.",
+        "inputs": "Inputs",
+        "outputs": "Outputs",
+        "name": "Naem",
+        "type": "Kynd",
+        "description": "Wut it duz",
+        "default": "Default",
+        "required": "Required",
+        "sensitive": "Sensitive",
+        "requiredBadge": "required",
+        "optionalBadge": "optional",
+        "sensitiveBadge": "sensitive",
+        "noneDeclared": "Dis module vershun declares no inputs or outputs."
+      },
+      "versions": {
+        "title": "Vershuns",
+        "count": "{count, plural, one {# vershun} other {# vershuns}}",
+        "emptyVcs": "No vershuns yet. Push a semver tag matching \"{pattern}\" to teh connected repository to publish a vershun.",
+        "emptyUpload": "No vershuns yet. Uplode a module or connect VCS to get startd.",
+        "version": "Vershun",
+        "status": "Statuz",
+        "source": "Source",
+        "actions": "Stuffs",
+        "manualUpload": "manual uplode",
+        "delete": "Delet"
+      },
+      "deleteDialog": {
+        "title": "Srsly Delet",
+        "moduleBody": "Dis wil permanently delet dis module an all its vershuns.",
+        "versionBody": "Dis wil permanently delet vershun {version}.",
+        "cancel": "Nvm",
+        "confirm": "Delet"
+      }
+    },
+    "providerDetail": {
+      "description": "Provydur registry",
+      "deleteProvider": "Delet Provydur",
+      "publishNote": "Provydur vershuns iz published wif teh <code>terrapod-publish</code> CLI, which client-signs teh binaries. Uplodin an signing provydur binaries from teh browser iz no longer supported. Dis page iz read-only fur vershuns an platforms.",
+      "empty": "No vershuns yet. Publish wif teh terrapod-publish CLI to get startd.",
+      "loadVersionsFailed": "Borked to gets vershuns",
+      "updateFailed": "Borked to update provydur",
+      "labelLockoutDefault": "Dis label change wud reduce yur access.",
+      "deleteFailed": "Delet borked",
+      "deleteFailedStatus": "Delet borked ({status})",
+      "platformCount": "{count, plural, one {# platform} other {# platforms}}",
+      "delete": "Delet",
+      "os": "OS",
+      "arch": "Arch",
+      "filename": "Filename",
+      "actions": "Stuffs",
+      "deleteDialog": {
+        "title": "Srsly Delet",
+        "providerBody": "Dis wil permanently delet dis provydur an all its vershuns.",
+        "versionBody": "Dis wil permanently delet vershun {version} an its platforms.",
+        "platformBody": "Dis wil permanently delet teh {os}/{arch} platform.",
+        "cancel": "Nvm",
+        "confirm": "Delet"
+      }
+    }
+  },
+  "adminUsers": {
+    "title": "Hoomans",
+    "description": "Manij local hooman accounts",
+    "empty": "No hoomans found.",
+    "columns": {
+      "email": "Email",
+      "displayName": "Display Naem",
+      "status": "Statuz",
+      "lastLogin": "Last Login",
+      "created": "Maded",
+      "actions": "Stuffs"
+    },
+    "form": {
+      "email": "Email",
+      "displayName": "Display Naem",
+      "displayNamePlaceholder": "Jane Doe",
+      "passwordOptional": "Sekrit werd (optional)",
+      "passwordPlaceholder": "Enter a strong sekrit werd"
+    },
+    "reset": {
+      "title": "Reset sekrit werd fur {email}",
+      "newPassword": "Nu Sekrit werd"
+    },
+    "password": {
+      "score": {
+        "veryWeak": "Very weak",
+        "weak": "Weak",
+        "fair": "Fair",
+        "good": "Good",
+        "strong": "Strong"
+      }
+    },
+    "status": {
+      "active": "Active",
+      "inactive": "Inactive",
+      "never": "Never"
+    },
+    "actions": {
+      "cancel": "Nvm",
+      "save": "Sav",
+      "saving": "Savin...",
+      "createUser": "Maek Hooman",
+      "creating": "Makin...",
+      "resetPassword": "Reset Sekrit werd",
+      "edit": "Eddit",
+      "delete": "Delet",
+      "resetPw": "Reset PW",
+      "setPw": "Set PW",
+      "cancelPw": "Nvm PW"
+    },
+    "confirm": {
+      "activate": "Activate hooman \"{email}\"?",
+      "deactivate": "Deactivate hooman \"{email}\"?",
+      "delete": "Delet hooman \"{email}\"? Dis kant bee undone."
+    },
+    "success": {
+      "created": "Hooman \"{email}\" maded",
+      "updated": "Hooman \"{email}\" updated",
+      "activated": "Hooman \"{email}\" activated",
+      "deactivated": "Hooman \"{email}\" deactivated",
+      "passwordReset": "Sekrit werd reset fur \"{email}\"",
+      "deleted": "Hooman \"{email}\" deletd"
+    },
+    "errors": {
+      "load": "Borked to gets hoomans",
+      "create": "Borked to maek hooman",
+      "createStatus": "Borked to maek hooman ({status})",
+      "update": "Borked to update hooman",
+      "resetPassword": "Borked to reset sekrit werd",
+      "delete": "Borked to delet hooman"
+    }
+  },
+  "adminRoles": {
+    "title": "Roles & Assignments",
+    "description": "Manij RBAC roles an hooman role assignments",
+    "builtIn": "built-in",
+    "emptyRoles": "No roles defined.",
+    "emptyAssignments": "No role assignments.",
+    "tabs": {
+      "roles": "Roles",
+      "assignments": "Assignments"
+    },
+    "columns": {
+      "provider": "Provydur",
+      "email": "Email",
+      "role": "Role",
+      "created": "Maded",
+      "actions": "Stuffs"
+    },
+    "form": {
+      "name": "Naem",
+      "namePattern": "Letters, numbers, hyphens, an underscores only. Must startz wif a letter or number.",
+      "workspacePermission": "Wurkspace Permission",
+      "poolPermission": "Pool Permission",
+      "registryPermission": "Registry Permission",
+      "catalogPermission": "Catalog Permission",
+      "descriptionLabel": "Wut it duz",
+      "descriptionPlaceholder": "Developer access",
+      "allowLabels": "Allow Labels (key=valyoo, comma-separated)",
+      "allowNames": "Allow Names (comma-separated)",
+      "denyLabels": "Deny Labels (key=valyoo, comma-separated)",
+      "denyNames": "Deny Names (comma-separated)",
+      "allowLabelsShort": "Allow Labels",
+      "allowNamesShort": "Allow Names",
+      "denyLabelsShort": "Deny Labels",
+      "denyNamesShort": "Deny Names"
+    },
+    "assignForm": {
+      "provider": "Provydur",
+      "email": "Email",
+      "roles": "Roles"
+    },
+    "caps": {
+      "selected": "{count, plural, one {# capability} other {# capabilities}} selected",
+      "count": "{count, plural, one {# capability} other {# capabilities}}",
+      "custom": "Custom",
+      "matchesPresets": "Matches presets",
+      "advanced": "Advanced — capabilities",
+      "otherPreserved": "Other capabilities (preserved on sav)",
+      "presetHelp": {
+        "before": "Selecting a preset above pre-checks its capabilities. Ticking or unticking a box past a preset marks teh role",
+        "after": "an its grant iz sent as an explicit capability set."
+      },
+      "groups": {
+        "workspace": "Wurkspace",
+        "run": "Runz",
+        "state": "State",
+        "var": "Variables",
+        "config": "Config",
+        "drift": "Drift",
+        "run-task": "Runz tasks",
+        "notification": "Notifications",
+        "run-trigger": "Runz triggers",
+        "pool": "Agent pools",
+        "registry": "Registry",
+        "catalog": "Service catalog"
+      }
+    },
+    "display": {
+      "allow": "Allow: {value}",
+      "allowNames": "Allow names: {value}",
+      "deny": "Deny: {value}",
+      "denyNames": "Deny names: {value}"
+    },
+    "actions": {
+      "cancel": "Nvm",
+      "save": "Sav",
+      "saving": "Savin...",
+      "edit": "Eddit",
+      "delete": "Delet",
+      "remove": "Yeet",
+      "createRole": "Maek Role",
+      "creating": "Makin...",
+      "addAssignment": "Gib Assignment",
+      "setRoles": "Set Roles"
+    },
+    "confirm": {
+      "deleteRole": "Delet role \"{name}\"? Any assignments referencing it iz affected.",
+      "removeAssignment": "Yeet role \"{roleName}\" from {email}?"
+    },
+    "success": {
+      "roleCreated": "Role \"{name}\" maded",
+      "roleUpdated": "Role \"{name}\" updated",
+      "roleDeleted": "Role \"{name}\" deletd",
+      "rolesAssigned": "Roles assigned to {email}",
+      "assignmentRemoved": "Assignment removed"
+    },
+    "errors": {
+      "loadRoles": "Borked to gets roles",
+      "loadAssignments": "Borked to gets assignments",
+      "createRole": "Borked to maek role",
+      "createRoleStatus": "Borked to maek role ({status})",
+      "updateRole": "Borked to update role",
+      "deleteRole": "Borked to delet role",
+      "setAssignment": "Borked to set assignment",
+      "setAssignmentStatus": "Borked to set assignment ({status})",
+      "deleteAssignment": "Borked to delet assignment"
+    }
+  },
+  "adminVcs": {
+    "title": "VCS Konekshuns",
+    "description": "Manij vershun control system integrations",
+    "empty": "No VCS konekshuns configured.",
+    "actions": {
+      "new": "Nu Konekshun",
+      "cancel": "Nvm",
+      "edit": "Eddit",
+      "delete": "Delet"
+    },
+    "confirmDelete": "Delet dis VCS konekshun? Wurkspaces using it wil lose VCS integration. Dis kant bee undone.",
+    "form": {
+      "name": "Naem",
+      "namePattern": "Letters, numbers, hyphens, an underscores only. Must startz wif a letter or number.",
+      "provider": "Provydur",
+      "providerImmutable": "Provydur iz immutable — delet an recreate to change it",
+      "serverUrl": "Server URL (optional)",
+      "serverUrlHint": "Must bee an HTTP or HTTPS URL (e.g. https://github.mycompany.com)",
+      "appId": "App ID",
+      "appIdHint": "GitHub App ID — numeric digits only",
+      "installationId": "Installation ID",
+      "installationIdHint": "GitHub App Installation ID — numeric digits only",
+      "privateKey": "Private Key (PEM)",
+      "browse": "Browse...",
+      "privateKeyKeep": "Leave blank to keep teh current key — paste a nu PEM to rotate",
+      "privateKeyPlaceholder": "-----BEGIN RSA PRIVATE KEY-----\n...\n\nDrop a .pem file heer or click Browse",
+      "webhookSecret": "Webhook Secret",
+      "optional": "(optional)",
+      "webhookSecretSet": "Set — leave blank to keep, enter a nu valyoo to rotate",
+      "webhookSecretGlobal": "Leave blank to use teh global webhook secret",
+      "webhookSecretHelp": "Per-konekshun HMAC secret fur dis installation's webhooks. Wen unset, teh global secret iz used.",
+      "accessToken": "Access Tokun",
+      "accessTokenKeep": "Leave blank to keep teh current tokun",
+      "saving": "Savin...",
+      "creating": "Makin...",
+      "saveChanges": "Sav Chanjes",
+      "createConnection": "Maek Konekshun"
+    },
+    "table": {
+      "name": "Naem",
+      "provider": "Provydur",
+      "serverUrl": "Server URL",
+      "status": "Statuz",
+      "created": "Maded",
+      "actions": "Stuffs"
+    },
+    "success": {
+      "created": "VCS konekshun \"{name}\" maded",
+      "updated": "VCS konekshun \"{name}\" updated",
+      "deleted": "VCS konekshun deletd"
+    },
+    "errors": {
+      "load": "Borked to gets VCS konekshuns",
+      "save": "Borked to sav konekshun",
+      "delete": "Borked to delet konekshun",
+      "createStatus": "Borked to maek konekshun ({status})",
+      "updateStatus": "Borked to update konekshun ({status})"
+    }
+  },
+  "adminVariableSets": {
+    "title": "Variable Sets",
+    "description": "Manij org-scoped variable sets fur wurkspace groups",
+    "empty": "No variable sets configured.",
+    "none": "-",
+    "actions": {
+      "new": "Nu Variable Set",
+      "cancel": "Nvm"
+    },
+    "form": {
+      "name": "Naem",
+      "namePattern": "Letters, numbers, hyphens, an underscores only. Must startz wif a letter or number.",
+      "descriptionLabel": "Wut it duz",
+      "descriptionPlaceholder": "AWS credentials fur all wurkspaces",
+      "global": "Global (apply to all wurkspaces)",
+      "priority": "Priority (override wurkspace vars)",
+      "creating": "Makin...",
+      "create": "Maek Variable Set"
+    },
+    "table": {
+      "name": "Naem",
+      "description": "Wut it duz",
+      "scope": "Scope",
+      "variables": "Variables",
+      "created": "Maded"
+    },
+    "scope": {
+      "global": "Global",
+      "priority": "Priority",
+      "standard": "Standard"
+    },
+    "errors": {
+      "load": "Borked to gets variable sets",
+      "create": "Borked to maek variable set",
+      "createStatus": "Borked to maek variable set ({status})"
+    },
+    "detail": {
+      "back": "Back to variable sets",
+      "headerFallback": "Variable set",
+      "notFound": "Variable set not found",
+      "global": "Global",
+      "priority": "Priority",
+      "yes": "Ya",
+      "no": "No",
+      "edit": "Eddit",
+      "cancel": "Nvm",
+      "save": "Sav",
+      "saving": "Savin...",
+      "delete": "Delet",
+      "deleting": "Deletin...",
+      "confirmDelete": "Srsly Delet",
+      "deleteTitle": "Delet Variable Set",
+      "deleteDescription": "Permanently delet dis variable set an all its variables.",
+      "tabs": {
+        "settings": "Settins",
+        "variables": "Variables",
+        "workspaces": "Wurkspaces"
+      },
+      "addVariable": "Gib Variable",
+      "adding": "Gibbin...",
+      "varKey": "Key",
+      "varValue": "Valyoo",
+      "varCategory": "Category",
+      "categoryTerraform": "Terraform",
+      "categoryEnv": "Environment",
+      "sensitive": "Sensitive",
+      "sensAbbr": "Sens.",
+      "enterNewValue": "Enter nu valyoo",
+      "empty": "empty",
+      "emptyVars": "No variables in dis set.",
+      "actions": "Stuffs",
+      "remove": "Yeet",
+      "add": "Gib",
+      "addWorkspace": "Gib Wurkspace",
+      "workspace": "Wurkspace",
+      "selectWorkspace": "Pik a wurkspace...",
+      "globalBanner": "Dis variable set iz global an applies to all wurkspaces automatically.",
+      "emptyWorkspaces": "No wurkspaces assigned to dis variable set.",
+      "confirmDeleteVar": "Delet dis variable? Dis kant bee undone.",
+      "confirmRemoveWorkspace": "Yeet dis wurkspace from teh variable set? Its variables wil no longer apply to dat wurkspace.",
+      "success": {
+        "updated": "Variable set updated",
+        "workspaceAdded": "Wurkspace added",
+        "workspaceRemoved": "Wurkspace removed"
+      },
+      "errors": {
+        "load": "Borked to gets variable set",
+        "update": "Borked to update variable set",
+        "delete": "Borked to delet variable set",
+        "loadVars": "Borked to gets variables",
+        "loadWorkspaces": "Borked to gets wurkspaces",
+        "addVar": "Borked to gib variable",
+        "addVarStatus": "Borked to gib variable ({status})",
+        "updateVar": "Borked to update variable",
+        "deleteVar": "Borked to delet variable",
+        "addWorkspace": "Borked to gib wurkspace",
+        "removeWorkspace": "Borked to yeet wurkspace"
+      }
+    }
+  },
+  "adminAutodiscovery": {
+    "title": "Autodiscovery",
+    "description": "Auto-maek wurkspaces in monorepos wen PRs touch matching paths",
+    "empty": "No autodiscovery rules yet. Maek one to startz auto-provisioning wurkspaces from PRs in yur monorepo.",
+    "unsavedRule": "(unsaved rule)",
+    "actions": {
+      "newRule": "Nu Rule",
+      "cancel": "Nvm",
+      "create": "Maek",
+      "update": "Update",
+      "preview": "Preview",
+      "edit": "Eddit",
+      "delete": "Delet",
+      "close": "Close"
+    },
+    "status": {
+      "enabled": "on",
+      "disabled": "off"
+    },
+    "form": {
+      "createTitle": "Maek rule",
+      "editTitle": "Eddit rule",
+      "name": "Naem",
+      "vcsConnection": "VCS konekshun",
+      "selectConnection": "Pik konekshun",
+      "repoUrl": "Repo URL",
+      "branch": "Branch (empty = default)",
+      "matchPattern": "Match pattern",
+      "matchPatternHint": "Gitignore-style globs. <code>**</code> matches across path segments. Only <code>*.tf*</code> files trigger autodiscovery.",
+      "ignorePatterns": "Ignore patterns (one per line)",
+      "nameTemplate": "Wurkspace naem template (optional)",
+      "nameTemplateHint": "Use <path></path> fur teh directory wif <code>/</code> replaced by <code>-</code>, or <root></root> fur teh directory as-iz. Empty = default (just teh dashed path).",
+      "templateDefaults": "Wurkspace template defaults",
+      "executionMode": "Execution mode",
+      "executionModeHint": "Autodiscovery iz VCS-driven; only agent execution iz supported.",
+      "agentPool": "Agent pool",
+      "none": "(none)",
+      "executionBackend": "Execution backend",
+      "terraformVersion": "Terraform vershun",
+      "cpuRequest": "CPU request",
+      "memoryRequest": "Memory request",
+      "ownerEmail": "Ownr email",
+      "autoApply": "Auto-apply",
+      "enabled": "On",
+      "onDirectoryDelete": "On directory delet",
+      "onDeleteFlag": "Flag (safe — mark pending deletion, requires manual action)",
+      "onDeleteDestroy": "Destroy (DANGER — tears down infrastructure den archives teh wurkspace)",
+      "onDirectoryDeleteHint": "Wut happens to an autodiscovered wurkspace wen its directory iz removed on teh tracked branch.",
+      "onDeleteDestroyWarning": "Dis wil runz a real terraform destroy on teh wurkspace wen its directory iz removed on teh tracked branch.",
+      "labels": "Labels (inherited by maded wurkspaces)",
+      "varFiles": "Var files (inherited by maded wurkspaces)",
+      "varFilesHint": "Relative <code>.tfvars</code> paths passed to plan/apply.",
+      "addVarFile": "Gib var file",
+      "executionHooks": "Execution hooks (associated wif each nu wurkspace)",
+      "executionHooksHint": "Pick from hooks defined on teh <page>Execution Hooks</page> admin page — each selected hook iz associated wif every wurkspace dis rule creates.",
+      "noHooks": "No execution hooks defined yet. Maek one on teh Execution Hooks admin page first.",
+      "hookDisabled": "(off)",
+      "hookNotInLibrary": "(not in library — untick to yeet)",
+      "runTaskTemplates": "Runz task templates (maded on each nu wurkspace)",
+      "notificationTemplates": "Notification templates (maded on each nu wurkspace)",
+      "saving": "Savin...",
+      "previewTitle": "Walk teh repo an preview which wurkspaces dis rule WOULD maek — no persistence"
+    },
+    "table": {
+      "name": "Naem",
+      "repo": "Repo",
+      "pattern": "Pattern",
+      "enabled": "On",
+      "created": "Maded",
+      "previewTitle": "Walk teh repo an preview which wurkspaces dis rule wud maek"
+    },
+    "deleteModal": {
+      "title": "Delet rule?",
+      "body": "Wurkspaces auto-maded by dis rule keep working. Future PRs touching nu paths under dis rule won't auto-maek moar wurkspaces."
+    },
+    "preview": {
+      "title": "Preview: {ruleName}",
+      "walkedFiles": "Walked <files>{count}</files> files on <refspan>{ref}</refspan>",
+      "walking": "Walking repository…",
+      "noMatches": "No directories in dis repo match teh rule's pattern. Nothing to maek.",
+      "colWorkspace": "Wurkspace",
+      "colDirectory": "Directory",
+      "colAction": "Action",
+      "repoRoot": "(repo root)",
+      "actionCreate": "Maek",
+      "skipDiscovered": "Skip (already discovered)",
+      "skipDiscoveredTitle": "Already maded by dis rule",
+      "skipCollision": "Skip (naem collision)",
+      "skipCollisionTitle": "A wurkspace wif dis naem already exists fur another reason",
+      "willCreate": "{count, plural, one {# wurkspace wil bee maded.} other {# wurkspaces wil bee maded.}} Existing wurkspaces (collisions) iz left untouched.",
+      "provision": "{count, plural, one {Provision # wurkspace} other {Provision # wurkspaces}}",
+      "provisioning": "Provisioning…",
+      "saveToProvision": "Sav teh rule to provision deez wurkspaces."
+    },
+    "success": {
+      "created": "Maded {name}",
+      "updated": "Updated {name}",
+      "deleted": "Deletd rule",
+      "provisioned": "{count, plural, one {Maded # wurkspace from \"{ruleName}\"} other {Maded # wurkspaces from \"{ruleName}\"}}"
+    },
+    "errors": {
+      "loadRules": "Borked to gets autodiscovery rules",
+      "load": "Borked to gets",
+      "createFailed": "Maek borked: {status} {detail}",
+      "updateFailed": "Update borked: {status} {detail}",
+      "save": "Borked to sav",
+      "deleteRule": "Borked to delet rule",
+      "delete": "Borked to delet",
+      "previewFailed": "Preview borked ({status})",
+      "preview": "Preview borked",
+      "previewPrereq": "Set VCS konekshun, repo URL, an pattern before previewing",
+      "scanFailed": "Scan borked ({status})",
+      "scan": "Scan borked"
+    }
+  },
+  "adminBulkUpdate": {
+    "title": "Bulk Update",
+    "description": "Pik wurkspaces by filter, den apply a settins change across all ov dem",
+    "none": "(none)",
+    "anyOption": "(any)",
+    "unchanged": "(unchanged)",
+    "unchangedOption": "(unchanged)",
+    "filter": {
+      "heading": "1. Pik wurkspaces",
+      "matchAll": "Match <strong>all</strong> wurkspaces (ignores teh filters below)",
+      "namePrefix": "Naem prefix",
+      "executionBackend": "Execution backend",
+      "ownerEmail": "Ownr email",
+      "agentPool": "Agent pool",
+      "vcsConnection": "VCS konekshun",
+      "labels": "Labels",
+      "search": "Luk fur",
+      "searching": "Searching..."
+    },
+    "results": {
+      "matched": "Matched <strong>{count}</strong> {count, plural, one {wurkspace} other {wurkspaces}}.",
+      "noMatch": "No wurkspaces matched dis filter.",
+      "colName": "Naem",
+      "colMode": "Mode",
+      "colBackend": "Backend",
+      "colTfVersion": "TF vershun",
+      "colLabels": "Labels"
+    },
+    "update": {
+      "heading": "2. Apply chanjes",
+      "hint": "Only fields u set below iz changed. Teh filter above selects which wurkspaces receive teh change.",
+      "terraformVersion": "Terraform vershun",
+      "executionBackend": "Execution backend",
+      "executionMode": "Execution mode",
+      "autoApply": "Auto-apply",
+      "agentPool": "Agent pool",
+      "cpuRequest": "CPU request",
+      "memoryRequest": "Memory request",
+      "setLabels": "Set labels (replaces teh labels map on every matched wurkspace)",
+      "setVarFiles": "Set var files",
+      "addVarFile": "Gib var file",
+      "setRunTasks": "Set runz tasks (upserted by naem on every matched wurkspace)",
+      "setNotifications": "Set notification configurations (upserted by naem)",
+      "dryRun": "Dry runz (preview only — no chanjes written)",
+      "confirmWarning": "Dis writes chanjes to every matched wurkspace.",
+      "confirmApply": "Srsly apply",
+      "applying": "Applying...",
+      "cancel": "Nvm",
+      "working": "Working...",
+      "previewDryRun": "Preview (dry runz)",
+      "applyChanges": "Apply chanjes"
+    },
+    "diff": {
+      "colWorkspace": "Wurkspace",
+      "colChanges": "Chanjes"
+    },
+    "dryResult": {
+      "heading": "Dry runz result",
+      "summary": "Matched <strong>{matched}</strong>; <strong>{wouldChange}</strong> wud change; {unchanged} unchanged. Nothing wuz written.",
+      "wouldChange": "Wud change",
+      "noChange": "No wurkspaces wud change wif dis update."
+    },
+    "applyResult": {
+      "heading": "Apply result",
+      "summary": "Matched <strong>{matched}</strong>; <appliedstrong>{applied}</appliedstrong> applied; {unchanged} unchanged; {errors, plural, one {# error} other {# errors}}.",
+      "applied": "Applied",
+      "unnamedWorkspace": "(wurkspace)",
+      "noChange": "No wurkspaces changed."
+    },
+    "errors": {
+      "searchFailed": "Luk fur borked ({status})",
+      "search": "Luk fur borked",
+      "bulkUpdateFailed": "Bulk update borked ({status})",
+      "bulkUpdate": "Bulk update borked"
+    }
+  },
+  "adminExecutionHooks": {
+    "title": "Execution Hooks",
+    "description": "Custom shell steps runz inside runner Jobs at pre/post-plan/apply points, associated wif wurkspaces",
+    "empty": "No execution hooks configured.",
+    "actions": {
+      "cancel": "Nvm",
+      "new": "Nu Execution Hook",
+      "creating": "Makin...",
+      "create": "Maek Execution Hook"
+    },
+    "badges": {
+      "disabled": "Off",
+      "enabled": "On"
+    },
+    "columns": {
+      "name": "Naem",
+      "hookPoint": "Hook Point",
+      "enabled": "On",
+      "priority": "Priority",
+      "workspaces": "Wurkspaces"
+    },
+    "form": {
+      "name": "Naem",
+      "namePatternTitle": "Letters, numbers, hyphens, an underscores only. Must startz wif a letter or number.",
+      "description": "Wut it duz",
+      "descriptionPlaceholder": "Gib an internal hosts entry before init",
+      "hookPoint": "Hook Point",
+      "priority": "Priority",
+      "priorityTitle": "Lower runz first wen several hooks share a point (ties broken by naem).",
+      "scriptLabel": "Script (<code>/bin/sh -c</code>)",
+      "scriptHelp": "Runz wif teh runner's cloud identity. A non-zero exit fails teh runz. Secrets shud come from wurkspace variables, not inline heer."
+    },
+    "errors": {
+      "load": "Borked to gets execution hooks",
+      "createStatus": "Borked to maek execution hook ({status})",
+      "create": "Borked to maek execution hook"
+    }
+  },
+  "adminPolicySets": {
+    "title": "Polisy Sets",
+    "description": "OPA polisy-as-code enforcement, scoped to wurkspaces by label",
+    "empty": "No polisy sets configured.",
+    "actions": {
+      "cancel": "Nvm",
+      "new": "Nu Polisy Set",
+      "creating": "Makin...",
+      "create": "Maek Polisy Set"
+    },
+    "badges": {
+      "disabled": "Off",
+      "mandatory": "Mandatory",
+      "advisory": "Advisory",
+      "global": "Global",
+      "labelScoped": "Label-scoped"
+    },
+    "columns": {
+      "name": "Naem",
+      "description": "Wut it duz",
+      "enforcement": "Enforcement",
+      "scope": "Scope",
+      "policies": "Polisys"
+    },
+    "form": {
+      "name": "Naem",
+      "namePatternTitle": "Letters, numbers, hyphens, an underscores only. Must startz wif a letter or number.",
+      "description": "Wut it duz",
+      "descriptionPlaceholder": "Mandatory guardrails fur production wurkspaces",
+      "enforcement": "Enforcement",
+      "enforcementAdvisory": "Advisory (warn, do not block)",
+      "enforcementMandatory": "Mandatory (block apply on failure)",
+      "globalScope": "Global (apply to every wurkspace)",
+      "sourceInline": "Inline (manij polisys in UI)",
+      "sourceVcs": "From VCS Repository",
+      "vcsConnection": "VCS Konekshun",
+      "selectConnection": "Pik konekshun...",
+      "repoUrl": "Repository URL",
+      "branch": "Branch",
+      "branchPlaceholder": "main (default)",
+      "policyPath": "Polisy Path",
+      "policyPathPlaceholder": "polisys/ (directory containing .rego files)",
+      "helpVcs": "Polisys wil bee synced from teh repository automatically.",
+      "helpInline": "Gib polisys an refine label scoping after makin teh set."
+    },
+    "errors": {
+      "load": "Borked to gets polisy sets",
+      "createStatus": "Borked to maek polisy set ({status})",
+      "create": "Borked to maek polisy set"
+    }
+  },
+  "adminCatalog": {
+    "title": "Catalog Admin",
+    "description": "Manij service catalog items",
+    "notEnabled": "Service catalog iz not on.",
+    "empty": "No catalog items yet.",
+    "actions": {
+      "new": "Nu Catalog Item",
+      "cancel": "Nvm",
+      "create": "Maek Catalog Item",
+      "creating": "Makin…",
+      "saveChanges": "Sav Chanjes",
+      "saving": "Savin…",
+      "edit": "Eddit",
+      "delete": "Delet"
+    },
+    "form": {
+      "name": "Naem",
+      "nameTitle": "Letters, numbers, hyphens, an underscores only. Must startz wif a letter or number.",
+      "module": "Module",
+      "moduleSelect": "Pik a module…",
+      "moduleImmutable": "Module iz immutable after creation",
+      "displayName": "Display naem",
+      "displayNamePlaceholder": "Standard S3 Bucket",
+      "versionPin": "Default vershun pin",
+      "versionPinPlaceholder": "e.g. 1.2.0 (empty = latest)",
+      "descriptionLabel": "Wut it duz",
+      "descriptionPlaceholder": "Wut dis catalog item provisions…",
+      "enabled": "On (visible in teh browse catalog)",
+      "providerTemplates": "Provydur templates",
+      "noProviderTemplates": "No provydur templates defined.",
+      "restrictPools": "Restrict to specific agent pools",
+      "noAgentPools": "No agent pools availbul.",
+      "anyPool": "Any agent pool may bee used.",
+      "labels": "Labels",
+      "variableOptions": "Variable options (advanced, JSON)",
+      "variableOptionsHint": "Per-input overrides (options, hidden, default). Leave as <code>[]</code> if unused."
+    },
+    "table": {
+      "name": "Naem",
+      "module": "Module",
+      "enabled": "On",
+      "actions": "Stuffs"
+    },
+    "badge": {
+      "enabled": "on",
+      "disabled": "off"
+    },
+    "confirm": {
+      "delete": "Delet dis catalog item? Existing provisioned instances iz unaffected."
+    },
+    "success": {
+      "created": "Catalog item \"{name}\" maded",
+      "updated": "Catalog item \"{name}\" updated",
+      "deleted": "Catalog item deletd"
+    },
+    "errors": {
+      "load": "Borked to gets catalog items",
+      "save": "Borked to sav catalog item",
+      "createStatus": "Borked to maek catalog item ({status})",
+      "updateStatus": "Borked to update catalog item ({status})",
+      "delete": "Borked to delet catalog item",
+      "deleteConflict": "Kant delet: dis catalog item haz provisioned instances.",
+      "varOptsInvalidJson": "Variable options must bee valid JSON (an array).",
+      "varOptsNotArray": "Variable options must bee a JSON array."
+    }
+  },
+  "adminProviderTemplates": {
+    "title": "Provydur Templates",
+    "description": "Reusable provydur configuration blocks fur catalog items",
+    "notEnabled": "Service catalog iz not on.",
+    "empty": "No provydur templates yet.",
+    "actions": {
+      "new": "Nu Template",
+      "cancel": "Nvm",
+      "create": "Maek Template",
+      "creating": "Makin…",
+      "saveChanges": "Sav Chanjes",
+      "saving": "Savin…",
+      "edit": "Eddit",
+      "delete": "Delet"
+    },
+    "form": {
+      "name": "Naem",
+      "providerType": "Provydur kynd",
+      "body": "Body (HCL)",
+      "parameters": "Parameters (advanced, JSON)",
+      "parametersHint": "Each parameter becomes a provision form field. Leave as <code>[]</code> if unused.",
+      "labels": "Labels"
+    },
+    "table": {
+      "name": "Naem",
+      "providerType": "Provydur kynd",
+      "parameters": "Parameters",
+      "actions": "Stuffs"
+    },
+    "confirm": {
+      "delete": "Delet dis provydur template? Catalog items referencing it wil fail to provision. Dis kant bee undone."
+    },
+    "success": {
+      "created": "Provydur template \"{name}\" maded",
+      "updated": "Provydur template \"{name}\" updated",
+      "deleted": "Provydur template deletd"
+    },
+    "errors": {
+      "load": "Borked to gets provydur templates",
+      "save": "Borked to sav provydur template",
+      "createStatus": "Borked to maek template ({status})",
+      "updateStatus": "Borked to update template ({status})",
+      "delete": "Borked to delet provydur template",
+      "deleteConflict": "Kant delet: dis template iz referenced by a catalog item.",
+      "paramsInvalidJson": "Parameters must bee valid JSON (an array).",
+      "paramsNotArray": "Parameters must bee a JSON array."
+    }
+  },
+  "adminAgentPools": {
+    "title": "Agent Pools",
+    "description": "Manij runner agent pools an dere listeners",
+    "empty": "No agent pools configured.",
+    "actions": {
+      "newPool": "Nu Pool",
+      "createPool": "Maek Pool",
+      "creating": "Makin...",
+      "cancel": "Nvm",
+      "edit": "Eddit",
+      "save": "Sav",
+      "saving": "Savin...",
+      "delete": "Delet",
+      "deleting": "Deletin...",
+      "confirmDelete": "Srsly Delet"
+    },
+    "form": {
+      "name": "Naem",
+      "namePattern": "Letters, numbers, hyphens, an underscores only. Must startz wif a letter or number.",
+      "description": "Wut it duz",
+      "descriptionPlaceholder": "Production AWS runners",
+      "labels": "Labels"
+    },
+    "columns": {
+      "name": "Naem",
+      "description": "Wut it duz",
+      "status": "Statuz",
+      "created": "Maded"
+    },
+    "badges": {
+      "default": "default",
+      "degradedTooltip": "Listeners iz heartbeating but dere certificates haz expired — runz wil fail to launch.",
+      "status": {
+        "online": "online",
+        "offline": "offline",
+        "degraded": "degraded"
+      }
+    },
+    "detail": {
+      "back": "Back to agent pools",
+      "defaultDescription": "Agent pool"
+    },
+    "tabs": {
+      "settings": "Settins",
+      "tokens": "Tokuns",
+      "listeners": "Listeners"
+    },
+    "settings": {
+      "title": "Pool Settins",
+      "fields": {
+        "name": "Naem",
+        "description": "Wut it duz",
+        "created": "Maded",
+        "owner": "Ownr",
+        "yourPermission": "Yur Permission",
+        "labels": "Labels"
+      },
+      "permissions": {
+        "read": "read",
+        "write": "write",
+        "admin": "admin"
+      }
+    },
+    "danger": {
+      "title": "Delet Pool",
+      "description": "Permanently delet dis agent pool an all associated tokuns."
+    },
+    "tokens": {
+      "create": "Maek Tokun",
+      "empty": "No tokuns fur dis pool.",
+      "revoke": "Revoke",
+      "created": {
+        "title": "Tokun maded successfully",
+        "copyNow": "Copy dis tokun nao — it wil not bee shown agin.",
+        "copy": "Copy"
+      },
+      "form": {
+        "description": "Wut it duz",
+        "descriptionPlaceholder": "Production listener tokun",
+        "maxUses": "Max Uses",
+        "maxUsesHint": "Default 2 — tolerates one bootstrap-race retry across listener replicas.",
+        "expiresAt": "Expires At",
+        "expiresAtHint": "Default 1 hour from nao."
+      },
+      "columns": {
+        "description": "Wut it duz",
+        "uses": "Uses",
+        "expires": "Expires",
+        "status": "Statuz",
+        "createdBy": "Maded By",
+        "actions": "Stuffs"
+      },
+      "badges": {
+        "revoked": "Revoked",
+        "active": "Active"
+      }
+    },
+    "listeners": {
+      "empty": "No listeners registered fur dis pool.",
+      "columns": {
+        "name": "Naem",
+        "status": "Statuz",
+        "replicas": "Replicas",
+        "certExpires": "Cert Expires",
+        "actions": "Stuffs"
+      },
+      "status": {
+        "online": "online",
+        "offline": "offline",
+        "degraded": "degraded",
+        "cert-expired": "cert-expired"
+      },
+      "tooltips": {
+        "certExpired": "Listener iz heartbeating but its certificate haz expired — every cert-authenticated call (claim runz, renew, runner-tokun) wil fail. Most likely cause: teh API never registered teh latest cert, or teh cert TTL elapsed before renewal.",
+        "degraded": "Listeners iz heartbeating but dere certificates haz expired — runz wil fail to launch."
+      }
+    },
+    "confirm": {
+      "revokeToken": "Revoke dis join tokun? Listeners using it can no longer join, an dis kant bee undone.",
+      "deleteListener": "Delet dis listener? It wil re-register on its next heartbeat if teh pod iz still running."
+    },
+    "success": {
+      "poolUpdated": "Pool updated",
+      "tokenRevoked": "Tokun revoked",
+      "listenerDeleted": "Listener deletd"
+    },
+    "errors": {
+      "loadPools": "Borked to gets agent pools",
+      "loadPool": "Borked to gets pool",
+      "loadTokens": "Borked to gets tokuns",
+      "loadListeners": "Borked to gets listeners",
+      "createPool": "Borked to maek pool",
+      "createStatus": "Borked to maek pool ({status})",
+      "updatePool": "Borked to update pool",
+      "deletePool": "Borked to delet pool",
+      "poolNotFound": "Pool not found",
+      "createToken": "Borked to maek tokun",
+      "createTokenStatus": "Borked to maek tokun ({status})",
+      "revokeToken": "Borked to revoke tokun",
+      "deleteListener": "Borked to delet listener"
+    }
+  },
+  "adminAuditLog": {
+    "title": "Audit Log",
+    "description": "Immutable log ov all API requests",
+    "empty": "No audit log entries found.",
+    "errors": {
+      "load": "Borked to gets audit log"
+    },
+    "filters": {
+      "actorEmail": "Actor Email",
+      "actorPlaceholder": "hooman@example.com",
+      "resourceType": "Rezorce Kynd",
+      "resourceTypePlaceholder": "wurkspaces",
+      "method": "Method",
+      "methodAll": "All",
+      "since": "Since",
+      "until": "Until",
+      "clear": "Clear",
+      "apply": "Apply Filters"
+    },
+    "columns": {
+      "timestamp": "Timestamp",
+      "actor": "Actor",
+      "action": "Action",
+      "resourceType": "Rezorce Kynd",
+      "resourceId": "Rezorce ID",
+      "status": "Statuz",
+      "duration": "Duration"
+    },
+    "pagination": {
+      "summary": "Page {current} ov {total} ({count, plural, one {# entry} other {# entries}})",
+      "previous": "Previous",
+      "next": "Next"
+    }
+  },
+  "adminBinaryCache": {
+    "title": "Cache",
+    "description": "CLI binary an provydur cache management",
+    "errors": {
+      "loadBinary": "Borked to gets binary cache",
+      "loadCache": "Borked to gets cache"
+    },
+    "sections": {
+      "cliBinaries": "CLI Binaries",
+      "providerBinaries": "Provydur Binaries"
+    },
+    "empty": {
+      "binaries": "No cached CLI binaries yet.",
+      "providers": "No cached provydur binaries yet."
+    },
+    "columns": {
+      "tool": "Tool",
+      "version": "Vershun",
+      "os": "OS",
+      "arch": "Arch",
+      "cachedAt": "Cached At",
+      "provider": "Provydur",
+      "hostname": "Hostname",
+      "actions": "Stuffs"
+    },
+    "warm": {
+      "heading": "Warm cache",
+      "hide": "Hide",
+      "prePopulate": "Pre-populate…",
+      "help": "Pre-pull binaries an provydur platforms into teh cache (one per line). Trailing <code>os/arch</code> tokuns iz optional — omit dem to use teh configured default platforms.",
+      "binariesLabel": "Binaries",
+      "providersLabel": "Providurs",
+      "warm": "Warm",
+      "warming": "Warming…",
+      "confirm": "Warm teh selected cache entries nao?",
+      "errorEmpty": "Gib at least one binary or provydur line to warm.",
+      "errorFailedStatus": "Warm borked ({status})",
+      "errorFailed": "Borked to warm cache",
+      "success": "Warmed {succeeded}/{total} ({failed} borked)"
+    },
+    "purge": {
+      "button": "Purge",
+      "confirmBinary": "Purge {tool} {version} from teh cache? It wil bee re-fetched from upstream on teh next request.",
+      "confirmProvider": "Purge {provider} {version} from teh provydur cache? It wil bee re-fetched from upstream on teh next request.",
+      "successBinary": "Purged {count} entries fur {tool} {version}",
+      "successProvider": "Purged {count} entries fur {provider} {version}",
+      "errorStatus": "Purge borked ({status})",
+      "error": "Borked to purge",
+      "errorProvider": "Borked to purge provydur",
+      "errorProviders": "Borked to purge provydurs"
+    },
+    "batchPurge": {
+      "purging": "Purging...",
+      "purgeSelected": "Purge Selected ({count})",
+      "confirmBinary": "Purge all selected binary cache entries? Dey wil bee re-fetched from upstream on teh next request.",
+      "confirmProvider": "Purge all selected provydur cache entries? Dey wil bee re-fetched from upstream on teh next request.",
+      "errorBinaryItem": "Purge borked fur {tool} {version}",
+      "errorProviderItem": "Purge borked fur {provider} {version}",
+      "successBinary": "Purged {count} binary cache entries",
+      "successProvider": "Purged {count} provydur cache entries"
+    }
+  },
+  "catalog": {
+    "title": "Service Catalog",
+    "description": "Provision self-service infrastructure from curated modules",
+    "notEnabled": "Service catalog iz not on.",
+    "empty": "No catalog items availbul.",
+    "card": {
+      "pinned": "pinned {version}",
+      "latest": "latest"
+    },
+    "errors": {
+      "loadItems": "Borked to gets catalog items"
+    }
+  },
+  "catalogDetail": {
+    "backLink": "← Catalog",
+    "backToCatalog": "Back to catalog",
+    "fallbackTitle": "Catalog item",
+    "notFound": "Catalog item not found, or teh service catalog iz not on.",
+    "common": {
+      "cancel": "Nvm"
+    },
+    "info": {
+      "module": "Module:",
+      "resolvedVersion": "Resolved vershun:",
+      "latest": "latest",
+      "disabled": "off"
+    },
+    "pending": {
+      "banner": "Teh runz fur <strong>{name}</strong> iz planned an waitin fur review. Srsly to apply, or discard.",
+      "working": "Working…",
+      "confirmApply": "Srsly & apply",
+      "discard": "Discard"
+    },
+    "field": {
+      "select": "Pik…"
+    },
+    "provision": {
+      "title": "Provision",
+      "workspaceName": "Wurkspace naem",
+      "workspaceNameTitle": "Letters, numbers, hyphens, an underscores only. Must startz wif a letter or number.",
+      "workspaceNamePlaceholder": "my-instance",
+      "agentPool": "Agent pool",
+      "selectPool": "Pik a pool…",
+      "noPoolsAvailable": "No agent pools iz availbul to u. U need write access to an agent pool to provision — ask an administrator to grant it.",
+      "noPoolsAllowed": "None ov teh agent pools u can access iz allowed by dis catalog item. Ask an administrator to widen teh item’s allowed pools or grant u access to one ov dem.",
+      "version": "Vershun",
+      "latestFloat": "Latest (float)",
+      "defaultPinOption": "{version} (default pin)",
+      "labelsOptional": "Labels (optional)",
+      "autoApplyHint": "Auto-apply applies chanjes without a manual review step.",
+      "provisioning": "Provisioning…",
+      "submit": "Provision"
+    },
+    "instances": {
+      "title": "Instances",
+      "empty": "No instances provisioned from dis item yet.",
+      "colName": "Naem",
+      "colVersion": "Vershun",
+      "colPool": "Pool",
+      "colActions": "Stuffs",
+      "reconfigure": "Reconfigure",
+      "destroy": "Destroy",
+      "orphan": "Orphan…",
+      "orphanTitle": "Delet teh catalog record without destroying its infrastructure (discouraged)"
+    },
+    "reconfigure": {
+      "title": "Reconfigure {name}",
+      "description": "Update inputs an/or vershun, den queue a runz.",
+      "currentOption": "{version} (current)",
+      "queuing": "Queuing…",
+      "queueRun": "Queue runz"
+    },
+    "destroy": {
+      "title": "Destroy {name}",
+      "heading": "Destroy {name}?",
+      "description": "Dis queues a destroy runz dat tears down dis instance's infrastructure. On a successful apply teh wurkspace iz archived. Dis kant bee undone.",
+      "autoApplyHint": "Auto-apply tears down immediately without review."
+    },
+    "orphan": {
+      "title": "Orphan {name}",
+      "heading": "Orphan {name}?",
+      "description": "Dis deletes teh catalog instance record but does <warn>not</warn> destroy its infrastructure — teh provisioned rezorces keep running, <warn>untracked an unmanaged</warn>. Dis iz discouraged. To reclaim teh infrastructure, nvm an use <emph>Destroy</emph> instead.",
+      "confirmPrompt": "Kynd teh instance naem <mono>{name}</mono> to srsly:",
+      "orphaning": "Orphaning…",
+      "submit": "Orphan & abandon infrastructure"
+    },
+    "actions": {
+      "confirmed": "Runz confirmed — applying.",
+      "discarded": "Runz discarded.",
+      "provisioned": "Provisioned {name} — plan iz ready fur review.",
+      "reconfigureQueued": "Reconfigure queued — runz maded.",
+      "reconfigureQueuedStatus": "Reconfigure queued — runz iz {status}.",
+      "destroyQueued": "Destroy queued — runz maded.",
+      "destroyQueuedStatus": "Destroy queued — runz iz {status}.",
+      "orphaned": "Orphaned {name} — catalog record deletd; its infrastructure iz left running, untracked an unmanaged."
+    },
+    "errors": {
+      "loadItem": "Borked to gets catalog item",
+      "confirm": "Borked to srsly",
+      "confirmStatus": "Borked to srsly ({status})",
+      "discard": "Borked to discard",
+      "discardStatus": "Borked to discard ({status})",
+      "provision": "Borked to provision",
+      "provisionStatus": "Borked to provision ({status})",
+      "reconfigure": "Borked to reconfigure",
+      "reconfigureStatus": "Borked to reconfigure ({status})",
+      "destroy": "Borked to destroy",
+      "destroyStatus": "Borked to destroy ({status})",
+      "orphan": "Borked to orphan",
+      "orphanStatus": "Borked to orphan ({status})"
+    }
+  },
+  "common": {
+    "connection": {
+      "reconnecting": "Reconnecting…"
+    },
+    "sessionExpiry": {
+      "banner": "Session expires in {minutes, plural, one {# minute} other {# minutes}} — <link>re-authenticate</link>"
+    },
+    "tokenExpiry": {
+      "withinDays": "{count, plural, one {# service tokun} other {# service tokuns}} expiring within {days, plural, one {# day} other {# days}} — <link>review</link>",
+      "soon": "{count, plural, one {# service tokun} other {# service tokuns}} expiring soon — <link>review</link>",
+      "dismissAria": "Dismiss tokun expiry warning"
+    },
+    "resourceUsage": {
+      "title": "Rezorce usage",
+      "oomKilled": "OOM-killed",
+      "killedLikelyOom": "Killed (likely OOM)",
+      "memory": "Memory",
+      "requested": "Requested {value}",
+      "limit": "Limit {value}"
+    },
+    "labelsEditor": {
+      "none": "None",
+      "removeAria": "Yeet {key}",
+      "keyPlaceholder": "key",
+      "valuePlaceholder": "valyoo",
+      "add": "Gib"
+    },
+    "sensitiveInput": {
+      "hide": "Hide",
+      "show": "Show",
+      "hideAria": "Hide valyoo",
+      "showAria": "Show valyoo"
+    },
+    "workspacePicker": {
+      "searchPlaceholder": "Luk fur wurkspaces…",
+      "loading": "Gettin…",
+      "empty": "No wurkspaces found",
+      "adding": "Gibbin…"
+    },
+    "templateEditors": {
+      "remove": "Yeet",
+      "add": "Gib",
+      "valuePlaceholder": "valyoo",
+      "name": "Naem",
+      "url": "URL",
+      "hmacKey": "HMAC key (optional)",
+      "hmacKeyPlaceholder": "shared secret",
+      "stage": "Stage",
+      "enforcement": "Enforcement",
+      "enabled": "On",
+      "runTaskNamePlaceholder": "security-scan",
+      "runTaskUrlPlaceholder": "https://hooks.example.com/task",
+      "addRunTask": "Gib runz task",
+      "destinationType": "Destination kynd",
+      "token": "Tokun (optional)",
+      "tokenPlaceholder": "HMAC / auth tokun",
+      "notificationNamePlaceholder": "slack-alerts",
+      "notificationUrlPlaceholder": "https://hooks.slack.com/services/...",
+      "emailAddresses": "Email addresses",
+      "emailPlaceholder": "ops@example.com",
+      "addEmail": "Gib email",
+      "triggers": "Triggers",
+      "addNotification": "Gib notification"
+    }
+  },
+  "planSummary": {
+    "aiGenerated": "AI generated",
+    "heading": {
+      "planSummary": "Plan summary",
+      "failureAnalysis": "Failure analysis"
+    },
+    "errors": {
+      "status": "HTTP {status}"
+    },
+    "regenerate": {
+      "label": "Regenerate",
+      "queueing": "Queueing…",
+      "tooltip": "Re-runz teh AI summary against teh same plan inputs",
+      "ariaLabel": "Regenerate AI summary",
+      "confirm": "Regenerate teh AI analysis? Dis runz teh model agin.",
+      "error": "Could not regenerate: <mono>{detail}</mono>"
+    },
+    "pending": {
+      "summarisingPlan": "Summarizing plan…",
+      "analysingFailure": "Analysing failure…"
+    },
+    "skipped": {
+      "fallback": "Summary skipped fur dis runz."
+    },
+    "errored": {
+      "heading": "Summarizer borked"
+    },
+    "riskFactors": {
+      "heading": "Risk factors",
+      "suggestedFixes": "Suggested fixes"
+    },
+    "tokens": "{input} in / {output} out tokuns",
+    "risk": {
+      "low": "low",
+      "medium": "medium",
+      "high": "high",
+      "critical": "critical",
+      "unknown": "unknown"
+    },
+    "badges": {
+      "noChanges": "No chanjes",
+      "noChangesLower": "no chanjes",
+      "noChangesTitle": "Plan reported no rezorce chanjes",
+      "toAdd": "{count, plural, one {# to gib} other {# to gib}}",
+      "toChange": "{count, plural, one {# to change} other {# to change}}",
+      "toDestroy": "{count, plural, one {# to destroy} other {# to destroy}}",
+      "toReplace": "{count, plural, one {# to replace} other {# to replace}}",
+      "toImport": "{count, plural, one {# to import} other {# to import}}"
+    },
+    "chat": {
+      "heading": "Follow-up",
+      "sharedThreadNote": "One shared thread, visible to anyone wif wurkspace read.",
+      "placeholder": "Ask a follow-up question bout dis plan… (⌘/Ctrl + Enter to send)",
+      "send": "Send",
+      "thinking": "Thinking…",
+      "you": "U",
+      "assistant": "Assistant"
+    },
+    "translatedNote": "Automatically translated to yur tung. Teh authoritative summary iz teh original.",
+    "translating": "Tranzlatin…"
+  },
+  "runDetail": {
+    "notFound": "Runz not found",
+    "runSection": "Runz section",
+    "workspaceFallback": "wurkspace",
+    "backTo": "Back to {name}",
+    "errorHeading": "Error",
+    "discardedHeading": "Discarded — re-plan required",
+    "common": {
+      "yes": "Ya",
+      "no": "No"
+    },
+    "header": {
+      "title": "Runz {id}",
+      "titleWithWorkspace": "{workspace} — runz {id}",
+      "description": "{source} runz"
+    },
+    "relTime": {
+      "justNow": "just nao",
+      "minutesAgo": "{count, plural, one {# minute ago} other {# minutes ago}}",
+      "hoursAgo": "{count, plural, one {# hour ago} other {# hours ago}}",
+      "daysAgo": "{count, plural, one {# day ago} other {# days ago}}"
+    },
+    "status": {
+      "pending": "Pending",
+      "queued": "Queued",
+      "planning": "Planning",
+      "planned": "Planned",
+      "confirmed": "Confirmed",
+      "applying": "Applying",
+      "canceling": "Canceling",
+      "applied": "Applied",
+      "errored": "Errored",
+      "canceled": "Canceled",
+      "discarded": "Discarded"
+    },
+    "activity": {
+      "pending": "Preparing teh runz",
+      "queued": "Waitin fur an availbul agent",
+      "planning": "Running terraform plan",
+      "plannedConfirmable": "Waitin fur u to srsly & apply",
+      "plannedSpeculative": "Speculative plan complete",
+      "plannedComplete": "Plan complete",
+      "confirmed": "Starting apply",
+      "applying": "Running terraform apply",
+      "canceling": "Stopping teh runz",
+      "applied": "Apply complete",
+      "errored": "Runz borked",
+      "canceled": "Runz canceled",
+      "discarded": "Plan discarded",
+      "elapsedTitle": "Elapsed in dis phase"
+    },
+    "badge": {
+      "destroy": "destroy",
+      "planOnly": "plan only"
+    },
+    "actions": {
+      "retryShort": "Retry",
+      "retryFull": "Retry Runz",
+      "retrying": "Retrying…",
+      "confirmShort": "Apply",
+      "confirmFull": "Srsly & Apply",
+      "confirming": "Confirming…",
+      "discard": "Discard",
+      "discarding": "Discarding…",
+      "cancelShort": "Nvm",
+      "cancelFull": "Nvm Runz",
+      "canceling": "Canceling…"
+    },
+    "confirm": {
+      "apply": "Apply dis runz? Dis applies teh plan an chanjes infrastructure.",
+      "discard": "Discard dis plan?",
+      "cancel": "Nvm dis runz?",
+      "retry": "Retry dis runz?"
+    },
+    "errors": {
+      "loadRun": "Borked to gets runz",
+      "action": {
+        "confirm": "Borked to srsly runz",
+        "discard": "Borked to discard runz",
+        "cancel": "Borked to nvm runz",
+        "retry": "Borked to retry runz"
+      }
+    },
+    "tabs": {
+      "overview": "Overview",
+      "ai": "AI",
+      "aiFull": "AI analysis",
+      "opa": "OPA",
+      "opaFull": "OPA polisys",
+      "impact": "Impact",
+      "impactFull": "Impact graph",
+      "planLabel": "Plan<log>Log</log>",
+      "applyLabel": "Apply<log>Log</log>",
+      "planFull": "Plan log",
+      "applyFull": "Apply log",
+      "details": "Details"
+    },
+    "banner": {
+      "destroy": "Dis iz a <strong>destroy</strong> runz — all managed rezorces wil bee destroyed wen applied.",
+      "planOnlyCli": "Dis iz a <strong>plan-only</strong> runz initiated from teh CLI on a VCS-connected wurkspace. Apply iz not availbul fur CLI-uploded code — only VCS-managed code can bee applied.",
+      "moduleOverridesPrefix": "Dis runz uses <strong>module overrides</strong>",
+      "moduleOverridesFromPr": "from PR #{number}",
+      "moduleOverridesSuffix": "wil bee fetched from teh PR branch instead ov teh published registry vershun."
+    },
+    "cards": {
+      "changes": "Chanjes",
+      "aiAnalysis": "AI analysis",
+      "policyChecks": "Polisy checks",
+      "resources": "Rezorces"
+    },
+    "changes": {
+      "noChanges": "No chanjes",
+      "planning": "Planning…",
+      "toAdd": "to gib",
+      "toChange": "to change",
+      "toDestroy": "to destroy",
+      "toReplace": "to replace",
+      "toImport": "to import"
+    },
+    "ai": {
+      "notAvailable": "Not availbul",
+      "ready": "Ready",
+      "riskSub": "{risk} risk",
+      "generating": "Generating…",
+      "skipped": "Skipped",
+      "failed": "Borked",
+      "available": "Availbul"
+    },
+    "policy": {
+      "none": "None",
+      "blocked": "Blocked",
+      "failedSub": "{count, plural, one {# borked} other {# borked}}",
+      "advisoryIssues": "Advisory issues",
+      "passedSub": "{passed}/{total} passed",
+      "passed": "Passed"
+    },
+    "resources": {
+      "overLimit": "Over limit",
+      "oomKilled": "OOM-killed",
+      "recorded": "Recorded",
+      "nearLimit": "Near limit",
+      "high": "High",
+      "withinLimits": "Within limits"
+    },
+    "details": {
+      "heading": "Details",
+      "executionBackend": "Execution Backend",
+      "source": "Source",
+      "autoApply": "Auto Apply",
+      "planOnly": "Plan Only",
+      "triggeredBy": "Triggered By",
+      "created": "Maded",
+      "commit": "Commit",
+      "branch": "Branch",
+      "prMr": "PR/MR",
+      "stateVersion": "State Vershun",
+      "viewState": "View State",
+      "runOptions": "Runz Options"
+    },
+    "timeline": {
+      "heading": "Timeline",
+      "queued": "Queued",
+      "planningStarted": "Planning startd",
+      "planComplete": "Plan complete",
+      "confirmed": "Confirmed",
+      "applyingStarted": "Applying startd",
+      "applied": "Applied",
+      "errored": "Errored",
+      "canceled": "Canceled",
+      "discarded": "Discarded"
+    },
+    "log": {
+      "color": "Color",
+      "colorOnTitle": "Showing ANSI colors — click fur plain text",
+      "colorOffTitle": "Showing plain text — click fur colors",
+      "refresh": "Refresh",
+      "refreshTitle": "Refresh log",
+      "copy": "Copy",
+      "copied": "Copied!",
+      "copyTitle": "Copy plain text to clipboard",
+      "copyAria": "Copy log to clipboard",
+      "download": "Downlode",
+      "downloadColorTitle": "Downlode log (wif ANSI color codes)",
+      "downloadPlainTitle": "Downlode log (plain text)",
+      "downloadAria": "Downlode log",
+      "follow": "Follow",
+      "followOnTitle": "Following teh live tail — click to stop",
+      "followOffTitle": "Follow teh live tail",
+      "end": "End",
+      "endTitle": "Jump to teh end ov teh log",
+      "planEmpty": "No plan output availbul yet.",
+      "applyEmpty": "No apply output availbul yet."
+    },
+    "policyPanel": {
+      "heading": "Polisy Checks",
+      "passedCount": "{passed}/{total} passed",
+      "blockedMessage": "Dis runz iz <strong>blocked by a mandatory polisy set</strong>. It wil not apply until teh failure iz resolved or an admin overrides it.",
+      "overriding": "Overriding...",
+      "overrideContinue": "Override & Continue",
+      "overrideFailed": "Override borked",
+      "overrideFailedStatus": "Override borked ({status})",
+      "overriddenBy": "overridden by {by}",
+      "policyPassed": "passed",
+      "noDenyMessage": "Polisy borked without producing a deny message or error output",
+      "enforcement": {
+        "mandatory": "mandatory",
+        "advisory": "advisory"
+      },
+      "outcome": {
+        "passed": "passed",
+        "failed": "borked",
+        "errored": "errored"
+      }
+    }
+  },
+  "workspaceDetail": {
+    "notFound": "Wurkspace not found",
+    "common": {
+      "enabled": "On",
+      "disabled": "Off",
+      "none": "None",
+      "default": "Default",
+      "never": "Never",
+      "actions": "Stuffs",
+      "workspaceLocked": "Wurkspace iz locked"
+    },
+    "actions": {
+      "edit": "Eddit",
+      "cancel": "Nvm",
+      "save": "Sav",
+      "saving": "Savin…",
+      "savingEllipsis": "Savin...",
+      "delete": "Delet",
+      "deleting": "Deletin...",
+      "add": "Gib",
+      "adding": "Gibbin...",
+      "remove": "Yeet",
+      "download": "Downlode",
+      "rollback": "Rollback",
+      "close": "Close",
+      "hide": "Hide",
+      "enable": "Turn on",
+      "disable": "Turn off",
+      "creating": "Makin...",
+      "sending": "Sending...",
+      "processing": "Processing...",
+      "queuing": "Queuing...",
+      "loading": "Gettin...",
+      "loadingLower": "gettin…"
+    },
+    "header": {
+      "executionMode": "{mode} execution mode"
+    },
+    "tabs": {
+      "overview": "Overview",
+      "variables": "Variables",
+      "runs": "Runz",
+      "state": "State",
+      "stateGraph": "State Graph",
+      "configurations": "Configurations",
+      "notifications": "Notifications",
+      "runTasks": "Runz Tasks",
+      "runTriggers": "Runz Triggers",
+      "sharing": "Sharing",
+      "selectLabel": "Wurkspace section"
+    },
+    "lifecycle": {
+      "pendingDeletion": "Pending deletion",
+      "pendingDeletionDefault": "Dis wurkspace iz marked fur deletion an requires manual action.",
+      "archived": "Archived",
+      "archivedDefault": "Dis wurkspace haz been archived."
+    },
+    "runQueuedBanner": {
+      "message": "Runz queued successfully.",
+      "viewRun": "View Runz"
+    },
+    "settings": {
+      "title": "Settins",
+      "saveChanges": "Sav chanjes",
+      "renamedNotice": "Wurkspace renamed. Update teh <name></name> field in yur <cloud></cloud> block to match."
+    },
+    "fields": {
+      "name": "Naem",
+      "nameTitle": "Letters, numbers, hyphens, underscores. Must startz wif a letter or number.",
+      "executionMode": "Execution Mode",
+      "execModeLocal": "Local",
+      "execModeAgent": "Agent",
+      "autoApply": "Auto Apply",
+      "cpuRequest": "CPU Request",
+      "cpuRequestTitle": "Kubernetes CPU quantity: whole cores (1, 2) or millicores (500m, 100m)",
+      "memoryRequest": "Memory Request",
+      "memoryRequestTitle": "Kubernetes memory quantity: bytes (1000) or wif suffix (512Mi, 2Gi, 1Ti)",
+      "executionBackend": "Execution Backend",
+      "version": "Vershun",
+      "versionPlaceholder": "e.g. 1.11 or 1.11.5",
+      "versionTitle": "Vershun in X.Y or X.Y.Z format (e.g. 1.11 or 1.11.5)",
+      "terragruntEnabledAgent": "On (agent mode)",
+      "terragruntEnabledVersion": "On (v{version})",
+      "terragruntVersionPlaceholder": "e.g. 1.0",
+      "terragruntVersionTitle": "Terragrunt vershun in X.Y or X.Y.Z format (e.g. 1.0)",
+      "workingDirectory": "Working Directory",
+      "workingDirectoryPlaceholder": "e.g. environments/dev",
+      "agentPool": "Agent Pool",
+      "owner": "Ownr",
+      "vcsConnection": "VCS Konekshun",
+      "vcsRepository": "VCS Repository",
+      "vcsRepositoryTitle": "Must bee an HTTP or HTTPS URL",
+      "vcsBranch": "VCS Branch",
+      "vcsBranchPlaceholder": "main (default)",
+      "vcsWorkflow": "VCS Workflow",
+      "vcsWorkflowMergeThenApply": "merge_den_apply (default — TFE / HCP standard)",
+      "vcsWorkflowApplyThenMerge": "apply_den_merge (Atlantis standard — opt-in)",
+      "autoMerge": "Auto-merge after apply",
+      "autoMergeStrategy": "Auto-merge Strategy",
+      "vcsPolling": "VCS Polling",
+      "labels": "Labels (tags)",
+      "labelsTitle": "Wurkspace labels do double duty: label-based RBAC matching, an as teh \"tags\" matched by terraform/tofu cloud '{' wurkspaces '{' tags = ... '}' '}' blocks.",
+      "varFiles": "Var Files",
+      "varFilesPlaceholder": "e.g. envs/dev.tfvars",
+      "triggerPrefixes": "Trigger Prefixes",
+      "triggerPrefixesHint": "Directories dat trigger runz. Overrides working directory filtering wen set.",
+      "triggerPrefixesPlaceholder": "e.g. modules",
+      "triggerPrefixesNone": "None (uses working directory)",
+      "driftIgnoreRules": "Drift Ignore Rules",
+      "driftIgnoreRulesHint": "Glob-aware Terraform address + attribute paths suppressed by teh drift classifier. <star></star> matches zero or moar non-<dot></dot> chars (spans <n></n> indices); <starIdx></starIdx> matches any bracketed index. A bare address wif no attribute suffix silences any change to dat rezorce — including destroys. Affects drift only, not regular plan/apply. See <docs>drift-ignore-rules.md</docs> fur teh full grammar.",
+      "driftIgnoreRulesNone": "None (every plan diff counts as drift)"
+    },
+    "vcsWorkflowWarning": {
+      "title": "Authorization delegated to yur VCS repository.",
+      "rbac": "Anyone who can merge teh PR can apply. Branch protection rules (required reviews, statuz checks, code ownr approval) become teh gate. Terrapod role/label RBAC does<em>not</em> apply to comment-driven stuffs in dis mode.",
+      "recommended": "<strong>Recommended:</strong> require linear history (rebase/squash before merge) so teh commit u apply iz teh commit dat lands.",
+      "credit": "Credit: dis workflow iz modelled on <atlantis>Atlantis</atlantis>. Atlantis remains teh right tool fur teams who only want PR-comment-driven applies an no platform UI."
+    },
+    "vcsPolling": {
+      "error": "Error",
+      "ok": "OK ({time})",
+      "notPolled": "Not polled yet"
+    },
+    "lockout": {
+      "revertLabels": "Revert Labels",
+      "saveAnyway": "Sav Anyway"
+    },
+    "lock": {
+      "title": "Lock Statuz",
+      "lockedDesc": "Dis wurkspace iz locked. No plans or applies can runz.",
+      "unlockedDesc": "Dis wurkspace iz unlocked an ready fur runz.",
+      "lock": "Lock",
+      "unlock": "Unlock",
+      "lockConfirm": "Lock dis wurkspace?",
+      "unlockConfirm": "Unlock dis wurkspace?"
+    },
+    "drift": {
+      "title": "Drift Detection",
+      "checkInterval": "Check Interval",
+      "status": "Statuz",
+      "statusNoDrift": "No Drift",
+      "statusDrifted": "Drifted",
+      "statusErrored": "Errored",
+      "statusUnchecked": "Unchecked",
+      "dismiss": "Dismiss",
+      "dismissing": "Dismissing…",
+      "dismissTitle": "Clear teh reported drift state. Teh next scheduled check wil repopulate it from reality.",
+      "lastChecked": "Last Checked",
+      "checkNow": "Check Nao",
+      "checkNowTitle": "Queue a plan-only runz to check fur drift",
+      "checkNowTitleDisabled": "Turn on drift detection first"
+    },
+    "intervals": {
+      "disabled": "Off",
+      "1hour": "1 hour",
+      "4hours": "4 hours",
+      "12hours": "12 hours",
+      "24hours": "24 hours",
+      "48hours": "48 hours",
+      "3days": "3 days",
+      "7days": "7 days"
+    },
+    "planExpiry": {
+      "title": "Plan Expiry",
+      "description": "Auto-discard an unconfirmed plan once it iz older than dis, so a stale plan kant bee applied against a moved world. Off by default; teh plan must den bee re-runz. (Applies to apply-capable runz only.)",
+      "expireAfter": "Expire after"
+    },
+    "aiSummary": {
+      "title": "AI Plan Summary",
+      "description": "Automatic LLM-generated change summary, risk assessment, an failure analysis on every plan-phase outcome fur dis wurkspace.",
+      "mode": "Mode",
+      "modeDefault": "Follow deployment default",
+      "modeEnabled": "Always summarize",
+      "modeDisabled": "Never summarize",
+      "contextLabel": "Wurkspace context",
+      "contextLabelSuffix": "(optional, additive)",
+      "contextPlaceholder": "Facts teh AI shud know bout dis wurkspace specifically. e.g. 'Fronts teh vault fur service X — destroying teh KMS key causes a global outage.'",
+      "noContext": "No wurkspace context set.",
+      "contextHint": "Added on top ov deployment-wide context. Max 4000 characters."
+    },
+    "slack": {
+      "title": "Slack notifications",
+      "description": "Opt dis wurkspace into Slack runz notifications — approval requests, applies, errors, an drift. Leave teh channel empty an dis wurkspace stays silent (dere iz no deployment-wide fan-out). Requires teh Slack app to bee on by an administrator.",
+      "channel": "Channel",
+      "channelPlaceholder": "#deploys or a channel ID (e.g. C0123ABCD)",
+      "notSet": "Not set — silent.",
+      "hint": "Teh Slack app must already bee a member ov teh channel."
+    },
+    "delete": {
+      "title": "Delet Wurkspace",
+      "description": "Permanently delet dis wurkspace an all associated state, variables, an runz.",
+      "confirm": "Srsly Delet"
+    },
+    "variables": {
+      "addVariable": "Gib Variable",
+      "key": "Key",
+      "value": "Valyoo",
+      "category": "Category",
+      "categoryEnv": "Environment",
+      "sensitive": "Sensitive",
+      "empty": "No variables configured fur dis wurkspace.",
+      "emptyValue": "empty",
+      "enterNewValue": "Enter nu valyoo",
+      "deleteConfirm": "Delet variable \"{key}\"?"
+    },
+    "runs": {
+      "options": "Options",
+      "hideOptions": "Hide Options",
+      "queueDestroy": "Queue Destroy",
+      "queueDestroyTitle": "Queue a destroy plan",
+      "destroyAllConfirm": "Destroy all rezorces?",
+      "confirmDestroy": "Srsly Destroy",
+      "queuePlan": "Queue Plan",
+      "queueRun": "Queue Runz",
+      "queuePlanConfirm": "Queue a speculative plan fur dis wurkspace?",
+      "queueApplyConfirm": "Queue a plan + apply runz? Dis can change infrastructure.",
+      "planOptions": "Plan Options",
+      "targetResources": "Target rezorces",
+      "replaceResources": "Replace rezorces",
+      "commaSeparated": "(comma-separated)",
+      "planOnly": "Plan Only",
+      "refreshOnly": "Refresh Only",
+      "skipRefresh": "Skip Refresh",
+      "allowEmptyApply": "Allow Empty Apply",
+      "vcsRef": "VCS Ref",
+      "branch": "Branch",
+      "tag": "Tag",
+      "defaultBranch": "Default ({branch})",
+      "nonDefaultRefNote": "Non-default ref selected — runz wil bee plan-only",
+      "empty": "No runz yet fur dis wurkspace.",
+      "runId": "Runz ID",
+      "status": "Statuz",
+      "type": "Kynd",
+      "changes": "Chanjes",
+      "source": "Source",
+      "triggeredBy": "Triggered By",
+      "created": "Maded",
+      "needsConfirm": "needs srsly",
+      "typeDestroy": "destroy",
+      "typePlanOnly": "plan only",
+      "typePlanApply": "plan + apply",
+      "sourceModuleTest": "module test",
+      "sourceModulePublish": "module publish"
+    },
+    "state": {
+      "deleteConfirm": "Delet state vershun #{serial}? Dis kant bee undone.",
+      "rollbackConfirm": "Rollback to state vershun #{serial}? A nu vershun wil bee maded wif teh same content.",
+      "confirmDelete": "Srsly Delet",
+      "confirmRollback": "Srsly Rollback",
+      "uploadState": "Uplode State",
+      "empty": "No state vershuns yet fur dis wurkspace.",
+      "serial": "Serial",
+      "createdBy": "Maded By",
+      "run": "Runz",
+      "size": "Size",
+      "created": "Maded",
+      "runner": "runner",
+      "latest": "latest"
+    },
+    "configurations": {
+      "description": "Uploded source archives fur dis wurkspace, newest first. Pick two rows to compare.",
+      "selectedCount": "{count}/2 selected",
+      "compare": "Compare",
+      "comparing": "Comparing…",
+      "empty": "No configuration vershuns yet. Dey appear heer as soon as a `terraform plan` uploads or a VCS push triggers a runz.",
+      "id": "ID",
+      "source": "Source",
+      "status": "Statuz",
+      "created": "Maded",
+      "current": "current",
+      "selectForCompare": "Pik {id} fur compare",
+      "compareLabel": "Compare",
+      "diff": "Diff",
+      "filesChanged": "{count} files changed",
+      "oversized": "Skipped {count, plural, one {# oversized file} other {# oversized files}}: {files}",
+      "noDiff": "No content differences between deez vershuns.",
+      "binaryChanged": "Binary file changed — diff not rendered.",
+      "diffType": {
+        "added": "added",
+        "removed": "removed",
+        "modified": "modified",
+        "binary-changed": "binary"
+      }
+    },
+    "notifications": {
+      "addNotification": "Gib Notification",
+      "name": "Naem",
+      "namePlaceholder": "Deploy notifications",
+      "destinationType": "Destination Kynd",
+      "typeGeneric": "Generic Webhook",
+      "typeEmail": "Email",
+      "url": "URL",
+      "hmacToken": "HMAC Tokun (optional)",
+      "signingSecret": "Signing secret",
+      "emailAddresses": "Email Addresses (comma-separated)",
+      "triggerEvents": "Trigger Events",
+      "createNotification": "Maek Notification",
+      "empty": "No notification configurations fur dis wurkspace.",
+      "ok": "OK",
+      "err": "Err {status}",
+      "fail": "FAIL",
+      "http": "HTTP {status}",
+      "verify": "Verify",
+      "history": "History",
+      "deliveryHistory": "Delivery History",
+      "enableConfirm": "Turn on dis notification?",
+      "disableConfirm": "Turn off dis notification?",
+      "deleteConfirm": "Delet notification \"{name}\"?"
+    },
+    "runTasks": {
+      "addRunTask": "Gib Runz Task",
+      "name": "Naem",
+      "namePlaceholder": "OPA Polisy Check",
+      "webhookUrl": "Webhook URL",
+      "stage": "Stage",
+      "enforcementLevel": "Enforcement Level",
+      "hmacKey": "HMAC Key (optional)",
+      "hmacKeyPlaceholder": "Signing secret fur webhook verification",
+      "createRunTask": "Maek Runz Task",
+      "empty": "No runz tasks configured fur dis wurkspace.",
+      "enableConfirm": "Turn on dis runz task?",
+      "disableConfirm": "Turn off dis runz task?",
+      "deleteConfirm": "Delet runz task \"{name}\"?"
+    },
+    "runTriggers": {
+      "title": "Runz Triggers",
+      "description": "Wen a source wurkspace completes an apply, downstream wurkspaces get a nu runz queued automatically. Up to 20 source wurkspaces per destination.",
+      "inboundHeading": "Source wurkspaces dat trigger runz heer",
+      "inboundEmpty": "No source wurkspaces trigger runz on dis wurkspace.",
+      "pickerPlaceholder": "Luk fur wurkspaces to gib as a source…",
+      "outboundHeading": "Destination wurkspaces dis wurkspace triggers",
+      "outboundEmpty": "Dis wurkspace does not trigger runz on any other wurkspace.",
+      "destinationNote": "(destination; yeet from dere)",
+      "removeConfirm": "Yeet dis runz trigger?"
+    },
+    "sharing": {
+      "title": "Remote State Sharing",
+      "description": "Producer-controlled allowlist fur cross-wurkspace <code></code>. State data iz secret-bearing — grant deliberately. <docs>Docs</docs>",
+      "outboundHeading": "Wurkspaces authorized to read dis workspace's state",
+      "outboundEmpty": "Dis workspace's state iz not shared wif any other wurkspace.",
+      "grantedBy": "granted by {by}",
+      "revoke": "Revoke",
+      "revokeConfirm": "Yeet dis remote state sharing? Teh consumer wil lose access to dis state.",
+      "pickerPlaceholder": "Luk fur wurkspaces to authorize as a consumer…",
+      "inboundHeading": "Wurkspaces dis wurkspace iz authorized to read state from",
+      "inboundEmpty": "Dis wurkspace iz not authorized to read state from any other wurkspace via terraform_remote_state.",
+      "producerNote": "(producer; revoke from dere)"
+    },
+    "runMessages": {
+      "manualDriftCheck": "Manual drift check from UI",
+      "queued": "Queued from UI",
+      "queuedSpeculative": "Queued from UI (speculative)",
+      "destroyQueued": "Destroy queued from UI"
+    },
+    "errors": {
+      "loadWorkspace": "Borked to gets wurkspace",
+      "loadRuns": "Borked to gets runz",
+      "loadVariables": "Borked to gets variables",
+      "loadStateVersions": "Borked to gets state vershuns",
+      "loadConfigurations": "Borked to gets configuration vershuns",
+      "loadNotifications": "Borked to gets notifications",
+      "loadOutboundConsumers": "Borked to gets outbound remote-state consumers",
+      "loadInboundConsumers": "Borked to gets inbound remote-state consumers",
+      "loadConsumers": "Borked to gets remote-state consumers",
+      "loadInboundTriggers": "Borked to gets inbound runz triggers",
+      "loadOutboundTriggers": "Borked to gets outbound runz triggers",
+      "loadTriggers": "Borked to gets runz triggers",
+      "loadRunTasks": "Borked to gets runz tasks",
+      "downloadStateFile": "Borked to downlode state file",
+      "downloadFailed": "Downlode borked",
+      "downloadFailedStatus": "Downlode borked ({status})",
+      "downloadTicketMissingUrl": "Downlode ticket response missing URL",
+      "diffFailed": "Diff borked",
+      "diffFailedStatus": "Diff borked ({status})",
+      "authorizeConsumer": "Borked to authorize consumer",
+      "revoke": "Borked to revoke",
+      "revokeConsumer": "Borked to revoke consumer",
+      "addTrigger": "Borked to gib runz trigger",
+      "removeTrigger": "Borked to yeet runz trigger",
+      "createRunTask": "Borked to maek runz task",
+      "createRunTaskStatus": "Borked to maek runz task ({status})",
+      "update": "Borked to update",
+      "toggleRunTask": "Borked to toggle runz task",
+      "delete": "Borked to delet",
+      "deleteRunTask": "Borked to delet runz task",
+      "labelLockout": "Dis label change wud reduce yur access.",
+      "updateWorkspace": "Borked to update wurkspace",
+      "lockWorkspace": "Borked to lock wurkspace",
+      "unlockWorkspace": "Borked to unlock wurkspace",
+      "updateAiSummary": "Borked to update AI summary settins",
+      "updateSlackChannel": "Borked to update Slack channel",
+      "updateDriftSettings": "Borked to update drift settins",
+      "updateDriftInterval": "Borked to update drift interval",
+      "updatePlanExpiry": "Borked to update plan expiry",
+      "queueDriftCheck": "Borked to queue drift check",
+      "queueDriftCheckStatus": "Borked to queue drift check ({status})",
+      "dismissDrift": "Borked to dismiss drift",
+      "dismissDriftStatus": "Borked to dismiss drift ({status})",
+      "deleteWorkspace": "Borked to delet wurkspace",
+      "addVariable": "Borked to gib variable",
+      "addVariableStatus": "Borked to gib variable ({status})",
+      "deleteVariable": "Borked to delet variable",
+      "updateVariable": "Borked to update variable",
+      "queuePlan": "Borked to queue plan",
+      "queuePlanStatus": "Borked to queue plan ({status})",
+      "queueDestroy": "Borked to queue destroy",
+      "queueDestroyStatus": "Borked to queue destroy ({status})",
+      "createNotification": "Borked to maek notification",
+      "createNotificationStatus": "Borked to maek notification ({status})",
+      "toggleNotification": "Borked to toggle notification",
+      "deleteNotification": "Borked to delet notification",
+      "verificationFailed": "Verification borked",
+      "verificationDeliveryFailed": "Verification delivery borked: {detail}",
+      "unknownError": "Unknown error",
+      "failed": "Borked",
+      "deleteStateVersion": "Borked to delet state vershun",
+      "rollbackStateVersion": "Borked to rollback state vershun",
+      "stateActionFailed": "State action borked",
+      "uploadState": "Borked to uplode state",
+      "uploadStateFile": "Borked to uplode state file"
+    }
+  },
+  "graphs": {
+    "stateTab": {
+      "loadError": "Borked to gets teh state graph.",
+      "emptyState": "No state yet — runz a plan an apply, or uplode state, den dis graph wil populate.",
+      "stateVersionLabel": "State vershun",
+      "currentSuffix": "(current)",
+      "colorByLabel": "Color by",
+      "viewGraph": "Graph",
+      "viewTable": "Table",
+      "resourceCount": "{count, plural, one {# rezorce} other {# rezorces}}",
+      "dependencyCount": "{count, plural, one {# dependency} other {# dependencies}}",
+      "truncated": "Showing teh first {shown} ov {total} rezorces — teh graph iz capped fur legibility.",
+      "colResource": "Rezorce",
+      "colType": "Kynd",
+      "colMode": "Mode",
+      "colModule": "Module",
+      "colDependedOnBy": "Depended on by",
+      "rootModule": "(root)"
+    },
+    "impact": {
+      "notAvailable": "Impact graph iz not availbul fur dis runz.",
+      "title": "Impact graph",
+      "subtitle": "plan ov {count, plural, one {# rezorce} other {# rezorces}}",
+      "hint": "Each sphere iz a rezorce; each arrow points to wut it depends on. Click a node → its transitive <b>impact</b> (everything downstream) lights up.",
+      "downstreamAffected": "downstream affected",
+      "action": {
+        "create": "maek",
+        "update": "update",
+        "replace": "replace",
+        "destroy": "destroy",
+        "unchanged": "unchanged"
+      }
+    },
+    "estate": {
+      "navHint": "Drag to rotate · scroll to zoom · right-drag to pan · <em>click a node to orbit around it</em>"
+    },
+    "state3d": {
+      "title": "State graph",
+      "hint": "Each sphere iz a rezorce; each arrow points to wut it depends on. Click a node → teh rezorces dat transitively <b>depend on it</b> light up.",
+      "dataSource": "data source",
+      "managed": "managed",
+      "dependOnThis": "depend on dis"
+    },
+    "resource3d": {
+      "resetView": "Reset view",
+      "clear": "Clear",
+      "key": "Key",
+      "resources": "Rezorces",
+      "hideKey": "Hide key",
+      "hideResources": "Hide rezorces",
+      "resourcesCount": "Rezorces ({count})",
+      "filterPlaceholder": "Filter rezorces…",
+      "navHint": "Drag to rotate · scroll to zoom · right-drag to pan · <em>click a rezorce to orbit around it</em>"
+    }
+  },
+  "execHookDetail": {
+    "backLink": "Back to execution hooks",
+    "defaultDescription": "Execution hook",
+    "notFound": "Execution hook not found",
+    "scriptEmpty": "(empty)",
+    "tabs": {
+      "settings": "Settins",
+      "workspaces": "Wurkspaces"
+    },
+    "common": {
+      "yes": "Ya",
+      "no": "No"
+    },
+    "actions": {
+      "edit": "Eddit",
+      "cancel": "Nvm",
+      "save": "Sav",
+      "saving": "Savin...",
+      "delete": "Delet",
+      "deleting": "Deletin...",
+      "confirmDelete": "Srsly Delet",
+      "add": "Gib",
+      "adding": "Gibbin...",
+      "remove": "Yeet"
+    },
+    "settings": {
+      "heading": "Settins"
+    },
+    "fields": {
+      "name": "Naem",
+      "description": "Wut it duz",
+      "hookPoint": "Hook Point",
+      "priority": "Priority",
+      "enabled": "On",
+      "script": "Script (<code>/bin/sh -c</code>)"
+    },
+    "delete": {
+      "heading": "Delet Execution Hook",
+      "description": "Permanently delet dis hook an yeet it from all wurkspaces."
+    },
+    "workspaces": {
+      "scopeNote": "Dis hook runz only on teh wurkspaces associated below. Dere iz no global scope.",
+      "associate": "Associate Wurkspace",
+      "workspaceLabel": "Wurkspace",
+      "selectPlaceholder": "Pik a wurkspace...",
+      "empty": "No wurkspaces associated wif dis hook.",
+      "colWorkspace": "Wurkspace",
+      "colActions": "Stuffs"
+    },
+    "confirm": {
+      "removeWorkspace": "Yeet dis wurkspace from teh hook? Teh hook wil no longer runz fur it."
+    },
+    "success": {
+      "updated": "Execution hook updated",
+      "workspaceAssociated": "Wurkspace associated",
+      "workspaceRemoved": "Wurkspace removed"
+    },
+    "errors": {
+      "load": "Borked to gets execution hook",
+      "update": "Borked to update execution hook",
+      "delete": "Borked to delet execution hook",
+      "addWorkspace": "Borked to gib wurkspace",
+      "removeWorkspace": "Borked to yeet wurkspace"
+    }
+  },
+  "policySetDetail": {
+    "backLink": "Polisy Sets",
+    "notFound": "Not found",
+    "unknown": "unknown",
+    "subtitle": "OPA polisy set · maded by {createdBy}",
+    "settings": {
+      "heading": "Settins"
+    },
+    "fields": {
+      "description": "Wut it duz",
+      "enforcement": "Enforcement",
+      "enabled": "On",
+      "globalScope": "Global (every wurkspace)"
+    },
+    "enforcement": {
+      "advisory": "Advisory (warn)",
+      "mandatory": "Mandatory (block apply)"
+    },
+    "scope": {
+      "allowLabels": "Allow labels (key: v1, v2)",
+      "allowLabelsPlaceholder": "env: prod, staging",
+      "allowNames": "Allow names (one per line)",
+      "denyLabels": "Deny labels (key: v1, v2)",
+      "denyNames": "Deny names (one per line)"
+    },
+    "vcs": {
+      "heading": "VCS Configuration",
+      "repoUrl": "Repository URL",
+      "branch": "Branch",
+      "branchPlaceholder": "main (default)",
+      "policyPath": "Polisy Path"
+    },
+    "vcsBanner": {
+      "syncedFrom": "Polisys synced from",
+      "at": "at",
+      "lastSynced": "Last synced {time}",
+      "commit": "(commit {sha})",
+      "syncError": "Sync error: {error}"
+    },
+    "policies": {
+      "heading": "Polisys ({count})",
+      "vcsManaged": "Managed by repository — push chanjes via PR",
+      "empty": "No polisys in dis set yet."
+    },
+    "addPolicy": {
+      "namePlaceholder": "Polisy naem",
+      "descPlaceholder": "Wut it duz (optional)",
+      "regoHint": "Rego v1. Must declare <code>package terrapod</code> an express violations via a <code>deny</code> set. Teh plan iz <code>input</code>; Terrapod context iz <code>data.terrapod_context</code>."
+    },
+    "actions": {
+      "saving": "Savin...",
+      "saveSettings": "Sav Settins",
+      "syncNow": "Sync Nao",
+      "cancel": "Nvm",
+      "addPolicy": "Gib Polisy",
+      "deleteSet": "Delet Set",
+      "validatingRego": "Validating Rego...",
+      "delete": "Delet",
+      "savePolicy": "Sav Polisy"
+    },
+    "confirm": {
+      "deleteSet": "Delet dis polisy set an all its polisys? Recorded runz evaluations iz kept.",
+      "deletePolicy": "Delet polisy \"{name}\"?"
+    },
+    "errors": {
+      "load": "Borked to gets polisy set",
+      "save": "Borked to sav polisy set",
+      "saveStatus": "Borked to sav ({status})",
+      "delete": "Borked to delet polisy set",
+      "deleteStatus": "Borked to delet ({status})",
+      "addPolicy": "Borked to gib polisy",
+      "addPolicyStatus": "Borked to gib polisy ({status})",
+      "savePolicy": "Borked to sav polisy",
+      "savePolicyStatus": "Borked to sav polisy ({status})",
+      "deletePolicy": "Borked to delet polisy",
+      "deletePolicyStatus": "Borked to delet ({status})"
+    }
+  },
+  "slackLink": {
+    "title": "Connect Slack to Terrapod",
+    "loading": "Gettin…",
+    "checking": "Checking yur link…",
+    "linking": "Linking yur Slack akownt…",
+    "unknown": "unknown",
+    "confirm": {
+      "prompt": "Link dis Slack akownt to <em>yur</em> Terrapod identity? Every future Slack action (approve/discard) wil runz as dis Terrapod hooman wif dere permissions.",
+      "slackUser": "Slack hooman",
+      "slackTeam": "Slack team",
+      "terrapodAccount": "Terrapod akownt",
+      "warning": "Only continue if u just startd dis link from Slack yourself. If u didn't, close dis tab an don't link — dis binds teh Slack akownt above to <em>yur</em> Terrapod identity.",
+      "button": "Srsly & link"
+    },
+    "success": {
+      "message": "Yur Slack akownt iz nao linked to Terrapod.",
+      "linkedAs": "Linked as <em>{email}</em>. U can close dis tab an return to Slack."
+    },
+    "errors": {
+      "missingLink": "Missing or invalid link. Startz agin wif teh Terrapod link command in Slack.",
+      "invalidLink": "Dis link iz invalid, expired, or already used. Startz teh link agin from Slack.",
+      "linkingFailed": "Linking borked."
+    }
+  },
+  "cliComplete": {
+    "loading": "Gettin...",
+    "completing": "Completing authentication...",
+    "invalid": {
+      "title": "Invalid Request",
+      "description": "Missing required parameters."
+    },
+    "success": {
+      "title": "Login Successful",
+      "complete": "API tokun maded. U can close dis tab."
+    },
+    "fallback": {
+      "description": "Could not reach teh CLI automatically.",
+      "button": "Click heer to complete manually"
+    },
+    "timeout": {
+      "description": "Teh CLI may not haz completed teh tokun exchange. Check yur terminal."
+    }
+  },
+  "apiDocs": {
+    "view": "View:",
+    "redocTitle": "ReDoc API Documentation"
+  }
+}

@@ -16,7 +16,8 @@
  */
 
 import type React from 'react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useTranslations, useLocale } from 'next-intl'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Sparkles, AlertTriangle, Info, ShieldAlert, ShieldX, RefreshCw } from 'lucide-react'
@@ -49,6 +50,10 @@ interface PlanSummary {
     'error-message': string
     'created-at': string
     'updated-at': string
+    /** Canonical language the summary is stored in (#767). */
+    language?: string
+    /** True when the served description/risk-factors were translated on view. */
+    translated?: boolean
   }
 }
 
@@ -68,36 +73,54 @@ const RISK_STYLES: Record<Severity, { pill: string; icon: typeof AlertTriangle }
 }
 
 export function PlanAiSummary({ runId, refreshKey = 0 }: Props) {
+  const t = useTranslations('planSummary')
+  const locale = useLocale()
   const [summary, setSummary] = useState<PlanSummary | null>(null)
   const [missing, setMissing] = useState(false)
   const [loading, setLoading] = useState(true)
   const [transportError, setTransportError] = useState<string | null>(null)
   const [regenerating, setRegenerating] = useState(false)
   const [regenerateError, setRegenerateError] = useState<string | null>(null)
+  // True while a locale change is re-fetching the translated summary. We keep
+  // the previous (now stale-language) content on screen and show a "Translating…"
+  // spinner over it, rather than blanking the panel (#767).
+  const [translating, setTranslating] = useState(false)
+  const hasContentRef = useRef(false)
   const isTouch = useIsTouch()
 
   const load = useCallback(async () => {
+    // A re-fetch while we already have a summary means the user switched
+    // language — show the translating spinner and keep the old content visible.
+    if (hasContentRef.current) setTranslating(true)
     try {
-      const res = await apiFetch(`/api/terrapod/v1/runs/run-${runId}/plan-summary`)
+      // Pass the reader's locale so the API translates the (canonical-language)
+      // summary on view (#767). Re-fetches automatically when the locale changes
+      // because `load` is keyed on it.
+      const res = await apiFetch(
+        `/api/terrapod/v1/runs/run-${runId}/plan-summary?locale=${encodeURIComponent(locale)}`,
+      )
       if (res.status === 404) {
         setMissing(true)
         setSummary(null)
+        hasContentRef.current = false
         return
       }
       if (!res.ok) {
-        setTransportError(`HTTP ${res.status}`)
+        setTransportError(t('errors.status', { status: res.status }))
         return
       }
       const data = await res.json()
       setSummary(data.data as PlanSummary)
+      hasContentRef.current = true
       setMissing(false)
       setTransportError(null)
     } catch (e) {
       setTransportError(e instanceof Error ? e.message : String(e))
     } finally {
       setLoading(false)
+      setTranslating(false)
     }
-  }, [runId])
+  }, [runId, t, locale])
 
   useEffect(() => {
     load()
@@ -107,7 +130,7 @@ export function PlanAiSummary({ runId, refreshKey = 0 }: Props) {
     // On a precise pointer a regenerate click is unambiguous ("this one wasn't
     // good enough"); on touch it re-runs the model on a mis-tap, so guard it
     // (#719 tier-2 mutation → touch-only confirm).
-    if (isTouch && !window.confirm('Regenerate the AI analysis? This runs the model again.')) return
+    if (isTouch && !window.confirm(t('regenerate.confirm'))) return
     setRegenerating(true)
     setRegenerateError(null)
     try {
@@ -117,7 +140,7 @@ export function PlanAiSummary({ runId, refreshKey = 0 }: Props) {
       )
       if (!res.ok) {
         // Surface the API's structured detail when available.
-        let detail = `HTTP ${res.status}`
+        let detail = t('errors.status', { status: res.status })
         try {
           const body = await res.json()
           if (body?.detail) detail = body.detail
@@ -139,7 +162,7 @@ export function PlanAiSummary({ runId, refreshKey = 0 }: Props) {
     } finally {
       setRegenerating(false)
     }
-  }, [runId, isTouch])
+  }, [runId, isTouch, t])
 
   // When the feature is globally disabled (no row will ever appear) we
   // render nothing — operators on a non-AI deployment don't see this
@@ -150,7 +173,7 @@ export function PlanAiSummary({ runId, refreshKey = 0 }: Props) {
 
   const attrs = summary?.attributes
   const kind = attrs?.kind ?? 'plan_summary'
-  const heading = kind === 'failure_analysis' ? 'Failure analysis' : 'Plan summary'
+  const heading = kind === 'failure_analysis' ? t('heading.failureAnalysis') : t('heading.planSummary')
 
   return (
     <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-6 mb-6">
@@ -160,7 +183,13 @@ export function PlanAiSummary({ runId, refreshKey = 0 }: Props) {
           <h3 className="text-sm font-medium text-slate-300">{heading}</h3>
           {/* Dropped on a phone — the ✨ sparkle already signals "AI", and the
               header row is too tight there to carry the extra words. */}
-          <span className="text-xs text-slate-500 hidden md:inline">AI generated</span>
+          <span className="text-xs text-slate-500 hidden md:inline">{t('aiGenerated')}</span>
+          {translating && (
+            <span className="flex items-center gap-1.5 text-xs text-brand-400">
+              <RefreshCw className="w-3 h-3 animate-spin" aria-hidden="true" />
+              {t('translating')}
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-3">
           {attrs && attrs.status === 'ready' && attrs['risk-level'] && (
@@ -175,12 +204,12 @@ export function PlanAiSummary({ runId, refreshKey = 0 }: Props) {
               onClick={regenerate}
               disabled={regenerating}
               className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-200 disabled:opacity-50 disabled:cursor-not-allowed px-2 py-1 rounded border border-slate-700/50 hover:border-slate-600"
-              title="Re-run the AI summary against the same plan inputs"
-              aria-label="Regenerate AI summary"
+              title={t('regenerate.tooltip')}
+              aria-label={t('regenerate.ariaLabel')}
             >
               <RefreshCw className={`w-3 h-3 ${regenerating ? 'animate-spin' : ''}`} />
               {/* Icon-only on a phone (the row is tight); label returns at md+. */}
-              <span className="hidden md:inline">{regenerating ? 'Queueing…' : 'Regenerate'}</span>
+              <span className="hidden md:inline">{regenerating ? t('regenerate.queueing') : t('regenerate.label')}</span>
             </button>
           )}
         </div>
@@ -188,7 +217,10 @@ export function PlanAiSummary({ runId, refreshKey = 0 }: Props) {
 
       {regenerateError && (
         <div className="mb-3 text-xs text-red-300 bg-red-900/20 border border-red-800/50 rounded p-2">
-          Could not regenerate: <span className="font-mono">{regenerateError}</span>
+          {t.rich('regenerate.error', {
+            detail: regenerateError,
+            mono: (chunks) => <span className="font-mono">{chunks}</span>,
+          })}
         </div>
       )}
 
@@ -196,20 +228,20 @@ export function PlanAiSummary({ runId, refreshKey = 0 }: Props) {
         <div className="flex items-center gap-3 text-sm text-slate-400">
           <LoadingSpinner />
           <span>
-            {kind === 'failure_analysis' ? 'Analysing failure…' : 'Summarising plan…'}
+            {kind === 'failure_analysis' ? t('pending.analysingFailure') : t('pending.summarisingPlan')}
           </span>
         </div>
       )}
 
       {attrs?.status === 'skipped' && (
         <p className="text-sm text-slate-500 italic">
-          {attrs['error-message'] || 'Summary skipped for this run.'}
+          {attrs['error-message'] || t('skipped.fallback')}
         </p>
       )}
 
       {attrs?.status === 'errored' && (
         <div className="text-sm text-red-300 bg-red-900/20 border border-red-800/50 rounded p-3">
-          <div className="font-medium mb-1">Summariser failed</div>
+          <div className="font-medium mb-1">{t('errored.heading')}</div>
           <div className="text-red-400/80 text-xs font-mono whitespace-pre-wrap break-all">
             {attrs['error-message']}
           </div>
@@ -234,7 +266,7 @@ export function PlanAiSummary({ runId, refreshKey = 0 }: Props) {
           {attrs['risk-factors'].length > 0 && (
             <div className="mt-5 pt-4 border-t border-slate-700/50">
               <h4 className="text-xs font-medium text-slate-400 mb-3">
-                {kind === 'failure_analysis' ? 'Suggested fixes' : 'Risk factors'}
+                {kind === 'failure_analysis' ? t('riskFactors.suggestedFixes') : t('riskFactors.heading')}
               </h4>
               <ul className="space-y-3">
                 {attrs['risk-factors'].map((rf, idx) => (
@@ -244,11 +276,15 @@ export function PlanAiSummary({ runId, refreshKey = 0 }: Props) {
             </div>
           )}
 
+          {attrs.translated && (
+            <p className="mt-3 text-xs text-slate-500 italic">{t('translatedNote')}</p>
+          )}
+
           {attrs.model && (
             <div className="mt-4 pt-3 border-t border-slate-700/50 flex items-center justify-between text-xs text-slate-500">
               <span className="font-mono">{attrs.model}</span>
               <span>
-                {attrs['input-tokens']} in / {attrs['output-tokens']} out tokens
+                {t('tokens', { input: attrs['input-tokens'], output: attrs['output-tokens'] })}
               </span>
             </div>
           )}
@@ -266,6 +302,7 @@ export function PlanAiSummary({ runId, refreshKey = 0 }: Props) {
 }
 
 function RiskPill({ level }: { level: Severity }) {
+  const t = useTranslations('planSummary')
   const style = RISK_STYLES[level] ?? RISK_STYLES['']
   const Icon = style.icon
   return (
@@ -273,7 +310,7 @@ function RiskPill({ level }: { level: Severity }) {
       className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium uppercase tracking-wide ${style.pill}`}
     >
       <Icon className="w-3 h-3" aria-hidden="true" />
-      {level || 'unknown'}
+      {level ? t(`risk.${level}`) : t('risk.unknown')}
     </span>
   )
 }

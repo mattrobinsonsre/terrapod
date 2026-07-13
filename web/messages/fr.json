@@ -1,0 +1,2621 @@
+{
+  "nav": {
+    "workspaces": "Espaces de travail",
+    "estate": "Parc",
+    "registry": "Registre",
+    "modules": "Modules",
+    "providers": "Fournisseurs",
+    "catalog": "Catalogue",
+    "agentPools": "Pools d'agents",
+    "admin": "Administration",
+    "users": "Utilisateurs",
+    "roles": "Rôles",
+    "vcsConnections": "Connexions VCS",
+    "variableSets": "Ensembles de variables",
+    "autodiscovery": "Découverte automatique",
+    "bulkUpdate": "Mise à jour groupée",
+    "executionHooks": "Hooks d'exécution",
+    "policySets": "Ensembles de politiques",
+    "providerTemplates": "Modèles de fournisseur",
+    "catalogAdmin": "Administration du catalogue",
+    "cache": "Cache",
+    "auditLog": "Journal d'audit",
+    "help": "Aide",
+    "apiReference": "Référence de l'API",
+    "docs": "Documentation",
+    "account": "Compte",
+    "apiTokens": "Tokens d'API",
+    "sessions": "Sessions",
+    "logOut": "Se déconnecter",
+    "menu": "Menu",
+    "openMenu": "Ouvrir le menu",
+    "openAccountMenu": "Ouvrir le menu du compte",
+    "closeMenu": "Fermer le menu"
+  },
+  "switcher": {
+    "language": "Langue",
+    "changeLanguage": "Changer de langue"
+  },
+  "workspaces": {
+    "title": "Espaces de travail",
+    "description": "Gérez les espaces de travail Terraform, l'état et les exécutions",
+    "new": "Nouvel espace de travail",
+    "cancel": "Annuler",
+    "create": "Créer l'espace de travail",
+    "creating": "Création…",
+    "loadFailed": "Échec du chargement des espaces de travail",
+    "createFailed": "Échec de la création de l'espace de travail",
+    "form": {
+      "name": "Nom",
+      "namePattern": "Lettres, chiffres, traits d'union et traits de soulignement uniquement. Doit commencer par une lettre ou un chiffre.",
+      "namePlaceholder": "my-workspace",
+      "executionMode": "Mode d'exécution",
+      "local": "Local",
+      "agent": "Agent",
+      "executionBackend": "Backend d'exécution",
+      "version": "Version",
+      "versionTitle": "Version au format X.Y ou X.Y.Z (par ex. 1.11 ou 1.11.5)",
+      "versionPlaceholder": "par ex. 1.11 ou 1.11.5",
+      "cpuRequest": "Demande CPU",
+      "cpuTitle": "Quantité CPU Kubernetes : cœurs entiers (1, 2) ou millicores (500m, 100m)",
+      "cpuHint": "par ex. 1, 0.5, 500m",
+      "memoryRequest": "Demande de mémoire",
+      "memoryTitle": "Quantité de mémoire Kubernetes : octets (1000) ou avec suffixe (512Mi, 2Gi, 1Ti)",
+      "memoryHint": "par ex. 2Gi, 512Mi, 1Ti",
+      "agentPool": "Pool d'agents",
+      "none": "Aucun",
+      "autoApply": "Application automatique",
+      "enabled": "Activé",
+      "workingDirectory": "Répertoire de travail",
+      "workingDirectoryPlaceholder": "par ex. environments/dev",
+      "workingDirectoryHint": "Sous-répertoire du dépôt contenant les fichiers .tf",
+      "vcsConnection": "Connexion VCS",
+      "vcsRepoUrl": "URL du dépôt VCS",
+      "vcsRepoUrlTitle": "Doit être une URL HTTP ou HTTPS",
+      "vcsRepoUrlPlaceholder": "https://github.com/org/repo",
+      "vcsBranch": "Branche VCS",
+      "vcsBranchPlaceholder": "main (par défaut)"
+    },
+    "stats": {
+      "total": "Total",
+      "health": "État de santé",
+      "locked": "Verrouillé",
+      "clearAllFilters": "Effacer tous les filtres",
+      "clearHealthFilter": "Effacer le filtre des problèmes de santé",
+      "filterHealth": "Filtrer sur les espaces de travail présentant des problèmes de santé",
+      "clearLockedFilter": "Effacer le filtre verrouillé",
+      "filterLocked": "Filtrer sur les espaces de travail verrouillés"
+    },
+    "filter": {
+      "placeholder": "Filtrer par nom, label ou statut — par ex. « eu1 », « env:prod », « status:errored »",
+      "ariaLabel": "Filtrer les espaces de travail",
+      "clear": "Effacer",
+      "status": "Statut",
+      "label": "Label",
+      "back": "retour",
+      "valueCount": "{count, plural, one {# valeur} other {# valeurs}}",
+      "removeTerm": "Retirer ce terme",
+      "showing": "Affichage de {filtered} sur {total}",
+      "termName": "nom : {value}",
+      "termStatus": "statut : {value}",
+      "termLabelAny": "{key} : (toutes)",
+      "termLabel": "{key} : {value}",
+      "hintStatus": "statut",
+      "hintHealth": "santé",
+      "hintLabel": "label",
+      "hintLabelKey": "clé de label",
+      "hintName": "nom"
+    },
+    "row": {
+      "removeLabelFilter": "Cliquez pour retirer du filtre",
+      "addLabelFilter": "Cliquez pour filtrer par ce label"
+    },
+    "table": {
+      "name": "Nom",
+      "mode": "Mode",
+      "pool": "Pool",
+      "resources": "Ressources",
+      "status": "Statut",
+      "created": "Créé le",
+      "resourcesValue": "{cpu} CPU / {memory}"
+    },
+    "empty": {
+      "none": "Aucun espace de travail pour l'instant. Créez-en un pour commencer.",
+      "noMatch": "Aucun espace de travail ne correspond à ce filtre."
+    }
+  },
+  "status": {
+    "state-diverged": "État divergent",
+    "vcs-error": "Erreur VCS",
+    "drifted": "Dérive détectée",
+    "errored": "En erreur",
+    "needs-confirm": "Confirmation requise",
+    "planning": "Planification",
+    "applying": "Application",
+    "canceling": "Annulation",
+    "confirmed": "Confirmé",
+    "queued": "En file d'attente",
+    "pending": "En attente",
+    "applied": "Appliqué",
+    "planned": "Planifié",
+    "canceled": "Annulé",
+    "discarded": "Abandonné",
+    "pendingDeletion": "Suppression en attente",
+    "archived": "Archivé"
+  },
+  "auth": {
+    "loading": "Chargement...",
+    "subtitle": "Connectez-vous pour gérer votre infrastructure",
+    "subtitleCli": "Connectez-vous pour autoriser la CLI",
+    "emailLabel": "E-mail",
+    "passwordLabel": "Mot de passe",
+    "signIn": "Se connecter",
+    "signingIn": "Connexion...",
+    "signInWith": "Se connecter avec {provider}",
+    "or": "ou",
+    "noProviders": "Aucun fournisseur d'authentification configuré",
+    "completingSignIn": "Finalisation de la connexion...",
+    "callbackFailedTitle": "Échec de l'authentification",
+    "tryAgain": "Réessayer",
+    "errors": {
+      "loadProviders": "Échec du chargement des fournisseurs",
+      "authenticationFailed": "Échec de l'authentification ({status})",
+      "tokenExchangeFailed": "Échec de l'échange de token ({status})",
+      "loginFailed": "Échec de la connexion",
+      "startLoginFailed": "Échec du démarrage de la connexion",
+      "missingCodeOrState": "Code d'autorisation ou état manquant",
+      "stateMismatch": "Incohérence d'état — possible attaque CSRF",
+      "missingVerifier": "Vérificateur PKCE manquant — veuillez réessayer de vous connecter"
+    }
+  },
+  "estate": {
+    "title": "Topologie du parc",
+    "description": "Chaque espace de travail que vous pouvez voir et les modules qu'ils utilisent, reliés par les déclencheurs d'exécution, l'état distant et les liens de modules. Regroupez selon l'axe qui convient à votre parc — la plateforme n'impose aucune convention de labellisation.",
+    "errors": {
+      "load": "Échec du chargement du graphe du parc."
+    },
+    "groupBy": {
+      "label": "Regrouper par"
+    },
+    "view": {
+      "graph": "Graphe",
+      "table": "Tableau"
+    },
+    "counts": {
+      "workspaces": "{count, plural, one {# espace de travail} other {# espaces de travail}}",
+      "modules": "{count, plural, one {# module} other {# modules}}",
+      "dependencies": "{count, plural, one {# dépendance} other {# dépendances}}"
+    },
+    "legend": {
+      "registryModule": "module de registre"
+    },
+    "detail": {
+      "moduleImpact": "{count, plural, one {espace de travail l'utilise — le mettre à niveau le replanifie} other {espaces de travail l'utilisent — le mettre à niveau les replanifie tous}}",
+      "dependOnThis": "{count, plural, one {en dépend} other {en dépendent}}"
+    },
+    "table": {
+      "workspaces": {
+        "heading": "Espaces de travail",
+        "col": {
+          "workspace": "Espace de travail",
+          "group": "Groupe",
+          "agentPool": "Pool d'agents",
+          "dependedOnBy": "Dépendances entrantes",
+          "modulesUsed": "Modules utilisés"
+        },
+        "noModules": "—"
+      },
+      "modules": {
+        "heading": "Modules",
+        "col": {
+          "module": "Module",
+          "usedBy": "Utilisé par (espaces de travail)"
+        }
+      }
+    }
+  },
+  "labels": {
+    "title": "Labels",
+    "description": "Parcourez les labels utilisés dans les espaces de travail, les pools d'agents, les modules et les fournisseurs du registre. En lecture seule — les labels se modifient sur la page de chaque entité.",
+    "none": "Aucun.",
+    "emptyKeys": "Aucun label utilisé pour l'instant. Labellisez un espace de travail, un pool d'agents, un module ou un fournisseur du registre pour commencer à regrouper les éléments ici.",
+    "emptyValues": "Aucune valeur pour « {key} ». Soit aucune entité lisible ne porte ce label, soit il a été retiré depuis le dernier affichage.",
+    "loadKeysFailed": "Échec du chargement des labels ({status})",
+    "loadValuesFailed": "Échec du chargement des valeurs pour {key} ({status})",
+    "loadEntitiesFailed": "Échec du chargement des entités ({status})",
+    "columns": {
+      "labelKey": "Clé de label",
+      "distinctValues": "Valeurs distinctes",
+      "value": "Valeur",
+      "total": "Total"
+    },
+    "entity": {
+      "workspaces": "Espaces de travail",
+      "agentPools": "Pools d'agents",
+      "modules": "Modules",
+      "providers": "Fournisseurs"
+    },
+    "deprecated": {
+      "badge": "Obsolète et non pris en charge.",
+      "body": "Le navigateur de labels ne figure plus dans la navigation principale et sera supprimé dans une prochaine version. Filtrez plutôt par label depuis la page <workspacesLink>Espaces de travail</workspacesLink>. Si vous dépendez de cette page, veuillez <issueLink>ouvrir une issue</issueLink>."
+    }
+  },
+  "settings": {
+    "tokens": {
+      "title": "Tokens d'API",
+      "description": "Gérez les tokens d'authentification pour la CLI et l'automatisation",
+      "descriptionAll": "Tous les tokens de tous les utilisateurs",
+      "myTokens": "Mes tokens",
+      "allTokens": "Tous les tokens",
+      "createToken": "Créer un token",
+      "cancel": "Annuler",
+      "tokenReady": "Token prêt",
+      "tokenReadyHelp": "Copiez ce token maintenant — il ne sera plus affiché.",
+      "dismissToken": "Fermer le token",
+      "hide": "Masquer",
+      "show": "Afficher",
+      "copy": "Copier",
+      "empty": "Aucun token d'API pour l'instant.",
+      "noDescription": "Aucune description",
+      "detached": "détaché",
+      "never": "Jamais",
+      "selected": "{count, plural, one {# token sélectionné} other {# tokens sélectionnés}}",
+      "revokeSelected": "Révoquer la sélection",
+      "revoking": "Révocation...",
+      "clearSelection": "Effacer la sélection",
+      "rotate": "Renouveler",
+      "rotating": "Renouvellement...",
+      "revoke": "Révoquer",
+      "confirmRotate": "Renouveler ce token ? Le secret actuel cesse de fonctionner immédiatement et un nouveau est émis.",
+      "confirmBulkRevoke": "{count, plural, one {Révoquer # token ?} other {Révoquer # tokens ?}}",
+      "kinds": {
+        "interactive": {
+          "label": "Personnel",
+          "help": "Un token personnel pour la CLI et l'automatisation ponctuelle. Il porte l'intégralité de vos autorisations en vigueur."
+        },
+        "service_bound": {
+          "label": "Service · lié",
+          "help": "Un token de service limité à un sous-ensemble de vos rôles. Son accès est l'intersection de ces rôles et des vôtres — et il cesse de fonctionner si votre compte est supprimé."
+        },
+        "service_detached": {
+          "label": "Service · détaché",
+          "help": "Un token de service géré par un administrateur, avec une portée fixe absolue, lié à aucun utilisateur. À utiliser pour l'automatisation machine-à-machine critique qui doit survivre au départ de n'importe quelle personne."
+        }
+      },
+      "lifespans": {
+        "720": "30 jours",
+        "2160": "90 jours",
+        "4320": "180 jours",
+        "8760": "1 an"
+      },
+      "filter": {
+        "all": "Tous les types"
+      },
+      "form": {
+        "description": "Description",
+        "descriptionPlaceholder": "Token du pipeline CI/CD",
+        "kind": "Type",
+        "lifespan": "Durée de vie",
+        "create": "Créer",
+        "creating": "Création...",
+        "pinnedRoles": "Rôles épinglés",
+        "pinnedRolesHelp": "— la portée à laquelle ce token est limité",
+        "pinnedRolesCapped": "(plafonné à votre propre accès)",
+        "noCustomRoles": "Aucun rôle personnalisé défini. Créez d'abord des rôles sous Administration → Rôles.",
+        "noScopedRoles": "Vous ne détenez aucun rôle à portée limitée à épingler. Ce token n'aurait aucun accès."
+      },
+      "columns": {
+        "description": "Description",
+        "kind": "Type",
+        "boundTo": "Lié à",
+        "created": "Créé le",
+        "lastUsed": "Dernière utilisation",
+        "expires": "Expire le",
+        "actions": "Actions"
+      },
+      "errors": {
+        "load": "Échec du chargement des tokens",
+        "create": "Échec de la création du token ({status})",
+        "createGeneric": "Échec de la création du token",
+        "rotate": "Échec du renouvellement du token ({status})",
+        "rotateGeneric": "Échec du renouvellement du token",
+        "revoke": "Échec de la révocation du token ({status})",
+        "revokeGeneric": "Échec de la révocation du token",
+        "bulkRevoke": "Échec de la révocation des tokens"
+      }
+    },
+    "sessions": {
+      "title": "Sessions",
+      "description": "Vos sessions actives",
+      "descriptionAll": "Toutes les sessions actives de la plateforme",
+      "empty": "Aucune session active.",
+      "revokeAll": "Tout révoquer",
+      "current": "Actuelle",
+      "columns": {
+        "provider": "Fournisseur",
+        "created": "Créée le",
+        "expires": "Expire le",
+        "lastActive": "Dernière activité",
+        "token": "Token"
+      },
+      "errors": {
+        "load": "Échec du chargement des sessions",
+        "revoke": "Échec de la révocation des sessions ({status})",
+        "revokeGeneric": "Échec de la révocation des sessions"
+      }
+    }
+  },
+  "registry": {
+    "modules": {
+      "title": "Modules",
+      "description": "Registre privé de modules Terraform",
+      "cancel": "Annuler",
+      "createModule": "Créer un module",
+      "empty": "Aucun module pour l'instant. Créez-en un pour commencer.",
+      "providerLabel": "Fournisseur : {provider}",
+      "versionCount": "{count, plural, one {# version} other {# versions}}",
+      "loadFailed": "Échec du chargement des modules",
+      "createFailed": "Échec de la création du module",
+      "createFailedStatus": "Échec de la création du module ({status})",
+      "form": {
+        "name": "Nom",
+        "provider": "Fournisseur",
+        "slugTitle": "Lettres minuscules, chiffres et traits d'union uniquement. Doit commencer par une lettre minuscule.",
+        "addressNote": "Le nom et le fournisseur forment l'adresse de registre du module et ne peuvent pas être modifiés après création.",
+        "vcsConnectionOptional": "Connexion VCS (facultatif)",
+        "noneUploadManually": "Aucune — téléverser les versions manuellement",
+        "repositoryUrl": "URL du dépôt",
+        "branchOptional": "Branche (facultatif)",
+        "branchPlaceholder": "main (laisser vide pour la valeur par défaut)",
+        "tagPattern": "Motif de tag",
+        "tagPatternHint": "Seuls les tags correspondant à ce motif créent des versions (par ex. v1.0.0)",
+        "labelsOptional": "Labels (facultatif)",
+        "creating": "Création...",
+        "create": "Créer"
+      }
+    },
+    "providers": {
+      "title": "Fournisseurs",
+      "description": "Registre privé de fournisseurs Terraform",
+      "cancel": "Annuler",
+      "createProvider": "Créer un fournisseur",
+      "empty": "Aucun fournisseur pour l'instant. Créez-en un pour commencer.",
+      "loadFailed": "Échec du chargement des fournisseurs",
+      "createFailed": "Échec de la création du fournisseur",
+      "createFailedStatus": "Échec de la création du fournisseur ({status})",
+      "form": {
+        "name": "Nom",
+        "slugTitle": "Lettres minuscules, chiffres et traits d'union uniquement. Doit commencer par une lettre minuscule.",
+        "creating": "Création...",
+        "create": "Créer"
+      }
+    },
+    "meta": {
+      "title": "Métadonnées",
+      "edit": "Modifier",
+      "cancel": "Annuler",
+      "save": "Enregistrer",
+      "saving": "Enregistrement...",
+      "saveAnyway": "Enregistrer quand même",
+      "revertLabels": "Rétablir les labels",
+      "owner": "Propriétaire",
+      "ownerNone": "Aucun",
+      "ownerPlaceholder": "user@example.com",
+      "labels": "Labels"
+    },
+    "moduleDetail": {
+      "notFound": "Module introuvable",
+      "loadFailed": "Échec du chargement du module",
+      "updateFailed": "Échec de la mise à jour du module",
+      "labelLockoutDefault": "Cette modification de label réduirait votre accès.",
+      "providerLabel": "Fournisseur : {provider}",
+      "cancel": "Annuler",
+      "uploadVersion": "Téléverser une version",
+      "vcsConnected": "VCS connecté",
+      "connectVcs": "Connecter le VCS",
+      "deleteModule": "Supprimer le module",
+      "linkFailed": "Échec de la liaison de l'espace de travail",
+      "linkFailedStatus": "Échec de la liaison ({status})",
+      "unlinkConfirm": "Dissocier cet espace de travail du module ? L'analyse d'impact ne s'exécutera plus pour lui.",
+      "unlinkFailed": "Échec de la dissociation de l'espace de travail",
+      "unlinkFailedStatus": "Échec de la dissociation ({status})",
+      "uploadFailed": "Échec du téléversement",
+      "uploadFailedStatus": "Échec du téléversement ({status})",
+      "saveVcsFailed": "Échec de l'enregistrement de la configuration VCS",
+      "saveVcsFailedStatus": "Échec de l'enregistrement de la configuration VCS ({status})",
+      "disableVcsFailed": "Échec de la désactivation du VCS",
+      "disableVcsFailedStatus": "Échec de la désactivation du VCS ({status})",
+      "deleteFailed": "Échec de la suppression",
+      "deleteFailedStatus": "Échec de la suppression ({status})",
+      "upload": {
+        "intro": "Sélectionnez un répertoire contenant les fichiers de votre module Terraform. Ils seront empaquetés dans une archive tar et téléversés.",
+        "version": "Version",
+        "moduleDirectory": "Répertoire du module",
+        "selectDirectory": "Sélectionner un répertoire",
+        "fileCount": "{count, plural, one {# fichier} other {# fichiers}}",
+        "filesToInclude": "{count, plural, one {# fichier à inclure :} other {# fichiers à inclure :}}",
+        "andMore": "...et {count} de plus",
+        "uploading": "Téléversement...",
+        "upload": "Téléverser"
+      },
+      "vcs": {
+        "intro": "Connectez ce module à un dépôt VCS. De nouvelles versions sont publiées automatiquement lorsque des tags semver correspondant au motif de tag sont poussés. Les commits de branche seuls ne créent pas de versions.",
+        "connection": "Connexion VCS",
+        "selectConnection": "Sélectionner une connexion...",
+        "repositoryUrl": "URL du dépôt",
+        "branchOptional": "Branche (facultatif)",
+        "branchPlaceholder": "main (laisser vide pour la valeur par défaut)",
+        "tagPattern": "Motif de tag",
+        "tagPatternHint": "Seuls les tags correspondant à ce motif créent des versions (par ex. v1.0.0)",
+        "saving": "Enregistrement...",
+        "saveConfiguration": "Enregistrer la configuration VCS",
+        "disconnect": "Déconnecter le VCS"
+      },
+      "vcsStatus": {
+        "connected": "VCS connecté :",
+        "lastTag": "Dernier tag : {tag}",
+        "firstVersionHint": "Poussez un tag semver (par ex. <code>v1.0.0</code>) correspondant au motif de tag pour publier la première version."
+      },
+      "links": {
+        "title": "Espaces de travail liés",
+        "linkWorkspace": "Lier un espace de travail",
+        "description": "Les espaces de travail liés reçoivent des plans spéculatifs lorsque des PR sont ouvertes contre ce module, et des exécutions standard lorsque de nouvelles versions sont publiées.",
+        "searchPlaceholder": "Rechercher des espaces de travail à lier…",
+        "empty": "Aucun espace de travail lié pour l'instant.",
+        "unlinkTitle": "Dissocier l'espace de travail"
+      },
+      "interface": {
+        "title": "Entrées et sorties",
+        "counts": "{inputs} entrées, {outputs} sorties",
+        "versionLabel": "Version :",
+        "noData": "Aucune donnée d'interface disponible pour cette version.",
+        "inputs": "Entrées",
+        "outputs": "Sorties",
+        "name": "Nom",
+        "type": "Type",
+        "description": "Description",
+        "default": "Valeur par défaut",
+        "required": "Requis",
+        "sensitive": "Sensible",
+        "requiredBadge": "requis",
+        "optionalBadge": "facultatif",
+        "sensitiveBadge": "sensible",
+        "noneDeclared": "Cette version du module ne déclare aucune entrée ni sortie."
+      },
+      "versions": {
+        "title": "Versions",
+        "count": "{count, plural, one {# version} other {# versions}}",
+        "emptyVcs": "Aucune version pour l'instant. Poussez un tag semver correspondant à « {pattern} » vers le dépôt connecté pour publier une version.",
+        "emptyUpload": "Aucune version pour l'instant. Téléversez un module ou connectez un VCS pour commencer.",
+        "version": "Version",
+        "status": "Statut",
+        "source": "Source",
+        "actions": "Actions",
+        "manualUpload": "téléversement manuel",
+        "delete": "Supprimer"
+      },
+      "deleteDialog": {
+        "title": "Confirmer la suppression",
+        "moduleBody": "Cela supprimera définitivement ce module et toutes ses versions.",
+        "versionBody": "Cela supprimera définitivement la version {version}.",
+        "cancel": "Annuler",
+        "confirm": "Supprimer"
+      }
+    },
+    "providerDetail": {
+      "description": "Registre de fournisseurs",
+      "deleteProvider": "Supprimer le fournisseur",
+      "publishNote": "Les versions de fournisseur sont publiées avec la CLI <code>terrapod-publish</code>, qui signe les binaires côté client. Le téléversement et la signature de binaires de fournisseur depuis le navigateur ne sont plus pris en charge. Cette page est en lecture seule pour les versions et les plateformes.",
+      "empty": "Aucune version pour l'instant. Publiez avec la CLI terrapod-publish pour commencer.",
+      "loadVersionsFailed": "Échec du chargement des versions",
+      "updateFailed": "Échec de la mise à jour du fournisseur",
+      "labelLockoutDefault": "Cette modification de label réduirait votre accès.",
+      "deleteFailed": "Échec de la suppression",
+      "deleteFailedStatus": "Échec de la suppression ({status})",
+      "platformCount": "{count, plural, one {# plateforme} other {# plateformes}}",
+      "delete": "Supprimer",
+      "os": "OS",
+      "arch": "Arch",
+      "filename": "Nom de fichier",
+      "actions": "Actions",
+      "deleteDialog": {
+        "title": "Confirmer la suppression",
+        "providerBody": "Cela supprimera définitivement ce fournisseur et toutes ses versions.",
+        "versionBody": "Cela supprimera définitivement la version {version} et ses plateformes.",
+        "platformBody": "Cela supprimera définitivement la plateforme {os}/{arch}.",
+        "cancel": "Annuler",
+        "confirm": "Supprimer"
+      }
+    }
+  },
+  "adminUsers": {
+    "title": "Utilisateurs",
+    "description": "Gérez les comptes utilisateurs locaux",
+    "empty": "Aucun utilisateur trouvé.",
+    "columns": {
+      "email": "E-mail",
+      "displayName": "Nom d'affichage",
+      "status": "Statut",
+      "lastLogin": "Dernière connexion",
+      "created": "Créé le",
+      "actions": "Actions"
+    },
+    "form": {
+      "email": "E-mail",
+      "displayName": "Nom d'affichage",
+      "displayNamePlaceholder": "Jean Dupont",
+      "passwordOptional": "Mot de passe (facultatif)",
+      "passwordPlaceholder": "Saisissez un mot de passe robuste"
+    },
+    "reset": {
+      "title": "Réinitialiser le mot de passe de {email}",
+      "newPassword": "Nouveau mot de passe"
+    },
+    "password": {
+      "score": {
+        "veryWeak": "Très faible",
+        "weak": "Faible",
+        "fair": "Moyen",
+        "good": "Bon",
+        "strong": "Robuste"
+      }
+    },
+    "status": {
+      "active": "Actif",
+      "inactive": "Inactif",
+      "never": "Jamais"
+    },
+    "actions": {
+      "cancel": "Annuler",
+      "save": "Enregistrer",
+      "saving": "Enregistrement...",
+      "createUser": "Créer un utilisateur",
+      "creating": "Création...",
+      "resetPassword": "Réinitialiser le mot de passe",
+      "edit": "Modifier",
+      "delete": "Supprimer",
+      "resetPw": "Réinit. MDP",
+      "setPw": "Définir MDP",
+      "cancelPw": "Annuler MDP"
+    },
+    "confirm": {
+      "activate": "Activer l'utilisateur « {email} » ?",
+      "deactivate": "Désactiver l'utilisateur « {email} » ?",
+      "delete": "Supprimer l'utilisateur « {email} » ? Cette action est irréversible."
+    },
+    "success": {
+      "created": "Utilisateur « {email} » créé",
+      "updated": "Utilisateur « {email} » mis à jour",
+      "activated": "Utilisateur « {email} » activé",
+      "deactivated": "Utilisateur « {email} » désactivé",
+      "passwordReset": "Mot de passe réinitialisé pour « {email} »",
+      "deleted": "Utilisateur « {email} » supprimé"
+    },
+    "errors": {
+      "load": "Échec du chargement des utilisateurs",
+      "create": "Échec de la création de l'utilisateur",
+      "createStatus": "Échec de la création de l'utilisateur ({status})",
+      "update": "Échec de la mise à jour de l'utilisateur",
+      "resetPassword": "Échec de la réinitialisation du mot de passe",
+      "delete": "Échec de la suppression de l'utilisateur"
+    }
+  },
+  "adminRoles": {
+    "title": "Rôles et attributions",
+    "description": "Gérez les rôles RBAC et les attributions de rôles aux utilisateurs",
+    "builtIn": "intégré",
+    "emptyRoles": "Aucun rôle défini.",
+    "emptyAssignments": "Aucune attribution de rôle.",
+    "tabs": {
+      "roles": "Rôles",
+      "assignments": "Attributions"
+    },
+    "columns": {
+      "provider": "Fournisseur",
+      "email": "E-mail",
+      "role": "Rôle",
+      "created": "Créé le",
+      "actions": "Actions"
+    },
+    "form": {
+      "name": "Nom",
+      "namePattern": "Lettres, chiffres, traits d'union et traits de soulignement uniquement. Doit commencer par une lettre ou un chiffre.",
+      "workspacePermission": "Autorisation sur l'espace de travail",
+      "poolPermission": "Autorisation sur le pool",
+      "registryPermission": "Autorisation sur le registre",
+      "catalogPermission": "Autorisation sur le catalogue",
+      "descriptionLabel": "Description",
+      "descriptionPlaceholder": "Accès développeur",
+      "allowLabels": "Labels autorisés (clé=valeur, séparés par des virgules)",
+      "allowNames": "Noms autorisés (séparés par des virgules)",
+      "denyLabels": "Labels refusés (clé=valeur, séparés par des virgules)",
+      "denyNames": "Noms refusés (séparés par des virgules)",
+      "allowLabelsShort": "Labels autorisés",
+      "allowNamesShort": "Noms autorisés",
+      "denyLabelsShort": "Labels refusés",
+      "denyNamesShort": "Noms refusés"
+    },
+    "assignForm": {
+      "provider": "Fournisseur",
+      "email": "E-mail",
+      "roles": "Rôles"
+    },
+    "caps": {
+      "selected": "{count, plural, one {# capacité sélectionnée} other {# capacités sélectionnées}}",
+      "count": "{count, plural, one {# capacité} other {# capacités}}",
+      "custom": "Personnalisé",
+      "matchesPresets": "Correspond aux préréglages",
+      "advanced": "Avancé — capacités",
+      "otherPreserved": "Autres capacités (préservées à l'enregistrement)",
+      "presetHelp": {
+        "before": "Sélectionner un préréglage ci-dessus pré-coche ses capacités. Cocher ou décocher une case au-delà d'un préréglage marque le rôle comme",
+        "after": "et son octroi est envoyé comme un ensemble de capacités explicite."
+      },
+      "groups": {
+        "workspace": "Espace de travail",
+        "run": "Exécution",
+        "state": "État",
+        "var": "Variables",
+        "config": "Configuration",
+        "drift": "Dérive",
+        "run-task": "Tâches d'exécution",
+        "notification": "Notifications",
+        "run-trigger": "Déclencheurs d'exécution",
+        "pool": "Pools d'agents",
+        "registry": "Registre",
+        "catalog": "Catalogue de services"
+      }
+    },
+    "display": {
+      "allow": "Autoriser : {value}",
+      "allowNames": "Noms autorisés : {value}",
+      "deny": "Refuser : {value}",
+      "denyNames": "Noms refusés : {value}"
+    },
+    "actions": {
+      "cancel": "Annuler",
+      "save": "Enregistrer",
+      "saving": "Enregistrement...",
+      "edit": "Modifier",
+      "delete": "Supprimer",
+      "remove": "Retirer",
+      "createRole": "Créer un rôle",
+      "creating": "Création...",
+      "addAssignment": "Ajouter une attribution",
+      "setRoles": "Définir les rôles"
+    },
+    "confirm": {
+      "deleteRole": "Supprimer le rôle « {name} » ? Toutes les attributions qui le référencent sont affectées.",
+      "removeAssignment": "Retirer le rôle « {roleName} » de {email} ?"
+    },
+    "success": {
+      "roleCreated": "Rôle « {name} » créé",
+      "roleUpdated": "Rôle « {name} » mis à jour",
+      "roleDeleted": "Rôle « {name} » supprimé",
+      "rolesAssigned": "Rôles attribués à {email}",
+      "assignmentRemoved": "Attribution retirée"
+    },
+    "errors": {
+      "loadRoles": "Échec du chargement des rôles",
+      "loadAssignments": "Échec du chargement des attributions",
+      "createRole": "Échec de la création du rôle",
+      "createRoleStatus": "Échec de la création du rôle ({status})",
+      "updateRole": "Échec de la mise à jour du rôle",
+      "deleteRole": "Échec de la suppression du rôle",
+      "setAssignment": "Échec de la définition de l'attribution",
+      "setAssignmentStatus": "Échec de la définition de l'attribution ({status})",
+      "deleteAssignment": "Échec de la suppression de l'attribution"
+    }
+  },
+  "adminVcs": {
+    "title": "Connexions VCS",
+    "description": "Gérez les intégrations avec les systèmes de gestion de versions",
+    "empty": "Aucune connexion VCS configurée.",
+    "actions": {
+      "new": "Nouvelle connexion",
+      "cancel": "Annuler",
+      "edit": "Modifier",
+      "delete": "Supprimer"
+    },
+    "confirmDelete": "Supprimer cette connexion VCS ? Les espaces de travail qui l'utilisent perdront l'intégration VCS. Cette action est irréversible.",
+    "form": {
+      "name": "Nom",
+      "namePattern": "Lettres, chiffres, traits d'union et traits de soulignement uniquement. Doit commencer par une lettre ou un chiffre.",
+      "provider": "Fournisseur",
+      "providerImmutable": "Le fournisseur est immuable — supprimez et recréez pour le changer",
+      "serverUrl": "URL du serveur (facultatif)",
+      "serverUrlHint": "Doit être une URL HTTP ou HTTPS (par ex. https://github.mycompany.com)",
+      "appId": "ID de l'application",
+      "appIdHint": "ID de l'application GitHub — chiffres numériques uniquement",
+      "installationId": "ID d'installation",
+      "installationIdHint": "ID d'installation de l'application GitHub — chiffres numériques uniquement",
+      "privateKey": "Clé privée (PEM)",
+      "browse": "Parcourir...",
+      "privateKeyKeep": "Laissez vide pour conserver la clé actuelle — collez un nouveau PEM pour la renouveler",
+      "privateKeyPlaceholder": "-----BEGIN RSA PRIVATE KEY-----\n...\n\nDéposez un fichier .pem ici ou cliquez sur Parcourir",
+      "webhookSecret": "Secret du webhook",
+      "optional": "(facultatif)",
+      "webhookSecretSet": "Défini — laissez vide pour conserver, saisissez une nouvelle valeur pour renouveler",
+      "webhookSecretGlobal": "Laissez vide pour utiliser le secret de webhook global",
+      "webhookSecretHelp": "Secret HMAC propre à cette connexion pour les webhooks de cette installation. Lorsqu'il n'est pas défini, le secret global est utilisé.",
+      "accessToken": "Token d'accès",
+      "accessTokenKeep": "Laissez vide pour conserver le token actuel",
+      "saving": "Enregistrement...",
+      "creating": "Création...",
+      "saveChanges": "Enregistrer les modifications",
+      "createConnection": "Créer la connexion"
+    },
+    "table": {
+      "name": "Nom",
+      "provider": "Fournisseur",
+      "serverUrl": "URL du serveur",
+      "status": "Statut",
+      "created": "Créé le",
+      "actions": "Actions"
+    },
+    "success": {
+      "created": "Connexion VCS « {name} » créée",
+      "updated": "Connexion VCS « {name} » mise à jour",
+      "deleted": "Connexion VCS supprimée"
+    },
+    "errors": {
+      "load": "Échec du chargement des connexions VCS",
+      "save": "Échec de l'enregistrement de la connexion",
+      "delete": "Échec de la suppression de la connexion",
+      "createStatus": "Échec de la création de la connexion ({status})",
+      "updateStatus": "Échec de la mise à jour de la connexion ({status})"
+    }
+  },
+  "adminVariableSets": {
+    "title": "Ensembles de variables",
+    "description": "Gérez les ensembles de variables à portée organisationnelle pour les groupes d'espaces de travail",
+    "empty": "Aucun ensemble de variables configuré.",
+    "none": "-",
+    "actions": {
+      "new": "Nouvel ensemble de variables",
+      "cancel": "Annuler"
+    },
+    "form": {
+      "name": "Nom",
+      "namePattern": "Lettres, chiffres, traits d'union et traits de soulignement uniquement. Doit commencer par une lettre ou un chiffre.",
+      "descriptionLabel": "Description",
+      "descriptionPlaceholder": "Identifiants AWS pour tous les espaces de travail",
+      "global": "Global (appliquer à tous les espaces de travail)",
+      "priority": "Priorité (remplacer les variables de l'espace de travail)",
+      "creating": "Création...",
+      "create": "Créer l'ensemble de variables"
+    },
+    "table": {
+      "name": "Nom",
+      "description": "Description",
+      "scope": "Portée",
+      "variables": "Variables",
+      "created": "Créé le"
+    },
+    "scope": {
+      "global": "Global",
+      "priority": "Priorité",
+      "standard": "Standard"
+    },
+    "errors": {
+      "load": "Échec du chargement des ensembles de variables",
+      "create": "Échec de la création de l'ensemble de variables",
+      "createStatus": "Échec de la création de l'ensemble de variables ({status})"
+    },
+    "detail": {
+      "back": "Retour aux ensembles de variables",
+      "headerFallback": "Ensemble de variables",
+      "notFound": "Ensemble de variables introuvable",
+      "global": "Global",
+      "priority": "Priorité",
+      "yes": "Oui",
+      "no": "Non",
+      "edit": "Modifier",
+      "cancel": "Annuler",
+      "save": "Enregistrer",
+      "saving": "Enregistrement...",
+      "delete": "Supprimer",
+      "deleting": "Suppression...",
+      "confirmDelete": "Confirmer la suppression",
+      "deleteTitle": "Supprimer l'ensemble de variables",
+      "deleteDescription": "Supprimer définitivement cet ensemble de variables et toutes ses variables.",
+      "tabs": {
+        "settings": "Paramètres",
+        "variables": "Variables",
+        "workspaces": "Espaces de travail"
+      },
+      "addVariable": "Ajouter une variable",
+      "adding": "Ajout...",
+      "varKey": "Clé",
+      "varValue": "Valeur",
+      "varCategory": "Catégorie",
+      "categoryTerraform": "Terraform",
+      "categoryEnv": "Environnement",
+      "sensitive": "Sensible",
+      "sensAbbr": "Sens.",
+      "enterNewValue": "Saisir une nouvelle valeur",
+      "empty": "vide",
+      "emptyVars": "Aucune variable dans cet ensemble.",
+      "actions": "Actions",
+      "remove": "Retirer",
+      "add": "Ajouter",
+      "addWorkspace": "Ajouter un espace de travail",
+      "workspace": "Espace de travail",
+      "selectWorkspace": "Sélectionner un espace de travail...",
+      "globalBanner": "Cet ensemble de variables est global et s'applique automatiquement à tous les espaces de travail.",
+      "emptyWorkspaces": "Aucun espace de travail affecté à cet ensemble de variables.",
+      "confirmDeleteVar": "Supprimer cette variable ? Cette action est irréversible.",
+      "confirmRemoveWorkspace": "Retirer cet espace de travail de l'ensemble de variables ? Ses variables ne s'appliqueront plus à cet espace de travail.",
+      "success": {
+        "updated": "Ensemble de variables mis à jour",
+        "workspaceAdded": "Espace de travail ajouté",
+        "workspaceRemoved": "Espace de travail retiré"
+      },
+      "errors": {
+        "load": "Échec du chargement de l'ensemble de variables",
+        "update": "Échec de la mise à jour de l'ensemble de variables",
+        "delete": "Échec de la suppression de l'ensemble de variables",
+        "loadVars": "Échec du chargement des variables",
+        "loadWorkspaces": "Échec du chargement des espaces de travail",
+        "addVar": "Échec de l'ajout de la variable",
+        "addVarStatus": "Échec de l'ajout de la variable ({status})",
+        "updateVar": "Échec de la mise à jour de la variable",
+        "deleteVar": "Échec de la suppression de la variable",
+        "addWorkspace": "Échec de l'ajout de l'espace de travail",
+        "removeWorkspace": "Échec du retrait de l'espace de travail"
+      }
+    }
+  },
+  "adminAutodiscovery": {
+    "title": "Découverte automatique",
+    "description": "Créez automatiquement des espaces de travail dans les monorepos lorsque des PR touchent des chemins correspondants",
+    "empty": "Aucune règle de découverte automatique pour l'instant. Créez-en une pour commencer à provisionner automatiquement des espaces de travail à partir des PR de votre monorepo.",
+    "unsavedRule": "(règle non enregistrée)",
+    "actions": {
+      "newRule": "Nouvelle règle",
+      "cancel": "Annuler",
+      "create": "Créer",
+      "update": "Mettre à jour",
+      "preview": "Aperçu",
+      "edit": "Modifier",
+      "delete": "Supprimer",
+      "close": "Fermer"
+    },
+    "status": {
+      "enabled": "activée",
+      "disabled": "désactivée"
+    },
+    "form": {
+      "createTitle": "Créer une règle",
+      "editTitle": "Modifier la règle",
+      "name": "Nom",
+      "vcsConnection": "Connexion VCS",
+      "selectConnection": "Sélectionner une connexion",
+      "repoUrl": "URL du dépôt",
+      "branch": "Branche (vide = par défaut)",
+      "matchPattern": "Motif de correspondance",
+      "matchPatternHint": "Globs de style gitignore. <code>**</code> correspond à travers les segments de chemin. Seuls les fichiers <code>*.tf*</code> déclenchent la découverte automatique.",
+      "ignorePatterns": "Motifs à ignorer (un par ligne)",
+      "nameTemplate": "Modèle de nom d'espace de travail (facultatif)",
+      "nameTemplateHint": "Utilisez <path></path> pour le répertoire avec <code>/</code> remplacé par <code>-</code>, ou <root></root> pour le répertoire tel quel. Vide = par défaut (juste le chemin avec des tirets).",
+      "templateDefaults": "Valeurs par défaut du modèle d'espace de travail",
+      "executionMode": "Mode d'exécution",
+      "executionModeHint": "La découverte automatique est pilotée par le VCS ; seule l'exécution par agent est prise en charge.",
+      "agentPool": "Pool d'agents",
+      "none": "(aucun)",
+      "executionBackend": "Backend d'exécution",
+      "terraformVersion": "Version de Terraform",
+      "cpuRequest": "Demande CPU",
+      "memoryRequest": "Demande de mémoire",
+      "ownerEmail": "E-mail du propriétaire",
+      "autoApply": "Application automatique",
+      "enabled": "Activée",
+      "onDirectoryDelete": "À la suppression du répertoire",
+      "onDeleteFlag": "Signaler (sûr — marquer comme suppression en attente, requiert une action manuelle)",
+      "onDeleteDestroy": "Détruire (DANGER — démantèle l'infrastructure puis archive l'espace de travail)",
+      "onDirectoryDeleteHint": "Ce qui arrive à un espace de travail découvert automatiquement lorsque son répertoire est supprimé sur la branche suivie.",
+      "onDeleteDestroyWarning": "Cela exécutera un véritable terraform destroy sur l'espace de travail lorsque son répertoire est supprimé sur la branche suivie.",
+      "labels": "Labels (hérités par les espaces de travail créés)",
+      "varFiles": "Fichiers de variables (hérités par les espaces de travail créés)",
+      "varFilesHint": "Chemins <code>.tfvars</code> relatifs passés au plan/apply.",
+      "addVarFile": "Ajouter un fichier de variables",
+      "executionHooks": "Hooks d'exécution (associés à chaque nouvel espace de travail)",
+      "executionHooksHint": "Choisissez parmi les hooks définis sur la page d'administration <page>Hooks d'exécution</page> — chaque hook sélectionné est associé à chaque espace de travail que cette règle crée.",
+      "noHooks": "Aucun hook d'exécution défini pour l'instant. Créez-en un d'abord sur la page d'administration Hooks d'exécution.",
+      "hookDisabled": "(désactivé)",
+      "hookNotInLibrary": "(absent de la bibliothèque — décochez pour retirer)",
+      "runTaskTemplates": "Modèles de tâches d'exécution (créés sur chaque nouvel espace de travail)",
+      "notificationTemplates": "Modèles de notification (créés sur chaque nouvel espace de travail)",
+      "saving": "Enregistrement...",
+      "previewTitle": "Parcourir le dépôt et prévisualiser quels espaces de travail cette règle CRÉERAIT — sans persistance"
+    },
+    "table": {
+      "name": "Nom",
+      "repo": "Dépôt",
+      "pattern": "Motif",
+      "enabled": "Activée",
+      "created": "Créée le",
+      "previewTitle": "Parcourir le dépôt et prévisualiser quels espaces de travail cette règle créerait"
+    },
+    "deleteModal": {
+      "title": "Supprimer la règle ?",
+      "body": "Les espaces de travail créés automatiquement par cette règle continuent de fonctionner. Les futures PR touchant de nouveaux chemins sous cette règle ne créeront plus d'espaces de travail automatiquement."
+    },
+    "preview": {
+      "title": "Aperçu : {ruleName}",
+      "walkedFiles": "Parcours de <files>{count}</files> fichiers sur <refspan>{ref}</refspan>",
+      "walking": "Parcours du dépôt…",
+      "noMatches": "Aucun répertoire de ce dépôt ne correspond au motif de la règle. Rien à créer.",
+      "colWorkspace": "Espace de travail",
+      "colDirectory": "Répertoire",
+      "colAction": "Action",
+      "repoRoot": "(racine du dépôt)",
+      "actionCreate": "Créer",
+      "skipDiscovered": "Ignorer (déjà découvert)",
+      "skipDiscoveredTitle": "Déjà créé par cette règle",
+      "skipCollision": "Ignorer (collision de nom)",
+      "skipCollisionTitle": "Un espace de travail portant ce nom existe déjà pour une autre raison",
+      "willCreate": "{count, plural, one {# espace de travail sera créé.} other {# espaces de travail seront créés.}} Les espaces de travail existants (collisions) sont laissés intacts.",
+      "provision": "{count, plural, one {Provisionner # espace de travail} other {Provisionner # espaces de travail}}",
+      "provisioning": "Provisionnement…",
+      "saveToProvision": "Enregistrez la règle pour provisionner ces espaces de travail."
+    },
+    "success": {
+      "created": "{name} créée",
+      "updated": "{name} mise à jour",
+      "deleted": "Règle supprimée",
+      "provisioned": "{count, plural, one {# espace de travail créé à partir de « {ruleName} »} other {# espaces de travail créés à partir de « {ruleName} »}}"
+    },
+    "errors": {
+      "loadRules": "Échec du chargement des règles de découverte automatique",
+      "load": "Échec du chargement",
+      "createFailed": "Échec de la création : {status} {detail}",
+      "updateFailed": "Échec de la mise à jour : {status} {detail}",
+      "save": "Échec de l'enregistrement",
+      "deleteRule": "Échec de la suppression de la règle",
+      "delete": "Échec de la suppression",
+      "previewFailed": "Échec de l'aperçu ({status})",
+      "preview": "Échec de l'aperçu",
+      "previewPrereq": "Définissez la connexion VCS, l'URL du dépôt et le motif avant de prévisualiser",
+      "scanFailed": "Échec de l'analyse ({status})",
+      "scan": "Échec de l'analyse"
+    }
+  },
+  "adminBulkUpdate": {
+    "title": "Mise à jour groupée",
+    "description": "Sélectionnez des espaces de travail par filtre, puis appliquez une modification de paramètre à tous",
+    "none": "(aucun)",
+    "anyOption": "(tout)",
+    "unchanged": "(inchangé)",
+    "unchangedOption": "(inchangé)",
+    "filter": {
+      "heading": "1. Sélectionner les espaces de travail",
+      "matchAll": "Correspondre à <strong>tous</strong> les espaces de travail (ignore les filtres ci-dessous)",
+      "namePrefix": "Préfixe de nom",
+      "executionBackend": "Backend d'exécution",
+      "ownerEmail": "E-mail du propriétaire",
+      "agentPool": "Pool d'agents",
+      "vcsConnection": "Connexion VCS",
+      "labels": "Labels",
+      "search": "Rechercher",
+      "searching": "Recherche..."
+    },
+    "results": {
+      "matched": "<strong>{count}</strong> {count, plural, one {espace de travail correspondant} other {espaces de travail correspondants}}.",
+      "noMatch": "Aucun espace de travail ne correspond à ce filtre.",
+      "colName": "Nom",
+      "colMode": "Mode",
+      "colBackend": "Backend",
+      "colTfVersion": "Version TF",
+      "colLabels": "Labels"
+    },
+    "update": {
+      "heading": "2. Appliquer les modifications",
+      "hint": "Seuls les champs que vous définissez ci-dessous sont modifiés. Le filtre ci-dessus sélectionne quels espaces de travail reçoivent la modification.",
+      "terraformVersion": "Version de Terraform",
+      "executionBackend": "Backend d'exécution",
+      "executionMode": "Mode d'exécution",
+      "autoApply": "Application automatique",
+      "agentPool": "Pool d'agents",
+      "cpuRequest": "Demande CPU",
+      "memoryRequest": "Demande de mémoire",
+      "setLabels": "Définir les labels (remplace la carte de labels sur chaque espace de travail correspondant)",
+      "setVarFiles": "Définir les fichiers de variables",
+      "addVarFile": "Ajouter un fichier de variables",
+      "setRunTasks": "Définir les tâches d'exécution (insérées ou mises à jour par nom sur chaque espace de travail correspondant)",
+      "setNotifications": "Définir les configurations de notification (insérées ou mises à jour par nom)",
+      "dryRun": "Simulation (aperçu uniquement — aucune modification écrite)",
+      "confirmWarning": "Cela écrit des modifications sur chaque espace de travail correspondant.",
+      "confirmApply": "Confirmer l'application",
+      "applying": "Application...",
+      "cancel": "Annuler",
+      "working": "Traitement...",
+      "previewDryRun": "Aperçu (simulation)",
+      "applyChanges": "Appliquer les modifications"
+    },
+    "diff": {
+      "colWorkspace": "Espace de travail",
+      "colChanges": "Modifications"
+    },
+    "dryResult": {
+      "heading": "Résultat de la simulation",
+      "summary": "<strong>{matched}</strong> correspondant(s) ; <strong>{wouldChange}</strong> seraient modifiés ; {unchanged} inchangés. Rien n'a été écrit.",
+      "wouldChange": "Seraient modifiés",
+      "noChange": "Aucun espace de travail ne serait modifié par cette mise à jour."
+    },
+    "applyResult": {
+      "heading": "Résultat de l'application",
+      "summary": "<strong>{matched}</strong> correspondant(s) ; <appliedstrong>{applied}</appliedstrong> appliqués ; {unchanged} inchangés ; {errors, plural, one {# erreur} other {# erreurs}}.",
+      "applied": "Appliqués",
+      "unnamedWorkspace": "(espace de travail)",
+      "noChange": "Aucun espace de travail modifié."
+    },
+    "errors": {
+      "searchFailed": "Échec de la recherche ({status})",
+      "search": "Échec de la recherche",
+      "bulkUpdateFailed": "Échec de la mise à jour groupée ({status})",
+      "bulkUpdate": "Échec de la mise à jour groupée"
+    }
+  },
+  "adminExecutionHooks": {
+    "title": "Hooks d'exécution",
+    "description": "Étapes shell personnalisées exécutées dans les Jobs de runner aux points pré/post-plan/apply, associées à des espaces de travail",
+    "empty": "Aucun hook d'exécution configuré.",
+    "actions": {
+      "cancel": "Annuler",
+      "new": "Nouveau hook d'exécution",
+      "creating": "Création...",
+      "create": "Créer le hook d'exécution"
+    },
+    "badges": {
+      "disabled": "Désactivé",
+      "enabled": "Activé"
+    },
+    "columns": {
+      "name": "Nom",
+      "hookPoint": "Point de hook",
+      "enabled": "Activé",
+      "priority": "Priorité",
+      "workspaces": "Espaces de travail"
+    },
+    "form": {
+      "name": "Nom",
+      "namePatternTitle": "Lettres, chiffres, traits d'union et traits de soulignement uniquement. Doit commencer par une lettre ou un chiffre.",
+      "description": "Description",
+      "descriptionPlaceholder": "Ajouter une entrée d'hôtes interne avant init",
+      "hookPoint": "Point de hook",
+      "priority": "Priorité",
+      "priorityTitle": "Une valeur plus basse s'exécute en premier lorsque plusieurs hooks partagent un point (les égalités sont départagées par le nom).",
+      "scriptLabel": "Script (<code>/bin/sh -c</code>)",
+      "scriptHelp": "S'exécute avec l'identité cloud du runner. Une sortie non nulle fait échouer l'exécution. Les secrets doivent provenir des variables de l'espace de travail, pas être inclus ici."
+    },
+    "errors": {
+      "load": "Échec du chargement des hooks d'exécution",
+      "createStatus": "Échec de la création du hook d'exécution ({status})",
+      "create": "Échec de la création du hook d'exécution"
+    }
+  },
+  "adminPolicySets": {
+    "title": "Ensembles de politiques",
+    "description": "Application de politiques en tant que code OPA, limitée aux espaces de travail par label",
+    "empty": "Aucun ensemble de politiques configuré.",
+    "actions": {
+      "cancel": "Annuler",
+      "new": "Nouvel ensemble de politiques",
+      "creating": "Création...",
+      "create": "Créer l'ensemble de politiques"
+    },
+    "badges": {
+      "disabled": "Désactivé",
+      "mandatory": "Obligatoire",
+      "advisory": "Consultatif",
+      "global": "Global",
+      "labelScoped": "Limité par label"
+    },
+    "columns": {
+      "name": "Nom",
+      "description": "Description",
+      "enforcement": "Application",
+      "scope": "Portée",
+      "policies": "Politiques"
+    },
+    "form": {
+      "name": "Nom",
+      "namePatternTitle": "Lettres, chiffres, traits d'union et traits de soulignement uniquement. Doit commencer par une lettre ou un chiffre.",
+      "description": "Description",
+      "descriptionPlaceholder": "Garde-fous obligatoires pour les espaces de travail de production",
+      "enforcement": "Application",
+      "enforcementAdvisory": "Consultatif (avertir, ne pas bloquer)",
+      "enforcementMandatory": "Obligatoire (bloquer l'application en cas d'échec)",
+      "globalScope": "Global (appliquer à chaque espace de travail)",
+      "sourceInline": "En ligne (gérer les politiques dans l'interface)",
+      "sourceVcs": "Depuis un dépôt VCS",
+      "vcsConnection": "Connexion VCS",
+      "selectConnection": "Sélectionner une connexion...",
+      "repoUrl": "URL du dépôt",
+      "branch": "Branche",
+      "branchPlaceholder": "main (par défaut)",
+      "policyPath": "Chemin des politiques",
+      "policyPathPlaceholder": "policies/ (répertoire contenant les fichiers .rego)",
+      "helpVcs": "Les politiques seront synchronisées automatiquement depuis le dépôt.",
+      "helpInline": "Ajoutez des politiques et affinez la portée par label après la création de l'ensemble."
+    },
+    "errors": {
+      "load": "Échec du chargement des ensembles de politiques",
+      "createStatus": "Échec de la création de l'ensemble de politiques ({status})",
+      "create": "Échec de la création de l'ensemble de politiques"
+    }
+  },
+  "adminCatalog": {
+    "title": "Administration du catalogue",
+    "description": "Gérez les éléments du catalogue de services",
+    "notEnabled": "Le catalogue de services n'est pas activé.",
+    "empty": "Aucun élément de catalogue pour l'instant.",
+    "actions": {
+      "new": "Nouvel élément de catalogue",
+      "cancel": "Annuler",
+      "create": "Créer l'élément de catalogue",
+      "creating": "Création…",
+      "saveChanges": "Enregistrer les modifications",
+      "saving": "Enregistrement…",
+      "edit": "Modifier",
+      "delete": "Supprimer"
+    },
+    "form": {
+      "name": "Nom",
+      "nameTitle": "Lettres, chiffres, traits d'union et traits de soulignement uniquement. Doit commencer par une lettre ou un chiffre.",
+      "module": "Module",
+      "moduleSelect": "Sélectionner un module…",
+      "moduleImmutable": "Le module est immuable après création",
+      "displayName": "Nom d'affichage",
+      "displayNamePlaceholder": "Bucket S3 standard",
+      "versionPin": "Épinglage de version par défaut",
+      "versionPinPlaceholder": "par ex. 1.2.0 (vide = la plus récente)",
+      "descriptionLabel": "Description",
+      "descriptionPlaceholder": "Ce que provisionne cet élément de catalogue…",
+      "enabled": "Activé (visible dans le catalogue parcourable)",
+      "providerTemplates": "Modèles de fournisseur",
+      "noProviderTemplates": "Aucun modèle de fournisseur défini.",
+      "restrictPools": "Restreindre à des pools d'agents spécifiques",
+      "noAgentPools": "Aucun pool d'agents disponible.",
+      "anyPool": "N'importe quel pool d'agents peut être utilisé.",
+      "labels": "Labels",
+      "variableOptions": "Options de variables (avancé, JSON)",
+      "variableOptionsHint": "Remplacements par entrée (options, masqué, valeur par défaut). Laissez <code>[]</code> si inutilisé."
+    },
+    "table": {
+      "name": "Nom",
+      "module": "Module",
+      "enabled": "Activé",
+      "actions": "Actions"
+    },
+    "badge": {
+      "enabled": "activé",
+      "disabled": "désactivé"
+    },
+    "confirm": {
+      "delete": "Supprimer cet élément de catalogue ? Les instances déjà provisionnées ne sont pas affectées."
+    },
+    "success": {
+      "created": "Élément de catalogue « {name} » créé",
+      "updated": "Élément de catalogue « {name} » mis à jour",
+      "deleted": "Élément de catalogue supprimé"
+    },
+    "errors": {
+      "load": "Échec du chargement des éléments de catalogue",
+      "save": "Échec de l'enregistrement de l'élément de catalogue",
+      "createStatus": "Échec de la création de l'élément de catalogue ({status})",
+      "updateStatus": "Échec de la mise à jour de l'élément de catalogue ({status})",
+      "delete": "Échec de la suppression de l'élément de catalogue",
+      "deleteConflict": "Suppression impossible : cet élément de catalogue a des instances provisionnées.",
+      "varOptsInvalidJson": "Les options de variables doivent être un JSON valide (un tableau).",
+      "varOptsNotArray": "Les options de variables doivent être un tableau JSON."
+    }
+  },
+  "adminProviderTemplates": {
+    "title": "Modèles de fournisseur",
+    "description": "Blocs de configuration de fournisseur réutilisables pour les éléments de catalogue",
+    "notEnabled": "Le catalogue de services n'est pas activé.",
+    "empty": "Aucun modèle de fournisseur pour l'instant.",
+    "actions": {
+      "new": "Nouveau modèle",
+      "cancel": "Annuler",
+      "create": "Créer le modèle",
+      "creating": "Création…",
+      "saveChanges": "Enregistrer les modifications",
+      "saving": "Enregistrement…",
+      "edit": "Modifier",
+      "delete": "Supprimer"
+    },
+    "form": {
+      "name": "Nom",
+      "providerType": "Type de fournisseur",
+      "body": "Corps (HCL)",
+      "parameters": "Paramètres (avancé, JSON)",
+      "parametersHint": "Chaque paramètre devient un champ du formulaire de provisionnement. Laissez <code>[]</code> si inutilisé.",
+      "labels": "Labels"
+    },
+    "table": {
+      "name": "Nom",
+      "providerType": "Type de fournisseur",
+      "parameters": "Paramètres",
+      "actions": "Actions"
+    },
+    "confirm": {
+      "delete": "Supprimer ce modèle de fournisseur ? Les éléments de catalogue qui le référencent échoueront au provisionnement. Cette action est irréversible."
+    },
+    "success": {
+      "created": "Modèle de fournisseur « {name} » créé",
+      "updated": "Modèle de fournisseur « {name} » mis à jour",
+      "deleted": "Modèle de fournisseur supprimé"
+    },
+    "errors": {
+      "load": "Échec du chargement des modèles de fournisseur",
+      "save": "Échec de l'enregistrement du modèle de fournisseur",
+      "createStatus": "Échec de la création du modèle ({status})",
+      "updateStatus": "Échec de la mise à jour du modèle ({status})",
+      "delete": "Échec de la suppression du modèle de fournisseur",
+      "deleteConflict": "Suppression impossible : ce modèle est référencé par un élément de catalogue.",
+      "paramsInvalidJson": "Les paramètres doivent être un JSON valide (un tableau).",
+      "paramsNotArray": "Les paramètres doivent être un tableau JSON."
+    }
+  },
+  "adminAgentPools": {
+    "title": "Pools d'agents",
+    "description": "Gérez les pools d'agents de runner et leurs listeners",
+    "empty": "Aucun pool d'agents configuré.",
+    "actions": {
+      "newPool": "Nouveau pool",
+      "createPool": "Créer le pool",
+      "creating": "Création...",
+      "cancel": "Annuler",
+      "edit": "Modifier",
+      "save": "Enregistrer",
+      "saving": "Enregistrement...",
+      "delete": "Supprimer",
+      "deleting": "Suppression...",
+      "confirmDelete": "Confirmer la suppression"
+    },
+    "form": {
+      "name": "Nom",
+      "namePattern": "Lettres, chiffres, traits d'union et traits de soulignement uniquement. Doit commencer par une lettre ou un chiffre.",
+      "description": "Description",
+      "descriptionPlaceholder": "Runners AWS de production",
+      "labels": "Labels"
+    },
+    "columns": {
+      "name": "Nom",
+      "description": "Description",
+      "status": "Statut",
+      "created": "Créé le"
+    },
+    "badges": {
+      "default": "par défaut",
+      "degradedTooltip": "Les listeners émettent un heartbeat mais leurs certificats ont expiré — les exécutions ne pourront pas démarrer.",
+      "status": {
+        "online": "en ligne",
+        "offline": "hors ligne",
+        "degraded": "dégradé"
+      }
+    },
+    "detail": {
+      "back": "Retour aux pools d'agents",
+      "defaultDescription": "Pool d'agents"
+    },
+    "tabs": {
+      "settings": "Paramètres",
+      "tokens": "Tokens",
+      "listeners": "Listeners"
+    },
+    "settings": {
+      "title": "Paramètres du pool",
+      "fields": {
+        "name": "Nom",
+        "description": "Description",
+        "created": "Créé le",
+        "owner": "Propriétaire",
+        "yourPermission": "Votre autorisation",
+        "labels": "Labels"
+      },
+      "permissions": {
+        "read": "lecture",
+        "write": "écriture",
+        "admin": "administration"
+      }
+    },
+    "danger": {
+      "title": "Supprimer le pool",
+      "description": "Supprimer définitivement ce pool d'agents et tous les tokens associés."
+    },
+    "tokens": {
+      "create": "Créer un token",
+      "empty": "Aucun token pour ce pool.",
+      "revoke": "Révoquer",
+      "created": {
+        "title": "Token créé avec succès",
+        "copyNow": "Copiez ce token maintenant — il ne sera plus affiché.",
+        "copy": "Copier"
+      },
+      "form": {
+        "description": "Description",
+        "descriptionPlaceholder": "Token de listener de production",
+        "maxUses": "Utilisations max.",
+        "maxUsesHint": "Par défaut 2 — tolère une nouvelle tentative en cas de course au démarrage entre les réplicas de listener.",
+        "expiresAt": "Expire le",
+        "expiresAtHint": "Par défaut 1 heure à partir de maintenant."
+      },
+      "columns": {
+        "description": "Description",
+        "uses": "Utilisations",
+        "expires": "Expire le",
+        "status": "Statut",
+        "createdBy": "Créé par",
+        "actions": "Actions"
+      },
+      "badges": {
+        "revoked": "Révoqué",
+        "active": "Actif"
+      }
+    },
+    "listeners": {
+      "empty": "Aucun listener enregistré pour ce pool.",
+      "columns": {
+        "name": "Nom",
+        "status": "Statut",
+        "replicas": "Réplicas",
+        "certExpires": "Expiration du certificat",
+        "actions": "Actions"
+      },
+      "status": {
+        "online": "en ligne",
+        "offline": "hors ligne",
+        "degraded": "dégradé",
+        "cert-expired": "certificat expiré"
+      },
+      "tooltips": {
+        "certExpired": "Le listener émet un heartbeat mais son certificat a expiré — chaque appel authentifié par certificat (réclamation d'exécution, renouvellement, token de runner) échouera. Cause la plus probable : l'API n'a jamais enregistré le dernier certificat, ou la durée de vie du certificat a expiré avant son renouvellement.",
+        "degraded": "Les listeners émettent un heartbeat mais leurs certificats ont expiré — les exécutions ne pourront pas démarrer."
+      }
+    },
+    "confirm": {
+      "revokeToken": "Révoquer ce token de jonction ? Les listeners qui l'utilisent ne pourront plus rejoindre, et cette action est irréversible.",
+      "deleteListener": "Supprimer ce listener ? Il se réenregistrera à son prochain heartbeat si le pod est toujours en cours d'exécution."
+    },
+    "success": {
+      "poolUpdated": "Pool mis à jour",
+      "tokenRevoked": "Token révoqué",
+      "listenerDeleted": "Listener supprimé"
+    },
+    "errors": {
+      "loadPools": "Échec du chargement des pools d'agents",
+      "loadPool": "Échec du chargement du pool",
+      "loadTokens": "Échec du chargement des tokens",
+      "loadListeners": "Échec du chargement des listeners",
+      "createPool": "Échec de la création du pool",
+      "createStatus": "Échec de la création du pool ({status})",
+      "updatePool": "Échec de la mise à jour du pool",
+      "deletePool": "Échec de la suppression du pool",
+      "poolNotFound": "Pool introuvable",
+      "createToken": "Échec de la création du token",
+      "createTokenStatus": "Échec de la création du token ({status})",
+      "revokeToken": "Échec de la révocation du token",
+      "deleteListener": "Échec de la suppression du listener"
+    }
+  },
+  "adminAuditLog": {
+    "title": "Journal d'audit",
+    "description": "Journal immuable de toutes les requêtes de l'API",
+    "empty": "Aucune entrée de journal d'audit trouvée.",
+    "errors": {
+      "load": "Échec du chargement du journal d'audit"
+    },
+    "filters": {
+      "actorEmail": "E-mail de l'acteur",
+      "actorPlaceholder": "user@example.com",
+      "resourceType": "Type de ressource",
+      "resourceTypePlaceholder": "workspaces",
+      "method": "Méthode",
+      "methodAll": "Toutes",
+      "since": "Depuis",
+      "until": "Jusqu'à",
+      "clear": "Effacer",
+      "apply": "Appliquer les filtres"
+    },
+    "columns": {
+      "timestamp": "Horodatage",
+      "actor": "Acteur",
+      "action": "Action",
+      "resourceType": "Type de ressource",
+      "resourceId": "ID de ressource",
+      "status": "Statut",
+      "duration": "Durée"
+    },
+    "pagination": {
+      "summary": "Page {current} sur {total} ({count, plural, one {# entrée} other {# entrées}})",
+      "previous": "Précédent",
+      "next": "Suivant"
+    }
+  },
+  "adminBinaryCache": {
+    "title": "Cache",
+    "description": "Gestion du cache des binaires CLI et des fournisseurs",
+    "errors": {
+      "loadBinary": "Échec du chargement du cache des binaires",
+      "loadCache": "Échec du chargement du cache"
+    },
+    "sections": {
+      "cliBinaries": "Binaires CLI",
+      "providerBinaries": "Binaires de fournisseur"
+    },
+    "empty": {
+      "binaries": "Aucun binaire CLI en cache pour l'instant.",
+      "providers": "Aucun binaire de fournisseur en cache pour l'instant."
+    },
+    "columns": {
+      "tool": "Outil",
+      "version": "Version",
+      "os": "OS",
+      "arch": "Arch",
+      "cachedAt": "Mis en cache le",
+      "provider": "Fournisseur",
+      "hostname": "Nom d'hôte",
+      "actions": "Actions"
+    },
+    "warm": {
+      "heading": "Préchauffer le cache",
+      "hide": "Masquer",
+      "prePopulate": "Pré-remplir…",
+      "help": "Pré-télécharger les binaires et les plateformes de fournisseur dans le cache (un par ligne). Les jetons <code>os/arch</code> en suffixe sont facultatifs — omettez-les pour utiliser les plateformes par défaut configurées.",
+      "binariesLabel": "Binaires",
+      "providersLabel": "Fournisseurs",
+      "warm": "Préchauffer",
+      "warming": "Préchauffage…",
+      "confirm": "Préchauffer les entrées de cache sélectionnées maintenant ?",
+      "errorEmpty": "Ajoutez au moins une ligne de binaire ou de fournisseur à préchauffer.",
+      "errorFailedStatus": "Échec du préchauffage ({status})",
+      "errorFailed": "Échec du préchauffage du cache",
+      "success": "{succeeded}/{total} préchauffés ({failed} échoués)"
+    },
+    "purge": {
+      "button": "Purger",
+      "confirmBinary": "Purger {tool} {version} du cache ? Il sera récupéré de nouveau depuis l'amont à la prochaine requête.",
+      "confirmProvider": "Purger {provider} {version} du cache de fournisseurs ? Il sera récupéré de nouveau depuis l'amont à la prochaine requête.",
+      "successBinary": "{count} entrées purgées pour {tool} {version}",
+      "successProvider": "{count} entrées purgées pour {provider} {version}",
+      "errorStatus": "Échec de la purge ({status})",
+      "error": "Échec de la purge",
+      "errorProvider": "Échec de la purge du fournisseur",
+      "errorProviders": "Échec de la purge des fournisseurs"
+    },
+    "batchPurge": {
+      "purging": "Purge...",
+      "purgeSelected": "Purger la sélection ({count})",
+      "confirmBinary": "Purger toutes les entrées de cache de binaires sélectionnées ? Elles seront récupérées de nouveau depuis l'amont à la prochaine requête.",
+      "confirmProvider": "Purger toutes les entrées de cache de fournisseurs sélectionnées ? Elles seront récupérées de nouveau depuis l'amont à la prochaine requête.",
+      "errorBinaryItem": "Échec de la purge pour {tool} {version}",
+      "errorProviderItem": "Échec de la purge pour {provider} {version}",
+      "successBinary": "{count} entrées de cache de binaires purgées",
+      "successProvider": "{count} entrées de cache de fournisseurs purgées"
+    }
+  },
+  "catalog": {
+    "title": "Catalogue de services",
+    "description": "Provisionnez une infrastructure en libre-service à partir de modules sélectionnés",
+    "notEnabled": "Le catalogue de services n'est pas activé.",
+    "empty": "Aucun élément de catalogue disponible.",
+    "card": {
+      "pinned": "épinglée {version}",
+      "latest": "la plus récente"
+    },
+    "errors": {
+      "loadItems": "Échec du chargement des éléments de catalogue"
+    }
+  },
+  "catalogDetail": {
+    "backLink": "← Catalogue",
+    "backToCatalog": "Retour au catalogue",
+    "fallbackTitle": "Élément de catalogue",
+    "notFound": "Élément de catalogue introuvable, ou le catalogue de services n'est pas activé.",
+    "common": {
+      "cancel": "Annuler"
+    },
+    "info": {
+      "module": "Module :",
+      "resolvedVersion": "Version résolue :",
+      "latest": "la plus récente",
+      "disabled": "désactivé"
+    },
+    "pending": {
+      "banner": "L'exécution pour <strong>{name}</strong> est planifiée et en attente de revue. Confirmez pour appliquer, ou abandonnez.",
+      "working": "Traitement…",
+      "confirmApply": "Confirmer et appliquer",
+      "discard": "Abandonner"
+    },
+    "field": {
+      "select": "Sélectionner…"
+    },
+    "provision": {
+      "title": "Provisionner",
+      "workspaceName": "Nom de l'espace de travail",
+      "workspaceNameTitle": "Lettres, chiffres, traits d'union et traits de soulignement uniquement. Doit commencer par une lettre ou un chiffre.",
+      "workspaceNamePlaceholder": "my-instance",
+      "agentPool": "Pool d'agents",
+      "selectPool": "Sélectionner un pool…",
+      "noPoolsAvailable": "Aucun pool d'agents n'est disponible pour vous. Vous devez disposer d'un accès en écriture à un pool d'agents pour provisionner — demandez à un administrateur de vous l'accorder.",
+      "noPoolsAllowed": "Aucun des pools d'agents auxquels vous avez accès n'est autorisé par cet élément de catalogue. Demandez à un administrateur d'élargir les pools autorisés de l'élément ou de vous donner accès à l'un d'eux.",
+      "version": "Version",
+      "latestFloat": "La plus récente (flottante)",
+      "defaultPinOption": "{version} (épinglage par défaut)",
+      "labelsOptional": "Labels (facultatif)",
+      "autoApplyHint": "L'application automatique applique les modifications sans étape de revue manuelle.",
+      "provisioning": "Provisionnement…",
+      "submit": "Provisionner"
+    },
+    "instances": {
+      "title": "Instances",
+      "empty": "Aucune instance provisionnée à partir de cet élément pour l'instant.",
+      "colName": "Nom",
+      "colVersion": "Version",
+      "colPool": "Pool",
+      "colActions": "Actions",
+      "reconfigure": "Reconfigurer",
+      "destroy": "Détruire",
+      "orphan": "Orpheliner…",
+      "orphanTitle": "Supprimer l'enregistrement de catalogue sans détruire son infrastructure (déconseillé)"
+    },
+    "reconfigure": {
+      "title": "Reconfigurer {name}",
+      "description": "Mettez à jour les entrées et/ou la version, puis mettez une exécution en file d'attente.",
+      "currentOption": "{version} (actuelle)",
+      "queuing": "Mise en file d'attente…",
+      "queueRun": "Mettre l'exécution en file d'attente"
+    },
+    "destroy": {
+      "title": "Détruire {name}",
+      "heading": "Détruire {name} ?",
+      "description": "Cela met en file d'attente une exécution de destruction qui démantèle l'infrastructure de cette instance. En cas d'application réussie, l'espace de travail est archivé. Cette action est irréversible.",
+      "autoApplyHint": "L'application automatique démantèle immédiatement sans revue."
+    },
+    "orphan": {
+      "title": "Orpheliner {name}",
+      "heading": "Orpheliner {name} ?",
+      "description": "Cela supprime l'enregistrement de l'instance de catalogue mais ne <warn>détruit pas</warn> son infrastructure — les ressources provisionnées continuent de fonctionner, <warn>non suivies et non gérées</warn>. Ceci est déconseillé. Pour récupérer l'infrastructure, annulez et utilisez plutôt <emph>Détruire</emph>.",
+      "confirmPrompt": "Saisissez le nom de l'instance <mono>{name}</mono> pour confirmer :",
+      "orphaning": "Orphelinage…",
+      "submit": "Orpheliner et abandonner l'infrastructure"
+    },
+    "actions": {
+      "confirmed": "Exécution confirmée — application en cours.",
+      "discarded": "Exécution abandonnée.",
+      "provisioned": "{name} provisionné — le plan est prêt pour la revue.",
+      "reconfigureQueued": "Reconfiguration mise en file d'attente — exécution créée.",
+      "reconfigureQueuedStatus": "Reconfiguration mise en file d'attente — l'exécution est {status}.",
+      "destroyQueued": "Destruction mise en file d'attente — exécution créée.",
+      "destroyQueuedStatus": "Destruction mise en file d'attente — l'exécution est {status}.",
+      "orphaned": "{name} orphelinée — enregistrement de catalogue supprimé ; son infrastructure reste en cours d'exécution, non suivie et non gérée."
+    },
+    "errors": {
+      "loadItem": "Échec du chargement de l'élément de catalogue",
+      "confirm": "Échec de la confirmation",
+      "confirmStatus": "Échec de la confirmation ({status})",
+      "discard": "Échec de l'abandon",
+      "discardStatus": "Échec de l'abandon ({status})",
+      "provision": "Échec du provisionnement",
+      "provisionStatus": "Échec du provisionnement ({status})",
+      "reconfigure": "Échec de la reconfiguration",
+      "reconfigureStatus": "Échec de la reconfiguration ({status})",
+      "destroy": "Échec de la destruction",
+      "destroyStatus": "Échec de la destruction ({status})",
+      "orphan": "Échec de l'orphelinage",
+      "orphanStatus": "Échec de l'orphelinage ({status})"
+    }
+  },
+  "common": {
+    "connection": {
+      "reconnecting": "Reconnexion…"
+    },
+    "sessionExpiry": {
+      "banner": "La session expire dans {minutes, plural, one {# minute} other {# minutes}} — <link>se réauthentifier</link>"
+    },
+    "tokenExpiry": {
+      "withinDays": "{count, plural, one {# token de service} other {# tokens de service}} expirant dans {days, plural, one {# jour} other {# jours}} — <link>examiner</link>",
+      "soon": "{count, plural, one {# token de service} other {# tokens de service}} expirant bientôt — <link>examiner</link>",
+      "dismissAria": "Fermer l'avertissement d'expiration de token"
+    },
+    "resourceUsage": {
+      "title": "Utilisation des ressources",
+      "oomKilled": "Terminé par OOM",
+      "killedLikelyOom": "Terminé (probablement OOM)",
+      "memory": "Mémoire",
+      "requested": "Demandé {value}",
+      "limit": "Limite {value}"
+    },
+    "labelsEditor": {
+      "none": "Aucun",
+      "removeAria": "Retirer {key}",
+      "keyPlaceholder": "clé",
+      "valuePlaceholder": "valeur",
+      "add": "Ajouter"
+    },
+    "sensitiveInput": {
+      "hide": "Masquer",
+      "show": "Afficher",
+      "hideAria": "Masquer la valeur",
+      "showAria": "Afficher la valeur"
+    },
+    "workspacePicker": {
+      "searchPlaceholder": "Rechercher des espaces de travail…",
+      "loading": "Chargement…",
+      "empty": "Aucun espace de travail trouvé",
+      "adding": "Ajout…"
+    },
+    "templateEditors": {
+      "remove": "Retirer",
+      "add": "Ajouter",
+      "valuePlaceholder": "valeur",
+      "name": "Nom",
+      "url": "URL",
+      "hmacKey": "Clé HMAC (facultatif)",
+      "hmacKeyPlaceholder": "secret partagé",
+      "stage": "Étape",
+      "enforcement": "Application",
+      "enabled": "Activé",
+      "runTaskNamePlaceholder": "security-scan",
+      "runTaskUrlPlaceholder": "https://hooks.example.com/task",
+      "addRunTask": "Ajouter une tâche d'exécution",
+      "destinationType": "Type de destination",
+      "token": "Token (facultatif)",
+      "tokenPlaceholder": "Token HMAC / d'authentification",
+      "notificationNamePlaceholder": "slack-alerts",
+      "notificationUrlPlaceholder": "https://hooks.slack.com/services/...",
+      "emailAddresses": "Adresses e-mail",
+      "emailPlaceholder": "ops@example.com",
+      "addEmail": "Ajouter un e-mail",
+      "triggers": "Déclencheurs",
+      "addNotification": "Ajouter une notification"
+    }
+  },
+  "planSummary": {
+    "aiGenerated": "Généré par IA",
+    "heading": {
+      "planSummary": "Résumé du plan",
+      "failureAnalysis": "Analyse de l'échec"
+    },
+    "errors": {
+      "status": "HTTP {status}"
+    },
+    "regenerate": {
+      "label": "Régénérer",
+      "queueing": "Mise en file d'attente…",
+      "tooltip": "Relancer le résumé IA sur les mêmes entrées de plan",
+      "ariaLabel": "Régénérer le résumé IA",
+      "confirm": "Régénérer l'analyse IA ? Cela réexécute le modèle.",
+      "error": "Impossible de régénérer : <mono>{detail}</mono>"
+    },
+    "pending": {
+      "summarisingPlan": "Résumé du plan en cours…",
+      "analysingFailure": "Analyse de l'échec en cours…"
+    },
+    "skipped": {
+      "fallback": "Résumé ignoré pour cette exécution."
+    },
+    "errored": {
+      "heading": "Échec du générateur de résumé"
+    },
+    "riskFactors": {
+      "heading": "Facteurs de risque",
+      "suggestedFixes": "Correctifs suggérés"
+    },
+    "tokens": "{input} tokens en entrée / {output} en sortie",
+    "risk": {
+      "low": "faible",
+      "medium": "moyen",
+      "high": "élevé",
+      "critical": "critique",
+      "unknown": "inconnu"
+    },
+    "badges": {
+      "noChanges": "Aucune modification",
+      "noChangesLower": "aucune modification",
+      "noChangesTitle": "Le plan n'a signalé aucune modification de ressource",
+      "toAdd": "{count, plural, one {# à ajouter} other {# à ajouter}}",
+      "toChange": "{count, plural, one {# à modifier} other {# à modifier}}",
+      "toDestroy": "{count, plural, one {# à détruire} other {# à détruire}}",
+      "toReplace": "{count, plural, one {# à remplacer} other {# à remplacer}}",
+      "toImport": "{count, plural, one {# à importer} other {# à importer}}"
+    },
+    "chat": {
+      "heading": "Suivi",
+      "sharedThreadNote": "Un fil partagé unique, visible par quiconque a un accès en lecture à l'espace de travail.",
+      "placeholder": "Posez une question de suivi sur ce plan… (⌘/Ctrl + Entrée pour envoyer)",
+      "send": "Envoyer",
+      "thinking": "Réflexion…",
+      "you": "Vous",
+      "assistant": "Assistant"
+    },
+    "translatedNote": "Traduit automatiquement dans votre langue. Le résumé faisant foi est l'original.",
+    "translating": "Traduction en cours…"
+  },
+  "runDetail": {
+    "notFound": "Exécution introuvable",
+    "runSection": "Section d'exécution",
+    "workspaceFallback": "espace de travail",
+    "backTo": "Retour à {name}",
+    "errorHeading": "Erreur",
+    "discardedHeading": "Abandonné — nouvelle planification requise",
+    "common": {
+      "yes": "Oui",
+      "no": "Non"
+    },
+    "header": {
+      "title": "Exécution {id}",
+      "titleWithWorkspace": "{workspace} — exécution {id}",
+      "description": "Exécution {source}"
+    },
+    "relTime": {
+      "justNow": "à l'instant",
+      "minutesAgo": "{count, plural, one {il y a # minute} other {il y a # minutes}}",
+      "hoursAgo": "{count, plural, one {il y a # heure} other {il y a # heures}}",
+      "daysAgo": "{count, plural, one {il y a # jour} other {il y a # jours}}"
+    },
+    "status": {
+      "pending": "En attente",
+      "queued": "En file d'attente",
+      "planning": "Planification",
+      "planned": "Planifié",
+      "confirmed": "Confirmé",
+      "applying": "Application",
+      "canceling": "Annulation",
+      "applied": "Appliqué",
+      "errored": "En erreur",
+      "canceled": "Annulé",
+      "discarded": "Abandonné"
+    },
+    "activity": {
+      "pending": "Préparation de l'exécution",
+      "queued": "En attente d'un agent disponible",
+      "planning": "Exécution de terraform plan",
+      "plannedConfirmable": "En attente de votre confirmation et application",
+      "plannedSpeculative": "Plan spéculatif terminé",
+      "plannedComplete": "Plan terminé",
+      "confirmed": "Démarrage de l'application",
+      "applying": "Exécution de terraform apply",
+      "canceling": "Arrêt de l'exécution",
+      "applied": "Application terminée",
+      "errored": "L'exécution a échoué",
+      "canceled": "Exécution annulée",
+      "discarded": "Plan abandonné",
+      "elapsedTitle": "Temps écoulé dans cette phase"
+    },
+    "badge": {
+      "destroy": "destruction",
+      "planOnly": "plan uniquement"
+    },
+    "actions": {
+      "retryShort": "Réessayer",
+      "retryFull": "Réexécuter",
+      "retrying": "Nouvelle tentative…",
+      "confirmShort": "Appliquer",
+      "confirmFull": "Confirmer et appliquer",
+      "confirming": "Confirmation…",
+      "discard": "Abandonner",
+      "discarding": "Abandon…",
+      "cancelShort": "Annuler",
+      "cancelFull": "Annuler l'exécution",
+      "canceling": "Annulation…"
+    },
+    "confirm": {
+      "apply": "Appliquer cette exécution ? Cela applique le plan et modifie l'infrastructure.",
+      "discard": "Abandonner ce plan ?",
+      "cancel": "Annuler cette exécution ?",
+      "retry": "Réexécuter cette exécution ?"
+    },
+    "errors": {
+      "loadRun": "Échec du chargement de l'exécution",
+      "action": {
+        "confirm": "Échec de la confirmation de l'exécution",
+        "discard": "Échec de l'abandon de l'exécution",
+        "cancel": "Échec de l'annulation de l'exécution",
+        "retry": "Échec de la réexécution"
+      }
+    },
+    "tabs": {
+      "overview": "Vue d'ensemble",
+      "ai": "IA",
+      "aiFull": "Analyse IA",
+      "opa": "OPA",
+      "opaFull": "Politiques OPA",
+      "impact": "Impact",
+      "impactFull": "Graphe d'impact",
+      "planLabel": "Plan<log>Journal</log>",
+      "applyLabel": "Apply<log>Journal</log>",
+      "planFull": "Journal du plan",
+      "applyFull": "Journal de l'application",
+      "details": "Détails"
+    },
+    "banner": {
+      "destroy": "Ceci est une exécution de <strong>destruction</strong> — toutes les ressources gérées seront détruites lors de l'application.",
+      "planOnlyCli": "Ceci est une exécution en <strong>plan uniquement</strong> initiée depuis la CLI sur un espace de travail connecté au VCS. L'application n'est pas disponible pour le code téléversé depuis la CLI — seul le code géré par le VCS peut être appliqué.",
+      "moduleOverridesPrefix": "Cette exécution utilise des <strong>remplacements de module</strong>",
+      "moduleOverridesFromPr": "de la PR #{number}",
+      "moduleOverridesSuffix": "seront récupérés depuis la branche de la PR au lieu de la version publiée du registre."
+    },
+    "cards": {
+      "changes": "Modifications",
+      "aiAnalysis": "Analyse IA",
+      "policyChecks": "Vérifications de politiques",
+      "resources": "Ressources"
+    },
+    "changes": {
+      "noChanges": "Aucune modification",
+      "planning": "Planification…",
+      "toAdd": "à ajouter",
+      "toChange": "à modifier",
+      "toDestroy": "à détruire",
+      "toReplace": "à remplacer",
+      "toImport": "à importer"
+    },
+    "ai": {
+      "notAvailable": "Non disponible",
+      "ready": "Prêt",
+      "riskSub": "risque {risk}",
+      "generating": "Génération…",
+      "skipped": "Ignoré",
+      "failed": "Échec",
+      "available": "Disponible"
+    },
+    "policy": {
+      "none": "Aucune",
+      "blocked": "Bloqué",
+      "failedSub": "{count, plural, one {# échec} other {# échecs}}",
+      "advisoryIssues": "Problèmes consultatifs",
+      "passedSub": "{passed}/{total} réussis",
+      "passed": "Réussi"
+    },
+    "resources": {
+      "overLimit": "Au-delà de la limite",
+      "oomKilled": "Terminé par OOM",
+      "recorded": "Enregistré",
+      "nearLimit": "Proche de la limite",
+      "high": "Élevé",
+      "withinLimits": "Dans les limites"
+    },
+    "details": {
+      "heading": "Détails",
+      "executionBackend": "Backend d'exécution",
+      "source": "Source",
+      "autoApply": "Application automatique",
+      "planOnly": "Plan uniquement",
+      "triggeredBy": "Déclenché par",
+      "created": "Créé le",
+      "commit": "Commit",
+      "branch": "Branche",
+      "prMr": "PR/MR",
+      "stateVersion": "Version d'état",
+      "viewState": "Voir l'état",
+      "runOptions": "Options d'exécution"
+    },
+    "timeline": {
+      "heading": "Chronologie",
+      "queued": "Mis en file d'attente",
+      "planningStarted": "Planification démarrée",
+      "planComplete": "Plan terminé",
+      "confirmed": "Confirmé",
+      "applyingStarted": "Application démarrée",
+      "applied": "Appliqué",
+      "errored": "En erreur",
+      "canceled": "Annulé",
+      "discarded": "Abandonné"
+    },
+    "log": {
+      "color": "Couleur",
+      "colorOnTitle": "Affichage des couleurs ANSI — cliquez pour du texte brut",
+      "colorOffTitle": "Affichage du texte brut — cliquez pour les couleurs",
+      "refresh": "Actualiser",
+      "refreshTitle": "Actualiser le journal",
+      "copy": "Copier",
+      "copied": "Copié !",
+      "copyTitle": "Copier le texte brut dans le presse-papiers",
+      "copyAria": "Copier le journal dans le presse-papiers",
+      "download": "Télécharger",
+      "downloadColorTitle": "Télécharger le journal (avec les codes de couleur ANSI)",
+      "downloadPlainTitle": "Télécharger le journal (texte brut)",
+      "downloadAria": "Télécharger le journal",
+      "follow": "Suivre",
+      "followOnTitle": "Suivi du flux en direct — cliquez pour arrêter",
+      "followOffTitle": "Suivre le flux en direct",
+      "end": "Fin",
+      "endTitle": "Aller à la fin du journal",
+      "planEmpty": "Aucune sortie de plan disponible pour l'instant.",
+      "applyEmpty": "Aucune sortie d'application disponible pour l'instant."
+    },
+    "policyPanel": {
+      "heading": "Vérifications de politiques",
+      "passedCount": "{passed}/{total} réussis",
+      "blockedMessage": "Cette exécution est <strong>bloquée par un ensemble de politiques obligatoire</strong>. Elle ne s'appliquera pas tant que l'échec n'est pas résolu ou qu'un administrateur ne le contourne pas.",
+      "overriding": "Contournement...",
+      "overrideContinue": "Contourner et continuer",
+      "overrideFailed": "Échec du contournement",
+      "overrideFailedStatus": "Échec du contournement ({status})",
+      "overriddenBy": "contourné par {by}",
+      "policyPassed": "réussi",
+      "noDenyMessage": "La politique a échoué sans produire de message de refus ni de sortie d'erreur",
+      "enforcement": {
+        "mandatory": "obligatoire",
+        "advisory": "consultatif"
+      },
+      "outcome": {
+        "passed": "réussi",
+        "failed": "échoué",
+        "errored": "en erreur"
+      }
+    }
+  },
+  "workspaceDetail": {
+    "notFound": "Espace de travail introuvable",
+    "common": {
+      "enabled": "Activé",
+      "disabled": "Désactivé",
+      "none": "Aucun",
+      "default": "Par défaut",
+      "never": "Jamais",
+      "actions": "Actions",
+      "workspaceLocked": "L'espace de travail est verrouillé"
+    },
+    "actions": {
+      "edit": "Modifier",
+      "cancel": "Annuler",
+      "save": "Enregistrer",
+      "saving": "Enregistrement…",
+      "savingEllipsis": "Enregistrement...",
+      "delete": "Supprimer",
+      "deleting": "Suppression...",
+      "add": "Ajouter",
+      "adding": "Ajout...",
+      "remove": "Retirer",
+      "download": "Télécharger",
+      "rollback": "Restaurer",
+      "close": "Fermer",
+      "hide": "Masquer",
+      "enable": "Activer",
+      "disable": "Désactiver",
+      "creating": "Création...",
+      "sending": "Envoi...",
+      "processing": "Traitement...",
+      "queuing": "Mise en file d'attente...",
+      "loading": "Chargement...",
+      "loadingLower": "chargement…"
+    },
+    "header": {
+      "executionMode": "Mode d'exécution {mode}"
+    },
+    "tabs": {
+      "overview": "Vue d'ensemble",
+      "variables": "Variables",
+      "runs": "Exécutions",
+      "state": "État",
+      "stateGraph": "Graphe d'état",
+      "configurations": "Configurations",
+      "notifications": "Notifications",
+      "runTasks": "Tâches d'exécution",
+      "runTriggers": "Déclencheurs d'exécution",
+      "sharing": "Partage",
+      "selectLabel": "Section de l'espace de travail"
+    },
+    "lifecycle": {
+      "pendingDeletion": "Suppression en attente",
+      "pendingDeletionDefault": "Cet espace de travail est marqué pour suppression et requiert une action manuelle.",
+      "archived": "Archivé",
+      "archivedDefault": "Cet espace de travail a été archivé."
+    },
+    "runQueuedBanner": {
+      "message": "Exécution mise en file d'attente avec succès.",
+      "viewRun": "Voir l'exécution"
+    },
+    "settings": {
+      "title": "Paramètres",
+      "saveChanges": "Enregistrer les modifications",
+      "renamedNotice": "Espace de travail renommé. Mettez à jour le champ <name></name> dans votre bloc <cloud></cloud> pour qu'il corresponde."
+    },
+    "fields": {
+      "name": "Nom",
+      "nameTitle": "Lettres, chiffres, traits d'union, traits de soulignement. Doit commencer par une lettre ou un chiffre.",
+      "executionMode": "Mode d'exécution",
+      "execModeLocal": "Local",
+      "execModeAgent": "Agent",
+      "autoApply": "Application automatique",
+      "cpuRequest": "Demande CPU",
+      "cpuRequestTitle": "Quantité CPU Kubernetes : cœurs entiers (1, 2) ou millicores (500m, 100m)",
+      "memoryRequest": "Demande de mémoire",
+      "memoryRequestTitle": "Quantité de mémoire Kubernetes : octets (1000) ou avec suffixe (512Mi, 2Gi, 1Ti)",
+      "executionBackend": "Backend d'exécution",
+      "version": "Version",
+      "versionPlaceholder": "par ex. 1.11 ou 1.11.5",
+      "versionTitle": "Version au format X.Y ou X.Y.Z (par ex. 1.11 ou 1.11.5)",
+      "terragruntEnabledAgent": "Activé (mode agent)",
+      "terragruntEnabledVersion": "Activé (v{version})",
+      "terragruntVersionPlaceholder": "par ex. 1.0",
+      "terragruntVersionTitle": "Version de Terragrunt au format X.Y ou X.Y.Z (par ex. 1.0)",
+      "workingDirectory": "Répertoire de travail",
+      "workingDirectoryPlaceholder": "par ex. environments/dev",
+      "agentPool": "Pool d'agents",
+      "owner": "Propriétaire",
+      "vcsConnection": "Connexion VCS",
+      "vcsRepository": "Dépôt VCS",
+      "vcsRepositoryTitle": "Doit être une URL HTTP ou HTTPS",
+      "vcsBranch": "Branche VCS",
+      "vcsBranchPlaceholder": "main (par défaut)",
+      "vcsWorkflow": "Workflow VCS",
+      "vcsWorkflowMergeThenApply": "merge_then_apply (par défaut — standard TFE / HCP)",
+      "vcsWorkflowApplyThenMerge": "apply_then_merge (standard Atlantis — activation explicite)",
+      "autoMerge": "Fusion automatique après application",
+      "autoMergeStrategy": "Stratégie de fusion automatique",
+      "vcsPolling": "Interrogation VCS",
+      "labels": "Labels (tags)",
+      "labelsTitle": "Les labels d'espace de travail ont un double rôle : la correspondance RBAC par label, et en tant que « tags » mis en correspondance par les blocs cloud '{' workspaces '{' tags = ... '}' '}' de terraform/tofu.",
+      "varFiles": "Fichiers de variables",
+      "varFilesPlaceholder": "par ex. envs/dev.tfvars",
+      "triggerPrefixes": "Préfixes de déclenchement",
+      "triggerPrefixesHint": "Répertoires qui déclenchent des exécutions. Remplace le filtrage par répertoire de travail lorsqu'ils sont définis.",
+      "triggerPrefixesPlaceholder": "par ex. modules",
+      "triggerPrefixesNone": "Aucun (utilise le répertoire de travail)",
+      "driftIgnoreRules": "Règles d'ignorance de dérive",
+      "driftIgnoreRulesHint": "Chemins d'adresses Terraform + attributs, avec prise en charge des globs, supprimés par le classificateur de dérive. <star></star> correspond à zéro ou plusieurs caractères non-<dot></dot> (couvre <n></n> indices) ; <starIdx></starIdx> correspond à tout indice entre crochets. Une adresse seule sans suffixe d'attribut fait taire toute modification de cette ressource — y compris les destructions. N'affecte que la dérive, pas le plan/apply normal. Voir <docs>drift-ignore-rules.md</docs> pour la grammaire complète.",
+      "driftIgnoreRulesNone": "Aucune (chaque écart de plan compte comme une dérive)"
+    },
+    "vcsWorkflowWarning": {
+      "title": "Autorisation déléguée à votre dépôt VCS.",
+      "rbac": "Quiconque peut fusionner la PR peut appliquer. Les règles de protection de branche (revues requises, vérifications de statut, approbation des propriétaires de code) deviennent le point de contrôle. Le RBAC par rôle/label de Terrapod ne s'applique <em>pas</em> aux actions pilotées par commentaire dans ce mode.",
+      "recommended": "<strong>Recommandé :</strong> exigez un historique linéaire (rebase/squash avant fusion) pour que le commit appliqué soit le commit qui arrive.",
+      "credit": "Crédit : ce workflow s'inspire d'<atlantis>Atlantis</atlantis>. Atlantis reste l'outil adapté aux équipes qui ne veulent que des applications pilotées par commentaire de PR et pas d'interface de plateforme."
+    },
+    "vcsPolling": {
+      "error": "Erreur",
+      "ok": "OK ({time})",
+      "notPolled": "Pas encore interrogé"
+    },
+    "lockout": {
+      "revertLabels": "Rétablir les labels",
+      "saveAnyway": "Enregistrer quand même"
+    },
+    "lock": {
+      "title": "État de verrouillage",
+      "lockedDesc": "Cet espace de travail est verrouillé. Aucun plan ni aucune application ne peut s'exécuter.",
+      "unlockedDesc": "Cet espace de travail est déverrouillé et prêt pour les exécutions.",
+      "lock": "Verrouiller",
+      "unlock": "Déverrouiller",
+      "lockConfirm": "Verrouiller cet espace de travail ?",
+      "unlockConfirm": "Déverrouiller cet espace de travail ?"
+    },
+    "drift": {
+      "title": "Détection de dérive",
+      "checkInterval": "Intervalle de vérification",
+      "status": "Statut",
+      "statusNoDrift": "Aucune dérive",
+      "statusDrifted": "Dérive détectée",
+      "statusErrored": "En erreur",
+      "statusUnchecked": "Non vérifié",
+      "dismiss": "Ignorer",
+      "dismissing": "Ignorance…",
+      "dismissTitle": "Effacer l'état de dérive signalé. La prochaine vérification planifiée le repeuplera à partir de la réalité.",
+      "lastChecked": "Dernière vérification",
+      "checkNow": "Vérifier maintenant",
+      "checkNowTitle": "Mettre en file d'attente une exécution en plan uniquement pour vérifier la dérive",
+      "checkNowTitleDisabled": "Activez d'abord la détection de dérive"
+    },
+    "intervals": {
+      "disabled": "Désactivé",
+      "1hour": "1 heure",
+      "4hours": "4 heures",
+      "12hours": "12 heures",
+      "24hours": "24 heures",
+      "48hours": "48 heures",
+      "3days": "3 jours",
+      "7days": "7 jours"
+    },
+    "planExpiry": {
+      "title": "Expiration du plan",
+      "description": "Abandonne automatiquement un plan non confirmé une fois qu'il est plus ancien que cela, afin qu'un plan périmé ne puisse pas être appliqué contre un monde qui a évolué. Désactivé par défaut ; le plan doit alors être réexécuté. (S'applique uniquement aux exécutions capables d'application.)",
+      "expireAfter": "Expire après"
+    },
+    "aiSummary": {
+      "title": "Résumé de plan IA",
+      "description": "Résumé de modifications généré automatiquement par LLM, évaluation des risques et analyse d'échec sur chaque résultat de phase de plan pour cet espace de travail.",
+      "mode": "Mode",
+      "modeDefault": "Suivre la valeur par défaut du déploiement",
+      "modeEnabled": "Toujours résumer",
+      "modeDisabled": "Ne jamais résumer",
+      "contextLabel": "Contexte de l'espace de travail",
+      "contextLabelSuffix": "(facultatif, additif)",
+      "contextPlaceholder": "Faits que l'IA devrait connaître à propos de cet espace de travail en particulier. par ex. « Sert de façade au coffre du service X — détruire la clé KMS provoque une panne globale. »",
+      "noContext": "Aucun contexte d'espace de travail défini.",
+      "contextHint": "Ajouté par-dessus le contexte à l'échelle du déploiement. 4000 caractères maximum."
+    },
+    "slack": {
+      "title": "Notifications Slack",
+      "description": "Abonnez cet espace de travail aux notifications d'exécution Slack — demandes d'approbation, applications, erreurs et dérives. Laissez le canal vide et cet espace de travail reste silencieux (il n'y a pas de diffusion à l'échelle du déploiement). Requiert que l'application Slack soit activée par un administrateur.",
+      "channel": "Canal",
+      "channelPlaceholder": "#deploys ou un ID de canal (par ex. C0123ABCD)",
+      "notSet": "Non défini — silencieux.",
+      "hint": "L'application Slack doit déjà être membre du canal."
+    },
+    "delete": {
+      "title": "Supprimer l'espace de travail",
+      "description": "Supprimer définitivement cet espace de travail et tout l'état, les variables et les exécutions associés.",
+      "confirm": "Confirmer la suppression"
+    },
+    "variables": {
+      "addVariable": "Ajouter une variable",
+      "key": "Clé",
+      "value": "Valeur",
+      "category": "Catégorie",
+      "categoryEnv": "Environnement",
+      "sensitive": "Sensible",
+      "empty": "Aucune variable configurée pour cet espace de travail.",
+      "emptyValue": "vide",
+      "enterNewValue": "Saisir une nouvelle valeur",
+      "deleteConfirm": "Supprimer la variable « {key} » ?"
+    },
+    "runs": {
+      "options": "Options",
+      "hideOptions": "Masquer les options",
+      "queueDestroy": "Mettre en file d'attente une destruction",
+      "queueDestroyTitle": "Mettre en file d'attente un plan de destruction",
+      "destroyAllConfirm": "Détruire toutes les ressources ?",
+      "confirmDestroy": "Confirmer la destruction",
+      "queuePlan": "Mettre en file d'attente un plan",
+      "queueRun": "Mettre en file d'attente une exécution",
+      "queuePlanConfirm": "Mettre en file d'attente un plan spéculatif pour cet espace de travail ?",
+      "queueApplyConfirm": "Mettre en file d'attente une exécution plan + apply ? Cela peut modifier l'infrastructure.",
+      "planOptions": "Options du plan",
+      "targetResources": "Ressources ciblées",
+      "replaceResources": "Ressources à remplacer",
+      "commaSeparated": "(séparées par des virgules)",
+      "planOnly": "Plan uniquement",
+      "refreshOnly": "Actualisation uniquement",
+      "skipRefresh": "Ignorer l'actualisation",
+      "allowEmptyApply": "Autoriser une application vide",
+      "vcsRef": "Réf VCS",
+      "branch": "Branche",
+      "tag": "Tag",
+      "defaultBranch": "Par défaut ({branch})",
+      "nonDefaultRefNote": "Réf non par défaut sélectionnée — l'exécution sera en plan uniquement",
+      "empty": "Aucune exécution pour l'instant pour cet espace de travail.",
+      "runId": "ID d'exécution",
+      "status": "Statut",
+      "type": "Type",
+      "changes": "Modifications",
+      "source": "Source",
+      "triggeredBy": "Déclenché par",
+      "created": "Créé le",
+      "needsConfirm": "confirmation requise",
+      "typeDestroy": "destruction",
+      "typePlanOnly": "plan uniquement",
+      "typePlanApply": "plan + apply",
+      "sourceModuleTest": "test de module",
+      "sourceModulePublish": "publication de module"
+    },
+    "state": {
+      "deleteConfirm": "Supprimer la version d'état n° {serial} ? Cette action est irréversible.",
+      "rollbackConfirm": "Restaurer la version d'état n° {serial} ? Une nouvelle version sera créée avec le même contenu.",
+      "confirmDelete": "Confirmer la suppression",
+      "confirmRollback": "Confirmer la restauration",
+      "uploadState": "Téléverser l'état",
+      "empty": "Aucune version d'état pour l'instant pour cet espace de travail.",
+      "serial": "Numéro de série",
+      "createdBy": "Créé par",
+      "run": "Exécution",
+      "size": "Taille",
+      "created": "Créé le",
+      "runner": "runner",
+      "latest": "la plus récente"
+    },
+    "configurations": {
+      "description": "Archives sources téléversées pour cet espace de travail, les plus récentes en premier. Choisissez deux lignes à comparer.",
+      "selectedCount": "{count}/2 sélectionnées",
+      "compare": "Comparer",
+      "comparing": "Comparaison…",
+      "empty": "Aucune version de configuration pour l'instant. Elles apparaissent ici dès qu'un « terraform plan » téléverse ou qu'un push VCS déclenche une exécution.",
+      "id": "ID",
+      "source": "Source",
+      "status": "Statut",
+      "created": "Créé le",
+      "current": "actuelle",
+      "selectForCompare": "Sélectionner {id} pour comparer",
+      "compareLabel": "Comparer",
+      "diff": "Diff",
+      "filesChanged": "{count} fichiers modifiés",
+      "oversized": "{count, plural, one {# fichier surdimensionné ignoré} other {# fichiers surdimensionnés ignorés}} : {files}",
+      "noDiff": "Aucune différence de contenu entre ces versions.",
+      "binaryChanged": "Fichier binaire modifié — diff non affiché.",
+      "diffType": {
+        "added": "ajouté",
+        "removed": "supprimé",
+        "modified": "modifié",
+        "binary-changed": "binaire"
+      }
+    },
+    "notifications": {
+      "addNotification": "Ajouter une notification",
+      "name": "Nom",
+      "namePlaceholder": "Notifications de déploiement",
+      "destinationType": "Type de destination",
+      "typeGeneric": "Webhook générique",
+      "typeEmail": "E-mail",
+      "url": "URL",
+      "hmacToken": "Token HMAC (facultatif)",
+      "signingSecret": "Secret de signature",
+      "emailAddresses": "Adresses e-mail (séparées par des virgules)",
+      "triggerEvents": "Événements déclencheurs",
+      "createNotification": "Créer la notification",
+      "empty": "Aucune configuration de notification pour cet espace de travail.",
+      "ok": "OK",
+      "err": "Err {status}",
+      "fail": "ÉCHEC",
+      "http": "HTTP {status}",
+      "verify": "Vérifier",
+      "history": "Historique",
+      "deliveryHistory": "Historique des livraisons",
+      "enableConfirm": "Activer cette notification ?",
+      "disableConfirm": "Désactiver cette notification ?",
+      "deleteConfirm": "Supprimer la notification « {name} » ?"
+    },
+    "runTasks": {
+      "addRunTask": "Ajouter une tâche d'exécution",
+      "name": "Nom",
+      "namePlaceholder": "Vérification de politique OPA",
+      "webhookUrl": "URL du webhook",
+      "stage": "Étape",
+      "enforcementLevel": "Niveau d'application",
+      "hmacKey": "Clé HMAC (facultatif)",
+      "hmacKeyPlaceholder": "Secret de signature pour la vérification du webhook",
+      "createRunTask": "Créer la tâche d'exécution",
+      "empty": "Aucune tâche d'exécution configurée pour cet espace de travail.",
+      "enableConfirm": "Activer cette tâche d'exécution ?",
+      "disableConfirm": "Désactiver cette tâche d'exécution ?",
+      "deleteConfirm": "Supprimer la tâche d'exécution « {name} » ?"
+    },
+    "runTriggers": {
+      "title": "Déclencheurs d'exécution",
+      "description": "Lorsqu'un espace de travail source termine une application, les espaces de travail en aval reçoivent automatiquement une nouvelle exécution en file d'attente. Jusqu'à 20 espaces de travail sources par destination.",
+      "inboundHeading": "Espaces de travail sources qui déclenchent des exécutions ici",
+      "inboundEmpty": "Aucun espace de travail source ne déclenche d'exécution sur cet espace de travail.",
+      "pickerPlaceholder": "Rechercher des espaces de travail à ajouter comme source…",
+      "outboundHeading": "Espaces de travail de destination que cet espace de travail déclenche",
+      "outboundEmpty": "Cet espace de travail ne déclenche d'exécution sur aucun autre espace de travail.",
+      "destinationNote": "(destination ; retirer depuis là-bas)",
+      "removeConfirm": "Retirer ce déclencheur d'exécution ?"
+    },
+    "sharing": {
+      "title": "Partage de l'état distant",
+      "description": "Liste d'autorisation contrôlée par le producteur pour le <code></code> inter-espaces de travail. Les données d'état contiennent des secrets — accordez délibérément. <docs>Documentation</docs>",
+      "outboundHeading": "Espaces de travail autorisés à lire l'état de cet espace de travail",
+      "outboundEmpty": "L'état de cet espace de travail n'est partagé avec aucun autre espace de travail.",
+      "grantedBy": "accordé par {by}",
+      "revoke": "Révoquer",
+      "revokeConfirm": "Retirer ce partage d'état distant ? Le consommateur perdra l'accès à cet état.",
+      "pickerPlaceholder": "Rechercher des espaces de travail à autoriser comme consommateur…",
+      "inboundHeading": "Espaces de travail dont cet espace de travail est autorisé à lire l'état",
+      "inboundEmpty": "Cet espace de travail n'est autorisé à lire l'état d'aucun autre espace de travail via terraform_remote_state.",
+      "producerNote": "(producteur ; révoquer depuis là-bas)"
+    },
+    "runMessages": {
+      "manualDriftCheck": "Vérification manuelle de dérive depuis l'interface",
+      "queued": "Mis en file d'attente depuis l'interface",
+      "queuedSpeculative": "Mis en file d'attente depuis l'interface (spéculatif)",
+      "destroyQueued": "Destruction mise en file d'attente depuis l'interface"
+    },
+    "errors": {
+      "loadWorkspace": "Échec du chargement de l'espace de travail",
+      "loadRuns": "Échec du chargement des exécutions",
+      "loadVariables": "Échec du chargement des variables",
+      "loadStateVersions": "Échec du chargement des versions d'état",
+      "loadConfigurations": "Échec du chargement des versions de configuration",
+      "loadNotifications": "Échec du chargement des notifications",
+      "loadOutboundConsumers": "Échec du chargement des consommateurs d'état distant sortants",
+      "loadInboundConsumers": "Échec du chargement des consommateurs d'état distant entrants",
+      "loadConsumers": "Échec du chargement des consommateurs d'état distant",
+      "loadInboundTriggers": "Échec du chargement des déclencheurs d'exécution entrants",
+      "loadOutboundTriggers": "Échec du chargement des déclencheurs d'exécution sortants",
+      "loadTriggers": "Échec du chargement des déclencheurs d'exécution",
+      "loadRunTasks": "Échec du chargement des tâches d'exécution",
+      "downloadStateFile": "Échec du téléchargement du fichier d'état",
+      "downloadFailed": "Échec du téléchargement",
+      "downloadFailedStatus": "Échec du téléchargement ({status})",
+      "downloadTicketMissingUrl": "URL manquante dans la réponse au ticket de téléchargement",
+      "diffFailed": "Échec du diff",
+      "diffFailedStatus": "Échec du diff ({status})",
+      "authorizeConsumer": "Échec de l'autorisation du consommateur",
+      "revoke": "Échec de la révocation",
+      "revokeConsumer": "Échec de la révocation du consommateur",
+      "addTrigger": "Échec de l'ajout du déclencheur d'exécution",
+      "removeTrigger": "Échec du retrait du déclencheur d'exécution",
+      "createRunTask": "Échec de la création de la tâche d'exécution",
+      "createRunTaskStatus": "Échec de la création de la tâche d'exécution ({status})",
+      "update": "Échec de la mise à jour",
+      "toggleRunTask": "Échec de la bascule de la tâche d'exécution",
+      "delete": "Échec de la suppression",
+      "deleteRunTask": "Échec de la suppression de la tâche d'exécution",
+      "labelLockout": "Cette modification de label réduirait votre accès.",
+      "updateWorkspace": "Échec de la mise à jour de l'espace de travail",
+      "lockWorkspace": "Échec du verrouillage de l'espace de travail",
+      "unlockWorkspace": "Échec du déverrouillage de l'espace de travail",
+      "updateAiSummary": "Échec de la mise à jour des paramètres du résumé IA",
+      "updateSlackChannel": "Échec de la mise à jour du canal Slack",
+      "updateDriftSettings": "Échec de la mise à jour des paramètres de dérive",
+      "updateDriftInterval": "Échec de la mise à jour de l'intervalle de dérive",
+      "updatePlanExpiry": "Échec de la mise à jour de l'expiration du plan",
+      "queueDriftCheck": "Échec de la mise en file d'attente de la vérification de dérive",
+      "queueDriftCheckStatus": "Échec de la mise en file d'attente de la vérification de dérive ({status})",
+      "dismissDrift": "Échec de l'ignorance de la dérive",
+      "dismissDriftStatus": "Échec de l'ignorance de la dérive ({status})",
+      "deleteWorkspace": "Échec de la suppression de l'espace de travail",
+      "addVariable": "Échec de l'ajout de la variable",
+      "addVariableStatus": "Échec de l'ajout de la variable ({status})",
+      "deleteVariable": "Échec de la suppression de la variable",
+      "updateVariable": "Échec de la mise à jour de la variable",
+      "queuePlan": "Échec de la mise en file d'attente du plan",
+      "queuePlanStatus": "Échec de la mise en file d'attente du plan ({status})",
+      "queueDestroy": "Échec de la mise en file d'attente de la destruction",
+      "queueDestroyStatus": "Échec de la mise en file d'attente de la destruction ({status})",
+      "createNotification": "Échec de la création de la notification",
+      "createNotificationStatus": "Échec de la création de la notification ({status})",
+      "toggleNotification": "Échec de la bascule de la notification",
+      "deleteNotification": "Échec de la suppression de la notification",
+      "verificationFailed": "Échec de la vérification",
+      "verificationDeliveryFailed": "Échec de la livraison de vérification : {detail}",
+      "unknownError": "Erreur inconnue",
+      "failed": "Échec",
+      "deleteStateVersion": "Échec de la suppression de la version d'état",
+      "rollbackStateVersion": "Échec de la restauration de la version d'état",
+      "stateActionFailed": "Échec de l'action sur l'état",
+      "uploadState": "Échec du téléversement de l'état",
+      "uploadStateFile": "Échec du téléversement du fichier d'état"
+    }
+  },
+  "graphs": {
+    "stateTab": {
+      "loadError": "Échec du chargement du graphe d'état.",
+      "emptyState": "Aucun état pour l'instant — exécutez un plan et une application, ou téléversez un état, et ce graphe se remplira.",
+      "stateVersionLabel": "Version d'état",
+      "currentSuffix": "(actuelle)",
+      "colorByLabel": "Colorier par",
+      "viewGraph": "Graphe",
+      "viewTable": "Tableau",
+      "resourceCount": "{count, plural, one {# ressource} other {# ressources}}",
+      "dependencyCount": "{count, plural, one {# dépendance} other {# dépendances}}",
+      "truncated": "Affichage des {shown} premières ressources sur {total} — le graphe est plafonné pour la lisibilité.",
+      "colResource": "Ressource",
+      "colType": "Type",
+      "colMode": "Mode",
+      "colModule": "Module",
+      "colDependedOnBy": "Dépendances entrantes",
+      "rootModule": "(racine)"
+    },
+    "impact": {
+      "notAvailable": "Le graphe d'impact n'est pas disponible pour cette exécution.",
+      "title": "Graphe d'impact",
+      "subtitle": "plan de {count, plural, one {# ressource} other {# ressources}}",
+      "hint": "Chaque sphère est une ressource ; chaque flèche pointe vers ce dont elle dépend. Cliquez sur un nœud → son <b>impact</b> transitif (tout ce qui se trouve en aval) s'illumine.",
+      "downstreamAffected": "affectés en aval",
+      "action": {
+        "create": "créer",
+        "update": "mettre à jour",
+        "replace": "remplacer",
+        "destroy": "détruire",
+        "unchanged": "inchangé"
+      }
+    },
+    "estate": {
+      "navHint": "Glisser pour pivoter · défiler pour zoomer · glisser-droit pour déplacer · <em>cliquez sur un nœud pour l'orbiter</em>"
+    },
+    "state3d": {
+      "title": "Graphe d'état",
+      "hint": "Chaque sphère est une ressource ; chaque flèche pointe vers ce dont elle dépend. Cliquez sur un nœud → les ressources qui en <b>dépendent</b> transitivement s'illuminent.",
+      "dataSource": "source de données",
+      "managed": "géré",
+      "dependOnThis": "en dépendent"
+    },
+    "resource3d": {
+      "resetView": "Réinitialiser la vue",
+      "clear": "Effacer",
+      "key": "Légende",
+      "resources": "Ressources",
+      "hideKey": "Masquer la légende",
+      "hideResources": "Masquer les ressources",
+      "resourcesCount": "Ressources ({count})",
+      "filterPlaceholder": "Filtrer les ressources…",
+      "navHint": "Glisser pour pivoter · défiler pour zoomer · glisser-droit pour déplacer · <em>cliquez sur une ressource pour l'orbiter</em>"
+    }
+  },
+  "execHookDetail": {
+    "backLink": "Retour aux hooks d'exécution",
+    "defaultDescription": "Hook d'exécution",
+    "notFound": "Hook d'exécution introuvable",
+    "scriptEmpty": "(vide)",
+    "tabs": {
+      "settings": "Paramètres",
+      "workspaces": "Espaces de travail"
+    },
+    "common": {
+      "yes": "Oui",
+      "no": "Non"
+    },
+    "actions": {
+      "edit": "Modifier",
+      "cancel": "Annuler",
+      "save": "Enregistrer",
+      "saving": "Enregistrement...",
+      "delete": "Supprimer",
+      "deleting": "Suppression...",
+      "confirmDelete": "Confirmer la suppression",
+      "add": "Ajouter",
+      "adding": "Ajout...",
+      "remove": "Retirer"
+    },
+    "settings": {
+      "heading": "Paramètres"
+    },
+    "fields": {
+      "name": "Nom",
+      "description": "Description",
+      "hookPoint": "Point de hook",
+      "priority": "Priorité",
+      "enabled": "Activé",
+      "script": "Script (<code>/bin/sh -c</code>)"
+    },
+    "delete": {
+      "heading": "Supprimer le hook d'exécution",
+      "description": "Supprimer définitivement ce hook et le retirer de tous les espaces de travail."
+    },
+    "workspaces": {
+      "scopeNote": "Ce hook ne s'exécute que sur les espaces de travail associés ci-dessous. Il n'y a pas de portée globale.",
+      "associate": "Associer un espace de travail",
+      "workspaceLabel": "Espace de travail",
+      "selectPlaceholder": "Sélectionner un espace de travail...",
+      "empty": "Aucun espace de travail associé à ce hook.",
+      "colWorkspace": "Espace de travail",
+      "colActions": "Actions"
+    },
+    "confirm": {
+      "removeWorkspace": "Retirer cet espace de travail du hook ? Le hook ne s'exécutera plus pour lui."
+    },
+    "success": {
+      "updated": "Hook d'exécution mis à jour",
+      "workspaceAssociated": "Espace de travail associé",
+      "workspaceRemoved": "Espace de travail retiré"
+    },
+    "errors": {
+      "load": "Échec du chargement du hook d'exécution",
+      "update": "Échec de la mise à jour du hook d'exécution",
+      "delete": "Échec de la suppression du hook d'exécution",
+      "addWorkspace": "Échec de l'ajout de l'espace de travail",
+      "removeWorkspace": "Échec du retrait de l'espace de travail"
+    }
+  },
+  "policySetDetail": {
+    "backLink": "Ensembles de politiques",
+    "notFound": "Introuvable",
+    "unknown": "inconnu",
+    "subtitle": "Ensemble de politiques OPA · créé par {createdBy}",
+    "settings": {
+      "heading": "Paramètres"
+    },
+    "fields": {
+      "description": "Description",
+      "enforcement": "Application",
+      "enabled": "Activé",
+      "globalScope": "Global (chaque espace de travail)"
+    },
+    "enforcement": {
+      "advisory": "Consultatif (avertir)",
+      "mandatory": "Obligatoire (bloquer l'application)"
+    },
+    "scope": {
+      "allowLabels": "Labels autorisés (clé : v1, v2)",
+      "allowLabelsPlaceholder": "env : prod, staging",
+      "allowNames": "Noms autorisés (un par ligne)",
+      "denyLabels": "Labels refusés (clé : v1, v2)",
+      "denyNames": "Noms refusés (un par ligne)"
+    },
+    "vcs": {
+      "heading": "Configuration VCS",
+      "repoUrl": "URL du dépôt",
+      "branch": "Branche",
+      "branchPlaceholder": "main (par défaut)",
+      "policyPath": "Chemin des politiques"
+    },
+    "vcsBanner": {
+      "syncedFrom": "Politiques synchronisées depuis",
+      "at": "à",
+      "lastSynced": "Dernière synchronisation {time}",
+      "commit": "(commit {sha})",
+      "syncError": "Erreur de synchronisation : {error}"
+    },
+    "policies": {
+      "heading": "Politiques ({count})",
+      "vcsManaged": "Géré par le dépôt — poussez les modifications via une PR",
+      "empty": "Aucune politique dans cet ensemble pour l'instant."
+    },
+    "addPolicy": {
+      "namePlaceholder": "Nom de la politique",
+      "descPlaceholder": "Description (facultatif)",
+      "regoHint": "Rego v1. Doit déclarer <code>package terrapod</code> et exprimer les violations via un ensemble <code>deny</code>. Le plan est <code>input</code> ; le contexte Terrapod est <code>data.terrapod_context</code>."
+    },
+    "actions": {
+      "saving": "Enregistrement...",
+      "saveSettings": "Enregistrer les paramètres",
+      "syncNow": "Synchroniser maintenant",
+      "cancel": "Annuler",
+      "addPolicy": "Ajouter une politique",
+      "deleteSet": "Supprimer l'ensemble",
+      "validatingRego": "Validation du Rego...",
+      "delete": "Supprimer",
+      "savePolicy": "Enregistrer la politique"
+    },
+    "confirm": {
+      "deleteSet": "Supprimer cet ensemble de politiques et toutes ses politiques ? Les évaluations d'exécution enregistrées sont conservées.",
+      "deletePolicy": "Supprimer la politique « {name} » ?"
+    },
+    "errors": {
+      "load": "Échec du chargement de l'ensemble de politiques",
+      "save": "Échec de l'enregistrement de l'ensemble de politiques",
+      "saveStatus": "Échec de l'enregistrement ({status})",
+      "delete": "Échec de la suppression de l'ensemble de politiques",
+      "deleteStatus": "Échec de la suppression ({status})",
+      "addPolicy": "Échec de l'ajout de la politique",
+      "addPolicyStatus": "Échec de l'ajout de la politique ({status})",
+      "savePolicy": "Échec de l'enregistrement de la politique",
+      "savePolicyStatus": "Échec de l'enregistrement de la politique ({status})",
+      "deletePolicy": "Échec de la suppression de la politique",
+      "deletePolicyStatus": "Échec de la suppression ({status})"
+    }
+  },
+  "slackLink": {
+    "title": "Connecter Slack à Terrapod",
+    "loading": "Chargement…",
+    "checking": "Vérification de votre liaison…",
+    "linking": "Liaison de votre compte Slack…",
+    "unknown": "inconnu",
+    "confirm": {
+      "prompt": "Lier ce compte Slack à <em>votre</em> identité Terrapod ? Chaque future action Slack (approuver/abandonner) s'exécutera en tant que cet utilisateur Terrapod avec ses autorisations.",
+      "slackUser": "Utilisateur Slack",
+      "slackTeam": "Équipe Slack",
+      "terrapodAccount": "Compte Terrapod",
+      "warning": "Ne continuez que si vous venez de démarrer cette liaison depuis Slack vous-même. Si ce n'est pas le cas, fermez cet onglet et ne liez pas — cela lie le compte Slack ci-dessus à <em>votre</em> identité Terrapod.",
+      "button": "Confirmer et lier"
+    },
+    "success": {
+      "message": "Votre compte Slack est maintenant lié à Terrapod.",
+      "linkedAs": "Lié en tant que <em>{email}</em>. Vous pouvez fermer cet onglet et revenir à Slack."
+    },
+    "errors": {
+      "missingLink": "Lien manquant ou invalide. Recommencez avec la commande de liaison Terrapod dans Slack.",
+      "invalidLink": "Ce lien est invalide, expiré ou déjà utilisé. Recommencez la liaison depuis Slack.",
+      "linkingFailed": "Échec de la liaison."
+    }
+  },
+  "cliComplete": {
+    "loading": "Chargement...",
+    "completing": "Finalisation de l'authentification...",
+    "invalid": {
+      "title": "Requête invalide",
+      "description": "Paramètres requis manquants."
+    },
+    "success": {
+      "title": "Connexion réussie",
+      "complete": "Token d'API créé. Vous pouvez fermer cet onglet."
+    },
+    "fallback": {
+      "description": "Impossible de joindre la CLI automatiquement.",
+      "button": "Cliquez ici pour terminer manuellement"
+    },
+    "timeout": {
+      "description": "La CLI n'a peut-être pas terminé l'échange de token. Vérifiez votre terminal."
+    }
+  },
+  "apiDocs": {
+    "view": "Vue :",
+    "redocTitle": "Documentation de l'API ReDoc"
+  }
+}

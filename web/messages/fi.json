@@ -1,0 +1,2621 @@
+{
+  "nav": {
+    "workspaces": "Työtilat",
+    "estate": "Ympäristö",
+    "registry": "Rekisteri",
+    "modules": "Moduulit",
+    "providers": "Palveluntarjoajat",
+    "catalog": "Luettelo",
+    "agentPools": "Agenttipoolit",
+    "admin": "Hallinta",
+    "users": "Käyttäjät",
+    "roles": "Roolit",
+    "vcsConnections": "VCS-yhteydet",
+    "variableSets": "Muuttujajoukot",
+    "autodiscovery": "Automaattinen löytäminen",
+    "bulkUpdate": "Massapäivitys",
+    "executionHooks": "Suorituskoukut",
+    "policySets": "Käytäntöjoukot",
+    "providerTemplates": "Palveluntarjoajamallit",
+    "catalogAdmin": "Luettelon hallinta",
+    "cache": "Välimuisti",
+    "auditLog": "Tarkastusloki",
+    "help": "Ohje",
+    "apiReference": "API-referenssi",
+    "docs": "Dokumentaatio",
+    "account": "Tili",
+    "apiTokens": "API-tunnukset",
+    "sessions": "Istunnot",
+    "logOut": "Kirjaudu ulos",
+    "menu": "Valikko",
+    "openMenu": "Avaa valikko",
+    "openAccountMenu": "Avaa tilivalikko",
+    "closeMenu": "Sulje valikko"
+  },
+  "switcher": {
+    "language": "Kieli",
+    "changeLanguage": "Vaihda kieltä"
+  },
+  "workspaces": {
+    "title": "Työtilat",
+    "description": "Hallitse Terraform-työtiloja, tilaa ja ajoja",
+    "new": "Uusi työtila",
+    "cancel": "Peruuta",
+    "create": "Luo työtila",
+    "creating": "Luodaan…",
+    "loadFailed": "Työtilojen lataaminen epäonnistui",
+    "createFailed": "Työtilan luominen epäonnistui",
+    "form": {
+      "name": "Nimi",
+      "namePattern": "Vain kirjaimet, numerot, tavuviivat ja alaviivat. Alettava kirjaimella tai numerolla.",
+      "namePlaceholder": "my-workspace",
+      "executionMode": "Suoritustila",
+      "local": "Paikallinen",
+      "agent": "Agentti",
+      "executionBackend": "Suoritustausta",
+      "version": "Versio",
+      "versionTitle": "Versio muodossa X.Y tai X.Y.Z (esim. 1.11 tai 1.11.5)",
+      "versionPlaceholder": "esim. 1.11 tai 1.11.5",
+      "cpuRequest": "CPU-pyyntö",
+      "cpuTitle": "Kubernetes CPU -määrä: kokonaisia ytimiä (1, 2) tai milliytimiä (500m, 100m)",
+      "cpuHint": "esim. 1, 0.5, 500m",
+      "memoryRequest": "Muistipyyntö",
+      "memoryTitle": "Kubernetes-muistimäärä: tavuja (1000) tai päätteellä (512Mi, 2Gi, 1Ti)",
+      "memoryHint": "esim. 2Gi, 512Mi, 1Ti",
+      "agentPool": "Agenttipooli",
+      "none": "Ei mitään",
+      "autoApply": "Automaattinen käyttöönotto",
+      "enabled": "Käytössä",
+      "workingDirectory": "Työhakemisto",
+      "workingDirectoryPlaceholder": "esim. environments/dev",
+      "workingDirectoryHint": "Alihakemisto repossa, joka sisältää .tf-tiedostot",
+      "vcsConnection": "VCS-yhteys",
+      "vcsRepoUrl": "VCS-repositorion URL",
+      "vcsRepoUrlTitle": "Oltava HTTP- tai HTTPS-URL",
+      "vcsRepoUrlPlaceholder": "https://github.com/org/repo",
+      "vcsBranch": "VCS-haara",
+      "vcsBranchPlaceholder": "main (oletus)"
+    },
+    "stats": {
+      "total": "Yhteensä",
+      "health": "Kunto",
+      "locked": "Lukittu",
+      "clearAllFilters": "Tyhjennä kaikki suodattimet",
+      "clearHealthFilter": "Tyhjennä kuntoongelmien suodatin",
+      "filterHealth": "Suodata työtilat, joilla on kuntoongelmia",
+      "clearLockedFilter": "Tyhjennä lukituksen suodatin",
+      "filterLocked": "Suodata lukitut työtilat"
+    },
+    "filter": {
+      "placeholder": "Suodata nimen, tunnisteen tai tilan mukaan — esim. \"eu1\", \"env:prod\", \"status:errored\"",
+      "ariaLabel": "Suodata työtiloja",
+      "clear": "Tyhjennä",
+      "status": "Tila",
+      "label": "Tunniste",
+      "back": "takaisin",
+      "valueCount": "{count, plural, one {# arvo} other {# arvoa}}",
+      "removeTerm": "Poista tämä ehto",
+      "showing": "Näytetään {filtered}/{total}",
+      "termName": "nimi: {value}",
+      "termStatus": "tila: {value}",
+      "termLabelAny": "{key}: (mikä tahansa)",
+      "termLabel": "{key}: {value}",
+      "hintStatus": "tila",
+      "hintHealth": "kunto",
+      "hintLabel": "tunniste",
+      "hintLabelKey": "tunnisteavain",
+      "hintName": "nimi"
+    },
+    "row": {
+      "removeLabelFilter": "Napsauta poistaaksesi suodattimesta",
+      "addLabelFilter": "Napsauta suodattaaksesi tämän tunnisteen mukaan"
+    },
+    "table": {
+      "name": "Nimi",
+      "mode": "Tila",
+      "pool": "Pooli",
+      "resources": "Resurssit",
+      "status": "Tila",
+      "created": "Luotu",
+      "resourcesValue": "{cpu} CPU / {memory}"
+    },
+    "empty": {
+      "none": "Ei vielä työtiloja. Luo yksi aloittaaksesi.",
+      "noMatch": "Yksikään työtila ei vastaa tätä suodatinta."
+    }
+  },
+  "status": {
+    "state-diverged": "Tila eronnut",
+    "vcs-error": "VCS-virhe",
+    "drifted": "Ajautunut",
+    "errored": "Virhe",
+    "needs-confirm": "Vaatii vahvistuksen",
+    "planning": "Suunnitellaan",
+    "applying": "Otetaan käyttöön",
+    "canceling": "Perutaan",
+    "confirmed": "Vahvistettu",
+    "queued": "Jonossa",
+    "pending": "Odottaa",
+    "applied": "Otettu käyttöön",
+    "planned": "Suunniteltu",
+    "canceled": "Peruttu",
+    "discarded": "Hylätty",
+    "pendingDeletion": "Odottaa poistoa",
+    "archived": "Arkistoitu"
+  },
+  "auth": {
+    "loading": "Ladataan...",
+    "subtitle": "Kirjaudu sisään hallitaksesi infrastruktuuriasi",
+    "subtitleCli": "Kirjaudu sisään valtuuttaaksesi CLI:n",
+    "emailLabel": "Sähköposti",
+    "passwordLabel": "Salasana",
+    "signIn": "Kirjaudu sisään",
+    "signingIn": "Kirjaudutaan sisään...",
+    "signInWith": "Kirjaudu sisään palvelulla {provider}",
+    "or": "tai",
+    "noProviders": "Todennuspalveluita ei ole määritetty",
+    "completingSignIn": "Viimeistellään kirjautumista...",
+    "callbackFailedTitle": "Todennus epäonnistui",
+    "tryAgain": "Yritä uudelleen",
+    "errors": {
+      "loadProviders": "Palveluntarjoajien lataaminen epäonnistui",
+      "authenticationFailed": "Todennus epäonnistui ({status})",
+      "tokenExchangeFailed": "Tunnuksen vaihto epäonnistui ({status})",
+      "loginFailed": "Kirjautuminen epäonnistui",
+      "startLoginFailed": "Kirjautumisen aloittaminen epäonnistui",
+      "missingCodeOrState": "Valtuutuskoodi tai tila puuttuu",
+      "stateMismatch": "Tila ei täsmää — mahdollinen CSRF-hyökkäys",
+      "missingVerifier": "PKCE-vahvistin puuttuu — yritä kirjautua sisään uudelleen"
+    }
+  },
+  "estate": {
+    "title": "Ympäristön topologia",
+    "description": "Kaikki näkemäsi työtilat ja niiden käyttämät moduulit, kytkettynä ajokäynnistimien, etätilan ja moduulilinkkien avulla. Ryhmittele minkä tahansa ympäristöösi sopivan akselin mukaan — alusta ei pakota tunnistuskäytäntöä.",
+    "errors": {
+      "load": "Ympäristögraafin lataaminen epäonnistui."
+    },
+    "groupBy": {
+      "label": "Ryhmittele"
+    },
+    "view": {
+      "graph": "Graafi",
+      "table": "Taulukko"
+    },
+    "counts": {
+      "workspaces": "{count, plural, one {# työtila} other {# työtilaa}}",
+      "modules": "{count, plural, one {# moduuli} other {# moduulia}}",
+      "dependencies": "{count, plural, one {# riippuvuus} other {# riippuvuutta}}"
+    },
+    "legend": {
+      "registryModule": "rekisterimoduuli"
+    },
+    "detail": {
+      "moduleImpact": "{count, plural, one {työtila käyttää tätä — sen päivittäminen ajaa suunnitelman uudelleen} other {työtilaa käyttää tätä — sen päivittäminen ajaa niiden kaikkien suunnitelman uudelleen}}",
+      "dependOnThis": "{count, plural, one {riippuu tästä} other {riippuvat tästä}}"
+    },
+    "table": {
+      "workspaces": {
+        "heading": "Työtilat",
+        "col": {
+          "workspace": "Työtila",
+          "group": "Ryhmä",
+          "agentPool": "Agenttipooli",
+          "dependedOnBy": "Riippuvat kohteesta",
+          "modulesUsed": "Käytetyt moduulit"
+        },
+        "noModules": "—"
+      },
+      "modules": {
+        "heading": "Moduulit",
+        "col": {
+          "module": "Moduuli",
+          "usedBy": "Käyttäjät (työtilat)"
+        }
+      }
+    }
+  },
+  "labels": {
+    "title": "Tunnisteet",
+    "description": "Selaa työtiloissa, agenttipooleissa, rekisterimoduuleissa ja rekisteripalveluntarjoajissa käytettyjä tunnisteita. Vain luku — tunnisteita muokataan kunkin entiteetin omalla sivulla.",
+    "none": "Ei mitään.",
+    "emptyKeys": "Ei vielä käytössä olevia tunnisteita. Tunnista mikä tahansa työtila, agenttipooli, rekisterimoduuli tai rekisteripalveluntarjoaja aloittaaksesi asioiden ryhmittelyn tänne.",
+    "emptyValues": "Ei arvoja avaimelle \"{key}\". Joko yksikään luettava entiteetti ei kanna tätä tunnistetta, tai se on poistettu edellisen näkymän jälkeen.",
+    "loadKeysFailed": "Tunnisteiden lataaminen epäonnistui ({status})",
+    "loadValuesFailed": "Avaimen {key} arvojen lataaminen epäonnistui ({status})",
+    "loadEntitiesFailed": "Entiteettien lataaminen epäonnistui ({status})",
+    "columns": {
+      "labelKey": "Tunnisteavain",
+      "distinctValues": "Erilliset arvot",
+      "value": "Arvo",
+      "total": "Yhteensä"
+    },
+    "entity": {
+      "workspaces": "Työtilat",
+      "agentPools": "Agenttipoolit",
+      "modules": "Moduulit",
+      "providers": "Palveluntarjoajat"
+    },
+    "deprecated": {
+      "badge": "Vanhentunut ja ei tuettu.",
+      "body": "Tunnisteselain ei ole enää päänavigoinnissa ja poistetaan tulevassa julkaisussa. Suodata sen sijaan tunnisteen mukaan <workspacesLink>Työtilat</workspacesLink>-sivulta. Jos luotat tähän sivuun, <issueLink>avaa ongelmailmoitus</issueLink>."
+    }
+  },
+  "settings": {
+    "tokens": {
+      "title": "API-tunnukset",
+      "description": "Hallitse CLI:n ja automaation todennustunnuksia",
+      "descriptionAll": "Kaikkien käyttäjien kaikki tunnukset",
+      "myTokens": "Omat tunnukset",
+      "allTokens": "Kaikki tunnukset",
+      "createToken": "Luo tunnus",
+      "cancel": "Peruuta",
+      "tokenReady": "Tunnus valmis",
+      "tokenReadyHelp": "Kopioi tämä tunnus nyt — sitä ei näytetä enää uudelleen.",
+      "dismissToken": "Hylkää tunnus",
+      "hide": "Piilota",
+      "show": "Näytä",
+      "copy": "Kopioi",
+      "empty": "Ei vielä API-tunnuksia.",
+      "noDescription": "Ei kuvausta",
+      "detached": "irrotettu",
+      "never": "Ei koskaan",
+      "selected": "{count, plural, one {# tunnus valittu} other {# tunnusta valittu}}",
+      "revokeSelected": "Peruuta valitut",
+      "revoking": "Perutaan...",
+      "clearSelection": "Tyhjennä valinta",
+      "rotate": "Kierrätä",
+      "rotating": "Kierrätetään...",
+      "revoke": "Peruuta",
+      "confirmRotate": "Kierrätetäänkö tämä tunnus? Nykyinen salaisuus lakkaa toimimasta välittömästi ja uusi myönnetään.",
+      "confirmBulkRevoke": "{count, plural, one {Perutaanko # tunnus?} other {Perutaanko # tunnusta?}}",
+      "kinds": {
+        "interactive": {
+          "label": "Henkilökohtainen",
+          "help": "Henkilökohtainen tunnus CLI:lle ja tilapäiselle automaatiolle. Kantaa täydet, ajantasaiset oikeutesi."
+        },
+        "service_bound": {
+          "label": "Palvelu · sidottu",
+          "help": "Palvelutunnus, joka on rajattu roolisi osajoukkoon. Sen pääsy on näiden roolien ja omiesi leikkaus — ja se lakkaa toimimasta, jos tilisi poistetaan."
+        },
+        "service_detached": {
+          "label": "Palvelu · irrotettu",
+          "help": "Hallinnan hallinnoima palvelutunnus, jolla on ehdoton kiinnitetty laajuus, ei sidottu yhteenkään käyttäjään. Käytä kriittiseen konelta-koneelle-automaatioon, jonka on selvittävä kenen tahansa lähdöstä."
+        }
+      },
+      "lifespans": {
+        "720": "30 päivää",
+        "2160": "90 päivää",
+        "4320": "180 päivää",
+        "8760": "1 vuosi"
+      },
+      "filter": {
+        "all": "Kaikki tyypit"
+      },
+      "form": {
+        "description": "Kuvaus",
+        "descriptionPlaceholder": "CI/CD-putken tunnus",
+        "kind": "Tyyppi",
+        "lifespan": "Voimassaoloaika",
+        "create": "Luo",
+        "creating": "Luodaan...",
+        "pinnedRoles": "Kiinnitetyt roolit",
+        "pinnedRolesHelp": "— laajuus, johon tämä tunnus on rajattu",
+        "pinnedRolesCapped": "(rajattu omaan pääsyysi)",
+        "noCustomRoles": "Ei määritettyjä mukautettuja rooleja. Luo roolit ensin kohdassa Hallinta → Roolit.",
+        "noScopedRoles": "Sinulla ei ole rajattuja rooleja kiinnitettäväksi. Tällä tunnuksella ei olisi pääsyä."
+      },
+      "columns": {
+        "description": "Kuvaus",
+        "kind": "Tyyppi",
+        "boundTo": "Sidottu kohteeseen",
+        "created": "Luotu",
+        "lastUsed": "Viimeksi käytetty",
+        "expires": "Vanhenee",
+        "actions": "Toiminnot"
+      },
+      "errors": {
+        "load": "Tunnusten lataaminen epäonnistui",
+        "create": "Tunnuksen luominen epäonnistui ({status})",
+        "createGeneric": "Tunnuksen luominen epäonnistui",
+        "rotate": "Tunnuksen kierrätys epäonnistui ({status})",
+        "rotateGeneric": "Tunnuksen kierrätys epäonnistui",
+        "revoke": "Tunnuksen peruuttaminen epäonnistui ({status})",
+        "revokeGeneric": "Tunnuksen peruuttaminen epäonnistui",
+        "bulkRevoke": "Tunnusten peruuttaminen epäonnistui"
+      }
+    },
+    "sessions": {
+      "title": "Istunnot",
+      "description": "Aktiiviset istuntosi",
+      "descriptionAll": "Kaikki aktiiviset istunnot koko alustalla",
+      "empty": "Ei aktiivisia istuntoja.",
+      "revokeAll": "Peruuta kaikki",
+      "current": "Nykyinen",
+      "columns": {
+        "provider": "Palveluntarjoaja",
+        "created": "Luotu",
+        "expires": "Vanhenee",
+        "lastActive": "Viimeksi aktiivinen",
+        "token": "Tunnus"
+      },
+      "errors": {
+        "load": "Istuntojen lataaminen epäonnistui",
+        "revoke": "Istuntojen peruuttaminen epäonnistui ({status})",
+        "revokeGeneric": "Istuntojen peruuttaminen epäonnistui"
+      }
+    }
+  },
+  "registry": {
+    "modules": {
+      "title": "Moduulit",
+      "description": "Yksityinen Terraform-moduulirekisteri",
+      "cancel": "Peruuta",
+      "createModule": "Luo moduuli",
+      "empty": "Ei vielä moduuleja. Luo yksi aloittaaksesi.",
+      "providerLabel": "Palveluntarjoaja: {provider}",
+      "versionCount": "{count, plural, one {# versio} other {# versiota}}",
+      "loadFailed": "Moduulien lataaminen epäonnistui",
+      "createFailed": "Moduulin luominen epäonnistui",
+      "createFailedStatus": "Moduulin luominen epäonnistui ({status})",
+      "form": {
+        "name": "Nimi",
+        "provider": "Palveluntarjoaja",
+        "slugTitle": "Vain pienet kirjaimet, numerot ja tavuviivat. Alettava pienellä kirjaimella.",
+        "addressNote": "Nimi ja palveluntarjoaja muodostavat moduulin rekisteriosoitteen, eikä niitä voi muuttaa luonnin jälkeen.",
+        "vcsConnectionOptional": "VCS-yhteys (valinnainen)",
+        "noneUploadManually": "Ei mitään — lataa versiot manuaalisesti",
+        "repositoryUrl": "Repositorion URL",
+        "branchOptional": "Haara (valinnainen)",
+        "branchPlaceholder": "main (jätä tyhjäksi oletusta varten)",
+        "tagPattern": "Tagimalli",
+        "tagPatternHint": "Vain tätä mallia vastaavat tagit luovat versioita (esim. v1.0.0)",
+        "labelsOptional": "Tunnisteet (valinnainen)",
+        "creating": "Luodaan...",
+        "create": "Luo"
+      }
+    },
+    "providers": {
+      "title": "Palveluntarjoajat",
+      "description": "Yksityinen Terraform-palveluntarjoajarekisteri",
+      "cancel": "Peruuta",
+      "createProvider": "Luo palveluntarjoaja",
+      "empty": "Ei vielä palveluntarjoajia. Luo yksi aloittaaksesi.",
+      "loadFailed": "Palveluntarjoajien lataaminen epäonnistui",
+      "createFailed": "Palveluntarjoajan luominen epäonnistui",
+      "createFailedStatus": "Palveluntarjoajan luominen epäonnistui ({status})",
+      "form": {
+        "name": "Nimi",
+        "slugTitle": "Vain pienet kirjaimet, numerot ja tavuviivat. Alettava pienellä kirjaimella.",
+        "creating": "Luodaan...",
+        "create": "Luo"
+      }
+    },
+    "meta": {
+      "title": "Metatiedot",
+      "edit": "Muokkaa",
+      "cancel": "Peruuta",
+      "save": "Tallenna",
+      "saving": "Tallennetaan...",
+      "saveAnyway": "Tallenna silti",
+      "revertLabels": "Palauta tunnisteet",
+      "owner": "Omistaja",
+      "ownerNone": "Ei mitään",
+      "ownerPlaceholder": "user@example.com",
+      "labels": "Tunnisteet"
+    },
+    "moduleDetail": {
+      "notFound": "Moduulia ei löytynyt",
+      "loadFailed": "Moduulin lataaminen epäonnistui",
+      "updateFailed": "Moduulin päivittäminen epäonnistui",
+      "labelLockoutDefault": "Tämä tunnistemuutos vähentäisi pääsyäsi.",
+      "providerLabel": "Palveluntarjoaja: {provider}",
+      "cancel": "Peruuta",
+      "uploadVersion": "Lataa versio",
+      "vcsConnected": "VCS yhdistetty",
+      "connectVcs": "Yhdistä VCS",
+      "deleteModule": "Poista moduuli",
+      "linkFailed": "Työtilan linkittäminen epäonnistui",
+      "linkFailedStatus": "Linkitys epäonnistui ({status})",
+      "unlinkConfirm": "Poistetaanko tämän työtilan linkitys moduulista? Vaikutusanalyysia ei enää suoriteta sille.",
+      "unlinkFailed": "Työtilan linkityksen poisto epäonnistui",
+      "unlinkFailedStatus": "Linkityksen poisto epäonnistui ({status})",
+      "uploadFailed": "Lataus epäonnistui",
+      "uploadFailedStatus": "Lataus epäonnistui ({status})",
+      "saveVcsFailed": "VCS-määrityksen tallentaminen epäonnistui",
+      "saveVcsFailedStatus": "VCS-määrityksen tallentaminen epäonnistui ({status})",
+      "disableVcsFailed": "VCS:n poistaminen käytöstä epäonnistui",
+      "disableVcsFailedStatus": "VCS:n poistaminen käytöstä epäonnistui ({status})",
+      "deleteFailed": "Poisto epäonnistui",
+      "deleteFailedStatus": "Poisto epäonnistui ({status})",
+      "upload": {
+        "intro": "Valitse hakemisto, joka sisältää Terraform-moduulitiedostosi. Ne pakataan tarball-tiedostoksi ja ladataan.",
+        "version": "Versio",
+        "moduleDirectory": "Moduulihakemisto",
+        "selectDirectory": "Valitse hakemisto",
+        "fileCount": "{count, plural, one {# tiedosto} other {# tiedostoa}}",
+        "filesToInclude": "{count, plural, one {# sisällytettävä tiedosto:} other {# sisällytettävää tiedostoa:}}",
+        "andMore": "...ja {count} lisää",
+        "uploading": "Ladataan...",
+        "upload": "Lataa"
+      },
+      "vcs": {
+        "intro": "Yhdistä tämä moduuli VCS-repositorioon. Uudet versiot julkaistaan automaattisesti, kun tagimallia vastaavia semver-tageja työnnetään. Pelkät haaracommitit eivät luo versioita.",
+        "connection": "VCS-yhteys",
+        "selectConnection": "Valitse yhteys...",
+        "repositoryUrl": "Repositorion URL",
+        "branchOptional": "Haara (valinnainen)",
+        "branchPlaceholder": "main (jätä tyhjäksi oletusta varten)",
+        "tagPattern": "Tagimalli",
+        "tagPatternHint": "Vain tätä mallia vastaavat tagit luovat versioita (esim. v1.0.0)",
+        "saving": "Tallennetaan...",
+        "saveConfiguration": "Tallenna VCS-määritys",
+        "disconnect": "Katkaise VCS-yhteys"
+      },
+      "vcsStatus": {
+        "connected": "VCS yhdistetty:",
+        "lastTag": "Viimeisin tagi: {tag}",
+        "firstVersionHint": "Työnnä tagimallia vastaava semver-tagi (esim. <code>v1.0.0</code>) julkaistaksesi ensimmäisen version."
+      },
+      "links": {
+        "title": "Linkitetyt työtilat",
+        "linkWorkspace": "Linkitä työtila",
+        "description": "Linkitetyt työtilat saavat spekulatiivisia suunnitelmia, kun PR:iä avataan tätä moduulia vastaan, ja tavallisia ajoja, kun uusia versioita julkaistaan.",
+        "searchPlaceholder": "Etsi linkitettäviä työtiloja…",
+        "empty": "Ei vielä linkitettyjä työtiloja.",
+        "unlinkTitle": "Poista työtilan linkitys"
+      },
+      "interface": {
+        "title": "Syötteet ja tulosteet",
+        "counts": "{inputs} syötettä, {outputs} tulostetta",
+        "versionLabel": "Versio:",
+        "noData": "Rajapintatietoja ei ole saatavilla tälle versiolle.",
+        "inputs": "Syötteet",
+        "outputs": "Tulosteet",
+        "name": "Nimi",
+        "type": "Tyyppi",
+        "description": "Kuvaus",
+        "default": "Oletus",
+        "required": "Pakollinen",
+        "sensitive": "Arkaluonteinen",
+        "requiredBadge": "pakollinen",
+        "optionalBadge": "valinnainen",
+        "sensitiveBadge": "arkaluonteinen",
+        "noneDeclared": "Tämä moduuliversio ei määrittele syötteitä eikä tulosteita."
+      },
+      "versions": {
+        "title": "Versiot",
+        "count": "{count, plural, one {# versio} other {# versiota}}",
+        "emptyVcs": "Ei vielä versioita. Työnnä mallia \"{pattern}\" vastaava semver-tagi yhdistettyyn repositorioon julkaistaksesi version.",
+        "emptyUpload": "Ei vielä versioita. Lataa moduuli tai yhdistä VCS aloittaaksesi.",
+        "version": "Versio",
+        "status": "Tila",
+        "source": "Lähde",
+        "actions": "Toiminnot",
+        "manualUpload": "manuaalinen lataus",
+        "delete": "Poista"
+      },
+      "deleteDialog": {
+        "title": "Vahvista poisto",
+        "moduleBody": "Tämä poistaa pysyvästi tämän moduulin ja kaikki sen versiot.",
+        "versionBody": "Tämä poistaa pysyvästi version {version}.",
+        "cancel": "Peruuta",
+        "confirm": "Poista"
+      }
+    },
+    "providerDetail": {
+      "description": "Palveluntarjoajarekisteri",
+      "deleteProvider": "Poista palveluntarjoaja",
+      "publishNote": "Palveluntarjoajaversiot julkaistaan <code>terrapod-publish</code>-CLI:llä, joka allekirjoittaa binaarit asiakaspuolella. Palveluntarjoajabinaarien lataaminen ja allekirjoittaminen selaimesta ei ole enää tuettua. Tämä sivu on vain luku -tilassa versioille ja alustoille.",
+      "empty": "Ei vielä versioita. Julkaise terrapod-publish-CLI:llä aloittaaksesi.",
+      "loadVersionsFailed": "Versioiden lataaminen epäonnistui",
+      "updateFailed": "Palveluntarjoajan päivittäminen epäonnistui",
+      "labelLockoutDefault": "Tämä tunnistemuutos vähentäisi pääsyäsi.",
+      "deleteFailed": "Poisto epäonnistui",
+      "deleteFailedStatus": "Poisto epäonnistui ({status})",
+      "platformCount": "{count, plural, one {# alusta} other {# alustaa}}",
+      "delete": "Poista",
+      "os": "Käyttöjärjestelmä",
+      "arch": "Arkkitehtuuri",
+      "filename": "Tiedostonimi",
+      "actions": "Toiminnot",
+      "deleteDialog": {
+        "title": "Vahvista poisto",
+        "providerBody": "Tämä poistaa pysyvästi tämän palveluntarjoajan ja kaikki sen versiot.",
+        "versionBody": "Tämä poistaa pysyvästi version {version} ja sen alustat.",
+        "platformBody": "Tämä poistaa pysyvästi alustan {os}/{arch}.",
+        "cancel": "Peruuta",
+        "confirm": "Poista"
+      }
+    }
+  },
+  "adminUsers": {
+    "title": "Käyttäjät",
+    "description": "Hallitse paikallisia käyttäjätilejä",
+    "empty": "Käyttäjiä ei löytynyt.",
+    "columns": {
+      "email": "Sähköposti",
+      "displayName": "Näyttönimi",
+      "status": "Tila",
+      "lastLogin": "Viimeisin kirjautuminen",
+      "created": "Luotu",
+      "actions": "Toiminnot"
+    },
+    "form": {
+      "email": "Sähköposti",
+      "displayName": "Näyttönimi",
+      "displayNamePlaceholder": "Matti Meikäläinen",
+      "passwordOptional": "Salasana (valinnainen)",
+      "passwordPlaceholder": "Syötä vahva salasana"
+    },
+    "reset": {
+      "title": "Nollaa salasana käyttäjälle {email}",
+      "newPassword": "Uusi salasana"
+    },
+    "password": {
+      "score": {
+        "veryWeak": "Erittäin heikko",
+        "weak": "Heikko",
+        "fair": "Kohtalainen",
+        "good": "Hyvä",
+        "strong": "Vahva"
+      }
+    },
+    "status": {
+      "active": "Aktiivinen",
+      "inactive": "Ei aktiivinen",
+      "never": "Ei koskaan"
+    },
+    "actions": {
+      "cancel": "Peruuta",
+      "save": "Tallenna",
+      "saving": "Tallennetaan...",
+      "createUser": "Luo käyttäjä",
+      "creating": "Luodaan...",
+      "resetPassword": "Nollaa salasana",
+      "edit": "Muokkaa",
+      "delete": "Poista",
+      "resetPw": "Nollaa salasana",
+      "setPw": "Aseta salasana",
+      "cancelPw": "Peruuta salasana"
+    },
+    "confirm": {
+      "activate": "Aktivoidaanko käyttäjä \"{email}\"?",
+      "deactivate": "Poistetaanko käyttäjä \"{email}\" käytöstä?",
+      "delete": "Poistetaanko käyttäjä \"{email}\"? Tätä ei voi kumota."
+    },
+    "success": {
+      "created": "Käyttäjä \"{email}\" luotu",
+      "updated": "Käyttäjä \"{email}\" päivitetty",
+      "activated": "Käyttäjä \"{email}\" aktivoitu",
+      "deactivated": "Käyttäjä \"{email}\" poistettu käytöstä",
+      "passwordReset": "Salasana nollattu käyttäjälle \"{email}\"",
+      "deleted": "Käyttäjä \"{email}\" poistettu"
+    },
+    "errors": {
+      "load": "Käyttäjien lataaminen epäonnistui",
+      "create": "Käyttäjän luominen epäonnistui",
+      "createStatus": "Käyttäjän luominen epäonnistui ({status})",
+      "update": "Käyttäjän päivittäminen epäonnistui",
+      "resetPassword": "Salasanan nollaaminen epäonnistui",
+      "delete": "Käyttäjän poistaminen epäonnistui"
+    }
+  },
+  "adminRoles": {
+    "title": "Roolit ja määritykset",
+    "description": "Hallitse RBAC-rooleja ja käyttäjien roolimäärityksiä",
+    "builtIn": "sisäänrakennettu",
+    "emptyRoles": "Ei määritettyjä rooleja.",
+    "emptyAssignments": "Ei roolimäärityksiä.",
+    "tabs": {
+      "roles": "Roolit",
+      "assignments": "Määritykset"
+    },
+    "columns": {
+      "provider": "Palveluntarjoaja",
+      "email": "Sähköposti",
+      "role": "Rooli",
+      "created": "Luotu",
+      "actions": "Toiminnot"
+    },
+    "form": {
+      "name": "Nimi",
+      "namePattern": "Vain kirjaimet, numerot, tavuviivat ja alaviivat. Alettava kirjaimella tai numerolla.",
+      "workspacePermission": "Työtilaoikeus",
+      "poolPermission": "Poolioikeus",
+      "registryPermission": "Rekisterioikeus",
+      "catalogPermission": "Luettelo-oikeus",
+      "descriptionLabel": "Kuvaus",
+      "descriptionPlaceholder": "Kehittäjän pääsy",
+      "allowLabels": "Salli tunnisteet (avain=arvo, pilkuin eroteltuna)",
+      "allowNames": "Salli nimet (pilkuin eroteltuna)",
+      "denyLabels": "Estä tunnisteet (avain=arvo, pilkuin eroteltuna)",
+      "denyNames": "Estä nimet (pilkuin eroteltuna)",
+      "allowLabelsShort": "Salli tunnisteet",
+      "allowNamesShort": "Salli nimet",
+      "denyLabelsShort": "Estä tunnisteet",
+      "denyNamesShort": "Estä nimet"
+    },
+    "assignForm": {
+      "provider": "Palveluntarjoaja",
+      "email": "Sähköposti",
+      "roles": "Roolit"
+    },
+    "caps": {
+      "selected": "{count, plural, one {# ominaisuus} other {# ominaisuutta}} valittu",
+      "count": "{count, plural, one {# ominaisuus} other {# ominaisuutta}}",
+      "custom": "Mukautettu",
+      "matchesPresets": "Vastaa esiasetuksia",
+      "advanced": "Lisäasetukset — ominaisuudet",
+      "otherPreserved": "Muut ominaisuudet (säilytetään tallennettaessa)",
+      "presetHelp": {
+        "before": "Yllä olevan esiasetuksen valitseminen esivalitsee sen ominaisuudet. Ruudun valitseminen tai poistaminen esiasetuksen ohi merkitsee roolin",
+        "after": "ja sen myöntö lähetetään nimenomaisena ominaisuusjoukkona."
+      },
+      "groups": {
+        "workspace": "Työtila",
+        "run": "Ajo",
+        "state": "Tila",
+        "var": "Muuttujat",
+        "config": "Määritys",
+        "drift": "Ajautuma",
+        "run-task": "Ajotehtävät",
+        "notification": "Ilmoitukset",
+        "run-trigger": "Ajokäynnistimet",
+        "pool": "Agenttipoolit",
+        "registry": "Rekisteri",
+        "catalog": "Palveluluettelo"
+      }
+    },
+    "display": {
+      "allow": "Salli: {value}",
+      "allowNames": "Salli nimet: {value}",
+      "deny": "Estä: {value}",
+      "denyNames": "Estä nimet: {value}"
+    },
+    "actions": {
+      "cancel": "Peruuta",
+      "save": "Tallenna",
+      "saving": "Tallennetaan...",
+      "edit": "Muokkaa",
+      "delete": "Poista",
+      "remove": "Poista",
+      "createRole": "Luo rooli",
+      "creating": "Luodaan...",
+      "addAssignment": "Lisää määritys",
+      "setRoles": "Aseta roolit"
+    },
+    "confirm": {
+      "deleteRole": "Poistetaanko rooli \"{name}\"? Kaikki siihen viittaavat määritykset kärsivät.",
+      "removeAssignment": "Poistetaanko rooli \"{roleName}\" käyttäjältä {email}?"
+    },
+    "success": {
+      "roleCreated": "Rooli \"{name}\" luotu",
+      "roleUpdated": "Rooli \"{name}\" päivitetty",
+      "roleDeleted": "Rooli \"{name}\" poistettu",
+      "rolesAssigned": "Roolit määritetty käyttäjälle {email}",
+      "assignmentRemoved": "Määritys poistettu"
+    },
+    "errors": {
+      "loadRoles": "Roolien lataaminen epäonnistui",
+      "loadAssignments": "Määritysten lataaminen epäonnistui",
+      "createRole": "Roolin luominen epäonnistui",
+      "createRoleStatus": "Roolin luominen epäonnistui ({status})",
+      "updateRole": "Roolin päivittäminen epäonnistui",
+      "deleteRole": "Roolin poistaminen epäonnistui",
+      "setAssignment": "Määrityksen asettaminen epäonnistui",
+      "setAssignmentStatus": "Määrityksen asettaminen epäonnistui ({status})",
+      "deleteAssignment": "Määrityksen poistaminen epäonnistui"
+    }
+  },
+  "adminVcs": {
+    "title": "VCS-yhteydet",
+    "description": "Hallitse versionhallintajärjestelmien integraatioita",
+    "empty": "Ei määritettyjä VCS-yhteyksiä.",
+    "actions": {
+      "new": "Uusi yhteys",
+      "cancel": "Peruuta",
+      "edit": "Muokkaa",
+      "delete": "Poista"
+    },
+    "confirmDelete": "Poistetaanko tämä VCS-yhteys? Sitä käyttävät työtilat menettävät VCS-integraation. Tätä ei voi kumota.",
+    "form": {
+      "name": "Nimi",
+      "namePattern": "Vain kirjaimet, numerot, tavuviivat ja alaviivat. Alettava kirjaimella tai numerolla.",
+      "provider": "Palveluntarjoaja",
+      "providerImmutable": "Palveluntarjoaja on muuttumaton — poista ja luo uudelleen muuttaaksesi sitä",
+      "serverUrl": "Palvelimen URL (valinnainen)",
+      "serverUrlHint": "Oltava HTTP- tai HTTPS-URL (esim. https://github.mycompany.com)",
+      "appId": "App ID",
+      "appIdHint": "GitHub App ID — vain numeromerkkejä",
+      "installationId": "Installation ID",
+      "installationIdHint": "GitHub App Installation ID — vain numeromerkkejä",
+      "privateKey": "Yksityinen avain (PEM)",
+      "browse": "Selaa...",
+      "privateKeyKeep": "Jätä tyhjäksi säilyttääksesi nykyisen avaimen — liitä uusi PEM kierrättääksesi",
+      "privateKeyPlaceholder": "-----BEGIN RSA PRIVATE KEY-----\n...\n\nPudota .pem-tiedosto tähän tai napsauta Selaa",
+      "webhookSecret": "Webhookin salaisuus",
+      "optional": "(valinnainen)",
+      "webhookSecretSet": "Asetettu — jätä tyhjäksi säilyttääksesi, syötä uusi arvo kierrättääksesi",
+      "webhookSecretGlobal": "Jätä tyhjäksi käyttääksesi globaalia webhookin salaisuutta",
+      "webhookSecretHelp": "Yhteyskohtainen HMAC-salaisuus tämän asennuksen webhookeille. Kun ei asetettu, käytetään globaalia salaisuutta.",
+      "accessToken": "Pääsytunnus",
+      "accessTokenKeep": "Jätä tyhjäksi säilyttääksesi nykyisen tunnuksen",
+      "saving": "Tallennetaan...",
+      "creating": "Luodaan...",
+      "saveChanges": "Tallenna muutokset",
+      "createConnection": "Luo yhteys"
+    },
+    "table": {
+      "name": "Nimi",
+      "provider": "Palveluntarjoaja",
+      "serverUrl": "Palvelimen URL",
+      "status": "Tila",
+      "created": "Luotu",
+      "actions": "Toiminnot"
+    },
+    "success": {
+      "created": "VCS-yhteys \"{name}\" luotu",
+      "updated": "VCS-yhteys \"{name}\" päivitetty",
+      "deleted": "VCS-yhteys poistettu"
+    },
+    "errors": {
+      "load": "VCS-yhteyksien lataaminen epäonnistui",
+      "save": "Yhteyden tallentaminen epäonnistui",
+      "delete": "Yhteyden poistaminen epäonnistui",
+      "createStatus": "Yhteyden luominen epäonnistui ({status})",
+      "updateStatus": "Yhteyden päivittäminen epäonnistui ({status})"
+    }
+  },
+  "adminVariableSets": {
+    "title": "Muuttujajoukot",
+    "description": "Hallitse organisaatiolaajuisia muuttujajoukkoja työtilaryhmille",
+    "empty": "Ei määritettyjä muuttujajoukkoja.",
+    "none": "-",
+    "actions": {
+      "new": "Uusi muuttujajoukko",
+      "cancel": "Peruuta"
+    },
+    "form": {
+      "name": "Nimi",
+      "namePattern": "Vain kirjaimet, numerot, tavuviivat ja alaviivat. Alettava kirjaimella tai numerolla.",
+      "descriptionLabel": "Kuvaus",
+      "descriptionPlaceholder": "AWS-tunnistetiedot kaikille työtiloille",
+      "global": "Globaali (koskee kaikkia työtiloja)",
+      "priority": "Prioriteetti (ohittaa työtilan muuttujat)",
+      "creating": "Luodaan...",
+      "create": "Luo muuttujajoukko"
+    },
+    "table": {
+      "name": "Nimi",
+      "description": "Kuvaus",
+      "scope": "Laajuus",
+      "variables": "Muuttujat",
+      "created": "Luotu"
+    },
+    "scope": {
+      "global": "Globaali",
+      "priority": "Prioriteetti",
+      "standard": "Vakio"
+    },
+    "errors": {
+      "load": "Muuttujajoukkojen lataaminen epäonnistui",
+      "create": "Muuttujajoukon luominen epäonnistui",
+      "createStatus": "Muuttujajoukon luominen epäonnistui ({status})"
+    },
+    "detail": {
+      "back": "Takaisin muuttujajoukkoihin",
+      "headerFallback": "Muuttujajoukko",
+      "notFound": "Muuttujajoukkoa ei löytynyt",
+      "global": "Globaali",
+      "priority": "Prioriteetti",
+      "yes": "Kyllä",
+      "no": "Ei",
+      "edit": "Muokkaa",
+      "cancel": "Peruuta",
+      "save": "Tallenna",
+      "saving": "Tallennetaan...",
+      "delete": "Poista",
+      "deleting": "Poistetaan...",
+      "confirmDelete": "Vahvista poisto",
+      "deleteTitle": "Poista muuttujajoukko",
+      "deleteDescription": "Poista pysyvästi tämä muuttujajoukko ja kaikki sen muuttujat.",
+      "tabs": {
+        "settings": "Asetukset",
+        "variables": "Muuttujat",
+        "workspaces": "Työtilat"
+      },
+      "addVariable": "Lisää muuttuja",
+      "adding": "Lisätään...",
+      "varKey": "Avain",
+      "varValue": "Arvo",
+      "varCategory": "Kategoria",
+      "categoryTerraform": "Terraform",
+      "categoryEnv": "Ympäristö",
+      "sensitive": "Arkaluonteinen",
+      "sensAbbr": "Ark.",
+      "enterNewValue": "Syötä uusi arvo",
+      "empty": "tyhjä",
+      "emptyVars": "Ei muuttujia tässä joukossa.",
+      "actions": "Toiminnot",
+      "remove": "Poista",
+      "add": "Lisää",
+      "addWorkspace": "Lisää työtila",
+      "workspace": "Työtila",
+      "selectWorkspace": "Valitse työtila...",
+      "globalBanner": "Tämä muuttujajoukko on globaali ja koskee automaattisesti kaikkia työtiloja.",
+      "emptyWorkspaces": "Tähän muuttujajoukkoon ei ole määritetty työtiloja.",
+      "confirmDeleteVar": "Poistetaanko tämä muuttuja? Tätä ei voi kumota.",
+      "confirmRemoveWorkspace": "Poistetaanko tämä työtila muuttujajoukosta? Sen muuttujat eivät enää koske kyseistä työtilaa.",
+      "success": {
+        "updated": "Muuttujajoukko päivitetty",
+        "workspaceAdded": "Työtila lisätty",
+        "workspaceRemoved": "Työtila poistettu"
+      },
+      "errors": {
+        "load": "Muuttujajoukon lataaminen epäonnistui",
+        "update": "Muuttujajoukon päivittäminen epäonnistui",
+        "delete": "Muuttujajoukon poistaminen epäonnistui",
+        "loadVars": "Muuttujien lataaminen epäonnistui",
+        "loadWorkspaces": "Työtilojen lataaminen epäonnistui",
+        "addVar": "Muuttujan lisääminen epäonnistui",
+        "addVarStatus": "Muuttujan lisääminen epäonnistui ({status})",
+        "updateVar": "Muuttujan päivittäminen epäonnistui",
+        "deleteVar": "Muuttujan poistaminen epäonnistui",
+        "addWorkspace": "Työtilan lisääminen epäonnistui",
+        "removeWorkspace": "Työtilan poistaminen epäonnistui"
+      }
+    }
+  },
+  "adminAutodiscovery": {
+    "title": "Automaattinen löytäminen",
+    "description": "Luo työtiloja automaattisesti monorepoissa, kun PR:t koskettavat vastaavia polkuja",
+    "empty": "Ei vielä automaattisen löytämisen sääntöjä. Luo yksi aloittaaksesi työtilojen automaattisen valmistelun monorepon PR:istä.",
+    "unsavedRule": "(tallentamaton sääntö)",
+    "actions": {
+      "newRule": "Uusi sääntö",
+      "cancel": "Peruuta",
+      "create": "Luo",
+      "update": "Päivitä",
+      "preview": "Esikatsele",
+      "edit": "Muokkaa",
+      "delete": "Poista",
+      "close": "Sulje"
+    },
+    "status": {
+      "enabled": "käytössä",
+      "disabled": "poissa käytöstä"
+    },
+    "form": {
+      "createTitle": "Luo sääntö",
+      "editTitle": "Muokkaa sääntöä",
+      "name": "Nimi",
+      "vcsConnection": "VCS-yhteys",
+      "selectConnection": "Valitse yhteys",
+      "repoUrl": "Repon URL",
+      "branch": "Haara (tyhjä = oletus)",
+      "matchPattern": "Vastaavuusmalli",
+      "matchPatternHint": "Gitignore-tyyliset glob-mallit. <code>**</code> vastaa polkusegmenttien yli. Vain <code>*.tf*</code>-tiedostot käynnistävät automaattisen löytämisen.",
+      "ignorePatterns": "Ohitusmallit (yksi riviä kohti)",
+      "nameTemplate": "Työtilan nimimalli (valinnainen)",
+      "nameTemplateHint": "Käytä <path></path> hakemistolle, jossa <code>/</code> on korvattu merkillä <code>-</code>, tai <root></root> hakemistolle sellaisenaan. Tyhjä = oletus (vain viivoitettu polku).",
+      "templateDefaults": "Työtilamallin oletukset",
+      "executionMode": "Suoritustila",
+      "executionModeHint": "Automaattinen löytäminen on VCS-vetoista; vain agenttisuoritus on tuettu.",
+      "agentPool": "Agenttipooli",
+      "none": "(ei mitään)",
+      "executionBackend": "Suoritustausta",
+      "terraformVersion": "Terraform-versio",
+      "cpuRequest": "CPU-pyyntö",
+      "memoryRequest": "Muistipyyntö",
+      "ownerEmail": "Omistajan sähköposti",
+      "autoApply": "Automaattinen käyttöönotto",
+      "enabled": "Käytössä",
+      "onDirectoryDelete": "Hakemiston poiston yhteydessä",
+      "onDeleteFlag": "Merkitse (turvallinen — merkitse odottamaan poistoa, vaatii manuaalisen toimenpiteen)",
+      "onDeleteDestroy": "Tuhoa (VAARA — purkaa infrastruktuurin ja arkistoi sitten työtilan)",
+      "onDirectoryDeleteHint": "Mitä automaattisesti löydetylle työtilalle tapahtuu, kun sen hakemisto poistetaan seuratusta haarasta.",
+      "onDeleteDestroyWarning": "Tämä suorittaa oikean terraform destroy -toiminnon työtilalle, kun sen hakemisto poistetaan seuratusta haarasta.",
+      "labels": "Tunnisteet (peritään luoduille työtiloille)",
+      "varFiles": "Muuttujatiedostot (peritään luoduille työtiloille)",
+      "varFilesHint": "Suhteelliset <code>.tfvars</code>-polut, jotka välitetään suunnitteluun/käyttöönottoon.",
+      "addVarFile": "Lisää muuttujatiedosto",
+      "executionHooks": "Suorituskoukut (liitetään jokaiseen uuteen työtilaan)",
+      "executionHooksHint": "Valitse <page>Suorituskoukut</page>-hallintasivulla määritetyistä koukuista — jokainen valittu koukku liitetään jokaiseen tämän säännön luomaan työtilaan.",
+      "noHooks": "Ei vielä määritettyjä suorituskoukkuja. Luo yksi ensin Suorituskoukut-hallintasivulla.",
+      "hookDisabled": "(poissa käytöstä)",
+      "hookNotInLibrary": "(ei kirjastossa — poista valinta poistaaksesi)",
+      "runTaskTemplates": "Ajotehtävämallit (luodaan jokaiseen uuteen työtilaan)",
+      "notificationTemplates": "Ilmoitusmallit (luodaan jokaiseen uuteen työtilaan)",
+      "saving": "Tallennetaan...",
+      "previewTitle": "Käy repo läpi ja esikatsele, mitkä työtilat tämä sääntö LUOISI — ei tallennusta"
+    },
+    "table": {
+      "name": "Nimi",
+      "repo": "Repo",
+      "pattern": "Malli",
+      "enabled": "Käytössä",
+      "created": "Luotu",
+      "previewTitle": "Käy repo läpi ja esikatsele, mitkä työtilat tämä sääntö loisi"
+    },
+    "deleteModal": {
+      "title": "Poistetaanko sääntö?",
+      "body": "Tämän säännön automaattisesti luomat työtilat jatkavat toimintaansa. Tulevat PR:t, jotka koskettavat uusia polkuja tämän säännön alla, eivät luo automaattisesti lisää työtiloja."
+    },
+    "preview": {
+      "title": "Esikatselu: {ruleName}",
+      "walkedFiles": "Käyty läpi <files>{count}</files> tiedostoa haarassa <refspan>{ref}</refspan>",
+      "walking": "Käydään repositoriota läpi…",
+      "noMatches": "Yksikään tämän repon hakemisto ei vastaa säännön mallia. Ei mitään luotavaa.",
+      "colWorkspace": "Työtila",
+      "colDirectory": "Hakemisto",
+      "colAction": "Toiminto",
+      "repoRoot": "(repon juuri)",
+      "actionCreate": "Luo",
+      "skipDiscovered": "Ohita (jo löydetty)",
+      "skipDiscoveredTitle": "Tämän säännön jo luoma",
+      "skipCollision": "Ohita (nimiristiriita)",
+      "skipCollisionTitle": "Tämänniminen työtila on jo olemassa muusta syystä",
+      "willCreate": "{count, plural, one {# työtila luodaan.} other {# työtilaa luodaan.}} Olemassa olevia työtiloja (ristiriidat) ei koskettu.",
+      "provision": "{count, plural, one {Valmistele # työtila} other {Valmistele # työtilaa}}",
+      "provisioning": "Valmistellaan…",
+      "saveToProvision": "Tallenna sääntö valmistellaksesi nämä työtilat."
+    },
+    "success": {
+      "created": "Luotu {name}",
+      "updated": "Päivitetty {name}",
+      "deleted": "Sääntö poistettu",
+      "provisioned": "{count, plural, one {Luotu # työtila säännöstä \"{ruleName}\"} other {Luotu # työtilaa säännöstä \"{ruleName}\"}}"
+    },
+    "errors": {
+      "loadRules": "Automaattisen löytämisen sääntöjen lataaminen epäonnistui",
+      "load": "Lataaminen epäonnistui",
+      "createFailed": "Luonti epäonnistui: {status} {detail}",
+      "updateFailed": "Päivitys epäonnistui: {status} {detail}",
+      "save": "Tallentaminen epäonnistui",
+      "deleteRule": "Säännön poistaminen epäonnistui",
+      "delete": "Poistaminen epäonnistui",
+      "previewFailed": "Esikatselu epäonnistui ({status})",
+      "preview": "Esikatselu epäonnistui",
+      "previewPrereq": "Aseta VCS-yhteys, repon URL ja malli ennen esikatselua",
+      "scanFailed": "Skannaus epäonnistui ({status})",
+      "scan": "Skannaus epäonnistui"
+    }
+  },
+  "adminBulkUpdate": {
+    "title": "Massapäivitys",
+    "description": "Valitse työtilat suodattimella ja tee sitten asetusmuutos niihin kaikkiin",
+    "none": "(ei mitään)",
+    "anyOption": "(mikä tahansa)",
+    "unchanged": "(muuttumaton)",
+    "unchangedOption": "(muuttumaton)",
+    "filter": {
+      "heading": "1. Valitse työtilat",
+      "matchAll": "Vastaa <strong>kaikkia</strong> työtiloja (ohittaa alla olevat suodattimet)",
+      "namePrefix": "Nimen etuliite",
+      "executionBackend": "Suoritustausta",
+      "ownerEmail": "Omistajan sähköposti",
+      "agentPool": "Agenttipooli",
+      "vcsConnection": "VCS-yhteys",
+      "labels": "Tunnisteet",
+      "search": "Hae",
+      "searching": "Haetaan..."
+    },
+    "results": {
+      "matched": "Vastasi <strong>{count}</strong> {count, plural, one {työtila} other {työtilaa}}.",
+      "noMatch": "Yksikään työtila ei vastannut tätä suodatinta.",
+      "colName": "Nimi",
+      "colMode": "Tila",
+      "colBackend": "Tausta",
+      "colTfVersion": "TF-versio",
+      "colLabels": "Tunnisteet"
+    },
+    "update": {
+      "heading": "2. Käytä muutoksia",
+      "hint": "Vain alla asettamiasi kenttiä muutetaan. Yllä oleva suodatin valitsee, mitkä työtilat saavat muutoksen.",
+      "terraformVersion": "Terraform-versio",
+      "executionBackend": "Suoritustausta",
+      "executionMode": "Suoritustila",
+      "autoApply": "Automaattinen käyttöönotto",
+      "agentPool": "Agenttipooli",
+      "cpuRequest": "CPU-pyyntö",
+      "memoryRequest": "Muistipyyntö",
+      "setLabels": "Aseta tunnisteet (korvaa tunnistekartan jokaisessa vastaavassa työtilassa)",
+      "setVarFiles": "Aseta muuttujatiedostot",
+      "addVarFile": "Lisää muuttujatiedosto",
+      "setRunTasks": "Aseta ajotehtävät (päivitetään nimen mukaan jokaisessa vastaavassa työtilassa)",
+      "setNotifications": "Aseta ilmoitusmääritykset (päivitetään nimen mukaan)",
+      "dryRun": "Testiajo (vain esikatselu — muutoksia ei kirjoiteta)",
+      "confirmWarning": "Tämä kirjoittaa muutokset jokaiseen vastaavaan työtilaan.",
+      "confirmApply": "Vahvista käyttöönotto",
+      "applying": "Otetaan käyttöön...",
+      "cancel": "Peruuta",
+      "working": "Työskennellään...",
+      "previewDryRun": "Esikatsele (testiajo)",
+      "applyChanges": "Käytä muutoksia"
+    },
+    "diff": {
+      "colWorkspace": "Työtila",
+      "colChanges": "Muutokset"
+    },
+    "dryResult": {
+      "heading": "Testiajon tulos",
+      "summary": "Vastasi <strong>{matched}</strong>; <strong>{wouldChange}</strong> muuttuisi; {unchanged} muuttumatta. Mitään ei kirjoitettu.",
+      "wouldChange": "Muuttuisi",
+      "noChange": "Yksikään työtila ei muuttuisi tällä päivityksellä."
+    },
+    "applyResult": {
+      "heading": "Käyttöönoton tulos",
+      "summary": "Vastasi <strong>{matched}</strong>; <appliedstrong>{applied}</appliedstrong> otettu käyttöön; {unchanged} muuttumatta; {errors, plural, one {# virhe} other {# virhettä}}.",
+      "applied": "Otettu käyttöön",
+      "unnamedWorkspace": "(työtila)",
+      "noChange": "Yksikään työtila ei muuttunut."
+    },
+    "errors": {
+      "searchFailed": "Haku epäonnistui ({status})",
+      "search": "Haku epäonnistui",
+      "bulkUpdateFailed": "Massapäivitys epäonnistui ({status})",
+      "bulkUpdate": "Massapäivitys epäonnistui"
+    }
+  },
+  "adminExecutionHooks": {
+    "title": "Suorituskoukut",
+    "description": "Mukautetut shell-vaiheet, jotka suoritetaan runner-Jobien sisällä suunnittelua/käyttöönottoa edeltävissä/seuraavissa kohdissa, liitettyinä työtiloihin",
+    "empty": "Ei määritettyjä suorituskoukkuja.",
+    "actions": {
+      "cancel": "Peruuta",
+      "new": "Uusi suorituskoukku",
+      "creating": "Luodaan...",
+      "create": "Luo suorituskoukku"
+    },
+    "badges": {
+      "disabled": "Poissa käytöstä",
+      "enabled": "Käytössä"
+    },
+    "columns": {
+      "name": "Nimi",
+      "hookPoint": "Koukkukohta",
+      "enabled": "Käytössä",
+      "priority": "Prioriteetti",
+      "workspaces": "Työtilat"
+    },
+    "form": {
+      "name": "Nimi",
+      "namePatternTitle": "Vain kirjaimet, numerot, tavuviivat ja alaviivat. Alettava kirjaimella tai numerolla.",
+      "description": "Kuvaus",
+      "descriptionPlaceholder": "Lisää sisäisen hostin merkintä ennen initiä",
+      "hookPoint": "Koukkukohta",
+      "priority": "Prioriteetti",
+      "priorityTitle": "Pienempi suoritetaan ensin, kun useat koukut jakavat kohdan (tasapelit ratkaistaan nimellä).",
+      "scriptLabel": "Skripti (<code>/bin/sh -c</code>)",
+      "scriptHelp": "Suoritetaan runnerin pilvi-identiteetillä. Nollasta poikkeava exit epäonnistaa ajon. Salaisuuksien tulisi tulla työtilan muuttujista, ei tähän sisäkkäisenä."
+    },
+    "errors": {
+      "load": "Suorituskoukkujen lataaminen epäonnistui",
+      "createStatus": "Suorituskoukun luominen epäonnistui ({status})",
+      "create": "Suorituskoukun luominen epäonnistui"
+    }
+  },
+  "adminPolicySets": {
+    "title": "Käytäntöjoukot",
+    "description": "OPA-käytäntö-koodina-valvonta, rajattuna työtiloihin tunnisteella",
+    "empty": "Ei määritettyjä käytäntöjoukkoja.",
+    "actions": {
+      "cancel": "Peruuta",
+      "new": "Uusi käytäntöjoukko",
+      "creating": "Luodaan...",
+      "create": "Luo käytäntöjoukko"
+    },
+    "badges": {
+      "disabled": "Poissa käytöstä",
+      "mandatory": "Pakollinen",
+      "advisory": "Neuvoa-antava",
+      "global": "Globaali",
+      "labelScoped": "Tunnisteeseen rajattu"
+    },
+    "columns": {
+      "name": "Nimi",
+      "description": "Kuvaus",
+      "enforcement": "Valvonta",
+      "scope": "Laajuus",
+      "policies": "Käytännöt"
+    },
+    "form": {
+      "name": "Nimi",
+      "namePatternTitle": "Vain kirjaimet, numerot, tavuviivat ja alaviivat. Alettava kirjaimella tai numerolla.",
+      "description": "Kuvaus",
+      "descriptionPlaceholder": "Pakolliset suojarajat tuotantotyötiloille",
+      "enforcement": "Valvonta",
+      "enforcementAdvisory": "Neuvoa-antava (varoita, älä estä)",
+      "enforcementMandatory": "Pakollinen (estä käyttöönotto epäonnistuessa)",
+      "globalScope": "Globaali (koskee jokaista työtilaa)",
+      "sourceInline": "Sisäinen (hallitse käytäntöjä käyttöliittymässä)",
+      "sourceVcs": "VCS-repositoriosta",
+      "vcsConnection": "VCS-yhteys",
+      "selectConnection": "Valitse yhteys...",
+      "repoUrl": "Repositorion URL",
+      "branch": "Haara",
+      "branchPlaceholder": "main (oletus)",
+      "policyPath": "Käytäntöpolku",
+      "policyPathPlaceholder": "policies/ (.rego-tiedostoja sisältävä hakemisto)",
+      "helpVcs": "Käytännöt synkronoidaan repositoriosta automaattisesti.",
+      "helpInline": "Lisää käytäntöjä ja tarkenna tunnisterajausta joukon luomisen jälkeen."
+    },
+    "errors": {
+      "load": "Käytäntöjoukkojen lataaminen epäonnistui",
+      "createStatus": "Käytäntöjoukon luominen epäonnistui ({status})",
+      "create": "Käytäntöjoukon luominen epäonnistui"
+    }
+  },
+  "adminCatalog": {
+    "title": "Luettelon hallinta",
+    "description": "Hallitse palveluluettelon kohteita",
+    "notEnabled": "Palveluluettelo ei ole käytössä.",
+    "empty": "Ei vielä luettelokohteita.",
+    "actions": {
+      "new": "Uusi luettelokohde",
+      "cancel": "Peruuta",
+      "create": "Luo luettelokohde",
+      "creating": "Luodaan…",
+      "saveChanges": "Tallenna muutokset",
+      "saving": "Tallennetaan…",
+      "edit": "Muokkaa",
+      "delete": "Poista"
+    },
+    "form": {
+      "name": "Nimi",
+      "nameTitle": "Vain kirjaimet, numerot, tavuviivat ja alaviivat. Alettava kirjaimella tai numerolla.",
+      "module": "Moduuli",
+      "moduleSelect": "Valitse moduuli…",
+      "moduleImmutable": "Moduuli on muuttumaton luonnin jälkeen",
+      "displayName": "Näyttönimi",
+      "displayNamePlaceholder": "Vakio-S3-ämpäri",
+      "versionPin": "Oletusversion kiinnitys",
+      "versionPinPlaceholder": "esim. 1.2.0 (tyhjä = uusin)",
+      "descriptionLabel": "Kuvaus",
+      "descriptionPlaceholder": "Mitä tämä luettelokohde valmistelee…",
+      "enabled": "Käytössä (näkyvissä selausluettelossa)",
+      "providerTemplates": "Palveluntarjoajamallit",
+      "noProviderTemplates": "Ei määritettyjä palveluntarjoajamalleja.",
+      "restrictPools": "Rajoita tiettyihin agenttipooleihin",
+      "noAgentPools": "Ei saatavilla olevia agenttipooleja.",
+      "anyPool": "Mitä tahansa agenttipoolia voidaan käyttää.",
+      "labels": "Tunnisteet",
+      "variableOptions": "Muuttujavaihtoehdot (edistynyt, JSON)",
+      "variableOptionsHint": "Syötekohtaiset ohitukset (vaihtoehdot, piilotettu, oletus). Jätä muotoon <code>[]</code>, jos ei käytössä."
+    },
+    "table": {
+      "name": "Nimi",
+      "module": "Moduuli",
+      "enabled": "Käytössä",
+      "actions": "Toiminnot"
+    },
+    "badge": {
+      "enabled": "käytössä",
+      "disabled": "poissa käytöstä"
+    },
+    "confirm": {
+      "delete": "Poistetaanko tämä luettelokohde? Olemassa olevat valmistellut instanssit eivät muutu."
+    },
+    "success": {
+      "created": "Luettelokohde \"{name}\" luotu",
+      "updated": "Luettelokohde \"{name}\" päivitetty",
+      "deleted": "Luettelokohde poistettu"
+    },
+    "errors": {
+      "load": "Luettelokohteiden lataaminen epäonnistui",
+      "save": "Luettelokohteen tallentaminen epäonnistui",
+      "createStatus": "Luettelokohteen luominen epäonnistui ({status})",
+      "updateStatus": "Luettelokohteen päivittäminen epäonnistui ({status})",
+      "delete": "Luettelokohteen poistaminen epäonnistui",
+      "deleteConflict": "Ei voi poistaa: tällä luettelokohteella on valmisteltuja instansseja.",
+      "varOptsInvalidJson": "Muuttujavaihtoehtojen on oltava kelvollista JSONia (taulukko).",
+      "varOptsNotArray": "Muuttujavaihtoehtojen on oltava JSON-taulukko."
+    }
+  },
+  "adminProviderTemplates": {
+    "title": "Palveluntarjoajamallit",
+    "description": "Uudelleenkäytettävät palveluntarjoajan määrityslohkot luettelokohteille",
+    "notEnabled": "Palveluluettelo ei ole käytössä.",
+    "empty": "Ei vielä palveluntarjoajamalleja.",
+    "actions": {
+      "new": "Uusi malli",
+      "cancel": "Peruuta",
+      "create": "Luo malli",
+      "creating": "Luodaan…",
+      "saveChanges": "Tallenna muutokset",
+      "saving": "Tallennetaan…",
+      "edit": "Muokkaa",
+      "delete": "Poista"
+    },
+    "form": {
+      "name": "Nimi",
+      "providerType": "Palveluntarjoajatyyppi",
+      "body": "Runko (HCL)",
+      "parameters": "Parametrit (edistynyt, JSON)",
+      "parametersHint": "Jokaisesta parametrista tulee valmistelulomakkeen kenttä. Jätä muotoon <code>[]</code>, jos ei käytössä.",
+      "labels": "Tunnisteet"
+    },
+    "table": {
+      "name": "Nimi",
+      "providerType": "Palveluntarjoajatyyppi",
+      "parameters": "Parametrit",
+      "actions": "Toiminnot"
+    },
+    "confirm": {
+      "delete": "Poistetaanko tämä palveluntarjoajamalli? Siihen viittaavien luettelokohteiden valmistelu epäonnistuu. Tätä ei voi kumota."
+    },
+    "success": {
+      "created": "Palveluntarjoajamalli \"{name}\" luotu",
+      "updated": "Palveluntarjoajamalli \"{name}\" päivitetty",
+      "deleted": "Palveluntarjoajamalli poistettu"
+    },
+    "errors": {
+      "load": "Palveluntarjoajamallien lataaminen epäonnistui",
+      "save": "Palveluntarjoajamallin tallentaminen epäonnistui",
+      "createStatus": "Mallin luominen epäonnistui ({status})",
+      "updateStatus": "Mallin päivittäminen epäonnistui ({status})",
+      "delete": "Palveluntarjoajamallin poistaminen epäonnistui",
+      "deleteConflict": "Ei voi poistaa: tähän malliin viittaa luettelokohde.",
+      "paramsInvalidJson": "Parametrien on oltava kelvollista JSONia (taulukko).",
+      "paramsNotArray": "Parametrien on oltava JSON-taulukko."
+    }
+  },
+  "adminAgentPools": {
+    "title": "Agenttipoolit",
+    "description": "Hallitse runner-agenttipooleja ja niiden kuuntelijoita",
+    "empty": "Ei määritettyjä agenttipooleja.",
+    "actions": {
+      "newPool": "Uusi pooli",
+      "createPool": "Luo pooli",
+      "creating": "Luodaan...",
+      "cancel": "Peruuta",
+      "edit": "Muokkaa",
+      "save": "Tallenna",
+      "saving": "Tallennetaan...",
+      "delete": "Poista",
+      "deleting": "Poistetaan...",
+      "confirmDelete": "Vahvista poisto"
+    },
+    "form": {
+      "name": "Nimi",
+      "namePattern": "Vain kirjaimet, numerot, tavuviivat ja alaviivat. Alettava kirjaimella tai numerolla.",
+      "description": "Kuvaus",
+      "descriptionPlaceholder": "Tuotannon AWS-runnerit",
+      "labels": "Tunnisteet"
+    },
+    "columns": {
+      "name": "Nimi",
+      "description": "Kuvaus",
+      "status": "Tila",
+      "created": "Luotu"
+    },
+    "badges": {
+      "default": "oletus",
+      "degradedTooltip": "Kuuntelijat lähettävät sydämenlyöntejä, mutta niiden varmenteet ovat vanhentuneet — ajot eivät käynnisty.",
+      "status": {
+        "online": "verkossa",
+        "offline": "poissa verkosta",
+        "degraded": "heikentynyt"
+      }
+    },
+    "detail": {
+      "back": "Takaisin agenttipooleihin",
+      "defaultDescription": "Agenttipooli"
+    },
+    "tabs": {
+      "settings": "Asetukset",
+      "tokens": "Tunnukset",
+      "listeners": "Kuuntelijat"
+    },
+    "settings": {
+      "title": "Poolin asetukset",
+      "fields": {
+        "name": "Nimi",
+        "description": "Kuvaus",
+        "created": "Luotu",
+        "owner": "Omistaja",
+        "yourPermission": "Oikeutesi",
+        "labels": "Tunnisteet"
+      },
+      "permissions": {
+        "read": "luku",
+        "write": "kirjoitus",
+        "admin": "hallinta"
+      }
+    },
+    "danger": {
+      "title": "Poista pooli",
+      "description": "Poista pysyvästi tämä agenttipooli ja kaikki siihen liittyvät tunnukset."
+    },
+    "tokens": {
+      "create": "Luo tunnus",
+      "empty": "Ei tunnuksia tälle poolille.",
+      "revoke": "Peruuta",
+      "created": {
+        "title": "Tunnus luotu onnistuneesti",
+        "copyNow": "Kopioi tämä tunnus nyt — sitä ei näytetä enää uudelleen.",
+        "copy": "Kopioi"
+      },
+      "form": {
+        "description": "Kuvaus",
+        "descriptionPlaceholder": "Tuotannon kuuntelijatunnus",
+        "maxUses": "Enimmäiskäyttökerrat",
+        "maxUsesHint": "Oletus 2 — sietää yhden bootstrap-kilpajuoksun uudelleenyrityksen kuuntelijareplikojen välillä.",
+        "expiresAt": "Vanhenee",
+        "expiresAtHint": "Oletus 1 tunti tästä hetkestä."
+      },
+      "columns": {
+        "description": "Kuvaus",
+        "uses": "Käyttökerrat",
+        "expires": "Vanhenee",
+        "status": "Tila",
+        "createdBy": "Luoja",
+        "actions": "Toiminnot"
+      },
+      "badges": {
+        "revoked": "Peruttu",
+        "active": "Aktiivinen"
+      }
+    },
+    "listeners": {
+      "empty": "Ei rekisteröityjä kuuntelijoita tälle poolille.",
+      "columns": {
+        "name": "Nimi",
+        "status": "Tila",
+        "replicas": "Replikat",
+        "certExpires": "Varmenne vanhenee",
+        "actions": "Toiminnot"
+      },
+      "status": {
+        "online": "verkossa",
+        "offline": "poissa verkosta",
+        "degraded": "heikentynyt",
+        "cert-expired": "varmenne-vanhentunut"
+      },
+      "tooltips": {
+        "certExpired": "Kuuntelija lähettää sydämenlyöntejä, mutta sen varmenne on vanhentunut — jokainen varmennetodennettu kutsu (ajon lunastus, uusiminen, runner-token) epäonnistuu. Todennäköisin syy: API ei koskaan rekisteröinyt uusinta varmennetta, tai varmenteen TTL kului ennen uusimista.",
+        "degraded": "Kuuntelijat lähettävät sydämenlyöntejä, mutta niiden varmenteet ovat vanhentuneet — ajot eivät käynnisty."
+      }
+    },
+    "confirm": {
+      "revokeToken": "Perutaanko tämä liittymistunnus? Sitä käyttävät kuuntelijat eivät voi enää liittyä, eikä tätä voi kumota.",
+      "deleteListener": "Poistetaanko tämä kuuntelija? Se rekisteröityy uudelleen seuraavan sydämenlyönnin yhteydessä, jos podi on yhä käynnissä."
+    },
+    "success": {
+      "poolUpdated": "Pooli päivitetty",
+      "tokenRevoked": "Tunnus peruttu",
+      "listenerDeleted": "Kuuntelija poistettu"
+    },
+    "errors": {
+      "loadPools": "Agenttipoolien lataaminen epäonnistui",
+      "loadPool": "Poolin lataaminen epäonnistui",
+      "loadTokens": "Tunnusten lataaminen epäonnistui",
+      "loadListeners": "Kuuntelijoiden lataaminen epäonnistui",
+      "createPool": "Poolin luominen epäonnistui",
+      "createStatus": "Poolin luominen epäonnistui ({status})",
+      "updatePool": "Poolin päivittäminen epäonnistui",
+      "deletePool": "Poolin poistaminen epäonnistui",
+      "poolNotFound": "Poolia ei löytynyt",
+      "createToken": "Tunnuksen luominen epäonnistui",
+      "createTokenStatus": "Tunnuksen luominen epäonnistui ({status})",
+      "revokeToken": "Tunnuksen peruuttaminen epäonnistui",
+      "deleteListener": "Kuuntelijan poistaminen epäonnistui"
+    }
+  },
+  "adminAuditLog": {
+    "title": "Tarkastusloki",
+    "description": "Muuttumaton loki kaikista API-pyynnöistä",
+    "empty": "Tarkastuslokimerkintöjä ei löytynyt.",
+    "errors": {
+      "load": "Tarkastuslokin lataaminen epäonnistui"
+    },
+    "filters": {
+      "actorEmail": "Toimijan sähköposti",
+      "actorPlaceholder": "user@example.com",
+      "resourceType": "Resurssityyppi",
+      "resourceTypePlaceholder": "workspaces",
+      "method": "Menetelmä",
+      "methodAll": "Kaikki",
+      "since": "Alkaen",
+      "until": "Asti",
+      "clear": "Tyhjennä",
+      "apply": "Käytä suodattimia"
+    },
+    "columns": {
+      "timestamp": "Aikaleima",
+      "actor": "Toimija",
+      "action": "Toiminto",
+      "resourceType": "Resurssityyppi",
+      "resourceId": "Resurssin ID",
+      "status": "Tila",
+      "duration": "Kesto"
+    },
+    "pagination": {
+      "summary": "Sivu {current}/{total} ({count, plural, one {# merkintä} other {# merkintää}})",
+      "previous": "Edellinen",
+      "next": "Seuraava"
+    }
+  },
+  "adminBinaryCache": {
+    "title": "Välimuisti",
+    "description": "CLI-binaarin ja palveluntarjoajan välimuistin hallinta",
+    "errors": {
+      "loadBinary": "Binaarivälimuistin lataaminen epäonnistui",
+      "loadCache": "Välimuistin lataaminen epäonnistui"
+    },
+    "sections": {
+      "cliBinaries": "CLI-binaarit",
+      "providerBinaries": "Palveluntarjoajabinaarit"
+    },
+    "empty": {
+      "binaries": "Ei vielä välimuistissa olevia CLI-binaareja.",
+      "providers": "Ei vielä välimuistissa olevia palveluntarjoajabinaareja."
+    },
+    "columns": {
+      "tool": "Työkalu",
+      "version": "Versio",
+      "os": "Käyttöjärjestelmä",
+      "arch": "Arkkitehtuuri",
+      "cachedAt": "Tallennettu välimuistiin",
+      "provider": "Palveluntarjoaja",
+      "hostname": "Isäntänimi",
+      "actions": "Toiminnot"
+    },
+    "warm": {
+      "heading": "Lämmitä välimuisti",
+      "hide": "Piilota",
+      "prePopulate": "Esitäytä…",
+      "help": "Esilataa binaarit ja palveluntarjoaja-alustat välimuistiin (yksi riviä kohti). Perässä olevat <code>os/arch</code>-osat ovat valinnaisia — jätä ne pois käyttääksesi määritettyjä oletusalustoja.",
+      "binariesLabel": "Binaarit",
+      "providersLabel": "Palveluntarjoajat",
+      "warm": "Lämmitä",
+      "warming": "Lämmitetään…",
+      "confirm": "Lämmitetäänkö valitut välimuistimerkinnät nyt?",
+      "errorEmpty": "Lisää vähintään yksi binaari- tai palveluntarjoajarivi lämmitettäväksi.",
+      "errorFailedStatus": "Lämmitys epäonnistui ({status})",
+      "errorFailed": "Välimuistin lämmittäminen epäonnistui",
+      "success": "Lämmitetty {succeeded}/{total} ({failed} epäonnistui)"
+    },
+    "purge": {
+      "button": "Poista",
+      "confirmBinary": "Poistetaanko {tool} {version} välimuistista? Se haetaan uudelleen ylävirrasta seuraavalla pyynnöllä.",
+      "confirmProvider": "Poistetaanko {provider} {version} palveluntarjoajavälimuistista? Se haetaan uudelleen ylävirrasta seuraavalla pyynnöllä.",
+      "successBinary": "Poistettu {count} merkintää kohteelle {tool} {version}",
+      "successProvider": "Poistettu {count} merkintää kohteelle {provider} {version}",
+      "errorStatus": "Poisto epäonnistui ({status})",
+      "error": "Poistaminen epäonnistui",
+      "errorProvider": "Palveluntarjoajan poistaminen epäonnistui",
+      "errorProviders": "Palveluntarjoajien poistaminen epäonnistui"
+    },
+    "batchPurge": {
+      "purging": "Poistetaan...",
+      "purgeSelected": "Poista valitut ({count})",
+      "confirmBinary": "Poistetaanko kaikki valitut binaarivälimuistimerkinnät? Ne haetaan uudelleen ylävirrasta seuraavalla pyynnöllä.",
+      "confirmProvider": "Poistetaanko kaikki valitut palveluntarjoajavälimuistimerkinnät? Ne haetaan uudelleen ylävirrasta seuraavalla pyynnöllä.",
+      "errorBinaryItem": "Poisto epäonnistui kohteelle {tool} {version}",
+      "errorProviderItem": "Poisto epäonnistui kohteelle {provider} {version}",
+      "successBinary": "Poistettu {count} binaarivälimuistimerkintää",
+      "successProvider": "Poistettu {count} palveluntarjoajavälimuistimerkintää"
+    }
+  },
+  "catalog": {
+    "title": "Palveluluettelo",
+    "description": "Valmistele itsepalveluinfrastruktuuria kuratoiduista moduuleista",
+    "notEnabled": "Palveluluettelo ei ole käytössä.",
+    "empty": "Ei saatavilla olevia luettelokohteita.",
+    "card": {
+      "pinned": "kiinnitetty {version}",
+      "latest": "uusin"
+    },
+    "errors": {
+      "loadItems": "Luettelokohteiden lataaminen epäonnistui"
+    }
+  },
+  "catalogDetail": {
+    "backLink": "← Luettelo",
+    "backToCatalog": "Takaisin luetteloon",
+    "fallbackTitle": "Luettelokohde",
+    "notFound": "Luettelokohdetta ei löytynyt, tai palveluluettelo ei ole käytössä.",
+    "common": {
+      "cancel": "Peruuta"
+    },
+    "info": {
+      "module": "Moduuli:",
+      "resolvedVersion": "Ratkaistu versio:",
+      "latest": "uusin",
+      "disabled": "poissa käytöstä"
+    },
+    "pending": {
+      "banner": "Kohteen <strong>{name}</strong> ajo on suunniteltu ja odottaa tarkastelua. Vahvista ottaaksesi käyttöön, tai hylkää.",
+      "working": "Työskennellään…",
+      "confirmApply": "Vahvista ja ota käyttöön",
+      "discard": "Hylkää"
+    },
+    "field": {
+      "select": "Valitse…"
+    },
+    "provision": {
+      "title": "Valmistele",
+      "workspaceName": "Työtilan nimi",
+      "workspaceNameTitle": "Vain kirjaimet, numerot, tavuviivat ja alaviivat. Alettava kirjaimella tai numerolla.",
+      "workspaceNamePlaceholder": "my-instance",
+      "agentPool": "Agenttipooli",
+      "selectPool": "Valitse pooli…",
+      "noPoolsAvailable": "Sinulla ei ole käytettävissä olevia agenttipooleja. Tarvitset kirjoitusoikeuden agenttipooliin valmistellaksesi — pyydä järjestelmänvalvojaa myöntämään se.",
+      "noPoolsAllowed": "Yksikään käytettävissäsi olevista agenttipooleista ei ole sallittu tälle luettelokohteelle. Pyydä järjestelmänvalvojaa laajentamaan kohteen sallittuja pooleja tai myöntämään sinulle pääsy johonkin niistä.",
+      "version": "Versio",
+      "latestFloat": "Uusin (liukuva)",
+      "defaultPinOption": "{version} (oletuskiinnitys)",
+      "labelsOptional": "Tunnisteet (valinnainen)",
+      "autoApplyHint": "Automaattinen käyttöönotto ottaa muutokset käyttöön ilman manuaalista tarkasteluvaihetta.",
+      "provisioning": "Valmistellaan…",
+      "submit": "Valmistele"
+    },
+    "instances": {
+      "title": "Instanssit",
+      "empty": "Tästä kohteesta ei ole vielä valmisteltu instansseja.",
+      "colName": "Nimi",
+      "colVersion": "Versio",
+      "colPool": "Pooli",
+      "colActions": "Toiminnot",
+      "reconfigure": "Määritä uudelleen",
+      "destroy": "Tuhoa",
+      "orphan": "Hylkää orvoksi…",
+      "orphanTitle": "Poista luettelotietue tuhoamatta sen infrastruktuuria (ei suositella)"
+    },
+    "reconfigure": {
+      "title": "Määritä uudelleen {name}",
+      "description": "Päivitä syötteet ja/tai versio ja aseta sitten ajo jonoon.",
+      "currentOption": "{version} (nykyinen)",
+      "queuing": "Asetetaan jonoon…",
+      "queueRun": "Aseta ajo jonoon"
+    },
+    "destroy": {
+      "title": "Tuhoa {name}",
+      "heading": "Tuhotaanko {name}?",
+      "description": "Tämä asettaa jonoon tuhoajon, joka purkaa tämän instanssin infrastruktuurin. Onnistuneen käyttöönoton yhteydessä työtila arkistoidaan. Tätä ei voi kumota.",
+      "autoApplyHint": "Automaattinen käyttöönotto purkaa välittömästi ilman tarkastelua."
+    },
+    "orphan": {
+      "title": "Hylkää orvoksi {name}",
+      "heading": "Hylätäänkö {name} orvoksi?",
+      "description": "Tämä poistaa luetteloinstanssin tietueen mutta <warn>ei</warn> tuhoa sen infrastruktuuria — valmistellut resurssit jatkavat toimintaansa, <warn>seuraamattomina ja hallitsemattomina</warn>. Tätä ei suositella. Infrastruktuurin takaisinsaamiseksi peruuta ja käytä sen sijaan <emph>Tuhoa</emph>.",
+      "confirmPrompt": "Kirjoita instanssin nimi <mono>{name}</mono> vahvistaaksesi:",
+      "orphaning": "Hylätään orvoksi…",
+      "submit": "Hylkää orvoksi ja hylkää infrastruktuuri"
+    },
+    "actions": {
+      "confirmed": "Ajo vahvistettu — otetaan käyttöön.",
+      "discarded": "Ajo hylätty.",
+      "provisioned": "Valmisteltu {name} — suunnitelma on valmis tarkasteltavaksi.",
+      "reconfigureQueued": "Uudelleenmääritys jonossa — ajo luotu.",
+      "reconfigureQueuedStatus": "Uudelleenmääritys jonossa — ajon tila on {status}.",
+      "destroyQueued": "Tuhoaminen jonossa — ajo luotu.",
+      "destroyQueuedStatus": "Tuhoaminen jonossa — ajon tila on {status}.",
+      "orphaned": "Hylätty orvoksi {name} — luettelotietue poistettu; sen infrastruktuuri jää käyntiin, seuraamattomana ja hallitsemattomana."
+    },
+    "errors": {
+      "loadItem": "Luettelokohteen lataaminen epäonnistui",
+      "confirm": "Vahvistaminen epäonnistui",
+      "confirmStatus": "Vahvistaminen epäonnistui ({status})",
+      "discard": "Hylkääminen epäonnistui",
+      "discardStatus": "Hylkääminen epäonnistui ({status})",
+      "provision": "Valmistelu epäonnistui",
+      "provisionStatus": "Valmistelu epäonnistui ({status})",
+      "reconfigure": "Uudelleenmääritys epäonnistui",
+      "reconfigureStatus": "Uudelleenmääritys epäonnistui ({status})",
+      "destroy": "Tuhoaminen epäonnistui",
+      "destroyStatus": "Tuhoaminen epäonnistui ({status})",
+      "orphan": "Orvoksi hylkääminen epäonnistui",
+      "orphanStatus": "Orvoksi hylkääminen epäonnistui ({status})"
+    }
+  },
+  "common": {
+    "connection": {
+      "reconnecting": "Yhdistetään uudelleen…"
+    },
+    "sessionExpiry": {
+      "banner": "Istunto vanhenee {minutes, plural, one {# minuutin} other {# minuutin}} kuluttua — <link>todenna uudelleen</link>"
+    },
+    "tokenExpiry": {
+      "withinDays": "{count, plural, one {# palvelutunnus} other {# palvelutunnusta}} vanhenee {days, plural, one {# päivän} other {# päivän}} kuluessa — <link>tarkastele</link>",
+      "soon": "{count, plural, one {# palvelutunnus} other {# palvelutunnusta}} vanhenee pian — <link>tarkastele</link>",
+      "dismissAria": "Hylkää tunnuksen vanhenemisvaroitus"
+    },
+    "resourceUsage": {
+      "title": "Resurssien käyttö",
+      "oomKilled": "OOM-lopetettu",
+      "killedLikelyOom": "Lopetettu (todennäköisesti OOM)",
+      "memory": "Muisti",
+      "requested": "Pyydetty {value}",
+      "limit": "Raja {value}"
+    },
+    "labelsEditor": {
+      "none": "Ei mitään",
+      "removeAria": "Poista {key}",
+      "keyPlaceholder": "avain",
+      "valuePlaceholder": "arvo",
+      "add": "Lisää"
+    },
+    "sensitiveInput": {
+      "hide": "Piilota",
+      "show": "Näytä",
+      "hideAria": "Piilota arvo",
+      "showAria": "Näytä arvo"
+    },
+    "workspacePicker": {
+      "searchPlaceholder": "Etsi työtiloja…",
+      "loading": "Ladataan…",
+      "empty": "Työtiloja ei löytynyt",
+      "adding": "Lisätään…"
+    },
+    "templateEditors": {
+      "remove": "Poista",
+      "add": "Lisää",
+      "valuePlaceholder": "arvo",
+      "name": "Nimi",
+      "url": "URL",
+      "hmacKey": "HMAC-avain (valinnainen)",
+      "hmacKeyPlaceholder": "jaettu salaisuus",
+      "stage": "Vaihe",
+      "enforcement": "Valvonta",
+      "enabled": "Käytössä",
+      "runTaskNamePlaceholder": "security-scan",
+      "runTaskUrlPlaceholder": "https://hooks.example.com/task",
+      "addRunTask": "Lisää ajotehtävä",
+      "destinationType": "Kohdetyyppi",
+      "token": "Tunnus (valinnainen)",
+      "tokenPlaceholder": "HMAC- / todennustunnus",
+      "notificationNamePlaceholder": "slack-alerts",
+      "notificationUrlPlaceholder": "https://hooks.slack.com/services/...",
+      "emailAddresses": "Sähköpostiosoitteet",
+      "emailPlaceholder": "ops@example.com",
+      "addEmail": "Lisää sähköposti",
+      "triggers": "Käynnistimet",
+      "addNotification": "Lisää ilmoitus"
+    }
+  },
+  "planSummary": {
+    "aiGenerated": "Tekoälyn luoma",
+    "heading": {
+      "planSummary": "Suunnitelman yhteenveto",
+      "failureAnalysis": "Epäonnistumisanalyysi"
+    },
+    "errors": {
+      "status": "HTTP {status}"
+    },
+    "regenerate": {
+      "label": "Luo uudelleen",
+      "queueing": "Asetetaan jonoon…",
+      "tooltip": "Aja tekoälyn yhteenveto uudelleen samoilla suunnitelman syötteillä",
+      "ariaLabel": "Luo tekoälyn yhteenveto uudelleen",
+      "confirm": "Luodaanko tekoälyanalyysi uudelleen? Tämä ajaa mallin uudelleen.",
+      "error": "Uudelleenluonti ei onnistunut: <mono>{detail}</mono>"
+    },
+    "pending": {
+      "summarisingPlan": "Tehdään yhteenvetoa suunnitelmasta…",
+      "analysingFailure": "Analysoidaan epäonnistumista…"
+    },
+    "skipped": {
+      "fallback": "Yhteenveto ohitettiin tälle ajolle."
+    },
+    "errored": {
+      "heading": "Yhteenvedon teko epäonnistui"
+    },
+    "riskFactors": {
+      "heading": "Riskitekijät",
+      "suggestedFixes": "Ehdotetut korjaukset"
+    },
+    "tokens": "{input} sisään / {output} ulos tokenia",
+    "risk": {
+      "low": "matala",
+      "medium": "keskitaso",
+      "high": "korkea",
+      "critical": "kriittinen",
+      "unknown": "tuntematon"
+    },
+    "badges": {
+      "noChanges": "Ei muutoksia",
+      "noChangesLower": "ei muutoksia",
+      "noChangesTitle": "Suunnitelma ei raportoinut resurssimuutoksia",
+      "toAdd": "{count, plural, one {# lisättävä} other {# lisättävää}}",
+      "toChange": "{count, plural, one {# muutettava} other {# muutettavaa}}",
+      "toDestroy": "{count, plural, one {# tuhottava} other {# tuhottavaa}}",
+      "toReplace": "{count, plural, one {# korvattava} other {# korvattavaa}}",
+      "toImport": "{count, plural, one {# tuotava} other {# tuotavaa}}"
+    },
+    "chat": {
+      "heading": "Jatkokysymys",
+      "sharedThreadNote": "Yksi jaettu keskustelu, näkyvissä kaikille, joilla on työtilan lukuoikeus.",
+      "placeholder": "Kysy jatkokysymys tästä suunnitelmasta… (⌘/Ctrl + Enter lähettää)",
+      "send": "Lähetä",
+      "thinking": "Ajatellaan…",
+      "you": "Sinä",
+      "assistant": "Avustaja"
+    },
+    "translatedNote": "Käännetty automaattisesti kielellesi. Auktoritatiivinen yhteenveto on alkuperäinen.",
+    "translating": "Käännetään…"
+  },
+  "runDetail": {
+    "notFound": "Ajoa ei löytynyt",
+    "runSection": "Ajon osio",
+    "workspaceFallback": "työtila",
+    "backTo": "Takaisin kohteeseen {name}",
+    "errorHeading": "Virhe",
+    "discardedHeading": "Hylätty — uudelleensuunnittelu vaaditaan",
+    "common": {
+      "yes": "Kyllä",
+      "no": "Ei"
+    },
+    "header": {
+      "title": "Ajo {id}",
+      "titleWithWorkspace": "{workspace} — ajo {id}",
+      "description": "{source}-ajo"
+    },
+    "relTime": {
+      "justNow": "juuri nyt",
+      "minutesAgo": "{count, plural, one {# minuutti sitten} other {# minuuttia sitten}}",
+      "hoursAgo": "{count, plural, one {# tunti sitten} other {# tuntia sitten}}",
+      "daysAgo": "{count, plural, one {# päivä sitten} other {# päivää sitten}}"
+    },
+    "status": {
+      "pending": "Odottaa",
+      "queued": "Jonossa",
+      "planning": "Suunnitellaan",
+      "planned": "Suunniteltu",
+      "confirmed": "Vahvistettu",
+      "applying": "Otetaan käyttöön",
+      "canceling": "Perutaan",
+      "applied": "Otettu käyttöön",
+      "errored": "Virhe",
+      "canceled": "Peruttu",
+      "discarded": "Hylätty"
+    },
+    "activity": {
+      "pending": "Valmistellaan ajoa",
+      "queued": "Odotetaan käytettävissä olevaa agenttia",
+      "planning": "Suoritetaan terraform plan",
+      "plannedConfirmable": "Odotetaan, että vahvistat ja otat käyttöön",
+      "plannedSpeculative": "Spekulatiivinen suunnitelma valmis",
+      "plannedComplete": "Suunnitelma valmis",
+      "confirmed": "Aloitetaan käyttöönottoa",
+      "applying": "Suoritetaan terraform apply",
+      "canceling": "Pysäytetään ajoa",
+      "applied": "Käyttöönotto valmis",
+      "errored": "Ajo epäonnistui",
+      "canceled": "Ajo peruttu",
+      "discarded": "Suunnitelma hylätty",
+      "elapsedTitle": "Kulunut tässä vaiheessa"
+    },
+    "badge": {
+      "destroy": "tuhoa",
+      "planOnly": "vain suunnittelu"
+    },
+    "actions": {
+      "retryShort": "Yritä uudelleen",
+      "retryFull": "Yritä ajoa uudelleen",
+      "retrying": "Yritetään uudelleen…",
+      "confirmShort": "Ota käyttöön",
+      "confirmFull": "Vahvista ja ota käyttöön",
+      "confirming": "Vahvistetaan…",
+      "discard": "Hylkää",
+      "discarding": "Hylätään…",
+      "cancelShort": "Peruuta",
+      "cancelFull": "Peruuta ajo",
+      "canceling": "Perutaan…"
+    },
+    "confirm": {
+      "apply": "Otetaanko tämä ajo käyttöön? Tämä ottaa suunnitelman käyttöön ja muuttaa infrastruktuuria.",
+      "discard": "Hylätäänkö tämä suunnitelma?",
+      "cancel": "Perutaanko tämä ajo?",
+      "retry": "Yritetäänkö tätä ajoa uudelleen?"
+    },
+    "errors": {
+      "loadRun": "Ajon lataaminen epäonnistui",
+      "action": {
+        "confirm": "Ajon vahvistaminen epäonnistui",
+        "discard": "Ajon hylkääminen epäonnistui",
+        "cancel": "Ajon peruuttaminen epäonnistui",
+        "retry": "Ajon uudelleenyritys epäonnistui"
+      }
+    },
+    "tabs": {
+      "overview": "Yleiskatsaus",
+      "ai": "Tekoäly",
+      "aiFull": "Tekoälyanalyysi",
+      "opa": "OPA",
+      "opaFull": "OPA-käytännöt",
+      "impact": "Vaikutus",
+      "impactFull": "Vaikutusgraafi",
+      "planLabel": "Suunnitelma<log>Loki</log>",
+      "applyLabel": "Käyttöönotto<log>Loki</log>",
+      "planFull": "Suunnitelmaloki",
+      "applyFull": "Käyttöönottoloki",
+      "details": "Tiedot"
+    },
+    "banner": {
+      "destroy": "Tämä on <strong>tuhoajo</strong> — kaikki hallitut resurssit tuhotaan käyttöönotettaessa.",
+      "planOnlyCli": "Tämä on <strong>vain suunnittelu</strong> -ajo, joka on aloitettu CLI:stä VCS-yhdistetyssä työtilassa. Käyttöönotto ei ole saatavilla CLI:llä ladatulle koodille — vain VCS:n hallinnoima koodi voidaan ottaa käyttöön.",
+      "moduleOverridesPrefix": "Tämä ajo käyttää <strong>moduuliohituksia</strong>",
+      "moduleOverridesFromPr": "PR:stä #{number}",
+      "moduleOverridesSuffix": "haetaan PR-haarasta julkaistun rekisteriversion sijaan."
+    },
+    "cards": {
+      "changes": "Muutokset",
+      "aiAnalysis": "Tekoälyanalyysi",
+      "policyChecks": "Käytäntötarkistukset",
+      "resources": "Resurssit"
+    },
+    "changes": {
+      "noChanges": "Ei muutoksia",
+      "planning": "Suunnitellaan…",
+      "toAdd": "lisättävää",
+      "toChange": "muutettavaa",
+      "toDestroy": "tuhottavaa",
+      "toReplace": "korvattavaa",
+      "toImport": "tuotavaa"
+    },
+    "ai": {
+      "notAvailable": "Ei saatavilla",
+      "ready": "Valmis",
+      "riskSub": "{risk} riski",
+      "generating": "Luodaan…",
+      "skipped": "Ohitettu",
+      "failed": "Epäonnistui",
+      "available": "Saatavilla"
+    },
+    "policy": {
+      "none": "Ei mitään",
+      "blocked": "Estetty",
+      "failedSub": "{count, plural, one {# epäonnistui} other {# epäonnistui}}",
+      "advisoryIssues": "Neuvoa-antavat ongelmat",
+      "passedSub": "{passed}/{total} läpäisi",
+      "passed": "Läpäisi"
+    },
+    "resources": {
+      "overLimit": "Yli rajan",
+      "oomKilled": "OOM-lopetettu",
+      "recorded": "Tallennettu",
+      "nearLimit": "Lähellä rajaa",
+      "high": "Korkea",
+      "withinLimits": "Rajojen sisällä"
+    },
+    "details": {
+      "heading": "Tiedot",
+      "executionBackend": "Suoritustausta",
+      "source": "Lähde",
+      "autoApply": "Automaattinen käyttöönotto",
+      "planOnly": "Vain suunnittelu",
+      "triggeredBy": "Käynnistänyt",
+      "created": "Luotu",
+      "commit": "Commit",
+      "branch": "Haara",
+      "prMr": "PR/MR",
+      "stateVersion": "Tilaversio",
+      "viewState": "Näytä tila",
+      "runOptions": "Ajon vaihtoehdot"
+    },
+    "timeline": {
+      "heading": "Aikajana",
+      "queued": "Jonossa",
+      "planningStarted": "Suunnittelu aloitettu",
+      "planComplete": "Suunnitelma valmis",
+      "confirmed": "Vahvistettu",
+      "applyingStarted": "Käyttöönotto aloitettu",
+      "applied": "Otettu käyttöön",
+      "errored": "Virhe",
+      "canceled": "Peruttu",
+      "discarded": "Hylätty"
+    },
+    "log": {
+      "color": "Väri",
+      "colorOnTitle": "Näytetään ANSI-värit — napsauta pelkkää tekstiä varten",
+      "colorOffTitle": "Näytetään pelkkä teksti — napsauta värejä varten",
+      "refresh": "Päivitä",
+      "refreshTitle": "Päivitä loki",
+      "copy": "Kopioi",
+      "copied": "Kopioitu!",
+      "copyTitle": "Kopioi pelkkä teksti leikepöydälle",
+      "copyAria": "Kopioi loki leikepöydälle",
+      "download": "Lataa",
+      "downloadColorTitle": "Lataa loki (ANSI-värikoodeilla)",
+      "downloadPlainTitle": "Lataa loki (pelkkä teksti)",
+      "downloadAria": "Lataa loki",
+      "follow": "Seuraa",
+      "followOnTitle": "Seurataan reaaliaikaista häntää — napsauta pysäyttääksesi",
+      "followOffTitle": "Seuraa reaaliaikaista häntää",
+      "end": "Loppu",
+      "endTitle": "Siirry lokin loppuun",
+      "planEmpty": "Suunnitelman tulostetta ei ole vielä saatavilla.",
+      "applyEmpty": "Käyttöönoton tulostetta ei ole vielä saatavilla."
+    },
+    "policyPanel": {
+      "heading": "Käytäntötarkistukset",
+      "passedCount": "{passed}/{total} läpäisi",
+      "blockedMessage": "Tämä ajo on <strong>estetty pakollisen käytäntöjoukon toimesta</strong>. Sitä ei oteta käyttöön, ennen kuin epäonnistuminen ratkaistaan tai järjestelmänvalvoja ohittaa sen.",
+      "overriding": "Ohitetaan...",
+      "overrideContinue": "Ohita ja jatka",
+      "overrideFailed": "Ohitus epäonnistui",
+      "overrideFailedStatus": "Ohitus epäonnistui ({status})",
+      "overriddenBy": "ohittanut {by}",
+      "policyPassed": "läpäisi",
+      "noDenyMessage": "Käytäntö epäonnistui tuottamatta deny-viestiä tai virhetulostetta",
+      "enforcement": {
+        "mandatory": "pakollinen",
+        "advisory": "neuvoa-antava"
+      },
+      "outcome": {
+        "passed": "läpäisi",
+        "failed": "epäonnistui",
+        "errored": "virhe"
+      }
+    }
+  },
+  "workspaceDetail": {
+    "notFound": "Työtilaa ei löytynyt",
+    "common": {
+      "enabled": "Käytössä",
+      "disabled": "Poissa käytöstä",
+      "none": "Ei mitään",
+      "default": "Oletus",
+      "never": "Ei koskaan",
+      "actions": "Toiminnot",
+      "workspaceLocked": "Työtila on lukittu"
+    },
+    "actions": {
+      "edit": "Muokkaa",
+      "cancel": "Peruuta",
+      "save": "Tallenna",
+      "saving": "Tallennetaan…",
+      "savingEllipsis": "Tallennetaan...",
+      "delete": "Poista",
+      "deleting": "Poistetaan...",
+      "add": "Lisää",
+      "adding": "Lisätään...",
+      "remove": "Poista",
+      "download": "Lataa",
+      "rollback": "Palauta",
+      "close": "Sulje",
+      "hide": "Piilota",
+      "enable": "Ota käyttöön",
+      "disable": "Poista käytöstä",
+      "creating": "Luodaan...",
+      "sending": "Lähetetään...",
+      "processing": "Käsitellään...",
+      "queuing": "Asetetaan jonoon...",
+      "loading": "Ladataan...",
+      "loadingLower": "ladataan…"
+    },
+    "header": {
+      "executionMode": "{mode}-suoritustila"
+    },
+    "tabs": {
+      "overview": "Yleiskatsaus",
+      "variables": "Muuttujat",
+      "runs": "Ajot",
+      "state": "Tila",
+      "stateGraph": "Tilagraafi",
+      "configurations": "Määritykset",
+      "notifications": "Ilmoitukset",
+      "runTasks": "Ajotehtävät",
+      "runTriggers": "Ajokäynnistimet",
+      "sharing": "Jakaminen",
+      "selectLabel": "Työtilan osio"
+    },
+    "lifecycle": {
+      "pendingDeletion": "Odottaa poistoa",
+      "pendingDeletionDefault": "Tämä työtila on merkitty poistettavaksi ja vaatii manuaalisen toimenpiteen.",
+      "archived": "Arkistoitu",
+      "archivedDefault": "Tämä työtila on arkistoitu."
+    },
+    "runQueuedBanner": {
+      "message": "Ajo asetettu jonoon onnistuneesti.",
+      "viewRun": "Näytä ajo"
+    },
+    "settings": {
+      "title": "Asetukset",
+      "saveChanges": "Tallenna muutokset",
+      "renamedNotice": "Työtila nimetty uudelleen. Päivitä <name></name>-kenttä <cloud></cloud>-lohkossasi vastaamaan."
+    },
+    "fields": {
+      "name": "Nimi",
+      "nameTitle": "Kirjaimet, numerot, tavuviivat, alaviivat. Alettava kirjaimella tai numerolla.",
+      "executionMode": "Suoritustila",
+      "execModeLocal": "Paikallinen",
+      "execModeAgent": "Agentti",
+      "autoApply": "Automaattinen käyttöönotto",
+      "cpuRequest": "CPU-pyyntö",
+      "cpuRequestTitle": "Kubernetes CPU -määrä: kokonaisia ytimiä (1, 2) tai milliytimiä (500m, 100m)",
+      "memoryRequest": "Muistipyyntö",
+      "memoryRequestTitle": "Kubernetes-muistimäärä: tavuja (1000) tai päätteellä (512Mi, 2Gi, 1Ti)",
+      "executionBackend": "Suoritustausta",
+      "version": "Versio",
+      "versionPlaceholder": "esim. 1.11 tai 1.11.5",
+      "versionTitle": "Versio muodossa X.Y tai X.Y.Z (esim. 1.11 tai 1.11.5)",
+      "terragruntEnabledAgent": "Käytössä (agenttitila)",
+      "terragruntEnabledVersion": "Käytössä (v{version})",
+      "terragruntVersionPlaceholder": "esim. 1.0",
+      "terragruntVersionTitle": "Terragrunt-versio muodossa X.Y tai X.Y.Z (esim. 1.0)",
+      "workingDirectory": "Työhakemisto",
+      "workingDirectoryPlaceholder": "esim. environments/dev",
+      "agentPool": "Agenttipooli",
+      "owner": "Omistaja",
+      "vcsConnection": "VCS-yhteys",
+      "vcsRepository": "VCS-repositorio",
+      "vcsRepositoryTitle": "Oltava HTTP- tai HTTPS-URL",
+      "vcsBranch": "VCS-haara",
+      "vcsBranchPlaceholder": "main (oletus)",
+      "vcsWorkflow": "VCS-työnkulku",
+      "vcsWorkflowMergeThenApply": "merge_then_apply (oletus — TFE / HCP -standardi)",
+      "vcsWorkflowApplyThenMerge": "apply_then_merge (Atlantis-standardi — valinnainen)",
+      "autoMerge": "Automaattinen yhdistäminen käyttöönoton jälkeen",
+      "autoMergeStrategy": "Automaattisen yhdistämisen strategia",
+      "vcsPolling": "VCS-kysely",
+      "labels": "Tunnisteet (tagit)",
+      "labelsTitle": "Työtilan tunnisteilla on kaksi tehtävää: tunnisteperustainen RBAC-vastaavuus ja \"tageina\", jotka terraform/tofu cloud '{' workspaces '{' tags = ... '}' '}' -lohkot vastaavat.",
+      "varFiles": "Muuttujatiedostot",
+      "varFilesPlaceholder": "esim. envs/dev.tfvars",
+      "triggerPrefixes": "Käynnistimen etuliitteet",
+      "triggerPrefixesHint": "Hakemistot, jotka käynnistävät ajoja. Ohittaa työhakemistosuodatuksen, kun asetettu.",
+      "triggerPrefixesPlaceholder": "esim. modules",
+      "triggerPrefixesNone": "Ei mitään (käyttää työhakemistoa)",
+      "driftIgnoreRules": "Ajautuman ohitussäännöt",
+      "driftIgnoreRulesHint": "Glob-tietoiset Terraform-osoite- ja attribuuttipolut, jotka ajautumaluokitin vaimentaa. <star></star> vastaa nollaa tai useampaa ei-<dot></dot>-merkkiä (kattaa <n></n> indeksiä); <starIdx></starIdx> vastaa mitä tahansa hakasulkeissa olevaa indeksiä. Pelkkä osoite ilman attribuuttipäätettä vaimentaa minkä tahansa muutoksen kyseiseen resurssiin — mukaan lukien tuhot. Vaikuttaa vain ajautumaan, ei tavalliseen suunnitteluun/käyttöönottoon. Katso koko kielioppi kohdasta <docs>drift-ignore-rules.md</docs>.",
+      "driftIgnoreRulesNone": "Ei mitään (jokainen suunnitelmaero lasketaan ajautumaksi)"
+    },
+    "vcsWorkflowWarning": {
+      "title": "Valtuutus delegoitu VCS-repositoriollesi.",
+      "rbac": "Kuka tahansa, joka voi yhdistää PR:n, voi ottaa käyttöön. Haaran suojaussäännöistä (vaaditut tarkastelut, tilatarkistukset, koodinomistajan hyväksyntä) tulee portti. Terrapod-roolien/-tunnisteiden RBAC<em>ei</em> koske kommenttivetoisia toimintoja tässä tilassa.",
+      "recommended": "<strong>Suositeltu:</strong> vaadi lineaarinen historia (rebase/squash ennen yhdistämistä), jotta käyttöönotettava commit on se commit, joka päätyy kohteeseen.",
+      "credit": "Kiitokset: tämä työnkulku on mallinnettu <atlantis>Atlantis</atlantis>in mukaan. Atlantis on edelleen oikea työkalu tiimeille, jotka haluavat vain PR-kommenttivetoiset käyttöönotot eivätkä alustan käyttöliittymää."
+    },
+    "vcsPolling": {
+      "error": "Virhe",
+      "ok": "OK ({time})",
+      "notPolled": "Ei vielä kyselty"
+    },
+    "lockout": {
+      "revertLabels": "Palauta tunnisteet",
+      "saveAnyway": "Tallenna silti"
+    },
+    "lock": {
+      "title": "Lukituksen tila",
+      "lockedDesc": "Tämä työtila on lukittu. Suunnitelmia tai käyttöönottoja ei voi suorittaa.",
+      "unlockedDesc": "Tämä työtila on lukitsematon ja valmis ajoihin.",
+      "lock": "Lukitse",
+      "unlock": "Poista lukitus",
+      "lockConfirm": "Lukitaanko tämä työtila?",
+      "unlockConfirm": "Poistetaanko tämän työtilan lukitus?"
+    },
+    "drift": {
+      "title": "Ajautuman tunnistus",
+      "checkInterval": "Tarkistusväli",
+      "status": "Tila",
+      "statusNoDrift": "Ei ajautumaa",
+      "statusDrifted": "Ajautunut",
+      "statusErrored": "Virhe",
+      "statusUnchecked": "Tarkistamaton",
+      "dismiss": "Hylkää",
+      "dismissing": "Hylätään…",
+      "dismissTitle": "Tyhjennä raportoitu ajautumatila. Seuraava ajoitettu tarkistus täyttää sen uudelleen todellisuudesta.",
+      "lastChecked": "Viimeksi tarkistettu",
+      "checkNow": "Tarkista nyt",
+      "checkNowTitle": "Aseta jonoon vain suunnittelu -ajo ajautuman tarkistamiseksi",
+      "checkNowTitleDisabled": "Ota ajautuman tunnistus ensin käyttöön"
+    },
+    "intervals": {
+      "disabled": "Poissa käytöstä",
+      "1hour": "1 tunti",
+      "4hours": "4 tuntia",
+      "12hours": "12 tuntia",
+      "24hours": "24 tuntia",
+      "48hours": "48 tuntia",
+      "3days": "3 päivää",
+      "7days": "7 päivää"
+    },
+    "planExpiry": {
+      "title": "Suunnitelman vanheneminen",
+      "description": "Hylkää vahvistamaton suunnitelma automaattisesti, kun se on tätä vanhempi, jotta vanhentunutta suunnitelmaa ei voi ottaa käyttöön muuttunutta maailmaa vastaan. Oletuksena pois päältä; suunnitelma on tällöin ajettava uudelleen. (Koskee vain käyttöönottokykyisiä ajoja.)",
+      "expireAfter": "Vanhene jälkeen"
+    },
+    "aiSummary": {
+      "title": "Tekoälyn suunnitelmayhteenveto",
+      "description": "Automaattinen LLM:n luoma muutosyhteenveto, riskiarvio ja epäonnistumisanalyysi jokaisesta tämän työtilan suunnitteluvaiheen tuloksesta.",
+      "mode": "Tila",
+      "modeDefault": "Noudata käyttöönoton oletusta",
+      "modeEnabled": "Tee aina yhteenveto",
+      "modeDisabled": "Älä koskaan tee yhteenvetoa",
+      "contextLabel": "Työtilan konteksti",
+      "contextLabelSuffix": "(valinnainen, lisäävä)",
+      "contextPlaceholder": "Faktat, jotka tekoälyn tulisi tietää nimenomaan tästä työtilasta. Esim. 'Toimii palvelun X holvin edustana — KMS-avaimen tuhoaminen aiheuttaa globaalin katkoksen.'",
+      "noContext": "Työtilan kontekstia ei ole asetettu.",
+      "contextHint": "Lisätään käyttöönottolaajuisen kontekstin päälle. Enintään 4000 merkkiä."
+    },
+    "slack": {
+      "title": "Slack-ilmoitukset",
+      "description": "Ota tämä työtila mukaan Slack-ajoilmoituksiin — hyväksyntäpyynnöt, käyttöönotot, virheet ja ajautuma. Jätä kanava tyhjäksi, niin tämä työtila pysyy hiljaa (ei ole käyttöönottolaajuista jakelua). Vaatii, että järjestelmänvalvoja on ottanut Slack-sovelluksen käyttöön.",
+      "channel": "Kanava",
+      "channelPlaceholder": "#deploys tai kanavan ID (esim. C0123ABCD)",
+      "notSet": "Ei asetettu — hiljainen.",
+      "hint": "Slack-sovelluksen on jo oltava kanavan jäsen."
+    },
+    "delete": {
+      "title": "Poista työtila",
+      "description": "Poista pysyvästi tämä työtila ja kaikki siihen liittyvä tila, muuttujat ja ajot.",
+      "confirm": "Vahvista poisto"
+    },
+    "variables": {
+      "addVariable": "Lisää muuttuja",
+      "key": "Avain",
+      "value": "Arvo",
+      "category": "Kategoria",
+      "categoryEnv": "Ympäristö",
+      "sensitive": "Arkaluonteinen",
+      "empty": "Tälle työtilalle ei ole määritetty muuttujia.",
+      "emptyValue": "tyhjä",
+      "enterNewValue": "Syötä uusi arvo",
+      "deleteConfirm": "Poistetaanko muuttuja \"{key}\"?"
+    },
+    "runs": {
+      "options": "Vaihtoehdot",
+      "hideOptions": "Piilota vaihtoehdot",
+      "queueDestroy": "Aseta tuhoaminen jonoon",
+      "queueDestroyTitle": "Aseta tuhosuunnitelma jonoon",
+      "destroyAllConfirm": "Tuhotaanko kaikki resurssit?",
+      "confirmDestroy": "Vahvista tuhoaminen",
+      "queuePlan": "Aseta suunnitelma jonoon",
+      "queueRun": "Aseta ajo jonoon",
+      "queuePlanConfirm": "Asetetaanko spekulatiivinen suunnitelma jonoon tälle työtilalle?",
+      "queueApplyConfirm": "Asetetaanko suunnittelu- + käyttöönottoajo jonoon? Tämä voi muuttaa infrastruktuuria.",
+      "planOptions": "Suunnitelman vaihtoehdot",
+      "targetResources": "Kohderesurssit",
+      "replaceResources": "Korvaa resurssit",
+      "commaSeparated": "(pilkuin eroteltuna)",
+      "planOnly": "Vain suunnittelu",
+      "refreshOnly": "Vain päivitys",
+      "skipRefresh": "Ohita päivitys",
+      "allowEmptyApply": "Salli tyhjä käyttöönotto",
+      "vcsRef": "VCS-viite",
+      "branch": "Haara",
+      "tag": "Tagi",
+      "defaultBranch": "Oletus ({branch})",
+      "nonDefaultRefNote": "Ei-oletusviite valittu — ajo on vain suunnittelu",
+      "empty": "Ei vielä ajoja tälle työtilalle.",
+      "runId": "Ajon ID",
+      "status": "Tila",
+      "type": "Tyyppi",
+      "changes": "Muutokset",
+      "source": "Lähde",
+      "triggeredBy": "Käynnistänyt",
+      "created": "Luotu",
+      "needsConfirm": "vaatii vahvistuksen",
+      "typeDestroy": "tuhoa",
+      "typePlanOnly": "vain suunnittelu",
+      "typePlanApply": "suunnittelu + käyttöönotto",
+      "sourceModuleTest": "moduulitesti",
+      "sourceModulePublish": "moduulijulkaisu"
+    },
+    "state": {
+      "deleteConfirm": "Poistetaanko tilaversio #{serial}? Tätä ei voi kumota.",
+      "rollbackConfirm": "Palautetaanko tilaversioon #{serial}? Uusi versio luodaan samalla sisällöllä.",
+      "confirmDelete": "Vahvista poisto",
+      "confirmRollback": "Vahvista palautus",
+      "uploadState": "Lataa tila",
+      "empty": "Ei vielä tilaversioita tälle työtilalle.",
+      "serial": "Sarjanumero",
+      "createdBy": "Luoja",
+      "run": "Ajo",
+      "size": "Koko",
+      "created": "Luotu",
+      "runner": "runner",
+      "latest": "uusin"
+    },
+    "configurations": {
+      "description": "Ladatut lähdearkistot tälle työtilalle, uusimmat ensin. Valitse kaksi riviä vertailua varten.",
+      "selectedCount": "{count}/2 valittu",
+      "compare": "Vertaa",
+      "comparing": "Vertaillaan…",
+      "empty": "Ei vielä määritysversioita. Ne näkyvät tässä heti, kun `terraform plan` lataa tai VCS-työntö käynnistää ajon.",
+      "id": "ID",
+      "source": "Lähde",
+      "status": "Tila",
+      "created": "Luotu",
+      "current": "nykyinen",
+      "selectForCompare": "Valitse {id} vertailua varten",
+      "compareLabel": "Vertaa",
+      "diff": "Ero",
+      "filesChanged": "{count} tiedostoa muuttunut",
+      "oversized": "Ohitettu {count, plural, one {# ylisuuri tiedosto} other {# ylisuurta tiedostoa}}: {files}",
+      "noDiff": "Ei sisältöeroja näiden versioiden välillä.",
+      "binaryChanged": "Binaaritiedosto muuttunut — eroa ei näytetä.",
+      "diffType": {
+        "added": "lisätty",
+        "removed": "poistettu",
+        "modified": "muokattu",
+        "binary-changed": "binaari"
+      }
+    },
+    "notifications": {
+      "addNotification": "Lisää ilmoitus",
+      "name": "Nimi",
+      "namePlaceholder": "Käyttöönottoilmoitukset",
+      "destinationType": "Kohdetyyppi",
+      "typeGeneric": "Yleinen webhook",
+      "typeEmail": "Sähköposti",
+      "url": "URL",
+      "hmacToken": "HMAC-tunnus (valinnainen)",
+      "signingSecret": "Allekirjoitussalaisuus",
+      "emailAddresses": "Sähköpostiosoitteet (pilkuin eroteltuna)",
+      "triggerEvents": "Käynnistystapahtumat",
+      "createNotification": "Luo ilmoitus",
+      "empty": "Ei ilmoitusmäärityksiä tälle työtilalle.",
+      "ok": "OK",
+      "err": "Virhe {status}",
+      "fail": "EPÄONNISTUI",
+      "http": "HTTP {status}",
+      "verify": "Vahvista",
+      "history": "Historia",
+      "deliveryHistory": "Toimitushistoria",
+      "enableConfirm": "Otetaanko tämä ilmoitus käyttöön?",
+      "disableConfirm": "Poistetaanko tämä ilmoitus käytöstä?",
+      "deleteConfirm": "Poistetaanko ilmoitus \"{name}\"?"
+    },
+    "runTasks": {
+      "addRunTask": "Lisää ajotehtävä",
+      "name": "Nimi",
+      "namePlaceholder": "OPA-käytäntötarkistus",
+      "webhookUrl": "Webhookin URL",
+      "stage": "Vaihe",
+      "enforcementLevel": "Valvontataso",
+      "hmacKey": "HMAC-avain (valinnainen)",
+      "hmacKeyPlaceholder": "Allekirjoitussalaisuus webhookin vahvistamista varten",
+      "createRunTask": "Luo ajotehtävä",
+      "empty": "Ei määritettyjä ajotehtäviä tälle työtilalle.",
+      "enableConfirm": "Otetaanko tämä ajotehtävä käyttöön?",
+      "disableConfirm": "Poistetaanko tämä ajotehtävä käytöstä?",
+      "deleteConfirm": "Poistetaanko ajotehtävä \"{name}\"?"
+    },
+    "runTriggers": {
+      "title": "Ajokäynnistimet",
+      "description": "Kun lähdetyötila suorittaa käyttöönoton loppuun, alavirran työtilat saavat automaattisesti uuden ajon jonoon. Enintään 20 lähdetyötilaa kohdetta kohti.",
+      "inboundHeading": "Lähdetyötilat, jotka käynnistävät ajoja täällä",
+      "inboundEmpty": "Yksikään lähdetyötila ei käynnistä ajoja tässä työtilassa.",
+      "pickerPlaceholder": "Etsi lähteeksi lisättäviä työtiloja…",
+      "outboundHeading": "Kohdetyötilat, joita tämä työtila käynnistää",
+      "outboundEmpty": "Tämä työtila ei käynnistä ajoja missään muussa työtilassa.",
+      "destinationNote": "(kohde; poista sieltä)",
+      "removeConfirm": "Poistetaanko tämä ajokäynnistin?"
+    },
+    "sharing": {
+      "title": "Etätilan jakaminen",
+      "description": "Tuottajan hallitsema sallittujen luettelo työtilojen väliselle <code></code>. Tiladata sisältää salaisuuksia — myönnä harkiten. <docs>Dokumentaatio</docs>",
+      "outboundHeading": "Työtilat, joilla on valtuutus lukea tämän työtilan tilaa",
+      "outboundEmpty": "Tämän työtilan tilaa ei ole jaettu minkään muun työtilan kanssa.",
+      "grantedBy": "myöntänyt {by}",
+      "revoke": "Peruuta",
+      "revokeConfirm": "Poistetaanko tämä etätilan jakaminen? Kuluttaja menettää pääsyn tähän tilaan.",
+      "pickerPlaceholder": "Etsi kuluttajaksi valtuutettavia työtiloja…",
+      "inboundHeading": "Työtilat, joiden tilaa tämä työtila on valtuutettu lukemaan",
+      "inboundEmpty": "Tätä työtilaa ei ole valtuutettu lukemaan minkään muun työtilan tilaa terraform_remote_state-toiminnon kautta.",
+      "producerNote": "(tuottaja; peruuta sieltä)"
+    },
+    "runMessages": {
+      "manualDriftCheck": "Manuaalinen ajautumatarkistus käyttöliittymästä",
+      "queued": "Asetettu jonoon käyttöliittymästä",
+      "queuedSpeculative": "Asetettu jonoon käyttöliittymästä (spekulatiivinen)",
+      "destroyQueued": "Tuhoaminen asetettu jonoon käyttöliittymästä"
+    },
+    "errors": {
+      "loadWorkspace": "Työtilan lataaminen epäonnistui",
+      "loadRuns": "Ajojen lataaminen epäonnistui",
+      "loadVariables": "Muuttujien lataaminen epäonnistui",
+      "loadStateVersions": "Tilaversioiden lataaminen epäonnistui",
+      "loadConfigurations": "Määritysversioiden lataaminen epäonnistui",
+      "loadNotifications": "Ilmoitusten lataaminen epäonnistui",
+      "loadOutboundConsumers": "Lähtevien etätilakuluttajien lataaminen epäonnistui",
+      "loadInboundConsumers": "Saapuvien etätilakuluttajien lataaminen epäonnistui",
+      "loadConsumers": "Etätilakuluttajien lataaminen epäonnistui",
+      "loadInboundTriggers": "Saapuvien ajokäynnistimien lataaminen epäonnistui",
+      "loadOutboundTriggers": "Lähtevien ajokäynnistimien lataaminen epäonnistui",
+      "loadTriggers": "Ajokäynnistimien lataaminen epäonnistui",
+      "loadRunTasks": "Ajotehtävien lataaminen epäonnistui",
+      "downloadStateFile": "Tilatiedoston lataaminen epäonnistui",
+      "downloadFailed": "Lataus epäonnistui",
+      "downloadFailedStatus": "Lataus epäonnistui ({status})",
+      "downloadTicketMissingUrl": "Lataustunnisteen vastauksesta puuttuu URL",
+      "diffFailed": "Ero epäonnistui",
+      "diffFailedStatus": "Ero epäonnistui ({status})",
+      "authorizeConsumer": "Kuluttajan valtuuttaminen epäonnistui",
+      "revoke": "Peruuttaminen epäonnistui",
+      "revokeConsumer": "Kuluttajan peruuttaminen epäonnistui",
+      "addTrigger": "Ajokäynnistimen lisääminen epäonnistui",
+      "removeTrigger": "Ajokäynnistimen poistaminen epäonnistui",
+      "createRunTask": "Ajotehtävän luominen epäonnistui",
+      "createRunTaskStatus": "Ajotehtävän luominen epäonnistui ({status})",
+      "update": "Päivittäminen epäonnistui",
+      "toggleRunTask": "Ajotehtävän vaihtaminen epäonnistui",
+      "delete": "Poistaminen epäonnistui",
+      "deleteRunTask": "Ajotehtävän poistaminen epäonnistui",
+      "labelLockout": "Tämä tunnistemuutos vähentäisi pääsyäsi.",
+      "updateWorkspace": "Työtilan päivittäminen epäonnistui",
+      "lockWorkspace": "Työtilan lukitseminen epäonnistui",
+      "unlockWorkspace": "Työtilan lukituksen poistaminen epäonnistui",
+      "updateAiSummary": "Tekoälyn yhteenvetoasetusten päivittäminen epäonnistui",
+      "updateSlackChannel": "Slack-kanavan päivittäminen epäonnistui",
+      "updateDriftSettings": "Ajautuma-asetusten päivittäminen epäonnistui",
+      "updateDriftInterval": "Ajautumavälin päivittäminen epäonnistui",
+      "updatePlanExpiry": "Suunnitelman vanhenemisen päivittäminen epäonnistui",
+      "queueDriftCheck": "Ajautumatarkistuksen asettaminen jonoon epäonnistui",
+      "queueDriftCheckStatus": "Ajautumatarkistuksen asettaminen jonoon epäonnistui ({status})",
+      "dismissDrift": "Ajautuman hylkääminen epäonnistui",
+      "dismissDriftStatus": "Ajautuman hylkääminen epäonnistui ({status})",
+      "deleteWorkspace": "Työtilan poistaminen epäonnistui",
+      "addVariable": "Muuttujan lisääminen epäonnistui",
+      "addVariableStatus": "Muuttujan lisääminen epäonnistui ({status})",
+      "deleteVariable": "Muuttujan poistaminen epäonnistui",
+      "updateVariable": "Muuttujan päivittäminen epäonnistui",
+      "queuePlan": "Suunnitelman asettaminen jonoon epäonnistui",
+      "queuePlanStatus": "Suunnitelman asettaminen jonoon epäonnistui ({status})",
+      "queueDestroy": "Tuhoamisen asettaminen jonoon epäonnistui",
+      "queueDestroyStatus": "Tuhoamisen asettaminen jonoon epäonnistui ({status})",
+      "createNotification": "Ilmoituksen luominen epäonnistui",
+      "createNotificationStatus": "Ilmoituksen luominen epäonnistui ({status})",
+      "toggleNotification": "Ilmoituksen vaihtaminen epäonnistui",
+      "deleteNotification": "Ilmoituksen poistaminen epäonnistui",
+      "verificationFailed": "Vahvistus epäonnistui",
+      "verificationDeliveryFailed": "Vahvistuksen toimitus epäonnistui: {detail}",
+      "unknownError": "Tuntematon virhe",
+      "failed": "Epäonnistui",
+      "deleteStateVersion": "Tilaversion poistaminen epäonnistui",
+      "rollbackStateVersion": "Tilaversion palauttaminen epäonnistui",
+      "stateActionFailed": "Tilatoiminto epäonnistui",
+      "uploadState": "Tilan lataaminen epäonnistui",
+      "uploadStateFile": "Tilatiedoston lataaminen epäonnistui"
+    }
+  },
+  "graphs": {
+    "stateTab": {
+      "loadError": "Tilagraafin lataaminen epäonnistui.",
+      "emptyState": "Ei vielä tilaa — aja suunnitelma ja käyttöönotto tai lataa tila, niin tämä graafi täyttyy.",
+      "stateVersionLabel": "Tilaversio",
+      "currentSuffix": "(nykyinen)",
+      "colorByLabel": "Väritä perusteella",
+      "viewGraph": "Graafi",
+      "viewTable": "Taulukko",
+      "resourceCount": "{count, plural, one {# resurssi} other {# resurssia}}",
+      "dependencyCount": "{count, plural, one {# riippuvuus} other {# riippuvuutta}}",
+      "truncated": "Näytetään ensimmäiset {shown}/{total} resurssia — graafi on rajattu luettavuuden vuoksi.",
+      "colResource": "Resurssi",
+      "colType": "Tyyppi",
+      "colMode": "Tila",
+      "colModule": "Moduuli",
+      "colDependedOnBy": "Riippuvat kohteesta",
+      "rootModule": "(juuri)"
+    },
+    "impact": {
+      "notAvailable": "Vaikutusgraafi ei ole saatavilla tälle ajolle.",
+      "title": "Vaikutusgraafi",
+      "subtitle": "suunnitelma, {count, plural, one {# resurssi} other {# resurssia}}",
+      "hint": "Jokainen pallo on resurssi; jokainen nuoli osoittaa siihen, mistä se riippuu. Napsauta solmua → sen transitiivinen <b>vaikutus</b> (kaikki alavirrassa) syttyy.",
+      "downstreamAffected": "alavirrassa vaikuttunut",
+      "action": {
+        "create": "luo",
+        "update": "päivitä",
+        "replace": "korvaa",
+        "destroy": "tuhoa",
+        "unchanged": "muuttumaton"
+      }
+    },
+    "estate": {
+      "navHint": "Vedä pyörittääksesi · vieritä zoomataksesi · oikea-vedä panoroidaksesi · <em>napsauta solmua kiertääksesi sen ympärillä</em>"
+    },
+    "state3d": {
+      "title": "Tilagraafi",
+      "hint": "Jokainen pallo on resurssi; jokainen nuoli osoittaa siihen, mistä se riippuu. Napsauta solmua → resurssit, jotka transitiivisesti <b>riippuvat siitä</b>, syttyvät.",
+      "dataSource": "tietolähde",
+      "managed": "hallittu",
+      "dependOnThis": "riippuvat tästä"
+    },
+    "resource3d": {
+      "resetView": "Nollaa näkymä",
+      "clear": "Tyhjennä",
+      "key": "Selite",
+      "resources": "Resurssit",
+      "hideKey": "Piilota selite",
+      "hideResources": "Piilota resurssit",
+      "resourcesCount": "Resurssit ({count})",
+      "filterPlaceholder": "Suodata resursseja…",
+      "navHint": "Vedä pyörittääksesi · vieritä zoomataksesi · oikea-vedä panoroidaksesi · <em>napsauta resurssia kiertääksesi sen ympärillä</em>"
+    }
+  },
+  "execHookDetail": {
+    "backLink": "Takaisin suorituskoukkuihin",
+    "defaultDescription": "Suorituskoukku",
+    "notFound": "Suorituskoukkua ei löytynyt",
+    "scriptEmpty": "(tyhjä)",
+    "tabs": {
+      "settings": "Asetukset",
+      "workspaces": "Työtilat"
+    },
+    "common": {
+      "yes": "Kyllä",
+      "no": "Ei"
+    },
+    "actions": {
+      "edit": "Muokkaa",
+      "cancel": "Peruuta",
+      "save": "Tallenna",
+      "saving": "Tallennetaan...",
+      "delete": "Poista",
+      "deleting": "Poistetaan...",
+      "confirmDelete": "Vahvista poisto",
+      "add": "Lisää",
+      "adding": "Lisätään...",
+      "remove": "Poista"
+    },
+    "settings": {
+      "heading": "Asetukset"
+    },
+    "fields": {
+      "name": "Nimi",
+      "description": "Kuvaus",
+      "hookPoint": "Koukkukohta",
+      "priority": "Prioriteetti",
+      "enabled": "Käytössä",
+      "script": "Skripti (<code>/bin/sh -c</code>)"
+    },
+    "delete": {
+      "heading": "Poista suorituskoukku",
+      "description": "Poista pysyvästi tämä koukku ja poista se kaikista työtiloista."
+    },
+    "workspaces": {
+      "scopeNote": "Tämä koukku suoritetaan vain alla liitetyissä työtiloissa. Globaalia laajuutta ei ole.",
+      "associate": "Liitä työtila",
+      "workspaceLabel": "Työtila",
+      "selectPlaceholder": "Valitse työtila...",
+      "empty": "Ei tähän koukkuun liitettyjä työtiloja.",
+      "colWorkspace": "Työtila",
+      "colActions": "Toiminnot"
+    },
+    "confirm": {
+      "removeWorkspace": "Poistetaanko tämä työtila koukusta? Koukku ei enää suoritu sille."
+    },
+    "success": {
+      "updated": "Suorituskoukku päivitetty",
+      "workspaceAssociated": "Työtila liitetty",
+      "workspaceRemoved": "Työtila poistettu"
+    },
+    "errors": {
+      "load": "Suorituskoukun lataaminen epäonnistui",
+      "update": "Suorituskoukun päivittäminen epäonnistui",
+      "delete": "Suorituskoukun poistaminen epäonnistui",
+      "addWorkspace": "Työtilan lisääminen epäonnistui",
+      "removeWorkspace": "Työtilan poistaminen epäonnistui"
+    }
+  },
+  "policySetDetail": {
+    "backLink": "Käytäntöjoukot",
+    "notFound": "Ei löytynyt",
+    "unknown": "tuntematon",
+    "subtitle": "OPA-käytäntöjoukko · luonut {createdBy}",
+    "settings": {
+      "heading": "Asetukset"
+    },
+    "fields": {
+      "description": "Kuvaus",
+      "enforcement": "Valvonta",
+      "enabled": "Käytössä",
+      "globalScope": "Globaali (jokainen työtila)"
+    },
+    "enforcement": {
+      "advisory": "Neuvoa-antava (varoita)",
+      "mandatory": "Pakollinen (estä käyttöönotto)"
+    },
+    "scope": {
+      "allowLabels": "Salli tunnisteet (avain: v1, v2)",
+      "allowLabelsPlaceholder": "env: prod, staging",
+      "allowNames": "Salli nimet (yksi riviä kohti)",
+      "denyLabels": "Estä tunnisteet (avain: v1, v2)",
+      "denyNames": "Estä nimet (yksi riviä kohti)"
+    },
+    "vcs": {
+      "heading": "VCS-määritys",
+      "repoUrl": "Repositorion URL",
+      "branch": "Haara",
+      "branchPlaceholder": "main (oletus)",
+      "policyPath": "Käytäntöpolku"
+    },
+    "vcsBanner": {
+      "syncedFrom": "Käytännöt synkronoitu lähteestä",
+      "at": "sijainnissa",
+      "lastSynced": "Viimeksi synkronoitu {time}",
+      "commit": "(commit {sha})",
+      "syncError": "Synkronointivirhe: {error}"
+    },
+    "policies": {
+      "heading": "Käytännöt ({count})",
+      "vcsManaged": "Repositorion hallinnoima — työnnä muutokset PR:n kautta",
+      "empty": "Ei vielä käytäntöjä tässä joukossa."
+    },
+    "addPolicy": {
+      "namePlaceholder": "Käytännön nimi",
+      "descPlaceholder": "Kuvaus (valinnainen)",
+      "regoHint": "Rego v1. Sen on määriteltävä <code>package terrapod</code> ja ilmaistava rikkomukset <code>deny</code>-joukon kautta. Suunnitelma on <code>input</code>; Terrapod-konteksti on <code>data.terrapod_context</code>."
+    },
+    "actions": {
+      "saving": "Tallennetaan...",
+      "saveSettings": "Tallenna asetukset",
+      "syncNow": "Synkronoi nyt",
+      "cancel": "Peruuta",
+      "addPolicy": "Lisää käytäntö",
+      "deleteSet": "Poista joukko",
+      "validatingRego": "Vahvistetaan Regoa...",
+      "delete": "Poista",
+      "savePolicy": "Tallenna käytäntö"
+    },
+    "confirm": {
+      "deleteSet": "Poistetaanko tämä käytäntöjoukko ja kaikki sen käytännöt? Tallennetut ajoarvioinnit säilytetään.",
+      "deletePolicy": "Poistetaanko käytäntö \"{name}\"?"
+    },
+    "errors": {
+      "load": "Käytäntöjoukon lataaminen epäonnistui",
+      "save": "Käytäntöjoukon tallentaminen epäonnistui",
+      "saveStatus": "Tallentaminen epäonnistui ({status})",
+      "delete": "Käytäntöjoukon poistaminen epäonnistui",
+      "deleteStatus": "Poistaminen epäonnistui ({status})",
+      "addPolicy": "Käytännön lisääminen epäonnistui",
+      "addPolicyStatus": "Käytännön lisääminen epäonnistui ({status})",
+      "savePolicy": "Käytännön tallentaminen epäonnistui",
+      "savePolicyStatus": "Käytännön tallentaminen epäonnistui ({status})",
+      "deletePolicy": "Käytännön poistaminen epäonnistui",
+      "deletePolicyStatus": "Poistaminen epäonnistui ({status})"
+    }
+  },
+  "slackLink": {
+    "title": "Yhdistä Slack Terrapodiin",
+    "loading": "Ladataan…",
+    "checking": "Tarkistetaan linkkiäsi…",
+    "linking": "Linkitetään Slack-tiliäsi…",
+    "unknown": "tuntematon",
+    "confirm": {
+      "prompt": "Linkitetäänkö tämä Slack-tili <em>sinun</em> Terrapod-identiteettiisi? Jokainen tuleva Slack-toiminto (hyväksy/hylkää) suoritetaan tänä Terrapod-käyttäjänä hänen oikeuksillaan.",
+      "slackUser": "Slack-käyttäjä",
+      "slackTeam": "Slack-tiimi",
+      "terrapodAccount": "Terrapod-tili",
+      "warning": "Jatka vain, jos aloitit tämän linkin juuri itse Slackista. Jos et, sulje tämä välilehti äläkä linkitä — tämä sitoo yllä olevan Slack-tilin <em>sinun</em> Terrapod-identiteettiisi.",
+      "button": "Vahvista ja linkitä"
+    },
+    "success": {
+      "message": "Slack-tilisi on nyt linkitetty Terrapodiin.",
+      "linkedAs": "Linkitetty muodossa <em>{email}</em>. Voit sulkea tämän välilehden ja palata Slackiin."
+    },
+    "errors": {
+      "missingLink": "Puuttuva tai virheellinen linkki. Aloita uudelleen Terrapod-linkkikomennolla Slackissa.",
+      "invalidLink": "Tämä linkki on virheellinen, vanhentunut tai jo käytetty. Aloita linkitys uudelleen Slackista.",
+      "linkingFailed": "Linkitys epäonnistui."
+    }
+  },
+  "cliComplete": {
+    "loading": "Ladataan...",
+    "completing": "Viimeistellään todennusta...",
+    "invalid": {
+      "title": "Virheellinen pyyntö",
+      "description": "Vaadittuja parametreja puuttuu."
+    },
+    "success": {
+      "title": "Kirjautuminen onnistui",
+      "complete": "API-tunnus luotu. Voit sulkea tämän välilehden."
+    },
+    "fallback": {
+      "description": "CLI:hin ei saatu yhteyttä automaattisesti.",
+      "button": "Napsauta tähän viimeistelläksesi manuaalisesti"
+    },
+    "timeout": {
+      "description": "CLI ei ehkä ole viimeistellyt tunnuksen vaihtoa. Tarkista päätteesi."
+    }
+  },
+  "apiDocs": {
+    "view": "Näkymä:",
+    "redocTitle": "ReDoc API -dokumentaatio"
+  }
+}

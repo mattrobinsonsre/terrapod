@@ -15,6 +15,7 @@
 import { Suspense, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { Layers, Server, Package, Blocks, ChevronRight } from 'lucide-react'
 
 import NavBar from '@/components/nav-bar'
@@ -30,11 +31,14 @@ import { apiFetch } from '@/lib/api'
 const ENTITY_TYPES = ['workspaces', 'agent-pools', 'registry-modules', 'registry-providers'] as const
 type EntityType = (typeof ENTITY_TYPES)[number]
 
-const ENTITY_LABELS: Record<EntityType, string> = {
-  'workspaces': 'Workspaces',
-  'agent-pools': 'Agent pools',
-  'registry-modules': 'Modules',
-  'registry-providers': 'Providers',
+// Translation keys (under the `labels` namespace) for each entity type's
+// display name. Resolved via `useTranslations` at the call sites — module
+// scope can't call the hook.
+const ENTITY_LABEL_KEYS: Record<EntityType, string> = {
+  'workspaces': 'entity.workspaces',
+  'agent-pools': 'entity.agentPools',
+  'registry-modules': 'entity.modules',
+  'registry-providers': 'entity.providers',
 }
 
 const ENTITY_ICONS: Record<EntityType, typeof Layers> = {
@@ -105,6 +109,7 @@ function LabelsBrowserInner() {
 // ── View 1: list distinct label keys ─────────────────────────────────
 
 function KeysView() {
+  const t = useTranslations('labels')
   const [keys, setKeys] = useState<KeyEntry[] | null>(null)
   const [error, setError] = useState('')
 
@@ -112,19 +117,19 @@ function KeysView() {
     let alive = true
     apiFetch('/api/terrapod/v1/labels')
       .then(async r => {
-        if (!r.ok) throw new Error(`Failed to load labels (${r.status})`)
+        if (!r.ok) throw new Error(t('loadKeysFailed', { status: r.status }))
         return r.json()
       })
       .then(d => alive && setKeys(d.data ?? []))
       .catch(e => alive && setError(e instanceof Error ? e.message : String(e)))
     return () => { alive = false }
-  }, [])
+  }, [t])
 
   if (error) return <ErrorBanner message={error} />
   if (keys === null) return <LoadingSpinner />
   if (keys.length === 0) {
     return (
-      <EmptyState message="No labels in use yet. Label any workspace, agent pool, registry module, or registry provider to start grouping things here." />
+      <EmptyState message={t('emptyKeys')} />
     )
   }
 
@@ -133,10 +138,10 @@ function KeysView() {
       <table className="w-full text-sm">
         <thead className="bg-slate-900/50 text-slate-400">
           <tr>
-            <th className="px-4 py-3 text-left font-medium">Label key</th>
-            <th className="px-4 py-3 text-right font-medium">Distinct values</th>
-            {ENTITY_TYPES.map(t => (
-              <th key={t} className="px-4 py-3 text-right font-medium">{ENTITY_LABELS[t]}</th>
+            <th className="px-4 py-3 text-left font-medium">{t('columns.labelKey')}</th>
+            <th className="px-4 py-3 text-right font-medium">{t('columns.distinctValues')}</th>
+            {ENTITY_TYPES.map(type => (
+              <th key={type} className="px-4 py-3 text-right font-medium">{t(ENTITY_LABEL_KEYS[type])}</th>
             ))}
             <th className="w-8" aria-hidden />
           </tr>
@@ -172,6 +177,7 @@ function KeysView() {
 // ── View 2: list distinct values for a key ───────────────────────────
 
 function ValuesView({ labelKey }: { labelKey: string }) {
+  const t = useTranslations('labels')
   const [values, setValues] = useState<ValueEntry[] | null>(null)
   const [error, setError] = useState('')
 
@@ -179,32 +185,32 @@ function ValuesView({ labelKey }: { labelKey: string }) {
     let alive = true
     apiFetch(`/api/terrapod/v1/labels/${encodeURIComponent(labelKey)}`)
       .then(async r => {
-        if (!r.ok) throw new Error(`Failed to load values for ${labelKey} (${r.status})`)
+        if (!r.ok) throw new Error(t('loadValuesFailed', { key: labelKey, status: r.status }))
         return r.json()
       })
       .then(d => alive && setValues(d.data ?? []))
       .catch(e => alive && setError(e instanceof Error ? e.message : String(e)))
     return () => { alive = false }
-  }, [labelKey])
+  }, [labelKey, t])
 
   return (
     <>
-      <Breadcrumb items={[{ label: 'Labels', href: '/labels' }, { label: labelKey }]} />
+      <Breadcrumb items={[{ label: t('title'), href: '/labels' }, { label: labelKey }]} />
       {error ? (
         <ErrorBanner message={error} />
       ) : values === null ? (
         <LoadingSpinner />
       ) : values.length === 0 ? (
-        <EmptyState message={`No values for "${labelKey}". Either no readable entity carries this label, or it was removed since the last view.`} />
+        <EmptyState message={t('emptyValues', { key: labelKey })} />
       ) : (
         <div className="overflow-hidden rounded-xl border border-slate-800">
           <table className="w-full text-sm">
             <thead className="bg-slate-900/50 text-slate-400">
               <tr>
-                <th className="px-4 py-3 text-left font-medium">Value</th>
-                <th className="px-4 py-3 text-right font-medium">Total</th>
-                {ENTITY_TYPES.map(t => (
-                  <th key={t} className="px-4 py-3 text-right font-medium">{ENTITY_LABELS[t]}</th>
+                <th className="px-4 py-3 text-left font-medium">{t('columns.value')}</th>
+                <th className="px-4 py-3 text-right font-medium">{t('columns.total')}</th>
+                {ENTITY_TYPES.map(type => (
+                  <th key={type} className="px-4 py-3 text-right font-medium">{t(ENTITY_LABEL_KEYS[type])}</th>
                 ))}
                 <th className="w-8" aria-hidden />
               </tr>
@@ -242,6 +248,7 @@ function ValuesView({ labelKey }: { labelKey: string }) {
 // ── View 3: list entities tagged with a specific key=value ──────────
 
 function EntitiesView({ labelKey, labelValue }: { labelKey: string; labelValue: string }) {
+  const t = useTranslations('labels')
   const [groups, setGroups] = useState<Record<EntityType, EntityRow[]> | null>(null)
   const [error, setError] = useState('')
 
@@ -251,19 +258,19 @@ function EntitiesView({ labelKey, labelValue }: { labelKey: string; labelValue: 
       `/api/terrapod/v1/labels/${encodeURIComponent(labelKey)}/${encodeURIComponent(labelValue)}`,
     )
       .then(async r => {
-        if (!r.ok) throw new Error(`Failed to load entities (${r.status})`)
+        if (!r.ok) throw new Error(t('loadEntitiesFailed', { status: r.status }))
         return r.json()
       })
       .then(d => alive && setGroups(d.data ?? null))
       .catch(e => alive && setError(e instanceof Error ? e.message : String(e)))
     return () => { alive = false }
-  }, [labelKey, labelValue])
+  }, [labelKey, labelValue, t])
 
   return (
     <>
       <Breadcrumb
         items={[
-          { label: 'Labels', href: '/labels' },
+          { label: t('title'), href: '/labels' },
           { label: labelKey, href: `/labels?key=${encodeURIComponent(labelKey)}` },
           { label: labelValue },
         ]}
@@ -281,12 +288,12 @@ function EntitiesView({ labelKey, labelValue }: { labelKey: string; labelValue: 
               <section key={type}>
                 <h2 className="mb-2 flex items-center gap-2 text-sm font-medium text-slate-300">
                   <Icon size={14} className="text-slate-500" />
-                  {ENTITY_LABELS[type]}
+                  {t(ENTITY_LABEL_KEYS[type])}
                   <span className="text-slate-500">({rows.length})</span>
                 </h2>
                 {rows.length === 0 ? (
                   <p className="px-4 py-3 text-sm text-slate-500 italic border border-slate-800 rounded-lg">
-                    None.
+                    {t('none')}
                   </p>
                 ) : (
                   <ul className="divide-y divide-slate-800 rounded-lg border border-slate-800">
@@ -359,13 +366,14 @@ function Breadcrumb({ items }: { items: { label: string; href?: string }[] }) {
 // boundary keeps the page statically buildable.
 
 export default function LabelsPage() {
+  const t = useTranslations('labels')
   return (
     <div className="min-h-dvh bg-slate-950 text-slate-200">
       <NavBar />
       <main className="mx-auto max-w-6xl px-4 py-8">
         <PageHeader
-          title="Labels"
-          description="Browse labels in use across workspaces, agent pools, registry modules, and registry providers. Read-only — labels are edited on each entity's own page."
+          title={t('title')}
+          description={t('description')}
         />
         {/* Deprecated surface — removed from the primary nav; reachable by
             direct link only, pending removal in a future release. */}
@@ -373,22 +381,24 @@ export default function LabelsPage() {
           role="status"
           className="mb-6 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-200"
         >
-          <span className="font-semibold">Deprecated &amp; unsupported.</span>{' '}
-          The Labels browser is no longer in the main navigation and will be
-          removed in a future release. Filter by label from the{' '}
-          <Link href="/workspaces" className="underline hover:text-amber-100">
-            Workspaces
-          </Link>{' '}
-          page instead. If you rely on this page, please{' '}
-          <a
-            href="https://github.com/mattrobinsonsre/terrapod/issues/new"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="underline hover:text-amber-100"
-          >
-            open an issue
-          </a>
-          .
+          <span className="font-semibold">{t('deprecated.badge')}</span>{' '}
+          {t.rich('deprecated.body', {
+            workspacesLink: (chunks) => (
+              <Link href="/workspaces" className="underline hover:text-amber-100">
+                {chunks}
+              </Link>
+            ),
+            issueLink: (chunks) => (
+              <a
+                href="https://github.com/mattrobinsonsre/terrapod/issues/new"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline hover:text-amber-100"
+              >
+                {chunks}
+              </a>
+            ),
+          })}
         </div>
         <Suspense fallback={<LoadingSpinner />}>
           <LabelsBrowserInner />

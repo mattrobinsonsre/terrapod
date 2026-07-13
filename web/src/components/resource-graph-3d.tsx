@@ -19,6 +19,7 @@
 // next/dynamic { ssr: false } so three / three-spritetext / react-force-graph-3d
 // never touch SSR.
 import { useEffect, useMemo, useRef, useState, type ReactElement, type ReactNode } from 'react'
+import { useTranslations } from 'next-intl'
 import ForceGraph3D from 'react-force-graph-3d'
 import SpriteText from 'three-spritetext'
 import * as THREE from 'three'
@@ -265,6 +266,7 @@ export function ResourceGraph3D<T extends RGNode>({
   // downstream (blast-radius) size.
   renderDetail: (n: T, downstream: number) => ReactNode
 }) {
+  const t = useTranslations('graphs')
   const [sel, setSel] = useState<string | null>(null)
   const [radius, setRadius] = useState<Set<string>>(new Set())
   const [filter, setFilter] = useState('')
@@ -502,10 +504,10 @@ export function ResourceGraph3D<T extends RGNode>({
       {/* Always-on toolbar — small, so the graph keeps the canvas. Key + Resources
           toggle their (dismissable) overlay panels; Reset view + Clear are direct. */}
       <div className="absolute z-20 top-3 left-3 flex flex-wrap gap-1.5">
-        <ToolBtn onClick={resetView}>Reset view</ToolBtn>
-        <ToolBtn onClick={clear}>Clear</ToolBtn>
-        <ToolBtn onClick={() => setKeyOpen((v) => !v)} active={keyOpen}>Key</ToolBtn>
-        <ToolBtn onClick={() => setListOpen((v) => !v)} active={listOpen}>Resources</ToolBtn>
+        <ToolBtn onClick={resetView}>{t('resource3d.resetView')}</ToolBtn>
+        <ToolBtn onClick={clear}>{t('resource3d.clear')}</ToolBtn>
+        <ToolBtn onClick={() => setKeyOpen((v) => !v)} active={keyOpen}>{t('resource3d.key')}</ToolBtn>
+        <ToolBtn onClick={() => setListOpen((v) => !v)} active={listOpen}>{t('resource3d.resources')}</ToolBtn>
       </div>
 
       {/* Key panel (legend + title + hint) — opt-in, dismissable */}
@@ -518,7 +520,7 @@ export function ResourceGraph3D<T extends RGNode>({
             </div>
             <button
               onClick={() => setKeyOpen(false)}
-              aria-label="Hide key"
+              aria-label={t('resource3d.hideKey')}
               className="text-slate-400 hover:text-slate-100 text-lg leading-none -mt-0.5 px-1"
             >
               ×
@@ -533,10 +535,12 @@ export function ResourceGraph3D<T extends RGNode>({
       {listOpen && (
         <div className="absolute z-10 top-14 right-3 w-[min(300px,80vw)] max-h-[calc(70vh-64px)] flex flex-col gap-2 rounded-xl border border-slate-700/40 bg-slate-900/85 backdrop-blur p-3">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-xs font-semibold text-slate-200">Resources ({nodes.length})</span>
+            <span className="text-xs font-semibold text-slate-200">
+              {t('resource3d.resourcesCount', { count: nodes.length })}
+            </span>
             <button
               onClick={() => setListOpen(false)}
-              aria-label="Hide resources"
+              aria-label={t('resource3d.hideResources')}
               className="text-slate-400 hover:text-slate-100 text-lg leading-none px-1"
             >
               ×
@@ -545,7 +549,7 @@ export function ResourceGraph3D<T extends RGNode>({
           <input
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            placeholder="Filter resources…"
+            placeholder={t('resource3d.filterPlaceholder')}
             className="text-xs bg-slate-700/20 border border-slate-600/40 rounded-lg px-2.5 py-1.5 outline-none focus:border-brand-500"
           />
           <div className="overflow-y-auto flex flex-col gap-px pr-0.5">
@@ -651,8 +655,9 @@ export function ResourceGraph3D<T extends RGNode>({
           to-orbit-around-it behaviour is non-obvious, so it has to be spelled
           out here. */}
       <div className="absolute bottom-1.5 inset-x-0 text-center text-[10px] text-slate-500 pointer-events-none select-none">
-        Drag to rotate · scroll to zoom · right-drag to pan ·{' '}
-        <span className="text-slate-400">click a resource to orbit around it</span>
+        {t.rich('resource3d.navHint', {
+          em: (chunks) => <span className="text-slate-400">{chunks}</span>,
+        })}
       </div>
     </div>
   )

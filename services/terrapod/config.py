@@ -1298,6 +1298,26 @@ class AISummaryConfig(BaseModel):
             "knows the default URLs."
         ),
     )
+    summary_language: str = Field(
+        default="en",
+        description=(
+            "Deployment-wide language the AI writes summaries, failure "
+            "analyses, and chat replies in — the single authoritative "
+            "language (#767). The generated text is stored verbatim in "
+            "`plan_summaries` and delivered as-is to external channels "
+            "(Slack, PR/MR comments). When a user opens a summary in the "
+            "web UI in a different locale, it is translated on view and "
+            "cached in Redis (7-day sliding TTL), never persisted — the "
+            "stored `summary_language` copy stays canonical. A BCP-47 base "
+            "code from the UI's supported set: en (default), en-GB, cy, de, "
+            "es, fr, la. The UI's fun locales (tlh Klingon plus the en-x-* "
+            "style locales: Marklar, LOLcat, leet, Pirate, Yoda) are valid "
+            "view-time translation targets too — real languages get a "
+            "translation, the constructed ones a style transform. Only an "
+            "unrecognised locale falls back to the canonical language. There "
+            "is deliberately no per-workspace override (single-org product)."
+        ),
+    )
     max_output_tokens: int = Field(
         default=16384,
         description=(

@@ -6,6 +6,7 @@
 // phone, where heavy WebGL is a poor fit (#719).
 import { useEffect, useMemo, useState } from 'react'
 import dynamic from 'next/dynamic'
+import { useTranslations } from 'next-intl'
 import NavBar from '@/components/nav-bar'
 import { PageHeader } from '@/components/page-header'
 import { LoadingSpinner } from '@/components/loading-spinner'
@@ -42,6 +43,7 @@ function Shell({ children }: { children: React.ReactNode }) {
 }
 
 export default function EstatePage() {
+  const t = useTranslations('estate')
   const [graph, setGraph] = useState<EstateGraphData | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [groupBy, setGroupBy] = useState('none')
@@ -57,7 +59,7 @@ export default function EstatePage() {
     let cancelled = false
     apiFetch('/api/terrapod/v1/estate-graph')
       .then(async (r) => {
-        if (!r.ok) throw new Error('Failed to load the estate graph.')
+        if (!r.ok) throw new Error(t('errors.load'))
         const b = await r.json()
         if (!cancelled) setGraph(b.data.attributes as EstateGraphData)
       })
@@ -111,13 +113,13 @@ export default function EstatePage() {
   return (
     <Shell>
       <PageHeader
-        title="Estate topology"
-        description="Every workspace you can see and the modules they use, wired by run-triggers, remote-state, and module links. Group by whatever axis fits your estate — the platform enforces no labelling convention."
+        title={t('title')}
+        description={t('description')}
       />
 
       <div className="flex flex-wrap items-center gap-3 mb-4">
         <label className="text-xs text-slate-400">
-          Group by{' '}
+          {t('groupBy.label')}{' '}
           <select
             value={groupBy}
             onChange={(e) => setGroupBy(e.target.value)}
@@ -131,12 +133,13 @@ export default function EstatePage() {
           </select>
         </label>
         <div className="flex gap-1">
-          <ToggleBtn v="graph" label="Graph" />
-          <ToggleBtn v="table" label="Table" />
+          <ToggleBtn v="graph" label={t('view.graph')} />
+          <ToggleBtn v="table" label={t('view.table')} />
         </div>
         <span className="text-xs text-slate-500">
-          {graph.meta.counts.workspaces} workspaces · {graph.meta.counts.modules} modules ·{' '}
-          {graph.meta.counts.edges} dependencies
+          {t('counts.workspaces', { count: graph.meta.counts.workspaces })} ·{' '}
+          {t('counts.modules', { count: graph.meta.counts.modules })} ·{' '}
+          {t('counts.dependencies', { count: graph.meta.counts.edges })}
         </span>
       </div>
 
@@ -150,7 +153,7 @@ export default function EstatePage() {
         ))}
         <span className="flex items-center gap-1.5">
           <span className="w-2.5 h-2.5 rotate-45" style={{ background: MODULE_COLOR }} />
-          registry module
+          {t('legend.registryModule')}
         </span>
       </div>
 
@@ -168,7 +171,7 @@ export default function EstatePage() {
               {selected.kind === 'module' ? (
                 <div className="text-sm mt-1.5">
                   <b>{usedBy(selected.id)}</b>{' '}
-                  <span className="text-slate-400">workspaces use this — bumping it re-plans them all</span>
+                  <span className="text-slate-400">{t('detail.moduleImpact', { count: usedBy(selected.id) })}</span>
                 </div>
               ) : (
                 <>
@@ -178,7 +181,7 @@ export default function EstatePage() {
                   </div>
                   <div className="text-lg font-bold mt-1.5">
                     {selected.indeg}{' '}
-                    <span className="text-xs font-medium text-slate-400">depend on this</span>
+                    <span className="text-xs font-medium text-slate-400">{t('detail.dependOnThis', { count: selected.indeg })}</span>
                   </div>
                 </>
               )}
@@ -188,18 +191,18 @@ export default function EstatePage() {
       ) : (
         <div className="flex flex-col gap-6">
           <section>
-            <h2 className="text-sm font-semibold text-slate-200 mb-2">Workspaces</h2>
+            <h2 className="text-sm font-semibold text-slate-200 mb-2">{t('table.workspaces.heading')}</h2>
             <div className="overflow-x-auto rounded-xl border border-slate-800">
               <table className="w-full text-sm">
                 <thead className="bg-slate-800/50 text-slate-400 text-xs">
                   <tr>
-                    <th scope="col" className="text-left px-3 py-2">Workspace</th>
+                    <th scope="col" className="text-left px-3 py-2">{t('table.workspaces.col.workspace')}</th>
                     <th scope="col" className="text-left px-3 py-2">
-                      {groupBy === 'none' ? 'Group' : axes.find((a) => a.value === groupBy)?.label}
+                      {groupBy === 'none' ? t('table.workspaces.col.group') : axes.find((a) => a.value === groupBy)?.label}
                     </th>
-                    <th scope="col" className="text-left px-3 py-2">Agent pool</th>
-                    <th scope="col" className="text-right px-3 py-2">Depended on by</th>
-                    <th scope="col" className="text-left px-3 py-2">Modules used</th>
+                    <th scope="col" className="text-left px-3 py-2">{t('table.workspaces.col.agentPool')}</th>
+                    <th scope="col" className="text-right px-3 py-2">{t('table.workspaces.col.dependedOnBy')}</th>
+                    <th scope="col" className="text-left px-3 py-2">{t('table.workspaces.col.modulesUsed')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -212,7 +215,7 @@ export default function EstatePage() {
                       <td className="px-3 py-2 text-slate-400">{n.pool}</td>
                       <td className="px-3 py-2 text-right tabular-nums text-slate-300">{n.indeg}</td>
                       <td className="px-3 py-2 text-slate-400 text-xs">
-                        {(modulesByWs[n.id] || []).join(', ') || '—'}
+                        {(modulesByWs[n.id] || []).join(', ') || t('table.workspaces.noModules')}
                       </td>
                     </tr>
                   ))}
@@ -223,13 +226,13 @@ export default function EstatePage() {
 
           {modules.length > 0 && (
             <section>
-              <h2 className="text-sm font-semibold text-slate-200 mb-2">Modules</h2>
+              <h2 className="text-sm font-semibold text-slate-200 mb-2">{t('table.modules.heading')}</h2>
               <div className="overflow-x-auto rounded-xl border border-slate-800">
                 <table className="w-full text-sm">
                   <thead className="bg-slate-800/50 text-slate-400 text-xs">
                     <tr>
-                      <th scope="col" className="text-left px-3 py-2">Module</th>
-                      <th scope="col" className="text-right px-3 py-2">Used by (workspaces)</th>
+                      <th scope="col" className="text-left px-3 py-2">{t('table.modules.col.module')}</th>
+                      <th scope="col" className="text-right px-3 py-2">{t('table.modules.col.usedBy')}</th>
                     </tr>
                   </thead>
                   <tbody>

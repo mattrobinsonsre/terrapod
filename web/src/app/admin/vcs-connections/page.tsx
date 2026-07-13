@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import NavBar from '@/components/nav-bar'
 import { PageHeader } from '@/components/page-header'
 import { LoadingSpinner } from '@/components/loading-spinner'
@@ -13,6 +14,7 @@ import { useConfirm } from '@/lib/use-confirm'
 import { apiFetch } from '@/lib/api'
 import { useSortable } from '@/lib/use-sortable'
 import { usePollingInterval } from '@/lib/use-polling-interval'
+import { useFormat } from '@/lib/format'
 
 interface VCSConnection {
   id: string
@@ -34,6 +36,8 @@ type VCSSortKey = 'name' | 'provider' | 'server-url' | 'status' | 'created'
 
 export default function VCSConnectionsPage() {
   const router = useRouter()
+  const t = useTranslations('adminVcs')
+  const fmt = useFormat()
   const { confirmDelete } = useConfirm()
   const [connections, setConnections] = useState<VCSConnection[]>([])
   const [loading, setLoading] = useState(true)
@@ -109,11 +113,11 @@ export default function VCSConnectionsPage() {
   async function loadConnections() {
     try {
       const res = await apiFetch('/api/terrapod/v1/vcs-connections')
-      if (!res.ok) throw new Error('Failed to load VCS connections')
+      if (!res.ok) throw new Error(t('errors.load'))
       const data = await res.json()
       setConnections(data.data || [])
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load VCS connections')
+      setError(err instanceof Error ? err.message : t('errors.load'))
     } finally {
       setLoading(false)
     }
@@ -152,31 +156,34 @@ export default function VCSConnectionsPage() {
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         throw new Error(
-          data.detail || `Failed to ${editing ? 'update' : 'create'} connection (${res.status})`,
+          data.detail ||
+            (editing
+              ? t('errors.updateStatus', { status: res.status })
+              : t('errors.createStatus', { status: res.status })),
         )
       }
-      setSuccess(`VCS connection "${name}" ${editing ? 'updated' : 'created'}`)
+      setSuccess(editing ? t('success.updated', { name }) : t('success.created', { name }))
       resetForm()
       setShowCreate(false)
       await loadConnections()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save connection')
+      setError(err instanceof Error ? err.message : t('errors.save'))
     } finally {
       setCreating(false)
     }
   }
 
   async function handleDelete(id: string) {
-    if (!confirmDelete('Delete this VCS connection? Workspaces using it will lose VCS integration. This cannot be undone.')) return
+    if (!confirmDelete(t('confirmDelete'))) return
     setError('')
     setSuccess('')
     try {
       const res = await apiFetch(`/api/terrapod/v1/vcs-connections/${id}`, { method: 'DELETE' })
-      if (!res.ok) throw new Error('Failed to delete connection')
-      setSuccess('VCS connection deleted')
+      if (!res.ok) throw new Error(t('errors.delete'))
+      setSuccess(t('success.deleted'))
       await loadConnections()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete connection')
+      setError(err instanceof Error ? err.message : t('errors.delete'))
     }
   }
 
@@ -197,8 +204,8 @@ export default function VCSConnectionsPage() {
       <NavBar />
       <main className="px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto">
         <PageHeader
-          title="VCS Connections"
-          description="Manage version control system integrations"
+          title={t('title')}
+          description={t('description')}
           actions={
             <button
               onClick={() => {
@@ -207,7 +214,7 @@ export default function VCSConnectionsPage() {
               }}
               className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors btn-smoke"
             >
-              {showCreate ? 'Cancel' : 'New Connection'}
+              {showCreate ? t('actions.cancel') : t('actions.new')}
             </button>
           }
         />
@@ -221,28 +228,28 @@ export default function VCSConnectionsPage() {
           <form onSubmit={handleSubmit} className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-4 mb-6 space-y-3">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
-                <label htmlFor="vcs-name" className="block text-sm font-medium text-slate-300 mb-1">Name</label>
+                <label htmlFor="vcs-name" className="block text-sm font-medium text-slate-300 mb-1">{t('form.name')}</label>
                 <input id="vcs-name" type="text" value={name} onChange={(e) => setName(e.target.value)} required
                   pattern="[a-zA-Z0-9][a-zA-Z0-9_\-]*"
-                  title="Letters, numbers, hyphens, and underscores only. Must start with a letter or number."
+                  title={t('form.namePattern')}
                   placeholder="my-github-app"
                   className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
               </div>
               <div>
-                <label htmlFor="vcs-provider" className="block text-sm font-medium text-slate-300 mb-1">Provider</label>
+                <label htmlFor="vcs-provider" className="block text-sm font-medium text-slate-300 mb-1">{t('form.provider')}</label>
                 <select id="vcs-provider" value={provider} disabled={editId !== null}
                   onChange={(e) => setProvider(e.target.value as 'github' | 'gitlab')}
-                  title={editId !== null ? 'Provider is immutable — delete and recreate to change it' : undefined}
+                  title={editId !== null ? t('form.providerImmutable') : undefined}
                   className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 disabled:opacity-60 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
                   <option value="github">GitHub</option>
                   <option value="gitlab">GitLab</option>
                 </select>
               </div>
               <div>
-                <label htmlFor="vcs-url" className="block text-sm font-medium text-slate-300 mb-1">Server URL (optional)</label>
+                <label htmlFor="vcs-url" className="block text-sm font-medium text-slate-300 mb-1">{t('form.serverUrl')}</label>
                 <input id="vcs-url" type="text" value={serverUrl} onChange={(e) => setServerUrl(e.target.value)}
                   pattern="https?://.+"
-                  title="Must be an HTTP or HTTPS URL (e.g. https://github.mycompany.com)"
+                  title={t('form.serverUrlHint')}
                   placeholder={provider === 'github' ? 'https://api.github.com' : 'https://gitlab.com'}
                   className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
               </div>
@@ -252,34 +259,34 @@ export default function VCSConnectionsPage() {
               <div className="space-y-3">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label htmlFor="gh-app-id" className="block text-sm font-medium text-slate-300 mb-1">App ID</label>
+                    <label htmlFor="gh-app-id" className="block text-sm font-medium text-slate-300 mb-1">{t('form.appId')}</label>
                     <input id="gh-app-id" type="text" value={appId} onChange={(e) => setAppId(e.target.value)} required
                       pattern="[0-9]+"
-                      title="GitHub App ID — numeric digits only"
+                      title={t('form.appIdHint')}
                       placeholder="123456"
                       className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
                   </div>
                   <div>
-                    <label htmlFor="gh-install-id" className="block text-sm font-medium text-slate-300 mb-1">Installation ID</label>
+                    <label htmlFor="gh-install-id" className="block text-sm font-medium text-slate-300 mb-1">{t('form.installationId')}</label>
                     <input id="gh-install-id" type="text" value={installationId} onChange={(e) => setInstallationId(e.target.value)} required
                       pattern="[0-9]+"
-                      title="GitHub App Installation ID — numeric digits only"
+                      title={t('form.installationIdHint')}
                       placeholder="789012"
                       className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
                   </div>
                 </div>
                 <div>
                   <div className="flex items-center gap-2 mb-1">
-                    <label htmlFor="gh-key" className="block text-sm font-medium text-slate-300">Private Key (PEM)</label>
+                    <label htmlFor="gh-key" className="block text-sm font-medium text-slate-300">{t('form.privateKey')}</label>
                     <button type="button" onClick={() => pemFileRef.current?.click()}
-                      className="text-xs text-brand-400 hover:text-brand-300 transition-colors">Browse...</button>
+                      className="text-xs text-brand-400 hover:text-brand-300 transition-colors">{t('form.browse')}</button>
                     <input ref={pemFileRef} type="file" accept=".pem,.key" className="hidden"
                       onChange={(e) => { const f = e.target.files?.[0]; if (f) f.text().then(t => setPrivateKey(t)) }} />
                   </div>
                   <textarea id="gh-key" value={privateKey} onChange={(e) => setPrivateKey(e.target.value)} required={editId === null} rows={4}
                     placeholder={editId !== null
-                      ? 'Leave blank to keep the current key — paste a new PEM to rotate'
-                      : '-----BEGIN RSA PRIVATE KEY-----&#10;...&#10;&#10;Drop a .pem file here or click Browse'}
+                      ? t('form.privateKeyKeep')
+                      : t('form.privateKeyPlaceholder')}
                     className={`w-full px-3 py-2 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent font-mono text-xs transition-colors ${pemDragOver ? 'border-2 border-dashed border-brand-400 bg-brand-900/20' : 'border border-slate-600'}`}
                     onDragOver={(e) => { e.preventDefault(); setPemDragOver(true) }}
                     onDragLeave={() => setPemDragOver(false)}
@@ -293,26 +300,26 @@ export default function VCSConnectionsPage() {
                 </div>
                 <div>
                   <label htmlFor="gh-webhook-secret" className="block text-sm font-medium text-slate-300 mb-1">
-                    Webhook Secret <span className="text-slate-500 font-normal">(optional)</span>
+                    {t('form.webhookSecret')} <span className="text-slate-500 font-normal">{t('form.optional')}</span>
                   </label>
                   <input id="gh-webhook-secret" type="password" value={webhookSecret}
                     onChange={(e) => setWebhookSecret(e.target.value)}
                     placeholder={editId !== null
                       ? (connections.find((c) => c.id === editId)?.attributes['has-webhook-secret']
-                          ? 'Set — leave blank to keep, enter a new value to rotate'
-                          : 'Leave blank to use the global secret')
-                      : 'Leave blank to use the global webhook secret'}
+                          ? t('form.webhookSecretSet')
+                          : t('form.webhookSecretGlobal'))
+                      : t('form.webhookSecretGlobal')}
                     className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
                   <p className="mt-1 text-xs text-slate-500">
-                    Per-connection HMAC secret for this installation&apos;s webhooks. When unset, the global secret is used.
+                    {t('form.webhookSecretHelp')}
                   </p>
                 </div>
               </div>
             ) : (
               <div>
-                <label htmlFor="gl-token" className="block text-sm font-medium text-slate-300 mb-1">Access Token</label>
+                <label htmlFor="gl-token" className="block text-sm font-medium text-slate-300 mb-1">{t('form.accessToken')}</label>
                 <input id="gl-token" type="password" value={token} onChange={(e) => setToken(e.target.value)} required={editId === null}
-                  placeholder={editId !== null ? 'Leave blank to keep the current token' : 'glpat-...'}
+                  placeholder={editId !== null ? t('form.accessTokenKeep') : 'glpat-...'}
                   className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
               </div>
             )}
@@ -320,8 +327,8 @@ export default function VCSConnectionsPage() {
             <button type="submit" disabled={creating}
               className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors">
               {creating
-                ? (editId !== null ? 'Saving...' : 'Creating...')
-                : (editId !== null ? 'Save Changes' : 'Create Connection')}
+                ? (editId !== null ? t('form.saving') : t('form.creating'))
+                : (editId !== null ? t('form.saveChanges') : t('form.createConnection'))}
             </button>
           </form>
         )}
@@ -329,18 +336,18 @@ export default function VCSConnectionsPage() {
         {loading ? (
           <LoadingSpinner />
         ) : connections.length === 0 ? (
-          <EmptyState message="No VCS connections configured." />
+          <EmptyState message={t('empty')} />
         ) : (
           <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-slate-700/50">
-                  <SortableHeader label="Name" sortKey="name" sortState={sortState} onSort={toggleSort} />
-                  <SortableHeader label="Provider" sortKey="provider" sortState={sortState} onSort={toggleSort} />
-                  <SortableHeader label="Server URL" sortKey="server-url" sortState={sortState} onSort={toggleSort} className="hidden sm:table-cell" />
-                  <SortableHeader label="Status" sortKey="status" sortState={sortState} onSort={toggleSort} className="hidden md:table-cell" />
-                  <SortableHeader label="Created" sortKey="created" sortState={sortState} onSort={toggleSort} className="hidden lg:table-cell" />
-                  <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">Actions</th>
+                  <SortableHeader label={t('table.name')} sortKey="name" sortState={sortState} onSort={toggleSort} />
+                  <SortableHeader label={t('table.provider')} sortKey="provider" sortState={sortState} onSort={toggleSort} />
+                  <SortableHeader label={t('table.serverUrl')} sortKey="server-url" sortState={sortState} onSort={toggleSort} className="hidden sm:table-cell" />
+                  <SortableHeader label={t('table.status')} sortKey="status" sortState={sortState} onSort={toggleSort} className="hidden md:table-cell" />
+                  <SortableHeader label={t('table.created')} sortKey="created" sortState={sortState} onSort={toggleSort} className="hidden lg:table-cell" />
+                  <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">{t('table.actions')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-700/30">
@@ -370,12 +377,12 @@ export default function VCSConnectionsPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-xs text-slate-500 hidden lg:table-cell">
-                      {conn.attributes['created-at'] ? new Date(conn.attributes['created-at']).toLocaleDateString() : ''}
+                      {fmt.date(conn.attributes['created-at'])}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex justify-end gap-2">
-                        <button onClick={() => startEdit(conn)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors">Edit</button>
-                        <button onClick={() => handleDelete(conn.id)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300 transition-colors">Delete</button>
+                        <button onClick={() => startEdit(conn)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors">{t('actions.edit')}</button>
+                        <button onClick={() => handleDelete(conn.id)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300 transition-colors">{t('actions.delete')}</button>
                       </div>
                     </td>
                   </tr>

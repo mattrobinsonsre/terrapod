@@ -67,6 +67,7 @@
   "ai_summary.model",
   "ai_summary.plan_json_max_bytes",
   "ai_summary.request_timeout_seconds",
+  "ai_summary.summary_language",
   "api_prefix",
   "app_name",
   "artifact_retention.batch_size",

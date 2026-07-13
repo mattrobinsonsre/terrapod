@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import Link from 'next/link'
 import NavBar from '@/components/nav-bar'
 import { PageHeader } from '@/components/page-header'
@@ -54,6 +55,7 @@ export default function VariableSetDetailPage() {
   const router = useRouter()
   const params = useParams()
   const varsetId = params.id as string
+  const t = useTranslations('adminVariableSets')
   const { confirmDelete } = useConfirm()
 
   const [varset, setVarset] = useState<Varset | null>(null)
@@ -105,15 +107,15 @@ export default function VariableSetDetailPage() {
   const loadVarset = useCallback(async () => {
     try {
       const res = await apiFetch(`/api/v2/varsets/${varsetId}`)
-      if (!res.ok) throw new Error('Failed to load variable set')
+      if (!res.ok) throw new Error(t('errors.load'))
       const data = await res.json()
       setVarset(data.data)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load variable set')
+      setError(err instanceof Error ? err.message : t('errors.load'))
     } finally {
       setLoading(false)
     }
-  }, [varsetId])
+  }, [varsetId, t])
 
   useEffect(() => {
     if (!getAuthState()) { router.push('/login'); return }
@@ -132,11 +134,11 @@ export default function VariableSetDetailPage() {
   async function loadVariables() {
     try {
       const res = await apiFetch(`/api/v2/varsets/${varsetId}/relationships/vars`)
-      if (!res.ok) throw new Error('Failed to load variables')
+      if (!res.ok) throw new Error(t('detail.errors.loadVars'))
       const data = await res.json()
       setVariables(data.data || [])
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load variables')
+      setError(err instanceof Error ? err.message : t('detail.errors.loadVars'))
     } finally {
       setVarsLoading(false)
     }
@@ -148,11 +150,11 @@ export default function VariableSetDetailPage() {
       // Varset show response may include workspace relationships
       // Re-fetch varset to get workspace list
       const res = await apiFetch(`/api/v2/varsets/${varsetId}`)
-      if (!res.ok) throw new Error('Failed to load workspaces')
+      if (!res.ok) throw new Error(t('detail.errors.loadWorkspaces'))
       const data = await res.json()
       setWorkspaces(data.data?.relationships?.workspaces?.data || [])
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load workspaces')
+      setError(err instanceof Error ? err.message : t('detail.errors.loadWorkspaces'))
     } finally {
       setWsLoading(false)
     }
@@ -198,13 +200,13 @@ export default function VariableSetDetailPage() {
           },
         }),
       })
-      if (!res.ok) throw new Error('Failed to update variable set')
+      if (!res.ok) throw new Error(t('detail.errors.update'))
       const data = await res.json()
       setVarset(data.data)
       setEditing(false)
-      setSuccess('Variable set updated')
+      setSuccess(t('detail.success.updated'))
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update variable set')
+      setError(err instanceof Error ? err.message : t('detail.errors.update'))
     } finally {
       setSaving(false)
     }
@@ -214,10 +216,10 @@ export default function VariableSetDetailPage() {
     setDeleting(true)
     try {
       const res = await apiFetch(`/api/v2/varsets/${varsetId}`, { method: 'DELETE' })
-      if (!res.ok) throw new Error('Failed to delete variable set')
+      if (!res.ok) throw new Error(t('detail.errors.delete'))
       router.push('/admin/variable-sets')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete variable set')
+      setError(err instanceof Error ? err.message : t('detail.errors.delete'))
       setDeleting(false)
     }
   }
@@ -245,7 +247,7 @@ export default function VariableSetDetailPage() {
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        throw new Error(data.detail || `Failed to add variable (${res.status})`)
+        throw new Error(data.detail || t('detail.errors.addVarStatus', { status: res.status }))
       }
       setVarKey('')
       setVarValue('')
@@ -255,7 +257,7 @@ export default function VariableSetDetailPage() {
       setShowAddVar(false)
       await loadVariables()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to add variable')
+      setError(err instanceof Error ? err.message : t('detail.errors.addVar'))
     } finally {
       setAddingVar(false)
     }
@@ -289,26 +291,26 @@ export default function VariableSetDetailPage() {
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        throw new Error(data.detail || 'Failed to update variable')
+        throw new Error(data.detail || t('detail.errors.updateVar'))
       }
       setEditingVarId(null)
       await loadVariables()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update variable')
+      setError(err instanceof Error ? err.message : t('detail.errors.updateVar'))
     } finally {
       setSavingVar(false)
     }
   }
 
   async function handleDeleteVariable(varId: string) {
-    if (!confirmDelete('Delete this variable? This cannot be undone.')) return
+    if (!confirmDelete(t('detail.confirmDeleteVar'))) return
     setError('')
     try {
       const res = await apiFetch(`/api/v2/varsets/${varsetId}/relationships/vars/${varId}`, { method: 'DELETE' })
-      if (!res.ok) throw new Error('Failed to delete variable')
+      if (!res.ok) throw new Error(t('detail.errors.deleteVar'))
       await loadVariables()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete variable')
+      setError(err instanceof Error ? err.message : t('detail.errors.deleteVar'))
     }
   }
 
@@ -327,22 +329,22 @@ export default function VariableSetDetailPage() {
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        throw new Error(data.detail || 'Failed to add workspace')
+        throw new Error(data.detail || t('detail.errors.addWorkspace'))
       }
       setSelectedWsId('')
       setShowAddWs(false)
-      setSuccess('Workspace added')
+      setSuccess(t('detail.success.workspaceAdded'))
       await loadWorkspaces()
       await loadVarset()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to add workspace')
+      setError(err instanceof Error ? err.message : t('detail.errors.addWorkspace'))
     } finally {
       setAddingWs(false)
     }
   }
 
   async function handleRemoveWorkspace(wsId: string) {
-    if (!confirmDelete('Remove this workspace from the variable set? Its variables will no longer apply to that workspace.')) return
+    if (!confirmDelete(t('detail.confirmRemoveWorkspace'))) return
     setError('')
     try {
       const res = await apiFetch(`/api/v2/varsets/${varsetId}/relationships/workspaces`, {
@@ -352,23 +354,23 @@ export default function VariableSetDetailPage() {
           data: [{ id: wsId, type: 'workspaces' }],
         }),
       })
-      if (!res.ok) throw new Error('Failed to remove workspace')
-      setSuccess('Workspace removed')
+      if (!res.ok) throw new Error(t('detail.errors.removeWorkspace'))
+      setSuccess(t('detail.success.workspaceRemoved'))
       await loadWorkspaces()
       await loadVarset()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to remove workspace')
+      setError(err instanceof Error ? err.message : t('detail.errors.removeWorkspace'))
     }
   }
 
   const tabs: { key: Tab; label: string }[] = [
-    { key: 'settings', label: 'Settings' },
-    { key: 'variables', label: 'Variables' },
-    { key: 'workspaces', label: 'Workspaces' },
+    { key: 'settings', label: t('detail.tabs.settings') },
+    { key: 'variables', label: t('detail.tabs.variables') },
+    { key: 'workspaces', label: t('detail.tabs.workspaces') },
   ]
 
   if (loading) return <><NavBar /><main className="px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto"><LoadingSpinner /></main></>
-  if (!varset) return <><NavBar /><main className="px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto"><ErrorBanner message="Variable set not found" /></main></>
+  if (!varset) return <><NavBar /><main className="px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto"><ErrorBanner message={t('detail.notFound')} /></main></>
 
   return (
     <>
@@ -376,13 +378,13 @@ export default function VariableSetDetailPage() {
       <main className="px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto">
         <div className="mb-4">
           <Link href="/admin/variable-sets" className="text-sm text-slate-400 hover:text-slate-200">
-            &larr; Back to variable sets
+            &larr; {t('detail.back')}
           </Link>
         </div>
 
         <PageHeader
           title={varset.attributes.name}
-          description={varset.attributes.description || 'Variable set'}
+          description={varset.attributes.description || t('detail.headerFallback')}
         />
 
         {error && <ErrorBanner message={error} />}
@@ -414,21 +416,21 @@ export default function VariableSetDetailPage() {
           <div className="space-y-6">
             <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-6">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-medium text-slate-300">Settings</h3>
+                <h3 className="text-sm font-medium text-slate-300">{t('detail.tabs.settings')}</h3>
                 {!editing ? (
-                  <button onClick={startEditing} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors">Edit</button>
+                  <button onClick={startEditing} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors">{t('detail.edit')}</button>
                 ) : (
                   <div className="flex gap-2">
-                    <button onClick={() => setEditing(false)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors">Cancel</button>
+                    <button onClick={() => setEditing(false)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors">{t('detail.cancel')}</button>
                     <button onClick={handleSave} disabled={saving} className="px-2.5 py-1 rounded-md text-xs font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors disabled:opacity-50">
-                      {saving ? 'Saving...' : 'Save'}
+                      {saving ? t('detail.saving') : t('detail.save')}
                     </button>
                   </div>
                 )}
               </div>
               <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <dt className="text-xs text-slate-500">Name</dt>
+                  <dt className="text-xs text-slate-500">{t('form.name')}</dt>
                   {editing ? (
                     <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)}
                       className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500" />
@@ -437,36 +439,36 @@ export default function VariableSetDetailPage() {
                   )}
                 </div>
                 <div>
-                  <dt className="text-xs text-slate-500">Description</dt>
+                  <dt className="text-xs text-slate-500">{t('form.descriptionLabel')}</dt>
                   {editing ? (
                     <input type="text" value={editDesc} onChange={(e) => setEditDesc(e.target.value)}
                       className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500" />
                   ) : (
-                    <dd className="mt-1 text-sm text-slate-200">{varset.attributes.description || '-'}</dd>
+                    <dd className="mt-1 text-sm text-slate-200">{varset.attributes.description || t('none')}</dd>
                   )}
                 </div>
                 <div>
-                  <dt className="text-xs text-slate-500">Global</dt>
+                  <dt className="text-xs text-slate-500">{t('detail.global')}</dt>
                   {editing ? (
                     <label className="flex items-center gap-2 mt-1">
                       <input type="checkbox" checked={editGlobal} onChange={(e) => setEditGlobal(e.target.checked)}
                         className="rounded border-slate-600 bg-slate-700 text-brand-600" />
-                      <span className="text-sm text-slate-200">{editGlobal ? 'Yes' : 'No'}</span>
+                      <span className="text-sm text-slate-200">{editGlobal ? t('detail.yes') : t('detail.no')}</span>
                     </label>
                   ) : (
-                    <dd className="mt-1 text-sm text-slate-200">{varset.attributes.global ? 'Yes' : 'No'}</dd>
+                    <dd className="mt-1 text-sm text-slate-200">{varset.attributes.global ? t('detail.yes') : t('detail.no')}</dd>
                   )}
                 </div>
                 <div>
-                  <dt className="text-xs text-slate-500">Priority</dt>
+                  <dt className="text-xs text-slate-500">{t('detail.priority')}</dt>
                   {editing ? (
                     <label className="flex items-center gap-2 mt-1">
                       <input type="checkbox" checked={editPriority} onChange={(e) => setEditPriority(e.target.checked)}
                         className="rounded border-slate-600 bg-slate-700 text-brand-600" />
-                      <span className="text-sm text-slate-200">{editPriority ? 'Yes' : 'No'}</span>
+                      <span className="text-sm text-slate-200">{editPriority ? t('detail.yes') : t('detail.no')}</span>
                     </label>
                   ) : (
-                    <dd className="mt-1 text-sm text-slate-200">{varset.attributes.priority ? 'Yes' : 'No'}</dd>
+                    <dd className="mt-1 text-sm text-slate-200">{varset.attributes.priority ? t('detail.yes') : t('detail.no')}</dd>
                   )}
                 </div>
               </dl>
@@ -475,20 +477,20 @@ export default function VariableSetDetailPage() {
             <div className="bg-slate-800/50 rounded-lg border border-red-900/30 p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-sm font-medium text-red-400">Delete Variable Set</h3>
-                  <p className="text-sm text-slate-400 mt-1">Permanently delete this variable set and all its variables.</p>
+                  <h3 className="text-sm font-medium text-red-400">{t('detail.deleteTitle')}</h3>
+                  <p className="text-sm text-slate-400 mt-1">{t('detail.deleteDescription')}</p>
                 </div>
                 {!showDeleteConfirm ? (
                   <button onClick={() => setShowDeleteConfirm(true)}
                     className="px-3 py-1.5 rounded-lg text-sm font-medium bg-red-600/20 hover:bg-red-600/40 text-red-400 transition-colors">
-                    Delete
+                    {t('detail.delete')}
                   </button>
                 ) : (
                   <div className="flex gap-2">
-                    <button onClick={() => setShowDeleteConfirm(false)} className="px-3 py-1.5 rounded-lg text-sm font-medium text-slate-400 hover:text-slate-200">Cancel</button>
+                    <button onClick={() => setShowDeleteConfirm(false)} className="px-3 py-1.5 rounded-lg text-sm font-medium text-slate-400 hover:text-slate-200">{t('detail.cancel')}</button>
                     <button onClick={handleDelete} disabled={deleting}
                       className="px-3 py-1.5 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-500 text-white transition-colors">
-                      {deleting ? 'Deleting...' : 'Confirm Delete'}
+                      {deleting ? t('detail.deleting') : t('detail.confirmDelete')}
                     </button>
                   </div>
                 )}
@@ -505,7 +507,7 @@ export default function VariableSetDetailPage() {
                 onClick={() => setShowAddVar(!showAddVar)}
                 className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors"
               >
-                {showAddVar ? 'Cancel' : 'Add Variable'}
+                {showAddVar ? t('detail.cancel') : t('detail.addVariable')}
               </button>
             </div>
 
@@ -513,28 +515,28 @@ export default function VariableSetDetailPage() {
               <form onSubmit={handleAddVariable} className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-4 mb-6 space-y-3">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label htmlFor="var-key" className="block text-sm font-medium text-slate-300 mb-1">Key</label>
+                    <label htmlFor="var-key" className="block text-sm font-medium text-slate-300 mb-1">{t('detail.varKey')}</label>
                     <input id="var-key" type="text" value={varKey} onChange={(e) => setVarKey(e.target.value)} required placeholder="AWS_REGION"
                       className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
                   </div>
                   <div>
-                    <label htmlFor="var-val" className="block text-sm font-medium text-slate-300 mb-1">Value</label>
+                    <label htmlFor="var-val" className="block text-sm font-medium text-slate-300 mb-1">{t('detail.varValue')}</label>
                     <SensitiveValueInput id="var-val" value={varValue} onChange={setVarValue} sensitive={varSensitive} placeholder="us-east-1"
                       rows={2} className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent resize-y" />
                   </div>
                   <div>
-                    <label htmlFor="var-cat" className="block text-sm font-medium text-slate-300 mb-1">Category</label>
+                    <label htmlFor="var-cat" className="block text-sm font-medium text-slate-300 mb-1">{t('detail.varCategory')}</label>
                     <select id="var-cat" value={varCategory} onChange={(e) => setVarCategory(e.target.value)}
                       className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
-                      <option value="terraform">Terraform</option>
-                      <option value="env">Environment</option>
+                      <option value="terraform">{t('detail.categoryTerraform')}</option>
+                      <option value="env">{t('detail.categoryEnv')}</option>
                     </select>
                   </div>
                   <div className="flex items-end gap-4">
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input type="checkbox" checked={varSensitive} onChange={(e) => setVarSensitive(e.target.checked)}
                         className="rounded border-slate-600 bg-slate-700 text-brand-600 focus:ring-brand-500" />
-                      <span className="text-sm text-slate-300">Sensitive</span>
+                      <span className="text-sm text-slate-300">{t('detail.sensitive')}</span>
                     </label>
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input type="checkbox" checked={varHcl} onChange={(e) => setVarHcl(e.target.checked)}
@@ -545,7 +547,7 @@ export default function VariableSetDetailPage() {
                 </div>
                 <button type="submit" disabled={addingVar}
                   className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors">
-                  {addingVar ? 'Adding...' : 'Add Variable'}
+                  {addingVar ? t('detail.adding') : t('detail.addVariable')}
                 </button>
               </form>
             )}
@@ -553,16 +555,16 @@ export default function VariableSetDetailPage() {
             {varsLoading ? (
               <LoadingSpinner />
             ) : variables.length === 0 ? (
-              <EmptyState message="No variables in this set." />
+              <EmptyState message={t('detail.emptyVars')} />
             ) : (
               <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-x-auto">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-slate-700/50">
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Key</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Value</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider hidden sm:table-cell">Category</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">Actions</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">{t('detail.varKey')}</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">{t('detail.varValue')}</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider hidden sm:table-cell">{t('detail.varCategory')}</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">{t('detail.actions')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-700/30">
@@ -576,7 +578,7 @@ export default function VariableSetDetailPage() {
                           <td className="px-4 py-3">
                             <SensitiveValueInput value={editVarValue} onChange={setEditVarValue}
                               sensitive={editVarSensitive}
-                              placeholder={editVarSensitive ? 'Enter new value' : ''}
+                              placeholder={editVarSensitive ? t('detail.enterNewValue') : ''}
                               rows={2}
                               className="w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 font-mono focus:outline-none focus:ring-1 focus:ring-brand-500 resize-y" />
                           </td>
@@ -590,7 +592,7 @@ export default function VariableSetDetailPage() {
                               <label className="flex items-center gap-1 cursor-pointer">
                                 <input type="checkbox" checked={editVarSensitive} onChange={(e) => setEditVarSensitive(e.target.checked)}
                                   className="rounded border-slate-600 bg-slate-700 text-brand-600" />
-                                <span className="text-xs text-slate-400">Sens.</span>
+                                <span className="text-xs text-slate-400">{t('detail.sensAbbr')}</span>
                               </label>
                               <label className="flex items-center gap-1 cursor-pointer">
                                 <input type="checkbox" checked={editVarHcl} onChange={(e) => setEditVarHcl(e.target.checked)}
@@ -601,9 +603,9 @@ export default function VariableSetDetailPage() {
                           </td>
                           <td className="px-4 py-3 text-right">
                             <div className="flex justify-end gap-2">
-                              <button onClick={() => setEditingVarId(null)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors">Cancel</button>
+                              <button onClick={() => setEditingVarId(null)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors">{t('detail.cancel')}</button>
                               <button onClick={handleSaveVar} disabled={savingVar} className="px-2.5 py-1 rounded-md text-xs font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors disabled:opacity-50">
-                                {savingVar ? 'Saving...' : 'Save'}
+                                {savingVar ? t('detail.saving') : t('detail.save')}
                               </button>
                             </div>
                           </td>
@@ -612,7 +614,7 @@ export default function VariableSetDetailPage() {
                         <tr key={v.id} className="hover:bg-slate-700/20 transition-colors">
                           <td className="px-4 py-3 text-sm text-slate-200 font-mono">{v.attributes.key}</td>
                           <td className="px-4 py-3 text-sm text-slate-400 font-mono">
-                            {v.attributes.sensitive ? '***' : (v.attributes.value || <span className="text-slate-600 italic">empty</span>)}
+                            {v.attributes.sensitive ? '***' : (v.attributes.value || <span className="text-slate-600 italic">{t('detail.empty')}</span>)}
                           </td>
                           <td className="px-4 py-3 text-xs text-slate-400 hidden sm:table-cell">
                             <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
@@ -623,8 +625,8 @@ export default function VariableSetDetailPage() {
                           </td>
                           <td className="px-4 py-3 text-right">
                             <div className="flex justify-end gap-2">
-                              <button onClick={() => startEditingVar(v)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors">Edit</button>
-                              <button onClick={() => handleDeleteVariable(v.id)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300 transition-colors">Delete</button>
+                              <button onClick={() => startEditingVar(v)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors">{t('detail.edit')}</button>
+                              <button onClick={() => handleDeleteVariable(v.id)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300 transition-colors">{t('detail.delete')}</button>
                             </div>
                           </td>
                         </tr>
@@ -646,24 +648,24 @@ export default function VariableSetDetailPage() {
                   onClick={() => setShowAddWs(!showAddWs)}
                   className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors"
                 >
-                  {showAddWs ? 'Cancel' : 'Add Workspace'}
+                  {showAddWs ? t('detail.cancel') : t('detail.addWorkspace')}
                 </button>
               </div>
             )}
 
             {varset.attributes.global && (
               <div className="mb-4 p-3 bg-blue-900/20 text-blue-300 rounded-lg text-sm border border-blue-800/50">
-                This variable set is global and applies to all workspaces automatically.
+                {t('detail.globalBanner')}
               </div>
             )}
 
             {showAddWs && (
               <form onSubmit={handleAddWorkspace} className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-4 mb-6 flex items-end gap-3">
                 <div className="flex-1">
-                  <label htmlFor="ws-select" className="block text-sm font-medium text-slate-300 mb-1">Workspace</label>
+                  <label htmlFor="ws-select" className="block text-sm font-medium text-slate-300 mb-1">{t('detail.workspace')}</label>
                   <select id="ws-select" value={selectedWsId} onChange={(e) => setSelectedWsId(e.target.value)}
                     className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
-                    <option value="">Select a workspace...</option>
+                    <option value="">{t('detail.selectWorkspace')}</option>
                     {allWorkspaces
                       .filter((ws) => !workspaces.some((assigned) => assigned.id === ws.id))
                       .map((ws) => (
@@ -673,7 +675,7 @@ export default function VariableSetDetailPage() {
                 </div>
                 <button type="submit" disabled={addingWs || !selectedWsId}
                   className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors">
-                  {addingWs ? 'Adding...' : 'Add'}
+                  {addingWs ? t('detail.adding') : t('detail.add')}
                 </button>
               </form>
             )}
@@ -681,14 +683,14 @@ export default function VariableSetDetailPage() {
             {wsLoading ? (
               <LoadingSpinner />
             ) : workspaces.length === 0 && !varset.attributes.global ? (
-              <EmptyState message="No workspaces assigned to this variable set." />
+              <EmptyState message={t('detail.emptyWorkspaces')} />
             ) : workspaces.length > 0 ? (
               <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-x-auto">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-slate-700/50">
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Workspace</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">Actions</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">{t('detail.workspace')}</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">{t('detail.actions')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-700/30">
@@ -700,7 +702,7 @@ export default function VariableSetDetailPage() {
                           </Link>
                         </td>
                         <td className="px-4 py-3 text-right">
-                          <button onClick={() => handleRemoveWorkspace(ws.id)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300 transition-colors">Remove</button>
+                          <button onClick={() => handleRemoveWorkspace(ws.id)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300 transition-colors">{t('detail.remove')}</button>
                         </td>
                       </tr>
                     ))}

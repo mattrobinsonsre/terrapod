@@ -370,6 +370,7 @@ data:
       {{- if .Values.api.config.ai_summary.api_base }}
       api_base: {{ .Values.api.config.ai_summary.api_base | quote }}
       {{- end }}
+      summary_language: {{ .Values.api.config.ai_summary.summary_language | default "en" | quote }}
       max_output_tokens: {{ .Values.api.config.ai_summary.max_output_tokens | default 16384 | int64 }}
       request_timeout_seconds: {{ .Values.api.config.ai_summary.request_timeout_seconds | default 60 | int64 }}
       # int64 cast prevents Helm's default float formatter from emitting

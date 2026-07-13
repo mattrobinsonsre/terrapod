@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import NavBar from '@/components/nav-bar'
 import { PageHeader } from '@/components/page-header'
 import { LoadingSpinner } from '@/components/loading-spinner'
@@ -12,6 +13,7 @@ import { useSortable } from '@/lib/use-sortable'
 import { useConfirm } from '@/lib/use-confirm'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
+import { useFormat } from '@/lib/format'
 import { usePollingInterval } from '@/lib/use-polling-interval'
 
 interface Role {
@@ -133,27 +135,28 @@ function CapabilityMatrix({
   custom: boolean
   idPrefix: string
 }) {
+  const t = useTranslations('adminRoles')
   const unknown = Array.from(selected).filter((c) => !ALL_CAPABILITIES_SET.has(c)).sort()
   return (
     <div className="mt-2 rounded-lg border border-slate-700/50 bg-slate-900/40 p-3">
       <div className="flex items-center justify-between mb-2">
         <span className="text-xs text-slate-400">
-          {selected.size} {selected.size === 1 ? 'capability' : 'capabilities'} selected
+          {t('caps.selected', { count: selected.size })}
         </span>
         {custom ? (
-          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-900/50 text-purple-300">Custom</span>
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-900/50 text-purple-300">{t('caps.custom')}</span>
         ) : (
-          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-700 text-slate-400">Matches presets</span>
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-700 text-slate-400">{t('caps.matchesPresets')}</span>
         )}
       </div>
       <p className="text-xs text-slate-500 mb-3">
-        Selecting a preset above pre-checks its capabilities. Ticking or unticking a box past a preset marks the role
-        <span className="text-purple-300"> Custom</span> and its grant is sent as an explicit capability set.
+        {t('caps.presetHelp.before')}
+        <span className="text-purple-300"> {t('caps.custom')}</span> {t('caps.presetHelp.after')}
       </p>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
         {CAPABILITY_GROUPS.map((group) => (
           <div key={group.resource}>
-            <div className="text-xs font-medium text-slate-300 mb-1">{group.label}</div>
+            <div className="text-xs font-medium text-slate-300 mb-1">{t(`caps.groups.${group.resource}`)}</div>
             <div className="space-y-1">
               {group.caps.map((cap) => {
                 const verb = cap.split(':')[1]
@@ -177,7 +180,7 @@ function CapabilityMatrix({
       </div>
       {unknown.length > 0 && (
         <div className="mt-3 pt-3 border-t border-slate-700/50">
-          <div className="text-xs text-slate-500 mb-1">Other capabilities (preserved on save)</div>
+          <div className="text-xs text-slate-500 mb-1">{t('caps.otherPreserved')}</div>
           <div className="flex flex-wrap gap-1">
             {unknown.map((c) => (
               <span key={c} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono bg-slate-700 text-slate-300">{c}</span>
@@ -209,6 +212,8 @@ interface Identity {
 type Tab = 'roles' | 'assignments'
 
 export default function RolesPage() {
+  const t = useTranslations('adminRoles')
+  const fmt = useFormat()
   const { confirmDelete } = useConfirm()
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<Tab>('roles')
@@ -300,11 +305,11 @@ export default function RolesPage() {
   async function loadRoles() {
     try {
       const res = await apiFetch('/api/terrapod/v1/roles')
-      if (!res.ok) throw new Error('Failed to load roles')
+      if (!res.ok) throw new Error(t('errors.loadRoles'))
       const data = await res.json()
       setRoles(data.data || [])
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load roles')
+      setError(err instanceof Error ? err.message : t('errors.loadRoles'))
     } finally {
       setRolesLoading(false)
     }
@@ -317,7 +322,7 @@ export default function RolesPage() {
         apiFetch('/api/terrapod/v1/role-assignments'),
         apiFetch('/api/terrapod/v1/role-assignments/identities'),
       ])
-      if (!assignRes.ok) throw new Error('Failed to load assignments')
+      if (!assignRes.ok) throw new Error(t('errors.loadAssignments'))
       const assignData = await assignRes.json()
       setAssignments(assignData.data || [])
       if (identRes.ok) {
@@ -325,7 +330,7 @@ export default function RolesPage() {
         setIdentities(identData.data || [])
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load assignments')
+      setError(err instanceof Error ? err.message : t('errors.loadAssignments'))
     } finally {
       setAssignmentsLoading(false)
     }
@@ -434,9 +439,9 @@ export default function RolesPage() {
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        throw new Error(data.detail || `Failed to create role (${res.status})`)
+        throw new Error(data.detail || t('errors.createRoleStatus', { status: res.status }))
       }
-      setSuccess(`Role "${roleName}" created`)
+      setSuccess(t('success.roleCreated', { name: roleName }))
       setRoleName('')
       setRoleDesc('')
       setRolePermission('read')
@@ -453,7 +458,7 @@ export default function RolesPage() {
       setShowCreateRole(false)
       await loadRoles()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create role')
+      setError(err instanceof Error ? err.message : t('errors.createRole'))
     } finally {
       setCreatingRole(false)
     }
@@ -523,29 +528,29 @@ export default function RolesPage() {
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        throw new Error(data.detail || 'Failed to update role')
+        throw new Error(data.detail || t('errors.updateRole'))
       }
-      setSuccess(`Role "${editingRole}" updated`)
+      setSuccess(t('success.roleUpdated', { name: editingRole }))
       setEditingRole(null)
       await loadRoles()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update role')
+      setError(err instanceof Error ? err.message : t('errors.updateRole'))
     } finally {
       setSavingRole(false)
     }
   }
 
   async function handleDeleteRole(name: string) {
-    if (!confirmDelete(`Delete role "${name}"? Any assignments referencing it are affected.`)) return
+    if (!confirmDelete(t('confirm.deleteRole', { name }))) return
     setError('')
     setSuccess('')
     try {
       const res = await apiFetch(`/api/terrapod/v1/roles/${name}`, { method: 'DELETE' })
-      if (!res.ok) throw new Error('Failed to delete role')
-      setSuccess(`Role "${name}" deleted`)
+      if (!res.ok) throw new Error(t('errors.deleteRole'))
+      setSuccess(t('success.roleDeleted', { name }))
       await loadRoles()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete role')
+      setError(err instanceof Error ? err.message : t('errors.deleteRole'))
     }
   }
 
@@ -571,33 +576,33 @@ export default function RolesPage() {
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        throw new Error(data.detail || `Failed to set assignment (${res.status})`)
+        throw new Error(data.detail || t('errors.setAssignmentStatus', { status: res.status }))
       }
-      setSuccess(`Roles assigned to ${assignEmail}`)
+      setSuccess(t('success.rolesAssigned', { email: assignEmail }))
       setAssignEmail('')
       setAssignRoles([])
       setShowCreateAssignment(false)
       await loadAssignments()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to set assignment')
+      setError(err instanceof Error ? err.message : t('errors.setAssignment'))
     } finally {
       setCreatingAssignment(false)
     }
   }
 
   async function handleDeleteAssignment(provider: string, email: string, roleName: string) {
-    if (!confirmDelete(`Remove role "${roleName}" from ${email}?`)) return
+    if (!confirmDelete(t('confirm.removeAssignment', { roleName, email }))) return
     setError('')
     setSuccess('')
     try {
       const res = await apiFetch(`/api/terrapod/v1/role-assignments/${encodeURIComponent(provider)}/${encodeURIComponent(email)}/${encodeURIComponent(roleName)}`, {
         method: 'DELETE',
       })
-      if (!res.ok) throw new Error('Failed to delete assignment')
-      setSuccess('Assignment removed')
+      if (!res.ok) throw new Error(t('errors.deleteAssignment'))
+      setSuccess(t('success.assignmentRemoved'))
       await loadAssignments()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete assignment')
+      setError(err instanceof Error ? err.message : t('errors.deleteAssignment'))
     }
   }
 
@@ -620,8 +625,8 @@ export default function RolesPage() {
   }
 
   const tabs: { key: Tab; label: string }[] = [
-    { key: 'roles', label: 'Roles' },
-    { key: 'assignments', label: 'Assignments' },
+    { key: 'roles', label: t('tabs.roles') },
+    { key: 'assignments', label: t('tabs.assignments') },
   ]
 
   return (
@@ -629,8 +634,8 @@ export default function RolesPage() {
       <NavBar />
       <main className="px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto">
         <PageHeader
-          title="Roles & Assignments"
-          description="Manage RBAC roles and user role assignments"
+          title={t('title')}
+          description={t('description')}
         />
 
         {error && <ErrorBanner message={error} />}
@@ -665,7 +670,7 @@ export default function RolesPage() {
                 onClick={() => setShowCreateRole(!showCreateRole)}
                 className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors"
               >
-                {showCreateRole ? 'Cancel' : 'Create Role'}
+                {showCreateRole ? t('actions.cancel') : t('actions.createRole')}
               </button>
             </div>
 
@@ -673,14 +678,14 @@ export default function RolesPage() {
               <form onSubmit={handleCreateRole} className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-4 mb-6 space-y-3">
                 <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                   <div>
-                    <label htmlFor="r-name" className="block text-sm font-medium text-slate-300 mb-1">Name</label>
+                    <label htmlFor="r-name" className="block text-sm font-medium text-slate-300 mb-1">{t('form.name')}</label>
                     <input id="r-name" type="text" value={roleName} onChange={(e) => setRoleName(e.target.value)} required placeholder="developer"
                       pattern="[a-zA-Z0-9][a-zA-Z0-9_\-]*"
-                      title="Letters, numbers, hyphens, and underscores only. Must start with a letter or number."
+                      title={t('form.namePattern')}
                       className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
                   </div>
                   <div>
-                    <label htmlFor="r-perm" className="block text-sm font-medium text-slate-300 mb-1">Workspace Permission</label>
+                    <label htmlFor="r-perm" className="block text-sm font-medium text-slate-300 mb-1">{t('form.workspacePermission')}</label>
                     <select id="r-perm" value={rolePermission} onChange={(e) => setCreatePreset('w', e.target.value)}
                       className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
                       <option value="read">read</option>
@@ -690,7 +695,7 @@ export default function RolesPage() {
                     </select>
                   </div>
                   <div>
-                    <label htmlFor="r-pool-perm" className="block text-sm font-medium text-slate-300 mb-1">Pool Permission</label>
+                    <label htmlFor="r-pool-perm" className="block text-sm font-medium text-slate-300 mb-1">{t('form.poolPermission')}</label>
                     <select id="r-pool-perm" value={rolePoolPermission} onChange={(e) => setCreatePreset('p', e.target.value)}
                       className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
                       <option value="read">read</option>
@@ -699,7 +704,7 @@ export default function RolesPage() {
                     </select>
                   </div>
                   <div>
-                    <label htmlFor="r-registry-perm" className="block text-sm font-medium text-slate-300 mb-1">Registry Permission</label>
+                    <label htmlFor="r-registry-perm" className="block text-sm font-medium text-slate-300 mb-1">{t('form.registryPermission')}</label>
                     <select id="r-registry-perm" value={roleRegistryPermission} onChange={(e) => setCreatePreset('r', e.target.value)}
                       className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
                       <option value="read">read</option>
@@ -708,7 +713,7 @@ export default function RolesPage() {
                     </select>
                   </div>
                   <div>
-                    <label htmlFor="r-catalog-perm" className="block text-sm font-medium text-slate-300 mb-1">Catalog Permission</label>
+                    <label htmlFor="r-catalog-perm" className="block text-sm font-medium text-slate-300 mb-1">{t('form.catalogPermission')}</label>
                     <select id="r-catalog-perm" value={roleCatalogPermission} onChange={(e) => setCreatePreset('c', e.target.value)}
                       className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
                       <option value="none">none</option>
@@ -721,43 +726,43 @@ export default function RolesPage() {
                 <div>
                   <button type="button" onClick={() => setShowCreateCaps(!showCreateCaps)}
                     className="text-xs text-brand-400 hover:text-brand-300">
-                    {showCreateCaps ? '▾ ' : '▸ '}Advanced — capabilities
-                    {roleCapsCustom && <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-900/50 text-purple-300">Custom</span>}
+                    {showCreateCaps ? '▾ ' : '▸ '}{t('caps.advanced')}
+                    {roleCapsCustom && <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-900/50 text-purple-300">{t('caps.custom')}</span>}
                   </button>
                   {showCreateCaps && (
                     <CapabilityMatrix selected={roleCaps} onToggle={toggleCreateCap} custom={roleCapsCustom} idPrefix="create" />
                   )}
                 </div>
                 <div>
-                  <label htmlFor="r-desc" className="block text-sm font-medium text-slate-300 mb-1">Description</label>
-                  <input id="r-desc" type="text" value={roleDesc} onChange={(e) => setRoleDesc(e.target.value)} placeholder="Developer access"
+                  <label htmlFor="r-desc" className="block text-sm font-medium text-slate-300 mb-1">{t('form.descriptionLabel')}</label>
+                  <input id="r-desc" type="text" value={roleDesc} onChange={(e) => setRoleDesc(e.target.value)} placeholder={t('form.descriptionPlaceholder')}
                     className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label htmlFor="r-allow-labels" className="block text-sm font-medium text-slate-300 mb-1">Allow Labels (key=value, comma-separated)</label>
+                    <label htmlFor="r-allow-labels" className="block text-sm font-medium text-slate-300 mb-1">{t('form.allowLabels')}</label>
                     <input id="r-allow-labels" type="text" value={roleAllowLabels} onChange={(e) => setRoleAllowLabels(e.target.value)} placeholder="env=dev, team=platform"
                       className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
                   </div>
                   <div>
-                    <label htmlFor="r-allow-names" className="block text-sm font-medium text-slate-300 mb-1">Allow Names (comma-separated)</label>
+                    <label htmlFor="r-allow-names" className="block text-sm font-medium text-slate-300 mb-1">{t('form.allowNames')}</label>
                     <input id="r-allow-names" type="text" value={roleAllowNames} onChange={(e) => setRoleAllowNames(e.target.value)} placeholder="ws-prod, ws-staging"
                       className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
                   </div>
                   <div>
-                    <label htmlFor="r-deny-labels" className="block text-sm font-medium text-slate-300 mb-1">Deny Labels (key=value, comma-separated)</label>
+                    <label htmlFor="r-deny-labels" className="block text-sm font-medium text-slate-300 mb-1">{t('form.denyLabels')}</label>
                     <input id="r-deny-labels" type="text" value={roleDenyLabels} onChange={(e) => setRoleDenyLabels(e.target.value)} placeholder="env=prod"
                       className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
                   </div>
                   <div>
-                    <label htmlFor="r-deny-names" className="block text-sm font-medium text-slate-300 mb-1">Deny Names (comma-separated)</label>
+                    <label htmlFor="r-deny-names" className="block text-sm font-medium text-slate-300 mb-1">{t('form.denyNames')}</label>
                     <input id="r-deny-names" type="text" value={roleDenyNames} onChange={(e) => setRoleDenyNames(e.target.value)} placeholder="ws-critical"
                       className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
                   </div>
                 </div>
                 <button type="submit" disabled={creatingRole}
                   className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors">
-                  {creatingRole ? 'Creating...' : 'Create Role'}
+                  {creatingRole ? t('actions.creating') : t('actions.createRole')}
                 </button>
               </form>
             )}
@@ -765,7 +770,7 @@ export default function RolesPage() {
             {rolesLoading ? (
               <LoadingSpinner />
             ) : roles.length === 0 ? (
-              <EmptyState message="No roles defined." />
+              <EmptyState message={t('emptyRoles')} />
             ) : (
               <div className="space-y-3">
                 {roles.map((role) => {
@@ -778,20 +783,20 @@ export default function RolesPage() {
                           <div className="flex items-center justify-between">
                             <h3 className="text-sm font-medium text-slate-200">{role.name}</h3>
                             <div className="flex gap-2">
-                              <button onClick={() => setEditingRole(null)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200">Cancel</button>
+                              <button onClick={() => setEditingRole(null)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200">{t('actions.cancel')}</button>
                               <button onClick={handleSaveRole} disabled={savingRole} className="px-2.5 py-1 rounded-md text-xs font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white">
-                                {savingRole ? 'Saving...' : 'Save'}
+                                {savingRole ? t('actions.saving') : t('actions.save')}
                               </button>
                             </div>
                           </div>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div>
-                              <label className="block text-xs text-slate-500 mb-1">Description</label>
+                              <label className="block text-xs text-slate-500 mb-1">{t('form.descriptionLabel')}</label>
                               <input type="text" value={editRoleDesc} onChange={(e) => setEditRoleDesc(e.target.value)}
                                 className="w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500" />
                             </div>
                             <div>
-                              <label className="block text-xs text-slate-500 mb-1">Workspace Permission</label>
+                              <label className="block text-xs text-slate-500 mb-1">{t('form.workspacePermission')}</label>
                               <select value={editRolePermission} onChange={(e) => setEditPreset('w', e.target.value)}
                                 className="w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500">
                                 <option value="read">read</option>
@@ -801,7 +806,7 @@ export default function RolesPage() {
                               </select>
                             </div>
                             <div>
-                              <label className="block text-xs text-slate-500 mb-1">Pool Permission</label>
+                              <label className="block text-xs text-slate-500 mb-1">{t('form.poolPermission')}</label>
                               <select value={editRolePoolPermission} onChange={(e) => setEditPreset('p', e.target.value)}
                                 className="w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500">
                                 <option value="read">read</option>
@@ -810,7 +815,7 @@ export default function RolesPage() {
                               </select>
                             </div>
                             <div>
-                              <label className="block text-xs text-slate-500 mb-1">Registry Permission</label>
+                              <label className="block text-xs text-slate-500 mb-1">{t('form.registryPermission')}</label>
                               <select value={editRoleRegistryPermission} onChange={(e) => setEditPreset('r', e.target.value)}
                                 className="w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500">
                                 <option value="read">read</option>
@@ -819,7 +824,7 @@ export default function RolesPage() {
                               </select>
                             </div>
                             <div>
-                              <label className="block text-xs text-slate-500 mb-1">Catalog Permission</label>
+                              <label className="block text-xs text-slate-500 mb-1">{t('form.catalogPermission')}</label>
                               <select value={editRoleCatalogPermission} onChange={(e) => setEditPreset('c', e.target.value)}
                                 className="w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500">
                                 <option value="none">none</option>
@@ -829,22 +834,22 @@ export default function RolesPage() {
                               </select>
                             </div>
                             <div>
-                              <label className="block text-xs text-slate-500 mb-1">Allow Labels</label>
+                              <label className="block text-xs text-slate-500 mb-1">{t('form.allowLabelsShort')}</label>
                               <input type="text" value={editRoleAllowLabels} onChange={(e) => setEditRoleAllowLabels(e.target.value)}
                                 className="w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500" />
                             </div>
                             <div>
-                              <label className="block text-xs text-slate-500 mb-1">Allow Names</label>
+                              <label className="block text-xs text-slate-500 mb-1">{t('form.allowNamesShort')}</label>
                               <input type="text" value={editRoleAllowNames} onChange={(e) => setEditRoleAllowNames(e.target.value)}
                                 className="w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500" />
                             </div>
                             <div>
-                              <label className="block text-xs text-slate-500 mb-1">Deny Labels</label>
+                              <label className="block text-xs text-slate-500 mb-1">{t('form.denyLabelsShort')}</label>
                               <input type="text" value={editRoleDenyLabels} onChange={(e) => setEditRoleDenyLabels(e.target.value)}
                                 className="w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500" />
                             </div>
                             <div>
-                              <label className="block text-xs text-slate-500 mb-1">Deny Names</label>
+                              <label className="block text-xs text-slate-500 mb-1">{t('form.denyNamesShort')}</label>
                               <input type="text" value={editRoleDenyNames} onChange={(e) => setEditRoleDenyNames(e.target.value)}
                                 className="w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500" />
                             </div>
@@ -852,8 +857,8 @@ export default function RolesPage() {
                           <div>
                             <button type="button" onClick={() => setShowEditCaps(!showEditCaps)}
                               className="text-xs text-brand-400 hover:text-brand-300">
-                              {showEditCaps ? '▾ ' : '▸ '}Advanced — capabilities
-                              {editRoleCapsCustom && <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-900/50 text-purple-300">Custom</span>}
+                              {showEditCaps ? '▾ ' : '▸ '}{t('caps.advanced')}
+                              {editRoleCapsCustom && <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-900/50 text-purple-300">{t('caps.custom')}</span>}
                             </button>
                             {showEditCaps && (
                               <CapabilityMatrix selected={editRoleCaps} onToggle={toggleEditCap} custom={editRoleCapsCustom} idPrefix={`edit-${role.name}`} />
@@ -866,7 +871,7 @@ export default function RolesPage() {
                             <div className="flex items-center gap-2 mb-1">
                               <h3 className="text-sm font-medium text-slate-200">{role.name}</h3>
                               {a['built-in'] && (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-700 text-slate-400">built-in</span>
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-700 text-slate-400">{t('builtIn')}</span>
                               )}
                               {a['workspace-permission'] && (
                                 <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${permissionBadge(a['workspace-permission'])}`}>
@@ -898,7 +903,7 @@ export default function RolesPage() {
                                   className="text-xs text-slate-400 hover:text-slate-200"
                                 >
                                   {expandedCaps.has(role.name) ? '▾ ' : '▸ '}
-                                  {a.capabilities!.length} {a.capabilities!.length === 1 ? 'capability' : 'capabilities'}
+                                  {t('caps.count', { count: a.capabilities!.length })}
                                 </button>
                                 {expandedCaps.has(role.name) && (
                                   <div className="mt-1.5 flex flex-wrap gap-1">
@@ -911,23 +916,23 @@ export default function RolesPage() {
                             )}
                             <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
                               {Object.keys(a['allow-labels'] || {}).length > 0 && (
-                                <span>Allow: {formatLabels(a['allow-labels'])}</span>
+                                <span>{t('display.allow', { value: formatLabels(a['allow-labels']) })}</span>
                               )}
                               {(a['allow-names'] || []).length > 0 && (
-                                <span>Allow names: {a['allow-names'].join(', ')}</span>
+                                <span>{t('display.allowNames', { value: a['allow-names'].join(', ') })}</span>
                               )}
                               {Object.keys(a['deny-labels'] || {}).length > 0 && (
-                                <span>Deny: {formatLabels(a['deny-labels'])}</span>
+                                <span>{t('display.deny', { value: formatLabels(a['deny-labels']) })}</span>
                               )}
                               {(a['deny-names'] || []).length > 0 && (
-                                <span>Deny names: {a['deny-names'].join(', ')}</span>
+                                <span>{t('display.denyNames', { value: a['deny-names'].join(', ') })}</span>
                               )}
                             </div>
                           </div>
                           {!a['built-in'] && (
                             <div className="flex gap-2 flex-shrink-0">
-                              <button onClick={() => startEditRole(role)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200">Edit</button>
-                              <button onClick={() => handleDeleteRole(role.name)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300">Delete</button>
+                              <button onClick={() => startEditRole(role)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200">{t('actions.edit')}</button>
+                              <button onClick={() => handleDeleteRole(role.name)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300">{t('actions.delete')}</button>
                             </div>
                           )}
                         </div>
@@ -948,7 +953,7 @@ export default function RolesPage() {
                 onClick={() => setShowCreateAssignment(!showCreateAssignment)}
                 className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors"
               >
-                {showCreateAssignment ? 'Cancel' : 'Add Assignment'}
+                {showCreateAssignment ? t('actions.cancel') : t('actions.addAssignment')}
               </button>
             </div>
 
@@ -956,7 +961,7 @@ export default function RolesPage() {
               <form onSubmit={handleCreateAssignment} className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-4 mb-6 space-y-3">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label htmlFor="a-provider" className="block text-sm font-medium text-slate-300 mb-1">Provider</label>
+                    <label htmlFor="a-provider" className="block text-sm font-medium text-slate-300 mb-1">{t('assignForm.provider')}</label>
                     <select id="a-provider" value={assignProvider} onChange={(e) => { setAssignProvider(e.target.value); setAssignEmail('') }} required
                       className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
                       {Array.from(new Set(identities.map((i) => i['provider-name']))).sort((a, b) => a === 'local' ? -1 : b === 'local' ? 1 : a.localeCompare(b)).map((p) => (
@@ -965,7 +970,7 @@ export default function RolesPage() {
                     </select>
                   </div>
                   <div>
-                    <label htmlFor="a-email" className="block text-sm font-medium text-slate-300 mb-1">Email</label>
+                    <label htmlFor="a-email" className="block text-sm font-medium text-slate-300 mb-1">{t('assignForm.email')}</label>
                     <input id="a-email" type="email" list="email-suggestions" value={assignEmail} onChange={(e) => setAssignEmail(e.target.value)} required
                       placeholder="user@example.com"
                       className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
@@ -977,7 +982,7 @@ export default function RolesPage() {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Roles</label>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">{t('assignForm.roles')}</label>
                   <div className="flex flex-wrap gap-2">
                     {roles.map((role) => (
                       <label key={role.name} className="flex items-center gap-1.5 cursor-pointer">
@@ -994,7 +999,7 @@ export default function RolesPage() {
                 </div>
                 <button type="submit" disabled={creatingAssignment || assignRoles.length === 0}
                   className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors">
-                  {creatingAssignment ? 'Saving...' : 'Set Roles'}
+                  {creatingAssignment ? t('actions.saving') : t('actions.setRoles')}
                 </button>
               </form>
             )}
@@ -1002,17 +1007,17 @@ export default function RolesPage() {
             {assignmentsLoading ? (
               <LoadingSpinner />
             ) : assignments.length === 0 ? (
-              <EmptyState message="No role assignments." />
+              <EmptyState message={t('emptyAssignments')} />
             ) : (
               <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-hidden">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-slate-700/50">
-                      <SortableHeader label="Provider" sortKey="provider" sortState={assignmentSortState} onSort={toggleAssignmentSort} />
-                      <SortableHeader label="Email" sortKey="email" sortState={assignmentSortState} onSort={toggleAssignmentSort} />
-                      <SortableHeader label="Role" sortKey="role" sortState={assignmentSortState} onSort={toggleAssignmentSort} />
-                      <SortableHeader label="Created" sortKey="created" sortState={assignmentSortState} onSort={toggleAssignmentSort} className="hidden sm:table-cell" />
-                      <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">Actions</th>
+                      <SortableHeader label={t('columns.provider')} sortKey="provider" sortState={assignmentSortState} onSort={toggleAssignmentSort} />
+                      <SortableHeader label={t('columns.email')} sortKey="email" sortState={assignmentSortState} onSort={toggleAssignmentSort} />
+                      <SortableHeader label={t('columns.role')} sortKey="role" sortState={assignmentSortState} onSort={toggleAssignmentSort} />
+                      <SortableHeader label={t('columns.created')} sortKey="created" sortState={assignmentSortState} onSort={toggleAssignmentSort} className="hidden sm:table-cell" />
+                      <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">{t('columns.actions')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-700/30">
@@ -1026,14 +1031,14 @@ export default function RolesPage() {
                           </span>
                         </td>
                         <td className="px-4 py-3 text-xs text-slate-500 hidden sm:table-cell">
-                          {a.attributes['created-at'] ? new Date(a.attributes['created-at']).toLocaleDateString() : ''}
+                          {a.attributes['created-at'] ? fmt.date(a.attributes['created-at']) : ''}
                         </td>
                         <td className="px-4 py-3 text-right">
                           <button
                             onClick={() => handleDeleteAssignment(a.attributes['provider-name'], a.attributes.email, a.attributes['role-name'])}
                             className="px-2.5 py-1 rounded-md text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300"
                           >
-                            Remove
+                            {t('actions.remove')}
                           </button>
                         </td>
                       </tr>

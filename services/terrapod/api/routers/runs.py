@@ -943,6 +943,7 @@ async def show_plan_by_id(
 @extensions_router.get("/runs/{run_id}/plan-summary")
 async def show_plan_summary(
     run_id: str = Path(...),
+    locale: str | None = Query(None),
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
@@ -955,6 +956,14 @@ async def show_plan_summary(
     "not summarised" signal (vs a `pending` row which means "in flight").
     The response shape is the same for both ``kind`` values; the UI
     branches on the ``kind`` attribute.
+
+    The stored text is authoritative and in the deployment's
+    ``ai_summary.summary_language`` (#767). When the caller passes a
+    ``?locale=`` for a different real language, the description and risk
+    factors are translated on view (Redis-cached, 7-day sliding TTL) and
+    ``translated``/``language`` attributes reflect that. Translation is
+    best-effort: on failure or budget exhaustion the canonical text is
+    served with ``translated=false``.
     """
     run = await _get_run(run_id, db)
     await _require_run_ws_capability(run, cap.RUN_READ, user, db)
@@ -965,6 +974,24 @@ async def show_plan_summary(
     if summary is None:
         raise HTTPException(status_code=404, detail="no summary for this plan")
 
+    canonical_language = settings.ai_summary.summary_language
+    description = summary.description
+    risk_factors = summary.risk_factors
+    translated = False
+    if summary.status == "ready" and locale:
+        from terrapod.services import summary_translation
+
+        result = await summary_translation.translate_summary(
+            summary_id=str(summary.id),
+            description=summary.description,
+            risk_factors=summary.risk_factors,
+            reader_locale=locale,
+        )
+        if result is not None:
+            description = result["description"]
+            risk_factors = result["risk_factors"]
+            translated = True
+
     return JSONResponse(
         content={
             "data": {
@@ -973,9 +1000,11 @@ async def show_plan_summary(
                 "attributes": {
                     "kind": summary.kind,
                     "status": summary.status,
-                    "description": summary.description,
+                    "description": description,
                     "risk-level": summary.risk_level,
-                    "risk-factors": summary.risk_factors,
+                    "risk-factors": risk_factors,
+                    "language": canonical_language,
+                    "translated": translated,
                     "model": summary.model,
                     "input-tokens": summary.input_tokens,
                     "output-tokens": summary.output_tokens,
@@ -1217,6 +1246,7 @@ async def _resolve_plan_summary_for_chat(
 @extensions_router.get("/runs/{run_id}/plan-summary/messages")
 async def list_plan_summary_messages(
     run_id: str = Path(...),
+    locale: str | None = Query(None),
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
@@ -1229,6 +1259,12 @@ async def list_plan_summary_messages(
     parent summary and appends these.
 
     Empty list when no follow-ups have been posted yet.
+
+    The stored thread is authoritative + monolingual in the deployment's
+    ``ai_summary.summary_language`` (#767). With ``?locale=`` set to a
+    different real language, each message's content is translated on view
+    (Redis-cached, best-effort — canonical on failure); the per-message
+    ``translated`` flag reflects whether that turn was translated.
     """
     _run, summary, _ws = await _resolve_plan_summary_for_chat(run_id, user, db)
     rows = (
@@ -1242,18 +1278,40 @@ async def list_plan_summary_messages(
         .scalars()
         .all()
     )
+
+    # View-time translation of the transcript into the reader's locale.
+    translations: list[str | None] = [None] * len(rows)
+    if locale and rows:
+        from terrapod.services import summary_translation
+
+        translations = await asyncio.gather(
+            *(
+                summary_translation.translate_message(
+                    message_id=str(row.id), content=row.content, reader_locale=locale
+                )
+                for row in rows
+            )
+        )
+
+    data = []
+    for row, translated_content in zip(rows, translations, strict=True):
+        attrs = _plan_summary_message_attr(row)
+        attrs["translated"] = translated_content is not None
+        if translated_content is not None:
+            attrs["content"] = translated_content
+        data.append(
+            {
+                "id": f"plan-summary-message-{row.id}",
+                "type": "plan-summary-messages",
+                "attributes": attrs,
+            }
+        )
     return JSONResponse(
         content={
-            "data": [
-                {
-                    "id": f"plan-summary-message-{row.id}",
-                    "type": "plan-summary-messages",
-                    "attributes": _plan_summary_message_attr(row),
-                }
-                for row in rows
-            ],
+            "data": data,
             "meta": {
                 "count": len(rows),
+                "language": settings.ai_summary.summary_language,
             },
         }
     )
@@ -1268,8 +1326,9 @@ async def post_plan_summary_message(
 ) -> JSONResponse:
     """Post a user follow-up + get the synchronous assistant reply (#463).
 
-    Body: ``{"data": {"attributes": {"content": "..."}}}`` (JSON:API
-    shape, matches the rest of Terrapod's POST endpoints).
+    Body: ``{"data": {"attributes": {"content": "...", "locale": "de"}}}``
+    (JSON:API shape). ``locale`` is optional and carries the reader's UI
+    language (in the body, not a query string — it's request payload).
 
     The service path persists the user row first (so a failed model
     call still records what was asked), then calls the model with
@@ -1277,11 +1336,17 @@ async def post_plan_summary_message(
     Bedrock-Anthropic / Bedrock-Nova get the prompt-cache hit), then
     persists the assistant turn + telemetry.
 
-    Returns 201 with the assistant message attributes. Authorisation
-    is read-on-workspace — anyone who can see the run can chat in
-    its thread (matches PR conversation semantics, not per-user
-    threads).
+    Language handling (#767): the stored thread is authoritative and
+    monolingual in ``ai_summary.summary_language``. When ``locale`` is a
+    different real language, the incoming prompt is NORMALISED into the
+    system language before it joins the thread (keeps the thread + the
+    prompt-cache prefix single-language); the model answers in the system
+    language, and the reply is translated back to the reader's locale for
+    the response only. Returns 201 with the assistant message attributes.
+    Authorisation is read-on-workspace — anyone who can see the run can
+    chat in its thread (matches PR conversation semantics).
     """
+    from terrapod.services import summary_translation
     from terrapod.services.summariser import (
         FollowupBudgetExhausted,
         FollowupCapReached,
@@ -1291,13 +1356,21 @@ async def post_plan_summary_message(
     )
 
     content = ""
+    locale = None
     try:
         attrs = body.get("data", {}).get("attributes", {}) or {}
         content = str(attrs.get("content", "") or "")
+        raw_locale = attrs.get("locale")
+        locale = str(raw_locale) if raw_locale else None
     except AttributeError:
         raise HTTPException(status_code=400, detail="malformed body") from None
 
     run, summary, workspace = await _resolve_plan_summary_for_chat(run_id, user, db)
+
+    # Normalise the prompt into the system language so the stored thread
+    # stays monolingual/authoritative (no-op when reader == system language).
+    if locale:
+        content = await summary_translation.normalize_to_system_language(content, locale)
 
     try:
         assistant_row = await post_followup(
@@ -1321,13 +1394,25 @@ async def post_plan_summary_message(
         # transcript reflects the failure.
         raise HTTPException(status_code=502, detail=f"model call failed: {e}") from e
 
+    # The stored reply is in the system language; translate it back to the
+    # reader's locale for immediate display (the transcript GET does the same).
+    attrs = _plan_summary_message_attr(assistant_row)
+    attrs["translated"] = False
+    if locale:
+        reply_tr = await summary_translation.translate_message(
+            message_id=str(assistant_row.id), content=assistant_row.content, reader_locale=locale
+        )
+        if reply_tr is not None:
+            attrs["content"] = reply_tr
+            attrs["translated"] = True
+
     return JSONResponse(
         status_code=201,
         content={
             "data": {
                 "id": f"plan-summary-message-{assistant_row.id}",
                 "type": "plan-summary-messages",
-                "attributes": _plan_summary_message_attr(assistant_row),
+                "attributes": attrs,
             }
         },
     )

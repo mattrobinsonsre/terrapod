@@ -1,0 +1,63 @@
+{
+  "auth": {
+    "subtitleCli": "Sign in to authorise the CLI"
+  },
+  "status": {
+    "canceling": "Cancelling",
+    "canceled": "Cancelled"
+  },
+  "estate": {
+    "description": "Every workspace you can see and the modules they use, wired by run-triggers, remote-state, and module links. Group by whatever axis fits your estate — the platform enforces no labelling convention."
+  },
+  "planSummary": {
+    "pending": {
+      "summarisingPlan": "Summarising plan…"
+    },
+    "errored": {
+      "heading": "Summariser failed"
+    }
+  },
+  "runDetail": {
+    "status": {
+      "canceling": "Cancelling",
+      "canceled": "Cancelled"
+    },
+    "activity": {
+      "canceled": "Run cancelled"
+    },
+    "actions": {
+      "canceling": "Cancelling…"
+    },
+    "timeline": {
+      "canceled": "Cancelled"
+    },
+    "log": {
+      "color": "Colour",
+      "colorOnTitle": "Showing ANSI colours — click for plain text",
+      "colorOffTitle": "Showing plain text — click for colours",
+      "downloadColorTitle": "Download log (with ANSI colour codes)"
+    }
+  },
+  "workspaceDetail": {
+    "aiSummary": {
+      "modeEnabled": "Always summarise",
+      "modeDisabled": "Never summarise"
+    },
+    "vcsWorkflowWarning": {
+      "title": "Authorisation delegated to your VCS repository."
+    },
+    "sharing": {
+      "outboundHeading": "Workspaces authorised to read this workspace's state",
+      "pickerPlaceholder": "Search workspaces to authorise as a consumer…",
+      "inboundHeading": "Workspaces this workspace is authorised to read state from"
+    },
+    "errors": {
+      "authorizeConsumer": "Failed to authorise consumer"
+    }
+  },
+  "graphs": {
+    "stateTab": {
+      "colorByLabel": "Colour by"
+    }
+  }
+}

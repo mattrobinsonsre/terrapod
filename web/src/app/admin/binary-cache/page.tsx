@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import NavBar from '@/components/nav-bar'
 import { PageHeader } from '@/components/page-header'
 import { LoadingSpinner } from '@/components/loading-spinner'
@@ -42,6 +43,7 @@ interface CachedProvider {
 }
 
 export default function CachePage() {
+  const t = useTranslations('adminBinaryCache')
   const router = useRouter()
   const { confirmDelete, confirmTouchMutation } = useConfirm()
   const [entries, setEntries] = useState<CachedBinary[]>([])
@@ -107,7 +109,7 @@ export default function CachePage() {
         apiFetch('/api/terrapod/v1/admin/binary-cache'),
         apiFetch('/api/terrapod/v1/admin/provider-cache'),
       ])
-      if (!binaryRes.ok) throw new Error('Failed to load binary cache')
+      if (!binaryRes.ok) throw new Error(t('errors.loadBinary'))
       const binaryData = await binaryRes.json()
       setEntries(binaryData.data || [])
 
@@ -116,7 +118,7 @@ export default function CachePage() {
         setProviderEntries(providerData.data || [])
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load cache')
+      setError(err instanceof Error ? err.message : t('errors.loadCache'))
     } finally {
       setLoading(false)
     }
@@ -131,7 +133,7 @@ export default function CachePage() {
   }
 
   async function handleBulkWarm() {
-    if (!confirmTouchMutation('Warm the selected cache entries now?')) return
+    if (!confirmTouchMutation(t('warm.confirm'))) return
     setError('')
     setSuccess('')
     setWarmResults(null)
@@ -155,7 +157,7 @@ export default function CachePage() {
       })
 
     if (binaries.length === 0 && providers.length === 0) {
-      setError('Add at least one binary or provider line to warm.')
+      setError(t('warm.errorEmpty'))
       return
     }
 
@@ -173,50 +175,50 @@ export default function CachePage() {
         const detail = data.detail
         const msg = Array.isArray(detail)
           ? detail.map((d) => d?.msg || JSON.stringify(d)).join('; ')
-          : detail || `Warm failed (${res.status})`
+          : detail || t('warm.errorFailedStatus', { status: res.status })
         throw new Error(msg)
       }
       setWarmResults(data.results || [])
-      setSuccess(`Warmed ${data.succeeded}/${data.total} (${data.failed} failed)`)
+      setSuccess(t('warm.success', { succeeded: data.succeeded, total: data.total, failed: data.failed }))
       await loadAll()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to warm cache')
+      setError(err instanceof Error ? err.message : t('warm.errorFailed'))
     } finally {
       setWarming(false)
     }
   }
 
   async function handlePurge(tool: string, version: string) {
-    if (!confirmDelete(`Purge ${tool} ${version} from the cache? It will be re-fetched from upstream on the next request.`)) return
+    if (!confirmDelete(t('purge.confirmBinary', { tool, version }))) return
     setError('')
     setSuccess('')
     try {
       const res = await apiFetch(`/api/terrapod/v1/admin/binary-cache/${tool}/${version}`, {
         method: 'DELETE',
       })
-      if (!res.ok) throw new Error(`Purge failed (${res.status})`)
+      if (!res.ok) throw new Error(t('purge.errorStatus', { status: res.status }))
       const data = await res.json()
-      setSuccess(`Purged ${data.count || 0} entries for ${tool} ${version}`)
+      setSuccess(t('purge.successBinary', { count: data.count || 0, tool, version }))
       await loadAll()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to purge')
+      setError(err instanceof Error ? err.message : t('purge.error'))
     }
   }
 
   async function handleProviderPurge(hostname: string, namespace: string, type: string, version: string) {
-    if (!confirmDelete(`Purge ${namespace}/${type} ${version} from the provider cache? It will be re-fetched from upstream on the next request.`)) return
+    if (!confirmDelete(t('purge.confirmProvider', { provider: `${namespace}/${type}`, version }))) return
     setError('')
     setSuccess('')
     try {
       const res = await apiFetch(`/api/terrapod/v1/admin/provider-cache/${hostname}/${namespace}/${type}/${version}`, {
         method: 'DELETE',
       })
-      if (!res.ok) throw new Error(`Purge failed (${res.status})`)
+      if (!res.ok) throw new Error(t('purge.errorStatus', { status: res.status }))
       const data = await res.json()
-      setSuccess(`Purged ${data.count || 0} entries for ${namespace}/${type} ${version}`)
+      setSuccess(t('purge.successProvider', { count: data.count || 0, provider: `${namespace}/${type}`, version }))
       await loadAll()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to purge provider')
+      setError(err instanceof Error ? err.message : t('purge.errorProvider'))
     }
   }
 
@@ -253,7 +255,7 @@ export default function CachePage() {
   }
 
   async function handleBatchPurgeBinaries() {
-    if (!confirmDelete('Purge all selected binary cache entries? They will be re-fetched from upstream on the next request.')) return
+    if (!confirmDelete(t('batchPurge.confirmBinary'))) return
     setPurging(true)
     setError('')
     setSuccess('')
@@ -269,22 +271,22 @@ export default function CachePage() {
       let totalPurged = 0
       for (const { tool, version } of keys.values()) {
         const res = await apiFetch(`/api/terrapod/v1/admin/binary-cache/${tool}/${version}`, { method: 'DELETE' })
-        if (!res.ok) throw new Error(`Purge failed for ${tool} ${version}`)
+        if (!res.ok) throw new Error(t('batchPurge.errorBinaryItem', { tool, version }))
         const data = await res.json()
         totalPurged += data.count || 0
       }
-      setSuccess(`Purged ${totalPurged} binary cache entries`)
+      setSuccess(t('batchPurge.successBinary', { count: totalPurged }))
       setSelectedBinaries(new Set())
       await loadAll()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to purge')
+      setError(err instanceof Error ? err.message : t('purge.error'))
     } finally {
       setPurging(false)
     }
   }
 
   async function handleBatchPurgeProviders() {
-    if (!confirmDelete('Purge all selected provider cache entries? They will be re-fetched from upstream on the next request.')) return
+    if (!confirmDelete(t('batchPurge.confirmProvider'))) return
     setPurging(true)
     setError('')
     setSuccess('')
@@ -305,15 +307,15 @@ export default function CachePage() {
       let totalPurged = 0
       for (const { hostname, namespace, type, version } of keys.values()) {
         const res = await apiFetch(`/api/terrapod/v1/admin/provider-cache/${hostname}/${namespace}/${type}/${version}`, { method: 'DELETE' })
-        if (!res.ok) throw new Error(`Purge failed for ${namespace}/${type} ${version}`)
+        if (!res.ok) throw new Error(t('batchPurge.errorProviderItem', { provider: `${namespace}/${type}`, version }))
         const data = await res.json()
         totalPurged += data.count || 0
       }
-      setSuccess(`Purged ${totalPurged} provider cache entries`)
+      setSuccess(t('batchPurge.successProvider', { count: totalPurged }))
       setSelectedProviders(new Set())
       await loadAll()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to purge providers')
+      setError(err instanceof Error ? err.message : t('purge.errorProviders'))
     } finally {
       setPurging(false)
     }
@@ -332,8 +334,8 @@ export default function CachePage() {
       <NavBar />
       <main className="px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto">
         <PageHeader
-          title="Cache"
-          description="CLI binary and provider cache management"
+          title={t('title')}
+          description={t('description')}
         />
 
         {error && <ErrorBanner message={error} />}
@@ -354,20 +356,20 @@ export default function CachePage() {
                 className="w-full flex items-center justify-between px-4 py-3 text-left text-slate-200 font-semibold"
                 aria-expanded={showWarm}
               >
-                <span>Warm cache</span>
-                <span className="text-slate-400 text-sm">{showWarm ? 'Hide' : 'Pre-populate…'}</span>
+                <span>{t('warm.heading')}</span>
+                <span className="text-slate-400 text-sm">{showWarm ? t('warm.hide') : t('warm.prePopulate')}</span>
               </button>
               {showWarm && (
                 <div className="px-4 pb-4 space-y-4 border-t border-slate-700/50 pt-4">
                   <p className="text-sm text-slate-400">
-                    Pre-pull binaries and provider platforms into the cache (one per line).
-                    Trailing <code className="text-slate-300">os/arch</code> tokens are optional —
-                    omit them to use the configured default platforms.
+                    {t.rich('warm.help', {
+                      code: (chunks) => <code className="text-slate-300">{chunks}</code>,
+                    })}
                   </p>
                   <div className="grid gap-4 md:grid-cols-2">
                     <div>
                       <label htmlFor="warm-binaries" className="block text-sm text-slate-300 mb-1">
-                        Binaries — <span className="text-slate-500">tool version [os/arch …]</span>
+                        {t('warm.binariesLabel')} — <span className="text-slate-500">tool version [os/arch …]</span>
                       </label>
                       <textarea
                         id="warm-binaries"
@@ -381,7 +383,7 @@ export default function CachePage() {
                     </div>
                     <div>
                       <label htmlFor="warm-providers" className="block text-sm text-slate-300 mb-1">
-                        Providers — <span className="text-slate-500">host/ns/type version [os/arch …]</span>
+                        {t('warm.providersLabel')} — <span className="text-slate-500">host/ns/type version [os/arch …]</span>
                       </label>
                       <textarea
                         id="warm-providers"
@@ -399,7 +401,7 @@ export default function CachePage() {
                     disabled={warming}
                     className="px-4 py-2 rounded-lg text-sm font-medium bg-violet-600/30 hover:bg-violet-600/50 disabled:opacity-50 text-violet-200 transition-colors"
                   >
-                    {warming ? 'Warming…' : 'Warm'}
+                    {warming ? t('warm.warming') : t('warm.warm')}
                   </button>
                   {warmResults && warmResults.length > 0 && (
                     <ul className="space-y-1 text-sm">
@@ -417,19 +419,19 @@ export default function CachePage() {
 
             {/* Binary Cache Section */}
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-lg font-semibold text-slate-200">CLI Binaries</h2>
+              <h2 className="text-lg font-semibold text-slate-200">{t('sections.cliBinaries')}</h2>
               {selectedBinaries.size > 0 && (
                 <button
                   onClick={handleBatchPurgeBinaries}
                   disabled={purging}
                   className="px-3 py-1.5 rounded-lg text-sm font-medium bg-red-600/20 hover:bg-red-600/40 disabled:opacity-50 text-red-400 transition-colors"
                 >
-                  {purging ? 'Purging...' : `Purge Selected (${selectedBinaries.size})`}
+                  {purging ? t('batchPurge.purging') : t('batchPurge.purgeSelected', { count: selectedBinaries.size })}
                 </button>
               )}
             </div>
             {entries.length === 0 ? (
-              <EmptyState message="No cached CLI binaries yet." />
+              <EmptyState message={t('empty.binaries')} />
             ) : (
               <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-x-auto mb-8">
                 <table className="w-full text-sm">
@@ -439,12 +441,12 @@ export default function CachePage() {
                         <input type="checkbox" checked={selectedBinaries.size === entries.length && entries.length > 0} onChange={toggleAllBinaries}
                           className="rounded border-slate-600 bg-slate-700 text-brand-600 focus:ring-brand-500" />
                       </th>
-                      <SortableHeader label="Tool" sortKey="tool" sortState={binarySortState} onSort={toggleBinarySort} />
-                      <SortableHeader label="Version" sortKey="version" sortState={binarySortState} onSort={toggleBinarySort} />
-                      <SortableHeader label="OS" sortKey="os" sortState={binarySortState} onSort={toggleBinarySort} />
-                      <SortableHeader label="Arch" sortKey="arch" sortState={binarySortState} onSort={toggleBinarySort} />
-                      <SortableHeader label="Cached At" sortKey="cached-at" sortState={binarySortState} onSort={toggleBinarySort} />
-                      <th className="text-right px-4 py-3 text-slate-400 font-medium">Actions</th>
+                      <SortableHeader label={t('columns.tool')} sortKey="tool" sortState={binarySortState} onSort={toggleBinarySort} />
+                      <SortableHeader label={t('columns.version')} sortKey="version" sortState={binarySortState} onSort={toggleBinarySort} />
+                      <SortableHeader label={t('columns.os')} sortKey="os" sortState={binarySortState} onSort={toggleBinarySort} />
+                      <SortableHeader label={t('columns.arch')} sortKey="arch" sortState={binarySortState} onSort={toggleBinarySort} />
+                      <SortableHeader label={t('columns.cachedAt')} sortKey="cached-at" sortState={binarySortState} onSort={toggleBinarySort} />
+                      <th className="text-right px-4 py-3 text-slate-400 font-medium">{t('columns.actions')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -464,7 +466,7 @@ export default function CachePage() {
                             onClick={() => handlePurge(entry.attributes.tool, entry.attributes.version)}
                             className="px-2.5 py-1 rounded-md text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300 transition-colors"
                           >
-                            Purge
+                            {t('purge.button')}
                           </button>
                         </td>
                       </tr>
@@ -476,19 +478,19 @@ export default function CachePage() {
 
             {/* Provider Cache Section */}
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-lg font-semibold text-slate-200">Provider Binaries</h2>
+              <h2 className="text-lg font-semibold text-slate-200">{t('sections.providerBinaries')}</h2>
               {selectedProviders.size > 0 && (
                 <button
                   onClick={handleBatchPurgeProviders}
                   disabled={purging}
                   className="px-3 py-1.5 rounded-lg text-sm font-medium bg-red-600/20 hover:bg-red-600/40 disabled:opacity-50 text-red-400 transition-colors"
                 >
-                  {purging ? 'Purging...' : `Purge Selected (${selectedProviders.size})`}
+                  {purging ? t('batchPurge.purging') : t('batchPurge.purgeSelected', { count: selectedProviders.size })}
                 </button>
               )}
             </div>
             {providerEntries.length === 0 ? (
-              <EmptyState message="No cached provider binaries yet." />
+              <EmptyState message={t('empty.providers')} />
             ) : (
               <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-x-auto">
                 <table className="w-full text-sm">
@@ -498,13 +500,13 @@ export default function CachePage() {
                         <input type="checkbox" checked={selectedProviders.size === providerEntries.length && providerEntries.length > 0} onChange={toggleAllProviders}
                           className="rounded border-slate-600 bg-slate-700 text-brand-600 focus:ring-brand-500" />
                       </th>
-                      <SortableHeader label="Provider" sortKey="provider" sortState={providerSortState} onSort={toggleProviderSort} />
-                      <SortableHeader label="Version" sortKey="version" sortState={providerSortState} onSort={toggleProviderSort} />
-                      <SortableHeader label="Hostname" sortKey="hostname" sortState={providerSortState} onSort={toggleProviderSort} />
-                      <SortableHeader label="OS" sortKey="os" sortState={providerSortState} onSort={toggleProviderSort} />
-                      <SortableHeader label="Arch" sortKey="arch" sortState={providerSortState} onSort={toggleProviderSort} />
-                      <SortableHeader label="Cached At" sortKey="cached-at" sortState={providerSortState} onSort={toggleProviderSort} />
-                      <th className="text-right px-4 py-3 text-slate-400 font-medium">Actions</th>
+                      <SortableHeader label={t('columns.provider')} sortKey="provider" sortState={providerSortState} onSort={toggleProviderSort} />
+                      <SortableHeader label={t('columns.version')} sortKey="version" sortState={providerSortState} onSort={toggleProviderSort} />
+                      <SortableHeader label={t('columns.hostname')} sortKey="hostname" sortState={providerSortState} onSort={toggleProviderSort} />
+                      <SortableHeader label={t('columns.os')} sortKey="os" sortState={providerSortState} onSort={toggleProviderSort} />
+                      <SortableHeader label={t('columns.arch')} sortKey="arch" sortState={providerSortState} onSort={toggleProviderSort} />
+                      <SortableHeader label={t('columns.cachedAt')} sortKey="cached-at" sortState={providerSortState} onSort={toggleProviderSort} />
+                      <th className="text-right px-4 py-3 text-slate-400 font-medium">{t('columns.actions')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -532,7 +534,7 @@ export default function CachePage() {
                             )}
                             className="px-2.5 py-1 rounded-md text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300 transition-colors"
                           >
-                            Purge
+                            {t('purge.button')}
                           </button>
                         </td>
                       </tr>

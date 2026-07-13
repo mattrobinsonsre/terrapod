@@ -1,0 +1,2621 @@
+{
+  "nav": {
+    "workspaces": "Çalışma Alanları",
+    "estate": "Envanter",
+    "registry": "Registry",
+    "modules": "Modüller",
+    "providers": "Sağlayıcılar",
+    "catalog": "Katalog",
+    "agentPools": "Agent Havuzları",
+    "admin": "Yönetim",
+    "users": "Kullanıcılar",
+    "roles": "Roller",
+    "vcsConnections": "VCS Bağlantıları",
+    "variableSets": "Değişken Setleri",
+    "autodiscovery": "Otomatik Keşif",
+    "bulkUpdate": "Toplu Güncelleme",
+    "executionHooks": "Yürütme Kancaları",
+    "policySets": "Politika Setleri",
+    "providerTemplates": "Sağlayıcı Şablonları",
+    "catalogAdmin": "Katalog Yönetimi",
+    "cache": "Önbellek",
+    "auditLog": "Denetim Günlüğü",
+    "help": "Yardım",
+    "apiReference": "API Başvurusu",
+    "docs": "Dokümanlar",
+    "account": "Hesap",
+    "apiTokens": "API Belirteçleri",
+    "sessions": "Oturumlar",
+    "logOut": "Çıkış yap",
+    "menu": "Menü",
+    "openMenu": "Menüyü aç",
+    "openAccountMenu": "Hesap menüsünü aç",
+    "closeMenu": "Menüyü kapat"
+  },
+  "switcher": {
+    "language": "Dil",
+    "changeLanguage": "Dili değiştir"
+  },
+  "workspaces": {
+    "title": "Çalışma Alanları",
+    "description": "Terraform çalışma alanlarını, durumunu ve çalıştırmalarını yönetin",
+    "new": "Yeni Çalışma Alanı",
+    "cancel": "İptal",
+    "create": "Çalışma Alanı Oluştur",
+    "creating": "Oluşturuluyor…",
+    "loadFailed": "Çalışma alanları yüklenemedi",
+    "createFailed": "Çalışma alanı oluşturulamadı",
+    "form": {
+      "name": "Ad",
+      "namePattern": "Yalnızca harfler, sayılar, tireler ve alt çizgiler. Bir harf veya sayı ile başlamalıdır.",
+      "namePlaceholder": "my-workspace",
+      "executionMode": "Yürütme Modu",
+      "local": "Yerel",
+      "agent": "Agent",
+      "executionBackend": "Yürütme Arka Ucu",
+      "version": "Sürüm",
+      "versionTitle": "X.Y veya X.Y.Z biçiminde sürüm (örn. 1.11 veya 1.11.5)",
+      "versionPlaceholder": "örn. 1.11 veya 1.11.5",
+      "cpuRequest": "CPU İsteği",
+      "cpuTitle": "Kubernetes CPU miktarı: tam çekirdek (1, 2) veya milliçekirdek (500m, 100m)",
+      "cpuHint": "örn. 1, 0.5, 500m",
+      "memoryRequest": "Bellek İsteği",
+      "memoryTitle": "Kubernetes bellek miktarı: bayt (1000) veya son ekli (512Mi, 2Gi, 1Ti)",
+      "memoryHint": "örn. 2Gi, 512Mi, 1Ti",
+      "agentPool": "Agent Havuzu",
+      "none": "Yok",
+      "autoApply": "Otomatik Uygula",
+      "enabled": "Etkin",
+      "workingDirectory": "Çalışma Dizini",
+      "workingDirectoryPlaceholder": "örn. environments/dev",
+      "workingDirectoryHint": "Repo içinde .tf dosyalarını içeren alt dizin",
+      "vcsConnection": "VCS Bağlantısı",
+      "vcsRepoUrl": "VCS Depo URL''si",
+      "vcsRepoUrlTitle": "HTTP veya HTTPS URL''si olmalıdır",
+      "vcsRepoUrlPlaceholder": "https://github.com/org/repo",
+      "vcsBranch": "VCS Dalı",
+      "vcsBranchPlaceholder": "main (varsayılan)"
+    },
+    "stats": {
+      "total": "Toplam",
+      "health": "Sağlık",
+      "locked": "Kilitli",
+      "clearAllFilters": "Tüm filtreleri temizle",
+      "clearHealthFilter": "Sağlık sorunları filtresini temizle",
+      "filterHealth": "Sağlık sorunu olan çalışma alanlarına göre filtrele",
+      "clearLockedFilter": "Kilitli filtresini temizle",
+      "filterLocked": "Kilitli çalışma alanlarına göre filtrele"
+    },
+    "filter": {
+      "placeholder": "Ada, etikete veya duruma göre filtrele — örn. \"eu1\", \"env:prod\", \"status:errored\"",
+      "ariaLabel": "Çalışma alanlarını filtrele",
+      "clear": "Temizle",
+      "status": "Durum",
+      "label": "Etiket",
+      "back": "geri",
+      "valueCount": "{count, plural, one {# değer} other {# değer}}",
+      "removeTerm": "Bu terimi kaldır",
+      "showing": "{total} içinden {filtered} gösteriliyor",
+      "termName": "ad: {value}",
+      "termStatus": "durum: {value}",
+      "termLabelAny": "{key}: (herhangi)",
+      "termLabel": "{key}: {value}",
+      "hintStatus": "durum",
+      "hintHealth": "sağlık",
+      "hintLabel": "etiket",
+      "hintLabelKey": "etiket anahtarı",
+      "hintName": "ad"
+    },
+    "row": {
+      "removeLabelFilter": "Filtreden kaldırmak için tıklayın",
+      "addLabelFilter": "Bu etikete göre filtrelemek için tıklayın"
+    },
+    "table": {
+      "name": "Ad",
+      "mode": "Mod",
+      "pool": "Havuz",
+      "resources": "Kaynaklar",
+      "status": "Durum",
+      "created": "Oluşturulma",
+      "resourcesValue": "{cpu} CPU / {memory}"
+    },
+    "empty": {
+      "none": "Henüz çalışma alanı yok. Başlamak için bir tane oluşturun.",
+      "noMatch": "Bu filtreyle eşleşen çalışma alanı yok."
+    }
+  },
+  "status": {
+    "state-diverged": "Durum Ayrıştı",
+    "vcs-error": "VCS Hatası",
+    "drifted": "Sürüklendi",
+    "errored": "Hata Verdi",
+    "needs-confirm": "Onay Gerekiyor",
+    "planning": "Planlanıyor",
+    "applying": "Uygulanıyor",
+    "canceling": "İptal Ediliyor",
+    "confirmed": "Onaylandı",
+    "queued": "Sıraya Alındı",
+    "pending": "Beklemede",
+    "applied": "Uygulandı",
+    "planned": "Planlandı",
+    "canceled": "İptal Edildi",
+    "discarded": "İptal Edildi",
+    "pendingDeletion": "Silinmeyi bekliyor",
+    "archived": "Arşivlendi"
+  },
+  "auth": {
+    "loading": "Yükleniyor...",
+    "subtitle": "Altyapınızı yönetmek için oturum açın",
+    "subtitleCli": "CLI''yi yetkilendirmek için oturum açın",
+    "emailLabel": "E-posta",
+    "passwordLabel": "Parola",
+    "signIn": "Oturum aç",
+    "signingIn": "Oturum açılıyor...",
+    "signInWith": "{provider} ile oturum aç",
+    "or": "veya",
+    "noProviders": "Yapılandırılmış kimlik doğrulama sağlayıcısı yok",
+    "completingSignIn": "Oturum açma tamamlanıyor...",
+    "callbackFailedTitle": "Kimlik Doğrulama Başarısız",
+    "tryAgain": "Tekrar Dene",
+    "errors": {
+      "loadProviders": "Sağlayıcılar yüklenemedi",
+      "authenticationFailed": "Kimlik doğrulama başarısız ({status})",
+      "tokenExchangeFailed": "Belirteç değişimi başarısız ({status})",
+      "loginFailed": "Oturum açma başarısız",
+      "startLoginFailed": "Oturum açma başlatılamadı",
+      "missingCodeOrState": "Yetkilendirme kodu veya durum eksik",
+      "stateMismatch": "Durum uyuşmazlığı — olası CSRF saldırısı",
+      "missingVerifier": "PKCE doğrulayıcısı eksik — lütfen tekrar oturum açmayı deneyin"
+    }
+  },
+  "estate": {
+    "title": "Envanter topolojisi",
+    "description": "Görebildiğiniz her çalışma alanı ve kullandıkları modüller; çalıştırma tetikleyicileri, uzak durum ve modül bağlantılarıyla birbirine bağlıdır. Envanterinize uyan herhangi bir eksene göre gruplayın — platform herhangi bir etiketleme kuralını zorunlu kılmaz.",
+    "errors": {
+      "load": "Envanter grafiği yüklenemedi."
+    },
+    "groupBy": {
+      "label": "Gruplama ölçütü"
+    },
+    "view": {
+      "graph": "Grafik",
+      "table": "Tablo"
+    },
+    "counts": {
+      "workspaces": "{count, plural, one {# çalışma alanı} other {# çalışma alanı}}",
+      "modules": "{count, plural, one {# modül} other {# modül}}",
+      "dependencies": "{count, plural, one {# bağımlılık} other {# bağımlılık}}"
+    },
+    "legend": {
+      "registryModule": "registry modülü"
+    },
+    "detail": {
+      "moduleImpact": "{count, plural, one {çalışma alanı bunu kullanır — güncellemek onu yeniden planlar} other {çalışma alanı bunu kullanır — güncellemek hepsini yeniden planlar}}",
+      "dependOnThis": "{count, plural, one {buna bağımlı} other {buna bağımlı}}"
+    },
+    "table": {
+      "workspaces": {
+        "heading": "Çalışma Alanları",
+        "col": {
+          "workspace": "Çalışma Alanı",
+          "group": "Grup",
+          "agentPool": "Agent havuzu",
+          "dependedOnBy": "Bağımlı olanlar",
+          "modulesUsed": "Kullanılan modüller"
+        },
+        "noModules": "—"
+      },
+      "modules": {
+        "heading": "Modüller",
+        "col": {
+          "module": "Modül",
+          "usedBy": "Kullananlar (çalışma alanları)"
+        }
+      }
+    }
+  },
+  "labels": {
+    "title": "Etiketler",
+    "description": "Çalışma alanları, agent havuzları, registry modülleri ve registry sağlayıcıları genelinde kullanılan etiketlere göz atın. Salt okunur — etiketler her varlığın kendi sayfasında düzenlenir.",
+    "none": "Yok.",
+    "emptyKeys": "Henüz kullanılan etiket yok. Burada gruplamaya başlamak için herhangi bir çalışma alanını, agent havuzunu, registry modülünü veya registry sağlayıcısını etiketleyin.",
+    "emptyValues": "\"{key}\" için değer yok. Ya bu etiketi taşıyan okunabilir bir varlık yok ya da son görünümden bu yana kaldırıldı.",
+    "loadKeysFailed": "Etiketler yüklenemedi ({status})",
+    "loadValuesFailed": "{key} için değerler yüklenemedi ({status})",
+    "loadEntitiesFailed": "Varlıklar yüklenemedi ({status})",
+    "columns": {
+      "labelKey": "Etiket anahtarı",
+      "distinctValues": "Benzersiz değerler",
+      "value": "Değer",
+      "total": "Toplam"
+    },
+    "entity": {
+      "workspaces": "Çalışma Alanları",
+      "agentPools": "Agent havuzları",
+      "modules": "Modüller",
+      "providers": "Sağlayıcılar"
+    },
+    "deprecated": {
+      "badge": "Kullanımdan kaldırıldı ve desteklenmiyor.",
+      "body": "Etiketler tarayıcısı artık ana gezinmede yer almıyor ve gelecek bir sürümde kaldırılacak. Bunun yerine <workspacesLink>Çalışma Alanları</workspacesLink> sayfasından etikete göre filtreleyin. Bu sayfaya güveniyorsanız lütfen <issueLink>bir sorun açın</issueLink>."
+    }
+  },
+  "settings": {
+    "tokens": {
+      "title": "API Belirteçleri",
+      "description": "CLI ve otomasyon için kimlik doğrulama belirteçlerini yönetin",
+      "descriptionAll": "Tüm kullanıcılar genelindeki tüm belirteçler",
+      "myTokens": "Belirteçlerim",
+      "allTokens": "Tüm Belirteçler",
+      "createToken": "Belirteç Oluştur",
+      "cancel": "İptal",
+      "tokenReady": "Belirteç hazır",
+      "tokenReadyHelp": "Bu belirteci şimdi kopyalayın — bir daha gösterilmeyecek.",
+      "dismissToken": "Belirteci kapat",
+      "hide": "Gizle",
+      "show": "Göster",
+      "copy": "Kopyala",
+      "empty": "Henüz API belirteci yok.",
+      "noDescription": "Açıklama yok",
+      "detached": "bağımsız",
+      "never": "Asla",
+      "selected": "{count, plural, one {# belirteç seçildi} other {# belirteç seçildi}}",
+      "revokeSelected": "Seçilenleri İptal Et",
+      "revoking": "İptal ediliyor...",
+      "clearSelection": "Seçimi temizle",
+      "rotate": "Yenile",
+      "rotating": "Yenileniyor...",
+      "revoke": "İptal Et",
+      "confirmRotate": "Bu belirteç yenilensin mi? Mevcut gizli değer hemen çalışmayı durdurur ve yenisi verilir.",
+      "confirmBulkRevoke": "{count, plural, one {# belirteç iptal edilsin mi?} other {# belirteç iptal edilsin mi?}}",
+      "kinds": {
+        "interactive": {
+          "label": "Kişisel",
+          "help": "CLI ve anlık otomasyon için kişisel bir belirteç. Tüm canlı izinlerinizi taşır."
+        },
+        "service_bound": {
+          "label": "Hizmet · bağlı",
+          "help": "Rollerinizin bir alt kümesine kapsamlanan bir hizmet belirteci. Erişimi, bu roller ile sizinkilerin kesişimidir — ve hesabınız kaldırılırsa çalışmayı durdurur."
+        },
+        "service_detached": {
+          "label": "Hizmet · bağımsız",
+          "help": "Herhangi bir kullanıcıya bağlı olmayan, mutlak sabit kapsamlı, yönetici tarafından yönetilen bir hizmet belirteci. Herhangi birinin ayrılmasından bağımsız olarak devam etmesi gereken kritik makineden makineye otomasyon için kullanın."
+        }
+      },
+      "lifespans": {
+        "720": "30 gün",
+        "2160": "90 gün",
+        "4320": "180 gün",
+        "8760": "1 yıl"
+      },
+      "filter": {
+        "all": "Tüm türler"
+      },
+      "form": {
+        "description": "Açıklama",
+        "descriptionPlaceholder": "CI/CD işlem hattı belirteci",
+        "kind": "Tür",
+        "lifespan": "Kullanım Süresi",
+        "create": "Oluştur",
+        "creating": "Oluşturuluyor...",
+        "pinnedRoles": "Sabitlenmiş roller",
+        "pinnedRolesHelp": "— bu belirtecin sınırlandığı kapsam",
+        "pinnedRolesCapped": "(kendi erişiminizle sınırlandırıldı)",
+        "noCustomRoles": "Tanımlı özel rol yok. Önce Yönetim → Roller altında roller oluşturun.",
+        "noScopedRoles": "Sabitlenecek kapsamlı rolünüz yok. Bu belirtecin erişimi olmaz."
+      },
+      "columns": {
+        "description": "Açıklama",
+        "kind": "Tür",
+        "boundTo": "Bağlı Olduğu",
+        "created": "Oluşturulma",
+        "lastUsed": "Son Kullanım",
+        "expires": "Sona Erme",
+        "actions": "Eylemler"
+      },
+      "errors": {
+        "load": "Belirteçler yüklenemedi",
+        "create": "Belirteç oluşturulamadı ({status})",
+        "createGeneric": "Belirteç oluşturulamadı",
+        "rotate": "Belirteç yenilenemedi ({status})",
+        "rotateGeneric": "Belirteç yenilenemedi",
+        "revoke": "Belirteç iptal edilemedi ({status})",
+        "revokeGeneric": "Belirteç iptal edilemedi",
+        "bulkRevoke": "Belirteçler iptal edilemedi"
+      }
+    },
+    "sessions": {
+      "title": "Oturumlar",
+      "description": "Etkin oturumlarınız",
+      "descriptionAll": "Platform genelindeki tüm etkin oturumlar",
+      "empty": "Etkin oturum yok.",
+      "revokeAll": "Tümünü İptal Et",
+      "current": "Geçerli",
+      "columns": {
+        "provider": "Sağlayıcı",
+        "created": "Oluşturulma",
+        "expires": "Sona Erme",
+        "lastActive": "Son Etkinlik",
+        "token": "Belirteç"
+      },
+      "errors": {
+        "load": "Oturumlar yüklenemedi",
+        "revoke": "Oturumlar iptal edilemedi ({status})",
+        "revokeGeneric": "Oturumlar iptal edilemedi"
+      }
+    }
+  },
+  "registry": {
+    "modules": {
+      "title": "Modüller",
+      "description": "Özel Terraform modül registry''si",
+      "cancel": "İptal",
+      "createModule": "Modül Oluştur",
+      "empty": "Henüz modül yok. Başlamak için bir tane oluşturun.",
+      "providerLabel": "Sağlayıcı: {provider}",
+      "versionCount": "{count, plural, one {# sürüm} other {# sürüm}}",
+      "loadFailed": "Modüller yüklenemedi",
+      "createFailed": "Modül oluşturulamadı",
+      "createFailedStatus": "Modül oluşturulamadı ({status})",
+      "form": {
+        "name": "Ad",
+        "provider": "Sağlayıcı",
+        "slugTitle": "Yalnızca küçük harfler, sayılar ve tireler. Bir küçük harfle başlamalıdır.",
+        "addressNote": "Ad ve sağlayıcı, modülün registry adresini oluşturur ve oluşturulduktan sonra değiştirilemez.",
+        "vcsConnectionOptional": "VCS Bağlantısı (isteğe bağlı)",
+        "noneUploadManually": "Yok — sürümleri elle yükle",
+        "repositoryUrl": "Depo URL''si",
+        "branchOptional": "Dal (isteğe bağlı)",
+        "branchPlaceholder": "main (varsayılan için boş bırakın)",
+        "tagPattern": "Etiket Deseni",
+        "tagPatternHint": "Yalnızca bu desenle eşleşen etiketler sürüm oluşturur (örn. v1.0.0)",
+        "labelsOptional": "Etiketler (isteğe bağlı)",
+        "creating": "Oluşturuluyor...",
+        "create": "Oluştur"
+      }
+    },
+    "providers": {
+      "title": "Sağlayıcılar",
+      "description": "Özel Terraform sağlayıcı registry''si",
+      "cancel": "İptal",
+      "createProvider": "Sağlayıcı Oluştur",
+      "empty": "Henüz sağlayıcı yok. Başlamak için bir tane oluşturun.",
+      "loadFailed": "Sağlayıcılar yüklenemedi",
+      "createFailed": "Sağlayıcı oluşturulamadı",
+      "createFailedStatus": "Sağlayıcı oluşturulamadı ({status})",
+      "form": {
+        "name": "Ad",
+        "slugTitle": "Yalnızca küçük harfler, sayılar ve tireler. Bir küçük harfle başlamalıdır.",
+        "creating": "Oluşturuluyor...",
+        "create": "Oluştur"
+      }
+    },
+    "meta": {
+      "title": "Meta Veri",
+      "edit": "Düzenle",
+      "cancel": "İptal",
+      "save": "Kaydet",
+      "saving": "Kaydediliyor...",
+      "saveAnyway": "Yine de Kaydet",
+      "revertLabels": "Etiketleri Geri Al",
+      "owner": "Sahip",
+      "ownerNone": "Yok",
+      "ownerPlaceholder": "user@example.com",
+      "labels": "Etiketler"
+    },
+    "moduleDetail": {
+      "notFound": "Modül bulunamadı",
+      "loadFailed": "Modül yüklenemedi",
+      "updateFailed": "Modül güncellenemedi",
+      "labelLockoutDefault": "Bu etiket değişikliği erişiminizi azaltır.",
+      "providerLabel": "Sağlayıcı: {provider}",
+      "cancel": "İptal",
+      "uploadVersion": "Sürüm Yükle",
+      "vcsConnected": "VCS Bağlı",
+      "connectVcs": "VCS Bağla",
+      "deleteModule": "Modülü Sil",
+      "linkFailed": "Çalışma alanı bağlanamadı",
+      "linkFailedStatus": "Bağlama başarısız ({status})",
+      "unlinkConfirm": "Bu çalışma alanının modülle bağlantısı kaldırılsın mı? Onun için artık etki analizi çalışmayacak.",
+      "unlinkFailed": "Çalışma alanının bağlantısı kaldırılamadı",
+      "unlinkFailedStatus": "Bağlantı kaldırma başarısız ({status})",
+      "uploadFailed": "Yükleme başarısız",
+      "uploadFailedStatus": "Yükleme başarısız ({status})",
+      "saveVcsFailed": "VCS yapılandırması kaydedilemedi",
+      "saveVcsFailedStatus": "VCS yapılandırması kaydedilemedi ({status})",
+      "disableVcsFailed": "VCS devre dışı bırakılamadı",
+      "disableVcsFailedStatus": "VCS devre dışı bırakılamadı ({status})",
+      "deleteFailed": "Silme başarısız",
+      "deleteFailedStatus": "Silme başarısız ({status})",
+      "upload": {
+        "intro": "Terraform modül dosyalarınızı içeren bir dizin seçin. Bir tarball''a paketlenip yüklenecekler.",
+        "version": "Sürüm",
+        "moduleDirectory": "Modül Dizini",
+        "selectDirectory": "Dizin Seç",
+        "fileCount": "{count, plural, one {# dosya} other {# dosya}}",
+        "filesToInclude": "{count, plural, one {dahil edilecek # dosya:} other {dahil edilecek # dosya:}}",
+        "andMore": "...ve {count} tane daha",
+        "uploading": "Yükleniyor...",
+        "upload": "Yükle"
+      },
+      "vcs": {
+        "intro": "Bu modülü bir VCS deposuna bağlayın. Etiket desenine uyan semver etiketleri gönderildiğinde yeni sürümler otomatik olarak yayımlanır. Yalnızca dal işlemeleri sürüm oluşturmaz.",
+        "connection": "VCS Bağlantısı",
+        "selectConnection": "Bir bağlantı seçin...",
+        "repositoryUrl": "Depo URL''si",
+        "branchOptional": "Dal (isteğe bağlı)",
+        "branchPlaceholder": "main (varsayılan için boş bırakın)",
+        "tagPattern": "Etiket Deseni",
+        "tagPatternHint": "Yalnızca bu desenle eşleşen etiketler sürüm oluşturur (örn. v1.0.0)",
+        "saving": "Kaydediliyor...",
+        "saveConfiguration": "VCS Yapılandırmasını Kaydet",
+        "disconnect": "VCS Bağlantısını Kes"
+      },
+      "vcsStatus": {
+        "connected": "VCS bağlı:",
+        "lastTag": "Son etiket: {tag}",
+        "firstVersionHint": "İlk sürümü yayımlamak için etiket desenine uyan bir semver etiketi (örn. <code>v1.0.0</code>) gönderin."
+      },
+      "links": {
+        "title": "Bağlı Çalışma Alanları",
+        "linkWorkspace": "Çalışma Alanı Bağla",
+        "description": "Bağlı çalışma alanları, bu modüle karşı PR''lar açıldığında spekülatif planlar ve yeni sürümler yayımlandığında standart çalıştırmalar alır.",
+        "searchPlaceholder": "Bağlanacak çalışma alanlarını ara…",
+        "empty": "Henüz bağlı çalışma alanı yok.",
+        "unlinkTitle": "Çalışma alanının bağlantısını kaldır"
+      },
+      "interface": {
+        "title": "Girdiler ve Çıktılar",
+        "counts": "{inputs} girdi, {outputs} çıktı",
+        "versionLabel": "Sürüm:",
+        "noData": "Bu sürüm için arayüz verisi mevcut değil.",
+        "inputs": "Girdiler",
+        "outputs": "Çıktılar",
+        "name": "Ad",
+        "type": "Tür",
+        "description": "Açıklama",
+        "default": "Varsayılan",
+        "required": "Gerekli",
+        "sensitive": "Hassas",
+        "requiredBadge": "gerekli",
+        "optionalBadge": "isteğe bağlı",
+        "sensitiveBadge": "hassas",
+        "noneDeclared": "Bu modül sürümü herhangi bir girdi veya çıktı bildirmiyor."
+      },
+      "versions": {
+        "title": "Sürümler",
+        "count": "{count, plural, one {# sürüm} other {# sürüm}}",
+        "emptyVcs": "Henüz sürüm yok. Bir sürüm yayımlamak için bağlı depoya \"{pattern}\" ile eşleşen bir semver etiketi gönderin.",
+        "emptyUpload": "Henüz sürüm yok. Başlamak için bir modül yükleyin veya VCS bağlayın.",
+        "version": "Sürüm",
+        "status": "Durum",
+        "source": "Kaynak",
+        "actions": "Eylemler",
+        "manualUpload": "elle yükleme",
+        "delete": "Sil"
+      },
+      "deleteDialog": {
+        "title": "Silmeyi Onayla",
+        "moduleBody": "Bu, bu modülü ve tüm sürümlerini kalıcı olarak siler.",
+        "versionBody": "Bu, {version} sürümünü kalıcı olarak siler.",
+        "cancel": "İptal",
+        "confirm": "Sil"
+      }
+    },
+    "providerDetail": {
+      "description": "Sağlayıcı registry''si",
+      "deleteProvider": "Sağlayıcıyı Sil",
+      "publishNote": "Sağlayıcı sürümleri, ikili dosyaları istemci tarafında imzalayan <code>terrapod-publish</code> CLI''si ile yayımlanır. Sağlayıcı ikili dosyalarını tarayıcıdan yükleme ve imzalama artık desteklenmiyor. Bu sayfa sürümler ve platformlar için salt okunurdur.",
+      "empty": "Henüz sürüm yok. Başlamak için terrapod-publish CLI''si ile yayımlayın.",
+      "loadVersionsFailed": "Sürümler yüklenemedi",
+      "updateFailed": "Sağlayıcı güncellenemedi",
+      "labelLockoutDefault": "Bu etiket değişikliği erişiminizi azaltır.",
+      "deleteFailed": "Silme başarısız",
+      "deleteFailedStatus": "Silme başarısız ({status})",
+      "platformCount": "{count, plural, one {# platform} other {# platform}}",
+      "delete": "Sil",
+      "os": "OS",
+      "arch": "Arch",
+      "filename": "Dosya adı",
+      "actions": "Eylemler",
+      "deleteDialog": {
+        "title": "Silmeyi Onayla",
+        "providerBody": "Bu, bu sağlayıcıyı ve tüm sürümlerini kalıcı olarak siler.",
+        "versionBody": "Bu, {version} sürümünü ve platformlarını kalıcı olarak siler.",
+        "platformBody": "Bu, {os}/{arch} platformunu kalıcı olarak siler.",
+        "cancel": "İptal",
+        "confirm": "Sil"
+      }
+    }
+  },
+  "adminUsers": {
+    "title": "Kullanıcılar",
+    "description": "Yerel kullanıcı hesaplarını yönetin",
+    "empty": "Kullanıcı bulunamadı.",
+    "columns": {
+      "email": "E-posta",
+      "displayName": "Görünen Ad",
+      "status": "Durum",
+      "lastLogin": "Son Oturum Açma",
+      "created": "Oluşturulma",
+      "actions": "Eylemler"
+    },
+    "form": {
+      "email": "E-posta",
+      "displayName": "Görünen Ad",
+      "displayNamePlaceholder": "Jane Doe",
+      "passwordOptional": "Parola (isteğe bağlı)",
+      "passwordPlaceholder": "Güçlü bir parola girin"
+    },
+    "reset": {
+      "title": "{email} için parolayı sıfırla",
+      "newPassword": "Yeni Parola"
+    },
+    "password": {
+      "score": {
+        "veryWeak": "Çok zayıf",
+        "weak": "Zayıf",
+        "fair": "Orta",
+        "good": "İyi",
+        "strong": "Güçlü"
+      }
+    },
+    "status": {
+      "active": "Etkin",
+      "inactive": "Etkin değil",
+      "never": "Asla"
+    },
+    "actions": {
+      "cancel": "İptal",
+      "save": "Kaydet",
+      "saving": "Kaydediliyor...",
+      "createUser": "Kullanıcı Oluştur",
+      "creating": "Oluşturuluyor...",
+      "resetPassword": "Parolayı Sıfırla",
+      "edit": "Düzenle",
+      "delete": "Sil",
+      "resetPw": "Parola Sıfırla",
+      "setPw": "Parola Belirle",
+      "cancelPw": "Parolayı İptal Et"
+    },
+    "confirm": {
+      "activate": "\"{email}\" kullanıcısı etkinleştirilsin mi?",
+      "deactivate": "\"{email}\" kullanıcısı devre dışı bırakılsın mı?",
+      "delete": "\"{email}\" kullanıcısı silinsin mi? Bu geri alınamaz."
+    },
+    "success": {
+      "created": "\"{email}\" kullanıcısı oluşturuldu",
+      "updated": "\"{email}\" kullanıcısı güncellendi",
+      "activated": "\"{email}\" kullanıcısı etkinleştirildi",
+      "deactivated": "\"{email}\" kullanıcısı devre dışı bırakıldı",
+      "passwordReset": "\"{email}\" için parola sıfırlandı",
+      "deleted": "\"{email}\" kullanıcısı silindi"
+    },
+    "errors": {
+      "load": "Kullanıcılar yüklenemedi",
+      "create": "Kullanıcı oluşturulamadı",
+      "createStatus": "Kullanıcı oluşturulamadı ({status})",
+      "update": "Kullanıcı güncellenemedi",
+      "resetPassword": "Parola sıfırlanamadı",
+      "delete": "Kullanıcı silinemedi"
+    }
+  },
+  "adminRoles": {
+    "title": "Roller ve Atamalar",
+    "description": "RBAC rollerini ve kullanıcı rol atamalarını yönetin",
+    "builtIn": "yerleşik",
+    "emptyRoles": "Tanımlı rol yok.",
+    "emptyAssignments": "Rol ataması yok.",
+    "tabs": {
+      "roles": "Roller",
+      "assignments": "Atamalar"
+    },
+    "columns": {
+      "provider": "Sağlayıcı",
+      "email": "E-posta",
+      "role": "Rol",
+      "created": "Oluşturulma",
+      "actions": "Eylemler"
+    },
+    "form": {
+      "name": "Ad",
+      "namePattern": "Yalnızca harfler, sayılar, tireler ve alt çizgiler. Bir harf veya sayı ile başlamalıdır.",
+      "workspacePermission": "Çalışma Alanı İzni",
+      "poolPermission": "Havuz İzni",
+      "registryPermission": "Registry İzni",
+      "catalogPermission": "Katalog İzni",
+      "descriptionLabel": "Açıklama",
+      "descriptionPlaceholder": "Geliştirici erişimi",
+      "allowLabels": "İzin Verilen Etiketler (anahtar=değer, virgülle ayrılmış)",
+      "allowNames": "İzin Verilen Adlar (virgülle ayrılmış)",
+      "denyLabels": "Reddedilen Etiketler (anahtar=değer, virgülle ayrılmış)",
+      "denyNames": "Reddedilen Adlar (virgülle ayrılmış)",
+      "allowLabelsShort": "İzin Verilen Etiketler",
+      "allowNamesShort": "İzin Verilen Adlar",
+      "denyLabelsShort": "Reddedilen Etiketler",
+      "denyNamesShort": "Reddedilen Adlar"
+    },
+    "assignForm": {
+      "provider": "Sağlayıcı",
+      "email": "E-posta",
+      "roles": "Roller"
+    },
+    "caps": {
+      "selected": "{count, plural, one {# yetenek} other {# yetenek}} seçildi",
+      "count": "{count, plural, one {# yetenek} other {# yetenek}}",
+      "custom": "Özel",
+      "matchesPresets": "Hazır ayarlarla eşleşiyor",
+      "advanced": "Gelişmiş — yetenekler",
+      "otherPreserved": "Diğer yetenekler (kaydederken korunur)",
+      "presetHelp": {
+        "before": "Yukarıdan bir hazır ayar seçmek onun yeteneklerini önceden işaretler. Bir hazır ayarın ötesinde bir kutuyu işaretlemek veya işaretini kaldırmak rolü",
+        "after": "olarak işaretler ve verdiği yetki açık bir yetenek kümesi olarak gönderilir."
+      },
+      "groups": {
+        "workspace": "Çalışma Alanı",
+        "run": "Çalıştırma",
+        "state": "Durum",
+        "var": "Değişkenler",
+        "config": "Yapılandırma",
+        "drift": "Sürüklenme",
+        "run-task": "Çalıştırma görevleri",
+        "notification": "Bildirimler",
+        "run-trigger": "Çalıştırma tetikleyicileri",
+        "pool": "Agent havuzları",
+        "registry": "Registry",
+        "catalog": "Hizmet kataloğu"
+      }
+    },
+    "display": {
+      "allow": "İzin ver: {value}",
+      "allowNames": "İzin verilen adlar: {value}",
+      "deny": "Reddet: {value}",
+      "denyNames": "Reddedilen adlar: {value}"
+    },
+    "actions": {
+      "cancel": "İptal",
+      "save": "Kaydet",
+      "saving": "Kaydediliyor...",
+      "edit": "Düzenle",
+      "delete": "Sil",
+      "remove": "Kaldır",
+      "createRole": "Rol Oluştur",
+      "creating": "Oluşturuluyor...",
+      "addAssignment": "Atama Ekle",
+      "setRoles": "Rolleri Ayarla"
+    },
+    "confirm": {
+      "deleteRole": "\"{name}\" rolü silinsin mi? Ona atıfta bulunan atamalar etkilenir.",
+      "removeAssignment": "\"{roleName}\" rolü {email} adresinden kaldırılsın mı?"
+    },
+    "success": {
+      "roleCreated": "\"{name}\" rolü oluşturuldu",
+      "roleUpdated": "\"{name}\" rolü güncellendi",
+      "roleDeleted": "\"{name}\" rolü silindi",
+      "rolesAssigned": "Roller {email} adresine atandı",
+      "assignmentRemoved": "Atama kaldırıldı"
+    },
+    "errors": {
+      "loadRoles": "Roller yüklenemedi",
+      "loadAssignments": "Atamalar yüklenemedi",
+      "createRole": "Rol oluşturulamadı",
+      "createRoleStatus": "Rol oluşturulamadı ({status})",
+      "updateRole": "Rol güncellenemedi",
+      "deleteRole": "Rol silinemedi",
+      "setAssignment": "Atama ayarlanamadı",
+      "setAssignmentStatus": "Atama ayarlanamadı ({status})",
+      "deleteAssignment": "Atama silinemedi"
+    }
+  },
+  "adminVcs": {
+    "title": "VCS Bağlantıları",
+    "description": "Sürüm kontrol sistemi entegrasyonlarını yönetin",
+    "empty": "Yapılandırılmış VCS bağlantısı yok.",
+    "actions": {
+      "new": "Yeni Bağlantı",
+      "cancel": "İptal",
+      "edit": "Düzenle",
+      "delete": "Sil"
+    },
+    "confirmDelete": "Bu VCS bağlantısı silinsin mi? Onu kullanan çalışma alanları VCS entegrasyonunu kaybeder. Bu geri alınamaz.",
+    "form": {
+      "name": "Ad",
+      "namePattern": "Yalnızca harfler, sayılar, tireler ve alt çizgiler. Bir harf veya sayı ile başlamalıdır.",
+      "provider": "Sağlayıcı",
+      "providerImmutable": "Sağlayıcı değiştirilemez — değiştirmek için silip yeniden oluşturun",
+      "serverUrl": "Sunucu URL''si (isteğe bağlı)",
+      "serverUrlHint": "HTTP veya HTTPS URL''si olmalıdır (örn. https://github.mycompany.com)",
+      "appId": "App ID",
+      "appIdHint": "GitHub App ID — yalnızca sayısal rakamlar",
+      "installationId": "Installation ID",
+      "installationIdHint": "GitHub App Installation ID — yalnızca sayısal rakamlar",
+      "privateKey": "Özel Anahtar (PEM)",
+      "browse": "Gözat...",
+      "privateKeyKeep": "Mevcut anahtarı korumak için boş bırakın — yenilemek için yeni bir PEM yapıştırın",
+      "privateKeyPlaceholder": "-----BEGIN RSA PRIVATE KEY-----\n...\n\nBuraya bir .pem dosyası bırakın veya Gözat''a tıklayın",
+      "webhookSecret": "Webhook Gizli Değeri",
+      "optional": "(isteğe bağlı)",
+      "webhookSecretSet": "Ayarlandı — korumak için boş bırakın, yenilemek için yeni bir değer girin",
+      "webhookSecretGlobal": "Genel webhook gizli değerini kullanmak için boş bırakın",
+      "webhookSecretHelp": "Bu kurulumun webhook''ları için bağlantıya özgü HMAC gizli değeri. Ayarlanmadığında genel gizli değer kullanılır.",
+      "accessToken": "Erişim Belirteci",
+      "accessTokenKeep": "Mevcut belirteci korumak için boş bırakın",
+      "saving": "Kaydediliyor...",
+      "creating": "Oluşturuluyor...",
+      "saveChanges": "Değişiklikleri Kaydet",
+      "createConnection": "Bağlantı Oluştur"
+    },
+    "table": {
+      "name": "Ad",
+      "provider": "Sağlayıcı",
+      "serverUrl": "Sunucu URL''si",
+      "status": "Durum",
+      "created": "Oluşturulma",
+      "actions": "Eylemler"
+    },
+    "success": {
+      "created": "\"{name}\" VCS bağlantısı oluşturuldu",
+      "updated": "\"{name}\" VCS bağlantısı güncellendi",
+      "deleted": "VCS bağlantısı silindi"
+    },
+    "errors": {
+      "load": "VCS bağlantıları yüklenemedi",
+      "save": "Bağlantı kaydedilemedi",
+      "delete": "Bağlantı silinemedi",
+      "createStatus": "Bağlantı oluşturulamadı ({status})",
+      "updateStatus": "Bağlantı güncellenemedi ({status})"
+    }
+  },
+  "adminVariableSets": {
+    "title": "Değişken Setleri",
+    "description": "Çalışma alanı grupları için org kapsamlı değişken setlerini yönetin",
+    "empty": "Yapılandırılmış değişken seti yok.",
+    "none": "-",
+    "actions": {
+      "new": "Yeni Değişken Seti",
+      "cancel": "İptal"
+    },
+    "form": {
+      "name": "Ad",
+      "namePattern": "Yalnızca harfler, sayılar, tireler ve alt çizgiler. Bir harf veya sayı ile başlamalıdır.",
+      "descriptionLabel": "Açıklama",
+      "descriptionPlaceholder": "Tüm çalışma alanları için AWS kimlik bilgileri",
+      "global": "Genel (tüm çalışma alanlarına uygula)",
+      "priority": "Öncelik (çalışma alanı değişkenlerini geçersiz kıl)",
+      "creating": "Oluşturuluyor...",
+      "create": "Değişken Seti Oluştur"
+    },
+    "table": {
+      "name": "Ad",
+      "description": "Açıklama",
+      "scope": "Kapsam",
+      "variables": "Değişkenler",
+      "created": "Oluşturulma"
+    },
+    "scope": {
+      "global": "Genel",
+      "priority": "Öncelik",
+      "standard": "Standart"
+    },
+    "errors": {
+      "load": "Değişken setleri yüklenemedi",
+      "create": "Değişken seti oluşturulamadı",
+      "createStatus": "Değişken seti oluşturulamadı ({status})"
+    },
+    "detail": {
+      "back": "Değişken setlerine dön",
+      "headerFallback": "Değişken seti",
+      "notFound": "Değişken seti bulunamadı",
+      "global": "Genel",
+      "priority": "Öncelik",
+      "yes": "Evet",
+      "no": "Hayır",
+      "edit": "Düzenle",
+      "cancel": "İptal",
+      "save": "Kaydet",
+      "saving": "Kaydediliyor...",
+      "delete": "Sil",
+      "deleting": "Siliniyor...",
+      "confirmDelete": "Silmeyi Onayla",
+      "deleteTitle": "Değişken Setini Sil",
+      "deleteDescription": "Bu değişken setini ve tüm değişkenlerini kalıcı olarak silin.",
+      "tabs": {
+        "settings": "Ayarlar",
+        "variables": "Değişkenler",
+        "workspaces": "Çalışma Alanları"
+      },
+      "addVariable": "Değişken Ekle",
+      "adding": "Ekleniyor...",
+      "varKey": "Anahtar",
+      "varValue": "Değer",
+      "varCategory": "Kategori",
+      "categoryTerraform": "Terraform",
+      "categoryEnv": "Ortam",
+      "sensitive": "Hassas",
+      "sensAbbr": "Hass.",
+      "enterNewValue": "Yeni değer girin",
+      "empty": "boş",
+      "emptyVars": "Bu sette değişken yok.",
+      "actions": "Eylemler",
+      "remove": "Kaldır",
+      "add": "Ekle",
+      "addWorkspace": "Çalışma Alanı Ekle",
+      "workspace": "Çalışma Alanı",
+      "selectWorkspace": "Bir çalışma alanı seçin...",
+      "globalBanner": "Bu değişken seti geneldir ve otomatik olarak tüm çalışma alanlarına uygulanır.",
+      "emptyWorkspaces": "Bu değişken setine atanmış çalışma alanı yok.",
+      "confirmDeleteVar": "Bu değişken silinsin mi? Bu geri alınamaz.",
+      "confirmRemoveWorkspace": "Bu çalışma alanı değişken setinden kaldırılsın mı? Değişkenleri artık o çalışma alanına uygulanmayacak.",
+      "success": {
+        "updated": "Değişken seti güncellendi",
+        "workspaceAdded": "Çalışma alanı eklendi",
+        "workspaceRemoved": "Çalışma alanı kaldırıldı"
+      },
+      "errors": {
+        "load": "Değişken seti yüklenemedi",
+        "update": "Değişken seti güncellenemedi",
+        "delete": "Değişken seti silinemedi",
+        "loadVars": "Değişkenler yüklenemedi",
+        "loadWorkspaces": "Çalışma alanları yüklenemedi",
+        "addVar": "Değişken eklenemedi",
+        "addVarStatus": "Değişken eklenemedi ({status})",
+        "updateVar": "Değişken güncellenemedi",
+        "deleteVar": "Değişken silinemedi",
+        "addWorkspace": "Çalışma alanı eklenemedi",
+        "removeWorkspace": "Çalışma alanı kaldırılamadı"
+      }
+    }
+  },
+  "adminAutodiscovery": {
+    "title": "Otomatik Keşif",
+    "description": "Monorepolarda PR''lar eşleşen yolları etkilediğinde çalışma alanlarını otomatik oluşturun",
+    "empty": "Henüz otomatik keşif kuralı yok. Monorepo''nuzdaki PR''lardan çalışma alanlarını otomatik hazırlamaya başlamak için bir tane oluşturun.",
+    "unsavedRule": "(kaydedilmemiş kural)",
+    "actions": {
+      "newRule": "Yeni Kural",
+      "cancel": "İptal",
+      "create": "Oluştur",
+      "update": "Güncelle",
+      "preview": "Önizleme",
+      "edit": "Düzenle",
+      "delete": "Sil",
+      "close": "Kapat"
+    },
+    "status": {
+      "enabled": "etkin",
+      "disabled": "devre dışı"
+    },
+    "form": {
+      "createTitle": "Kural oluştur",
+      "editTitle": "Kuralı düzenle",
+      "name": "Ad",
+      "vcsConnection": "VCS bağlantısı",
+      "selectConnection": "Bağlantı seç",
+      "repoUrl": "Repo URL''si",
+      "branch": "Dal (boş = varsayılan)",
+      "matchPattern": "Eşleşme deseni",
+      "matchPatternHint": "Gitignore tarzı glob''lar. <code>**</code> yol bölümleri arasında eşleşir. Yalnızca <code>*.tf*</code> dosyaları otomatik keşfi tetikler.",
+      "ignorePatterns": "Yoksayma desenleri (her satıra bir tane)",
+      "nameTemplate": "Çalışma alanı adı şablonu (isteğe bağlı)",
+      "nameTemplateHint": "<code>/</code> yerine <code>-</code> konulan dizin için <path></path>, ya da dizin olduğu gibi için <root></root> kullanın. Boş = varsayılan (yalnızca tireli yol).",
+      "templateDefaults": "Çalışma alanı şablon varsayılanları",
+      "executionMode": "Yürütme modu",
+      "executionModeHint": "Otomatik keşif VCS güdümlüdür; yalnızca agent yürütmesi desteklenir.",
+      "agentPool": "Agent havuzu",
+      "none": "(yok)",
+      "executionBackend": "Yürütme arka ucu",
+      "terraformVersion": "Terraform sürümü",
+      "cpuRequest": "CPU isteği",
+      "memoryRequest": "Bellek isteği",
+      "ownerEmail": "Sahip e-postası",
+      "autoApply": "Otomatik uygula",
+      "enabled": "Etkin",
+      "onDirectoryDelete": "Dizin silindiğinde",
+      "onDeleteFlag": "İşaretle (güvenli — silinmeyi bekliyor olarak işaretler, elle işlem gerektirir)",
+      "onDeleteDestroy": "Yok et (TEHLİKE — altyapıyı yıkar ve ardından çalışma alanını arşivler)",
+      "onDirectoryDeleteHint": "İzlenen dalda dizini kaldırıldığında otomatik keşfedilen bir çalışma alanına ne olacağı.",
+      "onDeleteDestroyWarning": "Bu, dizini izlenen dalda kaldırıldığında çalışma alanı üzerinde gerçek bir terraform destroy çalıştıracaktır.",
+      "labels": "Etiketler (oluşturulan çalışma alanlarına devralınır)",
+      "varFiles": "Var dosyaları (oluşturulan çalışma alanlarına devralınır)",
+      "varFilesHint": "plan/apply''a iletilen göreli <code>.tfvars</code> yolları.",
+      "addVarFile": "Var dosyası ekle",
+      "executionHooks": "Yürütme kancaları (her yeni çalışma alanıyla ilişkilendirilir)",
+      "executionHooksHint": "<page>Yürütme Kancaları</page> yönetim sayfasında tanımlanan kancalardan seçin — seçilen her kanca, bu kuralın oluşturduğu her çalışma alanıyla ilişkilendirilir.",
+      "noHooks": "Henüz tanımlı yürütme kancası yok. Önce Yürütme Kancaları yönetim sayfasında bir tane oluşturun.",
+      "hookDisabled": "(devre dışı)",
+      "hookNotInLibrary": "(kütüphanede yok — kaldırmak için işareti kaldırın)",
+      "runTaskTemplates": "Çalıştırma görevi şablonları (her yeni çalışma alanında oluşturulur)",
+      "notificationTemplates": "Bildirim şablonları (her yeni çalışma alanında oluşturulur)",
+      "saving": "Kaydediliyor...",
+      "previewTitle": "Repo''yu tarayın ve bu kuralın HANGİ çalışma alanlarını oluşturacağını önizleyin — kalıcılık yok"
+    },
+    "table": {
+      "name": "Ad",
+      "repo": "Repo",
+      "pattern": "Desen",
+      "enabled": "Etkin",
+      "created": "Oluşturulma",
+      "previewTitle": "Repo''yu tarayın ve bu kuralın hangi çalışma alanlarını oluşturacağını önizleyin"
+    },
+    "deleteModal": {
+      "title": "Kural silinsin mi?",
+      "body": "Bu kuralla otomatik oluşturulan çalışma alanları çalışmaya devam eder. Bu kural altındaki yeni yolları etkileyen gelecekteki PR''lar daha fazla çalışma alanını otomatik oluşturmaz."
+    },
+    "preview": {
+      "title": "Önizleme: {ruleName}",
+      "walkedFiles": "<refspan>{ref}</refspan> üzerinde <files>{count}</files> dosya tarandı",
+      "walking": "Depo taranıyor…",
+      "noMatches": "Bu repodaki hiçbir dizin kuralın deseniyle eşleşmiyor. Oluşturulacak bir şey yok.",
+      "colWorkspace": "Çalışma Alanı",
+      "colDirectory": "Dizin",
+      "colAction": "Eylem",
+      "repoRoot": "(repo kökü)",
+      "actionCreate": "Oluştur",
+      "skipDiscovered": "Atla (zaten keşfedildi)",
+      "skipDiscoveredTitle": "Bu kural tarafından zaten oluşturuldu",
+      "skipCollision": "Atla (ad çakışması)",
+      "skipCollisionTitle": "Bu ada sahip bir çalışma alanı başka bir nedenle zaten mevcut",
+      "willCreate": "{count, plural, one {# çalışma alanı oluşturulacak.} other {# çalışma alanı oluşturulacak.}} Mevcut çalışma alanları (çakışmalar) dokunulmadan bırakılır.",
+      "provision": "{count, plural, one {# çalışma alanını hazırla} other {# çalışma alanını hazırla}}",
+      "provisioning": "Hazırlanıyor…",
+      "saveToProvision": "Bu çalışma alanlarını hazırlamak için kuralı kaydedin."
+    },
+    "success": {
+      "created": "{name} oluşturuldu",
+      "updated": "{name} güncellendi",
+      "deleted": "Kural silindi",
+      "provisioned": "{count, plural, one {\"{ruleName}\" kuralından # çalışma alanı oluşturuldu} other {\"{ruleName}\" kuralından # çalışma alanı oluşturuldu}}"
+    },
+    "errors": {
+      "loadRules": "Otomatik keşif kuralları yüklenemedi",
+      "load": "Yüklenemedi",
+      "createFailed": "Oluşturma başarısız: {status} {detail}",
+      "updateFailed": "Güncelleme başarısız: {status} {detail}",
+      "save": "Kaydedilemedi",
+      "deleteRule": "Kural silinemedi",
+      "delete": "Silinemedi",
+      "previewFailed": "Önizleme başarısız ({status})",
+      "preview": "Önizleme başarısız",
+      "previewPrereq": "Önizlemeden önce VCS bağlantısı, repo URL''si ve deseni ayarlayın",
+      "scanFailed": "Tarama başarısız ({status})",
+      "scan": "Tarama başarısız"
+    }
+  },
+  "adminBulkUpdate": {
+    "title": "Toplu Güncelleme",
+    "description": "Çalışma alanlarını filtreyle seçin, ardından hepsine bir ayar değişikliği uygulayın",
+    "none": "(yok)",
+    "anyOption": "(herhangi)",
+    "unchanged": "(değişmemiş)",
+    "unchangedOption": "(değişmemiş)",
+    "filter": {
+      "heading": "1. Çalışma alanlarını seçin",
+      "matchAll": "<strong>Tüm</strong> çalışma alanlarını eşleştir (aşağıdaki filtreleri yoksayar)",
+      "namePrefix": "Ad öneki",
+      "executionBackend": "Yürütme arka ucu",
+      "ownerEmail": "Sahip e-postası",
+      "agentPool": "Agent havuzu",
+      "vcsConnection": "VCS bağlantısı",
+      "labels": "Etiketler",
+      "search": "Ara",
+      "searching": "Aranıyor..."
+    },
+    "results": {
+      "matched": "<strong>{count}</strong> {count, plural, one {çalışma alanı} other {çalışma alanı}} eşleşti.",
+      "noMatch": "Bu filtreyle eşleşen çalışma alanı yok.",
+      "colName": "Ad",
+      "colMode": "Mod",
+      "colBackend": "Arka Uç",
+      "colTfVersion": "TF sürümü",
+      "colLabels": "Etiketler"
+    },
+    "update": {
+      "heading": "2. Değişiklikleri uygula",
+      "hint": "Yalnızca aşağıda ayarladığınız alanlar değiştirilir. Yukarıdaki filtre, değişikliği hangi çalışma alanlarının alacağını seçer.",
+      "terraformVersion": "Terraform sürümü",
+      "executionBackend": "Yürütme arka ucu",
+      "executionMode": "Yürütme modu",
+      "autoApply": "Otomatik uygula",
+      "agentPool": "Agent havuzu",
+      "cpuRequest": "CPU isteği",
+      "memoryRequest": "Bellek isteği",
+      "setLabels": "Etiketleri ayarla (eşleşen her çalışma alanındaki etiket eşlemesini değiştirir)",
+      "setVarFiles": "Var dosyalarını ayarla",
+      "addVarFile": "Var dosyası ekle",
+      "setRunTasks": "Çalıştırma görevlerini ayarla (eşleşen her çalışma alanında ada göre eklenir/güncellenir)",
+      "setNotifications": "Bildirim yapılandırmalarını ayarla (ada göre eklenir/güncellenir)",
+      "dryRun": "Deneme çalıştırması (yalnızca önizleme — hiçbir değişiklik yazılmaz)",
+      "confirmWarning": "Bu, eşleşen her çalışma alanına değişiklik yazar.",
+      "confirmApply": "Uygulamayı onayla",
+      "applying": "Uygulanıyor...",
+      "cancel": "İptal",
+      "working": "Çalışıyor...",
+      "previewDryRun": "Önizleme (deneme çalıştırması)",
+      "applyChanges": "Değişiklikleri uygula"
+    },
+    "diff": {
+      "colWorkspace": "Çalışma Alanı",
+      "colChanges": "Değişiklikler"
+    },
+    "dryResult": {
+      "heading": "Deneme çalıştırması sonucu",
+      "summary": "<strong>{matched}</strong> eşleşti; <strong>{wouldChange}</strong> değişecekti; {unchanged} değişmedi. Hiçbir şey yazılmadı.",
+      "wouldChange": "Değişecekti",
+      "noChange": "Bu güncellemeyle hiçbir çalışma alanı değişmezdi."
+    },
+    "applyResult": {
+      "heading": "Uygulama sonucu",
+      "summary": "<strong>{matched}</strong> eşleşti; <appliedstrong>{applied}</appliedstrong> uygulandı; {unchanged} değişmedi; {errors, plural, one {# hata} other {# hata}}.",
+      "applied": "Uygulandı",
+      "unnamedWorkspace": "(çalışma alanı)",
+      "noChange": "Hiçbir çalışma alanı değişmedi."
+    },
+    "errors": {
+      "searchFailed": "Arama başarısız ({status})",
+      "search": "Arama başarısız",
+      "bulkUpdateFailed": "Toplu güncelleme başarısız ({status})",
+      "bulkUpdate": "Toplu güncelleme başarısız"
+    }
+  },
+  "adminExecutionHooks": {
+    "title": "Yürütme Kancaları",
+    "description": "Çalışma alanlarıyla ilişkili, pre/post-plan/apply noktalarında runner Job''larının içinde çalışan özel kabuk adımları",
+    "empty": "Yapılandırılmış yürütme kancası yok.",
+    "actions": {
+      "cancel": "İptal",
+      "new": "Yeni Yürütme Kancası",
+      "creating": "Oluşturuluyor...",
+      "create": "Yürütme Kancası Oluştur"
+    },
+    "badges": {
+      "disabled": "Devre dışı",
+      "enabled": "Etkin"
+    },
+    "columns": {
+      "name": "Ad",
+      "hookPoint": "Kanca Noktası",
+      "enabled": "Etkin",
+      "priority": "Öncelik",
+      "workspaces": "Çalışma Alanları"
+    },
+    "form": {
+      "name": "Ad",
+      "namePatternTitle": "Yalnızca harfler, sayılar, tireler ve alt çizgiler. Bir harf veya sayı ile başlamalıdır.",
+      "description": "Açıklama",
+      "descriptionPlaceholder": "init''ten önce dahili bir hosts girdisi ekle",
+      "hookPoint": "Kanca Noktası",
+      "priority": "Öncelik",
+      "priorityTitle": "Birkaç kanca aynı noktayı paylaştığında düşük olan önce çalışır (eşitlik ada göre çözülür).",
+      "scriptLabel": "Betik (<code>/bin/sh -c</code>)",
+      "scriptHelp": "Runner''ın bulut kimliğiyle çalışır. Sıfır olmayan bir çıkış, çalıştırmayı başarısız kılar. Gizli değerler burada satır içinde değil, çalışma alanı değişkenlerinden gelmelidir."
+    },
+    "errors": {
+      "load": "Yürütme kancaları yüklenemedi",
+      "createStatus": "Yürütme kancası oluşturulamadı ({status})",
+      "create": "Yürütme kancası oluşturulamadı"
+    }
+  },
+  "adminPolicySets": {
+    "title": "Politika Setleri",
+    "description": "Etikete göre çalışma alanlarına kapsamlanan OPA kod-olarak-politika zorlaması",
+    "empty": "Yapılandırılmış politika seti yok.",
+    "actions": {
+      "cancel": "İptal",
+      "new": "Yeni Politika Seti",
+      "creating": "Oluşturuluyor...",
+      "create": "Politika Seti Oluştur"
+    },
+    "badges": {
+      "disabled": "Devre dışı",
+      "mandatory": "Zorunlu",
+      "advisory": "Tavsiye niteliğinde",
+      "global": "Genel",
+      "labelScoped": "Etiket kapsamlı"
+    },
+    "columns": {
+      "name": "Ad",
+      "description": "Açıklama",
+      "enforcement": "Zorlama",
+      "scope": "Kapsam",
+      "policies": "Politikalar"
+    },
+    "form": {
+      "name": "Ad",
+      "namePatternTitle": "Yalnızca harfler, sayılar, tireler ve alt çizgiler. Bir harf veya sayı ile başlamalıdır.",
+      "description": "Açıklama",
+      "descriptionPlaceholder": "Üretim çalışma alanları için zorunlu koruma önlemleri",
+      "enforcement": "Zorlama",
+      "enforcementAdvisory": "Tavsiye niteliğinde (uyar, engelleme)",
+      "enforcementMandatory": "Zorunlu (başarısızlıkta uygulamayı engelle)",
+      "globalScope": "Genel (her çalışma alanına uygula)",
+      "sourceInline": "Satır içi (politikaları arayüzde yönet)",
+      "sourceVcs": "VCS Deposundan",
+      "vcsConnection": "VCS Bağlantısı",
+      "selectConnection": "Bağlantı seçin...",
+      "repoUrl": "Depo URL''si",
+      "branch": "Dal",
+      "branchPlaceholder": "main (varsayılan)",
+      "policyPath": "Politika Yolu",
+      "policyPathPlaceholder": "policies/ (.rego dosyalarını içeren dizin)",
+      "helpVcs": "Politikalar depodan otomatik olarak senkronize edilecek.",
+      "helpInline": "Seti oluşturduktan sonra politika ekleyin ve etiket kapsamını iyileştirin."
+    },
+    "errors": {
+      "load": "Politika setleri yüklenemedi",
+      "createStatus": "Politika seti oluşturulamadı ({status})",
+      "create": "Politika seti oluşturulamadı"
+    }
+  },
+  "adminCatalog": {
+    "title": "Katalog Yönetimi",
+    "description": "Hizmet kataloğu öğelerini yönetin",
+    "notEnabled": "Hizmet kataloğu etkin değil.",
+    "empty": "Henüz katalog öğesi yok.",
+    "actions": {
+      "new": "Yeni Katalog Öğesi",
+      "cancel": "İptal",
+      "create": "Katalog Öğesi Oluştur",
+      "creating": "Oluşturuluyor…",
+      "saveChanges": "Değişiklikleri Kaydet",
+      "saving": "Kaydediliyor…",
+      "edit": "Düzenle",
+      "delete": "Sil"
+    },
+    "form": {
+      "name": "Ad",
+      "nameTitle": "Yalnızca harfler, sayılar, tireler ve alt çizgiler. Bir harf veya sayı ile başlamalıdır.",
+      "module": "Modül",
+      "moduleSelect": "Bir modül seçin…",
+      "moduleImmutable": "Modül oluşturulduktan sonra değiştirilemez",
+      "displayName": "Görünen ad",
+      "displayNamePlaceholder": "Standart S3 Kovası",
+      "versionPin": "Varsayılan sürüm sabitleme",
+      "versionPinPlaceholder": "örn. 1.2.0 (boş = en son)",
+      "descriptionLabel": "Açıklama",
+      "descriptionPlaceholder": "Bu katalog öğesinin neyi hazırladığı…",
+      "enabled": "Etkin (göz atma kataloğunda görünür)",
+      "providerTemplates": "Sağlayıcı şablonları",
+      "noProviderTemplates": "Tanımlı sağlayıcı şablonu yok.",
+      "restrictPools": "Belirli agent havuzlarıyla sınırla",
+      "noAgentPools": "Kullanılabilir agent havuzu yok.",
+      "anyPool": "Herhangi bir agent havuzu kullanılabilir.",
+      "labels": "Etiketler",
+      "variableOptions": "Değişken seçenekleri (gelişmiş, JSON)",
+      "variableOptionsHint": "Girdi başına geçersiz kılmalar (seçenekler, gizli, varsayılan). Kullanılmıyorsa <code>[]</code> olarak bırakın."
+    },
+    "table": {
+      "name": "Ad",
+      "module": "Modül",
+      "enabled": "Etkin",
+      "actions": "Eylemler"
+    },
+    "badge": {
+      "enabled": "etkin",
+      "disabled": "devre dışı"
+    },
+    "confirm": {
+      "delete": "Bu katalog öğesi silinsin mi? Mevcut hazırlanmış örnekler etkilenmez."
+    },
+    "success": {
+      "created": "\"{name}\" katalog öğesi oluşturuldu",
+      "updated": "\"{name}\" katalog öğesi güncellendi",
+      "deleted": "Katalog öğesi silindi"
+    },
+    "errors": {
+      "load": "Katalog öğeleri yüklenemedi",
+      "save": "Katalog öğesi kaydedilemedi",
+      "createStatus": "Katalog öğesi oluşturulamadı ({status})",
+      "updateStatus": "Katalog öğesi güncellenemedi ({status})",
+      "delete": "Katalog öğesi silinemedi",
+      "deleteConflict": "Silinemez: bu katalog öğesinin hazırlanmış örnekleri var.",
+      "varOptsInvalidJson": "Değişken seçenekleri geçerli JSON (bir dizi) olmalıdır.",
+      "varOptsNotArray": "Değişken seçenekleri bir JSON dizisi olmalıdır."
+    }
+  },
+  "adminProviderTemplates": {
+    "title": "Sağlayıcı Şablonları",
+    "description": "Katalog öğeleri için yeniden kullanılabilir sağlayıcı yapılandırma blokları",
+    "notEnabled": "Hizmet kataloğu etkin değil.",
+    "empty": "Henüz sağlayıcı şablonu yok.",
+    "actions": {
+      "new": "Yeni Şablon",
+      "cancel": "İptal",
+      "create": "Şablon Oluştur",
+      "creating": "Oluşturuluyor…",
+      "saveChanges": "Değişiklikleri Kaydet",
+      "saving": "Kaydediliyor…",
+      "edit": "Düzenle",
+      "delete": "Sil"
+    },
+    "form": {
+      "name": "Ad",
+      "providerType": "Sağlayıcı türü",
+      "body": "Gövde (HCL)",
+      "parameters": "Parametreler (gelişmiş, JSON)",
+      "parametersHint": "Her parametre bir hazırlama formu alanı olur. Kullanılmıyorsa <code>[]</code> olarak bırakın.",
+      "labels": "Etiketler"
+    },
+    "table": {
+      "name": "Ad",
+      "providerType": "Sağlayıcı türü",
+      "parameters": "Parametreler",
+      "actions": "Eylemler"
+    },
+    "confirm": {
+      "delete": "Bu sağlayıcı şablonu silinsin mi? Ona atıfta bulunan katalog öğeleri hazırlanamaz. Bu geri alınamaz."
+    },
+    "success": {
+      "created": "\"{name}\" sağlayıcı şablonu oluşturuldu",
+      "updated": "\"{name}\" sağlayıcı şablonu güncellendi",
+      "deleted": "Sağlayıcı şablonu silindi"
+    },
+    "errors": {
+      "load": "Sağlayıcı şablonları yüklenemedi",
+      "save": "Sağlayıcı şablonu kaydedilemedi",
+      "createStatus": "Şablon oluşturulamadı ({status})",
+      "updateStatus": "Şablon güncellenemedi ({status})",
+      "delete": "Sağlayıcı şablonu silinemedi",
+      "deleteConflict": "Silinemez: bu şablona bir katalog öğesi tarafından atıfta bulunuluyor.",
+      "paramsInvalidJson": "Parametreler geçerli JSON (bir dizi) olmalıdır.",
+      "paramsNotArray": "Parametreler bir JSON dizisi olmalıdır."
+    }
+  },
+  "adminAgentPools": {
+    "title": "Agent Havuzları",
+    "description": "Runner agent havuzlarını ve dinleyicilerini yönetin",
+    "empty": "Yapılandırılmış agent havuzu yok.",
+    "actions": {
+      "newPool": "Yeni Havuz",
+      "createPool": "Havuz Oluştur",
+      "creating": "Oluşturuluyor...",
+      "cancel": "İptal",
+      "edit": "Düzenle",
+      "save": "Kaydet",
+      "saving": "Kaydediliyor...",
+      "delete": "Sil",
+      "deleting": "Siliniyor...",
+      "confirmDelete": "Silmeyi Onayla"
+    },
+    "form": {
+      "name": "Ad",
+      "namePattern": "Yalnızca harfler, sayılar, tireler ve alt çizgiler. Bir harf veya sayı ile başlamalıdır.",
+      "description": "Açıklama",
+      "descriptionPlaceholder": "Üretim AWS runner''ları",
+      "labels": "Etiketler"
+    },
+    "columns": {
+      "name": "Ad",
+      "description": "Açıklama",
+      "status": "Durum",
+      "created": "Oluşturulma"
+    },
+    "badges": {
+      "default": "varsayılan",
+      "degradedTooltip": "Dinleyiciler kalp atışı gönderiyor ancak sertifikaları sona ermiş — çalıştırmalar başlatılamayacak.",
+      "status": {
+        "online": "çevrimiçi",
+        "offline": "çevrimdışı",
+        "degraded": "bozulmuş"
+      }
+    },
+    "detail": {
+      "back": "Agent havuzlarına dön",
+      "defaultDescription": "Agent havuzu"
+    },
+    "tabs": {
+      "settings": "Ayarlar",
+      "tokens": "Belirteçler",
+      "listeners": "Dinleyiciler"
+    },
+    "settings": {
+      "title": "Havuz Ayarları",
+      "fields": {
+        "name": "Ad",
+        "description": "Açıklama",
+        "created": "Oluşturulma",
+        "owner": "Sahip",
+        "yourPermission": "İzniniz",
+        "labels": "Etiketler"
+      },
+      "permissions": {
+        "read": "okuma",
+        "write": "yazma",
+        "admin": "yönetici"
+      }
+    },
+    "danger": {
+      "title": "Havuzu Sil",
+      "description": "Bu agent havuzunu ve ilişkili tüm belirteçleri kalıcı olarak silin."
+    },
+    "tokens": {
+      "create": "Belirteç Oluştur",
+      "empty": "Bu havuz için belirteç yok.",
+      "revoke": "İptal Et",
+      "created": {
+        "title": "Belirteç başarıyla oluşturuldu",
+        "copyNow": "Bu belirteci şimdi kopyalayın — bir daha gösterilmeyecek.",
+        "copy": "Kopyala"
+      },
+      "form": {
+        "description": "Açıklama",
+        "descriptionPlaceholder": "Üretim dinleyici belirteci",
+        "maxUses": "Maksimum Kullanım",
+        "maxUsesHint": "Varsayılan 2 — dinleyici replikaları arasında bir önyükleme yarışı yeniden denemesini tolere eder.",
+        "expiresAt": "Sona Erme Zamanı",
+        "expiresAtHint": "Varsayılan şu andan itibaren 1 saat."
+      },
+      "columns": {
+        "description": "Açıklama",
+        "uses": "Kullanım",
+        "expires": "Sona Erme",
+        "status": "Durum",
+        "createdBy": "Oluşturan",
+        "actions": "Eylemler"
+      },
+      "badges": {
+        "revoked": "İptal Edildi",
+        "active": "Etkin"
+      }
+    },
+    "listeners": {
+      "empty": "Bu havuz için kayıtlı dinleyici yok.",
+      "columns": {
+        "name": "Ad",
+        "status": "Durum",
+        "replicas": "Replikalar",
+        "certExpires": "Sertifika Sona Erme",
+        "actions": "Eylemler"
+      },
+      "status": {
+        "online": "çevrimiçi",
+        "offline": "çevrimdışı",
+        "degraded": "bozulmuş",
+        "cert-expired": "sertifika-süresi-doldu"
+      },
+      "tooltips": {
+        "certExpired": "Dinleyici kalp atışı gönderiyor ancak sertifikası sona ermiş — sertifikayla kimliği doğrulanan her çağrı (çalıştırma alma, yenileme, runner-token) başarısız olacak. En olası neden: API en son sertifikayı hiç kaydetmedi ya da sertifika TTL''si yenilemeden önce doldu.",
+        "degraded": "Dinleyiciler kalp atışı gönderiyor ancak sertifikaları sona ermiş — çalıştırmalar başlatılamayacak."
+      }
+    },
+    "confirm": {
+      "revokeToken": "Bu katılım belirteci iptal edilsin mi? Onu kullanan dinleyiciler artık katılamaz ve bu geri alınamaz.",
+      "deleteListener": "Bu dinleyici silinsin mi? Pod hâlâ çalışıyorsa bir sonraki kalp atışında yeniden kaydolacak."
+    },
+    "success": {
+      "poolUpdated": "Havuz güncellendi",
+      "tokenRevoked": "Belirteç iptal edildi",
+      "listenerDeleted": "Dinleyici silindi"
+    },
+    "errors": {
+      "loadPools": "Agent havuzları yüklenemedi",
+      "loadPool": "Havuz yüklenemedi",
+      "loadTokens": "Belirteçler yüklenemedi",
+      "loadListeners": "Dinleyiciler yüklenemedi",
+      "createPool": "Havuz oluşturulamadı",
+      "createStatus": "Havuz oluşturulamadı ({status})",
+      "updatePool": "Havuz güncellenemedi",
+      "deletePool": "Havuz silinemedi",
+      "poolNotFound": "Havuz bulunamadı",
+      "createToken": "Belirteç oluşturulamadı",
+      "createTokenStatus": "Belirteç oluşturulamadı ({status})",
+      "revokeToken": "Belirteç iptal edilemedi",
+      "deleteListener": "Dinleyici silinemedi"
+    }
+  },
+  "adminAuditLog": {
+    "title": "Denetim Günlüğü",
+    "description": "Tüm API isteklerinin değiştirilemez günlüğü",
+    "empty": "Denetim günlüğü girdisi bulunamadı.",
+    "errors": {
+      "load": "Denetim günlüğü yüklenemedi"
+    },
+    "filters": {
+      "actorEmail": "Aktör E-postası",
+      "actorPlaceholder": "user@example.com",
+      "resourceType": "Kaynak Türü",
+      "resourceTypePlaceholder": "workspaces",
+      "method": "Metot",
+      "methodAll": "Tümü",
+      "since": "Başlangıç",
+      "until": "Bitiş",
+      "clear": "Temizle",
+      "apply": "Filtreleri Uygula"
+    },
+    "columns": {
+      "timestamp": "Zaman Damgası",
+      "actor": "Aktör",
+      "action": "Eylem",
+      "resourceType": "Kaynak Türü",
+      "resourceId": "Kaynak ID''si",
+      "status": "Durum",
+      "duration": "Süre"
+    },
+    "pagination": {
+      "summary": "Sayfa {current} / {total} ({count, plural, one {# girdi} other {# girdi}})",
+      "previous": "Önceki",
+      "next": "Sonraki"
+    }
+  },
+  "adminBinaryCache": {
+    "title": "Önbellek",
+    "description": "CLI ikili dosya ve sağlayıcı önbelleği yönetimi",
+    "errors": {
+      "loadBinary": "İkili dosya önbelleği yüklenemedi",
+      "loadCache": "Önbellek yüklenemedi"
+    },
+    "sections": {
+      "cliBinaries": "CLI İkili Dosyaları",
+      "providerBinaries": "Sağlayıcı İkili Dosyaları"
+    },
+    "empty": {
+      "binaries": "Henüz önbelleğe alınmış CLI ikili dosyası yok.",
+      "providers": "Henüz önbelleğe alınmış sağlayıcı ikili dosyası yok."
+    },
+    "columns": {
+      "tool": "Araç",
+      "version": "Sürüm",
+      "os": "OS",
+      "arch": "Arch",
+      "cachedAt": "Önbelleğe Alınma",
+      "provider": "Sağlayıcı",
+      "hostname": "Ana Bilgisayar Adı",
+      "actions": "Eylemler"
+    },
+    "warm": {
+      "heading": "Önbelleği ısıt",
+      "hide": "Gizle",
+      "prePopulate": "Önceden doldur…",
+      "help": "İkili dosyaları ve sağlayıcı platformlarını önbelleğe önceden çekin (her satıra bir tane). Sondaki <code>os/arch</code> belirteçleri isteğe bağlıdır — yapılandırılmış varsayılan platformları kullanmak için bunları atlayın.",
+      "binariesLabel": "İkili Dosyalar",
+      "providersLabel": "Sağlayıcılar",
+      "warm": "Isıt",
+      "warming": "Isıtılıyor…",
+      "confirm": "Seçili önbellek girdileri şimdi ısıtılsın mı?",
+      "errorEmpty": "Isıtmak için en az bir ikili dosya veya sağlayıcı satırı ekleyin.",
+      "errorFailedStatus": "Isıtma başarısız ({status})",
+      "errorFailed": "Önbellek ısıtılamadı",
+      "success": "{succeeded}/{total} ısıtıldı ({failed} başarısız)"
+    },
+    "purge": {
+      "button": "Temizle",
+      "confirmBinary": "{tool} {version} önbellekten temizlensin mi? Bir sonraki istekte yukarı akıştan yeniden getirilecek.",
+      "confirmProvider": "{provider} {version} sağlayıcı önbelleğinden temizlensin mi? Bir sonraki istekte yukarı akıştan yeniden getirilecek.",
+      "successBinary": "{tool} {version} için {count} girdi temizlendi",
+      "successProvider": "{provider} {version} için {count} girdi temizlendi",
+      "errorStatus": "Temizleme başarısız ({status})",
+      "error": "Temizlenemedi",
+      "errorProvider": "Sağlayıcı temizlenemedi",
+      "errorProviders": "Sağlayıcılar temizlenemedi"
+    },
+    "batchPurge": {
+      "purging": "Temizleniyor...",
+      "purgeSelected": "Seçilenleri Temizle ({count})",
+      "confirmBinary": "Seçili tüm ikili dosya önbellek girdileri temizlensin mi? Bir sonraki istekte yukarı akıştan yeniden getirilecekler.",
+      "confirmProvider": "Seçili tüm sağlayıcı önbellek girdileri temizlensin mi? Bir sonraki istekte yukarı akıştan yeniden getirilecekler.",
+      "errorBinaryItem": "{tool} {version} için temizleme başarısız",
+      "errorProviderItem": "{provider} {version} için temizleme başarısız",
+      "successBinary": "{count} ikili dosya önbellek girdisi temizlendi",
+      "successProvider": "{count} sağlayıcı önbellek girdisi temizlendi"
+    }
+  },
+  "catalog": {
+    "title": "Hizmet Kataloğu",
+    "description": "Seçilmiş modüllerden self servis altyapı hazırlayın",
+    "notEnabled": "Hizmet kataloğu etkin değil.",
+    "empty": "Kullanılabilir katalog öğesi yok.",
+    "card": {
+      "pinned": "sabitlendi {version}",
+      "latest": "en son"
+    },
+    "errors": {
+      "loadItems": "Katalog öğeleri yüklenemedi"
+    }
+  },
+  "catalogDetail": {
+    "backLink": "← Katalog",
+    "backToCatalog": "Kataloğa dön",
+    "fallbackTitle": "Katalog öğesi",
+    "notFound": "Katalog öğesi bulunamadı veya hizmet kataloğu etkin değil.",
+    "common": {
+      "cancel": "İptal"
+    },
+    "info": {
+      "module": "Modül:",
+      "resolvedVersion": "Çözümlenen sürüm:",
+      "latest": "en son",
+      "disabled": "devre dışı"
+    },
+    "pending": {
+      "banner": "<strong>{name}</strong> için çalıştırma planlandı ve inceleme bekliyor. Uygulamak için onaylayın veya iptal edin.",
+      "working": "Çalışıyor…",
+      "confirmApply": "Onayla ve uygula",
+      "discard": "İptal Et"
+    },
+    "field": {
+      "select": "Seç…"
+    },
+    "provision": {
+      "title": "Hazırla",
+      "workspaceName": "Çalışma alanı adı",
+      "workspaceNameTitle": "Yalnızca harfler, sayılar, tireler ve alt çizgiler. Bir harf veya sayı ile başlamalıdır.",
+      "workspaceNamePlaceholder": "my-instance",
+      "agentPool": "Agent havuzu",
+      "selectPool": "Bir havuz seçin…",
+      "noPoolsAvailable": "Kullanabileceğiniz agent havuzu yok. Hazırlamak için bir agent havuzuna yazma erişiminiz olmalı — bir yöneticiden bunu vermesini isteyin.",
+      "noPoolsAllowed": "Erişebildiğiniz agent havuzlarının hiçbirine bu katalog öğesi tarafından izin verilmiyor. Bir yöneticiden öğenin izin verilen havuzlarını genişletmesini veya size bunlardan birine erişim vermesini isteyin.",
+      "version": "Sürüm",
+      "latestFloat": "En son (değişken)",
+      "defaultPinOption": "{version} (varsayılan sabitleme)",
+      "labelsOptional": "Etiketler (isteğe bağlı)",
+      "autoApplyHint": "Otomatik uygula, değişiklikleri elle inceleme adımı olmadan uygular.",
+      "provisioning": "Hazırlanıyor…",
+      "submit": "Hazırla"
+    },
+    "instances": {
+      "title": "Örnekler",
+      "empty": "Bu öğeden henüz örnek hazırlanmadı.",
+      "colName": "Ad",
+      "colVersion": "Sürüm",
+      "colPool": "Havuz",
+      "colActions": "Eylemler",
+      "reconfigure": "Yeniden Yapılandır",
+      "destroy": "Yok Et",
+      "orphan": "Sahipsiz Bırak…",
+      "orphanTitle": "Altyapısını yok etmeden katalog kaydını sil (önerilmez)"
+    },
+    "reconfigure": {
+      "title": "{name} yeniden yapılandır",
+      "description": "Girdileri ve/veya sürümü güncelleyin, ardından bir çalıştırma sıraya alın.",
+      "currentOption": "{version} (geçerli)",
+      "queuing": "Sıraya alınıyor…",
+      "queueRun": "Çalıştırmayı sıraya al"
+    },
+    "destroy": {
+      "title": "{name} yok et",
+      "heading": "{name} yok edilsin mi?",
+      "description": "Bu, bu örneğin altyapısını yıkan bir yok etme çalıştırmasını sıraya alır. Başarılı bir uygulamada çalışma alanı arşivlenir. Bu geri alınamaz.",
+      "autoApplyHint": "Otomatik uygula, inceleme olmadan hemen yıkar."
+    },
+    "orphan": {
+      "title": "{name} sahipsiz bırak",
+      "heading": "{name} sahipsiz mi bırakılsın?",
+      "description": "Bu, katalog örnek kaydını siler ancak altyapısını yok <warn>etmez</warn> — hazırlanmış kaynaklar <warn>izlenmeyen ve yönetilmeyen</warn> şekilde çalışmaya devam eder. Bu önerilmez. Altyapıyı geri kazanmak için iptal edin ve bunun yerine <emph>Yok Et</emph>''i kullanın.",
+      "confirmPrompt": "Onaylamak için örnek adı <mono>{name}</mono> değerini yazın:",
+      "orphaning": "Sahipsiz bırakılıyor…",
+      "submit": "Sahipsiz bırak ve altyapıyı terk et"
+    },
+    "actions": {
+      "confirmed": "Çalıştırma onaylandı — uygulanıyor.",
+      "discarded": "Çalıştırma iptal edildi.",
+      "provisioned": "{name} hazırlandı — plan inceleme için hazır.",
+      "reconfigureQueued": "Yeniden yapılandırma sıraya alındı — çalıştırma oluşturuldu.",
+      "reconfigureQueuedStatus": "Yeniden yapılandırma sıraya alındı — çalıştırma {status}.",
+      "destroyQueued": "Yok etme sıraya alındı — çalıştırma oluşturuldu.",
+      "destroyQueuedStatus": "Yok etme sıraya alındı — çalıştırma {status}.",
+      "orphaned": "{name} sahipsiz bırakıldı — katalog kaydı silindi; altyapısı izlenmeyen ve yönetilmeyen şekilde çalışır bırakıldı."
+    },
+    "errors": {
+      "loadItem": "Katalog öğesi yüklenemedi",
+      "confirm": "Onaylanamadı",
+      "confirmStatus": "Onaylanamadı ({status})",
+      "discard": "İptal edilemedi",
+      "discardStatus": "İptal edilemedi ({status})",
+      "provision": "Hazırlanamadı",
+      "provisionStatus": "Hazırlanamadı ({status})",
+      "reconfigure": "Yeniden yapılandırılamadı",
+      "reconfigureStatus": "Yeniden yapılandırılamadı ({status})",
+      "destroy": "Yok edilemedi",
+      "destroyStatus": "Yok edilemedi ({status})",
+      "orphan": "Sahipsiz bırakılamadı",
+      "orphanStatus": "Sahipsiz bırakılamadı ({status})"
+    }
+  },
+  "common": {
+    "connection": {
+      "reconnecting": "Yeniden bağlanılıyor…"
+    },
+    "sessionExpiry": {
+      "banner": "Oturum {minutes, plural, one {# dakika} other {# dakika}} içinde sona eriyor — <link>yeniden kimlik doğrula</link>"
+    },
+    "tokenExpiry": {
+      "withinDays": "{days, plural, one {# gün} other {# gün}} içinde sona erecek {count, plural, one {# hizmet belirteci} other {# hizmet belirteci}} — <link>gözden geçir</link>",
+      "soon": "Yakında sona erecek {count, plural, one {# hizmet belirteci} other {# hizmet belirteci}} — <link>gözden geçir</link>",
+      "dismissAria": "Belirteç sona erme uyarısını kapat"
+    },
+    "resourceUsage": {
+      "title": "Kaynak kullanımı",
+      "oomKilled": "OOM ile sonlandırıldı",
+      "killedLikelyOom": "Sonlandırıldı (muhtemelen OOM)",
+      "memory": "Bellek",
+      "requested": "İstenen {value}",
+      "limit": "Sınır {value}"
+    },
+    "labelsEditor": {
+      "none": "Yok",
+      "removeAria": "{key} kaldır",
+      "keyPlaceholder": "anahtar",
+      "valuePlaceholder": "değer",
+      "add": "Ekle"
+    },
+    "sensitiveInput": {
+      "hide": "Gizle",
+      "show": "Göster",
+      "hideAria": "Değeri gizle",
+      "showAria": "Değeri göster"
+    },
+    "workspacePicker": {
+      "searchPlaceholder": "Çalışma alanlarını ara…",
+      "loading": "Yükleniyor…",
+      "empty": "Çalışma alanı bulunamadı",
+      "adding": "Ekleniyor…"
+    },
+    "templateEditors": {
+      "remove": "Kaldır",
+      "add": "Ekle",
+      "valuePlaceholder": "değer",
+      "name": "Ad",
+      "url": "URL",
+      "hmacKey": "HMAC anahtarı (isteğe bağlı)",
+      "hmacKeyPlaceholder": "paylaşılan gizli değer",
+      "stage": "Aşama",
+      "enforcement": "Zorlama",
+      "enabled": "Etkin",
+      "runTaskNamePlaceholder": "security-scan",
+      "runTaskUrlPlaceholder": "https://hooks.example.com/task",
+      "addRunTask": "Çalıştırma görevi ekle",
+      "destinationType": "Hedef türü",
+      "token": "Belirteç (isteğe bağlı)",
+      "tokenPlaceholder": "HMAC / kimlik doğrulama belirteci",
+      "notificationNamePlaceholder": "slack-alerts",
+      "notificationUrlPlaceholder": "https://hooks.slack.com/services/...",
+      "emailAddresses": "E-posta adresleri",
+      "emailPlaceholder": "ops@example.com",
+      "addEmail": "E-posta ekle",
+      "triggers": "Tetikleyiciler",
+      "addNotification": "Bildirim ekle"
+    }
+  },
+  "planSummary": {
+    "aiGenerated": "AI üretti",
+    "heading": {
+      "planSummary": "Plan özeti",
+      "failureAnalysis": "Başarısızlık analizi"
+    },
+    "errors": {
+      "status": "HTTP {status}"
+    },
+    "regenerate": {
+      "label": "Yeniden üret",
+      "queueing": "Sıraya alınıyor…",
+      "tooltip": "AI özetini aynı plan girdilerine karşı yeniden çalıştır",
+      "ariaLabel": "AI özetini yeniden üret",
+      "confirm": "AI analizi yeniden üretilsin mi? Bu, modeli tekrar çalıştırır.",
+      "error": "Yeniden üretilemedi: <mono>{detail}</mono>"
+    },
+    "pending": {
+      "summarisingPlan": "Plan özetleniyor…",
+      "analysingFailure": "Başarısızlık analiz ediliyor…"
+    },
+    "skipped": {
+      "fallback": "Bu çalıştırma için özet atlandı."
+    },
+    "errored": {
+      "heading": "Özetleyici başarısız oldu"
+    },
+    "riskFactors": {
+      "heading": "Risk faktörleri",
+      "suggestedFixes": "Önerilen düzeltmeler"
+    },
+    "tokens": "{input} giriş / {output} çıkış belirteci",
+    "risk": {
+      "low": "düşük",
+      "medium": "orta",
+      "high": "yüksek",
+      "critical": "kritik",
+      "unknown": "bilinmiyor"
+    },
+    "badges": {
+      "noChanges": "Değişiklik yok",
+      "noChangesLower": "değişiklik yok",
+      "noChangesTitle": "Plan hiçbir kaynak değişikliği bildirmedi",
+      "toAdd": "{count, plural, one {# eklenecek} other {# eklenecek}}",
+      "toChange": "{count, plural, one {# değişecek} other {# değişecek}}",
+      "toDestroy": "{count, plural, one {# yok edilecek} other {# yok edilecek}}",
+      "toReplace": "{count, plural, one {# değiştirilecek} other {# değiştirilecek}}",
+      "toImport": "{count, plural, one {# içe aktarılacak} other {# içe aktarılacak}}"
+    },
+    "chat": {
+      "heading": "İzleme",
+      "sharedThreadNote": "Çalışma alanı okuma iznine sahip herkesin görebildiği tek bir paylaşılan konu.",
+      "placeholder": "Bu plan hakkında bir izleme sorusu sorun… (göndermek için ⌘/Ctrl + Enter)",
+      "send": "Gönder",
+      "thinking": "Düşünüyor…",
+      "you": "Siz",
+      "assistant": "Asistan"
+    },
+    "translatedNote": "Otomatik olarak dilinize çevrildi. Yetkili özet orijinaldir.",
+    "translating": "Çevriliyor…"
+  },
+  "runDetail": {
+    "notFound": "Çalıştırma bulunamadı",
+    "runSection": "Çalıştırma bölümü",
+    "workspaceFallback": "çalışma alanı",
+    "backTo": "{name} sayfasına dön",
+    "errorHeading": "Hata",
+    "discardedHeading": "İptal edildi — yeniden planlama gerekli",
+    "common": {
+      "yes": "Evet",
+      "no": "Hayır"
+    },
+    "header": {
+      "title": "Çalıştırma {id}",
+      "titleWithWorkspace": "{workspace} — çalıştırma {id}",
+      "description": "{source} çalıştırması"
+    },
+    "relTime": {
+      "justNow": "az önce",
+      "minutesAgo": "{count, plural, one {# dakika önce} other {# dakika önce}}",
+      "hoursAgo": "{count, plural, one {# saat önce} other {# saat önce}}",
+      "daysAgo": "{count, plural, one {# gün önce} other {# gün önce}}"
+    },
+    "status": {
+      "pending": "Beklemede",
+      "queued": "Sıraya Alındı",
+      "planning": "Planlanıyor",
+      "planned": "Planlandı",
+      "confirmed": "Onaylandı",
+      "applying": "Uygulanıyor",
+      "canceling": "İptal Ediliyor",
+      "applied": "Uygulandı",
+      "errored": "Hata Verdi",
+      "canceled": "İptal Edildi",
+      "discarded": "İptal Edildi"
+    },
+    "activity": {
+      "pending": "Çalıştırma hazırlanıyor",
+      "queued": "Kullanılabilir bir agent bekleniyor",
+      "planning": "terraform plan çalıştırılıyor",
+      "plannedConfirmable": "Onaylayıp uygulamanız bekleniyor",
+      "plannedSpeculative": "Spekülatif plan tamamlandı",
+      "plannedComplete": "Plan tamamlandı",
+      "confirmed": "Uygulama başlatılıyor",
+      "applying": "terraform apply çalıştırılıyor",
+      "canceling": "Çalıştırma durduruluyor",
+      "applied": "Uygulama tamamlandı",
+      "errored": "Çalıştırma başarısız oldu",
+      "canceled": "Çalıştırma iptal edildi",
+      "discarded": "Plan iptal edildi",
+      "elapsedTitle": "Bu aşamada geçen süre"
+    },
+    "badge": {
+      "destroy": "yok et",
+      "planOnly": "yalnızca plan"
+    },
+    "actions": {
+      "retryShort": "Yeniden Dene",
+      "retryFull": "Çalıştırmayı Yeniden Dene",
+      "retrying": "Yeniden deneniyor…",
+      "confirmShort": "Uygula",
+      "confirmFull": "Onayla ve Uygula",
+      "confirming": "Onaylanıyor…",
+      "discard": "İptal Et",
+      "discarding": "İptal ediliyor…",
+      "cancelShort": "İptal",
+      "cancelFull": "Çalıştırmayı İptal Et",
+      "canceling": "İptal ediliyor…"
+    },
+    "confirm": {
+      "apply": "Bu çalıştırma uygulansın mı? Bu, planı uygular ve altyapıyı değiştirir.",
+      "discard": "Bu plan iptal edilsin mi?",
+      "cancel": "Bu çalıştırma iptal edilsin mi?",
+      "retry": "Bu çalıştırma yeniden denensin mi?"
+    },
+    "errors": {
+      "loadRun": "Çalıştırma yüklenemedi",
+      "action": {
+        "confirm": "Çalıştırma onaylanamadı",
+        "discard": "Çalıştırma iptal edilemedi",
+        "cancel": "Çalıştırma iptal edilemedi",
+        "retry": "Çalıştırma yeniden denenemedi"
+      }
+    },
+    "tabs": {
+      "overview": "Genel Bakış",
+      "ai": "AI",
+      "aiFull": "AI analizi",
+      "opa": "OPA",
+      "opaFull": "OPA politikaları",
+      "impact": "Etki",
+      "impactFull": "Etki grafiği",
+      "planLabel": "Plan<log>Günlüğü</log>",
+      "applyLabel": "Uygulama<log>Günlüğü</log>",
+      "planFull": "Plan günlüğü",
+      "applyFull": "Uygulama günlüğü",
+      "details": "Ayrıntılar"
+    },
+    "banner": {
+      "destroy": "Bu bir <strong>yok etme</strong> çalıştırmasıdır — uygulandığında yönetilen tüm kaynaklar yok edilecek.",
+      "planOnlyCli": "Bu, VCS bağlı bir çalışma alanında CLI''den başlatılan <strong>yalnızca plan</strong> çalıştırmasıdır. CLI ile yüklenen kod için uygulama kullanılamaz — yalnızca VCS ile yönetilen kod uygulanabilir.",
+      "moduleOverridesPrefix": "Bu çalıştırma <strong>modül geçersiz kılmaları</strong> kullanır",
+      "moduleOverridesFromPr": "PR #{number} kaynaklı",
+      "moduleOverridesSuffix": "yayımlanan registry sürümü yerine PR dalından getirilecek."
+    },
+    "cards": {
+      "changes": "Değişiklikler",
+      "aiAnalysis": "AI analizi",
+      "policyChecks": "Politika denetimleri",
+      "resources": "Kaynaklar"
+    },
+    "changes": {
+      "noChanges": "Değişiklik yok",
+      "planning": "Planlanıyor…",
+      "toAdd": "eklenecek",
+      "toChange": "değişecek",
+      "toDestroy": "yok edilecek",
+      "toReplace": "değiştirilecek",
+      "toImport": "içe aktarılacak"
+    },
+    "ai": {
+      "notAvailable": "Mevcut değil",
+      "ready": "Hazır",
+      "riskSub": "{risk} risk",
+      "generating": "Üretiliyor…",
+      "skipped": "Atlandı",
+      "failed": "Başarısız",
+      "available": "Mevcut"
+    },
+    "policy": {
+      "none": "Yok",
+      "blocked": "Engellendi",
+      "failedSub": "{count, plural, one {# başarısız} other {# başarısız}}",
+      "advisoryIssues": "Tavsiye niteliğinde sorunlar",
+      "passedSub": "{passed}/{total} geçti",
+      "passed": "Geçti"
+    },
+    "resources": {
+      "overLimit": "Sınır aşıldı",
+      "oomKilled": "OOM ile sonlandırıldı",
+      "recorded": "Kaydedildi",
+      "nearLimit": "Sınıra yakın",
+      "high": "Yüksek",
+      "withinLimits": "Sınırlar içinde"
+    },
+    "details": {
+      "heading": "Ayrıntılar",
+      "executionBackend": "Yürütme Arka Ucu",
+      "source": "Kaynak",
+      "autoApply": "Otomatik Uygula",
+      "planOnly": "Yalnızca Plan",
+      "triggeredBy": "Tetikleyen",
+      "created": "Oluşturulma",
+      "commit": "Commit",
+      "branch": "Dal",
+      "prMr": "PR/MR",
+      "stateVersion": "Durum Sürümü",
+      "viewState": "Durumu Görüntüle",
+      "runOptions": "Çalıştırma Seçenekleri"
+    },
+    "timeline": {
+      "heading": "Zaman Çizelgesi",
+      "queued": "Sıraya Alındı",
+      "planningStarted": "Planlama başladı",
+      "planComplete": "Plan tamamlandı",
+      "confirmed": "Onaylandı",
+      "applyingStarted": "Uygulama başladı",
+      "applied": "Uygulandı",
+      "errored": "Hata Verdi",
+      "canceled": "İptal Edildi",
+      "discarded": "İptal Edildi"
+    },
+    "log": {
+      "color": "Renk",
+      "colorOnTitle": "ANSI renkleri gösteriliyor — düz metin için tıklayın",
+      "colorOffTitle": "Düz metin gösteriliyor — renkler için tıklayın",
+      "refresh": "Yenile",
+      "refreshTitle": "Günlüğü yenile",
+      "copy": "Kopyala",
+      "copied": "Kopyalandı!",
+      "copyTitle": "Düz metni panoya kopyala",
+      "copyAria": "Günlüğü panoya kopyala",
+      "download": "İndir",
+      "downloadColorTitle": "Günlüğü indir (ANSI renk kodlarıyla)",
+      "downloadPlainTitle": "Günlüğü indir (düz metin)",
+      "downloadAria": "Günlüğü indir",
+      "follow": "İzle",
+      "followOnTitle": "Canlı akış izleniyor — durdurmak için tıklayın",
+      "followOffTitle": "Canlı akışı izle",
+      "end": "Son",
+      "endTitle": "Günlüğün sonuna atla",
+      "planEmpty": "Henüz plan çıktısı mevcut değil.",
+      "applyEmpty": "Henüz uygulama çıktısı mevcut değil."
+    },
+    "policyPanel": {
+      "heading": "Politika Denetimleri",
+      "passedCount": "{passed}/{total} geçti",
+      "blockedMessage": "Bu çalıştırma <strong>zorunlu bir politika seti tarafından engellendi</strong>. Başarısızlık çözülene veya bir yönetici geçersiz kılana kadar uygulanmayacak.",
+      "overriding": "Geçersiz kılınıyor...",
+      "overrideContinue": "Geçersiz Kıl ve Devam Et",
+      "overrideFailed": "Geçersiz kılma başarısız",
+      "overrideFailedStatus": "Geçersiz kılma başarısız ({status})",
+      "overriddenBy": "{by} tarafından geçersiz kılındı",
+      "policyPassed": "geçti",
+      "noDenyMessage": "Politika, bir reddetme mesajı veya hata çıktısı üretmeden başarısız oldu",
+      "enforcement": {
+        "mandatory": "zorunlu",
+        "advisory": "tavsiye niteliğinde"
+      },
+      "outcome": {
+        "passed": "geçti",
+        "failed": "başarısız",
+        "errored": "hata verdi"
+      }
+    }
+  },
+  "workspaceDetail": {
+    "notFound": "Çalışma alanı bulunamadı",
+    "common": {
+      "enabled": "Etkin",
+      "disabled": "Devre dışı",
+      "none": "Yok",
+      "default": "Varsayılan",
+      "never": "Asla",
+      "actions": "Eylemler",
+      "workspaceLocked": "Çalışma alanı kilitli"
+    },
+    "actions": {
+      "edit": "Düzenle",
+      "cancel": "İptal",
+      "save": "Kaydet",
+      "saving": "Kaydediliyor…",
+      "savingEllipsis": "Kaydediliyor...",
+      "delete": "Sil",
+      "deleting": "Siliniyor...",
+      "add": "Ekle",
+      "adding": "Ekleniyor...",
+      "remove": "Kaldır",
+      "download": "İndir",
+      "rollback": "Geri Al",
+      "close": "Kapat",
+      "hide": "Gizle",
+      "enable": "Etkinleştir",
+      "disable": "Devre dışı bırak",
+      "creating": "Oluşturuluyor...",
+      "sending": "Gönderiliyor...",
+      "processing": "İşleniyor...",
+      "queuing": "Sıraya alınıyor...",
+      "loading": "Yükleniyor...",
+      "loadingLower": "yükleniyor…"
+    },
+    "header": {
+      "executionMode": "{mode} yürütme modu"
+    },
+    "tabs": {
+      "overview": "Genel Bakış",
+      "variables": "Değişkenler",
+      "runs": "Çalıştırmalar",
+      "state": "Durum",
+      "stateGraph": "Durum Grafiği",
+      "configurations": "Yapılandırmalar",
+      "notifications": "Bildirimler",
+      "runTasks": "Çalıştırma Görevleri",
+      "runTriggers": "Çalıştırma Tetikleyicileri",
+      "sharing": "Paylaşım",
+      "selectLabel": "Çalışma alanı bölümü"
+    },
+    "lifecycle": {
+      "pendingDeletion": "Silinmeyi bekliyor",
+      "pendingDeletionDefault": "Bu çalışma alanı silinmek üzere işaretlendi ve elle işlem gerektiriyor.",
+      "archived": "Arşivlendi",
+      "archivedDefault": "Bu çalışma alanı arşivlendi."
+    },
+    "runQueuedBanner": {
+      "message": "Çalıştırma başarıyla sıraya alındı.",
+      "viewRun": "Çalıştırmayı Görüntüle"
+    },
+    "settings": {
+      "title": "Ayarlar",
+      "saveChanges": "Değişiklikleri kaydet",
+      "renamedNotice": "Çalışma alanı yeniden adlandırıldı. Eşleştirmek için <cloud></cloud> bloğunuzdaki <name></name> alanını güncelleyin."
+    },
+    "fields": {
+      "name": "Ad",
+      "nameTitle": "Harfler, sayılar, tireler, alt çizgiler. Bir harf veya sayı ile başlamalıdır.",
+      "executionMode": "Yürütme Modu",
+      "execModeLocal": "Yerel",
+      "execModeAgent": "Agent",
+      "autoApply": "Otomatik Uygula",
+      "cpuRequest": "CPU İsteği",
+      "cpuRequestTitle": "Kubernetes CPU miktarı: tam çekirdek (1, 2) veya milliçekirdek (500m, 100m)",
+      "memoryRequest": "Bellek İsteği",
+      "memoryRequestTitle": "Kubernetes bellek miktarı: bayt (1000) veya son ekli (512Mi, 2Gi, 1Ti)",
+      "executionBackend": "Yürütme Arka Ucu",
+      "version": "Sürüm",
+      "versionPlaceholder": "örn. 1.11 veya 1.11.5",
+      "versionTitle": "X.Y veya X.Y.Z biçiminde sürüm (örn. 1.11 veya 1.11.5)",
+      "terragruntEnabledAgent": "Etkin (agent modu)",
+      "terragruntEnabledVersion": "Etkin (v{version})",
+      "terragruntVersionPlaceholder": "örn. 1.0",
+      "terragruntVersionTitle": "X.Y veya X.Y.Z biçiminde Terragrunt sürümü (örn. 1.0)",
+      "workingDirectory": "Çalışma Dizini",
+      "workingDirectoryPlaceholder": "örn. environments/dev",
+      "agentPool": "Agent Havuzu",
+      "owner": "Sahip",
+      "vcsConnection": "VCS Bağlantısı",
+      "vcsRepository": "VCS Deposu",
+      "vcsRepositoryTitle": "HTTP veya HTTPS URL''si olmalıdır",
+      "vcsBranch": "VCS Dalı",
+      "vcsBranchPlaceholder": "main (varsayılan)",
+      "vcsWorkflow": "VCS İş Akışı",
+      "vcsWorkflowMergeThenApply": "merge_then_apply (varsayılan — TFE / HCP standardı)",
+      "vcsWorkflowApplyThenMerge": "apply_then_merge (Atlantis standardı — isteğe bağlı)",
+      "autoMerge": "Uygulamadan sonra otomatik birleştir",
+      "autoMergeStrategy": "Otomatik Birleştirme Stratejisi",
+      "vcsPolling": "VCS Yoklaması",
+      "labels": "Etiketler (tag''ler)",
+      "labelsTitle": "Çalışma alanı etiketleri çifte görev yapar: etikete dayalı RBAC eşleştirmesi ve terraform/tofu cloud '{' workspaces '{' tags = ... '}' '}' bloklarıyla eşleşen \"tag''ler\" olarak.",
+      "varFiles": "Var Dosyaları",
+      "varFilesPlaceholder": "örn. envs/dev.tfvars",
+      "triggerPrefixes": "Tetikleyici Önekleri",
+      "triggerPrefixesHint": "Çalıştırmaları tetikleyen dizinler. Ayarlandığında çalışma dizini filtrelemesini geçersiz kılar.",
+      "triggerPrefixesPlaceholder": "örn. modules",
+      "triggerPrefixesNone": "Yok (çalışma dizinini kullanır)",
+      "driftIgnoreRules": "Sürüklenme Yoksayma Kuralları",
+      "driftIgnoreRulesHint": "Sürüklenme sınıflandırıcısı tarafından bastırılan glob duyarlı Terraform adres + öznitelik yolları. <star></star> sıfır veya daha fazla <dot></dot> olmayan karakterle eşleşir (<n></n> dizin boyunca yayılır); <starIdx></starIdx> herhangi bir köşeli parantezli dizinle eşleşir. Öznitelik son eki olmayan çıplak bir adres, o kaynağa yapılan her değişikliği — yok etmeler dahil — susturur. Yalnızca sürüklenmeyi etkiler, normal plan/apply''ı değil. Tam dilbilgisi için <docs>drift-ignore-rules.md</docs> bölümüne bakın.",
+      "driftIgnoreRulesNone": "Yok (her plan farkı sürüklenme sayılır)"
+    },
+    "vcsWorkflowWarning": {
+      "title": "Yetkilendirme VCS deponuza devredildi.",
+      "rbac": "PR''ı birleştirebilen herkes uygulayabilir. Dal koruma kuralları (gerekli incelemeler, durum denetimleri, kod sahibi onayı) kapı haline gelir. Terrapod rol/etiket RBAC''si bu modda yorum güdümlü eylemlere<em>uygulanmaz</em>.",
+      "recommended": "<strong>Önerilir:</strong> uyguladığınız commit''in yerleşen commit olması için doğrusal geçmiş gerektirin (birleştirmeden önce rebase/squash yapın).",
+      "credit": "Not: bu iş akışı <atlantis>Atlantis</atlantis> temel alınarak modellenmiştir. Atlantis, yalnızca PR yorum güdümlü uygulamalar isteyen ve platform arayüzü istemeyen ekipler için doğru araç olmaya devam ediyor."
+    },
+    "vcsPolling": {
+      "error": "Hata",
+      "ok": "TAMAM ({time})",
+      "notPolled": "Henüz yoklanmadı"
+    },
+    "lockout": {
+      "revertLabels": "Etiketleri Geri Al",
+      "saveAnyway": "Yine de Kaydet"
+    },
+    "lock": {
+      "title": "Kilit Durumu",
+      "lockedDesc": "Bu çalışma alanı kilitli. Hiçbir plan veya uygulama çalışamaz.",
+      "unlockedDesc": "Bu çalışma alanının kilidi açık ve çalıştırmalara hazır.",
+      "lock": "Kilitle",
+      "unlock": "Kilidi Aç",
+      "lockConfirm": "Bu çalışma alanı kilitlensin mi?",
+      "unlockConfirm": "Bu çalışma alanının kilidi açılsın mı?"
+    },
+    "drift": {
+      "title": "Sürüklenme Tespiti",
+      "checkInterval": "Denetim Aralığı",
+      "status": "Durum",
+      "statusNoDrift": "Sürüklenme Yok",
+      "statusDrifted": "Sürüklendi",
+      "statusErrored": "Hata Verdi",
+      "statusUnchecked": "Denetlenmedi",
+      "dismiss": "Kapat",
+      "dismissing": "Kapatılıyor…",
+      "dismissTitle": "Bildirilen sürüklenme durumunu temizle. Bir sonraki planlı denetim onu gerçeklikten yeniden dolduracak.",
+      "lastChecked": "Son Denetim",
+      "checkNow": "Şimdi Denetle",
+      "checkNowTitle": "Sürüklenmeyi denetlemek için yalnızca plan çalıştırması sıraya al",
+      "checkNowTitleDisabled": "Önce sürüklenme tespitini etkinleştirin"
+    },
+    "intervals": {
+      "disabled": "Devre dışı",
+      "1hour": "1 saat",
+      "4hours": "4 saat",
+      "12hours": "12 saat",
+      "24hours": "24 saat",
+      "48hours": "48 saat",
+      "3days": "3 gün",
+      "7days": "7 gün"
+    },
+    "planExpiry": {
+      "title": "Plan Sona Ermesi",
+      "description": "Bir plan bu süreden eskidiğinde, onaylanmamış bir planı otomatik olarak iptal edin; böylece eski bir plan, değişmiş bir dünyaya karşı uygulanamaz. Varsayılan olarak kapalı; plan daha sonra yeniden çalıştırılmalıdır. (Yalnızca uygulama yapabilen çalıştırmalara uygulanır.)",
+      "expireAfter": "Şu süre sonra sona er"
+    },
+    "aiSummary": {
+      "title": "AI Plan Özeti",
+      "description": "Bu çalışma alanı için her plan aşaması sonucunda otomatik olarak LLM tarafından üretilen değişiklik özeti, risk değerlendirmesi ve başarısızlık analizi.",
+      "mode": "Mod",
+      "modeDefault": "Dağıtım varsayılanını izle",
+      "modeEnabled": "Her zaman özetle",
+      "modeDisabled": "Asla özetleme",
+      "contextLabel": "Çalışma alanı bağlamı",
+      "contextLabelSuffix": "(isteğe bağlı, ek)",
+      "contextPlaceholder": "AI''nin özellikle bu çalışma alanı hakkında bilmesi gereken gerçekler. örn. 'X hizmetinin vault''unu önler — KMS anahtarını yok etmek genel bir kesintiye neden olur.'",
+      "noContext": "Ayarlanmış çalışma alanı bağlamı yok.",
+      "contextHint": "Dağıtım genelindeki bağlamın üzerine eklenir. En fazla 4000 karakter."
+    },
+    "slack": {
+      "title": "Slack bildirimleri",
+      "description": "Bu çalışma alanını Slack çalıştırma bildirimlerine dahil edin — onay istekleri, uygulamalar, hatalar ve sürüklenme. Kanalı boş bırakın ve bu çalışma alanı sessiz kalır (dağıtım genelinde bir dağıtım yoktur). Slack uygulamasının bir yönetici tarafından etkinleştirilmesini gerektirir.",
+      "channel": "Kanal",
+      "channelPlaceholder": "#deploys veya bir kanal ID''si (örn. C0123ABCD)",
+      "notSet": "Ayarlanmadı — sessiz.",
+      "hint": "Slack uygulaması zaten kanalın bir üyesi olmalıdır."
+    },
+    "delete": {
+      "title": "Çalışma Alanını Sil",
+      "description": "Bu çalışma alanını ve ilişkili tüm durumu, değişkenleri ve çalıştırmaları kalıcı olarak silin.",
+      "confirm": "Silmeyi Onayla"
+    },
+    "variables": {
+      "addVariable": "Değişken Ekle",
+      "key": "Anahtar",
+      "value": "Değer",
+      "category": "Kategori",
+      "categoryEnv": "Ortam",
+      "sensitive": "Hassas",
+      "empty": "Bu çalışma alanı için yapılandırılmış değişken yok.",
+      "emptyValue": "boş",
+      "enterNewValue": "Yeni değer girin",
+      "deleteConfirm": "\"{key}\" değişkeni silinsin mi?"
+    },
+    "runs": {
+      "options": "Seçenekler",
+      "hideOptions": "Seçenekleri Gizle",
+      "queueDestroy": "Yok Etmeyi Sıraya Al",
+      "queueDestroyTitle": "Bir yok etme planını sıraya al",
+      "destroyAllConfirm": "Tüm kaynaklar yok edilsin mi?",
+      "confirmDestroy": "Yok Etmeyi Onayla",
+      "queuePlan": "Planı Sıraya Al",
+      "queueRun": "Çalıştırmayı Sıraya Al",
+      "queuePlanConfirm": "Bu çalışma alanı için spekülatif bir plan sıraya alınsın mı?",
+      "queueApplyConfirm": "Bir plan + apply çalıştırması sıraya alınsın mı? Bu, altyapıyı değiştirebilir.",
+      "planOptions": "Plan Seçenekleri",
+      "targetResources": "Hedef kaynaklar",
+      "replaceResources": "Kaynakları değiştir",
+      "commaSeparated": "(virgülle ayrılmış)",
+      "planOnly": "Yalnızca Plan",
+      "refreshOnly": "Yalnızca Yenile",
+      "skipRefresh": "Yenilemeyi Atla",
+      "allowEmptyApply": "Boş Uygulamaya İzin Ver",
+      "vcsRef": "VCS Ref",
+      "branch": "Dal",
+      "tag": "Etiket",
+      "defaultBranch": "Varsayılan ({branch})",
+      "nonDefaultRefNote": "Varsayılan olmayan ref seçildi — çalıştırma yalnızca plan olacak",
+      "empty": "Bu çalışma alanı için henüz çalıştırma yok.",
+      "runId": "Çalıştırma ID''si",
+      "status": "Durum",
+      "type": "Tür",
+      "changes": "Değişiklikler",
+      "source": "Kaynak",
+      "triggeredBy": "Tetikleyen",
+      "created": "Oluşturulma",
+      "needsConfirm": "onay gerekiyor",
+      "typeDestroy": "yok et",
+      "typePlanOnly": "yalnızca plan",
+      "typePlanApply": "plan + apply",
+      "sourceModuleTest": "modül testi",
+      "sourceModulePublish": "modül yayımlama"
+    },
+    "state": {
+      "deleteConfirm": "#{serial} durum sürümü silinsin mi? Bu geri alınamaz.",
+      "rollbackConfirm": "#{serial} durum sürümüne geri alınsın mı? Aynı içerikle yeni bir sürüm oluşturulacak.",
+      "confirmDelete": "Silmeyi Onayla",
+      "confirmRollback": "Geri Almayı Onayla",
+      "uploadState": "Durum Yükle",
+      "empty": "Bu çalışma alanı için henüz durum sürümü yok.",
+      "serial": "Seri",
+      "createdBy": "Oluşturan",
+      "run": "Çalıştırma",
+      "size": "Boyut",
+      "created": "Oluşturulma",
+      "runner": "runner",
+      "latest": "en son"
+    },
+    "configurations": {
+      "description": "Bu çalışma alanı için yüklenen kaynak arşivleri, en yeniden başlayarak. Karşılaştırmak için iki satır seçin.",
+      "selectedCount": "{count}/2 seçildi",
+      "compare": "Karşılaştır",
+      "comparing": "Karşılaştırılıyor…",
+      "empty": "Henüz yapılandırma sürümü yok. Bir `terraform plan` yüklediğinde veya bir VCS gönderimi bir çalıştırmayı tetiklediğinde burada görünürler.",
+      "id": "ID",
+      "source": "Kaynak",
+      "status": "Durum",
+      "created": "Oluşturulma",
+      "current": "geçerli",
+      "selectForCompare": "Karşılaştırma için {id} seç",
+      "compareLabel": "Karşılaştır",
+      "diff": "Fark",
+      "filesChanged": "{count} dosya değişti",
+      "oversized": "{count, plural, one {# aşırı büyük dosya atlandı} other {# aşırı büyük dosya atlandı}}: {files}",
+      "noDiff": "Bu sürümler arasında içerik farkı yok.",
+      "binaryChanged": "İkili dosya değişti — fark oluşturulmadı.",
+      "diffType": {
+        "added": "eklendi",
+        "removed": "kaldırıldı",
+        "modified": "değiştirildi",
+        "binary-changed": "ikili"
+      }
+    },
+    "notifications": {
+      "addNotification": "Bildirim Ekle",
+      "name": "Ad",
+      "namePlaceholder": "Dağıtım bildirimleri",
+      "destinationType": "Hedef Türü",
+      "typeGeneric": "Genel Webhook",
+      "typeEmail": "E-posta",
+      "url": "URL",
+      "hmacToken": "HMAC Belirteci (isteğe bağlı)",
+      "signingSecret": "İmzalama gizli değeri",
+      "emailAddresses": "E-posta Adresleri (virgülle ayrılmış)",
+      "triggerEvents": "Tetikleyici Olaylar",
+      "createNotification": "Bildirim Oluştur",
+      "empty": "Bu çalışma alanı için bildirim yapılandırması yok.",
+      "ok": "TAMAM",
+      "err": "Hata {status}",
+      "fail": "BAŞARISIZ",
+      "http": "HTTP {status}",
+      "verify": "Doğrula",
+      "history": "Geçmiş",
+      "deliveryHistory": "Teslimat Geçmişi",
+      "enableConfirm": "Bu bildirim etkinleştirilsin mi?",
+      "disableConfirm": "Bu bildirim devre dışı bırakılsın mı?",
+      "deleteConfirm": "\"{name}\" bildirimi silinsin mi?"
+    },
+    "runTasks": {
+      "addRunTask": "Çalıştırma Görevi Ekle",
+      "name": "Ad",
+      "namePlaceholder": "OPA Politika Denetimi",
+      "webhookUrl": "Webhook URL''si",
+      "stage": "Aşama",
+      "enforcementLevel": "Zorlama Düzeyi",
+      "hmacKey": "HMAC Anahtarı (isteğe bağlı)",
+      "hmacKeyPlaceholder": "Webhook doğrulaması için imzalama gizli değeri",
+      "createRunTask": "Çalıştırma Görevi Oluştur",
+      "empty": "Bu çalışma alanı için yapılandırılmış çalıştırma görevi yok.",
+      "enableConfirm": "Bu çalıştırma görevi etkinleştirilsin mi?",
+      "disableConfirm": "Bu çalıştırma görevi devre dışı bırakılsın mı?",
+      "deleteConfirm": "\"{name}\" çalıştırma görevi silinsin mi?"
+    },
+    "runTriggers": {
+      "title": "Çalıştırma Tetikleyicileri",
+      "description": "Bir kaynak çalışma alanı bir uygulamayı tamamladığında, aşağı akış çalışma alanlarına otomatik olarak yeni bir çalıştırma sıraya alınır. Her hedef için en fazla 20 kaynak çalışma alanı.",
+      "inboundHeading": "Burada çalıştırmaları tetikleyen kaynak çalışma alanları",
+      "inboundEmpty": "Hiçbir kaynak çalışma alanı bu çalışma alanında çalıştırma tetiklemiyor.",
+      "pickerPlaceholder": "Kaynak olarak eklemek için çalışma alanlarını ara…",
+      "outboundHeading": "Bu çalışma alanının tetiklediği hedef çalışma alanları",
+      "outboundEmpty": "Bu çalışma alanı başka hiçbir çalışma alanında çalıştırma tetiklemiyor.",
+      "destinationNote": "(hedef; oradan kaldırın)",
+      "removeConfirm": "Bu çalıştırma tetikleyicisi kaldırılsın mı?"
+    },
+    "sharing": {
+      "title": "Uzak Durum Paylaşımı",
+      "description": "Çalışma alanları arası <code></code> için üretici denetimli izin listesi. Durum verisi gizli değer taşır — bilinçli olarak verin. <docs>Dokümanlar</docs>",
+      "outboundHeading": "Bu çalışma alanının durumunu okumaya yetkili çalışma alanları",
+      "outboundEmpty": "Bu çalışma alanının durumu başka hiçbir çalışma alanıyla paylaşılmıyor.",
+      "grantedBy": "{by} tarafından verildi",
+      "revoke": "İptal Et",
+      "revokeConfirm": "Bu uzak durum paylaşımı kaldırılsın mı? Tüketici bu duruma erişimini kaybedecek.",
+      "pickerPlaceholder": "Tüketici olarak yetkilendirmek için çalışma alanlarını ara…",
+      "inboundHeading": "Bu çalışma alanının durum okumaya yetkili olduğu çalışma alanları",
+      "inboundEmpty": "Bu çalışma alanı, terraform_remote_state aracılığıyla başka hiçbir çalışma alanından durum okumaya yetkili değil.",
+      "producerNote": "(üretici; oradan iptal edin)"
+    },
+    "runMessages": {
+      "manualDriftCheck": "Arayüzden elle sürüklenme denetimi",
+      "queued": "Arayüzden sıraya alındı",
+      "queuedSpeculative": "Arayüzden sıraya alındı (spekülatif)",
+      "destroyQueued": "Arayüzden yok etme sıraya alındı"
+    },
+    "errors": {
+      "loadWorkspace": "Çalışma alanı yüklenemedi",
+      "loadRuns": "Çalıştırmalar yüklenemedi",
+      "loadVariables": "Değişkenler yüklenemedi",
+      "loadStateVersions": "Durum sürümleri yüklenemedi",
+      "loadConfigurations": "Yapılandırma sürümleri yüklenemedi",
+      "loadNotifications": "Bildirimler yüklenemedi",
+      "loadOutboundConsumers": "Giden uzak durum tüketicileri yüklenemedi",
+      "loadInboundConsumers": "Gelen uzak durum tüketicileri yüklenemedi",
+      "loadConsumers": "Uzak durum tüketicileri yüklenemedi",
+      "loadInboundTriggers": "Gelen çalıştırma tetikleyicileri yüklenemedi",
+      "loadOutboundTriggers": "Giden çalıştırma tetikleyicileri yüklenemedi",
+      "loadTriggers": "Çalıştırma tetikleyicileri yüklenemedi",
+      "loadRunTasks": "Çalıştırma görevleri yüklenemedi",
+      "downloadStateFile": "Durum dosyası indirilemedi",
+      "downloadFailed": "İndirme başarısız",
+      "downloadFailedStatus": "İndirme başarısız ({status})",
+      "downloadTicketMissingUrl": "İndirme bileti yanıtında URL eksik",
+      "diffFailed": "Fark başarısız",
+      "diffFailedStatus": "Fark başarısız ({status})",
+      "authorizeConsumer": "Tüketici yetkilendirilemedi",
+      "revoke": "İptal edilemedi",
+      "revokeConsumer": "Tüketici iptal edilemedi",
+      "addTrigger": "Çalıştırma tetikleyicisi eklenemedi",
+      "removeTrigger": "Çalıştırma tetikleyicisi kaldırılamadı",
+      "createRunTask": "Çalıştırma görevi oluşturulamadı",
+      "createRunTaskStatus": "Çalıştırma görevi oluşturulamadı ({status})",
+      "update": "Güncellenemedi",
+      "toggleRunTask": "Çalıştırma görevi değiştirilemedi",
+      "delete": "Silinemedi",
+      "deleteRunTask": "Çalıştırma görevi silinemedi",
+      "labelLockout": "Bu etiket değişikliği erişiminizi azaltır.",
+      "updateWorkspace": "Çalışma alanı güncellenemedi",
+      "lockWorkspace": "Çalışma alanı kilitlenemedi",
+      "unlockWorkspace": "Çalışma alanının kilidi açılamadı",
+      "updateAiSummary": "AI özeti ayarları güncellenemedi",
+      "updateSlackChannel": "Slack kanalı güncellenemedi",
+      "updateDriftSettings": "Sürüklenme ayarları güncellenemedi",
+      "updateDriftInterval": "Sürüklenme aralığı güncellenemedi",
+      "updatePlanExpiry": "Plan sona ermesi güncellenemedi",
+      "queueDriftCheck": "Sürüklenme denetimi sıraya alınamadı",
+      "queueDriftCheckStatus": "Sürüklenme denetimi sıraya alınamadı ({status})",
+      "dismissDrift": "Sürüklenme kapatılamadı",
+      "dismissDriftStatus": "Sürüklenme kapatılamadı ({status})",
+      "deleteWorkspace": "Çalışma alanı silinemedi",
+      "addVariable": "Değişken eklenemedi",
+      "addVariableStatus": "Değişken eklenemedi ({status})",
+      "deleteVariable": "Değişken silinemedi",
+      "updateVariable": "Değişken güncellenemedi",
+      "queuePlan": "Plan sıraya alınamadı",
+      "queuePlanStatus": "Plan sıraya alınamadı ({status})",
+      "queueDestroy": "Yok etme sıraya alınamadı",
+      "queueDestroyStatus": "Yok etme sıraya alınamadı ({status})",
+      "createNotification": "Bildirim oluşturulamadı",
+      "createNotificationStatus": "Bildirim oluşturulamadı ({status})",
+      "toggleNotification": "Bildirim değiştirilemedi",
+      "deleteNotification": "Bildirim silinemedi",
+      "verificationFailed": "Doğrulama başarısız",
+      "verificationDeliveryFailed": "Doğrulama teslimatı başarısız: {detail}",
+      "unknownError": "Bilinmeyen hata",
+      "failed": "Başarısız",
+      "deleteStateVersion": "Durum sürümü silinemedi",
+      "rollbackStateVersion": "Durum sürümü geri alınamadı",
+      "stateActionFailed": "Durum eylemi başarısız",
+      "uploadState": "Durum yüklenemedi",
+      "uploadStateFile": "Durum dosyası yüklenemedi"
+    }
+  },
+  "graphs": {
+    "stateTab": {
+      "loadError": "Durum grafiği yüklenemedi.",
+      "emptyState": "Henüz durum yok — bir plan ve apply çalıştırın veya durum yükleyin, ardından bu grafik dolacak.",
+      "stateVersionLabel": "Durum sürümü",
+      "currentSuffix": "(geçerli)",
+      "colorByLabel": "Renklendirme ölçütü",
+      "viewGraph": "Grafik",
+      "viewTable": "Tablo",
+      "resourceCount": "{count, plural, one {# kaynak} other {# kaynak}}",
+      "dependencyCount": "{count, plural, one {# bağımlılık} other {# bağımlılık}}",
+      "truncated": "{total} kaynağın ilk {shown} tanesi gösteriliyor — grafik okunabilirlik için sınırlandırıldı.",
+      "colResource": "Kaynak",
+      "colType": "Tür",
+      "colMode": "Mod",
+      "colModule": "Modül",
+      "colDependedOnBy": "Bağımlı olanlar",
+      "rootModule": "(kök)"
+    },
+    "impact": {
+      "notAvailable": "Bu çalıştırma için etki grafiği mevcut değil.",
+      "title": "Etki grafiği",
+      "subtitle": "{count, plural, one {# kaynak} other {# kaynak}} planı",
+      "hint": "Her küre bir kaynaktır; her ok neye bağımlı olduğunu gösterir. Bir düğüme tıklayın → onun geçişli <b>etkisi</b> (aşağı akıştaki her şey) aydınlanır.",
+      "downstreamAffected": "aşağı akış etkilendi",
+      "action": {
+        "create": "oluştur",
+        "update": "güncelle",
+        "replace": "değiştir",
+        "destroy": "yok et",
+        "unchanged": "değişmemiş"
+      }
+    },
+    "estate": {
+      "navHint": "Döndürmek için sürükleyin · yakınlaştırmak için kaydırın · kaydırmak için sağ sürükleyin · <em>etrafında dönmek için bir düğüme tıklayın</em>"
+    },
+    "state3d": {
+      "title": "Durum grafiği",
+      "hint": "Her küre bir kaynaktır; her ok neye bağımlı olduğunu gösterir. Bir düğüme tıklayın → geçişli olarak <b>ona bağımlı</b> kaynaklar aydınlanır.",
+      "dataSource": "veri kaynağı",
+      "managed": "yönetilen",
+      "dependOnThis": "buna bağımlı"
+    },
+    "resource3d": {
+      "resetView": "Görünümü sıfırla",
+      "clear": "Temizle",
+      "key": "Anahtar",
+      "resources": "Kaynaklar",
+      "hideKey": "Anahtarı gizle",
+      "hideResources": "Kaynakları gizle",
+      "resourcesCount": "Kaynaklar ({count})",
+      "filterPlaceholder": "Kaynakları filtrele…",
+      "navHint": "Döndürmek için sürükleyin · yakınlaştırmak için kaydırın · kaydırmak için sağ sürükleyin · <em>etrafında dönmek için bir kaynağa tıklayın</em>"
+    }
+  },
+  "execHookDetail": {
+    "backLink": "Yürütme kancalarına dön",
+    "defaultDescription": "Yürütme kancası",
+    "notFound": "Yürütme kancası bulunamadı",
+    "scriptEmpty": "(boş)",
+    "tabs": {
+      "settings": "Ayarlar",
+      "workspaces": "Çalışma Alanları"
+    },
+    "common": {
+      "yes": "Evet",
+      "no": "Hayır"
+    },
+    "actions": {
+      "edit": "Düzenle",
+      "cancel": "İptal",
+      "save": "Kaydet",
+      "saving": "Kaydediliyor...",
+      "delete": "Sil",
+      "deleting": "Siliniyor...",
+      "confirmDelete": "Silmeyi Onayla",
+      "add": "Ekle",
+      "adding": "Ekleniyor...",
+      "remove": "Kaldır"
+    },
+    "settings": {
+      "heading": "Ayarlar"
+    },
+    "fields": {
+      "name": "Ad",
+      "description": "Açıklama",
+      "hookPoint": "Kanca Noktası",
+      "priority": "Öncelik",
+      "enabled": "Etkin",
+      "script": "Betik (<code>/bin/sh -c</code>)"
+    },
+    "delete": {
+      "heading": "Yürütme Kancasını Sil",
+      "description": "Bu kancayı kalıcı olarak silin ve tüm çalışma alanlarından kaldırın."
+    },
+    "workspaces": {
+      "scopeNote": "Bu kanca yalnızca aşağıda ilişkilendirilen çalışma alanlarında çalışır. Genel kapsam yoktur.",
+      "associate": "Çalışma Alanı İlişkilendir",
+      "workspaceLabel": "Çalışma Alanı",
+      "selectPlaceholder": "Bir çalışma alanı seçin...",
+      "empty": "Bu kancayla ilişkili çalışma alanı yok.",
+      "colWorkspace": "Çalışma Alanı",
+      "colActions": "Eylemler"
+    },
+    "confirm": {
+      "removeWorkspace": "Bu çalışma alanı kancadan kaldırılsın mı? Kanca artık onun için çalışmayacak."
+    },
+    "success": {
+      "updated": "Yürütme kancası güncellendi",
+      "workspaceAssociated": "Çalışma alanı ilişkilendirildi",
+      "workspaceRemoved": "Çalışma alanı kaldırıldı"
+    },
+    "errors": {
+      "load": "Yürütme kancası yüklenemedi",
+      "update": "Yürütme kancası güncellenemedi",
+      "delete": "Yürütme kancası silinemedi",
+      "addWorkspace": "Çalışma alanı eklenemedi",
+      "removeWorkspace": "Çalışma alanı kaldırılamadı"
+    }
+  },
+  "policySetDetail": {
+    "backLink": "Politika Setleri",
+    "notFound": "Bulunamadı",
+    "unknown": "bilinmiyor",
+    "subtitle": "OPA politika seti · {createdBy} tarafından oluşturuldu",
+    "settings": {
+      "heading": "Ayarlar"
+    },
+    "fields": {
+      "description": "Açıklama",
+      "enforcement": "Zorlama",
+      "enabled": "Etkin",
+      "globalScope": "Genel (her çalışma alanı)"
+    },
+    "enforcement": {
+      "advisory": "Tavsiye niteliğinde (uyar)",
+      "mandatory": "Zorunlu (uygulamayı engelle)"
+    },
+    "scope": {
+      "allowLabels": "İzin verilen etiketler (anahtar: v1, v2)",
+      "allowLabelsPlaceholder": "env: prod, staging",
+      "allowNames": "İzin verilen adlar (her satıra bir tane)",
+      "denyLabels": "Reddedilen etiketler (anahtar: v1, v2)",
+      "denyNames": "Reddedilen adlar (her satıra bir tane)"
+    },
+    "vcs": {
+      "heading": "VCS Yapılandırması",
+      "repoUrl": "Depo URL''si",
+      "branch": "Dal",
+      "branchPlaceholder": "main (varsayılan)",
+      "policyPath": "Politika Yolu"
+    },
+    "vcsBanner": {
+      "syncedFrom": "Politikaların senkronize edildiği kaynak",
+      "at": "şurada",
+      "lastSynced": "Son senkronizasyon {time}",
+      "commit": "(commit {sha})",
+      "syncError": "Senkronizasyon hatası: {error}"
+    },
+    "policies": {
+      "heading": "Politikalar ({count})",
+      "vcsManaged": "Depo tarafından yönetiliyor — değişiklikleri PR aracılığıyla gönderin",
+      "empty": "Bu sette henüz politika yok."
+    },
+    "addPolicy": {
+      "namePlaceholder": "Politika adı",
+      "descPlaceholder": "Açıklama (isteğe bağlı)",
+      "regoHint": "Rego v1. <code>package terrapod</code> bildirmeli ve ihlalleri bir <code>deny</code> kümesi aracılığıyla ifade etmelidir. Plan <code>input</code>''tur; Terrapod bağlamı <code>data.terrapod_context</code>''tir."
+    },
+    "actions": {
+      "saving": "Kaydediliyor...",
+      "saveSettings": "Ayarları Kaydet",
+      "syncNow": "Şimdi Senkronize Et",
+      "cancel": "İptal",
+      "addPolicy": "Politika Ekle",
+      "deleteSet": "Seti Sil",
+      "validatingRego": "Rego doğrulanıyor...",
+      "delete": "Sil",
+      "savePolicy": "Politikayı Kaydet"
+    },
+    "confirm": {
+      "deleteSet": "Bu politika seti ve tüm politikaları silinsin mi? Kaydedilen çalıştırma değerlendirmeleri saklanır.",
+      "deletePolicy": "\"{name}\" politikası silinsin mi?"
+    },
+    "errors": {
+      "load": "Politika seti yüklenemedi",
+      "save": "Politika seti kaydedilemedi",
+      "saveStatus": "Kaydedilemedi ({status})",
+      "delete": "Politika seti silinemedi",
+      "deleteStatus": "Silinemedi ({status})",
+      "addPolicy": "Politika eklenemedi",
+      "addPolicyStatus": "Politika eklenemedi ({status})",
+      "savePolicy": "Politika kaydedilemedi",
+      "savePolicyStatus": "Politika kaydedilemedi ({status})",
+      "deletePolicy": "Politika silinemedi",
+      "deletePolicyStatus": "Silinemedi ({status})"
+    }
+  },
+  "slackLink": {
+    "title": "Slack''i Terrapod''a Bağla",
+    "loading": "Yükleniyor…",
+    "checking": "Bağlantınız denetleniyor…",
+    "linking": "Slack hesabınız bağlanıyor…",
+    "unknown": "bilinmiyor",
+    "confirm": {
+      "prompt": "Bu Slack hesabı <em>sizin</em> Terrapod kimliğinize bağlansın mı? Gelecekteki her Slack eylemi (onayla/iptal et) bu Terrapod kullanıcısı olarak ve onun izinleriyle çalışacak.",
+      "slackUser": "Slack kullanıcısı",
+      "slackTeam": "Slack ekibi",
+      "terrapodAccount": "Terrapod hesabı",
+      "warning": "Yalnızca bu bağlantıyı Slack''ten kendiniz başlattıysanız devam edin. Başlatmadıysanız bu sekmeyi kapatın ve bağlamayın — bu, yukarıdaki Slack hesabını <em>sizin</em> Terrapod kimliğinize bağlar.",
+      "button": "Onayla ve bağla"
+    },
+    "success": {
+      "message": "Slack hesabınız artık Terrapod''a bağlı.",
+      "linkedAs": "<em>{email}</em> olarak bağlandı. Bu sekmeyi kapatıp Slack''e dönebilirsiniz."
+    },
+    "errors": {
+      "missingLink": "Eksik veya geçersiz bağlantı. Slack''teki Terrapod bağlama komutuyla yeniden başlayın.",
+      "invalidLink": "Bu bağlantı geçersiz, süresi dolmuş veya zaten kullanılmış. Bağlantıyı Slack''ten yeniden başlatın.",
+      "linkingFailed": "Bağlama başarısız."
+    }
+  },
+  "cliComplete": {
+    "loading": "Yükleniyor...",
+    "completing": "Kimlik doğrulama tamamlanıyor...",
+    "invalid": {
+      "title": "Geçersiz İstek",
+      "description": "Gerekli parametreler eksik."
+    },
+    "success": {
+      "title": "Oturum Açma Başarılı",
+      "complete": "API belirteci oluşturuldu. Bu sekmeyi kapatabilirsiniz."
+    },
+    "fallback": {
+      "description": "CLI''ye otomatik olarak ulaşılamadı.",
+      "button": "Elle tamamlamak için buraya tıklayın"
+    },
+    "timeout": {
+      "description": "CLI, belirteç değişimini tamamlamamış olabilir. Terminalinizi kontrol edin."
+    }
+  },
+  "apiDocs": {
+    "view": "Görünüm:",
+    "redocTitle": "ReDoc API Dokümantasyonu"
+  }
+}

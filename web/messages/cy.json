@@ -1,0 +1,2621 @@
+{
+  "nav": {
+    "workspaces": "Gweithfannau",
+    "estate": "Ystad",
+    "registry": "Cofrestrfa",
+    "modules": "Modiwlau",
+    "providers": "Darparwyr",
+    "catalog": "Catalog",
+    "agentPools": "Pyllau Asiantau",
+    "admin": "Gweinyddu",
+    "users": "Defnyddwyr",
+    "roles": "Rolau",
+    "vcsConnections": "Cysylltiadau VCS",
+    "variableSets": "Setiau Newidynnau",
+    "autodiscovery": "Awtoddarganfod",
+    "bulkUpdate": "Diweddaru Swmp",
+    "executionHooks": "Bachau Gweithredu",
+    "policySets": "Setiau Polisi",
+    "providerTemplates": "Templedi Darparwr",
+    "catalogAdmin": "Gweinyddu'r Catalog",
+    "cache": "Storfa",
+    "auditLog": "Cofnod Archwilio",
+    "help": "Cymorth",
+    "apiReference": "Cyfeirlyfr API",
+    "docs": "Dogfennau",
+    "account": "Cyfrif",
+    "apiTokens": "Tocynnau API",
+    "sessions": "Sesiynau",
+    "logOut": "Allgofnodi",
+    "menu": "Dewislen",
+    "openMenu": "Agor y ddewislen",
+    "openAccountMenu": "Agor dewislen y cyfrif",
+    "closeMenu": "Cau'r ddewislen"
+  },
+  "switcher": {
+    "language": "Iaith",
+    "changeLanguage": "Newid iaith"
+  },
+  "workspaces": {
+    "title": "Gweithfannau",
+    "description": "Rheoli gweithfannau, cyflwr a rhediadau Terraform",
+    "new": "Gweithfan Newydd",
+    "cancel": "Canslo",
+    "create": "Creu Gweithfan",
+    "creating": "Wrthi'n creu…",
+    "loadFailed": "Methwyd llwytho'r gweithfannau",
+    "createFailed": "Methwyd creu'r weithfan",
+    "form": {
+      "name": "Enw",
+      "namePattern": "Llythrennau, rhifau, cysylltnodau a thanlinellau yn unig. Rhaid dechrau â llythyren neu rif.",
+      "namePlaceholder": "fy-ngweithfan",
+      "executionMode": "Modd Gweithredu",
+      "local": "Lleol",
+      "agent": "Asiant",
+      "executionBackend": "Peiriant Gweithredu",
+      "version": "Fersiwn",
+      "versionTitle": "Fersiwn ar ffurf X.Y neu X.Y.Z (e.e. 1.11 neu 1.11.5)",
+      "versionPlaceholder": "e.e. 1.11 neu 1.11.5",
+      "cpuRequest": "Cais CPU",
+      "cpuTitle": "Maint CPU Kubernetes: creiddiau cyflawn (1, 2) neu filicreiddiau (500m, 100m)",
+      "cpuHint": "e.e. 1, 0.5, 500m",
+      "memoryRequest": "Cais Cof",
+      "memoryTitle": "Maint cof Kubernetes: beitiau (1000) neu ag ôl-ddodiad (512Mi, 2Gi, 1Ti)",
+      "memoryHint": "e.e. 2Gi, 512Mi, 1Ti",
+      "agentPool": "Pwll Asiantau",
+      "none": "Dim",
+      "autoApply": "Gweithredu Awtomatig",
+      "enabled": "Wedi'i alluogi",
+      "workingDirectory": "Cyfeiriadur Gwaith",
+      "workingDirectoryPlaceholder": "e.e. environments/dev",
+      "workingDirectoryHint": "Is-gyfeiriadur o fewn y storfa sy'n cynnwys ffeiliau .tf",
+      "vcsConnection": "Cysylltiad VCS",
+      "vcsRepoUrl": "URL Storfa VCS",
+      "vcsRepoUrlTitle": "Rhaid iddo fod yn URL HTTP neu HTTPS",
+      "vcsRepoUrlPlaceholder": "https://github.com/org/repo",
+      "vcsBranch": "Cangen VCS",
+      "vcsBranchPlaceholder": "main (rhagosodedig)"
+    },
+    "stats": {
+      "total": "Cyfanswm",
+      "health": "Iechyd",
+      "locked": "Wedi'i gloi",
+      "clearAllFilters": "Clirio pob hidlydd",
+      "clearHealthFilter": "Clirio'r hidlydd problemau iechyd",
+      "filterHealth": "Hidlo i weithfannau â phroblemau iechyd",
+      "clearLockedFilter": "Clirio'r hidlydd cloi",
+      "filterLocked": "Hidlo i weithfannau wedi'u cloi"
+    },
+    "filter": {
+      "placeholder": "Hidlo yn ôl enw, label neu statws — e.e. \"eu1\", \"env:prod\", \"status:errored\"",
+      "ariaLabel": "Hidlo gweithfannau",
+      "clear": "Clirio",
+      "status": "Statws",
+      "label": "Label",
+      "back": "yn ôl",
+      "valueCount": "{count, plural, one {# gwerth} other {# gwerth}}",
+      "removeTerm": "Tynnu'r term hwn",
+      "showing": "Yn dangos {filtered} o {total}",
+      "termName": "enw: {value}",
+      "termStatus": "statws: {value}",
+      "termLabelAny": "{key}: (unrhyw un)",
+      "termLabel": "{key}: {value}",
+      "hintStatus": "statws",
+      "hintHealth": "iechyd",
+      "hintLabel": "label",
+      "hintLabelKey": "allwedd label",
+      "hintName": "enw"
+    },
+    "row": {
+      "removeLabelFilter": "Cliciwch i dynnu o'r hidlydd",
+      "addLabelFilter": "Cliciwch i hidlo yn ôl y label hwn"
+    },
+    "table": {
+      "name": "Enw",
+      "mode": "Modd",
+      "pool": "Pwll",
+      "resources": "Adnoddau",
+      "status": "Statws",
+      "created": "Crëwyd",
+      "resourcesValue": "{cpu} CPU / {memory}"
+    },
+    "empty": {
+      "none": "Dim gweithfannau eto. Crëwch un i ddechrau.",
+      "noMatch": "Nid oes gweithfannau'n cyfateb i'r hidlydd hwn."
+    }
+  },
+  "status": {
+    "state-diverged": "Cyflwr Wedi Gwyro",
+    "vcs-error": "Gwall VCS",
+    "drifted": "Wedi Drifftio",
+    "errored": "Gwallodd",
+    "needs-confirm": "Angen Cadarnhau",
+    "planning": "Cynllunio",
+    "applying": "Gweithredu",
+    "canceling": "Canslo",
+    "confirmed": "Cadarnhawyd",
+    "queued": "Yn y ciw",
+    "pending": "Yn aros",
+    "applied": "Gweithredwyd",
+    "planned": "Cynlluniwyd",
+    "canceled": "Canslwyd",
+    "discarded": "Taflwyd",
+    "pendingDeletion": "Yn aros i'w ddileu",
+    "archived": "Archifwyd"
+  },
+  "auth": {
+    "loading": "Wrthi'n llwytho...",
+    "subtitle": "Mewngofnodwch i reoli eich seilwaith",
+    "subtitleCli": "Mewngofnodwch i awdurdodi'r CLI",
+    "emailLabel": "E-bost",
+    "passwordLabel": "Cyfrinair",
+    "signIn": "Mewngofnodi",
+    "signingIn": "Wrthi'n mewngofnodi...",
+    "signInWith": "Mewngofnodi gyda {provider}",
+    "or": "neu",
+    "noProviders": "Dim darparwyr dilysu wedi'u ffurfweddu",
+    "completingSignIn": "Wrthi'n cwblhau'r mewngofnodi...",
+    "callbackFailedTitle": "Methodd y Dilysu",
+    "tryAgain": "Rhowch Gynnig Arall",
+    "errors": {
+      "loadProviders": "Methwyd llwytho'r darparwyr",
+      "authenticationFailed": "Methodd y dilysu ({status})",
+      "tokenExchangeFailed": "Methodd cyfnewid y tocyn ({status})",
+      "loginFailed": "Methodd y mewngofnodi",
+      "startLoginFailed": "Methwyd dechrau'r mewngofnodi",
+      "missingCodeOrState": "Cod awdurdodi neu gyflwr ar goll",
+      "stateMismatch": "Cyflwr yn anghyfateb — ymosodiad CSRF posibl",
+      "missingVerifier": "Dilyswr PKCE ar goll — ceisiwch fewngofnodi eto"
+    }
+  },
+  "estate": {
+    "title": "Topoleg yr ystad",
+    "description": "Pob gweithfan y gallwch ei gweld a'r modiwlau y maent yn eu defnyddio, wedi'u cysylltu gan sbardunau rhediad, cyflwr pell a chysylltiadau modiwl. Grwpiwch yn ôl pa echelin bynnag sy'n gweddu i'ch ystad — nid yw'r platfform yn gorfodi unrhyw gonfensiwn labelu.",
+    "errors": {
+      "load": "Methwyd llwytho graff yr ystad."
+    },
+    "groupBy": {
+      "label": "Grwpio yn ôl"
+    },
+    "view": {
+      "graph": "Graff",
+      "table": "Tabl"
+    },
+    "counts": {
+      "workspaces": "{count, plural, one {# weithfan} other {# gweithfan}}",
+      "modules": "{count, plural, one {# modiwl} other {# modiwl}}",
+      "dependencies": "{count, plural, one {# ddibyniaeth} other {# dibyniaeth}}"
+    },
+    "legend": {
+      "registryModule": "modiwl cofrestrfa"
+    },
+    "detail": {
+      "moduleImpact": "{count, plural, one {mae gweithfan yn defnyddio hwn — bydd ei fwmpio'n ei ail-gynllunio} other {mae gweithfannau'n defnyddio hwn — bydd ei fwmpio'n eu hail-gynllunio i gyd}}",
+      "dependOnThis": "{count, plural, one {yn dibynnu ar hwn} other {yn dibynnu ar hwn}}"
+    },
+    "table": {
+      "workspaces": {
+        "heading": "Gweithfannau",
+        "col": {
+          "workspace": "Gweithfan",
+          "group": "Grŵp",
+          "agentPool": "Pwll asiantau",
+          "dependedOnBy": "Dibynnir arni gan",
+          "modulesUsed": "Modiwlau a ddefnyddir"
+        },
+        "noModules": "—"
+      },
+      "modules": {
+        "heading": "Modiwlau",
+        "col": {
+          "module": "Modiwl",
+          "usedBy": "Defnyddir gan (gweithfannau)"
+        }
+      }
+    }
+  },
+  "labels": {
+    "title": "Labeli",
+    "description": "Pori labeli sydd ar waith ar draws gweithfannau, pyllau asiantau, modiwlau cofrestrfa a darparwyr cofrestrfa. Darllen yn unig — golygir labeli ar dudalen pob endid ei hun.",
+    "none": "Dim.",
+    "emptyKeys": "Dim labeli ar waith eto. Labelwch unrhyw weithfan, pwll asiantau, modiwl cofrestrfa neu ddarparwr cofrestrfa i ddechrau grwpio pethau yma.",
+    "emptyValues": "Dim gwerthoedd ar gyfer \"{key}\". Naill ai nid oes endid darllenadwy yn cario'r label hwn, neu fe'i tynnwyd ers yr olwg ddiwethaf.",
+    "loadKeysFailed": "Methwyd llwytho'r labeli ({status})",
+    "loadValuesFailed": "Methwyd llwytho gwerthoedd ar gyfer {key} ({status})",
+    "loadEntitiesFailed": "Methwyd llwytho'r endidau ({status})",
+    "columns": {
+      "labelKey": "Allwedd label",
+      "distinctValues": "Gwerthoedd gwahanol",
+      "value": "Gwerth",
+      "total": "Cyfanswm"
+    },
+    "entity": {
+      "workspaces": "Gweithfannau",
+      "agentPools": "Pyllau asiantau",
+      "modules": "Modiwlau",
+      "providers": "Darparwyr"
+    },
+    "deprecated": {
+      "badge": "Anghymeradwy a heb ei gynnal.",
+      "body": "Nid yw'r porwr Labeli yn y prif ddewislen mwyach a bydd yn cael ei dynnu mewn fersiwn yn y dyfodol. Hidlwch yn ôl label o'r dudalen <workspacesLink>Gweithfannau</workspacesLink> yn lle hynny. Os ydych yn dibynnu ar y dudalen hon, <issueLink>agorwch fater</issueLink> os gwelwch yn dda."
+    }
+  },
+  "settings": {
+    "tokens": {
+      "title": "Tocynnau API",
+      "description": "Rheoli tocynnau dilysu ar gyfer y CLI ac awtomeiddio",
+      "descriptionAll": "Pob tocyn ar draws pob defnyddiwr",
+      "myTokens": "Fy Nhocynnau",
+      "allTokens": "Pob Tocyn",
+      "createToken": "Creu Tocyn",
+      "cancel": "Canslo",
+      "tokenReady": "Tocyn yn barod",
+      "tokenReadyHelp": "Copïwch y tocyn hwn nawr — ni chaiff ei ddangos eto.",
+      "dismissToken": "Diystyru'r tocyn",
+      "hide": "Cuddio",
+      "show": "Dangos",
+      "copy": "Copïo",
+      "empty": "Dim tocynnau API eto.",
+      "noDescription": "Dim disgrifiad",
+      "detached": "wedi'i ddatgysylltu",
+      "never": "Byth",
+      "selected": "{count, plural, one {# tocyn wedi'i ddewis} other {# tocyn wedi'u dewis}}",
+      "revokeSelected": "Dirymu'r Rhai a Ddewiswyd",
+      "revoking": "Wrthi'n dirymu...",
+      "clearSelection": "Clirio'r dewis",
+      "rotate": "Cylchdroi",
+      "rotating": "Wrthi'n cylchdroi...",
+      "revoke": "Dirymu",
+      "confirmRotate": "Cylchdroi'r tocyn hwn? Mae'r gyfrinach bresennol yn peidio â gweithio ar unwaith a chyhoeddir un newydd.",
+      "confirmBulkRevoke": "{count, plural, one {Dirymu # tocyn?} other {Dirymu # tocyn?}}",
+      "kinds": {
+        "interactive": {
+          "label": "Personol",
+          "help": "Tocyn personol ar gyfer y CLI ac awtomeiddio ad-hoc. Yn cario eich holl ganiatâd byw."
+        },
+        "service_bound": {
+          "label": "Gwasanaeth · rhwym",
+          "help": "Tocyn gwasanaeth wedi'i gyfyngu i is-set o'ch rolau. Ei fynediad yw'r cyffordd rhwng y rolau hynny a'ch rhai chi — ac mae'n peidio â gweithio os caiff eich cyfrif ei dynnu."
+        },
+        "service_detached": {
+          "label": "Gwasanaeth · datgysylltiedig",
+          "help": "Tocyn gwasanaeth a reolir gan weinyddwr gyda chwmpas absoliwt pinnwyd, nad yw'n rhwym i unrhyw ddefnyddiwr. Defnyddiwch ar gyfer awtomeiddio peiriant-i-beiriant hanfodol sy'n gorfod goroesi ymadawiad unrhyw un person."
+        }
+      },
+      "lifespans": {
+        "720": "30 diwrnod",
+        "2160": "90 diwrnod",
+        "4320": "180 diwrnod",
+        "8760": "1 flwyddyn"
+      },
+      "filter": {
+        "all": "Pob math"
+      },
+      "form": {
+        "description": "Disgrifiad",
+        "descriptionPlaceholder": "Tocyn piblinell CI/CD",
+        "kind": "Math",
+        "lifespan": "Hyd oes",
+        "create": "Creu",
+        "creating": "Wrthi'n creu...",
+        "pinnedRoles": "Rolau pinnwyd",
+        "pinnedRolesHelp": "— y cwmpas y mae'r tocyn hwn wedi'i gyfyngu iddo",
+        "pinnedRolesCapped": "(wedi'i gyfyngu i'ch mynediad eich hun)",
+        "noCustomRoles": "Dim rolau addasedig wedi'u diffinio. Crëwch rolau o dan Gweinyddu → Rolau yn gyntaf.",
+        "noScopedRoles": "Nid oes gennych rolau cwmpasedig i'w pinio. Ni fyddai gan y tocyn hwn unrhyw fynediad."
+      },
+      "columns": {
+        "description": "Disgrifiad",
+        "kind": "Math",
+        "boundTo": "Rhwym i",
+        "created": "Crëwyd",
+        "lastUsed": "Defnyddiwyd Ddiwethaf",
+        "expires": "Yn Dod i Ben",
+        "actions": "Gweithredoedd"
+      },
+      "errors": {
+        "load": "Methwyd llwytho'r tocynnau",
+        "create": "Methwyd creu'r tocyn ({status})",
+        "createGeneric": "Methwyd creu'r tocyn",
+        "rotate": "Methwyd cylchdroi'r tocyn ({status})",
+        "rotateGeneric": "Methwyd cylchdroi'r tocyn",
+        "revoke": "Methwyd dirymu'r tocyn ({status})",
+        "revokeGeneric": "Methwyd dirymu'r tocyn",
+        "bulkRevoke": "Methwyd dirymu'r tocynnau"
+      }
+    },
+    "sessions": {
+      "title": "Sesiynau",
+      "description": "Eich sesiynau gweithredol",
+      "descriptionAll": "Pob sesiwn weithredol ar draws y platfform",
+      "empty": "Dim sesiynau gweithredol.",
+      "revokeAll": "Dirymu Pob Un",
+      "current": "Cyfredol",
+      "columns": {
+        "provider": "Darparwr",
+        "created": "Crëwyd",
+        "expires": "Yn Dod i Ben",
+        "lastActive": "Gweithredol Ddiwethaf",
+        "token": "Tocyn"
+      },
+      "errors": {
+        "load": "Methwyd llwytho'r sesiynau",
+        "revoke": "Methwyd dirymu'r sesiynau ({status})",
+        "revokeGeneric": "Methwyd dirymu'r sesiynau"
+      }
+    }
+  },
+  "registry": {
+    "modules": {
+      "title": "Modiwlau",
+      "description": "Cofrestrfa modiwlau Terraform preifat",
+      "cancel": "Canslo",
+      "createModule": "Creu Modiwl",
+      "empty": "Dim modiwlau eto. Crëwch un i ddechrau.",
+      "providerLabel": "Darparwr: {provider}",
+      "versionCount": "{count, plural, one {# fersiwn} other {# fersiwn}}",
+      "loadFailed": "Methwyd llwytho'r modiwlau",
+      "createFailed": "Methwyd creu'r modiwl",
+      "createFailedStatus": "Methwyd creu'r modiwl ({status})",
+      "form": {
+        "name": "Enw",
+        "provider": "Darparwr",
+        "slugTitle": "Llythrennau bach, rhifau a chysylltnodau yn unig. Rhaid dechrau â llythyren fach.",
+        "addressNote": "Mae'r enw a'r darparwr yn ffurfio cyfeiriad cofrestrfa'r modiwl ac ni ellir eu newid ar ôl eu creu.",
+        "vcsConnectionOptional": "Cysylltiad VCS (dewisol)",
+        "noneUploadManually": "Dim — llwythwch fersiynau â llaw",
+        "repositoryUrl": "URL y Storfa",
+        "branchOptional": "Cangen (dewisol)",
+        "branchPlaceholder": "main (gadewch yn wag am y rhagosodiad)",
+        "tagPattern": "Patrwm Tag",
+        "tagPatternHint": "Dim ond tagiau sy'n cyfateb i'r patrwm hwn sy'n creu fersiynau (e.e. v1.0.0)",
+        "labelsOptional": "Labeli (dewisol)",
+        "creating": "Wrthi'n creu...",
+        "create": "Creu"
+      }
+    },
+    "providers": {
+      "title": "Darparwyr",
+      "description": "Cofrestrfa darparwyr Terraform preifat",
+      "cancel": "Canslo",
+      "createProvider": "Creu Darparwr",
+      "empty": "Dim darparwyr eto. Crëwch un i ddechrau.",
+      "loadFailed": "Methwyd llwytho'r darparwyr",
+      "createFailed": "Methwyd creu'r darparwr",
+      "createFailedStatus": "Methwyd creu'r darparwr ({status})",
+      "form": {
+        "name": "Enw",
+        "slugTitle": "Llythrennau bach, rhifau a chysylltnodau yn unig. Rhaid dechrau â llythyren fach.",
+        "creating": "Wrthi'n creu...",
+        "create": "Creu"
+      }
+    },
+    "meta": {
+      "title": "Metadata",
+      "edit": "Golygu",
+      "cancel": "Canslo",
+      "save": "Cadw",
+      "saving": "Wrthi'n cadw...",
+      "saveAnyway": "Cadw Beth Bynnag",
+      "revertLabels": "Dychwelyd y Labeli",
+      "owner": "Perchennog",
+      "ownerNone": "Dim",
+      "ownerPlaceholder": "defnyddiwr@example.com",
+      "labels": "Labeli"
+    },
+    "moduleDetail": {
+      "notFound": "Ni chanfuwyd y modiwl",
+      "loadFailed": "Methwyd llwytho'r modiwl",
+      "updateFailed": "Methwyd diweddaru'r modiwl",
+      "labelLockoutDefault": "Byddai'r newid label hwn yn lleihau eich mynediad.",
+      "providerLabel": "Darparwr: {provider}",
+      "cancel": "Canslo",
+      "uploadVersion": "Llwytho Fersiwn i Fyny",
+      "vcsConnected": "VCS Wedi'i Gysylltu",
+      "connectVcs": "Cysylltu VCS",
+      "deleteModule": "Dileu'r Modiwl",
+      "linkFailed": "Methwyd cysylltu'r weithfan",
+      "linkFailedStatus": "Methodd y cysylltu ({status})",
+      "unlinkConfirm": "Datgysylltu'r weithfan hon oddi wrth y modiwl? Ni fydd dadansoddiad effaith yn rhedeg ar ei chyfer mwyach.",
+      "unlinkFailed": "Methwyd datgysylltu'r weithfan",
+      "unlinkFailedStatus": "Methodd y datgysylltu ({status})",
+      "uploadFailed": "Methodd y llwytho i fyny",
+      "uploadFailedStatus": "Methodd y llwytho i fyny ({status})",
+      "saveVcsFailed": "Methwyd cadw'r ffurfweddiad VCS",
+      "saveVcsFailedStatus": "Methwyd cadw'r ffurfweddiad VCS ({status})",
+      "disableVcsFailed": "Methwyd analluogi VCS",
+      "disableVcsFailedStatus": "Methwyd analluogi VCS ({status})",
+      "deleteFailed": "Methodd y dileu",
+      "deleteFailedStatus": "Methodd y dileu ({status})",
+      "upload": {
+        "intro": "Dewiswch gyfeiriadur sy'n cynnwys eich ffeiliau modiwl Terraform. Cânt eu pecynnu'n tarbêl a'u llwytho i fyny.",
+        "version": "Fersiwn",
+        "moduleDirectory": "Cyfeiriadur y Modiwl",
+        "selectDirectory": "Dewis Cyfeiriadur",
+        "fileCount": "{count, plural, one {# ffeil} other {# ffeil}}",
+        "filesToInclude": "{count, plural, one {# ffeil i'w chynnwys:} other {# ffeil i'w cynnwys:}}",
+        "andMore": "...a {count} yn rhagor",
+        "uploading": "Wrthi'n llwytho i fyny...",
+        "upload": "Llwytho i Fyny"
+      },
+      "vcs": {
+        "intro": "Cysylltwch y modiwl hwn â storfa VCS. Cyhoeddir fersiynau newydd yn awtomatig pan gaiff tagiau semver sy'n cyfateb i'r patrwm tag eu gwthio. Nid yw ymrwymiadau cangen yn unig yn creu fersiynau.",
+        "connection": "Cysylltiad VCS",
+        "selectConnection": "Dewiswch gysylltiad...",
+        "repositoryUrl": "URL y Storfa",
+        "branchOptional": "Cangen (dewisol)",
+        "branchPlaceholder": "main (gadewch yn wag am y rhagosodiad)",
+        "tagPattern": "Patrwm Tag",
+        "tagPatternHint": "Dim ond tagiau sy'n cyfateb i'r patrwm hwn sy'n creu fersiynau (e.e. v1.0.0)",
+        "saving": "Wrthi'n cadw...",
+        "saveConfiguration": "Cadw'r Ffurfweddiad VCS",
+        "disconnect": "Datgysylltu VCS"
+      },
+      "vcsStatus": {
+        "connected": "VCS wedi'i gysylltu:",
+        "lastTag": "Tag olaf: {tag}",
+        "firstVersionHint": "Gwthiwch dag semver (e.e. <code>v1.0.0</code>) sy'n cyfateb i'r patrwm tag i gyhoeddi'r fersiwn gyntaf."
+      },
+      "links": {
+        "title": "Gweithfannau Cysylltiedig",
+        "linkWorkspace": "Cysylltu Gweithfan",
+        "description": "Mae gweithfannau cysylltiedig yn derbyn cynlluniau tybiannol pan agorir PRau yn erbyn y modiwl hwn, a rhediadau safonol pan gyhoeddir fersiynau newydd.",
+        "searchPlaceholder": "Chwilio am weithfannau i'w cysylltu…",
+        "empty": "Dim gweithfannau wedi'u cysylltu eto.",
+        "unlinkTitle": "Datgysylltu'r weithfan"
+      },
+      "interface": {
+        "title": "Mewnbynnau ac Allbynnau",
+        "counts": "{inputs} mewnbwn, {outputs} allbwn",
+        "versionLabel": "Fersiwn:",
+        "noData": "Dim data rhyngwyneb ar gael ar gyfer y fersiwn hon.",
+        "inputs": "Mewnbynnau",
+        "outputs": "Allbynnau",
+        "name": "Enw",
+        "type": "Math",
+        "description": "Disgrifiad",
+        "default": "Rhagosodiad",
+        "required": "Gofynnol",
+        "sensitive": "Sensitif",
+        "requiredBadge": "gofynnol",
+        "optionalBadge": "dewisol",
+        "sensitiveBadge": "sensitif",
+        "noneDeclared": "Nid yw'r fersiwn modiwl hon yn datgan unrhyw fewnbynnau nac allbynnau."
+      },
+      "versions": {
+        "title": "Fersiynau",
+        "count": "{count, plural, one {# fersiwn} other {# fersiwn}}",
+        "emptyVcs": "Dim fersiynau eto. Gwthiwch dag semver sy'n cyfateb i \"{pattern}\" i'r storfa gysylltiedig i gyhoeddi fersiwn.",
+        "emptyUpload": "Dim fersiynau eto. Llwythwch fodiwl i fyny neu cysylltwch VCS i ddechrau.",
+        "version": "Fersiwn",
+        "status": "Statws",
+        "source": "Ffynhonnell",
+        "actions": "Gweithredoedd",
+        "manualUpload": "llwytho â llaw",
+        "delete": "Dileu"
+      },
+      "deleteDialog": {
+        "title": "Cadarnhau Dileu",
+        "moduleBody": "Bydd hyn yn dileu'r modiwl hwn a phob un o'i fersiynau'n barhaol.",
+        "versionBody": "Bydd hyn yn dileu fersiwn {version} yn barhaol.",
+        "cancel": "Canslo",
+        "confirm": "Dileu"
+      }
+    },
+    "providerDetail": {
+      "description": "Cofrestrfa darparwyr",
+      "deleteProvider": "Dileu'r Darparwr",
+      "publishNote": "Cyhoeddir fersiynau darparwr gyda'r CLI <code>terrapod-publish</code>, sy'n llofnodi'r deuaidd ar ochr y cleient. Ni chynhelir llwytho a llofnodi deuaidd darparwr o'r porwr mwyach. Mae'r dudalen hon yn ddarllen yn unig ar gyfer fersiynau a phlatfformau.",
+      "empty": "Dim fersiynau eto. Cyhoeddwch gyda'r CLI terrapod-publish i ddechrau.",
+      "loadVersionsFailed": "Methwyd llwytho'r fersiynau",
+      "updateFailed": "Methwyd diweddaru'r darparwr",
+      "labelLockoutDefault": "Byddai'r newid label hwn yn lleihau eich mynediad.",
+      "deleteFailed": "Methodd y dileu",
+      "deleteFailedStatus": "Methodd y dileu ({status})",
+      "platformCount": "{count, plural, one {# platfform} other {# platfform}}",
+      "delete": "Dileu",
+      "os": "OS",
+      "arch": "Arch",
+      "filename": "Enw ffeil",
+      "actions": "Gweithredoedd",
+      "deleteDialog": {
+        "title": "Cadarnhau Dileu",
+        "providerBody": "Bydd hyn yn dileu'r darparwr hwn a phob un o'i fersiynau'n barhaol.",
+        "versionBody": "Bydd hyn yn dileu fersiwn {version} a'i blatfformau'n barhaol.",
+        "platformBody": "Bydd hyn yn dileu'r platfform {os}/{arch} yn barhaol.",
+        "cancel": "Canslo",
+        "confirm": "Dileu"
+      }
+    }
+  },
+  "adminUsers": {
+    "title": "Defnyddwyr",
+    "description": "Rheoli cyfrifon defnyddwyr lleol",
+    "empty": "Ni chanfuwyd defnyddwyr.",
+    "columns": {
+      "email": "E-bost",
+      "displayName": "Enw Arddangos",
+      "status": "Statws",
+      "lastLogin": "Mewngofnod Diwethaf",
+      "created": "Crëwyd",
+      "actions": "Gweithredoedd"
+    },
+    "form": {
+      "email": "E-bost",
+      "displayName": "Enw Arddangos",
+      "displayNamePlaceholder": "Siân Jones",
+      "passwordOptional": "Cyfrinair (dewisol)",
+      "passwordPlaceholder": "Rhowch gyfrinair cryf"
+    },
+    "reset": {
+      "title": "Ailosod cyfrinair ar gyfer {email}",
+      "newPassword": "Cyfrinair Newydd"
+    },
+    "password": {
+      "score": {
+        "veryWeak": "Gwan iawn",
+        "weak": "Gwan",
+        "fair": "Gweddol",
+        "good": "Da",
+        "strong": "Cryf"
+      }
+    },
+    "status": {
+      "active": "Gweithredol",
+      "inactive": "Anweithredol",
+      "never": "Byth"
+    },
+    "actions": {
+      "cancel": "Canslo",
+      "save": "Cadw",
+      "saving": "Wrthi'n cadw...",
+      "createUser": "Creu Defnyddiwr",
+      "creating": "Wrthi'n creu...",
+      "resetPassword": "Ailosod Cyfrinair",
+      "edit": "Golygu",
+      "delete": "Dileu",
+      "resetPw": "Ailosod Cyf.",
+      "setPw": "Gosod Cyf.",
+      "cancelPw": "Canslo Cyf."
+    },
+    "confirm": {
+      "activate": "Actifadu'r defnyddiwr \"{email}\"?",
+      "deactivate": "Dadactifadu'r defnyddiwr \"{email}\"?",
+      "delete": "Dileu'r defnyddiwr \"{email}\"? Ni ellir dadwneud hyn."
+    },
+    "success": {
+      "created": "Crëwyd y defnyddiwr \"{email}\"",
+      "updated": "Diweddarwyd y defnyddiwr \"{email}\"",
+      "activated": "Actifadwyd y defnyddiwr \"{email}\"",
+      "deactivated": "Dadactifadwyd y defnyddiwr \"{email}\"",
+      "passwordReset": "Ailosodwyd y cyfrinair ar gyfer \"{email}\"",
+      "deleted": "Dilëwyd y defnyddiwr \"{email}\""
+    },
+    "errors": {
+      "load": "Methwyd llwytho'r defnyddwyr",
+      "create": "Methwyd creu'r defnyddiwr",
+      "createStatus": "Methwyd creu'r defnyddiwr ({status})",
+      "update": "Methwyd diweddaru'r defnyddiwr",
+      "resetPassword": "Methwyd ailosod y cyfrinair",
+      "delete": "Methwyd dileu'r defnyddiwr"
+    }
+  },
+  "adminRoles": {
+    "title": "Rolau a Neilltuadau",
+    "description": "Rheoli rolau RBAC a neilltuadau rôl defnyddwyr",
+    "builtIn": "cynhenid",
+    "emptyRoles": "Dim rolau wedi'u diffinio.",
+    "emptyAssignments": "Dim neilltuadau rôl.",
+    "tabs": {
+      "roles": "Rolau",
+      "assignments": "Neilltuadau"
+    },
+    "columns": {
+      "provider": "Darparwr",
+      "email": "E-bost",
+      "role": "Rôl",
+      "created": "Crëwyd",
+      "actions": "Gweithredoedd"
+    },
+    "form": {
+      "name": "Enw",
+      "namePattern": "Llythrennau, rhifau, cysylltnodau a thanlinellau yn unig. Rhaid dechrau â llythyren neu rif.",
+      "workspacePermission": "Caniatâd Gweithfan",
+      "poolPermission": "Caniatâd Pwll",
+      "registryPermission": "Caniatâd Cofrestrfa",
+      "catalogPermission": "Caniatâd Catalog",
+      "descriptionLabel": "Disgrifiad",
+      "descriptionPlaceholder": "Mynediad datblygwr",
+      "allowLabels": "Caniatáu Labeli (allwedd=gwerth, wedi'u gwahanu â choma)",
+      "allowNames": "Caniatáu Enwau (wedi'u gwahanu â choma)",
+      "denyLabels": "Gwrthod Labeli (allwedd=gwerth, wedi'u gwahanu â choma)",
+      "denyNames": "Gwrthod Enwau (wedi'u gwahanu â choma)",
+      "allowLabelsShort": "Caniatáu Labeli",
+      "allowNamesShort": "Caniatáu Enwau",
+      "denyLabelsShort": "Gwrthod Labeli",
+      "denyNamesShort": "Gwrthod Enwau"
+    },
+    "assignForm": {
+      "provider": "Darparwr",
+      "email": "E-bost",
+      "roles": "Rolau"
+    },
+    "caps": {
+      "selected": "{count, plural, one {# gallu} other {# gallu}} wedi'i ddewis",
+      "count": "{count, plural, one {# gallu} other {# gallu}}",
+      "custom": "Addasedig",
+      "matchesPresets": "Yn cyfateb i'r rhagosodiadau",
+      "advanced": "Uwch — galluoedd",
+      "otherPreserved": "Galluoedd eraill (cedwir wrth gadw)",
+      "presetHelp": {
+        "before": "Mae dewis rhagosodiad uchod yn rhag-diciad ei alluoedd. Mae ticio neu ddad-dicio blwch y tu hwnt i ragosodiad yn marcio'r rôl yn",
+        "after": "ac anfonir ei chaniatâd fel set alluoedd benodol."
+      },
+      "groups": {
+        "workspace": "Gweithfan",
+        "run": "Rhediad",
+        "state": "Cyflwr",
+        "var": "Newidynnau",
+        "config": "Ffurfweddiad",
+        "drift": "Drifft",
+        "run-task": "Tasgau rhediad",
+        "notification": "Hysbysiadau",
+        "run-trigger": "Sbardunau rhediad",
+        "pool": "Pyllau asiantau",
+        "registry": "Cofrestrfa",
+        "catalog": "Catalog gwasanaethau"
+      }
+    },
+    "display": {
+      "allow": "Caniatáu: {value}",
+      "allowNames": "Caniatáu enwau: {value}",
+      "deny": "Gwrthod: {value}",
+      "denyNames": "Gwrthod enwau: {value}"
+    },
+    "actions": {
+      "cancel": "Canslo",
+      "save": "Cadw",
+      "saving": "Wrthi'n cadw...",
+      "edit": "Golygu",
+      "delete": "Dileu",
+      "remove": "Tynnu",
+      "createRole": "Creu Rôl",
+      "creating": "Wrthi'n creu...",
+      "addAssignment": "Ychwanegu Neilltuad",
+      "setRoles": "Gosod Rolau"
+    },
+    "confirm": {
+      "deleteRole": "Dileu'r rôl \"{name}\"? Effeithir ar unrhyw neilltuadau sy'n cyfeirio ati.",
+      "removeAssignment": "Tynnu'r rôl \"{roleName}\" oddi wrth {email}?"
+    },
+    "success": {
+      "roleCreated": "Crëwyd y rôl \"{name}\"",
+      "roleUpdated": "Diweddarwyd y rôl \"{name}\"",
+      "roleDeleted": "Dilëwyd y rôl \"{name}\"",
+      "rolesAssigned": "Neilltuwyd rolau i {email}",
+      "assignmentRemoved": "Tynnwyd y neilltuad"
+    },
+    "errors": {
+      "loadRoles": "Methwyd llwytho'r rolau",
+      "loadAssignments": "Methwyd llwytho'r neilltuadau",
+      "createRole": "Methwyd creu'r rôl",
+      "createRoleStatus": "Methwyd creu'r rôl ({status})",
+      "updateRole": "Methwyd diweddaru'r rôl",
+      "deleteRole": "Methwyd dileu'r rôl",
+      "setAssignment": "Methwyd gosod y neilltuad",
+      "setAssignmentStatus": "Methwyd gosod y neilltuad ({status})",
+      "deleteAssignment": "Methwyd dileu'r neilltuad"
+    }
+  },
+  "adminVcs": {
+    "title": "Cysylltiadau VCS",
+    "description": "Rheoli integreiddiadau system rheoli fersiwn",
+    "empty": "Dim cysylltiadau VCS wedi'u ffurfweddu.",
+    "actions": {
+      "new": "Cysylltiad Newydd",
+      "cancel": "Canslo",
+      "edit": "Golygu",
+      "delete": "Dileu"
+    },
+    "confirmDelete": "Dileu'r cysylltiad VCS hwn? Bydd gweithfannau sy'n ei ddefnyddio'n colli integreiddiad VCS. Ni ellir dadwneud hyn.",
+    "form": {
+      "name": "Enw",
+      "namePattern": "Llythrennau, rhifau, cysylltnodau a thanlinellau yn unig. Rhaid dechrau â llythyren neu rif.",
+      "provider": "Darparwr",
+      "providerImmutable": "Mae'r darparwr yn anghyfnewidiadwy — dilëwch ac ail-grëwch i'w newid",
+      "serverUrl": "URL y Gweinydd (dewisol)",
+      "serverUrlHint": "Rhaid iddo fod yn URL HTTP neu HTTPS (e.e. https://github.mycompany.com)",
+      "appId": "App ID",
+      "appIdHint": "GitHub App ID — digidau rhifol yn unig",
+      "installationId": "Installation ID",
+      "installationIdHint": "GitHub App Installation ID — digidau rhifol yn unig",
+      "privateKey": "Allwedd Breifat (PEM)",
+      "browse": "Pori...",
+      "privateKeyKeep": "Gadewch yn wag i gadw'r allwedd bresennol — gludwch PEM newydd i'w chylchdroi",
+      "privateKeyPlaceholder": "-----BEGIN RSA PRIVATE KEY-----\n...\n\nGollyngwch ffeil .pem yma neu cliciwch Pori",
+      "webhookSecret": "Cyfrinach Webhook",
+      "optional": "(dewisol)",
+      "webhookSecretSet": "Wedi'i gosod — gadewch yn wag i'w chadw, rhowch werth newydd i'w chylchdroi",
+      "webhookSecretGlobal": "Gadewch yn wag i ddefnyddio'r gyfrinach webhook fyd-eang",
+      "webhookSecretHelp": "Cyfrinach HMAC fesul-cysylltiad ar gyfer webhooks y gosodiad hwn. Pan na chaiff ei gosod, defnyddir y gyfrinach fyd-eang.",
+      "accessToken": "Tocyn Mynediad",
+      "accessTokenKeep": "Gadewch yn wag i gadw'r tocyn presennol",
+      "saving": "Wrthi'n cadw...",
+      "creating": "Wrthi'n creu...",
+      "saveChanges": "Cadw Newidiadau",
+      "createConnection": "Creu Cysylltiad"
+    },
+    "table": {
+      "name": "Enw",
+      "provider": "Darparwr",
+      "serverUrl": "URL y Gweinydd",
+      "status": "Statws",
+      "created": "Crëwyd",
+      "actions": "Gweithredoedd"
+    },
+    "success": {
+      "created": "Crëwyd y cysylltiad VCS \"{name}\"",
+      "updated": "Diweddarwyd y cysylltiad VCS \"{name}\"",
+      "deleted": "Dilëwyd y cysylltiad VCS"
+    },
+    "errors": {
+      "load": "Methwyd llwytho'r cysylltiadau VCS",
+      "save": "Methwyd cadw'r cysylltiad",
+      "delete": "Methwyd dileu'r cysylltiad",
+      "createStatus": "Methwyd creu'r cysylltiad ({status})",
+      "updateStatus": "Methwyd diweddaru'r cysylltiad ({status})"
+    }
+  },
+  "adminVariableSets": {
+    "title": "Setiau Newidynnau",
+    "description": "Rheoli setiau newidynnau ar lefel y sefydliad ar gyfer grwpiau gweithfannau",
+    "empty": "Dim setiau newidynnau wedi'u ffurfweddu.",
+    "none": "-",
+    "actions": {
+      "new": "Set Newidynnau Newydd",
+      "cancel": "Canslo"
+    },
+    "form": {
+      "name": "Enw",
+      "namePattern": "Llythrennau, rhifau, cysylltnodau a thanlinellau yn unig. Rhaid dechrau â llythyren neu rif.",
+      "descriptionLabel": "Disgrifiad",
+      "descriptionPlaceholder": "Manylion adnabod AWS ar gyfer pob gweithfan",
+      "global": "Byd-eang (gweithredu ar bob gweithfan)",
+      "priority": "Blaenoriaeth (diystyru newidynnau'r weithfan)",
+      "creating": "Wrthi'n creu...",
+      "create": "Creu Set Newidynnau"
+    },
+    "table": {
+      "name": "Enw",
+      "description": "Disgrifiad",
+      "scope": "Cwmpas",
+      "variables": "Newidynnau",
+      "created": "Crëwyd"
+    },
+    "scope": {
+      "global": "Byd-eang",
+      "priority": "Blaenoriaeth",
+      "standard": "Safonol"
+    },
+    "errors": {
+      "load": "Methwyd llwytho'r setiau newidynnau",
+      "create": "Methwyd creu'r set newidynnau",
+      "createStatus": "Methwyd creu'r set newidynnau ({status})"
+    },
+    "detail": {
+      "back": "Yn ôl i'r setiau newidynnau",
+      "headerFallback": "Set newidynnau",
+      "notFound": "Ni chanfuwyd y set newidynnau",
+      "global": "Byd-eang",
+      "priority": "Blaenoriaeth",
+      "yes": "Ydy",
+      "no": "Nac ydy",
+      "edit": "Golygu",
+      "cancel": "Canslo",
+      "save": "Cadw",
+      "saving": "Wrthi'n cadw...",
+      "delete": "Dileu",
+      "deleting": "Wrthi'n dileu...",
+      "confirmDelete": "Cadarnhau Dileu",
+      "deleteTitle": "Dileu'r Set Newidynnau",
+      "deleteDescription": "Dileu'r set newidynnau hon a phob un o'i newidynnau'n barhaol.",
+      "tabs": {
+        "settings": "Gosodiadau",
+        "variables": "Newidynnau",
+        "workspaces": "Gweithfannau"
+      },
+      "addVariable": "Ychwanegu Newidyn",
+      "adding": "Wrthi'n ychwanegu...",
+      "varKey": "Allwedd",
+      "varValue": "Gwerth",
+      "varCategory": "Categori",
+      "categoryTerraform": "Terraform",
+      "categoryEnv": "Amgylchedd",
+      "sensitive": "Sensitif",
+      "sensAbbr": "Sens.",
+      "enterNewValue": "Rhowch werth newydd",
+      "empty": "gwag",
+      "emptyVars": "Dim newidynnau yn y set hon.",
+      "actions": "Gweithredoedd",
+      "remove": "Tynnu",
+      "add": "Ychwanegu",
+      "addWorkspace": "Ychwanegu Gweithfan",
+      "workspace": "Gweithfan",
+      "selectWorkspace": "Dewiswch weithfan...",
+      "globalBanner": "Mae'r set newidynnau hon yn fyd-eang ac yn gweithredu ar bob gweithfan yn awtomatig.",
+      "emptyWorkspaces": "Dim gweithfannau wedi'u neilltuo i'r set newidynnau hon.",
+      "confirmDeleteVar": "Dileu'r newidyn hwn? Ni ellir dadwneud hyn.",
+      "confirmRemoveWorkspace": "Tynnu'r weithfan hon o'r set newidynnau? Ni fydd ei newidynnau'n gweithredu ar y weithfan honno mwyach.",
+      "success": {
+        "updated": "Diweddarwyd y set newidynnau",
+        "workspaceAdded": "Ychwanegwyd y weithfan",
+        "workspaceRemoved": "Tynnwyd y weithfan"
+      },
+      "errors": {
+        "load": "Methwyd llwytho'r set newidynnau",
+        "update": "Methwyd diweddaru'r set newidynnau",
+        "delete": "Methwyd dileu'r set newidynnau",
+        "loadVars": "Methwyd llwytho'r newidynnau",
+        "loadWorkspaces": "Methwyd llwytho'r gweithfannau",
+        "addVar": "Methwyd ychwanegu'r newidyn",
+        "addVarStatus": "Methwyd ychwanegu'r newidyn ({status})",
+        "updateVar": "Methwyd diweddaru'r newidyn",
+        "deleteVar": "Methwyd dileu'r newidyn",
+        "addWorkspace": "Methwyd ychwanegu'r weithfan",
+        "removeWorkspace": "Methwyd tynnu'r weithfan"
+      }
+    }
+  },
+  "adminAutodiscovery": {
+    "title": "Awtoddarganfod",
+    "description": "Creu gweithfannau'n awtomatig mewn monorepos pan fydd PRau'n cyffwrdd â llwybrau sy'n cyfateb",
+    "empty": "Dim rheolau awtoddarganfod eto. Crëwch un i ddechrau darparu gweithfannau'n awtomatig o PRau yn eich monorepo.",
+    "unsavedRule": "(rheol heb ei chadw)",
+    "actions": {
+      "newRule": "Rheol Newydd",
+      "cancel": "Canslo",
+      "create": "Creu",
+      "update": "Diweddaru",
+      "preview": "Rhagolwg",
+      "edit": "Golygu",
+      "delete": "Dileu",
+      "close": "Cau"
+    },
+    "status": {
+      "enabled": "wedi'i alluogi",
+      "disabled": "wedi'i analluogi"
+    },
+    "form": {
+      "createTitle": "Creu rheol",
+      "editTitle": "Golygu rheol",
+      "name": "Enw",
+      "vcsConnection": "Cysylltiad VCS",
+      "selectConnection": "Dewiswch gysylltiad",
+      "repoUrl": "URL y storfa",
+      "branch": "Cangen (gwag = rhagosodedig)",
+      "matchPattern": "Patrwm cyfatebol",
+      "matchPatternHint": "Globiau arddull gitignore. Mae <code>**</code> yn cyfateb ar draws segmentau llwybr. Dim ond ffeiliau <code>*.tf*</code> sy'n sbarduno awtoddarganfod.",
+      "ignorePatterns": "Patrymau i'w hanwybyddu (un fesul llinell)",
+      "nameTemplate": "Templed enw'r weithfan (dewisol)",
+      "nameTemplateHint": "Defnyddiwch <path></path> ar gyfer y cyfeiriadur â <code>/</code> wedi'i newid am <code>-</code>, neu <root></root> ar gyfer y cyfeiriadur fel y mae. Gwag = rhagosodedig (dim ond y llwybr â chysylltnodau).",
+      "templateDefaults": "Rhagosodiadau templed y weithfan",
+      "executionMode": "Modd gweithredu",
+      "executionModeHint": "Mae awtoddarganfod yn cael ei yrru gan VCS; dim ond gweithredu asiant a gefnogir.",
+      "agentPool": "Pwll asiantau",
+      "none": "(dim)",
+      "executionBackend": "Peiriant gweithredu",
+      "terraformVersion": "Fersiwn Terraform",
+      "cpuRequest": "Cais CPU",
+      "memoryRequest": "Cais cof",
+      "ownerEmail": "E-bost y perchennog",
+      "autoApply": "Gweithredu awtomatig",
+      "enabled": "Wedi'i alluogi",
+      "onDirectoryDelete": "Ar ddileu cyfeiriadur",
+      "onDeleteFlag": "Baneru (diogel — marcio i'w ddileu, angen gweithred â llaw)",
+      "onDeleteDestroy": "Dinistrio (PERYGL — yn dymchwel seilwaith ac yna'n archifo'r weithfan)",
+      "onDirectoryDeleteHint": "Beth sy'n digwydd i weithfan awtoddarganfod pan gaiff ei chyfeiriadur ei dynnu ar y gangen a olrheinir.",
+      "onDeleteDestroyWarning": "Bydd hyn yn rhedeg terraform destroy go iawn ar y weithfan pan gaiff ei chyfeiriadur ei dynnu ar y gangen a olrheinir.",
+      "labels": "Labeli (etifeddir gan weithfannau a grëir)",
+      "varFiles": "Ffeiliau var (etifeddir gan weithfannau a grëir)",
+      "varFilesHint": "Llwybrau <code>.tfvars</code> perthynol a drosglwyddir i gynllunio/gweithredu.",
+      "addVarFile": "Ychwanegu ffeil var",
+      "executionHooks": "Bachau gweithredu (cysylltir â phob gweithfan newydd)",
+      "executionHooksHint": "Dewiswch o'r bachau a ddiffinnir ar dudalen weinyddol <page>Bachau Gweithredu</page> — cysylltir pob bach a ddewiswyd â phob gweithfan y mae'r rheol hon yn ei chreu.",
+      "noHooks": "Dim bachau gweithredu wedi'u diffinio eto. Crëwch un ar dudalen weinyddol Bachau Gweithredu yn gyntaf.",
+      "hookDisabled": "(wedi'i analluogi)",
+      "hookNotInLibrary": "(ddim yn y llyfrgell — dad-diciwch i'w dynnu)",
+      "runTaskTemplates": "Templedi tasg rhediad (crëir ar bob gweithfan newydd)",
+      "notificationTemplates": "Templedi hysbysu (crëir ar bob gweithfan newydd)",
+      "saving": "Wrthi'n cadw...",
+      "previewTitle": "Cerdded y storfa a rhagolygu pa weithfannau y BYDDAI'r rheol hon yn eu creu — dim cadw"
+    },
+    "table": {
+      "name": "Enw",
+      "repo": "Storfa",
+      "pattern": "Patrwm",
+      "enabled": "Wedi'i alluogi",
+      "created": "Crëwyd",
+      "previewTitle": "Cerdded y storfa a rhagolygu pa weithfannau y byddai'r rheol hon yn eu creu"
+    },
+    "deleteModal": {
+      "title": "Dileu'r rheol?",
+      "body": "Bydd gweithfannau a grëwyd yn awtomatig gan y rheol hon yn dal i weithio. Ni fydd PRau yn y dyfodol sy'n cyffwrdd â llwybrau newydd o dan y rheol hon yn creu rhagor o weithfannau'n awtomatig."
+    },
+    "preview": {
+      "title": "Rhagolwg: {ruleName}",
+      "walkedFiles": "Cerddwyd <files>{count}</files> ffeil ar <refspan>{ref}</refspan>",
+      "walking": "Wrthi'n cerdded y storfa…",
+      "noMatches": "Nid oes cyfeiriaduron yn y storfa hon yn cyfateb i batrwm y rheol. Dim i'w greu.",
+      "colWorkspace": "Gweithfan",
+      "colDirectory": "Cyfeiriadur",
+      "colAction": "Gweithred",
+      "repoRoot": "(gwraidd y storfa)",
+      "actionCreate": "Creu",
+      "skipDiscovered": "Hepgor (eisoes wedi'i ddarganfod)",
+      "skipDiscoveredTitle": "Eisoes wedi'i greu gan y rheol hon",
+      "skipCollision": "Hepgor (gwrthdaro enwau)",
+      "skipCollisionTitle": "Mae gweithfan â'r enw hwn eisoes yn bodoli am reswm arall",
+      "willCreate": "{count, plural, one {Bydd # weithfan yn cael ei chreu.} other {Bydd # gweithfan yn cael eu creu.}} Gadewir gweithfannau presennol (gwrthdrawiadau) heb eu cyffwrdd.",
+      "provision": "{count, plural, one {Darparu # weithfan} other {Darparu # gweithfan}}",
+      "provisioning": "Wrthi'n darparu…",
+      "saveToProvision": "Cadwch y rheol i ddarparu'r gweithfannau hyn."
+    },
+    "success": {
+      "created": "Crëwyd {name}",
+      "updated": "Diweddarwyd {name}",
+      "deleted": "Dilëwyd y rheol",
+      "provisioned": "{count, plural, one {Crëwyd # weithfan o \"{ruleName}\"} other {Crëwyd # gweithfan o \"{ruleName}\"}}"
+    },
+    "errors": {
+      "loadRules": "Methwyd llwytho'r rheolau awtoddarganfod",
+      "load": "Methwyd llwytho",
+      "createFailed": "Methodd y creu: {status} {detail}",
+      "updateFailed": "Methodd y diweddaru: {status} {detail}",
+      "save": "Methwyd cadw",
+      "deleteRule": "Methwyd dileu'r rheol",
+      "delete": "Methwyd dileu",
+      "previewFailed": "Methodd y rhagolwg ({status})",
+      "preview": "Methodd y rhagolwg",
+      "previewPrereq": "Gosodwch gysylltiad VCS, URL storfa a phatrwm cyn rhagolygu",
+      "scanFailed": "Methodd y sganio ({status})",
+      "scan": "Methodd y sganio"
+    }
+  },
+  "adminBulkUpdate": {
+    "title": "Diweddaru Swmp",
+    "description": "Dewiswch weithfannau yn ôl hidlydd, yna gweithredu newid gosodiad ar draws pob un ohonynt",
+    "none": "(dim)",
+    "anyOption": "(unrhyw un)",
+    "unchanged": "(heb newid)",
+    "unchangedOption": "(heb newid)",
+    "filter": {
+      "heading": "1. Dewiswch weithfannau",
+      "matchAll": "Cyfateb i <strong>bob</strong> gweithfan (yn anwybyddu'r hidlyddion isod)",
+      "namePrefix": "Rhagddodiad enw",
+      "executionBackend": "Peiriant gweithredu",
+      "ownerEmail": "E-bost y perchennog",
+      "agentPool": "Pwll asiantau",
+      "vcsConnection": "Cysylltiad VCS",
+      "labels": "Labeli",
+      "search": "Chwilio",
+      "searching": "Wrthi'n chwilio..."
+    },
+    "results": {
+      "matched": "Cyfatebodd <strong>{count}</strong> {count, plural, one {weithfan} other {gweithfan}}.",
+      "noMatch": "Ni chyfatebodd unrhyw weithfannau i'r hidlydd hwn.",
+      "colName": "Enw",
+      "colMode": "Modd",
+      "colBackend": "Peiriant",
+      "colTfVersion": "Fersiwn TF",
+      "colLabels": "Labeli"
+    },
+    "update": {
+      "heading": "2. Gweithredu newidiadau",
+      "hint": "Dim ond y meysydd a osodwch isod a newidir. Mae'r hidlydd uchod yn dewis pa weithfannau sy'n derbyn y newid.",
+      "terraformVersion": "Fersiwn Terraform",
+      "executionBackend": "Peiriant gweithredu",
+      "executionMode": "Modd gweithredu",
+      "autoApply": "Gweithredu awtomatig",
+      "agentPool": "Pwll asiantau",
+      "cpuRequest": "Cais CPU",
+      "memoryRequest": "Cais cof",
+      "setLabels": "Gosod labeli (yn amnewid map y labeli ar bob gweithfan gyfatebol)",
+      "setVarFiles": "Gosod ffeiliau var",
+      "addVarFile": "Ychwanegu ffeil var",
+      "setRunTasks": "Gosod tasgau rhediad (upsertir yn ôl enw ar bob gweithfan gyfatebol)",
+      "setNotifications": "Gosod ffurfweddiadau hysbysu (upsertir yn ôl enw)",
+      "dryRun": "Rhediad sych (rhagolwg yn unig — ni ysgrifennir unrhyw newidiadau)",
+      "confirmWarning": "Mae hyn yn ysgrifennu newidiadau i bob gweithfan gyfatebol.",
+      "confirmApply": "Cadarnhau gweithredu",
+      "applying": "Wrthi'n gweithredu...",
+      "cancel": "Canslo",
+      "working": "Wrthi'n gweithio...",
+      "previewDryRun": "Rhagolwg (rhediad sych)",
+      "applyChanges": "Gweithredu newidiadau"
+    },
+    "diff": {
+      "colWorkspace": "Gweithfan",
+      "colChanges": "Newidiadau"
+    },
+    "dryResult": {
+      "heading": "Canlyniad y rhediad sych",
+      "summary": "Cyfatebodd <strong>{matched}</strong>; byddai <strong>{wouldChange}</strong> yn newid; {unchanged} heb newid. Ni ysgrifennwyd dim.",
+      "wouldChange": "Byddai'n newid",
+      "noChange": "Ni fyddai unrhyw weithfannau'n newid gyda'r diweddariad hwn."
+    },
+    "applyResult": {
+      "heading": "Canlyniad y gweithredu",
+      "summary": "Cyfatebodd <strong>{matched}</strong>; gweithredwyd <appliedstrong>{applied}</appliedstrong>; {unchanged} heb newid; {errors, plural, one {# gwall} other {# gwall}}.",
+      "applied": "Gweithredwyd",
+      "unnamedWorkspace": "(gweithfan)",
+      "noChange": "Ni newidiodd unrhyw weithfannau."
+    },
+    "errors": {
+      "searchFailed": "Methodd y chwilio ({status})",
+      "search": "Methodd y chwilio",
+      "bulkUpdateFailed": "Methodd y diweddaru swmp ({status})",
+      "bulkUpdate": "Methodd y diweddaru swmp"
+    }
+  },
+  "adminExecutionHooks": {
+    "title": "Bachau Gweithredu",
+    "description": "Camau cragen addasedig a redir y tu mewn i Jobs y rhedwr ar bwyntiau cyn/ar ôl-cynllunio/gweithredu, wedi'u cysylltu â gweithfannau",
+    "empty": "Dim bachau gweithredu wedi'u ffurfweddu.",
+    "actions": {
+      "cancel": "Canslo",
+      "new": "Bach Gweithredu Newydd",
+      "creating": "Wrthi'n creu...",
+      "create": "Creu Bach Gweithredu"
+    },
+    "badges": {
+      "disabled": "Wedi'i analluogi",
+      "enabled": "Wedi'i alluogi"
+    },
+    "columns": {
+      "name": "Enw",
+      "hookPoint": "Pwynt Bach",
+      "enabled": "Wedi'i alluogi",
+      "priority": "Blaenoriaeth",
+      "workspaces": "Gweithfannau"
+    },
+    "form": {
+      "name": "Enw",
+      "namePatternTitle": "Llythrennau, rhifau, cysylltnodau a thanlinellau yn unig. Rhaid dechrau â llythyren neu rif.",
+      "description": "Disgrifiad",
+      "descriptionPlaceholder": "Ychwanegu cofnod hosts mewnol cyn init",
+      "hookPoint": "Pwynt Bach",
+      "priority": "Blaenoriaeth",
+      "priorityTitle": "Rhed y rhif is yn gyntaf pan fydd sawl bach yn rhannu pwynt (datrysir cydraddoldeb yn ôl enw).",
+      "scriptLabel": "Sgript (<code>/bin/sh -c</code>)",
+      "scriptHelp": "Rhed gydag adnabyddiaeth gwmwl y rhedwr. Mae ymadawiad dieithr yn methu'r rhediad. Dylai cyfrinachau ddod o newidynnau gweithfan, nid mewnlin yma."
+    },
+    "errors": {
+      "load": "Methwyd llwytho'r bachau gweithredu",
+      "createStatus": "Methwyd creu'r bach gweithredu ({status})",
+      "create": "Methwyd creu'r bach gweithredu"
+    }
+  },
+  "adminPolicySets": {
+    "title": "Setiau Polisi",
+    "description": "Gorfodi polisi-fel-cod OPA, wedi'i gwmpasu i weithfannau yn ôl label",
+    "empty": "Dim setiau polisi wedi'u ffurfweddu.",
+    "actions": {
+      "cancel": "Canslo",
+      "new": "Set Polisi Newydd",
+      "creating": "Wrthi'n creu...",
+      "create": "Creu Set Polisi"
+    },
+    "badges": {
+      "disabled": "Wedi'i analluogi",
+      "mandatory": "Gorfodol",
+      "advisory": "Cynghorol",
+      "global": "Byd-eang",
+      "labelScoped": "Cwmpaswyd yn ôl label"
+    },
+    "columns": {
+      "name": "Enw",
+      "description": "Disgrifiad",
+      "enforcement": "Gorfodaeth",
+      "scope": "Cwmpas",
+      "policies": "Polisïau"
+    },
+    "form": {
+      "name": "Enw",
+      "namePatternTitle": "Llythrennau, rhifau, cysylltnodau a thanlinellau yn unig. Rhaid dechrau â llythyren neu rif.",
+      "description": "Disgrifiad",
+      "descriptionPlaceholder": "Cyfyngiadau gorfodol ar gyfer gweithfannau cynhyrchu",
+      "enforcement": "Gorfodaeth",
+      "enforcementAdvisory": "Cynghorol (rhybuddio, peidio â rhwystro)",
+      "enforcementMandatory": "Gorfodol (rhwystro gweithredu ar fethiant)",
+      "globalScope": "Byd-eang (gweithredu ar bob gweithfan)",
+      "sourceInline": "Mewnlin (rheoli polisïau yn y rhyngwyneb)",
+      "sourceVcs": "O Storfa VCS",
+      "vcsConnection": "Cysylltiad VCS",
+      "selectConnection": "Dewiswch gysylltiad...",
+      "repoUrl": "URL y Storfa",
+      "branch": "Cangen",
+      "branchPlaceholder": "main (rhagosodedig)",
+      "policyPath": "Llwybr Polisi",
+      "policyPathPlaceholder": "policies/ (cyfeiriadur sy'n cynnwys ffeiliau .rego)",
+      "helpVcs": "Bydd polisïau'n cael eu cydweddu o'r storfa yn awtomatig.",
+      "helpInline": "Ychwanegwch bolisïau a mireiniwch gwmpasu labeli ar ôl creu'r set."
+    },
+    "errors": {
+      "load": "Methwyd llwytho'r setiau polisi",
+      "createStatus": "Methwyd creu'r set polisi ({status})",
+      "create": "Methwyd creu'r set polisi"
+    }
+  },
+  "adminCatalog": {
+    "title": "Gweinyddu'r Catalog",
+    "description": "Rheoli eitemau catalog gwasanaethau",
+    "notEnabled": "Nid yw'r catalog gwasanaethau wedi'i alluogi.",
+    "empty": "Dim eitemau catalog eto.",
+    "actions": {
+      "new": "Eitem Catalog Newydd",
+      "cancel": "Canslo",
+      "create": "Creu Eitem Catalog",
+      "creating": "Wrthi'n creu…",
+      "saveChanges": "Cadw Newidiadau",
+      "saving": "Wrthi'n cadw…",
+      "edit": "Golygu",
+      "delete": "Dileu"
+    },
+    "form": {
+      "name": "Enw",
+      "nameTitle": "Llythrennau, rhifau, cysylltnodau a thanlinellau yn unig. Rhaid dechrau â llythyren neu rif.",
+      "module": "Modiwl",
+      "moduleSelect": "Dewiswch fodiwl…",
+      "moduleImmutable": "Mae'r modiwl yn anghyfnewidiadwy ar ôl ei greu",
+      "displayName": "Enw arddangos",
+      "displayNamePlaceholder": "Bwced S3 Safonol",
+      "versionPin": "Pin fersiwn ragosodedig",
+      "versionPinPlaceholder": "e.e. 1.2.0 (gwag = diweddaraf)",
+      "descriptionLabel": "Disgrifiad",
+      "descriptionPlaceholder": "Beth mae'r eitem catalog hon yn ei ddarparu…",
+      "enabled": "Wedi'i alluogi (yn weladwy yn y catalog pori)",
+      "providerTemplates": "Templedi darparwr",
+      "noProviderTemplates": "Dim templedi darparwr wedi'u diffinio.",
+      "restrictPools": "Cyfyngu i byllau asiantau penodol",
+      "noAgentPools": "Dim pyllau asiantau ar gael.",
+      "anyPool": "Gellir defnyddio unrhyw bwll asiantau.",
+      "labels": "Labeli",
+      "variableOptions": "Opsiynau newidynnau (uwch, JSON)",
+      "variableOptionsHint": "Diystyriadau fesul-mewnbwn (opsiynau, cudd, rhagosodedig). Gadewch fel <code>[]</code> os na chaiff ei ddefnyddio."
+    },
+    "table": {
+      "name": "Enw",
+      "module": "Modiwl",
+      "enabled": "Wedi'i alluogi",
+      "actions": "Gweithredoedd"
+    },
+    "badge": {
+      "enabled": "wedi'i alluogi",
+      "disabled": "wedi'i analluogi"
+    },
+    "confirm": {
+      "delete": "Dileu'r eitem catalog hon? Ni effeithir ar achosion presennol a ddarparwyd."
+    },
+    "success": {
+      "created": "Crëwyd yr eitem catalog \"{name}\"",
+      "updated": "Diweddarwyd yr eitem catalog \"{name}\"",
+      "deleted": "Dilëwyd yr eitem catalog"
+    },
+    "errors": {
+      "load": "Methwyd llwytho'r eitemau catalog",
+      "save": "Methwyd cadw'r eitem catalog",
+      "createStatus": "Methwyd creu'r eitem catalog ({status})",
+      "updateStatus": "Methwyd diweddaru'r eitem catalog ({status})",
+      "delete": "Methwyd dileu'r eitem catalog",
+      "deleteConflict": "Ni ellir dileu: mae gan yr eitem catalog hon achosion a ddarparwyd.",
+      "varOptsInvalidJson": "Rhaid i'r opsiynau newidynnau fod yn JSON dilys (arae).",
+      "varOptsNotArray": "Rhaid i'r opsiynau newidynnau fod yn arae JSON."
+    }
+  },
+  "adminProviderTemplates": {
+    "title": "Templedi Darparwr",
+    "description": "Blociau ffurfweddiad darparwr ailddefnyddiadwy ar gyfer eitemau catalog",
+    "notEnabled": "Nid yw'r catalog gwasanaethau wedi'i alluogi.",
+    "empty": "Dim templedi darparwr eto.",
+    "actions": {
+      "new": "Templed Newydd",
+      "cancel": "Canslo",
+      "create": "Creu Templed",
+      "creating": "Wrthi'n creu…",
+      "saveChanges": "Cadw Newidiadau",
+      "saving": "Wrthi'n cadw…",
+      "edit": "Golygu",
+      "delete": "Dileu"
+    },
+    "form": {
+      "name": "Enw",
+      "providerType": "Math darparwr",
+      "body": "Corff (HCL)",
+      "parameters": "Paramedrau (uwch, JSON)",
+      "parametersHint": "Daw pob paramedr yn faes ffurflen ddarparu. Gadewch fel <code>[]</code> os na chaiff ei ddefnyddio.",
+      "labels": "Labeli"
+    },
+    "table": {
+      "name": "Enw",
+      "providerType": "Math darparwr",
+      "parameters": "Paramedrau",
+      "actions": "Gweithredoedd"
+    },
+    "confirm": {
+      "delete": "Dileu'r templed darparwr hwn? Bydd eitemau catalog sy'n cyfeirio ato'n methu â darparu. Ni ellir dadwneud hyn."
+    },
+    "success": {
+      "created": "Crëwyd y templed darparwr \"{name}\"",
+      "updated": "Diweddarwyd y templed darparwr \"{name}\"",
+      "deleted": "Dilëwyd y templed darparwr"
+    },
+    "errors": {
+      "load": "Methwyd llwytho'r templedi darparwr",
+      "save": "Methwyd cadw'r templed darparwr",
+      "createStatus": "Methwyd creu'r templed ({status})",
+      "updateStatus": "Methwyd diweddaru'r templed ({status})",
+      "delete": "Methwyd dileu'r templed darparwr",
+      "deleteConflict": "Ni ellir dileu: cyfeirir at y templed hwn gan eitem catalog.",
+      "paramsInvalidJson": "Rhaid i'r paramedrau fod yn JSON dilys (arae).",
+      "paramsNotArray": "Rhaid i'r paramedrau fod yn arae JSON."
+    }
+  },
+  "adminAgentPools": {
+    "title": "Pyllau Asiantau",
+    "description": "Rheoli pyllau asiantau'r rhedwr a'u gwrandawyr",
+    "empty": "Dim pyllau asiantau wedi'u ffurfweddu.",
+    "actions": {
+      "newPool": "Pwll Newydd",
+      "createPool": "Creu Pwll",
+      "creating": "Wrthi'n creu...",
+      "cancel": "Canslo",
+      "edit": "Golygu",
+      "save": "Cadw",
+      "saving": "Wrthi'n cadw...",
+      "delete": "Dileu",
+      "deleting": "Wrthi'n dileu...",
+      "confirmDelete": "Cadarnhau Dileu"
+    },
+    "form": {
+      "name": "Enw",
+      "namePattern": "Llythrennau, rhifau, cysylltnodau a thanlinellau yn unig. Rhaid dechrau â llythyren neu rif.",
+      "description": "Disgrifiad",
+      "descriptionPlaceholder": "Rhedwyr AWS cynhyrchu",
+      "labels": "Labeli"
+    },
+    "columns": {
+      "name": "Enw",
+      "description": "Disgrifiad",
+      "status": "Statws",
+      "created": "Crëwyd"
+    },
+    "badges": {
+      "default": "rhagosodedig",
+      "degradedTooltip": "Mae'r gwrandawyr yn curo'r galon ond mae eu tystysgrifau wedi dod i ben — bydd rhediadau'n methu â lansio.",
+      "status": {
+        "online": "ar-lein",
+        "offline": "all-lein",
+        "degraded": "gwaethygol"
+      }
+    },
+    "detail": {
+      "back": "Yn ôl i'r pyllau asiantau",
+      "defaultDescription": "Pwll asiantau"
+    },
+    "tabs": {
+      "settings": "Gosodiadau",
+      "tokens": "Tocynnau",
+      "listeners": "Gwrandawyr"
+    },
+    "settings": {
+      "title": "Gosodiadau'r Pwll",
+      "fields": {
+        "name": "Enw",
+        "description": "Disgrifiad",
+        "created": "Crëwyd",
+        "owner": "Perchennog",
+        "yourPermission": "Eich Caniatâd",
+        "labels": "Labeli"
+      },
+      "permissions": {
+        "read": "darllen",
+        "write": "ysgrifennu",
+        "admin": "gweinyddu"
+      }
+    },
+    "danger": {
+      "title": "Dileu'r Pwll",
+      "description": "Dileu'r pwll asiantau hwn a phob tocyn cysylltiedig yn barhaol."
+    },
+    "tokens": {
+      "create": "Creu Tocyn",
+      "empty": "Dim tocynnau ar gyfer y pwll hwn.",
+      "revoke": "Dirymu",
+      "created": {
+        "title": "Crëwyd y tocyn yn llwyddiannus",
+        "copyNow": "Copïwch y tocyn hwn nawr — ni chaiff ei ddangos eto.",
+        "copy": "Copïo"
+      },
+      "form": {
+        "description": "Disgrifiad",
+        "descriptionPlaceholder": "Tocyn gwrandäwr cynhyrchu",
+        "maxUses": "Uchafswm Defnydd",
+        "maxUsesHint": "Rhagosodiad 2 — yn goddef un ail-gais ras cychwyn ar draws atgynyrchion gwrandäwr.",
+        "expiresAt": "Yn Dod i Ben Am",
+        "expiresAtHint": "Rhagosodiad 1 awr o nawr."
+      },
+      "columns": {
+        "description": "Disgrifiad",
+        "uses": "Defnydd",
+        "expires": "Yn Dod i Ben",
+        "status": "Statws",
+        "createdBy": "Crëwyd Gan",
+        "actions": "Gweithredoedd"
+      },
+      "badges": {
+        "revoked": "Dirymwyd",
+        "active": "Gweithredol"
+      }
+    },
+    "listeners": {
+      "empty": "Dim gwrandawyr wedi'u cofrestru ar gyfer y pwll hwn.",
+      "columns": {
+        "name": "Enw",
+        "status": "Statws",
+        "replicas": "Atgynyrchion",
+        "certExpires": "Tystysgrif yn Dod i Ben",
+        "actions": "Gweithredoedd"
+      },
+      "status": {
+        "online": "ar-lein",
+        "offline": "all-lein",
+        "degraded": "gwaethygol",
+        "cert-expired": "tystysgrif-wedi-dod-i-ben"
+      },
+      "tooltips": {
+        "certExpired": "Mae'r gwrandäwr yn curo'r galon ond mae ei dystysgrif wedi dod i ben — bydd pob galwad wedi'i dilysu â thystysgrif (hawlio rhediad, adnewyddu, tocyn-rhedwr) yn methu. Achos mwyaf tebygol: ni chofrestrodd yr API y dystysgrif ddiweddaraf erioed, neu ddaeth TTL y dystysgrif i ben cyn adnewyddu.",
+        "degraded": "Mae'r gwrandawyr yn curo'r galon ond mae eu tystysgrifau wedi dod i ben — bydd rhediadau'n methu â lansio."
+      }
+    },
+    "confirm": {
+      "revokeToken": "Dirymu'r tocyn ymuno hwn? Ni all gwrandawyr sy'n ei ddefnyddio ymuno mwyach, ac ni ellir dadwneud hyn.",
+      "deleteListener": "Dileu'r gwrandäwr hwn? Bydd yn ail-gofrestru ar ei guriad calon nesaf os yw'r pod yn dal i redeg."
+    },
+    "success": {
+      "poolUpdated": "Diweddarwyd y pwll",
+      "tokenRevoked": "Dirymwyd y tocyn",
+      "listenerDeleted": "Dilëwyd y gwrandäwr"
+    },
+    "errors": {
+      "loadPools": "Methwyd llwytho'r pyllau asiantau",
+      "loadPool": "Methwyd llwytho'r pwll",
+      "loadTokens": "Methwyd llwytho'r tocynnau",
+      "loadListeners": "Methwyd llwytho'r gwrandawyr",
+      "createPool": "Methwyd creu'r pwll",
+      "createStatus": "Methwyd creu'r pwll ({status})",
+      "updatePool": "Methwyd diweddaru'r pwll",
+      "deletePool": "Methwyd dileu'r pwll",
+      "poolNotFound": "Ni chanfuwyd y pwll",
+      "createToken": "Methwyd creu'r tocyn",
+      "createTokenStatus": "Methwyd creu'r tocyn ({status})",
+      "revokeToken": "Methwyd dirymu'r tocyn",
+      "deleteListener": "Methwyd dileu'r gwrandäwr"
+    }
+  },
+  "adminAuditLog": {
+    "title": "Cofnod Archwilio",
+    "description": "Cofnod digyfnewid o bob cais API",
+    "empty": "Ni chanfuwyd cofnodion yn y cofnod archwilio.",
+    "errors": {
+      "load": "Methwyd llwytho'r cofnod archwilio"
+    },
+    "filters": {
+      "actorEmail": "E-bost yr Actor",
+      "actorPlaceholder": "defnyddiwr@example.com",
+      "resourceType": "Math Adnodd",
+      "resourceTypePlaceholder": "gweithfannau",
+      "method": "Dull",
+      "methodAll": "Pob un",
+      "since": "Ers",
+      "until": "Tan",
+      "clear": "Clirio",
+      "apply": "Gweithredu Hidlyddion"
+    },
+    "columns": {
+      "timestamp": "Stamp Amser",
+      "actor": "Actor",
+      "action": "Gweithred",
+      "resourceType": "Math Adnodd",
+      "resourceId": "ID Adnodd",
+      "status": "Statws",
+      "duration": "Hyd"
+    },
+    "pagination": {
+      "summary": "Tudalen {current} o {total} ({count, plural, one {# cofnod} other {# cofnod}})",
+      "previous": "Blaenorol",
+      "next": "Nesaf"
+    }
+  },
+  "adminBinaryCache": {
+    "title": "Storfa",
+    "description": "Rheoli storfa deuaidd y CLI a darparwyr",
+    "errors": {
+      "loadBinary": "Methwyd llwytho'r storfa ddeuaidd",
+      "loadCache": "Methwyd llwytho'r storfa"
+    },
+    "sections": {
+      "cliBinaries": "Deuaidd CLI",
+      "providerBinaries": "Deuaidd Darparwr"
+    },
+    "empty": {
+      "binaries": "Dim deuaidd CLI wedi'u storio eto.",
+      "providers": "Dim deuaidd darparwr wedi'u storio eto."
+    },
+    "columns": {
+      "tool": "Offeryn",
+      "version": "Fersiwn",
+      "os": "OS",
+      "arch": "Arch",
+      "cachedAt": "Storiwyd Am",
+      "provider": "Darparwr",
+      "hostname": "Enw Gwesteiwr",
+      "actions": "Gweithredoedd"
+    },
+    "warm": {
+      "heading": "Cynhesu'r storfa",
+      "hide": "Cuddio",
+      "prePopulate": "Rhagboblogi…",
+      "help": "Rhag-dynnu deuaidd a phlatfformau darparwr i'r storfa (un fesul llinell). Mae tocynnau <code>os/arch</code> ar ddiwedd yn ddewisol — gadewch nhw allan i ddefnyddio'r platfformau rhagosodedig a ffurfweddwyd.",
+      "binariesLabel": "Deuaidd",
+      "providersLabel": "Darparwyr",
+      "warm": "Cynhesu",
+      "warming": "Wrthi'n cynhesu…",
+      "confirm": "Cynhesu'r cofnodion storfa a ddewiswyd nawr?",
+      "errorEmpty": "Ychwanegwch o leiaf un llinell ddeuaidd neu ddarparwr i'w chynhesu.",
+      "errorFailedStatus": "Methodd y cynhesu ({status})",
+      "errorFailed": "Methwyd cynhesu'r storfa",
+      "success": "Cynheswyd {succeeded}/{total} ({failed} wedi methu)"
+    },
+    "purge": {
+      "button": "Gwaredu",
+      "confirmBinary": "Gwaredu {tool} {version} o'r storfa? Fe'i hail-nôlir o'r ffynhonnell ar y cais nesaf.",
+      "confirmProvider": "Gwaredu {provider} {version} o storfa'r darparwyr? Fe'i hail-nôlir o'r ffynhonnell ar y cais nesaf.",
+      "successBinary": "Gwaredwyd {count} cofnod ar gyfer {tool} {version}",
+      "successProvider": "Gwaredwyd {count} cofnod ar gyfer {provider} {version}",
+      "errorStatus": "Methodd y gwaredu ({status})",
+      "error": "Methwyd gwaredu",
+      "errorProvider": "Methwyd gwaredu'r darparwr",
+      "errorProviders": "Methwyd gwaredu'r darparwyr"
+    },
+    "batchPurge": {
+      "purging": "Wrthi'n gwaredu...",
+      "purgeSelected": "Gwaredu'r Rhai a Ddewiswyd ({count})",
+      "confirmBinary": "Gwaredu pob cofnod storfa ddeuaidd a ddewiswyd? Cânt eu hail-nôl o'r ffynhonnell ar y cais nesaf.",
+      "confirmProvider": "Gwaredu pob cofnod storfa darparwr a ddewiswyd? Cânt eu hail-nôl o'r ffynhonnell ar y cais nesaf.",
+      "errorBinaryItem": "Methodd y gwaredu ar gyfer {tool} {version}",
+      "errorProviderItem": "Methodd y gwaredu ar gyfer {provider} {version}",
+      "successBinary": "Gwaredwyd {count} cofnod storfa ddeuaidd",
+      "successProvider": "Gwaredwyd {count} cofnod storfa darparwr"
+    }
+  },
+  "catalog": {
+    "title": "Catalog Gwasanaethau",
+    "description": "Darparu seilwaith hunanwasanaeth o fodiwlau a guradwyd",
+    "notEnabled": "Nid yw'r catalog gwasanaethau wedi'i alluogi.",
+    "empty": "Dim eitemau catalog ar gael.",
+    "card": {
+      "pinned": "pinnwyd {version}",
+      "latest": "diweddaraf"
+    },
+    "errors": {
+      "loadItems": "Methwyd llwytho'r eitemau catalog"
+    }
+  },
+  "catalogDetail": {
+    "backLink": "← Catalog",
+    "backToCatalog": "Yn ôl i'r catalog",
+    "fallbackTitle": "Eitem catalog",
+    "notFound": "Ni chanfuwyd yr eitem catalog, neu nid yw'r catalog gwasanaethau wedi'i alluogi.",
+    "common": {
+      "cancel": "Canslo"
+    },
+    "info": {
+      "module": "Modiwl:",
+      "resolvedVersion": "Fersiwn a ddatryswyd:",
+      "latest": "diweddaraf",
+      "disabled": "wedi'i analluogi"
+    },
+    "pending": {
+      "banner": "Mae'r rhediad ar gyfer <strong>{name}</strong> wedi'i gynllunio ac yn aros am adolygiad. Cadarnhewch i'w weithredu, neu ei daflu.",
+      "working": "Wrthi'n gweithio…",
+      "confirmApply": "Cadarnhau a gweithredu",
+      "discard": "Taflu"
+    },
+    "field": {
+      "select": "Dewiswch…"
+    },
+    "provision": {
+      "title": "Darparu",
+      "workspaceName": "Enw'r weithfan",
+      "workspaceNameTitle": "Llythrennau, rhifau, cysylltnodau a thanlinellau yn unig. Rhaid dechrau â llythyren neu rif.",
+      "workspaceNamePlaceholder": "fy-achos",
+      "agentPool": "Pwll asiantau",
+      "selectPool": "Dewiswch bwll…",
+      "noPoolsAvailable": "Nid oes pyllau asiantau ar gael i chi. Mae angen mynediad ysgrifennu i bwll asiantau i ddarparu — gofynnwch i weinyddwr ei ganiatáu.",
+      "noPoolsAllowed": "Nid yw'r un o'r pyllau asiantau y gallwch eu cyrchu'n cael eu caniatáu gan yr eitem catalog hon. Gofynnwch i weinyddwr ehangu pyllau caniataol yr eitem neu ganiatáu mynediad i chi i un ohonynt.",
+      "version": "Fersiwn",
+      "latestFloat": "Diweddaraf (arnofio)",
+      "defaultPinOption": "{version} (pin rhagosodedig)",
+      "labelsOptional": "Labeli (dewisol)",
+      "autoApplyHint": "Mae gweithredu awtomatig yn gweithredu newidiadau heb gam adolygu â llaw.",
+      "provisioning": "Wrthi'n darparu…",
+      "submit": "Darparu"
+    },
+    "instances": {
+      "title": "Achosion",
+      "empty": "Dim achosion wedi'u darparu o'r eitem hon eto.",
+      "colName": "Enw",
+      "colVersion": "Fersiwn",
+      "colPool": "Pwll",
+      "colActions": "Gweithredoedd",
+      "reconfigure": "Ailffurfweddu",
+      "destroy": "Dinistrio",
+      "orphan": "Amddifadu…",
+      "orphanTitle": "Dileu'r cofnod catalog heb ddinistrio ei seilwaith (nid argymhellir)"
+    },
+    "reconfigure": {
+      "title": "Ailffurfweddu {name}",
+      "description": "Diweddarwch fewnbynnau a/neu fersiwn, yna ciwiwch rediad.",
+      "currentOption": "{version} (cyfredol)",
+      "queuing": "Wrthi'n ciwio…",
+      "queueRun": "Ciwio rhediad"
+    },
+    "destroy": {
+      "title": "Dinistrio {name}",
+      "heading": "Dinistrio {name}?",
+      "description": "Mae hyn yn ciwio rhediad dinistrio sy'n dymchwel seilwaith yr achos hwn. Ar weithrediad llwyddiannus caiff y weithfan ei harchifo. Ni ellir dadwneud hyn.",
+      "autoApplyHint": "Mae gweithredu awtomatig yn dymchwel ar unwaith heb adolygiad."
+    },
+    "orphan": {
+      "title": "Amddifadu {name}",
+      "heading": "Amddifadu {name}?",
+      "description": "Mae hyn yn dileu cofnod achos y catalog ond <warn>nid</warn> yw'n dinistrio ei seilwaith — mae'r adnoddau a ddarparwyd yn dal i redeg, <warn>heb eu holrhain a heb eu rheoli</warn>. Nid argymhellir hyn. I adfeddiannu'r seilwaith, cansliwch a defnyddiwch <emph>Dinistrio</emph> yn lle hynny.",
+      "confirmPrompt": "Teipiwch enw'r achos <mono>{name}</mono> i gadarnhau:",
+      "orphaning": "Wrthi'n amddifadu…",
+      "submit": "Amddifadu a gadael y seilwaith"
+    },
+    "actions": {
+      "confirmed": "Cadarnhawyd y rhediad — wrthi'n gweithredu.",
+      "discarded": "Taflwyd y rhediad.",
+      "provisioned": "Darparwyd {name} — mae'r cynllun yn barod i'w adolygu.",
+      "reconfigureQueued": "Ciwiwyd yr ailffurfweddu — crëwyd rhediad.",
+      "reconfigureQueuedStatus": "Ciwiwyd yr ailffurfweddu — mae'r rhediad yn {status}.",
+      "destroyQueued": "Ciwiwyd y dinistrio — crëwyd rhediad.",
+      "destroyQueuedStatus": "Ciwiwyd y dinistrio — mae'r rhediad yn {status}.",
+      "orphaned": "Amddifadwyd {name} — dilëwyd y cofnod catalog; gadewir ei seilwaith yn rhedeg, heb ei olrhain a heb ei reoli."
+    },
+    "errors": {
+      "loadItem": "Methwyd llwytho'r eitem catalog",
+      "confirm": "Methwyd cadarnhau",
+      "confirmStatus": "Methwyd cadarnhau ({status})",
+      "discard": "Methwyd taflu",
+      "discardStatus": "Methwyd taflu ({status})",
+      "provision": "Methwyd darparu",
+      "provisionStatus": "Methwyd darparu ({status})",
+      "reconfigure": "Methwyd ailffurfweddu",
+      "reconfigureStatus": "Methwyd ailffurfweddu ({status})",
+      "destroy": "Methwyd dinistrio",
+      "destroyStatus": "Methwyd dinistrio ({status})",
+      "orphan": "Methwyd amddifadu",
+      "orphanStatus": "Methwyd amddifadu ({status})"
+    }
+  },
+  "common": {
+    "connection": {
+      "reconnecting": "Wrthi'n ailgysylltu…"
+    },
+    "sessionExpiry": {
+      "banner": "Mae'r sesiwn yn dod i ben ymhen {minutes, plural, one {# munud} other {# munud}} — <link>ail-ddilysu</link>"
+    },
+    "tokenExpiry": {
+      "withinDays": "{count, plural, one {# tocyn gwasanaeth} other {# tocyn gwasanaeth}} yn dod i ben ymhen {days, plural, one {# diwrnod} other {# diwrnod}} — <link>adolygu</link>",
+      "soon": "{count, plural, one {# tocyn gwasanaeth} other {# tocyn gwasanaeth}} yn dod i ben yn fuan — <link>adolygu</link>",
+      "dismissAria": "Diystyru'r rhybudd bod tocyn yn dod i ben"
+    },
+    "resourceUsage": {
+      "title": "Defnydd adnoddau",
+      "oomKilled": "Lladdwyd gan OOM",
+      "killedLikelyOom": "Lladdwyd (OOM yn debygol)",
+      "memory": "Cof",
+      "requested": "Gofynnwyd {value}",
+      "limit": "Terfyn {value}"
+    },
+    "labelsEditor": {
+      "none": "Dim",
+      "removeAria": "Tynnu {key}",
+      "keyPlaceholder": "allwedd",
+      "valuePlaceholder": "gwerth",
+      "add": "Ychwanegu"
+    },
+    "sensitiveInput": {
+      "hide": "Cuddio",
+      "show": "Dangos",
+      "hideAria": "Cuddio'r gwerth",
+      "showAria": "Dangos y gwerth"
+    },
+    "workspacePicker": {
+      "searchPlaceholder": "Chwilio am weithfannau…",
+      "loading": "Wrthi'n llwytho…",
+      "empty": "Ni chanfuwyd gweithfannau",
+      "adding": "Wrthi'n ychwanegu…"
+    },
+    "templateEditors": {
+      "remove": "Tynnu",
+      "add": "Ychwanegu",
+      "valuePlaceholder": "gwerth",
+      "name": "Enw",
+      "url": "URL",
+      "hmacKey": "Allwedd HMAC (dewisol)",
+      "hmacKeyPlaceholder": "cyfrinach a rennir",
+      "stage": "Cam",
+      "enforcement": "Gorfodaeth",
+      "enabled": "Wedi'i alluogi",
+      "runTaskNamePlaceholder": "sgan-diogelwch",
+      "runTaskUrlPlaceholder": "https://hooks.example.com/task",
+      "addRunTask": "Ychwanegu tasg rhediad",
+      "destinationType": "Math cyrchfan",
+      "token": "Tocyn (dewisol)",
+      "tokenPlaceholder": "tocyn HMAC / dilysu",
+      "notificationNamePlaceholder": "slack-alerts",
+      "notificationUrlPlaceholder": "https://hooks.slack.com/services/...",
+      "emailAddresses": "Cyfeiriadau e-bost",
+      "emailPlaceholder": "ops@example.com",
+      "addEmail": "Ychwanegu e-bost",
+      "triggers": "Sbardunau",
+      "addNotification": "Ychwanegu hysbysiad"
+    }
+  },
+  "planSummary": {
+    "aiGenerated": "Cynhyrchwyd gan AI",
+    "heading": {
+      "planSummary": "Crynodeb y cynllun",
+      "failureAnalysis": "Dadansoddiad methiant"
+    },
+    "errors": {
+      "status": "HTTP {status}"
+    },
+    "regenerate": {
+      "label": "Ailgynhyrchu",
+      "queueing": "Wrthi'n ciwio…",
+      "tooltip": "Ail-redeg y crynodeb AI yn erbyn yr un mewnbynnau cynllun",
+      "ariaLabel": "Ailgynhyrchu'r crynodeb AI",
+      "confirm": "Ailgynhyrchu'r dadansoddiad AI? Mae hyn yn rhedeg y model eto.",
+      "error": "Methwyd ailgynhyrchu: <mono>{detail}</mono>"
+    },
+    "pending": {
+      "summarisingPlan": "Wrthi'n crynhoi'r cynllun…",
+      "analysingFailure": "Wrthi'n dadansoddi'r methiant…"
+    },
+    "skipped": {
+      "fallback": "Hepgorwyd y crynodeb ar gyfer y rhediad hwn."
+    },
+    "errored": {
+      "heading": "Methodd y crynhowr"
+    },
+    "riskFactors": {
+      "heading": "Ffactorau risg",
+      "suggestedFixes": "Datrysiadau a awgrymir"
+    },
+    "tokens": "{input} i mewn / {output} allan o docynnau",
+    "risk": {
+      "low": "isel",
+      "medium": "canolig",
+      "high": "uchel",
+      "critical": "critigol",
+      "unknown": "anhysbys"
+    },
+    "badges": {
+      "noChanges": "Dim newidiadau",
+      "noChangesLower": "dim newidiadau",
+      "noChangesTitle": "Adroddodd y cynllun ddim newidiadau adnodd",
+      "toAdd": "{count, plural, one {# i'w ychwanegu} other {# i'w hychwanegu}}",
+      "toChange": "{count, plural, one {# i'w newid} other {# i'w newid}}",
+      "toDestroy": "{count, plural, one {# i'w ddinistrio} other {# i'w dinistrio}}",
+      "toReplace": "{count, plural, one {# i'w amnewid} other {# i'w hamnewid}}",
+      "toImport": "{count, plural, one {# i'w fewnforio} other {# i'w mewnforio}}"
+    },
+    "chat": {
+      "heading": "Dilyniant",
+      "sharedThreadNote": "Un edefyn a rennir, gweladwy i unrhyw un â darllen ar y weithfan.",
+      "placeholder": "Gofynnwch gwestiwn dilynol am y cynllun hwn… (⌘/Ctrl + Enter i anfon)",
+      "send": "Anfon",
+      "thinking": "Wrthi'n meddwl…",
+      "you": "Chi",
+      "assistant": "Cynorthwyydd"
+    },
+    "translatedNote": "Cyfieithwyd yn awtomatig i'ch iaith. Y crynodeb awdurdodol yw'r gwreiddiol.",
+    "translating": "Yn cyfieithu…"
+  },
+  "runDetail": {
+    "notFound": "Ni chanfuwyd y rhediad",
+    "runSection": "Adran rhediad",
+    "workspaceFallback": "gweithfan",
+    "backTo": "Yn ôl i {name}",
+    "errorHeading": "Gwall",
+    "discardedHeading": "Taflwyd — angen ail-gynllunio",
+    "common": {
+      "yes": "Ie",
+      "no": "Na"
+    },
+    "header": {
+      "title": "Rhediad {id}",
+      "titleWithWorkspace": "{workspace} — rhediad {id}",
+      "description": "Rhediad {source}"
+    },
+    "relTime": {
+      "justNow": "nawr",
+      "minutesAgo": "{count, plural, one {# munud yn ôl} other {# munud yn ôl}}",
+      "hoursAgo": "{count, plural, one {# awr yn ôl} other {# awr yn ôl}}",
+      "daysAgo": "{count, plural, one {# diwrnod yn ôl} other {# diwrnod yn ôl}}"
+    },
+    "status": {
+      "pending": "Yn aros",
+      "queued": "Yn y ciw",
+      "planning": "Cynllunio",
+      "planned": "Cynlluniwyd",
+      "confirmed": "Cadarnhawyd",
+      "applying": "Gweithredu",
+      "canceling": "Canslo",
+      "applied": "Gweithredwyd",
+      "errored": "Gwallodd",
+      "canceled": "Canslwyd",
+      "discarded": "Taflwyd"
+    },
+    "activity": {
+      "pending": "Wrthi'n paratoi'r rhediad",
+      "queued": "Yn aros am asiant sydd ar gael",
+      "planning": "Wrthi'n rhedeg terraform plan",
+      "plannedConfirmable": "Yn aros i chi gadarnhau a gweithredu",
+      "plannedSpeculative": "Cynllun tybiannol wedi'i gwblhau",
+      "plannedComplete": "Cynllun wedi'i gwblhau",
+      "confirmed": "Wrthi'n dechrau gweithredu",
+      "applying": "Wrthi'n rhedeg terraform apply",
+      "canceling": "Wrthi'n atal y rhediad",
+      "applied": "Gweithredu wedi'i gwblhau",
+      "errored": "Methodd y rhediad",
+      "canceled": "Canslwyd y rhediad",
+      "discarded": "Taflwyd y cynllun",
+      "elapsedTitle": "Amser a aeth heibio yn y cam hwn"
+    },
+    "badge": {
+      "destroy": "dinistrio",
+      "planOnly": "cynllun yn unig"
+    },
+    "actions": {
+      "retryShort": "Ailgeisio",
+      "retryFull": "Ailgeisio'r Rhediad",
+      "retrying": "Wrthi'n ailgeisio…",
+      "confirmShort": "Gweithredu",
+      "confirmFull": "Cadarnhau a Gweithredu",
+      "confirming": "Wrthi'n cadarnhau…",
+      "discard": "Taflu",
+      "discarding": "Wrthi'n taflu…",
+      "cancelShort": "Canslo",
+      "cancelFull": "Canslo'r Rhediad",
+      "canceling": "Wrthi'n canslo…"
+    },
+    "confirm": {
+      "apply": "Gweithredu'r rhediad hwn? Mae hyn yn gweithredu'r cynllun ac yn newid seilwaith.",
+      "discard": "Taflu'r cynllun hwn?",
+      "cancel": "Canslo'r rhediad hwn?",
+      "retry": "Ailgeisio'r rhediad hwn?"
+    },
+    "errors": {
+      "loadRun": "Methwyd llwytho'r rhediad",
+      "action": {
+        "confirm": "Methwyd cadarnhau'r rhediad",
+        "discard": "Methwyd taflu'r rhediad",
+        "cancel": "Methwyd canslo'r rhediad",
+        "retry": "Methwyd ailgeisio'r rhediad"
+      }
+    },
+    "tabs": {
+      "overview": "Trosolwg",
+      "ai": "AI",
+      "aiFull": "Dadansoddiad AI",
+      "opa": "OPA",
+      "opaFull": "Polisïau OPA",
+      "impact": "Effaith",
+      "impactFull": "Graff effaith",
+      "planLabel": "Cynllun<log>Log</log>",
+      "applyLabel": "Gweithredu<log>Log</log>",
+      "planFull": "Log cynllun",
+      "applyFull": "Log gweithredu",
+      "details": "Manylion"
+    },
+    "banner": {
+      "destroy": "Mae hwn yn rhediad <strong>dinistrio</strong> — dinistrir pob adnodd a reolir wrth ei weithredu.",
+      "planOnlyCli": "Mae hwn yn rhediad <strong>cynllun-yn-unig</strong> a gychwynnwyd o'r CLI ar weithfan sydd wedi'i chysylltu â VCS. Nid yw gweithredu ar gael ar gyfer cod a lwythwyd o'r CLI — dim ond cod a reolir gan VCS y gellir ei weithredu.",
+      "moduleOverridesPrefix": "Mae'r rhediad hwn yn defnyddio <strong>diystyriadau modiwl</strong>",
+      "moduleOverridesFromPr": "o PR #{number}",
+      "moduleOverridesSuffix": "cânt eu nôl o gangen y PR yn lle'r fersiwn gofrestrfa a gyhoeddwyd."
+    },
+    "cards": {
+      "changes": "Newidiadau",
+      "aiAnalysis": "Dadansoddiad AI",
+      "policyChecks": "Gwiriadau polisi",
+      "resources": "Adnoddau"
+    },
+    "changes": {
+      "noChanges": "Dim newidiadau",
+      "planning": "Wrthi'n cynllunio…",
+      "toAdd": "i'w hychwanegu",
+      "toChange": "i'w newid",
+      "toDestroy": "i'w dinistrio",
+      "toReplace": "i'w hamnewid",
+      "toImport": "i'w mewnforio"
+    },
+    "ai": {
+      "notAvailable": "Ddim ar gael",
+      "ready": "Yn barod",
+      "riskSub": "risg {risk}",
+      "generating": "Wrthi'n cynhyrchu…",
+      "skipped": "Hepgorwyd",
+      "failed": "Methodd",
+      "available": "Ar gael"
+    },
+    "policy": {
+      "none": "Dim",
+      "blocked": "Rhwystrwyd",
+      "failedSub": "{count, plural, one {# wedi methu} other {# wedi methu}}",
+      "advisoryIssues": "Materion cynghorol",
+      "passedSub": "{passed}/{total} wedi pasio",
+      "passed": "Pasiwyd"
+    },
+    "resources": {
+      "overLimit": "Dros y terfyn",
+      "oomKilled": "Lladdwyd gan OOM",
+      "recorded": "Cofnodwyd",
+      "nearLimit": "Yn agos at y terfyn",
+      "high": "Uchel",
+      "withinLimits": "O fewn y terfynau"
+    },
+    "details": {
+      "heading": "Manylion",
+      "executionBackend": "Peiriant Gweithredu",
+      "source": "Ffynhonnell",
+      "autoApply": "Gweithredu Awtomatig",
+      "planOnly": "Cynllun yn Unig",
+      "triggeredBy": "Sbardunwyd Gan",
+      "created": "Crëwyd",
+      "commit": "Ymrwymiad",
+      "branch": "Cangen",
+      "prMr": "PR/MR",
+      "stateVersion": "Fersiwn Cyflwr",
+      "viewState": "Gweld y Cyflwr",
+      "runOptions": "Opsiynau Rhediad"
+    },
+    "timeline": {
+      "heading": "Llinell Amser",
+      "queued": "Rhoddwyd yn y ciw",
+      "planningStarted": "Dechreuodd y cynllunio",
+      "planComplete": "Cynllun wedi'i gwblhau",
+      "confirmed": "Cadarnhawyd",
+      "applyingStarted": "Dechreuodd y gweithredu",
+      "applied": "Gweithredwyd",
+      "errored": "Gwallodd",
+      "canceled": "Canslwyd",
+      "discarded": "Taflwyd"
+    },
+    "log": {
+      "color": "Lliw",
+      "colorOnTitle": "Yn dangos lliwiau ANSI — cliciwch am destun plaen",
+      "colorOffTitle": "Yn dangos testun plaen — cliciwch am liwiau",
+      "refresh": "Adnewyddu",
+      "refreshTitle": "Adnewyddu'r log",
+      "copy": "Copïo",
+      "copied": "Copïwyd!",
+      "copyTitle": "Copïo testun plaen i'r clipfwrdd",
+      "copyAria": "Copïo'r log i'r clipfwrdd",
+      "download": "Lawrlwytho",
+      "downloadColorTitle": "Lawrlwytho'r log (gyda chodau lliw ANSI)",
+      "downloadPlainTitle": "Lawrlwytho'r log (testun plaen)",
+      "downloadAria": "Lawrlwytho'r log",
+      "follow": "Dilyn",
+      "followOnTitle": "Yn dilyn y gynffon fyw — cliciwch i atal",
+      "followOffTitle": "Dilyn y gynffon fyw",
+      "end": "Diwedd",
+      "endTitle": "Neidio i ddiwedd y log",
+      "planEmpty": "Dim allbwn cynllun ar gael eto.",
+      "applyEmpty": "Dim allbwn gweithredu ar gael eto."
+    },
+    "policyPanel": {
+      "heading": "Gwiriadau Polisi",
+      "passedCount": "{passed}/{total} wedi pasio",
+      "blockedMessage": "Mae'r rhediad hwn wedi'i <strong>rwystro gan set polisi orfodol</strong>. Ni fydd yn gweithredu nes datrys y methiant neu nes i weinyddwr ei ddiystyru.",
+      "overriding": "Wrthi'n diystyru...",
+      "overrideContinue": "Diystyru a Pharhau",
+      "overrideFailed": "Methodd y diystyru",
+      "overrideFailedStatus": "Methodd y diystyru ({status})",
+      "overriddenBy": "diystyrwyd gan {by}",
+      "policyPassed": "wedi pasio",
+      "noDenyMessage": "Methodd y polisi heb gynhyrchu neges wrthod nac allbwn gwall",
+      "enforcement": {
+        "mandatory": "gorfodol",
+        "advisory": "cynghorol"
+      },
+      "outcome": {
+        "passed": "wedi pasio",
+        "failed": "wedi methu",
+        "errored": "wedi gwallu"
+      }
+    }
+  },
+  "workspaceDetail": {
+    "notFound": "Ni chanfuwyd y weithfan",
+    "common": {
+      "enabled": "Wedi'i alluogi",
+      "disabled": "Wedi'i analluogi",
+      "none": "Dim",
+      "default": "Rhagosodedig",
+      "never": "Byth",
+      "actions": "Gweithredoedd",
+      "workspaceLocked": "Mae'r weithfan wedi'i chloi"
+    },
+    "actions": {
+      "edit": "Golygu",
+      "cancel": "Canslo",
+      "save": "Cadw",
+      "saving": "Wrthi'n cadw…",
+      "savingEllipsis": "Wrthi'n cadw...",
+      "delete": "Dileu",
+      "deleting": "Wrthi'n dileu...",
+      "add": "Ychwanegu",
+      "adding": "Wrthi'n ychwanegu...",
+      "remove": "Tynnu",
+      "download": "Lawrlwytho",
+      "rollback": "Dychwelyd",
+      "close": "Cau",
+      "hide": "Cuddio",
+      "enable": "Galluogi",
+      "disable": "Analluogi",
+      "creating": "Wrthi'n creu...",
+      "sending": "Wrthi'n anfon...",
+      "processing": "Wrthi'n prosesu...",
+      "queuing": "Wrthi'n ciwio...",
+      "loading": "Wrthi'n llwytho...",
+      "loadingLower": "wrthi'n llwytho…"
+    },
+    "header": {
+      "executionMode": "modd gweithredu {mode}"
+    },
+    "tabs": {
+      "overview": "Trosolwg",
+      "variables": "Newidynnau",
+      "runs": "Rhediadau",
+      "state": "Cyflwr",
+      "stateGraph": "Graff Cyflwr",
+      "configurations": "Ffurfweddiadau",
+      "notifications": "Hysbysiadau",
+      "runTasks": "Tasgau Rhediad",
+      "runTriggers": "Sbardunau Rhediad",
+      "sharing": "Rhannu",
+      "selectLabel": "Adran gweithfan"
+    },
+    "lifecycle": {
+      "pendingDeletion": "Yn aros i'w ddileu",
+      "pendingDeletionDefault": "Mae'r weithfan hon wedi'i marcio i'w dileu ac mae angen gweithred â llaw.",
+      "archived": "Archifwyd",
+      "archivedDefault": "Archifwyd y weithfan hon."
+    },
+    "runQueuedBanner": {
+      "message": "Ciwiwyd y rhediad yn llwyddiannus.",
+      "viewRun": "Gweld y Rhediad"
+    },
+    "settings": {
+      "title": "Gosodiadau",
+      "saveChanges": "Cadw newidiadau",
+      "renamedNotice": "Ailenwyd y weithfan. Diweddarwch y maes <name></name> yn eich bloc <cloud></cloud> i gyfateb."
+    },
+    "fields": {
+      "name": "Enw",
+      "nameTitle": "Llythrennau, rhifau, cysylltnodau, tanlinellau. Rhaid dechrau â llythyren neu rif.",
+      "executionMode": "Modd Gweithredu",
+      "execModeLocal": "Lleol",
+      "execModeAgent": "Asiant",
+      "autoApply": "Gweithredu Awtomatig",
+      "cpuRequest": "Cais CPU",
+      "cpuRequestTitle": "Maint CPU Kubernetes: creiddiau cyflawn (1, 2) neu filicreiddiau (500m, 100m)",
+      "memoryRequest": "Cais Cof",
+      "memoryRequestTitle": "Maint cof Kubernetes: beitiau (1000) neu ag ôl-ddodiad (512Mi, 2Gi, 1Ti)",
+      "executionBackend": "Peiriant Gweithredu",
+      "version": "Fersiwn",
+      "versionPlaceholder": "e.e. 1.11 neu 1.11.5",
+      "versionTitle": "Fersiwn ar ffurf X.Y neu X.Y.Z (e.e. 1.11 neu 1.11.5)",
+      "terragruntEnabledAgent": "Wedi'i alluogi (modd asiant)",
+      "terragruntEnabledVersion": "Wedi'i alluogi (v{version})",
+      "terragruntVersionPlaceholder": "e.e. 1.0",
+      "terragruntVersionTitle": "Fersiwn Terragrunt ar ffurf X.Y neu X.Y.Z (e.e. 1.0)",
+      "workingDirectory": "Cyfeiriadur Gwaith",
+      "workingDirectoryPlaceholder": "e.e. environments/dev",
+      "agentPool": "Pwll Asiantau",
+      "owner": "Perchennog",
+      "vcsConnection": "Cysylltiad VCS",
+      "vcsRepository": "Storfa VCS",
+      "vcsRepositoryTitle": "Rhaid iddi fod yn URL HTTP neu HTTPS",
+      "vcsBranch": "Cangen VCS",
+      "vcsBranchPlaceholder": "main (rhagosodedig)",
+      "vcsWorkflow": "Llifwaith VCS",
+      "vcsWorkflowMergeThenApply": "merge_then_apply (rhagosodedig — safon TFE / HCP)",
+      "vcsWorkflowApplyThenMerge": "apply_then_merge (safon Atlantis — dewisol)",
+      "autoMerge": "Awtogyfuno ar ôl gweithredu",
+      "autoMergeStrategy": "Strategaeth Awtogyfuno",
+      "vcsPolling": "Pôl VCS",
+      "labels": "Labeli (tagiau)",
+      "labelsTitle": "Mae labeli gweithfan yn gwneud gwaith deublyg: cyfateb RBAC yn seiliedig ar labeli, a fel y \"tagiau\" a gyfatebir gan flociau terraform/tofu cloud '{' workspaces '{' tags = ... '}' '}'.",
+      "varFiles": "Ffeiliau Var",
+      "varFilesPlaceholder": "e.e. envs/dev.tfvars",
+      "triggerPrefixes": "Rhagddodiaid Sbarduno",
+      "triggerPrefixesHint": "Cyfeiriaduron sy'n sbarduno rhediadau. Yn diystyru hidlo'r cyfeiriadur gwaith pan gaiff ei osod.",
+      "triggerPrefixesPlaceholder": "e.e. modules",
+      "triggerPrefixesNone": "Dim (yn defnyddio'r cyfeiriadur gwaith)",
+      "driftIgnoreRules": "Rheolau Anwybyddu Drifft",
+      "driftIgnoreRulesHint": "Llwybrau cyfeiriad Terraform + priodwedd sy'n ymwybodol o globiau a atalir gan y dosbarthwr drifft. Mae <star></star> yn cyfateb i sero neu ragor o nodau nad ydynt yn <dot></dot> (yn rhychwantu <n></n> mynegai); mae <starIdx></starIdx> yn cyfateb i unrhyw fynegai mewn cromfachau. Mae cyfeiriad moel heb ôl-ddodiad priodwedd yn distewi unrhyw newid i'r adnodd hwnnw — gan gynnwys dinistriadau. Yn effeithio ar ddrifft yn unig, nid cynllun/gweithredu arferol. Gweler <docs>drift-ignore-rules.md</docs> am y gramadeg llawn.",
+      "driftIgnoreRulesNone": "Dim (mae pob gwahaniaeth cynllun yn cyfrif fel drifft)"
+    },
+    "vcsWorkflowWarning": {
+      "title": "Awdurdodi wedi'i ddirprwyo i'ch storfa VCS.",
+      "rbac": "Gall unrhyw un a all gyfuno'r PR weithredu. Daw rheolau diogelu cangen (adolygiadau gofynnol, gwiriadau statws, cymeradwyaeth perchennog cod) yn gât. <em>Nid</em> yw RBAC rôl/label Terrapod yn berthnasol i weithredoedd a yrrir gan sylwadau yn y modd hwn.",
+      "recommended": "<strong>Argymhellir:</strong> mynnu hanes llinol (rebase/squash cyn cyfuno) fel mai'r ymrwymiad a weithredwch yw'r ymrwymiad sy'n glanio.",
+      "credit": "Clod: mae'r llifwaith hwn wedi'i seilio ar <atlantis>Atlantis</atlantis>. Atlantis yw'r offeryn iawn o hyd i dimau sydd ond eisiau gweithrediadau a yrrir gan sylwadau PR a dim rhyngwyneb platfform."
+    },
+    "vcsPolling": {
+      "error": "Gwall",
+      "ok": "IAWN ({time})",
+      "notPolled": "Heb ei bolio eto"
+    },
+    "lockout": {
+      "revertLabels": "Dychwelyd y Labeli",
+      "saveAnyway": "Cadw Beth Bynnag"
+    },
+    "lock": {
+      "title": "Statws Clo",
+      "lockedDesc": "Mae'r weithfan hon wedi'i chloi. Ni all unrhyw gynlluniau na gweithrediadau redeg.",
+      "unlockedDesc": "Mae'r weithfan hon wedi'i datgloi ac yn barod ar gyfer rhediadau.",
+      "lock": "Cloi",
+      "unlock": "Datgloi",
+      "lockConfirm": "Cloi'r weithfan hon?",
+      "unlockConfirm": "Datgloi'r weithfan hon?"
+    },
+    "drift": {
+      "title": "Canfod Drifft",
+      "checkInterval": "Cyfwng Gwirio",
+      "status": "Statws",
+      "statusNoDrift": "Dim Drifft",
+      "statusDrifted": "Wedi Drifftio",
+      "statusErrored": "Gwallodd",
+      "statusUnchecked": "Heb ei Wirio",
+      "dismiss": "Diystyru",
+      "dismissing": "Wrthi'n diystyru…",
+      "dismissTitle": "Clirio'r cyflwr drifft a adroddwyd. Bydd y gwiriad amserlenedig nesaf yn ei ail-boblogi o'r realiti.",
+      "lastChecked": "Gwiriwyd Ddiwethaf",
+      "checkNow": "Gwirio Nawr",
+      "checkNowTitle": "Ciwio rhediad cynllun-yn-unig i wirio am ddrifft",
+      "checkNowTitleDisabled": "Galluogwch ganfod drifft yn gyntaf"
+    },
+    "intervals": {
+      "disabled": "Wedi'i analluogi",
+      "1hour": "1 awr",
+      "4hours": "4 awr",
+      "12hours": "12 awr",
+      "24hours": "24 awr",
+      "48hours": "48 awr",
+      "3days": "3 diwrnod",
+      "7days": "7 diwrnod"
+    },
+    "planExpiry": {
+      "title": "Terfyn Amser y Cynllun",
+      "description": "Taflu cynllun heb ei gadarnhau'n awtomatig unwaith y bydd yn hŷn na hyn, fel na ellir gweithredu cynllun hen yn erbyn byd sydd wedi symud. I ffwrdd yn ragosodedig; rhaid ail-redeg y cynllun wedyn. (Yn berthnasol i rediadau sy'n gallu gweithredu yn unig.)",
+      "expireAfter": "Dod i ben ar ôl"
+    },
+    "aiSummary": {
+      "title": "Crynodeb Cynllun AI",
+      "description": "Crynodeb newid a gynhyrchir yn awtomatig gan LLM, asesiad risg, a dadansoddiad methiant ar bob canlyniad cam-cynllun ar gyfer y weithfan hon.",
+      "mode": "Modd",
+      "modeDefault": "Dilyn rhagosodiad y defnydd",
+      "modeEnabled": "Crynhoi bob amser",
+      "modeDisabled": "Peidio â chrynhoi byth",
+      "contextLabel": "Cyd-destun y weithfan",
+      "contextLabelSuffix": "(dewisol, atodol)",
+      "contextPlaceholder": "Ffeithiau y dylai'r AI eu gwybod am y weithfan hon yn benodol. e.e. 'Yn ymyl y gladdgell ar gyfer gwasanaeth X — mae dinistrio'r allwedd KMS yn achosi toriad byd-eang.'",
+      "noContext": "Dim cyd-destun gweithfan wedi'i osod.",
+      "contextHint": "Ychwanegir ar ben cyd-destun ledled y defnydd. Uchafswm o 4000 nod."
+    },
+    "slack": {
+      "title": "Hysbysiadau Slack",
+      "description": "Optiwch y weithfan hon i mewn i hysbysiadau rhediad Slack — ceisiadau cymeradwyo, gweithrediadau, gwallau a drifft. Gadewch y sianel yn wag ac mae'r weithfan hon yn aros yn dawel (nid oes lledaenu ledled y defnydd). Angen i'r ap Slack gael ei alluogi gan weinyddwr.",
+      "channel": "Sianel",
+      "channelPlaceholder": "#deploys neu ID sianel (e.e. C0123ABCD)",
+      "notSet": "Heb ei osod — tawel.",
+      "hint": "Rhaid i'r ap Slack fod yn aelod o'r sianel eisoes."
+    },
+    "delete": {
+      "title": "Dileu'r Weithfan",
+      "description": "Dileu'r weithfan hon a phob cyflwr, newidyn a rhediad cysylltiedig yn barhaol.",
+      "confirm": "Cadarnhau Dileu"
+    },
+    "variables": {
+      "addVariable": "Ychwanegu Newidyn",
+      "key": "Allwedd",
+      "value": "Gwerth",
+      "category": "Categori",
+      "categoryEnv": "Amgylchedd",
+      "sensitive": "Sensitif",
+      "empty": "Dim newidynnau wedi'u ffurfweddu ar gyfer y weithfan hon.",
+      "emptyValue": "gwag",
+      "enterNewValue": "Rhowch werth newydd",
+      "deleteConfirm": "Dileu'r newidyn \"{key}\"?"
+    },
+    "runs": {
+      "options": "Opsiynau",
+      "hideOptions": "Cuddio Opsiynau",
+      "queueDestroy": "Ciwio Dinistrio",
+      "queueDestroyTitle": "Ciwio cynllun dinistrio",
+      "destroyAllConfirm": "Dinistrio pob adnodd?",
+      "confirmDestroy": "Cadarnhau Dinistrio",
+      "queuePlan": "Ciwio Cynllun",
+      "queueRun": "Ciwio Rhediad",
+      "queuePlanConfirm": "Ciwio cynllun tybiannol ar gyfer y weithfan hon?",
+      "queueApplyConfirm": "Ciwio rhediad cynllun + gweithredu? Gall hyn newid seilwaith.",
+      "planOptions": "Opsiynau Cynllun",
+      "targetResources": "Adnoddau targed",
+      "replaceResources": "Amnewid adnoddau",
+      "commaSeparated": "(wedi'u gwahanu â choma)",
+      "planOnly": "Cynllun yn Unig",
+      "refreshOnly": "Adnewyddu'n Unig",
+      "skipRefresh": "Hepgor Adnewyddu",
+      "allowEmptyApply": "Caniatáu Gweithredu Gwag",
+      "vcsRef": "Cyfeirnod VCS",
+      "branch": "Cangen",
+      "tag": "Tag",
+      "defaultBranch": "Rhagosodedig ({branch})",
+      "nonDefaultRefNote": "Dewiswyd cyfeirnod nad yw'n rhagosodedig — bydd y rhediad yn gynllun-yn-unig",
+      "empty": "Dim rhediadau eto ar gyfer y weithfan hon.",
+      "runId": "ID Rhediad",
+      "status": "Statws",
+      "type": "Math",
+      "changes": "Newidiadau",
+      "source": "Ffynhonnell",
+      "triggeredBy": "Sbardunwyd Gan",
+      "created": "Crëwyd",
+      "needsConfirm": "angen cadarnhau",
+      "typeDestroy": "dinistrio",
+      "typePlanOnly": "cynllun yn unig",
+      "typePlanApply": "cynllun + gweithredu",
+      "sourceModuleTest": "prawf modiwl",
+      "sourceModulePublish": "cyhoeddi modiwl"
+    },
+    "state": {
+      "deleteConfirm": "Dileu fersiwn cyflwr #{serial}? Ni ellir dadwneud hyn.",
+      "rollbackConfirm": "Dychwelyd i fersiwn cyflwr #{serial}? Crëir fersiwn newydd â'r un cynnwys.",
+      "confirmDelete": "Cadarnhau Dileu",
+      "confirmRollback": "Cadarnhau Dychwelyd",
+      "uploadState": "Llwytho Cyflwr i Fyny",
+      "empty": "Dim fersiynau cyflwr eto ar gyfer y weithfan hon.",
+      "serial": "Rhif Cyfresol",
+      "createdBy": "Crëwyd Gan",
+      "run": "Rhediad",
+      "size": "Maint",
+      "created": "Crëwyd",
+      "runner": "rhedwr",
+      "latest": "diweddaraf"
+    },
+    "configurations": {
+      "description": "Archifau ffynhonnell a lwythwyd ar gyfer y weithfan hon, y diweddaraf yn gyntaf. Dewiswch ddwy res i'w cymharu.",
+      "selectedCount": "{count}/2 wedi'u dewis",
+      "compare": "Cymharu",
+      "comparing": "Wrthi'n cymharu…",
+      "empty": "Dim fersiynau ffurfweddiad eto. Maent yn ymddangos yma cyn gynted ag y bydd `terraform plan` yn llwytho neu wthiad VCS yn sbarduno rhediad.",
+      "id": "ID",
+      "source": "Ffynhonnell",
+      "status": "Statws",
+      "created": "Crëwyd",
+      "current": "cyfredol",
+      "selectForCompare": "Dewiswch {id} i'w gymharu",
+      "compareLabel": "Cymharu",
+      "diff": "Gwahaniaeth",
+      "filesChanged": "{count} ffeil wedi newid",
+      "oversized": "Hepgorwyd {count, plural, one {# ffeil rhy fawr} other {# ffeil rhy fawr}}: {files}",
+      "noDiff": "Dim gwahaniaethau cynnwys rhwng y fersiynau hyn.",
+      "binaryChanged": "Newidiodd ffeil ddeuaidd — ni ddangosir y gwahaniaeth.",
+      "diffType": {
+        "added": "ychwanegwyd",
+        "removed": "tynnwyd",
+        "modified": "addaswyd",
+        "binary-changed": "deuaidd"
+      }
+    },
+    "notifications": {
+      "addNotification": "Ychwanegu Hysbysiad",
+      "name": "Enw",
+      "namePlaceholder": "Hysbysiadau defnydd",
+      "destinationType": "Math Cyrchfan",
+      "typeGeneric": "Webhook Generig",
+      "typeEmail": "E-bost",
+      "url": "URL",
+      "hmacToken": "Tocyn HMAC (dewisol)",
+      "signingSecret": "Cyfrinach llofnodi",
+      "emailAddresses": "Cyfeiriadau E-bost (wedi'u gwahanu â choma)",
+      "triggerEvents": "Digwyddiadau Sbarduno",
+      "createNotification": "Creu Hysbysiad",
+      "empty": "Dim ffurfweddiadau hysbysu ar gyfer y weithfan hon.",
+      "ok": "IAWN",
+      "err": "Gwall {status}",
+      "fail": "METHU",
+      "http": "HTTP {status}",
+      "verify": "Gwirio",
+      "history": "Hanes",
+      "deliveryHistory": "Hanes Danfon",
+      "enableConfirm": "Galluogi'r hysbysiad hwn?",
+      "disableConfirm": "Analluogi'r hysbysiad hwn?",
+      "deleteConfirm": "Dileu'r hysbysiad \"{name}\"?"
+    },
+    "runTasks": {
+      "addRunTask": "Ychwanegu Tasg Rhediad",
+      "name": "Enw",
+      "namePlaceholder": "Gwiriad Polisi OPA",
+      "webhookUrl": "URL Webhook",
+      "stage": "Cam",
+      "enforcementLevel": "Lefel Gorfodaeth",
+      "hmacKey": "Allwedd HMAC (dewisol)",
+      "hmacKeyPlaceholder": "Cyfrinach llofnodi ar gyfer dilysu webhook",
+      "createRunTask": "Creu Tasg Rhediad",
+      "empty": "Dim tasgau rhediad wedi'u ffurfweddu ar gyfer y weithfan hon.",
+      "enableConfirm": "Galluogi'r dasg rhediad hon?",
+      "disableConfirm": "Analluogi'r dasg rhediad hon?",
+      "deleteConfirm": "Dileu'r dasg rhediad \"{name}\"?"
+    },
+    "runTriggers": {
+      "title": "Sbardunau Rhediad",
+      "description": "Pan fydd gweithfan ffynhonnell yn cwblhau gweithrediad, caiff gweithfannau i lawr yr afon rediad newydd wedi'i giwio'n awtomatig. Hyd at 20 gweithfan ffynhonnell fesul cyrchfan.",
+      "inboundHeading": "Gweithfannau ffynhonnell sy'n sbarduno rhediadau yma",
+      "inboundEmpty": "Nid oes gweithfannau ffynhonnell yn sbarduno rhediadau ar y weithfan hon.",
+      "pickerPlaceholder": "Chwilio am weithfannau i'w hychwanegu fel ffynhonnell…",
+      "outboundHeading": "Gweithfannau cyrchfan y mae'r weithfan hon yn eu sbarduno",
+      "outboundEmpty": "Nid yw'r weithfan hon yn sbarduno rhediadau ar unrhyw weithfan arall.",
+      "destinationNote": "(cyrchfan; tynnwch oddi yno)",
+      "removeConfirm": "Tynnu'r sbardun rhediad hwn?"
+    },
+    "sharing": {
+      "title": "Rhannu Cyflwr Pell",
+      "description": "Rhestr ganiatáu a reolir gan y cynhyrchydd ar gyfer <code></code> traws-weithfan. Mae data cyflwr yn cario cyfrinachau — caniatewch yn fwriadol. <docs>Dogfennau</docs>",
+      "outboundHeading": "Gweithfannau sydd wedi'u hawdurdodi i ddarllen cyflwr y weithfan hon",
+      "outboundEmpty": "Ni rennir cyflwr y weithfan hon ag unrhyw weithfan arall.",
+      "grantedBy": "caniatawyd gan {by}",
+      "revoke": "Dirymu",
+      "revokeConfirm": "Tynnu'r rhannu cyflwr pell hwn? Bydd y defnyddiwr yn colli mynediad i'r cyflwr hwn.",
+      "pickerPlaceholder": "Chwilio am weithfannau i'w hawdurdodi fel defnyddiwr…",
+      "inboundHeading": "Gweithfannau y mae'r weithfan hon wedi'i hawdurdodi i ddarllen cyflwr ohonynt",
+      "inboundEmpty": "Nid yw'r weithfan hon wedi'i hawdurdodi i ddarllen cyflwr o unrhyw weithfan arall drwy terraform_remote_state.",
+      "producerNote": "(cynhyrchydd; dirymwch oddi yno)"
+    },
+    "runMessages": {
+      "manualDriftCheck": "Gwiriad drifft â llaw o'r rhyngwyneb",
+      "queued": "Ciwiwyd o'r rhyngwyneb",
+      "queuedSpeculative": "Ciwiwyd o'r rhyngwyneb (tybiannol)",
+      "destroyQueued": "Ciwiwyd dinistrio o'r rhyngwyneb"
+    },
+    "errors": {
+      "loadWorkspace": "Methwyd llwytho'r weithfan",
+      "loadRuns": "Methwyd llwytho'r rhediadau",
+      "loadVariables": "Methwyd llwytho'r newidynnau",
+      "loadStateVersions": "Methwyd llwytho'r fersiynau cyflwr",
+      "loadConfigurations": "Methwyd llwytho'r fersiynau ffurfweddiad",
+      "loadNotifications": "Methwyd llwytho'r hysbysiadau",
+      "loadOutboundConsumers": "Methwyd llwytho'r defnyddwyr cyflwr pell allanol",
+      "loadInboundConsumers": "Methwyd llwytho'r defnyddwyr cyflwr pell mewnol",
+      "loadConsumers": "Methwyd llwytho'r defnyddwyr cyflwr pell",
+      "loadInboundTriggers": "Methwyd llwytho'r sbardunau rhediad mewnol",
+      "loadOutboundTriggers": "Methwyd llwytho'r sbardunau rhediad allanol",
+      "loadTriggers": "Methwyd llwytho'r sbardunau rhediad",
+      "loadRunTasks": "Methwyd llwytho'r tasgau rhediad",
+      "downloadStateFile": "Methwyd lawrlwytho'r ffeil gyflwr",
+      "downloadFailed": "Methodd y lawrlwytho",
+      "downloadFailedStatus": "Methodd y lawrlwytho ({status})",
+      "downloadTicketMissingUrl": "Mae ymateb tocyn lawrlwytho'n colli URL",
+      "diffFailed": "Methodd y gwahaniaethu",
+      "diffFailedStatus": "Methodd y gwahaniaethu ({status})",
+      "authorizeConsumer": "Methwyd awdurdodi'r defnyddiwr",
+      "revoke": "Methwyd dirymu",
+      "revokeConsumer": "Methwyd dirymu'r defnyddiwr",
+      "addTrigger": "Methwyd ychwanegu'r sbardun rhediad",
+      "removeTrigger": "Methwyd tynnu'r sbardun rhediad",
+      "createRunTask": "Methwyd creu'r dasg rhediad",
+      "createRunTaskStatus": "Methwyd creu'r dasg rhediad ({status})",
+      "update": "Methwyd diweddaru",
+      "toggleRunTask": "Methwyd toglo'r dasg rhediad",
+      "delete": "Methwyd dileu",
+      "deleteRunTask": "Methwyd dileu'r dasg rhediad",
+      "labelLockout": "Byddai'r newid label hwn yn lleihau eich mynediad.",
+      "updateWorkspace": "Methwyd diweddaru'r weithfan",
+      "lockWorkspace": "Methwyd cloi'r weithfan",
+      "unlockWorkspace": "Methwyd datgloi'r weithfan",
+      "updateAiSummary": "Methwyd diweddaru gosodiadau'r crynodeb AI",
+      "updateSlackChannel": "Methwyd diweddaru'r sianel Slack",
+      "updateDriftSettings": "Methwyd diweddaru'r gosodiadau drifft",
+      "updateDriftInterval": "Methwyd diweddaru'r cyfwng drifft",
+      "updatePlanExpiry": "Methwyd diweddaru terfyn amser y cynllun",
+      "queueDriftCheck": "Methwyd ciwio'r gwiriad drifft",
+      "queueDriftCheckStatus": "Methwyd ciwio'r gwiriad drifft ({status})",
+      "dismissDrift": "Methwyd diystyru'r drifft",
+      "dismissDriftStatus": "Methwyd diystyru'r drifft ({status})",
+      "deleteWorkspace": "Methwyd dileu'r weithfan",
+      "addVariable": "Methwyd ychwanegu'r newidyn",
+      "addVariableStatus": "Methwyd ychwanegu'r newidyn ({status})",
+      "deleteVariable": "Methwyd dileu'r newidyn",
+      "updateVariable": "Methwyd diweddaru'r newidyn",
+      "queuePlan": "Methwyd ciwio'r cynllun",
+      "queuePlanStatus": "Methwyd ciwio'r cynllun ({status})",
+      "queueDestroy": "Methwyd ciwio'r dinistrio",
+      "queueDestroyStatus": "Methwyd ciwio'r dinistrio ({status})",
+      "createNotification": "Methwyd creu'r hysbysiad",
+      "createNotificationStatus": "Methwyd creu'r hysbysiad ({status})",
+      "toggleNotification": "Methwyd toglo'r hysbysiad",
+      "deleteNotification": "Methwyd dileu'r hysbysiad",
+      "verificationFailed": "Methodd y dilysu",
+      "verificationDeliveryFailed": "Methodd danfon y dilysiad: {detail}",
+      "unknownError": "Gwall anhysbys",
+      "failed": "Methodd",
+      "deleteStateVersion": "Methwyd dileu'r fersiwn cyflwr",
+      "rollbackStateVersion": "Methwyd dychwelyd y fersiwn cyflwr",
+      "stateActionFailed": "Methodd y weithred gyflwr",
+      "uploadState": "Methwyd llwytho'r cyflwr i fyny",
+      "uploadStateFile": "Methwyd llwytho'r ffeil gyflwr i fyny"
+    }
+  },
+  "graphs": {
+    "stateTab": {
+      "loadError": "Methwyd llwytho'r graff cyflwr.",
+      "emptyState": "Dim cyflwr eto — rhedwch gynllun a gweithrediad, neu llwythwch gyflwr, ac yna bydd y graff hwn yn poblogi.",
+      "stateVersionLabel": "Fersiwn cyflwr",
+      "currentSuffix": "(cyfredol)",
+      "colorByLabel": "Lliwio yn ôl",
+      "viewGraph": "Graff",
+      "viewTable": "Tabl",
+      "resourceCount": "{count, plural, one {# adnodd} other {# adnodd}}",
+      "dependencyCount": "{count, plural, one {# ddibyniaeth} other {# dibyniaeth}}",
+      "truncated": "Yn dangos y {shown} adnodd cyntaf o {total} — cyfyngir y graff er mwyn eglurder.",
+      "colResource": "Adnodd",
+      "colType": "Math",
+      "colMode": "Modd",
+      "colModule": "Modiwl",
+      "colDependedOnBy": "Dibynnir arno gan",
+      "rootModule": "(gwraidd)"
+    },
+    "impact": {
+      "notAvailable": "Nid yw'r graff effaith ar gael ar gyfer y rhediad hwn.",
+      "title": "Graff effaith",
+      "subtitle": "cynllun o {count, plural, one {# adnodd} other {# adnodd}}",
+      "hint": "Adnodd yw pob sffêr; mae pob saeth yn pwyntio at yr hyn y mae'n dibynnu arno. Cliciwch nod → mae ei <b>effaith</b> drosglwyddol (popeth i lawr yr afon) yn goleuo.",
+      "downstreamAffected": "effeithir i lawr yr afon",
+      "action": {
+        "create": "creu",
+        "update": "diweddaru",
+        "replace": "amnewid",
+        "destroy": "dinistrio",
+        "unchanged": "heb newid"
+      }
+    },
+    "estate": {
+      "navHint": "Llusgwch i gylchdroi · sgroliwch i chwyddo · llusgo-de i banio · <em>cliciwch nod i orbitio o'i amgylch</em>"
+    },
+    "state3d": {
+      "title": "Graff cyflwr",
+      "hint": "Adnodd yw pob sffêr; mae pob saeth yn pwyntio at yr hyn y mae'n dibynnu arno. Cliciwch nod → mae'r adnoddau sy'n <b>dibynnu arno</b> yn drosglwyddol yn goleuo.",
+      "dataSource": "ffynhonnell data",
+      "managed": "rheoledig",
+      "dependOnThis": "yn dibynnu ar hwn"
+    },
+    "resource3d": {
+      "resetView": "Ailosod yr olwg",
+      "clear": "Clirio",
+      "key": "Allwedd",
+      "resources": "Adnoddau",
+      "hideKey": "Cuddio'r allwedd",
+      "hideResources": "Cuddio'r adnoddau",
+      "resourcesCount": "Adnoddau ({count})",
+      "filterPlaceholder": "Hidlo adnoddau…",
+      "navHint": "Llusgwch i gylchdroi · sgroliwch i chwyddo · llusgo-de i banio · <em>cliciwch adnodd i orbitio o'i amgylch</em>"
+    }
+  },
+  "execHookDetail": {
+    "backLink": "Yn ôl i'r bachau gweithredu",
+    "defaultDescription": "Bach gweithredu",
+    "notFound": "Ni chanfuwyd y bach gweithredu",
+    "scriptEmpty": "(gwag)",
+    "tabs": {
+      "settings": "Gosodiadau",
+      "workspaces": "Gweithfannau"
+    },
+    "common": {
+      "yes": "Ie",
+      "no": "Na"
+    },
+    "actions": {
+      "edit": "Golygu",
+      "cancel": "Canslo",
+      "save": "Cadw",
+      "saving": "Wrthi'n cadw...",
+      "delete": "Dileu",
+      "deleting": "Wrthi'n dileu...",
+      "confirmDelete": "Cadarnhau Dileu",
+      "add": "Ychwanegu",
+      "adding": "Wrthi'n ychwanegu...",
+      "remove": "Tynnu"
+    },
+    "settings": {
+      "heading": "Gosodiadau"
+    },
+    "fields": {
+      "name": "Enw",
+      "description": "Disgrifiad",
+      "hookPoint": "Pwynt Bach",
+      "priority": "Blaenoriaeth",
+      "enabled": "Wedi'i alluogi",
+      "script": "Sgript (<code>/bin/sh -c</code>)"
+    },
+    "delete": {
+      "heading": "Dileu'r Bach Gweithredu",
+      "description": "Dileu'r bach hwn yn barhaol a'i dynnu o bob gweithfan."
+    },
+    "workspaces": {
+      "scopeNote": "Mae'r bach hwn ond yn rhedeg ar y gweithfannau a gysylltir isod. Nid oes cwmpas byd-eang.",
+      "associate": "Cysylltu Gweithfan",
+      "workspaceLabel": "Gweithfan",
+      "selectPlaceholder": "Dewiswch weithfan...",
+      "empty": "Dim gweithfannau wedi'u cysylltu â'r bach hwn.",
+      "colWorkspace": "Gweithfan",
+      "colActions": "Gweithredoedd"
+    },
+    "confirm": {
+      "removeWorkspace": "Tynnu'r weithfan hon o'r bach? Ni fydd y bach yn rhedeg ar ei chyfer mwyach."
+    },
+    "success": {
+      "updated": "Diweddarwyd y bach gweithredu",
+      "workspaceAssociated": "Cysylltwyd y weithfan",
+      "workspaceRemoved": "Tynnwyd y weithfan"
+    },
+    "errors": {
+      "load": "Methwyd llwytho'r bach gweithredu",
+      "update": "Methwyd diweddaru'r bach gweithredu",
+      "delete": "Methwyd dileu'r bach gweithredu",
+      "addWorkspace": "Methwyd ychwanegu'r weithfan",
+      "removeWorkspace": "Methwyd tynnu'r weithfan"
+    }
+  },
+  "policySetDetail": {
+    "backLink": "Setiau Polisi",
+    "notFound": "Ni chanfuwyd",
+    "unknown": "anhysbys",
+    "subtitle": "Set polisi OPA · crëwyd gan {createdBy}",
+    "settings": {
+      "heading": "Gosodiadau"
+    },
+    "fields": {
+      "description": "Disgrifiad",
+      "enforcement": "Gorfodaeth",
+      "enabled": "Wedi'i alluogi",
+      "globalScope": "Byd-eang (pob gweithfan)"
+    },
+    "enforcement": {
+      "advisory": "Cynghorol (rhybuddio)",
+      "mandatory": "Gorfodol (rhwystro gweithredu)"
+    },
+    "scope": {
+      "allowLabels": "Caniatáu labeli (allwedd: v1, v2)",
+      "allowLabelsPlaceholder": "env: prod, staging",
+      "allowNames": "Caniatáu enwau (un fesul llinell)",
+      "denyLabels": "Gwrthod labeli (allwedd: v1, v2)",
+      "denyNames": "Gwrthod enwau (un fesul llinell)"
+    },
+    "vcs": {
+      "heading": "Ffurfweddiad VCS",
+      "repoUrl": "URL y Storfa",
+      "branch": "Cangen",
+      "branchPlaceholder": "main (rhagosodedig)",
+      "policyPath": "Llwybr Polisi"
+    },
+    "vcsBanner": {
+      "syncedFrom": "Polisïau wedi'u cydweddu o",
+      "at": "am",
+      "lastSynced": "Cydweddwyd ddiwethaf {time}",
+      "commit": "(ymrwymiad {sha})",
+      "syncError": "Gwall cydweddu: {error}"
+    },
+    "policies": {
+      "heading": "Polisïau ({count})",
+      "vcsManaged": "Rheolir gan y storfa — gwthiwch newidiadau drwy PR",
+      "empty": "Dim polisïau yn y set hon eto."
+    },
+    "addPolicy": {
+      "namePlaceholder": "Enw'r polisi",
+      "descPlaceholder": "Disgrifiad (dewisol)",
+      "regoHint": "Rego v1. Rhaid datgan <code>package terrapod</code> a mynegi tramgwyddau drwy set <code>deny</code>. Y cynllun yw <code>input</code>; cyd-destun Terrapod yw <code>data.terrapod_context</code>."
+    },
+    "actions": {
+      "saving": "Wrthi'n cadw...",
+      "saveSettings": "Cadw Gosodiadau",
+      "syncNow": "Cydweddu Nawr",
+      "cancel": "Canslo",
+      "addPolicy": "Ychwanegu Polisi",
+      "deleteSet": "Dileu'r Set",
+      "validatingRego": "Wrthi'n dilysu Rego...",
+      "delete": "Dileu",
+      "savePolicy": "Cadw'r Polisi"
+    },
+    "confirm": {
+      "deleteSet": "Dileu'r set polisi hon a phob un o'i pholisïau? Cedwir gwerthusiadau rhediad a gofnodwyd.",
+      "deletePolicy": "Dileu'r polisi \"{name}\"?"
+    },
+    "errors": {
+      "load": "Methwyd llwytho'r set polisi",
+      "save": "Methwyd cadw'r set polisi",
+      "saveStatus": "Methwyd cadw ({status})",
+      "delete": "Methwyd dileu'r set polisi",
+      "deleteStatus": "Methwyd dileu ({status})",
+      "addPolicy": "Methwyd ychwanegu'r polisi",
+      "addPolicyStatus": "Methwyd ychwanegu'r polisi ({status})",
+      "savePolicy": "Methwyd cadw'r polisi",
+      "savePolicyStatus": "Methwyd cadw'r polisi ({status})",
+      "deletePolicy": "Methwyd dileu'r polisi",
+      "deletePolicyStatus": "Methwyd dileu ({status})"
+    }
+  },
+  "slackLink": {
+    "title": "Cysylltu Slack â Terrapod",
+    "loading": "Wrthi'n llwytho…",
+    "checking": "Wrthi'n gwirio eich cyswllt…",
+    "linking": "Wrthi'n cysylltu eich cyfrif Slack…",
+    "unknown": "anhysbys",
+    "confirm": {
+      "prompt": "Cysylltu'r cyfrif Slack hwn â'ch adnabyddiaeth Terrapod <em>chi</em>? Bydd pob gweithred Slack yn y dyfodol (cymeradwyo/taflu) yn rhedeg fel y defnyddiwr Terrapod hwn gyda'i ganiatâd.",
+      "slackUser": "Defnyddiwr Slack",
+      "slackTeam": "Tîm Slack",
+      "terrapodAccount": "Cyfrif Terrapod",
+      "warning": "Peidiwch â pharhau oni bai eich bod newydd ddechrau'r cyswllt hwn o Slack eich hun. Os na wnaethoch, caewch y tab hwn a pheidiwch â chysylltu — mae hyn yn rhwymo'r cyfrif Slack uchod i'ch adnabyddiaeth Terrapod <em>chi</em>.",
+      "button": "Cadarnhau a chysylltu"
+    },
+    "success": {
+      "message": "Mae eich cyfrif Slack bellach wedi'i gysylltu â Terrapod.",
+      "linkedAs": "Cysylltwyd fel <em>{email}</em>. Gallwch gau'r tab hwn a dychwelyd i Slack."
+    },
+    "errors": {
+      "missingLink": "Cyswllt ar goll neu annilys. Dechreuwch eto gyda gorchymyn cyswllt Terrapod yn Slack.",
+      "invalidLink": "Mae'r cyswllt hwn yn annilys, wedi dod i ben, neu eisoes wedi'i ddefnyddio. Dechreuwch y cyswllt eto o Slack.",
+      "linkingFailed": "Methodd y cysylltu."
+    }
+  },
+  "cliComplete": {
+    "loading": "Wrthi'n llwytho...",
+    "completing": "Wrthi'n cwblhau'r dilysu...",
+    "invalid": {
+      "title": "Cais Annilys",
+      "description": "Paramedrau gofynnol ar goll."
+    },
+    "success": {
+      "title": "Mewngofnodi'n Llwyddiannus",
+      "complete": "Crëwyd tocyn API. Gallwch gau'r tab hwn."
+    },
+    "fallback": {
+      "description": "Ni allwyd cyrraedd y CLI yn awtomatig.",
+      "button": "Cliciwch yma i gwblhau â llaw"
+    },
+    "timeout": {
+      "description": "Efallai nad yw'r CLI wedi cwblhau cyfnewid y tocyn. Gwiriwch eich terfynell."
+    }
+  },
+  "apiDocs": {
+    "view": "Golwg:",
+    "redocTitle": "Dogfennaeth API ReDoc"
+  }
+}

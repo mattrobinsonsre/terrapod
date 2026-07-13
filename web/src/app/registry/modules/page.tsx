@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import Link from 'next/link'
 import NavBar from '@/components/nav-bar'
 import { PageHeader } from '@/components/page-header'
@@ -33,6 +34,7 @@ interface Module {
 
 export default function ModulesPage() {
   const router = useRouter()
+  const t = useTranslations('registry')
   const [modules, setModules] = useState<Module[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -74,11 +76,11 @@ export default function ModulesPage() {
   async function loadModules() {
     try {
       const res = await apiFetch('/api/terrapod/v1/registry-modules')
-      if (!res.ok) throw new Error('Failed to load modules')
+      if (!res.ok) throw new Error(t('modules.loadFailed'))
       const data = await res.json()
       setModules(data.data || [])
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load modules')
+      setError(err instanceof Error ? err.message : t('modules.loadFailed'))
     } finally {
       setLoading(false)
     }
@@ -110,7 +112,7 @@ export default function ModulesPage() {
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        throw new Error(data.detail || `Failed to create module (${res.status})`)
+        throw new Error(data.detail || t('modules.createFailedStatus', { status: res.status }))
       }
       setNewName('')
       setNewProvider('')
@@ -122,7 +124,7 @@ export default function ModulesPage() {
       setShowCreate(false)
       await loadModules()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create module')
+      setError(err instanceof Error ? err.message : t('modules.createFailed'))
     } finally {
       setCreating(false)
     }
@@ -133,14 +135,14 @@ export default function ModulesPage() {
       <NavBar />
       <main className="px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto">
         <PageHeader
-          title="Modules"
-          description="Private Terraform module registry"
+          title={t('modules.title')}
+          description={t('modules.description')}
           actions={
             <button
               onClick={() => setShowCreate(!showCreate)}
               className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors btn-smoke"
             >
-              {showCreate ? 'Cancel' : 'Create Module'}
+              {showCreate ? t('modules.cancel') : t('modules.createModule')}
             </button>
           }
         />
@@ -151,7 +153,7 @@ export default function ModulesPage() {
           <form onSubmit={handleCreate} className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-4 mb-6 space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label htmlFor="mod-name" className="block text-sm font-medium text-slate-300 mb-1">Name</label>
+                <label htmlFor="mod-name" className="block text-sm font-medium text-slate-300 mb-1">{t('modules.form.name')}</label>
                 <input
                   id="mod-name"
                   type="text"
@@ -159,13 +161,13 @@ export default function ModulesPage() {
                   onChange={(e) => setNewName(e.target.value)}
                   required
                   pattern="[a-z][a-z0-9-]*"
-                  title="Lowercase letters, numbers, and hyphens only. Must start with a lowercase letter."
+                  title={t('modules.form.slugTitle')}
                   placeholder="vpc"
                   className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                 />
               </div>
               <div>
-                <label htmlFor="mod-provider" className="block text-sm font-medium text-slate-300 mb-1">Provider</label>
+                <label htmlFor="mod-provider" className="block text-sm font-medium text-slate-300 mb-1">{t('modules.form.provider')}</label>
                 <input
                   id="mod-provider"
                   type="text"
@@ -173,25 +175,25 @@ export default function ModulesPage() {
                   onChange={(e) => setNewProvider(e.target.value)}
                   required
                   pattern="[a-z][a-z0-9-]*"
-                  title="Lowercase letters, numbers, and hyphens only. Must start with a lowercase letter."
+                  title={t('modules.form.slugTitle')}
                   placeholder="aws"
                   className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                 />
               </div>
             </div>
-            <p className="mt-1 text-xs text-slate-500">Name and provider form the module&apos;s registry address and cannot be changed after creation.</p>
+            <p className="mt-1 text-xs text-slate-500">{t('modules.form.addressNote')}</p>
 
             {/* VCS Configuration */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label htmlFor="create-vcs-conn" className="block text-sm font-medium text-slate-300 mb-1">VCS Connection (optional)</label>
+                <label htmlFor="create-vcs-conn" className="block text-sm font-medium text-slate-300 mb-1">{t('modules.form.vcsConnectionOptional')}</label>
                 <select
                   id="create-vcs-conn"
                   value={newVcsConnectionId}
                   onChange={(e) => setNewVcsConnectionId(e.target.value)}
                   className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                 >
-                  <option value="">None — upload versions manually</option>
+                  <option value="">{t('modules.form.noneUploadManually')}</option>
                   {vcsConnections.map((conn) => (
                     <option key={conn.id} value={conn.id}>
                       {conn.attributes.name} ({conn.attributes.provider})
@@ -200,7 +202,7 @@ export default function ModulesPage() {
                 </select>
               </div>
               <div>
-                <label htmlFor="create-vcs-repo" className="block text-sm font-medium text-slate-300 mb-1">Repository URL</label>
+                <label htmlFor="create-vcs-repo" className="block text-sm font-medium text-slate-300 mb-1">{t('modules.form.repositoryUrl')}</label>
                 <input
                   id="create-vcs-repo"
                   type="text"
@@ -212,19 +214,19 @@ export default function ModulesPage() {
                 />
               </div>
               <div>
-                <label htmlFor="create-vcs-branch" className="block text-sm font-medium text-slate-300 mb-1">Branch (optional)</label>
+                <label htmlFor="create-vcs-branch" className="block text-sm font-medium text-slate-300 mb-1">{t('modules.form.branchOptional')}</label>
                 <input
                   id="create-vcs-branch"
                   type="text"
                   value={newVcsBranch}
                   onChange={(e) => setNewVcsBranch(e.target.value)}
-                  placeholder="main (leave empty for default)"
+                  placeholder={t('modules.form.branchPlaceholder')}
                   disabled={!newVcsConnectionId}
                   className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent disabled:opacity-50"
                 />
               </div>
               <div>
-                <label htmlFor="create-vcs-tag" className="block text-sm font-medium text-slate-300 mb-1">Tag Pattern</label>
+                <label htmlFor="create-vcs-tag" className="block text-sm font-medium text-slate-300 mb-1">{t('modules.form.tagPattern')}</label>
                 <input
                   id="create-vcs-tag"
                   type="text"
@@ -234,13 +236,13 @@ export default function ModulesPage() {
                   disabled={!newVcsConnectionId}
                   className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent disabled:opacity-50"
                 />
-                <p className="mt-1 text-xs text-slate-500">Only tags matching this pattern create versions (e.g. v1.0.0)</p>
+                <p className="mt-1 text-xs text-slate-500">{t('modules.form.tagPatternHint')}</p>
               </div>
             </div>
 
             {/* Labels */}
             <div className="pt-2">
-              <label className="block text-sm font-medium text-slate-300 mb-1">Labels (optional)</label>
+              <label className="block text-sm font-medium text-slate-300 mb-1">{t('modules.form.labelsOptional')}</label>
               <LabelsEditor labels={newLabels} onChange={setNewLabels} />
             </div>
 
@@ -249,7 +251,7 @@ export default function ModulesPage() {
               disabled={creating}
               className="mt-2 px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors"
             >
-              {creating ? 'Creating...' : 'Create'}
+              {creating ? t('modules.form.creating') : t('modules.form.create')}
             </button>
           </form>
         )}
@@ -257,7 +259,7 @@ export default function ModulesPage() {
         {loading ? (
           <LoadingSpinner />
         ) : modules.length === 0 ? (
-          <EmptyState message="No modules yet. Create one to get started." />
+          <EmptyState message={t('modules.empty')} />
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {modules.map((mod) => (
@@ -267,10 +269,10 @@ export default function ModulesPage() {
                 className="bg-slate-800/50 rounded-lg border border-slate-700/50 hover:border-brand-600/30 p-4 transition-colors"
               >
                 <h3 className="font-semibold text-slate-200">{mod.attributes.name}</h3>
-                <p className="text-sm text-slate-500 mt-1">Provider: {mod.attributes.provider}</p>
+                <p className="text-sm text-slate-500 mt-1">{t('modules.providerLabel', { provider: mod.attributes.provider })}</p>
                 <div className="flex items-center gap-2 mt-2">
                   <span className="text-xs text-slate-400">
-                    {mod.attributes['version-statuses']?.length || 0} version(s)
+                    {t('modules.versionCount', { count: mod.attributes['version-statuses']?.length || 0 })}
                   </span>
                   <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                     mod.attributes.status === 'setup_complete'

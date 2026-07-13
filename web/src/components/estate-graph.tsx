@@ -5,6 +5,7 @@
 // the fetch and passes the graph in, so the same data also drives the
 // accessible table fallback.
 import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
+import { useTranslations } from 'next-intl'
 import ForceGraph3D from 'react-force-graph-3d'
 import SpriteText from 'three-spritetext'
 import * as THREE from 'three'
@@ -76,6 +77,7 @@ export function EstateGraph3D({
   onSelect: (n: EstateNode | null) => void
   selectedId: string | null
 }) {
+  const t = useTranslations('graphs')
   const fgRef = useRef<FgMethods | null>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
   // Once the user takes camera control (click-to-orbit, drag, zoom), stop
@@ -262,8 +264,9 @@ export function EstateGraph3D({
         linkDirectionalArrowColor={(l) => EDGE[l.kind] || '#94a3b8'}
       />
       <div className="absolute bottom-1.5 inset-x-0 text-center text-[10px] text-slate-500 pointer-events-none select-none">
-        Drag to rotate · scroll to zoom · right-drag to pan ·{' '}
-        <span className="text-slate-400">click a node to orbit around it</span>
+        {t.rich('estate.navHint', {
+          em: (chunks) => <span className="text-slate-400">{chunks}</span>,
+        })}
       </div>
     </div>
   )

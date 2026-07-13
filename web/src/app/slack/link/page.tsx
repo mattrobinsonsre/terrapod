@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { getAuthState } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
 
@@ -15,10 +16,11 @@ import { apiFetch } from '@/lib/api'
 type Status = 'loading' | 'confirm' | 'linking' | 'success' | 'error'
 
 function SlackLinkInner() {
+  const t = useTranslations('slackLink')
   const params = useSearchParams()
   const state = params.get('state') || ''
   const [status, setStatus] = useState<Status>('loading')
-  const [message, setMessage] = useState('Checking your link…')
+  const [message, setMessage] = useState(t('checking'))
   const [email, setEmail] = useState('')
   const [slackTeam, setSlackTeam] = useState('')
   const [slackUser, setSlackUser] = useState('')
@@ -30,7 +32,7 @@ function SlackLinkInner() {
 
     if (!state) {
       setStatus('error')
-      setMessage('Missing or invalid link. Start again with the Terrapod link command in Slack.')
+      setMessage(t('errors.missingLink'))
       return
     }
 
@@ -59,14 +61,14 @@ function SlackLinkInner() {
         // Any preview failure (invalid signature, expired, already used) is the
         // same to the user — one friendly message, never a raw server detail.
         setStatus('error')
-        setMessage('This link is invalid, expired, or already used. Start the link again from Slack.')
+        setMessage(t('errors.invalidLink'))
       }
     })()
-  }, [state])
+  }, [state, t])
 
   async function confirmLink() {
     setStatus('linking')
-    setMessage('Linking your Slack account…')
+    setMessage(t('linking'))
     try {
       const res = await apiFetch('/api/terrapod/v1/slack/link', {
         method: 'POST',
@@ -75,18 +77,15 @@ function SlackLinkInner() {
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        throw new Error(
-          data.detail ||
-            'This link is invalid, expired, or already used. Start the link again from Slack.',
-        )
+        throw new Error(data.detail || t('errors.invalidLink'))
       }
       const data = await res.json()
       setEmail(data?.data?.email || email)
       setStatus('success')
-      setMessage('Your Slack account is now linked to Terrapod.')
+      setMessage(t('success.message'))
     } catch (e) {
       setStatus('error')
-      setMessage(e instanceof Error ? e.message : 'Linking failed.')
+      setMessage(e instanceof Error ? e.message : t('errors.linkingFailed'))
     }
   }
 
@@ -100,41 +99,39 @@ function SlackLinkInner() {
   return (
     <main className="h-dvh flex items-center justify-center px-4">
       <div className="w-full max-w-md">
-        <h1 className="text-xl font-semibold text-slate-100 mb-4 text-center">
-          Connect Slack to Terrapod
-        </h1>
+        <h1 className="text-xl font-semibold text-slate-100 mb-4 text-center">{t('title')}</h1>
         <div className={`rounded-lg border p-6 text-sm ${tone}`}>
           {status === 'confirm' ? (
             <div>
               <p className="text-slate-300">
-                Link this Slack account to <span className="font-medium text-slate-100">your</span>{' '}
-                Terrapod identity? Every future Slack action (approve/discard) will run as this
-                Terrapod user with their permissions.
+                {t.rich('confirm.prompt', {
+                  em: (chunks) => <span className="font-medium text-slate-100">{chunks}</span>,
+                })}
               </p>
               <dl className="mt-4 space-y-2">
                 <div className="flex justify-between gap-4">
-                  <dt className="text-xs text-slate-500">Slack user</dt>
-                  <dd className="text-slate-200 font-mono text-xs">{slackUser || 'unknown'}</dd>
+                  <dt className="text-xs text-slate-500">{t('confirm.slackUser')}</dt>
+                  <dd className="text-slate-200 font-mono text-xs">{slackUser || t('unknown')}</dd>
                 </div>
                 <div className="flex justify-between gap-4">
-                  <dt className="text-xs text-slate-500">Slack team</dt>
-                  <dd className="text-slate-200 font-mono text-xs">{slackTeam || 'unknown'}</dd>
+                  <dt className="text-xs text-slate-500">{t('confirm.slackTeam')}</dt>
+                  <dd className="text-slate-200 font-mono text-xs">{slackTeam || t('unknown')}</dd>
                 </div>
                 <div className="flex justify-between gap-4">
-                  <dt className="text-xs text-slate-500">Terrapod account</dt>
+                  <dt className="text-xs text-slate-500">{t('confirm.terrapodAccount')}</dt>
                   <dd className="text-slate-200 font-medium">{email}</dd>
                 </div>
               </dl>
               <p className="mt-4 text-xs text-amber-400/90">
-                Only continue if you just started this link from Slack yourself. If you didn&apos;t,
-                close this tab and don&apos;t link — this binds the Slack account above to{' '}
-                <span className="font-medium">your</span> Terrapod identity.
+                {t.rich('confirm.warning', {
+                  em: (chunks) => <span className="font-medium">{chunks}</span>,
+                })}
               </p>
               <button
                 onClick={confirmLink}
                 className="mt-4 w-full rounded bg-brand-600 hover:bg-brand-500 px-4 py-2 text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
               >
-                Confirm &amp; link
+                {t('confirm.button')}
               </button>
             </div>
           ) : (
@@ -142,8 +139,10 @@ function SlackLinkInner() {
               <p>{message}</p>
               {status === 'success' && email && (
                 <p className="mt-2 text-slate-400">
-                  Linked as <span className="font-medium text-slate-200">{email}</span>. You can
-                  close this tab and return to Slack.
+                  {t.rich('success.linkedAs', {
+                    email,
+                    em: (chunks) => <span className="font-medium text-slate-200">{chunks}</span>,
+                  })}
                 </p>
               )}
             </>
@@ -154,13 +153,14 @@ function SlackLinkInner() {
   )
 }
 
+function SlackLinkFallback() {
+  const t = useTranslations('slackLink')
+  return <main className="h-dvh flex items-center justify-center text-slate-400">{t('loading')}</main>
+}
+
 export default function SlackLinkPage() {
   return (
-    <Suspense
-      fallback={
-        <main className="h-dvh flex items-center justify-center text-slate-400">Loading…</main>
-      }
-    >
+    <Suspense fallback={<SlackLinkFallback />}>
       <SlackLinkInner />
     </Suspense>
   )

@@ -1,0 +1,2621 @@
+{
+  "nav": {
+    "workspaces": "Pracovní prostory",
+    "estate": "Estate",
+    "registry": "Registry",
+    "modules": "Moduly",
+    "providers": "Provideři",
+    "catalog": "Katalog",
+    "agentPools": "Fondy agentů",
+    "admin": "Správa",
+    "users": "Uživatelé",
+    "roles": "Role",
+    "vcsConnections": "VCS připojení",
+    "variableSets": "Sady proměnných",
+    "autodiscovery": "Automatické objevování",
+    "bulkUpdate": "Hromadná aktualizace",
+    "executionHooks": "Prováděcí háčky",
+    "policySets": "Sady zásad",
+    "providerTemplates": "Šablony providerů",
+    "catalogAdmin": "Správa katalogu",
+    "cache": "Cache",
+    "auditLog": "Auditní log",
+    "help": "Nápověda",
+    "apiReference": "API reference",
+    "docs": "Dokumentace",
+    "account": "Účet",
+    "apiTokens": "API tokeny",
+    "sessions": "Relace",
+    "logOut": "Odhlásit se",
+    "menu": "Nabídka",
+    "openMenu": "Otevřít nabídku",
+    "openAccountMenu": "Otevřít nabídku účtu",
+    "closeMenu": "Zavřít nabídku"
+  },
+  "switcher": {
+    "language": "Jazyk",
+    "changeLanguage": "Změnit jazyk"
+  },
+  "workspaces": {
+    "title": "Pracovní prostory",
+    "description": "Spravujte Terraform pracovní prostory, stav a běhy",
+    "new": "Nový pracovní prostor",
+    "cancel": "Zrušit",
+    "create": "Vytvořit pracovní prostor",
+    "creating": "Vytváření…",
+    "loadFailed": "Nepodařilo se načíst pracovní prostory",
+    "createFailed": "Nepodařilo se vytvořit pracovní prostor",
+    "form": {
+      "name": "Název",
+      "namePattern": "Pouze písmena, číslice, pomlčky a podtržítka. Musí začínat písmenem nebo číslicí.",
+      "namePlaceholder": "my-workspace",
+      "executionMode": "Režim provádění",
+      "local": "Lokální",
+      "agent": "Agent",
+      "executionBackend": "Prováděcí backend",
+      "version": "Verze",
+      "versionTitle": "Verze ve formátu X.Y nebo X.Y.Z (např. 1.11 nebo 1.11.5)",
+      "versionPlaceholder": "např. 1.11 nebo 1.11.5",
+      "cpuRequest": "Požadavek CPU",
+      "cpuTitle": "Kubernetes množství CPU: celá jádra (1, 2) nebo milicores (500m, 100m)",
+      "cpuHint": "např. 1, 0.5, 500m",
+      "memoryRequest": "Požadavek paměti",
+      "memoryTitle": "Kubernetes množství paměti: bajty (1000) nebo s příponou (512Mi, 2Gi, 1Ti)",
+      "memoryHint": "např. 2Gi, 512Mi, 1Ti",
+      "agentPool": "Fond agentů",
+      "none": "Žádný",
+      "autoApply": "Automatické použití",
+      "enabled": "Povoleno",
+      "workingDirectory": "Pracovní adresář",
+      "workingDirectoryPlaceholder": "např. environments/dev",
+      "workingDirectoryHint": "Podadresář v repozitáři obsahující soubory .tf",
+      "vcsConnection": "VCS připojení",
+      "vcsRepoUrl": "URL VCS repozitáře",
+      "vcsRepoUrlTitle": "Musí být URL adresa HTTP nebo HTTPS",
+      "vcsRepoUrlPlaceholder": "https://github.com/org/repo",
+      "vcsBranch": "VCS větev",
+      "vcsBranchPlaceholder": "main (výchozí)"
+    },
+    "stats": {
+      "total": "Celkem",
+      "health": "Stav",
+      "locked": "Uzamčeno",
+      "clearAllFilters": "Vymazat všechny filtry",
+      "clearHealthFilter": "Vymazat filtr problémů se stavem",
+      "filterHealth": "Filtrovat na pracovní prostory s problémy se stavem",
+      "clearLockedFilter": "Vymazat filtr uzamčení",
+      "filterLocked": "Filtrovat na uzamčené pracovní prostory"
+    },
+    "filter": {
+      "placeholder": "Filtrovat podle názvu, štítku nebo stavu — např. „eu1“, „env:prod“, „status:errored“",
+      "ariaLabel": "Filtrovat pracovní prostory",
+      "clear": "Vymazat",
+      "status": "Stav",
+      "label": "Štítek",
+      "back": "zpět",
+      "valueCount": "{count, plural, one {# hodnota} few {# hodnoty} many {# hodnoty} other {# hodnot}}",
+      "removeTerm": "Odebrat tento výraz",
+      "showing": "Zobrazeno {filtered} z {total}",
+      "termName": "název: {value}",
+      "termStatus": "stav: {value}",
+      "termLabelAny": "{key}: (jakékoli)",
+      "termLabel": "{key}: {value}",
+      "hintStatus": "stav",
+      "hintHealth": "stav zdraví",
+      "hintLabel": "štítek",
+      "hintLabelKey": "klíč štítku",
+      "hintName": "název"
+    },
+    "row": {
+      "removeLabelFilter": "Kliknutím odeberete z filtru",
+      "addLabelFilter": "Kliknutím filtrujte podle tohoto štítku"
+    },
+    "table": {
+      "name": "Název",
+      "mode": "Režim",
+      "pool": "Fond",
+      "resources": "Prostředky",
+      "status": "Stav",
+      "created": "Vytvořeno",
+      "resourcesValue": "{cpu} CPU / {memory}"
+    },
+    "empty": {
+      "none": "Zatím žádné pracovní prostory. Vytvořte jeden a začněte.",
+      "noMatch": "Tomuto filtru neodpovídají žádné pracovní prostory."
+    }
+  },
+  "status": {
+    "state-diverged": "Stav se rozešel",
+    "vcs-error": "Chyba VCS",
+    "drifted": "Odchýleno",
+    "errored": "Chyba",
+    "needs-confirm": "Vyžaduje potvrzení",
+    "planning": "Plánování",
+    "applying": "Aplikování",
+    "canceling": "Rušení",
+    "confirmed": "Potvrzeno",
+    "queued": "Ve frontě",
+    "pending": "Čeká",
+    "applied": "Aplikováno",
+    "planned": "Naplánováno",
+    "canceled": "Zrušeno",
+    "discarded": "Zahozeno",
+    "pendingDeletion": "Čeká na smazání",
+    "archived": "Archivováno"
+  },
+  "auth": {
+    "loading": "Načítání...",
+    "subtitle": "Přihlaste se a spravujte svou infrastrukturu",
+    "subtitleCli": "Přihlaste se a autorizujte CLI",
+    "emailLabel": "E-mail",
+    "passwordLabel": "Heslo",
+    "signIn": "Přihlásit se",
+    "signingIn": "Přihlašování...",
+    "signInWith": "Přihlásit se přes {provider}",
+    "or": "nebo",
+    "noProviders": "Nejsou nakonfigurováni žádní poskytovatelé ověřování",
+    "completingSignIn": "Dokončování přihlášení...",
+    "callbackFailedTitle": "Ověření selhalo",
+    "tryAgain": "Zkusit znovu",
+    "errors": {
+      "loadProviders": "Nepodařilo se načíst poskytovatele",
+      "authenticationFailed": "Ověření selhalo ({status})",
+      "tokenExchangeFailed": "Výměna tokenu selhala ({status})",
+      "loginFailed": "Přihlášení selhalo",
+      "startLoginFailed": "Nepodařilo se zahájit přihlášení",
+      "missingCodeOrState": "Chybí autorizační kód nebo stav",
+      "stateMismatch": "Neshoda stavu — možný útok CSRF",
+      "missingVerifier": "Chybí PKCE verifikátor — zkuste se prosím přihlásit znovu"
+    }
+  },
+  "estate": {
+    "title": "Topologie estate",
+    "description": "Každý pracovní prostor, který vidíte, a moduly, které používají, propojené prostřednictvím run-triggerů, remote-state a odkazů modulů. Seskupte podle libovolné osy, která vyhovuje vašemu estate — platforma nevynucuje žádnou konvenci štítkování.",
+    "errors": {
+      "load": "Nepodařilo se načíst graf estate."
+    },
+    "groupBy": {
+      "label": "Seskupit podle"
+    },
+    "view": {
+      "graph": "Graf",
+      "table": "Tabulka"
+    },
+    "counts": {
+      "workspaces": "{count, plural, one {# pracovní prostor} few {# pracovní prostory} many {# pracovního prostoru} other {# pracovních prostorů}}",
+      "modules": "{count, plural, one {# modul} few {# moduly} many {# modulu} other {# modulů}}",
+      "dependencies": "{count, plural, one {# závislost} few {# závislosti} many {# závislosti} other {# závislostí}}"
+    },
+    "legend": {
+      "registryModule": "modul z registry"
+    },
+    "detail": {
+      "moduleImpact": "{count, plural, one {pracovní prostor jej používá — jeho aktualizace jej znovu naplánuje} few {pracovní prostory jej používají — jeho aktualizace je všechny znovu naplánuje} many {pracovního prostoru jej používá — jeho aktualizace je všechny znovu naplánuje} other {pracovních prostorů jej používá — jeho aktualizace je všechny znovu naplánuje}}",
+      "dependOnThis": "{count, plural, one {závisí na tomto} few {závisí na tomto} many {závisí na tomto} other {závisí na tomto}}"
+    },
+    "table": {
+      "workspaces": {
+        "heading": "Pracovní prostory",
+        "col": {
+          "workspace": "Pracovní prostor",
+          "group": "Skupina",
+          "agentPool": "Fond agentů",
+          "dependedOnBy": "Závisí na něm",
+          "modulesUsed": "Použité moduly"
+        },
+        "noModules": "—"
+      },
+      "modules": {
+        "heading": "Moduly",
+        "col": {
+          "module": "Modul",
+          "usedBy": "Používají (pracovní prostory)"
+        }
+      }
+    }
+  },
+  "labels": {
+    "title": "Štítky",
+    "description": "Procházejte štítky používané napříč pracovními prostory, fondy agentů, moduly registry a providery registry. Pouze pro čtení — štítky se upravují na vlastní stránce každé entity.",
+    "none": "Žádné.",
+    "emptyKeys": "Zatím se nepoužívají žádné štítky. Oštítkujte libovolný pracovní prostor, fond agentů, modul registry nebo provider registry a začněte zde seskupovat.",
+    "emptyValues": "Žádné hodnoty pro „{key}“. Buď žádná čitelná entita tento štítek nenese, nebo byl od posledního zobrazení odebrán.",
+    "loadKeysFailed": "Nepodařilo se načíst štítky ({status})",
+    "loadValuesFailed": "Nepodařilo se načíst hodnoty pro {key} ({status})",
+    "loadEntitiesFailed": "Nepodařilo se načíst entity ({status})",
+    "columns": {
+      "labelKey": "Klíč štítku",
+      "distinctValues": "Různé hodnoty",
+      "value": "Hodnota",
+      "total": "Celkem"
+    },
+    "entity": {
+      "workspaces": "Pracovní prostory",
+      "agentPools": "Fondy agentů",
+      "modules": "Moduly",
+      "providers": "Provideři"
+    },
+    "deprecated": {
+      "badge": "Zastaralé a nepodporované.",
+      "body": "Prohlížeč štítků již není v hlavní navigaci a bude v příští verzi odstraněn. Filtrujte podle štítku na stránce <workspacesLink>Pracovní prostory</workspacesLink>. Pokud tuto stránku potřebujete, <issueLink>založte prosím issue</issueLink>."
+    }
+  },
+  "settings": {
+    "tokens": {
+      "title": "API tokeny",
+      "description": "Spravujte ověřovací tokeny pro CLI a automatizaci",
+      "descriptionAll": "Všechny tokeny všech uživatelů",
+      "myTokens": "Moje tokeny",
+      "allTokens": "Všechny tokeny",
+      "createToken": "Vytvořit token",
+      "cancel": "Zrušit",
+      "tokenReady": "Token je připraven",
+      "tokenReadyHelp": "Zkopírujte tento token nyní — už se znovu nezobrazí.",
+      "dismissToken": "Zavřít token",
+      "hide": "Skrýt",
+      "show": "Zobrazit",
+      "copy": "Kopírovat",
+      "empty": "Zatím žádné API tokeny.",
+      "noDescription": "Bez popisu",
+      "detached": "odpojený",
+      "never": "Nikdy",
+      "selected": "{count, plural, one {# vybraný token} few {# vybrané tokeny} many {# vybraného tokenu} other {# vybraných tokenů}}",
+      "revokeSelected": "Odvolat vybrané",
+      "revoking": "Odvolávání...",
+      "clearSelection": "Zrušit výběr",
+      "rotate": "Rotovat",
+      "rotating": "Rotování...",
+      "revoke": "Odvolat",
+      "confirmRotate": "Rotovat tento token? Aktuální tajný klíč okamžitě přestane fungovat a bude vydán nový.",
+      "confirmBulkRevoke": "{count, plural, one {Odvolat # token?} few {Odvolat # tokeny?} many {Odvolat # tokenu?} other {Odvolat # tokenů?}}",
+      "kinds": {
+        "interactive": {
+          "label": "Osobní",
+          "help": "Osobní token pro CLI a ad-hoc automatizaci. Nese vaše plná aktuální oprávnění."
+        },
+        "service_bound": {
+          "label": "Servisní · vázaný",
+          "help": "Servisní token omezený na podmnožinu vašich rolí. Jeho přístup je průnikem těchto rolí a vašich vlastních — a přestane fungovat, pokud je váš účet odebrán."
+        },
+        "service_detached": {
+          "label": "Servisní · odpojený",
+          "help": "Servisní token spravovaný administrátorem s absolutním pevně stanoveným rozsahem, nevázaný na žádného uživatele. Použijte pro kritickou automatizaci mezi stroji, která musí přežít odchod libovolné osoby."
+        }
+      },
+      "lifespans": {
+        "720": "30 dní",
+        "2160": "90 dní",
+        "4320": "180 dní",
+        "8760": "1 rok"
+      },
+      "filter": {
+        "all": "Všechny druhy"
+      },
+      "form": {
+        "description": "Popis",
+        "descriptionPlaceholder": "Token pro CI/CD pipeline",
+        "kind": "Druh",
+        "lifespan": "Doba platnosti",
+        "create": "Vytvořit",
+        "creating": "Vytváření...",
+        "pinnedRoles": "Připnuté role",
+        "pinnedRolesHelp": "— rozsah, na který je tento token omezen",
+        "pinnedRolesCapped": "(omezeno na váš vlastní přístup)",
+        "noCustomRoles": "Nejsou definovány žádné vlastní role. Nejprve vytvořte role v Správa → Role.",
+        "noScopedRoles": "Nemáte žádné omezené role k připnutí. Tento token by neměl žádný přístup."
+      },
+      "columns": {
+        "description": "Popis",
+        "kind": "Druh",
+        "boundTo": "Vázán na",
+        "created": "Vytvořeno",
+        "lastUsed": "Naposledy použito",
+        "expires": "Vyprší",
+        "actions": "Akce"
+      },
+      "errors": {
+        "load": "Nepodařilo se načíst tokeny",
+        "create": "Nepodařilo se vytvořit token ({status})",
+        "createGeneric": "Nepodařilo se vytvořit token",
+        "rotate": "Nepodařilo se rotovat token ({status})",
+        "rotateGeneric": "Nepodařilo se rotovat token",
+        "revoke": "Nepodařilo se odvolat token ({status})",
+        "revokeGeneric": "Nepodařilo se odvolat token",
+        "bulkRevoke": "Nepodařilo se odvolat tokeny"
+      }
+    },
+    "sessions": {
+      "title": "Relace",
+      "description": "Vaše aktivní relace",
+      "descriptionAll": "Všechny aktivní relace na platformě",
+      "empty": "Žádné aktivní relace.",
+      "revokeAll": "Odvolat vše",
+      "current": "Aktuální",
+      "columns": {
+        "provider": "Poskytovatel",
+        "created": "Vytvořeno",
+        "expires": "Vyprší",
+        "lastActive": "Naposledy aktivní",
+        "token": "Token"
+      },
+      "errors": {
+        "load": "Nepodařilo se načíst relace",
+        "revoke": "Nepodařilo se odvolat relace ({status})",
+        "revokeGeneric": "Nepodařilo se odvolat relace"
+      }
+    }
+  },
+  "registry": {
+    "modules": {
+      "title": "Moduly",
+      "description": "Privátní registry Terraform modulů",
+      "cancel": "Zrušit",
+      "createModule": "Vytvořit modul",
+      "empty": "Zatím žádné moduly. Vytvořte jeden a začněte.",
+      "providerLabel": "Provider: {provider}",
+      "versionCount": "{count, plural, one {# verze} few {# verze} many {# verze} other {# verzí}}",
+      "loadFailed": "Nepodařilo se načíst moduly",
+      "createFailed": "Nepodařilo se vytvořit modul",
+      "createFailedStatus": "Nepodařilo se vytvořit modul ({status})",
+      "form": {
+        "name": "Název",
+        "provider": "Provider",
+        "slugTitle": "Pouze malá písmena, číslice a pomlčky. Musí začínat malým písmenem.",
+        "addressNote": "Název a provider tvoří adresu modulu v registry a po vytvoření je nelze změnit.",
+        "vcsConnectionOptional": "VCS připojení (volitelné)",
+        "noneUploadManually": "Žádné — nahrávejte verze ručně",
+        "repositoryUrl": "URL repozitáře",
+        "branchOptional": "Větev (volitelné)",
+        "branchPlaceholder": "main (ponechte prázdné pro výchozí)",
+        "tagPattern": "Vzor tagů",
+        "tagPatternHint": "Verze vytvářejí pouze tagy odpovídající tomuto vzoru (např. v1.0.0)",
+        "labelsOptional": "Štítky (volitelné)",
+        "creating": "Vytváření...",
+        "create": "Vytvořit"
+      }
+    },
+    "providers": {
+      "title": "Provideři",
+      "description": "Privátní registry Terraform providerů",
+      "cancel": "Zrušit",
+      "createProvider": "Vytvořit provider",
+      "empty": "Zatím žádní provideři. Vytvořte jednoho a začněte.",
+      "loadFailed": "Nepodařilo se načíst providery",
+      "createFailed": "Nepodařilo se vytvořit provider",
+      "createFailedStatus": "Nepodařilo se vytvořit provider ({status})",
+      "form": {
+        "name": "Název",
+        "slugTitle": "Pouze malá písmena, číslice a pomlčky. Musí začínat malým písmenem.",
+        "creating": "Vytváření...",
+        "create": "Vytvořit"
+      }
+    },
+    "meta": {
+      "title": "Metadata",
+      "edit": "Upravit",
+      "cancel": "Zrušit",
+      "save": "Uložit",
+      "saving": "Ukládání...",
+      "saveAnyway": "Přesto uložit",
+      "revertLabels": "Vrátit štítky",
+      "owner": "Vlastník",
+      "ownerNone": "Žádný",
+      "ownerPlaceholder": "user@example.com",
+      "labels": "Štítky"
+    },
+    "moduleDetail": {
+      "notFound": "Modul nenalezen",
+      "loadFailed": "Nepodařilo se načíst modul",
+      "updateFailed": "Nepodařilo se aktualizovat modul",
+      "labelLockoutDefault": "Tato změna štítků by omezila váš přístup.",
+      "providerLabel": "Provider: {provider}",
+      "cancel": "Zrušit",
+      "uploadVersion": "Nahrát verzi",
+      "vcsConnected": "VCS připojeno",
+      "connectVcs": "Připojit VCS",
+      "deleteModule": "Smazat modul",
+      "linkFailed": "Nepodařilo se propojit pracovní prostor",
+      "linkFailedStatus": "Propojení selhalo ({status})",
+      "unlinkConfirm": "Odpojit tento pracovní prostor od modulu? Analýza dopadu pro něj již nebude probíhat.",
+      "unlinkFailed": "Nepodařilo se odpojit pracovní prostor",
+      "unlinkFailedStatus": "Odpojení selhalo ({status})",
+      "uploadFailed": "Nahrávání selhalo",
+      "uploadFailedStatus": "Nahrávání selhalo ({status})",
+      "saveVcsFailed": "Nepodařilo se uložit konfiguraci VCS",
+      "saveVcsFailedStatus": "Nepodařilo se uložit konfiguraci VCS ({status})",
+      "disableVcsFailed": "Nepodařilo se zakázat VCS",
+      "disableVcsFailedStatus": "Nepodařilo se zakázat VCS ({status})",
+      "deleteFailed": "Smazání selhalo",
+      "deleteFailedStatus": "Smazání selhalo ({status})",
+      "upload": {
+        "intro": "Vyberte adresář obsahující soubory vašeho Terraform modulu. Budou zabaleny do tarballu a nahrány.",
+        "version": "Verze",
+        "moduleDirectory": "Adresář modulu",
+        "selectDirectory": "Vybrat adresář",
+        "fileCount": "{count, plural, one {# soubor} few {# soubory} many {# souboru} other {# souborů}}",
+        "filesToInclude": "{count, plural, one {# soubor k zahrnutí:} few {# soubory k zahrnutí:} many {# souboru k zahrnutí:} other {# souborů k zahrnutí:}}",
+        "andMore": "...a {count} dalších",
+        "uploading": "Nahrávání...",
+        "upload": "Nahrát"
+      },
+      "vcs": {
+        "intro": "Připojte tento modul k VCS repozitáři. Nové verze se publikují automaticky při pushnutí semver tagů odpovídajících vzoru tagů. Samotné commity do větve verze nevytvářejí.",
+        "connection": "VCS připojení",
+        "selectConnection": "Vyberte připojení...",
+        "repositoryUrl": "URL repozitáře",
+        "branchOptional": "Větev (volitelné)",
+        "branchPlaceholder": "main (ponechte prázdné pro výchozí)",
+        "tagPattern": "Vzor tagů",
+        "tagPatternHint": "Verze vytvářejí pouze tagy odpovídající tomuto vzoru (např. v1.0.0)",
+        "saving": "Ukládání...",
+        "saveConfiguration": "Uložit konfiguraci VCS",
+        "disconnect": "Odpojit VCS"
+      },
+      "vcsStatus": {
+        "connected": "VCS připojeno:",
+        "lastTag": "Poslední tag: {tag}",
+        "firstVersionHint": "Pushněte semver tag (např. <code>v1.0.0</code>) odpovídající vzoru tagů pro publikaci první verze."
+      },
+      "links": {
+        "title": "Propojené pracovní prostory",
+        "linkWorkspace": "Propojit pracovní prostor",
+        "description": "Propojené pracovní prostory dostávají spekulativní plány, když jsou proti tomuto modulu otevřeny PR, a standardní běhy při publikaci nových verzí.",
+        "searchPlaceholder": "Vyhledat pracovní prostory k propojení…",
+        "empty": "Zatím nejsou propojeny žádné pracovní prostory.",
+        "unlinkTitle": "Odpojit pracovní prostor"
+      },
+      "interface": {
+        "title": "Vstupy a výstupy",
+        "counts": "{inputs} vstupů, {outputs} výstupů",
+        "versionLabel": "Verze:",
+        "noData": "Pro tuto verzi nejsou k dispozici žádná data rozhraní.",
+        "inputs": "Vstupy",
+        "outputs": "Výstupy",
+        "name": "Název",
+        "type": "Typ",
+        "description": "Popis",
+        "default": "Výchozí",
+        "required": "Povinné",
+        "sensitive": "Citlivé",
+        "requiredBadge": "povinné",
+        "optionalBadge": "volitelné",
+        "sensitiveBadge": "citlivé",
+        "noneDeclared": "Tato verze modulu nedeklaruje žádné vstupy ani výstupy."
+      },
+      "versions": {
+        "title": "Verze",
+        "count": "{count, plural, one {# verze} few {# verze} many {# verze} other {# verzí}}",
+        "emptyVcs": "Zatím žádné verze. Pushněte semver tag odpovídající „{pattern}“ do připojeného repozitáře pro publikaci verze.",
+        "emptyUpload": "Zatím žádné verze. Nahrajte modul nebo připojte VCS a začněte.",
+        "version": "Verze",
+        "status": "Stav",
+        "source": "Zdroj",
+        "actions": "Akce",
+        "manualUpload": "ruční nahrání",
+        "delete": "Smazat"
+      },
+      "deleteDialog": {
+        "title": "Potvrdit smazání",
+        "moduleBody": "Tímto trvale smažete tento modul a všechny jeho verze.",
+        "versionBody": "Tímto trvale smažete verzi {version}.",
+        "cancel": "Zrušit",
+        "confirm": "Smazat"
+      }
+    },
+    "providerDetail": {
+      "description": "Registry providerů",
+      "deleteProvider": "Smazat provider",
+      "publishNote": "Verze providerů se publikují pomocí CLI <code>terrapod-publish</code>, které binární soubory podepisuje na straně klienta. Nahrávání a podepisování binárních souborů providerů z prohlížeče již není podporováno. Tato stránka je pro verze a platformy pouze pro čtení.",
+      "empty": "Zatím žádné verze. Publikujte pomocí CLI terrapod-publish a začněte.",
+      "loadVersionsFailed": "Nepodařilo se načíst verze",
+      "updateFailed": "Nepodařilo se aktualizovat provider",
+      "labelLockoutDefault": "Tato změna štítků by omezila váš přístup.",
+      "deleteFailed": "Smazání selhalo",
+      "deleteFailedStatus": "Smazání selhalo ({status})",
+      "platformCount": "{count, plural, one {# platforma} few {# platformy} many {# platformy} other {# platforem}}",
+      "delete": "Smazat",
+      "os": "OS",
+      "arch": "Arch",
+      "filename": "Název souboru",
+      "actions": "Akce",
+      "deleteDialog": {
+        "title": "Potvrdit smazání",
+        "providerBody": "Tímto trvale smažete tento provider a všechny jeho verze.",
+        "versionBody": "Tímto trvale smažete verzi {version} a její platformy.",
+        "platformBody": "Tímto trvale smažete platformu {os}/{arch}.",
+        "cancel": "Zrušit",
+        "confirm": "Smazat"
+      }
+    }
+  },
+  "adminUsers": {
+    "title": "Uživatelé",
+    "description": "Spravujte lokální uživatelské účty",
+    "empty": "Nenalezeni žádní uživatelé.",
+    "columns": {
+      "email": "E-mail",
+      "displayName": "Zobrazované jméno",
+      "status": "Stav",
+      "lastLogin": "Poslední přihlášení",
+      "created": "Vytvořeno",
+      "actions": "Akce"
+    },
+    "form": {
+      "email": "E-mail",
+      "displayName": "Zobrazované jméno",
+      "displayNamePlaceholder": "Jan Novák",
+      "passwordOptional": "Heslo (volitelné)",
+      "passwordPlaceholder": "Zadejte silné heslo"
+    },
+    "reset": {
+      "title": "Obnovit heslo pro {email}",
+      "newPassword": "Nové heslo"
+    },
+    "password": {
+      "score": {
+        "veryWeak": "Velmi slabé",
+        "weak": "Slabé",
+        "fair": "Přijatelné",
+        "good": "Dobré",
+        "strong": "Silné"
+      }
+    },
+    "status": {
+      "active": "Aktivní",
+      "inactive": "Neaktivní",
+      "never": "Nikdy"
+    },
+    "actions": {
+      "cancel": "Zrušit",
+      "save": "Uložit",
+      "saving": "Ukládání...",
+      "createUser": "Vytvořit uživatele",
+      "creating": "Vytváření...",
+      "resetPassword": "Obnovit heslo",
+      "edit": "Upravit",
+      "delete": "Smazat",
+      "resetPw": "Obnovit heslo",
+      "setPw": "Nastavit heslo",
+      "cancelPw": "Zrušit heslo"
+    },
+    "confirm": {
+      "activate": "Aktivovat uživatele „{email}“?",
+      "deactivate": "Deaktivovat uživatele „{email}“?",
+      "delete": "Smazat uživatele „{email}“? Toto nelze vrátit zpět."
+    },
+    "success": {
+      "created": "Uživatel „{email}“ vytvořen",
+      "updated": "Uživatel „{email}“ aktualizován",
+      "activated": "Uživatel „{email}“ aktivován",
+      "deactivated": "Uživatel „{email}“ deaktivován",
+      "passwordReset": "Heslo obnoveno pro „{email}“",
+      "deleted": "Uživatel „{email}“ smazán"
+    },
+    "errors": {
+      "load": "Nepodařilo se načíst uživatele",
+      "create": "Nepodařilo se vytvořit uživatele",
+      "createStatus": "Nepodařilo se vytvořit uživatele ({status})",
+      "update": "Nepodařilo se aktualizovat uživatele",
+      "resetPassword": "Nepodařilo se obnovit heslo",
+      "delete": "Nepodařilo se smazat uživatele"
+    }
+  },
+  "adminRoles": {
+    "title": "Role a přiřazení",
+    "description": "Spravujte RBAC role a přiřazení rolí uživatelům",
+    "builtIn": "vestavěné",
+    "emptyRoles": "Nejsou definovány žádné role.",
+    "emptyAssignments": "Žádná přiřazení rolí.",
+    "tabs": {
+      "roles": "Role",
+      "assignments": "Přiřazení"
+    },
+    "columns": {
+      "provider": "Poskytovatel",
+      "email": "E-mail",
+      "role": "Role",
+      "created": "Vytvořeno",
+      "actions": "Akce"
+    },
+    "form": {
+      "name": "Název",
+      "namePattern": "Pouze písmena, číslice, pomlčky a podtržítka. Musí začínat písmenem nebo číslicí.",
+      "workspacePermission": "Oprávnění pracovního prostoru",
+      "poolPermission": "Oprávnění fondu",
+      "registryPermission": "Oprávnění registry",
+      "catalogPermission": "Oprávnění katalogu",
+      "descriptionLabel": "Popis",
+      "descriptionPlaceholder": "Přístup vývojáře",
+      "allowLabels": "Povolit štítky (key=value, oddělené čárkou)",
+      "allowNames": "Povolit názvy (oddělené čárkou)",
+      "denyLabels": "Zakázat štítky (key=value, oddělené čárkou)",
+      "denyNames": "Zakázat názvy (oddělené čárkou)",
+      "allowLabelsShort": "Povolit štítky",
+      "allowNamesShort": "Povolit názvy",
+      "denyLabelsShort": "Zakázat štítky",
+      "denyNamesShort": "Zakázat názvy"
+    },
+    "assignForm": {
+      "provider": "Poskytovatel",
+      "email": "E-mail",
+      "roles": "Role"
+    },
+    "caps": {
+      "selected": "vybráno {count, plural, one {# oprávnění} few {# oprávnění} many {# oprávnění} other {# oprávnění}}",
+      "count": "{count, plural, one {# oprávnění} few {# oprávnění} many {# oprávnění} other {# oprávnění}}",
+      "custom": "Vlastní",
+      "matchesPresets": "Odpovídá předvolbám",
+      "advanced": "Pokročilé — oprávnění",
+      "otherPreserved": "Ostatní oprávnění (zachována při uložení)",
+      "presetHelp": {
+        "before": "Výběr předvolby výše předem zaškrtne její oprávnění. Zaškrtnutí nebo odškrtnutí pole nad rámec předvolby označí roli jako",
+        "after": "a její grant se odešle jako explicitní sada oprávnění."
+      },
+      "groups": {
+        "workspace": "Pracovní prostor",
+        "run": "Běh",
+        "state": "Stav",
+        "var": "Proměnné",
+        "config": "Konfigurace",
+        "drift": "Odchýlení",
+        "run-task": "Run tasky",
+        "notification": "Oznámení",
+        "run-trigger": "Run triggery",
+        "pool": "Fondy agentů",
+        "registry": "Registry",
+        "catalog": "Servisní katalog"
+      }
+    },
+    "display": {
+      "allow": "Povolit: {value}",
+      "allowNames": "Povolit názvy: {value}",
+      "deny": "Zakázat: {value}",
+      "denyNames": "Zakázat názvy: {value}"
+    },
+    "actions": {
+      "cancel": "Zrušit",
+      "save": "Uložit",
+      "saving": "Ukládání...",
+      "edit": "Upravit",
+      "delete": "Smazat",
+      "remove": "Odebrat",
+      "createRole": "Vytvořit roli",
+      "creating": "Vytváření...",
+      "addAssignment": "Přidat přiřazení",
+      "setRoles": "Nastavit role"
+    },
+    "confirm": {
+      "deleteRole": "Smazat roli „{name}“? Jsou dotčena všechna přiřazení, která na ni odkazují.",
+      "removeAssignment": "Odebrat roli „{roleName}“ od {email}?"
+    },
+    "success": {
+      "roleCreated": "Role „{name}“ vytvořena",
+      "roleUpdated": "Role „{name}“ aktualizována",
+      "roleDeleted": "Role „{name}“ smazána",
+      "rolesAssigned": "Role přiřazeny uživateli {email}",
+      "assignmentRemoved": "Přiřazení odebráno"
+    },
+    "errors": {
+      "loadRoles": "Nepodařilo se načíst role",
+      "loadAssignments": "Nepodařilo se načíst přiřazení",
+      "createRole": "Nepodařilo se vytvořit roli",
+      "createRoleStatus": "Nepodařilo se vytvořit roli ({status})",
+      "updateRole": "Nepodařilo se aktualizovat roli",
+      "deleteRole": "Nepodařilo se smazat roli",
+      "setAssignment": "Nepodařilo se nastavit přiřazení",
+      "setAssignmentStatus": "Nepodařilo se nastavit přiřazení ({status})",
+      "deleteAssignment": "Nepodařilo se smazat přiřazení"
+    }
+  },
+  "adminVcs": {
+    "title": "VCS připojení",
+    "description": "Spravujte integrace se systémy pro správu verzí",
+    "empty": "Nejsou nakonfigurována žádná VCS připojení.",
+    "actions": {
+      "new": "Nové připojení",
+      "cancel": "Zrušit",
+      "edit": "Upravit",
+      "delete": "Smazat"
+    },
+    "confirmDelete": "Smazat toto VCS připojení? Pracovní prostory, které jej používají, ztratí integraci VCS. Toto nelze vrátit zpět.",
+    "form": {
+      "name": "Název",
+      "namePattern": "Pouze písmena, číslice, pomlčky a podtržítka. Musí začínat písmenem nebo číslicí.",
+      "provider": "Poskytovatel",
+      "providerImmutable": "Poskytovatel je neměnný — pro změnu smažte a znovu vytvořte",
+      "serverUrl": "URL serveru (volitelné)",
+      "serverUrlHint": "Musí být URL adresa HTTP nebo HTTPS (např. https://github.mycompany.com)",
+      "appId": "App ID",
+      "appIdHint": "GitHub App ID — pouze číslice",
+      "installationId": "Installation ID",
+      "installationIdHint": "GitHub App Installation ID — pouze číslice",
+      "privateKey": "Privátní klíč (PEM)",
+      "browse": "Procházet...",
+      "privateKeyKeep": "Ponechte prázdné pro zachování aktuálního klíče — vložte nový PEM pro rotaci",
+      "privateKeyPlaceholder": "-----BEGIN RSA PRIVATE KEY-----\n...\n\nSem přetáhněte soubor .pem nebo klikněte na Procházet",
+      "webhookSecret": "Tajný klíč webhooku",
+      "optional": "(volitelné)",
+      "webhookSecretSet": "Nastaveno — ponechte prázdné pro zachování, zadejte novou hodnotu pro rotaci",
+      "webhookSecretGlobal": "Ponechte prázdné pro použití globálního tajného klíče webhooku",
+      "webhookSecretHelp": "HMAC tajný klíč pro webhooky této instalace, specifický pro dané připojení. Pokud není nastaven, použije se globální tajný klíč.",
+      "accessToken": "Přístupový token",
+      "accessTokenKeep": "Ponechte prázdné pro zachování aktuálního tokenu",
+      "saving": "Ukládání...",
+      "creating": "Vytváření...",
+      "saveChanges": "Uložit změny",
+      "createConnection": "Vytvořit připojení"
+    },
+    "table": {
+      "name": "Název",
+      "provider": "Poskytovatel",
+      "serverUrl": "URL serveru",
+      "status": "Stav",
+      "created": "Vytvořeno",
+      "actions": "Akce"
+    },
+    "success": {
+      "created": "VCS připojení „{name}“ vytvořeno",
+      "updated": "VCS připojení „{name}“ aktualizováno",
+      "deleted": "VCS připojení smazáno"
+    },
+    "errors": {
+      "load": "Nepodařilo se načíst VCS připojení",
+      "save": "Nepodařilo se uložit připojení",
+      "delete": "Nepodařilo se smazat připojení",
+      "createStatus": "Nepodařilo se vytvořit připojení ({status})",
+      "updateStatus": "Nepodařilo se aktualizovat připojení ({status})"
+    }
+  },
+  "adminVariableSets": {
+    "title": "Sady proměnných",
+    "description": "Spravujte sady proměnných v rozsahu organizace pro skupiny pracovních prostorů",
+    "empty": "Nejsou nakonfigurovány žádné sady proměnných.",
+    "none": "-",
+    "actions": {
+      "new": "Nová sada proměnných",
+      "cancel": "Zrušit"
+    },
+    "form": {
+      "name": "Název",
+      "namePattern": "Pouze písmena, číslice, pomlčky a podtržítka. Musí začínat písmenem nebo číslicí.",
+      "descriptionLabel": "Popis",
+      "descriptionPlaceholder": "AWS přihlašovací údaje pro všechny pracovní prostory",
+      "global": "Globální (aplikovat na všechny pracovní prostory)",
+      "priority": "Priorita (přepsat proměnné pracovního prostoru)",
+      "creating": "Vytváření...",
+      "create": "Vytvořit sadu proměnných"
+    },
+    "table": {
+      "name": "Název",
+      "description": "Popis",
+      "scope": "Rozsah",
+      "variables": "Proměnné",
+      "created": "Vytvořeno"
+    },
+    "scope": {
+      "global": "Globální",
+      "priority": "Priorita",
+      "standard": "Standardní"
+    },
+    "errors": {
+      "load": "Nepodařilo se načíst sady proměnných",
+      "create": "Nepodařilo se vytvořit sadu proměnných",
+      "createStatus": "Nepodařilo se vytvořit sadu proměnných ({status})"
+    },
+    "detail": {
+      "back": "Zpět na sady proměnných",
+      "headerFallback": "Sada proměnných",
+      "notFound": "Sada proměnných nenalezena",
+      "global": "Globální",
+      "priority": "Priorita",
+      "yes": "Ano",
+      "no": "Ne",
+      "edit": "Upravit",
+      "cancel": "Zrušit",
+      "save": "Uložit",
+      "saving": "Ukládání...",
+      "delete": "Smazat",
+      "deleting": "Mazání...",
+      "confirmDelete": "Potvrdit smazání",
+      "deleteTitle": "Smazat sadu proměnných",
+      "deleteDescription": "Trvale smazat tuto sadu proměnných a všechny její proměnné.",
+      "tabs": {
+        "settings": "Nastavení",
+        "variables": "Proměnné",
+        "workspaces": "Pracovní prostory"
+      },
+      "addVariable": "Přidat proměnnou",
+      "adding": "Přidávání...",
+      "varKey": "Klíč",
+      "varValue": "Hodnota",
+      "varCategory": "Kategorie",
+      "categoryTerraform": "Terraform",
+      "categoryEnv": "Prostředí",
+      "sensitive": "Citlivé",
+      "sensAbbr": "Citl.",
+      "enterNewValue": "Zadejte novou hodnotu",
+      "empty": "prázdné",
+      "emptyVars": "V této sadě nejsou žádné proměnné.",
+      "actions": "Akce",
+      "remove": "Odebrat",
+      "add": "Přidat",
+      "addWorkspace": "Přidat pracovní prostor",
+      "workspace": "Pracovní prostor",
+      "selectWorkspace": "Vyberte pracovní prostor...",
+      "globalBanner": "Tato sada proměnných je globální a aplikuje se automaticky na všechny pracovní prostory.",
+      "emptyWorkspaces": "K této sadě proměnných nejsou přiřazeny žádné pracovní prostory.",
+      "confirmDeleteVar": "Smazat tuto proměnnou? Toto nelze vrátit zpět.",
+      "confirmRemoveWorkspace": "Odebrat tento pracovní prostor ze sady proměnných? Její proměnné se na tento pracovní prostor přestanou aplikovat.",
+      "success": {
+        "updated": "Sada proměnných aktualizována",
+        "workspaceAdded": "Pracovní prostor přidán",
+        "workspaceRemoved": "Pracovní prostor odebrán"
+      },
+      "errors": {
+        "load": "Nepodařilo se načíst sadu proměnných",
+        "update": "Nepodařilo se aktualizovat sadu proměnných",
+        "delete": "Nepodařilo se smazat sadu proměnných",
+        "loadVars": "Nepodařilo se načíst proměnné",
+        "loadWorkspaces": "Nepodařilo se načíst pracovní prostory",
+        "addVar": "Nepodařilo se přidat proměnnou",
+        "addVarStatus": "Nepodařilo se přidat proměnnou ({status})",
+        "updateVar": "Nepodařilo se aktualizovat proměnnou",
+        "deleteVar": "Nepodařilo se smazat proměnnou",
+        "addWorkspace": "Nepodařilo se přidat pracovní prostor",
+        "removeWorkspace": "Nepodařilo se odebrat pracovní prostor"
+      }
+    }
+  },
+  "adminAutodiscovery": {
+    "title": "Automatické objevování",
+    "description": "Automaticky vytvářejte pracovní prostory v monorepech, když se PR dotknou odpovídajících cest",
+    "empty": "Zatím žádná pravidla automatického objevování. Vytvořte jedno a začněte automaticky zřizovat pracovní prostory z PR ve vašem monorepu.",
+    "unsavedRule": "(neuložené pravidlo)",
+    "actions": {
+      "newRule": "Nové pravidlo",
+      "cancel": "Zrušit",
+      "create": "Vytvořit",
+      "update": "Aktualizovat",
+      "preview": "Náhled",
+      "edit": "Upravit",
+      "delete": "Smazat",
+      "close": "Zavřít"
+    },
+    "status": {
+      "enabled": "povoleno",
+      "disabled": "zakázáno"
+    },
+    "form": {
+      "createTitle": "Vytvořit pravidlo",
+      "editTitle": "Upravit pravidlo",
+      "name": "Název",
+      "vcsConnection": "VCS připojení",
+      "selectConnection": "Vyberte připojení",
+      "repoUrl": "URL repozitáře",
+      "branch": "Větev (prázdné = výchozí)",
+      "matchPattern": "Vzor shody",
+      "matchPatternHint": "Globy ve stylu gitignore. <code>**</code> odpovídá napříč segmenty cesty. Automatické objevování spouštějí pouze soubory <code>*.tf*</code>.",
+      "ignorePatterns": "Ignorované vzory (jeden na řádek)",
+      "nameTemplate": "Šablona názvu pracovního prostoru (volitelné)",
+      "nameTemplateHint": "Použijte <path></path> pro adresář s <code>/</code> nahrazeným <code>-</code>, nebo <root></root> pro adresář tak, jak je. Prázdné = výchozí (jen cesta s pomlčkami).",
+      "templateDefaults": "Výchozí hodnoty šablony pracovního prostoru",
+      "executionMode": "Režim provádění",
+      "executionModeHint": "Automatické objevování je řízeno VCS; podporováno je pouze provádění agentem.",
+      "agentPool": "Fond agentů",
+      "none": "(žádný)",
+      "executionBackend": "Prováděcí backend",
+      "terraformVersion": "Verze Terraform",
+      "cpuRequest": "Požadavek CPU",
+      "memoryRequest": "Požadavek paměti",
+      "ownerEmail": "E-mail vlastníka",
+      "autoApply": "Automatické použití",
+      "enabled": "Povoleno",
+      "onDirectoryDelete": "Při smazání adresáře",
+      "onDeleteFlag": "Označit (bezpečné — označit čekající smazání, vyžaduje ruční akci)",
+      "onDeleteDestroy": "Zničit (NEBEZPEČÍ — zbourá infrastrukturu a poté archivuje pracovní prostor)",
+      "onDirectoryDeleteHint": "Co se stane s automaticky objeveným pracovním prostorem, když je jeho adresář odstraněn ve sledované větvi.",
+      "onDeleteDestroyWarning": "Toto spustí skutečný terraform destroy na pracovním prostoru, když je jeho adresář odstraněn ve sledované větvi.",
+      "labels": "Štítky (zděděné vytvořenými pracovními prostory)",
+      "varFiles": "Var soubory (zděděné vytvořenými pracovními prostory)",
+      "varFilesHint": "Relativní cesty <code>.tfvars</code> předané do plan/apply.",
+      "addVarFile": "Přidat var soubor",
+      "executionHooks": "Prováděcí háčky (přiřazené každému novému pracovnímu prostoru)",
+      "executionHooksHint": "Vyberte z háčků definovaných na admin stránce <page>Prováděcí háčky</page> — každý vybraný háček je přiřazen každému pracovnímu prostoru, který toto pravidlo vytvoří.",
+      "noHooks": "Zatím nejsou definovány žádné prováděcí háčky. Nejprve vytvořte jeden na admin stránce Prováděcí háčky.",
+      "hookDisabled": "(zakázáno)",
+      "hookNotInLibrary": "(není v knihovně — odškrtněte pro odebrání)",
+      "runTaskTemplates": "Šablony run tasků (vytvořené na každém novém pracovním prostoru)",
+      "notificationTemplates": "Šablony oznámení (vytvořené na každém novém pracovním prostoru)",
+      "saving": "Ukládání...",
+      "previewTitle": "Projděte repozitář a zobrazte náhled, které pracovní prostory by toto pravidlo VYTVOŘILO — bez uložení"
+    },
+    "table": {
+      "name": "Název",
+      "repo": "Repozitář",
+      "pattern": "Vzor",
+      "enabled": "Povoleno",
+      "created": "Vytvořeno",
+      "previewTitle": "Projděte repozitář a zobrazte náhled, které pracovní prostory by toto pravidlo vytvořilo"
+    },
+    "deleteModal": {
+      "title": "Smazat pravidlo?",
+      "body": "Pracovní prostory automaticky vytvořené tímto pravidlem budou dále fungovat. Budoucí PR dotýkající se nových cest v rámci tohoto pravidla již automaticky nevytvoří další pracovní prostory."
+    },
+    "preview": {
+      "title": "Náhled: {ruleName}",
+      "walkedFiles": "Prošlo <files>{count}</files> souborů na <refspan>{ref}</refspan>",
+      "walking": "Procházení repozitáře…",
+      "noMatches": "Žádné adresáře v tomto repozitáři neodpovídají vzoru pravidla. Není co vytvářet.",
+      "colWorkspace": "Pracovní prostor",
+      "colDirectory": "Adresář",
+      "colAction": "Akce",
+      "repoRoot": "(kořen repozitáře)",
+      "actionCreate": "Vytvořit",
+      "skipDiscovered": "Přeskočit (již objeveno)",
+      "skipDiscoveredTitle": "Již vytvořeno tímto pravidlem",
+      "skipCollision": "Přeskočit (kolize názvů)",
+      "skipCollisionTitle": "Pracovní prostor s tímto názvem již existuje z jiného důvodu",
+      "willCreate": "{count, plural, one {Bude vytvořen # pracovní prostor.} few {Budou vytvořeny # pracovní prostory.} many {Bude vytvořeno # pracovního prostoru.} other {Bude vytvořeno # pracovních prostorů.}} Stávající pracovní prostory (kolize) zůstávají nedotčeny.",
+      "provision": "{count, plural, one {Zřídit # pracovní prostor} few {Zřídit # pracovní prostory} many {Zřídit # pracovního prostoru} other {Zřídit # pracovních prostorů}}",
+      "provisioning": "Zřizování…",
+      "saveToProvision": "Uložte pravidlo pro zřízení těchto pracovních prostorů."
+    },
+    "success": {
+      "created": "Vytvořeno {name}",
+      "updated": "Aktualizováno {name}",
+      "deleted": "Pravidlo smazáno",
+      "provisioned": "{count, plural, one {Vytvořen # pracovní prostor z „{ruleName}“} few {Vytvořeny # pracovní prostory z „{ruleName}“} many {Vytvořeno # pracovního prostoru z „{ruleName}“} other {Vytvořeno # pracovních prostorů z „{ruleName}“}}"
+    },
+    "errors": {
+      "loadRules": "Nepodařilo se načíst pravidla automatického objevování",
+      "load": "Nepodařilo se načíst",
+      "createFailed": "Vytvoření selhalo: {status} {detail}",
+      "updateFailed": "Aktualizace selhala: {status} {detail}",
+      "save": "Nepodařilo se uložit",
+      "deleteRule": "Nepodařilo se smazat pravidlo",
+      "delete": "Nepodařilo se smazat",
+      "previewFailed": "Náhled selhal ({status})",
+      "preview": "Náhled selhal",
+      "previewPrereq": "Před náhledem nastavte VCS připojení, URL repozitáře a vzor",
+      "scanFailed": "Sken selhal ({status})",
+      "scan": "Sken selhal"
+    }
+  },
+  "adminBulkUpdate": {
+    "title": "Hromadná aktualizace",
+    "description": "Vyberte pracovní prostory pomocí filtru a poté napříč všemi aplikujte změnu nastavení",
+    "none": "(žádný)",
+    "anyOption": "(jakýkoli)",
+    "unchanged": "(beze změny)",
+    "unchangedOption": "(beze změny)",
+    "filter": {
+      "heading": "1. Vyberte pracovní prostory",
+      "matchAll": "Odpovídat <strong>všem</strong> pracovním prostorům (ignoruje filtry níže)",
+      "namePrefix": "Prefix názvu",
+      "executionBackend": "Prováděcí backend",
+      "ownerEmail": "E-mail vlastníka",
+      "agentPool": "Fond agentů",
+      "vcsConnection": "VCS připojení",
+      "labels": "Štítky",
+      "search": "Hledat",
+      "searching": "Hledání..."
+    },
+    "results": {
+      "matched": "Odpovídá <strong>{count}</strong> {count, plural, one {pracovní prostor} few {pracovní prostory} many {pracovního prostoru} other {pracovních prostorů}}.",
+      "noMatch": "Tomuto filtru neodpovídají žádné pracovní prostory.",
+      "colName": "Název",
+      "colMode": "Režim",
+      "colBackend": "Backend",
+      "colTfVersion": "Verze TF",
+      "colLabels": "Štítky"
+    },
+    "update": {
+      "heading": "2. Aplikujte změny",
+      "hint": "Změní se pouze pole, která níže nastavíte. Filtr výše vybírá, které pracovní prostory změnu obdrží.",
+      "terraformVersion": "Verze Terraform",
+      "executionBackend": "Prováděcí backend",
+      "executionMode": "Režim provádění",
+      "autoApply": "Automatické použití",
+      "agentPool": "Fond agentů",
+      "cpuRequest": "Požadavek CPU",
+      "memoryRequest": "Požadavek paměti",
+      "setLabels": "Nastavit štítky (nahradí mapu štítků na každém odpovídajícím pracovním prostoru)",
+      "setVarFiles": "Nastavit var soubory",
+      "addVarFile": "Přidat var soubor",
+      "setRunTasks": "Nastavit run tasky (upsertovány podle názvu na každém odpovídajícím pracovním prostoru)",
+      "setNotifications": "Nastavit konfigurace oznámení (upsertovány podle názvu)",
+      "dryRun": "Zkušební běh (pouze náhled — žádné změny nezapsány)",
+      "confirmWarning": "Toto zapisuje změny do každého odpovídajícího pracovního prostoru.",
+      "confirmApply": "Potvrdit použití",
+      "applying": "Aplikování...",
+      "cancel": "Zrušit",
+      "working": "Pracuji...",
+      "previewDryRun": "Náhled (zkušební běh)",
+      "applyChanges": "Aplikovat změny"
+    },
+    "diff": {
+      "colWorkspace": "Pracovní prostor",
+      "colChanges": "Změny"
+    },
+    "dryResult": {
+      "heading": "Výsledek zkušebního běhu",
+      "summary": "Odpovídá <strong>{matched}</strong>; <strong>{wouldChange}</strong> by se změnilo; {unchanged} beze změny. Nic nebylo zapsáno.",
+      "wouldChange": "Změnilo by se",
+      "noChange": "Touto aktualizací by se nezměnily žádné pracovní prostory."
+    },
+    "applyResult": {
+      "heading": "Výsledek použití",
+      "summary": "Odpovídá <strong>{matched}</strong>; <appliedstrong>{applied}</appliedstrong> aplikováno; {unchanged} beze změny; {errors, plural, one {# chyba} few {# chyby} many {# chyby} other {# chyb}}.",
+      "applied": "Aplikováno",
+      "unnamedWorkspace": "(pracovní prostor)",
+      "noChange": "Žádné pracovní prostory se nezměnily."
+    },
+    "errors": {
+      "searchFailed": "Hledání selhalo ({status})",
+      "search": "Hledání selhalo",
+      "bulkUpdateFailed": "Hromadná aktualizace selhala ({status})",
+      "bulkUpdate": "Hromadná aktualizace selhala"
+    }
+  },
+  "adminExecutionHooks": {
+    "title": "Prováděcí háčky",
+    "description": "Vlastní shellové kroky spouštěné uvnitř runner Jobů v bodech pre/post-plan/apply, přiřazené k pracovním prostorům",
+    "empty": "Nejsou nakonfigurovány žádné prováděcí háčky.",
+    "actions": {
+      "cancel": "Zrušit",
+      "new": "Nový prováděcí háček",
+      "creating": "Vytváření...",
+      "create": "Vytvořit prováděcí háček"
+    },
+    "badges": {
+      "disabled": "Zakázáno",
+      "enabled": "Povoleno"
+    },
+    "columns": {
+      "name": "Název",
+      "hookPoint": "Bod háčku",
+      "enabled": "Povoleno",
+      "priority": "Priorita",
+      "workspaces": "Pracovní prostory"
+    },
+    "form": {
+      "name": "Název",
+      "namePatternTitle": "Pouze písmena, číslice, pomlčky a podtržítka. Musí začínat písmenem nebo číslicí.",
+      "description": "Popis",
+      "descriptionPlaceholder": "Přidat záznam interního hostitele před init",
+      "hookPoint": "Bod háčku",
+      "priority": "Priorita",
+      "priorityTitle": "Nižší se spouští dříve, když sdílí bod několik háčků (shody se řeší podle názvu).",
+      "scriptLabel": "Skript (<code>/bin/sh -c</code>)",
+      "scriptHelp": "Spouští se s cloud identitou runneru. Nenulový návratový kód selže běh. Tajné klíče by měly pocházet z proměnných pracovního prostoru, nikoli být uvedeny inline zde."
+    },
+    "errors": {
+      "load": "Nepodařilo se načíst prováděcí háčky",
+      "createStatus": "Nepodařilo se vytvořit prováděcí háček ({status})",
+      "create": "Nepodařilo se vytvořit prováděcí háček"
+    }
+  },
+  "adminPolicySets": {
+    "title": "Sady zásad",
+    "description": "Vynucování OPA policy-as-code, omezené na pracovní prostory podle štítku",
+    "empty": "Nejsou nakonfigurovány žádné sady zásad.",
+    "actions": {
+      "cancel": "Zrušit",
+      "new": "Nová sada zásad",
+      "creating": "Vytváření...",
+      "create": "Vytvořit sadu zásad"
+    },
+    "badges": {
+      "disabled": "Zakázáno",
+      "mandatory": "Povinné",
+      "advisory": "Doporučující",
+      "global": "Globální",
+      "labelScoped": "Omezeno štítkem"
+    },
+    "columns": {
+      "name": "Název",
+      "description": "Popis",
+      "enforcement": "Vynucování",
+      "scope": "Rozsah",
+      "policies": "Zásady"
+    },
+    "form": {
+      "name": "Název",
+      "namePatternTitle": "Pouze písmena, číslice, pomlčky a podtržítka. Musí začínat písmenem nebo číslicí.",
+      "description": "Popis",
+      "descriptionPlaceholder": "Povinná ochranná pravidla pro produkční pracovní prostory",
+      "enforcement": "Vynucování",
+      "enforcementAdvisory": "Doporučující (varovat, neblokovat)",
+      "enforcementMandatory": "Povinné (blokovat apply při selhání)",
+      "globalScope": "Globální (aplikovat na každý pracovní prostor)",
+      "sourceInline": "Inline (spravovat zásady v UI)",
+      "sourceVcs": "Z VCS repozitáře",
+      "vcsConnection": "VCS připojení",
+      "selectConnection": "Vyberte připojení...",
+      "repoUrl": "URL repozitáře",
+      "branch": "Větev",
+      "branchPlaceholder": "main (výchozí)",
+      "policyPath": "Cesta k zásadám",
+      "policyPathPlaceholder": "policies/ (adresář obsahující soubory .rego)",
+      "helpVcs": "Zásady budou automaticky synchronizovány z repozitáře.",
+      "helpInline": "Zásady přidejte a upřesněte omezení štítky po vytvoření sady."
+    },
+    "errors": {
+      "load": "Nepodařilo se načíst sady zásad",
+      "createStatus": "Nepodařilo se vytvořit sadu zásad ({status})",
+      "create": "Nepodařilo se vytvořit sadu zásad"
+    }
+  },
+  "adminCatalog": {
+    "title": "Správa katalogu",
+    "description": "Spravujte položky servisního katalogu",
+    "notEnabled": "Servisní katalog není povolen.",
+    "empty": "Zatím žádné položky katalogu.",
+    "actions": {
+      "new": "Nová položka katalogu",
+      "cancel": "Zrušit",
+      "create": "Vytvořit položku katalogu",
+      "creating": "Vytváření…",
+      "saveChanges": "Uložit změny",
+      "saving": "Ukládání…",
+      "edit": "Upravit",
+      "delete": "Smazat"
+    },
+    "form": {
+      "name": "Název",
+      "nameTitle": "Pouze písmena, číslice, pomlčky a podtržítka. Musí začínat písmenem nebo číslicí.",
+      "module": "Modul",
+      "moduleSelect": "Vyberte modul…",
+      "moduleImmutable": "Modul je po vytvoření neměnný",
+      "displayName": "Zobrazovaný název",
+      "displayNamePlaceholder": "Standardní S3 Bucket",
+      "versionPin": "Výchozí připnutí verze",
+      "versionPinPlaceholder": "např. 1.2.0 (prázdné = nejnovější)",
+      "descriptionLabel": "Popis",
+      "descriptionPlaceholder": "Co tato položka katalogu zřizuje…",
+      "enabled": "Povoleno (viditelné v procházeném katalogu)",
+      "providerTemplates": "Šablony providerů",
+      "noProviderTemplates": "Nejsou definovány žádné šablony providerů.",
+      "restrictPools": "Omezit na konkrétní fondy agentů",
+      "noAgentPools": "Nejsou k dispozici žádné fondy agentů.",
+      "anyPool": "Lze použít libovolný fond agentů.",
+      "labels": "Štítky",
+      "variableOptions": "Možnosti proměnných (pokročilé, JSON)",
+      "variableOptionsHint": "Přepisy pro jednotlivé vstupy (options, hidden, default). Ponechte jako <code>[]</code>, pokud se nepoužívá."
+    },
+    "table": {
+      "name": "Název",
+      "module": "Modul",
+      "enabled": "Povoleno",
+      "actions": "Akce"
+    },
+    "badge": {
+      "enabled": "povoleno",
+      "disabled": "zakázáno"
+    },
+    "confirm": {
+      "delete": "Smazat tuto položku katalogu? Stávající zřízené instance nejsou dotčeny."
+    },
+    "success": {
+      "created": "Položka katalogu „{name}“ vytvořena",
+      "updated": "Položka katalogu „{name}“ aktualizována",
+      "deleted": "Položka katalogu smazána"
+    },
+    "errors": {
+      "load": "Nepodařilo se načíst položky katalogu",
+      "save": "Nepodařilo se uložit položku katalogu",
+      "createStatus": "Nepodařilo se vytvořit položku katalogu ({status})",
+      "updateStatus": "Nepodařilo se aktualizovat položku katalogu ({status})",
+      "delete": "Nepodařilo se smazat položku katalogu",
+      "deleteConflict": "Nelze smazat: tato položka katalogu má zřízené instance.",
+      "varOptsInvalidJson": "Možnosti proměnných musí být platný JSON (pole).",
+      "varOptsNotArray": "Možnosti proměnných musí být JSON pole."
+    }
+  },
+  "adminProviderTemplates": {
+    "title": "Šablony providerů",
+    "description": "Znovupoužitelné bloky konfigurace providerů pro položky katalogu",
+    "notEnabled": "Servisní katalog není povolen.",
+    "empty": "Zatím žádné šablony providerů.",
+    "actions": {
+      "new": "Nová šablona",
+      "cancel": "Zrušit",
+      "create": "Vytvořit šablonu",
+      "creating": "Vytváření…",
+      "saveChanges": "Uložit změny",
+      "saving": "Ukládání…",
+      "edit": "Upravit",
+      "delete": "Smazat"
+    },
+    "form": {
+      "name": "Název",
+      "providerType": "Typ provideru",
+      "body": "Tělo (HCL)",
+      "parameters": "Parametry (pokročilé, JSON)",
+      "parametersHint": "Každý parametr se stane polem zřizovacího formuláře. Ponechte jako <code>[]</code>, pokud se nepoužívá.",
+      "labels": "Štítky"
+    },
+    "table": {
+      "name": "Název",
+      "providerType": "Typ provideru",
+      "parameters": "Parametry",
+      "actions": "Akce"
+    },
+    "confirm": {
+      "delete": "Smazat tuto šablonu provideru? Položky katalogu, které na ni odkazují, se nepodaří zřídit. Toto nelze vrátit zpět."
+    },
+    "success": {
+      "created": "Šablona provideru „{name}“ vytvořena",
+      "updated": "Šablona provideru „{name}“ aktualizována",
+      "deleted": "Šablona provideru smazána"
+    },
+    "errors": {
+      "load": "Nepodařilo se načíst šablony providerů",
+      "save": "Nepodařilo se uložit šablonu provideru",
+      "createStatus": "Nepodařilo se vytvořit šablonu ({status})",
+      "updateStatus": "Nepodařilo se aktualizovat šablonu ({status})",
+      "delete": "Nepodařilo se smazat šablonu provideru",
+      "deleteConflict": "Nelze smazat: na tuto šablonu odkazuje položka katalogu.",
+      "paramsInvalidJson": "Parametry musí být platný JSON (pole).",
+      "paramsNotArray": "Parametry musí být JSON pole."
+    }
+  },
+  "adminAgentPools": {
+    "title": "Fondy agentů",
+    "description": "Spravujte fondy runner agentů a jejich listenery",
+    "empty": "Nejsou nakonfigurovány žádné fondy agentů.",
+    "actions": {
+      "newPool": "Nový fond",
+      "createPool": "Vytvořit fond",
+      "creating": "Vytváření...",
+      "cancel": "Zrušit",
+      "edit": "Upravit",
+      "save": "Uložit",
+      "saving": "Ukládání...",
+      "delete": "Smazat",
+      "deleting": "Mazání...",
+      "confirmDelete": "Potvrdit smazání"
+    },
+    "form": {
+      "name": "Název",
+      "namePattern": "Pouze písmena, číslice, pomlčky a podtržítka. Musí začínat písmenem nebo číslicí.",
+      "description": "Popis",
+      "descriptionPlaceholder": "Produkční AWS runnery",
+      "labels": "Štítky"
+    },
+    "columns": {
+      "name": "Název",
+      "description": "Popis",
+      "status": "Stav",
+      "created": "Vytvořeno"
+    },
+    "badges": {
+      "default": "výchozí",
+      "degradedTooltip": "Listenery posílají heartbeaty, ale jejich certifikáty vypršely — spuštění běhů selže.",
+      "status": {
+        "online": "online",
+        "offline": "offline",
+        "degraded": "degradováno"
+      }
+    },
+    "detail": {
+      "back": "Zpět na fondy agentů",
+      "defaultDescription": "Fond agentů"
+    },
+    "tabs": {
+      "settings": "Nastavení",
+      "tokens": "Tokeny",
+      "listeners": "Listenery"
+    },
+    "settings": {
+      "title": "Nastavení fondu",
+      "fields": {
+        "name": "Název",
+        "description": "Popis",
+        "created": "Vytvořeno",
+        "owner": "Vlastník",
+        "yourPermission": "Vaše oprávnění",
+        "labels": "Štítky"
+      },
+      "permissions": {
+        "read": "čtení",
+        "write": "zápis",
+        "admin": "správce"
+      }
+    },
+    "danger": {
+      "title": "Smazat fond",
+      "description": "Trvale smazat tento fond agentů a všechny přidružené tokeny."
+    },
+    "tokens": {
+      "create": "Vytvořit token",
+      "empty": "Žádné tokeny pro tento fond.",
+      "revoke": "Odvolat",
+      "created": {
+        "title": "Token úspěšně vytvořen",
+        "copyNow": "Zkopírujte tento token nyní — už se znovu nezobrazí.",
+        "copy": "Kopírovat"
+      },
+      "form": {
+        "description": "Popis",
+        "descriptionPlaceholder": "Token produkčního listeneru",
+        "maxUses": "Maximum použití",
+        "maxUsesHint": "Výchozí 2 — toleruje jedno opakování při bootstrap-race napříč replikami listeneru.",
+        "expiresAt": "Vyprší v",
+        "expiresAtHint": "Výchozí 1 hodina od teď."
+      },
+      "columns": {
+        "description": "Popis",
+        "uses": "Použití",
+        "expires": "Vyprší",
+        "status": "Stav",
+        "createdBy": "Vytvořil",
+        "actions": "Akce"
+      },
+      "badges": {
+        "revoked": "Odvoláno",
+        "active": "Aktivní"
+      }
+    },
+    "listeners": {
+      "empty": "Pro tento fond nejsou registrovány žádné listenery.",
+      "columns": {
+        "name": "Název",
+        "status": "Stav",
+        "replicas": "Repliky",
+        "certExpires": "Certifikát vyprší",
+        "actions": "Akce"
+      },
+      "status": {
+        "online": "online",
+        "offline": "offline",
+        "degraded": "degradováno",
+        "cert-expired": "certifikát vypršel"
+      },
+      "tooltips": {
+        "certExpired": "Listener posílá heartbeaty, ale jeho certifikát vypršel — každé volání ověřené certifikátem (claim run, obnovení, runner-token) selže. Nejpravděpodobnější příčina: API nikdy neregistrovalo nejnovější certifikát, nebo TTL certifikátu uplynulo před obnovením.",
+        "degraded": "Listenery posílají heartbeaty, ale jejich certifikáty vypršely — spuštění běhů selže."
+      }
+    },
+    "confirm": {
+      "revokeToken": "Odvolat tento token pro připojení? Listenery, které jej používají, se již nemohou připojit, a toto nelze vrátit zpět.",
+      "deleteListener": "Smazat tento listener? Znovu se zaregistruje při dalším heartbeatu, pokud pod stále běží."
+    },
+    "success": {
+      "poolUpdated": "Fond aktualizován",
+      "tokenRevoked": "Token odvolán",
+      "listenerDeleted": "Listener smazán"
+    },
+    "errors": {
+      "loadPools": "Nepodařilo se načíst fondy agentů",
+      "loadPool": "Nepodařilo se načíst fond",
+      "loadTokens": "Nepodařilo se načíst tokeny",
+      "loadListeners": "Nepodařilo se načíst listenery",
+      "createPool": "Nepodařilo se vytvořit fond",
+      "createStatus": "Nepodařilo se vytvořit fond ({status})",
+      "updatePool": "Nepodařilo se aktualizovat fond",
+      "deletePool": "Nepodařilo se smazat fond",
+      "poolNotFound": "Fond nenalezen",
+      "createToken": "Nepodařilo se vytvořit token",
+      "createTokenStatus": "Nepodařilo se vytvořit token ({status})",
+      "revokeToken": "Nepodařilo se odvolat token",
+      "deleteListener": "Nepodařilo se smazat listener"
+    }
+  },
+  "adminAuditLog": {
+    "title": "Auditní log",
+    "description": "Neměnný log všech API požadavků",
+    "empty": "Nebyly nalezeny žádné záznamy auditního logu.",
+    "errors": {
+      "load": "Nepodařilo se načíst auditní log"
+    },
+    "filters": {
+      "actorEmail": "E-mail aktéra",
+      "actorPlaceholder": "user@example.com",
+      "resourceType": "Typ prostředku",
+      "resourceTypePlaceholder": "workspaces",
+      "method": "Metoda",
+      "methodAll": "Vše",
+      "since": "Od",
+      "until": "Do",
+      "clear": "Vymazat",
+      "apply": "Použít filtry"
+    },
+    "columns": {
+      "timestamp": "Časové razítko",
+      "actor": "Aktér",
+      "action": "Akce",
+      "resourceType": "Typ prostředku",
+      "resourceId": "ID prostředku",
+      "status": "Stav",
+      "duration": "Doba trvání"
+    },
+    "pagination": {
+      "summary": "Stránka {current} z {total} ({count, plural, one {# záznam} few {# záznamy} many {# záznamu} other {# záznamů}})",
+      "previous": "Předchozí",
+      "next": "Další"
+    }
+  },
+  "adminBinaryCache": {
+    "title": "Cache",
+    "description": "Správa cache CLI binárních souborů a providerů",
+    "errors": {
+      "loadBinary": "Nepodařilo se načíst cache binárních souborů",
+      "loadCache": "Nepodařilo se načíst cache"
+    },
+    "sections": {
+      "cliBinaries": "CLI binární soubory",
+      "providerBinaries": "Binární soubory providerů"
+    },
+    "empty": {
+      "binaries": "Zatím žádné cachované CLI binární soubory.",
+      "providers": "Zatím žádné cachované binární soubory providerů."
+    },
+    "columns": {
+      "tool": "Nástroj",
+      "version": "Verze",
+      "os": "OS",
+      "arch": "Arch",
+      "cachedAt": "Cachováno v",
+      "provider": "Provider",
+      "hostname": "Hostname",
+      "actions": "Akce"
+    },
+    "warm": {
+      "heading": "Předehřát cache",
+      "hide": "Skrýt",
+      "prePopulate": "Předvyplnit…",
+      "help": "Předstáhněte binární soubory a platformy providerů do cache (jeden na řádek). Koncové tokeny <code>os/arch</code> jsou volitelné — vynechte je pro použití nakonfigurovaných výchozích platforem.",
+      "binariesLabel": "Binární soubory",
+      "providersLabel": "Provideři",
+      "warm": "Předehřát",
+      "warming": "Předehřívání…",
+      "confirm": "Předehřát nyní vybrané položky cache?",
+      "errorEmpty": "Přidejte alespoň jeden řádek binárního souboru nebo provideru k předehřátí.",
+      "errorFailedStatus": "Předehřátí selhalo ({status})",
+      "errorFailed": "Nepodařilo se předehřát cache",
+      "success": "Předehřáto {succeeded}/{total} ({failed} selhalo)"
+    },
+    "purge": {
+      "button": "Vymazat",
+      "confirmBinary": "Vymazat {tool} {version} z cache? Při dalším požadavku bude znovu stažen z upstreamu.",
+      "confirmProvider": "Vymazat {provider} {version} z cache providerů? Při dalším požadavku bude znovu stažen z upstreamu.",
+      "successBinary": "Vymazáno {count} záznamů pro {tool} {version}",
+      "successProvider": "Vymazáno {count} záznamů pro {provider} {version}",
+      "errorStatus": "Vymazání selhalo ({status})",
+      "error": "Nepodařilo se vymazat",
+      "errorProvider": "Nepodařilo se vymazat provider",
+      "errorProviders": "Nepodařilo se vymazat providery"
+    },
+    "batchPurge": {
+      "purging": "Mazání...",
+      "purgeSelected": "Vymazat vybrané ({count})",
+      "confirmBinary": "Vymazat všechny vybrané záznamy cache binárních souborů? Při dalším požadavku budou znovu staženy z upstreamu.",
+      "confirmProvider": "Vymazat všechny vybrané záznamy cache providerů? Při dalším požadavku budou znovu staženy z upstreamu.",
+      "errorBinaryItem": "Vymazání selhalo pro {tool} {version}",
+      "errorProviderItem": "Vymazání selhalo pro {provider} {version}",
+      "successBinary": "Vymazáno {count} záznamů cache binárních souborů",
+      "successProvider": "Vymazáno {count} záznamů cache providerů"
+    }
+  },
+  "catalog": {
+    "title": "Servisní katalog",
+    "description": "Zřizujte self-service infrastrukturu z pečlivě vybraných modulů",
+    "notEnabled": "Servisní katalog není povolen.",
+    "empty": "Nejsou k dispozici žádné položky katalogu.",
+    "card": {
+      "pinned": "připnuto {version}",
+      "latest": "nejnovější"
+    },
+    "errors": {
+      "loadItems": "Nepodařilo se načíst položky katalogu"
+    }
+  },
+  "catalogDetail": {
+    "backLink": "← Katalog",
+    "backToCatalog": "Zpět na katalog",
+    "fallbackTitle": "Položka katalogu",
+    "notFound": "Položka katalogu nenalezena, nebo servisní katalog není povolen.",
+    "common": {
+      "cancel": "Zrušit"
+    },
+    "info": {
+      "module": "Modul:",
+      "resolvedVersion": "Vyřešená verze:",
+      "latest": "nejnovější",
+      "disabled": "zakázáno"
+    },
+    "pending": {
+      "banner": "Běh pro <strong>{name}</strong> je naplánován a čeká na kontrolu. Potvrďte pro aplikaci, nebo zahoďte.",
+      "working": "Pracuji…",
+      "confirmApply": "Potvrdit a aplikovat",
+      "discard": "Zahodit"
+    },
+    "field": {
+      "select": "Vybrat…"
+    },
+    "provision": {
+      "title": "Zřídit",
+      "workspaceName": "Název pracovního prostoru",
+      "workspaceNameTitle": "Pouze písmena, číslice, pomlčky a podtržítka. Musí začínat písmenem nebo číslicí.",
+      "workspaceNamePlaceholder": "my-instance",
+      "agentPool": "Fond agentů",
+      "selectPool": "Vyberte fond…",
+      "noPoolsAvailable": "Nejsou vám k dispozici žádné fondy agentů. Ke zřízení potřebujete přístup k zápisu do fondu agentů — požádejte administrátora o jeho udělení.",
+      "noPoolsAllowed": "Žádný z fondů agentů, ke kterým máte přístup, není touto položkou katalogu povolen. Požádejte administrátora o rozšíření povolených fondů položky nebo o udělení přístupu k jednomu z nich.",
+      "version": "Verze",
+      "latestFloat": "Nejnovější (plovoucí)",
+      "defaultPinOption": "{version} (výchozí připnutí)",
+      "labelsOptional": "Štítky (volitelné)",
+      "autoApplyHint": "Automatické použití aplikuje změny bez kroku ruční kontroly.",
+      "provisioning": "Zřizování…",
+      "submit": "Zřídit"
+    },
+    "instances": {
+      "title": "Instance",
+      "empty": "Z této položky zatím nebyly zřízeny žádné instance.",
+      "colName": "Název",
+      "colVersion": "Verze",
+      "colPool": "Fond",
+      "colActions": "Akce",
+      "reconfigure": "Překonfigurovat",
+      "destroy": "Zničit",
+      "orphan": "Osiřet…",
+      "orphanTitle": "Smazat záznam katalogu bez zničení jeho infrastruktury (nedoporučeno)"
+    },
+    "reconfigure": {
+      "title": "Překonfigurovat {name}",
+      "description": "Aktualizujte vstupy a/nebo verzi a poté zařaďte běh do fronty.",
+      "currentOption": "{version} (aktuální)",
+      "queuing": "Zařazování do fronty…",
+      "queueRun": "Zařadit běh do fronty"
+    },
+    "destroy": {
+      "title": "Zničit {name}",
+      "heading": "Zničit {name}?",
+      "description": "Toto zařadí do fronty destroy běh, který zbourá infrastrukturu této instance. Po úspěšném apply je pracovní prostor archivován. Toto nelze vrátit zpět.",
+      "autoApplyHint": "Automatické použití zbourá okamžitě bez kontroly."
+    },
+    "orphan": {
+      "title": "Osiřet {name}",
+      "heading": "Osiřet {name}?",
+      "description": "Toto smaže záznam instance katalogu, ale <warn>ne</warn>zničí její infrastrukturu — zřízené prostředky běží dál, <warn>nesledované a nespravované</warn>. Toto se nedoporučuje. Pro získání infrastruktury zpět zrušte a použijte místo toho <emph>Zničit</emph>.",
+      "confirmPrompt": "Pro potvrzení zadejte název instance <mono>{name}</mono>:",
+      "orphaning": "Osiřování…",
+      "submit": "Osiřet a opustit infrastrukturu"
+    },
+    "actions": {
+      "confirmed": "Běh potvrzen — aplikování.",
+      "discarded": "Běh zahozen.",
+      "provisioned": "Zřízeno {name} — plán je připraven ke kontrole.",
+      "reconfigureQueued": "Překonfigurování zařazeno do fronty — běh vytvořen.",
+      "reconfigureQueuedStatus": "Překonfigurování zařazeno do fronty — běh je {status}.",
+      "destroyQueued": "Zničení zařazeno do fronty — běh vytvořen.",
+      "destroyQueuedStatus": "Zničení zařazeno do fronty — běh je {status}.",
+      "orphaned": "Osiřeno {name} — záznam katalogu smazán; jeho infrastruktura běží dál, nesledovaná a nespravovaná."
+    },
+    "errors": {
+      "loadItem": "Nepodařilo se načíst položku katalogu",
+      "confirm": "Nepodařilo se potvrdit",
+      "confirmStatus": "Nepodařilo se potvrdit ({status})",
+      "discard": "Nepodařilo se zahodit",
+      "discardStatus": "Nepodařilo se zahodit ({status})",
+      "provision": "Nepodařilo se zřídit",
+      "provisionStatus": "Nepodařilo se zřídit ({status})",
+      "reconfigure": "Nepodařilo se překonfigurovat",
+      "reconfigureStatus": "Nepodařilo se překonfigurovat ({status})",
+      "destroy": "Nepodařilo se zničit",
+      "destroyStatus": "Nepodařilo se zničit ({status})",
+      "orphan": "Nepodařilo se osiřet",
+      "orphanStatus": "Nepodařilo se osiřet ({status})"
+    }
+  },
+  "common": {
+    "connection": {
+      "reconnecting": "Opětovné připojování…"
+    },
+    "sessionExpiry": {
+      "banner": "Relace vyprší za {minutes, plural, one {# minutu} few {# minuty} many {# minuty} other {# minut}} — <link>znovu se ověřte</link>"
+    },
+    "tokenExpiry": {
+      "withinDays": "{count, plural, one {# servisní token} few {# servisní tokeny} many {# servisního tokenu} other {# servisních tokenů}} vyprší do {days, plural, one {# dne} few {# dnů} many {# dne} other {# dnů}} — <link>zkontrolovat</link>",
+      "soon": "{count, plural, one {# servisní token} few {# servisní tokeny} many {# servisního tokenu} other {# servisních tokenů}} brzy vyprší — <link>zkontrolovat</link>",
+      "dismissAria": "Zavřít varování o vypršení tokenu"
+    },
+    "resourceUsage": {
+      "title": "Využití prostředků",
+      "oomKilled": "Ukončeno kvůli OOM",
+      "killedLikelyOom": "Ukončeno (pravděpodobně OOM)",
+      "memory": "Paměť",
+      "requested": "Požadováno {value}",
+      "limit": "Limit {value}"
+    },
+    "labelsEditor": {
+      "none": "Žádné",
+      "removeAria": "Odebrat {key}",
+      "keyPlaceholder": "klíč",
+      "valuePlaceholder": "hodnota",
+      "add": "Přidat"
+    },
+    "sensitiveInput": {
+      "hide": "Skrýt",
+      "show": "Zobrazit",
+      "hideAria": "Skrýt hodnotu",
+      "showAria": "Zobrazit hodnotu"
+    },
+    "workspacePicker": {
+      "searchPlaceholder": "Vyhledat pracovní prostory…",
+      "loading": "Načítání…",
+      "empty": "Nenalezeny žádné pracovní prostory",
+      "adding": "Přidávání…"
+    },
+    "templateEditors": {
+      "remove": "Odebrat",
+      "add": "Přidat",
+      "valuePlaceholder": "hodnota",
+      "name": "Název",
+      "url": "URL",
+      "hmacKey": "HMAC klíč (volitelné)",
+      "hmacKeyPlaceholder": "sdílený tajný klíč",
+      "stage": "Fáze",
+      "enforcement": "Vynucování",
+      "enabled": "Povoleno",
+      "runTaskNamePlaceholder": "security-scan",
+      "runTaskUrlPlaceholder": "https://hooks.example.com/task",
+      "addRunTask": "Přidat run task",
+      "destinationType": "Typ cíle",
+      "token": "Token (volitelné)",
+      "tokenPlaceholder": "HMAC / auth token",
+      "notificationNamePlaceholder": "slack-alerts",
+      "notificationUrlPlaceholder": "https://hooks.slack.com/services/...",
+      "emailAddresses": "E-mailové adresy",
+      "emailPlaceholder": "ops@example.com",
+      "addEmail": "Přidat e-mail",
+      "triggers": "Triggery",
+      "addNotification": "Přidat oznámení"
+    }
+  },
+  "planSummary": {
+    "aiGenerated": "Vygenerováno AI",
+    "heading": {
+      "planSummary": "Shrnutí plánu",
+      "failureAnalysis": "Analýza selhání"
+    },
+    "errors": {
+      "status": "HTTP {status}"
+    },
+    "regenerate": {
+      "label": "Vygenerovat znovu",
+      "queueing": "Zařazování do fronty…",
+      "tooltip": "Znovu spustit AI shrnutí proti stejným vstupům plánu",
+      "ariaLabel": "Vygenerovat AI shrnutí znovu",
+      "confirm": "Vygenerovat AI analýzu znovu? Toto znovu spustí model.",
+      "error": "Nepodařilo se vygenerovat znovu: <mono>{detail}</mono>"
+    },
+    "pending": {
+      "summarisingPlan": "Shrnování plánu…",
+      "analysingFailure": "Analyzování selhání…"
+    },
+    "skipped": {
+      "fallback": "Shrnutí bylo pro tento běh přeskočeno."
+    },
+    "errored": {
+      "heading": "Sumarizátor selhal"
+    },
+    "riskFactors": {
+      "heading": "Rizikové faktory",
+      "suggestedFixes": "Navrhované opravy"
+    },
+    "tokens": "{input} vstupních / {output} výstupních tokenů",
+    "risk": {
+      "low": "nízké",
+      "medium": "střední",
+      "high": "vysoké",
+      "critical": "kritické",
+      "unknown": "neznámé"
+    },
+    "badges": {
+      "noChanges": "Žádné změny",
+      "noChangesLower": "žádné změny",
+      "noChangesTitle": "Plán nehlásil žádné změny prostředků",
+      "toAdd": "{count, plural, one {# k přidání} few {# k přidání} many {# k přidání} other {# k přidání}}",
+      "toChange": "{count, plural, one {# ke změně} few {# ke změně} many {# ke změně} other {# ke změně}}",
+      "toDestroy": "{count, plural, one {# ke zničení} few {# ke zničení} many {# ke zničení} other {# ke zničení}}",
+      "toReplace": "{count, plural, one {# k nahrazení} few {# k nahrazení} many {# k nahrazení} other {# k nahrazení}}",
+      "toImport": "{count, plural, one {# k importu} few {# k importu} many {# k importu} other {# k importu}}"
+    },
+    "chat": {
+      "heading": "Návazné dotazy",
+      "sharedThreadNote": "Jedno sdílené vlákno, viditelné pro každého s právem čtení pracovního prostoru.",
+      "placeholder": "Položte návazný dotaz k tomuto plánu… (⌘/Ctrl + Enter pro odeslání)",
+      "send": "Odeslat",
+      "thinking": "Přemýšlím…",
+      "you": "Vy",
+      "assistant": "Asistent"
+    },
+    "translatedNote": "Automaticky přeloženo do vašeho jazyka. Autoritativní je původní shrnutí.",
+    "translating": "Překládání…"
+  },
+  "runDetail": {
+    "notFound": "Běh nenalezen",
+    "runSection": "Sekce běhu",
+    "workspaceFallback": "pracovní prostor",
+    "backTo": "Zpět na {name}",
+    "errorHeading": "Chyba",
+    "discardedHeading": "Zahozeno — vyžadováno opětovné naplánování",
+    "common": {
+      "yes": "Ano",
+      "no": "Ne"
+    },
+    "header": {
+      "title": "Běh {id}",
+      "titleWithWorkspace": "{workspace} — běh {id}",
+      "description": "Běh ze zdroje {source}"
+    },
+    "relTime": {
+      "justNow": "právě teď",
+      "minutesAgo": "{count, plural, one {před # minutou} few {před # minutami} many {před # minuty} other {před # minutami}}",
+      "hoursAgo": "{count, plural, one {před # hodinou} few {před # hodinami} many {před # hodiny} other {před # hodinami}}",
+      "daysAgo": "{count, plural, one {před # dnem} few {před # dny} many {před # dne} other {před # dny}}"
+    },
+    "status": {
+      "pending": "Čeká",
+      "queued": "Ve frontě",
+      "planning": "Plánování",
+      "planned": "Naplánováno",
+      "confirmed": "Potvrzeno",
+      "applying": "Aplikování",
+      "canceling": "Rušení",
+      "applied": "Aplikováno",
+      "errored": "Chyba",
+      "canceled": "Zrušeno",
+      "discarded": "Zahozeno"
+    },
+    "activity": {
+      "pending": "Příprava běhu",
+      "queued": "Čeká na dostupného agenta",
+      "planning": "Spouští se terraform plan",
+      "plannedConfirmable": "Čeká na vaše potvrzení a aplikaci",
+      "plannedSpeculative": "Spekulativní plán dokončen",
+      "plannedComplete": "Plán dokončen",
+      "confirmed": "Zahájení aplikace",
+      "applying": "Spouští se terraform apply",
+      "canceling": "Zastavování běhu",
+      "applied": "Aplikace dokončena",
+      "errored": "Běh selhal",
+      "canceled": "Běh zrušen",
+      "discarded": "Plán zahozen",
+      "elapsedTitle": "Uplynulý čas v této fázi"
+    },
+    "badge": {
+      "destroy": "zničit",
+      "planOnly": "pouze plán"
+    },
+    "actions": {
+      "retryShort": "Zkusit znovu",
+      "retryFull": "Zkusit běh znovu",
+      "retrying": "Opakování…",
+      "confirmShort": "Aplikovat",
+      "confirmFull": "Potvrdit a aplikovat",
+      "confirming": "Potvrzování…",
+      "discard": "Zahodit",
+      "discarding": "Zahazování…",
+      "cancelShort": "Zrušit",
+      "cancelFull": "Zrušit běh",
+      "canceling": "Rušení…"
+    },
+    "confirm": {
+      "apply": "Aplikovat tento běh? Toto aplikuje plán a změní infrastrukturu.",
+      "discard": "Zahodit tento plán?",
+      "cancel": "Zrušit tento běh?",
+      "retry": "Zkusit tento běh znovu?"
+    },
+    "errors": {
+      "loadRun": "Nepodařilo se načíst běh",
+      "action": {
+        "confirm": "Nepodařilo se potvrdit běh",
+        "discard": "Nepodařilo se zahodit běh",
+        "cancel": "Nepodařilo se zrušit běh",
+        "retry": "Nepodařilo se zopakovat běh"
+      }
+    },
+    "tabs": {
+      "overview": "Přehled",
+      "ai": "AI",
+      "aiFull": "AI analýza",
+      "opa": "OPA",
+      "opaFull": "OPA zásady",
+      "impact": "Dopad",
+      "impactFull": "Graf dopadu",
+      "planLabel": "Plán<log>Log</log>",
+      "applyLabel": "Apply<log>Log</log>",
+      "planFull": "Log plánu",
+      "applyFull": "Log apply",
+      "details": "Podrobnosti"
+    },
+    "banner": {
+      "destroy": "Toto je <strong>destroy</strong> běh — všechny spravované prostředky budou při aplikaci zničeny.",
+      "planOnlyCli": "Toto je <strong>plan-only</strong> běh spuštěný z CLI na pracovním prostoru připojeném k VCS. Apply není pro kód nahraný z CLI dostupný — aplikovat lze pouze kód spravovaný VCS.",
+      "moduleOverridesPrefix": "Tento běh používá <strong>přepisy modulů</strong>",
+      "moduleOverridesFromPr": "z PR #{number}",
+      "moduleOverridesSuffix": "budou staženy z větve PR namísto publikované verze z registry."
+    },
+    "cards": {
+      "changes": "Změny",
+      "aiAnalysis": "AI analýza",
+      "policyChecks": "Kontroly zásad",
+      "resources": "Prostředky"
+    },
+    "changes": {
+      "noChanges": "Žádné změny",
+      "planning": "Plánování…",
+      "toAdd": "k přidání",
+      "toChange": "ke změně",
+      "toDestroy": "ke zničení",
+      "toReplace": "k nahrazení",
+      "toImport": "k importu"
+    },
+    "ai": {
+      "notAvailable": "Není k dispozici",
+      "ready": "Připraveno",
+      "riskSub": "{risk} riziko",
+      "generating": "Generování…",
+      "skipped": "Přeskočeno",
+      "failed": "Selhalo",
+      "available": "K dispozici"
+    },
+    "policy": {
+      "none": "Žádné",
+      "blocked": "Blokováno",
+      "failedSub": "{count, plural, one {# selhalo} few {# selhaly} many {# selhalo} other {# selhalo}}",
+      "advisoryIssues": "Doporučující problémy",
+      "passedSub": "{passed}/{total} prošlo",
+      "passed": "Prošlo"
+    },
+    "resources": {
+      "overLimit": "Přes limit",
+      "oomKilled": "Ukončeno kvůli OOM",
+      "recorded": "Zaznamenáno",
+      "nearLimit": "Blízko limitu",
+      "high": "Vysoké",
+      "withinLimits": "V rámci limitů"
+    },
+    "details": {
+      "heading": "Podrobnosti",
+      "executionBackend": "Prováděcí backend",
+      "source": "Zdroj",
+      "autoApply": "Automatické použití",
+      "planOnly": "Pouze plán",
+      "triggeredBy": "Spuštěno kým",
+      "created": "Vytvořeno",
+      "commit": "Commit",
+      "branch": "Větev",
+      "prMr": "PR/MR",
+      "stateVersion": "Verze stavu",
+      "viewState": "Zobrazit stav",
+      "runOptions": "Možnosti běhu"
+    },
+    "timeline": {
+      "heading": "Časová osa",
+      "queued": "Ve frontě",
+      "planningStarted": "Plánování zahájeno",
+      "planComplete": "Plán dokončen",
+      "confirmed": "Potvrzeno",
+      "applyingStarted": "Aplikování zahájeno",
+      "applied": "Aplikováno",
+      "errored": "Chyba",
+      "canceled": "Zrušeno",
+      "discarded": "Zahozeno"
+    },
+    "log": {
+      "color": "Barva",
+      "colorOnTitle": "Zobrazují se ANSI barvy — kliknutím na prostý text",
+      "colorOffTitle": "Zobrazuje se prostý text — kliknutím na barvy",
+      "refresh": "Obnovit",
+      "refreshTitle": "Obnovit log",
+      "copy": "Kopírovat",
+      "copied": "Zkopírováno!",
+      "copyTitle": "Zkopírovat prostý text do schránky",
+      "copyAria": "Zkopírovat log do schránky",
+      "download": "Stáhnout",
+      "downloadColorTitle": "Stáhnout log (s ANSI barevnými kódy)",
+      "downloadPlainTitle": "Stáhnout log (prostý text)",
+      "downloadAria": "Stáhnout log",
+      "follow": "Sledovat",
+      "followOnTitle": "Sledování živého výstupu — kliknutím zastavíte",
+      "followOffTitle": "Sledovat živý výstup",
+      "end": "Konec",
+      "endTitle": "Přejít na konec logu",
+      "planEmpty": "Zatím není k dispozici žádný výstup plánu.",
+      "applyEmpty": "Zatím není k dispozici žádný výstup apply."
+    },
+    "policyPanel": {
+      "heading": "Kontroly zásad",
+      "passedCount": "{passed}/{total} prošlo",
+      "blockedMessage": "Tento běh je <strong>blokován povinnou sadou zásad</strong>. Nebude aplikován, dokud nebude selhání vyřešeno nebo dokud jej administrátor nepřepíše.",
+      "overriding": "Přepisování...",
+      "overrideContinue": "Přepsat a pokračovat",
+      "overrideFailed": "Přepsání selhalo",
+      "overrideFailedStatus": "Přepsání selhalo ({status})",
+      "overriddenBy": "přepsal {by}",
+      "policyPassed": "prošlo",
+      "noDenyMessage": "Zásada selhala, aniž by vytvořila deny zprávu nebo chybový výstup",
+      "enforcement": {
+        "mandatory": "povinné",
+        "advisory": "doporučující"
+      },
+      "outcome": {
+        "passed": "prošlo",
+        "failed": "selhalo",
+        "errored": "chyba"
+      }
+    }
+  },
+  "workspaceDetail": {
+    "notFound": "Pracovní prostor nenalezen",
+    "common": {
+      "enabled": "Povoleno",
+      "disabled": "Zakázáno",
+      "none": "Žádné",
+      "default": "Výchozí",
+      "never": "Nikdy",
+      "actions": "Akce",
+      "workspaceLocked": "Pracovní prostor je uzamčen"
+    },
+    "actions": {
+      "edit": "Upravit",
+      "cancel": "Zrušit",
+      "save": "Uložit",
+      "saving": "Ukládání…",
+      "savingEllipsis": "Ukládání...",
+      "delete": "Smazat",
+      "deleting": "Mazání...",
+      "add": "Přidat",
+      "adding": "Přidávání...",
+      "remove": "Odebrat",
+      "download": "Stáhnout",
+      "rollback": "Vrátit zpět",
+      "close": "Zavřít",
+      "hide": "Skrýt",
+      "enable": "Povolit",
+      "disable": "Zakázat",
+      "creating": "Vytváření...",
+      "sending": "Odesílání...",
+      "processing": "Zpracovávání...",
+      "queuing": "Zařazování do fronty...",
+      "loading": "Načítání...",
+      "loadingLower": "načítání…"
+    },
+    "header": {
+      "executionMode": "Režim provádění {mode}"
+    },
+    "tabs": {
+      "overview": "Přehled",
+      "variables": "Proměnné",
+      "runs": "Běhy",
+      "state": "Stav",
+      "stateGraph": "Graf stavu",
+      "configurations": "Konfigurace",
+      "notifications": "Oznámení",
+      "runTasks": "Run tasky",
+      "runTriggers": "Run triggery",
+      "sharing": "Sdílení",
+      "selectLabel": "Sekce pracovního prostoru"
+    },
+    "lifecycle": {
+      "pendingDeletion": "Čeká na smazání",
+      "pendingDeletionDefault": "Tento pracovní prostor je označen ke smazání a vyžaduje ruční akci.",
+      "archived": "Archivováno",
+      "archivedDefault": "Tento pracovní prostor byl archivován."
+    },
+    "runQueuedBanner": {
+      "message": "Běh úspěšně zařazen do fronty.",
+      "viewRun": "Zobrazit běh"
+    },
+    "settings": {
+      "title": "Nastavení",
+      "saveChanges": "Uložit změny",
+      "renamedNotice": "Pracovní prostor přejmenován. Aktualizujte pole <name></name> ve vašem bloku <cloud></cloud>, aby odpovídalo."
+    },
+    "fields": {
+      "name": "Název",
+      "nameTitle": "Písmena, číslice, pomlčky, podtržítka. Musí začínat písmenem nebo číslicí.",
+      "executionMode": "Režim provádění",
+      "execModeLocal": "Lokální",
+      "execModeAgent": "Agent",
+      "autoApply": "Automatické použití",
+      "cpuRequest": "Požadavek CPU",
+      "cpuRequestTitle": "Kubernetes množství CPU: celá jádra (1, 2) nebo milicores (500m, 100m)",
+      "memoryRequest": "Požadavek paměti",
+      "memoryRequestTitle": "Kubernetes množství paměti: bajty (1000) nebo s příponou (512Mi, 2Gi, 1Ti)",
+      "executionBackend": "Prováděcí backend",
+      "version": "Verze",
+      "versionPlaceholder": "např. 1.11 nebo 1.11.5",
+      "versionTitle": "Verze ve formátu X.Y nebo X.Y.Z (např. 1.11 nebo 1.11.5)",
+      "terragruntEnabledAgent": "Povoleno (režim agenta)",
+      "terragruntEnabledVersion": "Povoleno (v{version})",
+      "terragruntVersionPlaceholder": "např. 1.0",
+      "terragruntVersionTitle": "Verze Terragrunt ve formátu X.Y nebo X.Y.Z (např. 1.0)",
+      "workingDirectory": "Pracovní adresář",
+      "workingDirectoryPlaceholder": "např. environments/dev",
+      "agentPool": "Fond agentů",
+      "owner": "Vlastník",
+      "vcsConnection": "VCS připojení",
+      "vcsRepository": "VCS repozitář",
+      "vcsRepositoryTitle": "Musí být URL adresa HTTP nebo HTTPS",
+      "vcsBranch": "VCS větev",
+      "vcsBranchPlaceholder": "main (výchozí)",
+      "vcsWorkflow": "VCS workflow",
+      "vcsWorkflowMergeThenApply": "merge_then_apply (výchozí — standard TFE / HCP)",
+      "vcsWorkflowApplyThenMerge": "apply_then_merge (standard Atlantis — opt-in)",
+      "autoMerge": "Automatické sloučení po apply",
+      "autoMergeStrategy": "Strategie automatického sloučení",
+      "vcsPolling": "VCS polling",
+      "labels": "Štítky (tagy)",
+      "labelsTitle": "Štítky pracovního prostoru plní dvojí úlohu: shodu pro label-based RBAC a jako „tagy“ shodované bloky terraform/tofu cloud '{' workspaces '{' tags = ... '}' '}'.",
+      "varFiles": "Var soubory",
+      "varFilesPlaceholder": "např. envs/dev.tfvars",
+      "triggerPrefixes": "Prefixy triggerů",
+      "triggerPrefixesHint": "Adresáře, které spouštějí běhy. Když jsou nastaveny, přepisují filtrování podle pracovního adresáře.",
+      "triggerPrefixesPlaceholder": "např. modules",
+      "triggerPrefixesNone": "Žádné (používá pracovní adresář)",
+      "driftIgnoreRules": "Pravidla ignorování odchýlení",
+      "driftIgnoreRulesHint": "Glob-aware cesty Terraform adres + atributů potlačené klasifikátorem odchýlení. <star></star> odpovídá nule nebo více ne-<dot></dot> znakům (překlenuje <n></n> indexů); <starIdx></starIdx> odpovídá jakémukoli indexu v hranatých závorkách. Holá adresa bez přípony atributu umlčí jakoukoli změnu tohoto prostředku — včetně zničení. Ovlivňuje pouze odchýlení, nikoli běžný plan/apply. Úplnou gramatiku viz <docs>drift-ignore-rules.md</docs>.",
+      "driftIgnoreRulesNone": "Žádná (každý rozdíl v plánu se počítá jako odchýlení)"
+    },
+    "vcsWorkflowWarning": {
+      "title": "Autorizace delegována na váš VCS repozitář.",
+      "rbac": "Kdokoli, kdo může sloučit PR, může aplikovat. Bránou se stávají pravidla ochrany větve (povinné kontroly, status checks, schválení vlastníkem kódu). Terrapod role/label RBAC se<em>ne</em>vztahuje na akce řízené komentáři v tomto režimu.",
+      "recommended": "<strong>Doporučeno:</strong> vyžadujte lineární historii (rebase/squash před sloučením), aby commit, který aplikujete, byl commitem, který přistane.",
+      "credit": "Poděkování: toto workflow je modelováno podle <atlantis>Atlantis</atlantis>. Atlantis zůstává tím správným nástrojem pro týmy, které chtějí pouze aplikace řízené komentáři v PR a žádné platformové UI."
+    },
+    "vcsPolling": {
+      "error": "Chyba",
+      "ok": "OK ({time})",
+      "notPolled": "Zatím nepolováno"
+    },
+    "lockout": {
+      "revertLabels": "Vrátit štítky",
+      "saveAnyway": "Přesto uložit"
+    },
+    "lock": {
+      "title": "Stav uzamčení",
+      "lockedDesc": "Tento pracovní prostor je uzamčen. Nemohou probíhat žádné plány ani aplikace.",
+      "unlockedDesc": "Tento pracovní prostor je odemčen a připraven na běhy.",
+      "lock": "Uzamknout",
+      "unlock": "Odemknout",
+      "lockConfirm": "Uzamknout tento pracovní prostor?",
+      "unlockConfirm": "Odemknout tento pracovní prostor?"
+    },
+    "drift": {
+      "title": "Detekce odchýlení",
+      "checkInterval": "Interval kontroly",
+      "status": "Stav",
+      "statusNoDrift": "Bez odchýlení",
+      "statusDrifted": "Odchýleno",
+      "statusErrored": "Chyba",
+      "statusUnchecked": "Nezkontrolováno",
+      "dismiss": "Zavřít",
+      "dismissing": "Zavírání…",
+      "dismissTitle": "Vymazat nahlášený stav odchýlení. Další naplánovaná kontrola jej znovu naplní podle reality.",
+      "lastChecked": "Naposledy zkontrolováno",
+      "checkNow": "Zkontrolovat nyní",
+      "checkNowTitle": "Zařadit plan-only běh ke kontrole odchýlení",
+      "checkNowTitleDisabled": "Nejprve povolte detekci odchýlení"
+    },
+    "intervals": {
+      "disabled": "Zakázáno",
+      "1hour": "1 hodina",
+      "4hours": "4 hodiny",
+      "12hours": "12 hodin",
+      "24hours": "24 hodin",
+      "48hours": "48 hodin",
+      "3days": "3 dny",
+      "7days": "7 dní"
+    },
+    "planExpiry": {
+      "title": "Vypršení plánu",
+      "description": "Automaticky zahodit nepotvrzený plán, jakmile je starší než toto, aby nebylo možné aplikovat zastaralý plán proti změněnému světu. Ve výchozím nastavení vypnuto; plán pak musí být znovu spuštěn. (Platí pouze pro běhy schopné apply.)",
+      "expireAfter": "Vypršet po"
+    },
+    "aiSummary": {
+      "title": "AI shrnutí plánu",
+      "description": "Automatické, LLM generované shrnutí změn, posouzení rizik a analýza selhání u každého výsledku fáze plánu pro tento pracovní prostor.",
+      "mode": "Režim",
+      "modeDefault": "Řídit se výchozím nastavením nasazení",
+      "modeEnabled": "Vždy shrnout",
+      "modeDisabled": "Nikdy neshrnovat",
+      "contextLabel": "Kontext pracovního prostoru",
+      "contextLabelSuffix": "(volitelné, aditivní)",
+      "contextPlaceholder": "Fakta, která by AI měla vědět konkrétně o tomto pracovním prostoru. Např. „Stojí před vaultem pro službu X — zničení KMS klíče způsobí globální výpadek.“",
+      "noContext": "Není nastaven žádný kontext pracovního prostoru.",
+      "contextHint": "Přidáno navrch kontextu platného pro celé nasazení. Maximálně 4000 znaků."
+    },
+    "slack": {
+      "title": "Slack oznámení",
+      "description": "Přihlaste tento pracovní prostor k Slack oznámením o bězích — žádosti o schválení, aplikace, chyby a odchýlení. Ponechte kanál prázdný a tento pracovní prostor zůstane tichý (neexistuje žádné rozeslání pro celé nasazení). Vyžaduje, aby Slack aplikace byla povolena administrátorem.",
+      "channel": "Kanál",
+      "channelPlaceholder": "#deploys nebo ID kanálu (např. C0123ABCD)",
+      "notSet": "Nenastaveno — tiché.",
+      "hint": "Slack aplikace už musí být členem kanálu."
+    },
+    "delete": {
+      "title": "Smazat pracovní prostor",
+      "description": "Trvale smazat tento pracovní prostor a veškerý přidružený stav, proměnné a běhy.",
+      "confirm": "Potvrdit smazání"
+    },
+    "variables": {
+      "addVariable": "Přidat proměnnou",
+      "key": "Klíč",
+      "value": "Hodnota",
+      "category": "Kategorie",
+      "categoryEnv": "Prostředí",
+      "sensitive": "Citlivé",
+      "empty": "Pro tento pracovní prostor nejsou nakonfigurovány žádné proměnné.",
+      "emptyValue": "prázdné",
+      "enterNewValue": "Zadejte novou hodnotu",
+      "deleteConfirm": "Smazat proměnnou „{key}“?"
+    },
+    "runs": {
+      "options": "Možnosti",
+      "hideOptions": "Skrýt možnosti",
+      "queueDestroy": "Zařadit zničení",
+      "queueDestroyTitle": "Zařadit destroy plán do fronty",
+      "destroyAllConfirm": "Zničit všechny prostředky?",
+      "confirmDestroy": "Potvrdit zničení",
+      "queuePlan": "Zařadit plán",
+      "queueRun": "Zařadit běh",
+      "queuePlanConfirm": "Zařadit spekulativní plán pro tento pracovní prostor?",
+      "queueApplyConfirm": "Zařadit běh plan + apply? Toto může změnit infrastrukturu.",
+      "planOptions": "Možnosti plánu",
+      "targetResources": "Cílové prostředky",
+      "replaceResources": "Nahradit prostředky",
+      "commaSeparated": "(oddělené čárkou)",
+      "planOnly": "Pouze plán",
+      "refreshOnly": "Pouze refresh",
+      "skipRefresh": "Přeskočit refresh",
+      "allowEmptyApply": "Povolit prázdný apply",
+      "vcsRef": "VCS ref",
+      "branch": "Větev",
+      "tag": "Tag",
+      "defaultBranch": "Výchozí ({branch})",
+      "nonDefaultRefNote": "Vybrán nevýchozí ref — běh bude pouze plan-only",
+      "empty": "Zatím žádné běhy pro tento pracovní prostor.",
+      "runId": "ID běhu",
+      "status": "Stav",
+      "type": "Typ",
+      "changes": "Změny",
+      "source": "Zdroj",
+      "triggeredBy": "Spuštěno kým",
+      "created": "Vytvořeno",
+      "needsConfirm": "vyžaduje potvrzení",
+      "typeDestroy": "zničit",
+      "typePlanOnly": "pouze plán",
+      "typePlanApply": "plan + apply",
+      "sourceModuleTest": "test modulu",
+      "sourceModulePublish": "publikace modulu"
+    },
+    "state": {
+      "deleteConfirm": "Smazat verzi stavu #{serial}? Toto nelze vrátit zpět.",
+      "rollbackConfirm": "Vrátit se k verzi stavu #{serial}? Bude vytvořena nová verze se stejným obsahem.",
+      "confirmDelete": "Potvrdit smazání",
+      "confirmRollback": "Potvrdit vrácení zpět",
+      "uploadState": "Nahrát stav",
+      "empty": "Zatím žádné verze stavu pro tento pracovní prostor.",
+      "serial": "Serial",
+      "createdBy": "Vytvořil",
+      "run": "Běh",
+      "size": "Velikost",
+      "created": "Vytvořeno",
+      "runner": "runner",
+      "latest": "nejnovější"
+    },
+    "configurations": {
+      "description": "Nahrané zdrojové archivy pro tento pracovní prostor, nejnovější první. Pro porovnání vyberte dva řádky.",
+      "selectedCount": "{count}/2 vybráno",
+      "compare": "Porovnat",
+      "comparing": "Porovnávání…",
+      "empty": "Zatím žádné verze konfigurace. Objeví se zde, jakmile `terraform plan` provede nahrání nebo VCS push spustí běh.",
+      "id": "ID",
+      "source": "Zdroj",
+      "status": "Stav",
+      "created": "Vytvořeno",
+      "current": "aktuální",
+      "selectForCompare": "Vybrat {id} k porovnání",
+      "compareLabel": "Porovnat",
+      "diff": "Rozdíl",
+      "filesChanged": "{count} změněných souborů",
+      "oversized": "Přeskočeno {count, plural, one {# nadměrný soubor} few {# nadměrné soubory} many {# nadměrného souboru} other {# nadměrných souborů}}: {files}",
+      "noDiff": "Mezi těmito verzemi nejsou žádné rozdíly v obsahu.",
+      "binaryChanged": "Binární soubor změněn — rozdíl není vykreslen.",
+      "diffType": {
+        "added": "přidáno",
+        "removed": "odebráno",
+        "modified": "změněno",
+        "binary-changed": "binární"
+      }
+    },
+    "notifications": {
+      "addNotification": "Přidat oznámení",
+      "name": "Název",
+      "namePlaceholder": "Oznámení o nasazení",
+      "destinationType": "Typ cíle",
+      "typeGeneric": "Generický webhook",
+      "typeEmail": "E-mail",
+      "url": "URL",
+      "hmacToken": "HMAC token (volitelné)",
+      "signingSecret": "Podpisový tajný klíč",
+      "emailAddresses": "E-mailové adresy (oddělené čárkou)",
+      "triggerEvents": "Spouštěcí události",
+      "createNotification": "Vytvořit oznámení",
+      "empty": "Pro tento pracovní prostor nejsou žádné konfigurace oznámení.",
+      "ok": "OK",
+      "err": "Chyba {status}",
+      "fail": "SELHALO",
+      "http": "HTTP {status}",
+      "verify": "Ověřit",
+      "history": "Historie",
+      "deliveryHistory": "Historie doručení",
+      "enableConfirm": "Povolit toto oznámení?",
+      "disableConfirm": "Zakázat toto oznámení?",
+      "deleteConfirm": "Smazat oznámení „{name}“?"
+    },
+    "runTasks": {
+      "addRunTask": "Přidat run task",
+      "name": "Název",
+      "namePlaceholder": "OPA kontrola zásad",
+      "webhookUrl": "URL webhooku",
+      "stage": "Fáze",
+      "enforcementLevel": "Úroveň vynucování",
+      "hmacKey": "HMAC klíč (volitelné)",
+      "hmacKeyPlaceholder": "Podpisový tajný klíč pro ověření webhooku",
+      "createRunTask": "Vytvořit run task",
+      "empty": "Pro tento pracovní prostor nejsou nakonfigurovány žádné run tasky.",
+      "enableConfirm": "Povolit tento run task?",
+      "disableConfirm": "Zakázat tento run task?",
+      "deleteConfirm": "Smazat run task „{name}“?"
+    },
+    "runTriggers": {
+      "title": "Run triggery",
+      "description": "Když zdrojový pracovní prostor dokončí apply, navazujícím pracovním prostorům se automaticky zařadí nový běh do fronty. Až 20 zdrojových pracovních prostorů na cíl.",
+      "inboundHeading": "Zdrojové pracovní prostory, které zde spouštějí běhy",
+      "inboundEmpty": "Žádné zdrojové pracovní prostory nespouštějí běhy na tomto pracovním prostoru.",
+      "pickerPlaceholder": "Vyhledat pracovní prostory k přidání jako zdroj…",
+      "outboundHeading": "Cílové pracovní prostory, které tento pracovní prostor spouští",
+      "outboundEmpty": "Tento pracovní prostor nespouští běhy na žádném jiném pracovním prostoru.",
+      "destinationNote": "(cíl; odeberte odtamtud)",
+      "removeConfirm": "Odebrat tento run trigger?"
+    },
+    "sharing": {
+      "title": "Sdílení remote state",
+      "description": "Producentem řízený allowlist pro cross-workspace <code></code>. Data stavu nesou tajemství — udělujte uvážlivě. <docs>Dokumentace</docs>",
+      "outboundHeading": "Pracovní prostory oprávněné číst stav tohoto pracovního prostoru",
+      "outboundEmpty": "Stav tohoto pracovního prostoru není sdílen s žádným jiným pracovním prostorem.",
+      "grantedBy": "udělil {by}",
+      "revoke": "Odvolat",
+      "revokeConfirm": "Odebrat toto sdílení remote state? Konzument ztratí přístup k tomuto stavu.",
+      "pickerPlaceholder": "Vyhledat pracovní prostory k autorizaci jako konzument…",
+      "inboundHeading": "Pracovní prostory, ze kterých je tento pracovní prostor oprávněn číst stav",
+      "inboundEmpty": "Tento pracovní prostor není oprávněn číst stav z žádného jiného pracovního prostoru prostřednictvím terraform_remote_state.",
+      "producerNote": "(producent; odvolejte odtamtud)"
+    },
+    "runMessages": {
+      "manualDriftCheck": "Ruční kontrola odchýlení z UI",
+      "queued": "Zařazeno z UI",
+      "queuedSpeculative": "Zařazeno z UI (spekulativní)",
+      "destroyQueued": "Zničení zařazeno z UI"
+    },
+    "errors": {
+      "loadWorkspace": "Nepodařilo se načíst pracovní prostor",
+      "loadRuns": "Nepodařilo se načíst běhy",
+      "loadVariables": "Nepodařilo se načíst proměnné",
+      "loadStateVersions": "Nepodařilo se načíst verze stavu",
+      "loadConfigurations": "Nepodařilo se načíst verze konfigurace",
+      "loadNotifications": "Nepodařilo se načíst oznámení",
+      "loadOutboundConsumers": "Nepodařilo se načíst odchozí konzumenty remote-state",
+      "loadInboundConsumers": "Nepodařilo se načíst příchozí konzumenty remote-state",
+      "loadConsumers": "Nepodařilo se načíst konzumenty remote-state",
+      "loadInboundTriggers": "Nepodařilo se načíst příchozí run triggery",
+      "loadOutboundTriggers": "Nepodařilo se načíst odchozí run triggery",
+      "loadTriggers": "Nepodařilo se načíst run triggery",
+      "loadRunTasks": "Nepodařilo se načíst run tasky",
+      "downloadStateFile": "Nepodařilo se stáhnout soubor stavu",
+      "downloadFailed": "Stahování selhalo",
+      "downloadFailedStatus": "Stahování selhalo ({status})",
+      "downloadTicketMissingUrl": "V odpovědi na download ticket chybí URL",
+      "diffFailed": "Rozdíl selhal",
+      "diffFailedStatus": "Rozdíl selhal ({status})",
+      "authorizeConsumer": "Nepodařilo se autorizovat konzumenta",
+      "revoke": "Nepodařilo se odvolat",
+      "revokeConsumer": "Nepodařilo se odvolat konzumenta",
+      "addTrigger": "Nepodařilo se přidat run trigger",
+      "removeTrigger": "Nepodařilo se odebrat run trigger",
+      "createRunTask": "Nepodařilo se vytvořit run task",
+      "createRunTaskStatus": "Nepodařilo se vytvořit run task ({status})",
+      "update": "Nepodařilo se aktualizovat",
+      "toggleRunTask": "Nepodařilo se přepnout run task",
+      "delete": "Nepodařilo se smazat",
+      "deleteRunTask": "Nepodařilo se smazat run task",
+      "labelLockout": "Tato změna štítků by omezila váš přístup.",
+      "updateWorkspace": "Nepodařilo se aktualizovat pracovní prostor",
+      "lockWorkspace": "Nepodařilo se uzamknout pracovní prostor",
+      "unlockWorkspace": "Nepodařilo se odemknout pracovní prostor",
+      "updateAiSummary": "Nepodařilo se aktualizovat nastavení AI shrnutí",
+      "updateSlackChannel": "Nepodařilo se aktualizovat Slack kanál",
+      "updateDriftSettings": "Nepodařilo se aktualizovat nastavení odchýlení",
+      "updateDriftInterval": "Nepodařilo se aktualizovat interval odchýlení",
+      "updatePlanExpiry": "Nepodařilo se aktualizovat vypršení plánu",
+      "queueDriftCheck": "Nepodařilo se zařadit kontrolu odchýlení",
+      "queueDriftCheckStatus": "Nepodařilo se zařadit kontrolu odchýlení ({status})",
+      "dismissDrift": "Nepodařilo se zavřít odchýlení",
+      "dismissDriftStatus": "Nepodařilo se zavřít odchýlení ({status})",
+      "deleteWorkspace": "Nepodařilo se smazat pracovní prostor",
+      "addVariable": "Nepodařilo se přidat proměnnou",
+      "addVariableStatus": "Nepodařilo se přidat proměnnou ({status})",
+      "deleteVariable": "Nepodařilo se smazat proměnnou",
+      "updateVariable": "Nepodařilo se aktualizovat proměnnou",
+      "queuePlan": "Nepodařilo se zařadit plán",
+      "queuePlanStatus": "Nepodařilo se zařadit plán ({status})",
+      "queueDestroy": "Nepodařilo se zařadit zničení",
+      "queueDestroyStatus": "Nepodařilo se zařadit zničení ({status})",
+      "createNotification": "Nepodařilo se vytvořit oznámení",
+      "createNotificationStatus": "Nepodařilo se vytvořit oznámení ({status})",
+      "toggleNotification": "Nepodařilo se přepnout oznámení",
+      "deleteNotification": "Nepodařilo se smazat oznámení",
+      "verificationFailed": "Ověření selhalo",
+      "verificationDeliveryFailed": "Doručení ověření selhalo: {detail}",
+      "unknownError": "Neznámá chyba",
+      "failed": "Selhalo",
+      "deleteStateVersion": "Nepodařilo se smazat verzi stavu",
+      "rollbackStateVersion": "Nepodařilo se vrátit verzi stavu zpět",
+      "stateActionFailed": "Akce se stavem selhala",
+      "uploadState": "Nepodařilo se nahrát stav",
+      "uploadStateFile": "Nepodařilo se nahrát soubor stavu"
+    }
+  },
+  "graphs": {
+    "stateTab": {
+      "loadError": "Nepodařilo se načíst graf stavu.",
+      "emptyState": "Zatím žádný stav — spusťte plan a apply, nebo nahrajte stav, a poté se tento graf naplní.",
+      "stateVersionLabel": "Verze stavu",
+      "currentSuffix": "(aktuální)",
+      "colorByLabel": "Obarvit podle",
+      "viewGraph": "Graf",
+      "viewTable": "Tabulka",
+      "resourceCount": "{count, plural, one {# prostředek} few {# prostředky} many {# prostředku} other {# prostředků}}",
+      "dependencyCount": "{count, plural, one {# závislost} few {# závislosti} many {# závislosti} other {# závislostí}}",
+      "truncated": "Zobrazeno prvních {shown} z {total} prostředků — graf je pro čitelnost omezen.",
+      "colResource": "Prostředek",
+      "colType": "Typ",
+      "colMode": "Režim",
+      "colModule": "Modul",
+      "colDependedOnBy": "Závisí na něm",
+      "rootModule": "(kořen)"
+    },
+    "impact": {
+      "notAvailable": "Graf dopadu není pro tento běh k dispozici.",
+      "title": "Graf dopadu",
+      "subtitle": "plán {count, plural, one {# prostředku} few {# prostředků} many {# prostředku} other {# prostředků}}",
+      "hint": "Každá koule je prostředek; každá šipka ukazuje na to, na čem závisí. Klikněte na uzel → jeho tranzitivní <b>dopad</b> (vše navazující) se rozsvítí.",
+      "downstreamAffected": "navazující ovlivněné",
+      "action": {
+        "create": "vytvořit",
+        "update": "aktualizovat",
+        "replace": "nahradit",
+        "destroy": "zničit",
+        "unchanged": "beze změny"
+      }
+    },
+    "estate": {
+      "navHint": "Tažením otočíte · kolečkem přiblížíte · pravým tažením posunete · <em>kliknutím na uzel kolem něj obíháte</em>"
+    },
+    "state3d": {
+      "title": "Graf stavu",
+      "hint": "Každá koule je prostředek; každá šipka ukazuje na to, na čem závisí. Klikněte na uzel → rozsvítí se prostředky, které na něm tranzitivně <b>závisí</b>.",
+      "dataSource": "datový zdroj",
+      "managed": "spravovaný",
+      "dependOnThis": "závisí na tomto"
+    },
+    "resource3d": {
+      "resetView": "Resetovat zobrazení",
+      "clear": "Vymazat",
+      "key": "Legenda",
+      "resources": "Prostředky",
+      "hideKey": "Skrýt legendu",
+      "hideResources": "Skrýt prostředky",
+      "resourcesCount": "Prostředky ({count})",
+      "filterPlaceholder": "Filtrovat prostředky…",
+      "navHint": "Tažením otočíte · kolečkem přiblížíte · pravým tažením posunete · <em>kliknutím na prostředek kolem něj obíháte</em>"
+    }
+  },
+  "execHookDetail": {
+    "backLink": "Zpět na prováděcí háčky",
+    "defaultDescription": "Prováděcí háček",
+    "notFound": "Prováděcí háček nenalezen",
+    "scriptEmpty": "(prázdné)",
+    "tabs": {
+      "settings": "Nastavení",
+      "workspaces": "Pracovní prostory"
+    },
+    "common": {
+      "yes": "Ano",
+      "no": "Ne"
+    },
+    "actions": {
+      "edit": "Upravit",
+      "cancel": "Zrušit",
+      "save": "Uložit",
+      "saving": "Ukládání...",
+      "delete": "Smazat",
+      "deleting": "Mazání...",
+      "confirmDelete": "Potvrdit smazání",
+      "add": "Přidat",
+      "adding": "Přidávání...",
+      "remove": "Odebrat"
+    },
+    "settings": {
+      "heading": "Nastavení"
+    },
+    "fields": {
+      "name": "Název",
+      "description": "Popis",
+      "hookPoint": "Bod háčku",
+      "priority": "Priorita",
+      "enabled": "Povoleno",
+      "script": "Skript (<code>/bin/sh -c</code>)"
+    },
+    "delete": {
+      "heading": "Smazat prováděcí háček",
+      "description": "Trvale smazat tento háček a odebrat jej ze všech pracovních prostorů."
+    },
+    "workspaces": {
+      "scopeNote": "Tento háček se spouští pouze na pracovních prostorech přiřazených níže. Neexistuje žádný globální rozsah.",
+      "associate": "Přiřadit pracovní prostor",
+      "workspaceLabel": "Pracovní prostor",
+      "selectPlaceholder": "Vyberte pracovní prostor...",
+      "empty": "K tomuto háčku nejsou přiřazeny žádné pracovní prostory.",
+      "colWorkspace": "Pracovní prostor",
+      "colActions": "Akce"
+    },
+    "confirm": {
+      "removeWorkspace": "Odebrat tento pracovní prostor z háčku? Háček se pro něj již nebude spouštět."
+    },
+    "success": {
+      "updated": "Prováděcí háček aktualizován",
+      "workspaceAssociated": "Pracovní prostor přiřazen",
+      "workspaceRemoved": "Pracovní prostor odebrán"
+    },
+    "errors": {
+      "load": "Nepodařilo se načíst prováděcí háček",
+      "update": "Nepodařilo se aktualizovat prováděcí háček",
+      "delete": "Nepodařilo se smazat prováděcí háček",
+      "addWorkspace": "Nepodařilo se přidat pracovní prostor",
+      "removeWorkspace": "Nepodařilo se odebrat pracovní prostor"
+    }
+  },
+  "policySetDetail": {
+    "backLink": "Sady zásad",
+    "notFound": "Nenalezeno",
+    "unknown": "neznámé",
+    "subtitle": "OPA sada zásad · vytvořil {createdBy}",
+    "settings": {
+      "heading": "Nastavení"
+    },
+    "fields": {
+      "description": "Popis",
+      "enforcement": "Vynucování",
+      "enabled": "Povoleno",
+      "globalScope": "Globální (každý pracovní prostor)"
+    },
+    "enforcement": {
+      "advisory": "Doporučující (varovat)",
+      "mandatory": "Povinné (blokovat apply)"
+    },
+    "scope": {
+      "allowLabels": "Povolit štítky (key: v1, v2)",
+      "allowLabelsPlaceholder": "env: prod, staging",
+      "allowNames": "Povolit názvy (jeden na řádek)",
+      "denyLabels": "Zakázat štítky (key: v1, v2)",
+      "denyNames": "Zakázat názvy (jeden na řádek)"
+    },
+    "vcs": {
+      "heading": "Konfigurace VCS",
+      "repoUrl": "URL repozitáře",
+      "branch": "Větev",
+      "branchPlaceholder": "main (výchozí)",
+      "policyPath": "Cesta k zásadám"
+    },
+    "vcsBanner": {
+      "syncedFrom": "Zásady synchronizovány z",
+      "at": "v",
+      "lastSynced": "Naposledy synchronizováno {time}",
+      "commit": "(commit {sha})",
+      "syncError": "Chyba synchronizace: {error}"
+    },
+    "policies": {
+      "heading": "Zásady ({count})",
+      "vcsManaged": "Spravováno repozitářem — pushněte změny přes PR",
+      "empty": "V této sadě zatím nejsou žádné zásady."
+    },
+    "addPolicy": {
+      "namePlaceholder": "Název zásady",
+      "descPlaceholder": "Popis (volitelné)",
+      "regoHint": "Rego v1. Musí deklarovat <code>package terrapod</code> a vyjadřovat porušení prostřednictvím množiny <code>deny</code>. Plán je <code>input</code>; kontext Terrapod je <code>data.terrapod_context</code>."
+    },
+    "actions": {
+      "saving": "Ukládání...",
+      "saveSettings": "Uložit nastavení",
+      "syncNow": "Synchronizovat nyní",
+      "cancel": "Zrušit",
+      "addPolicy": "Přidat zásadu",
+      "deleteSet": "Smazat sadu",
+      "validatingRego": "Validace Rego...",
+      "delete": "Smazat",
+      "savePolicy": "Uložit zásadu"
+    },
+    "confirm": {
+      "deleteSet": "Smazat tuto sadu zásad a všechny její zásady? Zaznamenaná vyhodnocení běhů jsou zachována.",
+      "deletePolicy": "Smazat zásadu „{name}“?"
+    },
+    "errors": {
+      "load": "Nepodařilo se načíst sadu zásad",
+      "save": "Nepodařilo se uložit sadu zásad",
+      "saveStatus": "Nepodařilo se uložit ({status})",
+      "delete": "Nepodařilo se smazat sadu zásad",
+      "deleteStatus": "Nepodařilo se smazat ({status})",
+      "addPolicy": "Nepodařilo se přidat zásadu",
+      "addPolicyStatus": "Nepodařilo se přidat zásadu ({status})",
+      "savePolicy": "Nepodařilo se uložit zásadu",
+      "savePolicyStatus": "Nepodařilo se uložit zásadu ({status})",
+      "deletePolicy": "Nepodařilo se smazat zásadu",
+      "deletePolicyStatus": "Nepodařilo se smazat ({status})"
+    }
+  },
+  "slackLink": {
+    "title": "Připojit Slack k Terrapod",
+    "loading": "Načítání…",
+    "checking": "Kontrola vašeho propojení…",
+    "linking": "Propojování vašeho Slack účtu…",
+    "unknown": "neznámé",
+    "confirm": {
+      "prompt": "Propojit tento Slack účet s <em>vaší</em> Terrapod identitou? Každá budoucí Slack akce (schválit/zahodit) poběží jako tento Terrapod uživatel s jeho oprávněními.",
+      "slackUser": "Slack uživatel",
+      "slackTeam": "Slack tým",
+      "terrapodAccount": "Terrapod účet",
+      "warning": "Pokračujte pouze v případě, že jste toto propojení právě sami zahájili ze Slacku. Pokud ne, zavřete tuto kartu a nepropojujte — toto sváže výše uvedený Slack účet s <em>vaší</em> Terrapod identitou.",
+      "button": "Potvrdit a propojit"
+    },
+    "success": {
+      "message": "Váš Slack účet je nyní propojen s Terrapod.",
+      "linkedAs": "Propojeno jako <em>{email}</em>. Můžete zavřít tuto kartu a vrátit se do Slacku."
+    },
+    "errors": {
+      "missingLink": "Chybějící nebo neplatné propojení. Začněte znovu příkazem pro propojení Terrapod ve Slacku.",
+      "invalidLink": "Toto propojení je neplatné, vypršelo, nebo již bylo použito. Začněte propojení znovu ze Slacku.",
+      "linkingFailed": "Propojení selhalo."
+    }
+  },
+  "cliComplete": {
+    "loading": "Načítání...",
+    "completing": "Dokončování ověřování...",
+    "invalid": {
+      "title": "Neplatný požadavek",
+      "description": "Chybí povinné parametry."
+    },
+    "success": {
+      "title": "Přihlášení úspěšné",
+      "complete": "API token vytvořen. Můžete zavřít tuto kartu."
+    },
+    "fallback": {
+      "description": "Nepodařilo se automaticky spojit s CLI.",
+      "button": "Klikněte sem pro ruční dokončení"
+    },
+    "timeout": {
+      "description": "CLI možná nedokončilo výměnu tokenu. Zkontrolujte svůj terminál."
+    }
+  },
+  "apiDocs": {
+    "view": "Zobrazení:",
+    "redocTitle": "ReDoc API dokumentace"
+  }
+}

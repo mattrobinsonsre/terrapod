@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { useTranslations } from 'next-intl'
 import NavBar from '@/components/nav-bar'
 import { PageHeader } from '@/components/page-header'
 import { LoadingSpinner } from '@/components/loading-spinner'
@@ -62,6 +63,7 @@ const EMPTY_FORM = {
 }
 
 export default function AdminCatalogPage() {
+  const t = useTranslations('adminCatalog')
   const { confirmDelete } = useConfirm()
   const router = useRouter()
   const [items, setItems] = useState<CatalogItem[]>([])
@@ -96,7 +98,7 @@ export default function AdminCatalogPage() {
         setItems([])
         return
       }
-      if (!res.ok) throw new Error('Failed to load catalog items')
+      if (!res.ok) throw new Error(t('errors.load'))
       const data = await res.json()
       setDisabled(false)
       setItems(data.data || [])
@@ -111,7 +113,7 @@ export default function AdminCatalogPage() {
       if (tmplRes.ok) setTemplates((await tmplRes.json()).data || [])
       if (poolRes.ok) setPools((await poolRes.json()).data || [])
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load catalog items')
+      setError(err instanceof Error ? err.message : t('errors.load'))
     } finally {
       setLoading(false)
     }
@@ -161,10 +163,10 @@ export default function AdminCatalogPage() {
       try {
         variableOptions = JSON.parse(f.variableOptionsJson || '[]')
       } catch {
-        throw new Error('Variable options must be valid JSON (an array).')
+        throw new Error(t('errors.varOptsInvalidJson'))
       }
       if (!Array.isArray(variableOptions)) {
-        throw new Error('Variable options must be a JSON array.')
+        throw new Error(t('errors.varOptsNotArray'))
       }
 
       const attrs: Record<string, unknown> = {
@@ -192,33 +194,37 @@ export default function AdminCatalogPage() {
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        throw new Error(data.detail || `Failed to ${editing ? 'update' : 'create'} catalog item (${res.status})`)
+        throw new Error(data.detail || (editing
+          ? t('errors.updateStatus', { status: res.status })
+          : t('errors.createStatus', { status: res.status })))
       }
-      setSuccess(`Catalog item "${editing ? f.name : attrs.name}" ${editing ? 'updated' : 'created'}`)
+      setSuccess(editing
+        ? t('success.updated', { name: String(f.name) })
+        : t('success.created', { name: String(attrs.name) }))
       resetForm()
       setShowForm(false)
       await loadAll()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save catalog item')
+      setError(err instanceof Error ? err.message : t('errors.save'))
     } finally {
       setSaving(false)
     }
   }
 
   async function handleDelete(id: string) {
-    if (!confirmDelete('Delete this catalog item? Existing provisioned instances are unaffected.')) return
+    if (!confirmDelete(t('confirm.delete'))) return
     setError(''); setSuccess('')
     try {
       const res = await apiFetch(`/api/terrapod/v1/catalog-items/${id}`, { method: 'DELETE' })
       if (res.status === 409) {
         const data = await res.json().catch(() => ({}))
-        throw new Error(data.detail || 'Cannot delete: this catalog item has provisioned instances.')
+        throw new Error(data.detail || t('errors.deleteConflict'))
       }
-      if (!res.ok) throw new Error('Failed to delete catalog item')
-      setSuccess('Catalog item deleted')
+      if (!res.ok) throw new Error(t('errors.delete'))
+      setSuccess(t('success.deleted'))
       await loadAll()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete catalog item')
+      setError(err instanceof Error ? err.message : t('errors.delete'))
     }
   }
 
@@ -246,14 +252,14 @@ export default function AdminCatalogPage() {
       <NavBar />
       <main className="px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto">
         <PageHeader
-          title="Catalog Admin"
-          description="Manage service catalog items"
+          title={t('title')}
+          description={t('description')}
           actions={!disabled ? (
             <button
               onClick={() => { if (showForm) { setShowForm(false); resetForm() } else startCreate() }}
               className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors btn-smoke"
             >
-              {showForm ? 'Cancel' : 'New Catalog Item'}
+              {showForm ? t('actions.cancel') : t('actions.new')}
             </button>
           ) : undefined}
         />
@@ -265,7 +271,7 @@ export default function AdminCatalogPage() {
 
         {disabled ? (
           <div className="p-4 bg-slate-800/50 text-slate-400 rounded-lg text-sm border border-slate-700/50">
-            Service catalog is not enabled.
+            {t('notEnabled')}
           </div>
         ) : (
           <>
@@ -273,47 +279,47 @@ export default function AdminCatalogPage() {
               <form onSubmit={handleSubmit} className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-4 mb-6 space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label htmlFor="cat-name" className="block text-sm font-medium text-slate-300 mb-1">Name</label>
+                    <label htmlFor="cat-name" className="block text-sm font-medium text-slate-300 mb-1">{t('form.name')}</label>
                     <input id="cat-name" type="text" value={f.name} disabled={editId !== null}
                       onChange={(e) => setF({ ...f, name: e.target.value })} required
                       pattern="[a-zA-Z0-9][a-zA-Z0-9_\-]*"
-                      title="Letters, numbers, hyphens, and underscores only. Must start with a letter or number."
+                      title={t('form.nameTitle')}
                       placeholder="standard-bucket"
                       className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 disabled:opacity-60 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
                   </div>
                   <div>
-                    <label htmlFor="cat-module" className="block text-sm font-medium text-slate-300 mb-1">Module</label>
+                    <label htmlFor="cat-module" className="block text-sm font-medium text-slate-300 mb-1">{t('form.module')}</label>
                     <select id="cat-module" value={f.moduleId} disabled={editId !== null}
                       onChange={(e) => setF({ ...f, moduleId: e.target.value })} required
-                      title={editId !== null ? 'Module is immutable after creation' : undefined}
+                      title={editId !== null ? t('form.moduleImmutable') : undefined}
                       className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 disabled:opacity-60 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
-                      <option value="">Select a module…</option>
+                      <option value="">{t('form.moduleSelect')}</option>
                       {modules.map((m) => (
                         <option key={m.id} value={m.id}>{m.attributes.name}/{m.attributes.provider}</option>
                       ))}
                     </select>
                   </div>
                   <div>
-                    <label htmlFor="cat-display" className="block text-sm font-medium text-slate-300 mb-1">Display name</label>
+                    <label htmlFor="cat-display" className="block text-sm font-medium text-slate-300 mb-1">{t('form.displayName')}</label>
                     <input id="cat-display" type="text" value={f.displayName}
                       onChange={(e) => setF({ ...f, displayName: e.target.value })}
-                      placeholder="Standard S3 Bucket"
+                      placeholder={t('form.displayNamePlaceholder')}
                       className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
                   </div>
                   <div>
-                    <label htmlFor="cat-pin" className="block text-sm font-medium text-slate-300 mb-1">Default version pin</label>
+                    <label htmlFor="cat-pin" className="block text-sm font-medium text-slate-300 mb-1">{t('form.versionPin')}</label>
                     <input id="cat-pin" type="text" value={f.defaultVersionPin}
                       onChange={(e) => setF({ ...f, defaultVersionPin: e.target.value })}
-                      placeholder="e.g. 1.2.0 (empty = latest)"
+                      placeholder={t('form.versionPinPlaceholder')}
                       className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
                   </div>
                 </div>
 
                 <div>
-                  <label htmlFor="cat-desc" className="block text-sm font-medium text-slate-300 mb-1">Description</label>
+                  <label htmlFor="cat-desc" className="block text-sm font-medium text-slate-300 mb-1">{t('form.descriptionLabel')}</label>
                   <textarea id="cat-desc" value={f.description} rows={2}
                     onChange={(e) => setF({ ...f, description: e.target.value })}
-                    placeholder="What this catalog item provisions…"
+                    placeholder={t('form.descriptionPlaceholder')}
                     className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
                 </div>
 
@@ -321,14 +327,14 @@ export default function AdminCatalogPage() {
                   <input type="checkbox" checked={f.enabled}
                     onChange={(e) => setF({ ...f, enabled: e.target.checked })}
                     className="rounded border-slate-600 bg-slate-700 text-brand-600 focus:ring-brand-500" />
-                  <span className="text-sm text-slate-300">Enabled (visible in the browse catalog)</span>
+                  <span className="text-sm text-slate-300">{t('form.enabled')}</span>
                 </label>
 
                 {/* Provider templates multi-select */}
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1">Provider templates</label>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">{t('form.providerTemplates')}</label>
                   {templates.length === 0 ? (
-                    <p className="text-xs text-slate-500">No provider templates defined.</p>
+                    <p className="text-xs text-slate-500">{t('form.noProviderTemplates')}</p>
                   ) : (
                     <div className="flex flex-wrap gap-2">
                       {templates.map((t) => {
@@ -351,11 +357,11 @@ export default function AdminCatalogPage() {
                     <input type="checkbox" checked={restrictPools}
                       onChange={(e) => setRestrictPools(e.target.checked)}
                       className="rounded border-slate-600 bg-slate-700 text-brand-600 focus:ring-brand-500" />
-                    <span className="text-sm text-slate-300">Restrict to specific agent pools</span>
+                    <span className="text-sm text-slate-300">{t('form.restrictPools')}</span>
                   </label>
                   {restrictPools ? (
                     pools.length === 0 ? (
-                      <p className="text-xs text-slate-500">No agent pools available.</p>
+                      <p className="text-xs text-slate-500">{t('form.noAgentPools')}</p>
                     ) : (
                       <div className="flex flex-wrap gap-2">
                         {pools.map((p) => {
@@ -371,29 +377,29 @@ export default function AdminCatalogPage() {
                       </div>
                     )
                   ) : (
-                    <p className="text-xs text-slate-500">Any agent pool may be used.</p>
+                    <p className="text-xs text-slate-500">{t('form.anyPool')}</p>
                   )}
                 </div>
 
                 {/* Labels */}
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1">Labels</label>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">{t('form.labels')}</label>
                   <LabelsEditor labels={f.labels} onChange={(labels) => setF({ ...f, labels })} />
                 </div>
 
                 {/* Advanced: variable-options JSON */}
                 <div>
-                  <label htmlFor="cat-varopts" className="block text-sm font-medium text-slate-300 mb-1">Variable options (advanced, JSON)</label>
+                  <label htmlFor="cat-varopts" className="block text-sm font-medium text-slate-300 mb-1">{t('form.variableOptions')}</label>
                   <textarea id="cat-varopts" value={f.variableOptionsJson} rows={5}
                     onChange={(e) => setF({ ...f, variableOptionsJson: e.target.value })}
                     placeholder='[{"name": "region", "options": ["us-east-1", "eu-west-1"]}]'
                     className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
-                  <p className="mt-1 text-xs text-slate-500">Per-input overrides (options, hidden, default). Leave as <code>[]</code> if unused.</p>
+                  <p className="mt-1 text-xs text-slate-500">{t.rich('form.variableOptionsHint', { code: (chunks) => <code>{chunks}</code> })}</p>
                 </div>
 
                 <button type="submit" disabled={saving}
                   className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors">
-                  {saving ? (editId !== null ? 'Saving…' : 'Creating…') : (editId !== null ? 'Save Changes' : 'Create Catalog Item')}
+                  {saving ? (editId !== null ? t('actions.saving') : t('actions.creating')) : (editId !== null ? t('actions.saveChanges') : t('actions.create'))}
                 </button>
               </form>
             )}
@@ -401,16 +407,16 @@ export default function AdminCatalogPage() {
             {loading ? (
               <LoadingSpinner />
             ) : items.length === 0 ? (
-              <EmptyState message="No catalog items yet." />
+              <EmptyState message={t('empty')} />
             ) : (
               <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-x-auto">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-slate-700/50">
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Name</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider hidden sm:table-cell">Module</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider hidden md:table-cell">Enabled</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">Actions</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">{t('table.name')}</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider hidden sm:table-cell">{t('table.module')}</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider hidden md:table-cell">{t('table.enabled')}</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">{t('table.actions')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-700/30">
@@ -427,13 +433,13 @@ export default function AdminCatalogPage() {
                         </td>
                         <td className="px-4 py-3 hidden md:table-cell">
                           <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${item.attributes.enabled ? 'bg-green-900/50 text-green-300' : 'bg-slate-700 text-slate-400'}`}>
-                            {item.attributes.enabled ? 'enabled' : 'disabled'}
+                            {item.attributes.enabled ? t('badge.enabled') : t('badge.disabled')}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-right">
                           <div className="flex justify-end gap-2">
-                            <button onClick={() => startEdit(item)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200">Edit</button>
-                            <button onClick={() => handleDelete(item.id)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300">Delete</button>
+                            <button onClick={() => startEdit(item)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200">{t('actions.edit')}</button>
+                            <button onClick={() => handleDelete(item.id)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300">{t('actions.delete')}</button>
                           </div>
                         </td>
                       </tr>

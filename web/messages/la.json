@@ -1,0 +1,2621 @@
+{
+  "nav": {
+    "workspaces": "Loca Operis",
+    "estate": "Praedium",
+    "registry": "Tabularium",
+    "modules": "Moduli",
+    "providers": "Providers",
+    "catalog": "Catalogus",
+    "agentPools": "Agent Pools",
+    "admin": "Administratio",
+    "users": "Usores",
+    "roles": "Partes",
+    "vcsConnections": "Nexus VCS",
+    "variableSets": "Copiae Variabilium",
+    "autodiscovery": "Autoinventio",
+    "bulkUpdate": "Renovatio Massalis",
+    "executionHooks": "Unci Exsecutionis",
+    "policySets": "Copiae Regularum",
+    "providerTemplates": "Exempla Providers",
+    "catalogAdmin": "Administratio Catalogi",
+    "cache": "Promptuarium",
+    "auditLog": "Diarium Recognitionis",
+    "help": "Auxilium",
+    "apiReference": "Consultatio API",
+    "docs": "Documenta",
+    "account": "Ratio",
+    "apiTokens": "Tesserae API",
+    "sessions": "Sessiones",
+    "logOut": "Exire",
+    "menu": "Index",
+    "openMenu": "Indicem aperire",
+    "openAccountMenu": "Indicem rationis aperire",
+    "closeMenu": "Indicem claudere"
+  },
+  "switcher": {
+    "language": "Lingua",
+    "changeLanguage": "Linguam mutare"
+  },
+  "workspaces": {
+    "title": "Loca Operis",
+    "description": "Administra loca operis, statum et exsecutiones Terraform",
+    "new": "Novum Locus Operis",
+    "cancel": "Abrogare",
+    "create": "Locum Operis Creare",
+    "creating": "Creatur…",
+    "loadFailed": "Loca operis onerari non potuerunt",
+    "createFailed": "Locus operis creari non potuit",
+    "form": {
+      "name": "Nomen",
+      "namePattern": "Litterae, numeri, lineolae et lineolae subiectae solum. A littera vel numero incipiat necesse est.",
+      "namePlaceholder": "meum-locus-operis",
+      "executionMode": "Modus Exsecutionis",
+      "local": "Localis",
+      "agent": "Agent",
+      "executionBackend": "Instrumentum Exsecutionis",
+      "version": "Versio",
+      "versionTitle": "Versio forma X.Y aut X.Y.Z (exempli gratia 1.11 aut 1.11.5)",
+      "versionPlaceholder": "e.g. 1.11 aut 1.11.5",
+      "cpuRequest": "Postulatio CPU",
+      "cpuTitle": "Quantitas CPU Kubernetes: integra corda (1, 2) aut millicorda (500m, 100m)",
+      "cpuHint": "e.g. 1, 0.5, 500m",
+      "memoryRequest": "Postulatio Memoriae",
+      "memoryTitle": "Quantitas memoriae Kubernetes: octeti (1000) aut cum suffixo (512Mi, 2Gi, 1Ti)",
+      "memoryHint": "e.g. 2Gi, 512Mi, 1Ti",
+      "agentPool": "Agent Pool",
+      "none": "Nullus",
+      "autoApply": "Applicatio Automatica",
+      "enabled": "Activatum",
+      "workingDirectory": "Directorium Operandi",
+      "workingDirectoryPlaceholder": "e.g. environments/dev",
+      "workingDirectoryHint": "Subdirectorium intra repositorium tabulas .tf continens",
+      "vcsConnection": "Nexus VCS",
+      "vcsRepoUrl": "URL Repositorii VCS",
+      "vcsRepoUrlTitle": "URL genere HTTP aut HTTPS esse debet",
+      "vcsRepoUrlPlaceholder": "https://github.com/org/repo",
+      "vcsBranch": "Ramus VCS",
+      "vcsBranchPlaceholder": "main (praedefinitum)"
+    },
+    "stats": {
+      "total": "Summa",
+      "health": "Salus",
+      "locked": "Occlusa",
+      "clearAllFilters": "Omnia cribra vacuare",
+      "clearHealthFilter": "Cribrum salutis vacuare",
+      "filterHealth": "Cribrare ad loca operis cum incommodis salutis",
+      "clearLockedFilter": "Cribrum occlusorum vacuare",
+      "filterLocked": "Cribrare ad loca operis occlusa"
+    },
+    "filter": {
+      "placeholder": "Cribra per nomen, titulum aut statum — e.g. \"eu1\", \"env:prod\", \"status:errored\"",
+      "ariaLabel": "Loca operis cribrare",
+      "clear": "Vacuare",
+      "status": "Status",
+      "label": "Titulus",
+      "back": "retro",
+      "valueCount": "{count, plural, one {# valor} other {# valores}}",
+      "removeTerm": "Hunc terminum removere",
+      "showing": "Monstrantur {filtered} ex {total}",
+      "termName": "nomen: {value}",
+      "termStatus": "status: {value}",
+      "termLabelAny": "{key}: (quilibet)",
+      "termLabel": "{key}: {value}",
+      "hintStatus": "status",
+      "hintHealth": "salus",
+      "hintLabel": "titulus",
+      "hintLabelKey": "clavis tituli",
+      "hintName": "nomen"
+    },
+    "row": {
+      "removeLabelFilter": "Preme ut ex cribro removeatur",
+      "addLabelFilter": "Preme ut per hunc titulum cribretur"
+    },
+    "table": {
+      "name": "Nomen",
+      "mode": "Modus",
+      "pool": "Pool",
+      "resources": "Facultates",
+      "status": "Status",
+      "created": "Creatum",
+      "resourcesValue": "{cpu} CPU / {memory}"
+    },
+    "empty": {
+      "none": "Nulla adhuc loca operis. Unum crea ut incipias.",
+      "noMatch": "Nulla loca operis huic cribro conveniunt."
+    }
+  },
+  "status": {
+    "state-diverged": "Status Divergens",
+    "vcs-error": "Error VCS",
+    "drifted": "Aberratum",
+    "errored": "Erratum",
+    "needs-confirm": "Confirmatione Eget",
+    "planning": "Consilium Fit",
+    "applying": "Applicatur",
+    "canceling": "Abrogatur",
+    "confirmed": "Confirmatum",
+    "queued": "In Ordine",
+    "pending": "Pendens",
+    "applied": "Applicatum",
+    "planned": "Consilium Factum",
+    "canceled": "Abrogatum",
+    "discarded": "Reiectum",
+    "pendingDeletion": "Deletio pendens",
+    "archived": "In Tabulario Repositum"
+  },
+  "auth": {
+    "loading": "Oneratur...",
+    "subtitle": "Ingredere ut infrastructuram tuam administres",
+    "subtitleCli": "Ingredere ut CLI auctorem facias",
+    "emailLabel": "Inscriptio Electronica",
+    "passwordLabel": "Tessera",
+    "signIn": "Ingredi",
+    "signingIn": "Ingrediens...",
+    "signInWith": "Ingredere per {provider}",
+    "or": "aut",
+    "noProviders": "Nulli auctores authenticationis configurati",
+    "completingSignIn": "Ingressus perficitur...",
+    "callbackFailedTitle": "Authenticatio Defecit",
+    "tryAgain": "Iterum Conare",
+    "errors": {
+      "loadProviders": "Auctores onerari non potuerunt",
+      "authenticationFailed": "Authenticatio defecit ({status})",
+      "tokenExchangeFailed": "Permutatio tesserae defecit ({status})",
+      "loginFailed": "Ingressus defecit",
+      "startLoginFailed": "Ingressus incipi non potuit",
+      "missingCodeOrState": "Codex auctoritatis aut status deest",
+      "stateMismatch": "Status discrepat — impetus CSRF possibilis",
+      "missingVerifier": "Verificator PKCE deest — quaeso iterum ingredi conare"
+    }
+  },
+  "estate": {
+    "title": "Topologia praedii",
+    "description": "Omne locus operis quod videre potes et moduli quos usurpant, per run-triggers, remote-state et nexus modulorum coniuncti. Congrega quocumque axe praedio tuo aptum est — suggestus nullam titulandi consuetudinem imponit.",
+    "errors": {
+      "load": "Graphum praedii onerari non potuit."
+    },
+    "groupBy": {
+      "label": "Congrega per"
+    },
+    "view": {
+      "graph": "Graphum",
+      "table": "Tabula"
+    },
+    "counts": {
+      "workspaces": "{count, plural, one {# locus operis} other {# loca operis}}",
+      "modules": "{count, plural, one {# modulus} other {# moduli}}",
+      "dependencies": "{count, plural, one {# dependentia} other {# dependentiae}}"
+    },
+    "legend": {
+      "registryModule": "modulus tabularii"
+    },
+    "detail": {
+      "moduleImpact": "{count, plural, one {locus operis hoc usurpat — id augere id iterum consulit} other {loca operis hoc usurpant — id augere ea omnia iterum consulit}}",
+      "dependOnThis": "{count, plural, one {ab hoc dependet} other {ab hoc dependent}}"
+    },
+    "table": {
+      "workspaces": {
+        "heading": "Loca Operis",
+        "col": {
+          "workspace": "Locus Operis",
+          "group": "Grex",
+          "agentPool": "Agent pool",
+          "dependedOnBy": "Dependent ab hoc",
+          "modulesUsed": "Moduli usurpati"
+        },
+        "noModules": "—"
+      },
+      "modules": {
+        "heading": "Moduli",
+        "col": {
+          "module": "Modulus",
+          "usedBy": "Usurpatur ab (locis operis)"
+        }
+      }
+    }
+  },
+  "labels": {
+    "title": "Tituli",
+    "description": "Explora titulos usurpatos per loca operis, agent pools, modulos tabularii et providers tabularii. Tantum legendus — tituli in propria cuiusque entitatis pagina rediguntur.",
+    "none": "Nulli.",
+    "emptyKeys": "Nulli adhuc tituli usurpati. Titula quodlibet locus operis, agent pool, modulum tabularii aut providerem tabularii ut res hic congregare incipias.",
+    "emptyValues": "Nulli valores pro \"{key}\". Aut nulla entitas legibilis hunc titulum fert, aut ab ultimo aspectu remotus est.",
+    "loadKeysFailed": "Tituli onerari non potuerunt ({status})",
+    "loadValuesFailed": "Valores pro {key} onerari non potuerunt ({status})",
+    "loadEntitiesFailed": "Entitates onerari non potuerunt ({status})",
+    "columns": {
+      "labelKey": "Clavis tituli",
+      "distinctValues": "Valores distincti",
+      "value": "Valor",
+      "total": "Summa"
+    },
+    "entity": {
+      "workspaces": "Loca Operis",
+      "agentPools": "Agent pools",
+      "modules": "Moduli",
+      "providers": "Providers"
+    },
+    "deprecated": {
+      "badge": "Deprecatum et non sustentatum.",
+      "body": "Inspector Titulorum iam in navigatione principali non est et in futura editione removebitur. Loco eius cribra per titulum ex pagina <workspacesLink>Locorum Operis</workspacesLink>. Si hac pagina niteris, quaeso <issueLink>quaestionem aperi</issueLink>."
+    }
+  },
+  "settings": {
+    "tokens": {
+      "title": "Tesserae API",
+      "description": "Administra tesseras authenticationis pro CLI et automatione",
+      "descriptionAll": "Omnes tesserae per omnes usores",
+      "myTokens": "Tesserae Meae",
+      "allTokens": "Omnes Tesserae",
+      "createToken": "Tesseram Creare",
+      "cancel": "Abrogare",
+      "tokenReady": "Tessera parata",
+      "tokenReadyHelp": "Hanc tesseram nunc exscribe — iterum non monstrabitur.",
+      "dismissToken": "Tesseram dimittere",
+      "hide": "Celare",
+      "show": "Monstrare",
+      "copy": "Exscribere",
+      "empty": "Nullae adhuc tesserae API.",
+      "noDescription": "Nulla descriptio",
+      "detached": "seiuncta",
+      "never": "Numquam",
+      "selected": "{count, plural, one {# tessera selecta} other {# tesserae selectae}}",
+      "revokeSelected": "Selectas Revocare",
+      "revoking": "Revocantur...",
+      "clearSelection": "Selectionem vacuare",
+      "rotate": "Rotare",
+      "rotating": "Rotatur...",
+      "revoke": "Revocare",
+      "confirmRotate": "Hanc tesseram rotare? Secretum praesens statim operari desinit et novum emittitur.",
+      "confirmBulkRevoke": "{count, plural, one {Tesseram # revocare?} other {Tesseras # revocare?}}",
+      "kinds": {
+        "interactive": {
+          "label": "Personalis",
+          "help": "Tessera personalis pro CLI et automatione ad hoc. Plenas permissiones tuas vivas fert."
+        },
+        "service_bound": {
+          "label": "Servitium · vincta",
+          "help": "Tessera servitii ad subsidium partium tuarum circumscripta. Accessus eius est intersectio illarum partium et tuarum — et operari desinit si ratio tua removetur."
+        },
+        "service_detached": {
+          "label": "Servitium · seiuncta",
+          "help": "Tessera servitii ab administratore administrata cum absoluto ambitu fixo, nulli usori vincta. Usurpa pro critica automatione machina-ad-machinam quae superstes esse debet quovis uno homine abeunte."
+        }
+      },
+      "lifespans": {
+        "720": "30 dies",
+        "2160": "90 dies",
+        "4320": "180 dies",
+        "8760": "1 annus"
+      },
+      "filter": {
+        "all": "Omnia genera"
+      },
+      "form": {
+        "description": "Descriptio",
+        "descriptionPlaceholder": "Tessera fistulae CI/CD",
+        "kind": "Genus",
+        "lifespan": "Vita",
+        "create": "Creare",
+        "creating": "Creatur...",
+        "pinnedRoles": "Partes fixae",
+        "pinnedRolesHelp": "— ambitus ad quem haec tessera circumscribitur",
+        "pinnedRolesCapped": "(ad tuum accessum limitatum)",
+        "noCustomRoles": "Nullae partes propriae definitae. Prius partes crea sub Administratio → Partes.",
+        "noScopedRoles": "Nullas partes circumscriptas tenes ad figendum. Haec tessera nullum accessum haberet."
+      },
+      "columns": {
+        "description": "Descriptio",
+        "kind": "Genus",
+        "boundTo": "Vincta Cum",
+        "created": "Creatum",
+        "lastUsed": "Ultimum Usa",
+        "expires": "Exspirat",
+        "actions": "Actiones"
+      },
+      "errors": {
+        "load": "Tesserae onerari non potuerunt",
+        "create": "Tessera creari non potuit ({status})",
+        "createGeneric": "Tessera creari non potuit",
+        "rotate": "Tessera rotari non potuit ({status})",
+        "rotateGeneric": "Tessera rotari non potuit",
+        "revoke": "Tessera revocari non potuit ({status})",
+        "revokeGeneric": "Tessera revocari non potuit",
+        "bulkRevoke": "Tesserae revocari non potuerunt"
+      }
+    },
+    "sessions": {
+      "title": "Sessiones",
+      "description": "Sessiones tuae activae",
+      "descriptionAll": "Omnes sessiones activae per suggestum",
+      "empty": "Nullae sessiones activae.",
+      "revokeAll": "Omnes Revocare",
+      "current": "Praesens",
+      "columns": {
+        "provider": "Provider",
+        "created": "Creatum",
+        "expires": "Exspirat",
+        "lastActive": "Ultimo Activa",
+        "token": "Tessera"
+      },
+      "errors": {
+        "load": "Sessiones onerari non potuerunt",
+        "revoke": "Sessiones revocari non potuerunt ({status})",
+        "revokeGeneric": "Sessiones revocari non potuerunt"
+      }
+    }
+  },
+  "registry": {
+    "modules": {
+      "title": "Moduli",
+      "description": "Tabularium privatum modulorum Terraform",
+      "cancel": "Abrogare",
+      "createModule": "Modulum Creare",
+      "empty": "Nulli adhuc moduli. Unum crea ut incipias.",
+      "providerLabel": "Provider: {provider}",
+      "versionCount": "{count, plural, one {# versio} other {# versiones}}",
+      "loadFailed": "Moduli onerari non potuerunt",
+      "createFailed": "Modulus creari non potuit",
+      "createFailedStatus": "Modulus creari non potuit ({status})",
+      "form": {
+        "name": "Nomen",
+        "provider": "Provider",
+        "slugTitle": "Litterae minusculae, numeri et lineolae solum. A littera minuscula incipiat necesse est.",
+        "addressNote": "Nomen et provider inscriptionem moduli in tabulario efformant nec post creationem mutari possunt.",
+        "vcsConnectionOptional": "Nexus VCS (optionalis)",
+        "noneUploadManually": "Nullus — versiones manu subde",
+        "repositoryUrl": "URL Repositorii",
+        "branchOptional": "Ramus (optionalis)",
+        "branchPlaceholder": "main (vacuum relinque pro praedefinito)",
+        "tagPattern": "Exemplar Notarum",
+        "tagPatternHint": "Solum notae huic exemplari convenientes versiones creant (e.g. v1.0.0)",
+        "labelsOptional": "Tituli (optionales)",
+        "creating": "Creatur...",
+        "create": "Creare"
+      }
+    },
+    "providers": {
+      "title": "Providers",
+      "description": "Tabularium privatum providers Terraform",
+      "cancel": "Abrogare",
+      "createProvider": "Providerem Creare",
+      "empty": "Nulli adhuc providers. Unum crea ut incipias.",
+      "loadFailed": "Providers onerari non potuerunt",
+      "createFailed": "Provider creari non potuit",
+      "createFailedStatus": "Provider creari non potuit ({status})",
+      "form": {
+        "name": "Nomen",
+        "slugTitle": "Litterae minusculae, numeri et lineolae solum. A littera minuscula incipiat necesse est.",
+        "creating": "Creatur...",
+        "create": "Creare"
+      }
+    },
+    "meta": {
+      "title": "Metadata",
+      "edit": "Redigere",
+      "cancel": "Abrogare",
+      "save": "Servare",
+      "saving": "Servatur...",
+      "saveAnyway": "Nihilominus Servare",
+      "revertLabels": "Titulos Restituere",
+      "owner": "Dominus",
+      "ownerNone": "Nullus",
+      "ownerPlaceholder": "usor@exemplum.com",
+      "labels": "Tituli"
+    },
+    "moduleDetail": {
+      "notFound": "Modulus non inventus",
+      "loadFailed": "Modulus onerari non potuit",
+      "updateFailed": "Modulus renovari non potuit",
+      "labelLockoutDefault": "Haec mutatio tituli accessum tuum minueret.",
+      "providerLabel": "Provider: {provider}",
+      "cancel": "Abrogare",
+      "uploadVersion": "Versionem Subdere",
+      "vcsConnected": "VCS Coniunctum",
+      "connectVcs": "VCS Coniungere",
+      "deleteModule": "Modulum Delere",
+      "linkFailed": "Locus operis nectari non potuit",
+      "linkFailedStatus": "Nexus defecit ({status})",
+      "unlinkConfirm": "Hoc locus operis a modulo disiungere? Analysis effectus ei amplius non curret.",
+      "unlinkFailed": "Locus operis disiungi non potuit",
+      "unlinkFailedStatus": "Disiunctio defecit ({status})",
+      "uploadFailed": "Subditio defecit",
+      "uploadFailedStatus": "Subditio defecit ({status})",
+      "saveVcsFailed": "Configuratio VCS servari non potuit",
+      "saveVcsFailedStatus": "Configuratio VCS servari non potuit ({status})",
+      "disableVcsFailed": "VCS deactivari non potuit",
+      "disableVcsFailedStatus": "VCS deactivari non potuit ({status})",
+      "deleteFailed": "Deletio defecit",
+      "deleteFailedStatus": "Deletio defecit ({status})",
+      "upload": {
+        "intro": "Elige directorium tabulas moduli tui Terraform continens. In tarball colligentur et subdentur.",
+        "version": "Versio",
+        "moduleDirectory": "Directorium Moduli",
+        "selectDirectory": "Directorium Eligere",
+        "fileCount": "{count, plural, one {# tabula} other {# tabulae}}",
+        "filesToInclude": "{count, plural, one {# tabula includenda:} other {# tabulae includendae:}}",
+        "andMore": "...et {count} plures",
+        "uploading": "Subditur...",
+        "upload": "Subdere"
+      },
+      "vcs": {
+        "intro": "Necte hoc modulum ad repositorium VCS. Novae versiones automatice eduntur cum notae semver exemplari notarum convenientes impelluntur. Commissiones ramorum solae versiones non creant.",
+        "connection": "Nexus VCS",
+        "selectConnection": "Nexum elige...",
+        "repositoryUrl": "URL Repositorii",
+        "branchOptional": "Ramus (optionalis)",
+        "branchPlaceholder": "main (vacuum relinque pro praedefinito)",
+        "tagPattern": "Exemplar Notarum",
+        "tagPatternHint": "Solum notae huic exemplari convenientes versiones creant (e.g. v1.0.0)",
+        "saving": "Servatur...",
+        "saveConfiguration": "Configurationem VCS Servare",
+        "disconnect": "VCS Disiungere"
+      },
+      "vcsStatus": {
+        "connected": "VCS coniunctum:",
+        "lastTag": "Ultima nota: {tag}",
+        "firstVersionHint": "Impelle notam semver (e.g. <code>v1.0.0</code>) exemplari notarum convenientem ut prima versio edatur."
+      },
+      "links": {
+        "title": "Loca Operis Nexa",
+        "linkWorkspace": "Locum Operis Nectere",
+        "description": "Loca operis nexa consilia speculativa accipiunt cum PR contra hunc modulum aperiuntur, atque exsecutiones normales cum novae versiones eduntur.",
+        "searchPlaceholder": "Quaere loca operis nectenda…",
+        "empty": "Nulla adhuc loca operis nexa.",
+        "unlinkTitle": "Locus operis disiungere"
+      },
+      "interface": {
+        "title": "Ingressus et Egressus",
+        "counts": "{inputs} ingressus, {outputs} egressus",
+        "versionLabel": "Versio:",
+        "noData": "Nulla data interfaciei pro hac versione praesto.",
+        "inputs": "Ingressus",
+        "outputs": "Egressus",
+        "name": "Nomen",
+        "type": "Genus",
+        "description": "Descriptio",
+        "default": "Praedefinitum",
+        "required": "Requisitum",
+        "sensitive": "Sensibile",
+        "requiredBadge": "requisitum",
+        "optionalBadge": "optionale",
+        "sensitiveBadge": "sensibile",
+        "noneDeclared": "Haec versio moduli nullos ingressus nec egressus declarat."
+      },
+      "versions": {
+        "title": "Versiones",
+        "count": "{count, plural, one {# versio} other {# versiones}}",
+        "emptyVcs": "Nullae adhuc versiones. Impelle notam semver \"{pattern}\" convenientem ad repositorium coniunctum ut versio edatur.",
+        "emptyUpload": "Nullae adhuc versiones. Modulum subde aut VCS coniunge ut incipias.",
+        "version": "Versio",
+        "status": "Status",
+        "source": "Fons",
+        "actions": "Actiones",
+        "manualUpload": "subditio manualis",
+        "delete": "Delere"
+      },
+      "deleteDialog": {
+        "title": "Deletionem Confirmare",
+        "moduleBody": "Hoc perpetuo delebit hunc modulum et omnes eius versiones.",
+        "versionBody": "Hoc perpetuo delebit versionem {version}.",
+        "cancel": "Abrogare",
+        "confirm": "Delere"
+      }
+    },
+    "providerDetail": {
+      "description": "Tabularium providers",
+      "deleteProvider": "Providerem Delere",
+      "publishNote": "Versiones providers eduntur cum CLI <code>terrapod-publish</code>, quae binaria cliente-signat. Subdere et signare binaria providers ex navigatro amplius non sustinetur. Haec pagina pro versionibus et suggestibus tantum legenda est.",
+      "empty": "Nullae adhuc versiones. Ede cum CLI terrapod-publish ut incipias.",
+      "loadVersionsFailed": "Versiones onerari non potuerunt",
+      "updateFailed": "Provider renovari non potuit",
+      "labelLockoutDefault": "Haec mutatio tituli accessum tuum minueret.",
+      "deleteFailed": "Deletio defecit",
+      "deleteFailedStatus": "Deletio defecit ({status})",
+      "platformCount": "{count, plural, one {# suggestus} other {# suggestus}}",
+      "delete": "Delere",
+      "os": "OS",
+      "arch": "Arch",
+      "filename": "Nomen tabulae",
+      "actions": "Actiones",
+      "deleteDialog": {
+        "title": "Deletionem Confirmare",
+        "providerBody": "Hoc perpetuo delebit hunc providerem et omnes eius versiones.",
+        "versionBody": "Hoc perpetuo delebit versionem {version} et eius suggestus.",
+        "platformBody": "Hoc perpetuo delebit suggestum {os}/{arch}.",
+        "cancel": "Abrogare",
+        "confirm": "Delere"
+      }
+    }
+  },
+  "adminUsers": {
+    "title": "Usores",
+    "description": "Administra rationes usorum localium",
+    "empty": "Nulli usores inventi.",
+    "columns": {
+      "email": "Inscriptio Electronica",
+      "displayName": "Nomen Apparens",
+      "status": "Status",
+      "lastLogin": "Ultimus Ingressus",
+      "created": "Creatum",
+      "actions": "Actiones"
+    },
+    "form": {
+      "email": "Inscriptio Electronica",
+      "displayName": "Nomen Apparens",
+      "displayNamePlaceholder": "Iulia Doe",
+      "passwordOptional": "Tessera (optionalis)",
+      "passwordPlaceholder": "Insere firmam tesseram"
+    },
+    "reset": {
+      "title": "Tesseram reponere pro {email}",
+      "newPassword": "Nova Tessera"
+    },
+    "password": {
+      "score": {
+        "veryWeak": "Valde infirma",
+        "weak": "Infirma",
+        "fair": "Mediocris",
+        "good": "Bona",
+        "strong": "Firma"
+      }
+    },
+    "status": {
+      "active": "Activa",
+      "inactive": "Inactiva",
+      "never": "Numquam"
+    },
+    "actions": {
+      "cancel": "Abrogare",
+      "save": "Servare",
+      "saving": "Servatur...",
+      "createUser": "Usorem Creare",
+      "creating": "Creatur...",
+      "resetPassword": "Tesseram Reponere",
+      "edit": "Redigere",
+      "delete": "Delere",
+      "resetPw": "Repone Tess.",
+      "setPw": "Pone Tess.",
+      "cancelPw": "Abroga Tess."
+    },
+    "confirm": {
+      "activate": "Usorem \"{email}\" activare?",
+      "deactivate": "Usorem \"{email}\" deactivare?",
+      "delete": "Usorem \"{email}\" delere? Hoc revocari non potest."
+    },
+    "success": {
+      "created": "Usor \"{email}\" creatus",
+      "updated": "Usor \"{email}\" renovatus",
+      "activated": "Usor \"{email}\" activatus",
+      "deactivated": "Usor \"{email}\" deactivatus",
+      "passwordReset": "Tessera reposita pro \"{email}\"",
+      "deleted": "Usor \"{email}\" deletus"
+    },
+    "errors": {
+      "load": "Usores onerari non potuerunt",
+      "create": "Usor creari non potuit",
+      "createStatus": "Usor creari non potuit ({status})",
+      "update": "Usor renovari non potuit",
+      "resetPassword": "Tessera reponi non potuit",
+      "delete": "Usor deleri non potuit"
+    }
+  },
+  "adminRoles": {
+    "title": "Partes et Attributiones",
+    "description": "Administra partes RBAC et partium usorum attributiones",
+    "builtIn": "insita",
+    "emptyRoles": "Nullae partes definitae.",
+    "emptyAssignments": "Nullae partium attributiones.",
+    "tabs": {
+      "roles": "Partes",
+      "assignments": "Attributiones"
+    },
+    "columns": {
+      "provider": "Provider",
+      "email": "Inscriptio Electronica",
+      "role": "Pars",
+      "created": "Creatum",
+      "actions": "Actiones"
+    },
+    "form": {
+      "name": "Nomen",
+      "namePattern": "Litterae, numeri, lineolae et lineolae subiectae solum. A littera vel numero incipiat necesse est.",
+      "workspacePermission": "Permissio Loci Operis",
+      "poolPermission": "Permissio Pool",
+      "registryPermission": "Permissio Tabularii",
+      "catalogPermission": "Permissio Catalogi",
+      "descriptionLabel": "Descriptio",
+      "descriptionPlaceholder": "Accessus programmatoris",
+      "allowLabels": "Titulos Permittere (clavis=valor, commate seiuncta)",
+      "allowNames": "Nomina Permittere (commate seiuncta)",
+      "denyLabels": "Titulos Negare (clavis=valor, commate seiuncta)",
+      "denyNames": "Nomina Negare (commate seiuncta)",
+      "allowLabelsShort": "Titulos Permittere",
+      "allowNamesShort": "Nomina Permittere",
+      "denyLabelsShort": "Titulos Negare",
+      "denyNamesShort": "Nomina Negare"
+    },
+    "assignForm": {
+      "provider": "Provider",
+      "email": "Inscriptio Electronica",
+      "roles": "Partes"
+    },
+    "caps": {
+      "selected": "{count, plural, one {# facultas} other {# facultates}} selectae",
+      "count": "{count, plural, one {# facultas} other {# facultates}}",
+      "custom": "Propria",
+      "matchesPresets": "Praestitutis convenit",
+      "advanced": "Provectum — facultates",
+      "otherPreserved": "Aliae facultates (in servando conservatae)",
+      "presetHelp": {
+        "before": "Praestitutum supra eligere facultates eius praesignat. Quadratulum ultra praestitutum signare aut designare partem notat ut",
+        "after": "et concessio eius ut copia facultatum explicita mittitur."
+      },
+      "groups": {
+        "workspace": "Locus Operis",
+        "run": "Exsecutio",
+        "state": "Status",
+        "var": "Variabiles",
+        "config": "Configuratio",
+        "drift": "Aberratio",
+        "run-task": "Munera exsecutionis",
+        "notification": "Nuntiationes",
+        "run-trigger": "Concitatores exsecutionis",
+        "pool": "Agent pools",
+        "registry": "Tabularium",
+        "catalog": "Catalogus servitiorum"
+      }
+    },
+    "display": {
+      "allow": "Permitte: {value}",
+      "allowNames": "Nomina permitte: {value}",
+      "deny": "Nega: {value}",
+      "denyNames": "Nomina nega: {value}"
+    },
+    "actions": {
+      "cancel": "Abrogare",
+      "save": "Servare",
+      "saving": "Servatur...",
+      "edit": "Redigere",
+      "delete": "Delere",
+      "remove": "Removere",
+      "createRole": "Partem Creare",
+      "creating": "Creatur...",
+      "addAssignment": "Attributionem Addere",
+      "setRoles": "Partes Ponere"
+    },
+    "confirm": {
+      "deleteRole": "Partem \"{name}\" delere? Quaevis attributiones eam referentes afficiuntur.",
+      "removeAssignment": "Partem \"{roleName}\" ab {email} removere?"
+    },
+    "success": {
+      "roleCreated": "Pars \"{name}\" creata",
+      "roleUpdated": "Pars \"{name}\" renovata",
+      "roleDeleted": "Pars \"{name}\" deleta",
+      "rolesAssigned": "Partes {email} attributae",
+      "assignmentRemoved": "Attributio remota"
+    },
+    "errors": {
+      "loadRoles": "Partes onerari non potuerunt",
+      "loadAssignments": "Attributiones onerari non potuerunt",
+      "createRole": "Pars creari non potuit",
+      "createRoleStatus": "Pars creari non potuit ({status})",
+      "updateRole": "Pars renovari non potuit",
+      "deleteRole": "Pars deleri non potuit",
+      "setAssignment": "Attributio poni non potuit",
+      "setAssignmentStatus": "Attributio poni non potuit ({status})",
+      "deleteAssignment": "Attributio deleri non potuit"
+    }
+  },
+  "adminVcs": {
+    "title": "Nexus VCS",
+    "description": "Administra integrationes systematis versionum moderandarum",
+    "empty": "Nulli nexus VCS configurati.",
+    "actions": {
+      "new": "Novus Nexus",
+      "cancel": "Abrogare",
+      "edit": "Redigere",
+      "delete": "Delere"
+    },
+    "confirmDelete": "Hunc nexum VCS delere? Loca operis eo utentia integrationem VCS amittent. Hoc revocari non potest.",
+    "form": {
+      "name": "Nomen",
+      "namePattern": "Litterae, numeri, lineolae et lineolae subiectae solum. A littera vel numero incipiat necesse est.",
+      "provider": "Provider",
+      "providerImmutable": "Provider immutabilis est — dele et recrea ut mutes",
+      "serverUrl": "URL Servitoris (optionalis)",
+      "serverUrlHint": "URL genere HTTP aut HTTPS esse debet (e.g. https://github.mycompany.com)",
+      "appId": "App ID",
+      "appIdHint": "GitHub App ID — cifrae numericae solum",
+      "installationId": "Installation ID",
+      "installationIdHint": "GitHub App Installation ID — cifrae numericae solum",
+      "privateKey": "Clavis Privata (PEM)",
+      "browse": "Perlustrare...",
+      "privateKeyKeep": "Vacuum relinque ut clavem praesentem serves — novum PEM insere ut rotes",
+      "privateKeyPlaceholder": "-----BEGIN RSA PRIVATE KEY-----\n...\n\nTabulam .pem hic depone aut Perlustrare preme",
+      "webhookSecret": "Secretum Webhook",
+      "optional": "(optionalis)",
+      "webhookSecretSet": "Positum — vacuum relinque ut serves, novum valorem insere ut rotes",
+      "webhookSecretGlobal": "Vacuum relinque ut secreto webhook globali utaris",
+      "webhookSecretHelp": "Secretum HMAC per-nexum pro webhook huius installationis. Cum non positum, secretum globale usurpatur.",
+      "accessToken": "Tessera Accessus",
+      "accessTokenKeep": "Vacuum relinque ut tesseram praesentem serves",
+      "saving": "Servatur...",
+      "creating": "Creatur...",
+      "saveChanges": "Mutationes Servare",
+      "createConnection": "Nexum Creare"
+    },
+    "table": {
+      "name": "Nomen",
+      "provider": "Provider",
+      "serverUrl": "URL Servitoris",
+      "status": "Status",
+      "created": "Creatum",
+      "actions": "Actiones"
+    },
+    "success": {
+      "created": "Nexus VCS \"{name}\" creatus",
+      "updated": "Nexus VCS \"{name}\" renovatus",
+      "deleted": "Nexus VCS deletus"
+    },
+    "errors": {
+      "load": "Nexus VCS onerari non potuerunt",
+      "save": "Nexus servari non potuit",
+      "delete": "Nexus deleri non potuit",
+      "createStatus": "Nexus creari non potuit ({status})",
+      "updateStatus": "Nexus renovari non potuit ({status})"
+    }
+  },
+  "adminVariableSets": {
+    "title": "Copiae Variabilium",
+    "description": "Administra copias variabilium ambitu organizationis pro gregibus locorum operis",
+    "empty": "Nullae copiae variabilium configuratae.",
+    "none": "-",
+    "actions": {
+      "new": "Nova Copia Variabilium",
+      "cancel": "Abrogare"
+    },
+    "form": {
+      "name": "Nomen",
+      "namePattern": "Litterae, numeri, lineolae et lineolae subiectae solum. A littera vel numero incipiat necesse est.",
+      "descriptionLabel": "Descriptio",
+      "descriptionPlaceholder": "Credentiales AWS pro omnibus locis operis",
+      "global": "Globalis (applica ad omnia loca operis)",
+      "priority": "Prioritas (variabiles loci operis supersede)",
+      "creating": "Creatur...",
+      "create": "Copiam Variabilium Creare"
+    },
+    "table": {
+      "name": "Nomen",
+      "description": "Descriptio",
+      "scope": "Ambitus",
+      "variables": "Variabiles",
+      "created": "Creatum"
+    },
+    "scope": {
+      "global": "Globalis",
+      "priority": "Prioritas",
+      "standard": "Norma"
+    },
+    "errors": {
+      "load": "Copiae variabilium onerari non potuerunt",
+      "create": "Copia variabilium creari non potuit",
+      "createStatus": "Copia variabilium creari non potuit ({status})"
+    },
+    "detail": {
+      "back": "Retro ad copias variabilium",
+      "headerFallback": "Copia variabilium",
+      "notFound": "Copia variabilium non inventa",
+      "global": "Globalis",
+      "priority": "Prioritas",
+      "yes": "Ita",
+      "no": "Non",
+      "edit": "Redigere",
+      "cancel": "Abrogare",
+      "save": "Servare",
+      "saving": "Servatur...",
+      "delete": "Delere",
+      "deleting": "Deletur...",
+      "confirmDelete": "Deletionem Confirmare",
+      "deleteTitle": "Copiam Variabilium Delere",
+      "deleteDescription": "Perpetuo dele hanc copiam variabilium et omnes eius variabiles.",
+      "tabs": {
+        "settings": "Optiones",
+        "variables": "Variabiles",
+        "workspaces": "Loca Operis"
+      },
+      "addVariable": "Variabilem Addere",
+      "adding": "Additur...",
+      "varKey": "Clavis",
+      "varValue": "Valor",
+      "varCategory": "Categoria",
+      "categoryTerraform": "Terraform",
+      "categoryEnv": "Ambitus",
+      "sensitive": "Sensibile",
+      "sensAbbr": "Sens.",
+      "enterNewValue": "Novum valorem insere",
+      "empty": "vacuum",
+      "emptyVars": "Nullae variabiles in hac copia.",
+      "actions": "Actiones",
+      "remove": "Removere",
+      "add": "Addere",
+      "addWorkspace": "Locum Operis Addere",
+      "workspace": "Locus Operis",
+      "selectWorkspace": "Locum operis elige...",
+      "globalBanner": "Haec copia variabilium globalis est et automatice ad omnia loca operis applicatur.",
+      "emptyWorkspaces": "Nulla loca operis huic copiae variabilium attributa.",
+      "confirmDeleteVar": "Hanc variabilem delere? Hoc revocari non potest.",
+      "confirmRemoveWorkspace": "Hoc locus operis a copia variabilium removere? Variabiles eius illi loco operis amplius non applicabuntur.",
+      "success": {
+        "updated": "Copia variabilium renovata",
+        "workspaceAdded": "Locus operis additum",
+        "workspaceRemoved": "Locus operis remotum"
+      },
+      "errors": {
+        "load": "Copia variabilium onerari non potuit",
+        "update": "Copia variabilium renovari non potuit",
+        "delete": "Copia variabilium deleri non potuit",
+        "loadVars": "Variabiles onerari non potuerunt",
+        "loadWorkspaces": "Loca operis onerari non potuerunt",
+        "addVar": "Variabilis addi non potuit",
+        "addVarStatus": "Variabilis addi non potuit ({status})",
+        "updateVar": "Variabilis renovari non potuit",
+        "deleteVar": "Variabilis deleri non potuit",
+        "addWorkspace": "Locus operis addi non potuit",
+        "removeWorkspace": "Locus operis removeri non potuit"
+      }
+    }
+  },
+  "adminAutodiscovery": {
+    "title": "Autoinventio",
+    "description": "Automatice loca operis in monorepositoriis crea cum PR semitas convenientes tangunt",
+    "empty": "Nullae adhuc regulae autoinventionis. Unam crea ut loca operis ex PR in monorepositorio tuo automatice provideri incipias.",
+    "unsavedRule": "(regula non servata)",
+    "actions": {
+      "newRule": "Nova Regula",
+      "cancel": "Abrogare",
+      "create": "Creare",
+      "update": "Renovare",
+      "preview": "Praevidere",
+      "edit": "Redigere",
+      "delete": "Delere",
+      "close": "Claudere"
+    },
+    "status": {
+      "enabled": "activata",
+      "disabled": "deactivata"
+    },
+    "form": {
+      "createTitle": "Regulam creare",
+      "editTitle": "Regulam redigere",
+      "name": "Nomen",
+      "vcsConnection": "Nexus VCS",
+      "selectConnection": "Nexum elige",
+      "repoUrl": "URL Repositorii",
+      "branch": "Ramus (vacuum = praedefinitum)",
+      "matchPattern": "Exemplar conveniendi",
+      "matchPatternHint": "Globi more gitignore. <code>**</code> per segmenta semitae convenit. Solum tabulae <code>*.tf*</code> autoinventionem concitant.",
+      "ignorePatterns": "Exemplaria neglegenda (unum per lineam)",
+      "nameTemplate": "Exemplar nominis loci operis (optionale)",
+      "nameTemplateHint": "Usurpa <path></path> pro directorio cum <code>/</code> per <code>-</code> substituto, aut <root></root> pro directorio ut est. Vacuum = praedefinitum (sola semita lineolata).",
+      "templateDefaults": "Praedefinita exemplaris loci operis",
+      "executionMode": "Modus exsecutionis",
+      "executionModeHint": "Autoinventio VCS-acta est; sola exsecutio agent sustinetur.",
+      "agentPool": "Agent pool",
+      "none": "(nullus)",
+      "executionBackend": "Instrumentum exsecutionis",
+      "terraformVersion": "Versio Terraform",
+      "cpuRequest": "Postulatio CPU",
+      "memoryRequest": "Postulatio memoriae",
+      "ownerEmail": "Inscriptio domini",
+      "autoApply": "Applicatio automatica",
+      "enabled": "Activatum",
+      "onDirectoryDelete": "In directorii deletione",
+      "onDeleteFlag": "Notare (tutum — deletioni pendenti notare, actionem manualem requirit)",
+      "onDeleteDestroy": "Destruere (PERICULUM — infrastructuram disicit deinde locus operis in tabulario reponit)",
+      "onDirectoryDeleteHint": "Quid autoinvento loco operis accidat cum directorium eius in ramo sequestrato removetur.",
+      "onDeleteDestroyWarning": "Hoc verum terraform destroy in loco operis curret cum directorium eius in ramo sequestrato removetur.",
+      "labels": "Tituli (a locis operis creatis hereditati)",
+      "varFiles": "Tabulae variabilium (a locis operis creatis hereditatae)",
+      "varFilesHint": "Semitae relativae <code>.tfvars</code> ad plan/apply transmissae.",
+      "addVarFile": "Tabulam variabilium addere",
+      "executionHooks": "Unci exsecutionis (cum quolibet novo loco operis sociati)",
+      "executionHooksHint": "Elige ex uncis in pagina administrationis <page>Uncorum Exsecutionis</page> definitis — quisque uncus selectus cum omni loco operis quod haec regula creat sociatur.",
+      "noHooks": "Nulli adhuc unci exsecutionis definiti. Prius unum crea in pagina administrationis Uncorum Exsecutionis.",
+      "hookDisabled": "(deactivatus)",
+      "hookNotInLibrary": "(non in bibliotheca — designa ut removeatur)",
+      "runTaskTemplates": "Exemplaria munerum exsecutionis (in quolibet novo loco operis creata)",
+      "notificationTemplates": "Exemplaria nuntiationum (in quolibet novo loco operis creata)",
+      "saving": "Servatur...",
+      "previewTitle": "Repositorium perambula et praevide quae loca operis haec regula CREET — nulla persistentia"
+    },
+    "table": {
+      "name": "Nomen",
+      "repo": "Repositorium",
+      "pattern": "Exemplar",
+      "enabled": "Activata",
+      "created": "Creatum",
+      "previewTitle": "Repositorium perambula et praevide quae loca operis haec regula crearet"
+    },
+    "deleteModal": {
+      "title": "Regulam delere?",
+      "body": "Loca operis ab hac regula automatice creata operari pergunt. Futurae PR novas semitas sub hac regula tangentes plura loca operis automatice non creabunt."
+    },
+    "preview": {
+      "title": "Praevisio: {ruleName}",
+      "walkedFiles": "Perambulatae <files>{count}</files> tabulae in <refspan>{ref}</refspan>",
+      "walking": "Repositorium perambulatur…",
+      "noMatches": "Nulla directoria in hoc repositorio exemplari regulae conveniunt. Nihil creandum.",
+      "colWorkspace": "Locus Operis",
+      "colDirectory": "Directorium",
+      "colAction": "Actio",
+      "repoRoot": "(radix repositorii)",
+      "actionCreate": "Creare",
+      "skipDiscovered": "Praeterire (iam inventum)",
+      "skipDiscoveredTitle": "Iam ab hac regula creatum",
+      "skipCollision": "Praeterire (collisio nominum)",
+      "skipCollisionTitle": "Locus operis hoc nomine iam alia de causa exsistit",
+      "willCreate": "{count, plural, one {# locus operis creabitur.} other {# loca operis creabuntur.}} Loca operis exsistentia (collisiones) intacta relinquuntur.",
+      "provision": "{count, plural, one {# locus operis providere} other {# loca operis providere}}",
+      "provisioning": "Providetur…",
+      "saveToProvision": "Regulam serva ut haec loca operis provideas."
+    },
+    "success": {
+      "created": "Creatum {name}",
+      "updated": "Renovatum {name}",
+      "deleted": "Regula deleta",
+      "provisioned": "{count, plural, one {# locus operis ex \"{ruleName}\" creatum} other {# loca operis ex \"{ruleName}\" creata}}"
+    },
+    "errors": {
+      "loadRules": "Regulae autoinventionis onerari non potuerunt",
+      "load": "Onerari non potuit",
+      "createFailed": "Creatio defecit: {status} {detail}",
+      "updateFailed": "Renovatio defecit: {status} {detail}",
+      "save": "Servari non potuit",
+      "deleteRule": "Regula deleri non potuit",
+      "delete": "Deleri non potuit",
+      "previewFailed": "Praevisio defecit ({status})",
+      "preview": "Praevisio defecit",
+      "previewPrereq": "Pone nexum VCS, URL repositorii et exemplar antequam praevideas",
+      "scanFailed": "Scrutinium defecit ({status})",
+      "scan": "Scrutinium defecit"
+    }
+  },
+  "adminBulkUpdate": {
+    "title": "Renovatio Massalis",
+    "description": "Elige loca operis per cribrum, deinde mutationem optionum per omnia illa applica",
+    "none": "(nullus)",
+    "anyOption": "(quilibet)",
+    "unchanged": "(immutatum)",
+    "unchangedOption": "(immutatum)",
+    "filter": {
+      "heading": "1. Elige loca operis",
+      "matchAll": "Convenire <strong>omnibus</strong> locis operis (cribra infra neglegit)",
+      "namePrefix": "Praefixum nominis",
+      "executionBackend": "Instrumentum exsecutionis",
+      "ownerEmail": "Inscriptio domini",
+      "agentPool": "Agent pool",
+      "vcsConnection": "Nexus VCS",
+      "labels": "Tituli",
+      "search": "Quaerere",
+      "searching": "Quaeritur..."
+    },
+    "results": {
+      "matched": "Convenerunt <strong>{count}</strong> {count, plural, one {locus operis} other {loca operis}}.",
+      "noMatch": "Nulla loca operis huic cribro convenerunt.",
+      "colName": "Nomen",
+      "colMode": "Modus",
+      "colBackend": "Instrumentum",
+      "colTfVersion": "Versio TF",
+      "colLabels": "Tituli"
+    },
+    "update": {
+      "heading": "2. Applica mutationes",
+      "hint": "Sola campa infra posita mutantur. Cribrum supra eligit quae loca operis mutationem accipiant.",
+      "terraformVersion": "Versio Terraform",
+      "executionBackend": "Instrumentum exsecutionis",
+      "executionMode": "Modus exsecutionis",
+      "autoApply": "Applicatio automatica",
+      "agentPool": "Agent pool",
+      "cpuRequest": "Postulatio CPU",
+      "memoryRequest": "Postulatio memoriae",
+      "setLabels": "Titulos ponere (chartam titulorum in omni loco operis conveniente substituit)",
+      "setVarFiles": "Tabulas variabilium ponere",
+      "addVarFile": "Tabulam variabilium addere",
+      "setRunTasks": "Munera exsecutionis ponere (per nomen in omni loco operis conveniente inserta-vel-renovata)",
+      "setNotifications": "Configurationes nuntiationum ponere (per nomen insertae-vel-renovatae)",
+      "dryRun": "Cursus siccus (sola praevisio — nullae mutationes scriptae)",
+      "confirmWarning": "Hoc mutationes in omni loco operis conveniente scribit.",
+      "confirmApply": "Applicationem confirmare",
+      "applying": "Applicatur...",
+      "cancel": "Abrogare",
+      "working": "Operatur...",
+      "previewDryRun": "Praevidere (cursus siccus)",
+      "applyChanges": "Mutationes applicare"
+    },
+    "diff": {
+      "colWorkspace": "Locus Operis",
+      "colChanges": "Mutationes"
+    },
+    "dryResult": {
+      "heading": "Effectus cursus sicci",
+      "summary": "Convenerunt <strong>{matched}</strong>; <strong>{wouldChange}</strong> mutarentur; {unchanged} immutata. Nihil scriptum est.",
+      "wouldChange": "Mutaretur",
+      "noChange": "Nulla loca operis hac renovatione mutarentur."
+    },
+    "applyResult": {
+      "heading": "Effectus applicationis",
+      "summary": "Convenerunt <strong>{matched}</strong>; <appliedstrong>{applied}</appliedstrong> applicata; {unchanged} immutata; {errors, plural, one {# error} other {# errores}}.",
+      "applied": "Applicatum",
+      "unnamedWorkspace": "(locus operis)",
+      "noChange": "Nulla loca operis mutata."
+    },
+    "errors": {
+      "searchFailed": "Quaesitio defecit ({status})",
+      "search": "Quaesitio defecit",
+      "bulkUpdateFailed": "Renovatio massalis defecit ({status})",
+      "bulkUpdate": "Renovatio massalis defecit"
+    }
+  },
+  "adminExecutionHooks": {
+    "title": "Unci Exsecutionis",
+    "description": "Gradus proprii shell intra Jobs runner ad puncta prae/post-plan/apply currentes, cum locis operis sociati",
+    "empty": "Nulli unci exsecutionis configurati.",
+    "actions": {
+      "cancel": "Abrogare",
+      "new": "Novus Uncus Exsecutionis",
+      "creating": "Creatur...",
+      "create": "Uncum Exsecutionis Creare"
+    },
+    "badges": {
+      "disabled": "Deactivatus",
+      "enabled": "Activatus"
+    },
+    "columns": {
+      "name": "Nomen",
+      "hookPoint": "Punctum Unci",
+      "enabled": "Activatus",
+      "priority": "Prioritas",
+      "workspaces": "Loca Operis"
+    },
+    "form": {
+      "name": "Nomen",
+      "namePatternTitle": "Litterae, numeri, lineolae et lineolae subiectae solum. A littera vel numero incipiat necesse est.",
+      "description": "Descriptio",
+      "descriptionPlaceholder": "Adde ingressum hospitum internorum ante init",
+      "hookPoint": "Punctum Unci",
+      "priority": "Prioritas",
+      "priorityTitle": "Minor primum currit cum plures unci punctum communicant (aequalitates per nomen solvuntur).",
+      "scriptLabel": "Scriptum (<code>/bin/sh -c</code>)",
+      "scriptHelp": "Cum identitate nubis runner currit. Exitus non-nullus exsecutionem reddit falsam. Secreta e variabilibus loci operis, non hic inline, venire debent."
+    },
+    "errors": {
+      "load": "Unci exsecutionis onerari non potuerunt",
+      "createStatus": "Uncus exsecutionis creari non potuit ({status})",
+      "create": "Uncus exsecutionis creari non potuit"
+    }
+  },
+  "adminPolicySets": {
+    "title": "Copiae Regularum",
+    "description": "Coactio regularum ut codicis OPA, ad loca operis per titulum circumscripta",
+    "empty": "Nullae copiae regularum configuratae.",
+    "actions": {
+      "cancel": "Abrogare",
+      "new": "Nova Copia Regularum",
+      "creating": "Creatur...",
+      "create": "Copiam Regularum Creare"
+    },
+    "badges": {
+      "disabled": "Deactivata",
+      "mandatory": "Obligatoria",
+      "advisory": "Consultiva",
+      "global": "Globalis",
+      "labelScoped": "Titulo-circumscripta"
+    },
+    "columns": {
+      "name": "Nomen",
+      "description": "Descriptio",
+      "enforcement": "Coactio",
+      "scope": "Ambitus",
+      "policies": "Regulae"
+    },
+    "form": {
+      "name": "Nomen",
+      "namePatternTitle": "Litterae, numeri, lineolae et lineolae subiectae solum. A littera vel numero incipiat necesse est.",
+      "description": "Descriptio",
+      "descriptionPlaceholder": "Cautiones obligatoriae pro locis operis productionis",
+      "enforcement": "Coactio",
+      "enforcementAdvisory": "Consultiva (mone, ne obsta)",
+      "enforcementMandatory": "Obligatoria (applicationem in defectu obsta)",
+      "globalScope": "Globalis (applica ad omne locus operis)",
+      "sourceInline": "Inline (regulas in UI administra)",
+      "sourceVcs": "Ex Repositorio VCS",
+      "vcsConnection": "Nexus VCS",
+      "selectConnection": "Nexum elige...",
+      "repoUrl": "URL Repositorii",
+      "branch": "Ramus",
+      "branchPlaceholder": "main (praedefinitum)",
+      "policyPath": "Semita Regularum",
+      "policyPathPlaceholder": "policies/ (directorium tabulas .rego continens)",
+      "helpVcs": "Regulae automatice a repositorio synchronizabuntur.",
+      "helpInline": "Adde regulas et circumscriptionem tituli affina post copiam creatam."
+    },
+    "errors": {
+      "load": "Copiae regularum onerari non potuerunt",
+      "createStatus": "Copia regularum creari non potuit ({status})",
+      "create": "Copia regularum creari non potuit"
+    }
+  },
+  "adminCatalog": {
+    "title": "Administratio Catalogi",
+    "description": "Administra res catalogi servitiorum",
+    "notEnabled": "Catalogus servitiorum non activatus est.",
+    "empty": "Nullae adhuc res catalogi.",
+    "actions": {
+      "new": "Nova Res Catalogi",
+      "cancel": "Abrogare",
+      "create": "Rem Catalogi Creare",
+      "creating": "Creatur…",
+      "saveChanges": "Mutationes Servare",
+      "saving": "Servatur…",
+      "edit": "Redigere",
+      "delete": "Delere"
+    },
+    "form": {
+      "name": "Nomen",
+      "nameTitle": "Litterae, numeri, lineolae et lineolae subiectae solum. A littera vel numero incipiat necesse est.",
+      "module": "Modulus",
+      "moduleSelect": "Modulum elige…",
+      "moduleImmutable": "Modulus post creationem immutabilis est",
+      "displayName": "Nomen apparens",
+      "displayNamePlaceholder": "Situla S3 Norma",
+      "versionPin": "Versionis fixatio praedefinita",
+      "versionPinPlaceholder": "e.g. 1.2.0 (vacuum = novissima)",
+      "descriptionLabel": "Descriptio",
+      "descriptionPlaceholder": "Quid haec res catalogi provideat…",
+      "enabled": "Activata (visibilis in catalogo explorando)",
+      "providerTemplates": "Exempla providers",
+      "noProviderTemplates": "Nulla exempla providers definita.",
+      "restrictPools": "Restringe ad certos agent pools",
+      "noAgentPools": "Nulli agent pools praesto.",
+      "anyPool": "Quilibet agent pool usurpari potest.",
+      "labels": "Tituli",
+      "variableOptions": "Optiones variabilium (provectum, JSON)",
+      "variableOptionsHint": "Substitutiones per-ingressum (optiones, hidden, default). Relinque ut <code>[]</code> si non usurpatae."
+    },
+    "table": {
+      "name": "Nomen",
+      "module": "Modulus",
+      "enabled": "Activata",
+      "actions": "Actiones"
+    },
+    "badge": {
+      "enabled": "activata",
+      "disabled": "deactivata"
+    },
+    "confirm": {
+      "delete": "Hanc rem catalogi delere? Instantiae exsistentes provisae non afficiuntur."
+    },
+    "success": {
+      "created": "Res catalogi \"{name}\" creata",
+      "updated": "Res catalogi \"{name}\" renovata",
+      "deleted": "Res catalogi deleta"
+    },
+    "errors": {
+      "load": "Res catalogi onerari non potuerunt",
+      "save": "Res catalogi servari non potuit",
+      "createStatus": "Res catalogi creari non potuit ({status})",
+      "updateStatus": "Res catalogi renovari non potuit ({status})",
+      "delete": "Res catalogi deleri non potuit",
+      "deleteConflict": "Deleri non potest: haec res catalogi instantias provisas habet.",
+      "varOptsInvalidJson": "Optiones variabilium JSON validum esse debent (ordo).",
+      "varOptsNotArray": "Optiones variabilium ordo JSON esse debent."
+    }
+  },
+  "adminProviderTemplates": {
+    "title": "Exempla Providers",
+    "description": "Blocci configurationis providers reusabiles pro rebus catalogi",
+    "notEnabled": "Catalogus servitiorum non activatus est.",
+    "empty": "Nulla adhuc exempla providers.",
+    "actions": {
+      "new": "Novum Exemplar",
+      "cancel": "Abrogare",
+      "create": "Exemplar Creare",
+      "creating": "Creatur…",
+      "saveChanges": "Mutationes Servare",
+      "saving": "Servatur…",
+      "edit": "Redigere",
+      "delete": "Delere"
+    },
+    "form": {
+      "name": "Nomen",
+      "providerType": "Genus provider",
+      "body": "Corpus (HCL)",
+      "parameters": "Parametri (provectum, JSON)",
+      "parametersHint": "Quisque parameter fit campum formae provisionis. Relinque ut <code>[]</code> si non usurpati.",
+      "labels": "Tituli"
+    },
+    "table": {
+      "name": "Nomen",
+      "providerType": "Genus provider",
+      "parameters": "Parametri",
+      "actions": "Actiones"
+    },
+    "confirm": {
+      "delete": "Hoc exemplar providers delere? Res catalogi id referentes providi non poterunt. Hoc revocari non potest."
+    },
+    "success": {
+      "created": "Exemplar providers \"{name}\" creatum",
+      "updated": "Exemplar providers \"{name}\" renovatum",
+      "deleted": "Exemplar providers deletum"
+    },
+    "errors": {
+      "load": "Exempla providers onerari non potuerunt",
+      "save": "Exemplar providers servari non potuit",
+      "createStatus": "Exemplar creari non potuit ({status})",
+      "updateStatus": "Exemplar renovari non potuit ({status})",
+      "delete": "Exemplar providers deleri non potuit",
+      "deleteConflict": "Deleri non potest: hoc exemplar a re catalogi refertur.",
+      "paramsInvalidJson": "Parametri JSON validum esse debent (ordo).",
+      "paramsNotArray": "Parametri ordo JSON esse debent."
+    }
+  },
+  "adminAgentPools": {
+    "title": "Agent Pools",
+    "description": "Administra agent pools runner et eorum listeners",
+    "empty": "Nulli agent pools configurati.",
+    "actions": {
+      "newPool": "Novum Pool",
+      "createPool": "Pool Creare",
+      "creating": "Creatur...",
+      "cancel": "Abrogare",
+      "edit": "Redigere",
+      "save": "Servare",
+      "saving": "Servatur...",
+      "delete": "Delere",
+      "deleting": "Deletur...",
+      "confirmDelete": "Deletionem Confirmare"
+    },
+    "form": {
+      "name": "Nomen",
+      "namePattern": "Litterae, numeri, lineolae et lineolae subiectae solum. A littera vel numero incipiat necesse est.",
+      "description": "Descriptio",
+      "descriptionPlaceholder": "Runners AWS productionis",
+      "labels": "Tituli"
+    },
+    "columns": {
+      "name": "Nomen",
+      "description": "Descriptio",
+      "status": "Status",
+      "created": "Creatum"
+    },
+    "badges": {
+      "default": "praedefinitum",
+      "degradedTooltip": "Listeners cor pulsant sed eorum certificata exspiraverunt — exsecutiones lanciari non poterunt.",
+      "status": {
+        "online": "in linea",
+        "offline": "extra lineam",
+        "degraded": "imminutum"
+      }
+    },
+    "detail": {
+      "back": "Retro ad agent pools",
+      "defaultDescription": "Agent pool"
+    },
+    "tabs": {
+      "settings": "Optiones",
+      "tokens": "Tesserae",
+      "listeners": "Listeners"
+    },
+    "settings": {
+      "title": "Optiones Pool",
+      "fields": {
+        "name": "Nomen",
+        "description": "Descriptio",
+        "created": "Creatum",
+        "owner": "Dominus",
+        "yourPermission": "Permissio Tua",
+        "labels": "Tituli"
+      },
+      "permissions": {
+        "read": "legere",
+        "write": "scribere",
+        "admin": "administrare"
+      }
+    },
+    "danger": {
+      "title": "Pool Delere",
+      "description": "Perpetuo dele hoc agent pool et omnes tesseras sociatas."
+    },
+    "tokens": {
+      "create": "Tesseram Creare",
+      "empty": "Nullae tesserae huic pool.",
+      "revoke": "Revocare",
+      "created": {
+        "title": "Tessera feliciter creata",
+        "copyNow": "Hanc tesseram nunc exscribe — iterum non monstrabitur.",
+        "copy": "Exscribere"
+      },
+      "form": {
+        "description": "Descriptio",
+        "descriptionPlaceholder": "Tessera listener productionis",
+        "maxUses": "Usus Maximi",
+        "maxUsesHint": "Praedefinitum 2 — unam repetitionem certationis initialis inter exempla listener tolerat.",
+        "expiresAt": "Exspirat",
+        "expiresAtHint": "Praedefinitum 1 hora ab nunc."
+      },
+      "columns": {
+        "description": "Descriptio",
+        "uses": "Usus",
+        "expires": "Exspirat",
+        "status": "Status",
+        "createdBy": "Creata Ab",
+        "actions": "Actiones"
+      },
+      "badges": {
+        "revoked": "Revocata",
+        "active": "Activa"
+      }
+    },
+    "listeners": {
+      "empty": "Nulli listeners huic pool inscripti.",
+      "columns": {
+        "name": "Nomen",
+        "status": "Status",
+        "replicas": "Exempla",
+        "certExpires": "Certificatum Exspirat",
+        "actions": "Actiones"
+      },
+      "status": {
+        "online": "in linea",
+        "offline": "extra lineam",
+        "degraded": "imminutum",
+        "cert-expired": "certificatum-exspiratum"
+      },
+      "tooltips": {
+        "certExpired": "Listener cor pulsat sed certificatum eius exspiravit — omnis vocatio certificato-authenticata (exsecutionem sumere, renovare, runner-token) deficiet. Causa verisimillima: API novissimum certificatum numquam inscripsit, aut TTL certificati ante renovationem elapsum est.",
+        "degraded": "Listeners cor pulsant sed eorum certificata exspiraverunt — exsecutiones lanciari non poterunt."
+      }
+    },
+    "confirm": {
+      "revokeToken": "Hanc tesseram iungendi revocare? Listeners ea utentes iungi amplius non possunt, et hoc revocari non potest.",
+      "deleteListener": "Hunc listener delere? Se reinscribet in proximo corde pulsante si pod adhuc currit."
+    },
+    "success": {
+      "poolUpdated": "Pool renovatum",
+      "tokenRevoked": "Tessera revocata",
+      "listenerDeleted": "Listener deletus"
+    },
+    "errors": {
+      "loadPools": "Agent pools onerari non potuerunt",
+      "loadPool": "Pool onerari non potuit",
+      "loadTokens": "Tesserae onerari non potuerunt",
+      "loadListeners": "Listeners onerari non potuerunt",
+      "createPool": "Pool creari non potuit",
+      "createStatus": "Pool creari non potuit ({status})",
+      "updatePool": "Pool renovari non potuit",
+      "deletePool": "Pool deleri non potuit",
+      "poolNotFound": "Pool non inventum",
+      "createToken": "Tessera creari non potuit",
+      "createTokenStatus": "Tessera creari non potuit ({status})",
+      "revokeToken": "Tessera revocari non potuit",
+      "deleteListener": "Listener deleri non potuit"
+    }
+  },
+  "adminAuditLog": {
+    "title": "Diarium Recognitionis",
+    "description": "Diarium immutabile omnium petitionum API",
+    "empty": "Nullae inscriptiones diarii recognitionis inventae.",
+    "errors": {
+      "load": "Diarium recognitionis onerari non potuit"
+    },
+    "filters": {
+      "actorEmail": "Inscriptio Actoris",
+      "actorPlaceholder": "usor@exemplum.com",
+      "resourceType": "Genus Facultatis",
+      "resourceTypePlaceholder": "loca operis",
+      "method": "Methodus",
+      "methodAll": "Omnes",
+      "since": "Ex",
+      "until": "Usque ad",
+      "clear": "Vacuare",
+      "apply": "Cribra Applicare"
+    },
+    "columns": {
+      "timestamp": "Momentum Temporis",
+      "actor": "Actor",
+      "action": "Actio",
+      "resourceType": "Genus Facultatis",
+      "resourceId": "ID Facultatis",
+      "status": "Status",
+      "duration": "Duratio"
+    },
+    "pagination": {
+      "summary": "Pagina {current} ex {total} ({count, plural, one {# inscriptio} other {# inscriptiones}})",
+      "previous": "Prior",
+      "next": "Sequens"
+    }
+  },
+  "adminBinaryCache": {
+    "title": "Promptuarium",
+    "description": "Administratio promptuarii binariorum CLI et providers",
+    "errors": {
+      "loadBinary": "Promptuarium binariorum onerari non potuit",
+      "loadCache": "Promptuarium onerari non potuit"
+    },
+    "sections": {
+      "cliBinaries": "Binaria CLI",
+      "providerBinaries": "Binaria Providers"
+    },
+    "empty": {
+      "binaries": "Nulla adhuc binaria CLI in promptuario.",
+      "providers": "Nulla adhuc binaria providers in promptuario."
+    },
+    "columns": {
+      "tool": "Instrumentum",
+      "version": "Versio",
+      "os": "OS",
+      "arch": "Arch",
+      "cachedAt": "In Promptuario Positum",
+      "provider": "Provider",
+      "hostname": "Nomen Hospitis",
+      "actions": "Actiones"
+    },
+    "warm": {
+      "heading": "Promptuarium calefacere",
+      "hide": "Celare",
+      "prePopulate": "Praeimplere…",
+      "help": "Praetrahe binaria et suggestus providers in promptuarium (unum per lineam). Signa <code>os/arch</code> in fine optionalia sunt — omitte ut suggestibus praedefinitis configuratis utaris.",
+      "binariesLabel": "Binaria",
+      "providersLabel": "Providers",
+      "warm": "Calefacere",
+      "warming": "Calefit…",
+      "confirm": "Inscriptiones promptuarii selectas nunc calefacere?",
+      "errorEmpty": "Adde saltem unam lineam binarii aut provider ad calefaciendum.",
+      "errorFailedStatus": "Calefactio defecit ({status})",
+      "errorFailed": "Promptuarium calefieri non potuit",
+      "success": "Calefacta {succeeded}/{total} ({failed} defecerunt)"
+    },
+    "purge": {
+      "button": "Purgare",
+      "confirmBinary": "{tool} {version} e promptuario purgare? A superiore in proxima petitione iterum petetur.",
+      "confirmProvider": "{provider} {version} e promptuario providers purgare? A superiore in proxima petitione iterum petetur.",
+      "successBinary": "Purgatae {count} inscriptiones pro {tool} {version}",
+      "successProvider": "Purgatae {count} inscriptiones pro {provider} {version}",
+      "errorStatus": "Purgatio defecit ({status})",
+      "error": "Purgari non potuit",
+      "errorProvider": "Provider purgari non potuit",
+      "errorProviders": "Providers purgari non potuerunt"
+    },
+    "batchPurge": {
+      "purging": "Purgatur...",
+      "purgeSelected": "Selectas Purgare ({count})",
+      "confirmBinary": "Omnes inscriptiones promptuarii binariorum selectas purgare? A superiore in proxima petitione iterum petentur.",
+      "confirmProvider": "Omnes inscriptiones promptuarii providers selectas purgare? A superiore in proxima petitione iterum petentur.",
+      "errorBinaryItem": "Purgatio defecit pro {tool} {version}",
+      "errorProviderItem": "Purgatio defecit pro {provider} {version}",
+      "successBinary": "Purgatae {count} inscriptiones promptuarii binariorum",
+      "successProvider": "Purgatae {count} inscriptiones promptuarii providers"
+    }
+  },
+  "catalog": {
+    "title": "Catalogus Servitiorum",
+    "description": "Provide infrastructuram sui-servitii ex modulis selectis",
+    "notEnabled": "Catalogus servitiorum non activatus est.",
+    "empty": "Nullae res catalogi praesto.",
+    "card": {
+      "pinned": "fixata {version}",
+      "latest": "novissima"
+    },
+    "errors": {
+      "loadItems": "Res catalogi onerari non potuerunt"
+    }
+  },
+  "catalogDetail": {
+    "backLink": "← Catalogus",
+    "backToCatalog": "Retro ad catalogum",
+    "fallbackTitle": "Res catalogi",
+    "notFound": "Res catalogi non inventa, aut catalogus servitiorum non activatus.",
+    "common": {
+      "cancel": "Abrogare"
+    },
+    "info": {
+      "module": "Modulus:",
+      "resolvedVersion": "Versio resoluta:",
+      "latest": "novissima",
+      "disabled": "deactivata"
+    },
+    "pending": {
+      "banner": "Exsecutio pro <strong>{name}</strong> consilio facta est et recognitionem exspectat. Confirma ut applices, aut reice.",
+      "working": "Operatur…",
+      "confirmApply": "Confirmare et applicare",
+      "discard": "Reicere"
+    },
+    "field": {
+      "select": "Elige…"
+    },
+    "provision": {
+      "title": "Providere",
+      "workspaceName": "Nomen loci operis",
+      "workspaceNameTitle": "Litterae, numeri, lineolae et lineolae subiectae solum. A littera vel numero incipiat necesse est.",
+      "workspaceNamePlaceholder": "mea-instantia",
+      "agentPool": "Agent pool",
+      "selectPool": "Pool elige…",
+      "noPoolsAvailable": "Nulli agent pools tibi praesto sunt. Accessu scribendi ad agent pool eges ut provideas — administratorem roga ut eum concedat.",
+      "noPoolsAllowed": "Nullus ex agent pools quos accedere potes ab hac re catalogi permittitur. Administratorem roga ut pools permissos rei amplificet aut tibi accessum ad unum eorum concedat.",
+      "version": "Versio",
+      "latestFloat": "Novissima (fluens)",
+      "defaultPinOption": "{version} (fixatio praedefinita)",
+      "labelsOptional": "Tituli (optionales)",
+      "autoApplyHint": "Applicatio automatica mutationes sine gradu recognitionis manualis applicat.",
+      "provisioning": "Providetur…",
+      "submit": "Providere"
+    },
+    "instances": {
+      "title": "Instantiae",
+      "empty": "Nullae adhuc instantiae ex hac re provisae.",
+      "colName": "Nomen",
+      "colVersion": "Versio",
+      "colPool": "Pool",
+      "colActions": "Actiones",
+      "reconfigure": "Reconfigurare",
+      "destroy": "Destruere",
+      "orphan": "Orbare…",
+      "orphanTitle": "Recordum catalogi delere sine infrastructura eius destruenda (dissuasum)"
+    },
+    "reconfigure": {
+      "title": "{name} reconfigurare",
+      "description": "Renova ingressus et/vel versionem, deinde exsecutionem in ordinem pone.",
+      "currentOption": "{version} (praesens)",
+      "queuing": "In ordinem ponitur…",
+      "queueRun": "Exsecutionem in ordinem ponere"
+    },
+    "destroy": {
+      "title": "{name} destruere",
+      "heading": "{name} destruere?",
+      "description": "Hoc exsecutionem destructionis in ordinem ponit quae infrastructuram huius instantiae disicit. In felici applicatione locus operis in tabulario reponitur. Hoc revocari non potest.",
+      "autoApplyHint": "Applicatio automatica statim sine recognitione disicit."
+    },
+    "orphan": {
+      "title": "{name} orbare",
+      "heading": "{name} orbare?",
+      "description": "Hoc recordum instantiae catalogi delet sed infrastructuram eius <warn>non</warn> destruit — facultates provisae currere pergunt, <warn>non observatae et non administratae</warn>. Hoc dissuasum est. Ut infrastructuram recipias, abroga et <emph>Destruere</emph> loco eius usurpa.",
+      "confirmPrompt": "Scribe nomen instantiae <mono>{name}</mono> ut confirmes:",
+      "orphaning": "Orbatur…",
+      "submit": "Orbare et infrastructuram deserere"
+    },
+    "actions": {
+      "confirmed": "Exsecutio confirmata — applicatur.",
+      "discarded": "Exsecutio reiecta.",
+      "provisioned": "{name} provisum — consilium ad recognitionem paratum.",
+      "reconfigureQueued": "Reconfiguratio in ordinem posita — exsecutio creata.",
+      "reconfigureQueuedStatus": "Reconfiguratio in ordinem posita — exsecutio est {status}.",
+      "destroyQueued": "Destructio in ordinem posita — exsecutio creata.",
+      "destroyQueuedStatus": "Destructio in ordinem posita — exsecutio est {status}.",
+      "orphaned": "{name} orbatum — recordum catalogi deletum; infrastructura eius currens relinquitur, non observata et non administrata."
+    },
+    "errors": {
+      "loadItem": "Res catalogi onerari non potuit",
+      "confirm": "Confirmari non potuit",
+      "confirmStatus": "Confirmari non potuit ({status})",
+      "discard": "Reici non potuit",
+      "discardStatus": "Reici non potuit ({status})",
+      "provision": "Provideri non potuit",
+      "provisionStatus": "Provideri non potuit ({status})",
+      "reconfigure": "Reconfigurari non potuit",
+      "reconfigureStatus": "Reconfigurari non potuit ({status})",
+      "destroy": "Destrui non potuit",
+      "destroyStatus": "Destrui non potuit ({status})",
+      "orphan": "Orbari non potuit",
+      "orphanStatus": "Orbari non potuit ({status})"
+    }
+  },
+  "common": {
+    "connection": {
+      "reconnecting": "Reconectitur…"
+    },
+    "sessionExpiry": {
+      "banner": "Sessio exspirat post {minutes, plural, one {# minutum} other {# minuta}} — <link>iterum authentica</link>"
+    },
+    "tokenExpiry": {
+      "withinDays": "{count, plural, one {# tessera servitii} other {# tesserae servitii}} intra {days, plural, one {# diem} other {# dies}} exspirantes — <link>recognosce</link>",
+      "soon": "{count, plural, one {# tessera servitii} other {# tesserae servitii}} mox exspirantes — <link>recognosce</link>",
+      "dismissAria": "Monitum exspirationis tesserae dimittere"
+    },
+    "resourceUsage": {
+      "title": "Usus facultatum",
+      "oomKilled": "OOM-occisum",
+      "killedLikelyOom": "Occisum (verisimiliter OOM)",
+      "memory": "Memoria",
+      "requested": "Postulatum {value}",
+      "limit": "Limes {value}"
+    },
+    "labelsEditor": {
+      "none": "Nulli",
+      "removeAria": "{key} removere",
+      "keyPlaceholder": "clavis",
+      "valuePlaceholder": "valor",
+      "add": "Addere"
+    },
+    "sensitiveInput": {
+      "hide": "Celare",
+      "show": "Monstrare",
+      "hideAria": "Valorem celare",
+      "showAria": "Valorem monstrare"
+    },
+    "workspacePicker": {
+      "searchPlaceholder": "Loca operis quaerere…",
+      "loading": "Oneratur…",
+      "empty": "Nulla loca operis inventa",
+      "adding": "Additur…"
+    },
+    "templateEditors": {
+      "remove": "Removere",
+      "add": "Addere",
+      "valuePlaceholder": "valor",
+      "name": "Nomen",
+      "url": "URL",
+      "hmacKey": "HMAC clavis (optionalis)",
+      "hmacKeyPlaceholder": "secretum commune",
+      "stage": "Gradus",
+      "enforcement": "Coactio",
+      "enabled": "Activatum",
+      "runTaskNamePlaceholder": "scrutinium-securitatis",
+      "runTaskUrlPlaceholder": "https://hooks.example.com/task",
+      "addRunTask": "Munus exsecutionis addere",
+      "destinationType": "Genus destinationis",
+      "token": "Tessera (optionalis)",
+      "tokenPlaceholder": "HMAC / tessera auth",
+      "notificationNamePlaceholder": "slack-monita",
+      "notificationUrlPlaceholder": "https://hooks.slack.com/services/...",
+      "emailAddresses": "Inscriptiones electronicae",
+      "emailPlaceholder": "ops@example.com",
+      "addEmail": "Inscriptionem addere",
+      "triggers": "Concitatores",
+      "addNotification": "Nuntiationem addere"
+    }
+  },
+  "planSummary": {
+    "aiGenerated": "AI generatum",
+    "heading": {
+      "planSummary": "Summarium consilii",
+      "failureAnalysis": "Analysis defectus"
+    },
+    "errors": {
+      "status": "HTTP {status}"
+    },
+    "regenerate": {
+      "label": "Regenerare",
+      "queueing": "In ordinem ponitur…",
+      "tooltip": "Summarium AI contra eosdem ingressus consilii iterum curre",
+      "ariaLabel": "Summarium AI regenerare",
+      "confirm": "Analysin AI regenerare? Hoc modelum iterum currit.",
+      "error": "Regenerari non potuit: <mono>{detail}</mono>"
+    },
+    "pending": {
+      "summarisingPlan": "Consilium summatim redigitur…",
+      "analysingFailure": "Defectus analysatur…"
+    },
+    "skipped": {
+      "fallback": "Summarium pro hac exsecutione praeteritum."
+    },
+    "errored": {
+      "heading": "Summariator defecit"
+    },
+    "riskFactors": {
+      "heading": "Momenta periculi",
+      "suggestedFixes": "Emendationes suggestae"
+    },
+    "tokens": "{input} in / {output} ex tokens",
+    "risk": {
+      "low": "humile",
+      "medium": "medium",
+      "high": "altum",
+      "critical": "criticum",
+      "unknown": "ignotum"
+    },
+    "badges": {
+      "noChanges": "Nullae mutationes",
+      "noChangesLower": "nullae mutationes",
+      "noChangesTitle": "Consilium nullas mutationes facultatum rettulit",
+      "toAdd": "{count, plural, one {# addendum} other {# addenda}}",
+      "toChange": "{count, plural, one {# mutandum} other {# mutanda}}",
+      "toDestroy": "{count, plural, one {# destruendum} other {# destruenda}}",
+      "toReplace": "{count, plural, one {# substituendum} other {# substituenda}}",
+      "toImport": "{count, plural, one {# importandum} other {# importanda}}"
+    },
+    "chat": {
+      "heading": "Subsequens",
+      "sharedThreadNote": "Unus filum communis, visibilis cuivis cum accessu legendi loci operis.",
+      "placeholder": "Roga quaestionem subsequentem de hoc consilio… (⌘/Ctrl + Enter ut mittas)",
+      "send": "Mittere",
+      "thinking": "Cogitatur…",
+      "you": "Tu",
+      "assistant": "Adiutor"
+    },
+    "translatedNote": "Automatice in linguam tuam translatum. Summarium auctoritativum est originale.",
+    "translating": "Vertens…"
+  },
+  "runDetail": {
+    "notFound": "Exsecutio non inventa",
+    "runSection": "Sectio exsecutionis",
+    "workspaceFallback": "locus operis",
+    "backTo": "Retro ad {name}",
+    "errorHeading": "Error",
+    "discardedHeading": "Reiectum — reconsilium requisitum",
+    "common": {
+      "yes": "Ita",
+      "no": "Non"
+    },
+    "header": {
+      "title": "Exsecutio {id}",
+      "titleWithWorkspace": "{workspace} — exsecutio {id}",
+      "description": "Exsecutio {source}"
+    },
+    "relTime": {
+      "justNow": "modo nunc",
+      "minutesAgo": "{count, plural, one {abhinc # minutum} other {abhinc # minuta}}",
+      "hoursAgo": "{count, plural, one {abhinc # hora} other {abhinc # horae}}",
+      "daysAgo": "{count, plural, one {abhinc # dies} other {abhinc # dies}}"
+    },
+    "status": {
+      "pending": "Pendens",
+      "queued": "In Ordine",
+      "planning": "Consilium Fit",
+      "planned": "Consilium Factum",
+      "confirmed": "Confirmatum",
+      "applying": "Applicatur",
+      "canceling": "Abrogatur",
+      "applied": "Applicatum",
+      "errored": "Erratum",
+      "canceled": "Abrogatum",
+      "discarded": "Reiectum"
+    },
+    "activity": {
+      "pending": "Exsecutio praeparatur",
+      "queued": "Agent praesto exspectatur",
+      "planning": "terraform plan curritur",
+      "plannedConfirmable": "Exspectatur ut confirmes et applices",
+      "plannedSpeculative": "Consilium speculativum perfectum",
+      "plannedComplete": "Consilium perfectum",
+      "confirmed": "Applicatio incipitur",
+      "applying": "terraform apply curritur",
+      "canceling": "Exsecutio sistitur",
+      "applied": "Applicatio perfecta",
+      "errored": "Exsecutio defecit",
+      "canceled": "Exsecutio abrogata",
+      "discarded": "Consilium reiectum",
+      "elapsedTitle": "Elapsum in hac phasi"
+    },
+    "badge": {
+      "destroy": "destructio",
+      "planOnly": "solum consilium"
+    },
+    "actions": {
+      "retryShort": "Retentare",
+      "retryFull": "Exsecutionem Retentare",
+      "retrying": "Retentatur…",
+      "confirmShort": "Applicare",
+      "confirmFull": "Confirmare et Applicare",
+      "confirming": "Confirmatur…",
+      "discard": "Reicere",
+      "discarding": "Reicitur…",
+      "cancelShort": "Abrogare",
+      "cancelFull": "Exsecutionem Abrogare",
+      "canceling": "Abrogatur…"
+    },
+    "confirm": {
+      "apply": "Hanc exsecutionem applicare? Hoc consilium applicat et infrastructuram mutat.",
+      "discard": "Hoc consilium reicere?",
+      "cancel": "Hanc exsecutionem abrogare?",
+      "retry": "Hanc exsecutionem retentare?"
+    },
+    "errors": {
+      "loadRun": "Exsecutio onerari non potuit",
+      "action": {
+        "confirm": "Exsecutio confirmari non potuit",
+        "discard": "Exsecutio reici non potuit",
+        "cancel": "Exsecutio abrogari non potuit",
+        "retry": "Exsecutio retentari non potuit"
+      }
+    },
+    "tabs": {
+      "overview": "Conspectus",
+      "ai": "AI",
+      "aiFull": "Analysis AI",
+      "opa": "OPA",
+      "opaFull": "Regulae OPA",
+      "impact": "Effectus",
+      "impactFull": "Graphum effectus",
+      "planLabel": "Consilium<log>Diarium</log>",
+      "applyLabel": "Applicatio<log>Diarium</log>",
+      "planFull": "Diarium consilii",
+      "applyFull": "Diarium applicationis",
+      "details": "Particularia"
+    },
+    "banner": {
+      "destroy": "Haec est exsecutio <strong>destructionis</strong> — omnes facultates administratae destruentur cum applicatur.",
+      "planOnlyCli": "Haec est exsecutio <strong>solum-consilii</strong> ex CLI in loco operis VCS-coniuncto incepta. Applicatio pro codice CLI-subdito non praesto est — solum codex VCS-administratus applicari potest.",
+      "moduleOverridesPrefix": "Haec exsecutio <strong>substitutiones modulorum</strong> usurpat",
+      "moduleOverridesFromPr": "e PR #{number}",
+      "moduleOverridesSuffix": "e ramo PR petentur loco versionis tabularii editae."
+    },
+    "cards": {
+      "changes": "Mutationes",
+      "aiAnalysis": "Analysis AI",
+      "policyChecks": "Probationes regularum",
+      "resources": "Facultates"
+    },
+    "changes": {
+      "noChanges": "Nullae mutationes",
+      "planning": "Consilium fit…",
+      "toAdd": "addenda",
+      "toChange": "mutanda",
+      "toDestroy": "destruenda",
+      "toReplace": "substituenda",
+      "toImport": "importanda"
+    },
+    "ai": {
+      "notAvailable": "Non praesto",
+      "ready": "Parata",
+      "riskSub": "{risk} periculum",
+      "generating": "Generatur…",
+      "skipped": "Praeterita",
+      "failed": "Defecit",
+      "available": "Praesto"
+    },
+    "policy": {
+      "none": "Nullae",
+      "blocked": "Obstructum",
+      "failedSub": "{count, plural, one {# defecit} other {# defecerunt}}",
+      "advisoryIssues": "Incommoda consultiva",
+      "passedSub": "{passed}/{total} probata",
+      "passed": "Probata"
+    },
+    "resources": {
+      "overLimit": "Supra limitem",
+      "oomKilled": "OOM-occisum",
+      "recorded": "Recordatum",
+      "nearLimit": "Prope limitem",
+      "high": "Altum",
+      "withinLimits": "Intra limites"
+    },
+    "details": {
+      "heading": "Particularia",
+      "executionBackend": "Instrumentum Exsecutionis",
+      "source": "Fons",
+      "autoApply": "Applicatio Automatica",
+      "planOnly": "Solum Consilium",
+      "triggeredBy": "Concitatum a",
+      "created": "Creatum",
+      "commit": "Commissio",
+      "branch": "Ramus",
+      "prMr": "PR/MR",
+      "stateVersion": "Versio Status",
+      "viewState": "Statum Videre",
+      "runOptions": "Optiones Exsecutionis"
+    },
+    "timeline": {
+      "heading": "Series Temporum",
+      "queued": "In Ordine Positum",
+      "planningStarted": "Consilium inceptum",
+      "planComplete": "Consilium perfectum",
+      "confirmed": "Confirmatum",
+      "applyingStarted": "Applicatio incepta",
+      "applied": "Applicatum",
+      "errored": "Erratum",
+      "canceled": "Abrogatum",
+      "discarded": "Reiectum"
+    },
+    "log": {
+      "color": "Color",
+      "colorOnTitle": "Colores ANSI monstrantur — preme pro textu plano",
+      "colorOffTitle": "Textus planus monstratur — preme pro coloribus",
+      "refresh": "Renovare",
+      "refreshTitle": "Diarium renovare",
+      "copy": "Exscribere",
+      "copied": "Exscriptum!",
+      "copyTitle": "Textum planum in tabellam exscribere",
+      "copyAria": "Diarium in tabellam exscribere",
+      "download": "Depromere",
+      "downloadColorTitle": "Diarium depromere (cum codicibus coloris ANSI)",
+      "downloadPlainTitle": "Diarium depromere (textus planus)",
+      "downloadAria": "Diarium depromere",
+      "follow": "Sequi",
+      "followOnTitle": "Caudam vivam sequens — preme ut sistas",
+      "followOffTitle": "Caudam vivam sequi",
+      "end": "Finis",
+      "endTitle": "Ad finem diarii salire",
+      "planEmpty": "Nullus egressus consilii adhuc praesto.",
+      "applyEmpty": "Nullus egressus applicationis adhuc praesto."
+    },
+    "policyPanel": {
+      "heading": "Probationes Regularum",
+      "passedCount": "{passed}/{total} probata",
+      "blockedMessage": "Haec exsecutio <strong>a copia regularum obligatoria obstruitur</strong>. Non applicabitur donec defectus solvatur aut administrator eam supersedat.",
+      "overriding": "Superseditur...",
+      "overrideContinue": "Supersedere et Pergere",
+      "overrideFailed": "Supersessio defecit",
+      "overrideFailedStatus": "Supersessio defecit ({status})",
+      "overriddenBy": "supersessum ab {by}",
+      "policyPassed": "probata",
+      "noDenyMessage": "Regula defecit sine nuntio negationis aut egressu erroris",
+      "enforcement": {
+        "mandatory": "obligatoria",
+        "advisory": "consultiva"
+      },
+      "outcome": {
+        "passed": "probata",
+        "failed": "defecit",
+        "errored": "erravit"
+      }
+    }
+  },
+  "workspaceDetail": {
+    "notFound": "Locus operis non inventum",
+    "common": {
+      "enabled": "Activatum",
+      "disabled": "Deactivatum",
+      "none": "Nullum",
+      "default": "Praedefinitum",
+      "never": "Numquam",
+      "actions": "Actiones",
+      "workspaceLocked": "Locus operis occlusum est"
+    },
+    "actions": {
+      "edit": "Redigere",
+      "cancel": "Abrogare",
+      "save": "Servare",
+      "saving": "Servatur…",
+      "savingEllipsis": "Servatur...",
+      "delete": "Delere",
+      "deleting": "Deletur...",
+      "add": "Addere",
+      "adding": "Additur...",
+      "remove": "Removere",
+      "download": "Depromere",
+      "rollback": "Retrovolvere",
+      "close": "Claudere",
+      "hide": "Celare",
+      "enable": "Activare",
+      "disable": "Deactivare",
+      "creating": "Creatur...",
+      "sending": "Mittitur...",
+      "processing": "Tractatur...",
+      "queuing": "In ordinem ponitur...",
+      "loading": "Oneratur...",
+      "loadingLower": "oneratur…"
+    },
+    "header": {
+      "executionMode": "modus exsecutionis {mode}"
+    },
+    "tabs": {
+      "overview": "Conspectus",
+      "variables": "Variabiles",
+      "runs": "Exsecutiones",
+      "state": "Status",
+      "stateGraph": "Graphum Status",
+      "configurations": "Configurationes",
+      "notifications": "Nuntiationes",
+      "runTasks": "Munera Exsecutionis",
+      "runTriggers": "Concitatores Exsecutionis",
+      "sharing": "Communicatio",
+      "selectLabel": "Sectio loci operis"
+    },
+    "lifecycle": {
+      "pendingDeletion": "Deletio pendens",
+      "pendingDeletionDefault": "Hoc locus operis deletioni notatum est et actionem manualem requirit.",
+      "archived": "In Tabulario Repositum",
+      "archivedDefault": "Hoc locus operis in tabulario repositum est."
+    },
+    "runQueuedBanner": {
+      "message": "Exsecutio feliciter in ordinem posita.",
+      "viewRun": "Exsecutionem Videre"
+    },
+    "settings": {
+      "title": "Optiones",
+      "saveChanges": "Mutationes servare",
+      "renamedNotice": "Locus operis renominatum. Renova campum <name></name> in tuo blocco <cloud></cloud> ut conveniat."
+    },
+    "fields": {
+      "name": "Nomen",
+      "nameTitle": "Litterae, numeri, lineolae, lineolae subiectae. A littera vel numero incipiat necesse est.",
+      "executionMode": "Modus Exsecutionis",
+      "execModeLocal": "Localis",
+      "execModeAgent": "Agent",
+      "autoApply": "Applicatio Automatica",
+      "cpuRequest": "Postulatio CPU",
+      "cpuRequestTitle": "Quantitas CPU Kubernetes: integra corda (1, 2) aut millicorda (500m, 100m)",
+      "memoryRequest": "Postulatio Memoriae",
+      "memoryRequestTitle": "Quantitas memoriae Kubernetes: octeti (1000) aut cum suffixo (512Mi, 2Gi, 1Ti)",
+      "executionBackend": "Instrumentum Exsecutionis",
+      "version": "Versio",
+      "versionPlaceholder": "e.g. 1.11 aut 1.11.5",
+      "versionTitle": "Versio forma X.Y aut X.Y.Z (exempli gratia 1.11 aut 1.11.5)",
+      "terragruntEnabledAgent": "Activatum (modus agent)",
+      "terragruntEnabledVersion": "Activatum (v{version})",
+      "terragruntVersionPlaceholder": "e.g. 1.0",
+      "terragruntVersionTitle": "Versio Terragrunt forma X.Y aut X.Y.Z (exempli gratia 1.0)",
+      "workingDirectory": "Directorium Operandi",
+      "workingDirectoryPlaceholder": "e.g. environments/dev",
+      "agentPool": "Agent Pool",
+      "owner": "Dominus",
+      "vcsConnection": "Nexus VCS",
+      "vcsRepository": "Repositorium VCS",
+      "vcsRepositoryTitle": "URL genere HTTP aut HTTPS esse debet",
+      "vcsBranch": "Ramus VCS",
+      "vcsBranchPlaceholder": "main (praedefinitum)",
+      "vcsWorkflow": "Fluxus Operis VCS",
+      "vcsWorkflowMergeThenApply": "merge_then_apply (praedefinitum — norma TFE / HCP)",
+      "vcsWorkflowApplyThenMerge": "apply_then_merge (norma Atlantis — ex electione)",
+      "autoMerge": "Automatice-conflare post applicationem",
+      "autoMergeStrategy": "Ratio Auto-conflandi",
+      "vcsPolling": "Interrogatio VCS",
+      "labels": "Tituli (tags)",
+      "labelsTitle": "Tituli loci operis duplex officium praestant: convenientia RBAC titulo-basata, et ut \"tags\" quae a blocis terraform/tofu cloud '{' workspaces '{' tags = ... '}' '}' conveniuntur.",
+      "varFiles": "Tabulae Variabilium",
+      "varFilesPlaceholder": "e.g. envs/dev.tfvars",
+      "triggerPrefixes": "Praefixa Concitantia",
+      "triggerPrefixesHint": "Directoria quae exsecutiones concitant. Cribrationem directorii operandi supersedet cum posita.",
+      "triggerPrefixesPlaceholder": "e.g. modules",
+      "triggerPrefixesNone": "Nulla (directorio operandi utitur)",
+      "driftIgnoreRules": "Regulae Aberrationem Neglegendi",
+      "driftIgnoreRulesHint": "Semitae inscriptionum et attributorum Terraform globi-gnarae a classificatore aberrationis suppressae. <star></star> zero aut plures characteres non-<dot></dot> convenit (spatium <n></n> indicum); <starIdx></starIdx> quemvis indicem uncinatum convenit. Inscriptio nuda sine suffixo attributi quamvis mutationem illius facultatis silet — destructiones inclusas. Solam aberrationem afficit, non normale plan/apply. Vide <docs>drift-ignore-rules.md</docs> pro grammatica plena.",
+      "driftIgnoreRulesNone": "Nulla (omnis differentia consilii ut aberratio numeratur)"
+    },
+    "vcsWorkflowWarning": {
+      "title": "Auctoritas repositorio VCS tuo delegata.",
+      "rbac": "Quisquis PR conflare potest applicare potest. Regulae protectionis ramorum (recognitiones requisitae, probationes status, approbatio dominorum codicis) fiunt porta. RBAC partium/titulorum Terrapod<em>non</em> applicatur ad actiones commentario-actas in hoc modo.",
+      "recommended": "<strong>Commendatum:</strong> historiam linearem require (rebase/squash ante conflationem) ut commissio quam applicas sit commissio quae terram tangit.",
+      "credit": "Meritum: hic fluxus operis ad exemplar <atlantis>Atlantis</atlantis> conformatus est. Atlantis manet rectum instrumentum turmis quae solum applicationes PR-commentario-actas et nullam suggestus UI volunt."
+    },
+    "vcsPolling": {
+      "error": "Error",
+      "ok": "OK ({time})",
+      "notPolled": "Nondum interrogatum"
+    },
+    "lockout": {
+      "revertLabels": "Titulos Restituere",
+      "saveAnyway": "Nihilominus Servare"
+    },
+    "lock": {
+      "title": "Status Occlusionis",
+      "lockedDesc": "Hoc locus operis occlusum est. Nulla consilia nec applicationes currere possunt.",
+      "unlockedDesc": "Hoc locus operis reseratum est et exsecutionibus paratum.",
+      "lock": "Occludere",
+      "unlock": "Reserare",
+      "lockConfirm": "Hoc locus operis occludere?",
+      "unlockConfirm": "Hoc locus operis reserare?"
+    },
+    "drift": {
+      "title": "Inventio Aberrationis",
+      "checkInterval": "Intervallum Inspectionis",
+      "status": "Status",
+      "statusNoDrift": "Nulla Aberratio",
+      "statusDrifted": "Aberratum",
+      "statusErrored": "Erratum",
+      "statusUnchecked": "Non Inspectum",
+      "dismiss": "Dimittere",
+      "dismissing": "Dimittitur…",
+      "dismissTitle": "Vacua statum aberrationis relatum. Proxima inspectio ordinata eum ex realitate reimplebit.",
+      "lastChecked": "Ultimo Inspectum",
+      "checkNow": "Nunc Inspicere",
+      "checkNowTitle": "Exsecutionem solum-consilii in ordinem pone ut aberrationem inspicias",
+      "checkNowTitleDisabled": "Prius inventionem aberrationis activa"
+    },
+    "intervals": {
+      "disabled": "Deactivatum",
+      "1hour": "1 hora",
+      "4hours": "4 horae",
+      "12hours": "12 horae",
+      "24hours": "24 horae",
+      "48hours": "48 horae",
+      "3days": "3 dies",
+      "7days": "7 dies"
+    },
+    "planExpiry": {
+      "title": "Exspiratio Consilii",
+      "description": "Automatice reice consilium non confirmatum ubi hoc antiquius est, ut consilium obsoletum contra mundum mutatum applicari non possit. Praedefinite deactivatum; consilium deinde iterum currendum est. (Applicatur solum ad exsecutiones applicationis-capaces.)",
+      "expireAfter": "Exspirare post"
+    },
+    "aiSummary": {
+      "title": "Summarium Consilii AI",
+      "description": "Summarium mutationum ab LLM automatice generatum, aestimatio periculi et analysis defectus in omni exitu phasis consilii huius loci operis.",
+      "mode": "Modus",
+      "modeDefault": "Praedefinitum instructionis sequi",
+      "modeEnabled": "Semper summatim redigere",
+      "modeDisabled": "Numquam summatim redigere",
+      "contextLabel": "Contextus loci operis",
+      "contextLabelSuffix": "(optionalis, additivus)",
+      "contextPlaceholder": "Facta quae AI de hoc loco operis specialiter scire debet. e.g. 'Vault pro servitio X frontat — clavem KMS destruere globalem defectionem causat.'",
+      "noContext": "Nullus contextus loci operis positus.",
+      "contextHint": "Super contextum per totam instructionem additur. Maximum 4000 characteres."
+    },
+    "slack": {
+      "title": "Nuntiationes Slack",
+      "description": "Adscribe hoc locus operis ad nuntiationes exsecutionis Slack — petitiones approbationis, applicationes, errores et aberrationes. Relinque canalem vacuum et hoc locus operis silet (nulla per totam instructionem dispersio). Requirit ut app Slack ab administratore activetur.",
+      "channel": "Canalis",
+      "channelPlaceholder": "#deploys aut ID canalis (e.g. C0123ABCD)",
+      "notSet": "Non positum — silens.",
+      "hint": "App Slack iam membrum canalis esse debet."
+    },
+    "delete": {
+      "title": "Locum Operis Delere",
+      "description": "Perpetuo dele hoc locus operis et omnem statum, variabiles et exsecutiones sociatas.",
+      "confirm": "Deletionem Confirmare"
+    },
+    "variables": {
+      "addVariable": "Variabilem Addere",
+      "key": "Clavis",
+      "value": "Valor",
+      "category": "Categoria",
+      "categoryEnv": "Ambitus",
+      "sensitive": "Sensibile",
+      "empty": "Nullae variabiles huic loco operis configuratae.",
+      "emptyValue": "vacuum",
+      "enterNewValue": "Novum valorem insere",
+      "deleteConfirm": "Variabilem \"{key}\" delere?"
+    },
+    "runs": {
+      "options": "Optiones",
+      "hideOptions": "Optiones Celare",
+      "queueDestroy": "Destructionem In Ordinem Ponere",
+      "queueDestroyTitle": "Consilium destructionis in ordinem pone",
+      "destroyAllConfirm": "Omnes facultates destruere?",
+      "confirmDestroy": "Destructionem Confirmare",
+      "queuePlan": "Consilium In Ordinem Ponere",
+      "queueRun": "Exsecutionem In Ordinem Ponere",
+      "queuePlanConfirm": "Consilium speculativum huic loco operis in ordinem ponere?",
+      "queueApplyConfirm": "Exsecutionem plan + apply in ordinem ponere? Hoc infrastructuram mutare potest.",
+      "planOptions": "Optiones Consilii",
+      "targetResources": "Facultates destinatas",
+      "replaceResources": "Facultates substituere",
+      "commaSeparated": "(commate seiuncta)",
+      "planOnly": "Solum Consilium",
+      "refreshOnly": "Solum Reficere",
+      "skipRefresh": "Refectionem Praeterire",
+      "allowEmptyApply": "Applicationem Vacuam Permittere",
+      "vcsRef": "Ref VCS",
+      "branch": "Ramus",
+      "tag": "Nota",
+      "defaultBranch": "Praedefinitus ({branch})",
+      "nonDefaultRefNote": "Ref non-praedefinitum selectum — exsecutio solum-consilii erit",
+      "empty": "Nullae adhuc exsecutiones huic loco operis.",
+      "runId": "ID Exsecutionis",
+      "status": "Status",
+      "type": "Genus",
+      "changes": "Mutationes",
+      "source": "Fons",
+      "triggeredBy": "Concitatum a",
+      "created": "Creatum",
+      "needsConfirm": "confirmatione eget",
+      "typeDestroy": "destructio",
+      "typePlanOnly": "solum consilium",
+      "typePlanApply": "plan + apply",
+      "sourceModuleTest": "probatio moduli",
+      "sourceModulePublish": "editio moduli"
+    },
+    "state": {
+      "deleteConfirm": "Versionem status #{serial} delere? Hoc revocari non potest.",
+      "rollbackConfirm": "Ad versionem status #{serial} retrovolvere? Nova versio eodem contentu creabitur.",
+      "confirmDelete": "Deletionem Confirmare",
+      "confirmRollback": "Retrovolutionem Confirmare",
+      "uploadState": "Statum Subdere",
+      "empty": "Nullae adhuc versiones status huic loco operis.",
+      "serial": "Series",
+      "createdBy": "Creatum a",
+      "run": "Exsecutio",
+      "size": "Magnitudo",
+      "created": "Creatum",
+      "runner": "runner",
+      "latest": "novissima"
+    },
+    "configurations": {
+      "description": "Fontium archiva huic loco operis subdita, novissima primum. Elige duas lineas ad comparandum.",
+      "selectedCount": "{count}/2 selectae",
+      "compare": "Comparare",
+      "comparing": "Comparatur…",
+      "empty": "Nullae adhuc versiones configurationis. Hic apparent statim atque `terraform plan` subdit aut impulsus VCS exsecutionem concitat.",
+      "id": "ID",
+      "source": "Fons",
+      "status": "Status",
+      "created": "Creatum",
+      "current": "praesens",
+      "selectForCompare": "Elige {id} ad comparandum",
+      "compareLabel": "Comparare",
+      "diff": "Differentia",
+      "filesChanged": "{count} tabulae mutatae",
+      "oversized": "Praeteritae {count, plural, one {# tabula nimium magna} other {# tabulae nimium magnae}}: {files}",
+      "noDiff": "Nullae differentiae contentus inter has versiones.",
+      "binaryChanged": "Tabula binaria mutata — differentia non reddita.",
+      "diffType": {
+        "added": "addita",
+        "removed": "remota",
+        "modified": "modificata",
+        "binary-changed": "binaria"
+      }
+    },
+    "notifications": {
+      "addNotification": "Nuntiationem Addere",
+      "name": "Nomen",
+      "namePlaceholder": "Nuntiationes applicationis",
+      "destinationType": "Genus Destinationis",
+      "typeGeneric": "Webhook Generalis",
+      "typeEmail": "Inscriptio Electronica",
+      "url": "URL",
+      "hmacToken": "Tessera HMAC (optionalis)",
+      "signingSecret": "Secretum signandi",
+      "emailAddresses": "Inscriptiones Electronicae (commate seiunctae)",
+      "triggerEvents": "Eventus Concitantes",
+      "createNotification": "Nuntiationem Creare",
+      "empty": "Nullae configurationes nuntiationum huic loco operis.",
+      "ok": "OK",
+      "err": "Err {status}",
+      "fail": "DEFECIT",
+      "http": "HTTP {status}",
+      "verify": "Verificare",
+      "history": "Historia",
+      "deliveryHistory": "Historia Traditionis",
+      "enableConfirm": "Hanc nuntiationem activare?",
+      "disableConfirm": "Hanc nuntiationem deactivare?",
+      "deleteConfirm": "Nuntiationem \"{name}\" delere?"
+    },
+    "runTasks": {
+      "addRunTask": "Munus Exsecutionis Addere",
+      "name": "Nomen",
+      "namePlaceholder": "Probatio Regulae OPA",
+      "webhookUrl": "URL Webhook",
+      "stage": "Gradus",
+      "enforcementLevel": "Gradus Coactionis",
+      "hmacKey": "Clavis HMAC (optionalis)",
+      "hmacKeyPlaceholder": "Secretum signandi pro verificatione webhook",
+      "createRunTask": "Munus Exsecutionis Creare",
+      "empty": "Nulla munera exsecutionis huic loco operis configurata.",
+      "enableConfirm": "Hoc munus exsecutionis activare?",
+      "disableConfirm": "Hoc munus exsecutionis deactivare?",
+      "deleteConfirm": "Munus exsecutionis \"{name}\" delere?"
+    },
+    "runTriggers": {
+      "title": "Concitatores Exsecutionis",
+      "description": "Cum locus operis fons applicationem perficit, loca operis subsequentia novam exsecutionem automatice in ordinem positam accipiunt. Usque ad 20 loca operis fontia per destinationem.",
+      "inboundHeading": "Loca operis fontia quae exsecutiones hic concitant",
+      "inboundEmpty": "Nulla loca operis fontia exsecutiones in hoc loco operis concitant.",
+      "pickerPlaceholder": "Quaere loca operis ut fontem addas…",
+      "outboundHeading": "Loca operis destinationis quae hoc locus operis concitat",
+      "outboundEmpty": "Hoc locus operis in nullo alio loco operis exsecutiones concitat.",
+      "destinationNote": "(destinatio; inde remove)",
+      "removeConfirm": "Hunc concitatorem exsecutionis removere?"
+    },
+    "sharing": {
+      "title": "Communicatio Status Remoti",
+      "description": "Index permissorum a productore moderatus pro <code></code> inter loca operis. Data status secreta ferunt — consulto concede. <docs>Documenta</docs>",
+      "outboundHeading": "Loca operis auctoritatem habentia ut statum huius loci operis legant",
+      "outboundEmpty": "Status huius loci operis cum nullo alio loco operis communicatur.",
+      "grantedBy": "concessum ab {by}",
+      "revoke": "Revocare",
+      "revokeConfirm": "Hanc communicationem status remoti removere? Consumptor accessum ad hunc statum amittet.",
+      "pickerPlaceholder": "Quaere loca operis ut consumptorem auctorem facias…",
+      "inboundHeading": "Loca operis a quibus hoc locus operis statum legere auctoratur",
+      "inboundEmpty": "Hoc locus operis statum ex nullo alio loco operis per terraform_remote_state legere auctoratur.",
+      "producerNote": "(productor; inde revoca)"
+    },
+    "runMessages": {
+      "manualDriftCheck": "Inspectio aberrationis manualis ex UI",
+      "queued": "In ordinem positum ex UI",
+      "queuedSpeculative": "In ordinem positum ex UI (speculativum)",
+      "destroyQueued": "Destructio in ordinem posita ex UI"
+    },
+    "errors": {
+      "loadWorkspace": "Locus operis onerari non potuit",
+      "loadRuns": "Exsecutiones onerari non potuerunt",
+      "loadVariables": "Variabiles onerari non potuerunt",
+      "loadStateVersions": "Versiones status onerari non potuerunt",
+      "loadConfigurations": "Versiones configurationis onerari non potuerunt",
+      "loadNotifications": "Nuntiationes onerari non potuerunt",
+      "loadOutboundConsumers": "Consumptores status remoti egredientes onerari non potuerunt",
+      "loadInboundConsumers": "Consumptores status remoti ingredientes onerari non potuerunt",
+      "loadConsumers": "Consumptores status remoti onerari non potuerunt",
+      "loadInboundTriggers": "Concitatores exsecutionis ingredientes onerari non potuerunt",
+      "loadOutboundTriggers": "Concitatores exsecutionis egredientes onerari non potuerunt",
+      "loadTriggers": "Concitatores exsecutionis onerari non potuerunt",
+      "loadRunTasks": "Munera exsecutionis onerari non potuerunt",
+      "downloadStateFile": "Tabula status deprimi non potuit",
+      "downloadFailed": "Depromptio defecit",
+      "downloadFailedStatus": "Depromptio defecit ({status})",
+      "downloadTicketMissingUrl": "Responso tesserae depromendi URL deest",
+      "diffFailed": "Differentia defecit",
+      "diffFailedStatus": "Differentia defecit ({status})",
+      "authorizeConsumer": "Consumptor auctorari non potuit",
+      "revoke": "Revocari non potuit",
+      "revokeConsumer": "Consumptor revocari non potuit",
+      "addTrigger": "Concitator exsecutionis addi non potuit",
+      "removeTrigger": "Concitator exsecutionis removeri non potuit",
+      "createRunTask": "Munus exsecutionis creari non potuit",
+      "createRunTaskStatus": "Munus exsecutionis creari non potuit ({status})",
+      "update": "Renovari non potuit",
+      "toggleRunTask": "Munus exsecutionis commutari non potuit",
+      "delete": "Deleri non potuit",
+      "deleteRunTask": "Munus exsecutionis deleri non potuit",
+      "labelLockout": "Haec mutatio tituli accessum tuum minueret.",
+      "updateWorkspace": "Locus operis renovari non potuit",
+      "lockWorkspace": "Locus operis occludi non potuit",
+      "unlockWorkspace": "Locus operis reserari non potuit",
+      "updateAiSummary": "Optiones summarii AI renovari non potuerunt",
+      "updateSlackChannel": "Canalis Slack renovari non potuit",
+      "updateDriftSettings": "Optiones aberrationis renovari non potuerunt",
+      "updateDriftInterval": "Intervallum aberrationis renovari non potuit",
+      "updatePlanExpiry": "Exspiratio consilii renovari non potuit",
+      "queueDriftCheck": "Inspectio aberrationis in ordinem poni non potuit",
+      "queueDriftCheckStatus": "Inspectio aberrationis in ordinem poni non potuit ({status})",
+      "dismissDrift": "Aberratio dimitti non potuit",
+      "dismissDriftStatus": "Aberratio dimitti non potuit ({status})",
+      "deleteWorkspace": "Locus operis deleri non potuit",
+      "addVariable": "Variabilis addi non potuit",
+      "addVariableStatus": "Variabilis addi non potuit ({status})",
+      "deleteVariable": "Variabilis deleri non potuit",
+      "updateVariable": "Variabilis renovari non potuit",
+      "queuePlan": "Consilium in ordinem poni non potuit",
+      "queuePlanStatus": "Consilium in ordinem poni non potuit ({status})",
+      "queueDestroy": "Destructio in ordinem poni non potuit",
+      "queueDestroyStatus": "Destructio in ordinem poni non potuit ({status})",
+      "createNotification": "Nuntiatio creari non potuit",
+      "createNotificationStatus": "Nuntiatio creari non potuit ({status})",
+      "toggleNotification": "Nuntiatio commutari non potuit",
+      "deleteNotification": "Nuntiatio deleri non potuit",
+      "verificationFailed": "Verificatio defecit",
+      "verificationDeliveryFailed": "Traditio verificationis defecit: {detail}",
+      "unknownError": "Error ignotus",
+      "failed": "Defecit",
+      "deleteStateVersion": "Versio status deleri non potuit",
+      "rollbackStateVersion": "Versio status retrovolvi non potuit",
+      "stateActionFailed": "Actio status defecit",
+      "uploadState": "Status subdi non potuit",
+      "uploadStateFile": "Tabula status subdi non potuit"
+    }
+  },
+  "graphs": {
+    "stateTab": {
+      "loadError": "Graphum status onerari non potuit.",
+      "emptyState": "Nullus adhuc status — curre consilium et applicationem, aut statum subde, deinde hoc graphum implebitur.",
+      "stateVersionLabel": "Versio status",
+      "currentSuffix": "(praesens)",
+      "colorByLabel": "Colora per",
+      "viewGraph": "Graphum",
+      "viewTable": "Tabula",
+      "resourceCount": "{count, plural, one {# facultas} other {# facultates}}",
+      "dependencyCount": "{count, plural, one {# dependentia} other {# dependentiae}}",
+      "truncated": "Monstrantur primae {shown} ex {total} facultatibus — graphum ad legibilitatem circumscribitur.",
+      "colResource": "Facultas",
+      "colType": "Genus",
+      "colMode": "Modus",
+      "colModule": "Modulus",
+      "colDependedOnBy": "Dependent ab hoc",
+      "rootModule": "(radix)"
+    },
+    "impact": {
+      "notAvailable": "Graphum effectus pro hac exsecutione non praesto est.",
+      "title": "Graphum effectus",
+      "subtitle": "consilium {count, plural, one {# facultatis} other {# facultatum}}",
+      "hint": "Quaeque sphaera est facultas; quaeque sagitta ad id monstrat a quo dependet. Preme nodum → eius transitivus <b>effectus</b> (omne quod subsequitur) illucescit.",
+      "downstreamAffected": "subsequens affectum",
+      "action": {
+        "create": "creare",
+        "update": "renovare",
+        "replace": "substituere",
+        "destroy": "destruere",
+        "unchanged": "immutatum"
+      }
+    },
+    "estate": {
+      "navHint": "Trahe ut rotes · volve ut scalas · dextra-trahe ut moveas · <em>preme nodum ut circa eum orbites</em>"
+    },
+    "state3d": {
+      "title": "Graphum status",
+      "hint": "Quaeque sphaera est facultas; quaeque sagitta ad id monstrat a quo dependet. Preme nodum → facultates quae ab eo transitive <b>dependent</b> illucescunt.",
+      "dataSource": "fons datorum",
+      "managed": "administrata",
+      "dependOnThis": "ab hoc dependent"
+    },
+    "resource3d": {
+      "resetView": "Aspectum reponere",
+      "clear": "Vacuare",
+      "key": "Clavis",
+      "resources": "Facultates",
+      "hideKey": "Clavem celare",
+      "hideResources": "Facultates celare",
+      "resourcesCount": "Facultates ({count})",
+      "filterPlaceholder": "Facultates cribrare…",
+      "navHint": "Trahe ut rotes · volve ut scalas · dextra-trahe ut moveas · <em>preme facultatem ut circa eam orbites</em>"
+    }
+  },
+  "execHookDetail": {
+    "backLink": "Retro ad uncos exsecutionis",
+    "defaultDescription": "Uncus exsecutionis",
+    "notFound": "Uncus exsecutionis non inventus",
+    "scriptEmpty": "(vacuum)",
+    "tabs": {
+      "settings": "Optiones",
+      "workspaces": "Loca Operis"
+    },
+    "common": {
+      "yes": "Ita",
+      "no": "Non"
+    },
+    "actions": {
+      "edit": "Redigere",
+      "cancel": "Abrogare",
+      "save": "Servare",
+      "saving": "Servatur...",
+      "delete": "Delere",
+      "deleting": "Deletur...",
+      "confirmDelete": "Deletionem Confirmare",
+      "add": "Addere",
+      "adding": "Additur...",
+      "remove": "Removere"
+    },
+    "settings": {
+      "heading": "Optiones"
+    },
+    "fields": {
+      "name": "Nomen",
+      "description": "Descriptio",
+      "hookPoint": "Punctum Unci",
+      "priority": "Prioritas",
+      "enabled": "Activatus",
+      "script": "Scriptum (<code>/bin/sh -c</code>)"
+    },
+    "delete": {
+      "heading": "Uncum Exsecutionis Delere",
+      "description": "Perpetuo dele hunc uncum et remove eum ex omnibus locis operis."
+    },
+    "workspaces": {
+      "scopeNote": "Hic uncus solum in locis operis infra sociatis currit. Nullus ambitus globalis est.",
+      "associate": "Locum Operis Sociare",
+      "workspaceLabel": "Locus Operis",
+      "selectPlaceholder": "Locum operis elige...",
+      "empty": "Nulla loca operis huic unco sociata.",
+      "colWorkspace": "Locus Operis",
+      "colActions": "Actiones"
+    },
+    "confirm": {
+      "removeWorkspace": "Hoc locus operis ab unco removere? Uncus ei amplius non curret."
+    },
+    "success": {
+      "updated": "Uncus exsecutionis renovatus",
+      "workspaceAssociated": "Locus operis sociatum",
+      "workspaceRemoved": "Locus operis remotum"
+    },
+    "errors": {
+      "load": "Uncus exsecutionis onerari non potuit",
+      "update": "Uncus exsecutionis renovari non potuit",
+      "delete": "Uncus exsecutionis deleri non potuit",
+      "addWorkspace": "Locus operis addi non potuit",
+      "removeWorkspace": "Locus operis removeri non potuit"
+    }
+  },
+  "policySetDetail": {
+    "backLink": "Copiae Regularum",
+    "notFound": "Non inventum",
+    "unknown": "ignotum",
+    "subtitle": "Copia regularum OPA · creata ab {createdBy}",
+    "settings": {
+      "heading": "Optiones"
+    },
+    "fields": {
+      "description": "Descriptio",
+      "enforcement": "Coactio",
+      "enabled": "Activata",
+      "globalScope": "Globalis (omne locus operis)"
+    },
+    "enforcement": {
+      "advisory": "Consultiva (mone)",
+      "mandatory": "Obligatoria (applicationem obsta)"
+    },
+    "scope": {
+      "allowLabels": "Titulos permittere (clavis: v1, v2)",
+      "allowLabelsPlaceholder": "env: prod, staging",
+      "allowNames": "Nomina permittere (unum per lineam)",
+      "denyLabels": "Titulos negare (clavis: v1, v2)",
+      "denyNames": "Nomina negare (unum per lineam)"
+    },
+    "vcs": {
+      "heading": "Configuratio VCS",
+      "repoUrl": "URL Repositorii",
+      "branch": "Ramus",
+      "branchPlaceholder": "main (praedefinitum)",
+      "policyPath": "Semita Regularum"
+    },
+    "vcsBanner": {
+      "syncedFrom": "Regulae synchronizatae ex",
+      "at": "in",
+      "lastSynced": "Ultimo synchronizatum {time}",
+      "commit": "(commissio {sha})",
+      "syncError": "Error synchronizationis: {error}"
+    },
+    "policies": {
+      "heading": "Regulae ({count})",
+      "vcsManaged": "A repositorio administratae — muta impelle per PR",
+      "empty": "Nullae adhuc regulae in hac copia."
+    },
+    "addPolicy": {
+      "namePlaceholder": "Nomen regulae",
+      "descPlaceholder": "Descriptio (optionalis)",
+      "regoHint": "Rego v1. Declaret <code>package terrapod</code> et violationes per copiam <code>deny</code> exprimat necesse est. Consilium est <code>input</code>; contextus Terrapod est <code>data.terrapod_context</code>."
+    },
+    "actions": {
+      "saving": "Servatur...",
+      "saveSettings": "Optiones Servare",
+      "syncNow": "Nunc Synchronizare",
+      "cancel": "Abrogare",
+      "addPolicy": "Regulam Addere",
+      "deleteSet": "Copiam Delere",
+      "validatingRego": "Rego validatur...",
+      "delete": "Delere",
+      "savePolicy": "Regulam Servare"
+    },
+    "confirm": {
+      "deleteSet": "Hanc copiam regularum et omnes eius regulas delere? Aestimationes exsecutionum recordatae servantur.",
+      "deletePolicy": "Regulam \"{name}\" delere?"
+    },
+    "errors": {
+      "load": "Copia regularum onerari non potuit",
+      "save": "Copia regularum servari non potuit",
+      "saveStatus": "Servari non potuit ({status})",
+      "delete": "Copia regularum deleri non potuit",
+      "deleteStatus": "Deleri non potuit ({status})",
+      "addPolicy": "Regula addi non potuit",
+      "addPolicyStatus": "Regula addi non potuit ({status})",
+      "savePolicy": "Regula servari non potuit",
+      "savePolicyStatus": "Regula servari non potuit ({status})",
+      "deletePolicy": "Regula deleri non potuit",
+      "deletePolicyStatus": "Deleri non potuit ({status})"
+    }
+  },
+  "slackLink": {
+    "title": "Slack cum Terrapod Coniungere",
+    "loading": "Oneratur…",
+    "checking": "Nexus tuus inspicitur…",
+    "linking": "Ratio tua Slack nectitur…",
+    "unknown": "ignotum",
+    "confirm": {
+      "prompt": "Hanc rationem Slack ad <em>tuam</em> identitatem Terrapod nectere? Omnis futura actio Slack (approbare/reicere) ut hic usor Terrapod cum permissionibus eius curret.",
+      "slackUser": "Usor Slack",
+      "slackTeam": "Turma Slack",
+      "terrapodAccount": "Ratio Terrapod",
+      "warning": "Perge solum si hunc nexum modo ipse ex Slack incepisti. Si non fecisti, claude hanc scidam et ne nectas — hoc rationem Slack supra ad <em>tuam</em> identitatem Terrapod vincit.",
+      "button": "Confirmare et nectere"
+    },
+    "success": {
+      "message": "Ratio tua Slack nunc cum Terrapod nexa est.",
+      "linkedAs": "Nexa ut <em>{email}</em>. Hanc scidam claudere et ad Slack redire potes."
+    },
+    "errors": {
+      "missingLink": "Nexus deest aut invalidus. Iterum incipe cum mandato nexus Terrapod in Slack.",
+      "invalidLink": "Hic nexus invalidus, exspiratus aut iam usus est. Iterum incipe nexum ex Slack.",
+      "linkingFailed": "Nexus defecit."
+    }
+  },
+  "cliComplete": {
+    "loading": "Oneratur...",
+    "completing": "Authenticatio perficitur...",
+    "invalid": {
+      "title": "Petitio Invalida",
+      "description": "Parametri requisiti desunt."
+    },
+    "success": {
+      "title": "Ingressus Felix",
+      "complete": "Tessera API creata. Hanc scidam claudere potes."
+    },
+    "fallback": {
+      "description": "CLI automatice attingi non potuit.",
+      "button": "Preme hic ut manu perficias"
+    },
+    "timeout": {
+      "description": "CLI permutationem tesserae fortasse non perfecit. Terminale tuum inspice."
+    }
+  },
+  "apiDocs": {
+    "view": "Aspectus:",
+    "redocTitle": "Documentatio API ReDoc"
+  }
+}
