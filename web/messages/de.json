@@ -1733,7 +1733,8 @@
       "you": "Sie",
       "assistant": "Assistent"
     },
-    "translatedNote": "Automatisch in Ihre Sprache übersetzt. Maßgeblich ist die ursprüngliche Zusammenfassung."
+    "translatedNote": "Automatisch in Ihre Sprache übersetzt. Maßgeblich ist die ursprüngliche Zusammenfassung.",
+    "translating": "Wird übersetzt…"
   },
   "runDetail": {
     "notFound": "Ausführung nicht gefunden",

@@ -16,7 +16,7 @@
  */
 
 import type React from 'react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslations, useLocale } from 'next-intl'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -81,9 +81,17 @@ export function PlanAiSummary({ runId, refreshKey = 0 }: Props) {
   const [transportError, setTransportError] = useState<string | null>(null)
   const [regenerating, setRegenerating] = useState(false)
   const [regenerateError, setRegenerateError] = useState<string | null>(null)
+  // True while a locale change is re-fetching the translated summary. We keep
+  // the previous (now stale-language) content on screen and show a "Translating…"
+  // spinner over it, rather than blanking the panel (#767).
+  const [translating, setTranslating] = useState(false)
+  const hasContentRef = useRef(false)
   const isTouch = useIsTouch()
 
   const load = useCallback(async () => {
+    // A re-fetch while we already have a summary means the user switched
+    // language — show the translating spinner and keep the old content visible.
+    if (hasContentRef.current) setTranslating(true)
     try {
       // Pass the reader's locale so the API translates the (canonical-language)
       // summary on view (#767). Re-fetches automatically when the locale changes
@@ -94,6 +102,7 @@ export function PlanAiSummary({ runId, refreshKey = 0 }: Props) {
       if (res.status === 404) {
         setMissing(true)
         setSummary(null)
+        hasContentRef.current = false
         return
       }
       if (!res.ok) {
@@ -102,12 +111,14 @@ export function PlanAiSummary({ runId, refreshKey = 0 }: Props) {
       }
       const data = await res.json()
       setSummary(data.data as PlanSummary)
+      hasContentRef.current = true
       setMissing(false)
       setTransportError(null)
     } catch (e) {
       setTransportError(e instanceof Error ? e.message : String(e))
     } finally {
       setLoading(false)
+      setTranslating(false)
     }
   }, [runId, t, locale])
 
@@ -173,6 +184,12 @@ export function PlanAiSummary({ runId, refreshKey = 0 }: Props) {
           {/* Dropped on a phone — the ✨ sparkle already signals "AI", and the
               header row is too tight there to carry the extra words. */}
           <span className="text-xs text-slate-500 hidden md:inline">{t('aiGenerated')}</span>
+          {translating && (
+            <span className="flex items-center gap-1.5 text-xs text-brand-400">
+              <RefreshCw className="w-3 h-3 animate-spin" aria-hidden="true" />
+              {t('translating')}
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-3">
           {attrs && attrs.status === 'ready' && attrs['risk-level'] && (
