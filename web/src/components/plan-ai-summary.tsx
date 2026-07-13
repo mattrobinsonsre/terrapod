@@ -17,7 +17,7 @@
 
 import type React from 'react'
 import { useCallback, useEffect, useState } from 'react'
-import { useTranslations } from 'next-intl'
+import { useTranslations, useLocale } from 'next-intl'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Sparkles, AlertTriangle, Info, ShieldAlert, ShieldX, RefreshCw } from 'lucide-react'
@@ -50,6 +50,10 @@ interface PlanSummary {
     'error-message': string
     'created-at': string
     'updated-at': string
+    /** Canonical language the summary is stored in (#767). */
+    language?: string
+    /** True when the served description/risk-factors were translated on view. */
+    translated?: boolean
   }
 }
 
@@ -70,6 +74,7 @@ const RISK_STYLES: Record<Severity, { pill: string; icon: typeof AlertTriangle }
 
 export function PlanAiSummary({ runId, refreshKey = 0 }: Props) {
   const t = useTranslations('planSummary')
+  const locale = useLocale()
   const [summary, setSummary] = useState<PlanSummary | null>(null)
   const [missing, setMissing] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -80,7 +85,12 @@ export function PlanAiSummary({ runId, refreshKey = 0 }: Props) {
 
   const load = useCallback(async () => {
     try {
-      const res = await apiFetch(`/api/terrapod/v1/runs/run-${runId}/plan-summary`)
+      // Pass the reader's locale so the API translates the (canonical-language)
+      // summary on view (#767). Re-fetches automatically when the locale changes
+      // because `load` is keyed on it.
+      const res = await apiFetch(
+        `/api/terrapod/v1/runs/run-${runId}/plan-summary?locale=${encodeURIComponent(locale)}`,
+      )
       if (res.status === 404) {
         setMissing(true)
         setSummary(null)
@@ -99,7 +109,7 @@ export function PlanAiSummary({ runId, refreshKey = 0 }: Props) {
     } finally {
       setLoading(false)
     }
-  }, [runId, t])
+  }, [runId, t, locale])
 
   useEffect(() => {
     load()
@@ -247,6 +257,10 @@ export function PlanAiSummary({ runId, refreshKey = 0 }: Props) {
                 ))}
               </ul>
             </div>
+          )}
+
+          {attrs.translated && (
+            <p className="mt-3 text-xs text-slate-500 italic">{t('translatedNote')}</p>
           )}
 
           {attrs.model && (

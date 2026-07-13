@@ -1732,7 +1732,8 @@
       "thinking": "Thinking…",
       "you": "You",
       "assistant": "Assistant"
-    }
+    },
+    "translatedNote": "Automatically translated to your language. The authoritative summary is the original."
   },
   "runDetail": {
     "notFound": "Run not found",

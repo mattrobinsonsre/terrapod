@@ -22,7 +22,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useTranslations } from 'next-intl'
+import { useTranslations, useLocale } from 'next-intl'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { MessageCircle, Send, User, Sparkles } from 'lucide-react'
@@ -50,6 +50,7 @@ interface Props {
 
 export function PlanSummaryChat({ runId, refreshKey }: Props) {
   const t = useTranslations('planSummary')
+  const locale = useLocale()
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [loaded, setLoaded] = useState(false)
   const [input, setInput] = useState('')
@@ -61,7 +62,7 @@ export function PlanSummaryChat({ runId, refreshKey }: Props) {
   const load = useCallback(async () => {
     try {
       const res = await apiFetch(
-        `/api/terrapod/v1/runs/run-${runId}/plan-summary/messages`,
+        `/api/terrapod/v1/runs/run-${runId}/plan-summary/messages?locale=${encodeURIComponent(locale)}`,
       )
       if (res.status === 404) {
         // Parent summary missing — caller hides this component.
@@ -77,7 +78,7 @@ export function PlanSummaryChat({ runId, refreshKey }: Props) {
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     }
-  }, [runId, t])
+  }, [runId, t, locale])
 
   useEffect(() => {
     load()
@@ -125,7 +126,11 @@ export function PlanSummaryChat({ runId, refreshKey }: Props) {
           method: 'POST',
           headers: { 'Content-Type': 'application/vnd.api+json' },
           body: JSON.stringify({
-            data: { attributes: { content: text } },
+            // locale rides in the body (it's request payload, not a query
+            // string): the server normalises the prompt into the system
+            // language before it joins the thread, then translates the reply
+            // back for display (#767).
+            data: { attributes: { content: text, locale } },
           }),
         },
       )
@@ -164,7 +169,7 @@ export function PlanSummaryChat({ runId, refreshKey }: Props) {
     } finally {
       setSending(false)
     }
-  }, [input, runId, sending, load, t])
+  }, [input, runId, sending, load, t, locale])
 
   if (!loaded && messages.length === 0) {
     // First load — silent until we know whether there's a thread.
