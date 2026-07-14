@@ -26,6 +26,8 @@ Commands:
   schema    Introspect the provider schema and print the discovery surface
             (the data sources usable for filter-based discovery and the
             arguments each accepts to narrow the search).
+  query     Run one data-source query via tofu and print the structured
+            result (the resources it found). Read-only; performs no import.
 
 Run "terrapod-query <command> -h" for command-specific flags.
 `
@@ -43,6 +45,8 @@ func main() {
 	switch cmd {
 	case "schema":
 		err = runSchema(ctx, args)
+	case "query":
+		err = runQuery(ctx, args)
 	case "-h", "--help", "help":
 		fmt.Print(usage)
 		return

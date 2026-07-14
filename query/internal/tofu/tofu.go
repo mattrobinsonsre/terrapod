@@ -65,3 +65,22 @@ func (r *Runner) Init(ctx context.Context) error {
 func (r *Runner) ProvidersSchema(ctx context.Context) ([]byte, error) {
 	return r.run(ctx, "providers", "schema", "-json")
 }
+
+// Apply reads the configuration in the working directory and writes the result
+// to local state. terrapod-query only ever applies a data-source-only
+// configuration (a `data` block plus an `output`), which issues provider
+// read/`Describe` calls and makes NO changes to infrastructure — it is the
+// tofu-native way to force the data source to be read and its result to be
+// materialised for `output -json`. There are no managed `resource` blocks in a
+// discovery configuration, so nothing can be created, changed, or destroyed.
+func (r *Runner) Apply(ctx context.Context) error {
+	_, err := r.run(ctx, "apply", "-auto-approve", "-input=false", "-no-color")
+	return err
+}
+
+// OutputJSON returns the JSON-encoded value of a named output via
+// `tofu output -json <name>`. The value is the data source's attributes — the
+// structured result the query package parses (no text scraping).
+func (r *Runner) OutputJSON(ctx context.Context, name string) ([]byte, error) {
+	return r.run(ctx, "output", "-json", name)
+}
