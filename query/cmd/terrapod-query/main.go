@@ -28,6 +28,8 @@ Commands:
             arguments each accepts to narrow the search).
   query     Run one data-source query via tofu and print the structured
             result (the resources it found). Read-only; performs no import.
+  import    Turn a query result into candidate import {} blocks. Composable:
+            terrapod-query query ... | terrapod-query import --resource TYPE
 
 Run "terrapod-query <command> -h" for command-specific flags.
 `
@@ -47,6 +49,8 @@ func main() {
 		err = runSchema(ctx, args)
 	case "query":
 		err = runQuery(ctx, args)
+	case "import":
+		err = runImport(ctx, args)
 	case "-h", "--help", "help":
 		fmt.Print(usage)
 		return

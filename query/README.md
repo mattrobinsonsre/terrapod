@@ -37,14 +37,34 @@ guesses fail safe.
 
 ```
 terrapod-query schema [--dir DIR] [--tofu PATH] [--from FILE] [--all]
+terrapod-query query  --type TYPE --provider-config FILE [--filter NAME=V1,V2 ...] [--arg NAME=HCL ...] [--dir DIR] [--tofu PATH]
+terrapod-query import [--from FILE] [--resource TYPE] [--out FILE]
 ```
 
-`schema` introspects the provider schema and prints the discovery surface as
-JSON: the data sources usable for filter-based discovery, and the arguments each
-accepts to narrow the search. By default it lists the strong-signal subset
-(sources with a `filter` block, a `tags` argument, or a plural/list return);
-`--all` lists every data source with its settable inputs. `--from` reads an
-already-captured `providers schema -json` document instead of running tofu.
+**`schema`** (D1) introspects the provider schema and prints the discovery
+surface as JSON: the data sources usable for filter-based discovery, and the
+arguments each accepts to narrow the search. By default it lists the
+strong-signal subset (sources with a `filter` block, a `tags` argument, or a
+plural/list return); `--all` lists every data source with its settable inputs.
+`--from` reads an already-captured `providers schema -json` document instead of
+running tofu.
 
-_This is deliverable D1 of #823. Query execution (D2) and import-block emission
-(D3) follow._
+**`query`** (D2) runs one data-source query via tofu in an ephemeral directory
+and prints the structured result — the resources it found — from
+`tofu output -json`. Read-only: the config it runs is a `data` block plus an
+`output`, so it only issues provider reads and performs no import. `--filter`
+and `--arg` are repeatable.
+
+**`import`** (D3) turns a query result into candidate `import {}` blocks. It
+maps the returned ids onto the managed resource type (derived from the data
+source name, or set with `--resource`) and emits one block per id. Composable:
+
+```sh
+terrapod-query query --type aws_vpcs --provider-config aws.tf \
+  --filter 'tag:env=prod' | terrapod-query import --resource aws_vpc
+```
+
+The emitted blocks are candidates: a mis-derived id fails safe (it shows as a
+create/replace in the plan, not an import — the operator sees it and doesn't
+merge). Feeding them to `tofu plan -generate-config-out` behind the import-only
+plan gate is #824's job.
