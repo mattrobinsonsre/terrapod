@@ -62,6 +62,13 @@ RUN echo "apt-refresh=${APT_REFRESH}" \
 COPY --from=builder /tmp/opa /usr/local/bin/opa
 RUN /usr/local/bin/opa version
 
+# terrapod-query — tofu-native discovery engine (#823), pre-built for this arch
+# by the build-query CI job (or the local go build) and staged in the build
+# context. The runner drives it for data-source discovery (D2) using the tofu
+# the Job fetches per-run from the binary cache.
+COPY docker/query-bin/terrapod-query /usr/local/bin/terrapod-query
+RUN chmod 0755 /usr/local/bin/terrapod-query && /usr/local/bin/terrapod-query --help >/dev/null
+
 # Python deps from builder
 COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
