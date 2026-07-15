@@ -175,7 +175,13 @@
       "load": "F41l3d 70 l04d 7h3 357473 gr4ph."
     },
     "groupBy": {
-      "label": "Gr0up by"
+      "label": "Gr0up by",
+      "axis": {
+        "none": "N07h1ng (51ngl3 c0l0r)",
+        "pool": "4g3n7 p00l",
+        "prefix": "N4m3 pr3f1x",
+        "label": "l4b3l: {key}"
+      }
     },
     "view": {
       "graph": "Gr4ph",
@@ -2390,7 +2396,14 @@
       "colMode": "M0d3",
       "colModule": "M0dul3",
       "colDependedOnBy": "D3p3nd3d 0n by",
-      "rootModule": "(r007)"
+      "rootModule": "(r007)",
+      "colorBy": {
+        "type": "R350urc3 7yp3",
+        "module": "M0dul3",
+        "provider": "Pr0v1d3r",
+        "mode": "M4n4g3d / d474",
+        "none": "N07h1ng (51ngl3 c0l0r)"
+      }
     },
     "impact": {
       "notAvailable": "1mp4c7 gr4ph 15 n07 4v41l4bl3 f0r 7h15 run.",

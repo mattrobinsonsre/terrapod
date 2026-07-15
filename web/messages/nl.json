@@ -175,7 +175,13 @@
       "load": "Kan de landschapsgrafiek niet laden."
     },
     "groupBy": {
-      "label": "Groeperen op"
+      "label": "Groeperen op",
+      "axis": {
+        "none": "Niets (één kleur)",
+        "pool": "Agentpool",
+        "prefix": "Naamprefix",
+        "label": "label: {key}"
+      }
     },
     "view": {
       "graph": "Grafiek",
@@ -2390,7 +2396,14 @@
       "colMode": "Modus",
       "colModule": "Module",
       "colDependedOnBy": "Afhankelijk gemaakt door",
-      "rootModule": "(root)"
+      "rootModule": "(root)",
+      "colorBy": {
+        "type": "Resourcetype",
+        "module": "Module",
+        "provider": "Provider",
+        "mode": "Beheerd / data",
+        "none": "Niets (één kleur)"
+      }
     },
     "impact": {
       "notAvailable": "Impactgrafiek is niet beschikbaar voor deze uitvoering.",

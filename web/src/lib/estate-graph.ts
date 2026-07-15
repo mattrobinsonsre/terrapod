@@ -37,14 +37,19 @@ export const endId = (x: string | EstateNode): string => (typeof x === 'string' 
 
 // The grouping axes for an estate — derived from the DATA, never assumed (the
 // platform enforces no labelling convention).
-export function groupAxes(nodes: EstateNode[]): { value: string; label: string }[] {
+// Returns the stable group-by axis VALUES only; the human-readable label for
+// each is resolved at the render site through next-intl (`t()`), so the option
+// text is translated in every locale. (A `label:<key>` value carries a
+// workspace-label key, which is user data, not translatable copy — the render
+// site formats it as "label: {key}".)
+export function groupAxes(nodes: EstateNode[]): { value: string }[] {
   const ws = nodes.filter((n) => n.kind === 'workspace')
   const keys = [...new Set(ws.flatMap((n) => Object.keys(n.labels)))].sort()
   return [
-    { value: 'none', label: 'Nothing (single colour)' },
-    ...keys.map((k) => ({ value: 'label:' + k, label: 'label: ' + k })),
-    { value: 'pool', label: 'Agent pool' },
-    { value: 'prefix', label: 'Name prefix' },
+    { value: 'none' },
+    ...keys.map((k) => ({ value: 'label:' + k })),
+    { value: 'pool' },
+    { value: 'prefix' },
   ]
 }
 

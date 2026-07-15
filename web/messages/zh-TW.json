@@ -175,7 +175,13 @@
       "load": "載入資產圖失敗。"
     },
     "groupBy": {
-      "label": "分組依據"
+      "label": "分組依據",
+      "axis": {
+        "none": "無（單一顏色）",
+        "pool": "代理程式集區",
+        "prefix": "名稱前綴",
+        "label": "label: {key}"
+      }
     },
     "view": {
       "graph": "圖形",
@@ -2390,7 +2396,14 @@
       "colMode": "模式",
       "colModule": "模組",
       "colDependedOnBy": "被依賴於",
-      "rootModule": "（根）"
+      "rootModule": "（根）",
+      "colorBy": {
+        "type": "資源類型",
+        "module": "模組",
+        "provider": "提供者",
+        "mode": "受管理 / 資料",
+        "none": "無（單一顏色）"
+      }
     },
     "impact": {
       "notAvailable": "此執行沒有可用的影響圖。",

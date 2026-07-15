@@ -175,7 +175,13 @@
       "load": "Load the estate graph, it did not."
     },
     "groupBy": {
-      "label": "By, Group"
+      "label": "By, Group",
+      "axis": {
+        "none": "Nothing (single color)",
+        "pool": "Agent pool",
+        "prefix": "Name prefix",
+        "label": "label: {key}"
+      }
     },
     "view": {
       "graph": "Graph",
@@ -2390,7 +2396,14 @@
       "colMode": "Mode",
       "colModule": "Module",
       "colDependedOnBy": "on by, Depended",
-      "rootModule": "(root)"
+      "rootModule": "(root)",
+      "colorBy": {
+        "type": "Resource type",
+        "module": "Module",
+        "provider": "Provider",
+        "mode": "Managed / data",
+        "none": "Nothing (single color)"
+      }
     },
     "impact": {
       "notAvailable": "For this run, available the impact graph is not.",

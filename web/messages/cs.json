@@ -175,7 +175,13 @@
       "load": "Nepodařilo se načíst graf estate."
     },
     "groupBy": {
-      "label": "Seskupit podle"
+      "label": "Seskupit podle",
+      "axis": {
+        "none": "Nic (jedna barva)",
+        "pool": "Fond agentů",
+        "prefix": "Předpona názvu",
+        "label": "label: {key}"
+      }
     },
     "view": {
       "graph": "Graf",
@@ -2390,7 +2396,14 @@
       "colMode": "Režim",
       "colModule": "Modul",
       "colDependedOnBy": "Závisí na něm",
-      "rootModule": "(kořen)"
+      "rootModule": "(kořen)",
+      "colorBy": {
+        "type": "Typ prostředku",
+        "module": "Modul",
+        "provider": "Poskytovatel",
+        "mode": "Spravované / data",
+        "none": "Nic (jedna barva)"
+      }
     },
     "impact": {
       "notAvailable": "Graf dopadu není pro tento běh k dispozici.",

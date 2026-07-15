@@ -175,7 +175,13 @@
       "load": "Kunne ikke laste landskapsgrafen."
     },
     "groupBy": {
-      "label": "Grupper etter"
+      "label": "Grupper etter",
+      "axis": {
+        "none": "Ingenting (én farge)",
+        "pool": "Agentpool",
+        "prefix": "Navneprefiks",
+        "label": "label: {key}"
+      }
     },
     "view": {
       "graph": "Graf",
@@ -2390,7 +2396,14 @@
       "colMode": "Modus",
       "colModule": "Modul",
       "colDependedOnBy": "Avhengiggjort av",
-      "rootModule": "(rot)"
+      "rootModule": "(rot)",
+      "colorBy": {
+        "type": "Ressurstype",
+        "module": "Modul",
+        "provider": "Leverandør",
+        "mode": "Administrert / data",
+        "none": "Ingenting (én farge)"
+      }
     },
     "impact": {
       "notAvailable": "Konsekvensgraf er ikke tilgjengelig for denne kjøringen.",

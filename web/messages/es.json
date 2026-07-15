@@ -175,7 +175,13 @@
       "load": "No se pudo cargar el grafo del patrimonio."
     },
     "groupBy": {
-      "label": "Agrupar por"
+      "label": "Agrupar por",
+      "axis": {
+        "none": "Nada (un solo color)",
+        "pool": "Grupo de agentes",
+        "prefix": "Prefijo de nombre",
+        "label": "label: {key}"
+      }
     },
     "view": {
       "graph": "Grafo",
@@ -2390,7 +2396,14 @@
       "colMode": "Modo",
       "colModule": "Módulo",
       "colDependedOnBy": "Dependido por",
-      "rootModule": "(raíz)"
+      "rootModule": "(raíz)",
+      "colorBy": {
+        "type": "Tipo de recurso",
+        "module": "Módulo",
+        "provider": "Proveedor",
+        "mode": "Gestionado / datos",
+        "none": "Nada (un solo color)"
+      }
     },
     "impact": {
       "notAvailable": "El grafo de impacto no está disponible para esta ejecución.",

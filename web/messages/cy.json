@@ -175,7 +175,13 @@
       "load": "Methwyd llwytho graff yr ystad."
     },
     "groupBy": {
-      "label": "Grwpio yn ôl"
+      "label": "Grwpio yn ôl",
+      "axis": {
+        "none": "Dim byd (un lliw)",
+        "pool": "Pwll asiantau",
+        "prefix": "Rhagddodiad enw",
+        "label": "label: {key}"
+      }
     },
     "view": {
       "graph": "Graff",
@@ -2390,7 +2396,14 @@
       "colMode": "Modd",
       "colModule": "Modiwl",
       "colDependedOnBy": "Dibynnir arno gan",
-      "rootModule": "(gwraidd)"
+      "rootModule": "(gwraidd)",
+      "colorBy": {
+        "type": "Math o adnodd",
+        "module": "Modiwl",
+        "provider": "Darparwr",
+        "mode": "Rheoledig / data",
+        "none": "Dim byd (un lliw)"
+      }
     },
     "impact": {
       "notAvailable": "Nid yw'r graff effaith ar gael ar gyfer y rhediad hwn.",

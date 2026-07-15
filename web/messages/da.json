@@ -175,7 +175,13 @@
       "load": "Kunne ikke indlæse ejendomsgrafen."
     },
     "groupBy": {
-      "label": "Gruppér efter"
+      "label": "Gruppér efter",
+      "axis": {
+        "none": "Intet (én farve)",
+        "pool": "Agentpulje",
+        "prefix": "Navnepræfiks",
+        "label": "label: {key}"
+      }
     },
     "view": {
       "graph": "Graf",
@@ -2390,7 +2396,14 @@
       "colMode": "Tilstand",
       "colModule": "Modul",
       "colDependedOnBy": "Afhængige",
-      "rootModule": "(rod)"
+      "rootModule": "(rod)",
+      "colorBy": {
+        "type": "Ressourcetype",
+        "module": "Modul",
+        "provider": "Udbyder",
+        "mode": "Administreret / data",
+        "none": "Intet (én farve)"
+      }
     },
     "impact": {
       "notAvailable": "Konsekvensgraf er ikke tilgængelig for denne kørsel.",
