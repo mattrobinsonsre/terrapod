@@ -61,6 +61,7 @@ RUN_CANCEL = "run:cancel"  # discard / cancel / retry a run
 WORKSPACE_LOCK = "workspace:lock"  # lock / unlock own lock (state lock)
 STATE_READ = "state:read"  # download RAW state JSON (contains secrets)
 DRIFT_DISMISS = "drift:dismiss"  # dismiss a workspace drift flag
+WORKSPACE_ONBOARD = "workspace:onboard"  # onboard existing resources (#824): pool-cred account-wide discovery → import blocks/config
 
 # ── Workspace / runs — write tier ───────────────────────────────────────────
 RUN_APPLY = "run:apply"  # create an apply-capable run + confirm apply
@@ -157,6 +158,11 @@ _WORKSPACE_LEVELS["plan"] = _WORKSPACE_LEVELS["read"] | {
     WORKSPACE_LOCK,
     STATE_READ,
     DRIFT_DISMISS,
+    # Onboarding (#824) sits in the plan tier: it's read-only discovery run with
+    # the workspace's pool identity — the same trust class as queueing a plan
+    # (which already refreshes real resources with those creds). A dedicated
+    # token, so it's independently checkable and revocable from any single role.
+    WORKSPACE_ONBOARD,
 }
 _WORKSPACE_LEVELS["write"] = _WORKSPACE_LEVELS["plan"] | {
     RUN_APPLY,

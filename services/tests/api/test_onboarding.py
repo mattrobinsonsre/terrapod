@@ -46,15 +46,22 @@ def _restore_onboarding():
 @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
 @patch("terrapod.api.app.init_redis")
 @patch("terrapod.api.app.init_db")
-class TestOnboardingGate:
-    async def test_disabled_returns_404(self, *mocks):
+class TestOnboardingAvailability:
+    """The probe is always reachable (onboarding has no feature flag — it's
+    gated per-workspace by the workspace:onboard capability). It only reports
+    whether the optional AI mode is available."""
+
+    async def test_ai_disabled_still_200_reports_unavailable(self, *mocks):
         settings.ai_onboarding.enabled = False
         app = _make_app(_user())
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.get("/api/terrapod/v1/onboarding", headers=_AUTH)
-        assert resp.status_code == 404
+        assert resp.status_code == 200  # no feature flag → never 404
+        attrs = resp.json()["data"]["attributes"]
+        assert attrs["ai-available"] is False
+        assert attrs["ai-model-configured"] is False
 
-    async def test_enabled_reports_model_configured(self, *mocks):
+    async def test_ai_enabled_with_model(self, *mocks):
         settings.ai_onboarding.enabled = True
         settings.ai_onboarding.model = "bedrock/us.anthropic.claude-sonnet-4-6"
         app = _make_app(_user())
@@ -62,17 +69,19 @@ class TestOnboardingGate:
             resp = await c.get("/api/terrapod/v1/onboarding", headers=_AUTH)
         assert resp.status_code == 200
         attrs = resp.json()["data"]["attributes"]
-        assert attrs["enabled"] is True
-        assert attrs["model-configured"] is True
+        assert attrs["ai-available"] is True
+        assert attrs["ai-model-configured"] is True
 
-    async def test_enabled_without_model_reports_unconfigured(self, *mocks):
+    async def test_ai_enabled_without_model(self, *mocks):
         settings.ai_onboarding.enabled = True
         settings.ai_onboarding.model = ""
         app = _make_app(_user())
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.get("/api/terrapod/v1/onboarding", headers=_AUTH)
         assert resp.status_code == 200
-        assert resp.json()["data"]["attributes"]["model-configured"] is False
+        attrs = resp.json()["data"]["attributes"]
+        assert attrs["ai-available"] is True
+        assert attrs["ai-model-configured"] is False
 
 
 class TestOnboardingConfig:
@@ -92,3 +101,20 @@ class TestOnboardingConfig:
         assert hasattr(settings, "ai_onboarding")
         assert hasattr(settings, "ai_summary")
         assert settings.ai_onboarding is not settings.ai_summary
+
+
+class TestOnboardingCapability:
+    """workspace:onboard is a dedicated, plan-tier, grantable capability (#824)."""
+
+    def test_in_plan_tier_and_grantable(self):
+        from terrapod.auth import capabilities as cap
+
+        # In the plan tier (same trust class as run:plan), so plan/write/admin
+        # roles get it and the migration backfills existing run:plan roles.
+        assert cap.WORKSPACE_ONBOARD in cap.caps_for_level("plan")
+        assert cap.WORKSPACE_ONBOARD not in cap.caps_for_level("read")
+        # Grantable + independently checkable (dedicated token, revocable per role).
+        assert cap.WORKSPACE_ONBOARD in cap.GRANTABLE_CAPABILITIES
+        assert cap.has_capability({cap.WORKSPACE_ONBOARD}, cap.WORKSPACE_ONBOARD)
+        # Not a platform cap.
+        assert cap.WORKSPACE_ONBOARD not in cap.PLATFORM_CAPABILITIES

@@ -104,6 +104,7 @@ capabilities).
 | `workspace:lock` | POST workspaces/{id}/actions/lock; .../unlock (own lock) |
 | `state:read` | GET state-versions/{id}/download (**raw** state JSON — contains secrets) |
 | `drift:dismiss` | POST workspaces/{id}/actions/dismiss-drift |
+| `workspace:onboard` | Onboard existing resources (#824): discover with the workspace's pool identity → import blocks / config (endpoints land with the discovery run type). Plan tier because it's read-only discovery run with the same pool creds a plan already uses; a dedicated token, so it's independently revocable. |
 
 ### `write` preset (adds)
 
