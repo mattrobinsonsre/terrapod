@@ -76,7 +76,7 @@ func runQuery(ctx context.Context, args []string) error {
 			return fmt.Errorf("create work dir: %w", err)
 		}
 		if !*keep {
-			defer os.RemoveAll(workDir)
+			defer func() { _ = os.RemoveAll(workDir) }()
 		}
 	}
 
