@@ -96,3 +96,36 @@ test.describe('i18n language switcher', () => {
     expect(intlErrors, `next-intl errors: ${intlErrors.join('\n')}`).toEqual([]);
   });
 });
+
+// The login page is the one authenticated users never see, so the nav-bar globe
+// switcher isn't available there — an unauthenticated visitor would otherwise
+// have no way to pick a language before signing in (#835). The login page mounts
+// its own LocaleSwitcher; prove it flips the pre-sign-in copy through the BFF
+// with no session.
+test.describe('i18n language switcher on the login page', () => {
+  // Drop the admin storageState — the login page only renders unauthenticated.
+  test.use({ storageState: { cookies: [], origins: [] } });
+
+  test('an unauthenticated visitor can choose a language before signing in', async ({ page, context }) => {
+    const intlErrors = guardIntlErrors(page);
+
+    await page.goto('/login');
+    // English baseline — the sign-in subtitle above the card.
+    await expect(page.getByText('Sign in to manage your infrastructure')).toBeVisible();
+
+    // The switcher is present pre-auth and flips the copy to German.
+    await switchLocale(page, /Change language/i, 'Deutsch');
+
+    await expect(
+      page.getByText('Melden Sie sich an, um Ihre Infrastruktur zu verwalten'),
+    ).toBeVisible();
+    await expect(page.getByText('Sign in to manage your infrastructure')).toHaveCount(0);
+
+    // The server layout reads NEXT_LOCALE — set even without a session.
+    const cookies = await context.cookies();
+    expect(cookies.find((c) => c.name === 'NEXT_LOCALE')?.value).toBe('de');
+
+    await expect(page.locator('body')).not.toContainText('MISSING_MESSAGE');
+    expect(intlErrors, `next-intl errors: ${intlErrors.join('\n')}`).toEqual([]);
+  });
+});
