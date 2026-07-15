@@ -505,6 +505,41 @@ api:
         # or markdown. Multiline strings are supported via `|`.
         fleet_context: ""
 
+    # AI Onboarding (#824) — an INDEPENDENT AI feature, separate from
+    # ai_summary above. Discovers existing, unmanaged cloud resources (via
+    # terrapod-query) and generates copy-pasteable `resource` + `import {}`
+    # blocks. Its own switch, model, endpoint, secret, and token budget — you
+    # enable and configure it completely independently of the plan summariser
+    # (e.g. run onboarding on a stronger model while summaries stay on Sonnet).
+    ai_onboarding:
+      enabled: false
+      # LiteLLM model string (same format as ai_summary.model). Onboarding
+      # generates and repairs HCL over a whole provider schema, so a stronger
+      # model may be warranted:
+      #   bedrock/us.anthropic.claude-sonnet-4-6  (default — recommended)
+      #   bedrock/anthropic.claude-opus-4-8       (stronger HCL generation)
+      #   openai/gpt-5 · anthropic/claude-opus-4-8 · gemini/gemini-2.5-pro
+      # Sonnet is the recommended default; Opus is the documented alternative
+      # when you want the strongest HCL generation. `enabled: false` keeps the
+      # feature double-opt-in even with a model set.
+      model: "bedrock/us.anthropic.claude-sonnet-4-6"
+      # Override the upstream base URL (self-hosted OpenAI-compat / Azure only).
+      api_base: ""
+      max_output_tokens: 16384
+      request_timeout_seconds: 120
+      # Cap on output tokens per UTC day across onboarding sessions — its OWN
+      # Redis counter, separate from ai_summary. 0 = unlimited.
+      daily_token_budget: 0
+      auth:
+        # api_key is injected via env var (TERRAPOD_AI_ONBOARDING__AUTH__API_KEY)
+        # from a K8s Secret — set it through api.extraEnv / extraEnvFrom; it is
+        # never rendered into the ConfigMap. Ignored for bedrock/ models (AWS
+        # credential chain / IRSA).
+        aws_region: "us-east-1"
+        aws_role_arn: ""
+        aws_session_name: "terrapod-ai-onboarding"
+        aws_external_id: ""
+
     # Drift Detection — scheduled plan-only runs to detect infrastructure drift
     drift_detection:
       enabled: true

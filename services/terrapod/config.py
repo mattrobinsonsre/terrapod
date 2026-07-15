@@ -1407,6 +1407,102 @@ class AISummaryConfig(BaseModel):
     context: AISummaryContextConfig = Field(default_factory=AISummaryContextConfig)
 
 
+class AIOnboardingAuthConfig(BaseModel):
+    """Auth for the AI onboarding model (#824).
+
+    Same shape and LiteLLM auth-selection behaviour as the summariser's auth
+    (the model-string prefix picks the path: ``bedrock/`` → AWS credential
+    chain, ``openai/``/``anthropic/``/… → bearer key). Deliberately a SEPARATE
+    config from the summariser's — onboarding is an independent AI feature and
+    may run on a different provider / account / model.
+    """
+
+    api_key: str = Field(
+        default="",
+        description=(
+            "Bearer API key for non-AWS providers. Inject from a K8s Secret via "
+            "env var (TERRAPOD_AI_ONBOARDING__AUTH__API_KEY) — never commit to "
+            "values.yaml. Ignored for ``bedrock/...`` (AWS credential chain)."
+        ),
+    )
+    aws_region: str = Field(
+        default="us-east-1",
+        description="AWS region for Bedrock invocation (``bedrock/`` models only).",
+    )
+    aws_role_arn: str = Field(
+        default="",
+        description=(
+            "Cross-account IAM role to assume for Bedrock. Empty = use the "
+            "pod's ambient (IRSA) credentials directly."
+        ),
+    )
+    aws_session_name: str = Field(
+        default="terrapod-ai-onboarding",
+        description="STS session name when assuming aws_role_arn.",
+    )
+    aws_external_id: str = Field(
+        default="",
+        description="Optional STS ExternalId for the assumed role.",
+    )
+
+
+class AIOnboardingConfig(BaseModel):
+    """AI onboarding configuration (#824) — an independent AI feature.
+
+    Drives the onboarding workflow that discovers existing, unmanaged cloud
+    resources (via terrapod-query, #823) and generates copy-pasteable
+    ``resource`` + ``import {}`` blocks. Completely uncoupled from the
+    plan-summary AI (``ai_summary``): its own master switch, model, endpoint,
+    auth secret, and token budget, so an operator can run either, both, or
+    neither — and pick a different (e.g. stronger, HCL-capable) model here.
+
+    All deployments default to disabled — enabling requires this switch AND an
+    explicit model + endpoint/secret. The underlying LiteLLM client, Redis
+    token-budget accounting, and retry are shared machinery parameterised by
+    this config; only the settings are independent.
+    """
+
+    enabled: bool = Field(
+        default=False,
+        description="Master switch. Off by default — the onboarding surface self-gates (404).",
+    )
+    model: str = Field(
+        default="",
+        description=(
+            "LiteLLM model string (same format as ai_summary.model). Onboarding "
+            "generates and repairs HCL over a whole provider schema, so a "
+            "stronger model may be warranted — Sonnet is the recommended "
+            "default, Opus (``bedrock/anthropic.claude-opus-4-8``) a documented "
+            "alternative. Example: ``bedrock/us.anthropic.claude-sonnet-4-6``."
+        ),
+    )
+    api_base: str = Field(
+        default="",
+        description="Override the upstream base URL (self-hosted OpenAI-compat / Azure only).",
+    )
+    max_output_tokens: int = Field(
+        default=16384,
+        description="Upper bound on model response tokens per call (a cap, not a target).",
+    )
+    request_timeout_seconds: int = Field(
+        default=120,
+        description=(
+            "HTTP timeout for a single onboarding model call. Higher than the "
+            "summariser's default — HCL generation over a large schema is a "
+            "bigger completion."
+        ),
+    )
+    daily_token_budget: int = Field(
+        default=0,
+        description=(
+            "Cap on output tokens spent per UTC day across all onboarding "
+            "sessions. 0 = unlimited. Maintained in Redis (its OWN counter, "
+            "separate from ai_summary); calls past the cap are skipped."
+        ),
+    )
+    auth: AIOnboardingAuthConfig = Field(default_factory=AIOnboardingAuthConfig)
+
+
 class DatabaseConfig(BaseModel):
     """SQLAlchemy connection pool settings.
 
@@ -1654,6 +1750,7 @@ class Settings(BaseSettings):
 
     # AI Plan Summary (#401)
     ai_summary: AISummaryConfig = Field(default_factory=AISummaryConfig)
+    ai_onboarding: AIOnboardingConfig = Field(default_factory=AIOnboardingConfig)
 
     # Workspace defaults
     default_execution_backend: str = Field(
