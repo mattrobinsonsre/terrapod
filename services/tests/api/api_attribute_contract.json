@@ -203,6 +203,10 @@
     "status",
     "success"
   ],
+  "onboarding.onboarding_availability": [
+    "ai-available",
+    "ai-model-configured"
+  ],
   "policy_sets._evaluation_json": [
     "created-at",
     "enforcement-level",
