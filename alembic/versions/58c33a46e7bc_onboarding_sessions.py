@@ -41,7 +41,10 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.Column("provider", sa.String(64), server_default="", nullable=False),
-        sa.Column("discovery_surface", postgresql.JSONB(), nullable=True),
+        # engine + engine_version pin the Redis surface-cache key; the bulky
+        # discovery surface itself is Redis-only (time-limited), never in the DB.
+        sa.Column("engine", sa.String(20), server_default="", nullable=False),
+        sa.Column("engine_version", sa.String(50), server_default="", nullable=False),
         sa.Column(
             "selected_types",
             postgresql.JSONB(),

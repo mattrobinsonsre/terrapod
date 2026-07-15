@@ -2265,11 +2265,15 @@ class OnboardingSession(Base):
     # The terraform/tofu provider being onboarded, e.g. "aws". A session covers
     # one provider; onboard several by running several sessions.
     provider: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    # The engine + resolved engine version D1 ran with — the other two-thirds of
+    # the Redis surface-cache key (with `provider`). Small scalars only: the bulky
+    # D1 discovery **surface** itself (the provider schema — generic, regenerable,
+    # version-stable) is NEVER persisted here; it lives solely in a time-limited
+    # Redis cache (see onboarding_service). These pin the key so a later change to
+    # the workspace's engine/version doesn't orphan a session's surface.
+    engine: Mapped[str] = mapped_column(String(20), nullable=False, default="")
+    engine_version: Mapped[str] = mapped_column(String(50), nullable=False, default="")
 
-    # D1: the discovery surface — the strong-signal data sources + their inputs
-    # (terrapod-query schema output). Bounded (a list, not resource data), so
-    # JSONB is fine; the per-provider+version cache lives in Redis (service layer).
-    discovery_surface: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     # Operator/AI-selected data-source types to query in D2 (e.g. ["aws_vpcs"]).
     selected_types: Mapped[list[str]] = mapped_column(
         JSONB, nullable=False, default=list, server_default="[]"

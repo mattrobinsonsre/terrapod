@@ -67,7 +67,10 @@ async def test_run_schema_discovery_cache_hit_skips_subprocess():
         await svc.run_schema_discovery(db, session.id)
 
     assert session.status == "schema_ready"
-    assert session.discovery_surface == cached
+    # Surface is Redis-only — pinned by the small engine/version scalars, never
+    # written to the session row.
+    assert session.engine == "tofu"
+    assert session.engine_version == "1.12"
     dl.assert_not_called()  # cache hit → never touched the binary/subprocess
 
 

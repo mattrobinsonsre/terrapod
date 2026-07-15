@@ -30,6 +30,7 @@ import asyncio
 import json
 import os
 import platform
+import re
 import shutil
 import stat
 import subprocess  # noqa: S404 — used only via to_thread with fixed argv, no shell
@@ -94,6 +95,29 @@ async def set_cached_surface(
         )
     except Exception as exc:  # noqa: BLE001
         logger.debug("onboarding_surface_cache_set_failed", error=str(exc))
+
+
+async def get_session_surface(session: OnboardingSession) -> dict[str, Any] | None:
+    """A session's discovery surface from the Redis cache, or None if expired.
+
+    The surface is Redis-only and time-limited, so a ``schema_ready`` session
+    whose cache entry has since expired returns None here — the caller re-runs
+    discovery (cheap: a warm cache for that engine+version+provider repopulates
+    it, and a cold one is the one-time provider download).
+    """
+    if not (session.engine and session.engine_version and session.provider):
+        return None
+    return await get_cached_surface(session.engine, session.engine_version, session.provider)
+
+
+# A terraform provider short-name. Validated because it is interpolated into
+# generated HCL (`provider "<name>" {}`) — restrict to the identifier charset so
+# a session's provider field can never inject arbitrary config.
+_PROVIDER_RE = re.compile(r"^[a-z][a-z0-9_-]{0,63}$")
+
+
+def is_valid_provider(provider: str) -> bool:
+    return bool(_PROVIDER_RE.match(provider))
 
 
 # ---------------------------------------------------------------------------
@@ -268,10 +292,16 @@ async def run_schema_discovery(db: AsyncSession, session_id: uuid.UUID) -> None:
     version = workspace.terraform_version or "latest"
     provider = session.provider
 
+    # Pin the cache key on the session (small scalars) so the surface can be
+    # re-fetched from Redis on read even if the workspace's engine/version later
+    # changes. The surface itself is never written to the session row.
+    session.engine = engine
+    session.engine_version = version
+
     cached = await get_cached_surface(engine, version, provider)
     if cached is not None:
-        session.discovery_surface = cached
         session.status = "schema_ready"
+        session.error = ""
         await db.flush()
         return
 
@@ -284,10 +314,10 @@ async def run_schema_discovery(db: AsyncSession, session_id: uuid.UUID) -> None:
             asyncio.to_thread(_discover_surface_blocking, engine_bin, provider, workdir),
             timeout=_DISCOVERY_TIMEOUT_SECONDS + 30,
         )
-        session.discovery_surface = surface
+        # Surface goes to the time-limited Redis cache ONLY — never the DB row.
+        await set_cached_surface(engine, version, provider, surface)
         session.status = "schema_ready"
         session.error = ""
-        await set_cached_surface(engine, version, provider, surface)
         await db.flush()
         logger.info(
             "onboarding_schema_ready",
@@ -305,3 +335,21 @@ async def run_schema_discovery(db: AsyncSession, session_id: uuid.UUID) -> None:
     finally:
         if workdir:
             await asyncio.to_thread(shutil.rmtree, workdir, ignore_errors=True)
+
+
+async def handle_schema_discover_trigger(payload: dict) -> None:
+    """Scheduler trigger handler: run D1 discovery off the request thread.
+
+    The API POST enqueues this so the (potentially slow, first-time) provider
+    download never blocks the HTTP request. Multi-replica-safe — any replica
+    dequeues and runs it; the surface cache makes re-runs cheap.
+    """
+    from terrapod.db.session import get_db_session
+
+    session_id = payload.get("session_id", "")
+    if not session_id:
+        logger.warning("onboarding_schema_discover_missing_session_id", payload=payload)
+        return
+    async with get_db_session() as db:
+        await run_schema_discovery(db, uuid.UUID(session_id))
+        await db.commit()

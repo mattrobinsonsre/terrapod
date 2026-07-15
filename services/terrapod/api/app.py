@@ -196,6 +196,17 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         description="Deliver workspace notification on run state change",
     )
 
+    # Onboarding D1 schema discovery (#824) — runs the credential-less
+    # tofu init + terrapod-query schema off the request thread. Always
+    # registered; a no-op unless a session enqueues it.
+    from terrapod.services.onboarding_service import handle_schema_discover_trigger
+
+    register_trigger_handler(
+        "onboarding_schema_discover",
+        handler=handle_schema_discover_trigger,
+        description="Run credential-less onboarding D1 schema discovery for a session",
+    )
+
     # Slack app run notifications (#556) — approval / applied / errored / drift.
     # Registered only when the Slack app is enabled; the handler also no-ops
     # unless the target workspace opted in with its own channel.

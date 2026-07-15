@@ -118,3 +118,144 @@ class TestOnboardingCapability:
         assert cap.has_capability({cap.WORKSPACE_ONBOARD}, cap.WORKSPACE_ONBOARD)
         # Not a platform cap.
         assert cap.WORKSPACE_ONBOARD not in cap.PLATFORM_CAPABILITIES
+
+
+# ---------------------------------------------------------------------------
+# Session endpoints (#824 P2) — create / list / get, RBAC + validation gates.
+# ---------------------------------------------------------------------------
+import datetime as _dt  # noqa: E402
+from types import SimpleNamespace  # noqa: E402
+
+from terrapod.auth.capabilities import WORKSPACE_ONBOARD  # noqa: E402
+
+_ONB = "terrapod.api.routers.onboarding"
+
+
+def _fake_ws():
+    return SimpleNamespace(
+        id="11111111-1111-1111-1111-111111111111",
+        name="ws1",
+        labels={},
+        owner_email="",
+        catalog_item_id=None,
+    )
+
+
+def _fake_session(status="pending", provider="aws"):
+    now = _dt.datetime(2026, 1, 1, tzinfo=_dt.UTC)
+    return SimpleNamespace(
+        id="22222222-2222-2222-2222-222222222222",
+        workspace_id="11111111-1111-1111-1111-111111111111",
+        status=status,
+        provider=provider,
+        engine="tofu",
+        engine_version="1.12",
+        selected_types=[],
+        ai_assisted=False,
+        error="",
+        discovery_run_id=None,
+        result_run_id=None,
+        created_by="u@test.com",
+        created_at=now,
+        updated_at=now,
+    )
+
+
+@patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+@patch("terrapod.api.app.init_redis")
+@patch("terrapod.api.app.init_db")
+class TestOnboardingSessions:
+    async def _client(self):
+        app = _make_app(_user())
+        return AsyncClient(transport=ASGITransport(app=app), base_url=_BASE)
+
+    async def test_create_requires_onboard_capability(self, *mocks):
+        with (
+            patch(f"{_ONB}._get_workspace", AsyncMock(return_value=_fake_ws())),
+            patch(
+                f"{_ONB}.resolve_workspace_capabilities_for", AsyncMock(return_value=frozenset())
+            ),
+        ):
+            async with await self._client() as c:
+                resp = await c.post(
+                    "/api/terrapod/v1/workspaces/ws-1/onboarding-sessions",
+                    json={"data": {"attributes": {"provider": "aws"}}},
+                    headers=_AUTH,
+                )
+        assert resp.status_code == 403
+
+    async def test_create_rejects_bad_provider(self, *mocks):
+        with (
+            patch(f"{_ONB}._get_workspace", AsyncMock(return_value=_fake_ws())),
+            patch(
+                f"{_ONB}.resolve_workspace_capabilities_for",
+                AsyncMock(return_value=frozenset({WORKSPACE_ONBOARD})),
+            ),
+        ):
+            async with await self._client() as c:
+                resp = await c.post(
+                    "/api/terrapod/v1/workspaces/ws-1/onboarding-sessions",
+                    json={"data": {"attributes": {"provider": "AWS!"}}},
+                    headers=_AUTH,
+                )
+        assert resp.status_code == 422
+
+    async def test_create_happy_enqueues_discovery(self, *mocks):
+        enq = AsyncMock()
+        with (
+            patch(f"{_ONB}._get_workspace", AsyncMock(return_value=_fake_ws())),
+            patch(
+                f"{_ONB}.resolve_workspace_capabilities_for",
+                AsyncMock(return_value=frozenset({WORKSPACE_ONBOARD})),
+            ),
+            patch(
+                f"{_ONB}.onboarding_service.create_session", AsyncMock(return_value=_fake_session())
+            ),
+            patch("terrapod.services.scheduler.enqueue_trigger", enq),
+        ):
+            async with await self._client() as c:
+                resp = await c.post(
+                    "/api/terrapod/v1/workspaces/ws-1/onboarding-sessions",
+                    json={"data": {"attributes": {"provider": "aws"}}},
+                    headers=_AUTH,
+                )
+        assert resp.status_code == 201
+        data = resp.json()["data"]
+        assert data["type"] == "onboarding-sessions"
+        assert data["attributes"]["status"] == "pending"
+        assert data["attributes"]["provider"] == "aws"
+        enq.assert_awaited_once()  # discovery runs off the request thread
+
+    async def test_get_returns_surface_from_cache(self, *mocks):
+        surface = {"count": 2, "data_sources": [{"name": "aws_vpcs"}]}
+        with (
+            patch(
+                f"{_ONB}.onboarding_service.get_session",
+                AsyncMock(return_value=_fake_session(status="schema_ready")),
+            ),
+            patch(
+                f"{_ONB}.onboarding_service.get_session_surface", AsyncMock(return_value=surface)
+            ),
+            patch(
+                f"{_ONB}.resolve_workspace_capabilities_for",
+                AsyncMock(return_value=frozenset({WORKSPACE_ONBOARD})),
+            ),
+        ):
+            async with await self._client() as c:
+                resp = await c.get(
+                    "/api/terrapod/v1/onboarding-sessions/22222222-2222-2222-2222-222222222222",
+                    headers=_AUTH,
+                )
+        assert resp.status_code == 200
+        attrs = resp.json()["data"]["attributes"]
+        assert attrs["discovery-surface"] == surface
+        assert attrs["data-source-count"] == 2
+
+    async def test_get_missing_is_404(self, *mocks):
+        with patch(f"{_ONB}.onboarding_service.get_session", AsyncMock(return_value=None)):
+            async with await self._client() as c:
+                resp = await c.get(
+                    "/api/terrapod/v1/onboarding-sessions/22222222-2222-2222-2222-222222222222",
+                    headers=_AUTH,
+                )
+        assert resp.status_code == 404

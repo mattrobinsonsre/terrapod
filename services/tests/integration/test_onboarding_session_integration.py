@@ -60,7 +60,8 @@ async def test_onboarding_session_defaults(app, client):
         assert got.status == "pending"
         assert got.selected_types == []
         assert got.query_results is None
-        assert got.discovery_surface is None
+        assert got.engine == ""
+        assert got.engine_version == ""
         assert got.ai_assisted is False
         assert got.error == ""
         assert got.provider == "aws"
