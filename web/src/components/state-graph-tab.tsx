@@ -109,7 +109,7 @@ export function StateGraphTab({ workspaceId }: { workspaceId: string }) {
           >
             {axes.map((a) => (
               <option key={a.value} value={a.value}>
-                {a.label}
+                {t(`stateTab.colorBy.${a.value}`)}
               </option>
             ))}
           </select>

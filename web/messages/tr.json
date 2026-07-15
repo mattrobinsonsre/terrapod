@@ -175,7 +175,13 @@
       "load": "Envanter grafiği yüklenemedi."
     },
     "groupBy": {
-      "label": "Gruplama ölçütü"
+      "label": "Gruplama ölçütü",
+      "axis": {
+        "none": "Hiçbiri (tek renk)",
+        "pool": "Aracı havuzu",
+        "prefix": "Ad öneki",
+        "label": "label: {key}"
+      }
     },
     "view": {
       "graph": "Grafik",
@@ -2390,7 +2396,14 @@
       "colMode": "Mod",
       "colModule": "Modül",
       "colDependedOnBy": "Bağımlı olanlar",
-      "rootModule": "(kök)"
+      "rootModule": "(kök)",
+      "colorBy": {
+        "type": "Kaynak türü",
+        "module": "Modül",
+        "provider": "Sağlayıcı",
+        "mode": "Yönetilen / veri",
+        "none": "Hiçbiri (tek renk)"
+      }
     },
     "impact": {
       "notAvailable": "Bu çalıştırma için etki grafiği mevcut değil.",

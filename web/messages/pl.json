@@ -175,7 +175,13 @@
       "load": "Nie udało się wczytać grafu majątku."
     },
     "groupBy": {
-      "label": "Grupuj według"
+      "label": "Grupuj według",
+      "axis": {
+        "none": "Nic (jeden kolor)",
+        "pool": "Pula agentów",
+        "prefix": "Prefiks nazwy",
+        "label": "label: {key}"
+      }
     },
     "view": {
       "graph": "Graf",
@@ -2390,7 +2396,14 @@
       "colMode": "Tryb",
       "colModule": "Moduł",
       "colDependedOnBy": "Zależne od tego",
-      "rootModule": "(główny)"
+      "rootModule": "(główny)",
+      "colorBy": {
+        "type": "Typ zasobu",
+        "module": "Moduł",
+        "provider": "Dostawca",
+        "mode": "Zarządzane / dane",
+        "none": "Nic (jeden kolor)"
+      }
     },
     "impact": {
       "notAvailable": "Graf wpływu nie jest dostępny dla tego przebiegu.",

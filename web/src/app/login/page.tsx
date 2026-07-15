@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
+import { LocaleSwitcher } from '@/components/locale-switcher'
 import { setAuth } from '@/lib/auth'
 import { STORAGE_AUTH_STATE, STORAGE_PKCE_VERIFIER, STORAGE_REDIRECT_AFTER_LOGIN } from '@/lib/constants'
 import { generatePKCE, generateState } from '@/lib/pkce'
@@ -15,13 +16,22 @@ interface Provider {
 export default function LoginPage() {
   const t = useTranslations('auth')
   return (
-    <Suspense fallback={
-      <main className="h-dvh flex items-center justify-center p-4">
-        <div className="text-slate-500">{t('loading')}</div>
-      </main>
-    }>
-      <LoginContent />
-    </Suspense>
+    <>
+      {/* Language chooser — always visible, before sign-in (the nav-bar
+          switcher isn't shown to unauthenticated users). Writes the
+          NEXT_LOCALE cookie + refreshes, re-rendering the login page in the
+          chosen locale. */}
+      <div className="absolute top-4 right-4 z-10">
+        <LocaleSwitcher />
+      </div>
+      <Suspense fallback={
+        <main className="h-dvh flex items-center justify-center p-4">
+          <div className="text-slate-500">{t('loading')}</div>
+        </main>
+      }>
+        <LoginContent />
+      </Suspense>
+    </>
   )
 }
 

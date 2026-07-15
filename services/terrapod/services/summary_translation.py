@@ -81,8 +81,18 @@ _LANGUAGE_NAMES: dict[str, str] = {
     # Constructed / fun locales — a style transform of the prose, not a language.
     "tlh": "Klingon (tlhIngan Hol, the constructed language from Star Trek)",
     "en-x-marklar": (
-        "Marklar-speak — English but with most nouns replaced by the word "
-        '"marklar", as the Marklars speak in South Park'
+        "Marklar-speak — English with every noun (common and proper: people, "
+        'places, and things) replaced by the word "marklar", as the Marklars '
+        "speak in South Park. Attributive nouns count too — a noun used to "
+        'modify another noun, like "Agent" in "Agent Pools" or "VCS" in "VCS '
+        'connection", is still a noun, so replace it as well ("Agent Pools" to '
+        '"Marklar Marklars"). Only genuine NON-nouns stay: adjectives, verbs, '
+        "articles, prepositions, conjunctions, numbers. Decide from the word's "
+        'role in the sentence, not in isolation — in "Total workspaces" the '
+        'word "Total" is an adjective and stays, while the noun "workspaces" '
+        'becomes "marklars". Match the original word\'s capitalisation and '
+        'number: singular to "marklar"/"Marklar", plural to "marklars"/'
+        '"Marklars".'
     ),
     "en-x-lolcat": "LOLcat speak — the broken-English, misspelled cat-meme dialect (lolspeak)",
     "en-x-leet": (

@@ -175,7 +175,13 @@
       "load": "Der Bestandsgraph konnte nicht geladen werden."
     },
     "groupBy": {
-      "label": "Gruppieren nach"
+      "label": "Gruppieren nach",
+      "axis": {
+        "none": "Nichts (eine Farbe)",
+        "pool": "Agent-Pool",
+        "prefix": "Namenspräfix",
+        "label": "label: {key}"
+      }
     },
     "view": {
       "graph": "Graph",
@@ -2390,7 +2396,14 @@
       "colMode": "Modus",
       "colModule": "Modul",
       "colDependedOnBy": "Abhängig davon",
-      "rootModule": "(Root)"
+      "rootModule": "(Root)",
+      "colorBy": {
+        "type": "Ressourcentyp",
+        "module": "Modul",
+        "provider": "Provider",
+        "mode": "Verwaltet / Daten",
+        "none": "Nichts (eine Farbe)"
+      }
     },
     "impact": {
       "notAvailable": "Für diese Ausführung ist kein Auswirkungsgraph verfügbar.",

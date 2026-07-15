@@ -175,7 +175,13 @@
       "load": "Échec du chargement du graphe du parc."
     },
     "groupBy": {
-      "label": "Regrouper par"
+      "label": "Regrouper par",
+      "axis": {
+        "none": "Aucun (couleur unique)",
+        "pool": "Pool d'agents",
+        "prefix": "Préfixe de nom",
+        "label": "label: {key}"
+      }
     },
     "view": {
       "graph": "Graphe",
@@ -2390,7 +2396,14 @@
       "colMode": "Mode",
       "colModule": "Module",
       "colDependedOnBy": "Dépendances entrantes",
-      "rootModule": "(racine)"
+      "rootModule": "(racine)",
+      "colorBy": {
+        "type": "Type de ressource",
+        "module": "Module",
+        "provider": "Fournisseur",
+        "mode": "Géré / données",
+        "none": "Aucun (couleur unique)"
+      }
     },
     "impact": {
       "notAvailable": "Le graphe d'impact n'est pas disponible pour cette exécution.",

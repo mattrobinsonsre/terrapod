@@ -175,7 +175,13 @@
       "load": "Graphum praedii onerari non potuit."
     },
     "groupBy": {
-      "label": "Congrega per"
+      "label": "Congrega per",
+      "axis": {
+        "none": "Nihil (color unus)",
+        "pool": "Grex procuratorum",
+        "prefix": "Praefixum nominis",
+        "label": "label: {key}"
+      }
     },
     "view": {
       "graph": "Graphum",
@@ -2390,7 +2396,14 @@
       "colMode": "Modus",
       "colModule": "Modulus",
       "colDependedOnBy": "Dependent ab hoc",
-      "rootModule": "(radix)"
+      "rootModule": "(radix)",
+      "colorBy": {
+        "type": "Genus opis",
+        "module": "Modulus",
+        "provider": "Praebitor",
+        "mode": "Administrata / data",
+        "none": "Nihil (color unus)"
+      }
     },
     "impact": {
       "notAvailable": "Graphum effectus pro hac exsecutione non praesto est.",

@@ -175,7 +175,13 @@
       "load": "에스테이트 그래프를 불러오지 못했습니다."
     },
     "groupBy": {
-      "label": "그룹화 기준"
+      "label": "그룹화 기준",
+      "axis": {
+        "none": "없음 (단일 색상)",
+        "pool": "에이전트 풀",
+        "prefix": "이름 접두사",
+        "label": "label: {key}"
+      }
     },
     "view": {
       "graph": "그래프",
@@ -2390,7 +2396,14 @@
       "colMode": "모드",
       "colModule": "모듈",
       "colDependedOnBy": "종속하는 항목",
-      "rootModule": "(루트)"
+      "rootModule": "(루트)",
+      "colorBy": {
+        "type": "리소스 유형",
+        "module": "모듈",
+        "provider": "프로바이더",
+        "mode": "관리형 / 데이터",
+        "none": "없음 (단일 색상)"
+      }
     },
     "impact": {
       "notAvailable": "이 실행에는 영향 그래프를 사용할 수 없습니다.",
