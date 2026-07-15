@@ -49,6 +49,7 @@ if a route is on that list it stays at `/api/v2/`; otherwise it goes under
 | `provider/` | `terraform-provider-terrapod` — a thin wrapper over go-terrapod. | Go |
 | `migrate/` | `terrapod-migrate` — TFE/HCP + Atlantis migration CLI. | Go |
 | `publish/` | `terrapod-publish` — registry publish CLI (client-signed provider/module uploads). | Go |
+| `query/` | `terrapod-query` — tofu-native discovery engine for onboarding existing resources (schema → filtered data-source query → `import {}` blocks; MPL, no BUSL). Standalone CLI + baked into the api/runner images. | Go |
 | `helm/terrapod/` | The Helm chart (the only supported deployment mechanism). | YAML |
 | `alembic/` | Async Alembic migrations (hash-based revision IDs). | Python |
 | `docs/` | User + operator documentation. | Markdown |

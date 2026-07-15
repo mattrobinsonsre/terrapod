@@ -118,6 +118,7 @@ See [Architecture](architecture.md) for the full breakdown.
 | [FAQ](faq.md) | Straight answers to the common buyer questions (free — and always free, no paid tier? OpenTofu? Terragrunt? air-gapped? production-ready? do I really need Kubernetes? can mixed-tool teams share one install? monorepo / dedicated / mixed repos? per-workspace CPU+memory? vs Terrakube/Atlantis/Digger?) |
 | [Getting Started](getting-started.md) | Deploy the Helm chart on Kubernetes (or k3s), first workspace, first plan/apply |
 | [Migration](migration.md) | Move a TFE / HCP Terraform or Atlantis platform onto Terrapod with `terrapod-migrate` — dry-run-first, reversible, with an explicit "what transfers vs. what's a checklist" breakdown |
+| [terrapod-query](terrapod-query.md) | Tofu-native discovery engine for onboarding existing, unmanaged cloud resources into IaC — introspect provider schema, run filtered data-source queries, emit `import {}` blocks (MPL, no BUSL). Standalone CLI + baked into the api/runner images |
 | [Local Development](local-development.md) | Run Terrapod from source with Tilt (contributors only) |
 | [Architecture](architecture.md) | System components, storage, runners, auth flows |
 | [Authentication](authentication.md) | Local auth, OIDC, SAML, terraform login, API tokens, scoped service tokens (bound/detached) + offboarding idle guard |
