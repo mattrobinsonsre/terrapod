@@ -69,6 +69,20 @@ fi
 # Docker Builds
 # ─────────────────────────────────────────────────────────────────────────────
 
+# terrapod-query (#823) is baked into the API and runner images from a pre-built
+# linux binary staged at docker/query-bin/. In CI the build-query job produces
+# it; locally we compile it in a golang container (no host Go toolchain needed).
+# The container is linux/<host arch>, matching the local k8s nodes. This runs at
+# Tiltfile eval so the binary exists before the image builds; the runner build
+# reruns it (below) so query source edits are picked up without a Tilt restart.
+QUERY_BUILD = (
+    'mkdir -p docker/query-bin && ' +
+    'docker run --rm -v "$PWD/query":/src -w /src golang:1.26 ' +
+    'go build -trimpath -o terrapod-query-bin ./cmd/terrapod-query && ' +
+    'mv query/terrapod-query-bin docker/query-bin/terrapod-query'
+)
+local(QUERY_BUILD, quiet=True)
+
 # API Server (Python)
 docker_build(
     'terrapod-api',
@@ -109,9 +123,11 @@ docker_build(
 # pullPolicy: Never so K8s Jobs find it in the local Docker daemon.
 local_resource(
     'build-runner-image',
-    cmd='docker build -f docker/Dockerfile.runner -t terrapod-runner:local .',
+    cmd=QUERY_BUILD + ' && docker build -f docker/Dockerfile.runner -t terrapod-runner:local .',
     deps=[
         'docker/Dockerfile.runner',
+        'query/cmd',
+        'query/internal',
         'services/pyproject-runner.toml',
         'services/terrapod/http_retry.py',
         'services/terrapod/runner/__init__.py',

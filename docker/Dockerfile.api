@@ -83,6 +83,30 @@ RUN ARCH="${TARGETARCH:-$(dpkg --print-architecture)}" \
     && chmod 0755 /usr/local/bin/opa \
     && /usr/local/bin/opa version
 
+# OpenTofu — baked in so the API can run credential-less schema introspection
+# (`tofu providers schema -json`) for terrapod-query discovery (#823) without
+# spinning up a runner Job. Pinned; the runner fetches its own tofu per-run from
+# the binary cache, so this copy serves only the API's read-only schema dump.
+# tar.gz avoids needing unzip; verified against the published SHA256SUMS.
+ARG TOFU_VERSION=1.12.4
+RUN ARCH="${TARGETARCH:-$(dpkg --print-architecture)}" \
+    && BASE="https://github.com/opentofu/opentofu/releases/download/v${TOFU_VERSION}" \
+    && curl -fsSL --retry 6 --retry-delay 4 --retry-all-errors -o /tmp/tofu.tar.gz "${BASE}/tofu_${TOFU_VERSION}_linux_${ARCH}.tar.gz" \
+    && curl -fsSL --retry 6 --retry-delay 4 --retry-all-errors -o /tmp/tofu.sha256sums "${BASE}/tofu_${TOFU_VERSION}_SHA256SUMS" \
+    && sum="$(awk -v f="tofu_${TOFU_VERSION}_linux_${ARCH}.tar.gz" '$2==f {print $1}' /tmp/tofu.sha256sums)" \
+    && echo "${sum}  /tmp/tofu.tar.gz" | sha256sum -c - \
+    && tar -xzf /tmp/tofu.tar.gz -C /usr/local/bin tofu \
+    && rm /tmp/tofu.tar.gz /tmp/tofu.sha256sums \
+    && chmod 0755 /usr/local/bin/tofu \
+    && /usr/local/bin/tofu version
+
+# terrapod-query — the tofu-native discovery engine (#823), pre-built for this
+# arch by the build-query CI job (or the local Tilt/Make go build) and staged at
+# docker/query-bin/terrapod-query in the build context. Baked into the API image
+# so credential-less schema introspection (D1) runs here, no runner needed.
+COPY docker/query-bin/terrapod-query /usr/local/bin/terrapod-query
+RUN chmod 0755 /usr/local/bin/terrapod-query && /usr/local/bin/terrapod-query --help >/dev/null
+
 WORKDIR /app
 
 # Copy installed Python packages from builder

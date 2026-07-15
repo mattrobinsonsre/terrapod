@@ -287,6 +287,81 @@ jobs:
         run: go test ./... -v -count=1 -timeout 120s
         working-directory: publish
 
+  # ── Query Lint ────────────────────────────────────────
+  query-lint:
+    name: Query Lint
+    needs: prepare
+    if: needs.prepare.outputs.images_exist != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: query/go.mod
+          # Stdlib-only module — no go.sum, so nothing to cache.
+          cache: false
+      - name: Vet
+        run: go vet ./...
+        working-directory: query
+      - name: Build
+        run: go build ./...
+        working-directory: query
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
+        with:
+          version: v2.12.2
+          working-directory: query
+          args: --config=../.golangci.yml
+
+  # ── Query Test ────────────────────────────────────────
+  query-test:
+    name: Query Test
+    needs: prepare
+    if: needs.prepare.outputs.images_exist != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: query/go.mod
+          cache: false
+      - name: Test
+        run: go test ./... -v -count=1 -timeout 120s
+        working-directory: query
+
+  # ── Build terrapod-query binary (baked into api + runner images) ──────
+  build-query:
+    name: Build terrapod-query (${{ matrix.goarch }})
+    needs: prepare
+    # Runs whenever images will be built (to bake the binary in) OR on a tag
+    # (so release-query can attach the SAME linux binaries to the Release —
+    # built once here, reused by both the image bake and the release, never
+    # compiled twice).
+    if: needs.prepare.outputs.images_exist != 'true' || needs.prepare.outputs.is_tag == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        goarch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: query/go.mod
+          cache: false
+      - name: Build linux/${{ matrix.goarch }}
+        working-directory: query
+        env:
+          GOOS: linux
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "0"
+        run: go build -trimpath -ldflags "-s -w" -o "terrapod-query-linux-${{ matrix.goarch }}" ./cmd/terrapod-query
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: terrapod-query-linux-${{ matrix.goarch }}
+          path: query/terrapod-query-linux-${{ matrix.goarch }}
+          retention-days: 1
+
   # ── Python Test ────────────────────────────────────────
   python-test:
     # Sharded by directory so each shard gets its own Postgres /
@@ -895,7 +970,7 @@ jobs:
   # artifacted on PRs so scan-images can scan it.
   build-images-amd64:
     name: Build ${{ matrix.image }} (amd64)
-    needs: prepare
+    needs: [prepare, build-query]
     if: needs.prepare.outputs.images_exist != 'true'
     runs-on: ubuntu-latest
     permissions:
@@ -928,6 +1003,20 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           username: ${{ github.actor }}
 
+      # terrapod-query is baked into api + runner (#823) from the binary the
+      # build-query job compiled once — staged into the build context here.
+      - name: Stage terrapod-query binary (api/runner only)
+        if: matrix.image == 'terrapod-api' || matrix.image == 'terrapod-runner'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: terrapod-query-linux-amd64
+          path: docker/query-bin
+      - name: Normalise terrapod-query binary
+        if: matrix.image == 'terrapod-api' || matrix.image == 'terrapod-runner'
+        run: |
+          mv docker/query-bin/terrapod-query-linux-amd64 docker/query-bin/terrapod-query
+          chmod 0755 docker/query-bin/terrapod-query
+
       - name: Build and push
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
         with:
@@ -959,7 +1048,7 @@ jobs:
 
   build-images-arm64:
     name: Build ${{ matrix.image }} (arm64)
-    needs: prepare
+    needs: [prepare, build-query]
     if: needs.prepare.outputs.images_exist != 'true'
     runs-on: ubuntu-24.04-arm
     permissions:
@@ -991,6 +1080,20 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           username: ${{ github.actor }}
+
+      # terrapod-query is baked into api + runner (#823) from the binary the
+      # build-query job compiled once — staged into the build context here.
+      - name: Stage terrapod-query binary (api/runner only)
+        if: matrix.image == 'terrapod-api' || matrix.image == 'terrapod-runner'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: terrapod-query-linux-arm64
+          path: docker/query-bin
+      - name: Normalise terrapod-query binary
+        if: matrix.image == 'terrapod-api' || matrix.image == 'terrapod-runner'
+        run: |
+          mv docker/query-bin/terrapod-query-linux-arm64 docker/query-bin/terrapod-query
+          chmod 0755 docker/query-bin/terrapod-query
 
       - name: Build and push
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
@@ -1695,9 +1798,88 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GPG_FINGERPRINT: ${{ steps.gpg.outputs.fingerprint }}
 
+  release-query:
+    name: Release — terrapod-query
+    # Reuses the linux binaries build-query already compiled (downloaded as
+    # artifacts), so linux is never compiled twice — only darwin/windows are
+    # built here. (No GoReleaser: its `prebuilt` builder is Pro-only, so this
+    # packages the artifacts + native builds directly.)
+    needs: [prepare, release-create, build-query]
+    if: |
+      always()
+      && needs.prepare.outputs.is_tag == 'true'
+      && needs.release-create.result == 'success'
+      && needs.build-query.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: query/go.mod
+          cache: false
+
+      - name: Download prebuilt linux binaries (built once by build-query)
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          pattern: terrapod-query-linux-*
+          path: prebuilt
+          merge-multiple: true
+
+      - name: Import GPG signing key
+        id: gpg
+        run: |
+          echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
+          fingerprint=$(gpg --with-colons --import-options show-only --import <<< "${{ secrets.GPG_PRIVATE_KEY }}" | awk -F: '/^fpr:/{print $10; exit}')
+          echo "fingerprint=$fingerprint" >> "$GITHUB_OUTPUT"
+
+      - name: Package, checksum, sign, and upload
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GPG_FINGERPRINT: ${{ steps.gpg.outputs.fingerprint }}
+        run: |
+          set -euo pipefail
+          version="${{ needs.prepare.outputs.version }}"
+          ver="${version#v}"   # archive names use the bare version, matching the other tools
+          mkdir -p dist
+
+          # Reuse the EXACT linux binaries baked into the images (built once by
+          # build-query) — tar them, don't recompile.
+          for arch in amd64 arm64; do
+            install -m 0755 "prebuilt/terrapod-query-linux-${arch}" dist/terrapod-query
+            tar -C dist -czf "dist/terrapod-query_${ver}_linux_${arch}.tar.gz" terrapod-query
+            rm dist/terrapod-query
+          done
+
+          # Build + package the remaining platforms here (punted from build-query).
+          for platform in darwin/amd64 darwin/arm64 windows/amd64 windows/arm64; do
+            os="${platform%/*}"; arch="${platform#*/}"
+            out="terrapod-query"; [ "$os" = "windows" ] && out="terrapod-query.exe"
+            (cd query && GOOS="$os" GOARCH="$arch" CGO_ENABLED=0 \
+              go build -trimpath -ldflags "-s -w" -o "../dist/${out}" ./cmd/terrapod-query)
+            if [ "$os" = "windows" ]; then
+              (cd dist && zip -q "terrapod-query_${ver}_${os}_${arch}.zip" "${out}" && rm "${out}")
+            else
+              tar -C dist -czf "dist/terrapod-query_${ver}_${os}_${arch}.tar.gz" "${out}"
+              rm "dist/${out}"
+            fi
+          done
+
+          # SHA256SUMS over all archives + detached GPG signature (same shape as
+          # the provider/migrate/publish artifacts).
+          ( cd dist && sha256sum terrapod-query_${ver}_* > "terrapod-query_${ver}_SHA256SUMS" )
+          gpg --batch --local-user "$GPG_FINGERPRINT" \
+            --output "dist/terrapod-query_${ver}_SHA256SUMS.sig" \
+            --detach-sign "dist/terrapod-query_${ver}_SHA256SUMS"
+
+          # Append to the Release that release-create already opened.
+          gh release upload "$version" dist/terrapod-query_${ver}_* --clobber
+
   release-finalize:
     name: Release — Finalize (notes + chart + SBOMs)
-    needs: [prepare, release-create, release-images, release-provider, release-migrate, release-publish]
+    needs: [prepare, release-create, release-images, release-provider, release-migrate, release-publish, release-query]
     if: |
       always()
       && needs.prepare.outputs.is_tag == 'true'
@@ -1706,6 +1888,7 @@ jobs:
       && needs.release-provider.result == 'success'
       && needs.release-migrate.result == 'success'
       && needs.release-publish.result == 'success'
+      && needs.release-query.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -1790,11 +1973,11 @@ jobs:
   # ── Cleanup Tag on Failure ─────────────────────────────
   cleanup-tag:
     name: Cleanup Tag
-    needs: [prepare, build-images-amd64, build-images-arm64, scan-images, create-manifests, release-create, release-images, release-provider, release-migrate, release-publish, release-finalize]
+    needs: [prepare, build-images-amd64, build-images-arm64, build-query, scan-images, create-manifests, release-create, release-images, release-provider, release-migrate, release-publish, release-query, release-finalize]
     if: |
       always()
       && needs.prepare.outputs.is_tag == 'true'
-      && (needs.build-images-amd64.result == 'failure' || needs.build-images-arm64.result == 'failure' || needs.scan-images.result == 'failure' || needs.create-manifests.result == 'failure' || needs.release-create.result == 'failure' || needs.release-images.result == 'failure' || needs.release-provider.result == 'failure' || needs.release-migrate.result == 'failure' || needs.release-publish.result == 'failure' || needs.release-finalize.result == 'failure')
+      && (needs.build-images-amd64.result == 'failure' || needs.build-images-arm64.result == 'failure' || needs.build-query.result == 'failure' || needs.scan-images.result == 'failure' || needs.create-manifests.result == 'failure' || needs.release-create.result == 'failure' || needs.release-images.result == 'failure' || needs.release-provider.result == 'failure' || needs.release-migrate.result == 'failure' || needs.release-publish.result == 'failure' || needs.release-query.result == 'failure' || needs.release-finalize.result == 'failure')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -1827,6 +2010,9 @@ jobs:
       - migrate-test
       - publish-lint
       - publish-test
+      - query-lint
+      - query-test
+      - build-query
       - python-test
       - migration-check
       - python-audit
@@ -1850,6 +2036,7 @@ jobs:
       - release-provider
       - release-migrate
       - release-publish
+      - release-query
       - release-finalize
     runs-on: ubuntu-latest
     steps:
@@ -1867,6 +2054,9 @@ jobs:
             "${{ needs.migrate-test.result }}"
             "${{ needs.publish-lint.result }}"
             "${{ needs.publish-test.result }}"
+            "${{ needs.query-lint.result }}"
+            "${{ needs.query-test.result }}"
+            "${{ needs.build-query.result }}"
             "${{ needs.python-test.result }}"
             "${{ needs.migration-check.result }}"
             "${{ needs.python-audit.result }}"
@@ -1890,6 +2080,7 @@ jobs:
             "${{ needs.release-provider.result }}"
             "${{ needs.release-migrate.result }}"
             "${{ needs.release-publish.result }}"
+            "${{ needs.release-query.result }}"
             "${{ needs.release-finalize.result }}"
           )
 

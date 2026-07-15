@@ -41,6 +41,7 @@ The authoritative source is [AGENTS.md](AGENTS.md). Key invariants an agent must
 | `provider/` | `terraform-provider-terrapod` — a thin wrapper over go-terrapod. | Go |
 | `migrate/` | `terrapod-migrate` — TFE/HCP + Atlantis migration CLI. | Go |
 | `publish/` | `terrapod-publish` — registry publish CLI (client-signed uploads). | Go |
+| `query/` | `terrapod-query` — tofu-native discovery engine: introspect provider schema → run filtered data-source queries → emit `import {}` blocks (MPL, no BUSL). Baked into the api + runner images and published standalone. | Go |
 | `helm/terrapod/` | The Helm chart (the only supported deployment mechanism); `values.yaml` + `values.schema.json`. | YAML |
 | `alembic/` | Async Alembic database migrations (hash-based revision IDs). | Python |
 | `docs/` | User + operator documentation (this map's targets). | Markdown |
@@ -125,4 +126,4 @@ How each capability is turned on. **Platform-level** features are Helm values un
 - [docs/registry-publishing.md](docs/registry-publishing.md): the client-signed provider/module publish protocol.
 - [docs/supply-chain-verification.md](docs/supply-chain-verification.md): two directions. (1) Terrapod's own releases — every image + the Helm chart is keyless-signed with cosign, with per-image SBOM (SPDX) + SLSA build-provenance attestations, verifiable via `cosign verify` / `gh attestation verify` (identity pinned to the release workflow's GitHub OIDC). (2) Upstream artifacts Terrapod fetches — cached binaries + provider archives verified against the publisher's GPG-signed SHA256SUMS (pinned keys); the runner re-verifies the executable before running it. Config: `registry.binary_cache.verify` / `registry.provider_cache.verify` (off|checksum|signature, default signature).
 - [docs/remote-state.md](docs/remote-state.md): cross-workspace `terraform_remote_state` composition.
-- The four Go modules (`go-terrapod/`, `provider/`, `migrate/`, `publish/`) each have their own `go.mod` and package docs.
+- The five Go modules (`go-terrapod/`, `provider/`, `migrate/`, `publish/`, `query/`) each have their own `go.mod` and package docs.

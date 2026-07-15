@@ -46,6 +46,9 @@ test-e2e-down:      ## Tear down E2E test containers
 
 # ── Build ─────────────────────────────────────────────────
 images:             ## Build Docker images (single-arch, local)
+	mkdir -p docker/query-bin
+	docker run --rm -v "$(PWD)/query":/src -w /src golang:1.26 go build -trimpath -o terrapod-query-bin ./cmd/terrapod-query
+	mv query/terrapod-query-bin docker/query-bin/terrapod-query
 	docker build -f docker/Dockerfile.api -t terrapod-api:local .
 	docker build -f docker/Dockerfile.web -t terrapod-web:local .
 
