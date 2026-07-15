@@ -86,6 +86,7 @@
   "GET /api/terrapod/v1/listeners/{listener_id}/events",
   "GET /api/terrapod/v1/listeners/{listener_id}/runs/next",
   "GET /api/terrapod/v1/notification-configurations/{nc_id}",
+  "GET /api/terrapod/v1/onboarding",
   "GET /api/terrapod/v1/policy-sets",
   "GET /api/terrapod/v1/policy-sets/{ps_id}",
   "GET /api/terrapod/v1/provider-templates",

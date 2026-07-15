@@ -831,6 +831,13 @@ def create_application() -> FastAPI:
 
     app.include_router(catalog_router, prefix=TERRAPOD_PREFIX)
 
+    # AI onboarding (#824) — discover existing resources → copy-pasteable
+    # resource + import blocks. Self-gates on settings.ai_onboarding.enabled
+    # (404 when disabled), so it is always mounted.
+    from terrapod.api.routers.onboarding import router as onboarding_router
+
+    app.include_router(onboarding_router, prefix=TERRAPOD_PREFIX)
+
     # VCS webhook event receiver — Terrapod-specific.
     from terrapod.api.routers.vcs_events import router as vcs_events_router
 
