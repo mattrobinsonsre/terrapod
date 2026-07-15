@@ -175,7 +175,13 @@
       "load": "Det gick inte att läsa in beståndsgrafen."
     },
     "groupBy": {
-      "label": "Gruppera efter"
+      "label": "Gruppera efter",
+      "axis": {
+        "none": "Inget (en färg)",
+        "pool": "Agentpool",
+        "prefix": "Namnprefix",
+        "label": "label: {key}"
+      }
     },
     "view": {
       "graph": "Graf",
@@ -2390,7 +2396,14 @@
       "colMode": "Läge",
       "colModule": "Modul",
       "colDependedOnBy": "Beroende av",
-      "rootModule": "(rot)"
+      "rootModule": "(rot)",
+      "colorBy": {
+        "type": "Resurstyp",
+        "module": "Modul",
+        "provider": "Leverantör",
+        "mode": "Hanterad / data",
+        "none": "Inget (en färg)"
+      }
     },
     "impact": {
       "notAvailable": "Konsekvensgraf är inte tillgänglig för denna körning.",

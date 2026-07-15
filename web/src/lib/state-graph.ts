@@ -49,15 +49,12 @@ export const endId = (x: string | StateNode): string => (typeof x === 'string' ?
 // Grouping axes for a state graph — derived from the DATA. Resource type is the
 // most informative default (colour every aws_subnet the same), with module /
 // provider / mode as alternatives.
-export function groupAxes(nodes: StateNode[]): { value: string; label: string }[] {
+// Stable colour-by axis VALUES only; the label for each is resolved at the
+// render site via next-intl (`t('stateTab.colorBy.<value>')`) so the option
+// text translates in every locale.
+export function groupAxes(nodes: StateNode[]): { value: string }[] {
   void nodes
-  return [
-    { value: 'type', label: 'Resource type' },
-    { value: 'module', label: 'Module' },
-    { value: 'provider', label: 'Provider' },
-    { value: 'mode', label: 'Managed / data' },
-    { value: 'none', label: 'Nothing (single color)' },
-  ]
+  return [{ value: 'type' }, { value: 'module' }, { value: 'provider' }, { value: 'mode' }, { value: 'none' }]
 }
 
 export function categoryOf(n: StateNode, groupBy: string): string {

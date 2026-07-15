@@ -7,7 +7,15 @@
     "canceled": "Cancelled"
   },
   "estate": {
-    "description": "Every workspace you can see and the modules they use, wired by run-triggers, remote-state, and module links. Group by whatever axis fits your estate — the platform enforces no labelling convention."
+    "description": "Every workspace you can see and the modules they use, wired by run-triggers, remote-state, and module links. Group by whatever axis fits your estate — the platform enforces no labelling convention.",
+    "groupBy": {
+      "axis": {
+        "none": "Nothing (single colour)",
+        "pool": "Agent pool",
+        "prefix": "Name prefix",
+        "label": "label: {key}"
+      }
+    }
   },
   "planSummary": {
     "pending": {
@@ -57,7 +65,14 @@
   },
   "graphs": {
     "stateTab": {
-      "colorByLabel": "Colour by"
+      "colorByLabel": "Colour by",
+      "colorBy": {
+        "type": "Resource type",
+        "module": "Module",
+        "provider": "Provider",
+        "mode": "Managed / data",
+        "none": "Nothing (single colour)"
+      }
     }
   }
 }

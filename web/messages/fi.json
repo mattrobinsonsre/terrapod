@@ -175,7 +175,13 @@
       "load": "Ympäristögraafin lataaminen epäonnistui."
     },
     "groupBy": {
-      "label": "Ryhmittele"
+      "label": "Ryhmittele",
+      "axis": {
+        "none": "Ei mitään (yksi väri)",
+        "pool": "Agenttiryhmä",
+        "prefix": "Nimen etuliite",
+        "label": "label: {key}"
+      }
     },
     "view": {
       "graph": "Graafi",
@@ -2390,7 +2396,14 @@
       "colMode": "Tila",
       "colModule": "Moduuli",
       "colDependedOnBy": "Riippuvat kohteesta",
-      "rootModule": "(juuri)"
+      "rootModule": "(juuri)",
+      "colorBy": {
+        "type": "Resurssin tyyppi",
+        "module": "Moduuli",
+        "provider": "Toimittaja",
+        "mode": "Hallittu / data",
+        "none": "Ei mitään (yksi väri)"
+      }
     },
     "impact": {
       "notAvailable": "Vaikutusgraafi ei ole saatavilla tälle ajolle.",

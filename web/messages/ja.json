@@ -175,7 +175,13 @@
       "load": "エステートグラフの読み込みに失敗しました。"
     },
     "groupBy": {
-      "label": "グループ化"
+      "label": "グループ化",
+      "axis": {
+        "none": "なし（単色）",
+        "pool": "エージェントプール",
+        "prefix": "名前プレフィックス",
+        "label": "label: {key}"
+      }
     },
     "view": {
       "graph": "グラフ",
@@ -2390,7 +2396,14 @@
       "colMode": "モード",
       "colModule": "モジュール",
       "colDependedOnBy": "依存されている",
-      "rootModule": "（ルート）"
+      "rootModule": "（ルート）",
+      "colorBy": {
+        "type": "リソースタイプ",
+        "module": "モジュール",
+        "provider": "プロバイダー",
+        "mode": "管理対象 / データ",
+        "none": "なし（単色）"
+      }
     },
     "impact": {
       "notAvailable": "この実行では影響グラフは利用できません。",

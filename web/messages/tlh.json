@@ -175,7 +175,13 @@
       "load": "Sep chart ghelmeH lujpu'."
     },
     "groupBy": {
-      "label": "tlhegh"
+      "label": "tlhegh",
+      "axis": {
+        "none": "pagh (wa' rItlh)",
+        "pool": "toy'wI' ghom",
+        "prefix": "pongHom",
+        "label": "per: {key}"
+      }
     },
     "view": {
       "graph": "chart",
@@ -2390,7 +2396,14 @@
       "colMode": "mIw",
       "colModule": "Segh",
       "colDependedOnBy": "lIntagh ghaj",
-      "rootModule": "(Hal)"
+      "rootModule": "(Hal)",
+      "colorBy": {
+        "type": "Segh",
+        "module": "boq",
+        "provider": "nobwI'",
+        "mode": "vu'lu'bogh / De'",
+        "none": "pagh (wa' rItlh)"
+      }
     },
     "impact": {
       "notAvailable": "Sar vamvaD 'ang chart lo'laHbe'.",

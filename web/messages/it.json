@@ -175,7 +175,13 @@
       "load": "Impossibile caricare il grafico dell''estate."
     },
     "groupBy": {
-      "label": "Raggruppa per"
+      "label": "Raggruppa per",
+      "axis": {
+        "none": "Nessuno (colore unico)",
+        "pool": "Pool di agenti",
+        "prefix": "Prefisso del nome",
+        "label": "label: {key}"
+      }
     },
     "view": {
       "graph": "Grafico",
@@ -2390,7 +2396,14 @@
       "colMode": "Modalità",
       "colModule": "Modulo",
       "colDependedOnBy": "Dipendenti da questo",
-      "rootModule": "(root)"
+      "rootModule": "(root)",
+      "colorBy": {
+        "type": "Tipo di risorsa",
+        "module": "Modulo",
+        "provider": "Provider",
+        "mode": "Gestito / dati",
+        "none": "Nessuno (colore unico)"
+      }
     },
     "impact": {
       "notAvailable": "Il grafico di impatto non è disponibile per questa esecuzione.",

@@ -94,6 +94,18 @@ export default function EstatePage() {
   if (error) return <Shell><ErrorBanner message={error} /></Shell>
   if (!graph) return <Shell><LoadingSpinner /></Shell>
 
+  // Translate a group-by axis value into its display label. The axis VALUES are
+  // stable tokens from groupAxes(); the labels live in the catalog so they
+  // translate. A `label:<key>` value carries a workspace-label key (user data),
+  // formatted as "label: {key}".
+  const axisLabel = (value: string) => {
+    if (value === 'none') return t('groupBy.axis.none')
+    if (value === 'pool') return t('groupBy.axis.pool')
+    if (value === 'prefix') return t('groupBy.axis.prefix')
+    if (value.startsWith('label:')) return t('groupBy.axis.label', { key: value.slice(6) })
+    return value
+  }
+
   const workspaces = graph.nodes.filter((n) => n.kind === 'workspace')
   const modules = graph.nodes.filter((n) => n.kind === 'module')
   const usedBy = (modId: string) =>
@@ -127,7 +139,7 @@ export default function EstatePage() {
           >
             {axes.map((a) => (
               <option key={a.value} value={a.value}>
-                {a.label}
+                {axisLabel(a.value)}
               </option>
             ))}
           </select>
@@ -198,7 +210,7 @@ export default function EstatePage() {
                   <tr>
                     <th scope="col" className="text-left px-3 py-2">{t('table.workspaces.col.workspace')}</th>
                     <th scope="col" className="text-left px-3 py-2">
-                      {groupBy === 'none' ? t('table.workspaces.col.group') : axes.find((a) => a.value === groupBy)?.label}
+                      {groupBy === 'none' ? t('table.workspaces.col.group') : axisLabel(groupBy)}
                     </th>
                     <th scope="col" className="text-left px-3 py-2">{t('table.workspaces.col.agentPool')}</th>
                     <th scope="col" className="text-right px-3 py-2">{t('table.workspaces.col.dependedOnBy')}</th>

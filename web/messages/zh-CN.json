@@ -175,7 +175,13 @@
       "load": "加载资产图失败。"
     },
     "groupBy": {
-      "label": "分组依据"
+      "label": "分组依据",
+      "axis": {
+        "none": "无（单一颜色）",
+        "pool": "代理池",
+        "prefix": "名称前缀",
+        "label": "label: {key}"
+      }
     },
     "view": {
       "graph": "图形",
@@ -2390,7 +2396,14 @@
       "colMode": "模式",
       "colModule": "模块",
       "colDependedOnBy": "被依赖于",
-      "rootModule": "（根）"
+      "rootModule": "（根）",
+      "colorBy": {
+        "type": "资源类型",
+        "module": "模块",
+        "provider": "提供程序",
+        "mode": "托管 / 数据",
+        "none": "无（单一颜色）"
+      }
     },
     "impact": {
       "notAvailable": "此运行没有可用的影响图。",
