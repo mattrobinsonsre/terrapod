@@ -854,3 +854,84 @@ async def upload_plan_artifacts(
             pass
 
     return Response(status_code=204)
+
+
+# ── Onboarding discovery artifacts (#824 P2 — D2/D3) ───────────────────
+# The discovery Job uploads its generated artifacts here; each resolves the
+# owning OnboardingSession via its ``discovery_run_id`` (== this run) and writes
+# the column directly. The runner token is scoped to the discovery run id, so a
+# Job can only ever write to its own session. Config/imports are .tf TEXT that
+# lands in a DB row (small-file class — a handful of resources), capped to guard
+# the pod (a very large estate that outgrows a row is a documented follow-up).
+
+_ONBOARDING_MAX_BYTES = 10 * 1024 * 1024
+
+
+async def _get_onboarding_session_for_run(run_id: str, db: AsyncSession):
+    from terrapod.db.models import OnboardingSession
+
+    result = await db.execute(
+        select(OnboardingSession).where(OnboardingSession.discovery_run_id == uuid.UUID(run_id))
+    )
+    session = result.scalar_one_or_none()
+    if session is None:
+        raise HTTPException(status_code=404, detail="No onboarding session for this run")
+    return session
+
+
+async def _read_capped_text(request: Request) -> str:
+    body = await request.body()
+    if len(body) > _ONBOARDING_MAX_BYTES:
+        raise HTTPException(status_code=413, detail="onboarding artifact too large")
+    return body.decode("utf-8", errors="replace")
+
+
+@router.put("/runs/{run_id}/artifacts/onboarding-config")
+async def upload_onboarding_config(
+    run_id: str,
+    request: Request,
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """The cleaned, import-only generated `resource {}` config (D3 + clean)."""
+    require_runner_for_run(user, run_id)
+    session = await _get_onboarding_session_for_run(run_id, db)
+    session.generated_config = await _read_capped_text(request)
+    await db.commit()
+    return Response(status_code=204)
+
+
+@router.put("/runs/{run_id}/artifacts/onboarding-imports")
+async def upload_onboarding_imports(
+    run_id: str,
+    request: Request,
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """The candidate `import {}` blocks (D3)."""
+    require_runner_for_run(user, run_id)
+    session = await _get_onboarding_session_for_run(run_id, db)
+    session.import_blocks = await _read_capped_text(request)
+    await db.commit()
+    return Response(status_code=204)
+
+
+@router.post("/runs/{run_id}/artifacts/onboarding-query-results")
+async def post_onboarding_query_results(
+    run_id: str,
+    request: Request,
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """The raw D2 query results + the import-only verdict (JSON)."""
+    require_runner_for_run(user, run_id)
+    session = await _get_onboarding_session_for_run(run_id, db)
+    try:
+        payload = await request.json()
+    except (ValueError, UnicodeDecodeError):
+        raise HTTPException(status_code=422, detail="body must be JSON") from None
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=422, detail="body must be a JSON object")
+    session.query_results = payload
+    await db.commit()
+    return Response(status_code=204)

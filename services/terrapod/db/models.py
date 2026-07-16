@@ -2236,6 +2236,14 @@ ONBOARDING_STATUSES = (
     "canceled",
 )
 
+# The ``Run.source`` value for the D2/D3 runner discovery run a session
+# dispatches. It reuses the whole run pipeline (pool dispatch, listener, Job,
+# reconciler) but is handled specially: it is always plan-only, generates config
+# from an empty dir (no configuration version), and never posts VCS status,
+# notifications, run triggers, or mutates workspace state. run_service and
+# run_reconciler key their onboarding-specific branches off this literal.
+ONBOARDING_DISCOVERY_SOURCE = "onboarding-discovery"
+
 
 class OnboardingSession(Base):
     """A workspace-scoped resource-onboarding discovery session (#824 P2).

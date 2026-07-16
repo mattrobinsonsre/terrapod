@@ -41,6 +41,7 @@ import structlog
 from terrapod.runner import lock_extender, plan_artifacts
 from terrapod.runner.phases import (
     backend_backstop,
+    discovery,
     execution_hooks,
     init_phase,
     log_capture,
@@ -570,6 +571,24 @@ def _run_body(cfg: RunnerConfig, work_dir: Path) -> int:
         tg_bin = terragrunt.download_terragrunt(cfg)
         binary = str(terragrunt.write_wrappers(terragrunt_bin=tg_bin, real_tf_bin=binary_path))
         log.info("terragrunt enabled", tg_wrapper=binary)
+
+    # Onboarding discovery (#824 P2): a session-scoped run with NO configuration
+    # version and NO state — it writes its own providers.tf and drives
+    # terrapod-query + native tofu. Keyed on the session id (the run is
+    # plan-phase for all infra). It still needs the provider-mirror env so
+    # `tofu init` can install the provider on the runner, but none of the config
+    # tarball / state / chdir / backstop machinery below. Branch here and return.
+    if cfg.is_discovery:
+        mirror_config.write_terraform_rc(
+            api_url=cfg.api_url,
+            auth_token=cfg.auth_token,
+            public_api_url=cfg.public_api_url,
+            config_path=_TF_RC,
+        )
+        for k, v in mirror_config.export_env(config_path=_TF_RC, env={}).items():
+            os.environ[k] = v
+        work_dir.mkdir(parents=True, exist_ok=True)
+        return discovery.run_discovery(cfg, binary=binary, work_dir=work_dir)
 
     # 2. Configuration tarball.
     work_dir.mkdir(parents=True, exist_ok=True)

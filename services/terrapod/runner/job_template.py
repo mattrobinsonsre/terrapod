@@ -84,6 +84,9 @@ def build_job_spec(
     is_destroy: bool = False,
     working_directory: str = "",
     ca_secret_name: str = "",
+    onboard_session_id: str = "",
+    onboard_provider: str = "",
+    onboard_types: list[str] | None = None,
 ) -> dict:
     """Build a K8s Job spec for a run phase.
 
@@ -201,6 +204,14 @@ def build_job_spec(
         container_env.append({"name": "TP_DESTROY", "value": "true"})
     if working_directory:
         container_env.append({"name": "TP_WORKING_DIR", "value": working_directory})
+
+    # Onboarding discovery (#824 P2): a non-empty session id makes the entrypoint
+    # run D2/D3 (terrapod-query) instead of a workspace plan. The run stays
+    # plan-phase for all infra (Job name / Redis keys / reconciler).
+    if onboard_session_id:
+        container_env.append({"name": "TP_ONBOARD_SESSION_ID", "value": onboard_session_id})
+        container_env.append({"name": "TP_ONBOARD_PROVIDER", "value": onboard_provider})
+        container_env.append({"name": "TP_ONBOARD_TYPES", "value": json.dumps(onboard_types or [])})
 
     # Termination grace period — passed to entrypoint for time-budgeted shutdown
     container_env.append(

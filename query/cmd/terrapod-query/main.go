@@ -30,6 +30,9 @@ Commands:
             result (the resources it found). Read-only; performs no import.
   import    Turn a query result into candidate import {} blocks. Composable:
             terrapod-query query ... | terrapod-query import --resource TYPE
+  clean     Deterministically prune a "tofu plan -generate-config-out" document
+            (drop computed-only + zero-valued optional attributes) so it plans
+            import-only. Schema-driven, no AI — the AI-off fallback.
 
 Run "terrapod-query <command> -h" for command-specific flags.
 `
@@ -51,6 +54,8 @@ func main() {
 		err = runQuery(ctx, args)
 	case "import":
 		err = runImport(ctx, args)
+	case "clean":
+		err = runClean(ctx, args)
 	case "-h", "--help", "help":
 		fmt.Print(usage)
 		return

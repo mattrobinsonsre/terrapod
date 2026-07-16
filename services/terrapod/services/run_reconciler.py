@@ -283,7 +283,21 @@ async def _handle_succeeded(db: AsyncSession, run: Run) -> None:
     direct POST (`/plan-result` / `/apply-result`) already drove the
     transition, this is a no-op.
     """
+    from terrapod.db.models import ONBOARDING_DISCOVERY_SOURCE
     from terrapod.services import run_service
+
+    # Onboarding discovery (#824 P2): the discovery Job uploaded its artifacts
+    # directly to the session; there is no plan to complete. Settle the run
+    # (planning → planned) and flip the session status, skipping the plan
+    # machinery (supersede / auto-apply / notifications / plan artifacts).
+    if run.source == ONBOARDING_DISCOVERY_SOURCE:
+        from terrapod.services import onboarding_service
+
+        await _persist_live_log_if_missing(run, "plan")
+        if run.status == "planning":
+            await run_service.transition_run(db, run, "planned")
+        await onboarding_service.complete_discovery(db, run.id, success=True)
+        return
 
     phase = "plan" if run.status == "planning" else "apply"
     await _persist_live_log_if_missing(run, phase)
@@ -296,12 +310,19 @@ async def _handle_succeeded(db: AsyncSession, run: Run) -> None:
 
 async def _handle_failed(db: AsyncSession, run: Run, error_message: str) -> None:
     """Handle a failed or deleted Job."""
+    from terrapod.db.models import ONBOARDING_DISCOVERY_SOURCE
     from terrapod.services import run_service
 
     phase = "plan" if run.status == "planning" else "apply"
     await _persist_live_log_if_missing(run, phase)
 
     run = await run_service.transition_run(db, run, "errored", error_message=error_message)
+
+    # Onboarding discovery (#824 P2): also mark the session errored.
+    if run.source == ONBOARDING_DISCOVERY_SOURCE:
+        from terrapod.services import onboarding_service
+
+        await onboarding_service.complete_discovery(db, run.id, success=False, error=error_message)
 
     # Unlock workspace
     ws = await db.get(Workspace, run.workspace_id)

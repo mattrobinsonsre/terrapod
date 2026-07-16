@@ -746,6 +746,10 @@ class RunnerListener:
             is_destroy=attrs.get("is-destroy", False),
             working_directory=attrs.get("working-directory", ""),
             ca_secret_name=ca_secret_name,
+            # Onboarding discovery (#824 P2): present only for discovery runs.
+            onboard_session_id=attrs.get("onboard-session-id", ""),
+            onboard_provider=attrs.get("onboard-provider", ""),
+            onboard_types=attrs.get("onboard-types", []),
         )
 
         namespace = self.runner_config.runner_namespace

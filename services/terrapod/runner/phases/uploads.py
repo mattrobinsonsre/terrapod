@@ -445,6 +445,47 @@ def _cli_main(argv: list[str] | None = None) -> int:
     return 0
 
 
+# ── Onboarding discovery (#824 P2 — D2/D3) ─────────────────────────────
+# The discovery Job uploads its generated artifacts to the onboarding session
+# (resolved server-side via the discovery run id). All three are idempotent
+# server-side (fixed session row), so retries are safe.
+
+
+def upload_onboarding_config(
+    cfg: RunnerConfig, config_path: Path, *, client: httpx.Client | None = None
+) -> bool:
+    """The cleaned, import-only ``resource {}`` config (D3 + clean pass)."""
+    url = f"{cfg.api_url}/api/terrapod/v1/runs/{cfg.run_id}/artifacts/onboarding-config"
+    ok, status = _put_file(cfg, url, config_path, content_type="text/plain", client=client)
+    if not ok:
+        logger.warning("onboarding config upload failed", status=status)
+    return ok
+
+
+def upload_onboarding_imports(
+    cfg: RunnerConfig, imports_path: Path, *, client: httpx.Client | None = None
+) -> bool:
+    """The candidate ``import {}`` blocks (D3)."""
+    url = f"{cfg.api_url}/api/terrapod/v1/runs/{cfg.run_id}/artifacts/onboarding-imports"
+    ok, status = _put_file(cfg, url, imports_path, content_type="text/plain", client=client)
+    if not ok:
+        logger.warning("onboarding imports upload failed", status=status)
+    return ok
+
+
+def post_onboarding_query_results(
+    cfg: RunnerConfig, body: dict, *, client: httpx.Client | None = None
+) -> bool:
+    """The raw D2 query results + the import-only verdict (JSON)."""
+    url = f"{cfg.api_url}/api/terrapod/v1/runs/{cfg.run_id}/artifacts/onboarding-query-results"
+    ok, status = _post_json(
+        cfg, url, body, timeout_seconds=30.0, client=client, retries=3, idempotent=True
+    )
+    if not ok:
+        logger.warning("onboarding query-results post failed", status=status)
+    return ok
+
+
 if __name__ == "__main__":
     import sys
 

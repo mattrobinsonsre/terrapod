@@ -152,6 +152,113 @@ async def list_sessions(db: AsyncSession, workspace_id: uuid.UUID) -> list[Onboa
 
 
 # ---------------------------------------------------------------------------
+# D2/D3 dispatch — the runner discovery run (schema_ready → querying)
+# ---------------------------------------------------------------------------
+class OnboardingError(ValueError):
+    """A precondition failure the router maps to a 4xx (422 by default)."""
+
+
+async def start_discovery(
+    db: AsyncSession, session: OnboardingSession, selected_types: list[str]
+) -> OnboardingSession:
+    """Dispatch the D2/D3 discovery run for a ``schema_ready`` session.
+
+    D2 (data-source query) and D3 (``-generate-config-out`` + cleanup) touch the
+    cloud, so unlike credential-less D1 they run on the runner with the pool's
+    workload identity. We reuse the normal run pipeline: create a plan-only
+    ``onboarding-discovery`` run with **no** configuration version (the runner
+    generates config from an empty dir), queue it for pickup, and move the
+    session to ``querying``. The reconciler completes the session from the run's
+    outcome + uploaded artifacts.
+
+    Raises ``OnboardingError`` on any precondition failure (bad state, no pool,
+    empty/invalid selection, expired surface) — the router maps it to 422.
+    """
+    from terrapod.db.models import ONBOARDING_DISCOVERY_SOURCE
+    from terrapod.services import run_service
+
+    if session.status != "schema_ready":
+        raise OnboardingError(
+            f"session must be 'schema_ready' to start discovery (is '{session.status}')"
+        )
+
+    workspace = await db.get(Workspace, session.workspace_id)
+    if workspace is None:
+        raise OnboardingError("workspace no longer exists")
+    # D2/D3 need a runner (cloud creds) — agent execution with an assigned pool.
+    if workspace.execution_mode != "agent" or workspace.agent_pool_id is None:
+        raise OnboardingError(
+            "discovery requires an agent-mode workspace with an assigned agent pool"
+        )
+
+    # Only the data sources D1 surfaced are queryable; the selection must be a
+    # non-empty subset of them. The surface is Redis-only, so an expired one
+    # means the caller must re-run schema discovery first.
+    surface = await get_session_surface(session)
+    if surface is None:
+        raise OnboardingError("discovery surface has expired; re-run schema discovery")
+    available = {ds.get("name") for ds in (surface.get("data_sources") or []) if ds.get("name")}
+    # Preserve caller order, drop dupes and anything not in the surface.
+    cleaned = [t for t in dict.fromkeys(selected_types) if t in available]
+    if not cleaned:
+        raise OnboardingError(
+            "selected_types must be a non-empty subset of the discovery surface's data sources"
+        )
+
+    run = await run_service.create_run(
+        db,
+        workspace,
+        message=f"Onboarding discovery: {session.provider} ({len(cleaned)} data source(s))",
+        plan_only=True,
+        source=ONBOARDING_DISCOVERY_SOURCE,
+        created_by=session.created_by,
+    )
+    # No configuration version — the runner writes providers.tf + the import
+    # blocks itself — so queue directly for listener pickup.
+    await run_service.queue_run(db, run)
+
+    session.selected_types = cleaned
+    session.discovery_run_id = run.id
+    session.status = "querying"
+    session.error = ""
+    await db.flush()
+    logger.info(
+        "onboarding_discovery_started",
+        session_id=str(session.id),
+        run_id=str(run.id),
+        types=len(cleaned),
+    )
+    return session
+
+
+async def complete_discovery(
+    db: AsyncSession, run_id: uuid.UUID, *, success: bool, error: str = ""
+) -> None:
+    """Reconciler hook: settle a discovery run's session from the Job outcome.
+
+    The runner already uploaded the artifacts (config / imports / query results)
+    directly to the session via the artifact endpoints, so this only flips the
+    session status: ``config_ready`` when the run succeeded AND produced config,
+    else ``errored``. Idempotent and safe to call more than once. No-ops if the
+    session was already resolved or doesn't exist.
+    """
+    result = await db.execute(
+        select(OnboardingSession).where(OnboardingSession.discovery_run_id == run_id)
+    )
+    session = result.scalar_one_or_none()
+    if session is None or session.status not in ("querying",):
+        return
+    if success and session.generated_config:
+        session.status = "config_ready"
+        session.error = ""
+    else:
+        session.status = "errored"
+        session.error = (error or "discovery produced no config")[:2000]
+    await db.flush()
+    logger.info("onboarding_discovery_completed", session_id=str(session.id), status=session.status)
+
+
+# ---------------------------------------------------------------------------
 # D1 discovery orchestration
 # ---------------------------------------------------------------------------
 def _local_platform() -> tuple[str, str]:

@@ -99,3 +99,128 @@ async def test_run_schema_discovery_missing_workspace_errors_cleanly():
     await svc.run_schema_discovery(db, session.id)
     assert session.status == "errored"
     assert "workspace" in session.error.lower()
+
+
+# --- D2/D3 dispatch: start_discovery ---------------------------------------
+def _agent_ws():
+    return SimpleNamespace(
+        id=uuid.uuid4(),
+        execution_backend="tofu",
+        terraform_version="1.12",
+        execution_mode="agent",
+        agent_pool_id=uuid.uuid4(),
+        auto_apply=False,
+        terragrunt_enabled=False,
+        terragrunt_version="",
+        resource_cpu="1",
+        resource_memory="2Gi",
+        name="ws",
+    )
+
+
+@pytest.mark.asyncio
+async def test_start_discovery_requires_schema_ready():
+    session = OnboardingSession(workspace_id=uuid.uuid4(), provider="aws", status="pending")
+    db = AsyncMock()
+    with pytest.raises(svc.OnboardingError):
+        await svc.start_discovery(db, session, ["aws_vpcs"])
+
+
+@pytest.mark.asyncio
+async def test_start_discovery_requires_agent_pool():
+    ws = SimpleNamespace(id=uuid.uuid4(), execution_mode="local", agent_pool_id=None)
+    session = OnboardingSession(workspace_id=ws.id, provider="aws", status="schema_ready")
+    db = _fake_db(session, ws)
+    with pytest.raises(svc.OnboardingError):
+        await svc.start_discovery(db, session, ["aws_vpcs"])
+
+
+@pytest.mark.asyncio
+async def test_start_discovery_rejects_selection_not_in_surface():
+    ws = _agent_ws()
+    session = OnboardingSession(
+        workspace_id=ws.id,
+        provider="aws",
+        status="schema_ready",
+        engine="tofu",
+        engine_version="1.12",
+    )
+    db = _fake_db(session, ws)
+    surface = {"data_sources": [{"name": "aws_vpcs"}]}
+    with patch.object(svc, "get_session_surface", AsyncMock(return_value=surface)):
+        with pytest.raises(svc.OnboardingError):
+            await svc.start_discovery(db, session, ["not_a_real_type"])
+
+
+@pytest.mark.asyncio
+async def test_start_discovery_happy_path_creates_run_and_transitions():
+    ws = _agent_ws()
+    session = OnboardingSession(
+        workspace_id=ws.id,
+        provider="aws",
+        status="schema_ready",
+        engine="tofu",
+        engine_version="1.12",
+        created_by="u@x",
+    )
+    db = _fake_db(session, ws)
+    surface = {"data_sources": [{"name": "aws_vpcs"}, {"name": "aws_subnets"}]}
+    fake_run = SimpleNamespace(id=uuid.uuid4())
+    with (
+        patch.object(svc, "get_session_surface", AsyncMock(return_value=surface)),
+        patch("terrapod.services.run_service.create_run", AsyncMock(return_value=fake_run)) as cr,
+        patch("terrapod.services.run_service.queue_run", AsyncMock()) as qr,
+    ):
+        # dupes + an unknown type are dropped; order preserved.
+        await svc.start_discovery(db, session, ["aws_vpcs", "bogus", "aws_vpcs"])
+
+    assert session.status == "querying"
+    assert session.selected_types == ["aws_vpcs"]
+    assert session.discovery_run_id == fake_run.id
+    cr.assert_awaited_once()
+    assert cr.await_args.kwargs["source"] == "onboarding-discovery"
+    assert cr.await_args.kwargs["plan_only"] is True
+    qr.assert_awaited_once()
+
+
+# --- reconciler hook: complete_discovery -----------------------------------
+def _db_returning(session):
+    db = AsyncMock()
+    db.execute = AsyncMock(return_value=SimpleNamespace(scalar_one_or_none=lambda: session))
+    return db
+
+
+@pytest.mark.asyncio
+async def test_complete_discovery_success_with_config_is_config_ready():
+    session = OnboardingSession(workspace_id=uuid.uuid4(), provider="aws", status="querying")
+    session.generated_config = 'resource "aws_vpc" "x" {}'
+    db = _db_returning(session)
+    await svc.complete_discovery(db, uuid.uuid4(), success=True)
+    assert session.status == "config_ready"
+
+
+@pytest.mark.asyncio
+async def test_complete_discovery_success_without_config_errors():
+    session = OnboardingSession(workspace_id=uuid.uuid4(), provider="aws", status="querying")
+    session.generated_config = None
+    db = _db_returning(session)
+    await svc.complete_discovery(db, uuid.uuid4(), success=True)
+    assert session.status == "errored"
+
+
+@pytest.mark.asyncio
+async def test_complete_discovery_failure_errors_with_message():
+    session = OnboardingSession(workspace_id=uuid.uuid4(), provider="aws", status="querying")
+    db = _db_returning(session)
+    await svc.complete_discovery(db, uuid.uuid4(), success=False, error="boom")
+    assert session.status == "errored"
+    assert "boom" in session.error
+
+
+@pytest.mark.asyncio
+async def test_complete_discovery_ignores_already_resolved_session():
+    session = OnboardingSession(workspace_id=uuid.uuid4(), provider="aws", status="config_ready")
+    db = _db_returning(session)
+    await svc.complete_discovery(db, uuid.uuid4(), success=False, error="late")
+    # An already-terminal session is not clobbered by a late reconciler pass.
+    assert session.status == "config_ready"

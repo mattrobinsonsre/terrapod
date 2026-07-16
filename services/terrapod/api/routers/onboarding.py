@@ -188,3 +188,42 @@ async def get_onboarding_session(
     await _require_onboard(ws, user, db)
     surface = await onboarding_service.get_session_surface(session)
     return {"data": _session_json(session, surface=surface)}
+
+
+@router.post("/onboarding-sessions/{session_id}/discover")
+async def start_onboarding_discovery(
+    session_id: str,
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+    user: AuthenticatedUser = Depends(get_current_user),
+) -> dict:
+    """Dispatch the D2/D3 runner discovery run for a schema_ready session.
+
+    Body: ``{"data": {"attributes": {"selected-types": ["aws_vpcs", ...]}}}`` —
+    the data-source types (a subset of the session's discovery surface) to query.
+    """
+    try:
+        sid = uuid.UUID(session_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Onboarding session not found") from None
+    session = await onboarding_service.get_session(db, sid)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Onboarding session not found")
+    ws = await db.get(Workspace, session.workspace_id)
+    if ws is None:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+    await _require_onboard(ws, user, db)
+
+    attrs = (body.get("data") or {}).get("attributes") or {}
+    raw_types = attrs.get("selected-types") or attrs.get("selected_types") or []
+    if not isinstance(raw_types, list) or not all(isinstance(t, str) for t in raw_types):
+        raise HTTPException(status_code=422, detail="selected-types must be a list of strings")
+
+    try:
+        session = await onboarding_service.start_discovery(db, session, raw_types)
+    except onboarding_service.OnboardingError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from None
+    await db.commit()
+
+    surface = await onboarding_service.get_session_surface(session)
+    return {"data": _session_json(session, surface=surface)}
