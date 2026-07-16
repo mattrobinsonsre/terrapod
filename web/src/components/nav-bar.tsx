@@ -302,7 +302,7 @@ function MobileDrawer({
   return (
     <div
       id={id}
-      className="md:hidden fixed top-0 left-0 right-0 h-dvh z-40 bg-slate-900 flex flex-col"
+      className="lg:hidden fixed top-0 left-0 right-0 h-dvh z-40 bg-slate-900 flex flex-col"
     >
       <div className="flex items-center justify-between h-14 px-4 border-b border-slate-800 flex-shrink-0">
         <span className="font-bold text-lg text-slate-100">{title}</span>
@@ -394,8 +394,12 @@ export default function NavBar() {
       <TokenExpiryBanner />
       <nav className="border-b border-slate-800 bg-slate-900/80 backdrop-blur-sm sticky top-0 z-10">
         <div className="px-4 sm:px-6 lg:px-8">
-          {/* Desktop nav */}
-          <div className="hidden md:flex items-center gap-1 py-2">
+          {/* Desktop nav — enabled at `lg`, not `md`: the full horizontal nav
+              (logo + 5 primary items + admin + locale + help + a long account
+              email) doesn't fit until ~1024, so below `lg` it would wrap into a
+              tall, ugly multi-row bar that (being sticky) also covers page
+              content beneath it. Below `lg` we use the clean hamburger instead. */}
+          <div className="hidden lg:flex items-center gap-1 py-2">
             <Link href="/" className="flex items-center gap-2 mr-3 flex-shrink-0">
               <img src="/logo.svg" alt="Terrapod" className="w-7 h-7" />
               <span className="font-bold text-lg text-slate-100">Terrapod</span>
@@ -437,8 +441,8 @@ export default function NavBar() {
             />
           </div>
 
-          {/* Mobile top bar — logo + Account trigger + hamburger */}
-          <div className="md:hidden flex items-center justify-between h-14">
+          {/* Mobile top bar — logo + Account trigger + hamburger (below `lg`) */}
+          <div className="lg:hidden flex items-center justify-between h-14">
             <Link href="/" className="flex items-center gap-2">
               <img src="/logo.svg" alt="Terrapod" className="w-7 h-7" />
               <span className="font-bold text-lg text-slate-100">Terrapod</span>
