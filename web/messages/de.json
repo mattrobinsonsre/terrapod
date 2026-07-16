@@ -1993,7 +1993,8 @@
       "loadingLower": "wird geladen…"
     },
     "header": {
-      "executionMode": "Ausführungsmodus {mode}"
+      "executionMode": "Ausführungsmodus {mode}",
+      "onboard": "Einbinden"
     },
     "tabs": {
       "overview": "Übersicht",
@@ -2630,5 +2631,42 @@
   "apiDocs": {
     "view": "Ansicht:",
     "redocTitle": "ReDoc-API-Dokumentation"
+  },
+  "onboarding": {
+    "title": "Bestehende Ressourcen einbinden",
+    "backTo": "Zurück zu {workspace}",
+    "description": "Bestehende, nicht verwaltete Cloud-Ressourcen in {workspace} erkennen und prüfbare Ressourcen- und Import-Blöcke erzeugen.",
+    "providerLabel": "Anbieter",
+    "providerVersionLabel": "Provider-Version (optional)",
+    "start": "Erkennung starten",
+    "starting": "Wird gestartet…",
+    "sessionsLabel": "Erkennungssitzungen",
+    "empty": "Noch keine Erkennungssitzungen. Wählen Sie oben einen Anbieter und starten Sie eine.",
+    "analysing": "Anbieter-Schema wird analysiert… beim ersten Mal kann das eine Minute dauern (der Anbieter wird heruntergeladen).",
+    "surfaceIntro": "Wählen Sie aus, welche der {count} abfragbaren Datenquellen erkannt werden sollen.",
+    "filterPlaceholder": "Datenquellen filtern…",
+    "noMatches": "Keine Datenquellen entsprechen dem Filter.",
+    "discover": "{count} Typ(en) erkennen",
+    "discovering": "Wird gesendet…",
+    "queryingHint": "Ressourcen werden erkannt — der Runner fragt Ihre Cloud ab und erzeugt Konfiguration.",
+    "viewRun": "Lauf ansehen",
+    "reviewIntro": "Erzeugt aus: {types}. Prüfen Sie unten, verschieben Sie die Konfiguration in Ihren Workspace und wenden Sie den Import an.",
+    "importBlocks": "Import-Blöcke",
+    "generatedConfig": "Erzeugte Konfiguration",
+    "copy": "Kopieren",
+    "copied": "Kopiert",
+    "nextStepNote": "Weiter: Verschieben Sie diese Konfiguration in Ihr Workspace-Repository und führen Sie sie aus — eine korrekte Einbindung plant nur Importe (0 hinzuzufügen / 0 zu ändern / 0 zu entfernen).",
+    "erroredFallback": "Erkennungslauf fehlgeschlagen. Öffnen Sie den Lauf, um die Protokolle zu sehen.",
+    "viewRunLogs": "Lauf-Protokolle ansehen",
+    "noResources": "Keine nicht verwalteten {types}-Ressourcen in diesem Konto/dieser Region gefunden.",
+    "state": {
+      "pending": "Schema-Analyse",
+      "schema_ready": "Bereit zur Erkennung",
+      "querying": "Erkennung läuft",
+      "config_ready": "Konfiguration bereit",
+      "run_created": "Import-Lauf erstellt",
+      "errored": "Fehlgeschlagen",
+      "canceled": "Abgebrochen"
+    }
   }
 }

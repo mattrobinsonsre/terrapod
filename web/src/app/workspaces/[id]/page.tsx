@@ -1660,7 +1660,17 @@ function WorkspaceDetailContent() {
         <PageHeader
           title={attrs.name}
           description={t('header.executionMode', { mode: attrs['execution-mode'] })}
-          actions={<ConnectionStatus connected={sseConnected} />}
+          actions={
+            <div className="flex items-center gap-3">
+              <a
+                href={`/workspaces/${workspaceId}/onboarding`}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 whitespace-nowrap"
+              >
+                {t('header.onboard')}
+              </a>
+              <ConnectionStatus connected={sseConnected} />
+            </div>
+          }
         />
 
         {error && <ErrorBanner message={error} />}

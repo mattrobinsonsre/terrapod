@@ -7,16 +7,37 @@
           "version": 0,
           "block": {
             "attributes": {
-              "ids": { "type": ["list", "string"], "computed": true },
-              "tags": { "type": ["map", "string"], "optional": true }
+              "ids": {
+                "type": [
+                  "list",
+                  "string"
+                ],
+                "computed": true
+              },
+              "tags": {
+                "type": [
+                  "map",
+                  "string"
+                ],
+                "optional": true
+              }
             },
             "block_types": {
               "filter": {
                 "nesting_mode": "set",
                 "block": {
                   "attributes": {
-                    "name": { "type": "string", "required": true },
-                    "values": { "type": ["list", "string"], "required": true }
+                    "name": {
+                      "type": "string",
+                      "required": true
+                    },
+                    "values": {
+                      "type": [
+                        "list",
+                        "string"
+                      ],
+                      "required": true
+                    }
                   }
                 }
               }
@@ -27,17 +48,40 @@
           "version": 0,
           "block": {
             "attributes": {
-              "id": { "type": "string", "optional": true, "computed": true },
-              "cidr_block": { "type": "string", "optional": true, "computed": true },
-              "tags": { "type": ["map", "string"], "computed": true }
+              "id": {
+                "type": "string",
+                "optional": true,
+                "computed": true
+              },
+              "cidr_block": {
+                "type": "string",
+                "optional": true,
+                "computed": true
+              },
+              "tags": {
+                "type": [
+                  "map",
+                  "string"
+                ],
+                "computed": true
+              }
             },
             "block_types": {
               "filter": {
                 "nesting_mode": "set",
                 "block": {
                   "attributes": {
-                    "name": { "type": "string", "required": true },
-                    "values": { "type": ["list", "string"], "required": true }
+                    "name": {
+                      "type": "string",
+                      "required": true
+                    },
+                    "values": {
+                      "type": [
+                        "list",
+                        "string"
+                      ],
+                      "required": true
+                    }
                   }
                 }
               }
@@ -48,9 +92,31 @@
           "version": 0,
           "block": {
             "attributes": {
-              "account_id": { "type": "string", "computed": true },
-              "arn": { "type": "string", "computed": true },
-              "id": { "type": "string", "computed": true }
+              "account_id": {
+                "type": "string",
+                "computed": true
+              },
+              "arn": {
+                "type": "string",
+                "computed": true
+              },
+              "id": {
+                "type": "string",
+                "computed": true
+              }
+            }
+          }
+        }
+      },
+      "resource_schemas": {
+        "aws_vpc": {
+          "version": 0,
+          "block": {
+            "attributes": {
+              "id": {
+                "type": "string",
+                "computed": true
+              }
             }
           }
         }
@@ -62,10 +128,22 @@
           "version": 0,
           "block": {
             "attributes": {
-              "name": { "type": "string", "optional": true },
-              "project": { "type": "string", "optional": true },
-              "zone": { "type": "string", "optional": true },
-              "id": { "type": "string", "computed": true }
+              "name": {
+                "type": "string",
+                "optional": true
+              },
+              "project": {
+                "type": "string",
+                "optional": true
+              },
+              "zone": {
+                "type": "string",
+                "optional": true
+              },
+              "id": {
+                "type": "string",
+                "computed": true
+              }
             }
           }
         }

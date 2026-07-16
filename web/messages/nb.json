@@ -1993,7 +1993,8 @@
       "loadingLower": "laster …"
     },
     "header": {
-      "executionMode": "{mode}-kjøringsmodus"
+      "executionMode": "{mode}-kjøringsmodus",
+      "onboard": "Onboard"
     },
     "tabs": {
       "overview": "Oversikt",
@@ -2630,5 +2631,42 @@
   "apiDocs": {
     "view": "Visning:",
     "redocTitle": "ReDoc API-dokumentasjon"
+  },
+  "onboarding": {
+    "title": "Onboard eksisterende ressurser",
+    "backTo": "Tilbake til {workspace}",
+    "description": "Oppdag eksisterende, ustyrte skyressurser i {workspace} og generer resurs- og importblokker for gjennomgang.",
+    "providerLabel": "Leverandør",
+    "providerVersionLabel": "Leverandørversjon (valgfritt)",
+    "start": "Start oppdagelse",
+    "starting": "Starter…",
+    "sessionsLabel": "Oppdagelsesøkter",
+    "empty": "Ingen oppdagelsesøkter ennå. Velg en leverandør og start en ovenfor.",
+    "analysing": "Analyserer leverandørens skjema… første gang kan det ta et minutt (leverandøren lastes ned).",
+    "surfaceIntro": "Velg hvilke av de {count} søkbare datakildene som skal oppdages.",
+    "filterPlaceholder": "Filtrer datakilder…",
+    "noMatches": "Ingen datakilder samsvarer med filteret.",
+    "discover": "Oppdag {count} type(r)",
+    "discovering": "Sender…",
+    "queryingHint": "Oppdager ressurser — runneren spør skyen din og genererer konfigurasjon.",
+    "viewRun": "Vis kjøring",
+    "reviewIntro": "Generert fra: {types}. Se gjennom nedenfor, flytt deretter konfigurasjonen til arbeidsområdet ditt og bruk importen.",
+    "importBlocks": "importblokker",
+    "generatedConfig": "Generert konfigurasjon",
+    "copy": "Kopier",
+    "copied": "Kopiert",
+    "nextStepNote": "Neste: flytt denne konfigurasjonen til arbeidsområde-repoet ditt og kjør den — en korrekt onboarding planlegger bare importer (0 å legge til / 0 å endre / 0 å fjerne).",
+    "erroredFallback": "Oppdagelse mislyktes. Åpne kjøringen for å se loggene.",
+    "viewRunLogs": "Vis kjøringslogger",
+    "noResources": "Ingen ustyrte {types}-ressurser ble funnet i denne kontoen/regionen.",
+    "state": {
+      "pending": "Analyserer skjema",
+      "schema_ready": "Klar til oppdagelse",
+      "querying": "Oppdager",
+      "config_ready": "Konfigurasjon klar",
+      "run_created": "Importkjøring opprettet",
+      "errored": "Feilet",
+      "canceled": "Avbrutt"
+    }
   }
 }

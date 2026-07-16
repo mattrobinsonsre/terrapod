@@ -203,6 +203,26 @@
     "status",
     "success"
   ],
+  "onboarding._session_json": [
+    "ai-assisted",
+    "created-at",
+    "created-by",
+    "data-source-count",
+    "discovery-run-id",
+    "discovery-surface",
+    "engine",
+    "engine-version",
+    "error",
+    "generated-config",
+    "import-blocks",
+    "provider",
+    "provider-version",
+    "result-run-id",
+    "selected-types",
+    "status",
+    "updated-at",
+    "workspace-id"
+  ],
   "onboarding.onboarding_availability": [
     "ai-available",
     "ai-model-configured"

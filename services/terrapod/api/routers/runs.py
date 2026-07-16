@@ -1623,6 +1623,25 @@ async def next_run(
     run_data["data"]["attributes"]["working-directory"] = ws.working_directory if ws else ""
     run_data["data"]["attributes"]["phase"] = phase
 
+    # Onboarding discovery (#824 P2): surface the session's provider + selected
+    # types so the Job can run terrapod-query. The run stays plan-phase; the
+    # runner branches on the presence of a session id. Resolved via the discovery
+    # run id (== this run).
+    from terrapod.db.models import ONBOARDING_DISCOVERY_SOURCE, OnboardingSession
+
+    if run.source == ONBOARDING_DISCOVERY_SOURCE:
+        sess = (
+            await db.execute(
+                select(OnboardingSession).where(OnboardingSession.discovery_run_id == run.id)
+            )
+        ).scalar_one_or_none()
+        if sess is not None:
+            attrs = run_data["data"]["attributes"]
+            attrs["onboard-session-id"] = str(sess.id)
+            attrs["onboard-provider"] = sess.provider
+            attrs["onboard-provider-version"] = sess.provider_version or ""
+            attrs["onboard-types"] = sess.selected_types or []
+
     return JSONResponse(content=run_data)
 
 

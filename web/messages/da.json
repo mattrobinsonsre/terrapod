@@ -1993,7 +1993,8 @@
       "loadingLower": "indlæser…"
     },
     "header": {
-      "executionMode": "{mode}-eksekveringstilstand"
+      "executionMode": "{mode}-eksekveringstilstand",
+      "onboard": "Onboard"
     },
     "tabs": {
       "overview": "Oversigt",
@@ -2630,5 +2631,42 @@
   "apiDocs": {
     "view": "Visning:",
     "redocTitle": "ReDoc API-dokumentation"
+  },
+  "onboarding": {
+    "title": "Onboard eksisterende ressourcer",
+    "backTo": "Tilbage til {workspace}",
+    "description": "Find eksisterende, ustyrede cloud-ressourcer i {workspace}, og generér ressource- og importblokke til gennemsyn.",
+    "providerLabel": "Udbyder",
+    "providerVersionLabel": "Udbyderversion (valgfrit)",
+    "start": "Start registrering",
+    "starting": "Starter…",
+    "sessionsLabel": "Registreringssessioner",
+    "empty": "Ingen registreringssessioner endnu. Vælg en udbyder, og start en ovenfor.",
+    "analysing": "Analyserer udbyderens skema… første gang kan det tage et minut (udbyderen downloades).",
+    "surfaceIntro": "Vælg hvilke af de {count} søgbare datakilder der skal registreres.",
+    "filterPlaceholder": "Filtrér datakilder…",
+    "noMatches": "Ingen datakilder matcher filteret.",
+    "discover": "Registrér {count} type(r)",
+    "discovering": "Sender…",
+    "queryingHint": "Registrerer ressourcer — runneren forespørger din cloud og genererer konfiguration.",
+    "viewRun": "Vis kørsel",
+    "reviewIntro": "Genereret ud fra: {types}. Gennemse nedenfor, flyt derefter konfigurationen til din workspace, og anvend importen.",
+    "importBlocks": "importblokke",
+    "generatedConfig": "Genereret konfiguration",
+    "copy": "Kopiér",
+    "copied": "Kopieret",
+    "nextStepNote": "Næste: flyt denne konfiguration til din workspace-repo, og kør den — en korrekt onboarding planlægger kun importer (0 at tilføje / 0 at ændre / 0 at fjerne).",
+    "erroredFallback": "Registrering mislykkedes. Åbn kørslen for at se loggene.",
+    "viewRunLogs": "Vis kørselslogfiler",
+    "noResources": "Ingen ustyrede {types}-ressourcer blev fundet i denne konto/region.",
+    "state": {
+      "pending": "Analyserer skema",
+      "schema_ready": "Klar til registrering",
+      "querying": "Registrerer",
+      "config_ready": "Konfiguration klar",
+      "run_created": "Importkørsel oprettet",
+      "errored": "Fejlet",
+      "canceled": "Annulleret"
+    }
   }
 }

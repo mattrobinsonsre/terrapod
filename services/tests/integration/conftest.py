@@ -33,6 +33,7 @@ os.environ.setdefault("TERRAPOD_RATE_LIMIT__ENABLED", "false")
 
 # All tables for TRUNCATE CASCADE (order doesn't matter with CASCADE)
 _ALL_TABLES = [
+    "onboarding_sessions",
     "task_stage_results",
     "task_stages",
     "run_tasks",

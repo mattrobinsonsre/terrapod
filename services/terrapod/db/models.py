@@ -2211,3 +2211,122 @@ class PlanSummaryMessage(Base):
             "created_at",
         ),
     )
+
+
+# Onboarding session lifecycle (#824 P2). A session is workspace-scoped and
+# discovers existing, unmanaged cloud resources, then generates copy-pasteable
+# ``resource`` + ``import {}`` config. The stages map onto where each runs:
+#   pending      created; nothing discovered yet
+#   schema_ready D1 discovery surface captured (in the API, credential-less —
+#                `tofu providers schema` needs no cloud creds)
+#   querying     a runner discovery run is in flight (D2 query + D3 generate,
+#                using the workspace's engine/version + the pool's cloud creds)
+#   config_ready cleaned resource+import config generated and ready to review
+#   run_created  an import-only run was created from the generated config (the
+#                normal, gated plan path — a mis-guess fails safe as a
+#                create/replace the operator sees and doesn't merge)
+#   errored / canceled  terminal
+ONBOARDING_STATUSES = (
+    "pending",
+    "schema_ready",
+    "querying",
+    "config_ready",
+    "run_created",
+    "errored",
+    "canceled",
+)
+
+# The ``Run.source`` value for the D2/D3 runner discovery run a session
+# dispatches. It reuses the whole run pipeline (pool dispatch, listener, Job,
+# reconciler) but is handled specially: it is always plan-only, generates config
+# from an empty dir (no configuration version), and never posts VCS status,
+# notifications, run triggers, or mutates workspace state. run_service and
+# run_reconciler key their onboarding-specific branches off this literal.
+ONBOARDING_DISCOVERY_SOURCE = "onboarding-discovery"
+
+
+class OnboardingSession(Base):
+    """A workspace-scoped resource-onboarding discovery session (#824 P2).
+
+    Drives the discovery engine (terrapod-query, #823): D1 schema in the API,
+    D2/D3 query+generate on the runner, then a gated import-only run. Read-only
+    throughout discovery — the only mutating step is the operator-confirmed
+    import run, which goes through the normal run gate. Gated per workspace by
+    the ``workspace:onboard`` capability; the AI mode (natural-language + config
+    cleanup) is the optional part, keyed on ``ai_onboarding.enabled``.
+    """
+
+    __tablename__ = "onboarding_sessions"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=generate_uuid7
+    )
+    workspace_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    # One of ONBOARDING_STATUSES. Validated at the service layer.
+    status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="pending", server_default="pending"
+    )
+    # The terraform/tofu provider being onboarded, e.g. "aws". A session covers
+    # one provider; onboard several by running several sessions.
+    provider: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    # The engine + resolved engine version D1 ran with — the other two-thirds of
+    # the Redis surface-cache key (with `provider`). Small scalars only: the bulky
+    # D1 discovery **surface** itself (the provider schema — generic, regenerable,
+    # version-stable) is NEVER persisted here; it lives solely in a time-limited
+    # Redis cache (see onboarding_service). These pin the key so a later change to
+    # the workspace's engine/version doesn't orphan a session's surface.
+    engine: Mapped[str] = mapped_column(String(20), nullable=False, default="")
+    engine_version: Mapped[str] = mapped_column(String(50), nullable=False, default="")
+    # Optional provider version *constraint* the discovery pins in its generated
+    # ``providers.tf`` (e.g. "< 6.0", "~> 5.0"). Empty = unconstrained (latest).
+    # Discovery writes its own minimal provider block (it does NOT read the
+    # workspace's config), so without this it always resolves the newest provider;
+    # pinning lets an operator match the version they actually run (e.g. AWS v5,
+    # which lacks the per-resource `region` attribute v6 stamps on everything).
+    # Part of the Redis surface-cache key — a v5 and a v6 schema differ.
+    provider_version: Mapped[str] = mapped_column(
+        String(64), nullable=False, default="", server_default=""
+    )
+
+    # Operator/AI-selected data-source types to query in D2 (e.g. ["aws_vpcs"]).
+    selected_types: Mapped[list[str]] = mapped_column(
+        JSONB, nullable=False, default=list, server_default="[]"
+    )
+    # D2: raw query results — the import-candidate ids found, per type.
+    query_results: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+
+    # D3: the generated, cleaned config. Split so the UI can show each: the
+    # `resource {}` blocks (post-cleanup — null/empty ConflictsWith attributes
+    # pruned so the config actually plans) and the `import {}` blocks. Text is
+    # unbounded; a very large estate that outgrows a row is a follow-up (move to
+    # object storage), not a foundation concern.
+    generated_config: Mapped[str | None] = mapped_column(Text, nullable=True)
+    import_blocks: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # The runner discovery run that produced query_results/config (D2/D3), and
+    # the resulting gated import-only run. Bare nullable UUIDs (no FK), matching
+    # the Run.listener_id precedent — a deleted run must not cascade-delete the
+    # onboarding history, and the serializer resolves them on read.
+    discovery_run_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    result_run_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+
+    # Whether the optional AI mode assisted this session (naming, cleanup, chat).
+    ai_assisted: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=sa.text("false")
+    )
+    # Human-readable failure detail when status == "errored".
+    error: Mapped[str] = mapped_column(Text, nullable=False, default="")
+
+    created_by: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False
+    )
+
+    __table_args__ = (sa.Index("ix_onboarding_sessions_workspace", "workspace_id", "created_at"),)

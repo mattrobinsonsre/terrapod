@@ -1993,7 +1993,8 @@
       "loadingLower": "ladataan…"
     },
     "header": {
-      "executionMode": "{mode}-suoritustila"
+      "executionMode": "{mode}-suoritustila",
+      "onboard": "Käyttöönotto"
     },
     "tabs": {
       "overview": "Yleiskatsaus",
@@ -2630,5 +2631,42 @@
   "apiDocs": {
     "view": "Näkymä:",
     "redocTitle": "ReDoc API -dokumentaatio"
+  },
+  "onboarding": {
+    "title": "Ota käyttöön olemassa olevat resurssit",
+    "backTo": "Takaisin: {workspace}",
+    "description": "Tunnista {workspace}-työtilassa olevat hallitsemattomat pilviresurssit ja luo tarkistettavat resurssi- ja tuontilohkot.",
+    "providerLabel": "Toimittaja",
+    "providerVersionLabel": "Toimittajan versio (valinnainen)",
+    "start": "Aloita tunnistus",
+    "starting": "Aloitetaan…",
+    "sessionsLabel": "Tunnistusistunnot",
+    "empty": "Ei vielä tunnistusistuntoja. Valitse toimittaja ja aloita yllä.",
+    "analysing": "Analysoidaan toimittajan skeemaa… ensimmäisellä kerralla tämä voi kestää minuutin (toimittaja ladataan).",
+    "surfaceIntro": "Valitse, mitkä {count} kyseltävästä tietolähteestä tunnistetaan.",
+    "filterPlaceholder": "Suodata tietolähteitä…",
+    "noMatches": "Mikään tietolähde ei vastaa suodatinta.",
+    "discover": "Tunnista {count} tyyppi(ä)",
+    "discovering": "Lähetetään…",
+    "queryingHint": "Tunnistetaan resursseja — suoritin kysyy pilveäsi ja luo konfiguraation.",
+    "viewRun": "Näytä ajo",
+    "reviewIntro": "Luotu lähteestä: {types}. Tarkista alta, siirrä sitten konfiguraatio työtilaasi ja ota tuonti käyttöön.",
+    "importBlocks": "tuontilohkot",
+    "generatedConfig": "Luotu konfiguraatio",
+    "copy": "Kopioi",
+    "copied": "Kopioitu",
+    "nextStepNote": "Seuraavaksi: siirrä tämä konfiguraatio työtilasi repoon ja aja se — oikea käyttöönotto suunnittelee vain tuonteja (0 lisättävää / 0 muutettavaa / 0 poistettavaa).",
+    "erroredFallback": "Tunnistus epäonnistui. Avaa ajo nähdäksesi lokit.",
+    "viewRunLogs": "Näytä ajon lokit",
+    "noResources": "Tästä tilistä tai alueelta ei löytynyt hallitsemattomia {types}-resursseja.",
+    "state": {
+      "pending": "Analysoidaan skeemaa",
+      "schema_ready": "Valmis tunnistukseen",
+      "querying": "Tunnistetaan",
+      "config_ready": "Konfiguraatio valmis",
+      "run_created": "Tuontiajo luotu",
+      "errored": "Virhe",
+      "canceled": "Peruutettu"
+    }
   }
 }

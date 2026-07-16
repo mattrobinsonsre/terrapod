@@ -1993,7 +1993,8 @@
       "loadingLower": "laddar…"
     },
     "header": {
-      "executionMode": "{mode}-exekveringsläge"
+      "executionMode": "{mode}-exekveringsläge",
+      "onboard": "Onboarda"
     },
     "tabs": {
       "overview": "Översikt",
@@ -2630,5 +2631,42 @@
   "apiDocs": {
     "view": "Vy:",
     "redocTitle": "ReDoc API-dokumentation"
+  },
+  "onboarding": {
+    "title": "Onboarda befintliga resurser",
+    "backTo": "Tillbaka till {workspace}",
+    "description": "Upptäck befintliga, ohanterade molnresurser i {workspace} och generera granskningsbara resurs- och importblock.",
+    "providerLabel": "Leverantör",
+    "providerVersionLabel": "Leverantörsversion (valfritt)",
+    "start": "Starta upptäckt",
+    "starting": "Startar…",
+    "sessionsLabel": "Upptäcktssessioner",
+    "empty": "Inga upptäcktssessioner ännu. Välj en leverantör och starta en ovan.",
+    "analysing": "Analyserar leverantörens schema… första gången kan det ta en minut (leverantören laddas ner).",
+    "surfaceIntro": "Välj vilka av de {count} frågbara datakällorna som ska upptäckas.",
+    "filterPlaceholder": "Filtrera datakällor…",
+    "noMatches": "Inga datakällor matchar filtret.",
+    "discover": "Upptäck {count} typ(er)",
+    "discovering": "Skickar…",
+    "queryingHint": "Upptäcker resurser — runnern frågar ditt moln och genererar konfiguration.",
+    "viewRun": "Visa körning",
+    "reviewIntro": "Genererad från: {types}. Granska nedan, flytta sedan konfigurationen till din workspace och tillämpa importen.",
+    "importBlocks": "importblock",
+    "generatedConfig": "Genererad konfiguration",
+    "copy": "Kopiera",
+    "copied": "Kopierad",
+    "nextStepNote": "Nästa: flytta denna konfiguration till din workspace-repo och kör den — en korrekt onboarding planerar endast importer (0 att lägga till / 0 att ändra / 0 att ta bort).",
+    "erroredFallback": "Upptäckten misslyckades. Öppna körningen för att se loggarna.",
+    "viewRunLogs": "Visa körningsloggar",
+    "noResources": "Inga ohanterade {types}-resurser hittades i detta konto/denna region.",
+    "state": {
+      "pending": "Analyserar schema",
+      "schema_ready": "Redo att upptäcka",
+      "querying": "Upptäcker",
+      "config_ready": "Konfiguration klar",
+      "run_created": "Importkörning skapad",
+      "errored": "Fel",
+      "canceled": "Avbruten"
+    }
   }
 }

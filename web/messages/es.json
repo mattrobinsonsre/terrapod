@@ -1993,7 +1993,8 @@
       "loadingLower": "cargando…"
     },
     "header": {
-      "executionMode": "modo de ejecución {mode}"
+      "executionMode": "modo de ejecución {mode}",
+      "onboard": "Incorporar"
     },
     "tabs": {
       "overview": "Resumen",
@@ -2630,5 +2631,42 @@
   "apiDocs": {
     "view": "Ver:",
     "redocTitle": "Documentación de la API con ReDoc"
+  },
+  "onboarding": {
+    "title": "Incorporar recursos existentes",
+    "backTo": "Volver a {workspace}",
+    "description": "Detecta recursos de nube existentes y no gestionados en {workspace} y genera bloques de recursos e importación revisables.",
+    "providerLabel": "Proveedor",
+    "providerVersionLabel": "Versión del proveedor (opcional)",
+    "start": "Iniciar detección",
+    "starting": "Iniciando…",
+    "sessionsLabel": "Sesiones de detección",
+    "empty": "Aún no hay sesiones de detección. Elige un proveedor e inicia una arriba.",
+    "analysing": "Analizando el esquema del proveedor… la primera vez puede tardar un minuto (se descarga el proveedor).",
+    "surfaceIntro": "Selecciona cuáles de las {count} fuentes de datos consultables detectar.",
+    "filterPlaceholder": "Filtrar fuentes de datos…",
+    "noMatches": "Ninguna fuente de datos coincide con el filtro.",
+    "discover": "Detectar {count} tipo(s)",
+    "discovering": "Enviando…",
+    "queryingHint": "Detectando recursos: el runner consulta tu nube y genera la configuración.",
+    "viewRun": "Ver ejecución",
+    "reviewIntro": "Generado a partir de: {types}. Revisa abajo, luego mueve la configuración a tu workspace y aplica la importación.",
+    "importBlocks": "bloques de importación",
+    "generatedConfig": "Configuración generada",
+    "copy": "Copiar",
+    "copied": "Copiado",
+    "nextStepNote": "Siguiente: mueve esta configuración al repositorio de tu workspace y ejecútala; una incorporación correcta planifica solo importaciones (0 para añadir / 0 para cambiar / 0 para destruir).",
+    "erroredFallback": "La detección falló. Abre la ejecución para ver los registros.",
+    "viewRunLogs": "Ver registros de la ejecución",
+    "noResources": "No se encontraron recursos {types} no gestionados en esta cuenta/región.",
+    "state": {
+      "pending": "Analizando esquema",
+      "schema_ready": "Listo para detectar",
+      "querying": "Detectando",
+      "config_ready": "Configuración lista",
+      "run_created": "Ejecución de importación creada",
+      "errored": "Con error",
+      "canceled": "Cancelado"
+    }
   }
 }

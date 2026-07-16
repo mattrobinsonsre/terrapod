@@ -1993,7 +1993,8 @@
       "loadingLower": "chargement…"
     },
     "header": {
-      "executionMode": "Mode d'exécution {mode}"
+      "executionMode": "Mode d'exécution {mode}",
+      "onboard": "Intégrer"
     },
     "tabs": {
       "overview": "Vue d'ensemble",
@@ -2630,5 +2631,42 @@
   "apiDocs": {
     "view": "Vue :",
     "redocTitle": "Documentation de l'API ReDoc"
+  },
+  "onboarding": {
+    "title": "Intégrer des ressources existantes",
+    "backTo": "Retour à {workspace}",
+    "description": "Détecte les ressources cloud existantes et non gérées dans {workspace} et génère des blocs de ressources et d import vérifiables.",
+    "providerLabel": "Fournisseur",
+    "providerVersionLabel": "Version du fournisseur (facultatif)",
+    "start": "Lancer la détection",
+    "starting": "Démarrage…",
+    "sessionsLabel": "Sessions de détection",
+    "empty": "Aucune session de détection pour le moment. Choisissez un fournisseur et lancez-en une ci-dessus.",
+    "analysing": "Analyse du schéma du fournisseur… la première fois, cela peut prendre une minute (téléchargement du fournisseur).",
+    "surfaceIntro": "Sélectionnez lesquelles des {count} sources de données interrogeables détecter.",
+    "filterPlaceholder": "Filtrer les sources de données…",
+    "noMatches": "Aucune source de données ne correspond au filtre.",
+    "discover": "Détecter {count} type(s)",
+    "discovering": "Envoi…",
+    "queryingHint": "Détection des ressources — le runner interroge votre cloud et génère la configuration.",
+    "viewRun": "Voir l exécution",
+    "reviewIntro": "Généré à partir de : {types}. Vérifiez ci-dessous, puis déplacez la configuration dans votre workspace et appliquez l import.",
+    "importBlocks": "blocs d import",
+    "generatedConfig": "Configuration générée",
+    "copy": "Copier",
+    "copied": "Copié",
+    "nextStepNote": "Étape suivante : déplacez cette configuration dans le dépôt de votre workspace et exécutez-la — une intégration correcte planifie uniquement des imports (0 à ajouter / 0 à modifier / 0 à détruire).",
+    "erroredFallback": "La détection a échoué. Ouvrez l exécution pour voir les journaux.",
+    "viewRunLogs": "Voir les journaux de l exécution",
+    "noResources": "Aucune ressource {types} non gérée trouvée dans ce compte/cette région.",
+    "state": {
+      "pending": "Analyse du schéma",
+      "schema_ready": "Prêt à détecter",
+      "querying": "Détection",
+      "config_ready": "Configuration prête",
+      "run_created": "Exécution d import créée",
+      "errored": "En erreur",
+      "canceled": "Annulé"
+    }
   }
 }

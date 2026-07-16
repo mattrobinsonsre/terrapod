@@ -112,6 +112,94 @@ func TestNonDiscoveryDataSourceExcludedFromStrongSubset(t *testing.T) {
 	}
 }
 
+func TestImportableRequiresIdsListNotJustQueryable(t *testing.T) {
+	s := loadFixture(t)
+
+	// aws_vpc is queryable (it has a filter block) but exposes no computed `ids`
+	// list — the same shape as aws_eips (a filter but allocation_ids, not ids).
+	// The deterministic import path can't derive ids from it, so it must NOT be
+	// importable even though it is queryable.
+	vpc, _ := find(s.Catalogue(), "aws_vpc")
+	if !vpc.Queryable() {
+		t.Fatal("precondition: aws_vpc should be queryable (has a filter)")
+	}
+	if vpc.Importable() {
+		t.Error("aws_vpc has no computed `ids`; must not be importable")
+	}
+
+	// aws_vpcs has a computed `ids` list → importable.
+	vpcs, _ := find(s.Catalogue(), "aws_vpcs")
+	if !vpcs.Importable() {
+		t.Error("aws_vpcs exposes a computed `ids` list; should be importable")
+	}
+
+	// The importable surface is exactly {aws_vpcs} — a strict subset of the
+	// queryable surface {aws_vpc, aws_vpcs}, proving a source can be queryable
+	// yet excluded from onboarding because import can't consume it.
+	imp := s.ImportableDataSources()
+	if len(imp) != 1 || imp[0].Name != "aws_vpcs" {
+		t.Fatalf("expected importable surface = [aws_vpcs], got %+v", imp)
+	}
+}
+
+func TestIDListAttrGeneralisesBeyondIds(t *testing.T) {
+	// aws_eips exposes `allocation_ids` (not `ids`) plus a synthetic scalar `id`
+	// (region) and a `public_ips` list. The single `*_ids` list is the id list;
+	// the resource aws_eip exists, so it is importable.
+	doc := `{"format_version":"1.0","provider_schemas":{"registry.opentofu.org/hashicorp/aws":{
+	  "resource_schemas":{"aws_eip":{"version":0,"block":{"attributes":{"id":{"type":"string","computed":true}}}}},
+	  "data_source_schemas":{"aws_eips":{"version":0,"block":{
+	    "attributes":{
+	      "id":{"type":"string","computed":true},
+	      "allocation_ids":{"type":["list","string"],"computed":true},
+	      "public_ips":{"type":["list","string"],"computed":true}},
+	    "block_types":{"filter":{"nesting_mode":"set","block":{}}}}}}}}}`
+	s, err := Parse([]byte(doc))
+	if err != nil {
+		t.Fatal(err)
+	}
+	eips, ok := find(s.Catalogue(), "aws_eips")
+	if !ok {
+		t.Fatal("aws_eips missing")
+	}
+	if eips.IDListAttr != "allocation_ids" {
+		t.Errorf("IDListAttr = %q, want allocation_ids", eips.IDListAttr)
+	}
+	if eips.ResourceType != "aws_eip" {
+		t.Errorf("ResourceType = %q, want aws_eip", eips.ResourceType)
+	}
+	if !eips.Importable() {
+		t.Error("aws_eips (allocation_ids + aws_eip resource exists) should be importable")
+	}
+}
+
+func TestImportableRequiresTheTargetResourceToExist(t *testing.T) {
+	// aws_availability_zones has a computed `ids` list but singularises to
+	// aws_availability_zone, which is NOT a managed resource — so it must be
+	// excluded even though it has an id list (the authoritative existence check).
+	doc := `{"format_version":"1.0","provider_schemas":{"registry.opentofu.org/hashicorp/aws":{
+	  "resource_schemas":{"aws_vpc":{"version":0,"block":{"attributes":{"id":{"type":"string","computed":true}}}}},
+	  "data_source_schemas":{"aws_availability_zones":{"version":0,"block":{
+	    "attributes":{"ids":{"type":["list","string"],"computed":true}}}}}}}}`
+	s, err := Parse([]byte(doc))
+	if err != nil {
+		t.Fatal(err)
+	}
+	az, _ := find(s.Catalogue(), "aws_availability_zones")
+	if az.IDListAttr != "ids" {
+		t.Errorf("precondition: IDListAttr = %q, want ids", az.IDListAttr)
+	}
+	if az.ResourceType != "" {
+		t.Errorf("aws_availability_zone is not a managed resource; ResourceType should be empty, got %q", az.ResourceType)
+	}
+	if az.Importable() {
+		t.Error("no matching managed resource → must not be importable")
+	}
+	if len(s.ImportableDataSources()) != 0 {
+		t.Error("importable surface should be empty")
+	}
+}
+
 func assertEqualSet(t *testing.T, label string, got, want []string) {
 	t.Helper()
 	if len(got) != len(want) {

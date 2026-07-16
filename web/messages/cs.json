@@ -1993,7 +1993,8 @@
       "loadingLower": "načítání…"
     },
     "header": {
-      "executionMode": "Režim provádění {mode}"
+      "executionMode": "Režim provádění {mode}",
+      "onboard": "Zapojit"
     },
     "tabs": {
       "overview": "Přehled",
@@ -2630,5 +2631,42 @@
   "apiDocs": {
     "view": "Zobrazení:",
     "redocTitle": "ReDoc API dokumentace"
+  },
+  "onboarding": {
+    "title": "Zapojit existující prostředky",
+    "backTo": "Zpět na {workspace}",
+    "description": "Objevte existující, nespravované cloudové prostředky v {workspace} a vygenerujte ke kontrole bloky prostředků a importu.",
+    "providerLabel": "Poskytovatel",
+    "providerVersionLabel": "Verze poskytovatele (volitelné)",
+    "start": "Spustit objevování",
+    "starting": "Spouštění…",
+    "sessionsLabel": "Relace objevování",
+    "empty": "Zatím žádné relace objevování. Vyberte poskytovatele a spusťte jednu výše.",
+    "analysing": "Analýza schématu poskytovatele… poprvé to může trvat minutu (stahuje se poskytovatel).",
+    "surfaceIntro": "Vyberte, které z {count} dotazovatelných zdrojů dat objevit.",
+    "filterPlaceholder": "Filtrovat zdroje dat…",
+    "noMatches": "Žádný zdroj dat neodpovídá filtru.",
+    "discover": "Objevit {count} typ(ů)",
+    "discovering": "Odesílání…",
+    "queryingHint": "Objevování prostředků — runner se dotazuje vašeho cloudu a generuje konfiguraci.",
+    "viewRun": "Zobrazit běh",
+    "reviewIntro": "Vygenerováno z: {types}. Zkontrolujte níže, poté přesuňte konfiguraci do svého workspace a použijte import.",
+    "importBlocks": "bloky importu",
+    "generatedConfig": "Vygenerovaná konfigurace",
+    "copy": "Kopírovat",
+    "copied": "Zkopírováno",
+    "nextStepNote": "Další: přesuňte tuto konfiguraci do repozitáře workspace a spusťte ji — správné zapojení plánuje pouze importy (0 k přidání / 0 ke změně / 0 k odstranění).",
+    "erroredFallback": "Objevování selhalo. Otevřete běh a zobrazte protokoly.",
+    "viewRunLogs": "Zobrazit protokoly běhu",
+    "noResources": "V tomto účtu ani regionu nebyly nalezeny žádné nespravované prostředky {types}.",
+    "state": {
+      "pending": "Analýza schématu",
+      "schema_ready": "Připraveno k objevování",
+      "querying": "Objevování",
+      "config_ready": "Konfigurace připravena",
+      "run_created": "Vytvořen běh importu",
+      "errored": "Chyba",
+      "canceled": "Zrušeno"
+    }
   }
 }

@@ -1993,7 +1993,8 @@
       "loadingLower": "yükleniyor…"
     },
     "header": {
-      "executionMode": "{mode} yürütme modu"
+      "executionMode": "{mode} yürütme modu",
+      "onboard": "Dahil et"
     },
     "tabs": {
       "overview": "Genel Bakış",
@@ -2630,5 +2631,42 @@
   "apiDocs": {
     "view": "Görünüm:",
     "redocTitle": "ReDoc API Dokümantasyonu"
+  },
+  "onboarding": {
+    "title": "Mevcut kaynakları dahil et",
+    "backTo": "{workspace} çalışma alanına dön",
+    "description": "{workspace} içindeki mevcut, yönetilmeyen bulut kaynaklarını keşfedin ve incelenebilir kaynak ile içe aktarma blokları oluşturun.",
+    "providerLabel": "Sağlayıcı",
+    "providerVersionLabel": "Sağlayıcı sürümü (isteğe bağlı)",
+    "start": "Keşfi başlat",
+    "starting": "Başlatılıyor…",
+    "sessionsLabel": "Keşif oturumları",
+    "empty": "Henüz keşif oturumu yok. Yukarıdan bir sağlayıcı seçip başlatın.",
+    "analysing": "Sağlayıcı şeması analiz ediliyor… ilk seferde bir dakika sürebilir (sağlayıcı indiriliyor).",
+    "surfaceIntro": "Keşfedilecek {count} sorgulanabilir veri kaynağından hangilerini seçin.",
+    "filterPlaceholder": "Veri kaynaklarını filtrele…",
+    "noMatches": "Filtreyle eşleşen veri kaynağı yok.",
+    "discover": "{count} tür keşfet",
+    "discovering": "Gönderiliyor…",
+    "queryingHint": "Kaynaklar keşfediliyor — runner bulutunuzu sorguluyor ve yapılandırma oluşturuyor.",
+    "viewRun": "Çalıştırmayı görüntüle",
+    "reviewIntro": "Şuradan oluşturuldu: {types}. Aşağıda inceleyin, ardından yapılandırmayı workspace inize taşıyın ve içe aktarmayı uygulayın.",
+    "importBlocks": "içe aktarma blokları",
+    "generatedConfig": "Oluşturulan yapılandırma",
+    "copy": "Kopyala",
+    "copied": "Kopyalandı",
+    "nextStepNote": "Sonraki: bu yapılandırmayı workspace deponuza taşıyın ve çalıştırın — doğru bir dahil etme yalnızca içe aktarma planlar (0 ekleme / 0 değiştirme / 0 kaldırma).",
+    "erroredFallback": "Keşif başarısız oldu. Günlükleri görmek için çalıştırmayı açın.",
+    "viewRunLogs": "Çalıştırma günlüklerini görüntüle",
+    "noResources": "Bu hesap veya bölgede yönetilmeyen {types} kaynağı bulunamadı.",
+    "state": {
+      "pending": "Şema analiz ediliyor",
+      "schema_ready": "Keşfe hazır",
+      "querying": "Keşfediliyor",
+      "config_ready": "Yapılandırma hazır",
+      "run_created": "İçe aktarma çalıştırması oluşturuldu",
+      "errored": "Hata",
+      "canceled": "İptal edildi"
+    }
   }
 }

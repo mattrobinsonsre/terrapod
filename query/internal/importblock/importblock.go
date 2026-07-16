@@ -86,8 +86,14 @@ func Render(blocks []Block) string {
 	return b.String()
 }
 
-// extractIDs pulls the id(s) from a data source's output value: the `ids` list
-// (plural sources) or the scalar `id` (singular sources).
+// extractIDs pulls the id(s) from a data source's output value. It mirrors the
+// schema-side rule in schema.idListAttr so the surface and the import stage agree
+// on which attribute is the id list: the canonical `ids` list, else the single
+// attribute named `*_ids`/`*_identifiers` that is a list of strings (aws_eips →
+// `allocation_ids`), else the scalar `id` (a genuinely singular source). The
+// synthetic scalar `id` that plural sources also carry (a region/hash) is never
+// reached for them because their `*_ids` list is picked first — and such sources
+// are only surfaced when that list exists.
 func extractIDs(value json.RawMessage) ([]string, error) {
 	var obj map[string]json.RawMessage
 	if err := json.Unmarshal(value, &obj); err != nil {
@@ -98,6 +104,24 @@ func extractIDs(value json.RawMessage) ([]string, error) {
 		if err := json.Unmarshal(raw, &ids); err != nil {
 			return nil, fmt.Errorf("ids is not a string list: %w", err)
 		}
+		return ids, nil
+	}
+	// A single `*_ids` / `*_identifiers` string list (e.g. allocation_ids).
+	var candidate string
+	n := 0
+	for k, raw := range obj {
+		if !strings.HasSuffix(k, "_ids") && !strings.HasSuffix(k, "_identifiers") {
+			continue
+		}
+		var ids []string
+		if json.Unmarshal(raw, &ids) == nil {
+			candidate = k
+			n++
+		}
+	}
+	if n == 1 {
+		var ids []string
+		_ = json.Unmarshal(obj[candidate], &ids)
 		return ids, nil
 	}
 	if raw, ok := obj["id"]; ok {

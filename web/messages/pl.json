@@ -1993,7 +1993,8 @@
       "loadingLower": "wczytywanie…"
     },
     "header": {
-      "executionMode": "Tryb wykonania: {mode}"
+      "executionMode": "Tryb wykonania: {mode}",
+      "onboard": "Wdróż"
     },
     "tabs": {
       "overview": "Przegląd",
@@ -2630,5 +2631,42 @@
   "apiDocs": {
     "view": "Widok:",
     "redocTitle": "Dokumentacja API ReDoc"
+  },
+  "onboarding": {
+    "title": "Wdróż istniejące zasoby",
+    "backTo": "Powrót do {workspace}",
+    "description": "Wykryj istniejące, niezarządzane zasoby chmurowe w {workspace} i wygeneruj do przeglądu bloki zasobów oraz importu.",
+    "providerLabel": "Dostawca",
+    "providerVersionLabel": "Wersja dostawcy (opcjonalnie)",
+    "start": "Rozpocznij wykrywanie",
+    "starting": "Rozpoczynanie…",
+    "sessionsLabel": "Sesje wykrywania",
+    "empty": "Brak sesji wykrywania. Wybierz dostawcę i rozpocznij powyżej.",
+    "analysing": "Analizowanie schematu dostawcy… za pierwszym razem może to potrwać minutę (pobieranie dostawcy).",
+    "surfaceIntro": "Wybierz, które z {count} odpytywalnych źródeł danych wykryć.",
+    "filterPlaceholder": "Filtruj źródła danych…",
+    "noMatches": "Żadne źródło danych nie pasuje do filtra.",
+    "discover": "Wykryj {count} typ(y)",
+    "discovering": "Wysyłanie…",
+    "queryingHint": "Wykrywanie zasobów — runner odpytuje Twoją chmurę i generuje konfigurację.",
+    "viewRun": "Zobacz uruchomienie",
+    "reviewIntro": "Wygenerowano z: {types}. Sprawdź poniżej, następnie przenieś konfigurację do swojego workspace i zastosuj import.",
+    "importBlocks": "bloki importu",
+    "generatedConfig": "Wygenerowana konfiguracja",
+    "copy": "Kopiuj",
+    "copied": "Skopiowano",
+    "nextStepNote": "Dalej: przenieś tę konfigurację do repozytorium workspace i uruchom ją — poprawne wdrożenie planuje wyłącznie importy (0 do dodania / 0 do zmiany / 0 do usunięcia).",
+    "erroredFallback": "Wykrywanie nie powiodło się. Otwórz uruchomienie, aby zobaczyć logi.",
+    "viewRunLogs": "Zobacz logi uruchomienia",
+    "noResources": "Nie znaleziono niezarządzanych zasobów {types} na tym koncie ani w tym regionie.",
+    "state": {
+      "pending": "Analizowanie schematu",
+      "schema_ready": "Gotowe do wykrywania",
+      "querying": "Wykrywanie",
+      "config_ready": "Konfiguracja gotowa",
+      "run_created": "Utworzono uruchomienie importu",
+      "errored": "Błąd",
+      "canceled": "Anulowano"
+    }
   }
 }

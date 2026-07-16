@@ -1993,7 +1993,8 @@
       "loadingLower": "読み込み中…"
     },
     "header": {
-      "executionMode": "{mode} 実行モード"
+      "executionMode": "{mode} 実行モード",
+      "onboard": "オンボード"
     },
     "tabs": {
       "overview": "概要",
@@ -2630,5 +2631,42 @@
   "apiDocs": {
     "view": "表示:",
     "redocTitle": "ReDoc APIドキュメント"
+  },
+  "onboarding": {
+    "title": "既存リソースをオンボード",
+    "backTo": "{workspace} に戻る",
+    "description": "{workspace} 内の既存の未管理クラウドリソースを検出し、レビュー可能なリソースおよびインポートブロックを生成します。",
+    "providerLabel": "プロバイダー",
+    "providerVersionLabel": "プロバイダーバージョン（任意）",
+    "start": "検出を開始",
+    "starting": "開始中…",
+    "sessionsLabel": "検出セッション",
+    "empty": "検出セッションはまだありません。上でプロバイダーを選択して開始してください。",
+    "analysing": "プロバイダースキーマを分析中… 初回はプロバイダーのダウンロードに1分ほどかかる場合があります。",
+    "surfaceIntro": "検出する対象を、{count} 件のクエリ可能なデータソースから選択してください。",
+    "filterPlaceholder": "データソースを絞り込み…",
+    "noMatches": "フィルターに一致するデータソースはありません。",
+    "discover": "{count} 種類を検出",
+    "discovering": "送信中…",
+    "queryingHint": "リソースを検出中 — ランナーがクラウドを照会し、設定を生成しています。",
+    "viewRun": "実行を表示",
+    "reviewIntro": "生成元: {types}。下記を確認し、設定をワークスペースに移してインポートを適用してください。",
+    "importBlocks": "インポートブロック",
+    "generatedConfig": "生成された設定",
+    "copy": "コピー",
+    "copied": "コピー済み",
+    "nextStepNote": "次へ: この設定をワークスペースのリポジトリに移して実行してください。正しいオンボードはインポートのみを計画します（追加0 / 変更0 / 削除0）。",
+    "erroredFallback": "検出に失敗しました。実行を開いてログを確認してください。",
+    "viewRunLogs": "実行ログを表示",
+    "noResources": "このアカウント/リージョンに未管理の {types} リソースは見つかりませんでした。",
+    "state": {
+      "pending": "スキーマ分析中",
+      "schema_ready": "検出の準備完了",
+      "querying": "検出中",
+      "config_ready": "設定準備完了",
+      "run_created": "インポート実行を作成",
+      "errored": "エラー",
+      "canceled": "キャンセル済み"
+    }
   }
 }

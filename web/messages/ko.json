@@ -1993,7 +1993,8 @@
       "loadingLower": "불러오는 중…"
     },
     "header": {
-      "executionMode": "{mode} 실행 모드"
+      "executionMode": "{mode} 실행 모드",
+      "onboard": "온보딩"
     },
     "tabs": {
       "overview": "개요",
@@ -2630,5 +2631,42 @@
   "apiDocs": {
     "view": "보기:",
     "redocTitle": "ReDoc API 문서"
+  },
+  "onboarding": {
+    "title": "기존 리소스 온보딩",
+    "backTo": "{workspace}(으)로 돌아가기",
+    "description": "{workspace}의 기존 비관리형 클라우드 리소스를 검색하고 검토 가능한 리소스 및 import 블록을 생성합니다.",
+    "providerLabel": "공급자",
+    "providerVersionLabel": "공급자 버전(선택 사항)",
+    "start": "검색 시작",
+    "starting": "시작 중…",
+    "sessionsLabel": "검색 세션",
+    "empty": "아직 검색 세션이 없습니다. 위에서 공급자를 선택하고 시작하세요.",
+    "analysing": "공급자 스키마 분석 중… 처음에는 공급자 다운로드로 1분 정도 걸릴 수 있습니다.",
+    "surfaceIntro": "검색할 대상을 {count}개의 쿼리 가능한 데이터 소스 중에서 선택하세요.",
+    "filterPlaceholder": "데이터 소스 필터링…",
+    "noMatches": "필터와 일치하는 데이터 소스가 없습니다.",
+    "discover": "{count}개 유형 검색",
+    "discovering": "전송 중…",
+    "queryingHint": "리소스 검색 중 — 러너가 클라우드를 쿼리하고 구성을 생성합니다.",
+    "viewRun": "실행 보기",
+    "reviewIntro": "생성 원본: {types}. 아래를 검토한 다음 구성을 워크스페이스로 옮기고 import를 적용하세요.",
+    "importBlocks": "import 블록",
+    "generatedConfig": "생성된 구성",
+    "copy": "복사",
+    "copied": "복사됨",
+    "nextStepNote": "다음: 이 구성을 워크스페이스 저장소로 옮기고 실행하세요. 올바른 온보딩은 import만 계획합니다(추가 0 / 변경 0 / 삭제 0).",
+    "erroredFallback": "검색에 실패했습니다. 실행을 열어 로그를 확인하세요.",
+    "viewRunLogs": "실행 로그 보기",
+    "noResources": "이 계정/리전에서 관리되지 않는 {types} 리소스를 찾을 수 없습니다.",
+    "state": {
+      "pending": "스키마 분석 중",
+      "schema_ready": "검색 준비 완료",
+      "querying": "검색 중",
+      "config_ready": "구성 준비 완료",
+      "run_created": "import 실행 생성됨",
+      "errored": "오류",
+      "canceled": "취소됨"
+    }
   }
 }

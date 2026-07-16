@@ -33,6 +33,19 @@ class RunnerConfig:
     run_id: str
     phase: Literal["plan", "apply"]
 
+    # Onboarding discovery (#824 P2). A discovery run is a normal plan-phase run
+    # as far as all infra is concerned (Job naming, per-phase Redis status keys,
+    # the reconciler) — so ``phase`` stays "plan". What makes it discovery is a
+    # non-empty ``onboard_session_id``: the entrypoint branches on that to run
+    # D2/D3 (write its own providers.tf for `onboard_provider`, query
+    # `onboard_types` via terrapod-query, generate + clean config, upload to the
+    # session) instead of a workspace plan. There is no configuration version or
+    # state.
+    onboard_session_id: str
+    onboard_provider: str
+    onboard_provider_version: str
+    onboard_types: list[str]
+
     # Backend selection
     backend: Literal["terraform", "tofu"]
     version: str
@@ -116,6 +129,10 @@ class RunnerConfig:
             auth_token=e.get("TP_AUTH_TOKEN", ""),
             run_id=e.get("TP_RUN_ID", ""),
             phase=e.get("TP_PHASE", "plan"),  # type: ignore[arg-type]
+            onboard_session_id=e.get("TP_ONBOARD_SESSION_ID", ""),
+            onboard_provider=e.get("TP_ONBOARD_PROVIDER", ""),
+            onboard_provider_version=e.get("TP_ONBOARD_PROVIDER_VERSION", ""),
+            onboard_types=_json_list("TP_ONBOARD_TYPES"),
             backend=e.get("TP_BACKEND", "tofu"),  # type: ignore[arg-type]
             version=e.get("TP_VERSION", ""),
             terragrunt_enabled=_bool("TP_TERRAGRUNT_ENABLED"),
@@ -145,6 +162,13 @@ class RunnerConfig:
         state download) are reachable. False in degenerate test/dev
         invocations that run the entrypoint with no listener context."""
         return bool(self.api_url) and bool(self.run_id)
+
+    @property
+    def is_discovery(self) -> bool:
+        """An onboarding discovery run (#824 P2). Keyed on the session id, not
+        ``phase`` — the run is plan-phase for all infra; only the entrypoint's
+        behaviour branch differs."""
+        return bool(self.onboard_session_id)
 
     @property
     def auth_header(self) -> str:

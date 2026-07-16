@@ -22,6 +22,7 @@ func runSchema(ctx context.Context, args []string) error {
 	bin := fs.String("tofu", "", `path to the tofu binary (default: "tofu" on PATH)`)
 	from := fs.String("from", "", "read a captured `providers schema -json` document from this file instead of running tofu")
 	all := fs.Bool("all", false, "list every data source, not just the strong-signal discovery subset")
+	importable := fs.Bool("importable", false, "list only data sources the deterministic import path can consume (a computed `ids` list) — the onboarding surface")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -37,8 +38,11 @@ func runSchema(ctx context.Context, args []string) error {
 	}
 
 	candidates := s.QueryableDataSources()
-	if *all {
+	switch {
+	case *all:
 		candidates = s.Catalogue()
+	case *importable:
+		candidates = s.ImportableDataSources()
 	}
 
 	out, err := json.MarshalIndent(struct {
