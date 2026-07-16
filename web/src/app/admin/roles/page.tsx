@@ -644,8 +644,8 @@ export default function RolesPage() {
         )}
 
         {/* Tabs */}
-        <div className="border-b border-slate-700/50 mb-6">
-          <div className="flex gap-1 -mb-px">
+        <div className="border-b border-slate-700/50 mb-6 overflow-x-auto">
+          <div className="flex gap-1 -mb-px whitespace-nowrap">
             {tabs.map((tab) => (
               <button
                 key={tab.key}

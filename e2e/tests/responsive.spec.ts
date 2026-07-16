@@ -375,3 +375,39 @@ test.describe('Responsive harness (phone viewport)', () => {
     await expectNoHorizontalPageScroll(page);
   });
 });
+
+/**
+ * Tablet-width guard for the md–lg dead-zone (#839).
+ *
+ * The phone `responsive` project runs below md and the desktop projects run
+ * well above lg, so the 768–1023px band — where the desktop nav used to render
+ * (at md) but not fit until lg, wrapping into a tall sticky bar that shoved page
+ * content (incl. the run/workspace tab bar) out of view — was tested by NEITHER
+ * side. This block pins that band: the nav must still be its compact hamburger
+ * form (desktop link row is `hidden lg:flex`, so it must NOT show here), and no
+ * page must scroll horizontally — including the ≤11-tab workspace-detail strip,
+ * which now scrolls within itself (`overflow-x-auto`) instead of overflowing the
+ * page. One DRY viewport-driven UI, verified at the seam.
+ */
+test.describe('Tablet width (md–lg dead-zone, #839)', () => {
+  test.use({ viewport: { width: 900, height: 900 }, isMobile: false });
+
+  test('nav stays a compact hamburger, no page h-scroll', async ({ page }) => {
+    await page.goto('/workspaces');
+    // Below lg the mobile hamburger is the nav; the desktop link row is hidden.
+    await expect(page.getByRole('button', { name: /open menu/i })).toBeVisible();
+    await expectNoHorizontalPageScroll(page);
+  });
+
+  test('workspace-detail tab strip scrolls within itself, no page h-scroll', async ({ page }) => {
+    const token = getStoredToken();
+    const wsId = await createWorkspace(token, uniqueName('e2e-tabstrip-tablet'));
+
+    await page.goto(`/workspaces/${wsId}`);
+    // At ≥md the desktop tab bar renders (not the mobile <select>).
+    await expect(page.getByRole('button', { name: 'Overview' })).toBeVisible({ timeout: 15_000 });
+    // The ~11-tab strip must not push the page into horizontal scroll — it is
+    // contained by overflow-x-auto on its wrapper (the #839 fix).
+    await expectNoHorizontalPageScroll(page);
+  });
+});

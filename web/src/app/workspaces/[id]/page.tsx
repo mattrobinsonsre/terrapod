@@ -1718,8 +1718,8 @@ function WorkspaceDetailContent() {
             ))}
           </select>
         </div>
-        <div className="hidden border-b border-slate-700/50 mb-6 md:block">
-          <div className="flex gap-1 -mb-px">
+        <div className="hidden border-b border-slate-700/50 mb-6 md:block overflow-x-auto">
+          <div className="flex gap-1 -mb-px whitespace-nowrap">
             {tabs.map((tab) => (
               <button
                 key={tab.key}
