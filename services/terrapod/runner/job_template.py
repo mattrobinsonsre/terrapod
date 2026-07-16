@@ -86,6 +86,7 @@ def build_job_spec(
     ca_secret_name: str = "",
     onboard_session_id: str = "",
     onboard_provider: str = "",
+    onboard_provider_version: str = "",
     onboard_types: list[str] | None = None,
 ) -> dict:
     """Build a K8s Job spec for a run phase.
@@ -211,6 +212,9 @@ def build_job_spec(
     if onboard_session_id:
         container_env.append({"name": "TP_ONBOARD_SESSION_ID", "value": onboard_session_id})
         container_env.append({"name": "TP_ONBOARD_PROVIDER", "value": onboard_provider})
+        container_env.append(
+            {"name": "TP_ONBOARD_PROVIDER_VERSION", "value": onboard_provider_version}
+        )
         container_env.append({"name": "TP_ONBOARD_TYPES", "value": json.dumps(onboard_types or [])})
 
     # Termination grace period — passed to entrypoint for time-budgeted shutdown

@@ -1993,7 +1993,8 @@
       "loadingLower": "正在加载…"
     },
     "header": {
-      "executionMode": "{mode}执行模式"
+      "executionMode": "{mode}执行模式",
+      "onboard": "导入"
     },
     "tabs": {
       "overview": "概览",
@@ -2630,5 +2631,42 @@
   "apiDocs": {
     "view": "视图：",
     "redocTitle": "ReDoc API 文档"
+  },
+  "onboarding": {
+    "title": "导入现有资源",
+    "backTo": "返回 {workspace}",
+    "description": "在 {workspace} 中发现现有的、未纳管的云资源，并生成可审阅的资源块和 import 块。",
+    "providerLabel": "提供商",
+    "providerVersionLabel": "提供商版本（可选）",
+    "start": "开始发现",
+    "starting": "正在启动…",
+    "sessionsLabel": "发现会话",
+    "empty": "暂无发现会话。请在上方选择提供商并开始。",
+    "analysing": "正在分析提供商架构… 首次可能需要一分钟（正在下载提供商）。",
+    "surfaceIntro": "从 {count} 个可查询的数据源中选择要发现的对象。",
+    "filterPlaceholder": "筛选数据源…",
+    "noMatches": "没有数据源与筛选匹配。",
+    "discover": "发现 {count} 种类型",
+    "discovering": "正在派发…",
+    "queryingHint": "正在发现资源 — 运行器正在查询你的云并生成配置。",
+    "viewRun": "查看运行",
+    "reviewIntro": "生成来源：{types}。请在下方审阅，然后将配置移入你的工作区并应用导入。",
+    "importBlocks": "import 块",
+    "generatedConfig": "生成的配置",
+    "copy": "复制",
+    "copied": "已复制",
+    "nextStepNote": "下一步：将此配置移入你的工作区仓库并运行 — 正确的导入仅规划 import（新增 0 / 变更 0 / 销毁 0）。",
+    "erroredFallback": "发现运行失败。打开该运行以查看日志。",
+    "viewRunLogs": "查看运行日志",
+    "noResources": "在此账户/区域中未找到未纳管的 {types} 资源。",
+    "state": {
+      "pending": "正在分析架构",
+      "schema_ready": "可以发现",
+      "querying": "正在发现",
+      "config_ready": "配置就绪",
+      "run_created": "已创建导入运行",
+      "errored": "出错",
+      "canceled": "已取消"
+    }
   }
 }

@@ -96,6 +96,7 @@ def _session_json(s: OnboardingSession, surface: dict | None = None) -> dict:
             "workspace-id": str(s.workspace_id),
             "status": s.status,
             "provider": s.provider,
+            "provider-version": s.provider_version,
             "engine": s.engine,
             "engine-version": s.engine_version,
             "selected-types": s.selected_types or [],
@@ -103,6 +104,9 @@ def _session_json(s: OnboardingSession, surface: dict | None = None) -> dict:
             "error": s.error,
             "data-source-count": (surface or {}).get("count") if surface else None,
             "discovery-surface": surface,
+            # D3 output — the reviewable payload. Present once status == config_ready.
+            "generated-config": s.generated_config,
+            "import-blocks": s.import_blocks,
             "discovery-run-id": str(s.discovery_run_id) if s.discovery_run_id else None,
             "result-run-id": str(s.result_run_id) if s.result_run_id else None,
             "created-by": s.created_by,
@@ -131,9 +135,21 @@ async def create_onboarding_session(
             status_code=422,
             detail="provider must be a lowercase terraform provider name (e.g. 'aws')",
         )
+    provider_version = str(
+        attrs.get("provider-version") or attrs.get("provider_version") or ""
+    ).strip()
+    if not onboarding_service.is_valid_version_constraint(provider_version):
+        raise HTTPException(
+            status_code=422,
+            detail="provider-version must be a terraform version constraint (e.g. '< 6.0', '~> 5.0')",
+        )
 
     session = await onboarding_service.create_session(
-        db, workspace_id=ws.id, provider=provider, created_by=user.email
+        db,
+        workspace_id=ws.id,
+        provider=provider,
+        created_by=user.email,
+        provider_version=provider_version,
     )
     await db.commit()
 

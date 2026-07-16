@@ -1993,7 +1993,8 @@
       "loadingLower": "bezig met laden…"
     },
     "header": {
-      "executionMode": "{mode}-uitvoeringsmodus"
+      "executionMode": "{mode}-uitvoeringsmodus",
+      "onboard": "Onboarden"
     },
     "tabs": {
       "overview": "Overzicht",
@@ -2630,5 +2631,42 @@
   "apiDocs": {
     "view": "Weergave:",
     "redocTitle": "ReDoc API-documentatie"
+  },
+  "onboarding": {
+    "title": "Bestaande resources onboarden",
+    "backTo": "Terug naar {workspace}",
+    "description": "Ontdek bestaande, onbeheerde cloudresources in {workspace} en genereer beoordeelbare resource- en importblokken.",
+    "providerLabel": "Provider",
+    "providerVersionLabel": "Providerversie (optioneel)",
+    "start": "Ontdekking starten",
+    "starting": "Starten…",
+    "sessionsLabel": "Ontdekkingssessies",
+    "empty": "Nog geen ontdekkingssessies. Kies hierboven een provider en start er een.",
+    "analysing": "Providerschema wordt geanalyseerd… de eerste keer kan dit een minuut duren (provider wordt gedownload).",
+    "surfaceIntro": "Selecteer welke van de {count} opvraagbare gegevensbronnen u wilt ontdekken.",
+    "filterPlaceholder": "Gegevensbronnen filteren…",
+    "noMatches": "Geen gegevensbronnen komen overeen met het filter.",
+    "discover": "{count} type(n) ontdekken",
+    "discovering": "Verzenden…",
+    "queryingHint": "Resources worden ontdekt — de runner bevraagt uw cloud en genereert configuratie.",
+    "viewRun": "Uitvoering bekijken",
+    "reviewIntro": "Gegenereerd uit: {types}. Bekijk hieronder, verplaats de configuratie naar uw workspace en pas de import toe.",
+    "importBlocks": "importblokken",
+    "generatedConfig": "Gegenereerde configuratie",
+    "copy": "Kopiëren",
+    "copied": "Gekopieerd",
+    "nextStepNote": "Volgende: verplaats deze configuratie naar uw workspace-repository en voer deze uit — een correcte onboarding plant alleen imports (0 toe te voegen / 0 te wijzigen / 0 te verwijderen).",
+    "erroredFallback": "Ontdekking mislukt. Open de uitvoering om de logs te zien.",
+    "viewRunLogs": "Uitvoeringslogs bekijken",
+    "noResources": "Geen onbeheerde {types}-resources gevonden in dit account/deze regio.",
+    "state": {
+      "pending": "Schema analyseren",
+      "schema_ready": "Klaar om te ontdekken",
+      "querying": "Ontdekken",
+      "config_ready": "Configuratie gereed",
+      "run_created": "Import-uitvoering gemaakt",
+      "errored": "Mislukt",
+      "canceled": "Geannuleerd"
+    }
   }
 }

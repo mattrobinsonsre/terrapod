@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strings"
 )
 
 // Schema is the top-level `providers schema -json` document.
@@ -84,8 +85,26 @@ type DataSource struct {
 	// HasTags is true when the data source accepts a settable `tags` argument.
 	HasTags bool `json:"has_tags"`
 	// ReturnsList is true when the data source returns multiple results (a
-	// plural/list source, detected by a computed `ids` output).
+	// plural/list source, detected by a computed resource-id list — see
+	// IDListAttr).
 	ReturnsList bool `json:"returns_list"`
+	// IDListAttr is the name of the computed attribute holding this source's
+	// list of resource ids (the values usable as import ids), or "" when there
+	// isn't an unambiguous one. It is the canonical `ids`, else the single
+	// computed string-list attribute named `*_ids`/`*_identifiers` (e.g.
+	// aws_eips → `allocation_ids`). This is the schema-side half of import-id
+	// derivation; importblock.extractIDs applies the same rule to the query
+	// result JSON, and the import-only plan is the final authority on whether the
+	// chosen id was correct.
+	IDListAttr string `json:"id_list_attr,omitempty"`
+	// ResourceType is the managed resource these ids import into, derived by
+	// singularising the data-source name (aws_eips → aws_eip) AND confirmed to
+	// exist in the provider's `resource_schemas`. There is no declared
+	// data-source→resource link in the schema, so the *name* is a convention
+	// guess — but the *existence* check is authoritative: it rejects list sources
+	// with no matching managed resource (aws_availability_zones, aws_ip_ranges).
+	// "" when the singularised name isn't a real managed resource.
+	ResourceType string `json:"resource_type,omitempty"`
 	// Inputs are the settable (Optional or Required, non-Computed) argument
 	// names — attributes and nested blocks — a query can constrain on, sorted.
 	Inputs []string `json:"inputs"`
@@ -104,6 +123,20 @@ func (d DataSource) Queryable() bool {
 	return d.HasFilter || d.HasTags || d.ReturnsList
 }
 
+// Importable reports whether the deterministic import derivation
+// (query/internal/importblock) can turn this data source's result into `import`
+// blocks: it must expose a computed list of resource ids. This is deliberately
+// stricter than Queryable — a source can be a fine *query* target yet have no
+// usable id list. The id list is found schema-driven, with no per-resource map:
+// the canonical `ids`, or the single computed string-list attribute named
+// `*_ids`/`*_identifiers` (so aws_eips → `allocation_ids`, aws_db_instances →
+// `instance_identifiers`, … are all handled). A source with no such list, or an
+// ambiguous choice of several, is not importable and is kept off the onboarding
+// surface so a user can't select a dead end.
+func (d DataSource) Importable() bool {
+	return d.IDListAttr != "" && d.ResourceType != ""
+}
+
 // Catalogue returns every data source across every provider, classified, sorted
 // by provider then name — the complete discovery surface derived from the
 // schema. Use QueryableDataSources for just the strong-signal subset.
@@ -111,7 +144,7 @@ func (s *Schema) Catalogue() []DataSource {
 	var out []DataSource
 	for provider, ps := range s.ProviderSchemas {
 		for name, ds := range ps.DataSourceSchemas {
-			out = append(out, classify(provider, name, ds))
+			out = append(out, classify(provider, name, ds, ps.ResourceSchemas))
 		}
 	}
 	sort.Slice(out, func(i, j int) bool {
@@ -136,8 +169,25 @@ func (s *Schema) QueryableDataSources() []DataSource {
 	return out
 }
 
+// ImportableDataSources returns the Catalogue filtered to data sources the
+// deterministic import path can consume (see DataSource.Importable). This is the
+// onboarding surface: every entry can be queried AND turned into import blocks,
+// so a user never selects a source that silently finds nothing.
+func (s *Schema) ImportableDataSources() []DataSource {
+	all := s.Catalogue()
+	out := all[:0:0]
+	for _, d := range all {
+		if d.Importable() {
+			out = append(out, d)
+		}
+	}
+	return out
+}
+
 // classify derives the discovery signals for one data source from its block.
-func classify(provider, name string, ds ResourceSchema) DataSource {
+// resources is the provider's managed-resource schema map, used to confirm the
+// import target actually exists.
+func classify(provider, name string, ds ResourceSchema, resources map[string]ResourceSchema) DataSource {
 	d := DataSource{Provider: provider, Name: name}
 	blk := ds.Block
 
@@ -148,9 +198,16 @@ func classify(provider, name string, ds ResourceSchema) DataSource {
 	if a, ok := blk.Attributes["tags"]; ok && !a.Computed {
 		d.HasTags = true
 	}
-	// Plural/list sources expose a computed `ids` list of matched resources.
-	if a, ok := blk.Attributes["ids"]; ok && a.Computed {
-		d.ReturnsList = true
+	// Plural/list sources expose a computed list of matched resource ids — the
+	// canonical `ids` or a single `*_ids`/`*_identifiers` string list.
+	d.IDListAttr = idListAttr(blk)
+	d.ReturnsList = d.IDListAttr != ""
+	// Convention-guess the managed resource type (trim trailing "s"), then
+	// authoritatively confirm it exists as a real managed resource.
+	if rt := singularize(name); rt != name {
+		if _, ok := resources[rt]; ok {
+			d.ResourceType = rt
+		}
 	}
 
 	// Settable inputs: optional/required non-computed attributes, plus nested
@@ -170,4 +227,58 @@ func classify(provider, name string, ds ResourceSchema) DataSource {
 	sort.Strings(d.Inputs)
 	sort.Strings(d.RequiredInputs)
 	return d
+}
+
+// idListAttr picks the computed attribute holding a source's list of resource
+// ids, schema-driven and with no per-resource map: the canonical `ids`, else the
+// single computed string-list attribute whose name ends `_ids`/`_identifiers`
+// (aws_eips → `allocation_ids`, aws_db_instances → `instance_identifiers`). It
+// returns "" when there is none or the choice is ambiguous (several candidates),
+// so such a source is neither surfaced nor mis-derived. importblock.extractIDs
+// mirrors this rule against the query result JSON.
+func idListAttr(blk Block) string {
+	if a, ok := blk.Attributes["ids"]; ok && a.Computed && isStringList(a.Type) {
+		return "ids"
+	}
+	var found string
+	n := 0
+	for name, a := range blk.Attributes {
+		if !a.Computed || !isStringList(a.Type) {
+			continue
+		}
+		if strings.HasSuffix(name, "_ids") || strings.HasSuffix(name, "_identifiers") {
+			found = name
+			n++
+		}
+	}
+	if n == 1 {
+		return found
+	}
+	return ""
+}
+
+// isStringList reports whether a raw attribute type is a `list(string)` or
+// `set(string)`, encoded as ["list","string"] / ["set","string"].
+func isStringList(t json.RawMessage) bool {
+	var arr []json.RawMessage
+	if json.Unmarshal(t, &arr) != nil || len(arr) != 2 {
+		return false
+	}
+	var kind, elem string
+	if json.Unmarshal(arr[0], &kind) != nil || json.Unmarshal(arr[1], &elem) != nil {
+		return false
+	}
+	return (kind == "list" || kind == "set") && elem == "string"
+}
+
+// singularize best-effort-maps a data-source type to its managed resource type
+// by trimming a single trailing "s" (aws_vpcs → aws_vpc). There is no declared
+// data-source→resource link in the provider schema, so this is a naming
+// convention; callers confirm the result exists in resource_schemas before
+// trusting it, and mirrors importblock.singularize.
+func singularize(dsType string) string {
+	if s, ok := strings.CutSuffix(dsType, "s"); ok {
+		return s
+	}
+	return dsType
 }

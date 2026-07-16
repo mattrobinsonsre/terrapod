@@ -43,6 +43,7 @@ class RunnerConfig:
     # state.
     onboard_session_id: str
     onboard_provider: str
+    onboard_provider_version: str
     onboard_types: list[str]
 
     # Backend selection
@@ -130,6 +131,7 @@ class RunnerConfig:
             phase=e.get("TP_PHASE", "plan"),  # type: ignore[arg-type]
             onboard_session_id=e.get("TP_ONBOARD_SESSION_ID", ""),
             onboard_provider=e.get("TP_ONBOARD_PROVIDER", ""),
+            onboard_provider_version=e.get("TP_ONBOARD_PROVIDER_VERSION", ""),
             onboard_types=_json_list("TP_ONBOARD_TYPES"),
             backend=e.get("TP_BACKEND", "tofu"),  # type: ignore[arg-type]
             version=e.get("TP_VERSION", ""),

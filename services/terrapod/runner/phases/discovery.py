@@ -51,11 +51,16 @@ _STEP_TIMEOUT = 600
 _NO_CHANGES_RE = re.compile(r"0 to add, 0 to change, 0 to destroy")
 
 
-def _provider_config_hcl(provider: str) -> str:
+def _provider_config_hcl(provider: str, version_constraint: str = "") -> str:
+    # An optional version constraint (e.g. "< 6.0") pins the provider so D2/D3
+    # generate config against the version the operator runs — and matches the
+    # version D1 introspected. Empty = latest. It's the session's validated
+    # constraint (routers/onboarding), not free-form runner input.
+    ver = f', version = "{version_constraint}"' if version_constraint else ""
     return (
         "terraform {\n"
         "  required_providers {\n"
-        f'    {provider} = {{ source = "{provider}" }}\n'
+        f'    {provider} = {{ source = "{provider}"{ver} }}\n'
         "  }\n"
         "}\n"
         f'provider "{provider}" {{}}\n'
@@ -86,7 +91,9 @@ def run_discovery(cfg: RunnerConfig, binary: str, work_dir: Path) -> int:
         return 1
 
     work_dir.mkdir(parents=True, exist_ok=True)
-    (work_dir / "providers.tf").write_text(_provider_config_hcl(provider), encoding="utf-8")
+    (work_dir / "providers.tf").write_text(
+        _provider_config_hcl(provider, cfg.onboard_provider_version), encoding="utf-8"
+    )
 
     # 2. init — installs the provider plugin (through the mirror env the caller
     # already exported). A provider that won't install is a hard failure.
@@ -98,6 +105,7 @@ def run_discovery(cfg: RunnerConfig, binary: str, work_dir: Path) -> int:
     # 3. Per selected type: query (D2) then import (D3).
     query_results: dict[str, object] = {}
     import_blocks: list[str] = []
+    query_errors: dict[str, str] = {}
     for dstype in types:
         q = _run(
             [
@@ -113,12 +121,19 @@ def run_discovery(cfg: RunnerConfig, binary: str, work_dir: Path) -> int:
             work_dir,
         )
         if q.returncode != 0:
-            log.warning("discovery query failed", type=dstype, stderr=q.stderr[-1000:])
+            # A query that *errors* (bad creds, provider rejected the call) is a
+            # real failure to surface — distinct from one that succeeds and finds
+            # nothing. Record it; we only hard-fail the run if it leaves us with
+            # no resources AND no successful queries at all.
+            msg = (q.stderr or q.stdout).strip()[-500:]
+            log.warning("discovery query failed", type=dstype, stderr=msg)
+            query_errors[dstype] = msg or f"query exited {q.returncode}"
             continue
         try:
             query_results[dstype] = json.loads(q.stdout)
         except ValueError:
             log.warning("discovery query bad json", type=dstype)
+            query_errors[dstype] = "query returned unparseable output"
             continue
         # import derives the managed resource type from the data-source name;
         # the query result JSON is fed on stdin.
@@ -134,8 +149,32 @@ def run_discovery(cfg: RunnerConfig, binary: str, work_dir: Path) -> int:
             import_blocks.append(imp.stdout.strip())
 
     if not import_blocks:
-        log.error("discovery found no importable resources", types=types)
-        return 1
+        # No importable resources. Two very different situations:
+        #  - every query ran but the account/region simply has none of the
+        #    selected types → a clean, *successful* empty discovery (0 to import).
+        #  - a query errored (creds/provider) and none succeeded → a real failure.
+        if query_errors and not query_results:
+            joined = "; ".join(f"{t}: {e}" for t, e in query_errors.items())
+            log.error("discovery queries all failed", errors=joined)
+            print(f"terrapod-discovery: all data-source queries failed — {joined}", flush=True)
+            return 1
+        log.info("discovery found no resources", types=types, queried=list(query_results))
+        print(
+            "terrapod-discovery: queried "
+            f"{', '.join(types)} — no unmanaged resources found in this account/region.",
+            flush=True,
+        )
+        uploads.post_onboarding_query_results(
+            cfg,
+            {
+                "results": query_results,
+                "selected_types": types,
+                "query_errors": query_errors,
+                "found": 0,
+                "import_only": True,
+            },
+        )
+        return 0
 
     (work_dir / "imports.tf").write_text("\n\n".join(import_blocks) + "\n", encoding="utf-8")
 

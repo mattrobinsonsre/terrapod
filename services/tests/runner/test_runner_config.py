@@ -17,6 +17,28 @@ def test_from_env_minimal_defaults() -> None:
     assert cfg.refresh_only is False
     assert cfg.destroy is False
     assert cfg.has_api is False
+    # Onboarding discovery (#824 P2) is off unless a session id is present.
+    assert cfg.onboard_session_id == ""
+    assert cfg.onboard_provider == ""
+    assert cfg.onboard_provider_version == ""
+    assert cfg.onboard_types == []
+    assert cfg.is_discovery is False
+
+
+def test_from_env_onboarding_discovery_fields() -> None:
+    cfg = RunnerConfig.from_env(
+        env={
+            "TP_ONBOARD_SESSION_ID": "sess-1",
+            "TP_ONBOARD_PROVIDER": "aws",
+            "TP_ONBOARD_PROVIDER_VERSION": "< 6.0",
+            "TP_ONBOARD_TYPES": '["aws_vpcs", "aws_eips"]',
+        }
+    )
+    assert cfg.onboard_session_id == "sess-1"
+    assert cfg.onboard_provider == "aws"
+    assert cfg.onboard_provider_version == "< 6.0"
+    assert cfg.onboard_types == ["aws_vpcs", "aws_eips"]
+    assert cfg.is_discovery is True
 
 
 def test_from_env_strips_trailing_slash_on_api_url() -> None:

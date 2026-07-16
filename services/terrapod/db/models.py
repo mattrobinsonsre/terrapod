@@ -2281,6 +2281,16 @@ class OnboardingSession(Base):
     # the workspace's engine/version doesn't orphan a session's surface.
     engine: Mapped[str] = mapped_column(String(20), nullable=False, default="")
     engine_version: Mapped[str] = mapped_column(String(50), nullable=False, default="")
+    # Optional provider version *constraint* the discovery pins in its generated
+    # ``providers.tf`` (e.g. "< 6.0", "~> 5.0"). Empty = unconstrained (latest).
+    # Discovery writes its own minimal provider block (it does NOT read the
+    # workspace's config), so without this it always resolves the newest provider;
+    # pinning lets an operator match the version they actually run (e.g. AWS v5,
+    # which lacks the per-resource `region` attribute v6 stamps on everything).
+    # Part of the Redis surface-cache key — a v5 and a v6 schema differ.
+    provider_version: Mapped[str] = mapped_column(
+        String(64), nullable=False, default="", server_default=""
+    )
 
     # Operator/AI-selected data-source types to query in D2 (e.g. ["aws_vpcs"]).
     selected_types: Mapped[list[str]] = mapped_column(

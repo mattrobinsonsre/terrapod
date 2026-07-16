@@ -1993,7 +1993,8 @@
       "loadingLower": "caricamento in corso…"
     },
     "header": {
-      "executionMode": "modalità di esecuzione {mode}"
+      "executionMode": "modalità di esecuzione {mode}",
+      "onboard": "Importa"
     },
     "tabs": {
       "overview": "Panoramica",
@@ -2630,5 +2631,42 @@
   "apiDocs": {
     "view": "Vista:",
     "redocTitle": "Documentazione API ReDoc"
+  },
+  "onboarding": {
+    "title": "Importa risorse esistenti",
+    "backTo": "Torna a {workspace}",
+    "description": "Rileva risorse cloud esistenti e non gestite in {workspace} e genera blocchi di risorse e import revisionabili.",
+    "providerLabel": "Provider",
+    "providerVersionLabel": "Versione del provider (opzionale)",
+    "start": "Avvia rilevamento",
+    "starting": "Avvio…",
+    "sessionsLabel": "Sessioni di rilevamento",
+    "empty": "Nessuna sessione di rilevamento. Scegli un provider e avviane una sopra.",
+    "analysing": "Analisi dello schema del provider… la prima volta può richiedere un minuto (download del provider).",
+    "surfaceIntro": "Seleziona quali delle {count} sorgenti dati interrogabili rilevare.",
+    "filterPlaceholder": "Filtra sorgenti dati…",
+    "noMatches": "Nessuna sorgente dati corrisponde al filtro.",
+    "discover": "Rileva {count} tipo/i",
+    "discovering": "Invio…",
+    "queryingHint": "Rilevamento risorse — il runner interroga il tuo cloud e genera la configurazione.",
+    "viewRun": "Vedi esecuzione",
+    "reviewIntro": "Generato da: {types}. Rivedi sotto, poi sposta la configurazione nel tuo workspace e applica l import.",
+    "importBlocks": "blocchi di import",
+    "generatedConfig": "Configurazione generata",
+    "copy": "Copia",
+    "copied": "Copiato",
+    "nextStepNote": "Passo successivo: sposta questa configurazione nel repository del workspace ed eseguila — un onboarding corretto pianifica solo import (0 da aggiungere / 0 da modificare / 0 da distruggere).",
+    "erroredFallback": "Rilevamento non riuscito. Apri l esecuzione per vedere i log.",
+    "viewRunLogs": "Vedi i log dell esecuzione",
+    "noResources": "Nessuna risorsa {types} non gestita trovata in questo account/regione.",
+    "state": {
+      "pending": "Analisi schema",
+      "schema_ready": "Pronto al rilevamento",
+      "querying": "Rilevamento",
+      "config_ready": "Configurazione pronta",
+      "run_created": "Esecuzione di import creata",
+      "errored": "In errore",
+      "canceled": "Annullato"
+    }
   }
 }

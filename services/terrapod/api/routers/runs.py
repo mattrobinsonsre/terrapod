@@ -1639,6 +1639,7 @@ async def next_run(
             attrs = run_data["data"]["attributes"]
             attrs["onboard-session-id"] = str(sess.id)
             attrs["onboard-provider"] = sess.provider
+            attrs["onboard-provider-version"] = sess.provider_version or ""
             attrs["onboard-types"] = sess.selected_types or []
 
     return JSONResponse(content=run_data)

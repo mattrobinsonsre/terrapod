@@ -63,16 +63,24 @@ _DISCOVERY_TIMEOUT_SECONDS = 300
 # ---------------------------------------------------------------------------
 # Redis surface cache (pure — keyed by engine + version + provider)
 # ---------------------------------------------------------------------------
-def _surface_cache_key(engine: str, engine_version: str, provider: str) -> str:
-    return f"tp:onboard:surface:{engine}:{engine_version}:{provider}"
+def _surface_cache_key(
+    engine: str, engine_version: str, provider: str, provider_version: str
+) -> str:
+    # provider_version is part of the key: a v5 and a v6 provider schema differ
+    # (v6 adds a per-resource `region` attribute, etc.), so their surfaces must
+    # not collide. Empty constraint (latest) is its own key.
+    return f"tp:onboard:surface:{engine}:{engine_version}:{provider}:{provider_version}"
 
 
 async def get_cached_surface(
-    engine: str, engine_version: str, provider: str
+    engine: str, engine_version: str, provider: str, provider_version: str = ""
 ) -> dict[str, Any] | None:
-    """Return the cached discovery surface for (engine, version, provider), or None."""
+    """Return the cached discovery surface for the (engine, version, provider,
+    provider_version) tuple, or None."""
     try:
-        raw = await get_redis_client().get(_surface_cache_key(engine, engine_version, provider))
+        raw = await get_redis_client().get(
+            _surface_cache_key(engine, engine_version, provider, provider_version)
+        )
     except Exception as exc:  # noqa: BLE001 — cache is best-effort
         logger.debug("onboarding_surface_cache_get_failed", error=str(exc))
         return None
@@ -85,11 +93,15 @@ async def get_cached_surface(
 
 
 async def set_cached_surface(
-    engine: str, engine_version: str, provider: str, surface: dict[str, Any]
+    engine: str,
+    engine_version: str,
+    provider: str,
+    surface: dict[str, Any],
+    provider_version: str = "",
 ) -> None:
     try:
         await get_redis_client().set(
-            _surface_cache_key(engine, engine_version, provider),
+            _surface_cache_key(engine, engine_version, provider, provider_version),
             json.dumps(surface),
             ex=_SURFACE_TTL_SECONDS,
         )
@@ -102,12 +114,14 @@ async def get_session_surface(session: OnboardingSession) -> dict[str, Any] | No
 
     The surface is Redis-only and time-limited, so a ``schema_ready`` session
     whose cache entry has since expired returns None here — the caller re-runs
-    discovery (cheap: a warm cache for that engine+version+provider repopulates
-    it, and a cold one is the one-time provider download).
+    discovery (cheap: a warm cache for that engine+version+provider(+constraint)
+    repopulates it, and a cold one is the one-time provider download).
     """
     if not (session.engine and session.engine_version and session.provider):
         return None
-    return await get_cached_surface(session.engine, session.engine_version, session.provider)
+    return await get_cached_surface(
+        session.engine, session.engine_version, session.provider, session.provider_version or ""
+    )
 
 
 # A terraform provider short-name. Validated because it is interpolated into
@@ -120,16 +134,33 @@ def is_valid_provider(provider: str) -> bool:
     return bool(_PROVIDER_RE.match(provider))
 
 
+# A terraform version *constraint* (e.g. "< 6.0", "~> 5.0", ">= 5.1, < 6.0"). It
+# is interpolated into generated HCL (`version = "<here>"`), so restrict it to the
+# constraint charset — digits, dots, commas, the operators, whitespace, a leading
+# `v`, and `-` for pre-release tags — which can't break out of the string literal.
+_VERSION_CONSTRAINT_RE = re.compile(r"^[0-9.,<>=!~v\s-]{1,64}$")
+
+
+def is_valid_version_constraint(vc: str) -> bool:
+    return vc == "" or bool(_VERSION_CONSTRAINT_RE.match(vc))
+
+
 # ---------------------------------------------------------------------------
 # Session CRUD (pure DB)
 # ---------------------------------------------------------------------------
 async def create_session(
-    db: AsyncSession, *, workspace_id: uuid.UUID, provider: str, created_by: str
+    db: AsyncSession,
+    *,
+    workspace_id: uuid.UUID,
+    provider: str,
+    created_by: str,
+    provider_version: str = "",
 ) -> OnboardingSession:
     """Create a pending onboarding session for a workspace."""
     session = OnboardingSession(
         workspace_id=workspace_id,
         provider=provider.strip(),
+        provider_version=provider_version.strip(),
         created_by=created_by,
         status="pending",
     )
@@ -238,9 +269,13 @@ async def complete_discovery(
 
     The runner already uploaded the artifacts (config / imports / query results)
     directly to the session via the artifact endpoints, so this only flips the
-    session status: ``config_ready`` when the run succeeded AND produced config,
-    else ``errored``. Idempotent and safe to call more than once. No-ops if the
-    session was already resolved or doesn't exist.
+    session status: ``config_ready`` when the run **succeeded** (the runner ran to
+    completion and uploaded whatever it produced), else ``errored``. A successful
+    run with no generated config is the legitimate "no unmanaged resources of the
+    selected types were found" outcome — a clean terminal state, not an error;
+    the runner only exits 0 once its uploads land (or there was nothing to
+    upload), so success is a trustworthy signal here. Idempotent and safe to call
+    more than once. No-ops if the session was already resolved or doesn't exist.
     """
     result = await db.execute(
         select(OnboardingSession).where(OnboardingSession.discovery_run_id == run_id)
@@ -248,12 +283,12 @@ async def complete_discovery(
     session = result.scalar_one_or_none()
     if session is None or session.status not in ("querying",):
         return
-    if success and session.generated_config:
+    if success:
         session.status = "config_ready"
         session.error = ""
     else:
         session.status = "errored"
-        session.error = (error or "discovery produced no config")[:2000]
+        session.error = (error or "discovery run failed")[:2000]
     await db.flush()
     logger.info("onboarding_discovery_completed", session_id=str(session.id), status=session.status)
 
@@ -276,17 +311,20 @@ def _resolve_tmpdir() -> str | None:
     return None
 
 
-def _provider_config_hcl(provider: str) -> str:
+def _provider_config_hcl(provider: str, version_constraint: str = "") -> str:
     """Minimal HCL to make ``tofu init`` install the provider for schema reads.
 
     Only ``required_providers`` is needed for ``providers schema`` — the empty
-    provider block keeps tofu happy without any credentials or region.
+    provider block keeps tofu happy without any credentials or region. An optional
+    ``version_constraint`` pins the provider version (e.g. "< 6.0") so the schema
+    (and later D2/D3) match the version the operator runs; empty = latest.
     """
     # Hosted registry source: a bare provider name resolves to hashicorp/<name>.
+    ver = f', version = "{version_constraint}"' if version_constraint else ""
     return (
         "terraform {\n"
         "  required_providers {\n"
-        f'    {provider} = {{ source = "{provider}" }}\n'
+        f'    {provider} = {{ source = "{provider}"{ver} }}\n'
         "  }\n"
         "}\n"
         f'provider "{provider}" {{}}\n'
@@ -341,14 +379,16 @@ def _unzip_engine(zip_path: str, dest: str, engine: str) -> None:
     os.chmod(dest, os.stat(dest).st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
 
-def _discover_surface_blocking(engine_bin: str, provider: str, workdir: str) -> dict[str, Any]:
+def _discover_surface_blocking(
+    engine_bin: str, provider: str, workdir: str, version_constraint: str = ""
+) -> dict[str, Any]:
     """Run ``tofu init`` + ``terrapod-query schema`` in ``workdir`` (BLOCKING).
 
     Isolated so callers wrap it in ``asyncio.to_thread`` and tests can mock it.
     Credential-less and read-only: schema introspection never touches the cloud.
     """
     with open(os.path.join(workdir, "providers.tf"), "w") as f:
-        f.write(_provider_config_hcl(provider))
+        f.write(_provider_config_hcl(provider, version_constraint))
 
     env = {**os.environ, "TF_IN_AUTOMATION": "1"}
     init = subprocess.run(  # noqa: S603 — fixed argv, no shell, trusted binary
@@ -362,8 +402,14 @@ def _discover_surface_blocking(engine_bin: str, provider: str, workdir: str) -> 
     if init.returncode != 0:
         raise RuntimeError(f"{os.path.basename(engine_bin)} init failed: {init.stderr[-2000:]}")
 
+    # --importable restricts the surface to data sources the deterministic import
+    # path can consume: they expose a derivable resource-id list (``ids`` or a
+    # single ``*_ids``/``*_identifiers`` list, so aws_eips → ``allocation_ids``
+    # works) AND singularise to a managed resource that actually exists. That
+    # keeps genuinely un-importable sources (e.g. aws_availability_zones) off the
+    # surface without excluding real ones like EIPs.
     query = subprocess.run(  # noqa: S603
-        [QUERY_BIN, "schema", "--dir", workdir, "--tofu", engine_bin],
+        [QUERY_BIN, "schema", "--dir", workdir, "--tofu", engine_bin, "--importable"],
         cwd=workdir,
         env=env,
         capture_output=True,
@@ -398,6 +444,7 @@ async def run_schema_discovery(db: AsyncSession, session_id: uuid.UUID) -> None:
     )
     version = workspace.terraform_version or "latest"
     provider = session.provider
+    provider_version = session.provider_version or ""
 
     # Pin the cache key on the session (small scalars) so the surface can be
     # re-fetched from Redis on read even if the workspace's engine/version later
@@ -405,7 +452,7 @@ async def run_schema_discovery(db: AsyncSession, session_id: uuid.UUID) -> None:
     session.engine = engine
     session.engine_version = version
 
-    cached = await get_cached_surface(engine, version, provider)
+    cached = await get_cached_surface(engine, version, provider, provider_version)
     if cached is not None:
         session.status = "schema_ready"
         session.error = ""
@@ -418,11 +465,13 @@ async def run_schema_discovery(db: AsyncSession, session_id: uuid.UUID) -> None:
         tmpdir = _resolve_tmpdir()
         workdir = await asyncio.to_thread(tempfile.mkdtemp, prefix="onb-d1-", dir=tmpdir)
         surface = await asyncio.wait_for(
-            asyncio.to_thread(_discover_surface_blocking, engine_bin, provider, workdir),
+            asyncio.to_thread(
+                _discover_surface_blocking, engine_bin, provider, workdir, provider_version
+            ),
             timeout=_DISCOVERY_TIMEOUT_SECONDS + 30,
         )
         # Surface goes to the time-limited Redis cache ONLY — never the DB row.
-        await set_cached_surface(engine, version, provider, surface)
+        await set_cached_surface(engine, version, provider, surface, provider_version)
         session.status = "schema_ready"
         session.error = ""
         await db.flush()

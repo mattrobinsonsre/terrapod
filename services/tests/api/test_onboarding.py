@@ -148,9 +148,13 @@ def _fake_session(status="pending", provider="aws"):
         workspace_id="11111111-1111-1111-1111-111111111111",
         status=status,
         provider=provider,
+        provider_version="",
         engine="tofu",
         engine_version="1.12",
         selected_types=[],
+        query_results=None,
+        generated_config=None,
+        import_blocks=None,
         ai_assisted=False,
         error="",
         discovery_run_id=None,
@@ -199,6 +203,46 @@ class TestOnboardingSessions:
                     headers=_AUTH,
                 )
         assert resp.status_code == 422
+
+    async def test_create_rejects_bad_provider_version(self, *mocks):
+        with (
+            patch(f"{_ONB}._get_workspace", AsyncMock(return_value=_fake_ws())),
+            patch(
+                f"{_ONB}.resolve_workspace_capabilities_for",
+                AsyncMock(return_value=frozenset({WORKSPACE_ONBOARD})),
+            ),
+        ):
+            async with await self._client() as c:
+                resp = await c.post(
+                    "/api/terrapod/v1/workspaces/ws-1/onboarding-sessions",
+                    # would break out of the generated HCL version string
+                    json={
+                        "data": {"attributes": {"provider": "aws", "provider-version": '6" }\nx'}}
+                    },
+                    headers=_AUTH,
+                )
+        assert resp.status_code == 422
+
+    async def test_create_passes_provider_version_constraint(self, *mocks):
+        create = AsyncMock(return_value=_fake_session())
+        with (
+            patch(f"{_ONB}._get_workspace", AsyncMock(return_value=_fake_ws())),
+            patch(
+                f"{_ONB}.resolve_workspace_capabilities_for",
+                AsyncMock(return_value=frozenset({WORKSPACE_ONBOARD})),
+            ),
+            patch(f"{_ONB}.onboarding_service.create_session", create),
+            patch("terrapod.services.scheduler.enqueue_trigger", AsyncMock()),
+        ):
+            async with await self._client() as c:
+                resp = await c.post(
+                    "/api/terrapod/v1/workspaces/ws-1/onboarding-sessions",
+                    json={"data": {"attributes": {"provider": "aws", "provider-version": "< 6.0"}}},
+                    headers=_AUTH,
+                )
+        assert resp.status_code == 201
+        # The validated constraint is threaded to the session, not dropped.
+        assert create.await_args.kwargs["provider_version"] == "< 6.0"
 
     async def test_create_happy_enqueues_discovery(self, *mocks):
         enq = AsyncMock()

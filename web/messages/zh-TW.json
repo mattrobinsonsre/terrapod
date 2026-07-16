@@ -1993,7 +1993,8 @@
       "loadingLower": "正在載入…"
     },
     "header": {
-      "executionMode": "{mode}執行模式"
+      "executionMode": "{mode}執行模式",
+      "onboard": "匯入"
     },
     "tabs": {
       "overview": "概覽",
@@ -2630,5 +2631,42 @@
   "apiDocs": {
     "view": "檢視：",
     "redocTitle": "ReDoc API 文件"
+  },
+  "onboarding": {
+    "title": "匯入現有資源",
+    "backTo": "返回 {workspace}",
+    "description": "在 {workspace} 中探索現有、未納管的雲端資源，並產生可審閱的資源區塊與 import 區塊。",
+    "providerLabel": "供應商",
+    "providerVersionLabel": "供應商版本（選填）",
+    "start": "開始探索",
+    "starting": "正在啟動…",
+    "sessionsLabel": "探索工作階段",
+    "empty": "尚無探索工作階段。請在上方選擇供應商並開始。",
+    "analysing": "正在分析供應商結構描述… 首次可能需要一分鐘（正在下載供應商）。",
+    "surfaceIntro": "從 {count} 個可查詢的資料來源中選擇要探索的對象。",
+    "filterPlaceholder": "篩選資料來源…",
+    "noMatches": "沒有資料來源符合篩選。",
+    "discover": "探索 {count} 種類型",
+    "discovering": "正在派發…",
+    "queryingHint": "正在探索資源 — 執行器正在查詢你的雲端並產生設定。",
+    "viewRun": "檢視執行",
+    "reviewIntro": "產生來源：{types}。請在下方審閱，然後將設定移入你的工作區並套用匯入。",
+    "importBlocks": "import 區塊",
+    "generatedConfig": "產生的設定",
+    "copy": "複製",
+    "copied": "已複製",
+    "nextStepNote": "下一步：將此設定移入你的工作區儲存庫並執行 — 正確的匯入僅規劃 import（新增 0 / 變更 0 / 銷毀 0）。",
+    "erroredFallback": "探索執行失敗。開啟該執行以檢視記錄。",
+    "viewRunLogs": "檢視執行記錄",
+    "noResources": "在此帳戶/區域中找不到未納管的 {types} 資源。",
+    "state": {
+      "pending": "正在分析結構描述",
+      "schema_ready": "可以探索",
+      "querying": "正在探索",
+      "config_ready": "設定就緒",
+      "run_created": "已建立匯入執行",
+      "errored": "發生錯誤",
+      "canceled": "已取消"
+    }
   }
 }

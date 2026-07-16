@@ -34,6 +34,29 @@ func TestPluralResultOneBlockPerID(t *testing.T) {
 	}
 }
 
+func TestAllocationIdsResultExtractsFromUnderscoreIdsList(t *testing.T) {
+	// aws_eips exposes `allocation_ids` (not `ids`), plus a synthetic scalar `id`
+	// (region) and a `public_ips` list. Extraction must pick allocation_ids —
+	// not the region `id`, not public_ips — so real EIPs are discovered.
+	res := result(t, "aws_eips",
+		`{"id":"eu-west-1","allocation_ids":["eipalloc-0a1b","eipalloc-0c2d"],"public_ips":["1.2.3.4","5.6.7.8"]}`)
+	blocks, err := FromResult(res, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(blocks) != 2 {
+		t.Fatalf("expected 2 blocks from allocation_ids, got %d: %+v", len(blocks), blocks)
+	}
+	if blocks[0].To != "aws_eip.eipalloc-0a1b" || blocks[0].ID != "eipalloc-0a1b" {
+		t.Errorf("expected import by allocation id, got %+v", blocks[0])
+	}
+	for _, b := range blocks {
+		if b.ID == "eu-west-1" || strings.HasPrefix(b.ID, "1.2") {
+			t.Errorf("must not import by region id or public ip: %+v", b)
+		}
+	}
+}
+
 func TestSingularResultSingleBlock(t *testing.T) {
 	res := result(t, "aws_vpc", `{"id":"vpc-single","cidr_block":"10.0.0.0/16"}`)
 	blocks, err := FromResult(res, Options{})

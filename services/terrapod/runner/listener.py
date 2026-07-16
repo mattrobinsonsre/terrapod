@@ -749,6 +749,7 @@ class RunnerListener:
             # Onboarding discovery (#824 P2): present only for discovery runs.
             onboard_session_id=attrs.get("onboard-session-id", ""),
             onboard_provider=attrs.get("onboard-provider", ""),
+            onboard_provider_version=attrs.get("onboard-provider-version", ""),
             onboard_types=attrs.get("onboard-types", []),
         )
 

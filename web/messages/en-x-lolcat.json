@@ -1993,7 +1993,8 @@
       "loadingLower": "loadin…"
     },
     "header": {
-      "executionMode": "{mode} execushun mode"
+      "executionMode": "{mode} execushun mode",
+      "onboard": "Onboard"
     },
     "tabs": {
       "overview": "Ovrview",
@@ -2630,5 +2631,42 @@
   "apiDocs": {
     "view": "Vyoo:",
     "redocTitle": "ReDoc API Documentashun"
+  },
+  "onboarding": {
+    "title": "Onboard existing resources",
+    "backTo": "Back to {workspace}",
+    "description": "Discover existing, unmanaged cloud resources in {workspace} and generate reviewable resource + import blocks.",
+    "providerLabel": "Provider",
+    "providerVersionLabel": "Provider version (optional)",
+    "start": "Start discovery",
+    "starting": "Starting…",
+    "sessionsLabel": "Discovery sessions",
+    "empty": "No discovery sessions yet. Pick a provider and start one above.",
+    "analysing": "Analysing the provider schema… this can take a minute the first time (downloading the provider).",
+    "surfaceIntro": "Select which of the {count} queryable data sources to discover.",
+    "filterPlaceholder": "Filter data sources…",
+    "noMatches": "No data sources match your filter.",
+    "discover": "Discover {count} type(s)",
+    "discovering": "Dispatching…",
+    "queryingHint": "Discovering resources — the runner is querying your cloud and generating config.",
+    "viewRun": "View run",
+    "reviewIntro": "Generated from: {types}. Review below, then move the config into your workspace and apply the import.",
+    "importBlocks": "import blocks",
+    "generatedConfig": "Generated configuration",
+    "copy": "Copy",
+    "copied": "Copied",
+    "nextStepNote": "Next: move this config into your workspace repo and run it — a correct onboarding plans import-only (0 to add / 0 to change / 0 to destroy).",
+    "erroredFallback": "Discovery run failed. Open the run to see the logs.",
+    "viewRunLogs": "View run logs",
+    "noResources": "No unmanaged {types} resources were found in this account/region.",
+    "state": {
+      "pending": "Analysing schema",
+      "schema_ready": "Ready to discover",
+      "querying": "Discovering",
+      "config_ready": "Config ready",
+      "run_created": "Import run created",
+      "errored": "Errored",
+      "canceled": "Canceled"
+    }
   }
 }

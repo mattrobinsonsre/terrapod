@@ -34,7 +34,16 @@ def _fake_db(session, workspace):
 
 # --- pure helpers ----------------------------------------------------------
 def test_surface_cache_key_shape():
-    assert svc._surface_cache_key("tofu", "1.12", "aws") == "tp:onboard:surface:tofu:1.12:aws"
+    # Includes the provider-version constraint segment (empty = latest) so a v5
+    # and a v6 surface never collide.
+    assert svc._surface_cache_key("tofu", "1.12", "aws", "") == "tp:onboard:surface:tofu:1.12:aws:"
+
+
+def test_surface_cache_key_separates_provider_versions():
+    latest = svc._surface_cache_key("tofu", "1.12", "aws", "")
+    pinned = svc._surface_cache_key("tofu", "1.12", "aws", "< 6.0")
+    assert latest != pinned
+    assert pinned.endswith(":< 6.0")
 
 
 def test_provider_config_hcl_installs_provider_for_schema():
@@ -43,6 +52,30 @@ def test_provider_config_hcl_installs_provider_for_schema():
     assert 'aws = { source = "aws" }' in hcl
     # Empty provider block — schema reads need no credentials or region.
     assert 'provider "aws" {}' in hcl
+
+
+def test_provider_config_hcl_pins_version_constraint():
+    hcl = svc._provider_config_hcl("aws", "< 6.0")
+    assert 'aws = { source = "aws", version = "< 6.0" }' in hcl
+    # No constraint → no version key (resolves latest).
+    assert "version =" not in svc._provider_config_hcl("aws")
+
+
+@pytest.mark.parametrize(
+    ("value", "ok"),
+    [
+        ("", True),
+        ("< 6.0", True),
+        ("~> 5.0", True),
+        (">= 5.1, < 6.0", True),
+        ("6", True),
+        ('6" }\nmalicious', False),  # can't break out of the HCL string literal
+        ("garbage", False),
+        ("aws", False),
+    ],
+)
+def test_is_valid_version_constraint(value, ok):
+    assert svc.is_valid_version_constraint(value) is ok
 
 
 def test_local_platform_is_linux():
@@ -200,12 +233,17 @@ async def test_complete_discovery_success_with_config_is_config_ready():
 
 
 @pytest.mark.asyncio
-async def test_complete_discovery_success_without_config_errors():
+async def test_complete_discovery_success_without_config_is_config_ready_nothing_found():
+    # A successful run that produced no config is the legitimate "no unmanaged
+    # resources of the selected types were found" outcome — a clean terminal
+    # state, NOT an error. The runner only exits 0 once its uploads land (or
+    # there was nothing to upload), so success is trustworthy here.
     session = OnboardingSession(workspace_id=uuid.uuid4(), provider="aws", status="querying")
     session.generated_config = None
     db = _db_returning(session)
     await svc.complete_discovery(db, uuid.uuid4(), success=True)
-    assert session.status == "errored"
+    assert session.status == "config_ready"
+    assert session.error == ""
 
 
 @pytest.mark.asyncio
