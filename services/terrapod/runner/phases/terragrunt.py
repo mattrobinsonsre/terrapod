@@ -178,7 +178,10 @@ def write_wrappers(
     )
     for path, src in ((tf_wrapper, tf_src), (tg_wrapper, tg_src)):
         path.write_text(src)
-        path.chmod(path.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
+        # Owner-execute only (S_IEXEC == S_IXUSR) — these wrappers live in the
+        # runner Job's private working dir and are exec'd solely by the Job's own
+        # user; group/other execute is needless (insecure-file-permissions SAST).
+        path.chmod(path.stat().st_mode | stat.S_IEXEC)
     logger.info("terragrunt wrappers written", tg=str(tg_wrapper), tf=str(tf_wrapper))
     return tg_wrapper
 
