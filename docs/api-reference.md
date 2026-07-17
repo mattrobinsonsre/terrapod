@@ -3131,6 +3131,158 @@ Records the runner's policy-evaluation outcomes for the run. Persisted via Postg
 
 ---
 
+## Onboarding / Resource Discovery
+
+Discover existing, unmanaged cloud resources and generate copy-pasteable `resource {}` + `import {}` blocks, then bring them under management with a single gated import run. A session drives a discovery engine: **D1 schema** discovery runs credential-lessly in the API; **D2 query** + **D3 generate/clean** run on the runner; the only mutating step is an operator-confirmed, plan-only import run through the normal run gate.
+
+Onboarding has **no feature flag** — it is gated per workspace by the `workspace:onboard` capability (see [Roles](#roles)). Every session endpoint requires `workspace:onboard` on the workspace, returning `403` otherwise. The optional **AI mode** (natural-language selection + config cleanup) is the only part behind a switch (`api.config.ai_onboarding.enabled`); it never alters an attribute value or an import id.
+
+### Availability Probe
+
+```
+GET /api/terrapod/v1/onboarding
+```
+
+Any authenticated user. Reports whether the optional AI mode is available, so the UI can offer the conversational path when it is configured. Onboarding itself is always present — actual access is decided per-workspace by the `workspace:onboard` capability on the real endpoints.
+
+**Response:**
+```json
+{
+  "data": {
+    "type": "onboarding-availability",
+    "attributes": {
+      "ai-available": true,
+      "ai-model-configured": true
+    }
+  }
+}
+```
+
+| Attribute | Description |
+|---|---|
+| `ai-available` | Whether the AI mode switch (`ai_onboarding.enabled`) is on. |
+| `ai-model-configured` | Whether AI mode is on **and** a model is configured. |
+
+### Create Onboarding Session
+
+```
+POST /api/terrapod/v1/workspaces/{id}/onboarding-sessions
+```
+
+Requires `workspace:onboard`. Starts a session and kicks off credential-less D1 schema discovery on a scheduler trigger (off the request thread). The client polls the session (below) until `status == "schema_ready"`, then reads the discovery surface and selects the data-source types to query.
+
+**Request body:**
+```json
+{
+  "data": {
+    "type": "onboarding-sessions",
+    "attributes": {
+      "provider": "aws",
+      "provider-version": "< 6.0"
+    }
+  }
+}
+```
+
+| Attribute | Description |
+|---|---|
+| `provider` | The terraform/tofu provider to onboard, lowercase (e.g. `aws`). One provider per session; onboard several by running several sessions. Invalid → `422`. |
+| `provider-version` | Optional provider version *constraint* pinned in the generated `providers.tf` (e.g. `< 6.0`, `~> 5.0`). Empty = unconstrained (latest). Must be a valid terraform version constraint or → `422`. |
+
+Returns `201` with the serialized session (below).
+
+### List Onboarding Sessions
+
+```
+GET /api/terrapod/v1/workspaces/{id}/onboarding-sessions
+```
+
+Requires `workspace:onboard`. Returns the workspace's sessions. The (large, per-session) discovery surface is **omitted** from the list — fetch a single session for it.
+
+### Show Onboarding Session
+
+```
+GET /api/terrapod/v1/onboarding-sessions/{id}
+```
+
+Requires `workspace:onboard` on the session's workspace. Returns the session **including** its `discovery-surface` (served from a time-limited Redis cache — never persisted per-session; an expired session simply re-runs discovery). Once `status == "config_ready"`, the generated config and import blocks are present.
+
+### Start Discovery (D2/D3)
+
+```
+POST /api/terrapod/v1/onboarding-sessions/{id}/discover
+```
+
+Requires `workspace:onboard`. Dispatches the runner discovery run for a `schema_ready` session, querying the selected subset of the session's discovery surface. A session not in `schema_ready` → `422`.
+
+**Request body:**
+```json
+{
+  "data": {
+    "type": "onboarding-sessions",
+    "attributes": {
+      "selected-types": ["aws_vpcs", "aws_subnets"]
+    }
+  }
+}
+```
+
+| Attribute | Description |
+|---|---|
+| `selected-types` | The data-source types (a subset of the session's discovery surface) to query. Must be a list of strings or → `422`. |
+
+Returns the serialized session (now with `discovery-run-id` set).
+
+### Session Attributes
+
+The `onboarding-sessions` JSON:API resource the UI consumes:
+
+| Attribute | Description |
+|---|---|
+| `workspace-id` | The owning workspace. |
+| `status` | Session lifecycle state, one of `pending`, `schema_ready`, `querying`, `config_ready`, `run_created`, `errored`, `canceled`. |
+| `provider` | The provider being onboarded (e.g. `aws`). |
+| `provider-version` | The provider version constraint pinned in the generated `providers.tf`; empty = unconstrained. |
+| `engine` | The engine D1 ran with (`terraform` / `tofu`). |
+| `engine-version` | The resolved engine version D1 ran with. |
+| `selected-types` | The data-source types selected for the D2 query. |
+| `ai-assisted` | Whether the optional AI mode assisted this session (naming, cleanup, chat). True iff the polished view exists. |
+| `discovery-surface` | The D1 provider-schema surface (from the Redis cache). Present only on the **show** (detail) read; `null` on list. |
+| `data-source-count` | Count derived from the discovery surface (`null` when the surface isn't included). |
+| `generated-config` | D3 output — the cleaned, import-only `resource {}` config (null/empty ConflictsWith attributes pruned so it plans). Present once `status == config_ready`. |
+| `import-blocks` | D3 output — the candidate `import {}` blocks. Present once `status == config_ready`. |
+| `polished-config` | Optional AI-polished view of `generated-config` (resources renamed from tags, grouped, commented). **Never alters a value or import id** (enforced by a value-preservation check). `null` until the polish lands or if rejected / AI disabled. |
+| `polished-import-blocks` | The polished counterpart to `import-blocks`; renames are mirrored deterministically into the `to = <addr>` targets. |
+| `paired-config` | **Derived presentation view** (computed at serialize time, never stored): each `import {}` interleaved directly above the resource it targets, over the canonical `generated-config`/`import-blocks`. Ids/values untouched. `null` until config exists. |
+| `paired-polished-config` | The same derived pairing over the polished halves. `null` until the polished config exists. |
+| `discovery-run-id` | The runner discovery run that produced the query results + config (D2/D3), or `null`. |
+| `result-run-id` | The resulting gated import-only run, or `null`. |
+| `error` | Human-readable failure detail when `status == "errored"`. |
+| `created-by` | The user who started the session. |
+| `created-at` | RFC3339 timestamp. |
+| `updated-at` | RFC3339 timestamp. |
+
+### Runner Discovery Artifacts
+
+The runner discovery Job uploads its generated artifacts to these endpoints. Auth is a **runner token scoped to the discovery run** — each endpoint resolves the owning session via its `discovery_run_id` (== this run), so a Job can only ever write to its own session. Bodies are capped (`413` if too large).
+
+```
+PUT  /api/terrapod/v1/runs/{run_id}/artifacts/onboarding-config
+```
+The cleaned, import-only generated `resource {}` config (D3 + clean). Body is `.tf` text; stored on the session's `generated-config`. Returns `204`.
+
+```
+PUT  /api/terrapod/v1/runs/{run_id}/artifacts/onboarding-imports
+```
+The candidate `import {}` blocks (D3). Body is `.tf` text; stored on the session's `import-blocks`. Returns `204`.
+
+```
+POST /api/terrapod/v1/runs/{run_id}/artifacts/onboarding-query-results
+```
+The raw D2 query results + the import-only verdict (JSON object; non-JSON or non-object → `422`). Stored on the session. Returns `204`.
+
+> **Import run is always plan-only:** the confirmed import step is a gated, **import-only** run (plan-only) through the normal run gate — never an auto-apply.
+
 ## Service Catalog
 
 No-code self-service provisioning over the private module registry. A *catalog item* blesses a registry module; provisioning it creates an agent-mode, non-VCS, catalog-managed workspace whose configuration is a server-generated wrapper. See [Service Catalog](service-catalog.md) for the full feature doc.
@@ -3373,7 +3525,7 @@ Queues an `is_destroy` run with source **`catalog-lifecycle`**. On a **successfu
 
 Returns a reference to the queued destroy run. **Required permission:** catalog `use`.
 
-> **Run sources:** catalog runs carry `source = "catalog"` (provision / reconfigure) or `source = "catalog-lifecycle"` (destroy → archive). These appear on the run object alongside the existing sources (`tfe-api`, `vcs`, `drift-detection`, `autodiscovery-lifecycle`, `module-test`, `module-publish`).
+> **Run sources:** catalog runs carry `source = "catalog"` (provision / reconfigure) or `source = "catalog-lifecycle"` (destroy → archive). These appear on the run object alongside the existing sources (`tfe-api`, `vcs`, `drift-detection`, `autodiscovery-lifecycle`, `module-test`, `module-publish`, `onboarding-discovery`).
 
 ### Confirm / Discard a Catalog Instance Run
 

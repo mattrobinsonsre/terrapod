@@ -30,6 +30,10 @@ Resolved per-request, with no `/<locale>/` URL segment:
 The switcher writes the cookie and refreshes; the server layout re-runs
 `src/i18n/request.ts` and re-provides messages — no reload, no URL change.
 
+The same picker is also offered **pre-auth on the login screen** (#836), so an
+operator can choose their language before signing in; it writes the same
+`NEXT_LOCALE` cookie, so the choice carries through to the authenticated app.
+
 `en` (US English) is the **source** catalog. Every other locale deep-merges
 over `en`, so a missing key can never render `MISSING_KEY` — but see the
 completeness gate below: a *partial* locale is never actually offered.
