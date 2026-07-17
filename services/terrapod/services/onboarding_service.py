@@ -386,7 +386,15 @@ async def _download_engine_binary(db: AsyncSession, engine: str, version: str) -
 
 
 def _unzip_engine(zip_path: str, dest: str, engine: str) -> None:
-    """Extract the engine binary from a release zip to ``dest`` and mark it +x."""
+    """Extract the engine binary from a release zip to ``dest`` and mark it
+    owner-executable.
+
+    Only the OWNER execute bit is set (``S_IXUSR``) — not group/other. The binary
+    lives in a private ``mkdtemp`` directory (mode 0700) on the pod's ephemeral
+    storage and is executed only by this pod's own user; granting group/other
+    execute would be needlessly permissive (flagged by the insecure-file-
+    permissions SAST rule).
+    """
     import zipfile
 
     with zipfile.ZipFile(zip_path) as zf:
@@ -395,7 +403,7 @@ def _unzip_engine(zip_path: str, dest: str, engine: str) -> None:
             raise RuntimeError(f"{engine} binary not found in release archive")
         with zf.open(member) as src, open(dest, "wb") as out:
             shutil.copyfileobj(src, out)
-    os.chmod(dest, os.stat(dest).st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    os.chmod(dest, os.stat(dest).st_mode | stat.S_IXUSR)
 
 
 def _discover_surface_blocking(
