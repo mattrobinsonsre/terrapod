@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mattrobinsonsre/terrapod/query/internal/query"
+	"github.com/mattrobinsonsre/terrapod/query/discovery/query"
 )
 
 func result(t *testing.T, dsType, valueJSON string) *query.Result {

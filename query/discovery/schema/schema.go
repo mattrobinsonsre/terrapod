@@ -124,7 +124,7 @@ func (d DataSource) Queryable() bool {
 }
 
 // Importable reports whether the deterministic import derivation
-// (query/internal/importblock) can turn this data source's result into `import`
+// (query/discovery/importblock) can turn this data source's result into `import`
 // blocks: it must expose a computed list of resource ids. This is deliberately
 // stricter than Queryable — a source can be a fine *query* target yet have no
 // usable id list. The id list is found schema-driven, with no per-resource map:

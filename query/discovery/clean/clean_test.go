@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mattrobinsonsre/terrapod/query/internal/schema"
+	"github.com/mattrobinsonsre/terrapod/query/discovery/schema"
 )
 
 // testSchema mirrors the shape of a real provider schema (an aws_vpc-like

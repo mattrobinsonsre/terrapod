@@ -26,7 +26,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/mattrobinsonsre/terrapod/query/internal/query"
+	"github.com/mattrobinsonsre/terrapod/query/discovery/query"
 )
 
 // Block is a single candidate import.
