@@ -6,13 +6,13 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/mattrobinsonsre/terrapod/query/internal/clean"
-	"github.com/mattrobinsonsre/terrapod/query/internal/schema"
+	"github.com/mattrobinsonsre/terrapod/query/discovery/clean"
+	"github.com/mattrobinsonsre/terrapod/query/discovery/schema"
 )
 
 // runClean deterministically prunes a `tofu plan -generate-config-out` document
 // so it plans import-only, using only the provider schema (no AI). See
-// internal/clean for the rules. The provider schema is loaded exactly like the
+// discovery/clean for the rules. The provider schema is loaded exactly like the
 // `schema` command: --from a captured document, or by shelling tofu in --dir.
 func runClean(ctx context.Context, args []string) error {
 	fs := flag.NewFlagSet("clean", flag.ExitOnError)

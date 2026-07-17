@@ -8,8 +8,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/mattrobinsonsre/terrapod/query/internal/query"
-	"github.com/mattrobinsonsre/terrapod/query/internal/tofu"
+	"github.com/mattrobinsonsre/terrapod/query/discovery/query"
+	"github.com/mattrobinsonsre/terrapod/query/discovery/tofu"
 )
 
 // stringSlice collects repeatable flags (--filter, --arg).

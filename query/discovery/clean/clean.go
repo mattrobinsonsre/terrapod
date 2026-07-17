@@ -36,7 +36,7 @@ import (
 	"github.com/hashicorp/hcl/v2/hclwrite"
 	"github.com/zclconf/go-cty/cty"
 
-	"github.com/mattrobinsonsre/terrapod/query/internal/schema"
+	"github.com/mattrobinsonsre/terrapod/query/discovery/schema"
 )
 
 // Report summarises what the pass changed, for logging + the UI.

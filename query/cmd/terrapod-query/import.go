@@ -8,8 +8,8 @@ import (
 	"io"
 	"os"
 
-	"github.com/mattrobinsonsre/terrapod/query/internal/importblock"
-	"github.com/mattrobinsonsre/terrapod/query/internal/query"
+	"github.com/mattrobinsonsre/terrapod/query/discovery/importblock"
+	"github.com/mattrobinsonsre/terrapod/query/discovery/query"
 )
 
 // runImport turns a query result (the JSON printed by `terrapod-query query`)

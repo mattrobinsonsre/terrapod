@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/mattrobinsonsre/terrapod/query/internal/schema"
-	"github.com/mattrobinsonsre/terrapod/query/internal/tofu"
+	"github.com/mattrobinsonsre/terrapod/query/discovery/schema"
+	"github.com/mattrobinsonsre/terrapod/query/discovery/tofu"
 )
 
 // runSchema introspects the provider schema and prints the discovery surface as
