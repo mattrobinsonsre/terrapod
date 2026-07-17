@@ -23,7 +23,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/mattrobinsonsre/terrapod/query/internal/tofu"
+	"github.com/mattrobinsonsre/terrapod/query/discovery/tofu"
 )
 
 // outputName is the fixed name of the output the discovery config exposes.

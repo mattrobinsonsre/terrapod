@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mattrobinsonsre/terrapod/query/internal/tofu"
+	"github.com/mattrobinsonsre/terrapod/query/discovery/tofu"
 )
 
 func TestRenderConfigFiltersAndArgs(t *testing.T) {
