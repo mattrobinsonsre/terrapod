@@ -2,9 +2,11 @@ package sign
 
 import (
 	"bytes"
+	"strings"
 	"testing"
 
 	"github.com/ProtonMail/go-crypto/openpgp"
+	"github.com/ProtonMail/go-crypto/openpgp/armor"
 )
 
 func testEntity(t *testing.T) *openpgp.Entity {
@@ -14,6 +16,93 @@ func testEntity(t *testing.T) *openpgp.Entity {
 		t.Fatal(err)
 	}
 	return e
+}
+
+// armorPrivate serialises an entity as an ASCII-armored private key block — the
+// form LoadPrivateKey parses (what a `--signing-key KEY.asc` file contains).
+func armorPrivate(t *testing.T, e *openpgp.Entity) string {
+	t.Helper()
+	var buf bytes.Buffer
+	w, err := armor.Encode(&buf, openpgp.PrivateKeyType, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := e.SerializePrivate(w, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return buf.String()
+}
+
+// armorPublic serialises only the public half — LoadPrivateKey must reject it.
+func armorPublic(t *testing.T, e *openpgp.Entity) string {
+	t.Helper()
+	var buf bytes.Buffer
+	w, err := armor.Encode(&buf, openpgp.PublicKeyType, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := e.Serialize(w); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return buf.String()
+}
+
+func TestLoadPrivateKeyRoundTrip(t *testing.T) {
+	e := testEntity(t)
+	loaded, err := LoadPrivateKey(armorPrivate(t, e), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loaded.PrivateKey == nil {
+		t.Fatal("loaded entity has no private key")
+	}
+	if KeyID(loaded) != KeyID(e) {
+		t.Errorf("key id mismatch: loaded %q, want %q", KeyID(loaded), KeyID(e))
+	}
+	// A key loaded from armor must be able to sign, and the signature must
+	// verify against the same entity — proves the round-trip preserved usable
+	// key material.
+	data := []byte("abc123  provider_1.0.0_linux_amd64.zip\n")
+	sig, err := DetachSign(loaded, data)
+	if err != nil {
+		t.Fatalf("sign with loaded key: %v", err)
+	}
+	if _, err := openpgp.CheckDetachedSignature(
+		openpgp.EntityList{loaded}, bytes.NewReader(data), bytes.NewReader(sig), nil); err != nil {
+		t.Fatalf("signature from loaded key did not verify: %v", err)
+	}
+}
+
+func TestLoadPrivateKeyRejectsPublicKey(t *testing.T) {
+	e := testEntity(t)
+	_, err := LoadPrivateKey(armorPublic(t, e), "")
+	if err == nil {
+		t.Fatal("expected error loading a public key as private")
+	}
+	if !strings.Contains(err.Error(), "public key") {
+		t.Errorf("error = %q, want it to mention 'public key'", err.Error())
+	}
+}
+
+// Note: the passphrase-decrypt branch of LoadPrivateKey (an encrypted signing
+// key) is not exercised here — go-crypto's SerializePrivate can't emit an
+// encrypted armored block in-memory (it re-signs the identity, which needs the
+// unlocked key), so covering it would require a committed pre-encrypted .asc
+// fixture. Tracked as a follow-up rather than an in-memory quick win.
+
+func TestLoadPrivateKeyRejectsGarbage(t *testing.T) {
+	if _, err := LoadPrivateKey("-----BEGIN PGP PRIVATE KEY BLOCK-----\nnot base64\n-----END PGP PRIVATE KEY BLOCK-----\n", ""); err == nil {
+		t.Fatal("expected error on malformed armor")
+	}
+	if _, err := LoadPrivateKey("not armored at all", ""); err == nil {
+		t.Fatal("expected error on non-armored input")
+	}
 }
 
 func TestDetachSignVerifies(t *testing.T) {
