@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -332,5 +333,47 @@ func TestClient_ContextCancellation(t *testing.T) {
 	_, err := c.Get(ctx, "/x")
 	if err == nil {
 		t.Fatal("expected ctx-cancellation error")
+	}
+}
+
+// timeoutNetErr is a net.Error whose Timeout() reports true — the shape
+// isTransientNetError treats as retryable.
+type timeoutNetErr struct{ timeout bool }
+
+func (e timeoutNetErr) Error() string   { return "simulated net error" }
+func (e timeoutNetErr) Timeout() bool   { return e.timeout }
+func (e timeoutNetErr) Temporary() bool { return e.timeout }
+
+func TestIsTransientNetError(t *testing.T) {
+	// context.DeadlineExceeded is treated as transient (lets the inner
+	// backoff retry a request-scoped timeout).
+	if !isTransientNetError(context.DeadlineExceeded) {
+		t.Error("context.DeadlineExceeded should be transient")
+	}
+	// A wrapped DeadlineExceeded is caught via errors.Is.
+	if !isTransientNetError(fmt.Errorf("dial: %w", context.DeadlineExceeded)) {
+		t.Error("wrapped DeadlineExceeded should be transient")
+	}
+	// A net.Error whose Timeout() is true → transient.
+	if !isTransientNetError(timeoutNetErr{timeout: true}) {
+		t.Error("timeout net.Error should be transient")
+	}
+	// A *net.OpError wrapping a timeout → transient (Timeout() bubbles up).
+	opErr := &net.OpError{Op: "read", Net: "tcp", Err: timeoutNetErr{timeout: true}}
+	if !isTransientNetError(opErr) {
+		t.Error("timeout *net.OpError should be transient")
+	}
+	// A net.Error that is NOT a timeout (e.g. connection refused) → not transient.
+	if isTransientNetError(timeoutNetErr{timeout: false}) {
+		t.Error("non-timeout net.Error should not be transient")
+	}
+	// A plain non-net error → not transient.
+	if isTransientNetError(errors.New("boom")) {
+		t.Error("plain error should not be transient")
+	}
+	// A refused-connection *net.OpError (Timeout()==false) → not transient.
+	refused := &net.OpError{Op: "dial", Net: "tcp", Err: timeoutNetErr{timeout: false}}
+	if isTransientNetError(refused) {
+		t.Error("connection-refused *net.OpError should not be transient")
 	}
 }

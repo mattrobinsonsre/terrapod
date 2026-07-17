@@ -64,6 +64,17 @@ func TestCreateRemoteStateConsumer(t *testing.T) {
 	}
 }
 
+func TestGetRemoteStateConsumer(t *testing.T) {
+	c := newRSCFixture(t)
+	rsc, err := c.GetRemoteStateConsumer(t.Context(), "rsc-aaa")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rsc.ID != "rsc-aaa" || rsc.ProducerWorkspaceID != "ws-prod" || rsc.ConsumerWorkspaceID != "ws-app" {
+		t.Errorf("rsc: %+v", rsc)
+	}
+}
+
 func TestListRemoteStateConsumers(t *testing.T) {
 	c := newRSCFixture(t)
 	list, err := c.ListRemoteStateConsumers(t.Context(), "ws-prod")

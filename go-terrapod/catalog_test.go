@@ -117,6 +117,28 @@ func TestProviderTemplateCRUD(t *testing.T) {
 	}
 }
 
+func TestGetProviderTemplate(t *testing.T) {
+	c := newCatalogFixture(t)
+	tmpl, err := c.GetProviderTemplate(t.Context(), "pt-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tmpl.ID != "pt-1" || tmpl.Attributes["name"] != "aws-default" {
+		t.Errorf("provider template: %+v", tmpl)
+	}
+}
+
+func TestGetCatalogItem(t *testing.T) {
+	c := newCatalogFixture(t)
+	item, err := c.GetCatalogItem(t.Context(), "ci-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if item.ID != "ci-1" || item.Attributes["name"] != "vpc" {
+		t.Errorf("catalog item: %+v", item)
+	}
+}
+
 func TestCatalogItemCRUDAndForm(t *testing.T) {
 	c := newCatalogFixture(t)
 	item, err := c.CreateCatalogItem(t.Context(), map[string]any{

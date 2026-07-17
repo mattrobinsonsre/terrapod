@@ -70,6 +70,17 @@ func TestCreateVariableSet(t *testing.T) {
 	}
 }
 
+func TestGetVariableSet(t *testing.T) {
+	c, _ := newVarsetFixture(t)
+	v, err := c.GetVariableSet(t.Context(), "varset-aaa")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v.ID != "varset-aaa" || v.Name != "shared" || !v.Global {
+		t.Errorf("varset: %+v", v)
+	}
+}
+
 func TestListVariableSets(t *testing.T) {
 	c, _ := newVarsetFixture(t)
 	list, err := c.ListVariableSets(t.Context())
