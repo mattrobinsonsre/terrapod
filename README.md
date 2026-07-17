@@ -172,6 +172,7 @@ Everything below is implemented and shipped today.
 | Feature | Description |
 |---|---|
 | Migrate in from TFE / HCP / Atlantis | [`terrapod-migrate`](docs/migration.md) — a dry-run-first, reversible CLI that moves an existing Terraform Enterprise / HCP Terraform / Atlantis platform onto Terrapod: previews, then creates VCS connections, workspaces, variables, variable sets, state (serial + lineage preserved), run triggers, notifications, agent pools, and registry signing keys; verifies parity and rolls back cleanly. Registry module/provider *versions* are reported for re-publish (a source-API + signing-key limit), and RBAC is suggested, never auto-applied |
+| Discover existing resources into IaC | [`terrapod-query`](docs/terrapod-query.md) — a **tofu-native** discovery engine that finds existing, unmanaged cloud resources and emits `import {}` blocks (schema → filtered `data`-source query → import blocks; MPL, no BUSL). It rides **data sources** rather than a provider's Terraform-1.14 `list`-resource support, so by design it doesn't require a provider to ship `list` resources — it discovers through the data sources providers already expose (where `terraform query` needs a `list` resource that provider may not have). Usable **standalone by any OpenTofu (or Terraform) user**, and baked into the API + runner images to drive the in-product onboarding flow (import is always a gated, import-only run). Optional AI polish renames/groups/comments the generated config without ever touching a value or import id |
 
 ### AI (optional, off by default)
 

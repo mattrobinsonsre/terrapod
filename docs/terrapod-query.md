@@ -32,6 +32,37 @@ Discovery is **read-only throughout**: the configuration it runs contains only a
 `data` block and an `output`, so it issues provider read/`Describe` calls and
 never creates, changes, or destroys anything.
 
+## Useful on its own — not just inside Terrapod
+
+`terrapod-query` is a **standalone tool** first and a Terrapod feature second. You
+do not need a Terrapod deployment to use it: point it at a provider and your own
+credentials and it prints `import {}` blocks you can drop into any OpenTofu (or
+Terraform) project. That makes it useful to **OpenTofu users independently**, and
+useful to **Terraform users too**.
+
+The reason it works so broadly is that discovery rides **data sources**, not a
+provider's dedicated resource-*listing* capability:
+
+- Terraform 1.14 added `terraform query` with `list {}` blocks, but that path
+  depends on each provider shipping **provider-defined list resources** — a new
+  capability providers are only beginning to adopt. Where a provider hasn't added
+  list support for a resource type, `terraform query` has no `list` resource to
+  enumerate it.
+- `terrapod-query` instead reads the provider **schema** to find data sources
+  that accept a `filter`/`tags`/name argument and return a plural/id list, then
+  runs an ordinary `data` block. Data sources are long-established and widely
+  available across mature providers, so discovery can reach resource types that
+  have a data source but no `list` resource.
+
+This is a property of the mechanism, not a benchmark: `terrapod-query` never calls
+a provider's `list` resource or `terraform query` at all — it only introspects the
+schema, runs `data` blocks, and (for config) `plan -generate-config-out`. So it
+doesn't rely on the provider's `list` functionality the way `terraform query`
+does; it uses whatever data sources a provider already ships. It complements the
+native path rather than replacing it — where a provider *does* offer first-class
+list resources, that route is great; where it doesn't, data-source discovery can
+still get you import blocks.
+
 ## How the effective id is chosen
 
 There is **no declared link** in a provider schema between a data source and the
