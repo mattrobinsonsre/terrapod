@@ -99,6 +99,9 @@ field CreateNotificationConfigurationRequest.Name string
 field CreateNotificationConfigurationRequest.Token string
 field CreateNotificationConfigurationRequest.Triggers []string
 field CreateNotificationConfigurationRequest.URL string
+field CreateOnboardingSessionRequest.Provider string
+field CreateOnboardingSessionRequest.ProviderVersion string
+field CreateOnboardingSessionRequest.WorkspaceID string
 field CreatePolicySetRequest.AllowLabels map[string]string
 field CreatePolicySetRequest.AllowNames []string
 field CreatePolicySetRequest.DenyLabels map[string]string
@@ -203,6 +206,8 @@ field CreateWorkspaceRequest.VCSRepoURL string `json:"vcs-repo-url,omitempty"`
 field CreateWorkspaceRequest.VCSWorkflow string `json:"vcs-workflow,omitempty"`
 field CreateWorkspaceRequest.VarFiles []string `json:"var-files,omitempty"`
 field CreateWorkspaceRequest.WorkingDirectory string `json:"working-directory,omitempty"`
+field DiscoverySurface.Count int `json:"count"`
+field DiscoverySurface.DataSources []OnboardingDataSource `json:"data_sources"`
 field Document.Data json.RawMessage `json:"data"`
 field Document.Included json.RawMessage `json:"included,omitempty"`
 field Document.Meta json.RawMessage `json:"meta,omitempty"`
@@ -291,6 +296,40 @@ field NotificationConfiguration.Triggers []string `json:"triggers,omitempty"`
 field NotificationConfiguration.URL string `json:"url,omitempty"`
 field NotificationConfiguration.UpdatedAt string `json:"updated-at,omitempty"`
 field NotificationConfiguration.WorkspaceID string `json:"workspace-id,omitempty"`
+field OnboardingAvailability.AIAvailable bool `json:"ai-available"`
+field OnboardingAvailability.AIModelConfigured bool `json:"ai-model-configured"`
+field OnboardingDataSource.HasFilter bool `json:"has_filter"`
+field OnboardingDataSource.HasTags bool `json:"has_tags"`
+field OnboardingDataSource.IDListAttr string `json:"id_list_attr,omitempty"`
+field OnboardingDataSource.Inputs []string `json:"inputs,omitempty"`
+field OnboardingDataSource.Name string `json:"name"`
+field OnboardingDataSource.Provider string `json:"provider"`
+field OnboardingDataSource.RequiredInputs []string `json:"required_inputs,omitempty"`
+field OnboardingDataSource.ResourceType string `json:"resource_type,omitempty"`
+field OnboardingDataSource.ReturnsList bool `json:"returns_list"`
+field OnboardingSession.AIAssisted bool `json:"ai-assisted"`
+field OnboardingSession.CreatedAt string `json:"created-at,omitempty"`
+field OnboardingSession.CreatedBy string `json:"created-by,omitempty"`
+field OnboardingSession.DataSourceCount *int64 `json:"data-source-count,omitempty"`
+field OnboardingSession.DiscoveryRunID string `json:"discovery-run-id,omitempty"`
+field OnboardingSession.DiscoverySurface *DiscoverySurface `json:"discovery-surface,omitempty"`
+field OnboardingSession.Engine string `json:"engine,omitempty"`
+field OnboardingSession.EngineVersion string `json:"engine-version,omitempty"`
+field OnboardingSession.Error string `json:"error,omitempty"`
+field OnboardingSession.GeneratedConfig string `json:"generated-config,omitempty"`
+field OnboardingSession.ID string `json:"id"`
+field OnboardingSession.ImportBlocks string `json:"import-blocks,omitempty"`
+field OnboardingSession.PairedConfig string `json:"paired-config,omitempty"`
+field OnboardingSession.PairedPolishedConfig string `json:"paired-polished-config,omitempty"`
+field OnboardingSession.PolishedConfig string `json:"polished-config,omitempty"`
+field OnboardingSession.PolishedImportBlocks string `json:"polished-import-blocks,omitempty"`
+field OnboardingSession.Provider string `json:"provider"`
+field OnboardingSession.ProviderVersion string `json:"provider-version,omitempty"`
+field OnboardingSession.ResultRunID string `json:"result-run-id,omitempty"`
+field OnboardingSession.SelectedTypes []string `json:"selected-types,omitempty"`
+field OnboardingSession.Status string `json:"status"`
+field OnboardingSession.UpdatedAt string `json:"updated-at,omitempty"`
+field OnboardingSession.WorkspaceID string `json:"workspace-id"`
 field Options.BaseURL string
 field Options.HTTPClient *http.Client
 field Options.MaxRetries int
@@ -733,6 +772,7 @@ method (*Client) CreateExecutionHook(ctx context.Context, req CreateExecutionHoo
 method (*Client) CreateGPGKey(ctx context.Context, req CreateGPGKeyRequest) (*GPGKey, error)
 method (*Client) CreateModuleWorkspaceLink(ctx context.Context, req CreateModuleWorkspaceLinkRequest) (*ModuleWorkspaceLink, error)
 method (*Client) CreateNotificationConfiguration(ctx context.Context, workspaceID string, req CreateNotificationConfigurationRequest) (*NotificationConfiguration, error)
+method (*Client) CreateOnboardingSession(ctx context.Context, req CreateOnboardingSessionRequest) (*OnboardingSession, error)
 method (*Client) CreatePolicySet(ctx context.Context, req CreatePolicySetRequest) (*PolicySet, error)
 method (*Client) CreateProviderTemplate(ctx context.Context, attrs map[string]any) (*ProviderTemplate, error)
 method (*Client) CreateRegistryModule(ctx context.Context, req CreateRegistryModuleRequest) (*RegistryModule, error)
@@ -791,6 +831,8 @@ method (*Client) GetExecutionHook(ctx context.Context, id string) (*ExecutionHoo
 method (*Client) GetGPGKey(ctx context.Context, id string) (*GPGKey, error)
 method (*Client) GetModuleWorkspaceLink(ctx context.Context, moduleName, moduleProvider, linkID string) (*ModuleWorkspaceLink, error)
 method (*Client) GetNotificationConfiguration(ctx context.Context, id string) (*NotificationConfiguration, error)
+method (*Client) GetOnboardingAvailability(ctx context.Context) (*OnboardingAvailability, error)
+method (*Client) GetOnboardingSession(ctx context.Context, sessionID string) (*OnboardingSession, error)
 method (*Client) GetPlanSummary(ctx context.Context, planID string) (*PlanSummary, error)
 method (*Client) GetPolicySet(ctx context.Context, id string) (*PolicySet, error)
 method (*Client) GetProviderTemplate(ctx context.Context, id string) (*ProviderTemplate, error)
@@ -827,6 +869,7 @@ method (*Client) ListLabelKeys(ctx context.Context) ([]LabelKey, error)
 method (*Client) ListLabelValues(ctx context.Context, key string) ([]LabelValue, error)
 method (*Client) ListModuleWorkspaceLinks(ctx context.Context, moduleName, moduleProvider string) ([]ModuleWorkspaceLink, error)
 method (*Client) ListNotificationConfigurations(ctx context.Context, workspaceID string) ([]NotificationConfiguration, error)
+method (*Client) ListOnboardingSessions(ctx context.Context, workspaceID string) ([]OnboardingSession, error)
 method (*Client) ListOutboundRunTriggers(ctx context.Context, workspaceID string) ([]RunTrigger, error)
 method (*Client) ListPlanSummaryMessages(ctx context.Context, runID string) ([]*PlanSummaryMessage, error)
 method (*Client) ListPolicySets(ctx context.Context) ([]PolicySet, error)
@@ -861,6 +904,7 @@ method (*Client) RotateAPIToken(ctx context.Context, tokenID string) (*APIToken,
 method (*Client) RotateDEK(ctx context.Context) (*EncryptionStatus, error)
 method (*Client) SearchWorkspaces(ctx context.Context, filter WorkspaceFilter) (*SearchWorkspacesResult, error)
 method (*Client) SetRolesForIdentity(ctx context.Context, providerName, email string, roles []string) error
+method (*Client) StartOnboardingDiscovery(ctx context.Context, sessionID string, selectedTypes []string) (*OnboardingSession, error)
 method (*Client) SyncPolicySet(ctx context.Context, id string) (*PolicySet, error)
 method (*Client) UnassignWorkspaceFromExecutionHook(ctx context.Context, hookID, workspaceID string) error
 method (*Client) UnassignWorkspaceFromVarset(ctx context.Context, varsetID, workspaceID string) error
@@ -915,6 +959,7 @@ type CreateExecutionHookRequest struct
 type CreateGPGKeyRequest struct
 type CreateModuleWorkspaceLinkRequest struct
 type CreateNotificationConfigurationRequest struct
+type CreateOnboardingSessionRequest struct
 type CreatePolicySetRequest struct
 type CreateRegistryModuleRequest struct
 type CreateRegistryProviderRequest struct
@@ -929,6 +974,7 @@ type CreateVariableRequest struct
 type CreateVariableSetRequest struct
 type CreateVarsetVariableRequest struct
 type CreateWorkspaceRequest struct
+type DiscoverySurface struct
 type Document struct
 type EncryptionStatus struct
 type ErrorObject struct
@@ -950,6 +996,9 @@ type ListMeta struct
 type ModuleWorkspaceLink struct
 type NotFoundError struct
 type NotificationConfiguration struct
+type OnboardingAvailability struct
+type OnboardingDataSource struct
+type OnboardingSession struct
 type Options struct
 type PlanSummary struct
 type PlanSummaryMessage struct
