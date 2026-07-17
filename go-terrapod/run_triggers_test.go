@@ -99,6 +99,17 @@ func TestListInboundRunTriggers(t *testing.T) {
 	}
 }
 
+func TestListOutboundRunTriggers(t *testing.T) {
+	c, _ := newRunTriggerFixture(t)
+	list, err := c.ListOutboundRunTriggers(t.Context(), "ws-network")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list) != 1 || list[0].ID != "rt-aaa" || list[0].WorkspaceID != "ws-app" {
+		t.Errorf("list: %+v", list)
+	}
+}
+
 func TestDeleteRunTrigger(t *testing.T) {
 	c, _ := newRunTriggerFixture(t)
 	if err := c.DeleteRunTrigger(t.Context(), "rt-aaa"); err != nil {

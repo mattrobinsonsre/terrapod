@@ -119,6 +119,53 @@ func TestGetIntAttr_HandlesNumericLiteral(t *testing.T) {
 	}
 }
 
+func TestGetFloat64Attr(t *testing.T) {
+	r := &Resource{Attributes: map[string]json.RawMessage{
+		"ratio":   json.RawMessage("0.75"),
+		"nullish": json.RawMessage("null"),
+		"wrong":   json.RawMessage(`"not-a-number"`),
+	}}
+	if got := GetFloat64Attr(r, "ratio"); got != 0.75 {
+		t.Errorf("ratio = %v", got)
+	}
+	// Absent key → 0.
+	if got := GetFloat64Attr(r, "absent"); got != 0 {
+		t.Errorf("absent = %v", got)
+	}
+	// JSON null → 0 (unmarshal into float64 fails and returns zero).
+	if got := GetFloat64Attr(r, "nullish"); got != 0 {
+		t.Errorf("null = %v", got)
+	}
+	// Wrong type → 0.
+	if got := GetFloat64Attr(r, "wrong"); got != 0 {
+		t.Errorf("wrong-type = %v", got)
+	}
+}
+
+func TestGetMapAttr(t *testing.T) {
+	r := &Resource{Attributes: map[string]json.RawMessage{
+		"labels":  json.RawMessage(`{"env":"prod","team":"sre"}`),
+		"nullish": json.RawMessage("null"),
+		"wrong":   json.RawMessage(`["not","a","map"]`),
+	}}
+	m := GetMapAttr(r, "labels")
+	if len(m) != 2 || m["env"] != "prod" || m["team"] != "sre" {
+		t.Errorf("labels = %+v", m)
+	}
+	// Absent key → nil.
+	if GetMapAttr(r, "absent") != nil {
+		t.Error("absent should be nil")
+	}
+	// JSON null → nil.
+	if GetMapAttr(r, "nullish") != nil {
+		t.Error("null should be nil")
+	}
+	// Wrong type (array, not object) → nil.
+	if GetMapAttr(r, "wrong") != nil {
+		t.Error("wrong-type should be nil")
+	}
+}
+
 func TestGetRelationshipID(t *testing.T) {
 	r := &Resource{Relationships: map[string]Relationship{
 		"workspace": {Data: json.RawMessage(`{"id":"ws-x","type":"workspaces"}`)},

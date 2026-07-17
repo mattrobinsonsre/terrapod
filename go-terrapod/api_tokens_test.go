@@ -94,6 +94,24 @@ func TestCreateAPIToken(t *testing.T) {
 	}
 }
 
+func TestGetAPIToken(t *testing.T) {
+	c := newAPITokenFixture(t)
+	tok, err := c.GetAPIToken(t.Context(), "at-svc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tok.ID != "at-svc" || tok.Kind != "service_bound" || tok.BoundTo != "dev" {
+		t.Errorf("token: %+v", tok)
+	}
+	// The raw secret is never present on a metadata read.
+	if tok.Token != "" {
+		t.Errorf("raw token should be absent on GET: %+v", tok)
+	}
+	if len(tok.PinnedRoles) != 1 || tok.PinnedRoles[0] != "deployer" {
+		t.Errorf("pinned roles: %+v", tok)
+	}
+}
+
 func TestListUserAPITokens(t *testing.T) {
 	c := newAPITokenFixture(t)
 	list, err := c.ListUserAPITokens(t.Context(), "dev")
