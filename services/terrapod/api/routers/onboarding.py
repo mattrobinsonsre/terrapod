@@ -86,9 +86,24 @@ async def _require_onboard(ws: Workspace, user: AuthenticatedUser, db: AsyncSess
         )
 
 
-def _session_json(s: OnboardingSession, surface: dict | None = None) -> dict:
-    """Serialize a session. ``surface`` (from the Redis cache) is included only on
-    the detail read — it's never stored on the row, so callers fetch it."""
+def _session_json(
+    s: OnboardingSession, surface: dict | None = None, *, detail: bool = False
+) -> dict:
+    """Serialize a session. ``surface`` (from the Redis cache) and the derived
+    ``paired-*`` views are included only on the **detail** read — the surface is
+    never stored on the row, and the paired views are a regex reflow over the full
+    config, so computing them per-row in the list handler (an ``async def``) would
+    be sync work on the event loop (Rule 13). The list omits both."""
+    paired_config = (
+        onboarding_polish.pair_config_and_imports(s.generated_config, s.import_blocks or "")
+        if detail and s.generated_config
+        else None
+    )
+    paired_polished = (
+        onboarding_polish.pair_config_and_imports(s.polished_config, s.polished_import_blocks or "")
+        if detail and s.polished_config
+        else None
+    )
     return {
         "type": "onboarding-sessions",
         "id": str(s.id),
@@ -117,18 +132,8 @@ def _session_json(s: OnboardingSession, surface: dict | None = None) -> dict:
             # directly above the resource it targets (import ids/values untouched;
             # the split fields above stay canonical). Computed at serialize time —
             # never stored. Null until config exists.
-            "paired-config": (
-                onboarding_polish.pair_config_and_imports(s.generated_config, s.import_blocks or "")
-                if s.generated_config
-                else None
-            ),
-            "paired-polished-config": (
-                onboarding_polish.pair_config_and_imports(
-                    s.polished_config, s.polished_import_blocks or ""
-                )
-                if s.polished_config
-                else None
-            ),
+            "paired-config": paired_config,
+            "paired-polished-config": paired_polished,
             "discovery-run-id": str(s.discovery_run_id) if s.discovery_run_id else None,
             "result-run-id": str(s.result_run_id) if s.result_run_id else None,
             "created-by": s.created_by,
@@ -225,7 +230,7 @@ async def get_onboarding_session(
         raise HTTPException(status_code=404, detail="Workspace not found")
     await _require_onboard(ws, user, db)
     surface = await onboarding_service.get_session_surface(session)
-    return {"data": _session_json(session, surface=surface)}
+    return {"data": _session_json(session, surface=surface, detail=True)}
 
 
 @router.post("/onboarding-sessions/{session_id}/discover")
@@ -264,4 +269,4 @@ async def start_onboarding_discovery(
     await db.commit()
 
     surface = await onboarding_service.get_session_surface(session)
-    return {"data": _session_json(session, surface=surface)}
+    return {"data": _session_json(session, surface=surface, detail=True)}

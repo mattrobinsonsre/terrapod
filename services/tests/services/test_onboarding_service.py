@@ -78,6 +78,25 @@ def test_is_valid_version_constraint(value, ok):
     assert svc.is_valid_version_constraint(value) is ok
 
 
+@pytest.mark.parametrize(
+    ("value", "ok"),
+    [
+        ("aws", True),
+        ("google", True),
+        ("azurerm", True),
+        ("aws-cc", True),  # hyphen allowed inside the name
+        ("", False),  # empty rejected
+        ("AWS", False),  # uppercase rejected (interpolated into `provider "<name>"`)
+        ("1aws", False),  # must start with a letter
+        ('aws" }\nmalicious', False),  # can't break out of the HCL string literal
+        ("aws provider", False),  # no whitespace
+        ("a" * 65, False),  # over length cap
+    ],
+)
+def test_is_valid_provider(value, ok):
+    assert svc.is_valid_provider(value) is ok
+
+
 def test_local_platform_is_linux():
     os_, arch = svc._local_platform()
     assert os_ == "linux"

@@ -127,6 +127,7 @@ import datetime as _dt  # noqa: E402
 from types import SimpleNamespace  # noqa: E402
 
 from terrapod.auth.capabilities import WORKSPACE_ONBOARD  # noqa: E402
+from terrapod.services import onboarding_service  # noqa: E402
 
 _ONB = "terrapod.api.routers.onboarding"
 
@@ -305,3 +306,77 @@ class TestOnboardingSessions:
                     headers=_AUTH,
                 )
         assert resp.status_code == 404
+
+    # --- POST /onboarding-sessions/{id}/discover (D2/D3 dispatch) ---
+    _DISCOVER = "/api/terrapod/v1/onboarding-sessions/22222222-2222-2222-2222-222222222222/discover"
+
+    async def test_discover_requires_onboard_capability(self, *mocks):
+        with (
+            patch(
+                f"{_ONB}.onboarding_service.get_session",
+                AsyncMock(return_value=_fake_session(status="schema_ready")),
+            ),
+            patch(
+                f"{_ONB}.resolve_workspace_capabilities_for", AsyncMock(return_value=frozenset())
+            ),
+        ):
+            async with await self._client() as c:
+                resp = await c.post(
+                    self._DISCOVER,
+                    json={"data": {"attributes": {"selected-types": ["aws_vpcs"]}}},
+                    headers=_AUTH,
+                )
+        assert resp.status_code == 403
+
+    async def test_discover_rejects_non_list_selected_types(self, *mocks):
+        with (
+            patch(
+                f"{_ONB}.onboarding_service.get_session",
+                AsyncMock(return_value=_fake_session(status="schema_ready")),
+            ),
+            patch(
+                f"{_ONB}.resolve_workspace_capabilities_for",
+                AsyncMock(return_value=frozenset({WORKSPACE_ONBOARD})),
+            ),
+        ):
+            async with await self._client() as c:
+                resp = await c.post(
+                    self._DISCOVER,
+                    json={"data": {"attributes": {"selected-types": "aws_vpcs"}}},
+                    headers=_AUTH,
+                )
+        assert resp.status_code == 422
+
+    async def test_discover_bad_uuid_is_404(self, *mocks):
+        async with await self._client() as c:
+            resp = await c.post(
+                "/api/terrapod/v1/onboarding-sessions/not-a-uuid/discover",
+                json={"data": {"attributes": {"selected-types": []}}},
+                headers=_AUTH,
+            )
+        assert resp.status_code == 404
+
+    async def test_discover_maps_onboarding_error_to_422(self, *mocks):
+        with (
+            patch(
+                f"{_ONB}.onboarding_service.get_session",
+                AsyncMock(return_value=_fake_session(status="pending")),
+            ),
+            patch(
+                f"{_ONB}.resolve_workspace_capabilities_for",
+                AsyncMock(return_value=frozenset({WORKSPACE_ONBOARD})),
+            ),
+            patch(
+                f"{_ONB}.onboarding_service.start_discovery",
+                AsyncMock(
+                    side_effect=onboarding_service.OnboardingError("session is not schema_ready")
+                ),
+            ),
+        ):
+            async with await self._client() as c:
+                resp = await c.post(
+                    self._DISCOVER,
+                    json={"data": {"attributes": {"selected-types": ["aws_vpcs"]}}},
+                    headers=_AUTH,
+                )
+        assert resp.status_code == 422

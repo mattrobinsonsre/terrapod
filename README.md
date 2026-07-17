@@ -166,6 +166,7 @@ Everything below is implemented and shipped today.
 | Estate topology | Whole-estate dependency graph — workspaces + modules wired by run-triggers, remote-state, and module links; group by any label / pool / name prefix; RBAC-filtered; accessible table fallback |
 | State resource graph | Per-workspace resource dependency graph from Terraform state — resources wired by `depends-on`; current state version by default with an older-version picker; group by type / module / provider / mode; accessible table fallback |
 | Workspace health | Per-workspace health conditions, VCS polling status, drift detection indicators |
+| Internationalization | Web UI translated into **24 languages** (next-intl) — European + Asian — with the locale resolved per-request (`NEXT_LOCALE` cookie → `Accept-Language` → `en`), selectable on the login screen and via a nav switcher. AI plan summaries are translated at view time; two CI gates keep every offered language 100% complete (no partial locales) and block untranslated UI strings |
 
 ### Migration & onboarding
 
