@@ -2659,6 +2659,12 @@
     "erroredFallback": "Wykrywanie nie powiodło się. Otwórz uruchomienie, aby zobaczyć logi.",
     "viewRunLogs": "Zobacz logi uruchomienia",
     "noResources": "Nie znaleziono niezarządzanych zasobów {types} na tym koncie ani w tym regionie.",
+    "aiPolishedBadge": "Uporządkowane przez AI",
+    "aiPolishedNote": "Zasoby zmieniono nazwy na podstawie tagów, pogrupowano i opatrzono komentarzami — wartości atrybutów i identyfikatory importu pozostają bez zmian.",
+    "viewPolished": "Uporządkowany",
+    "viewRaw": "Surowy",
+    "pairedTitle": "Pary import i resource",
+    "pairedNote": "Każdy blok import znajduje się bezpośrednio nad zasobem, na który wskazuje — skopiuj parę lub użyj osobnych bloków poniżej.",
     "state": {
       "pending": "Analizowanie schematu",
       "schema_ready": "Gotowe do wykrywania",

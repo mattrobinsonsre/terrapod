@@ -2307,6 +2307,19 @@ class OnboardingSession(Base):
     generated_config: Mapped[str | None] = mapped_column(Text, nullable=True)
     import_blocks: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    # Optional AI-polished view of the discovery output (#824 Phase A). The AI
+    # renames resources from their tags, groups, and comments — it NEVER alters
+    # an attribute value or an import id (enforced by a local value-preservation
+    # check, not trust). Stored SEPARATELY so the deterministic, guaranteed-
+    # import-clean `generated_config`/`import_blocks` are never lost — the UI
+    # toggles raw↔polished and apply can always fall back to raw. Both halves
+    # move together: a rename in `polished_config` is mirrored into the
+    # `to = <addr>` of `polished_import_blocks` deterministically (the AI supplies
+    # a rename map, not edits to the import ids). Null until the polish lands (or
+    # if it was rejected / AI disabled); `ai_assisted` gates whether it exists.
+    polished_config: Mapped[str | None] = mapped_column(Text, nullable=True)
+    polished_import_blocks: Mapped[str | None] = mapped_column(Text, nullable=True)
+
     # The runner discovery run that produced query_results/config (D2/D3), and
     # the resulting gated import-only run. Bare nullable UUIDs (no FK), matching
     # the Run.listener_id precedent — a deleted run must not cascade-delete the

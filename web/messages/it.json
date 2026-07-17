@@ -2659,6 +2659,12 @@
     "erroredFallback": "Rilevamento non riuscito. Apri l esecuzione per vedere i log.",
     "viewRunLogs": "Vedi i log dell esecuzione",
     "noResources": "Nessuna risorsa {types} non gestita trovata in questo account/regione.",
+    "aiPolishedBadge": "Ottimizzato con IA",
+    "aiPolishedNote": "Risorse rinominate dai tag, raggruppate e commentate — i valori degli attributi e gli ID di import restano invariati.",
+    "viewPolished": "Ottimizzato",
+    "viewRaw": "Grezzo",
+    "pairedTitle": "Coppie import + risorsa",
+    "pairedNote": "Ogni blocco import si trova direttamente sopra la risorsa a cui punta — copia una coppia oppure usa i blocchi separati qui sotto.",
     "state": {
       "pending": "Analisi schema",
       "schema_ready": "Pronto al rilevamento",

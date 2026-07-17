@@ -32,6 +32,37 @@ Discovery is **read-only throughout**: the configuration it runs contains only a
 `data` block and an `output`, so it issues provider read/`Describe` calls and
 never creates, changes, or destroys anything.
 
+## Useful on its own — not just inside Terrapod
+
+`terrapod-query` is a **standalone tool** first and a Terrapod feature second. You
+do not need a Terrapod deployment to use it: point it at a provider and your own
+credentials and it prints `import {}` blocks you can drop into any OpenTofu (or
+Terraform) project. That makes it useful to **OpenTofu users independently**, and
+useful to **Terraform users too**.
+
+The reason it works so broadly is that discovery rides **data sources**, not a
+provider's dedicated resource-*listing* capability:
+
+- Terraform 1.14 added `terraform query` with `list {}` blocks, but that path
+  depends on each provider shipping **provider-defined list resources** — a new
+  capability providers are only beginning to adopt. Where a provider hasn't added
+  list support for a resource type, `terraform query` has no `list` resource to
+  enumerate it.
+- `terrapod-query` instead reads the provider **schema** to find data sources
+  that accept a `filter`/`tags`/name argument and return a plural/id list, then
+  runs an ordinary `data` block. Data sources are long-established and widely
+  available across mature providers, so discovery can reach resource types that
+  have a data source but no `list` resource.
+
+This is a property of the mechanism, not a benchmark: `terrapod-query` never calls
+a provider's `list` resource or `terraform query` at all — it only introspects the
+schema, runs `data` blocks, and (for config) `plan -generate-config-out`. So it
+doesn't rely on the provider's `list` functionality the way `terraform query`
+does; it uses whatever data sources a provider already ships. It complements the
+native path rather than replacing it — where a provider *does* offer first-class
+list resources, that route is great; where it doesn't, data-source discovery can
+still get you import blocks.
+
 ## How the effective id is chosen
 
 There is **no declared link** in a provider schema between a data source and the
@@ -119,11 +150,35 @@ credentials, and is also **baked into the Terrapod API and runner images**:
 - **Query execution** hits the real cloud with the workspace's identity, so it
   runs in a **runner Job**, the same execution split as every plan/apply.
 
+## AI config polish (optional)
+
+Machine-generated config is correct but hard to read: every resource carries an
+opaque label derived from its cloud id (`aws_eip.eipalloc_0ccdb1`). When
+`api.config.ai_onboarding.enabled` is set (its own model + endpoint + token
+budget, independent of the plan-summary AI), Terrapod can **polish** a discovery
+session's generated config so it reads like something a human wrote — resources
+**renamed from their tags**, **grouped**, and **commented**.
+
+The polish is deliberately narrow and **safe by construction**: the model returns
+only structured naming decisions (a per-resource new-name / group / comment), and
+Terrapod applies them to the raw text deterministically. It **never changes an
+attribute value or an import id** — those are copied verbatim, and a value-
+preservation check runs before anything is stored. If the model's suggestion is
+inconsistent (an unknown resource, an invalid or colliding name), the polish is
+rejected and the raw config is kept.
+
+The result is stored **alongside** the deterministic output, never replacing it:
+the onboarding review screen shows a **Raw ↔ Polished** toggle, and the raw,
+guaranteed-import-clean config is always available as the fallback. The import is
+still a normal, gated Terrapod run either way. Disable the feature and discovery
+behaves exactly as before (raw config only).
+
 ## Status
 
 The `terrapod-query` engine (schema → query → import) is complete and shipped as
-a binary. The platform integration that drives it end-to-end — an AI onboarding
-workflow that chooses what to query, iterates, runs
-`tofu plan -generate-config-out`, cleans the generated config, and raises a
-reviewed VCS pull request behind the import-only plan gate — is tracked
-separately in [#824](https://github.com/mattrobinsonsre/terrapod/issues/824).
+a binary, and the platform integration that drives it — discovery sessions, D1
+schema introspection, runner-side query + `tofu plan -generate-config-out` +
+config cleanup, and the optional AI config polish above — is implemented. The
+remaining end-to-end step (an AI workflow that chooses what to query, iterates,
+and raises a reviewed VCS pull request behind the import-only plan gate) is
+tracked in [#824](https://github.com/mattrobinsonsre/terrapod/issues/824).

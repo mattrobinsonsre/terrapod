@@ -36,7 +36,7 @@ from terrapod.config import settings
 from terrapod.db.models import OnboardingSession, Workspace
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
-from terrapod.services import onboarding_service
+from terrapod.services import onboarding_polish, onboarding_service
 from terrapod.services.workspace_rbac_service import resolve_workspace_capabilities_for
 
 router = APIRouter(tags=["onboarding"])
@@ -107,6 +107,28 @@ def _session_json(s: OnboardingSession, surface: dict | None = None) -> dict:
             # D3 output — the reviewable payload. Present once status == config_ready.
             "generated-config": s.generated_config,
             "import-blocks": s.import_blocks,
+            # Optional AI-polished view (#824 Phase A) — resources renamed from
+            # tags, grouped, commented; import ids/values untouched. Null until
+            # the polish lands (or if rejected / AI disabled). `ai-assisted`
+            # (above) is true iff these are populated.
+            "polished-config": s.polished_config,
+            "polished-import-blocks": s.polished_import_blocks,
+            # Derived, presentation-only "paired" view: each `import {}` interleaved
+            # directly above the resource it targets (import ids/values untouched;
+            # the split fields above stay canonical). Computed at serialize time —
+            # never stored. Null until config exists.
+            "paired-config": (
+                onboarding_polish.pair_config_and_imports(s.generated_config, s.import_blocks or "")
+                if s.generated_config
+                else None
+            ),
+            "paired-polished-config": (
+                onboarding_polish.pair_config_and_imports(
+                    s.polished_config, s.polished_import_blocks or ""
+                )
+                if s.polished_config
+                else None
+            ),
             "discovery-run-id": str(s.discovery_run_id) if s.discovery_run_id else None,
             "result-run-id": str(s.result_run_id) if s.result_run_id else None,
             "created-by": s.created_by,

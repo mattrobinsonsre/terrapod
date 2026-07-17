@@ -107,6 +107,8 @@ How each capability is turned on. **Platform-level** features are Helm values un
 | Run triggers | Link source→destination workspaces | [run-triggers.md](docs/run-triggers.md) |
 | Agent execution | Create an agent pool + a join token, deploy a runner listener | [runners.md](docs/runners.md) |
 | Terragrunt (agent mode) | Per-workspace `terragrunt_enabled` + pinned version | [terragrunt.md](docs/terragrunt.md) |
+| Resource discovery / onboarding (`terrapod-query`) | Discover existing, unmanaged cloud resources and emit `import {}` blocks. **tofu-native** (schema → filtered `data`-source query → import blocks); works with any provider that ships **data sources**, so it does NOT depend on the provider's Terraform-1.14 `list`-resource support the way `terraform query` does. Ships as a **standalone cross-platform CLI usable on its own by OpenTofu (and Terraform) users**, and is baked into the API + runner images to drive the in-product onboarding flow (per-workspace `workspace:onboard` capability; import is always a gated, import-only run) | [terrapod-query.md](docs/terrapod-query.md) |
+| AI onboarding config polish | `api.config.ai_onboarding.enabled` (off by default; own model + endpoint + token budget). Renames discovered resources from their tags, groups, and comments — safe by construction (never changes an attribute value or import id; raw config always kept, Raw↔Polished toggle) | [terrapod-query.md](docs/terrapod-query.md#ai-config-polish-optional) |
 
 ## Reference & operations
 

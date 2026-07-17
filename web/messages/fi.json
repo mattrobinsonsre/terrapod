@@ -2659,6 +2659,12 @@
     "erroredFallback": "Tunnistus epäonnistui. Avaa ajo nähdäksesi lokit.",
     "viewRunLogs": "Näytä ajon lokit",
     "noResources": "Tästä tilistä tai alueelta ei löytynyt hallitsemattomia {types}-resursseja.",
+    "aiPolishedBadge": "Tekoälyn siistimä",
+    "aiPolishedNote": "Resurssit nimetty uudelleen tunnisteiden perusteella, ryhmitelty ja kommentoitu — attribuuttien arvot ja tuonti-ID:t ovat ennallaan.",
+    "viewPolished": "Siistitty",
+    "viewRaw": "Raaka",
+    "pairedTitle": "Import- ja resource-parit",
+    "pairedNote": "Jokainen import-lohko sijaitsee suoraan kohteenaan olevan resurssin yläpuolella — kopioi pari tai käytä alla olevia erillisiä lohkoja.",
     "state": {
       "pending": "Analysoidaan skeemaa",
       "schema_ready": "Valmis tunnistukseen",

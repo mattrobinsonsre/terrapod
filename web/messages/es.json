@@ -2659,6 +2659,12 @@
     "erroredFallback": "La detección falló. Abre la ejecución para ver los registros.",
     "viewRunLogs": "Ver registros de la ejecución",
     "noResources": "No se encontraron recursos {types} no gestionados en esta cuenta/región.",
+    "aiPolishedBadge": "Depurado por IA",
+    "aiPolishedNote": "Recursos renombrados a partir de etiquetas, agrupados y comentados — los valores de los atributos y los ID de importación no se modifican.",
+    "viewPolished": "Depurado",
+    "viewRaw": "Sin procesar",
+    "pairedTitle": "Pares de import y recurso",
+    "pairedNote": "Cada bloque import se sitúa justo encima del recurso al que apunta — copia un par o usa los bloques separados de abajo.",
     "state": {
       "pending": "Analizando esquema",
       "schema_ready": "Listo para detectar",

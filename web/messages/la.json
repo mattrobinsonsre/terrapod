@@ -4,9 +4,9 @@
     "estate": "Praedium",
     "registry": "Tabularium",
     "modules": "Moduli",
-    "providers": "Providers",
+    "providers": "Praebitores",
     "catalog": "Catalogus",
-    "agentPools": "Agent Pools",
+    "agentPools": "Copiae Actorum",
     "admin": "Administratio",
     "users": "Usores",
     "roles": "Partes",
@@ -51,7 +51,7 @@
       "namePlaceholder": "meum-locus-operis",
       "executionMode": "Modus Exsecutionis",
       "local": "Localis",
-      "agent": "Agent",
+      "agent": "Actor",
       "executionBackend": "Instrumentum Exsecutionis",
       "version": "Versio",
       "versionTitle": "Versio forma X.Y aut X.Y.Z (exempli gratia 1.11 aut 1.11.5)",
@@ -62,7 +62,7 @@
       "memoryRequest": "Postulatio Memoriae",
       "memoryTitle": "Quantitas memoriae Kubernetes: octeti (1000) aut cum suffixo (512Mi, 2Gi, 1Ti)",
       "memoryHint": "e.g. 2Gi, 512Mi, 1Ti",
-      "agentPool": "Agent Pool",
+      "agentPool": "Copia Actorum",
       "none": "Nullus",
       "autoApply": "Applicatio Automatica",
       "enabled": "Activatum",
@@ -113,7 +113,7 @@
     "table": {
       "name": "Nomen",
       "mode": "Modus",
-      "pool": "Pool",
+      "pool": "Copia",
       "resources": "Facultates",
       "status": "Status",
       "created": "Creatum",
@@ -180,7 +180,7 @@
         "none": "Nihil (color unus)",
         "pool": "Grex procuratorum",
         "prefix": "Praefixum nominis",
-        "label": "label: {key}"
+        "label": "titulus: {key}"
       }
     },
     "view": {
@@ -205,7 +205,7 @@
         "col": {
           "workspace": "Locus Operis",
           "group": "Grex",
-          "agentPool": "Agent pool",
+          "agentPool": "Copia actorum",
           "dependedOnBy": "Dependent ab hoc",
           "modulesUsed": "Moduli usurpati"
         },
@@ -237,9 +237,9 @@
     },
     "entity": {
       "workspaces": "Loca Operis",
-      "agentPools": "Agent pools",
+      "agentPools": "Copiae actorum",
       "modules": "Moduli",
-      "providers": "Providers"
+      "providers": "Praebitores"
     },
     "deprecated": {
       "badge": "Deprecatum et non sustentatum.",
@@ -338,7 +338,7 @@
       "revokeAll": "Omnes Revocare",
       "current": "Praesens",
       "columns": {
-        "provider": "Provider",
+        "provider": "Praebitor",
         "created": "Creatum",
         "expires": "Exspirat",
         "lastActive": "Ultimo Activa",
@@ -358,14 +358,14 @@
       "cancel": "Abrogare",
       "createModule": "Modulum Creare",
       "empty": "Nulli adhuc moduli. Unum crea ut incipias.",
-      "providerLabel": "Provider: {provider}",
+      "providerLabel": "Praebitor: {provider}",
       "versionCount": "{count, plural, one {# versio} other {# versiones}}",
       "loadFailed": "Moduli onerari non potuerunt",
       "createFailed": "Modulus creari non potuit",
       "createFailedStatus": "Modulus creari non potuit ({status})",
       "form": {
         "name": "Nomen",
-        "provider": "Provider",
+        "provider": "Praebitor",
         "slugTitle": "Litterae minusculae, numeri et lineolae solum. A littera minuscula incipiat necesse est.",
         "addressNote": "Nomen et provider inscriptionem moduli in tabulario efformant nec post creationem mutari possunt.",
         "vcsConnectionOptional": "Nexus VCS (optionalis)",
@@ -381,7 +381,7 @@
       }
     },
     "providers": {
-      "title": "Providers",
+      "title": "Praebitores",
       "description": "Tabularium privatum providers Terraform",
       "cancel": "Abrogare",
       "createProvider": "Providerem Creare",
@@ -414,7 +414,7 @@
       "loadFailed": "Modulus onerari non potuit",
       "updateFailed": "Modulus renovari non potuit",
       "labelLockoutDefault": "Haec mutatio tituli accessum tuum minueret.",
-      "providerLabel": "Provider: {provider}",
+      "providerLabel": "Praebitor: {provider}",
       "cancel": "Abrogare",
       "uploadVersion": "Versionem Subdere",
       "vcsConnected": "VCS Coniunctum",
@@ -617,7 +617,7 @@
       "assignments": "Attributiones"
     },
     "columns": {
-      "provider": "Provider",
+      "provider": "Praebitor",
       "email": "Inscriptio Electronica",
       "role": "Pars",
       "created": "Creatum",
@@ -642,7 +642,7 @@
       "denyNamesShort": "Nomina Negare"
     },
     "assignForm": {
-      "provider": "Provider",
+      "provider": "Praebitor",
       "email": "Inscriptio Electronica",
       "roles": "Partes"
     },
@@ -667,7 +667,7 @@
         "run-task": "Munera exsecutionis",
         "notification": "Nuntiationes",
         "run-trigger": "Concitatores exsecutionis",
-        "pool": "Agent pools",
+        "pool": "Copiae actorum",
         "registry": "Tabularium",
         "catalog": "Catalogus servitiorum"
       }
@@ -727,7 +727,7 @@
     "form": {
       "name": "Nomen",
       "namePattern": "Litterae, numeri, lineolae et lineolae subiectae solum. A littera vel numero incipiat necesse est.",
-      "provider": "Provider",
+      "provider": "Praebitor",
       "providerImmutable": "Provider immutabilis est — dele et recrea ut mutes",
       "serverUrl": "URL Servitoris (optionalis)",
       "serverUrlHint": "URL genere HTTP aut HTTPS esse debet (e.g. https://github.mycompany.com)",
@@ -753,7 +753,7 @@
     },
     "table": {
       "name": "Nomen",
-      "provider": "Provider",
+      "provider": "Praebitor",
       "serverUrl": "URL Servitoris",
       "status": "Status",
       "created": "Creatum",
@@ -907,7 +907,7 @@
       "templateDefaults": "Praedefinita exemplaris loci operis",
       "executionMode": "Modus exsecutionis",
       "executionModeHint": "Autoinventio VCS-acta est; sola exsecutio agent sustinetur.",
-      "agentPool": "Agent pool",
+      "agentPool": "Copia actorum",
       "none": "(nullus)",
       "executionBackend": "Instrumentum exsecutionis",
       "terraformVersion": "Versio Terraform",
@@ -1000,7 +1000,7 @@
       "namePrefix": "Praefixum nominis",
       "executionBackend": "Instrumentum exsecutionis",
       "ownerEmail": "Inscriptio domini",
-      "agentPool": "Agent pool",
+      "agentPool": "Copia actorum",
       "vcsConnection": "Nexus VCS",
       "labels": "Tituli",
       "search": "Quaerere",
@@ -1022,7 +1022,7 @@
       "executionBackend": "Instrumentum exsecutionis",
       "executionMode": "Modus exsecutionis",
       "autoApply": "Applicatio automatica",
-      "agentPool": "Agent pool",
+      "agentPool": "Copia actorum",
       "cpuRequest": "Postulatio CPU",
       "memoryRequest": "Postulatio memoriae",
       "setLabels": "Titulos ponere (chartam titulorum in omni loco operis conveniente substituit)",
@@ -1267,7 +1267,7 @@
     }
   },
   "adminAgentPools": {
-    "title": "Agent Pools",
+    "title": "Copiae Actorum",
     "description": "Administra agent pools runner et eorum listeners",
     "empty": "Nulli agent pools configurati.",
     "actions": {
@@ -1306,12 +1306,12 @@
     },
     "detail": {
       "back": "Retro ad agent pools",
-      "defaultDescription": "Agent pool"
+      "defaultDescription": "Copia actorum"
     },
     "tabs": {
       "settings": "Optiones",
       "tokens": "Tesserae",
-      "listeners": "Listeners"
+      "listeners": "Auscultatores"
     },
     "settings": {
       "title": "Optiones Pool",
@@ -1463,7 +1463,7 @@
       "os": "OS",
       "arch": "Arch",
       "cachedAt": "In Promptuario Positum",
-      "provider": "Provider",
+      "provider": "Praebitor",
       "hostname": "Nomen Hospitis",
       "actions": "Actiones"
     },
@@ -1473,7 +1473,7 @@
       "prePopulate": "Praeimplere…",
       "help": "Praetrahe binaria et suggestus providers in promptuarium (unum per lineam). Signa <code>os/arch</code> in fine optionalia sunt — omitte ut suggestibus praedefinitis configuratis utaris.",
       "binariesLabel": "Binaria",
-      "providersLabel": "Providers",
+      "providersLabel": "Praebitores",
       "warm": "Calefacere",
       "warming": "Calefit…",
       "confirm": "Inscriptiones promptuarii selectas nunc calefacere?",
@@ -1545,7 +1545,7 @@
       "workspaceName": "Nomen loci operis",
       "workspaceNameTitle": "Litterae, numeri, lineolae et lineolae subiectae solum. A littera vel numero incipiat necesse est.",
       "workspaceNamePlaceholder": "mea-instantia",
-      "agentPool": "Agent pool",
+      "agentPool": "Copia actorum",
       "selectPool": "Pool elige…",
       "noPoolsAvailable": "Nulli agent pools tibi praesto sunt. Accessu scribendi ad agent pool eges ut provideas — administratorem roga ut eum concedat.",
       "noPoolsAllowed": "Nullus ex agent pools quos accedere potes ab hac re catalogi permittitur. Administratorem roga ut pools permissos rei amplificet aut tibi accessum ad unum eorum concedat.",
@@ -1562,7 +1562,7 @@
       "empty": "Nullae adhuc instantiae ex hac re provisae.",
       "colName": "Nomen",
       "colVersion": "Versio",
-      "colPool": "Pool",
+      "colPool": "Copia",
       "colActions": "Actiones",
       "reconfigure": "Reconfigurare",
       "destroy": "Destruere",
@@ -2029,7 +2029,7 @@
       "nameTitle": "Litterae, numeri, lineolae, lineolae subiectae. A littera vel numero incipiat necesse est.",
       "executionMode": "Modus Exsecutionis",
       "execModeLocal": "Localis",
-      "execModeAgent": "Agent",
+      "execModeAgent": "Actor",
       "autoApply": "Applicatio Automatica",
       "cpuRequest": "Postulatio CPU",
       "cpuRequestTitle": "Quantitas CPU Kubernetes: integra corda (1, 2) aut millicorda (500m, 100m)",
@@ -2045,7 +2045,7 @@
       "terragruntVersionTitle": "Versio Terragrunt forma X.Y aut X.Y.Z (exempli gratia 1.0)",
       "workingDirectory": "Directorium Operandi",
       "workingDirectoryPlaceholder": "e.g. environments/dev",
-      "agentPool": "Agent Pool",
+      "agentPool": "Copia Actorum",
       "owner": "Dominus",
       "vcsConnection": "Nexus VCS",
       "vcsRepository": "Repositorium VCS",
@@ -2214,7 +2214,7 @@
       "run": "Exsecutio",
       "size": "Magnitudo",
       "created": "Creatum",
-      "runner": "runner",
+      "runner": "cursor",
       "latest": "novissima"
     },
     "configurations": {
@@ -2633,40 +2633,46 @@
     "redocTitle": "Documentatio API ReDoc"
   },
   "onboarding": {
-    "title": "Onboard existing resources",
-    "backTo": "Back to {workspace}",
-    "description": "Discover existing, unmanaged cloud resources in {workspace} and generate reviewable resource + import blocks.",
-    "providerLabel": "Provider",
-    "providerVersionLabel": "Provider version (optional)",
-    "start": "Start discovery",
-    "starting": "Starting…",
-    "sessionsLabel": "Discovery sessions",
-    "empty": "No discovery sessions yet. Pick a provider and start one above.",
-    "analysing": "Analysing the provider schema… this can take a minute the first time (downloading the provider).",
-    "surfaceIntro": "Select which of the {count} queryable data sources to discover.",
-    "filterPlaceholder": "Filter data sources…",
-    "noMatches": "No data sources match your filter.",
-    "discover": "Discover {count} type(s)",
-    "discovering": "Dispatching…",
-    "queryingHint": "Discovering resources — the runner is querying your cloud and generating config.",
-    "viewRun": "View run",
-    "reviewIntro": "Generated from: {types}. Review below, then move the config into your workspace and apply the import.",
-    "importBlocks": "import blocks",
-    "generatedConfig": "Generated configuration",
-    "copy": "Copy",
-    "copied": "Copied",
-    "nextStepNote": "Next: move this config into your workspace repo and run it — a correct onboarding plans import-only (0 to add / 0 to change / 0 to destroy).",
-    "erroredFallback": "Discovery run failed. Open the run to see the logs.",
-    "viewRunLogs": "View run logs",
-    "noResources": "No unmanaged {types} resources were found in this account/region.",
+    "title": "Res exsistentes admittere",
+    "backTo": "Ad {workspace} redire",
+    "description": "Res nubis exsistentes et non administratas in {workspace} inveni atque partes resource + import recensendas genera.",
+    "providerLabel": "Praebitor",
+    "providerVersionLabel": "Versio praebitoris (ad libitum)",
+    "start": "Inventionem incipere",
+    "starting": "Incipiens…",
+    "sessionsLabel": "Sessiones inventionis",
+    "empty": "Nullae adhuc sessiones inventionis. Praebitorem elige et unam supra incipe.",
+    "analysing": "Forma praebitoris examinatur… hoc prima vice minutam capere potest (praebitore descendente).",
+    "surfaceIntro": "Elige quos ex {count} fontibus datorum interrogabilibus invenire velis.",
+    "filterPlaceholder": "Fontes datorum percola…",
+    "noMatches": "Nulli fontes datorum percolationi tuae congruunt.",
+    "discover": "{count} genera invenire",
+    "discovering": "Mittens…",
+    "queryingHint": "Res inveniuntur — cursor nubem tuam interrogat et configurationem generat.",
+    "viewRun": "Cursum videre",
+    "reviewIntro": "Generatum ex: {types}. Infra recense, deinde configurationem in locum operis tuum move et importationem applica.",
+    "importBlocks": "partes import",
+    "generatedConfig": "Configuratio generata",
+    "copy": "Exscribere",
+    "copied": "Exscriptum",
+    "nextStepNote": "Deinde: hanc configurationem in tabularium loci operis tui move et exsequere — recta admissio importationem solam destinat (0 to add / 0 to change / 0 to destroy).",
+    "erroredFallback": "Cursus inventionis defecit. Cursum aperi ut acta videas.",
+    "viewRunLogs": "Acta cursus videre",
+    "noResources": "Nullae res {types} non administratae in hoc computo/regione inventae sunt.",
+    "aiPolishedBadge": "Ab IA expolitum",
+    "aiPolishedNote": "Res ex notis renominatae, congregatae, et annotatae — valores attributorum et ID importationis immutati manent.",
+    "viewPolished": "Expolitum",
+    "viewRaw": "Rude",
+    "pairedTitle": "Paria import + resource",
+    "pairedNote": "Quaeque pars import directe supra rem quam petit sita est — par exscribe, aut partibus separatis infra utere.",
     "state": {
-      "pending": "Analysing schema",
-      "schema_ready": "Ready to discover",
-      "querying": "Discovering",
-      "config_ready": "Config ready",
-      "run_created": "Import run created",
-      "errored": "Errored",
-      "canceled": "Canceled"
+      "pending": "Forma examinatur",
+      "schema_ready": "Ad inveniendum parata",
+      "querying": "Inveniens",
+      "config_ready": "Configuratio parata",
+      "run_created": "Cursus importationis creatus",
+      "errored": "Erratum",
+      "canceled": "Abrogatum"
     }
   }
 }

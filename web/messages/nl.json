@@ -2659,6 +2659,12 @@
     "erroredFallback": "Ontdekking mislukt. Open de uitvoering om de logs te zien.",
     "viewRunLogs": "Uitvoeringslogs bekijken",
     "noResources": "Geen onbeheerde {types}-resources gevonden in dit account/deze regio.",
+    "aiPolishedBadge": "AI-opgeschoond",
+    "aiPolishedNote": "Resources hernoemd op basis van tags, gegroepeerd en voorzien van commentaar — attribuutwaarden en import-ID's blijven ongewijzigd.",
+    "viewPolished": "Opgeschoond",
+    "viewRaw": "Ruw",
+    "pairedTitle": "Import- en resource-paren",
+    "pairedNote": "Elk import-blok staat direct boven de resource waarop het is gericht — kopieer een paar, of gebruik de aparte blokken hieronder.",
     "state": {
       "pending": "Schema analyseren",
       "schema_ready": "Klaar om te ontdekken",

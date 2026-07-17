@@ -2659,6 +2659,12 @@
     "erroredFallback": "发现运行失败。打开该运行以查看日志。",
     "viewRunLogs": "查看运行日志",
     "noResources": "在此账户/区域中未找到未纳管的 {types} 资源。",
+    "aiPolishedBadge": "AI 已优化",
+    "aiPolishedNote": "资源已根据标签重命名、分组并添加注释 — 属性值和导入 ID 保持不变。",
+    "viewPolished": "已优化",
+    "viewRaw": "原始",
+    "pairedTitle": "import 与 resource 配对",
+    "pairedNote": "每个 import 块都紧邻其目标 resource 上方 — 可复制配对，或使用下方的独立块。",
     "state": {
       "pending": "正在分析架构",
       "schema_ready": "可以发现",

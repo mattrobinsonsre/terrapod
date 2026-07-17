@@ -2659,6 +2659,12 @@
     "erroredFallback": "A descoberta falhou. Abra a execução para ver os logs.",
     "viewRunLogs": "Ver logs da execução",
     "noResources": "Nenhum recurso {types} não gerenciado foi encontrado nesta conta/região.",
+    "aiPolishedBadge": "Refinado por IA",
+    "aiPolishedNote": "Recursos renomeados a partir de tags, agrupados e comentados — os valores dos atributos e os IDs de import permanecem inalterados.",
+    "viewPolished": "Refinado",
+    "viewRaw": "Bruto",
+    "pairedTitle": "Pares de import e resource",
+    "pairedNote": "Cada bloco import fica logo acima do resource que ele referencia — copie um par ou use os blocos separados abaixo.",
     "state": {
       "pending": "Analisando esquema",
       "schema_ready": "Pronto para descobrir",

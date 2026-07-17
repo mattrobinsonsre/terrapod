@@ -2659,6 +2659,12 @@
     "erroredFallback": "검색에 실패했습니다. 실행을 열어 로그를 확인하세요.",
     "viewRunLogs": "실행 로그 보기",
     "noResources": "이 계정/리전에서 관리되지 않는 {types} 리소스를 찾을 수 없습니다.",
+    "aiPolishedBadge": "AI 정리됨",
+    "aiPolishedNote": "리소스는 태그를 기반으로 이름이 변경되고 그룹화 및 주석 처리되었습니다 — 속성 값과 import ID는 변경되지 않았습니다.",
+    "viewPolished": "정리됨",
+    "viewRaw": "원본",
+    "pairedTitle": "import + resource 쌍",
+    "pairedNote": "각 import 블록은 대상 resource 바로 위에 배치됩니다 — 쌍을 복사하거나 아래의 개별 블록을 사용하세요.",
     "state": {
       "pending": "스키마 분석 중",
       "schema_ready": "검색 준비 완료",

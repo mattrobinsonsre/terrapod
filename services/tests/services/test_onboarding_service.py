@@ -262,3 +262,43 @@ async def test_complete_discovery_ignores_already_resolved_session():
     await svc.complete_discovery(db, uuid.uuid4(), success=False, error="late")
     # An already-terminal session is not clobbered by a late reconciler pass.
     assert session.status == "config_ready"
+
+
+# --- AI polish enqueue on config_ready (#824 Phase A) ----------------------
+@pytest.mark.asyncio
+async def test_complete_discovery_enqueues_polish_when_ai_enabled(monkeypatch):
+    session = OnboardingSession(workspace_id=uuid.uuid4(), provider="aws", status="querying")
+    session.generated_config = 'resource "aws_vpc" "x" {}'
+    db = _db_returning(session)
+    monkeypatch.setattr(svc.settings.ai_onboarding, "enabled", True)
+    enqueue = AsyncMock()
+    with patch("terrapod.services.scheduler.enqueue_trigger", enqueue):
+        await svc.complete_discovery(db, uuid.uuid4(), success=True)
+    assert enqueue.await_count == 1
+    assert enqueue.await_args.args[0] == "onboarding_polish"
+    assert enqueue.await_args.args[1] == {"session_id": str(session.id)}
+
+
+@pytest.mark.asyncio
+async def test_complete_discovery_no_polish_when_ai_disabled(monkeypatch):
+    session = OnboardingSession(workspace_id=uuid.uuid4(), provider="aws", status="querying")
+    session.generated_config = 'resource "aws_vpc" "x" {}'
+    db = _db_returning(session)
+    monkeypatch.setattr(svc.settings.ai_onboarding, "enabled", False)
+    enqueue = AsyncMock()
+    with patch("terrapod.services.scheduler.enqueue_trigger", enqueue):
+        await svc.complete_discovery(db, uuid.uuid4(), success=True)
+    enqueue.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_complete_discovery_no_polish_when_nothing_found(monkeypatch):
+    # AI on, but discovery found no resources → no config to polish → no enqueue.
+    session = OnboardingSession(workspace_id=uuid.uuid4(), provider="aws", status="querying")
+    session.generated_config = None
+    db = _db_returning(session)
+    monkeypatch.setattr(svc.settings.ai_onboarding, "enabled", True)
+    enqueue = AsyncMock()
+    with patch("terrapod.services.scheduler.enqueue_trigger", enqueue):
+        await svc.complete_discovery(db, uuid.uuid4(), success=True)
+    enqueue.assert_not_awaited()

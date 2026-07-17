@@ -155,6 +155,8 @@ def _fake_session(status="pending", provider="aws"):
         query_results=None,
         generated_config=None,
         import_blocks=None,
+        polished_config=None,
+        polished_import_blocks=None,
         ai_assisted=False,
         error="",
         discovery_run_id=None,

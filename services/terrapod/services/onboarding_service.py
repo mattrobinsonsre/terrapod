@@ -292,6 +292,25 @@ async def complete_discovery(
     await db.flush()
     logger.info("onboarding_discovery_completed", session_id=str(session.id), status=session.status)
 
+    # AI config polish (#824 Phase A) — optional, best-effort. When discovery
+    # produced config and the feature is on, enqueue the polish. The handler keys
+    # on the (already-committed) generated_config, so enqueuing here — before the
+    # reconciler commits the status flip — is race-free. A failed enqueue leaves
+    # the raw config intact; it is never a discovery failure.
+    if success and session.generated_config and settings.ai_onboarding.enabled:
+        try:
+            from terrapod.services.scheduler import enqueue_trigger
+
+            await enqueue_trigger(
+                "onboarding_polish",
+                {"session_id": str(session.id)},
+                dedup_key=f"onb_polish:{session.id}",
+            )
+        except Exception as exc:  # noqa: BLE001 — polish is best-effort
+            logger.warning(
+                "onboarding_polish_enqueue_failed", session_id=str(session.id), error=str(exc)
+            )
+
 
 # ---------------------------------------------------------------------------
 # D1 discovery orchestration

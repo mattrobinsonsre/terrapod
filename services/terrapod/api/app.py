@@ -207,6 +207,18 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         description="Run credential-less onboarding D1 schema discovery for a session",
     )
 
+    # AI onboarding config polish (#824 Phase A) — rename discovered resources
+    # from their tags, group, and comment. Always registered; the handler
+    # self-gates on settings.ai_onboarding.enabled and only fires once a session
+    # reaches config_ready with generated config.
+    from terrapod.services.onboarding_ai_service import handle_onboarding_polish
+
+    register_trigger_handler(
+        "onboarding_polish",
+        handler=handle_onboarding_polish,
+        description="AI-polish an onboarding session's generated config (naming/grouping/comments)",
+    )
+
     # Slack app run notifications (#556) — approval / applied / errored / drift.
     # Registered only when the Slack app is enabled; the handler also no-ops
     # unless the target workspace opted in with its own channel.

@@ -2659,6 +2659,12 @@
     "erroredFallback": "検出に失敗しました。実行を開いてログを確認してください。",
     "viewRunLogs": "実行ログを表示",
     "noResources": "このアカウント/リージョンに未管理の {types} リソースは見つかりませんでした。",
+    "aiPolishedBadge": "AI整形済み",
+    "aiPolishedNote": "リソースはタグに基づいて名前変更・グループ化・コメント付けされています — 属性値とインポートIDは変更されていません。",
+    "viewPolished": "整形済み",
+    "viewRaw": "未加工",
+    "pairedTitle": "import と resource のペア",
+    "pairedNote": "各 import ブロックは対象の resource の直上に配置されます — ペアをコピーするか、下の個別のブロックを使用してください。",
     "state": {
       "pending": "スキーマ分析中",
       "schema_ready": "検出の準備完了",

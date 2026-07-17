@@ -2659,6 +2659,12 @@
     "erroredFallback": "Oppdagelse mislyktes. Åpne kjøringen for å se loggene.",
     "viewRunLogs": "Vis kjøringslogger",
     "noResources": "Ingen ustyrte {types}-ressurser ble funnet i denne kontoen/regionen.",
+    "aiPolishedBadge": "AI-pusset",
+    "aiPolishedNote": "Ressurser gitt nytt navn ut fra tagger, gruppert og kommentert — attributtverdier og import-ID-er er uendret.",
+    "viewPolished": "Pusset",
+    "viewRaw": "Rå",
+    "pairedTitle": "Import- og resource-par",
+    "pairedNote": "Hver import-blokk plasseres rett over resursen den er rettet mot — kopier et par, eller bruk de separate blokkene nedenfor.",
     "state": {
       "pending": "Analyserer skjema",
       "schema_ready": "Klar til oppdagelse",

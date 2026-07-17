@@ -2659,6 +2659,12 @@
     "erroredFallback": "Upptäckten misslyckades. Öppna körningen för att se loggarna.",
     "viewRunLogs": "Visa körningsloggar",
     "noResources": "Inga ohanterade {types}-resurser hittades i detta konto/denna region.",
+    "aiPolishedBadge": "AI-putsad",
+    "aiPolishedNote": "Resurser omdöpta utifrån taggar, grupperade och kommenterade — attributvärden och import-ID:n är oförändrade.",
+    "viewPolished": "Putsad",
+    "viewRaw": "Rå",
+    "pairedTitle": "Import- och resurspar",
+    "pairedNote": "Varje import-block placeras direkt ovanför den resurs det riktar sig mot — kopiera ett par, eller använd de separata blocken nedan.",
     "state": {
       "pending": "Analyserar schema",
       "schema_ready": "Redo att upptäcka",
