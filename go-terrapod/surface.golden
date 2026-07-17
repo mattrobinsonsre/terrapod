@@ -138,6 +138,19 @@ field CreateRoleRequest.Name string
 field CreateRoleRequest.PoolPermission string
 field CreateRoleRequest.RegistryPermission string
 field CreateRoleRequest.WorkspacePermission string
+field CreateRunRequest.AllowEmptyApply bool
+field CreateRunRequest.AutoApply *bool
+field CreateRunRequest.ConfigurationVersionID string
+field CreateRunRequest.IsDestroy bool
+field CreateRunRequest.Message string
+field CreateRunRequest.PlanOnly bool
+field CreateRunRequest.Refresh *bool
+field CreateRunRequest.RefreshOnly bool
+field CreateRunRequest.ReplaceAddrs []string
+field CreateRunRequest.TargetAddrs []string
+field CreateRunRequest.TerraformVersion string
+field CreateRunRequest.VCSRef string
+field CreateRunRequest.WorkspaceID string
 field CreateRunTaskRequest.Enabled *bool
 field CreateRunTaskRequest.EnforcementLevel string
 field CreateRunTaskRequest.HMACKey string
@@ -442,6 +455,54 @@ field RoleAssignment.CreatedAt string `json:"created-at,omitempty"`
 field RoleAssignment.Email string `json:"email"`
 field RoleAssignment.ProviderName string `json:"provider-name"`
 field RoleAssignment.RoleName string `json:"role-name"`
+field Run.Actions RunActions `json:"actions"`
+field Run.AllowEmptyApply bool `json:"allow-empty-apply"`
+field Run.AutoApply bool `json:"auto-apply"`
+field Run.CreatedAt string `json:"created-at,omitempty"`
+field Run.CreatedBy string `json:"created-by,omitempty"`
+field Run.DiscardReason string `json:"discard-reason,omitempty"`
+field Run.ErrorMessage string `json:"error-message,omitempty"`
+field Run.ExecutionBackend string `json:"execution-backend,omitempty"`
+field Run.HasChanges *bool `json:"has-changes,omitempty"`
+field Run.HasJSONOutput bool `json:"has-json-output"`
+field Run.ID string `json:"id"`
+field Run.IsDestroy bool `json:"is-destroy"`
+field Run.IsDriftDetection bool `json:"is-drift-detection"`
+field Run.Message string `json:"message,omitempty"`
+field Run.PeakCPUUsec *int64 `json:"peak-cpu-usec,omitempty"`
+field Run.PeakMemoryBytes *int64 `json:"peak-memory-bytes,omitempty"`
+field Run.PlanOnly bool `json:"plan-only"`
+field Run.Refresh bool `json:"refresh"`
+field Run.RefreshOnly bool `json:"refresh-only"`
+field Run.ReplaceAddrs []string `json:"replace-addrs,omitempty"`
+field Run.ResourceCPU string `json:"resource-cpu,omitempty"`
+field Run.ResourceMemory string `json:"resource-memory,omitempty"`
+field Run.RunnerExitCode *int64 `json:"runner-exit-code,omitempty"`
+field Run.RunnerExitReason string `json:"runner-exit-reason,omitempty"`
+field Run.RunnerExitStatus string `json:"runner-exit-status,omitempty"`
+field Run.Source string `json:"source,omitempty"`
+field Run.StateDiverged bool `json:"state-diverged"`
+field Run.Status string `json:"status"`
+field Run.StatusTimestamps RunStatusTimestamps `json:"status-timestamps"`
+field Run.TargetAddrs []string `json:"target-addrs,omitempty"`
+field Run.TerraformVersion string `json:"terraform-version,omitempty"`
+field Run.TerragruntEnabled bool `json:"terragrunt-enabled"`
+field Run.TerragruntVersion string `json:"terragrunt-version,omitempty"`
+field Run.UpdatedAt string `json:"updated-at,omitempty"`
+field Run.VCSBranch string `json:"vcs-branch,omitempty"`
+field Run.VCSCommitSHA string `json:"vcs-commit-sha,omitempty"`
+field Run.VCSPullRequestNumber *int64 `json:"vcs-pull-request-number,omitempty"`
+field Run.WorkspaceID string `json:"workspace-id,omitempty"`
+field Run.WorkspaceName string `json:"workspace-name,omitempty"`
+field RunActions.IsCancelable bool `json:"is-cancelable"`
+field RunActions.IsConfirmable bool `json:"is-confirmable"`
+field RunActions.IsDiscardable bool `json:"is-discardable"`
+field RunActions.IsRetryable bool `json:"is-retryable"`
+field RunStatusTimestamps.AppliedAt string `json:"applied-at,omitempty"`
+field RunStatusTimestamps.ApplyingAt string `json:"applying-at,omitempty"`
+field RunStatusTimestamps.PlanQueuedAt string `json:"plan-queued-at,omitempty"`
+field RunStatusTimestamps.PlannedAt string `json:"planned-at,omitempty"`
+field RunStatusTimestamps.PlanningAt string `json:"planning-at,omitempty"`
 field RunTask.CreatedAt string `json:"created-at,omitempty"`
 field RunTask.Enabled bool `json:"enabled"`
 field RunTask.EnforcementLevel string `json:"enforcement-level"`
@@ -758,9 +819,11 @@ method (*AuthenticationError) Error() string
 method (*AuthorizationError) Error() string
 method (*Client) AddPolicy(ctx context.Context, policySetID string, req AddPolicyRequest) (*Policy, error)
 method (*Client) AddRoleToIdentity(ctx context.Context, providerName, email, roleName string) error
+method (*Client) ApplyRun(ctx context.Context, runID string) (*Run, error)
 method (*Client) AssignWorkspaceToExecutionHook(ctx context.Context, hookID, workspaceID string) error
 method (*Client) AssignWorkspaceToVarset(ctx context.Context, varsetID, workspaceID string) error
 method (*Client) BulkUpdateWorkspaces( ctx context.Context, filter WorkspaceFilter, update map[string]any, dryRun bool, ) (*BulkUpdateResult, error)
+method (*Client) CancelRun(ctx context.Context, runID string) (*Run, error)
 method (*Client) ConfirmCatalogInstanceRun(ctx context.Context, wsID string) (*CatalogRunRef, error)
 method (*Client) CreateAPIToken(ctx context.Context, userID string, req CreateAPITokenRequest) (*APIToken, error)
 method (*Client) CreateAgentPool(ctx context.Context, req CreateAgentPoolRequest) (*AgentPool, error)
@@ -779,6 +842,7 @@ method (*Client) CreateRegistryModule(ctx context.Context, req CreateRegistryMod
 method (*Client) CreateRegistryProvider(ctx context.Context, req CreateRegistryProviderRequest) (*RegistryProvider, error)
 method (*Client) CreateRemoteStateConsumer(ctx context.Context, req CreateRemoteStateConsumerRequest) (*RemoteStateConsumer, error)
 method (*Client) CreateRole(ctx context.Context, req CreateRoleRequest) (*Role, error)
+method (*Client) CreateRun(ctx context.Context, req CreateRunRequest) (*Run, error)
 method (*Client) CreateRunTask(ctx context.Context, workspaceID string, req CreateRunTaskRequest) (*RunTask, error)
 method (*Client) CreateRunTrigger(ctx context.Context, req CreateRunTriggerRequest) (*RunTrigger, error)
 method (*Client) CreateStateVersion(ctx context.Context, workspaceID string, req CreateStateVersionRequest) (*StateVersion, error)
@@ -816,6 +880,7 @@ method (*Client) DeleteWithBody(ctx context.Context, path string, payload []byte
 method (*Client) DeleteWorkspace(ctx context.Context, id string) error
 method (*Client) DestroyCatalogInstance(ctx context.Context, wsID string, attrs map[string]any) (*CatalogRunRef, error)
 method (*Client) DiscardCatalogInstanceRun(ctx context.Context, wsID string) (*CatalogRunRef, error)
+method (*Client) DiscardRun(ctx context.Context, runID string) (*Run, error)
 method (*Client) Get(ctx context.Context, path string) ([]byte, error)
 method (*Client) GetAPIToken(ctx context.Context, tokenID string) (*APIToken, error)
 method (*Client) GetAgentPool(ctx context.Context, id string) (*AgentPool, error)
@@ -841,7 +906,9 @@ method (*Client) GetRegistryProvider(ctx context.Context, name string) (*Registr
 method (*Client) GetRemoteStateConsumer(ctx context.Context, id string) (*RemoteStateConsumer, error)
 method (*Client) GetRole(ctx context.Context, name string) (*Role, error)
 method (*Client) GetRoleAssignment(ctx context.Context, providerName, email, roleName string) (*RoleAssignment, error)
+method (*Client) GetRun(ctx context.Context, runID string) (*Run, error)
 method (*Client) GetRunImpactGraph(ctx context.Context, runID string) (*ImpactGraph, error)
+method (*Client) GetRunPlanJSON(ctx context.Context, runID string) ([]byte, error)
 method (*Client) GetRunTask(ctx context.Context, id string) (*RunTask, error)
 method (*Client) GetRunTrigger(ctx context.Context, id string) (*RunTrigger, error)
 method (*Client) GetStateGraph(ctx context.Context, workspaceID, stateVersionID string) (*StateGraph, error)
@@ -885,6 +952,7 @@ method (*Client) ListVCSConnections(ctx context.Context) ([]VCSConnection, error
 method (*Client) ListVariableSets(ctx context.Context) ([]VariableSet, error)
 method (*Client) ListVariables(ctx context.Context, workspaceID string) ([]Variable, error)
 method (*Client) ListVarsetVariables(ctx context.Context, varsetID string) ([]VariableSetVariable, error)
+method (*Client) ListWorkspaceRuns(ctx context.Context, workspaceID string, pageNumber, pageSize int) ([]Run, error)
 method (*Client) ListWorkspaces(ctx context.Context, opts WorkspaceListOptions) (*WorkspaceList, error)
 method (*Client) OrphanCatalogInstance(ctx context.Context, wsID string) error
 method (*Client) Patch(ctx context.Context, path string, payload []byte) ([]byte, error)
@@ -965,6 +1033,7 @@ type CreateRegistryModuleRequest struct
 type CreateRegistryProviderRequest struct
 type CreateRemoteStateConsumerRequest struct
 type CreateRoleRequest struct
+type CreateRunRequest struct
 type CreateRunTaskRequest struct
 type CreateRunTriggerRequest struct
 type CreateStateVersionRequest struct
@@ -1014,6 +1083,9 @@ type RemoteStateConsumer struct
 type Resource struct
 type Role struct
 type RoleAssignment struct
+type Run struct
+type RunActions struct
+type RunStatusTimestamps struct
 type RunTask struct
 type RunTrigger struct
 type SearchWorkspacesResult struct

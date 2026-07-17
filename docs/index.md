@@ -54,6 +54,7 @@ Beyond broad TFE compatibility, Terrapod is built with three deliberate design f
 | **Cross-Workspace Remote State** | `terraform_remote_state` composition with a producer-controlled consumer allowlist (secure by default; secret-bearing state stays with its owner) |
 | **Internationalization** | Web UI translated into 24 languages (next-intl); AI plan summaries translated at view time; completeness-gated so a partial language is never shipped. See [i18n](internationalization.md) |
 | **Migrate in (TFE / HCP / Atlantis)** | [`terrapod-migrate`](migration.md) — a dry-run-first, reversible CLI that moves an existing Terraform Enterprise / HCP Terraform / Atlantis platform onto Terrapod: previews, creates the core (VCS connections, workspaces, variables, variable sets, state with serial + lineage preserved, run triggers, notifications, agent pools, registry signing keys), verifies parity, and rolls back cleanly. Registry versions are reported for re-publish; RBAC is suggested, never auto-applied |
+| **Terraform / OpenTofu provider** | [`terraform-provider-terrapod`](terraform-provider.md) — manage Terrapod itself as code: 25 `terrapod_*` resources + 7 data sources (workspaces, variables, roles, VCS connections, agent pools, run tasks/triggers, notifications, registry, catalog, execution hooks, …). Served per-instance from `<host>/default/terrapod`, GPG-signed |
 
 ---
 
@@ -119,6 +120,7 @@ See [Architecture](architecture.md) for the full breakdown.
 | [Getting Started](getting-started.md) | Deploy the Helm chart on Kubernetes (or k3s), first workspace, first plan/apply |
 | [Migration](migration.md) | Move a TFE / HCP Terraform or Atlantis platform onto Terrapod with `terrapod-migrate` — dry-run-first, reversible, with an explicit "what transfers vs. what's a checklist" breakdown |
 | [terrapod-query](terrapod-query.md) | Tofu-native discovery engine for onboarding existing, unmanaged cloud resources into IaC — introspect provider schema, run filtered data-source queries, emit `import {}` blocks (MPL, no BUSL). Standalone CLI + baked into the api/runner images |
+| [Terraform provider](terraform-provider.md) | `terraform-provider-terrapod` — manage Terrapod itself as code (workspaces, variables, roles, VCS connections, agent pools, run tasks, catalog, execution hooks, …) via 25 `terrapod_*` resources + 7 data sources; served per-instance and GPG-signed |
 | [Local Development](local-development.md) | Run Terrapod from source with Tilt (contributors only) |
 | [Architecture](architecture.md) | System components, storage, runners, auth flows |
 | [Authentication](authentication.md) | Local auth, OIDC, SAML, terraform login, API tokens, scoped service tokens (bound/detached) + offboarding idle guard |
