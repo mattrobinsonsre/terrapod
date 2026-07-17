@@ -81,6 +81,13 @@ standard-imghdr = "^3.13"
 # requires_python = <3.14. The 3.13 floor stays until litellm
 # restores 3.14 compatibility.
 litellm = ">=1.87,<2.0"
+# Required at RUNTIME by litellm's completion() path: litellm 1.9x lazily imports
+# litellm.responses.mcp -> litellm.proxy.common_utils.http_parsing_utils, which
+# does an unconditional `import orjson`. orjson is one of litellm's own optional
+# deps (we install it without the proxy extra), so without declaring it here
+# every real acompletion() call — AI plan summaries AND AI onboarding polish —
+# fails with ModuleNotFoundError. Caught by the #824 live Bedrock smoke.
+orjson = "^3.10"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^9.0.2"

@@ -2659,6 +2659,12 @@
     "erroredFallback": "Keşif başarısız oldu. Günlükleri görmek için çalıştırmayı açın.",
     "viewRunLogs": "Çalıştırma günlüklerini görüntüle",
     "noResources": "Bu hesap veya bölgede yönetilmeyen {types} kaynağı bulunamadı.",
+    "aiPolishedBadge": "AI ile düzenlendi",
+    "aiPolishedNote": "Kaynaklar etiketlere göre yeniden adlandırıldı, gruplandı ve yorumlandı — öznitelik değerleri ve import kimlikleri değişmedi.",
+    "viewPolished": "Düzenlenmiş",
+    "viewRaw": "Ham",
+    "pairedTitle": "import + resource çiftleri",
+    "pairedNote": "Her import bloğu, hedeflediği resource'un hemen üstünde yer alır — bir çifti kopyalayın veya aşağıdaki ayrı blokları kullanın.",
     "state": {
       "pending": "Şema analiz ediliyor",
       "schema_ready": "Keşfe hazır",

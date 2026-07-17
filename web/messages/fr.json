@@ -2659,6 +2659,12 @@
     "erroredFallback": "La détection a échoué. Ouvrez l exécution pour voir les journaux.",
     "viewRunLogs": "Voir les journaux de l exécution",
     "noResources": "Aucune ressource {types} non gérée trouvée dans ce compte/cette région.",
+    "aiPolishedBadge": "Optimisé par IA",
+    "aiPolishedNote": "Ressources renommées à partir des tags, regroupées et commentées — les valeurs des attributs et les ID d'import restent inchangés.",
+    "viewPolished": "Optimisé",
+    "viewRaw": "Brut",
+    "pairedTitle": "Paires import + ressource",
+    "pairedNote": "Chaque bloc import se place directement au-dessus de la ressource qu'il cible — copiez une paire, ou utilisez les blocs séparés ci-dessous.",
     "state": {
       "pending": "Analyse du schéma",
       "schema_ready": "Prêt à détecter",

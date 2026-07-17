@@ -2659,6 +2659,12 @@
     "erroredFallback": "探索執行失敗。開啟該執行以檢視記錄。",
     "viewRunLogs": "檢視執行記錄",
     "noResources": "在此帳戶/區域中找不到未納管的 {types} 資源。",
+    "aiPolishedBadge": "AI 已整理",
+    "aiPolishedNote": "資源已依標籤重新命名、分組並加上註解 — 屬性值與匯入 ID 維持不變。",
+    "viewPolished": "已整理",
+    "viewRaw": "原始",
+    "pairedTitle": "import 與 resource 配對",
+    "pairedNote": "每個 import 區塊都緊鄰其目標 resource 上方 — 可複製配對，或使用下方的獨立區塊。",
     "state": {
       "pending": "正在分析結構描述",
       "schema_ready": "可以探索",

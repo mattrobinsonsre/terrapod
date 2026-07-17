@@ -2659,6 +2659,12 @@
     "erroredFallback": "Registrering mislykkedes. Åbn kørslen for at se loggene.",
     "viewRunLogs": "Vis kørselslogfiler",
     "noResources": "Ingen ustyrede {types}-ressourcer blev fundet i denne konto/region.",
+    "aiPolishedBadge": "AI-pudset",
+    "aiPolishedNote": "Ressourcer omdøbt ud fra tags, grupperet og kommenteret — attributværdier og import-ID'er er uændrede.",
+    "viewPolished": "Pudset",
+    "viewRaw": "Rå",
+    "pairedTitle": "Import- og resource-par",
+    "pairedNote": "Hver import-blok placeres direkte over den resource, den er rettet mod — kopiér et par, eller brug de separate blokke nedenfor.",
     "state": {
       "pending": "Analyserer skema",
       "schema_ready": "Klar til registrering",

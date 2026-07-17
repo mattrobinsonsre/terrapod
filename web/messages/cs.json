@@ -2659,6 +2659,12 @@
     "erroredFallback": "Objevování selhalo. Otevřete běh a zobrazte protokoly.",
     "viewRunLogs": "Zobrazit protokoly běhu",
     "noResources": "V tomto účtu ani regionu nebyly nalezeny žádné nespravované prostředky {types}.",
+    "aiPolishedBadge": "Upraveno pomocí AI",
+    "aiPolishedNote": "Zdroje přejmenovány podle tagů, seskupeny a opatřeny komentáři — hodnoty atributů a ID importu zůstávají beze změny.",
+    "viewPolished": "Upravený",
+    "viewRaw": "Nezpracovaný",
+    "pairedTitle": "Páry import a resource",
+    "pairedNote": "Každý blok import je umístěn přímo nad zdrojem, na který cílí — zkopírujte pár nebo použijte samostatné bloky níže.",
     "state": {
       "pending": "Analýza schématu",
       "schema_ready": "Připraveno k objevování",

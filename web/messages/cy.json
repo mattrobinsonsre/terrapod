@@ -2659,6 +2659,12 @@
     "erroredFallback": "Discovery run failed. Open the run to see the logs.",
     "viewRunLogs": "View run logs",
     "noResources": "No unmanaged {types} resources were found in this account/region.",
+    "aiPolishedBadge": "Loywyd gan AI",
+    "aiPolishedNote": "Adnoddau wedi'u hailenwi o dagiau, eu grwpio a'u hanodi — mae gwerthoedd priodoleddau a IDau mewnforio yn ddigyfnewid.",
+    "viewPolished": "Wedi'i loywi",
+    "viewRaw": "Amrwd",
+    "pairedTitle": "Parau import + adnodd",
+    "pairedNote": "Mae pob bloc import yn eistedd yn union uwchben yr adnodd y mae'n ei dargedu — copïwch bâr, neu defnyddiwch y blociau ar wahân isod.",
     "state": {
       "pending": "Analysing schema",
       "schema_ready": "Ready to discover",

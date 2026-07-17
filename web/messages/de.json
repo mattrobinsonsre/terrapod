@@ -2659,6 +2659,12 @@
     "erroredFallback": "Erkennungslauf fehlgeschlagen. Öffnen Sie den Lauf, um die Protokolle zu sehen.",
     "viewRunLogs": "Lauf-Protokolle ansehen",
     "noResources": "Keine nicht verwalteten {types}-Ressourcen in diesem Konto/dieser Region gefunden.",
+    "aiPolishedBadge": "KI-aufbereitet",
+    "aiPolishedNote": "Ressourcen aus Tags umbenannt, gruppiert und kommentiert — Attributwerte und Import-IDs bleiben unverändert.",
+    "viewPolished": "Aufbereitet",
+    "viewRaw": "Roh",
+    "pairedTitle": "Import-und-Ressource-Paare",
+    "pairedNote": "Jeder Import-Block steht direkt über der Ressource, auf die er abzielt — kopieren Sie ein Paar oder verwenden Sie die separaten Blöcke unten.",
     "state": {
       "pending": "Schema-Analyse",
       "schema_ready": "Bereit zur Erkennung",

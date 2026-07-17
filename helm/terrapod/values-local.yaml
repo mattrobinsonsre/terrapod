@@ -137,6 +137,18 @@ api:
           infrastructure. Bias toward low/medium risk ratings unless
           the plan actually destroys data stores or IAM trust roots.
 
+    # AI onboarding config polish (#824 Phase A) — independent of ai_summary but
+    # reuses the same pod Bedrock creds (terrapod-ai-summary-aws-creds env, picked
+    # up by boto3's default chain). Model set explicitly here — ai_onboarding has
+    # no chart-default model. Enabled locally for the live F-gate smoke.
+    ai_onboarding:
+      enabled: true
+      model: bedrock/us.anthropic.claude-sonnet-4-6
+      request_timeout_seconds: 120
+      daily_token_budget: 0  # no cap in local dev
+      auth:
+        aws_region: us-east-1
+
   serviceAccount:
     create: true
 

@@ -2659,6 +2659,12 @@
     "erroredFallback": "Discovery run failed. Open the run to see the logs.",
     "viewRunLogs": "View run logs",
     "noResources": "No unmanaged {types} resources were found in this account/region.",
+    "aiPolishedBadge": "AI expolitum",
+    "aiPolishedNote": "Facultates ex titulis renominatae, congregatae et annotatae — valores attributorum et importationis identitates immutata manent.",
+    "viewPolished": "Expolitum",
+    "viewRaw": "Crudum",
+    "pairedTitle": "Paria import et resource",
+    "pairedNote": "Quisque cuneus import statim supra resource quem petit collocatur — par describe, vel cuneis separatis infra utere.",
     "state": {
       "pending": "Analysing schema",
       "schema_ready": "Ready to discover",

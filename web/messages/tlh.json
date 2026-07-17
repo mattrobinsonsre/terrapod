@@ -2659,6 +2659,12 @@
     "erroredFallback": "Discovery run failed. Open the run to see the logs.",
     "viewRunLogs": "View run logs",
     "noResources": "No unmanaged {types} resources were found in this account/region.",
+    "aiPolishedBadge": "AI polished",
+    "aiPolishedNote": "Resources renamed from tags, grouped, and commented — attribute values and import IDs are unchanged.",
+    "viewPolished": "Polished",
+    "viewRaw": "Raw",
+    "pairedTitle": "Import + resource pairs",
+    "pairedNote": "Each import block sits directly above the resource it targets — copy a pair, or use the separate blocks below.",
     "state": {
       "pending": "Analysing schema",
       "schema_ready": "Ready to discover",

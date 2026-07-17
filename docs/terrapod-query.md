@@ -119,11 +119,35 @@ credentials, and is also **baked into the Terrapod API and runner images**:
 - **Query execution** hits the real cloud with the workspace's identity, so it
   runs in a **runner Job**, the same execution split as every plan/apply.
 
+## AI config polish (optional)
+
+Machine-generated config is correct but hard to read: every resource carries an
+opaque label derived from its cloud id (`aws_eip.eipalloc_0ccdb1`). When
+`api.config.ai_onboarding.enabled` is set (its own model + endpoint + token
+budget, independent of the plan-summary AI), Terrapod can **polish** a discovery
+session's generated config so it reads like something a human wrote — resources
+**renamed from their tags**, **grouped**, and **commented**.
+
+The polish is deliberately narrow and **safe by construction**: the model returns
+only structured naming decisions (a per-resource new-name / group / comment), and
+Terrapod applies them to the raw text deterministically. It **never changes an
+attribute value or an import id** — those are copied verbatim, and a value-
+preservation check runs before anything is stored. If the model's suggestion is
+inconsistent (an unknown resource, an invalid or colliding name), the polish is
+rejected and the raw config is kept.
+
+The result is stored **alongside** the deterministic output, never replacing it:
+the onboarding review screen shows a **Raw ↔ Polished** toggle, and the raw,
+guaranteed-import-clean config is always available as the fallback. The import is
+still a normal, gated Terrapod run either way. Disable the feature and discovery
+behaves exactly as before (raw config only).
+
 ## Status
 
 The `terrapod-query` engine (schema → query → import) is complete and shipped as
-a binary. The platform integration that drives it end-to-end — an AI onboarding
-workflow that chooses what to query, iterates, runs
-`tofu plan -generate-config-out`, cleans the generated config, and raises a
-reviewed VCS pull request behind the import-only plan gate — is tracked
-separately in [#824](https://github.com/mattrobinsonsre/terrapod/issues/824).
+a binary, and the platform integration that drives it — discovery sessions, D1
+schema introspection, runner-side query + `tofu plan -generate-config-out` +
+config cleanup, and the optional AI config polish above — is implemented. The
+remaining end-to-end step (an AI workflow that chooses what to query, iterates,
+and raises a reviewed VCS pull request behind the import-only plan gate) is
+tracked in [#824](https://github.com/mattrobinsonsre/terrapod/issues/824).

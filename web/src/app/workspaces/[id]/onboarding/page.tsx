@@ -39,6 +39,11 @@ interface SessionAttrs {
   'discovery-surface': { count?: number; data_sources?: DataSource[] } | null
   'generated-config': string | null
   'import-blocks': string | null
+  'polished-config': string | null
+  'polished-import-blocks': string | null
+  'paired-config': string | null
+  'paired-polished-config': string | null
+  'ai-assisted': boolean
   'discovery-run-id': string | null
   'created-at': string
 }
@@ -69,6 +74,10 @@ export default function OnboardingPage() {
   const [filter, setFilter] = useState('')
   const [discovering, setDiscovering] = useState(false)
   const [copied, setCopied] = useState('')
+  // Raw↔polished view toggle for the reviewable config. Defaults to the polished
+  // view when the AI polish is available (falls back to raw automatically when
+  // it isn't). Never loses the raw view — the operator can flip back any time.
+  const [showRaw, setShowRaw] = useState(false)
 
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -76,6 +85,13 @@ export default function OnboardingPage() {
     () => sessions.find((s) => s.id === activeId) ?? null,
     [sessions, activeId],
   )
+
+  // The AI polish exists only when it landed (ai-assisted) AND produced config.
+  // `usePolished` is what the toggle + code blocks read; raw is always the
+  // fallback, so a missing/rejected polish silently shows the deterministic view.
+  const hasPolished =
+    !!active?.attributes['ai-assisted'] && !!active?.attributes['polished-config']
+  const usePolished = hasPolished && !showRaw
 
   const loadWorkspace = useCallback(async () => {
     try {
@@ -432,9 +448,68 @@ export default function OnboardingPage() {
                 <p className="text-sm text-slate-300">
                   {t('reviewIntro', { types: active.attributes['selected-types'].join(', ') })}
                 </p>
+                {hasPolished && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-brand-900/50 px-2.5 py-1 text-xs font-medium text-brand-300">
+                      ✨ {t('aiPolishedBadge')}
+                    </span>
+                    <span className="text-xs text-slate-500">{t('aiPolishedNote')}</span>
+                    <div className="ml-auto inline-flex overflow-hidden rounded-lg border border-slate-700">
+                      <button
+                        type="button"
+                        onClick={() => setShowRaw(false)}
+                        className={`px-3 py-1.5 text-xs font-medium ${
+                          usePolished
+                            ? 'bg-brand-600 text-white'
+                            : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                        }`}
+                      >
+                        {t('viewPolished')}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowRaw(true)}
+                        className={`px-3 py-1.5 text-xs font-medium ${
+                          !usePolished
+                            ? 'bg-slate-600 text-white'
+                            : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                        }`}
+                      >
+                        {t('viewRaw')}
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {/* Paired view first: each import{} directly above its resource — the
+                    easiest thing to review and paste. The separate import / config
+                    blocks below carry the same content, split. */}
+                {(usePolished
+                  ? active.attributes['paired-polished-config']
+                  : active.attributes['paired-config']) && (
+                  <div className="space-y-1">
+                    <CodeBlock
+                      title={t('pairedTitle')}
+                      text={
+                        (usePolished
+                          ? active.attributes['paired-polished-config']
+                          : active.attributes['paired-config']) || ''
+                      }
+                      copyKey="paired"
+                      copied={copied}
+                      onCopy={copy}
+                      copyLabel={t('copy')}
+                      copiedLabel={t('copied')}
+                    />
+                    <p className="text-xs text-slate-500">{t('pairedNote')}</p>
+                  </div>
+                )}
                 <CodeBlock
                   title={t('importBlocks')}
-                  text={active.attributes['import-blocks'] || ''}
+                  text={
+                    (usePolished
+                      ? active.attributes['polished-import-blocks']
+                      : active.attributes['import-blocks']) || ''
+                  }
                   copyKey="imports"
                   copied={copied}
                   onCopy={copy}
@@ -443,7 +518,11 @@ export default function OnboardingPage() {
                 />
                 <CodeBlock
                   title={t('generatedConfig')}
-                  text={active.attributes['generated-config'] || ''}
+                  text={
+                    (usePolished
+                      ? active.attributes['polished-config']
+                      : active.attributes['generated-config']) || ''
+                  }
                   copyKey="config"
                   copied={copied}
                   onCopy={copy}
