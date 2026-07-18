@@ -173,8 +173,12 @@
       "additionalProperties": false,
       "properties": {
         "page_size": {
-          "description": "max workspaces to return (default 50)",
+          "description": "max workspaces to return in this page (default 50)",
           "type": "integer"
+        },
+        "search": {
+          "description": "filter workspaces by name substring",
+          "type": "string"
         }
       },
       "type": "object"

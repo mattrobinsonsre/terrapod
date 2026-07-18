@@ -16,7 +16,8 @@ import (
 func registerObserve(s *mcp.Server, c *terrapod.Client) {
 	// ── terrapod_workspace_list ──────────────────────────────────────
 	type workspaceListIn struct {
-		PageSize int `json:"page_size,omitempty" jsonschema:"max workspaces to return (default 50)"`
+		PageSize int `json:"page_size,omitempty" jsonschema:"max workspaces to return in this page (default 50)"`
+		Search   string `json:"search,omitempty" jsonschema:"filter workspaces by name substring"`
 	}
 	type workspaceSummary struct {
 		ID            string            `json:"id"`
@@ -27,23 +28,36 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 		Labels        map[string]string `json:"labels,omitempty"`
 	}
 	type workspaceListOut struct {
-		Count      int                `json:"count"`
+		// Returned is how many workspaces this response contains; Total is the
+		// full count on the instance (post-filter). Returned < Total means the
+		// result is a truncated page — narrow with `search` or raise page_size.
+		Returned   int                `json:"returned"`
+		Total      int                `json:"total"`
+		Truncated  bool               `json:"truncated"`
 		Workspaces []workspaceSummary `json:"workspaces"`
 	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "terrapod_workspace_list",
-		Description: "List workspaces on this Terrapod instance with their status, execution mode, lock state, drift status, and labels. Use this to orient before acting.",
+		Description: "List workspaces on this Terrapod instance with their status, execution mode, lock state, drift status, and labels. Use this to orient before acting. Returns up to page_size workspaces; `total` reports the full count so you know if the result was truncated (narrow with `search`).",
 		Annotations: readOnly,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in workspaceListIn) (*mcp.CallToolResult, workspaceListOut, error) {
 		size := in.PageSize
 		if size <= 0 {
 			size = 50
 		}
-		list, err := c.ListWorkspaces(ctx, terrapod.WorkspaceListOptions{PageSize: size})
+		list, err := c.ListWorkspaces(ctx, terrapod.WorkspaceListOptions{PageSize: size, Search: in.Search})
 		if err != nil {
 			return errResult(err), workspaceListOut{}, nil
 		}
-		out := workspaceListOut{Count: len(list.Items)}
+		// Total comes from the server's meta.pagination (see #862); it is the
+		// authoritative count, not the length of this page. max() guards a
+		// server that predates pagination and returns no meta (TotalCount 0).
+		total := max(list.TotalCount, len(list.Items))
+		out := workspaceListOut{
+			Returned:  len(list.Items),
+			Total:     total,
+			Truncated: len(list.Items) < total,
+		}
 		for i := range list.Items {
 			w := &list.Items[i]
 			out.Workspaces = append(out.Workspaces, workspaceSummary{
