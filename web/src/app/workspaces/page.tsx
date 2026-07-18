@@ -15,7 +15,7 @@ import { SortableHeader } from '@/components/sortable-header'
 import { WorkspaceStatusBadges } from '@/components/workspace-status-badges'
 import { StatChip } from '@/components/stat-chip'
 import { getAuthState } from '@/lib/auth'
-import { apiFetch } from '@/lib/api'
+import { apiFetch, fetchAllPages } from '@/lib/api'
 import { useSortable } from '@/lib/use-sortable'
 import { useWorkspaceListEvents } from '@/lib/use-workspace-list-events'
 import {
@@ -460,10 +460,10 @@ function WorkspacesPageInner() {
 
   async function loadWorkspaces() {
     try {
-      const res = await apiFetch('/api/v2/organizations/default/workspaces')
-      if (!res.ok) throw new Error(t('loadFailed'))
-      const data = await res.json()
-      setWorkspaces(data.data || [])
+      // Fetch the whole list (paging through internally) and filter/sort
+      // client-side — the workspace list is deliberately not page-through UI.
+      const items = await fetchAllPages<Workspace>('/api/v2/organizations/default/workspaces')
+      setWorkspaces(items)
     } catch (err) {
       setError(err instanceof Error ? err.message : t('loadFailed'))
     } finally {

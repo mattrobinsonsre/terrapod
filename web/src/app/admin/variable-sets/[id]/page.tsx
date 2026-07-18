@@ -12,7 +12,7 @@ import { EmptyState } from '@/components/empty-state'
 import { SensitiveValueInput } from '@/components/sensitive-value-input'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { useConfirm } from '@/lib/use-confirm'
-import { apiFetch } from '@/lib/api'
+import { apiFetch, fetchAllPages } from '@/lib/api'
 import { usePollingInterval } from '@/lib/use-polling-interval'
 
 interface VarsetAttrs {
@@ -162,10 +162,8 @@ export default function VariableSetDetailPage() {
 
   async function loadAllWorkspaces() {
     try {
-      const res = await apiFetch('/api/v2/organizations/default/workspaces')
-      if (!res.ok) return
-      const data = await res.json()
-      setAllWorkspaces(data.data || [])
+      // Page through the whole list so every workspace is assignable.
+      setAllWorkspaces(await fetchAllPages<WorkspaceRef>('/api/v2/organizations/default/workspaces'))
     } catch {
       // Non-critical
     }

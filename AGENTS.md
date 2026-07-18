@@ -374,6 +374,44 @@ multi-language implementation ships in the same PR**:
   `UPDATE_API_CONTRACT=1 pytest tests/api/test_route_contract.py` — a conscious,
   reviewed act so new surface never slips in silently. (More of the "no breaking
   changes" program lands under #550.)
+- **List endpoints — optional pagination (convention)** — every list/collection
+  endpoint supports **optional** paging and always returns a `meta.pagination`
+  block. Use the shared helper `services/terrapod/api/pagination.py::paginate(
+  items, request)`, which reads the params off the raw `Request` and slices the
+  already-materialised list. Rules:
+  - **`page[size]` >= 1** (with optional `page[number]`, 1-indexed) → return
+    that page, size capped at `MAX_PAGE_SIZE` (100).
+  - **`page[size]=0` OR no paging params** → return the **full list** as a single
+    page. Both are the "non-paged" signal. This preserves the pre-pagination
+    behaviour, so no caller that omits paging changes — which is what makes
+    adding pagination **additive / MINOR-safe** rather than breaking.
+  - **Always emit `meta.pagination`** with Terrapod's four keys —
+    `current-page`, `page-size`, `total-count`, `total-pages`. This is
+    **Terrapod's own shape, used uniformly on both `/api/v2` and
+    `/api/terrapod/v1`** — do not model non-TFE endpoints on TFE's key set
+    (no `prev-page`/`next-page`). On `/api/v2` the shape still matches what a
+    `go-tfe` client parses; that compatibility is incidental, not a constraint
+    the native surface bends to.
+  - **RBAC-filtered lists slice AFTER the permission filter** — pass the visible
+    list to `paginate()` so pages are full and `total-count` is the visible
+    count, never the pre-filter row count.
+  - **Contract-safe:** because params are read off `Request` (no `Query()`
+    declarations) and `meta` is a top-level sibling of `data`, the route,
+    attribute, wire, config, and migration snapshots are all untouched — this
+    change needs **no snapshot regen**. Adding declared `Query(alias="page[size]")`
+    params instead would change the route signature and require a conscious route
+    snapshot regen, so prefer the `Request`-based helper.
+  - **The one exception is unbounded-history collections** (workspace **runs**):
+    they keep a sensible bounded default page (20) instead of "absent → all",
+    since returning the entire run history on every request is a perf hazard.
+    They still honour `page[size]` and emit `meta.pagination` so a client can
+    page the full history.
+  - **Clients page + loop to fetch a whole collection** rather than relying on
+    the "absent → all" default — it's more robust across version/skew. go-terrapod
+    exposes single-page `List*` (returns `meta` on the typed list result) plus
+    `ListAll*` loop helpers; the web UI, which deliberately shows whole lists and
+    filters client-side (**no page-through UX**), fetches via `fetchAllPages()`
+    in `web/src/lib/api.ts`.
 - **The config-channel contract (hard requirement)** — a three-way contract
   binding the **config code**, the **Helm chart**, and the **chart tests**:
   the in-code config models (the API's Pydantic `Settings`, the listener's

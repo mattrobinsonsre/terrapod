@@ -1084,3 +1084,137 @@ class TestVcsWorkflowAttributes:
         assert resp.status_code == 200, resp.text
         assert ws.auto_merge is True
         assert ws.auto_merge_strategy == "squash"
+
+
+# ── List Workspaces: pagination wiring ──────────────────────────────────
+
+
+def _list_db(workspaces):
+    """A mock DB whose two execute() calls return workspaces then no runs."""
+    ws_result = MagicMock()
+    ws_result.scalars.return_value.all.return_value = workspaces
+    runs_result = MagicMock()
+    runs_result.scalars.return_value.all.return_value = []
+    db = AsyncMock()
+    db.execute.side_effect = [ws_result, runs_result]
+    return db
+
+
+class TestListWorkspacesPagination:
+    """The #862 bug fix: /api/v2 workspace list honours page[size] and always
+    emits meta.pagination, while absent params / page[size]=0 return the full
+    list (so the whole-list-fetch web UI and go-tfe bulk clients are unchanged).
+    """
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_capabilities_for")
+    async def test_absent_params_returns_full_list_with_meta(self, mock_resolve, *mocks):
+        mock_resolve.return_value = caps_for_level("read")
+        wss = [_mock_workspace(name=f"ws-{i}") for i in range(3)]
+        app, _ = _make_app(_user(), mock_db=_list_db(wss))
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get("/api/v2/organizations/default/workspaces", headers=_AUTH)
+
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert len(body["data"]) == 3  # full list, no truncation
+        assert body["meta"]["pagination"] == {
+            "current-page": 1,
+            "page-size": 3,
+            "total-count": 3,
+            "total-pages": 1,
+        }
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_capabilities_for")
+    async def test_page_size_zero_returns_full_list(self, mock_resolve, *mocks):
+        mock_resolve.return_value = caps_for_level("read")
+        wss = [_mock_workspace(name=f"ws-{i}") for i in range(3)]
+        app, _ = _make_app(_user(), mock_db=_list_db(wss))
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get(
+                "/api/v2/organizations/default/workspaces?page[size]=0", headers=_AUTH
+            )
+
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert len(body["data"]) == 3
+        assert body["meta"]["pagination"]["total-pages"] == 1
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_capabilities_for")
+    async def test_first_page_honours_page_size(self, mock_resolve, *mocks):
+        mock_resolve.return_value = caps_for_level("read")
+        wss = [_mock_workspace(name=f"ws-{i}") for i in range(5)]
+        app, _ = _make_app(_user(), mock_db=_list_db(wss))
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get(
+                "/api/v2/organizations/default/workspaces?page[size]=2", headers=_AUTH
+            )
+
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert len(body["data"]) == 2  # only the first page
+        assert body["meta"]["pagination"] == {
+            "current-page": 1,
+            "page-size": 2,
+            "total-count": 5,
+            "total-pages": 3,
+        }
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_capabilities_for")
+    async def test_second_page(self, mock_resolve, *mocks):
+        mock_resolve.return_value = caps_for_level("read")
+        wss = [_mock_workspace(name=f"ws-{i}") for i in range(5)]
+        app, _ = _make_app(_user(), mock_db=_list_db(wss))
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get(
+                "/api/v2/organizations/default/workspaces?page[size]=2&page[number]=3",
+                headers=_AUTH,
+            )
+
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert len(body["data"]) == 1  # last, partial page (5 items, size 2)
+        assert body["meta"]["pagination"]["current-page"] == 3
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_capabilities_for")
+    async def test_page_slices_after_rbac_filter(self, mock_resolve, *mocks):
+        # Two of four workspaces are invisible (no caps). total-count must be 2
+        # (the visible set), and a page[size]=1 returns exactly one visible ws —
+        # proving the slice happens AFTER the permission filter, not before.
+        wss = [_mock_workspace(name=f"ws-{i}") for i in range(4)]
+        visible_names = {wss[0].name, wss[2].name}
+
+        async def _caps(_db, _user, ws):
+            return caps_for_level("read") if ws.name in visible_names else set()
+
+        mock_resolve.side_effect = _caps
+        app, _ = _make_app(_user(), mock_db=_list_db(wss))
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get(
+                "/api/v2/organizations/default/workspaces?page[size]=1", headers=_AUTH
+            )
+
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert len(body["data"]) == 1
+        assert body["meta"]["pagination"]["total-count"] == 2  # visible only
+        assert body["meta"]["pagination"]["total-pages"] == 2
