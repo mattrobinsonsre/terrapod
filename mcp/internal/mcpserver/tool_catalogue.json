@@ -1,0 +1,187 @@
+[
+  {
+    "name": "terrapod_run_apply",
+    "destructive": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "run_id": {
+          "description": "the run id (run-...) to act on",
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_run_cancel",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "run_id": {
+          "description": "the run id (run-...) to act on",
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_run_create",
+    "destructive": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "auto_apply": {
+          "description": "auto-apply on success (default: the workspace setting)",
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "is_destroy": {
+          "description": "plan a destroy (tear-down) run",
+          "type": "boolean"
+        },
+        "message": {
+          "description": "an optional human message describing why",
+          "type": "string"
+        },
+        "plan_only": {
+          "description": "plan only, no apply (default true — the safe choice)",
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "refresh": {
+          "description": "refresh state before planning (default true)",
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "workspace_id": {
+          "description": "the workspace id (ws-...) to queue the run against",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_run_discard",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "run_id": {
+          "description": "the run id (run-...) to act on",
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_run_get",
+    "read_only": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "run_id": {
+          "description": "the run id (run-... or a bare uuid)",
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_run_list",
+    "read_only": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "page_size": {
+          "description": "max runs to return (default 20, newest first)",
+          "type": "integer"
+        },
+        "workspace_id": {
+          "description": "the workspace id (ws-...) whose runs to list",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_run_plan_json",
+    "read_only": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "run_id": {
+          "description": "the run id whose structured JSON plan output to fetch",
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_workspace_get",
+    "read_only": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "workspace": {
+          "description": "the workspace id (ws-...) or its name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_workspace_list",
+    "read_only": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "page_size": {
+          "description": "max workspaces to return in this page (default 50)",
+          "type": "integer"
+        },
+        "search": {
+          "description": "filter workspaces by name substring",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  }
+]
