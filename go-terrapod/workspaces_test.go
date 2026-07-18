@@ -326,6 +326,89 @@ func TestListWorkspaces_PaginationMeta(t *testing.T) {
 	}
 }
 
+func TestListWorkspaces_SurfacesPageSize(t *testing.T) {
+	f := newWorkspaceFixtureServer(t)
+	f.listHandler = func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{
+		  "data": [],
+		  "meta": {"pagination": {"current-page": 1, "page-size": 25, "total-pages": 1, "total-count": 0}}
+		}`))
+	}
+	c := f.client()
+	list, err := c.ListWorkspaces(t.Context(), WorkspaceListOptions{})
+	if err != nil {
+		t.Fatalf("ListWorkspaces: %v", err)
+	}
+	if list.PageSize != 25 {
+		t.Errorf("PageSize = %d, want 25", list.PageSize)
+	}
+}
+
+func TestListAllWorkspaces_LoopsAllPages(t *testing.T) {
+	// The server returns 3 pages of 2 (total 5). ListAllWorkspaces must loop
+	// until total-pages is reached and return every workspace.
+	pages := map[string]string{
+		"1": `{"data":[
+		  {"id":"ws-a","type":"workspaces","attributes":{"name":"a"}},
+		  {"id":"ws-b","type":"workspaces","attributes":{"name":"b"}}],
+		  "meta":{"pagination":{"current-page":1,"page-size":2,"total-pages":3,"total-count":5}}}`,
+		"2": `{"data":[
+		  {"id":"ws-c","type":"workspaces","attributes":{"name":"c"}},
+		  {"id":"ws-d","type":"workspaces","attributes":{"name":"d"}}],
+		  "meta":{"pagination":{"current-page":2,"page-size":2,"total-pages":3,"total-count":5}}}`,
+		"3": `{"data":[
+		  {"id":"ws-e","type":"workspaces","attributes":{"name":"e"}}],
+		  "meta":{"pagination":{"current-page":3,"page-size":2,"total-pages":3,"total-count":5}}}`,
+	}
+	f := newWorkspaceFixtureServer(t)
+	var requested []string
+	f.listHandler = func(w http.ResponseWriter, r *http.Request) {
+		page := r.URL.Query().Get("page[number]")
+		requested = append(requested, page)
+		if got := r.URL.Query().Get("page[size]"); got != "2" {
+			t.Errorf("page size = %q, want 2", got)
+		}
+		body, ok := pages[page]
+		if !ok {
+			t.Fatalf("unexpected page request: %q", page)
+		}
+		_, _ = w.Write([]byte(body))
+	}
+	c := f.client()
+	all, err := c.ListAllWorkspaces(t.Context(), WorkspaceListOptions{PageSize: 2})
+	if err != nil {
+		t.Fatalf("ListAllWorkspaces: %v", err)
+	}
+	if len(all) != 5 {
+		t.Fatalf("got %d workspaces, want 5: %+v", len(all), all)
+	}
+	if all[0].ID != "ws-a" || all[4].ID != "ws-e" {
+		t.Errorf("wrong order/content: %+v", all)
+	}
+	if len(requested) != 3 {
+		t.Errorf("requested pages %v, want exactly 3", requested)
+	}
+}
+
+func TestListAllWorkspaces_StopsOnShortPageWithoutMeta(t *testing.T) {
+	// A server that omits total-pages (older/non-paginating) must still
+	// terminate: a page shorter than the requested size means the end.
+	f := newWorkspaceFixtureServer(t)
+	f.listHandler = func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"data":[
+		  {"id":"ws-a","type":"workspaces","attributes":{"name":"a"}}],
+		  "meta":{"pagination":{}}}`))
+	}
+	c := f.client()
+	all, err := c.ListAllWorkspaces(t.Context(), WorkspaceListOptions{PageSize: 100})
+	if err != nil {
+		t.Fatalf("ListAllWorkspaces: %v", err)
+	}
+	if len(all) != 1 {
+		t.Errorf("got %d, want 1 (single short page terminates)", len(all))
+	}
+}
+
 func TestListWorkspaces_SearchFilter(t *testing.T) {
 	f := newWorkspaceFixtureServer(t)
 	f.listHandler = func(w http.ResponseWriter, r *http.Request) {

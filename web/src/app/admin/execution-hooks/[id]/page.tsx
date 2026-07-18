@@ -11,7 +11,7 @@ import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { useConfirm } from '@/lib/use-confirm'
-import { apiFetch } from '@/lib/api'
+import { apiFetch, fetchAllPages } from '@/lib/api'
 import { usePollingInterval } from '@/lib/use-polling-interval'
 
 const HOOK_POINTS = ['pre_init', 'pre_plan', 'post_plan', 'pre_apply', 'post_apply'] as const
@@ -103,11 +103,8 @@ export default function ExecutionHookDetailPage() {
   async function loadAllWorkspaces() {
     setWsLoading(true)
     try {
-      const res = await apiFetch('/api/v2/organizations/default/workspaces')
-      if (res.ok) {
-        const data = await res.json()
-        setAllWorkspaces(data.data || [])
-      }
+      // Page through the whole list so every workspace is attachable.
+      setAllWorkspaces(await fetchAllPages<WorkspaceRef>('/api/v2/organizations/default/workspaces'))
     } catch {
       // Non-critical
     } finally {

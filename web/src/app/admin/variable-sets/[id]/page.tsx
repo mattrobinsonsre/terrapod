@@ -12,7 +12,7 @@ import { EmptyState } from '@/components/empty-state'
 import { SensitiveValueInput } from '@/components/sensitive-value-input'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { useConfirm } from '@/lib/use-confirm'
-import { apiFetch } from '@/lib/api'
+import { apiFetch, fetchAllPages } from '@/lib/api'
 import { usePollingInterval } from '@/lib/use-polling-interval'
 
 interface VarsetAttrs {
@@ -133,10 +133,7 @@ export default function VariableSetDetailPage() {
 
   async function loadVariables() {
     try {
-      const res = await apiFetch(`/api/v2/varsets/${varsetId}/relationships/vars`)
-      if (!res.ok) throw new Error(t('detail.errors.loadVars'))
-      const data = await res.json()
-      setVariables(data.data || [])
+      setVariables(await fetchAllPages<Variable>(`/api/v2/varsets/${varsetId}/relationships/vars`))
     } catch (err) {
       setError(err instanceof Error ? err.message : t('detail.errors.loadVars'))
     } finally {
@@ -162,10 +159,8 @@ export default function VariableSetDetailPage() {
 
   async function loadAllWorkspaces() {
     try {
-      const res = await apiFetch('/api/v2/organizations/default/workspaces')
-      if (!res.ok) return
-      const data = await res.json()
-      setAllWorkspaces(data.data || [])
+      // Page through the whole list so every workspace is assignable.
+      setAllWorkspaces(await fetchAllPages<WorkspaceRef>('/api/v2/organizations/default/workspaces'))
     } catch {
       // Non-critical
     }

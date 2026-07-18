@@ -40,6 +40,7 @@ from terrapod.api.dependencies import (
     require_admin,
 )
 from terrapod.api.labels import validate_labels as _validate_labels
+from terrapod.api.pagination import paginate
 from terrapod.auth import capabilities as cap
 from terrapod.auth.capabilities import has_capability
 from terrapod.db.session import get_db
@@ -272,6 +273,7 @@ async def _require_pool_capability(
 
 @router.get("/agent-pools")
 async def list_pools(
+    request: Request = None,
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
@@ -299,7 +301,8 @@ async def list_pools(
         # 401s every authenticated call, so we cross-check cert expiry too.
         status = _derive_pool_status(listeners)
         result.append(_pool_json(p, status=status, permission=perm))
-    return JSONResponse(content={"data": result})
+    page_items, meta = paginate(result, request)
+    return JSONResponse(content={"data": page_items, "meta": meta})
 
 
 @router.post("/agent-pools", status_code=201)
@@ -444,6 +447,7 @@ async def delete_pool(
 @router.get("/agent-pools/{pool_id}/tokens")
 async def list_pool_tokens(
     pool_id: str = Path(...),
+    request: Request = None,
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
@@ -451,7 +455,9 @@ async def list_pool_tokens(
     pool = await _get_pool(pool_id, db)
     await _require_pool_capability(pool, user, db, cap.POOL_MANAGE)
     tokens = await agent_pool_service.list_pool_tokens(db, pool.id)
-    return JSONResponse(content={"data": [_token_json(t) for t in tokens]})
+    items = [_token_json(t) for t in tokens]
+    page_items, meta = paginate(items, request)
+    return JSONResponse(content={"data": page_items, "meta": meta})
 
 
 @router.post("/agent-pools/{pool_id}/tokens", status_code=201)
@@ -606,6 +612,7 @@ async def join_listener_by_token(
 @listener_router.get("/agent-pools/{pool_id}/listeners")
 async def list_pool_listeners(
     pool_id: str = Path(...),
+    request: Request = None,
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
@@ -632,17 +639,18 @@ async def list_pool_listeners(
         ]
     )
     counts_iter = iter(replica_counts)
-    return JSONResponse(
-        content={
-            "data": [
-                _listener_json(
-                    lis,
-                    replica_count=next(counts_iter) if tracks else None,
-                )
-                for lis, tracks in zip(listeners, tracking, strict=True)
-            ]
-        }
-    )
+    # Build the FULL list of listener dicts first — the comprehension must run to
+    # completion so the one-shot positional `counts_iter` stays aligned with the
+    # `tracking` flags; pagination then only slices the finished list.
+    items = [
+        _listener_json(
+            lis,
+            replica_count=next(counts_iter) if tracks else None,
+        )
+        for lis, tracks in zip(listeners, tracking, strict=True)
+    ]
+    page_items, meta = paginate(items, request)
+    return JSONResponse(content={"data": page_items, "meta": meta})
 
 
 @listener_router.get("/agent-pools/{pool_id}/events")

@@ -42,6 +42,7 @@ from terrapod.api.dependencies import (
     require_non_runner,
 )
 from terrapod.api.labels import validate_labels
+from terrapod.api.pagination import paginate
 from terrapod.api.serialization import rfc3339
 from terrapod.auth import capabilities as cap
 from terrapod.auth.capabilities import has_capability
@@ -313,6 +314,7 @@ async def create_module_endpoint(
 
 @management_router.get("/registry-modules")
 async def list_modules_endpoint(
+    request: Request = None,
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
@@ -329,7 +331,8 @@ async def list_modules_endpoint(
         )
         if has_capability(caps, cap.REGISTRY_READ):
             visible.append(_module_to_jsonapi(m, caps))
-    return JSONResponse(content={"data": visible})
+    page_items, meta = paginate(visible, request)
+    return JSONResponse(content={"data": page_items, "meta": meta})
 
 
 @management_router.get("/registry-modules/private/default/{name}/{provider}")
@@ -864,6 +867,7 @@ def _link_to_jsonapi(link: ModuleWorkspaceLink) -> dict:
 async def list_workspace_links(
     name: str,
     provider: str,
+    request: Request = None,
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
@@ -889,7 +893,9 @@ async def list_workspace_links(
     )
     links = list(result.scalars().all())
 
-    return JSONResponse(content={"data": [_link_to_jsonapi(link) for link in links]})
+    items = [_link_to_jsonapi(link) for link in links]
+    page_items, meta = paginate(items, request)
+    return JSONResponse(content={"data": page_items, "meta": meta})
 
 
 @workspace_links_router.post("/registry-modules/private/default/{name}/{provider}/workspace-links")

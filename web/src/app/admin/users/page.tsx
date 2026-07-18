@@ -14,7 +14,7 @@ import { SortableHeader } from '@/components/sortable-header'
 import { useSortable } from '@/lib/use-sortable'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { useConfirm } from '@/lib/use-confirm'
-import { apiFetch } from '@/lib/api'
+import { apiFetch, fetchAllPages } from '@/lib/api'
 import { useFormat } from '@/lib/format'
 import { usePollingInterval } from '@/lib/use-polling-interval'
 
@@ -302,10 +302,9 @@ export default function UsersPage() {
 
   async function loadUsers() {
     try {
-      const res = await apiFetch('/api/terrapod/v1/users?page[size]=100')
-      if (!res.ok) throw new Error(t('errors.load'))
-      const data = await res.json()
-      setUsers(data.data || [])
+      // Page through all users (previously capped at page[size]=100, which
+      // silently truncated deployments with more than 100 users).
+      setUsers(await fetchAllPages<UserRecord>('/api/terrapod/v1/users'))
     } catch (err) {
       setError(err instanceof Error ? err.message : t('errors.load'))
     } finally {

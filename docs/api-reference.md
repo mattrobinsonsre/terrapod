@@ -80,6 +80,38 @@ Responses use `application/json` (accepted by `go-tfe`).
 
 Terrapod is single-organization. The literal organization name `default` is the only valid value; every API path that contains an organization segment uses `organizations/default/` verbatim. Requests to any other organization name return 404.
 
+### Pagination
+
+List (collection `GET`) endpoints support **optional** pagination and always return a `meta.pagination` block:
+
+| Query param | Meaning |
+|---|---|
+| `page[size]` | Items per page. `>= 1` returns that page (capped at **100**). **`0` — or omitting paging entirely — returns the full list** as a single page. |
+| `page[number]` | 1-indexed page to return (default `1`). Only meaningful with `page[size] >= 1`. A page past the end returns an empty `data` array, not an error. |
+
+Every list response carries pagination metadata in Terrapod's four-key shape:
+
+```json
+{
+  "data": [ /* ... */ ],
+  "meta": {
+    "pagination": {
+      "current-page": 1,
+      "page-size": 100,
+      "total-count": 250,
+      "total-pages": 3
+    }
+  }
+}
+```
+
+Notes:
+
+- **Absent params → full list.** Omitting `page[size]` (or sending `page[size]=0`) returns every item, so a client that just wants the whole collection can ignore paging entirely. This is a deliberate Terrapod behaviour; on `/api/v2/` the `meta.pagination` shape still matches what a `go-tfe` client expects.
+- **To fetch everything robustly, page and loop** rather than relying on the absent-params default — request `page[size]=100`, then `page[number]=1,2,…` until `total-pages` is reached. go-terrapod exposes `ListAll*` helpers that do this; the web UI uses `fetchAllPages()`.
+- **Unbounded-history collections are the one exception:** the runs list (`GET /api/v2/workspaces/{id}/runs`) keeps a **bounded default page (20)** instead of returning all history, but still honours `page[size]` and emits `meta.pagination` so you can page the full history.
+- `total-count` is the size of the whole (RBAC-filtered) collection, not the returned page.
+
 ---
 
 ## Health Check Endpoints
@@ -217,6 +249,8 @@ Returns feature flags (all enabled for Terrapod).
 ```
 GET /api/v2/organizations/default/workspaces
 ```
+
+Supports optional [pagination](#pagination) (`page[size]`/`page[number]`; absent or `page[size]=0` returns the full list) and filtering by `search[name]` and cloud-block tags (`filter[tagged][...]`). Results are scoped to workspaces the caller can read.
 
 ### Get Workspace by Name
 
@@ -699,6 +733,8 @@ GET /api/v2/runs/{run_id}
 ```
 GET /api/v2/workspaces/{id}/runs
 ```
+
+Newest first. Because run history grows without bound, this endpoint keeps a **bounded default page** (`page[size]` default 20, max 100) rather than returning everything — the one exception to the "absent → full list" [pagination](#pagination) convention. It honours `page[size]`/`page[number]` and always returns `meta.pagination`, so you can page the full history.
 
 ### Confirm Run (Approve Apply)
 

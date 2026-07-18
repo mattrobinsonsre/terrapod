@@ -34,7 +34,7 @@ import re
 import uuid
 from datetime import UTC
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Path
+from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -47,6 +47,7 @@ from terrapod.api.dependencies import (
     require_admin,
     require_runner_for_run,
 )
+from terrapod.api.pagination import paginate
 from terrapod.auth import capabilities as cap
 from terrapod.auth.capabilities import has_capability
 from terrapod.db.models import (
@@ -197,6 +198,7 @@ def _validate_enforcement(level: str) -> str:
 
 @router.get("/policy-sets")
 async def list_policy_sets(
+    request: Request = None,
     user: AuthenticatedUser = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
@@ -210,7 +212,9 @@ async def list_policy_sets(
         .scalars()
         .all()
     )
-    return JSONResponse(content={"data": [_policy_set_json(ps) for ps in rows]})
+    items = [_policy_set_json(ps) for ps in rows]
+    page_items, meta = paginate(items, request)
+    return JSONResponse(content={"data": page_items, "meta": meta})
 
 
 @router.post("/policy-sets", status_code=201)

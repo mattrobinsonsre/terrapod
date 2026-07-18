@@ -23,12 +23,13 @@ Endpoints:
 
 from datetime import UTC
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.api.dependencies import AuthenticatedUser, effective_platform_roles, get_current_user
+from terrapod.api.pagination import paginate
 from terrapod.auth.api_tokens import (
     create_api_token,
     get_token_by_id,
@@ -195,6 +196,7 @@ async def create_user_token(
 @router.get("/users/{user_id}/authentication-tokens")
 async def list_user_tokens_endpoint(
     user_id: str,
+    request: Request = None,
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
@@ -206,12 +208,15 @@ async def list_user_tokens_endpoint(
         )
 
     tokens = await list_user_tokens(db, user.email)
-    return JSONResponse(content={"data": [_token_to_jsonapi(t) for t in tokens]})
+    items = [_token_to_jsonapi(t) for t in tokens]
+    page_items, meta = paginate(items, request)
+    return JSONResponse(content={"data": page_items, "meta": meta})
 
 
 @router.get("/admin/authentication-tokens")
 async def list_all_tokens_endpoint(
     kind: str | None = Query(default=None),
+    request: Request = None,
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
@@ -232,7 +237,9 @@ async def list_all_tokens_endpoint(
         )
 
     tokens = await list_all_tokens(db, kind=kind)
-    return JSONResponse(content={"data": [_token_to_jsonapi(t) for t in tokens]})
+    items = [_token_to_jsonapi(t) for t in tokens]
+    page_items, meta = paginate(items, request)
+    return JSONResponse(content={"data": page_items, "meta": meta})
 
 
 @router.post("/admin/authentication-tokens/actions/revoke-all")

@@ -20,12 +20,13 @@ Endpoints:
     DELETE /api/terrapod/v1/admin/provider-cache/{hostname}/{namespace}/{type}/{version}      — purge provider
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user, require_admin
+from terrapod.api.pagination import paginate
 from terrapod.api.serialization import rfc3339
 from terrapod.config import WarmBinaryEntry, WarmProviderEntry, settings
 from terrapod.db.session import get_db
@@ -202,31 +203,30 @@ async def get_binary_sha256sums_sig(
 @router.get("/admin/binary-cache")
 async def list_cached_binaries_endpoint(
     tool: str | None = None,
+    request: Request = None,
     user: AuthenticatedUser = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """List all cached binaries."""
     entries = await list_cached_binaries(db, tool=tool)
-    return JSONResponse(
-        content={
-            "data": [
-                {
-                    "id": str(e.id),
-                    "type": "cached-binaries",
-                    "attributes": {
-                        "tool": e.tool,
-                        "version": e.version,
-                        "os": e.os,
-                        "arch": e.arch,
-                        "shasum": e.shasum,
-                        "download-url": e.download_url,
-                        "cached-at": rfc3339(e.cached_at),
-                    },
-                }
-                for e in entries
-            ]
+    items = [
+        {
+            "id": str(e.id),
+            "type": "cached-binaries",
+            "attributes": {
+                "tool": e.tool,
+                "version": e.version,
+                "os": e.os,
+                "arch": e.arch,
+                "shasum": e.shasum,
+                "download-url": e.download_url,
+                "cached-at": rfc3339(e.cached_at),
+            },
         }
-    )
+        for e in entries
+    ]
+    page_items, meta = paginate(items, request)
+    return JSONResponse(content={"data": page_items, "meta": meta})
 
 
 @router.post("/admin/binary-cache/warm")
@@ -328,32 +328,31 @@ async def purge_binary_endpoint(
 @router.get("/admin/provider-cache")
 async def list_cached_providers_endpoint(
     hostname: str | None = None,
+    request: Request = None,
     user: AuthenticatedUser = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """List all cached provider binaries."""
     entries = await list_cached_providers(db, hostname=hostname)
-    return JSONResponse(
-        content={
-            "data": [
-                {
-                    "id": str(e.id),
-                    "type": "cached-providers",
-                    "attributes": {
-                        "hostname": e.hostname,
-                        "namespace": e.namespace,
-                        "provider-type": e.type,
-                        "version": e.version,
-                        "os": e.os,
-                        "arch": e.arch,
-                        "shasum": e.shasum,
-                        "cached-at": rfc3339(e.cached_at),
-                    },
-                }
-                for e in entries
-            ]
+    items = [
+        {
+            "id": str(e.id),
+            "type": "cached-providers",
+            "attributes": {
+                "hostname": e.hostname,
+                "namespace": e.namespace,
+                "provider-type": e.type,
+                "version": e.version,
+                "os": e.os,
+                "arch": e.arch,
+                "shasum": e.shasum,
+                "cached-at": rfc3339(e.cached_at),
+            },
         }
-    )
+        for e in entries
+    ]
+    page_items, meta = paginate(items, request)
+    return JSONResponse(content={"data": page_items, "meta": meta})
 
 
 @router.delete("/admin/provider-cache/{hostname}/{namespace}/{type}/{version}")

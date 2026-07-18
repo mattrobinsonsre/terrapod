@@ -96,6 +96,49 @@ export async function apiFetch(path: string, init?: RequestInit): Promise<Respon
 }
 
 /**
+ * Fetch EVERY item from a paginated list endpoint by looping the pages.
+ *
+ * Terrapod list endpoints support optional pagination: they return the full
+ * list when no page params are sent, but they honour `page[size]`/`page[number]`
+ * and always emit `meta.pagination` (see docs/api-reference.md and the #862
+ * convention). The web UI deliberately shows whole lists and filters/sorts
+ * client-side — it does NOT page-through in the UI. To fetch the whole list
+ * *robustly* (rather than relying on the server's absent-params default), this
+ * helper pages through with a fixed page size and concatenates `data`, so it
+ * stays correct regardless of any server-side default page.
+ *
+ * It stops on `meta.pagination.total-pages` (authoritative); if the server
+ * omits meta, a page shorter than the page size ends the loop. Returns the
+ * combined `data` array. Throws (via parseApiError) on any non-OK page.
+ *
+ * `path` may already carry a query string (e.g. a search filter); the page
+ * params are appended with the correct separator.
+ */
+export async function fetchAllPages<T = unknown>(path: string, pageSize = 100): Promise<T[]> {
+  const sep = path.includes('?') ? '&' : '?'
+  const all: T[] = []
+  for (let page = 1; ; page++) {
+    const url = `${path}${sep}page[size]=${pageSize}&page[number]=${page}`
+    const res = await apiFetch(url)
+    if (!res.ok) {
+      throw new Error(await parseApiError(res, 'Failed to load list'))
+    }
+    const body = await res.json()
+    const items: T[] = Array.isArray(body?.data) ? body.data : []
+    all.push(...items)
+
+    const totalPages = Number(body?.meta?.pagination?.['total-pages'] ?? 0)
+    if (totalPages > 0) {
+      if (page >= totalPages) break
+    } else if (items.length < pageSize) {
+      // No meta (older server / non-paginating collection): a short page ends it.
+      break
+    }
+  }
+  return all
+}
+
+/**
  * Extract a human-readable message from a failed API response.
  *
  * Handles the shapes the API actually returns — JSON:API `{ errors: [{ detail }] }`,

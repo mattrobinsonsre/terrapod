@@ -13,7 +13,7 @@ import { SortableHeader } from '@/components/sortable-header'
 import { LabelsEditor } from '@/components/labels-editor'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { useIsAdmin } from '@/lib/use-auth-roles'
-import { apiFetch } from '@/lib/api'
+import { apiFetch, fetchAllPages } from '@/lib/api'
 import { useSortable } from '@/lib/use-sortable'
 import { usePollingInterval } from '@/lib/use-polling-interval'
 
@@ -79,10 +79,7 @@ export default function AgentPoolsPage() {
 
   async function loadPools() {
     try {
-      const res = await apiFetch('/api/terrapod/v1/agent-pools')
-      if (!res.ok) throw new Error(t('errors.loadPools'))
-      const data = await res.json()
-      setPools(data.data || [])
+      setPools(await fetchAllPages<AgentPool>('/api/terrapod/v1/agent-pools'))
     } catch (err) {
       setError(err instanceof Error ? err.message : t('errors.loadPools'))
     } finally {

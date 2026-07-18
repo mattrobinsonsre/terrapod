@@ -20,13 +20,14 @@ import uuid
 from datetime import UTC
 
 import sqlalchemy as sa
-from fastapi import APIRouter, Body, Depends, HTTPException, Path, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request, status
 from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user, require_admin
+from terrapod.api.pagination import paginate
 from terrapod.auth import capabilities as cap
 from terrapod.auth.capabilities import has_capability
 from terrapod.db.models import (
@@ -95,6 +96,7 @@ async def _get_workspace(workspace_id: str, db: AsyncSession) -> Workspace:
 @router.get("/workspaces/{workspace_id}/vars")
 async def list_workspace_vars(
     workspace_id: str = Path(...),
+    request: Request = None,
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
@@ -106,7 +108,9 @@ async def list_workspace_vars(
             status_code=status.HTTP_403_FORBIDDEN, detail="Requires read permission on workspace"
         )
     variables = await variable_service.list_variables(db, ws.id)
-    return JSONResponse(content={"data": [_var_json(v) for v in variables]})
+    items = [_var_json(v) for v in variables]
+    page_items, meta = paginate(items, request)
+    return JSONResponse(content={"data": page_items, "meta": meta})
 
 
 @router.post("/workspaces/{workspace_id}/vars", status_code=201)
@@ -278,6 +282,7 @@ def _varset_json(vs: VariableSet) -> dict:
 
 @router.get("/organizations/default/varsets")
 async def list_varsets(
+    request: Request = None,
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
@@ -291,7 +296,9 @@ async def list_varsets(
         .order_by(VariableSet.name)
     )
     varsets = result.scalars().all()
-    return JSONResponse(content={"data": [_varset_json(vs) for vs in varsets]})
+    items = [_varset_json(vs) for vs in varsets]
+    page_items, meta = paginate(items, request)
+    return JSONResponse(content={"data": page_items, "meta": meta})
 
 
 @router.post("/organizations/default/varsets", status_code=201)
@@ -413,13 +420,16 @@ def _vsvar_json(vsv: VariableSetVariable, varset_id: str) -> dict:
 @router.get("/varsets/{varset_id}/relationships/vars")
 async def list_varset_vars(
     varset_id: str = Path(...),
+    request: Request = None,
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """List variables in a variable set."""
     vs = await _get_varset(varset_id, db)
     await db.refresh(vs, ["variables"])
-    return JSONResponse(content={"data": [_vsvar_json(v, varset_id) for v in vs.variables]})
+    items = [_vsvar_json(v, varset_id) for v in vs.variables]
+    page_items, meta = paginate(items, request)
+    return JSONResponse(content={"data": page_items, "meta": meta})
 
 
 @router.post("/varsets/{varset_id}/relationships/vars", status_code=201)

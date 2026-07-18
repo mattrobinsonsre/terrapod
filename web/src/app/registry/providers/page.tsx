@@ -10,7 +10,7 @@ import { LoadingSpinner } from '@/components/loading-spinner'
 import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
 import { getAuthState } from '@/lib/auth'
-import { apiFetch } from '@/lib/api'
+import { apiFetch, fetchAllPages } from '@/lib/api'
 import { usePollingInterval } from '@/lib/use-polling-interval'
 
 interface Provider {
@@ -43,10 +43,7 @@ export default function ProvidersPage() {
 
   async function loadProviders() {
     try {
-      const res = await apiFetch('/api/terrapod/v1/registry-providers')
-      if (!res.ok) throw new Error(t('providers.loadFailed'))
-      const data = await res.json()
-      setProviders(data.data || [])
+      setProviders(await fetchAllPages<Provider>('/api/terrapod/v1/registry-providers'))
     } catch (err) {
       setError(err instanceof Error ? err.message : t('providers.loadFailed'))
     } finally {

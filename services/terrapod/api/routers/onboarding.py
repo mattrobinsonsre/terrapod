@@ -25,11 +25,12 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user
+from terrapod.api.pagination import paginate
 from terrapod.api.serialization import rfc3339
 from terrapod.auth.capabilities import WORKSPACE_ONBOARD, has_capability
 from terrapod.config import settings
@@ -201,6 +202,7 @@ async def create_onboarding_session(
 @router.get("/workspaces/{workspace_id}/onboarding-sessions")
 async def list_onboarding_sessions(
     workspace_id: str,
+    request: Request = None,
     db: AsyncSession = Depends(get_db),
     user: AuthenticatedUser = Depends(get_current_user),
 ) -> dict:
@@ -209,7 +211,9 @@ async def list_onboarding_sessions(
     sessions = await onboarding_service.list_sessions(db, ws.id)
     # Surfaces are omitted from the list (each is a large per-session Redis read);
     # the detail endpoint carries the surface.
-    return {"data": [_session_json(s) for s in sessions]}
+    items = [_session_json(s) for s in sessions]
+    page_items, meta = paginate(items, request)
+    return {"data": page_items, "meta": meta}
 
 
 @router.get("/onboarding-sessions/{session_id}")

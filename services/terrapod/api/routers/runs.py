@@ -603,14 +603,34 @@ async def list_workspace_runs(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Requires read permission on workspace",
         )
+    # Runs are the one deliberate exception to the "absent → full list"
+    # convention: run history grows without bound, so this endpoint keeps a
+    # sensible bounded default page (20) rather than returning everything.
+    # It honours page[size]/page[number] and always emits meta.pagination so
+    # clients can page through the full history. (See pagination.py.)
+    if page_size < 1:
+        page_size = 20
+    page_size = min(page_size, 100)
+    if page_number < 1:
+        page_number = 1
+
     runs = await run_service.list_workspace_runs(db, ws.id, page_number, page_size)
+    total = await run_service.count_workspace_runs(db, ws.id)
     has_vcs = ws.vcs_connection_id is not None
     return JSONResponse(
         content={
             "data": [
                 _run_json(r, workspace_name=ws.name, workspace_has_vcs=has_vcs)["data"]
                 for r in runs
-            ]
+            ],
+            "meta": {
+                "pagination": {
+                    "current-page": page_number,
+                    "page-size": page_size,
+                    "total-count": total,
+                    "total-pages": (total + page_size - 1) // page_size if total > 0 else 0,
+                }
+            },
         }
     )
 

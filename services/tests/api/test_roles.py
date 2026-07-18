@@ -106,6 +106,55 @@ class TestListRoles:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
+    async def test_list_emits_pagination_meta(self, *mocks):
+        # #862 Stage 2: /roles now emits meta.pagination. The list is the 3
+        # built-ins concatenated with the DB rows, and paginate() slices the
+        # COMBINED list — so total-count is builtins + custom.
+        user = _user(roles=["admin"])
+        app, mock_db = _make_app(user)
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.all.return_value = [
+            _mock_role("c1"),
+            _mock_role("c2"),
+        ]
+        mock_db.execute.return_value = mock_result
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get("/api/terrapod/v1/roles", headers=_AUTH)
+        assert resp.status_code == 200
+        body = resp.json()
+        # 3 built-ins (admin/audit/everyone) + 2 custom = 5
+        assert body["meta"]["pagination"]["total-count"] == 5
+        assert len(body["data"]) == 5  # absent params → full list
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_list_honours_page_size(self, *mocks):
+        user = _user(roles=["admin"])
+        app, mock_db = _make_app(user)
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.all.return_value = [
+            _mock_role("c1"),
+            _mock_role("c2"),
+        ]
+        mock_db.execute.return_value = mock_result
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get("/api/terrapod/v1/roles?page[size]=2", headers=_AUTH)
+        assert resp.status_code == 200
+        body = resp.json()
+        assert len(body["data"]) == 2  # one page of the combined list
+        assert body["meta"]["pagination"] == {
+            "current-page": 1,
+            "page-size": 2,
+            "total-count": 5,
+            "total-pages": 3,
+        }
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
     async def test_list_includes_pool_permission(self, *mocks):
         user = _user(roles=["admin"])
         app, mock_db = _make_app(user)

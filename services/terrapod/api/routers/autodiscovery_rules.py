@@ -25,7 +25,7 @@ import uuid
 from datetime import UTC
 from typing import Any
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Path
+from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request
 from fastapi.responses import JSONResponse, Response
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -33,6 +33,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.api.dependencies import AuthenticatedUser, require_admin
 from terrapod.api.labels import validate_labels
+from terrapod.api.pagination import paginate
 from terrapod.api.routers.workspace_bulk import (
     validate_notification_specs,
     validate_run_task_specs,
@@ -274,6 +275,7 @@ def _coerce_attrs(attrs: dict, *, on_create: bool) -> dict[str, Any]:
 
 @router.get("/autodiscovery-rules")
 async def list_rules(
+    request: Request = None,
     user: AuthenticatedUser = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
@@ -282,7 +284,9 @@ async def list_rules(
         select(AutodiscoveryRule).order_by(AutodiscoveryRule.created_at.desc())
     )
     rules = result.scalars().all()
-    return JSONResponse(content={"data": [_rule_json(r) for r in rules]})
+    items = [_rule_json(r) for r in rules]
+    page_items, meta = paginate(items, request)
+    return JSONResponse(content={"data": page_items, "meta": meta})
 
 
 # ── Create ───────────────────────────────────────────────────────────────

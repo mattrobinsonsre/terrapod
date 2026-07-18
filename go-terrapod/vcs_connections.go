@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"strconv"
 )
 
 // VCSConnection is the decoded form of one Terrapod VCS connection
@@ -102,6 +103,42 @@ func (c *Client) ListVCSConnections(ctx context.Context) ([]VCSConnection, error
 		out = append(out, *vcsConnFromResource(&resources[i]))
 	}
 	return out, nil
+}
+
+// ListAllVCSConnections fetches every VCS connection, paging through the whole
+// collection so the caller doesn't have to. It loops on the server's
+// meta.total-pages (falling back to "a short page ends it" when the server
+// omits meta), so it stays correct even if the endpoint imposes a page size.
+// Prefer this over ListVCSConnections when correctness across a large,
+// paginated collection matters (e.g. dedup on migration).
+func (c *Client) ListAllVCSConnections(ctx context.Context) ([]VCSConnection, error) {
+	const pageSize = 100
+	var all []VCSConnection
+	for page := 1; ; page++ {
+		q := url.Values{}
+		q.Set("page[number]", strconv.Itoa(page))
+		q.Set("page[size]", strconv.Itoa(pageSize))
+		data, err := c.Get(ctx, "/api/terrapod/v1/vcs-connections?"+q.Encode())
+		if err != nil {
+			return nil, err
+		}
+		resources, err := ParseResourceList(data)
+		if err != nil {
+			return nil, err
+		}
+		for i := range resources {
+			all = append(all, *vcsConnFromResource(&resources[i]))
+		}
+		meta, _ := parseListMeta(data)
+		if meta.TotalPages > 0 {
+			if page >= meta.TotalPages {
+				break
+			}
+		} else if len(resources) < pageSize {
+			break
+		}
+	}
+	return all, nil
 }
 
 // UpdateVCSConnection patches the connection by id. The Provider

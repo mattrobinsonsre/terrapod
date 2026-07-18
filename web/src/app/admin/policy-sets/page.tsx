@@ -11,7 +11,7 @@ import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
 import { SortableHeader } from '@/components/sortable-header'
 import { getAuthState, isAdmin } from '@/lib/auth'
-import { apiFetch } from '@/lib/api'
+import { apiFetch, fetchAllPages } from '@/lib/api'
 import { useSortable } from '@/lib/use-sortable'
 import { usePollingInterval } from '@/lib/use-polling-interval'
 
@@ -75,10 +75,7 @@ export default function PolicySetsPage() {
 
   async function loadSets() {
     try {
-      const res = await apiFetch('/api/terrapod/v1/policy-sets')
-      if (!res.ok) throw new Error(t('errors.load'))
-      const data = await res.json()
-      setSets(data.data || [])
+      setSets(await fetchAllPages<PolicySet>('/api/terrapod/v1/policy-sets'))
     } catch (err) {
       setError(err instanceof Error ? err.message : t('errors.load'))
     } finally {
@@ -88,9 +85,9 @@ export default function PolicySetsPage() {
 
   useEffect(() => {
     if (showCreate && source === 'vcs' && vcsConnections.length === 0) {
-      apiFetch('/api/terrapod/v1/vcs-connections').then(r => r.ok ? r.json() : { data: [] }).then(d => {
-        setVcsConnections(d.data || [])
-      }).catch(() => {})
+      fetchAllPages<{ id: string; attributes: { name: string } }>('/api/terrapod/v1/vcs-connections')
+        .then(setVcsConnections)
+        .catch(() => {})
     }
   }, [showCreate, source, vcsConnections.length])
 

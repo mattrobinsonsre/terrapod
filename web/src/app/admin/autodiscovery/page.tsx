@@ -18,7 +18,7 @@ import {
   type NotificationSpec,
 } from '@/components/template-editors'
 import { getAuthState, isAdmin } from '@/lib/auth'
-import { apiFetch } from '@/lib/api'
+import { apiFetch, fetchAllPages } from '@/lib/api'
 import { useSortable } from '@/lib/use-sortable'
 import { useFormat } from '@/lib/format'
 
@@ -153,27 +153,17 @@ export default function AutodiscoveryPage() {
 
   async function loadAll() {
     try {
-      const [rulesRes, connsRes, poolsRes, hooksRes] = await Promise.all([
-        apiFetch('/api/terrapod/v1/autodiscovery-rules'),
-        apiFetch('/api/terrapod/v1/vcs-connections'),
-        apiFetch('/api/terrapod/v1/agent-pools'),
-        apiFetch('/api/terrapod/v1/execution-hooks'),
+      // rules are fatal for the page; the pickers (conns/pools/hooks) are non-fatal
+      const [rulesList, connsList, poolsList, hooksList] = await Promise.all([
+        fetchAllPages<AutodiscoveryRule>('/api/terrapod/v1/autodiscovery-rules'),
+        fetchAllPages<VCSConnection>('/api/terrapod/v1/vcs-connections').catch(() => [] as VCSConnection[]),
+        fetchAllPages<AgentPool>('/api/terrapod/v1/agent-pools').catch(() => [] as AgentPool[]),
+        fetchAllPages<ExecutionHookRef>('/api/terrapod/v1/execution-hooks').catch(() => [] as ExecutionHookRef[]),
       ])
-      if (!rulesRes.ok) throw new Error(t('errors.loadRules'))
-      const rulesData = await rulesRes.json()
-      setRules(rulesData.data || [])
-      if (connsRes.ok) {
-        const cd = await connsRes.json()
-        setConnections(cd.data || [])
-      }
-      if (poolsRes.ok) {
-        const pd = await poolsRes.json()
-        setPools(pd.data || [])
-      }
-      if (hooksRes.ok) {
-        const hd = await hooksRes.json()
-        setHooks(hd.data || [])
-      }
+      setRules(rulesList)
+      setConnections(connsList)
+      setPools(poolsList)
+      setHooks(hooksList)
     } catch (err) {
       setError(err instanceof Error ? err.message : t('errors.load'))
     } finally {

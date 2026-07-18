@@ -232,6 +232,7 @@ func GetRelationshipID(r *Resource, name string) string {
 // returns WorkspaceList with CurrentPage/TotalPages/TotalCount).
 type ListMeta struct {
 	CurrentPage int `json:"current-page"`
+	PageSize    int `json:"page-size"`
 	TotalPages  int `json:"total-pages"`
 	TotalCount  int `json:"total-count"`
 }

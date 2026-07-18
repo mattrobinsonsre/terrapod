@@ -289,6 +289,7 @@ field LabelKey.ValueCount int `json:"value-count"`
 field LabelValue.EntityCounts map[string]int `json:"entity-counts"`
 field LabelValue.Value string `json:"value"`
 field ListMeta.CurrentPage int `json:"current-page"`
+field ListMeta.PageSize int `json:"page-size"`
 field ListMeta.TotalCount int `json:"total-count"`
 field ListMeta.TotalPages int `json:"total-pages"`
 field ModuleWorkspaceLink.CreatedAt string `json:"created-at,omitempty"`
@@ -783,6 +784,7 @@ field WorkspaceFilter.VCSConnectionID string `json:"vcs_connection_id,omitempty"
 field WorkspaceFilter.WorkspaceIDs []string `json:"workspace_ids,omitempty"`
 field WorkspaceList.CurrentPage int
 field WorkspaceList.Items []Workspace
+field WorkspaceList.PageSize int
 field WorkspaceList.TotalCount int
 field WorkspaceList.TotalPages int
 field WorkspaceListOptions.PageNumber int
@@ -925,6 +927,11 @@ method (*Client) IsWorkspaceAssignedToVarset(ctx context.Context, varsetID, work
 method (*Client) ListAgentPoolTokens(ctx context.Context, poolID string) ([]AgentPoolToken, error)
 method (*Client) ListAgentPools(ctx context.Context) ([]AgentPool, error)
 method (*Client) ListAllAPITokens(ctx context.Context, kind string) ([]APIToken, error)
+method (*Client) ListAllAgentPools(ctx context.Context) ([]AgentPool, error)
+method (*Client) ListAllCatalogInstances(ctx context.Context, itemID string) ([]CatalogInstance, error)
+method (*Client) ListAllVCSConnections(ctx context.Context) ([]VCSConnection, error)
+method (*Client) ListAllVariables(ctx context.Context, workspaceID string) ([]Variable, error)
+method (*Client) ListAllWorkspaces(ctx context.Context, opts WorkspaceListOptions) ([]Workspace, error)
 method (*Client) ListCatalogInstances(ctx context.Context, itemID string) ([]CatalogInstance, error)
 method (*Client) ListCatalogItems(ctx context.Context) ([]CatalogItem, error)
 method (*Client) ListExecutionHooks(ctx context.Context) ([]ExecutionHook, error)

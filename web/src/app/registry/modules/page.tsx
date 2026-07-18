@@ -11,7 +11,7 @@ import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
 import { LabelsEditor } from '@/components/labels-editor'
 import { getAuthState } from '@/lib/auth'
-import { apiFetch } from '@/lib/api'
+import { apiFetch, fetchAllPages } from '@/lib/api'
 import { usePollingInterval } from '@/lib/use-polling-interval'
 
 interface VCSConnection {
@@ -63,11 +63,7 @@ export default function ModulesPage() {
 
   async function loadVcsConnections() {
     try {
-      const res = await apiFetch('/api/terrapod/v1/vcs-connections')
-      if (res.ok) {
-        const data = await res.json()
-        setVcsConnections(data.data || [])
-      }
+      setVcsConnections(await fetchAllPages<VCSConnection>('/api/terrapod/v1/vcs-connections'))
     } catch {
       // VCS connections are optional
     }
@@ -75,10 +71,7 @@ export default function ModulesPage() {
 
   async function loadModules() {
     try {
-      const res = await apiFetch('/api/terrapod/v1/registry-modules')
-      if (!res.ok) throw new Error(t('modules.loadFailed'))
-      const data = await res.json()
-      setModules(data.data || [])
+      setModules(await fetchAllPages<Module>('/api/terrapod/v1/registry-modules'))
     } catch (err) {
       setError(err instanceof Error ? err.message : t('modules.loadFailed'))
     } finally {

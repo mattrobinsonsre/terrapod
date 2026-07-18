@@ -29,7 +29,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query, Request
 from fastapi.responses import JSONResponse, Response
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -42,6 +42,7 @@ from terrapod.api.dependencies import (
     require_admin_or_audit,
 )
 from terrapod.api.labels import validate_labels
+from terrapod.api.pagination import paginate
 from terrapod.auth import capabilities as cap
 from terrapod.auth.capabilities import has_capability
 from terrapod.config import settings
@@ -188,12 +189,15 @@ def _coerce_template(attrs: dict, *, on_create: bool) -> dict:
 
 @router.get("/provider-templates")
 async def list_provider_templates(
+    request: Request = None,
     _: None = Depends(require_catalog_enabled),
     user: AuthenticatedUser = Depends(require_admin_or_audit),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     templates = await catalog_service.list_provider_templates(db)
-    return JSONResponse(content={"data": [_template_json(t) for t in templates]})
+    items = [_template_json(t) for t in templates]
+    page_items, meta = paginate(items, request)
+    return JSONResponse(content={"data": page_items, "meta": meta})
 
 
 @router.post("/provider-templates", status_code=201)
@@ -394,6 +398,7 @@ async def _coerce_item(db: AsyncSession, attrs: dict, *, on_create: bool) -> dic
 
 @router.get("/catalog-items")
 async def list_catalog_items(
+    request: Request = None,
     _: None = Depends(require_catalog_enabled),
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -405,8 +410,9 @@ async def list_catalog_items(
             db, user, item.name, item.labels or {}, item.owner_email or ""
         )
         if has_capability(caps, cap.CATALOG_READ):
-            visible.append(item)
-    return JSONResponse(content={"data": [_item_json(i) for i in visible]})
+            visible.append(_item_json(item))
+    page_items, meta = paginate(visible, request)
+    return JSONResponse(content={"data": page_items, "meta": meta})
 
 
 @router.post("/catalog-items", status_code=201)
@@ -555,13 +561,16 @@ async def get_catalog_item_form(
 @router.get("/catalog-items/{item_id}/instances")
 async def list_catalog_item_instances(
     item_id: str = Path(...),
+    request: Request = None,
     _: None = Depends(require_catalog_enabled),
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     item = await _load_item_for_read(db, user, item_id)
     instances = await catalog_service.list_instances(db, item.id)
-    return JSONResponse(content={"data": [_instance_json(w) for w in instances]})
+    items = [_instance_json(w) for w in instances]
+    page_items, meta = paginate(items, request)
+    return JSONResponse(content={"data": page_items, "meta": meta})
 
 
 @router.post("/catalog-items/{item_id}/provision", status_code=201)

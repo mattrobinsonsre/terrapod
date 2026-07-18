@@ -174,3 +174,52 @@ func TestDeleteAgentPool(t *testing.T) {
 		t.Error(err)
 	}
 }
+
+func TestListAllAgentPools_LoopsAllPages(t *testing.T) {
+	// 3 pages of 2 (total 5). ListAllAgentPools must loop on meta.total-pages
+	// and return every pool, requesting exactly 3 pages.
+	pages := map[string]string{
+		"1": `{"data":[
+		  {"id":"apool-a","type":"agent-pools","attributes":{"name":"a"}},
+		  {"id":"apool-b","type":"agent-pools","attributes":{"name":"b"}}],
+		  "meta":{"pagination":{"current-page":1,"page-size":2,"total-pages":3,"total-count":5}}}`,
+		"2": `{"data":[
+		  {"id":"apool-c","type":"agent-pools","attributes":{"name":"c"}},
+		  {"id":"apool-d","type":"agent-pools","attributes":{"name":"d"}}],
+		  "meta":{"pagination":{"current-page":2,"page-size":2,"total-pages":3,"total-count":5}}}`,
+		"3": `{"data":[
+		  {"id":"apool-e","type":"agent-pools","attributes":{"name":"e"}}],
+		  "meta":{"pagination":{"current-page":3,"page-size":2,"total-pages":3,"total-count":5}}}`,
+	}
+	var requested []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		page := r.URL.Query().Get("page[number]")
+		requested = append(requested, page)
+		if got := r.URL.Query().Get("page[size]"); got != "100" {
+			t.Errorf("page size = %q, want 100", got)
+		}
+		body, ok := pages[page]
+		if !ok {
+			t.Fatalf("unexpected page request: %q", page)
+		}
+		_, _ = w.Write([]byte(body))
+	}))
+	t.Cleanup(srv.Close)
+	c, err := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	all, err := c.ListAllAgentPools(t.Context())
+	if err != nil {
+		t.Fatalf("ListAllAgentPools: %v", err)
+	}
+	if len(all) != 5 {
+		t.Fatalf("got %d pools, want 5: %+v", len(all), all)
+	}
+	if all[0].ID != "apool-a" || all[4].ID != "apool-e" {
+		t.Errorf("wrong order/content: %+v", all)
+	}
+	if len(requested) != 3 {
+		t.Errorf("requested pages %v, want exactly 3", requested)
+	}
+}

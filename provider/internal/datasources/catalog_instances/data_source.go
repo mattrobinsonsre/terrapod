@@ -96,7 +96,7 @@ func (d *catalogInstancesDataSource) Read(ctx context.Context, req datasource.Re
 		return
 	}
 
-	instances, err := d.tc.ListCatalogInstances(ctx, config.CatalogItemID.ValueString())
+	instances, err := d.tc.ListAllCatalogInstances(ctx, config.CatalogItemID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to list catalog instances", err.Error())
 		return

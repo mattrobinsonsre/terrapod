@@ -20,13 +20,14 @@ Endpoints:
 import uuid
 from datetime import UTC
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Path, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request, status
 from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user
+from terrapod.api.pagination import paginate
 from terrapod.auth import capabilities as cap
 from terrapod.auth.capabilities import has_capability
 from terrapod.db.models import Run, RunTask, TaskStage, TaskStageResult, Workspace
@@ -241,6 +242,7 @@ async def create_run_task(
 @extensions_router.get("/workspaces/{workspace_id}/run-tasks")
 async def list_run_tasks(
     workspace_id: str = Path(...),
+    request: Request = None,
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
@@ -256,7 +258,9 @@ async def list_run_tasks(
     )
     tasks = list(result.scalars().all())
 
-    return JSONResponse(content={"data": [_run_task_json(rt) for rt in tasks]})
+    items = [_run_task_json(rt) for rt in tasks]
+    page_items, meta = paginate(items, request)
+    return JSONResponse(content={"data": page_items, "meta": meta})
 
 
 @extensions_router.get("/run-tasks/{rt_id}")

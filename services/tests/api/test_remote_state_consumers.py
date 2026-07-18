@@ -418,7 +418,10 @@ class TestListConsumers:
                 headers=_AUTH,
             )
         assert resp.status_code == 200
-        assert resp.json() == {"data": []}
+        # #862: list endpoints now always emit meta.pagination alongside data.
+        body = resp.json()
+        assert body["data"] == []
+        assert body["meta"]["pagination"]["total-count"] == 0
 
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")

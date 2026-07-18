@@ -15,12 +15,13 @@ Endpoints:
 
 from datetime import UTC
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Path
+from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.api.dependencies import AuthenticatedUser, require_admin, require_admin_or_audit
+from terrapod.api.pagination import paginate
 from terrapod.auth.builtin_roles import BUILTIN_ROLES, is_builtin_role
 from terrapod.auth.capabilities import (
     AXIS_LEVEL_MAPS,
@@ -163,6 +164,7 @@ def _builtin_role_json(name: str, info: dict) -> dict:
 
 @router.get("/roles")
 async def list_roles(
+    request: Request = None,
     user: AuthenticatedUser = Depends(require_admin_or_audit),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
@@ -175,7 +177,8 @@ async def list_roles(
     for role in result.scalars().all():
         data.append(_role_json(role))
 
-    return JSONResponse(content={"data": data})
+    page_items, meta = paginate(data, request)
+    return JSONResponse(content={"data": page_items, "meta": meta})
 
 
 @router.post("/roles", status_code=201)

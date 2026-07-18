@@ -11,7 +11,7 @@ import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
 import { SortableHeader } from '@/components/sortable-header'
 import { getAuthState, isAdmin } from '@/lib/auth'
-import { apiFetch } from '@/lib/api'
+import { apiFetch, fetchAllPages } from '@/lib/api'
 import { useSortable } from '@/lib/use-sortable'
 import { usePollingInterval } from '@/lib/use-polling-interval'
 
@@ -76,10 +76,7 @@ export default function ExecutionHooksPage() {
 
   async function loadHooks() {
     try {
-      const res = await apiFetch('/api/terrapod/v1/execution-hooks')
-      if (!res.ok) throw new Error(t('errors.load'))
-      const data = await res.json()
-      setHooks(data.data || [])
+      setHooks(await fetchAllPages<ExecutionHook>('/api/terrapod/v1/execution-hooks'))
     } catch (err) {
       setError(err instanceof Error ? err.message : t('errors.load'))
     } finally {
