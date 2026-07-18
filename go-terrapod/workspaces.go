@@ -213,6 +213,7 @@ type WorkspaceListOptions struct {
 type WorkspaceList struct {
 	Items       []Workspace
 	CurrentPage int
+	PageSize    int
 	TotalPages  int
 	TotalCount  int
 }
@@ -328,10 +329,52 @@ func (c *Client) ListWorkspaces(ctx context.Context, opts WorkspaceListOptions) 
 	// separately so the resource-list parse stays clean.
 	if meta, err := parseListMeta(data); err == nil {
 		list.CurrentPage = meta.CurrentPage
+		list.PageSize = meta.PageSize
 		list.TotalPages = meta.TotalPages
 		list.TotalCount = meta.TotalCount
 	}
 	return list, nil
+}
+
+// ListAllWorkspaces fetches every workspace matching opts, paging through
+// the whole collection so the caller doesn't have to. It is the robust way
+// to "get all workspaces": it loops on the server's meta.total-pages rather
+// than relying on any single-response default, so it stays correct even if
+// the server imposes a page size. opts.PageNumber is ignored (paging starts
+// at 1); opts.PageSize sets the per-request page (defaults to 100 here to
+// keep round-trips down), and opts.Search still filters.
+//
+// Prefer this over ListWorkspaces when you want the complete set; use
+// ListWorkspaces when you genuinely want a single page (e.g. surfacing
+// total-count to a user without pulling everything).
+func (c *Client) ListAllWorkspaces(ctx context.Context, opts WorkspaceListOptions) ([]Workspace, error) {
+	pageSize := opts.PageSize
+	if pageSize <= 0 {
+		pageSize = 100
+	}
+	var all []Workspace
+	for page := 1; ; page++ {
+		list, err := c.ListWorkspaces(ctx, WorkspaceListOptions{
+			PageNumber: page,
+			PageSize:   pageSize,
+			Search:     opts.Search,
+		})
+		if err != nil {
+			return nil, err
+		}
+		all = append(all, list.Items...)
+		// Stop when we've collected every page. TotalPages is authoritative;
+		// fall back to "a short page means the end" if the server omitted meta
+		// (older server, or a non-paginating collection).
+		if list.TotalPages > 0 {
+			if page >= list.TotalPages {
+				break
+			}
+		} else if len(list.Items) < pageSize {
+			break
+		}
+	}
+	return all, nil
 }
 
 // ── Internal helpers ─────────────────────────────────────────────────

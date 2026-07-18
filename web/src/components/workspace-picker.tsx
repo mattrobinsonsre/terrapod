@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Search } from 'lucide-react'
 import { useTranslations } from 'next-intl'
-import { apiFetch } from '@/lib/api'
+import { fetchAllPages } from '@/lib/api'
 
 export interface WorkspaceOption {
   id: string
@@ -51,15 +51,13 @@ export function WorkspacePicker({
     let active = true
     ;(async () => {
       try {
-        const res = await apiFetch('/api/v2/organizations/default/workspaces')
-        if (res.ok && active) {
-          const data = await res.json()
-          setAll(
-            (data.data || []).map((ws: { id: string; attributes: { name: string } }) => ({
-              id: ws.id,
-              name: ws.attributes.name,
-            }))
-          )
+        // Page through the whole list so the picker can find any workspace,
+        // not just the first server page.
+        const items = await fetchAllPages<{ id: string; attributes: { name: string } }>(
+          '/api/v2/organizations/default/workspaces'
+        )
+        if (active) {
+          setAll(items.map((ws) => ({ id: ws.id, name: ws.attributes.name })))
         }
       } catch {
         // best-effort; empty list renders "No workspaces found"

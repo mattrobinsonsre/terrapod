@@ -1519,3 +1519,97 @@ class TestGranularCapabilityEnforcement:
             )
         assert resp.status_code == 403
         assert "run:apply" in resp.json()["detail"]
+
+
+# ── List workspace runs: pagination meta (#862) ─────────────────────────
+
+
+def _ws_lookup_db(ws):
+    """Mock DB whose _get_workspace execute() returns ws."""
+    result = MagicMock()
+    result.scalar_one_or_none.return_value = ws
+    db = AsyncMock()
+    db.execute.return_value = result
+    return db
+
+
+class TestListRunsPagination:
+    """Runs are the deliberate exception to 'absent → full list': run history
+    grows unbounded, so this endpoint keeps a bounded default page but now
+    always emits meta.pagination so a client can page the full history.
+    """
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs.run_service.count_workspace_runs")
+    @patch("terrapod.api.routers.runs.run_service.list_workspace_runs")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
+    async def test_list_emits_meta(self, mock_resolve, mock_list, mock_count, *mocks):
+        mock_resolve.return_value = caps_for_level("read")
+        ws = _mock_workspace()
+        mock_list.return_value = [_mock_run(ws_id=ws.id) for _ in range(2)]
+        mock_count.return_value = 45  # more than one page exists
+
+        app, _ = _make_app(_user(), mock_db=_ws_lookup_db(ws))
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get(
+                f"/api/v2/workspaces/ws-{ws.id}/runs?page[size]=2&page[number]=3",
+                headers=_AUTH,
+            )
+
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert len(body["data"]) == 2
+        assert body["meta"]["pagination"] == {
+            "current-page": 3,
+            "page-size": 2,
+            "total-count": 45,
+            "total-pages": 23,  # ceil(45/2)
+        }
+        # The service was asked for page 3 at size 2.
+        assert mock_list.await_args.args[2:] == (3, 2)
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs.run_service.count_workspace_runs")
+    @patch("terrapod.api.routers.runs.run_service.list_workspace_runs")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
+    async def test_default_page_size_is_bounded(self, mock_resolve, mock_list, mock_count, *mocks):
+        mock_resolve.return_value = caps_for_level("read")
+        ws = _mock_workspace()
+        mock_list.return_value = []
+        mock_count.return_value = 0
+
+        app, _ = _make_app(_user(), mock_db=_ws_lookup_db(ws))
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get(f"/api/v2/workspaces/ws-{ws.id}/runs", headers=_AUTH)
+
+        assert resp.status_code == 200, resp.text
+        # Absent params → bounded default of 20 (NOT the full history).
+        assert mock_list.await_args.args[2:] == (1, 20)
+        assert resp.json()["meta"]["pagination"]["page-size"] == 20
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs.run_service.count_workspace_runs")
+    @patch("terrapod.api.routers.runs.run_service.list_workspace_runs")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
+    async def test_page_size_zero_falls_back_to_default(
+        self, mock_resolve, mock_list, mock_count, *mocks
+    ):
+        # Unlike the bounded-collection endpoints, page[size]=0 here must NOT
+        # dump all history — it clamps to the default page.
+        mock_resolve.return_value = caps_for_level("read")
+        ws = _mock_workspace()
+        mock_list.return_value = []
+        mock_count.return_value = 0
+
+        app, _ = _make_app(_user(), mock_db=_ws_lookup_db(ws))
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get(f"/api/v2/workspaces/ws-{ws.id}/runs?page[size]=0", headers=_AUTH)
+
+        assert resp.status_code == 200, resp.text
+        assert mock_list.await_args.args[2:] == (1, 20)

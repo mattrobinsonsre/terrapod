@@ -53,6 +53,7 @@ from terrapod.api.dependencies import (
     require_non_runner,
 )
 from terrapod.api.labels import validate_labels
+from terrapod.api.pagination import paginate
 from terrapod.auth import capabilities as cap
 from terrapod.auth.capabilities import has_capability
 from terrapod.db.models import (
@@ -868,8 +869,14 @@ async def list_workspaces(
         if caps:
             visible.append(_workspace_json(ws, caps, latest_run=latest_runs.get(ws.id))["data"])
 
+    # Optional JSON:API pagination (TFE wire shape). page[size]>=1 returns that
+    # page; page[size]=0 or absent params return the full RBAC-filtered list as a
+    # single page. meta is always emitted so paginating clients (go-terrapod,
+    # the provider, go-tfe) can loop, while bulk-fetch callers stay unaffected.
+    page_items, meta = paginate(visible, request)
+
     return JSONResponse(
-        content={"data": visible},
+        content={"data": page_items, "meta": meta},
         headers=_tfe_headers(),
     )
 
@@ -1645,10 +1652,14 @@ async def list_state_versions(
     )
     state_versions = result.scalars().all()
 
+    # Optional JSON:API pagination (see pagination.paginate): page[size]>=1 →
+    # that page; page[size]=0 or absent → full list. go-tfe paginates this
+    # endpoint, so meta is always emitted.
+    items = [_state_version_json(sv, request)["data"] for sv in state_versions]
+    page_items, meta = paginate(items, request)
+
     return JSONResponse(
-        content={
-            "data": [_state_version_json(sv, request)["data"] for sv in state_versions],
-        },
+        content={"data": page_items, "meta": meta},
         headers=_tfe_headers(),
     )
 

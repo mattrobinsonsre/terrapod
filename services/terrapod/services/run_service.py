@@ -3,7 +3,7 @@
 import json
 import uuid
 
-from sqlalchemy import and_, not_, or_, select
+from sqlalchemy import and_, func, not_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
@@ -1473,6 +1473,14 @@ async def list_workspace_runs(
         .limit(page_size)
     )
     return list(result.scalars().all())
+
+
+async def count_workspace_runs(db: AsyncSession, workspace_id: uuid.UUID) -> int:
+    """Total run count for a workspace (for pagination meta.total-count)."""
+    result = await db.execute(
+        select(func.count()).select_from(Run).where(Run.workspace_id == workspace_id)
+    )
+    return int(result.scalar_one())
 
 
 async def claim_next_run(
