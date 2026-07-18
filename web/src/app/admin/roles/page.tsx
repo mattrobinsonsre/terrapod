@@ -12,7 +12,7 @@ import { SortableHeader } from '@/components/sortable-header'
 import { useSortable } from '@/lib/use-sortable'
 import { useConfirm } from '@/lib/use-confirm'
 import { getAuthState, isAdmin } from '@/lib/auth'
-import { apiFetch } from '@/lib/api'
+import { apiFetch, fetchAllPages } from '@/lib/api'
 import { useFormat } from '@/lib/format'
 import { usePollingInterval } from '@/lib/use-polling-interval'
 
@@ -304,10 +304,7 @@ export default function RolesPage() {
 
   async function loadRoles() {
     try {
-      const res = await apiFetch('/api/terrapod/v1/roles')
-      if (!res.ok) throw new Error(t('errors.loadRoles'))
-      const data = await res.json()
-      setRoles(data.data || [])
+      setRoles(await fetchAllPages<Role>('/api/terrapod/v1/roles'))
     } catch (err) {
       setError(err instanceof Error ? err.message : t('errors.loadRoles'))
     } finally {
@@ -318,17 +315,13 @@ export default function RolesPage() {
   async function loadAssignments() {
     setAssignmentsLoading(true)
     try {
-      const [assignRes, identRes] = await Promise.all([
-        apiFetch('/api/terrapod/v1/role-assignments'),
-        apiFetch('/api/terrapod/v1/role-assignments/identities'),
+      const [assignmentsList, identitiesList] = await Promise.all([
+        fetchAllPages<RoleAssignment>('/api/terrapod/v1/role-assignments'),
+        // identities are non-fatal for the page
+        fetchAllPages<Identity>('/api/terrapod/v1/role-assignments/identities').catch(() => [] as Identity[]),
       ])
-      if (!assignRes.ok) throw new Error(t('errors.loadAssignments'))
-      const assignData = await assignRes.json()
-      setAssignments(assignData.data || [])
-      if (identRes.ok) {
-        const identData = await identRes.json()
-        setIdentities(identData.data || [])
-      }
+      setAssignments(assignmentsList)
+      setIdentities(identitiesList)
     } catch (err) {
       setError(err instanceof Error ? err.message : t('errors.loadAssignments'))
     } finally {

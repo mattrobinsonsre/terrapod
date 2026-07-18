@@ -24,13 +24,14 @@ Endpoints:
 import uuid
 from datetime import UTC
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query, Request, status
 from fastapi.responses import JSONResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user
+from terrapod.api.pagination import paginate
 from terrapod.auth import capabilities as cap
 from terrapod.auth.capabilities import has_capability
 from terrapod.db.models import Workspace, WorkspaceRemoteStateConsumer
@@ -198,6 +199,7 @@ async def create_remote_state_consumer(
 async def list_remote_state_consumers(
     workspace_id: str = Path(...),
     filter_type: str | None = Query(None, alias="filter[remote-state-consumer][type]"),
+    request: Request = None,
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
@@ -234,7 +236,9 @@ async def list_remote_state_consumers(
     )
     rows = list((await db.execute(query)).scalars().all())
 
-    return JSONResponse(content={"data": [_consumer_json(r) for r in rows]})
+    items = [_consumer_json(r) for r in rows]
+    page_items, meta = paginate(items, request)
+    return JSONResponse(content={"data": page_items, "meta": meta})
 
 
 @router.put("/workspaces/{workspace_id}/remote-state-consumers")

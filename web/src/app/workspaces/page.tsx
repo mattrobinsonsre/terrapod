@@ -433,15 +433,13 @@ function WorkspacesPageInner() {
   useEffect(() => {
     if (!showCreate) return
     if (!vcsConnectionsLoaded) {
-      apiFetch('/api/terrapod/v1/vcs-connections')
-        .then(res => res.ok ? res.json() : { data: [] })
-        .then(data => { setVcsConnections(data.data || []); setVcsConnectionsLoaded(true) })
+      fetchAllPages<{ id: string; attributes: { name: string; provider: string } }>('/api/terrapod/v1/vcs-connections')
+        .then(conns => { setVcsConnections(conns); setVcsConnectionsLoaded(true) })
         .catch(() => {})
     }
     if (!agentPoolsLoaded) {
-      apiFetch('/api/terrapod/v1/agent-pools')
-        .then(res => res.ok ? res.json() : { data: [] })
-        .then(data => { setAgentPools(data.data || []); setAgentPoolsLoaded(true) })
+      fetchAllPages<{ id: string; attributes: { name: string } }>('/api/terrapod/v1/agent-pools')
+        .then(pools => { setAgentPools(pools); setAgentPoolsLoaded(true) })
         .catch(() => {})
     }
   }, [showCreate, vcsConnectionsLoaded, agentPoolsLoaded])

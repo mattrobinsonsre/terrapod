@@ -19,12 +19,13 @@ Endpoints:
 import uuid
 from datetime import UTC
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Path
+from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.api.dependencies import AuthenticatedUser, require_admin
+from terrapod.api.pagination import paginate
 from terrapod.db.models import VCSConnection, generate_uuid7
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
@@ -88,12 +89,15 @@ async def _get_connection(db: AsyncSession, connection_id: uuid.UUID) -> VCSConn
 
 @router.get("/vcs-connections")
 async def list_connections(
+    request: Request = None,
     user: AuthenticatedUser = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """List all VCS connections (admin only)."""
     connections = await _list_connections(db)
-    return JSONResponse(content={"data": [_connection_json(c) for c in connections]})
+    items = [_connection_json(c) for c in connections]
+    page_items, meta = paginate(items, request)
+    return JSONResponse(content={"data": page_items, "meta": meta})
 
 
 @router.post("/vcs-connections", status_code=201)

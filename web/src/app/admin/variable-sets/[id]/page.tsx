@@ -133,10 +133,7 @@ export default function VariableSetDetailPage() {
 
   async function loadVariables() {
     try {
-      const res = await apiFetch(`/api/v2/varsets/${varsetId}/relationships/vars`)
-      if (!res.ok) throw new Error(t('detail.errors.loadVars'))
-      const data = await res.json()
-      setVariables(data.data || [])
+      setVariables(await fetchAllPages<Variable>(`/api/v2/varsets/${varsetId}/relationships/vars`))
     } catch (err) {
       setError(err instanceof Error ? err.message : t('detail.errors.loadVars'))
     } finally {

@@ -13,7 +13,7 @@ import { useSortable } from '@/lib/use-sortable'
 import { usePollingInterval } from '@/lib/use-polling-interval'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { useConfirm } from '@/lib/use-confirm'
-import { apiFetch } from '@/lib/api'
+import { apiFetch, fetchAllPages } from '@/lib/api'
 
 interface CachedBinary {
   id: string
@@ -105,18 +105,13 @@ export default function CachePage() {
 
   async function loadAll() {
     try {
-      const [binaryRes, providerRes] = await Promise.all([
-        apiFetch('/api/terrapod/v1/admin/binary-cache'),
-        apiFetch('/api/terrapod/v1/admin/provider-cache'),
+      // binary cache is fatal for the page; provider cache is non-fatal
+      const [binaryList, providerList] = await Promise.all([
+        fetchAllPages<CachedBinary>('/api/terrapod/v1/admin/binary-cache'),
+        fetchAllPages<CachedProvider>('/api/terrapod/v1/admin/provider-cache').catch(() => [] as CachedProvider[]),
       ])
-      if (!binaryRes.ok) throw new Error(t('errors.loadBinary'))
-      const binaryData = await binaryRes.json()
-      setEntries(binaryData.data || [])
-
-      if (providerRes.ok) {
-        const providerData = await providerRes.json()
-        setProviderEntries(providerData.data || [])
-      }
+      setEntries(binaryList)
+      setProviderEntries(providerList)
     } catch (err) {
       setError(err instanceof Error ? err.message : t('errors.loadCache'))
     } finally {

@@ -10,7 +10,7 @@ import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
 import { SortableHeader } from '@/components/sortable-header'
 import { getAuthState, getUserId, isAdmin } from '@/lib/auth'
-import { apiFetch } from '@/lib/api'
+import { apiFetch, fetchAllPages } from '@/lib/api'
 import { useSortable } from '@/lib/use-sortable'
 import { useFormat } from '@/lib/format'
 
@@ -109,9 +109,8 @@ export default function TokensPage() {
   // them, and only admins can list all roles for the picker.
   useEffect(() => {
     if (!admin) return
-    apiFetch('/api/terrapod/v1/roles')
-      .then((r) => (r.ok ? r.json() : { data: [] }))
-      .then((d) => setAllRoles((d.data || []).map((role: { name: string }) => role.name).filter(Boolean)))
+    fetchAllPages<{ name: string }>('/api/terrapod/v1/roles')
+      .then((roles) => setAllRoles(roles.map((role) => role.name).filter(Boolean)))
       .catch(() => {})
   }, [admin])
 
@@ -124,10 +123,7 @@ export default function TokensPage() {
       } else {
         url = `/api/terrapod/v1/users/${userId}/authentication-tokens`
       }
-      const res = await apiFetch(url)
-      if (!res.ok) throw new Error(t('tokens.errors.load'))
-      const data = await res.json()
-      setTokens(data.data || [])
+      setTokens(await fetchAllPages<Token>(url))
     } catch (err) {
       setError(err instanceof Error ? err.message : t('tokens.errors.load'))
     } finally {

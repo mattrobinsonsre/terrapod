@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"strconv"
 )
 
 // AgentPool is the decoded form of a Terrapod agent pool — the named
@@ -81,6 +82,43 @@ func (c *Client) ListAgentPools(ctx context.Context) ([]AgentPool, error) {
 		out = append(out, *agentPoolFromResource(&resources[i]))
 	}
 	return out, nil
+}
+
+// ListAllAgentPools fetches every pool visible to the caller, paging through
+// the whole collection so the caller doesn't have to. It loops on the server's
+// meta.total-pages (falling back to "a short page ends it" when the server
+// omits meta), so it stays correct even if the endpoint imposes a page size.
+// Result scope is still determined by pool RBAC. Prefer this over
+// ListAgentPools when correctness over a large, paginated fleet matters (e.g. a
+// find-by-name lookup).
+func (c *Client) ListAllAgentPools(ctx context.Context) ([]AgentPool, error) {
+	const pageSize = 100
+	var all []AgentPool
+	for page := 1; ; page++ {
+		q := url.Values{}
+		q.Set("page[number]", strconv.Itoa(page))
+		q.Set("page[size]", strconv.Itoa(pageSize))
+		data, err := c.Get(ctx, "/api/terrapod/v1/agent-pools?"+q.Encode())
+		if err != nil {
+			return nil, err
+		}
+		resources, err := ParseResourceList(data)
+		if err != nil {
+			return nil, err
+		}
+		for i := range resources {
+			all = append(all, *agentPoolFromResource(&resources[i]))
+		}
+		meta, _ := parseListMeta(data)
+		if meta.TotalPages > 0 {
+			if page >= meta.TotalPages {
+				break
+			}
+		} else if len(resources) < pageSize {
+			break
+		}
+	}
+	return all, nil
 }
 
 // UpdateAgentPool patches the pool. Caller must hold pool admin.

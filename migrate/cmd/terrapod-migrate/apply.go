@@ -225,7 +225,7 @@ func resolveVCSConnections(ctx context.Context, c *terrapod.Client, planConns []
 	if len(planConns) == 0 {
 		return out, nil
 	}
-	existing, err := c.ListVCSConnections(ctx)
+	existing, err := c.ListAllVCSConnections(ctx)
 	if err != nil {
 		return nil, err
 	}

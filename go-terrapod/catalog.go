@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"strconv"
 )
 
 // Service catalog (#535): provider templates, catalog items, and the
@@ -216,6 +217,42 @@ func (c *Client) ListCatalogInstances(ctx context.Context, itemID string) ([]Cat
 		out = append(out, *catalogInstanceFromResource(&resources[i]))
 	}
 	return out, nil
+}
+
+// ListAllCatalogInstances fetches every provisioned instance of a catalog item,
+// paging through the whole collection so the caller doesn't have to. It loops on
+// the server's meta.total-pages (falling back to "a short page ends it" when the
+// server omits meta), so it stays correct even if the endpoint imposes a page
+// size. Prefer this over ListCatalogInstances when correctness over a large,
+// paginated instance set matters.
+func (c *Client) ListAllCatalogInstances(ctx context.Context, itemID string) ([]CatalogInstance, error) {
+	const pageSize = 100
+	var all []CatalogInstance
+	for page := 1; ; page++ {
+		q := url.Values{}
+		q.Set("page[number]", strconv.Itoa(page))
+		q.Set("page[size]", strconv.Itoa(pageSize))
+		data, err := c.Get(ctx, "/api/terrapod/v1/catalog-items/"+url.PathEscape(itemID)+"/instances?"+q.Encode())
+		if err != nil {
+			return nil, err
+		}
+		resources, err := ParseResourceList(data)
+		if err != nil {
+			return nil, err
+		}
+		for i := range resources {
+			all = append(all, *catalogInstanceFromResource(&resources[i]))
+		}
+		meta, _ := parseListMeta(data)
+		if meta.TotalPages > 0 {
+			if page >= meta.TotalPages {
+				break
+			}
+		} else if len(resources) < pageSize {
+			break
+		}
+	}
+	return all, nil
 }
 
 // GetCatalogInstance reads a single catalog instance by workspace id (requires

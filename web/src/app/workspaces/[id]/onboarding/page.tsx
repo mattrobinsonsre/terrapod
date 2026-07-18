@@ -18,7 +18,7 @@ import { PageHeader } from '@/components/page-header'
 import { LoadingSpinner } from '@/components/loading-spinner'
 import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
-import { apiFetch } from '@/lib/api'
+import { apiFetch, fetchAllPages } from '@/lib/api'
 
 interface DataSource {
   name: string
@@ -106,10 +106,7 @@ export default function OnboardingPage() {
   }, [workspaceId])
 
   const loadSessions = useCallback(async () => {
-    const res = await apiFetch(`/api/terrapod/v1/workspaces/${workspaceId}/onboarding-sessions`)
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    const d = await res.json()
-    const list: Session[] = d?.data ?? []
+    const list = await fetchAllPages<Session>(`/api/terrapod/v1/workspaces/${workspaceId}/onboarding-sessions`)
     setSessions(list)
     setActiveId((cur) => cur ?? (list.length ? list[0].id : null))
     return list

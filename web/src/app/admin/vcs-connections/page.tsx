@@ -11,7 +11,7 @@ import { EmptyState } from '@/components/empty-state'
 import { SortableHeader } from '@/components/sortable-header'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { useConfirm } from '@/lib/use-confirm'
-import { apiFetch } from '@/lib/api'
+import { apiFetch, fetchAllPages } from '@/lib/api'
 import { useSortable } from '@/lib/use-sortable'
 import { usePollingInterval } from '@/lib/use-polling-interval'
 import { useFormat } from '@/lib/format'
@@ -112,10 +112,7 @@ export default function VCSConnectionsPage() {
 
   async function loadConnections() {
     try {
-      const res = await apiFetch('/api/terrapod/v1/vcs-connections')
-      if (!res.ok) throw new Error(t('errors.load'))
-      const data = await res.json()
-      setConnections(data.data || [])
+      setConnections(await fetchAllPages<VCSConnection>('/api/terrapod/v1/vcs-connections'))
     } catch (err) {
       setError(err instanceof Error ? err.message : t('errors.load'))
     } finally {

@@ -49,6 +49,7 @@ from terrapod.api.dependencies import (
     require_non_runner,
 )
 from terrapod.api.labels import validate_labels
+from terrapod.api.pagination import paginate
 from terrapod.api.serialization import rfc3339
 from terrapod.auth import capabilities as cap
 from terrapod.auth.capabilities import has_capability
@@ -323,6 +324,7 @@ async def create_provider_endpoint(
 
 @management_router.get(_BASE)
 async def list_providers_endpoint(
+    request: Request = None,
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
@@ -339,7 +341,8 @@ async def list_providers_endpoint(
         )
         if caps:
             visible.append(_provider_to_jsonapi(p, caps))
-    return JSONResponse(content={"data": visible})
+    page_items, meta = paginate(visible, request)
+    return JSONResponse(content={"data": page_items, "meta": meta})
 
 
 @management_router.get(_BASE + "/private/default/{name}")
@@ -568,6 +571,7 @@ async def upload_provider_shasums_sig_endpoint(
 @management_router.get(_BASE + "/private/default/{name}/versions")
 async def list_provider_versions_endpoint(
     name: str,
+    request: Request = None,
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
@@ -587,9 +591,9 @@ async def list_provider_versions_endpoint(
         raise HTTPException(status_code=404, detail="Provider not found")
 
     versions = await list_provider_versions(db, provider.id)
-    return JSONResponse(
-        content={"data": [_version_to_jsonapi(v) for v in versions]},
-    )
+    items = [_version_to_jsonapi(v) for v in versions]
+    page_items, meta = paginate(items, request)
+    return JSONResponse(content={"data": page_items, "meta": meta})
 
 
 @management_router.delete(_BASE + "/private/default/{name}/versions/{version}")

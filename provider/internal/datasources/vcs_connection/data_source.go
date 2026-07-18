@@ -89,7 +89,7 @@ func (d *vcsConnectionDataSource) Read(ctx context.Context, req datasource.ReadR
 		return
 	}
 
-	conns, err := d.tc.ListVCSConnections(ctx)
+	conns, err := d.tc.ListAllVCSConnections(ctx)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to list VCS connections", err.Error())
 		return

@@ -179,3 +179,52 @@ func TestDeleteVCSConnection(t *testing.T) {
 		t.Error(err)
 	}
 }
+
+func TestListAllVCSConnections_LoopsAllPages(t *testing.T) {
+	// 3 pages of 2 (total 5). ListAllVCSConnections must loop on
+	// meta.total-pages and return every connection, requesting exactly 3 pages.
+	pages := map[string]string{
+		"1": `{"data":[
+		  {"id":"vcs-a","type":"vcs-connections","attributes":{"name":"a","provider":"github"}},
+		  {"id":"vcs-b","type":"vcs-connections","attributes":{"name":"b","provider":"github"}}],
+		  "meta":{"pagination":{"current-page":1,"page-size":2,"total-pages":3,"total-count":5}}}`,
+		"2": `{"data":[
+		  {"id":"vcs-c","type":"vcs-connections","attributes":{"name":"c","provider":"gitlab"}},
+		  {"id":"vcs-d","type":"vcs-connections","attributes":{"name":"d","provider":"gitlab"}}],
+		  "meta":{"pagination":{"current-page":2,"page-size":2,"total-pages":3,"total-count":5}}}`,
+		"3": `{"data":[
+		  {"id":"vcs-e","type":"vcs-connections","attributes":{"name":"e","provider":"github"}}],
+		  "meta":{"pagination":{"current-page":3,"page-size":2,"total-pages":3,"total-count":5}}}`,
+	}
+	var requested []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		page := r.URL.Query().Get("page[number]")
+		requested = append(requested, page)
+		if got := r.URL.Query().Get("page[size]"); got != "100" {
+			t.Errorf("page size = %q, want 100", got)
+		}
+		body, ok := pages[page]
+		if !ok {
+			t.Fatalf("unexpected page request: %q", page)
+		}
+		_, _ = w.Write([]byte(body))
+	}))
+	t.Cleanup(srv.Close)
+	c, err := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	all, err := c.ListAllVCSConnections(t.Context())
+	if err != nil {
+		t.Fatalf("ListAllVCSConnections: %v", err)
+	}
+	if len(all) != 5 {
+		t.Fatalf("got %d connections, want 5: %+v", len(all), all)
+	}
+	if all[0].ID != "vcs-a" || all[4].ID != "vcs-e" {
+		t.Errorf("wrong order/content: %+v", all)
+	}
+	if len(requested) != 3 {
+		t.Errorf("requested pages %v, want exactly 3", requested)
+	}
+}

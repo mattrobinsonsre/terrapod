@@ -15,13 +15,14 @@ Endpoints:
 import uuid
 from datetime import UTC
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query, Request, status
 from fastapi.responses import JSONResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user
+from terrapod.api.pagination import paginate
 from terrapod.auth import capabilities as cap
 from terrapod.auth.capabilities import has_capability
 from terrapod.db.models import RunTrigger, Workspace
@@ -170,6 +171,7 @@ async def create_run_trigger(
 async def list_run_triggers(
     workspace_id: str = Path(...),
     filter_type: str | None = Query(None, alias="filter[run-trigger][type]"),
+    request: Request = None,
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
@@ -201,7 +203,9 @@ async def list_run_triggers(
     result = await db.execute(query)
     triggers = list(result.scalars().all())
 
-    return JSONResponse(content={"data": [_trigger_json(t) for t in triggers]})
+    items = [_trigger_json(t) for t in triggers]
+    page_items, meta = paginate(items, request)
+    return JSONResponse(content={"data": page_items, "meta": meta})
 
 
 @router.get("/run-triggers/{run_trigger_id}")

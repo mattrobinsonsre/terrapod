@@ -14,12 +14,13 @@ Endpoints:
 
 from datetime import UTC
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Path
+from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.api.dependencies import AuthenticatedUser, require_admin, require_admin_or_audit
+from terrapod.api.pagination import paginate
 from terrapod.auth.builtin_roles import is_builtin_role, is_platform_role
 from terrapod.auth.recent_users import list_recent_users
 from terrapod.db.models import PlatformRoleAssignment, Role, RoleAssignment, User
@@ -50,6 +51,7 @@ def _assignment_json(provider: str, email: str, role_name: str, created_at=None)
 
 @router.get("/role-assignments")
 async def list_role_assignments(
+    request: Request = None,
     user: AuthenticatedUser = Depends(require_admin_or_audit),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
@@ -72,7 +74,8 @@ async def list_role_assignments(
     for ra in result.scalars().all():
         data.append(_assignment_json(ra.provider_name, ra.email, ra.role_name, ra.created_at))
 
-    return JSONResponse(content={"data": data})
+    page_items, meta = paginate(data, request)
+    return JSONResponse(content={"data": page_items, "meta": meta})
 
 
 @router.get("/role-assignments/identities")

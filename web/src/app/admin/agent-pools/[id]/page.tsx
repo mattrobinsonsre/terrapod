@@ -13,7 +13,7 @@ import { ConnectionStatus } from '@/components/connection-status'
 import { LabelsEditor } from '@/components/labels-editor'
 import { getAuthState } from '@/lib/auth'
 import { useConfirm } from '@/lib/use-confirm'
-import { apiFetch } from '@/lib/api'
+import { apiFetch, fetchAllPages } from '@/lib/api'
 import { usePoolEvents } from '@/lib/use-pool-events'
 import { usePollingInterval } from '@/lib/use-polling-interval'
 
@@ -155,10 +155,7 @@ export default function AgentPoolDetailPage() {
 
   async function loadTokens() {
     try {
-      const res = await apiFetch(`/api/terrapod/v1/agent-pools/${poolId}/tokens`)
-      if (!res.ok) throw new Error(t('errors.loadTokens'))
-      const data = await res.json()
-      setTokens(data.data || [])
+      setTokens(await fetchAllPages<PoolToken>(`/api/terrapod/v1/agent-pools/${poolId}/tokens`))
     } catch (err) {
       setError(err instanceof Error ? err.message : t('errors.loadTokens'))
     } finally {
@@ -168,10 +165,7 @@ export default function AgentPoolDetailPage() {
 
   const loadListeners = useCallback(async () => {
     try {
-      const res = await apiFetch(`/api/terrapod/v1/agent-pools/${poolId}/listeners`)
-      if (!res.ok) throw new Error(t('errors.loadListeners'))
-      const data = await res.json()
-      setListeners(data.data || [])
+      setListeners(await fetchAllPages<Listener>(`/api/terrapod/v1/agent-pools/${poolId}/listeners`))
     } catch (err) {
       setError(err instanceof Error ? err.message : t('errors.loadListeners'))
     } finally {

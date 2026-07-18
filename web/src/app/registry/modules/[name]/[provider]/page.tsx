@@ -13,7 +13,7 @@ import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { useConfirm } from '@/lib/use-confirm'
-import { apiFetch } from '@/lib/api'
+import { apiFetch, fetchAllPages } from '@/lib/api'
 import { LabelsEditor } from '@/components/labels-editor'
 import { usePollingInterval } from '@/lib/use-polling-interval'
 
@@ -248,11 +248,7 @@ export default function ModuleDetailPage() {
 
   async function loadVcsConnections() {
     try {
-      const res = await apiFetch('/api/terrapod/v1/vcs-connections')
-      if (res.ok) {
-        const data = await res.json()
-        setVcsConnections(data.data || [])
-      }
+      setVcsConnections(await fetchAllPages<VCSConnection>('/api/terrapod/v1/vcs-connections'))
     } catch {
       // VCS connections are optional — ignore errors
     }

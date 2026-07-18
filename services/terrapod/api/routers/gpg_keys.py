@@ -18,12 +18,13 @@ Endpoints (canonical):
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user
+from terrapod.api.pagination import paginate
 from terrapod.api.serialization import rfc3339
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
@@ -132,13 +133,16 @@ async def create_gpg_key_endpoint(
 @router.get("/gpg-keys")
 async def list_gpg_keys_endpoint(
     filter_namespace: str | None = Query(None, alias="filter[namespace]"),
+    request: Request = None,
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """List GPG keys, optionally filtered by namespace (org)."""
     keys = await list_gpg_keys(db)
+    items = [_gpg_key_to_jsonapi(k) for k in keys]
+    page_items, meta = paginate(items, request)
     return JSONResponse(
-        content={"data": [_gpg_key_to_jsonapi(k) for k in keys]},
+        content={"data": page_items, "meta": meta},
     )
 
 

@@ -224,3 +224,55 @@ func TestVariableFromResource_EnvCategory(t *testing.T) {
 		t.Errorf("variable: %+v", v)
 	}
 }
+
+func TestListAllVariables_LoopsAllPages(t *testing.T) {
+	// 3 pages of 2 (total 5). ListAllVariables must loop on meta.total-pages,
+	// scope to the workspace's /vars path, and return every variable.
+	pages := map[string]string{
+		"1": `{"data":[
+		  {"id":"var-a","type":"vars","attributes":{"key":"a","category":"terraform"}},
+		  {"id":"var-b","type":"vars","attributes":{"key":"b","category":"terraform"}}],
+		  "meta":{"pagination":{"current-page":1,"page-size":2,"total-pages":3,"total-count":5}}}`,
+		"2": `{"data":[
+		  {"id":"var-c","type":"vars","attributes":{"key":"c","category":"env"}},
+		  {"id":"var-d","type":"vars","attributes":{"key":"d","category":"env"}}],
+		  "meta":{"pagination":{"current-page":2,"page-size":2,"total-pages":3,"total-count":5}}}`,
+		"3": `{"data":[
+		  {"id":"var-e","type":"vars","attributes":{"key":"e","category":"terraform"}}],
+		  "meta":{"pagination":{"current-page":3,"page-size":2,"total-pages":3,"total-count":5}}}`,
+	}
+	var requested []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v2/workspaces/ws-1/vars" {
+			t.Fatalf("unexpected path: %q", r.URL.Path)
+		}
+		page := r.URL.Query().Get("page[number]")
+		requested = append(requested, page)
+		if got := r.URL.Query().Get("page[size]"); got != "100" {
+			t.Errorf("page size = %q, want 100", got)
+		}
+		body, ok := pages[page]
+		if !ok {
+			t.Fatalf("unexpected page request: %q", page)
+		}
+		_, _ = w.Write([]byte(body))
+	}))
+	t.Cleanup(srv.Close)
+	c, err := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	all, err := c.ListAllVariables(t.Context(), "ws-1")
+	if err != nil {
+		t.Fatalf("ListAllVariables: %v", err)
+	}
+	if len(all) != 5 {
+		t.Fatalf("got %d variables, want 5: %+v", len(all), all)
+	}
+	if all[0].Key != "a" || all[4].Key != "e" {
+		t.Errorf("wrong order/content: %+v", all)
+	}
+	if len(requested) != 3 {
+		t.Errorf("requested pages %v, want exactly 3", requested)
+	}
+}
