@@ -20,6 +20,15 @@ func newGPGFixture(t *testing.T) (*Client, *[]byte) {
 		}
 		w.Header().Set("Content-Type", "application/vnd.api+json")
 		switch {
+		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/revoke"):
+			// A malformed / mismatched revocation certificate → 422.
+			body := string(lastBody)
+			if !strings.Contains(body, "revocation-certificate") ||
+				strings.Contains(body, "\"revocation-certificate\":\"bad\"") {
+				http.Error(w, `{"errors":[{"status":"422","title":"Unprocessable Entity","detail":"invalid revocation certificate"}]}`, http.StatusUnprocessableEntity)
+				return
+			}
+			_, _ = w.Write([]byte(`{"data":{"id":"gpg-aaa","type":"gpg-keys","attributes":{"key-id":"ABC123","namespace":"default"}}}`))
 		case r.Method == http.MethodPost && r.URL.Path == "/api/terrapod/v1/gpg-keys":
 			w.WriteHeader(http.StatusCreated)
 			_, _ = w.Write([]byte(`{"data":{"id":"gpg-aaa","type":"gpg-keys","attributes":{
@@ -84,6 +93,39 @@ func TestListGPGKeys(t *testing.T) {
 	list, err := c.ListGPGKeys(t.Context())
 	if err != nil || len(list) != 1 {
 		t.Errorf("list: %v / %v", list, err)
+	}
+}
+
+func TestRevokeGPGKey(t *testing.T) {
+	c, lastBody := newGPGFixture(t)
+	k, err := c.RevokeGPGKey(t.Context(), "gpg-aaa",
+		"-----BEGIN PGP PUBLIC KEY BLOCK-----\nrevocation\n-----END PGP PUBLIC KEY BLOCK-----")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if k.ID != "gpg-aaa" || k.KeyID != "ABC123" {
+		t.Errorf("key: %+v", k)
+	}
+	// The SDK must send the certificate under revocation-certificate.
+	var req struct {
+		Data struct {
+			Attributes map[string]any `json:"attributes"`
+		} `json:"data"`
+	}
+	_ = json.Unmarshal(*lastBody, &req)
+	if _, has := req.Data.Attributes["revocation-certificate"]; !has {
+		t.Errorf("revocation-certificate not sent: %+v", req.Data.Attributes)
+	}
+}
+
+func TestRevokeGPGKeyInvalidCertificate(t *testing.T) {
+	c, _ := newGPGFixture(t)
+	_, err := c.RevokeGPGKey(t.Context(), "gpg-aaa", "bad")
+	if err == nil {
+		t.Fatal("expected validation error")
+	}
+	if _, ok := err.(*ValidationError); !ok {
+		t.Errorf("expected *ValidationError, got %T: %v", err, err)
 	}
 }
 

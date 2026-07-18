@@ -93,6 +93,17 @@ func TestListExecutionHooks(t *testing.T) {
 	}
 }
 
+func TestGetExecutionHook(t *testing.T) {
+	c, _ := newHookFixture(t)
+	h, err := c.GetExecutionHook(t.Context(), "hook-aaa")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if h.ID != "hook-aaa" || h.Name != "hosts" || h.HookPoint != "pre_init" {
+		t.Errorf("hook: %+v", h)
+	}
+}
+
 func TestUpdateExecutionHook_PointerSemantics(t *testing.T) {
 	c, lastBody := newHookFixture(t)
 	point := "post_apply"
