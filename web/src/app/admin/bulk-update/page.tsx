@@ -16,7 +16,7 @@ import {
   type NotificationSpec,
 } from '@/components/template-editors'
 import { getAuthState, isAdmin } from '@/lib/auth'
-import { apiFetch } from '@/lib/api'
+import { apiFetch, fetchAllPages } from '@/lib/api'
 
 interface WorkspaceSummary {
   id: string
@@ -133,12 +133,12 @@ export default function BulkUpdatePage() {
   async function loadRefs() {
     setLoading(true)
     try {
-      const [poolsRes, connsRes] = await Promise.all([
-        apiFetch('/api/terrapod/v1/agent-pools'),
-        apiFetch('/api/terrapod/v1/vcs-connections'),
+      const [poolsList, connsList] = await Promise.all([
+        fetchAllPages<AgentPool>('/api/terrapod/v1/agent-pools').catch(() => [] as AgentPool[]),
+        fetchAllPages<VCSConnection>('/api/terrapod/v1/vcs-connections').catch(() => [] as VCSConnection[]),
       ])
-      if (poolsRes.ok) setPools((await poolsRes.json()).data || [])
-      if (connsRes.ok) setConnections((await connsRes.json()).data || [])
+      setPools(poolsList)
+      setConnections(connsList)
     } catch {
       // refs are convenience-only; the page still works with manual ids
     } finally {

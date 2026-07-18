@@ -12,7 +12,7 @@ import { EmptyState } from '@/components/empty-state'
 import { LabelsEditor } from '@/components/labels-editor'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { useConfirm } from '@/lib/use-confirm'
-import { apiFetch } from '@/lib/api'
+import { apiFetch, fetchAllPages } from '@/lib/api'
 
 interface CatalogItem {
   id: string
@@ -104,14 +104,14 @@ export default function AdminCatalogPage() {
       setItems(data.data || [])
 
       // Best-effort load of pickers; don't fail the page if any are empty.
-      const [modRes, tmplRes, poolRes] = await Promise.all([
-        apiFetch('/api/terrapod/v1/registry-modules'),
-        apiFetch('/api/terrapod/v1/provider-templates'),
-        apiFetch('/api/terrapod/v1/agent-pools'),
+      const [mods, tmpls, agentPools] = await Promise.all([
+        fetchAllPages<ModuleOption>('/api/terrapod/v1/registry-modules').catch(() => [] as ModuleOption[]),
+        fetchAllPages<ProviderTemplate>('/api/terrapod/v1/provider-templates').catch(() => [] as ProviderTemplate[]),
+        fetchAllPages<AgentPool>('/api/terrapod/v1/agent-pools').catch(() => [] as AgentPool[]),
       ])
-      if (modRes.ok) setModules((await modRes.json()).data || [])
-      if (tmplRes.ok) setTemplates((await tmplRes.json()).data || [])
-      if (poolRes.ok) setPools((await poolRes.json()).data || [])
+      setModules(mods)
+      setTemplates(tmpls)
+      setPools(agentPools)
     } catch (err) {
       setError(err instanceof Error ? err.message : t('errors.load'))
     } finally {

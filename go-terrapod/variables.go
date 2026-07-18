@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"strconv"
 )
 
 // Variable is the decoded form of one Terrapod workspace variable.
@@ -135,6 +136,42 @@ func (c *Client) ListVariables(ctx context.Context, workspaceID string) ([]Varia
 		out = append(out, *v)
 	}
 	return out, nil
+}
+
+// ListAllVariables fetches every variable on a workspace, paging through the
+// whole collection so the caller doesn't have to. It loops on the server's
+// meta.total-pages (falling back to "a short page ends it" when the server omits
+// meta), so it stays correct even if the endpoint imposes a page size. Prefer
+// this over ListVariables when correctness over a large, paginated variable set
+// matters (e.g. verifying a full migration).
+func (c *Client) ListAllVariables(ctx context.Context, workspaceID string) ([]Variable, error) {
+	const pageSize = 100
+	var all []Variable
+	for page := 1; ; page++ {
+		q := url.Values{}
+		q.Set("page[number]", strconv.Itoa(page))
+		q.Set("page[size]", strconv.Itoa(pageSize))
+		data, err := c.Get(ctx, "/api/v2/workspaces/"+url.PathEscape(workspaceID)+"/vars?"+q.Encode())
+		if err != nil {
+			return nil, err
+		}
+		resources, err := ParseResourceList(data)
+		if err != nil {
+			return nil, err
+		}
+		for i := range resources {
+			all = append(all, *variableFromResource(&resources[i]))
+		}
+		meta, _ := parseListMeta(data)
+		if meta.TotalPages > 0 {
+			if page >= meta.TotalPages {
+				break
+			}
+		} else if len(resources) < pageSize {
+			break
+		}
+	}
+	return all, nil
 }
 
 // UpdateVariable patches a variable in place. Pointer fields on the

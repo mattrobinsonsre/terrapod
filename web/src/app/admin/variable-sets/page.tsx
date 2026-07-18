@@ -11,7 +11,7 @@ import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
 import { SortableHeader } from '@/components/sortable-header'
 import { getAuthState, isAdmin } from '@/lib/auth'
-import { apiFetch } from '@/lib/api'
+import { apiFetch, fetchAllPages } from '@/lib/api'
 import { useSortable } from '@/lib/use-sortable'
 import { usePollingInterval } from '@/lib/use-polling-interval'
 import { useFormat } from '@/lib/format'
@@ -71,10 +71,7 @@ export default function VariableSetsPage() {
 
   async function loadVarsets() {
     try {
-      const res = await apiFetch('/api/v2/organizations/default/varsets')
-      if (!res.ok) throw new Error(t('errors.load'))
-      const data = await res.json()
-      setVarsets(data.data || [])
+      setVarsets(await fetchAllPages<VariableSet>('/api/v2/organizations/default/varsets'))
     } catch (err) {
       setError(err instanceof Error ? err.message : t('errors.load'))
     } finally {

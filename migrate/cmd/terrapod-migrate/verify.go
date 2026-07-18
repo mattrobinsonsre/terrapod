@@ -180,9 +180,9 @@ func runVerify(ctx context.Context, c *terrapod.Client, state *framework.State) 
 		// recorded count (ExpectedVarCount == 0) fall back to the
 		// presence-only behaviour.
 		if ws := ws; ws != nil {
-			vars, err := c.ListVariables(ctx, ws.ID)
+			vars, err := c.ListAllVariables(ctx, ws.ID)
 			if err != nil {
-				v.Failures = append(v.Failures, fmt.Sprintf("ListVariables failed: %v", err))
+				v.Failures = append(v.Failures, fmt.Sprintf("ListAllVariables failed: %v", err))
 			} else {
 				v.VariableCount = len(vars)
 				v.ExpectedVariableCount = rec.ExpectedVarCount

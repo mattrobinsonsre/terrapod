@@ -219,3 +219,55 @@ func TestCatalogProvisionAndLifecycle(t *testing.T) {
 		t.Fatalf("orphan: %v", err)
 	}
 }
+
+func TestListAllCatalogInstances_LoopsAllPages(t *testing.T) {
+	// 3 pages of 2 (total 5). ListAllCatalogInstances must loop on
+	// meta.total-pages, scope to the item's /instances path, and return all.
+	pages := map[string]string{
+		"1": `{"data":[
+		  {"id":"ws-a","type":"catalog-instances","attributes":{"name":"a"}},
+		  {"id":"ws-b","type":"catalog-instances","attributes":{"name":"b"}}],
+		  "meta":{"pagination":{"current-page":1,"page-size":2,"total-pages":3,"total-count":5}}}`,
+		"2": `{"data":[
+		  {"id":"ws-c","type":"catalog-instances","attributes":{"name":"c"}},
+		  {"id":"ws-d","type":"catalog-instances","attributes":{"name":"d"}}],
+		  "meta":{"pagination":{"current-page":2,"page-size":2,"total-pages":3,"total-count":5}}}`,
+		"3": `{"data":[
+		  {"id":"ws-e","type":"catalog-instances","attributes":{"name":"e"}}],
+		  "meta":{"pagination":{"current-page":3,"page-size":2,"total-pages":3,"total-count":5}}}`,
+	}
+	var requested []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/terrapod/v1/catalog-items/ci-1/instances" {
+			t.Fatalf("unexpected path: %q", r.URL.Path)
+		}
+		page := r.URL.Query().Get("page[number]")
+		requested = append(requested, page)
+		if got := r.URL.Query().Get("page[size]"); got != "100" {
+			t.Errorf("page size = %q, want 100", got)
+		}
+		body, ok := pages[page]
+		if !ok {
+			t.Fatalf("unexpected page request: %q", page)
+		}
+		_, _ = w.Write([]byte(body))
+	}))
+	t.Cleanup(srv.Close)
+	c, err := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	all, err := c.ListAllCatalogInstances(t.Context(), "ci-1")
+	if err != nil {
+		t.Fatalf("ListAllCatalogInstances: %v", err)
+	}
+	if len(all) != 5 {
+		t.Fatalf("got %d instances, want 5: %+v", len(all), all)
+	}
+	if all[0].ID != "ws-a" || all[4].ID != "ws-e" {
+		t.Errorf("wrong order/content: %+v", all)
+	}
+	if len(requested) != 3 {
+		t.Errorf("requested pages %v, want exactly 3", requested)
+	}
+}

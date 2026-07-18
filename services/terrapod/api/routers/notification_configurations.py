@@ -17,13 +17,14 @@ Endpoints:
 import uuid
 from datetime import UTC
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Path, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request, status
 from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user
+from terrapod.api.pagination import paginate
 from terrapod.auth import capabilities as cap
 from terrapod.auth.capabilities import has_capability
 from terrapod.db.models import NotificationConfiguration, Workspace
@@ -179,6 +180,7 @@ async def create_notification_configuration(
 @router.get("/workspaces/{workspace_id}/notification-configurations")
 async def list_notification_configurations(
     workspace_id: str = Path(...),
+    request: Request = None,
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
@@ -194,7 +196,9 @@ async def list_notification_configurations(
     )
     configs = list(result.scalars().all())
 
-    return JSONResponse(content={"data": [_nc_json(nc) for nc in configs]})
+    items = [_nc_json(nc) for nc in configs]
+    page_items, meta = paginate(items, request)
+    return JSONResponse(content={"data": page_items, "meta": meta})
 
 
 async def _get_nc(nc_id: str, db: AsyncSession) -> NotificationConfiguration:

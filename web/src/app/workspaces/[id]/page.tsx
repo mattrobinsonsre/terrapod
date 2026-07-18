@@ -19,7 +19,7 @@ import { MobileCardList, MobileCard } from '@/components/mobile-card-list'
 import { StateGraphTab } from '@/components/state-graph-tab'
 import { useIsTouch } from '@/lib/use-media-query'
 import { getAuthState, isAdmin } from '@/lib/auth'
-import { apiFetch } from '@/lib/api'
+import { apiFetch, fetchAllPages } from '@/lib/api'
 import { useSortable } from '@/lib/use-sortable'
 import { useRunEvents } from '@/lib/use-run-events'
 
@@ -576,10 +576,7 @@ function WorkspaceDetailContent() {
 
   async function loadVariables() {
     try {
-      const res = await apiFetch(`/api/v2/workspaces/${workspaceId}/vars`)
-      if (!res.ok) throw new Error(t('errors.loadVariables'))
-      const data = await res.json()
-      setVariables(data.data || [])
+      setVariables(await fetchAllPages<Variable>(`/api/v2/workspaces/${workspaceId}/vars`))
     } catch (err) {
       setError(err instanceof Error ? err.message : t('errors.loadVariables'))
     } finally {
@@ -589,10 +586,7 @@ function WorkspaceDetailContent() {
 
   async function loadStateVersions() {
     try {
-      const res = await apiFetch(`/api/v2/workspaces/${workspaceId}/state-versions`)
-      if (!res.ok) throw new Error(t('errors.loadStateVersions'))
-      const data = await res.json()
-      setStateVersions(data.data || [])
+      setStateVersions(await fetchAllPages<StateVersionItem>(`/api/v2/workspaces/${workspaceId}/state-versions`))
     } catch (err) {
       setError(err instanceof Error ? err.message : t('errors.loadStateVersions'))
     } finally {
@@ -717,10 +711,7 @@ function WorkspaceDetailContent() {
   async function loadNotifications() {
     setNotifLoading(true)
     try {
-      const res = await apiFetch(`/api/terrapod/v1/workspaces/${workspaceId}/notification-configurations`)
-      if (!res.ok) throw new Error(t('errors.loadNotifications'))
-      const data = await res.json()
-      setNotifications(data.data || [])
+      setNotifications(await fetchAllPages<NotificationConfig>(`/api/terrapod/v1/workspaces/${workspaceId}/notification-configurations`))
     } catch (err) {
       setError(err instanceof Error ? err.message : t('errors.loadNotifications'))
     } finally {
@@ -744,16 +735,12 @@ function WorkspaceDetailContent() {
     setRscLoading(true)
     try {
       const base = `/api/terrapod/v1/workspaces/${workspaceId}/remote-state-consumers`
-      const [outRes, inRes] = await Promise.all([
-        apiFetch(`${base}?filter[remote-state-consumer][type]=outbound`),
-        apiFetch(`${base}?filter[remote-state-consumer][type]=inbound`),
+      const [outRows, inRows] = await Promise.all([
+        fetchAllPages<Parameters<typeof _rscFromRow>[0]>(`${base}?filter[remote-state-consumer][type]=outbound`),
+        fetchAllPages<Parameters<typeof _rscFromRow>[0]>(`${base}?filter[remote-state-consumer][type]=inbound`),
       ])
-      if (!outRes.ok) throw new Error(t('errors.loadOutboundConsumers'))
-      if (!inRes.ok) throw new Error(t('errors.loadInboundConsumers'))
-      const outData = await outRes.json()
-      const inData = await inRes.json()
-      setRscOutbound((outData.data || []).map(_rscFromRow))
-      setRscInbound((inData.data || []).map(_rscFromRow))
+      setRscOutbound(outRows.map(_rscFromRow))
+      setRscInbound(inRows.map(_rscFromRow))
     } catch (err) {
       setError(err instanceof Error ? err.message : t('errors.loadConsumers'))
     } finally {
@@ -819,16 +806,12 @@ function WorkspaceDetailContent() {
     setTrgLoading(true)
     try {
       const base = `/api/terrapod/v1/workspaces/${workspaceId}/run-triggers`
-      const [inRes, outRes] = await Promise.all([
-        apiFetch(`${base}?filter[run-trigger][type]=inbound`),
-        apiFetch(`${base}?filter[run-trigger][type]=outbound`),
+      const [inRows, outRows] = await Promise.all([
+        fetchAllPages<Parameters<typeof _trgFromRow>[0]>(`${base}?filter[run-trigger][type]=inbound`),
+        fetchAllPages<Parameters<typeof _trgFromRow>[0]>(`${base}?filter[run-trigger][type]=outbound`),
       ])
-      if (!inRes.ok) throw new Error(t('errors.loadInboundTriggers'))
-      if (!outRes.ok) throw new Error(t('errors.loadOutboundTriggers'))
-      const inData = await inRes.json()
-      const outData = await outRes.json()
-      setTrgInbound((inData.data || []).map(_trgFromRow))
-      setTrgOutbound((outData.data || []).map(_trgFromRow))
+      setTrgInbound(inRows.map(_trgFromRow))
+      setTrgOutbound(outRows.map(_trgFromRow))
     } catch (err) {
       setError(err instanceof Error ? err.message : t('errors.loadTriggers'))
     } finally {
@@ -882,10 +865,7 @@ function WorkspaceDetailContent() {
   async function loadRunTasks() {
     setRunTasksLoading(true)
     try {
-      const res = await apiFetch(`/api/terrapod/v1/workspaces/${workspaceId}/run-tasks`)
-      if (!res.ok) throw new Error(t('errors.loadRunTasks'))
-      const data = await res.json()
-      setRunTasks(data.data || [])
+      setRunTasks(await fetchAllPages<RunTaskItem>(`/api/terrapod/v1/workspaces/${workspaceId}/run-tasks`))
     } catch (err) {
       setError(err instanceof Error ? err.message : t('errors.loadRunTasks'))
     } finally {
@@ -987,15 +967,14 @@ function WorkspaceDetailContent() {
     setEditAutoMergeStrategy(workspace.attributes['auto-merge-strategy'] || 'merge')
     setEditing(true)
     if (!poolsLoaded) {
-      apiFetch('/api/terrapod/v1/agent-pools').then(res => res.ok ? res.json() : { data: [] }).then(data => {
-        const allPools: AgentPool[] = data.data || []
+      fetchAllPages<AgentPool>('/api/terrapod/v1/agent-pools').then(allPools => {
         setAgentPools(allPools.filter(p => p.attributes.permission === 'write' || p.attributes.permission === 'admin'))
         setPoolsLoaded(true)
       }).catch(() => {})
     }
     if (!vcsConnectionsLoaded) {
-      apiFetch('/api/terrapod/v1/vcs-connections').then(res => res.ok ? res.json() : { data: [] }).then(data => {
-        setVcsConnections(data.data || [])
+      fetchAllPages<{ id: string; attributes: { name: string; provider: string } }>('/api/terrapod/v1/vcs-connections').then(conns => {
+        setVcsConnections(conns)
         setVcsConnectionsLoaded(true)
       }).catch(() => {})
     }

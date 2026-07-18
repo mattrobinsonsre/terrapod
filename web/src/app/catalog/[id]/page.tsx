@@ -12,7 +12,7 @@ import { EmptyState } from '@/components/empty-state'
 import { LabelsEditor } from '@/components/labels-editor'
 import { Modal } from '@/components/modal'
 import { getAuthState, isAdmin } from '@/lib/auth'
-import { apiFetch } from '@/lib/api'
+import { apiFetch, fetchAllPages } from '@/lib/api'
 
 interface CatalogItem {
   id: string
@@ -158,11 +158,7 @@ export default function CatalogItemPage() {
 
   const loadInstances = useCallback(async () => {
     try {
-      const res = await apiFetch(`/api/terrapod/v1/catalog-items/${itemId}/instances`)
-      if (res.ok) {
-        const data = await res.json()
-        setInstances(data.data || [])
-      }
+      setInstances(await fetchAllPages<Instance>(`/api/terrapod/v1/catalog-items/${itemId}/instances`))
     } catch {
       // instances are non-fatal for the page
     }
@@ -174,10 +170,11 @@ export default function CatalogItemPage() {
 
     async function load() {
       try {
-        const [itemRes, formRes, poolsRes] = await Promise.all([
+        const [itemRes, formRes, poolsList] = await Promise.all([
           apiFetch(`/api/terrapod/v1/catalog-items/${itemId}`),
           apiFetch(`/api/terrapod/v1/catalog-items/${itemId}/form`),
-          apiFetch('/api/terrapod/v1/agent-pools'),
+          // pools are non-fatal for the page; page robustly but never fail the load on them
+          fetchAllPages<AgentPool>('/api/terrapod/v1/agent-pools').catch(() => [] as AgentPool[]),
         ])
         if (cancelled) return
         if (itemRes.status === 404) { setNotFound(true); return }
@@ -195,10 +192,7 @@ export default function CatalogItemPage() {
           setProvInputs(init)
         }
 
-        if (poolsRes.ok) {
-          const poolsData = await poolsRes.json()
-          setPools(poolsData.data || [])
-        }
+        setPools(poolsList)
 
         await loadInstances()
       } catch (err) {

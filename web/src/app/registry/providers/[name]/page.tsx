@@ -11,7 +11,7 @@ import { LoadingSpinner } from '@/components/loading-spinner'
 import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
 import { getAuthState, isAdmin } from '@/lib/auth'
-import { apiFetch } from '@/lib/api'
+import { apiFetch, fetchAllPages } from '@/lib/api'
 import { LabelsEditor } from '@/components/labels-editor'
 import { usePollingInterval } from '@/lib/use-polling-interval'
 
@@ -88,10 +88,7 @@ export default function ProviderDetailPage() {
 
   async function loadVersions() {
     try {
-      const res = await apiFetch(`${basePath}/versions`)
-      if (!res.ok) throw new Error(t('providerDetail.loadVersionsFailed'))
-      const data = await res.json()
-      setVersions(data.data || [])
+      setVersions(await fetchAllPages<Version>(`${basePath}/versions`))
     } catch (err) {
       setError(err instanceof Error ? err.message : t('providerDetail.loadVersionsFailed'))
     } finally {

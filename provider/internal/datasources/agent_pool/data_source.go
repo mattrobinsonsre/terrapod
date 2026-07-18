@@ -77,7 +77,7 @@ func (d *agentPoolDataSource) Read(ctx context.Context, req datasource.ReadReque
 		return
 	}
 
-	pools, err := d.tc.ListAgentPools(ctx)
+	pools, err := d.tc.ListAllAgentPools(ctx)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to list agent pools", err.Error())
 		return

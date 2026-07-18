@@ -12,7 +12,7 @@ Consumed by ``web/src/app/admin/execution-hooks/*`` and go-terrapod (PR2).
 import uuid
 from datetime import UTC
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Path
+from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy import inspect as sa_inspect
 from sqlalchemy import select
@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from terrapod.api.dependencies import AuthenticatedUser, require_admin
+from terrapod.api.pagination import paginate
 from terrapod.db.models import ExecutionHook, ExecutionHookWorkspace, Workspace
 from terrapod.db.session import get_db
 from terrapod.services import execution_hook_service
@@ -105,6 +106,7 @@ async def _get_hook(hook_id: str, db: AsyncSession) -> ExecutionHook:
 
 @router.get("/execution-hooks")
 async def list_hooks(
+    request: Request = None,
     user: AuthenticatedUser = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
@@ -115,7 +117,9 @@ async def list_hooks(
         .order_by(ExecutionHook.name)
     )
     hooks = result.scalars().all()
-    return JSONResponse(content={"data": [_hook_json(h) for h in hooks]})
+    items = [_hook_json(h) for h in hooks]
+    page_items, meta = paginate(items, request)
+    return JSONResponse(content={"data": page_items, "meta": meta})
 
 
 @router.post("/execution-hooks", status_code=201)
