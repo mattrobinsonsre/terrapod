@@ -118,6 +118,7 @@ Everything below is implemented and shipped today.
 | Remote state | Versioned state with locking and rollback; encrypted at rest by your object store, with optional app-layer BYOK envelope encryption |
 | CLI-driven runs | `terraform` / `tofu` plan / apply via the `cloud` backend (both verified) |
 | Terraform / OpenTofu provider | **Manage Terrapod itself as code** — [`terraform-provider-terrapod`](docs/terraform-provider.md) ships **25 resources + 7 data sources** (`terrapod_workspace`, `terrapod_variable`, `terrapod_role`, `terrapod_vcs_connection`, `terrapod_agent_pool`, `terrapod_run_task`, `terrapod_catalog_item`, `terrapod_execution_hook`, …), served per-instance from `<host>/default/terrapod` and GPG-signed |
+| AI agent integration (MCP) | **Drive Terrapod from an AI agent** (Claude, Cursor, …) via an official [MCP server](docs/mcp.md), `terrapod-mcp` — a local stdio binary authed with your `tofu login` token. Read-rich Observe tools (workspaces, runs, **structured plan JSON**, drift) + gated Act tools (plan/apply through the normal RBAC'd lifecycle). One server per instance = strict prod/dev isolation |
 | Agent execution | Server-side plan / apply on ephemeral K8s Jobs (ARC pattern) |
 | Agent pools | Named runner-listener groups; join-token → certificate exchange for auth |
 | TFE V2 CLI surface | The `cloud`-backend subset of the TFE V2 API (JSON:API) consumed by `terraform`/`tofu` + `terraform login` — not the full TFE V2 API |
