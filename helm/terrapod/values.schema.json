@@ -814,6 +814,16 @@
           }
         },
 
+        "cost_estimation": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "prices_url": { "type": "string" },
+            "default_region": { "type": "string" }
+          }
+        },
+
         "vcs": {
           "type": "object",
           "additionalProperties": false,

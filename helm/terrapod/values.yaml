@@ -358,6 +358,22 @@ api:
     catalog:
       enabled: true
 
+    # Cost estimation (#871). Estimates monthly cost by matching plan/state
+    # resources against OpenInfraQuote's published prices.csv, mirrored into
+    # object storage on demand (pull-through — fetched when missing or stale, no
+    # schedule; no per-run egress). On by default (first-class feature); because
+    # the cache is pull-through, nothing is fetched until a cost surface is used.
+    # This is an API-side setting — the API instructs runners per-run whether to
+    # estimate (falling back to yes). Air-gapped: pre-seed the cached object or
+    # point prices_url at an internal mirror. Powered by OpenInfraQuote (MPL-2.0).
+    cost_estimation:
+      enabled: true
+      prices_url: "https://oiq.terrateam.io/prices.csv.gz"
+      # Fallback only: region is resolved per resource (AWS v6 `region`, Azure
+      # `location`, GCP `region`/`location`, then provider config). A plan can
+      # span regions, so this default is used only when a resource has no region.
+      default_region: "us-east-1"
+
     # VCS Integration
     # VCS connections (GitHub App installations, GitLab tokens) are created
     # dynamically via the API. All credentials are stored on the connection

@@ -140,6 +140,15 @@ def binary_cache_sums_sig_key(tool: str, version: str) -> str:
     return f"cache/binaries/{tool}/{version}/SHA256SUMS.sig"
 
 
+def cost_pricesheet_key() -> str:
+    """Key for the cached OpenInfraQuote pricesheet (decompressed CSV, #871).
+
+    Mirrored from the configured `cost_estimation.prices_url` into object storage
+    so runners and the API read a cached copy with no per-run egress.
+    """
+    return "cache/cost/prices.csv"
+
+
 # --- Platform Provider Cache ---
 
 

@@ -660,6 +660,9 @@ jobs:
           echo "$out" | grep -q 'command: "/terrapod"' || { echo "FAIL: slack command not rendered into config.yaml (#691)"; exit 1; }
           echo "$out" | grep -q 'label: ""' || { echo "FAIL: slack label not rendered into config.yaml (#691)"; exit 1; }
           echo "$out" | grep -q "TERRAPOD_SLACK__BOT_TOKEN" || { echo "FAIL: slack bot-token secretKeyRef env missing"; exit 1; }
+          # Cost estimation (#871): non-secret config renders into config.yaml.
+          echo "$out" | grep -q "cost_estimation:" || { echo "FAIL: cost_estimation config not rendered into config.yaml (#871)"; exit 1; }
+          echo "$out" | grep -q "prices_url:" || { echo "FAIL: cost_estimation.prices_url not rendered (#871)"; exit 1; }
           echo "values-local renders OK (incl. Slack config + secretKeyRef)"
       - name: Eval values render (embedded Postgres/Redis)
         run: |
