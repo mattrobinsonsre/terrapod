@@ -14,7 +14,7 @@
     "variableSets": "מערכי משתנים",
     "autodiscovery": "גילוי אוטומטי",
     "bulkUpdate": "עדכון מרובה",
-    "executionHooks": "Hooks של הרצה",
+    "executionHooks": "ווי הרצה",
     "policySets": "מערכי מדיניות",
     "providerTemplates": "תבניות ספק",
     "catalogAdmin": "ניהול קטלוג",
@@ -163,8 +163,8 @@
       "tokenExchangeFailed": "החלפת האסימון נכשלה ({status})",
       "loginFailed": "הכניסה נכשלה",
       "startLoginFailed": "התחלת הכניסה נכשלה",
-      "missingCodeOrState": "חסר קוד הרשאה או state",
-      "stateMismatch": "אי-התאמת state — ייתכן ניסיון CSRF",
+      "missingCodeOrState": "חסר קוד הרשאה או מצב",
+      "stateMismatch": "אי-התאמת מצב — ייתכן ניסיון CSRF",
       "missingVerifier": "חסר מאמת PKCE — נסו להיכנס שוב"
     }
   },
@@ -243,7 +243,7 @@
     },
     "deprecated": {
       "badge": "מיושן ולא נתמך.",
-      "body": "דפדפן התוויות כבר אינו בניווט הראשי ויוסר בגרסה עתידית. סננו לפי תווית מעמוד <workspacesLink>סביבות העבודה</workspacesLink> במקום. אם אתם מסתמכים על עמוד זה, אנא <issueLink>פתחו issue</issueLink>."
+      "body": "דפדפן התוויות כבר אינו בניווט הראשי ויוסר בגרסה עתידית. סננו לפי תווית מעמוד <workspacesLink>סביבות העבודה</workspacesLink> במקום. אם אתם מסתמכים על עמוד זה, אנא <issueLink>פתחו דיווח</issueLink>."
     }
   },
   "settings": {
@@ -434,7 +434,7 @@
       "deleteFailed": "המחיקה נכשלה",
       "deleteFailedStatus": "המחיקה נכשלה ({status})",
       "upload": {
-        "intro": "בחרו תיקייה המכילה את קובצי מודול ה-Terraform שלכם. הם ייארזו ל-tarball ויועלו.",
+        "intro": "בחרו תיקייה המכילה את קובצי מודול ה-Terraform שלכם. הם ייארזו לארכיון tar ויועלו.",
         "version": "גרסה",
         "moduleDirectory": "תיקיית מודול",
         "selectDirectory": "בחירת תיקייה",
@@ -445,7 +445,7 @@
         "upload": "העלאה"
       },
       "vcs": {
-        "intro": "חברו מודול זה למאגר VCS. גרסאות חדשות מתפרסמות אוטומטית כאשר תגיות semver התואמות לתבנית התגית נדחפות. מסירות (commits) לענף בלבד אינן יוצרות גרסאות.",
+        "intro": "חברו מודול זה למאגר VCS. גרסאות חדשות מתפרסמות אוטומטית כאשר תגיות semver התואמות לתבנית התגית נדחפות. מסירות לענף בלבד אינן יוצרות גרסאות.",
         "connection": "חיבור VCS",
         "selectConnection": "בחירת חיבור...",
         "repositoryUrl": "כתובת מאגר",
@@ -907,7 +907,7 @@
       "templateDefaults": "ברירות מחדל לתבנית סביבת עבודה",
       "executionMode": "מצב הרצה",
       "executionModeHint": "הגילוי האוטומטי מונע-VCS; נתמכת רק הרצת agent.",
-      "agentPool": "מאגר agent",
+      "agentPool": "מאגר סוכנים",
       "none": "(אין)",
       "executionBackend": "מנוע הרצה",
       "terraformVersion": "גרסת Terraform",
@@ -1000,7 +1000,7 @@
       "namePrefix": "קידומת שם",
       "executionBackend": "מנוע הרצה",
       "ownerEmail": "אימייל בעלים",
-      "agentPool": "מאגר agent",
+      "agentPool": "מאגר סוכנים",
       "vcsConnection": "חיבור VCS",
       "labels": "תוויות",
       "search": "חיפוש",
@@ -1022,7 +1022,7 @@
       "executionBackend": "מנוע הרצה",
       "executionMode": "מצב הרצה",
       "autoApply": "החלה אוטומטית",
-      "agentPool": "מאגר agent",
+      "agentPool": "מאגר סוכנים",
       "cpuRequest": "בקשת CPU",
       "memoryRequest": "בקשת זיכרון",
       "setLabels": "הגדרת תוויות (מחליף את מפת התוויות בכל סביבת עבודה תואמת)",
@@ -1182,9 +1182,9 @@
       "enabled": "מופעל (נראה בקטלוג העיון)",
       "providerTemplates": "תבניות ספק",
       "noProviderTemplates": "לא הוגדרו תבניות ספק.",
-      "restrictPools": "הגבלה למאגרי agent מסוימים",
-      "noAgentPools": "אין מאגרי agent זמינים.",
-      "anyPool": "ניתן להשתמש בכל מאגר agent.",
+      "restrictPools": "הגבלה למאגרי סוכנים מסוימים",
+      "noAgentPools": "אין מאגרי סוכנים זמינים.",
+      "anyPool": "ניתן להשתמש בכל מאגר סוכנים.",
       "labels": "תוויות",
       "variableOptions": "אפשרויות משתנים (מתקדם, JSON)",
       "variableOptionsHint": "עקיפות לכל קלט (options, hidden, default). השאירו כ-<code>[]</code> אם לא בשימוש."
@@ -1267,9 +1267,9 @@
     }
   },
   "adminAgentPools": {
-    "title": "מאגרי Agent",
-    "description": "ניהול מאגרי agent של רצים והמאזינים שלהם",
-    "empty": "לא הוגדרו מאגרי agent.",
+    "title": "מאגרי סוכנים",
+    "description": "ניהול מאגרי סוכנים של רצים והמאזינים שלהם",
+    "empty": "לא הוגדרו מאגרי סוכנים.",
     "actions": {
       "newPool": "מאגר חדש",
       "createPool": "יצירת מאגר",
@@ -1305,8 +1305,8 @@
       }
     },
     "detail": {
-      "back": "חזרה למאגרי agent",
-      "defaultDescription": "מאגר agent"
+      "back": "חזרה למאגרי סוכנים",
+      "defaultDescription": "מאגר סוכנים"
     },
     "tabs": {
       "settings": "הגדרות",
@@ -1331,7 +1331,7 @@
     },
     "danger": {
       "title": "מחיקת מאגר",
-      "description": "מחיקה לצמיתות של מאגר agent זה וכל האסימונים המשויכים אליו."
+      "description": "מחיקה לצמיתות של מאגר סוכנים זה וכל האסימונים המשויכים אליו."
     },
     "tokens": {
       "create": "יצירת אסימון",
@@ -1393,7 +1393,7 @@
       "listenerDeleted": "המאזין נמחק"
     },
     "errors": {
-      "loadPools": "טעינת מאגרי ה-agent נכשלה",
+      "loadPools": "טעינת מאגרי הסוכנים נכשלה",
       "loadPool": "טעינת המאגר נכשלה",
       "loadTokens": "טעינת האסימונים נכשלה",
       "loadListeners": "טעינת המאזינים נכשלה",
@@ -2058,7 +2058,7 @@
       "autoMerge": "מיזוג אוטומטי לאחר החלה",
       "autoMergeStrategy": "אסטרטגיית מיזוג אוטומטי",
       "vcsPolling": "סקירת VCS",
-      "labels": "תוויות (tags)",
+      "labels": "תוויות (תגיות)",
       "labelsTitle": "תוויות סביבת העבודה ממלאות תפקיד כפול: התאמה של RBAC מבוסס-תוויות, ובתור ה\"tags\" המותאמים על ידי בלוקים של terraform/tofu cloud '{' workspaces '{' tags = ... '}' '}'.",
       "varFiles": "קובצי משתנים",
       "varFilesPlaceholder": "לדוגמה envs/dev.tfvars",
@@ -2073,7 +2073,7 @@
     "vcsWorkflowWarning": {
       "title": "ההרשאה הואצלה למאגר ה-VCS שלכם.",
       "rbac": "כל מי שיכול למזג את ה-PR יכול להחיל. כללי הגנת ענף (סקירות נדרשות, בדיקות סטטוס, אישור בעל קוד) הופכים לשער. RBAC של תפקיד/תווית ב-Terrapod<em>אינו</em>חל על פעולות מונחות-תגובה במצב זה.",
-      "recommended": "<strong>מומלץ:</strong> לדרוש היסטוריה לינארית (rebase/squash לפני מיזוג) כך שהקומיט שאתם מחילים הוא הקומיט שנוחת.",
+      "recommended": "<strong>מומלץ:</strong> לדרוש היסטוריה לינארית (שינוי בסיס/כיווץ לפני מיזוג) כך שהמסירה שאתם מיישמים היא המסירה שנוחתת.",
       "credit": "קרדיט: תהליך עבודה זה מבוסס על <atlantis>Atlantis</atlantis>. Atlantis נותר הכלי הנכון לצוותים שרוצים רק החלות מונחות-תגובת-PR וללא ממשק פלטפורמה."
     },
     "vcsPolling": {
@@ -2173,7 +2173,7 @@
       "queuePlan": "הוספת תוכנית לתור",
       "queueRun": "הוספת הרצה לתור",
       "queuePlanConfirm": "להוסיף תוכנית ספקולטיבית לתור עבור סביבת עבודה זו?",
-      "queueApplyConfirm": "להוסיף הרצת plan + apply לתור? זה עשוי לשנות תשתית.",
+      "queueApplyConfirm": "להוסיף הרצת תכנון + יישום לתור? זה עשוי לשנות תשתית.",
       "planOptions": "אפשרויות תוכנית",
       "targetResources": "משאבי יעד",
       "replaceResources": "החלפת משאבים",
@@ -2198,7 +2198,7 @@
       "needsConfirm": "דורש אישור",
       "typeDestroy": "השמדה",
       "typePlanOnly": "תוכנית בלבד",
-      "typePlanApply": "plan + apply",
+      "typePlanApply": "תכנון + יישום",
       "sourceModuleTest": "בדיקת מודול",
       "sourceModulePublish": "פרסום מודול"
     },
@@ -2222,7 +2222,7 @@
       "selectedCount": "{count}/2 נבחרו",
       "compare": "השוואה",
       "comparing": "משווה…",
-      "empty": "אין עדיין גרסאות תצורה. הן מופיעות כאן ברגע ש-`terraform plan` מעלה או ש-push ל-VCS מפעיל הרצה.",
+      "empty": "אין עדיין גרסאות תצורה. הן מופיעות כאן ברגע ש-`terraform plan` מעלה או שדחיפה ל-VCS מפעילה הרצה.",
       "id": "מזהה",
       "source": "מקור",
       "status": "סטטוס",
@@ -2383,7 +2383,7 @@
   "graphs": {
     "stateTab": {
       "loadError": "טעינת גרף המצב נכשלה.",
-      "emptyState": "עדיין אין מצב — הריצו plan ו-apply, או העלו מצב, ואז גרף זה יתמלא.",
+      "emptyState": "עדיין אין מצב — הריצו תכנון ויישום, או העלו מצב, ואז גרף זה יתמלא.",
       "stateVersionLabel": "גרסת מצב",
       "currentSuffix": "(נוכחית)",
       "colorByLabel": "צביעה לפי",
@@ -2443,9 +2443,9 @@
     }
   },
   "execHookDetail": {
-    "backLink": "חזרה ל-hooks של הרצה",
-    "defaultDescription": "hook הרצה",
-    "notFound": "hook ההרצה לא נמצא",
+    "backLink": "חזרה לווי הרצה",
+    "defaultDescription": "וו הרצה",
+    "notFound": "וו ההרצה לא נמצא",
     "scriptEmpty": "(ריק)",
     "tabs": {
       "settings": "הגדרות",
@@ -2473,36 +2473,36 @@
     "fields": {
       "name": "שם",
       "description": "תיאור",
-      "hookPoint": "נקודת Hook",
+      "hookPoint": "נקודת וו",
       "priority": "עדיפות",
       "enabled": "מופעל",
       "script": "סקריפט (<code>/bin/sh -c</code>)"
     },
     "delete": {
-      "heading": "מחיקת hook הרצה",
-      "description": "מחקו לצמיתות את ה-hook הזה והסירו אותו מכל סביבות העבודה."
+      "heading": "מחיקת וו הרצה",
+      "description": "מחקו לצמיתות את הוו הזה והסירו אותו מכל סביבות העבודה."
     },
     "workspaces": {
-      "scopeNote": "hook זה רץ רק על סביבות העבודה המשויכות למטה. אין היקף גלובלי.",
+      "scopeNote": "וו זה רץ רק על סביבות העבודה המשויכות למטה. אין היקף גלובלי.",
       "associate": "שיוך סביבת עבודה",
       "workspaceLabel": "סביבת עבודה",
       "selectPlaceholder": "בחירת סביבת עבודה...",
-      "empty": "אין סביבות עבודה משויכות ל-hook זה.",
+      "empty": "אין סביבות עבודה משויכות לוו זה.",
       "colWorkspace": "סביבת עבודה",
       "colActions": "פעולות"
     },
     "confirm": {
-      "removeWorkspace": "להסיר את סביבת העבודה הזו מה-hook? ה-hook לא ירוץ עוד עבורה."
+      "removeWorkspace": "להסיר את סביבת העבודה הזו מהוו? הוו לא ירוץ עוד עבורה."
     },
     "success": {
-      "updated": "hook ההרצה עודכן",
+      "updated": "וו ההרצה עודכן",
       "workspaceAssociated": "סביבת העבודה שויכה",
       "workspaceRemoved": "סביבת העבודה הוסרה"
     },
     "errors": {
-      "load": "טעינת hook ההרצה נכשלה",
-      "update": "עדכון hook ההרצה נכשל",
-      "delete": "מחיקת hook ההרצה נכשלה",
+      "load": "טעינת וו ההרצה נכשלה",
+      "update": "עדכון וו ההרצה נכשל",
+      "delete": "מחיקת וו ההרצה נכשלה",
       "addWorkspace": "הוספת סביבת העבודה נכשלה",
       "removeWorkspace": "הסרת סביבת העבודה נכשלה"
     }
@@ -2543,7 +2543,7 @@
       "syncedFrom": "מדיניות מסונכרנת מ-",
       "at": "בשעה",
       "lastSynced": "סונכרן לאחרונה {time}",
-      "commit": "(commit {sha})",
+      "commit": "(מסירה {sha})",
       "syncError": "שגיאת סנכרון: {error}"
     },
     "policies": {
