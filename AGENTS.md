@@ -143,15 +143,28 @@ Per-surface verification before you push (lint alone is **not** enough):
 ## The API ↔ Consumer contract (hard)
 
 Terrapod's API has several classes of consumer, each with its own contract.
-**Every API change must update every consumer it affects.**
+**Every API change must update every consumer it affects — whether it consumes
+the API *directly* (its own HTTP calls) or *transitively* (through go-terrapod).**
+A change is not done when the server compiles; it is done when every consumer
+that surfaces the changed thing has been carried along with it.
 
-- **Web UI** (`web/`) — SSR fetches + client `fetch()` calls.
+- **Web UI** (`web/`) — **direct** consumer: SSR fetches + client `fetch()` calls.
 - **go-terrapod** (`go-terrapod/`) — the canonical Go SDK; the source of
-  truth for the Go-side shape of every resource.
-- **terraform-provider-terrapod** (`provider/`) — imports go-terrapod for
-  every API call; holds only Terraform-plugin-framework code.
+  truth for the Go-side shape of every resource. Every other Go consumer below
+  goes through it, so an API change lands in go-terrapod **first** and then
+  fans out to all of them.
+- **terraform-provider-terrapod** (`provider/`) — **transitive** (via
+  go-terrapod); holds only Terraform-plugin-framework code.
 - **terrapod-migrate** (`migrate/`) and **terrapod-publish** (`publish/`) —
-  both import go-terrapod for every Terrapod-side write.
+  **transitive**; both import go-terrapod for every Terrapod-side write.
+- **terrapod-mcp** (`mcp/`) — **transitive**; the MCP server exposes curated
+  `terrapod_*` tools to AI agents, each backed by a go-terrapod call. It is a
+  first-class consumer: **when you add or change an endpoint, a go-terrapod
+  method, or a JSON:API attribute that an MCP tool surfaces (or should surface),
+  update the MCP tool + its `tool_catalogue.json` golden in the same change.**
+  A new capability an agent should be able to observe or drive is not complete
+  until it has a tool. Its tools inherit the API's RBAC (they act as the user's
+  `tofu login` identity), so no tool may widen access beyond what the API grants.
 
 The workflow when extending the API:
 
@@ -159,14 +172,19 @@ The workflow when extending the API:
    CLI-surface list; otherwise `/api/terrapod/v1/`).
 2. Add a typed method to **go-terrapod** + a test (the shape matches the
    JSON:API response).
-3. Add the consumer code that needs it (provider resource, frontend page,
-   migration/publish writer).
+3. Add the consumer code for **every** surface the change touches — directly or
+   transitively: the provider resource, the frontend page, the
+   migration/publish writer, **and the MCP tool** (with its catalogue golden).
+   If a surface genuinely isn't affected, that's fine — but the default is that
+   it is, and skipping one silently is the failure this contract exists to
+   prevent.
 
 When a JSON:API attribute name changes, update go-terrapod's struct
 field/tag, the provider's matching attribute, every frontend `fetch` that
-references it, and the migration tool if it touches that field. go-terrapod is
-the single source of truth for the Go-side view; the provider and migration
-tools do not carry their own JSON:API marshaling.
+references it, the migration tool if it touches that field, and any MCP tool
+that returns it. go-terrapod is the single source of truth for the Go-side
+view; the provider, migration tools, and MCP do not carry their own JSON:API
+marshaling — they read the changed shape off go-terrapod.
 
 ## The Code ↔ Tests contract (hard)
 

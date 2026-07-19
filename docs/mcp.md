@@ -100,9 +100,20 @@ Every tool is namespaced `terrapod_*` and carries a safety annotation
 | `terrapod_run_discard` | — | Discard a planned run without applying. |
 | `terrapod_run_cancel` | — | Cancel a non-terminal run. |
 
+### Manage (gated) — shape the estate
+
+| Tool | Safety | What it does |
+|---|---|---|
+| `terrapod_workspace_create` | — | Create a workspace (name required; execution mode, VCS wiring, agent pool, labels, …). |
+| `terrapod_workspace_update` | — | Update a workspace's settings (only the fields you pass change; applies on its next run). |
+| `terrapod_workspace_delete` | destructive | Delete a workspace + its Terrapod records. Does **not** destroy the tracked infra — queue a destroy run first. Catalog-managed workspaces are refused. |
+| `terrapod_variable_list` | read-only | List a workspace's variables (sensitive values masked). |
+| `terrapod_variable_set` | — | Upsert a variable by key (terraform or env; `hcl` for non-string values). |
+| `terrapod_variable_delete` | destructive | Delete a variable by key. |
+
 Nothing bypasses the platform: applies obey the workspace's VCS/auto-apply/lock
-rules and OPA policy, and every action is bounded by your Terrapod RBAC — a
-read-only token cannot mutate.
+rules and OPA policy, config changes apply on the next run, and every action is
+bounded by your Terrapod RBAC — a read-only token cannot mutate.
 
 ## Safety model, in short
 
@@ -124,13 +135,13 @@ warns you through the agent.
 
 ## Roadmap (additive)
 
-The foundation ships Observe + gated Act. Landing next, additively (no breaking
-changes): full management **CRUD** (workspaces, variables, VCS connections,
-roles, agent pools, run tasks, notifications, execution hooks, …), the **Ground**
-tools (private registry modules + their input/output interface, provider schemas)
-so an agent writes correct config against *your* estate, and the tofu-native
-**`discover`** tool (folding in [`terrapod-query`](terrapod-query.md)) for
-onboarding existing resources.
+Observe + gated Act + workspace/variable **Manage** have landed. Continuing
+additively (no breaking changes): the rest of management **CRUD** (VCS
+connections, roles, agent pools, run tasks, notifications, execution hooks, …),
+the **Ground** tools (private registry modules + their input/output interface,
+provider schemas) so an agent writes correct config against *your* estate, and
+the tofu-native **`discover`** tool (folding in
+[`terrapod-query`](terrapod-query.md)) for onboarding existing resources.
 
 ## See also
 

@@ -7,6 +7,18 @@
 // namespace tools per server, so an agent configured with a dev server and a
 // prod server gets two clearly-labelled tool sets, and a server bound to dev
 // literally cannot touch prod (it holds no prod token/host).
+//
+// # Consumer contract (see AGENTS.md → "The API ↔ Consumer contract")
+//
+// terrapod-mcp is a first-class, *transitive* consumer of the Terrapod API: every
+// tool here is backed by a go-terrapod call and reads the JSON:API shape off
+// go-terrapod — it carries no marshaling of its own. So a change to an endpoint,
+// a go-terrapod method, or a JSON:API attribute that a tool surfaces (or should
+// surface) is not complete until the tool + its tool_catalogue.json golden are
+// updated in the same change. New agent-observable/-drivable capability is not
+// done until it has a tool. Tools never widen access: they inherit the caller's
+// `tofu login` RBAC, and mutating tools that remove config or infrastructure
+// carry the `destructive` hint so the host confirms.
 package mcpserver
 
 import (
@@ -73,6 +85,7 @@ func New(cfg Config) (*mcp.Server, *terrapod.Client, error) {
 
 	registerObserve(srv, client)
 	registerAct(srv, client)
+	registerCRUD(srv, client)
 
 	return srv, client, nil
 }
