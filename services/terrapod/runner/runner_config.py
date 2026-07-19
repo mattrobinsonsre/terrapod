@@ -70,6 +70,15 @@ class RunnerConfig:
     destroy: bool
     plan_only: bool
 
+    # Cost estimation (#871). The API instructs each run whether to estimate
+    # cost (never the runner self-deciding) — the listener relays the API's
+    # `cost-estimation` / `cost-default-region` per-run instruction. Absent env
+    # (a lagging listener) falls back to enabled, matching the API default.
+    # `cost_default_region` is only the *fallback* region for a resource whose
+    # region can't be resolved from its own attributes/provider config.
+    cost_estimation: bool
+    cost_default_region: str
+
     # Misc behaviours
     termination_grace_period_seconds: int
     upload_timeout_seconds: int
@@ -147,6 +156,8 @@ class RunnerConfig:
             allow_empty_apply=_bool("TP_ALLOW_EMPTY_APPLY"),
             destroy=_bool("TP_DESTROY"),
             plan_only=_bool("TP_PLAN_ONLY"),
+            cost_estimation=_bool("TP_COST_ESTIMATION", default=True),
+            cost_default_region=e.get("TP_COST_DEFAULT_REGION", "") or "us-east-1",
             termination_grace_period_seconds=_int("TP_TERMINATION_GRACE", 120),
             upload_timeout_seconds=_int("TP_UPLOAD_TIMEOUT", 60),
             download_retries=_int("TP_DOWNLOAD_RETRIES", 3),

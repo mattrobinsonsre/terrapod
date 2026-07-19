@@ -282,6 +282,27 @@ def upload_plan_json(
     return ok
 
 
+def upload_cost_estimate(
+    cfg: RunnerConfig,
+    json_path: Path,
+    *,
+    client: httpx.Client | None = None,
+) -> bool:
+    """Plan phase. Best-effort (#871). The UI serves this for the Cost tab
+    and the AI cost enhancement; if it's missing the read endpoint just 404s."""
+    url = f"{cfg.api_url}/api/terrapod/v1/runs/{cfg.run_id}/artifacts/cost-estimate"
+    ok, status = _put_file(
+        cfg,
+        url,
+        json_path,
+        content_type="application/json",
+        client=client,
+    )
+    if not ok:
+        logger.warning("cost-estimate upload failed (non-fatal)", status=status)
+    return ok
+
+
 def upload_state(
     cfg: RunnerConfig,
     state_path: Path,

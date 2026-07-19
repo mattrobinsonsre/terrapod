@@ -903,3 +903,98 @@ class TestResourceProfile:
             )
 
         assert resp.status_code == 403
+
+
+# ── upload_cost_estimate (#871) ───────────────────────────────────────
+
+
+class TestUploadCostEstimate:
+    """PUT /runs/{id}/artifacts/cost-estimate — store + cache totals + flag."""
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.run_artifacts.get_storage")
+    async def test_stores_and_caches_totals(self, mock_get_storage, *_mocks):
+        run_id = uuid.uuid4()
+        run = _mock_run(run_id=run_id)
+        run.has_cost_estimate = False
+        mock_db = AsyncMock()
+        mock_db.get.return_value = run
+        storage = AsyncMock()
+        mock_get_storage.return_value = storage
+
+        estimate = {
+            "currency": "USD",
+            "total": {"min": 73.0, "max": 146.0},
+            "previous": {"min": 0.0, "max": 0.0},
+            "diff": {"min": 73.0, "max": 146.0},
+            "resources": [],
+            "unpriced": [],
+        }
+
+        app = _make_app(_runner_user(run_id), mock_db)
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            resp = await client.put(
+                f"/api/terrapod/v1/runs/{run.id}/artifacts/cost-estimate",
+                content=json.dumps(estimate).encode(),
+                headers={**_AUTH, "Content-Type": "application/json"},
+            )
+
+        assert resp.status_code == 204
+        assert run.has_cost_estimate is True
+        assert run.cost_currency == "USD"
+        assert run.cost_monthly_min == 73.0
+        assert run.cost_monthly_max == 146.0
+        # Stored under the canonical cost key.
+        key = storage.put_stream.await_args.args[0]
+        assert key.endswith(f"{run.id}.cost-estimate.json")
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.run_artifacts.get_storage")
+    async def test_malformed_estimate_still_204_with_null_totals(self, mock_get_storage, *_mocks):
+        run_id = uuid.uuid4()
+        run = _mock_run(run_id=run_id)
+        run.has_cost_estimate = False
+        run.cost_currency = None
+        run.cost_monthly_min = None
+        run.cost_monthly_max = None
+        mock_db = AsyncMock()
+        mock_db.get.return_value = run
+        mock_get_storage.return_value = AsyncMock()
+
+        app = _make_app(_runner_user(run_id), mock_db)
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            resp = await client.put(
+                f"/api/terrapod/v1/runs/{run.id}/artifacts/cost-estimate",
+                content=b"not json at all",
+                headers={**_AUTH, "Content-Type": "application/json"},
+            )
+
+        # Artifact still stored + flag set; only the cached totals are skipped.
+        assert resp.status_code == 204
+        assert run.has_cost_estimate is True
+        assert run.cost_monthly_min is None
+        assert run.cost_monthly_max is None
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_403_for_wrong_run_scope(self, *_mocks):
+        run_id = uuid.uuid4()
+        wrong_run_id = uuid.uuid4()
+        run = _mock_run(run_id=run_id)
+        mock_db = AsyncMock()
+        mock_db.get.return_value = run
+
+        app = _make_app(_runner_user(wrong_run_id), mock_db)
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            resp = await client.put(
+                f"/api/terrapod/v1/runs/{run.id}/artifacts/cost-estimate",
+                content=b"{}",
+                headers={**_AUTH, "Content-Type": "application/json"},
+            )
+
+        assert resp.status_code == 403

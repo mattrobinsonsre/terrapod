@@ -45,6 +45,7 @@ from terrapod.storage import get_storage
 from terrapod.storage.keys import (
     apply_log_key,
     config_version_key,
+    cost_estimate_key,
     lock_file_key,
     plan_artifacts_key,
     plan_json_output_key,
@@ -414,6 +415,73 @@ async def _enqueue_plan_json_followups(run: Run) -> Response:
             logger.debug("Failed to re-enqueue drift completion after upload", error=str(e))
 
     return Response(status_code=204)
+
+
+def _summarize_cost_file(path: str) -> tuple[str | None, float | None, float | None] | None:
+    """Read (currency, monthly_min, monthly_max) from a cost_estimate.json.
+
+    Reads + parses on disk (never the raw request body) so it can run in a
+    worker thread off the event loop. Returns None on any parse/shape error —
+    the artifact is still stored and served; only the cached totals are skipped.
+    """
+    try:
+        with open(path) as fh:
+            data = json.load(fh)
+        total = data.get("total") or {}
+        currency = data.get("currency")
+        return (
+            currency if isinstance(currency, str) else None,
+            float(total["min"]) if total.get("min") is not None else None,
+            float(total["max"]) if total.get("max") is not None else None,
+        )
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+
+
+@router.put("/runs/{run_id}/artifacts/cost-estimate")
+async def upload_cost_estimate(
+    run_id: str,
+    request: Request,
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """Upload the run's cost estimate (`cost_estimate.json`, #871).
+
+    Produced by the runner from the plan JSON via the native cost engine. Sets
+    `runs.has_cost_estimate = true` (gating the Cost tab + download URL) and
+    caches the plan-total monthly range for cheap list display. Advisory: a
+    parse failure still stores the artifact, just without the cached totals.
+    """
+    require_runner_for_run(user, run_id)
+    run = await _get_run(run_id, db)
+
+    # Small artifact (bounded by resource count) but streamed to a tempfile for
+    # consistency with the other artifact uploads; parsed in a thread (#13).
+    tmp_path, _body_bytes = await stream_to_tempfile(request, suffix=".cost.json")
+    try:
+        storage = get_storage()
+        key = cost_estimate_key(str(run.workspace_id), str(run.id))
+        # Storage first, then the flag (same order as plan-json): a commit
+        # failure after upload leaves an orphan artifact, never an advertised
+        # URL pointing at nothing.
+        await storage.put_stream(key, file_chunks(tmp_path), content_type="application/json")
+        run.has_cost_estimate = True
+        totals = await asyncio.to_thread(_summarize_cost_file, tmp_path)
+        if totals is not None:
+            run.cost_currency, run.cost_monthly_min, run.cost_monthly_max = totals
+        else:
+            logger.warning(
+                "cost_estimate.summary_unparseable",
+                run_id=str(run.id),
+                workspace_id=str(run.workspace_id),
+            )
+        await db.commit()
+        return Response(status_code=204)
+    finally:
+        try:
+            await asyncio.to_thread(os.unlink, tmp_path)
+        except OSError:
+            pass
 
 
 @router.put("/runs/{run_id}/artifacts/apply-log")

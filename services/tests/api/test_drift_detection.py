@@ -231,6 +231,10 @@ class TestRunDriftAttributes:
         run.resource_destructions = None
         run.resource_replacements = None
         run.resource_imports = None
+        run.has_cost_estimate = False
+        run.cost_currency = None
+        run.cost_monthly_min = None
+        run.cost_monthly_max = None
         run.peak_memory_bytes = None
         run.peak_cpu_usec = None
         run.runner_exit_code = None

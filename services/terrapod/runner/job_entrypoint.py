@@ -41,6 +41,7 @@ import structlog
 from terrapod.runner import lock_extender, plan_artifacts
 from terrapod.runner.phases import (
     backend_backstop,
+    cost,
     discovery,
     execution_hooks,
     init_phase,
@@ -329,6 +330,17 @@ def _run_plan_phase(
             uploads.upload_plan_json(cfg, _PLAN_JSON)
         except Exception as exc:  # noqa: BLE001
             log.warning("plan-json upload raised (non-fatal)", err=str(exc))
+
+    # Cost estimate (#871, best-effort). Runs off the plan JSON — the API
+    # instructs per-run whether to estimate (cfg.cost_estimation, default yes);
+    # cost is advisory and never fails the run.
+    if plan_show_ok and cfg.cost_estimation:
+        try:
+            cost_json = cost.estimate_cost(cfg, _PLAN_JSON)
+            if cost_json is not None:
+                uploads.upload_cost_estimate(cfg, cost_json)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("cost estimate raised (non-fatal)", err=str(exc))
 
     # post_plan execution hooks (#619) — after a successful plan and after its
     # artifacts (plan file + show-json) are uploaded, so the hook can inspect

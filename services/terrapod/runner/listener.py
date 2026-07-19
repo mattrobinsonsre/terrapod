@@ -744,6 +744,10 @@ class RunnerListener:
             refresh=attrs.get("refresh", True),
             allow_empty_apply=attrs.get("allow-empty-apply", False),
             is_destroy=attrs.get("is-destroy", False),
+            # Cost estimation (#871): the API instructs per-run (fallback yes);
+            # the listener only relays it, never self-configures.
+            cost_estimation=attrs.get("cost-estimation", True),
+            cost_default_region=attrs.get("cost-default-region", "us-east-1"),
             working_directory=attrs.get("working-directory", ""),
             ca_secret_name=ca_secret_name,
             # Onboarding discovery (#824 P2): present only for discovery runs.
