@@ -30,13 +30,25 @@ function guardIntlErrors(page: import('@playwright/test').Page) {
 }
 
 async function switchLocale(page: import('@playwright/test').Page, triggerName: RegExp, itemName: string) {
-  await page.getByRole('button', { name: triggerName }).first().click();
+  const trigger = page.getByRole('button', { name: triggerName }).first();
+  const menu = page.getByRole('menu');
+  // Open the menu robustly. The Radix trigger can be clicked before React has
+  // hydrated its onClick handler (far more likely under CI/host load), so a
+  // single click sometimes no-ops and the menu never opens — the dominant cause
+  // of this spec's flake (#873). Retry the click until the menu is actually
+  // visible, guarding against a toggle-close by only clicking when it isn't
+  // already open.
+  await expect(async () => {
+    if (!(await menu.isVisible())) {
+      await trigger.click();
+    }
+    await expect(menu).toBeVisible({ timeout: 1000 });
+  }).toPass({ timeout: 15000 });
   // Exact match: several native names are substrings of others (e.g. "English"
   // ⊂ "English (UK)"), so a loose name match is ambiguous across 30+ locales.
-  const item = page.getByRole('menuitem', { name: itemName, exact: true });
+  const item = menu.getByRole('menuitem', { name: itemName, exact: true });
   // The switcher is a max-h-[70vh] scroll container; the bottom locales (the
-  // joke set) sit well below the fold, and Playwright's implicit click-scroll
-  // is unreliable inside this Radix scroll region — scroll it in explicitly.
+  // joke set) sit below the fold, so scroll the item into view before clicking.
   await item.scrollIntoViewIfNeeded();
   await item.click();
 }
