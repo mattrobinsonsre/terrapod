@@ -180,21 +180,43 @@ def _price_products(
     return (pp, min_val, max_val)
 
 
+def _region_matches(product: Product, region: str | None) -> bool:
+    """Keep region-agnostic products and region-specific products in ``region``.
+
+    OpenInfraQuote's ``--region`` filters globally; we instead filter each
+    resource's products to *its own* resolved region (#871), because a plan can
+    span regions (AWS provider v6 puts ``region`` on every resource; Azure/GCP
+    have per-resource ``location``/``region``). Products with no ``region`` in
+    their pricing match set are global (e.g. Route53) and always kept.
+    """
+    pr = product.pricing_match_set.find_by_key("region")
+    if pr is None:
+        return True
+    return region is None or pr[1] == region
+
+
 def price(
     matches: list[tuple[Resource, Change, list[Product]]],
     usage_entries: list[Entry],
+    region_by_address: dict[str, str] | None = None,
 ) -> tuple[PriceResult, list[tuple[Resource, Change]]]:
     """Price matched resources. Returns ``(result, unpriced)``.
 
-    ``unpriced`` lists resources that matched no priceable product (or whose
-    products carried no usage entry) — the "Unpriced" bucket in the UX.
+    ``region_by_address`` maps each resource address to its resolved region;
+    a resource's region-specific products are filtered to that region so a
+    multi-region plan prices each resource correctly (#871). ``unpriced`` lists
+    resources that matched no priceable product (or whose products carried no
+    usage entry) — the "Unpriced" bucket in the UX.
     """
+    region_by_address = region_by_address or {}
     priced_resources: list[PricedResource] = []
     unpriced: list[tuple[Resource, Change]] = []
     currency = "USD"
 
-    for resource, change, products in matches:
+    for resource, change, all_products in matches:
         resource_ms = resource.to_match_set()
+        region = region_by_address.get(resource.address)
+        products = [p for p in all_products if _region_matches(p, region)]
         # Group products by their matched usage entry (keyed by query text).
         entry_by_key: dict[str, Entry] = {}
         products_by_key: dict[str, list[Product]] = {}

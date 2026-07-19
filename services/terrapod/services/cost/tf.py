@@ -196,3 +196,49 @@ def resources_from_json(json: dict[str, Any]) -> list[tuple[Resource, Change]]:
     if json.get("version") == 4 and "resources" in json:
         return resources_from_state_v4(json)
     raise ValueError("input is neither a terraform plan, show-state, nor state v4 file")
+
+
+# ---------------------------------------------------------------------------
+# Per-resource region resolution (#871)
+# ---------------------------------------------------------------------------
+#
+# A plan can legitimately span regions — AWS provider v6 puts `region` on every
+# resource, and Azure/GCP have always had per-resource `location`/`region`. So
+# region is resolved per resource, not per plan, in this precedence:
+#   1. the resource's own attribute (`values.region` / `values.location`)
+#   2. its provider config's constant region (`configuration.provider_config`)
+#   3. a caller-supplied fallback (`cost_estimation.default_region`)
+
+# Ordered attribute keys checked on a resource's `values` for its region.
+_REGION_ATTR_KEYS = ("region", "location")
+
+
+def provider_regions(plan_json: dict[str, Any]) -> dict[str, str]:
+    """Map ``provider_name`` → constant region from a plan's provider configs.
+
+    Only providers whose ``region`` is a literal (``constant_value``) are
+    included — a region set from a variable/expression can't be resolved from
+    the plan JSON. Empty for state inputs (which carry no ``configuration``).
+    """
+    out: dict[str, str] = {}
+    provider_config = plan_json.get("configuration", {}).get("provider_config", {})
+    for pc in provider_config.values():
+        full = pc.get("full_name") or pc.get("name")
+        region = pc.get("expressions", {}).get("region", {}).get("constant_value")
+        if isinstance(full, str) and full and isinstance(region, str) and region:
+            out[full] = region
+    return out
+
+
+def resolve_region(resource: Resource, provider_region_map: dict[str, str], default: str) -> str:
+    """Resolve a resource's region: own attribute → provider config → default."""
+    values = resource.data.get("values")
+    if isinstance(values, dict):
+        for key in _REGION_ATTR_KEYS:
+            val = values.get(key)
+            if isinstance(val, str) and val:
+                return val
+    provider = resource.data.get("provider_name")
+    if isinstance(provider, str) and provider in provider_region_map:
+        return provider_region_map[provider]
+    return default

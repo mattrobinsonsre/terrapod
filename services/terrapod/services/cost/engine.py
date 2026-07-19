@@ -24,7 +24,12 @@ from typing import IO, Any
 from terrapod.services.cost import usage as usage_mod
 from terrapod.services.cost.pricer import price
 from terrapod.services.cost.prices import load_pricesheet
-from terrapod.services.cost.tf import Change, resources_from_json
+from terrapod.services.cost.tf import (
+    Change,
+    provider_regions,
+    resolve_region,
+    resources_from_json,
+)
 
 
 @dataclass(frozen=True)
@@ -83,6 +88,7 @@ def estimate(
     tf_json: dict[str, Any],
     pricesheet: IO[str],
     usage_json: list[dict[str, Any]] | None = None,
+    default_region: str = "us-east-1",
 ) -> CostEstimate:
     """Estimate monthly cost for a plan or state against a pricesheet.
 
@@ -92,8 +98,17 @@ def estimate(
                     ``prices.csv`` (streamed once, never fully materialised).
     ``usage_json`` — optional user usage overrides; prepended to the vendored
                     OpenInfraQuote defaults.
+    ``default_region`` — fallback region for a resource whose region can't be
+                    resolved from its attributes or provider config. Region is
+                    resolved **per resource** (a plan can span regions, #871).
     """
     resources = resources_from_json(tf_json)
+    # Resolve each resource's region (own attr → provider config → default).
+    provider_region_map = provider_regions(tf_json)
+    region_by_address = {
+        res.address: resolve_region(res, provider_region_map, default_region)
+        for res, _change in resources
+    }
     # Accumulate matching products per resource in a single pass over the sheet.
     acc = [(res, change, res.to_match_set(), []) for res, change in resources]
     for product in load_pricesheet(pricesheet):
@@ -104,7 +119,7 @@ def estimate(
 
     matches = [(res, change, products) for res, change, _ms, products in acc]
     usage_entries = usage_mod.load_usage(usage_json)
-    result, unpriced = price(matches, usage_entries)
+    result, unpriced = price(matches, usage_entries, region_by_address)
 
     resource_costs = [
         ResourceCost(

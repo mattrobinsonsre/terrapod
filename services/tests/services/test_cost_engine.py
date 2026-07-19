@@ -20,7 +20,13 @@ from terrapod.services.cost.match_query import MatchQuery
 from terrapod.services.cost.match_set import MatchSet
 from terrapod.services.cost.prices import EmptyMatchSet, PriceKind, product_of_row
 from terrapod.services.cost.range import Range, overlap
-from terrapod.services.cost.tf import flatten, resources_from_json
+from terrapod.services.cost.tf import (
+    Resource,
+    flatten,
+    provider_regions,
+    resolve_region,
+    resources_from_json,
+)
 from terrapod.services.cost.usage import DATA, bound_to_usage_amount, default_entries, match_entry
 
 # ---------------------------------------------------------------------------
@@ -337,3 +343,87 @@ def test_estimate_to_dict_shape():
     assert set(d) == {"currency", "total", "previous", "diff", "resources", "unpriced"}
     assert d["total"]["min"] == pytest.approx(73.0)
     assert d["resources"][0]["monthly"]["max"] == pytest.approx(73.0)
+
+
+# ---------------------------------------------------------------------------
+# per-resource region resolution (#871)
+# ---------------------------------------------------------------------------
+
+
+def _resource(addr, rtype, values, provider_name=None):
+    data = {"address": addr, "type": rtype, "name": addr.split(".")[-1], "values": values}
+    if provider_name:
+        data["provider_name"] = provider_name
+    return Resource(address=addr, name=data["name"], type=rtype, data=data)
+
+
+def test_resolve_region_from_resource_attribute():
+    # AWS v6 `region` on the resource.
+    r = _resource("aws_instance.web", "aws_instance", {"region": "eu-west-1"})
+    assert resolve_region(r, {}, "us-east-1") == "eu-west-1"
+    # Azure `location`.
+    r2 = _resource("azurerm_vm.a", "azurerm_virtual_machine", {"location": "westeurope"})
+    assert resolve_region(r2, {}, "us-east-1") == "westeurope"
+
+
+def test_resolve_region_from_provider_config():
+    r = _resource(
+        "aws_instance.web",
+        "aws_instance",
+        {"instance_type": "m5.large"},  # no region attr (pre-v6)
+        provider_name="registry.terraform.io/hashicorp/aws",
+    )
+    pmap = {"registry.terraform.io/hashicorp/aws": "ap-south-1"}
+    assert resolve_region(r, pmap, "us-east-1") == "ap-south-1"
+
+
+def test_resolve_region_falls_back_to_default():
+    r = _resource("aws_instance.web", "aws_instance", {"instance_type": "m5.large"})
+    assert resolve_region(r, {}, "us-east-1") == "us-east-1"
+
+
+def test_provider_regions_extracts_constant_only():
+    plan = {
+        "configuration": {
+            "provider_config": {
+                "aws": {
+                    "full_name": "registry.terraform.io/hashicorp/aws",
+                    "expressions": {"region": {"constant_value": "us-west-2"}},
+                },
+                "aws.var": {
+                    "full_name": "registry.terraform.io/hashicorp/aws",
+                    "expressions": {"region": {"references": ["var.region"]}},  # not constant
+                },
+            }
+        }
+    }
+    pmap = provider_regions(plan)
+    assert pmap == {"registry.terraform.io/hashicorp/aws": "us-west-2"}
+
+
+# Two identical EC2 products differing only by region+price. A per-plan region
+# would mis-price the other resource; per-resource region prices each correctly.
+_MULTI_REGION_SHEET = (
+    "service,product_family,match_set,pricing_match_set,price,price_type,ccy\n"
+    "AmazonEC2,Compute,type=aws_instance,"
+    "service_class=instance&purchase_option=on_demand&os=linux&region=us-east-1,0.10,t,USD\n"
+    "AmazonEC2,Compute,type=aws_instance,"
+    "service_class=instance&purchase_option=on_demand&os=linux&region=eu-west-1,0.20,t,USD\n"
+)
+
+
+def test_estimate_prices_each_resource_in_its_own_region():
+    plan = _plan(
+        resources=[
+            _res("aws_instance.us", "aws_instance", "us", {"region": "us-east-1"}),
+            _res("aws_instance.eu", "aws_instance", "eu", {"region": "eu-west-1"}),
+        ]
+    )
+    est = estimate(plan, io.StringIO(_MULTI_REGION_SHEET))
+    by_addr = {r.address: r for r in est.resources}
+    # us-east-1 @ $0.10/hr * 730 = $73; eu-west-1 @ $0.20/hr * 730 = $146.
+    assert by_addr["aws_instance.us"].monthly_min == pytest.approx(73.0)
+    assert by_addr["aws_instance.us"].monthly_max == pytest.approx(73.0)
+    assert by_addr["aws_instance.eu"].monthly_min == pytest.approx(146.0)
+    assert by_addr["aws_instance.eu"].monthly_max == pytest.approx(146.0)
+    assert est.total_min == pytest.approx(219.0)
