@@ -292,6 +292,9 @@ field ListMeta.CurrentPage int `json:"current-page"`
 field ListMeta.PageSize int `json:"page-size"`
 field ListMeta.TotalCount int `json:"total-count"`
 field ListMeta.TotalPages int `json:"total-pages"`
+field ModuleInterface.Inputs []map[string]any `json:"inputs"`
+field ModuleInterface.Outputs []map[string]any `json:"outputs"`
+field ModuleInterface.Version string `json:"version"`
 field ModuleWorkspaceLink.CreatedAt string `json:"created-at,omitempty"`
 field ModuleWorkspaceLink.CreatedBy string `json:"created-by,omitempty"`
 field ModuleWorkspaceLink.ID string `json:"id"`
@@ -896,6 +899,7 @@ method (*Client) GetEncryptionStatus(ctx context.Context) (*EncryptionStatus, er
 method (*Client) GetEstateGraph(ctx context.Context) (*EstateGraph, error)
 method (*Client) GetExecutionHook(ctx context.Context, id string) (*ExecutionHook, error)
 method (*Client) GetGPGKey(ctx context.Context, id string) (*GPGKey, error)
+method (*Client) GetModuleInterface(ctx context.Context, name, provider, version string) (*ModuleInterface, error)
 method (*Client) GetModuleWorkspaceLink(ctx context.Context, moduleName, moduleProvider, linkID string) (*ModuleWorkspaceLink, error)
 method (*Client) GetNotificationConfiguration(ctx context.Context, id string) (*NotificationConfiguration, error)
 method (*Client) GetOnboardingAvailability(ctx context.Context) (*OnboardingAvailability, error)
@@ -948,6 +952,8 @@ method (*Client) ListOutboundRunTriggers(ctx context.Context, workspaceID string
 method (*Client) ListPlanSummaryMessages(ctx context.Context, runID string) ([]*PlanSummaryMessage, error)
 method (*Client) ListPolicySets(ctx context.Context) ([]PolicySet, error)
 method (*Client) ListProviderTemplates(ctx context.Context) ([]ProviderTemplate, error)
+method (*Client) ListRegistryModules(ctx context.Context) ([]RegistryModule, error)
+method (*Client) ListRegistryProviders(ctx context.Context) ([]RegistryProvider, error)
 method (*Client) ListRemoteStateConsumers(ctx context.Context, producerWorkspaceID string) ([]RemoteStateConsumer, error)
 method (*Client) ListRoleAssignments(ctx context.Context) ([]RoleAssignment, error)
 method (*Client) ListRoleAssignmentsForIdentity(ctx context.Context, providerName, email string) ([]RoleAssignment, error)
@@ -1069,6 +1075,7 @@ type LabelEntity struct
 type LabelKey struct
 type LabelValue struct
 type ListMeta struct
+type ModuleInterface struct
 type ModuleWorkspaceLink struct
 type NotFoundError struct
 type NotificationConfiguration struct

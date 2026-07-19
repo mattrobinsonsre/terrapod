@@ -111,6 +111,16 @@ Every tool is namespaced `terrapod_*` and carries a safety annotation
 | `terrapod_variable_set` | — | Upsert a variable by key (terraform or env; `hcl` for non-string values). |
 | `terrapod_variable_delete` | destructive | Delete a variable by key. |
 
+### Ground (read-only) — write correct config against *your* estate
+
+| Tool | What it does |
+|---|---|
+| `terrapod_registry_module_list` | List the private registry modules published here (name, provider, VCS, status). |
+| `terrapod_registry_module_get` | One module by name + provider — source, status, owner, labels. |
+| `terrapod_registry_module_interface` | A module version's **inputs + outputs** — the exact surface to author a correct `module` block against it, instead of guessing variable names. |
+| `terrapod_registry_provider_list` | List the private registry providers published here. |
+| `terrapod_registry_provider_get` | One provider by name — namespace, owner, labels. |
+
 Nothing bypasses the platform: applies obey the workspace's VCS/auto-apply/lock
 rules and OPA policy, config changes apply on the next run, and every action is
 bounded by your Terrapod RBAC — a read-only token cannot mutate.
@@ -135,12 +145,10 @@ warns you through the agent.
 
 ## Roadmap (additive)
 
-Observe + gated Act + workspace/variable **Manage** have landed. Continuing
-additively (no breaking changes): the rest of management **CRUD** (VCS
-connections, roles, agent pools, run tasks, notifications, execution hooks, …),
-the **Ground** tools (private registry modules + their input/output interface,
-provider schemas) so an agent writes correct config against *your* estate, and
-the tofu-native **`discover`** tool (folding in
+Observe + gated Act + workspace/variable **Manage** + registry **Ground** have
+landed. Continuing additively (no breaking changes): the rest of management
+**CRUD** (VCS connections, roles, agent pools, run tasks, notifications,
+execution hooks, …), and the tofu-native **`discover`** tool (folding in
 [`terrapod-query`](terrapod-query.md)) for onboarding existing resources.
 
 ## See also

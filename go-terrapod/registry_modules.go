@@ -29,6 +29,14 @@ type RegistryModule struct {
 	UpdatedAt       string            `json:"updated-at,omitempty"`
 }
 
+// ModuleInterface is a published module version's input/output surface —
+// what an agent needs to author a correct `module` block against it.
+type ModuleInterface struct {
+	Version string           `json:"version"`
+	Inputs  []map[string]any `json:"inputs"`
+	Outputs []map[string]any `json:"outputs"`
+}
+
 // CreateRegistryModuleRequest registers a new module.
 type CreateRegistryModuleRequest struct {
 	Name            string
@@ -71,6 +79,56 @@ func (c *Client) GetRegistryModule(ctx context.Context, name, providerName strin
 		return nil, err
 	}
 	return parseRegistryModule(data)
+}
+
+// ListRegistryModules returns every module in the registry (the
+// management list — not the CLI download protocol). Slices the
+// server's JSON:API list through the same per-resource projector the
+// single-resource Get uses.
+func (c *Client) ListRegistryModules(ctx context.Context) ([]RegistryModule, error) {
+	data, err := c.Get(ctx, "/api/terrapod/v1/registry-modules")
+	if err != nil {
+		return nil, err
+	}
+	resources, err := ParseResourceList(data)
+	if err != nil {
+		return nil, err
+	}
+	modules := make([]RegistryModule, 0, len(resources))
+	for i := range resources {
+		modules = append(modules, *registryModuleFromResource(&resources[i]))
+	}
+	return modules, nil
+}
+
+// GetModuleInterface reads a published module version's input/output
+// surface — the inputs an agent must supply and the outputs it can
+// consume when authoring a `module` block. Returns *NotFoundError when
+// interface extraction is disabled for the module or the version is
+// unknown.
+func (c *Client) GetModuleInterface(ctx context.Context, name, provider, version string) (*ModuleInterface, error) {
+	path := fmt.Sprintf("/api/terrapod/v1/registry-modules/private/default/%s/%s/%s/interface",
+		url.PathEscape(name), url.PathEscape(provider), url.PathEscape(version))
+	data, err := c.Get(ctx, path)
+	if err != nil {
+		return nil, err
+	}
+	res, err := ParseResource(data)
+	if err != nil {
+		return nil, fmt.Errorf("parse module-interface response: %w", err)
+	}
+	iface := &ModuleInterface{Version: GetStringAttr(res, "version")}
+	if raw, ok := res.Attributes["inputs"]; ok && len(raw) > 0 && string(raw) != "null" {
+		if err := json.Unmarshal(raw, &iface.Inputs); err != nil {
+			return nil, fmt.Errorf("parse module-interface inputs: %w", err)
+		}
+	}
+	if raw, ok := res.Attributes["outputs"]; ok && len(raw) > 0 && string(raw) != "null" {
+		if err := json.Unmarshal(raw, &iface.Outputs); err != nil {
+			return nil, fmt.Errorf("parse module-interface outputs: %w", err)
+		}
+	}
+	return iface, nil
 }
 
 // UpdateRegistryModule patches a module identified by (name, provider).

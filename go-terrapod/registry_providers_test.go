@@ -82,3 +82,32 @@ func TestDeleteRegistryProvider(t *testing.T) {
 		t.Error(err)
 	}
 }
+
+func TestListRegistryProviders(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/api/terrapod/v1/registry-providers" {
+			http.Error(w, "unhandled", http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_, _ = w.Write([]byte(`{"data":[
+		  {"id":"prov-aaa","type":"registry-providers","attributes":{"name":"acme"}},
+		  {"id":"prov-bbb","type":"registry-providers","attributes":{"name":"widgets"}}
+		]}`))
+	}))
+	t.Cleanup(srv.Close)
+	c, err := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	provs, err := c.ListRegistryProviders(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(provs) != 2 {
+		t.Fatalf("expected 2 providers, got %d", len(provs))
+	}
+	if provs[0].Name != "acme" || provs[1].Name != "widgets" {
+		t.Errorf("providers: %+v", provs)
+	}
+}

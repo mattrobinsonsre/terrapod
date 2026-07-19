@@ -1,5 +1,87 @@
 [
   {
+    "name": "terrapod_registry_module_get",
+    "read_only": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "description": "the module name",
+          "type": "string"
+        },
+        "provider": {
+          "description": "the module's provider (e.g. aws)",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "provider"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_registry_module_interface",
+    "read_only": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "description": "the module name",
+          "type": "string"
+        },
+        "provider": {
+          "description": "the module's provider (e.g. aws)",
+          "type": "string"
+        },
+        "version": {
+          "description": "the module version (e.g. 1.2.3)",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "provider",
+        "version"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_registry_module_list",
+    "read_only": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_registry_provider_get",
+    "read_only": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "description": "the provider name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_registry_provider_list",
+    "read_only": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "type": "object"
+    }
+  },
+  {
     "name": "terrapod_run_apply",
     "destructive": true,
     "input_schema": {
