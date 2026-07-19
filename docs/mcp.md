@@ -121,6 +121,20 @@ Every tool is namespaced `terrapod_*` and carries a safety annotation
 | `terrapod_registry_provider_list` | List the private registry providers published here. |
 | `terrapod_registry_provider_get` | One provider by name — namespace, owner, labels. |
 
+### Discover (gated) — onboard existing resources
+
+Tofu-native resource discovery: bring existing cloud resources under management.
+These tools only **discover and generate** — they produce reviewable `import {}`
+blocks + config for the human to adopt; **they never apply an import themselves**.
+
+| Tool | Safety | What it does |
+|---|---|---|
+| `terrapod_onboard_availability` | read-only | Is the AI-assisted onboarding path available (its own switch + model)? |
+| `terrapod_onboard_start` | — | Start a discovery session for a workspace + provider; kicks off credential-less schema discovery. |
+| `terrapod_onboard_list` | read-only | A workspace's discovery sessions. |
+| `terrapod_onboard_get` | read-only | One session — status, discovery surface (importable data sources), and the generated config + `import {}` blocks. |
+| `terrapod_onboard_discover` | — | Run discovery over chosen data-source types → generated config + import blocks (imports nothing). |
+
 Nothing bypasses the platform: applies obey the workspace's VCS/auto-apply/lock
 rules and OPA policy, config changes apply on the next run, and every action is
 bounded by your Terrapod RBAC — a read-only token cannot mutate.
@@ -145,11 +159,11 @@ warns you through the agent.
 
 ## Roadmap (additive)
 
-Observe + gated Act + workspace/variable **Manage** + registry **Ground** have
-landed. Continuing additively (no breaking changes): the rest of management
-**CRUD** (VCS connections, roles, agent pools, run tasks, notifications,
-execution hooks, …), and the tofu-native **`discover`** tool (folding in
-[`terrapod-query`](terrapod-query.md)) for onboarding existing resources.
+Observe + gated Act + workspace/variable **Manage** + registry **Ground** +
+resource **Discover** have landed. Continuing additively (no breaking changes):
+the rest of management **CRUD** (VCS connections, roles, agent pools, run tasks,
+notifications, execution hooks, …), and — once the gated import-only apply lands
+— an `onboard_apply` tool to adopt the generated import blocks.
 
 ## See also
 
