@@ -32,8 +32,13 @@ function guardIntlErrors(page: import('@playwright/test').Page) {
 async function switchLocale(page: import('@playwright/test').Page, triggerName: RegExp, itemName: string) {
   await page.getByRole('button', { name: triggerName }).first().click();
   // Exact match: several native names are substrings of others (e.g. "English"
-  // ⊂ "English (UK)"), so a loose name match is ambiguous across 30 locales.
-  await page.getByRole('menuitem', { name: itemName, exact: true }).click();
+  // ⊂ "English (UK)"), so a loose name match is ambiguous across 30+ locales.
+  const item = page.getByRole('menuitem', { name: itemName, exact: true });
+  // The switcher is a max-h-[70vh] scroll container; the bottom locales (the
+  // joke set) sit well below the fold, and Playwright's implicit click-scroll
+  // is unreliable inside this Radix scroll region — scroll it in explicitly.
+  await item.scrollIntoViewIfNeeded();
+  await item.click();
 }
 
 test.describe('i18n language switcher', () => {

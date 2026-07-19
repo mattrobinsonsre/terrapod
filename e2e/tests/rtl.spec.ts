@@ -25,7 +25,11 @@ function guardIntlErrors(page: import('@playwright/test').Page) {
 
 async function switchLocale(page: import('@playwright/test').Page, triggerName: RegExp, itemName: string) {
   await page.getByRole('button', { name: triggerName }).first().click();
-  await page.getByRole('menuitem', { name: itemName, exact: true }).click();
+  // Bottom locales sit below the fold in the switcher's scroll region; scroll
+  // the item in explicitly (Playwright's implicit click-scroll is flaky here).
+  const item = page.getByRole('menuitem', { name: itemName, exact: true });
+  await item.scrollIntoViewIfNeeded();
+  await item.click();
 }
 
 test.describe('RTL locales', () => {
@@ -73,18 +77,20 @@ test.describe('RTL locales', () => {
     expect(intlErrors, `next-intl errors: ${intlErrors.join('\n')}`).toEqual([]);
   });
 
-  test('Hebrew and Persian also resolve to dir=rtl', async ({ page }) => {
+  test('Hebrew and Persian also resolve to dir=rtl', async ({ page, context }) => {
     const intlErrors = guardIntlErrors(page);
 
+    // Drive these two by the cookie the SSR layout reads (the switcher UI is
+    // already covered by the Arabic case + i18n.spec); chaining the switcher
+    // across RTL aria-labels is needlessly fragile.
     await page.goto('/workspaces');
-    await switchLocale(page, /Change language/i, 'עברית');
-    await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
-    await expect(page.locator('body')).not.toContainText('MISSING_MESSAGE');
-
-    // Switch on to Persian (trigger's aria-label is now Hebrew).
-    await switchLocale(page, /.*/, 'فارسی');
-    await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
-    await expect(page.locator('body')).not.toContainText('MISSING_MESSAGE');
+    const origin = new URL(page.url()).origin;
+    for (const loc of ['he', 'fa']) {
+      await context.addCookies([{ name: 'NEXT_LOCALE', value: loc, url: origin }]);
+      await page.reload();
+      await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
+      await expect(page.locator('body')).not.toContainText('MISSING_MESSAGE');
+    }
 
     expect(intlErrors, `next-intl errors: ${intlErrors.join('\n')}`).toEqual([]);
   });
