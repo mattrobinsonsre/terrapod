@@ -180,5 +180,13 @@ export default defineConfig({
       testMatch: 'i18n.spec.ts',
       use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
     },
+    {
+      // RTL guard (#829): switching to Arabic/Hebrew/Persian flips <html dir>
+      // to "rtl", mirrors the chrome, isolates code islands LTR, and never
+      // introduces horizontal page scroll — all through the real BFF chain.
+      name: 'rtl',
+      testMatch: 'rtl.spec.ts',
+      use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
+    },
   ],
 });

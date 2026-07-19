@@ -46,6 +46,11 @@ export const locales = [
   'fi',
   'pt-PT',
   'la',
+  // Right-to-left languages (#829). The UI mirrors under these (see RTL_LOCALES);
+  // their catalogs are held to the same full-parity + ICU gate as every other.
+  'ar',
+  'he',
+  'fa',
   // Novelty / joke locales. `tlh` (Klingon) is a real ISO 639-2 subtag. The
   // rest use a valid BCP-47 shape — a real base language plus a `-x-` private-use
   // subtag (`en-x-marklar`) — NOT a private-use-only tag (`x-marklar`), which
@@ -88,6 +93,9 @@ export const localeNames: Record<Locale, string> = {
   fi: 'Suomi',
   'pt-PT': 'Português (Portugal)',
   la: 'Latina',
+  ar: 'العربية',
+  he: 'עברית',
+  fa: 'فارسی',
   tlh: 'tlhIngan Hol',
   'en-x-marklar': 'Marklar',
   'en-x-lolcat': 'LOLCAT',

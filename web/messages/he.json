@@ -1,0 +1,2678 @@
+{
+  "nav": {
+    "workspaces": "סביבות עבודה",
+    "estate": "מצבת",
+    "registry": "רישום",
+    "modules": "מודולים",
+    "providers": "ספקים",
+    "catalog": "קטלוג",
+    "agentPools": "מאגרי סוכנים",
+    "admin": "ניהול",
+    "users": "משתמשים",
+    "roles": "תפקידים",
+    "vcsConnections": "חיבורי VCS",
+    "variableSets": "מערכי משתנים",
+    "autodiscovery": "גילוי אוטומטי",
+    "bulkUpdate": "עדכון מרובה",
+    "executionHooks": "Hooks של הרצה",
+    "policySets": "מערכי מדיניות",
+    "providerTemplates": "תבניות ספק",
+    "catalogAdmin": "ניהול קטלוג",
+    "cache": "מטמון",
+    "auditLog": "יומן ביקורת",
+    "help": "עזרה",
+    "apiReference": "מדריך API",
+    "docs": "תיעוד",
+    "account": "חשבון",
+    "apiTokens": "אסימוני API",
+    "sessions": "הפעלות",
+    "logOut": "התנתקות",
+    "menu": "תפריט",
+    "openMenu": "פתיחת תפריט",
+    "openAccountMenu": "פתיחת תפריט חשבון",
+    "closeMenu": "סגירת תפריט"
+  },
+  "switcher": {
+    "language": "שפה",
+    "changeLanguage": "שינוי שפה"
+  },
+  "workspaces": {
+    "title": "סביבות עבודה",
+    "description": "נהל סביבות עבודה, מצב והרצות של Terraform",
+    "new": "סביבת עבודה חדשה",
+    "cancel": "בטל",
+    "create": "צור סביבת עבודה",
+    "creating": "יוצר…",
+    "loadFailed": "טעינת סביבות העבודה נכשלה",
+    "createFailed": "יצירת סביבת העבודה נכשלה",
+    "form": {
+      "name": "שם",
+      "namePattern": "אותיות, ספרות, מקפים וקווים תחתונים בלבד. חייב להתחיל באות או בספרה.",
+      "namePlaceholder": "my-workspace",
+      "executionMode": "מצב הרצה",
+      "local": "מקומי",
+      "agent": "סוכן",
+      "executionBackend": "מנוע הרצה",
+      "version": "גרסה",
+      "versionTitle": "גרסה בפורמט X.Y או X.Y.Z (למשל 1.11 או 1.11.5)",
+      "versionPlaceholder": "למשל 1.11 או 1.11.5",
+      "cpuRequest": "בקשת CPU",
+      "cpuTitle": "כמות CPU של Kubernetes: ליבות שלמות (1, 2) או מילי-ליבות (500m, 100m)",
+      "cpuHint": "למשל 1, 0.5, 500m",
+      "memoryRequest": "בקשת זיכרון",
+      "memoryTitle": "כמות זיכרון של Kubernetes: בתים (1000) או עם סיומת (512Mi, 2Gi, 1Ti)",
+      "memoryHint": "למשל 2Gi, 512Mi, 1Ti",
+      "agentPool": "מאגר סוכנים",
+      "none": "ללא",
+      "autoApply": "החלה אוטומטית",
+      "enabled": "מופעל",
+      "workingDirectory": "ספריית עבודה",
+      "workingDirectoryPlaceholder": "למשל environments/dev",
+      "workingDirectoryHint": "תת-ספרייה בתוך המאגר המכילה קבצי ‎.tf",
+      "vcsConnection": "חיבור VCS",
+      "vcsRepoUrl": "כתובת URL של מאגר VCS",
+      "vcsRepoUrlTitle": "חייבת להיות כתובת URL מסוג HTTP או HTTPS",
+      "vcsRepoUrlPlaceholder": "https://github.com/org/repo",
+      "vcsBranch": "ענף VCS",
+      "vcsBranchPlaceholder": "main (ברירת מחדל)"
+    },
+    "stats": {
+      "total": "סה\"כ",
+      "health": "תקינות",
+      "locked": "נעול",
+      "clearAllFilters": "נקה את כל המסננים",
+      "clearHealthFilter": "נקה את מסנן בעיות התקינות",
+      "filterHealth": "סנן לסביבות עבודה עם בעיות תקינות",
+      "clearLockedFilter": "נקה את מסנן הנעילה",
+      "filterLocked": "סנן לסביבות עבודה נעולות"
+    },
+    "filter": {
+      "placeholder": "סנן לפי שם, תווית או סטטוס — למשל \"eu1\", \"env:prod\", \"status:errored\"",
+      "ariaLabel": "סנן סביבות עבודה",
+      "clear": "נקה",
+      "status": "סטטוס",
+      "label": "תווית",
+      "back": "חזרה",
+      "valueCount": "{count, plural, one {ערך #} two {# ערכים} many {# ערכים} other {# ערכים}}",
+      "removeTerm": "הסר מונח זה",
+      "showing": "מציג {filtered} מתוך {total}",
+      "termName": "שם: {value}",
+      "termStatus": "סטטוס: {value}",
+      "termLabelAny": "{key}: (כלשהו)",
+      "termLabel": "{key}: {value}",
+      "hintStatus": "סטטוס",
+      "hintHealth": "תקינות",
+      "hintLabel": "תווית",
+      "hintLabelKey": "מפתח תווית",
+      "hintName": "שם"
+    },
+    "row": {
+      "removeLabelFilter": "לחץ להסרה מהמסנן",
+      "addLabelFilter": "לחץ לסינון לפי תווית זו"
+    },
+    "table": {
+      "name": "שם",
+      "mode": "מצב",
+      "pool": "מאגר",
+      "resources": "משאבים",
+      "status": "סטטוס",
+      "created": "נוצר",
+      "resourcesValue": "{cpu} CPU / {memory}"
+    },
+    "empty": {
+      "none": "אין עדיין סביבות עבודה. צור אחת כדי להתחיל.",
+      "noMatch": "אין סביבות עבודה התואמות למסנן זה."
+    }
+  },
+  "status": {
+    "state-diverged": "מצב שהסתעף",
+    "vcs-error": "שגיאת VCS",
+    "drifted": "סטה",
+    "errored": "שגיאה",
+    "needs-confirm": "מצריך אישור",
+    "planning": "מתכנן",
+    "applying": "מחיל",
+    "canceling": "מבטל",
+    "confirmed": "אושר",
+    "queued": "בתור",
+    "pending": "ממתין",
+    "applied": "הוחל",
+    "planned": "תוכנן",
+    "canceled": "בוטל",
+    "discarded": "נזנח",
+    "pendingDeletion": "ממתין למחיקה",
+    "archived": "בארכיון"
+  },
+  "auth": {
+    "loading": "טוען...",
+    "subtitle": "היכנסו כדי לנהל את התשתית שלכם",
+    "subtitleCli": "היכנסו כדי לאשר את ה-CLI",
+    "emailLabel": "דוא\"ל",
+    "passwordLabel": "סיסמה",
+    "signIn": "כניסה",
+    "signingIn": "נכנס...",
+    "signInWith": "כניסה עם {provider}",
+    "or": "או",
+    "noProviders": "לא הוגדרו ספקי אימות",
+    "completingSignIn": "משלים כניסה...",
+    "callbackFailedTitle": "האימות נכשל",
+    "tryAgain": "נסו שוב",
+    "errors": {
+      "loadProviders": "טעינת הספקים נכשלה",
+      "authenticationFailed": "האימות נכשל ({status})",
+      "tokenExchangeFailed": "החלפת האסימון נכשלה ({status})",
+      "loginFailed": "הכניסה נכשלה",
+      "startLoginFailed": "התחלת הכניסה נכשלה",
+      "missingCodeOrState": "חסר קוד הרשאה או state",
+      "stateMismatch": "אי-התאמת state — ייתכן ניסיון CSRF",
+      "missingVerifier": "חסר מאמת PKCE — נסו להיכנס שוב"
+    }
+  },
+  "estate": {
+    "title": "טופולוגיית מערך",
+    "description": "כל סביבות העבודה שאתה יכול לראות והמודולים שהן משתמשות בהם, מקושרות באמצעות טריגרים של הרצות, מצב מרוחק וקישורי מודולים. קבץ לפי כל ציר שמתאים למערך שלך — הפלטפורמה אינה אוכפת מוסכמת תיוג.",
+    "errors": {
+      "load": "טעינת גרף המערך נכשלה."
+    },
+    "groupBy": {
+      "label": "קבץ לפי",
+      "axis": {
+        "none": "כלום (צבע יחיד)",
+        "pool": "מאגר סוכנים",
+        "prefix": "קידומת שם",
+        "label": "תווית: {key}"
+      }
+    },
+    "view": {
+      "graph": "גרף",
+      "table": "טבלה"
+    },
+    "counts": {
+      "workspaces": "{count, plural, one {סביבת עבודה #} two {# סביבות עבודה} many {# סביבות עבודה} other {# סביבות עבודה}}",
+      "modules": "{count, plural, one {מודול #} two {# מודולים} many {# מודולים} other {# מודולים}}",
+      "dependencies": "{count, plural, one {תלות #} two {# תלויות} many {# תלויות} other {# תלויות}}"
+    },
+    "legend": {
+      "registryModule": "מודול רישום"
+    },
+    "detail": {
+      "moduleImpact": "{count, plural, one {סביבת עבודה משתמשת בזה — עדכון שלו מתכנן אותה מחדש} two {סביבות עבודה משתמשות בזה — עדכון שלו מתכנן את כולן מחדש} many {סביבות עבודה משתמשות בזה — עדכון שלו מתכנן את כולן מחדש} other {סביבות עבודה משתמשות בזה — עדכון שלו מתכנן את כולן מחדש}}",
+      "dependOnThis": "{count, plural, one {תלוי בזה} two {תלויות בזה} many {תלויות בזה} other {תלויות בזה}}"
+    },
+    "table": {
+      "workspaces": {
+        "heading": "סביבות עבודה",
+        "col": {
+          "workspace": "סביבת עבודה",
+          "group": "קבוצה",
+          "agentPool": "מאגר סוכנים",
+          "dependedOnBy": "תלויים בו",
+          "modulesUsed": "מודולים בשימוש"
+        },
+        "noModules": "—"
+      },
+      "modules": {
+        "heading": "מודולים",
+        "col": {
+          "module": "מודול",
+          "usedBy": "בשימוש על ידי (סביבות עבודה)"
+        }
+      }
+    }
+  },
+  "labels": {
+    "title": "תוויות",
+    "description": "עיינו בתוויות בשימוש ברחבי סביבות עבודה, מאגרי סוכנים, מודולי רישום וספקי רישום. לקריאה בלבד — התוויות נערכות בעמוד של כל ישות.",
+    "none": "ללא.",
+    "emptyKeys": "אין עדיין תוויות בשימוש. תייגו כל סביבת עבודה, מאגר סוכנים, מודול רישום או ספק רישום כדי להתחיל לקבץ דברים כאן.",
+    "emptyValues": "אין ערכים עבור \"{key}\". או שאף ישות קריאה אינה נושאת תווית זו, או שהיא הוסרה מאז התצוגה האחרונה.",
+    "loadKeysFailed": "טעינת התוויות נכשלה ({status})",
+    "loadValuesFailed": "טעינת הערכים עבור {key} נכשלה ({status})",
+    "loadEntitiesFailed": "טעינת הישויות נכשלה ({status})",
+    "columns": {
+      "labelKey": "מפתח תווית",
+      "distinctValues": "ערכים ייחודיים",
+      "value": "ערך",
+      "total": "סה\"כ"
+    },
+    "entity": {
+      "workspaces": "סביבות עבודה",
+      "agentPools": "מאגרי סוכנים",
+      "modules": "מודולים",
+      "providers": "ספקים"
+    },
+    "deprecated": {
+      "badge": "מיושן ולא נתמך.",
+      "body": "דפדפן התוויות כבר אינו בניווט הראשי ויוסר בגרסה עתידית. סננו לפי תווית מעמוד <workspacesLink>סביבות העבודה</workspacesLink> במקום. אם אתם מסתמכים על עמוד זה, אנא <issueLink>פתחו issue</issueLink>."
+    }
+  },
+  "settings": {
+    "tokens": {
+      "title": "אסימוני API",
+      "description": "ניהול אסימוני אימות ל-CLI ולאוטומציה",
+      "descriptionAll": "כל האסימונים של כל המשתמשים",
+      "myTokens": "האסימונים שלי",
+      "allTokens": "כל האסימונים",
+      "createToken": "יצירת אסימון",
+      "cancel": "ביטול",
+      "tokenReady": "האסימון מוכן",
+      "tokenReadyHelp": "העתיקו את האסימון עכשיו — הוא לא יוצג שוב.",
+      "dismissToken": "סגירת האסימון",
+      "hide": "הסתרה",
+      "show": "הצגה",
+      "copy": "העתקה",
+      "empty": "עדיין אין אסימוני API.",
+      "noDescription": "אין תיאור",
+      "detached": "מנותק",
+      "never": "אף פעם",
+      "selected": "{count, plural, one {נבחר # אסימון} other {נבחרו # אסימונים}}",
+      "revokeSelected": "ביטול הנבחרים",
+      "revoking": "מבטל...",
+      "clearSelection": "ניקוי הבחירה",
+      "rotate": "החלפה",
+      "rotating": "מחליף...",
+      "revoke": "ביטול",
+      "confirmRotate": "להחליף את האסימון הזה? הסוד הנוכחי מפסיק לעבוד מיד ומונפק אחד חדש.",
+      "confirmBulkRevoke": "{count, plural, one {לבטל # אסימון?} other {לבטל # אסימונים?}}",
+      "kinds": {
+        "interactive": {
+          "label": "אישי",
+          "help": "אסימון אישי ל-CLI ולאוטומציה אד-הוק. נושא את מלוא ההרשאות הפעילות שלך."
+        },
+        "service_bound": {
+          "label": "שירות · מקושר",
+          "help": "אסימון שירות מוגבל לתת-קבוצה של התפקידים שלך. הגישה שלו היא החיתוך של התפקידים האלה ושל שלך — והוא מפסיק לעבוד אם החשבון שלך יוסר."
+        },
+        "service_detached": {
+          "label": "שירות · מנותק",
+          "help": "אסימון שירות מנוהל-מנהל עם היקף מוצמד מוחלט, שאינו מקושר לאף משתמש. השתמשו בו לאוטומציה קריטית ממכונה למכונה שחייבת לשרוד עזיבה של כל אדם."
+        }
+      },
+      "lifespans": {
+        "720": "30 יום",
+        "2160": "90 יום",
+        "4320": "180 יום",
+        "8760": "שנה"
+      },
+      "filter": {
+        "all": "כל הסוגים"
+      },
+      "form": {
+        "description": "תיאור",
+        "descriptionPlaceholder": "אסימון צינור CI/CD",
+        "kind": "סוג",
+        "lifespan": "משך חיים",
+        "create": "יצירה",
+        "creating": "יוצר...",
+        "pinnedRoles": "תפקידים מוצמדים",
+        "pinnedRolesHelp": "— ההיקף שאסימון זה מוגבל אליו",
+        "pinnedRolesCapped": "(מוגבל לגישה שלך)",
+        "noCustomRoles": "לא הוגדרו תפקידים מותאמים. צרו תחילה תפקידים תחת ניהול ← תפקידים.",
+        "noScopedRoles": "אין לך תפקידים ממודרים להצמיד. לאסימון זה לא תהיה גישה."
+      },
+      "columns": {
+        "description": "תיאור",
+        "kind": "סוג",
+        "boundTo": "מקושר ל",
+        "created": "נוצר",
+        "lastUsed": "שימוש אחרון",
+        "expires": "פג",
+        "actions": "פעולות"
+      },
+      "errors": {
+        "load": "טעינת האסימונים נכשלה",
+        "create": "יצירת האסימון נכשלה ({status})",
+        "createGeneric": "יצירת האסימון נכשלה",
+        "rotate": "החלפת האסימון נכשלה ({status})",
+        "rotateGeneric": "החלפת האסימון נכשלה",
+        "revoke": "ביטול האסימון נכשל ({status})",
+        "revokeGeneric": "ביטול האסימון נכשל",
+        "bulkRevoke": "ביטול האסימונים נכשל"
+      }
+    },
+    "sessions": {
+      "title": "הפעלות",
+      "description": "ההפעלות הפעילות שלך",
+      "descriptionAll": "כל ההפעלות הפעילות בכל הפלטפורמה",
+      "empty": "אין הפעלות פעילות.",
+      "revokeAll": "ביטול הכול",
+      "current": "נוכחית",
+      "columns": {
+        "provider": "ספק",
+        "created": "נוצר",
+        "expires": "פג",
+        "lastActive": "פעילות אחרונה",
+        "token": "אסימון"
+      },
+      "errors": {
+        "load": "טעינת ההפעלות נכשלה",
+        "revoke": "ביטול ההפעלות נכשל ({status})",
+        "revokeGeneric": "ביטול ההפעלות נכשל"
+      }
+    }
+  },
+  "registry": {
+    "modules": {
+      "title": "מודולים",
+      "description": "רישום מודולים פרטי של Terraform",
+      "cancel": "ביטול",
+      "createModule": "יצירת מודול",
+      "empty": "אין עדיין מודולים. צרו אחד כדי להתחיל.",
+      "providerLabel": "ספק: {provider}",
+      "versionCount": "{count, plural, one {# גרסה} two {# גרסאות} many {# גרסאות} other {# גרסאות}}",
+      "loadFailed": "טעינת המודולים נכשלה",
+      "createFailed": "יצירת המודול נכשלה",
+      "createFailedStatus": "יצירת המודול נכשלה ({status})",
+      "form": {
+        "name": "שם",
+        "provider": "ספק",
+        "slugTitle": "אותיות קטנות, ספרות ומקפים בלבד. חייב להתחיל באות קטנה.",
+        "addressNote": "השם והספק יוצרים את כתובת המודול ברישום ולא ניתן לשנותם לאחר היצירה.",
+        "vcsConnectionOptional": "חיבור VCS (אופציונלי)",
+        "noneUploadManually": "ללא — העלאת גרסאות ידנית",
+        "repositoryUrl": "כתובת מאגר",
+        "branchOptional": "ענף (אופציונלי)",
+        "branchPlaceholder": "main (השאירו ריק לברירת מחדל)",
+        "tagPattern": "תבנית תגית",
+        "tagPatternHint": "רק תגיות התואמות לתבנית זו יוצרות גרסאות (למשל v1.0.0)",
+        "labelsOptional": "תוויות (אופציונלי)",
+        "creating": "יוצר...",
+        "create": "יצירה"
+      }
+    },
+    "providers": {
+      "title": "ספקים",
+      "description": "רישום ספקים פרטי של Terraform",
+      "cancel": "ביטול",
+      "createProvider": "יצירת ספק",
+      "empty": "אין עדיין ספקים. צרו אחד כדי להתחיל.",
+      "loadFailed": "טעינת הספקים נכשלה",
+      "createFailed": "יצירת הספק נכשלה",
+      "createFailedStatus": "יצירת הספק נכשלה ({status})",
+      "form": {
+        "name": "שם",
+        "slugTitle": "אותיות קטנות, ספרות ומקפים בלבד. חייב להתחיל באות קטנה.",
+        "creating": "יוצר...",
+        "create": "יצירה"
+      }
+    },
+    "meta": {
+      "title": "מטא-נתונים",
+      "edit": "עריכה",
+      "cancel": "ביטול",
+      "save": "שמירה",
+      "saving": "שומר...",
+      "saveAnyway": "שמור בכל זאת",
+      "revertLabels": "שחזור תוויות",
+      "owner": "בעלים",
+      "ownerNone": "ללא",
+      "ownerPlaceholder": "user@example.com",
+      "labels": "תוויות"
+    },
+    "moduleDetail": {
+      "notFound": "המודול לא נמצא",
+      "loadFailed": "טעינת המודול נכשלה",
+      "updateFailed": "עדכון המודול נכשל",
+      "labelLockoutDefault": "שינוי תווית זה עלול לצמצם את הגישה שלכם.",
+      "providerLabel": "ספק: {provider}",
+      "cancel": "ביטול",
+      "uploadVersion": "העלאת גרסה",
+      "vcsConnected": "VCS מחובר",
+      "connectVcs": "חיבור VCS",
+      "deleteModule": "מחיקת מודול",
+      "linkFailed": "קישור סביבת העבודה נכשל",
+      "linkFailedStatus": "הקישור נכשל ({status})",
+      "unlinkConfirm": "לבטל את קישור סביבת העבודה הזו מהמודול? ניתוח ההשפעה לא יופעל עוד עבורה.",
+      "unlinkFailed": "ביטול קישור סביבת העבודה נכשל",
+      "unlinkFailedStatus": "ביטול הקישור נכשל ({status})",
+      "uploadFailed": "ההעלאה נכשלה",
+      "uploadFailedStatus": "ההעלאה נכשלה ({status})",
+      "saveVcsFailed": "שמירת תצורת VCS נכשלה",
+      "saveVcsFailedStatus": "שמירת תצורת VCS נכשלה ({status})",
+      "disableVcsFailed": "השבתת VCS נכשלה",
+      "disableVcsFailedStatus": "השבתת VCS נכשלה ({status})",
+      "deleteFailed": "המחיקה נכשלה",
+      "deleteFailedStatus": "המחיקה נכשלה ({status})",
+      "upload": {
+        "intro": "בחרו תיקייה המכילה את קובצי מודול ה-Terraform שלכם. הם ייארזו ל-tarball ויועלו.",
+        "version": "גרסה",
+        "moduleDirectory": "תיקיית מודול",
+        "selectDirectory": "בחירת תיקייה",
+        "fileCount": "{count, plural, one {# קובץ} two {# קבצים} many {# קבצים} other {# קבצים}}",
+        "filesToInclude": "{count, plural, one {# קובץ לכלול:} two {# קבצים לכלול:} many {# קבצים לכלול:} other {# קבצים לכלול:}}",
+        "andMore": "...ועוד {count}",
+        "uploading": "מעלה...",
+        "upload": "העלאה"
+      },
+      "vcs": {
+        "intro": "חברו מודול זה למאגר VCS. גרסאות חדשות מתפרסמות אוטומטית כאשר תגיות semver התואמות לתבנית התגית נדחפות. מסירות (commits) לענף בלבד אינן יוצרות גרסאות.",
+        "connection": "חיבור VCS",
+        "selectConnection": "בחירת חיבור...",
+        "repositoryUrl": "כתובת מאגר",
+        "branchOptional": "ענף (אופציונלי)",
+        "branchPlaceholder": "main (השאירו ריק לברירת מחדל)",
+        "tagPattern": "תבנית תגית",
+        "tagPatternHint": "רק תגיות התואמות לתבנית זו יוצרות גרסאות (למשל v1.0.0)",
+        "saving": "שומר...",
+        "saveConfiguration": "שמירת תצורת VCS",
+        "disconnect": "ניתוק VCS"
+      },
+      "vcsStatus": {
+        "connected": "VCS מחובר:",
+        "lastTag": "תגית אחרונה: {tag}",
+        "firstVersionHint": "דחפו תגית semver (למשל <code>v1.0.0</code>) התואמת לתבנית התגית כדי לפרסם את הגרסה הראשונה."
+      },
+      "links": {
+        "title": "סביבות עבודה מקושרות",
+        "linkWorkspace": "קישור סביבת עבודה",
+        "description": "סביבות עבודה מקושרות מקבלות תוכניות ספקולטיביות כאשר נפתחות בקשות משיכה (PR) מול מודול זה, וריצות רגילות כאשר מתפרסמות גרסאות חדשות.",
+        "searchPlaceholder": "חיפוש סביבות עבודה לקישור…",
+        "empty": "אין עדיין סביבות עבודה מקושרות.",
+        "unlinkTitle": "ביטול קישור סביבת עבודה"
+      },
+      "interface": {
+        "title": "קלטים ופלטים",
+        "counts": "{inputs} קלטים, {outputs} פלטים",
+        "versionLabel": "גרסה:",
+        "noData": "אין נתוני ממשק זמינים לגרסה זו.",
+        "inputs": "קלטים",
+        "outputs": "פלטים",
+        "name": "שם",
+        "type": "סוג",
+        "description": "תיאור",
+        "default": "ברירת מחדל",
+        "required": "נדרש",
+        "sensitive": "רגיש",
+        "requiredBadge": "נדרש",
+        "optionalBadge": "אופציונלי",
+        "sensitiveBadge": "רגיש",
+        "noneDeclared": "גרסת מודול זו אינה מצהירה על קלטים או פלטים."
+      },
+      "versions": {
+        "title": "גרסאות",
+        "count": "{count, plural, one {# גרסה} two {# גרסאות} many {# גרסאות} other {# גרסאות}}",
+        "emptyVcs": "אין עדיין גרסאות. דחפו תגית semver התואמת ל-\"{pattern}\" למאגר המחובר כדי לפרסם גרסה.",
+        "emptyUpload": "אין עדיין גרסאות. העלו מודול או חברו VCS כדי להתחיל.",
+        "version": "גרסה",
+        "status": "סטטוס",
+        "source": "מקור",
+        "actions": "פעולות",
+        "manualUpload": "העלאה ידנית",
+        "delete": "מחיקה"
+      },
+      "deleteDialog": {
+        "title": "אישור מחיקה",
+        "moduleBody": "פעולה זו תמחק לצמיתות את המודול הזה ואת כל גרסאותיו.",
+        "versionBody": "פעולה זו תמחק לצמיתות את גרסה {version}.",
+        "cancel": "ביטול",
+        "confirm": "מחיקה"
+      }
+    },
+    "providerDetail": {
+      "description": "רישום ספקים",
+      "deleteProvider": "מחיקת ספק",
+      "publishNote": "גרסאות ספק מתפרסמות באמצעות כלי שורת הפקודה <code>terrapod-publish</code>, החותם את הבינאריים בצד הלקוח. העלאה וחתימה של בינאריי ספק מהדפדפן אינן נתמכות עוד. דף זה הוא לקריאה בלבד עבור גרסאות ופלטפורמות.",
+      "empty": "אין עדיין גרסאות. פרסמו באמצעות כלי שורת הפקודה terrapod-publish כדי להתחיל.",
+      "loadVersionsFailed": "טעינת הגרסאות נכשלה",
+      "updateFailed": "עדכון הספק נכשל",
+      "labelLockoutDefault": "שינוי תווית זה עלול לצמצם את הגישה שלכם.",
+      "deleteFailed": "המחיקה נכשלה",
+      "deleteFailedStatus": "המחיקה נכשלה ({status})",
+      "platformCount": "{count, plural, one {# פלטפורמה} two {# פלטפורמות} many {# פלטפורמות} other {# פלטפורמות}}",
+      "delete": "מחיקה",
+      "os": "מערכת הפעלה",
+      "arch": "ארכיטקטורה",
+      "filename": "שם קובץ",
+      "actions": "פעולות",
+      "deleteDialog": {
+        "title": "אישור מחיקה",
+        "providerBody": "פעולה זו תמחק לצמיתות את הספק הזה ואת כל גרסאותיו.",
+        "versionBody": "פעולה זו תמחק לצמיתות את גרסה {version} ואת הפלטפורמות שלה.",
+        "platformBody": "פעולה זו תמחק לצמיתות את פלטפורמת {os}/{arch}.",
+        "cancel": "ביטול",
+        "confirm": "מחיקה"
+      }
+    }
+  },
+  "adminUsers": {
+    "title": "משתמשים",
+    "description": "נהל חשבונות משתמש מקומיים",
+    "empty": "לא נמצאו משתמשים.",
+    "columns": {
+      "email": "אימייל",
+      "displayName": "שם תצוגה",
+      "status": "סטטוס",
+      "lastLogin": "התחברות אחרונה",
+      "created": "נוצר",
+      "actions": "פעולות"
+    },
+    "form": {
+      "email": "אימייל",
+      "displayName": "שם תצוגה",
+      "displayNamePlaceholder": "ישראל ישראלי",
+      "passwordOptional": "סיסמה (אופציונלי)",
+      "passwordPlaceholder": "הזן סיסמה חזקה"
+    },
+    "reset": {
+      "title": "איפוס סיסמה עבור {email}",
+      "newPassword": "סיסמה חדשה"
+    },
+    "password": {
+      "score": {
+        "veryWeak": "חלשה מאוד",
+        "weak": "חלשה",
+        "fair": "בינונית",
+        "good": "טובה",
+        "strong": "חזקה"
+      }
+    },
+    "status": {
+      "active": "פעיל",
+      "inactive": "לא פעיל",
+      "never": "אף פעם"
+    },
+    "actions": {
+      "cancel": "בטל",
+      "save": "שמור",
+      "saving": "שומר...",
+      "createUser": "צור משתמש",
+      "creating": "יוצר...",
+      "resetPassword": "אפס סיסמה",
+      "edit": "ערוך",
+      "delete": "מחק",
+      "resetPw": "אפס סיסמה",
+      "setPw": "הגדר סיסמה",
+      "cancelPw": "בטל שינוי סיסמה"
+    },
+    "confirm": {
+      "activate": "להפעיל את המשתמש \"{email}\"?",
+      "deactivate": "להשבית את המשתמש \"{email}\"?",
+      "delete": "למחוק את המשתמש \"{email}\"? לא ניתן לבטל פעולה זו."
+    },
+    "success": {
+      "created": "המשתמש \"{email}\" נוצר",
+      "updated": "המשתמש \"{email}\" עודכן",
+      "activated": "המשתמש \"{email}\" הופעל",
+      "deactivated": "המשתמש \"{email}\" הושבת",
+      "passwordReset": "הסיסמה אופסה עבור \"{email}\"",
+      "deleted": "המשתמש \"{email}\" נמחק"
+    },
+    "errors": {
+      "load": "טעינת המשתמשים נכשלה",
+      "create": "יצירת המשתמש נכשלה",
+      "createStatus": "יצירת המשתמש נכשלה ({status})",
+      "update": "עדכון המשתמש נכשל",
+      "resetPassword": "איפוס הסיסמה נכשל",
+      "delete": "מחיקת המשתמש נכשלה"
+    }
+  },
+  "adminRoles": {
+    "title": "תפקידים והקצאות",
+    "description": "ניהול תפקידי RBAC והקצאות תפקידים למשתמשים",
+    "builtIn": "מובנה",
+    "emptyRoles": "לא הוגדרו תפקידים.",
+    "emptyAssignments": "אין הקצאות תפקידים.",
+    "tabs": {
+      "roles": "תפקידים",
+      "assignments": "הקצאות"
+    },
+    "columns": {
+      "provider": "ספק",
+      "email": "דוא\"ל",
+      "role": "תפקיד",
+      "created": "נוצר",
+      "actions": "פעולות"
+    },
+    "form": {
+      "name": "שם",
+      "namePattern": "אותיות, ספרות, מקפים וקווים תחתונים בלבד. חייב להתחיל באות או ספרה.",
+      "workspacePermission": "הרשאת סביבת עבודה",
+      "poolPermission": "הרשאת מאגר",
+      "registryPermission": "הרשאת רישום",
+      "catalogPermission": "הרשאת קטלוג",
+      "descriptionLabel": "תיאור",
+      "descriptionPlaceholder": "גישת מפתח",
+      "allowLabels": "תוויות מותרות (key=value, מופרד בפסיקים)",
+      "allowNames": "שמות מותרים (מופרד בפסיקים)",
+      "denyLabels": "תוויות אסורות (key=value, מופרד בפסיקים)",
+      "denyNames": "שמות אסורים (מופרד בפסיקים)",
+      "allowLabelsShort": "תוויות מותרות",
+      "allowNamesShort": "שמות מותרים",
+      "denyLabelsShort": "תוויות אסורות",
+      "denyNamesShort": "שמות אסורים"
+    },
+    "assignForm": {
+      "provider": "ספק",
+      "email": "דוא\"ל",
+      "roles": "תפקידים"
+    },
+    "caps": {
+      "selected": "{count, plural, one {# יכולת נבחרה} two {# יכולות נבחרו} many {# יכולות נבחרו} other {# יכולות נבחרו}}",
+      "count": "{count, plural, one {# יכולת} two {# יכולות} many {# יכולות} other {# יכולות}}",
+      "custom": "מותאם אישית",
+      "matchesPresets": "תואם לתבניות מוגדרות",
+      "advanced": "מתקדם — יכולות",
+      "otherPreserved": "יכולות אחרות (נשמרות בשמירה)",
+      "presetHelp": {
+        "before": "בחירת תבנית מוגדרת למעלה מסמנת מראש את יכולותיה. סימון או ביטול סימון של תיבה מעבר לתבנית מוגדרת מסמן את התפקיד",
+        "after": "וההרשאה שלו נשלחת כמערך יכולות מפורש."
+      },
+      "groups": {
+        "workspace": "סביבת עבודה",
+        "run": "ריצה",
+        "state": "מצב",
+        "var": "משתנים",
+        "config": "תצורה",
+        "drift": "סטייה",
+        "run-task": "משימות ריצה",
+        "notification": "התראות",
+        "run-trigger": "טריגרים לריצה",
+        "pool": "מאגרי סוכנים",
+        "registry": "רישום",
+        "catalog": "קטלוג שירותים"
+      }
+    },
+    "display": {
+      "allow": "מותר: {value}",
+      "allowNames": "שמות מותרים: {value}",
+      "deny": "אסור: {value}",
+      "denyNames": "שמות אסורים: {value}"
+    },
+    "actions": {
+      "cancel": "ביטול",
+      "save": "שמירה",
+      "saving": "שומר...",
+      "edit": "עריכה",
+      "delete": "מחיקה",
+      "remove": "הסרה",
+      "createRole": "יצירת תפקיד",
+      "creating": "יוצר...",
+      "addAssignment": "הוספת הקצאה",
+      "setRoles": "הגדרת תפקידים"
+    },
+    "confirm": {
+      "deleteRole": "למחוק את התפקיד \"{name}\"? כל הקצאה המפנה אליו תושפע.",
+      "removeAssignment": "להסיר את התפקיד \"{roleName}\" מ-{email}?"
+    },
+    "success": {
+      "roleCreated": "התפקיד \"{name}\" נוצר",
+      "roleUpdated": "התפקיד \"{name}\" עודכן",
+      "roleDeleted": "התפקיד \"{name}\" נמחק",
+      "rolesAssigned": "תפקידים הוקצו ל-{email}",
+      "assignmentRemoved": "ההקצאה הוסרה"
+    },
+    "errors": {
+      "loadRoles": "טעינת התפקידים נכשלה",
+      "loadAssignments": "טעינת ההקצאות נכשלה",
+      "createRole": "יצירת התפקיד נכשלה",
+      "createRoleStatus": "יצירת התפקיד נכשלה ({status})",
+      "updateRole": "עדכון התפקיד נכשל",
+      "deleteRole": "מחיקת התפקיד נכשלה",
+      "setAssignment": "הגדרת ההקצאה נכשלה",
+      "setAssignmentStatus": "הגדרת ההקצאה נכשלה ({status})",
+      "deleteAssignment": "מחיקת ההקצאה נכשלה"
+    }
+  },
+  "adminVcs": {
+    "title": "חיבורי VCS",
+    "description": "ניהול שילובי מערכת בקרת גרסאות",
+    "empty": "לא הוגדרו חיבורי VCS.",
+    "actions": {
+      "new": "חיבור חדש",
+      "cancel": "ביטול",
+      "edit": "עריכה",
+      "delete": "מחיקה"
+    },
+    "confirmDelete": "למחוק את חיבור ה-VCS הזה? סביבות עבודה המשתמשות בו יאבדו את שילוב ה-VCS. לא ניתן לבטל זאת.",
+    "form": {
+      "name": "שם",
+      "namePattern": "אותיות, ספרות, מקפים וקווים תחתונים בלבד. חייב להתחיל באות או ספרה.",
+      "provider": "ספק",
+      "providerImmutable": "הספק אינו ניתן לשינוי — מחקו וצרו מחדש כדי לשנותו",
+      "serverUrl": "כתובת שרת (אופציונלי)",
+      "serverUrlHint": "חייבת להיות כתובת HTTP או HTTPS (למשל https://github.mycompany.com)",
+      "appId": "מזהה אפליקציה",
+      "appIdHint": "מזהה GitHub App — ספרות מספריות בלבד",
+      "installationId": "מזהה התקנה",
+      "installationIdHint": "מזהה התקנת GitHub App — ספרות מספריות בלבד",
+      "privateKey": "מפתח פרטי (PEM)",
+      "browse": "עיון...",
+      "privateKeyKeep": "השאירו ריק כדי לשמור על המפתח הנוכחי — הדביקו PEM חדש כדי להחליף",
+      "privateKeyPlaceholder": "-----BEGIN RSA PRIVATE KEY-----\n...\n\nגררו קובץ .pem לכאן או לחצו עיון",
+      "webhookSecret": "סוד Webhook",
+      "optional": "(אופציונלי)",
+      "webhookSecretSet": "הוגדר — השאירו ריק כדי לשמור, הזינו ערך חדש כדי להחליף",
+      "webhookSecretGlobal": "השאירו ריק כדי להשתמש בסוד ה-Webhook הגלובלי",
+      "webhookSecretHelp": "סוד HMAC ייעודי לחיבור עבור ה-Webhooks של התקנה זו. כשלא מוגדר, נעשה שימוש בסוד הגלובלי.",
+      "accessToken": "אסימון גישה",
+      "accessTokenKeep": "השאירו ריק כדי לשמור על האסימון הנוכחי",
+      "saving": "שומר...",
+      "creating": "יוצר...",
+      "saveChanges": "שמירת שינויים",
+      "createConnection": "יצירת חיבור"
+    },
+    "table": {
+      "name": "שם",
+      "provider": "ספק",
+      "serverUrl": "כתובת שרת",
+      "status": "סטטוס",
+      "created": "נוצר",
+      "actions": "פעולות"
+    },
+    "success": {
+      "created": "חיבור ה-VCS \"{name}\" נוצר",
+      "updated": "חיבור ה-VCS \"{name}\" עודכן",
+      "deleted": "חיבור ה-VCS נמחק"
+    },
+    "errors": {
+      "load": "טעינת חיבורי ה-VCS נכשלה",
+      "save": "שמירת החיבור נכשלה",
+      "delete": "מחיקת החיבור נכשלה",
+      "createStatus": "יצירת החיבור נכשלה ({status})",
+      "updateStatus": "עדכון החיבור נכשל ({status})"
+    }
+  },
+  "adminVariableSets": {
+    "title": "מערכי משתנים",
+    "description": "נהל מערכי משתנים ברמת הארגון עבור קבוצות סביבות עבודה",
+    "empty": "לא הוגדרו מערכי משתנים.",
+    "none": "-",
+    "actions": {
+      "new": "מערך משתנים חדש",
+      "cancel": "בטל"
+    },
+    "form": {
+      "name": "שם",
+      "namePattern": "אותיות, ספרות, מקפים וקווים תחתונים בלבד. חייב להתחיל באות או בספרה.",
+      "descriptionLabel": "תיאור",
+      "descriptionPlaceholder": "פרטי גישה של AWS לכל סביבות העבודה",
+      "global": "גלובלי (החל על כל סביבות העבודה)",
+      "priority": "עדיפות (עקוף משתני סביבת עבודה)",
+      "creating": "יוצר...",
+      "create": "צור מערך משתנים"
+    },
+    "table": {
+      "name": "שם",
+      "description": "תיאור",
+      "scope": "היקף",
+      "variables": "משתנים",
+      "created": "נוצר"
+    },
+    "scope": {
+      "global": "גלובלי",
+      "priority": "עדיפות",
+      "standard": "רגיל"
+    },
+    "errors": {
+      "load": "טעינת מערכי המשתנים נכשלה",
+      "create": "יצירת מערך המשתנים נכשלה",
+      "createStatus": "יצירת מערך המשתנים נכשלה ({status})"
+    },
+    "detail": {
+      "back": "חזרה למערכי משתנים",
+      "headerFallback": "מערך משתנים",
+      "notFound": "מערך המשתנים לא נמצא",
+      "global": "גלובלי",
+      "priority": "עדיפות",
+      "yes": "כן",
+      "no": "לא",
+      "edit": "ערוך",
+      "cancel": "בטל",
+      "save": "שמור",
+      "saving": "שומר...",
+      "delete": "מחק",
+      "deleting": "מוחק...",
+      "confirmDelete": "אשר מחיקה",
+      "deleteTitle": "מחק מערך משתנים",
+      "deleteDescription": "מחק לצמיתות מערך משתנים זה ואת כל המשתנים שבו.",
+      "tabs": {
+        "settings": "הגדרות",
+        "variables": "משתנים",
+        "workspaces": "סביבות עבודה"
+      },
+      "addVariable": "הוסף משתנה",
+      "adding": "מוסיף...",
+      "varKey": "מפתח",
+      "varValue": "ערך",
+      "varCategory": "קטגוריה",
+      "categoryTerraform": "Terraform",
+      "categoryEnv": "סביבה",
+      "sensitive": "רגיש",
+      "sensAbbr": "רגיש",
+      "enterNewValue": "הזן ערך חדש",
+      "empty": "ריק",
+      "emptyVars": "אין משתנים במערך זה.",
+      "actions": "פעולות",
+      "remove": "הסר",
+      "add": "הוסף",
+      "addWorkspace": "הוסף סביבת עבודה",
+      "workspace": "סביבת עבודה",
+      "selectWorkspace": "בחר סביבת עבודה...",
+      "globalBanner": "מערך משתנים זה גלובלי וחל על כל סביבות העבודה אוטומטית.",
+      "emptyWorkspaces": "אין סביבות עבודה משויכות למערך משתנים זה.",
+      "confirmDeleteVar": "למחוק את המשתנה הזה? לא ניתן לבטל פעולה זו.",
+      "confirmRemoveWorkspace": "להסיר את סביבת העבודה הזו ממערך המשתנים? המשתנים שלו יפסיקו לחול על סביבת עבודה זו.",
+      "success": {
+        "updated": "מערך המשתנים עודכן",
+        "workspaceAdded": "סביבת העבודה נוספה",
+        "workspaceRemoved": "סביבת העבודה הוסרה"
+      },
+      "errors": {
+        "load": "טעינת מערך המשתנים נכשלה",
+        "update": "עדכון מערך המשתנים נכשל",
+        "delete": "מחיקת מערך המשתנים נכשלה",
+        "loadVars": "טעינת המשתנים נכשלה",
+        "loadWorkspaces": "טעינת סביבות העבודה נכשלה",
+        "addVar": "הוספת המשתנה נכשלה",
+        "addVarStatus": "הוספת המשתנה נכשלה ({status})",
+        "updateVar": "עדכון המשתנה נכשל",
+        "deleteVar": "מחיקת המשתנה נכשלה",
+        "addWorkspace": "הוספת סביבת העבודה נכשלה",
+        "removeWorkspace": "הסרת סביבת העבודה נכשלה"
+      }
+    }
+  },
+  "adminAutodiscovery": {
+    "title": "גילוי אוטומטי",
+    "description": "יצירה אוטומטית של סביבות עבודה במונו-ריפו כשבקשות משיכה נוגעות בנתיבים תואמים",
+    "empty": "עדיין אין כללי גילוי אוטומטי. צרו כלל כדי להתחיל להקצות סביבות עבודה אוטומטית מבקשות משיכה במונו-ריפו שלכם.",
+    "unsavedRule": "(כלל לא שמור)",
+    "actions": {
+      "newRule": "כלל חדש",
+      "cancel": "ביטול",
+      "create": "יצירה",
+      "update": "עדכון",
+      "preview": "תצוגה מקדימה",
+      "edit": "עריכה",
+      "delete": "מחיקה",
+      "close": "סגירה"
+    },
+    "status": {
+      "enabled": "מופעל",
+      "disabled": "מושבת"
+    },
+    "form": {
+      "createTitle": "יצירת כלל",
+      "editTitle": "עריכת כלל",
+      "name": "שם",
+      "vcsConnection": "חיבור VCS",
+      "selectConnection": "בחירת חיבור",
+      "repoUrl": "כתובת מאגר",
+      "branch": "ענף (ריק = ברירת מחדל)",
+      "matchPattern": "תבנית התאמה",
+      "matchPatternHint": "תבניות בסגנון Gitignore. <code>**</code> מתאים לרוחב מקטעי נתיב. רק קבצי <code>*.tf*</code> מפעילים גילוי אוטומטי.",
+      "ignorePatterns": "תבניות התעלמות (אחת בכל שורה)",
+      "nameTemplate": "תבנית שם סביבת עבודה (אופציונלי)",
+      "nameTemplateHint": "השתמשו ב-<path></path> עבור הספרייה כאשר <code>/</code> מוחלף ב-<code>-</code>, או ב-<root></root> עבור הספרייה כמות שהיא. ריק = ברירת מחדל (רק הנתיב עם מקפים).",
+      "templateDefaults": "ברירות מחדל לתבנית סביבת עבודה",
+      "executionMode": "מצב הרצה",
+      "executionModeHint": "הגילוי האוטומטי מונע-VCS; נתמכת רק הרצת agent.",
+      "agentPool": "מאגר agent",
+      "none": "(אין)",
+      "executionBackend": "מנוע הרצה",
+      "terraformVersion": "גרסת Terraform",
+      "cpuRequest": "בקשת CPU",
+      "memoryRequest": "בקשת זיכרון",
+      "ownerEmail": "אימייל בעלים",
+      "autoApply": "החלה אוטומטית",
+      "enabled": "מופעל",
+      "onDirectoryDelete": "בעת מחיקת ספרייה",
+      "onDeleteFlag": "סימון (בטוח — סימון כממתין למחיקה, מצריך פעולה ידנית)",
+      "onDeleteDestroy": "השמדה (סכנה — מפרק את התשתית ואז מארכב את סביבת העבודה)",
+      "onDirectoryDeleteHint": "מה קורה לסביבת עבודה שהתגלתה אוטומטית כשהספרייה שלה מוסרת מהענף המנוטר.",
+      "onDeleteDestroyWarning": "פעולה זו תריץ terraform destroy אמיתי על סביבת העבודה כשהספרייה שלה מוסרת מהענף המנוטר.",
+      "labels": "תוויות (מורשות לסביבות העבודה שנוצרות)",
+      "varFiles": "קובצי משתנים (מורשים לסביבות העבודה שנוצרות)",
+      "varFilesHint": "נתיבי <code>.tfvars</code> יחסיים המועברים ל-plan/apply.",
+      "addVarFile": "הוספת קובץ משתנים",
+      "executionHooks": "ווי הרצה (משויכים לכל סביבת עבודה חדשה)",
+      "executionHooksHint": "בחרו מבין ווים שהוגדרו בעמוד הניהול <page>ווי הרצה</page> — כל וו נבחר משויך לכל סביבת עבודה שכלל זה יוצר.",
+      "noHooks": "עדיין לא הוגדרו ווי הרצה. צרו אחד תחילה בעמוד הניהול ווי הרצה.",
+      "hookDisabled": "(מושבת)",
+      "hookNotInLibrary": "(לא בספרייה — בטלו את הסימון להסרה)",
+      "runTaskTemplates": "תבניות משימות הרצה (נוצרות בכל סביבת עבודה חדשה)",
+      "notificationTemplates": "תבניות התראות (נוצרות בכל סביבת עבודה חדשה)",
+      "saving": "שומר...",
+      "previewTitle": "סקירת המאגר ותצוגה מקדימה של סביבות העבודה שכלל זה היה יוצר — ללא שמירה"
+    },
+    "table": {
+      "name": "שם",
+      "repo": "מאגר",
+      "pattern": "תבנית",
+      "enabled": "מופעל",
+      "created": "נוצר",
+      "previewTitle": "סקירת המאגר ותצוגה מקדימה של סביבות העבודה שכלל זה היה יוצר"
+    },
+    "deleteModal": {
+      "title": "למחוק את הכלל?",
+      "body": "סביבות עבודה שנוצרו אוטומטית על ידי כלל זה ימשיכו לעבוד. בקשות משיכה עתידיות הנוגעות בנתיבים חדשים תחת כלל זה לא ייצרו סביבות עבודה נוספות אוטומטית."
+    },
+    "preview": {
+      "title": "תצוגה מקדימה: {ruleName}",
+      "walkedFiles": "נסרקו <files>{count}</files> קבצים ב-<refspan>{ref}</refspan>",
+      "walking": "סורק מאגר…",
+      "noMatches": "אף ספרייה במאגר זה אינה תואמת את תבנית הכלל. אין מה ליצור.",
+      "colWorkspace": "סביבת עבודה",
+      "colDirectory": "ספרייה",
+      "colAction": "פעולה",
+      "repoRoot": "(שורש המאגר)",
+      "actionCreate": "יצירה",
+      "skipDiscovered": "דילוג (כבר התגלה)",
+      "skipDiscoveredTitle": "כבר נוצר על ידי כלל זה",
+      "skipCollision": "דילוג (התנגשות שמות)",
+      "skipCollisionTitle": "סביבת עבודה בשם זה כבר קיימת מסיבה אחרת",
+      "willCreate": "{count, plural, one {תיווצר # סביבת עבודה.} other {ייווצרו # סביבות עבודה.}} סביבות עבודה קיימות (התנגשויות) נותרות ללא שינוי.",
+      "provision": "{count, plural, one {הקצאת # סביבת עבודה} other {הקצאת # סביבות עבודה}}",
+      "provisioning": "מקצה…",
+      "saveToProvision": "שמרו את הכלל כדי להקצות את סביבות העבודה האלה."
+    },
+    "success": {
+      "created": "נוצר {name}",
+      "updated": "עודכן {name}",
+      "deleted": "הכלל נמחק",
+      "provisioned": "{count, plural, one {נוצרה # סביבת עבודה מ-\"{ruleName}\"} other {נוצרו # סביבות עבודה מ-\"{ruleName}\"}}"
+    },
+    "errors": {
+      "loadRules": "טעינת כללי הגילוי האוטומטי נכשלה",
+      "load": "הטעינה נכשלה",
+      "createFailed": "היצירה נכשלה: {status} {detail}",
+      "updateFailed": "העדכון נכשל: {status} {detail}",
+      "save": "השמירה נכשלה",
+      "deleteRule": "מחיקת הכלל נכשלה",
+      "delete": "המחיקה נכשלה",
+      "previewFailed": "התצוגה המקדימה נכשלה ({status})",
+      "preview": "התצוגה המקדימה נכשלה",
+      "previewPrereq": "הגדירו חיבור VCS, כתובת מאגר ותבנית לפני הצגת תצוגה מקדימה",
+      "scanFailed": "הסריקה נכשלה ({status})",
+      "scan": "הסריקה נכשלה"
+    }
+  },
+  "adminBulkUpdate": {
+    "title": "עדכון מרוכז",
+    "description": "בחרו סביבות עבודה לפי מסנן, ואז החילו שינוי הגדרות על כולן",
+    "none": "(אין)",
+    "anyOption": "(כל)",
+    "unchanged": "(ללא שינוי)",
+    "unchangedOption": "(ללא שינוי)",
+    "filter": {
+      "heading": "1. בחירת סביבות עבודה",
+      "matchAll": "התאמת <strong>כל</strong> סביבות העבודה (מתעלם מהמסננים שלמטה)",
+      "namePrefix": "קידומת שם",
+      "executionBackend": "מנוע הרצה",
+      "ownerEmail": "אימייל בעלים",
+      "agentPool": "מאגר agent",
+      "vcsConnection": "חיבור VCS",
+      "labels": "תוויות",
+      "search": "חיפוש",
+      "searching": "מחפש..."
+    },
+    "results": {
+      "matched": "הותאמו <strong>{count}</strong> {count, plural, one {סביבת עבודה} other {סביבות עבודה}}.",
+      "noMatch": "אף סביבת עבודה לא תאמה למסנן זה.",
+      "colName": "שם",
+      "colMode": "מצב",
+      "colBackend": "מנוע",
+      "colTfVersion": "גרסת TF",
+      "colLabels": "תוויות"
+    },
+    "update": {
+      "heading": "2. החלת שינויים",
+      "hint": "רק שדות שתגדירו למטה ישונו. המסנן שלמעלה בוחר אילו סביבות עבודה יקבלו את השינוי.",
+      "terraformVersion": "גרסת Terraform",
+      "executionBackend": "מנוע הרצה",
+      "executionMode": "מצב הרצה",
+      "autoApply": "החלה אוטומטית",
+      "agentPool": "מאגר agent",
+      "cpuRequest": "בקשת CPU",
+      "memoryRequest": "בקשת זיכרון",
+      "setLabels": "הגדרת תוויות (מחליף את מפת התוויות בכל סביבת עבודה תואמת)",
+      "setVarFiles": "הגדרת קובצי משתנים",
+      "addVarFile": "הוספת קובץ משתנים",
+      "setRunTasks": "הגדרת משימות הרצה (מעודכנות לפי שם בכל סביבת עבודה תואמת)",
+      "setNotifications": "הגדרת תצורות התראה (מעודכנות לפי שם)",
+      "dryRun": "הרצה יבשה (תצוגה מקדימה בלבד — לא נכתבים שינויים)",
+      "confirmWarning": "פעולה זו כותבת שינויים לכל סביבת עבודה תואמת.",
+      "confirmApply": "אישור החלה",
+      "applying": "מחיל...",
+      "cancel": "ביטול",
+      "working": "עובד...",
+      "previewDryRun": "תצוגה מקדימה (הרצה יבשה)",
+      "applyChanges": "החלת שינויים"
+    },
+    "diff": {
+      "colWorkspace": "סביבת עבודה",
+      "colChanges": "שינויים"
+    },
+    "dryResult": {
+      "heading": "תוצאת הרצה יבשה",
+      "summary": "הותאמו <strong>{matched}</strong>; <strong>{wouldChange}</strong> ישתנו; {unchanged} ללא שינוי. שום דבר לא נכתב.",
+      "wouldChange": "ישתנה",
+      "noChange": "אף סביבת עבודה לא תשתנה עם עדכון זה."
+    },
+    "applyResult": {
+      "heading": "תוצאת החלה",
+      "summary": "הותאמו <strong>{matched}</strong>; <appliedstrong>{applied}</appliedstrong> הוחלו; {unchanged} ללא שינוי; {errors, plural, one {# שגיאה} other {# שגיאות}}.",
+      "applied": "הוחל",
+      "unnamedWorkspace": "(סביבת עבודה)",
+      "noChange": "אף סביבת עבודה לא השתנתה."
+    },
+    "errors": {
+      "searchFailed": "החיפוש נכשל ({status})",
+      "search": "החיפוש נכשל",
+      "bulkUpdateFailed": "העדכון המרוכז נכשל ({status})",
+      "bulkUpdate": "העדכון המרוכז נכשל"
+    }
+  },
+  "adminExecutionHooks": {
+    "title": "ווי הרצה",
+    "description": "שלבי מעטפת מותאמים הרצים בתוך משימות רץ בנקודות pre/post-plan/apply, משויכים לסביבות עבודה",
+    "empty": "לא הוגדרו ווי הרצה.",
+    "actions": {
+      "cancel": "ביטול",
+      "new": "וו הרצה חדש",
+      "creating": "יוצר...",
+      "create": "יצירת וו הרצה"
+    },
+    "badges": {
+      "disabled": "מושבת",
+      "enabled": "מופעל"
+    },
+    "columns": {
+      "name": "שם",
+      "hookPoint": "נקודת וו",
+      "enabled": "מופעל",
+      "priority": "עדיפות",
+      "workspaces": "סביבות עבודה"
+    },
+    "form": {
+      "name": "שם",
+      "namePatternTitle": "אותיות, מספרים, מקפים וקווים תחתונים בלבד. חייב להתחיל באות או במספר.",
+      "description": "תיאור",
+      "descriptionPlaceholder": "הוספת רשומת מארחים פנימיים לפני init",
+      "hookPoint": "נקודת וו",
+      "priority": "עדיפות",
+      "priorityTitle": "נמוך יותר רץ ראשון כשמספר ווים חולקים נקודה (שוויונות נשברים לפי שם).",
+      "scriptLabel": "סקריפט (<code>/bin/sh -c</code>)",
+      "scriptHelp": "רץ עם זהות הענן של הרץ. יציאה שאינה אפס מכשילה את ההרצה. סודות צריכים להגיע ממשתני סביבת העבודה, לא משורבבים כאן."
+    },
+    "errors": {
+      "load": "טעינת ווי ההרצה נכשלה",
+      "createStatus": "יצירת וו ההרצה נכשלה ({status})",
+      "create": "יצירת וו ההרצה נכשלה"
+    }
+  },
+  "adminPolicySets": {
+    "title": "קבוצות מדיניות",
+    "description": "אכיפת מדיניות-כקוד של OPA, ממוקדת לסביבות עבודה לפי תווית",
+    "empty": "לא הוגדרו קבוצות מדיניות.",
+    "actions": {
+      "cancel": "ביטול",
+      "new": "קבוצת מדיניות חדשה",
+      "creating": "יוצר...",
+      "create": "יצירת קבוצת מדיניות"
+    },
+    "badges": {
+      "disabled": "מושבת",
+      "mandatory": "חובה",
+      "advisory": "מייעץ",
+      "global": "גלובלי",
+      "labelScoped": "ממוקד-תווית"
+    },
+    "columns": {
+      "name": "שם",
+      "description": "תיאור",
+      "enforcement": "אכיפה",
+      "scope": "היקף",
+      "policies": "מדיניויות"
+    },
+    "form": {
+      "name": "שם",
+      "namePatternTitle": "אותיות, מספרים, מקפים וקווים תחתונים בלבד. חייב להתחיל באות או מספר.",
+      "description": "תיאור",
+      "descriptionPlaceholder": "מעקות בטיחות חובה לסביבות עבודה בייצור",
+      "enforcement": "אכיפה",
+      "enforcementAdvisory": "מייעץ (אזהרה, ללא חסימה)",
+      "enforcementMandatory": "חובה (חסימת החלה בכשל)",
+      "globalScope": "גלובלי (חל על כל סביבת עבודה)",
+      "sourceInline": "מוטבע (ניהול מדיניויות בממשק)",
+      "sourceVcs": "ממאגר VCS",
+      "vcsConnection": "חיבור VCS",
+      "selectConnection": "בחירת חיבור...",
+      "repoUrl": "כתובת URL של המאגר",
+      "branch": "ענף",
+      "branchPlaceholder": "main (ברירת מחדל)",
+      "policyPath": "נתיב מדיניות",
+      "policyPathPlaceholder": "policies/ (תיקייה המכילה קובצי .rego)",
+      "helpVcs": "המדיניויות יסונכרנו מהמאגר אוטומטית.",
+      "helpInline": "הוסיפו מדיניויות ועדנו את מיקוד התווית לאחר יצירת הקבוצה."
+    },
+    "errors": {
+      "load": "טעינת קבוצות המדיניות נכשלה",
+      "createStatus": "יצירת קבוצת המדיניות נכשלה ({status})",
+      "create": "יצירת קבוצת המדיניות נכשלה"
+    }
+  },
+  "adminCatalog": {
+    "title": "ניהול קטלוג",
+    "description": "ניהול פריטי קטלוג שירותים",
+    "notEnabled": "קטלוג השירותים אינו מופעל.",
+    "empty": "עדיין אין פריטי קטלוג.",
+    "actions": {
+      "new": "פריט קטלוג חדש",
+      "cancel": "ביטול",
+      "create": "יצירת פריט קטלוג",
+      "creating": "יוצר…",
+      "saveChanges": "שמירת שינויים",
+      "saving": "שומר…",
+      "edit": "עריכה",
+      "delete": "מחיקה"
+    },
+    "form": {
+      "name": "שם",
+      "nameTitle": "אותיות, מספרים, מקפים וקווים תחתונים בלבד. חייב להתחיל באות או במספר.",
+      "module": "מודול",
+      "moduleSelect": "בחירת מודול…",
+      "moduleImmutable": "המודול אינו ניתן לשינוי לאחר היצירה",
+      "displayName": "שם תצוגה",
+      "displayNamePlaceholder": "דלי S3 סטנדרטי",
+      "versionPin": "הצמדת גרסת ברירת מחדל",
+      "versionPinPlaceholder": "לדוגמה 1.2.0 (ריק = האחרונה)",
+      "descriptionLabel": "תיאור",
+      "descriptionPlaceholder": "מה פריט קטלוג זה מקצה…",
+      "enabled": "מופעל (נראה בקטלוג העיון)",
+      "providerTemplates": "תבניות ספק",
+      "noProviderTemplates": "לא הוגדרו תבניות ספק.",
+      "restrictPools": "הגבלה למאגרי agent מסוימים",
+      "noAgentPools": "אין מאגרי agent זמינים.",
+      "anyPool": "ניתן להשתמש בכל מאגר agent.",
+      "labels": "תוויות",
+      "variableOptions": "אפשרויות משתנים (מתקדם, JSON)",
+      "variableOptionsHint": "עקיפות לכל קלט (options, hidden, default). השאירו כ-<code>[]</code> אם לא בשימוש."
+    },
+    "table": {
+      "name": "שם",
+      "module": "מודול",
+      "enabled": "מופעל",
+      "actions": "פעולות"
+    },
+    "badge": {
+      "enabled": "מופעל",
+      "disabled": "מושבת"
+    },
+    "confirm": {
+      "delete": "למחוק את פריט הקטלוג הזה? מופעים קיימים שהוקצו אינם מושפעים."
+    },
+    "success": {
+      "created": "פריט הקטלוג \"{name}\" נוצר",
+      "updated": "פריט הקטלוג \"{name}\" עודכן",
+      "deleted": "פריט הקטלוג נמחק"
+    },
+    "errors": {
+      "load": "טעינת פריטי הקטלוג נכשלה",
+      "save": "שמירת פריט הקטלוג נכשלה",
+      "createStatus": "יצירת פריט הקטלוג נכשלה ({status})",
+      "updateStatus": "עדכון פריט הקטלוג נכשל ({status})",
+      "delete": "מחיקת פריט הקטלוג נכשלה",
+      "deleteConflict": "לא ניתן למחוק: לפריט קטלוג זה יש מופעים שהוקצו.",
+      "varOptsInvalidJson": "אפשרויות המשתנים חייבות להיות JSON תקין (מערך).",
+      "varOptsNotArray": "אפשרויות המשתנים חייבות להיות מערך JSON."
+    }
+  },
+  "adminProviderTemplates": {
+    "title": "תבניות ספק",
+    "description": "בלוקי תצורת ספק לשימוש חוזר עבור פריטי קטלוג",
+    "notEnabled": "קטלוג השירותים אינו מופעל.",
+    "empty": "אין עדיין תבניות ספק.",
+    "actions": {
+      "new": "תבנית חדשה",
+      "cancel": "ביטול",
+      "create": "יצירת תבנית",
+      "creating": "יוצר…",
+      "saveChanges": "שמירת שינויים",
+      "saving": "שומר…",
+      "edit": "עריכה",
+      "delete": "מחיקה"
+    },
+    "form": {
+      "name": "שם",
+      "providerType": "סוג ספק",
+      "body": "גוף (HCL)",
+      "parameters": "פרמטרים (מתקדם, JSON)",
+      "parametersHint": "כל פרמטר הופך לשדה בטופס ההקצאה. השאירו כ-<code>[]</code> אם לא בשימוש.",
+      "labels": "תוויות"
+    },
+    "table": {
+      "name": "שם",
+      "providerType": "סוג ספק",
+      "parameters": "פרמטרים",
+      "actions": "פעולות"
+    },
+    "confirm": {
+      "delete": "למחוק תבנית ספק זו? פריטי קטלוג המפנים אליה ייכשלו בהקצאה. לא ניתן לבטל זאת."
+    },
+    "success": {
+      "created": "תבנית הספק \"{name}\" נוצרה",
+      "updated": "תבנית הספק \"{name}\" עודכנה",
+      "deleted": "תבנית הספק נמחקה"
+    },
+    "errors": {
+      "load": "טעינת תבניות הספק נכשלה",
+      "save": "שמירת תבנית הספק נכשלה",
+      "createStatus": "יצירת התבנית נכשלה ({status})",
+      "updateStatus": "עדכון התבנית נכשל ({status})",
+      "delete": "מחיקת תבנית הספק נכשלה",
+      "deleteConflict": "לא ניתן למחוק: תבנית זו מופנית על ידי פריט קטלוג.",
+      "paramsInvalidJson": "הפרמטרים חייבים להיות JSON תקין (מערך).",
+      "paramsNotArray": "הפרמטרים חייבים להיות מערך JSON."
+    }
+  },
+  "adminAgentPools": {
+    "title": "מאגרי Agent",
+    "description": "ניהול מאגרי agent של רצים והמאזינים שלהם",
+    "empty": "לא הוגדרו מאגרי agent.",
+    "actions": {
+      "newPool": "מאגר חדש",
+      "createPool": "יצירת מאגר",
+      "creating": "יוצר...",
+      "cancel": "ביטול",
+      "edit": "עריכה",
+      "save": "שמירה",
+      "saving": "שומר...",
+      "delete": "מחיקה",
+      "deleting": "מוחק...",
+      "confirmDelete": "אישור מחיקה"
+    },
+    "form": {
+      "name": "שם",
+      "namePattern": "אותיות, מספרים, מקפים וקווים תחתונים בלבד. חייב להתחיל באות או במספר.",
+      "description": "תיאור",
+      "descriptionPlaceholder": "רצי AWS בייצור",
+      "labels": "תוויות"
+    },
+    "columns": {
+      "name": "שם",
+      "description": "תיאור",
+      "status": "סטטוס",
+      "created": "נוצר"
+    },
+    "badges": {
+      "default": "ברירת מחדל",
+      "degradedTooltip": "המאזינים שולחים פעימות אך התעודות שלהם פגו — הרצות ייכשלו בהפעלה.",
+      "status": {
+        "online": "מחובר",
+        "offline": "מנותק",
+        "degraded": "מנוון"
+      }
+    },
+    "detail": {
+      "back": "חזרה למאגרי agent",
+      "defaultDescription": "מאגר agent"
+    },
+    "tabs": {
+      "settings": "הגדרות",
+      "tokens": "אסימונים",
+      "listeners": "מאזינים"
+    },
+    "settings": {
+      "title": "הגדרות מאגר",
+      "fields": {
+        "name": "שם",
+        "description": "תיאור",
+        "created": "נוצר",
+        "owner": "בעלים",
+        "yourPermission": "ההרשאה שלך",
+        "labels": "תוויות"
+      },
+      "permissions": {
+        "read": "קריאה",
+        "write": "כתיבה",
+        "admin": "ניהול"
+      }
+    },
+    "danger": {
+      "title": "מחיקת מאגר",
+      "description": "מחיקה לצמיתות של מאגר agent זה וכל האסימונים המשויכים אליו."
+    },
+    "tokens": {
+      "create": "יצירת אסימון",
+      "empty": "אין אסימונים למאגר זה.",
+      "revoke": "ביטול",
+      "created": {
+        "title": "האסימון נוצר בהצלחה",
+        "copyNow": "העתיקו את האסימון עכשיו — הוא לא יוצג שוב.",
+        "copy": "העתקה"
+      },
+      "form": {
+        "description": "תיאור",
+        "descriptionPlaceholder": "אסימון מאזין בייצור",
+        "maxUses": "מספר שימושים מרבי",
+        "maxUsesHint": "ברירת מחדל 2 — סובל ניסיון חוזר אחד של מרוץ אתחול בין העתקי מאזינים.",
+        "expiresAt": "פג בתאריך",
+        "expiresAtHint": "ברירת מחדל שעה אחת מעכשיו."
+      },
+      "columns": {
+        "description": "תיאור",
+        "uses": "שימושים",
+        "expires": "פג",
+        "status": "סטטוס",
+        "createdBy": "נוצר על ידי",
+        "actions": "פעולות"
+      },
+      "badges": {
+        "revoked": "בוטל",
+        "active": "פעיל"
+      }
+    },
+    "listeners": {
+      "empty": "לא רשומים מאזינים למאגר זה.",
+      "columns": {
+        "name": "שם",
+        "status": "סטטוס",
+        "replicas": "העתקים",
+        "certExpires": "תעודה פגה",
+        "actions": "פעולות"
+      },
+      "status": {
+        "online": "מחובר",
+        "offline": "מנותק",
+        "degraded": "מנוון",
+        "cert-expired": "תעודה פגה"
+      },
+      "tooltips": {
+        "certExpired": "המאזין שולח פעימות אך התעודה שלו פגה — כל קריאה מאומתת-תעודה (תפיסת הרצה, חידוש, אסימון רץ) תיכשל. הסיבה הסבירה ביותר: ה-API מעולם לא רשם את התעודה העדכנית, או שתוקף התעודה חלף לפני החידוש.",
+        "degraded": "המאזינים שולחים פעימות אך התעודות שלהם פגו — הרצות ייכשלו בהפעלה."
+      }
+    },
+    "confirm": {
+      "revokeToken": "לבטל את אסימון ההצטרפות הזה? מאזינים המשתמשים בו לא יוכלו עוד להצטרף, ולא ניתן לבטל פעולה זו.",
+      "deleteListener": "למחוק את המאזין הזה? הוא יירשם מחדש בפעימה הבאה שלו אם ה-pod עדיין פועל."
+    },
+    "success": {
+      "poolUpdated": "המאגר עודכן",
+      "tokenRevoked": "האסימון בוטל",
+      "listenerDeleted": "המאזין נמחק"
+    },
+    "errors": {
+      "loadPools": "טעינת מאגרי ה-agent נכשלה",
+      "loadPool": "טעינת המאגר נכשלה",
+      "loadTokens": "טעינת האסימונים נכשלה",
+      "loadListeners": "טעינת המאזינים נכשלה",
+      "createPool": "יצירת המאגר נכשלה",
+      "createStatus": "יצירת המאגר נכשלה ({status})",
+      "updatePool": "עדכון המאגר נכשל",
+      "deletePool": "מחיקת המאגר נכשלה",
+      "poolNotFound": "המאגר לא נמצא",
+      "createToken": "יצירת האסימון נכשלה",
+      "createTokenStatus": "יצירת האסימון נכשלה ({status})",
+      "revokeToken": "ביטול האסימון נכשל",
+      "deleteListener": "מחיקת המאזין נכשלה"
+    }
+  },
+  "adminAuditLog": {
+    "title": "יומן ביקורת",
+    "description": "יומן בלתי ניתן לשינוי של כל בקשות ה-API",
+    "empty": "לא נמצאו רשומות ביומן הביקורת.",
+    "errors": {
+      "load": "טעינת יומן הביקורת נכשלה"
+    },
+    "filters": {
+      "actorEmail": "אימייל מבצע",
+      "actorPlaceholder": "user@example.com",
+      "resourceType": "סוג משאב",
+      "resourceTypePlaceholder": "workspaces",
+      "method": "שיטה",
+      "methodAll": "הכל",
+      "since": "מתאריך",
+      "until": "עד תאריך",
+      "clear": "נקה",
+      "apply": "החל מסננים"
+    },
+    "columns": {
+      "timestamp": "חותמת זמן",
+      "actor": "מבצע",
+      "action": "פעולה",
+      "resourceType": "סוג משאב",
+      "resourceId": "מזהה משאב",
+      "status": "סטטוס",
+      "duration": "משך"
+    },
+    "pagination": {
+      "summary": "עמוד {current} מתוך {total} ({count, plural, one {רשומה #} two {# רשומות} many {# רשומות} other {# רשומות}})",
+      "previous": "הקודם",
+      "next": "הבא"
+    }
+  },
+  "adminBinaryCache": {
+    "title": "מטמון",
+    "description": "ניהול מטמון של קובצי CLI ומטמון ספקים",
+    "errors": {
+      "loadBinary": "טעינת מטמון הקבצים הבינאריים נכשלה",
+      "loadCache": "טעינת המטמון נכשלה"
+    },
+    "sections": {
+      "cliBinaries": "קבצים בינאריים של CLI",
+      "providerBinaries": "קבצים בינאריים של ספקים"
+    },
+    "empty": {
+      "binaries": "אין עדיין קובצי CLI במטמון.",
+      "providers": "אין עדיין קבצים בינאריים של ספקים במטמון."
+    },
+    "columns": {
+      "tool": "כלי",
+      "version": "גרסה",
+      "os": "מערכת הפעלה",
+      "arch": "ארכיטקטורה",
+      "cachedAt": "נשמר במטמון בתאריך",
+      "provider": "ספק",
+      "hostname": "שם מארח",
+      "actions": "פעולות"
+    },
+    "warm": {
+      "heading": "חימום מטמון",
+      "hide": "הסתר",
+      "prePopulate": "מילוי מראש…",
+      "help": "משוך מראש קבצים בינאריים ופלטפורמות ספקים אל המטמון (אחד בכל שורה). אסימוני <code>os/arch</code> בסוף הם אופציונליים — השמט אותם כדי להשתמש בפלטפורמות ברירת המחדל שהוגדרו.",
+      "binariesLabel": "קבצים בינאריים",
+      "providersLabel": "ספקים",
+      "warm": "חמם",
+      "warming": "מחמם…",
+      "confirm": "לחמם את ערכי המטמון הנבחרים כעת?",
+      "errorEmpty": "הוסף לפחות שורת קובץ בינארי או ספק אחת לחימום.",
+      "errorFailedStatus": "החימום נכשל ({status})",
+      "errorFailed": "חימום המטמון נכשל",
+      "success": "חוממו {succeeded}/{total} ({failed} נכשלו)"
+    },
+    "purge": {
+      "button": "מחק",
+      "confirmBinary": "למחוק את {tool} {version} מהמטמון? הוא יימשך מחדש מהמקור בבקשה הבאה.",
+      "confirmProvider": "למחוק את {provider} {version} ממטמון הספקים? הוא יימשך מחדש מהמקור בבקשה הבאה.",
+      "successBinary": "נמחקו {count} ערכים עבור {tool} {version}",
+      "successProvider": "נמחקו {count} ערכים עבור {provider} {version}",
+      "errorStatus": "המחיקה נכשלה ({status})",
+      "error": "המחיקה נכשלה",
+      "errorProvider": "מחיקת הספק נכשלה",
+      "errorProviders": "מחיקת הספקים נכשלה"
+    },
+    "batchPurge": {
+      "purging": "מוחק...",
+      "purgeSelected": "מחק נבחרים ({count})",
+      "confirmBinary": "למחוק את כל ערכי מטמון הקבצים הבינאריים הנבחרים? הם יימשכו מחדש מהמקור בבקשה הבאה.",
+      "confirmProvider": "למחוק את כל ערכי מטמון הספקים הנבחרים? הם יימשכו מחדש מהמקור בבקשה הבאה.",
+      "errorBinaryItem": "המחיקה נכשלה עבור {tool} {version}",
+      "errorProviderItem": "המחיקה נכשלה עבור {provider} {version}",
+      "successBinary": "נמחקו {count} ערכי מטמון של קבצים בינאריים",
+      "successProvider": "נמחקו {count} ערכי מטמון של ספקים"
+    }
+  },
+  "catalog": {
+    "title": "קטלוג שירותים",
+    "description": "הקצה תשתית בשירות עצמי ממודולים אצורים",
+    "notEnabled": "קטלוג השירותים אינו מופעל.",
+    "empty": "אין פריטי קטלוג זמינים.",
+    "card": {
+      "pinned": "מוצמד ל-{version}",
+      "latest": "האחרון"
+    },
+    "errors": {
+      "loadItems": "טעינת פריטי הקטלוג נכשלה"
+    }
+  },
+  "catalogDetail": {
+    "backLink": "← קטלוג",
+    "backToCatalog": "חזרה לקטלוג",
+    "fallbackTitle": "פריט קטלוג",
+    "notFound": "פריט הקטלוג לא נמצא, או שקטלוג השירותים אינו מופעל.",
+    "common": {
+      "cancel": "ביטול"
+    },
+    "info": {
+      "module": "מודול:",
+      "resolvedVersion": "גרסה שנפתרה:",
+      "latest": "האחרונה",
+      "disabled": "מושבת"
+    },
+    "pending": {
+      "banner": "הריצה עבור <strong>{name}</strong> תוכננה וממתינה לבדיקה. אשרו כדי להחיל, או בטלו.",
+      "working": "מעבד…",
+      "confirmApply": "אישור והחלה",
+      "discard": "ביטול"
+    },
+    "field": {
+      "select": "בחירה…"
+    },
+    "provision": {
+      "title": "הקצאה",
+      "workspaceName": "שם סביבת עבודה",
+      "workspaceNameTitle": "אותיות, ספרות, מקפים וקווים תחתונים בלבד. חייב להתחיל באות או ספרה.",
+      "workspaceNamePlaceholder": "my-instance",
+      "agentPool": "מאגר סוכנים",
+      "selectPool": "בחירת מאגר…",
+      "noPoolsAvailable": "אין מאגרי סוכנים זמינים עבורכם. נדרשת הרשאת כתיבה למאגר סוכנים כדי להקצות — בקשו ממנהל מערכת להעניק לכם אותה.",
+      "noPoolsAllowed": "אף אחד ממאגרי הסוכנים שאליהם יש לכם גישה אינו מורשה על ידי פריט קטלוג זה. בקשו ממנהל מערכת להרחיב את המאגרים המורשים של הפריט או להעניק לכם גישה לאחד מהם.",
+      "version": "גרסה",
+      "latestFloat": "האחרונה (צפה)",
+      "defaultPinOption": "{version} (קיבוע ברירת מחדל)",
+      "labelsOptional": "תוויות (אופציונלי)",
+      "autoApplyHint": "החלה אוטומטית מחילה שינויים ללא שלב בדיקה ידני.",
+      "provisioning": "מקצה…",
+      "submit": "הקצאה"
+    },
+    "instances": {
+      "title": "מופעים",
+      "empty": "עדיין לא הוקצו מופעים מפריט זה.",
+      "colName": "שם",
+      "colVersion": "גרסה",
+      "colPool": "מאגר",
+      "colActions": "פעולות",
+      "reconfigure": "הגדרה מחדש",
+      "destroy": "השמדה",
+      "orphan": "נטישה…",
+      "orphanTitle": "מחיקת רשומת הקטלוג מבלי להשמיד את התשתית שלה (לא מומלץ)"
+    },
+    "reconfigure": {
+      "title": "הגדרה מחדש של {name}",
+      "description": "עדכנו קלטים ו/או גרסה, ואז הכניסו ריצה לתור.",
+      "currentOption": "{version} (נוכחית)",
+      "queuing": "מכניס לתור…",
+      "queueRun": "הכנסת ריצה לתור"
+    },
+    "destroy": {
+      "title": "השמדת {name}",
+      "heading": "להשמיד את {name}?",
+      "description": "פעולה זו מכניסה לתור ריצת השמדה המפרקת את התשתית של מופע זה. בהחלה מוצלחת סביבת העבודה מועברת לארכיון. לא ניתן לבטל זאת.",
+      "autoApplyHint": "החלה אוטומטית מפרקת מיד ללא בדיקה."
+    },
+    "orphan": {
+      "title": "נטישת {name}",
+      "heading": "לנטוש את {name}?",
+      "description": "פעולה זו מוחקת את רשומת מופע הקטלוג אך <warn>אינה</warn> משמידה את התשתית שלו — המשאבים שהוקצו ממשיכים לפעול, <warn>ללא מעקב וללא ניהול</warn>. פעולה זו אינה מומלצת. כדי להשיב את התשתית, בטלו והשתמשו ב<emph>השמדה</emph> במקום.",
+      "confirmPrompt": "הקלידו את שם המופע <mono>{name}</mono> כדי לאשר:",
+      "orphaning": "נוטש…",
+      "submit": "נטישה ונטישת התשתית"
+    },
+    "actions": {
+      "confirmed": "הריצה אושרה — מחיל.",
+      "discarded": "הריצה בוטלה.",
+      "provisioned": "{name} הוקצה — התוכנית מוכנה לבדיקה.",
+      "reconfigureQueued": "ההגדרה מחדש הוכנסה לתור — נוצרה ריצה.",
+      "reconfigureQueuedStatus": "ההגדרה מחדש הוכנסה לתור — הריצה במצב {status}.",
+      "destroyQueued": "ההשמדה הוכנסה לתור — נוצרה ריצה.",
+      "destroyQueuedStatus": "ההשמדה הוכנסה לתור — הריצה במצב {status}.",
+      "orphaned": "{name} ננטש — רשומת הקטלוג נמחקה; התשתית שלו נותרה פועלת, ללא מעקב וללא ניהול."
+    },
+    "errors": {
+      "loadItem": "טעינת פריט הקטלוג נכשלה",
+      "confirm": "האישור נכשל",
+      "confirmStatus": "האישור נכשל ({status})",
+      "discard": "הביטול נכשל",
+      "discardStatus": "הביטול נכשל ({status})",
+      "provision": "ההקצאה נכשלה",
+      "provisionStatus": "ההקצאה נכשלה ({status})",
+      "reconfigure": "ההגדרה מחדש נכשלה",
+      "reconfigureStatus": "ההגדרה מחדש נכשלה ({status})",
+      "destroy": "ההשמדה נכשלה",
+      "destroyStatus": "ההשמדה נכשלה ({status})",
+      "orphan": "הנטישה נכשלה",
+      "orphanStatus": "הנטישה נכשלה ({status})"
+    }
+  },
+  "common": {
+    "connection": {
+      "reconnecting": "מתחבר מחדש…"
+    },
+    "sessionExpiry": {
+      "banner": "ההפעלה תפוג בעוד {minutes, plural, one {דקה #} two {# דקות} many {# דקות} other {# דקות}} — <link>אימות מחדש</link>"
+    },
+    "tokenExpiry": {
+      "withinDays": "{count, plural, one {אסימון שירות #} two {# אסימוני שירות} many {# אסימוני שירות} other {# אסימוני שירות}} יפוגו בתוך {days, plural, one {יום #} two {# ימים} many {# ימים} other {# ימים}} — <link>סקירה</link>",
+      "soon": "{count, plural, one {אסימון שירות #} two {# אסימוני שירות} many {# אסימוני שירות} other {# אסימוני שירות}} יפוגו בקרוב — <link>סקירה</link>",
+      "dismissAria": "ביטול אזהרת פקיעת האסימון"
+    },
+    "resourceUsage": {
+      "title": "שימוש במשאבים",
+      "oomKilled": "נהרג ב-OOM",
+      "killedLikelyOom": "נהרג (ככל הנראה OOM)",
+      "memory": "זיכרון",
+      "requested": "התבקש {value}",
+      "limit": "מגבלה {value}"
+    },
+    "labelsEditor": {
+      "none": "ללא",
+      "removeAria": "הסרת {key}",
+      "keyPlaceholder": "מפתח",
+      "valuePlaceholder": "ערך",
+      "add": "הוספה"
+    },
+    "sensitiveInput": {
+      "hide": "הסתרה",
+      "show": "הצגה",
+      "hideAria": "הסתרת הערך",
+      "showAria": "הצגת הערך"
+    },
+    "workspacePicker": {
+      "searchPlaceholder": "חיפוש סביבות עבודה…",
+      "loading": "טוען…",
+      "empty": "לא נמצאו סביבות עבודה",
+      "adding": "מוסיף…"
+    },
+    "templateEditors": {
+      "remove": "הסרה",
+      "add": "הוספה",
+      "valuePlaceholder": "ערך",
+      "name": "שם",
+      "url": "כתובת URL",
+      "hmacKey": "מפתח HMAC (אופציונלי)",
+      "hmacKeyPlaceholder": "סוד משותף",
+      "stage": "שלב",
+      "enforcement": "אכיפה",
+      "enabled": "מופעל",
+      "runTaskNamePlaceholder": "security-scan",
+      "runTaskUrlPlaceholder": "https://hooks.example.com/task",
+      "addRunTask": "הוספת משימת הרצה",
+      "destinationType": "סוג יעד",
+      "token": "אסימון (אופציונלי)",
+      "tokenPlaceholder": "אסימון HMAC / אימות",
+      "notificationNamePlaceholder": "slack-alerts",
+      "notificationUrlPlaceholder": "https://hooks.slack.com/services/...",
+      "emailAddresses": "כתובות אימייל",
+      "emailPlaceholder": "ops@example.com",
+      "addEmail": "הוספת אימייל",
+      "triggers": "טריגרים",
+      "addNotification": "הוספת התראה"
+    }
+  },
+  "planSummary": {
+    "aiGenerated": "נוצר על ידי AI",
+    "heading": {
+      "planSummary": "סיכום תכנון",
+      "failureAnalysis": "ניתוח כשל"
+    },
+    "errors": {
+      "status": "HTTP {status}"
+    },
+    "regenerate": {
+      "label": "צור מחדש",
+      "queueing": "מכניס לתור…",
+      "tooltip": "הרץ מחדש את סיכום ה-AI על אותם קלטי תכנון",
+      "ariaLabel": "צור מחדש סיכום AI",
+      "confirm": "לייצר מחדש את ניתוח ה-AI? פעולה זו מריצה את המודל שוב.",
+      "error": "לא ניתן לייצר מחדש: <mono>{detail}</mono>"
+    },
+    "pending": {
+      "summarisingPlan": "מסכם את התכנון…",
+      "analysingFailure": "מנתח את הכשל…"
+    },
+    "skipped": {
+      "fallback": "הסיכום דולג עבור הרצה זו."
+    },
+    "errored": {
+      "heading": "המסכם נכשל"
+    },
+    "riskFactors": {
+      "heading": "גורמי סיכון",
+      "suggestedFixes": "תיקונים מוצעים"
+    },
+    "tokens": "{input} קלט / {output} פלט אסימונים",
+    "risk": {
+      "low": "נמוך",
+      "medium": "בינוני",
+      "high": "גבוה",
+      "critical": "קריטי",
+      "unknown": "לא ידוע"
+    },
+    "badges": {
+      "noChanges": "אין שינויים",
+      "noChangesLower": "אין שינויים",
+      "noChangesTitle": "התכנון לא דיווח על שינויים במשאבים",
+      "toAdd": "{count, plural, one {# להוספה} two {# להוספה} many {# להוספה} other {# להוספה}}",
+      "toChange": "{count, plural, one {# לשינוי} two {# לשינוי} many {# לשינוי} other {# לשינוי}}",
+      "toDestroy": "{count, plural, one {# להשמדה} two {# להשמדה} many {# להשמדה} other {# להשמדה}}",
+      "toReplace": "{count, plural, one {# להחלפה} two {# להחלפה} many {# להחלפה} other {# להחלפה}}",
+      "toImport": "{count, plural, one {# לייבוא} two {# לייבוא} many {# לייבוא} other {# לייבוא}}"
+    },
+    "chat": {
+      "heading": "המשך שיחה",
+      "sharedThreadNote": "שרשור משותף אחד, גלוי לכל מי שיש לו הרשאת קריאה לסביבת העבודה.",
+      "placeholder": "שאל שאלת המשך על התכנון הזה… (⌘/Ctrl + Enter לשליחה)",
+      "send": "שלח",
+      "thinking": "חושב…",
+      "you": "אתה",
+      "assistant": "עוזר"
+    },
+    "translatedNote": "תורגם אוטומטית לשפתך. הסיכום המחייב הוא המקור.",
+    "translating": "מתרגם…"
+  },
+  "runDetail": {
+    "notFound": "הרצה לא נמצאה",
+    "runSection": "מקטע הרצה",
+    "workspaceFallback": "סביבת עבודה",
+    "backTo": "חזרה אל {name}",
+    "errorHeading": "שגיאה",
+    "discardedHeading": "נדחתה — נדרש תכנון מחדש",
+    "common": {
+      "yes": "כן",
+      "no": "לא"
+    },
+    "header": {
+      "title": "הרצה {id}",
+      "titleWithWorkspace": "{workspace} — הרצה {id}",
+      "description": "הרצה מסוג {source}"
+    },
+    "relTime": {
+      "justNow": "עכשיו",
+      "minutesAgo": "{count, plural, one {לפני # דקה} two {לפני # דקות} many {לפני # דקות} other {לפני # דקות}}",
+      "hoursAgo": "{count, plural, one {לפני # שעה} two {לפני # שעות} many {לפני # שעות} other {לפני # שעות}}",
+      "daysAgo": "{count, plural, one {לפני # יום} two {לפני # ימים} many {לפני # ימים} other {לפני # ימים}}"
+    },
+    "status": {
+      "pending": "ממתין",
+      "queued": "בתור",
+      "planning": "מתכנן",
+      "planned": "תוכנן",
+      "confirmed": "אושר",
+      "applying": "מיישם",
+      "canceling": "מבטל",
+      "applied": "יושם",
+      "errored": "נכשל",
+      "canceled": "בוטל",
+      "discarded": "נדחה"
+    },
+    "activity": {
+      "pending": "מכין את ההרצה",
+      "queued": "ממתין לסוכן פנוי",
+      "planning": "מריץ terraform plan",
+      "plannedConfirmable": "ממתין לאישור והחלה שלך",
+      "plannedSpeculative": "תכנון ספקולטיבי הושלם",
+      "plannedComplete": "התכנון הושלם",
+      "confirmed": "מתחיל יישום",
+      "applying": "מריץ terraform apply",
+      "canceling": "עוצר את ההרצה",
+      "applied": "היישום הושלם",
+      "errored": "ההרצה נכשלה",
+      "canceled": "ההרצה בוטלה",
+      "discarded": "התכנון נדחה",
+      "elapsedTitle": "זמן שחלף בשלב זה"
+    },
+    "badge": {
+      "destroy": "השמדה",
+      "planOnly": "תכנון בלבד"
+    },
+    "actions": {
+      "retryShort": "נסה שוב",
+      "retryFull": "הרץ שוב",
+      "retrying": "מנסה שוב…",
+      "confirmShort": "החל",
+      "confirmFull": "אשר והחל",
+      "confirming": "מאשר…",
+      "discard": "דחה",
+      "discarding": "דוחה…",
+      "cancelShort": "בטל",
+      "cancelFull": "בטל הרצה",
+      "canceling": "מבטל…"
+    },
+    "confirm": {
+      "apply": "להחיל את ההרצה הזו? פעולה זו מחילה את התכנון ומשנה את התשתית.",
+      "discard": "לדחות את התכנון הזה?",
+      "cancel": "לבטל את ההרצה הזו?",
+      "retry": "להריץ שוב את ההרצה הזו?"
+    },
+    "errors": {
+      "loadRun": "טעינת ההרצה נכשלה",
+      "action": {
+        "confirm": "אישור ההרצה נכשל",
+        "discard": "דחיית ההרצה נכשלה",
+        "cancel": "ביטול ההרצה נכשל",
+        "retry": "ניסיון ההרצה מחדש נכשל"
+      }
+    },
+    "tabs": {
+      "overview": "סקירה כללית",
+      "ai": "AI",
+      "aiFull": "ניתוח AI",
+      "opa": "OPA",
+      "opaFull": "מדיניות OPA",
+      "impact": "השפעה",
+      "impactFull": "גרף השפעה",
+      "planLabel": "תכנון<log>יומן</log>",
+      "applyLabel": "יישום<log>יומן</log>",
+      "planFull": "יומן תכנון",
+      "applyFull": "יומן יישום",
+      "details": "פרטים"
+    },
+    "banner": {
+      "destroy": "זוהי הרצת <strong>השמדה</strong> — כל המשאבים המנוהלים יושמדו בעת ההחלה.",
+      "planOnlyCli": "זוהי הרצת <strong>תכנון בלבד</strong> שהופעלה מה-CLI על סביבת עבודה המחוברת ל-VCS. יישום אינו זמין עבור קוד שהועלה מה-CLI — ניתן להחיל רק קוד המנוהל ב-VCS.",
+      "moduleOverridesPrefix": "הרצה זו משתמשת ב<strong>עקיפות מודול</strong>",
+      "moduleOverridesFromPr": "מ-PR ‏#{number}",
+      "moduleOverridesSuffix": "יימשך מענף ה-PR במקום מגרסת הרישום שפורסמה."
+    },
+    "cards": {
+      "changes": "שינויים",
+      "aiAnalysis": "ניתוח AI",
+      "policyChecks": "בדיקות מדיניות",
+      "resources": "משאבים"
+    },
+    "changes": {
+      "noChanges": "אין שינויים",
+      "planning": "מתכנן…",
+      "toAdd": "להוספה",
+      "toChange": "לשינוי",
+      "toDestroy": "להשמדה",
+      "toReplace": "להחלפה",
+      "toImport": "לייבוא"
+    },
+    "ai": {
+      "notAvailable": "לא זמין",
+      "ready": "מוכן",
+      "riskSub": "סיכון {risk}",
+      "generating": "מייצר…",
+      "skipped": "דולג",
+      "failed": "נכשל",
+      "available": "זמין"
+    },
+    "policy": {
+      "none": "ללא",
+      "blocked": "חסום",
+      "failedSub": "{count, plural, one {# נכשל} two {# נכשלו} many {# נכשלו} other {# נכשלו}}",
+      "advisoryIssues": "בעיות ייעוץ",
+      "passedSub": "{passed}/{total} עברו",
+      "passed": "עבר"
+    },
+    "resources": {
+      "overLimit": "מעל המגבלה",
+      "oomKilled": "הופסק עקב חוסר זיכרון",
+      "recorded": "נרשם",
+      "nearLimit": "קרוב למגבלה",
+      "high": "גבוה",
+      "withinLimits": "בתוך המגבלות"
+    },
+    "details": {
+      "heading": "פרטים",
+      "executionBackend": "מנוע הרצה",
+      "source": "מקור",
+      "autoApply": "החלה אוטומטית",
+      "planOnly": "תכנון בלבד",
+      "triggeredBy": "הופעל על ידי",
+      "created": "נוצר",
+      "commit": "קומיט",
+      "branch": "ענף",
+      "prMr": "PR/MR",
+      "stateVersion": "גרסת מצב",
+      "viewState": "הצג מצב",
+      "runOptions": "אפשרויות הרצה"
+    },
+    "timeline": {
+      "heading": "ציר זמן",
+      "queued": "בתור",
+      "planningStarted": "התכנון החל",
+      "planComplete": "התכנון הושלם",
+      "confirmed": "אושר",
+      "applyingStarted": "היישום החל",
+      "applied": "יושם",
+      "errored": "נכשל",
+      "canceled": "בוטל",
+      "discarded": "נדחה"
+    },
+    "log": {
+      "color": "צבע",
+      "colorOnTitle": "מציג צבעי ANSI — לחץ לטקסט רגיל",
+      "colorOffTitle": "מציג טקסט רגיל — לחץ לצבעים",
+      "refresh": "רענן",
+      "refreshTitle": "רענן יומן",
+      "copy": "העתק",
+      "copied": "הועתק!",
+      "copyTitle": "העתק טקסט רגיל ללוח",
+      "copyAria": "העתק יומן ללוח",
+      "download": "הורד",
+      "downloadColorTitle": "הורד יומן (עם קודי צבע ANSI)",
+      "downloadPlainTitle": "הורד יומן (טקסט רגיל)",
+      "downloadAria": "הורד יומן",
+      "follow": "עקוב",
+      "followOnTitle": "עוקב אחר הזרם החי — לחץ לעצירה",
+      "followOffTitle": "עקוב אחר הזרם החי",
+      "end": "סוף",
+      "endTitle": "דלג לסוף היומן",
+      "planEmpty": "אין עדיין פלט תכנון זמין.",
+      "applyEmpty": "אין עדיין פלט יישום זמין."
+    },
+    "policyPanel": {
+      "heading": "בדיקות מדיניות",
+      "passedCount": "{passed}/{total} עברו",
+      "blockedMessage": "הרצה זו <strong>חסומה על ידי מערך מדיניות חובה</strong>. היא לא תיושם עד שהכשל ייפתר או שמנהל יעקוף אותו.",
+      "overriding": "עוקף...",
+      "overrideContinue": "עקוף והמשך",
+      "overrideFailed": "העקיפה נכשלה",
+      "overrideFailedStatus": "העקיפה נכשלה ({status})",
+      "overriddenBy": "נעקף על ידי {by}",
+      "policyPassed": "עבר",
+      "noDenyMessage": "המדיניות נכשלה מבלי להפיק הודעת דחייה או פלט שגיאה",
+      "enforcement": {
+        "mandatory": "חובה",
+        "advisory": "ייעוץ"
+      },
+      "outcome": {
+        "passed": "עבר",
+        "failed": "נכשל",
+        "errored": "שגיאה"
+      }
+    }
+  },
+  "workspaceDetail": {
+    "notFound": "סביבת העבודה לא נמצאה",
+    "common": {
+      "enabled": "מופעל",
+      "disabled": "מושבת",
+      "none": "ללא",
+      "default": "ברירת מחדל",
+      "never": "אף פעם",
+      "actions": "פעולות",
+      "workspaceLocked": "סביבת העבודה נעולה"
+    },
+    "actions": {
+      "edit": "עריכה",
+      "cancel": "ביטול",
+      "save": "שמירה",
+      "saving": "שומר…",
+      "savingEllipsis": "שומר...",
+      "delete": "מחיקה",
+      "deleting": "מוחק...",
+      "add": "הוספה",
+      "adding": "מוסיף...",
+      "remove": "הסרה",
+      "download": "הורדה",
+      "rollback": "שחזור",
+      "close": "סגירה",
+      "hide": "הסתרה",
+      "enable": "הפעלה",
+      "disable": "השבתה",
+      "creating": "יוצר...",
+      "sending": "שולח...",
+      "processing": "מעבד...",
+      "queuing": "מוסיף לתור...",
+      "loading": "טוען...",
+      "loadingLower": "טוען…"
+    },
+    "header": {
+      "executionMode": "מצב הרצה {mode}",
+      "onboard": "קליטה"
+    },
+    "tabs": {
+      "overview": "סקירה",
+      "variables": "משתנים",
+      "runs": "הרצות",
+      "state": "מצב",
+      "stateGraph": "גרף מצב",
+      "configurations": "תצורות",
+      "notifications": "התראות",
+      "runTasks": "משימות הרצה",
+      "runTriggers": "טריגרים להרצה",
+      "sharing": "שיתוף",
+      "selectLabel": "מקטע סביבת עבודה"
+    },
+    "lifecycle": {
+      "pendingDeletion": "ממתין למחיקה",
+      "pendingDeletionDefault": "סביבת עבודה זו מסומנת למחיקה ודורשת פעולה ידנית.",
+      "archived": "בארכיון",
+      "archivedDefault": "סביבת עבודה זו הועברה לארכיון."
+    },
+    "runQueuedBanner": {
+      "message": "ההרצה נוספה לתור בהצלחה.",
+      "viewRun": "הצגת הרצה"
+    },
+    "settings": {
+      "title": "הגדרות",
+      "saveChanges": "שמירת שינויים",
+      "renamedNotice": "שם סביבת העבודה שונה. עדכנו את השדה <name></name> בבלוק <cloud></cloud> שלכם כך שיתאים."
+    },
+    "fields": {
+      "name": "שם",
+      "nameTitle": "אותיות, מספרים, מקפים, קווים תחתונים. חייב להתחיל באות או מספר.",
+      "executionMode": "מצב הרצה",
+      "execModeLocal": "מקומי",
+      "execModeAgent": "סוכן",
+      "autoApply": "החלה אוטומטית",
+      "cpuRequest": "בקשת CPU",
+      "cpuRequestTitle": "כמות CPU של Kubernetes: ליבות שלמות (1, 2) או מיליליבות (500m, 100m)",
+      "memoryRequest": "בקשת זיכרון",
+      "memoryRequestTitle": "כמות זיכרון של Kubernetes: בייטים (1000) או עם סיומת (512Mi, 2Gi, 1Ti)",
+      "executionBackend": "מנוע הרצה",
+      "version": "גרסה",
+      "versionPlaceholder": "לדוגמה 1.11 או 1.11.5",
+      "versionTitle": "גרסה בפורמט X.Y או X.Y.Z (לדוגמה 1.11 או 1.11.5)",
+      "terragruntEnabledAgent": "מופעל (מצב סוכן)",
+      "terragruntEnabledVersion": "מופעל (v{version})",
+      "terragruntVersionPlaceholder": "לדוגמה 1.0",
+      "terragruntVersionTitle": "גרסת Terragrunt בפורמט X.Y או X.Y.Z (לדוגמה 1.0)",
+      "workingDirectory": "תיקיית עבודה",
+      "workingDirectoryPlaceholder": "לדוגמה environments/dev",
+      "agentPool": "מאגר סוכנים",
+      "owner": "בעלים",
+      "vcsConnection": "חיבור VCS",
+      "vcsRepository": "מאגר VCS",
+      "vcsRepositoryTitle": "חייבת להיות כתובת HTTP או HTTPS",
+      "vcsBranch": "ענף VCS",
+      "vcsBranchPlaceholder": "main (ברירת מחדל)",
+      "vcsWorkflow": "תהליך עבודה של VCS",
+      "vcsWorkflowMergeThenApply": "merge_then_apply (ברירת מחדל — תקן TFE / HCP)",
+      "vcsWorkflowApplyThenMerge": "apply_then_merge (תקן Atlantis — הצטרפות ידנית)",
+      "autoMerge": "מיזוג אוטומטי לאחר החלה",
+      "autoMergeStrategy": "אסטרטגיית מיזוג אוטומטי",
+      "vcsPolling": "סקירת VCS",
+      "labels": "תוויות (tags)",
+      "labelsTitle": "תוויות סביבת העבודה ממלאות תפקיד כפול: התאמה של RBAC מבוסס-תוויות, ובתור ה\"tags\" המותאמים על ידי בלוקים של terraform/tofu cloud '{' workspaces '{' tags = ... '}' '}'.",
+      "varFiles": "קובצי משתנים",
+      "varFilesPlaceholder": "לדוגמה envs/dev.tfvars",
+      "triggerPrefixes": "קידומות טריגר",
+      "triggerPrefixesHint": "תיקיות שמפעילות הרצות. גוברות על סינון תיקיית העבודה כאשר מוגדרות.",
+      "triggerPrefixesPlaceholder": "לדוגמה modules",
+      "triggerPrefixesNone": "ללא (משתמש בתיקיית העבודה)",
+      "driftIgnoreRules": "כללי התעלמות מסטייה",
+      "driftIgnoreRulesHint": "נתיבי כתובת Terraform + מאפיינים תומכי glob המושתקים על ידי מסווג הסטייה. <star></star> מתאים לאפס או יותר תווים שאינם <dot></dot> (משתרע על פני <n></n> אינדקסים); <starIdx></starIdx> מתאים לכל אינדקס בסוגריים. כתובת חשופה ללא סיומת מאפיין משתיקה כל שינוי במשאב זה — כולל מחיקות. משפיע על סטייה בלבד, לא על plan/apply רגילים. ראו <docs>drift-ignore-rules.md</docs> לדקדוק המלא.",
+      "driftIgnoreRulesNone": "ללא (כל הבדל בתוכנית נחשב סטייה)"
+    },
+    "vcsWorkflowWarning": {
+      "title": "ההרשאה הואצלה למאגר ה-VCS שלכם.",
+      "rbac": "כל מי שיכול למזג את ה-PR יכול להחיל. כללי הגנת ענף (סקירות נדרשות, בדיקות סטטוס, אישור בעל קוד) הופכים לשער. RBAC של תפקיד/תווית ב-Terrapod<em>אינו</em>חל על פעולות מונחות-תגובה במצב זה.",
+      "recommended": "<strong>מומלץ:</strong> לדרוש היסטוריה לינארית (rebase/squash לפני מיזוג) כך שהקומיט שאתם מחילים הוא הקומיט שנוחת.",
+      "credit": "קרדיט: תהליך עבודה זה מבוסס על <atlantis>Atlantis</atlantis>. Atlantis נותר הכלי הנכון לצוותים שרוצים רק החלות מונחות-תגובת-PR וללא ממשק פלטפורמה."
+    },
+    "vcsPolling": {
+      "error": "שגיאה",
+      "ok": "תקין ({time})",
+      "notPolled": "טרם נסקר"
+    },
+    "lockout": {
+      "revertLabels": "שחזור תוויות",
+      "saveAnyway": "שמירה בכל זאת"
+    },
+    "lock": {
+      "title": "מצב נעילה",
+      "lockedDesc": "סביבת עבודה זו נעולה. לא ניתן להריץ תוכניות או החלות.",
+      "unlockedDesc": "סביבת עבודה זו פתוחה ומוכנה להרצות.",
+      "lock": "נעילה",
+      "unlock": "שחרור נעילה",
+      "lockConfirm": "לנעול סביבת עבודה זו?",
+      "unlockConfirm": "לשחרר את נעילת סביבת העבודה?"
+    },
+    "drift": {
+      "title": "זיהוי סטייה",
+      "checkInterval": "מרווח בדיקה",
+      "status": "סטטוס",
+      "statusNoDrift": "אין סטייה",
+      "statusDrifted": "יש סטייה",
+      "statusErrored": "שגיאה",
+      "statusUnchecked": "לא נבדק",
+      "dismiss": "בטל",
+      "dismissing": "מבטל…",
+      "dismissTitle": "נקו את מצב הסטייה המדווח. הבדיקה המתוזמנת הבאה תמלא אותו מחדש מהמציאות.",
+      "lastChecked": "נבדק לאחרונה",
+      "checkNow": "בדיקה עכשיו",
+      "checkNowTitle": "הוספת הרצת תוכנית-בלבד לתור לבדיקת סטייה",
+      "checkNowTitleDisabled": "הפעילו תחילה את זיהוי הסטייה"
+    },
+    "intervals": {
+      "disabled": "מושבת",
+      "1hour": "שעה אחת",
+      "4hours": "4 שעות",
+      "12hours": "12 שעות",
+      "24hours": "24 שעות",
+      "48hours": "48 שעות",
+      "3days": "3 ימים",
+      "7days": "7 ימים"
+    },
+    "planExpiry": {
+      "title": "פקיעת תוכנית",
+      "description": "מחיקה אוטומטית של תוכנית לא מאושרת כאשר היא ישנה מכך, כדי שתוכנית מיושנת לא תוחל על עולם שהשתנה. כבוי כברירת מחדל; אז יש להריץ את התוכנית מחדש. (חל על הרצות בעלות יכולת החלה בלבד.)",
+      "expireAfter": "פקיעה לאחר"
+    },
+    "aiSummary": {
+      "title": "סיכום תוכנית מבוסס AI",
+      "description": "סיכום שינויים אוטומטי שנוצר על ידי LLM, הערכת סיכונים וניתוח כשלים בכל תוצאת שלב-תוכנית לסביבת עבודה זו.",
+      "mode": "מצב",
+      "modeDefault": "לפי ברירת המחדל של הפריסה",
+      "modeEnabled": "תמיד לסכם",
+      "modeDisabled": "לעולם לא לסכם",
+      "contextLabel": "הקשר סביבת העבודה",
+      "contextLabelSuffix": "(אופציונלי, נוסף)",
+      "contextPlaceholder": "עובדות שה-AI צריך לדעת על סביבת עבודה זו במיוחד. לדוגמה 'משמשת כחזית ל-vault של שירות X — מחיקת מפתח ה-KMS גורמת להשבתה גלובלית.'",
+      "noContext": "לא הוגדר הקשר לסביבת העבודה.",
+      "contextHint": "מתווסף מעל להקשר הכלל-פריסתי. עד 4000 תווים."
+    },
+    "slack": {
+      "title": "התראות Slack",
+      "description": "צרפו סביבת עבודה זו להתראות הרצה ב-Slack — בקשות אישור, החלות, שגיאות וסטיות. השאירו את הערוץ ריק וסביבת עבודה זו תישאר שקטה (אין הפצה כלל-פריסתית). דורש שאפליקציית Slack תופעל על ידי מנהל.",
+      "channel": "ערוץ",
+      "channelPlaceholder": "#deploys או מזהה ערוץ (לדוגמה C0123ABCD)",
+      "notSet": "לא הוגדר — שקט.",
+      "hint": "אפליקציית Slack חייבת להיות כבר חברה בערוץ."
+    },
+    "delete": {
+      "title": "מחיקת סביבת עבודה",
+      "description": "מחקו לצמיתות את סביבת העבודה הזו ואת כל המצב, המשתנים וההרצות המשויכים.",
+      "confirm": "אישור מחיקה"
+    },
+    "variables": {
+      "addVariable": "הוספת משתנה",
+      "key": "מפתח",
+      "value": "ערך",
+      "category": "קטגוריה",
+      "categoryEnv": "סביבה",
+      "sensitive": "רגיש",
+      "empty": "לא הוגדרו משתנים לסביבת עבודה זו.",
+      "emptyValue": "ריק",
+      "enterNewValue": "הזינו ערך חדש",
+      "deleteConfirm": "למחוק את המשתנה \"{key}\"?"
+    },
+    "runs": {
+      "options": "אפשרויות",
+      "hideOptions": "הסתרת אפשרויות",
+      "queueDestroy": "הוספת השמדה לתור",
+      "queueDestroyTitle": "הוספת תוכנית השמדה לתור",
+      "destroyAllConfirm": "להשמיד את כל המשאבים?",
+      "confirmDestroy": "אישור השמדה",
+      "queuePlan": "הוספת תוכנית לתור",
+      "queueRun": "הוספת הרצה לתור",
+      "queuePlanConfirm": "להוסיף תוכנית ספקולטיבית לתור עבור סביבת עבודה זו?",
+      "queueApplyConfirm": "להוסיף הרצת plan + apply לתור? זה עשוי לשנות תשתית.",
+      "planOptions": "אפשרויות תוכנית",
+      "targetResources": "משאבי יעד",
+      "replaceResources": "החלפת משאבים",
+      "commaSeparated": "(מופרד בפסיקים)",
+      "planOnly": "תוכנית בלבד",
+      "refreshOnly": "רענון בלבד",
+      "skipRefresh": "דילוג על רענון",
+      "allowEmptyApply": "אפשר החלה ריקה",
+      "vcsRef": "רפרנס VCS",
+      "branch": "ענף",
+      "tag": "תג",
+      "defaultBranch": "ברירת מחדל ({branch})",
+      "nonDefaultRefNote": "נבחר רפרנס שאינו ברירת מחדל — ההרצה תהיה תוכנית-בלבד",
+      "empty": "אין עדיין הרצות לסביבת עבודה זו.",
+      "runId": "מזהה הרצה",
+      "status": "סטטוס",
+      "type": "סוג",
+      "changes": "שינויים",
+      "source": "מקור",
+      "triggeredBy": "הופעל על ידי",
+      "created": "נוצר",
+      "needsConfirm": "דורש אישור",
+      "typeDestroy": "השמדה",
+      "typePlanOnly": "תוכנית בלבד",
+      "typePlanApply": "plan + apply",
+      "sourceModuleTest": "בדיקת מודול",
+      "sourceModulePublish": "פרסום מודול"
+    },
+    "state": {
+      "deleteConfirm": "למחוק את גרסת המצב #{serial}? לא ניתן לבטל זאת.",
+      "rollbackConfirm": "לשחזר לגרסת המצב #{serial}? תיווצר גרסה חדשה עם אותו תוכן.",
+      "confirmDelete": "אישור מחיקה",
+      "confirmRollback": "אישור שחזור",
+      "uploadState": "העלאת מצב",
+      "empty": "אין עדיין גרסאות מצב לסביבת עבודה זו.",
+      "serial": "מספר סידורי",
+      "createdBy": "נוצר על ידי",
+      "run": "הרצה",
+      "size": "גודל",
+      "created": "נוצר",
+      "runner": "מריץ",
+      "latest": "אחרון"
+    },
+    "configurations": {
+      "description": "ארכיוני מקור שהועלו לסביבת עבודה זו, החדש ביותר תחילה. בחרו שתי שורות להשוואה.",
+      "selectedCount": "{count}/2 נבחרו",
+      "compare": "השוואה",
+      "comparing": "משווה…",
+      "empty": "אין עדיין גרסאות תצורה. הן מופיעות כאן ברגע ש-`terraform plan` מעלה או ש-push ל-VCS מפעיל הרצה.",
+      "id": "מזהה",
+      "source": "מקור",
+      "status": "סטטוס",
+      "created": "נוצר",
+      "current": "נוכחי",
+      "selectForCompare": "בחירת {id} להשוואה",
+      "compareLabel": "השוואה",
+      "diff": "הפרש",
+      "filesChanged": "{count} קבצים שונו",
+      "oversized": "דולגו {count, plural, one {# קובץ בגודל חורג} two {# קבצים בגודל חורג} many {# קבצים בגודל חורג} other {# קבצים בגודל חורג}}: {files}",
+      "noDiff": "אין הבדלי תוכן בין גרסאות אלה.",
+      "binaryChanged": "קובץ בינארי שונה — ההפרש לא מוצג.",
+      "diffType": {
+        "added": "נוסף",
+        "removed": "הוסר",
+        "modified": "שונה",
+        "binary-changed": "בינארי"
+      }
+    },
+    "notifications": {
+      "addNotification": "הוספת התראה",
+      "name": "שם",
+      "namePlaceholder": "התראות פריסה",
+      "destinationType": "סוג יעד",
+      "typeGeneric": "Webhook כללי",
+      "typeEmail": "אימייל",
+      "url": "כתובת URL",
+      "hmacToken": "אסימון HMAC (אופציונלי)",
+      "signingSecret": "סוד חתימה",
+      "emailAddresses": "כתובות אימייל (מופרדות בפסיקים)",
+      "triggerEvents": "אירועי טריגר",
+      "createNotification": "יצירת התראה",
+      "empty": "אין תצורות התראה לסביבת עבודה זו.",
+      "ok": "תקין",
+      "err": "שגיאה {status}",
+      "fail": "כשל",
+      "http": "HTTP {status}",
+      "verify": "אימות",
+      "history": "היסטוריה",
+      "deliveryHistory": "היסטוריית משלוח",
+      "enableConfirm": "להפעיל התראה זו?",
+      "disableConfirm": "להשבית התראה זו?",
+      "deleteConfirm": "למחוק את ההתראה \"{name}\"?"
+    },
+    "runTasks": {
+      "addRunTask": "הוספת משימת הרצה",
+      "name": "שם",
+      "namePlaceholder": "בדיקת מדיניות OPA",
+      "webhookUrl": "כתובת Webhook",
+      "stage": "שלב",
+      "enforcementLevel": "רמת אכיפה",
+      "hmacKey": "מפתח HMAC (אופציונלי)",
+      "hmacKeyPlaceholder": "סוד חתימה לאימות webhook",
+      "createRunTask": "יצירת משימת הרצה",
+      "empty": "לא הוגדרו משימות הרצה לסביבת עבודה זו.",
+      "enableConfirm": "להפעיל משימת הרצה זו?",
+      "disableConfirm": "להשבית משימת הרצה זו?",
+      "deleteConfirm": "למחוק את משימת ההרצה \"{name}\"?"
+    },
+    "runTriggers": {
+      "title": "טריגרים להרצה",
+      "description": "כאשר סביבת עבודה מקור משלימה החלה, סביבות עבודה במורד הזרם מקבלות הרצה חדשה בתור אוטומטית. עד 20 סביבות עבודה מקור לכל יעד.",
+      "inboundHeading": "סביבות עבודה מקור שמפעילות הרצות כאן",
+      "inboundEmpty": "אין סביבות עבודה מקור שמפעילות הרצות בסביבת עבודה זו.",
+      "pickerPlaceholder": "חפשו סביבות עבודה להוספה כמקור…",
+      "outboundHeading": "סביבות עבודה יעד שסביבת עבודה זו מפעילה",
+      "outboundEmpty": "סביבת עבודה זו אינה מפעילה הרצות בשום סביבת עבודה אחרת.",
+      "destinationNote": "(יעד; הסירו משם)",
+      "removeConfirm": "להסיר טריגר הרצה זה?"
+    },
+    "sharing": {
+      "title": "שיתוף מצב מרוחק",
+      "description": "רשימת היתרים בשליטת היצרן עבור <code></code> חוצה-סביבות-עבודה. נתוני מצב נושאי-סוד — הענקה במכוון. <docs>תיעוד</docs>",
+      "outboundHeading": "סביבות עבודה מורשות לקרוא את המצב של סביבת עבודה זו",
+      "outboundEmpty": "המצב של סביבת עבודה זו אינו משותף עם אף סביבת עבודה אחרת.",
+      "grantedBy": "הוענק על ידי {by}",
+      "revoke": "ביטול הרשאה",
+      "revokeConfirm": "להסיר שיתוף מצב מרוחק זה? הצרכן יאבד גישה למצב זה.",
+      "pickerPlaceholder": "חפשו סביבות עבודה להרשאה כצרכן…",
+      "inboundHeading": "סביבות עבודה שסביבת עבודה זו מורשית לקרוא מהן מצב",
+      "inboundEmpty": "סביבת עבודה זו אינה מורשית לקרוא מצב מאף סביבת עבודה אחרת דרך terraform_remote_state.",
+      "producerNote": "(יצרן; בטלו את ההרשאה משם)"
+    },
+    "runMessages": {
+      "manualDriftCheck": "בדיקת סטייה ידנית מהממשק",
+      "queued": "נוסף לתור מהממשק",
+      "queuedSpeculative": "נוסף לתור מהממשק (ספקולטיבי)",
+      "destroyQueued": "השמדה נוספה לתור מהממשק"
+    },
+    "errors": {
+      "loadWorkspace": "טעינת סביבת העבודה נכשלה",
+      "loadRuns": "טעינת ההרצות נכשלה",
+      "loadVariables": "טעינת המשתנים נכשלה",
+      "loadStateVersions": "טעינת גרסאות המצב נכשלה",
+      "loadConfigurations": "טעינת גרסאות התצורה נכשלה",
+      "loadNotifications": "טעינת ההתראות נכשלה",
+      "loadOutboundConsumers": "טעינת צרכני מצב-מרוחק יוצאים נכשלה",
+      "loadInboundConsumers": "טעינת צרכני מצב-מרוחק נכנסים נכשלה",
+      "loadConsumers": "טעינת צרכני מצב-מרוחק נכשלה",
+      "loadInboundTriggers": "טעינת טריגרי הרצה נכנסים נכשלה",
+      "loadOutboundTriggers": "טעינת טריגרי הרצה יוצאים נכשלה",
+      "loadTriggers": "טעינת טריגרי ההרצה נכשלה",
+      "loadRunTasks": "טעינת משימות ההרצה נכשלה",
+      "downloadStateFile": "הורדת קובץ המצב נכשלה",
+      "downloadFailed": "ההורדה נכשלה",
+      "downloadFailedStatus": "ההורדה נכשלה ({status})",
+      "downloadTicketMissingUrl": "בתגובת כרטיס ההורדה חסרה כתובת URL",
+      "diffFailed": "ההפרש נכשל",
+      "diffFailedStatus": "ההפרש נכשל ({status})",
+      "authorizeConsumer": "הרשאת הצרכן נכשלה",
+      "revoke": "ביטול ההרשאה נכשל",
+      "revokeConsumer": "ביטול הרשאת הצרכן נכשל",
+      "addTrigger": "הוספת טריגר ההרצה נכשלה",
+      "removeTrigger": "הסרת טריגר ההרצה נכשלה",
+      "createRunTask": "יצירת משימת ההרצה נכשלה",
+      "createRunTaskStatus": "יצירת משימת ההרצה נכשלה ({status})",
+      "update": "העדכון נכשל",
+      "toggleRunTask": "החלפת מצב משימת ההרצה נכשלה",
+      "delete": "המחיקה נכשלה",
+      "deleteRunTask": "מחיקת משימת ההרצה נכשלה",
+      "labelLockout": "שינוי תווית זה יצמצם את הגישה שלכם.",
+      "updateWorkspace": "עדכון סביבת העבודה נכשל",
+      "lockWorkspace": "נעילת סביבת העבודה נכשלה",
+      "unlockWorkspace": "שחרור נעילת סביבת העבודה נכשל",
+      "updateAiSummary": "עדכון הגדרות סיכום ה-AI נכשל",
+      "updateSlackChannel": "עדכון ערוץ ה-Slack נכשל",
+      "updateDriftSettings": "עדכון הגדרות הסטייה נכשל",
+      "updateDriftInterval": "עדכון מרווח הסטייה נכשל",
+      "updatePlanExpiry": "עדכון פקיעת התוכנית נכשל",
+      "queueDriftCheck": "הוספת בדיקת הסטייה לתור נכשלה",
+      "queueDriftCheckStatus": "הוספת בדיקת הסטייה לתור נכשלה ({status})",
+      "dismissDrift": "ביטול הסטייה נכשל",
+      "dismissDriftStatus": "ביטול הסטייה נכשל ({status})",
+      "deleteWorkspace": "מחיקת סביבת העבודה נכשלה",
+      "addVariable": "הוספת המשתנה נכשלה",
+      "addVariableStatus": "הוספת המשתנה נכשלה ({status})",
+      "deleteVariable": "מחיקת המשתנה נכשלה",
+      "updateVariable": "עדכון המשתנה נכשל",
+      "queuePlan": "הוספת התוכנית לתור נכשלה",
+      "queuePlanStatus": "הוספת התוכנית לתור נכשלה ({status})",
+      "queueDestroy": "הוספת ההשמדה לתור נכשלה",
+      "queueDestroyStatus": "הוספת ההשמדה לתור נכשלה ({status})",
+      "createNotification": "יצירת ההתראה נכשלה",
+      "createNotificationStatus": "יצירת ההתראה נכשלה ({status})",
+      "toggleNotification": "החלפת מצב ההתראה נכשלה",
+      "deleteNotification": "מחיקת ההתראה נכשלה",
+      "verificationFailed": "האימות נכשל",
+      "verificationDeliveryFailed": "משלוח האימות נכשל: {detail}",
+      "unknownError": "שגיאה לא ידועה",
+      "failed": "נכשל",
+      "deleteStateVersion": "מחיקת גרסת המצב נכשלה",
+      "rollbackStateVersion": "שחזור גרסת המצב נכשל",
+      "stateActionFailed": "פעולת המצב נכשלה",
+      "uploadState": "העלאת המצב נכשלה",
+      "uploadStateFile": "העלאת קובץ המצב נכשלה"
+    }
+  },
+  "graphs": {
+    "stateTab": {
+      "loadError": "טעינת גרף המצב נכשלה.",
+      "emptyState": "עדיין אין מצב — הריצו plan ו-apply, או העלו מצב, ואז גרף זה יתמלא.",
+      "stateVersionLabel": "גרסת מצב",
+      "currentSuffix": "(נוכחית)",
+      "colorByLabel": "צביעה לפי",
+      "viewGraph": "גרף",
+      "viewTable": "טבלה",
+      "resourceCount": "{count, plural, one {# משאב} other {# משאבים}}",
+      "dependencyCount": "{count, plural, one {# תלות} other {# תלויות}}",
+      "truncated": "מוצגים {shown} המשאבים הראשונים מתוך {total} — הגרף מוגבל לקריאוּת.",
+      "colResource": "משאב",
+      "colType": "סוג",
+      "colMode": "מצב",
+      "colModule": "מודול",
+      "colDependedOnBy": "תלויים בו",
+      "rootModule": "(שורש)",
+      "colorBy": {
+        "type": "סוג משאב",
+        "module": "מודול",
+        "provider": "ספק",
+        "mode": "מנוהל / נתונים",
+        "none": "כלום (צבע יחיד)"
+      }
+    },
+    "impact": {
+      "notAvailable": "גרף ההשפעה אינו זמין להרצה זו.",
+      "title": "גרף השפעה",
+      "subtitle": "תוכנית של {count, plural, one {# משאב} other {# משאבים}}",
+      "hint": "כל כדור הוא משאב; כל חץ מצביע על מה שהוא תלוי בו. לחיצה על צומת ← ה<b>השפעה</b> הטרנזיטיבית שלו (כל מה שבמורד הזרם) נדלקת.",
+      "downstreamAffected": "מושפעים במורד הזרם",
+      "action": {
+        "create": "יצירה",
+        "update": "עדכון",
+        "replace": "החלפה",
+        "destroy": "השמדה",
+        "unchanged": "ללא שינוי"
+      }
+    },
+    "estate": {
+      "navHint": "גררו לסיבוב · גללו לזום · גרירה ימנית להזזה · <em>לחצו על צומת להקפה סביבו</em>"
+    },
+    "state3d": {
+      "title": "גרף מצב",
+      "hint": "כל כדור הוא משאב; כל חץ מצביע על מה שהוא תלוי בו. לחיצה על צומת ← המשאבים ש<b>תלויים בו</b> טרנזיטיבית נדלקים.",
+      "dataSource": "מקור נתונים",
+      "managed": "מנוהל",
+      "dependOnThis": "תלויים בזה"
+    },
+    "resource3d": {
+      "resetView": "איפוס תצוגה",
+      "clear": "ניקוי",
+      "key": "מקרא",
+      "resources": "משאבים",
+      "hideKey": "הסתרת מקרא",
+      "hideResources": "הסתרת משאבים",
+      "resourcesCount": "משאבים ({count})",
+      "filterPlaceholder": "סינון משאבים…",
+      "navHint": "גררו לסיבוב · גללו לזום · גרירה ימנית להזזה · <em>לחצו על משאב להקפה סביבו</em>"
+    }
+  },
+  "execHookDetail": {
+    "backLink": "חזרה ל-hooks של הרצה",
+    "defaultDescription": "hook הרצה",
+    "notFound": "hook ההרצה לא נמצא",
+    "scriptEmpty": "(ריק)",
+    "tabs": {
+      "settings": "הגדרות",
+      "workspaces": "סביבות עבודה"
+    },
+    "common": {
+      "yes": "כן",
+      "no": "לא"
+    },
+    "actions": {
+      "edit": "עריכה",
+      "cancel": "ביטול",
+      "save": "שמירה",
+      "saving": "שומר...",
+      "delete": "מחיקה",
+      "deleting": "מוחק...",
+      "confirmDelete": "אישור מחיקה",
+      "add": "הוספה",
+      "adding": "מוסיף...",
+      "remove": "הסרה"
+    },
+    "settings": {
+      "heading": "הגדרות"
+    },
+    "fields": {
+      "name": "שם",
+      "description": "תיאור",
+      "hookPoint": "נקודת Hook",
+      "priority": "עדיפות",
+      "enabled": "מופעל",
+      "script": "סקריפט (<code>/bin/sh -c</code>)"
+    },
+    "delete": {
+      "heading": "מחיקת hook הרצה",
+      "description": "מחקו לצמיתות את ה-hook הזה והסירו אותו מכל סביבות העבודה."
+    },
+    "workspaces": {
+      "scopeNote": "hook זה רץ רק על סביבות העבודה המשויכות למטה. אין היקף גלובלי.",
+      "associate": "שיוך סביבת עבודה",
+      "workspaceLabel": "סביבת עבודה",
+      "selectPlaceholder": "בחירת סביבת עבודה...",
+      "empty": "אין סביבות עבודה משויכות ל-hook זה.",
+      "colWorkspace": "סביבת עבודה",
+      "colActions": "פעולות"
+    },
+    "confirm": {
+      "removeWorkspace": "להסיר את סביבת העבודה הזו מה-hook? ה-hook לא ירוץ עוד עבורה."
+    },
+    "success": {
+      "updated": "hook ההרצה עודכן",
+      "workspaceAssociated": "סביבת העבודה שויכה",
+      "workspaceRemoved": "סביבת העבודה הוסרה"
+    },
+    "errors": {
+      "load": "טעינת hook ההרצה נכשלה",
+      "update": "עדכון hook ההרצה נכשל",
+      "delete": "מחיקת hook ההרצה נכשלה",
+      "addWorkspace": "הוספת סביבת העבודה נכשלה",
+      "removeWorkspace": "הסרת סביבת העבודה נכשלה"
+    }
+  },
+  "policySetDetail": {
+    "backLink": "מערכי מדיניות",
+    "notFound": "לא נמצא",
+    "unknown": "לא ידוע",
+    "subtitle": "מערך מדיניות OPA · נוצר על ידי {createdBy}",
+    "settings": {
+      "heading": "הגדרות"
+    },
+    "fields": {
+      "description": "תיאור",
+      "enforcement": "אכיפה",
+      "enabled": "מופעל",
+      "globalScope": "גלובלי (כל סביבת עבודה)"
+    },
+    "enforcement": {
+      "advisory": "מייעץ (אזהרה)",
+      "mandatory": "חובה (חסימת החלה)"
+    },
+    "scope": {
+      "allowLabels": "תוויות מותרות (key: v1, v2)",
+      "allowLabelsPlaceholder": "env: prod, staging",
+      "allowNames": "שמות מותרים (אחד בכל שורה)",
+      "denyLabels": "תוויות אסורות (key: v1, v2)",
+      "denyNames": "שמות אסורים (אחד בכל שורה)"
+    },
+    "vcs": {
+      "heading": "תצורת VCS",
+      "repoUrl": "כתובת מאגר",
+      "branch": "ענף",
+      "branchPlaceholder": "main (ברירת מחדל)",
+      "policyPath": "נתיב מדיניות"
+    },
+    "vcsBanner": {
+      "syncedFrom": "מדיניות מסונכרנת מ-",
+      "at": "בשעה",
+      "lastSynced": "סונכרן לאחרונה {time}",
+      "commit": "(commit {sha})",
+      "syncError": "שגיאת סנכרון: {error}"
+    },
+    "policies": {
+      "heading": "מדיניות ({count})",
+      "vcsManaged": "מנוהל על ידי המאגר — דחפו שינויים באמצעות PR",
+      "empty": "אין עדיין מדיניות במערך זה."
+    },
+    "addPolicy": {
+      "namePlaceholder": "שם מדיניות",
+      "descPlaceholder": "תיאור (אופציונלי)",
+      "regoHint": "Rego v1. חייב להצהיר <code>package terrapod</code> ולבטא הפרות באמצעות מערך <code>deny</code>. התוכנית היא <code>input</code>; הקשר Terrapod הוא <code>data.terrapod_context</code>."
+    },
+    "actions": {
+      "saving": "שומר...",
+      "saveSettings": "שמירת הגדרות",
+      "syncNow": "סנכרן עכשיו",
+      "cancel": "ביטול",
+      "addPolicy": "הוספת מדיניות",
+      "deleteSet": "מחיקת מערך",
+      "validatingRego": "מאמת Rego...",
+      "delete": "מחיקה",
+      "savePolicy": "שמירת מדיניות"
+    },
+    "confirm": {
+      "deleteSet": "למחוק את מערך המדיניות הזה ואת כל המדיניות שבו? הערכות ריצה מתועדות נשמרות.",
+      "deletePolicy": "למחוק את המדיניות \"{name}\"?"
+    },
+    "errors": {
+      "load": "טעינת מערך המדיניות נכשלה",
+      "save": "שמירת מערך המדיניות נכשלה",
+      "saveStatus": "השמירה נכשלה ({status})",
+      "delete": "מחיקת מערך המדיניות נכשלה",
+      "deleteStatus": "המחיקה נכשלה ({status})",
+      "addPolicy": "הוספת המדיניות נכשלה",
+      "addPolicyStatus": "הוספת המדיניות נכשלה ({status})",
+      "savePolicy": "שמירת המדיניות נכשלה",
+      "savePolicyStatus": "שמירת המדיניות נכשלה ({status})",
+      "deletePolicy": "מחיקת המדיניות נכשלה",
+      "deletePolicyStatus": "המחיקה נכשלה ({status})"
+    }
+  },
+  "slackLink": {
+    "title": "חיבור Slack ל-Terrapod",
+    "loading": "טוען…",
+    "checking": "בודק את הקישור שלכם…",
+    "linking": "מקשר את חשבון ה-Slack שלכם…",
+    "unknown": "לא ידוע",
+    "confirm": {
+      "prompt": "לקשר את חשבון ה-Slack הזה לזהות ה-Terrapod<em>שלכם</em>? כל פעולת Slack עתידית (אישור/ביטול) תרוץ כמשתמש Terrapod זה עם ההרשאות שלו.",
+      "slackUser": "משתמש Slack",
+      "slackTeam": "צוות Slack",
+      "terrapodAccount": "חשבון Terrapod",
+      "warning": "המשיכו רק אם התחלתם את הקישור הזה מ-Slack בעצמכם. אם לא, סגרו את הלשונית ואל תקשרו — פעולה זו כובלת את חשבון ה-Slack שלמעלה לזהות ה-Terrapod<em>שלכם</em>.",
+      "button": "אישור וקישור"
+    },
+    "success": {
+      "message": "חשבון ה-Slack שלכם מקושר כעת ל-Terrapod.",
+      "linkedAs": "מקושר כ-<em>{email}</em>. תוכלו לסגור לשונית זו ולחזור ל-Slack."
+    },
+    "errors": {
+      "missingLink": "קישור חסר או לא תקין. התחילו מחדש עם פקודת הקישור של Terrapod ב-Slack.",
+      "invalidLink": "קישור זה אינו תקין, פג תוקף, או כבר נעשה בו שימוש. התחילו את הקישור מחדש מ-Slack.",
+      "linkingFailed": "הקישור נכשל."
+    }
+  },
+  "cliComplete": {
+    "loading": "טוען...",
+    "completing": "משלים אימות...",
+    "invalid": {
+      "title": "בקשה לא תקינה",
+      "description": "חסרים פרמטרים נדרשים."
+    },
+    "success": {
+      "title": "הכניסה הצליחה",
+      "complete": "אסימון API נוצר. ניתן לסגור לשונית זו."
+    },
+    "fallback": {
+      "description": "לא ניתן היה להגיע ל-CLI אוטומטית.",
+      "button": "לחצו כאן כדי להשלים ידנית"
+    },
+    "timeout": {
+      "description": "ייתכן שה-CLI לא השלים את החלפת האסימון. בדקו את הטרמינל."
+    }
+  },
+  "apiDocs": {
+    "view": "תצוגה:",
+    "redocTitle": "תיעוד API של ReDoc"
+  },
+  "onboarding": {
+    "title": "קליטת משאבים קיימים",
+    "backTo": "חזרה אל {workspace}",
+    "description": "גלו משאבי ענן קיימים ולא-מנוהלים ב-{workspace} וצרו בלוקים של משאבים וייבוא הניתנים לסקירה.",
+    "providerLabel": "ספק",
+    "providerVersionLabel": "גרסת ספק (אופציונלי)",
+    "start": "התחלת גילוי",
+    "starting": "מתחיל…",
+    "sessionsLabel": "הפעלות גילוי",
+    "empty": "עדיין אין הפעלות גילוי. בחרו ספק והתחילו אחת למעלה.",
+    "analysing": "מנתח את סכימת הספק… זה עשוי לקחת דקה בפעם הראשונה (הורדת הספק).",
+    "surfaceIntro": "בחרו אילו מבין {count} מקורות הנתונים הניתנים לתשאול לגלות.",
+    "filterPlaceholder": "סינון מקורות נתונים…",
+    "noMatches": "אף מקור נתונים אינו תואם את המסנן שלך.",
+    "discover": "גילוי {count} סוגים",
+    "discovering": "משגר…",
+    "queryingHint": "מגלה משאבים — הרץ מתשאל את הענן שלך ומייצר תצורה.",
+    "viewRun": "הצגת הרצה",
+    "reviewIntro": "נוצר מ: {types}. סקרו למטה, ואז העבירו את התצורה לסביבת העבודה שלכם והחילו את הייבוא.",
+    "importBlocks": "בלוקים של ייבוא",
+    "generatedConfig": "תצורה שנוצרה",
+    "copy": "העתקה",
+    "copied": "הועתק",
+    "nextStepNote": "השלב הבא: העבירו תצורה זו למאגר סביבת העבודה שלכם והריצו אותה — קליטה נכונה מתכננת ייבוא בלבד (0 להוספה / 0 לשינוי / 0 להשמדה).",
+    "erroredFallback": "הרצת הגילוי נכשלה. פתחו את ההרצה כדי לראות את היומנים.",
+    "viewRunLogs": "הצגת יומני הרצה",
+    "noResources": "לא נמצאו משאבי {types} לא-מנוהלים בחשבון/אזור זה.",
+    "aiPolishedBadge": "מלוטש ב-AI",
+    "aiPolishedNote": "משאבים שמם שונה לפי תוויות, קובצו ותועדו — ערכי תכונות ומזהי ייבוא נותרו ללא שינוי.",
+    "viewPolished": "מלוטש",
+    "viewRaw": "גולמי",
+    "pairedTitle": "זוגות ייבוא + משאב",
+    "pairedNote": "כל בלוק ייבוא יושב ישירות מעל המשאב שאליו הוא מכוון — העתיקו זוג, או השתמשו בבלוקים הנפרדים שלמטה.",
+    "state": {
+      "pending": "מנתח סכימה",
+      "schema_ready": "מוכן לגילוי",
+      "querying": "מגלה",
+      "config_ready": "התצורה מוכנה",
+      "run_created": "הרצת ייבוא נוצרה",
+      "errored": "שגיאה",
+      "canceled": "בוטל"
+    }
+  }
+}

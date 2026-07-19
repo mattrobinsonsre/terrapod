@@ -78,6 +78,11 @@ _LANGUAGE_NAMES: dict[str, str] = {
     "fi": "Finnish",
     "pt-pt": "European Portuguese",
     "la": "Latin",
+    # Right-to-left languages (#829). Write natural right-to-left prose; keep
+    # code, resource addresses, and identifiers verbatim (they render LTR).
+    "ar": "Arabic",
+    "he": "Hebrew",
+    "fa": "Persian",
     # Constructed / fun locales — a style transform of the prose, not a language.
     "tlh": "Klingon (tlhIngan Hol, the constructed language from Star Trek)",
     "en-x-marklar": (
