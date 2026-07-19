@@ -1,0 +1,339 @@
+"""Tests for the native cost-estimation engine (issue #871).
+
+The engine is a faithful Python port of OpenInfraQuote's matcher + pricer. These
+tests pin the ported behaviour with hand-verified fixtures — a tiny pricesheet +
+plan/state whose totals can be computed by hand — plus focused unit coverage of
+each primitive (match sets, the match-query language, CSV product parsing, the
+plan/state adapters, and the usage catalogue). Bit-exact agreement with the real
+``oiq`` binary is pinned separately by the differential oracle in
+``test_cost_differential.py``.
+"""
+
+from __future__ import annotations
+
+import io
+
+import pytest
+
+from terrapod.services.cost import estimate
+from terrapod.services.cost.match_query import MatchQuery
+from terrapod.services.cost.match_set import MatchSet
+from terrapod.services.cost.prices import EmptyMatchSet, PriceKind, product_of_row
+from terrapod.services.cost.range import Range, overlap
+from terrapod.services.cost.tf import flatten, resources_from_json
+from terrapod.services.cost.usage import DATA, bound_to_usage_amount, default_entries, match_entry
+
+# ---------------------------------------------------------------------------
+# match_set
+# ---------------------------------------------------------------------------
+
+
+def test_match_set_of_string_parses_and_pct_decodes():
+    ms = MatchSet.of_string("type=aws_instance&values.name=my%20box&empty=")
+    assert ms.contains("type", "aws_instance")
+    assert ms.contains("values.name", "my box")  # percent-decoded
+    assert ms.contains("empty", "")
+    assert ms.find_by_key("missing") is None
+
+
+def test_match_set_drops_empty_segments():
+    assert MatchSet.of_string("&&a=b&&") == MatchSet.of_list([("a", "b")])
+
+
+def test_match_set_missing_equals_raises():
+    with pytest.raises(ValueError):
+        MatchSet.of_string("novalue")
+
+
+def test_match_set_subset_and_union():
+    resource = MatchSet.of_list(
+        [("type", "aws_instance"), ("values.size", "large"), ("mode", "managed")]
+    )
+    product = MatchSet.of_list([("type", "aws_instance")])
+    assert product.is_subset_of(resource)
+    assert not resource.is_subset_of(product)
+    u = product.union(MatchSet.of_list([("region", "us-east-1")]))
+    assert u.contains("type", "aws_instance") and u.contains("region", "us-east-1")
+
+
+# ---------------------------------------------------------------------------
+# match_query
+# ---------------------------------------------------------------------------
+
+
+def _ms(*pairs: tuple[str, str]) -> MatchSet:
+    return MatchSet.of_list(list(pairs))
+
+
+def test_match_query_equals_and_key():
+    ms = _ms(("type", "aws_instance"), ("os", "linux"))
+    assert MatchQuery.of_string("type = aws_instance").eval(ms)
+    assert not MatchQuery.of_string("type = aws_lambda_function").eval(ms)
+    assert MatchQuery.of_string("os").eval(ms)  # key existence
+    assert not MatchQuery.of_string("region").eval(ms)
+
+
+def test_match_query_boolean_precedence_and_parens():
+    ms = _ms(("a", "1"), ("b", "2"))
+    # OR < AND < NOT: `a = 1 and b = 3 or a = 1` -> (a=1 and b=3) or a=1 -> True
+    assert MatchQuery.of_string("a = 1 and b = 3 or a = 1").eval(ms)
+    assert not MatchQuery.of_string("a = 1 and b = 3").eval(ms)
+    assert MatchQuery.of_string("not b = 3").eval(ms)
+    assert MatchQuery.of_string("(a = 1 or a = 9) and b = 2").eval(ms)
+    assert not MatchQuery.of_string("not (a = 1)").eval(ms)
+
+
+def test_match_query_empty_matches_everything():
+    assert MatchQuery.of_string("").eval(_ms())
+    assert MatchQuery.of_string("   ").eval(_ms(("x", "y")))
+
+
+def test_match_query_real_usage_entry_with_not_and_parens():
+    # From the vendored usage.json (Lambda x86 arch entry).
+    q = MatchQuery.of_string(
+        "type = aws_lambda_function and service_class = duration "
+        "and (not values.architectures or values.architectures=x86) and arch=x86"
+    )
+    ms = _ms(
+        ("type", "aws_lambda_function"),
+        ("service_class", "duration"),
+        ("arch", "x86"),
+    )  # no values.architectures -> `not values.architectures` is True
+    assert q.eval(ms)
+    ms_arm = _ms(
+        ("type", "aws_lambda_function"),
+        ("service_class", "duration"),
+        ("arch", "x86"),
+        ("values.architectures", "arm64"),
+    )
+    assert not q.eval(ms_arm)
+
+
+# ---------------------------------------------------------------------------
+# prices
+# ---------------------------------------------------------------------------
+
+
+def test_product_of_row_price_types():
+    base = ["AmazonEC2", "Compute", "type=aws_instance", "region=us-east-1", "0.10", "t", "USD"]
+    assert product_of_row(base).price.kind is PriceKind.PER_TIME
+    assert product_of_row([*base[:5], "o", "USD"]).price.kind is PriceKind.PER_OPERATION
+    assert product_of_row([*base[:5], "d", "USD"]).price.kind is PriceKind.PER_DATA
+    attr = product_of_row([*base[:5], "a=values.storage", "USD"])
+    assert attr.price.kind is PriceKind.ATTR and attr.price.attr == "values.storage"
+
+
+def test_product_of_row_empty_match_set_skipped():
+    with pytest.raises(EmptyMatchSet):
+        product_of_row(["S", "F", "", "region=x", "0.1", "t", "USD"])
+
+
+# ---------------------------------------------------------------------------
+# tf adapter
+# ---------------------------------------------------------------------------
+
+
+def test_flatten_scalars_and_lists():
+    flat = dict(
+        flatten(
+            {
+                "type": "aws_instance",
+                "values": {"count": 3, "enabled": True, "note": None, "tags": ["a", "b"]},
+            }
+        )
+    )
+    assert flat["type"] == "aws_instance"
+    assert flat["values.count"] == "3"
+    assert flat["values.enabled"] == "true"  # bool lowercased
+    assert flat["values.note"] == "null"
+    # list reuses prefix; set collapses -> last wins in dict() but both present in pairs
+    tags = [v for k, v in flatten({"tags": ["a", "b"]}) if k == "tags"]
+    assert set(tags) == {"a", "b"}
+
+
+def _plan(resources, prior=None):
+    plan = {
+        "format_version": "1.2",
+        "terraform_version": "1.9.0",
+        "planned_values": {"root_module": {"resources": resources}},
+    }
+    if prior is not None:
+        plan["prior_state"] = {"values": {"root_module": {"resources": prior}}}
+    return plan
+
+
+def _res(addr, rtype, name, values):
+    return {"address": addr, "type": rtype, "name": name, "mode": "managed", "values": values}
+
+
+def test_resources_from_plan_add_remove_noop():
+    web = _res("aws_instance.web", "aws_instance", "web", {"instance_type": "m5.large"})
+    db = _res("aws_db_instance.db", "aws_db_instance", "db", {"instance_class": "db.t3.medium"})
+    old = _res("aws_instance.old", "aws_instance", "old", {"instance_type": "t2.micro"})
+    plan = _plan(resources=[web, db], prior=[web, old])
+    got = {r.address: change for r, change in resources_from_plan_helper(plan)}
+    assert got == {
+        "aws_instance.web": "noop",
+        "aws_db_instance.db": "add",
+        "aws_instance.old": "remove",
+    }
+
+
+def resources_from_plan_helper(plan):
+    from terrapod.services.cost.tf import resources_from_plan
+
+    return resources_from_plan(plan)
+
+
+def test_resources_from_state_v4_lifts_attributes():
+    state = {
+        "version": 4,
+        "terraform_version": "1.9.0",
+        "resources": [
+            {
+                "mode": "managed",
+                "type": "aws_instance",
+                "name": "web",
+                "instances": [{"attributes": {"instance_type": "m5.large"}}],
+            },
+            {
+                "mode": "data",
+                "type": "aws_ami",
+                "name": "ubuntu",
+                "instances": [{"attributes": {}}],
+            },
+        ],
+    }
+    resources = resources_from_json(state)
+    assert len(resources) == 1  # data source skipped
+    res, change = resources[0]
+    assert change == "noop"
+    assert res.to_match_set().contains("type", "aws_instance")
+    assert res.to_match_set().contains("values.instance_type", "m5.large")
+
+
+# ---------------------------------------------------------------------------
+# usage
+# ---------------------------------------------------------------------------
+
+
+def test_default_usage_catalogue_loads():
+    entries = default_entries()
+    assert len(entries) == 18  # vendored from OpenInfraQuote
+    ec2 = match_entry(
+        _ms(
+            ("type", "aws_instance"),
+            ("service_class", "instance"),
+            ("purchase_option", "on_demand"),
+            ("os", "linux"),
+        ),
+        entries,
+    )
+    assert ec2 is not None and ec2.usage is not None
+    assert ec2.usage.time == Range(730, 730)
+
+
+def test_bound_to_usage_amount_clamps_to_tier():
+    from terrapod.services.cost.usage import Entry, Usage
+
+    entry = Entry(
+        description="d",
+        divisor=None,
+        match_query=MatchQuery.of_string(""),
+        usage=Usage.from_data_range(Range(50, 900)),
+    )
+    # usage 50..900 clamped into tier [0, 100]: min stays 50, max caps at the
+    # tier width 100 -> the slice of usage that falls in this pricing tier.
+    bounded = bound_to_usage_amount(DATA, Range(0, 100), entry)
+    assert bounded is not None and bounded.usage.data == Range(50, 100)
+    # a point usage of 900 into tier [0, 100]: exactly 100 units fall in-tier.
+    point = Entry(
+        description="d",
+        divisor=None,
+        match_query=MatchQuery.of_string(""),
+        usage=Usage.from_data_range(Range(900, 900)),
+    )
+    got = bound_to_usage_amount(DATA, Range(0, 100), point)
+    assert got is not None and got.usage.data == Range(100, 100)
+    # tier entirely above usage -> None
+    assert bound_to_usage_amount(DATA, Range(2000, 3000), entry) is None
+
+
+def test_range_overlap():
+    assert overlap(Range(0, 5), Range(3, 10)) == Range(3, 5)
+    assert overlap(Range(0, 5), Range(6, 10)) is None
+
+
+# ---------------------------------------------------------------------------
+# end-to-end (hand-verified totals)
+# ---------------------------------------------------------------------------
+
+# One on-demand Linux EC2 instance. The EC2-hours usage default is time=730,
+# the product is $0.10/hour Per_time, divisor 1 -> 730 * 0.10 = $73.00/month.
+_EC2_ROW = (
+    "AmazonEC2,Compute Instance,type=aws_instance,"
+    "service_class=instance&purchase_option=on_demand&os=linux&region=us-east-1,"
+    "0.1000000000,t,USD\n"
+)
+_PRICESHEET = "service,product_family,match_set,pricing_match_set,price,price_type,ccy\n" + _EC2_ROW
+
+
+def _sheet() -> io.StringIO:
+    return io.StringIO(_PRICESHEET)
+
+
+def test_estimate_plan_add_hand_verified():
+    plan = _plan(
+        resources=[_res("aws_instance.web", "aws_instance", "web", {"instance_type": "m5.large"})]
+    )
+    est = estimate(plan, _sheet())
+    assert est.currency == "USD"
+    assert est.total_min == pytest.approx(73.0)
+    assert est.total_max == pytest.approx(73.0)
+    assert est.diff_min == pytest.approx(73.0)  # it's an add
+    assert est.prev_min == pytest.approx(0.0)
+    assert len(est.resources) == 1
+    assert est.resources[0].monthly_min == pytest.approx(73.0)
+    assert est.resources[0].change == "add"
+    assert est.unpriced == []
+
+
+def test_estimate_state_noop_current_cost():
+    state = {
+        "format_version": "1.0",
+        "terraform_version": "1.9.0",
+        "values": {
+            "root_module": {"resources": [_res("aws_instance.web", "aws_instance", "web", {})]}
+        },
+    }
+    est = estimate(state, _sheet())
+    assert est.total_min == pytest.approx(73.0)
+    assert est.diff_min == pytest.approx(0.0)  # noop -> no delta
+    assert est.prev_min == pytest.approx(73.0)
+
+
+def test_estimate_remove_negates_and_diffs():
+    web = _res("aws_instance.web", "aws_instance", "web", {})
+    plan = _plan(resources=[], prior=[web])
+    est = estimate(plan, _sheet())
+    assert est.total_min == pytest.approx(-73.0)
+    assert est.diff_min == pytest.approx(-73.0)
+    assert est.prev_min == pytest.approx(0.0)  # total - diff
+    assert est.resources[0].change == "remove"
+
+
+def test_estimate_unpriced_bucket():
+    plan = _plan(resources=[_res("aws_thing.x", "aws_unpriceable", "x", {})])
+    est = estimate(plan, _sheet())
+    assert est.resources == []
+    assert est.total_min == pytest.approx(0.0)
+    assert len(est.unpriced) == 1
+    assert est.unpriced[0].type == "aws_unpriceable"
+
+
+def test_estimate_to_dict_shape():
+    plan = _plan(resources=[_res("aws_instance.web", "aws_instance", "web", {})])
+    d = estimate(plan, _sheet()).to_dict()
+    assert set(d) == {"currency", "total", "previous", "diff", "resources", "unpriced"}
+    assert d["total"]["min"] == pytest.approx(73.0)
+    assert d["resources"][0]["monthly"]["max"] == pytest.approx(73.0)

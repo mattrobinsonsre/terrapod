@@ -1,0 +1,125 @@
+[
+  {
+    "description": "Default AWS EC2 Instance hours",
+    "match_query": "type = aws_instance and service_class = instance and purchase_option = on_demand and os = linux",
+    "usage": {
+      "time": 730
+    }
+  },
+  {
+    "description": "Default number of AWS S3 Bucket PUT, POST, UPDATE, and LIST operations (Tier 1) (Per 1,000)",
+    "match_query": "type = aws_s3_bucket and tier = 1 and purchase_option = on_demand",
+    "usage": {
+      "operations": 4000000
+    }
+  },
+  {
+    "description": "Default number of AWS S3 Bucket GET and other operations (Tier 2) (Per 10,000)",
+    "match_query": "type = aws_s3_bucket and tier = 2 and purchase_option = on_demand",
+    "usage": {
+      "operations": 50000000
+    }
+  },
+  {
+    "description": "Default AWS S3 Bucket storage (Per GB-Month)",
+    "match_query": "type = aws_s3_bucket and service_class = storage and purchase_option = on_demand and storage_class = general_purpose",
+    "usage": {
+      "data": 900
+    }
+  },
+  {
+    "description": "Default AWS RDS storage (Per GB-Month)",
+    "match_query": "type = aws_db_instance and service_class = storage and purchase_option = on_demand",
+    "usage": {
+      "data": 1
+    }
+  },
+  {
+    "description": "Default AWS RDS IOPS (Per 1 million I/O requests)",
+    "match_query": "type = aws_db_instance and service_class = iops and values.storage_type = standard",
+    "usage": {
+      "operations": 200000000
+    }
+  },
+  {
+    "description": "Default AWS RDS Instance hours",
+    "match_query": "type = aws_db_instance and service_class = instance and purchase_option = on_demand",
+    "usage": {
+      "time": 730
+    }
+  },
+  {
+    "description": "Default AWS SQS IOPS (Per 1 million)",
+    "match_query": "type = aws_sqs_queue and service_class = requests",
+    "usage": {
+      "operations": 50000000
+    }
+  },
+  {
+    "description": "Default AWS Lambda monthly requests",
+    "match_query": "type = aws_lambda_function and service_class = requests",
+    "usage": {
+      "operations": 100000000
+    }
+  },
+  {
+    "description": "Default AWS Lambda monthly duration, ARM (seconds)",
+    "match_query": "type = aws_lambda_function and service_class = duration and values.architectures=arm64 and arch=arm64",
+    "usage": {
+      "time": 1000000
+    }
+  },
+  {
+    "description": "Default AWS Lambda monthly duration, x86 (seconds)",
+    "match_query": "type = aws_lambda_function and service_class = duration and (not values.architectures or values.architectures=x86) and arch=x86",
+    "usage": {
+      "time": 1000000
+    }
+  },
+  {
+    "description": "Default AWS EBS standard IOPS",
+    "match_query": "type = aws_ebs_volume and values.type = standard and service_class = iops",
+    "usage": {
+      "operations": 400000000
+    }
+  },
+  {
+    "description": "AWS EBS Storage",
+    "match_query": "type = aws_ebs_volume and service_class = storage"
+  },
+  {
+    "description": "AWS DynamoDB Standard storage",
+    "match_query": "type = aws_dynamodb_table and service_class = storage",
+    "usage": {
+      "data": 80
+    }
+  },
+  {
+    "description": "AWS DynamoDB Storage",
+    "match_query": "type = aws_dynamodb_table and service_class = storage and ((table_class = ia and values.table_class = STANDARD_INFREQUENT_ACCESS) or ((not values.table_class or values.table_class = STANDARD or values.table_class = null) and table_class = standard))",
+    "usage": {
+      "data": 80
+    }
+  },
+  {
+    "description": "AWS DynamoDB Read Requests",
+    "match_query": "type = aws_dynamodb_table and service_class = requests and request_type = read and ((table_class = ia and values.table_class = STANDARD_INFREQUENT_ACCESS) or ((not values.table_class or values.table_class = STANDARD or values.table_class = null) and table_class = standard))",
+    "usage": {
+      "operations": 80000000
+    }
+  },
+  {
+    "description": "AWS DynamoDB Write Requests",
+    "match_query": "type = aws_dynamodb_table and service_class = requests and request_type = write and ((table_class = ia and values.table_class = STANDARD_INFREQUENT_ACCESS) or ((not values.table_class or values.table_class = STANDARD or values.table_class = null) and table_class = standard))",
+    "usage": {
+      "operations": 16000000
+    }
+  },
+  {
+    "description": "AWS DynamoDB Stream Requests",
+    "match_query": "type = aws_dynamodb_table and service_class = requests and request_type = stream",
+    "usage": {
+      "operations": 0
+    }
+  }
+]
