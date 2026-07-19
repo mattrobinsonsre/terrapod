@@ -97,7 +97,14 @@ func TestLoadPrivateKeyRejectsPublicKey(t *testing.T) {
 // fixture. Tracked as a follow-up rather than an in-memory quick win.
 
 func TestLoadPrivateKeyRejectsGarbage(t *testing.T) {
-	if _, err := LoadPrivateKey("-----BEGIN PGP PRIVATE KEY BLOCK-----\nnot base64\n-----END PGP PRIVATE KEY BLOCK-----\n", ""); err == nil {
+	// Deliberately-malformed armored input: the PGP markers wrap the literal
+	// text "not base64" — there is NO key material here. It exists only to
+	// prove LoadPrivateKey rejects bad armor. The secret scanner matches the
+	// marker text, not a real key (every real test key is generated at runtime
+	// via openpgp.NewEntity), so this is a false positive.
+	// nosemgrep: generic.secrets.security.detected-pgp-private-key-block
+	const malformedArmor = "-----BEGIN PGP PRIVATE KEY BLOCK-----\nnot base64\n-----END PGP PRIVATE KEY BLOCK-----\n"
+	if _, err := LoadPrivateKey(malformedArmor, ""); err == nil {
 		t.Fatal("expected error on malformed armor")
 	}
 	if _, err := LoadPrivateKey("not armored at all", ""); err == nil {
