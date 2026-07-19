@@ -1484,8 +1484,10 @@ jobs:
   #   release-provider — GoReleaser provider, append mode.
   #   release-migrate  — GoReleaser migrate, append mode.
   #   release-publish  — GoReleaser terrapod-publish, append mode.
-  #   release-finalize — joins all five; sets real title + release notes
-  #                      and uploads the workflow artifact from
+  #   release-query    — GoReleaser terrapod-query, append mode.
+  #   release-mcp      — GoReleaser terrapod-mcp, append mode.
+  #   release-finalize — joins all the above; sets real title + release
+  #                      notes and uploads the workflow artifact from
   #                      release-images.
   #
   # Both goreleaser invocations also pass `--parallelism 6` so each
@@ -1920,9 +1922,49 @@ jobs:
           # Append to the Release that release-create already opened.
           gh release upload "$version" dist/terrapod-query_${ver}_* --clobber
 
+  release-mcp:
+    name: Release — MCP server (GoReleaser)
+    # Parallel with the other GoReleaser jobs — all append to the Release that
+    # release-create made.
+    needs: [prepare, release-create]
+    if: |
+      always()
+      && needs.prepare.outputs.is_tag == 'true'
+      && needs.release-create.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: mcp/go.mod
+          cache-dependency-path: mcp/go.sum
+
+      - name: Import GPG signing key
+        id: gpg
+        run: |
+          echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
+          fingerprint=$(gpg --with-colons --import-options show-only --import <<< "${{ secrets.GPG_PRIVATE_KEY }}" | awk -F: '/^fpr:/{print $10; exit}')
+          echo "fingerprint=$fingerprint" >> "$GITHUB_OUTPUT"
+
+      - name: Build terrapod-mcp binaries with GoReleaser
+        uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7
+        with:
+          distribution: goreleaser
+          version: latest
+          args: release --clean --parallelism 6
+          workdir: mcp
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GPG_FINGERPRINT: ${{ steps.gpg.outputs.fingerprint }}
+
   release-finalize:
     name: Release — Finalize (notes + chart + SBOMs)
-    needs: [prepare, release-create, release-images, release-provider, release-migrate, release-publish, release-query]
+    needs: [prepare, release-create, release-images, release-provider, release-migrate, release-publish, release-query, release-mcp]
     if: |
       always()
       && needs.prepare.outputs.is_tag == 'true'
@@ -1932,6 +1974,7 @@ jobs:
       && needs.release-migrate.result == 'success'
       && needs.release-publish.result == 'success'
       && needs.release-query.result == 'success'
+      && needs.release-mcp.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -2016,11 +2059,11 @@ jobs:
   # ── Cleanup Tag on Failure ─────────────────────────────
   cleanup-tag:
     name: Cleanup Tag
-    needs: [prepare, build-images-amd64, build-images-arm64, build-query, scan-images, create-manifests, release-create, release-images, release-provider, release-migrate, release-publish, release-query, release-finalize]
+    needs: [prepare, build-images-amd64, build-images-arm64, build-query, scan-images, create-manifests, release-create, release-images, release-provider, release-migrate, release-publish, release-query, release-mcp, release-finalize]
     if: |
       always()
       && needs.prepare.outputs.is_tag == 'true'
-      && (needs.build-images-amd64.result == 'failure' || needs.build-images-arm64.result == 'failure' || needs.build-query.result == 'failure' || needs.scan-images.result == 'failure' || needs.create-manifests.result == 'failure' || needs.release-create.result == 'failure' || needs.release-images.result == 'failure' || needs.release-provider.result == 'failure' || needs.release-migrate.result == 'failure' || needs.release-publish.result == 'failure' || needs.release-query.result == 'failure' || needs.release-finalize.result == 'failure')
+      && (needs.build-images-amd64.result == 'failure' || needs.build-images-arm64.result == 'failure' || needs.build-query.result == 'failure' || needs.scan-images.result == 'failure' || needs.create-manifests.result == 'failure' || needs.release-create.result == 'failure' || needs.release-images.result == 'failure' || needs.release-provider.result == 'failure' || needs.release-migrate.result == 'failure' || needs.release-publish.result == 'failure' || needs.release-query.result == 'failure' || needs.release-mcp.result == 'failure' || needs.release-finalize.result == 'failure')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -2082,6 +2125,7 @@ jobs:
       - release-migrate
       - release-publish
       - release-query
+      - release-mcp
       - release-finalize
     runs-on: ubuntu-latest
     steps:
@@ -2128,6 +2172,7 @@ jobs:
             "${{ needs.release-migrate.result }}"
             "${{ needs.release-publish.result }}"
             "${{ needs.release-query.result }}"
+            "${{ needs.release-mcp.result }}"
             "${{ needs.release-finalize.result }}"
           )
 

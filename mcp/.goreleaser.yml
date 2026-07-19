@@ -1,0 +1,65 @@
+# GoReleaser config for terrapod-mcp.
+#
+# Built and published alongside the Terraform provider on every Terrapod
+# release tag. The provider's own .goreleaser.yml creates the GitHub Release;
+# we append our archives + checksums to it with `release.mode: append`, which
+# avoids the second invocation trying (and failing) to create a duplicate
+# release. Mirrors publish/.goreleaser.yml.
+#
+# terrapod-mcp is a standalone stdio CLI an operator installs on their
+# workstation (not baked into any image), so — like terrapod-publish — it ships
+# as release archives, not a container.
+#
+# Distribution targets:
+#   - Linux  amd64 + arm64
+#   - Windows amd64 + arm64
+#   - macOS  universal (Apple "Universal 2" fat binary via lipo)
+version: 2
+
+project_name: terrapod-mcp
+
+builds:
+  - main: ./cmd/terrapod-mcp
+    env:
+      - CGO_ENABLED=0
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    flags:
+      - -trimpath
+    ldflags:
+      - "-s -w -X github.com/mattrobinsonsre/terrapod/mcp/internal/mcpserver.Version={{ .Version }}"
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    binary: terrapod-mcp
+
+universal_binaries:
+  - replace: true
+
+archives:
+  - format: zip
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+
+checksum:
+  name_template: "{{ .ProjectName }}_{{ .Version }}_SHA256SUMS"
+  algorithm: sha256
+
+signs:
+  - artifacts: checksum
+    args:
+      - "--batch"
+      - "--local-user"
+      - "{{ .Env.GPG_FINGERPRINT }}"
+      - "--output"
+      - "${signature}"
+      - "--detach-sign"
+      - "${artifact}"
+
+release:
+  mode: append
+
+changelog:
+  disable: true
