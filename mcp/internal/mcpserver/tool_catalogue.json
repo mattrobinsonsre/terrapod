@@ -1,5 +1,99 @@
 [
   {
+    "name": "terrapod_onboard_availability",
+    "read_only": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_onboard_discover",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "selected_types": {
+          "description": "a non-empty subset of the session's discovery-surface data-source types to query",
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "session_id": {
+          "description": "the schema_ready session id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "session_id",
+        "selected_types"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_onboard_get",
+    "read_only": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "session_id": {
+          "description": "the onboarding session id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "session_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_onboard_list",
+    "read_only": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "workspace_id": {
+          "description": "the workspace id (ws-...) whose discovery sessions to list",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_onboard_start",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "provider": {
+          "description": "lowercase terraform provider name (e.g. aws)",
+          "type": "string"
+        },
+        "provider_version": {
+          "description": "optional provider version constraint (e.g. ~\u003e 5.0)",
+          "type": "string"
+        },
+        "workspace_id": {
+          "description": "the workspace id (ws-...) to onboard resources into",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_id",
+        "provider"
+      ],
+      "type": "object"
+    }
+  },
+  {
     "name": "terrapod_registry_module_get",
     "read_only": true,
     "input_schema": {
