@@ -769,6 +769,11 @@ def create_application() -> FastAPI:
 
     include_terrapod(binary_cache_router)
 
+    # Cost-estimation pricesheet cache (#871) — runner-facing download + admin.
+    from terrapod.api.routers.cost_estimation import router as cost_estimation_router
+
+    include_terrapod(cost_estimation_router)
+
     # Variable endpoints
     from terrapod.api.routers.variables import router as variables_router
 
