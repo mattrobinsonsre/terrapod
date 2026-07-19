@@ -57,7 +57,7 @@ export function LabelsEditor({ labels, onChange, readOnly = false }: LabelsEdito
               <button
                 type="button"
                 onClick={() => removeLabel(k)}
-                className="ml-0.5 text-slate-400 hover:text-red-400"
+                className="ms-0.5 text-slate-400 hover:text-red-400"
                 aria-label={t('labelsEditor.removeAria', { key: k })}
               >
                 &times;

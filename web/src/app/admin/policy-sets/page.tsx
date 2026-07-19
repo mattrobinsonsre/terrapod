@@ -266,11 +266,11 @@ export default function PolicySetsPage() {
                         {ps.attributes.name}
                       </Link>
                       {!ps.attributes.enabled && (
-                        <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-700 text-slate-400">{t('badges.disabled')}</span>
+                        <span className="ms-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-700 text-slate-400">{t('badges.disabled')}</span>
                       )}
                       {/* Below md the ENFORCEMENT column is hidden — reflow it inline so a phone
                           still sees whether a policy blocks applies or only advises (#719). */}
-                      <span className={`md:hidden ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                      <span className={`md:hidden ms-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                         ps.attributes['enforcement-level'] === 'mandatory' ? 'bg-red-900/50 text-red-300' : 'bg-amber-900/50 text-amber-300'
                       }`}>
                         {ps.attributes['enforcement-level'] === 'mandatory' ? t('badges.mandatory') : t('badges.advisory')}

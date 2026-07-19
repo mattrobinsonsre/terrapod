@@ -415,8 +415,8 @@ export default function ExecutionHookDetailPage() {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-slate-700/50">
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">{t('workspaces.colWorkspace')}</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">{t('workspaces.colActions')}</th>
+                      <th className="px-4 py-3 text-start text-xs font-medium text-slate-400 uppercase tracking-wider">{t('workspaces.colWorkspace')}</th>
+                      <th className="px-4 py-3 text-end text-xs font-medium text-slate-400 uppercase tracking-wider">{t('workspaces.colActions')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-700/30">
@@ -427,7 +427,7 @@ export default function ExecutionHookDetailPage() {
                             {wsName(ws.id)}
                           </Link>
                         </td>
-                        <td className="px-4 py-3 text-right">
+                        <td className="px-4 py-3 text-end">
                           <button onClick={() => handleRemoveWorkspace(ws.id)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300 transition-colors">{t('actions.remove')}</button>
                         </td>
                       </tr>

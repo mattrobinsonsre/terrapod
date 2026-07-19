@@ -135,7 +135,7 @@ export default function EstatePage() {
           <select
             value={groupBy}
             onChange={(e) => setGroupBy(e.target.value)}
-            className="ml-1 text-sm bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-slate-100"
+            className="ms-1 text-sm bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-slate-100"
           >
             {axes.map((a) => (
               <option key={a.value} value={a.value}>
@@ -178,7 +178,7 @@ export default function EstatePage() {
             onSelect={setSelected}
           />
           {selected && (
-            <div className="absolute z-10 bottom-3 left-3 max-w-[min(360px,80vw)] rounded-xl border border-slate-700/40 bg-slate-900/85 backdrop-blur px-4 py-3">
+            <div className="absolute z-10 bottom-3 start-3 max-w-[min(360px,80vw)] rounded-xl border border-slate-700/40 bg-slate-900/85 backdrop-blur px-4 py-3">
               <div className="font-mono text-xs text-slate-100 break-all">{selected.name}</div>
               {selected.kind === 'module' ? (
                 <div className="text-sm mt-1.5">
@@ -208,24 +208,24 @@ export default function EstatePage() {
               <table className="w-full text-sm">
                 <thead className="bg-slate-800/50 text-slate-400 text-xs">
                   <tr>
-                    <th scope="col" className="text-left px-3 py-2">{t('table.workspaces.col.workspace')}</th>
-                    <th scope="col" className="text-left px-3 py-2">
+                    <th scope="col" className="text-start px-3 py-2">{t('table.workspaces.col.workspace')}</th>
+                    <th scope="col" className="text-start px-3 py-2">
                       {groupBy === 'none' ? t('table.workspaces.col.group') : axisLabel(groupBy)}
                     </th>
-                    <th scope="col" className="text-left px-3 py-2">{t('table.workspaces.col.agentPool')}</th>
-                    <th scope="col" className="text-right px-3 py-2">{t('table.workspaces.col.dependedOnBy')}</th>
-                    <th scope="col" className="text-left px-3 py-2">{t('table.workspaces.col.modulesUsed')}</th>
+                    <th scope="col" className="text-start px-3 py-2">{t('table.workspaces.col.agentPool')}</th>
+                    <th scope="col" className="text-end px-3 py-2">{t('table.workspaces.col.dependedOnBy')}</th>
+                    <th scope="col" className="text-start px-3 py-2">{t('table.workspaces.col.modulesUsed')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {workspaces.map((n) => (
                     <tr key={n.id} className="border-t border-slate-800/70">
-                      <th scope="row" className="text-left px-3 py-2 font-mono text-xs text-slate-100 font-normal">
+                      <th scope="row" className="text-start px-3 py-2 font-mono text-xs text-slate-100 font-normal">
                         {n.name}
                       </th>
                       <td className="px-3 py-2 text-slate-300">{categoryOf(n, groupBy)}</td>
                       <td className="px-3 py-2 text-slate-400">{n.pool}</td>
-                      <td className="px-3 py-2 text-right tabular-nums text-slate-300">{n.indeg}</td>
+                      <td className="px-3 py-2 text-end tabular-nums text-slate-300">{n.indeg}</td>
                       <td className="px-3 py-2 text-slate-400 text-xs">
                         {(modulesByWs[n.id] || []).join(', ') || t('table.workspaces.noModules')}
                       </td>
@@ -243,17 +243,17 @@ export default function EstatePage() {
                 <table className="w-full text-sm">
                   <thead className="bg-slate-800/50 text-slate-400 text-xs">
                     <tr>
-                      <th scope="col" className="text-left px-3 py-2">{t('table.modules.col.module')}</th>
-                      <th scope="col" className="text-right px-3 py-2">{t('table.modules.col.usedBy')}</th>
+                      <th scope="col" className="text-start px-3 py-2">{t('table.modules.col.module')}</th>
+                      <th scope="col" className="text-end px-3 py-2">{t('table.modules.col.usedBy')}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {modules.map((m) => (
                       <tr key={m.id} className="border-t border-slate-800/70">
-                        <th scope="row" className="text-left px-3 py-2 font-mono text-xs text-slate-100 font-normal">
+                        <th scope="row" className="text-start px-3 py-2 font-mono text-xs text-slate-100 font-normal">
                           {m.name}
                         </th>
-                        <td className="px-3 py-2 text-right tabular-nums text-slate-300">
+                        <td className="px-3 py-2 text-end tabular-nums text-slate-300">
                           {usedBy(m.id)}
                         </td>
                       </tr>

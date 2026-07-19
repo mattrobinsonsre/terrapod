@@ -68,7 +68,7 @@ export function SensitiveValueInput({
         onClick={() => setReveal((r) => !r)}
         tabIndex={-1}
         aria-label={reveal ? t('sensitiveInput.hideAria') : t('sensitiveInput.showAria')}
-        className="absolute top-1.5 right-2 text-xs text-slate-400 hover:text-slate-200"
+        className="absolute top-1.5 end-2 text-xs text-slate-400 hover:text-slate-200"
       >
         {reveal ? t('sensitiveInput.hide') : t('sensitiveInput.show')}
       </button>

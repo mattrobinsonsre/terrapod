@@ -480,7 +480,7 @@ export default function UsersPage() {
                   <SortableHeader label={t('columns.status')} sortKey="active" sortState={sortState} onSort={toggleSort} />
                   <SortableHeader label={t('columns.lastLogin')} sortKey="lastLogin" sortState={sortState} onSort={toggleSort} className="hidden md:table-cell" />
                   <SortableHeader label={t('columns.created')} sortKey="created" sortState={sortState} onSort={toggleSort} className="hidden lg:table-cell" />
-                  <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">{t('columns.actions')}</th>
+                  <th className="px-4 py-3 text-end text-xs font-medium text-slate-400 uppercase tracking-wider">{t('columns.actions')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-700/30">
@@ -529,7 +529,7 @@ export default function UsersPage() {
                       <td className="px-4 py-3 text-xs text-slate-500 hidden lg:table-cell">
                         {a['created-at'] ? fmt.date(a['created-at']) : ''}
                       </td>
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-4 py-3 text-end">
                         <div className="flex gap-2 justify-end">
                           {!isEditing && (
                             <button onClick={() => startEdit(u)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors">{t('actions.edit')}</button>

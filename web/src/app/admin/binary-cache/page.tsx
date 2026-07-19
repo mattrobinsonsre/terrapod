@@ -348,7 +348,7 @@ export default function CachePage() {
             <div className="mb-6 bg-slate-800/50 rounded-lg border border-slate-700/50">
               <button
                 onClick={() => setShowWarm((v) => !v)}
-                className="w-full flex items-center justify-between px-4 py-3 text-left text-slate-200 font-semibold"
+                className="w-full flex items-center justify-between px-4 py-3 text-start text-slate-200 font-semibold"
                 aria-expanded={showWarm}
               >
                 <span>{t('warm.heading')}</span>
@@ -441,7 +441,7 @@ export default function CachePage() {
                       <SortableHeader label={t('columns.os')} sortKey="os" sortState={binarySortState} onSort={toggleBinarySort} />
                       <SortableHeader label={t('columns.arch')} sortKey="arch" sortState={binarySortState} onSort={toggleBinarySort} />
                       <SortableHeader label={t('columns.cachedAt')} sortKey="cached-at" sortState={binarySortState} onSort={toggleBinarySort} />
-                      <th className="text-right px-4 py-3 text-slate-400 font-medium">{t('columns.actions')}</th>
+                      <th className="text-end px-4 py-3 text-slate-400 font-medium">{t('columns.actions')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -456,7 +456,7 @@ export default function CachePage() {
                         <td className="px-4 py-3 text-slate-400">{entry.attributes.os}</td>
                         <td className="px-4 py-3 text-slate-400">{entry.attributes.arch}</td>
                         <td className="px-4 py-3 text-slate-400 text-xs">{formatDate(entry.attributes['cached-at'])}</td>
-                        <td className="px-4 py-3 text-right">
+                        <td className="px-4 py-3 text-end">
                           <button
                             onClick={() => handlePurge(entry.attributes.tool, entry.attributes.version)}
                             className="px-2.5 py-1 rounded-md text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300 transition-colors"
@@ -501,7 +501,7 @@ export default function CachePage() {
                       <SortableHeader label={t('columns.os')} sortKey="os" sortState={providerSortState} onSort={toggleProviderSort} />
                       <SortableHeader label={t('columns.arch')} sortKey="arch" sortState={providerSortState} onSort={toggleProviderSort} />
                       <SortableHeader label={t('columns.cachedAt')} sortKey="cached-at" sortState={providerSortState} onSort={toggleProviderSort} />
-                      <th className="text-right px-4 py-3 text-slate-400 font-medium">{t('columns.actions')}</th>
+                      <th className="text-end px-4 py-3 text-slate-400 font-medium">{t('columns.actions')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -519,7 +519,7 @@ export default function CachePage() {
                         <td className="px-4 py-3 text-slate-400">{entry.attributes.os}</td>
                         <td className="px-4 py-3 text-slate-400">{entry.attributes.arch}</td>
                         <td className="px-4 py-3 text-slate-400 text-xs">{formatDate(entry.attributes['cached-at'])}</td>
-                        <td className="px-4 py-3 text-right">
+                        <td className="px-4 py-3 text-end">
                           <button
                             onClick={() => handleProviderPurge(
                               entry.attributes.hostname,

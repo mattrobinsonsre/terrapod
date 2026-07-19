@@ -244,7 +244,7 @@ function SummaryCard({
   tone?: CardTone
   onClick?: () => void
 }) {
-  const base = 'rounded-lg border border-slate-700/50 bg-slate-800/40 p-4 text-left w-full'
+  const base = 'rounded-lg border border-slate-700/50 bg-slate-800/40 p-4 text-start w-full'
   const body = (
     <>
       <div className="text-xs uppercase tracking-wider text-slate-500 mb-1 flex items-center justify-between">
@@ -463,7 +463,7 @@ function LogPanel({
           </div>
           {/* Scroll-nav group, divider-separated from the utilities. Both keep
               their text label at all widths so they never read as another icon. */}
-          <div className="flex items-center gap-1.5 border-l border-slate-700/60 pl-2">
+          <div className="flex items-center gap-1.5 border-s border-slate-700/60 ps-2">
             {/* Follow appears only while the log is streaming: a persistent
                 auto-tail toggle. Green when engaged; the scroll listener also
                 flips it as the operator scrolls up/down. */}
@@ -1148,7 +1148,7 @@ function RunDetailPageInner() {
             only when the run has them; each log gets its own full-height tab;
             Details holds metadata / timeline / resource usage / run options.
             Six tabs don't fit a phone, so the strip scrolls horizontally with a
-            right-edge fade cueing there's more (mobile only — desktop fits). */}
+            end-edge fade cueing there's more (mobile only — desktop fits). */}
         {/* Mobile (`< md`): a native <select> view picker — one tap, native
             picker, no awful horizontal-scroll strip. Desktop (`md+`): the tab
             bar (all tabs fit, so no scroll/fade needed). One `tabs` source, two
@@ -1647,7 +1647,7 @@ function PolicyPanel({
               {policies.length > 0 && (
                 <div className="mt-3 space-y-2">
                   {policies.map((p) => (
-                    <div key={p.policy} className="text-xs border-l-2 pl-3 py-1" style={{borderColor: p.passed ? '#4ade80' : p.error ? '#f59e0b' : '#f87171'}}>
+                    <div key={p.policy} className="text-xs border-s-2 ps-3 py-1" style={{borderColor: p.passed ? '#4ade80' : p.error ? '#f59e0b' : '#f87171'}}>
                       <div className="flex items-center gap-2">
                         <span className={p.passed ? 'text-green-400' : p.error ? 'text-amber-400' : 'text-red-400'}>
                           {p.passed ? '✓' : p.error ? '⚠' : '✗'}
@@ -1656,15 +1656,15 @@ function PolicyPanel({
                         {p.passed && <span className="text-green-500">{t('policyPanel.policyPassed')}</span>}
                       </div>
                       {p.error && (
-                        <div className="mt-1 ml-5 p-2 bg-amber-900/20 rounded border border-amber-800/40">
+                        <div className="mt-1 ms-5 p-2 bg-amber-900/20 rounded border border-amber-800/40">
                           <p className="text-amber-300 font-mono whitespace-pre-wrap">{p.error}</p>
                         </div>
                       )}
                       {!p.passed && !p.error && (!p.violations || p.violations.length === 0) && (
-                        <p className="mt-1 ml-5 text-slate-400 italic">{t('policyPanel.noDenyMessage')}</p>
+                        <p className="mt-1 ms-5 text-slate-400 italic">{t('policyPanel.noDenyMessage')}</p>
                       )}
                       {p.violations && p.violations.length > 0 && (
-                        <ul className="mt-1 ml-5 space-y-0.5">
+                        <ul className="mt-1 ms-5 space-y-0.5">
                           {p.violations.map((v: string, i: number) => (
                             <li key={`v${i}`} className="text-red-300 font-mono">
                               &bull; {v}
@@ -1673,7 +1673,7 @@ function PolicyPanel({
                         </ul>
                       )}
                       {p.warnings && p.warnings.length > 0 && (
-                        <ul className="mt-1 ml-5 space-y-0.5">
+                        <ul className="mt-1 ms-5 space-y-0.5">
                           {p.warnings.map((w: string, i: number) => (
                             <li key={`w${i}`} className="text-amber-300 font-mono">
                               &bull; {w}

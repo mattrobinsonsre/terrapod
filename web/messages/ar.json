@@ -1,0 +1,2678 @@
+{
+  "nav": {
+    "workspaces": "مساحات العمل",
+    "estate": "المِلكية",
+    "registry": "السجل",
+    "modules": "الوحدات",
+    "providers": "المزوّدون",
+    "catalog": "الكتالوج",
+    "agentPools": "تجمّعات الوكلاء",
+    "admin": "الإدارة",
+    "users": "المستخدمون",
+    "roles": "الأدوار",
+    "vcsConnections": "اتصالات نظام التحكم بالإصدارات",
+    "variableSets": "مجموعات المتغيّرات",
+    "autodiscovery": "الاكتشاف التلقائي",
+    "bulkUpdate": "التحديث المجمّع",
+    "executionHooks": "خطافات التنفيذ",
+    "policySets": "مجموعات السياسات",
+    "providerTemplates": "قوالب المزوّدين",
+    "catalogAdmin": "إدارة الكتالوج",
+    "cache": "الذاكرة المؤقتة",
+    "auditLog": "سجل التدقيق",
+    "help": "المساعدة",
+    "apiReference": "مرجع واجهة برمجة التطبيقات",
+    "docs": "الوثائق",
+    "account": "الحساب",
+    "apiTokens": "رموز واجهة برمجة التطبيقات",
+    "sessions": "الجلسات",
+    "logOut": "تسجيل الخروج",
+    "menu": "القائمة",
+    "openMenu": "فتح القائمة",
+    "openAccountMenu": "فتح قائمة الحساب",
+    "closeMenu": "إغلاق القائمة"
+  },
+  "switcher": {
+    "language": "اللغة",
+    "changeLanguage": "تغيير اللغة"
+  },
+  "workspaces": {
+    "title": "مساحات العمل",
+    "description": "إدارة مساحات عمل Terraform والحالة والتشغيلات",
+    "new": "مساحة عمل جديدة",
+    "cancel": "إلغاء",
+    "create": "إنشاء مساحة عمل",
+    "creating": "جارٍ الإنشاء…",
+    "loadFailed": "فشل تحميل مساحات العمل",
+    "createFailed": "فشل إنشاء مساحة العمل",
+    "form": {
+      "name": "الاسم",
+      "namePattern": "الأحرف والأرقام والشرطات والشرطات السفلية فقط. يجب أن يبدأ بحرف أو رقم.",
+      "namePlaceholder": "my-workspace",
+      "executionMode": "وضع التنفيذ",
+      "local": "محلي",
+      "agent": "وكيل",
+      "executionBackend": "خلفية التنفيذ",
+      "version": "الإصدار",
+      "versionTitle": "الإصدار بتنسيق X.Y أو X.Y.Z (مثل 1.11 أو 1.11.5)",
+      "versionPlaceholder": "مثل 1.11 أو 1.11.5",
+      "cpuRequest": "طلب المعالج",
+      "cpuTitle": "كمية معالج Kubernetes: أنوية كاملة (1، 2) أو ميلي-نواة (500m، 100m)",
+      "cpuHint": "مثل 1، 0.5، 500m",
+      "memoryRequest": "طلب الذاكرة",
+      "memoryTitle": "كمية ذاكرة Kubernetes: بالبايت (1000) أو بلاحقة (512Mi، 2Gi، 1Ti)",
+      "memoryHint": "مثل 2Gi، 512Mi، 1Ti",
+      "agentPool": "مجموعة الوكلاء",
+      "none": "لا شيء",
+      "autoApply": "التطبيق التلقائي",
+      "enabled": "مُفعّل",
+      "workingDirectory": "دليل العمل",
+      "workingDirectoryPlaceholder": "مثل environments/dev",
+      "workingDirectoryHint": "الدليل الفرعي داخل المستودع الذي يحتوي على ملفات .tf",
+      "vcsConnection": "اتصال VCS",
+      "vcsRepoUrl": "عنوان URL لمستودع VCS",
+      "vcsRepoUrlTitle": "يجب أن يكون عنوان URL بروتوكول HTTP أو HTTPS",
+      "vcsRepoUrlPlaceholder": "https://github.com/org/repo",
+      "vcsBranch": "فرع VCS",
+      "vcsBranchPlaceholder": "main (افتراضي)"
+    },
+    "stats": {
+      "total": "الإجمالي",
+      "health": "الحالة الصحية",
+      "locked": "مقفول",
+      "clearAllFilters": "مسح جميع عوامل التصفية",
+      "clearHealthFilter": "مسح عامل تصفية مشكلات الحالة الصحية",
+      "filterHealth": "التصفية لمساحات العمل ذات مشكلات الحالة الصحية",
+      "clearLockedFilter": "مسح عامل تصفية المقفولة",
+      "filterLocked": "التصفية لمساحات العمل المقفولة"
+    },
+    "filter": {
+      "placeholder": "التصفية حسب الاسم أو التسمية أو الحالة — مثل \"eu1\"، \"env:prod\"، \"status:errored\"",
+      "ariaLabel": "تصفية مساحات العمل",
+      "clear": "مسح",
+      "status": "الحالة",
+      "label": "التسمية",
+      "back": "رجوع",
+      "valueCount": "{count, plural, zero {# قيمة} one {قيمة واحدة} two {قيمتان} few {# قيم} many {# قيمة} other {# قيمة}}",
+      "removeTerm": "إزالة هذا المصطلح",
+      "showing": "عرض {filtered} من {total}",
+      "termName": "الاسم: {value}",
+      "termStatus": "الحالة: {value}",
+      "termLabelAny": "{key}: (أي)",
+      "termLabel": "{key}: {value}",
+      "hintStatus": "الحالة",
+      "hintHealth": "الحالة الصحية",
+      "hintLabel": "التسمية",
+      "hintLabelKey": "مفتاح التسمية",
+      "hintName": "الاسم"
+    },
+    "row": {
+      "removeLabelFilter": "انقر للإزالة من عامل التصفية",
+      "addLabelFilter": "انقر للتصفية حسب هذه التسمية"
+    },
+    "table": {
+      "name": "الاسم",
+      "mode": "الوضع",
+      "pool": "المجموعة",
+      "resources": "الموارد",
+      "status": "الحالة",
+      "created": "تاريخ الإنشاء",
+      "resourcesValue": "{cpu} معالج / {memory}"
+    },
+    "empty": {
+      "none": "لا توجد مساحات عمل بعد. أنشئ واحدة للبدء.",
+      "noMatch": "لا توجد مساحات عمل تطابق عامل التصفية هذا."
+    }
+  },
+  "status": {
+    "state-diverged": "الحالة متباعدة",
+    "vcs-error": "خطأ في نظام التحكم في الإصدارات",
+    "drifted": "منحرف",
+    "errored": "حدث خطأ",
+    "needs-confirm": "يتطلب تأكيدًا",
+    "planning": "جارٍ التخطيط",
+    "applying": "جارٍ التطبيق",
+    "canceling": "جارٍ الإلغاء",
+    "confirmed": "مؤكَّد",
+    "queued": "في قائمة الانتظار",
+    "pending": "قيد الانتظار",
+    "applied": "طُبِّق",
+    "planned": "مُخطَّط",
+    "canceled": "أُلغي",
+    "discarded": "مُهمَل",
+    "pendingDeletion": "بانتظار الحذف",
+    "archived": "مؤرشف"
+  },
+  "auth": {
+    "loading": "جارٍ التحميل...",
+    "subtitle": "سجّل الدخول لإدارة بنيتك التحتية",
+    "subtitleCli": "سجّل الدخول للتصريح لواجهة سطر الأوامر",
+    "emailLabel": "البريد الإلكتروني",
+    "passwordLabel": "كلمة المرور",
+    "signIn": "تسجيل الدخول",
+    "signingIn": "جارٍ تسجيل الدخول...",
+    "signInWith": "تسجيل الدخول باستخدام {provider}",
+    "or": "أو",
+    "noProviders": "لا توجد مزوّدو مصادقة مهيّأون",
+    "completingSignIn": "جارٍ إكمال تسجيل الدخول...",
+    "callbackFailedTitle": "فشلت المصادقة",
+    "tryAgain": "حاول مرة أخرى",
+    "errors": {
+      "loadProviders": "فشل تحميل المزوّدين",
+      "authenticationFailed": "فشلت المصادقة ({status})",
+      "tokenExchangeFailed": "فشل تبادل الرمز ({status})",
+      "loginFailed": "فشل تسجيل الدخول",
+      "startLoginFailed": "فشل بدء تسجيل الدخول",
+      "missingCodeOrState": "رمز التصريح أو الحالة مفقود",
+      "stateMismatch": "عدم تطابق الحالة — هجوم CSRF محتمل",
+      "missingVerifier": "مُتحقّق PKCE مفقود — يرجى محاولة تسجيل الدخول مرة أخرى"
+    }
+  },
+  "estate": {
+    "title": "طوبولوجيا العقارات",
+    "description": "كل مساحة عمل يمكنك رؤيتها والوحدات التي تستخدمها، مترابطة عبر مُحفّزات التشغيل والحالة البعيدة وروابط الوحدات. جمّع حسب أي محور يناسب عقاراتك — لا تفرض المنصة أي اصطلاح للتسمية.",
+    "errors": {
+      "load": "فشل تحميل رسم العقارات البياني."
+    },
+    "groupBy": {
+      "label": "التجميع حسب",
+      "axis": {
+        "none": "لا شيء (لون واحد)",
+        "pool": "مجموعة الوكلاء",
+        "prefix": "بادئة الاسم",
+        "label": "التسمية: {key}"
+      }
+    },
+    "view": {
+      "graph": "رسم بياني",
+      "table": "جدول"
+    },
+    "counts": {
+      "workspaces": "{count, plural, zero {# مساحة عمل} one {مساحة عمل واحدة} two {مساحتا عمل} few {# مساحات عمل} many {# مساحة عمل} other {# مساحة عمل}}",
+      "modules": "{count, plural, zero {# وحدة} one {وحدة واحدة} two {وحدتان} few {# وحدات} many {# وحدة} other {# وحدة}}",
+      "dependencies": "{count, plural, zero {# تبعية} one {تبعية واحدة} two {تبعيتان} few {# تبعيات} many {# تبعية} other {# تبعية}}"
+    },
+    "legend": {
+      "registryModule": "وحدة السجل"
+    },
+    "detail": {
+      "moduleImpact": "{count, plural, zero {لا توجد مساحات عمل تستخدم هذه — رفع إصدارها يعيد تخطيطها} one {مساحة عمل تستخدم هذه — رفع إصدارها يعيد تخطيطها} two {مساحتا عمل تستخدمان هذه — رفع إصدارها يعيد تخطيطهما} few {مساحات عمل تستخدم هذه — رفع إصدارها يعيد تخطيطها جميعًا} many {مساحة عمل تستخدم هذه — رفع إصدارها يعيد تخطيطها جميعًا} other {مساحات عمل تستخدم هذه — رفع إصدارها يعيد تخطيطها جميعًا}}",
+      "dependOnThis": "{count, plural, zero {لا يعتمد على هذا} one {يعتمد على هذا} two {يعتمدان على هذا} few {تعتمد على هذا} many {تعتمد على هذا} other {تعتمد على هذا}}"
+    },
+    "table": {
+      "workspaces": {
+        "heading": "مساحات العمل",
+        "col": {
+          "workspace": "مساحة العمل",
+          "group": "المجموعة",
+          "agentPool": "مجموعة الوكلاء",
+          "dependedOnBy": "معتمَد عليه من قبل",
+          "modulesUsed": "الوحدات المستخدمة"
+        },
+        "noModules": "—"
+      },
+      "modules": {
+        "heading": "الوحدات",
+        "col": {
+          "module": "الوحدة",
+          "usedBy": "مستخدمة من قبل (مساحات العمل)"
+        }
+      }
+    }
+  },
+  "labels": {
+    "title": "التسميات",
+    "description": "تصفّح التسميات المستخدمة عبر مساحات العمل ومجموعات الوكلاء ووحدات السجل ومزوّدي السجل. للقراءة فقط — تُحرَّر التسميات في صفحة كل كيان.",
+    "none": "لا شيء.",
+    "emptyKeys": "لا توجد تسميات مستخدمة بعد. سمِّ أي مساحة عمل أو مجموعة وكلاء أو وحدة سجل أو مزوّد سجل لبدء تجميع الأشياء هنا.",
+    "emptyValues": "لا توجد قيم لـ \"{key}\". إما أنه لا يحمل هذه التسمية أي كيان قابل للقراءة، أو أنها أُزيلت منذ آخر عرض.",
+    "loadKeysFailed": "فشل تحميل التسميات ({status})",
+    "loadValuesFailed": "فشل تحميل قيم {key} ({status})",
+    "loadEntitiesFailed": "فشل تحميل الكيانات ({status})",
+    "columns": {
+      "labelKey": "مفتاح التسمية",
+      "distinctValues": "القيم المميزة",
+      "value": "القيمة",
+      "total": "الإجمالي"
+    },
+    "entity": {
+      "workspaces": "مساحات العمل",
+      "agentPools": "مجموعات الوكلاء",
+      "modules": "الوحدات",
+      "providers": "المزوّدون"
+    },
+    "deprecated": {
+      "badge": "مهملة وغير مدعومة.",
+      "body": "لم يعد متصفح التسميات في التنقل الرئيسي وسيُزال في إصدار مستقبلي. صفِّ حسب التسمية من صفحة <workspacesLink>مساحات العمل</workspacesLink> بدلًا من ذلك. إذا كنت تعتمد على هذه الصفحة، فيُرجى <issueLink>فتح مشكلة</issueLink>."
+    }
+  },
+  "settings": {
+    "tokens": {
+      "title": "رموز واجهة البرمجة المميزة",
+      "description": "إدارة رموز المصادقة المميزة لواجهة سطر الأوامر والأتمتة",
+      "descriptionAll": "جميع الرموز المميزة عبر كل المستخدمين",
+      "myTokens": "رموزي المميزة",
+      "allTokens": "جميع الرموز المميزة",
+      "createToken": "إنشاء رمز مميز",
+      "cancel": "إلغاء",
+      "tokenReady": "الرمز المميز جاهز",
+      "tokenReadyHelp": "انسخ هذا الرمز المميز الآن — لن يُعرض مرة أخرى.",
+      "dismissToken": "تجاهل الرمز المميز",
+      "hide": "إخفاء",
+      "show": "إظهار",
+      "copy": "نسخ",
+      "empty": "لا توجد رموز واجهة برمجة مميزة بعد.",
+      "noDescription": "لا يوجد وصف",
+      "detached": "منفصل",
+      "never": "أبدًا",
+      "selected": "{count, plural, zero {تم تحديد # رمز مميز} one {تم تحديد رمز مميز واحد} two {تم تحديد رمزين مميزين} few {تم تحديد # رموز مميزة} many {تم تحديد # رمزًا مميزًا} other {تم تحديد # رمز مميز}}",
+      "revokeSelected": "إبطال المحدَّد",
+      "revoking": "جارٍ الإبطال...",
+      "clearSelection": "مسح التحديد",
+      "rotate": "تدوير",
+      "rotating": "جارٍ التدوير...",
+      "revoke": "إبطال",
+      "confirmRotate": "تدوير هذا الرمز المميز؟ يتوقف السر الحالي عن العمل فورًا ويُصدَر سر جديد.",
+      "confirmBulkRevoke": "{count, plural, zero {إبطال # رمز مميز؟} one {إبطال رمز مميز واحد؟} two {إبطال رمزين مميزين؟} few {إبطال # رموز مميزة؟} many {إبطال # رمزًا مميزًا؟} other {إبطال # رمز مميز؟}}",
+      "kinds": {
+        "interactive": {
+          "label": "شخصي",
+          "help": "رمز مميز شخصي لواجهة سطر الأوامر والأتمتة الفورية. يحمل جميع أذوناتك الفعلية المباشرة."
+        },
+        "service_bound": {
+          "label": "خدمة · مقيّد",
+          "help": "رمز خدمة مميز مُقيَّد بمجموعة فرعية من أدوارك. وصوله هو تقاطع تلك الأدوار مع وصولك الخاص — ويتوقف عن العمل إذا حُذف حسابك."
+        },
+        "service_detached": {
+          "label": "خدمة · منفصل",
+          "help": "رمز خدمة مميز يديره المسؤول بنطاق مثبَّت مطلق، غير مقيّد بأي مستخدم. استخدمه للأتمتة الحرجة بين الأجهزة التي يجب أن تصمد بعد مغادرة أي شخص."
+        }
+      },
+      "lifespans": {
+        "720": "30 يومًا",
+        "2160": "90 يومًا",
+        "4320": "180 يومًا",
+        "8760": "سنة واحدة"
+      },
+      "filter": {
+        "all": "جميع الأنواع"
+      },
+      "form": {
+        "description": "الوصف",
+        "descriptionPlaceholder": "رمز مسار CI/CD المميز",
+        "kind": "النوع",
+        "lifespan": "مدة الصلاحية",
+        "create": "إنشاء",
+        "creating": "جارٍ الإنشاء...",
+        "pinnedRoles": "الأدوار المثبَّتة",
+        "pinnedRolesHelp": "— النطاق الذي يقتصر عليه هذا الرمز المميز",
+        "pinnedRolesCapped": "(مُقيَّد بوصولك الخاص)",
+        "noCustomRoles": "لم تُعرَّف أدوار مخصصة. أنشئ الأدوار في الإدارة ← الأدوار أولًا.",
+        "noScopedRoles": "لا تحمل أي أدوار ذات نطاق لتثبيتها. لن يكون لهذا الرمز المميز أي وصول."
+      },
+      "columns": {
+        "description": "الوصف",
+        "kind": "النوع",
+        "boundTo": "مقيّد بـ",
+        "created": "تاريخ الإنشاء",
+        "lastUsed": "آخر استخدام",
+        "expires": "ينتهي",
+        "actions": "الإجراءات"
+      },
+      "errors": {
+        "load": "تعذّر تحميل الرموز المميزة",
+        "create": "تعذّر إنشاء الرمز المميز ({status})",
+        "createGeneric": "تعذّر إنشاء الرمز المميز",
+        "rotate": "تعذّر تدوير الرمز المميز ({status})",
+        "rotateGeneric": "تعذّر تدوير الرمز المميز",
+        "revoke": "تعذّر إبطال الرمز المميز ({status})",
+        "revokeGeneric": "تعذّر إبطال الرمز المميز",
+        "bulkRevoke": "تعذّر إبطال الرموز المميزة"
+      }
+    },
+    "sessions": {
+      "title": "الجلسات",
+      "description": "جلساتك النشطة",
+      "descriptionAll": "جميع الجلسات النشطة عبر المنصة",
+      "empty": "لا توجد جلسات نشطة.",
+      "revokeAll": "إبطال الكل",
+      "current": "الحالية",
+      "columns": {
+        "provider": "المزوّد",
+        "created": "تاريخ الإنشاء",
+        "expires": "ينتهي",
+        "lastActive": "آخر نشاط",
+        "token": "الرمز المميز"
+      },
+      "errors": {
+        "load": "تعذّر تحميل الجلسات",
+        "revoke": "تعذّر إبطال الجلسات ({status})",
+        "revokeGeneric": "تعذّر إبطال الجلسات"
+      }
+    }
+  },
+  "registry": {
+    "modules": {
+      "title": "الوحدات",
+      "description": "سجل وحدات Terraform الخاص",
+      "cancel": "إلغاء",
+      "createModule": "إنشاء وحدة",
+      "empty": "لا توجد وحدات بعد. أنشئ واحدة للبدء.",
+      "providerLabel": "المزوّد: {provider}",
+      "versionCount": "{count, plural, zero {لا إصدارات} one {إصدار واحد} two {إصداران} few {# إصدارات} many {# إصدارًا} other {# إصدار}}",
+      "loadFailed": "فشل تحميل الوحدات",
+      "createFailed": "فشل إنشاء الوحدة",
+      "createFailedStatus": "فشل إنشاء الوحدة ({status})",
+      "form": {
+        "name": "الاسم",
+        "provider": "المزوّد",
+        "slugTitle": "أحرف صغيرة وأرقام وشرطات فقط. يجب أن يبدأ بحرف صغير.",
+        "addressNote": "يشكّل الاسم والمزوّد عنوان الوحدة في السجل ولا يمكن تغييرهما بعد الإنشاء.",
+        "vcsConnectionOptional": "اتصال نظام التحكم بالإصدارات (اختياري)",
+        "noneUploadManually": "لا شيء — رفع الإصدارات يدويًا",
+        "repositoryUrl": "رابط المستودع",
+        "branchOptional": "الفرع (اختياري)",
+        "branchPlaceholder": "main (اتركه فارغًا للفرع الافتراضي)",
+        "tagPattern": "نمط الوسم",
+        "tagPatternHint": "تنشئ الوسوم المطابقة لهذا النمط فقط إصدارات (مثل v1.0.0)",
+        "labelsOptional": "التسميات (اختياري)",
+        "creating": "جارٍ الإنشاء...",
+        "create": "إنشاء"
+      }
+    },
+    "providers": {
+      "title": "المزوّدون",
+      "description": "سجل مزوّدي Terraform الخاص",
+      "cancel": "إلغاء",
+      "createProvider": "إنشاء مزوّد",
+      "empty": "لا يوجد مزوّدون بعد. أنشئ واحدًا للبدء.",
+      "loadFailed": "فشل تحميل المزوّدين",
+      "createFailed": "فشل إنشاء المزوّد",
+      "createFailedStatus": "فشل إنشاء المزوّد ({status})",
+      "form": {
+        "name": "الاسم",
+        "slugTitle": "أحرف صغيرة وأرقام وشرطات فقط. يجب أن يبدأ بحرف صغير.",
+        "creating": "جارٍ الإنشاء...",
+        "create": "إنشاء"
+      }
+    },
+    "meta": {
+      "title": "البيانات الوصفية",
+      "edit": "تعديل",
+      "cancel": "إلغاء",
+      "save": "حفظ",
+      "saving": "جارٍ الحفظ...",
+      "saveAnyway": "احفظ على أي حال",
+      "revertLabels": "إعادة التسميات",
+      "owner": "المالك",
+      "ownerNone": "لا شيء",
+      "ownerPlaceholder": "user@example.com",
+      "labels": "التسميات"
+    },
+    "moduleDetail": {
+      "notFound": "الوحدة غير موجودة",
+      "loadFailed": "فشل تحميل الوحدة",
+      "updateFailed": "فشل تحديث الوحدة",
+      "labelLockoutDefault": "سيؤدي تغيير التسمية هذا إلى تقليل وصولك.",
+      "providerLabel": "المزوّد: {provider}",
+      "cancel": "إلغاء",
+      "uploadVersion": "رفع إصدار",
+      "vcsConnected": "متصل بنظام التحكم بالإصدارات",
+      "connectVcs": "ربط نظام التحكم بالإصدارات",
+      "deleteModule": "حذف الوحدة",
+      "linkFailed": "فشل ربط مساحة العمل",
+      "linkFailedStatus": "فشل الربط ({status})",
+      "unlinkConfirm": "إلغاء ربط مساحة العمل هذه بالوحدة؟ لن يُجرى تحليل الأثر لها بعد الآن.",
+      "unlinkFailed": "فشل إلغاء ربط مساحة العمل",
+      "unlinkFailedStatus": "فشل إلغاء الربط ({status})",
+      "uploadFailed": "فشل الرفع",
+      "uploadFailedStatus": "فشل الرفع ({status})",
+      "saveVcsFailed": "فشل حفظ إعدادات نظام التحكم بالإصدارات",
+      "saveVcsFailedStatus": "فشل حفظ إعدادات نظام التحكم بالإصدارات ({status})",
+      "disableVcsFailed": "فشل تعطيل نظام التحكم بالإصدارات",
+      "disableVcsFailedStatus": "فشل تعطيل نظام التحكم بالإصدارات ({status})",
+      "deleteFailed": "فشل الحذف",
+      "deleteFailedStatus": "فشل الحذف ({status})",
+      "upload": {
+        "intro": "اختر دليلًا يحتوي على ملفات وحدة Terraform الخاصة بك. ستُحزَّم في أرشيف مضغوط وتُرفع.",
+        "version": "الإصدار",
+        "moduleDirectory": "دليل الوحدة",
+        "selectDirectory": "اختيار دليل",
+        "fileCount": "{count, plural, zero {لا ملفات} one {ملف واحد} two {ملفان} few {# ملفات} many {# ملفًا} other {# ملف}}",
+        "filesToInclude": "{count, plural, zero {لا ملفات لتضمينها:} one {ملف واحد لتضمينه:} two {ملفان لتضمينهما:} few {# ملفات لتضمينها:} many {# ملفًا لتضمينها:} other {# ملف لتضمينها:}}",
+        "andMore": "...و{count} أخرى",
+        "uploading": "جارٍ الرفع...",
+        "upload": "رفع"
+      },
+      "vcs": {
+        "intro": "اربط هذه الوحدة بمستودع نظام تحكم بالإصدارات. تُنشر الإصدارات الجديدة تلقائيًا عند دفع وسوم semver المطابقة لنمط الوسم. لا تنشئ التزامات الفرع وحدها إصدارات.",
+        "connection": "اتصال نظام التحكم بالإصدارات",
+        "selectConnection": "اختر اتصالًا...",
+        "repositoryUrl": "رابط المستودع",
+        "branchOptional": "الفرع (اختياري)",
+        "branchPlaceholder": "main (اتركه فارغًا للفرع الافتراضي)",
+        "tagPattern": "نمط الوسم",
+        "tagPatternHint": "تنشئ الوسوم المطابقة لهذا النمط فقط إصدارات (مثل v1.0.0)",
+        "saving": "جارٍ الحفظ...",
+        "saveConfiguration": "حفظ إعدادات نظام التحكم بالإصدارات",
+        "disconnect": "قطع الاتصال بنظام التحكم بالإصدارات"
+      },
+      "vcsStatus": {
+        "connected": "متصل بنظام التحكم بالإصدارات:",
+        "lastTag": "آخر وسم: {tag}",
+        "firstVersionHint": "ادفع وسم semver (مثل <code>v1.0.0</code>) مطابقًا لنمط الوسم لنشر الإصدار الأول."
+      },
+      "links": {
+        "title": "مساحات العمل المرتبطة",
+        "linkWorkspace": "ربط مساحة عمل",
+        "description": "تتلقى مساحات العمل المرتبطة خططًا تخمينية عند فتح طلبات سحب مقابل هذه الوحدة، وعمليات تشغيل قياسية عند نشر إصدارات جديدة.",
+        "searchPlaceholder": "ابحث عن مساحات عمل لربطها…",
+        "empty": "لا توجد مساحات عمل مرتبطة بعد.",
+        "unlinkTitle": "إلغاء ربط مساحة العمل"
+      },
+      "interface": {
+        "title": "المدخلات والمخرجات",
+        "counts": "{inputs} مدخلات، {outputs} مخرجات",
+        "versionLabel": "الإصدار:",
+        "noData": "لا تتوفر بيانات واجهة لهذا الإصدار.",
+        "inputs": "المدخلات",
+        "outputs": "المخرجات",
+        "name": "الاسم",
+        "type": "النوع",
+        "description": "الوصف",
+        "default": "الافتراضي",
+        "required": "مطلوب",
+        "sensitive": "حسّاس",
+        "requiredBadge": "مطلوب",
+        "optionalBadge": "اختياري",
+        "sensitiveBadge": "حسّاس",
+        "noneDeclared": "لا يعلن إصدار الوحدة هذا عن أي مدخلات أو مخرجات."
+      },
+      "versions": {
+        "title": "الإصدارات",
+        "count": "{count, plural, zero {لا إصدارات} one {إصدار واحد} two {إصداران} few {# إصدارات} many {# إصدارًا} other {# إصدار}}",
+        "emptyVcs": "لا توجد إصدارات بعد. ادفع وسم semver مطابقًا لـ \"{pattern}\" إلى المستودع المتصل لنشر إصدار.",
+        "emptyUpload": "لا توجد إصدارات بعد. ارفع وحدة أو اربط نظام التحكم بالإصدارات للبدء.",
+        "version": "الإصدار",
+        "status": "الحالة",
+        "source": "المصدر",
+        "actions": "الإجراءات",
+        "manualUpload": "رفع يدوي",
+        "delete": "حذف"
+      },
+      "deleteDialog": {
+        "title": "تأكيد الحذف",
+        "moduleBody": "سيؤدي هذا إلى حذف هذه الوحدة وجميع إصداراتها نهائيًا.",
+        "versionBody": "سيؤدي هذا إلى حذف الإصدار {version} نهائيًا.",
+        "cancel": "إلغاء",
+        "confirm": "حذف"
+      }
+    },
+    "providerDetail": {
+      "description": "سجل المزوّدين",
+      "deleteProvider": "حذف المزوّد",
+      "publishNote": "تُنشر إصدارات المزوّدين باستخدام واجهة سطر الأوامر <code>terrapod-publish</code>، التي توقّع الملفات الثنائية من جهة العميل. لم يعد رفع الملفات الثنائية للمزوّدين وتوقيعها من المتصفح مدعومًا. هذه الصفحة للقراءة فقط للإصدارات والمنصّات.",
+      "empty": "لا توجد إصدارات بعد. انشر باستخدام واجهة سطر الأوامر terrapod-publish للبدء.",
+      "loadVersionsFailed": "فشل تحميل الإصدارات",
+      "updateFailed": "فشل تحديث المزوّد",
+      "labelLockoutDefault": "سيؤدي تغيير التسمية هذا إلى تقليل وصولك.",
+      "deleteFailed": "فشل الحذف",
+      "deleteFailedStatus": "فشل الحذف ({status})",
+      "platformCount": "{count, plural, zero {لا منصّات} one {منصّة واحدة} two {منصّتان} few {# منصّات} many {# منصّة} other {# منصّة}}",
+      "delete": "حذف",
+      "os": "نظام التشغيل",
+      "arch": "المعمارية",
+      "filename": "اسم الملف",
+      "actions": "الإجراءات",
+      "deleteDialog": {
+        "title": "تأكيد الحذف",
+        "providerBody": "سيؤدي هذا إلى حذف هذا المزوّد وجميع إصداراته نهائيًا.",
+        "versionBody": "سيؤدي هذا إلى حذف الإصدار {version} ومنصّاته نهائيًا.",
+        "platformBody": "سيؤدي هذا إلى حذف منصّة {os}/{arch} نهائيًا.",
+        "cancel": "إلغاء",
+        "confirm": "حذف"
+      }
+    }
+  },
+  "adminUsers": {
+    "title": "المستخدمون",
+    "description": "إدارة حسابات المستخدمين المحليين",
+    "empty": "لم يتم العثور على مستخدمين.",
+    "columns": {
+      "email": "البريد الإلكتروني",
+      "displayName": "الاسم المعروض",
+      "status": "الحالة",
+      "lastLogin": "آخر تسجيل دخول",
+      "created": "تاريخ الإنشاء",
+      "actions": "الإجراءات"
+    },
+    "form": {
+      "email": "البريد الإلكتروني",
+      "displayName": "الاسم المعروض",
+      "displayNamePlaceholder": "Jane Doe",
+      "passwordOptional": "كلمة المرور (اختياري)",
+      "passwordPlaceholder": "أدخل كلمة مرور قوية"
+    },
+    "reset": {
+      "title": "إعادة تعيين كلمة المرور لـ {email}",
+      "newPassword": "كلمة المرور الجديدة"
+    },
+    "password": {
+      "score": {
+        "veryWeak": "ضعيفة جدًا",
+        "weak": "ضعيفة",
+        "fair": "متوسطة",
+        "good": "جيدة",
+        "strong": "قوية"
+      }
+    },
+    "status": {
+      "active": "نشط",
+      "inactive": "غير نشط",
+      "never": "أبدًا"
+    },
+    "actions": {
+      "cancel": "إلغاء",
+      "save": "حفظ",
+      "saving": "جارٍ الحفظ...",
+      "createUser": "إنشاء مستخدم",
+      "creating": "جارٍ الإنشاء...",
+      "resetPassword": "إعادة تعيين كلمة المرور",
+      "edit": "تعديل",
+      "delete": "حذف",
+      "resetPw": "إعادة تعيين",
+      "setPw": "تعيين كلمة مرور",
+      "cancelPw": "إلغاء"
+    },
+    "confirm": {
+      "activate": "تفعيل المستخدم \"{email}\"؟",
+      "deactivate": "إلغاء تفعيل المستخدم \"{email}\"؟",
+      "delete": "حذف المستخدم \"{email}\"؟ لا يمكن التراجع عن هذا."
+    },
+    "success": {
+      "created": "تم إنشاء المستخدم \"{email}\"",
+      "updated": "تم تحديث المستخدم \"{email}\"",
+      "activated": "تم تفعيل المستخدم \"{email}\"",
+      "deactivated": "تم إلغاء تفعيل المستخدم \"{email}\"",
+      "passwordReset": "تمت إعادة تعيين كلمة المرور لـ \"{email}\"",
+      "deleted": "تم حذف المستخدم \"{email}\""
+    },
+    "errors": {
+      "load": "فشل تحميل المستخدمين",
+      "create": "فشل إنشاء المستخدم",
+      "createStatus": "فشل إنشاء المستخدم ({status})",
+      "update": "فشل تحديث المستخدم",
+      "resetPassword": "فشل إعادة تعيين كلمة المرور",
+      "delete": "فشل حذف المستخدم"
+    }
+  },
+  "adminRoles": {
+    "title": "الأدوار والتعيينات",
+    "description": "إدارة أدوار التحكم في الوصول (RBAC) وتعيينات أدوار المستخدمين",
+    "builtIn": "مدمج",
+    "emptyRoles": "لا توجد أدوار معرّفة.",
+    "emptyAssignments": "لا توجد تعيينات أدوار.",
+    "tabs": {
+      "roles": "الأدوار",
+      "assignments": "التعيينات"
+    },
+    "columns": {
+      "provider": "المزوّد",
+      "email": "البريد الإلكتروني",
+      "role": "الدور",
+      "created": "أُنشئ في",
+      "actions": "الإجراءات"
+    },
+    "form": {
+      "name": "الاسم",
+      "namePattern": "أحرف وأرقام وشرطات وشرطات سفلية فقط. يجب أن يبدأ بحرف أو رقم.",
+      "workspacePermission": "صلاحية مساحة العمل",
+      "poolPermission": "صلاحية التجمّع",
+      "registryPermission": "صلاحية السجل",
+      "catalogPermission": "صلاحية الكتالوج",
+      "descriptionLabel": "الوصف",
+      "descriptionPlaceholder": "وصول المطوّر",
+      "allowLabels": "السماح بالتسميات (key=value، مفصولة بفواصل)",
+      "allowNames": "السماح بالأسماء (مفصولة بفواصل)",
+      "denyLabels": "منع التسميات (key=value، مفصولة بفواصل)",
+      "denyNames": "منع الأسماء (مفصولة بفواصل)",
+      "allowLabelsShort": "السماح بالتسميات",
+      "allowNamesShort": "السماح بالأسماء",
+      "denyLabelsShort": "منع التسميات",
+      "denyNamesShort": "منع الأسماء"
+    },
+    "assignForm": {
+      "provider": "المزوّد",
+      "email": "البريد الإلكتروني",
+      "roles": "الأدوار"
+    },
+    "caps": {
+      "selected": "{count, plural, zero {لم تُحدَّد قدرات} one {قدرة واحدة محدّدة} two {قدرتان محدّدتان} few {# قدرات محدّدة} many {# قدرة محدّدة} other {# قدرة محدّدة}}",
+      "count": "{count, plural, zero {لا قدرات} one {قدرة واحدة} two {قدرتان} few {# قدرات} many {# قدرة} other {# قدرة}}",
+      "custom": "مخصّص",
+      "matchesPresets": "يطابق الإعدادات المسبقة",
+      "advanced": "متقدّم — القدرات",
+      "otherPreserved": "قدرات أخرى (محفوظة عند الحفظ)",
+      "presetHelp": {
+        "before": "يؤدي اختيار إعداد مسبق أعلاه إلى تحديد قدراته مسبقًا. تحديد أو إلغاء تحديد مربع بعد إعداد مسبق يُعلّم الدور",
+        "after": "ويُرسَل منحه كمجموعة قدرات صريحة."
+      },
+      "groups": {
+        "workspace": "مساحة العمل",
+        "run": "التشغيل",
+        "state": "الحالة",
+        "var": "المتغيّرات",
+        "config": "الإعدادات",
+        "drift": "الانحراف",
+        "run-task": "مهام التشغيل",
+        "notification": "الإشعارات",
+        "run-trigger": "مشغّلات التشغيل",
+        "pool": "تجمّعات الوكلاء",
+        "registry": "السجل",
+        "catalog": "كتالوج الخدمات"
+      }
+    },
+    "display": {
+      "allow": "السماح: {value}",
+      "allowNames": "السماح بالأسماء: {value}",
+      "deny": "المنع: {value}",
+      "denyNames": "منع الأسماء: {value}"
+    },
+    "actions": {
+      "cancel": "إلغاء",
+      "save": "حفظ",
+      "saving": "جارٍ الحفظ...",
+      "edit": "تعديل",
+      "delete": "حذف",
+      "remove": "إزالة",
+      "createRole": "إنشاء دور",
+      "creating": "جارٍ الإنشاء...",
+      "addAssignment": "إضافة تعيين",
+      "setRoles": "تعيين الأدوار"
+    },
+    "confirm": {
+      "deleteRole": "حذف الدور \"{name}\"؟ ستتأثر أي تعيينات تشير إليه.",
+      "removeAssignment": "إزالة الدور \"{roleName}\" من {email}؟"
+    },
+    "success": {
+      "roleCreated": "أُنشئ الدور \"{name}\"",
+      "roleUpdated": "حُدّث الدور \"{name}\"",
+      "roleDeleted": "حُذف الدور \"{name}\"",
+      "rolesAssigned": "عُيّنت الأدوار إلى {email}",
+      "assignmentRemoved": "أُزيل التعيين"
+    },
+    "errors": {
+      "loadRoles": "فشل تحميل الأدوار",
+      "loadAssignments": "فشل تحميل التعيينات",
+      "createRole": "فشل إنشاء الدور",
+      "createRoleStatus": "فشل إنشاء الدور ({status})",
+      "updateRole": "فشل تحديث الدور",
+      "deleteRole": "فشل حذف الدور",
+      "setAssignment": "فشل تعيين التعيين",
+      "setAssignmentStatus": "فشل تعيين التعيين ({status})",
+      "deleteAssignment": "فشل حذف التعيين"
+    }
+  },
+  "adminVcs": {
+    "title": "اتصالات نظام التحكم بالإصدارات",
+    "description": "إدارة تكاملات أنظمة التحكم بالإصدارات",
+    "empty": "لا توجد اتصالات نظام تحكم بالإصدارات مهيّأة.",
+    "actions": {
+      "new": "اتصال جديد",
+      "cancel": "إلغاء",
+      "edit": "تعديل",
+      "delete": "حذف"
+    },
+    "confirmDelete": "حذف اتصال نظام التحكم بالإصدارات هذا؟ ستفقد مساحات العمل التي تستخدمه تكامل نظام التحكم بالإصدارات. لا يمكن التراجع عن هذا.",
+    "form": {
+      "name": "الاسم",
+      "namePattern": "أحرف وأرقام وشرطات وشرطات سفلية فقط. يجب أن يبدأ بحرف أو رقم.",
+      "provider": "المزوّد",
+      "providerImmutable": "المزوّد غير قابل للتغيير — احذف وأعد الإنشاء لتغييره",
+      "serverUrl": "رابط الخادم (اختياري)",
+      "serverUrlHint": "يجب أن يكون رابط HTTP أو HTTPS (مثل https://github.mycompany.com)",
+      "appId": "معرّف التطبيق",
+      "appIdHint": "معرّف تطبيق GitHub — أرقام رقمية فقط",
+      "installationId": "معرّف التثبيت",
+      "installationIdHint": "معرّف تثبيت تطبيق GitHub — أرقام رقمية فقط",
+      "privateKey": "المفتاح الخاص (PEM)",
+      "browse": "استعراض...",
+      "privateKeyKeep": "اتركه فارغًا للاحتفاظ بالمفتاح الحالي — الصق PEM جديدًا للتدوير",
+      "privateKeyPlaceholder": "-----BEGIN RSA PRIVATE KEY-----\n...\n\nأسقط ملف .pem هنا أو انقر استعراض",
+      "webhookSecret": "سرّ Webhook",
+      "optional": "(اختياري)",
+      "webhookSecretSet": "مُعيّن — اتركه فارغًا للاحتفاظ، أو أدخل قيمة جديدة للتدوير",
+      "webhookSecretGlobal": "اتركه فارغًا لاستخدام سرّ Webhook العام",
+      "webhookSecretHelp": "سرّ HMAC خاص بالاتصال لـ webhooks هذا التثبيت. عند عدم تعيينه، يُستخدم السرّ العام.",
+      "accessToken": "رمز الوصول",
+      "accessTokenKeep": "اتركه فارغًا للاحتفاظ بالرمز الحالي",
+      "saving": "جارٍ الحفظ...",
+      "creating": "جارٍ الإنشاء...",
+      "saveChanges": "حفظ التغييرات",
+      "createConnection": "إنشاء اتصال"
+    },
+    "table": {
+      "name": "الاسم",
+      "provider": "المزوّد",
+      "serverUrl": "رابط الخادم",
+      "status": "الحالة",
+      "created": "أُنشئ في",
+      "actions": "الإجراءات"
+    },
+    "success": {
+      "created": "أُنشئ اتصال نظام التحكم بالإصدارات \"{name}\"",
+      "updated": "حُدّث اتصال نظام التحكم بالإصدارات \"{name}\"",
+      "deleted": "حُذف اتصال نظام التحكم بالإصدارات"
+    },
+    "errors": {
+      "load": "فشل تحميل اتصالات نظام التحكم بالإصدارات",
+      "save": "فشل حفظ الاتصال",
+      "delete": "فشل حذف الاتصال",
+      "createStatus": "فشل إنشاء الاتصال ({status})",
+      "updateStatus": "فشل تحديث الاتصال ({status})"
+    }
+  },
+  "adminVariableSets": {
+    "title": "مجموعات المتغيرات",
+    "description": "إدارة مجموعات المتغيرات على نطاق المؤسسة لمجموعات مساحات العمل",
+    "empty": "لا توجد مجموعات متغيرات مُهيّأة.",
+    "none": "-",
+    "actions": {
+      "new": "مجموعة متغيرات جديدة",
+      "cancel": "إلغاء"
+    },
+    "form": {
+      "name": "الاسم",
+      "namePattern": "الأحرف والأرقام والشرطات والشرطات السفلية فقط. يجب أن يبدأ بحرف أو رقم.",
+      "descriptionLabel": "الوصف",
+      "descriptionPlaceholder": "بيانات اعتماد AWS لجميع مساحات العمل",
+      "global": "عام (يُطبّق على جميع مساحات العمل)",
+      "priority": "أولوية (تجاوز متغيرات مساحة العمل)",
+      "creating": "جارٍ الإنشاء...",
+      "create": "إنشاء مجموعة متغيرات"
+    },
+    "table": {
+      "name": "الاسم",
+      "description": "الوصف",
+      "scope": "النطاق",
+      "variables": "المتغيرات",
+      "created": "تاريخ الإنشاء"
+    },
+    "scope": {
+      "global": "عام",
+      "priority": "أولوية",
+      "standard": "قياسي"
+    },
+    "errors": {
+      "load": "فشل تحميل مجموعات المتغيرات",
+      "create": "فشل إنشاء مجموعة المتغيرات",
+      "createStatus": "فشل إنشاء مجموعة المتغيرات ({status})"
+    },
+    "detail": {
+      "back": "العودة إلى مجموعات المتغيرات",
+      "headerFallback": "مجموعة المتغيرات",
+      "notFound": "لم يتم العثور على مجموعة المتغيرات",
+      "global": "عام",
+      "priority": "أولوية",
+      "yes": "نعم",
+      "no": "لا",
+      "edit": "تعديل",
+      "cancel": "إلغاء",
+      "save": "حفظ",
+      "saving": "جارٍ الحفظ...",
+      "delete": "حذف",
+      "deleting": "جارٍ الحذف...",
+      "confirmDelete": "تأكيد الحذف",
+      "deleteTitle": "حذف مجموعة المتغيرات",
+      "deleteDescription": "حذف مجموعة المتغيرات هذه وجميع متغيراتها نهائيًا.",
+      "tabs": {
+        "settings": "الإعدادات",
+        "variables": "المتغيرات",
+        "workspaces": "مساحات العمل"
+      },
+      "addVariable": "إضافة متغير",
+      "adding": "جارٍ الإضافة...",
+      "varKey": "المفتاح",
+      "varValue": "القيمة",
+      "varCategory": "الفئة",
+      "categoryTerraform": "Terraform",
+      "categoryEnv": "البيئة",
+      "sensitive": "حساس",
+      "sensAbbr": "حساس",
+      "enterNewValue": "أدخل قيمة جديدة",
+      "empty": "فارغ",
+      "emptyVars": "لا توجد متغيرات في هذه المجموعة.",
+      "actions": "الإجراءات",
+      "remove": "إزالة",
+      "add": "إضافة",
+      "addWorkspace": "إضافة مساحة عمل",
+      "workspace": "مساحة العمل",
+      "selectWorkspace": "اختر مساحة عمل...",
+      "globalBanner": "مجموعة المتغيرات هذه عامة وتُطبّق على جميع مساحات العمل تلقائيًا.",
+      "emptyWorkspaces": "لا توجد مساحات عمل مُعيّنة لمجموعة المتغيرات هذه.",
+      "confirmDeleteVar": "حذف هذا المتغير؟ لا يمكن التراجع عن هذا.",
+      "confirmRemoveWorkspace": "إزالة مساحة العمل هذه من مجموعة المتغيرات؟ لن تُطبّق متغيراتها على تلك المساحة بعد الآن.",
+      "success": {
+        "updated": "تم تحديث مجموعة المتغيرات",
+        "workspaceAdded": "تمت إضافة مساحة العمل",
+        "workspaceRemoved": "تمت إزالة مساحة العمل"
+      },
+      "errors": {
+        "load": "فشل تحميل مجموعة المتغيرات",
+        "update": "فشل تحديث مجموعة المتغيرات",
+        "delete": "فشل حذف مجموعة المتغيرات",
+        "loadVars": "فشل تحميل المتغيرات",
+        "loadWorkspaces": "فشل تحميل مساحات العمل",
+        "addVar": "فشل إضافة المتغير",
+        "addVarStatus": "فشل إضافة المتغير ({status})",
+        "updateVar": "فشل تحديث المتغير",
+        "deleteVar": "فشل حذف المتغير",
+        "addWorkspace": "فشل إضافة مساحة العمل",
+        "removeWorkspace": "فشل إزالة مساحة العمل"
+      }
+    }
+  },
+  "adminAutodiscovery": {
+    "title": "الاكتشاف التلقائي",
+    "description": "إنشاء مساحات العمل تلقائيًا في المستودعات الأحادية عند تعديل طلبات السحب لمسارات مطابقة",
+    "empty": "لا توجد قواعد اكتشاف تلقائي بعد. أنشئ قاعدة لبدء توفير مساحات العمل تلقائيًا من طلبات السحب في مستودعك الأحادي.",
+    "unsavedRule": "(قاعدة غير محفوظة)",
+    "actions": {
+      "newRule": "قاعدة جديدة",
+      "cancel": "إلغاء",
+      "create": "إنشاء",
+      "update": "تحديث",
+      "preview": "معاينة",
+      "edit": "تعديل",
+      "delete": "حذف",
+      "close": "إغلاق"
+    },
+    "status": {
+      "enabled": "مُفعَّل",
+      "disabled": "مُعطَّل"
+    },
+    "form": {
+      "createTitle": "إنشاء قاعدة",
+      "editTitle": "تعديل قاعدة",
+      "name": "الاسم",
+      "vcsConnection": "اتصال نظام التحكم في الإصدارات",
+      "selectConnection": "اختر اتصالًا",
+      "repoUrl": "عنوان المستودع",
+      "branch": "الفرع (فارغ = الافتراضي)",
+      "matchPattern": "نمط المطابقة",
+      "matchPatternHint": "أنماط بديلة على غرار Gitignore. تطابق <code>**</code> عبر مقاطع المسار. الملفات من نوع <code>*.tf*</code> فقط تُشغّل الاكتشاف التلقائي.",
+      "ignorePatterns": "أنماط التجاهل (نمط في كل سطر)",
+      "nameTemplate": "قالب اسم مساحة العمل (اختياري)",
+      "nameTemplateHint": "استخدم <path></path> للمجلد مع استبدال <code>/</code> بـ <code>-</code>، أو <root></root> للمجلد كما هو. فارغ = الافتراضي (المسار المفصول بشرطات فقط).",
+      "templateDefaults": "الإعدادات الافتراضية لقالب مساحة العمل",
+      "executionMode": "وضع التنفيذ",
+      "executionModeHint": "الاكتشاف التلقائي مدفوع بنظام التحكم في الإصدارات؛ وضع التنفيذ عبر الوكيل هو الوحيد المدعوم.",
+      "agentPool": "مجمّع الوكلاء",
+      "none": "(لا شيء)",
+      "executionBackend": "خلفية التنفيذ",
+      "terraformVersion": "إصدار Terraform",
+      "cpuRequest": "طلب المعالج",
+      "memoryRequest": "طلب الذاكرة",
+      "ownerEmail": "البريد الإلكتروني للمالك",
+      "autoApply": "التطبيق التلقائي",
+      "enabled": "مُفعَّل",
+      "onDirectoryDelete": "عند حذف المجلد",
+      "onDeleteFlag": "وضع علامة (آمن — يُعلَّم بانتظار الحذف، ويتطلب إجراءً يدويًا)",
+      "onDeleteDestroy": "تدمير (خطر — يُفكِّك البنية التحتية ثم يؤرشف مساحة العمل)",
+      "onDirectoryDeleteHint": "ما يحدث لمساحة العمل المُكتشفة تلقائيًا عند إزالة مجلدها من الفرع المتتبَّع.",
+      "onDeleteDestroyWarning": "سيؤدي هذا إلى تشغيل terraform destroy فعلي على مساحة العمل عند إزالة مجلدها من الفرع المتتبَّع.",
+      "labels": "التسميات (تَرِثها مساحات العمل المُنشأة)",
+      "varFiles": "ملفات المتغيرات (تَرِثها مساحات العمل المُنشأة)",
+      "varFilesHint": "مسارات <code>.tfvars</code> نسبية تُمرَّر إلى plan/apply.",
+      "addVarFile": "إضافة ملف متغيرات",
+      "executionHooks": "خطافات التنفيذ (مرتبطة بكل مساحة عمل جديدة)",
+      "executionHooksHint": "اختر من الخطافات المُعرَّفة في صفحة إدارة <page>خطافات التنفيذ</page> — يُرتبط كل خطاف محدَّد بكل مساحة عمل تُنشئها هذه القاعدة.",
+      "noHooks": "لم تُعرَّف أي خطافات تنفيذ بعد. أنشئ واحدًا في صفحة إدارة خطافات التنفيذ أولًا.",
+      "hookDisabled": "(مُعطَّل)",
+      "hookNotInLibrary": "(غير موجود في المكتبة — أزِل التحديد للحذف)",
+      "runTaskTemplates": "قوالب مهام التشغيل (تُنشأ على كل مساحة عمل جديدة)",
+      "notificationTemplates": "قوالب الإشعارات (تُنشأ على كل مساحة عمل جديدة)",
+      "saving": "جارٍ الحفظ...",
+      "previewTitle": "استعرِض المستودع وعايِن مساحات العمل التي ستُنشئها هذه القاعدة — دون حفظ"
+    },
+    "table": {
+      "name": "الاسم",
+      "repo": "المستودع",
+      "pattern": "النمط",
+      "enabled": "مُفعَّل",
+      "created": "تاريخ الإنشاء",
+      "previewTitle": "استعرِض المستودع وعايِن مساحات العمل التي ستُنشئها هذه القاعدة"
+    },
+    "deleteModal": {
+      "title": "حذف القاعدة؟",
+      "body": "تظل مساحات العمل المُنشأة تلقائيًا بواسطة هذه القاعدة تعمل. لن تُنشئ طلبات السحب المستقبلية التي تعدّل مسارات جديدة ضمن هذه القاعدة مساحات عمل إضافية تلقائيًا."
+    },
+    "preview": {
+      "title": "المعاينة: {ruleName}",
+      "walkedFiles": "تم استعراض <files>{count}</files> ملفًا على <refspan>{ref}</refspan>",
+      "walking": "جارٍ استعراض المستودع…",
+      "noMatches": "لا توجد مجلدات في هذا المستودع تطابق نمط القاعدة. لا شيء لإنشائه.",
+      "colWorkspace": "مساحة العمل",
+      "colDirectory": "المجلد",
+      "colAction": "الإجراء",
+      "repoRoot": "(جذر المستودع)",
+      "actionCreate": "إنشاء",
+      "skipDiscovered": "تخطٍّ (تم اكتشافه مسبقًا)",
+      "skipDiscoveredTitle": "تم إنشاؤه بالفعل بواسطة هذه القاعدة",
+      "skipCollision": "تخطٍّ (تعارض في الاسم)",
+      "skipCollisionTitle": "توجد بالفعل مساحة عمل بهذا الاسم لسبب آخر",
+      "willCreate": "{count, plural, zero {لن تُنشأ أي مساحة عمل.} one {ستُنشأ مساحة عمل واحدة.} two {ستُنشأ مساحتا عمل.} few {ستُنشأ # مساحات عمل.} many {ستُنشأ # مساحة عمل.} other {ستُنشأ # مساحة عمل.}} تُترك مساحات العمل الموجودة (التعارضات) دون تغيير.",
+      "provision": "{count, plural, zero {توفير # مساحة عمل} one {توفير مساحة عمل واحدة} two {توفير مساحتَي عمل} few {توفير # مساحات عمل} many {توفير # مساحة عمل} other {توفير # مساحة عمل}}",
+      "provisioning": "جارٍ التوفير…",
+      "saveToProvision": "احفظ القاعدة لتوفير مساحات العمل هذه."
+    },
+    "success": {
+      "created": "تم إنشاء {name}",
+      "updated": "تم تحديث {name}",
+      "deleted": "تم حذف القاعدة",
+      "provisioned": "{count, plural, zero {تم إنشاء # مساحة عمل من \"{ruleName}\"} one {تم إنشاء مساحة عمل واحدة من \"{ruleName}\"} two {تم إنشاء مساحتَي عمل من \"{ruleName}\"} few {تم إنشاء # مساحات عمل من \"{ruleName}\"} many {تم إنشاء # مساحة عمل من \"{ruleName}\"} other {تم إنشاء # مساحة عمل من \"{ruleName}\"}}"
+    },
+    "errors": {
+      "loadRules": "تعذّر تحميل قواعد الاكتشاف التلقائي",
+      "load": "تعذّر التحميل",
+      "createFailed": "فشل الإنشاء: {status} {detail}",
+      "updateFailed": "فشل التحديث: {status} {detail}",
+      "save": "تعذّر الحفظ",
+      "deleteRule": "تعذّر حذف القاعدة",
+      "delete": "تعذّر الحذف",
+      "previewFailed": "فشلت المعاينة ({status})",
+      "preview": "فشلت المعاينة",
+      "previewPrereq": "حدِّد اتصال نظام التحكم في الإصدارات وعنوان المستودع والنمط قبل المعاينة",
+      "scanFailed": "فشل الفحص ({status})",
+      "scan": "فشل الفحص"
+    }
+  },
+  "adminBulkUpdate": {
+    "title": "التحديث المجمّع",
+    "description": "حدِّد مساحات العمل بواسطة عامل تصفية، ثم طبِّق تغييرًا في الإعدادات عليها جميعًا",
+    "none": "(لا شيء)",
+    "anyOption": "(أي)",
+    "unchanged": "(دون تغيير)",
+    "unchangedOption": "(دون تغيير)",
+    "filter": {
+      "heading": "1. حدِّد مساحات العمل",
+      "matchAll": "مطابقة <strong>جميع</strong> مساحات العمل (يتجاهل عوامل التصفية أدناه)",
+      "namePrefix": "بادئة الاسم",
+      "executionBackend": "خلفية التنفيذ",
+      "ownerEmail": "البريد الإلكتروني للمالك",
+      "agentPool": "مجمّع الوكلاء",
+      "vcsConnection": "اتصال نظام التحكم في الإصدارات",
+      "labels": "التسميات",
+      "search": "بحث",
+      "searching": "جارٍ البحث..."
+    },
+    "results": {
+      "matched": "تمت مطابقة <strong>{count}</strong> {count, plural, zero {مساحة عمل} one {مساحة عمل} two {مساحتَي عمل} few {مساحات عمل} many {مساحة عمل} other {مساحة عمل}}.",
+      "noMatch": "لا توجد مساحات عمل مطابقة لعامل التصفية هذا.",
+      "colName": "الاسم",
+      "colMode": "الوضع",
+      "colBackend": "الخلفية",
+      "colTfVersion": "إصدار TF",
+      "colLabels": "التسميات"
+    },
+    "update": {
+      "heading": "2. تطبيق التغييرات",
+      "hint": "لا يتغير سوى الحقول التي تضبطها أدناه. يحدِّد عامل التصفية أعلاه مساحات العمل التي تتلقى التغيير.",
+      "terraformVersion": "إصدار Terraform",
+      "executionBackend": "خلفية التنفيذ",
+      "executionMode": "وضع التنفيذ",
+      "autoApply": "التطبيق التلقائي",
+      "agentPool": "مجمّع الوكلاء",
+      "cpuRequest": "طلب المعالج",
+      "memoryRequest": "طلب الذاكرة",
+      "setLabels": "تعيين التسميات (يستبدل خريطة التسميات على كل مساحة عمل مطابقة)",
+      "setVarFiles": "تعيين ملفات المتغيرات",
+      "addVarFile": "إضافة ملف متغيرات",
+      "setRunTasks": "تعيين مهام التشغيل (تُحدَّث أو تُضاف بحسب الاسم على كل مساحة عمل مطابقة)",
+      "setNotifications": "تعيين تهيئات الإشعارات (تُحدَّث أو تُضاف بحسب الاسم)",
+      "dryRun": "تشغيل تجريبي (معاينة فقط — لا تُكتب أي تغييرات)",
+      "confirmWarning": "يكتب هذا التغييرات إلى كل مساحة عمل مطابقة.",
+      "confirmApply": "تأكيد التطبيق",
+      "applying": "جارٍ التطبيق...",
+      "cancel": "إلغاء",
+      "working": "جارٍ العمل...",
+      "previewDryRun": "معاينة (تشغيل تجريبي)",
+      "applyChanges": "تطبيق التغييرات"
+    },
+    "diff": {
+      "colWorkspace": "مساحة العمل",
+      "colChanges": "التغييرات"
+    },
+    "dryResult": {
+      "heading": "نتيجة التشغيل التجريبي",
+      "summary": "تمت مطابقة <strong>{matched}</strong>؛ <strong>{wouldChange}</strong> ستتغيّر؛ {unchanged} دون تغيير. لم يُكتب أي شيء.",
+      "wouldChange": "ستتغيّر",
+      "noChange": "لن تتغيّر أي مساحة عمل بهذا التحديث."
+    },
+    "applyResult": {
+      "heading": "نتيجة التطبيق",
+      "summary": "تمت مطابقة <strong>{matched}</strong>؛ <appliedstrong>{applied}</appliedstrong> طُبِّقت؛ {unchanged} دون تغيير؛ {errors, plural, zero {# خطأ} one {خطأ واحد} two {خطآن} few {# أخطاء} many {# خطأً} other {# خطأ}}.",
+      "applied": "طُبِّقت",
+      "unnamedWorkspace": "(مساحة عمل)",
+      "noChange": "لم تتغيّر أي مساحة عمل."
+    },
+    "errors": {
+      "searchFailed": "فشل البحث ({status})",
+      "search": "فشل البحث",
+      "bulkUpdateFailed": "فشل التحديث المجمّع ({status})",
+      "bulkUpdate": "فشل التحديث المجمّع"
+    }
+  },
+  "adminExecutionHooks": {
+    "title": "خطافات التنفيذ",
+    "description": "خطوات صدفة مخصصة تُشغَّل داخل مهام المنفِّذ عند نقاط قبل/بعد التخطيط/التطبيق، ومرتبطة بمساحات العمل",
+    "empty": "لم تُهيَّأ أي خطافات تنفيذ.",
+    "actions": {
+      "cancel": "إلغاء",
+      "new": "خطاف تنفيذ جديد",
+      "creating": "جارٍ الإنشاء...",
+      "create": "إنشاء خطاف تنفيذ"
+    },
+    "badges": {
+      "disabled": "مُعطَّل",
+      "enabled": "مُفعَّل"
+    },
+    "columns": {
+      "name": "الاسم",
+      "hookPoint": "نقطة الخطاف",
+      "enabled": "مُفعَّل",
+      "priority": "الأولوية",
+      "workspaces": "مساحات العمل"
+    },
+    "form": {
+      "name": "الاسم",
+      "namePatternTitle": "أحرف وأرقام وشرطات وشرطات سفلية فقط. يجب أن يبدأ بحرف أو رقم.",
+      "description": "الوصف",
+      "descriptionPlaceholder": "أضف مُدخل مضيفين داخليين قبل init",
+      "hookPoint": "نقطة الخطاف",
+      "priority": "الأولوية",
+      "priorityTitle": "تُشغَّل الأقل أولًا عندما تشترك عدة خطافات في نقطة واحدة (يُحسَم التعادل بالاسم).",
+      "scriptLabel": "السكربت (<code>/bin/sh -c</code>)",
+      "scriptHelp": "يُشغَّل بهوية المنفِّذ السحابية. يؤدي الخروج بقيمة غير صفرية إلى فشل التشغيل. ينبغي أن تأتي الأسرار من متغيرات مساحة العمل، لا مضمَّنة هنا."
+    },
+    "errors": {
+      "load": "تعذّر تحميل خطافات التنفيذ",
+      "createStatus": "تعذّر إنشاء خطاف التنفيذ ({status})",
+      "create": "تعذّر إنشاء خطاف التنفيذ"
+    }
+  },
+  "adminPolicySets": {
+    "title": "مجموعات السياسات",
+    "description": "إنفاذ السياسة كرمز عبر OPA، محدّد النطاق لمساحات العمل حسب التسمية",
+    "empty": "لا توجد مجموعات سياسات مُهيّأة.",
+    "actions": {
+      "cancel": "إلغاء",
+      "new": "مجموعة سياسات جديدة",
+      "creating": "جارٍ الإنشاء...",
+      "create": "إنشاء مجموعة سياسات"
+    },
+    "badges": {
+      "disabled": "مُعطّل",
+      "mandatory": "إلزامي",
+      "advisory": "استشاري",
+      "global": "عام",
+      "labelScoped": "محدّد بالتسمية"
+    },
+    "columns": {
+      "name": "الاسم",
+      "description": "الوصف",
+      "enforcement": "الإنفاذ",
+      "scope": "النطاق",
+      "policies": "السياسات"
+    },
+    "form": {
+      "name": "الاسم",
+      "namePatternTitle": "أحرف وأرقام وشرطات وشرطات سفلية فقط. يجب أن يبدأ بحرف أو رقم.",
+      "description": "الوصف",
+      "descriptionPlaceholder": "حواجز حماية إلزامية لمساحات عمل الإنتاج",
+      "enforcement": "الإنفاذ",
+      "enforcementAdvisory": "استشاري (تحذير، دون حظر)",
+      "enforcementMandatory": "إلزامي (حظر التطبيق عند الفشل)",
+      "globalScope": "عام (ينطبق على كل مساحة عمل)",
+      "sourceInline": "مضمّن (إدارة السياسات في الواجهة)",
+      "sourceVcs": "من مستودع VCS",
+      "vcsConnection": "اتصال VCS",
+      "selectConnection": "اختر اتصالًا...",
+      "repoUrl": "عنوان URL للمستودع",
+      "branch": "الفرع",
+      "branchPlaceholder": "main (افتراضي)",
+      "policyPath": "مسار السياسة",
+      "policyPathPlaceholder": "policies/ (دليل يحتوي على ملفات .rego)",
+      "helpVcs": "ستتم مزامنة السياسات من المستودع تلقائيًا.",
+      "helpInline": "أضف السياسات وحسّن تحديد نطاق التسمية بعد إنشاء المجموعة."
+    },
+    "errors": {
+      "load": "فشل تحميل مجموعات السياسات",
+      "createStatus": "فشل إنشاء مجموعة السياسات ({status})",
+      "create": "فشل إنشاء مجموعة السياسات"
+    }
+  },
+  "adminCatalog": {
+    "title": "إدارة الكتالوج",
+    "description": "إدارة عناصر كتالوج الخدمات",
+    "notEnabled": "كتالوج الخدمات غير مُفعَّل.",
+    "empty": "لا توجد عناصر كتالوج بعد.",
+    "actions": {
+      "new": "عنصر كتالوج جديد",
+      "cancel": "إلغاء",
+      "create": "إنشاء عنصر كتالوج",
+      "creating": "جارٍ الإنشاء…",
+      "saveChanges": "حفظ التغييرات",
+      "saving": "جارٍ الحفظ…",
+      "edit": "تعديل",
+      "delete": "حذف"
+    },
+    "form": {
+      "name": "الاسم",
+      "nameTitle": "أحرف وأرقام وشرطات وشرطات سفلية فقط. يجب أن يبدأ بحرف أو رقم.",
+      "module": "الوحدة",
+      "moduleSelect": "اختر وحدة…",
+      "moduleImmutable": "لا يمكن تغيير الوحدة بعد الإنشاء",
+      "displayName": "الاسم المعروض",
+      "displayNamePlaceholder": "حاوية S3 قياسية",
+      "versionPin": "تثبيت الإصدار الافتراضي",
+      "versionPinPlaceholder": "مثال 1.2.0 (فارغ = الأحدث)",
+      "descriptionLabel": "الوصف",
+      "descriptionPlaceholder": "ما يوفّره عنصر الكتالوج هذا…",
+      "enabled": "مُفعَّل (مرئي في كتالوج التصفح)",
+      "providerTemplates": "قوالب المزوّد",
+      "noProviderTemplates": "لم تُعرَّف قوالب مزوّد.",
+      "restrictPools": "التقييد على مجمّعات وكلاء محددة",
+      "noAgentPools": "لا توجد مجمّعات وكلاء متاحة.",
+      "anyPool": "يمكن استخدام أي مجمّع وكلاء.",
+      "labels": "التسميات",
+      "variableOptions": "خيارات المتغيرات (متقدم، JSON)",
+      "variableOptionsHint": "تجاوزات لكل مُدخَل (الخيارات، الإخفاء، الافتراضي). اتركه <code>[]</code> إن لم يُستخدَم."
+    },
+    "table": {
+      "name": "الاسم",
+      "module": "الوحدة",
+      "enabled": "مُفعَّل",
+      "actions": "الإجراءات"
+    },
+    "badge": {
+      "enabled": "مُفعَّل",
+      "disabled": "مُعطَّل"
+    },
+    "confirm": {
+      "delete": "حذف عنصر الكتالوج هذا؟ لن تتأثر النُّسخ المُوفَّرة الموجودة."
+    },
+    "success": {
+      "created": "تم إنشاء عنصر الكتالوج \"{name}\"",
+      "updated": "تم تحديث عنصر الكتالوج \"{name}\"",
+      "deleted": "تم حذف عنصر الكتالوج"
+    },
+    "errors": {
+      "load": "تعذّر تحميل عناصر الكتالوج",
+      "save": "تعذّر حفظ عنصر الكتالوج",
+      "createStatus": "تعذّر إنشاء عنصر الكتالوج ({status})",
+      "updateStatus": "تعذّر تحديث عنصر الكتالوج ({status})",
+      "delete": "تعذّر حذف عنصر الكتالوج",
+      "deleteConflict": "تعذّر الحذف: يحتوي عنصر الكتالوج هذا على نُسخ مُوفَّرة.",
+      "varOptsInvalidJson": "يجب أن تكون خيارات المتغيرات بصيغة JSON صالحة (مصفوفة).",
+      "varOptsNotArray": "يجب أن تكون خيارات المتغيرات مصفوفة JSON."
+    }
+  },
+  "adminProviderTemplates": {
+    "title": "قوالب المزوّد",
+    "description": "كتل تكوين مزوّد قابلة لإعادة الاستخدام لعناصر الكتالوج",
+    "notEnabled": "كتالوج الخدمة غير مُفعّل.",
+    "empty": "لا توجد قوالب مزوّد بعد.",
+    "actions": {
+      "new": "قالب جديد",
+      "cancel": "إلغاء",
+      "create": "إنشاء قالب",
+      "creating": "جارٍ الإنشاء…",
+      "saveChanges": "حفظ التغييرات",
+      "saving": "جارٍ الحفظ…",
+      "edit": "تعديل",
+      "delete": "حذف"
+    },
+    "form": {
+      "name": "الاسم",
+      "providerType": "نوع المزوّد",
+      "body": "المحتوى (HCL)",
+      "parameters": "المعلمات (متقدم، JSON)",
+      "parametersHint": "تصبح كل معلمة حقلًا في نموذج التزويد. اتركها <code>[]</code> إن لم تُستخدم.",
+      "labels": "التسميات"
+    },
+    "table": {
+      "name": "الاسم",
+      "providerType": "نوع المزوّد",
+      "parameters": "المعلمات",
+      "actions": "الإجراءات"
+    },
+    "confirm": {
+      "delete": "هل تريد حذف قالب المزوّد هذا؟ ستفشل عناصر الكتالوج التي تشير إليه في التزويد. لا يمكن التراجع عن هذا."
+    },
+    "success": {
+      "created": "تم إنشاء قالب المزوّد \"{name}\"",
+      "updated": "تم تحديث قالب المزوّد \"{name}\"",
+      "deleted": "تم حذف قالب المزوّد"
+    },
+    "errors": {
+      "load": "فشل تحميل قوالب المزوّد",
+      "save": "فشل حفظ قالب المزوّد",
+      "createStatus": "فشل إنشاء القالب ({status})",
+      "updateStatus": "فشل تحديث القالب ({status})",
+      "delete": "فشل حذف قالب المزوّد",
+      "deleteConflict": "لا يمكن الحذف: هذا القالب مُشار إليه بواسطة عنصر كتالوج.",
+      "paramsInvalidJson": "يجب أن تكون المعلمات بصيغة JSON صالحة (مصفوفة).",
+      "paramsNotArray": "يجب أن تكون المعلمات مصفوفة JSON."
+    }
+  },
+  "adminAgentPools": {
+    "title": "مجمّعات الوكلاء",
+    "description": "إدارة مجمّعات وكلاء المنفِّذين ومستمعيها",
+    "empty": "لم تُهيَّأ أي مجمّعات وكلاء.",
+    "actions": {
+      "newPool": "مجمّع جديد",
+      "createPool": "إنشاء مجمّع",
+      "creating": "جارٍ الإنشاء...",
+      "cancel": "إلغاء",
+      "edit": "تعديل",
+      "save": "حفظ",
+      "saving": "جارٍ الحفظ...",
+      "delete": "حذف",
+      "deleting": "جارٍ الحذف...",
+      "confirmDelete": "تأكيد الحذف"
+    },
+    "form": {
+      "name": "الاسم",
+      "namePattern": "أحرف وأرقام وشرطات وشرطات سفلية فقط. يجب أن يبدأ بحرف أو رقم.",
+      "description": "الوصف",
+      "descriptionPlaceholder": "منفِّذو AWS للإنتاج",
+      "labels": "التسميات"
+    },
+    "columns": {
+      "name": "الاسم",
+      "description": "الوصف",
+      "status": "الحالة",
+      "created": "تاريخ الإنشاء"
+    },
+    "badges": {
+      "default": "افتراضي",
+      "degradedTooltip": "يرسل المستمعون نبضات القلب لكن انتهت صلاحية شهاداتهم — ستفشل عمليات التشغيل في الانطلاق.",
+      "status": {
+        "online": "متصل",
+        "offline": "غير متصل",
+        "degraded": "متدهور"
+      }
+    },
+    "detail": {
+      "back": "العودة إلى مجمّعات الوكلاء",
+      "defaultDescription": "مجمّع الوكلاء"
+    },
+    "tabs": {
+      "settings": "الإعدادات",
+      "tokens": "الرموز المميزة",
+      "listeners": "المستمعون"
+    },
+    "settings": {
+      "title": "إعدادات المجمّع",
+      "fields": {
+        "name": "الاسم",
+        "description": "الوصف",
+        "created": "تاريخ الإنشاء",
+        "owner": "المالك",
+        "yourPermission": "إذنك",
+        "labels": "التسميات"
+      },
+      "permissions": {
+        "read": "قراءة",
+        "write": "كتابة",
+        "admin": "إدارة"
+      }
+    },
+    "danger": {
+      "title": "حذف المجمّع",
+      "description": "احذف مجمّع الوكلاء هذا وجميع الرموز المميزة المرتبطة به نهائيًا."
+    },
+    "tokens": {
+      "create": "إنشاء رمز مميز",
+      "empty": "لا توجد رموز مميزة لهذا المجمّع.",
+      "revoke": "إبطال",
+      "created": {
+        "title": "تم إنشاء الرمز المميز بنجاح",
+        "copyNow": "انسخ هذا الرمز المميز الآن — لن يُعرض مرة أخرى.",
+        "copy": "نسخ"
+      },
+      "form": {
+        "description": "الوصف",
+        "descriptionPlaceholder": "رمز مستمع الإنتاج المميز",
+        "maxUses": "أقصى عدد استخدامات",
+        "maxUsesHint": "الافتراضي 2 — يحتمل إعادة محاولة واحدة عند تسابق التمهيد بين نسخ المستمعين.",
+        "expiresAt": "ينتهي في",
+        "expiresAtHint": "الافتراضي بعد ساعة واحدة من الآن."
+      },
+      "columns": {
+        "description": "الوصف",
+        "uses": "الاستخدامات",
+        "expires": "ينتهي",
+        "status": "الحالة",
+        "createdBy": "أنشأه",
+        "actions": "الإجراءات"
+      },
+      "badges": {
+        "revoked": "مُبطَل",
+        "active": "نشط"
+      }
+    },
+    "listeners": {
+      "empty": "لا يوجد مستمعون مسجَّلون لهذا المجمّع.",
+      "columns": {
+        "name": "الاسم",
+        "status": "الحالة",
+        "replicas": "النُّسخ",
+        "certExpires": "انتهاء صلاحية الشهادة",
+        "actions": "الإجراءات"
+      },
+      "status": {
+        "online": "متصل",
+        "offline": "غير متصل",
+        "degraded": "متدهور",
+        "cert-expired": "شهادة منتهية"
+      },
+      "tooltips": {
+        "certExpired": "يرسل المستمع نبضات القلب لكن انتهت صلاحية شهادته — سيفشل كل نداء مُصادَق بالشهادة (المطالبة بالتشغيل، التجديد، رمز المنفِّذ المميز). السبب الأرجح: لم تسجّل واجهة البرمجة أحدث شهادة، أو انقضت مدة صلاحية الشهادة قبل التجديد.",
+        "degraded": "يرسل المستمعون نبضات القلب لكن انتهت صلاحية شهاداتهم — ستفشل عمليات التشغيل في الانطلاق."
+      }
+    },
+    "confirm": {
+      "revokeToken": "إبطال رمز الانضمام هذا؟ لن يعود بإمكان المستمعين الذين يستخدمونه الانضمام، ولا يمكن التراجع عن هذا.",
+      "deleteListener": "حذف هذا المستمع؟ سيُعيد التسجيل عند نبضة القلب التالية إذا كانت القِراب لا تزال قيد التشغيل."
+    },
+    "success": {
+      "poolUpdated": "تم تحديث المجمّع",
+      "tokenRevoked": "تم إبطال الرمز المميز",
+      "listenerDeleted": "تم حذف المستمع"
+    },
+    "errors": {
+      "loadPools": "تعذّر تحميل مجمّعات الوكلاء",
+      "loadPool": "تعذّر تحميل المجمّع",
+      "loadTokens": "تعذّر تحميل الرموز المميزة",
+      "loadListeners": "تعذّر تحميل المستمعين",
+      "createPool": "تعذّر إنشاء المجمّع",
+      "createStatus": "تعذّر إنشاء المجمّع ({status})",
+      "updatePool": "تعذّر تحديث المجمّع",
+      "deletePool": "تعذّر حذف المجمّع",
+      "poolNotFound": "المجمّع غير موجود",
+      "createToken": "تعذّر إنشاء الرمز المميز",
+      "createTokenStatus": "تعذّر إنشاء الرمز المميز ({status})",
+      "revokeToken": "تعذّر إبطال الرمز المميز",
+      "deleteListener": "تعذّر حذف المستمع"
+    }
+  },
+  "adminAuditLog": {
+    "title": "سجل التدقيق",
+    "description": "سجل غير قابل للتغيير لجميع طلبات واجهة برمجة التطبيقات",
+    "empty": "لم يتم العثور على إدخالات في سجل التدقيق.",
+    "errors": {
+      "load": "فشل تحميل سجل التدقيق"
+    },
+    "filters": {
+      "actorEmail": "البريد الإلكتروني للفاعل",
+      "actorPlaceholder": "user@example.com",
+      "resourceType": "نوع المورد",
+      "resourceTypePlaceholder": "مساحات العمل",
+      "method": "الطريقة",
+      "methodAll": "الكل",
+      "since": "منذ",
+      "until": "حتى",
+      "clear": "مسح",
+      "apply": "تطبيق عوامل التصفية"
+    },
+    "columns": {
+      "timestamp": "الطابع الزمني",
+      "actor": "الفاعل",
+      "action": "الإجراء",
+      "resourceType": "نوع المورد",
+      "resourceId": "معرّف المورد",
+      "status": "الحالة",
+      "duration": "المدة"
+    },
+    "pagination": {
+      "summary": "الصفحة {current} من {total} ({count, plural, zero {# إدخال} one {# إدخال} two {# إدخالان} few {# إدخالات} many {# إدخالًا} other {# إدخال}})",
+      "previous": "السابق",
+      "next": "التالي"
+    }
+  },
+  "adminBinaryCache": {
+    "title": "ذاكرة التخزين المؤقت",
+    "description": "إدارة ذاكرة التخزين المؤقت للملفات الثنائية لواجهة سطر الأوامر والموفّرين",
+    "errors": {
+      "loadBinary": "فشل تحميل ذاكرة التخزين المؤقت للملفات الثنائية",
+      "loadCache": "فشل تحميل ذاكرة التخزين المؤقت"
+    },
+    "sections": {
+      "cliBinaries": "ملفات واجهة سطر الأوامر الثنائية",
+      "providerBinaries": "ملفات الموفّرين الثنائية"
+    },
+    "empty": {
+      "binaries": "لا توجد ملفات ثنائية مخزّنة مؤقتًا لواجهة سطر الأوامر بعد.",
+      "providers": "لا توجد ملفات موفّرين ثنائية مخزّنة مؤقتًا بعد."
+    },
+    "columns": {
+      "tool": "الأداة",
+      "version": "الإصدار",
+      "os": "نظام التشغيل",
+      "arch": "المعمارية",
+      "cachedAt": "تاريخ التخزين المؤقت",
+      "provider": "الموفّر",
+      "hostname": "اسم المضيف",
+      "actions": "الإجراءات"
+    },
+    "warm": {
+      "heading": "تسخين ذاكرة التخزين المؤقت",
+      "hide": "إخفاء",
+      "prePopulate": "التعبئة المسبقة…",
+      "help": "اسحب الملفات الثنائية ومنصات الموفّرين مسبقًا إلى ذاكرة التخزين المؤقت (واحد لكل سطر). رموز <code>os/arch</code> اللاحقة اختيارية — احذفها لاستخدام المنصات الافتراضية المُهيّأة.",
+      "binariesLabel": "الملفات الثنائية",
+      "providersLabel": "الموفّرون",
+      "warm": "تسخين",
+      "warming": "جارٍ التسخين…",
+      "confirm": "تسخين إدخالات ذاكرة التخزين المؤقت المحددة الآن؟",
+      "errorEmpty": "أضف سطر ملف ثنائي أو موفّر واحدًا على الأقل للتسخين.",
+      "errorFailedStatus": "فشل التسخين ({status})",
+      "errorFailed": "فشل تسخين ذاكرة التخزين المؤقت",
+      "success": "تم تسخين {succeeded}/{total} ({failed} فشل)"
+    },
+    "purge": {
+      "button": "تطهير",
+      "confirmBinary": "تطهير {tool} {version} من ذاكرة التخزين المؤقت؟ سيُعاد جلبه من المصدر عند الطلب التالي.",
+      "confirmProvider": "تطهير {provider} {version} من ذاكرة التخزين المؤقت للموفّرين؟ سيُعاد جلبه من المصدر عند الطلب التالي.",
+      "successBinary": "تم تطهير {count} إدخالًا لـ {tool} {version}",
+      "successProvider": "تم تطهير {count} إدخالًا لـ {provider} {version}",
+      "errorStatus": "فشل التطهير ({status})",
+      "error": "فشل التطهير",
+      "errorProvider": "فشل تطهير الموفّر",
+      "errorProviders": "فشل تطهير الموفّرين"
+    },
+    "batchPurge": {
+      "purging": "جارٍ التطهير...",
+      "purgeSelected": "تطهير المحدد ({count})",
+      "confirmBinary": "تطهير جميع إدخالات ذاكرة التخزين المؤقت للملفات الثنائية المحددة؟ سيُعاد جلبها من المصدر عند الطلب التالي.",
+      "confirmProvider": "تطهير جميع إدخالات ذاكرة التخزين المؤقت للموفّرين المحددة؟ سيُعاد جلبها من المصدر عند الطلب التالي.",
+      "errorBinaryItem": "فشل التطهير لـ {tool} {version}",
+      "errorProviderItem": "فشل التطهير لـ {provider} {version}",
+      "successBinary": "تم تطهير {count} إدخالًا من ذاكرة التخزين المؤقت للملفات الثنائية",
+      "successProvider": "تم تطهير {count} إدخالًا من ذاكرة التخزين المؤقت للموفّرين"
+    }
+  },
+  "catalog": {
+    "title": "كتالوج الخدمات",
+    "description": "توفير بنية تحتية بالخدمة الذاتية من وحدات منسّقة",
+    "notEnabled": "كتالوج الخدمات غير مُفعّل.",
+    "empty": "لا توجد عناصر كتالوج متاحة.",
+    "card": {
+      "pinned": "مثبّت {version}",
+      "latest": "الأحدث"
+    },
+    "errors": {
+      "loadItems": "فشل تحميل عناصر الكتالوج"
+    }
+  },
+  "catalogDetail": {
+    "backLink": "← الكتالوج",
+    "backToCatalog": "العودة إلى الكتالوج",
+    "fallbackTitle": "عنصر الكتالوج",
+    "notFound": "عنصر الكتالوج غير موجود، أو أن كتالوج الخدمات غير مفعّل.",
+    "common": {
+      "cancel": "إلغاء"
+    },
+    "info": {
+      "module": "الوحدة:",
+      "resolvedVersion": "الإصدار المحلول:",
+      "latest": "الأحدث",
+      "disabled": "معطّل"
+    },
+    "pending": {
+      "banner": "تم التخطيط لتشغيل <strong>{name}</strong> وهو بانتظار المراجعة. أكّد للتطبيق، أو تجاهل.",
+      "working": "جارٍ العمل…",
+      "confirmApply": "تأكيد وتطبيق",
+      "discard": "تجاهل"
+    },
+    "field": {
+      "select": "اختر…"
+    },
+    "provision": {
+      "title": "التزويد",
+      "workspaceName": "اسم مساحة العمل",
+      "workspaceNameTitle": "أحرف وأرقام وشرطات وشرطات سفلية فقط. يجب أن يبدأ بحرف أو رقم.",
+      "workspaceNamePlaceholder": "my-instance",
+      "agentPool": "تجمّع الوكلاء",
+      "selectPool": "اختر تجمّعًا…",
+      "noPoolsAvailable": "لا تتوفر لك تجمّعات وكلاء. تحتاج إلى صلاحية الكتابة على تجمّع وكلاء لإجراء التزويد — اطلب من المسؤول منحك إياها.",
+      "noPoolsAllowed": "لا يُسمح بأي من تجمّعات الوكلاء التي يمكنك الوصول إليها في عنصر الكتالوج هذا. اطلب من المسؤول توسيع التجمّعات المسموح بها للعنصر أو منحك الوصول إلى أحدها.",
+      "version": "الإصدار",
+      "latestFloat": "الأحدث (متغيّر)",
+      "defaultPinOption": "{version} (التثبيت الافتراضي)",
+      "labelsOptional": "التسميات (اختياري)",
+      "autoApplyHint": "يطبّق التطبيق التلقائي التغييرات دون خطوة مراجعة يدوية.",
+      "provisioning": "جارٍ التزويد…",
+      "submit": "تزويد"
+    },
+    "instances": {
+      "title": "المثيلات",
+      "empty": "لم يُزوَّد أي مثيل من هذا العنصر بعد.",
+      "colName": "الاسم",
+      "colVersion": "الإصدار",
+      "colPool": "التجمّع",
+      "colActions": "الإجراءات",
+      "reconfigure": "إعادة التهيئة",
+      "destroy": "تدمير",
+      "orphan": "تيتيم…",
+      "orphanTitle": "حذف سجل الكتالوج دون تدمير بنيته التحتية (غير مستحسن)"
+    },
+    "reconfigure": {
+      "title": "إعادة تهيئة {name}",
+      "description": "حدّث المدخلات و/أو الإصدار، ثم أدرِج عملية تشغيل في قائمة الانتظار.",
+      "currentOption": "{version} (الحالي)",
+      "queuing": "جارٍ الإدراج في قائمة الانتظار…",
+      "queueRun": "إدراج التشغيل في قائمة الانتظار"
+    },
+    "destroy": {
+      "title": "تدمير {name}",
+      "heading": "تدمير {name}؟",
+      "description": "يؤدي هذا إلى إدراج عملية تشغيل تدمير في قائمة الانتظار تهدم البنية التحتية لهذا المثيل. عند نجاح التطبيق تُؤرشف مساحة العمل. لا يمكن التراجع عن هذا.",
+      "autoApplyHint": "يهدم التطبيق التلقائي على الفور دون مراجعة."
+    },
+    "orphan": {
+      "title": "تيتيم {name}",
+      "heading": "تيتيم {name}؟",
+      "description": "يؤدي هذا إلى حذف سجل مثيل الكتالوج ولكنه <warn>لا</warn> يدمّر بنيته التحتية — تبقى الموارد المزوّدة قيد التشغيل، <warn>غير متتبَّعة وغير مُدارة</warn>. هذا غير مستحسن. لاستعادة البنية التحتية، ألغِ واستخدم <emph>تدمير</emph> بدلًا من ذلك.",
+      "confirmPrompt": "اكتب اسم المثيل <mono>{name}</mono> للتأكيد:",
+      "orphaning": "جارٍ التيتيم…",
+      "submit": "تيتيم وهجر البنية التحتية"
+    },
+    "actions": {
+      "confirmed": "تم تأكيد التشغيل — جارٍ التطبيق.",
+      "discarded": "تم تجاهل التشغيل.",
+      "provisioned": "تم تزويد {name} — الخطة جاهزة للمراجعة.",
+      "reconfigureQueued": "أُدرجت إعادة التهيئة في قائمة الانتظار — أُنشئت عملية تشغيل.",
+      "reconfigureQueuedStatus": "أُدرجت إعادة التهيئة في قائمة الانتظار — التشغيل {status}.",
+      "destroyQueued": "أُدرج التدمير في قائمة الانتظار — أُنشئت عملية تشغيل.",
+      "destroyQueuedStatus": "أُدرج التدمير في قائمة الانتظار — التشغيل {status}.",
+      "orphaned": "تم تيتيم {name} — حُذف سجل الكتالوج؛ تُركت بنيته التحتية قيد التشغيل، غير متتبَّعة وغير مُدارة."
+    },
+    "errors": {
+      "loadItem": "فشل تحميل عنصر الكتالوج",
+      "confirm": "فشل التأكيد",
+      "confirmStatus": "فشل التأكيد ({status})",
+      "discard": "فشل التجاهل",
+      "discardStatus": "فشل التجاهل ({status})",
+      "provision": "فشل التزويد",
+      "provisionStatus": "فشل التزويد ({status})",
+      "reconfigure": "فشلت إعادة التهيئة",
+      "reconfigureStatus": "فشلت إعادة التهيئة ({status})",
+      "destroy": "فشل التدمير",
+      "destroyStatus": "فشل التدمير ({status})",
+      "orphan": "فشل التيتيم",
+      "orphanStatus": "فشل التيتيم ({status})"
+    }
+  },
+  "common": {
+    "connection": {
+      "reconnecting": "جارٍ إعادة الاتصال…"
+    },
+    "sessionExpiry": {
+      "banner": "تنتهي الجلسة خلال {minutes, plural, zero {# دقيقة} one {# دقيقة} two {# دقيقتين} few {# دقائق} many {# دقيقة} other {# دقيقة}} — <link>أعد المصادقة</link>"
+    },
+    "tokenExpiry": {
+      "withinDays": "{count, plural, zero {# رمز خدمة} one {# رمز خدمة} two {# رمزا خدمة} few {# رموز خدمة} many {# رمز خدمة} other {# رمز خدمة}} تنتهي صلاحيته خلال {days, plural, zero {# يوم} one {# يوم} two {# يومين} few {# أيام} many {# يومًا} other {# يوم}} — <link>راجع</link>",
+      "soon": "{count, plural, zero {# رمز خدمة} one {# رمز خدمة} two {# رمزا خدمة} few {# رموز خدمة} many {# رمز خدمة} other {# رمز خدمة}} تنتهي صلاحيته قريبًا — <link>راجع</link>",
+      "dismissAria": "تجاهل تحذير انتهاء صلاحية الرمز"
+    },
+    "resourceUsage": {
+      "title": "استخدام الموارد",
+      "oomKilled": "أُنهي بسبب نفاد الذاكرة",
+      "killedLikelyOom": "أُنهي (على الأرجح نفاد ذاكرة)",
+      "memory": "الذاكرة",
+      "requested": "المطلوب {value}",
+      "limit": "الحد {value}"
+    },
+    "labelsEditor": {
+      "none": "لا شيء",
+      "removeAria": "إزالة {key}",
+      "keyPlaceholder": "المفتاح",
+      "valuePlaceholder": "القيمة",
+      "add": "إضافة"
+    },
+    "sensitiveInput": {
+      "hide": "إخفاء",
+      "show": "إظهار",
+      "hideAria": "إخفاء القيمة",
+      "showAria": "إظهار القيمة"
+    },
+    "workspacePicker": {
+      "searchPlaceholder": "ابحث عن مساحات العمل…",
+      "loading": "جارٍ التحميل…",
+      "empty": "لم يتم العثور على مساحات عمل",
+      "adding": "جارٍ الإضافة…"
+    },
+    "templateEditors": {
+      "remove": "إزالة",
+      "add": "إضافة",
+      "valuePlaceholder": "القيمة",
+      "name": "الاسم",
+      "url": "عنوان URL",
+      "hmacKey": "مفتاح HMAC (اختياري)",
+      "hmacKeyPlaceholder": "سرّ مشترك",
+      "stage": "المرحلة",
+      "enforcement": "الإنفاذ",
+      "enabled": "مُفعّل",
+      "runTaskNamePlaceholder": "security-scan",
+      "runTaskUrlPlaceholder": "https://hooks.example.com/task",
+      "addRunTask": "إضافة مهمة تشغيل",
+      "destinationType": "نوع الوجهة",
+      "token": "الرمز (اختياري)",
+      "tokenPlaceholder": "رمز HMAC / مصادقة",
+      "notificationNamePlaceholder": "slack-alerts",
+      "notificationUrlPlaceholder": "https://hooks.slack.com/services/...",
+      "emailAddresses": "عناوين البريد الإلكتروني",
+      "emailPlaceholder": "ops@example.com",
+      "addEmail": "إضافة بريد إلكتروني",
+      "triggers": "المُشغّلات",
+      "addNotification": "إضافة إشعار"
+    }
+  },
+  "planSummary": {
+    "aiGenerated": "أُنشئ بواسطة الذكاء الاصطناعي",
+    "heading": {
+      "planSummary": "ملخص الخطة",
+      "failureAnalysis": "تحليل الفشل"
+    },
+    "errors": {
+      "status": "HTTP {status}"
+    },
+    "regenerate": {
+      "label": "إعادة الإنشاء",
+      "queueing": "جارٍ وضعه في قائمة الانتظار…",
+      "tooltip": "إعادة تشغيل ملخص الذكاء الاصطناعي على مدخلات الخطة نفسها",
+      "ariaLabel": "إعادة إنشاء ملخص الذكاء الاصطناعي",
+      "confirm": "إعادة إنشاء تحليل الذكاء الاصطناعي؟ يؤدي ذلك إلى تشغيل النموذج مرة أخرى.",
+      "error": "تعذّر إعادة الإنشاء: <mono>{detail}</mono>"
+    },
+    "pending": {
+      "summarisingPlan": "جارٍ تلخيص الخطة…",
+      "analysingFailure": "جارٍ تحليل الفشل…"
+    },
+    "skipped": {
+      "fallback": "تم تخطي الملخص لهذا التشغيل."
+    },
+    "errored": {
+      "heading": "فشل المُلخّص"
+    },
+    "riskFactors": {
+      "heading": "عوامل المخاطر",
+      "suggestedFixes": "الإصلاحات المقترحة"
+    },
+    "tokens": "{input} داخل / {output} خارج من الرموز",
+    "risk": {
+      "low": "منخفض",
+      "medium": "متوسط",
+      "high": "مرتفع",
+      "critical": "حرج",
+      "unknown": "غير معروف"
+    },
+    "badges": {
+      "noChanges": "لا توجد تغييرات",
+      "noChangesLower": "لا توجد تغييرات",
+      "noChangesTitle": "أبلغت الخطة عن عدم وجود تغييرات في الموارد",
+      "toAdd": "{count, plural, zero {# للإضافة} one {# للإضافة} two {# للإضافة} few {# للإضافة} many {# للإضافة} other {# للإضافة}}",
+      "toChange": "{count, plural, zero {# للتغيير} one {# للتغيير} two {# للتغيير} few {# للتغيير} many {# للتغيير} other {# للتغيير}}",
+      "toDestroy": "{count, plural, zero {# للتدمير} one {# للتدمير} two {# للتدمير} few {# للتدمير} many {# للتدمير} other {# للتدمير}}",
+      "toReplace": "{count, plural, zero {# للاستبدال} one {# للاستبدال} two {# للاستبدال} few {# للاستبدال} many {# للاستبدال} other {# للاستبدال}}",
+      "toImport": "{count, plural, zero {# للاستيراد} one {# للاستيراد} two {# للاستيراد} few {# للاستيراد} many {# للاستيراد} other {# للاستيراد}}"
+    },
+    "chat": {
+      "heading": "متابعة",
+      "sharedThreadNote": "سلسلة مشتركة واحدة، مرئية لأي شخص لديه صلاحية قراءة مساحة العمل.",
+      "placeholder": "اطرح سؤال متابعة حول هذه الخطة… (⌘/Ctrl + Enter للإرسال)",
+      "send": "إرسال",
+      "thinking": "جارٍ التفكير…",
+      "you": "أنت",
+      "assistant": "المساعد"
+    },
+    "translatedNote": "تُرجم تلقائيًا إلى لغتك. الملخص المُعتمد هو النص الأصلي.",
+    "translating": "جارٍ الترجمة…"
+  },
+  "runDetail": {
+    "notFound": "لم يتم العثور على التشغيل",
+    "runSection": "قسم التشغيل",
+    "workspaceFallback": "مساحة العمل",
+    "backTo": "العودة إلى {name}",
+    "errorHeading": "خطأ",
+    "discardedHeading": "تم التجاهل — يلزم إعادة التخطيط",
+    "common": {
+      "yes": "نعم",
+      "no": "لا"
+    },
+    "header": {
+      "title": "التشغيل {id}",
+      "titleWithWorkspace": "{workspace} — التشغيل {id}",
+      "description": "تشغيل {source}"
+    },
+    "relTime": {
+      "justNow": "الآن",
+      "minutesAgo": "{count, plural, zero {منذ لحظات} one {منذ دقيقة واحدة} two {منذ دقيقتين} few {منذ # دقائق} many {منذ # دقيقة} other {منذ # دقيقة}}",
+      "hoursAgo": "{count, plural, zero {منذ لحظات} one {منذ ساعة واحدة} two {منذ ساعتين} few {منذ # ساعات} many {منذ # ساعة} other {منذ # ساعة}}",
+      "daysAgo": "{count, plural, zero {اليوم} one {منذ يوم واحد} two {منذ يومين} few {منذ # أيام} many {منذ # يومًا} other {منذ # يوم}}"
+    },
+    "status": {
+      "pending": "قيد الانتظار",
+      "queued": "في قائمة الانتظار",
+      "planning": "جارٍ التخطيط",
+      "planned": "تم التخطيط",
+      "confirmed": "تم التأكيد",
+      "applying": "جارٍ التطبيق",
+      "canceling": "جارٍ الإلغاء",
+      "applied": "تم التطبيق",
+      "errored": "حدث خطأ",
+      "canceled": "تم الإلغاء",
+      "discarded": "تم التجاهل"
+    },
+    "activity": {
+      "pending": "جارٍ تجهيز التشغيل",
+      "queued": "بانتظار وكيل متاح",
+      "planning": "جارٍ تشغيل terraform plan",
+      "plannedConfirmable": "بانتظار قيامك بالتأكيد والتطبيق",
+      "plannedSpeculative": "اكتمل التخطيط الاستطلاعي",
+      "plannedComplete": "اكتمل التخطيط",
+      "confirmed": "جارٍ بدء التطبيق",
+      "applying": "جارٍ تشغيل terraform apply",
+      "canceling": "جارٍ إيقاف التشغيل",
+      "applied": "اكتمل التطبيق",
+      "errored": "فشل التشغيل",
+      "canceled": "تم إلغاء التشغيل",
+      "discarded": "تم تجاهل الخطة",
+      "elapsedTitle": "الوقت المنقضي في هذه المرحلة"
+    },
+    "badge": {
+      "destroy": "تدمير",
+      "planOnly": "تخطيط فقط"
+    },
+    "actions": {
+      "retryShort": "إعادة المحاولة",
+      "retryFull": "إعادة تشغيل",
+      "retrying": "جارٍ إعادة المحاولة…",
+      "confirmShort": "تطبيق",
+      "confirmFull": "تأكيد وتطبيق",
+      "confirming": "جارٍ التأكيد…",
+      "discard": "تجاهل",
+      "discarding": "جارٍ التجاهل…",
+      "cancelShort": "إلغاء",
+      "cancelFull": "إلغاء التشغيل",
+      "canceling": "جارٍ الإلغاء…"
+    },
+    "confirm": {
+      "apply": "تطبيق هذا التشغيل؟ يؤدي ذلك إلى تطبيق الخطة وتغيير البنية التحتية.",
+      "discard": "تجاهل هذه الخطة؟",
+      "cancel": "إلغاء هذا التشغيل؟",
+      "retry": "إعادة تشغيل هذا التشغيل؟"
+    },
+    "errors": {
+      "loadRun": "فشل تحميل التشغيل",
+      "action": {
+        "confirm": "فشل تأكيد التشغيل",
+        "discard": "فشل تجاهل التشغيل",
+        "cancel": "فشل إلغاء التشغيل",
+        "retry": "فشل إعادة تشغيل التشغيل"
+      }
+    },
+    "tabs": {
+      "overview": "نظرة عامة",
+      "ai": "الذكاء الاصطناعي",
+      "aiFull": "تحليل الذكاء الاصطناعي",
+      "opa": "OPA",
+      "opaFull": "سياسات OPA",
+      "impact": "التأثير",
+      "impactFull": "رسم التأثير البياني",
+      "planLabel": "التخطيط<log>سجل</log>",
+      "applyLabel": "التطبيق<log>سجل</log>",
+      "planFull": "سجل التخطيط",
+      "applyFull": "سجل التطبيق",
+      "details": "التفاصيل"
+    },
+    "banner": {
+      "destroy": "هذا تشغيل <strong>تدمير</strong> — سيتم تدمير جميع الموارد المُدارة عند التطبيق.",
+      "planOnlyCli": "هذا تشغيل <strong>تخطيط فقط</strong> بدأ من واجهة سطر الأوامر على مساحة عمل متصلة بنظام التحكم في الإصدارات (VCS). التطبيق غير متاح للتعليمات البرمجية المرفوعة عبر واجهة سطر الأوامر — يمكن تطبيق التعليمات البرمجية المُدارة عبر VCS فقط.",
+      "moduleOverridesPrefix": "يستخدم هذا التشغيل <strong>تجاوزات الوحدات</strong>",
+      "moduleOverridesFromPr": "من طلب السحب رقم {number}",
+      "moduleOverridesSuffix": "سيتم جلبها من فرع طلب السحب بدلاً من إصدار السجل المنشور."
+    },
+    "cards": {
+      "changes": "التغييرات",
+      "aiAnalysis": "تحليل الذكاء الاصطناعي",
+      "policyChecks": "فحوصات السياسات",
+      "resources": "الموارد"
+    },
+    "changes": {
+      "noChanges": "لا توجد تغييرات",
+      "planning": "جارٍ التخطيط…",
+      "toAdd": "للإضافة",
+      "toChange": "للتغيير",
+      "toDestroy": "للتدمير",
+      "toReplace": "للاستبدال",
+      "toImport": "للاستيراد"
+    },
+    "ai": {
+      "notAvailable": "غير متاح",
+      "ready": "جاهز",
+      "riskSub": "مخاطر {risk}",
+      "generating": "جارٍ الإنشاء…",
+      "skipped": "تم التخطي",
+      "failed": "فشل",
+      "available": "متاح"
+    },
+    "policy": {
+      "none": "لا شيء",
+      "blocked": "محظور",
+      "failedSub": "{count, plural, zero {# فاشل} one {# فاشل} two {# فاشلان} few {# فاشلة} many {# فاشلًا} other {# فاشل}}",
+      "advisoryIssues": "مشكلات إرشادية",
+      "passedSub": "{passed}/{total} ناجح",
+      "passed": "ناجح"
+    },
+    "resources": {
+      "overLimit": "تجاوز الحد",
+      "oomKilled": "أُنهي بسبب نفاد الذاكرة",
+      "recorded": "مُسجّل",
+      "nearLimit": "قريب من الحد",
+      "high": "مرتفع",
+      "withinLimits": "ضمن الحدود"
+    },
+    "details": {
+      "heading": "التفاصيل",
+      "executionBackend": "خلفية التنفيذ",
+      "source": "المصدر",
+      "autoApply": "التطبيق التلقائي",
+      "planOnly": "تخطيط فقط",
+      "triggeredBy": "بدأ بواسطة",
+      "created": "تاريخ الإنشاء",
+      "commit": "التزام",
+      "branch": "الفرع",
+      "prMr": "طلب السحب/الدمج",
+      "stateVersion": "إصدار الحالة",
+      "viewState": "عرض الحالة",
+      "runOptions": "خيارات التشغيل"
+    },
+    "timeline": {
+      "heading": "الجدول الزمني",
+      "queued": "في قائمة الانتظار",
+      "planningStarted": "بدأ التخطيط",
+      "planComplete": "اكتمل التخطيط",
+      "confirmed": "تم التأكيد",
+      "applyingStarted": "بدأ التطبيق",
+      "applied": "تم التطبيق",
+      "errored": "حدث خطأ",
+      "canceled": "تم الإلغاء",
+      "discarded": "تم التجاهل"
+    },
+    "log": {
+      "color": "اللون",
+      "colorOnTitle": "عرض ألوان ANSI — انقر للنص العادي",
+      "colorOffTitle": "عرض النص العادي — انقر للألوان",
+      "refresh": "تحديث",
+      "refreshTitle": "تحديث السجل",
+      "copy": "نسخ",
+      "copied": "تم النسخ!",
+      "copyTitle": "نسخ النص العادي إلى الحافظة",
+      "copyAria": "نسخ السجل إلى الحافظة",
+      "download": "تنزيل",
+      "downloadColorTitle": "تنزيل السجل (مع رموز ألوان ANSI)",
+      "downloadPlainTitle": "تنزيل السجل (نص عادي)",
+      "downloadAria": "تنزيل السجل",
+      "follow": "متابعة",
+      "followOnTitle": "متابعة البث المباشر — انقر للإيقاف",
+      "followOffTitle": "متابعة البث المباشر",
+      "end": "النهاية",
+      "endTitle": "الانتقال إلى نهاية السجل",
+      "planEmpty": "لا يوجد ناتج تخطيط متاح بعد.",
+      "applyEmpty": "لا يوجد ناتج تطبيق متاح بعد."
+    },
+    "policyPanel": {
+      "heading": "فحوصات السياسات",
+      "passedCount": "{passed}/{total} ناجح",
+      "blockedMessage": "هذا التشغيل <strong>محظور بواسطة مجموعة سياسات إلزامية</strong>. لن يتم تطبيقه حتى يُحلّ الفشل أو يتجاوزه المسؤول.",
+      "overriding": "جارٍ التجاوز...",
+      "overrideContinue": "تجاوز ومتابعة",
+      "overrideFailed": "فشل التجاوز",
+      "overrideFailedStatus": "فشل التجاوز ({status})",
+      "overriddenBy": "تم التجاوز بواسطة {by}",
+      "policyPassed": "ناجح",
+      "noDenyMessage": "فشلت السياسة دون إنتاج رسالة رفض أو ناتج خطأ",
+      "enforcement": {
+        "mandatory": "إلزامي",
+        "advisory": "إرشادي"
+      },
+      "outcome": {
+        "passed": "ناجح",
+        "failed": "فاشل",
+        "errored": "حدث خطأ"
+      }
+    }
+  },
+  "workspaceDetail": {
+    "notFound": "لم يتم العثور على مساحة العمل",
+    "common": {
+      "enabled": "مُفعّل",
+      "disabled": "مُعطّل",
+      "none": "لا شيء",
+      "default": "افتراضي",
+      "never": "أبدًا",
+      "actions": "الإجراءات",
+      "workspaceLocked": "مساحة العمل مقفلة"
+    },
+    "actions": {
+      "edit": "تعديل",
+      "cancel": "إلغاء",
+      "save": "حفظ",
+      "saving": "جارٍ الحفظ…",
+      "savingEllipsis": "جارٍ الحفظ...",
+      "delete": "حذف",
+      "deleting": "جارٍ الحذف...",
+      "add": "إضافة",
+      "adding": "جارٍ الإضافة...",
+      "remove": "إزالة",
+      "download": "تنزيل",
+      "rollback": "التراجع",
+      "close": "إغلاق",
+      "hide": "إخفاء",
+      "enable": "تفعيل",
+      "disable": "تعطيل",
+      "creating": "جارٍ الإنشاء...",
+      "sending": "جارٍ الإرسال...",
+      "processing": "جارٍ المعالجة...",
+      "queuing": "جارٍ الإضافة إلى قائمة الانتظار...",
+      "loading": "جارٍ التحميل...",
+      "loadingLower": "جارٍ التحميل…"
+    },
+    "header": {
+      "executionMode": "وضع التنفيذ {mode}",
+      "onboard": "الإعداد"
+    },
+    "tabs": {
+      "overview": "نظرة عامة",
+      "variables": "المتغيرات",
+      "runs": "عمليات التشغيل",
+      "state": "الحالة",
+      "stateGraph": "مخطط الحالة",
+      "configurations": "التكوينات",
+      "notifications": "الإشعارات",
+      "runTasks": "مهام التشغيل",
+      "runTriggers": "مُشغّلات التشغيل",
+      "sharing": "المشاركة",
+      "selectLabel": "قسم مساحة العمل"
+    },
+    "lifecycle": {
+      "pendingDeletion": "بانتظار الحذف",
+      "pendingDeletionDefault": "تم وضع علامة على مساحة العمل هذه للحذف وتتطلب إجراءً يدويًا.",
+      "archived": "مؤرشفة",
+      "archivedDefault": "تمت أرشفة مساحة العمل هذه."
+    },
+    "runQueuedBanner": {
+      "message": "تمت إضافة التشغيل إلى قائمة الانتظار بنجاح.",
+      "viewRun": "عرض التشغيل"
+    },
+    "settings": {
+      "title": "الإعدادات",
+      "saveChanges": "حفظ التغييرات",
+      "renamedNotice": "تمت إعادة تسمية مساحة العمل. حدّث حقل <name></name> في كتلة <cloud></cloud> ليتطابق."
+    },
+    "fields": {
+      "name": "الاسم",
+      "nameTitle": "أحرف وأرقام وشرطات وشرطات سفلية. يجب أن يبدأ بحرف أو رقم.",
+      "executionMode": "وضع التنفيذ",
+      "execModeLocal": "محلي",
+      "execModeAgent": "وكيل",
+      "autoApply": "التطبيق التلقائي",
+      "cpuRequest": "طلب المعالج",
+      "cpuRequestTitle": "كمية معالج Kubernetes: أنوية كاملة (1، 2) أو ملّي أنوية (500m، 100m)",
+      "memoryRequest": "طلب الذاكرة",
+      "memoryRequestTitle": "كمية ذاكرة Kubernetes: بايتات (1000) أو مع لاحقة (512Mi، 2Gi، 1Ti)",
+      "executionBackend": "خلفية التنفيذ",
+      "version": "الإصدار",
+      "versionPlaceholder": "مثال: 1.11 أو 1.11.5",
+      "versionTitle": "الإصدار بصيغة X.Y أو X.Y.Z (مثال: 1.11 أو 1.11.5)",
+      "terragruntEnabledAgent": "مُفعّل (وضع الوكيل)",
+      "terragruntEnabledVersion": "مُفعّل (v{version})",
+      "terragruntVersionPlaceholder": "مثال: 1.0",
+      "terragruntVersionTitle": "إصدار Terragrunt بصيغة X.Y أو X.Y.Z (مثال: 1.0)",
+      "workingDirectory": "دليل العمل",
+      "workingDirectoryPlaceholder": "مثال: environments/dev",
+      "agentPool": "مجموعة الوكلاء",
+      "owner": "المالك",
+      "vcsConnection": "اتصال VCS",
+      "vcsRepository": "مستودع VCS",
+      "vcsRepositoryTitle": "يجب أن يكون عنوان URL بروتوكول HTTP أو HTTPS",
+      "vcsBranch": "فرع VCS",
+      "vcsBranchPlaceholder": "main (افتراضي)",
+      "vcsWorkflow": "سير عمل VCS",
+      "vcsWorkflowMergeThenApply": "merge_then_apply (افتراضي — معيار TFE / HCP)",
+      "vcsWorkflowApplyThenMerge": "apply_then_merge (معيار Atlantis — اختياري)",
+      "autoMerge": "الدمج التلقائي بعد التطبيق",
+      "autoMergeStrategy": "استراتيجية الدمج التلقائي",
+      "vcsPolling": "استقصاء VCS",
+      "labels": "التسميات (الوسوم)",
+      "labelsTitle": "تؤدي تسميات مساحة العمل دورًا مزدوجًا: مطابقة التحكم في الوصول المستند إلى التسميات (RBAC)، وكـ\"وسوم\" تطابقها كتل terraform/tofu cloud '{' workspaces '{' tags = ... '}' '}'.",
+      "varFiles": "ملفات المتغيرات",
+      "varFilesPlaceholder": "مثال: envs/dev.tfvars",
+      "triggerPrefixes": "بادئات التشغيل",
+      "triggerPrefixesHint": "الأدلة التي تُشغّل عمليات التشغيل. تتجاوز تصفية دليل العمل عند تعيينها.",
+      "triggerPrefixesPlaceholder": "مثال: modules",
+      "triggerPrefixesNone": "لا شيء (يستخدم دليل العمل)",
+      "driftIgnoreRules": "قواعد تجاهل الانحراف",
+      "driftIgnoreRulesHint": "مسارات عناوين Terraform + سمات تدعم أنماط glob يقمعها مُصنّف الانحراف. يطابق <star></star> صفرًا أو أكثر من الأحرف غير <dot></dot> (يمتد عبر <n></n> مؤشرات)؛ ويطابق <starIdx></starIdx> أي مؤشر بين قوسين. عنوان مجرد بلا لاحقة سمة يُسكت أي تغيير على ذلك المورد — بما في ذلك عمليات الحذف. يؤثر على الانحراف فقط، لا على plan/apply العادي. راجع <docs>drift-ignore-rules.md</docs> للنحو الكامل.",
+      "driftIgnoreRulesNone": "لا شيء (يُحتسب كل اختلاف في الخطة كانحراف)"
+    },
+    "vcsWorkflowWarning": {
+      "title": "تم تفويض الترخيص إلى مستودع VCS الخاص بك.",
+      "rbac": "يمكن لأي شخص قادر على دمج الـ PR أن يُطبّق. تصبح قواعد حماية الفرع (المراجعات المطلوبة، فحوصات الحالة، موافقة مالك الكود) هي البوابة. لا ينطبق التحكم في الوصول المستند إلى الأدوار/التسميات في Terrapod<em>على</em> الإجراءات المدفوعة بالتعليقات في هذا الوضع.",
+      "recommended": "<strong>موصى به:</strong> اشترط سجلًا خطيًا (إعادة التأسيس/الضغط قبل الدمج) بحيث يكون الإيداع الذي تُطبّقه هو الإيداع الذي يستقر.",
+      "credit": "إسناد: هذا سير العمل مصمّم على غرار <atlantis>Atlantis</atlantis>. يظل Atlantis الأداة المناسبة للفرق التي تريد فقط عمليات تطبيق مدفوعة بتعليقات الـ PR دون واجهة منصة."
+    },
+    "vcsPolling": {
+      "error": "خطأ",
+      "ok": "موافق ({time})",
+      "notPolled": "لم يُستقصَ بعد"
+    },
+    "lockout": {
+      "revertLabels": "التراجع عن التسميات",
+      "saveAnyway": "الحفظ على أي حال"
+    },
+    "lock": {
+      "title": "حالة القفل",
+      "lockedDesc": "مساحة العمل هذه مقفلة. لا يمكن تشغيل أي خطط أو عمليات تطبيق.",
+      "unlockedDesc": "مساحة العمل هذه غير مقفلة وجاهزة لعمليات التشغيل.",
+      "lock": "قفل",
+      "unlock": "إلغاء القفل",
+      "lockConfirm": "هل تريد قفل مساحة العمل هذه؟",
+      "unlockConfirm": "هل تريد إلغاء قفل مساحة العمل هذه؟"
+    },
+    "drift": {
+      "title": "كشف الانحراف",
+      "checkInterval": "فترة الفحص",
+      "status": "الحالة",
+      "statusNoDrift": "لا انحراف",
+      "statusDrifted": "منحرف",
+      "statusErrored": "خطأ",
+      "statusUnchecked": "غير مفحوص",
+      "dismiss": "تجاهل",
+      "dismissing": "جارٍ التجاهل…",
+      "dismissTitle": "مسح حالة الانحراف المُبلّغ عنها. سيعيد الفحص المجدول التالي ملأها من الواقع.",
+      "lastChecked": "آخر فحص",
+      "checkNow": "افحص الآن",
+      "checkNowTitle": "إضافة تشغيل بخطة فقط إلى قائمة الانتظار للتحقق من الانحراف",
+      "checkNowTitleDisabled": "فعّل كشف الانحراف أولًا"
+    },
+    "intervals": {
+      "disabled": "مُعطّل",
+      "1hour": "ساعة واحدة",
+      "4hours": "4 ساعات",
+      "12hours": "12 ساعة",
+      "24hours": "24 ساعة",
+      "48hours": "48 ساعة",
+      "3days": "3 أيام",
+      "7days": "7 أيام"
+    },
+    "planExpiry": {
+      "title": "انتهاء صلاحية الخطة",
+      "description": "تجاهل خطة غير مؤكدة تلقائيًا بمجرد تجاوزها هذه المدة، بحيث لا يمكن تطبيق خطة قديمة على واقع تغيّر. مُعطّل افتراضيًا؛ عندئذٍ يجب إعادة تشغيل الخطة. (ينطبق على عمليات التشغيل القادرة على التطبيق فقط.)",
+      "expireAfter": "تنتهي الصلاحية بعد"
+    },
+    "aiSummary": {
+      "title": "ملخص الخطة بالذكاء الاصطناعي",
+      "description": "ملخص للتغييرات وتقييم للمخاطر وتحليل للأعطال يُولّده نموذج لغوي كبير تلقائيًا لكل نتيجة مرحلة تخطيط في مساحة العمل هذه.",
+      "mode": "الوضع",
+      "modeDefault": "اتباع الافتراضي للنشر",
+      "modeEnabled": "التلخيص دائمًا",
+      "modeDisabled": "عدم التلخيص أبدًا",
+      "contextLabel": "سياق مساحة العمل",
+      "contextLabelSuffix": "(اختياري، إضافي)",
+      "contextPlaceholder": "حقائق ينبغي أن يعرفها الذكاء الاصطناعي عن مساحة العمل هذه تحديدًا. مثال: 'يواجه خزنة الخدمة X — حذف مفتاح KMS يسبب انقطاعًا عالميًا.'",
+      "noContext": "لم يُعيَّن سياق لمساحة العمل.",
+      "contextHint": "يُضاف فوق السياق الشامل للنشر. بحد أقصى 4000 حرف."
+    },
+    "slack": {
+      "title": "إشعارات Slack",
+      "description": "اشترك بمساحة العمل هذه في إشعارات تشغيل Slack — طلبات الموافقة، وعمليات التطبيق، والأخطاء، والانحراف. اترك القناة فارغة وتبقى مساحة العمل هذه صامتة (لا يوجد بث شامل للنشر). يتطلب تفعيل تطبيق Slack من قبل مسؤول.",
+      "channel": "القناة",
+      "channelPlaceholder": "‎#deploys أو معرّف قناة (مثال: C0123ABCD)",
+      "notSet": "غير مُعيّن — صامت.",
+      "hint": "يجب أن يكون تطبيق Slack عضوًا في القناة بالفعل."
+    },
+    "delete": {
+      "title": "حذف مساحة العمل",
+      "description": "احذف مساحة العمل هذه وكل ما يرتبط بها من حالة ومتغيرات وعمليات تشغيل حذفًا دائمًا.",
+      "confirm": "تأكيد الحذف"
+    },
+    "variables": {
+      "addVariable": "إضافة متغير",
+      "key": "المفتاح",
+      "value": "القيمة",
+      "category": "الفئة",
+      "categoryEnv": "بيئة",
+      "sensitive": "حساس",
+      "empty": "لا توجد متغيرات مُهيّأة لمساحة العمل هذه.",
+      "emptyValue": "فارغ",
+      "enterNewValue": "أدخل قيمة جديدة",
+      "deleteConfirm": "هل تريد حذف المتغير \"{key}\"؟"
+    },
+    "runs": {
+      "options": "الخيارات",
+      "hideOptions": "إخفاء الخيارات",
+      "queueDestroy": "إضافة الحذف إلى قائمة الانتظار",
+      "queueDestroyTitle": "إضافة خطة حذف إلى قائمة الانتظار",
+      "destroyAllConfirm": "هل تريد حذف جميع الموارد؟",
+      "confirmDestroy": "تأكيد الحذف",
+      "queuePlan": "إضافة خطة إلى قائمة الانتظار",
+      "queueRun": "إضافة تشغيل إلى قائمة الانتظار",
+      "queuePlanConfirm": "هل تريد إضافة خطة تخمينية لمساحة العمل هذه إلى قائمة الانتظار؟",
+      "queueApplyConfirm": "هل تريد إضافة تشغيل خطة + تطبيق إلى قائمة الانتظار؟ قد يؤدي هذا إلى تغيير البنية التحتية.",
+      "planOptions": "خيارات الخطة",
+      "targetResources": "الموارد المستهدفة",
+      "replaceResources": "استبدال الموارد",
+      "commaSeparated": "(مفصولة بفواصل)",
+      "planOnly": "خطة فقط",
+      "refreshOnly": "تحديث فقط",
+      "skipRefresh": "تخطي التحديث",
+      "allowEmptyApply": "السماح بتطبيق فارغ",
+      "vcsRef": "مرجع VCS",
+      "branch": "فرع",
+      "tag": "وسم",
+      "defaultBranch": "افتراضي ({branch})",
+      "nonDefaultRefNote": "تم تحديد مرجع غير افتراضي — سيكون التشغيل بخطة فقط",
+      "empty": "لا توجد عمليات تشغيل بعد لمساحة العمل هذه.",
+      "runId": "معرّف التشغيل",
+      "status": "الحالة",
+      "type": "النوع",
+      "changes": "التغييرات",
+      "source": "المصدر",
+      "triggeredBy": "شُغّل بواسطة",
+      "created": "أُنشئ",
+      "needsConfirm": "يحتاج تأكيدًا",
+      "typeDestroy": "حذف",
+      "typePlanOnly": "خطة فقط",
+      "typePlanApply": "خطة + تطبيق",
+      "sourceModuleTest": "اختبار الوحدة",
+      "sourceModulePublish": "نشر الوحدة"
+    },
+    "state": {
+      "deleteConfirm": "هل تريد حذف نسخة الحالة رقم #{serial}؟ لا يمكن التراجع عن هذا.",
+      "rollbackConfirm": "هل تريد التراجع إلى نسخة الحالة رقم #{serial}؟ سيتم إنشاء نسخة جديدة بالمحتوى نفسه.",
+      "confirmDelete": "تأكيد الحذف",
+      "confirmRollback": "تأكيد التراجع",
+      "uploadState": "رفع الحالة",
+      "empty": "لا توجد نسخ حالة بعد لمساحة العمل هذه.",
+      "serial": "الرقم التسلسلي",
+      "createdBy": "أنشأها",
+      "run": "التشغيل",
+      "size": "الحجم",
+      "created": "أُنشئت",
+      "runner": "المُشغّل",
+      "latest": "الأحدث"
+    },
+    "configurations": {
+      "description": "أرشيفات المصدر المرفوعة لمساحة العمل هذه، الأحدث أولًا. اختر صفّين للمقارنة.",
+      "selectedCount": "{count}/2 محدد",
+      "compare": "مقارنة",
+      "comparing": "جارٍ المقارنة…",
+      "empty": "لا توجد نسخ تكوين بعد. تظهر هنا بمجرد أن يرفع `terraform plan` أو أن يُطلق دفعٌ عبر VCS عملية تشغيل.",
+      "id": "المعرّف",
+      "source": "المصدر",
+      "status": "الحالة",
+      "created": "أُنشئت",
+      "current": "الحالي",
+      "selectForCompare": "تحديد {id} للمقارنة",
+      "compareLabel": "مقارنة",
+      "diff": "الفرق",
+      "filesChanged": "{count} ملفات تغيّرت",
+      "oversized": "تم تخطي {count, plural, zero {# ملف كبير الحجم} one {# ملف كبير الحجم} two {# ملفين كبيري الحجم} few {# ملفات كبيرة الحجم} many {# ملفًا كبير الحجم} other {# ملف كبير الحجم}}: {files}",
+      "noDiff": "لا توجد فروق في المحتوى بين هاتين النسختين.",
+      "binaryChanged": "تغيّر ملف ثنائي — لم يُعرض الفرق.",
+      "diffType": {
+        "added": "مُضاف",
+        "removed": "مُزال",
+        "modified": "مُعدّل",
+        "binary-changed": "ثنائي"
+      }
+    },
+    "notifications": {
+      "addNotification": "إضافة إشعار",
+      "name": "الاسم",
+      "namePlaceholder": "إشعارات النشر",
+      "destinationType": "نوع الوجهة",
+      "typeGeneric": "خطاف ويب عام",
+      "typeEmail": "بريد إلكتروني",
+      "url": "عنوان URL",
+      "hmacToken": "رمز HMAC (اختياري)",
+      "signingSecret": "سرّ التوقيع",
+      "emailAddresses": "عناوين البريد الإلكتروني (مفصولة بفواصل)",
+      "triggerEvents": "أحداث التشغيل",
+      "createNotification": "إنشاء إشعار",
+      "empty": "لا توجد تكوينات إشعارات لمساحة العمل هذه.",
+      "ok": "موافق",
+      "err": "خطأ {status}",
+      "fail": "فشل",
+      "http": "HTTP {status}",
+      "verify": "تحقق",
+      "history": "السجل",
+      "deliveryHistory": "سجل التسليم",
+      "enableConfirm": "هل تريد تفعيل هذا الإشعار؟",
+      "disableConfirm": "هل تريد تعطيل هذا الإشعار؟",
+      "deleteConfirm": "هل تريد حذف الإشعار \"{name}\"؟"
+    },
+    "runTasks": {
+      "addRunTask": "إضافة مهمة تشغيل",
+      "name": "الاسم",
+      "namePlaceholder": "فحص سياسة OPA",
+      "webhookUrl": "عنوان URL لخطاف الويب",
+      "stage": "المرحلة",
+      "enforcementLevel": "مستوى الإنفاذ",
+      "hmacKey": "مفتاح HMAC (اختياري)",
+      "hmacKeyPlaceholder": "سرّ التوقيع للتحقق من خطاف الويب",
+      "createRunTask": "إنشاء مهمة تشغيل",
+      "empty": "لا توجد مهام تشغيل مُهيّأة لمساحة العمل هذه.",
+      "enableConfirm": "هل تريد تفعيل مهمة التشغيل هذه؟",
+      "disableConfirm": "هل تريد تعطيل مهمة التشغيل هذه؟",
+      "deleteConfirm": "هل تريد حذف مهمة التشغيل \"{name}\"؟"
+    },
+    "runTriggers": {
+      "title": "مُشغّلات التشغيل",
+      "description": "عندما تُكمل مساحة عمل مصدر عملية تطبيق، تحصل مساحات العمل التابعة على عملية تشغيل جديدة في قائمة الانتظار تلقائيًا. حتى 20 مساحة عمل مصدر لكل وجهة.",
+      "inboundHeading": "مساحات عمل المصدر التي تُشغّل عمليات تشغيل هنا",
+      "inboundEmpty": "لا توجد مساحات عمل مصدر تُشغّل عمليات تشغيل على مساحة العمل هذه.",
+      "pickerPlaceholder": "ابحث عن مساحات عمل لإضافتها كمصدر…",
+      "outboundHeading": "مساحات عمل الوجهة التي تُشغّلها مساحة العمل هذه",
+      "outboundEmpty": "لا تُشغّل مساحة العمل هذه أي عمليات تشغيل على أي مساحة عمل أخرى.",
+      "destinationNote": "(وجهة؛ أزلها من هناك)",
+      "removeConfirm": "هل تريد إزالة مُشغّل التشغيل هذا؟"
+    },
+    "sharing": {
+      "title": "مشاركة الحالة عن بُعد",
+      "description": "قائمة سماح يتحكم بها المُنتِج لـ <code></code> عبر مساحات العمل. تحمل بيانات الحالة أسرارًا — امنح بتعمّد. <docs>الوثائق</docs>",
+      "outboundHeading": "مساحات العمل المصرّح لها بقراءة حالة مساحة العمل هذه",
+      "outboundEmpty": "حالة مساحة العمل هذه غير مشتركة مع أي مساحة عمل أخرى.",
+      "grantedBy": "مُنحت بواسطة {by}",
+      "revoke": "إلغاء",
+      "revokeConfirm": "هل تريد إزالة مشاركة الحالة عن بُعد هذه؟ سيفقد المستهلك الوصول إلى هذه الحالة.",
+      "pickerPlaceholder": "ابحث عن مساحات عمل للترخيص لها كمستهلك…",
+      "inboundHeading": "مساحات العمل المصرّح لهذه المساحة بقراءة الحالة منها",
+      "inboundEmpty": "مساحة العمل هذه غير مصرّح لها بقراءة الحالة من أي مساحة عمل أخرى عبر terraform_remote_state.",
+      "producerNote": "(مُنتِج؛ ألغِ من هناك)"
+    },
+    "runMessages": {
+      "manualDriftCheck": "فحص انحراف يدوي من الواجهة",
+      "queued": "أُضيف إلى قائمة الانتظار من الواجهة",
+      "queuedSpeculative": "أُضيف إلى قائمة الانتظار من الواجهة (تخميني)",
+      "destroyQueued": "أُضيف الحذف إلى قائمة الانتظار من الواجهة"
+    },
+    "errors": {
+      "loadWorkspace": "فشل تحميل مساحة العمل",
+      "loadRuns": "فشل تحميل عمليات التشغيل",
+      "loadVariables": "فشل تحميل المتغيرات",
+      "loadStateVersions": "فشل تحميل نسخ الحالة",
+      "loadConfigurations": "فشل تحميل نسخ التكوين",
+      "loadNotifications": "فشل تحميل الإشعارات",
+      "loadOutboundConsumers": "فشل تحميل مستهلكي الحالة عن بُعد الصادرين",
+      "loadInboundConsumers": "فشل تحميل مستهلكي الحالة عن بُعد الواردين",
+      "loadConsumers": "فشل تحميل مستهلكي الحالة عن بُعد",
+      "loadInboundTriggers": "فشل تحميل مُشغّلات التشغيل الواردة",
+      "loadOutboundTriggers": "فشل تحميل مُشغّلات التشغيل الصادرة",
+      "loadTriggers": "فشل تحميل مُشغّلات التشغيل",
+      "loadRunTasks": "فشل تحميل مهام التشغيل",
+      "downloadStateFile": "فشل تنزيل ملف الحالة",
+      "downloadFailed": "فشل التنزيل",
+      "downloadFailedStatus": "فشل التنزيل ({status})",
+      "downloadTicketMissingUrl": "استجابة تذكرة التنزيل تفتقد عنوان URL",
+      "diffFailed": "فشلت المقارنة",
+      "diffFailedStatus": "فشلت المقارنة ({status})",
+      "authorizeConsumer": "فشل الترخيص للمستهلك",
+      "revoke": "فشل الإلغاء",
+      "revokeConsumer": "فشل إلغاء المستهلك",
+      "addTrigger": "فشل إضافة مُشغّل التشغيل",
+      "removeTrigger": "فشل إزالة مُشغّل التشغيل",
+      "createRunTask": "فشل إنشاء مهمة التشغيل",
+      "createRunTaskStatus": "فشل إنشاء مهمة التشغيل ({status})",
+      "update": "فشل التحديث",
+      "toggleRunTask": "فشل تبديل مهمة التشغيل",
+      "delete": "فشل الحذف",
+      "deleteRunTask": "فشل حذف مهمة التشغيل",
+      "labelLockout": "قد يؤدي تغيير التسمية هذا إلى تقليل وصولك.",
+      "updateWorkspace": "فشل تحديث مساحة العمل",
+      "lockWorkspace": "فشل قفل مساحة العمل",
+      "unlockWorkspace": "فشل إلغاء قفل مساحة العمل",
+      "updateAiSummary": "فشل تحديث إعدادات ملخص الذكاء الاصطناعي",
+      "updateSlackChannel": "فشل تحديث قناة Slack",
+      "updateDriftSettings": "فشل تحديث إعدادات الانحراف",
+      "updateDriftInterval": "فشل تحديث فترة الانحراف",
+      "updatePlanExpiry": "فشل تحديث انتهاء صلاحية الخطة",
+      "queueDriftCheck": "فشل إضافة فحص الانحراف إلى قائمة الانتظار",
+      "queueDriftCheckStatus": "فشل إضافة فحص الانحراف إلى قائمة الانتظار ({status})",
+      "dismissDrift": "فشل تجاهل الانحراف",
+      "dismissDriftStatus": "فشل تجاهل الانحراف ({status})",
+      "deleteWorkspace": "فشل حذف مساحة العمل",
+      "addVariable": "فشل إضافة المتغير",
+      "addVariableStatus": "فشل إضافة المتغير ({status})",
+      "deleteVariable": "فشل حذف المتغير",
+      "updateVariable": "فشل تحديث المتغير",
+      "queuePlan": "فشل إضافة الخطة إلى قائمة الانتظار",
+      "queuePlanStatus": "فشل إضافة الخطة إلى قائمة الانتظار ({status})",
+      "queueDestroy": "فشل إضافة الحذف إلى قائمة الانتظار",
+      "queueDestroyStatus": "فشل إضافة الحذف إلى قائمة الانتظار ({status})",
+      "createNotification": "فشل إنشاء الإشعار",
+      "createNotificationStatus": "فشل إنشاء الإشعار ({status})",
+      "toggleNotification": "فشل تبديل الإشعار",
+      "deleteNotification": "فشل حذف الإشعار",
+      "verificationFailed": "فشل التحقق",
+      "verificationDeliveryFailed": "فشل تسليم التحقق: {detail}",
+      "unknownError": "خطأ غير معروف",
+      "failed": "فشل",
+      "deleteStateVersion": "فشل حذف نسخة الحالة",
+      "rollbackStateVersion": "فشل التراجع عن نسخة الحالة",
+      "stateActionFailed": "فشل إجراء الحالة",
+      "uploadState": "فشل رفع الحالة",
+      "uploadStateFile": "فشل رفع ملف الحالة"
+    }
+  },
+  "graphs": {
+    "stateTab": {
+      "loadError": "تعذّر تحميل رسم الحالة البياني.",
+      "emptyState": "لا توجد حالة بعد — نفِّذ التخطيط والتطبيق، أو ارفع حالة، وحينها سيمتلئ هذا الرسم البياني.",
+      "stateVersionLabel": "إصدار الحالة",
+      "currentSuffix": "(الحالي)",
+      "colorByLabel": "التلوين حسب",
+      "viewGraph": "رسم بياني",
+      "viewTable": "جدول",
+      "resourceCount": "{count, plural, zero {# مورد} one {مورد واحد} two {موردان} few {# موارد} many {# موردًا} other {# مورد}}",
+      "dependencyCount": "{count, plural, zero {# تبعية} one {تبعية واحدة} two {تبعيتان} few {# تبعيات} many {# تبعية} other {# تبعية}}",
+      "truncated": "عرض أول {shown} من أصل {total} مورد — الرسم البياني محدود لتحسين الوضوح.",
+      "colResource": "المورد",
+      "colType": "النوع",
+      "colMode": "الوضع",
+      "colModule": "الوحدة",
+      "colDependedOnBy": "يعتمد عليه",
+      "rootModule": "(الجذر)",
+      "colorBy": {
+        "type": "نوع المورد",
+        "module": "الوحدة",
+        "provider": "المزوّد",
+        "mode": "مُدار / بيانات",
+        "none": "لا شيء (لون واحد)"
+      }
+    },
+    "impact": {
+      "notAvailable": "رسم التأثير البياني غير متاح لعملية التشغيل هذه.",
+      "title": "رسم التأثير البياني",
+      "subtitle": "خطة من {count, plural, zero {# مورد} one {مورد واحد} two {موردين} few {# موارد} many {# موردًا} other {# مورد}}",
+      "hint": "كل كرة هي مورد؛ وكل سهم يشير إلى ما يعتمد عليه. انقر على عقدة ← يُضاء <b>تأثيرها</b> المتعدي (كل ما هو أسفلها في السلسلة).",
+      "downstreamAffected": "المتأثرون في السلسلة",
+      "action": {
+        "create": "إنشاء",
+        "update": "تحديث",
+        "replace": "استبدال",
+        "destroy": "تدمير",
+        "unchanged": "دون تغيير"
+      }
+    },
+    "estate": {
+      "navHint": "اسحب للتدوير · مرِّر للتكبير · اسحب باليمين للتحريك · <em>انقر على عقدة للدوران حولها</em>"
+    },
+    "state3d": {
+      "title": "رسم الحالة البياني",
+      "hint": "كل كرة هي مورد؛ وكل سهم يشير إلى ما يعتمد عليه. انقر على عقدة ← تُضاء الموارد التي <b>تعتمد عليها</b> بشكل متعدٍّ.",
+      "dataSource": "مصدر بيانات",
+      "managed": "مُدار",
+      "dependOnThis": "تعتمد على هذا"
+    },
+    "resource3d": {
+      "resetView": "إعادة تعيين العرض",
+      "clear": "مسح",
+      "key": "المفتاح",
+      "resources": "الموارد",
+      "hideKey": "إخفاء المفتاح",
+      "hideResources": "إخفاء الموارد",
+      "resourcesCount": "الموارد ({count})",
+      "filterPlaceholder": "تصفية الموارد…",
+      "navHint": "اسحب للتدوير · مرِّر للتكبير · اسحب باليمين للتحريك · <em>انقر على مورد للدوران حوله</em>"
+    }
+  },
+  "execHookDetail": {
+    "backLink": "العودة إلى خطافات التنفيذ",
+    "defaultDescription": "خطاف التنفيذ",
+    "notFound": "خطاف التنفيذ غير موجود",
+    "scriptEmpty": "(فارغ)",
+    "tabs": {
+      "settings": "الإعدادات",
+      "workspaces": "مساحات العمل"
+    },
+    "common": {
+      "yes": "نعم",
+      "no": "لا"
+    },
+    "actions": {
+      "edit": "تعديل",
+      "cancel": "إلغاء",
+      "save": "حفظ",
+      "saving": "جارٍ الحفظ...",
+      "delete": "حذف",
+      "deleting": "جارٍ الحذف...",
+      "confirmDelete": "تأكيد الحذف",
+      "add": "إضافة",
+      "adding": "جارٍ الإضافة...",
+      "remove": "إزالة"
+    },
+    "settings": {
+      "heading": "الإعدادات"
+    },
+    "fields": {
+      "name": "الاسم",
+      "description": "الوصف",
+      "hookPoint": "نقطة الخطاف",
+      "priority": "الأولوية",
+      "enabled": "مفعّل",
+      "script": "السكربت (<code>/bin/sh -c</code>)"
+    },
+    "delete": {
+      "heading": "حذف خطاف التنفيذ",
+      "description": "حذف هذا الخطاف نهائيًا وإزالته من جميع مساحات العمل."
+    },
+    "workspaces": {
+      "scopeNote": "يعمل هذا الخطاف فقط على مساحات العمل المرتبطة أدناه. لا يوجد نطاق عام.",
+      "associate": "ربط مساحة عمل",
+      "workspaceLabel": "مساحة العمل",
+      "selectPlaceholder": "اختر مساحة عمل...",
+      "empty": "لا توجد مساحات عمل مرتبطة بهذا الخطاف.",
+      "colWorkspace": "مساحة العمل",
+      "colActions": "الإجراءات"
+    },
+    "confirm": {
+      "removeWorkspace": "إزالة مساحة العمل هذه من الخطاف؟ لن يعمل الخطاف لها بعد الآن."
+    },
+    "success": {
+      "updated": "حُدّث خطاف التنفيذ",
+      "workspaceAssociated": "رُبطت مساحة العمل",
+      "workspaceRemoved": "أُزيلت مساحة العمل"
+    },
+    "errors": {
+      "load": "فشل تحميل خطاف التنفيذ",
+      "update": "فشل تحديث خطاف التنفيذ",
+      "delete": "فشل حذف خطاف التنفيذ",
+      "addWorkspace": "فشل إضافة مساحة العمل",
+      "removeWorkspace": "فشل إزالة مساحة العمل"
+    }
+  },
+  "policySetDetail": {
+    "backLink": "مجموعات السياسات",
+    "notFound": "غير موجود",
+    "unknown": "غير معروف",
+    "subtitle": "مجموعة سياسات OPA · أنشأها {createdBy}",
+    "settings": {
+      "heading": "الإعدادات"
+    },
+    "fields": {
+      "description": "الوصف",
+      "enforcement": "الإنفاذ",
+      "enabled": "مفعّل",
+      "globalScope": "عام (كل مساحات العمل)"
+    },
+    "enforcement": {
+      "advisory": "استشاري (تحذير)",
+      "mandatory": "إلزامي (حظر التطبيق)"
+    },
+    "scope": {
+      "allowLabels": "السماح بالتسميات (key: v1, v2)",
+      "allowLabelsPlaceholder": "env: prod, staging",
+      "allowNames": "السماح بالأسماء (واحد في كل سطر)",
+      "denyLabels": "منع التسميات (key: v1, v2)",
+      "denyNames": "منع الأسماء (واحد في كل سطر)"
+    },
+    "vcs": {
+      "heading": "إعدادات نظام التحكم بالإصدارات",
+      "repoUrl": "رابط المستودع",
+      "branch": "الفرع",
+      "branchPlaceholder": "main (الافتراضي)",
+      "policyPath": "مسار السياسة"
+    },
+    "vcsBanner": {
+      "syncedFrom": "تمت مزامنة السياسات من",
+      "at": "في",
+      "lastSynced": "آخر مزامنة {time}",
+      "commit": "(الالتزام {sha})",
+      "syncError": "خطأ في المزامنة: {error}"
+    },
+    "policies": {
+      "heading": "السياسات ({count})",
+      "vcsManaged": "مُدارة بواسطة المستودع — ادفع التغييرات عبر طلب سحب",
+      "empty": "لا توجد سياسات في هذه المجموعة بعد."
+    },
+    "addPolicy": {
+      "namePlaceholder": "اسم السياسة",
+      "descPlaceholder": "الوصف (اختياري)",
+      "regoHint": "Rego v1. يجب أن يعلن <code>package terrapod</code> وأن يعبّر عن الانتهاكات عبر مجموعة <code>deny</code>. الخطة هي <code>input</code>؛ وسياق Terrapod هو <code>data.terrapod_context</code>."
+    },
+    "actions": {
+      "saving": "جارٍ الحفظ...",
+      "saveSettings": "حفظ الإعدادات",
+      "syncNow": "مزامنة الآن",
+      "cancel": "إلغاء",
+      "addPolicy": "إضافة سياسة",
+      "deleteSet": "حذف المجموعة",
+      "validatingRego": "جارٍ التحقق من Rego...",
+      "delete": "حذف",
+      "savePolicy": "حفظ السياسة"
+    },
+    "confirm": {
+      "deleteSet": "حذف مجموعة السياسات هذه وجميع سياساتها؟ تُحفظ تقييمات التشغيل المسجّلة.",
+      "deletePolicy": "حذف السياسة \"{name}\"؟"
+    },
+    "errors": {
+      "load": "فشل تحميل مجموعة السياسات",
+      "save": "فشل حفظ مجموعة السياسات",
+      "saveStatus": "فشل الحفظ ({status})",
+      "delete": "فشل حذف مجموعة السياسات",
+      "deleteStatus": "فشل الحذف ({status})",
+      "addPolicy": "فشل إضافة السياسة",
+      "addPolicyStatus": "فشل إضافة السياسة ({status})",
+      "savePolicy": "فشل حفظ السياسة",
+      "savePolicyStatus": "فشل حفظ السياسة ({status})",
+      "deletePolicy": "فشل حذف السياسة",
+      "deletePolicyStatus": "فشل الحذف ({status})"
+    }
+  },
+  "slackLink": {
+    "title": "ربط Slack بـ Terrapod",
+    "loading": "جارٍ التحميل…",
+    "checking": "جارٍ التحقق من ربطك…",
+    "linking": "جارٍ ربط حساب Slack الخاص بك…",
+    "unknown": "غير معروف",
+    "confirm": {
+      "prompt": "هل تريد ربط حساب Slack هذا بهوية <em>Terrapod</em> الخاصة بك؟ سيُنفَّذ كل إجراء Slack مستقبلي (موافقة/تجاهل) بصفتك مستخدم Terrapod هذا وبأذوناته.",
+      "slackUser": "مستخدم Slack",
+      "slackTeam": "فريق Slack",
+      "terrapodAccount": "حساب Terrapod",
+      "warning": "تابع فقط إذا كنت قد بدأت هذا الربط من Slack بنفسك للتو. إن لم تفعل، فأغلق هذه العلامة ولا تربط — فهذا يربط حساب Slack أعلاه بهوية <em>Terrapod</em> الخاصة بك.",
+      "button": "تأكيد وربط"
+    },
+    "success": {
+      "message": "أصبح حساب Slack الخاص بك الآن مرتبطًا بـ Terrapod.",
+      "linkedAs": "مرتبط كـ <em>{email}</em>. يمكنك إغلاق هذه العلامة والعودة إلى Slack."
+    },
+    "errors": {
+      "missingLink": "رابط مفقود أو غير صالح. ابدأ من جديد بأمر ربط Terrapod في Slack.",
+      "invalidLink": "هذا الرابط غير صالح أو منتهي الصلاحية أو مُستخدَم بالفعل. ابدأ الربط من جديد من Slack.",
+      "linkingFailed": "فشل الربط."
+    }
+  },
+  "cliComplete": {
+    "loading": "جارٍ التحميل...",
+    "completing": "جارٍ إكمال المصادقة...",
+    "invalid": {
+      "title": "طلب غير صالح",
+      "description": "معاملات مطلوبة مفقودة."
+    },
+    "success": {
+      "title": "نجح تسجيل الدخول",
+      "complete": "أُنشئ رمز واجهة برمجة التطبيقات. يمكنك إغلاق هذه العلامة التبويبية."
+    },
+    "fallback": {
+      "description": "تعذّر الوصول إلى واجهة سطر الأوامر تلقائيًا.",
+      "button": "انقر هنا للإكمال يدويًا"
+    },
+    "timeout": {
+      "description": "قد لا تكون واجهة سطر الأوامر قد أكملت تبادل الرمز. تحقّق من الطرفية."
+    }
+  },
+  "apiDocs": {
+    "view": "العرض:",
+    "redocTitle": "توثيق واجهة البرمجة ReDoc"
+  },
+  "onboarding": {
+    "title": "إدماج الموارد الموجودة",
+    "backTo": "العودة إلى {workspace}",
+    "description": "اكتشف موارد السحابة الموجودة غير المُدارة في {workspace} وأنشئ كتل موارد واستيراد قابلة للمراجعة.",
+    "providerLabel": "المزوّد",
+    "providerVersionLabel": "إصدار المزوّد (اختياري)",
+    "start": "بدء الاكتشاف",
+    "starting": "جارٍ البدء…",
+    "sessionsLabel": "جلسات الاكتشاف",
+    "empty": "لا توجد جلسات اكتشاف بعد. اختر مزوّدًا وابدأ واحدة أعلاه.",
+    "analysing": "جارٍ تحليل مخطط المزوّد… قد يستغرق هذا دقيقة في المرة الأولى (تنزيل المزوّد).",
+    "surfaceIntro": "حدِّد أيًّا من مصادر البيانات الـ {count} القابلة للاستعلام تريد اكتشافه.",
+    "filterPlaceholder": "تصفية مصادر البيانات…",
+    "noMatches": "لا توجد مصادر بيانات تطابق عامل التصفية الخاص بك.",
+    "discover": "اكتشاف {count} نوع (أنواع)",
+    "discovering": "جارٍ الإرسال…",
+    "queryingHint": "جارٍ اكتشاف الموارد — المنفِّذ يستعلم من سحابتك وينشئ التهيئة.",
+    "viewRun": "عرض التشغيل",
+    "reviewIntro": "أُنشئ من: {types}. راجِع أدناه، ثم انقل التهيئة إلى مساحة عملك وطبِّق الاستيراد.",
+    "importBlocks": "كتل الاستيراد",
+    "generatedConfig": "التهيئة المُنشأة",
+    "copy": "نسخ",
+    "copied": "تم النسخ",
+    "nextStepNote": "التالي: انقل هذه التهيئة إلى مستودع مساحة عملك ونفِّذها — الإدماج الصحيح يخطِّط للاستيراد فقط (0 للإضافة / 0 للتغيير / 0 للتدمير).",
+    "erroredFallback": "فشل تشغيل الاكتشاف. افتح التشغيل لعرض السجلات.",
+    "viewRunLogs": "عرض سجلات التشغيل",
+    "noResources": "لم يُعثَر على موارد {types} غير مُدارة في هذا الحساب/المنطقة.",
+    "aiPolishedBadge": "مُنقَّح بالذكاء الاصطناعي",
+    "aiPolishedNote": "أُعيدت تسمية الموارد من الوسوم، وجُمِّعت، وعُلِّق عليها — قيم السمات ومُعرِّفات الاستيراد دون تغيير.",
+    "viewPolished": "مُنقَّح",
+    "viewRaw": "خام",
+    "pairedTitle": "أزواج الاستيراد + المورد",
+    "pairedNote": "تقع كل كتلة استيراد مباشرة فوق المورد الذي تستهدفه — انسخ زوجًا، أو استخدم الكتل المنفصلة أدناه.",
+    "state": {
+      "pending": "جارٍ تحليل المخطط",
+      "schema_ready": "جاهز للاكتشاف",
+      "querying": "جارٍ الاكتشاف",
+      "config_ready": "التهيئة جاهزة",
+      "run_created": "تم إنشاء تشغيل الاستيراد",
+      "errored": "حدث خطأ",
+      "canceled": "أُلغي"
+    }
+  }
+}

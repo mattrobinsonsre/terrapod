@@ -120,7 +120,7 @@ export function ResourceUsage({
           <span className="font-mono">
             {peakMemoryBytes !== null ? humanBytes(peakMemoryBytes) : '—'}
             {memPct !== null && (
-              <span className="ml-2 text-slate-500">{memPct.toFixed(0)}%</span>
+              <span className="ms-2 text-slate-500">{memPct.toFixed(0)}%</span>
             )}
           </span>
         </div>

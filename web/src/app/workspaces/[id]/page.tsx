@@ -2415,7 +2415,7 @@ function WorkspaceDetailContent() {
                 <div className="sm:col-span-2">
                   <dt className="text-xs text-slate-500">
                     {t('aiSummary.contextLabel')}
-                    <span className="ml-2 text-slate-600">{t('aiSummary.contextLabelSuffix')}</span>
+                    <span className="ms-2 text-slate-600">{t('aiSummary.contextLabelSuffix')}</span>
                   </dt>
                   <dd className="mt-1">
                     {perms['can-update'] ? (
@@ -2445,7 +2445,7 @@ function WorkspaceDetailContent() {
                     )}
                     <p className="text-xs text-slate-500 mt-1">
                       {t('aiSummary.contextHint')}
-                      {savingAiSummary && <span className="ml-2 text-brand-400">{t('actions.saving')}</span>}
+                      {savingAiSummary && <span className="ms-2 text-brand-400">{t('actions.saving')}</span>}
                     </p>
                   </dd>
                 </div>
@@ -2489,7 +2489,7 @@ function WorkspaceDetailContent() {
                     )}
                     <p className="text-xs text-slate-500 mt-1">
                       {t('slack.hint')}
-                      {savingSlackChannel && <span className="ml-2 text-brand-400">{t('actions.saving')}</span>}
+                      {savingSlackChannel && <span className="ms-2 text-brand-400">{t('actions.saving')}</span>}
                     </p>
                   </dd>
                 </div>
@@ -2596,7 +2596,7 @@ function WorkspaceDetailContent() {
                       <SortableHeader label={t('variables.key')} sortKey="key" sortState={varSortState} onSort={toggleVarSort} />
                       <SortableHeader label={t('variables.value')} sortKey="value" sortState={varSortState} onSort={toggleVarSort} />
                       <SortableHeader label={t('variables.category')} sortKey="category" sortState={varSortState} onSort={toggleVarSort} className="hidden sm:table-cell" />
-                      <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">{t('common.actions')}</th>
+                      <th className="px-4 py-3 text-end text-xs font-medium text-slate-400 uppercase tracking-wider">{t('common.actions')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-700/30">
@@ -2633,7 +2633,7 @@ function WorkspaceDetailContent() {
                               </label>
                             </div>
                           </td>
-                          <td className="px-4 py-3 text-right">
+                          <td className="px-4 py-3 text-end">
                             <div className="flex justify-end gap-2">
                               <button onClick={() => setEditingVarId(null)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200">{t('actions.cancel')}</button>
                               <button onClick={handleSaveVar} disabled={savingVar} className="px-2.5 py-1 rounded-md text-xs font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white">
@@ -2656,7 +2656,7 @@ function WorkspaceDetailContent() {
                             </span>
                           </td>
                           {perms['can-update-variable'] && (
-                            <td className="px-4 py-3 text-right">
+                            <td className="px-4 py-3 text-end">
                               <div className="flex justify-end gap-2">
                                 <button onClick={() => startEditingVar(v)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200">{t('actions.edit')}</button>
                                 <button onClick={() => handleDeleteVariable(v.id)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300">{t('actions.delete')}</button>
@@ -2933,7 +2933,7 @@ function WorkspaceDetailContent() {
                       <SortableHeader label={t('runs.runId')} sortKey="id" sortState={runSortState} onSort={toggleRunSort} />
                       <SortableHeader label={t('runs.status')} sortKey="status" sortState={runSortState} onSort={toggleRunSort} />
                       <SortableHeader label={t('runs.type')} sortKey="type" sortState={runSortState} onSort={toggleRunSort} className="hidden sm:table-cell" />
-                      <th className="text-left px-4 py-2 text-xs font-medium text-slate-400 uppercase tracking-wider hidden md:table-cell">{t('runs.changes')}</th>
+                      <th className="text-start px-4 py-2 text-xs font-medium text-slate-400 uppercase tracking-wider hidden md:table-cell">{t('runs.changes')}</th>
                       <SortableHeader label={t('runs.source')} sortKey="source" sortState={runSortState} onSort={toggleRunSort} className="hidden sm:table-cell" />
                       <SortableHeader label={t('runs.triggeredBy')} sortKey="created-by" sortState={runSortState} onSort={toggleRunSort} className="hidden lg:table-cell" />
                       <SortableHeader label={t('runs.created')} sortKey="created-at" sortState={runSortState} onSort={toggleRunSort} className="hidden md:table-cell" />
@@ -3181,10 +3181,10 @@ function WorkspaceDetailContent() {
                       <tr className="border-b border-slate-700/50">
                         <SortableHeader label={t('state.serial')} sortKey="serial" sortState={stateSortState} onSort={toggleStateSort} />
                         <SortableHeader label={t('state.createdBy')} sortKey="created-by" sortState={stateSortState} onSort={toggleStateSort} />
-                        <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">{t('state.run')}</th>
+                        <th className="px-4 py-3 text-start text-xs font-medium text-slate-400 uppercase tracking-wider">{t('state.run')}</th>
                         <SortableHeader label={t('state.size')} sortKey="size" sortState={stateSortState} onSort={toggleStateSort} />
                         <SortableHeader label={t('state.created')} sortKey="created-at" sortState={stateSortState} onSort={toggleStateSort} className="hidden lg:table-cell" />
-                        <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">{t('common.actions')}</th>
+                        <th className="px-4 py-3 text-end text-xs font-medium text-slate-400 uppercase tracking-wider">{t('common.actions')}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-700/30">
@@ -3213,7 +3213,7 @@ function WorkspaceDetailContent() {
                             <td className="px-4 py-3 text-xs text-slate-500 hidden lg:table-cell">
                               {sv.attributes['created-at'] ? new Date(sv.attributes['created-at']).toLocaleString() : ''}
                             </td>
-                            <td className="px-4 py-3 text-right">
+                            <td className="px-4 py-3 text-end">
                               <div className="flex items-center justify-end gap-2">
                                 <button
                                   onClick={() => downloadStateVersion(sv)}
@@ -3365,11 +3365,11 @@ function WorkspaceDetailContent() {
                     <thead className="bg-slate-900/50 text-slate-400">
                       <tr>
                         <th className="w-8 px-2 py-3" aria-hidden />
-                        <th className="px-4 py-3 text-left font-medium">{t('configurations.id')}</th>
-                        <th className="px-4 py-3 text-left font-medium">{t('configurations.source')}</th>
-                        <th className="px-4 py-3 text-left font-medium">{t('configurations.status')}</th>
-                        <th className="px-4 py-3 text-left font-medium">{t('configurations.created')}</th>
-                        <th className="px-4 py-3 text-right font-medium">{t('actions.download')}</th>
+                        <th className="px-4 py-3 text-start font-medium">{t('configurations.id')}</th>
+                        <th className="px-4 py-3 text-start font-medium">{t('configurations.source')}</th>
+                        <th className="px-4 py-3 text-start font-medium">{t('configurations.status')}</th>
+                        <th className="px-4 py-3 text-start font-medium">{t('configurations.created')}</th>
+                        <th className="px-4 py-3 text-end font-medium">{t('actions.download')}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800">
@@ -3392,7 +3392,7 @@ function WorkspaceDetailContent() {
                             <td className="px-4 py-3 font-mono text-xs">
                               <span className="text-slate-200">{cv.id}</span>
                               {isCurrent && (
-                                <span className="ml-2 inline-flex items-center rounded bg-green-900/40 px-1.5 py-0.5 text-xs font-medium text-green-300">
+                                <span className="ms-2 inline-flex items-center rounded bg-green-900/40 px-1.5 py-0.5 text-xs font-medium text-green-300">
                                   {t('configurations.current')}
                                 </span>
                               )}
@@ -3402,7 +3402,7 @@ function WorkspaceDetailContent() {
                             <td className="px-4 py-3 text-slate-400">
                               {new Date(cv.attributes['created-at']).toLocaleString()}
                             </td>
-                            <td className="px-4 py-3 text-right">
+                            <td className="px-4 py-3 text-end">
                               {canDownload ? (
                                 <button
                                   type="button"
@@ -3893,7 +3893,7 @@ function WorkspaceDetailContent() {
                       <a href={`/workspaces/${edge.workspaceId}`} className="text-brand-400 hover:text-brand-300 font-medium">
                         {edge.workspaceName || edge.workspaceId}
                       </a>
-                      <span className="ml-2 text-xs text-slate-500">{t('runTriggers.destinationNote')}</span>
+                      <span className="ms-2 text-xs text-slate-500">{t('runTriggers.destinationNote')}</span>
                     </li>
                   ))}
                 </ul>
@@ -3932,7 +3932,7 @@ function WorkspaceDetailContent() {
                           {e.consumerName || e.consumerId}
                         </a>
                         {e.createdBy && (
-                          <span className="ml-2 text-xs text-slate-500">{t('sharing.grantedBy', { by: e.createdBy })}</span>
+                          <span className="ms-2 text-xs text-slate-500">{t('sharing.grantedBy', { by: e.createdBy })}</span>
                         )}
                       </div>
                       {perms['can-update'] && (
@@ -3974,7 +3974,7 @@ function WorkspaceDetailContent() {
                       <a href={`/workspaces/${e.producerId}`} className="text-brand-400 hover:text-brand-300 font-medium">
                         {e.producerName || e.producerId}
                       </a>
-                      <span className="ml-2 text-xs text-slate-500">{t('sharing.producerNote')}</span>
+                      <span className="ms-2 text-xs text-slate-500">{t('sharing.producerNote')}</span>
                     </li>
                   ))}
                 </ul>

@@ -224,8 +224,8 @@ export default function CatalogItemPage() {
       <div key={field.name}>
         <label htmlFor={id} className="block text-sm font-medium text-slate-300 mb-1">
           {field.name}
-          {field.required && <span className="text-red-400 ml-0.5">*</span>}
-          <span className="ml-2 text-[10px] uppercase tracking-wide text-slate-500">{field.source}</span>
+          {field.required && <span className="text-red-400 ms-0.5">*</span>}
+          <span className="ms-2 text-[10px] uppercase tracking-wide text-slate-500">{field.source}</span>
         </label>
         {field.description && (
           <p className="text-xs text-slate-500 mb-1">{field.description}</p>
@@ -525,7 +525,7 @@ export default function CatalogItemPage() {
             {provError && <ErrorBanner message={provError} />}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
-                <label htmlFor="prov-name" className="block text-sm font-medium text-slate-300 mb-1">{t('provision.workspaceName')}<span className="text-red-400 ml-0.5">*</span></label>
+                <label htmlFor="prov-name" className="block text-sm font-medium text-slate-300 mb-1">{t('provision.workspaceName')}<span className="text-red-400 ms-0.5">*</span></label>
                 <input
                   id="prov-name"
                   type="text"
@@ -539,7 +539,7 @@ export default function CatalogItemPage() {
                 />
               </div>
               <div>
-                <label htmlFor="prov-pool" className="block text-sm font-medium text-slate-300 mb-1">{t('provision.agentPool')}<span className="text-red-400 ml-0.5">*</span></label>
+                <label htmlFor="prov-pool" className="block text-sm font-medium text-slate-300 mb-1">{t('provision.agentPool')}<span className="text-red-400 ms-0.5">*</span></label>
                 <select
                   id="prov-pool"
                   value={provPoolId}
@@ -625,10 +625,10 @@ export default function CatalogItemPage() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-slate-700/50">
-                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">{t('instances.colName')}</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider hidden sm:table-cell">{t('instances.colVersion')}</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider hidden md:table-cell">{t('instances.colPool')}</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">{t('instances.colActions')}</th>
+                    <th className="px-4 py-3 text-start text-xs font-medium text-slate-400 uppercase tracking-wider">{t('instances.colName')}</th>
+                    <th className="px-4 py-3 text-start text-xs font-medium text-slate-400 uppercase tracking-wider hidden sm:table-cell">{t('instances.colVersion')}</th>
+                    <th className="px-4 py-3 text-start text-xs font-medium text-slate-400 uppercase tracking-wider hidden md:table-cell">{t('instances.colPool')}</th>
+                    <th className="px-4 py-3 text-end text-xs font-medium text-slate-400 uppercase tracking-wider">{t('instances.colActions')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-700/30">
@@ -647,7 +647,7 @@ export default function CatalogItemPage() {
                         <td className="px-4 py-3 text-xs text-slate-400 hidden md:table-cell">
                           {poolName || inst.attributes['agent-pool-id'] || '—'}
                         </td>
-                        <td className="px-4 py-3 text-right">
+                        <td className="px-4 py-3 text-end">
                           <div className="flex justify-end gap-2">
                             <button onClick={() => startReconfigure(inst)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200">{t('instances.reconfigure')}</button>
                             <button onClick={() => { setDestroyInstance(inst); setDestroyError(''); setDestroyAutoApply(false) }} className="px-2.5 py-1 rounded-md text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300">{t('instances.destroy')}</button>

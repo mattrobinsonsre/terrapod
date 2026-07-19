@@ -251,7 +251,7 @@ export default function BulkUpdatePage() {
         <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-slate-700/50 text-left text-xs text-slate-400 uppercase">
+              <tr className="border-b border-slate-700/50 text-start text-xs text-slate-400 uppercase">
                 <th className="px-4 py-2">{t('diff.colWorkspace')}</th>
                 <th className="px-4 py-2">{t('diff.colChanges')}</th>
               </tr>
@@ -416,7 +416,7 @@ export default function BulkUpdatePage() {
               <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-slate-700/50 text-left text-xs text-slate-400 uppercase">
+                    <tr className="border-b border-slate-700/50 text-start text-xs text-slate-400 uppercase">
                       <th className="px-4 py-2">{t('results.colName')}</th>
                       <th className="px-4 py-2">{t('results.colMode')}</th>
                       <th className="px-4 py-2">{t('results.colBackend')}</th>

@@ -766,7 +766,7 @@ export default function AutodiscoveryPage() {
         ) : (
           <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="text-left text-slate-400 border-b border-slate-800">
+            <thead className="text-start text-slate-400 border-b border-slate-800">
               <tr>
                 <SortableHeader label={t('table.name')} sortKey="name" sortState={sortState} onSort={toggleSort} />
                 <SortableHeader label={t('table.repo')} sortKey="repo" sortState={sortState} onSort={toggleSort} />
@@ -794,7 +794,7 @@ export default function AutodiscoveryPage() {
                   <td className="py-3 text-slate-400">
                     {fmt.date(r.attributes['created-at'])}
                   </td>
-                  <td className="py-3 text-right">
+                  <td className="py-3 text-end">
                     <div className="flex justify-end gap-2">
                       <button
                         onClick={() => openPreview(r.id, r.attributes.name)}
@@ -887,9 +887,9 @@ export default function AutodiscoveryPage() {
                   <table className="w-full text-sm">
                     <thead className="bg-slate-800/50 sticky top-0">
                       <tr className="border-b border-slate-700/50">
-                        <th className="text-left px-3 py-2 text-xs font-medium text-slate-400 uppercase">{t('preview.colWorkspace')}</th>
-                        <th className="text-left px-3 py-2 text-xs font-medium text-slate-400 uppercase">{t('preview.colDirectory')}</th>
-                        <th className="text-left px-3 py-2 text-xs font-medium text-slate-400 uppercase">{t('preview.colAction')}</th>
+                        <th className="text-start px-3 py-2 text-xs font-medium text-slate-400 uppercase">{t('preview.colWorkspace')}</th>
+                        <th className="text-start px-3 py-2 text-xs font-medium text-slate-400 uppercase">{t('preview.colDirectory')}</th>
+                        <th className="text-start px-3 py-2 text-xs font-medium text-slate-400 uppercase">{t('preview.colAction')}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-700/30">

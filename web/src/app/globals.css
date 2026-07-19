@@ -123,3 +123,25 @@ body {
   /* Keep dots evenly spaced regardless of the field's normal font. */
   letter-spacing: 0.05em;
 }
+
+/* Bidi isolation for RTL locales (#829). Under `dir="rtl"` the UI prose flows
+   right-to-left, but code, resource addresses (aws_instance.web), IDs, hashes,
+   versions, URLs, and log/plan output are Latin identifiers that must stay
+   left-to-right — otherwise a `terraform_data.x` embedded in an Arabic sentence
+   visually scrambles (the trailing punctuation/number jumps to the wrong end).
+   Everything code-like in this app is rendered as `<code>` or `.font-mono`, so
+   one rule isolates all of it: `direction: ltr` pins the run LTR and
+   `unicode-bidi: isolate` stops it re-ordering against the surrounding RTL text.
+   Scoped to `[dir="rtl"]` so LTR rendering is untouched. */
+[dir="rtl"] code,
+[dir="rtl"] .font-mono {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+/* Inline code sits inside RTL prose; keep it visually on the text side it was
+   authored next to (start edge) rather than forcing left. `isolate` already
+   fixes ordering; this keeps the isolated island from drifting. */
+[dir="rtl"] :is(p, li, span, div) > code {
+  text-align: start;
+}

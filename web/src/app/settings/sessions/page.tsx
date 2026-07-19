@@ -127,7 +127,7 @@ export default function SessionsPage() {
                         <SortableHeader label={t('sessions.columns.created')} sortKey="created_at" sortState={sortState} onSort={toggleSort} />
                         <SortableHeader label={t('sessions.columns.expires')} sortKey="expires_at" sortState={sortState} onSort={toggleSort} />
                         <SortableHeader label={t('sessions.columns.lastActive')} sortKey="last_active_at" sortState={sortState} onSort={toggleSort} />
-                        <th className="text-left px-4 py-3 text-slate-400 font-medium">{t('sessions.columns.token')}</th>
+                        <th className="text-start px-4 py-3 text-slate-400 font-medium">{t('sessions.columns.token')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -136,7 +136,7 @@ export default function SessionsPage() {
                           <td className="px-4 py-3 text-slate-200">
                             {s.provider_name}
                             {s.is_current && (
-                              <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-brand-900/50 text-brand-300 border border-brand-700/50">
+                              <span className="ms-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-brand-900/50 text-brand-300 border border-brand-700/50">
                                 {t('sessions.current')}
                               </span>
                             )}

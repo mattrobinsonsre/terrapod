@@ -302,7 +302,7 @@ function MobileDrawer({
   return (
     <div
       id={id}
-      className="lg:hidden fixed top-0 left-0 right-0 h-dvh z-40 bg-slate-900 flex flex-col"
+      className="lg:hidden fixed top-0 start-0 end-0 h-dvh z-40 bg-slate-900 flex flex-col"
     >
       <div className="flex items-center justify-between h-14 px-4 border-b border-slate-800 flex-shrink-0">
         <span className="font-bold text-lg text-slate-100">{title}</span>
@@ -400,7 +400,7 @@ export default function NavBar() {
               tall, ugly multi-row bar that (being sticky) also covers page
               content beneath it. Below `lg` we use the clean hamburger instead. */}
           <div className="hidden lg:flex items-center gap-1 py-2">
-            <Link href="/" className="flex items-center gap-2 mr-3 flex-shrink-0">
+            <Link href="/" className="flex items-center gap-2 me-3 flex-shrink-0">
               <img src="/logo.svg" alt="Terrapod" className="w-7 h-7" />
               <span className="font-bold text-lg text-slate-100">Terrapod</span>
               {version && <span className="text-xs text-slate-500 font-normal">{version}</span>}

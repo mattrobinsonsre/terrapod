@@ -248,7 +248,7 @@ export default function OnboardingPage() {
             href={`/workspaces/${workspaceId}`}
             className="text-sm text-slate-400 hover:text-slate-200"
           >
-            {/* i18n-ignore — decorative left-arrow glyph, not copy */}&larr;{' '}
+            {/* i18n-ignore — decorative start-arrow glyph, not copy */}&larr;{' '}
             {t('backTo', { workspace: wsName || workspaceId })}
           </Link>
         </div>
@@ -451,7 +451,7 @@ export default function OnboardingPage() {
                       ✨ {t('aiPolishedBadge')}
                     </span>
                     <span className="text-xs text-slate-500">{t('aiPolishedNote')}</span>
-                    <div className="ml-auto inline-flex overflow-hidden rounded-lg border border-slate-700">
+                    <div className="ms-auto inline-flex overflow-hidden rounded-lg border border-slate-700">
                       <button
                         type="button"
                         onClick={() => setShowRaw(false)}

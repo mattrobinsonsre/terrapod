@@ -1,0 +1,2678 @@
+{
+  "nav": {
+    "workspaces": "فضاهای کاری",
+    "estate": "دارایی‌ها",
+    "registry": "رجیستری",
+    "modules": "ماژول‌ها",
+    "providers": "ارائه‌دهندگان",
+    "catalog": "کاتالوگ",
+    "agentPools": "استخرهای عامل",
+    "admin": "مدیریت",
+    "users": "کاربران",
+    "roles": "نقش‌ها",
+    "vcsConnections": "اتصال‌های VCS",
+    "variableSets": "مجموعه‌های متغیر",
+    "autodiscovery": "کشف خودکار",
+    "bulkUpdate": "به‌روزرسانی گروهی",
+    "executionHooks": "قلاب‌های اجرا",
+    "policySets": "مجموعه‌های سیاست",
+    "providerTemplates": "قالب‌های ارائه‌دهنده",
+    "catalogAdmin": "مدیریت کاتالوگ",
+    "cache": "حافظه پنهان",
+    "auditLog": "گزارش ممیزی",
+    "help": "راهنما",
+    "apiReference": "مرجع API",
+    "docs": "مستندات",
+    "account": "حساب",
+    "apiTokens": "توکن‌های API",
+    "sessions": "نشست‌ها",
+    "logOut": "خروج",
+    "menu": "منو",
+    "openMenu": "باز کردن منو",
+    "openAccountMenu": "باز کردن منوی حساب",
+    "closeMenu": "بستن منو"
+  },
+  "switcher": {
+    "language": "زبان",
+    "changeLanguage": "تغییر زبان"
+  },
+  "workspaces": {
+    "title": "فضاهای کاری",
+    "description": "مدیریت فضاهای کاری Terraform، وضعیت و اجراها",
+    "new": "فضای کاری جدید",
+    "cancel": "لغو",
+    "create": "ایجاد فضای کاری",
+    "creating": "در حال ایجاد…",
+    "loadFailed": "بارگذاری فضاهای کاری ناموفق بود",
+    "createFailed": "ایجاد فضای کاری ناموفق بود",
+    "form": {
+      "name": "نام",
+      "namePattern": "فقط حروف، اعداد، خط تیره و زیرخط. باید با یک حرف یا عدد شروع شود.",
+      "namePlaceholder": "my-workspace",
+      "executionMode": "حالت اجرا",
+      "local": "محلی",
+      "agent": "عامل",
+      "executionBackend": "پشتیبان اجرا",
+      "version": "نسخه",
+      "versionTitle": "نسخه در قالب X.Y یا X.Y.Z (مثلاً 1.11 یا 1.11.5)",
+      "versionPlaceholder": "مثلاً 1.11 یا 1.11.5",
+      "cpuRequest": "درخواست CPU",
+      "cpuTitle": "مقدار CPU در Kubernetes: هسته‌های کامل (1، 2) یا میلی‌هسته (500m، 100m)",
+      "cpuHint": "مثلاً 1، 0.5، 500m",
+      "memoryRequest": "درخواست حافظه",
+      "memoryTitle": "مقدار حافظه در Kubernetes: بایت (1000) یا با پسوند (512Mi، 2Gi، 1Ti)",
+      "memoryHint": "مثلاً 2Gi، 512Mi، 1Ti",
+      "agentPool": "استخر عامل",
+      "none": "هیچ‌کدام",
+      "autoApply": "اعمال خودکار",
+      "enabled": "فعال",
+      "workingDirectory": "پوشهٔ کاری",
+      "workingDirectoryPlaceholder": "مثلاً environments/dev",
+      "workingDirectoryHint": "زیرپوشه‌ای درون مخزن که فایل‌های ‎.tf را دربردارد",
+      "vcsConnection": "اتصال VCS",
+      "vcsRepoUrl": "نشانی مخزن VCS",
+      "vcsRepoUrlTitle": "باید یک نشانی HTTP یا HTTPS باشد",
+      "vcsRepoUrlPlaceholder": "https://github.com/org/repo",
+      "vcsBranch": "شاخهٔ VCS",
+      "vcsBranchPlaceholder": "main (پیش‌فرض)"
+    },
+    "stats": {
+      "total": "کل",
+      "health": "سلامت",
+      "locked": "قفل‌شده",
+      "clearAllFilters": "پاک کردن همهٔ فیلترها",
+      "clearHealthFilter": "پاک کردن فیلتر مسائل سلامت",
+      "filterHealth": "فیلتر به فضاهای کاری دارای مسائل سلامت",
+      "clearLockedFilter": "پاک کردن فیلتر قفل‌شده",
+      "filterLocked": "فیلتر به فضاهای کاری قفل‌شده"
+    },
+    "filter": {
+      "placeholder": "فیلتر بر اساس نام، برچسب یا وضعیت — مثلاً «eu1»، «env:prod»، «status:errored»",
+      "ariaLabel": "فیلتر فضاهای کاری",
+      "clear": "پاک کردن",
+      "status": "وضعیت",
+      "label": "برچسب",
+      "back": "بازگشت",
+      "valueCount": "{count, plural, one {# مقدار} other {# مقدار}}",
+      "removeTerm": "حذف این عبارت",
+      "showing": "نمایش {filtered} از {total}",
+      "termName": "نام: {value}",
+      "termStatus": "وضعیت: {value}",
+      "termLabelAny": "{key}: (هر مقدار)",
+      "termLabel": "{key}: {value}",
+      "hintStatus": "وضعیت",
+      "hintHealth": "سلامت",
+      "hintLabel": "برچسب",
+      "hintLabelKey": "کلید برچسب",
+      "hintName": "نام"
+    },
+    "row": {
+      "removeLabelFilter": "برای حذف از فیلتر کلیک کنید",
+      "addLabelFilter": "برای فیلتر بر اساس این برچسب کلیک کنید"
+    },
+    "table": {
+      "name": "نام",
+      "mode": "حالت",
+      "pool": "استخر",
+      "resources": "منابع",
+      "status": "وضعیت",
+      "created": "ایجادشده",
+      "resourcesValue": "{cpu} CPU / {memory}"
+    },
+    "empty": {
+      "none": "هنوز فضای کاری‌ای وجود ندارد. برای شروع یکی ایجاد کنید.",
+      "noMatch": "هیچ فضای کاری با این فیلتر مطابقت ندارد."
+    }
+  },
+  "status": {
+    "state-diverged": "وضعیت واگرا",
+    "vcs-error": "خطای VCS",
+    "drifted": "منحرف‌شده",
+    "errored": "با خطا مواجه شد",
+    "needs-confirm": "نیازمند تأیید",
+    "planning": "در حال طرح‌ریزی",
+    "applying": "در حال اعمال",
+    "canceling": "در حال لغو",
+    "confirmed": "تأییدشده",
+    "queued": "در صف",
+    "pending": "در انتظار",
+    "applied": "اعمال‌شده",
+    "planned": "طرح‌ریزی‌شده",
+    "canceled": "لغوشده",
+    "discarded": "دورانداخته‌شده",
+    "pendingDeletion": "در انتظار حذف",
+    "archived": "بایگانی‌شده"
+  },
+  "auth": {
+    "loading": "در حال بارگذاری...",
+    "subtitle": "برای مدیریت زیرساخت خود وارد شوید",
+    "subtitleCli": "برای مجوز دادن به CLI وارد شوید",
+    "emailLabel": "ایمیل",
+    "passwordLabel": "گذرواژه",
+    "signIn": "ورود",
+    "signingIn": "در حال ورود...",
+    "signInWith": "ورود با {provider}",
+    "or": "یا",
+    "noProviders": "هیچ ارائه‌دهنده احرازهویتی پیکربندی نشده است",
+    "completingSignIn": "در حال تکمیل ورود...",
+    "callbackFailedTitle": "احرازهویت ناموفق بود",
+    "tryAgain": "دوباره تلاش کنید",
+    "errors": {
+      "loadProviders": "بارگذاری ارائه‌دهندگان ناموفق بود",
+      "authenticationFailed": "احرازهویت ناموفق بود ({status})",
+      "tokenExchangeFailed": "تبادل توکن ناموفق بود ({status})",
+      "loginFailed": "ورود ناموفق بود",
+      "startLoginFailed": "شروع ورود ناموفق بود",
+      "missingCodeOrState": "کد مجوز یا وضعیت یافت نشد",
+      "stateMismatch": "عدم تطابق وضعیت — احتمال حمله CSRF",
+      "missingVerifier": "تأییدکننده PKCE یافت نشد — لطفاً دوباره وارد شوید"
+    }
+  },
+  "estate": {
+    "title": "توپولوژی املاک",
+    "description": "هر فضای کاری که می‌توانید ببینید و ماژول‌هایی که استفاده می‌کنند، متصل‌شده از طریق راه‌اندازهای اجرا، وضعیت راه دور و پیوندهای ماژول. بر اساس هر محوری که با املاک شما تناسب دارد گروه‌بندی کنید — پلتفرم هیچ قرارداد برچسب‌گذاری‌ای را تحمیل نمی‌کند.",
+    "errors": {
+      "load": "بارگذاری نمودار املاک ناموفق بود."
+    },
+    "groupBy": {
+      "label": "گروه‌بندی بر اساس",
+      "axis": {
+        "none": "هیچ‌چیز (یک رنگ)",
+        "pool": "استخر عامل",
+        "prefix": "پیشوند نام",
+        "label": "برچسب: {key}"
+      }
+    },
+    "view": {
+      "graph": "نمودار",
+      "table": "جدول"
+    },
+    "counts": {
+      "workspaces": "{count, plural, one {# فضای کاری} other {# فضای کاری}}",
+      "modules": "{count, plural, one {# ماژول} other {# ماژول}}",
+      "dependencies": "{count, plural, one {# وابستگی} other {# وابستگی}}"
+    },
+    "legend": {
+      "registryModule": "ماژول رجیستری"
+    },
+    "detail": {
+      "moduleImpact": "{count, plural, one {فضای کاری از این استفاده می‌کند — ارتقای آن دوباره برنامه‌ریزی‌اش می‌کند} other {فضای کاری از این استفاده می‌کنند — ارتقای آن همه را دوباره برنامه‌ریزی می‌کند}}",
+      "dependOnThis": "{count, plural, one {به این وابسته است} other {به این وابسته‌اند}}"
+    },
+    "table": {
+      "workspaces": {
+        "heading": "فضاهای کاری",
+        "col": {
+          "workspace": "فضای کاری",
+          "group": "گروه",
+          "agentPool": "استخر عامل",
+          "dependedOnBy": "وابسته‌ها",
+          "modulesUsed": "ماژول‌های استفاده‌شده"
+        },
+        "noModules": "—"
+      },
+      "modules": {
+        "heading": "ماژول‌ها",
+        "col": {
+          "module": "ماژول",
+          "usedBy": "استفاده‌شده توسط (فضاهای کاری)"
+        }
+      }
+    }
+  },
+  "labels": {
+    "title": "برچسب‌ها",
+    "description": "برچسب‌های در حال استفاده در فضاهای کاری، استخرهای عامل، ماژول‌های رجیستری و ارائه‌دهندگان رجیستری را مرور کنید. فقط‌خواندنی — برچسب‌ها در صفحهٔ خودِ هر موجودیت ویرایش می‌شوند.",
+    "none": "هیچ‌کدام.",
+    "emptyKeys": "هنوز هیچ برچسبی در حال استفاده نیست. هر فضای کاری، استخر عامل، ماژول رجیستری یا ارائه‌دهندهٔ رجیستری را برچسب بزنید تا گروه‌بندی چیزها را اینجا آغاز کنید.",
+    "emptyValues": "هیچ مقداری برای «{key}» وجود ندارد. یا هیچ موجودیت قابل‌خواندنی این برچسب را ندارد، یا از آخرین نما حذف شده است.",
+    "loadKeysFailed": "بارگذاری برچسب‌ها ناموفق بود ({status})",
+    "loadValuesFailed": "بارگذاری مقادیر برای {key} ناموفق بود ({status})",
+    "loadEntitiesFailed": "بارگذاری موجودیت‌ها ناموفق بود ({status})",
+    "columns": {
+      "labelKey": "کلید برچسب",
+      "distinctValues": "مقادیر متمایز",
+      "value": "مقدار",
+      "total": "مجموع"
+    },
+    "entity": {
+      "workspaces": "فضاهای کاری",
+      "agentPools": "استخرهای عامل",
+      "modules": "ماژول‌ها",
+      "providers": "ارائه‌دهندگان"
+    },
+    "deprecated": {
+      "badge": "منسوخ و پشتیبانی‌نشده.",
+      "body": "مرورگر برچسب‌ها دیگر در ناوبری اصلی نیست و در نسخه‌ای در آینده حذف خواهد شد. به‌جای آن از صفحهٔ <workspacesLink>فضاهای کاری</workspacesLink> بر پایهٔ برچسب فیلتر کنید. اگر به این صفحه متکی هستید، لطفاً <issueLink>یک مسئله باز کنید</issueLink>."
+    }
+  },
+  "settings": {
+    "tokens": {
+      "title": "توکن‌های API",
+      "description": "مدیریت توکن‌های احرازهویت برای CLI و خودکارسازی",
+      "descriptionAll": "همه توکن‌ها در میان همه کاربران",
+      "myTokens": "توکن‌های من",
+      "allTokens": "همه توکن‌ها",
+      "createToken": "ایجاد توکن",
+      "cancel": "لغو",
+      "tokenReady": "توکن آماده است",
+      "tokenReadyHelp": "همین حالا این توکن را کپی کنید — دیگر نمایش داده نخواهد شد.",
+      "dismissToken": "بستن توکن",
+      "hide": "پنهان کردن",
+      "show": "نمایش",
+      "copy": "کپی",
+      "empty": "هنوز هیچ توکن APIای وجود ندارد.",
+      "noDescription": "بدون توضیحات",
+      "detached": "منفصل",
+      "never": "هرگز",
+      "selected": "{count, plural, one {# توکن انتخاب شد} other {# توکن انتخاب شدند}}",
+      "revokeSelected": "ابطال انتخاب‌شده‌ها",
+      "revoking": "در حال ابطال...",
+      "clearSelection": "پاک کردن انتخاب",
+      "rotate": "چرخش",
+      "rotating": "در حال چرخش...",
+      "revoke": "ابطال",
+      "confirmRotate": "این توکن چرخانده شود؟ راز فعلی بلافاصله از کار می‌افتد و رازی جدید صادر می‌شود.",
+      "confirmBulkRevoke": "{count, plural, one {# توکن ابطال شود؟} other {# توکن ابطال شوند؟}}",
+      "kinds": {
+        "interactive": {
+          "label": "شخصی",
+          "help": "یک توکن شخصی برای CLI و خودکارسازی موردی. تمام دسترسی‌های زنده شما را حمل می‌کند."
+        },
+        "service_bound": {
+          "label": "سرویس · مقید",
+          "help": "یک توکن سرویس که به زیرمجموعه‌ای از نقش‌های شما محدود شده است. دسترسی آن اشتراک آن نقش‌ها و دسترسی خود شماست — و اگر حساب شما حذف شود از کار می‌افتد."
+        },
+        "service_detached": {
+          "label": "سرویس · منفصل",
+          "help": "یک توکن سرویس مدیریت‌شده توسط مدیر با دامنه مطلق پین‌شده، که به هیچ کاربری مقید نیست. برای خودکارسازی حیاتی ماشین‌به‌ماشین که باید از رفتن هر فرد جان سالم به در ببرد استفاده کنید."
+        }
+      },
+      "lifespans": {
+        "720": "۳۰ روز",
+        "2160": "۹۰ روز",
+        "4320": "۱۸۰ روز",
+        "8760": "۱ سال"
+      },
+      "filter": {
+        "all": "همه انواع"
+      },
+      "form": {
+        "description": "توضیحات",
+        "descriptionPlaceholder": "توکن خط‌لوله CI/CD",
+        "kind": "نوع",
+        "lifespan": "طول عمر",
+        "create": "ایجاد",
+        "creating": "در حال ایجاد...",
+        "pinnedRoles": "نقش‌های پین‌شده",
+        "pinnedRolesHelp": "— دامنه‌ای که این توکن به آن محدود است",
+        "pinnedRolesCapped": "(محدود به دسترسی خود شما)",
+        "noCustomRoles": "هیچ نقش سفارشی‌ای تعریف نشده است. ابتدا نقش‌ها را در مدیر ← نقش‌ها بسازید.",
+        "noScopedRoles": "شما هیچ نقش محدوده‌داری برای پین کردن ندارید. این توکن هیچ دسترسی‌ای نخواهد داشت."
+      },
+      "columns": {
+        "description": "توضیحات",
+        "kind": "نوع",
+        "boundTo": "مقید به",
+        "created": "ایجادشده",
+        "lastUsed": "آخرین استفاده",
+        "expires": "انقضا",
+        "actions": "اقدامات"
+      },
+      "errors": {
+        "load": "بارگذاری توکن‌ها ناموفق بود",
+        "create": "ایجاد توکن ناموفق بود ({status})",
+        "createGeneric": "ایجاد توکن ناموفق بود",
+        "rotate": "چرخش توکن ناموفق بود ({status})",
+        "rotateGeneric": "چرخش توکن ناموفق بود",
+        "revoke": "ابطال توکن ناموفق بود ({status})",
+        "revokeGeneric": "ابطال توکن ناموفق بود",
+        "bulkRevoke": "ابطال توکن‌ها ناموفق بود"
+      }
+    },
+    "sessions": {
+      "title": "نشست‌ها",
+      "description": "نشست‌های فعال شما",
+      "descriptionAll": "همه نشست‌های فعال در سراسر پلتفرم",
+      "empty": "هیچ نشست فعالی وجود ندارد.",
+      "revokeAll": "ابطال همه",
+      "current": "کنونی",
+      "columns": {
+        "provider": "ارائه‌دهنده",
+        "created": "ایجادشده",
+        "expires": "انقضا",
+        "lastActive": "آخرین فعالیت",
+        "token": "توکن"
+      },
+      "errors": {
+        "load": "بارگذاری نشست‌ها ناموفق بود",
+        "revoke": "ابطال نشست‌ها ناموفق بود ({status})",
+        "revokeGeneric": "ابطال نشست‌ها ناموفق بود"
+      }
+    }
+  },
+  "registry": {
+    "modules": {
+      "title": "ماژول‌ها",
+      "description": "رجیستری خصوصی ماژول‌های Terraform",
+      "cancel": "انصراف",
+      "createModule": "ایجاد ماژول",
+      "empty": "هنوز هیچ ماژولی وجود ندارد. برای شروع یکی ایجاد کنید.",
+      "providerLabel": "ارائه‌دهنده: {provider}",
+      "versionCount": "{count, plural, one {# نسخه} other {# نسخه}}",
+      "loadFailed": "بارگذاری ماژول‌ها ناموفق بود",
+      "createFailed": "ایجاد ماژول ناموفق بود",
+      "createFailedStatus": "ایجاد ماژول ناموفق بود ({status})",
+      "form": {
+        "name": "نام",
+        "provider": "ارائه‌دهنده",
+        "slugTitle": "فقط حروف کوچک، اعداد و خط تیره مجاز است. باید با یک حرف کوچک شروع شود.",
+        "addressNote": "نام و ارائه‌دهنده، آدرس رجیستری ماژول را تشکیل می‌دهند و پس از ایجاد قابل تغییر نیستند.",
+        "vcsConnectionOptional": "اتصال VCS (اختیاری)",
+        "noneUploadManually": "هیچ‌کدام — نسخه‌ها را به‌صورت دستی بارگذاری کنید",
+        "repositoryUrl": "نشانی مخزن",
+        "branchOptional": "شاخه (اختیاری)",
+        "branchPlaceholder": "main (برای پیش‌فرض خالی بگذارید)",
+        "tagPattern": "الگوی برچسب",
+        "tagPatternHint": "فقط برچسب‌هایی که با این الگو مطابقت دارند نسخه ایجاد می‌کنند (مثلاً v1.0.0)",
+        "labelsOptional": "برچسب‌ها (اختیاری)",
+        "creating": "در حال ایجاد...",
+        "create": "ایجاد"
+      }
+    },
+    "providers": {
+      "title": "ارائه‌دهندگان",
+      "description": "رجیستری خصوصی ارائه‌دهندگان Terraform",
+      "cancel": "انصراف",
+      "createProvider": "ایجاد ارائه‌دهنده",
+      "empty": "هنوز هیچ ارائه‌دهنده‌ای وجود ندارد. برای شروع یکی ایجاد کنید.",
+      "loadFailed": "بارگذاری ارائه‌دهندگان ناموفق بود",
+      "createFailed": "ایجاد ارائه‌دهنده ناموفق بود",
+      "createFailedStatus": "ایجاد ارائه‌دهنده ناموفق بود ({status})",
+      "form": {
+        "name": "نام",
+        "slugTitle": "فقط حروف کوچک، اعداد و خط تیره مجاز است. باید با یک حرف کوچک شروع شود.",
+        "creating": "در حال ایجاد...",
+        "create": "ایجاد"
+      }
+    },
+    "meta": {
+      "title": "فراداده",
+      "edit": "ویرایش",
+      "cancel": "انصراف",
+      "save": "ذخیره",
+      "saving": "در حال ذخیره...",
+      "saveAnyway": "به‌هرحال ذخیره کن",
+      "revertLabels": "بازگرداندن برچسب‌ها",
+      "owner": "مالک",
+      "ownerNone": "هیچ‌کدام",
+      "ownerPlaceholder": "user@example.com",
+      "labels": "برچسب‌ها"
+    },
+    "moduleDetail": {
+      "notFound": "ماژول یافت نشد",
+      "loadFailed": "بارگذاری ماژول ناموفق بود",
+      "updateFailed": "به‌روزرسانی ماژول ناموفق بود",
+      "labelLockoutDefault": "این تغییر برچسب دسترسی شما را کاهش می‌دهد.",
+      "providerLabel": "ارائه‌دهنده: {provider}",
+      "cancel": "انصراف",
+      "uploadVersion": "بارگذاری نسخه",
+      "vcsConnected": "VCS متصل شد",
+      "connectVcs": "اتصال به VCS",
+      "deleteModule": "حذف ماژول",
+      "linkFailed": "پیوند فضای کاری ناموفق بود",
+      "linkFailedStatus": "پیوند ناموفق بود ({status})",
+      "unlinkConfirm": "پیوند این فضای کاری از ماژول قطع شود؟ دیگر تحلیل تأثیر برای آن اجرا نخواهد شد.",
+      "unlinkFailed": "قطع پیوند فضای کاری ناموفق بود",
+      "unlinkFailedStatus": "قطع پیوند ناموفق بود ({status})",
+      "uploadFailed": "بارگذاری ناموفق بود",
+      "uploadFailedStatus": "بارگذاری ناموفق بود ({status})",
+      "saveVcsFailed": "ذخیره پیکربندی VCS ناموفق بود",
+      "saveVcsFailedStatus": "ذخیره پیکربندی VCS ناموفق بود ({status})",
+      "disableVcsFailed": "غیرفعال‌سازی VCS ناموفق بود",
+      "disableVcsFailedStatus": "غیرفعال‌سازی VCS ناموفق بود ({status})",
+      "deleteFailed": "حذف ناموفق بود",
+      "deleteFailedStatus": "حذف ناموفق بود ({status})",
+      "upload": {
+        "intro": "پوشه‌ای حاوی فایل‌های ماژول Terraform خود را انتخاب کنید. آن‌ها در یک بایگانی بسته‌بندی و بارگذاری می‌شوند.",
+        "version": "نسخه",
+        "moduleDirectory": "پوشه ماژول",
+        "selectDirectory": "انتخاب پوشه",
+        "fileCount": "{count, plural, one {# فایل} other {# فایل}}",
+        "filesToInclude": "{count, plural, one {# فایل برای گنجاندن:} other {# فایل برای گنجاندن:}}",
+        "andMore": "...و {count} مورد دیگر",
+        "uploading": "در حال بارگذاری...",
+        "upload": "بارگذاری"
+      },
+      "vcs": {
+        "intro": "این ماژول را به یک مخزن VCS متصل کنید. با ارسال برچسب‌های semver که با الگوی برچسب مطابقت دارند، نسخه‌های جدید به‌طور خودکار منتشر می‌شوند. کامیت‌های شاخه به‌تنهایی نسخه ایجاد نمی‌کنند.",
+        "connection": "اتصال VCS",
+        "selectConnection": "یک اتصال انتخاب کنید...",
+        "repositoryUrl": "نشانی مخزن",
+        "branchOptional": "شاخه (اختیاری)",
+        "branchPlaceholder": "main (برای پیش‌فرض خالی بگذارید)",
+        "tagPattern": "الگوی برچسب",
+        "tagPatternHint": "فقط برچسب‌هایی که با این الگو مطابقت دارند نسخه ایجاد می‌کنند (مثلاً v1.0.0)",
+        "saving": "در حال ذخیره...",
+        "saveConfiguration": "ذخیره پیکربندی VCS",
+        "disconnect": "قطع اتصال VCS"
+      },
+      "vcsStatus": {
+        "connected": "VCS متصل شد:",
+        "lastTag": "آخرین برچسب: {tag}",
+        "firstVersionHint": "یک برچسب semver (مثلاً <code>v1.0.0</code>) که با الگوی برچسب مطابقت دارد ارسال کنید تا اولین نسخه منتشر شود."
+      },
+      "links": {
+        "title": "فضاهای کاری پیوندشده",
+        "linkWorkspace": "پیوند فضای کاری",
+        "description": "فضاهای کاری پیوندشده هنگام باز شدن PR در برابر این ماژول، پلن‌های احتمالی و هنگام انتشار نسخه‌های جدید، اجراهای استاندارد دریافت می‌کنند.",
+        "searchPlaceholder": "جست‌وجوی فضاهای کاری برای پیوند…",
+        "empty": "هنوز هیچ فضای کاری پیوند نشده است.",
+        "unlinkTitle": "قطع پیوند فضای کاری"
+      },
+      "interface": {
+        "title": "ورودی‌ها و خروجی‌ها",
+        "counts": "{inputs} ورودی، {outputs} خروجی",
+        "versionLabel": "نسخه:",
+        "noData": "هیچ داده رابطی برای این نسخه در دسترس نیست.",
+        "inputs": "ورودی‌ها",
+        "outputs": "خروجی‌ها",
+        "name": "نام",
+        "type": "نوع",
+        "description": "توضیحات",
+        "default": "پیش‌فرض",
+        "required": "الزامی",
+        "sensitive": "حساس",
+        "requiredBadge": "الزامی",
+        "optionalBadge": "اختیاری",
+        "sensitiveBadge": "حساس",
+        "noneDeclared": "این نسخه ماژول هیچ ورودی یا خروجی‌ای اعلام نمی‌کند."
+      },
+      "versions": {
+        "title": "نسخه‌ها",
+        "count": "{count, plural, one {# نسخه} other {# نسخه}}",
+        "emptyVcs": "هنوز هیچ نسخه‌ای وجود ندارد. یک برچسب semver که با \"{pattern}\" مطابقت دارد به مخزن متصل ارسال کنید تا نسخه‌ای منتشر شود.",
+        "emptyUpload": "هنوز هیچ نسخه‌ای وجود ندارد. برای شروع یک ماژول بارگذاری کنید یا به VCS متصل شوید.",
+        "version": "نسخه",
+        "status": "وضعیت",
+        "source": "منبع",
+        "actions": "کنش‌ها",
+        "manualUpload": "بارگذاری دستی",
+        "delete": "حذف"
+      },
+      "deleteDialog": {
+        "title": "تأیید حذف",
+        "moduleBody": "این کار این ماژول و تمام نسخه‌های آن را برای همیشه حذف می‌کند.",
+        "versionBody": "این کار نسخه {version} را برای همیشه حذف می‌کند.",
+        "cancel": "انصراف",
+        "confirm": "حذف"
+      }
+    },
+    "providerDetail": {
+      "description": "رجیستری ارائه‌دهنده",
+      "deleteProvider": "حذف ارائه‌دهنده",
+      "publishNote": "نسخه‌های ارائه‌دهنده با ابزار خط فرمان <code>terrapod-publish</code> منتشر می‌شوند که باینری‌ها را در سمت کلاینت امضا می‌کند. بارگذاری و امضای باینری‌های ارائه‌دهنده از مرورگر دیگر پشتیبانی نمی‌شود. این صفحه برای نسخه‌ها و پلتفرم‌ها فقط‌خواندنی است.",
+      "empty": "هنوز هیچ نسخه‌ای وجود ندارد. برای شروع با ابزار خط فرمان terrapod-publish منتشر کنید.",
+      "loadVersionsFailed": "بارگذاری نسخه‌ها ناموفق بود",
+      "updateFailed": "به‌روزرسانی ارائه‌دهنده ناموفق بود",
+      "labelLockoutDefault": "این تغییر برچسب دسترسی شما را کاهش می‌دهد.",
+      "deleteFailed": "حذف ناموفق بود",
+      "deleteFailedStatus": "حذف ناموفق بود ({status})",
+      "platformCount": "{count, plural, one {# پلتفرم} other {# پلتفرم}}",
+      "delete": "حذف",
+      "os": "سیستم‌عامل",
+      "arch": "معماری",
+      "filename": "نام فایل",
+      "actions": "کنش‌ها",
+      "deleteDialog": {
+        "title": "تأیید حذف",
+        "providerBody": "این کار این ارائه‌دهنده و تمام نسخه‌های آن را برای همیشه حذف می‌کند.",
+        "versionBody": "این کار نسخه {version} و پلتفرم‌های آن را برای همیشه حذف می‌کند.",
+        "platformBody": "این کار پلتفرم {os}/{arch} را برای همیشه حذف می‌کند.",
+        "cancel": "انصراف",
+        "confirm": "حذف"
+      }
+    }
+  },
+  "adminUsers": {
+    "title": "کاربران",
+    "description": "مدیریت حساب‌های کاربری محلی",
+    "empty": "هیچ کاربری یافت نشد.",
+    "columns": {
+      "email": "ایمیل",
+      "displayName": "نام نمایشی",
+      "status": "وضعیت",
+      "lastLogin": "آخرین ورود",
+      "created": "ایجادشده",
+      "actions": "اقدامات"
+    },
+    "form": {
+      "email": "ایمیل",
+      "displayName": "نام نمایشی",
+      "displayNamePlaceholder": "Jane Doe",
+      "passwordOptional": "رمز عبور (اختیاری)",
+      "passwordPlaceholder": "یک رمز عبور قوی وارد کنید"
+    },
+    "reset": {
+      "title": "بازنشانی رمز عبور برای {email}",
+      "newPassword": "رمز عبور جدید"
+    },
+    "password": {
+      "score": {
+        "veryWeak": "بسیار ضعیف",
+        "weak": "ضعیف",
+        "fair": "متوسط",
+        "good": "خوب",
+        "strong": "قوی"
+      }
+    },
+    "status": {
+      "active": "فعال",
+      "inactive": "غیرفعال",
+      "never": "هرگز"
+    },
+    "actions": {
+      "cancel": "لغو",
+      "save": "ذخیره",
+      "saving": "در حال ذخیره...",
+      "createUser": "ایجاد کاربر",
+      "creating": "در حال ایجاد...",
+      "resetPassword": "بازنشانی رمز عبور",
+      "edit": "ویرایش",
+      "delete": "حذف",
+      "resetPw": "بازنشانی رمز",
+      "setPw": "تنظیم رمز",
+      "cancelPw": "لغو رمز"
+    },
+    "confirm": {
+      "activate": "کاربر «{email}» فعال شود؟",
+      "deactivate": "کاربر «{email}» غیرفعال شود؟",
+      "delete": "کاربر «{email}» حذف شود؟ این کار قابل بازگشت نیست."
+    },
+    "success": {
+      "created": "کاربر «{email}» ایجاد شد",
+      "updated": "کاربر «{email}» به‌روزرسانی شد",
+      "activated": "کاربر «{email}» فعال شد",
+      "deactivated": "کاربر «{email}» غیرفعال شد",
+      "passwordReset": "رمز عبور برای «{email}» بازنشانی شد",
+      "deleted": "کاربر «{email}» حذف شد"
+    },
+    "errors": {
+      "load": "بارگذاری کاربران ناموفق بود",
+      "create": "ایجاد کاربر ناموفق بود",
+      "createStatus": "ایجاد کاربر ناموفق بود ({status})",
+      "update": "به‌روزرسانی کاربر ناموفق بود",
+      "resetPassword": "بازنشانی رمز عبور ناموفق بود",
+      "delete": "حذف کاربر ناموفق بود"
+    }
+  },
+  "adminRoles": {
+    "title": "نقش‌ها و انتساب‌ها",
+    "description": "مدیریت نقش‌های RBAC و انتساب نقش کاربران",
+    "builtIn": "داخلی",
+    "emptyRoles": "هیچ نقشی تعریف نشده است.",
+    "emptyAssignments": "هیچ انتساب نقشی وجود ندارد.",
+    "tabs": {
+      "roles": "نقش‌ها",
+      "assignments": "انتساب‌ها"
+    },
+    "columns": {
+      "provider": "ارائه‌دهنده",
+      "email": "ایمیل",
+      "role": "نقش",
+      "created": "ایجادشده",
+      "actions": "کنش‌ها"
+    },
+    "form": {
+      "name": "نام",
+      "namePattern": "فقط حروف، اعداد، خط تیره و زیرخط مجاز است. باید با یک حرف یا عدد شروع شود.",
+      "workspacePermission": "مجوز فضای کاری",
+      "poolPermission": "مجوز استخر",
+      "registryPermission": "مجوز رجیستری",
+      "catalogPermission": "مجوز کاتالوگ",
+      "descriptionLabel": "توضیحات",
+      "descriptionPlaceholder": "دسترسی توسعه‌دهنده",
+      "allowLabels": "برچسب‌های مجاز (key=value، جداشده با کاما)",
+      "allowNames": "نام‌های مجاز (جداشده با کاما)",
+      "denyLabels": "برچسب‌های ممنوع (key=value، جداشده با کاما)",
+      "denyNames": "نام‌های ممنوع (جداشده با کاما)",
+      "allowLabelsShort": "برچسب‌های مجاز",
+      "allowNamesShort": "نام‌های مجاز",
+      "denyLabelsShort": "برچسب‌های ممنوع",
+      "denyNamesShort": "نام‌های ممنوع"
+    },
+    "assignForm": {
+      "provider": "ارائه‌دهنده",
+      "email": "ایمیل",
+      "roles": "نقش‌ها"
+    },
+    "caps": {
+      "selected": "{count, plural, one {# قابلیت} other {# قابلیت}} انتخاب شد",
+      "count": "{count, plural, one {# قابلیت} other {# قابلیت}}",
+      "custom": "سفارشی",
+      "matchesPresets": "با پیش‌تنظیم‌ها مطابقت دارد",
+      "advanced": "پیشرفته — قابلیت‌ها",
+      "otherPreserved": "قابلیت‌های دیگر (هنگام ذخیره حفظ می‌شوند)",
+      "presetHelp": {
+        "before": "انتخاب یک پیش‌تنظیم در بالا، قابلیت‌های آن را از پیش علامت می‌زند. علامت زدن یا برداشتن علامت یک کادر فراتر از پیش‌تنظیم، نقش را",
+        "after": "علامت‌گذاری می‌کند و مجوز آن به‌عنوان یک مجموعه قابلیت صریح ارسال می‌شود."
+      },
+      "groups": {
+        "workspace": "فضای کاری",
+        "run": "اجرا",
+        "state": "وضعیت",
+        "var": "متغیرها",
+        "config": "پیکربندی",
+        "drift": "انحراف",
+        "run-task": "وظایف اجرا",
+        "notification": "اعلان‌ها",
+        "run-trigger": "محرک‌های اجرا",
+        "pool": "استخرهای عامل",
+        "registry": "رجیستری",
+        "catalog": "کاتالوگ خدمات"
+      }
+    },
+    "display": {
+      "allow": "مجاز: {value}",
+      "allowNames": "نام‌های مجاز: {value}",
+      "deny": "ممنوع: {value}",
+      "denyNames": "نام‌های ممنوع: {value}"
+    },
+    "actions": {
+      "cancel": "انصراف",
+      "save": "ذخیره",
+      "saving": "در حال ذخیره...",
+      "edit": "ویرایش",
+      "delete": "حذف",
+      "remove": "برداشتن",
+      "createRole": "ایجاد نقش",
+      "creating": "در حال ایجاد...",
+      "addAssignment": "افزودن انتساب",
+      "setRoles": "تنظیم نقش‌ها"
+    },
+    "confirm": {
+      "deleteRole": "نقش «{name}» حذف شود؟ هر انتسابی که به آن ارجاع دهد تحت تأثیر قرار می‌گیرد.",
+      "removeAssignment": "نقش «{roleName}» از {email} برداشته شود؟"
+    },
+    "success": {
+      "roleCreated": "نقش «{name}» ایجاد شد",
+      "roleUpdated": "نقش «{name}» به‌روزرسانی شد",
+      "roleDeleted": "نقش «{name}» حذف شد",
+      "rolesAssigned": "نقش‌ها به {email} انتساب داده شد",
+      "assignmentRemoved": "انتساب برداشته شد"
+    },
+    "errors": {
+      "loadRoles": "بارگذاری نقش‌ها ناموفق بود",
+      "loadAssignments": "بارگذاری انتساب‌ها ناموفق بود",
+      "createRole": "ایجاد نقش ناموفق بود",
+      "createRoleStatus": "ایجاد نقش ناموفق بود ({status})",
+      "updateRole": "به‌روزرسانی نقش ناموفق بود",
+      "deleteRole": "حذف نقش ناموفق بود",
+      "setAssignment": "تنظیم انتساب ناموفق بود",
+      "setAssignmentStatus": "تنظیم انتساب ناموفق بود ({status})",
+      "deleteAssignment": "حذف انتساب ناموفق بود"
+    }
+  },
+  "adminVcs": {
+    "title": "اتصال‌های VCS",
+    "description": "مدیریت یکپارچه‌سازی‌های سامانه کنترل نسخه",
+    "empty": "هیچ اتصال VCS پیکربندی نشده است.",
+    "actions": {
+      "new": "اتصال جدید",
+      "cancel": "انصراف",
+      "edit": "ویرایش",
+      "delete": "حذف"
+    },
+    "confirmDelete": "این اتصال VCS حذف شود؟ فضاهای کاری که از آن استفاده می‌کنند یکپارچه‌سازی VCS را از دست می‌دهند. این کار قابل بازگشت نیست.",
+    "form": {
+      "name": "نام",
+      "namePattern": "فقط حروف، اعداد، خط تیره و زیرخط مجاز است. باید با یک حرف یا عدد شروع شود.",
+      "provider": "ارائه‌دهنده",
+      "providerImmutable": "ارائه‌دهنده تغییرناپذیر است — برای تغییر آن حذف و دوباره ایجاد کنید",
+      "serverUrl": "نشانی سرور (اختیاری)",
+      "serverUrlHint": "باید یک نشانی HTTP یا HTTPS باشد (مثلاً https://github.mycompany.com)",
+      "appId": "شناسه App",
+      "appIdHint": "شناسه GitHub App — فقط ارقام عددی",
+      "installationId": "شناسه نصب",
+      "installationIdHint": "شناسه نصب GitHub App — فقط ارقام عددی",
+      "privateKey": "کلید خصوصی (PEM)",
+      "browse": "مرور...",
+      "privateKeyKeep": "برای حفظ کلید فعلی خالی بگذارید — برای چرخش، یک PEM جدید بچسبانید",
+      "privateKeyPlaceholder": "-----BEGIN RSA PRIVATE KEY-----\n...\n\nیک فایل .pem را اینجا رها کنید یا روی مرور کلیک کنید",
+      "webhookSecret": "راز وب‌هوک",
+      "optional": "(اختیاری)",
+      "webhookSecretSet": "تنظیم‌شده — برای حفظ خالی بگذارید، برای چرخش یک مقدار جدید وارد کنید",
+      "webhookSecretGlobal": "برای استفاده از راز سراسری وب‌هوک خالی بگذارید",
+      "webhookSecretHelp": "راز HMAC هر اتصال برای وب‌هوک‌های این نصب. هنگامی که تنظیم نشده باشد، از راز سراسری استفاده می‌شود.",
+      "accessToken": "توکن دسترسی",
+      "accessTokenKeep": "برای حفظ توکن فعلی خالی بگذارید",
+      "saving": "در حال ذخیره...",
+      "creating": "در حال ایجاد...",
+      "saveChanges": "ذخیره تغییرات",
+      "createConnection": "ایجاد اتصال"
+    },
+    "table": {
+      "name": "نام",
+      "provider": "ارائه‌دهنده",
+      "serverUrl": "نشانی سرور",
+      "status": "وضعیت",
+      "created": "ایجادشده",
+      "actions": "کنش‌ها"
+    },
+    "success": {
+      "created": "اتصال VCS «{name}» ایجاد شد",
+      "updated": "اتصال VCS «{name}» به‌روزرسانی شد",
+      "deleted": "اتصال VCS حذف شد"
+    },
+    "errors": {
+      "load": "بارگذاری اتصال‌های VCS ناموفق بود",
+      "save": "ذخیره اتصال ناموفق بود",
+      "delete": "حذف اتصال ناموفق بود",
+      "createStatus": "ایجاد اتصال ناموفق بود ({status})",
+      "updateStatus": "به‌روزرسانی اتصال ناموفق بود ({status})"
+    }
+  },
+  "adminVariableSets": {
+    "title": "مجموعه‌های متغیر",
+    "description": "مدیریت مجموعه‌های متغیر با دامنهٔ سازمان برای گروه‌های فضای کاری",
+    "empty": "هیچ مجموعه متغیری پیکربندی نشده است.",
+    "none": "-",
+    "actions": {
+      "new": "مجموعه متغیر جدید",
+      "cancel": "لغو"
+    },
+    "form": {
+      "name": "نام",
+      "namePattern": "فقط حروف، اعداد، خط تیره و زیرخط. باید با یک حرف یا عدد شروع شود.",
+      "descriptionLabel": "توضیحات",
+      "descriptionPlaceholder": "اعتبارنامه‌های AWS برای همهٔ فضاهای کاری",
+      "global": "سراسری (اعمال به همهٔ فضاهای کاری)",
+      "priority": "اولویت (بازنویسی متغیرهای فضای کاری)",
+      "creating": "در حال ایجاد...",
+      "create": "ایجاد مجموعه متغیر"
+    },
+    "table": {
+      "name": "نام",
+      "description": "توضیحات",
+      "scope": "دامنه",
+      "variables": "متغیرها",
+      "created": "ایجادشده"
+    },
+    "scope": {
+      "global": "سراسری",
+      "priority": "اولویت",
+      "standard": "استاندارد"
+    },
+    "errors": {
+      "load": "بارگذاری مجموعه‌های متغیر ناموفق بود",
+      "create": "ایجاد مجموعه متغیر ناموفق بود",
+      "createStatus": "ایجاد مجموعه متغیر ناموفق بود ({status})"
+    },
+    "detail": {
+      "back": "بازگشت به مجموعه‌های متغیر",
+      "headerFallback": "مجموعه متغیر",
+      "notFound": "مجموعه متغیر یافت نشد",
+      "global": "سراسری",
+      "priority": "اولویت",
+      "yes": "بله",
+      "no": "خیر",
+      "edit": "ویرایش",
+      "cancel": "لغو",
+      "save": "ذخیره",
+      "saving": "در حال ذخیره...",
+      "delete": "حذف",
+      "deleting": "در حال حذف...",
+      "confirmDelete": "تأیید حذف",
+      "deleteTitle": "حذف مجموعه متغیر",
+      "deleteDescription": "این مجموعه متغیر و همهٔ متغیرهای آن را برای همیشه حذف کنید.",
+      "tabs": {
+        "settings": "تنظیمات",
+        "variables": "متغیرها",
+        "workspaces": "فضاهای کاری"
+      },
+      "addVariable": "افزودن متغیر",
+      "adding": "در حال افزودن...",
+      "varKey": "کلید",
+      "varValue": "مقدار",
+      "varCategory": "دسته‌بندی",
+      "categoryTerraform": "Terraform",
+      "categoryEnv": "محیط",
+      "sensitive": "حساس",
+      "sensAbbr": "حساس",
+      "enterNewValue": "مقدار جدید را وارد کنید",
+      "empty": "خالی",
+      "emptyVars": "هیچ متغیری در این مجموعه وجود ندارد.",
+      "actions": "اقدامات",
+      "remove": "حذف",
+      "add": "افزودن",
+      "addWorkspace": "افزودن فضای کاری",
+      "workspace": "فضای کاری",
+      "selectWorkspace": "یک فضای کاری انتخاب کنید...",
+      "globalBanner": "این مجموعه متغیر سراسری است و به‌طور خودکار به همهٔ فضاهای کاری اعمال می‌شود.",
+      "emptyWorkspaces": "هیچ فضای کاری به این مجموعه متغیر اختصاص نیافته است.",
+      "confirmDeleteVar": "این متغیر حذف شود؟ این کار قابل بازگشت نیست.",
+      "confirmRemoveWorkspace": "این فضای کاری از مجموعه متغیر حذف شود؟ متغیرهای آن دیگر به آن فضای کاری اعمال نخواهند شد.",
+      "success": {
+        "updated": "مجموعه متغیر به‌روزرسانی شد",
+        "workspaceAdded": "فضای کاری افزوده شد",
+        "workspaceRemoved": "فضای کاری حذف شد"
+      },
+      "errors": {
+        "load": "بارگذاری مجموعه متغیر ناموفق بود",
+        "update": "به‌روزرسانی مجموعه متغیر ناموفق بود",
+        "delete": "حذف مجموعه متغیر ناموفق بود",
+        "loadVars": "بارگذاری متغیرها ناموفق بود",
+        "loadWorkspaces": "بارگذاری فضاهای کاری ناموفق بود",
+        "addVar": "افزودن متغیر ناموفق بود",
+        "addVarStatus": "افزودن متغیر ناموفق بود ({status})",
+        "updateVar": "به‌روزرسانی متغیر ناموفق بود",
+        "deleteVar": "حذف متغیر ناموفق بود",
+        "addWorkspace": "افزودن فضای کاری ناموفق بود",
+        "removeWorkspace": "حذف فضای کاری ناموفق بود"
+      }
+    }
+  },
+  "adminAutodiscovery": {
+    "title": "کشف خودکار",
+    "description": "ایجاد خودکار فضاهای کاری در مونوریپوها هنگامی که PRها مسیرهای منطبق را لمس می‌کنند",
+    "empty": "هنوز هیچ قاعده کشف خودکاری وجود ندارد. یکی بسازید تا تأمین خودکار فضاهای کاری از PRها در مونوریپوی خود را آغاز کنید.",
+    "unsavedRule": "(قاعده ذخیره‌نشده)",
+    "actions": {
+      "newRule": "قاعده جدید",
+      "cancel": "لغو",
+      "create": "ایجاد",
+      "update": "به‌روزرسانی",
+      "preview": "پیش‌نمایش",
+      "edit": "ویرایش",
+      "delete": "حذف",
+      "close": "بستن"
+    },
+    "status": {
+      "enabled": "فعال",
+      "disabled": "غیرفعال"
+    },
+    "form": {
+      "createTitle": "ایجاد قاعده",
+      "editTitle": "ویرایش قاعده",
+      "name": "نام",
+      "vcsConnection": "اتصال VCS",
+      "selectConnection": "انتخاب اتصال",
+      "repoUrl": "نشانی مخزن",
+      "branch": "شاخه (خالی = پیش‌فرض)",
+      "matchPattern": "الگوی تطبیق",
+      "matchPatternHint": "گلاب‌های به‌سبک gitignore. <code>**</code> در سراسر بخش‌های مسیر تطبیق می‌یابد. تنها فایل‌های <code>*.tf*</code> کشف خودکار را فعال می‌کنند.",
+      "ignorePatterns": "الگوهای نادیده‌گیری (هر کدام در یک خط)",
+      "nameTemplate": "قالب نام فضای کاری (اختیاری)",
+      "nameTemplateHint": "از <path></path> برای دایرکتوری با <code>/</code> جایگزین‌شده با <code>-</code> استفاده کنید، یا از <root></root> برای دایرکتوری همان‌گونه که هست. خالی = پیش‌فرض (فقط مسیر با خط تیره).",
+      "templateDefaults": "پیش‌فرض‌های قالب فضای کاری",
+      "executionMode": "حالت اجرا",
+      "executionModeHint": "کشف خودکار مبتنی بر VCS است؛ تنها اجرای عاملی (agent) پشتیبانی می‌شود.",
+      "agentPool": "استخر عامل",
+      "none": "(هیچ‌کدام)",
+      "executionBackend": "پشتوانه اجرا",
+      "terraformVersion": "نسخه Terraform",
+      "cpuRequest": "درخواست CPU",
+      "memoryRequest": "درخواست حافظه",
+      "ownerEmail": "ایمیل مالک",
+      "autoApply": "اعمال خودکار",
+      "enabled": "فعال",
+      "onDirectoryDelete": "هنگام حذف دایرکتوری",
+      "onDeleteFlag": "علامت‌گذاری (ایمن — علامت‌گذاری برای حذف در انتظار، نیازمند اقدام دستی)",
+      "onDeleteDestroy": "تخریب (خطرناک — زیرساخت را از بین می‌برد سپس فضای کاری را بایگانی می‌کند)",
+      "onDirectoryDeleteHint": "هنگامی که دایرکتوری یک فضای کاری کشف‌شده در شاخه ردیابی‌شده حذف شود، چه اتفاقی برای آن می‌افتد.",
+      "onDeleteDestroyWarning": "این کار هنگامی که دایرکتوری در شاخه ردیابی‌شده حذف شود، یک terraform destroy واقعی روی فضای کاری اجرا می‌کند.",
+      "labels": "برچسب‌ها (به فضاهای کاری ایجادشده به ارث می‌رسد)",
+      "varFiles": "فایل‌های متغیر (به فضاهای کاری ایجادشده به ارث می‌رسد)",
+      "varFilesHint": "مسیرهای نسبی <code>.tfvars</code> که به plan/apply ارسال می‌شوند.",
+      "addVarFile": "افزودن فایل متغیر",
+      "executionHooks": "قلاب‌های اجرا (مرتبط با هر فضای کاری جدید)",
+      "executionHooksHint": "از قلاب‌های تعریف‌شده در صفحه مدیریت <page>قلاب‌های اجرا</page> انتخاب کنید — هر قلاب انتخاب‌شده با هر فضای کاری‌ای که این قاعده می‌سازد مرتبط می‌شود.",
+      "noHooks": "هنوز هیچ قلاب اجرایی تعریف نشده است. ابتدا یکی در صفحه مدیریت قلاب‌های اجرا بسازید.",
+      "hookDisabled": "(غیرفعال)",
+      "hookNotInLibrary": "(در کتابخانه نیست — برای حذف تیک را بردارید)",
+      "runTaskTemplates": "قالب‌های وظیفه اجرا (روی هر فضای کاری جدید ایجاد می‌شود)",
+      "notificationTemplates": "قالب‌های اعلان (روی هر فضای کاری جدید ایجاد می‌شود)",
+      "saving": "در حال ذخیره...",
+      "previewTitle": "مخزن را پیمایش کن و پیش‌نمایش بده که این قاعده کدام فضاهای کاری را ایجاد خواهد کرد — بدون ماندگاری"
+    },
+    "table": {
+      "name": "نام",
+      "repo": "مخزن",
+      "pattern": "الگو",
+      "enabled": "فعال",
+      "created": "ایجادشده",
+      "previewTitle": "مخزن را پیمایش کن و پیش‌نمایش بده که این قاعده کدام فضاهای کاری را ایجاد خواهد کرد"
+    },
+    "deleteModal": {
+      "title": "قاعده حذف شود؟",
+      "body": "فضاهای کاری‌ای که به‌طور خودکار توسط این قاعده ایجاد شده‌اند به کار خود ادامه می‌دهند. PRهای آینده که مسیرهای جدید تحت این قاعده را لمس کنند، فضاهای کاری بیشتری به‌طور خودکار ایجاد نخواهند کرد."
+    },
+    "preview": {
+      "title": "پیش‌نمایش: {ruleName}",
+      "walkedFiles": "<files>{count}</files> فایل روی <refspan>{ref}</refspan> پیمایش شد",
+      "walking": "در حال پیمایش مخزن…",
+      "noMatches": "هیچ دایرکتوری‌ای در این مخزن با الگوی قاعده تطبیق ندارد. چیزی برای ایجاد نیست.",
+      "colWorkspace": "فضای کاری",
+      "colDirectory": "دایرکتوری",
+      "colAction": "اقدام",
+      "repoRoot": "(ریشه مخزن)",
+      "actionCreate": "ایجاد",
+      "skipDiscovered": "رد کردن (قبلاً کشف شده)",
+      "skipDiscoveredTitle": "قبلاً توسط این قاعده ایجاد شده است",
+      "skipCollision": "رد کردن (تداخل نام)",
+      "skipCollisionTitle": "به دلیل دیگری، فضای کاری‌ای با این نام از پیش وجود دارد",
+      "willCreate": "{count, plural, one {# فضای کاری ایجاد خواهد شد.} other {# فضای کاری ایجاد خواهند شد.}} فضاهای کاری موجود (تداخل‌ها) دست‌نخورده باقی می‌مانند.",
+      "provision": "{count, plural, one {تأمین # فضای کاری} other {تأمین # فضای کاری}}",
+      "provisioning": "در حال تأمین…",
+      "saveToProvision": "قاعده را ذخیره کنید تا این فضاهای کاری تأمین شوند."
+    },
+    "success": {
+      "created": "{name} ایجاد شد",
+      "updated": "{name} به‌روزرسانی شد",
+      "deleted": "قاعده حذف شد",
+      "provisioned": "{count, plural, one {# فضای کاری از «{ruleName}» ایجاد شد} other {# فضای کاری از «{ruleName}» ایجاد شد}}"
+    },
+    "errors": {
+      "loadRules": "بارگذاری قواعد کشف خودکار ناموفق بود",
+      "load": "بارگذاری ناموفق بود",
+      "createFailed": "ایجاد ناموفق بود: {status} {detail}",
+      "updateFailed": "به‌روزرسانی ناموفق بود: {status} {detail}",
+      "save": "ذخیره ناموفق بود",
+      "deleteRule": "حذف قاعده ناموفق بود",
+      "delete": "حذف ناموفق بود",
+      "previewFailed": "پیش‌نمایش ناموفق بود ({status})",
+      "preview": "پیش‌نمایش ناموفق بود",
+      "previewPrereq": "پیش از پیش‌نمایش، اتصال VCS، نشانی مخزن و الگو را تنظیم کنید",
+      "scanFailed": "اسکن ناموفق بود ({status})",
+      "scan": "اسکن ناموفق بود"
+    }
+  },
+  "adminBulkUpdate": {
+    "title": "به‌روزرسانی گروهی",
+    "description": "فضاهای کاری را با فیلتر انتخاب کنید، سپس یک تغییر تنظیمات را روی همه آن‌ها اعمال کنید",
+    "none": "(هیچ‌کدام)",
+    "anyOption": "(هر کدام)",
+    "unchanged": "(بدون تغییر)",
+    "unchangedOption": "(بدون تغییر)",
+    "filter": {
+      "heading": "۱. انتخاب فضاهای کاری",
+      "matchAll": "تطبیق با <strong>همه</strong> فضاهای کاری (فیلترهای زیر را نادیده می‌گیرد)",
+      "namePrefix": "پیشوند نام",
+      "executionBackend": "پشتوانه اجرا",
+      "ownerEmail": "ایمیل مالک",
+      "agentPool": "استخر عامل",
+      "vcsConnection": "اتصال VCS",
+      "labels": "برچسب‌ها",
+      "search": "جستجو",
+      "searching": "در حال جستجو..."
+    },
+    "results": {
+      "matched": "<strong>{count}</strong> {count, plural, one {فضای کاری} other {فضای کاری}} تطبیق یافت.",
+      "noMatch": "هیچ فضای کاری‌ای با این فیلتر تطبیق نیافت.",
+      "colName": "نام",
+      "colMode": "حالت",
+      "colBackend": "پشتوانه",
+      "colTfVersion": "نسخه TF",
+      "colLabels": "برچسب‌ها"
+    },
+    "update": {
+      "heading": "۲. اعمال تغییرات",
+      "hint": "تنها فیلدهایی که در زیر تنظیم می‌کنید تغییر می‌کنند. فیلتر بالا انتخاب می‌کند که کدام فضاهای کاری تغییر را دریافت می‌کنند.",
+      "terraformVersion": "نسخه Terraform",
+      "executionBackend": "پشتوانه اجرا",
+      "executionMode": "حالت اجرا",
+      "autoApply": "اعمال خودکار",
+      "agentPool": "استخر عامل",
+      "cpuRequest": "درخواست CPU",
+      "memoryRequest": "درخواست حافظه",
+      "setLabels": "تنظیم برچسب‌ها (نقشه برچسب‌ها را روی هر فضای کاری تطبیق‌یافته جایگزین می‌کند)",
+      "setVarFiles": "تنظیم فایل‌های متغیر",
+      "addVarFile": "افزودن فایل متغیر",
+      "setRunTasks": "تنظیم وظایف اجرا (بر اساس نام روی هر فضای کاری تطبیق‌یافته درج/به‌روز می‌شود)",
+      "setNotifications": "تنظیم پیکربندی‌های اعلان (بر اساس نام درج/به‌روز می‌شود)",
+      "dryRun": "اجرای آزمایشی (فقط پیش‌نمایش — هیچ تغییری نوشته نمی‌شود)",
+      "confirmWarning": "این کار تغییرات را روی هر فضای کاری تطبیق‌یافته می‌نویسد.",
+      "confirmApply": "تأیید اعمال",
+      "applying": "در حال اعمال...",
+      "cancel": "لغو",
+      "working": "در حال کار...",
+      "previewDryRun": "پیش‌نمایش (اجرای آزمایشی)",
+      "applyChanges": "اعمال تغییرات"
+    },
+    "diff": {
+      "colWorkspace": "فضای کاری",
+      "colChanges": "تغییرات"
+    },
+    "dryResult": {
+      "heading": "نتیجه اجرای آزمایشی",
+      "summary": "<strong>{matched}</strong> تطبیق یافت؛ <strong>{wouldChange}</strong> تغییر خواهد کرد؛ {unchanged} بدون تغییر. چیزی نوشته نشد.",
+      "wouldChange": "تغییر خواهد کرد",
+      "noChange": "با این به‌روزرسانی هیچ فضای کاری‌ای تغییر نخواهد کرد."
+    },
+    "applyResult": {
+      "heading": "نتیجه اعمال",
+      "summary": "<strong>{matched}</strong> تطبیق یافت؛ <appliedstrong>{applied}</appliedstrong> اعمال شد؛ {unchanged} بدون تغییر؛ {errors, plural, one {# خطا} other {# خطا}}.",
+      "applied": "اعمال‌شده",
+      "unnamedWorkspace": "(فضای کاری)",
+      "noChange": "هیچ فضای کاری‌ای تغییر نکرد."
+    },
+    "errors": {
+      "searchFailed": "جستجو ناموفق بود ({status})",
+      "search": "جستجو ناموفق بود",
+      "bulkUpdateFailed": "به‌روزرسانی گروهی ناموفق بود ({status})",
+      "bulkUpdate": "به‌روزرسانی گروهی ناموفق بود"
+    }
+  },
+  "adminExecutionHooks": {
+    "title": "قلاب‌های اجرا",
+    "description": "گام‌های شل سفارشی که درون Jobهای اجراکننده در نقاط پیش/پس از طرح/اعمال اجرا می‌شوند و با فضاهای کاری مرتبط‌اند",
+    "empty": "هیچ قلاب اجرایی پیکربندی نشده است.",
+    "actions": {
+      "cancel": "لغو",
+      "new": "قلاب اجرای جدید",
+      "creating": "در حال ایجاد...",
+      "create": "ایجاد قلاب اجرا"
+    },
+    "badges": {
+      "disabled": "غیرفعال",
+      "enabled": "فعال"
+    },
+    "columns": {
+      "name": "نام",
+      "hookPoint": "نقطه قلاب",
+      "enabled": "فعال",
+      "priority": "اولویت",
+      "workspaces": "فضاهای کاری"
+    },
+    "form": {
+      "name": "نام",
+      "namePatternTitle": "فقط حروف، اعداد، خط تیره و زیرخط. باید با یک حرف یا عدد شروع شود.",
+      "description": "توضیحات",
+      "descriptionPlaceholder": "افزودن یک ورودی میزبان داخلی پیش از init",
+      "hookPoint": "نقطه قلاب",
+      "priority": "اولویت",
+      "priorityTitle": "هنگامی که چند قلاب یک نقطه را به اشتراک می‌گذارند، اولویت پایین‌تر زودتر اجرا می‌شود (تساوی‌ها بر اساس نام حل می‌شوند).",
+      "scriptLabel": "اسکریپت (<code>/bin/sh -c</code>)",
+      "scriptHelp": "با هویت ابری اجراکننده اجرا می‌شود. خروج غیرصفر اجرا را با شکست مواجه می‌کند. رازها باید از متغیرهای فضای کاری بیایند، نه به‌صورت درون‌خطی در اینجا."
+    },
+    "errors": {
+      "load": "بارگذاری قلاب‌های اجرا ناموفق بود",
+      "createStatus": "ایجاد قلاب اجرا ناموفق بود ({status})",
+      "create": "ایجاد قلاب اجرا ناموفق بود"
+    }
+  },
+  "adminPolicySets": {
+    "title": "مجموعه‌های سیاست",
+    "description": "اعمال سیاست‌به‌عنوان‌کد OPA، محدودشده به فضاهای کاری بر پایهٔ برچسب",
+    "empty": "هیچ مجموعهٔ سیاستی پیکربندی نشده است.",
+    "actions": {
+      "cancel": "لغو",
+      "new": "مجموعهٔ سیاست جدید",
+      "creating": "در حال ایجاد...",
+      "create": "ایجاد مجموعهٔ سیاست"
+    },
+    "badges": {
+      "disabled": "غیرفعال",
+      "mandatory": "الزامی",
+      "advisory": "توصیه‌ای",
+      "global": "سراسری",
+      "labelScoped": "محدود به برچسب"
+    },
+    "columns": {
+      "name": "نام",
+      "description": "توضیح",
+      "enforcement": "اعمال",
+      "scope": "دامنه",
+      "policies": "سیاست‌ها"
+    },
+    "form": {
+      "name": "نام",
+      "namePatternTitle": "فقط حروف، اعداد، خط تیره و زیرخط. باید با یک حرف یا عدد شروع شود.",
+      "description": "توضیح",
+      "descriptionPlaceholder": "حفاظ‌های الزامی برای فضاهای کاری تولید",
+      "enforcement": "اعمال",
+      "enforcementAdvisory": "توصیه‌ای (هشدار بده، مسدود نکن)",
+      "enforcementMandatory": "الزامی (در صورت شکست، اعمال را مسدود کن)",
+      "globalScope": "سراسری (بر هر فضای کاری اعمال شود)",
+      "sourceInline": "درون‌خطی (مدیریت سیاست‌ها در رابط کاربری)",
+      "sourceVcs": "از مخزن VCS",
+      "vcsConnection": "اتصال VCS",
+      "selectConnection": "انتخاب اتصال...",
+      "repoUrl": "نشانی مخزن",
+      "branch": "شاخه",
+      "branchPlaceholder": "main (پیش‌فرض)",
+      "policyPath": "مسیر سیاست",
+      "policyPathPlaceholder": "policies/ (پوشهٔ حاوی فایل‌های .rego)",
+      "helpVcs": "سیاست‌ها به‌طور خودکار از مخزن همگام‌سازی خواهند شد.",
+      "helpInline": "پس از ایجاد مجموعه، سیاست‌ها را اضافه کنید و محدوده‌بندی برچسب را دقیق‌تر کنید."
+    },
+    "errors": {
+      "load": "بارگذاری مجموعه‌های سیاست ناموفق بود",
+      "createStatus": "ایجاد مجموعهٔ سیاست ناموفق بود ({status})",
+      "create": "ایجاد مجموعهٔ سیاست ناموفق بود"
+    }
+  },
+  "adminCatalog": {
+    "title": "مدیریت کاتالوگ",
+    "description": "مدیریت اقلام کاتالوگ سرویس",
+    "notEnabled": "کاتالوگ سرویس فعال نیست.",
+    "empty": "هنوز هیچ قلم کاتالوگی وجود ندارد.",
+    "actions": {
+      "new": "قلم کاتالوگ جدید",
+      "cancel": "لغو",
+      "create": "ایجاد قلم کاتالوگ",
+      "creating": "در حال ایجاد…",
+      "saveChanges": "ذخیره تغییرات",
+      "saving": "در حال ذخیره…",
+      "edit": "ویرایش",
+      "delete": "حذف"
+    },
+    "form": {
+      "name": "نام",
+      "nameTitle": "فقط حروف، اعداد، خط تیره و زیرخط. باید با یک حرف یا عدد شروع شود.",
+      "module": "ماژول",
+      "moduleSelect": "یک ماژول انتخاب کنید…",
+      "moduleImmutable": "ماژول پس از ایجاد تغییرناپذیر است",
+      "displayName": "نام نمایشی",
+      "displayNamePlaceholder": "سطل استاندارد S3",
+      "versionPin": "پین نسخه پیش‌فرض",
+      "versionPinPlaceholder": "مثلاً ۱.۲.۰ (خالی = آخرین)",
+      "descriptionLabel": "توضیحات",
+      "descriptionPlaceholder": "این قلم کاتالوگ چه چیزی تأمین می‌کند…",
+      "enabled": "فعال (در کاتالوگ مرور نمایان است)",
+      "providerTemplates": "قالب‌های ارائه‌دهنده",
+      "noProviderTemplates": "هیچ قالب ارائه‌دهنده‌ای تعریف نشده است.",
+      "restrictPools": "محدود کردن به استخرهای عامل مشخص",
+      "noAgentPools": "هیچ استخر عاملی در دسترس نیست.",
+      "anyPool": "هر استخر عاملی ممکن است استفاده شود.",
+      "labels": "برچسب‌ها",
+      "variableOptions": "گزینه‌های متغیر (پیشرفته، JSON)",
+      "variableOptionsHint": "بازنویسی‌های هر ورودی (گزینه‌ها، پنهان، پیش‌فرض). اگر استفاده نمی‌شود، به‌صورت <code>[]</code> رها کنید."
+    },
+    "table": {
+      "name": "نام",
+      "module": "ماژول",
+      "enabled": "فعال",
+      "actions": "اقدامات"
+    },
+    "badge": {
+      "enabled": "فعال",
+      "disabled": "غیرفعال"
+    },
+    "confirm": {
+      "delete": "این قلم کاتالوگ حذف شود؟ نمونه‌های تأمین‌شده موجود بی‌تأثیر می‌مانند."
+    },
+    "success": {
+      "created": "قلم کاتالوگ «{name}» ایجاد شد",
+      "updated": "قلم کاتالوگ «{name}» به‌روزرسانی شد",
+      "deleted": "قلم کاتالوگ حذف شد"
+    },
+    "errors": {
+      "load": "بارگذاری اقلام کاتالوگ ناموفق بود",
+      "save": "ذخیره قلم کاتالوگ ناموفق بود",
+      "createStatus": "ایجاد قلم کاتالوگ ناموفق بود ({status})",
+      "updateStatus": "به‌روزرسانی قلم کاتالوگ ناموفق بود ({status})",
+      "delete": "حذف قلم کاتالوگ ناموفق بود",
+      "deleteConflict": "امکان حذف نیست: این قلم کاتالوگ نمونه‌های تأمین‌شده دارد.",
+      "varOptsInvalidJson": "گزینه‌های متغیر باید JSON معتبر باشند (یک آرایه).",
+      "varOptsNotArray": "گزینه‌های متغیر باید یک آرایه JSON باشند."
+    }
+  },
+  "adminProviderTemplates": {
+    "title": "قالب‌های ارائه‌دهنده",
+    "description": "بلوک‌های پیکربندی ارائه‌دهندهٔ قابل‌استفادهٔ مجدد برای اقلام کاتالوگ",
+    "notEnabled": "کاتالوگ سرویس فعال نیست.",
+    "empty": "هنوز هیچ قالب ارائه‌دهنده‌ای وجود ندارد.",
+    "actions": {
+      "new": "قالب جدید",
+      "cancel": "لغو",
+      "create": "ایجاد قالب",
+      "creating": "در حال ایجاد…",
+      "saveChanges": "ذخیره تغییرات",
+      "saving": "در حال ذخیره…",
+      "edit": "ویرایش",
+      "delete": "حذف"
+    },
+    "form": {
+      "name": "نام",
+      "providerType": "نوع ارائه‌دهنده",
+      "body": "بدنه (HCL)",
+      "parameters": "پارامترها (پیشرفته، JSON)",
+      "parametersHint": "هر پارامتر به یک فیلد فرم فراهم‌سازی تبدیل می‌شود. اگر استفاده نمی‌شود، به‌صورت <code>[]</code> بگذارید.",
+      "labels": "برچسب‌ها"
+    },
+    "table": {
+      "name": "نام",
+      "providerType": "نوع ارائه‌دهنده",
+      "parameters": "پارامترها",
+      "actions": "کنش‌ها"
+    },
+    "confirm": {
+      "delete": "این قالب ارائه‌دهنده حذف شود؟ اقلام کاتالوگی که به آن ارجاع می‌دهند در فراهم‌سازی شکست خواهند خورد. این کار قابل‌بازگشت نیست."
+    },
+    "success": {
+      "created": "قالب ارائه‌دهندهٔ «{name}» ایجاد شد",
+      "updated": "قالب ارائه‌دهندهٔ «{name}» به‌روزرسانی شد",
+      "deleted": "قالب ارائه‌دهنده حذف شد"
+    },
+    "errors": {
+      "load": "بارگذاری قالب‌های ارائه‌دهنده ناموفق بود",
+      "save": "ذخیرهٔ قالب ارائه‌دهنده ناموفق بود",
+      "createStatus": "ایجاد قالب ناموفق بود ({status})",
+      "updateStatus": "به‌روزرسانی قالب ناموفق بود ({status})",
+      "delete": "حذف قالب ارائه‌دهنده ناموفق بود",
+      "deleteConflict": "حذف ممکن نیست: این قالب توسط یک قلم کاتالوگ ارجاع داده شده است.",
+      "paramsInvalidJson": "پارامترها باید JSON معتبر باشند (یک آرایه).",
+      "paramsNotArray": "پارامترها باید یک آرایهٔ JSON باشند."
+    }
+  },
+  "adminAgentPools": {
+    "title": "استخرهای عامل",
+    "description": "مدیریت استخرهای عامل اجراکننده و شنوندگان آن‌ها",
+    "empty": "هیچ استخر عاملی پیکربندی نشده است.",
+    "actions": {
+      "newPool": "استخر جدید",
+      "createPool": "ایجاد استخر",
+      "creating": "در حال ایجاد...",
+      "cancel": "لغو",
+      "edit": "ویرایش",
+      "save": "ذخیره",
+      "saving": "در حال ذخیره...",
+      "delete": "حذف",
+      "deleting": "در حال حذف...",
+      "confirmDelete": "تأیید حذف"
+    },
+    "form": {
+      "name": "نام",
+      "namePattern": "فقط حروف، اعداد، خط تیره و زیرخط. باید با یک حرف یا عدد شروع شود.",
+      "description": "توضیحات",
+      "descriptionPlaceholder": "اجراکننده‌های AWS تولید",
+      "labels": "برچسب‌ها"
+    },
+    "columns": {
+      "name": "نام",
+      "description": "توضیحات",
+      "status": "وضعیت",
+      "created": "ایجادشده"
+    },
+    "badges": {
+      "default": "پیش‌فرض",
+      "degradedTooltip": "شنوندگان در حال ارسال ضربان قلب هستند اما گواهی‌هایشان منقضی شده است — اجراها با شکست راه‌اندازی مواجه می‌شوند.",
+      "status": {
+        "online": "آنلاین",
+        "offline": "آفلاین",
+        "degraded": "تنزل‌یافته"
+      }
+    },
+    "detail": {
+      "back": "بازگشت به استخرهای عامل",
+      "defaultDescription": "استخر عامل"
+    },
+    "tabs": {
+      "settings": "تنظیمات",
+      "tokens": "توکن‌ها",
+      "listeners": "شنوندگان"
+    },
+    "settings": {
+      "title": "تنظیمات استخر",
+      "fields": {
+        "name": "نام",
+        "description": "توضیحات",
+        "created": "ایجادشده",
+        "owner": "مالک",
+        "yourPermission": "دسترسی شما",
+        "labels": "برچسب‌ها"
+      },
+      "permissions": {
+        "read": "خواندن",
+        "write": "نوشتن",
+        "admin": "مدیر"
+      }
+    },
+    "danger": {
+      "title": "حذف استخر",
+      "description": "این استخر عامل و همه توکن‌های مرتبط را برای همیشه حذف کنید."
+    },
+    "tokens": {
+      "create": "ایجاد توکن",
+      "empty": "هیچ توکنی برای این استخر وجود ندارد.",
+      "revoke": "ابطال",
+      "created": {
+        "title": "توکن با موفقیت ایجاد شد",
+        "copyNow": "همین حالا این توکن را کپی کنید — دیگر نمایش داده نخواهد شد.",
+        "copy": "کپی"
+      },
+      "form": {
+        "description": "توضیحات",
+        "descriptionPlaceholder": "توکن شنونده تولید",
+        "maxUses": "حداکثر استفاده",
+        "maxUsesHint": "پیش‌فرض ۲ — یک تلاش مجدد در شرایط رقابت راه‌اندازی میان نسخه‌های شنونده را تحمل می‌کند.",
+        "expiresAt": "انقضا در",
+        "expiresAtHint": "پیش‌فرض ۱ ساعت از اکنون."
+      },
+      "columns": {
+        "description": "توضیحات",
+        "uses": "استفاده‌ها",
+        "expires": "انقضا",
+        "status": "وضعیت",
+        "createdBy": "ایجادشده توسط",
+        "actions": "اقدامات"
+      },
+      "badges": {
+        "revoked": "ابطال‌شده",
+        "active": "فعال"
+      }
+    },
+    "listeners": {
+      "empty": "هیچ شنونده‌ای برای این استخر ثبت نشده است.",
+      "columns": {
+        "name": "نام",
+        "status": "وضعیت",
+        "replicas": "نسخه‌ها",
+        "certExpires": "انقضای گواهی",
+        "actions": "اقدامات"
+      },
+      "status": {
+        "online": "آنلاین",
+        "offline": "آفلاین",
+        "degraded": "تنزل‌یافته",
+        "cert-expired": "گواهی منقضی‌شده"
+      },
+      "tooltips": {
+        "certExpired": "شنونده در حال ارسال ضربان است اما گواهی آن منقضی شده — هر فراخوانی احرازهویت‌شده با گواهی (ادعای اجرا، تمدید، توکن اجراکننده) با شکست مواجه می‌شود. محتمل‌ترین علت: API آخرین گواهی را ثبت نکرده، یا TTL گواهی پیش از تمدید سپری شده است.",
+        "degraded": "شنوندگان در حال ارسال ضربان هستند اما گواهی‌هایشان منقضی شده است — اجراها با شکست راه‌اندازی مواجه می‌شوند."
+      }
+    },
+    "confirm": {
+      "revokeToken": "این توکن پیوستن ابطال شود؟ شنوندگانی که از آن استفاده می‌کنند دیگر نمی‌توانند بپیوندند، و این اقدام قابل بازگشت نیست.",
+      "deleteListener": "این شنونده حذف شود؟ اگر پاد همچنان در حال اجرا باشد، در ضربان بعدی خود دوباره ثبت خواهد شد."
+    },
+    "success": {
+      "poolUpdated": "استخر به‌روزرسانی شد",
+      "tokenRevoked": "توکن ابطال شد",
+      "listenerDeleted": "شنونده حذف شد"
+    },
+    "errors": {
+      "loadPools": "بارگذاری استخرهای عامل ناموفق بود",
+      "loadPool": "بارگذاری استخر ناموفق بود",
+      "loadTokens": "بارگذاری توکن‌ها ناموفق بود",
+      "loadListeners": "بارگذاری شنوندگان ناموفق بود",
+      "createPool": "ایجاد استخر ناموفق بود",
+      "createStatus": "ایجاد استخر ناموفق بود ({status})",
+      "updatePool": "به‌روزرسانی استخر ناموفق بود",
+      "deletePool": "حذف استخر ناموفق بود",
+      "poolNotFound": "استخر یافت نشد",
+      "createToken": "ایجاد توکن ناموفق بود",
+      "createTokenStatus": "ایجاد توکن ناموفق بود ({status})",
+      "revokeToken": "ابطال توکن ناموفق بود",
+      "deleteListener": "حذف شنونده ناموفق بود"
+    }
+  },
+  "adminAuditLog": {
+    "title": "گزارش حسابرسی",
+    "description": "گزارش تغییرناپذیر همهٔ درخواست‌های API",
+    "empty": "هیچ ورودی گزارش حسابرسی یافت نشد.",
+    "errors": {
+      "load": "بارگذاری گزارش حسابرسی ناموفق بود"
+    },
+    "filters": {
+      "actorEmail": "ایمیل کنشگر",
+      "actorPlaceholder": "user@example.com",
+      "resourceType": "نوع منبع",
+      "resourceTypePlaceholder": "workspaces",
+      "method": "متد",
+      "methodAll": "همه",
+      "since": "از",
+      "until": "تا",
+      "clear": "پاک کردن",
+      "apply": "اعمال فیلترها"
+    },
+    "columns": {
+      "timestamp": "زمان",
+      "actor": "کنشگر",
+      "action": "اقدام",
+      "resourceType": "نوع منبع",
+      "resourceId": "شناسهٔ منبع",
+      "status": "وضعیت",
+      "duration": "مدت"
+    },
+    "pagination": {
+      "summary": "صفحهٔ {current} از {total} ({count, plural, one {# ورودی} other {# ورودی}})",
+      "previous": "قبلی",
+      "next": "بعدی"
+    }
+  },
+  "adminBinaryCache": {
+    "title": "حافظهٔ پنهان",
+    "description": "مدیریت حافظهٔ پنهان باینری CLI و ارائه‌دهنده",
+    "errors": {
+      "loadBinary": "بارگذاری حافظهٔ پنهان باینری ناموفق بود",
+      "loadCache": "بارگذاری حافظهٔ پنهان ناموفق بود"
+    },
+    "sections": {
+      "cliBinaries": "باینری‌های CLI",
+      "providerBinaries": "باینری‌های ارائه‌دهنده"
+    },
+    "empty": {
+      "binaries": "هنوز باینری CLI پنهان‌شده‌ای وجود ندارد.",
+      "providers": "هنوز باینری ارائه‌دهندهٔ پنهان‌شده‌ای وجود ندارد."
+    },
+    "columns": {
+      "tool": "ابزار",
+      "version": "نسخه",
+      "os": "سیستم‌عامل",
+      "arch": "معماری",
+      "cachedAt": "پنهان‌شده در",
+      "provider": "ارائه‌دهنده",
+      "hostname": "نام میزبان",
+      "actions": "اقدامات"
+    },
+    "warm": {
+      "heading": "گرم کردن حافظهٔ پنهان",
+      "hide": "پنهان کردن",
+      "prePopulate": "پیش‌پرکردن…",
+      "help": "باینری‌ها و پلتفرم‌های ارائه‌دهنده را از پیش به داخل حافظهٔ پنهان بکشید (هر کدام در یک خط). توکن‌های پایانی <code>os/arch</code> اختیاری هستند — برای استفاده از پلتفرم‌های پیش‌فرض پیکربندی‌شده آن‌ها را حذف کنید.",
+      "binariesLabel": "باینری‌ها",
+      "providersLabel": "ارائه‌دهندگان",
+      "warm": "گرم کردن",
+      "warming": "در حال گرم کردن…",
+      "confirm": "ورودی‌های انتخاب‌شدهٔ حافظهٔ پنهان اکنون گرم شوند؟",
+      "errorEmpty": "برای گرم کردن حداقل یک خط باینری یا ارائه‌دهنده اضافه کنید.",
+      "errorFailedStatus": "گرم کردن ناموفق بود ({status})",
+      "errorFailed": "گرم کردن حافظهٔ پنهان ناموفق بود",
+      "success": "{succeeded}/{total} گرم شد ({failed} ناموفق)"
+    },
+    "purge": {
+      "button": "پاک‌سازی",
+      "confirmBinary": "‏{tool} {version} از حافظهٔ پنهان پاک‌سازی شود؟ در درخواست بعدی دوباره از منبع بالادست واکشی خواهد شد.",
+      "confirmProvider": "‏{provider} {version} از حافظهٔ پنهان ارائه‌دهنده پاک‌سازی شود؟ در درخواست بعدی دوباره از منبع بالادست واکشی خواهد شد.",
+      "successBinary": "{count} ورودی برای {tool} {version} پاک‌سازی شد",
+      "successProvider": "{count} ورودی برای {provider} {version} پاک‌سازی شد",
+      "errorStatus": "پاک‌سازی ناموفق بود ({status})",
+      "error": "پاک‌سازی ناموفق بود",
+      "errorProvider": "پاک‌سازی ارائه‌دهنده ناموفق بود",
+      "errorProviders": "پاک‌سازی ارائه‌دهندگان ناموفق بود"
+    },
+    "batchPurge": {
+      "purging": "در حال پاک‌سازی...",
+      "purgeSelected": "پاک‌سازی موارد انتخاب‌شده ({count})",
+      "confirmBinary": "همهٔ ورودی‌های انتخاب‌شدهٔ حافظهٔ پنهان باینری پاک‌سازی شوند؟ در درخواست بعدی دوباره از منبع بالادست واکشی خواهند شد.",
+      "confirmProvider": "همهٔ ورودی‌های انتخاب‌شدهٔ حافظهٔ پنهان ارائه‌دهنده پاک‌سازی شوند؟ در درخواست بعدی دوباره از منبع بالادست واکشی خواهند شد.",
+      "errorBinaryItem": "پاک‌سازی برای {tool} {version} ناموفق بود",
+      "errorProviderItem": "پاک‌سازی برای {provider} {version} ناموفق بود",
+      "successBinary": "{count} ورودی حافظهٔ پنهان باینری پاک‌سازی شد",
+      "successProvider": "{count} ورودی حافظهٔ پنهان ارائه‌دهنده پاک‌سازی شد"
+    }
+  },
+  "catalog": {
+    "title": "کاتالوگ خدمات",
+    "description": "تأمین زیرساخت سلف‌سرویس از ماژول‌های گزینش‌شده",
+    "notEnabled": "کاتالوگ خدمات فعال نیست.",
+    "empty": "هیچ آیتم کاتالوگی در دسترس نیست.",
+    "card": {
+      "pinned": "پین‌شده {version}",
+      "latest": "آخرین"
+    },
+    "errors": {
+      "loadItems": "بارگذاری آیتم‌های کاتالوگ ناموفق بود"
+    }
+  },
+  "catalogDetail": {
+    "backLink": "← کاتالوگ",
+    "backToCatalog": "بازگشت به کاتالوگ",
+    "fallbackTitle": "مورد کاتالوگ",
+    "notFound": "مورد کاتالوگ یافت نشد، یا کاتالوگ خدمات فعال نیست.",
+    "common": {
+      "cancel": "انصراف"
+    },
+    "info": {
+      "module": "ماژول:",
+      "resolvedVersion": "نسخه تعیین‌شده:",
+      "latest": "آخرین",
+      "disabled": "غیرفعال"
+    },
+    "pending": {
+      "banner": "اجرا برای <strong>{name}</strong> پلن شده و در انتظار بازبینی است. برای اعمال تأیید کنید، یا نادیده بگیرید.",
+      "working": "در حال انجام…",
+      "confirmApply": "تأیید و اعمال",
+      "discard": "نادیده گرفتن"
+    },
+    "field": {
+      "select": "انتخاب…"
+    },
+    "provision": {
+      "title": "تأمین",
+      "workspaceName": "نام فضای کاری",
+      "workspaceNameTitle": "فقط حروف، اعداد، خط تیره و زیرخط مجاز است. باید با یک حرف یا عدد شروع شود.",
+      "workspaceNamePlaceholder": "my-instance",
+      "agentPool": "استخر عامل",
+      "selectPool": "یک استخر انتخاب کنید…",
+      "noPoolsAvailable": "هیچ استخر عاملی در دسترس شما نیست. برای تأمین به دسترسی نوشتن روی یک استخر عامل نیاز دارید — از یک مدیر بخواهید آن را اعطا کند.",
+      "noPoolsAllowed": "هیچ‌یک از استخرهای عاملی که به آن‌ها دسترسی دارید توسط این مورد کاتالوگ مجاز نیست. از یک مدیر بخواهید استخرهای مجاز این مورد را گسترش دهد یا به یکی از آن‌ها دسترسی به شما بدهد.",
+      "version": "نسخه",
+      "latestFloat": "آخرین (شناور)",
+      "defaultPinOption": "{version} (پین پیش‌فرض)",
+      "labelsOptional": "برچسب‌ها (اختیاری)",
+      "autoApplyHint": "اعمال خودکار، تغییرات را بدون مرحله بازبینی دستی اعمال می‌کند.",
+      "provisioning": "در حال تأمین…",
+      "submit": "تأمین"
+    },
+    "instances": {
+      "title": "نمونه‌ها",
+      "empty": "هنوز هیچ نمونه‌ای از این مورد تأمین نشده است.",
+      "colName": "نام",
+      "colVersion": "نسخه",
+      "colPool": "استخر",
+      "colActions": "کنش‌ها",
+      "reconfigure": "پیکربندی مجدد",
+      "destroy": "تخریب",
+      "orphan": "یتیم‌سازی…",
+      "orphanTitle": "حذف رکورد کاتالوگ بدون تخریب زیرساخت آن (توصیه نمی‌شود)"
+    },
+    "reconfigure": {
+      "title": "پیکربندی مجدد {name}",
+      "description": "ورودی‌ها و/یا نسخه را به‌روزرسانی کنید، سپس یک اجرا را در صف قرار دهید.",
+      "currentOption": "{version} (فعلی)",
+      "queuing": "در حال صف‌بندی…",
+      "queueRun": "صف‌بندی اجرا"
+    },
+    "destroy": {
+      "title": "تخریب {name}",
+      "heading": "{name} تخریب شود؟",
+      "description": "این کار یک اجرای تخریب را در صف قرار می‌دهد که زیرساخت این نمونه را از بین می‌برد. با یک اعمال موفق، فضای کاری بایگانی می‌شود. این کار قابل بازگشت نیست.",
+      "autoApplyHint": "اعمال خودکار بدون بازبینی بلافاصله زیرساخت را از بین می‌برد."
+    },
+    "orphan": {
+      "title": "یتیم‌سازی {name}",
+      "heading": "{name} یتیم شود؟",
+      "description": "این کار رکورد نمونه کاتالوگ را حذف می‌کند اما زیرساخت آن را تخریب <warn>نمی‌کند</warn> — منابع تأمین‌شده همچنان در حال اجرا می‌مانند، <warn>ردیابی‌نشده و مدیریت‌نشده</warn>. این کار توصیه نمی‌شود. برای بازپس‌گیری زیرساخت، انصراف دهید و به‌جای آن از <emph>تخریب</emph> استفاده کنید.",
+      "confirmPrompt": "برای تأیید، نام نمونه <mono>{name}</mono> را تایپ کنید:",
+      "orphaning": "در حال یتیم‌سازی…",
+      "submit": "یتیم‌سازی و رهاسازی زیرساخت"
+    },
+    "actions": {
+      "confirmed": "اجرا تأیید شد — در حال اعمال.",
+      "discarded": "اجرا نادیده گرفته شد.",
+      "provisioned": "{name} تأمین شد — پلن برای بازبینی آماده است.",
+      "reconfigureQueued": "پیکربندی مجدد در صف قرار گرفت — اجرا ایجاد شد.",
+      "reconfigureQueuedStatus": "پیکربندی مجدد در صف قرار گرفت — وضعیت اجرا {status} است.",
+      "destroyQueued": "تخریب در صف قرار گرفت — اجرا ایجاد شد.",
+      "destroyQueuedStatus": "تخریب در صف قرار گرفت — وضعیت اجرا {status} است.",
+      "orphaned": "{name} یتیم شد — رکورد کاتالوگ حذف شد؛ زیرساخت آن در حال اجرا رها شده، ردیابی‌نشده و مدیریت‌نشده است."
+    },
+    "errors": {
+      "loadItem": "بارگذاری مورد کاتالوگ ناموفق بود",
+      "confirm": "تأیید ناموفق بود",
+      "confirmStatus": "تأیید ناموفق بود ({status})",
+      "discard": "نادیده گرفتن ناموفق بود",
+      "discardStatus": "نادیده گرفتن ناموفق بود ({status})",
+      "provision": "تأمین ناموفق بود",
+      "provisionStatus": "تأمین ناموفق بود ({status})",
+      "reconfigure": "پیکربندی مجدد ناموفق بود",
+      "reconfigureStatus": "پیکربندی مجدد ناموفق بود ({status})",
+      "destroy": "تخریب ناموفق بود",
+      "destroyStatus": "تخریب ناموفق بود ({status})",
+      "orphan": "یتیم‌سازی ناموفق بود",
+      "orphanStatus": "یتیم‌سازی ناموفق بود ({status})"
+    }
+  },
+  "common": {
+    "connection": {
+      "reconnecting": "در حال اتصال مجدد…"
+    },
+    "sessionExpiry": {
+      "banner": "نشست تا {minutes, plural, one {# دقیقه} other {# دقیقه}} دیگر منقضی می‌شود — <link>احراز هویت مجدد</link>"
+    },
+    "tokenExpiry": {
+      "withinDays": "{count, plural, one {# توکن سرویس} other {# توکن سرویس}} که ظرف {days, plural, one {# روز} other {# روز}} منقضی می‌شود — <link>بازبینی</link>",
+      "soon": "{count, plural, one {# توکن سرویس} other {# توکن سرویس}} که به‌زودی منقضی می‌شود — <link>بازبینی</link>",
+      "dismissAria": "نادیده‌گیری هشدار انقضای توکن"
+    },
+    "resourceUsage": {
+      "title": "مصرف منابع",
+      "oomKilled": "کشته‌شده به‌دلیل OOM",
+      "killedLikelyOom": "کشته‌شده (احتمالاً OOM)",
+      "memory": "حافظه",
+      "requested": "درخواست‌شده {value}",
+      "limit": "محدودیت {value}"
+    },
+    "labelsEditor": {
+      "none": "هیچ‌کدام",
+      "removeAria": "برداشتن {key}",
+      "keyPlaceholder": "کلید",
+      "valuePlaceholder": "مقدار",
+      "add": "افزودن"
+    },
+    "sensitiveInput": {
+      "hide": "پنهان کردن",
+      "show": "نمایش",
+      "hideAria": "پنهان کردن مقدار",
+      "showAria": "نمایش مقدار"
+    },
+    "workspacePicker": {
+      "searchPlaceholder": "جست‌وجوی فضاهای کاری…",
+      "loading": "در حال بارگذاری…",
+      "empty": "هیچ فضای کاری یافت نشد",
+      "adding": "در حال افزودن…"
+    },
+    "templateEditors": {
+      "remove": "برداشتن",
+      "add": "افزودن",
+      "valuePlaceholder": "مقدار",
+      "name": "نام",
+      "url": "نشانی",
+      "hmacKey": "کلید HMAC (اختیاری)",
+      "hmacKeyPlaceholder": "راز مشترک",
+      "stage": "مرحله",
+      "enforcement": "اعمال",
+      "enabled": "فعال",
+      "runTaskNamePlaceholder": "security-scan",
+      "runTaskUrlPlaceholder": "https://hooks.example.com/task",
+      "addRunTask": "افزودن وظیفهٔ اجرا",
+      "destinationType": "نوع مقصد",
+      "token": "توکن (اختیاری)",
+      "tokenPlaceholder": "توکن HMAC / احراز هویت",
+      "notificationNamePlaceholder": "slack-alerts",
+      "notificationUrlPlaceholder": "https://hooks.slack.com/services/...",
+      "emailAddresses": "نشانی‌های ایمیل",
+      "emailPlaceholder": "ops@example.com",
+      "addEmail": "افزودن ایمیل",
+      "triggers": "محرک‌ها",
+      "addNotification": "افزودن اعلان"
+    }
+  },
+  "planSummary": {
+    "aiGenerated": "تولیدشده توسط هوش مصنوعی",
+    "heading": {
+      "planSummary": "خلاصهٔ برنامه",
+      "failureAnalysis": "تحلیل شکست"
+    },
+    "errors": {
+      "status": "HTTP {status}"
+    },
+    "regenerate": {
+      "label": "تولید مجدد",
+      "queueing": "در حال قرار دادن در صف…",
+      "tooltip": "خلاصهٔ هوش مصنوعی را دوباره روی همان ورودی‌های برنامه اجرا کنید",
+      "ariaLabel": "تولید مجدد خلاصهٔ هوش مصنوعی",
+      "confirm": "تحلیل هوش مصنوعی دوباره تولید شود؟ این کار مدل را دوباره اجرا می‌کند.",
+      "error": "تولید مجدد ممکن نشد: <mono>{detail}</mono>"
+    },
+    "pending": {
+      "summarisingPlan": "در حال خلاصه‌سازی برنامه…",
+      "analysingFailure": "در حال تحلیل شکست…"
+    },
+    "skipped": {
+      "fallback": "خلاصه‌سازی برای این اجرا رد شد."
+    },
+    "errored": {
+      "heading": "خلاصه‌ساز ناموفق بود"
+    },
+    "riskFactors": {
+      "heading": "عوامل ریسک",
+      "suggestedFixes": "اصلاحات پیشنهادی"
+    },
+    "tokens": "{input} ورودی / {output} خروجی توکن",
+    "risk": {
+      "low": "کم",
+      "medium": "متوسط",
+      "high": "زیاد",
+      "critical": "بحرانی",
+      "unknown": "نامشخص"
+    },
+    "badges": {
+      "noChanges": "بدون تغییر",
+      "noChangesLower": "بدون تغییر",
+      "noChangesTitle": "برنامه هیچ تغییری در منابع گزارش نکرد",
+      "toAdd": "{count, plural, one {# برای افزودن} other {# برای افزودن}}",
+      "toChange": "{count, plural, one {# برای تغییر} other {# برای تغییر}}",
+      "toDestroy": "{count, plural, one {# برای تخریب} other {# برای تخریب}}",
+      "toReplace": "{count, plural, one {# برای جایگزینی} other {# برای جایگزینی}}",
+      "toImport": "{count, plural, one {# برای وارد کردن} other {# برای وارد کردن}}"
+    },
+    "chat": {
+      "heading": "پیگیری",
+      "sharedThreadNote": "یک رشتهٔ مشترک، قابل مشاهده برای هرکسی که دسترسی خواندن فضای کاری دارد.",
+      "placeholder": "یک سؤال پیگیری دربارهٔ این برنامه بپرسید… (⌘/Ctrl + Enter برای ارسال)",
+      "send": "ارسال",
+      "thinking": "در حال فکر کردن…",
+      "you": "شما",
+      "assistant": "دستیار"
+    },
+    "translatedNote": "به‌طور خودکار به زبان شما ترجمه شده است. خلاصهٔ معتبر همان نسخهٔ اصلی است.",
+    "translating": "در حال ترجمه…"
+  },
+  "runDetail": {
+    "notFound": "اجرا یافت نشد",
+    "runSection": "بخش اجرا",
+    "workspaceFallback": "فضای کاری",
+    "backTo": "بازگشت به {name}",
+    "errorHeading": "خطا",
+    "discardedHeading": "کنار گذاشته شد — برنامه‌ریزی مجدد لازم است",
+    "common": {
+      "yes": "بله",
+      "no": "خیر"
+    },
+    "header": {
+      "title": "اجرای {id}",
+      "titleWithWorkspace": "{workspace} — اجرای {id}",
+      "description": "اجرای {source}"
+    },
+    "relTime": {
+      "justNow": "همین الان",
+      "minutesAgo": "{count, plural, one {# دقیقه پیش} other {# دقیقه پیش}}",
+      "hoursAgo": "{count, plural, one {# ساعت پیش} other {# ساعت پیش}}",
+      "daysAgo": "{count, plural, one {# روز پیش} other {# روز پیش}}"
+    },
+    "status": {
+      "pending": "در انتظار",
+      "queued": "در صف",
+      "planning": "در حال برنامه‌ریزی",
+      "planned": "برنامه‌ریزی‌شده",
+      "confirmed": "تأییدشده",
+      "applying": "در حال اعمال",
+      "canceling": "در حال لغو",
+      "applied": "اعمال‌شده",
+      "errored": "دارای خطا",
+      "canceled": "لغوشده",
+      "discarded": "کنار گذاشته‌شده"
+    },
+    "activity": {
+      "pending": "در حال آماده‌سازی اجرا",
+      "queued": "در انتظار یک عامل در دسترس",
+      "planning": "در حال اجرای terraform plan",
+      "plannedConfirmable": "در انتظار تأیید و اعمال شما",
+      "plannedSpeculative": "برنامه‌ریزی حدسی کامل شد",
+      "plannedComplete": "برنامه‌ریزی کامل شد",
+      "confirmed": "در حال شروع اعمال",
+      "applying": "در حال اجرای terraform apply",
+      "canceling": "در حال متوقف کردن اجرا",
+      "applied": "اعمال کامل شد",
+      "errored": "اجرا ناموفق بود",
+      "canceled": "اجرا لغو شد",
+      "discarded": "برنامه کنار گذاشته شد",
+      "elapsedTitle": "زمان سپری‌شده در این مرحله"
+    },
+    "badge": {
+      "destroy": "تخریب",
+      "planOnly": "فقط برنامه‌ریزی"
+    },
+    "actions": {
+      "retryShort": "تلاش مجدد",
+      "retryFull": "تلاش مجدد اجرا",
+      "retrying": "در حال تلاش مجدد…",
+      "confirmShort": "اعمال",
+      "confirmFull": "تأیید و اعمال",
+      "confirming": "در حال تأیید…",
+      "discard": "کنار گذاشتن",
+      "discarding": "در حال کنار گذاشتن…",
+      "cancelShort": "لغو",
+      "cancelFull": "لغو اجرا",
+      "canceling": "در حال لغو…"
+    },
+    "confirm": {
+      "apply": "این اجرا اعمال شود؟ این کار برنامه را اعمال کرده و زیرساخت را تغییر می‌دهد.",
+      "discard": "این برنامه کنار گذاشته شود؟",
+      "cancel": "این اجرا لغو شود؟",
+      "retry": "این اجرا مجدداً تلاش شود؟"
+    },
+    "errors": {
+      "loadRun": "بارگذاری اجرا ناموفق بود",
+      "action": {
+        "confirm": "تأیید اجرا ناموفق بود",
+        "discard": "کنار گذاشتن اجرا ناموفق بود",
+        "cancel": "لغو اجرا ناموفق بود",
+        "retry": "تلاش مجدد اجرا ناموفق بود"
+      }
+    },
+    "tabs": {
+      "overview": "نمای کلی",
+      "ai": "هوش مصنوعی",
+      "aiFull": "تحلیل هوش مصنوعی",
+      "opa": "OPA",
+      "opaFull": "سیاست‌های OPA",
+      "impact": "تأثیر",
+      "impactFull": "نمودار تأثیر",
+      "planLabel": "برنامه<log>گزارش</log>",
+      "applyLabel": "اعمال<log>گزارش</log>",
+      "planFull": "گزارش برنامه",
+      "applyFull": "گزارش اعمال",
+      "details": "جزئیات"
+    },
+    "banner": {
+      "destroy": "این یک اجرای <strong>تخریب</strong> است — با اعمال آن، تمام منابع مدیریت‌شده تخریب خواهند شد.",
+      "planOnlyCli": "این یک اجرای <strong>فقط برنامه‌ریزی</strong> است که از CLI روی یک فضای کاری متصل به VCS آغاز شده است. اعمال برای کد بارگذاری‌شده از CLI در دسترس نیست — فقط کد مدیریت‌شده توسط VCS قابل اعمال است.",
+      "moduleOverridesPrefix": "این اجرا از <strong>بازنویسی‌های ماژول</strong> استفاده می‌کند",
+      "moduleOverridesFromPr": "از PR #{number}",
+      "moduleOverridesSuffix": "به‌جای نسخهٔ منتشرشده در رجیستری، از شاخهٔ PR واکشی خواهد شد."
+    },
+    "cards": {
+      "changes": "تغییرات",
+      "aiAnalysis": "تحلیل هوش مصنوعی",
+      "policyChecks": "بررسی‌های سیاست",
+      "resources": "منابع"
+    },
+    "changes": {
+      "noChanges": "بدون تغییر",
+      "planning": "در حال برنامه‌ریزی…",
+      "toAdd": "برای افزودن",
+      "toChange": "برای تغییر",
+      "toDestroy": "برای تخریب",
+      "toReplace": "برای جایگزینی",
+      "toImport": "برای وارد کردن"
+    },
+    "ai": {
+      "notAvailable": "در دسترس نیست",
+      "ready": "آماده",
+      "riskSub": "ریسک {risk}",
+      "generating": "در حال تولید…",
+      "skipped": "رد شد",
+      "failed": "ناموفق",
+      "available": "در دسترس"
+    },
+    "policy": {
+      "none": "هیچ‌کدام",
+      "blocked": "مسدودشده",
+      "failedSub": "{count, plural, one {# ناموفق} other {# ناموفق}}",
+      "advisoryIssues": "مسائل مشورتی",
+      "passedSub": "{passed}/{total} قبول‌شده",
+      "passed": "قبول‌شده"
+    },
+    "resources": {
+      "overLimit": "فراتر از حد",
+      "oomKilled": "به‌دلیل کمبود حافظه متوقف شد",
+      "recorded": "ثبت‌شده",
+      "nearLimit": "نزدیک به حد",
+      "high": "بالا",
+      "withinLimits": "در محدودهٔ مجاز"
+    },
+    "details": {
+      "heading": "جزئیات",
+      "executionBackend": "پشتیبان اجرا",
+      "source": "منبع",
+      "autoApply": "اعمال خودکار",
+      "planOnly": "فقط برنامه‌ریزی",
+      "triggeredBy": "آغازشده توسط",
+      "created": "ایجادشده",
+      "commit": "کامیت",
+      "branch": "شاخه",
+      "prMr": "PR/MR",
+      "stateVersion": "نسخهٔ وضعیت",
+      "viewState": "مشاهدهٔ وضعیت",
+      "runOptions": "گزینه‌های اجرا"
+    },
+    "timeline": {
+      "heading": "خط زمانی",
+      "queued": "در صف",
+      "planningStarted": "برنامه‌ریزی آغاز شد",
+      "planComplete": "برنامه‌ریزی کامل شد",
+      "confirmed": "تأییدشده",
+      "applyingStarted": "اعمال آغاز شد",
+      "applied": "اعمال‌شده",
+      "errored": "دارای خطا",
+      "canceled": "لغوشده",
+      "discarded": "کنار گذاشته‌شده"
+    },
+    "log": {
+      "color": "رنگ",
+      "colorOnTitle": "نمایش رنگ‌های ANSI — برای متن ساده کلیک کنید",
+      "colorOffTitle": "نمایش متن ساده — برای رنگ‌ها کلیک کنید",
+      "refresh": "بازخوانی",
+      "refreshTitle": "بازخوانی گزارش",
+      "copy": "کپی",
+      "copied": "کپی شد!",
+      "copyTitle": "کپی متن ساده در کلیپ‌بورد",
+      "copyAria": "کپی گزارش در کلیپ‌بورد",
+      "download": "دانلود",
+      "downloadColorTitle": "دانلود گزارش (با کدهای رنگ ANSI)",
+      "downloadPlainTitle": "دانلود گزارش (متن ساده)",
+      "downloadAria": "دانلود گزارش",
+      "follow": "دنبال کردن",
+      "followOnTitle": "در حال دنبال کردن جریان زنده — برای توقف کلیک کنید",
+      "followOffTitle": "دنبال کردن جریان زنده",
+      "end": "انتها",
+      "endTitle": "پرش به انتهای گزارش",
+      "planEmpty": "هنوز خروجی برنامه‌ای در دسترس نیست.",
+      "applyEmpty": "هنوز خروجی اعمالی در دسترس نیست."
+    },
+    "policyPanel": {
+      "heading": "بررسی‌های سیاست",
+      "passedCount": "{passed}/{total} قبول‌شده",
+      "blockedMessage": "این اجرا <strong>توسط یک مجموعه سیاست الزامی مسدود شده است</strong>. تا زمانی که خطا برطرف نشود یا یک مدیر آن را نادیده نگیرد، اعمال نخواهد شد.",
+      "overriding": "در حال نادیده‌گیری...",
+      "overrideContinue": "نادیده‌گیری و ادامه",
+      "overrideFailed": "نادیده‌گیری ناموفق بود",
+      "overrideFailedStatus": "نادیده‌گیری ناموفق بود ({status})",
+      "overriddenBy": "نادیده‌گرفته‌شده توسط {by}",
+      "policyPassed": "قبول‌شده",
+      "noDenyMessage": "سیاست بدون تولید پیام رد یا خروجی خطا ناموفق شد",
+      "enforcement": {
+        "mandatory": "الزامی",
+        "advisory": "مشورتی"
+      },
+      "outcome": {
+        "passed": "قبول‌شده",
+        "failed": "ناموفق",
+        "errored": "دارای خطا"
+      }
+    }
+  },
+  "workspaceDetail": {
+    "notFound": "فضای کاری یافت نشد",
+    "common": {
+      "enabled": "فعال",
+      "disabled": "غیرفعال",
+      "none": "هیچ‌کدام",
+      "default": "پیش‌فرض",
+      "never": "هرگز",
+      "actions": "کنش‌ها",
+      "workspaceLocked": "فضای کاری قفل شده است"
+    },
+    "actions": {
+      "edit": "ویرایش",
+      "cancel": "لغو",
+      "save": "ذخیره",
+      "saving": "در حال ذخیره…",
+      "savingEllipsis": "در حال ذخیره...",
+      "delete": "حذف",
+      "deleting": "در حال حذف...",
+      "add": "افزودن",
+      "adding": "در حال افزودن...",
+      "remove": "برداشتن",
+      "download": "دانلود",
+      "rollback": "بازگردانی",
+      "close": "بستن",
+      "hide": "پنهان کردن",
+      "enable": "فعال کردن",
+      "disable": "غیرفعال کردن",
+      "creating": "در حال ایجاد...",
+      "sending": "در حال ارسال...",
+      "processing": "در حال پردازش...",
+      "queuing": "در حال افزودن به صف...",
+      "loading": "در حال بارگذاری...",
+      "loadingLower": "در حال بارگذاری…"
+    },
+    "header": {
+      "executionMode": "حالت اجرای {mode}",
+      "onboard": "راه‌اندازی"
+    },
+    "tabs": {
+      "overview": "نمای کلی",
+      "variables": "متغیرها",
+      "runs": "اجراها",
+      "state": "وضعیت",
+      "stateGraph": "گراف وضعیت",
+      "configurations": "پیکربندی‌ها",
+      "notifications": "اعلان‌ها",
+      "runTasks": "وظایف اجرا",
+      "runTriggers": "محرک‌های اجرا",
+      "sharing": "اشتراک‌گذاری",
+      "selectLabel": "بخش فضای کاری"
+    },
+    "lifecycle": {
+      "pendingDeletion": "در انتظار حذف",
+      "pendingDeletionDefault": "این فضای کاری برای حذف علامت‌گذاری شده و به کنش دستی نیاز دارد.",
+      "archived": "بایگانی‌شده",
+      "archivedDefault": "این فضای کاری بایگانی شده است."
+    },
+    "runQueuedBanner": {
+      "message": "اجرا با موفقیت به صف افزوده شد.",
+      "viewRun": "مشاهده اجرا"
+    },
+    "settings": {
+      "title": "تنظیمات",
+      "saveChanges": "ذخیره تغییرات",
+      "renamedNotice": "نام فضای کاری تغییر کرد. فیلد <name></name> را در بلوک <cloud></cloud> خود به‌روزرسانی کنید تا مطابقت داشته باشد."
+    },
+    "fields": {
+      "name": "نام",
+      "nameTitle": "حروف، اعداد، خط تیره، زیرخط. باید با یک حرف یا عدد شروع شود.",
+      "executionMode": "حالت اجرا",
+      "execModeLocal": "محلی",
+      "execModeAgent": "عامل",
+      "autoApply": "اعمال خودکار",
+      "cpuRequest": "درخواست CPU",
+      "cpuRequestTitle": "مقدار CPU در کوبرنتیز: هسته‌های کامل (1، 2) یا میلی‌کور (500m، 100m)",
+      "memoryRequest": "درخواست حافظه",
+      "memoryRequestTitle": "مقدار حافظه در کوبرنتیز: بایت (1000) یا با پسوند (512Mi، 2Gi، 1Ti)",
+      "executionBackend": "بک‌اند اجرا",
+      "version": "نسخه",
+      "versionPlaceholder": "مثلاً 1.11 یا 1.11.5",
+      "versionTitle": "نسخه در قالب X.Y یا X.Y.Z (مثلاً 1.11 یا 1.11.5)",
+      "terragruntEnabledAgent": "فعال (حالت عامل)",
+      "terragruntEnabledVersion": "فعال (نسخه {version})",
+      "terragruntVersionPlaceholder": "مثلاً 1.0",
+      "terragruntVersionTitle": "نسخه Terragrunt در قالب X.Y یا X.Y.Z (مثلاً 1.0)",
+      "workingDirectory": "پوشه کاری",
+      "workingDirectoryPlaceholder": "مثلاً environments/dev",
+      "agentPool": "استخر عامل",
+      "owner": "مالک",
+      "vcsConnection": "اتصال VCS",
+      "vcsRepository": "مخزن VCS",
+      "vcsRepositoryTitle": "باید یک نشانی HTTP یا HTTPS باشد",
+      "vcsBranch": "شاخه VCS",
+      "vcsBranchPlaceholder": "main (پیش‌فرض)",
+      "vcsWorkflow": "گردش کار VCS",
+      "vcsWorkflowMergeThenApply": "merge_then_apply (پیش‌فرض — استاندارد TFE / HCP)",
+      "vcsWorkflowApplyThenMerge": "apply_then_merge (استاندارد Atlantis — انتخابی)",
+      "autoMerge": "ادغام خودکار پس از اعمال",
+      "autoMergeStrategy": "راهبرد ادغام خودکار",
+      "vcsPolling": "نظرسنجی VCS",
+      "labels": "برچسب‌ها (تگ‌ها)",
+      "labelsTitle": "برچسب‌های فضای کاری دو نقش دارند: تطبیق RBAC مبتنی بر برچسب، و به‌عنوان «تگ‌هایی» که با بلوک‌های terraform/tofu cloud '{' workspaces '{' tags = ... '}' '}' تطبیق داده می‌شوند.",
+      "varFiles": "فایل‌های متغیر",
+      "varFilesPlaceholder": "مثلاً envs/dev.tfvars",
+      "triggerPrefixes": "پیشوندهای محرک",
+      "triggerPrefixesHint": "پوشه‌هایی که اجراها را فعال می‌کنند. در صورت تنظیم، بر فیلترسازی پوشه کاری اولویت دارد.",
+      "triggerPrefixesPlaceholder": "مثلاً modules",
+      "triggerPrefixesNone": "هیچ‌کدام (از پوشه کاری استفاده می‌کند)",
+      "driftIgnoreRules": "قوانین نادیده‌گیری انحراف",
+      "driftIgnoreRulesHint": "مسیرهای نشانی Terraform + ویژگی سازگار با گلاب که توسط طبقه‌بند انحراف سرکوب می‌شوند. <star></star> صفر یا چند نویسهٔ غیر-<dot></dot> را تطبیق می‌دهد (<n></n> اندیس را در بر می‌گیرد)؛ <starIdx></starIdx> هر اندیس داخل کروشه را تطبیق می‌دهد. یک نشانی خالی بدون پسوند ویژگی هر تغییری در آن منبع را — از جمله حذف‌ها — خاموش می‌کند. تنها بر انحراف اثر می‌گذارد، نه بر plan/apply عادی. برای دستور زبان کامل، <docs>drift-ignore-rules.md</docs> را ببینید.",
+      "driftIgnoreRulesNone": "هیچ‌کدام (هر تفاوت در طرح به‌عنوان انحراف شمرده می‌شود)"
+    },
+    "vcsWorkflowWarning": {
+      "title": "مجوزدهی به مخزن VCS شما واگذار شده است.",
+      "rbac": "هرکس که بتواند PR را ادغام کند می‌تواند اعمال کند. قوانین محافظت از شاخه (بازبینی‌های الزامی، بررسی‌های وضعیت، تأیید مالک کد) به دروازه تبدیل می‌شوند. RBAC مبتنی بر نقش/برچسب Terrapod در این حالت به کنش‌های مبتنی بر نظر اعمال <em>نمی‌شود</em>.",
+      "recommended": "<strong>توصیه‌شده:</strong> تاریخچهٔ خطی را الزامی کنید (بازپایه‌گذاری/فشرده‌سازی پیش از ادغام) تا کامیتی که اعمال می‌کنید همان کامیتی باشد که ثبت می‌شود.",
+      "credit": "منبع الهام: این گردش کار بر پایهٔ <atlantis>Atlantis</atlantis> مدل‌سازی شده است. Atlantis همچنان ابزار مناسبی برای تیم‌هایی است که تنها اعمال‌های مبتنی بر نظرِ PR را می‌خواهند و رابط کاربری پلتفرم نمی‌خواهند."
+    },
+    "vcsPolling": {
+      "error": "خطا",
+      "ok": "درست ({time})",
+      "notPolled": "هنوز نظرسنجی نشده"
+    },
+    "lockout": {
+      "revertLabels": "بازگردانی برچسب‌ها",
+      "saveAnyway": "به‌هرحال ذخیره کن"
+    },
+    "lock": {
+      "title": "وضعیت قفل",
+      "lockedDesc": "این فضای کاری قفل است. هیچ طرح یا اعمالی نمی‌تواند اجرا شود.",
+      "unlockedDesc": "این فضای کاری باز است و آمادهٔ اجراها است.",
+      "lock": "قفل کردن",
+      "unlock": "باز کردن قفل",
+      "lockConfirm": "این فضای کاری قفل شود؟",
+      "unlockConfirm": "قفل این فضای کاری باز شود؟"
+    },
+    "drift": {
+      "title": "تشخیص انحراف",
+      "checkInterval": "بازهٔ بررسی",
+      "status": "وضعیت",
+      "statusNoDrift": "بدون انحراف",
+      "statusDrifted": "منحرف‌شده",
+      "statusErrored": "دارای خطا",
+      "statusUnchecked": "بررسی‌نشده",
+      "dismiss": "نادیده گرفتن",
+      "dismissing": "در حال نادیده‌گیری…",
+      "dismissTitle": "وضعیت انحراف گزارش‌شده را پاک کنید. بررسی زمان‌بندی‌شدهٔ بعدی آن را از روی واقعیت دوباره پر می‌کند.",
+      "lastChecked": "آخرین بررسی",
+      "checkNow": "همین حالا بررسی کن",
+      "checkNowTitle": "افزودن یک اجرای فقط-طرح به صف برای بررسی انحراف",
+      "checkNowTitleDisabled": "ابتدا تشخیص انحراف را فعال کنید"
+    },
+    "intervals": {
+      "disabled": "غیرفعال",
+      "1hour": "۱ ساعت",
+      "4hours": "۴ ساعت",
+      "12hours": "۱۲ ساعت",
+      "24hours": "۲۴ ساعت",
+      "48hours": "۴۸ ساعت",
+      "3days": "۳ روز",
+      "7days": "۷ روز"
+    },
+    "planExpiry": {
+      "title": "انقضای طرح",
+      "description": "پس از آنکه یک طرح تأییدنشده از این کهنه‌تر شد به‌طور خودکار دور انداخته می‌شود، تا یک طرح کهنه نتواند بر روی دنیایی که تغییر کرده اعمال شود. به‌طور پیش‌فرض خاموش است؛ سپس طرح باید دوباره اجرا شود. (فقط بر اجراهای قابل‌اعمال اثر می‌گذارد.)",
+      "expireAfter": "انقضا پس از"
+    },
+    "aiSummary": {
+      "title": "خلاصهٔ هوش مصنوعیِ طرح",
+      "description": "خلاصهٔ تغییرات، ارزیابی ریسک و تحلیل شکستِ خودکار تولیدشده توسط LLM برای هر نتیجهٔ فاز طرح در این فضای کاری.",
+      "mode": "حالت",
+      "modeDefault": "پیروی از پیش‌فرض استقرار",
+      "modeEnabled": "همیشه خلاصه کن",
+      "modeDisabled": "هرگز خلاصه نکن",
+      "contextLabel": "زمینهٔ فضای کاری",
+      "contextLabelSuffix": "(اختیاری، افزوده)",
+      "contextPlaceholder": "حقایقی که هوش مصنوعی باید به‌طور خاص دربارهٔ این فضای کاری بداند. مثلاً «جلوی vault سرویس X قرار دارد — حذف کلید KMS باعث یک قطعی سراسری می‌شود.»",
+      "noContext": "هیچ زمینهٔ فضای کاری تنظیم نشده است.",
+      "contextHint": "علاوه بر زمینهٔ سراسری استقرار افزوده می‌شود. حداکثر ۴۰۰۰ نویسه."
+    },
+    "slack": {
+      "title": "اعلان‌های Slack",
+      "description": "این فضای کاری را برای اعلان‌های اجرای Slack انتخاب کنید — درخواست‌های تأیید، اعمال‌ها، خطاها و انحراف. کانال را خالی بگذارید و این فضای کاری خاموش می‌ماند (هیچ پخش سراسری استقراری وجود ندارد). نیازمند فعال بودن اپ Slack توسط یک مدیر است.",
+      "channel": "کانال",
+      "channelPlaceholder": "#deploys یا یک شناسهٔ کانال (مثلاً C0123ABCD)",
+      "notSet": "تنظیم‌نشده — خاموش.",
+      "hint": "اپ Slack باید از قبل عضو این کانال باشد."
+    },
+    "delete": {
+      "title": "حذف فضای کاری",
+      "description": "این فضای کاری و همهٔ وضعیت، متغیرها و اجراهای مرتبط با آن را برای همیشه حذف کنید.",
+      "confirm": "تأیید حذف"
+    },
+    "variables": {
+      "addVariable": "افزودن متغیر",
+      "key": "کلید",
+      "value": "مقدار",
+      "category": "دسته",
+      "categoryEnv": "محیط",
+      "sensitive": "حساس",
+      "empty": "هیچ متغیری برای این فضای کاری پیکربندی نشده است.",
+      "emptyValue": "خالی",
+      "enterNewValue": "مقدار جدید را وارد کنید",
+      "deleteConfirm": "متغیر «{key}» حذف شود؟"
+    },
+    "runs": {
+      "options": "گزینه‌ها",
+      "hideOptions": "پنهان کردن گزینه‌ها",
+      "queueDestroy": "افزودن نابودی به صف",
+      "queueDestroyTitle": "افزودن یک طرح نابودی به صف",
+      "destroyAllConfirm": "همهٔ منابع نابود شوند؟",
+      "confirmDestroy": "تأیید نابودی",
+      "queuePlan": "افزودن طرح به صف",
+      "queueRun": "افزودن اجرا به صف",
+      "queuePlanConfirm": "یک طرح احتمالی برای این فضای کاری به صف افزوده شود؟",
+      "queueApplyConfirm": "یک اجرای طرح + اعمال به صف افزوده شود؟ این کار می‌تواند زیرساخت را تغییر دهد.",
+      "planOptions": "گزینه‌های طرح",
+      "targetResources": "منابع هدف",
+      "replaceResources": "جایگزینی منابع",
+      "commaSeparated": "(با کاما جدا شده)",
+      "planOnly": "فقط طرح",
+      "refreshOnly": "فقط تازه‌سازی",
+      "skipRefresh": "رد کردن تازه‌سازی",
+      "allowEmptyApply": "اجازهٔ اعمال خالی",
+      "vcsRef": "مرجع VCS",
+      "branch": "شاخه",
+      "tag": "تگ",
+      "defaultBranch": "پیش‌فرض ({branch})",
+      "nonDefaultRefNote": "مرجع غیرپیش‌فرض انتخاب شد — اجرا فقط-طرح خواهد بود",
+      "empty": "هنوز هیچ اجرایی برای این فضای کاری وجود ندارد.",
+      "runId": "شناسهٔ اجرا",
+      "status": "وضعیت",
+      "type": "نوع",
+      "changes": "تغییرات",
+      "source": "منبع",
+      "triggeredBy": "فعال‌شده توسط",
+      "created": "ایجادشده",
+      "needsConfirm": "نیازمند تأیید",
+      "typeDestroy": "نابودی",
+      "typePlanOnly": "فقط طرح",
+      "typePlanApply": "طرح + اعمال",
+      "sourceModuleTest": "آزمون ماژول",
+      "sourceModulePublish": "انتشار ماژول"
+    },
+    "state": {
+      "deleteConfirm": "نسخهٔ وضعیت #{serial} حذف شود؟ این کار قابل‌بازگشت نیست.",
+      "rollbackConfirm": "به نسخهٔ وضعیت #{serial} بازگردانی شود؟ یک نسخهٔ جدید با همان محتوا ایجاد خواهد شد.",
+      "confirmDelete": "تأیید حذف",
+      "confirmRollback": "تأیید بازگردانی",
+      "uploadState": "بارگذاری وضعیت",
+      "empty": "هنوز هیچ نسخهٔ وضعیتی برای این فضای کاری وجود ندارد.",
+      "serial": "سریال",
+      "createdBy": "ایجادشده توسط",
+      "run": "اجرا",
+      "size": "اندازه",
+      "created": "ایجادشده",
+      "runner": "اجراکننده",
+      "latest": "جدیدترین"
+    },
+    "configurations": {
+      "description": "بایگانی‌های منبع بارگذاری‌شده برای این فضای کاری، جدیدترین در ابتدا. دو ردیف را برای مقایسه انتخاب کنید.",
+      "selectedCount": "{count}/2 انتخاب‌شده",
+      "compare": "مقایسه",
+      "comparing": "در حال مقایسه…",
+      "empty": "هنوز هیچ نسخهٔ پیکربندی‌ای وجود ندارد. به‌محض اینکه یک `terraform plan` بارگذاری کند یا یک ارسال در VCS اجرایی را فعال کند، اینجا نمایان می‌شوند.",
+      "id": "شناسه",
+      "source": "منبع",
+      "status": "وضعیت",
+      "created": "ایجادشده",
+      "current": "کنونی",
+      "selectForCompare": "انتخاب {id} برای مقایسه",
+      "compareLabel": "مقایسه",
+      "diff": "تفاوت",
+      "filesChanged": "{count} فایل تغییر کرد",
+      "oversized": "{count, plural, one {# فایل بیش‌ازحد بزرگ} other {# فایل بیش‌ازحد بزرگ}} رد شد: {files}",
+      "noDiff": "هیچ تفاوت محتوایی میان این نسخه‌ها وجود ندارد.",
+      "binaryChanged": "فایل باینری تغییر کرد — تفاوت رندر نشد.",
+      "diffType": {
+        "added": "افزوده‌شده",
+        "removed": "حذف‌شده",
+        "modified": "اصلاح‌شده",
+        "binary-changed": "باینری"
+      }
+    },
+    "notifications": {
+      "addNotification": "افزودن اعلان",
+      "name": "نام",
+      "namePlaceholder": "اعلان‌های استقرار",
+      "destinationType": "نوع مقصد",
+      "typeGeneric": "وب‌هوک عمومی",
+      "typeEmail": "ایمیل",
+      "url": "نشانی",
+      "hmacToken": "توکن HMAC (اختیاری)",
+      "signingSecret": "راز امضا",
+      "emailAddresses": "نشانی‌های ایمیل (با کاما جدا شده)",
+      "triggerEvents": "رویدادهای محرک",
+      "createNotification": "ایجاد اعلان",
+      "empty": "هیچ پیکربندی اعلانی برای این فضای کاری وجود ندارد.",
+      "ok": "درست",
+      "err": "خطا {status}",
+      "fail": "ناموفق",
+      "http": "HTTP {status}",
+      "verify": "تأیید",
+      "history": "تاریخچه",
+      "deliveryHistory": "تاریخچهٔ تحویل",
+      "enableConfirm": "این اعلان فعال شود؟",
+      "disableConfirm": "این اعلان غیرفعال شود؟",
+      "deleteConfirm": "اعلان «{name}» حذف شود؟"
+    },
+    "runTasks": {
+      "addRunTask": "افزودن وظیفهٔ اجرا",
+      "name": "نام",
+      "namePlaceholder": "بررسی سیاست OPA",
+      "webhookUrl": "نشانی وب‌هوک",
+      "stage": "مرحله",
+      "enforcementLevel": "سطح اعمال",
+      "hmacKey": "کلید HMAC (اختیاری)",
+      "hmacKeyPlaceholder": "راز امضا برای تأیید وب‌هوک",
+      "createRunTask": "ایجاد وظیفهٔ اجرا",
+      "empty": "هیچ وظیفهٔ اجرایی برای این فضای کاری پیکربندی نشده است.",
+      "enableConfirm": "این وظیفهٔ اجرا فعال شود؟",
+      "disableConfirm": "این وظیفهٔ اجرا غیرفعال شود؟",
+      "deleteConfirm": "وظیفهٔ اجرای «{name}» حذف شود؟"
+    },
+    "runTriggers": {
+      "title": "محرک‌های اجرا",
+      "description": "هنگامی که یک فضای کاری منبع یک اعمال را کامل می‌کند، برای فضاهای کاری پایین‌دستی به‌طور خودکار یک اجرای جدید به صف افزوده می‌شود. تا ۲۰ فضای کاری منبع برای هر مقصد.",
+      "inboundHeading": "فضاهای کاری منبع که اجراها را اینجا فعال می‌کنند",
+      "inboundEmpty": "هیچ فضای کاری منبعی اجراها را در این فضای کاری فعال نمی‌کند.",
+      "pickerPlaceholder": "برای افزودن به‌عنوان منبع، فضاهای کاری را جست‌وجو کنید…",
+      "outboundHeading": "فضاهای کاری مقصد که این فضای کاری فعال می‌کند",
+      "outboundEmpty": "این فضای کاری اجراها را در هیچ فضای کاری دیگری فعال نمی‌کند.",
+      "destinationNote": "(مقصد؛ از آنجا برداشته شود)",
+      "removeConfirm": "این محرک اجرا برداشته شود؟"
+    },
+    "sharing": {
+      "title": "اشتراک‌گذاری وضعیت راه‌دور",
+      "description": "فهرست مجازِ کنترل‌شده توسط تولیدکننده برای <code></code> بین‌فضاکاری. داده‌های وضعیت حاوی راز هستند — با دقت اعطا کنید. <docs>مستندات</docs>",
+      "outboundHeading": "فضاهای کاری مجاز به خواندن وضعیت این فضای کاری",
+      "outboundEmpty": "وضعیت این فضای کاری با هیچ فضای کاری دیگری به اشتراک گذاشته نشده است.",
+      "grantedBy": "اعطاشده توسط {by}",
+      "revoke": "لغو اعطا",
+      "revokeConfirm": "این اشتراک‌گذاری وضعیت راه‌دور برداشته شود؟ مصرف‌کننده دسترسی به این وضعیت را از دست خواهد داد.",
+      "pickerPlaceholder": "برای اعطای مجوز به‌عنوان مصرف‌کننده، فضاهای کاری را جست‌وجو کنید…",
+      "inboundHeading": "فضاهای کاری که این فضای کاری مجاز به خواندن وضعیت از آن‌هاست",
+      "inboundEmpty": "این فضای کاری مجاز به خواندن وضعیت از هیچ فضای کاری دیگری از طریق terraform_remote_state نیست.",
+      "producerNote": "(تولیدکننده؛ از آنجا لغو شود)"
+    },
+    "runMessages": {
+      "manualDriftCheck": "بررسی دستی انحراف از رابط کاربری",
+      "queued": "از رابط کاربری به صف افزوده شد",
+      "queuedSpeculative": "از رابط کاربری به صف افزوده شد (احتمالی)",
+      "destroyQueued": "نابودی از رابط کاربری به صف افزوده شد"
+    },
+    "errors": {
+      "loadWorkspace": "بارگذاری فضای کاری ناموفق بود",
+      "loadRuns": "بارگذاری اجراها ناموفق بود",
+      "loadVariables": "بارگذاری متغیرها ناموفق بود",
+      "loadStateVersions": "بارگذاری نسخه‌های وضعیت ناموفق بود",
+      "loadConfigurations": "بارگذاری نسخه‌های پیکربندی ناموفق بود",
+      "loadNotifications": "بارگذاری اعلان‌ها ناموفق بود",
+      "loadOutboundConsumers": "بارگذاری مصرف‌کنندگان خروجی وضعیت راه‌دور ناموفق بود",
+      "loadInboundConsumers": "بارگذاری مصرف‌کنندگان ورودی وضعیت راه‌دور ناموفق بود",
+      "loadConsumers": "بارگذاری مصرف‌کنندگان وضعیت راه‌دور ناموفق بود",
+      "loadInboundTriggers": "بارگذاری محرک‌های ورودی اجرا ناموفق بود",
+      "loadOutboundTriggers": "بارگذاری محرک‌های خروجی اجرا ناموفق بود",
+      "loadTriggers": "بارگذاری محرک‌های اجرا ناموفق بود",
+      "loadRunTasks": "بارگذاری وظایف اجرا ناموفق بود",
+      "downloadStateFile": "دانلود فایل وضعیت ناموفق بود",
+      "downloadFailed": "دانلود ناموفق بود",
+      "downloadFailedStatus": "دانلود ناموفق بود ({status})",
+      "downloadTicketMissingUrl": "پاسخ بلیت دانلود فاقد نشانی است",
+      "diffFailed": "تفاوت‌گیری ناموفق بود",
+      "diffFailedStatus": "تفاوت‌گیری ناموفق بود ({status})",
+      "authorizeConsumer": "اعطای مجوز به مصرف‌کننده ناموفق بود",
+      "revoke": "لغو اعطا ناموفق بود",
+      "revokeConsumer": "لغو اعطا از مصرف‌کننده ناموفق بود",
+      "addTrigger": "افزودن محرک اجرا ناموفق بود",
+      "removeTrigger": "برداشتن محرک اجرا ناموفق بود",
+      "createRunTask": "ایجاد وظیفهٔ اجرا ناموفق بود",
+      "createRunTaskStatus": "ایجاد وظیفهٔ اجرا ناموفق بود ({status})",
+      "update": "به‌روزرسانی ناموفق بود",
+      "toggleRunTask": "تغییر وضعیت وظیفهٔ اجرا ناموفق بود",
+      "delete": "حذف ناموفق بود",
+      "deleteRunTask": "حذف وظیفهٔ اجرا ناموفق بود",
+      "labelLockout": "این تغییر برچسب دسترسی شما را کاهش می‌دهد.",
+      "updateWorkspace": "به‌روزرسانی فضای کاری ناموفق بود",
+      "lockWorkspace": "قفل کردن فضای کاری ناموفق بود",
+      "unlockWorkspace": "باز کردن قفل فضای کاری ناموفق بود",
+      "updateAiSummary": "به‌روزرسانی تنظیمات خلاصهٔ هوش مصنوعی ناموفق بود",
+      "updateSlackChannel": "به‌روزرسانی کانال Slack ناموفق بود",
+      "updateDriftSettings": "به‌روزرسانی تنظیمات انحراف ناموفق بود",
+      "updateDriftInterval": "به‌روزرسانی بازهٔ انحراف ناموفق بود",
+      "updatePlanExpiry": "به‌روزرسانی انقضای طرح ناموفق بود",
+      "queueDriftCheck": "افزودن بررسی انحراف به صف ناموفق بود",
+      "queueDriftCheckStatus": "افزودن بررسی انحراف به صف ناموفق بود ({status})",
+      "dismissDrift": "نادیده‌گیری انحراف ناموفق بود",
+      "dismissDriftStatus": "نادیده‌گیری انحراف ناموفق بود ({status})",
+      "deleteWorkspace": "حذف فضای کاری ناموفق بود",
+      "addVariable": "افزودن متغیر ناموفق بود",
+      "addVariableStatus": "افزودن متغیر ناموفق بود ({status})",
+      "deleteVariable": "حذف متغیر ناموفق بود",
+      "updateVariable": "به‌روزرسانی متغیر ناموفق بود",
+      "queuePlan": "افزودن طرح به صف ناموفق بود",
+      "queuePlanStatus": "افزودن طرح به صف ناموفق بود ({status})",
+      "queueDestroy": "افزودن نابودی به صف ناموفق بود",
+      "queueDestroyStatus": "افزودن نابودی به صف ناموفق بود ({status})",
+      "createNotification": "ایجاد اعلان ناموفق بود",
+      "createNotificationStatus": "ایجاد اعلان ناموفق بود ({status})",
+      "toggleNotification": "تغییر وضعیت اعلان ناموفق بود",
+      "deleteNotification": "حذف اعلان ناموفق بود",
+      "verificationFailed": "تأیید ناموفق بود",
+      "verificationDeliveryFailed": "تحویل تأیید ناموفق بود: {detail}",
+      "unknownError": "خطای ناشناخته",
+      "failed": "ناموفق",
+      "deleteStateVersion": "حذف نسخهٔ وضعیت ناموفق بود",
+      "rollbackStateVersion": "بازگردانی نسخهٔ وضعیت ناموفق بود",
+      "stateActionFailed": "کنش وضعیت ناموفق بود",
+      "uploadState": "بارگذاری وضعیت ناموفق بود",
+      "uploadStateFile": "بارگذاری فایل وضعیت ناموفق بود"
+    }
+  },
+  "graphs": {
+    "stateTab": {
+      "loadError": "بارگذاری گراف وضعیت ناموفق بود.",
+      "emptyState": "هنوز هیچ وضعیتی وجود ندارد — یک طرح و اعمال اجرا کنید، یا وضعیت را بارگذاری کنید، سپس این گراف پر می‌شود.",
+      "stateVersionLabel": "نسخه وضعیت",
+      "currentSuffix": "(کنونی)",
+      "colorByLabel": "رنگ بر اساس",
+      "viewGraph": "گراف",
+      "viewTable": "جدول",
+      "resourceCount": "{count, plural, one {# منبع} other {# منبع}}",
+      "dependencyCount": "{count, plural, one {# وابستگی} other {# وابستگی}}",
+      "truncated": "نمایش {shown} منبع نخست از {total} منبع — گراف برای خوانایی محدود شده است.",
+      "colResource": "منبع",
+      "colType": "نوع",
+      "colMode": "حالت",
+      "colModule": "ماژول",
+      "colDependedOnBy": "وابسته‌شده توسط",
+      "rootModule": "(ریشه)",
+      "colorBy": {
+        "type": "نوع منبع",
+        "module": "ماژول",
+        "provider": "ارائه‌دهنده",
+        "mode": "مدیریت‌شده / داده",
+        "none": "هیچ‌چیز (تک‌رنگ)"
+      }
+    },
+    "impact": {
+      "notAvailable": "گراف تأثیر برای این اجرا در دسترس نیست.",
+      "title": "گراف تأثیر",
+      "subtitle": "طرحِ {count, plural, one {# منبع} other {# منبع}}",
+      "hint": "هر کره یک منبع است؛ هر پیکان به آنچه به آن وابسته است اشاره می‌کند. روی یک گره کلیک کنید ← <b>تأثیر</b> گذرای آن (همه چیز در پایین‌دست) روشن می‌شود.",
+      "downstreamAffected": "متأثر در پایین‌دست",
+      "action": {
+        "create": "ایجاد",
+        "update": "به‌روزرسانی",
+        "replace": "جایگزینی",
+        "destroy": "تخریب",
+        "unchanged": "بدون تغییر"
+      }
+    },
+    "estate": {
+      "navHint": "بکشید تا بچرخانید · اسکرول کنید تا بزرگ‌نمایی کنید · با کلیک راست بکشید تا جابه‌جا کنید · <em>روی یک گره کلیک کنید تا به دور آن بچرخید</em>"
+    },
+    "state3d": {
+      "title": "گراف وضعیت",
+      "hint": "هر کره یک منبع است؛ هر پیکان به آنچه به آن وابسته است اشاره می‌کند. روی یک گره کلیک کنید ← منابعی که به‌طور گذرا <b>به آن وابسته‌اند</b> روشن می‌شوند.",
+      "dataSource": "منبع داده",
+      "managed": "مدیریت‌شده",
+      "dependOnThis": "به این وابسته‌اند"
+    },
+    "resource3d": {
+      "resetView": "بازنشانی نما",
+      "clear": "پاک کردن",
+      "key": "راهنما",
+      "resources": "منابع",
+      "hideKey": "پنهان کردن راهنما",
+      "hideResources": "پنهان کردن منابع",
+      "resourcesCount": "منابع ({count})",
+      "filterPlaceholder": "فیلتر منابع…",
+      "navHint": "بکشید تا بچرخانید · اسکرول کنید تا بزرگ‌نمایی کنید · با کلیک راست بکشید تا جابه‌جا کنید · <em>روی یک منبع کلیک کنید تا به دور آن بچرخید</em>"
+    }
+  },
+  "execHookDetail": {
+    "backLink": "بازگشت به قلاب‌های اجرا",
+    "defaultDescription": "قلاب اجرا",
+    "notFound": "قلاب اجرا یافت نشد",
+    "scriptEmpty": "(خالی)",
+    "tabs": {
+      "settings": "تنظیمات",
+      "workspaces": "فضاهای کاری"
+    },
+    "common": {
+      "yes": "بله",
+      "no": "خیر"
+    },
+    "actions": {
+      "edit": "ویرایش",
+      "cancel": "انصراف",
+      "save": "ذخیره",
+      "saving": "در حال ذخیره...",
+      "delete": "حذف",
+      "deleting": "در حال حذف...",
+      "confirmDelete": "تأیید حذف",
+      "add": "افزودن",
+      "adding": "در حال افزودن...",
+      "remove": "برداشتن"
+    },
+    "settings": {
+      "heading": "تنظیمات"
+    },
+    "fields": {
+      "name": "نام",
+      "description": "توضیحات",
+      "hookPoint": "نقطه قلاب",
+      "priority": "اولویت",
+      "enabled": "فعال",
+      "script": "اسکریپت (<code>/bin/sh -c</code>)"
+    },
+    "delete": {
+      "heading": "حذف قلاب اجرا",
+      "description": "این قلاب را برای همیشه حذف کنید و آن را از تمام فضاهای کاری بردارید."
+    },
+    "workspaces": {
+      "scopeNote": "این قلاب فقط روی فضاهای کاری‌ای که در زیر مرتبط شده‌اند اجرا می‌شود. هیچ حوزه سراسری‌ای وجود ندارد.",
+      "associate": "مرتبط‌کردن فضای کاری",
+      "workspaceLabel": "فضای کاری",
+      "selectPlaceholder": "یک فضای کاری انتخاب کنید...",
+      "empty": "هیچ فضای کاری‌ای با این قلاب مرتبط نیست.",
+      "colWorkspace": "فضای کاری",
+      "colActions": "کنش‌ها"
+    },
+    "confirm": {
+      "removeWorkspace": "این فضای کاری از قلاب برداشته شود؟ قلاب دیگر برای آن اجرا نخواهد شد."
+    },
+    "success": {
+      "updated": "قلاب اجرا به‌روزرسانی شد",
+      "workspaceAssociated": "فضای کاری مرتبط شد",
+      "workspaceRemoved": "فضای کاری برداشته شد"
+    },
+    "errors": {
+      "load": "بارگذاری قلاب اجرا ناموفق بود",
+      "update": "به‌روزرسانی قلاب اجرا ناموفق بود",
+      "delete": "حذف قلاب اجرا ناموفق بود",
+      "addWorkspace": "افزودن فضای کاری ناموفق بود",
+      "removeWorkspace": "برداشتن فضای کاری ناموفق بود"
+    }
+  },
+  "policySetDetail": {
+    "backLink": "مجموعه‌های سیاست",
+    "notFound": "یافت نشد",
+    "unknown": "نامشخص",
+    "subtitle": "مجموعه سیاست OPA · ایجادشده توسط {createdBy}",
+    "settings": {
+      "heading": "تنظیمات"
+    },
+    "fields": {
+      "description": "توضیحات",
+      "enforcement": "اعمال",
+      "enabled": "فعال",
+      "globalScope": "سراسری (هر فضای کاری)"
+    },
+    "enforcement": {
+      "advisory": "توصیه‌ای (هشدار)",
+      "mandatory": "الزامی (مسدودسازی اعمال)"
+    },
+    "scope": {
+      "allowLabels": "برچسب‌های مجاز (key: v1, v2)",
+      "allowLabelsPlaceholder": "env: prod, staging",
+      "allowNames": "نام‌های مجاز (هر کدام در یک خط)",
+      "denyLabels": "برچسب‌های ممنوع (key: v1, v2)",
+      "denyNames": "نام‌های ممنوع (هر کدام در یک خط)"
+    },
+    "vcs": {
+      "heading": "پیکربندی VCS",
+      "repoUrl": "نشانی مخزن",
+      "branch": "شاخه",
+      "branchPlaceholder": "main (پیش‌فرض)",
+      "policyPath": "مسیر سیاست"
+    },
+    "vcsBanner": {
+      "syncedFrom": "سیاست‌ها همگام‌سازی‌شده از",
+      "at": "در",
+      "lastSynced": "آخرین همگام‌سازی {time}",
+      "commit": "(کامیت {sha})",
+      "syncError": "خطای همگام‌سازی: {error}"
+    },
+    "policies": {
+      "heading": "سیاست‌ها ({count})",
+      "vcsManaged": "مدیریت‌شده توسط مخزن — تغییرات را از طریق PR ارسال کنید",
+      "empty": "هنوز هیچ سیاستی در این مجموعه وجود ندارد."
+    },
+    "addPolicy": {
+      "namePlaceholder": "نام سیاست",
+      "descPlaceholder": "توضیحات (اختیاری)",
+      "regoHint": "Rego v1. باید <code>package terrapod</code> را اعلام کند و نقض‌ها را از طریق یک مجموعه <code>deny</code> بیان کند. پلن، <code>input</code> است؛ زمینه Terrapod، <code>data.terrapod_context</code> است."
+    },
+    "actions": {
+      "saving": "در حال ذخیره...",
+      "saveSettings": "ذخیره تنظیمات",
+      "syncNow": "همگام‌سازی اکنون",
+      "cancel": "انصراف",
+      "addPolicy": "افزودن سیاست",
+      "deleteSet": "حذف مجموعه",
+      "validatingRego": "در حال اعتبارسنجی Rego...",
+      "delete": "حذف",
+      "savePolicy": "ذخیره سیاست"
+    },
+    "confirm": {
+      "deleteSet": "این مجموعه سیاست و تمام سیاست‌های آن حذف شود؟ ارزیابی‌های اجرای ثبت‌شده حفظ می‌شوند.",
+      "deletePolicy": "سیاست «{name}» حذف شود؟"
+    },
+    "errors": {
+      "load": "بارگذاری مجموعه سیاست ناموفق بود",
+      "save": "ذخیره مجموعه سیاست ناموفق بود",
+      "saveStatus": "ذخیره ناموفق بود ({status})",
+      "delete": "حذف مجموعه سیاست ناموفق بود",
+      "deleteStatus": "حذف ناموفق بود ({status})",
+      "addPolicy": "افزودن سیاست ناموفق بود",
+      "addPolicyStatus": "افزودن سیاست ناموفق بود ({status})",
+      "savePolicy": "ذخیره سیاست ناموفق بود",
+      "savePolicyStatus": "ذخیره سیاست ناموفق بود ({status})",
+      "deletePolicy": "حذف سیاست ناموفق بود",
+      "deletePolicyStatus": "حذف ناموفق بود ({status})"
+    }
+  },
+  "slackLink": {
+    "title": "اتصال Slack به Terrapod",
+    "loading": "در حال بارگذاری…",
+    "checking": "در حال بررسی اتصال شما…",
+    "linking": "در حال اتصال حساب Slack شما…",
+    "unknown": "ناشناخته",
+    "confirm": {
+      "prompt": "این حساب Slack به هویت Terrapod <em>شما</em> متصل شود؟ هر کنش آیندهٔ Slack (تأیید/دورانداختن) به‌عنوان این کاربر Terrapod و با مجوزهای او اجرا خواهد شد.",
+      "slackUser": "کاربر Slack",
+      "slackTeam": "تیم Slack",
+      "terrapodAccount": "حساب Terrapod",
+      "warning": "تنها در صورتی ادامه دهید که خودتان همین حالا این اتصال را از Slack آغاز کرده‌اید. اگر شما نبوده‌اید، این تب را ببندید و متصل نکنید — این کار حساب Slack بالا را به هویت Terrapod <em>شما</em> پیوند می‌دهد.",
+      "button": "تأیید و اتصال"
+    },
+    "success": {
+      "message": "حساب Slack شما اکنون به Terrapod متصل شده است.",
+      "linkedAs": "متصل‌شده به‌عنوان <em>{email}</em>. می‌توانید این تب را ببندید و به Slack بازگردید."
+    },
+    "errors": {
+      "missingLink": "پیوند گم‌شده یا نامعتبر است. با فرمان اتصال Terrapod در Slack دوباره شروع کنید.",
+      "invalidLink": "این پیوند نامعتبر، منقضی یا از قبل استفاده‌شده است. اتصال را دوباره از Slack آغاز کنید.",
+      "linkingFailed": "اتصال ناموفق بود."
+    }
+  },
+  "cliComplete": {
+    "loading": "در حال بارگذاری...",
+    "completing": "در حال تکمیل احرازهویت...",
+    "invalid": {
+      "title": "درخواست نامعتبر",
+      "description": "پارامترهای الزامی یافت نشد."
+    },
+    "success": {
+      "title": "ورود موفق",
+      "complete": "توکن API ایجاد شد. می‌توانید این زبانه را ببندید."
+    },
+    "fallback": {
+      "description": "دسترسی خودکار به CLI امکان‌پذیر نبود.",
+      "button": "برای تکمیل دستی اینجا کلیک کنید"
+    },
+    "timeout": {
+      "description": "ممکن است CLI تبادل توکن را تکمیل نکرده باشد. پایانه خود را بررسی کنید."
+    }
+  },
+  "apiDocs": {
+    "view": "نما:",
+    "redocTitle": "مستندات API با ReDoc"
+  },
+  "onboarding": {
+    "title": "پذیرش منابع موجود",
+    "backTo": "بازگشت به {workspace}",
+    "description": "منابع ابری موجود و مدیریت‌نشده را در {workspace} کشف کنید و بلوک‌های منبع + درون‌ریزیِ قابل بازبینی تولید کنید.",
+    "providerLabel": "ارائه‌دهنده",
+    "providerVersionLabel": "نسخه ارائه‌دهنده (اختیاری)",
+    "start": "آغاز کشف",
+    "starting": "در حال آغاز…",
+    "sessionsLabel": "نشست‌های کشف",
+    "empty": "هنوز هیچ نشست کشفی وجود ندارد. یک ارائه‌دهنده انتخاب کنید و یکی را در بالا آغاز کنید.",
+    "analysing": "در حال تحلیل شمای ارائه‌دهنده… این کار بار اول می‌تواند یک دقیقه طول بکشد (در حال دانلود ارائه‌دهنده).",
+    "surfaceIntro": "انتخاب کنید که کدام‌یک از {count} منبع داده قابل‌جستجو کشف شود.",
+    "filterPlaceholder": "فیلتر منابع داده…",
+    "noMatches": "هیچ منبع داده‌ای با فیلتر شما تطبیق ندارد.",
+    "discover": "کشف {count} نوع",
+    "discovering": "در حال ارسال…",
+    "queryingHint": "در حال کشف منابع — اجراکننده در حال جستجوی ابر شما و تولید پیکربندی است.",
+    "viewRun": "مشاهده اجرا",
+    "reviewIntro": "تولیدشده از: {types}. در زیر بازبینی کنید، سپس پیکربندی را به فضای کاری خود منتقل کنید و درون‌ریزی را اعمال کنید.",
+    "importBlocks": "بلوک‌های درون‌ریزی",
+    "generatedConfig": "پیکربندی تولیدشده",
+    "copy": "کپی",
+    "copied": "کپی شد",
+    "nextStepNote": "بعدی: این پیکربندی را به مخزن فضای کاری خود منتقل کنید و آن را اجرا کنید — یک پذیرش صحیح تنها درون‌ریزی را طرح‌ریزی می‌کند (۰ افزوده / ۰ تغییر / ۰ تخریب).",
+    "erroredFallback": "اجرای کشف با شکست مواجه شد. اجرا را باز کنید تا گزارش‌ها را ببینید.",
+    "viewRunLogs": "مشاهده گزارش‌های اجرا",
+    "noResources": "هیچ منبع {types} مدیریت‌نشده‌ای در این حساب/ناحیه یافت نشد.",
+    "aiPolishedBadge": "پرداخت‌شده با هوش مصنوعی",
+    "aiPolishedNote": "منابع از روی برچسب‌ها تغییرنام یافتند، گروه‌بندی و مستند شدند — مقادیر خصیصه‌ها و شناسه‌های درون‌ریزی بدون تغییر مانده‌اند.",
+    "viewPolished": "پرداخت‌شده",
+    "viewRaw": "خام",
+    "pairedTitle": "جفت‌های درون‌ریزی + منبع",
+    "pairedNote": "هر بلوک درون‌ریزی مستقیماً بالای منبعی که هدف می‌گیرد قرار دارد — یک جفت را کپی کنید، یا از بلوک‌های جداگانه زیر استفاده کنید.",
+    "state": {
+      "pending": "در حال تحلیل شما",
+      "schema_ready": "آماده کشف",
+      "querying": "در حال کشف",
+      "config_ready": "پیکربندی آماده",
+      "run_created": "اجرای درون‌ریزی ایجاد شد",
+      "errored": "با خطا مواجه شد",
+      "canceled": "لغوشده"
+    }
+  }
+}

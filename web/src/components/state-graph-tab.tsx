@@ -90,7 +90,7 @@ export function StateGraphTab({ workspaceId }: { workspaceId: string }) {
           <select
             value={version}
             onChange={(e) => setVersion(e.target.value)}
-            className="ml-1 text-sm bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-slate-100"
+            className="ms-1 text-sm bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-slate-100"
           >
             {versions.map((v) => (
               <option key={v.id} value={v.is_current ? '' : v.id}>
@@ -105,7 +105,7 @@ export function StateGraphTab({ workspaceId }: { workspaceId: string }) {
           <select
             value={groupBy}
             onChange={(e) => setGroupBy(e.target.value)}
-            className="ml-1 text-sm bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-slate-100"
+            className="ms-1 text-sm bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-slate-100"
           >
             {axes.map((a) => (
               <option key={a.value} value={a.value}>
@@ -141,23 +141,23 @@ export function StateGraphTab({ workspaceId }: { workspaceId: string }) {
           <table className="w-full text-sm">
             <thead className="bg-slate-800/50 text-slate-400 text-xs">
               <tr>
-                <th scope="col" className="text-left px-3 py-2">{t('stateTab.colResource')}</th>
-                <th scope="col" className="text-left px-3 py-2">{t('stateTab.colType')}</th>
-                <th scope="col" className="text-left px-3 py-2">{t('stateTab.colMode')}</th>
-                <th scope="col" className="text-left px-3 py-2">{t('stateTab.colModule')}</th>
-                <th scope="col" className="text-right px-3 py-2">{t('stateTab.colDependedOnBy')}</th>
+                <th scope="col" className="text-start px-3 py-2">{t('stateTab.colResource')}</th>
+                <th scope="col" className="text-start px-3 py-2">{t('stateTab.colType')}</th>
+                <th scope="col" className="text-start px-3 py-2">{t('stateTab.colMode')}</th>
+                <th scope="col" className="text-start px-3 py-2">{t('stateTab.colModule')}</th>
+                <th scope="col" className="text-end px-3 py-2">{t('stateTab.colDependedOnBy')}</th>
               </tr>
             </thead>
             <tbody>
               {sortedNodes.map((n) => (
                 <tr key={n.id} className="border-t border-slate-800/70">
-                  <th scope="row" className="text-left px-3 py-2 font-mono text-xs text-slate-100 font-normal break-all">
+                  <th scope="row" className="text-start px-3 py-2 font-mono text-xs text-slate-100 font-normal break-all">
                     {n.name}
                   </th>
                   <td className="px-3 py-2 text-slate-300">{n.type}</td>
                   <td className="px-3 py-2 text-slate-400">{n.mode}</td>
                   <td className="px-3 py-2 text-slate-400 text-xs">{n.module || t('stateTab.rootModule')}</td>
-                  <td className="px-3 py-2 text-right tabular-nums text-slate-300">{n.indeg}</td>
+                  <td className="px-3 py-2 text-end tabular-nums text-slate-300">{n.indeg}</td>
                 </tr>
               ))}
             </tbody>

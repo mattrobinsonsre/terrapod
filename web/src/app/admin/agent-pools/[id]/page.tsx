@@ -528,12 +528,12 @@ export default function AgentPoolDetailPage() {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-slate-700/50">
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">{t('tokens.columns.description')}</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider hidden sm:table-cell">{t('tokens.columns.uses')}</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider hidden md:table-cell">{t('tokens.columns.expires')}</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider hidden md:table-cell">{t('tokens.columns.status')}</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider hidden lg:table-cell">{t('tokens.columns.createdBy')}</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">{t('tokens.columns.actions')}</th>
+                      <th className="px-4 py-3 text-start text-xs font-medium text-slate-400 uppercase tracking-wider">{t('tokens.columns.description')}</th>
+                      <th className="px-4 py-3 text-start text-xs font-medium text-slate-400 uppercase tracking-wider hidden sm:table-cell">{t('tokens.columns.uses')}</th>
+                      <th className="px-4 py-3 text-start text-xs font-medium text-slate-400 uppercase tracking-wider hidden md:table-cell">{t('tokens.columns.expires')}</th>
+                      <th className="px-4 py-3 text-start text-xs font-medium text-slate-400 uppercase tracking-wider hidden md:table-cell">{t('tokens.columns.status')}</th>
+                      <th className="px-4 py-3 text-start text-xs font-medium text-slate-400 uppercase tracking-wider hidden lg:table-cell">{t('tokens.columns.createdBy')}</th>
+                      <th className="px-4 py-3 text-end text-xs font-medium text-slate-400 uppercase tracking-wider">{t('tokens.columns.actions')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-700/30">
@@ -554,7 +554,7 @@ export default function AgentPoolDetailPage() {
                           </span>
                         </td>
                         <td className="px-4 py-3 text-xs text-slate-400 hidden lg:table-cell">{tok.attributes['created-by']}</td>
-                        <td className="px-4 py-3 text-right">
+                        <td className="px-4 py-3 text-end">
                           {!tok.attributes.revoked && (
                             <button onClick={() => handleRevokeToken(tok.id)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300 transition-colors">{t('tokens.revoke')}</button>
                           )}
@@ -580,11 +580,11 @@ export default function AgentPoolDetailPage() {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-slate-700/50">
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">{t('listeners.columns.name')}</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">{t('listeners.columns.status')}</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">{t('listeners.columns.replicas')}</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider hidden md:table-cell">{t('listeners.columns.certExpires')}</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">{t('listeners.columns.actions')}</th>
+                      <th className="px-4 py-3 text-start text-xs font-medium text-slate-400 uppercase tracking-wider">{t('listeners.columns.name')}</th>
+                      <th className="px-4 py-3 text-start text-xs font-medium text-slate-400 uppercase tracking-wider">{t('listeners.columns.status')}</th>
+                      <th className="px-4 py-3 text-start text-xs font-medium text-slate-400 uppercase tracking-wider">{t('listeners.columns.replicas')}</th>
+                      <th className="px-4 py-3 text-start text-xs font-medium text-slate-400 uppercase tracking-wider hidden md:table-cell">{t('listeners.columns.certExpires')}</th>
+                      <th className="px-4 py-3 text-end text-xs font-medium text-slate-400 uppercase tracking-wider">{t('listeners.columns.actions')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-700/30">
@@ -610,7 +610,7 @@ export default function AgentPoolDetailPage() {
                         <td className="px-4 py-3 text-xs text-slate-400 hidden md:table-cell">
                           {formatDate(l.attributes['certificate-expires-at'])}
                         </td>
-                        <td className="px-4 py-3 text-right">
+                        <td className="px-4 py-3 text-end">
                           <button onClick={() => handleDeleteListener(l.id)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300 transition-colors">{t('actions.delete')}</button>
                         </td>
                       </tr>
