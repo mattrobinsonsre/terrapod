@@ -150,6 +150,175 @@
     }
   },
   {
+    "name": "terrapod_variable_delete",
+    "destructive": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "description": "the variable key to delete",
+          "type": "string"
+        },
+        "workspace_id": {
+          "description": "the workspace id (ws-...)",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_id",
+        "key"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_variable_list",
+    "read_only": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "workspace_id": {
+          "description": "the workspace id (ws-...) whose variables to list",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_variable_set",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "category": {
+          "description": "terraform or env (default terraform)",
+          "type": "string"
+        },
+        "description": {
+          "description": "optional human description",
+          "type": "string"
+        },
+        "hcl": {
+          "description": "the value is a raw HCL expression (lists/objects); default false",
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "key": {
+          "description": "the variable key",
+          "type": "string"
+        },
+        "sensitive": {
+          "description": "mark sensitive — masked at rest and in responses; default false",
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "value": {
+          "description": "the value (empty is legal, e.g. flag-shaped env vars)",
+          "type": "string"
+        },
+        "workspace_id": {
+          "description": "the workspace id (ws-...)",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_id",
+        "key"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_workspace_create",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "agent_pool_id": {
+          "description": "agent pool id (apool-...) for agent execution mode",
+          "type": "string"
+        },
+        "auto_apply": {
+          "description": "auto-apply successful plans (default false)",
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "execution_backend": {
+          "description": "tofu or terraform (default: server default)",
+          "type": "string"
+        },
+        "execution_mode": {
+          "description": "local or agent (default: server default)",
+          "type": "string"
+        },
+        "labels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "key/value labels for RBAC + filtering (reserved keys rejected)",
+          "type": "object"
+        },
+        "name": {
+          "description": "the workspace name (unique within the org)",
+          "type": "string"
+        },
+        "owner_email": {
+          "description": "workspace owner email (defaults to the caller)",
+          "type": "string"
+        },
+        "terraform_version": {
+          "description": "partial version like 1.15 (means 1.15.*); no HCL operators",
+          "type": "string"
+        },
+        "vcs_branch": {
+          "description": "tracked branch (empty = repo default)",
+          "type": "string"
+        },
+        "vcs_connection_id": {
+          "description": "VCS connection id to wire this workspace to a repo",
+          "type": "string"
+        },
+        "vcs_repo_url": {
+          "description": "git repo URL (requires vcs_connection_id)",
+          "type": "string"
+        },
+        "working_directory": {
+          "description": "subdirectory within the repo",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_workspace_delete",
+    "destructive": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "workspace_id": {
+          "description": "the workspace id (ws-...) to delete",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
     "name": "terrapod_workspace_get",
     "read_only": true,
     "input_schema": {
@@ -181,6 +350,60 @@
           "type": "string"
         }
       },
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_workspace_update",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "agent_pool_id": {
+          "description": "agent pool id (apool-...)",
+          "type": "string"
+        },
+        "auto_apply": {
+          "description": "auto-apply successful plans",
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "execution_backend": {
+          "description": "tofu or terraform",
+          "type": "string"
+        },
+        "execution_mode": {
+          "description": "local or agent",
+          "type": "string"
+        },
+        "labels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "replace the label set (reserved keys rejected)",
+          "type": "object"
+        },
+        "name": {
+          "description": "rename the workspace (empty = leave)",
+          "type": "string"
+        },
+        "terraform_version": {
+          "description": "partial version like 1.15",
+          "type": "string"
+        },
+        "working_directory": {
+          "description": "subdirectory within the repo",
+          "type": "string"
+        },
+        "workspace_id": {
+          "description": "the workspace id (ws-...) to update",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_id"
+      ],
       "type": "object"
     }
   }
