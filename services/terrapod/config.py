@@ -748,6 +748,45 @@ class CatalogConfig(BaseModel):
     enabled: bool = Field(default=True)
 
 
+class CostEstimationConfig(BaseModel):
+    """Cost estimation via a cached OpenInfraQuote pricesheet (#871).
+
+    Terrapod estimates monthly cost by matching plan/state resources against
+    OpenInfraQuote's published ``prices.csv`` (https://github.com/terrateamio/openinfraquote,
+    MPL-2.0). The gzipped sheet is mirrored into object storage on a schedule so
+    runners (plan path) and the API (state/workspace path) read a cached copy —
+    no per-run egress. Air-gapped deployments pre-seed the cached object or point
+    ``prices_url`` at an internal mirror; the refresh is best-effort and never
+    required at request time.
+
+    On by default — it's a first-class feature. Because the cache is
+    pull-through, enabling it costs nothing until a cost surface is actually
+    used (no startup egress); set ``enabled: false`` to turn the feature off
+    entirely. The pricing data and engine design are OpenInfraQuote's; Terrapod
+    credits them wherever cost is shown.
+    """
+
+    enabled: bool = Field(default=True)
+    prices_url: str = Field(
+        default="https://oiq.terrateam.io/prices.csv.gz",
+        description=(
+            "Upstream OpenInfraQuote pricesheet (gzipped CSV). Fetched on demand "
+            "(pull-through) when the cached copy is missing or stale — no schedule. "
+            "Point at an internal mirror for air-gapped deployments."
+        ),
+    )
+    default_region: str = Field(
+        default="us-east-1",
+        description=(
+            "Fallback region used to price a resource only when its own region "
+            "can't be determined. Region is resolved per resource — from the "
+            "resource's attributes (AWS v6 `region`, Azure `location`, GCP "
+            "`region`/`location`), then its provider config — because a single "
+            "plan can legitimately span regions; this default is the last resort."
+        ),
+    )
+
+
 # --- VCS Configuration ---
 
 
@@ -1711,6 +1750,9 @@ class Settings(BaseSettings):
 
     # Service Catalog
     catalog: CatalogConfig = Field(default_factory=CatalogConfig)
+
+    # Cost estimation (#871)
+    cost_estimation: CostEstimationConfig = Field(default_factory=CostEstimationConfig)
 
     # VCS
     vcs: VCSConfig = Field(default_factory=VCSConfig)
