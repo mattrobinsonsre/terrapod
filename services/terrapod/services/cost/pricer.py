@@ -1,0 +1,286 @@
+"""Pricer — port of OpenInfraQuote's ``oiq_pricer.ml`` price path (MPL-2.0).
+
+Given resources matched to products, this computes each resource's monthly cost
+range: group a resource's products by their default-usage entry, bound usage to
+any per-usage / provision tiers, quote each product as
+``usage_bound / divisor * unit_price``, and take the cheapest and dearest quote
+as the resource's ``(min, max)``. Removed resources are negated; the run-level
+``diff`` sums adds+removes; ``prev = total - diff``.
+
+Only the numeric pricing is here — matching (resource ↔ product) is done in
+:mod:`terrapod.services.cost.engine`. The optional ``--match-query`` product
+filter of the upstream CLI is not needed by Terrapod and is omitted.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+from terrapod.services.cost import usage as usage_mod
+from terrapod.services.cost.match_set import MatchSet
+from terrapod.services.cost.prices import PriceKind, Product
+from terrapod.services.cost.range import Range, append, overlap
+from terrapod.services.cost.tf import Change, Resource
+from terrapod.services.cost.usage import Entry, Usage
+
+# Sentinel for "Inf" usage bounds. A large finite int keeps ranges int-typed;
+# real (finite) consumption always wins the min() clamps in the bounding logic.
+_INF = 2**63 - 1
+
+
+class ResourceMissingAttr(Exception):
+    """An attribute-priced product needs a resource attr that isn't present."""
+
+
+def _int_of_usage(v: str) -> int:
+    return _INF if v == "Inf" else int(v)
+
+
+@dataclass(frozen=True)
+class PricedProduct:
+    service: str
+    product_family: str
+    price: Range[float]
+    usage_description: str
+    ccy: str
+
+
+@dataclass(frozen=True)
+class PricedResource:
+    address: str
+    name: str
+    type: str
+    change: Change
+    price: Range[float]
+    products: list[PricedProduct]
+
+
+@dataclass(frozen=True)
+class PriceResult:
+    total: Range[float]
+    diff: Range[float]
+    prev: Range[float]
+    resources: list[PricedResource]
+    currency: str
+
+
+# --- the four transform steps (mirror oiq_pricer) ---------------------------
+
+
+def _synthesize_usage_from_attr(
+    resource_ms: MatchSet, entry: Entry, products: list[Product]
+) -> tuple[Entry, list[Product]]:
+    all_attr = all(p.price.kind is PriceKind.ATTR for p in products)
+    if all_attr:
+        if not products:
+            if entry.usage is not None:
+                return (entry, products)
+            raise AssertionError("empty attr product group with no usage")
+        attr = products[0].price.attr
+        assert attr is not None
+        found = resource_ms.find_by_key(attr)
+        if found is None:
+            raise ResourceMissingAttr(f"resource missing attr {attr!r} for pricing")
+        usage_val = int(found[1])
+        usage = Usage.from_data_range(Range(usage_val, usage_val))
+        return (entry.with_usage(usage), products)
+    if entry.usage is not None:
+        return (entry, products)
+    raise AssertionError("non-attr product group with no usage entry")
+
+
+def _apply_provision_amount(entry: Entry, products: list[Product]) -> tuple[Entry, list[Product]]:
+    assert entry.usage is not None
+    kept: list[Product] = []
+    for product in products:
+        ms = product.pricing_match_set
+        spa = ms.find_by_key("start_provision_amount")
+        epa = ms.find_by_key("end_provision_amount")
+        if spa is not None and epa is not None:
+            provision = Range(_int_of_usage(spa[1]), _int_of_usage(epa[1]))
+            priced_by = _priced_by_range(product, entry.usage)
+            if overlap(provision, priced_by) is not None:
+                kept.append(product)
+        elif spa is None and epa is None:
+            kept.append(product)
+        # else: malformed row (one bound only) — drop, mirroring the assert path
+    return (entry, kept)
+
+
+def _priced_by_range(product: Product, usage: Usage) -> Range[int]:
+    kind = product.price.kind
+    if kind is PriceKind.PER_TIME:
+        return usage.time
+    if kind is PriceKind.PER_OPERATION:
+        return usage.operations
+    return usage.data  # PER_DATA and ATTR
+
+
+def _apply_usage_amount(entry: Entry, products: list[Product]) -> list[tuple[Entry, list[Product]]]:
+    has_usage_amount = any(
+        p.pricing_match_set.find_by_key("start_usage_amount") is not None
+        and p.pricing_match_set.find_by_key("end_usage_amount") is not None
+        for p in products
+    )
+    if not has_usage_amount:
+        return [(entry, products)]
+
+    groups: dict[tuple[Range[int], str], list[Product]] = {}
+    for product in products:
+        ms = product.pricing_match_set
+        sua = _int_of_usage(ms.find_by_key("start_usage_amount")[1])  # type: ignore[index]
+        eua = _int_of_usage(ms.find_by_key("end_usage_amount")[1])  # type: ignore[index]
+        rng = Range(sua, eua)
+        kind = product.price.kind
+        priced_by = (
+            "time"
+            if kind is PriceKind.PER_TIME
+            else "operations"
+            if kind is PriceKind.PER_OPERATION
+            else "data"
+        )
+        groups.setdefault((rng, priced_by), []).append(product)
+
+    out: list[tuple[Entry, list[Product]]] = []
+    for (usage_range, priced_by), group in groups.items():
+        accessor = {
+            "time": usage_mod.TIME,
+            "operations": usage_mod.OPERATIONS,
+            "data": usage_mod.DATA,
+        }[priced_by]
+        bounded = usage_mod.bound_to_usage_amount(accessor, usage_range, entry)
+        if bounded is not None:
+            out.append((bounded, group))
+    return out
+
+
+def _price_products(
+    entry: Entry, products: list[Product]
+) -> tuple[PricedProduct, float, float] | None:
+    assert entry.usage is not None
+    divisor = float(entry.divisor if entry.divisor is not None else 1)
+    priced: list[tuple[Product, float]] = []
+    for product in products:
+        unit_price = product.price.value
+        base = _priced_by_range(product, entry.usage)
+        priced.append((product, float(base.min) / divisor * unit_price))
+        priced.append((product, float(base.max) / divisor * unit_price))
+    if not priced:
+        return None
+    priced.sort(key=lambda pq: pq[1])
+    (product_min, min_val) = priced[0]
+    (_product_max, max_val) = priced[-1]
+    pp = PricedProduct(
+        service=product_min.service,
+        product_family=product_min.product_family,
+        price=Range(min_val, max_val),
+        usage_description=entry.description,
+        ccy=product_min.ccy,
+    )
+    return (pp, min_val, max_val)
+
+
+def _region_matches(product: Product, region: str | None) -> bool:
+    """Keep region-agnostic products and region-specific products in ``region``.
+
+    OpenInfraQuote's ``--region`` filters globally; we instead filter each
+    resource's products to *its own* resolved region (#871), because a plan can
+    span regions (AWS provider v6 puts ``region`` on every resource; Azure/GCP
+    have per-resource ``location``/``region``). Products with no ``region`` in
+    their pricing match set are global (e.g. Route53) and always kept.
+    """
+    pr = product.pricing_match_set.find_by_key("region")
+    if pr is None:
+        return True
+    return region is None or pr[1] == region
+
+
+def price(
+    matches: list[tuple[Resource, Change, list[Product]]],
+    usage_entries: list[Entry],
+    region_by_address: dict[str, str] | None = None,
+) -> tuple[PriceResult, list[tuple[Resource, Change]]]:
+    """Price matched resources. Returns ``(result, unpriced)``.
+
+    ``region_by_address`` maps each resource address to its resolved region;
+    a resource's region-specific products are filtered to that region so a
+    multi-region plan prices each resource correctly (#871). ``unpriced`` lists
+    resources that matched no priceable product (or whose products carried no
+    usage entry) — the "Unpriced" bucket in the UX.
+    """
+    region_by_address = region_by_address or {}
+    priced_resources: list[PricedResource] = []
+    unpriced: list[tuple[Resource, Change]] = []
+    currency = "USD"
+
+    for resource, change, all_products in matches:
+        resource_ms = resource.to_match_set()
+        region = region_by_address.get(resource.address)
+        products = [p for p in all_products if _region_matches(p, region)]
+        # Group products by their matched usage entry (keyed by query text).
+        entry_by_key: dict[str, Entry] = {}
+        products_by_key: dict[str, list[Product]] = {}
+        for product in products:
+            combined = resource_ms.union(product.match_set).union(product.pricing_match_set)
+            entry = usage_mod.match_entry(combined, usage_entries)
+            if entry is None:
+                continue
+            key = entry.match_query.to_string()
+            entry_by_key.setdefault(key, entry)
+            products_by_key.setdefault(key, []).append(product)
+
+        priced_products: list[PricedProduct] = []
+        for key, group_products in products_by_key.items():
+            entry = entry_by_key[key]
+            try:
+                syn_entry, syn_products = _synthesize_usage_from_attr(
+                    resource_ms, entry, group_products
+                )
+                prov_entry, prov_products = _apply_provision_amount(syn_entry, syn_products)
+                for bounded_entry, bounded_products in _apply_usage_amount(
+                    prov_entry, prov_products
+                ):
+                    if not bounded_products:
+                        continue
+                    quoted = _price_products(bounded_entry, bounded_products)
+                    if quoted is not None:
+                        pp, _mn, _mx = quoted
+                        priced_products.append(pp)
+                        currency = pp.ccy
+            except (ResourceMissingAttr, AssertionError):
+                # Pathological product/usage combo — treat this resource as
+                # unpriced rather than crashing the whole estimate.
+                continue
+
+        if priced_products:
+            sign = -1.0 if change == "remove" else 1.0
+            summed = Range(0.0, 0.0)
+            for pp in priced_products:
+                summed = append(lambda a, b: a + b, summed, pp.price)
+            resource_price = Range(sign * summed.min, sign * summed.max)
+            priced_resources.append(
+                PricedResource(
+                    address=resource.address,
+                    name=resource.name,
+                    type=resource.type,
+                    change=change,
+                    price=resource_price,
+                    products=priced_products,
+                )
+            )
+        else:
+            unpriced.append((resource, change))
+
+    total = Range(0.0, 0.0)
+    for pr in priced_resources:
+        total = append(lambda a, b: a + b, total, pr.price)
+    diff = Range(0.0, 0.0)
+    for pr in priced_resources:
+        if pr.change in ("add", "remove"):
+            diff = append(lambda a, b: a + b, diff, pr.price)
+    prev = append(lambda a, b: a - b, total, diff)
+
+    result = PriceResult(
+        total=total, diff=diff, prev=prev, resources=priced_resources, currency=currency
+    )
+    return (result, unpriced)
