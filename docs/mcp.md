@@ -12,6 +12,21 @@ It is an ordinary API client — outbound HTTPS only, authenticated with the
 **`tofu login` token you already hold**, holding no privileged access. There is
 no in-cluster or shared/remote server to deploy.
 
+## Install
+
+`terrapod-mcp` ships as a signed release archive on every Terrapod release —
+Linux/Windows (amd64 + arm64) and a universal macOS binary — attached to the
+[GitHub Release](https://github.com/mattrobinsonsre/terrapod/releases) alongside
+the provider and the other CLIs. Download the archive for your platform, verify
+it against the `terrapod-mcp_<version>_SHA256SUMS` (signed with the project GPG
+key), and drop the `terrapod-mcp` binary somewhere on your `PATH`.
+
+Or build from source with Go:
+
+```sh
+go install github.com/mattrobinsonsre/terrapod/mcp/cmd/terrapod-mcp@latest
+```
+
 ## Quick start
 
 ### 1. Log in (once per instance)
