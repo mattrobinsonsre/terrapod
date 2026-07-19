@@ -157,6 +157,13 @@ def _run_json(
                 # Whether a structured JSON plan exists — gates the Impact
                 # graph tab in the UI (#761).
                 "has-json-output": bool(run.has_json_output),
+                # Cost estimation (#871): whether a cost estimate artifact
+                # exists (gates the Cost tab + download URL) and the cached
+                # monthly total range for cheap list display.
+                "has-cost-estimate": bool(run.has_cost_estimate),
+                "cost-currency": run.cost_currency,
+                "cost-monthly-min": run.cost_monthly_min,
+                "cost-monthly-max": run.cost_monthly_max,
                 "plan-summary": _plan_summary_attr(run),
                 "workspace-name": workspace_name,
                 "workspace-has-vcs": workspace_has_vcs,
@@ -1639,6 +1646,12 @@ async def next_run(
     run_data["data"]["attributes"]["env-vars"] = env_vars
     run_data["data"]["attributes"]["terraform-vars"] = terraform_vars
     run_data["data"]["attributes"]["execution-hooks"] = execution_hooks
+    # Cost estimation (#871): the API instructs the runner (via the listener)
+    # whether to estimate cost — the runner never self-configures. Global API
+    # setting today (per-workspace override is a future refinement); the runner
+    # falls back to enabled if a lagging listener drops the field.
+    run_data["data"]["attributes"]["cost-estimation"] = settings.cost_estimation.enabled
+    run_data["data"]["attributes"]["cost-default-region"] = settings.cost_estimation.default_region
     run_data["data"]["attributes"]["var-files"] = ws.var_files if ws and ws.var_files else []
     run_data["data"]["attributes"]["working-directory"] = ws.working_directory if ws else ""
     run_data["data"]["attributes"]["phase"] = phase

@@ -41,6 +41,16 @@ def plan_json_output_key(workspace_id: str, run_id: str) -> str:
     return f"plans/{workspace_id}/{run_id}.json-output"
 
 
+def cost_estimate_key(workspace_id: str, run_id: str) -> str:
+    """Key for a run's cost estimate (`cost_estimate.json`, #871).
+
+    The native OpenInfraQuote-port estimate of the plan's monthly cost delta,
+    produced by the runner from the plan JSON and uploaded as a run artifact —
+    the cost analogue of `plan_json_output_key`.
+    """
+    return f"plans/{workspace_id}/{run_id}.cost-estimate.json"
+
+
 def lock_file_key(workspace_id: str, run_id: str) -> str:
     """Key for the `.terraform.lock.hcl` produced by the plan-phase init.
 

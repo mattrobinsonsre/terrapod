@@ -89,6 +89,11 @@ COPY services/terrapod/runner/lock_extender.py ./terrapod/runner/lock_extender.p
 COPY services/terrapod/runner/plan_artifacts.py ./terrapod/runner/plan_artifacts.py
 COPY services/terrapod/runner/job_entrypoint.py ./terrapod/runner/job_entrypoint.py
 COPY services/terrapod/runner/phases/ ./terrapod/runner/phases/
+# Native cost engine (#871) — imported by phases/cost.py to price the plan JSON.
+# Pure stdlib (csv/json/dataclasses) + a vendored usage_defaults.json data file,
+# so it fits the minimal runner image with no new deps. terrapod.services is a
+# namespace package here (only the cost subpackage is copied in).
+COPY services/terrapod/services/cost/ ./terrapod/services/cost/
 
 # /home/runner is the writable HOME for UID 1000 — without it, tools
 # that consult $HOME (helm's repository/index cache, kubectl's

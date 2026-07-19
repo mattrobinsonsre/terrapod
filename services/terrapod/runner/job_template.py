@@ -82,6 +82,8 @@ def build_job_spec(
     refresh: bool = True,
     allow_empty_apply: bool = False,
     is_destroy: bool = False,
+    cost_estimation: bool = True,
+    cost_default_region: str = "us-east-1",
     working_directory: str = "",
     ca_secret_name: str = "",
     onboard_session_id: str = "",
@@ -203,6 +205,13 @@ def build_job_spec(
         container_env.append({"name": "TP_ALLOW_EMPTY_APPLY", "value": "true"})
     if is_destroy:
         container_env.append({"name": "TP_DESTROY", "value": "true"})
+    # Cost estimation (#871). The runner defaults to enabled, so only emit the
+    # env when the API instructs OFF; always ship the fallback region so a
+    # resource whose region can't be resolved is priced consistently.
+    if not cost_estimation:
+        container_env.append({"name": "TP_COST_ESTIMATION", "value": "false"})
+    elif cost_default_region:
+        container_env.append({"name": "TP_COST_DEFAULT_REGION", "value": cost_default_region})
     if working_directory:
         container_env.append({"name": "TP_WORKING_DIR", "value": working_directory})
 

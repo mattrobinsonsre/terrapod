@@ -527,3 +527,33 @@ class TestCABundleInjection:
         spec = self._spec("tprun-abc-ca", ca_enabled=False)
         pod = spec["spec"]["template"]["spec"]
         assert not any(v["name"] == "ca-src" for v in pod["volumes"])
+
+
+class TestCostEstimationEnv:
+    """#871 — the API's per-run cost instruction reaches the Job env."""
+
+    def _spec_env(self, **kw):
+        from terrapod.runner.job_template import build_job_spec
+
+        spec = build_job_spec(
+            run_id="abc123",
+            phase="plan",
+            runner_config=_runner_config(),
+            auth_secret_name="tprun-abc12345-auth",
+            env_vars=[],
+            terraform_vars=[],
+            **kw,
+        )
+        container = spec["spec"]["template"]["spec"]["containers"][0]
+        return {e["name"]: e.get("value") for e in container["env"] if "value" in e}
+
+    def test_enabled_default_ships_region_not_disable_flag(self):
+        env = self._spec_env(cost_estimation=True, cost_default_region="eu-west-1")
+        # Runner defaults to enabled, so no TP_COST_ESTIMATION on the happy path.
+        assert "TP_COST_ESTIMATION" not in env
+        assert env["TP_COST_DEFAULT_REGION"] == "eu-west-1"
+
+    def test_disabled_ships_off_flag_and_no_region(self):
+        env = self._spec_env(cost_estimation=False, cost_default_region="us-east-1")
+        assert env["TP_COST_ESTIMATION"] == "false"
+        assert "TP_COST_DEFAULT_REGION" not in env

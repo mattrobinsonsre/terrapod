@@ -97,3 +97,28 @@ def test_has_api_requires_both_url_and_run_id() -> None:
     assert (
         RunnerConfig.from_env(env={"TP_API_URL": "https://x", "TP_RUN_ID": "r-1"}).has_api is True
     )
+
+
+class TestCostEstimationConfig:
+    """#871 — cost fields default to enabled (fallback yes) and parse env."""
+
+    def test_defaults_enabled_us_east_1(self):
+        from terrapod.runner.runner_config import RunnerConfig
+
+        cfg = RunnerConfig.from_env(env={"TP_API_URL": "https://x", "TP_RUN_ID": "r"})
+        assert cfg.cost_estimation is True
+        assert cfg.cost_default_region == "us-east-1"
+
+    def test_env_overrides(self):
+        from terrapod.runner.runner_config import RunnerConfig
+
+        cfg = RunnerConfig.from_env(
+            env={
+                "TP_API_URL": "https://x",
+                "TP_RUN_ID": "r",
+                "TP_COST_ESTIMATION": "false",
+                "TP_COST_DEFAULT_REGION": "ap-south-1",
+            }
+        )
+        assert cfg.cost_estimation is False
+        assert cfg.cost_default_region == "ap-south-1"

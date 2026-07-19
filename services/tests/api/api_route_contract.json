@@ -298,6 +298,7 @@
   "PUT /api/terrapod/v1/registry-providers/private/default/{name}/versions/{version}/shasums.sig",
   "PUT /api/terrapod/v1/role-assignments",
   "PUT /api/terrapod/v1/runs/{run_id}/artifacts/apply-log",
+  "PUT /api/terrapod/v1/runs/{run_id}/artifacts/cost-estimate",
   "PUT /api/terrapod/v1/runs/{run_id}/artifacts/lock-file",
   "PUT /api/terrapod/v1/runs/{run_id}/artifacts/onboarding-config",
   "PUT /api/terrapod/v1/runs/{run_id}/artifacts/onboarding-imports",

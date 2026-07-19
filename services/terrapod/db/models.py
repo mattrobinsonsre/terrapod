@@ -18,6 +18,7 @@ from sqlalchemy import (
     BigInteger,
     Boolean,
     DateTime,
+    Float,
     ForeignKey,
     Index,
     Integer,
@@ -1560,6 +1561,20 @@ class Run(Base):
     resource_destructions: Mapped[int | None] = mapped_column(Integer, nullable=True)
     resource_replacements: Mapped[int | None] = mapped_column(Integer, nullable=True)
     resource_imports: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    # Cost estimation (#871). Set once the runner uploads `cost_estimate.json`
+    # (the native OpenInfraQuote-port estimate of this plan's monthly delta).
+    # `has_cost_estimate` gates the download URL the same way `has_json_output`
+    # does; the min/max are the plan-total monthly range cached for cheap list
+    # display (the full per-resource breakdown lives in the stored artifact).
+    # Null on runs that pre-date the feature, errored before plan, or had cost
+    # estimation disabled for the run.
+    has_cost_estimate: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="false", default=False
+    )
+    cost_currency: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    cost_monthly_min: Mapped[float | None] = mapped_column(Float, nullable=True)
+    cost_monthly_max: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     # Job tracking (populated by listener after launching K8s Job)
     job_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
