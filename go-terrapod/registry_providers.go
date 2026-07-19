@@ -59,6 +59,26 @@ func (c *Client) GetRegistryProvider(ctx context.Context, name string) (*Registr
 	return parseRegistryProvider(data)
 }
 
+// ListRegistryProviders returns every provider in the registry (the
+// management list — not the CLI download protocol). Slices the
+// server's JSON:API list through the same per-resource projector the
+// single-resource Get uses.
+func (c *Client) ListRegistryProviders(ctx context.Context) ([]RegistryProvider, error) {
+	data, err := c.Get(ctx, "/api/terrapod/v1/registry-providers")
+	if err != nil {
+		return nil, err
+	}
+	resources, err := ParseResourceList(data)
+	if err != nil {
+		return nil, err
+	}
+	providers := make([]RegistryProvider, 0, len(resources))
+	for i := range resources {
+		providers = append(providers, *registryProviderFromResource(&resources[i]))
+	}
+	return providers, nil
+}
+
 // UpdateRegistryProvider patches a provider by name.
 func (c *Client) UpdateRegistryProvider(ctx context.Context, name string, req UpdateRegistryProviderRequest) (*RegistryProvider, error) {
 	attrs := map[string]any{}
