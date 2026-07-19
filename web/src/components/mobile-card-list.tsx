@@ -52,7 +52,7 @@ export function MobileCard({ title, badge, fields, actions, href }: MobileCardPr
           {fields.map((f) => (
             <div key={f.label} className="flex items-baseline justify-between gap-3">
               <dt className="shrink-0 text-slate-500">{f.label}</dt>
-              <dd className={`min-w-0 break-words text-right ${f.valueClassName ?? 'text-slate-300'}`}>
+              <dd className={`min-w-0 break-words text-end ${f.valueClassName ?? 'text-slate-300'}`}>
                 {f.value}
               </dd>
             </div>

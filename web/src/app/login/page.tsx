@@ -21,7 +21,7 @@ export default function LoginPage() {
           switcher isn't shown to unauthenticated users). Writes the
           NEXT_LOCALE cookie + refreshes, re-rendering the login page in the
           chosen locale. */}
-      <div className="absolute top-4 right-4 z-10">
+      <div className="absolute top-4 end-4 z-10">
         <LocaleSwitcher />
       </div>
       <Suspense fallback={

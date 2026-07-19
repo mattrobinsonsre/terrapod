@@ -720,7 +720,7 @@ export default function RolesPage() {
                   <button type="button" onClick={() => setShowCreateCaps(!showCreateCaps)}
                     className="text-xs text-brand-400 hover:text-brand-300">
                     {showCreateCaps ? '▾ ' : '▸ '}{t('caps.advanced')}
-                    {roleCapsCustom && <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-900/50 text-purple-300">{t('caps.custom')}</span>}
+                    {roleCapsCustom && <span className="ms-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-900/50 text-purple-300">{t('caps.custom')}</span>}
                   </button>
                   {showCreateCaps && (
                     <CapabilityMatrix selected={roleCaps} onToggle={toggleCreateCap} custom={roleCapsCustom} idPrefix="create" />
@@ -851,7 +851,7 @@ export default function RolesPage() {
                             <button type="button" onClick={() => setShowEditCaps(!showEditCaps)}
                               className="text-xs text-brand-400 hover:text-brand-300">
                               {showEditCaps ? '▾ ' : '▸ '}{t('caps.advanced')}
-                              {editRoleCapsCustom && <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-900/50 text-purple-300">{t('caps.custom')}</span>}
+                              {editRoleCapsCustom && <span className="ms-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-900/50 text-purple-300">{t('caps.custom')}</span>}
                             </button>
                             {showEditCaps && (
                               <CapabilityMatrix selected={editRoleCaps} onToggle={toggleEditCap} custom={editRoleCapsCustom} idPrefix={`edit-${role.name}`} />
@@ -1010,7 +1010,7 @@ export default function RolesPage() {
                       <SortableHeader label={t('columns.email')} sortKey="email" sortState={assignmentSortState} onSort={toggleAssignmentSort} />
                       <SortableHeader label={t('columns.role')} sortKey="role" sortState={assignmentSortState} onSort={toggleAssignmentSort} />
                       <SortableHeader label={t('columns.created')} sortKey="created" sortState={assignmentSortState} onSort={toggleAssignmentSort} className="hidden sm:table-cell" />
-                      <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">{t('columns.actions')}</th>
+                      <th className="px-4 py-3 text-end text-xs font-medium text-slate-400 uppercase tracking-wider">{t('columns.actions')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-700/30">
@@ -1026,7 +1026,7 @@ export default function RolesPage() {
                         <td className="px-4 py-3 text-xs text-slate-500 hidden sm:table-cell">
                           {a.attributes['created-at'] ? fmt.date(a.attributes['created-at']) : ''}
                         </td>
-                        <td className="px-4 py-3 text-right">
+                        <td className="px-4 py-3 text-end">
                           <button
                             onClick={() => handleDeleteAssignment(a.attributes['provider-name'], a.attributes.email, a.attributes['role-name'])}
                             className="px-2.5 py-1 rounded-md text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300"

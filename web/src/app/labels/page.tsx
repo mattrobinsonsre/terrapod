@@ -138,10 +138,10 @@ function KeysView() {
       <table className="w-full text-sm">
         <thead className="bg-slate-900/50 text-slate-400">
           <tr>
-            <th className="px-4 py-3 text-left font-medium">{t('columns.labelKey')}</th>
-            <th className="px-4 py-3 text-right font-medium">{t('columns.distinctValues')}</th>
+            <th className="px-4 py-3 text-start font-medium">{t('columns.labelKey')}</th>
+            <th className="px-4 py-3 text-end font-medium">{t('columns.distinctValues')}</th>
             {ENTITY_TYPES.map(type => (
-              <th key={type} className="px-4 py-3 text-right font-medium">{t(ENTITY_LABEL_KEYS[type])}</th>
+              <th key={type} className="px-4 py-3 text-end font-medium">{t(ENTITY_LABEL_KEYS[type])}</th>
             ))}
             <th className="w-8" aria-hidden />
           </tr>
@@ -157,14 +157,14 @@ function KeysView() {
                   {entry.key}
                 </Link>
               </td>
-              <td className="px-4 py-3 text-right text-slate-300">{entry['value-count']}</td>
+              <td className="px-4 py-3 text-end text-slate-300">{entry['value-count']}</td>
               {ENTITY_TYPES.map(t => (
-                <td key={t} className="px-4 py-3 text-right text-slate-400">
+                <td key={t} className="px-4 py-3 text-end text-slate-400">
                   {entry['entity-counts'][t] ?? 0}
                 </td>
               ))}
               <td className="px-2 text-slate-600">
-                <ChevronRight size={16} />
+                <ChevronRight size={16} className="rtl:-scale-x-100" />
               </td>
             </tr>
           ))}
@@ -207,10 +207,10 @@ function ValuesView({ labelKey }: { labelKey: string }) {
           <table className="w-full text-sm">
             <thead className="bg-slate-900/50 text-slate-400">
               <tr>
-                <th className="px-4 py-3 text-left font-medium">{t('columns.value')}</th>
-                <th className="px-4 py-3 text-right font-medium">{t('columns.total')}</th>
+                <th className="px-4 py-3 text-start font-medium">{t('columns.value')}</th>
+                <th className="px-4 py-3 text-end font-medium">{t('columns.total')}</th>
                 {ENTITY_TYPES.map(type => (
-                  <th key={type} className="px-4 py-3 text-right font-medium">{t(ENTITY_LABEL_KEYS[type])}</th>
+                  <th key={type} className="px-4 py-3 text-end font-medium">{t(ENTITY_LABEL_KEYS[type])}</th>
                 ))}
                 <th className="w-8" aria-hidden />
               </tr>
@@ -226,14 +226,14 @@ function ValuesView({ labelKey }: { labelKey: string }) {
                       {entry.value}
                     </Link>
                   </td>
-                  <td className="px-4 py-3 text-right text-slate-300">{totalEntities(entry['entity-counts'])}</td>
+                  <td className="px-4 py-3 text-end text-slate-300">{totalEntities(entry['entity-counts'])}</td>
                   {ENTITY_TYPES.map(t => (
-                    <td key={t} className="px-4 py-3 text-right text-slate-400">
+                    <td key={t} className="px-4 py-3 text-end text-slate-400">
                       {entry['entity-counts'][t] ?? 0}
                     </td>
                   ))}
                   <td className="px-2 text-slate-600">
-                    <ChevronRight size={16} />
+                    <ChevronRight size={16} className="rtl:-scale-x-100" />
                   </td>
                 </tr>
               ))}
@@ -353,7 +353,7 @@ function Breadcrumb({ items }: { items: { label: string; href?: string }[] }) {
                 {item.label}
               </span>
             )}
-            {!isLast && <ChevronRight size={14} className="text-slate-600" />}
+            {!isLast && <ChevronRight size={14} className="text-slate-600 rtl:-scale-x-100" />}
           </span>
         )
       })}

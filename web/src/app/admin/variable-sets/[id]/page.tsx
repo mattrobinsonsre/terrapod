@@ -556,10 +556,10 @@ export default function VariableSetDetailPage() {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-slate-700/50">
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">{t('detail.varKey')}</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">{t('detail.varValue')}</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider hidden sm:table-cell">{t('detail.varCategory')}</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">{t('detail.actions')}</th>
+                      <th className="px-4 py-3 text-start text-xs font-medium text-slate-400 uppercase tracking-wider">{t('detail.varKey')}</th>
+                      <th className="px-4 py-3 text-start text-xs font-medium text-slate-400 uppercase tracking-wider">{t('detail.varValue')}</th>
+                      <th className="px-4 py-3 text-start text-xs font-medium text-slate-400 uppercase tracking-wider hidden sm:table-cell">{t('detail.varCategory')}</th>
+                      <th className="px-4 py-3 text-end text-xs font-medium text-slate-400 uppercase tracking-wider">{t('detail.actions')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-700/30">
@@ -596,7 +596,7 @@ export default function VariableSetDetailPage() {
                               </label>
                             </div>
                           </td>
-                          <td className="px-4 py-3 text-right">
+                          <td className="px-4 py-3 text-end">
                             <div className="flex justify-end gap-2">
                               <button onClick={() => setEditingVarId(null)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors">{t('detail.cancel')}</button>
                               <button onClick={handleSaveVar} disabled={savingVar} className="px-2.5 py-1 rounded-md text-xs font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors disabled:opacity-50">
@@ -618,7 +618,7 @@ export default function VariableSetDetailPage() {
                               {v.attributes.category}
                             </span>
                           </td>
-                          <td className="px-4 py-3 text-right">
+                          <td className="px-4 py-3 text-end">
                             <div className="flex justify-end gap-2">
                               <button onClick={() => startEditingVar(v)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors">{t('detail.edit')}</button>
                               <button onClick={() => handleDeleteVariable(v.id)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300 transition-colors">{t('detail.delete')}</button>
@@ -684,8 +684,8 @@ export default function VariableSetDetailPage() {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-slate-700/50">
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">{t('detail.workspace')}</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">{t('detail.actions')}</th>
+                      <th className="px-4 py-3 text-start text-xs font-medium text-slate-400 uppercase tracking-wider">{t('detail.workspace')}</th>
+                      <th className="px-4 py-3 text-end text-xs font-medium text-slate-400 uppercase tracking-wider">{t('detail.actions')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-700/30">
@@ -696,7 +696,7 @@ export default function VariableSetDetailPage() {
                             {ws.attributes?.name || ws.id}
                           </Link>
                         </td>
-                        <td className="px-4 py-3 text-right">
+                        <td className="px-4 py-3 text-end">
                           <button onClick={() => handleRemoveWorkspace(ws.id)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300 transition-colors">{t('detail.remove')}</button>
                         </td>
                       </tr>

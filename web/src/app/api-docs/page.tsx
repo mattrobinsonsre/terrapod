@@ -26,7 +26,7 @@ export default function ApiDocsPage() {
       <NavBar />
       <div className="flex flex-col" style={{ height: 'calc(100dvh - 57px)' }}>
         <div className="flex items-center gap-2 px-4 py-2 border-b border-slate-800 bg-slate-900/60">
-          <span className="text-sm font-medium text-slate-400 mr-2">{t('view')}</span>
+          <span className="text-sm font-medium text-slate-400 me-2">{t('view')}</span>
           <button
             onClick={() => setView('redoc')}
             className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
@@ -51,7 +51,7 @@ export default function ApiDocsPage() {
             href="/api/openapi.json"
             target="_blank"
             rel="noopener noreferrer"
-            className="ml-auto px-3 py-1 rounded text-sm font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+            className="ms-auto px-3 py-1 rounded text-sm font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
           >
             OpenAPI JSON
           </a>

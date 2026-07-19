@@ -503,7 +503,7 @@ export function ResourceGraph3D<T extends RGNode>({
     <div className="relative w-full h-[70vh] min-h-[420px] rounded-xl overflow-hidden border border-slate-800 bg-[#0a0e17]">
       {/* Always-on toolbar — small, so the graph keeps the canvas. Key + Resources
           toggle their (dismissable) overlay panels; Reset view + Clear are direct. */}
-      <div className="absolute z-20 top-3 left-3 flex flex-wrap gap-1.5">
+      <div className="absolute z-20 top-3 start-3 flex flex-wrap gap-1.5">
         <ToolBtn onClick={resetView}>{t('resource3d.resetView')}</ToolBtn>
         <ToolBtn onClick={clear}>{t('resource3d.clear')}</ToolBtn>
         <ToolBtn onClick={() => setKeyOpen((v) => !v)} active={keyOpen}>{t('resource3d.key')}</ToolBtn>
@@ -512,7 +512,7 @@ export function ResourceGraph3D<T extends RGNode>({
 
       {/* Key panel (legend + title + hint) — opt-in, dismissable */}
       {keyOpen && (
-        <div className="absolute z-10 top-14 left-3 max-w-[min(320px,80vw)] rounded-xl border border-slate-700/40 bg-slate-900/85 backdrop-blur px-4 py-3">
+        <div className="absolute z-10 top-14 start-3 max-w-[min(320px,80vw)] rounded-xl border border-slate-700/40 bg-slate-900/85 backdrop-blur px-4 py-3">
           <div className="flex items-start justify-between gap-2">
             <div>
               <div className="text-sm font-semibold">{title}</div>
@@ -533,7 +533,7 @@ export function ResourceGraph3D<T extends RGNode>({
 
       {/* Resource list — opt-in, dismissable */}
       {listOpen && (
-        <div className="absolute z-10 top-14 right-3 w-[min(300px,80vw)] max-h-[calc(70vh-64px)] flex flex-col gap-2 rounded-xl border border-slate-700/40 bg-slate-900/85 backdrop-blur p-3">
+        <div className="absolute z-10 top-14 end-3 w-[min(300px,80vw)] max-h-[calc(70vh-64px)] flex flex-col gap-2 rounded-xl border border-slate-700/40 bg-slate-900/85 backdrop-blur p-3">
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-semibold text-slate-200">
               {t('resource3d.resourcesCount', { count: nodes.length })}
@@ -552,7 +552,7 @@ export function ResourceGraph3D<T extends RGNode>({
             placeholder={t('resource3d.filterPlaceholder')}
             className="text-xs bg-slate-700/20 border border-slate-600/40 rounded-lg px-2.5 py-1.5 outline-none focus:border-brand-500"
           />
-          <div className="overflow-y-auto flex flex-col gap-px pr-0.5">
+          <div className="overflow-y-auto flex flex-col gap-px pe-0.5">
             {sorted
               .filter((n) => !filter || n.id.toLowerCase().includes(filter.toLowerCase()))
               .map((n) => (
@@ -560,7 +560,7 @@ export function ResourceGraph3D<T extends RGNode>({
                   key={n.id}
                   onClick={() => select(n.id)}
                   title={n.id}
-                  className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-left ${
+                  className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-start ${
                     n.id === sel ? 'bg-brand-500/25 outline outline-1 outline-brand-500/50' : 'hover:bg-slate-700/30'
                   }`}
                 >
@@ -574,7 +574,7 @@ export function ResourceGraph3D<T extends RGNode>({
 
       {/* Selection detail */}
       {sel && byId[sel] && (
-        <div className="absolute z-10 bottom-3 left-3 max-w-[min(380px,52vw)] sm:max-w-[380px] rounded-xl border border-slate-700/40 bg-slate-900/80 backdrop-blur px-4 py-3">
+        <div className="absolute z-10 bottom-3 start-3 max-w-[min(380px,52vw)] sm:max-w-[380px] rounded-xl border border-slate-700/40 bg-slate-900/80 backdrop-blur px-4 py-3">
           {renderDetail(byId[sel], radius.size)}
         </div>
       )}

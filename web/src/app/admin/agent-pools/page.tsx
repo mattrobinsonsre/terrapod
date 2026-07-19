@@ -176,7 +176,7 @@ export default function AgentPoolsPage() {
                 <tr className="border-b border-slate-700/50">
                   <SortableHeader label={t('columns.name')} sortKey="name" sortState={sortState} onSort={toggleSort} />
                   <SortableHeader label={t('columns.description')} sortKey="description" sortState={sortState} onSort={toggleSort} className="hidden sm:table-cell" />
-                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider hidden md:table-cell">{t('columns.status')}</th>
+                  <th className="px-4 py-3 text-start text-xs font-medium text-slate-400 uppercase tracking-wider hidden md:table-cell">{t('columns.status')}</th>
                   <SortableHeader label={t('columns.created')} sortKey="created" sortState={sortState} onSort={toggleSort} className="hidden lg:table-cell" />
                 </tr>
               </thead>

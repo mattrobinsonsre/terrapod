@@ -117,5 +117,27 @@ export function isSupportedLocale(value: string | undefined | null): value is Lo
   return !!value && (locales as readonly string[]).includes(value)
 }
 
+// Right-to-left locales (#829). The whole UI mirrors (`dir="rtl"`) when one is
+// active — layout, icons, and inline-axis spacing all flip. Membership is by
+// the base language subtag so a region variant (e.g. a future `ar-EG`) is
+// covered automatically. These are intentionally NOT all present in `locales`
+// yet: a locale is only offered once its catalog reaches full parity AND the
+// mirrored layout is verified, so we never render a broken RTL UI. The `dir`
+// plumbing keys off this set, so adding a locale here + to `locales` is all it
+// takes to turn a language RTL.
+export const RTL_LOCALES = new Set(['ar', 'he', 'fa'])
+
+// True when the locale should render right-to-left. Matches on the base subtag
+// so `fa-IR` resolves the same as `fa`. Safe for any string (unknown → false).
+export function isRTL(locale: string | undefined | null): boolean {
+  if (!locale) return false
+  return RTL_LOCALES.has(locale) || RTL_LOCALES.has(locale.split('-')[0]!)
+}
+
+// The document direction for a locale — fed straight to `<html dir=...>`.
+export function dirForLocale(locale: string | undefined | null): 'rtl' | 'ltr' {
+  return isRTL(locale) ? 'rtl' : 'ltr'
+}
+
 // The cookie the switcher writes and the server layout reads to pick a locale.
 export const LOCALE_COOKIE = 'NEXT_LOCALE'

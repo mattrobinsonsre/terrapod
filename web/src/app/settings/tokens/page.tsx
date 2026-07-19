@@ -331,11 +331,11 @@ export default function TokensPage() {
         {error && <ErrorBanner message={error} />}
 
         {createdToken && (
-          <div className="relative mb-6 p-4 pr-10 bg-green-900/30 rounded-lg border border-green-800/50">
+          <div className="relative mb-6 p-4 pe-10 bg-green-900/30 rounded-lg border border-green-800/50">
             <button
               onClick={() => { setCreatedToken(null); setShowToken(false) }}
               aria-label={t('tokens.dismissToken')}
-              className="absolute top-2 right-2 text-green-400 hover:text-green-200 transition-colors"
+              className="absolute top-2 end-2 text-green-400 hover:text-green-200 transition-colors"
             >
               ✕
             </button>
@@ -518,7 +518,7 @@ export default function TokensPage() {
                   <SortableHeader label={t('tokens.columns.created')} sortKey="created-at" sortState={sortState} onSort={toggleSort} />
                   <SortableHeader label={t('tokens.columns.lastUsed')} sortKey="last-used-at" sortState={sortState} onSort={toggleSort} />
                   <SortableHeader label={t('tokens.columns.expires')} sortKey="expires-at" sortState={sortState} onSort={toggleSort} />
-                  <th className="text-right px-4 py-3 text-slate-400 font-medium">{t('tokens.columns.actions')}</th>
+                  <th className="text-end px-4 py-3 text-slate-400 font-medium">{t('tokens.columns.actions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -564,12 +564,12 @@ export default function TokensPage() {
                       <td className={`px-4 py-3 text-xs ${expiryColor(tok.attributes['expires-at'], isLoginToken(tok))}`}>
                         {formatDate(tok.attributes['expires-at'])}
                       </td>
-                      <td className="px-4 py-3 text-right whitespace-nowrap">
+                      <td className="px-4 py-3 text-end whitespace-nowrap">
                         {isService && (
                           <button
                             onClick={() => handleRotate(tok.id)}
                             disabled={rotatingId === tok.id}
-                            className="text-xs text-brand-400 hover:text-brand-300 disabled:text-slate-500 transition-colors mr-3"
+                            className="text-xs text-brand-400 hover:text-brand-300 disabled:text-slate-500 transition-colors me-3"
                           >
                             {rotatingId === tok.id ? t('tokens.rotating') : t('tokens.rotate')}
                           </button>

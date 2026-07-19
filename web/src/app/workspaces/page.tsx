@@ -799,7 +799,7 @@ function WorkspacesPageInner() {
                     <div
                       role="listbox"
                       data-testid="filter-suggestions"
-                      className="absolute left-0 right-0 z-20 mt-1 rounded-lg bg-slate-800 border border-slate-700 shadow-xl py-1 max-h-72 overflow-y-auto"
+                      className="absolute start-0 end-0 z-20 mt-1 rounded-lg bg-slate-800 border border-slate-700 shadow-xl py-1 max-h-72 overflow-y-auto"
                     >
                       {suggestions.map((s, i) => (
                         <button
@@ -812,7 +812,7 @@ function WorkspacesPageInner() {
                           // keyboard-highlight index), so a hover never hijacks a bare Enter.
                           onMouseDown={e => { e.preventDefault(); applyFilterSuggestion(s) }}
                           className={
-                            'w-full flex items-center gap-2 px-3 py-1.5 text-sm transition-colors text-left border-l-2 ' +
+                            'w-full flex items-center gap-2 px-3 py-1.5 text-sm transition-colors text-start border-s-2 ' +
                             (i === suggestIndex
                               ? 'bg-brand-600/40 text-white border-brand-300 font-semibold ring-1 ring-inset ring-brand-400/60'
                               : 'border-transparent text-slate-300 hover:bg-slate-700/40')
@@ -872,7 +872,7 @@ function WorkspacesPageInner() {
                   {statusMenuOpen && (
                     <div
                       role="menu"
-                      className="absolute right-0 z-10 mt-1 w-64 rounded-lg bg-slate-800 border border-slate-700 shadow-xl py-1 max-h-96 overflow-y-auto"
+                      className="absolute end-0 z-10 mt-1 w-64 rounded-lg bg-slate-800 border border-slate-700 shadow-xl py-1 max-h-96 overflow-y-auto"
                     >
                       {WORKSPACE_STATUSES.map(opt => {
                         const active = hasStatusTerm(parsedFilter, opt.filter)
@@ -895,7 +895,7 @@ function WorkspacesPageInner() {
                               {active ? '✓' : ''}
                             </span>
                             <span className={'w-1.5 h-1.5 rounded-full ' + opt.dot} />
-                            <span className="flex-1 text-left">{ts(opt.filter)}</span>
+                            <span className="flex-1 text-start">{ts(opt.filter)}</span>
                             <span className={'text-xs ' + (count > 0 ? 'text-slate-400' : 'text-slate-600')}>{count}</span>
                           </button>
                         )
@@ -939,7 +939,7 @@ function WorkspacesPageInner() {
                           </svg>
                         </button>
                         {labelMenuOpen && labelMenuKey === null && (
-                          <div role="menu" className="absolute right-0 z-10 mt-1 w-64 rounded-lg bg-slate-800 border border-slate-700 shadow-xl py-1 max-h-96 overflow-y-auto">
+                          <div role="menu" className="absolute end-0 z-10 mt-1 w-64 rounded-lg bg-slate-800 border border-slate-700 shadow-xl py-1 max-h-96 overflow-y-auto">
                             {sortedLabelKeys.map(k => (
                               <button
                                 key={k}
@@ -948,7 +948,7 @@ function WorkspacesPageInner() {
                                 onClick={() => setLabelMenuKey(k)}
                                 className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-700/40 transition-colors"
                               >
-                                <span className="flex-1 text-left font-mono text-xs">{k}</span>
+                                <span className="flex-1 text-start font-mono text-xs">{k}</span>
                                 <span className="text-xs text-slate-500">{t('filter.valueCount', { count: labelIndex.get(k)?.size || 0 })}</span>
                                 <span aria-hidden className="text-slate-500">›</span>
                               </button>
@@ -956,7 +956,7 @@ function WorkspacesPageInner() {
                           </div>
                         )}
                         {labelMenuOpen && labelMenuKey !== null && (
-                          <div role="menu" className="absolute right-0 z-10 mt-1 w-64 rounded-lg bg-slate-800 border border-slate-700 shadow-xl py-1 max-h-96 overflow-y-auto">
+                          <div role="menu" className="absolute end-0 z-10 mt-1 w-64 rounded-lg bg-slate-800 border border-slate-700 shadow-xl py-1 max-h-96 overflow-y-auto">
                             <button
                               type="button"
                               onClick={() => setLabelMenuKey(null)}
@@ -964,7 +964,7 @@ function WorkspacesPageInner() {
                             >
                               <span aria-hidden>‹</span>
                               <span>{t('filter.back')}</span>
-                              <span className="ml-auto font-mono text-slate-500">{labelMenuKey}</span>
+                              <span className="ms-auto font-mono text-slate-500">{labelMenuKey}</span>
                             </button>
                             {Array.from(labelIndex.get(labelMenuKey)?.entries() || [])
                               .sort(([a], [b]) => a.localeCompare(b))
@@ -985,7 +985,7 @@ function WorkspacesPageInner() {
                                     }
                                   >
                                     <span className="w-3 inline-flex justify-center text-brand-400">{active ? '✓' : ''}</span>
-                                    <span className="flex-1 text-left font-mono text-xs">{v}</span>
+                                    <span className="flex-1 text-start font-mono text-xs">{v}</span>
                                     <span className="text-xs text-slate-500">{count}</span>
                                   </button>
                                 )
@@ -1080,7 +1080,7 @@ function WorkspacesPageInner() {
                                   title={active ? t('row.removeLabelFilter') : t('row.addLabelFilter')}
                                 >
                                   <span className="text-slate-500">{k}:</span>
-                                  <span className="ml-0.5">{v}</span>
+                                  <span className="ms-0.5">{v}</span>
                                 </button>
                               )
                             })}

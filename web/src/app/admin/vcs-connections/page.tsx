@@ -344,7 +344,7 @@ export default function VCSConnectionsPage() {
                   <SortableHeader label={t('table.serverUrl')} sortKey="server-url" sortState={sortState} onSort={toggleSort} className="hidden sm:table-cell" />
                   <SortableHeader label={t('table.status')} sortKey="status" sortState={sortState} onSort={toggleSort} className="hidden md:table-cell" />
                   <SortableHeader label={t('table.created')} sortKey="created" sortState={sortState} onSort={toggleSort} className="hidden lg:table-cell" />
-                  <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">{t('table.actions')}</th>
+                  <th className="px-4 py-3 text-end text-xs font-medium text-slate-400 uppercase tracking-wider">{t('table.actions')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-700/30">
@@ -376,7 +376,7 @@ export default function VCSConnectionsPage() {
                     <td className="px-4 py-3 text-xs text-slate-500 hidden lg:table-cell">
                       {fmt.date(conn.attributes['created-at'])}
                     </td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="px-4 py-3 text-end">
                       <div className="flex justify-end gap-2">
                         <button onClick={() => startEdit(conn)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors">{t('actions.edit')}</button>
                         <button onClick={() => handleDelete(conn.id)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300 transition-colors">{t('actions.delete')}</button>

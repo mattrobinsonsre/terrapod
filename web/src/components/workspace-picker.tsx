@@ -105,11 +105,11 @@ export function WorkspacePicker({
               type="button"
               onClick={() => onSelect(ws)}
               disabled={disabled || busyId === ws.id}
-              className="w-full text-left px-2 py-1.5 rounded text-sm text-slate-300 hover:bg-slate-700/50 transition-colors disabled:opacity-50"
+              className="w-full text-start px-2 py-1.5 rounded text-sm text-slate-300 hover:bg-slate-700/50 transition-colors disabled:opacity-50"
             >
               {ws.name}
               {busyId === ws.id && (
-                <span className="text-xs text-slate-500 ml-2">
+                <span className="text-xs text-slate-500 ms-2">
                   {t('workspacePicker.adding')}
                 </span>
               )}

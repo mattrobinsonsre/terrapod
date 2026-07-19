@@ -274,10 +274,10 @@ export default function ProviderDetailPage() {
                     tabIndex={0}
                     onClick={() => setExpandedVersion(isExpanded ? null : v.attributes.version)}
                     onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpandedVersion(isExpanded ? null : v.attributes.version) } }}
-                    className="w-full flex items-center justify-between px-4 py-3 text-left cursor-pointer"
+                    className="w-full flex items-center justify-between px-4 py-3 text-start cursor-pointer"
                   >
                     <div className="flex items-center gap-3">
-                      {isExpanded ? <ChevronDown size={16} className="text-slate-500" /> : <ChevronRight size={16} className="text-slate-500" />}
+                      {isExpanded ? <ChevronDown size={16} className="text-slate-500" /> : <ChevronRight size={16} className="text-slate-500 rtl:-scale-x-100" />}
                       <span className="font-mono text-slate-200">{v.attributes.version}</span>
                       <span className="text-xs text-slate-500">{t('providerDetail.platformCount', { count: v.attributes.platforms?.length || 0 })}</span>
                       {v.attributes['shasums-uploaded'] && (
@@ -303,10 +303,10 @@ export default function ProviderDetailPage() {
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="text-slate-500 text-xs">
-                            <th className="text-left py-1 font-medium">{t('providerDetail.os')}</th>
-                            <th className="text-left py-1 font-medium">{t('providerDetail.arch')}</th>
-                            <th className="text-left py-1 font-medium">{t('providerDetail.filename')}</th>
-                            <th className="text-right py-1 font-medium">{t('providerDetail.actions')}</th>
+                            <th className="text-start py-1 font-medium">{t('providerDetail.os')}</th>
+                            <th className="text-start py-1 font-medium">{t('providerDetail.arch')}</th>
+                            <th className="text-start py-1 font-medium">{t('providerDetail.filename')}</th>
+                            <th className="text-end py-1 font-medium">{t('providerDetail.actions')}</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -316,7 +316,7 @@ export default function ProviderDetailPage() {
                               <td className="py-1.5 text-slate-300">{p.arch}</td>
                               <td className="py-1.5 text-slate-400 font-mono text-xs break-all">{p.filename}</td>
                               {provPerms['can-destroy'] && (
-                                <td className="py-1.5 text-right">
+                                <td className="py-1.5 text-end">
                                   <button
                                     onClick={() => setDeleteTarget({ type: 'platform', version: v.attributes.version, os: p.os, arch: p.arch })}
                                     className="px-2.5 py-1 rounded-md text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300 transition-colors"

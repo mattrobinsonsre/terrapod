@@ -707,12 +707,12 @@ export default function ModuleDetailPage() {
                     <span className="text-green-300">{t('moduleDetail.vcsStatus.connected')}</span>{' '}
                     <span className="text-slate-300 font-mono text-xs">{module.attributes['vcs-repo-url']}</span>
                     {module.attributes['vcs-last-tag'] && (
-                      <span className="text-slate-400 ml-2">{t('moduleDetail.vcsStatus.lastTag', { tag: module.attributes['vcs-last-tag'] })}</span>
+                      <span className="text-slate-400 ms-2">{t('moduleDetail.vcsStatus.lastTag', { tag: module.attributes['vcs-last-tag'] })}</span>
                     )}
                   </div>
                 </div>
                 {(module.attributes['version-statuses'] || []).length === 0 && (
-                  <p className="text-xs text-green-400/70 mt-2 ml-7">
+                  <p className="text-xs text-green-400/70 mt-2 ms-7">
                     {t.rich('moduleDetail.vcsStatus.firstVersionHint', {
                       code: (chunks) => <code className="font-mono">{chunks}</code>,
                     })}
@@ -836,7 +836,7 @@ export default function ModuleDetailPage() {
             <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-hidden mb-6">
               <button
                 onClick={() => setInterfaceExpanded(!interfaceExpanded)}
-                className="w-full flex items-center justify-between px-5 py-4 text-left"
+                className="w-full flex items-center justify-between px-5 py-4 text-start"
               >
                 <div className="flex items-center gap-3">
                   <h3 className="text-sm font-semibold text-slate-200">{t('moduleDetail.interface.title')}</h3>
@@ -886,20 +886,20 @@ export default function ModuleDetailPage() {
                             <table className="w-full text-sm">
                               <thead>
                                 <tr className="text-xs text-slate-500 border-b border-slate-700/50">
-                                  <th className="text-left py-2 pr-4">{t('moduleDetail.interface.name')}</th>
-                                  <th className="text-left py-2 pr-4">{t('moduleDetail.interface.type')}</th>
-                                  <th className="text-left py-2 pr-4">{t('moduleDetail.interface.description')}</th>
-                                  <th className="text-left py-2 pr-4">{t('moduleDetail.interface.default')}</th>
-                                  <th className="text-left py-2">{t('moduleDetail.interface.required')}</th>
+                                  <th className="text-start py-2 pe-4">{t('moduleDetail.interface.name')}</th>
+                                  <th className="text-start py-2 pe-4">{t('moduleDetail.interface.type')}</th>
+                                  <th className="text-start py-2 pe-4">{t('moduleDetail.interface.description')}</th>
+                                  <th className="text-start py-2 pe-4">{t('moduleDetail.interface.default')}</th>
+                                  <th className="text-start py-2">{t('moduleDetail.interface.required')}</th>
                                 </tr>
                               </thead>
                               <tbody>
                                 {interfaceData.inputs.map((inp) => (
                                   <tr key={inp.name} className="border-b border-slate-700/30">
-                                    <td className="py-2 pr-4 font-mono text-xs text-slate-200">{inp.name}</td>
-                                    <td className="py-2 pr-4 font-mono text-xs text-slate-400">{inp.type}</td>
-                                    <td className="py-2 pr-4 text-slate-300">{inp.description}</td>
-                                    <td className="py-2 pr-4 font-mono text-xs text-slate-400">{inp.default ?? '—'}</td>
+                                    <td className="py-2 pe-4 font-mono text-xs text-slate-200">{inp.name}</td>
+                                    <td className="py-2 pe-4 font-mono text-xs text-slate-400">{inp.type}</td>
+                                    <td className="py-2 pe-4 text-slate-300">{inp.description}</td>
+                                    <td className="py-2 pe-4 font-mono text-xs text-slate-400">{inp.default ?? '—'}</td>
                                     <td className="py-2">
                                       {inp.required ? (
                                         <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-900/50 text-amber-300">{t('moduleDetail.interface.requiredBadge')}</span>
@@ -923,16 +923,16 @@ export default function ModuleDetailPage() {
                             <table className="w-full text-sm">
                               <thead>
                                 <tr className="text-xs text-slate-500 border-b border-slate-700/50">
-                                  <th className="text-left py-2 pr-4">{t('moduleDetail.interface.name')}</th>
-                                  <th className="text-left py-2 pr-4">{t('moduleDetail.interface.description')}</th>
-                                  <th className="text-left py-2">{t('moduleDetail.interface.sensitive')}</th>
+                                  <th className="text-start py-2 pe-4">{t('moduleDetail.interface.name')}</th>
+                                  <th className="text-start py-2 pe-4">{t('moduleDetail.interface.description')}</th>
+                                  <th className="text-start py-2">{t('moduleDetail.interface.sensitive')}</th>
                                 </tr>
                               </thead>
                               <tbody>
                                 {interfaceData.outputs.map((out) => (
                                   <tr key={out.name} className="border-b border-slate-700/30">
-                                    <td className="py-2 pr-4 font-mono text-xs text-slate-200">{out.name}</td>
-                                    <td className="py-2 pr-4 text-slate-300">{out.description}</td>
+                                    <td className="py-2 pe-4 font-mono text-xs text-slate-200">{out.name}</td>
+                                    <td className="py-2 pe-4 text-slate-300">{out.description}</td>
                                     <td className="py-2">
                                       {out.sensitive && (
                                         <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-900/50 text-red-300">{t('moduleDetail.interface.sensitiveBadge')}</span>
@@ -959,7 +959,7 @@ export default function ModuleDetailPage() {
             <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-hidden">
               <button
                 onClick={() => setVersionsExpanded(!versionsExpanded)}
-                className="w-full flex items-center justify-between px-5 py-4 text-left"
+                className="w-full flex items-center justify-between px-5 py-4 text-start"
               >
                 <div className="flex items-center gap-3">
                   <h3 className="text-sm font-semibold text-slate-200">{t('moduleDetail.versions.title')}</h3>
@@ -989,12 +989,12 @@ export default function ModuleDetailPage() {
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="border-b border-slate-700/50">
-                          <th className="text-left px-4 py-3 text-slate-400 font-medium">{t('moduleDetail.versions.version')}</th>
-                          <th className="text-left px-4 py-3 text-slate-400 font-medium">{t('moduleDetail.versions.status')}</th>
+                          <th className="text-start px-4 py-3 text-slate-400 font-medium">{t('moduleDetail.versions.version')}</th>
+                          <th className="text-start px-4 py-3 text-slate-400 font-medium">{t('moduleDetail.versions.status')}</th>
                           {isVcsSource && (
-                            <th className="text-left px-4 py-3 text-slate-400 font-medium">{t('moduleDetail.versions.source')}</th>
+                            <th className="text-start px-4 py-3 text-slate-400 font-medium">{t('moduleDetail.versions.source')}</th>
                           )}
-                          <th className="text-right px-4 py-3 text-slate-400 font-medium">{t('moduleDetail.versions.actions')}</th>
+                          <th className="text-end px-4 py-3 text-slate-400 font-medium">{t('moduleDetail.versions.actions')}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1016,7 +1016,7 @@ export default function ModuleDetailPage() {
                                   <span className="text-slate-300 text-xs">
                                     <span className="font-mono">{v['vcs-tag']}</span>
                                     {v['vcs-commit-sha'] && (
-                                      <span className="text-slate-500 ml-1.5" title={v['vcs-commit-sha']}>
+                                      <span className="text-slate-500 ms-1.5" title={v['vcs-commit-sha']}>
                                         ({v['vcs-commit-sha'].slice(0, 7)})
                                       </span>
                                     )}
@@ -1027,7 +1027,7 @@ export default function ModuleDetailPage() {
                               </td>
                             )}
                             {modPerms['can-destroy'] && (
-                              <td className="px-4 py-3 text-right">
+                              <td className="px-4 py-3 text-end">
                                 <button
                                   onClick={() => setDeleteTarget(v.version)}
                                   className="px-2.5 py-1 rounded-md text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300 transition-colors"
