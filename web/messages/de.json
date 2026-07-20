@@ -1833,6 +1833,8 @@
       "opaFull": "OPA-Richtlinien",
       "impact": "Auswirkung",
       "impactFull": "Auswirkungsdiagramm",
+      "cost": "Kosten",
+      "costFull": "Kostenschätzung",
       "planLabel": "Plan<log>-Protokoll</log>",
       "applyLabel": "Anwenden<log>-Protokoll</log>",
       "planFull": "Plan-Protokoll",
@@ -1955,6 +1957,29 @@
         "failed": "fehlgeschlagen",
         "errored": "fehlerhaft"
       }
+    },
+    "cost": {
+      "notAvailable": "Für diesen Lauf ist keine Kostenschätzung verfügbar.",
+      "perMonth": "{amount}/Mon.",
+      "monthlyTotal": "Monatssumme",
+      "thisRun": "Änderung dieses Laufs",
+      "thisRunHint": "Monatliche Änderung durch diesen Lauf",
+      "previous": "Vor diesem Lauf",
+      "previousHint": "Geschätzte monatliche Kosten des vorherigen Zustands",
+      "pricedCount": "{count, plural, one {# bepreiste Ressource} other {# bepreiste Ressourcen}}",
+      "colResource": "Ressource",
+      "colType": "Typ",
+      "colChange": "Änderung",
+      "colMonthly": "Monatlich",
+      "change": {
+        "add": "Hinzufügen",
+        "remove": "Entfernen",
+        "noop": "Keine Änderung"
+      },
+      "unpricedTitle": "{count, plural, one {# nicht bepreiste Ressource} other {# nicht bepreiste Ressourcen}}",
+      "unpricedHint": "In den Preisdaten gab es keine Übereinstimmung für diese — ein nicht zugeordneter Typ, eine Ressource ohne direkte Kosten oder ein noch nicht abgedeckter Anbieter.",
+      "indicative": "Schätzungen sind Richtwerte; die tatsächlichen Kosten hängen von Nutzung, Region, Verpflichtungen und Rabatten ab.",
+      "credit": "Kostendaten von <oiq>OpenInfraQuote</oiq>."
     }
   },
   "workspaceDetail": {

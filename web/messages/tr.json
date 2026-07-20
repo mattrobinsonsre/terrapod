@@ -1833,6 +1833,8 @@
       "opaFull": "OPA politikaları",
       "impact": "Etki",
       "impactFull": "Etki grafiği",
+      "cost": "Maliyet",
+      "costFull": "Maliyet tahmini",
       "planLabel": "Plan<log>Günlüğü</log>",
       "applyLabel": "Uygulama<log>Günlüğü</log>",
       "planFull": "Plan günlüğü",
@@ -1955,6 +1957,29 @@
         "failed": "başarısız",
         "errored": "hata verdi"
       }
+    },
+    "cost": {
+      "notAvailable": "Bu çalıştırma için maliyet tahmini mevcut değil.",
+      "perMonth": "{amount}/ay",
+      "monthlyTotal": "Aylık toplam",
+      "thisRun": "Bu çalıştırmanın değişimi",
+      "thisRunHint": "Bu çalıştırmanın getirdiği aylık değişim",
+      "previous": "Bu çalıştırmadan önce",
+      "previousHint": "Önceki durumun tahmini aylık maliyeti",
+      "pricedCount": "{count, plural, one {fiyatlandırılmış # kaynak} other {fiyatlandırılmış # kaynak}}",
+      "colResource": "Kaynak",
+      "colType": "Tür",
+      "colChange": "Değişim",
+      "colMonthly": "Aylık",
+      "change": {
+        "add": "Ekle",
+        "remove": "Kaldır",
+        "noop": "Değişiklik yok"
+      },
+      "unpricedTitle": "{count, plural, one {fiyatlandırılmamış # kaynak} other {fiyatlandırılmamış # kaynak}}",
+      "unpricedHint": "Fiyatlandırma verilerinde bunlarla eşleşen bir şey yoktu — eşlenmemiş bir tür, doğrudan maliyeti olmayan bir kaynak veya henüz kapsanmayan bir sağlayıcı.",
+      "indicative": "Tahminler yaklaşıktır; gerçek maliyet kullanıma, bölgeye, taahhütlere ve indirimlere bağlıdır.",
+      "credit": "Maliyet verileri <oiq>OpenInfraQuote</oiq> kaynağından."
     }
   },
   "workspaceDetail": {

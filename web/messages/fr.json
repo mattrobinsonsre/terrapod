@@ -1833,6 +1833,8 @@
       "opaFull": "Politiques OPA",
       "impact": "Impact",
       "impactFull": "Graphe d'impact",
+      "cost": "Coût",
+      "costFull": "Estimation du coût",
       "planLabel": "Plan<log>Journal</log>",
       "applyLabel": "Apply<log>Journal</log>",
       "planFull": "Journal du plan",
@@ -1955,6 +1957,29 @@
         "failed": "échoué",
         "errored": "en erreur"
       }
+    },
+    "cost": {
+      "notAvailable": "Aucune estimation de coût n'est disponible pour cette exécution.",
+      "perMonth": "{amount}/mois",
+      "monthlyTotal": "Total mensuel",
+      "thisRun": "Variation de cette exécution",
+      "thisRunHint": "Variation mensuelle introduite par cette exécution",
+      "previous": "Avant cette exécution",
+      "previousHint": "Coût mensuel estimé de l'état précédent",
+      "pricedCount": "{count, plural, one {# ressource tarifée} other {# ressources tarifées}}",
+      "colResource": "Ressource",
+      "colType": "Type",
+      "colChange": "Modification",
+      "colMonthly": "Mensuel",
+      "change": {
+        "add": "Ajouter",
+        "remove": "Supprimer",
+        "noop": "Aucune modification"
+      },
+      "unpricedTitle": "{count, plural, one {# ressource non tarifée} other {# ressources non tarifées}}",
+      "unpricedHint": "Rien dans les données tarifaires ne correspondait à ces éléments : un type non mappé, une ressource sans coût direct ou un fournisseur pas encore pris en charge.",
+      "indicative": "Les estimations sont indicatives ; le coût réel dépend de l'utilisation, de la région, des engagements et des remises.",
+      "credit": "Données de coût de <oiq>OpenInfraQuote</oiq>."
     }
   },
   "workspaceDetail": {

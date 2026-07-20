@@ -1833,6 +1833,8 @@
       "opaFull": "Políticas OPA",
       "impact": "Impacto",
       "impactFull": "Grafo de impacto",
+      "cost": "Custo",
+      "costFull": "Estimativa de custo",
       "planLabel": "Plan<log>Log</log>",
       "applyLabel": "Apply<log>Log</log>",
       "planFull": "Log do plan",
@@ -1955,6 +1957,29 @@
         "failed": "falhou",
         "errored": "com erro"
       }
+    },
+    "cost": {
+      "notAvailable": "Não está disponível qualquer estimativa de custo para esta execução.",
+      "perMonth": "{amount}/mês",
+      "monthlyTotal": "Total mensal",
+      "thisRun": "Alteração desta execução",
+      "thisRunHint": "Alteração mensal introduzida por esta execução",
+      "previous": "Antes desta execução",
+      "previousHint": "Custo mensal estimado do estado anterior",
+      "pricedCount": "{count, plural, one {# recurso com preço} other {# recursos com preço}}",
+      "colResource": "Recurso",
+      "colType": "Tipo",
+      "colChange": "Alteração",
+      "colMonthly": "Mensal",
+      "change": {
+        "add": "Adicionar",
+        "remove": "Remover",
+        "noop": "Sem alteração"
+      },
+      "unpricedTitle": "{count, plural, one {# recurso sem preço} other {# recursos sem preço}}",
+      "unpricedHint": "Nada nos dados de preços correspondeu a estes — um tipo não mapeado, um recurso sem custo direto ou um fornecedor ainda não abrangido.",
+      "indicative": "As estimativas são indicativas; o custo real depende da utilização, da região, dos compromissos e dos descontos.",
+      "credit": "Dados de custo do <oiq>OpenInfraQuote</oiq>."
     }
   },
   "workspaceDetail": {

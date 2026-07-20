@@ -1833,6 +1833,8 @@
       "opaFull": "Criteri OPA",
       "impact": "Impatto",
       "impactFull": "Grafico di impatto",
+      "cost": "Costo",
+      "costFull": "Stima dei costi",
       "planLabel": "Plan<log>Log</log>",
       "applyLabel": "Apply<log>Log</log>",
       "planFull": "Log del plan",
@@ -1955,6 +1957,29 @@
         "failed": "fallito",
         "errored": "in errore"
       }
+    },
+    "cost": {
+      "notAvailable": "Nessuna stima dei costi è disponibile per questa esecuzione.",
+      "perMonth": "{amount}/mese",
+      "monthlyTotal": "Totale mensile",
+      "thisRun": "Variazione di questa esecuzione",
+      "thisRunHint": "Variazione mensile introdotta da questa esecuzione",
+      "previous": "Prima di questa esecuzione",
+      "previousHint": "Costo mensile stimato dello stato precedente",
+      "pricedCount": "{count, plural, one {# risorsa con prezzo} other {# risorse con prezzo}}",
+      "colResource": "Risorsa",
+      "colType": "Tipo",
+      "colChange": "Variazione",
+      "colMonthly": "Mensile",
+      "change": {
+        "add": "Aggiungi",
+        "remove": "Rimuovi",
+        "noop": "Nessuna variazione"
+      },
+      "unpricedTitle": "{count, plural, one {# risorsa senza prezzo} other {# risorse senza prezzo}}",
+      "unpricedHint": "Nessun elemento nei dati sui prezzi corrispondeva a questi: un tipo non mappato, una risorsa senza costo diretto o un provider non ancora supportato.",
+      "indicative": "Le stime sono indicative; il costo effettivo dipende da utilizzo, regione, impegni e sconti.",
+      "credit": "Dati sui costi da <oiq>OpenInfraQuote</oiq>."
     }
   },
   "workspaceDetail": {

@@ -1,5 +1,6 @@
 """Tests for run CRUD and lifecycle endpoints with RBAC."""
 
+import json
 import uuid
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -660,6 +661,101 @@ class TestImpactGraph:
             resp = await c.get(f"/api/terrapod/v1/runs/run-{run.id}/impact-graph", headers=_AUTH)
         assert resp.status_code == 403
         mock_graph.assert_not_called()
+
+
+class TestCostEstimate:
+    """GET /runs/{id}/cost-estimate — #871 run-page Cost tab read endpoint."""
+
+    _ESTIMATE = {
+        "currency": "USD",
+        "total": {"min": 219.0, "max": 219.0},
+        "previous": {"min": 73.0, "max": 73.0},
+        "diff": {"min": 146.0, "max": 146.0},
+        "resources": [
+            {
+                "address": "aws_instance.eu",
+                "type": "aws_instance",
+                "name": "eu",
+                "change": "add",
+                "monthly": {"min": 146.0, "max": 146.0},
+            }
+        ],
+        "unpriced": [{"address": "random_pet.name", "type": "random_pet", "change": "add"}],
+    }
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs.get_storage")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
+    @patch("terrapod.api.routers.runs.run_service.get_run")
+    async def test_cost_estimate_with_read(
+        self, mock_get_run, mock_resolve, mock_get_storage, *mocks
+    ):
+        mock_resolve.return_value = caps_for_level("read")
+        run = _mock_run(status="applied")
+        run.has_cost_estimate = True
+        mock_get_run.return_value = run
+        storage = AsyncMock()
+        storage.get.return_value = json.dumps(self._ESTIMATE).encode()
+        mock_get_storage.return_value = storage
+        ws = _mock_workspace(ws_id=run.workspace_id)
+        app, mock_db = _make_app(_user())
+        mock_db.get.return_value = ws
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get(f"/api/terrapod/v1/runs/run-{run.id}/cost-estimate", headers=_AUTH)
+        assert resp.status_code == 200
+        data = resp.json()["data"]
+        assert data["type"] == "cost-estimates"
+        assert data["attributes"]["currency"] == "USD"
+        assert data["attributes"]["total"]["min"] == 219.0
+        assert data["attributes"]["resources"][0]["address"] == "aws_instance.eu"
+        assert data["relationships"]["run"]["data"]["id"] == f"run-{run.id}"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs.get_storage")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
+    @patch("terrapod.api.routers.runs.run_service.get_run")
+    async def test_cost_estimate_404_when_none(
+        self, mock_get_run, mock_resolve, mock_get_storage, *mocks
+    ):
+        mock_resolve.return_value = caps_for_level("read")
+        run = _mock_run()
+        run.has_cost_estimate = False  # run produced no cost estimate
+        mock_get_run.return_value = run
+        ws = _mock_workspace(ws_id=run.workspace_id)
+        app, mock_db = _make_app(_user())
+        mock_db.get.return_value = ws
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get(f"/api/terrapod/v1/runs/run-{run.id}/cost-estimate", headers=_AUTH)
+        assert resp.status_code == 404
+        mock_get_storage.assert_not_called()
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs.get_storage")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
+    @patch("terrapod.api.routers.runs.run_service.get_run")
+    async def test_cost_estimate_forbidden_without_read(
+        self, mock_get_run, mock_resolve, mock_get_storage, *mocks
+    ):
+        mock_resolve.return_value = set()  # no capabilities → RUN_READ gate rejects
+        run = _mock_run()
+        run.has_cost_estimate = True
+        mock_get_run.return_value = run
+        ws = _mock_workspace(ws_id=run.workspace_id)
+        app, mock_db = _make_app(_user())
+        mock_db.get.return_value = ws
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get(f"/api/terrapod/v1/runs/run-{run.id}/cost-estimate", headers=_AUTH)
+        assert resp.status_code == 403
+        mock_get_storage.assert_not_called()
 
 
 # ── Confirm Run ────────────────────────────────────────────────────────

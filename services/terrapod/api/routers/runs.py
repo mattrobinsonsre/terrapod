@@ -63,7 +63,12 @@ from terrapod.services.workspace_rbac_service import (
     resolve_workspace_capabilities_for,
 )
 from terrapod.storage import get_storage
-from terrapod.storage.keys import apply_log_key, plan_json_output_key, plan_log_key
+from terrapod.storage.keys import (
+    apply_log_key,
+    cost_estimate_key,
+    plan_json_output_key,
+    plan_log_key,
+)
 from terrapod.storage.protocol import ObjectNotFoundError
 
 router = APIRouter(prefix="/api/v2", tags=["runs"])
@@ -1076,6 +1081,50 @@ async def show_impact_graph(
                 "id": f"impact-graph-{run.id}",
                 "type": "impact-graphs",
                 "attributes": graph,
+                "relationships": {
+                    "run": {"data": {"id": f"run-{run.id}", "type": "runs"}},
+                },
+            }
+        }
+    )
+
+
+@extensions_router.get("/runs/{run_id}/cost-estimate")
+async def show_cost_estimate(
+    run_id: str = Path(...),
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Cost estimate for the run-page Cost tab (#871).
+
+    Terrapod-native. Returns the runner-produced ``cost_estimate.json`` (the
+    native OpenInfraQuote-port estimate of the plan's monthly cost delta)
+    inline — small payload, browser-reachable through the BFF in every storage
+    backend (unlike a presigned 302). 404 when the run produced no estimate
+    (errored before plan, cost estimation disabled, or the artifact aged out).
+    Every figure here is **data** (`oiq`-derived); no AI is involved.
+    """
+    run = await _get_run(run_id, db)
+    await _require_run_ws_capability(run, cap.RUN_READ, user, db)
+
+    if not run.has_cost_estimate:
+        raise HTTPException(status_code=404, detail="no cost estimate for this run")
+
+    storage = get_storage()
+    key = cost_estimate_key(str(run.workspace_id), str(run.id))
+    try:
+        raw = await storage.get(key)
+    except ObjectNotFoundError:
+        raise HTTPException(status_code=404, detail="no cost estimate for this run") from None
+    # Small artifact (bounded by resource count) — inline parse is fine here.
+    estimate = json.loads(raw)
+
+    return JSONResponse(
+        content={
+            "data": {
+                "id": f"cost-estimate-{run.id}",
+                "type": "cost-estimates",
+                "attributes": estimate,
                 "relationships": {
                     "run": {"data": {"id": f"run-{run.id}", "type": "runs"}},
                 },

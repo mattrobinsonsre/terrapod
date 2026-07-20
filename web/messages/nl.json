@@ -1833,6 +1833,8 @@
       "opaFull": "OPA-beleidsregels",
       "impact": "Impact",
       "impactFull": "Impactgrafiek",
+      "cost": "Kosten",
+      "costFull": "Kostenraming",
       "planLabel": "Plan<log>-logboek</log>",
       "applyLabel": "Apply<log>-logboek</log>",
       "planFull": "Plan-logboek",
@@ -1955,6 +1957,29 @@
         "failed": "mislukt",
         "errored": "fout"
       }
+    },
+    "cost": {
+      "notAvailable": "Er is geen kostenraming beschikbaar voor deze uitvoering.",
+      "perMonth": "{amount}/mnd",
+      "monthlyTotal": "Maandtotaal",
+      "thisRun": "Wijziging van deze uitvoering",
+      "thisRunHint": "Maandelijkse wijziging die deze uitvoering met zich meebrengt",
+      "previous": "Vóór deze uitvoering",
+      "previousHint": "Geschatte maandelijkse kosten van de vorige status",
+      "pricedCount": "{count, plural, one {# resource met prijs} other {# resources met prijs}}",
+      "colResource": "Resource",
+      "colType": "Type",
+      "colChange": "Wijziging",
+      "colMonthly": "Maandelijks",
+      "change": {
+        "add": "Toevoegen",
+        "remove": "Verwijderen",
+        "noop": "Geen wijziging"
+      },
+      "unpricedTitle": "{count, plural, one {# resource zonder prijs} other {# resources zonder prijs}}",
+      "unpricedHint": "Niets in de prijsgegevens kwam overeen met deze — een niet-toegewezen type, een resource zonder directe kosten of een provider die nog niet wordt ondersteund.",
+      "indicative": "Ramingen zijn indicatief; de werkelijke kosten hangen af van gebruik, regio, verplichtingen en kortingen.",
+      "credit": "Kostengegevens van <oiq>OpenInfraQuote</oiq>."
     }
   },
   "workspaceDetail": {

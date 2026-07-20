@@ -1833,6 +1833,8 @@
       "opaFull": "OPA zásady",
       "impact": "Dopad",
       "impactFull": "Graf dopadu",
+      "cost": "Náklady",
+      "costFull": "Odhad nákladů",
       "planLabel": "Plán<log>Log</log>",
       "applyLabel": "Apply<log>Log</log>",
       "planFull": "Log plánu",
@@ -1955,6 +1957,29 @@
         "failed": "selhalo",
         "errored": "chyba"
       }
+    },
+    "cost": {
+      "notAvailable": "Pro tento běh není k dispozici žádný odhad nákladů.",
+      "perMonth": "{amount}/měs.",
+      "monthlyTotal": "Měsíční součet",
+      "thisRun": "Změna tohoto běhu",
+      "thisRunHint": "Měsíční změna, kterou přináší tento běh",
+      "previous": "Před tímto během",
+      "previousHint": "Odhadované měsíční náklady předchozího stavu",
+      "pricedCount": "{count, plural, one {# zdroj s cenou} few {# zdroje s cenou} many {# zdroje s cenou} other {# zdrojů s cenou}}",
+      "colResource": "Zdroj",
+      "colType": "Typ",
+      "colChange": "Změna",
+      "colMonthly": "Měsíčně",
+      "change": {
+        "add": "Přidat",
+        "remove": "Odebrat",
+        "noop": "Beze změny"
+      },
+      "unpricedTitle": "{count, plural, one {# zdroj bez ceny} few {# zdroje bez ceny} many {# zdroje bez ceny} other {# zdrojů bez ceny}}",
+      "unpricedHint": "Nic v cenových datech těmto neodpovídalo — nenamapovaný typ, zdroj bez přímých nákladů nebo dosud nepodporovaný poskytovatel.",
+      "indicative": "Odhady jsou orientační; skutečné náklady závisí na využití, regionu, závazcích a slevách.",
+      "credit": "Data o nákladech od <oiq>OpenInfraQuote</oiq>."
     }
   },
   "workspaceDetail": {

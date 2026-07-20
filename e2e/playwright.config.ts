@@ -105,6 +105,11 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
     },
     {
+      name: 'cost-tab',
+      testMatch: 'cost-tab.spec.ts',
+      use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
+    },
+    {
       name: 'estate',
       testMatch: 'estate.spec.ts',
       use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
