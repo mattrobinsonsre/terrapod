@@ -407,6 +407,17 @@
     "log-read-url",
     "status"
   ],
+  "runs._cost_summary_json": [
+    "advisories",
+    "created-at",
+    "error-message",
+    "input-tokens",
+    "model",
+    "narrative",
+    "output-tokens",
+    "status",
+    "updated-at"
+  ],
   "runs._plan_json": [
     "ai-summary-url",
     "has-changes",
@@ -488,6 +499,9 @@
     "risk-level",
     "status",
     "updated-at"
+  ],
+  "runs.show_cost_estimate": [
+    "ai-summary-url"
   ],
   "runs.show_plan_summary": [
     "created-at",
