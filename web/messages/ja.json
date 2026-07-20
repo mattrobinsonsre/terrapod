@@ -1833,6 +1833,8 @@
       "opaFull": "OPAポリシー",
       "impact": "影響",
       "impactFull": "影響グラフ",
+      "cost": "コスト",
+      "costFull": "コスト見積もり",
       "planLabel": "プラン<log>ログ</log>",
       "applyLabel": "適用<log>ログ</log>",
       "planFull": "プランログ",
@@ -1955,6 +1957,29 @@
         "failed": "失敗",
         "errored": "エラー"
       }
+    },
+    "cost": {
+      "notAvailable": "この実行に利用できるコスト見積もりはありません。",
+      "perMonth": "{amount}/月",
+      "monthlyTotal": "月額合計",
+      "thisRun": "この実行による変化",
+      "thisRunHint": "この実行がもたらす月額の変化",
+      "previous": "この実行の前",
+      "previousHint": "以前の状態の推定月額コスト",
+      "pricedCount": "{count, plural, other {価格付きリソース # 件}}",
+      "colResource": "リソース",
+      "colType": "種類",
+      "colChange": "変更",
+      "colMonthly": "月額",
+      "change": {
+        "add": "追加",
+        "remove": "削除",
+        "noop": "変更なし"
+      },
+      "unpricedTitle": "{count, plural, other {価格未算出のリソース # 件}}",
+      "unpricedHint": "価格データに一致するものがありませんでした。マッピングされていない種類、直接コストのないリソース、または未対応のプロバイダーです。",
+      "indicative": "見積もりは目安です。実際のコストは使用状況、リージョン、コミットメント、割引によって異なります。",
+      "credit": "コストデータの提供元: <oiq>OpenInfraQuote</oiq>。"
     }
   },
   "workspaceDetail": {

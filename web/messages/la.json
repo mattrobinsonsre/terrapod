@@ -1833,6 +1833,8 @@
       "opaFull": "Regulae OPA",
       "impact": "Effectus",
       "impactFull": "Graphum effectus",
+      "cost": "Impensa",
+      "costFull": "Aestimatio impensae",
       "planLabel": "Consilium<log>Diarium</log>",
       "applyLabel": "Applicatio<log>Diarium</log>",
       "planFull": "Diarium consilii",
@@ -1955,6 +1957,29 @@
         "failed": "defecit",
         "errored": "erravit"
       }
+    },
+    "cost": {
+      "notAvailable": "Nulla aestimatio impensae huic executioni praesto est.",
+      "perMonth": "{amount}/mens.",
+      "monthlyTotal": "Summa menstrua",
+      "thisRun": "Mutatio huius executionis",
+      "thisRunHint": "Mutatio menstrua quam haec executio inducit",
+      "previous": "Ante hanc executionem",
+      "previousHint": "Impensa menstrua aestimata status prioris",
+      "pricedCount": "{count, plural, one {# fons pretio taxatus} other {# fontes pretio taxati}}",
+      "colResource": "Fons",
+      "colType": "Genus",
+      "colChange": "Mutatio",
+      "colMonthly": "Menstruum",
+      "change": {
+        "add": "Addere",
+        "remove": "Removere",
+        "noop": "Nulla mutatio"
+      },
+      "unpricedTitle": "{count, plural, one {# fons pretio non taxatus} other {# fontes pretio non taxati}}",
+      "unpricedHint": "Nihil in datis pretiorum his congruebat — genus non designatum, fons sine impensa directa, vel provisor nondum comprehensus.",
+      "indicative": "Aestimationes indicativae sunt; impensa vera ab usu, regione, obligationibus et deductionibus pendet.",
+      "credit": "Data impensae ex <oiq>OpenInfraQuote</oiq>."
     }
   },
   "workspaceDetail": {

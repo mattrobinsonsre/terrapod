@@ -1833,6 +1833,8 @@
       "opaFull": "OPA-politikker",
       "impact": "Konsekvens",
       "impactFull": "Konsekvensgraf",
+      "cost": "Omkostning",
+      "costFull": "Omkostningsestimat",
       "planLabel": "Plan<log>log</log>",
       "applyLabel": "Apply<log>log</log>",
       "planFull": "Plan-log",
@@ -1955,6 +1957,29 @@
         "failed": "fejlet",
         "errored": "fejl"
       }
+    },
+    "cost": {
+      "notAvailable": "Der er ikke noget omkostningsestimat tilgængeligt for denne kørsel.",
+      "perMonth": "{amount}/md.",
+      "monthlyTotal": "Månedligt total",
+      "thisRun": "Denne kørsels ændring",
+      "thisRunHint": "Månedlig ændring, som denne kørsel medfører",
+      "previous": "Før denne kørsel",
+      "previousHint": "Anslåede månedlige omkostninger for den tidligere tilstand",
+      "pricedCount": "{count, plural, one {# prissat ressource} other {# prissatte ressourcer}}",
+      "colResource": "Ressource",
+      "colType": "Type",
+      "colChange": "Ændring",
+      "colMonthly": "Månedligt",
+      "change": {
+        "add": "Tilføj",
+        "remove": "Fjern",
+        "noop": "Ingen ændring"
+      },
+      "unpricedTitle": "{count, plural, one {# ikke-prissat ressource} other {# ikke-prissatte ressourcer}}",
+      "unpricedHint": "Intet i prisdataene matchede disse — en ikke-tilknyttet type, en ressource uden direkte omkostning eller en udbyder, der endnu ikke er dækket.",
+      "indicative": "Estimaterne er vejledende; den faktiske omkostning afhænger af forbrug, region, forpligtelser og rabatter.",
+      "credit": "Omkostningsdata fra <oiq>OpenInfraQuote</oiq>."
     }
   },
   "workspaceDetail": {

@@ -1833,6 +1833,8 @@
       "opaFull": "OPA-policyer",
       "impact": "Konsekvens",
       "impactFull": "Konsekvensgraf",
+      "cost": "Kostnad",
+      "costFull": "Kostnadsuppskattning",
       "planLabel": "Plan<log>logg</log>",
       "applyLabel": "Apply<log>logg</log>",
       "planFull": "Plan-logg",
@@ -1955,6 +1957,29 @@
         "failed": "misslyckad",
         "errored": "fel"
       }
+    },
+    "cost": {
+      "notAvailable": "Ingen kostnadsuppskattning är tillgänglig för den här körningen.",
+      "perMonth": "{amount}/mån",
+      "monthlyTotal": "Månadssumma",
+      "thisRun": "Den här körningens ändring",
+      "thisRunHint": "Månatlig ändring som den här körningen medför",
+      "previous": "Före den här körningen",
+      "previousHint": "Uppskattad månadskostnad för det tidigare tillståndet",
+      "pricedCount": "{count, plural, one {# prissatt resurs} other {# prissatta resurser}}",
+      "colResource": "Resurs",
+      "colType": "Typ",
+      "colChange": "Ändring",
+      "colMonthly": "Månadsvis",
+      "change": {
+        "add": "Lägg till",
+        "remove": "Ta bort",
+        "noop": "Ingen ändring"
+      },
+      "unpricedTitle": "{count, plural, one {# oprissatt resurs} other {# oprissatta resurser}}",
+      "unpricedHint": "Inget i prisdata matchade dessa — en icke mappad typ, en resurs utan direkt kostnad eller en leverantör som ännu inte stöds.",
+      "indicative": "Uppskattningarna är vägledande; den faktiska kostnaden beror på användning, region, åtaganden och rabatter.",
+      "credit": "Kostnadsdata från <oiq>OpenInfraQuote</oiq>."
     }
   },
   "workspaceDetail": {

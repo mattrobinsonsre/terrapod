@@ -1,5 +1,6 @@
 """Tests for run CRUD and lifecycle endpoints with RBAC."""
 
+import json
 import uuid
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
