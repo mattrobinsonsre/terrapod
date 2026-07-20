@@ -102,7 +102,19 @@ Per-surface verification before you push (lint alone is **not** enough):
    Every feature — including SSE and streaming — must work through the full
    proxy chain. New SSE endpoints must be added to the `headers()` config in
    `web/next.config.js` with `Content-Encoding: none`, or SSE silently fails
-   through the BFF.
+   through the BFF. **The `/api/*` proxy MUST stream request bodies — it is a
+   Route Handler (`web/src/app/api/[...path]/route.ts`) that forwards
+   `request.body` unbuffered via `fetch(..., { duplex: 'half' })`, NOT Next.js
+   middleware.** Middleware buffers the whole request body and caps it at
+   `middlewareClientMaxBodySize` (10 MB), which silently truncates large uploads
+   (config-version tarballs, state blobs, provider binaries are tens–hundreds of
+   MB) and kills the proxied request with a `socket hang up` — a 500 with no run
+   ever created, and it defeats the API's careful direct-to-storage streaming
+   (rule 14 / #884). The route handler reads `process.env.API_URL` per request,
+   so it keeps runtime config too. The small-body prefixes (`/.well-known`,
+   `/oauth`, `/v1`) may stay on the middleware. Never raise the middleware body
+   cap as a "fix" — that still buffers the whole body in the web pod (OOM risk)
+   and doesn't stream.
 9. **Single organization (hard requirement)** — Terrapod does **not** support
    multiple organizations at any level. There is no `org_name` column
    anywhere. The literal organization name is always `default` — in code,

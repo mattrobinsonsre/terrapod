@@ -105,6 +105,14 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
     },
     {
+      // #884: a >10MB upload must stream through the BFF proxy chain (the
+      // streaming Route Handler, not the body-capping middleware). Drives raw
+      // HTTP through BASE_URL, so no browser storageState is needed.
+      name: 'large-upload',
+      testMatch: 'large-upload.spec.ts',
+      use: { ...devices['Desktop Chrome'] },
+    },
+    {
       name: 'estate',
       testMatch: 'estate.spec.ts',
       use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
