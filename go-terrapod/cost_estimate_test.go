@@ -154,3 +154,90 @@ func TestGetWorkspaceCostEstimateEmptyID(t *testing.T) {
 		t.Fatal("want error for empty workspace id")
 	}
 }
+
+const costSummaryBody = `{"data":{"id":"cost-summary-abc","type":"cost-summaries",
+  "attributes":{
+    "status":"ready",
+    "narrative":"Roughly $219/mo, dominated by aws_instance.eu.",
+    "advisories":[
+      {"kind":"reserved","title":"RI aws_instance.eu","detail":"On-demand 24/7; a 1yr RI cuts it.","monthly_saving":{"min":40.0,"max":60.0},"source":"ai-estimate"},
+      {"kind":"rightsizing","title":"Downsize us","detail":"Idle most of the day.","monthly_saving":null,"source":"ai-estimate"}
+    ],
+    "model":"bedrock/claude","input-tokens":120,"output-tokens":60,"error-message":"",
+    "created-at":"2026-01-01T00:00:00Z","updated-at":"2026-01-01T00:01:00Z"
+  },
+  "relationships":{"run":{"data":{"id":"run-abc","type":"runs"}}}}}`
+
+func TestGetRunCostSummary(t *testing.T) {
+	c := newCostEstimateFixture(t, http.StatusOK, costSummaryBody)
+	s, err := c.GetRunCostSummary(t.Context(), "abc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.RunID != "abc" {
+		t.Errorf("RunID = %q, want abc", s.RunID)
+	}
+	if s.Status != "ready" || s.Narrative == "" {
+		t.Errorf("status/narrative not decoded: %+v", s)
+	}
+	if len(s.Advisories) != 2 {
+		t.Fatalf("advisories=%d, want 2", len(s.Advisories))
+	}
+	a := s.Advisories[0]
+	if a.Kind != "reserved" || a.Source != "ai-estimate" {
+		t.Errorf("advisory not decoded / provenance lost: %+v", a)
+	}
+	if a.MonthlySaving == nil || a.MonthlySaving.Min != 40.0 {
+		t.Errorf("monthly_saving not decoded: %+v", a.MonthlySaving)
+	}
+	if s.Advisories[1].MonthlySaving != nil {
+		t.Errorf("null monthly_saving should decode to nil, got %+v", s.Advisories[1].MonthlySaving)
+	}
+}
+
+func TestGetRunCostSummaryNotFound(t *testing.T) {
+	c := newCostEstimateFixture(t, http.StatusNotFound, "")
+	if _, err := c.GetRunCostSummary(t.Context(), "run-none"); !IsNotFound(err) {
+		t.Fatalf("want NotFoundError, got %v", err)
+	}
+}
+
+func TestGetRunCostSummaryEmptyID(t *testing.T) {
+	c := newCostEstimateFixture(t, http.StatusOK, costSummaryBody)
+	if _, err := c.GetRunCostSummary(t.Context(), ""); err == nil {
+		t.Fatal("want error for empty run id")
+	}
+}
+
+func TestRegenerateRunCostSummary(t *testing.T) {
+	// The regenerate endpoint returns 202 with the pending row.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Errorf("method = %s, want POST", r.Method)
+		}
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		w.WriteHeader(http.StatusAccepted)
+		_, _ = w.Write([]byte(`{"data":{"id":"cost-summary-abc","type":"cost-summaries",
+		  "attributes":{"status":"pending","narrative":"","advisories":[]},
+		  "relationships":{"run":{"data":{"id":"run-abc","type":"runs"}}}}}`))
+	}))
+	t.Cleanup(srv.Close)
+	c, err := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err := c.RegenerateRunCostSummary(t.Context(), "abc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.Status != "pending" {
+		t.Errorf("status = %q, want pending", s.Status)
+	}
+}
+
+func TestRegenerateRunCostSummaryEmptyID(t *testing.T) {
+	c := newCostEstimateFixture(t, http.StatusOK, costSummaryBody)
+	if _, err := c.RegenerateRunCostSummary(t.Context(), ""); err == nil {
+		t.Fatal("want error for empty run id")
+	}
+}

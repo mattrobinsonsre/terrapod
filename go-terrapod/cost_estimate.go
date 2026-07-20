@@ -164,3 +164,106 @@ func (c *Client) GetWorkspaceCostEstimate(ctx context.Context, workspaceID strin
 	}
 	return e, nil
 }
+
+// CostAdvisory is one AI-suggested savings opportunity attached to a run's cost
+// narrative (#871). It is AI *polish*, never an authoritative figure:
+// MonthlySaving is the model's ESTIMATE and Source is always "ai-estimate"
+// (stamped server-side); render it distinctly from the oiq cost figures and
+// never treat it as a computed total.
+type CostAdvisory struct {
+	Kind          string     `json:"kind"` // savings_plan|reserved|spot|rightsizing|other
+	Title         string     `json:"title"`
+	Detail        string     `json:"detail"`
+	MonthlySaving *CostRange `json:"monthly_saving"` // nil when the model gave no figure
+	Source        string     `json:"source"`         // always "ai-estimate"
+}
+
+// CostSummary is the optional AI *enhancement* of a run's cost estimate (#871):
+// a plain-language narrative plus savings advisories. It rides the plan-analysis
+// AI switch and holds AI polish ONLY — the authoritative monthly figures live on
+// CostEstimate (GetRunCostEstimate) and are never restated here.
+type CostSummary struct {
+	// ID is the prefixed resource id ("cost-summary-<uuid>"); RunID is the bare
+	// run UUID resolved from the `run` relationship.
+	ID           string         `json:"-"`
+	RunID        string         `json:"-"`
+	Status       string         `json:"status"` // pending|ready|errored|skipped
+	Narrative    string         `json:"narrative"`
+	Advisories   []CostAdvisory `json:"advisories"`
+	Model        string         `json:"model"`
+	InputTokens  int            `json:"input-tokens"`
+	OutputTokens int            `json:"output-tokens"`
+	ErrorMessage string         `json:"error-message"`
+	CreatedAt    string         `json:"created-at"`
+	UpdatedAt    string         `json:"updated-at"`
+}
+
+func costSummaryFromResource(res *Resource) *CostSummary {
+	s := &CostSummary{
+		ID:           res.ID,
+		RunID:        strings.TrimPrefix(GetRelationshipID(res, "run"), "run-"),
+		Status:       GetStringAttr(res, "status"),
+		Narrative:    GetStringAttr(res, "narrative"),
+		Model:        GetStringAttr(res, "model"),
+		InputTokens:  int(GetIntAttr(res, "input-tokens")),
+		OutputTokens: int(GetIntAttr(res, "output-tokens")),
+		ErrorMessage: GetStringAttr(res, "error-message"),
+		CreatedAt:    GetStringAttr(res, "created-at"),
+		UpdatedAt:    GetStringAttr(res, "updated-at"),
+	}
+	if raw, ok := res.Attributes["advisories"]; ok {
+		_ = json.Unmarshal(raw, &s.Advisories)
+	}
+	return s
+}
+
+// GetRunCostSummary fetches the AI cost narrative for a run (#871).
+//
+// runID accepts either a bare run UUID or the prefixed "run-<uuid>" form.
+//
+// Returns *NotFoundError when no narrative exists yet (AI disabled, workspace
+// opted out, or not generated). A `pending` status means it is in flight.
+func (c *Client) GetRunCostSummary(ctx context.Context, runID string) (*CostSummary, error) {
+	if runID == "" {
+		return nil, errors.New("run id is required")
+	}
+	id := runID
+	if len(id) > 4 && id[:4] != "run-" {
+		id = "run-" + id
+	}
+	data, err := c.Get(ctx, "/api/terrapod/v1/runs/"+url.PathEscape(id)+"/cost-summary")
+	if err != nil {
+		return nil, err
+	}
+	res, err := ParseResource(data)
+	if err != nil {
+		return nil, fmt.Errorf("parse cost summary response: %w", err)
+	}
+	return costSummaryFromResource(res), nil
+}
+
+// RegenerateRunCostSummary re-fires the AI cost narrative for a run (#871).
+// Returns the upserted pending row immediately; the model call runs
+// asynchronously (listen for the `cost_summary_ready` SSE event, or poll
+// GetRunCostSummary).
+//
+// Returns *ConflictError when the run has no cost estimate to narrate, and the
+// equivalent of a 503 when AI summary is globally disabled.
+func (c *Client) RegenerateRunCostSummary(ctx context.Context, runID string) (*CostSummary, error) {
+	if runID == "" {
+		return nil, errors.New("run id is required")
+	}
+	id := runID
+	if len(id) > 4 && id[:4] != "run-" {
+		id = "run-" + id
+	}
+	data, err := c.Post(ctx, "/api/terrapod/v1/runs/"+url.PathEscape(id)+"/cost-summary/regenerate", nil)
+	if err != nil {
+		return nil, err
+	}
+	res, err := ParseResource(data)
+	if err != nil {
+		return nil, fmt.Errorf("parse regenerate cost summary response: %w", err)
+	}
+	return costSummaryFromResource(res), nil
+}

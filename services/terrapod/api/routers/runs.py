@@ -48,6 +48,7 @@ from terrapod.auth import capabilities as cap
 from terrapod.auth.capabilities import has_capability
 from terrapod.config import settings
 from terrapod.db.models import (
+    CostSummary,
     PlanSummary,
     PlanSummaryMessage,
     Run,
@@ -1119,6 +1120,13 @@ async def show_cost_estimate(
     # Small artifact (bounded by resource count) — inline parse is fine here.
     estimate = json.loads(raw)
 
+    # Advertise the AI cost-narrative URL only when the feature is globally
+    # enabled (#871) — this omission is the UI's "is the cost AI on?" signal,
+    # mirroring how `ai-summary-url` gates the plan summary. AI is polish only;
+    # the figures above stay authoritative regardless.
+    if settings.ai_summary.enabled:
+        estimate = {**estimate, "ai-summary-url": f"/api/terrapod/v1/runs/{run.id}/cost-summary"}
+
     return JSONResponse(
         content={
             "data": {
@@ -1131,6 +1139,127 @@ async def show_cost_estimate(
             }
         }
     )
+
+
+def _cost_summary_json(run_id, summary: CostSummary) -> dict:
+    """JSON:API body for a cost-summary row."""
+    return {
+        "data": {
+            "id": f"cost-summary-{summary.id}",
+            "type": "cost-summaries",
+            "attributes": {
+                "status": summary.status,
+                "narrative": summary.narrative,
+                # Every advisory carries source="ai-estimate" (stamped server-side);
+                # the UI renders these distinctly from the authoritative figures.
+                "advisories": summary.advisories,
+                "model": summary.model,
+                "input-tokens": summary.input_tokens,
+                "output-tokens": summary.output_tokens,
+                "error-message": summary.error_message,
+                "created-at": _rfc3339(summary.created_at),
+                "updated-at": _rfc3339(summary.updated_at),
+            },
+            "relationships": {
+                "run": {"data": {"id": f"run-{run_id}", "type": "runs"}},
+            },
+        }
+    }
+
+
+@extensions_router.get("/runs/{run_id}/cost-summary")
+async def show_cost_summary(
+    run_id: str = Path(...),
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """AI cost narrative + savings advisories for a run (#871).
+
+    Terrapod-native; the optional AI *enhancement* over the data-only cost
+    estimate, riding the plan-analysis AI switch. AI *polish* only — the
+    authoritative oiq figures live on the data-only `/runs/{id}/cost-estimate`
+    endpoint and are never restated here; every advisory dollar amount is
+    tagged `source: "ai-estimate"`.
+
+    404 when no cost narrative exists yet — the UI uses this as the "not
+    generated" signal (vs a `pending` row, which means "in flight"). The
+    narrative is stored in the deployment's `ai_summary.summary_language`;
+    view-time translation for a reader `?locale=` is a follow-up (#871).
+    """
+    run = await _get_run(run_id, db)
+    await _require_run_ws_capability(run, cap.RUN_READ, user, db)
+
+    summary = (
+        await db.execute(select(CostSummary).where(CostSummary.run_id == run.id))
+    ).scalar_one_or_none()
+    if summary is None:
+        raise HTTPException(status_code=404, detail="no cost narrative for this run")
+
+    return JSONResponse(content=_cost_summary_json(run.id, summary))
+
+
+@extensions_router.post("/runs/{run_id}/cost-summary/regenerate")
+async def regenerate_cost_summary(
+    run_id: str = Path(...),
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Re-fire the AI cost narrative for a run (#871).
+
+    Anyone with workspace `read` can regenerate; it mutates no infrastructure
+    and is centrally cost-gated by `ai_summary.daily_token_budget`. Upserts the
+    row to `pending`, enqueues the `ai_cost_summary` trigger BYPASSING the
+    per-run dedup (an explicit operator click always goes through), returns 202.
+
+    409 when the run has no cost estimate to narrate. 503 when AI is globally
+    disabled.
+    """
+    from terrapod.services.scheduler import enqueue_trigger
+
+    if not settings.ai_summary.enabled:
+        raise HTTPException(status_code=503, detail="AI summary is disabled globally")
+
+    run = await _get_run(run_id, db)
+    await _require_run_ws_capability(run, cap.RUN_READ, user, db)
+
+    if not run.has_cost_estimate:
+        raise HTTPException(status_code=409, detail="run has no cost estimate to narrate")
+
+    pending_values = {
+        "run_id": run.id,
+        "status": "pending",
+        "model": settings.ai_summary.model,
+        "narrative": "",
+        "advisories": [],
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "error_message": "",
+    }
+    stmt = pg_insert(CostSummary).values(**pending_values)
+    stmt = stmt.on_conflict_do_update(
+        index_elements=["run_id"],
+        set_={
+            "status": stmt.excluded.status,
+            "model": stmt.excluded.model,
+            "narrative": stmt.excluded.narrative,
+            "advisories": stmt.excluded.advisories,
+            "input_tokens": stmt.excluded.input_tokens,
+            "output_tokens": stmt.excluded.output_tokens,
+            "error_message": stmt.excluded.error_message,
+            "updated_at": now_utc(),
+        },
+    )
+    await db.execute(stmt)
+    await db.commit()
+
+    summary = (
+        await db.execute(select(CostSummary).where(CostSummary.run_id == run.id))
+    ).scalar_one_or_none()
+
+    # No dedup_key → bypass the per-run dedup; an explicit click always fires.
+    await enqueue_trigger("ai_cost_summary", {"run_id": str(run.id)})
+
+    return JSONResponse(status_code=202, content=_cost_summary_json(run.id, summary))
 
 
 def _summary_kind_for_run(run: Run) -> str | None:
