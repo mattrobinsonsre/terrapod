@@ -50,6 +50,11 @@ type Config struct {
 	EnvHint string
 	// SkipTLSVerify disables certificate verification (local/dev only).
 	SkipTLSVerify bool
+	// RefreshTokenFromFile is true when Token was resolved from the credentials
+	// file (not an explicit --token / $TERRAPOD_TOKEN). It lets the client
+	// re-read the file and retry once on a 401, so an in-session `tofu login`
+	// refresh is picked up without reconnecting the MCP (issue #880).
+	RefreshTokenFromFile bool
 }
 
 // New builds the go-terrapod client for the configured instance and an MCP
@@ -65,10 +70,14 @@ func New(cfg Config) (*mcp.Server, *terrapod.Client, error) {
 	// MCP-built-against version to what the server advertises.
 	terrapod.SDKVersion = Version
 
+	// Inject an http.Client that refreshes the token on a 401 (issue #880) so an
+	// in-session `tofu login` refresh is picked up without reconnecting. It owns
+	// the TLS config now, so SkipTLSVerify is passed to it, not to go-terrapod
+	// (which ignores its own SkipTLSVerify once an HTTPClient is supplied).
 	client, err := terrapod.NewClient(terrapod.Options{
-		BaseURL:       cfg.Host,
-		Token:         cfg.Token,
-		SkipTLSVerify: cfg.SkipTLSVerify,
+		BaseURL:    cfg.Host,
+		Token:      cfg.Token,
+		HTTPClient: newHTTPClient(cfg.Host, cfg.Token, cfg.RefreshTokenFromFile, cfg.SkipTLSVerify),
 	})
 	if err != nil {
 		return nil, nil, fmt.Errorf("build terrapod client: %w", err)
