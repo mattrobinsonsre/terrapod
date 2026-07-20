@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-const PROXY_PREFIXES = ['/api/', '/.well-known/', '/oauth/', '/v1/']
+// `/api/*` is proxied by the streaming Route Handler at app/api/[...path]/
+// route.ts — NOT here. Middleware buffers the request body and caps it at
+// `middlewareClientMaxBodySize` (10 MB), which truncates large uploads
+// (config-version tarballs, state blobs, provider binaries) and breaks them
+// with a `socket hang up` (#884). The remaining prefixes only ever carry small
+// request bodies (service discovery, the OAuth token exchange, the registry
+// CLI protocol), so the middleware rewrite is fine for them. Both this
+// middleware and the route handler run inside the BFF (web) tier — all traffic
+// still flows client → BFF → API (rule 8); only the /api proxy mechanism
+// differs so it can stream.
+const PROXY_PREFIXES = ['/.well-known/', '/oauth/', '/v1/']
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
@@ -30,5 +40,7 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/api/:path*', '/.well-known/:path*', '/oauth/:path*', '/v1/:path*'],
+  // `/api/:path*` is intentionally absent — the streaming Route Handler owns it
+  // (see PROXY_PREFIXES note above). Keep the matcher in sync with it.
+  matcher: ['/.well-known/:path*', '/oauth/:path*', '/v1/:path*'],
 }
