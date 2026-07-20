@@ -942,6 +942,8 @@ Returns the AI-generated plan summary (or failure analysis on errored plans) whe
 
 All five payloads carry `{run_id, workspace_id}` at minimum. The UI re-fetches the summary on any of them. For VCS-driven runs, the per-workspace PR/MR status comment is edited in place to include the summary content when it lands.
 
+The **AI cost narrative** (#871 — the optional enhancement over the data-only cost estimate, riding this same `ai_summary.enabled` switch + per-workspace mode) emits its own lifecycle events on the same per-workspace channel: `cost_summary_pending`, `cost_summary_ready`, `cost_summary_errored`, and `cost_summary_skipped` (workspace opted out / daily budget hit / no estimate). Each carries `{run_id, workspace_id}`. These are AI *polish* only — the authoritative figures stay on the data-only cost-estimate endpoint; every advisory dollar amount is tagged `source: "ai-estimate"`.
+
 ### Regenerate Plan Summary
 
 ```

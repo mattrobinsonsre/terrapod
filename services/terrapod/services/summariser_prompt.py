@@ -116,12 +116,91 @@ FAILURE_ANALYSIS_TOOL: dict = {
 }
 
 
+# --- Cost summary (#871) -----------------------------------------------------
+# The AI *enhancement* of a run's cost estimate: a plain-language narrative of
+# the (authoritative, oiq-derived) figures + optional savings advisories. HARD
+# provenance: the model is told never to restate/override the oiq total, and
+# every advisory dollar amount is an AI ESTIMATE (the API stamps
+# `source: "ai-estimate"` on each advisory server-side; the schema does not let
+# the model claim otherwise).
+COST_SUMMARY_JSON_SCHEMA: dict = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["narrative", "advisories"],
+    "properties": {
+        "narrative": {
+            "type": "string",
+            "description": (
+                "Plain-language explanation of the cost estimate: what drives "
+                "the monthly cost, which resources dominate, and how a change "
+                "moves the bill. Up to ~350 words. Refer to resources by their "
+                "terraform address. Do NOT restate the authoritative monthly "
+                "total as if you computed it — it is given to you and shown "
+                "separately; describe and contextualise it, never replace it. "
+                "No chain-of-thought, no preamble."
+            ),
+        },
+        "advisories": {
+            "type": "array",
+            "description": (
+                "Optional cost-savings suggestions, ordered biggest-impact "
+                "first. Empty array is fine when nothing obvious applies. Each "
+                "monthly_saving is YOUR ESTIMATE, not a computed figure."
+            ),
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["kind", "title", "detail"],
+                "properties": {
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "savings_plan",
+                            "reserved",
+                            "spot",
+                            "rightsizing",
+                            "other",
+                        ],
+                    },
+                    "title": {"type": "string", "maxLength": 120},
+                    "detail": {"type": "string", "maxLength": 600},
+                    "monthly_saving_min": {
+                        "type": "number",
+                        "description": "Estimated low end of monthly saving (same currency).",
+                    },
+                    "monthly_saving_max": {
+                        "type": "number",
+                        "description": "Estimated high end of monthly saving (same currency).",
+                    },
+                },
+            },
+        },
+    },
+}
+
+
+COST_SUMMARY_TOOL: dict = {
+    "type": "function",
+    "function": {
+        "name": "submit_cost_summary",
+        "description": (
+            "Submit the structured cost summary. Call this tool exactly once "
+            "with the narrative and any savings advisories. Never restate the "
+            "authoritative monthly total as your own computation."
+        ),
+        "parameters": COST_SUMMARY_JSON_SCHEMA,
+    },
+}
+
+
 def tool_for_kind(kind: str) -> dict:
     """Return the LiteLLM tool definition matching this summariser kind."""
     if kind == "plan_summary":
         return PLAN_SUMMARY_TOOL
     if kind == "failure_analysis":
         return FAILURE_ANALYSIS_TOOL
+    if kind == "cost_summary":
+        return COST_SUMMARY_TOOL
     raise ValueError(f"unknown summariser kind: {kind!r}")
 
 
@@ -536,6 +615,83 @@ def render_prompt(
 
     tool_name = "submit_plan_summary" if kind == "plan_summary" else "submit_failure_analysis"
     user_parts.append(f"Now call the `{tool_name}` tool exactly once with your structured answer.")
+
+    user_message = "\n\n".join(user_parts)
+    return system_message, user_message
+
+
+# --- Cost summary prompt (#871) ---------------------------------------------
+COST_SUMMARY_SKILL_PROMPT = """\
+You are a senior cloud FinOps reviewer. You are given an ALREADY-COMPUTED, \
+authoritative monthly cost estimate for a Terraform/OpenTofu plan (produced by \
+a deterministic pricing engine, OpenInfraQuote). Your job is to EXPLAIN and \
+CONTEXTUALISE it and, where obvious, suggest concrete savings — never to \
+recompute or override it.
+
+Hard rules:
+- The authoritative monthly total and every per-resource figure are DATA. They \
+are given to you and shown to the user separately. Describe them, group them, \
+explain what drives them — but never present a different total as if you \
+computed it, and never contradict the given figures.
+- Any monthly_saving you put on an advisory is YOUR ESTIMATE, not a computed \
+number. Keep advisories practical and specific to what is actually in the \
+plan (e.g. a long-lived on-demand instance → a Savings Plan / reserved \
+instance; a fault-tolerant batch workload → spot; an over-provisioned \
+instance class → rightsizing). Do not invent resources that are not present.
+- Be concise and factual. Refer to resources by their terraform address. No \
+chain-of-thought, no preamble, no restating these instructions.
+- If the estimate is trivial or nothing obvious can be saved, say so briefly \
+and return an empty advisories array.\
+"""
+
+
+def render_cost_prompt(
+    *,
+    estimate_json: str,
+    plan_json: str = "",
+    fleet_context: str = "",
+    workspace_context: str = "",
+    prompt_prefix: str = "",
+    prompt_suffix: str = "",
+    output_language: str = "",
+) -> tuple[str, str]:
+    """Render the (system, user) messages for the cost-summary request.
+
+    ``estimate_json`` is the authoritative oiq cost estimate (the
+    ``cost_estimate.json`` artifact body). ``plan_json`` is optional extra
+    context (the structured plan) — pass "" to omit it. The output contract is
+    the ``submit_cost_summary`` tool; provenance guardrails live in the skill
+    prompt above and are re-asserted server-side (advisories are stamped
+    ``source: "ai-estimate"`` regardless of what the model returns).
+    """
+    parts: list[str] = []
+    if prompt_prefix.strip():
+        parts.append(prompt_prefix.strip())
+    parts.append(COST_SUMMARY_SKILL_PROMPT)
+    if prompt_suffix.strip():
+        parts.append(prompt_suffix.strip())
+    if output_language.strip() and output_language.strip().lower() != "english":
+        parts.append(
+            f"OUTPUT_LANGUAGE: Write every natural-language field you emit — the "
+            f"narrative and each advisory's title and detail — in "
+            f"{output_language.strip()}. Keep all identifiers verbatim and "
+            f"untranslated: resource addresses, provider and module names, HCL "
+            f"keywords, CLI flags, file paths, currency codes, and anything "
+            f"inside backticks."
+        )
+    system_message = "\n\n".join(parts)
+
+    user_parts: list[str] = []
+    if fleet_context.strip():
+        user_parts.append(f"FLEET_CONTEXT:\n{fleet_context.strip()}")
+    if workspace_context.strip():
+        user_parts.append(f"WORKSPACE_CONTEXT:\n{workspace_context.strip()}")
+    user_parts.append(f"COST_ESTIMATE (authoritative, oiq-derived):\n```json\n{estimate_json}\n```")
+    if plan_json.strip():
+        user_parts.append(f"PLAN_JSON (context):\n```json\n{plan_json}\n```")
+    user_parts.append(
+        "Now call the `submit_cost_summary` tool exactly once with your structured answer."
+    )
 
     user_message = "\n\n".join(user_parts)
     return system_message, user_message

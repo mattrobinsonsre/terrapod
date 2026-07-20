@@ -289,6 +289,16 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
             description="Summarise plan changes or analyse plan failures via LLM",
         )
 
+        # AI cost narrative (#871) — the optional enhancement over the
+        # deterministic oiq cost estimate. Rides this same switch.
+        from terrapod.services.cost_summariser import handle_ai_cost_summary
+
+        register_trigger_handler(
+            "ai_cost_summary",
+            handler=handle_ai_cost_summary,
+            description="Narrate a run's cost estimate + suggest savings via LLM",
+        )
+
     # Run reconciler (drives run state transitions based on Job outcomes)
     from terrapod.services.run_reconciler import reconcile_runs
 
