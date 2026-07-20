@@ -164,6 +164,7 @@ Everything below is implemented and shipped today.
 | Run tasks | Pre/post-plan webhook hooks for external validation |
 | Execution hooks | **Custom execution steps** — admin-managed shell run in the runner Job at pre_init / pre_plan / post_plan / pre_apply / post_apply, associated with workspaces (`pre_init` is the setup/tooling/auth slot; custom runner images cover heavier needs) |
 | Service catalog | No-code self-service provisioning over the module registry |
+| Cost estimation | Monthly cost of managed infrastructure — a per-plan delta on every run and the current total on a workspace; data only (native OpenInfraQuote-port engine, credited), on by default |
 | Impact graph | Interactive dependency + blast-radius view of a plan on the run page — module-clustered, click a resource to light up its transitive downstream impact |
 | Estate topology | Whole-estate dependency graph — workspaces + modules wired by run-triggers, remote-state, and module links; group by any label / pool / name prefix; RBAC-filtered; accessible table fallback |
 | State resource graph | Per-workspace resource dependency graph from Terraform state — resources wired by `depends-on`; current state version by default with an older-version picker; group by type / module / provider / mode; accessible table fallback |
@@ -401,6 +402,7 @@ See [docs/authentication.md](docs/authentication.md) for setup guides.
 | [Runners](docs/runners.md) | Agent pools, the listener/runner ARC model, custom runner images |
 | [Cloud Credentials](docs/cloud-credentials.md) | AWS IRSA, GCP WIF, Azure WI setup + a preflight doctor that verifies SA→role + object-store access before the first run |
 | [Service Catalog](docs/service-catalog.md) | No-code self-service provisioning over the module registry |
+| [Cost Estimation](docs/cost-estimation.md) | Monthly cost of managed infrastructure (per-plan delta + per-workspace state total); native OpenInfraQuote-port engine, data only |
 | [Monitoring](docs/monitoring.md) | Prometheus metrics, scraping, shipped Grafana dashboard + alert rules (with per-alert runbooks) |
 | [Optional Webhook Ingress](docs/deployment-webhook-ingress.md) | Split public webhook ingress so the management plane can stay private |
 | [Forward Proxy & Custom CA](docs/deployment-proxy.md) | Route all outbound HTTP(S) through a corporate proxy and trust a private/MITM CA, across every component including runner Jobs |

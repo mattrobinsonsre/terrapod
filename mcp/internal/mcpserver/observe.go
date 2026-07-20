@@ -181,6 +181,44 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 		}
 		return nil, planJSONOut{RunID: in.RunID, PlanJSON: raw}, nil
 	})
+
+	// ── terrapod_workspace_cost ──────────────────────────────────────
+	type wsCostIn struct {
+		WorkspaceID string `json:"workspace_id" jsonschema:"the workspace id (ws-...) whose current managed-infrastructure monthly cost to estimate"`
+	}
+	mcp.AddTool(s, &mcp.Tool{
+		Name:        "terrapod_workspace_cost",
+		Description: "Estimate the CURRENT monthly cost of a workspace's managed infrastructure from its latest state (native OpenInfraQuote-port engine — data only, no AI). Returns currency, the total monthly range, per-resource costs, the unpriced resources, and which state version was priced. `state-version` is null when the workspace has no state yet.",
+		Annotations: readOnly,
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in wsCostIn) (*mcp.CallToolResult, *terrapod.WorkspaceCostEstimate, error) {
+		if in.WorkspaceID == "" {
+			return errText("workspace_id is required"), nil, nil
+		}
+		e, err := c.GetWorkspaceCostEstimate(ctx, in.WorkspaceID)
+		if err != nil {
+			return errResult(err), nil, nil
+		}
+		return nil, e, nil
+	})
+
+	// ── terrapod_run_cost ────────────────────────────────────────────
+	type runCostIn struct {
+		RunID string `json:"run_id" jsonschema:"the run id (run-... or a bare uuid) whose plan cost delta to fetch"`
+	}
+	mcp.AddTool(s, &mcp.Tool{
+		Name:        "terrapod_run_cost",
+		Description: "Get a run's monthly cost estimate — the plan's cost DELTA: the projected monthly total, the delta this run introduces, the previous total, per-resource costs, and unpriced resources (native OpenInfraQuote-port engine — data only, no AI). Returns 'not available' when the run produced no cost estimate.",
+		Annotations: readOnly,
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in runCostIn) (*mcp.CallToolResult, *terrapod.CostEstimate, error) {
+		if in.RunID == "" {
+			return errText("run_id is required"), nil, nil
+		}
+		e, err := c.GetRunCostEstimate(ctx, in.RunID)
+		if err != nil {
+			return errResult(err), nil, nil
+		}
+		return nil, e, nil
+	})
 }
 
 // errResult turns a go-terrapod error into an agent-facing tool error,
