@@ -77,6 +77,39 @@ class TestNormaliseAdvisories:
         assert len(out[0]["detail"]) == 600
 
 
+class TestNormaliseEstimatedResources:
+    def test_stamps_source_and_coerces_range(self):
+        out = cost_summariser._normalise_estimated_resources(
+            [
+                {
+                    "address": "google_compute_instance.x",
+                    "type": "google_compute_instance",
+                    "monthly_min": 12,
+                    "monthly_max": 15.5,
+                    "basis": "e2-medium us-central1",
+                    "source": "computed",  # lie
+                }
+            ]
+        )
+        assert len(out) == 1
+        assert out[0]["source"] == "ai-estimate"
+        assert out[0]["monthly"] == {"min": 12.0, "max": 15.5}
+        assert out[0]["address"] == "google_compute_instance.x"
+
+    def test_drops_entries_without_address_or_numeric_range(self):
+        out = cost_summariser._normalise_estimated_resources(
+            [
+                {"type": "x", "monthly_min": 1, "monthly_max": 2},  # no address
+                {"address": "a.b", "monthly_min": "n/a", "monthly_max": 2},  # non-numeric
+                {"address": "a.b", "monthly_min": 1, "monthly_max": 2, "basis": "ok"},  # valid
+            ]
+        )
+        assert [e["address"] for e in out] == ["a.b"]
+
+    def test_non_list_returns_empty(self):
+        assert cost_summariser._normalise_estimated_resources(None) == []
+
+
 # ---------------------------------------------------------------------------
 # No state leakage — hard invariant (Code ↔ Tests contract)
 # ---------------------------------------------------------------------------
@@ -156,6 +189,16 @@ async def test_ready_path_stamps_advisories_and_emits(monkeypatch):
     call_model = AsyncMock(
         return_value=(
             {
+                "estimated_resources": [
+                    {
+                        "address": "azurerm_storage_account.a",
+                        "type": "azurerm_storage_account",
+                        "monthly_min": 5,
+                        "monthly_max": 8,
+                        "basis": "LRS hot ~100GB",
+                        "source": "computed",  # model lie — must be overwritten
+                    },
+                ],
                 "narrative": "Roughly $73/mo, driven by aws_instance.web.",
                 "advisories": [
                     {
@@ -187,10 +230,15 @@ async def test_ready_path_stamps_advisories_and_emits(monkeypatch):
         sess.return_value.__aexit__ = AsyncMock(return_value=False)
         await cost_summariser.handle_ai_cost_summary({"run_id": str(run.id)})
 
-    # The terminal upsert is status="ready" with a stamped advisory.
+    # The terminal upsert is status="ready" with the PRIMARY estimated
+    # resources (provenance forced) + a stamped advisory.
     ready = [c for c in upsert.await_args_list if c.kwargs.get("status") == "ready"]
     assert ready, "expected a ready upsert"
     kw = ready[-1].kwargs
+    er = kw["estimated_resources"][0]
+    assert er["address"] == "azurerm_storage_account.a"
+    assert er["monthly"] == {"min": 5.0, "max": 8.0}
+    assert er["source"] == "ai-estimate"  # the model's "computed" was overwritten
     assert kw["narrative"].startswith("Roughly")
     assert kw["advisories"][0]["source"] == "ai-estimate"
     assert kw["advisories"][0]["monthly_saving"] == {"min": 20.0, "max": 30.0}

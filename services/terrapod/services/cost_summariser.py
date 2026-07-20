@@ -6,14 +6,20 @@ per-workspace mode) and reuses the plan summariser's model plumbing — the
 LiteLLM tool-calling call (:func:`summariser._call_model`), the shared daily
 token budget, and the per-workspace run-events SSE channel.
 
-**Provenance is a hard invariant (the whole reason cost is data-first).** This
-service produces AI *polish* only — a plain-language narrative of the estimate
-plus optional savings advisories — stored in ``cost_summaries``. It NEVER
-computes, restates, or overrides the authoritative figures: those come from the
-runner-produced ``cost_estimate.json`` artifact (oiq-derived) and are served by
-the data-only ``/runs/{id}/cost-estimate`` endpoint. Every advisory dollar
-amount is stamped ``source: "ai-estimate"`` **server-side here**, regardless of
-what the model returns, and is never a gate.
+**Its PRIMARY job is to price what oiq can't (#871 reframe).** The deterministic
+engine prices what its pricesheet covers; this service uses the model's own cost
+knowledge to ESTIMATE the resources oiq could NOT price — the ``unpriced`` bucket
+(unmapped types, and providers oiq doesn't cover, e.g. Azure/GCP) plus obviously
+usage-driven costs it omits. Those estimates are the ``estimated_resources``
+primary output. A human-readable ``narrative`` + savings ``advisories`` are the
+secondary bonus.
+
+**Provenance is a hard invariant.** Every figure this service stores — each
+estimated resource and each advisory — is tagged ``source: "ai-estimate"``
+**server-side here**, regardless of what the model returns. It is shown as a
+separate overlay, NEVER summed into or substituted for the authoritative oiq
+total (which stays on the data-only ``/runs/{id}/cost-estimate`` endpoint), and
+is never a gate.
 
 The only input fed to the model is the ``cost_estimate.json`` artifact — a
 derived, non-sensitive aggregate (resource addresses, types, monthly ranges).
@@ -59,6 +65,7 @@ async def _upsert_cost_summary(
     *,
     run_id: uuid.UUID,
     status: str,
+    estimated_resources: list[dict] | None = None,
     narrative: str = "",
     advisories: list[dict] | None = None,
     model: str = "",
@@ -69,7 +76,7 @@ async def _upsert_cost_summary(
     """Idempotent upsert keyed on (run_id); never downgrades a 'ready' row.
 
     Mirrors ``summariser._upsert_summary`` so a transient errored retry can't
-    clobber a good narrative.
+    clobber a good result.
     """
     existing = (
         await db.execute(select(CostSummary).where(CostSummary.run_id == run_id))
@@ -81,6 +88,7 @@ async def _upsert_cost_summary(
         "id": uuid.uuid4(),
         "run_id": run_id,
         "status": status,
+        "estimated_resources": estimated_resources or [],
         "narrative": narrative,
         "advisories": advisories or [],
         "model": model,
@@ -94,6 +102,7 @@ async def _upsert_cost_summary(
         index_elements=["run_id"],
         set_={
             "status": stmt.excluded.status,
+            "estimated_resources": stmt.excluded.estimated_resources,
             "narrative": stmt.excluded.narrative,
             "advisories": stmt.excluded.advisories,
             "model": stmt.excluded.model,
@@ -104,6 +113,40 @@ async def _upsert_cost_summary(
         },
     )
     await db.execute(stmt)
+
+
+def _normalise_estimated_resources(raw: object) -> list[dict]:
+    """Coerce the model's per-resource estimates into the stored shape.
+
+    The PRIMARY output (#871): AI estimates for resources oiq couldn't price.
+    Each becomes ``{address, type, monthly: {min, max}, basis, source:
+    "ai-estimate"}``. ``source`` is forced here — the model can never claim a
+    computed figure. Entries missing a numeric range or an address are dropped.
+    """
+    if not isinstance(raw, list):
+        return []
+    out: list[dict] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        address = item.get("address")
+        lo = item.get("monthly_min")
+        hi = item.get("monthly_max")
+        if not isinstance(address, str) or not address:
+            continue
+        if not isinstance(lo, int | float) or not isinstance(hi, int | float):
+            continue
+        basis = item.get("basis")
+        out.append(
+            {
+                "address": address,
+                "type": item.get("type") if isinstance(item.get("type"), str) else "",
+                "monthly": {"min": float(lo), "max": float(hi)},
+                "basis": basis[:400] if isinstance(basis, str) else "",
+                "source": "ai-estimate",  # HARD provenance — always an estimate
+            }
+        )
+    return out
 
 
 def _normalise_advisories(raw: object) -> list[dict]:
@@ -236,26 +279,32 @@ async def handle_ai_cost_summary(payload: dict) -> None:
             await _emit_summary_event("cost_summary_errored", ws.id, run_id)
             return
 
-        narrative = args.get("narrative") if isinstance(args, dict) else None
-        advisories = _normalise_advisories(
-            args.get("advisories") if isinstance(args, dict) else None
-        )
-        if not isinstance(narrative, str) or not narrative.strip():
+        # A non-dict tool result is the only genuine failure — the model
+        # returned something unusable. Empty estimates/advisories/narrative are
+        # ALL legitimate "ready" states (oiq priced everything; nothing for the
+        # AI to add), so we don't error on them.
+        if not isinstance(args, dict):
             await _upsert_cost_summary(
                 db,
                 run_id=run_id,
                 status="errored",
                 model=cfg.model,
-                error_message="model returned no narrative",
+                error_message="model returned no structured result",
             )
             await db.commit()
             await _emit_summary_event("cost_summary_errored", ws.id, run_id)
             return
 
+        estimated_resources = _normalise_estimated_resources(args.get("estimated_resources"))
+        advisories = _normalise_advisories(args.get("advisories"))
+        narrative = args.get("narrative")
+        narrative = narrative if isinstance(narrative, str) else ""
+
         await _upsert_cost_summary(
             db,
             run_id=run_id,
             status="ready",
+            estimated_resources=estimated_resources,
             narrative=narrative,
             advisories=advisories,
             model=cfg.model,

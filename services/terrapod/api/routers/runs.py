@@ -1149,9 +1149,13 @@ def _cost_summary_json(run_id, summary: CostSummary) -> dict:
             "type": "cost-summaries",
             "attributes": {
                 "status": summary.status,
+                # PRIMARY (#871): the model's estimates for what oiq couldn't
+                # price. Each carries source="ai-estimate" (stamped server-side);
+                # the UI renders these as a separate overlay, never summed into
+                # the authoritative oiq total.
+                "estimated-resources": summary.estimated_resources,
                 "narrative": summary.narrative,
-                # Every advisory carries source="ai-estimate" (stamped server-side);
-                # the UI renders these distinctly from the authoritative figures.
+                # Advisories also carry source="ai-estimate".
                 "advisories": summary.advisories,
                 "model": summary.model,
                 "input-tokens": summary.input_tokens,
@@ -1229,6 +1233,7 @@ async def regenerate_cost_summary(
         "run_id": run.id,
         "status": "pending",
         "model": settings.ai_summary.model,
+        "estimated_resources": [],
         "narrative": "",
         "advisories": [],
         "input_tokens": 0,
@@ -1241,6 +1246,7 @@ async def regenerate_cost_summary(
         set_={
             "status": stmt.excluded.status,
             "model": stmt.excluded.model,
+            "estimated_resources": stmt.excluded.estimated_resources,
             "narrative": stmt.excluded.narrative,
             "advisories": stmt.excluded.advisories,
             "input_tokens": stmt.excluded.input_tokens,

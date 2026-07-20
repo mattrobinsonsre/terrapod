@@ -2268,7 +2268,18 @@ class CostSummary(Base):
 
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
 
-    # Model fields — populated when status == "ready"
+    # Model fields — populated when status == "ready".
+    #
+    # estimated_resources is the PRIMARY output (#871 reframe): the model's own
+    # monthly estimate for resources the deterministic oiq engine could NOT
+    # price — the "unpriced" bucket (unmapped types, and providers oiq doesn't
+    # cover, e.g. Azure/GCP) plus usage-driven dimensions it omits. Each carries
+    # `source: "ai-estimate"` (stamped server-side), is shown as a separate
+    # overlay beside the authoritative oiq figures, and is NEVER summed into the
+    # oiq total. narrative + advisories are the secondary, human-readable bonus.
+    estimated_resources: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB, default=list, nullable=False
+    )
     narrative: Mapped[str] = mapped_column(Text, nullable=False, default="")
     advisories: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list, nullable=False)
 

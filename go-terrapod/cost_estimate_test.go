@@ -158,6 +158,9 @@ func TestGetWorkspaceCostEstimateEmptyID(t *testing.T) {
 const costSummaryBody = `{"data":{"id":"cost-summary-abc","type":"cost-summaries",
   "attributes":{
     "status":"ready",
+    "estimated-resources":[
+      {"address":"azurerm_linux_virtual_machine.web","type":"azurerm_linux_virtual_machine","monthly":{"min":70.0,"max":90.0},"basis":"Standard_D2s_v5, West Europe, 730h","source":"ai-estimate"}
+    ],
     "narrative":"Roughly $219/mo, dominated by aws_instance.eu.",
     "advisories":[
       {"kind":"reserved","title":"RI aws_instance.eu","detail":"On-demand 24/7; a 1yr RI cuts it.","monthly_saving":{"min":40.0,"max":60.0},"source":"ai-estimate"},
@@ -179,6 +182,16 @@ func TestGetRunCostSummary(t *testing.T) {
 	}
 	if s.Status != "ready" || s.Narrative == "" {
 		t.Errorf("status/narrative not decoded: %+v", s)
+	}
+	if len(s.EstimatedResources) != 1 {
+		t.Fatalf("estimated_resources=%d, want 1", len(s.EstimatedResources))
+	}
+	er := s.EstimatedResources[0]
+	if er.Address != "azurerm_linux_virtual_machine.web" || er.Source != "ai-estimate" {
+		t.Errorf("estimated resource not decoded / provenance lost: %+v", er)
+	}
+	if er.Monthly.Min != 70.0 || er.Basis == "" {
+		t.Errorf("estimated resource monthly/basis not decoded: %+v", er)
 	}
 	if len(s.Advisories) != 2 {
 		t.Fatalf("advisories=%d, want 2", len(s.Advisories))
