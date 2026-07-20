@@ -65,7 +65,17 @@ test.describe('Responsive harness (phone viewport)', () => {
 
     // Account has its own trigger + drawer (personal/session items + log out).
     await menu.getByRole('button', { name: /close menu/i }).click();
-    await page.getByRole('button', { name: 'Open account menu' }).click();
+    // Wait for the nav sheet to fully close before opening the account drawer.
+    // The open sheet is a full-screen `fixed … z-40` overlay covering the account
+    // trigger in the top bar; closing it unmounts the drawer via a React state
+    // update. Driving the account-open click before that unmount completes lets
+    // the click miss (the overlay still intercepts) so the account drawer never
+    // opens — the intermittent "element(s) not found" flake (#896). Gate on the
+    // sheet being gone, then on the trigger being actionable, before clicking.
+    await expect(menu).toBeHidden();
+    const accountTrigger = page.getByRole('button', { name: 'Open account menu' });
+    await expect(accountTrigger).toBeVisible();
+    await accountTrigger.click();
     const account = page.locator('#mobile-account-menu');
     await expect(account).toBeVisible();
     await expect(account.getByRole('link', { name: 'API Tokens' })).toBeVisible();
