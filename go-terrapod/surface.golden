@@ -82,6 +82,9 @@ field CostResource.Change string `json:"change"`
 field CostResource.Monthly CostRange `json:"monthly"`
 field CostResource.Name string `json:"name"`
 field CostResource.Type string `json:"type"`
+field CostStateVersion.CreatedAt string `json:"created-at"`
+field CostStateVersion.ID string `json:"id"`
+field CostStateVersion.Serial int `json:"serial"`
 field CreateAPITokenRequest.Description string
 field CreateAPITokenRequest.Kind string
 field CreateAPITokenRequest.LifespanHours int64
@@ -788,6 +791,14 @@ field Workspace.WorkingDirectory string `json:"working-directory,omitempty"`
 field WorkspaceChange.Diff map[string]any `json:"diff,omitempty"`
 field WorkspaceChange.ID string `json:"id"`
 field WorkspaceChange.Name string `json:"name"`
+field WorkspaceCostEstimate.Currency string `json:"currency"`
+field WorkspaceCostEstimate.Diff CostRange `json:"diff"`
+field WorkspaceCostEstimate.Previous CostRange `json:"previous"`
+field WorkspaceCostEstimate.Resources []CostResource `json:"resources"`
+field WorkspaceCostEstimate.StateVersion *CostStateVersion `json:"state-version"`
+field WorkspaceCostEstimate.Total CostRange `json:"total"`
+field WorkspaceCostEstimate.Unpriced []UnpricedResource `json:"unpriced"`
+field WorkspaceCostEstimate.WorkspaceID string `json:"-"`
 field WorkspaceFilter.AgentPoolID string `json:"agent_pool_id,omitempty"`
 field WorkspaceFilter.All bool `json:"all,omitempty"`
 field WorkspaceFilter.DriftStatus string `json:"drift_status,omitempty"`
@@ -944,6 +955,7 @@ method (*Client) GetVariableSet(ctx context.Context, id string) (*VariableSet, e
 method (*Client) GetVarsetVariable(ctx context.Context, varsetID, varID string) (*VariableSetVariable, error)
 method (*Client) GetWorkspace(ctx context.Context, id string) (*Workspace, error)
 method (*Client) GetWorkspaceByName(ctx context.Context, name string) (*Workspace, error)
+method (*Client) GetWorkspaceCostEstimate(ctx context.Context, workspaceID string) (*WorkspaceCostEstimate, error)
 method (*Client) IsWorkspaceAssignedToExecutionHook(ctx context.Context, hookID, workspaceID string) (bool, error)
 method (*Client) IsWorkspaceAssignedToVarset(ctx context.Context, varsetID, workspaceID string) (bool, error)
 method (*Client) ListAgentPoolTokens(ctx context.Context, poolID string) ([]AgentPoolToken, error)
@@ -1054,6 +1066,7 @@ type ConflictError struct
 type CostEstimate struct
 type CostRange struct
 type CostResource struct
+type CostStateVersion struct
 type CreateAPITokenRequest struct
 type CreateAgentPoolRequest struct
 type CreateAgentPoolTokenRequest struct
@@ -1158,6 +1171,7 @@ type WarmProviderEntry struct
 type WarmResult struct
 type Workspace struct
 type WorkspaceChange struct
+type WorkspaceCostEstimate struct
 type WorkspaceFilter struct
 type WorkspaceList struct
 type WorkspaceListOptions struct
