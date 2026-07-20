@@ -1833,6 +1833,8 @@
       "opaFull": "Zasady OPA",
       "impact": "Wpływ",
       "impactFull": "Graf wpływu",
+      "cost": "Koszt",
+      "costFull": "Szacunkowy koszt",
       "planLabel": "Plan<log>Dziennik</log>",
       "applyLabel": "Zastosuj<log>Dziennik</log>",
       "planFull": "Dziennik planu",
@@ -1955,6 +1957,29 @@
         "failed": "niepowodzenie",
         "errored": "błąd"
       }
+    },
+    "cost": {
+      "notAvailable": "Dla tego przebiegu nie jest dostępny szacunkowy koszt.",
+      "perMonth": "{amount}/mies.",
+      "monthlyTotal": "Suma miesięczna",
+      "thisRun": "Zmiana w tym przebiegu",
+      "thisRunHint": "Miesięczna zmiana wprowadzana przez ten przebieg",
+      "previous": "Przed tym przebiegiem",
+      "previousHint": "Szacowany miesięczny koszt poprzedniego stanu",
+      "pricedCount": "{count, plural, one {# zasób z ceną} few {# zasoby z ceną} many {# zasobów z ceną} other {# zasobu z ceną}}",
+      "colResource": "Zasób",
+      "colType": "Typ",
+      "colChange": "Zmiana",
+      "colMonthly": "Miesięcznie",
+      "change": {
+        "add": "Dodaj",
+        "remove": "Usuń",
+        "noop": "Bez zmian"
+      },
+      "unpricedTitle": "{count, plural, one {# zasób bez ceny} few {# zasoby bez ceny} many {# zasobów bez ceny} other {# zasobu bez ceny}}",
+      "unpricedHint": "Nic w danych cenowych nie pasowało do nich — niezmapowany typ, zasób bez bezpośredniego kosztu lub dostawca jeszcze nieobsługiwany.",
+      "indicative": "Szacunki mają charakter orientacyjny; rzeczywisty koszt zależy od użycia, regionu, zobowiązań i rabatów.",
+      "credit": "Dane o kosztach od <oiq>OpenInfraQuote</oiq>."
     }
   },
   "workspaceDetail": {

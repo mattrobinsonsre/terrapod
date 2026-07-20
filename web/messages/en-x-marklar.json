@@ -1833,6 +1833,8 @@
       "opaFull": "Marklar marklars",
       "impact": "Marklar",
       "impactFull": "Marklar marklar",
+      "cost": "Cost",
+      "costFull": "Cost estimate",
       "planLabel": "Marklar<log>Marklar</log>",
       "applyLabel": "Marklar<log>Marklar</log>",
       "planFull": "Marklar marklar",
@@ -1955,6 +1957,29 @@
         "failed": "failed",
         "errored": "errored"
       }
+    },
+    "cost": {
+      "notAvailable": "No cost estimate is available for this run.",
+      "perMonth": "{amount}/mo",
+      "monthlyTotal": "Monthly total",
+      "thisRun": "This run's change",
+      "thisRunHint": "Monthly change this run introduces",
+      "previous": "Before this run",
+      "previousHint": "Estimated monthly cost of the prior state",
+      "pricedCount": "{count, plural, one {# priced resource} other {# priced resources}}",
+      "colResource": "Resource",
+      "colType": "Type",
+      "colChange": "Change",
+      "colMonthly": "Monthly",
+      "change": {
+        "add": "Add",
+        "remove": "Remove",
+        "noop": "No change"
+      },
+      "unpricedTitle": "{count, plural, one {# unpriced resource} other {# unpriced resources}}",
+      "unpricedHint": "Nothing in the pricing data matched these — an unmapped type, a resource with no direct cost, or a provider not yet covered.",
+      "indicative": "Estimates are indicative; actual cost depends on usage, region, commitments, and discounts.",
+      "credit": "Cost data from <oiq>OpenInfraQuote</oiq>."
     }
   },
   "workspaceDetail": {

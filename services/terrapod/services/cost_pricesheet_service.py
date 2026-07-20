@@ -175,3 +175,31 @@ async def pricesheet_download_url(storage: ObjectStore) -> str:
 def pricesheet_stream(storage: ObjectStore) -> AsyncIterator[bytes]:
     """Stream the cached pricesheet's bytes (for the API state/workspace path)."""
     return storage.get_stream(cost_pricesheet_key())
+
+
+def _safe_unlink(path: str) -> None:
+    try:
+        os.unlink(path)
+    except OSError:
+        pass
+
+
+async def download_cached_to_file(storage: ObjectStore) -> str:
+    """Stream the cached pricesheet CSV to a PVC tempfile; return its path.
+
+    For the API's state/workspace cost path: the native engine reads the sheet
+    as a local text file, and it's ~20 MB decompressed, so it lands on the
+    attached PVC (rule 14), streamed off the event loop (rule 13). The caller
+    owns the returned path and MUST unlink it. Raises ``ObjectNotFoundError`` if
+    no sheet is cached (call :func:`ensure_pricesheet` first).
+    """
+    tmpdir = _resolve_ephemeral_tmpdir()
+    fd, path = await asyncio.to_thread(tempfile.mkstemp, suffix=".csv", dir=tmpdir)
+    await asyncio.to_thread(os.close, fd)
+    try:
+        async for chunk in storage.get_stream(cost_pricesheet_key()):
+            await asyncio.to_thread(_append_chunk, path, chunk)
+    except BaseException:
+        await asyncio.to_thread(_safe_unlink, path)
+        raise
+    return path

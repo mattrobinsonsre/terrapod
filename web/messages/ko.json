@@ -1833,6 +1833,8 @@
       "opaFull": "OPA 정책",
       "impact": "영향",
       "impactFull": "영향 그래프",
+      "cost": "비용",
+      "costFull": "비용 추정치",
       "planLabel": "계획<log>로그</log>",
       "applyLabel": "적용<log>로그</log>",
       "planFull": "계획 로그",
@@ -1955,6 +1957,29 @@
         "failed": "실패",
         "errored": "오류"
       }
+    },
+    "cost": {
+      "notAvailable": "이 실행에 대한 비용 추정치가 없습니다.",
+      "perMonth": "{amount}/월",
+      "monthlyTotal": "월 합계",
+      "thisRun": "이 실행의 변경",
+      "thisRunHint": "이 실행으로 인한 월간 변경",
+      "previous": "이 실행 전",
+      "previousHint": "이전 상태의 예상 월 비용",
+      "pricedCount": "{count, plural, other {가격이 산정된 리소스 #개}}",
+      "colResource": "리소스",
+      "colType": "유형",
+      "colChange": "변경",
+      "colMonthly": "월간",
+      "change": {
+        "add": "추가",
+        "remove": "제거",
+        "noop": "변경 없음"
+      },
+      "unpricedTitle": "{count, plural, other {가격이 없는 리소스 #개}}",
+      "unpricedHint": "가격 데이터에서 일치하는 항목이 없습니다. 매핑되지 않은 유형, 직접 비용이 없는 리소스 또는 아직 지원되지 않는 공급자입니다.",
+      "indicative": "추정치는 참고용이며, 실제 비용은 사용량, 리전, 약정, 할인에 따라 달라집니다.",
+      "credit": "비용 데이터 제공: <oiq>OpenInfraQuote</oiq>."
     }
   },
   "workspaceDetail": {

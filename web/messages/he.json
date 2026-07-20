@@ -1833,6 +1833,8 @@
       "opaFull": "מדיניות OPA",
       "impact": "השפעה",
       "impactFull": "גרף השפעה",
+      "cost": "עלות",
+      "costFull": "אומדן עלות",
       "planLabel": "תכנון<log>יומן</log>",
       "applyLabel": "יישום<log>יומן</log>",
       "planFull": "יומן תכנון",
@@ -1955,6 +1957,29 @@
         "failed": "נכשל",
         "errored": "שגיאה"
       }
+    },
+    "cost": {
+      "notAvailable": "אין אומדן עלות זמין להרצה זו.",
+      "perMonth": "{amount}/חודש",
+      "monthlyTotal": "סך חודשי",
+      "thisRun": "השינוי בהרצה זו",
+      "thisRunHint": "השינוי החודשי שהרצה זו מביאה",
+      "previous": "לפני הרצה זו",
+      "previousHint": "העלות החודשית המשוערת של המצב הקודם",
+      "pricedCount": "{count, plural, one {# משאב מתומחר} two {# משאבים מתומחרים} many {# משאבים מתומחרים} other {# משאבים מתומחרים}}",
+      "colResource": "משאב",
+      "colType": "סוג",
+      "colChange": "שינוי",
+      "colMonthly": "חודשי",
+      "change": {
+        "add": "הוספה",
+        "remove": "הסרה",
+        "noop": "ללא שינוי"
+      },
+      "unpricedTitle": "{count, plural, one {# משאב לא מתומחר} two {# משאבים לא מתומחרים} many {# משאבים לא מתומחרים} other {# משאבים לא מתומחרים}}",
+      "unpricedHint": "שום דבר בנתוני התמחור לא תאם אותם — סוג לא ממופה, משאב ללא עלות ישירה, או ספק שעדיין אינו נתמך.",
+      "indicative": "האומדנים הם להמחשה בלבד; העלות בפועל תלויה בשימוש, באזור, בהתחייבויות ובהנחות.",
+      "credit": "נתוני עלות מ־<oiq>OpenInfraQuote</oiq>."
     }
   },
   "workspaceDetail": {

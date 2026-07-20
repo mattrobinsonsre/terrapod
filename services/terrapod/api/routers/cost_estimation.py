@@ -11,12 +11,14 @@ Cost estimates are powered by OpenInfraQuote
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.responses import RedirectResponse
+from fastapi import APIRouter, Depends, HTTPException, Path, status
+from fastapi.responses import JSONResponse, RedirectResponse
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user, require_admin
 from terrapod.config import settings
-from terrapod.services import cost_pricesheet_service
+from terrapod.db.session import get_db
+from terrapod.services import cost_pricesheet_service, workspace_cost_service
 from terrapod.storage import get_storage
 from terrapod.storage.protocol import ObjectStore
 
@@ -44,6 +46,47 @@ async def download_pricesheet(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_NOT_CACHED_DETAIL)
     url = await cost_pricesheet_service.pricesheet_download_url(storage)
     return RedirectResponse(url=url, status_code=status.HTTP_302_FOUND)
+
+
+@router.get("/workspaces/{workspace_id}/cost-estimate")
+async def show_workspace_cost_estimate(
+    workspace_id: str = Path(...),
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Current monthly cost of a workspace's managed infrastructure (#871).
+
+    Terrapod-native. Runs the workspace's latest state version through the native
+    OpenInfraQuote-port cost engine server-side and returns the estimate — the
+    *state* analogue of the run Cost tab's plan-*delta* estimate. Same
+    ``currency/total/previous/diff/resources/unpriced`` shape, plus a
+    ``state-version`` meta naming the priced version (null when the workspace has
+    no state yet). Every figure is **data** (`oiq`-derived); no AI is involved.
+    Gated on ``state:read`` (the estimate derives from the state blob). 404 when
+    cost estimation is disabled; 503 when no pricesheet is available.
+    """
+    if not settings.cost_estimation.enabled:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_DISABLED_DETAIL)
+    try:
+        attrs = await workspace_cost_service.estimate_workspace_cost(db, user, workspace_id)
+    except workspace_cost_service.PricesheetUnavailable as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
+        ) from exc
+
+    ws_short = workspace_id.removeprefix("ws-")
+    return JSONResponse(
+        content={
+            "data": {
+                "id": f"workspace-cost-{ws_short}",
+                "type": "workspace-cost-estimates",
+                "attributes": attrs,
+                "relationships": {
+                    "workspace": {"data": {"id": f"ws-{ws_short}", "type": "workspaces"}},
+                },
+            }
+        }
+    )
 
 
 @router.get("/cost-estimation/pricesheet/status")

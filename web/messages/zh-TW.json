@@ -1833,6 +1833,8 @@
       "opaFull": "OPA 策略",
       "impact": "影響",
       "impactFull": "影響圖",
+      "cost": "成本",
+      "costFull": "成本估算",
       "planLabel": "計畫<log>日誌</log>",
       "applyLabel": "應用<log>日誌</log>",
       "planFull": "計畫日誌",
@@ -1955,6 +1957,29 @@
         "failed": "失敗",
         "errored": "已出錯"
       }
+    },
+    "cost": {
+      "notAvailable": "此次執行沒有可用的成本估算。",
+      "perMonth": "{amount}/月",
+      "monthlyTotal": "每月總計",
+      "thisRun": "本次執行的變更",
+      "thisRunHint": "本次執行帶來的每月變更",
+      "previous": "本次執行之前",
+      "previousHint": "先前狀態的預估每月成本",
+      "pricedCount": "{count, plural, other {# 個已計價資源}}",
+      "colResource": "資源",
+      "colType": "類型",
+      "colChange": "變更",
+      "colMonthly": "每月",
+      "change": {
+        "add": "新增",
+        "remove": "移除",
+        "noop": "無變更"
+      },
+      "unpricedTitle": "{count, plural, other {# 個未計價資源}}",
+      "unpricedHint": "定價資料中沒有與這些資源相符的項目——未對應的類型、沒有直接成本的資源，或尚未支援的供應商。",
+      "indicative": "估算僅供參考；實際成本取決於使用量、區域、承諾用量與折扣。",
+      "credit": "成本資料來自 <oiq>OpenInfraQuote</oiq>。"
     }
   },
   "workspaceDetail": {

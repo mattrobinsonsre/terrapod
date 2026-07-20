@@ -24,6 +24,10 @@ const ImpactGraph = dynamic(() => import('@/components/impact-graph').then((m) =
   ssr: false,
   loading: () => <LoadingSpinner />,
 })
+// Cost tab (#871) — loaded on demand; data-only oiq cost breakdown.
+const CostPanel = dynamic(() => import('@/components/cost-panel').then((m) => m.CostPanel), {
+  loading: () => <LoadingSpinner />,
+})
 
 interface RunActions {
   'is-confirmable': boolean
@@ -53,6 +57,7 @@ interface RunAttrs {
   'vcs-pull-request-number': number | null
   'has-changes': boolean
   'has-json-output'?: boolean
+  'has-cost-estimate'?: boolean
   'plan-summary': {
     add: number
     change: number
@@ -97,7 +102,7 @@ interface PlanApply {
 // more to show has its own tab — AI analysis and OPA policy only appear when
 // the run actually has them. Details holds the metadata / timeline / run
 // options / resource usage.
-type RunView = 'overview' | 'ai' | 'opa' | 'impact' | 'plan' | 'apply' | 'details'
+type RunView = 'overview' | 'ai' | 'opa' | 'impact' | 'cost' | 'plan' | 'apply' | 'details'
 
 const ansiConverter = new Convert({
   fg: '#cbd5e1',
@@ -597,7 +602,7 @@ function RunDetailPageInner() {
   // onto the matching tab, so old links from the runs list and the
   // confirm-redirect keep working.
   const viewParam = searchParams.get('view')
-  const KNOWN_VIEWS: RunView[] = ['overview', 'ai', 'opa', 'impact', 'plan', 'apply', 'details']
+  const KNOWN_VIEWS: RunView[] = ['overview', 'ai', 'opa', 'impact', 'cost', 'plan', 'apply', 'details']
   const initialView: RunView = KNOWN_VIEWS.includes(viewParam as RunView)
     ? (viewParam as RunView)
     : viewParam === 'logs' || tabParam === 'plan'
@@ -919,6 +924,9 @@ function RunDetailPageInner() {
     ...((policyInfo?.present ? [['opa', t('tabs.opa'), t('tabs.opaFull')]] : []) as [RunView, React.ReactNode, string][]),
     ...((attrs['has-json-output']
       ? [['impact', t('tabs.impact'), t('tabs.impactFull')]]
+      : []) as [RunView, React.ReactNode, string][]),
+    ...((attrs['has-cost-estimate']
+      ? [['cost', t('tabs.cost'), t('tabs.costFull')]]
       : []) as [RunView, React.ReactNode, string][]),
     ['plan', planLabel, t('tabs.planFull')],
     ...((attrs['plan-only'] ? [] : [['apply', applyLabel, t('tabs.applyFull')]]) as [RunView, React.ReactNode, string][]),

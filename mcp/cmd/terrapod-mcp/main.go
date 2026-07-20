@@ -46,13 +46,17 @@ func main() {
 		fmt.Fprintln(os.Stderr, "terrapod-mcp:", err)
 		os.Exit(1)
 	}
+	// A token from the credentials file can be refreshed live on a 401 (a
+	// `tofu login` re-write); an explicit --token / $TERRAPOD_TOKEN is static.
+	refreshFromFile := *token == "" && os.Getenv("TERRAPOD_TOKEN") == ""
 
 	srv, client, err := mcpserver.New(mcpserver.Config{
-		Host:          *host,
-		Name:          *name,
-		Token:         tok,
-		EnvHint:       *envHint,
-		SkipTLSVerify: *skipTLS,
+		Host:                 *host,
+		Name:                 *name,
+		Token:                tok,
+		EnvHint:              *envHint,
+		SkipTLSVerify:        *skipTLS,
+		RefreshTokenFromFile: refreshFromFile,
 	})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "terrapod-mcp:", err)

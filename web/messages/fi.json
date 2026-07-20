@@ -1833,6 +1833,8 @@
       "opaFull": "OPA-käytännöt",
       "impact": "Vaikutus",
       "impactFull": "Vaikutusgraafi",
+      "cost": "Kustannus",
+      "costFull": "Kustannusarvio",
       "planLabel": "Suunnitelma<log>Loki</log>",
       "applyLabel": "Käyttöönotto<log>Loki</log>",
       "planFull": "Suunnitelmaloki",
@@ -1955,6 +1957,29 @@
         "failed": "epäonnistui",
         "errored": "virhe"
       }
+    },
+    "cost": {
+      "notAvailable": "Tälle ajolle ei ole saatavilla kustannusarviota.",
+      "perMonth": "{amount}/kk",
+      "monthlyTotal": "Kuukausisumma",
+      "thisRun": "Tämän ajon muutos",
+      "thisRunHint": "Tämän ajon tuoma kuukausittainen muutos",
+      "previous": "Ennen tätä ajoa",
+      "previousHint": "Aiemman tilan arvioitu kuukausikustannus",
+      "pricedCount": "{count, plural, one {# hinnoiteltu resurssi} other {# hinnoiteltua resurssia}}",
+      "colResource": "Resurssi",
+      "colType": "Tyyppi",
+      "colChange": "Muutos",
+      "colMonthly": "Kuukausittain",
+      "change": {
+        "add": "Lisää",
+        "remove": "Poista",
+        "noop": "Ei muutosta"
+      },
+      "unpricedTitle": "{count, plural, one {# hinnoittelematon resurssi} other {# hinnoittelematonta resurssia}}",
+      "unpricedHint": "Hinnoittelutiedoista ei löytynyt vastaavuutta näille — kartoittamaton tyyppi, resurssi ilman suoraa kustannusta tai palveluntarjoaja, jota ei vielä tueta.",
+      "indicative": "Arviot ovat suuntaa antavia; todellinen kustannus riippuu käytöstä, alueesta, sitoumuksista ja alennuksista.",
+      "credit": "Kustannustiedot: <oiq>OpenInfraQuote</oiq>."
     }
   },
   "workspaceDetail": {
