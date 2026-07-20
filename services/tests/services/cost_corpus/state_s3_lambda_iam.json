@@ -1,0 +1,31 @@
+{
+  "format_version": "1.0",
+  "terraform_version": "1.9.0",
+  "values": {
+    "root_module": {
+      "resources": [
+        {
+          "address": "aws_s3_bucket.assets",
+          "mode": "managed",
+          "type": "aws_s3_bucket",
+          "name": "assets",
+          "values": { "bucket": "assets" }
+        },
+        {
+          "address": "aws_lambda_function.fn",
+          "mode": "managed",
+          "type": "aws_lambda_function",
+          "name": "fn",
+          "values": { "memory_size": 512, "architectures": ["x86_64"] }
+        },
+        {
+          "address": "aws_iam_role.r",
+          "mode": "managed",
+          "type": "aws_iam_role",
+          "name": "r",
+          "values": { "name": "r" }
+        }
+      ]
+    }
+  }
+}

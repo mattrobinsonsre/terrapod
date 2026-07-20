@@ -46,6 +46,16 @@ Full request/response shapes are in the [API reference](api-reference.md#cost-es
 - **AI agents (MCP)** — the [`terrapod-mcp`](mcp.md) server exposes `terrapod_run_cost` and `terrapod_workspace_cost` read-only tools, so an agent can reason about the price of a change alongside its plan JSON.
 - **Go SDK** — [`go-terrapod`](terraform-provider.md) exposes `GetRunCostEstimate` and `GetWorkspaceCostEstimate`.
 
+## Correctness — proven against the real oiq
+
+The estimates are **deterministic data**, and Terrapod proves the ported engine
+is faithful: a CI **differential oracle** runs the genuine `oiq` binary over a
+committed plan/state corpus and asserts the native engine agrees bit-exact on
+the *same* pricesheet. Because the assertion is engine-agreement (not a fixed
+dollar figure), a daily pricesheet refresh moves both engines together and the
+test stays valid. The binary lives only in CI as the oracle — no third-party
+cost binary is ever shipped in a Terrapod image.
+
 ## AI enhancement (separate, optional)
 
 The figures above are always **authoritative oiq-derived data**. An optional AI *enhancement* — a plain-language narrative plus savings advisories (Savings Plans / reserved-instance / spot) — rides the existing [plan-analysis AI switch](ai-plan-summary.md) and renders alongside the data, always flagged distinctly. AI dollar figures are marked `source: ai-estimate` and are **never** blended into the authoritative total and never a gate. With AI disabled, only the data view is shown.
