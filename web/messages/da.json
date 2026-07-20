@@ -1979,7 +1979,9 @@
       "unpricedTitle": "{count, plural, one {# ikke-prissat ressource} other {# ikke-prissatte ressourcer}}",
       "unpricedHint": "Intet i prisdataene matchede disse — en ikke-tilknyttet type, en ressource uden direkte omkostning eller en udbyder, der endnu ikke er dækket.",
       "indicative": "Estimaterne er vejledende; den faktiske omkostning afhænger af forbrug, region, forpligtelser og rabatter.",
-      "credit": "Omkostningsdata fra <oiq>OpenInfraQuote</oiq>."
+      "credit": "Omkostningsdata fra <oiq>OpenInfraQuote</oiq>.",
+      "asOfState": "pr. tilstand v{serial}",
+      "noState": "Ingen omkostning endnu — vises efter første anvendelse."
     }
   },
   "workspaceDetail": {
@@ -2022,17 +2024,18 @@
       "onboard": "Onboard"
     },
     "tabs": {
-      "overview": "Oversigt",
+      "configuration": "Konfiguration",
       "variables": "Variabler",
       "runs": "Kørsler",
       "state": "Tilstand",
       "stateGraph": "Tilstandsgraf",
-      "configurations": "Konfigurationer",
+      "versions": "Versioner",
       "notifications": "Notifikationer",
       "runTasks": "Kørselsopgaver",
       "runTriggers": "Kørselstriggere",
       "sharing": "Deling",
-      "selectLabel": "Arbejdsområdesektion"
+      "selectLabel": "Arbejdsområdesektion",
+      "cost": "Omkostning"
     },
     "lifecycle": {
       "pendingDeletion": "Afventer sletning",

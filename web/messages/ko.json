@@ -1979,7 +1979,9 @@
       "unpricedTitle": "{count, plural, other {가격이 없는 리소스 #개}}",
       "unpricedHint": "가격 데이터에서 일치하는 항목이 없습니다. 매핑되지 않은 유형, 직접 비용이 없는 리소스 또는 아직 지원되지 않는 공급자입니다.",
       "indicative": "추정치는 참고용이며, 실제 비용은 사용량, 리전, 약정, 할인에 따라 달라집니다.",
-      "credit": "비용 데이터 제공: <oiq>OpenInfraQuote</oiq>."
+      "credit": "비용 데이터 제공: <oiq>OpenInfraQuote</oiq>.",
+      "asOfState": "상태 v{serial} 기준",
+      "noState": "아직 비용이 없습니다 — 첫 적용 후에 표시됩니다."
     }
   },
   "workspaceDetail": {
@@ -2022,17 +2024,18 @@
       "onboard": "온보딩"
     },
     "tabs": {
-      "overview": "개요",
+      "configuration": "구성",
       "variables": "변수",
       "runs": "실행",
       "state": "상태",
       "stateGraph": "상태 그래프",
-      "configurations": "구성",
+      "versions": "버전",
       "notifications": "알림",
       "runTasks": "실행 작업",
       "runTriggers": "실행 트리거",
       "sharing": "공유",
-      "selectLabel": "워크스페이스 섹션"
+      "selectLabel": "워크스페이스 섹션",
+      "cost": "비용"
     },
     "lifecycle": {
       "pendingDeletion": "삭제 대기 중",

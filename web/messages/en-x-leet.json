@@ -1979,7 +1979,9 @@
       "unpricedTitle": "{count, plural, one {# unpriced resource} other {# unpriced resources}}",
       "unpricedHint": "Nothing in the pricing data matched these — an unmapped type, a resource with no direct cost, or a provider not yet covered.",
       "indicative": "Estimates are indicative; actual cost depends on usage, region, commitments, and discounts.",
-      "credit": "Cost data from <oiq>OpenInfraQuote</oiq>."
+      "credit": "Cost data from <oiq>OpenInfraQuote</oiq>.",
+      "asOfState": "as of state v{serial}",
+      "noState": "No cost yet — appears after the first apply."
     }
   },
   "workspaceDetail": {
@@ -2022,17 +2024,18 @@
       "onboard": "Onboard"
     },
     "tabs": {
-      "overview": "0v3rv13w",
+      "configuration": "C0nf1gur4710n",
       "variables": "V4r14bl35",
       "runs": "Run5",
       "state": "57473",
       "stateGraph": "57473 Gr4ph",
-      "configurations": "C0nf1gur4710n5",
+      "versions": "V3r510n5",
       "notifications": "N071f1c4710n5",
       "runTasks": "Run 745k5",
       "runTriggers": "Run 7r1gg3r5",
       "sharing": "5h4r1ng",
-      "selectLabel": "W0rk5p4c3 53c710n"
+      "selectLabel": "W0rk5p4c3 53c710n",
+      "cost": "C057"
     },
     "lifecycle": {
       "pendingDeletion": "P3nd1ng d3l3710n",

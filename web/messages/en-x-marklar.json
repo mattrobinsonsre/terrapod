@@ -1979,7 +1979,9 @@
       "unpricedTitle": "{count, plural, one {# unpriced resource} other {# unpriced resources}}",
       "unpricedHint": "Nothing in the pricing data matched these — an unmapped type, a resource with no direct cost, or a provider not yet covered.",
       "indicative": "Estimates are indicative; actual cost depends on usage, region, commitments, and discounts.",
-      "credit": "Cost data from <oiq>OpenInfraQuote</oiq>."
+      "credit": "Cost data from <oiq>OpenInfraQuote</oiq>.",
+      "asOfState": "as of marklar v{serial}",
+      "noState": "No marklar yet — appears after the first marklar."
     }
   },
   "workspaceDetail": {
@@ -2022,17 +2024,18 @@
       "onboard": "Onboard"
     },
     "tabs": {
-      "overview": "Marklar",
+      "configuration": "Marklar",
       "variables": "Marklars",
       "runs": "Marklars",
       "state": "Marklar",
       "stateGraph": "Marklar Marklar",
-      "configurations": "Marklars",
+      "versions": "Marklars",
       "notifications": "Marklars",
       "runTasks": "Run Marklars",
       "runTriggers": "Run Marklars",
       "sharing": "Marklar",
-      "selectLabel": "Marklar marklar"
+      "selectLabel": "Marklar marklar",
+      "cost": "Marklar"
     },
     "lifecycle": {
       "pendingDeletion": "Pending marklar",

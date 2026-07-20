@@ -1979,7 +1979,9 @@
       "unpricedTitle": "{count, plural, one {# risorsa senza prezzo} other {# risorse senza prezzo}}",
       "unpricedHint": "Nessun elemento nei dati sui prezzi corrispondeva a questi: un tipo non mappato, una risorsa senza costo diretto o un provider non ancora supportato.",
       "indicative": "Le stime sono indicative; il costo effettivo dipende da utilizzo, regione, impegni e sconti.",
-      "credit": "Dati sui costi da <oiq>OpenInfraQuote</oiq>."
+      "credit": "Dati sui costi da <oiq>OpenInfraQuote</oiq>.",
+      "asOfState": "allo stato v{serial}",
+      "noState": "Nessun costo ancora — compare dopo la prima applicazione."
     }
   },
   "workspaceDetail": {
@@ -2022,17 +2024,18 @@
       "onboard": "Importa"
     },
     "tabs": {
-      "overview": "Panoramica",
+      "configuration": "Configurazione",
       "variables": "Variabili",
       "runs": "Esecuzioni",
       "state": "Stato",
       "stateGraph": "Grafico dello stato",
-      "configurations": "Configurazioni",
+      "versions": "Versioni",
       "notifications": "Notifiche",
       "runTasks": "Run task",
       "runTriggers": "Run trigger",
       "sharing": "Condivisione",
-      "selectLabel": "Sezione del workspace"
+      "selectLabel": "Sezione del workspace",
+      "cost": "Costo"
     },
     "lifecycle": {
       "pendingDeletion": "Eliminazione in attesa",

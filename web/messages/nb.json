@@ -1979,7 +1979,9 @@
       "unpricedTitle": "{count, plural, one {# ikke-priset ressurs} other {# ikke-prisede ressurser}}",
       "unpricedHint": "Ingenting i prisdataene samsvarte med disse — en ikke-tilordnet type, en ressurs uten direkte kostnad eller en leverandør som ennå ikke støttes.",
       "indicative": "Estimatene er veiledende; den faktiske kostnaden avhenger av bruk, region, forpliktelser og rabatter.",
-      "credit": "Kostnadsdata fra <oiq>OpenInfraQuote</oiq>."
+      "credit": "Kostnadsdata fra <oiq>OpenInfraQuote</oiq>.",
+      "asOfState": "per tilstand v{serial}",
+      "noState": "Ingen kostnad ennå — vises etter første anvendelse."
     }
   },
   "workspaceDetail": {
@@ -2022,17 +2024,18 @@
       "onboard": "Onboard"
     },
     "tabs": {
-      "overview": "Oversikt",
+      "configuration": "Konfigurasjon",
       "variables": "Variabler",
       "runs": "Kjøringer",
       "state": "Tilstand",
       "stateGraph": "Tilstandsgraf",
-      "configurations": "Konfigurasjoner",
+      "versions": "Versjoner",
       "notifications": "Varsler",
       "runTasks": "Kjøringsoppgaver",
       "runTriggers": "Kjøringsutløsere",
       "sharing": "Deling",
-      "selectLabel": "Arbeidsområdeseksjon"
+      "selectLabel": "Arbeidsområdeseksjon",
+      "cost": "Kostnad"
     },
     "lifecycle": {
       "pendingDeletion": "Venter på sletting",

@@ -1979,7 +1979,9 @@
       "unpricedTitle": "{count, plural, other {# 个未计价资源}}",
       "unpricedHint": "定价数据中没有与这些资源匹配的项——未映射的类型、无直接成本的资源，或尚未支持的提供商。",
       "indicative": "估算仅供参考；实际成本取决于使用量、区域、承诺用量和折扣。",
-      "credit": "成本数据来自 <oiq>OpenInfraQuote</oiq>。"
+      "credit": "成本数据来自 <oiq>OpenInfraQuote</oiq>。",
+      "asOfState": "截至状态 v{serial}",
+      "noState": "暂无成本 — 首次应用后显示。"
     }
   },
   "workspaceDetail": {
@@ -2022,17 +2024,18 @@
       "onboard": "导入"
     },
     "tabs": {
-      "overview": "概览",
+      "configuration": "配置",
       "variables": "变量",
       "runs": "运行",
       "state": "状态",
       "stateGraph": "状态图",
-      "configurations": "配置",
+      "versions": "版本",
       "notifications": "通知",
       "runTasks": "运行任务",
       "runTriggers": "运行触发器",
       "sharing": "共享",
-      "selectLabel": "工作区部分"
+      "selectLabel": "工作区部分",
+      "cost": "成本"
     },
     "lifecycle": {
       "pendingDeletion": "待删除",

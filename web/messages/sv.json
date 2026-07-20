@@ -1979,7 +1979,9 @@
       "unpricedTitle": "{count, plural, one {# oprissatt resurs} other {# oprissatta resurser}}",
       "unpricedHint": "Inget i prisdata matchade dessa — en icke mappad typ, en resurs utan direkt kostnad eller en leverantör som ännu inte stöds.",
       "indicative": "Uppskattningarna är vägledande; den faktiska kostnaden beror på användning, region, åtaganden och rabatter.",
-      "credit": "Kostnadsdata från <oiq>OpenInfraQuote</oiq>."
+      "credit": "Kostnadsdata från <oiq>OpenInfraQuote</oiq>.",
+      "asOfState": "enligt tillstånd v{serial}",
+      "noState": "Ingen kostnad ännu — visas efter första tillämpningen."
     }
   },
   "workspaceDetail": {
@@ -2022,17 +2024,18 @@
       "onboard": "Onboarda"
     },
     "tabs": {
-      "overview": "Översikt",
+      "configuration": "Konfiguration",
       "variables": "Variabler",
       "runs": "Körningar",
       "state": "Tillstånd",
       "stateGraph": "Tillståndsgraf",
-      "configurations": "Konfigurationer",
+      "versions": "Versioner",
       "notifications": "Aviseringar",
       "runTasks": "Körningsuppgifter",
       "runTriggers": "Körningsutlösare",
       "sharing": "Delning",
-      "selectLabel": "Arbetsytesektion"
+      "selectLabel": "Arbetsytesektion",
+      "cost": "Kostnad"
     },
     "lifecycle": {
       "pendingDeletion": "Väntar på borttagning",

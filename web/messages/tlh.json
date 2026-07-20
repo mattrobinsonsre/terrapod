@@ -1979,7 +1979,9 @@
       "unpricedTitle": "{count, plural, one {# unpriced resource} other {# unpriced resources}}",
       "unpricedHint": "Nothing in the pricing data matched these — an unmapped type, a resource with no direct cost, or a provider not yet covered.",
       "indicative": "Estimates are indicative; actual cost depends on usage, region, commitments, and discounts.",
-      "credit": "Cost data from <oiq>OpenInfraQuote</oiq>."
+      "credit": "Cost data from <oiq>OpenInfraQuote</oiq>.",
+      "asOfState": "Dotlh v{serial} rurlaw'",
+      "noState": "wagh tu'lu'be' — wa'DIch lo' ghevqo' 'ej cha'lu'."
     }
   },
   "workspaceDetail": {
@@ -2022,17 +2024,18 @@
       "onboard": "Onboard"
     },
     "tabs": {
-      "overview": "'aqroS",
+      "configuration": "numtaH",
       "variables": "choHlaHmey",
       "runs": "Sarmey",
       "state": "Dotlh",
       "stateGraph": "Dotlh chart",
-      "configurations": "numtaHmey",
+      "versions": "choHmey",
       "notifications": "QInmey",
       "runTasks": "Sar Qu'mey",
       "runTriggers": "Sar taghwI'mey",
       "sharing": "HuvmoH",
-      "selectLabel": "Qumwo' 'ay'"
+      "selectLabel": "Qumwo' 'ay'",
+      "cost": "wagh"
     },
     "lifecycle": {
       "pendingDeletion": "Qaw' loStaH",

@@ -110,6 +110,14 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
     },
     {
+      // #871: the workspace Cost tab (current managed-infra cost from state) +
+      // the Overview→Configuration / Configurations→Versions tab renames
+      // (query string carries the new keys).
+      name: 'workspace-cost-tab',
+      testMatch: 'workspace-cost-tab.spec.ts',
+      use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
+    },
+    {
       // #884: a >10MB upload must stream through the BFF proxy chain (the
       // streaming Route Handler, not the body-capping middleware). Drives raw
       // HTTP through BASE_URL, so no browser storageState is needed.

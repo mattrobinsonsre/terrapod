@@ -17,6 +17,7 @@ import { WorkspacePicker } from '@/components/workspace-picker'
 import { SensitiveValueInput } from '@/components/sensitive-value-input'
 import { MobileCardList, MobileCard } from '@/components/mobile-card-list'
 import { StateGraphTab } from '@/components/state-graph-tab'
+import { CostPanel } from '@/components/cost-panel'
 import { useIsTouch } from '@/lib/use-media-query'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch, fetchAllPages } from '@/lib/api'
@@ -217,9 +218,9 @@ const ALL_TRIGGERS = [
 const ALL_STAGES = ['pre_plan', 'post_plan', 'pre_apply'] as const
 const ALL_ENFORCEMENT_LEVELS = ['mandatory', 'advisory'] as const
 
-type Tab = 'overview' | 'variables' | 'runs' | 'state' | 'state-graph' | 'configurations' | 'notifications' | 'run-tasks' | 'run-triggers' | 'sharing'
+type Tab = 'configuration' | 'variables' | 'runs' | 'state' | 'state-graph' | 'cost' | 'versions' | 'notifications' | 'run-tasks' | 'run-triggers' | 'sharing'
 
-const VALID_TABS: Set<string> = new Set(['overview', 'variables', 'runs', 'state', 'state-graph', 'configurations', 'notifications', 'run-tasks', 'run-triggers', 'sharing'])
+const VALID_TABS: Set<string> = new Set(['configuration', 'variables', 'runs', 'state', 'state-graph', 'cost', 'versions', 'notifications', 'run-tasks', 'run-triggers', 'sharing'])
 
 export default function WorkspaceDetailPage() {
   return (
@@ -236,8 +237,8 @@ function WorkspaceDetailContent() {
   const searchParams = useSearchParams()
   const workspaceId = params.id as string
 
-  const tabParam = searchParams.get('tab') || 'overview'
-  const activeTab: Tab = VALID_TABS.has(tabParam) ? (tabParam as Tab) : 'overview'
+  const tabParam = searchParams.get('tab') || 'configuration'
+  const activeTab: Tab = VALID_TABS.has(tabParam) ? (tabParam as Tab) : 'configuration'
 
   function setActiveTab(tab: Tab) {
     router.replace(`?tab=${tab}`, { scroll: false })
@@ -540,7 +541,7 @@ function WorkspaceDetailContent() {
     if (activeTab === 'runs') loadRuns()
     if (activeTab === 'state') loadStateVersions()
     if (activeTab === 'sharing') loadRemoteStateConsumers()
-    if (activeTab === 'configurations') loadConfigurations()
+    if (activeTab === 'versions') loadConfigurations()
     if (activeTab === 'notifications') loadNotifications()
     if (activeTab === 'run-tasks') loadRunTasks()
     if (activeTab === 'run-triggers') loadRunTriggers()
@@ -1548,12 +1549,13 @@ function WorkspaceDetailContent() {
   }
 
   const tabs: { key: Tab; label: string }[] = [
-    { key: 'overview', label: t('tabs.overview') },
+    { key: 'configuration', label: t('tabs.configuration') },
     { key: 'variables', label: t('tabs.variables') },
     { key: 'runs', label: t('tabs.runs') },
     { key: 'state', label: t('tabs.state') },
     { key: 'state-graph', label: t('tabs.stateGraph') },
-    { key: 'configurations', label: t('tabs.configurations') },
+    { key: 'cost', label: t('tabs.cost') },
+    { key: 'versions', label: t('tabs.versions') },
     { key: 'notifications', label: t('tabs.notifications') },
     { key: 'run-tasks', label: t('tabs.runTasks') },
     { key: 'run-triggers', label: t('tabs.runTriggers') },
@@ -1725,8 +1727,8 @@ function WorkspaceDetailContent() {
           </div>
         </div>
 
-        {/* Overview Tab */}
-        {activeTab === 'overview' && (
+        {/* Configuration Tab (workspace settings) */}
+        {activeTab === 'configuration' && (
           <div className="space-y-6">
             <HealthConditions conditions={attrs['health-conditions'] || []} />
             <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-6">
@@ -3333,8 +3335,13 @@ function WorkspaceDetailContent() {
           <StateGraphTab workspaceId={workspace.id} />
         )}
 
-        {/* Configurations Tab */}
-        {activeTab === 'configurations' && (
+        {/* Cost Tab (#871) — current managed-infra cost from latest state */}
+        {activeTab === 'cost' && workspace && (
+          <CostPanel workspaceId={workspace.id} />
+        )}
+
+        {/* Versions Tab (configuration versions) */}
+        {activeTab === 'versions' && (
           <div>
             <div className="flex items-center justify-between mb-4">
               <p className="text-sm text-slate-400">

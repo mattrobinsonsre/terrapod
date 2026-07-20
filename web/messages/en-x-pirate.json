@@ -1979,7 +1979,9 @@
       "unpricedTitle": "{count, plural, one {# unpriced resource} other {# unpriced resources}}",
       "unpricedHint": "Nothing in the pricing data matched these — an unmapped type, a resource with no direct cost, or a provider not yet covered.",
       "indicative": "Estimates are indicative; actual cost depends on usage, region, commitments, and discounts.",
-      "credit": "Cost data from <oiq>OpenInfraQuote</oiq>."
+      "credit": "Cost data from <oiq>OpenInfraQuote</oiq>.",
+      "asOfState": "as o' state v{serial}",
+      "noState": "No booty yet — appears after th' first apply."
     }
   },
   "workspaceDetail": {
@@ -2022,17 +2024,18 @@
       "onboard": "Onboard"
     },
     "tabs": {
-      "overview": "Overview",
+      "configuration": "Riggin''",
       "variables": "Variables",
       "runs": "Voyages",
       "state": "State",
       "stateGraph": "State Graph",
-      "configurations": "Riggin''s",
+      "versions": "Versions",
       "notifications": "Notifications",
       "runTasks": "Voyage Tasks",
       "runTriggers": "Voyage Triggers",
       "sharing": "Sharin''",
-      "selectLabel": "Work-deck section"
+      "selectLabel": "Work-deck section",
+      "cost": "Booty"
     },
     "lifecycle": {
       "pendingDeletion": "Pendin'' send t'' Davy Jones",

@@ -1979,7 +1979,9 @@
       "unpricedTitle": "{count, plural, one {# منبع قیمت‌گذاری‌نشده} other {# منبع قیمت‌گذاری‌نشده}}",
       "unpricedHint": "چیزی در داده‌های قیمت‌گذاری با این‌ها مطابقت نداشت — نوع نگاشت‌نشده، منبعی بدون هزینه مستقیم، یا ارائه‌دهنده‌ای که هنوز پشتیبانی نمی‌شود.",
       "indicative": "برآوردها تقریبی هستند؛ هزینه واقعی به میزان استفاده، ناحیه، تعهدات و تخفیف‌ها بستگی دارد.",
-      "credit": "داده‌های هزینه از <oiq>OpenInfraQuote</oiq>."
+      "credit": "داده‌های هزینه از <oiq>OpenInfraQuote</oiq>.",
+      "asOfState": "بر اساس وضعیت v{serial}",
+      "noState": "هنوز هزینه‌ای نیست — پس از اولین اعمال نمایش داده می‌شود."
     }
   },
   "workspaceDetail": {
@@ -2022,17 +2024,18 @@
       "onboard": "راه‌اندازی"
     },
     "tabs": {
-      "overview": "نمای کلی",
+      "configuration": "پیکربندی",
       "variables": "متغیرها",
       "runs": "اجراها",
       "state": "وضعیت",
       "stateGraph": "گراف وضعیت",
-      "configurations": "پیکربندی‌ها",
+      "versions": "نسخه‌ها",
       "notifications": "اعلان‌ها",
       "runTasks": "وظایف اجرا",
       "runTriggers": "محرک‌های اجرا",
       "sharing": "اشتراک‌گذاری",
-      "selectLabel": "بخش فضای کاری"
+      "selectLabel": "بخش فضای کاری",
+      "cost": "هزینه"
     },
     "lifecycle": {
       "pendingDeletion": "در انتظار حذف",

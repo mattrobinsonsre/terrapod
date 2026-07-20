@@ -163,6 +163,17 @@ test.describe('Responsive harness (phone viewport)', () => {
     await expectNoHorizontalPageScroll(page);
   });
 
+  test('workspace cost tab has no horizontal page scroll at phone width', async ({ page }) => {
+    // The Cost tab (#871) — headline card + per-resource table (which collapses
+    // to stacked cards below sm). A fresh workspace has no state, so it shows
+    // the deterministic empty state; either way the page must not h-scroll.
+    const token = getStoredToken();
+    const wsId = await createWorkspace(token, uniqueName('resp-cost'));
+    await page.goto(`/workspaces/${wsId}?tab=cost`);
+    await expect(page.getByText(/No cost yet/i)).toBeVisible({ timeout: 15_000 });
+    await expectNoHorizontalPageScroll(page);
+  });
+
   test('workspace state list becomes cards at phone width', async ({ page }) => {
     // The state-version table hid Created-by / Run / Size / Created behind
     // sm/md/lg breakpoints, leaving a phone with only the serial. Below md it
@@ -215,7 +226,7 @@ test.describe('Responsive harness (phone viewport)', () => {
     const wsId = await createWorkspace(token, wsName);
     await seedRun(token, wsId);
 
-    await page.goto(`/workspaces/${wsId}?tab=configurations`);
+    await page.goto(`/workspaces/${wsId}?tab=versions`);
 
     await expect(page.locator('#ws-tab-select')).toBeVisible();
     // The desktop table's column header is hidden at phone width...
@@ -405,7 +416,7 @@ test.describe('Tablet width (md–lg dead-zone, #839)', () => {
 
     await page.goto(`/workspaces/${wsId}`);
     // At ≥md the desktop tab bar renders (not the mobile <select>).
-    await expect(page.getByRole('button', { name: 'Overview' })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole('button', { name: 'Configuration' })).toBeVisible({ timeout: 15_000 });
     // The ~11-tab strip must not push the page into horizontal scroll — it is
     // contained by overflow-x-auto on its wrapper (the #839 fix).
     await expectNoHorizontalPageScroll(page);

@@ -1979,7 +1979,9 @@
       "unpricedTitle": "{count, plural, zero {# adnodd heb bris} one {# adnodd heb bris} two {# adnodd heb bris} few {# adnodd heb bris} many {# adnodd heb bris} other {# adnodd heb bris}}",
       "unpricedHint": "Doedd dim byd yn y data prisio yn cyfateb i'r rhain — math heb ei fapio, adnodd heb gost uniongyrchol, neu ddarparwr nad yw wedi'i gynnwys eto.",
       "indicative": "Amcangyfrifon dangosol yw'r rhain; mae'r gost wirioneddol yn dibynnu ar ddefnydd, rhanbarth, ymrwymiadau a gostyngiadau.",
-      "credit": "Data cost gan <oiq>OpenInfraQuote</oiq>."
+      "credit": "Data cost gan <oiq>OpenInfraQuote</oiq>.",
+      "asOfState": "fel ar gyflwr v{serial}",
+      "noState": "Dim cost eto — mae'n ymddangos ar ôl y gweithrediad cyntaf."
     }
   },
   "workspaceDetail": {
@@ -2022,17 +2024,18 @@
       "onboard": "Ymgymryd"
     },
     "tabs": {
-      "overview": "Trosolwg",
+      "configuration": "Ffurfweddiad",
       "variables": "Newidynnau",
       "runs": "Rhediadau",
       "state": "Cyflwr",
       "stateGraph": "Graff Cyflwr",
-      "configurations": "Ffurfweddiadau",
+      "versions": "Fersiynau",
       "notifications": "Hysbysiadau",
       "runTasks": "Tasgau Rhediad",
       "runTriggers": "Sbardunau Rhediad",
       "sharing": "Rhannu",
-      "selectLabel": "Adran gweithfan"
+      "selectLabel": "Adran gweithfan",
+      "cost": "Cost"
     },
     "lifecycle": {
       "pendingDeletion": "Yn aros i'w ddileu",

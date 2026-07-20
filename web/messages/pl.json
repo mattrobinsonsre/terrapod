@@ -1979,7 +1979,9 @@
       "unpricedTitle": "{count, plural, one {# zasób bez ceny} few {# zasoby bez ceny} many {# zasobów bez ceny} other {# zasobu bez ceny}}",
       "unpricedHint": "Nic w danych cenowych nie pasowało do nich — niezmapowany typ, zasób bez bezpośredniego kosztu lub dostawca jeszcze nieobsługiwany.",
       "indicative": "Szacunki mają charakter orientacyjny; rzeczywisty koszt zależy od użycia, regionu, zobowiązań i rabatów.",
-      "credit": "Dane o kosztach od <oiq>OpenInfraQuote</oiq>."
+      "credit": "Dane o kosztach od <oiq>OpenInfraQuote</oiq>.",
+      "asOfState": "według stanu v{serial}",
+      "noState": "Brak kosztu — pojawia się po pierwszym zastosowaniu."
     }
   },
   "workspaceDetail": {
@@ -2022,17 +2024,18 @@
       "onboard": "Wdróż"
     },
     "tabs": {
-      "overview": "Przegląd",
+      "configuration": "Konfiguracja",
       "variables": "Zmienne",
       "runs": "Przebiegi",
       "state": "Stan",
       "stateGraph": "Graf stanu",
-      "configurations": "Konfiguracje",
+      "versions": "Wersje",
       "notifications": "Powiadomienia",
       "runTasks": "Zadania przebiegu",
       "runTriggers": "Wyzwalacze przebiegów",
       "sharing": "Udostępnianie",
-      "selectLabel": "Sekcja obszaru roboczego"
+      "selectLabel": "Sekcja obszaru roboczego",
+      "cost": "Koszt"
     },
     "lifecycle": {
       "pendingDeletion": "Oczekuje na usunięcie",

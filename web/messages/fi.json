@@ -1979,7 +1979,9 @@
       "unpricedTitle": "{count, plural, one {# hinnoittelematon resurssi} other {# hinnoittelematonta resurssia}}",
       "unpricedHint": "Hinnoittelutiedoista ei löytynyt vastaavuutta näille — kartoittamaton tyyppi, resurssi ilman suoraa kustannusta tai palveluntarjoaja, jota ei vielä tueta.",
       "indicative": "Arviot ovat suuntaa antavia; todellinen kustannus riippuu käytöstä, alueesta, sitoumuksista ja alennuksista.",
-      "credit": "Kustannustiedot: <oiq>OpenInfraQuote</oiq>."
+      "credit": "Kustannustiedot: <oiq>OpenInfraQuote</oiq>.",
+      "asOfState": "tilan v{serial} mukaan",
+      "noState": "Ei vielä kustannuksia — näkyy ensimmäisen käytön jälkeen."
     }
   },
   "workspaceDetail": {
@@ -2022,17 +2024,18 @@
       "onboard": "Käyttöönotto"
     },
     "tabs": {
-      "overview": "Yleiskatsaus",
+      "configuration": "Konfiguraatio",
       "variables": "Muuttujat",
       "runs": "Ajot",
       "state": "Tila",
       "stateGraph": "Tilagraafi",
-      "configurations": "Määritykset",
+      "versions": "Versiot",
       "notifications": "Ilmoitukset",
       "runTasks": "Ajotehtävät",
       "runTriggers": "Ajokäynnistimet",
       "sharing": "Jakaminen",
-      "selectLabel": "Työtilan osio"
+      "selectLabel": "Työtilan osio",
+      "cost": "Kustannukset"
     },
     "lifecycle": {
       "pendingDeletion": "Odottaa poistoa",
