@@ -68,6 +68,20 @@ field Client.MaxRetries int
 field Client.Token string
 field Client.UserAgent string
 field ConflictError.Detail string
+field CostEstimate.Currency string `json:"currency"`
+field CostEstimate.Diff CostRange `json:"diff"`
+field CostEstimate.Previous CostRange `json:"previous"`
+field CostEstimate.Resources []CostResource `json:"resources"`
+field CostEstimate.RunID string `json:"-"`
+field CostEstimate.Total CostRange `json:"total"`
+field CostEstimate.Unpriced []UnpricedResource `json:"unpriced"`
+field CostRange.Max float64 `json:"max"`
+field CostRange.Min float64 `json:"min"`
+field CostResource.Address string `json:"address"`
+field CostResource.Change string `json:"change"`
+field CostResource.Monthly CostRange `json:"monthly"`
+field CostResource.Name string `json:"name"`
+field CostResource.Type string `json:"type"`
 field CreateAPITokenRequest.Description string
 field CreateAPITokenRequest.Kind string
 field CreateAPITokenRequest.LifespanHours int64
@@ -557,6 +571,9 @@ field StateVersion.Lineage string `json:"lineage"`
 field StateVersion.MD5 string `json:"md5,omitempty"`
 field StateVersion.Serial int64 `json:"serial"`
 field StateVersion.StateSize int64 `json:"state-size,omitempty"`
+field UnpricedResource.Address string `json:"address"`
+field UnpricedResource.Change string `json:"change"`
+field UnpricedResource.Type string `json:"type"`
 field UpdateAgentPoolRequest.Description *string
 field UpdateAgentPoolRequest.Labels *map[string]string
 field UpdateAgentPoolRequest.Name string
@@ -913,6 +930,7 @@ method (*Client) GetRemoteStateConsumer(ctx context.Context, id string) (*Remote
 method (*Client) GetRole(ctx context.Context, name string) (*Role, error)
 method (*Client) GetRoleAssignment(ctx context.Context, providerName, email, roleName string) (*RoleAssignment, error)
 method (*Client) GetRun(ctx context.Context, runID string) (*Run, error)
+method (*Client) GetRunCostEstimate(ctx context.Context, runID string) (*CostEstimate, error)
 method (*Client) GetRunImpactGraph(ctx context.Context, runID string) (*ImpactGraph, error)
 method (*Client) GetRunPlanJSON(ctx context.Context, runID string) ([]byte, error)
 method (*Client) GetRunTask(ctx context.Context, id string) (*RunTask, error)
@@ -1033,6 +1051,9 @@ type CatalogItem struct
 type CatalogRunRef struct
 type Client struct
 type ConflictError struct
+type CostEstimate struct
+type CostRange struct
+type CostResource struct
 type CreateAPITokenRequest struct
 type CreateAgentPoolRequest struct
 type CreateAgentPoolTokenRequest struct
@@ -1109,6 +1130,7 @@ type StateGraphMeta struct
 type StateGraphVersion struct
 type StateNode struct
 type StateVersion struct
+type UnpricedResource struct
 type UpdateAgentPoolRequest struct
 type UpdateExecutionHookRequest struct
 type UpdateNotificationConfigurationRequest struct
