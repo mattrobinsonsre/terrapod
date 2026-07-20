@@ -93,3 +93,74 @@ func (c *Client) GetRunCostEstimate(ctx context.Context, runID string) (*CostEst
 	}
 	return e, nil
 }
+
+// CostStateVersion identifies the state version a workspace cost estimate was
+// derived from. Nil on a WorkspaceCostEstimate when the workspace has no state.
+type CostStateVersion struct {
+	ID        string `json:"id"`     // prefixed "sv-<uuid>"
+	Serial    int    `json:"serial"`
+	CreatedAt string `json:"created-at"`
+}
+
+// WorkspaceCostEstimate is the native OpenInfraQuote-port estimate of a
+// workspace's CURRENT managed infrastructure, derived server-side from its
+// latest Terraform state (#871). It is the state analogue of CostEstimate's
+// plan-delta view: Total is the current projected monthly spend, Diff is zero
+// (state carries no change), and every resource is a "noop".
+//
+// Every figure is DATA (oiq-derived) — no AI involved. Credit: pricing data +
+// matcher/pricer design are OpenInfraQuote's (by Terrateam).
+type WorkspaceCostEstimate struct {
+	// WorkspaceID is the bare workspace UUID (the "ws-" prefix is stripped),
+	// resolved from the `workspace` relationship.
+	WorkspaceID string             `json:"-"`
+	Currency    string             `json:"currency"`
+	Total       CostRange          `json:"total"`
+	Previous    CostRange          `json:"previous"`
+	Diff        CostRange          `json:"diff"`
+	Resources   []CostResource     `json:"resources"`
+	Unpriced    []UnpricedResource `json:"unpriced"`
+	// StateVersion names the priced state version; nil when the workspace has
+	// no state yet (Total is zero in that case).
+	StateVersion *CostStateVersion `json:"state-version"`
+}
+
+// GetWorkspaceCostEstimate fetches the current managed-infrastructure cost
+// estimate for a workspace, computed from its latest state version.
+//
+// workspaceID accepts either a bare workspace UUID or the prefixed "ws-<uuid>"
+// form. A workspace with no state returns a zeroed estimate with a nil
+// StateVersion (not an error). Returns *NotFoundError when cost estimation is
+// disabled globally.
+func (c *Client) GetWorkspaceCostEstimate(ctx context.Context, workspaceID string) (*WorkspaceCostEstimate, error) {
+	if workspaceID == "" {
+		return nil, errors.New("workspace id is required")
+	}
+	id := workspaceID
+	if len(id) < 3 || id[:3] != "ws-" {
+		id = "ws-" + id
+	}
+	data, err := c.Get(ctx, "/api/terrapod/v1/workspaces/"+url.PathEscape(id)+"/cost-estimate")
+	if err != nil {
+		return nil, err
+	}
+	res, err := ParseResource(data)
+	if err != nil {
+		return nil, fmt.Errorf("parse workspace cost estimate response: %w", err)
+	}
+	e := &WorkspaceCostEstimate{WorkspaceID: strings.TrimPrefix(GetRelationshipID(res, "workspace"), "ws-")}
+	for key, dst := range map[string]any{
+		"currency":      &e.Currency,
+		"total":         &e.Total,
+		"previous":      &e.Previous,
+		"diff":          &e.Diff,
+		"resources":     &e.Resources,
+		"unpriced":      &e.Unpriced,
+		"state-version": &e.StateVersion,
+	} {
+		if raw, ok := res.Attributes[key]; ok {
+			_ = json.Unmarshal(raw, dst)
+		}
+	}
+	return e, nil
+}

@@ -3319,6 +3319,98 @@ The raw D2 query results + the import-only verdict (JSON object; non-JSON or non
 
 > **Import run is always plan-only:** the confirmed import step is a gated, **import-only** run (plan-only) through the normal run gate — never an auto-apply.
 
+## Cost Estimation
+
+Terrapod estimates the monthly cost of Terraform/OpenTofu-managed infrastructure using a **native, pure-Python reader engine that is compatible with — and consumes the published pricesheet of — [OpenInfraQuote](https://github.com/terrateamio/openinfraquote) (oiq, by Terrateam, MPL-2.0)**. Terrapod ships **no binary and shells out to nothing**; it downloads oiq's `prices.csv` and matches plan/state resources against it. The pricing data and matcher/pricer design are OpenInfraQuote's; Terrapod credits them wherever cost is shown.
+
+Every figure returned here is **data** (oiq-derived) — no AI is involved. (An optional AI *enhancement* — narrative + savings advisories — is a separate surface that rides the plan-analysis AI switch and is always flagged distinctly; it never blends into these authoritative numbers.)
+
+Cost estimation is **on by default** (Helm: `api.config.cost_estimation.enabled`, default `true`); when disabled the endpoints below return `404`. The pricesheet is a **pull-through cache** (mirrored into object storage on demand, no schedule) — air-gapped deployments pre-seed the cached object or point `cost_estimation.prices_url` at an internal mirror. `cost_estimation.default_region` is only the fallback for a resource whose region can't be resolved from its own attributes or provider config (region is resolved **per resource**).
+
+There are two cost views: a **run** view (the monthly cost *delta* a plan introduces) and a **workspace** view (the *current* monthly cost of the workspace's managed infrastructure, priced from its latest state version).
+
+### Show Run Cost Estimate
+
+```
+GET /api/terrapod/v1/runs/{run_id}/cost-estimate
+```
+
+Requires `run:read` on the run's workspace. Returns the runner-produced estimate of the plan's monthly cost delta (`404` when the run produced no estimate — errored before plan, cost estimation disabled, or the artifact aged out).
+
+**Response:**
+```json
+{
+  "data": {
+    "id": "cost-estimate-<run-uuid>",
+    "type": "cost-estimates",
+    "attributes": {
+      "currency": "USD",
+      "total": { "min": 219.0, "max": 219.0 },
+      "previous": { "min": 73.0, "max": 73.0 },
+      "diff": { "min": 146.0, "max": 146.0 },
+      "resources": [
+        { "address": "aws_instance.eu", "type": "aws_instance", "name": "eu", "change": "add", "monthly": { "min": 146.0, "max": 146.0 } }
+      ],
+      "unpriced": [ { "address": "random_pet.name", "type": "random_pet", "change": "add" } ]
+    },
+    "relationships": { "run": { "data": { "id": "run-<uuid>", "type": "runs" } } }
+  }
+}
+```
+
+| Attribute | Description |
+|---|---|
+| `currency` | Pricesheet currency (typically `USD`). |
+| `total` | Projected monthly spend of the planned state (min/max range). |
+| `previous` | Projected monthly spend of the prior state (`total − diff`). |
+| `diff` | Monthly delta this run introduces (adds positive, removes negative). |
+| `resources[]` | Per-resource cost; `change` is `add` / `remove` / `noop`. |
+| `unpriced[]` | Resources nothing in the pricesheet matched (unmapped/free type, or a provider the data doesn't cover). |
+
+### Show Workspace Cost Estimate
+
+```
+GET /api/terrapod/v1/workspaces/{id}/cost-estimate
+```
+
+Requires `state:read` on the workspace (the estimate is derived server-side from the secret-bearing state blob, though only non-sensitive aggregates are returned). Runs the workspace's **latest state version** through the cost engine to report the current monthly cost of its managed infrastructure — the state analogue of the run delta above. Because state carries no change, every resource is a `noop`, `diff` is zero, and `total` is the current monthly spend.
+
+A workspace with **no state yet** (or a state-version row whose bytes haven't landed / were swept) returns a zeroed estimate with `state-version: null` rather than an error. `503` when no pricesheet is available (upstream fetch failed and nothing is cached).
+
+**Response:**
+```json
+{
+  "data": {
+    "id": "workspace-cost-<workspace-uuid>",
+    "type": "workspace-cost-estimates",
+    "attributes": {
+      "currency": "USD",
+      "total": { "min": 292.0, "max": 292.0 },
+      "previous": { "min": 292.0, "max": 292.0 },
+      "diff": { "min": 0.0, "max": 0.0 },
+      "resources": [
+        { "address": "aws_instance.web", "type": "aws_instance", "name": "web", "change": "noop", "monthly": { "min": 73.0, "max": 73.0 } }
+      ],
+      "unpriced": [],
+      "state-version": { "id": "sv-<uuid>", "serial": 7, "created-at": "2026-01-01T00:00:00Z" }
+    },
+    "relationships": { "workspace": { "data": { "id": "ws-<uuid>", "type": "workspaces" } } }
+  }
+}
+```
+
+The attributes match the run estimate, plus `state-version` naming the priced version (`null` when the workspace has no state).
+
+### Pricesheet (runner + admin)
+
+```
+GET  /api/terrapod/v1/cost-estimation/pricesheet             # 302 → presigned cached CSV (any authenticated caller; consumed by runner Jobs)
+GET  /api/terrapod/v1/cost-estimation/pricesheet/status      # admin: enabled + cached?
+POST /api/terrapod/v1/cost-estimation/pricesheet/refresh     # admin: force re-fetch from upstream
+```
+
+The download endpoint is pull-through: a cold or stale cache is fetched from `cost_estimation.prices_url` on demand, and a stale copy is served if a refresh fails (a transient upstream outage never breaks a run). `404` when cost estimation is disabled or nothing is cached; the returned presigned URL needs no auth. `refresh` returns `502` on an upstream/decompress failure.
+
 ## Service Catalog
 
 No-code self-service provisioning over the private module registry. A *catalog item* blesses a registry module; provisioning it creates an agent-mode, non-VCS, catalog-managed workspace whose configuration is a server-generated wrapper. See [Service Catalog](service-catalog.md) for the full feature doc.
