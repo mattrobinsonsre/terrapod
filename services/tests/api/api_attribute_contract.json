@@ -411,6 +411,7 @@
     "advisories",
     "created-at",
     "error-message",
+    "estimated-resources",
     "input-tokens",
     "model",
     "narrative",

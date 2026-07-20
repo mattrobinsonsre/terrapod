@@ -80,6 +80,11 @@ field CostEstimate.Resources []CostResource `json:"resources"`
 field CostEstimate.RunID string `json:"-"`
 field CostEstimate.Total CostRange `json:"total"`
 field CostEstimate.Unpriced []UnpricedResource `json:"unpriced"`
+field CostEstimatedResource.Address string `json:"address"`
+field CostEstimatedResource.Basis string `json:"basis"`
+field CostEstimatedResource.Monthly CostRange `json:"monthly"`
+field CostEstimatedResource.Source string `json:"source"`
+field CostEstimatedResource.Type string `json:"type"`
 field CostRange.Max float64 `json:"max"`
 field CostRange.Min float64 `json:"min"`
 field CostResource.Address string `json:"address"`
@@ -93,6 +98,7 @@ field CostStateVersion.Serial int `json:"serial"`
 field CostSummary.Advisories []CostAdvisory `json:"advisories"`
 field CostSummary.CreatedAt string `json:"created-at"`
 field CostSummary.ErrorMessage string `json:"error-message"`
+field CostSummary.EstimatedResources []CostEstimatedResource `json:"estimated-resources"`
 field CostSummary.ID string `json:"-"`
 field CostSummary.InputTokens int `json:"input-tokens"`
 field CostSummary.Model string `json:"model"`
@@ -1083,6 +1089,7 @@ type Client struct
 type ConflictError struct
 type CostAdvisory struct
 type CostEstimate struct
+type CostEstimatedResource struct
 type CostRange struct
 type CostResource struct
 type CostStateVersion struct

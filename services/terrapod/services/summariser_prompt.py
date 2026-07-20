@@ -126,18 +126,54 @@ FAILURE_ANALYSIS_TOOL: dict = {
 COST_SUMMARY_JSON_SCHEMA: dict = {
     "type": "object",
     "additionalProperties": False,
-    "required": ["narrative", "advisories"],
+    "required": ["estimated_resources", "advisories"],
     "properties": {
+        "estimated_resources": {
+            "type": "array",
+            "description": (
+                "YOUR PRIMARY JOB. From your own knowledge, estimate the monthly "
+                "cost of resources the deterministic pricing engine could NOT "
+                "price — the ones listed under UNPRICED (unmapped types, or "
+                "providers/regions the pricesheet doesn't cover, e.g. Azure/GCP) "
+                "— plus any usage-driven cost the priced figures obviously omit "
+                "(data egress, request volumes, cross-AZ). Do NOT re-estimate or "
+                "restate resources that are ALREADY priced deterministically — "
+                "those numbers are authoritative and shown separately. One entry "
+                "per resource you can put a number on; omit ones you genuinely "
+                "cannot estimate. Empty array is fine if nothing is estimable."
+            ),
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["address", "monthly_min", "monthly_max", "basis"],
+                "properties": {
+                    "address": {
+                        "type": "string",
+                        "description": "Terraform address of the resource being estimated.",
+                    },
+                    "type": {"type": "string", "description": "Terraform resource type."},
+                    "monthly_min": {"type": "number", "description": "Low end, monthly, USD."},
+                    "monthly_max": {"type": "number", "description": "High end, monthly, USD."},
+                    "basis": {
+                        "type": "string",
+                        "maxLength": 400,
+                        "description": (
+                            "One line on how you arrived at the estimate + the "
+                            "key assumption (region, tier, usage), so the reader "
+                            "can judge it. This is an estimate, not a quote."
+                        ),
+                    },
+                },
+            },
+        },
         "narrative": {
             "type": "string",
             "description": (
-                "Plain-language explanation of the cost estimate: what drives "
-                "the monthly cost, which resources dominate, and how a change "
-                "moves the bill. Up to ~350 words. Refer to resources by their "
-                "terraform address. Do NOT restate the authoritative monthly "
-                "total as if you computed it — it is given to you and shown "
-                "separately; describe and contextualise it, never replace it. "
-                "No chain-of-thought, no preamble."
+                "OPTIONAL, secondary. A brief plain-language read of the overall "
+                "cost picture — up to ~200 words, resources by terraform address. "
+                "Do NOT restate the authoritative deterministic total as if you "
+                "computed it (it is given + shown separately). Empty string is "
+                "fine; the estimates above are the point, not this prose."
             ),
         },
         "advisories": {
@@ -184,9 +220,10 @@ COST_SUMMARY_TOOL: dict = {
     "function": {
         "name": "submit_cost_summary",
         "description": (
-            "Submit the structured cost summary. Call this tool exactly once "
-            "with the narrative and any savings advisories. Never restate the "
-            "authoritative monthly total as your own computation."
+            "Submit your cost estimates. Call this tool exactly once. The "
+            "primary field is estimated_resources — YOUR estimate for what the "
+            "deterministic engine could not price. Never restate an "
+            "already-priced figure as your own computation."
         ),
         "parameters": COST_SUMMARY_JSON_SCHEMA,
     },
@@ -622,26 +659,32 @@ def render_prompt(
 
 # --- Cost summary prompt (#871) ---------------------------------------------
 COST_SUMMARY_SKILL_PROMPT = """\
-You are a senior cloud FinOps reviewer. You are given an ALREADY-COMPUTED, \
-authoritative monthly cost estimate for a Terraform/OpenTofu plan (produced by \
-a deterministic pricing engine, OpenInfraQuote). Your job is to EXPLAIN and \
-CONTEXTUALISE it and, where obvious, suggest concrete savings — never to \
-recompute or override it.
+You are a senior cloud FinOps engineer. A deterministic pricing engine \
+(OpenInfraQuote) has ALREADY priced the resources it has data for; those \
+figures are authoritative and shown to the user separately. Some resources it \
+could NOT price — they are listed under UNPRICED (unmapped types, or \
+providers/regions its pricesheet doesn't cover, e.g. Azure/GCP).
+
+YOUR PRIMARY JOB is to fill that gap: from your own cost knowledge, ESTIMATE the \
+monthly cost of the unpriced resources — that is the whole point of this task, \
+not writing prose.
 
 Hard rules:
-- The authoritative monthly total and every per-resource figure are DATA. They \
-are given to you and shown to the user separately. Describe them, group them, \
-explain what drives them — but never present a different total as if you \
-computed it, and never contradict the given figures.
-- Any monthly_saving you put on an advisory is YOUR ESTIMATE, not a computed \
-number. Keep advisories practical and specific to what is actually in the \
-plan (e.g. a long-lived on-demand instance → a Savings Plan / reserved \
-instance; a fault-tolerant batch workload → spot; an over-provisioned \
-instance class → rightsizing). Do not invent resources that are not present.
-- Be concise and factual. Refer to resources by their terraform address. No \
-chain-of-thought, no preamble, no restating these instructions.
-- If the estimate is trivial or nothing obvious can be saved, say so briefly \
-and return an empty advisories array.\
+- estimated_resources is the main output. Estimate monthly cost ONLY for the \
+UNPRICED resources (and any obviously-omitted usage-driven cost — egress, \
+requests, cross-AZ). NEVER re-estimate or restate a resource that is already \
+priced deterministically; those numbers are authoritative and yours would only \
+add noise. Give each estimate a one-line `basis` stating your key assumption \
+(region, tier, usage) so the reader can judge it. Omit anything you genuinely \
+cannot estimate; an empty array is fine if nothing is estimable.
+- Everything you output is an ESTIMATE (the API tags it `source: ai-estimate`) \
+— it is shown as a separate overlay, never merged into the authoritative total, \
+never a gate. Do not present a different authoritative total.
+- Advisories (savings) are secondary and specific to what is present (long-lived \
+on-demand → Savings Plan/RI; fault-tolerant batch → spot; oversized → \
+rightsizing). Their monthly_saving is also your estimate.
+- narrative is optional and secondary — a brief read of the picture, or empty. \
+Refer to resources by terraform address. No chain-of-thought, no preamble.\
 """
 
 
@@ -686,11 +729,18 @@ def render_cost_prompt(
         user_parts.append(f"FLEET_CONTEXT:\n{fleet_context.strip()}")
     if workspace_context.strip():
         user_parts.append(f"WORKSPACE_CONTEXT:\n{workspace_context.strip()}")
-    user_parts.append(f"COST_ESTIMATE (authoritative, oiq-derived):\n```json\n{estimate_json}\n```")
+    user_parts.append(
+        "DETERMINISTIC_COST_ESTIMATE (authoritative — priced resources are in "
+        "`resources`; the ones the engine could NOT price are in `unpriced`, and "
+        "THOSE are what you estimate):\n"
+        f"```json\n{estimate_json}\n```"
+    )
     if plan_json.strip():
         user_parts.append(f"PLAN_JSON (context):\n```json\n{plan_json}\n```")
     user_parts.append(
-        "Now call the `submit_cost_summary` tool exactly once with your structured answer."
+        "Now call the `submit_cost_summary` tool exactly once: estimate the "
+        "UNPRICED resources in `estimated_resources` (the primary output), then "
+        "any savings advisories, then an optional brief narrative."
     )
 
     user_message = "\n\n".join(user_parts)

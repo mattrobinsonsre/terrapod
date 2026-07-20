@@ -57,6 +57,19 @@ def _mock_cost_summary(run_id, status="ready"):
     s.id = uuid.uuid4()
     s.run_id = run_id
     s.status = status
+    s.estimated_resources = (
+        [
+            {
+                "address": "azurerm_storage_account.a",
+                "type": "azurerm_storage_account",
+                "monthly": {"min": 5.0, "max": 8.0},
+                "basis": "LRS, hot tier, ~100GB",
+                "source": "ai-estimate",
+            }
+        ]
+        if status == "ready"
+        else []
+    )
     s.narrative = "Roughly $73/mo." if status == "ready" else ""
     s.advisories = (
         [
@@ -113,6 +126,9 @@ class TestGetCostSummary:
         assert resp.status_code == 200
         attrs = resp.json()["data"]["attributes"]
         assert attrs["status"] == "ready"
+        # PRIMARY output surfaced with provenance intact.
+        assert attrs["estimated-resources"][0]["address"] == "azurerm_storage_account.a"
+        assert attrs["estimated-resources"][0]["source"] == "ai-estimate"
         assert attrs["narrative"].startswith("Roughly")
         assert attrs["advisories"][0]["source"] == "ai-estimate"  # provenance surfaced
 

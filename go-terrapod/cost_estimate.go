@@ -178,24 +178,40 @@ type CostAdvisory struct {
 	Source        string     `json:"source"`         // always "ai-estimate"
 }
 
-// CostSummary is the optional AI *enhancement* of a run's cost estimate (#871):
-// a plain-language narrative plus savings advisories. It rides the plan-analysis
-// AI switch and holds AI polish ONLY — the authoritative monthly figures live on
-// CostEstimate (GetRunCostEstimate) and are never restated here.
+// CostEstimatedResource is an AI monthly estimate for a resource the
+// deterministic oiq engine could NOT price (#871) — the PRIMARY output of the
+// cost AI. Monthly is always an ESTIMATE (Source == "ai-estimate"), shown as a
+// separate overlay and never summed into the authoritative oiq total; Basis is
+// the model's one-line justification/assumption.
+type CostEstimatedResource struct {
+	Address string    `json:"address"`
+	Type    string    `json:"type"`
+	Monthly CostRange `json:"monthly"`
+	Basis   string    `json:"basis"`
+	Source  string    `json:"source"` // always "ai-estimate"
+}
+
+// CostSummary is the optional AI *enhancement* of a run's cost estimate (#871).
+// Its PRIMARY value is EstimatedResources — the model pricing what oiq couldn't
+// (the unpriced set + providers oiq doesn't cover + usage-driven costs). The
+// narrative + advisories are the secondary, human-readable bonus. Everything
+// here is AI estimate/polish — the authoritative figures live on CostEstimate
+// (GetRunCostEstimate) and are never restated.
 type CostSummary struct {
 	// ID is the prefixed resource id ("cost-summary-<uuid>"); RunID is the bare
 	// run UUID resolved from the `run` relationship.
-	ID           string         `json:"-"`
-	RunID        string         `json:"-"`
-	Status       string         `json:"status"` // pending|ready|errored|skipped
-	Narrative    string         `json:"narrative"`
-	Advisories   []CostAdvisory `json:"advisories"`
-	Model        string         `json:"model"`
-	InputTokens  int            `json:"input-tokens"`
-	OutputTokens int            `json:"output-tokens"`
-	ErrorMessage string         `json:"error-message"`
-	CreatedAt    string         `json:"created-at"`
-	UpdatedAt    string         `json:"updated-at"`
+	ID                 string                  `json:"-"`
+	RunID              string                  `json:"-"`
+	Status             string                  `json:"status"` // pending|ready|errored|skipped
+	EstimatedResources []CostEstimatedResource `json:"estimated-resources"`
+	Narrative          string                  `json:"narrative"`
+	Advisories         []CostAdvisory          `json:"advisories"`
+	Model              string                  `json:"model"`
+	InputTokens        int                     `json:"input-tokens"`
+	OutputTokens       int                     `json:"output-tokens"`
+	ErrorMessage       string                  `json:"error-message"`
+	CreatedAt          string                  `json:"created-at"`
+	UpdatedAt          string                  `json:"updated-at"`
 }
 
 func costSummaryFromResource(res *Resource) *CostSummary {
@@ -210,6 +226,9 @@ func costSummaryFromResource(res *Resource) *CostSummary {
 		ErrorMessage: GetStringAttr(res, "error-message"),
 		CreatedAt:    GetStringAttr(res, "created-at"),
 		UpdatedAt:    GetStringAttr(res, "updated-at"),
+	}
+	if raw, ok := res.Attributes["estimated-resources"]; ok {
+		_ = json.Unmarshal(raw, &s.EstimatedResources)
 	}
 	if raw, ok := res.Attributes["advisories"]; ok {
 		_ = json.Unmarshal(raw, &s.Advisories)
