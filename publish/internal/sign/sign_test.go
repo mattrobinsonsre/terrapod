@@ -102,8 +102,9 @@ func TestLoadPrivateKeyRejectsGarbage(t *testing.T) {
 	// prove LoadPrivateKey rejects bad armor. The secret scanner matches the
 	// marker text, not a real key (every real test key is generated at runtime
 	// via openpgp.NewEntity), so this is a false positive.
-	// nosemgrep: generic.secrets.security.detected-pgp-private-key-block
-	const malformedArmor = "-----BEGIN PGP PRIVATE KEY BLOCK-----\nnot base64\n-----END PGP PRIVATE KEY BLOCK-----\n"
+	// Full check-id (registry rules carry a doubled leaf; the single-id form did
+	// not match, so the suppression never took — GitHub code-scanning alert).
+	const malformedArmor = "-----BEGIN PGP PRIVATE KEY BLOCK-----\nnot base64\n-----END PGP PRIVATE KEY BLOCK-----\n" // nosemgrep: generic.secrets.security.detected-pgp-private-key-block.detected-pgp-private-key-block
 	if _, err := LoadPrivateKey(malformedArmor, ""); err == nil {
 		t.Fatal("expected error on malformed armor")
 	}

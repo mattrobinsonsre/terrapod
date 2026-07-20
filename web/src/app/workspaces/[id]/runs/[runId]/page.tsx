@@ -1313,6 +1313,10 @@ function RunDetailPageInner() {
             view; the tab only appears when the run produced a JSON plan. */}
         {view === 'impact' && <ImpactGraph runId={runId.replace(/^run-/, '')} />}
 
+        {/* Cost tab (#871) — data-only oiq monthly cost breakdown; the tab only
+            appears when the run produced a cost estimate (has-cost-estimate). */}
+        {view === 'cost' && <CostPanel runId={runId.replace(/^run-/, '')} />}
+
         {view === 'details' && (
         <>
         {/* Resource usage panel (#430) — peak memory/CPU alongside the
