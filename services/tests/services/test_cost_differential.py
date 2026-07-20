@@ -75,7 +75,13 @@ def _oiq_price(plan_path: Path) -> dict[str, tuple[float, float]]:
     figures the native engine's ``CostEstimate`` mirrors.
     """
     assert _BINARY and _PRICESHEET
+    # nosemgrep (both calls): list-form (no shell=True → no shell injection),
+    # CI-only test running the oracle binary whose path/pricesheet come from the
+    # trusted CI job's own env, never an end user. The comment sits on the sink
+    # (subprocess.run) line — ruff-format-stable — with the full doubled check-id
+    # (registry rules carry a doubled leaf) so the suppression actually matches.
     matched = subprocess.run(
+        # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-tainted-env-args.dangerous-subprocess-use-tainted-env-args
         [_BINARY, "match", "--pricesheet", _PRICESHEET, str(plan_path)],
         capture_output=True,
         text=True,
@@ -83,8 +89,9 @@ def _oiq_price(plan_path: Path) -> dict[str, tuple[float, float]]:
     )
     priced = subprocess.run(
         # --format json: the default is a human "summary"; --region: sugar for
-        # 'not region or region=R', pricing the plan in one region (see module
-        # docstring + corpus README on why the corpus is single-region).
+        # 'not region or region=R', pricing the plan in one region. The nosemgrep
+        # line must sit directly above the args (the finding line).
+        # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-tainted-env-args.dangerous-subprocess-use-tainted-env-args
         [_BINARY, "price", "--format", "json", "--region", _REGION],
         input=matched.stdout,
         capture_output=True,
