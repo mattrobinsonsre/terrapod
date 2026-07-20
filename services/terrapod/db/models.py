@@ -2228,6 +2228,66 @@ class PlanSummaryMessage(Base):
     )
 
 
+class CostSummary(Base):
+    """LLM-generated *enhancement* of a run's cost estimate (#871).
+
+    One-to-one with Run, keyed by (run_id). Rides the same switch as the
+    plan summary (``ai_summary.enabled`` + the per-workspace mode) and is
+    stored separately from ``runs`` for the same reasons ``plan_summaries``
+    is (footprint + cold-read bloat).
+
+    **Provenance is a hard invariant.** This row holds AI *polish* only —
+    a plain-language narrative of the oiq-derived cost estimate plus
+    optional savings *advisories* (Savings Plans / reserved / spot /
+    rightsizing). It NEVER holds, restates, or replaces the authoritative
+    oiq figures: those live in the ``cost_estimate.json`` artifact and the
+    ``runs`` cost columns, and are served by the data-only cost-estimate
+    endpoint. Any dollar amount an advisory carries is an AI *estimate*,
+    tagged ``source: "ai-estimate"`` in the ``advisories`` JSON, is never a
+    gate, and is always rendered distinctly from the data figures.
+
+    ``advisories`` is a list of ``{kind, title, detail, monthly_saving:
+    {min, max}, source}`` objects (``kind`` ∈ savings_plan / reserved /
+    spot / rightsizing / other; ``source`` is always ``"ai-estimate"``).
+
+    Status values mirror PlanSummary: pending / ready / skipped / errored.
+    The handler upserts on (run_id) so retries are idempotent and a
+    ``ready`` row is never overwritten by a later errored attempt.
+    """
+
+    __tablename__ = "cost_summaries"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=generate_uuid7
+    )
+    run_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("runs.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
+
+    # Model fields — populated when status == "ready"
+    narrative: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    advisories: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list, nullable=False)
+
+    # Telemetry / debugging
+    model: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    input_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    output_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    error_message: Mapped[str] = mapped_column(Text, nullable=False, default="")
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False
+    )
+
+    __table_args__ = (sa.UniqueConstraint("run_id", name="uq_cost_summaries_run"),)
+
+
 # Onboarding session lifecycle (#824 P2). A session is workspace-scoped and
 # discovers existing, unmanaged cloud resources, then generates copy-pasteable
 # ``resource`` + ``import {}`` config. The stages map onto where each runs:

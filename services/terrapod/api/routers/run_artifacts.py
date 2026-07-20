@@ -476,6 +476,22 @@ async def upload_cost_estimate(
                 workspace_id=str(run.workspace_id),
             )
         await db.commit()
+        # AI cost narrative (#871) — enqueue the enhancement now that the
+        # estimate is in storage and the flag is committed. Rides the same
+        # switch as the plan summary; best-effort, deduped per run. The handler
+        # re-checks the flag + workspace mode, so a disabled workspace no-ops.
+        if settings.ai_summary.enabled:
+            try:
+                from terrapod.services.scheduler import enqueue_trigger
+
+                await enqueue_trigger(
+                    "ai_cost_summary",
+                    {"run_id": str(run.id)},
+                    dedup_key=f"aicost:{run.id}",
+                    dedup_ttl=300,
+                )
+            except Exception as e:
+                logger.debug("Failed to enqueue ai_cost_summary after upload", error=str(e))
         return Response(status_code=204)
     finally:
         try:
