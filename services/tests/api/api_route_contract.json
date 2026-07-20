@@ -131,6 +131,7 @@
   "GET /api/terrapod/v1/vcs-connections",
   "GET /api/terrapod/v1/vcs-connections/{connection_id}",
   "GET /api/terrapod/v1/workspace-events",
+  "GET /api/terrapod/v1/workspaces/{workspace_id}/cost-estimate",
   "GET /api/terrapod/v1/workspaces/{workspace_id}/notification-configurations",
   "GET /api/terrapod/v1/workspaces/{workspace_id}/onboarding-sessions",
   "GET /api/terrapod/v1/workspaces/{workspace_id}/remote-state-consumers ?filter_type",

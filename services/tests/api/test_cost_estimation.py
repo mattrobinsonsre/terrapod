@@ -19,7 +19,9 @@ _AUTH = {"Authorization": "Bearer dummy"}
 _DL = "/api/terrapod/v1/cost-estimation/pricesheet"
 _STATUS = "/api/terrapod/v1/cost-estimation/pricesheet/status"
 _REFRESH = "/api/terrapod/v1/cost-estimation/pricesheet/refresh"
+_WS_COST = "/api/terrapod/v1/workspaces/ws-abc123/cost-estimate"
 _SVC = "terrapod.services.cost_pricesheet_service"
+_WSVC = "terrapod.services.workspace_cost_service"
 
 
 def _user(roles=None):
@@ -124,3 +126,78 @@ class TestAdminSurfaces:
             with patch.object(settings.cost_estimation, "enabled", True):
                 resp = await c.post(_REFRESH, headers=_AUTH)
         assert resp.status_code == 502
+
+
+@patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+@patch("terrapod.api.app.init_redis")
+@patch("terrapod.api.app.init_db")
+class TestWorkspaceCostEstimate:
+    """The workspace state-cost endpoint (#871) — the RBAC + engine work lives
+    in workspace_cost_service (unit-tested separately); the router is thin."""
+
+    async def test_disabled_returns_404(self, *mocks):
+        app = _make_app(_user(roles=["everyone"]))
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            with patch.object(settings.cost_estimation, "enabled", False):
+                resp = await c.get(_WS_COST, headers=_AUTH)
+        assert resp.status_code == 404
+
+    @patch(f"{_WSVC}.estimate_workspace_cost", new_callable=AsyncMock)
+    async def test_happy_path(self, mock_estimate, *mocks):
+        mock_estimate.return_value = {
+            "currency": "USD",
+            "total": {"min": 292.0, "max": 292.0},
+            "previous": {"min": 292.0, "max": 292.0},
+            "diff": {"min": 0.0, "max": 0.0},
+            "resources": [
+                {
+                    "address": "aws_instance.web",
+                    "type": "aws_instance",
+                    "name": "web",
+                    "change": "noop",
+                    "monthly": {"min": 73.0, "max": 73.0},
+                }
+            ],
+            "unpriced": [],
+            "state-version": {"id": "sv-xyz", "serial": 7, "created-at": "2026-07-20T09:00:00Z"},
+        }
+        app = _make_app(_user(roles=["everyone"]))
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            with patch.object(settings.cost_estimation, "enabled", True):
+                resp = await c.get(_WS_COST, headers=_AUTH)
+        assert resp.status_code == 200
+        data = resp.json()["data"]
+        assert data["type"] == "workspace-cost-estimates"
+        assert data["id"] == "workspace-cost-abc123"
+        assert data["relationships"]["workspace"]["data"]["id"] == "ws-abc123"
+        assert data["attributes"]["total"]["max"] == 292.0
+        assert data["attributes"]["state-version"]["serial"] == 7
+
+    @patch(f"{_WSVC}.estimate_workspace_cost", new_callable=AsyncMock)
+    async def test_no_state_returns_zeroed_estimate(self, mock_estimate, *mocks):
+        mock_estimate.return_value = {
+            "currency": "USD",
+            "total": {"min": 0.0, "max": 0.0},
+            "previous": {"min": 0.0, "max": 0.0},
+            "diff": {"min": 0.0, "max": 0.0},
+            "resources": [],
+            "unpriced": [],
+            "state-version": None,
+        }
+        app = _make_app(_user(roles=["everyone"]))
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            with patch.object(settings.cost_estimation, "enabled", True):
+                resp = await c.get(_WS_COST, headers=_AUTH)
+        assert resp.status_code == 200
+        assert resp.json()["data"]["attributes"]["state-version"] is None
+
+    @patch(f"{_WSVC}.estimate_workspace_cost", new_callable=AsyncMock)
+    async def test_pricesheet_unavailable_returns_503(self, mock_estimate, *mocks):
+        from terrapod.services.workspace_cost_service import PricesheetUnavailable
+
+        mock_estimate.side_effect = PricesheetUnavailable("no sheet")
+        app = _make_app(_user(roles=["everyone"]))
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            with patch.object(settings.cost_estimation, "enabled", True):
+                resp = await c.get(_WS_COST, headers=_AUTH)
+        assert resp.status_code == 503
