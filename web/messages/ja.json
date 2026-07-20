@@ -1979,7 +1979,9 @@
       "unpricedTitle": "{count, plural, other {価格未算出のリソース # 件}}",
       "unpricedHint": "価格データに一致するものがありませんでした。マッピングされていない種類、直接コストのないリソース、または未対応のプロバイダーです。",
       "indicative": "見積もりは目安です。実際のコストは使用状況、リージョン、コミットメント、割引によって異なります。",
-      "credit": "コストデータの提供元: <oiq>OpenInfraQuote</oiq>。"
+      "credit": "コストデータの提供元: <oiq>OpenInfraQuote</oiq>。",
+      "asOfState": "状態 v{serial} 時点",
+      "noState": "まだコストはありません — 最初の適用後に表示されます。"
     }
   },
   "workspaceDetail": {
@@ -2022,17 +2024,18 @@
       "onboard": "オンボード"
     },
     "tabs": {
-      "overview": "概要",
+      "configuration": "構成",
       "variables": "変数",
       "runs": "実行",
       "state": "状態",
       "stateGraph": "状態グラフ",
-      "configurations": "設定",
+      "versions": "バージョン",
       "notifications": "通知",
       "runTasks": "実行タスク",
       "runTriggers": "実行トリガー",
       "sharing": "共有",
-      "selectLabel": "ワークスペースセクション"
+      "selectLabel": "ワークスペースセクション",
+      "cost": "コスト"
     },
     "lifecycle": {
       "pendingDeletion": "削除保留中",

@@ -1979,7 +1979,9 @@
       "unpricedTitle": "{count, plural, other {# 個未計價資源}}",
       "unpricedHint": "定價資料中沒有與這些資源相符的項目——未對應的類型、沒有直接成本的資源，或尚未支援的供應商。",
       "indicative": "估算僅供參考；實際成本取決於使用量、區域、承諾用量與折扣。",
-      "credit": "成本資料來自 <oiq>OpenInfraQuote</oiq>。"
+      "credit": "成本資料來自 <oiq>OpenInfraQuote</oiq>。",
+      "asOfState": "截至狀態 v{serial}",
+      "noState": "尚無成本 — 首次套用後顯示。"
     }
   },
   "workspaceDetail": {
@@ -2022,17 +2024,18 @@
       "onboard": "匯入"
     },
     "tabs": {
-      "overview": "概覽",
+      "configuration": "設定",
       "variables": "變數",
       "runs": "執行",
       "state": "狀態",
       "stateGraph": "狀態圖",
-      "configurations": "配置",
+      "versions": "版本",
       "notifications": "通知",
       "runTasks": "執行任務",
       "runTriggers": "執行觸發器",
       "sharing": "共享",
-      "selectLabel": "工作區部分"
+      "selectLabel": "工作區部分",
+      "cost": "成本"
     },
     "lifecycle": {
       "pendingDeletion": "待刪除",

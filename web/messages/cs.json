@@ -1979,7 +1979,9 @@
       "unpricedTitle": "{count, plural, one {# zdroj bez ceny} few {# zdroje bez ceny} many {# zdroje bez ceny} other {# zdrojů bez ceny}}",
       "unpricedHint": "Nic v cenových datech těmto neodpovídalo — nenamapovaný typ, zdroj bez přímých nákladů nebo dosud nepodporovaný poskytovatel.",
       "indicative": "Odhady jsou orientační; skutečné náklady závisí na využití, regionu, závazcích a slevách.",
-      "credit": "Data o nákladech od <oiq>OpenInfraQuote</oiq>."
+      "credit": "Data o nákladech od <oiq>OpenInfraQuote</oiq>.",
+      "asOfState": "dle stavu v{serial}",
+      "noState": "Zatím žádné náklady — zobrazí se po prvním použití."
     }
   },
   "workspaceDetail": {
@@ -2022,17 +2024,18 @@
       "onboard": "Zapojit"
     },
     "tabs": {
-      "overview": "Přehled",
+      "configuration": "Konfigurace",
       "variables": "Proměnné",
       "runs": "Běhy",
       "state": "Stav",
       "stateGraph": "Graf stavu",
-      "configurations": "Konfigurace",
+      "versions": "Verze",
       "notifications": "Oznámení",
       "runTasks": "Run tasky",
       "runTriggers": "Run triggery",
       "sharing": "Sdílení",
-      "selectLabel": "Sekce pracovního prostoru"
+      "selectLabel": "Sekce pracovního prostoru",
+      "cost": "Náklady"
     },
     "lifecycle": {
       "pendingDeletion": "Čeká na smazání",

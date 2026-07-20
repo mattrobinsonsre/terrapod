@@ -1979,7 +1979,9 @@
       "unpricedTitle": "{count, plural, one {# ressource non tarifée} other {# ressources non tarifées}}",
       "unpricedHint": "Rien dans les données tarifaires ne correspondait à ces éléments : un type non mappé, une ressource sans coût direct ou un fournisseur pas encore pris en charge.",
       "indicative": "Les estimations sont indicatives ; le coût réel dépend de l'utilisation, de la région, des engagements et des remises.",
-      "credit": "Données de coût de <oiq>OpenInfraQuote</oiq>."
+      "credit": "Données de coût de <oiq>OpenInfraQuote</oiq>.",
+      "asOfState": "à l'état v{serial}",
+      "noState": "Aucun coût pour l'instant — apparaît après la première application."
     }
   },
   "workspaceDetail": {
@@ -2022,17 +2024,18 @@
       "onboard": "Intégrer"
     },
     "tabs": {
-      "overview": "Vue d'ensemble",
+      "configuration": "Configuration",
       "variables": "Variables",
       "runs": "Exécutions",
       "state": "État",
       "stateGraph": "Graphe d'état",
-      "configurations": "Configurations",
+      "versions": "Versions",
       "notifications": "Notifications",
       "runTasks": "Tâches d'exécution",
       "runTriggers": "Déclencheurs d'exécution",
       "sharing": "Partage",
-      "selectLabel": "Section de l'espace de travail"
+      "selectLabel": "Section de l'espace de travail",
+      "cost": "Coût"
     },
     "lifecycle": {
       "pendingDeletion": "Suppression en attente",

@@ -1979,7 +1979,9 @@
       "unpricedTitle": "{count, plural, zero {# مورد غير مسعّر} one {# مورد غير مسعّر} two {# موردان غير مسعّرين} few {# موارد غير مسعّرة} many {# موردًا غير مسعّر} other {# مورد غير مسعّر}}",
       "unpricedHint": "لم يتطابق أي شيء في بيانات التسعير مع هذه — نوع غير مُعيَّن، أو مورد بلا تكلفة مباشرة، أو مزوّد غير مدعوم بعد.",
       "indicative": "التقديرات استرشادية؛ تعتمد التكلفة الفعلية على الاستخدام والمنطقة والالتزامات والخصومات.",
-      "credit": "بيانات التكلفة من <oiq>OpenInfraQuote</oiq>."
+      "credit": "بيانات التكلفة من <oiq>OpenInfraQuote</oiq>.",
+      "asOfState": "اعتبارًا من الحالة v{serial}",
+      "noState": "لا توجد تكلفة بعد — تظهر بعد أول تطبيق."
     }
   },
   "workspaceDetail": {
@@ -2022,17 +2024,18 @@
       "onboard": "الإعداد"
     },
     "tabs": {
-      "overview": "نظرة عامة",
+      "configuration": "التكوين",
       "variables": "المتغيرات",
       "runs": "عمليات التشغيل",
       "state": "الحالة",
       "stateGraph": "مخطط الحالة",
-      "configurations": "التكوينات",
+      "versions": "الإصدارات",
       "notifications": "الإشعارات",
       "runTasks": "مهام التشغيل",
       "runTriggers": "مُشغّلات التشغيل",
       "sharing": "المشاركة",
-      "selectLabel": "قسم مساحة العمل"
+      "selectLabel": "قسم مساحة العمل",
+      "cost": "التكلفة"
     },
     "lifecycle": {
       "pendingDeletion": "بانتظار الحذف",

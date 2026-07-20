@@ -1979,7 +1979,9 @@
       "unpricedTitle": "{count, plural, one {fiyatlandırılmamış # kaynak} other {fiyatlandırılmamış # kaynak}}",
       "unpricedHint": "Fiyatlandırma verilerinde bunlarla eşleşen bir şey yoktu — eşlenmemiş bir tür, doğrudan maliyeti olmayan bir kaynak veya henüz kapsanmayan bir sağlayıcı.",
       "indicative": "Tahminler yaklaşıktır; gerçek maliyet kullanıma, bölgeye, taahhütlere ve indirimlere bağlıdır.",
-      "credit": "Maliyet verileri <oiq>OpenInfraQuote</oiq> kaynağından."
+      "credit": "Maliyet verileri <oiq>OpenInfraQuote</oiq> kaynağından.",
+      "asOfState": "durum v{serial} itibarıyla",
+      "noState": "Henüz maliyet yok — ilk uygulamadan sonra görünür."
     }
   },
   "workspaceDetail": {
@@ -2022,17 +2024,18 @@
       "onboard": "Dahil et"
     },
     "tabs": {
-      "overview": "Genel Bakış",
+      "configuration": "Yapılandırma",
       "variables": "Değişkenler",
       "runs": "Çalıştırmalar",
       "state": "Durum",
       "stateGraph": "Durum Grafiği",
-      "configurations": "Yapılandırmalar",
+      "versions": "Sürümler",
       "notifications": "Bildirimler",
       "runTasks": "Çalıştırma Görevleri",
       "runTriggers": "Çalıştırma Tetikleyicileri",
       "sharing": "Paylaşım",
-      "selectLabel": "Çalışma alanı bölümü"
+      "selectLabel": "Çalışma alanı bölümü",
+      "cost": "Maliyet"
     },
     "lifecycle": {
       "pendingDeletion": "Silinmeyi bekliyor",

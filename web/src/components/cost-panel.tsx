@@ -1,11 +1,18 @@
 'use client'
 
-// Cost panel (#871) — the run-page Cost tab. Renders the runner-produced
-// cost estimate (a native OpenInfraQuote-port estimate of the plan's monthly
-// cost delta). Every figure here is DATA — oiq-derived, no AI. The AI
-// enhancement (narrative, savings advisories, chat) is a separate follow-up
-// that rides the plan-analysis AI switch; when it lands it renders alongside,
-// clearly flagged, never blended into these authoritative numbers.
+// Cost panel (#871) — the Cost tab for BOTH a run and a workspace.
+//
+//  • run (runId):       the runner-produced estimate of the plan's monthly cost
+//                       *delta* — shows Monthly total + This-run + Previous.
+//  • workspace (workspaceId): the API-produced estimate of the workspace's
+//                       *current* managed-infra cost from its latest state —
+//                       shows just Monthly total (state carries no delta) plus
+//                       which state version it priced. Every resource is a noop,
+//                       so the per-resource Change column is dropped.
+//
+// Every figure here is DATA — oiq-derived, no AI. The AI enhancement (narrative,
+// savings advisories, chat) is a separate follow-up that rides the plan-analysis
+// AI switch; it renders alongside, clearly flagged, never blended into these.
 import { useEffect, useState } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import { apiFetch } from '@/lib/api'
@@ -29,6 +36,11 @@ interface UnpricedResource {
   type: string
   change: Change
 }
+interface StateVersionMeta {
+  id: string
+  serial: number
+  'created-at': string
+}
 interface Estimate {
   currency: string
   total: Range
@@ -36,6 +48,7 @@ interface Estimate {
   diff: Range
   resources: CostResource[]
   unpriced: UnpricedResource[]
+  'state-version'?: StateVersionMeta | null
 }
 
 const CHANGE_BADGE: Record<Change, string> = {
@@ -44,15 +57,22 @@ const CHANGE_BADGE: Record<Change, string> = {
   noop: 'bg-slate-700 text-slate-300',
 }
 
-export function CostPanel({ runId }: { runId: string }) {
+export function CostPanel({ runId, workspaceId }: { runId?: string; workspaceId?: string }) {
   const t = useTranslations('runDetail')
   const locale = useLocale()
   const [est, setEst] = useState<Estimate | null>(null)
   const [error, setError] = useState<string | null>(null)
 
+  // Workspace (current state cost) vs run (plan delta) — the only differences
+  // are the endpoint, the extra delta headline cards, and the Change column.
+  const isWorkspace = !!workspaceId
+  const endpoint = isWorkspace
+    ? `/api/terrapod/v1/workspaces/${workspaceId}/cost-estimate`
+    : `/api/terrapod/v1/runs/${runId}/cost-estimate`
+
   useEffect(() => {
     let cancelled = false
-    apiFetch(`/api/terrapod/v1/runs/${runId}/cost-estimate`)
+    apiFetch(endpoint)
       .then(async (res) => {
         if (!res.ok) throw new Error(t('cost.notAvailable'))
         const body = await res.json()
@@ -62,7 +82,7 @@ export function CostPanel({ runId }: { runId: string }) {
     return () => {
       cancelled = true
     }
-  }, [runId, t])
+  }, [endpoint, t])
 
   if (error) return <ErrorBanner message={error} />
   if (!est) return <LoadingSpinner />
@@ -83,40 +103,60 @@ export function CostPanel({ runId }: { runId: string }) {
   const unpriced = est.unpriced.length
   const diffPositive = est.diff.max > 0
   const diffNegative = est.diff.max < 0 && est.diff.min < 0
+  const sv = est['state-version'] ?? null
+
+  // Workspace with no state yet: a friendly empty state, not a $0 table.
+  if (isWorkspace && !sv) {
+    return (
+      <div className="rounded-xl border border-slate-700 bg-slate-800/30 p-6 text-sm text-slate-400">
+        {t('cost.noState')}
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Headline stat cards */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      {/* Headline stat cards. Run: total + this-run delta + previous. Workspace:
+          just the current total (state carries no delta). */}
+      <div className={`grid grid-cols-1 gap-3 ${isWorkspace ? 'sm:max-w-xs' : 'sm:grid-cols-3'}`}>
         <div className="rounded-xl border border-slate-700 bg-slate-800/50 p-4">
-          <div className="text-xs uppercase tracking-wide text-slate-400">
-            {t('cost.monthlyTotal')}
+          <div className="flex items-center justify-between gap-2">
+            <div className="text-xs uppercase tracking-wide text-slate-400">
+              {t('cost.monthlyTotal')}
+            </div>
+            {isWorkspace && sv && (
+              <span className="text-xs text-slate-500">{t('cost.asOfState', { serial: sv.serial })}</span>
+            )}
           </div>
           <div className="mt-1 text-2xl font-semibold tabular-nums text-slate-100" dir="ltr">
             {perMonth(est.total)}
           </div>
           <div className="mt-1 text-xs text-slate-500">{t('cost.pricedCount', { count: priced })}</div>
         </div>
-        <div className="rounded-xl border border-slate-700 bg-slate-800/50 p-4">
-          <div className="text-xs uppercase tracking-wide text-slate-400">{t('cost.thisRun')}</div>
-          <div
-            className={`mt-1 text-2xl font-semibold tabular-nums ${
-              diffPositive ? 'text-emerald-300' : diffNegative ? 'text-red-300' : 'text-slate-100'
-            }`}
-            dir="ltr"
-          >
-            {diffPositive ? '+' : ''}
-            {perMonth(est.diff)}
-          </div>
-          <div className="mt-1 text-xs text-slate-500">{t('cost.thisRunHint')}</div>
-        </div>
-        <div className="rounded-xl border border-slate-700 bg-slate-800/50 p-4">
-          <div className="text-xs uppercase tracking-wide text-slate-400">{t('cost.previous')}</div>
-          <div className="mt-1 text-2xl font-semibold tabular-nums text-slate-100" dir="ltr">
-            {perMonth(est.previous)}
-          </div>
-          <div className="mt-1 text-xs text-slate-500">{t('cost.previousHint')}</div>
-        </div>
+        {!isWorkspace && (
+          <>
+            <div className="rounded-xl border border-slate-700 bg-slate-800/50 p-4">
+              <div className="text-xs uppercase tracking-wide text-slate-400">{t('cost.thisRun')}</div>
+              <div
+                className={`mt-1 text-2xl font-semibold tabular-nums ${
+                  diffPositive ? 'text-emerald-300' : diffNegative ? 'text-red-300' : 'text-slate-100'
+                }`}
+                dir="ltr"
+              >
+                {diffPositive ? '+' : ''}
+                {perMonth(est.diff)}
+              </div>
+              <div className="mt-1 text-xs text-slate-500">{t('cost.thisRunHint')}</div>
+            </div>
+            <div className="rounded-xl border border-slate-700 bg-slate-800/50 p-4">
+              <div className="text-xs uppercase tracking-wide text-slate-400">{t('cost.previous')}</div>
+              <div className="mt-1 text-2xl font-semibold tabular-nums text-slate-100" dir="ltr">
+                {perMonth(est.previous)}
+              </div>
+              <div className="mt-1 text-xs text-slate-500">{t('cost.previousHint')}</div>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Per-resource breakdown */}
@@ -131,11 +171,17 @@ export function CostPanel({ runId }: { runId: string }) {
                   {r.address}
                 </div>
                 <div className="mt-2 flex items-center justify-between gap-2">
-                  <span
-                    className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${CHANGE_BADGE[r.change]}`}
-                  >
-                    {t(`cost.change.${r.change}`)}
-                  </span>
+                  {isWorkspace ? (
+                    <span className="font-mono text-xs text-slate-400" dir="ltr">
+                      {r.type}
+                    </span>
+                  ) : (
+                    <span
+                      className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${CHANGE_BADGE[r.change]}`}
+                    >
+                      {t(`cost.change.${r.change}`)}
+                    </span>
+                  )}
                   <span className="tabular-nums text-sm text-slate-200" dir="ltr">
                     {perMonth(r.monthly)}
                   </span>
@@ -151,7 +197,7 @@ export function CostPanel({ runId }: { runId: string }) {
                 <tr className="border-b border-slate-700 text-left text-xs uppercase tracking-wide text-slate-400">
                   <th className="px-4 py-2 font-medium">{t('cost.colResource')}</th>
                   <th className="px-4 py-2 font-medium">{t('cost.colType')}</th>
-                  <th className="px-4 py-2 font-medium">{t('cost.colChange')}</th>
+                  {!isWorkspace && <th className="px-4 py-2 font-medium">{t('cost.colChange')}</th>}
                   <th className="px-4 py-2 text-right font-medium">{t('cost.colMonthly')}</th>
                 </tr>
               </thead>
@@ -164,13 +210,15 @@ export function CostPanel({ runId }: { runId: string }) {
                     <td className="px-4 py-2 font-mono text-xs text-slate-400" dir="ltr">
                       {r.type}
                     </td>
-                    <td className="px-4 py-2">
-                      <span
-                        className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${CHANGE_BADGE[r.change]}`}
-                      >
-                        {t(`cost.change.${r.change}`)}
-                      </span>
-                    </td>
+                    {!isWorkspace && (
+                      <td className="px-4 py-2">
+                        <span
+                          className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${CHANGE_BADGE[r.change]}`}
+                        >
+                          {t(`cost.change.${r.change}`)}
+                        </span>
+                      </td>
+                    )}
                     <td className="px-4 py-2 text-right tabular-nums text-slate-200" dir="ltr">
                       {perMonth(r.monthly)}
                     </td>

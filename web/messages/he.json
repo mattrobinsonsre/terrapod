@@ -1979,7 +1979,9 @@
       "unpricedTitle": "{count, plural, one {# משאב לא מתומחר} two {# משאבים לא מתומחרים} many {# משאבים לא מתומחרים} other {# משאבים לא מתומחרים}}",
       "unpricedHint": "שום דבר בנתוני התמחור לא תאם אותם — סוג לא ממופה, משאב ללא עלות ישירה, או ספק שעדיין אינו נתמך.",
       "indicative": "האומדנים הם להמחשה בלבד; העלות בפועל תלויה בשימוש, באזור, בהתחייבויות ובהנחות.",
-      "credit": "נתוני עלות מ־<oiq>OpenInfraQuote</oiq>."
+      "credit": "נתוני עלות מ־<oiq>OpenInfraQuote</oiq>.",
+      "asOfState": "נכון למצב v{serial}",
+      "noState": "עדיין אין עלות — מופיעה לאחר ההחלה הראשונה."
     }
   },
   "workspaceDetail": {
@@ -2022,17 +2024,18 @@
       "onboard": "קליטה"
     },
     "tabs": {
-      "overview": "סקירה",
+      "configuration": "תצורה",
       "variables": "משתנים",
       "runs": "הרצות",
       "state": "מצב",
       "stateGraph": "גרף מצב",
-      "configurations": "תצורות",
+      "versions": "גרסאות",
       "notifications": "התראות",
       "runTasks": "משימות הרצה",
       "runTriggers": "טריגרים להרצה",
       "sharing": "שיתוף",
-      "selectLabel": "מקטע סביבת עבודה"
+      "selectLabel": "מקטע סביבת עבודה",
+      "cost": "עלות"
     },
     "lifecycle": {
       "pendingDeletion": "ממתין למחיקה",

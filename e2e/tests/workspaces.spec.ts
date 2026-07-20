@@ -43,7 +43,7 @@ test.describe('Workspaces', () => {
     await page.click(`text=${wsName}`);
 
     // Verify tabs are present (use getByRole to avoid matching text in other elements)
-    await expect(page.getByRole('button', { name: 'Overview' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Configuration' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Variables' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Runs' })).toBeVisible();
     // `exact` so 'State' doesn't also match the 'State Graph' tab (#765).
