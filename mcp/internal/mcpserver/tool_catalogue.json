@@ -209,6 +209,23 @@
     }
   },
   {
+    "name": "terrapod_run_cost",
+    "read_only": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "run_id": {
+          "description": "the run id (run-... or a bare uuid) whose plan cost delta to fetch",
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
     "name": "terrapod_run_create",
     "destructive": true,
     "input_schema": {
@@ -407,6 +424,23 @@
       "required": [
         "workspace_id",
         "key"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_workspace_cost",
+    "read_only": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "workspace_id": {
+          "description": "the workspace id (ws-...) whose current managed-infrastructure monthly cost to estimate",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_id"
       ],
       "type": "object"
     }
