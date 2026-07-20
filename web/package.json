@@ -12,7 +12,7 @@
     "i18n:lint": "node scripts/check-no-hardcoded-strings.mjs"
   },
   "dependencies": {
-    "@radix-ui/react-dialog": "^1.1.18",
+    "@radix-ui/react-dialog": "^1.1.19",
     "@radix-ui/react-dropdown-menu": "^2.1.20",
     "@radix-ui/react-tabs": "^1.1.16",
     "@zxcvbn-ts/core": "^3.0.4",
