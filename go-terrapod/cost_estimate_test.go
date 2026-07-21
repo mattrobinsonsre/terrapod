@@ -167,6 +167,7 @@ const costSummaryBody = `{"data":{"id":"cost-summary-abc","type":"cost-summaries
       {"kind":"rightsizing","title":"Downsize us","detail":"Idle most of the day.","monthly_saving":null,"source":"ai-estimate"}
     ],
     "model":"bedrock/claude","input-tokens":120,"output-tokens":60,"error-message":"",
+    "language":"en","translated":true,
     "created-at":"2026-01-01T00:00:00Z","updated-at":"2026-01-01T00:01:00Z"
   },
   "relationships":{"run":{"data":{"id":"run-abc","type":"runs"}}}}}`
@@ -182,6 +183,9 @@ func TestGetRunCostSummary(t *testing.T) {
 	}
 	if s.Status != "ready" || s.Narrative == "" {
 		t.Errorf("status/narrative not decoded: %+v", s)
+	}
+	if s.Language != "en" || !s.Translated {
+		t.Errorf("language/translated not decoded: lang=%q translated=%v", s.Language, s.Translated)
 	}
 	if len(s.EstimatedResources) != 1 {
 		t.Fatalf("estimated_resources=%d, want 1", len(s.EstimatedResources))

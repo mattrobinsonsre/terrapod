@@ -101,11 +101,13 @@ field CostSummary.ErrorMessage string `json:"error-message"`
 field CostSummary.EstimatedResources []CostEstimatedResource `json:"estimated-resources"`
 field CostSummary.ID string `json:"-"`
 field CostSummary.InputTokens int `json:"input-tokens"`
+field CostSummary.Language string `json:"-"`
 field CostSummary.Model string `json:"model"`
 field CostSummary.Narrative string `json:"narrative"`
 field CostSummary.OutputTokens int `json:"output-tokens"`
 field CostSummary.RunID string `json:"-"`
 field CostSummary.Status string `json:"status"`
+field CostSummary.Translated bool `json:"-"`
 field CostSummary.UpdatedAt string `json:"updated-at"`
 field CreateAPITokenRequest.Description string
 field CreateAPITokenRequest.Kind string

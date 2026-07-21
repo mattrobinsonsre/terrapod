@@ -159,6 +159,95 @@ async def test_translate_summary_model_failure_falls_back(_no_cache):
     assert out is None  # caller serves canonical text
 
 
+# ── translate_cost_summary (#871) ────────────────────────────────────────────
+
+
+async def test_translate_cost_summary_skips_untranslatable_locale(_no_cache):
+    with patch.object(st.settings.ai_summary, "summary_language", "en"):
+        out = await st.translate_cost_summary(
+            summary_id="c1",
+            narrative="hi",
+            estimated_resources=[],
+            advisories=[],
+            reader_locale="en-x-leet",
+        )
+    assert out is None
+
+
+async def test_translate_cost_summary_translates_prose_preserves_data(_no_cache):
+    # Only narrative + estimate.basis + advisory.title/detail are translated;
+    # address/type/monthly/source + kind/monthly_saving/source stay verbatim.
+    translated_json = json.dumps(
+        {
+            "narrative": "Zusammenfassung auf Deutsch",
+            "estimated": [{"basis": "Grundlage DE"}],
+            "advisories": [{"title": "Titel DE", "detail": "Detail DE"}],
+        }
+    )
+    with (
+        patch.object(st.settings.ai_summary, "summary_language", "en"),
+        patch.object(st, "_translate_call", AsyncMock(return_value=(translated_json, 42))),
+    ):
+        out = await st.translate_cost_summary(
+            summary_id="c1",
+            narrative="English narrative",
+            estimated_resources=[
+                {
+                    "address": "azurerm_storage_account.a",
+                    "type": "azurerm_storage_account",
+                    "monthly": {"min": 5.0, "max": 8.0},
+                    "basis": "LRS hot ~100GB",
+                    "source": "ai-estimate",
+                }
+            ],
+            advisories=[
+                {
+                    "kind": "reserved",
+                    "title": "T",
+                    "detail": "D",
+                    "monthly_saving": {"min": 10.0, "max": 20.0},
+                    "source": "ai-estimate",
+                }
+            ],
+            reader_locale="de",
+        )
+    assert out["narrative"] == "Zusammenfassung auf Deutsch"
+    e = out["estimated_resources"][0]
+    assert e["basis"] == "Grundlage DE"
+    # non-prose fields preserved untouched
+    assert e["address"] == "azurerm_storage_account.a"
+    assert e["monthly"] == {"min": 5.0, "max": 8.0}
+    assert e["source"] == "ai-estimate"
+    a = out["advisories"][0]
+    assert a["title"] == "Titel DE" and a["detail"] == "Detail DE"
+    assert a["kind"] == "reserved"
+    assert a["monthly_saving"] == {"min": 10.0, "max": 20.0}
+    assert a["source"] == "ai-estimate"
+
+
+async def test_translate_cost_summary_empty_is_none(_no_cache):
+    with patch.object(st.settings.ai_summary, "summary_language", "en"):
+        out = await st.translate_cost_summary(
+            summary_id="c1", narrative="", estimated_resources=[], advisories=[], reader_locale="de"
+        )
+    assert out is None
+
+
+async def test_translate_cost_summary_model_failure_falls_back(_no_cache):
+    with (
+        patch.object(st.settings.ai_summary, "summary_language", "en"),
+        patch.object(st, "_translate_call", AsyncMock(side_effect=RuntimeError("boom"))),
+    ):
+        out = await st.translate_cost_summary(
+            summary_id="c1",
+            narrative="x",
+            estimated_resources=[],
+            advisories=[{"kind": "other", "title": "t", "detail": "d", "monthly_saving": None}],
+            reader_locale="de",
+        )
+    assert out is None  # caller serves canonical text
+
+
 # ── normalize_to_system_language (3b helper) ─────────────────────────────────
 
 

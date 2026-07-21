@@ -136,6 +136,65 @@ class TestGetCostSummary:
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
     @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
+    async def test_translated_on_locale(self, mock_resolve, *_):
+        # ?locale= translates the prose on view; data fields stay verbatim, and
+        # translated/language reflect the translation (#871).
+        mock_resolve.return_value = caps_for_level("read")
+        run = _mock_run()
+        ws = _mock_ws(run.workspace_id)
+        summary = _mock_cost_summary(run.id)
+        mock_db = AsyncMock()
+        mock_db.execute = AsyncMock(
+            side_effect=[
+                MagicMock(scalar_one_or_none=MagicMock(return_value=run)),
+                MagicMock(scalar_one_or_none=MagicMock(return_value=summary)),
+            ]
+        )
+        mock_db.get = AsyncMock(return_value=ws)
+
+        translated = {
+            "narrative": "Zusammenfassung DE",
+            "estimated_resources": [
+                {
+                    "address": "azurerm_storage_account.a",
+                    "type": "azurerm_storage_account",
+                    "monthly": {"min": 5.0, "max": 8.0},
+                    "basis": "Grundlage DE",
+                    "source": "ai-estimate",
+                }
+            ],
+            "advisories": [
+                {"kind": "reserved", "title": "Titel DE", "detail": "d", "source": "ai-estimate"}
+            ],
+        }
+
+        app = _make_app(_user(), mock_db)
+        with (
+            patch(
+                "terrapod.services.summary_translation.translate_cost_summary",
+                AsyncMock(return_value=translated),
+            ),
+            patch("terrapod.api.routers.runs.settings.ai_summary.summary_language", "en"),
+        ):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+                resp = await c.get(
+                    f"/api/terrapod/v1/runs/run-{run.id}/cost-summary?locale=de", headers=_AUTH
+                )
+
+        assert resp.status_code == 200
+        attrs = resp.json()["data"]["attributes"]
+        assert attrs["translated"] is True
+        assert attrs["language"] == "en"
+        assert attrs["narrative"] == "Zusammenfassung DE"
+        assert attrs["estimated-resources"][0]["basis"] == "Grundlage DE"
+        # Provenance + numbers preserved through translation.
+        assert attrs["estimated-resources"][0]["source"] == "ai-estimate"
+        assert attrs["estimated-resources"][0]["monthly"] == {"min": 5.0, "max": 8.0}
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
     async def test_404_when_absent(self, mock_resolve, *_):
         mock_resolve.return_value = caps_for_level("read")
         run = _mock_run()

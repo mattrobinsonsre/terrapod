@@ -17,7 +17,7 @@
  */
 
 import type React from 'react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslations, useLocale } from 'next-intl'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -61,6 +61,10 @@ interface CostSummary {
     'input-tokens': number
     'output-tokens': number
     'error-message': string
+    /** Canonical language the prose is stored in (#871). */
+    language?: string
+    /** True when the served prose was translated on view for the reader. */
+    translated?: boolean
     'created-at': string
     'updated-at': string
   }
@@ -83,6 +87,9 @@ const ADVISORY_BADGE: Record<AdvisoryKind, string> = {
 
 export function CostAiSummary({ runId, refreshKey = 0 }: Props) {
   const t = useTranslations('runDetail')
+  // "Translating…" + the translated note are the same concept as the plan
+  // summary; reuse its already-translated strings rather than duplicate keys.
+  const tp = useTranslations('planSummary')
   const locale = useLocale()
   const [summary, setSummary] = useState<CostSummary | null>(null)
   const [missing, setMissing] = useState(false)
@@ -90,14 +97,27 @@ export function CostAiSummary({ runId, refreshKey = 0 }: Props) {
   const [transportError, setTransportError] = useState<string | null>(null)
   const [regenerating, setRegenerating] = useState(false)
   const [regenerateError, setRegenerateError] = useState<string | null>(null)
+  // True while a locale change re-fetches the translated view — keep the
+  // previous (stale-language) content on screen under a spinner (#871/#767).
+  const [translating, setTranslating] = useState(false)
+  const hasContentRef = useRef(false)
   const isTouch = useIsTouch()
 
   const load = useCallback(async () => {
+    // A re-fetch while we already have content means the reader switched
+    // language — show the translating spinner and keep the old content visible.
+    if (hasContentRef.current) setTranslating(true)
     try {
-      const res = await apiFetch(`/api/terrapod/v1/runs/run-${runId}/cost-summary`)
+      // Pass the reader's locale so the API translates the canonical-language
+      // prose on view (#871). Re-fetches when the locale changes (load is keyed
+      // on it).
+      const res = await apiFetch(
+        `/api/terrapod/v1/runs/run-${runId}/cost-summary?locale=${encodeURIComponent(locale)}`,
+      )
       if (res.status === 404) {
         setMissing(true)
         setSummary(null)
+        hasContentRef.current = false
         return
       }
       if (!res.ok) {
@@ -106,14 +126,16 @@ export function CostAiSummary({ runId, refreshKey = 0 }: Props) {
       }
       const data = await res.json()
       setSummary(data.data as CostSummary)
+      hasContentRef.current = true
       setMissing(false)
       setTransportError(null)
     } catch (e) {
       setTransportError(e instanceof Error ? e.message : String(e))
     } finally {
       setLoading(false)
+      setTranslating(false)
     }
-  }, [runId, t])
+  }, [runId, t, locale])
 
   useEffect(() => {
     load()
@@ -171,6 +193,12 @@ export function CostAiSummary({ runId, refreshKey = 0 }: Props) {
           <Sparkles className="h-4 w-4 text-brand-400" aria-hidden="true" />
           <h3 className="text-sm font-medium text-slate-200">{t('costAi.heading')}</h3>
           <span className="hidden text-xs text-slate-500 md:inline">{t('costAi.aiGenerated')}</span>
+          {translating && (
+            <span className="flex items-center gap-1.5 text-xs text-brand-400">
+              <RefreshCw className="h-3 w-3 animate-spin" aria-hidden="true" />
+              {tp('translating')}
+            </span>
+          )}
         </div>
         {attrs && attrs.status !== 'pending' && (
           <button
@@ -322,6 +350,10 @@ export function CostAiSummary({ runId, refreshKey = 0 }: Props) {
                 </ReactMarkdown>
               </div>
             </div>
+          )}
+
+          {attrs.translated && (
+            <p className="text-xs italic text-slate-500">{tp('translatedNote')}</p>
           )}
 
           {/* Provenance + model footer. */}

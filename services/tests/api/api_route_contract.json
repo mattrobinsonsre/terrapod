@@ -116,7 +116,7 @@
   "GET /api/terrapod/v1/runs/{run_id}/artifacts/plan-file",
   "GET /api/terrapod/v1/runs/{run_id}/artifacts/state",
   "GET /api/terrapod/v1/runs/{run_id}/cost-estimate",
-  "GET /api/terrapod/v1/runs/{run_id}/cost-summary",
+  "GET /api/terrapod/v1/runs/{run_id}/cost-summary ?locale",
   "GET /api/terrapod/v1/runs/{run_id}/impact-graph",
   "GET /api/terrapod/v1/runs/{run_id}/plan",
   "GET /api/terrapod/v1/runs/{run_id}/plan-summary ?locale",

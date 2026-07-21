@@ -324,6 +324,91 @@ async def translate_summary(
     }
 
 
+async def translate_cost_summary(
+    *,
+    summary_id: str,
+    narrative: str,
+    estimated_resources: list[dict[str, Any]],
+    advisories: list[dict[str, Any]],
+    reader_locale: str | None,
+) -> dict[str, Any] | None:
+    """Translate a ready cost summary's prose into the reader's locale, or None.
+
+    The cost analogue of :func:`translate_summary` (#871). Returns
+    ``{"narrative": str, "estimated_resources": [...], "advisories": [...]}`` with
+    only the natural-language fields translated — the narrative, each estimated
+    resource's ``basis``, and each advisory's ``title``/``detail``. Every other
+    field (``address``/``type``/``monthly``/``source`` on estimates;
+    ``kind``/``monthly_saving``/``source`` on advisories) is preserved verbatim.
+    Returns None when no translation applies (locale not a target, same language,
+    budget exhausted, or the model call fails) — the caller then serves canonical.
+    """
+    target = target_language(reader_locale, settings.ai_summary.summary_language)
+    if target is None:
+        return None
+    if not (narrative or estimated_resources or advisories):
+        return None
+
+    # Only the translatable natural-language fields go into the cache key + call.
+    est_min = [{"basis": e.get("basis", "")} for e in estimated_resources]
+    adv_min = [{"title": a.get("title", ""), "detail": a.get("detail", "")} for a in advisories]
+    canonical = json.dumps(
+        {"narrative": narrative, "estimated": est_min, "advisories": adv_min},
+        ensure_ascii=False,
+        sort_keys=True,
+    )
+    key = _cache_key("cost_summary", summary_id, target, _hash(canonical))
+
+    cached = await _cache_get(key)
+    if cached is None:
+        if not await _budget_ok():
+            logger.info("cost_translation_skipped_budget", summary_id=summary_id, target=target)
+            return None
+        try:
+            raw, out_tok = await _translate_call(
+                _TRANSLATE_JSON_SYSTEM.format(target=target),
+                canonical,
+                max_tokens=settings.ai_summary.max_output_tokens,
+            )
+            await _charge(out_tok)
+            cached = _strip_json_fence(raw)
+            json.loads(cached)  # validate before caching
+            await _cache_set(key, cached)
+        except Exception as exc:  # noqa: BLE001 — never break the view
+            logger.warning(
+                "cost_translation_failed", summary_id=summary_id, target=target, error=str(exc)
+            )
+            return None
+
+    try:
+        payload = json.loads(cached)
+    except (ValueError, TypeError):
+        return None
+
+    te = payload.get("estimated", [])
+    out_est: list[dict[str, Any]] = []
+    for i, orig in enumerate(estimated_resources):
+        merged = dict(orig)
+        if i < len(te) and isinstance(te[i], dict):
+            merged["basis"] = te[i].get("basis", orig.get("basis", ""))
+        out_est.append(merged)
+
+    ta = payload.get("advisories", [])
+    out_adv: list[dict[str, Any]] = []
+    for i, orig in enumerate(advisories):
+        merged = dict(orig)
+        if i < len(ta) and isinstance(ta[i], dict):
+            merged["title"] = ta[i].get("title", orig.get("title", ""))
+            merged["detail"] = ta[i].get("detail", orig.get("detail", ""))
+        out_adv.append(merged)
+
+    return {
+        "narrative": payload.get("narrative", narrative),
+        "estimated_resources": out_est,
+        "advisories": out_adv,
+    }
+
+
 async def translate_message(
     *, message_id: str, content: str, reader_locale: str | None
 ) -> str | None:
