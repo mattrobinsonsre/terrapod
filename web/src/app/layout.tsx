@@ -13,6 +13,13 @@ export const metadata: Metadata = {
   icons: {
     icon: '/logo.svg',
   },
+  // Suppress the browser's built-in machine translation (#906). The UI ships
+  // its own translated catalogs + an in-app switcher (#767). Chrome decides
+  // whether to OFFER page translation from this Google-specific meta, NOT from
+  // the W3C `translate="no"` attribute on <html> (which Chrome only honors for
+  // excluding individual elements) — so both are set: the meta stops the
+  // "Translate this page?" offer, the attribute marks the content non-translatable.
+  other: { google: 'notranslate' },
 }
 
 export default async function RootLayout({
