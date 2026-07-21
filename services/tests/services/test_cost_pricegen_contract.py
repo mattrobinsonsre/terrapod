@@ -61,6 +61,11 @@ _ROWS = [
     "AWSLambda,Serverless,type=aws_lambda_function,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=requests&start_usage_amount=0&end_usage_amount=Inf,0.0000002000,o,USD",
     "AWSLambda,Serverless,type=aws_lambda_function,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=duration&arch=x86&start_usage_amount=0&end_usage_amount=6000000000,0.0000166667,t,USD",
     "AWSLambda,Serverless,type=aws_lambda_function&values.architectures=arm64,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=duration&arch=arm64&start_usage_amount=0&end_usage_amount=7500000000,0.0000133334,t,USD",
+    # S3 — Standard storage (first GB tier) + Tier-1 (PUT/LIST) + Tier-2 (GET)
+    # requests, each correlated with a usage entry via a literal pricing dim.
+    "AmazonS3,Storage,type=aws_s3_bucket,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=storage&storage_class=general_purpose&start_usage_amount=0&end_usage_amount=51200,0.0230000000,d,USD",
+    "AmazonS3,API Request,type=aws_s3_bucket,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=requests&tier=1&start_usage_amount=0&end_usage_amount=Inf,0.0000050000,o,USD",
+    "AmazonS3,API Request,type=aws_s3_bucket,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=requests&tier=2&start_usage_amount=0&end_usage_amount=Inf,0.0000004000,o,USD",
 ]
 
 
@@ -394,6 +399,28 @@ def test_lambda_x86_and_arm64_price_by_architecture():
         reqs + 1_000_000 * 0.0000133334, abs=0.01
     )
     assert costs["aws_lambda_function.a"] < costs["aws_lambda_function.d"]  # arm64 cheaper
+
+
+def test_s3_bucket_storage_plus_request_tiers():
+    """S3 prices its three dimensions — Standard storage (per-GB, first tier) +
+    Tier-1 and Tier-2 requests — each correlated to its usage entry by a literal
+    pricing dimension (storage_class / tier). (#893)"""
+    plan = _plan(
+        [
+            {
+                "address": "aws_s3_bucket.b",
+                "type": "aws_s3_bucket",
+                "name": "b",
+                "mode": "managed",
+                "values": {"region": "us-east-1"},
+            }
+        ]
+    )
+    est = estimate(plan, _sheet())
+    # usage defaults: 900 GB storage + 4M Tier-1 + 50M Tier-2 requests.
+    expected = 900 * 0.023 + 4_000_000 * 0.000005 + 50_000_000 * 0.0000004
+    assert est.resources[0].monthly_min == pytest.approx(expected, abs=0.01)  # $60.70
+    assert est.unpriced == []
 
 
 def test_ec2_instance_prices():

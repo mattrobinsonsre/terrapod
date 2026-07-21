@@ -28,3 +28,7 @@ recipes:
     recipe: aws_lambda_function
     offer: .cache/lambda-us-east-1.json
     fetch: { service_code: AWSLambda, region: us-east-1 }
+  - provider: aws
+    recipe: aws_s3_bucket
+    offer: .cache/s3-us-east-1.json
+    fetch: { service_code: AmazonS3, region: us-east-1 }
