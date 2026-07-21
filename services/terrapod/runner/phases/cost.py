@@ -105,7 +105,7 @@ def _fetch_pricesheet(cfg: RunnerConfig) -> bool:
     to a presigned storage URL that ``download_to_file`` follows.
     """
     url = f"{cfg.api_url}{_PRICESHEET_PATH}"
-    headers = {"Authorization": cfg.auth_header} if cfg.auth_token else {}
+    headers = {"Authorization": f"Bearer {cfg.auth_token}"} if cfg.auth_token else {}
     result = download_to_file(
         url,
         _PRICESHEET_CSV,
