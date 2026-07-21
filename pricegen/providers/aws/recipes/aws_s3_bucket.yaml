@@ -1,0 +1,33 @@
+# S3 -> aws_s3_bucket (on-demand). Three cost dimensions for the common Standard
+# (General Purpose) class: per-GB-month storage (tiered) + Tier-1 requests
+# (PUT/POST/LIST) + Tier-2 requests (GET/etc). Each correlates with an existing
+# usage entry via a literal pricing dimension: storage_class=general_purpose,
+# tier=1, tier=2. Only Standard storage is covered here; Infrequent Access /
+# Glacier / One Zone (SIA/GIR/XZ groups) are follow-ups.
+resource_type: aws_s3_bucket
+service: AmazonS3
+
+components:
+  # Standard storage — per GB-month, tiered (0-51200 / 51200-512000 / 512000-Inf).
+  - product_family: "^Storage$"
+    service_class: storage
+    select: { volumeType: Standard }
+    pricing: { storage_class: general_purpose }
+    price: { type: d, unit: GB-Mo }
+    tier: usage
+
+  # Tier-1 requests (PUT / POST / LIST) — the pricier request class.
+  - product_family: "^API Request$"
+    service_class: requests
+    select: { group: S3-API-Tier1 }
+    pricing: { tier: "1" }
+    price: { type: o, unit: Requests }
+    tier: usage
+
+  # Tier-2 requests (GET / SELECT / others).
+  - product_family: "^API Request$"
+    service_class: requests
+    select: { group: S3-API-Tier2 }
+    pricing: { tier: "2" }
+    price: { type: o, unit: Requests }
+    tier: usage
