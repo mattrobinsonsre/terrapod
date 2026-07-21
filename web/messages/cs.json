@@ -1982,6 +1982,39 @@
       "credit": "Data o nákladech od <oiq>OpenInfraQuote</oiq>.",
       "asOfState": "dle stavu v{serial}",
       "noState": "Zatím žádné náklady — zobrazí se po prvním použití."
+    },
+    "costAi": {
+      "heading": "Odhad nákladů od AI",
+      "aiGenerated": "Vygenerováno AI",
+      "pending": "Odhadování nákladů, které cenová data nepokrývají…",
+      "skipped": "Odhad nákladů od AI byl pro tento běh přeskočen.",
+      "errored": "Odhad nákladů od AI selhal",
+      "estimatedTitle": "{count, plural, one {# zdroj odhadnutý AI} few {# zdroje odhadnuté AI} many {# zdroje odhadnuté AI} other {# zdrojů odhadnutých AI}}",
+      "estimatedHint": "Měsíční odhady pro zdroje, které cenová data nedokázala ocenit — nejlepší odhad modelu, nikoli vypočtená hodnota.",
+      "nothingToEstimate": "Cenová data pokryla každý zdroj — pro AI nezbylo nic k odhadu.",
+      "colBasis": "Základ",
+      "colEstimated": "Odh. měsíčně",
+      "advisoriesTitle": "Možnosti úspor",
+      "saveUpTo": "ušetřete ~{amount}/měs.",
+      "narrativeTitle": "Souhrn",
+      "estimateNote": "Odhady AI — zobrazují se samostatně a nikdy se nepřičítají k výše uvedenému oceněnému součtu.",
+      "advisoryKind": {
+        "savings_plan": "Savings Plan",
+        "reserved": "Rezervované",
+        "spot": "Spot",
+        "rightsizing": "Optimalizace velikosti",
+        "other": "Tip"
+      },
+      "regenerate": {
+        "label": "Vygenerovat znovu",
+        "queueing": "Řazení do fronty…",
+        "tooltip": "Znovu spustit odhad nákladů od AI",
+        "ariaLabel": "Znovu vygenerovat odhad nákladů od AI",
+        "confirm": "Spustit odhad nákladů od AI pro tento běh znovu?"
+      },
+      "errors": {
+        "status": "Nepodařilo se načíst odhad nákladů od AI (HTTP {status})."
+      }
     }
   },
   "workspaceDetail": {

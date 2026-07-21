@@ -1982,6 +1982,39 @@
       "credit": "Data impensae ex <oiq>OpenInfraQuote</oiq>.",
       "asOfState": "secundum statum v{serial}",
       "noState": "Nullus sumptus adhuc — post primam applicationem apparet."
+    },
+    "costAi": {
+      "heading": "Aestimatio impensae per AI",
+      "aiGenerated": "AI generatum",
+      "pending": "Impensae aestimantur quas data pretiorum comprehendere non possunt…",
+      "skipped": "Aestimatio impensae per AI huic executioni praetermissa est.",
+      "errored": "Aestimatio impensae per AI defecit",
+      "estimatedTitle": "{count, plural, one {# fons per AI aestimatus} other {# fontes per AI aestimati}}",
+      "estimatedHint": "Aestimationes menstruae fontium quibus data pretiorum pretium imponere non potuerunt — optima coniectura exemplaris, non numerus computatus.",
+      "nothingToEstimate": "Data pretiorum omnem fontem comprehenderunt — nihil AI aestimandum relictum.",
+      "colBasis": "Fundamentum",
+      "colEstimated": "Menstr. aestim.",
+      "advisoriesTitle": "Occasiones parsimoniae",
+      "saveUpTo": "serva ~{amount}/mens.",
+      "narrativeTitle": "Summarium",
+      "estimateNote": "Aestimationes AI — seorsum ostensae, numquam summae taxatae supra adiectae.",
+      "advisoryKind": {
+        "savings_plan": "Consilium parsimoniae",
+        "reserved": "Reservatum",
+        "spot": "Spot",
+        "rightsizing": "Magnitudinis accommodatio",
+        "other": "Suggestio"
+      },
+      "regenerate": {
+        "label": "Regenerare",
+        "queueing": "In ordine…",
+        "tooltip": "Aestimationem impensae per AI iterum exsequi",
+        "ariaLabel": "Aestimationem impensae per AI regenerare",
+        "confirm": "Aestimationem impensae per AI huic executioni iterum exsequi?"
+      },
+      "errors": {
+        "status": "Aestimatio impensae per AI onerari non potuit (HTTP {status})."
+      }
     }
   },
   "workspaceDetail": {

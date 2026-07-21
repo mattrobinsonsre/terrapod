@@ -1982,6 +1982,39 @@
       "credit": "コストデータの提供元: <oiq>OpenInfraQuote</oiq>。",
       "asOfState": "状態 v{serial} 時点",
       "noState": "まだコストはありません — 最初の適用後に表示されます。"
+    },
+    "costAi": {
+      "heading": "AI コスト見積もり",
+      "aiGenerated": "AI生成",
+      "pending": "価格データでカバーできないコストを見積もり中…",
+      "skipped": "この実行では AI コスト見積もりがスキップされました。",
+      "errored": "AI コスト見積もりに失敗しました",
+      "estimatedTitle": "{count, plural, other {AI 見積もりリソース # 件}}",
+      "estimatedHint": "価格データで算出できなかったリソースの月額見積もり — 計算値ではなく、モデルによる推測です。",
+      "nothingToEstimate": "価格データがすべてのリソースをカバーしました — AI が見積もるものはありません。",
+      "colBasis": "根拠",
+      "colEstimated": "推定月額",
+      "advisoriesTitle": "コスト削減の機会",
+      "saveUpTo": "~{amount}/月 節約",
+      "narrativeTitle": "概要",
+      "estimateNote": "AI による見積もり — 別途表示され、上記の価格付き合計には加算されません。",
+      "advisoryKind": {
+        "savings_plan": "節約プラン",
+        "reserved": "リザーブド",
+        "spot": "スポット",
+        "rightsizing": "サイズ最適化",
+        "other": "ヒント"
+      },
+      "regenerate": {
+        "label": "再生成",
+        "queueing": "キューに追加中…",
+        "tooltip": "AI コスト見積もりを再実行",
+        "ariaLabel": "AI コスト見積もりを再生成",
+        "confirm": "この実行の AI コスト見積もりを再実行しますか？"
+      },
+      "errors": {
+        "status": "AI コスト見積もりの読み込みに失敗しました（HTTP {status}）。"
+      }
     }
   },
   "workspaceDetail": {
