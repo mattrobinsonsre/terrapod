@@ -261,7 +261,9 @@ function ChatRow({ msg }: { msg: ChatMessage }) {
           </div>
         ) : (
           <div className="text-sm text-slate-300 leading-relaxed">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+            {/* singleTilde:false — a lone "~" (e.g. "~50 resources") must not be
+                paired into a GFM strikethrough span. */}
+            <ReactMarkdown remarkPlugins={[[remarkGfm, { singleTilde: false }]]}>
               {msg.attributes.content}
             </ReactMarkdown>
           </div>

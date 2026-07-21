@@ -1998,6 +1998,7 @@
       "saveUpTo": "save ~{amount}/mo",
       "narrativeTitle": "Marklar",
       "estimateNote": "AI estimates — shown separately, never added to the priced marklar above.",
+      "chatPlaceholder": "Ask a follow-up marklar about these marklar… (⌘/Ctrl + Marklar to send)",
       "advisoryKind": {
         "savings_plan": "Savings Plan",
         "reserved": "Reserved",

@@ -43,7 +43,10 @@ interface Props {
 }
 
 export function CostSummaryChat({ runId, refreshKey }: Props) {
+  // Generic chat labels (heading/send/you/assistant) are reused from the plan
+  // summary; only the placeholder is cost-specific (`runDetail.costAi`).
   const t = useTranslations('planSummary')
+  const tc = useTranslations('runDetail')
   const locale = useLocale()
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [loaded, setLoaded] = useState(false)
@@ -182,7 +185,7 @@ export function CostSummaryChat({ runId, refreshKey }: Props) {
             }}
             disabled={sending}
             rows={2}
-            placeholder={t('chat.placeholder')}
+            placeholder={tc('costAi.chatPlaceholder')}
             className="max-h-40 min-h-[3rem] flex-1 resize-y rounded border border-slate-700 bg-slate-900/60 p-2 text-sm text-slate-200 placeholder-slate-500 focus:border-brand-500 focus:outline-none"
           />
           <button
@@ -221,7 +224,11 @@ function ChatRow({ msg }: { msg: ChatMessage }) {
           </div>
         ) : (
           <div className="text-sm leading-relaxed text-slate-300">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.attributes.content}</ReactMarkdown>
+            {/* singleTilde:false — cost prose is full of "~$X" (approximately);
+                without this, GFM pairs the tildes into strikethrough spans. */}
+            <ReactMarkdown remarkPlugins={[[remarkGfm, { singleTilde: false }]]}>
+              {msg.attributes.content}
+            </ReactMarkdown>
           </div>
         )}
       </div>

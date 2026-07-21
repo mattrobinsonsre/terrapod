@@ -1998,6 +1998,7 @@
       "saveUpTo": "save ~{amount}/mo",
       "narrativeTitle": "Summry",
       "estimateNote": "AI estim8s — shown seprately, nevr added ta teh priced total abuv.",
+      "chatPlaceholder": "Ask a follow-up questshun bout deze costs… (⌘/Ctrl + Enter ta send)",
       "advisoryKind": {
         "savings_plan": "Savingz Plan",
         "reserved": "Reservd",

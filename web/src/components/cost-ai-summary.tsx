@@ -346,7 +346,12 @@ export function CostAiSummary({ runId, refreshKey = 0 }: Props) {
                 {t('costAi.narrativeTitle')}
               </h4>
               <div className="text-sm leading-relaxed text-slate-400">
-                <ReactMarkdown remarkPlugins={[remarkGfm]} components={COST_MARKDOWN_COMPONENTS}>
+                {/* singleTilde:false — "~$X" (approximately) must not become
+                    a GFM strikethrough span; cost prose uses it constantly. */}
+                <ReactMarkdown
+                  remarkPlugins={[[remarkGfm, { singleTilde: false }]]}
+                  components={COST_MARKDOWN_COMPONENTS}
+                >
                   {attrs.narrative}
                 </ReactMarkdown>
               </div>

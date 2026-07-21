@@ -1998,6 +1998,7 @@
       "saveUpTo": "חיסכון של ~{amount}/חודש",
       "narrativeTitle": "סיכום",
       "estimateNote": "אומדני AI — מוצגים בנפרד, ולעולם אינם נוספים לסך המתומחר שלמעלה.",
+      "chatPlaceholder": "שאל שאלת המשך על העלויות האלה… (⌘/Ctrl + Enter לשליחה)",
       "advisoryKind": {
         "savings_plan": "תוכנית חיסכון",
         "reserved": "שמור",

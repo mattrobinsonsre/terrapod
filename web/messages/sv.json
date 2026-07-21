@@ -1998,6 +1998,7 @@
       "saveUpTo": "spara ~{amount}/mån",
       "narrativeTitle": "Sammanfattning",
       "estimateNote": "AI-uppskattningar — visas separat, läggs aldrig till prissumman ovan.",
+      "chatPlaceholder": "Ställ en uppföljningsfråga om dessa kostnader… (⌘/Ctrl + Enter för att skicka)",
       "advisoryKind": {
         "savings_plan": "Savings Plan",
         "reserved": "Reserverad",

@@ -1998,6 +1998,7 @@
       "saveUpTo": "säästä ~{amount}/kk",
       "narrativeTitle": "Yhteenveto",
       "estimateNote": "Tekoälyn arviot — näytetään erikseen, eikä niitä koskaan lisätä yllä olevaan hinnoiteltuun summaan.",
+      "chatPlaceholder": "Kysy jatkokysymys näistä kustannuksista… (⌘/Ctrl + Enter lähettää)",
       "advisoryKind": {
         "savings_plan": "Savings Plan",
         "reserved": "Varattu",

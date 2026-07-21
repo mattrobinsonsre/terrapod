@@ -1998,6 +1998,7 @@
       "saveUpTo": "توفير ~{amount}/شهر",
       "narrativeTitle": "ملخّص",
       "estimateNote": "تقديرات الذكاء الاصطناعي — تُعرض بشكل منفصل ولا تُضاف أبدًا إلى الإجمالي المسعّر أعلاه.",
+      "chatPlaceholder": "اطرح سؤال متابعة حول هذه التكاليف… (⌘/Ctrl + Enter للإرسال)",
       "advisoryKind": {
         "savings_plan": "خطة توفير",
         "reserved": "محجوز",

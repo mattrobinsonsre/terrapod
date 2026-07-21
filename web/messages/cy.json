@@ -1998,6 +1998,7 @@
       "saveUpTo": "arbedwch ~{amount}/mis",
       "narrativeTitle": "Crynodeb",
       "estimateNote": "Amcangyfrifon AI — dangosir ar wahân, byth yn cael eu hychwanegu at y cyfanswm â phris uchod.",
+      "chatPlaceholder": "Gofynnwch gwestiwn dilynol am y costau hyn… (⌘/Ctrl + Enter i anfon)",
       "advisoryKind": {
         "savings_plan": "Cynllun arbed",
         "reserved": "Neilltuedig",

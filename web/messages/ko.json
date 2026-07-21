@@ -1998,6 +1998,7 @@
       "saveUpTo": "~{amount}/월 절감",
       "narrativeTitle": "요약",
       "estimateNote": "AI 추정치 — 별도로 표시되며, 위의 가격 산정 합계에는 포함되지 않습니다.",
+      "chatPlaceholder": "이 비용에 대해 후속 질문을 하세요… (⌘/Ctrl + Enter로 전송)",
       "advisoryKind": {
         "savings_plan": "절감형 플랜",
         "reserved": "예약형",

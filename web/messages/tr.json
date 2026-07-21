@@ -1998,6 +1998,7 @@
       "saveUpTo": "~{amount}/ay tasarruf",
       "narrativeTitle": "Özet",
       "estimateNote": "AI tahminleri — ayrı gösterilir, yukarıdaki fiyatlandırılmış toplama asla eklenmez.",
+      "chatPlaceholder": "Bu maliyetler hakkında bir izleme sorusu sorun… (göndermek için ⌘/Ctrl + Enter)",
       "advisoryKind": {
         "savings_plan": "Savings Plan",
         "reserved": "Ayrılmış",

@@ -1998,6 +1998,7 @@
       "saveUpTo": "экономия ~{amount}/мес.",
       "narrativeTitle": "Сводка",
       "estimateNote": "Оценки ИИ — показаны отдельно и никогда не добавляются к указанной выше сумме с ценами.",
+      "chatPlaceholder": "Задайте уточняющий вопрос об этих расходах… (⌘/Ctrl + Enter для отправки)",
       "advisoryKind": {
         "savings_plan": "Savings Plan",
         "reserved": "Зарезервировано",

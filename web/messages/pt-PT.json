@@ -1998,6 +1998,7 @@
       "saveUpTo": "poupe ~{amount}/mês",
       "narrativeTitle": "Resumo",
       "estimateNote": "Estimativas por IA — apresentadas separadamente, nunca somadas ao total com preço acima.",
+      "chatPlaceholder": "Faça uma pergunta de acompanhamento sobre estes custos… (⌘/Ctrl + Enter para enviar)",
       "advisoryKind": {
         "savings_plan": "Plano de poupança",
         "reserved": "Reservado",

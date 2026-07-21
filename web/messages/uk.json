@@ -1998,6 +1998,7 @@
       "saveUpTo": "заощадьте ~{amount}/міс.",
       "narrativeTitle": "Підсумок",
       "estimateNote": "Оцінки ШІ — показані окремо, ніколи не додаються до наведеної вище суми з цінами.",
+      "chatPlaceholder": "Поставте уточнювальне запитання про ці витрати… (⌘/Ctrl + Enter, щоб надіслати)",
       "advisoryKind": {
         "savings_plan": "Savings Plan",
         "reserved": "Зарезервовано",

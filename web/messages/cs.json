@@ -1998,6 +1998,7 @@
       "saveUpTo": "ušetřete ~{amount}/měs.",
       "narrativeTitle": "Souhrn",
       "estimateNote": "Odhady AI — zobrazují se samostatně a nikdy se nepřičítají k výše uvedenému oceněnému součtu.",
+      "chatPlaceholder": "Položte návazný dotaz k těmto nákladům… (⌘/Ctrl + Enter pro odeslání)",
       "advisoryKind": {
         "savings_plan": "Savings Plan",
         "reserved": "Rezervované",

@@ -1998,6 +1998,7 @@
       "saveUpTo": "節省 ~{amount}/月",
       "narrativeTitle": "摘要",
       "estimateNote": "AI 估算——單獨顯示，絕不計入上方的計價總計。",
+      "chatPlaceholder": "就此成本提一個追問… （⌘/Ctrl + Enter 傳送）",
       "advisoryKind": {
         "savings_plan": "節省方案",
         "reserved": "預留",
