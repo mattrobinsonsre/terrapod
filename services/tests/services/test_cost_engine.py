@@ -225,7 +225,9 @@ def test_resources_from_state_v4_lifts_attributes():
 
 def test_default_usage_catalogue_loads():
     entries = default_entries()
-    assert len(entries) == 18  # vendored from OpenInfraQuote
+    # 18 vendored from OpenInfraQuote + 1 Terrapod addition (RDS provisioned
+    # IOPS io1/io2, #928 — the usage-less service_class=iops entry).
+    assert len(entries) == 19
     ec2 = match_entry(
         _ms(
             ("type", "aws_instance"),

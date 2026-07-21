@@ -42,6 +42,10 @@
     }
   },
   {
+    "description": "AWS RDS provisioned IOPS (io1/io2/gp3) — quantity read from the resource's iops attr; usage-less. Must stay AFTER the storage_type=standard entry above (first match wins) so magnetic keeps the per-request entry.",
+    "match_query": "type = aws_db_instance and service_class = iops"
+  },
+  {
     "description": "Default AWS RDS Instance hours",
     "match_query": "type = aws_db_instance and service_class = instance and purchase_option = on_demand",
     "usage": {
