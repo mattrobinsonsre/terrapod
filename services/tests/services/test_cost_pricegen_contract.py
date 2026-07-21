@@ -50,6 +50,11 @@ _ROWS = [
     # per-vCPU-core + per-GiB-RAM rates (n2-standard-4 = 4*core + 16*ram). Region
     # is derived from the resource's `zone`.
     "Compute Engine,Compute Instance,type=google_compute_instance&values.machine_type=n2-standard-4,service_provider=gcp&purchase_option=on_demand&region=us-central1&service_class=instance&start_usage_amount=0&end_usage_amount=Inf,0.1942360000,t,USD",
+    # SQS — first request tier for a standard (fifo=false) and a FIFO queue. The
+    # CORRECT mapping: FIFO is pricier ($0.50/M) than Standard ($0.40/M); oiq has
+    # these inverted, so this row set deliberately does NOT match oiq.
+    "AWSQueueService,API Request,type=aws_sqs_queue&values.fifo_queue=false,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=requests&start_usage_amount=0&end_usage_amount=100000000000,0.0000004000,o,USD",
+    "AWSQueueService,API Request,type=aws_sqs_queue&values.fifo_queue=true,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=requests&start_usage_amount=0&end_usage_amount=100000000000,0.0000005000,o,USD",
 ]
 
 
@@ -308,6 +313,42 @@ def test_gcp_compute_instance_prices_with_zone_derived_region():
     # 0.194236/hr * 730 = 141.79
     assert est.resources[0].monthly_min == pytest.approx(0.194236 * 730, abs=0.01)
     assert est.unpriced == []
+
+
+def test_sqs_queue_fifo_is_pricier_than_standard():
+    """SQS request pricing, and the correctness check: FIFO ($0.50/M) costs more
+    than Standard ($0.40/M). oiq has these inverted; we map by the real AWS
+    meaning, so this asserts the RIGHT answer, not oiq's (#893)."""
+    plan = {
+        "format_version": "1.2",
+        "terraform_version": "1.9.0",
+        "planned_values": {
+            "root_module": {
+                "resources": [
+                    {
+                        "address": "aws_sqs_queue.std",
+                        "type": "aws_sqs_queue",
+                        "name": "std",
+                        "mode": "managed",
+                        "values": {"fifo_queue": False, "region": "us-east-1"},
+                    },
+                    {
+                        "address": "aws_sqs_queue.fifo",
+                        "type": "aws_sqs_queue",
+                        "name": "fifo",
+                        "mode": "managed",
+                        "values": {"fifo_queue": True, "region": "us-east-1"},
+                    },
+                ]
+            }
+        },
+    }
+    est = estimate(plan, _sheet())
+    costs = {r.address: r.monthly_min for r in est.resources}
+    # 50M requests/mo (the usage default) in the first tier.
+    assert costs["aws_sqs_queue.std"] == pytest.approx(50_000_000 * 0.0000004, abs=0.01)
+    assert costs["aws_sqs_queue.fifo"] == pytest.approx(50_000_000 * 0.0000005, abs=0.01)
+    assert costs["aws_sqs_queue.fifo"] > costs["aws_sqs_queue.std"]  # FIFO pricier
 
 
 def test_ec2_instance_prices():

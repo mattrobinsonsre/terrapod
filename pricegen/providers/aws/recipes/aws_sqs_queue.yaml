@@ -1,0 +1,32 @@
+# SQS -> aws_sqs_queue (on-demand). Per-API-request pricing, tiered by monthly
+# request volume. AWS's `queueType` maps to the Terraform `fifo_queue` bool.
+#
+# NB we map queueType->fifo_queue CORRECTLY, unlike oiq, which has it inverted:
+# AWS charges Standard $0.40/M requests and FIFO $0.50/M (FIFO is pricier), but
+# oiq's rows tag the $0.50 rate as fifo_queue=false and $0.40 as fifo_queue=true
+# — backwards. Matching oiq's rows by parity would copy that bug; we map by the
+# real AWS meaning instead (Standard->false, FIFO->true). The "Fair" and "Any"
+# queueTypes (a promo tier and the $0 first-1M free tier) are unmapped -> skipped.
+#
+# Uses the existing usage entry `type = aws_sqs_queue and service_class =
+# requests` (50M requests/mo) — which lands in the first tier.
+resource_type: aws_sqs_queue
+service: AWSQueueService
+
+components:
+  - product_family: "^API Request$"
+    service_class: requests
+    match:
+      # queueType is "Standard" or "FIFO (first-in, first-out)" — extract the
+      # leading word, then map. "Fair"/"Any" (a promo tier + the free first-1M
+      # tier) don't match -> skipped.
+      fifo_queue:
+        attr: queueType
+        regex: "^(Standard|FIFO)"
+        map:
+          Standard: "false"
+          FIFO: "true"
+    # per-request (`o`); the 3 volume tiers come from the offer's priceDimensions
+    # (0-100B / 100B-200B / 200B-Inf), emitted as start/end_usage_amount.
+    price: { type: o, unit: Requests }
+    tier: usage
