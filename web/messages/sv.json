@@ -1982,6 +1982,39 @@
       "credit": "Kostnadsdata från <oiq>OpenInfraQuote</oiq>.",
       "asOfState": "enligt tillstånd v{serial}",
       "noState": "Ingen kostnad ännu — visas efter första tillämpningen."
+    },
+    "costAi": {
+      "heading": "AI-kostnadsuppskattning",
+      "aiGenerated": "AI-genererad",
+      "pending": "Uppskattar kostnader som prisdata inte kan täcka…",
+      "skipped": "AI-kostnadsuppskattning hoppades över för denna körning.",
+      "errored": "AI-kostnadsuppskattning misslyckades",
+      "estimatedTitle": "{count, plural, one {# AI-uppskattad resurs} other {# AI-uppskattade resurser}}",
+      "estimatedHint": "Månatliga uppskattningar för resurser som prisdata inte kunde prissätta — modellens bästa gissning, inte en beräknad siffra.",
+      "nothingToEstimate": "Prisdata täckte alla resurser — inget kvar för AI att uppskatta.",
+      "colBasis": "Grund",
+      "colEstimated": "Uppsk. månadsvis",
+      "advisoriesTitle": "Besparingsmöjligheter",
+      "saveUpTo": "spara ~{amount}/mån",
+      "narrativeTitle": "Sammanfattning",
+      "estimateNote": "AI-uppskattningar — visas separat, läggs aldrig till prissumman ovan.",
+      "advisoryKind": {
+        "savings_plan": "Savings Plan",
+        "reserved": "Reserverad",
+        "spot": "Spot",
+        "rightsizing": "Rätt storlek",
+        "other": "Tips"
+      },
+      "regenerate": {
+        "label": "Generera om",
+        "queueing": "Köar…",
+        "tooltip": "Kör AI-kostnadsuppskattningen igen",
+        "ariaLabel": "Generera om AI-kostnadsuppskattning",
+        "confirm": "Kör AI-kostnadsuppskattningen för denna körning igen?"
+      },
+      "errors": {
+        "status": "Det gick inte att läsa in AI-kostnadsuppskattningen (HTTP {status})."
+      }
     }
   },
   "workspaceDetail": {

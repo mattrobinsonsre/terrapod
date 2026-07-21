@@ -1982,6 +1982,39 @@
       "credit": "Dane o kosztach od <oiq>OpenInfraQuote</oiq>.",
       "asOfState": "według stanu v{serial}",
       "noState": "Brak kosztu — pojawia się po pierwszym zastosowaniu."
+    },
+    "costAi": {
+      "heading": "Szacunek kosztów AI",
+      "aiGenerated": "Wygenerowano przez AI",
+      "pending": "Szacowanie kosztów, których dane cenowe nie obejmują…",
+      "skipped": "Szacowanie kosztów AI zostało pominięte dla tego uruchomienia.",
+      "errored": "Szacowanie kosztów AI nie powiodło się",
+      "estimatedTitle": "{count, plural, one {# zasób oszacowany przez AI} few {# zasoby oszacowane przez AI} many {# zasobów oszacowanych przez AI} other {# zasobu oszacowanego przez AI}}",
+      "estimatedHint": "Miesięczne szacunki dla zasobów, których dane cenowe nie potrafiły wycenić — najlepsze przypuszczenie modelu, a nie wyliczona wartość.",
+      "nothingToEstimate": "Dane cenowe obejmowały każdy zasób — nic nie pozostało do oszacowania przez AI.",
+      "colBasis": "Podstawa",
+      "colEstimated": "Szac. miesięcznie",
+      "advisoriesTitle": "Możliwości oszczędności",
+      "saveUpTo": "oszczędź ~{amount}/mies.",
+      "narrativeTitle": "Podsumowanie",
+      "estimateNote": "Szacunki AI — pokazywane osobno, nigdy nie dodawane do wycenionej sumy powyżej.",
+      "advisoryKind": {
+        "savings_plan": "Savings Plan",
+        "reserved": "Zarezerwowane",
+        "spot": "Spot",
+        "rightsizing": "Dopasowanie rozmiaru",
+        "other": "Wskazówka"
+      },
+      "regenerate": {
+        "label": "Wygeneruj ponownie",
+        "queueing": "Kolejkowanie…",
+        "tooltip": "Uruchom ponownie szacowanie kosztów AI",
+        "ariaLabel": "Wygeneruj ponownie szacunek kosztów AI",
+        "confirm": "Uruchomić ponownie szacowanie kosztów AI dla tego uruchomienia?"
+      },
+      "errors": {
+        "status": "Nie udało się załadować szacunku kosztów AI (HTTP {status})."
+      }
     }
   },
   "workspaceDetail": {

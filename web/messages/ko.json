@@ -1982,6 +1982,39 @@
       "credit": "비용 데이터 제공: <oiq>OpenInfraQuote</oiq>.",
       "asOfState": "상태 v{serial} 기준",
       "noState": "아직 비용이 없습니다 — 첫 적용 후에 표시됩니다."
+    },
+    "costAi": {
+      "heading": "AI 비용 추정",
+      "aiGenerated": "AI 생성",
+      "pending": "가격 데이터로 다룰 수 없는 비용을 추정하는 중…",
+      "skipped": "이 실행에서는 AI 비용 추정을 건너뛰었습니다.",
+      "errored": "AI 비용 추정 실패",
+      "estimatedTitle": "{count, plural, other {AI 추정 리소스 #개}}",
+      "estimatedHint": "가격 데이터로 가격을 산정할 수 없는 리소스의 월간 추정치 — 계산된 값이 아니라 모델의 추정입니다.",
+      "nothingToEstimate": "가격 데이터가 모든 리소스를 다루었습니다 — AI가 추정할 항목이 없습니다.",
+      "colBasis": "근거",
+      "colEstimated": "예상 월간",
+      "advisoriesTitle": "절감 기회",
+      "saveUpTo": "~{amount}/월 절감",
+      "narrativeTitle": "요약",
+      "estimateNote": "AI 추정치 — 별도로 표시되며, 위의 가격 산정 합계에는 포함되지 않습니다.",
+      "advisoryKind": {
+        "savings_plan": "절감형 플랜",
+        "reserved": "예약형",
+        "spot": "스팟",
+        "rightsizing": "적정 크기 조정",
+        "other": "팁"
+      },
+      "regenerate": {
+        "label": "다시 생성",
+        "queueing": "대기열에 추가 중…",
+        "tooltip": "AI 비용 추정 다시 실행",
+        "ariaLabel": "AI 비용 추정 다시 생성",
+        "confirm": "이 실행에 대한 AI 비용 추정을 다시 실행하시겠습니까?"
+      },
+      "errors": {
+        "status": "AI 비용 추정을 불러오지 못했습니다 (HTTP {status})."
+      }
     }
   },
   "workspaceDetail": {

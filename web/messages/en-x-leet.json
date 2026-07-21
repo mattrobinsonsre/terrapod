@@ -1982,6 +1982,39 @@
       "credit": "Cost data from <oiq>OpenInfraQuote</oiq>.",
       "asOfState": "as of state v{serial}",
       "noState": "No cost yet — appears after the first apply."
+    },
+    "costAi": {
+      "heading": "41 c057 3571m473",
+      "aiGenerated": "41-g3n3r473d",
+      "pending": "3571m471ng c0575 7h3 pr1c1ng d474 c4n't c0v3r…",
+      "skipped": "41 c057 3571m4710n w45 5k1pp3d f0r 7h15 run.",
+      "errored": "41 c057 3571m4710n f41l3d",
+      "estimatedTitle": "{count, plural, one {# 41-3571m473d r350urc3} other {# 41-3571m473d r350urc35}}",
+      "estimatedHint": "M0n7hly 3571m4735 f0r r350urc35 7h3 pr1c1ng d474 c0uldn't pr1c3 — 7h3 m0d3l'5 b357 gu355, n07 4 c0mpu73d f1gur3.",
+      "nothingToEstimate": "7h3 pr1c1ng d474 c0v3r3d 3v3ry r350urc3 — n07h1ng l3f7 f0r 7h3 41 70 3571m473.",
+      "colBasis": "B4515",
+      "colEstimated": "357. m0n7hly",
+      "advisoriesTitle": "54v1ng5 0pp0r7un17135",
+      "saveUpTo": "54v3 ~{amount}/m0",
+      "narrativeTitle": "5umm4ry",
+      "estimateNote": "41 3571m4735 — 5h0wn 53p4r473ly, n3v3r 4dd3d 70 7h3 pr1c3d 7074l 4b0v3.",
+      "advisoryKind": {
+        "savings_plan": "54v1ng5 Pl4n",
+        "reserved": "R353rv3d",
+        "spot": "5p07",
+        "rightsizing": "R1gh751z1ng",
+        "other": "71p"
+      },
+      "regenerate": {
+        "label": "R3g3n3r473",
+        "queueing": "Qu3u1ng…",
+        "tooltip": "R3-run 7h3 41 c057 3571m473",
+        "ariaLabel": "R3g3n3r473 41 c057 3571m473",
+        "confirm": "R3-run 7h3 41 c057 3571m473 f0r 7h15 run?"
+      },
+      "errors": {
+        "status": "F41l3d 70 l04d 41 c057 3571m473 (H77P {status})."
+      }
     }
   },
   "workspaceDetail": {

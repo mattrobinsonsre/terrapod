@@ -1982,6 +1982,39 @@
       "credit": "Données de coût de <oiq>OpenInfraQuote</oiq>.",
       "asOfState": "à l'état v{serial}",
       "noState": "Aucun coût pour l'instant — apparaît après la première application."
+    },
+    "costAi": {
+      "heading": "Estimation de coût par IA",
+      "aiGenerated": "Généré par IA",
+      "pending": "Estimation des coûts que les données tarifaires ne peuvent pas couvrir…",
+      "skipped": "L''estimation de coût par IA a été ignorée pour cette exécution.",
+      "errored": "L''estimation de coût par IA a échoué",
+      "estimatedTitle": "{count, plural, one {# ressource estimée par IA} other {# ressources estimées par IA}}",
+      "estimatedHint": "Estimations mensuelles pour les ressources que les données tarifaires n''ont pas pu tarifer — la meilleure estimation du modèle, pas un chiffre calculé.",
+      "nothingToEstimate": "Les données tarifaires couvraient chaque ressource — rien à estimer pour l''IA.",
+      "colBasis": "Base",
+      "colEstimated": "Mensuel est.",
+      "advisoriesTitle": "Opportunités d''économies",
+      "saveUpTo": "économisez ~{amount}/mois",
+      "narrativeTitle": "Résumé",
+      "estimateNote": "Estimations par IA — affichées séparément, jamais ajoutées au total tarifé ci-dessus.",
+      "advisoryKind": {
+        "savings_plan": "Plan d''économies",
+        "reserved": "Réservé",
+        "spot": "Spot",
+        "rightsizing": "Redimensionnement",
+        "other": "Conseil"
+      },
+      "regenerate": {
+        "label": "Régénérer",
+        "queueing": "Mise en file…",
+        "tooltip": "Relancer l''estimation de coût par IA",
+        "ariaLabel": "Régénérer l''estimation de coût par IA",
+        "confirm": "Relancer l''estimation de coût par IA pour cette exécution ?"
+      },
+      "errors": {
+        "status": "Échec du chargement de l''estimation de coût par IA (HTTP {status})."
+      }
     }
   },
   "workspaceDetail": {

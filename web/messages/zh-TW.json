@@ -1982,6 +1982,39 @@
       "credit": "成本資料來自 <oiq>OpenInfraQuote</oiq>。",
       "asOfState": "截至狀態 v{serial}",
       "noState": "尚無成本 — 首次套用後顯示。"
+    },
+    "costAi": {
+      "heading": "AI 成本估算",
+      "aiGenerated": "AI 生成",
+      "pending": "正在估算定價資料無法涵蓋的成本…",
+      "skipped": "本次執行已略過 AI 成本估算。",
+      "errored": "AI 成本估算失敗",
+      "estimatedTitle": "{count, plural, other {# 個 AI 估算資源}}",
+      "estimatedHint": "對定價資料無法計價的資源的每月估算——是模型的最佳推測，而非計算得出的數值。",
+      "nothingToEstimate": "定價資料已涵蓋所有資源——無需 AI 估算。",
+      "colBasis": "依據",
+      "colEstimated": "預估每月",
+      "advisoriesTitle": "節省機會",
+      "saveUpTo": "節省 ~{amount}/月",
+      "narrativeTitle": "摘要",
+      "estimateNote": "AI 估算——單獨顯示，絕不計入上方的計價總計。",
+      "advisoryKind": {
+        "savings_plan": "節省方案",
+        "reserved": "預留",
+        "spot": "競價",
+        "rightsizing": "規格最佳化",
+        "other": "提示"
+      },
+      "regenerate": {
+        "label": "重新產生",
+        "queueing": "正在排入佇列…",
+        "tooltip": "重新執行 AI 成本估算",
+        "ariaLabel": "重新產生 AI 成本估算",
+        "confirm": "要為本次執行重新執行 AI 成本估算嗎？"
+      },
+      "errors": {
+        "status": "無法載入 AI 成本估算（HTTP {status}）。"
+      }
     }
   },
   "workspaceDetail": {
