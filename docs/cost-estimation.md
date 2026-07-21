@@ -58,14 +58,25 @@ cost binary is ever shipped in a Terrapod image.
 
 ## AI enhancement (separate, optional)
 
-The figures above are always **authoritative oiq-derived data**. An optional AI *enhancement* — a plain-language narrative plus savings advisories (Savings Plans / reserved-instance / spot) — rides the existing [plan-analysis AI switch](ai-plan-summary.md) and renders alongside the data, always flagged distinctly. AI dollar figures are marked `source: ai-estimate` and are **never** blended into the authoritative total and never a gate. With AI disabled, only the data view is shown.
+The figures above are always **authoritative oiq-derived data**. An optional AI layer rides the existing [plan-analysis AI switch](ai-plan-summary.md) (`api.config.ai_summary.enabled` + the per-workspace mode) and renders **beside** the data on the run Cost tab — never blended into it. With AI disabled, only the data view shows. Every AI dollar figure is tagged `source: "ai-estimate"`, shown separately, and is **never** summed into the authoritative oiq total and never a gate.
+
+Its layers, in order of importance:
+
+- **Estimated resources (primary).** The model prices what the deterministic engine *couldn't* — the `unpriced` bucket: unmapped resource types, providers the pricesheet doesn't cover (e.g. Azure/GCP), and usage-driven costs. Each estimate is a monthly range with a one-line basis (the model's assumption), flagged as an estimate.
+- **Savings advisories (secondary).** Opportunities such as Savings Plans, reserved instances, spot, and right-sizing, each with an optional monthly-saving range.
+- **Narrative (tertiary).** A short plain-language summary of the estimate.
+- **Chat.** A follow-up Q&A thread grounded in the estimate — ask why a resource is expensive, or what a cheaper instance class would cost. One shared thread per run (anyone with workspace read), gated by the same per-run message cap and daily token budget as the plan-summary chat. The model answers from the estimate only and keeps computed-vs-estimated figures distinct.
+
+**Languages.** Like the plan analysis, the AI cost prose (narrative, each estimate's basis, advisory text, and chat replies) is generated in the deployment's `ai_summary.summary_language` and **translated on view** into the reader's UI locale (best-effort, cached); the authoritative oiq figures are locale-agnostic numbers.
+
+The authoritative figures always live on the data-only cost-estimate endpoint and are never restated by the AI layer.
 
 ---
 
 ## See also
 
 - [API Reference → Cost Estimation](api-reference.md#cost-estimation) — full endpoint shapes.
-- [AI Plan Summary](ai-plan-summary.md) — the switch the optional cost narrative rides.
+- [AI Plan Summary](ai-plan-summary.md) — the switch the optional cost AI rides.
 - [MCP](mcp.md) — the `terrapod_run_cost` / `terrapod_workspace_cost` agent tools.
 - [OpenInfraQuote](https://github.com/terrateamio/openinfraquote) — the pricesheet and matcher design Terrapod's engine is compatible with.
 - Original feature request: <https://github.com/mattrobinsonsre/terrapod/issues/871>
