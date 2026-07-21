@@ -49,6 +49,7 @@ from terrapod.auth.capabilities import has_capability
 from terrapod.config import settings
 from terrapod.db.models import (
     CostSummary,
+    CostSummaryMessage,
     PlanSummary,
     PlanSummaryMessage,
     Run,
@@ -1315,6 +1316,189 @@ async def regenerate_cost_summary(
     await enqueue_trigger("ai_cost_summary", {"run_id": str(run.id)})
 
     return JSONResponse(status_code=202, content=_cost_summary_json(run.id, summary))
+
+
+# ── Cost-summary chat (#871) ─────────────────────────────────────────────
+
+
+def _cost_summary_message_attr(msg: CostSummaryMessage) -> dict:
+    """JSON:API attributes block for a single cost-chat turn."""
+    return {
+        "role": msg.role,
+        "content": msg.content,
+        "model": msg.model,
+        "input-tokens": msg.input_tokens,
+        "output-tokens": msg.output_tokens,
+        "error-message": msg.error_message,
+        "created-at": _rfc3339(msg.created_at),
+    }
+
+
+async def _resolve_cost_summary_for_chat(
+    run_id: str, user: AuthenticatedUser, db: AsyncSession
+) -> tuple[Run, CostSummary, Workspace]:
+    """Shared header for both cost-chat endpoints — run exists, user has
+    workspace `read`, a ready cost summary exists (404/409 otherwise)."""
+    run = await _get_run(run_id, db)
+    await _require_run_ws_capability(run, cap.RUN_READ, user, db)
+    summary = (
+        await db.execute(select(CostSummary).where(CostSummary.run_id == run.id))
+    ).scalar_one_or_none()
+    if summary is None:
+        raise HTTPException(status_code=404, detail="no cost estimate for this run")
+    if summary.status != "ready":
+        raise HTTPException(
+            status_code=409,
+            detail=f"cost estimate is '{summary.status}', not 'ready' — cannot start chat",
+        )
+    workspace = (
+        await db.execute(select(Workspace).where(Workspace.id == run.workspace_id))
+    ).scalar_one_or_none()
+    if workspace is None:
+        raise HTTPException(status_code=404, detail="workspace not found")
+    return run, summary, workspace
+
+
+@extensions_router.get("/runs/{run_id}/cost-summary/messages")
+async def list_cost_summary_messages(
+    run_id: str = Path(...),
+    locale: str | None = Query(None),
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Full transcript of the AI cost-estimate chat thread (#871).
+
+    Chronological order; empty list when no follow-ups posted yet. The initial
+    estimate/advisories live on the parent ``CostSummary`` row — this returns
+    ONLY the conversational follow-ups. With ``?locale=`` set to a different real
+    language, each message is translated on view (best-effort; ``translated``
+    per row).
+    """
+    _run, summary, _ws = await _resolve_cost_summary_for_chat(run_id, user, db)
+    rows = (
+        (
+            await db.execute(
+                select(CostSummaryMessage)
+                .where(CostSummaryMessage.cost_summary_id == summary.id)
+                .order_by(CostSummaryMessage.created_at, CostSummaryMessage.id)
+            )
+        )
+        .scalars()
+        .all()
+    )
+
+    translations: list[str | None] = [None] * len(rows)
+    if locale and rows:
+        from terrapod.services import summary_translation
+
+        translations = await asyncio.gather(
+            *(
+                summary_translation.translate_message(
+                    message_id=str(row.id), content=row.content, reader_locale=locale
+                )
+                for row in rows
+            )
+        )
+
+    data = []
+    for row, translated_content in zip(rows, translations, strict=True):
+        attrs = _cost_summary_message_attr(row)
+        attrs["translated"] = translated_content is not None
+        if translated_content is not None:
+            attrs["content"] = translated_content
+        data.append(
+            {
+                "id": f"cost-summary-message-{row.id}",
+                "type": "cost-summary-messages",
+                "attributes": attrs,
+            }
+        )
+    return JSONResponse(
+        content={
+            "data": data,
+            "meta": {"count": len(rows), "language": settings.ai_summary.summary_language},
+        }
+    )
+
+
+@extensions_router.post("/runs/{run_id}/cost-summary/messages")
+async def post_cost_summary_message(
+    run_id: str = Path(...),
+    body: dict = Body(...),
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Post an operator follow-up + get the synchronous assistant reply (#871).
+
+    Body: ``{"data": {"attributes": {"content": "...", "locale": "de"}}}``.
+    ``locale`` (optional) is the reader's UI language: the incoming prompt is
+    normalised into the system language so the stored thread stays monolingual,
+    and the reply is translated back to the reader's locale for the response.
+    Read-on-workspace auth (anyone who can see the run can chat). Returns 201.
+    """
+    from terrapod.services import summary_translation
+    from terrapod.services.cost_summariser import post_cost_followup
+    from terrapod.services.summariser import (
+        FollowupBudgetExhausted,
+        FollowupCapReached,
+        FollowupDisabled,
+        FollowupError,
+    )
+
+    content = ""
+    locale = None
+    try:
+        attrs = body.get("data", {}).get("attributes", {}) or {}
+        content = str(attrs.get("content", "") or "")
+        raw_locale = attrs.get("locale")
+        locale = str(raw_locale) if raw_locale else None
+    except AttributeError:
+        raise HTTPException(status_code=400, detail="malformed body") from None
+
+    run, summary, workspace = await _resolve_cost_summary_for_chat(run_id, user, db)
+
+    if locale:
+        content = await summary_translation.normalize_to_system_language(content, locale)
+
+    try:
+        assistant_row = await post_cost_followup(
+            db=db,
+            cost_summary=summary,
+            run=run,
+            workspace=workspace,
+            user_message_text=content,
+        )
+    except FollowupDisabled as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+    except FollowupCapReached as e:
+        raise HTTPException(status_code=409, detail=str(e)) from e
+    except FollowupBudgetExhausted as e:
+        raise HTTPException(status_code=429, detail=str(e)) from e
+    except FollowupError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except (RuntimeError, ValueError) as e:
+        raise HTTPException(status_code=502, detail=f"model call failed: {e}") from e
+
+    attrs = _cost_summary_message_attr(assistant_row)
+    attrs["translated"] = False
+    if locale:
+        reply_tr = await summary_translation.translate_message(
+            message_id=str(assistant_row.id), content=assistant_row.content, reader_locale=locale
+        )
+        if reply_tr is not None:
+            attrs["content"] = reply_tr
+            attrs["translated"] = True
+
+    return JSONResponse(
+        status_code=201,
+        content={
+            "data": {
+                "id": f"cost-summary-message-{assistant_row.id}",
+                "type": "cost-summary-messages",
+                "attributes": attrs,
+            }
+        },
+    )
 
 
 def _summary_kind_for_run(run: Run) -> str | None:

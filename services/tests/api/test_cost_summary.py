@@ -283,3 +283,142 @@ class TestRegenerateCostSummary:
                     f"/api/terrapod/v1/runs/run-{run.id}/cost-summary/regenerate", headers=_AUTH
                 )
         assert resp.status_code == 409
+
+
+def _mock_cost_message(content="reply", role="assistant"):
+    m = MagicMock()
+    m.id = uuid.uuid4()
+    m.role = role
+    m.content = content
+    m.model = "test-model"
+    m.input_tokens = 100
+    m.output_tokens = 25
+    m.error_message = ""
+    m.created_at = datetime(2026, 1, 1, tzinfo=UTC)
+    return m
+
+
+class TestCostSummaryChat:
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs._resolve_cost_summary_for_chat")
+    async def test_post_reply(self, mock_resolve, *_):
+        run = _mock_run()
+        ws = _mock_ws(run.workspace_id)
+        summary = _mock_cost_summary(run.id)
+        mock_resolve.return_value = (run, summary, ws)
+        assistant = _mock_cost_message(content="An mq.m5.large runs 24/7.")
+
+        app = _make_app(_user(), AsyncMock())
+        with patch(
+            "terrapod.services.cost_summariser.post_cost_followup",
+            new_callable=AsyncMock,
+            return_value=assistant,
+        ):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+                resp = await c.post(
+                    f"/api/terrapod/v1/runs/run-{run.id}/cost-summary/messages",
+                    headers=_AUTH,
+                    json={"data": {"attributes": {"content": "why so pricey?"}}},
+                )
+        assert resp.status_code == 201
+        attrs = resp.json()["data"]["attributes"]
+        assert attrs["role"] == "assistant"
+        assert attrs["content"].startswith("An mq")
+        assert attrs["translated"] is False
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs._resolve_cost_summary_for_chat")
+    async def test_post_normalizes_and_translates_on_locale(self, mock_resolve, *_):
+        run = _mock_run()
+        ws = _mock_ws(run.workspace_id)
+        summary = _mock_cost_summary(run.id)
+        mock_resolve.return_value = (run, summary, ws)
+        assistant = _mock_cost_message(content="English reply")
+
+        app = _make_app(_user(), AsyncMock())
+        with (
+            patch(
+                "terrapod.services.summary_translation.normalize_to_system_language",
+                new_callable=AsyncMock,
+                return_value="Warum so teuer?",
+            ) as norm,
+            patch(
+                "terrapod.services.cost_summariser.post_cost_followup",
+                new_callable=AsyncMock,
+                return_value=assistant,
+            ) as pf,
+            patch(
+                "terrapod.services.summary_translation.translate_message",
+                new_callable=AsyncMock,
+                return_value="Deutsche Antwort",
+            ),
+        ):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+                resp = await c.post(
+                    f"/api/terrapod/v1/runs/run-{run.id}/cost-summary/messages",
+                    headers=_AUTH,
+                    json={"data": {"attributes": {"content": "pourquoi?", "locale": "de"}}},
+                )
+        assert resp.status_code == 201
+        attrs = resp.json()["data"]["attributes"]
+        assert attrs["content"] == "Deutsche Antwort"
+        assert attrs["translated"] is True
+        norm.assert_awaited_once_with("pourquoi?", "de")
+        # The normalised (system-language) text is what reaches the service.
+        assert pf.await_args.kwargs["user_message_text"] == "Warum so teuer?"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs._resolve_cost_summary_for_chat")
+    async def test_post_cap_reached_is_409(self, mock_resolve, *_):
+        from terrapod.services.summariser import FollowupCapReached
+
+        run = _mock_run()
+        ws = _mock_ws(run.workspace_id)
+        summary = _mock_cost_summary(run.id)
+        mock_resolve.return_value = (run, summary, ws)
+
+        app = _make_app(_user(), AsyncMock())
+        with patch(
+            "terrapod.services.cost_summariser.post_cost_followup",
+            new_callable=AsyncMock,
+            side_effect=FollowupCapReached("cap hit"),
+        ):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+                resp = await c.post(
+                    f"/api/terrapod/v1/runs/run-{run.id}/cost-summary/messages",
+                    headers=_AUTH,
+                    json={"data": {"attributes": {"content": "hi"}}},
+                )
+        assert resp.status_code == 409
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs._resolve_cost_summary_for_chat")
+    async def test_post_disabled_is_503(self, mock_resolve, *_):
+        from terrapod.services.summariser import FollowupDisabled
+
+        run = _mock_run()
+        ws = _mock_ws(run.workspace_id)
+        summary = _mock_cost_summary(run.id)
+        mock_resolve.return_value = (run, summary, ws)
+
+        app = _make_app(_user(), AsyncMock())
+        with patch(
+            "terrapod.services.cost_summariser.post_cost_followup",
+            new_callable=AsyncMock,
+            side_effect=FollowupDisabled("off"),
+        ):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+                resp = await c.post(
+                    f"/api/terrapod/v1/runs/run-{run.id}/cost-summary/messages",
+                    headers=_AUTH,
+                    json={"data": {"attributes": {"content": "hi"}}},
+                )
+        assert resp.status_code == 503

@@ -293,3 +293,87 @@ func (c *Client) RegenerateRunCostSummary(ctx context.Context, runID string) (*C
 	}
 	return costSummaryFromResource(res), nil
 }
+
+// CostSummaryMessage is one turn in a run's AI cost-estimate chat thread (#871).
+// The initial estimate/advisories live on the parent CostSummary; these are the
+// conversational follow-ups grounded in that estimate.
+type CostSummaryMessage struct {
+	ID           string `json:"id"`
+	Role         string `json:"role"` // "user" or "assistant"
+	Content      string `json:"content"`
+	Model        string `json:"model,omitempty"`
+	InputTokens  int    `json:"input-tokens"`
+	OutputTokens int    `json:"output-tokens"`
+	ErrorMessage string `json:"error-message,omitempty"`
+	CreatedAt    string `json:"created-at,omitempty"`
+}
+
+// ListRunCostSummaryMessages returns the full cost-chat transcript for a run in
+// chronological order (empty when no follow-ups posted). Returns *NotFoundError
+// when no cost estimate exists, *ConflictError when it isn't ready.
+func (c *Client) ListRunCostSummaryMessages(ctx context.Context, runID string) ([]*CostSummaryMessage, error) {
+	if runID == "" {
+		return nil, errors.New("run id is required")
+	}
+	id := runID
+	if len(id) > 4 && id[:4] != "run-" {
+		id = "run-" + id
+	}
+	data, err := c.Get(ctx, "/api/terrapod/v1/runs/"+url.PathEscape(id)+"/cost-summary/messages")
+	if err != nil {
+		return nil, err
+	}
+	resources, err := ParseResourceList(data)
+	if err != nil {
+		return nil, fmt.Errorf("parse cost messages response: %w", err)
+	}
+	out := make([]*CostSummaryMessage, 0, len(resources))
+	for i := range resources {
+		r := resources[i]
+		out = append(out, costSummaryMessageFromResource(&r))
+	}
+	return out, nil
+}
+
+// PostRunCostSummaryMessage posts an operator follow-up question about a run's
+// cost estimate and returns the synchronous assistant reply. Read-on-workspace
+// auth. Error mappings mirror the plan-summary chat (409 cap/unready, 429 budget,
+// 503 disabled, 400 empty/oversize, 502 model failure).
+func (c *Client) PostRunCostSummaryMessage(ctx context.Context, runID, content string) (*CostSummaryMessage, error) {
+	if runID == "" {
+		return nil, errors.New("run id is required")
+	}
+	if content == "" {
+		return nil, errors.New("content is required")
+	}
+	id := runID
+	if len(id) > 4 && id[:4] != "run-" {
+		id = "run-" + id
+	}
+	body, err := MarshalResource("cost-summary-messages", map[string]any{"content": content}, nil)
+	if err != nil {
+		return nil, fmt.Errorf("marshal cost message: %w", err)
+	}
+	data, err := c.Post(ctx, "/api/terrapod/v1/runs/"+url.PathEscape(id)+"/cost-summary/messages", body)
+	if err != nil {
+		return nil, err
+	}
+	res, err := ParseResource(data)
+	if err != nil {
+		return nil, fmt.Errorf("parse post-cost-message response: %w", err)
+	}
+	return costSummaryMessageFromResource(res), nil
+}
+
+func costSummaryMessageFromResource(res *Resource) *CostSummaryMessage {
+	return &CostSummaryMessage{
+		ID:           res.ID,
+		Role:         GetStringAttr(res, "role"),
+		Content:      GetStringAttr(res, "content"),
+		Model:        GetStringAttr(res, "model"),
+		InputTokens:  int(GetIntAttr(res, "input-tokens")),
+		OutputTokens: int(GetIntAttr(res, "output-tokens")),
+		ErrorMessage: GetStringAttr(res, "error-message"),
+		CreatedAt:    GetStringAttr(res, "created-at"),
+	}
+}

@@ -25,6 +25,7 @@ import { Sparkles, RefreshCw, TrendingDown, Sigma } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
 import { useIsTouch } from '@/lib/use-media-query'
 import { LoadingSpinner } from '@/components/loading-spinner'
+import { CostSummaryChat } from '@/components/cost-summary-chat'
 
 interface Range {
   min: number
@@ -365,6 +366,9 @@ export function CostAiSummary({ runId, refreshKey = 0 }: Props) {
               </span>
             )}
           </div>
+
+          {/* Follow-up chat thread — grounded in the cost estimate (#871). */}
+          <CostSummaryChat runId={runId} refreshKey={refreshKey} />
         </div>
       )}
     </div>
