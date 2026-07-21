@@ -1,0 +1,36 @@
+# Drift-guardrail thresholds for the scheduled publish job (#922).
+#
+# The guardrail (pricegen/drift.py) diffs each run's manifest against the last
+# PUBLISHED manifest and blocks a publish (or opens an issue) when a recipe's
+# coverage collapses or the feed grew a value the recipe doesn't cover — the
+# "the cloud changed its API and our logic needs an update" signal. These
+# knobs keep intentional drops from paging us.
+
+# Hard floor per recipe: fewer rows than this ⇒ BLOCK (the family regex / select
+# almost certainly stopped matching — e.g. a renamed product family).
+min_rows:
+  aws_db_instance: 1000
+  azurerm_linux_virtual_machine: 500
+  google_compute_instance: 50
+
+# WARN if a recipe's row count moves more than this fraction vs the last publish.
+row_delta_fraction: 0.5
+
+# WARN if a recipe's max price swings by more than this factor vs last publish
+# (a ×10 jump or →0 usually means a unit/parse error, not a real price change).
+price_swing_factor: 10
+
+# Expected-unmapped allowlist: an unmapped value MATCHING any of these regexes
+# (per recipe, per field) is a deliberate drop and does NOT warn. A genuinely
+# NEW unmapped value — one that matches nothing here and wasn't unmapped last
+# publish — is the actionable drift signal and warns.
+known_unmapped:
+  aws_db_instance:
+    match.engine:
+      - "Aurora" # separate aws_rds_cluster_instance recipe
+      - "Db2" # not yet mapped (deliberate)
+      - "Outpost" # RDS on Outposts — out of scope
+      - "Developer" # SQL Server Developer edition
+      - "Express" # SQL Server Express edition
+    match.storage_type:
+      - "Aurora" # Aurora volume types -> aws_rds_cluster_instance
