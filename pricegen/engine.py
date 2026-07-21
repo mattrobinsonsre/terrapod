@@ -28,11 +28,19 @@ def _snake(camel: str) -> str:
 
 
 def resolve(spec, attrs: dict) -> str | None:
-    """A literal, an ``{attr: X}`` pull, an ``{attr: X, regex: 'pat(cap)'}``
-    extraction, and/or a ``{map: {...}}`` translation. Returns None to SKIP the
-    unit (attr missing, regex no-match, or value unmapped)."""
+    """Resolve a field spec to a string, or None to SKIP the unit. Forms:
+    * a literal string
+    * ``{attr: X}``                 — pull attribute X
+    * ``{attr: X, regex: 'pat(cap)'}`` — extract a capture from a string field
+    * ``{attr|from + map: {...}}``  — translate; an unmapped value -> None
+    * ``{from: [a, b], map: {...}}``  — COMBINE several attrs (joined by '|')
+      then look up, e.g. RDS (databaseEngine, databaseEdition) -> engine value.
+    """
     if isinstance(spec, str):
         return spec
+    if isinstance(spec, dict) and "from" in spec:
+        key = "|".join(attrs.get(a) or "" for a in spec["from"])
+        return spec.get("map", {}).get(key)
     if isinstance(spec, dict) and "attr" in spec:
         v = attrs.get(spec["attr"])
         if v is None:
@@ -113,9 +121,14 @@ def _tier_fields(
 
 
 def generate(recipe: dict, defaults: dict, units, *, service: str):
-    """Yield 7-tuples for every unit any component of the recipe covers."""
+    """Yield 7-tuples for every unit any component of the recipe covers.
+
+    Deduplicates identical rows — vendor feeds carry redundant SKUs (AWS lists
+    the same RDS instance twice at the same price), and we emit one clean row.
+    """
     rtype = recipe["resource_type"]
     units = list(units)  # reused across components
+    seen: set = set()
 
     for component in recipe["components"]:
         fam_re = re.compile(component["product_family"])
@@ -156,7 +169,7 @@ def generate(recipe: dict, defaults: dict, units, *, service: str):
                 pricing_parts += _tier_fields(
                     tier_mode, begin, end, tiered, forced=bounds is not None
                 )
-                yield (
+                row = (
                     service,
                     unit.family,
                     match_set,
@@ -165,3 +178,7 @@ def generate(recipe: dict, defaults: dict, units, *, service: str):
                     ptype,
                     "USD",
                 )
+                if row in seen:
+                    continue
+                seen.add(row)
+                yield row
