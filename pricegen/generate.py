@@ -22,6 +22,7 @@ import argparse
 import csv
 import gzip
 import importlib
+import json
 import sys
 import urllib.request
 from pathlib import Path
@@ -74,6 +75,44 @@ def fetch_oiq_rows(rtype: str, region: str) -> list[list[str]]:
     return out
 
 
+def _manifest(stats: engine.RecipeStats, recipe: dict) -> dict:
+    """The per-recipe drift-diagnostics record the scheduled generator persists
+    and diffs across runs (#922). ``unmapped`` is the actionable signal: values
+    the feed carried for a mapped field that our recipe didn't cover."""
+    return {
+        "resource_type": recipe["resource_type"],
+        "service": recipe["service"],
+        "rows": stats.rows,
+        "units_in_family": stats.units_total,
+        "skipped": {
+            "select": stats.skipped_select,
+            "absent": stats.skipped_absent,
+            "unmapped": stats.skipped_unmapped,
+        },
+        "unmapped": {f: dict(c) for f, c in sorted(stats.unmapped.items())},
+        "price_min": stats.price_min,
+        "price_max": stats.price_max,
+    }
+
+
+def _report_stats(stats: engine.RecipeStats, rtype: str) -> None:
+    print(f"=== diagnostics ({rtype}) ===", file=sys.stderr)
+    print(
+        f"  {stats.rows} rows from {stats.units_total} in-family units "
+        f"(skipped: select={stats.skipped_select} absent={stats.skipped_absent} "
+        f"unmapped={stats.skipped_unmapped})",
+        file=sys.stderr,
+    )
+    if stats.price_min is not None:
+        print(f"  price range: {stats.price_min} … {stats.price_max}", file=sys.stderr)
+    if stats.unmapped:
+        # The drift signal — a value the feed carries that our recipe drops.
+        print("  UNMAPPED (recipe may need an update):", file=sys.stderr)
+        for fieldname, counter in sorted(stats.unmapped.items()):
+            for value, n in counter.most_common(10):
+                print(f"    {fieldname}={value!r} ({n})", file=sys.stderr)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--provider", default="aws", help="aws | azure | gcp")
@@ -83,6 +122,12 @@ def main() -> int:
         "--out", type=Path, help="write rows here (gzip if .gz); default stdout"
     )
     ap.add_argument("--compare-oiq", metavar="REGION")
+    ap.add_argument(
+        "--manifest",
+        type=Path,
+        help="write a drift-diagnostics manifest (JSON) here — the artifact the "
+        "scheduled generator diffs across runs to alert on feed/logic drift (#922)",
+    )
     args = ap.parse_args()
 
     pdir = HERE / "providers" / args.provider
@@ -96,8 +141,15 @@ def main() -> int:
     print(f"loading {args.provider} offer {args.offer} …", file=sys.stderr)
     offer = adapter.load(args.offer)
     units = adapter.iter_units(offer, term=defaults.get("price_term", "OnDemand"))
-    rows = list(engine.generate(recipe, defaults, units, service=recipe["service"]))
+    stats = engine.RecipeStats()
+    rows = list(
+        engine.generate(recipe, defaults, units, service=recipe["service"], stats=stats)
+    )
     print(f"generated {len(rows)} rows for {recipe['resource_type']}", file=sys.stderr)
+    _report_stats(stats, recipe["resource_type"])
+    if args.manifest:
+        args.manifest.write_text(json.dumps(_manifest(stats, recipe), indent=2))
+        print(f"wrote manifest {args.manifest}", file=sys.stderr)
 
     if args.out:
         opener = gzip.open if args.out.suffix == ".gz" else open
