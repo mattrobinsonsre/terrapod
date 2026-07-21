@@ -1,0 +1,28 @@
+# GCP Compute Engine -> google_compute_instance (computed).
+#
+# GCP prices compute per vCPU-core hour + per GiB-RAM hour SEPARATELY (e.g.
+# "N2 Instance Core running in Americas" + "N2 Instance Ram running in
+# Americas"), so a machine type's cost is vCPU x core-rate + RAM_GiB x ram-rate.
+# generate_computed reads each family's Core+Ram rate, then enumerates machine
+# types from the per-family shape catalog below and pre-computes each total,
+# emitting one values.machine_type=<type> row per type (matched by the consumer
+# like any instance — no consumer arithmetic).
+#
+# The `families` keys are the Terraform machine prefix (n2 -> n2-standard-4),
+# matched to the Core/Ram SKU family by `family_regex` (which lowercases the
+# extracted token: "N2 Instance Core" -> n2, "N1 Predefined Instance Core" ->
+# n1). Each shape maps to its GiB-per-vCPU ratio. Custom machine types
+# (n2-custom-*) aren't enumerable -> left unpriced (documented gap); over-
+# enumerated sizes that a family doesn't offer are harmless (never matched).
+resource_type: google_compute_instance
+service: Compute Engine
+
+computed:
+  region: us-central1
+  family_regex: '^(\w+)(?: Predefined)? Instance (Core|Ram) running in'
+  vcpus: [1, 2, 4, 8, 16, 32, 48, 64, 96, 128]
+  families:
+    # ratios = GiB RAM per vCPU for each shape (GCP's fixed shape definitions).
+    n1: { standard: 3.75, highmem: 6.5, highcpu: 0.9 }
+    n2: { standard: 4, highmem: 8, highcpu: 1 }
+    e2: { standard: 4, highmem: 8, highcpu: 1 }
