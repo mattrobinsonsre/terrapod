@@ -42,7 +42,7 @@ Terrapod is compatible with the `terraform`/`tofu` **`cloud` backend** — the s
 
 ## Is Terrapod for you?
 
-If you want an open, self-hosted alternative to Terraform Enterprise / HCP Terraform, yes. Terrapod is the **full** platform layer, not a thin slice of it — point your existing `cloud` blocks and CI/CD at it and it just works, with zero code changes. (Terrapod speaks the `terraform`/`tofu` `cloud`/`remote` backend protocol, not the entire `go-tfe` surface: arbitrary `go-tfe` automation, the `hashicorp/tfe` provider, and Backstage TFC plugins assume teams/projects/multi-org and aren't compatibility targets.)
+If you want an open, self-hosted alternative to Terraform Enterprise / HCP Terraform, yes. Terrapod is the **full** platform layer, not a thin slice of it — point your existing `cloud` blocks and CI/CD at it and it just works, with zero code changes. (Terrapod speaks the `terraform`/`tofu` `cloud`/`remote` backend protocol, not the entire `go-tfe` surface: arbitrary `go-tfe` automation, the `hashicorp/tfe` provider, and Backstage TFC plugins assume teams/projects/multi-org and aren't compatibility targets. That caveat is specifically about the *`hashicorp/tfe`* provider — Terrapod **does** ship its own first-class Terraform/OpenTofu provider, [`terraform-provider-terrapod`](docs/terraform-provider.md), for managing Terrapod itself as code.)
 
 Everything you'd expect from the platform tier is here and first-class:
 
