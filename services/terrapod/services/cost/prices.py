@@ -92,19 +92,55 @@ def product_of_row(row: list[str]) -> Product:
     )
 
 
-def load_pricesheet(fp: IO[str]) -> Iterator[Product]:
-    """Stream products from an open ``prices.csv`` file object.
+_YAML_SCHEMA_PREFIX = "terrapod-pricesheet/"
 
-    The header row is skipped. Rows with an empty resource match set are
-    dropped. This is a generator so a ~200k-row sheet is never fully
-    materialised in memory.
+
+def _product_of_yaml(entry: dict, currency: str) -> Product:
+    """Parse one product mapping from a Terrapod YAML pricesheet."""
+    match_set = entry.get("match", "")
+    if match_set == "":
+        raise EmptyMatchSet
+    price_value = float(entry["price"])
+    return Product(
+        service=entry.get("service", ""),
+        product_family=entry.get("family", ""),
+        match_set=MatchSet.of_string(match_set),
+        pricing_match_set=MatchSet.of_string(entry.get("pricing", "")),
+        price=_parse_price_type(entry["price_type"], price_value),
+        ccy=currency,
+    )
+
+
+def load_pricesheet(fp: IO[str]) -> Iterator[Product]:
+    """Stream products from an open pricesheet file object.
+
+    Two formats are accepted, auto-detected from the first line:
+
+    * **OpenInfraQuote CSV** (``service,product_family,…`` header) — streamed row
+      by row so a ~200k-row sheet is never fully materialised.
+    * **Terrapod YAML** (``schema: terrapod-pricesheet/vN``, produced by
+      ``pricegen``) — a self-describing ``{schema, currency, products: [...]}``
+      document. Our sheet is far smaller and more targeted, so it's parsed whole.
+
+    Rows/products with an empty resource match set are dropped (mirrors
+    ``oiq_prices.Product.of_row``).
     """
-    reader = csv.reader(fp)
-    try:
-        next(reader)  # header
-    except StopIteration:
+    first = fp.readline()
+    if first.lstrip().startswith("schema:") and _YAML_SCHEMA_PREFIX in first:
+        # Lazy import: the CSV/oiq path (incl. the minimal-deps Cost Differential
+        # CI job) never needs PyYAML — only a Terrapod YAML sheet does.
+        import yaml
+
+        doc = yaml.safe_load(first + fp.read()) or {}
+        currency = doc.get("currency", "USD")
+        for entry in doc.get("products", []):
+            try:
+                yield _product_of_yaml(entry, currency)
+            except EmptyMatchSet:
+                continue
         return
-    for row in reader:
+    # CSV: ``first`` was the header line; the remaining lines are data rows.
+    for row in csv.reader(fp):
         if not row:
             continue
         try:

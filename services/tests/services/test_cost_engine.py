@@ -134,6 +134,50 @@ def test_product_of_row_empty_match_set_skipped():
         product_of_row(["S", "F", "", "region=x", "0.1", "t", "USD"])
 
 
+def test_load_pricesheet_reads_terrapod_yaml():
+    # the format pricegen publishes (#893) — auto-detected via the schema line.
+    import io
+
+    from terrapod.services.cost.prices import PriceKind, load_pricesheet
+
+    sheet = (
+        "schema: terrapod-pricesheet/v1\n"
+        "currency: USD\n"
+        "products:\n"
+        "- service: AmazonEC2\n"
+        "  family: Compute Instance\n"
+        "  match: type=aws_instance&values.instance_type=m5.large\n"
+        "  pricing: region=us-east-1&service_class=instance\n"
+        "  price: '0.096'\n"
+        "  price_type: t\n"
+        "- service: S\n"  # empty match -> skipped
+        "  family: F\n"
+        "  match: ''\n"
+        "  pricing: region=us-east-1\n"
+        "  price: '1'\n"
+        "  price_type: t\n"
+    )
+    products = list(load_pricesheet(io.StringIO(sheet)))
+    assert len(products) == 1  # the empty-match product is dropped
+    p = products[0]
+    assert p.service == "AmazonEC2" and p.ccy == "USD"
+    assert p.price.kind is PriceKind.PER_TIME and p.price.value == 0.096
+    assert p.match_set.contains("values.instance_type", "m5.large")
+
+
+def test_load_pricesheet_still_reads_csv():
+    import io
+
+    from terrapod.services.cost.prices import load_pricesheet
+
+    sheet = (
+        "service,product_family,match_set,pricing_match_set,price,price_type,ccy\n"
+        "AmazonEC2,Compute,type=aws_instance&values.x=1,region=us-east-1,0.10,t,USD\n"
+    )
+    products = list(load_pricesheet(io.StringIO(sheet)))
+    assert len(products) == 1 and products[0].service == "AmazonEC2"
+
+
 # ---------------------------------------------------------------------------
 # tf adapter
 # ---------------------------------------------------------------------------
