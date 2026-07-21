@@ -25,11 +25,18 @@ _multi_az: &multi_az
   map: { Single-AZ: "false", Multi-AZ: "true" }
 
 components:
-  # The DB instance — priced per hour (`t`). Unlike oiq (which drops license from
-  # the match_set and emits ambiguous duplicate-keyed rows), we put license_model
-  # IN the match — a Terraform aws_db_instance has it, and its value is
-  # engine-specific, so it's a composite (databaseEngine, licenseModel) map. This
-  # gives one unambiguous price per (engine, class, multi_az, license), incl. BYOL.
+  # The DB instance — priced per hour (`t`). We match on (engine, instance_class,
+  # multi_az) and DELIBERATELY do NOT put license_model in the match: it's an
+  # Optional+Computed attribute that a `terraform plan` for a new DB emits as
+  # null/absent (the common estimate case), so a row that required it would fail
+  # to match — proven by running the consumer engine against a plan without it.
+  # The `select` still keeps the three clean license models as SEPARATE priced
+  # rows; under the consumer's SUBSET matching that means postgres/mysql (one
+  # license) price to a single value, while SQL Server / Oracle (License-included
+  # vs BYOL, different prices, same key) price to a min..max RANGE — the honest
+  # answer when the plan doesn't pin the license. (oiq's "ambiguous duplicate"
+  # rows are the same thing; under subset matching a range is correct, not a bug,
+  # which is why the earlier attempt to disambiguate via license_model was wrong.)
   - product_family: "^Database Instance$"
     service_class: instance
     select:
@@ -43,18 +50,6 @@ components:
       engine: *engine # unmapped engine/edition (Db2, Outposts, Developer) -> skipped
       instance_class: { attr: instanceType }
       multi_az: *multi_az
-      license_model:
-        from: [databaseEngine, licenseModel]
-        map:
-          "PostgreSQL|No license required": postgresql-license
-          "MySQL|No license required": general-public-license
-          "MariaDB|No license required": general-public-license
-          "SQL Server|License included": license-included
-          "SQL Server|Bring your own license": bring-your-own-license
-          "Oracle|License included": license-included
-          "Oracle|Bring your own license": bring-your-own-license
-          "Aurora PostgreSQL|No license required": postgresql-license
-          "Aurora MySQL|No license required": general-public-license
     price: { type: t, unit: Hrs }
     tier: usage
 
