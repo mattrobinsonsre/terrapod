@@ -1,0 +1,29 @@
+# Azure VM -> azurerm_linux_virtual_machine (on-demand / Consumption).
+#
+# Azure prices the base compute rate under the Linux SKU: a productName carries
+# "Windows" ONLY for Windows images (which add the license premium); the Linux /
+# base-compute meter is everything that is NOT Windows. So we select the base
+# rate by EXCLUDING "Windows" from productName, and exclude the Spot / Low
+# Priority variants (which live in skuName). The Terraform `size` attribute is
+# armSkuName verbatim (e.g. "Standard_D2s_v5"). Needs the paired usage entry
+# `type = azurerm_linux_virtual_machine and service_class = instance` (time:730).
+resource_type: azurerm_linux_virtual_machine
+service: Virtual Machines
+
+components:
+  - product_family: "^Virtual Machines$" # the Unit family = Azure serviceName
+    service_class: instance
+    select:
+      # base compute rate = NOT the Windows-licensed meter…
+      # base compute rate = NOT the Windows-licensed meter, and NOT the classic
+      # "Cloud Services" (PaaS) meters that also carry serviceName=Virtual
+      # Machines at a different rate (not azurerm_linux_virtual_machine).
+      productName: { regex: "Windows|Cloud ?Services", negate: true }
+      # …and NOT the discounted Spot / Low-Priority variants.
+      skuName: { regex: "Spot|Low Priority", negate: true }
+    match:
+      size: { attr: armSkuName } # Terraform azurerm_linux_virtual_machine.size
+    pricing:
+      os: linux
+    price: { type: t, unit: "1 Hour" } # per-hour; engine ×730 for monthly
+    tier: usage

@@ -43,6 +43,9 @@ _ROWS = [
     "AmazonRDS,Provisioned IOPS,type=aws_db_instance&values.storage_type=io1&values.multi_az=false,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=iops,0.1000000000,a=values.iops,USD",
     # EC2 for breadth.
     "AmazonEC2,Compute Instance,type=aws_instance&values.instance_type=m5.large,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=instance&os=linux&start_usage_amount=0&end_usage_amount=Inf,0.0960000000,t,USD",
+    # Azure Linux VM (#931) — proves the second cloud prices through the same
+    # engine. size = armSkuName; region resolved from the resource's `location`.
+    "Virtual Machines,Virtual Machines,type=azurerm_linux_virtual_machine&values.size=Standard_D2s_v5,service_provider=azure&purchase_option=on_demand&region=eastus&service_class=instance&os=linux&start_usage_amount=0&end_usage_amount=Inf,0.096,t,USD",
 ]
 
 
@@ -243,6 +246,33 @@ def test_rds_gp3_default_iops_is_free_baseline():
 
 
 # --- EC2 breadth + the unpriced bucket -------------------------------------
+
+
+def test_azure_linux_vm_prices_through_the_same_engine():
+    """A second cloud: azurerm_linux_virtual_machine prices via size=armSkuName,
+    with region resolved from the resource's `location`. Proves the provider-
+    agnostic sheet + engine work beyond AWS (#931)."""
+    plan = {
+        "format_version": "1.2",
+        "terraform_version": "1.9.0",
+        "planned_values": {
+            "root_module": {
+                "resources": [
+                    {
+                        "address": "azurerm_linux_virtual_machine.a",
+                        "type": "azurerm_linux_virtual_machine",
+                        "name": "a",
+                        "mode": "managed",
+                        "values": {"size": "Standard_D2s_v5", "location": "eastus"},
+                    }
+                ]
+            }
+        },
+    }
+    est = estimate(plan, _sheet())
+    # 0.096/hr * 730 = 70.08
+    assert est.resources[0].monthly_min == pytest.approx(0.096 * 730, abs=0.01)
+    assert est.unpriced == []
 
 
 def test_ec2_instance_prices():

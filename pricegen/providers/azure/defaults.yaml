@@ -1,0 +1,20 @@
+# Azure provider defaults (#893). Shared across every Azure recipe.
+#
+# canonical: the one dimension that's a clean attribute — the retail-price
+# `type`. We price on-demand (Consumption); Reservation / DevTestConsumption
+# rows are filtered out here (applied only where the attr is present). The
+# Spot/Low-Priority variants live in skuName, NOT type, so each recipe excludes
+# them with a regex select — not here.
+canonical:
+  type: Consumption
+
+# pricing_common: the billing dimensions every Azure row carries. region comes
+# from armRegionName; the consumer resolves an azurerm resource's region from
+# its `location` attribute and filters to matching rows (#871).
+pricing_common:
+  service_provider: azure
+  purchase_option: on_demand
+  region: { attr: armRegionName }
+
+# Azure's Consumption meters are the on-demand equivalent of AWS OnDemand.
+price_term: Consumption

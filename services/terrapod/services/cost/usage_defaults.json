@@ -125,5 +125,12 @@
     "usage": {
       "operations": 0
     }
+  },
+  {
+    "description": "Azure Linux VM instance hours (Terrapod addition)",
+    "match_query": "type = azurerm_linux_virtual_machine and service_class = instance",
+    "usage": {
+      "time": 730
+    }
   }
 ]
