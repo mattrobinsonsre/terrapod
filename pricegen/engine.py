@@ -60,6 +60,11 @@ def _resolve2(spec, attrs: dict) -> tuple[str | None, str | None, str | None]:
     """
     if isinstance(spec, str):
         return spec, None, None
+    if isinstance(spec, dict) and "const" in spec:
+        # a fixed literal to STAMP on the row (e.g. values.architectures=arm64 on
+        # the ARM-duration component) — distinct from a bare string in a `match`,
+        # which _match_set reads as an attribute NAME.
+        return spec["const"], None, None
     if isinstance(spec, dict) and "from" in spec:
         vals = [attrs.get(a) for a in spec["from"]]
         key = "|".join(v or "" for v in vals)
@@ -154,7 +159,9 @@ def _match_set(
     """Return ``(match_set, miss)`` where miss is ``(field, reason, value)`` for
     the first field that didn't resolve, or None when the whole set resolved."""
     parts = [f"type={rtype}"]
-    match = component["match"]
+    # A component with no `match` constrains only the resource type (matches all
+    # of that type) — e.g. Lambda requests apply to every lambda.
+    match = component.get("match", {})
     items = (
         {_snake(a): {"attr": a} for a in match} if isinstance(match, list) else match
     )

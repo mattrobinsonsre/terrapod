@@ -36,7 +36,10 @@ def iter_units(offer: dict, *, term: str = "OnDemand"):
         for t in offer_terms.values():
             for pd in t.get("priceDimensions", {}).values():
                 usd = pd.get("pricePerUnit", {}).get("USD")
-                if usd is None:
+                # Skip $0 dimensions — they're AWS Free Tier / promotional SKUs
+                # (e.g. Lambda's free duration tier, often carrying an empty
+                # region), not a real charge. Mirrors the Azure adapter.
+                if usd is None or float(usd) == 0:
                     continue
                 prices.append(
                     Price(
