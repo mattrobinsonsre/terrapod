@@ -126,6 +126,7 @@ operators mirror it as today. Weekly regeneration is the target cadence.
 - [x] End-to-end pricing validation (real consumer engine, not just row-parity) + generator drift diagnostics
 - [x] Azure adapter + `azurerm_linux_virtual_machine` (regex select, validated end-to-end) — second cloud proven
 - [x] GCP computed engine + `google_compute_instance` (Σ vCPU-core + GiB-RAM, formulaic catalog, zone→region, validated end-to-end) — **all three clouds proven**
+- [x] Publish pipeline: `fetch_offers` (official APIs) → `publish` (combined gzipped-YAML sheet + drift manifest) → `drift` guardrail → scheduled workflow to a rolling GitHub Release
+- [ ] Consumer reads the Terrapod YAML sheet + flip `cost_estimation.prices_url` default to the rolling release
 - [ ] AWS breadth (LB, NAT, EIP, S3, …) + all-regions + a row-parity CI gate
 - [ ] Broaden GCP families/regions; Azure managed disks / Windows
-- [ ] Publish job (gzipped-YAML rolling release) + engine reads YAML + `prices_url` default

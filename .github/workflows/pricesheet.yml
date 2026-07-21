@@ -1,0 +1,90 @@
+name: Pricesheet
+
+# Weekly regeneration of the self-generated cost pricesheet (#893) from the
+# official cloud pricing APIs, published to a rolling GitHub Release. Runs ONLY
+# on a schedule (or manual dispatch) — never on PRs — because it fetches live
+# pricing data and publishes an artifact. The drift guardrail (#922) diffs this
+# run's manifest against the last published one and REFUSES to publish a
+# collapsed sheet, opening an issue instead.
+
+on:
+  schedule:
+    - cron: "17 6 * * 1" # Mondays 06:17 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: write # publish the rolling release
+  issues: write # open/refresh the drift issue
+
+env:
+  RELEASE_TAG: pricesheet
+  DRIFT_TITLE: "pricegen: pricesheet drift detected"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v5.0.0
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      - run: pip install pyyaml
+
+      - name: Fetch offers from the official cloud pricing APIs
+        env:
+          GCP_BILLING_API_KEY: ${{ secrets.GCP_BILLING_API_KEY }}
+        run: python -m pricegen.fetch_offers
+
+      - name: Generate the pricesheet + drift manifest
+        run: python -m pricegen.publish --out prices.yaml.gz --manifest manifest.json
+
+      - name: Download the last published manifest (if any)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p prev
+          if gh release download "$RELEASE_TAG" --pattern manifest.json --dir prev 2>/dev/null; then
+            echo "have_prev=true" >> "$GITHUB_ENV"
+          else
+            echo "have_prev=false" >> "$GITHUB_ENV"
+            echo "No previous release — first publish, skipping drift check."
+          fi
+
+      - name: Drift guardrail
+        id: drift
+        if: env.have_prev == 'true'
+        run: |
+          set +e
+          python -m pricegen.drift --prev prev/manifest.json --curr manifest.json \
+            --issue-body drift-body.md
+          echo "blocked=$?" >> "$GITHUB_OUTPUT"
+          set -e
+
+      - name: Open/refresh drift issue and fail (blocking drift)
+        if: steps.drift.outputs.blocked == '1'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          existing=$(gh issue list --state open --search "$DRIFT_TITLE in:title" \
+            --json number --jq '.[0].number')
+          if [ -n "$existing" ]; then
+            gh issue edit "$existing" --body-file drift-body.md
+            echo "Refreshed drift issue #$existing"
+          else
+            gh issue create --title "$DRIFT_TITLE" --body-file drift-body.md
+          fi
+          echo "::error::Pricesheet drift is blocking — the collapsed sheet was NOT published."
+          exit 1
+
+      - name: Publish to the rolling release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" \
+              --title "Terrapod cost pricesheet (rolling)" \
+              --notes "Auto-generated weekly from official cloud pricing APIs (#893). The \`prices.yaml.gz\` asset is a stable URL for \`cost_estimation.prices_url\`; \`manifest.json\` is the drift manifest." \
+              --latest=false
+          fi
+          gh release upload "$RELEASE_TAG" prices.yaml.gz manifest.json --clobber
+          echo "Published $(du -h prices.yaml.gz | cut -f1) pricesheet to the '$RELEASE_TAG' release."
