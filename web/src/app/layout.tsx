@@ -31,8 +31,13 @@ export default async function RootLayout({
   // flash on load. LTR locales (every one currently offered) render `dir="ltr"`
   // — identical to before — until an RTL locale is added to `locales`.
   const dir = dirForLocale(locale)
+  // The app ships its own professionally-translated catalogs + a language
+  // switcher (#767), so tell the browser's built-in translator (Chrome/Edge/
+  // Safari) to stand down: `translate="no"` suppresses the "Translate this
+  // page?" prompt and stops a machine-translation layer from fighting — and
+  // degrading — our own next-intl strings. Users switch language in-app.
   return (
-    <html lang={locale} dir={dir} className="dark">
+    <html lang={locale} dir={dir} translate="no" className="dark">
       <body className={inter.className}>
         <NextIntlClientProvider locale={locale} messages={messages}>
           {children}
