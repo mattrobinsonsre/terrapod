@@ -942,7 +942,7 @@ Returns the AI-generated plan summary (or failure analysis on errored plans) whe
 
 All five payloads carry `{run_id, workspace_id}` at minimum. The UI re-fetches the summary on any of them. For VCS-driven runs, the per-workspace PR/MR status comment is edited in place to include the summary content when it lands.
 
-The **AI cost narrative** (#871 — the optional enhancement over the data-only cost estimate, riding this same `ai_summary.enabled` switch + per-workspace mode) emits its own lifecycle events on the same per-workspace channel: `cost_summary_pending`, `cost_summary_ready`, `cost_summary_errored`, and `cost_summary_skipped` (workspace opted out / daily budget hit / no estimate). Each carries `{run_id, workspace_id}`. These are AI *polish* only — the authoritative figures stay on the data-only cost-estimate endpoint; every advisory dollar amount is tagged `source: "ai-estimate"`.
+The **AI cost estimate** (#871 — the optional AI layer over the data-only cost estimate, riding this same `ai_summary.enabled` switch + per-workspace mode) emits its own lifecycle events on the same per-workspace channel: `cost_summary_pending`, `cost_summary_ready`, `cost_summary_errored`, `cost_summary_skipped` (workspace opted out / daily budget hit / no estimate), and `cost_summary_message_posted` (a cost-chat follow-up turn landed — carries `message_id`; refetch the transcript). Each carries `{run_id, workspace_id}`. Its primary output is estimates for resources the pricesheet couldn't price; the authoritative figures stay on the data-only cost-estimate endpoint, and every AI dollar amount is tagged `source: "ai-estimate"`, never summed into the oiq total.
 
 ### Regenerate Plan Summary
 
@@ -3412,6 +3412,54 @@ POST /api/terrapod/v1/cost-estimation/pricesheet/refresh     # admin: force re-f
 ```
 
 The download endpoint is pull-through: a cold or stale cache is fetched from `cost_estimation.prices_url` on demand, and a stale copy is served if a refresh fails (a transient upstream outage never breaks a run). `404` when cost estimation is disabled or nothing is cached; the returned presigned URL needs no auth. `refresh` returns `502` on an upstream/decompress failure.
+
+### AI cost estimate (summary + advisories + chat)
+
+The optional AI layer over the data-only estimate (rides `ai_summary.enabled` + the per-workspace mode). Its **primary** output is estimates for the resources the pricesheet couldn't price; secondary are savings advisories and a short narrative. Every dollar figure is tagged `source: "ai-estimate"`, shown separately from the authoritative oiq total and never summed into it.
+
+```
+GET  /api/terrapod/v1/runs/{run_id}/cost-summary[?locale=<code>]
+POST /api/terrapod/v1/runs/{run_id}/cost-summary/regenerate
+```
+
+`GET` returns the summary; `404` until one has been generated (a `pending` row means "in flight"). With `?locale=` set to a real language different from the deployment's `ai_summary.summary_language`, the narrative + each estimate's `basis` + each advisory's `title`/`detail` are translated on view (best-effort, Redis-cached), and `translated`/`language` reflect that. `POST .../regenerate` re-fires it and returns `202` with a `pending` row (`409` when the run has no cost estimate; `503` when AI is globally disabled).
+
+**Response (`ready`):**
+```json
+{
+  "data": {
+    "id": "cost-summary-<uuid>",
+    "type": "cost-summaries",
+    "attributes": {
+      "status": "ready",
+      "estimated-resources": [
+        { "address": "azurerm_storage_account.a", "type": "azurerm_storage_account", "monthly": { "min": 5.0, "max": 8.0 }, "basis": "LRS hot ~100GB", "source": "ai-estimate" }
+      ],
+      "advisories": [
+        { "kind": "reserved", "title": "1-year RI", "detail": "…", "monthly_saving": { "min": 14.0, "max": 21.0 }, "source": "ai-estimate" }
+      ],
+      "narrative": "The unpriced resources add an estimated …",
+      "model": "bedrock/…", "input-tokens": 120, "output-tokens": 60,
+      "language": "en", "translated": false,
+      "created-at": "2026-01-01T00:00:00Z", "updated-at": "2026-01-01T00:01:00Z"
+    },
+    "relationships": { "run": { "data": { "id": "run-<uuid>", "type": "runs" } } }
+  }
+}
+```
+
+`status` is one of `pending` / `ready` / `errored` / `skipped`. Advisory `kind` is one of `savings_plan` / `reserved` / `spot` / `rightsizing` / `other`; `monthly_saving` may be `null`.
+
+#### Cost chat
+
+A follow-up Q&A thread grounded in the estimate (the cost analogue of the [plan-summary chat](#list-plan-summary-chat-messages)), one shared thread per run.
+
+```
+GET  /api/terrapod/v1/runs/{run_id}/cost-summary/messages[?locale=<code>]
+POST /api/terrapod/v1/runs/{run_id}/cost-summary/messages
+```
+
+`GET` returns the transcript (`cost-summary-messages`, chronological; each message translated on view when `?locale=` is set, with a per-message `translated` flag). `POST` a body of `{"data": {"attributes": {"content": "…", "locale": "de"}}}` to ask a question and get the synchronous assistant reply (`201`). Read-on-workspace auth. Error mapping mirrors the plan chat: `409` (per-run message cap hit, or the summary isn't `ready`), `429` (daily token budget hit), `503` (chat disabled), `400` (empty/oversize body), `502` (model failure — the user turn is still recorded). The model answers from the estimate only and keeps computed-vs-estimated figures distinct.
 
 ## Service Catalog
 

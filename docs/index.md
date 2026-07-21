@@ -33,7 +33,7 @@ Beyond broad TFE compatibility, Terrapod is built with three deliberate design f
 | **RBAC** | Label-based role system with hierarchical workspace permissions (read/plan/write/admin) |
 | **Private Registry** | Publish, version, and share modules and providers internally with pull-through caching |
 | **Service Catalog** | No-code self-service provisioning over the private registry; blessed modules become one-click agent-mode workspaces with provider templates and a dedicated RBAC axis |
-| **Cost Estimation** | Monthly cost of managed infrastructure — a per-plan delta on every run and the current total on a workspace; data only via a native OpenInfraQuote-port engine (credited), on by default |
+| **Cost Estimation** | Monthly cost of managed infrastructure — a per-plan delta on every run and the current total on a workspace; data via a native OpenInfraQuote-port engine (credited), on by default; optional AI layer estimates the resources oiq can't price + savings advisories + a grounded cost chat |
 | **Agent Pools** | Named groups of runner listeners; join token → certificate exchange for auth |
 | **SSO (OIDC / SAML)** | Pluggable identity providers (Auth0, Okta, Azure AD, etc.) |
 | **Run Triggers** | Cross-workspace dependency chains -- source apply triggers downstream runs |
@@ -152,7 +152,7 @@ See [Architecture](architecture.md) for the full breakdown.
 | [Registry](registry.md) | Private module/provider registry, caching layers |
 | [Registry Publishing](registry-publishing.md) | Publishing providers/modules with the `terrapod-publish` CLI and the client-signed publish protocol |
 | [Service Catalog](service-catalog.md) | No-code self-service provisioning over the private module registry: blessed catalog items, provider templates, a `catalog_permission` RBAC axis, and a full provision → reconfigure → destroy lifecycle |
-| [Cost Estimation](cost-estimation.md) | Monthly cost of managed infrastructure — a per-plan delta (run) and the current state total (workspace); native OpenInfraQuote-port engine, data only; Cost tab on both pages + MCP tools |
+| [Cost Estimation](cost-estimation.md) | Monthly cost of managed infrastructure — a per-plan delta (run) and the current state total (workspace); native OpenInfraQuote-port engine (data) + optional AI layer (estimates unpriced resources, advisories, grounded chat); Cost tab on both pages + MCP tools |
 | [Monitoring](monitoring.md) | Prometheus metrics, scraping, shipped Grafana dashboard + alert rules (with per-alert runbooks) |
 | [Deployment](deployment.md) | Production Helm deployment, storage backends, scaling |
 | [Split-networking deployments](deployment-network-isolation.md) | Three-Ingress model: management / webhook / internal agent path, with split-hostname runner config |
