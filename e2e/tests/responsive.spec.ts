@@ -52,9 +52,18 @@ test.describe('Responsive harness (phone viewport)', () => {
     // Opening it reveals the grouped sheet: primary links plus labelled
     // sections (Registry / Help, + Admin for admins). Account is NOT here — it
     // has its own trigger + drawer.
-    await hamburger.click();
+    //
+    // The nav is a client component: right after navigation the hamburger is
+    // SSR-rendered and visible, but a click can land BEFORE React hydrates and
+    // wires its onClick — the click is swallowed, `menuOpen` never flips, and
+    // #mobile-nav-menu never mounts (the pre-hydration lost-click flake, #902).
+    // Retry the click until the sheet actually opens, clicking only while it's
+    // still closed so a late-hydrated handler can't toggle it back shut.
     const menu = page.locator('#mobile-nav-menu');
-    await expect(menu).toBeVisible();
+    await expect(async () => {
+      if (!(await menu.isVisible())) await hamburger.click();
+      await expect(menu).toBeVisible({ timeout: 1000 });
+    }).toPass({ timeout: 15000 });
     await expect(menu.getByRole('link', { name: 'Workspaces' })).toBeVisible();
     await expect(menu.getByText('Registry', { exact: true })).toBeVisible();
     await expect(menu.getByText('Help', { exact: true })).toBeVisible();
