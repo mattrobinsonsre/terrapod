@@ -86,3 +86,34 @@ components:
       multi_az: *multi_az
     price: { type: "a=values.allocated_storage" }
     tier: none
+
+  # Provisioned IOPS — priced per provisioned IOPS-month, read from the real
+  # `iops` attr (`a=`). Like storage, the rate is engine-independent, so we match
+  # on (storage_type, multi_az) only. Verified against the offer: RDS PIOPS rates
+  # are FLAT, not graduated (io1/io2 $0.10) — so `a=values.iops` prices io1 AND
+  # io2 EXACTLY, and both ALWAYS carry an `iops` attr in Terraform (no missing-
+  # attr edge). io1/io2 have NO free baseline: you pay for every provisioned IOPS.
+  #
+  # gp3 is deliberately EXCLUDED: gp3 includes 3000 free provisioned IOPS, and the
+  # consumer's provision model can FILTER to a tier but can't SUBTRACT a baseline
+  # (verified — a gp3 at exactly 3000 IOPS billed the full 3000). Including gp3
+  # would spuriously bill the free baseline on the common case. gp3-above-3000 is
+  # a minor, opt-in line item; leaving it $0 (a bounded under-estimate) is more
+  # honest than a baseline over-charge until the consumer gains baseline
+  # subtraction (#926/#929). Default gp3 (no explicit iops) is correctly $0
+  # anyway. Needs the paired usage-less `service_class=iops` entry in
+  # usage_defaults.json to price at all.
+  - product_family: "^Provisioned IOPS$"
+    service_class: iops
+    select:
+      deploymentOption: [Single-AZ, Multi-AZ] # skip Mirror / readable-standbys / RAC
+    match:
+      storage_type:
+        attr: volumeType
+        map:
+          Provisioned IOPS (SSD): io1
+          Provisioned IOPS-IO2: io2
+          # General Purpose-GP3 deliberately absent -> unmapped -> skipped (see above).
+      multi_az: *multi_az
+    price: { type: "a=values.iops" }
+    tier: none
