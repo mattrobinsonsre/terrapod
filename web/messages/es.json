@@ -1982,6 +1982,39 @@
       "credit": "Datos de coste de <oiq>OpenInfraQuote</oiq>.",
       "asOfState": "según el estado v{serial}",
       "noState": "Aún sin coste — aparece tras la primera aplicación."
+    },
+    "costAi": {
+      "heading": "Estimación de coste por IA",
+      "aiGenerated": "Generado por IA",
+      "pending": "Estimando costes que los datos de precios no pueden cubrir…",
+      "skipped": "Se omitió la estimación de coste por IA para esta ejecución.",
+      "errored": "La estimación de coste por IA falló",
+      "estimatedTitle": "{count, plural, one {# recurso estimado por IA} other {# recursos estimados por IA}}",
+      "estimatedHint": "Estimaciones mensuales para recursos a los que los datos de precios no pudieron poner precio: la mejor conjetura del modelo, no una cifra calculada.",
+      "nothingToEstimate": "Los datos de precios cubrieron todos los recursos: nada que la IA deba estimar.",
+      "colBasis": "Base",
+      "colEstimated": "Mensual est.",
+      "advisoriesTitle": "Oportunidades de ahorro",
+      "saveUpTo": "ahorra ~{amount}/mes",
+      "narrativeTitle": "Resumen",
+      "estimateNote": "Estimaciones por IA: se muestran por separado y nunca se suman al total con precio de arriba.",
+      "advisoryKind": {
+        "savings_plan": "Plan de ahorro",
+        "reserved": "Reservado",
+        "spot": "Spot",
+        "rightsizing": "Ajuste de tamaño",
+        "other": "Consejo"
+      },
+      "regenerate": {
+        "label": "Regenerar",
+        "queueing": "En cola…",
+        "tooltip": "Volver a ejecutar la estimación de coste por IA",
+        "ariaLabel": "Regenerar la estimación de coste por IA",
+        "confirm": "¿Volver a ejecutar la estimación de coste por IA para esta ejecución?"
+      },
+      "errors": {
+        "status": "No se pudo cargar la estimación de coste por IA (HTTP {status})."
+      }
     }
   },
   "workspaceDetail": {

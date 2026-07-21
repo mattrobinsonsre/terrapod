@@ -28,6 +28,12 @@ const ImpactGraph = dynamic(() => import('@/components/impact-graph').then((m) =
 const CostPanel = dynamic(() => import('@/components/cost-panel').then((m) => m.CostPanel), {
   loading: () => <LoadingSpinner />,
 })
+// AI cost estimate (#871) — the model pricing what oiq couldn't; renders beside
+// CostPanel in the Cost tab. Its own SSE-driven refresh (cost_summary_* events).
+const CostAiSummary = dynamic(
+  () => import('@/components/cost-ai-summary').then((m) => m.CostAiSummary),
+  { loading: () => null },
+)
 
 interface RunActions {
   'is-confirmable': boolean
@@ -568,6 +574,9 @@ function RunDetailPageInner() {
   // PlanAiSummary component refetches without forcing the whole run to
   // reload.
   const [aiSummaryRefresh, setAiSummaryRefresh] = useState(0)
+  // Bumped on the SSE cost_summary_* events so CostAiSummary refetches live
+  // (#871) without reloading the whole run.
+  const [costSummaryRefresh, setCostSummaryRefresh] = useState(0)
 
   // Lightweight status of the AI analysis + policy checks, used by the
   // Overview summary cards and to decide whether the AI / OPA tabs appear.
@@ -701,6 +710,17 @@ function RunDetailPageInner() {
       ].includes(event.event) && event.run_id === bareId
     ) {
       setAiSummaryRefresh((n) => n + 1)
+    }
+    // AI cost-estimate lifecycle events → refetch the CostAiSummary panel.
+    if (
+      [
+        'cost_summary_ready',
+        'cost_summary_pending',
+        'cost_summary_errored',
+        'cost_summary_skipped',
+      ].includes(event.event) && event.run_id === bareId
+    ) {
+      setCostSummaryRefresh((n) => n + 1)
     }
   }, [runId, loadRun]))
 
@@ -1313,9 +1333,16 @@ function RunDetailPageInner() {
             view; the tab only appears when the run produced a JSON plan. */}
         {view === 'impact' && <ImpactGraph runId={runId.replace(/^run-/, '')} />}
 
-        {/* Cost tab (#871) — data-only oiq monthly cost breakdown; the tab only
-            appears when the run produced a cost estimate (has-cost-estimate). */}
-        {view === 'cost' && <CostPanel runId={runId.replace(/^run-/, '')} />}
+        {/* Cost tab (#871) — the deterministic oiq breakdown, with the AI cost
+            estimate (pricing what oiq couldn't) rendered beside it. The tab
+            appears when the run produced a cost estimate (has-cost-estimate);
+            the AI panel self-hides when the feature is off. */}
+        {view === 'cost' && (
+          <div className="flex flex-col gap-6">
+            <CostPanel runId={runId.replace(/^run-/, '')} />
+            <CostAiSummary runId={runId.replace(/^run-/, '')} refreshKey={costSummaryRefresh} />
+          </div>
+        )}
 
         {view === 'details' && (
         <>

@@ -1982,6 +1982,39 @@
       "credit": "Cost data from <oiq>OpenInfraQuote</oiq>.",
       "asOfState": "as of marklar v{serial}",
       "noState": "No marklar yet — appears after the first marklar."
+    },
+    "costAi": {
+      "heading": "AI marklar estimate",
+      "aiGenerated": "Marklar generated",
+      "pending": "Estimating marklars the marklar data can't cover…",
+      "skipped": "Marklar skipped for this marklar.",
+      "errored": "Marklar failed",
+      "estimatedTitle": "{count, plural, one {# AI-estimated resource} other {# AI-estimated resources}}",
+      "estimatedHint": "Monthly estimates for resources the marklar data couldn't price — the model's best guess, not a computed marklar.",
+      "nothingToEstimate": "The marklar data covered every resource — nothing left for the AI to estimate.",
+      "colBasis": "Basis",
+      "colEstimated": "Est. monthly",
+      "advisoriesTitle": "Marklar opportunities",
+      "saveUpTo": "save ~{amount}/mo",
+      "narrativeTitle": "Marklar",
+      "estimateNote": "AI estimates — shown separately, never added to the priced marklar above.",
+      "advisoryKind": {
+        "savings_plan": "Savings Plan",
+        "reserved": "Reserved",
+        "spot": "Spot",
+        "rightsizing": "Rightsizing",
+        "other": "Marklar"
+      },
+      "regenerate": {
+        "label": "Regenerate",
+        "queueing": "Marklaring…",
+        "tooltip": "Re-run the AI marklar estimate",
+        "ariaLabel": "Regenerate AI marklar estimate",
+        "confirm": "Re-run the AI marklar estimate for this marklar?"
+      },
+      "errors": {
+        "status": "Could not load AI marklar estimate (Marklar {status})."
+      }
     }
   },
   "workspaceDetail": {

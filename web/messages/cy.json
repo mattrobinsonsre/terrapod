@@ -1982,6 +1982,39 @@
       "credit": "Data cost gan <oiq>OpenInfraQuote</oiq>.",
       "asOfState": "fel ar gyflwr v{serial}",
       "noState": "Dim cost eto — mae'n ymddangos ar ôl y gweithrediad cyntaf."
+    },
+    "costAi": {
+      "heading": "Amcangyfrif cost gan AI",
+      "aiGenerated": "Cynhyrchwyd gan AI",
+      "pending": "Amcangyfrif costau na all y data prisio eu cwmpasu…",
+      "skipped": "Hepgorwyd yr amcangyfrif cost gan AI ar gyfer y rhediad hwn.",
+      "errored": "Methodd yr amcangyfrif cost gan AI",
+      "estimatedTitle": "{count, plural, zero {# adnodd a amcangyfrifwyd gan AI} one {# adnodd a amcangyfrifwyd gan AI} two {# adnodd a amcangyfrifwyd gan AI} few {# adnodd a amcangyfrifwyd gan AI} many {# adnodd a amcangyfrifwyd gan AI} other {# adnodd a amcangyfrifwyd gan AI}}",
+      "estimatedHint": "Amcangyfrifon misol ar gyfer adnoddau na allai''r data prisio eu prisio — dyfaliad gorau''r model, nid ffigur wedi''i gyfrifo.",
+      "nothingToEstimate": "Roedd y data prisio yn cwmpasu pob adnodd — dim ar ôl i''r AI ei amcangyfrif.",
+      "colBasis": "Sail",
+      "colEstimated": "Misol amcan.",
+      "advisoriesTitle": "Cyfleoedd i arbed",
+      "saveUpTo": "arbedwch ~{amount}/mis",
+      "narrativeTitle": "Crynodeb",
+      "estimateNote": "Amcangyfrifon AI — dangosir ar wahân, byth yn cael eu hychwanegu at y cyfanswm â phris uchod.",
+      "advisoryKind": {
+        "savings_plan": "Cynllun arbed",
+        "reserved": "Neilltuedig",
+        "spot": "Spot",
+        "rightsizing": "Addasu maint",
+        "other": "Awgrym"
+      },
+      "regenerate": {
+        "label": "Ailgynhyrchu",
+        "queueing": "Yn ciwio…",
+        "tooltip": "Ailredeg yr amcangyfrif cost gan AI",
+        "ariaLabel": "Ailgynhyrchu''r amcangyfrif cost gan AI",
+        "confirm": "Ailredeg yr amcangyfrif cost gan AI ar gyfer y rhediad hwn?"
+      },
+      "errors": {
+        "status": "Methwyd â llwytho''r amcangyfrif cost gan AI (HTTP {status})."
+      }
     }
   },
   "workspaceDetail": {

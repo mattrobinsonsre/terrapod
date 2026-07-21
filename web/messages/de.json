@@ -1982,6 +1982,39 @@
       "credit": "Kostendaten von <oiq>OpenInfraQuote</oiq>.",
       "asOfState": "Stand Zustand v{serial}",
       "noState": "Noch keine Kosten — erscheint nach der ersten Anwendung."
+    },
+    "costAi": {
+      "heading": "KI-Kostenschätzung",
+      "aiGenerated": "KI-generiert",
+      "pending": "Schätzung von Kosten, die die Preisdaten nicht abdecken können…",
+      "skipped": "Die KI-Kostenschätzung wurde für diesen Lauf übersprungen.",
+      "errored": "KI-Kostenschätzung fehlgeschlagen",
+      "estimatedTitle": "{count, plural, one {# KI-geschätzte Ressource} other {# KI-geschätzte Ressourcen}}",
+      "estimatedHint": "Monatliche Schätzungen für Ressourcen, die die Preisdaten nicht bepreisen konnten — die beste Vermutung des Modells, kein berechneter Wert.",
+      "nothingToEstimate": "Die Preisdaten deckten jede Ressource ab — nichts mehr für die KI zu schätzen.",
+      "colBasis": "Basis",
+      "colEstimated": "Monatl. gesch.",
+      "advisoriesTitle": "Einsparmöglichkeiten",
+      "saveUpTo": "spare ~{amount}/Mon.",
+      "narrativeTitle": "Zusammenfassung",
+      "estimateNote": "KI-Schätzungen — separat angezeigt, nie zur bepreisten Summe oben addiert.",
+      "advisoryKind": {
+        "savings_plan": "Sparplan",
+        "reserved": "Reserviert",
+        "spot": "Spot",
+        "rightsizing": "Größenanpassung",
+        "other": "Tipp"
+      },
+      "regenerate": {
+        "label": "Neu generieren",
+        "queueing": "Wird eingereiht…",
+        "tooltip": "KI-Kostenschätzung erneut ausführen",
+        "ariaLabel": "KI-Kostenschätzung neu generieren",
+        "confirm": "KI-Kostenschätzung für diesen Lauf erneut ausführen?"
+      },
+      "errors": {
+        "status": "KI-Kostenschätzung konnte nicht geladen werden (HTTP {status})."
+      }
     }
   },
   "workspaceDetail": {

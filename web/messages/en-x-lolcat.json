@@ -1982,6 +1982,39 @@
       "credit": "Cost data from <oiq>OpenInfraQuote</oiq>.",
       "asOfState": "as of state v{serial}",
       "noState": "No cost yet — appears after teh furst apply."
+    },
+    "costAi": {
+      "heading": "AI cost estim8",
+      "aiGenerated": "AI generated",
+      "pending": "Estimatin costz teh pricin data cant cover…",
+      "skipped": "AI cost estimashun skipped fer dis run.",
+      "errored": "AI cost estimashun failed",
+      "estimatedTitle": "{count, plural, one {# AI-estim8d resource} other {# AI-estim8d resourcez}}",
+      "estimatedHint": "Munthly estim8s fer teh resourcez teh pricin data couldnt price — teh models best guess, not a computd figger.",
+      "nothingToEstimate": "Teh pricin data covrd evry resource — nuffin left fer teh AI to estim8.",
+      "colBasis": "Basis",
+      "colEstimated": "Est. munthly",
+      "advisoriesTitle": "Savinz oppurtunitiez",
+      "saveUpTo": "save ~{amount}/mo",
+      "narrativeTitle": "Summry",
+      "estimateNote": "AI estim8s — shown seprately, nevr added ta teh priced total abuv.",
+      "advisoryKind": {
+        "savings_plan": "Savingz Plan",
+        "reserved": "Reservd",
+        "spot": "Spot",
+        "rightsizing": "Rightsizin",
+        "other": "Tip"
+      },
+      "regenerate": {
+        "label": "Regeneratez",
+        "queueing": "Queuein…",
+        "tooltip": "Re-run teh AI cost estim8",
+        "ariaLabel": "Regenerate AI cost estim8",
+        "confirm": "Re-run teh AI cost estim8 fer dis run?"
+      },
+      "errors": {
+        "status": "Could not load AI cost estim8 (HTTP {status})."
+      }
     }
   },
   "workspaceDetail": {

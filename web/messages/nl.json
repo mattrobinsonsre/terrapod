@@ -1982,6 +1982,39 @@
       "credit": "Kostengegevens van <oiq>OpenInfraQuote</oiq>.",
       "asOfState": "vanaf status v{serial}",
       "noState": "Nog geen kosten — verschijnt na de eerste toepassing."
+    },
+    "costAi": {
+      "heading": "AI-kostenraming",
+      "aiGenerated": "Door AI gegenereerd",
+      "pending": "Kosten ramen die de prijsgegevens niet kunnen dekken…",
+      "skipped": "AI-kostenraming is overgeslagen voor deze uitvoering.",
+      "errored": "AI-kostenraming mislukt",
+      "estimatedTitle": "{count, plural, one {# door AI geraamde resource} other {# door AI geraamde resources}}",
+      "estimatedHint": "Maandelijkse ramingen voor resources waaraan de prijsgegevens geen prijs konden toekennen — de beste gok van het model, geen berekend cijfer.",
+      "nothingToEstimate": "De prijsgegevens dekten elke resource — niets meer voor de AI om te ramen.",
+      "colBasis": "Basis",
+      "colEstimated": "Maand. raming",
+      "advisoriesTitle": "Besparingsmogelijkheden",
+      "saveUpTo": "bespaar ~{amount}/mnd",
+      "narrativeTitle": "Samenvatting",
+      "estimateNote": "AI-ramingen — apart weergegeven, nooit opgeteld bij het geprijsde totaal hierboven.",
+      "advisoryKind": {
+        "savings_plan": "Besparingsplan",
+        "reserved": "Gereserveerd",
+        "spot": "Spot",
+        "rightsizing": "Rightsizing",
+        "other": "Tip"
+      },
+      "regenerate": {
+        "label": "Opnieuw genereren",
+        "queueing": "In wachtrij…",
+        "tooltip": "AI-kostenraming opnieuw uitvoeren",
+        "ariaLabel": "AI-kostenraming opnieuw genereren",
+        "confirm": "AI-kostenraming voor deze uitvoering opnieuw uitvoeren?"
+      },
+      "errors": {
+        "status": "AI-kostenraming kan niet worden geladen (HTTP {status})."
+      }
     }
   },
   "workspaceDetail": {
