@@ -66,6 +66,12 @@ _ROWS = [
     "AmazonS3,Storage,type=aws_s3_bucket,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=storage&storage_class=general_purpose&start_usage_amount=0&end_usage_amount=51200,0.0230000000,d,USD",
     "AmazonS3,API Request,type=aws_s3_bucket,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=requests&tier=1&start_usage_amount=0&end_usage_amount=Inf,0.0000050000,o,USD",
     "AmazonS3,API Request,type=aws_s3_bucket,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=requests&tier=2&start_usage_amount=0&end_usage_amount=Inf,0.0000004000,o,USD",
+    # DynamoDB (PayPerRequest, Standard) — read + write request units + storage.
+    # Storage starts at 0 (the 25 GB account-wide free tier is NOT applied
+    # per-table), so a table is billed for its full storage.
+    "AmazonDynamoDB,Amazon DynamoDB PayPerRequest Throughput,type=aws_dynamodb_table,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=requests&request_type=read&table_class=standard&start_usage_amount=0&end_usage_amount=Inf,0.0000001250,o,USD",
+    "AmazonDynamoDB,Amazon DynamoDB PayPerRequest Throughput,type=aws_dynamodb_table,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=requests&request_type=write&table_class=standard&start_usage_amount=0&end_usage_amount=Inf,0.0000006250,o,USD",
+    "AmazonDynamoDB,Database Storage,type=aws_dynamodb_table,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=storage&table_class=standard&start_usage_amount=0&end_usage_amount=Inf,0.2500000000,d,USD",
 ]
 
 
@@ -420,6 +426,28 @@ def test_s3_bucket_storage_plus_request_tiers():
     # usage defaults: 900 GB storage + 4M Tier-1 + 50M Tier-2 requests.
     expected = 900 * 0.023 + 4_000_000 * 0.000005 + 50_000_000 * 0.0000004
     assert est.resources[0].monthly_min == pytest.approx(expected, abs=0.01)  # $60.70
+    assert est.unpriced == []
+
+
+def test_dynamodb_table_read_write_storage():
+    """DynamoDB PayPerRequest table: read + write request units + full storage
+    (the 25 GB account-wide free tier is deliberately NOT applied per-table, so
+    it's consistent with Lambda and doesn't under-estimate). (#893)"""
+    plan = _plan(
+        [
+            {
+                "address": "aws_dynamodb_table.t",
+                "type": "aws_dynamodb_table",
+                "name": "t",
+                "mode": "managed",
+                "values": {"region": "us-east-1", "billing_mode": "PAY_PER_REQUEST"},
+            }
+        ]
+    )
+    est = estimate(plan, _sheet())
+    # usage defaults: 80M reads + 16M writes + 80 GB storage (billed from 0).
+    expected = 80_000_000 * 0.000000125 + 16_000_000 * 0.000000625 + 80 * 0.25
+    assert est.resources[0].monthly_min == pytest.approx(expected, abs=0.01)  # $40.00
     assert est.unpriced == []
 
 

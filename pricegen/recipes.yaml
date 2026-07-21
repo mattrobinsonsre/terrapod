@@ -32,3 +32,7 @@ recipes:
     recipe: aws_s3_bucket
     offer: .cache/s3-us-east-1.json
     fetch: { service_code: AmazonS3, region: us-east-1 }
+  - provider: aws
+    recipe: aws_dynamodb_table
+    offer: .cache/ddb-us-east-1.json
+    fetch: { service_code: AmazonDynamoDB, region: us-east-1 }
