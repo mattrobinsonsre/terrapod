@@ -116,3 +116,35 @@ def test_no_api_skips(tmp_path, monkeypatch):
     with patch.object(cost, "download_to_file", side_effect=AssertionError("no fetch")):
         out = cost.estimate_cost(cfg, plan)
     assert out is None
+
+
+def test_pricesheet_request_sends_well_formed_bearer_header(tmp_path, monkeypatch):
+    """Regression: the pricesheet fetch must send a valid ``Authorization: Bearer
+    <token>`` header — NOT a doubled ``Authorization: Authorization: Bearer ...``.
+
+    The cost phase once built the header value from ``cfg.auth_header`` (which was
+    the *entire* header line ``"Authorization: Bearer <tok>"``) under the
+    ``Authorization`` key, so the runner sent ``Authorization: Authorization:
+    Bearer <tok>`` and every agent-run pricesheet fetch 401'd — cost estimation
+    silently skipped on every server-side run. Only surfaced live (a real runner
+    against a real API); the prior tests stubbed the download without asserting
+    the header. Pin the exact header the request carries.
+    """
+    _redirect_paths(tmp_path, monkeypatch)
+    plan = tmp_path / "plan.json"
+    plan.write_text(json.dumps(_PLAN))
+
+    seen: dict[str, str] = {}
+
+    def capture_download(url, output_path, headers=None, **_kw):
+        seen.update(headers or {})
+        output_path.write_text(_SHEET)
+        return DownloadResult(ok=True, status=200)
+
+    with patch.object(cost, "download_to_file", side_effect=capture_download):
+        out = cost.estimate_cost(_cfg(TP_AUTH_TOKEN="tok"), plan)
+
+    assert out is not None
+    assert seen.get("Authorization") == "Bearer tok"
+    # Belt-and-braces: the value must not itself contain the header name.
+    assert "Authorization:" not in seen.get("Authorization", "")

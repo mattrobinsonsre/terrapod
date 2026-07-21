@@ -180,7 +180,3 @@ class RunnerConfig:
         ``phase`` — the run is plan-phase for all infra; only the entrypoint's
         behaviour branch differs."""
         return bool(self.onboard_session_id)
-
-    @property
-    def auth_header(self) -> str:
-        return f"Authorization: Bearer {self.auth_token}"
