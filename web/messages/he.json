@@ -1982,6 +1982,39 @@
       "credit": "נתוני עלות מ־<oiq>OpenInfraQuote</oiq>.",
       "asOfState": "נכון למצב v{serial}",
       "noState": "עדיין אין עלות — מופיעה לאחר ההחלה הראשונה."
+    },
+    "costAi": {
+      "heading": "אומדן עלות מבוסס AI",
+      "aiGenerated": "נוצר על ידי AI",
+      "pending": "מעריך עלויות שנתוני התמחור אינם יכולים לכסות…",
+      "skipped": "אומדן העלות מבוסס ה-AI דולג עבור הרצה זו.",
+      "errored": "אומדן העלות מבוסס ה-AI נכשל",
+      "estimatedTitle": "{count, plural, one {# משאב מוערך ב-AI} two {# משאבים מוערכים ב-AI} many {# משאבים מוערכים ב-AI} other {# משאבים מוערכים ב-AI}}",
+      "estimatedHint": "אומדנים חודשיים למשאבים שנתוני התמחור לא הצליחו לתמחר — הניחוש הטוב ביותר של המודל, לא נתון מחושב.",
+      "nothingToEstimate": "נתוני התמחור כיסו כל משאב — לא נותר דבר שה-AI צריך להעריך.",
+      "colBasis": "בסיס",
+      "colEstimated": "אומדן חודשי",
+      "advisoriesTitle": "הזדמנויות לחיסכון",
+      "saveUpTo": "חיסכון של ~{amount}/חודש",
+      "narrativeTitle": "סיכום",
+      "estimateNote": "אומדני AI — מוצגים בנפרד, ולעולם אינם נוספים לסך המתומחר שלמעלה.",
+      "advisoryKind": {
+        "savings_plan": "תוכנית חיסכון",
+        "reserved": "שמור",
+        "spot": "ספוט",
+        "rightsizing": "התאמת גודל",
+        "other": "טיפ"
+      },
+      "regenerate": {
+        "label": "יצירה מחדש",
+        "queueing": "מוסיף לתור…",
+        "tooltip": "הרצה מחדש של אומדן העלות מבוסס ה-AI",
+        "ariaLabel": "יצירה מחדש של אומדן העלות מבוסס ה-AI",
+        "confirm": "להריץ מחדש את אומדן העלות מבוסס ה-AI עבור הרצה זו?"
+      },
+      "errors": {
+        "status": "טעינת אומדן העלות מבוסס ה-AI נכשלה (HTTP {status})."
+      }
     }
   },
   "workspaceDetail": {

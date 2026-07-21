@@ -1982,6 +1982,39 @@
       "credit": "Maliyet verileri <oiq>OpenInfraQuote</oiq> kaynağından.",
       "asOfState": "durum v{serial} itibarıyla",
       "noState": "Henüz maliyet yok — ilk uygulamadan sonra görünür."
+    },
+    "costAi": {
+      "heading": "AI maliyet tahmini",
+      "aiGenerated": "AI üretti",
+      "pending": "Fiyatlandırma verilerinin kapsayamadığı maliyetler tahmin ediliyor…",
+      "skipped": "Bu çalıştırma için AI maliyet tahmini atlandı.",
+      "errored": "AI maliyet tahmini başarısız oldu",
+      "estimatedTitle": "{count, plural, one {AI ile tahmin edilen # kaynak} other {AI ile tahmin edilen # kaynak}}",
+      "estimatedHint": "Fiyatlandırma verilerinin fiyatlandıramadığı kaynaklar için aylık tahminler — hesaplanmış bir rakam değil, modelin en iyi tahmini.",
+      "nothingToEstimate": "Fiyatlandırma verileri her kaynağı kapsadı — AI için tahmin edilecek bir şey kalmadı.",
+      "colBasis": "Dayanak",
+      "colEstimated": "Tah. aylık",
+      "advisoriesTitle": "Tasarruf fırsatları",
+      "saveUpTo": "~{amount}/ay tasarruf",
+      "narrativeTitle": "Özet",
+      "estimateNote": "AI tahminleri — ayrı gösterilir, yukarıdaki fiyatlandırılmış toplama asla eklenmez.",
+      "advisoryKind": {
+        "savings_plan": "Savings Plan",
+        "reserved": "Ayrılmış",
+        "spot": "Spot",
+        "rightsizing": "Boyut optimizasyonu",
+        "other": "İpucu"
+      },
+      "regenerate": {
+        "label": "Yeniden oluştur",
+        "queueing": "Sıraya alınıyor…",
+        "tooltip": "AI maliyet tahminini yeniden çalıştır",
+        "ariaLabel": "AI maliyet tahminini yeniden oluştur",
+        "confirm": "Bu çalıştırma için AI maliyet tahmini yeniden çalıştırılsın mı?"
+      },
+      "errors": {
+        "status": "AI maliyet tahmini yüklenemedi (HTTP {status})."
+      }
     }
   },
   "workspaceDetail": {

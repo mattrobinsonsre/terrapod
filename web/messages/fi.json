@@ -1982,6 +1982,39 @@
       "credit": "Kustannustiedot: <oiq>OpenInfraQuote</oiq>.",
       "asOfState": "tilan v{serial} mukaan",
       "noState": "Ei vielä kustannuksia — näkyy ensimmäisen käytön jälkeen."
+    },
+    "costAi": {
+      "heading": "Tekoälyn kustannusarvio",
+      "aiGenerated": "Tekoälyn luoma",
+      "pending": "Arvioidaan kustannuksia, joita hinnoittelutiedot eivät kata…",
+      "skipped": "Tekoälyn kustannusarvio ohitettiin tässä ajossa.",
+      "errored": "Tekoälyn kustannusarvio epäonnistui",
+      "estimatedTitle": "{count, plural, one {# tekoälyn arvioima resurssi} other {# tekoälyn arvioimaa resurssia}}",
+      "estimatedHint": "Kuukausiarviot resursseille, joita hinnoittelutiedot eivät pystyneet hinnoittelemaan — mallin paras arvaus, ei laskettu luku.",
+      "nothingToEstimate": "Hinnoittelutiedot kattoivat kaikki resurssit — tekoälylle ei jäänyt mitään arvioitavaa.",
+      "colBasis": "Peruste",
+      "colEstimated": "Arv. kuukausittain",
+      "advisoriesTitle": "Säästömahdollisuudet",
+      "saveUpTo": "säästä ~{amount}/kk",
+      "narrativeTitle": "Yhteenveto",
+      "estimateNote": "Tekoälyn arviot — näytetään erikseen, eikä niitä koskaan lisätä yllä olevaan hinnoiteltuun summaan.",
+      "advisoryKind": {
+        "savings_plan": "Savings Plan",
+        "reserved": "Varattu",
+        "spot": "Spot",
+        "rightsizing": "Koon optimointi",
+        "other": "Vinkki"
+      },
+      "regenerate": {
+        "label": "Luo uudelleen",
+        "queueing": "Asetetaan jonoon…",
+        "tooltip": "Suorita tekoälyn kustannusarvio uudelleen",
+        "ariaLabel": "Luo tekoälyn kustannusarvio uudelleen",
+        "confirm": "Suoritetaanko tekoälyn kustannusarvio tälle ajolle uudelleen?"
+      },
+      "errors": {
+        "status": "Tekoälyn kustannusarvion lataus epäonnistui (HTTP {status})."
+      }
     }
   },
   "workspaceDetail": {

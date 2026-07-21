@@ -15,6 +15,16 @@
  * stacked cards on mobile, unpriced bucket, OpenInfraQuote credit) is verified
  * on the live Tilt stack, where a real run produces a cost estimate — the panel
  * is unreachable in CI without one, the same as the Impact tab.
+ *
+ * The AI cost estimate section (#871 — the model pricing what oiq couldn't,
+ * plus savings advisories and a narrative) lives on this same tab, below the
+ * deterministic panel, and self-hides (renders nothing) when no cost-summary
+ * row exists (404). It is behind the SAME gate: no runner in CI means no cost
+ * estimate, so no Cost tab, so the AI section can't render either — and the
+ * E2E stack runs with AI disabled regardless. Like CostPanel, its rendered
+ * output (AI-estimated-resource table, advisory badges, demoted narrative,
+ * "never added to the priced total" provenance line) is verified on the live
+ * Tilt stack against a real agent run, not in CI.
  */
 import { test, expect } from '@playwright/test'
 import { getStoredToken, createWorkspace, seedRun, uniqueName } from '../helpers/api'

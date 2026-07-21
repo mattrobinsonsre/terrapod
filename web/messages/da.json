@@ -1982,6 +1982,39 @@
       "credit": "Omkostningsdata fra <oiq>OpenInfraQuote</oiq>.",
       "asOfState": "pr. tilstand v{serial}",
       "noState": "Ingen omkostning endnu — vises efter første anvendelse."
+    },
+    "costAi": {
+      "heading": "AI-omkostningsestimat",
+      "aiGenerated": "AI-genereret",
+      "pending": "Estimerer omkostninger, som prisdataene ikke kan dække…",
+      "skipped": "AI-omkostningsestimering blev sprunget over for denne kørsel.",
+      "errored": "AI-omkostningsestimering mislykkedes",
+      "estimatedTitle": "{count, plural, one {# AI-estimeret ressource} other {# AI-estimerede ressourcer}}",
+      "estimatedHint": "Månedlige estimater for ressourcer, som prisdataene ikke kunne prissætte — modellens bedste gæt, ikke et beregnet tal.",
+      "nothingToEstimate": "Prisdataene dækkede alle ressourcer — intet tilbage, som AI skal estimere.",
+      "colBasis": "Grundlag",
+      "colEstimated": "Est. månedligt",
+      "advisoriesTitle": "Besparelsesmuligheder",
+      "saveUpTo": "spar ~{amount}/md.",
+      "narrativeTitle": "Resumé",
+      "estimateNote": "AI-estimater — vises separat, lægges aldrig til den prissatte total ovenfor.",
+      "advisoryKind": {
+        "savings_plan": "Savings Plan",
+        "reserved": "Reserveret",
+        "spot": "Spot",
+        "rightsizing": "Tilpasning af størrelse",
+        "other": "Tip"
+      },
+      "regenerate": {
+        "label": "Generér igen",
+        "queueing": "Sætter i kø…",
+        "tooltip": "Kør AI-omkostningsestimatet igen",
+        "ariaLabel": "Generér AI-omkostningsestimat igen",
+        "confirm": "Kør AI-omkostningsestimatet for denne kørsel igen?"
+      },
+      "errors": {
+        "status": "Kunne ikke indlæse AI-omkostningsestimatet (HTTP {status})."
+      }
     }
   },
   "workspaceDetail": {

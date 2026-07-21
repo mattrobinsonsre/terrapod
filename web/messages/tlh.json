@@ -1982,6 +1982,39 @@
       "credit": "Cost data from <oiq>OpenInfraQuote</oiq>.",
       "asOfState": "Dotlh v{serial} rurlaw'",
       "noState": "wagh tu'lu'be' — wa'DIch lo' ghevqo' 'ej cha'lu'."
+    },
+    "costAi": {
+      "heading": "AI wagh Qel",
+      "aiGenerated": "AI chenmoHlu'pu'",
+      "pending": "wagh De' QellaHbe'bogh waghmey QeltaH…",
+      "skipped": "vamvaD AI wagh Qel jumlu'pu'.",
+      "errored": "AI wagh Qel lujpu'",
+      "estimatedTitle": "{count, plural, one {# AI-Qelpu'bogh Sep} other {# AI-Qelpu'bogh Sep}}",
+      "estimatedHint": "wagh De' QellaHbe'bogh SepmeyvaD jar Qelmey — model Qub pov 'oH, mI' ngoHlu'pu'be'.",
+      "nothingToEstimate": "wagh De' Hoch Sep Qelpu' — AI QelmeH pagh ratlh.",
+      "colBasis": "mung",
+      "colEstimated": "jar Qel",
+      "advisoriesTitle": "waghHa'meH 'ebmey",
+      "saveUpTo": "waghHa' ~{amount}/jar",
+      "narrativeTitle": "tlhoS",
+      "estimateNote": "AI Qelmey — pImDaq cha'lu', Dung wagh naQvaD chellu'be'.",
+      "advisoryKind": {
+        "savings_plan": "waghHa' nab",
+        "reserved": "pollu'bogh",
+        "spot": "Spot",
+        "rightsizing": "chomHa'",
+        "other": "qeS"
+      },
+      "regenerate": {
+        "label": "chenmoHqa'",
+        "queueing": "tlhamDaq…",
+        "tooltip": "AI wagh Qel vangqa'",
+        "ariaLabel": "AI wagh Qel chenmoHqa'",
+        "confirm": "vamvaD AI wagh Qel vangqa''a'?"
+      },
+      "errors": {
+        "status": "AI wagh Qel laDlaHbe' (HTTP {status})."
+      }
     }
   },
   "workspaceDetail": {

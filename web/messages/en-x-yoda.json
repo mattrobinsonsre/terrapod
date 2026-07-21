@@ -1982,6 +1982,39 @@
       "credit": "Cost data from <oiq>OpenInfraQuote</oiq>.",
       "asOfState": "as of state v{serial}",
       "noState": "No cost yet — appears after the first apply, it does."
+    },
+    "costAi": {
+      "heading": "estimate, AI cost",
+      "aiGenerated": "generated, AI",
+      "pending": "The costs the pricing data can't cover, estimating…",
+      "skipped": "For this run, skipped the AI cost estimation was.",
+      "errored": "Failed, the AI cost estimation did",
+      "estimatedTitle": "{count, plural, one {# AI-estimated resource} other {# AI-estimated resources}}",
+      "estimatedHint": "For resources the pricing data couldn't price, monthly estimates these are — the model's best guess, not a computed figure.",
+      "nothingToEstimate": "Every resource, the pricing data covered — nothing left for the AI to estimate, there is.",
+      "colBasis": "Basis",
+      "colEstimated": "Est. monthly",
+      "advisoriesTitle": "opportunities, Savings",
+      "saveUpTo": "~{amount}/mo, save",
+      "narrativeTitle": "Summary",
+      "estimateNote": "Shown separately, the AI estimates are — to the priced total above, never added.",
+      "advisoryKind": {
+        "savings_plan": "Savings Plan",
+        "reserved": "Reserved",
+        "spot": "Spot",
+        "rightsizing": "Rightsizing",
+        "other": "Tip"
+      },
+      "regenerate": {
+        "label": "Regenerate",
+        "queueing": "Queuing, we are…",
+        "tooltip": "The AI cost estimate, re-run",
+        "ariaLabel": "AI cost estimate, Regenerate",
+        "confirm": "The AI cost estimate for this run, re-run?"
+      },
+      "errors": {
+        "status": "Load the AI cost estimate, failed it did (HTTP {status})."
+      }
     }
   },
   "workspaceDetail": {

@@ -1982,6 +1982,39 @@
       "credit": "Kostnadsdata fra <oiq>OpenInfraQuote</oiq>.",
       "asOfState": "per tilstand v{serial}",
       "noState": "Ingen kostnad ennå — vises etter første anvendelse."
+    },
+    "costAi": {
+      "heading": "AI-kostnadsestimat",
+      "aiGenerated": "AI-generert",
+      "pending": "Estimerer kostnader som prisdataene ikke kan dekke…",
+      "skipped": "AI-kostnadsestimering ble hoppet over for denne kjøringen.",
+      "errored": "AI-kostnadsestimering mislyktes",
+      "estimatedTitle": "{count, plural, one {# AI-estimert ressurs} other {# AI-estimerte ressurser}}",
+      "estimatedHint": "Månedlige estimater for ressurser som prisdataene ikke kunne prissette — modellens beste gjetning, ikke et beregnet tall.",
+      "nothingToEstimate": "Prisdataene dekket alle ressurser — ingenting igjen for AI å estimere.",
+      "colBasis": "Grunnlag",
+      "colEstimated": "Est. månedlig",
+      "advisoriesTitle": "Sparemuligheter",
+      "saveUpTo": "spar ~{amount}/mnd",
+      "narrativeTitle": "Sammendrag",
+      "estimateNote": "AI-estimater — vises separat, legges aldri til den prissatte totalen over.",
+      "advisoryKind": {
+        "savings_plan": "Savings Plan",
+        "reserved": "Reservert",
+        "spot": "Spot",
+        "rightsizing": "Riktig størrelse",
+        "other": "Tips"
+      },
+      "regenerate": {
+        "label": "Generer på nytt",
+        "queueing": "Legger i kø…",
+        "tooltip": "Kjør AI-kostnadsestimatet på nytt",
+        "ariaLabel": "Generer AI-kostnadsestimat på nytt",
+        "confirm": "Kjøre AI-kostnadsestimatet for denne kjøringen på nytt?"
+      },
+      "errors": {
+        "status": "Kunne ikke laste AI-kostnadsestimatet (HTTP {status})."
+      }
     }
   },
   "workspaceDetail": {
