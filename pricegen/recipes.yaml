@@ -20,3 +20,7 @@ recipes:
     recipe: google_compute_instance
     offer: .cache/gcp-compute.json
     fetch: { service_id: "6F81-5844-456A" } # Compute Engine
+  - provider: aws
+    recipe: aws_sqs_queue
+    offer: .cache/sqs-us-east-1.json
+    fetch: { service_code: AWSQueueService, region: us-east-1 }
