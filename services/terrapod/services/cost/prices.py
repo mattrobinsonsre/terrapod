@@ -22,8 +22,6 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import IO
 
-import yaml
-
 from terrapod.services.cost.match_set import MatchSet
 
 
@@ -129,6 +127,10 @@ def load_pricesheet(fp: IO[str]) -> Iterator[Product]:
     """
     first = fp.readline()
     if first.lstrip().startswith("schema:") and _YAML_SCHEMA_PREFIX in first:
+        # Lazy import: the CSV/oiq path (incl. the minimal-deps Cost Differential
+        # CI job) never needs PyYAML — only a Terrapod YAML sheet does.
+        import yaml
+
         doc = yaml.safe_load(first + fp.read()) or {}
         currency = doc.get("currency", "USD")
         for entry in doc.get("products", []):
