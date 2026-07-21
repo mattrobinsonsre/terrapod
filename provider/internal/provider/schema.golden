@@ -82,6 +82,19 @@ data terrapod_workspace.vcs_last_error_at required=false optional=false computed
 data terrapod_workspace.vcs_last_polled_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.vcs_repo_url required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.working_directory required=false optional=false computed=true sensitive=false type=basetypes.StringType
+data terrapod_workspace_cost.currency required=false optional=false computed=true sensitive=false type=basetypes.StringType
+data terrapod_workspace_cost.diff_max required=false optional=false computed=true sensitive=false type=basetypes.Float64Type
+data terrapod_workspace_cost.diff_min required=false optional=false computed=true sensitive=false type=basetypes.Float64Type
+data terrapod_workspace_cost.previous_max required=false optional=false computed=true sensitive=false type=basetypes.Float64Type
+data terrapod_workspace_cost.previous_min required=false optional=false computed=true sensitive=false type=basetypes.Float64Type
+data terrapod_workspace_cost.resources required=false optional=false computed=true sensitive=false type=types.ListType[types.ObjectType["address":basetypes.StringType, "change":basetypes.StringType, "monthly_max":basetypes.Float64Type, "monthly_min":basetypes.Float64Type, "name":basetypes.StringType, "type":basetypes.StringType]]
+data terrapod_workspace_cost.state_version_created_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
+data terrapod_workspace_cost.state_version_id required=false optional=false computed=true sensitive=false type=basetypes.StringType
+data terrapod_workspace_cost.state_version_serial required=false optional=false computed=true sensitive=false type=basetypes.Int64Type
+data terrapod_workspace_cost.total_max required=false optional=false computed=true sensitive=false type=basetypes.Float64Type
+data terrapod_workspace_cost.total_min required=false optional=false computed=true sensitive=false type=basetypes.Float64Type
+data terrapod_workspace_cost.unpriced required=false optional=false computed=true sensitive=false type=types.ListType[types.ObjectType["address":basetypes.StringType, "change":basetypes.StringType, "type":basetypes.StringType]]
+data terrapod_workspace_cost.workspace_id required=true optional=false computed=false sensitive=false type=basetypes.StringType
 data terrapod_workspaces.search required=false optional=true computed=false sensitive=false type=basetypes.StringType
 data terrapod_workspaces.workspaces required=false optional=false computed=true sensitive=false type=types.ListType[types.ObjectType["execution_mode":basetypes.StringType, "id":basetypes.StringType, "locked":basetypes.BoolType, "name":basetypes.StringType]]
 resource terrapod_agent_pool.created_at required=false optional=false computed=true sensitive=false type=basetypes.StringType

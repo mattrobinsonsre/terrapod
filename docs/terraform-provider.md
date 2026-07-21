@@ -33,8 +33,23 @@ otherwise click through in the web UI or call over the API, expressed as HCL:
 | Service catalog | `terrapod_catalog_item`, `terrapod_catalog_instance`, `terrapod_provider_template` |
 
 **Data sources** (`terrapod_*`): `terrapod_workspace`, `terrapod_workspaces`,
-`terrapod_agent_pool`, `terrapod_role`, `terrapod_user`,
-`terrapod_vcs_connection`, `terrapod_catalog_instances`.
+`terrapod_workspace_cost`, `terrapod_agent_pool`, `terrapod_role`,
+`terrapod_user`, `terrapod_vcs_connection`, `terrapod_catalog_instances`.
+
+`terrapod_workspace_cost` reports a workspace's current monthly managed-infra
+cost (from its latest state, via the native OpenInfraQuote-port engine) — useful
+for budget guardrails and reporting. Example:
+
+```hcl
+data "terrapod_workspace_cost" "app" {
+  workspace_id = terrapod_workspace.app.id
+}
+
+# e.g. gate something on the estimate, or surface it as an output
+output "app_monthly_cost" {
+  value = data.terrapod_workspace_cost.app.total_max
+}
+```
 
 Under the hood the provider is a thin, typed wrapper over the canonical Go SDK
 [`go-terrapod`](../go-terrapod): the SDK owns every API call shape, and the

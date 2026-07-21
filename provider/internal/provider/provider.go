@@ -19,6 +19,7 @@ import (
 	userDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/user"
 	vcsConnectionDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/vcs_connection"
 	workspaceDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/workspace"
+	workspaceCostDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/workspace_cost"
 	workspacesDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/workspaces"
 	agentPoolRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/agent_pool"
 	agentPoolTokenRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/agent_pool_token"
@@ -174,6 +175,7 @@ func (p *terrapodProvider) Resources(_ context.Context) []func() resource.Resour
 func (p *terrapodProvider) DataSources(_ context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{
 		workspaceDS.NewDataSource,
+		workspaceCostDS.NewDataSource,
 		workspacesDS.NewDataSource,
 		roleDS.NewDataSource,
 		agentPoolDS.NewDataSource,
