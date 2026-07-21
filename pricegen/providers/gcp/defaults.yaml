@@ -1,0 +1,14 @@
+# GCP provider defaults (#893). Shared across every GCP recipe.
+#
+# canonical: price on-demand — GCP's OnDemand vs Commitment/Reserved distinction
+# is the SKU's category.usageType. Applied only where the attr is present.
+canonical:
+  usage_type: OnDemand
+
+# pricing_common: the billing dimensions every GCP row carries. region is set
+# per-recipe (the computed compute recipe pins a single region per run).
+pricing_common:
+  service_provider: gcp
+  purchase_option: on_demand
+
+price_term: OnDemand

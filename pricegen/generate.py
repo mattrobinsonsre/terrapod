@@ -142,9 +142,18 @@ def main() -> int:
     offer = adapter.load(args.offer)
     units = adapter.iter_units(offer, term=defaults.get("price_term", "OnDemand"))
     stats = engine.RecipeStats()
-    rows = list(
-        engine.generate(recipe, defaults, units, service=recipe["service"], stats=stats)
-    )
+    # A recipe is either `components:` (direct match, AWS/Azure) or `computed:`
+    # (arithmetic assembly, GCP compute). generate_computed consumes the unit
+    # stream once, so materialize it for that path.
+    if "computed" in recipe:
+        gen = engine.generate_computed(
+            recipe, defaults, list(units), service=recipe["service"], stats=stats
+        )
+    else:
+        gen = engine.generate(
+            recipe, defaults, units, service=recipe["service"], stats=stats
+        )
+    rows = list(gen)
     print(f"generated {len(rows)} rows for {recipe['resource_type']}", file=sys.stderr)
     _report_stats(stats, recipe["resource_type"])
     if args.manifest:

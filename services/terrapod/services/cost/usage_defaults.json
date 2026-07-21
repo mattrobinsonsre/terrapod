@@ -132,5 +132,12 @@
     "usage": {
       "time": 730
     }
+  },
+  {
+    "description": "GCP Compute Engine instance hours (Terrapod addition)",
+    "match_query": "type = google_compute_instance and service_class = instance",
+    "usage": {
+      "time": 730
+    }
   }
 ]

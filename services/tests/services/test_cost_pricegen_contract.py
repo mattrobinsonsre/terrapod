@@ -46,6 +46,10 @@ _ROWS = [
     # Azure Linux VM (#931) — proves the second cloud prices through the same
     # engine. size = armSkuName; region resolved from the resource's `location`.
     "Virtual Machines,Virtual Machines,type=azurerm_linux_virtual_machine&values.size=Standard_D2s_v5,service_provider=azure&purchase_option=on_demand&region=eastus&service_class=instance&os=linux&start_usage_amount=0&end_usage_amount=Inf,0.096,t,USD",
+    # GCP compute (#933) — the computed kind: this row is pre-assembled from the
+    # per-vCPU-core + per-GiB-RAM rates (n2-standard-4 = 4*core + 16*ram). Region
+    # is derived from the resource's `zone`.
+    "Compute Engine,Compute Instance,type=google_compute_instance&values.machine_type=n2-standard-4,service_provider=gcp&purchase_option=on_demand&region=us-central1&service_class=instance&start_usage_amount=0&end_usage_amount=Inf,0.1942360000,t,USD",
 ]
 
 
@@ -272,6 +276,37 @@ def test_azure_linux_vm_prices_through_the_same_engine():
     est = estimate(plan, _sheet())
     # 0.096/hr * 730 = 70.08
     assert est.resources[0].monthly_min == pytest.approx(0.096 * 730, abs=0.01)
+    assert est.unpriced == []
+
+
+def test_gcp_compute_instance_prices_with_zone_derived_region():
+    """Third cloud: google_compute_instance prices via a pre-computed
+    machine_type row, with region DERIVED from the resource's `zone`
+    (us-central1-a -> us-central1). Proves the computed kind + zone handling
+    end-to-end (#933)."""
+    plan = {
+        "format_version": "1.2",
+        "terraform_version": "1.9.0",
+        "planned_values": {
+            "root_module": {
+                "resources": [
+                    {
+                        "address": "google_compute_instance.a",
+                        "type": "google_compute_instance",
+                        "name": "a",
+                        "mode": "managed",
+                        "values": {
+                            "machine_type": "n2-standard-4",
+                            "zone": "us-central1-a",
+                        },
+                    }
+                ]
+            }
+        },
+    }
+    est = estimate(plan, _sheet())
+    # 0.194236/hr * 730 = 141.79
+    assert est.resources[0].monthly_min == pytest.approx(0.194236 * 730, abs=0.01)
     assert est.unpriced == []
 
 

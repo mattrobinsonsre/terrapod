@@ -226,8 +226,8 @@ def test_resources_from_state_v4_lifts_attributes():
 def test_default_usage_catalogue_loads():
     entries = default_entries()
     # 18 vendored from OpenInfraQuote + Terrapod additions: RDS provisioned IOPS
-    # io1/io2 (#928, usage-less service_class=iops) + Azure Linux VM hours (#931).
-    assert len(entries) == 20
+    # io1/io2 (#928) + Azure Linux VM hours (#931) + GCP Compute hours (#933).
+    assert len(entries) == 21
     ec2 = match_entry(
         _ms(
             ("type", "aws_instance"),
@@ -382,6 +382,23 @@ def test_resolve_region_from_provider_config():
 def test_resolve_region_falls_back_to_default():
     r = _resource("aws_instance.web", "aws_instance", {"instance_type": "m5.large"})
     assert resolve_region(r, {}, "us-east-1") == "us-east-1"
+
+
+def test_resolve_region_derives_from_gcp_zone():
+    # a google_compute_instance carries `zone`, not `region` (#933).
+    r = _resource(
+        "google_compute_instance.a",
+        "google_compute_instance",
+        {"machine_type": "n2-standard-4", "zone": "us-central1-a"},
+    )
+    assert resolve_region(r, {}, "us-east-1") == "us-central1"
+    # an explicit region attribute still wins over zone.
+    r2 = _resource(
+        "google_compute_instance.b",
+        "google_compute_instance",
+        {"region": "europe-west1", "zone": "us-central1-a"},
+    )
+    assert resolve_region(r2, {}, "us-east-1") == "europe-west1"
 
 
 def test_provider_regions_extracts_constant_only():

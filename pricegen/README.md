@@ -33,7 +33,7 @@ pricegen/
   providers/
     aws/   { adapter.py, defaults.yaml, recipes/*.yaml }
     azure/ { adapter.py, defaults.yaml, recipes/*.yaml }   # VM proven
-    gcp/   { adapter.py, defaults.yaml, recipes/*.yaml }   # WIP
+    gcp/   { adapter.py, defaults.yaml, recipes/*.yaml }   # compute proven
 ```
 
 - **Adapter** — normalizes the vendor feed into `Unit`s. AWS joins `products`+`terms`;
@@ -125,6 +125,7 @@ operators mirror it as today. Weekly regeneration is the target cadence.
 - [x] AWS RDS (`aws_db_instance`): instance + storage + io1/io2 provisioned IOPS, all validated end-to-end
 - [x] End-to-end pricing validation (real consumer engine, not just row-parity) + generator drift diagnostics
 - [x] Azure adapter + `azurerm_linux_virtual_machine` (regex select, validated end-to-end) — second cloud proven
+- [x] GCP computed engine + `google_compute_instance` (Σ vCPU-core + GiB-RAM, formulaic catalog, zone→region, validated end-to-end) — **all three clouds proven**
 - [ ] AWS breadth (LB, NAT, EIP, S3, …) + all-regions + a row-parity CI gate
-- [ ] GCP computed-component engine + machine-type catalog + adapter + recipes
+- [ ] Broaden GCP families/regions; Azure managed disks / Windows
 - [ ] Publish job (gzipped-YAML rolling release) + engine reads YAML + `prices_url` default

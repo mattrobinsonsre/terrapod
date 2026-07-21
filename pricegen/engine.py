@@ -10,12 +10,16 @@ value we need often lives inside a string field (Azure's OS/tier in
 ``productName``/``skuName``; GCP's machine family in ``description``) rather than
 a clean attribute like AWS's ``instanceType``.
 
-Two component kinds:
-  * direct   — match a unit, emit its price (AWS, Azure).
-  * computed — assemble a row from several units × an external catalog (GCP
-    machine_type -> Σ vCPU-core + RAM-GB). Not implemented yet; the direct kind
-    is what the AWS/Azure recipes use. The seam is here so GCP slots in without
-    an engine rewrite.
+Two recipe kinds:
+  * direct   — ``components:`` — match a unit, emit its price (AWS, Azure). Run
+    by :func:`generate`.
+  * computed — ``computed:`` — assemble a row from several units by arithmetic
+    (GCP prices per vCPU-core hour + per GiB-RAM hour separately, so a machine
+    type costs ``vCPU × core-rate + RAM_GiB × ram-rate``). Run by
+    :func:`generate_computed`, which enumerates machine types from a compact
+    per-family shape catalog in the recipe and pre-computes each total, so the
+    emitted rows match ``values.machine_type`` like any other instance — no
+    consumer arithmetic needed.
 
 Diagnostics (#922): ``generate`` optionally records a :class:`RecipeStats` — row
 counts and, crucially, the *reason* each unit was dropped. The high-signal
@@ -272,4 +276,95 @@ def generate(recipe: dict, defaults: dict, units, *, service: str, stats=None):
                 if stats is not None:
                     stats.rows += 1
                     stats._note_price(p.usd)
+                yield row
+
+
+# --- computed kind (GCP compute: Σ vCPU-core + RAM-GiB) ---------------------
+
+
+def generate_computed(recipe: dict, defaults: dict, units, *, service: str, stats=None):
+    """Yield rows for a ``computed:`` recipe (GCP Compute Engine).
+
+    GCP prices compute per **vCPU-core hour** and per **GiB-RAM hour** as
+    separate SKUs (e.g. "N2 Instance Core running in Americas" / "... Ram ..."),
+    so a machine type's hourly cost is ``vCPU × core-rate + RAM_GiB × ram-rate``.
+    We read each family's Core+Ram rate from the units, then enumerate machine
+    types from a compact per-family shape catalog and pre-compute each total —
+    emitting one ``values.machine_type=<type>`` row per type, matched by the
+    consumer exactly like an AWS/Azure instance (no consumer arithmetic).
+
+    Recipe ``computed`` block::
+
+        computed:
+          region: us-central1                 # match units in this region
+          family_regex: '^(\\w+)(?: Predefined)? Instance (Core|Ram) running in'
+          vcpus: [1, 2, 4, 8, 16, 32, 64, 96]
+          families:                            # key = machine prefix (lowercased
+            n2: { standard: 4, highmem: 8, highcpu: 1 }   # token); shape -> GiB/vCPU
+            e2: { standard: 4, highmem: 8, highcpu: 1 }
+
+    Custom machine types (``n2-custom-…``) aren't enumerable and are left
+    unpriced (a documented gap); over-enumerated sizes that don't exist are
+    harmless (they never match a real plan).
+    """
+    spec = recipe["computed"]
+    rtype = recipe["resource_type"]
+    region = spec["region"]
+    fam_re = re.compile(spec["family_regex"])
+    canon = defaults.get("canonical", {})
+
+    # 1. Collect each family's Core/Ram rate from the OnDemand, in-region units.
+    rates: dict[str, dict[str, float]] = {}
+    for unit in units:
+        a = unit.attrs
+        if a.get("region") != region:
+            continue
+        if any(a.get(dim) != c for dim, c in canon.items() if dim in a):
+            continue
+        m = fam_re.match(a.get("description", ""))
+        if not m:
+            continue
+        fam, kind = m.group(1).lower(), m.group(2)
+        if unit.prices:
+            rates.setdefault(fam, {})[kind] = float(unit.prices[0].usd)
+
+    # 2. Enumerate machine types and pre-compute each total.
+    base = dict(defaults.get("pricing_common", {}))
+    base.pop("region", None)  # region is per-computed-spec, emitted below
+    base["service_class"] = "instance"
+    base["region"] = region
+    pricing = "&".join(
+        [f"{k}={v}" for k, v in base.items()]
+        + ["start_usage_amount=0", "end_usage_amount=Inf"]
+    )
+    seen: set = set()
+    for fam, shapes in spec["families"].items():
+        fam_rates = rates.get(fam)
+        if not fam_rates or "Core" not in fam_rates or "Ram" not in fam_rates:
+            if stats is not None:
+                stats._note_unmapped("family", fam)  # rates missing -> drift signal
+            continue
+        core, ram = fam_rates["Core"], fam_rates["Ram"]
+        for shape, gib_per_vcpu in shapes.items():
+            for vcpu in spec["vcpus"]:
+                machine_type = f"{fam}-{shape}-{vcpu}"
+                ram_gib = vcpu * gib_per_vcpu
+                hourly = vcpu * core + ram_gib * ram
+                match_set = f"type={rtype}&values.machine_type={machine_type}"
+                row = (
+                    service,
+                    "Compute Instance",
+                    match_set,
+                    pricing,
+                    f"{hourly:.10f}",
+                    "t",
+                    "USD",
+                )
+                if row in seen:
+                    continue
+                seen.add(row)
+                if stats is not None:
+                    stats.rows += 1
+                    stats.units_total += 1
+                    stats._note_price(f"{hourly:.10f}")
                 yield row

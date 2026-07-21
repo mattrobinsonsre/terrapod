@@ -20,6 +20,7 @@ same ``{type, values.*}`` shape falls out either way.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -231,13 +232,22 @@ def provider_regions(plan_json: dict[str, Any]) -> dict[str, str]:
 
 
 def resolve_region(resource: Resource, provider_region_map: dict[str, str], default: str) -> str:
-    """Resolve a resource's region: own attribute → provider config → default."""
+    """Resolve a resource's region: own attribute → provider config → default.
+
+    A GCP ``google_compute_instance`` carries a ``zone`` (``us-central1-a``), not
+    a ``region`` — the region is the zone with its trailing ``-<letter>`` removed.
+    (AWS uses ``availability_zone``, not ``zone``, so keying on ``zone`` is
+    GCP-safe.)
+    """
     values = resource.data.get("values")
     if isinstance(values, dict):
         for key in _REGION_ATTR_KEYS:
             val = values.get(key)
             if isinstance(val, str) and val:
                 return val
+        zone = values.get("zone")
+        if isinstance(zone, str) and zone:
+            return re.sub(r"-[a-z]$", "", zone)
     provider = resource.data.get("provider_name")
     if isinstance(provider, str) and provider in provider_region_map:
         return provider_region_map[provider]
