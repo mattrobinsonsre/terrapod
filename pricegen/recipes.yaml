@@ -1,17 +1,22 @@
 # The set of recipes the published Terrapod pricesheet includes (#893).
 #
-# Each entry names a provider, a recipe, and the offer file it reads. In CI the
-# offers are fetched fresh (a later phase); locally they come from the gitignored
-# `.cache/` (see the fetch snippets in the provider adapters' module docs). The
-# `publish` generator runs every entry through the engine, combines the rows into
-# one gzipped-YAML pricesheet, and aggregates the per-recipe drift manifests.
+# Each entry names a provider, a recipe, the offer file it reads, and a `fetch:`
+# block describing how to download that offer from the official cloud pricing
+# API. `python -m pricegen.fetch_offers` populates the offers (from the API); the
+# `publish` generator then runs every entry through the engine, combines the rows
+# into one gzipped-YAML pricesheet, and aggregates the per-recipe drift manifests.
+# Locally the offers live in the gitignored `.cache/`; in CI the scheduled
+# pricesheet workflow fetches them fresh each run.
 recipes:
   - provider: aws
     recipe: aws_db_instance
     offer: .cache/rds-us-east-1.json
+    fetch: { service_code: AmazonRDS, region: us-east-1 }
   - provider: azure
     recipe: azurerm_linux_virtual_machine
     offer: .cache/azure-vm-eastus.json
+    fetch: { service_name: "Virtual Machines", region: eastus }
   - provider: gcp
     recipe: google_compute_instance
     offer: .cache/gcp-compute.json
+    fetch: { service_id: "6F81-5844-456A" } # Compute Engine
