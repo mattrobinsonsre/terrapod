@@ -24,3 +24,7 @@ recipes:
     recipe: aws_sqs_queue
     offer: .cache/sqs-us-east-1.json
     fetch: { service_code: AWSQueueService, region: us-east-1 }
+  - provider: aws
+    recipe: aws_lambda_function
+    offer: .cache/lambda-us-east-1.json
+    fetch: { service_code: AWSLambda, region: us-east-1 }

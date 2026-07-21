@@ -180,3 +180,16 @@ def test_generate_tier_bounds_override():
     rows = list(generate(recipe, _defaults(), [_unit("m5.large")], service="AmazonEC2"))
     assert "start_provision_amount=3000" in rows[0][3]
     assert "end_provision_amount=Inf" in rows[0][3]
+
+
+def test_resolve_const_literal():
+    # a `const` in a match stamps a fixed value (not read as an attr name).
+    assert _resolve2({"const": "arm64"}, {}) == ("arm64", None, None)
+    assert _resolve2({"const": "arm64"}, {"arm64": "x"}) == ("arm64", None, None)
+
+
+def test_generate_component_without_match_constrains_only_type():
+    recipe = _recipe()
+    del recipe["components"][0]["match"]  # no match -> matches all of the type
+    rows = list(generate(recipe, _defaults(), [_unit("m5.large")], service="AmazonEC2"))
+    assert rows[0][2] == "type=aws_instance"  # only the type constraint

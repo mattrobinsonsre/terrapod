@@ -55,6 +55,12 @@ _ROWS = [
     # these inverted, so this row set deliberately does NOT match oiq.
     "AWSQueueService,API Request,type=aws_sqs_queue&values.fifo_queue=false,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=requests&start_usage_amount=0&end_usage_amount=100000000000,0.0000004000,o,USD",
     "AWSQueueService,API Request,type=aws_sqs_queue&values.fifo_queue=true,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=requests&start_usage_amount=0&end_usage_amount=100000000000,0.0000005000,o,USD",
+    # Lambda — requests (arch-independent) + duration first tier, x86 and arm64.
+    # x86 duration carries no architectures constraint (default lambda); arm64
+    # carries values.architectures=arm64. arch pricing dim gates the usage entry.
+    "AWSLambda,Serverless,type=aws_lambda_function,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=requests&start_usage_amount=0&end_usage_amount=Inf,0.0000002000,o,USD",
+    "AWSLambda,Serverless,type=aws_lambda_function,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=duration&arch=x86&start_usage_amount=0&end_usage_amount=6000000000,0.0000166667,t,USD",
+    "AWSLambda,Serverless,type=aws_lambda_function&values.architectures=arm64,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=duration&arch=arm64&start_usage_amount=0&end_usage_amount=7500000000,0.0000133334,t,USD",
 ]
 
 
@@ -349,6 +355,45 @@ def test_sqs_queue_fifo_is_pricier_than_standard():
     assert costs["aws_sqs_queue.std"] == pytest.approx(50_000_000 * 0.0000004, abs=0.01)
     assert costs["aws_sqs_queue.fifo"] == pytest.approx(50_000_000 * 0.0000005, abs=0.01)
     assert costs["aws_sqs_queue.fifo"] > costs["aws_sqs_queue.std"]  # FIFO pricier
+
+
+def test_lambda_x86_and_arm64_price_by_architecture():
+    """A default (x86) lambda and an arm64 lambda price their duration at the
+    right per-arch rate — the `arch` pricing dimension + `values.architectures`
+    correlate correctly (arm64 is cheaper). Requests are arch-independent (#893)."""
+
+    def fn(addr, arch=None):
+        v = {"region": "us-east-1", "memory_size": 512}
+        if arch:
+            v["architectures"] = [arch]
+        return {
+            "address": addr,
+            "type": "aws_lambda_function",
+            "name": addr.split(".")[-1],
+            "mode": "managed",
+            "values": v,
+        }
+
+    plan = {
+        "format_version": "1.2",
+        "terraform_version": "1.9.0",
+        "planned_values": {
+            "root_module": {
+                "resources": [fn("aws_lambda_function.d"), fn("aws_lambda_function.a", "arm64")]
+            }
+        },
+    }
+    est = estimate(plan, _sheet())
+    costs = {r.address: r.monthly_min for r in est.resources}
+    # usage defaults: 100M requests + 1M GB-s duration.
+    reqs = 100_000_000 * 0.0000002
+    assert costs["aws_lambda_function.d"] == pytest.approx(
+        reqs + 1_000_000 * 0.0000166667, abs=0.01
+    )
+    assert costs["aws_lambda_function.a"] == pytest.approx(
+        reqs + 1_000_000 * 0.0000133334, abs=0.01
+    )
+    assert costs["aws_lambda_function.a"] < costs["aws_lambda_function.d"]  # arm64 cheaper
 
 
 def test_ec2_instance_prices():

@@ -1,0 +1,41 @@
+# Lambda -> aws_lambda_function (on-demand). Two cost dimensions: per-request
+# (arch-independent) and per-GB-second duration (x86 vs arm64 differ). The
+# consumer correlates the architecture via an `arch` pricing dimension + the
+# resource's `architectures` list, so we stamp both: the ARM duration rows carry
+# `values.architectures=arm64` (via `const`) + pricing `arch=arm64`; the x86 rows
+# carry no architectures constraint (matching the default-x86 case) + `arch=x86`.
+# A default lambda (no `architectures`) matches the x86 rows; an arm64 lambda
+# (`architectures=["arm64"]` -> flattens to values.architectures=arm64) matches
+# the ARM rows and NOT the x86 ones (the usage entries gate on arch). Uses the
+# existing aws_lambda_function usage entries (requests + duration by arch).
+resource_type: aws_lambda_function
+service: AWSLambda
+
+components:
+  # Requests — arch-independent, per request. (Only the plural-unit "Requests"
+  # SKU is the real charge; the group filter + unit keep it unambiguous.)
+  - product_family: "^Serverless$"
+    service_class: requests
+    select: { group: AWS-Lambda-Requests }
+    price: { type: o, unit: Requests }
+    tier: usage
+
+  # Duration x86 — GB-second, tiered by monthly volume. `arch=x86` in pricing;
+  # no architectures constraint so it prices the default (x86) lambda.
+  - product_family: "^Serverless$"
+    service_class: duration
+    select: { group: AWS-Lambda-Duration }
+    pricing: { arch: x86 }
+    price: { type: t, unit: Lambda-GB-Second }
+    tier: usage
+
+  # Duration arm64 — stamps values.architectures=arm64 (const) so it only prices
+  # an arm64 lambda, and arch=arm64 so the arm64 usage entry selects it.
+  - product_family: "^Serverless$"
+    service_class: duration
+    select: { group: AWS-Lambda-Duration-ARM }
+    match:
+      architectures: { const: arm64 }
+    pricing: { arch: arm64 }
+    price: { type: t, unit: Lambda-GB-Second }
+    tier: usage
