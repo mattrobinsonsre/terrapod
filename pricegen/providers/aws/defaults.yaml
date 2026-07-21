@@ -1,0 +1,26 @@
+# Shared generator defaults (#893). This is the "patterns" layer — the knowledge
+# that is the same across most resource types, so a recipe only declares its
+# genuine deviations.
+
+# `canonical` — the standard value of each AWS SKU dimension. It is applied to a
+# product as a filter ONLY WHEN the product actually has that attribute, so a
+# resource that lacks a dimension (EBS has no `tenancy`) simply skips it, while
+# EC2 gets it enforced. This is the irreducible "pick the default variant"
+# domain knowledge — kept in one place instead of copied into every recipe. A
+# resource whose canonical differs overrides the key in its own `select`.
+canonical:
+  marketoption: OnDemand
+  tenancy: Shared
+  capacitystatus: Used
+  preInstalledSw: "NA"
+  licenseModel: No License required
+
+# `pricing_common` — pricing_match_set dimensions emitted on every row. Literal
+# strings verbatim; `{attr: X}` pulls an AWS attribute.
+pricing_common:
+  service_provider: aws
+  purchase_option: on_demand # overridden per price-variant (e.g. reserved)
+  region: { attr: regionCode }
+
+# Default AWS term the price is read from.
+price_term: OnDemand
