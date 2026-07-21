@@ -57,3 +57,37 @@ components:
           "Aurora MySQL|No license required": general-public-license
     price: { type: t, unit: Hrs }
     tier: usage
+
+  # Storage — priced per allocated GB-month. AWS tags storage SKUs per engine +
+  # edition, but the *price* is identical across every engine/edition (gp2/gp3
+  # $0.115, io1/io2 $0.125, magnetic $0.10) — the engine tag is cosmetic. Since
+  # the consumer matches by SUBSET, we omit `engine` entirely: one row per
+  # (storage_type, multi_az) correctly prices every engine, and dedup collapses
+  # the redundant per-engine SKUs. (oiq instead expands one price into 17
+  # engine-keyed rows — same result, more noise.) `volumeType` -> the Terraform
+  # `storage_type`; unmapped types (the Aurora variants) resolve to None and are
+  # skipped, keeping Aurora out of aws_db_instance. Priced with `a=` (read the
+  # real `allocated_storage` attr) rather than oiq's `d` (which falls back to a
+  # 1-GB usage default because tf-flattening never feeds allocated_storage into
+  # usage.data) — same choice as aws_ebs_volume's `a=values.size`, and accurate.
+  - product_family: "^Database Storage$"
+    service_class: storage
+    select:
+      deploymentOption: [Single-AZ, Multi-AZ] # skip Mirror / readable-standbys / RAC
+    match:
+      storage_type:
+        attr: volumeType
+        map:
+          General Purpose: gp2
+          General Purpose (SSD): gp2 # legacy SKU name for gp2
+          General Purpose-GP3: gp3
+          Provisioned IOPS: io1
+          Provisioned IOPS (SSD): io1 # legacy SKU name for io1
+          Provisioned IOPS-IO2: io2
+          Magnetic: standard
+          # Aurora volume types (General Purpose-Aurora, IO Optimized-Aurora)
+          # are deliberately absent -> None -> skipped (Aurora is a separate
+          # aws_rds_cluster_instance recipe).
+      multi_az: *multi_az
+    price: { type: "a=values.allocated_storage" }
+    tier: none
