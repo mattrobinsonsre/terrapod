@@ -1998,6 +1998,7 @@
       "saveUpTo": "économisez ~{amount}/mois",
       "narrativeTitle": "Résumé",
       "estimateNote": "Estimations par IA — affichées séparément, jamais ajoutées au total tarifé ci-dessus.",
+      "chatPlaceholder": "Posez une question de suivi sur ces coûts… (⌘/Ctrl + Entrée pour envoyer)",
       "advisoryKind": {
         "savings_plan": "Plan d''économies",
         "reserved": "Réservé",

@@ -1998,6 +1998,7 @@
       "saveUpTo": "save ~{amount}/mo",
       "narrativeTitle": "Summary",
       "estimateNote": "AI estimates — shown separately, never added to the priced total above.",
+      "chatPlaceholder": "Ask a follow-up question about these costs… (⌘/Ctrl + Enter to send)",
       "advisoryKind": {
         "savings_plan": "Savings Plan",
         "reserved": "Reserved",

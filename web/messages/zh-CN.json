@@ -1998,6 +1998,7 @@
       "saveUpTo": "节省 ~{amount}/月",
       "narrativeTitle": "摘要",
       "estimateNote": "AI 估算——单独显示，绝不计入上方的计价合计。",
+      "chatPlaceholder": "就此成本提一个追问… （⌘/Ctrl + Enter 发送）",
       "advisoryKind": {
         "savings_plan": "节省计划",
         "reserved": "预留",

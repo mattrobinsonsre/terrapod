@@ -1998,6 +1998,7 @@
       "saveUpTo": "~{amount}/月 節約",
       "narrativeTitle": "概要",
       "estimateNote": "AI による見積もり — 別途表示され、上記の価格付き合計には加算されません。",
+      "chatPlaceholder": "このコストについてフォローアップの質問をする…（⌘/Ctrl + Enter で送信）",
       "advisoryKind": {
         "savings_plan": "節約プラン",
         "reserved": "リザーブド",

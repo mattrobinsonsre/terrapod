@@ -1998,6 +1998,7 @@
       "saveUpTo": "spare ~{amount}/Mon.",
       "narrativeTitle": "Zusammenfassung",
       "estimateNote": "KI-Schätzungen — separat angezeigt, nie zur bepreisten Summe oben addiert.",
+      "chatPlaceholder": "Stellen Sie eine Rückfrage zu diesen Kosten… (⌘/Strg + Eingabe zum Senden)",
       "advisoryKind": {
         "savings_plan": "Sparplan",
         "reserved": "Reserviert",

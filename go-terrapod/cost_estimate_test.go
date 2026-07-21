@@ -258,3 +258,72 @@ func TestRegenerateRunCostSummaryEmptyID(t *testing.T) {
 		t.Fatal("want error for empty run id")
 	}
 }
+
+const costMessagesBody = `{"data":[
+  {"id":"cost-summary-message-1","type":"cost-summary-messages","attributes":{"role":"user","content":"why is the broker so expensive?","input-tokens":0,"output-tokens":0}},
+  {"id":"cost-summary-message-2","type":"cost-summary-messages","attributes":{"role":"assistant","content":"An mq.m5.large runs 24/7 at ~$0.30/hr.","model":"bedrock/claude","input-tokens":100,"output-tokens":25}}
+],"meta":{"count":2,"language":"en"}}`
+
+const costReplyBody = `{"data":{"id":"cost-summary-message-2","type":"cost-summary-messages",
+  "attributes":{"role":"assistant","content":"An mq.m5.large runs 24/7 at ~$0.30/hr.","model":"bedrock/claude","input-tokens":100,"output-tokens":25}}}`
+
+func newCostChatFixture(t *testing.T) *Client {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		switch r.Method {
+		case http.MethodGet:
+			_, _ = w.Write([]byte(costMessagesBody))
+		case http.MethodPost:
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write([]byte(costReplyBody))
+		}
+	}))
+	t.Cleanup(srv.Close)
+	c, err := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return c
+}
+
+func TestListRunCostSummaryMessages(t *testing.T) {
+	c := newCostChatFixture(t)
+	msgs, err := c.ListRunCostSummaryMessages(t.Context(), "abc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(msgs) != 2 {
+		t.Fatalf("messages: %+v", msgs)
+	}
+	if msgs[0].Role != "user" || msgs[1].Role != "assistant" {
+		t.Errorf("roles: %+v", msgs)
+	}
+	if msgs[1].OutputTokens != 25 {
+		t.Errorf("output tokens: %+v", msgs[1])
+	}
+}
+
+func TestPostRunCostSummaryMessage(t *testing.T) {
+	c := newCostChatFixture(t)
+	reply, err := c.PostRunCostSummaryMessage(t.Context(), "abc", "why is the broker so expensive?")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reply.Role != "assistant" || reply.OutputTokens != 25 {
+		t.Errorf("reply: %+v", reply)
+	}
+}
+
+func TestPostRunCostSummaryMessageGuards(t *testing.T) {
+	c := newCostChatFixture(t)
+	if _, err := c.PostRunCostSummaryMessage(t.Context(), "abc", ""); err == nil {
+		t.Fatal("want error for empty content")
+	}
+	if _, err := c.PostRunCostSummaryMessage(t.Context(), "", "hi"); err == nil {
+		t.Fatal("want error for empty run id")
+	}
+	if _, err := c.ListRunCostSummaryMessages(t.Context(), ""); err == nil {
+		t.Fatal("want error for empty run id on list")
+	}
+}

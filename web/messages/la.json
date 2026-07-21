@@ -1998,6 +1998,7 @@
       "saveUpTo": "serva ~{amount}/mens.",
       "narrativeTitle": "Summarium",
       "estimateNote": "Aestimationes AI — seorsum ostensae, numquam summae taxatae supra adiectae.",
+      "chatPlaceholder": "Roga quaestionem subsequentem de his impensis… (⌘/Ctrl + Enter ut mittas)",
       "advisoryKind": {
         "savings_plan": "Consilium parsimoniae",
         "reserved": "Reservatum",

@@ -36,16 +36,23 @@ from __future__ import annotations
 
 import uuid
 
+import sqlalchemy as sa
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.config import settings
-from terrapod.db.models import CostSummary, Run, Workspace, now_utc
+from terrapod.db.models import CostSummary, CostSummaryMessage, Run, Workspace, now_utc
 from terrapod.db.session import get_db_session
 from terrapod.logging_config import get_logger
 from terrapod.services.summariser import (
+    FollowupBudgetExhausted,
+    FollowupCapReached,
+    FollowupDisabled,
+    FollowupError,
     _budget_charge,
     _budget_remaining,
+    _call_chat_model,
     _call_model,
     _emit_summary_event,
     _resolve_workspace_mode,
@@ -314,3 +321,207 @@ async def handle_ai_cost_summary(payload: dict) -> None:
         await db.commit()
         await _budget_charge(output_tokens)
         await _emit_summary_event("cost_summary_ready", ws.id, run_id)
+
+
+# ---------------------------------------------------------------------------
+# Chat follow-ups (#871) — Q&A thread grounded in the cost estimate
+# ---------------------------------------------------------------------------
+
+_COST_CHAT_SYSTEM = (
+    "You are a FinOps assistant answering follow-up questions about a single "
+    "Terraform/OpenTofu plan's cost estimate. You are given: (1) the "
+    "deterministic cost estimate (from OpenInfraQuote pricing data — these "
+    "figures are computed and authoritative), and (2) the AI-estimated figures "
+    "for resources the pricing data could not cover (these are ESTIMATES, not "
+    "computed). Answer concisely in {language}, grounded ONLY in the materials "
+    "provided. Keep the distinction clear: never present an AI estimate as a "
+    "computed/authoritative figure, and never invent prices for resources not in "
+    "the materials — if a question can't be answered from what's provided, say so "
+    "rather than guessing. No tool calls; plain prose."
+)
+
+
+def _render_cost_chat_context(estimate_json: str, summary: CostSummary) -> str:
+    """The initial context turn for the cost chat — the derived estimate plus
+    the AI estimates/advisories the summariser already produced. Small by
+    construction (a derived aggregate, no state/plan JSON)."""
+    import json
+
+    ai = {
+        "estimated_resources": summary.estimated_resources,
+        "advisories": summary.advisories,
+        "narrative": summary.narrative,
+    }
+    return (
+        "DETERMINISTIC_COST_ESTIMATE (OpenInfraQuote — computed, authoritative):\n"
+        f"{estimate_json}\n\n"
+        "AI_ESTIMATES (source: ai-estimate — NOT computed):\n"
+        f"{json.dumps(ai, ensure_ascii=False)}"
+    )
+
+
+async def _build_cost_followup_history(
+    db: AsyncSession, summary: CostSummary, new_user_text: str
+) -> list[dict]:
+    """Chat history appended after the (system + initial-context) prefix:
+    a framing exchange that establishes prose follow-up mode, prior turns in
+    chronological order, then the just-posted user message."""
+    history: list[dict] = [
+        {
+            "role": "user",
+            "content": (
+                "Thanks — the cost estimate above is recorded. I'd like to ask "
+                "follow-up questions about these costs in plain prose. Answer "
+                "concisely, grounded only in the estimate and AI figures above, "
+                "and keep computed vs AI-estimated figures distinct."
+            ),
+        },
+        {
+            "role": "assistant",
+            "content": (
+                "Understood. I'll answer follow-up questions about this cost "
+                "estimate in prose, grounded in the figures provided, and flag "
+                "which numbers are AI estimates. What would you like to know?"
+            ),
+        },
+    ]
+    prior = (
+        (
+            await db.execute(
+                sa.select(CostSummaryMessage)
+                .where(CostSummaryMessage.cost_summary_id == summary.id)
+                .order_by(CostSummaryMessage.created_at, CostSummaryMessage.id)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    for msg in prior:
+        if msg.role == "assistant" and not msg.content.strip():
+            continue
+        history.append({"role": msg.role, "content": msg.content})
+    history.append({"role": "user", "content": new_user_text})
+    return history
+
+
+async def post_cost_followup(
+    *,
+    db: AsyncSession,
+    cost_summary: CostSummary,
+    run: Run,
+    workspace: Workspace,
+    user_message_text: str,
+) -> CostSummaryMessage:
+    """Process one operator follow-up turn on a cost estimate (#871).
+
+    Mirrors ``summariser.post_followup`` but grounded in the (small) cost
+    estimate rather than the plan context. The router has already authorised +
+    loaded the rows. Persists the user turn first (so a failed model call still
+    records the question), calls the model, then persists the assistant turn +
+    telemetry and emits the SSE event.
+
+    Raises FollowupDisabled / FollowupCapReached / FollowupBudgetExhausted /
+    FollowupError, or RuntimeError/ValueError on a model failure (an errored
+    assistant row is committed first so the transcript reflects it).
+    """
+    cfg = settings.ai_summary
+    if not cfg.enabled or cfg.followup_max_messages_per_run <= 0:
+        raise FollowupDisabled("AI follow-up chat is disabled")
+    if not _resolve_workspace_mode(workspace):
+        raise FollowupDisabled("AI summary is disabled for this workspace")
+
+    text = (user_message_text or "").strip()
+    if not text:
+        raise FollowupError("message body is empty")
+    if len(text) > 32 * 1024:
+        raise FollowupError("message body exceeds 32 KiB")
+
+    # Per-run cap counts USER rows only.
+    user_count = (
+        await db.execute(
+            sa.select(sa.func.count())
+            .select_from(CostSummaryMessage)
+            .where(
+                CostSummaryMessage.cost_summary_id == cost_summary.id,
+                CostSummaryMessage.role == "user",
+            )
+        )
+    ).scalar() or 0
+    if user_count >= cfg.followup_max_messages_per_run:
+        raise FollowupCapReached(
+            f"reached the {cfg.followup_max_messages_per_run}-message cap for this run"
+        )
+
+    remaining = await _budget_remaining()
+    if remaining is not None and remaining <= 0:
+        raise FollowupBudgetExhausted("daily AI token budget exhausted")
+
+    # Persist the user turn first so it survives a downstream model failure.
+    db.add(CostSummaryMessage(cost_summary_id=cost_summary.id, role="user", content=text))
+    await db.flush()
+
+    # Ground the chat in the derived cost estimate — the ONLY external input
+    # (no state, no plan JSON). If it aged out, record an errored assistant turn.
+    storage = get_storage()
+    key = cost_estimate_key(str(run.workspace_id), str(run.id))
+    try:
+        raw = await storage.get(key)
+    except ObjectNotFoundError:
+        err = "no cost estimate available to ground the follow-up"
+        db.add(
+            CostSummaryMessage(
+                cost_summary_id=cost_summary.id,
+                role="assistant",
+                content="",
+                model=cfg.model,
+                error_message=err,
+            )
+        )
+        await db.commit()
+        raise FollowupError(err) from None
+    estimate_json = raw.decode() if isinstance(raw, bytes) else str(raw)
+
+    system_message = _COST_CHAT_SYSTEM.format(language=cfg.summary_language or "English")
+    initial_user_message = _render_cost_chat_context(estimate_json, cost_summary)
+    history = await _build_cost_followup_history(db, cost_summary, text)
+
+    try:
+        reply_text, in_tok, out_tok = await _call_chat_model(
+            system_message=system_message,
+            user_message=initial_user_message,
+            history=history,
+            max_output_tokens=cfg.followup_max_output_tokens,
+        )
+    except Exception as e:  # noqa: BLE001
+        logger.warning("cost follow-up call failed", run_id=str(run.id), error=str(e))
+        db.add(
+            CostSummaryMessage(
+                cost_summary_id=cost_summary.id,
+                role="assistant",
+                content="",
+                model=cfg.model,
+                error_message=str(e)[:500],
+            )
+        )
+        await db.commit()
+        raise
+
+    assistant_row = CostSummaryMessage(
+        cost_summary_id=cost_summary.id,
+        role="assistant",
+        content=reply_text,
+        model=cfg.model,
+        input_tokens=in_tok,
+        output_tokens=out_tok,
+    )
+    db.add(assistant_row)
+    await _budget_charge(out_tok)
+    await db.commit()
+
+    await _emit_summary_event(
+        "cost_summary_message_posted",
+        workspace.id,
+        run.id,
+        message_id=str(assistant_row.id),
+    )
+    return assistant_row

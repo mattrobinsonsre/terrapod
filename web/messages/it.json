@@ -1998,6 +1998,7 @@
       "saveUpTo": "risparmia ~{amount}/mese",
       "narrativeTitle": "Riepilogo",
       "estimateNote": "Stime tramite IA — mostrate separatamente, mai aggiunte al totale con prezzo qui sopra.",
+      "chatPlaceholder": "Poni una domanda di follow-up su questi costi… (⌘/Ctrl + Invio per inviare)",
       "advisoryKind": {
         "savings_plan": "Piano di risparmio",
         "reserved": "Riservato",

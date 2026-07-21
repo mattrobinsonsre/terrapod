@@ -1998,6 +1998,7 @@
       "saveUpTo": "oszczędź ~{amount}/mies.",
       "narrativeTitle": "Podsumowanie",
       "estimateNote": "Szacunki AI — pokazywane osobno, nigdy nie dodawane do wycenionej sumy powyżej.",
+      "chatPlaceholder": "Zadaj pytanie uzupełniające o te koszty… (⌘/Ctrl + Enter, aby wysłać)",
       "advisoryKind": {
         "savings_plan": "Savings Plan",
         "reserved": "Zarezerwowane",

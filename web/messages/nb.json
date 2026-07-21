@@ -1998,6 +1998,7 @@
       "saveUpTo": "spar ~{amount}/mnd",
       "narrativeTitle": "Sammendrag",
       "estimateNote": "AI-estimater — vises separat, legges aldri til den prissatte totalen over.",
+      "chatPlaceholder": "Still et oppfølgingsspørsmål om disse kostnadene … (⌘/Ctrl + Enter for å sende)",
       "advisoryKind": {
         "savings_plan": "Savings Plan",
         "reserved": "Reservert",

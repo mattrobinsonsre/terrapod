@@ -1998,6 +1998,7 @@
       "saveUpTo": "bespaar ~{amount}/mnd",
       "narrativeTitle": "Samenvatting",
       "estimateNote": "AI-ramingen — apart weergegeven, nooit opgeteld bij het geprijsde totaal hierboven.",
+      "chatPlaceholder": "Stel een vervolgvraag over deze kosten… (⌘/Ctrl + Enter om te verzenden)",
       "advisoryKind": {
         "savings_plan": "Besparingsplan",
         "reserved": "Gereserveerd",

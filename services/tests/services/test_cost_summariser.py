@@ -272,6 +272,107 @@ async def test_workspace_mode_disabled_skips(monkeypatch):
     assert any(c.args and c.args[0] == "cost_summary_skipped" for c in emit.await_args_list)
 
 
+# ---------------------------------------------------------------------------
+# Chat follow-ups (#871) — early gate behaviour
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_cost_followup_disabled_global_raises(monkeypatch):
+    from terrapod.services.summariser import FollowupDisabled
+
+    monkeypatch.setattr(cost_summariser.settings.ai_summary, "enabled", False)
+    with pytest.raises(FollowupDisabled):
+        await cost_summariser.post_cost_followup(
+            db=AsyncMock(),
+            cost_summary=MagicMock(),
+            run=MagicMock(),
+            workspace=MagicMock(),
+            user_message_text="hi",
+        )
+
+
+@pytest.mark.asyncio
+async def test_cost_followup_workspace_off_raises(monkeypatch):
+    from terrapod.services.summariser import FollowupDisabled
+
+    monkeypatch.setattr(cost_summariser.settings.ai_summary, "enabled", True)
+    monkeypatch.setattr(cost_summariser.settings.ai_summary, "followup_max_messages_per_run", 10)
+    with patch("terrapod.services.cost_summariser._resolve_workspace_mode", return_value=False):
+        with pytest.raises(FollowupDisabled):
+            await cost_summariser.post_cost_followup(
+                db=AsyncMock(),
+                cost_summary=MagicMock(),
+                run=MagicMock(),
+                workspace=MagicMock(),
+                user_message_text="hi",
+            )
+
+
+@pytest.mark.asyncio
+async def test_cost_followup_empty_text_raises(monkeypatch):
+    from terrapod.services.summariser import FollowupError
+
+    monkeypatch.setattr(cost_summariser.settings.ai_summary, "enabled", True)
+    monkeypatch.setattr(cost_summariser.settings.ai_summary, "followup_max_messages_per_run", 10)
+    with patch("terrapod.services.cost_summariser._resolve_workspace_mode", return_value=True):
+        with pytest.raises(FollowupError):
+            await cost_summariser.post_cost_followup(
+                db=AsyncMock(),
+                cost_summary=MagicMock(),
+                run=MagicMock(),
+                workspace=MagicMock(),
+                user_message_text="   ",
+            )
+
+
+@pytest.mark.asyncio
+async def test_cost_followup_happy_path_persists_and_emits(monkeypatch):
+    # Full turn: persists the assistant reply + telemetry and emits the
+    # cost_summary_message_posted SSE event (the SSE half of the contract).
+    monkeypatch.setattr(cost_summariser.settings.ai_summary, "enabled", True)
+    monkeypatch.setattr(cost_summariser.settings.ai_summary, "followup_max_messages_per_run", 10)
+
+    run = MagicMock(id=uuid.uuid4(), workspace_id=uuid.uuid4())
+    ws = MagicMock(id=uuid.uuid4())
+    summary = MagicMock(id=uuid.uuid4(), estimated_resources=[], advisories=[], narrative="")
+
+    db = AsyncMock()
+    db.add = MagicMock()
+    db.flush = AsyncMock()
+    db.commit = AsyncMock()
+    db.execute = AsyncMock(
+        side_effect=[
+            MagicMock(scalar=MagicMock(return_value=0)),  # user-turn count
+            MagicMock(scalars=MagicMock(return_value=MagicMock(all=MagicMock(return_value=[])))),
+        ]
+    )
+    storage = MagicMock()
+    storage.get = AsyncMock(return_value=b'{"currency":"USD","total":{"min":73,"max":73}}')
+    emit = AsyncMock()
+
+    with (
+        patch("terrapod.services.cost_summariser._resolve_workspace_mode", return_value=True),
+        patch("terrapod.services.cost_summariser._budget_remaining", AsyncMock(return_value=None)),
+        patch("terrapod.services.cost_summariser._budget_charge", AsyncMock()),
+        patch("terrapod.services.cost_summariser.get_storage", return_value=storage),
+        patch(
+            "terrapod.services.cost_summariser._call_chat_model",
+            AsyncMock(return_value=("Because it runs 24/7.", 120, 30)),
+        ),
+        patch("terrapod.services.cost_summariser._emit_summary_event", emit),
+    ):
+        row = await cost_summariser.post_cost_followup(
+            db=db, cost_summary=summary, run=run, workspace=ws, user_message_text="why?"
+        )
+
+    assert row.role == "assistant"
+    assert row.content == "Because it runs 24/7."
+    assert row.output_tokens == 30
+    # SSE event fired for this run.
+    assert any(c.args and c.args[0] == "cost_summary_message_posted" for c in emit.await_args_list)
+
+
 @pytest.mark.asyncio
 async def test_missing_artifact_skips(monkeypatch):
     from terrapod.storage.protocol import ObjectNotFoundError

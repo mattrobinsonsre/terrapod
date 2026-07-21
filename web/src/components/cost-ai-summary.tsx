@@ -25,6 +25,7 @@ import { Sparkles, RefreshCw, TrendingDown, Sigma } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
 import { useIsTouch } from '@/lib/use-media-query'
 import { LoadingSpinner } from '@/components/loading-spinner'
+import { CostSummaryChat } from '@/components/cost-summary-chat'
 
 interface Range {
   min: number
@@ -345,7 +346,12 @@ export function CostAiSummary({ runId, refreshKey = 0 }: Props) {
                 {t('costAi.narrativeTitle')}
               </h4>
               <div className="text-sm leading-relaxed text-slate-400">
-                <ReactMarkdown remarkPlugins={[remarkGfm]} components={COST_MARKDOWN_COMPONENTS}>
+                {/* singleTilde:false — "~$X" (approximately) must not become
+                    a GFM strikethrough span; cost prose uses it constantly. */}
+                <ReactMarkdown
+                  remarkPlugins={[[remarkGfm, { singleTilde: false }]]}
+                  components={COST_MARKDOWN_COMPONENTS}
+                >
                   {attrs.narrative}
                 </ReactMarkdown>
               </div>
@@ -365,6 +371,9 @@ export function CostAiSummary({ runId, refreshKey = 0 }: Props) {
               </span>
             )}
           </div>
+
+          {/* Follow-up chat thread — grounded in the cost estimate (#871). */}
+          <CostSummaryChat runId={runId} refreshKey={refreshKey} />
         </div>
       )}
     </div>

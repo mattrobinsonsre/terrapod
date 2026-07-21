@@ -711,13 +711,15 @@ function RunDetailPageInner() {
     ) {
       setAiSummaryRefresh((n) => n + 1)
     }
-    // AI cost-estimate lifecycle events → refetch the CostAiSummary panel.
+    // AI cost-estimate lifecycle events (incl. a chat turn) → refetch the
+    // CostAiSummary panel + its chat thread.
     if (
       [
         'cost_summary_ready',
         'cost_summary_pending',
         'cost_summary_errored',
         'cost_summary_skipped',
+        'cost_summary_message_posted',
       ].includes(event.event) && event.run_id === bareId
     ) {
       setCostSummaryRefresh((n) => n + 1)

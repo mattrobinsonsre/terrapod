@@ -1998,6 +1998,7 @@
       "saveUpTo": "waghHa' ~{amount}/jar",
       "narrativeTitle": "tlhoS",
       "estimateNote": "AI Qelmey — pImDaq cha'lu', Dung wagh naQvaD chellu'be'.",
+      "chatPlaceholder": "nab vam wagh'meH yu' yIghel… (⌘/Ctrl + Enter ngeHmeH)",
       "advisoryKind": {
         "savings_plan": "waghHa' nab",
         "reserved": "pollu'bogh",

@@ -2299,6 +2299,59 @@ class CostSummary(Base):
     __table_args__ = (sa.UniqueConstraint("run_id", name="uq_cost_summaries_run"),)
 
 
+class CostSummaryMessage(Base):
+    """One turn in the AI cost-estimate chat thread (#871).
+
+    The cost analogue of :class:`PlanSummaryMessage` — attached to a
+    ``CostSummary``, it stores conversational follow-ups (operator questions +
+    model replies) that build on top of the initial estimate/advisories the
+    parent ``CostSummary`` row holds. The chat is grounded in the derived cost
+    estimate only (the same ``cost_estimate.json`` the summariser reads), never
+    Terraform state or the plan JSON.
+
+    Roles: ``"user"`` (operator question) / ``"assistant"`` (model reply). Each
+    assistant row carries its own telemetry so the daily budget debits per turn;
+    user rows have zero tokens (columns exist so the shape is uniform). Ordering
+    is ``(cost_summary_id, created_at)`` — chronological; uuid7 IDs are
+    time-ordered so PK order matches.
+    """
+
+    __tablename__ = "cost_summary_messages"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=generate_uuid7
+    )
+    cost_summary_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("cost_summaries.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    role: Mapped[str] = mapped_column(String(20), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False, default="")
+
+    # Telemetry — meaningful on assistant rows, zero on user rows.
+    model: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    input_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    output_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    error_message: Mapped[str] = mapped_column(Text, nullable=False, default="")
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc, nullable=False
+    )
+
+    __table_args__ = (
+        sa.CheckConstraint(
+            "role IN ('user', 'assistant')",
+            name="ck_cost_summary_messages_role",
+        ),
+        sa.Index(
+            "ix_cost_summary_messages_cost_created",
+            "cost_summary_id",
+            "created_at",
+        ),
+    )
+
+
 # Onboarding session lifecycle (#824 P2). A session is workspace-scoped and
 # discovers existing, unmanaged cloud resources, then generates copy-pasteable
 # ``resource`` + ``import {}`` config. The stages map onto where each runs:

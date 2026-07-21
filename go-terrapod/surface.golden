@@ -109,6 +109,14 @@ field CostSummary.RunID string `json:"-"`
 field CostSummary.Status string `json:"status"`
 field CostSummary.Translated bool `json:"-"`
 field CostSummary.UpdatedAt string `json:"updated-at"`
+field CostSummaryMessage.Content string `json:"content"`
+field CostSummaryMessage.CreatedAt string `json:"created-at,omitempty"`
+field CostSummaryMessage.ErrorMessage string `json:"error-message,omitempty"`
+field CostSummaryMessage.ID string `json:"id"`
+field CostSummaryMessage.InputTokens int `json:"input-tokens"`
+field CostSummaryMessage.Model string `json:"model,omitempty"`
+field CostSummaryMessage.OutputTokens int `json:"output-tokens"`
+field CostSummaryMessage.Role string `json:"role"`
 field CreateAPITokenRequest.Description string
 field CreateAPITokenRequest.Kind string
 field CreateAPITokenRequest.LifespanHours int64
@@ -1013,6 +1021,7 @@ method (*Client) ListRemoteStateConsumers(ctx context.Context, producerWorkspace
 method (*Client) ListRoleAssignments(ctx context.Context) ([]RoleAssignment, error)
 method (*Client) ListRoleAssignmentsForIdentity(ctx context.Context, providerName, email string) ([]RoleAssignment, error)
 method (*Client) ListRoles(ctx context.Context) ([]Role, error)
+method (*Client) ListRunCostSummaryMessages(ctx context.Context, runID string) ([]*CostSummaryMessage, error)
 method (*Client) ListRunTasks(ctx context.Context, workspaceID string) ([]RunTask, error)
 method (*Client) ListUserAPITokens(ctx context.Context, userID string) ([]APIToken, error)
 method (*Client) ListUsers(ctx context.Context) ([]User, error)
@@ -1026,6 +1035,7 @@ method (*Client) OrphanCatalogInstance(ctx context.Context, wsID string) error
 method (*Client) Patch(ctx context.Context, path string, payload []byte) ([]byte, error)
 method (*Client) Post(ctx context.Context, path string, payload []byte) ([]byte, error)
 method (*Client) PostPlanSummaryMessage(ctx context.Context, runID, content string) (*PlanSummaryMessage, error)
+method (*Client) PostRunCostSummaryMessage(ctx context.Context, runID, content string) (*CostSummaryMessage, error)
 method (*Client) ProvisionCatalogItem(ctx context.Context, itemID string, attrs map[string]any) (*CatalogInstance, error)
 method (*Client) Put(ctx context.Context, path string, payload []byte) ([]byte, error)
 method (*Client) PutRaw(ctx context.Context, path, contentType string, payload []byte) ([]byte, error)
@@ -1096,6 +1106,7 @@ type CostRange struct
 type CostResource struct
 type CostStateVersion struct
 type CostSummary struct
+type CostSummaryMessage struct
 type CreateAPITokenRequest struct
 type CreateAgentPoolRequest struct
 type CreateAgentPoolTokenRequest struct

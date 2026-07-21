@@ -256,7 +256,7 @@ export function PlanAiSummary({ runId, refreshKey = 0 }: Props) {
               especially on a phone. Inline code / lists / links inherit. */}
           <div className="text-sm text-slate-300 leading-relaxed">
             <ReactMarkdown
-              remarkPlugins={[remarkGfm]}
+              remarkPlugins={[[remarkGfm, { singleTilde: false }]]}
               components={SUMMARY_MARKDOWN_COMPONENTS}
             >
               {attrs.description}
