@@ -1,0 +1,45 @@
+# DynamoDB -> aws_dynamodb_table (on-demand / PayPerRequest, Standard class).
+# Three cost dimensions: read request units, write request units, and per-GB
+# storage. Each correlates with its existing usage entry via literal pricing
+# dimensions (request_type=read/write, table_class=standard). Only the common
+# PayPerRequest + Standard table class is covered; Infrequent Access (the *IA
+# groups), global-table ReplicatedWrite, PITR storage, and provisioned capacity
+# are follow-ups. The exact `group`/`usagetype` selects keep IA/Replicated/PITR
+# out (they're distinct SKUs, not attributes on these).
+resource_type: aws_dynamodb_table
+service: AmazonDynamoDB
+
+components:
+  # Read request units (PayPerRequest, Standard).
+  - product_family: "^Amazon DynamoDB PayPerRequest Throughput$"
+    service_class: requests
+    select: { group: DDB-ReadUnits }
+    pricing: { request_type: read, table_class: standard }
+    price: { type: o, unit: ReadRequestUnits }
+    tier: usage
+
+  # Write request units.
+  - product_family: "^Amazon DynamoDB PayPerRequest Throughput$"
+    service_class: requests
+    select: { group: DDB-WriteUnits }
+    pricing: { request_type: write, table_class: standard }
+    price: { type: o, unit: WriteRequestUnits }
+    tier: usage
+
+  # Storage — per GB-month at $0.25. The offer tiers this 0-25 GB @ $0 (the
+  # account-wide 25 GB free tier) then 25-Inf @ $0.25. We do NOT apply that free
+  # tier per-table: it's an account-wide one-off, and applying it per-resource
+  # would under-estimate (and be inconsistent with Lambda, whose free tier we
+  # also drop). `tier_bounds` forces the billable range to start at 0 so a table
+  # is billed for its full storage. (The $0 free-tier row is already dropped by
+  # the adapter's $0-skip; this pins the remaining rate's start to 0.)
+  - product_family: "^Database Storage$"
+    service_class: storage
+    select: { usagetype: TimedStorage-ByteHrs }
+    pricing: { table_class: standard }
+    price: { type: d, unit: GB-Mo }
+    tier: usage
+    tier_bounds:
+      - when: { usagetype: TimedStorage-ByteHrs }
+        start: "0"
+        end: Inf
