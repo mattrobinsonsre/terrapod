@@ -210,8 +210,13 @@ type CostSummary struct {
 	InputTokens        int                     `json:"input-tokens"`
 	OutputTokens       int                     `json:"output-tokens"`
 	ErrorMessage       string                  `json:"error-message"`
-	CreatedAt          string                  `json:"created-at"`
-	UpdatedAt          string                  `json:"updated-at"`
+	// Language is the canonical language the prose is stored in; Translated is
+	// true when the served narrative/basis/advisory text was translated on view
+	// for a reader locale (#871). Request a locale via GetRunCostSummaryLocale.
+	Language     string `json:"-"`
+	Translated   bool   `json:"-"`
+	CreatedAt    string `json:"created-at"`
+	UpdatedAt    string `json:"updated-at"`
 }
 
 func costSummaryFromResource(res *Resource) *CostSummary {
@@ -224,6 +229,8 @@ func costSummaryFromResource(res *Resource) *CostSummary {
 		InputTokens:  int(GetIntAttr(res, "input-tokens")),
 		OutputTokens: int(GetIntAttr(res, "output-tokens")),
 		ErrorMessage: GetStringAttr(res, "error-message"),
+		Language:     GetStringAttr(res, "language"),
+		Translated:   GetBoolAttr(res, "translated"),
 		CreatedAt:    GetStringAttr(res, "created-at"),
 		UpdatedAt:    GetStringAttr(res, "updated-at"),
 	}

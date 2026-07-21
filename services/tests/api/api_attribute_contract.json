@@ -413,10 +413,12 @@
     "error-message",
     "estimated-resources",
     "input-tokens",
+    "language",
     "model",
     "narrative",
     "output-tokens",
     "status",
+    "translated",
     "updated-at"
   ],
   "runs._plan_json": [

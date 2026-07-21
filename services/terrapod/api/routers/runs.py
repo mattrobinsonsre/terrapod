@@ -1141,8 +1141,22 @@ async def show_cost_estimate(
     )
 
 
-def _cost_summary_json(run_id, summary: CostSummary) -> dict:
-    """JSON:API body for a cost-summary row."""
+def _cost_summary_json(
+    run_id,
+    summary: CostSummary,
+    *,
+    estimated_resources: list | None = None,
+    narrative: str | None = None,
+    advisories: list | None = None,
+    translated: bool = False,
+    language: str = "",
+) -> dict:
+    """JSON:API body for a cost-summary row.
+
+    The natural-language fields default to the stored (canonical-language)
+    values; pass translated overrides (with ``translated=True`` + the canonical
+    ``language``) to serve a reader-locale view (#871).
+    """
     return {
         "data": {
             "id": f"cost-summary-{summary.id}",
@@ -1153,14 +1167,20 @@ def _cost_summary_json(run_id, summary: CostSummary) -> dict:
                 # price. Each carries source="ai-estimate" (stamped server-side);
                 # the UI renders these as a separate overlay, never summed into
                 # the authoritative oiq total.
-                "estimated-resources": summary.estimated_resources,
-                "narrative": summary.narrative,
+                "estimated-resources": estimated_resources
+                if estimated_resources is not None
+                else summary.estimated_resources,
+                "narrative": narrative if narrative is not None else summary.narrative,
                 # Advisories also carry source="ai-estimate".
-                "advisories": summary.advisories,
+                "advisories": advisories if advisories is not None else summary.advisories,
                 "model": summary.model,
                 "input-tokens": summary.input_tokens,
                 "output-tokens": summary.output_tokens,
                 "error-message": summary.error_message,
+                # Canonical language the summary is stored in; `translated` is
+                # true when the served prose was translated on view (#871/#767).
+                "language": language,
+                "translated": translated,
                 "created-at": _rfc3339(summary.created_at),
                 "updated-at": _rfc3339(summary.updated_at),
             },
@@ -1174,21 +1194,26 @@ def _cost_summary_json(run_id, summary: CostSummary) -> dict:
 @extensions_router.get("/runs/{run_id}/cost-summary")
 async def show_cost_summary(
     run_id: str = Path(...),
+    locale: str | None = Query(None),
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
-    """AI cost narrative + savings advisories for a run (#871).
+    """AI cost estimate + savings advisories for a run (#871).
 
     Terrapod-native; the optional AI *enhancement* over the data-only cost
-    estimate, riding the plan-analysis AI switch. AI *polish* only — the
-    authoritative oiq figures live on the data-only `/runs/{id}/cost-estimate`
-    endpoint and are never restated here; every advisory dollar amount is
-    tagged `source: "ai-estimate"`.
+    estimate, riding the plan-analysis AI switch. Its estimates price what oiq
+    couldn't; the authoritative oiq figures live on the data-only
+    `/runs/{id}/cost-estimate` endpoint and are never restated here. Every AI
+    dollar amount is tagged `source: "ai-estimate"`.
 
-    404 when no cost narrative exists yet — the UI uses this as the "not
-    generated" signal (vs a `pending` row, which means "in flight"). The
-    narrative is stored in the deployment's `ai_summary.summary_language`;
-    view-time translation for a reader `?locale=` is a follow-up (#871).
+    404 when no cost estimate exists yet — the UI uses this as the "not
+    generated" signal (vs a `pending` row, which means "in flight"). The prose
+    is stored in the deployment's `ai_summary.summary_language`; when the caller
+    passes a `?locale=` for a different real language, the narrative + each
+    estimate's `basis` + each advisory's `title`/`detail` are translated on view
+    (Redis-cached, 7-day sliding TTL, best-effort) and `translated`/`language`
+    reflect that. On failure or budget exhaustion the canonical text is served
+    with `translated=false`.
     """
     run = await _get_run(run_id, db)
     await _require_run_ws_capability(run, cap.RUN_READ, user, db)
@@ -1197,9 +1222,33 @@ async def show_cost_summary(
         await db.execute(select(CostSummary).where(CostSummary.run_id == run.id))
     ).scalar_one_or_none()
     if summary is None:
-        raise HTTPException(status_code=404, detail="no cost narrative for this run")
+        raise HTTPException(status_code=404, detail="no cost estimate for this run")
 
-    return JSONResponse(content=_cost_summary_json(run.id, summary))
+    canonical_language = settings.ai_summary.summary_language
+    if summary.status == "ready" and locale:
+        from terrapod.services import summary_translation
+
+        result = await summary_translation.translate_cost_summary(
+            summary_id=str(summary.id),
+            narrative=summary.narrative,
+            estimated_resources=summary.estimated_resources,
+            advisories=summary.advisories,
+            reader_locale=locale,
+        )
+        if result is not None:
+            return JSONResponse(
+                content=_cost_summary_json(
+                    run.id,
+                    summary,
+                    estimated_resources=result["estimated_resources"],
+                    narrative=result["narrative"],
+                    advisories=result["advisories"],
+                    translated=True,
+                    language=canonical_language,
+                )
+            )
+
+    return JSONResponse(content=_cost_summary_json(run.id, summary, language=canonical_language))
 
 
 @extensions_router.post("/runs/{run_id}/cost-summary/regenerate")
