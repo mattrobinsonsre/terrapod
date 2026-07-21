@@ -1,0 +1,44 @@
+# EBS -> aws_ebs_volume. A composite resource: its cost is TWO components from
+# two AWS product families — the per-GB storage charge and the per-provisioned-
+# IOPS charge — so the recipe lists both. `volumeApiName` (gp3/io1/io2/…) is the
+# AWS attribute for the volume type; it maps to the Terraform `type` attribute
+# (an explicit map, since the names don't snake-align).
+resource_type: aws_ebs_volume
+service: AmazonEC2
+
+components:
+  # Storage: priced per GB-month, charged as `a=values.size` (rate × the
+  # volume's `size` attribute, applied by the engine). Flat — no tier fields.
+  - product_family: "^Storage$"
+    service_class: storage
+    match: { type: volumeApiName }
+    price: { type: "a=values.size" }
+    tier: none
+
+  # Provisioned IOPS: priced per IOPS-month (`o`). io2's tier rates are separate
+  # AWS SKUs (io2/io2.tier2/io2.tier3, groups "EBS IOPS"/"…Tier 2"/"…Tier 3"), so
+  # the group filter is a REGEX to catch all three. The tier BOUNDARIES aren't in
+  # the API (every SKU says 0-Inf) — gp3's free 3000-IOPS baseline and io2's
+  # 32000/64000 breaks are domain knowledge, encoded here as `tier_bounds`.
+  - product_family: "^System Operation$"
+    service_class: iops
+    match: { type: volumeApiName }
+    select: { group: { regex: "^EBS IOPS" } }
+    price: { type: o, unit: IOPS-Mo }
+    tier: provision
+    tier_bounds:
+      - when: { volumeApiName: gp3, group: EBS IOPS }
+        start: "3000" # gp3 includes 3000 free IOPS; you pay only above it
+        end: Inf
+      # io2's three tiers. Base must be bounded 0-32000 (not 0-Inf) so the engine
+      # tiers correctly — oiq omits this base row + io2 storage entirely (a gap;
+      # we are deliberately more complete).
+      - when: { volumeApiName: io2, group: EBS IOPS }
+        start: "0"
+        end: "32000"
+      - when: { volumeApiName: io2, group: EBS IOPS Tier 2 }
+        start: "32001"
+        end: "64000"
+      - when: { volumeApiName: io2, group: EBS IOPS Tier 3 }
+        start: "64001"
+        end: Inf

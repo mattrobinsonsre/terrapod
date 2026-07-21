@@ -1,0 +1,27 @@
+# EC2 Compute Instance -> aws_instance (on-demand). Thin: the canonical SKU
+# variant (OnDemand/Shared/Used/NA/No-License), the region dimension, the
+# purchase_option and service_provider all come from providers/aws/defaults.yaml.
+# This recipe declares only what is specific to aws_instance.
+#
+# Produces rows byte-identical to oiq's, e.g.
+#   type=aws_instance&values.instance_type=m5.large | …&os=linux | 0.096 | t | USD
+resource_type: aws_instance
+service: AmazonEC2
+
+components:
+  - # `^Compute Instance` matches "Compute Instance" AND "Compute Instance
+    # (bare metal)" in one — each row keeps its own family in the column.
+    product_family: "^Compute Instance"
+    service_class: instance
+    # AWS `instanceType` -> values.instance_type (auto-snaked from the attr name).
+    match: [instanceType]
+    # The only deviation from the defaults: oiq carries just these two OSes.
+    select:
+      operatingSystem: [Linux, Windows]
+    # os is the one pricing dimension unique to instances.
+    pricing:
+      os:
+        attr: operatingSystem
+        map: { Linux: linux, Windows: windows }
+    price: { type: t, unit: Hrs } # per-hour; engine ×730 for monthly
+    tier: usage # instances always carry start/end_usage_amount (0/Inf)
