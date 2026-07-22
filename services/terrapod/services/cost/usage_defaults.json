@@ -315,5 +315,20 @@
       "typical": 100,
       "high": 16000
     }
+  },
+  {
+    "description": "EFS stored size (General Purpose)",
+    "match_query": "type = aws_efs_file_system and service_class = storage",
+    "usage": {
+      "data": 100
+    },
+    "assumption": true,
+    "bands": {
+      "dimension": "stored size",
+      "unit": "GB-month",
+      "low": 10,
+      "typical": 100,
+      "high": 50000
+    }
   }
 ]
