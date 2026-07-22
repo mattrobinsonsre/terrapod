@@ -127,6 +127,8 @@ _ROWS = [
     "Azure Kubernetes Service,Azure Kubernetes Service,type=azurerm_kubernetes_cluster&values.sku_tier=Standard,service_provider=azure&purchase_option=on_demand&region=eastus&service_class=hours&start_usage_amount=0&end_usage_amount=Inf,0.1,t,USD",
     "Storage,Storage,type=azurerm_storage_account&values.account_replication_type=LRS,service_provider=azure&purchase_option=on_demand&region=eastus&service_class=storage&start_usage_amount=0&end_usage_amount=51200,0.0208,d,USD",
     "Storage,Storage,type=azurerm_storage_account&values.account_replication_type=LRS,service_provider=azure&purchase_option=on_demand&region=eastus&service_class=storage&start_usage_amount=51200&end_usage_amount=512000,0.019968,d,USD",
+    # GCP Cloud Storage bucket (#999) — Standard regional storage $0.02/GiB-mo.
+    "Cloud Storage,Standard Storage US Regional,type=google_storage_bucket&values.storage_class=STANDARD,service_provider=gcp&purchase_option=on_demand&region=us-central1&service_class=storage&start_usage_amount=0&end_usage_amount=Inf,0.0200000000,d,USD",
 ]
 
 
@@ -1009,6 +1011,28 @@ def test_azure_storage_account_volume_tiered():
     # the point is it is well BELOW the flat-rate 500000*.0208 = $10400 (no
     # double-count) and above the second tier. Assert it applied the discount.
     assert band["cost_high"] < 500000 * 0.0208
+
+
+def test_gcs_bucket_storage_band_case_insensitive_location():
+    """GCS bucket Standard storage prices per GiB-month (band). The bucket's
+    `location` is often uppercase ("US-CENTRAL1"); region resolution is now
+    case-insensitive, so both cases price. (#999)"""
+    for loc in ("us-central1", "US-CENTRAL1"):
+        plan = _plan(
+            [
+                {
+                    "address": "google_storage_bucket.b",
+                    "type": "google_storage_bucket",
+                    "name": "b",
+                    "mode": "managed",
+                    "values": {"location": loc, "storage_class": "STANDARD"},
+                }
+            ]
+        )
+        d = estimate(plan, _sheet()).to_dict()
+        assert d["resources"][0]["monthly"]["max"] == pytest.approx(1000 * 0.02, abs=0.01), (
+            loc
+        )  # $20
 
 
 def test_ec2_instance_prices():

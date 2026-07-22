@@ -239,16 +239,20 @@ def resolve_region(resource: Resource, provider_region_map: dict[str, str], defa
     (AWS uses ``availability_zone``, not ``zone``, so keying on ``zone`` is
     GCP-safe.)
     """
+    # Every region in the pricing data is lowercase (aws us-east-1, azure eastus,
+    # gcp us-central1), but a resource attribute may not be — a
+    # google_storage_bucket's `location` is commonly "US-CENTRAL1" / "US". Lower-
+    # case the resolved region so the region filter is case-insensitive.
     values = resource.data.get("values")
     if isinstance(values, dict):
         for key in _REGION_ATTR_KEYS:
             val = values.get(key)
             if isinstance(val, str) and val:
-                return val
+                return val.lower()
         zone = values.get("zone")
         if isinstance(zone, str) and zone:
-            return re.sub(r"-[a-z]$", "", zone)
+            return re.sub(r"-[a-z]$", "", zone.lower())
     provider = resource.data.get("provider_name")
     if isinstance(provider, str) and provider in provider_region_map:
-        return provider_region_map[provider]
+        return provider_region_map[provider].lower()
     return default
