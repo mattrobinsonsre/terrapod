@@ -117,6 +117,10 @@ _ROWS = [
     "AWSKMS,Encryption Key,type=aws_kms_key,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=keys&start_usage_amount=0&end_usage_amount=Inf,1.0000000000,o,USD",
     "AWSSecretsManager,Secret,type=aws_secretsmanager_secret,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=secrets&start_usage_amount=0&end_usage_amount=Inf,0.4000000000,o,USD",
     "AmazonSNS,API Request,type=aws_sns_topic,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=requests&start_usage_amount=0&end_usage_amount=Inf,0.0000005000,o,USD",
+    # ElastiCache (#995) — per cache-node-hour by node_type + engine; cost scales
+    # with num_cache_nodes via the count-multiply feature. memcached t3.micro
+    # $0.017/hr.
+    "AmazonElastiCache,Cache Instance,type=aws_elasticache_cluster&values.node_type=cache.t3.micro&values.engine=memcached,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=nodes&start_usage_amount=0&end_usage_amount=Inf,0.0170000000,t,USD",
 ]
 
 
@@ -877,6 +881,72 @@ def test_api_gateway_rest_and_http_request_bands():
     # typical 10M requests: REST 10M*3.5e-6 = $35, HTTP 10M*1e-6 = $10.
     assert by["aws_api_gateway_rest_api.r"]["monthly"]["max"] == pytest.approx(35.0, abs=0.5)
     assert by["aws_apigatewayv2_api.h"]["monthly"]["max"] == pytest.approx(10.0, abs=0.5)
+
+
+def test_elasticache_cost_scales_with_num_cache_nodes():
+    """aws_elasticache_cluster prices per node-hour and the count-multiply
+    feature scales it by num_cache_nodes: 3 memcached t3.micro nodes =
+    3 * 730 * 0.017 = $37.23. A 1-node default matches the single-node cost. (#995)"""
+    plan = _plan(
+        [
+            {
+                "address": "aws_elasticache_cluster.multi",
+                "type": "aws_elasticache_cluster",
+                "name": "multi",
+                "mode": "managed",
+                "values": {
+                    "region": "us-east-1",
+                    "node_type": "cache.t3.micro",
+                    "engine": "memcached",
+                    "num_cache_nodes": 3,
+                },
+            },
+            {
+                "address": "aws_elasticache_cluster.one",
+                "type": "aws_elasticache_cluster",
+                "name": "one",
+                "mode": "managed",
+                "values": {
+                    "region": "us-east-1",
+                    "node_type": "cache.t3.micro",
+                    "engine": "memcached",
+                    "num_cache_nodes": 1,
+                },
+            },
+        ]
+    )
+    d = estimate(plan, _sheet()).to_dict()
+    by = {r["address"]: r for r in d["resources"]}
+    assert by["aws_elasticache_cluster.multi"]["monthly"]["max"] == pytest.approx(
+        3 * 730 * 0.017, abs=0.01
+    )
+    assert by["aws_elasticache_cluster.one"]["monthly"]["max"] == pytest.approx(
+        1 * 730 * 0.017, abs=0.01
+    )
+
+
+def test_count_multiply_defaults_to_one_when_attr_absent():
+    """The count-multiply falls back to 1 when the count attribute is absent from
+    the plan (a Redis cluster that omits num_cache_nodes) — no under/over-count,
+    no crash. (#995)"""
+    plan = _plan(
+        [
+            {
+                "address": "aws_elasticache_cluster.redis",
+                "type": "aws_elasticache_cluster",
+                "name": "redis",
+                "mode": "managed",
+                # no num_cache_nodes -> factor defaults to 1
+                "values": {
+                    "region": "us-east-1",
+                    "node_type": "cache.t3.micro",
+                    "engine": "memcached",
+                },
+            }
+        ]
+    )
+    d = estimate(plan, _sheet()).to_dict()
+    assert d["resources"][0]["monthly"]["max"] == pytest.approx(730 * 0.017, abs=0.01)
 
 
 def test_ec2_instance_prices():

@@ -1,0 +1,23 @@
+# ElastiCache -> aws_elasticache_cluster. Priced per cache-node-hour by
+# node_type. A cluster's cost scales with num_cache_nodes, so the paired usage
+# entry carries a `count` (× values.num_cache_nodes) — the count-multiply engine
+# feature. Redis/Memcached/Valkey price identically per node, so we match
+# node_type only and let the per-engine SKUs dedup. From the AmazonElastiCache
+# offer. Reserved nodes + data-tiering are follow-ups.
+resource_type: aws_elasticache_cluster
+service: AmazonElastiCache
+
+components:
+  - product_family: "^Cache Instance$"
+    service_class: nodes
+    # Exclude the "Extended Support" surcharge SKUs (for running EOL engine
+    # versions) — we price the base node rate.
+    select: { usagetype: { regex: "ExtendedSupport", negate: true } }
+    match:
+      node_type: { attr: instanceType }
+      # Engines price differently (Redis/Memcached $0.017 vs Valkey $0.0136 for
+      # t3.micro), so match the engine — map the product's cacheEngine to the
+      # Terraform `engine` value.
+      engine: { attr: cacheEngine, map: { Redis: redis, Memcached: memcached, Valkey: valkey } }
+    price: { type: t, unit: Hrs }
+    tier: usage

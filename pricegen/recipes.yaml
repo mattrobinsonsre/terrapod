@@ -137,3 +137,7 @@ recipes:
     recipe: aws_apigatewayv2_api
     offer: .cache/apigw-us-east-1.json
     fetch: { service_code: AmazonApiGateway, region: us-east-1 }
+  - provider: aws
+    recipe: aws_elasticache_cluster
+    offer: .cache/elasticache-us-east-1.json
+    fetch: { service_code: AmazonElastiCache, region: us-east-1 }

@@ -13,6 +13,7 @@ min_rows:
   azurerm_linux_virtual_machine: 500
   google_compute_instance: 50
   aws_rds_cluster_instance: 50
+  aws_elasticache_cluster: 100
 
 # WARN if a recipe's row count moves more than this fraction vs the last publish.
 row_delta_fraction: 0.5
