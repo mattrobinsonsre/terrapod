@@ -1,0 +1,14 @@
+# API Gateway HTTP API -> aws_apigatewayv2_api (protocol_type=HTTP). Per-request,
+# tiered ($1.00/M for the first 300M, then $0.90/M) — cheaper than REST. Usage-
+# driven band. We stamp protocol_type=HTTP; WebSocket APIs (ApiGatewayMessage,
+# ApiGatewayMinute) are a follow-up. From the AmazonApiGateway offer.
+resource_type: aws_apigatewayv2_api
+service: AmazonApiGateway
+
+components:
+  - product_family: "^API Calls$"
+    service_class: requests
+    select: { usagetype: { regex: "ApiGatewayHttpRequest$" } }
+    match: { protocol_type: { const: HTTP } }
+    price: { type: o, unit: Requests }
+    tier: usage

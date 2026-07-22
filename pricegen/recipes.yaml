@@ -129,3 +129,11 @@ recipes:
     recipe: aws_sns_topic
     offer: .cache/sns-us-east-1.json
     fetch: { service_code: AmazonSNS, region: us-east-1 }
+  - provider: aws
+    recipe: aws_api_gateway_rest_api
+    offer: .cache/apigw-us-east-1.json
+    fetch: { service_code: AmazonApiGateway, region: us-east-1 }
+  - provider: aws
+    recipe: aws_apigatewayv2_api
+    offer: .cache/apigw-us-east-1.json
+    fetch: { service_code: AmazonApiGateway, region: us-east-1 }
