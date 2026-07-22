@@ -454,5 +454,20 @@
       "typical": 5000,
       "high": 500000
     }
+  },
+  {
+    "description": "GCS bucket standard storage",
+    "match_query": "type = google_storage_bucket and service_class = storage",
+    "usage": {
+      "data": 1000
+    },
+    "assumption": true,
+    "bands": {
+      "dimension": "stored data",
+      "unit": "GiB-month",
+      "low": 100,
+      "typical": 1000,
+      "high": 100000
+    }
   }
 ]

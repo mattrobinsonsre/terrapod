@@ -1,0 +1,17 @@
+# GCP Cloud Storage -> google_storage_bucket. Standard-class regional storage at
+# $0.02/GiB-month, usage-driven (bucket size unknown -> band). We match
+# storage_class=STANDARD and the regional SKUs (description "Standard Storage
+# <geo> Regional"); the SKU carries many serviceRegions, so this is partly
+# multi-region for free. Multi-region buckets and Nearline/Coldline/Archive
+# classes are follow-ups. Region emitted from the SKU; the consumer resolves the
+# bucket's region from its `location`.
+resource_type: google_storage_bucket
+service: Cloud Storage
+
+components:
+  - product_family: "^Standard Storage .+ Regional$"
+    service_class: storage
+    match: { storage_class: { const: STANDARD } }
+    pricing: { region: { attr: region } }
+    price: { type: d, unit: GiBy.mo }
+    tier: usage
