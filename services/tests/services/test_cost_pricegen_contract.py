@@ -152,6 +152,8 @@ _ROWS = [
     "Cloud DNS,ManagedZone,type=google_dns_managed_zone,service_provider=gcp&purchase_option=on_demand&service_class=zones&start_usage_amount=0&end_usage_amount=Inf,0.2000000000,o,USD",
     # Azure Container Registry (#1017) — flat per-tier daily fee. Premium $1.6666/day.
     "Container Registry,Container Registry,type=azurerm_container_registry&values.sku=Premium,service_provider=azure&purchase_option=on_demand&region=eastus&service_class=registry&start_usage_amount=0&end_usage_amount=Inf,1.6666,t,USD",
+    # Cloud Pub/Sub (#1019) — message throughput $40/TiB (band), global.
+    "Cloud Pub/Sub,Message Delivery Basic,type=google_pubsub_topic,service_provider=gcp&purchase_option=on_demand&service_class=throughput&start_usage_amount=0&end_usage_amount=Inf,40.0000000000,d,USD",
 ]
 
 
@@ -1237,6 +1239,23 @@ def test_azure_container_registry_tier_fee():
     )
     d = estimate(plan, _sheet()).to_dict()
     assert d["resources"][0]["monthly"]["max"] == pytest.approx(30 * 1.6666, abs=0.01)
+
+
+def test_gcp_pubsub_topic_throughput_band():
+    """google_pubsub_topic: message throughput $40/TiB (band), global. (#1019)"""
+    plan = _plan(
+        [
+            {
+                "address": "google_pubsub_topic.t",
+                "type": "google_pubsub_topic",
+                "name": "t",
+                "mode": "managed",
+                "values": {"name": "t"},
+            }
+        ]
+    )
+    d = estimate(plan, _sheet()).to_dict()
+    assert d["resources"][0]["monthly"]["max"] == pytest.approx(40.0, abs=0.01)
 
 
 def test_ec2_instance_prices():

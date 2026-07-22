@@ -1,0 +1,12 @@
+# Cloud Pub/Sub -> google_pubsub_topic. Message throughput at $40/TiB (the Basic
+# message-delivery rate), usage-driven (volume unknown -> band). Global. The
+# per-connector delivery rates (to BigQuery/GCS/Kinesis/etc.) are follow-ups.
+# From the Cloud Pub/Sub offer.
+resource_type: google_pubsub_topic
+service: Cloud Pub/Sub
+
+components:
+  - product_family: "^Message Delivery Basic$"
+    service_class: throughput
+    price: { type: d, unit: TiBy }
+    tier: usage
