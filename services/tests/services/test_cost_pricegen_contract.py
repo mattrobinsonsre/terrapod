@@ -46,6 +46,10 @@ _ROWS = [
     # Azure Linux VM (#931) — proves the second cloud prices through the same
     # engine. size = armSkuName; region resolved from the resource's `location`.
     "Virtual Machines,Virtual Machines,type=azurerm_linux_virtual_machine&values.size=Standard_D2s_v5,service_provider=azure&purchase_option=on_demand&region=eastus&service_class=instance&os=linux&start_usage_amount=0&end_usage_amount=Inf,0.096,t,USD",
+    # Azure Windows VM (#989) — the Windows-licensed meter ($0.188 vs Linux
+    # $0.096). Azure public IP — Standard Static $0.005/hr.
+    "Virtual Machines,Virtual Machines,type=azurerm_windows_virtual_machine&values.size=Standard_D2s_v5,service_provider=azure&purchase_option=on_demand&region=eastus&service_class=instance&os=windows&start_usage_amount=0&end_usage_amount=Inf,0.188,t,USD",
+    "Virtual Network,Virtual Network,type=azurerm_public_ip,service_provider=azure&purchase_option=on_demand&region=eastus&service_class=hours&start_usage_amount=0&end_usage_amount=Inf,0.005,t,USD",
     # GCP compute (#933) — the computed kind: this row is pre-assembled from the
     # per-vCPU-core + per-GiB-RAM rates (n2-standard-4 = 4*core + 16*ram). Region
     # is derived from the resource's `zone`.
@@ -777,6 +781,35 @@ def test_sns_topic_usage_driven_publishes_band():
     assert r["monthly"]["max"] == pytest.approx(5_000_000 * 0.0000005, abs=0.01)  # $2.50
     pub = {ua["dimension"]: ua for ua in r["usage_assumptions"]}["publishes"]
     assert pub["cost_high"] == pytest.approx(1_000_000_000 * 0.0000005, abs=0.5)  # $500
+
+
+def test_azure_windows_vm_and_public_ip():
+    """Azure Windows VM prices at the Windows-licensed meter (region from
+    `location`); a Standard public IP is a deterministic hourly charge. (#989)"""
+    plan = _plan(
+        [
+            {
+                "address": "azurerm_windows_virtual_machine.win",
+                "type": "azurerm_windows_virtual_machine",
+                "name": "win",
+                "mode": "managed",
+                "values": {"location": "eastus", "size": "Standard_D2s_v5"},
+            },
+            {
+                "address": "azurerm_public_ip.ip",
+                "type": "azurerm_public_ip",
+                "name": "ip",
+                "mode": "managed",
+                "values": {"location": "eastus"},
+            },
+        ]
+    )
+    d = estimate(plan, _sheet()).to_dict()
+    by = {r["address"]: r for r in d["resources"]}
+    assert by["azurerm_windows_virtual_machine.win"]["monthly"]["max"] == pytest.approx(
+        730 * 0.188, abs=0.01
+    )
+    assert by["azurerm_public_ip.ip"]["monthly"]["max"] == pytest.approx(730 * 0.005, abs=0.01)
 
 
 def test_ec2_instance_prices():

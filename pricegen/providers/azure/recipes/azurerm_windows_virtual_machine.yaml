@@ -1,0 +1,22 @@
+# Azure Windows VM -> azurerm_windows_virtual_machine (on-demand / Consumption).
+#
+# Same base compute as the Linux recipe, but the Windows-licensed meter — Azure
+# tags the Windows image premium with "Windows" in productName (e.g. "Virtual
+# Machines Dsv5 Series Windows"), so here we SELECT it (the Linux recipe excludes
+# it). Spot / Low Priority variants (in skuName) are excluded. `size` is
+# armSkuName verbatim. From the same Virtual Machines offer as the Linux VM.
+resource_type: azurerm_windows_virtual_machine
+service: Virtual Machines
+
+components:
+  - product_family: "^Virtual Machines$"
+    service_class: instance
+    select:
+      productName: { regex: "Windows" }
+      skuName: { regex: "Spot|Low Priority", negate: true }
+    match:
+      size: { attr: armSkuName }
+    pricing:
+      os: windows
+    price: { type: t, unit: "1 Hour" }
+    tier: usage

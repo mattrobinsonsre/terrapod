@@ -1,0 +1,15 @@
+# Azure Public IP -> azurerm_public_ip. Priced per hour. We price the modern
+# default — a Standard Static IPv4 public IP ($0.005/hr, deterministic) — which
+# is the default sku in azurerm 4.x. Basic (retiring) and Global are distinct
+# meters, follow-ups. From the Virtual Network offer.
+resource_type: azurerm_public_ip
+service: Virtual Network
+
+components:
+  - product_family: "^Virtual Network$"
+    service_class: hours
+    select:
+      productName: "IP Addresses"
+      meterName: "Standard IPv4 Static Public IP"
+    price: { type: t, unit: "1 Hour" }
+    tier: usage

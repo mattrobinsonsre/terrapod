@@ -16,6 +16,14 @@ recipes:
     recipe: azurerm_linux_virtual_machine
     offer: .cache/azure-vm-eastus.json
     fetch: { service_name: "Virtual Machines", region: eastus }
+  - provider: azure
+    recipe: azurerm_windows_virtual_machine
+    offer: .cache/azure-vm-eastus.json
+    fetch: { service_name: "Virtual Machines", region: eastus }
+  - provider: azure
+    recipe: azurerm_public_ip
+    offer: .cache/azure-vnet-eastus.json
+    fetch: { service_name: "Virtual Network", region: eastus }
   - provider: gcp
     recipe: google_compute_instance
     offer: .cache/gcp-compute.json

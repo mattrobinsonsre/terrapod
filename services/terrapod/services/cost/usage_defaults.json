@@ -366,5 +366,19 @@
       "typical": 5000000,
       "high": 1000000000
     }
+  },
+  {
+    "description": "Azure Windows VM hours (always-on)",
+    "match_query": "type = azurerm_windows_virtual_machine and service_class = instance",
+    "usage": {
+      "time": 730
+    }
+  },
+  {
+    "description": "Azure public IP hours (always-on)",
+    "match_query": "type = azurerm_public_ip and service_class = hours",
+    "usage": {
+      "time": 730
+    }
   }
 ]
