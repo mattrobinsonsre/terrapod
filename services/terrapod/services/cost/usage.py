@@ -62,9 +62,33 @@ class Entry:
     divisor: int | None
     match_query: MatchQuery
     usage: Usage | None
+    # A component priced through this entry is a USAGE ASSUMPTION (its quantity
+    # is a guess about runtime traffic — requests, data processed, duration —
+    # not something the plan tells us) when ``assumption`` is set. ``bands`` then
+    # carries our low/typical/high judgement so the estimate can flag the
+    # assumption and the AI layer can refine it per-resource (#962). Deterministic
+    # entries (always-on hours, storage from the resource's own size attr) leave
+    # both unset. ``bands`` shape: {dimension, unit, low, typical, high}.
+    assumption: bool = False
+    bands: dict[str, Any] | None = None
 
     def with_usage(self, usage: Usage) -> Entry:
         return replace(self, usage=usage)
+
+    def usage_assumption(self) -> dict[str, Any] | None:
+        """This entry's usage-assumption descriptor for the cost result, or None
+        if it's a deterministic entry."""
+        if not self.assumption:
+            return None
+        b = self.bands or {}
+        return {
+            "description": self.description,
+            "dimension": b.get("dimension"),
+            "unit": b.get("unit"),
+            "low": b.get("low"),
+            "typical": b.get("typical"),
+            "high": b.get("high"),
+        }
 
 
 # Accessors for the three usage dimensions (get/set a Range on a Usage).
@@ -114,6 +138,8 @@ def _entry_from_obj(obj: dict[str, Any]) -> Entry:
         divisor=obj.get("divisor"),
         match_query=MatchQuery.of_string(obj["match_query"]),
         usage=_parse_usage(obj.get("usage")),
+        assumption=bool(obj.get("assumption", False)),
+        bands=obj.get("bands"),
     )
 
 
