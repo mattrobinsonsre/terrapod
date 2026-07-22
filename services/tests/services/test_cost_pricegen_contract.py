@@ -154,6 +154,11 @@ _ROWS = [
     "Container Registry,Container Registry,type=azurerm_container_registry&values.sku=Premium,service_provider=azure&purchase_option=on_demand&region=eastus&service_class=registry&start_usage_amount=0&end_usage_amount=Inf,1.6666,t,USD",
     # Cloud Pub/Sub (#1019) — message throughput $40/TiB (band), global.
     "Cloud Pub/Sub,Message Delivery Basic,type=google_pubsub_topic,service_provider=gcp&purchase_option=on_demand&service_class=throughput&start_usage_amount=0&end_usage_amount=Inf,40.0000000000,d,USD",
+    # Cloud SQL (#1021) — COMPUTED: db-custom-N-M -> N vCPU ($0.0413/hr) +
+    # M/1024 GiB RAM ($0.007/GiB-hr) + storage ($0.17/GiB-mo). Zonal PostgreSQL.
+    "Cloud SQL,vCPU,type=google_sql_database_instance,service_provider=gcp&purchase_option=on_demand&region=us-central1&service_class=vcpu&start_usage_amount=0&end_usage_amount=Inf,0.0413000000,t,USD",
+    "Cloud SQL,RAM,type=google_sql_database_instance,service_provider=gcp&purchase_option=on_demand&region=us-central1&service_class=ram&start_usage_amount=0&end_usage_amount=Inf,0.0070000000,t,USD",
+    "Cloud SQL,Storage,type=google_sql_database_instance,service_provider=gcp&purchase_option=on_demand&region=us-central1&service_class=storage,0.1700000000,a=values.settings.disk_size,USD",
 ]
 
 
@@ -1256,6 +1261,42 @@ def test_gcp_pubsub_topic_throughput_band():
     )
     d = estimate(plan, _sheet()).to_dict()
     assert d["resources"][0]["monthly"]["max"] == pytest.approx(40.0, abs=0.01)
+
+
+def test_cloud_sql_computed_from_db_custom_tier():
+    """google_sql_database_instance is COMPUTED: the db-custom-N-M tier string is
+    parsed to N vCPUs + M/1024 GiB RAM (each priced per-hour), plus storage.
+    db-custom-2-7680 + 100 GB = 2*0.0413*730 + 7.5*0.007*730 + 100*0.17. (#1021)"""
+    plan = {
+        "format_version": "1.2",
+        "terraform_version": "1.9.0",
+        "planned_values": {
+            "root_module": {
+                "resources": [
+                    {
+                        "address": "google_sql_database_instance.db",
+                        "type": "google_sql_database_instance",
+                        "name": "db",
+                        "mode": "managed",
+                        "values": {
+                            "region": "us-central1",
+                            "database_version": "POSTGRES_15",
+                            "settings": [
+                                {
+                                    "tier": "db-custom-2-7680",
+                                    "disk_size": 100,
+                                    "availability_type": "ZONAL",
+                                }
+                            ],
+                        },
+                    }
+                ]
+            }
+        },
+    }
+    d = estimate(plan, _sheet()).to_dict()
+    expected = 2 * 0.0413 * 730 + 7.5 * 0.007 * 730 + 100 * 0.17
+    assert d["resources"][0]["monthly"]["max"] == pytest.approx(expected, abs=0.05)
 
 
 def test_ec2_instance_prices():
