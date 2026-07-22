@@ -380,5 +380,16 @@
     "usage": {
       "time": 730
     }
+  },
+  {
+    "description": "GCP persistent disk",
+    "match_query": "type = google_compute_disk and service_class = storage"
+  },
+  {
+    "description": "GCP static IP hours (reserved)",
+    "match_query": "type = google_compute_address and service_class = hours",
+    "usage": {
+      "time": 730
+    }
   }
 ]

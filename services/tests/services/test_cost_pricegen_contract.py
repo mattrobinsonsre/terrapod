@@ -54,6 +54,11 @@ _ROWS = [
     # per-vCPU-core + per-GiB-RAM rates (n2-standard-4 = 4*core + 16*ram). Region
     # is derived from the resource's `zone`.
     "Compute Engine,Compute Instance,type=google_compute_instance&values.machine_type=n2-standard-4,service_provider=gcp&purchase_option=on_demand&region=us-central1&service_class=instance&start_usage_amount=0&end_usage_amount=Inf,0.1942360000,t,USD",
+    # GCP persistent disk (#991) — per GiB-month by type, priced a=values.size.
+    # pd-ssd $0.17, pd-standard $0.04. Static IP $0.01/hr.
+    "Compute Engine,SSD backed PD Capacity,type=google_compute_disk&values.type=pd-ssd,service_provider=gcp&purchase_option=on_demand&region=us-central1&service_class=storage,0.1700000000,a=values.size,USD",
+    "Compute Engine,Storage PD Capacity,type=google_compute_disk&values.type=pd-standard,service_provider=gcp&purchase_option=on_demand&region=us-central1&service_class=storage,0.0400000000,a=values.size,USD",
+    "Compute Engine,Static Ip Charge,type=google_compute_address,service_provider=gcp&purchase_option=on_demand&region=us-central1&service_class=hours&start_usage_amount=0&end_usage_amount=Inf,0.0100000000,t,USD",
     # SQS — first request tier for a standard (fifo=false) and a FIFO queue. The
     # CORRECT mapping: FIFO is pricier ($0.50/M) than Standard ($0.40/M); oiq has
     # these inverted, so this row set deliberately does NOT match oiq.
@@ -810,6 +815,37 @@ def test_azure_windows_vm_and_public_ip():
         730 * 0.188, abs=0.01
     )
     assert by["azurerm_public_ip.ip"]["monthly"]["max"] == pytest.approx(730 * 0.005, abs=0.01)
+
+
+def test_gcp_disk_and_static_ip():
+    """GCP persistent disk prices by type at a=values.size (region from `zone`);
+    a static IP is a deterministic hourly reserved charge. (#991)"""
+    plan = _plan(
+        [
+            {
+                "address": "google_compute_disk.d",
+                "type": "google_compute_disk",
+                "name": "d",
+                "mode": "managed",
+                "values": {"zone": "us-central1-a", "type": "pd-ssd", "size": 100},
+            },
+            {
+                "address": "google_compute_address.ip",
+                "type": "google_compute_address",
+                "name": "ip",
+                "mode": "managed",
+                "values": {"region": "us-central1"},
+            },
+        ]
+    )
+    d = estimate(plan, _sheet()).to_dict()
+    by = {r["address"]: r for r in d["resources"]}
+    assert by["google_compute_disk.d"]["monthly"]["max"] == pytest.approx(
+        100 * 0.17, abs=0.01
+    )  # $17
+    assert by["google_compute_address.ip"]["monthly"]["max"] == pytest.approx(
+        730 * 0.01, abs=0.01
+    )  # $7.30
 
 
 def test_ec2_instance_prices():

@@ -1,0 +1,29 @@
+# GCP persistent disk -> google_compute_disk. Priced per GiB-month by disk type,
+# deterministic (size is a plan attribute). Three common types, each a distinct
+# Cloud Billing SKU description: pd-standard ($0.04), pd-balanced ($0.10),
+# pd-ssd ($0.17). We stamp the Terraform `type` (via const) to keep the rows
+# distinct and price with `a=values.size` (size GiB × per-GiB rate). Region is
+# emitted from the SKU's region attr; the consumer resolves google_compute_disk
+# region from its `zone`. pd-extreme / regional / hyperdisk are follow-ups.
+resource_type: google_compute_disk
+service: Compute Engine
+
+components:
+  - product_family: "^Storage PD Capacity$"
+    service_class: storage
+    match: { type: { const: pd-standard } }
+    pricing: { region: { attr: region } }
+    price: { type: "a=values.size", unit: GiBy.mo }
+    tier: usage
+  - product_family: "^Balanced PD Capacity$"
+    service_class: storage
+    match: { type: { const: pd-balanced } }
+    pricing: { region: { attr: region } }
+    price: { type: "a=values.size", unit: GiBy.mo }
+    tier: usage
+  - product_family: "^SSD backed PD Capacity$"
+    service_class: storage
+    match: { type: { const: pd-ssd } }
+    pricing: { region: { attr: region } }
+    price: { type: "a=values.size", unit: GiBy.mo }
+    tier: usage

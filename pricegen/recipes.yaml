@@ -28,6 +28,14 @@ recipes:
     recipe: google_compute_instance
     offer: .cache/gcp-compute.json
     fetch: { service_id: "6F81-5844-456A" } # Compute Engine
+  - provider: gcp
+    recipe: google_compute_disk
+    offer: .cache/gcp-compute.json
+    fetch: { service_id: "6F81-5844-456A" } # Compute Engine
+  - provider: gcp
+    recipe: google_compute_address
+    offer: .cache/gcp-compute.json
+    fetch: { service_id: "6F81-5844-456A" } # Compute Engine
   - provider: aws
     recipe: aws_sqs_queue
     offer: .cache/sqs-us-east-1.json
