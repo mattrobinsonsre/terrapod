@@ -476,5 +476,16 @@
     "usage": {
       "time": 730
     }
+  },
+  {
+    "description": "Kinesis provisioned shards",
+    "match_query": "type = aws_kinesis_stream and service_class = shards",
+    "usage": {
+      "time": 730
+    },
+    "count": {
+      "attr": "values.shard_count",
+      "default": 1
+    }
   }
 ]

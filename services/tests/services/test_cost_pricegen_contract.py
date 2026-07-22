@@ -131,6 +131,8 @@ _ROWS = [
     "Cloud Storage,Standard Storage US Regional,type=google_storage_bucket&values.storage_class=STANDARD,service_provider=gcp&purchase_option=on_demand&region=us-central1&service_class=storage&start_usage_amount=0&end_usage_amount=Inf,0.0200000000,d,USD",
     # GKE cluster (#1001) — $0.10/hr management fee, global (no region).
     "Kubernetes Engine,Zonal Kubernetes Clusters,type=google_container_cluster,service_provider=gcp&purchase_option=on_demand&service_class=hours&start_usage_amount=0&end_usage_amount=Inf,0.1000000000,t,USD",
+    # Kinesis (#1003) — per shard-hour $0.015, scaled by shard_count (count-multiply).
+    "AmazonKinesis,Kinesis Streams,type=aws_kinesis_stream,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=shards&start_usage_amount=0&end_usage_amount=Inf,0.0150000000,t,USD",
 ]
 
 
@@ -1052,6 +1054,24 @@ def test_gke_cluster_management_fee():
     )
     d = estimate(plan, _sheet()).to_dict()
     assert d["resources"][0]["monthly"]["max"] == pytest.approx(730 * 0.1, abs=0.01)
+
+
+def test_kinesis_stream_scales_with_shard_count():
+    """aws_kinesis_stream prices per shard-hour ($0.015) scaled by shard_count
+    via count-multiply: 4 shards = 4 * 730 * 0.015 = $43.80. (#1003)"""
+    plan = _plan(
+        [
+            {
+                "address": "aws_kinesis_stream.s",
+                "type": "aws_kinesis_stream",
+                "name": "s",
+                "mode": "managed",
+                "values": {"region": "us-east-1", "shard_count": 4},
+            }
+        ]
+    )
+    d = estimate(plan, _sheet()).to_dict()
+    assert d["resources"][0]["monthly"]["max"] == pytest.approx(4 * 730 * 0.015, abs=0.01)
 
 
 def test_ec2_instance_prices():

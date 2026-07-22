@@ -1,0 +1,14 @@
+# Kinesis -> aws_kinesis_stream (PROVISIONED mode). Priced per shard-hour
+# ($0.015), scaled by shard_count via the count-multiply feature. The
+# Extended-ShardHour ($0.02, >24h retention) surcharge and the PUT payload-unit
+# charge are follow-ups; on-demand streams (no shard_count) price a single shard
+# here. From the AmazonKinesis offer.
+resource_type: aws_kinesis_stream
+service: AmazonKinesis
+
+components:
+  - product_family: "^Kinesis Streams$"
+    service_class: shards
+    select: { usagetype: { regex: "Storage-ShardHour$" } }
+    price: { type: t, unit: ShardHour }
+    tier: usage
