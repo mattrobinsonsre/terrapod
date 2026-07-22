@@ -509,5 +509,15 @@
       "typical": 100,
       "high": 100000
     }
+  },
+  {
+    "description": "Azure managed disk (per-size tier)",
+    "match_query": "type = azurerm_managed_disk and service_class = disk",
+    "usage": {
+      "operations": 1
+    },
+    "size_tier": {
+      "attr": "values.disk_size_gb"
+    }
   }
 ]

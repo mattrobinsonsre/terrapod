@@ -78,6 +78,13 @@ class Entry:
     # {attr: "values.num_cache_nodes", default: 1}. Absent/unset ⇒ factor 1 (the
     # common single-unit case), so existing entries are unchanged.
     count: dict[str, Any] | None = None
+    # A component priced by a FIXED per-size TIER — an Azure managed disk's cost
+    # is a flat monthly fee for the tier its ``disk_size_gb`` falls into (P10 =
+    # up to 128 GiB = $19.71/mo), not a per-GB rate. ``size_tier`` names the
+    # size attribute; the pricer keeps only the product whose ``tier_max_gb``
+    # pricing dim is the smallest that is ≥ the resource's size, then charges it
+    # flat (usage = 1). Shape: {attr: "values.disk_size_gb"}. Unset ⇒ no tiering.
+    size_tier: dict[str, Any] | None = None
 
     def with_usage(self, usage: Usage) -> Entry:
         return replace(self, usage=usage)
@@ -148,6 +155,7 @@ def _entry_from_obj(obj: dict[str, Any]) -> Entry:
         assumption=bool(obj.get("assumption", False)),
         bands=obj.get("bands"),
         count=obj.get("count"),
+        size_tier=obj.get("size_tier"),
     )
 
 
