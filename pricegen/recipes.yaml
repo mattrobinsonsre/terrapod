@@ -36,3 +36,28 @@ recipes:
     recipe: aws_dynamodb_table
     offer: .cache/ddb-us-east-1.json
     fetch: { service_code: AmazonDynamoDB, region: us-east-1 }
+  # EC2 + EBS come from the ~450 MB AmazonEC2 offer, so their fetch blocks carry
+  # `families` (+ `keep_attrs` for the huge Compute Instance family) — fetch_offers
+  # stream-filters the offer with ijson to a small compact offer at flat RAM, and
+  # the shared download is cached so the 450 MB is pulled once for both.
+  - provider: aws
+    recipe: aws_instance
+    offer: .cache/ec2-instance-us-east-1.json
+    fetch:
+      service_code: AmazonEC2
+      region: us-east-1
+      families: [Compute Instance]
+      keep_attrs:
+        operatingSystem: [Linux, Windows]
+        tenancy: [Shared]
+        capacitystatus: [Used]
+        marketoption: [OnDemand]
+        preInstalledSw: ["NA"]
+        licenseModel: ["No License required"]
+  - provider: aws
+    recipe: aws_ebs_volume
+    offer: .cache/ec2-ebs-us-east-1.json
+    fetch:
+      service_code: AmazonEC2
+      region: us-east-1
+      families: [Storage, System Operation]
