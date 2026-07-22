@@ -72,6 +72,9 @@ _ROWS = [
     "AmazonDynamoDB,Amazon DynamoDB PayPerRequest Throughput,type=aws_dynamodb_table,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=requests&request_type=read&table_class=standard&start_usage_amount=0&end_usage_amount=Inf,0.0000001250,o,USD",
     "AmazonDynamoDB,Amazon DynamoDB PayPerRequest Throughput,type=aws_dynamodb_table,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=requests&request_type=write&table_class=standard&start_usage_amount=0&end_usage_amount=Inf,0.0000006250,o,USD",
     "AmazonDynamoDB,Database Storage,type=aws_dynamodb_table,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=storage&table_class=standard&start_usage_amount=0&end_usage_amount=Inf,0.2500000000,d,USD",
+    # EBS gp3 storage — priced a=values.size. From the ~450 MB EC2 offer, now in
+    # the published sheet via the ijson stream-filter (#893).
+    "AmazonEC2,Storage,type=aws_ebs_volume&values.type=gp3,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=storage,0.0800000000,a=values.size,USD",
 ]
 
 
@@ -449,6 +452,24 @@ def test_dynamodb_table_read_write_storage():
     expected = 80_000_000 * 0.000000125 + 16_000_000 * 0.000000625 + 80 * 0.25
     assert est.resources[0].monthly_min == pytest.approx(expected, abs=0.01)  # $40.00
     assert est.unpriced == []
+
+
+def test_ebs_gp3_volume_prices_by_size():
+    """aws_ebs_volume gp3 storage is priced a=values.size (rate x the volume's
+    size attr). Now in the published sheet via the EC2-offer stream-filter."""
+    plan = _plan(
+        [
+            {
+                "address": "aws_ebs_volume.d",
+                "type": "aws_ebs_volume",
+                "name": "d",
+                "mode": "managed",
+                "values": {"type": "gp3", "size": 100, "region": "us-east-1"},
+            }
+        ]
+    )
+    est = estimate(plan, _sheet())
+    assert est.resources[0].monthly_min == pytest.approx(100 * 0.08, abs=0.01)  # $8.00
 
 
 def test_ec2_instance_prices():

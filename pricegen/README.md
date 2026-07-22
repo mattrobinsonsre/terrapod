@@ -90,8 +90,13 @@ covers; a future deterministic resolver is a `services/…/cost` enhancement.
 
 ## Running it
 
-Requires `pyyaml`. Offer files are large (one EC2 region ≈ 458 MB) — cached
-under `.cache/` (gitignored).
+Requires `pyyaml` (and `ijson` for the large AmazonEC2 offer). Offer files are
+large (one EC2 region ≈ 458 MB) — cached under `.cache/` (gitignored). The
+fetcher **stream-filters** big offers with ijson to just the families a recipe
+needs, so RAM stays flat (~50 MB) regardless of offer size instead of the
+~2.5 GB a whole-file `json.load` would take; the full 9-recipe publish peaks
+around 270 MB. Recipes whose `fetch:` block has a `families` key take the
+streaming path; the shared EC2 download is cached across recipes in one run.
 
 ```sh
 # fetch one AWS region offer (public, no credentials)
