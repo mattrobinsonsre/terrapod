@@ -100,6 +100,11 @@ _ROWS = [
     # standard mode. r6g.large $0.26 (MySQL/PostgreSQL price identically -> one
     # deduped row keyed on instance_class only).
     "AmazonRDS,Database Instance,type=aws_rds_cluster_instance&values.instance_class=db.r6g.large,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=instance&start_usage_amount=0&end_usage_amount=Inf,0.2600000000,t,USD",
+    # Flat-fee count charges (usage=1, deterministic): KMS key $1/mo, Secrets
+    # Manager secret $0.40/mo. SNS publishes $0.50/M (usage-driven band).
+    "AWSKMS,Encryption Key,type=aws_kms_key,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=keys&start_usage_amount=0&end_usage_amount=Inf,1.0000000000,o,USD",
+    "AWSSecretsManager,Secret,type=aws_secretsmanager_secret,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=secrets&start_usage_amount=0&end_usage_amount=Inf,0.4000000000,o,USD",
+    "AmazonSNS,API Request,type=aws_sns_topic,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=requests&start_usage_amount=0&end_usage_amount=Inf,0.0000005000,o,USD",
 ]
 
 
@@ -730,6 +735,48 @@ def test_aurora_cluster_instance_prices_deterministically():
     r = d["resources"][0]
     assert r["monthly"]["max"] == pytest.approx(730 * 0.26, abs=0.01)  # $189.80
     assert "usage_assumptions" not in r  # deterministic
+
+
+def test_flat_fee_resources_price_deterministically():
+    """Flat monthly per-resource fees (KMS key $1, Secrets Manager secret $0.40)
+    price at usage=1 with no engine change and no usage band. (#893/#987)"""
+    for rtype, expected in [("aws_kms_key", 1.0), ("aws_secretsmanager_secret", 0.40)]:
+        plan = _plan(
+            [
+                {
+                    "address": f"{rtype}.x",
+                    "type": rtype,
+                    "name": "x",
+                    "mode": "managed",
+                    "values": {"region": "us-east-1"},
+                }
+            ]
+        )
+        d = estimate(plan, _sheet()).to_dict()
+        r = d["resources"][0]
+        assert r["monthly"]["max"] == pytest.approx(expected, abs=0.001), rtype
+        assert "usage_assumptions" not in r  # deterministic
+
+
+def test_sns_topic_usage_driven_publishes_band():
+    """aws_sns_topic: per-publish requests ($0.50/M), usage-driven band; the
+    account-wide 1M free tier is not applied per-topic. (#987)"""
+    plan = _plan(
+        [
+            {
+                "address": "aws_sns_topic.t",
+                "type": "aws_sns_topic",
+                "name": "t",
+                "mode": "managed",
+                "values": {"region": "us-east-1"},
+            }
+        ]
+    )
+    d = estimate(plan, _sheet()).to_dict()
+    r = d["resources"][0]
+    assert r["monthly"]["max"] == pytest.approx(5_000_000 * 0.0000005, abs=0.01)  # $2.50
+    pub = {ua["dimension"]: ua for ua in r["usage_assumptions"]}["publishes"]
+    assert pub["cost_high"] == pytest.approx(1_000_000_000 * 0.0000005, abs=0.5)  # $500
 
 
 def test_ec2_instance_prices():

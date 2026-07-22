@@ -1,0 +1,20 @@
+# SNS -> aws_sns_topic. Per-publish request pricing ($0.50 per million,
+# usage-driven so it carries a band). The first 1M requests/month are an
+# account-wide free tier ($0 SKU dropped by the adapter); consistent with our
+# Lambda/DynamoDB treatment we do NOT apply that free tier per-topic
+# (tier_bounds start:0 bills from the first request). Message DELIVERY charges
+# (HTTP/email/SMS — SMS especially varies by destination) are a separate concern
+# and out of scope here. From the small AmazonSNS offer.
+resource_type: aws_sns_topic
+service: AmazonSNS
+
+components:
+  - product_family: "^API Request$"
+    service_class: requests
+    select: { group: SNS-Requests-Tier1 }
+    price: { type: o, unit: Requests }
+    tier: usage
+    tier_bounds:
+      - when: { group: SNS-Requests-Tier1 }
+        start: "0"
+        end: Inf

@@ -101,3 +101,15 @@ recipes:
     recipe: aws_rds_cluster_instance
     offer: .cache/rds-us-east-1.json
     fetch: { service_code: AmazonRDS, region: us-east-1 }
+  - provider: aws
+    recipe: aws_kms_key
+    offer: .cache/kms-us-east-1.json
+    fetch: { service_code: awskms, region: us-east-1 }
+  - provider: aws
+    recipe: aws_secretsmanager_secret
+    offer: .cache/secretsmanager-us-east-1.json
+    fetch: { service_code: AWSSecretsManager, region: us-east-1 }
+  - provider: aws
+    recipe: aws_sns_topic
+    offer: .cache/sns-us-east-1.json
+    fetch: { service_code: AmazonSNS, region: us-east-1 }

@@ -1,0 +1,13 @@
+# KMS -> aws_kms_key. A customer-managed key is a flat $1/month per key
+# (Encryption Key family). Deterministic — one key per resource, no usage guess.
+# Modeled as a count charge (price_type `o`) with a fixed usage of 1 key. Request
+# charges ($0.03/10k) are a separate usage concern and out of scope here.
+resource_type: aws_kms_key
+service: AWSKMS
+
+components:
+  - product_family: "^Encryption Key$"
+    service_class: keys
+    select: { usagetype: { regex: "KMS-Keys$" } }
+    price: { type: o, unit: Keys }
+    tier: usage

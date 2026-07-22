@@ -337,5 +337,34 @@
     "usage": {
       "time": 730
     }
+  },
+  {
+    "description": "KMS customer-managed key",
+    "match_query": "type = aws_kms_key and service_class = keys",
+    "usage": {
+      "operations": 1
+    }
+  },
+  {
+    "description": "Secrets Manager secret",
+    "match_query": "type = aws_secretsmanager_secret and service_class = secrets",
+    "usage": {
+      "operations": 1
+    }
+  },
+  {
+    "description": "SNS publishes",
+    "match_query": "type = aws_sns_topic and service_class = requests",
+    "usage": {
+      "operations": 5000000
+    },
+    "assumption": true,
+    "bands": {
+      "dimension": "publishes",
+      "unit": "requests/month",
+      "low": 100000,
+      "typical": 5000000,
+      "high": 1000000000
+    }
   }
 ]
