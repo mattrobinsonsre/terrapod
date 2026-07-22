@@ -1,0 +1,13 @@
+# GCP static IP -> google_compute_address. A reserved static external IPv4 is
+# $0.01/hr (Static Ip Charge). Deterministic. (An in-use external IP on a
+# running VM is billed under a different, near-free meter; we price the reserved
+# static-IP rate, the clearest google_compute_address cost.)
+resource_type: google_compute_address
+service: Compute Engine
+
+components:
+  - product_family: "^Static Ip Charge$"
+    service_class: hours
+    pricing: { region: { attr: region } }
+    price: { type: t, unit: h }
+    tier: usage

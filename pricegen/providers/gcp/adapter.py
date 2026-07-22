@@ -37,12 +37,19 @@ def _rate(sku: dict) -> str | None:
     if not infos:
         return None
     tiers = infos[0].get("pricingExpression", {}).get("tieredRates") or []
-    if not tiers:
-        return None
-    up = tiers[0].get("unitPrice", {})
-    units = int(up.get("units", "0") or 0)
-    nanos = up.get("nanos", 0)
-    return f"{units + nanos / 1e9:.10f}"
+    # Take the first tier with a NON-ZERO unit price. Many GCP SKUs lead with a
+    # $0 tier that encodes an always-free allotment (e.g. pd-standard's first
+    # 30 GiB, a static IP's first hour) before the real marginal rate kicks in.
+    # We bill the marginal rate from unit 0 — i.e. we do NOT apply the
+    # account-wide free tier per-resource, exactly as we drop AWS/Azure free
+    # tiers. An all-zero SKU returns None (skipped, like the AWS $0-skip). This
+    # leaves single-tier SKUs (compute Core/Ram, SSD/Balanced PD) unchanged.
+    for t in tiers:
+        up = t.get("unitPrice", {})
+        val = int(up.get("units", "0") or 0) + up.get("nanos", 0) / 1e9
+        if val > 0:
+            return f"{val:.10f}"
+    return None
 
 
 def iter_units(offer: dict, *, term: str = "OnDemand"):
