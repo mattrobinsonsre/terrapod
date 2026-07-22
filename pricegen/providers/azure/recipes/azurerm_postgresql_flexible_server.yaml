@@ -1,0 +1,25 @@
+# Azure PostgreSQL Flexible Server -> azurerm_postgresql_flexible_server.
+# COMPUTED per vCore-hour, and the rate depends on the TIER (General Purpose
+# $0.089, Memory Optimized $0.125) — both of which are encoded in the compound
+# `sku_name` ("GP_Standard_D4s_v3"). The vCore count is parsed from sku_name by
+# the count feature; the tier is DERIVED into values.sku_tier
+# (resource_derivations.json) so the per-tier rate rows match. We pin the
+# current-gen v5 series as the representative rate per tier. Burstable, storage
+# (storage_mb -> GB needs an a= divisor), IOPS, and HA/read-replicas are
+# follow-ups. From the Azure Database for PostgreSQL offer.
+resource_type: azurerm_postgresql_flexible_server
+service: Azure Database for PostgreSQL
+
+components:
+  - product_family: "^Azure Database for PostgreSQL$"
+    service_class: vcore
+    select:
+      productName: { regex: "(General Purpose Ddsv5|Memory Optimized Edsv5) Series Compute$" }
+      skuName: vCore
+    match:
+      sku_tier:
+        attr: productName
+        regex: "(General Purpose|Memory Optimized)"
+        map: { "General Purpose": general_purpose, "Memory Optimized": memory_optimized }
+    price: { type: t, unit: "1 Hour" }
+    tier: usage

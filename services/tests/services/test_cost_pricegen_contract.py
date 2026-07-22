@@ -159,6 +159,11 @@ _ROWS = [
     "Cloud SQL,vCPU,type=google_sql_database_instance,service_provider=gcp&purchase_option=on_demand&region=us-central1&service_class=vcpu&start_usage_amount=0&end_usage_amount=Inf,0.0413000000,t,USD",
     "Cloud SQL,RAM,type=google_sql_database_instance,service_provider=gcp&purchase_option=on_demand&region=us-central1&service_class=ram&start_usage_amount=0&end_usage_amount=Inf,0.0070000000,t,USD",
     "Cloud SQL,Storage,type=google_sql_database_instance,service_provider=gcp&purchase_option=on_demand&region=us-central1&service_class=storage,0.1700000000,a=values.settings.disk_size,USD",
+    # Azure PostgreSQL Flexible Server (#1023) — COMPUTED per vCore, rate by TIER
+    # (GP $0.089 / MO $0.125). The tier is DERIVED into values.sku_tier from the
+    # sku_name (resource_derivations.json); the vCore count is parsed from it too.
+    "Azure Database for PostgreSQL,Azure Database for PostgreSQL,type=azurerm_postgresql_flexible_server&values.sku_tier=general_purpose,service_provider=azure&purchase_option=on_demand&region=eastus&service_class=vcore&start_usage_amount=0&end_usage_amount=Inf,0.089,t,USD",
+    "Azure Database for PostgreSQL,Azure Database for PostgreSQL,type=azurerm_postgresql_flexible_server&values.sku_tier=memory_optimized,service_provider=azure&purchase_option=on_demand&region=eastus&service_class=vcore&start_usage_amount=0&end_usage_amount=Inf,0.125,t,USD",
 ]
 
 
@@ -1297,6 +1302,37 @@ def test_cloud_sql_computed_from_db_custom_tier():
     d = estimate(plan, _sheet()).to_dict()
     expected = 2 * 0.0413 * 730 + 7.5 * 0.007 * 730 + 100 * 0.17
     assert d["resources"][0]["monthly"]["max"] == pytest.approx(expected, abs=0.05)
+
+
+def test_azure_postgres_flexible_computed_by_tier_and_vcore():
+    """azurerm_postgresql_flexible_server is COMPUTED per vCore, and the rate
+    depends on the TIER — both encoded in the sku_name. resource_derivations
+    turns sku_name into values.sku_tier so the GP ($0.089) vs MO ($0.125) rate
+    matches; the vCore count is parsed from sku_name too. (#1023)"""
+
+    def plan(sku):
+        return {
+            "format_version": "1.2",
+            "terraform_version": "1.9.0",
+            "planned_values": {
+                "root_module": {
+                    "resources": [
+                        {
+                            "address": "azurerm_postgresql_flexible_server.db",
+                            "type": "azurerm_postgresql_flexible_server",
+                            "name": "db",
+                            "mode": "managed",
+                            "values": {"location": "eastus", "sku_name": sku},
+                        }
+                    ]
+                }
+            },
+        }
+
+    d = estimate(plan("GP_Standard_D4s_v3"), _sheet()).to_dict()
+    assert d["resources"][0]["monthly"]["max"] == pytest.approx(4 * 0.089 * 730, abs=0.05)
+    d = estimate(plan("MO_Standard_E8s_v3"), _sheet()).to_dict()
+    assert d["resources"][0]["monthly"]["max"] == pytest.approx(8 * 0.125 * 730, abs=0.05)
 
 
 def test_ec2_instance_prices():

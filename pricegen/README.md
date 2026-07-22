@@ -137,4 +137,5 @@ operators mirror it as today. Weekly regeneration is the target cadence.
 - [x] Count-multiply engine feature (a component's cost × a resource attribute) + `aws_elasticache_cluster` (per-node × num_cache_nodes, by node_type + engine)
 - [ ] More AWS breadth (Route53 + CloudFront [global offers], Kinesis [count-multiply], CloudWatch) + all-regions + a row-parity CI gate
 - [x] Cloud SQL (`google_sql_database_instance`): db-custom-N-M COMPUTED (vCPU + RAM parsed from the tier) + storage (Zonal PostgreSQL/MySQL)
-- [ ] Azure DB (mssql/postgresql sku_name parse); Regional-HA + predefined Cloud SQL tiers
+- [x] Azure `azurerm_postgresql_flexible_server` (COMPUTED per vCore, tier derived from sku_name via resource_derivations)
+- [ ] Azure `azurerm_mssql_database` (same pattern); Regional-HA + predefined Cloud SQL tiers

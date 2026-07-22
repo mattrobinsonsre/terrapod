@@ -56,22 +56,35 @@ def iter_units(offer: dict, *, term: str = "Consumption"):
         # size's price. Mirrors the AWS adapter skipping items with no USD price.
         if usd is None or usd == 0:
             continue
-        # Include armRegionName: Azure reuses a meterId ACROSS regions, so
-        # grouping by meterId alone would merge every region's copy of a single-
-        # tier meter and set their ends to each other (a bogus [0,0] tier). Each
-        # (meter, type, term, region) is its own independent tier ladder.
+        # A tiered meter's tiers share every descriptor and differ only in
+        # tierMinimumUnits. `meterId` is NOT a reliable tier-ladder key: Azure
+        # reuses one meterId across regions AND across skuNames (e.g. blob "Data
+        # Stored" shares a meterId over Hot LRS / GRS / ZRS). So key on the full
+        # meter identity — grouping by meterId would merge unrelated meters and
+        # then either fabricate a [0,0] tier or drop rows in the dedup below.
         key = (
-            item.get("meterId") or item.get("meterName"),
+            item.get("meterName", ""),
+            item.get("skuName", ""),
+            item.get("productName", ""),
             item.get("type", ""),
             item.get("reservationTerm", ""),
             item.get("armRegionName", ""),
         )
         groups[key].append(item)
 
-    for items in groups.values():
+    for group in groups.values():
         # tierMinimumUnits is a float (0.0, 51200.0, …); sort ascending so the
         # end boundary is the next tier's start.
-        items.sort(key=lambda i: float(i.get("tierMinimumUnits", 0) or 0))
+        group.sort(key=lambda i: float(i.get("tierMinimumUnits", 0) or 0))
+        # Dedup consecutive same-tier entries: the retail feed sometimes lists a
+        # meter twice at the same tierMinimumUnits, which would otherwise make a
+        # zero-width [start, start] tier that prices to $0.
+        items: list[dict] = []
+        for it in group:
+            t = float(it.get("tierMinimumUnits", 0) or 0)
+            if items and float(items[-1].get("tierMinimumUnits", 0) or 0) == t:
+                continue
+            items.append(it)
         for idx, item in enumerate(items):
             begin = int(float(item.get("tierMinimumUnits", 0) or 0))
             end = (
