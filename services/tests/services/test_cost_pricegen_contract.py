@@ -89,6 +89,9 @@ _ROWS = [
     "AmazonEC2,Load Balancer-Application,type=aws_lb&values.load_balancer_type=application,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=lcu&start_usage_amount=0&end_usage_amount=Inf,0.0080000000,t,USD",
     "AmazonEC2,Load Balancer-Network,type=aws_lb&values.load_balancer_type=network,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=hours&start_usage_amount=0&end_usage_amount=Inf,0.0225000000,t,USD",
     "AmazonEC2,Load Balancer-Network,type=aws_lb&values.load_balancer_type=network,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=lcu&start_usage_amount=0&end_usage_amount=Inf,0.0060000000,t,USD",
+    # Classic ELB (aws_elb) — deterministic hour + usage-driven data processed.
+    "AmazonEC2,Load Balancer,type=aws_elb,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=hours&start_usage_amount=0&end_usage_amount=Inf,0.0250000000,t,USD",
+    "AmazonEC2,Load Balancer,type=aws_elb,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=data&start_usage_amount=0&end_usage_amount=Inf,0.0080000000,d,USD",
 ]
 
 
@@ -624,6 +627,31 @@ def test_nlb_prices_at_the_network_lcu_rate():
     assert r["monthly"]["max"] == pytest.approx(730 * 0.0225 + 1460 * 0.006, abs=0.01)
     lcu = {ua["dimension"]: ua for ua in r["usage_assumptions"]}["capacity units"]
     assert lcu["cost_typical"] == pytest.approx(1460 * 0.006, abs=0.01)
+
+
+def test_classic_elb_hours_plus_data_band():
+    """aws_elb (classic): deterministic hour ($0.025 * 730) + usage-driven data
+    processed band ($0.008/GB). (#893/#979)"""
+    plan = _plan(
+        [
+            {
+                "address": "aws_elb.legacy",
+                "type": "aws_elb",
+                "name": "legacy",
+                "mode": "managed",
+                "values": {"region": "us-east-1"},
+            }
+        ]
+    )
+    d = estimate(plan, _sheet()).to_dict()
+    r = d["resources"][0]
+    # hours 730*0.025 = 18.25 + data typical 500*0.008 = 4.0 -> 22.25
+    assert r["monthly"]["max"] == pytest.approx(730 * 0.025 + 500 * 0.008, abs=0.01)
+    dims = {ua["dimension"]: ua for ua in r["usage_assumptions"]}
+    assert set(dims) == {"data processed"}
+    data = dims["data processed"]
+    assert data["cost_typical"] == pytest.approx(500 * 0.008, abs=0.01)
+    assert data["cost_high"] == pytest.approx(50000 * 0.008, abs=0.01)
 
 
 def test_ec2_instance_prices():

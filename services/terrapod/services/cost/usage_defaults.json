@@ -265,6 +265,28 @@
     }
   },
   {
+    "description": "Classic load balancer hours (always-on)",
+    "match_query": "type = aws_elb and service_class = hours",
+    "usage": {
+      "time": 730
+    }
+  },
+  {
+    "description": "Classic load balancer data processed",
+    "match_query": "type = aws_elb and service_class = data",
+    "usage": {
+      "data": 500
+    },
+    "assumption": true,
+    "bands": {
+      "dimension": "data processed",
+      "unit": "GB/month",
+      "low": 50,
+      "typical": 500,
+      "high": 50000
+    }
+  },
+  {
     "description": "NAT Gateway data processed",
     "match_query": "type = aws_nat_gateway and service_class = data",
     "usage": {
