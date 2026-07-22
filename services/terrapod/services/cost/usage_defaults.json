@@ -585,5 +585,34 @@
       "typical": 1,
       "high": 100
     }
+  },
+  {
+    "description": "Cloud SQL vCPU (from db-custom tier)",
+    "match_query": "type = google_sql_database_instance and service_class = vcpu",
+    "usage": {
+      "time": 730
+    },
+    "count": {
+      "attr": "values.settings.tier",
+      "regex": "db-custom-(\\d+)-",
+      "default": 1
+    }
+  },
+  {
+    "description": "Cloud SQL RAM (from db-custom tier)",
+    "match_query": "type = google_sql_database_instance and service_class = ram",
+    "usage": {
+      "time": 730
+    },
+    "count": {
+      "attr": "values.settings.tier",
+      "regex": "db-custom-\\d+-(\\d+)",
+      "divisor": 1024,
+      "default": 0
+    }
+  },
+  {
+    "description": "Cloud SQL storage",
+    "match_query": "type = google_sql_database_instance and service_class = storage"
   }
 ]

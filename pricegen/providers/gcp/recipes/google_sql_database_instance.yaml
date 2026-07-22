@@ -1,0 +1,30 @@
+# Cloud SQL -> google_sql_database_instance. A COMPUTED, custom-tier model:
+# db-custom-N-M prices as N vCPUs + M/1024 GiB RAM (+ storage). We price the
+# common case — Zonal, Enterprise edition, PostgreSQL/MySQL (which share the
+# same per-vCPU $0.0413/hr and per-GiB-RAM $0.007/hr rates), so the recipe
+# matches on type only (the two engines' identical SKUs dedup). The vCPU and RAM
+# counts are parsed out of the `settings.tier` string (db-custom-N-M) by the
+# count feature. Storage is priced from settings.disk_size at $0.17/GiB-month.
+#
+# Follow-ups: Regional/HA (doubles the rates), SQL Server (pricier), the legacy
+# predefined tiers (db-n1-standard-N) and shared-core (db-f1-micro/db-g1-small),
+# and the newer HyperDisk storage variants. From the Cloud SQL offer.
+resource_type: google_sql_database_instance
+service: Cloud SQL
+
+components:
+  - product_family: '^Cloud SQL for PostgreSQL: Zonal - vCPU in Americas$'
+    service_class: vcpu
+    pricing: { region: { attr: region } }
+    price: { type: t, unit: h }
+    tier: usage
+  - product_family: '^Cloud SQL for PostgreSQL: Zonal - RAM in Americas$'
+    service_class: ram
+    pricing: { region: { attr: region } }
+    price: { type: t, unit: GiBy.h }
+    tier: usage
+  - product_family: '^Cloud SQL for PostgreSQL: Zonal - Standard storage in Americas$'
+    service_class: storage
+    pricing: { region: { attr: region } }
+    price: { type: "a=values.settings.disk_size", unit: GiBy.mo }
+    tier: usage

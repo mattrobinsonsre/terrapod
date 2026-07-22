@@ -136,4 +136,5 @@ operators mirror it as today. Weekly regeneration is the target cadence.
 - [x] AWS breadth: `aws_sqs_queue`, `aws_lambda_function`, `aws_s3_bucket`, `aws_dynamodb_table`, `aws_nat_gateway`, `aws_eip`, `aws_lb` (ALB+NLB), `aws_elb`, `aws_ebs_snapshot`, `aws_efs_file_system`, `aws_kms_key` ($1 flat), `aws_secretsmanager_secret` ($0.40 flat), `aws_sns_topic` (publishes band), `aws_kinesis_stream` (shards × count), `aws_elasticache_cluster` (nodes × count), `aws_api_gateway_rest_api` + `aws_apigatewayv2_api` (tiered request bands) (deterministic + usage-driven, with low/typical/high cost bands)
 - [x] Count-multiply engine feature (a component's cost × a resource attribute) + `aws_elasticache_cluster` (per-node × num_cache_nodes, by node_type + engine)
 - [ ] More AWS breadth (Route53 + CloudFront [global offers], Kinesis [count-multiply], CloudWatch) + all-regions + a row-parity CI gate
-- [ ] Broaden GCP families/regions; Azure managed disks / Windows
+- [x] Cloud SQL (`google_sql_database_instance`): db-custom-N-M COMPUTED (vCPU + RAM parsed from the tier) + storage (Zonal PostgreSQL/MySQL)
+- [ ] Azure DB (mssql/postgresql sku_name parse); Regional-HA + predefined Cloud SQL tiers

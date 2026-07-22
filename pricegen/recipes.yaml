@@ -68,6 +68,10 @@ recipes:
     recipe: google_pubsub_topic
     offer: .cache/gcp-pubsub.json
     fetch: { service_id: "A1E8-BE35-7EBC" } # Cloud Pub/Sub
+  - provider: gcp
+    recipe: google_sql_database_instance
+    offer: .cache/gcp-sql.json
+    fetch: { service_id: "9662-B51E-5089" } # Cloud SQL
   - provider: aws
     recipe: aws_sqs_queue
     offer: .cache/sqs-us-east-1.json

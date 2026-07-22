@@ -14,6 +14,7 @@ filter of the upstream CLI is not needed by Terrapod and is omitted.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field, replace
 
 from terrapod.services.cost import usage as usage_mod
@@ -293,9 +294,14 @@ def _cost_band(
 
 def _count_factor(entry: Entry, resource_ms: MatchSet) -> float:
     """Multiplier for a per-unit component whose quantity scales with a resource
-    attribute — ElastiCache node cost × ``num_cache_nodes``, Kinesis × ``shard_count``.
-    Reads the attribute named by the entry's ``count`` spec; defaults to 1 (the
-    single-unit case) when unset, absent, or unparseable, so nothing regresses."""
+    attribute — ElastiCache node cost × ``num_cache_nodes``, Kinesis ×
+    ``shard_count``, or a value parsed out of a string attribute (Cloud SQL's
+    ``db-custom-N-M`` tier → N vCPUs, M/1024 GiB RAM).
+
+    Spec shape: {attr, default?, regex?, divisor?}. ``regex`` extracts capture
+    group 1 from the attribute string; ``divisor`` scales the result (e.g. RAM
+    MB → GiB). Defaults to 1 (or ``default``) when unset, absent, or
+    unparseable, so nothing regresses."""
     spec = entry.count
     if not spec:
         return 1.0
@@ -306,8 +312,19 @@ def _count_factor(entry: Entry, resource_ms: MatchSet) -> float:
     found = resource_ms.find_by_key(attr)
     if found is None:
         return default
+    raw = found[1]
+    rx = spec.get("regex")
+    if rx:
+        m = re.search(rx, raw)
+        if m is None:
+            return default
+        raw = m.group(1)
+    divisor = float(spec.get("divisor", 1) or 1)
     try:
-        return max(1.0, float(found[1]))
+        # No floor of 1 here: a parsed RAM count can be fractional GiB, and a
+        # count of 0 means the component contributes nothing. Absent/unparseable
+        # still fall back to ``default`` above.
+        return max(0.0, float(raw) / divisor)
     except (ValueError, TypeError):
         return default
 
