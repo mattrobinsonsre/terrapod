@@ -1981,7 +1981,8 @@
       "indicative": "Ramingen zijn indicatief; de werkelijke kosten hangen af van gebruik, regio, verplichtingen en kortingen.",
       "credit": "Kostengegevens van <oiq>OpenInfraQuote</oiq>.",
       "asOfState": "vanaf status v{serial}",
-      "noState": "Nog geen kosten — verschijnt na de eerste toepassing."
+      "noState": "Nog geen kosten — verschijnt na de eerste toepassing.",
+      "usageBand": "{dimension}: {typical} {unit} typisch (bereik {low}–{high})"
     },
     "costAi": {
       "heading": "AI-kostenraming",

@@ -1981,7 +1981,8 @@
       "indicative": "Szacunki mają charakter orientacyjny; rzeczywisty koszt zależy od użycia, regionu, zobowiązań i rabatów.",
       "credit": "Dane o kosztach od <oiq>OpenInfraQuote</oiq>.",
       "asOfState": "według stanu v{serial}",
-      "noState": "Brak kosztu — pojawia się po pierwszym zastosowaniu."
+      "noState": "Brak kosztu — pojawia się po pierwszym zastosowaniu.",
+      "usageBand": "{dimension}: typowo {typical} {unit} (zakres {low}–{high})"
     },
     "costAi": {
       "heading": "Szacunek kosztów AI",

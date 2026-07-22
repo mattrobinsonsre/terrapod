@@ -1981,7 +1981,8 @@
       "indicative": "Estimates are indicative; actual cost depends on usage, region, commitments, and discounts.",
       "credit": "Cost data from <oiq>OpenInfraQuote</oiq>.",
       "asOfState": "as of state v{serial}",
-      "noState": "No cost yet — appears after the first apply, it does."
+      "noState": "No cost yet — appears after the first apply, it does.",
+      "usageBand": "{dimension}: typical {typical} {unit}, it is (range {low}–{high})"
     },
     "costAi": {
       "heading": "estimate, AI cost",

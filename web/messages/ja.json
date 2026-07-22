@@ -1981,7 +1981,8 @@
       "indicative": "見積もりは目安です。実際のコストは使用状況、リージョン、コミットメント、割引によって異なります。",
       "credit": "コストデータの提供元: <oiq>OpenInfraQuote</oiq>。",
       "asOfState": "状態 v{serial} 時点",
-      "noState": "まだコストはありません — 最初の適用後に表示されます。"
+      "noState": "まだコストはありません — 最初の適用後に表示されます。",
+      "usageBand": "{dimension}：標準 {typical} {unit}（範囲 {low}〜{high}）"
     },
     "costAi": {
       "heading": "AI コスト見積もり",

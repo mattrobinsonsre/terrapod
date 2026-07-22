@@ -46,12 +46,26 @@ type workspaceCostDataSourceModel struct {
 }
 
 type costResourceObj struct {
-	Address    types.String  `tfsdk:"address"`
-	Type       types.String  `tfsdk:"type"`
-	Name       types.String  `tfsdk:"name"`
-	Change     types.String  `tfsdk:"change"`
-	MonthlyMin types.Float64 `tfsdk:"monthly_min"`
-	MonthlyMax types.Float64 `tfsdk:"monthly_max"`
+	Address          types.String  `tfsdk:"address"`
+	Type             types.String  `tfsdk:"type"`
+	Name             types.String  `tfsdk:"name"`
+	Change           types.String  `tfsdk:"change"`
+	MonthlyMin       types.Float64 `tfsdk:"monthly_min"`
+	MonthlyMax       types.Float64 `tfsdk:"monthly_max"`
+	UsageAssumptions types.List    `tfsdk:"usage_assumptions"`
+}
+
+// usageAssumptionObj is the low/typical/high usage band assumed for a resource
+// whose cost can't be priced deterministically from state (data processed,
+// invocations, storage). Surfaced raw so the estimate is honest with AI off:
+// the cost assumes `typical`, and could sit anywhere in `low`–`high`.
+type usageAssumptionObj struct {
+	Description types.String  `tfsdk:"description"`
+	Dimension  types.String  `tfsdk:"dimension"`
+	Unit       types.String  `tfsdk:"unit"`
+	Low        types.Float64 `tfsdk:"low"`
+	Typical    types.Float64 `tfsdk:"typical"`
+	High       types.Float64 `tfsdk:"high"`
 }
 
 type unpricedObj struct {
@@ -60,13 +74,23 @@ type unpricedObj struct {
 	Change  types.String `tfsdk:"change"`
 }
 
+var usageAssumptionAttrTypes = map[string]attr.Type{
+	"description": types.StringType,
+	"dimension":   types.StringType,
+	"unit":        types.StringType,
+	"low":         types.Float64Type,
+	"typical":     types.Float64Type,
+	"high":        types.Float64Type,
+}
+
 var costResourceAttrTypes = map[string]attr.Type{
-	"address":     types.StringType,
-	"type":        types.StringType,
-	"name":        types.StringType,
-	"change":      types.StringType,
-	"monthly_min": types.Float64Type,
-	"monthly_max": types.Float64Type,
+	"address":           types.StringType,
+	"type":              types.StringType,
+	"name":              types.StringType,
+	"change":            types.StringType,
+	"monthly_min":       types.Float64Type,
+	"monthly_max":       types.Float64Type,
+	"usage_assumptions": types.ListType{ElemType: types.ObjectType{AttrTypes: usageAssumptionAttrTypes}},
 }
 
 var unpricedAttrTypes = map[string]attr.Type{
@@ -113,6 +137,22 @@ func (d *workspaceCostDataSource) Schema(_ context.Context, _ datasource.SchemaR
 						"change":      schema.StringAttribute{Description: "noop | add | remove.", Computed: true},
 						"monthly_min": schema.Float64Attribute{Description: "Monthly cost, lower bound.", Computed: true},
 						"monthly_max": schema.Float64Attribute{Description: "Monthly cost, upper bound.", Computed: true},
+						"usage_assumptions": schema.ListNestedAttribute{
+							Description: "Usage bands assumed for resources whose cost depends on runtime usage the plan " +
+								"doesn't declare (data processed, invocations, storage). The monthly cost assumes " +
+								"`typical`; the true cost sits somewhere in `low`–`high`. Empty for deterministically-priced resources.",
+							Computed: true,
+							NestedObject: schema.NestedAttributeObject{
+								Attributes: map[string]schema.Attribute{
+									"description": schema.StringAttribute{Description: "Human-readable label for the assumption.", Computed: true},
+									"dimension":   schema.StringAttribute{Description: "What is being metered (e.g. \"data processed\").", Computed: true},
+									"unit":        schema.StringAttribute{Description: "Unit of the band bounds (e.g. \"GB/month\").", Computed: true},
+									"low":         schema.Float64Attribute{Description: "Low-usage bound.", Computed: true},
+									"typical":     schema.Float64Attribute{Description: "Typical (assumed) usage — the point estimate the monthly cost is based on.", Computed: true},
+									"high":        schema.Float64Attribute{Description: "High-usage bound.", Computed: true},
+								},
+							},
+						},
 					},
 				},
 			},
@@ -174,13 +214,27 @@ func (d *workspaceCostDataSource) Read(ctx context.Context, req datasource.ReadR
 
 	resources := make([]costResourceObj, 0, len(est.Resources))
 	for _, r := range est.Resources {
+		bands := make([]usageAssumptionObj, 0, len(r.UsageAssumptions))
+		for _, a := range r.UsageAssumptions {
+			bands = append(bands, usageAssumptionObj{
+				Description: types.StringValue(a.Description),
+				Dimension:   types.StringValue(a.Dimension),
+				Unit:        types.StringValue(a.Unit),
+				Low:         types.Float64Value(a.Low),
+				Typical:     types.Float64Value(a.Typical),
+				High:        types.Float64Value(a.High),
+			})
+		}
+		bandList, diags := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: usageAssumptionAttrTypes}, bands)
+		resp.Diagnostics.Append(diags...)
 		resources = append(resources, costResourceObj{
-			Address:    types.StringValue(r.Address),
-			Type:       types.StringValue(r.Type),
-			Name:       types.StringValue(r.Name),
-			Change:     types.StringValue(r.Change),
-			MonthlyMin: types.Float64Value(r.Monthly.Min),
-			MonthlyMax: types.Float64Value(r.Monthly.Max),
+			Address:          types.StringValue(r.Address),
+			Type:             types.StringValue(r.Type),
+			Name:             types.StringValue(r.Name),
+			Change:           types.StringValue(r.Change),
+			MonthlyMin:       types.Float64Value(r.Monthly.Min),
+			MonthlyMax:       types.Float64Value(r.Monthly.Max),
+			UsageAssumptions: bandList,
 		})
 	}
 	resList, diags := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: costResourceAttrTypes}, resources)

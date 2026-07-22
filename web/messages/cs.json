@@ -1981,7 +1981,8 @@
       "indicative": "Odhady jsou orientační; skutečné náklady závisí na využití, regionu, závazcích a slevách.",
       "credit": "Data o nákladech od <oiq>OpenInfraQuote</oiq>.",
       "asOfState": "dle stavu v{serial}",
-      "noState": "Zatím žádné náklady — zobrazí se po prvním použití."
+      "noState": "Zatím žádné náklady — zobrazí se po prvním použití.",
+      "usageBand": "{dimension}: typicky {typical} {unit} (rozsah {low}–{high})"
     },
     "costAi": {
       "heading": "Odhad nákladů od AI",

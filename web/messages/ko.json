@@ -1981,7 +1981,8 @@
       "indicative": "추정치는 참고용이며, 실제 비용은 사용량, 리전, 약정, 할인에 따라 달라집니다.",
       "credit": "비용 데이터 제공: <oiq>OpenInfraQuote</oiq>.",
       "asOfState": "상태 v{serial} 기준",
-      "noState": "아직 비용이 없습니다 — 첫 적용 후에 표시됩니다."
+      "noState": "아직 비용이 없습니다 — 첫 적용 후에 표시됩니다.",
+      "usageBand": "{dimension}: 일반적으로 {typical} {unit} (범위 {low}–{high})"
     },
     "costAi": {
       "heading": "AI 비용 추정",

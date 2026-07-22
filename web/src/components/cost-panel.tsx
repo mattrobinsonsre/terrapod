@@ -13,7 +13,7 @@
 // Every figure here is DATA — oiq-derived, no AI. The AI enhancement (narrative,
 // savings advisories, chat) is a separate follow-up that rides the plan-analysis
 // AI switch; it renders alongside, clearly flagged, never blended into these.
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import { apiFetch } from '@/lib/api'
 import { LoadingSpinner } from '@/components/loading-spinner'
@@ -24,12 +24,21 @@ interface Range {
   min: number
   max: number
 }
+interface UsageAssumption {
+  description: string
+  dimension: string
+  unit: string
+  low: number
+  typical: number
+  high: number
+}
 interface CostResource {
   address: string
   type: string
   name: string
   change: Change
   monthly: Range
+  usage_assumptions?: UsageAssumption[]
 }
 interface UnpricedResource {
   address: string
@@ -98,6 +107,32 @@ export function CostPanel({ runId, workspaceId }: { runId?: string; workspaceId?
   // A range renders as one figure when min == max, else "min – max".
   const range = (r: Range) => (r.min === r.max ? money(r.min) : `${money(r.min)} – ${money(r.max)}`)
   const perMonth = (r: Range) => t('cost.perMonth', { amount: range(r) })
+
+  // Usage-driven resources (NAT data, Lambda invocations, S3 storage…) can't be
+  // priced deterministically from the plan — the cost depends on runtime usage
+  // the plan doesn't declare. We surface the assumption band directly (not only
+  // to the AI layer, which is optional) so the raw estimate is honest: this cost
+  // assumes `typical`, and could sit anywhere in `low`–`high` (#962).
+  const qty = (n: number) => new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(n)
+  const bandLine = (a: UsageAssumption) =>
+    t('cost.usageBand', {
+      dimension: a.dimension,
+      typical: qty(a.typical),
+      low: qty(a.low),
+      high: qty(a.high),
+      unit: a.unit,
+    })
+  const Bands = ({ list }: { list?: UsageAssumption[] }) =>
+    list && list.length ? (
+      <ul className="mt-1 space-y-0.5">
+        {list.map((a) => (
+          <li key={a.dimension} className="flex items-start gap-1 text-xs text-amber-300/80">
+            <span aria-hidden>≈</span>
+            <span>{bandLine(a)}</span>
+          </li>
+        ))}
+      </ul>
+    ) : null
 
   const priced = est.resources.length
   const unpriced = est.unpriced.length
@@ -186,6 +221,7 @@ export function CostPanel({ runId, workspaceId }: { runId?: string; workspaceId?
                     {perMonth(r.monthly)}
                   </span>
                 </div>
+                <Bands list={r.usage_assumptions} />
               </div>
             ))}
           </div>
@@ -202,28 +238,44 @@ export function CostPanel({ runId, workspaceId }: { runId?: string; workspaceId?
                 </tr>
               </thead>
               <tbody>
-                {est.resources.map((r) => (
-                  <tr key={r.address} className="border-b border-slate-800 last:border-0">
-                    <td className="px-4 py-2 font-mono text-xs text-slate-200" dir="ltr">
-                      {r.address}
-                    </td>
-                    <td className="px-4 py-2 font-mono text-xs text-slate-400" dir="ltr">
-                      {r.type}
-                    </td>
-                    {!isWorkspace && (
-                      <td className="px-4 py-2">
-                        <span
-                          className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${CHANGE_BADGE[r.change]}`}
-                        >
-                          {t(`cost.change.${r.change}`)}
-                        </span>
-                      </td>
-                    )}
-                    <td className="px-4 py-2 text-right tabular-nums text-slate-200" dir="ltr">
-                      {perMonth(r.monthly)}
-                    </td>
-                  </tr>
-                ))}
+                {est.resources.map((r) => {
+                  const bands = r.usage_assumptions
+                  return (
+                    <Fragment key={r.address}>
+                      <tr
+                        className={
+                          bands?.length ? 'border-slate-800' : 'border-b border-slate-800 last:border-0'
+                        }
+                      >
+                        <td className="px-4 py-2 font-mono text-xs text-slate-200" dir="ltr">
+                          {r.address}
+                        </td>
+                        <td className="px-4 py-2 font-mono text-xs text-slate-400" dir="ltr">
+                          {r.type}
+                        </td>
+                        {!isWorkspace && (
+                          <td className="px-4 py-2">
+                            <span
+                              className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${CHANGE_BADGE[r.change]}`}
+                            >
+                              {t(`cost.change.${r.change}`)}
+                            </span>
+                          </td>
+                        )}
+                        <td className="px-4 py-2 text-right tabular-nums text-slate-200" dir="ltr">
+                          {perMonth(r.monthly)}
+                        </td>
+                      </tr>
+                      {bands?.length ? (
+                        <tr className="border-b border-slate-800 last:border-0">
+                          <td colSpan={isWorkspace ? 3 : 4} className="px-4 pb-2">
+                            <Bands list={bands} />
+                          </td>
+                        </tr>
+                      ) : null}
+                    </Fragment>
+                  )
+                })}
               </tbody>
             </table>
           </div>
