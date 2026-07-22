@@ -1,0 +1,15 @@
+# Azure Container Registry -> azurerm_container_registry. A flat per-tier daily
+# fee (Basic/Standard/Premium "Registry Unit"): Premium $1.6666/day, Standard
+# $0.6666, Basic ~$0.167. We match the Terraform `sku` to the skuName and price
+# ~30 days/month. Geo-replication units (Premium) + storage overage are
+# follow-ups. From the Container Registry offer.
+resource_type: azurerm_container_registry
+service: Container Registry
+
+components:
+  - product_family: "^Container Registry$"
+    service_class: registry
+    select: { meterName: { regex: "^(Basic|Standard|Premium) Registry Unit$" } }
+    match: { sku: { attr: skuName } }
+    price: { type: t, unit: "1/Day" }
+    tier: usage

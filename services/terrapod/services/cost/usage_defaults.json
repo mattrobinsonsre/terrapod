@@ -563,5 +563,12 @@
     "usage": {
       "operations": 1
     }
+  },
+  {
+    "description": "Azure Container Registry tier (per day)",
+    "match_query": "type = azurerm_container_registry and service_class = registry",
+    "usage": {
+      "time": 30
+    }
   }
 ]
