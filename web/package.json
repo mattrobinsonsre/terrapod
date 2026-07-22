@@ -50,6 +50,7 @@
   "overrides": {
     "postcss": "^8.5.13",
     "@babel/core": "^7.29.6",
-    "brace-expansion": "^2.0.2"
+    "brace-expansion": "^2.0.2",
+    "sharp": "^0.35.3"
   }
 }
