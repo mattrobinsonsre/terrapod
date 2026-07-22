@@ -1,0 +1,12 @@
+# Cloud DNS -> google_dns_managed_zone. A flat $0.20/month per managed zone
+# (first 25; $0.10 beyond, not applied per-resource). Global. Query charges are
+# a separate usage concern. Modeled as a flat count charge (usage=1). From the
+# Cloud DNS offer.
+resource_type: google_dns_managed_zone
+service: Cloud DNS
+
+components:
+  - product_family: "^ManagedZone$"
+    service_class: zones
+    price: { type: o, unit: mo }
+    tier: usage
