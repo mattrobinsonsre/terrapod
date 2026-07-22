@@ -38,6 +38,17 @@ def iter_units(offer: dict, *, term: str = "Consumption"):
     it's filtered by the recipe's canonical dimension (``type: Consumption``),
     not here — every priced item is yielded and the engine selects.
     """
+    # A tiered meter (e.g. blob "Data Stored": 0 / 50 TB / 500 TB) arrives as
+    # several Items sharing a meterId, differing only in tierMinimumUnits. The
+    # feed gives each tier's START but not its END, so we group by meter and set
+    # each tier's end to the next tier's start (the last is open-ended). Without
+    # this every tier would end at Inf and overlap, double-counting large usage.
+    # Keyed by (meterId, type, reservationTerm) so Consumption tiers never mix
+    # with Reservation ones. Single-tier meters (VMs, IPs, AKS) → one item per
+    # group → end "Inf", exactly as before.
+    from collections import defaultdict
+
+    groups: dict[tuple, list[dict]] = defaultdict(list)
     for item in offer.get("Items", []):
         usd = item.get("unitPrice")
         # A $0 retail price is a feed placeholder (e.g. not-yet-GA meters), not a
@@ -45,13 +56,28 @@ def iter_units(offer: dict, *, term: str = "Consumption"):
         # size's price. Mirrors the AWS adapter skipping items with no USD price.
         if usd is None or usd == 0:
             continue
-        # tierMinimumUnits is a float (0.0, 51200.0, …); the consumer parses tier
-        # bounds with int(), so normalize to an int-string ("0.0" would crash it).
-        begin = str(int(float(item.get("tierMinimumUnits", 0) or 0)))
-        price = Price(
-            usd=str(usd),
-            begin=begin,
-            end="Inf",
-            unit=item.get("unitOfMeasure", ""),
+        key = (
+            item.get("meterId") or item.get("meterName"),
+            item.get("type", ""),
+            item.get("reservationTerm", ""),
         )
-        yield Unit(item.get("serviceName", ""), item, [price])
+        groups[key].append(item)
+
+    for items in groups.values():
+        # tierMinimumUnits is a float (0.0, 51200.0, …); sort ascending so the
+        # end boundary is the next tier's start.
+        items.sort(key=lambda i: float(i.get("tierMinimumUnits", 0) or 0))
+        for idx, item in enumerate(items):
+            begin = int(float(item.get("tierMinimumUnits", 0) or 0))
+            end = (
+                "Inf"
+                if idx + 1 >= len(items)
+                else str(int(float(items[idx + 1].get("tierMinimumUnits", 0) or 0)))
+            )
+            price = Price(
+                usd=str(item["unitPrice"]),
+                begin=str(begin),
+                end=end,
+                unit=item.get("unitOfMeasure", ""),
+            )
+            yield Unit(item.get("serviceName", ""), item, [price])

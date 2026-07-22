@@ -1,0 +1,22 @@
+# Azure Storage account -> azurerm_storage_account. Standard Hot blob storage
+# (StorageV2 / "General Block Blob v2"), per GB-month, usage-driven (size unknown
+# -> band). The rate depends on the redundancy, so we match
+# account_replication_type by extracting it from the skuName ("Hot LRS" ->
+# LRS, "Hot RA-GRS" -> RAGRS). Cool/Cold/Archive access tiers and Premium are
+# follow-ups. The offer's 50TB/450TB volume tiers flow through.
+resource_type: azurerm_storage_account
+service: Storage
+
+components:
+  - product_family: "^Storage$"
+    service_class: storage
+    select:
+      productName: "General Block Blob v2"
+      meterName: { regex: "^Hot .* Data Stored$" }
+    match:
+      account_replication_type:
+        attr: skuName
+        regex: "^Hot (\\S+)"
+        map: { LRS: LRS, ZRS: ZRS, GRS: GRS, GZRS: GZRS, "RA-GRS": RAGRS, "RA-GZRS": RAGZRS }
+    price: { type: d, unit: "1 GB/Month" }
+    tier: usage

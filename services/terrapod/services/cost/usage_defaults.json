@@ -432,5 +432,27 @@
       "attr": "values.num_cache_nodes",
       "default": 1
     }
+  },
+  {
+    "description": "Azure AKS Standard tier hours",
+    "match_query": "type = azurerm_kubernetes_cluster and service_class = hours",
+    "usage": {
+      "time": 730
+    }
+  },
+  {
+    "description": "Azure storage account data stored",
+    "match_query": "type = azurerm_storage_account and service_class = storage",
+    "usage": {
+      "data": 5000
+    },
+    "assumption": true,
+    "bands": {
+      "dimension": "stored data",
+      "unit": "GB-month",
+      "low": 100,
+      "typical": 5000,
+      "high": 500000
+    }
   }
 ]
