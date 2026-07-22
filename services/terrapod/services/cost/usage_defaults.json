@@ -469,5 +469,12 @@
       "typical": 1000,
       "high": 100000
     }
+  },
+  {
+    "description": "GKE cluster management (always-on)",
+    "match_query": "type = google_container_cluster and service_class = hours",
+    "usage": {
+      "time": 730
+    }
   }
 ]
