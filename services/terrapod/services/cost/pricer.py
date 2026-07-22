@@ -322,7 +322,9 @@ def _region_matches(product: Product, region: str | None) -> bool:
     their pricing match set are global (e.g. Route53) and always kept.
     """
     pr = product.pricing_match_set.find_by_key("region")
-    if pr is None:
+    # No region dim, or an EMPTY one, means the product prices globally (Route53,
+    # CloudFront — their AWS `regionCode` attribute is empty) — always keep it.
+    if pr is None or pr[1] == "":
         return True
     return region is None or pr[1] == region
 

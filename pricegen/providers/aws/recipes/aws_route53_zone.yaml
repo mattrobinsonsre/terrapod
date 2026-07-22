@@ -1,0 +1,14 @@
+# Route53 hosted zone -> aws_route53_zone. A flat $0.50/month per hosted zone
+# (first 25 zones; $0.10 beyond, which per our convention we don't apply
+# per-resource). Global pricing (no region). Query charges are a separate usage
+# concern. Modeled as a flat count charge (usage=1). From the global Route53
+# offer (current/index.json).
+resource_type: aws_route53_zone
+service: AmazonRoute53
+
+components:
+  - product_family: "^DNS Zone$"
+    service_class: zones
+    select: { usagetype: { regex: "HostedZone$" } }
+    price: { type: o, unit: HostedZone }
+    tier: usage

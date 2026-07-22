@@ -140,6 +140,8 @@ _ROWS = [
     # feature). Premium P10 (<=128 GiB) $19.71/mo; P15 (<=256) $38.01.
     "Storage,Storage,type=azurerm_managed_disk&values.storage_account_type=Premium_LRS,service_provider=azure&purchase_option=on_demand&region=eastus&service_class=disk&tier_max_gb=128,19.71,o,USD",
     "Storage,Storage,type=azurerm_managed_disk&values.storage_account_type=Premium_LRS,service_provider=azure&purchase_option=on_demand&region=eastus&service_class=disk&tier_max_gb=256,38.012142,o,USD",
+    # Route53 hosted zone (#1009) — flat $0.50/zone, GLOBAL (empty region= dim).
+    "AmazonRoute53,DNS Zone,type=aws_route53_zone,service_provider=aws&purchase_option=on_demand&region=&service_class=zones&start_usage_amount=0&end_usage_amount=25,0.5000000000,o,USD",
 ]
 
 
@@ -1135,6 +1137,25 @@ def test_azure_managed_disk_rounds_up_to_size_tier():
         )
         d = estimate(plan, _sheet()).to_dict()
         assert d["resources"][0]["monthly"]["max"] == pytest.approx(expected, abs=0.01), size
+
+
+def test_route53_zone_flat_global():
+    """aws_route53_zone is a flat $0.50/mo hosted-zone fee, priced GLOBALLY — the
+    row carries an empty region= dim, and a resource with any resolved region
+    still matches it. (#1009)"""
+    plan = _plan(
+        [
+            {
+                "address": "aws_route53_zone.z",
+                "type": "aws_route53_zone",
+                "name": "z",
+                "mode": "managed",
+                "values": {"name": "example.com"},
+            }
+        ]
+    )
+    d = estimate(plan, _sheet()).to_dict()
+    assert d["resources"][0]["monthly"]["max"] == pytest.approx(0.50, abs=0.001)
 
 
 def test_ec2_instance_prices():

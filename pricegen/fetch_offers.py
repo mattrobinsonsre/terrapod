@@ -111,7 +111,13 @@ def fetch_aws(fetch: dict) -> dict:
     Small offers load whole. Large ones (a ``families`` filter in the fetch
     block, e.g. AmazonEC2) are stream-filtered with ijson to just the needed
     families + ``keep_attrs``, so RAM stays flat regardless of offer size."""
-    svc, region = fetch["service_code"], fetch["region"]
+    svc = fetch["service_code"]
+    # A few services (Route53, CloudFront) price globally — their products aren't
+    # region-split, so there is no region_index; the whole offer lives at
+    # current/index.json. `global: true` fetches that instead of a region.
+    if fetch.get("global"):
+        return _get_json(f"{_AWS_BULK}/offers/v1.0/aws/{svc}/current/index.json")
+    region = fetch["region"]
     idx = _get_json(f"{_AWS_BULK}/offers/v1.0/aws/{svc}/current/region_index.json")
     region_url = _AWS_BULK + idx["regions"][region]["currentVersionUrl"]
     families = fetch.get("families")

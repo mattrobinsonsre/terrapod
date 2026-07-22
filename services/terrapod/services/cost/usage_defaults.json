@@ -519,5 +519,12 @@
     "size_tier": {
       "attr": "values.disk_size_gb"
     }
+  },
+  {
+    "description": "Route53 hosted zone",
+    "match_query": "type = aws_route53_zone and service_class = zones",
+    "usage": {
+      "operations": 1
+    }
   }
 ]
