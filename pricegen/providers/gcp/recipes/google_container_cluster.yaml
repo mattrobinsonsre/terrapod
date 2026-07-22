@@ -1,0 +1,13 @@
+# GKE -> google_container_cluster. The cluster management fee is $0.10/hr
+# (Zonal or Regional; Extended-Period $0.50 for EOL versions is excluded).
+# Global (one rate everywhere). GKE gives one zonal cluster free per billing
+# account, but per-resource we charge the fee. Node pools are separate compute
+# (priced by google_compute_instance). Deterministic.
+resource_type: google_container_cluster
+service: Kubernetes Engine
+
+components:
+  - product_family: "^(Zonal|Regional) Kubernetes Clusters$"
+    service_class: hours
+    price: { type: t, unit: h }
+    tier: usage

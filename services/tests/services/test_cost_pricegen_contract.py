@@ -129,6 +129,8 @@ _ROWS = [
     "Storage,Storage,type=azurerm_storage_account&values.account_replication_type=LRS,service_provider=azure&purchase_option=on_demand&region=eastus&service_class=storage&start_usage_amount=51200&end_usage_amount=512000,0.019968,d,USD",
     # GCP Cloud Storage bucket (#999) — Standard regional storage $0.02/GiB-mo.
     "Cloud Storage,Standard Storage US Regional,type=google_storage_bucket&values.storage_class=STANDARD,service_provider=gcp&purchase_option=on_demand&region=us-central1&service_class=storage&start_usage_amount=0&end_usage_amount=Inf,0.0200000000,d,USD",
+    # GKE cluster (#1001) — $0.10/hr management fee, global (no region).
+    "Kubernetes Engine,Zonal Kubernetes Clusters,type=google_container_cluster,service_provider=gcp&purchase_option=on_demand&service_class=hours&start_usage_amount=0&end_usage_amount=Inf,0.1000000000,t,USD",
 ]
 
 
@@ -1033,6 +1035,23 @@ def test_gcs_bucket_storage_band_case_insensitive_location():
         assert d["resources"][0]["monthly"]["max"] == pytest.approx(1000 * 0.02, abs=0.01), (
             loc
         )  # $20
+
+
+def test_gke_cluster_management_fee():
+    """google_container_cluster is a $0.10/hr management fee (global), $73/mo. (#1001)"""
+    plan = _plan(
+        [
+            {
+                "address": "google_container_cluster.c",
+                "type": "google_container_cluster",
+                "name": "c",
+                "mode": "managed",
+                "values": {"location": "us-central1"},
+            }
+        ]
+    )
+    d = estimate(plan, _sheet()).to_dict()
+    assert d["resources"][0]["monthly"]["max"] == pytest.approx(730 * 0.1, abs=0.01)
 
 
 def test_ec2_instance_prices():
