@@ -18,7 +18,7 @@
       "unit": "requests/month",
       "low": 100000,
       "typical": 4000000,
-      "high": 100000000
+      "high": 1000000000
     }
   },
   {
@@ -33,7 +33,7 @@
       "unit": "requests/month",
       "low": 1000000,
       "typical": 50000000,
-      "high": 1000000000
+      "high": 10000000000
     }
   },
   {
@@ -48,7 +48,7 @@
       "unit": "GB-month",
       "low": 50,
       "typical": 900,
-      "high": 10000
+      "high": 500000
     }
   },
   {
@@ -88,7 +88,7 @@
       "unit": "requests/month",
       "low": 1000000,
       "typical": 50000000,
-      "high": 5000000000
+      "high": 50000000000
     }
   },
   {
@@ -103,7 +103,7 @@
       "unit": "requests/month",
       "low": 1000000,
       "typical": 100000000,
-      "high": 10000000000
+      "high": 50000000000
     }
   },
   {
@@ -118,7 +118,7 @@
       "unit": "GB-seconds/month",
       "low": 100000,
       "typical": 1000000,
-      "high": 100000000
+      "high": 1000000000
     }
   },
   {
@@ -133,7 +133,7 @@
       "unit": "GB-seconds/month",
       "low": 100000,
       "typical": 1000000,
-      "high": 100000000
+      "high": 1000000000
     }
   },
   {
@@ -159,7 +159,7 @@
       "unit": "GB-month",
       "low": 5,
       "typical": 80,
-      "high": 5000
+      "high": 50000
     }
   },
   {
@@ -174,7 +174,7 @@
       "unit": "GB-month",
       "low": 5,
       "typical": 80,
-      "high": 5000
+      "high": 50000
     }
   },
   {
@@ -189,7 +189,7 @@
       "unit": "RRU/month",
       "low": 1000000,
       "typical": 80000000,
-      "high": 10000000000
+      "high": 50000000000
     }
   },
   {
@@ -204,7 +204,7 @@
       "unit": "WRU/month",
       "low": 500000,
       "typical": 16000000,
-      "high": 2000000000
+      "high": 10000000000
     }
   },
   {
