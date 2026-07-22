@@ -1,0 +1,18 @@
+# Elastic IP -> aws_eip. Since 2024-02-01 AWS charges $0.005/hr for EVERY public
+# IPv4 address, attached or idle, so an aws_eip is a DETERMINISTIC always-on
+# charge (~$3.65/mo) — like the NAT gateway HOUR, not a usage guess. Priced from
+# the small AmazonVPC offer. The product carries an EMPTY productFamily, so the
+# adapter falls back to the attribute `group` (VPCPublicIPv4Address), which this
+# recipe matches. We match the In-use rate (an EIP is normally attached; the
+# Idle rate is identical anyway). The region-prefixed usagetype
+# (`USE1-PublicIPv4:InUseAddress`) is matched by regex so the recipe stays
+# region-portable.
+resource_type: aws_eip
+service: AmazonVPC
+
+components:
+  - product_family: "^VPCPublicIPv4Address$"
+    service_class: hours
+    select: { usagetype: { regex: "PublicIPv4:InUseAddress$" } }
+    price: { type: t, unit: Hrs }
+    tier: usage

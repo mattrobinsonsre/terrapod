@@ -51,6 +51,10 @@ def iter_units(offer: dict, *, term: str = "OnDemand"):
                 )
         if not prices:
             continue
-        yield Unit(
-            product.get("productFamily", ""), product.get("attributes", {}), prices
-        )
+        attrs = product.get("attributes", {})
+        # Some priced products carry an EMPTY productFamily (e.g. VPC public-IPv4
+        # address charges). Fall back to the attribute `group` so a recipe has a
+        # stable family to match on. No existing recipe matches an empty family,
+        # so this only enables new coverage — it never re-routes a matched SKU.
+        family = product.get("productFamily") or attrs.get("group", "")
+        yield Unit(family, attrs, prices)

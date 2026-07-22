@@ -78,6 +78,10 @@ _ROWS = [
     # NAT gateway — deterministic always-on hours + usage-driven data processed.
     "AmazonEC2,NAT Gateway,type=aws_nat_gateway,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=hours&start_usage_amount=0&end_usage_amount=Inf,0.0450000000,t,USD",
     "AmazonEC2,NAT Gateway,type=aws_nat_gateway,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=data&start_usage_amount=0&end_usage_amount=Inf,0.0450000000,d,USD",
+    # Elastic IP — every public IPv4 is $0.005/hr since 2024-02-01, so an aws_eip
+    # is a deterministic always-on charge (from the AmazonVPC offer; the product's
+    # empty productFamily falls back to the `group`).
+    "AmazonVPC,VPCPublicIPv4Address,type=aws_eip,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=hours&start_usage_amount=0&end_usage_amount=Inf,0.0050000000,t,USD",
 ]
 
 
@@ -543,6 +547,29 @@ def test_nat_gateway_deterministic_hours_plus_usage_driven_data():
     # The headline monthly stays at typical (hours + typical data), NOT the
     # widened band — so workspace totals don't balloon on the high bound.
     assert r["monthly"]["max"] == pytest.approx(730 * 0.045 + data["cost_typical"], abs=0.01)
+
+
+def test_eip_deterministic_hourly_public_ipv4():
+    """aws_eip: since 2024-02-01 every public IPv4 is billed $0.005/hr whether
+    attached or idle, so an Elastic IP is a deterministic always-on charge with
+    NO usage assumption (like the NAT hour). 0.005*730 = $3.65/mo. (#893)"""
+    plan = _plan(
+        [
+            {
+                "address": "aws_eip.nat",
+                "type": "aws_eip",
+                "name": "nat",
+                "mode": "managed",
+                "values": {"region": "us-east-1", "domain": "vpc"},
+            }
+        ]
+    )
+    d = estimate(plan, _sheet()).to_dict()
+    r = d["resources"][0]
+    assert r["monthly"]["min"] == pytest.approx(730 * 0.005, abs=0.01)
+    assert r["monthly"]["max"] == pytest.approx(730 * 0.005, abs=0.01)
+    # Deterministic — no usage band, field omitted entirely.
+    assert "usage_assumptions" not in r
 
 
 def test_ec2_instance_prices():

@@ -236,6 +236,13 @@
     }
   },
   {
+    "description": "Elastic IP hours (always-on public IPv4 charge)",
+    "match_query": "type = aws_eip and service_class = hours",
+    "usage": {
+      "time": 730
+    }
+  },
+  {
     "description": "NAT Gateway data processed",
     "match_query": "type = aws_nat_gateway and service_class = data",
     "usage": {
