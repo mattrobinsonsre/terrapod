@@ -99,6 +99,15 @@ up() {
   restore_ctx
 
   log "Installing Terrapod (${RELEASE}) into namespace '${NS}' using image tag '${VERSION}'…"
+  # Optional image-registry override. When set (e.g. CI's k3d leg points every
+  # image at a k3d-managed local registry, which is a deterministic pull instead
+  # of the flaky `k3d image import`), redirect all five images via
+  # global.imageRegistry. Empty by default, so a normal `make eval` — which loads
+  # images straight into the node — is unaffected.
+  local reg_args=()
+  if [[ -n "${TERRAPOD_EVAL_IMAGE_REGISTRY:-}" ]]; then
+    reg_args+=(--set "global.imageRegistry=${TERRAPOD_EVAL_IMAGE_REGISTRY}")
+  fi
   # `--wait` blocks until every Deployment — including the runner listener — is
   # ready. The listener only reports ready once it has JOINED the agent pool, and
   # the pool is created by the bootstrap job, which is a PRE-install hook (see
@@ -108,6 +117,7 @@ up() {
   helm --kube-context "$ctx" upgrade --install "$RELEASE" "$CHART_DIR" \
     --namespace "$NS" --create-namespace \
     -f "${CHART_DIR}/values-eval.yaml" \
+    "${reg_args[@]}" \
     --set "api.image.tag=${VERSION}" \
     --set "web.image.tag=${VERSION}" \
     --set "migrations.image.tag=${VERSION}" \

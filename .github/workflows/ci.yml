@@ -953,13 +953,27 @@ jobs:
             kind create cluster --name terrapod-eval --wait 120s
             for img in $imgs; do kind load docker-image "$img" --name terrapod-eval; done
           else
-            k3d cluster create terrapod-eval --wait --timeout 120s
-            # Import ALL images in ONE call. Separate per-image `k3d image import`
-            # calls race on their temp tarball ("ctr: open …tar: no such file or
-            # directory") and k3d masks that with exit 0 — which silently left the
-            # listener image unimported (ImagePullBackOff → run stuck queued). One
-            # call = one tarball = no race.
-            k3d image import $imgs -c terrapod-eval
+            # A k3d-managed local registry, NOT `k3d image import`. The import
+            # reports "Successfully imported" but leaves images unresolvable by
+            # the kubelet under their own ref, so pods fall back to pulling from
+            # ghcr.io (nothing pushed there on PRs) → ImagePullBackOff → the
+            # pre-install migration hook hangs the whole boot for 10 min. A real
+            # registry pull is deterministic and works identically on PR + branch
+            # builds. #975.
+            reg_port=5111
+            k3d registry create eval-registry.localhost --port "$reg_port"
+            k3d cluster create terrapod-eval \
+              --registry-use "k3d-eval-registry.localhost:${reg_port}" \
+              --wait --timeout 120s
+            for i in terrapod-api terrapod-web terrapod-migrations terrapod-listener terrapod-runner; do
+              # Push over localhost:PORT (docker auto-treats localhost as an
+              # insecure registry — no daemon config needed); pods pull the same
+              # repo path in-cluster via k3d-eval-registry.localhost:PORT, which
+              # the chart's global.imageRegistry override points them at.
+              dst="localhost:${reg_port}/mattrobinsonsre/${i}:sha-${sha}-amd64"
+              docker tag "$REGISTRY/${i}:sha-${sha}-amd64" "$dst"
+              docker push "$dst"
+            done
           fi
       - name: make eval (install into the cluster)
         env:
@@ -971,6 +985,13 @@ jobs:
           # this the k3d matrix job would auto-detect kind and the smoke step's
           # k3d-pinned context lookup would miss.
           TERRAPOD_EVAL_TOOL: ${{ matrix.tool }}
+          # k3d pulls every image from the local registry created above (kind
+          # loads images straight into the node, so it needs no override). #975.
+          TERRAPOD_EVAL_IMAGE_REGISTRY: ${{ matrix.tool == 'k3d' && 'k3d-eval-registry.localhost:5111' || '' }}
+          # Fail fast: a healthy boot is ~50s, so cap the install wait at 5 min so
+          # a genuine image/scheduling problem surfaces quickly with pod
+          # diagnostics instead of a ~10-min silent hang. #975.
+          TERRAPOD_EVAL_HELM_TIMEOUT: 300s
         run: scripts/eval.sh up
       - name: Smoke the running stack
         run: |
