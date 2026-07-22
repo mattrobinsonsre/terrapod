@@ -271,8 +271,9 @@ def test_default_usage_catalogue_loads():
     entries = default_entries()
     # 18 vendored from OpenInfraQuote + Terrapod additions: RDS provisioned IOPS
     # io1/io2 (#928) + Azure Linux VM hours (#931) + GCP Compute hours (#933) +
-    # NAT gateway hours+data (#966) + Elastic IP hours (#973).
-    assert len(entries) == 24
+    # NAT gateway hours+data (#966) + Elastic IP hours (#973) + load balancer
+    # hours+LCU (#977).
+    assert len(entries) == 26
     ec2 = match_entry(
         _ms(
             ("type", "aws_instance"),

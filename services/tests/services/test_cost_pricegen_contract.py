@@ -82,6 +82,13 @@ _ROWS = [
     # is a deterministic always-on charge (from the AmazonVPC offer; the product's
     # empty productFamily falls back to the `group`).
     "AmazonVPC,VPCPublicIPv4Address,type=aws_eip,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=hours&start_usage_amount=0&end_usage_amount=Inf,0.0050000000,t,USD",
+    # Load balancers — ALB + NLB, each a deterministic hour + a usage-driven LCU
+    # (capacity units) band. load_balancer_type is stamped (schema Default, so a
+    # plan always carries it). ALB LCU $0.008, NLB LCU $0.006.
+    "AmazonEC2,Load Balancer-Application,type=aws_lb&values.load_balancer_type=application,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=hours&start_usage_amount=0&end_usage_amount=Inf,0.0225000000,t,USD",
+    "AmazonEC2,Load Balancer-Application,type=aws_lb&values.load_balancer_type=application,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=lcu&start_usage_amount=0&end_usage_amount=Inf,0.0080000000,t,USD",
+    "AmazonEC2,Load Balancer-Network,type=aws_lb&values.load_balancer_type=network,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=hours&start_usage_amount=0&end_usage_amount=Inf,0.0225000000,t,USD",
+    "AmazonEC2,Load Balancer-Network,type=aws_lb&values.load_balancer_type=network,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=lcu&start_usage_amount=0&end_usage_amount=Inf,0.0060000000,t,USD",
 ]
 
 
@@ -570,6 +577,53 @@ def test_eip_deterministic_hourly_public_ipv4():
     assert r["monthly"]["max"] == pytest.approx(730 * 0.005, abs=0.01)
     # Deterministic — no usage band, field omitted entirely.
     assert "usage_assumptions" not in r
+
+
+def test_alb_hours_plus_lcu_band():
+    """aws_lb (application): deterministic hour ($0.0225 * 730) + usage-driven
+    LCU capacity band. load_balancer_type is stamped, so the ALB rows match and
+    the NLB rows don't. (#893/#977)"""
+    plan = _plan(
+        [
+            {
+                "address": "aws_lb.app",
+                "type": "aws_lb",
+                "name": "app",
+                "mode": "managed",
+                "values": {"region": "us-east-1", "load_balancer_type": "application"},
+            }
+        ]
+    )
+    d = estimate(plan, _sheet()).to_dict()
+    r = d["resources"][0]
+    # hours 730*0.0225 = 16.425 + LCU typical 1460*0.008 = 11.68 -> 28.105
+    assert r["monthly"]["max"] == pytest.approx(730 * 0.0225 + 1460 * 0.008, abs=0.01)
+    dims = {ua["dimension"]: ua for ua in r["usage_assumptions"]}
+    assert set(dims) == {"capacity units"}  # LCU is the assumption, not the hour
+    lcu = dims["capacity units"]
+    assert lcu["cost_typical"] == pytest.approx(1460 * 0.008, abs=0.01)
+    assert lcu["cost_high"] == pytest.approx(30000 * 0.008, abs=0.01)  # honest busy high
+
+
+def test_nlb_prices_at_the_network_lcu_rate():
+    """aws_lb (network) picks the NLB family rows (LCU $0.006, not the ALB
+    $0.008) via the stamped load_balancer_type. (#977)"""
+    plan = _plan(
+        [
+            {
+                "address": "aws_lb.net",
+                "type": "aws_lb",
+                "name": "net",
+                "mode": "managed",
+                "values": {"region": "us-east-1", "load_balancer_type": "network"},
+            }
+        ]
+    )
+    d = estimate(plan, _sheet()).to_dict()
+    r = d["resources"][0]
+    assert r["monthly"]["max"] == pytest.approx(730 * 0.0225 + 1460 * 0.006, abs=0.01)
+    lcu = {ua["dimension"]: ua for ua in r["usage_assumptions"]}["capacity units"]
+    assert lcu["cost_typical"] == pytest.approx(1460 * 0.006, abs=0.01)
 
 
 def test_ec2_instance_prices():
