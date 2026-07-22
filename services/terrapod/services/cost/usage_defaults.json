@@ -247,7 +247,7 @@
       "unit": "GB/month",
       "low": 10,
       "typical": 100,
-      "high": 5000
+      "high": 50000
     }
   }
 ]
