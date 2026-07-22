@@ -134,5 +134,6 @@ operators mirror it as today. Weekly regeneration is the target cadence.
 - [x] Publish pipeline: `fetch_offers` (official APIs) → `publish` (combined gzipped-YAML sheet + drift manifest) → `drift` guardrail → scheduled workflow to a rolling GitHub Release
 - [x] Consumer reads the Terrapod YAML sheet (flip of `cost_estimation.prices_url` default deferred until coverage parity)
 - [x] AWS breadth: `aws_sqs_queue`, `aws_lambda_function`, `aws_s3_bucket`, `aws_dynamodb_table`, `aws_nat_gateway`, `aws_eip`, `aws_lb` (ALB+NLB), `aws_elb`, `aws_ebs_snapshot`, `aws_efs_file_system`, `aws_kms_key` ($1 flat), `aws_secretsmanager_secret` ($0.40 flat), `aws_sns_topic` (publishes band), `aws_api_gateway_rest_api` + `aws_apigatewayv2_api` (tiered request bands) (deterministic + usage-driven, with low/typical/high cost bands)
-- [ ] More AWS breadth (Route53 + CloudFront [global offers], ElastiCache [needs node-count engine feature], CloudWatch) + all-regions + a row-parity CI gate
+- [x] Count-multiply engine feature (a component's cost × a resource attribute) + `aws_elasticache_cluster` (per-node × num_cache_nodes, by node_type + engine)
+- [ ] More AWS breadth (Route53 + CloudFront [global offers], Kinesis [count-multiply], CloudWatch) + all-regions + a row-parity CI gate
 - [ ] Broaden GCP families/regions; Azure managed disks / Windows

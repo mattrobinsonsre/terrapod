@@ -71,6 +71,13 @@ class Entry:
     # both unset. ``bands`` shape: {dimension, unit, low, typical, high}.
     assumption: bool = False
     bands: dict[str, Any] | None = None
+    # A per-unit component whose quantity scales with a resource attribute —
+    # e.g. an ElastiCache cluster's cost is per-NODE (× num_cache_nodes), a
+    # Kinesis stream's is per-SHARD (× shard_count). ``count`` names that
+    # attribute; the pricer multiplies this entry's component cost by it. Shape:
+    # {attr: "values.num_cache_nodes", default: 1}. Absent/unset ⇒ factor 1 (the
+    # common single-unit case), so existing entries are unchanged.
+    count: dict[str, Any] | None = None
 
     def with_usage(self, usage: Usage) -> Entry:
         return replace(self, usage=usage)
@@ -140,6 +147,7 @@ def _entry_from_obj(obj: dict[str, Any]) -> Entry:
         usage=_parse_usage(obj.get("usage")),
         assumption=bool(obj.get("assumption", False)),
         bands=obj.get("bands"),
+        count=obj.get("count"),
     )
 
 

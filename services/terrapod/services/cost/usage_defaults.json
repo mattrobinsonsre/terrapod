@@ -421,5 +421,16 @@
       "typical": 10000000,
       "high": 1000000000
     }
+  },
+  {
+    "description": "ElastiCache cache nodes (always-on)",
+    "match_query": "type = aws_elasticache_cluster and service_class = nodes",
+    "usage": {
+      "time": 730
+    },
+    "count": {
+      "attr": "values.num_cache_nodes",
+      "default": 1
+    }
   }
 ]

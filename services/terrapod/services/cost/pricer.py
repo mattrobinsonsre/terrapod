@@ -14,7 +14,7 @@ filter of the upstream CLI is not needed by Terrapod and is omitted.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from terrapod.services.cost import usage as usage_mod
 from terrapod.services.cost.match_set import MatchSet
@@ -256,6 +256,27 @@ def _cost_band(
         return None
 
 
+def _count_factor(entry: Entry, resource_ms: MatchSet) -> float:
+    """Multiplier for a per-unit component whose quantity scales with a resource
+    attribute — ElastiCache node cost × ``num_cache_nodes``, Kinesis × ``shard_count``.
+    Reads the attribute named by the entry's ``count`` spec; defaults to 1 (the
+    single-unit case) when unset, absent, or unparseable, so nothing regresses."""
+    spec = entry.count
+    if not spec:
+        return 1.0
+    default = float(spec.get("default", 1) or 1)
+    attr = spec.get("attr")
+    if not attr:
+        return default
+    found = resource_ms.find_by_key(attr)
+    if found is None:
+        return default
+    try:
+        return max(1.0, float(found[1]))
+    except (ValueError, TypeError):
+        return default
+
+
 def _region_matches(product: Product, region: str | None) -> bool:
     """Keep region-agnostic products and region-specific products in ``region``.
 
@@ -317,11 +338,21 @@ def price(
                 # Pathological product/usage combo — treat this resource as
                 # unpriced rather than crashing the whole estimate.
                 continue
+            # Scale the whole component by its unit count (× num_cache_nodes,
+            # × shard_count, …). Factor 1 for the common single-unit case.
+            factor = _count_factor(entry, resource_ms)
+            if factor != 1.0:
+                group_pps = [
+                    replace(pp, price=Range(pp.price.min * factor, pp.price.max * factor))
+                    for pp in group_pps
+                ]
             for pp in group_pps:
                 priced_products.append(pp)
                 currency = pp.ccy
             if group_pps:
                 band = _cost_band(resource_ms, entry, group_products)
+                if band is not None and factor != 1.0:
+                    band = (band[0] * factor, band[1] * factor, band[2] * factor)
                 if band is not None and entry.bands:
                     dim = entry.bands.get("dimension")
                     if dim is not None:
