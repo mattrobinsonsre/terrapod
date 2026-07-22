@@ -1981,7 +1981,8 @@
       "indicative": "Estimates are indicative; actual cost depends on usage, region, commitments, and discounts.",
       "credit": "Cost data from <oiq>OpenInfraQuote</oiq>.",
       "asOfState": "as of state v{serial}",
-      "noState": "No cost yet — appears after the first apply."
+      "noState": "No cost yet — appears after the first apply.",
+      "usageBand": "{dimension}: {typical} {unit} typ1c4l (r4ng3 {low}–{high})"
     },
     "costAi": {
       "heading": "41 c057 3571m473",

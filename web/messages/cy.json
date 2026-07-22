@@ -1981,7 +1981,8 @@
       "indicative": "Amcangyfrifon dangosol yw'r rhain; mae'r gost wirioneddol yn dibynnu ar ddefnydd, rhanbarth, ymrwymiadau a gostyngiadau.",
       "credit": "Data cost gan <oiq>OpenInfraQuote</oiq>.",
       "asOfState": "fel ar gyflwr v{serial}",
-      "noState": "Dim cost eto — mae'n ymddangos ar ôl y gweithrediad cyntaf."
+      "noState": "Dim cost eto — mae'n ymddangos ar ôl y gweithrediad cyntaf.",
+      "usageBand": "{dimension}: {typical} {unit} nodweddiadol (ystod {low}–{high})"
     },
     "costAi": {
       "heading": "Amcangyfrif cost gan AI",

@@ -1981,7 +1981,8 @@
       "indicative": "Tahminler yaklaşıktır; gerçek maliyet kullanıma, bölgeye, taahhütlere ve indirimlere bağlıdır.",
       "credit": "Maliyet verileri <oiq>OpenInfraQuote</oiq> kaynağından.",
       "asOfState": "durum v{serial} itibarıyla",
-      "noState": "Henüz maliyet yok — ilk uygulamadan sonra görünür."
+      "noState": "Henüz maliyet yok — ilk uygulamadan sonra görünür.",
+      "usageBand": "{dimension}: tipik {typical} {unit} (aralık {low}–{high})"
     },
     "costAi": {
       "heading": "AI maliyet tahmini",

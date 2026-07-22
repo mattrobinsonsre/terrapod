@@ -23,6 +23,23 @@ type CostResource struct {
 	Name    string    `json:"name"`
 	Change  string    `json:"change"` // noop | add | remove
 	Monthly CostRange `json:"monthly"`
+	// UsageAssumptions are the usage-driven line items (requests, data
+	// processed, duration) whose quantity was assumed, not read from the plan —
+	// each with a low/typical/high band. Priced at the typical; the band is the
+	// honest raw range (usable with the AI enhancement off), which the AI then
+	// narrows per-resource. Empty/omitted for a fully deterministic resource.
+	UsageAssumptions []UsageAssumption `json:"usage_assumptions,omitempty"`
+}
+
+// UsageAssumption describes one usage-driven cost component whose quantity was a
+// low/typical/high judgement rather than a fact from the plan (#962).
+type UsageAssumption struct {
+	Description string  `json:"description"`
+	Dimension  string  `json:"dimension"`
+	Unit       string  `json:"unit"`
+	Low        float64 `json:"low"`
+	Typical    float64 `json:"typical"`
+	High       float64 `json:"high"`
 }
 
 // UnpricedResource is a resource nothing in the pricesheet matched (unmapped

@@ -1981,7 +1981,8 @@
       "indicative": "Estimates are indicative; actual cost depends on usage, region, commitments, and discounts.",
       "credit": "Cost data from <oiq>OpenInfraQuote</oiq>.",
       "asOfState": "as of marklar v{serial}",
-      "noState": "No marklar yet — appears after the first marklar."
+      "noState": "No marklar yet — appears after the first marklar.",
+      "usageBand": "{dimension}: {typical} {unit} marklar (marklar {low}–{high})"
     },
     "costAi": {
       "heading": "AI marklar estimate",

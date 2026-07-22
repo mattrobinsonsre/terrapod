@@ -1981,7 +1981,8 @@
       "indicative": "估算仅供参考；实际成本取决于使用量、区域、承诺用量和折扣。",
       "credit": "成本数据来自 <oiq>OpenInfraQuote</oiq>。",
       "asOfState": "截至状态 v{serial}",
-      "noState": "暂无成本 — 首次应用后显示。"
+      "noState": "暂无成本 — 首次应用后显示。",
+      "usageBand": "{dimension}：典型 {typical} {unit}（范围 {low}–{high}）"
     },
     "costAi": {
       "heading": "AI 成本估算",

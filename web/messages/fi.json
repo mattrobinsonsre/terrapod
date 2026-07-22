@@ -1981,7 +1981,8 @@
       "indicative": "Arviot ovat suuntaa antavia; todellinen kustannus riippuu käytöstä, alueesta, sitoumuksista ja alennuksista.",
       "credit": "Kustannustiedot: <oiq>OpenInfraQuote</oiq>.",
       "asOfState": "tilan v{serial} mukaan",
-      "noState": "Ei vielä kustannuksia — näkyy ensimmäisen käytön jälkeen."
+      "noState": "Ei vielä kustannuksia — näkyy ensimmäisen käytön jälkeen.",
+      "usageBand": "{dimension}: tyypillisesti {typical} {unit} (vaihteluväli {low}–{high})"
     },
     "costAi": {
       "heading": "Tekoälyn kustannusarvio",

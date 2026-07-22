@@ -1981,7 +1981,8 @@
       "indicative": "As estimativas são indicativas; o custo real depende do uso, da região, dos compromissos e dos descontos.",
       "credit": "Dados de custo do <oiq>OpenInfraQuote</oiq>.",
       "asOfState": "a partir do estado v{serial}",
-      "noState": "Sem custo ainda — aparece após a primeira aplicação."
+      "noState": "Sem custo ainda — aparece após a primeira aplicação.",
+      "usageBand": "{dimension}: {typical} {unit} típico (faixa {low}–{high})"
     },
     "costAi": {
       "heading": "Estimativa de custo por IA",

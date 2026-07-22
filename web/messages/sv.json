@@ -1981,7 +1981,8 @@
       "indicative": "Uppskattningarna är vägledande; den faktiska kostnaden beror på användning, region, åtaganden och rabatter.",
       "credit": "Kostnadsdata från <oiq>OpenInfraQuote</oiq>.",
       "asOfState": "enligt tillstånd v{serial}",
-      "noState": "Ingen kostnad ännu — visas efter första tillämpningen."
+      "noState": "Ingen kostnad ännu — visas efter första tillämpningen.",
+      "usageBand": "{dimension}: {typical} {unit} typiskt (intervall {low}–{high})"
     },
     "costAi": {
       "heading": "AI-kostnadsuppskattning",

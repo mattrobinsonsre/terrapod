@@ -3351,7 +3351,9 @@ Requires `run:read` on the run's workspace. Returns the runner-produced estimate
       "previous": { "min": 73.0, "max": 73.0 },
       "diff": { "min": 146.0, "max": 146.0 },
       "resources": [
-        { "address": "aws_instance.eu", "type": "aws_instance", "name": "eu", "change": "add", "monthly": { "min": 146.0, "max": 146.0 } }
+        { "address": "aws_instance.eu", "type": "aws_instance", "name": "eu", "change": "add", "monthly": { "min": 146.0, "max": 146.0 } },
+        { "address": "aws_nat_gateway.gw", "type": "aws_nat_gateway", "name": "gw", "change": "add", "monthly": { "min": 32.85, "max": 37.85 },
+          "usage_assumptions": [ { "description": "NAT data processed", "dimension": "data processed", "unit": "GB/month", "low": 10, "typical": 100, "high": 50000 } ] }
       ],
       "unpriced": [ { "address": "random_pet.name", "type": "random_pet", "change": "add" } ]
     },
@@ -3367,6 +3369,7 @@ Requires `run:read` on the run's workspace. Returns the runner-produced estimate
 | `previous` | Projected monthly spend of the prior state (`total − diff`). |
 | `diff` | Monthly delta this run introduces (adds positive, removes negative). |
 | `resources[]` | Per-resource cost; `change` is `add` / `remove` / `noop`. |
+| `resources[].usage_assumptions[]` | Present only on resources whose cost depends on runtime usage the plan doesn't declare (data processed, invocations, storage). Each entry is `{description, dimension, unit, low, typical, high}`: the `monthly` figure assumes `typical`; the true cost sits in `low`–`high`. Raw data — surfaced independently of the AI layer so the estimate is honest with AI off. Omitted for deterministically-priced resources. |
 | `unpriced[]` | Resources nothing in the pricesheet matched (unmapped/free type, or a provider the data doesn't cover). |
 
 ### Show Workspace Cost Estimate

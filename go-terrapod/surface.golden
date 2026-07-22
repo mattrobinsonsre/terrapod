@@ -92,6 +92,7 @@ field CostResource.Change string `json:"change"`
 field CostResource.Monthly CostRange `json:"monthly"`
 field CostResource.Name string `json:"name"`
 field CostResource.Type string `json:"type"`
+field CostResource.UsageAssumptions []UsageAssumption `json:"usage_assumptions,omitempty"`
 field CostStateVersion.CreatedAt string `json:"created-at"`
 field CostStateVersion.ID string `json:"id"`
 field CostStateVersion.Serial int `json:"serial"`
@@ -715,6 +716,12 @@ field UpdateWorkspaceRequest.VCSRepoURL string `json:"vcs-repo-url,omitempty"`
 field UpdateWorkspaceRequest.VCSWorkflow string `json:"vcs-workflow,omitempty"`
 field UpdateWorkspaceRequest.VarFiles []string `json:"var-files,omitempty"`
 field UpdateWorkspaceRequest.WorkingDirectory string `json:"working-directory,omitempty"`
+field UsageAssumption.Description string `json:"description"`
+field UsageAssumption.Dimension string `json:"dimension"`
+field UsageAssumption.High float64 `json:"high"`
+field UsageAssumption.Low float64 `json:"low"`
+field UsageAssumption.Typical float64 `json:"typical"`
+field UsageAssumption.Unit string `json:"unit"`
 field User.CreatedAt string `json:"created-at,omitempty"`
 field User.DisplayName string `json:"display-name,omitempty"`
 field User.Email string `json:"email"`
@@ -1199,6 +1206,7 @@ type UpdateVariableRequest struct
 type UpdateVariableSetRequest struct
 type UpdateVarsetVariableRequest struct
 type UpdateWorkspaceRequest struct
+type UsageAssumption struct
 type User struct
 type VCSConnection struct
 type ValidationError struct

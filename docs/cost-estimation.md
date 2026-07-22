@@ -46,6 +46,21 @@ Full request/response shapes are in the [API reference](api-reference.md#cost-es
 - **AI agents (MCP)** — the [`terrapod-mcp`](mcp.md) server exposes `terrapod_run_cost` and `terrapod_workspace_cost` read-only tools, so an agent can reason about the price of a change alongside its plan JSON.
 - **Go SDK** — [`go-terrapod`](terraform-provider.md) exposes `GetRunCostEstimate` and `GetWorkspaceCostEstimate`.
 
+## Usage assumptions (honest ranges for usage-driven costs)
+
+Some resources can't be priced from state alone — the bill depends on **runtime usage the plan doesn't declare**: a NAT gateway's cost is dominated by data processed, a Lambda function by invocations, an S3 bucket by stored volume. For these, the deterministic engine prices a **typical** usage point and surfaces the underlying band alongside the number, so the estimate is honest about what it assumed. This is **raw data, available with the AI layer off** — the AI *narrows* an already-useful band; it is never a prerequisite for the number making sense.
+
+Each such resource carries a `usage_assumptions` array, one entry per metered dimension:
+
+| Field | Meaning |
+|---|---|
+| `description` | Human-readable label for the assumption |
+| `dimension` | What is being metered (e.g. `data processed`) |
+| `unit` | Unit of the bounds (e.g. `GB/month`) |
+| `low` / `typical` / `high` | The band — the monthly cost is based on `typical`; the true cost sits somewhere in `low`–`high` |
+
+Both Cost tabs render these beneath the resource (e.g. *"data processed: 100 GB/month typical (range 10–50000)"*); the `terrapod_workspace_cost` data source and the `go-terrapod` SDK expose them as `usage_assumptions` on each resource. Bounds are set to be honest raw — a `high` covers a genuinely busy resource, not a token value — so an operator reading the deterministic estimate can judge where their real workload sits.
+
 ## Correctness — proven against the real oiq
 
 The estimates are **deterministic data**, and Terrapod proves the ported engine

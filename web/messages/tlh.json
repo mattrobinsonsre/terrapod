@@ -1981,7 +1981,8 @@
       "indicative": "Estimates are indicative; actual cost depends on usage, region, commitments, and discounts.",
       "credit": "Cost data from <oiq>OpenInfraQuote</oiq>.",
       "asOfState": "Dotlh v{serial} rurlaw'",
-      "noState": "wagh tu'lu'be' — wa'DIch lo' ghevqo' 'ej cha'lu'."
+      "noState": "wagh tu'lu'be' — wa'DIch lo' ghevqo' 'ej cha'lu'.",
+      "usageBand": "{dimension}: {typical} {unit} typical (range {low}–{high})"
     },
     "costAi": {
       "heading": "AI wagh Qel",

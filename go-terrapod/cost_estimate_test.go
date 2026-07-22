@@ -33,7 +33,8 @@ const costEstimateBody = `{"data":{"id":"cost-estimate-abc","type":"cost-estimat
     "diff":{"min":146.0,"max":146.0},
     "resources":[
       {"address":"aws_instance.eu","type":"aws_instance","name":"eu","change":"add","monthly":{"min":146.0,"max":146.0}},
-      {"address":"aws_instance.us","type":"aws_instance","name":"us","change":"noop","monthly":{"min":73.0,"max":73.0}}
+      {"address":"aws_instance.us","type":"aws_instance","name":"us","change":"noop","monthly":{"min":73.0,"max":73.0},
+       "usage_assumptions":[{"description":"NAT data","dimension":"data processed","unit":"GB/month","low":10,"typical":100,"high":50000}]}
     ],
     "unpriced":[
       {"address":"random_pet.name","type":"random_pet","change":"add"}
@@ -58,6 +59,13 @@ func TestGetRunCostEstimate(t *testing.T) {
 	}
 	if len(e.Resources) != 2 || len(e.Unpriced) != 1 {
 		t.Fatalf("resources=%d unpriced=%d, want 2/1", len(e.Resources), len(e.Unpriced))
+	}
+	if len(e.Resources[0].UsageAssumptions) != 0 {
+		t.Errorf("deterministic resource should have no usage assumptions, got %+v", e.Resources[0].UsageAssumptions)
+	}
+	if ua := e.Resources[1].UsageAssumptions; len(ua) != 1 || ua[0].Dimension != "data processed" ||
+		ua[0].Typical != 100 || ua[0].High != 50000 {
+		t.Errorf("usage_assumptions not decoded: %+v", e.Resources[1].UsageAssumptions)
 	}
 	if e.Resources[0].Change != "add" || e.Resources[0].Monthly.Min != 146.0 {
 		t.Errorf("resource not decoded: %+v", e.Resources[0])

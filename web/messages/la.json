@@ -1981,7 +1981,8 @@
       "indicative": "Aestimationes indicativae sunt; impensa vera ab usu, regione, obligationibus et deductionibus pendet.",
       "credit": "Data impensae ex <oiq>OpenInfraQuote</oiq>.",
       "asOfState": "secundum statum v{serial}",
-      "noState": "Nullus sumptus adhuc — post primam applicationem apparet."
+      "noState": "Nullus sumptus adhuc — post primam applicationem apparet.",
+      "usageBand": "{dimension}: {typical} {unit} usitate (ambitus {low}–{high})"
     },
     "costAi": {
       "heading": "Aestimatio impensae per AI",
