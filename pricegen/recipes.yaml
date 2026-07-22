@@ -61,3 +61,10 @@ recipes:
       service_code: AmazonEC2
       region: us-east-1
       families: [Storage, System Operation]
+  - provider: aws
+    recipe: aws_nat_gateway
+    offer: .cache/ec2-nat-us-east-1.json
+    fetch:
+      service_code: AmazonEC2
+      region: us-east-1
+      families: [NAT Gateway]

@@ -75,6 +75,9 @@ _ROWS = [
     # EBS gp3 storage — priced a=values.size. From the ~450 MB EC2 offer, now in
     # the published sheet via the ijson stream-filter (#893).
     "AmazonEC2,Storage,type=aws_ebs_volume&values.type=gp3,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=storage,0.0800000000,a=values.size,USD",
+    # NAT gateway — deterministic always-on hours + usage-driven data processed.
+    "AmazonEC2,NAT Gateway,type=aws_nat_gateway,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=hours&start_usage_amount=0&end_usage_amount=Inf,0.0450000000,t,USD",
+    "AmazonEC2,NAT Gateway,type=aws_nat_gateway,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=data&start_usage_amount=0&end_usage_amount=Inf,0.0450000000,d,USD",
 ]
 
 
@@ -504,6 +507,30 @@ def test_usage_assumptions_flagged_with_bands_for_usage_driven_resources():
     assert inv["unit"] and inv["description"]
     # deterministic EC2 instance: no usage assumptions, field omitted.
     assert "usage_assumptions" not in by_addr["aws_instance.web"]
+
+
+def test_nat_gateway_deterministic_hours_plus_usage_driven_data():
+    """NAT gateway: the always-on hour is deterministic (confident), the data
+    processed is usage-driven and flagged with a band — the full #962 loop on a
+    net-new resource. (#893/#962)"""
+    plan = _plan(
+        [
+            {
+                "address": "aws_nat_gateway.n",
+                "type": "aws_nat_gateway",
+                "name": "n",
+                "mode": "managed",
+                "values": {"region": "us-east-1"},
+            }
+        ]
+    )
+    d = estimate(plan, _sheet()).to_dict()
+    r = d["resources"][0]
+    # hours 730*0.045=32.85 (deterministic) + data 100*0.045=4.50 (typical)
+    assert r["monthly"]["min"] == pytest.approx(730 * 0.045 + 100 * 0.045, abs=0.01)
+    dims = {ua["dimension"]: ua for ua in r["usage_assumptions"]}
+    assert set(dims) == {"data processed"}  # only data is an assumption, not hours
+    assert dims["data processed"]["low"] < dims["data processed"]["high"]
 
 
 def test_ec2_instance_prices():
