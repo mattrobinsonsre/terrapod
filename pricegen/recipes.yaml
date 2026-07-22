@@ -56,6 +56,10 @@ recipes:
     recipe: google_container_cluster
     offer: .cache/gcp-gke.json
     fetch: { service_id: "CCD8-9BF1-090E" } # Kubernetes Engine
+  - provider: gcp
+    recipe: google_dns_managed_zone
+    offer: .cache/gcp-dns.json
+    fetch: { service_id: "FA26-5236-B8B5" } # Cloud DNS
   - provider: aws
     recipe: aws_sqs_queue
     offer: .cache/sqs-us-east-1.json

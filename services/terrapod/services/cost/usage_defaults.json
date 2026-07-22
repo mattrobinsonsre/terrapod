@@ -556,5 +556,12 @@
       "typical": 50,
       "high": 5000
     }
+  },
+  {
+    "description": "Cloud DNS managed zone",
+    "match_query": "type = google_dns_managed_zone and service_class = zones",
+    "usage": {
+      "operations": 1
+    }
   }
 ]

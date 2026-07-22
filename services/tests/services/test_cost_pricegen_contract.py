@@ -148,6 +148,8 @@ _ROWS = [
     "AmazonCloudFront,Data Transfer,type=aws_cloudfront_distribution,service_provider=aws&purchase_option=on_demand&region=&service_class=data&start_usage_amount=10240&end_usage_amount=51200,0.0800000000,d,USD",
     # ECR (#1013) — image storage $0.10/GB-mo (band).
     "AmazonECR,EC2 Container Registry,type=aws_ecr_repository,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=storage&start_usage_amount=0&end_usage_amount=Inf,0.1000000000,d,USD",
+    # Cloud DNS zone (#1015) — flat $0.20/mo, global.
+    "Cloud DNS,ManagedZone,type=google_dns_managed_zone,service_provider=gcp&purchase_option=on_demand&service_class=zones&start_usage_amount=0&end_usage_amount=Inf,0.2000000000,o,USD",
 ]
 
 
@@ -1198,6 +1200,23 @@ def test_ecr_repository_storage_band():
     )
     d = estimate(plan, _sheet()).to_dict()
     assert d["resources"][0]["monthly"]["max"] == pytest.approx(50 * 0.10, abs=0.01)
+
+
+def test_gcp_dns_managed_zone_flat():
+    """google_dns_managed_zone is a flat $0.20/mo, global. (#1015)"""
+    plan = _plan(
+        [
+            {
+                "address": "google_dns_managed_zone.z",
+                "type": "google_dns_managed_zone",
+                "name": "z",
+                "mode": "managed",
+                "values": {"name": "ex"},
+            }
+        ]
+    )
+    d = estimate(plan, _sheet()).to_dict()
+    assert d["resources"][0]["monthly"]["max"] == pytest.approx(0.20, abs=0.001)
 
 
 def test_ec2_instance_prices():
