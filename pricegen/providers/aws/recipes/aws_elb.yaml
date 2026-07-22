@@ -1,0 +1,19 @@
+# Classic Load Balancer -> aws_elb. The legacy ELB (distinct from aws_lb's
+# ALB/NLB). Two charges from the AmazonEC2 offer's `Load Balancer` family: the
+# always-on HOUR ($0.025/hr — deterministic) and per-GB DATA processed
+# ($0.008/GB — usage-driven, a traffic guess with a band). Shares the cached EC2
+# download via the ijson stream-filter.
+resource_type: aws_elb
+service: AmazonEC2
+
+components:
+  - product_family: "^Load Balancer$"
+    service_class: hours
+    select: { usagetype: LoadBalancerUsage }
+    price: { type: t, unit: Hrs }
+    tier: usage
+  - product_family: "^Load Balancer$"
+    service_class: data
+    select: { usagetype: DataProcessing-Bytes }
+    price: { type: d, unit: GB }
+    tier: usage
