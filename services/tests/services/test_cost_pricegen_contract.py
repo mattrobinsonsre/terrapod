@@ -96,6 +96,10 @@ _ROWS = [
     "AmazonEC2,Storage Snapshot,type=aws_ebs_snapshot,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=storage&start_usage_amount=0&end_usage_amount=Inf,0.0500000000,d,USD",
     # EFS — usage-driven General Purpose stored size at $0.30/GB-month.
     "AmazonEFS,Storage,type=aws_efs_file_system,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=storage&start_usage_amount=0&end_usage_amount=Inf,0.3000000000,d,USD",
+    # Aurora cluster instance (aws_rds_cluster_instance) — deterministic per-hour,
+    # standard mode. r6g.large $0.26 (MySQL/PostgreSQL price identically -> one
+    # deduped row keyed on instance_class only).
+    "AmazonRDS,Database Instance,type=aws_rds_cluster_instance&values.instance_class=db.r6g.large,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=instance&start_usage_amount=0&end_usage_amount=Inf,0.2600000000,t,USD",
 ]
 
 
@@ -701,6 +705,31 @@ def test_efs_usage_driven_storage_band():
     data = {ua["dimension"]: ua for ua in r["usage_assumptions"]}["stored size"]
     assert data["cost_typical"] == pytest.approx(100 * 0.30, abs=0.01)
     assert data["cost_high"] == pytest.approx(50000 * 0.30, abs=0.01)
+
+
+def test_aurora_cluster_instance_prices_deterministically():
+    """aws_rds_cluster_instance (Aurora): deterministic per-hour, standard mode.
+    Matched on instance_class only (engine omitted — MySQL/PostgreSQL price the
+    same and dedup to one row). No usage band. (#893/#985)"""
+    plan = _plan(
+        [
+            {
+                "address": "aws_rds_cluster_instance.writer",
+                "type": "aws_rds_cluster_instance",
+                "name": "writer",
+                "mode": "managed",
+                "values": {
+                    "region": "us-east-1",
+                    "instance_class": "db.r6g.large",
+                    "engine": "aurora-postgresql",
+                },
+            }
+        ]
+    )
+    d = estimate(plan, _sheet()).to_dict()
+    r = d["resources"][0]
+    assert r["monthly"]["max"] == pytest.approx(730 * 0.26, abs=0.01)  # $189.80
+    assert "usage_assumptions" not in r  # deterministic
 
 
 def test_ec2_instance_prices():

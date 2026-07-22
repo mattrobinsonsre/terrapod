@@ -330,5 +330,12 @@
       "typical": 100,
       "high": 50000
     }
+  },
+  {
+    "description": "Aurora cluster instance hours (always-on)",
+    "match_query": "type = aws_rds_cluster_instance and service_class = instance",
+    "usage": {
+      "time": 730
+    }
   }
 ]

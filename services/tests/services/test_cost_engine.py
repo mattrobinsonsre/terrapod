@@ -273,8 +273,8 @@ def test_default_usage_catalogue_loads():
     # io1/io2 (#928) + Azure Linux VM hours (#931) + GCP Compute hours (#933) +
     # NAT gateway hours+data (#966) + Elastic IP hours (#973) + load balancer
     # hours+LCU (#977) + classic ELB hours+data (#979) + EBS snapshot storage
-    # (#981) + EFS storage (#983).
-    assert len(entries) == 30
+    # (#981) + EFS storage (#983) + Aurora cluster instance hours (#985).
+    assert len(entries) == 31
     ec2 = match_entry(
         _ms(
             ("type", "aws_instance"),

@@ -1,0 +1,26 @@
+# Aurora -> aws_rds_cluster_instance (the cluster's compute; aws_rds_cluster is
+# the storage/cluster). Priced per instance-hour, deterministic (an instance is
+# always-on). Aurora MySQL and PostgreSQL price identically, so we match only
+# instance_class (engine omitted; the redundant per-engine SKUs dedup to one
+# row). We select STANDARD-mode pricing (`InstanceUsage:`, NOT
+# `InstanceUsageIOOptimized:`) — the common default; the I/O-Optimized mode is
+# set on the parent aws_rds_cluster (storage_type=aurora-iopt1), not visible on
+# the instance resource, so it's a natural follow-up. From the cached AmazonRDS
+# offer. Serverless v2 (db.serverless, ACU-priced) is out of scope here.
+resource_type: aws_rds_cluster_instance
+service: AmazonRDS
+
+components:
+  - product_family: "^Database Instance$"
+    service_class: instance
+    select:
+      databaseEngine: { regex: "^Aurora" }
+      usagetype: { regex: "InstanceUsage:" }
+      # RDS reports "No license required" (lowercase l); the shared canonical uses
+      # EC2's "No License required" (capital L) — AWS is inconsistent across
+      # services — so override to match, exactly as aws_db_instance does.
+      licenseModel: No license required
+    match:
+      instance_class: { attr: instanceType }
+    price: { type: t, unit: Hrs }
+    tier: usage
