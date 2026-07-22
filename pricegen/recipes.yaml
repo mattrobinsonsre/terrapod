@@ -97,3 +97,7 @@ recipes:
     recipe: aws_efs_file_system
     offer: .cache/efs-us-east-1.json
     fetch: { service_code: AmazonEFS, region: us-east-1 }
+  - provider: aws
+    recipe: aws_rds_cluster_instance
+    offer: .cache/rds-us-east-1.json
+    fetch: { service_code: AmazonRDS, region: us-east-1 }

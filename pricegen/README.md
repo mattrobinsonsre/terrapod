@@ -127,7 +127,7 @@ operators mirror it as today. Weekly regeneration is the target cadence.
 
 - [x] Provider-agnostic architecture (adapter → Unit → shared engine)
 - [x] AWS adapter + `aws_instance` (parity) + `aws_ebs_volume` (composite, exceptions)
-- [x] AWS RDS (`aws_db_instance`): instance + storage + io1/io2 provisioned IOPS, all validated end-to-end
+- [x] AWS RDS (`aws_db_instance`): instance + storage + io1/io2 provisioned IOPS, all validated end-to-end; Aurora (`aws_rds_cluster_instance`) instance hours (standard mode, 90 classes)
 - [x] End-to-end pricing validation (real consumer engine, not just row-parity) + generator drift diagnostics
 - [x] Azure adapter + `azurerm_linux_virtual_machine` (regex select, validated end-to-end) — second cloud proven
 - [x] GCP computed engine + `google_compute_instance` (Σ vCPU-core + GiB-RAM, formulaic catalog, zone→region, validated end-to-end) — **all three clouds proven**
