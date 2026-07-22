@@ -186,6 +186,76 @@ def _price_products(
     return (pp, min_val, max_val)
 
 
+def _quote_group(
+    resource_ms: MatchSet, entry: Entry, group_products: list[Product]
+) -> list[PricedProduct]:
+    """Run the full price chain for one entry-group, returning its priced products.
+
+    Raises ``ResourceMissingAttr`` / ``AssertionError`` on a pathological combo
+    (the caller treats that as unpriced).
+    """
+    out: list[PricedProduct] = []
+    syn_entry, syn_products = _synthesize_usage_from_attr(resource_ms, entry, group_products)
+    prov_entry, prov_products = _apply_provision_amount(syn_entry, syn_products)
+    for bounded_entry, bounded_products in _apply_usage_amount(prov_entry, prov_products):
+        if not bounded_products:
+            continue
+        quoted = _price_products(bounded_entry, bounded_products)
+        if quoted is not None:
+            out.append(quoted[0])
+    return out
+
+
+def _sum_price(priced_products: list[PricedProduct]) -> Range[float]:
+    summed = Range(0.0, 0.0)
+    for pp in priced_products:
+        summed = append(lambda a, b: a + b, summed, pp.price)
+    return summed
+
+
+def _band_dimension_accessor(entry: Entry, typical: int) -> usage_mod.Accessor | None:
+    """Locate the usage dimension a banded entry varies — the one whose assumed
+    value equals the band's ``typical`` (the memory invariant "typical == usage
+    value"). ``None`` if it can't be located (misconfigured band)."""
+    if entry.usage is None:
+        return None
+    for acc in (usage_mod.TIME, usage_mod.OPERATIONS, usage_mod.DATA):
+        cur = acc.get(entry.usage)
+        if cur.min == cur.max == typical:
+            return acc
+    return None
+
+
+def _cost_band(
+    resource_ms: MatchSet, entry: Entry, group_products: list[Product]
+) -> tuple[float, float, float] | None:
+    """For a banded usage-driven entry, the monthly cost at the band's
+    low / typical / high usage — the dollar impact of the assumption (#962).
+
+    Re-prices the same product group with the varied dimension pinned to each
+    band point (so tiered/provisioned pricing is honoured at each point). Returns
+    ``None`` for a deterministic entry or a band we can't map to a dimension.
+    """
+    b = entry.bands or {}
+    lo, ty, hi = b.get("low"), b.get("typical"), b.get("high")
+    if not entry.assumption or lo is None or ty is None or hi is None:
+        return None
+    acc = _band_dimension_accessor(entry, int(ty))
+    if acc is None or entry.usage is None:
+        return None
+
+    def _at(v: int) -> float:
+        pinned = entry.with_usage(acc.set(Range(v, v), entry.usage))
+        # The upper bound of the point quote (== lower when there's no pricing
+        # ambiguity like license variants) is the cost at this usage level.
+        return _sum_price(_quote_group(resource_ms, pinned, group_products)).max
+
+    try:
+        return (_at(int(lo)), _at(int(ty)), _at(int(hi)))
+    except (ResourceMissingAttr, AssertionError):
+        return None
+
+
 def _region_matches(product: Product, region: str | None) -> bool:
     """Keep region-agnostic products and region-specific products in ``region``.
 
@@ -236,27 +306,26 @@ def price(
             products_by_key.setdefault(key, []).append(product)
 
         priced_products: list[PricedProduct] = []
+        # Per-usage-dimension monthly cost band (low, typical, high) for the
+        # usage-driven components, keyed by the band's dimension (#962).
+        cost_band_by_dim: dict[str, tuple[float, float, float]] = {}
         for key, group_products in products_by_key.items():
             entry = entry_by_key[key]
             try:
-                syn_entry, syn_products = _synthesize_usage_from_attr(
-                    resource_ms, entry, group_products
-                )
-                prov_entry, prov_products = _apply_provision_amount(syn_entry, syn_products)
-                for bounded_entry, bounded_products in _apply_usage_amount(
-                    prov_entry, prov_products
-                ):
-                    if not bounded_products:
-                        continue
-                    quoted = _price_products(bounded_entry, bounded_products)
-                    if quoted is not None:
-                        pp, _mn, _mx = quoted
-                        priced_products.append(pp)
-                        currency = pp.ccy
+                group_pps = _quote_group(resource_ms, entry, group_products)
             except (ResourceMissingAttr, AssertionError):
                 # Pathological product/usage combo — treat this resource as
                 # unpriced rather than crashing the whole estimate.
                 continue
+            for pp in group_pps:
+                priced_products.append(pp)
+                currency = pp.ccy
+            if group_pps:
+                band = _cost_band(resource_ms, entry, group_products)
+                if band is not None and entry.bands:
+                    dim = entry.bands.get("dimension")
+                    if dim is not None:
+                        cost_band_by_dim[dim] = band
 
         if priced_products:
             sign = -1.0 if change == "remove" else 1.0
@@ -271,6 +340,16 @@ def price(
             for used_entry in entry_by_key.values():
                 ua = used_entry.usage_assumption()
                 if ua is not None and ua["dimension"] not in seen_dims:
+                    # Attach the monthly cost at low/typical/high usage (the
+                    # dollar impact of the assumption) when we could price it.
+                    band = cost_band_by_dim.get(ua["dimension"])
+                    if band is not None:
+                        ua = {
+                            **ua,
+                            "cost_low": band[0],
+                            "cost_typical": band[1],
+                            "cost_high": band[2],
+                        }
                     assumptions.append(ua)
                     seen_dims.add(ua["dimension"])
             priced_resources.append(

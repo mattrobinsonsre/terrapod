@@ -1982,7 +1982,8 @@
       "credit": "Kostendaten von <oiq>OpenInfraQuote</oiq>.",
       "asOfState": "Stand Zustand v{serial}",
       "noState": "Noch keine Kosten — erscheint nach der ersten Anwendung.",
-      "usageBand": "{dimension}: {typical} {unit} typisch (Bereich {low}–{high})"
+      "usageBand": "{dimension}: {typical} {unit} typisch (Bereich {low}–{high})",
+      "usageBandCost": "{dimension}: {costTypical}/Mon. typisch — {costLow}–{costHigh} über {low}–{high} {unit}"
     },
     "costAi": {
       "heading": "KI-Kostenschätzung",

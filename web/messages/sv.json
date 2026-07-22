@@ -1982,7 +1982,8 @@
       "credit": "Kostnadsdata från <oiq>OpenInfraQuote</oiq>.",
       "asOfState": "enligt tillstånd v{serial}",
       "noState": "Ingen kostnad ännu — visas efter första tillämpningen.",
-      "usageBand": "{dimension}: {typical} {unit} typiskt (intervall {low}–{high})"
+      "usageBand": "{dimension}: {typical} {unit} typiskt (intervall {low}–{high})",
+      "usageBandCost": "{dimension}: {costTypical}/mån typiskt — {costLow}–{costHigh} vid {low}–{high} {unit}"
     },
     "costAi": {
       "heading": "AI-kostnadsuppskattning",

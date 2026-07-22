@@ -734,9 +734,11 @@ def render_cost_prompt(
         "`resources`; the ones the engine could NOT price are in `unpriced`, and "
         "THOSE are what you estimate). A priced resource may carry "
         "`usage_assumptions`: usage-driven line items (requests, data processed, "
-        "duration) priced at a TYPICAL guess, each with low/typical/high bands — "
-        "so its real cost can swing across that band with traffic, and the priced "
-        "figure is only the typical point:\n"
+        "duration) priced at a TYPICAL guess, each with a low/typical/high "
+        "quantity band AND its monthly dollar impact at each point "
+        "(`cost_low`/`cost_typical`/`cost_high`) — so its real cost can swing "
+        "across `cost_low`–`cost_high` with traffic, and the priced figure folds "
+        "in only `cost_typical`:\n"
         f"```json\n{estimate_json}\n```"
     )
     if plan_json.strip():

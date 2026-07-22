@@ -1982,7 +1982,8 @@
       "credit": "Maliyet verileri <oiq>OpenInfraQuote</oiq> kaynağından.",
       "asOfState": "durum v{serial} itibarıyla",
       "noState": "Henüz maliyet yok — ilk uygulamadan sonra görünür.",
-      "usageBand": "{dimension}: tipik {typical} {unit} (aralık {low}–{high})"
+      "usageBand": "{dimension}: tipik {typical} {unit} (aralık {low}–{high})",
+      "usageBandCost": "{dimension}: {costTypical}/ay tipik — {low}–{high} {unit} aralığında {costLow}–{costHigh}"
     },
     "costAi": {
       "heading": "AI maliyet tahmini",

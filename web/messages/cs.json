@@ -1982,7 +1982,8 @@
       "credit": "Data o nákladech od <oiq>OpenInfraQuote</oiq>.",
       "asOfState": "dle stavu v{serial}",
       "noState": "Zatím žádné náklady — zobrazí se po prvním použití.",
-      "usageBand": "{dimension}: typicky {typical} {unit} (rozsah {low}–{high})"
+      "usageBand": "{dimension}: typicky {typical} {unit} (rozsah {low}–{high})",
+      "usageBandCost": "{dimension}: {costTypical}/měs typicky — {costLow}–{costHigh} při {low}–{high} {unit}"
     },
     "costAi": {
       "heading": "Odhad nákladů od AI",

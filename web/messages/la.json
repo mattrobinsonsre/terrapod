@@ -1982,7 +1982,8 @@
       "credit": "Data impensae ex <oiq>OpenInfraQuote</oiq>.",
       "asOfState": "secundum statum v{serial}",
       "noState": "Nullus sumptus adhuc — post primam applicationem apparet.",
-      "usageBand": "{dimension}: {typical} {unit} usitate (ambitus {low}–{high})"
+      "usageBand": "{dimension}: {typical} {unit} usitate (ambitus {low}–{high})",
+      "usageBandCost": "{dimension}: {costTypical}/mens. usitate — {costLow}–{costHigh} inter {low}–{high} {unit}"
     },
     "costAi": {
       "heading": "Aestimatio impensae per AI",

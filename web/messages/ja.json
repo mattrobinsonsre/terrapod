@@ -1982,7 +1982,8 @@
       "credit": "コストデータの提供元: <oiq>OpenInfraQuote</oiq>。",
       "asOfState": "状態 v{serial} 時点",
       "noState": "まだコストはありません — 最初の適用後に表示されます。",
-      "usageBand": "{dimension}：標準 {typical} {unit}（範囲 {low}〜{high}）"
+      "usageBand": "{dimension}：標準 {typical} {unit}（範囲 {low}〜{high}）",
+      "usageBandCost": "{dimension}：標準 {costTypical}/月 — {low}〜{high} {unit} で {costLow}〜{costHigh}"
     },
     "costAi": {
       "heading": "AI コスト見積もり",

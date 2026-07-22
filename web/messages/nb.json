@@ -1982,7 +1982,8 @@
       "credit": "Kostnadsdata fra <oiq>OpenInfraQuote</oiq>.",
       "asOfState": "per tilstand v{serial}",
       "noState": "Ingen kostnad ennå — vises etter første anvendelse.",
-      "usageBand": "{dimension}: {typical} {unit} typisk (område {low}–{high})"
+      "usageBand": "{dimension}: {typical} {unit} typisk (område {low}–{high})",
+      "usageBandCost": "{dimension}: {costTypical}/mnd typisk — {costLow}–{costHigh} ved {low}–{high} {unit}"
     },
     "costAi": {
       "heading": "AI-kostnadsestimat",

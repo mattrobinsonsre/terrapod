@@ -1982,7 +1982,8 @@
       "credit": "成本数据来自 <oiq>OpenInfraQuote</oiq>。",
       "asOfState": "截至状态 v{serial}",
       "noState": "暂无成本 — 首次应用后显示。",
-      "usageBand": "{dimension}：典型 {typical} {unit}（范围 {low}–{high}）"
+      "usageBand": "{dimension}：典型 {typical} {unit}（范围 {low}–{high}）",
+      "usageBandCost": "{dimension}：典型 {costTypical}/月 — {low}–{high} {unit} 区间 {costLow}–{costHigh}"
     },
     "costAi": {
       "heading": "AI 成本估算",

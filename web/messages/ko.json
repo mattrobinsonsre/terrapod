@@ -1982,7 +1982,8 @@
       "credit": "비용 데이터 제공: <oiq>OpenInfraQuote</oiq>.",
       "asOfState": "상태 v{serial} 기준",
       "noState": "아직 비용이 없습니다 — 첫 적용 후에 표시됩니다.",
-      "usageBand": "{dimension}: 일반적으로 {typical} {unit} (범위 {low}–{high})"
+      "usageBand": "{dimension}: 일반적으로 {typical} {unit} (범위 {low}–{high})",
+      "usageBandCost": "{dimension}: 월 {costTypical} 일반 — {low}–{high} {unit}에서 {costLow}–{costHigh}"
     },
     "costAi": {
       "heading": "AI 비용 추정",

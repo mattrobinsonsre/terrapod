@@ -3352,8 +3352,8 @@ Requires `run:read` on the run's workspace. Returns the runner-produced estimate
       "diff": { "min": 146.0, "max": 146.0 },
       "resources": [
         { "address": "aws_instance.eu", "type": "aws_instance", "name": "eu", "change": "add", "monthly": { "min": 146.0, "max": 146.0 } },
-        { "address": "aws_nat_gateway.gw", "type": "aws_nat_gateway", "name": "gw", "change": "add", "monthly": { "min": 32.85, "max": 37.85 },
-          "usage_assumptions": [ { "description": "NAT data processed", "dimension": "data processed", "unit": "GB/month", "low": 10, "typical": 100, "high": 50000 } ] }
+        { "address": "aws_nat_gateway.gw", "type": "aws_nat_gateway", "name": "gw", "change": "add", "monthly": { "min": 37.35, "max": 37.35 },
+          "usage_assumptions": [ { "description": "NAT data processed", "dimension": "data processed", "unit": "GB/month", "low": 10, "typical": 100, "high": 50000, "cost_low": 0.45, "cost_typical": 4.50, "cost_high": 2250.0 } ] }
       ],
       "unpriced": [ { "address": "random_pet.name", "type": "random_pet", "change": "add" } ]
     },
@@ -3369,7 +3369,7 @@ Requires `run:read` on the run's workspace. Returns the runner-produced estimate
 | `previous` | Projected monthly spend of the prior state (`total − diff`). |
 | `diff` | Monthly delta this run introduces (adds positive, removes negative). |
 | `resources[]` | Per-resource cost; `change` is `add` / `remove` / `noop`. |
-| `resources[].usage_assumptions[]` | Present only on resources whose cost depends on runtime usage the plan doesn't declare (data processed, invocations, storage). Each entry is `{description, dimension, unit, low, typical, high}`: the `monthly` figure assumes `typical`; the true cost sits in `low`–`high`. Raw data — surfaced independently of the AI layer so the estimate is honest with AI off. Omitted for deterministically-priced resources. |
+| `resources[].usage_assumptions[]` | Present only on resources whose cost depends on runtime usage the plan doesn't declare (data processed, invocations, storage). Each entry is `{description, dimension, unit, low, typical, high, cost_low, cost_typical, cost_high}`: `low`/`typical`/`high` are the assumed *quantity* (in `unit`); `cost_low`/`cost_typical`/`cost_high` are the resulting monthly *cost* at each. The `monthly` figure folds in `cost_typical`; the true cost sits in `cost_low`–`cost_high` as usage varies. `cost_*` are omitted if the band couldn't be priced. Raw data — surfaced independently of the AI layer so the estimate is honest with AI off. Omitted entirely for deterministically-priced resources. |
 | `unpriced[]` | Resources nothing in the pricesheet matched (unmapped/free type, or a provider the data doesn't cover). |
 
 ### Show Workspace Cost Estimate

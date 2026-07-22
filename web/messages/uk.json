@@ -1982,7 +1982,8 @@
       "credit": "Дані про вартість від <oiq>OpenInfraQuote</oiq>.",
       "asOfState": "станом на v{serial}",
       "noState": "Вартості поки немає — з'явиться після першого застосування.",
-      "usageBand": "{dimension}: типово {typical} {unit} (діапазон {low}–{high})"
+      "usageBand": "{dimension}: типово {typical} {unit} (діапазон {low}–{high})",
+      "usageBandCost": "{dimension}: {costTypical}/міс типово — {costLow}–{costHigh} при {low}–{high} {unit}"
     },
     "costAi": {
       "heading": "Оцінка витрат ШІ",

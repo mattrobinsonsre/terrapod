@@ -503,8 +503,11 @@ def test_usage_assumptions_flagged_with_bands_for_usage_driven_resources():
     dims = {ua["dimension"]: ua for ua in lam["usage_assumptions"]}
     assert "invocations" in dims and "duration" in dims
     inv = dims["invocations"]
-    assert inv["low"] < inv["typical"] < inv["high"]  # a real band
+    assert inv["low"] < inv["typical"] < inv["high"]  # a real quantity band
     assert inv["unit"] and inv["description"]
+    # Each band also carries its monthly dollar impact at low/typical/high (#962).
+    assert inv["cost_low"] < inv["cost_typical"] < inv["cost_high"]
+    assert inv["cost_low"] >= 0
     # deterministic EC2 instance: no usage assumptions, field omitted.
     assert "usage_assumptions" not in by_addr["aws_instance.web"]
 
@@ -530,7 +533,16 @@ def test_nat_gateway_deterministic_hours_plus_usage_driven_data():
     assert r["monthly"]["min"] == pytest.approx(730 * 0.045 + 100 * 0.045, abs=0.01)
     dims = {ua["dimension"]: ua for ua in r["usage_assumptions"]}
     assert set(dims) == {"data processed"}  # only data is an assumption, not hours
-    assert dims["data processed"]["low"] < dims["data processed"]["high"]
+    data = dims["data processed"]
+    assert data["low"] < data["high"]
+    # Per-item COST band (#962): the monthly dollar impact at low/typical/high
+    # usage. data rate 0.045/GB → 10→$0.45, 100→$4.50, 50000→$2250.
+    assert data["cost_low"] == pytest.approx(10 * 0.045, abs=0.01)
+    assert data["cost_typical"] == pytest.approx(100 * 0.045, abs=0.01)
+    assert data["cost_high"] == pytest.approx(50000 * 0.045, abs=0.01)
+    # The headline monthly stays at typical (hours + typical data), NOT the
+    # widened band — so workspace totals don't balloon on the high bound.
+    assert r["monthly"]["max"] == pytest.approx(730 * 0.045 + data["cost_typical"], abs=0.01)
 
 
 def test_ec2_instance_prices():

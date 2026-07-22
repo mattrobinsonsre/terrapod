@@ -1982,7 +1982,8 @@
       "credit": "Cost data from <oiq>OpenInfraQuote</oiq>.",
       "asOfState": "as o' state v{serial}",
       "noState": "No booty yet — appears after th' first apply.",
-      "usageBand": "{dimension}: {typical} {unit} be usual (twixt {low}–{high})"
+      "usageBand": "{dimension}: {typical} {unit} be usual (twixt {low}–{high})",
+      "usageBandCost": "{dimension}: {costTypical}/mo be usual — {costLow}–{costHigh} twixt {low}–{high} {unit}"
     },
     "costAi": {
       "heading": "AI booty reckonin''",

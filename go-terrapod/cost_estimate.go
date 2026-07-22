@@ -33,6 +33,13 @@ type CostResource struct {
 
 // UsageAssumption describes one usage-driven cost component whose quantity was a
 // low/typical/high judgement rather than a fact from the plan (#962).
+//
+// Low/Typical/High are the assumed *quantity* (e.g. GB/month); CostLow/
+// CostTypical/CostHigh are the resulting monthly *cost* in the estimate's
+// currency at each of those quantities — the honest dollar range of the
+// assumption (usable with the AI off). The Cost* fields are pointers: nil when
+// the server couldn't price the band (rare — a misconfigured or unpriceable
+// component), distinct from a genuine $0.
 type UsageAssumption struct {
 	Description string  `json:"description"`
 	Dimension  string  `json:"dimension"`
@@ -40,6 +47,10 @@ type UsageAssumption struct {
 	Low        float64 `json:"low"`
 	Typical    float64 `json:"typical"`
 	High       float64 `json:"high"`
+
+	CostLow     *float64 `json:"cost_low,omitempty"`
+	CostTypical *float64 `json:"cost_typical,omitempty"`
+	CostHigh    *float64 `json:"cost_high,omitempty"`
 }
 
 // UnpricedResource is a resource nothing in the pricesheet matched (unmapped
