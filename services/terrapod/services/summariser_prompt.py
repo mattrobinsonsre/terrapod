@@ -732,7 +732,11 @@ def render_cost_prompt(
     user_parts.append(
         "DETERMINISTIC_COST_ESTIMATE (authoritative — priced resources are in "
         "`resources`; the ones the engine could NOT price are in `unpriced`, and "
-        "THOSE are what you estimate):\n"
+        "THOSE are what you estimate). A priced resource may carry "
+        "`usage_assumptions`: usage-driven line items (requests, data processed, "
+        "duration) priced at a TYPICAL guess, each with low/typical/high bands — "
+        "so its real cost can swing across that band with traffic, and the priced "
+        "figure is only the typical point:\n"
         f"```json\n{estimate_json}\n```"
     )
     if plan_json.strip():
@@ -740,7 +744,12 @@ def render_cost_prompt(
     user_parts.append(
         "Now call the `submit_cost_summary` tool exactly once: estimate the "
         "UNPRICED resources in `estimated_resources` (the primary output), then "
-        "any savings advisories, then an optional brief narrative."
+        "any savings advisories, then an optional brief narrative. Where a priced "
+        "resource carries `usage_assumptions`, use them: in the narrative/"
+        "advisories, flag the usage-driven items that dominate its cost, and — "
+        "only where the resource's own context (name, config, workspace) clearly "
+        "suggests it — say whether its real usage sits toward the low or high end "
+        "of the band. Do not restate the deterministic figures as your own."
     )
 
     user_message = "\n\n".join(user_parts)

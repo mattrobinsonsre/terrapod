@@ -472,6 +472,40 @@ def test_ebs_gp3_volume_prices_by_size():
     assert est.resources[0].monthly_min == pytest.approx(100 * 0.08, abs=0.01)  # $8.00
 
 
+def test_usage_assumptions_flagged_with_bands_for_usage_driven_resources():
+    """A usage-driven resource (Lambda) exposes usage_assumptions with
+    low/typical/high bands so the AI/UI can flag + refine them; a deterministic
+    resource (an EC2 instance — always-on hours) exposes none (#962)."""
+    plan = _plan(
+        [
+            {
+                "address": "aws_lambda_function.f",
+                "type": "aws_lambda_function",
+                "name": "f",
+                "mode": "managed",
+                "values": {"region": "us-east-1", "memory_size": 512},
+            },
+            {
+                "address": "aws_instance.web",
+                "type": "aws_instance",
+                "name": "web",
+                "mode": "managed",
+                "values": {"instance_type": "m5.large", "region": "us-east-1"},
+            },
+        ]
+    )
+    d = estimate(plan, _sheet()).to_dict()
+    by_addr = {r["address"]: r for r in d["resources"]}
+    lam = by_addr["aws_lambda_function.f"]
+    dims = {ua["dimension"]: ua for ua in lam["usage_assumptions"]}
+    assert "invocations" in dims and "duration" in dims
+    inv = dims["invocations"]
+    assert inv["low"] < inv["typical"] < inv["high"]  # a real band
+    assert inv["unit"] and inv["description"]
+    # deterministic EC2 instance: no usage assumptions, field omitted.
+    assert "usage_assumptions" not in by_addr["aws_instance.web"]
+
+
 def test_ec2_instance_prices():
     plan = {
         "format_version": "1.2",

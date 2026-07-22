@@ -14,7 +14,7 @@ filter of the upstream CLI is not needed by Terrapod and is omitted.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from terrapod.services.cost import usage as usage_mod
 from terrapod.services.cost.match_set import MatchSet
@@ -53,6 +53,12 @@ class PricedResource:
     change: Change
     price: Range[float]
     products: list[PricedProduct]
+    # The usage assumptions folded into this resource's cost — each a
+    # {description, dimension, unit, low, typical, high} for a usage-driven
+    # component (requests, data, duration) whose quantity was guessed, not read
+    # from the plan. Empty for a fully-deterministic resource. Surfaced so the
+    # UI can flag assumptions and the AI can refine them per-resource (#962).
+    usage_assumptions: list[dict] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -258,6 +264,15 @@ def price(
             for pp in priced_products:
                 summed = append(lambda a, b: a + b, summed, pp.price)
             resource_price = Range(sign * summed.min, sign * summed.max)
+            # Collect the usage assumptions that fed this resource's cost (one per
+            # dimension) — the usage-driven entries that matched its products.
+            assumptions: list[dict] = []
+            seen_dims: set = set()
+            for used_entry in entry_by_key.values():
+                ua = used_entry.usage_assumption()
+                if ua is not None and ua["dimension"] not in seen_dims:
+                    assumptions.append(ua)
+                    seen_dims.add(ua["dimension"])
             priced_resources.append(
                 PricedResource(
                     address=resource.address,
@@ -266,6 +281,7 @@ def price(
                     change=change,
                     price=resource_price,
                     products=priced_products,
+                    usage_assumptions=assumptions,
                 )
             )
         else:

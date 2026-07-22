@@ -40,6 +40,10 @@ class ResourceCost:
     change: Change
     monthly_min: float
     monthly_max: float
+    # Usage-driven components whose quantity was assumed, each a
+    # {description, dimension, unit, low, typical, high} — so the estimate can
+    # flag them and the AI can refine them per-resource (#962).
+    usage_assumptions: list[dict] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -75,6 +79,10 @@ class CostEstimate:
                     "name": r.name,
                     "change": r.change,
                     "monthly": {"min": r.monthly_min, "max": r.monthly_max},
+                    # Additive (#962): usage-driven line items whose quantity was
+                    # assumed, with low/typical/high bands. Omitted when empty so
+                    # deterministic resources' payload is unchanged.
+                    **({"usage_assumptions": r.usage_assumptions} if r.usage_assumptions else {}),
                 }
                 for r in self.resources
             ],
@@ -129,6 +137,7 @@ def estimate(
             change=pr.change,
             monthly_min=pr.price.min,
             monthly_max=pr.price.max,
+            usage_assumptions=pr.usage_assumptions,
         )
         for pr in result.resources
     ]
