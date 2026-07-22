@@ -300,5 +300,20 @@
       "typical": 100,
       "high": 50000
     }
+  },
+  {
+    "description": "EBS snapshot stored size (incremental)",
+    "match_query": "type = aws_ebs_snapshot and service_class = storage",
+    "usage": {
+      "data": 100
+    },
+    "assumption": true,
+    "bands": {
+      "dimension": "stored size",
+      "unit": "GB-month",
+      "low": 8,
+      "typical": 100,
+      "high": 16000
+    }
   }
 ]

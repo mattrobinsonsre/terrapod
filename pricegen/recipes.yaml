@@ -86,3 +86,10 @@ recipes:
       service_code: AmazonEC2
       region: us-east-1
       families: [Load Balancer]
+  - provider: aws
+    recipe: aws_ebs_snapshot
+    offer: .cache/ec2-snapshot-us-east-1.json
+    fetch:
+      service_code: AmazonEC2
+      region: us-east-1
+      families: [Storage Snapshot]

@@ -1,0 +1,16 @@
+# EBS snapshot -> aws_ebs_snapshot. Standard snapshot storage at $0.05/GB-month.
+# The billed size is the INCREMENTAL (changed-block) size, which the plan can't
+# tell us (aws_ebs_snapshot.volume_size is the source volume size, not the
+# incremental stored size, and is Computed anyway), so it's usage-driven with a
+# band (#962). We match only the plain `EBS:SnapshotUsage` SKU — NOT the archive
+# tier (SnapshotArchive*), outposts (.outposts), or the UnderBilling variant.
+# From the cached AmazonEC2 offer (Storage Snapshot family).
+resource_type: aws_ebs_snapshot
+service: AmazonEC2
+
+components:
+  - product_family: "^Storage Snapshot$"
+    service_class: storage
+    select: { usagetype: { regex: "EBS:SnapshotUsage$" } }
+    price: { type: d, unit: GB-Mo }
+    tier: usage
