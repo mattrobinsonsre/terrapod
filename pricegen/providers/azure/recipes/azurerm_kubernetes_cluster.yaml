@@ -1,0 +1,14 @@
+# Azure AKS -> azurerm_kubernetes_cluster. The Standard tier carries a $0.10/hr
+# cluster uptime-SLA (control-plane) fee; the Free tier (the Terraform default)
+# is $0 and correctly stays unpriced. We match sku_tier=Standard. Node pools are
+# separate azurerm VMs (priced by the VM recipes). From the AKS offer.
+resource_type: azurerm_kubernetes_cluster
+service: Azure Kubernetes Service
+
+components:
+  - product_family: "^Azure Kubernetes Service$"
+    service_class: hours
+    select: { meterName: "Standard Uptime SLA" }
+    match: { sku_tier: { const: Standard } }
+    price: { type: t, unit: "1 Hour" }
+    tier: usage

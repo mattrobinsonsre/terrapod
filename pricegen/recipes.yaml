@@ -24,6 +24,14 @@ recipes:
     recipe: azurerm_public_ip
     offer: .cache/azure-vnet-eastus.json
     fetch: { service_name: "Virtual Network", region: eastus }
+  - provider: azure
+    recipe: azurerm_kubernetes_cluster
+    offer: .cache/azure-aks-eastus.json
+    fetch: { service_name: "Azure Kubernetes Service", region: eastus }
+  - provider: azure
+    recipe: azurerm_storage_account
+    offer: .cache/azure-storage-eastus.json
+    fetch: { service_name: "Storage", region: eastus }
   - provider: gcp
     recipe: google_compute_instance
     offer: .cache/gcp-compute.json

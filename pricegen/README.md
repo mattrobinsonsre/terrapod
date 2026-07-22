@@ -129,7 +129,7 @@ operators mirror it as today. Weekly regeneration is the target cadence.
 - [x] AWS adapter + `aws_instance` (parity) + `aws_ebs_volume` (composite, exceptions)
 - [x] AWS RDS (`aws_db_instance`): instance + storage + io1/io2 provisioned IOPS, all validated end-to-end; Aurora (`aws_rds_cluster_instance`) instance hours (standard mode, 90 classes)
 - [x] End-to-end pricing validation (real consumer engine, not just row-parity) + generator drift diagnostics
-- [x] Azure adapter + `azurerm_linux_virtual_machine`, `azurerm_windows_virtual_machine` (Windows-licensed meter), `azurerm_public_ip` (Standard Static hourly) — validated end-to-end
+- [x] Azure adapter + `azurerm_linux_virtual_machine`, `azurerm_windows_virtual_machine` (Windows meter), `azurerm_public_ip`, `azurerm_kubernetes_cluster` (AKS Standard tier), `azurerm_storage_account` (Standard Hot, replication-matched, volume-tiered) — validated end-to-end. Azure adapter now bounds tiered meters (each tier ends at the next tier's start, not Inf)
 - [x] GCP computed engine + `google_compute_instance` (Σ vCPU-core + GiB-RAM, formulaic catalog, zone→region); `google_compute_disk` (pd-standard/balanced/ssd, per-GiB), `google_compute_address` (static IP hourly) — validated end-to-end. GCP adapter skips leading $0 tiers (unlocks pd-standard + IPs; bills the marginal rate from 0)
 - [x] Publish pipeline: `fetch_offers` (official APIs) → `publish` (combined gzipped-YAML sheet + drift manifest) → `drift` guardrail → scheduled workflow to a rolling GitHub Release
 - [x] Consumer reads the Terrapod YAML sheet (flip of `cost_estimation.prices_url` default deferred until coverage parity)

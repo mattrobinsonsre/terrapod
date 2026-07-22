@@ -121,6 +121,12 @@ _ROWS = [
     # with num_cache_nodes via the count-multiply feature. memcached t3.micro
     # $0.017/hr.
     "AmazonElastiCache,Cache Instance,type=aws_elasticache_cluster&values.node_type=cache.t3.micro&values.engine=memcached,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=nodes&start_usage_amount=0&end_usage_amount=Inf,0.0170000000,t,USD",
+    # Azure AKS (#997) — Standard tier $0.10/hr (Free tier stays unpriced).
+    # Azure storage account — Standard Hot LRS, VOLUME-TIERED (proper tier ends
+    # from the adapter fix): $0.0208 to 50 TB, then $0.019968, then $0.019136.
+    "Azure Kubernetes Service,Azure Kubernetes Service,type=azurerm_kubernetes_cluster&values.sku_tier=Standard,service_provider=azure&purchase_option=on_demand&region=eastus&service_class=hours&start_usage_amount=0&end_usage_amount=Inf,0.1,t,USD",
+    "Storage,Storage,type=azurerm_storage_account&values.account_replication_type=LRS,service_provider=azure&purchase_option=on_demand&region=eastus&service_class=storage&start_usage_amount=0&end_usage_amount=51200,0.0208,d,USD",
+    "Storage,Storage,type=azurerm_storage_account&values.account_replication_type=LRS,service_provider=azure&purchase_option=on_demand&region=eastus&service_class=storage&start_usage_amount=51200&end_usage_amount=512000,0.019968,d,USD",
 ]
 
 
@@ -947,6 +953,62 @@ def test_count_multiply_defaults_to_one_when_attr_absent():
     )
     d = estimate(plan, _sheet()).to_dict()
     assert d["resources"][0]["monthly"]["max"] == pytest.approx(730 * 0.017, abs=0.01)
+
+
+def test_azure_aks_standard_and_free():
+    """Azure AKS: Standard tier is a $0.10/hr control-plane fee ($73/mo); the
+    Free tier (the Terraform default) stays unpriced ($0). (#997)"""
+    std = _plan(
+        [
+            {
+                "address": "azurerm_kubernetes_cluster.std",
+                "type": "azurerm_kubernetes_cluster",
+                "name": "std",
+                "mode": "managed",
+                "values": {"location": "eastus", "sku_tier": "Standard"},
+            }
+        ]
+    )
+    d = estimate(std, _sheet()).to_dict()
+    assert d["resources"][0]["monthly"]["max"] == pytest.approx(730 * 0.1, abs=0.01)
+    free = _plan(
+        [
+            {
+                "address": "azurerm_kubernetes_cluster.free",
+                "type": "azurerm_kubernetes_cluster",
+                "name": "free",
+                "mode": "managed",
+                "values": {"location": "eastus", "sku_tier": "Free"},
+            }
+        ]
+    )
+    d = estimate(free, _sheet()).to_dict()
+    assert d["resources"] == []  # Free tier is $0 -> unpriced
+
+
+def test_azure_storage_account_volume_tiered():
+    """Azure storage account (Standard Hot LRS) is usage-driven and VOLUME-TIERED
+    — the adapter fix gives each tier a proper end, so a >50 TB account is priced
+    across tiers rather than double-counted. 5 TB = 5000 * 0.0208 = $104. (#997)"""
+    plan = _plan(
+        [
+            {
+                "address": "azurerm_storage_account.sa",
+                "type": "azurerm_storage_account",
+                "name": "sa",
+                "mode": "managed",
+                "values": {"location": "eastus", "account_replication_type": "LRS"},
+            }
+        ]
+    )
+    d = estimate(plan, _sheet()).to_dict()
+    r = d["resources"][0]
+    assert r["monthly"]["max"] == pytest.approx(5000 * 0.0208, abs=0.01)  # typical 5 TB
+    band = {ua["dimension"]: ua for ua in r["usage_assumptions"]}["stored data"]
+    # high 500 TB is tiered: 51200*.0208 + 460800*.019968 + 12800(*... clipped) —
+    # the point is it is well BELOW the flat-rate 500000*.0208 = $10400 (no
+    # double-count) and above the second tier. Assert it applied the discount.
+    assert band["cost_high"] < 500000 * 0.0208
 
 
 def test_ec2_instance_prices():
