@@ -59,6 +59,9 @@ _ROWS = [
     "Compute Engine,SSD backed PD Capacity,type=google_compute_disk&values.type=pd-ssd,service_provider=gcp&purchase_option=on_demand&region=us-central1&service_class=storage,0.1700000000,a=values.size,USD",
     "Compute Engine,Storage PD Capacity,type=google_compute_disk&values.type=pd-standard,service_provider=gcp&purchase_option=on_demand&region=us-central1&service_class=storage,0.0400000000,a=values.size,USD",
     "Compute Engine,Static Ip Charge,type=google_compute_address,service_provider=gcp&purchase_option=on_demand&region=us-central1&service_class=hours&start_usage_amount=0&end_usage_amount=Inf,0.0100000000,t,USD",
+    # API Gateway (#993) — REST tiered ($3.50/M first tier) + HTTP ($1.00/M).
+    "AmazonApiGateway,API Calls,type=aws_api_gateway_rest_api,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=requests&start_usage_amount=0&end_usage_amount=333000000,0.0000035000,o,USD",
+    "AmazonApiGateway,API Calls,type=aws_apigatewayv2_api&values.protocol_type=HTTP,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=requests&start_usage_amount=0&end_usage_amount=300000000,0.0000010000,o,USD",
     # SQS — first request tier for a standard (fifo=false) and a FIFO queue. The
     # CORRECT mapping: FIFO is pricier ($0.50/M) than Standard ($0.40/M); oiq has
     # these inverted, so this row set deliberately does NOT match oiq.
@@ -846,6 +849,34 @@ def test_gcp_disk_and_static_ip():
     assert by["google_compute_address.ip"]["monthly"]["max"] == pytest.approx(
         730 * 0.01, abs=0.01
     )  # $7.30
+
+
+def test_api_gateway_rest_and_http_request_bands():
+    """API Gateway REST ($3.50/M first tier) and HTTP ($1.00/M) price per-request
+    with usage bands; HTTP is stamped protocol_type=HTTP. (#993)"""
+    plan = _plan(
+        [
+            {
+                "address": "aws_api_gateway_rest_api.r",
+                "type": "aws_api_gateway_rest_api",
+                "name": "r",
+                "mode": "managed",
+                "values": {"region": "us-east-1"},
+            },
+            {
+                "address": "aws_apigatewayv2_api.h",
+                "type": "aws_apigatewayv2_api",
+                "name": "h",
+                "mode": "managed",
+                "values": {"region": "us-east-1", "protocol_type": "HTTP"},
+            },
+        ]
+    )
+    d = estimate(plan, _sheet()).to_dict()
+    by = {r["address"]: r for r in d["resources"]}
+    # typical 10M requests: REST 10M*3.5e-6 = $35, HTTP 10M*1e-6 = $10.
+    assert by["aws_api_gateway_rest_api.r"]["monthly"]["max"] == pytest.approx(35.0, abs=0.5)
+    assert by["aws_apigatewayv2_api.h"]["monthly"]["max"] == pytest.approx(10.0, abs=0.5)
 
 
 def test_ec2_instance_prices():

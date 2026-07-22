@@ -275,8 +275,9 @@ def test_default_usage_catalogue_loads():
     # hours+LCU (#977) + classic ELB hours+data (#979) + EBS snapshot storage
     # (#981) + EFS storage (#983) + Aurora cluster instance hours (#985) +
     # KMS key + Secrets Manager secret + SNS publishes (#987) + Azure Windows VM
-    # + Azure public IP (#989) + GCP persistent disk + GCP static IP (#991).
-    assert len(entries) == 38
+    # + Azure public IP (#989) + GCP persistent disk + GCP static IP (#991) +
+    # API Gateway REST + HTTP requests (#993).
+    assert len(entries) == 40
     ec2 = match_entry(
         _ms(
             ("type", "aws_instance"),

@@ -1,0 +1,13 @@
+# API Gateway REST API -> aws_api_gateway_rest_api. Per-request pricing, tiered
+# by monthly volume ($3.50/M for the first 333M, then cheaper). Usage-driven, so
+# it carries a band. The tiers flow through from the offer's priceDimensions.
+# From the small AmazonApiGateway offer. (HTTP APIs are aws_apigatewayv2_api.)
+resource_type: aws_api_gateway_rest_api
+service: AmazonApiGateway
+
+components:
+  - product_family: "^API Calls$"
+    service_class: requests
+    select: { usagetype: { regex: "ApiGatewayRequest$" } }
+    price: { type: o, unit: Requests }
+    tier: usage

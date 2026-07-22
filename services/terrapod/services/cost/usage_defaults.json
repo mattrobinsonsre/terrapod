@@ -391,5 +391,35 @@
     "usage": {
       "time": 730
     }
+  },
+  {
+    "description": "API Gateway REST requests",
+    "match_query": "type = aws_api_gateway_rest_api and service_class = requests",
+    "usage": {
+      "operations": 10000000
+    },
+    "assumption": true,
+    "bands": {
+      "dimension": "requests",
+      "unit": "requests/month",
+      "low": 1000000,
+      "typical": 10000000,
+      "high": 1000000000
+    }
+  },
+  {
+    "description": "API Gateway HTTP requests",
+    "match_query": "type = aws_apigatewayv2_api and service_class = requests",
+    "usage": {
+      "operations": 10000000
+    },
+    "assumption": true,
+    "bands": {
+      "dimension": "requests",
+      "unit": "requests/month",
+      "low": 1000000,
+      "typical": 10000000,
+      "high": 1000000000
+    }
   }
 ]
