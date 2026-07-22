@@ -146,6 +146,8 @@ _ROWS = [
     # 10 TB), global (empty region), usage-driven band.
     "AmazonCloudFront,Data Transfer,type=aws_cloudfront_distribution,service_provider=aws&purchase_option=on_demand&region=&service_class=data&start_usage_amount=0&end_usage_amount=10240,0.0850000000,d,USD",
     "AmazonCloudFront,Data Transfer,type=aws_cloudfront_distribution,service_provider=aws&purchase_option=on_demand&region=&service_class=data&start_usage_amount=10240&end_usage_amount=51200,0.0800000000,d,USD",
+    # ECR (#1013) — image storage $0.10/GB-mo (band).
+    "AmazonECR,EC2 Container Registry,type=aws_ecr_repository,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=storage&start_usage_amount=0&end_usage_amount=Inf,0.1000000000,d,USD",
 ]
 
 
@@ -1179,6 +1181,23 @@ def test_cloudfront_us_data_transfer_band():
     )
     d = estimate(plan, _sheet()).to_dict()
     assert d["resources"][0]["monthly"]["max"] == pytest.approx(5000 * 0.085, abs=0.01)
+
+
+def test_ecr_repository_storage_band():
+    """aws_ecr_repository: container image storage $0.10/GB-month (band). (#1013)"""
+    plan = _plan(
+        [
+            {
+                "address": "aws_ecr_repository.r",
+                "type": "aws_ecr_repository",
+                "name": "r",
+                "mode": "managed",
+                "values": {"region": "us-east-1"},
+            }
+        ]
+    )
+    d = estimate(plan, _sheet()).to_dict()
+    assert d["resources"][0]["monthly"]["max"] == pytest.approx(50 * 0.10, abs=0.01)
 
 
 def test_ec2_instance_prices():

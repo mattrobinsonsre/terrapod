@@ -541,5 +541,20 @@
       "typical": 5000,
       "high": 1000000
     }
+  },
+  {
+    "description": "ECR image storage",
+    "match_query": "type = aws_ecr_repository and service_class = storage",
+    "usage": {
+      "data": 50
+    },
+    "assumption": true,
+    "bands": {
+      "dimension": "stored images",
+      "unit": "GB-month",
+      "low": 1,
+      "typical": 50,
+      "high": 5000
+    }
   }
 ]

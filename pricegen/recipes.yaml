@@ -177,3 +177,7 @@ recipes:
     recipe: aws_cloudfront_distribution
     offer: .cache/cloudfront.json
     fetch: { service_code: AmazonCloudFront, global: true }
+  - provider: aws
+    recipe: aws_ecr_repository
+    offer: .cache/ecr-us-east-1.json
+    fetch: { service_code: AmazonECR, region: us-east-1 }

@@ -1,0 +1,12 @@
+# ECR -> aws_ecr_repository. Container image storage at $0.10/GB-month, usage-
+# driven (repo size unknown -> band). We match the standard TimedStorage SKU
+# (not the Archive tier). From the AmazonECR offer.
+resource_type: aws_ecr_repository
+service: AmazonECR
+
+components:
+  - product_family: "^EC2 Container Registry$"
+    service_class: storage
+    select: { usagetype: { regex: "TimedStorage-ByteHrs$" } }
+    price: { type: d, unit: GB-Mo }
+    tier: usage
