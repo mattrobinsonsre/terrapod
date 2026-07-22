@@ -1,0 +1,15 @@
+# EFS -> aws_efs_file_system. Standard General Purpose regional storage at
+# $0.30/GB-month. The stored size is usage-driven (EFS grows/shrinks with the
+# data written; not a plan attribute), so it's a band (#962). We select the
+# General Purpose storage class explicitly, so the One Zone ($0.16), Infrequent
+# Access, and Archive tiers are excluded (each a distinct storageClass — natural
+# follow-ups). From the small AmazonEFS offer.
+resource_type: aws_efs_file_system
+service: AmazonEFS
+
+components:
+  - product_family: "^Storage$"
+    service_class: storage
+    select: { storageClass: "General Purpose" }
+    price: { type: d, unit: GB-Mo }
+    tier: usage

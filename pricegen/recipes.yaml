@@ -93,3 +93,7 @@ recipes:
       service_code: AmazonEC2
       region: us-east-1
       families: [Storage Snapshot]
+  - provider: aws
+    recipe: aws_efs_file_system
+    offer: .cache/efs-us-east-1.json
+    fetch: { service_code: AmazonEFS, region: us-east-1 }

@@ -94,6 +94,8 @@ _ROWS = [
     "AmazonEC2,Load Balancer,type=aws_elb,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=data&start_usage_amount=0&end_usage_amount=Inf,0.0080000000,d,USD",
     # EBS snapshot — usage-driven incremental stored size at $0.05/GB-month.
     "AmazonEC2,Storage Snapshot,type=aws_ebs_snapshot,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=storage&start_usage_amount=0&end_usage_amount=Inf,0.0500000000,d,USD",
+    # EFS — usage-driven General Purpose stored size at $0.30/GB-month.
+    "AmazonEFS,Storage,type=aws_efs_file_system,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=storage&start_usage_amount=0&end_usage_amount=Inf,0.3000000000,d,USD",
 ]
 
 
@@ -677,6 +679,28 @@ def test_ebs_snapshot_usage_driven_storage_band():
     data = {ua["dimension"]: ua for ua in r["usage_assumptions"]}["stored size"]
     assert data["cost_typical"] == pytest.approx(100 * 0.05, abs=0.01)
     assert data["cost_high"] == pytest.approx(16000 * 0.05, abs=0.01)
+
+
+def test_efs_usage_driven_storage_band():
+    """aws_efs_file_system: General Purpose stored size is usage-driven ($0.30/
+    GB-month) — EFS grows with the data written, not a plan attribute. (#983)"""
+    plan = _plan(
+        [
+            {
+                "address": "aws_efs_file_system.fs",
+                "type": "aws_efs_file_system",
+                "name": "fs",
+                "mode": "managed",
+                "values": {"region": "us-east-1"},
+            }
+        ]
+    )
+    d = estimate(plan, _sheet()).to_dict()
+    r = d["resources"][0]
+    assert r["monthly"]["max"] == pytest.approx(100 * 0.30, abs=0.01)  # typical 100 GB
+    data = {ua["dimension"]: ua for ua in r["usage_assumptions"]}["stored size"]
+    assert data["cost_typical"] == pytest.approx(100 * 0.30, abs=0.01)
+    assert data["cost_high"] == pytest.approx(50000 * 0.30, abs=0.01)
 
 
 def test_ec2_instance_prices():
