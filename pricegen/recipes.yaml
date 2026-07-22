@@ -173,3 +173,7 @@ recipes:
     recipe: aws_route53_zone
     offer: .cache/route53.json
     fetch: { service_code: AmazonRoute53, global: true }
+  - provider: aws
+    recipe: aws_cloudfront_distribution
+    offer: .cache/cloudfront.json
+    fetch: { service_code: AmazonCloudFront, global: true }

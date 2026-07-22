@@ -142,6 +142,10 @@ _ROWS = [
     "Storage,Storage,type=azurerm_managed_disk&values.storage_account_type=Premium_LRS,service_provider=azure&purchase_option=on_demand&region=eastus&service_class=disk&tier_max_gb=256,38.012142,o,USD",
     # Route53 hosted zone (#1009) — flat $0.50/zone, GLOBAL (empty region= dim).
     "AmazonRoute53,DNS Zone,type=aws_route53_zone,service_provider=aws&purchase_option=on_demand&region=&service_class=zones&start_usage_amount=0&end_usage_amount=25,0.5000000000,o,USD",
+    # CloudFront (#1011) — US-tier data transfer out, tiered ($0.085/GB first
+    # 10 TB), global (empty region), usage-driven band.
+    "AmazonCloudFront,Data Transfer,type=aws_cloudfront_distribution,service_provider=aws&purchase_option=on_demand&region=&service_class=data&start_usage_amount=0&end_usage_amount=10240,0.0850000000,d,USD",
+    "AmazonCloudFront,Data Transfer,type=aws_cloudfront_distribution,service_provider=aws&purchase_option=on_demand&region=&service_class=data&start_usage_amount=10240&end_usage_amount=51200,0.0800000000,d,USD",
 ]
 
 
@@ -1156,6 +1160,25 @@ def test_route53_zone_flat_global():
     )
     d = estimate(plan, _sheet()).to_dict()
     assert d["resources"][0]["monthly"]["max"] == pytest.approx(0.50, abs=0.001)
+
+
+def test_cloudfront_us_data_transfer_band():
+    """aws_cloudfront_distribution prices US-tier data transfer out (tiered) as a
+    usage band; it's global (empty region). 5 TB in the first tier = 5000 *
+    0.085 = $425. (#1011)"""
+    plan = _plan(
+        [
+            {
+                "address": "aws_cloudfront_distribution.d",
+                "type": "aws_cloudfront_distribution",
+                "name": "d",
+                "mode": "managed",
+                "values": {},
+            }
+        ]
+    )
+    d = estimate(plan, _sheet()).to_dict()
+    assert d["resources"][0]["monthly"]["max"] == pytest.approx(5000 * 0.085, abs=0.01)
 
 
 def test_ec2_instance_prices():

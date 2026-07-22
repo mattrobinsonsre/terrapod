@@ -526,5 +526,20 @@
     "usage": {
       "operations": 1
     }
+  },
+  {
+    "description": "CloudFront data transfer out (US tier)",
+    "match_query": "type = aws_cloudfront_distribution and service_class = data",
+    "usage": {
+      "data": 5000
+    },
+    "assumption": true,
+    "bands": {
+      "dimension": "data transfer out",
+      "unit": "GB/month",
+      "low": 100,
+      "typical": 5000,
+      "high": 1000000
+    }
   }
 ]
