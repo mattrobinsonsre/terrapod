@@ -1,0 +1,23 @@
+# VPC Interface endpoint -> aws_vpc_endpoint (vpc_endpoint_type=Interface /
+# PrivateLink). Two charges: the endpoint HOUR ($0.01/hr) and per-GB data
+# processed ($0.01/GB, tiered). Gateway endpoints (S3/DynamoDB) are free and
+# correctly stay unpriced (they don't match Interface). NOTE: the hourly charge
+# is per-AZ (per ENI); we price a single ENI as the baseline — a multi-subnet
+# endpoint costs proportionally more (per-AZ count is a follow-up). From the
+# AmazonVPC offer.
+resource_type: aws_vpc_endpoint
+service: AmazonVPC
+
+components:
+  - product_family: "^VpcEndpoint$"
+    service_class: hours
+    select: { usagetype: { regex: "VpcEndpoint-Hours$" }, endpointType: PrivateLink }
+    match: { vpc_endpoint_type: { const: Interface } }
+    price: { type: t, unit: Hrs }
+    tier: usage
+  - product_family: "^VpcEndpoint$"
+    service_class: data
+    select: { usagetype: { regex: "VpcEndpoint-Bytes$" }, endpointType: PrivateLink }
+    match: { vpc_endpoint_type: { const: Interface } }
+    price: { type: d, unit: GB }
+    tier: usage

@@ -487,5 +487,27 @@
       "attr": "values.shard_count",
       "default": 1
     }
+  },
+  {
+    "description": "VPC interface endpoint hours (per ENI)",
+    "match_query": "type = aws_vpc_endpoint and service_class = hours",
+    "usage": {
+      "time": 730
+    }
+  },
+  {
+    "description": "VPC interface endpoint data",
+    "match_query": "type = aws_vpc_endpoint and service_class = data",
+    "usage": {
+      "data": 100
+    },
+    "assumption": true,
+    "bands": {
+      "dimension": "data processed",
+      "unit": "GB/month",
+      "low": 10,
+      "typical": 100,
+      "high": 100000
+    }
   }
 ]

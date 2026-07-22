@@ -133,6 +133,9 @@ _ROWS = [
     "Kubernetes Engine,Zonal Kubernetes Clusters,type=google_container_cluster,service_provider=gcp&purchase_option=on_demand&service_class=hours&start_usage_amount=0&end_usage_amount=Inf,0.1000000000,t,USD",
     # Kinesis (#1003) — per shard-hour $0.015, scaled by shard_count (count-multiply).
     "AmazonKinesis,Kinesis Streams,type=aws_kinesis_stream,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=shards&start_usage_amount=0&end_usage_amount=Inf,0.0150000000,t,USD",
+    # VPC interface endpoint (#1005) — $0.01/hr per ENI + data processed band.
+    "AmazonVPC,VpcEndpoint,type=aws_vpc_endpoint&values.vpc_endpoint_type=Interface,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=hours&start_usage_amount=0&end_usage_amount=Inf,0.0100000000,t,USD",
+    "AmazonVPC,VpcEndpoint,type=aws_vpc_endpoint&values.vpc_endpoint_type=Interface,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=data&start_usage_amount=0&end_usage_amount=Inf,0.0100000000,d,USD",
 ]
 
 
@@ -1072,6 +1075,38 @@ def test_kinesis_stream_scales_with_shard_count():
     )
     d = estimate(plan, _sheet()).to_dict()
     assert d["resources"][0]["monthly"]["max"] == pytest.approx(4 * 730 * 0.015, abs=0.01)
+
+
+def test_vpc_interface_endpoint_hours_plus_data():
+    """aws_vpc_endpoint Interface: $0.01/hr per ENI + data band. A Gateway
+    endpoint (S3/DynamoDB) is free and stays unpriced. (#1005)"""
+    iface = _plan(
+        [
+            {
+                "address": "aws_vpc_endpoint.i",
+                "type": "aws_vpc_endpoint",
+                "name": "i",
+                "mode": "managed",
+                "values": {"region": "us-east-1", "vpc_endpoint_type": "Interface"},
+            }
+        ]
+    )
+    d = estimate(iface, _sheet()).to_dict()
+    # hours 730*0.01 + data typical 100*0.01 = 7.30 + 1.00 = 8.30
+    assert d["resources"][0]["monthly"]["max"] == pytest.approx(730 * 0.01 + 100 * 0.01, abs=0.01)
+    gw = _plan(
+        [
+            {
+                "address": "aws_vpc_endpoint.g",
+                "type": "aws_vpc_endpoint",
+                "name": "g",
+                "mode": "managed",
+                "values": {"region": "us-east-1", "vpc_endpoint_type": "Gateway"},
+            }
+        ]
+    )
+    d = estimate(gw, _sheet()).to_dict()
+    assert d["resources"] == []  # Gateway endpoints are free
 
 
 def test_ec2_instance_prices():
