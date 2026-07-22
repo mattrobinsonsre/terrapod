@@ -31,6 +31,9 @@ interface UsageAssumption {
   low: number
   typical: number
   high: number
+  cost_low?: number
+  cost_typical?: number
+  cost_high?: number
 }
 interface CostResource {
   address: string
@@ -114,14 +117,30 @@ export function CostPanel({ runId, workspaceId }: { runId?: string; workspaceId?
   // to the AI layer, which is optional) so the raw estimate is honest: this cost
   // assumes `typical`, and could sit anywhere in `low`–`high` (#962).
   const qty = (n: number) => new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(n)
-  const bandLine = (a: UsageAssumption) =>
-    t('cost.usageBand', {
+  const bandLine = (a: UsageAssumption) => {
+    // When the server priced the band, lead with the dollar range (the
+    // actionable figure): typical cost folded into `monthly`, plus the honest
+    // low–high the bill could reach as usage varies. Fall back to the raw
+    // quantity band if the cost couldn't be priced.
+    if (a.cost_typical != null && a.cost_low != null && a.cost_high != null) {
+      return t('cost.usageBandCost', {
+        dimension: a.dimension,
+        costTypical: money(a.cost_typical),
+        costLow: money(a.cost_low),
+        costHigh: money(a.cost_high),
+        low: qty(a.low),
+        high: qty(a.high),
+        unit: a.unit,
+      })
+    }
+    return t('cost.usageBand', {
       dimension: a.dimension,
       typical: qty(a.typical),
       low: qty(a.low),
       high: qty(a.high),
       unit: a.unit,
     })
+  }
   const Bands = ({ list }: { list?: UsageAssumption[] }) =>
     list && list.length ? (
       <ul className="mt-1 space-y-0.5">

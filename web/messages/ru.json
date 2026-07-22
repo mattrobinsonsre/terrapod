@@ -1982,7 +1982,8 @@
       "credit": "Данные о стоимости от <oiq>OpenInfraQuote</oiq>.",
       "asOfState": "по состоянию v{serial}",
       "noState": "Стоимости пока нет — появится после первого применения.",
-      "usageBand": "{dimension}: типично {typical} {unit} (диапазон {low}–{high})"
+      "usageBand": "{dimension}: типично {typical} {unit} (диапазон {low}–{high})",
+      "usageBandCost": "{dimension}: {costTypical}/мес типично — {costLow}–{costHigh} при {low}–{high} {unit}"
     },
     "costAi": {
       "heading": "Оценка стоимости ИИ",

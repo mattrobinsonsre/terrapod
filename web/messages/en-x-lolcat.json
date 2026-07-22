@@ -1982,7 +1982,8 @@
       "credit": "Cost data from <oiq>OpenInfraQuote</oiq>.",
       "asOfState": "as of state v{serial}",
       "noState": "No cost yet — appears after teh furst apply.",
-      "usageBand": "{dimension}: {typical} {unit} usual (rangez {low}–{high})"
+      "usageBand": "{dimension}: {typical} {unit} usual (rangez {low}–{high})",
+      "usageBandCost": "{dimension}: {costTypical}/mo usual — {costLow}–{costHigh} across {low}–{high} {unit}"
     },
     "costAi": {
       "heading": "AI cost estim8",

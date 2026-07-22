@@ -1982,7 +1982,8 @@
       "credit": "داده‌های هزینه از <oiq>OpenInfraQuote</oiq>.",
       "asOfState": "بر اساس وضعیت v{serial}",
       "noState": "هنوز هزینه‌ای نیست — پس از اولین اعمال نمایش داده می‌شود.",
-      "usageBand": "{dimension}: {typical} {unit} معمول (بازه {low}–{high})"
+      "usageBand": "{dimension}: {typical} {unit} معمول (بازه {low}–{high})",
+      "usageBandCost": "{dimension}: {costTypical}/ماه معمول — {costLow}–{costHigh} در بازه {low}–{high} {unit}"
     },
     "costAi": {
       "heading": "برآورد هزینه با هوش مصنوعی",

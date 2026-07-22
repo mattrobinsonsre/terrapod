@@ -1982,7 +1982,8 @@
       "credit": "Kostengegevens van <oiq>OpenInfraQuote</oiq>.",
       "asOfState": "vanaf status v{serial}",
       "noState": "Nog geen kosten — verschijnt na de eerste toepassing.",
-      "usageBand": "{dimension}: {typical} {unit} typisch (bereik {low}–{high})"
+      "usageBand": "{dimension}: {typical} {unit} typisch (bereik {low}–{high})",
+      "usageBandCost": "{dimension}: {costTypical}/mnd typisch — {costLow}–{costHigh} over {low}–{high} {unit}"
     },
     "costAi": {
       "heading": "AI-kostenraming",

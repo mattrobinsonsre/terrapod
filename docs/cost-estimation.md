@@ -56,10 +56,13 @@ Each such resource carries a `usage_assumptions` array, one entry per metered di
 |---|---|
 | `description` | Human-readable label for the assumption |
 | `dimension` | What is being metered (e.g. `data processed`) |
-| `unit` | Unit of the bounds (e.g. `GB/month`) |
-| `low` / `typical` / `high` | The band — the monthly cost is based on `typical`; the true cost sits somewhere in `low`–`high` |
+| `unit` | Unit of the quantity bounds (e.g. `GB/month`) |
+| `low` / `typical` / `high` | The assumed **quantity** band |
+| `cost_low` / `cost_typical` / `cost_high` | The resulting monthly **cost** at each quantity — the dollar impact of the assumption. Omitted if the band couldn't be priced |
 
-Both Cost tabs render these beneath the resource (e.g. *"data processed: 100 GB/month typical (range 10–50000)"*); the `terrapod_workspace_cost` data source and the `go-terrapod` SDK expose them as `usage_assumptions` on each resource. Bounds are set to be honest raw — a `high` covers a genuinely busy resource, not a token value — so an operator reading the deterministic estimate can judge where their real workload sits.
+The `monthly` figure folds in `cost_typical` (so workspace totals stay at a sensible point estimate, not the high bound); the true cost of that line item sits somewhere in `cost_low`–`cost_high` as usage varies. A NAT gateway, for instance, is priced at ~$4.50/mo of data at typical usage, but `cost_high` shows it would cost **~$2,250/mo** if it processed 50 TB — the honest upper bound, visible without turning on the AI.
+
+Both Cost tabs render this beneath the resource (e.g. *"data processed: $4.50/mo typical — $0.45–$2,250 across 10–50000 GB/month"*); the `terrapod_workspace_cost` data source and the `go-terrapod` SDK expose the same fields on each resource. Bounds are set to be honest raw — a `high` covers a genuinely busy resource, not a token value — so an operator reading the deterministic estimate can judge where their real workload sits.
 
 ## Correctness — proven against the real oiq
 

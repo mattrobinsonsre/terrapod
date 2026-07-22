@@ -1982,7 +1982,8 @@
       "credit": "Kustannustiedot: <oiq>OpenInfraQuote</oiq>.",
       "asOfState": "tilan v{serial} mukaan",
       "noState": "Ei vielä kustannuksia — näkyy ensimmäisen käytön jälkeen.",
-      "usageBand": "{dimension}: tyypillisesti {typical} {unit} (vaihteluväli {low}–{high})"
+      "usageBand": "{dimension}: tyypillisesti {typical} {unit} (vaihteluväli {low}–{high})",
+      "usageBandCost": "{dimension}: {costTypical}/kk tyypillisesti — {costLow}–{costHigh} välillä {low}–{high} {unit}"
     },
     "costAi": {
       "heading": "Tekoälyn kustannusarvio",

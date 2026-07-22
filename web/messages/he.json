@@ -1982,7 +1982,8 @@
       "credit": "נתוני עלות מ־<oiq>OpenInfraQuote</oiq>.",
       "asOfState": "נכון למצב v{serial}",
       "noState": "עדיין אין עלות — מופיעה לאחר ההחלה הראשונה.",
-      "usageBand": "{dimension}: {typical} {unit} טיפוסי (טווח {low}–{high})"
+      "usageBand": "{dimension}: {typical} {unit} טיפוסי (טווח {low}–{high})",
+      "usageBandCost": "{dimension}: {costTypical}/חודש טיפוסי — {costLow}–{costHigh} על פני {low}–{high} {unit}"
     },
     "costAi": {
       "heading": "אומדן עלות מבוסס AI",

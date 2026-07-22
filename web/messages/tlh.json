@@ -1982,7 +1982,8 @@
       "credit": "Cost data from <oiq>OpenInfraQuote</oiq>.",
       "asOfState": "Dotlh v{serial} rurlaw'",
       "noState": "wagh tu'lu'be' — wa'DIch lo' ghevqo' 'ej cha'lu'.",
-      "usageBand": "{dimension}: {typical} {unit} typical (range {low}–{high})"
+      "usageBand": "{dimension}: {typical} {unit} typical (range {low}–{high})",
+      "usageBandCost": "{dimension}: {costTypical}/mo typical — {costLow}–{costHigh} across {low}–{high} {unit}"
     },
     "costAi": {
       "heading": "AI wagh Qel",

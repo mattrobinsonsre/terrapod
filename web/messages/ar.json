@@ -1982,7 +1982,8 @@
       "credit": "بيانات التكلفة من <oiq>OpenInfraQuote</oiq>.",
       "asOfState": "اعتبارًا من الحالة v{serial}",
       "noState": "لا توجد تكلفة بعد — تظهر بعد أول تطبيق.",
-      "usageBand": "{dimension}: {typical} {unit} نموذجي (النطاق {low}–{high})"
+      "usageBand": "{dimension}: {typical} {unit} نموذجي (النطاق {low}–{high})",
+      "usageBandCost": "{dimension}: {costTypical}/شهر نموذجي — {costLow}–{costHigh} عبر {low}–{high} {unit}"
     },
     "costAi": {
       "heading": "تقدير التكلفة بالذكاء الاصطناعي",

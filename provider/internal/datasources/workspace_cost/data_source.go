@@ -66,6 +66,11 @@ type usageAssumptionObj struct {
 	Low        types.Float64 `tfsdk:"low"`
 	Typical    types.Float64 `tfsdk:"typical"`
 	High       types.Float64 `tfsdk:"high"`
+	// Monthly cost at low/typical/high usage — null when the server couldn't
+	// price the band.
+	CostLow     types.Float64 `tfsdk:"cost_low"`
+	CostTypical types.Float64 `tfsdk:"cost_typical"`
+	CostHigh    types.Float64 `tfsdk:"cost_high"`
 }
 
 type unpricedObj struct {
@@ -75,12 +80,15 @@ type unpricedObj struct {
 }
 
 var usageAssumptionAttrTypes = map[string]attr.Type{
-	"description": types.StringType,
-	"dimension":   types.StringType,
-	"unit":        types.StringType,
-	"low":         types.Float64Type,
-	"typical":     types.Float64Type,
-	"high":        types.Float64Type,
+	"description":  types.StringType,
+	"dimension":    types.StringType,
+	"unit":         types.StringType,
+	"low":          types.Float64Type,
+	"typical":      types.Float64Type,
+	"high":         types.Float64Type,
+	"cost_low":     types.Float64Type,
+	"cost_typical": types.Float64Type,
+	"cost_high":    types.Float64Type,
 }
 
 var costResourceAttrTypes = map[string]attr.Type{
@@ -97,6 +105,15 @@ var unpricedAttrTypes = map[string]attr.Type{
 	"address": types.StringType,
 	"type":    types.StringType,
 	"change":  types.StringType,
+}
+
+// float64PtrValue maps an optional API float (nil = "the server didn't price
+// this band") to a Terraform Float64, null when absent.
+func float64PtrValue(p *float64) types.Float64 {
+	if p == nil {
+		return types.Float64Null()
+	}
+	return types.Float64Value(*p)
 }
 
 // NewDataSource returns a new workspace-cost data source.
@@ -147,9 +164,12 @@ func (d *workspaceCostDataSource) Schema(_ context.Context, _ datasource.SchemaR
 									"description": schema.StringAttribute{Description: "Human-readable label for the assumption.", Computed: true},
 									"dimension":   schema.StringAttribute{Description: "What is being metered (e.g. \"data processed\").", Computed: true},
 									"unit":        schema.StringAttribute{Description: "Unit of the band bounds (e.g. \"GB/month\").", Computed: true},
-									"low":         schema.Float64Attribute{Description: "Low-usage bound.", Computed: true},
-									"typical":     schema.Float64Attribute{Description: "Typical (assumed) usage — the point estimate the monthly cost is based on.", Computed: true},
-									"high":        schema.Float64Attribute{Description: "High-usage bound.", Computed: true},
+									"low":          schema.Float64Attribute{Description: "Low-usage bound (quantity).", Computed: true},
+									"typical":      schema.Float64Attribute{Description: "Typical (assumed) usage quantity — the point estimate the monthly cost is based on.", Computed: true},
+									"high":         schema.Float64Attribute{Description: "High-usage bound (quantity).", Computed: true},
+									"cost_low":     schema.Float64Attribute{Description: "Monthly cost at low usage; null when unpriceable.", Computed: true},
+									"cost_typical": schema.Float64Attribute{Description: "Monthly cost at typical usage (the amount folded into `monthly`); null when unpriceable.", Computed: true},
+									"cost_high":    schema.Float64Attribute{Description: "Monthly cost at high usage — the honest upper bound if usage runs hot; null when unpriceable.", Computed: true},
 								},
 							},
 						},
@@ -223,6 +243,9 @@ func (d *workspaceCostDataSource) Read(ctx context.Context, req datasource.ReadR
 				Low:         types.Float64Value(a.Low),
 				Typical:     types.Float64Value(a.Typical),
 				High:        types.Float64Value(a.High),
+				CostLow:     float64PtrValue(a.CostLow),
+				CostTypical: float64PtrValue(a.CostTypical),
+				CostHigh:    float64PtrValue(a.CostHigh),
 			})
 		}
 		bandList, diags := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: usageAssumptionAttrTypes}, bands)

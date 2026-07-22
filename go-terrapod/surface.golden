@@ -716,6 +716,9 @@ field UpdateWorkspaceRequest.VCSRepoURL string `json:"vcs-repo-url,omitempty"`
 field UpdateWorkspaceRequest.VCSWorkflow string `json:"vcs-workflow,omitempty"`
 field UpdateWorkspaceRequest.VarFiles []string `json:"var-files,omitempty"`
 field UpdateWorkspaceRequest.WorkingDirectory string `json:"working-directory,omitempty"`
+field UsageAssumption.CostHigh *float64 `json:"cost_high,omitempty"`
+field UsageAssumption.CostLow *float64 `json:"cost_low,omitempty"`
+field UsageAssumption.CostTypical *float64 `json:"cost_typical,omitempty"`
 field UsageAssumption.Description string `json:"description"`
 field UsageAssumption.Dimension string `json:"dimension"`
 field UsageAssumption.High float64 `json:"high"`

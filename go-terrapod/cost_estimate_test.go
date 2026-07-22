@@ -34,7 +34,7 @@ const costEstimateBody = `{"data":{"id":"cost-estimate-abc","type":"cost-estimat
     "resources":[
       {"address":"aws_instance.eu","type":"aws_instance","name":"eu","change":"add","monthly":{"min":146.0,"max":146.0}},
       {"address":"aws_instance.us","type":"aws_instance","name":"us","change":"noop","monthly":{"min":73.0,"max":73.0},
-       "usage_assumptions":[{"description":"NAT data","dimension":"data processed","unit":"GB/month","low":10,"typical":100,"high":50000}]}
+       "usage_assumptions":[{"description":"NAT data","dimension":"data processed","unit":"GB/month","low":10,"typical":100,"high":50000,"cost_low":0.45,"cost_typical":4.5,"cost_high":2250.0}]}
     ],
     "unpriced":[
       {"address":"random_pet.name","type":"random_pet","change":"add"}
@@ -66,6 +66,16 @@ func TestGetRunCostEstimate(t *testing.T) {
 	if ua := e.Resources[1].UsageAssumptions; len(ua) != 1 || ua[0].Dimension != "data processed" ||
 		ua[0].Typical != 100 || ua[0].High != 50000 {
 		t.Errorf("usage_assumptions not decoded: %+v", e.Resources[1].UsageAssumptions)
+	}
+	if ct := e.Resources[1].UsageAssumptions[0].CostTypical; ct == nil || *ct != 4.5 {
+		t.Errorf("cost_typical not decoded: %v", ct)
+	}
+	if ch := e.Resources[1].UsageAssumptions[0].CostHigh; ch == nil || *ch != 2250.0 {
+		t.Errorf("cost_high not decoded: %v", ch)
+	}
+	// Deterministic resource has no cost band pointers set either.
+	if len(e.Resources[0].UsageAssumptions) != 0 {
+		t.Errorf("resource[0] should carry no assumptions")
 	}
 	if e.Resources[0].Change != "add" || e.Resources[0].Monthly.Min != 146.0 {
 		t.Errorf("resource not decoded: %+v", e.Resources[0])

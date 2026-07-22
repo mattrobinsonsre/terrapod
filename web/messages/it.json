@@ -1982,7 +1982,8 @@
       "credit": "Dati sui costi da <oiq>OpenInfraQuote</oiq>.",
       "asOfState": "allo stato v{serial}",
       "noState": "Nessun costo ancora — compare dopo la prima applicazione.",
-      "usageBand": "{dimension}: {typical} {unit} tipico (intervallo {low}–{high})"
+      "usageBand": "{dimension}: {typical} {unit} tipico (intervallo {low}–{high})",
+      "usageBandCost": "{dimension}: {costTypical}/mese tipico — {costLow}–{costHigh} su {low}–{high} {unit}"
     },
     "costAi": {
       "heading": "Stima dei costi tramite IA",

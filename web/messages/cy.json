@@ -1982,7 +1982,8 @@
       "credit": "Data cost gan <oiq>OpenInfraQuote</oiq>.",
       "asOfState": "fel ar gyflwr v{serial}",
       "noState": "Dim cost eto — mae'n ymddangos ar ôl y gweithrediad cyntaf.",
-      "usageBand": "{dimension}: {typical} {unit} nodweddiadol (ystod {low}–{high})"
+      "usageBand": "{dimension}: {typical} {unit} nodweddiadol (ystod {low}–{high})",
+      "usageBandCost": "{dimension}: {costTypical}/mis nodweddiadol — {costLow}–{costHigh} ar draws {low}–{high} {unit}"
     },
     "costAi": {
       "heading": "Amcangyfrif cost gan AI",
