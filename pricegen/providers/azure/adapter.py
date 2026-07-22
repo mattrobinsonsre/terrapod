@@ -56,10 +56,15 @@ def iter_units(offer: dict, *, term: str = "Consumption"):
         # size's price. Mirrors the AWS adapter skipping items with no USD price.
         if usd is None or usd == 0:
             continue
+        # Include armRegionName: Azure reuses a meterId ACROSS regions, so
+        # grouping by meterId alone would merge every region's copy of a single-
+        # tier meter and set their ends to each other (a bogus [0,0] tier). Each
+        # (meter, type, term, region) is its own independent tier ladder.
         key = (
             item.get("meterId") or item.get("meterName"),
             item.get("type", ""),
             item.get("reservationTerm", ""),
+            item.get("armRegionName", ""),
         )
         groups[key].append(item)
 

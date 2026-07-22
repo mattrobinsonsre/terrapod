@@ -150,6 +150,8 @@ _ROWS = [
     "AmazonECR,EC2 Container Registry,type=aws_ecr_repository,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=storage&start_usage_amount=0&end_usage_amount=Inf,0.1000000000,d,USD",
     # Cloud DNS zone (#1015) — flat $0.20/mo, global.
     "Cloud DNS,ManagedZone,type=google_dns_managed_zone,service_provider=gcp&purchase_option=on_demand&service_class=zones&start_usage_amount=0&end_usage_amount=Inf,0.2000000000,o,USD",
+    # Azure Container Registry (#1017) — flat per-tier daily fee. Premium $1.6666/day.
+    "Container Registry,Container Registry,type=azurerm_container_registry&values.sku=Premium,service_provider=azure&purchase_option=on_demand&region=eastus&service_class=registry&start_usage_amount=0&end_usage_amount=Inf,1.6666,t,USD",
 ]
 
 
@@ -1217,6 +1219,24 @@ def test_gcp_dns_managed_zone_flat():
     )
     d = estimate(plan, _sheet()).to_dict()
     assert d["resources"][0]["monthly"]["max"] == pytest.approx(0.20, abs=0.001)
+
+
+def test_azure_container_registry_tier_fee():
+    """azurerm_container_registry is a flat per-tier daily fee; Premium ~$50/mo
+    (1.6666/day * 30). Matched on sku. (#1017)"""
+    plan = _plan(
+        [
+            {
+                "address": "azurerm_container_registry.r",
+                "type": "azurerm_container_registry",
+                "name": "r",
+                "mode": "managed",
+                "values": {"location": "eastus", "sku": "Premium"},
+            }
+        ]
+    )
+    d = estimate(plan, _sheet()).to_dict()
+    assert d["resources"][0]["monthly"]["max"] == pytest.approx(30 * 1.6666, abs=0.01)
 
 
 def test_ec2_instance_prices():
