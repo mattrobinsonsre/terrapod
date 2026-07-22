@@ -40,6 +40,10 @@ recipes:
     recipe: azurerm_container_registry
     offer: .cache/azure-acr.json
     fetch: { service_name: "Container Registry", region: eastus }
+  - provider: azure
+    recipe: azurerm_postgresql_flexible_server
+    offer: .cache/azure-pg.json
+    fetch: { service_name: "Azure Database for PostgreSQL", region: eastus }
   - provider: gcp
     recipe: google_compute_instance
     offer: .cache/gcp-compute.json

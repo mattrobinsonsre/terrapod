@@ -1,0 +1,10 @@
+{
+  "azurerm_postgresql_flexible_server": [
+    {
+      "from": "values.sku_name",
+      "to": "values.sku_tier",
+      "regex": "^(GP|MO|B)_",
+      "map": {"GP": "general_purpose", "MO": "memory_optimized", "B": "burstable"}
+    }
+  ]
+}

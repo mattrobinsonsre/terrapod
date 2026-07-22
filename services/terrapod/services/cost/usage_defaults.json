@@ -614,5 +614,17 @@
   {
     "description": "Cloud SQL storage",
     "match_query": "type = google_sql_database_instance and service_class = storage"
+  },
+  {
+    "description": "Azure PostgreSQL Flexible Server vCore (from sku_name)",
+    "match_query": "type = azurerm_postgresql_flexible_server and service_class = vcore",
+    "usage": {
+      "time": 730
+    },
+    "count": {
+      "attr": "values.sku_name",
+      "regex": "Standard_[A-Za-z](\\d+)",
+      "default": 2
+    }
   }
 ]

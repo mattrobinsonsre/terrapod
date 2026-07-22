@@ -20,11 +20,55 @@ same ``{type, values.*}`` shape falls out either way.
 
 from __future__ import annotations
 
+import json as _json
 import re
 from dataclasses import dataclass
+from importlib import resources
 from typing import Any, Literal
 
 from terrapod.services.cost.match_set import MatchSet
+
+# Resource-side match-attribute derivations. Some resources encode a
+# match-relevant dimension inside a compound string that the pricing rows key on
+# separately — e.g. an azurerm_postgresql_flexible_server's `sku_name`
+# ("GP_Standard_D4s_v3") carries the tier (GP/MO/B, which sets the vCore rate)
+# that the SKUs price as distinct products. Subset matching needs an exact
+# resource attribute, so we DERIVE one (values.sku_tier) from the string before
+# matching. Each rule: {from, to, regex (capture group 1), map?}. Loaded lazily.
+_DERIVATIONS: dict[str, list[dict[str, Any]]] | None = None
+
+
+def _derivations() -> dict[str, list[dict[str, Any]]]:
+    global _DERIVATIONS
+    if _DERIVATIONS is None:
+        text = (
+            resources.files("terrapod.services.cost")
+            .joinpath("resource_derivations.json")
+            .read_text()
+        )
+        _DERIVATIONS = _json.loads(text)
+    return _DERIVATIONS
+
+
+def _derive(rtype: str, pairs: list[tuple[str, str]]) -> list[tuple[str, str]]:
+    rules = _derivations().get(rtype)
+    if not rules:
+        return []
+    lookup: dict[str, str] = {}
+    for k, v in pairs:
+        lookup.setdefault(k, v)
+    out: list[tuple[str, str]] = []
+    for r in rules:
+        val = lookup.get(r["from"])
+        if val is None:
+            continue
+        m = re.search(r["regex"], val)
+        if m is None:
+            continue
+        cap = m.group(1)
+        out.append((r["to"], r.get("map", {}).get(cap, cap)))
+    return out
+
 
 Change = Literal["noop", "add", "remove"]
 
@@ -80,7 +124,8 @@ class Resource:
     data: dict[str, Any]
 
     def to_match_set(self) -> MatchSet:
-        return MatchSet.of_list(flatten(self.data))
+        pairs = flatten(self.data)
+        return MatchSet.of_list(pairs + _derive(self.type, pairs))
 
 
 def _resource_of_obj(obj: dict[str, Any]) -> Resource:
