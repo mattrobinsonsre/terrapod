@@ -161,3 +161,7 @@ recipes:
     recipe: aws_kinesis_stream
     offer: .cache/kinesis-us-east-1.json
     fetch: { service_code: AmazonKinesis, region: us-east-1 }
+  - provider: aws
+    recipe: aws_vpc_endpoint
+    offer: .cache/vpc-us-east-1.json
+    fetch: { service_code: AmazonVPC, region: us-east-1 }

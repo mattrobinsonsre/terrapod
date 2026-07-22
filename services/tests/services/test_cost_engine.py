@@ -278,8 +278,9 @@ def test_default_usage_catalogue_loads():
     # + Azure public IP (#989) + GCP persistent disk + GCP static IP (#991) +
     # API Gateway REST + HTTP requests (#993) + ElastiCache nodes (#995) +
     # Azure AKS hours + Azure storage account data (#997) + GCS bucket storage
-    # (#999) + GKE cluster management (#1001) + Kinesis shards (#1003).
-    assert len(entries) == 46
+    # (#999) + GKE cluster management (#1001) + Kinesis shards (#1003) + VPC
+    # interface endpoint hours+data (#1005).
+    assert len(entries) == 48
     ec2 = match_entry(
         _ms(
             ("type", "aws_instance"),
