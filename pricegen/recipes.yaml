@@ -169,3 +169,7 @@ recipes:
     recipe: aws_vpc_endpoint
     offer: .cache/vpc-us-east-1.json
     fetch: { service_code: AmazonVPC, region: us-east-1 }
+  - provider: aws
+    recipe: aws_route53_zone
+    offer: .cache/route53.json
+    fetch: { service_code: AmazonRoute53, global: true }
