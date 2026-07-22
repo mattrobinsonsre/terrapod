@@ -1,0 +1,62 @@
+# Azure managed disk -> azurerm_managed_disk. Azure disks are priced as a FLAT
+# monthly fee for the TIER the disk_size_gb rounds up into (P10 = up to 128 GiB
+# = $19.71/mo), NOT per-GB. So each tier is one row carrying its ceiling
+# (`tier_max_gb`); the size_tier engine feature picks the smallest tier ≥ the
+# disk's size and charges it flat (usage = 1). Covers the three common LRS
+# families (Premium SSD P-tiers, Standard SSD E-tiers, Standard HDD S-tiers);
+# ZRS/UltraSSD/PremiumV2 are follow-ups. The tier number maps to the same GiB
+# ceiling across P/E/S. From the Storage offer.
+resource_type: azurerm_managed_disk
+service: Storage
+
+# Tier number -> max GiB (shared: P10/E10/S10 all cap at 128 GiB).
+_tier_gb: &tier_gb
+  attr: skuName
+  regex: "^[PES](\\d+) "
+  map:
+    "1": "4"
+    "2": "8"
+    "3": "16"
+    "4": "32"
+    "6": "64"
+    "10": "128"
+    "15": "256"
+    "20": "512"
+    "30": "1024"
+    "40": "2048"
+    "50": "4096"
+    "60": "8192"
+    "70": "16384"
+    "80": "32768"
+
+components:
+  - product_family: "^Storage$"
+    service_class: disk
+    select:
+      productName: "Premium SSD Managed Disks"
+      skuName: { regex: "^P\\d+ LRS$" }
+      meterName: { regex: " LRS Disk$" }
+    match: { storage_account_type: { const: Premium_LRS } }
+    pricing: { tier_max_gb: *tier_gb }
+    price: { type: o, unit: "1/Month" }
+    tier: usage
+  - product_family: "^Storage$"
+    service_class: disk
+    select:
+      productName: "Standard SSD Managed Disks"
+      skuName: { regex: "^E\\d+ LRS$" }
+      meterName: { regex: " LRS Disk$" }
+    match: { storage_account_type: { const: StandardSSD_LRS } }
+    pricing: { tier_max_gb: *tier_gb }
+    price: { type: o, unit: "1/Month" }
+    tier: usage
+  - product_family: "^Storage$"
+    service_class: disk
+    select:
+      productName: "Standard HDD Managed Disks"
+      skuName: { regex: "^S\\d+ LRS$" }
+      meterName: { regex: " LRS Disk$" }
+    match: { storage_account_type: { const: Standard_LRS } }
+    pricing: { tier_max_gb: *tier_gb }
+    price: { type: o, unit: "1/Month" }
+    tier: usage

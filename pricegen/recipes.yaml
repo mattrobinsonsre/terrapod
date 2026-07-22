@@ -32,6 +32,10 @@ recipes:
     recipe: azurerm_storage_account
     offer: .cache/azure-storage-eastus.json
     fetch: { service_name: "Storage", region: eastus }
+  - provider: azure
+    recipe: azurerm_managed_disk
+    offer: .cache/azure-storage-eastus.json
+    fetch: { service_name: "Storage", region: eastus }
   - provider: gcp
     recipe: google_compute_instance
     offer: .cache/gcp-compute.json

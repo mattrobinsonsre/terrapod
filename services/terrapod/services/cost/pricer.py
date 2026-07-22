@@ -186,6 +186,39 @@ def _price_products(
     return (pp, min_val, max_val)
 
 
+def _apply_size_tier(entry: Entry, products: list[Product], resource_ms: MatchSet) -> list[Product]:
+    """For a fixed-per-size-tier component (Azure managed disk), keep only the
+    product whose ``tier_max_gb`` is the smallest that is ≥ the resource's size
+    attribute — i.e. the tier the disk rounds up into. Unknown/absent size ⇒
+    keep all (the estimate becomes a range across tiers rather than crashing)."""
+    spec = entry.size_tier
+    if not spec:
+        return products
+    attr = spec.get("attr")
+    found = resource_ms.find_by_key(attr) if attr else None
+    if found is None:
+        return products
+    try:
+        size = float(found[1])
+    except (ValueError, TypeError):
+        return products
+    candidates: list[tuple[float, Product]] = []
+    for p in products:
+        tm = p.pricing_match_set.find_by_key("tier_max_gb")
+        if tm is None:
+            continue
+        try:
+            cap = float(tm[1])
+        except (ValueError, TypeError):
+            continue
+        if cap >= size:
+            candidates.append((cap, p))
+    if not candidates:
+        return products
+    best = min(cap for cap, _ in candidates)
+    return [p for cap, p in candidates if cap == best]
+
+
 def _quote_group(
     resource_ms: MatchSet, entry: Entry, group_products: list[Product]
 ) -> list[PricedProduct]:
@@ -196,6 +229,8 @@ def _quote_group(
     """
     out: list[PricedProduct] = []
     syn_entry, syn_products = _synthesize_usage_from_attr(resource_ms, entry, group_products)
+    # Fixed-per-size-tier (Azure disk): pick the tier the size rounds into first.
+    syn_products = _apply_size_tier(syn_entry, syn_products, resource_ms)
     prov_entry, prov_products = _apply_provision_amount(syn_entry, syn_products)
     for bounded_entry, bounded_products in _apply_usage_amount(prov_entry, prov_products):
         if not bounded_products:

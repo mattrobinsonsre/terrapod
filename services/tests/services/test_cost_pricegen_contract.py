@@ -136,6 +136,10 @@ _ROWS = [
     # VPC interface endpoint (#1005) — $0.01/hr per ENI + data processed band.
     "AmazonVPC,VpcEndpoint,type=aws_vpc_endpoint&values.vpc_endpoint_type=Interface,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=hours&start_usage_amount=0&end_usage_amount=Inf,0.0100000000,t,USD",
     "AmazonVPC,VpcEndpoint,type=aws_vpc_endpoint&values.vpc_endpoint_type=Interface,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=data&start_usage_amount=0&end_usage_amount=Inf,0.0100000000,d,USD",
+    # Azure managed disk (#1007) — FLAT price per SIZE TIER (the size_tier engine
+    # feature). Premium P10 (<=128 GiB) $19.71/mo; P15 (<=256) $38.01.
+    "Storage,Storage,type=azurerm_managed_disk&values.storage_account_type=Premium_LRS,service_provider=azure&purchase_option=on_demand&region=eastus&service_class=disk&tier_max_gb=128,19.71,o,USD",
+    "Storage,Storage,type=azurerm_managed_disk&values.storage_account_type=Premium_LRS,service_provider=azure&purchase_option=on_demand&region=eastus&service_class=disk&tier_max_gb=256,38.012142,o,USD",
 ]
 
 
@@ -1107,6 +1111,30 @@ def test_vpc_interface_endpoint_hours_plus_data():
     )
     d = estimate(gw, _sheet()).to_dict()
     assert d["resources"] == []  # Gateway endpoints are free
+
+
+def test_azure_managed_disk_rounds_up_to_size_tier():
+    """Azure managed disks are FLAT-priced per size tier: the size_tier feature
+    rounds disk_size_gb UP to the smallest tier that fits and charges it flat.
+    100 GiB -> P10 (<=128) $19.71; 200 GiB -> P15 (<=256) $38.01. (#1007)"""
+    for size, expected in [(100, 19.71), (128, 19.71), (200, 38.012142)]:
+        plan = _plan(
+            [
+                {
+                    "address": "azurerm_managed_disk.d",
+                    "type": "azurerm_managed_disk",
+                    "name": "d",
+                    "mode": "managed",
+                    "values": {
+                        "location": "eastus",
+                        "storage_account_type": "Premium_LRS",
+                        "disk_size_gb": size,
+                    },
+                }
+            ]
+        )
+        d = estimate(plan, _sheet()).to_dict()
+        assert d["resources"][0]["monthly"]["max"] == pytest.approx(expected, abs=0.01), size
 
 
 def test_ec2_instance_prices():
