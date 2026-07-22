@@ -1,0 +1,20 @@
+# CloudFront -> aws_cloudfront_distribution. The dominant cost is data transfer
+# out to viewers, priced by viewer GEOGRAPHY (US/EU/AP/AU/…) and tiered by
+# volume. Viewer geography is unknowable from the plan, so we price the US/NA
+# tier (the common default) as a usage-driven band; the volume tiers (first
+# 10 TB $0.085/GB, then cheaper) flow through. Per-region egress + request
+# charges are follow-ups. Global pricing (empty region=). From the global
+# CloudFront offer.
+resource_type: aws_cloudfront_distribution
+service: AmazonCloudFront
+
+components:
+  - product_family: "^Data Transfer$"
+    service_class: data
+    select: { usagetype: { regex: "US-DataTransfer-Out-Bytes$" } }
+    # CloudFront has no `regionCode` attr (it's global; the default
+    # region={attr: regionCode} resolves to absent and drops the row). Override
+    # to an empty region so it prices globally (the empty-region match).
+    pricing: { region: { const: "" } }
+    price: { type: d, unit: GB }
+    tier: usage
