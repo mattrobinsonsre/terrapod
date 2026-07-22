@@ -72,3 +72,10 @@ recipes:
     recipe: aws_eip
     offer: .cache/vpc-us-east-1.json
     fetch: { service_code: AmazonVPC, region: us-east-1 }
+  - provider: aws
+    recipe: aws_lb
+    offer: .cache/ec2-lb-us-east-1.json
+    fetch:
+      service_code: AmazonEC2
+      region: us-east-1
+      families: [Load Balancer-Application, Load Balancer-Network]

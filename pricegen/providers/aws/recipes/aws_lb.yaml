@@ -1,0 +1,40 @@
+# Application/Network Load Balancer -> aws_lb (aws_alb is an alias). Two charges
+# per LB: the always-on HOUR ($0.0225/hr — deterministic) and per-LCU-hour
+# capacity ($0.008 ALB / $0.006 NLB — usage-driven, a traffic guess with a
+# band). ALB and NLB are SEPARATE product families in the AmazonEC2 offer, so
+# each is its own pair of components, keyed by `values.load_balancer_type`
+# (stamped via `const`). aws_lb's load_balancer_type has a schema Default of
+# "application", so a `terraform plan` always carries it (unlike license_model,
+# #924) — matching on it is safe. From the large AmazonEC2 offer via the ijson
+# stream-filter, sharing the cached EC2 download.
+resource_type: aws_lb
+service: AmazonEC2
+
+components:
+  # ── Application Load Balancer ──────────────────────────────────────────────
+  - product_family: "^Load Balancer-Application$"
+    service_class: hours
+    select: { usagetype: LoadBalancerUsage }
+    match: { load_balancer_type: { const: application } }
+    price: { type: t, unit: Hrs }
+    tier: usage
+  - product_family: "^Load Balancer-Application$"
+    service_class: lcu
+    select: { usagetype: LCUUsage }
+    match: { load_balancer_type: { const: application } }
+    price: { type: t, unit: LCU-Hrs }
+    tier: usage
+
+  # ── Network Load Balancer ──────────────────────────────────────────────────
+  - product_family: "^Load Balancer-Network$"
+    service_class: hours
+    select: { usagetype: LoadBalancerUsage }
+    match: { load_balancer_type: { const: network } }
+    price: { type: t, unit: Hrs }
+    tier: usage
+  - product_family: "^Load Balancer-Network$"
+    service_class: lcu
+    select: { usagetype: LCUUsage }
+    match: { load_balancer_type: { const: network } }
+    price: { type: t, unit: LCU-Hrs }
+    tier: usage

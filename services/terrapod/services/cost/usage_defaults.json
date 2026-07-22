@@ -243,6 +243,28 @@
     }
   },
   {
+    "description": "Load balancer hours (always-on)",
+    "match_query": "type = aws_lb and service_class = hours",
+    "usage": {
+      "time": 730
+    }
+  },
+  {
+    "description": "Load balancer capacity units (LCU-hours)",
+    "match_query": "type = aws_lb and service_class = lcu",
+    "usage": {
+      "time": 1460
+    },
+    "assumption": true,
+    "bands": {
+      "dimension": "capacity units",
+      "unit": "LCU-hours/month",
+      "low": 730,
+      "typical": 1460,
+      "high": 30000
+    }
+  },
+  {
     "description": "NAT Gateway data processed",
     "match_query": "type = aws_nat_gateway and service_class = data",
     "usage": {
