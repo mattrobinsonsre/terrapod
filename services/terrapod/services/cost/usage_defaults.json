@@ -570,5 +570,20 @@
     "usage": {
       "time": 30
     }
+  },
+  {
+    "description": "Pub/Sub message throughput",
+    "match_query": "type = google_pubsub_topic and service_class = throughput",
+    "usage": {
+      "data": 1
+    },
+    "assumption": true,
+    "bands": {
+      "dimension": "message throughput",
+      "unit": "TiB/month",
+      "low": 1,
+      "typical": 1,
+      "high": 100
+    }
   }
 ]

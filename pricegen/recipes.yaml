@@ -64,6 +64,10 @@ recipes:
     recipe: google_dns_managed_zone
     offer: .cache/gcp-dns.json
     fetch: { service_id: "FA26-5236-B8B5" } # Cloud DNS
+  - provider: gcp
+    recipe: google_pubsub_topic
+    offer: .cache/gcp-pubsub.json
+    fetch: { service_id: "A1E8-BE35-7EBC" } # Cloud Pub/Sub
   - provider: aws
     recipe: aws_sqs_queue
     offer: .cache/sqs-us-east-1.json

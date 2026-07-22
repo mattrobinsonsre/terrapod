@@ -280,8 +280,8 @@ def test_default_usage_catalogue_loads():
     # Azure AKS hours + Azure storage account data (#997) + GCS bucket storage
     # (#999) + GKE cluster management (#1001) + Kinesis shards (#1003) + VPC
     # interface endpoint hours+data (#1005) + Azure managed disk per-size tier
-    # (#1007) + Route53 hosted zone (#1009) + CloudFront data transfer (#1011) + ECR image storage (#1013) + Cloud DNS zone (#1015) + Azure ACR tier (#1017).
-    assert len(entries) == 54
+    # (#1007) + Route53 hosted zone (#1009) + CloudFront data transfer (#1011) + ECR image storage (#1013) + Cloud DNS zone (#1015) + Azure ACR tier (#1017) + Pub/Sub throughput (#1019).
+    assert len(entries) == 55
     ec2 = match_entry(
         _ms(
             ("type", "aws_instance"),
