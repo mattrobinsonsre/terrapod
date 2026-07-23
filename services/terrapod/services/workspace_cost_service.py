@@ -148,6 +148,19 @@ async def estimate_workspace_cost(db: AsyncSession, user, workspace_id: str) -> 
     try:
         default_region = settings.cost_estimation.default_region
         attrs = await asyncio.to_thread(_run_engine, state_bytes, pricesheet_path, default_region)
+    except Exception as exc:  # noqa: BLE001 — contain ANY engine error to a clean 503
+        # The runner plan path treats a pricing failure as advisory (skips the
+        # estimate); this endpoint must likewise never 500 on an engine bug. Fail
+        # closed to a 503 (mapped from PricesheetUnavailable) rather than surfacing a
+        # raw traceback or the misleading $0 the fail-closed philosophy avoids.
+        logger.warning(
+            "workspace_cost_engine_failed",
+            workspace_id=str(ws.id),
+            state_version_id=str(sv.id),
+            error=str(exc),
+            error_type=type(exc).__name__,
+        )
+        raise PricesheetUnavailable(f"cost estimation failed ({type(exc).__name__})") from exc
     finally:
         await asyncio.to_thread(cost_pricesheet_service._safe_unlink, pricesheet_path)
 

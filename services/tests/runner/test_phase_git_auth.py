@@ -64,10 +64,11 @@ def test_http_writes_credential_store_and_tokenless_rewrite(tmp_path):
     # store helper wired to the creds file; path-scoped (host/org).
     assert "helper = store --file=" in cfg
     assert "useHttpPath = true" in cfg
-    # ssh→https rewrite is present and TOKENLESS.
-    assert "insteadOf = ssh://git@github.com/" in cfg
-    assert "insteadOf = git@github.com:" in cfg
-    assert 'url "https://github.com/"' in cfg
+    # ssh→https rewrite is present, TOKENLESS, and PATH-SCOPED to the org (the
+    # pattern names one) so it can't hijack another org's ssh source on the host.
+    assert 'url "https://github.com/myorg/"' in cfg
+    assert "insteadOf = ssh://git@github.com/myorg/" in cfg
+    assert "insteadOf = git@github.com:myorg/" in cfg
 
 
 def test_http_default_username_is_x_access_token(tmp_path):
@@ -171,6 +172,54 @@ def test_rewrite_none_does_not_touch_urls(tmp_path):
     store helper for matching https URLs, but no protocol rewrite happens)."""
     env = git_auth.configure([_http("github.com", rewrite="none")], base_dir=tmp_path)
     assert _get_url(env, "ssh://git@github.com/org/repo.git") == "ssh://git@github.com/org/repo.git"
+
+
+@pytest.mark.skipif(not _HAS_GIT, reason="git binary required")
+def test_to_https_rewrite_is_path_scoped_and_spares_other_orgs(tmp_path):
+    """Regression (#1028 audit finding 7): an http `to_https` rewrite scoped to
+    org-a must NOT rewrite a DIFFERENT org's ssh source on the same host — a
+    host-wide insteadOf would silently strip org-b's ssh (deploy-key) auth."""
+    env = git_auth.configure(
+        [
+            _http("github.com/org-a", rewrite="to_https"),
+            _ssh("github.com/org-b", rewrite="none"),
+        ],
+        base_dir=tmp_path,
+    )
+    # org-a's ssh source IS rewritten to https (token path).
+    assert (
+        _get_url(env, "ssh://git@github.com/org-a/repo.git") == "https://github.com/org-a/repo.git"
+    )
+    # org-b's ssh source is UNTOUCHED — still ssh, so its deploy key applies.
+    assert (
+        _get_url(env, "ssh://git@github.com/org-b/repo.git")
+        == "ssh://git@github.com/org-b/repo.git"
+    )
+
+
+def test_env_neutralises_git_tracing(tmp_path):
+    """Regression (#1028 audit finding 8): the returned env forces git tracing OFF
+    so an operator-set GIT_TRACE_CURL/GIT_CURL_VERBOSE (which log the Authorization
+    header) can't leak the token into the streamed run log."""
+    env = git_auth.configure([_http("github.com")], base_dir=tmp_path)
+    assert env["GIT_TRACE_CURL"] == "0"
+    assert env["GIT_CURL_VERBOSE"] == "0"
+    assert env["GIT_TRACE"] == "0"
+    assert env["GIT_TRACE_PACKET"] == "0"
+
+
+def test_non_dict_entry_is_skipped_not_raised(tmp_path):
+    """Regression (#1028 audit finding 9): a non-dict item in the mounted list is
+    skipped, honouring the phase's 'never raises' contract (was: AttributeError)."""
+    entries = [
+        "not-a-dict",
+        42,
+        None,
+        {"category": "git_http_auth", "key": "github.com", "value": '{"token":"ghp_X"}'},
+    ]
+    git_auth.configure(entries, base_dir=tmp_path)  # must not raise
+    creds = (tmp_path / "git-credentials").read_text().splitlines()
+    assert creds == ["https://x-access-token:ghp_X@github.com"]  # only the good entry
 
 
 # --- HARD log-safety invariant ----------------------------------------------
