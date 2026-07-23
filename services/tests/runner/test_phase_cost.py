@@ -56,8 +56,18 @@ def _cfg(**overrides) -> RunnerConfig:
 
 def _redirect_paths(tmp_path, monkeypatch):
     """Point the phase's fixed /tmp paths at the test's tmp dir."""
-    monkeypatch.setattr(cost, "_PRICESHEET_CSV", tmp_path / "prices.csv")
+    monkeypatch.setattr(cost, "_PRICESHEET_DB", tmp_path / "prices.sqlite")
     monkeypatch.setattr(cost, "_COST_ESTIMATE_JSON", tmp_path / "cost_estimate.json")
+
+
+def _write_sheet_db(output_path) -> None:
+    """The endpoint serves a pre-built SQLite index (#1034); the fake download
+    builds one from the sample sheet at the runner's download target."""
+    import io
+
+    from terrapod.services.cost.pricesheet_db import build_index
+
+    build_index(io.StringIO(_SHEET), str(output_path))
 
 
 def test_happy_path_writes_estimate(tmp_path, monkeypatch):
@@ -66,7 +76,7 @@ def test_happy_path_writes_estimate(tmp_path, monkeypatch):
     plan.write_text(json.dumps(_PLAN))
 
     def fake_download(url, output_path, **_kw):
-        output_path.write_text(_SHEET)
+        _write_sheet_db(output_path)
         return DownloadResult(ok=True, status=200)
 
     with patch.object(cost, "download_to_file", side_effect=fake_download):
@@ -138,7 +148,7 @@ def test_pricesheet_request_sends_well_formed_bearer_header(tmp_path, monkeypatc
 
     def capture_download(url, output_path, headers=None, **_kw):
         seen.update(headers or {})
-        output_path.write_text(_SHEET)
+        _write_sheet_db(output_path)
         return DownloadResult(ok=True, status=200)
 
     with patch.object(cost, "download_to_file", side_effect=capture_download):

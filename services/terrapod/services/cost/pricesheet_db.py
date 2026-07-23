@@ -70,7 +70,7 @@ def _record(
 
 
 def _stream_csv_records(fp: IO[str]) -> Iterator[_Record]:
-    """Yield records from an oiq-style CSV (the header line already consumed)."""
+    """Yield records from a CSV sheet (the header line already consumed)."""
     import csv
 
     for row in csv.reader(fp):
@@ -159,7 +159,7 @@ def stream_records(fp: IO[str]) -> Iterator[_Record]:
     """Stream ``(type, region, …)`` records from a sheet, bounded memory.
 
     Auto-detects Terrapod YAML (``schema: terrapod-pricesheet/vN`` first line,
-    parsed as events) vs oiq CSV (streamed row-by-row).
+    parsed as events) vs CSV (streamed row-by-row).
     """
     first = fp.readline()
     if first.lstrip().startswith("schema:") and _YAML_SCHEMA_PREFIX in first:

@@ -36,10 +36,11 @@ from terrapod.runner.runner_config import RunnerConfig
 
 logger = structlog.get_logger("runner.cost")
 
-# Where the fetched pricesheet CSV and the produced estimate land. On the runner
-# Job pod (unlike the API pod) /tmp is ordinary ephemeral disk, so the ~200k-row
-# CSV is safe here — this is not the RAM-tmpfs API pod the PVC rule guards.
-_PRICESHEET_CSV = Path("/tmp/prices.csv")
+# Where the fetched pricesheet index and the produced estimate land. On the
+# runner Job pod (unlike the API pod) /tmp is ordinary ephemeral disk. The
+# pre-built SQLite index (#1034) is fetched here and queried off disk — the
+# runner never parses the whole 260k-product sheet.
+_PRICESHEET_DB = Path("/tmp/prices.sqlite")
 _COST_ESTIMATE_JSON = Path("/tmp/cost_estimate.json")
 
 _PRICESHEET_PATH = "/api/terrapod/v1/cost-estimation/pricesheet"
@@ -71,11 +72,15 @@ def estimate_cost(cfg: RunnerConfig, plan_json: Path) -> Path | None:
         # Imported lazily so a failure to fetch the pricesheet never even
         # touches the engine, and the engine's import cost is off the hot path.
         from terrapod.services.cost import estimate
+        from terrapod.services.cost.pricesheet_db import PricesheetIndex
 
         with plan_json.open() as fh:
             tf_json = json.load(fh)
-        with _PRICESHEET_CSV.open() as sheet:
-            result = estimate(tf_json, sheet, default_region=cfg.cost_default_region)
+        index = PricesheetIndex.open(str(_PRICESHEET_DB))
+        try:
+            result = estimate(tf_json, index=index, default_region=cfg.cost_default_region)
+        finally:
+            index.close()
     except Exception as exc:  # noqa: BLE001 — advisory; any failure → skip
         logger.warning("cost engine raised — skipping cost estimate", err=str(exc))
         return None
@@ -98,17 +103,17 @@ def estimate_cost(cfg: RunnerConfig, plan_json: Path) -> Path | None:
 
 
 def _fetch_pricesheet(cfg: RunnerConfig) -> bool:
-    """Download the cached pricesheet CSV to ``_PRICESHEET_CSV``.
+    """Download the cached pricesheet **SQLite index** to ``_PRICESHEET_DB``.
 
-    Hits the API's pull-through cache endpoint (which fetches upstream on a
-    cold/stale cache), authenticated with the runner token; the endpoint 302s
+    Hits the API's pull-through cache endpoint (which builds the index upstream on
+    a cold/stale cache), authenticated with the runner token; the endpoint 302s
     to a presigned storage URL that ``download_to_file`` follows.
     """
     url = f"{cfg.api_url}{_PRICESHEET_PATH}"
     headers = {"Authorization": f"Bearer {cfg.auth_token}"} if cfg.auth_token else {}
     result = download_to_file(
         url,
-        _PRICESHEET_CSV,
+        _PRICESHEET_DB,
         headers=headers,
         api_url=cfg.api_url,
         retries=cfg.download_retries,
@@ -117,4 +122,4 @@ def _fetch_pricesheet(cfg: RunnerConfig) -> bool:
     if not result.ok:
         logger.warning("pricesheet download failed", url=url, status=result.status)
         return False
-    return _PRICESHEET_CSV.exists() and _PRICESHEET_CSV.stat().st_size > 0
+    return _PRICESHEET_DB.exists() and _PRICESHEET_DB.stat().st_size > 0

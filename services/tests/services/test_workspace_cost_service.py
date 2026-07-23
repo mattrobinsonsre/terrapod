@@ -78,7 +78,7 @@ def _patches(caps, sv, *, state_bytes=b"{}", engine=_ENGINE_RESULT):
         patch.object(
             svc.cost_pricesheet_service,
             "download_cached_to_file",
-            AsyncMock(return_value="/tmp/prices.csv"),
+            AsyncMock(return_value="/tmp/prices.sqlite"),
         ),
         patch.object(svc.cost_pricesheet_service, "_safe_unlink", MagicMock()),
         patch.object(svc, "_run_engine", MagicMock(return_value=dict(engine))),
@@ -171,4 +171,4 @@ async def test_pricesheet_tempfile_is_always_unlinked():
     with _Ctx(patches):
         with pytest.raises(ValueError):
             await svc.estimate_workspace_cost(_db_returning(sv), _user(), str(WS))
-    unlink.assert_called_once_with("/tmp/prices.csv")
+    unlink.assert_called_once_with("/tmp/prices.sqlite")
