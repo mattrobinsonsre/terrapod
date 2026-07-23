@@ -2638,7 +2638,7 @@ function WorkspaceDetailContent() {
                     <p className="text-xs text-slate-400">{t('variables.gitHttpHint')}</p>
                     <div>
                       <label className="block text-sm font-medium text-slate-300 mb-1">{t('variables.gitCredSource')}</label>
-                      <select value={gitSource} onChange={(e) => setGitSource(e.target.value as 'vcs_connection' | 'static')} className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+                      <select id="git-source" value={gitSource} onChange={(e) => setGitSource(e.target.value as 'vcs_connection' | 'static')} className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
                         <option value="vcs_connection">{t('variables.gitSourceVcs')}</option>
                         <option value="static">{t('variables.gitSourceStatic')}</option>
                       </select>
@@ -2658,7 +2658,7 @@ function WorkspaceDetailContent() {
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                           <label className="block text-sm font-medium text-slate-300 mb-1">{t('variables.gitUsername')}</label>
-                          <input type="text" value={gitUsername} onChange={(e) => setGitUsername(e.target.value)} placeholder="x-access-token" className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
+                          <input id="git-username" type="text" value={gitUsername} onChange={(e) => setGitUsername(e.target.value)} placeholder="x-access-token" className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-slate-300 mb-1">{t('variables.gitToken')}</label>
