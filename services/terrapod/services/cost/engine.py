@@ -202,14 +202,25 @@ def estimate(
         for res, change in unpriced
         if res.address not in synth_meta and res.address not in priced_addrs
     ]
+
+    # Recompute the totals from the FINAL resource lines (#1029 fix): price()'s
+    # totals were summed over the synth fleet-units priced at ×1, so they miss
+    # the ×count fold and the fleet-line merge. The per-resource costs already
+    # carry the count-multiplied, correctly-signed value (removes are negative
+    # via price()), so summing them reproduces total/diff/prev under the same
+    # convention (prev = total − diff; diff counts add/remove only).
+    total_min = sum(rc.monthly_min for rc in resource_costs)
+    total_max = sum(rc.monthly_max for rc in resource_costs)
+    diff_min = sum(rc.monthly_min for rc in resource_costs if rc.change in ("add", "remove"))
+    diff_max = sum(rc.monthly_max for rc in resource_costs if rc.change in ("add", "remove"))
     return CostEstimate(
         currency=result.currency,
-        total_min=result.total.min,
-        total_max=result.total.max,
-        prev_min=result.prev.min,
-        prev_max=result.prev.max,
-        diff_min=result.diff.min,
-        diff_max=result.diff.max,
+        total_min=total_min,
+        total_max=total_max,
+        prev_min=total_min - diff_min,
+        prev_max=total_max - diff_max,
+        diff_min=diff_min,
+        diff_max=diff_max,
         resources=resource_costs,
         unpriced=unpriced_resources,
     )

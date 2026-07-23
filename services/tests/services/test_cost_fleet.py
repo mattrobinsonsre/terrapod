@@ -206,6 +206,34 @@ def test_deferred_fleet_is_unpriced_not_crash():
     assert "aws_msk_cluster.kafka" in unpriced
 
 
+def test_fleet_cost_is_reflected_in_the_total():
+    # Regression (#1029): the estimate TOTAL must reflect fleet × count — not the
+    # synth fleet-unit priced at ×1. Before the fix, price()'s total summed the
+    # synth units (×1), so the total was less than the fleet's own line.
+    est = estimate(
+        _state(
+            _r("aws_instance", "solo", instance_type="m5.large", region="us-east-1"),
+            _r("aws_launch_template", "web", id="lt-1", instance_type="m5.large"),
+            _r(
+                "aws_autoscaling_group",
+                "web",
+                region="us-east-1",
+                desired_capacity=3,
+                launch_template=[{"id": "lt-1"}],
+            ),
+        ),
+        io.StringIO(_SHEET),
+    )
+    by = {r.address: r for r in est.resources}
+    solo = by["aws_instance.solo"].monthly_max
+    asg = by["aws_autoscaling_group.web"].monthly_max
+    assert asg == solo * 3
+    # total = solo + asg (launch template is unpriced) = 4 units, NOT the buggy
+    # solo + (synth ×1) = 2 units.
+    assert est.total_max == solo + asg
+    assert est.total_max == solo * 4
+
+
 def test_unresolvable_asg_reference_is_unpriced():
     # launch template not in the plan → can't resolve unit → unpriced, no crash.
     by, unpriced = _run(
