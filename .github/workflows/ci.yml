@@ -451,51 +451,25 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
       - run: scripts/test.sh python -- ${{ matrix.slice.pytest_args }} ${{ matrix.slice.paths }}
 
-  # ── Cost Differential Oracle (#871) ───────────────────
-  # Correctness backstop for the native, OpenInfraQuote-compatible cost engine:
-  # run the REAL `oiq` binary over the committed plan/state corpus and assert
-  # our pure-Python engine agrees bit-exact on the SAME pricesheet. The binary
-  # lives ONLY here as an oracle — it is never shipped in any image (Terrapod
-  # carries no third-party cost binary; that's the whole point of the port).
-  # The engine is pure stdlib, so this needs no DB/Redis/S3 — just Python + the
-  # binary + a pricesheet. In the normal `make test` shards the same test file
-  # SKIPS (no OIQ_BINARY/OIQ_PRICESHEET set), so it is never double-run.
-  cost-differential:
-    name: Cost Differential
+  # ── pricegen unit tests (#1025) ───────────────────────
+  # The pricegen package (self-generated cost pricesheet, #893) is a standalone
+  # pure-Python tool — it isn't copied into the services test image, so its unit
+  # tests (adapters, engine, computed path, multi-region fetch/merge) run here.
+  # Deps are just pyyaml + ijson (the same the weekly Pricesheet workflow uses);
+  # no DB/Redis/network — the fetch tests monkeypatch the HTTP layer.
+  pricegen-test:
+    name: pricegen Test
     needs: prepare
     if: needs.prepare.outputs.images_exist != 'true'
     runs-on: ubuntu-latest
-    env:
-      # Pin the oracle binary version; bump deliberately (a new oiq could change
-      # pricing semantics — that's exactly what this job is here to catch).
-      OIQ_VERSION: v1.10.0
-      OIQ_REGION: us-east-1
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.13"
-      - run: pip install pytest
-      - name: Fetch the real oiq binary (oracle only — never shipped)
-        run: |
-          set -euo pipefail
-          curl -fsSL -o oiq.tar.gz \
-            "https://github.com/terrateamio/openinfraquote/releases/download/${OIQ_VERSION}/oiq-linux-amd64-${OIQ_VERSION}.tar.gz"
-          tar xzf oiq.tar.gz
-          chmod +x oiq
-          ./oiq --version
-      - name: Fetch the published pricesheet (same sheet fed to both engines)
-        run: |
-          set -euo pipefail
-          curl -fsSL -o prices.csv.gz https://oiq.terrateam.io/prices.csv.gz
-          gunzip -f prices.csv.gz
-          wc -l prices.csv
-      - name: Differential — native engine vs oiq
-        working-directory: services
-        env:
-          OIQ_BINARY: ${{ github.workspace }}/oiq
-          OIQ_PRICESHEET: ${{ github.workspace }}/prices.csv
-        run: PYTHONPATH=. python -m pytest tests/services/test_cost_differential.py -v
+      - run: pip install pyyaml ijson pytest
+      - name: Run pricegen unit tests
+        run: python -m pytest pricegen/tests -v
 
   # ── Migration smoke (#544) ────────────────────────────
   # The Python test tiers build the schema with `Base.metadata.create_all`, so
@@ -2172,7 +2146,7 @@ jobs:
       - mcp-test
       - build-query
       - python-test
-      - cost-differential
+      - pricegen-test
       - migration-check
       - python-audit
       - npm-audit
@@ -2220,7 +2194,7 @@ jobs:
             "${{ needs.mcp-test.result }}"
             "${{ needs.build-query.result }}"
             "${{ needs.python-test.result }}"
-            "${{ needs.cost-differential.result }}"
+            "${{ needs.pricegen-test.result }}"
             "${{ needs.migration-check.result }}"
             "${{ needs.python-audit.result }}"
             "${{ needs.npm-audit.result }}"

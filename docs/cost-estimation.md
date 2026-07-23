@@ -70,15 +70,17 @@ The `monthly` figure folds in `cost_typical` (so workspace totals stay at a sens
 
 Both Cost tabs render this beneath the resource (e.g. *"data processed: $4.50/mo typical — $0.45–$2,250 across 10–50000 GB/month"*); the `terrapod_workspace_cost` data source and the `go-terrapod` SDK expose the same fields on each resource. Bounds are set to be honest raw — a `high` covers a genuinely busy resource, not a token value — so an operator reading the deterministic estimate can judge where their real workload sits.
 
-## Correctness — proven against the real oiq
+## Correctness
 
-The estimates are **deterministic data**, and Terrapod proves the ported engine
-is faithful: a CI **differential oracle** runs the genuine `oiq` binary over a
-committed plan/state corpus and asserts the native engine agrees bit-exact on
-the *same* pricesheet. Because the assertion is engine-agreement (not a fixed
-dollar figure), a daily pricesheet refresh moves both engines together and the
-test stays valid. The binary lives only in CI as the oracle — no third-party
-cost binary is ever shipped in a Terrapod image.
+The estimates are **deterministic data**. During the port, the native engine was
+validated bit-exact against the reference implementation over a committed
+plan/state corpus on the *same* pricesheet — that one-off oracle comparison is
+complete, and Terrapod no longer depends on any third-party cost engine or its
+hosted feed (Terrapod now generates its own pricesheet — see the self-generated
+pricesheet, #893/#1025). Ongoing correctness is asserted by the committed engine
+unit tests (`test_cost_engine.py`) and the end-to-end pricegen contract tests
+(`test_cost_pricegen_contract.py`), which check real priced outputs against known
+expected values. No third-party cost binary is ever shipped in a Terrapod image.
 
 ## AI enhancement (separate, optional)
 

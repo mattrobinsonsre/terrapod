@@ -17,6 +17,9 @@
 resource_type: google_compute_instance
 service: Compute Engine
 
+# `region` is the standalone-CLI fallback; the published sheet enumerates every
+# region in recipes.yaml's `regions.gcp` (threaded in by publish), since a SKU's
+# Core/Ram rate covers each region it serves via serviceRegions (#1025).
 computed:
   region: us-central1
   family_regex: '^(\w+)(?: Predefined)? Instance (Core|Ram) running in'
