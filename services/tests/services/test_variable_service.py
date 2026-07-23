@@ -58,6 +58,37 @@ class TestCreateVariable:
         assert call_kwargs["value"] == "mysecret"
         assert call_kwargs["sensitive"] is True
 
+    async def test_invalid_category_raises(self):
+        import pytest
+
+        db = AsyncMock(spec=AsyncSession)
+        with pytest.raises(ValueError, match="invalid variable category"):
+            await create_variable(db, uuid.uuid4(), key="k", value="v", category="bogus")
+
+    @patch("terrapod.services.variable_service.Variable")
+    async def test_git_http_auth_forces_sensitive(self, MockVar):
+        # git-auth categories hold secrets — sensitive is forced True even if the
+        # caller passed False (#1028).
+        db = AsyncMock(spec=AsyncSession)
+        await create_variable(
+            db,
+            uuid.uuid4(),
+            key="github.com",
+            value="{}",
+            category="git_http_auth",
+            sensitive=False,
+        )
+        assert MockVar.call_args[1]["sensitive"] is True
+        assert MockVar.call_args[1]["category"] == "git_http_auth"
+
+    @patch("terrapod.services.variable_service.Variable")
+    async def test_git_ssh_auth_forces_sensitive(self, MockVar):
+        db = AsyncMock(spec=AsyncSession)
+        await create_variable(
+            db, uuid.uuid4(), key="gitlab.com", value="{}", category="git_ssh_auth", sensitive=False
+        )
+        assert MockVar.call_args[1]["sensitive"] is True
+
     @patch("terrapod.services.variable_service.Variable")
     async def test_version_id_set(self, MockVar):
         db = AsyncMock(spec=AsyncSession)

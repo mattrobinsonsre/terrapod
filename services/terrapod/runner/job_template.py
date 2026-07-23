@@ -18,6 +18,10 @@ _TFVARS_MOUNT_DIR = "/var/run/terrapod/vars"
 # Secret, mounted alongside the tfvars file.
 _HOOKS_SECRET_KEY = "execution-hooks.json"
 _HOOKS_FILENAME = "execution-hooks.json"
+# Private-git-module auth (#1028) — another key in the same per-run vars Secret,
+# mounted alongside the tfvars file; read by runner/phases/git_auth.py.
+_GIT_AUTH_SECRET_KEY = "git-auth.json"
+_GIT_AUTH_FILENAME = "git-auth.json"
 
 # Custom outbound CA trust bundle (#592). The listener ships the raw custom CA
 # into a per-run Secret under this key; an init container merges it with the
@@ -65,6 +69,7 @@ def build_job_spec(
     env_vars: list[dict[str, str]],
     terraform_vars: list[dict[str, str]],
     execution_hooks: list[dict] | None = None,
+    git_auth: list[dict] | None = None,
     vars_secret_name: str = "",
     resource_cpu: str = "1",
     resource_memory: str = "2Gi",
@@ -425,6 +430,8 @@ def build_job_spec(
         secret_items.append({"key": _TFVARS_SECRET_KEY, "path": _TFVARS_FILENAME})
     if execution_hooks:
         secret_items.append({"key": _HOOKS_SECRET_KEY, "path": _HOOKS_FILENAME})
+    if git_auth:
+        secret_items.append({"key": _GIT_AUTH_SECRET_KEY, "path": _GIT_AUTH_FILENAME})
     if vars_secret_name and secret_items:
         pod = job_spec["spec"]["template"]["spec"]
         pod["volumes"].append(

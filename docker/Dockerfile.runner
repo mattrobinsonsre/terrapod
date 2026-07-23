@@ -95,16 +95,21 @@ COPY services/terrapod/runner/phases/ ./terrapod/runner/phases/
 # namespace package here (only the cost subpackage is copied in).
 COPY services/terrapod/services/cost/ ./terrapod/services/cost/
 
-# /home/runner is the writable HOME for UID 1000 — without it, tools
-# that consult $HOME (helm's repository/index cache, kubectl's
-# ~/.kube/cache, git's ~/.gitconfig, AWS CLI's ~/.aws) fall back to
-# os.UserHomeDir() lookups that resolve to "/" for a UID with no
-# /etc/passwd entry, then write to /.cache/… which isn't writable
-# and triggers misleading "cannot be reached" errors from helm
-# specifically. Keeping HOME off /workspace so terraform's .terraform/
-# and the user's HCL stay separate from tool caches.
+# /home/runner is the writable HOME for UID 1000, and UID 1000 gets a real
+# /etc/passwd entry. The passwd entry matters twice over:
+#   1. Tools that consult $HOME (helm's repository/index cache, kubectl's
+#      ~/.kube/cache, git's ~/.gitconfig, AWS CLI's ~/.aws) — HOME alone covers
+#      most, but a passwd entry makes os.UserHomeDir()/getpwuid() lookups correct
+#      rather than resolving to "/".
+#   2. OpenSSH (#1028): `git::ssh://…` module sources shell out to ssh, which
+#      calls getpwuid(geteuid()) for the user's name + home. With no passwd entry
+#      that returns NULL and ssh aborts with "No user exists for uid 1000", so SSH
+#      module fetches failed without a custom image. The entry fixes it.
+# HOME stays off /workspace so terraform's .terraform/ and the user's HCL stay
+# separate from tool caches.
 RUN mkdir -p /workspace /tmp/bin /home/runner \
-    && chown -R 1000:1000 /workspace /tmp/bin /home/runner
+    && chown -R 1000:1000 /workspace /tmp/bin /home/runner \
+    && echo 'runner:x:1000:1000::/home/runner:/usr/sbin/nologin' >> /etc/passwd
 
 USER 1000:1000
 ENV HOME=/home/runner \

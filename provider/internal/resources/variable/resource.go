@@ -60,7 +60,7 @@ func (r *variableResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 				Optional: true, Sensitive: true, Description: "Variable value. Sensitive variables are write-only.",
 			},
 			"category": schema.StringAttribute{
-				Required: true, Description: "Category: terraform or env.",
+				Required: true, Description: "Category: terraform, env, git_http_auth, or git_ssh_auth.",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"hcl": schema.BoolAttribute{

@@ -2563,6 +2563,8 @@ function WorkspaceDetailContent() {
                     <select id="var-cat" value={varCategory} onChange={(e) => setVarCategory(e.target.value)} className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
                       <option value="terraform">Terraform</option>
                       <option value="env">{t('variables.categoryEnv')}</option>
+                      <option value="git_http_auth">git_http_auth</option>
+                      <option value="git_ssh_auth">git_ssh_auth</option>
                     </select>
                   </div>
                   <div className="flex items-end gap-4">
@@ -2622,6 +2624,8 @@ function WorkspaceDetailContent() {
                                 className="px-2 py-1 text-xs border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500">
                                 <option value="terraform">terraform</option>
                                 <option value="env">env</option>
+                                <option value="git_http_auth">git_http_auth</option>
+                                <option value="git_ssh_auth">git_ssh_auth</option>
                               </select>
                               <label className="flex items-center gap-1 cursor-pointer">
                                 <input type="checkbox" checked={editVarSensitive} onChange={(e) => setEditVarSensitive(e.target.checked)}
@@ -2704,6 +2708,8 @@ function WorkspaceDetailContent() {
                           >
                             <option value="terraform">terraform</option>
                             <option value="env">env</option>
+                            <option value="git_http_auth">git_http_auth</option>
+                            <option value="git_ssh_auth">git_ssh_auth</option>
                           </select>
                           <label className="flex items-center gap-1 cursor-pointer">
                             <input type="checkbox" checked={editVarSensitive} onChange={(e) => setEditVarSensitive(e.target.checked)} className="rounded border-slate-600 bg-slate-700 text-brand-600" />

@@ -18,7 +18,7 @@ type Variable struct {
 	ID          string `json:"id"`
 	Key         string `json:"key"`
 	Value       string `json:"value,omitempty"`
-	Category    string `json:"category"` // "terraform" | "env"
+	Category    string `json:"category"` // "terraform" | "env" | "git_http_auth" | "git_ssh_auth"
 	HCL         bool   `json:"hcl"`
 	Sensitive   bool   `json:"sensitive"`
 	Description string `json:"description,omitempty"`
@@ -33,7 +33,7 @@ type Variable struct {
 type CreateVariableRequest struct {
 	Key         string `json:"key"`
 	Value       string `json:"value"`
-	Category    string `json:"category"` // "terraform" | "env"
+	Category    string `json:"category"` // "terraform" | "env" | "git_http_auth" | "git_ssh_auth"
 	HCL         bool   `json:"hcl,omitempty"`
 	Sensitive   bool   `json:"sensitive,omitempty"`
 	Description string `json:"description,omitempty"`

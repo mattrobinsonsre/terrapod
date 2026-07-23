@@ -38,6 +38,22 @@ def _version_hash(key: str, value: str, category: str) -> str:
     return hashlib.sha256(content.encode()).hexdigest()[:16]
 
 
+# The categories a variable may carry. `git_http_auth`/`git_ssh_auth` (#1028)
+# hold private-git-module credentials — always sensitive, materialized by the
+# runner's git_auth phase, never rendered into terraform inputs.
+VALID_CATEGORIES = frozenset({"terraform", "env", "git_http_auth", "git_ssh_auth"})
+GIT_AUTH_CATEGORIES = frozenset({"git_http_auth", "git_ssh_auth"})
+
+
+def _validated_category(category: str) -> str:
+    if category not in VALID_CATEGORIES:
+        raise ValueError(
+            f"invalid variable category {category!r}; must be one of "
+            + ", ".join(sorted(VALID_CATEGORIES))
+        )
+    return category
+
+
 async def create_variable(
     db: AsyncSession,
     workspace_id: uuid.UUID,
@@ -49,6 +65,9 @@ async def create_variable(
     sensitive: bool = False,
 ) -> Variable:
     """Create a workspace variable."""
+    category = _validated_category(category)
+    if category in GIT_AUTH_CATEGORIES:
+        sensitive = True  # git-auth values are always secret
     var = Variable(
         workspace_id=workspace_id,
         key=key,
@@ -80,7 +99,7 @@ async def update_variable(
     if description is not None:
         var.description = description
     if category is not None:
-        var.category = category
+        var.category = _validated_category(category)
     if hcl is not None:
         var.hcl = hcl
 
@@ -90,7 +109,11 @@ async def update_variable(
         var.value = value
         var.version_id = _version_hash(var.key, value, var.category)
 
-    if sensitive is not None:
+    # git-auth categories are always secret and can never be downgraded.
+    force_sensitive = var.category in GIT_AUTH_CATEGORIES
+    if force_sensitive:
+        var.sensitive = True
+    elif sensitive is not None:
         var.sensitive = sensitive
 
     # Security: downgrading a variable from sensitive → non-sensitive would
@@ -99,7 +122,7 @@ async def update_variable(
     # secret must not become world-readable by flipping a flag. If the caller
     # didn't supply a fresh value in the same request, clear it so the old
     # secret is never exposed — the operator must re-enter it.
-    if was_sensitive and sensitive is False and value is None:
+    if not force_sensitive and was_sensitive and sensitive is False and value is None:
         var.value = ""
         var.version_id = _version_hash(var.key, "", var.category)
 
