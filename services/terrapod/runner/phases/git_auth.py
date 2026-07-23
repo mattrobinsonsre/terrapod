@@ -110,6 +110,10 @@ def configure(entries: list[dict], *, base_dir: Path) -> dict[str, str]:
     ssh_hosts: list[tuple[str, Path, Path]] = []  # (host, key_path, known_hosts_path)
 
     for entry in entries:
+        if not isinstance(entry, dict):
+            # Honour the "never raises" contract: a non-dict item in the mounted
+            # list must be skipped, not `.get()`-ed into an AttributeError.
+            continue
         category = entry.get("category")
         pattern = (entry.get("key") or "").strip()
         if not pattern:
@@ -136,11 +140,25 @@ def configure(entries: list[dict], *, base_dir: Path) -> dict[str, str]:
                 use_http_path = True
             creds_lines.append(f"https://{username}:{token}@{scope}")
             if rewrite == "to_https":
-                # Tokenless rewrite — the store helper supplies the token per host.
+                # Tokenless rewrite (the store helper supplies the token per matched
+                # URL). SCOPE it to the org path when the pattern names one, so a
+                # host-wide insteadOf can't silently hijack a *different* org's ssh
+                # source on the same host — e.g. an org-b deploy-key fetch getting
+                # rewritten to https and losing its auth. Host-wide only when the
+                # pattern is a bare host.
+                if "/" in scope:
+                    org_path = scope.split("/", 1)[1].rstrip("/")
+                    https_target = f"https://{host}/{org_path}/"
+                    ssh_src = f"ssh://git@{host}/{org_path}/"
+                    scp_src = f"git@{host}:{org_path}/"
+                else:
+                    https_target = f"https://{host}/"
+                    ssh_src = f"ssh://git@{host}/"
+                    scp_src = f"git@{host}:"
                 config += [
-                    f'[url "https://{host}/"]\n',
-                    f"\tinsteadOf = ssh://git@{host}/\n",
-                    f"\tinsteadOf = git@{host}:\n",
+                    f'[url "{https_target}"]\n',
+                    f"\tinsteadOf = {ssh_src}\n",
+                    f"\tinsteadOf = {scp_src}\n",
                 ]
         elif category == _SSH:
             key = cred.get("private_key")
@@ -195,6 +213,15 @@ def configure(entries: list[dict], *, base_dir: Path) -> dict[str, str]:
     git_config.write_text("".join(config), encoding="utf-8")
     # GIT_CONFIG_GLOBAL isolates our config so nothing user-owned is clobbered.
     env["GIT_CONFIG_GLOBAL"] = str(git_config)
+    # Log-safety backstop: force git tracing OFF so an operator-set GIT_TRACE_CURL /
+    # GIT_CURL_VERBOSE (which log the Authorization header — base64 `user:token`) to
+    # the stderr the runner streams verbatim can't defeat the tokenless-mechanism
+    # guarantee. We only reach here when a credential is being materialised, and
+    # these override any inherited env value for the git subprocess.
+    env["GIT_TRACE"] = "0"
+    env["GIT_TRACE_CURL"] = "0"
+    env["GIT_CURL_VERBOSE"] = "0"
+    env["GIT_TRACE_PACKET"] = "0"
     return env
 
 

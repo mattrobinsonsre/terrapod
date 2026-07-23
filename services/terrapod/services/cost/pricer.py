@@ -147,7 +147,7 @@ def _price_graduated_attr_provision(
 
     assert entry.usage is not None
     attr = entry.usage.data.max  # ATTR usage was synthesized as a point Range(v, v)
-    divisor = float(entry.divisor if entry.divisor is not None else 1)
+    divisor = float(entry.divisor or 1)  # None OR 0 → 1 (guard ZeroDivisionError)
     tiers.sort(key=lambda t: t[0])
     out: list[PricedProduct] = []
     prev_end = 0
@@ -189,10 +189,21 @@ def _apply_usage_amount(entry: Entry, products: list[Product]) -> list[tuple[Ent
         return [(entry, products)]
 
     groups: dict[tuple[Range[int], str], list[Product]] = {}
+    untiered: list[Product] = []
     for product in products:
         ms = product.pricing_match_set
-        sua = _int_of_usage(ms.find_by_key("start_usage_amount")[1])  # type: ignore[index]
-        eua = _int_of_usage(ms.find_by_key("end_usage_amount")[1])  # type: ignore[index]
+        start = ms.find_by_key("start_usage_amount")
+        end = ms.find_by_key("end_usage_amount")
+        if start is None or end is None:
+            # Mixed group: `has_usage_amount` (any-product) is true, but THIS product
+            # carries no usage-amount tier bounds — e.g. a flat PER_TIME hour charge
+            # sharing one entry with tiered PER_DATA bands (aws_lb/aws_elb shape).
+            # Price it as the untiered remainder rather than indexing a missing key
+            # (find_by_key → None → None[1] → TypeError, which price() doesn't catch).
+            untiered.append(product)
+            continue
+        sua = _int_of_usage(start[1])
+        eua = _int_of_usage(end[1])
         rng = Range(sua, eua)
         kind = product.price.kind
         priced_by = (
@@ -214,6 +225,8 @@ def _apply_usage_amount(entry: Entry, products: list[Product]) -> list[tuple[Ent
         bounded = usage_mod.bound_to_usage_amount(accessor, usage_range, entry)
         if bounded is not None:
             out.append((bounded, group))
+    if untiered:
+        out.append((entry, untiered))
     return out
 
 
@@ -221,7 +234,7 @@ def _price_products(
     entry: Entry, products: list[Product]
 ) -> tuple[PricedProduct, float, float] | None:
     assert entry.usage is not None
-    divisor = float(entry.divisor if entry.divisor is not None else 1)
+    divisor = float(entry.divisor or 1)  # None OR 0 → 1 (guard ZeroDivisionError)
     priced: list[tuple[Product, float]] = []
     for product in products:
         unit_price = product.price.value

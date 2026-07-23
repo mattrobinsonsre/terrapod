@@ -161,14 +161,17 @@ async def test_happy_path_prices_and_attaches_sv_meta():
     }
 
 
-async def test_pricesheet_tempfile_is_always_unlinked():
-    """The PVC pricesheet tempfile is cleaned up even when the engine raises."""
+async def test_engine_exception_is_contained_and_tempfile_unlinked():
+    """The PVC pricesheet tempfile is cleaned up even when the engine raises, AND
+    (#1028 cost audit finding 3) an engine crash — e.g. the TypeError/ZeroDivisionError
+    a pricing edge could throw — is CONTAINED to PricesheetUnavailable (→ 503), never
+    propagated as a raw 500 the way the runner plan path avoids by skipping."""
     sv = _sv()
     patches = _patches(frozenset({cap.STATE_READ}), sv)
     unlink = MagicMock()
     patches[6] = patch.object(svc.cost_pricesheet_service, "_safe_unlink", unlink)
-    patches[7] = patch.object(svc, "_run_engine", MagicMock(side_effect=ValueError("bad state")))
+    patches[7] = patch.object(svc, "_run_engine", MagicMock(side_effect=TypeError("mixed group")))
     with _Ctx(patches):
-        with pytest.raises(ValueError):
+        with pytest.raises(svc.PricesheetUnavailable):  # was a raw TypeError → HTTP 500
             await svc.estimate_workspace_cost(_db_returning(sv), _user(), str(WS))
     unlink.assert_called_once_with("/tmp/prices.sqlite")
