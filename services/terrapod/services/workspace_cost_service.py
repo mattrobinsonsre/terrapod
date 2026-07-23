@@ -64,12 +64,20 @@ def _empty_attrs(state_version: dict | None = None) -> dict[str, Any]:
 
 
 def _run_engine(state_bytes: bytes, pricesheet_path: str, default_region: str) -> dict[str, Any]:
-    """Parse state + run the cost engine (sync — called via ``to_thread``)."""
+    """Parse state + run the cost engine (sync — called via ``to_thread``).
+
+    ``pricesheet_path`` is the cached **SQLite index** (#1034); the engine queries
+    it off disk (bounded memory) instead of parsing the whole sheet.
+    """
     from terrapod.services.cost import estimate
+    from terrapod.services.cost.pricesheet_db import PricesheetIndex
 
     tf_json = json.loads(state_bytes)
-    with open(pricesheet_path) as sheet:
-        result = estimate(tf_json, sheet, default_region=default_region)
+    index = PricesheetIndex.open(pricesheet_path)
+    try:
+        result = estimate(tf_json, index=index, default_region=default_region)
+    finally:
+        index.close()
     return result.to_dict()
 
 

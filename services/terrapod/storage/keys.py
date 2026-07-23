@@ -159,6 +159,17 @@ def cost_pricesheet_key() -> str:
     return "cache/cost/prices.csv"
 
 
+def cost_pricesheet_db_key() -> str:
+    """Key for the cached pricesheet **SQLite index** (#1034).
+
+    The multi-region sheet (~260k products) is streamed once into a SQLite index
+    at cache refresh and stored here; both the API and runner download this file
+    and query it off disk (bounded memory) instead of parsing the whole sheet.
+    A distinct key from the raw-sheet key above so the two never get confused.
+    """
+    return "cache/cost/prices.sqlite"
+
+
 # --- Platform Provider Cache ---
 
 

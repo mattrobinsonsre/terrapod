@@ -81,7 +81,8 @@ def _meta(age: timedelta) -> MagicMock:
 # --- refresh (real gunzip + streamed store) --------------------------------
 
 
-async def test_refresh_downloads_decompresses_and_stores():
+async def test_refresh_downloads_builds_sqlite_index_and_stores():
+    # refresh now gunzips → builds a SQLite index → stores the .sqlite (#1034).
     gz = gzip.compress(_CSV)
     captured: dict = {}
     storage = _storage_capturing(captured)
@@ -89,10 +90,28 @@ async def test_refresh_downloads_decompresses_and_stores():
     with patch.object(svc.httpx, "AsyncClient", lambda **kw: _FakeClient(gz)):
         size = await svc.refresh_pricesheet(storage)
 
-    assert captured["key"] == "cache/cost/prices.csv"
-    assert captured["content_type"] == "text/csv"
-    assert captured["data"] == _CSV  # decompressed round-trip
-    assert size == len(_CSV)
+    assert captured["key"] == "cache/cost/prices.sqlite"
+    assert captured["content_type"] == "application/x-sqlite3"
+    assert size == len(captured["data"]) > 0
+    assert captured["data"][:16].startswith(b"SQLite format 3")  # real sqlite file
+
+    # the stored index is queryable and has the CSV's product
+    import os
+    import tempfile
+
+    from terrapod.services.cost.pricesheet_db import PricesheetIndex
+
+    fd, path = tempfile.mkstemp(suffix=".sqlite")
+    os.close(fd)
+    try:
+        with open(path, "wb") as f:
+            f.write(captured["data"])
+        idx = PricesheetIndex.open(path)
+        cands = list(idx.candidates("aws_instance", "us-east-1"))
+        assert len(cands) == 1 and cands[0].price.value == 0.10
+        idx.close()
+    finally:
+        os.unlink(path)
 
 
 async def test_pricesheet_available_and_download_url():
@@ -104,7 +123,7 @@ async def test_pricesheet_available_and_download_url():
 
     assert await svc.pricesheet_available(storage) is True
     assert await svc.pricesheet_download_url(storage) == "https://example/presigned/prices.csv"
-    storage.exists.assert_awaited_with("cache/cost/prices.csv")
+    storage.exists.assert_awaited_with("cache/cost/prices.sqlite")
 
 
 # --- pull-through ensure_pricesheet ----------------------------------------

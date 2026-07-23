@@ -39,7 +39,8 @@ import httpx
 import structlog
 
 from terrapod.config import settings
-from terrapod.storage.keys import cost_pricesheet_key
+from terrapod.services.cost import pricesheet_db
+from terrapod.storage.keys import cost_pricesheet_db_key
 from terrapod.storage.protocol import ObjectStore
 
 logger = structlog.get_logger(__name__)
@@ -88,22 +89,33 @@ async def _file_chunks(path: str) -> AsyncIterator[bytes]:
         await asyncio.to_thread(fh.close)
 
 
-async def refresh_pricesheet(storage: ObjectStore) -> int:
-    """Fetch the configured pricesheet, decompress it, and cache it in storage.
+def _build_db(sheet_path: str, db_path: str) -> int:
+    """Stream a decompressed sheet file into a SQLite index (sync, off-loop)."""
+    with open(sheet_path) as fp:
+        return pricesheet_db.build_index(fp, db_path)
 
-    Streams ``cost_estimation.prices_url`` (gzipped CSV) to a PVC tempfile,
-    gunzips it off-loop, then streams the decompressed CSV into object storage
-    at :func:`cost_pricesheet_key`. Returns the stored CSV size in bytes. Raises
-    on any download/decompress failure (the store only happens on success, so a
+
+async def refresh_pricesheet(storage: ObjectStore) -> int:
+    """Fetch the configured pricesheet, build a SQLite index, and cache it (#1034).
+
+    Streams ``cost_estimation.prices_url`` (gzipped CSV / Terrapod YAML) to a PVC
+    tempfile, gunzips it off-loop, **streams it into a SQLite index**
+    (:mod:`pricesheet_db` — bounded memory even for the ~260k-product multi-region
+    sheet), then stores the ``.sqlite`` in object storage at
+    :func:`cost_pricesheet_db_key`. Both the API and runner query that file off
+    disk instead of parsing the whole sheet. Returns the stored DB size in bytes.
+    Raises on any download/build failure (the store only happens on success, so a
     previously cached copy is left intact).
     """
     url = settings.cost_estimation.prices_url
     tmpdir = _resolve_ephemeral_tmpdir()
 
-    gz_fd, gz_path = await asyncio.to_thread(tempfile.mkstemp, suffix=".csv.gz", dir=tmpdir)
+    gz_fd, gz_path = await asyncio.to_thread(tempfile.mkstemp, suffix=".gz", dir=tmpdir)
     await asyncio.to_thread(os.close, gz_fd)
-    csv_fd, csv_path = await asyncio.to_thread(tempfile.mkstemp, suffix=".csv", dir=tmpdir)
-    await asyncio.to_thread(os.close, csv_fd)
+    sheet_fd, sheet_path = await asyncio.to_thread(tempfile.mkstemp, suffix=".sheet", dir=tmpdir)
+    await asyncio.to_thread(os.close, sheet_fd)
+    db_fd, db_path = await asyncio.to_thread(tempfile.mkstemp, suffix=".sqlite", dir=tmpdir)
+    await asyncio.to_thread(os.close, db_fd)
     try:
         async with httpx.AsyncClient(follow_redirects=True) as client:
             # trust_env (httpx default) routes via the configured proxy/CA (#592).
@@ -112,18 +124,22 @@ async def refresh_pricesheet(storage: ObjectStore) -> int:
                 async for chunk in resp.aiter_bytes(_CHUNK):
                     await asyncio.to_thread(_append_chunk, gz_path, chunk)
 
-        await asyncio.to_thread(_gunzip_file, gz_path, csv_path)
-        size = await asyncio.to_thread(os.path.getsize, csv_path)
+        await asyncio.to_thread(_gunzip_file, gz_path, sheet_path)
+        # SQLite can't be built into via a stream, so build to the temp file then
+        # (over)write the cache atomically at the DB key.
+        await asyncio.to_thread(os.unlink, db_path)  # build_index creates fresh
+        rows = await asyncio.to_thread(_build_db, sheet_path, db_path)
+        size = await asyncio.to_thread(os.path.getsize, db_path)
 
         await storage.put_stream(
-            cost_pricesheet_key(),
-            _file_chunks(csv_path),
-            content_type="text/csv",
+            cost_pricesheet_db_key(),
+            _file_chunks(db_path),
+            content_type="application/x-sqlite3",
         )
-        logger.info("cost_pricesheet_refreshed", url=url, size_bytes=size)
+        logger.info("cost_pricesheet_refreshed", url=url, rows=rows, size_bytes=size)
         return size
     finally:
-        for path in (gz_path, csv_path):
+        for path in (gz_path, sheet_path, db_path):
             try:
                 await asyncio.to_thread(os.unlink, path)
             except OSError:
@@ -132,10 +148,10 @@ async def refresh_pricesheet(storage: ObjectStore) -> int:
 
 async def _is_fresh(storage: ObjectStore) -> bool:
     """True when a cached pricesheet exists and is younger than the TTL."""
-    if not await storage.exists(cost_pricesheet_key()):
+    if not await storage.exists(cost_pricesheet_db_key()):
         return False
     try:
-        meta = await storage.head(cost_pricesheet_key())
+        meta = await storage.head(cost_pricesheet_db_key())
     except Exception:  # noqa: BLE001 - any head failure => treat as stale
         return False
     modified = meta.last_modified
@@ -155,7 +171,7 @@ async def ensure_pricesheet(storage: ObjectStore) -> bool:
     """
     if await _is_fresh(storage):
         return True
-    had_copy = await storage.exists(cost_pricesheet_key())
+    had_copy = await storage.exists(cost_pricesheet_db_key())
     try:
         await refresh_pricesheet(storage)
         return True
@@ -166,18 +182,18 @@ async def ensure_pricesheet(storage: ObjectStore) -> bool:
 
 async def pricesheet_available(storage: ObjectStore) -> bool:
     """Whether a cached pricesheet currently exists (no refetch)."""
-    return await storage.exists(cost_pricesheet_key())
+    return await storage.exists(cost_pricesheet_db_key())
 
 
 async def pricesheet_download_url(storage: ObjectStore) -> str:
     """Presigned download URL for the cached pricesheet (302 target for runners)."""
-    presigned = await storage.presigned_get_url(cost_pricesheet_key())
+    presigned = await storage.presigned_get_url(cost_pricesheet_db_key())
     return presigned.url
 
 
 def pricesheet_stream(storage: ObjectStore) -> AsyncIterator[bytes]:
     """Stream the cached pricesheet's bytes (for the API state/workspace path)."""
-    return storage.get_stream(cost_pricesheet_key())
+    return storage.get_stream(cost_pricesheet_db_key())
 
 
 def _safe_unlink(path: str) -> None:
@@ -197,10 +213,10 @@ async def download_cached_to_file(storage: ObjectStore) -> str:
     no sheet is cached (call :func:`ensure_pricesheet` first).
     """
     tmpdir = _resolve_ephemeral_tmpdir()
-    fd, path = await asyncio.to_thread(tempfile.mkstemp, suffix=".csv", dir=tmpdir)
+    fd, path = await asyncio.to_thread(tempfile.mkstemp, suffix=".sqlite", dir=tmpdir)
     await asyncio.to_thread(os.close, fd)
     try:
-        async for chunk in storage.get_stream(cost_pricesheet_key()):
+        async for chunk in storage.get_stream(cost_pricesheet_db_key()):
             await asyncio.to_thread(_append_chunk, path, chunk)
     except BaseException:
         await asyncio.to_thread(_safe_unlink, path)
