@@ -144,6 +144,10 @@
     }
   },
   {
+    "description": "AWS EBS provisioned IOPS (io1/io2/gp3)",
+    "match_query": "type = aws_ebs_volume and service_class = iops"
+  },
+  {
     "description": "AWS EBS Storage",
     "match_query": "type = aws_ebs_volume and service_class = storage"
   },
