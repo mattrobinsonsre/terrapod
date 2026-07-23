@@ -9,7 +9,6 @@ is ABSENT (canonical "apply only where present") or its value is allowed.
 from __future__ import annotations
 
 import pricegen.fetch_offers as fo
-from pricegen.fetch_offers import _keep, fetch_aws, fetch_azure
 from pricegen.shard import ALL
 
 _FAMS = {"Compute Instance"}
@@ -25,25 +24,25 @@ def _p(family="Compute Instance", **attrs):
 
 
 def test_wrong_family_dropped():
-    assert not _keep(_p(family="Storage"), _FAMS, _KEEP)
+    assert not fo._keep(_p(family="Storage"), _FAMS, _KEEP)
 
 
 def test_matching_product_kept():
-    assert _keep(_p(operatingSystem="Linux", tenancy="Shared"), _FAMS, _KEEP)
+    assert fo._keep(_p(operatingSystem="Linux", tenancy="Shared"), _FAMS, _KEEP)
 
 
 def test_disallowed_value_dropped():
-    assert not _keep(_p(operatingSystem="RHEL", tenancy="Shared"), _FAMS, _KEEP)
-    assert not _keep(_p(operatingSystem="Linux", tenancy="Dedicated"), _FAMS, _KEEP)
+    assert not fo._keep(_p(operatingSystem="RHEL", tenancy="Shared"), _FAMS, _KEEP)
+    assert not fo._keep(_p(operatingSystem="Linux", tenancy="Dedicated"), _FAMS, _KEEP)
 
 
 def test_absent_attr_is_kept_mirrors_canonical():
     # marketoption absent on some SKUs -> kept (canonical applies only where present).
-    assert _keep(_p(operatingSystem="Linux", tenancy="Shared"), _FAMS, _KEEP)
+    assert fo._keep(_p(operatingSystem="Linux", tenancy="Shared"), _FAMS, _KEEP)
 
 
 def test_no_keep_attrs_keeps_any_in_family():
-    assert _keep(_p(family="Storage", volumeApiName="gp3"), {"Storage"}, {})
+    assert fo._keep(_p(family="Storage", volumeApiName="gp3"), {"Storage"}, {})
 
 
 # --- multi-region fetch + merge (#1025) ------------------------------------
@@ -75,7 +74,7 @@ def test_fetch_aws_merges_regions(monkeypatch):
         return offers[url[len(fo._AWS_BULK) :]]
 
     monkeypatch.setattr(fo, "_get_json", fake_get_json)
-    out = fetch_aws({"service_code": "AmazonS3"}, ["us-east-1", "eu-west-1"])
+    out = fo.fetch_aws({"service_code": "AmazonS3"}, ["us-east-1", "eu-west-1"])
     assert set(out["products"]) == {"SKU_E1", "SKU_W1"}
     assert set(out["terms"]["OnDemand"]) == {"SKU_E1", "SKU_W1"}
 
@@ -90,7 +89,7 @@ def test_fetch_aws_skips_region_absent_from_index(monkeypatch):
 
     monkeypatch.setattr(fo, "_get_json", fake_get_json)
     # ap-south-1 isn't in the index — skipped, not an error.
-    out = fetch_aws({"service_code": "AmazonS3"}, ["us-east-1", "ap-south-1"])
+    out = fo.fetch_aws({"service_code": "AmazonS3"}, ["us-east-1", "ap-south-1"])
     assert set(out["products"]) == {"SKU_E1"}
 
 
@@ -102,7 +101,7 @@ def test_fetch_aws_global_ignores_regions(monkeypatch):
         return {"products": {"G": {}}}
 
     monkeypatch.setattr(fo, "_get_json", fake_get_json)
-    out = fetch_aws({"service_code": "AmazonRoute53", "global": True}, ["us-east-1"])
+    out = fo.fetch_aws({"service_code": "AmazonRoute53", "global": True}, ["us-east-1"])
     # one fetch of current/index.json, no region_index involved
     assert len(calls) == 1 and calls[0].endswith("current/index.json")
     assert out["products"] == {"G": {}}
@@ -126,7 +125,7 @@ def test_fetch_aws_large_offer_merges_via_stream_filter(monkeypatch):
         return {"products": {sku: {}}, "terms": {"OnDemand": {sku: {}}}}
 
     monkeypatch.setattr(fo, "_stream_filter_aws", fake_stream)
-    out = fetch_aws(
+    out = fo.fetch_aws(
         {"service_code": "AmazonEC2", "families": ["Compute Instance"]},
         ["us-east-1", "eu-west-1"],
     )
@@ -145,7 +144,7 @@ def test_fetch_azure_concats_regions(monkeypatch):
         return pages[region]  # single page each (no NextPageLink)
 
     monkeypatch.setattr(fo, "_get_json", fake_get_json)
-    out = fetch_azure({"service_name": "Storage"}, ["eastus", "westeurope"])
+    out = fo.fetch_azure({"service_name": "Storage"}, ["eastus", "westeurope"])
     assert {i["armRegionName"] for i in out["Items"]} == {"eastus", "westeurope"}
 
 
@@ -166,7 +165,7 @@ def test_fetch_aws_all_regions_discovers_from_index(monkeypatch):
         return {"products": {sku: {}}, "terms": {"OnDemand": {sku: {}}}}
 
     monkeypatch.setattr(fo, "_get_json", fake_get_json)
-    out = fetch_aws({"service_code": "AmazonS3"}, ALL)
+    out = fo.fetch_aws({"service_code": "AmazonS3"}, ALL)
     # one product per region key in the index
     assert len(out["products"]) == 3
 
@@ -180,6 +179,6 @@ def test_fetch_azure_all_regions_drops_filter(monkeypatch):
         return {"Items": [{"armRegionName": "eastus"}, {"armRegionName": "westus"}]}
 
     monkeypatch.setattr(fo, "_get_json", fake_get_json)
-    out = fetch_azure({"service_name": "Storage"}, ALL)
+    out = fo.fetch_azure({"service_name": "Storage"}, ALL)
     assert "armRegionName" not in captured["url"]  # no region filter
     assert {i["armRegionName"] for i in out["Items"]} == {"eastus", "westus"}
