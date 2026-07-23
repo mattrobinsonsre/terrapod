@@ -11,10 +11,20 @@ could reach an argv/stdout.
 from __future__ import annotations
 
 import json
+import os
 import re
+import shutil
 import stat
+import subprocess
+
+import pytest
 
 from terrapod.runner.phases import git_auth
+
+# Some assertions below drive git's OWN `insteadOf` engine to prove the rewrite
+# semantics (not just that we wrote the right config strings). Skip cleanly where
+# the git binary is unavailable (it is present in the runner + test images).
+_HAS_GIT = shutil.which("git") is not None
 
 
 def _http(pattern, token="ghp_SECRETTOKEN", username=None, rewrite="to_https"):
@@ -103,6 +113,64 @@ def test_ssh_writes_key_known_hosts_and_config(tmp_path):
     # https→ssh rewrite.
     assert "insteadOf = https://gitlab.example.com/" in cfg
     assert env["GIT_CONFIG_GLOBAL"] == str(tmp_path / "gitconfig")
+
+
+# --- real-git rewrite semantics (git's own insteadOf engine) -----------------
+# The string-level tests above prove we EMIT the right `insteadOf` lines; these
+# prove git actually REWRITES with them. `git ls-remote --get-url` applies
+# insteadOf and prints the resolved URL with no network I/O — deterministic.
+
+
+def _get_url(env, source):
+    r = subprocess.run(
+        ["git", "ls-remote", "--get-url", source],
+        env={**os.environ, **env},
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return r.stdout.strip()
+
+
+@pytest.mark.skipif(not _HAS_GIT, reason="git binary required")
+@pytest.mark.parametrize(
+    "source",
+    ["ssh://git@github.com/org/repo.git", "git@github.com:org/repo.git"],
+)
+def test_to_https_rewrite_resolves_ssh_and_scp_sources(tmp_path, source):
+    """`rewrite=to_https`: both the ssh:// and scp-style git@host: forms of a
+    source resolve to the tokenless https URL (git supplies the token via the
+    store helper out-of-band, so the resolved URL itself carries no secret)."""
+    env = git_auth.configure([_http("github.com", rewrite="to_https")], base_dir=tmp_path)
+    assert _get_url(env, source) == "https://github.com/org/repo.git"
+
+
+@pytest.mark.skipif(not _HAS_GIT, reason="git binary required")
+def test_to_ssh_rewrite_resolves_https_source(tmp_path):
+    """`rewrite=to_ssh`: an https:// source resolves to the ssh:// deploy-key URL
+    (the direction the live smoke did not exercise)."""
+    env = git_auth.configure([_ssh("gitlab.example.com", rewrite="to_ssh")], base_dir=tmp_path)
+    assert (
+        _get_url(env, "https://gitlab.example.com/grp/proj.git")
+        == "ssh://git@gitlab.example.com/grp/proj.git"
+    )
+
+
+@pytest.mark.skipif(not _HAS_GIT, reason="git binary required")
+def test_rewrite_is_scoped_to_its_host(tmp_path):
+    """A rewrite for host A must NEVER touch a source on host B — over-broad
+    insteadOf would silently reroute unrelated module fetches."""
+    env = git_auth.configure([_http("github.com", rewrite="to_https")], base_dir=tmp_path)
+    assert _get_url(env, "https://example.com/x.git") == "https://example.com/x.git"
+    assert _get_url(env, "ssh://git@example.com/x.git") == "ssh://git@example.com/x.git"
+
+
+@pytest.mark.skipif(not _HAS_GIT, reason="git binary required")
+def test_rewrite_none_does_not_touch_urls(tmp_path):
+    """`rewrite=none`: sources pass through unchanged (auth still applies via the
+    store helper for matching https URLs, but no protocol rewrite happens)."""
+    env = git_auth.configure([_http("github.com", rewrite="none")], base_dir=tmp_path)
+    assert _get_url(env, "ssh://git@github.com/org/repo.git") == "ssh://git@github.com/org/repo.git"
 
 
 # --- HARD log-safety invariant ----------------------------------------------
