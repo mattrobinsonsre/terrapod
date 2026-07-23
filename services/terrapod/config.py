@@ -768,11 +768,14 @@ class CostEstimationConfig(BaseModel):
 
     enabled: bool = Field(default=True)
     prices_url: str = Field(
-        default="https://oiq.terrateam.io/prices.csv.gz",
+        default="https://github.com/mattrobinsonsre/terrapod/releases/download/pricesheet/prices.yaml.gz",
         description=(
-            "Upstream OpenInfraQuote pricesheet (gzipped CSV). Fetched on demand "
-            "(pull-through) when the cached copy is missing or stale — no schedule. "
-            "Point at an internal mirror for air-gapped deployments."
+            "Pricesheet source (gzipped). Defaults to Terrapod's self-generated, "
+            "multi-region pricesheet published weekly to a rolling GitHub Release "
+            "(#893). Fetched on demand (pull-through) when the cached copy is "
+            "missing or stale — no schedule. The reader auto-detects the format "
+            "(Terrapod YAML or an OpenInfraQuote-compatible CSV), so an internal "
+            "mirror of either shape works for air-gapped deployments."
         ),
     )
     default_region: str = Field(

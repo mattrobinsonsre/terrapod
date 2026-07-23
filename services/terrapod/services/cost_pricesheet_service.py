@@ -1,12 +1,15 @@
 """Pricesheet cache service for cost estimation (#871).
 
-Mirrors OpenInfraQuote's published ``prices.csv.gz`` into object storage so the
-runner (plan path) and the API (state/workspace path) read a cached copy — no
-per-run egress to ``oiq.terrateam.io``. This is a **pull-through** cache, exactly
-like Terrapod's binary/provider caches: the sheet is fetched **on demand** when
-it's missing or stale, not on a schedule. No operator scheduling, no interval to
-tune. Air-gapped deployments pre-seed the cached object or point
-``cost_estimation.prices_url`` at an internal mirror.
+Mirrors the configured pricesheet (``cost_estimation.prices_url``, a gzipped
+sheet) into object storage so the runner (plan path) and the API (state/workspace
+path) read a cached copy — no per-run egress. It defaults to Terrapod's own
+self-generated, multi-region pricesheet (#893/#1025), and also accepts an
+OpenInfraQuote-compatible CSV; the reader auto-detects the format by content, so
+this cache is format-agnostic (it stores the decompressed bytes verbatim). This
+is a **pull-through** cache, exactly like Terrapod's binary/provider caches: the
+sheet is fetched **on demand** when it's missing or stale, not on a schedule. No
+operator scheduling, no interval to tune. Air-gapped deployments pre-seed the
+cached object or point ``cost_estimation.prices_url`` at an internal mirror.
 
 Staleness comes straight from object storage (the cached object's
 ``last_modified``), so there's no separate timestamp store. Refresh is
