@@ -683,6 +683,7 @@ jobs:
           # Cost estimation (#871): non-secret config renders into config.yaml.
           echo "$out" | grep -q "cost_estimation:" || { echo "FAIL: cost_estimation config not rendered into config.yaml (#871)"; exit 1; }
           echo "$out" | grep -q "prices_url:" || { echo "FAIL: cost_estimation.prices_url not rendered (#871)"; exit 1; }
+          echo "$out" | grep -q "default_region:" || { echo "FAIL: cost_estimation.default_region not rendered (#871)"; exit 1; }
           echo "values-local renders OK (incl. Slack config + secretKeyRef)"
       - name: Eval values render (embedded Postgres/Redis)
         run: |

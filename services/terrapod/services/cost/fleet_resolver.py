@@ -338,13 +338,6 @@ def resolve_fleets(resources: list[tuple[Resource, Change]]) -> list[Fleet]:
     return out
 
 
-def is_fleet(resource_type: str) -> bool:
-    """Whether a resource type is handled by the fleet resolver (priced or
-    deferred) — the engine excludes these from normal matching to avoid
-    double-handling and lets the resolver own their output."""
-    return resource_type in DESCRIPTORS or resource_type in DEFERRED_FLEETS
-
-
 def synth_resources(fleet: Fleet, region: str) -> list[tuple[str, Resource, float]]:
     """Build a minimal priceable resource per part, stamped with the fleet's
     resolved region. Returns ``(synth_address, resource, count)`` — the engine

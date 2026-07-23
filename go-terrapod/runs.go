@@ -77,6 +77,13 @@ type Run struct {
 	HasChanges       *bool `json:"has-changes,omitempty"`
 	HasJSONOutput    bool  `json:"has-json-output"`
 	StateDiverged    bool  `json:"state-diverged"`
+	// Cost estimation (#871): HasCostEstimate gates the run's Cost tab; the cached
+	// monthly range is echoed for cheap list display. Currency/min/max are nil
+	// until an estimate exists (a plan-only or errored run may have none).
+	HasCostEstimate bool     `json:"has-cost-estimate"`
+	CostCurrency    string   `json:"cost-currency,omitempty"`
+	CostMonthlyMin  *float64 `json:"cost-monthly-min,omitempty"`
+	CostMonthlyMax  *float64 `json:"cost-monthly-max,omitempty"`
 	// Workspace context.
 	WorkspaceID   string `json:"workspace-id,omitempty"` // from the `workspace` relationship
 	WorkspaceName string `json:"workspace-name,omitempty"`
@@ -321,6 +328,8 @@ func runFromResource(res *Resource) *Run {
 		IsDriftDetection:  GetBoolAttr(res, "is-drift-detection"),
 		HasJSONOutput:     GetBoolAttr(res, "has-json-output"),
 		StateDiverged:     GetBoolAttr(res, "state-diverged"),
+		HasCostEstimate:   GetBoolAttr(res, "has-cost-estimate"),
+		CostCurrency:      GetStringAttr(res, "cost-currency"),
 		WorkspaceName:     GetStringAttr(res, "workspace-name"),
 		VCSCommitSHA:      GetStringAttr(res, "vcs-commit-sha"),
 		VCSBranch:         GetStringAttr(res, "vcs-branch"),
@@ -336,6 +345,8 @@ func runFromResource(res *Resource) *Run {
 	r.RunnerExitCode = nullableInt(res, "runner-exit-code")
 	r.VCSPullRequestNumber = nullableInt(res, "vcs-pull-request-number")
 	r.HasChanges = nullableBool(res, "has-changes")
+	r.CostMonthlyMin = nullableFloat(res, "cost-monthly-min")
+	r.CostMonthlyMax = nullableFloat(res, "cost-monthly-max")
 	unmarshalAttr(res, "actions", &r.Actions)
 	unmarshalAttr(res, "status-timestamps", &r.StatusTimestamps)
 	return r
@@ -352,6 +363,20 @@ func nullableInt(res *Resource, key string) *int64 {
 		return nil
 	}
 	return &n
+}
+
+// nullableFloat returns a *float64 for an attribute that may be JSON null /
+// absent (distinguishing "no estimate" from an explicit 0.0).
+func nullableFloat(res *Resource, key string) *float64 {
+	raw, ok := res.Attributes[key]
+	if !ok || len(raw) == 0 || string(raw) == "null" {
+		return nil
+	}
+	var f float64
+	if json.Unmarshal(raw, &f) != nil {
+		return nil
+	}
+	return &f
 }
 
 // nullableBool returns a *bool for an attribute that may be JSON null / absent

@@ -387,7 +387,7 @@
       "additionalProperties": false,
       "properties": {
         "category": {
-          "description": "terraform or env (default terraform)",
+          "description": "terraform, env, git_http_auth, or git_ssh_auth (default terraform); the git_* categories carry private-git-module credentials as a JSON value and are always sensitive",
           "type": "string"
         },
         "description": {

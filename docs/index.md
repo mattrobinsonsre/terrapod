@@ -30,10 +30,11 @@ Beyond broad TFE compatibility, Terrapod is built with three deliberate design f
 | **VCS Integration** | GitHub (App) and GitLab (access token); inbound webhooks supported (GitHub HMAC + GitLab token) for instant triggers, plus outbound polling so webhooks are optional, never required |
 | **VCS Workflows** | Default merge-then-apply (TFE standard) plus opt-in apply-then-merge mode (Atlantis-style: PR comments drive applies, `terrapod apply` from a PR comment, auto-merge after apply) |
 | **Variables & Secrets** | Per-workspace env and Terraform variables; sensitive values protected by database encryption-at-rest; variable sets |
+| **Private Module Source Auth** | First-class auth for private `git::https://` / `git::ssh://` module sources — a scoped `git_http_auth` / `git_ssh_auth` variable (static token or minted from a VCS connection), ssh↔https protocol rewrite, log-safe per-run-Secret delivery ([module-auth.md](module-auth.md)) |
 | **RBAC** | Label-based role system with hierarchical workspace permissions (read/plan/write/admin) |
 | **Private Registry** | Publish, version, and share modules and providers internally with pull-through caching |
 | **Service Catalog** | No-code self-service provisioning over the private registry; blessed modules become one-click agent-mode workspaces with provider templates and a dedicated RBAC axis |
-| **Cost Estimation** | Monthly cost of managed infrastructure — a per-plan delta on every run and the current total on a workspace; data via a native cost engine (credited), on by default; optional AI layer estimates the resources the engine can't price + savings advisories + a grounded cost chat |
+| **Cost Estimation** | Monthly cost of managed infrastructure — a per-plan delta on every run and the current total on a workspace; data via a native cost engine, on by default; optional AI layer estimates the resources the engine can't price + savings advisories + a grounded cost chat |
 | **Agent Pools** | Named groups of runner listeners; join token → certificate exchange for auth |
 | **SSO (OIDC / SAML)** | Pluggable identity providers (Auth0, Okta, Azure AD, etc.) |
 | **Run Triggers** | Cross-workspace dependency chains -- source apply triggers downstream runs |
