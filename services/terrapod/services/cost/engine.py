@@ -151,7 +151,10 @@ def estimate(
     if own_index:
         if pricesheet is None:
             raise ValueError("estimate() needs either `pricesheet` or `index`")
-        index = pricesheet_db.PricesheetIndex.build_memory(pricesheet)
+        # File-backed temp build (streamed, bounded) — never an in-memory DB. The
+        # API/runner pass a pre-built `index=` (the cached .sqlite); this path is
+        # for tests + small raw CSV/YAML mirrors.
+        index = pricesheet_db.PricesheetIndex.build_temp(pricesheet)
     try:
         matches = []
         for res, change in priceable:

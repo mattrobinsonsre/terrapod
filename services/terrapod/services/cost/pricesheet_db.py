@@ -20,14 +20,17 @@ Neither ever holds the whole sheet:
   agnostic rows) *before* the existing subset-match runs — bounded memory, and
   a few milliseconds per plan.
 
-A raw ``prices_url`` (CSV mirror, small YAML) still works: :func:`build_memory`
-builds an in-memory index from any stream, so the engine has one code path.
+A raw ``prices_url`` (CSV mirror, small YAML) still works: :meth:`build_temp`
+builds a **file-backed** index from any stream into a temp file (auto-cleaned),
+so the engine has one code path and never holds the DB in memory.
 """
 
 from __future__ import annotations
 
+import os
 import re
 import sqlite3
+import tempfile
 from collections.abc import Iterator
 from typing import IO
 
@@ -197,27 +200,43 @@ def build_index(fp: IO[str], db_path: str) -> int:
 
 
 class PricesheetIndex:
-    """Query wrapper over a built SQLite pricesheet index (file or in-memory).
+    """Query wrapper over a built SQLite pricesheet index — **always file-backed**.
 
-    :meth:`candidates` returns the products whose ``type`` matches a resource and
-    whose ``region`` is the resource's region or region-agnostic — the *only*
-    products that can subset-match it — so the engine never scans the full sheet.
+    The DB is a real file so SQLite pages it off disk (bounded ~18 MB query
+    memory), never materialised in RAM. :meth:`candidates` returns the products
+    whose ``type`` matches a resource and whose ``region`` is the resource's
+    region or region-agnostic — the *only* products that can subset-match it — so
+    the engine never scans the full sheet.
     """
 
-    def __init__(self, con: sqlite3.Connection):
+    def __init__(self, con: sqlite3.Connection, tmp_path: str | None = None):
         self._con = con
+        self._tmp_path = tmp_path  # a build_temp() file to unlink on close()
 
     @classmethod
     def open(cls, db_path: str) -> PricesheetIndex:
+        """Open a pre-built index file (the cached ``.sqlite`` — API/runner)."""
         return cls(sqlite3.connect(db_path, check_same_thread=False))
 
     @classmethod
-    def build_memory(cls, fp: IO[str]) -> PricesheetIndex:
-        """Build an in-memory index from a raw stream (tests, small CSV/YAML
-        mirrors) so the engine has a single index-based code path."""
-        con = sqlite3.connect(":memory:")
-        _create(con, stream_records(fp))
-        return cls(con)
+    def build_temp(cls, fp: IO[str], dir: str | None = None) -> PricesheetIndex:
+        """Build a **file-backed** index from a raw stream into a temp file, for
+        tests and small CSV/YAML mirrors (the API/runner use a pre-built cached
+        file via :meth:`open`). Streamed build (bounded memory); the temp file is
+        deleted on :meth:`close`. Never an in-memory DB — the index is always a
+        real file so the query stays paged off disk.
+        """
+        fd, path = tempfile.mkstemp(suffix=".sqlite", dir=dir)
+        os.close(fd)
+        try:
+            build_index(fp, path)
+        except BaseException:
+            try:
+                os.unlink(path)
+            except OSError:
+                pass
+            raise
+        return cls(sqlite3.connect(path, check_same_thread=False), tmp_path=path)
 
     def candidates(self, rtype: str, region: str | None) -> Iterator[Product]:
         """Yield candidate products for a resource of ``rtype`` in ``region``
@@ -242,3 +261,9 @@ class PricesheetIndex:
 
     def close(self) -> None:
         self._con.close()
+        if self._tmp_path is not None:
+            try:
+                os.unlink(self._tmp_path)
+            except OSError:
+                pass
+            self._tmp_path = None
