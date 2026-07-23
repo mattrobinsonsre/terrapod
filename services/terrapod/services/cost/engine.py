@@ -21,10 +21,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field, replace
 from typing import IO, Any
 
-from terrapod.services.cost import fleet_resolver
+from terrapod.services.cost import fleet_resolver, pricesheet_db
 from terrapod.services.cost import usage as usage_mod
 from terrapod.services.cost.pricer import price
-from terrapod.services.cost.prices import load_pricesheet
 from terrapod.services.cost.tf import (
     Change,
     provider_regions,
@@ -95,16 +94,22 @@ class CostEstimate:
 
 def estimate(
     tf_json: dict[str, Any],
-    pricesheet: IO[str],
+    pricesheet: IO[str] | None = None,
     usage_json: list[dict[str, Any]] | None = None,
     default_region: str = "us-east-1",
+    *,
+    index: pricesheet_db.PricesheetIndex | None = None,
 ) -> CostEstimate:
     """Estimate monthly cost for a plan or state against a pricesheet.
 
     ``tf_json``   — parsed ``terraform show -json`` (plan or state) or a raw
                     state v4 file.
-    ``pricesheet`` — an open text file object over OpenInfraQuote's
-                    ``prices.csv`` (streamed once, never fully materialised).
+    ``pricesheet`` — an open text pricesheet stream (CSV or Terrapod YAML). Built
+                    into an in-memory SQLite index (small sheets / mirrors / tests).
+    ``index``     — a pre-built :class:`~pricesheet_db.PricesheetIndex` (the API /
+                    runner pass the cached ``.sqlite`` so the 260k-product sheet is
+                    parsed once per refresh, not per request, #1034). Exactly one
+                    of ``pricesheet`` / ``index`` is used.
     ``usage_json`` — optional user usage overrides; prepended to the vendored
                     OpenInfraQuote defaults.
     ``default_region`` — fallback region for a resource whose region can't be
@@ -137,15 +142,28 @@ def estimate(
 
     priceable = list(resources) + synth_pairs
 
-    # Accumulate matching products per resource in a single pass over the sheet.
-    acc = [(res, change, res.to_match_set(), []) for res, change in priceable]
-    for product in load_pricesheet(pricesheet):
-        prod_ms = product.match_set
-        for _res, _change, res_ms, products in acc:
-            if prod_ms.is_subset_of(res_ms):
-                products.append(product)
-
-    matches = [(res, change, products) for res, change, _ms, products in acc]
+    # Match via the SQLite index (#1034): for each resource, query only the
+    # products sharing its type + resolved region (plus region-agnostic rows),
+    # then subset-match those — never scanning the full 260k-product sheet. A raw
+    # stream (tests, small CSV/YAML mirrors) is built into an in-memory index so
+    # there is one matching path.
+    own_index = index is None
+    if own_index:
+        if pricesheet is None:
+            raise ValueError("estimate() needs either `pricesheet` or `index`")
+        index = pricesheet_db.PricesheetIndex.build_memory(pricesheet)
+    try:
+        matches = []
+        for res, change in priceable:
+            res_ms = res.to_match_set()
+            region = region_by_address.get(res.address)
+            products = [
+                p for p in index.candidates(res.type, region) if p.match_set.is_subset_of(res_ms)
+            ]
+            matches.append((res, change, products))
+    finally:
+        if own_index:
+            index.close()
     usage_entries = usage_mod.load_usage(usage_json)
     result, unpriced = price(matches, usage_entries, region_by_address)
 
