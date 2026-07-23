@@ -184,6 +184,22 @@ class TestUpdateVariable:
         await update_variable(db, var, description="new desc")
         assert var.value == "keep-me"
 
+    async def test_git_auth_update_cannot_downgrade_sensitive_or_clear_value(self):
+        """#1028 audit C-3: a git-auth credential is force-sensitive — an update
+        with sensitive=False must keep it sensitive AND preserve its value (the
+        downgrade-clears-value path must NOT fire for git categories, else a valid
+        credential would be silently wiped)."""
+        db = AsyncMock(spec=AsyncSession)
+        var = MagicMock()
+        var.key = "github.com"
+        var.value = '{"token":"ghp_secret"}'
+        var.sensitive = True
+        var.category = "git_http_auth"
+
+        await update_variable(db, var, sensitive=False)  # attempt downgrade
+        assert var.sensitive is True  # forced back on
+        assert var.value == '{"token":"ghp_secret"}'  # value preserved, not cleared
+
 
 # ── resolve_variables ──────────────────────────────────────────────────
 

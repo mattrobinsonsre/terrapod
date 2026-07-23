@@ -65,9 +65,6 @@ class EmptyMatchSet(Exception):
     """A product carried a blank resource match set — skipped, not an error."""
 
 
-_YAML_SCHEMA_PREFIX = "terrapod-pricesheet/"
-
-
 def product_from_yaml(entry: dict, currency: str) -> Product:
     """Build a :class:`Product` from one product mapping of a YAML pricesheet.
 

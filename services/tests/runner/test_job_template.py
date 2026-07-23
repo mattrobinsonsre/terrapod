@@ -160,6 +160,37 @@ class TestExecutionHooksMount:
         keys = {i["key"] for i in vol["secret"]["items"]}
         assert keys == {"terraform.tfvars.json", "execution-hooks.json"}
 
+    def test_git_auth_added_as_secret_item(self):
+        """#1028 audit C-2: the git-auth credential is delivered as a `git-auth.json`
+        item projected from the per-run Secret onto the tfvars volume — never in the
+        Job spec/env. A regression in this mount wiring would pass every phase test
+        (they build their own inputs), so pin it at the job-builder layer."""
+        from terrapod.runner.job_template import build_job_spec
+
+        spec = build_job_spec(
+            run_id="abc123",
+            phase="plan",
+            runner_config=_runner_config(),
+            auth_secret_name="tprun-abc12345-auth",
+            env_vars=[],
+            terraform_vars=[],
+            execution_hooks=[],
+            vars_secret_name="tprun-abc12345-plan-vars",
+            git_auth=[{"category": "git_http_auth", "key": "github.com", "value": "{}"}],
+        )
+        vol = self._tfvars_volume(spec)
+        assert vol is not None
+        items = vol["secret"]["items"]
+        keys = {i["key"] for i in items}
+        assert "git-auth.json" in keys
+        # Delivered as a projected file, mounted read-only — never a container env var.
+        git_item = next(i for i in items if i["key"] == "git-auth.json")
+        assert git_item["path"] == "git-auth.json"
+        env = spec["spec"]["template"]["spec"]["containers"][0].get("env", [])
+        assert not any("git" in (e.get("name", "").lower()) for e in env), (
+            "git-auth must never be delivered via a container env var"
+        )
+
     def test_no_volume_when_no_hooks_no_vars(self):
         spec = self._spec(
             execution_hooks=[],
