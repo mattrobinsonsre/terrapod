@@ -1944,17 +1944,26 @@ jobs:
           done
 
           # Build + package the remaining platforms here (punted from build-query).
-          for platform in darwin/amd64 darwin/arm64 windows/amd64 windows/arm64; do
-            os="${platform%/*}"; arch="${platform#*/}"
-            out="terrapod-query"; [ "$os" = "windows" ] && out="terrapod-query.exe"
-            (cd query && GOOS="$os" GOARCH="$arch" CGO_ENABLED=0 \
-              go build -trimpath -ldflags "-s -w" -o "../dist/${out}" ./cmd/terrapod-query)
-            if [ "$os" = "windows" ]; then
-              (cd dist && zip -q "terrapod-query_${ver}_${os}_${arch}.zip" "${out}" && rm "${out}")
-            else
-              tar -C dist -czf "dist/terrapod-query_${ver}_${os}_${arch}.tar.gz" "${out}"
-              rm "dist/${out}"
-            fi
+          # macOS: build BOTH arches and fuse them into a single UNIVERSAL binary
+          # (darwin_all), matching the terrapod-migrate/publish/mcp artifacts.
+          # makefat is the pure-Go fat-binary writer GoReleaser uses internally, so
+          # it produces a valid universal Mach-O on the Linux runner (no lipo).
+          GOBIN="${RUNNER_TEMP:-/tmp}/qbin" go install github.com/randall77/makefat@v0.0.0-20260406194835-1b91746796b7
+          makefat="${RUNNER_TEMP:-/tmp}/qbin/makefat"
+          for arch in amd64 arm64; do
+            (cd query && GOOS=darwin GOARCH="$arch" CGO_ENABLED=0 \
+              go build -trimpath -ldflags "-s -w" -o "../dist/terrapod-query-darwin-${arch}" ./cmd/terrapod-query)
+          done
+          "$makefat" dist/terrapod-query \
+            dist/terrapod-query-darwin-amd64 dist/terrapod-query-darwin-arm64
+          tar -C dist -czf "dist/terrapod-query_${ver}_darwin_all.tar.gz" terrapod-query
+          rm dist/terrapod-query dist/terrapod-query-darwin-amd64 dist/terrapod-query-darwin-arm64
+
+          # Windows: per-arch (no universal concept on Windows).
+          for arch in amd64 arm64; do
+            (cd query && GOOS=windows GOARCH="$arch" CGO_ENABLED=0 \
+              go build -trimpath -ldflags "-s -w" -o "../dist/terrapod-query.exe" ./cmd/terrapod-query)
+            (cd dist && zip -q "terrapod-query_${ver}_windows_${arch}.zip" terrapod-query.exe && rm terrapod-query.exe)
           done
 
           # SHA256SUMS over all archives + detached GPG signature (same shape as
