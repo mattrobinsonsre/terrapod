@@ -46,14 +46,25 @@ jobs:
         name: Discover AWS regions + assemble the shard matrix
         run: |
           python - <<'PY' >> "$GITHUB_OUTPUT"
-          import json, urllib.request
+          import json, re, urllib.request
           BULK = "https://pricing.us-east-1.amazonaws.com"
+          # region_index.json is the small (~19 KB) index — region -> offer URL,
+          # NOT the ~458 MB offer itself. We only read it to enumerate region
+          # names for the matrix; the big offer is fetched (stream-filtered) only
+          # inside each region shard.
           req = urllib.request.Request(
               f"{BULK}/offers/v1.0/aws/AmazonEC2/current/region_index.json",
               headers={"User-Agent": "terrapod-pricegen/0.1"},
           )
           with urllib.request.urlopen(req) as r:  # noqa: S310 trusted host
-              regions = sorted(json.load(r)["regions"])
+              index = json.load(r)["regions"]
+          # The index also lists Local Zones / Wavelength zones as pseudo-regions
+          # (us-east-1-atl-1, eu-west-2-wl1-lon1, ...). A Terraform resource's
+          # `region` attribute is always a standard region (Local Zones are picked
+          # via AZ/subnet, not the provider region), so a row keyed on a local
+          # zone would never resolve — keep only canonical regions (incl GovCloud).
+          std = re.compile(r"^[a-z]{2}(-gov)?-[a-z]+-\d+$")
+          regions = sorted(r for r in index if std.match(r))
           shards = [
               {"name": f"aws-{reg}", "args": f"--only aws --region {reg}"}
               for reg in regions
