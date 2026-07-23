@@ -138,6 +138,7 @@ local_resource(
         'services/terrapod/runner/plan_artifacts.py',
         'services/terrapod/runner/job_entrypoint.py',
         'services/terrapod/runner/phases',
+        'services/terrapod/runner/saas_known_hosts',
         'services/terrapod/services/cost',
     ],
     labels=['build'],

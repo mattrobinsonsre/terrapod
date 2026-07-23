@@ -111,6 +111,22 @@ RUN mkdir -p /workspace /tmp/bin /home/runner \
     && chown -R 1000:1000 /workspace /tmp/bin /home/runner \
     && echo 'runner:x:1000:1000::/home/runner:/usr/sbin/nologin' >> /etc/passwd
 
+# Pre-trust the SaaS git host keys (#1028). Baked as static LITERALS from a
+# version-controlled file — never fetched via ssh-keyscan (which is
+# trust-on-first-use and adds a build-time network hop). The key material is
+# authoritative: github.com from https://api.github.com/meta (ssh_keys),
+# gitlab.com verified against GitLab's published SHA256 fingerprints
+# (docs.gitlab.com → SSH host keys). ssh reads /etc/ssh/ssh_known_hosts as the
+# GLOBAL known_hosts even when a per-host UserKnownHostsFile is set, so a
+# `git::ssh://` module fetch to github.com/gitlab.com verifies out of the box —
+# the operator does NOT have to supply known_hosts for these SaaS hosts (only for
+# self-hosted GHE/GitLab). tests/runner/test_runner_known_hosts.py re-derives the
+# fingerprint of every baked key and fails CI if one drifts from the published
+# value. To refresh after a provider key rotation, update saas_known_hosts AND the
+# expected fingerprint in that test (both authoritative sources above).
+COPY services/terrapod/runner/saas_known_hosts /etc/ssh/ssh_known_hosts
+RUN chmod 0644 /etc/ssh/ssh_known_hosts
+
 USER 1000:1000
 ENV HOME=/home/runner \
     PYTHONUNBUFFERED=1 \

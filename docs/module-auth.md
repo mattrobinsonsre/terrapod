@@ -62,6 +62,13 @@ The token can come from two sources:
 `git_ssh_auth` is static only (VCS connections mint HTTPS tokens, not SSH keys):
 `{"private_key":"-----BEGIN …","known_hosts":"github.com ssh-ed25519 …","rewrite":"none"}`.
 
+**`known_hosts` is optional for github.com and gitlab.com.** Their SSH host keys
+are baked into the runner image (authoritative — github.com from the GitHub
+`/meta` API, gitlab.com verified against GitLab's published fingerprints), so a
+`git::ssh://` fetch to those SaaS hosts verifies out of the box. Supply
+`known_hosts` only to pin a **self-hosted** GitHub Enterprise / GitLab host; for
+github.com/gitlab.com you can leave it blank.
+
 ## Enabling it
 
 Nothing to enable — it's on by default. Create the credential like any variable.
