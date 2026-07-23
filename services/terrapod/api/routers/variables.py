@@ -449,16 +449,22 @@ async def create_varset_var(
 
     value = attrs.get("value", "")
     sensitive = attrs.get("sensitive", False)
+    try:
+        category = variable_service._validated_category(attrs.get("category", "terraform"))
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+    if category in variable_service.GIT_AUTH_CATEGORIES:
+        sensitive = True  # git-auth values are always secret
 
     vsv = VariableSetVariable(
         variable_set_id=vs.id,
         key=key,
         value=value,
         description=attrs.get("description", ""),
-        category=attrs.get("category", "terraform"),
+        category=category,
         hcl=attrs.get("hcl", False),
         sensitive=sensitive,
-        version_id=variable_service._version_hash(key, value, attrs.get("category", "terraform")),
+        version_id=variable_service._version_hash(key, value, category),
     )
     db.add(vsv)
     await db.commit()
@@ -495,21 +501,28 @@ async def update_varset_var(
     if "description" in attrs:
         vsv.description = attrs["description"]
     if "category" in attrs:
-        vsv.category = attrs["category"]
+        try:
+            vsv.category = variable_service._validated_category(attrs["category"])
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=str(e)) from e
     if "hcl" in attrs:
         vsv.hcl = attrs["hcl"]
     was_sensitive = vsv.sensitive
     if "value" in attrs:
         vsv.value = attrs["value"]
         vsv.version_id = variable_service._version_hash(vsv.key, attrs["value"], vsv.category)
-    if "sensitive" in attrs:
+    # git-auth categories are always secret and can never be downgraded.
+    force_sensitive = vsv.category in variable_service.GIT_AUTH_CATEGORIES
+    if force_sensitive:
+        vsv.sensitive = True
+    elif "sensitive" in attrs:
         vsv.sensitive = attrs["sensitive"]
 
     # Security: a sensitive → non-sensitive downgrade must not expose the
     # previously-hidden value. If no fresh value was supplied in the same
     # request, clear it so the old secret is never returned in plaintext
     # (mirrors variable_service.update_variable for workspace vars).
-    if was_sensitive and vsv.sensitive is False and "value" not in attrs:
+    if not force_sensitive and was_sensitive and vsv.sensitive is False and "value" not in attrs:
         vsv.value = ""
         vsv.version_id = variable_service._version_hash(vsv.key, "", vsv.category)
 

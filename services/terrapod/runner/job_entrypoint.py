@@ -44,6 +44,7 @@ from terrapod.runner.phases import (
     cost,
     discovery,
     execution_hooks,
+    git_auth,
     init_phase,
     log_capture,
     mirror_config,
@@ -636,6 +637,17 @@ def _run_body(cfg: RunnerConfig, work_dir: Path) -> int:
         except (ValueError, OSError) as exc:
             log.error("failed to render terraform variables", error=str(exc))
             return 1
+
+    # 4b. Private-git-module auth (#1028): materialize git credentials from the
+    # per-run Secret into git config BEFORE init fetches modules — and before the
+    # pre_init hooks, so operator hooks see them too. Log-safe by construction;
+    # the returned env (GIT_CONFIG_GLOBAL, sshCommand) flows into init's environment
+    # since init_phase inherits os.environ. Advisory — a bad cred never fails a run.
+    try:
+        for _k, _v in git_auth.run().items():
+            os.environ[_k] = _v
+    except Exception as exc:  # noqa: BLE001
+        log.warning("git module auth setup skipped", error=str(exc))
 
     # 5. State download — AFTER chdir so terraform.tfstate lands beside
     # the user's .tf files.

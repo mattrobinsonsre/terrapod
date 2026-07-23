@@ -2040,6 +2040,16 @@ async def next_run(
         if v.category == "terraform"
     ]
 
+    # Private-git-module auth (#1028): git_http_auth / git_ssh_auth vars are
+    # resolved into concrete credentials here (a `vcs_connection` source mints a
+    # short-lived git-HTTPS token from the referenced VCS connection), then
+    # delivered — like the vars/hooks — via the per-run Secret and materialized by
+    # the runner's git_auth phase before `init` fetches modules. Never plaintext
+    # in the Job spec; never in logs (the phase is log-safe by construction).
+    from terrapod.services.git_auth_service import resolve_git_auth
+
+    git_auth = await resolve_git_auth(db, resolved)
+
     # Resolve execution hooks associated with this workspace (#619). Delivered
     # alongside the vars via the per-run Secret; the runner runs each hook_point
     # at its boundary. Enforced-empty for local execution never reaches here
@@ -2063,6 +2073,7 @@ async def next_run(
     run_data["data"]["attributes"]["env-vars"] = env_vars
     run_data["data"]["attributes"]["terraform-vars"] = terraform_vars
     run_data["data"]["attributes"]["execution-hooks"] = execution_hooks
+    run_data["data"]["attributes"]["git-auth"] = git_auth
     # Cost estimation (#871): the API instructs the runner (via the listener)
     # whether to estimate cost — the runner never self-configures. Global API
     # setting today (per-workspace override is a future refinement); the runner

@@ -695,6 +695,18 @@ class RunnerListener:
             if self.runner_config.hooks_enabled
             else []
         )
+        # Private-git-module auth (#1028). Concrete credentials already resolved
+        # server-side (vcs_connection sources minted to tokens); the listener just
+        # ferries them into the per-run Secret as a mounted file — never the Job
+        # spec. Materialized by the runner's git_auth phase before init.
+        git_auth = [
+            {
+                "category": g.get("category", ""),
+                "key": g.get("key", ""),
+                "value": g.get("value", ""),
+            }
+            for g in attrs.get("git-auth", [])
+        ]
 
         run_short = run_id[:16]
         # Phase is part of the Secret name to avoid a 409 AlreadyExists when
@@ -711,7 +723,7 @@ class RunnerListener:
         # mirrors the auth Secret; ownerReference GCs it with the Job.
         vars_secret_name = (
             f"tprun-{run_short}-{phase}-vars"
-            if (env_vars or terraform_vars or execution_hooks)
+            if (env_vars or terraform_vars or execution_hooks or git_auth)
             else ""
         )
         # Per-run CA Secret (#592): ships the custom outbound CA into the runner
@@ -730,6 +742,7 @@ class RunnerListener:
             env_vars=env_vars,
             terraform_vars=terraform_vars,
             execution_hooks=execution_hooks,
+            git_auth=git_auth,
             resource_cpu=attrs.get("resource-cpu", "1"),
             resource_memory=attrs.get("resource-memory", "2Gi"),
             terraform_version=attrs.get("terraform-version", ""),
@@ -790,6 +803,7 @@ class RunnerListener:
                     job_name,
                     job_uid,
                     execution_hooks=execution_hooks,
+                    git_auth=git_auth,
                 )
             except Exception as e:
                 logger.error("Failed to create vars secret", run_id=run_id, error=str(e))
@@ -1082,6 +1096,7 @@ class RunnerListener:
         job_name: str,
         job_uid: str,
         execution_hooks: list[dict] | None = None,
+        git_auth: list[dict] | None = None,
     ) -> None:
         """Create a K8s Secret holding all workspace variable values, with an
         ownerReference to the Job (cascade-GC'd with it, like the auth Secret).
@@ -1091,6 +1106,8 @@ class RunnerListener:
             a file; the entrypoint renders terrapod.auto.tfvars from it.
           - `execution-hooks.json`: JSON blob [{hook_point, name, script}] (#619)
             — mounted as a file; the entrypoint runs each hook at its boundary.
+          - `git-auth.json`: JSON blob [{category, key, value}] (#1028) — mounted
+            as a file; the git_auth phase materializes git credentials before init.
           - one key per env-category var — sourced via secretKeyRef in the Job.
 
         Values never appear in the Job spec, so they aren't readable via
@@ -1119,6 +1136,17 @@ class RunnerListener:
                         "script": h.get("script", ""),
                     }
                     for h in execution_hooks
+                ]
+            )
+        if git_auth:
+            string_data["git-auth.json"] = json.dumps(
+                [
+                    {
+                        "category": g.get("category", ""),
+                        "key": g.get("key", ""),
+                        "value": g.get("value", ""),
+                    }
+                    for g in git_auth
                 ]
             )
         for var in env_vars:
