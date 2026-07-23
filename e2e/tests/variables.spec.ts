@@ -85,6 +85,42 @@ test.describe('Variables', () => {
     await expect(valField).toHaveClass(/text-masked/);
   });
 
+  test('git-auth category swaps the form to a credential builder and round-trips', async ({
+    page,
+  }) => {
+    // #1028 / #1042: selecting a git category must ADAPT the form (the user's
+    // complaint was that the generic value field stayed put), expose a
+    // credential-source picker, and store a masked, URL-pattern-scoped var.
+    const pattern = `github.com/e2e-${Date.now()}`;
+    await page.goto(`/workspaces/${workspaceId}?tab=variables`);
+    await page.click('button:has-text("Add Variable")');
+
+    // Baseline: the generic value field is present for a normal category.
+    await expect(page.locator('#var-val')).toBeVisible();
+
+    // Switch to the git HTTPS credential category.
+    await page.selectOption('#var-cat', 'git_http_auth');
+
+    // The form ADAPTED: the generic value field is gone; the git builder is shown.
+    await expect(page.locator('#var-val')).toHaveCount(0);
+    await expect(page.locator('#git-source')).toBeVisible();
+
+    // The key field is now the URL pattern; use a static token source so the
+    // test needs no configured VCS connection.
+    await page.fill('#var-key', pattern);
+    await page.selectOption('#git-source', 'static');
+    await page.fill('#git-token', 'ghp_e2e_fake_token');
+
+    await page.click('form button:has-text("Add Variable")');
+
+    // Row renders with the VISIBLE URL pattern (not secret) and a MASKED value
+    // (the token is forced sensitive; it must never render in the table).
+    const row = page.locator(`tr:has-text("${pattern}")`);
+    await expect(row).toBeVisible({ timeout: 10_000 });
+    await expect(row.locator('text=***')).toBeVisible();
+    await expect(page.locator(`text=ghp_e2e_fake_token`)).toHaveCount(0);
+  });
+
   test('delete variable removes it from list', async ({ page }) => {
     const varKey = `DELETE_e2e_${Date.now()}`;
 

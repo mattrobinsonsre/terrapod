@@ -103,6 +103,48 @@ func TestCreateVariable_SensitiveDefaultsOff(t *testing.T) {
 	}
 }
 
+func TestCreateVariable_GitAuthCategories(t *testing.T) {
+	// The git-auth categories (#1028) are plain string pass-through on the SDK
+	// side — no enum, no special marshalling — but the contract is that the SDK
+	// transmits them verbatim (category + the JSON credential value + sensitive)
+	// so the server receives what the runner will later materialize.
+	for _, cat := range []string{"git_http_auth", "git_ssh_auth"} {
+		t.Run(cat, func(t *testing.T) {
+			c, _, lastBody := newVarFixture(t)
+			jsonVal := `{"source":"static","username":"x-access-token","token":"ghp_x","rewrite":"to_https"}`
+			_, err := c.CreateVariable(t.Context(), "ws-aaa", CreateVariableRequest{
+				Key:       "github.com/myorg",
+				Value:     jsonVal,
+				Category:  cat,
+				Sensitive: true,
+			})
+			if err != nil {
+				t.Fatalf("CreateVariable: %v", err)
+			}
+			var req struct {
+				Data struct {
+					Attributes map[string]any `json:"attributes"`
+				} `json:"data"`
+			}
+			if err := json.Unmarshal(*lastBody, &req); err != nil {
+				t.Fatal(err)
+			}
+			if req.Data.Attributes["category"] != cat {
+				t.Errorf("category = %v, want %q", req.Data.Attributes["category"], cat)
+			}
+			if req.Data.Attributes["key"] != "github.com/myorg" {
+				t.Errorf("key (URL pattern) not transmitted: %+v", req.Data.Attributes)
+			}
+			if req.Data.Attributes["value"] != jsonVal {
+				t.Errorf("JSON credential value not transmitted verbatim: %+v", req.Data.Attributes["value"])
+			}
+			if v, _ := req.Data.Attributes["sensitive"].(bool); !v {
+				t.Errorf("sensitive should be true for a git-auth credential: %+v", req.Data.Attributes)
+			}
+		})
+	}
+}
+
 func TestListVariables(t *testing.T) {
 	c, _, _ := newVarFixture(t)
 	vars, err := c.ListVariables(t.Context(), "ws-aaa")
