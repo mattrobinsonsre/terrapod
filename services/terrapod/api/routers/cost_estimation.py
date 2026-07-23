@@ -33,7 +33,7 @@ async def download_pricesheet(
     user: AuthenticatedUser = Depends(get_current_user),
     storage: ObjectStore = Depends(get_storage),
 ) -> RedirectResponse:
-    """Redirect (302) to a presigned URL for the cached pricesheet CSV.
+    """Redirect (302) to a presigned URL for the cached pricesheet (gzipped YAML).
 
     Consumed by runner Jobs (plan-path cost phase). Pull-through: the sheet is
     fetched on demand if the cached copy is missing or stale (no schedule), and

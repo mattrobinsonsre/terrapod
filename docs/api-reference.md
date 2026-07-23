@@ -1472,7 +1472,7 @@ POST /api/v2/workspaces/{id}/vars
 }
 ```
 
-`category` is either `terraform` or `env`. In agent mode both are delivered to the runner Job via a per-run Kubernetes Secret (never plaintext in the Job spec): `terraform` vars are rendered into a generated `terrapod.auto.tfvars` from a Secret-mounted blob (honouring `hcl`), and `env` vars are injected via `secretKeyRef`. (In local execution mode the CLI handles variables itself.)
+`category` is one of `terraform`, `env`, `git_http_auth`, or `git_ssh_auth`. In agent mode all are delivered to the runner Job via a per-run Kubernetes Secret (never plaintext in the Job spec): `terraform` vars are rendered into a generated `terrapod.auto.tfvars` from a Secret-mounted blob (honouring `hcl`), and `env` vars are injected via `secretKeyRef`. (In local execution mode the CLI handles variables itself.) The two `git_*_auth` categories carry credentials for private git module sources — the `key` is a host/URL pattern and the `value` a JSON credential; they are always forced `sensitive` and consumed by the runner's git-auth phase before `init` (see [Module Source Auth](module-auth.md)), not by terraform/tofu directly.
 
 **Required permission:** `write` on the workspace.
 
@@ -3409,7 +3409,7 @@ The attributes match the run estimate, plus `state-version` naming the priced ve
 ### Pricesheet (runner + admin)
 
 ```
-GET  /api/terrapod/v1/cost-estimation/pricesheet             # 302 → presigned cached CSV (any authenticated caller; consumed by runner Jobs)
+GET  /api/terrapod/v1/cost-estimation/pricesheet             # 302 → presigned cached pricesheet (gzipped YAML) (any authenticated caller; consumed by runner Jobs)
 GET  /api/terrapod/v1/cost-estimation/pricesheet/status      # admin: enabled + cached?
 POST /api/terrapod/v1/cost-estimation/pricesheet/refresh     # admin: force re-fetch from upstream
 ```

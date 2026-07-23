@@ -158,13 +158,14 @@ Everything below is implemented and shipped today.
 | Workspace autodiscovery | Atlantis-style monorepo autodiscovery — pattern-matched rules auto-create workspaces on PRs to new directories |
 | Terragrunt | Per-workspace Terragrunt for agent-mode runs (a flag + pinned version, pull-through binary cache, local-backend reconciliation so Terrapod still owns state); CLI-driven runs need no extra config |
 | Variables & secrets | Per-workspace env and Terraform variables; sensitive values protected by database encryption-at-rest; variable sets |
+| Private module source auth | First-class auth for private `git::https://` / `git::ssh://` module sources — a scoped `git_http_auth` / `git_ssh_auth` variable (static token or minted from a VCS connection), with ssh↔https protocol rewriting; credentials are log-safe and delivered only via the per-run Secret ([module-auth.md](docs/module-auth.md)) |
 | Drift detection | Scheduled plan-only runs to detect out-of-band changes, with a per-workspace ignore allowlist |
 | Notifications | Webhook (HMAC-SHA512), Slack (Block Kit), and email alerts on run events |
 | Interactive Slack app | Outbound Socket Mode app — `/terrapod` account linking + opt-in per-workspace run notifications with RBAC-checked Approve/Discard buttons; multiple deployments can share one Slack workspace |
 | Run tasks | Pre/post-plan webhook hooks for external validation |
 | Execution hooks | **Custom execution steps** — admin-managed shell run in the runner Job at pre_init / pre_plan / post_plan / pre_apply / post_apply, associated with workspaces (`pre_init` is the setup/tooling/auth slot; custom runner images cover heavier needs) |
 | Service catalog | No-code self-service provisioning over the module registry |
-| Cost estimation | Monthly cost of managed infrastructure — a per-plan delta on every run and the current total on a workspace; data via a native cost engine (credited), on by default; optional AI layer estimates the resources the engine can't price + savings advisories + a grounded cost chat |
+| Cost estimation | Monthly cost of managed infrastructure — a per-plan delta on every run and the current total on a workspace; data via a native cost engine, on by default; optional AI layer estimates the resources the engine can't price + savings advisories + a grounded cost chat |
 | Impact graph | Interactive dependency + blast-radius view of a plan on the run page — module-clustered, click a resource to light up its transitive downstream impact |
 | Estate topology | Whole-estate dependency graph — workspaces + modules wired by run-triggers, remote-state, and module links; group by any label / pool / name prefix; RBAC-filtered; accessible table fallback |
 | State resource graph | Per-workspace resource dependency graph from Terraform state — resources wired by `depends-on`; current state version by default with an older-version picker; group by type / module / provider / mode; accessible table fallback |
@@ -380,6 +381,7 @@ See [docs/authentication.md](docs/authentication.md) for setup guides.
 | [Deployment](docs/deployment.md) | Production Helm deployment, storage backends, scaling |
 | [Registry](docs/registry.md) | Private module/provider registry, caching layers |
 | [Registry Publishing](docs/registry-publishing.md) | Publishing providers/modules with `terrapod-publish` and the client-signed publish protocol |
+| [Module Source Auth](docs/module-auth.md) | Authenticating private `git::https://` / `git::ssh://` module sources (scoped credentials, ssh↔https rewrite, log-safe delivery) |
 | [VCS Integration](docs/vcs-integration.md) | GitHub and GitLab setup, polling, webhooks |
 | [VCS Workflows](docs/vcs-workflows.md) | PR/MR comment commands, speculative plans, apply-on-merge |
 | [Policies (OPA)](docs/policies.md) | Rego policy authoring, advisory vs mandatory enforcement, label-based scoping, admin override |

@@ -13,7 +13,7 @@ ranges, per-resource costs, and the list of resources nothing priced (the
 "Unpriced" bucket surfaced in the UX).
 
 The engine is pure and synchronous. On the API event loop it must be called via
-``asyncio.to_thread`` (streaming a ~200k-row CSV is CPU-bound — rule 13).
+``asyncio.to_thread`` (streaming a large pricesheet is CPU-bound — rule 13).
 """
 
 from __future__ import annotations
@@ -104,7 +104,7 @@ def estimate(
 
     ``tf_json``   — parsed ``terraform show -json`` (plan or state) or a raw
                     state v4 file.
-    ``pricesheet`` — an open text pricesheet stream (CSV or Terrapod YAML). Built
+    ``pricesheet`` — an open text pricesheet stream (Terrapod YAML). Built
                     into an in-memory SQLite index (small sheets / mirrors / tests).
     ``index``     — a pre-built :class:`~pricesheet_db.PricesheetIndex` (the API /
                     runner pass the cached ``.sqlite`` so the 260k-product sheet is
@@ -145,7 +145,7 @@ def estimate(
     # Match via the SQLite index (#1034): for each resource, query only the
     # products sharing its type + resolved region (plus region-agnostic rows),
     # then subset-match those — never scanning the full 260k-product sheet. A raw
-    # stream (tests, small CSV/YAML mirrors) is built into an in-memory index so
+    # stream (tests, small YAML mirrors) is built into an in-memory index so
     # there is one matching path.
     own_index = index is None
     if own_index:
@@ -153,7 +153,7 @@ def estimate(
             raise ValueError("estimate() needs either `pricesheet` or `index`")
         # File-backed temp build (streamed, bounded) — never an in-memory DB. The
         # API/runner pass a pre-built `index=` (the cached .sqlite); this path is
-        # for tests + small raw CSV/YAML mirrors.
+        # for tests + small raw YAML mirrors.
         index = pricesheet_db.PricesheetIndex.build_temp(pricesheet)
     try:
         matches = []
