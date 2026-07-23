@@ -304,6 +304,17 @@ function WorkspaceDetailContent() {
   const [varCategory, setVarCategory] = useState('terraform')
   const [varSensitive, setVarSensitive] = useState(false)
   const [varHcl, setVarHcl] = useState(false)
+  // Git module-source auth builder (#1028): when the category is git_http_auth /
+  // git_ssh_auth the form swaps to discrete credential fields that serialize into
+  // the JSON value on submit (see handleAddVariable). git creds are always sensitive.
+  const [gitSource, setGitSource] = useState<'vcs_connection' | 'static'>('vcs_connection')
+  const [gitVcsConnId, setGitVcsConnId] = useState('')
+  const [gitUsername, setGitUsername] = useState('')
+  const [gitToken, setGitToken] = useState('')
+  const [gitPrivateKey, setGitPrivateKey] = useState('')
+  const [gitKnownHosts, setGitKnownHosts] = useState('')
+  const [gitRewrite, setGitRewrite] = useState<'none' | 'to_https' | 'to_ssh'>('none')
+  const isGitCat = varCategory === 'git_http_auth' || varCategory === 'git_ssh_auth'
   const [addingVar, setAddingVar] = useState(false)
 
   const isTouch = useIsTouch()
@@ -1255,6 +1266,35 @@ function WorkspaceDetailContent() {
     }
   }
 
+  // The git-auth VCS-connection picker needs the connection list; it's otherwise
+  // only fetched when editing workspace settings. Load it on demand when a git
+  // category is picked (any connection is selectable — module auth can use a
+  // different connection than the one fetching the workspace's own code).
+  function ensureVcsConnections() {
+    if (vcsConnectionsLoaded) return
+    fetchAllPages<{ id: string; attributes: { name: string; provider: string } }>(
+      '/api/terrapod/v1/vcs-connections'
+    )
+      .then((conns) => {
+        setVcsConnections(conns)
+        setVcsConnectionsLoaded(true)
+      })
+      .catch(() => {})
+  }
+
+  // Serialize the git-auth credential builder into the JSON value the API stores
+  // (#1028). git creds are always sensitive. Non-git categories use the raw value.
+  function buildGitAuthValue(): string {
+    if (varCategory === 'git_http_auth') {
+      return JSON.stringify(
+        gitSource === 'vcs_connection'
+          ? { source: 'vcs_connection', vcs_connection_id: gitVcsConnId, rewrite: gitRewrite }
+          : { source: 'static', username: gitUsername || 'x-access-token', token: gitToken, rewrite: gitRewrite }
+      )
+    }
+    return JSON.stringify({ private_key: gitPrivateKey, known_hosts: gitKnownHosts, rewrite: gitRewrite })
+  }
+
   async function handleAddVariable(e: React.FormEvent) {
     e.preventDefault()
     setAddingVar(true)
@@ -1268,9 +1308,9 @@ function WorkspaceDetailContent() {
             type: 'vars',
             attributes: {
               key: varKey,
-              value: varValue,
+              value: isGitCat ? buildGitAuthValue() : varValue,
               category: varCategory,
-              sensitive: varSensitive,
+              sensitive: isGitCat ? true : varSensitive,
               hcl: varHcl,
             },
           },
@@ -1285,6 +1325,13 @@ function WorkspaceDetailContent() {
       setVarCategory('terraform')
       setVarSensitive(false)
       setVarHcl(false)
+      setGitSource('vcs_connection')
+      setGitVcsConnId('')
+      setGitUsername('')
+      setGitToken('')
+      setGitPrivateKey('')
+      setGitKnownHosts('')
+      setGitRewrite('none')
       setShowAddVar(false)
       await loadVariables()
     } catch (err) {
@@ -2549,35 +2596,107 @@ function WorkspaceDetailContent() {
 
             {showAddVar && (
               <form onSubmit={handleAddVariable} className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-4 mb-6 space-y-3">
+                {/* Category first — the form below adapts to it (git categories swap
+                    the value field for a credential builder, #1028). */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label htmlFor="var-key" className="block text-sm font-medium text-slate-300 mb-1">{t('variables.key')}</label>
-                    <input id="var-key" type="text" value={varKey} onChange={(e) => setVarKey(e.target.value)} required placeholder="AWS_REGION" className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
-                  </div>
-                  <div>
-                    <label htmlFor="var-val" className="block text-sm font-medium text-slate-300 mb-1">{t('variables.value')}</label>
-                    <SensitiveValueInput id="var-val" value={varValue} onChange={setVarValue} sensitive={varSensitive} placeholder="us-east-1" rows={2} className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent resize-y" />
-                  </div>
-                  <div>
                     <label htmlFor="var-cat" className="block text-sm font-medium text-slate-300 mb-1">{t('variables.category')}</label>
-                    <select id="var-cat" value={varCategory} onChange={(e) => setVarCategory(e.target.value)} className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+                    <select id="var-cat" value={varCategory} onChange={(e) => { setVarCategory(e.target.value); if (e.target.value === 'git_http_auth') ensureVcsConnections() }} className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
                       <option value="terraform">Terraform</option>
                       <option value="env">{t('variables.categoryEnv')}</option>
-                      <option value="git_http_auth">git_http_auth</option>
-                      <option value="git_ssh_auth">git_ssh_auth</option>
+                      <option value="git_http_auth">Git HTTPS credential</option>
+                      <option value="git_ssh_auth">Git SSH credential</option>
                     </select>
                   </div>
-                  <div className="flex items-end gap-4">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={varSensitive} onChange={(e) => setVarSensitive(e.target.checked)} className="rounded border-slate-600 bg-slate-700 text-brand-600 focus:ring-brand-500" />
-                      <span className="text-sm text-slate-300">{t('variables.sensitive')}</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={varHcl} onChange={(e) => setVarHcl(e.target.checked)} className="rounded border-slate-600 bg-slate-700 text-brand-600 focus:ring-brand-500" />
-                      <span className="text-sm text-slate-300">HCL</span>
-                    </label>
+                  <div>
+                    <label htmlFor="var-key" className="block text-sm font-medium text-slate-300 mb-1">{isGitCat ? t('variables.gitUrlPattern') : t('variables.key')}</label>
+                    <input id="var-key" type="text" value={varKey} onChange={(e) => setVarKey(e.target.value)} required placeholder={isGitCat ? 'github.com/my-org' : 'AWS_REGION'} className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
                   </div>
                 </div>
+
+                {!isGitCat && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label htmlFor="var-val" className="block text-sm font-medium text-slate-300 mb-1">{t('variables.value')}</label>
+                      <SensitiveValueInput id="var-val" value={varValue} onChange={setVarValue} sensitive={varSensitive} placeholder="us-east-1" rows={2} className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent resize-y" />
+                    </div>
+                    <div className="flex items-end gap-4">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" checked={varSensitive} onChange={(e) => setVarSensitive(e.target.checked)} className="rounded border-slate-600 bg-slate-700 text-brand-600 focus:ring-brand-500" />
+                        <span className="text-sm text-slate-300">{t('variables.sensitive')}</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" checked={varHcl} onChange={(e) => setVarHcl(e.target.checked)} className="rounded border-slate-600 bg-slate-700 text-brand-600 focus:ring-brand-500" />
+                        <span className="text-sm text-slate-300">HCL</span>
+                      </label>
+                    </div>
+                  </div>
+                )}
+
+                {varCategory === 'git_http_auth' && (
+                  <div className="space-y-3 rounded-lg border border-slate-700/50 bg-slate-900/30 p-3">
+                    <p className="text-xs text-slate-400">{t('variables.gitHttpHint')}</p>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-1">{t('variables.gitCredSource')}</label>
+                      <select value={gitSource} onChange={(e) => setGitSource(e.target.value as 'vcs_connection' | 'static')} className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+                        <option value="vcs_connection">{t('variables.gitSourceVcs')}</option>
+                        <option value="static">{t('variables.gitSourceStatic')}</option>
+                      </select>
+                    </div>
+                    {gitSource === 'vcs_connection' ? (
+                      <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-1">{t('variables.gitVcsConnection')}</label>
+                        <select value={gitVcsConnId} onChange={(e) => setGitVcsConnId(e.target.value)} required className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+                          <option value="">{t('variables.gitVcsConnectionSelect')}</option>
+                          {vcsConnections.map((c) => (
+                            <option key={c.id} value={c.id}>{c.attributes.name} ({c.attributes.provider})</option>
+                          ))}
+                        </select>
+                        <p className="text-xs text-slate-500 mt-1">{t('variables.gitVcsConnectionHint')}</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-sm font-medium text-slate-300 mb-1">{t('variables.gitUsername')}</label>
+                          <input type="text" value={gitUsername} onChange={(e) => setGitUsername(e.target.value)} placeholder="x-access-token" className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-slate-300 mb-1">{t('variables.gitToken')}</label>
+                          <SensitiveValueInput id="git-token" value={gitToken} onChange={setGitToken} sensitive placeholder="ghp_xxx" rows={2} className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent resize-y" />
+                        </div>
+                      </div>
+                    )}
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-1">{t('variables.gitRewrite')}</label>
+                      <select value={gitRewrite} onChange={(e) => setGitRewrite(e.target.value as 'none' | 'to_https' | 'to_ssh')} className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+                        <option value="none">{t('variables.gitRewriteNone')}</option>
+                        <option value="to_https">{t('variables.gitRewriteToHttps')}</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+
+                {varCategory === 'git_ssh_auth' && (
+                  <div className="space-y-3 rounded-lg border border-slate-700/50 bg-slate-900/30 p-3">
+                    <p className="text-xs text-slate-400">{t('variables.gitSshHint')}</p>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-1">{t('variables.gitPrivateKey')}</label>
+                      <SensitiveValueInput id="git-key" value={gitPrivateKey} onChange={setGitPrivateKey} sensitive placeholder="-----BEGIN OPENSSH PRIVATE KEY-----" rows={4} className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent resize-y" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-1">{t('variables.gitKnownHosts')}</label>
+                      <textarea value={gitKnownHosts} onChange={(e) => setGitKnownHosts(e.target.value)} placeholder="github.com ssh-ed25519 AAAA..." rows={2} className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent resize-y" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-1">{t('variables.gitRewrite')}</label>
+                      <select value={gitRewrite} onChange={(e) => setGitRewrite(e.target.value as 'none' | 'to_https' | 'to_ssh')} className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+                        <option value="none">{t('variables.gitRewriteNone')}</option>
+                        <option value="to_ssh">{t('variables.gitRewriteToSsh')}</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+
                 <button type="submit" disabled={addingVar} className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors">
                   {addingVar ? t('actions.adding') : t('variables.addVariable')}
                 </button>
@@ -2624,8 +2743,8 @@ function WorkspaceDetailContent() {
                                 className="px-2 py-1 text-xs border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500">
                                 <option value="terraform">terraform</option>
                                 <option value="env">env</option>
-                                <option value="git_http_auth">git_http_auth</option>
-                                <option value="git_ssh_auth">git_ssh_auth</option>
+                                <option value="git_http_auth">Git HTTPS credential</option>
+                                <option value="git_ssh_auth">Git SSH credential</option>
                               </select>
                               <label className="flex items-center gap-1 cursor-pointer">
                                 <input type="checkbox" checked={editVarSensitive} onChange={(e) => setEditVarSensitive(e.target.checked)}
@@ -2708,8 +2827,8 @@ function WorkspaceDetailContent() {
                           >
                             <option value="terraform">terraform</option>
                             <option value="env">env</option>
-                            <option value="git_http_auth">git_http_auth</option>
-                            <option value="git_ssh_auth">git_ssh_auth</option>
+                            <option value="git_http_auth">Git HTTPS credential</option>
+                            <option value="git_ssh_auth">Git SSH credential</option>
                           </select>
                           <label className="flex items-center gap-1 cursor-pointer">
                             <input type="checkbox" checked={editVarSensitive} onChange={(e) => setEditVarSensitive(e.target.checked)} className="rounded border-slate-600 bg-slate-700 text-brand-600" />
