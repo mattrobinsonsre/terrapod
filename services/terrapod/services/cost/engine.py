@@ -18,9 +18,10 @@ The engine is pure and synchronous. On the API event loop it must be called via
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import IO, Any
 
+from terrapod.services.cost import fleet_resolver
 from terrapod.services.cost import usage as usage_mod
 from terrapod.services.cost.pricer import price
 from terrapod.services.cost.prices import load_pricesheet
@@ -117,8 +118,27 @@ def estimate(
         res.address: resolve_region(res, provider_region_map, default_region)
         for res, _change in resources
     }
+
+    # Fleet resources (#1029) bill as N units whose priceable shape lives on a
+    # nested block or a referenced resource — resolve them into synthetic
+    # instance-shaped units, price those through the normal path, and ADD the
+    # total to the fleet's own line. Fleets stay in normal matching too, because
+    # some carry a direct cost on top of their nodes (an AKS cluster has a
+    # management fee *and* its default node pool's VMs).
+    fleets = fleet_resolver.resolve_fleets(resources)
+    synth_meta: dict[str, tuple[int, float]] = {}  # synth addr → (fleet idx, count)
+    synth_pairs: list[tuple[Any, Change]] = []
+    for fi, fleet in enumerate(fleets):
+        fregion = region_by_address.get(fleet.address, default_region)
+        for addr, sres, count in fleet_resolver.synth_resources(fleet, fregion):
+            synth_pairs.append((sres, fleet.change))
+            region_by_address[addr] = fregion
+            synth_meta[addr] = (fi, count)
+
+    priceable = list(resources) + synth_pairs
+
     # Accumulate matching products per resource in a single pass over the sheet.
-    acc = [(res, change, res.to_match_set(), []) for res, change in resources]
+    acc = [(res, change, res.to_match_set(), []) for res, change in priceable]
     for product in load_pricesheet(pricesheet):
         prod_ms = product.match_set
         for _res, _change, res_ms, products in acc:
@@ -129,8 +149,12 @@ def estimate(
     usage_entries = usage_mod.load_usage(usage_json)
     result, unpriced = price(matches, usage_entries, region_by_address)
 
-    resource_costs = [
-        ResourceCost(
+    # Priced non-synth resources (fleets included, carrying their DIRECT cost).
+    priced_by_addr: dict[str, ResourceCost] = {}
+    for pr in result.resources:
+        if pr.address in synth_meta:
+            continue
+        priced_by_addr[pr.address] = ResourceCost(
             address=pr.address,
             type=pr.type,
             name=pr.name,
@@ -139,11 +163,44 @@ def estimate(
             monthly_max=pr.price.max,
             usage_assumptions=pr.usage_assumptions,
         )
-        for pr in result.resources
-    ]
+
+    # Sum each fleet's synth parts × count, then add to (or create) its line.
+    fleet_synth: dict[int, list[float]] = {}
+    for pr in result.resources:
+        meta = synth_meta.get(pr.address)
+        if meta is None:
+            continue
+        fi, count = meta
+        agg = fleet_synth.setdefault(fi, [0.0, 0.0])
+        agg[0] += pr.price.min * count
+        agg[1] += pr.price.max * count
+    for fi, (lo, hi) in fleet_synth.items():
+        f = fleets[fi]
+        existing = priced_by_addr.get(f.address)
+        if existing is not None:
+            priced_by_addr[f.address] = replace(
+                existing,
+                monthly_min=existing.monthly_min + lo,
+                monthly_max=existing.monthly_max + hi,
+            )
+        else:
+            priced_by_addr[f.address] = ResourceCost(
+                address=f.address,
+                type=f.type,
+                name=f.name,
+                change=f.change,
+                monthly_min=lo,
+                monthly_max=hi,
+            )
+
+    resource_costs = list(priced_by_addr.values())
+    priced_addrs = set(priced_by_addr)
+    # Unpriced: real resources nothing priced — never the internal synth-unit
+    # addresses, and never a fleet that ended up priced (directly or via nodes).
     unpriced_resources = [
         UnpricedResource(address=res.address, type=res.type, change=change)
         for res, change in unpriced
+        if res.address not in synth_meta and res.address not in priced_addrs
     ]
     return CostEstimate(
         currency=result.currency,

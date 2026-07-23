@@ -46,6 +46,12 @@ Full request/response shapes are in the [API reference](api-reference.md#cost-es
 - **AI agents (MCP)** — the [`terrapod-mcp`](mcp.md) server exposes `terrapod_run_cost` and `terrapod_workspace_cost` read-only tools, so an agent can reason about the price of a change alongside its plan JSON.
 - **Go SDK** — [`go-terrapod`](terraform-provider.md) exposes `GetRunCostEstimate` and `GetWorkspaceCostEstimate`.
 
+## Group / fleet resources
+
+Some resources bill as **N units** where the priceable unit lives on a nested block or a *referenced* resource — so matching the resource's own attributes isn't enough. The engine resolves these before pricing: it derives the unit type and count, prices the unit through the normal path, multiplies by the count, and folds the total back onto the fleet's line (adding to any direct cost the resource also has — e.g. an AKS cluster's management fee *plus* its node pool VMs).
+
+Covered today: `aws_autoscaling_group` (launch template/config, incl. `mixed_instances_policy`), `aws_eks_node_group`, `aws_emr_cluster`, `azurerm_kubernetes_cluster` (+ `_node_pool`), `azurerm_*_virtual_machine_scale_set`, `google_container_node_pool`, and `google_compute_(region_)instance_group_manager`. Coverage is a declarative table, so new fleet types are a data change. A fleet whose unit type isn't yet in the pricesheet (Redshift, MSK, OpenSearch, Fargate, …) is recognised but stays in the **unpriced** bucket until that unit's pricing lands — never a crash, never a wrong number.
+
 ## Usage assumptions (honest ranges for usage-driven costs)
 
 Some resources can't be priced from state alone — the bill depends on **runtime usage the plan doesn't declare**: a NAT gateway's cost is dominated by data processed, a Lambda function by invocations, an S3 bucket by stored volume. For these, the deterministic engine prices a **typical** usage point and surfaces the underlying band alongside the number, so the estimate is honest about what it assumed. This is **raw data, available with the AI layer off** — the AI *narrows* an already-useful band; it is never a prerequisite for the number making sense.
