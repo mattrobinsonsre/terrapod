@@ -46,8 +46,8 @@ def test_http_writes_credential_store_and_tokenless_rewrite(tmp_path):
     # GIT_CONFIG_GLOBAL isolates our config.
     assert env["GIT_CONFIG_GLOBAL"] == str(tmp_path / "gitconfig")
 
-    creds = (tmp_path / "git-credentials").read_text()
-    assert "https://x-access-token:ghp_SECRETTOKEN@github.com/myorg" in creds
+    creds = (tmp_path / "git-credentials").read_text().splitlines()
+    assert creds == ["https://x-access-token:ghp_SECRETTOKEN@github.com/myorg"]
     assert _mode(tmp_path / "git-credentials") == 0o600  # secret file, owner-only
 
     cfg = (tmp_path / "gitconfig").read_text()
@@ -62,10 +62,8 @@ def test_http_writes_credential_store_and_tokenless_rewrite(tmp_path):
 
 def test_http_default_username_is_x_access_token(tmp_path):
     git_auth.configure([_http("github.com", username=None)], base_dir=tmp_path)
-    assert (
-        "https://x-access-token:ghp_SECRETTOKEN@github.com"
-        in (tmp_path / "git-credentials").read_text()
-    )
+    creds = (tmp_path / "git-credentials").read_text().splitlines()
+    assert creds == ["https://x-access-token:ghp_SECRETTOKEN@github.com"]
 
 
 def test_http_bare_host_is_not_path_scoped(tmp_path):
@@ -80,9 +78,10 @@ def test_multiple_orgs_same_host_get_distinct_credential_lines(tmp_path):
         [_http("github.com/orgA", token="TOKEN_A"), _http("github.com/orgB", token="TOKEN_B")],
         base_dir=tmp_path,
     )
-    creds = (tmp_path / "git-credentials").read_text()
-    assert "@github.com/orgA" in creds and "TOKEN_A" in creds
-    assert "@github.com/orgB" in creds and "TOKEN_B" in creds
+    lines = (tmp_path / "git-credentials").read_text().splitlines()
+    # exact line membership (not substring-in-blob) — one distinct token per org.
+    assert "https://x-access-token:TOKEN_A@github.com/orgA" in lines
+    assert "https://x-access-token:TOKEN_B@github.com/orgB" in lines
     assert "useHttpPath = true" in (tmp_path / "gitconfig").read_text()
 
 
@@ -142,9 +141,9 @@ def test_malformed_value_is_skipped(tmp_path):
         _http("gitlab.com"),
     ]
     git_auth.configure(entries, base_dir=tmp_path)
-    creds = (tmp_path / "git-credentials").read_text()
-    assert "gitlab.com" in creds  # the good one still landed
-    assert "github.com" not in creds  # the malformed one skipped
+    creds = (tmp_path / "git-credentials").read_text().splitlines()
+    # exactly one line — the malformed github entry produced none, the good one did.
+    assert creds == ["https://x-access-token:ghp_SECRETTOKEN@gitlab.com"]
 
 
 def test_load_absent_file_returns_empty(tmp_path):

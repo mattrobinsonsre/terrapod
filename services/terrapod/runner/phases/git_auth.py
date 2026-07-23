@@ -88,16 +88,15 @@ def _write_private(path: Path, content: str) -> None:
         os.close(fd)
 
 
-def configure(entries: list[dict], *, base_dir: Path, home: Path | None = None) -> dict[str, str]:
+def configure(entries: list[dict], *, base_dir: Path) -> dict[str, str]:
     """Materialize ``entries`` into git config + credential/key files under
     ``base_dir`` and return the env overrides the caller merges into
     ``os.environ`` (so the ``init`` subprocess inherits them).
 
-    ``base_dir`` is a runner-owned dir for the generated config (isolated via
-    ``GIT_CONFIG_GLOBAL``); ``home`` (default ``$HOME``) is where ``.ssh`` keys
-    land. Returns ``{}`` when there are no usable entries.
+    ``base_dir`` is a runner-owned dir for all generated files (config,
+    credentials, keys), isolated via ``GIT_CONFIG_GLOBAL``. Returns ``{}`` when
+    there are no usable entries.
     """
-    home = home or Path(os.environ.get("HOME", str(base_dir)))
     creds_lines: list[str] = []  # git-credentials store lines (secret; 0600 file)
     config: list[str] = []  # gitconfig sections (NO secrets — tokenless)
     use_http_path = False
