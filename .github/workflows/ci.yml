@@ -451,6 +451,26 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
       - run: scripts/test.sh python -- ${{ matrix.slice.pytest_args }} ${{ matrix.slice.paths }}
 
+  # ── pricegen unit tests (#1025) ───────────────────────
+  # The pricegen package (self-generated cost pricesheet, #893) is a standalone
+  # pure-Python tool — it isn't copied into the services test image, so its unit
+  # tests (adapters, engine, computed path, multi-region fetch/merge) run here.
+  # Deps are just pyyaml + ijson (the same the weekly Pricesheet workflow uses);
+  # no DB/Redis/network — the fetch tests monkeypatch the HTTP layer.
+  pricegen-test:
+    name: pricegen Test
+    needs: prepare
+    if: needs.prepare.outputs.images_exist != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      - run: pip install pyyaml ijson pytest
+      - name: Run pricegen unit tests
+        run: python -m pytest pricegen/tests -v
+
   # ── Migration smoke (#544) ────────────────────────────
   # The Python test tiers build the schema with `Base.metadata.create_all`, so
   # the migration files are never executed by any test. This one-shot job runs
@@ -2126,6 +2146,7 @@ jobs:
       - mcp-test
       - build-query
       - python-test
+      - pricegen-test
       - migration-check
       - python-audit
       - npm-audit
@@ -2173,6 +2194,7 @@ jobs:
             "${{ needs.mcp-test.result }}"
             "${{ needs.build-query.result }}"
             "${{ needs.python-test.result }}"
+            "${{ needs.pricegen-test.result }}"
             "${{ needs.migration-check.result }}"
             "${{ needs.python-audit.result }}"
             "${{ needs.npm-audit.result }}"
