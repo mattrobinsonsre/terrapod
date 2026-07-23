@@ -15,24 +15,31 @@ components:
     price: { type: "a=values.size" }
     tier: none
 
-  # Provisioned IOPS: priced per IOPS-month (`o`). io2's tier rates are separate
-  # AWS SKUs (io2/io2.tier2/io2.tier3, groups "EBS IOPS"/"…Tier 2"/"…Tier 3"), so
-  # the group filter is a REGEX to catch all three. The tier BOUNDARIES aren't in
-  # the API (every SKU says 0-Inf) — gp3's free 3000-IOPS baseline and io2's
-  # 32000/64000 breaks are domain knowledge, encoded here as `tier_bounds`.
+  # Provisioned IOPS: charged from the volume's own `iops` attribute
+  # (`a=values.iops` — deterministic, so no usage assumption is needed; the older
+  # `o`/usage-based form never priced because there was no per-second usage entry
+  # for provisioned volumes, silently dropping the whole IOPS charge). io1 is
+  # FLAT (a single 0-Inf rate → full `iops` × rate). gp3 and io2 are TIERED: gp3's
+  # first 3000 IOPS are free, and io2's rate steps at 32000/64000 across three
+  # separate AWS SKUs (io2/io2.tier2/io2.tier3, groups "EBS IOPS"/"…Tier 2"/
+  # "…Tier 3") — so the group filter is a REGEX to catch all three. The tier
+  # BOUNDARIES aren't in the API (every SKU says 0-Inf); they're domain knowledge,
+  # encoded as `tier_bounds` and applied *graduated* by the consumer pricer (each
+  # tier's slice of `iops` × that tier's rate). `unit: IOPS-Mo` selects the
+  # IOPS-month price dimension.
   - product_family: "^System Operation$"
     service_class: iops
     match: { type: volumeApiName }
     select: { group: { regex: "^EBS IOPS" } }
-    price: { type: o, unit: IOPS-Mo }
+    price: { type: "a=values.iops", unit: IOPS-Mo }
     tier: provision
     tier_bounds:
       - when: { volumeApiName: gp3, group: EBS IOPS }
         start: "3000" # gp3 includes 3000 free IOPS; you pay only above it
         end: Inf
-      # io2's three tiers. Base must be bounded 0-32000 (not 0-Inf) so the engine
-      # tiers correctly — oiq omits this base row + io2 storage entirely (a gap;
-      # we are deliberately more complete).
+      # io2's three graduated tiers. The base is bounded 0-32000 (not 0-Inf) so the
+      # graduated pricer charges each tier's slice at its own rate; we deliberately
+      # price the io2 base row + io2 storage that some generators omit.
       - when: { volumeApiName: io2, group: EBS IOPS }
         start: "0"
         end: "32000"

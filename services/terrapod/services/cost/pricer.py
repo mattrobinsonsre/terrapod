@@ -114,6 +114,63 @@ def _apply_provision_amount(entry: Entry, products: list[Product]) -> tuple[Entr
     return (entry, kept)
 
 
+def _price_graduated_attr_provision(
+    entry: Entry, products: list[Product]
+) -> list[PricedProduct] | None:
+    """Graduated per-tier pricing for **attribute-priced provision tiers**.
+
+    When a component is priced from a resource attribute (``a=values.iops``) AND
+    its products carry provision-tier bounds, the charge is not ``rate × attr`` at
+    one tier but the **sum over tiers** of ``rate_i × (attr's slice of tier i)`` —
+    so a free baseline (gp3's first 3000 IOPS) and graduated breaks (io2's
+    32000/64000 tiers, each a distinct AWS SKU with its own rate) are honoured.
+    Each tier's slice is ``min(attr, tier_end) − tier_lower``, where ``tier_lower``
+    is the tier's own start for the first tier and the previous tier's end after
+    that (contiguous tiers).
+
+    Returns priced products, or ``None`` when the group isn't
+    attribute-priced-with-provision-tiers, so the caller falls through to the
+    standard chain unchanged: **io1** (attribute-priced but with no tier bounds →
+    full ``iops`` at one rate) and usage-priced provision tiers both take that
+    path. Returns ``[]`` (a priced $0) when the attribute sits entirely within a
+    free baseline (e.g. gp3 at exactly 3000 IOPS).
+    """
+    if not products or not all(p.price.kind is PriceKind.ATTR for p in products):
+        return None
+    tiers: list[tuple[int, int, Product]] = []
+    for product in products:
+        ms = product.pricing_match_set
+        spa = ms.find_by_key("start_provision_amount")
+        epa = ms.find_by_key("end_provision_amount")
+        if spa is None or epa is None:
+            return None  # untiered attr product (io1) — standard chain charges full attr
+        tiers.append((_int_of_usage(spa[1]), _int_of_usage(epa[1]), product))
+
+    assert entry.usage is not None
+    attr = entry.usage.data.max  # ATTR usage was synthesized as a point Range(v, v)
+    divisor = float(entry.divisor if entry.divisor is not None else 1)
+    tiers.sort(key=lambda t: t[0])
+    out: list[PricedProduct] = []
+    prev_end = 0
+    for i, (start, end, product) in enumerate(tiers):
+        lower = start if i == 0 else prev_end
+        prev_end = end
+        qty = min(attr, end) - lower
+        if qty <= 0:
+            continue
+        cost = qty / divisor * product.price.value
+        out.append(
+            PricedProduct(
+                service=product.service,
+                product_family=product.product_family,
+                price=Range(cost, cost),
+                usage_description=entry.description,
+                ccy=product.ccy,
+            )
+        )
+    return out
+
+
 def _priced_by_range(product: Product, usage: Usage) -> Range[int]:
     kind = product.price.kind
     if kind is PriceKind.PER_TIME:
@@ -232,6 +289,13 @@ def _quote_group(
     syn_entry, syn_products = _synthesize_usage_from_attr(resource_ms, entry, group_products)
     # Fixed-per-size-tier (Azure disk): pick the tier the size rounds into first.
     syn_products = _apply_size_tier(syn_entry, syn_products, resource_ms)
+    # Graduated attribute-priced provision tiers (gp3 free baseline, io2 tiers):
+    # charge each tier's slice of the attribute, not the full attribute at one
+    # rate. Non-None ⇒ this branch owns the quote; None ⇒ fall through (io1 flat,
+    # usage-priced provision) to the standard chain below.
+    graduated = _price_graduated_attr_provision(syn_entry, syn_products)
+    if graduated is not None:
+        return graduated
     prov_entry, prov_products = _apply_provision_amount(syn_entry, syn_products)
     for bounded_entry, bounded_products in _apply_usage_amount(prov_entry, prov_products):
         if not bounded_products:

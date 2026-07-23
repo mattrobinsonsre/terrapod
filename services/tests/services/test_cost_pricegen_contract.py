@@ -84,9 +84,21 @@ _ROWS = [
     "AmazonDynamoDB,Amazon DynamoDB PayPerRequest Throughput,type=aws_dynamodb_table,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=requests&request_type=read&table_class=standard&start_usage_amount=0&end_usage_amount=Inf,0.0000001250,o,USD",
     "AmazonDynamoDB,Amazon DynamoDB PayPerRequest Throughput,type=aws_dynamodb_table,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=requests&request_type=write&table_class=standard&start_usage_amount=0&end_usage_amount=Inf,0.0000006250,o,USD",
     "AmazonDynamoDB,Database Storage,type=aws_dynamodb_table,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=storage&table_class=standard&start_usage_amount=0&end_usage_amount=Inf,0.2500000000,d,USD",
-    # EBS gp3 storage — priced a=values.size. From the ~450 MB EC2 offer, now in
-    # the published sheet via the ijson stream-filter (#893).
+    # EBS storage — priced a=values.size. From the ~450 MB EC2 offer, now in the
+    # published sheet via the ijson stream-filter (#893). gp3 $0.08, io1/io2 $0.125.
     "AmazonEC2,Storage,type=aws_ebs_volume&values.type=gp3,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=storage,0.0800000000,a=values.size,USD",
+    "AmazonEC2,Storage,type=aws_ebs_volume&values.type=io1,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=storage,0.1250000000,a=values.size,USD",
+    "AmazonEC2,Storage,type=aws_ebs_volume&values.type=io2,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=storage,0.1250000000,a=values.size,USD",
+    # EBS provisioned IOPS — priced a=values.iops (#929). io1 is FLAT (no
+    # provision bounds → the whole `iops` at one $0.065 rate). gp3 has a free
+    # 3000-IOPS baseline ([3000,Inf] @ $0.005). io2 is GRADUATED across three
+    # SKUs: [0,32000] @ $0.065, (32000,64000] @ $0.046, (64000,Inf] @ $0.032 —
+    # the consumer pricer charges each tier's slice of `iops` at its own rate.
+    "AmazonEC2,System Operation,type=aws_ebs_volume&values.type=io1,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=iops,0.0650000000,a=values.iops,USD",
+    "AmazonEC2,System Operation,type=aws_ebs_volume&values.type=gp3,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=iops&start_provision_amount=3000&end_provision_amount=Inf,0.0050000000,a=values.iops,USD",
+    "AmazonEC2,System Operation,type=aws_ebs_volume&values.type=io2,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=iops&start_provision_amount=0&end_provision_amount=32000,0.0650000000,a=values.iops,USD",
+    "AmazonEC2,System Operation,type=aws_ebs_volume&values.type=io2,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=iops&start_provision_amount=32001&end_provision_amount=64000,0.0460000000,a=values.iops,USD",
+    "AmazonEC2,System Operation,type=aws_ebs_volume&values.type=io2,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=iops&start_provision_amount=64001&end_provision_amount=Inf,0.0320000000,a=values.iops,USD",
     # NAT gateway — deterministic always-on hours + usage-driven data processed.
     "AmazonEC2,NAT Gateway,type=aws_nat_gateway,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=hours&start_usage_amount=0&end_usage_amount=Inf,0.0450000000,t,USD",
     "AmazonEC2,NAT Gateway,type=aws_nat_gateway,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=data&start_usage_amount=0&end_usage_amount=Inf,0.0450000000,d,USD",
@@ -559,6 +571,66 @@ def test_ebs_gp3_volume_prices_by_size():
     )
     est = estimate(plan, _sheet())
     assert est.resources[0].monthly_min == pytest.approx(100 * 0.08, abs=0.01)  # $8.00
+
+
+# --- EBS provisioned IOPS: flat (io1), free-baseline (gp3), graduated (io2) --
+# (#929) Before this, io1/io2/gp3 provisioned IOPS were silently dropped — the
+# recipe priced them `o` with no usage entry, so a 10k-IOPS io1 lost ~$650/mo.
+
+
+def _ebs(addr, values):
+    return {
+        "address": addr,
+        "type": "aws_ebs_volume",
+        "name": addr.split(".")[-1],
+        "mode": "managed",
+        "values": {"region": "us-east-1", **values},
+    }
+
+
+def test_ebs_io1_provisioned_iops_prices_flat_from_attr():
+    """io1 has no free baseline and no graduated tiers: the whole `iops` attribute
+    is billed at one rate. This is the case the #929 probe caught dropping ~$650."""
+    plan = _plan([_ebs("aws_ebs_volume.io1", {"type": "io1", "size": 100, "iops": 10000})])
+    est = estimate(plan, _sheet())
+    # storage 100*0.125=12.50 + iops 10000*0.065=650.00 = 662.50
+    assert est.resources[0].monthly_min == pytest.approx(12.50 + 650.0, abs=0.01)
+
+
+def test_ebs_gp3_iops_charges_only_above_the_free_baseline():
+    """gp3's first 3000 IOPS are free; only the excess is billed. The [3000,Inf]
+    provision tier must SUBTRACT the baseline, not charge the full attribute."""
+    plan = _plan([_ebs("aws_ebs_volume.gp3", {"type": "gp3", "size": 100, "iops": 5000})])
+    est = estimate(plan, _sheet())
+    # storage 100*0.08=8.00 + iops (5000-3000)*0.005=10.00 = 18.00
+    assert est.resources[0].monthly_min == pytest.approx(8.0 + 10.0, abs=0.01)
+
+
+def test_ebs_gp3_iops_at_baseline_is_free():
+    """A gp3 volume provisioned at exactly its 3000 free IOPS incurs no IOPS
+    charge — the tier slice is zero, so only storage is billed."""
+    plan = _plan([_ebs("aws_ebs_volume.gp3b", {"type": "gp3", "size": 50, "iops": 3000})])
+    est = estimate(plan, _sheet())
+    assert est.resources[0].monthly_min == pytest.approx(50 * 0.08, abs=0.01)  # storage only
+
+
+def test_ebs_io2_provisioned_iops_prices_graduated_across_tiers():
+    """io2 steps down in price at 32000 and 64000 IOPS across three separate SKUs.
+    The charge is the SUM of each tier's slice at its own rate — not the whole
+    attribute at the single tier that happens to contain it."""
+    plan = _plan([_ebs("aws_ebs_volume.io2", {"type": "io2", "size": 100, "iops": 50000})])
+    est = estimate(plan, _sheet())
+    # storage 100*0.125=12.50 + iops [32000*0.065 + 18000*0.046] = 2080 + 828 = 2908
+    assert est.resources[0].monthly_min == pytest.approx(12.50 + 2080.0 + 828.0, abs=0.01)
+
+
+def test_ebs_io2_iops_spanning_all_three_tiers():
+    """A 100k-IOPS io2 volume exercises all three graduated tiers."""
+    plan = _plan([_ebs("aws_ebs_volume.io2big", {"type": "io2", "size": 10, "iops": 100000})])
+    est = estimate(plan, _sheet())
+    # storage 10*0.125=1.25 + iops [32000*0.065 + 32000*0.046 + 36000*0.032]
+    #                              = 2080 + 1472 + 1152 = 4704
+    assert est.resources[0].monthly_min == pytest.approx(1.25 + 4704.0, abs=0.01)
 
 
 def test_usage_assumptions_flagged_with_bands_for_usage_driven_resources():
