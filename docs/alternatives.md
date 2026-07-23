@@ -51,7 +51,7 @@ The main self-hosted, open-source options in this space, described neutrally:
 
 | Tool | What it is | Execution model | Notes |
 |---|---|---|---|
-| **Terrapod** | Full self-hosted TFE/TFC replacement (control plane + UI + registry) | Its own **outbound-only** runners on Kubernetes (ARC pattern) | TFE-V2 API parity; air-gap/firewall-friendly; native Terragrunt; AI review; OPA policy sets. MPL-2.0. |
+| **Terrapod** | Full self-hosted TFE/TFC replacement (control plane + UI + registry) | Its own **outbound-only** runners on Kubernetes (ARC pattern) | TFE-V2 API parity; air-gap/firewall-friendly; native Terragrunt; built-in cost estimation; AI review; OPA policy sets. MPL-2.0. |
 | **Terrakube** | Full self-hosted TFE/TFC replacement | Its own Kubernetes-Job executors | The most mature open-source peer; multi-org tenancy; established community. Apache-2.0. |
 | **Digger** | Orchestration layer that reuses your CI | Runs inside your existing GitHub Actions / GitLab CI | Very lightweight — no separate execution engine to operate; you keep your CI as the runner. |
 | **Atlantis** | Focused PR-based plan/apply automation | Webhook-driven, runs in its own server | Battle-tested and widely deployed; lightweight to run. Works alongside your existing state/registry/RBAC tooling. |

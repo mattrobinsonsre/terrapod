@@ -149,6 +149,20 @@ If a run is OOM-killed, Terrapod surfaces the peak memory it reached and names
 the exact value to raise before retrying. See
 [Per-workspace resources](architecture.md#per-workspace-resources).
 
+## Does Terrapod estimate infrastructure costs?
+
+Yes — cost estimation is built in and on by default, with no third-party
+service. Every run shows the monthly cost **delta** its plan would introduce, and
+each workspace shows its current monthly **total**, priced by a native engine
+over Terrapod's own self-generated pricesheet (AWS, Azure, and GCP). It works
+air-gapped — the pricesheet is a pull-through cache you can pre-seed or point at
+an internal mirror (`cost_estimation.prices_url`). The deterministic numbers
+stand on their own; an optional AI layer (off unless you enable the plan-analysis
+AI) additionally estimates the resources the engine can't price, offers savings
+advisories, and answers a grounded cost chat — always clearly marked as an AI
+estimate and never blended into the deterministic total. See
+[Cost estimation](cost-estimation.md).
+
 ## How is Terrapod different from Terrakube?
 
 Both are full self-hosted TFE/TFC replacements at rough feature parity. Terrapod's
