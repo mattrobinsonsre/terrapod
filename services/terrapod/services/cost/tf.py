@@ -300,4 +300,4 @@ def resolve_region(resource: Resource, provider_region_map: dict[str, str], defa
     provider = resource.data.get("provider_name")
     if isinstance(provider, str) and provider in provider_region_map:
         return provider_region_map[provider].lower()
-    return default
+    return default.lower()  # sheet regions are lowercase; match exactly

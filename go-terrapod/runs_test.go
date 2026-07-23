@@ -19,6 +19,7 @@ const runAttrs = `{
   "refresh-only":false,"refresh":true,"allow-empty-apply":false,
   "is-drift-detection":false,"has-changes":true,"has-json-output":true,
   "state-diverged":false,
+  "has-cost-estimate":true,"cost-currency":"USD","cost-monthly-min":12.5,"cost-monthly-max":40.0,
   "peak-memory-bytes":536870912,"peak-cpu-usec":null,"runner-exit-code":0,
   "runner-exit-reason":"","workspace-name":"app",
   "vcs-commit-sha":"abc123","vcs-branch":"main","vcs-pull-request-number":null,
@@ -142,6 +143,13 @@ func TestGetRunParsesNativeFields(t *testing.T) {
 	}
 	if run.HasChanges == nil || !*run.HasChanges {
 		t.Errorf("has-changes: %+v", run.HasChanges)
+	}
+	// Cost estimation fields (#871) surfaced on the run object.
+	if !run.HasCostEstimate || run.CostCurrency != "USD" {
+		t.Errorf("cost flags: has=%v ccy=%q", run.HasCostEstimate, run.CostCurrency)
+	}
+	if run.CostMonthlyMax == nil || *run.CostMonthlyMax != 40.0 {
+		t.Errorf("cost-monthly-max: %+v", run.CostMonthlyMax)
 	}
 	if run.PeakMemoryBytes == nil || *run.PeakMemoryBytes != 536870912 {
 		t.Errorf("peak-memory-bytes: %+v", run.PeakMemoryBytes)

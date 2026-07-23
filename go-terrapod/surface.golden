@@ -512,12 +512,16 @@ field RoleAssignment.RoleName string `json:"role-name"`
 field Run.Actions RunActions `json:"actions"`
 field Run.AllowEmptyApply bool `json:"allow-empty-apply"`
 field Run.AutoApply bool `json:"auto-apply"`
+field Run.CostCurrency string `json:"cost-currency,omitempty"`
+field Run.CostMonthlyMax *float64 `json:"cost-monthly-max,omitempty"`
+field Run.CostMonthlyMin *float64 `json:"cost-monthly-min,omitempty"`
 field Run.CreatedAt string `json:"created-at,omitempty"`
 field Run.CreatedBy string `json:"created-by,omitempty"`
 field Run.DiscardReason string `json:"discard-reason,omitempty"`
 field Run.ErrorMessage string `json:"error-message,omitempty"`
 field Run.ExecutionBackend string `json:"execution-backend,omitempty"`
 field Run.HasChanges *bool `json:"has-changes,omitempty"`
+field Run.HasCostEstimate bool `json:"has-cost-estimate"`
 field Run.HasJSONOutput bool `json:"has-json-output"`
 field Run.ID string `json:"id"`
 field Run.IsDestroy bool `json:"is-destroy"`

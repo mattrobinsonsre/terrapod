@@ -145,7 +145,7 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		WorkspaceID string `json:"workspace_id" jsonschema:"the workspace id (ws-...)"`
 		Key         string `json:"key" jsonschema:"the variable key"`
 		Value       string `json:"value,omitempty" jsonschema:"the value (empty is legal, e.g. flag-shaped env vars)"`
-		Category    string `json:"category,omitempty" jsonschema:"terraform or env (default terraform)"`
+		Category    string `json:"category,omitempty" jsonschema:"terraform, env, git_http_auth, or git_ssh_auth (default terraform); the git_* categories carry private-git-module credentials as a JSON value and are always sensitive"`
 		HCL         *bool  `json:"hcl,omitempty" jsonschema:"the value is a raw HCL expression (lists/objects); default false"`
 		Sensitive   *bool  `json:"sensitive,omitempty" jsonschema:"mark sensitive — masked at rest and in responses; default false"`
 		Description string `json:"description,omitempty" jsonschema:"optional human description"`
@@ -153,7 +153,7 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "terrapod_variable_set",
 		Description: "Set a workspace variable — creates it if the key is new, updates it in place if it exists (an upsert keyed on `key`). " +
-			"category defaults to terraform; set category=env for an environment variable. Set hcl=true for non-string values (lists/objects/numbers). Returns the variable.",
+			"category defaults to terraform; set category=env for an environment variable, or git_http_auth/git_ssh_auth for private-git-module credentials (JSON value, always sensitive — see the module-auth docs). Set hcl=true for non-string values (lists/objects/numbers). Returns the variable.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in variableSetIn) (*mcp.CallToolResult, *terrapod.Variable, error) {
 		if in.WorkspaceID == "" || in.Key == "" {
 			return errText("workspace_id and key are required"), nil, nil
