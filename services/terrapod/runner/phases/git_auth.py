@@ -15,6 +15,13 @@ pattern/scope (``github.com``, ``github.com/myorg``, ``gitlab.example.com``) and
 * ``git_http_auth`` → ``{"username","token","rewrite":"to_https"|"none"}``
 * ``git_ssh_auth``  → ``{"private_key","known_hosts","rewrite":"to_ssh"|"none"}``
 
+``known_hosts`` is optional for github.com/gitlab.com: their host keys are baked
+into the runner image's global ``/etc/ssh/ssh_known_hosts`` (see
+``runner/saas_known_hosts`` + ``Dockerfile.runner``), which ssh consults in
+addition to the per-host ``UserKnownHostsFile`` this phase writes — so an empty
+``known_hosts`` for those SaaS hosts still verifies. Supply it only to pin a
+self-hosted host.
+
 **Protocol rewriting (ssh↔https).** Each entry's ``rewrite`` makes source URLs
 protocol-agnostic via ``insteadOf``: ``to_https`` maps ``ssh://git@host/`` and
 scp ``git@host:`` onto ``https://host/`` (so ``ssh://`` sources authenticate over
