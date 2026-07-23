@@ -319,6 +319,77 @@ def test_bound_to_usage_amount_clamps_to_tier():
     assert bound_to_usage_amount(DATA, Range(2000, 3000), entry) is None
 
 
+def test_apply_usage_amount_mixed_group_does_not_crash():
+    """Regression (#1028 cost audit finding 1): a group where SOME products carry
+    usage-amount tier bounds and some don't (the aws_lb/aws_elb shape — a flat
+    PER_TIME hour sharing one entry with tiered PER_DATA bands) must NOT index a
+    missing key (find_by_key → None → None[1] → TypeError, uncaught by price()).
+    The untiered product is priced as the remainder instead."""
+    from terrapod.services.cost.pricer import _apply_usage_amount
+    from terrapod.services.cost.prices import product_from_yaml
+    from terrapod.services.cost.usage import Entry, Usage
+
+    tiered = product_from_yaml(
+        {
+            "service": "s",
+            "family": "f",
+            "match": "type=aws_lb",
+            "price_type": "d",
+            "price": "0.008",
+            "pricing": "region=us-east-1&start_usage_amount=0&end_usage_amount=10000",
+        },
+        "USD",
+    )
+    flat = product_from_yaml(  # no usage-amount bounds → the missing-key crash source
+        {
+            "service": "s",
+            "family": "f",
+            "match": "type=aws_lb",
+            "price_type": "t",
+            "price": "0.0225",
+            "pricing": "region=us-east-1",
+        },
+        "USD",
+    )
+    entry = Entry(
+        description="d",
+        divisor=None,
+        match_query=MatchQuery.parse(""),
+        usage=Usage.from_data_range(Range(0, 5000)),
+    )
+    out = _apply_usage_amount(entry, [tiered, flat])  # must not raise TypeError
+    priced = [p for _, group in out for p in group]
+    assert flat in priced and tiered in priced  # both accounted for
+
+
+def test_price_products_zero_divisor_does_not_crash():
+    """Regression (#1028 cost audit finding 2): a usage entry with divisor=0 must be
+    treated as divisor 1 (parity with _count_factor's `or 1`), not ZeroDivisionError."""
+    from terrapod.services.cost.pricer import _price_products
+    from terrapod.services.cost.prices import product_from_yaml
+    from terrapod.services.cost.usage import Entry, Usage
+
+    product = product_from_yaml(
+        {
+            "service": "s",
+            "family": "f",
+            "match": "type=aws_x",
+            "price_type": "d",
+            "price": "0.10",
+            "pricing": "region=us-east-1",
+        },
+        "USD",
+    )
+    entry = Entry(
+        description="d",
+        divisor=0,
+        match_query=MatchQuery.parse(""),
+        usage=Usage.from_data_range(Range(100, 100)),
+    )
+    result = _price_products(entry, [product])  # must not raise ZeroDivisionError
+    assert result is not None
+
+
 def test_range_intersect():
     assert intersect(Range(0, 5), Range(3, 10)) == Range(3, 5)
     assert intersect(Range(0, 5), Range(6, 10)) is None
