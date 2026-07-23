@@ -30,6 +30,8 @@ from pathlib import Path
 
 import yaml
 
+from pricegen.shard import ALL, add_shard_args, matches, regions_for
+
 HERE = Path(__file__).parent
 _UA = {"User-Agent": "terrapod-pricegen/0.1"}
 _AWS_BULK = "https://pricing.us-east-1.amazonaws.com"
@@ -105,47 +107,85 @@ def _cleanup_big_offers() -> None:
     _BIG_OFFER_CACHE.clear()
 
 
-def fetch_aws(fetch: dict) -> dict:
-    """AWS Price List Bulk API: region_index → the region's offer.
+def fetch_aws(fetch: dict, regions: list[str]) -> dict:
+    """AWS Price List Bulk API: region_index → each region's offer, merged (#1025).
 
-    Small offers load whole. Large ones (a ``families`` filter in the fetch
-    block, e.g. AmazonEC2) are stream-filtered with ijson to just the needed
-    families + ``keep_attrs``, so RAM stays flat regardless of offer size."""
+    Loops ``regions``, downloading each region's offer and merging the products +
+    OnDemand terms into one offer dict. AWS SKU ids are region-specific, so there
+    are no key collisions; each product carries its own ``regionCode``, so the
+    emitted rows are correctly per-region without any generate-side change.
+
+    Small offers load whole. Large ones (a ``families`` filter in the fetch block,
+    e.g. AmazonEC2) are stream-filtered with ijson per region to just the needed
+    families + ``keep_attrs``, so RAM stays flat regardless of offer size — and
+    the per-region download is cached, so a region's 450 MB is pulled once and
+    reused across every recipe reading that family."""
     svc = fetch["service_code"]
     # A few services (Route53, CloudFront) price globally — their products aren't
     # region-split, so there is no region_index; the whole offer lives at
-    # current/index.json. `global: true` fetches that instead of a region.
+    # current/index.json. `global: true` fetches that instead of any region.
     if fetch.get("global"):
         return _get_json(f"{_AWS_BULK}/offers/v1.0/aws/{svc}/current/index.json")
-    region = fetch["region"]
     idx = _get_json(f"{_AWS_BULK}/offers/v1.0/aws/{svc}/current/region_index.json")
-    region_url = _AWS_BULK + idx["regions"][region]["currentVersionUrl"]
+    if regions == ALL:  # discover every region this service is offered in (#1025)
+        regions = list(idx["regions"])
     families = fetch.get("families")
-    if families:
-        return _stream_filter_aws(region_url, families, fetch.get("keep_attrs", {}))
-    return _get_json(region_url)
+    keep_attrs = fetch.get("keep_attrs", {})
+    products: dict = {}
+    terms: dict = {}
+    for region in regions:
+        entry = idx["regions"].get(region)
+        if entry is None:
+            # Not every service is offered in every region — skip cleanly.
+            print(f"    {svc}: no offer for region {region}, skipping", file=sys.stderr)
+            continue
+        region_url = _AWS_BULK + entry["currentVersionUrl"]
+        if families:
+            sub = _stream_filter_aws(region_url, families, keep_attrs)
+        else:
+            sub = _get_json(region_url)
+        products.update(sub.get("products", {}))
+        terms.update(sub.get("terms", {}).get("OnDemand", {}))
+    return {"products": products, "terms": {"OnDemand": terms}}
 
 
-def fetch_azure(fetch: dict) -> dict:
-    """Azure Retail Prices API — page through every Consumption item."""
-    name, region = fetch["service_name"], fetch["region"]
-    flt = (
-        f"serviceName eq '{name}' and armRegionName eq '{region}' "
-        "and priceType eq 'Consumption'"
-    )
-    url = "https://prices.azure.com/api/retail/prices?" + urllib.parse.urlencode(
-        {"$filter": flt}
-    )
+def fetch_azure(fetch: dict, regions: list[str]) -> dict:
+    """Azure Retail Prices API — page through every Consumption item, per region.
+
+    Loops ``regions`` (#1025), filtering each with ``armRegionName eq '<region>'``
+    and concatenating the ``Items``. Each item carries its own ``armRegionName``,
+    so the emitted rows are per-region with no generate-side change. The
+    :data:`~pricegen.shard.ALL` sentinel drops the region filter entirely — one
+    paginated pass returns every region's meters (the Azure shard, since Azure's
+    compact JSON feed isn't disk-bound the way AWS's per-region offers are)."""
+    name = fetch["service_name"]
+    if regions == ALL:
+        filters = [f"serviceName eq '{name}' and priceType eq 'Consumption'"]
+    else:
+        filters = [
+            f"serviceName eq '{name}' and armRegionName eq '{region}' "
+            "and priceType eq 'Consumption'"
+            for region in regions
+        ]
     items: list[dict] = []
-    while url:
-        d = _get_json(url)
-        items.extend(d.get("Items", []))
-        url = d.get("NextPageLink")
+    for flt in filters:
+        url = "https://prices.azure.com/api/retail/prices?" + urllib.parse.urlencode(
+            {"$filter": flt}
+        )
+        while url:
+            d = _get_json(url)
+            items.extend(d.get("Items", []))
+            url = d.get("NextPageLink")
     return {"Items": items}
 
 
-def fetch_gcp(fetch: dict) -> dict:
-    """GCP Cloud Billing Catalog — page through a service's SKUs (needs a key)."""
+def fetch_gcp(fetch: dict, regions: list[str]) -> dict:
+    """GCP Cloud Billing Catalog — page through a service's SKUs (needs a key).
+
+    ``regions`` is accepted for adapter-interface symmetry but ignored: the
+    catalog isn't region-filtered — each SKU carries its own ``serviceRegions``,
+    which the adapter expands to one Unit per (SKU, region), so GCP is already
+    multi-region for free (#1025)."""
     key = os.environ.get("GCP_BILLING_API_KEY")
     if not key:
         raise SystemExit("GCP_BILLING_API_KEY not set — required to fetch GCP offers")
@@ -171,14 +211,18 @@ _FETCHERS = {"aws": fetch_aws, "azure": fetch_azure, "gcp": fetch_gcp}
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--config", type=Path, default=HERE / "recipes.yaml")
-    ap.add_argument("--only", help="fetch only this provider (aws|azure|gcp)")
+    add_shard_args(ap)
     args = ap.parse_args()
 
     config = yaml.safe_load(args.config.read_text())
+    # The per-provider region set the sheet is generated across (#1025). CI shards
+    # override this per job (--region / --all-regions / --global-only); with no
+    # flags this curated set is the single-runner / local-dev default.
+    region_sets = config.get("regions", {})
     try:
         for cfg in config["recipes"]:
             provider = cfg["provider"]
-            if args.only and provider != args.only:
+            if not matches(cfg, args):
                 continue
             fetch = cfg.get("fetch")
             if not fetch:
@@ -187,11 +231,20 @@ def main() -> int:
                     file=sys.stderr,
                 )
                 continue
+            regions = regions_for(cfg, args, region_sets)
             out = cfg["offer"]
             out = Path(out) if Path(out).is_absolute() else HERE / out
             out.parent.mkdir(parents=True, exist_ok=True)
-            print(f"  fetching {provider}/{cfg['recipe']} → {out} …", file=sys.stderr)
-            offer = _FETCHERS[provider](fetch)
+            scope = (
+                "global"
+                if regions is None
+                else ("all regions" if regions == ALL else f"{len(regions)} region(s)")
+            )
+            print(
+                f"  fetching {provider}/{cfg['recipe']} → {out} ({scope}) …",
+                file=sys.stderr,
+            )
+            offer = _FETCHERS[provider](fetch, regions)
             size = len(
                 offer.get("skus") or offer.get("Items") or offer.get("products") or {}
             )

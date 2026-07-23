@@ -37,6 +37,8 @@ import re
 from collections import Counter
 from dataclasses import dataclass, field
 
+from pricegen.shard import ALL
+
 
 def _snake(camel: str) -> str:
     return re.sub(r"(?<!^)(?=[A-Z])", "_", camel).lower()
@@ -289,21 +291,31 @@ def generate(recipe: dict, defaults: dict, units, *, service: str, stats=None):
 # --- computed kind (GCP compute: Σ vCPU-core + RAM-GiB) ---------------------
 
 
-def generate_computed(recipe: dict, defaults: dict, units, *, service: str, stats=None):
-    """Yield rows for a ``computed:`` recipe (GCP Compute Engine).
+def generate_computed(
+    recipe: dict, defaults: dict, units, *, service: str, stats=None, regions=None
+):
+    """Yield rows for a ``computed:`` recipe (GCP Compute Engine), per region.
 
     GCP prices compute per **vCPU-core hour** and per **GiB-RAM hour** as
     separate SKUs (e.g. "N2 Instance Core running in Americas" / "... Ram ..."),
     so a machine type's hourly cost is ``vCPU × core-rate + RAM_GiB × ram-rate``.
-    We read each family's Core+Ram rate from the units, then enumerate machine
-    types from a compact per-family shape catalog and pre-compute each total —
-    emitting one ``values.machine_type=<type>`` row per type, matched by the
-    consumer exactly like an AWS/Azure instance (no consumer arithmetic).
+    For each target region we read each family's Core+Ram rate from the units
+    serving that region, then enumerate machine types from a compact per-family
+    shape catalog and pre-compute each total — emitting one
+    ``values.machine_type=<type>`` row per (type, region), matched by the consumer
+    exactly like an AWS/Azure instance (no consumer arithmetic).
+
+    Region set (#1025): ``regions`` — a list, or the ``ALL`` sentinel to
+    enumerate every region the units serve (the GCP shard) — wins; else the
+    recipe's ``computed.regions`` (list) or ``computed.region`` (single,
+    standalone-CLI fallback). A SKU carries every region it serves in
+    ``serviceRegions``, so the Americas/Europe/Asia Core+Ram rate is found for
+    each concrete region by the region filter — no region→geo mapping is needed.
 
     Recipe ``computed`` block::
 
         computed:
-          region: us-central1                 # match units in this region
+          region: us-central1                 # standalone-CLI fallback region
           family_regex: '^(\\w+)(?: Predefined)? Instance (Core|Ram) running in'
           vcpus: [1, 2, 4, 8, 16, 32, 64, 96]
           families:                            # key = machine prefix (lowercased
@@ -316,62 +328,73 @@ def generate_computed(recipe: dict, defaults: dict, units, *, service: str, stat
     """
     spec = recipe["computed"]
     rtype = recipe["resource_type"]
-    region = spec["region"]
     fam_re = re.compile(spec["family_regex"])
     canon = defaults.get("canonical", {})
+    units = list(units)  # reused across regions
+    if regions == ALL:
+        # Enumerate every region the compute units serve (the GCP shard, #1025) —
+        # a SKU's serviceRegions were expanded to one unit per region upstream.
+        target_regions = sorted(
+            {u.attrs.get("region") for u in units if u.attrs.get("region")}
+        )
+    else:
+        target_regions = regions or spec.get("regions") or [spec["region"]]
 
-    # 1. Collect each family's Core/Ram rate from the OnDemand, in-region units.
-    rates: dict[str, dict[str, float]] = {}
-    for unit in units:
-        a = unit.attrs
-        if a.get("region") != region:
-            continue
-        if any(a.get(dim) != c for dim, c in canon.items() if dim in a):
-            continue
-        m = fam_re.match(a.get("description", ""))
-        if not m:
-            continue
-        fam, kind = m.group(1).lower(), m.group(2)
-        if unit.prices:
-            rates.setdefault(fam, {})[kind] = float(unit.prices[0].usd)
-
-    # 2. Enumerate machine types and pre-compute each total.
-    base = dict(defaults.get("pricing_common", {}))
-    base.pop("region", None)  # region is per-computed-spec, emitted below
-    base["service_class"] = "instance"
-    base["region"] = region
-    pricing = "&".join(
-        [f"{k}={v}" for k, v in base.items()]
-        + ["start_usage_amount=0", "end_usage_amount=Inf"]
-    )
     seen: set = set()
-    for fam, shapes in spec["families"].items():
-        fam_rates = rates.get(fam)
-        if not fam_rates or "Core" not in fam_rates or "Ram" not in fam_rates:
-            if stats is not None:
-                stats._note_unmapped("family", fam)  # rates missing -> drift signal
-            continue
-        core, ram = fam_rates["Core"], fam_rates["Ram"]
-        for shape, gib_per_vcpu in shapes.items():
-            for vcpu in spec["vcpus"]:
-                machine_type = f"{fam}-{shape}-{vcpu}"
-                ram_gib = vcpu * gib_per_vcpu
-                hourly = vcpu * core + ram_gib * ram
-                match_set = f"type={rtype}&values.machine_type={machine_type}"
-                row = (
-                    service,
-                    "Compute Instance",
-                    match_set,
-                    pricing,
-                    f"{hourly:.10f}",
-                    "t",
-                    "USD",
-                )
-                if row in seen:
-                    continue
-                seen.add(row)
+    for region in target_regions:
+        # 1. Collect each family's Core/Ram rate from the OnDemand units serving
+        #    this region (a SKU serves it if the region is in its serviceRegions).
+        rates: dict[str, dict[str, float]] = {}
+        for unit in units:
+            a = unit.attrs
+            if a.get("region") != region:
+                continue
+            if any(a.get(dim) != c for dim, c in canon.items() if dim in a):
+                continue
+            m = fam_re.match(a.get("description", ""))
+            if not m:
+                continue
+            fam, kind = m.group(1).lower(), m.group(2)
+            if unit.prices:
+                rates.setdefault(fam, {})[kind] = float(unit.prices[0].usd)
+
+        # 2. Enumerate machine types and pre-compute each total for this region.
+        base = dict(defaults.get("pricing_common", {}))
+        base.pop("region", None)  # region is per-region, emitted below
+        base["service_class"] = "instance"
+        base["region"] = region
+        pricing = "&".join(
+            [f"{k}={v}" for k, v in base.items()]
+            + ["start_usage_amount=0", "end_usage_amount=Inf"]
+        )
+        for fam, shapes in spec["families"].items():
+            fam_rates = rates.get(fam)
+            if not fam_rates or "Core" not in fam_rates or "Ram" not in fam_rates:
                 if stats is not None:
-                    stats.rows += 1
-                    stats.units_total += 1
-                    stats._note_price(f"{hourly:.10f}")
-                yield row
+                    # rates missing for this family in this region -> drift signal
+                    stats._note_unmapped("family", f"{fam}@{region}")
+                continue
+            core, ram = fam_rates["Core"], fam_rates["Ram"]
+            for shape, gib_per_vcpu in shapes.items():
+                for vcpu in spec["vcpus"]:
+                    machine_type = f"{fam}-{shape}-{vcpu}"
+                    ram_gib = vcpu * gib_per_vcpu
+                    hourly = vcpu * core + ram_gib * ram
+                    match_set = f"type={rtype}&values.machine_type={machine_type}"
+                    row = (
+                        service,
+                        "Compute Instance",
+                        match_set,
+                        pricing,
+                        f"{hourly:.10f}",
+                        "t",
+                        "USD",
+                    )
+                    if row in seen:
+                        continue
+                    seen.add(row)
+                    if stats is not None:
+                        stats.rows += 1
+                        stats.units_total += 1
+                        stats._note_price(f"{hourly:.10f}")
+                    yield row

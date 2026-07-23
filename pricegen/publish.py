@@ -32,6 +32,7 @@ from pathlib import Path
 import yaml
 
 from pricegen import engine
+from pricegen.shard import add_shard_args, matches, regions_for
 
 HERE = Path(__file__).parent
 SCHEMA = "terrapod-pricesheet/v1"
@@ -90,7 +91,9 @@ def combine(
     return sheet, manifest
 
 
-def _run_one(cfg: dict) -> tuple[dict, list[tuple], engine.RecipeStats]:
+def _run_one(
+    cfg: dict, regions: list[str] | None = None
+) -> tuple[dict, list[tuple], engine.RecipeStats]:
     pdir = HERE / "providers" / cfg["provider"]
     adapter = importlib.import_module(f"pricegen.providers.{cfg['provider']}.adapter")
     defaults = yaml.safe_load((pdir / "defaults.yaml").read_text())
@@ -102,9 +105,18 @@ def _run_one(cfg: dict) -> tuple[dict, list[tuple], engine.RecipeStats]:
     units = adapter.iter_units(offer, term=defaults.get("price_term", "OnDemand"))
     stats = engine.RecipeStats()
     if "computed" in recipe:
+        # The computed (GCP compute) recipe enumerates rows per region, so it
+        # needs the region set (#1025) — a list, or the ALL sentinel to enumerate
+        # every region the units serve; the direct path gets region from each
+        # product attribute and needs no region list.
         rows = list(
             engine.generate_computed(
-                recipe, defaults, list(units), service=recipe["service"], stats=stats
+                recipe,
+                defaults,
+                list(units),
+                service=recipe["service"],
+                stats=stats,
+                regions=regions,
             )
         )
     else:
@@ -122,10 +134,20 @@ def main() -> int:
     ap.add_argument("--config", type=Path, default=HERE / "recipes.yaml")
     ap.add_argument("--out", type=Path, default=Path("prices.yaml.gz"))
     ap.add_argument("--manifest", type=Path, default=Path("manifest.json"))
+    add_shard_args(ap)
     args = ap.parse_args()
 
     config = yaml.safe_load(args.config.read_text())
-    results = [_run_one(cfg) for cfg in config["recipes"]]
+    region_sets = config.get("regions", {})
+    # In the CI-split model this generates one shard's slice (its recipes for its
+    # region(s)); pricegen.merge combines the partials. With no flags it generates
+    # the whole sheet in one pass (local / single-runner). Selection MUST match
+    # what fetch_offers fetched for the same flags — both use pricegen.shard.
+    results = [
+        _run_one(cfg, regions_for(cfg, args, region_sets))
+        for cfg in config["recipes"]
+        if matches(cfg, args)
+    ]
     sheet, manifest = combine(results)
 
     with gzip.open(args.out, "wt") as f:
