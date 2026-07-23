@@ -1,7 +1,7 @@
 """Shared recipe engine (#893) — provider-agnostic.
 
 Applies a resource recipe (defaults + components) to a stream of normalized
-``Unit``s (from any provider's adapter) and yields OpenInfraQuote-shaped rows:
+``Unit``s (from any provider's adapter) and yields pricesheet rows:
 
     service, product_family, match_set, pricing_match_set, price, price_type, ccy
 

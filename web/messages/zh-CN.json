@@ -1979,7 +1979,6 @@
       "unpricedTitle": "{count, plural, other {# 个未计价资源}}",
       "unpricedHint": "定价数据中没有与这些资源匹配的项——未映射的类型、无直接成本的资源，或尚未支持的提供商。",
       "indicative": "估算仅供参考；实际成本取决于使用量、区域、承诺用量和折扣。",
-      "credit": "成本数据来自 <oiq>OpenInfraQuote</oiq>。",
       "asOfState": "截至状态 v{serial}",
       "noState": "暂无成本 — 首次应用后显示。",
       "usageBand": "{dimension}：典型 {typical} {unit}（范围 {low}–{high}）",

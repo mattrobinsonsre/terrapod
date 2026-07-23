@@ -1979,7 +1979,6 @@
       "unpricedTitle": "{count, plural, one {# zdroj bez ceny} few {# zdroje bez ceny} many {# zdroje bez ceny} other {# zdrojů bez ceny}}",
       "unpricedHint": "Nic v cenových datech těmto neodpovídalo — nenamapovaný typ, zdroj bez přímých nákladů nebo dosud nepodporovaný poskytovatel.",
       "indicative": "Odhady jsou orientační; skutečné náklady závisí na využití, regionu, závazcích a slevách.",
-      "credit": "Data o nákladech od <oiq>OpenInfraQuote</oiq>.",
       "asOfState": "dle stavu v{serial}",
       "noState": "Zatím žádné náklady — zobrazí se po prvním použití.",
       "usageBand": "{dimension}: typicky {typical} {unit} (rozsah {low}–{high})",

@@ -1979,7 +1979,6 @@
       "unpricedTitle": "{count, plural, one {# ressource non tarifée} other {# ressources non tarifées}}",
       "unpricedHint": "Rien dans les données tarifaires ne correspondait à ces éléments : un type non mappé, une ressource sans coût direct ou un fournisseur pas encore pris en charge.",
       "indicative": "Les estimations sont indicatives ; le coût réel dépend de l'utilisation, de la région, des engagements et des remises.",
-      "credit": "Données de coût de <oiq>OpenInfraQuote</oiq>.",
       "asOfState": "à l'état v{serial}",
       "noState": "Aucun coût pour l'instant — apparaît après la première application.",
       "usageBand": "{dimension} : {typical} {unit} typique (plage {low}–{high})",

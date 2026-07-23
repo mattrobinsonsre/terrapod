@@ -1563,7 +1563,7 @@ class Run(Base):
     resource_imports: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     # Cost estimation (#871). Set once the runner uploads `cost_estimate.json`
-    # (the native OpenInfraQuote-port estimate of this plan's monthly delta).
+    # (the native cost estimate of this plan's monthly delta).
     # `has_cost_estimate` gates the download URL the same way `has_json_output`
     # does; the min/max are the plan-total monthly range cached for cheap list
     # display (the full per-resource breakdown lives in the stored artifact).
@@ -2237,10 +2237,10 @@ class CostSummary(Base):
     is (footprint + cold-read bloat).
 
     **Provenance is a hard invariant.** This row holds AI *polish* only —
-    a plain-language narrative of the oiq-derived cost estimate plus
+    a plain-language narrative of the engine-derived cost estimate plus
     optional savings *advisories* (Savings Plans / reserved / spot /
     rightsizing). It NEVER holds, restates, or replaces the authoritative
-    oiq figures: those live in the ``cost_estimate.json`` artifact and the
+    deterministic figures: those live in the ``cost_estimate.json`` artifact and the
     ``runs`` cost columns, and are served by the data-only cost-estimate
     endpoint. Any dollar amount an advisory carries is an AI *estimate*,
     tagged ``source: "ai-estimate"`` in the ``advisories`` JSON, is never a
@@ -2271,12 +2271,12 @@ class CostSummary(Base):
     # Model fields — populated when status == "ready".
     #
     # estimated_resources is the PRIMARY output (#871 reframe): the model's own
-    # monthly estimate for resources the deterministic oiq engine could NOT
-    # price — the "unpriced" bucket (unmapped types, and providers oiq doesn't
+    # monthly estimate for resources the deterministic engine could NOT
+    # price — the "unpriced" bucket (unmapped types, and providers the engine doesn't
     # cover, e.g. Azure/GCP) plus usage-driven dimensions it omits. Each carries
     # `source: "ai-estimate"` (stamped server-side), is shown as a separate
-    # overlay beside the authoritative oiq figures, and is NEVER summed into the
-    # oiq total. narrative + advisories are the secondary, human-readable bonus.
+    # overlay beside the authoritative deterministic figures, and is NEVER summed into the
+    # deterministic total. narrative + advisories are the secondary, human-readable bonus.
     estimated_resources: Mapped[list[dict[str, Any]]] = mapped_column(
         JSONB, default=list, nullable=False
     )

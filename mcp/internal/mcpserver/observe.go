@@ -188,7 +188,7 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "terrapod_workspace_cost",
-		Description: "Estimate the CURRENT monthly cost of a workspace's managed infrastructure from its latest state (native OpenInfraQuote-port engine — data only, no AI). Returns currency, the total monthly range, per-resource costs, the unpriced resources, and which state version was priced. `state-version` is null when the workspace has no state yet.",
+		Description: "Estimate the CURRENT monthly cost of a workspace's managed infrastructure from its latest state (native native cost engine — data only, no AI). Returns currency, the total monthly range, per-resource costs, the unpriced resources, and which state version was priced. `state-version` is null when the workspace has no state yet.",
 		Annotations: readOnly,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in wsCostIn) (*mcp.CallToolResult, *terrapod.WorkspaceCostEstimate, error) {
 		if in.WorkspaceID == "" {
@@ -207,7 +207,7 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "terrapod_run_cost",
-		Description: "Get a run's monthly cost estimate — the plan's cost DELTA: the projected monthly total, the delta this run introduces, the previous total, per-resource costs, and unpriced resources (native OpenInfraQuote-port engine — data only, no AI). Returns 'not available' when the run produced no cost estimate.",
+		Description: "Get a run's monthly cost estimate — the plan's cost DELTA: the projected monthly total, the delta this run introduces, the previous total, per-resource costs, and unpriced resources (native native cost engine — data only, no AI). Returns 'not available' when the run produced no cost estimate.",
 		Annotations: readOnly,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in runCostIn) (*mcp.CallToolResult, *terrapod.CostEstimate, error) {
 		if in.RunID == "" {

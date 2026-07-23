@@ -1979,7 +1979,6 @@
       "unpricedTitle": "{count, plural, one {# ikke-prissat ressource} other {# ikke-prissatte ressourcer}}",
       "unpricedHint": "Intet i prisdataene matchede disse — en ikke-tilknyttet type, en ressource uden direkte omkostning eller en udbyder, der endnu ikke er dækket.",
       "indicative": "Estimaterne er vejledende; den faktiske omkostning afhænger af forbrug, region, forpligtelser og rabatter.",
-      "credit": "Omkostningsdata fra <oiq>OpenInfraQuote</oiq>.",
       "asOfState": "pr. tilstand v{serial}",
       "noState": "Ingen omkostning endnu — vises efter første anvendelse.",
       "usageBand": "{dimension}: {typical} {unit} typisk (interval {low}–{high})",

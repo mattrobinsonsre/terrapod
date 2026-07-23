@@ -1100,11 +1100,11 @@ async def show_cost_estimate(
     """Cost estimate for the run-page Cost tab (#871).
 
     Terrapod-native. Returns the runner-produced ``cost_estimate.json`` (the
-    native OpenInfraQuote-port estimate of the plan's monthly cost delta)
+    native cost estimate of the plan's monthly cost delta)
     inline — small payload, browser-reachable through the BFF in every storage
     backend (unlike a presigned 302). 404 when the run produced no estimate
     (errored before plan, cost estimation disabled, or the artifact aged out).
-    Every figure here is **data** (`oiq`-derived); no AI is involved.
+    Every figure here is **data** (engine-derived); no AI is involved.
     """
     run = await _get_run(run_id, db)
     await _require_run_ws_capability(run, cap.RUN_READ, user, db)
@@ -1164,10 +1164,10 @@ def _cost_summary_json(
             "type": "cost-summaries",
             "attributes": {
                 "status": summary.status,
-                # PRIMARY (#871): the model's estimates for what oiq couldn't
+                # PRIMARY (#871): the model's estimates for what the engine couldn't
                 # price. Each carries source="ai-estimate" (stamped server-side);
                 # the UI renders these as a separate overlay, never summed into
-                # the authoritative oiq total.
+                # the authoritative deterministic total.
                 "estimated-resources": estimated_resources
                 if estimated_resources is not None
                 else summary.estimated_resources,
@@ -1202,8 +1202,8 @@ async def show_cost_summary(
     """AI cost estimate + savings advisories for a run (#871).
 
     Terrapod-native; the optional AI *enhancement* over the data-only cost
-    estimate, riding the plan-analysis AI switch. Its estimates price what oiq
-    couldn't; the authoritative oiq figures live on the data-only
+    estimate, riding the plan-analysis AI switch. Its estimates price what the engine
+    couldn't; the authoritative deterministic figures live on the data-only
     `/runs/{id}/cost-estimate` endpoint and are never restated here. Every AI
     dollar amount is tagged `source: "ai-estimate"`.
 

@@ -1979,7 +1979,6 @@
       "unpricedTitle": "{count, plural, one {# unpriced resource} other {# unpriced resources}}",
       "unpricedHint": "Nothing in the pricing data matched these — an unmapped type, a resource with no direct cost, or a provider not yet covered.",
       "indicative": "Estimates are indicative; actual cost depends on usage, region, commitments, and discounts.",
-      "credit": "Cost data from <oiq>OpenInfraQuote</oiq>.",
       "asOfState": "Dotlh v{serial} rurlaw'",
       "noState": "wagh tu'lu'be' — wa'DIch lo' ghevqo' 'ej cha'lu'.",
       "usageBand": "{dimension}: {typical} {unit} typical (range {low}–{high})",

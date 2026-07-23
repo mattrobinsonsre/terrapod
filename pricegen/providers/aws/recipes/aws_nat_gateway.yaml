@@ -1,6 +1,6 @@
 # NAT Gateway -> aws_nat_gateway. Two charges: the always-on gateway HOUR
 # ($0.045/hr — deterministic, the resource exists so it runs 730h) and per-GB
-# DATA processed ($0.045/GB — usage-driven, a traffic guess). Net-new vs oiq, so
+# DATA processed ($0.045/GB — usage-driven, a traffic guess), so
 # it needs paired usage entries; the data entry carries a low/typical/high band
 # (#962) so the estimate flags it as an assumption and the AI can refine it (NAT
 # data cost can dwarf the fixed hour cost, so this matters). From the large

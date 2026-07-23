@@ -290,7 +290,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         )
 
         # AI cost narrative (#871) — the optional enhancement over the
-        # deterministic oiq cost estimate. Rides this same switch.
+        # deterministic cost estimate. Rides this same switch.
         from terrapod.services.cost_summariser import handle_ai_cost_summary
 
         register_trigger_handler(

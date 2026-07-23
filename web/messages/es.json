@@ -1979,7 +1979,6 @@
       "unpricedTitle": "{count, plural, one {# recurso sin precio} other {# recursos sin precio}}",
       "unpricedHint": "Nada en los datos de precios coincidió con estos: un tipo no asignado, un recurso sin coste directo o un proveedor aún no cubierto.",
       "indicative": "Las estimaciones son orientativas; el coste real depende del uso, la región, los compromisos y los descuentos.",
-      "credit": "Datos de coste de <oiq>OpenInfraQuote</oiq>.",
       "asOfState": "según el estado v{serial}",
       "noState": "Aún sin coste — aparece tras la primera aplicación.",
       "usageBand": "{dimension}: {typical} {unit} típico (rango {low}–{high})",

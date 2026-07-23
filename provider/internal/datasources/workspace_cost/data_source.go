@@ -3,7 +3,7 @@
 // API Contract: GET /api/terrapod/v1/workspaces/{id}/cost-estimate
 // Reports the current monthly cost of a workspace's managed infrastructure,
 // computed server-side from its latest state version by the native
-// OpenInfraQuote-port engine. Data only — no AI. Useful in config for budget
+// native cost engine. Data only — no AI. Useful in config for budget
 // guardrails, reporting, or feeding a threshold into an alert.
 //
 // A workspace with no state yet returns a zeroed estimate with a null
@@ -128,7 +128,7 @@ func (d *workspaceCostDataSource) Metadata(_ context.Context, req datasource.Met
 func (d *workspaceCostDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description: "Current monthly cost of a workspace's managed infrastructure, computed " +
-			"from its latest state by the native OpenInfraQuote-port engine (data only, no AI). " +
+			"from its latest state by the native native cost engine (data only, no AI). " +
 			"Useful for budget guardrails and reporting. A workspace with no state returns a " +
 			"zeroed estimate with a null state_version.",
 		Attributes: map[string]schema.Attribute{

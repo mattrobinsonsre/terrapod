@@ -24,11 +24,11 @@ const ImpactGraph = dynamic(() => import('@/components/impact-graph').then((m) =
   ssr: false,
   loading: () => <LoadingSpinner />,
 })
-// Cost tab (#871) — loaded on demand; data-only oiq cost breakdown.
+// Cost tab (#871) — loaded on demand; data-only cost breakdown.
 const CostPanel = dynamic(() => import('@/components/cost-panel').then((m) => m.CostPanel), {
   loading: () => <LoadingSpinner />,
 })
-// AI cost estimate (#871) — the model pricing what oiq couldn't; renders beside
+// AI cost estimate (#871) — the model pricing what the deterministic engine couldn't; renders beside
 // CostPanel in the Cost tab. Its own SSE-driven refresh (cost_summary_* events).
 const CostAiSummary = dynamic(
   () => import('@/components/cost-ai-summary').then((m) => m.CostAiSummary),
@@ -1335,8 +1335,8 @@ function RunDetailPageInner() {
             view; the tab only appears when the run produced a JSON plan. */}
         {view === 'impact' && <ImpactGraph runId={runId.replace(/^run-/, '')} />}
 
-        {/* Cost tab (#871) — the deterministic oiq breakdown, with the AI cost
-            estimate (pricing what oiq couldn't) rendered beside it. The tab
+        {/* Cost tab (#871) — the deterministic breakdown, with the AI cost
+            estimate (pricing what the engine couldn't) rendered beside it. The tab
             appears when the run produced a cost estimate (has-cost-estimate);
             the AI panel self-hides when the feature is off. */}
         {view === 'cost' && (

@@ -1,12 +1,12 @@
 """Cost-estimation endpoints (#871) — Terrapod-native (`/api/terrapod/v1/`).
 
-Serves the cached OpenInfraQuote pricesheet to runners (the plan-path cost
+Serves the cached pricesheet to runners (the plan-path cost
 phase fetches it, like the binary cache) and exposes admin refresh/status. This
 is a Terrapod extension, not part of the `terraform`/`tofu` CLI surface, so it
 lives under `/api/terrapod/v1/`, never `/api/v2/`.
 
-Cost estimates are powered by OpenInfraQuote
-(https://github.com/terrateamio/openinfraquote, MPL-2.0).
+Cost estimates are computed by Terrapod's native cost engine over its own
+self-generated pricesheet (see :mod:`terrapod.services.cost`).
 """
 
 from __future__ import annotations
@@ -57,11 +57,11 @@ async def show_workspace_cost_estimate(
     """Current monthly cost of a workspace's managed infrastructure (#871).
 
     Terrapod-native. Runs the workspace's latest state version through the native
-    OpenInfraQuote-port cost engine server-side and returns the estimate — the
+    native cost engine server-side and returns the estimate — the
     *state* analogue of the run Cost tab's plan-*delta* estimate. Same
     ``currency/total/previous/diff/resources/unpriced`` shape, plus a
     ``state-version`` meta naming the priced version (null when the workspace has
-    no state yet). Every figure is **data** (`oiq`-derived); no AI is involved.
+    no state yet). Every figure is **data** (engine-derived); no AI is involved.
     Gated on ``state:read`` (the estimate derives from the state blob). 404 when
     cost estimation is disabled; 503 when no pricesheet is available.
     """
@@ -103,7 +103,7 @@ async def pricesheet_status(
         "enabled": settings.cost_estimation.enabled,
         "available": available,
         "prices_url": settings.cost_estimation.prices_url,
-        "source": "OpenInfraQuote (https://github.com/terrateamio/openinfraquote)",
+        "source": "Terrapod self-generated pricesheet (pricegen)",
     }
 
 

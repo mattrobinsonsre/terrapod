@@ -3,12 +3,12 @@
 /**
  * AI cost-estimate panel (#871) — the AI layer of the run Cost tab.
  *
- * Renders BESIDE the deterministic oiq CostPanel, never blended into it. Its
- * PRIMARY output is `estimated-resources`: the model pricing what the oiq engine
- * could NOT (the unpriced bucket — unmapped types, providers oiq doesn't cover
+ * Renders BESIDE the deterministic CostPanel, never blended into it. Its
+ * PRIMARY output is `estimated-resources`: the model pricing what the deterministic engine
+ * could NOT (the unpriced bucket — unmapped types, providers the engine doesn't cover
  * like Azure/GCP, usage-driven costs). Every figure is an ESTIMATE, stamped
  * `source: "ai-estimate"` server-side, shown distinctly and never summed into
- * the authoritative oiq total. Savings `advisories` and the prose `narrative`
+ * the authoritative deterministic total. Savings `advisories` and the prose `narrative`
  * are the secondary, human-readable bonus.
  *
  * Mirrors PlanAiSummary: fetch + status states (pending/ready/errored/skipped) +
@@ -246,7 +246,7 @@ export function CostAiSummary({ runId, refreshKey = 0 }: Props) {
 
       {attrs?.status === 'ready' && (
         <div className="flex flex-col gap-5">
-          {/* PRIMARY — estimated resources (what oiq couldn't price). */}
+          {/* PRIMARY — estimated resources (what the engine couldn't price). */}
           {estimated.length > 0 ? (
             <div>
               <div className="mb-1 flex items-center gap-2">

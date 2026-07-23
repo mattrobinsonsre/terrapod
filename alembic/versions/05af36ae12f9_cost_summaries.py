@@ -3,8 +3,8 @@
 Adds the ``cost_summaries`` table backing the optional AI *enhancement* of a
 run's cost estimate. It rides the plan-analysis AI switch (``ai_summary.enabled``
 + the per-workspace mode) and holds AI *polish* only — a plain-language
-narrative of the oiq-derived estimate plus optional savings advisories. It never
-holds, restates, or replaces the authoritative oiq figures (those stay in the
+narrative of the deterministic estimate plus optional savings advisories. It never
+holds, restates, or replaces the authoritative deterministic figures (those stay in the
 ``cost_estimate.json`` artifact + the ``runs`` cost columns); any dollar amount
 in ``advisories`` is an AI estimate tagged ``source: "ai-estimate"``.
 
@@ -20,9 +20,8 @@ Revises: 238c16839feb
 """
 
 import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
-
 from alembic import op
+from sqlalchemy.dialects import postgresql
 
 revision = "05af36ae12f9"
 down_revision = "238c16839feb"

@@ -1979,7 +1979,6 @@
       "unpricedTitle": "{count, plural, one {fiyatlandırılmamış # kaynak} other {fiyatlandırılmamış # kaynak}}",
       "unpricedHint": "Fiyatlandırma verilerinde bunlarla eşleşen bir şey yoktu — eşlenmemiş bir tür, doğrudan maliyeti olmayan bir kaynak veya henüz kapsanmayan bir sağlayıcı.",
       "indicative": "Tahminler yaklaşıktır; gerçek maliyet kullanıma, bölgeye, taahhütlere ve indirimlere bağlıdır.",
-      "credit": "Maliyet verileri <oiq>OpenInfraQuote</oiq> kaynağından.",
       "asOfState": "durum v{serial} itibarıyla",
       "noState": "Henüz maliyet yok — ilk uygulamadan sonra görünür.",
       "usageBand": "{dimension}: tipik {typical} {unit} (aralık {low}–{high})",

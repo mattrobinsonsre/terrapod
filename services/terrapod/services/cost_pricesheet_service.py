@@ -2,11 +2,11 @@
 
 Mirrors the configured pricesheet (``cost_estimation.prices_url``, a gzipped
 sheet) into object storage so the runner (plan path) and the API (state/workspace
-path) read a cached copy — no per-run egress. It defaults to Terrapod's own
-self-generated, multi-region pricesheet (#893/#1025), and also accepts an
-OpenInfraQuote-compatible CSV; the reader auto-detects the format by content, so
-this cache is format-agnostic (it stores the decompressed bytes verbatim). This
-is a **pull-through** cache, exactly like Terrapod's binary/provider caches: the
+path) read a cached copy — no per-run egress. It serves Terrapod's own
+self-generated, multi-region pricesheet (#893/#1025) — a self-describing YAML
+document — which is streamed once into a SQLite index at refresh (#1034) and
+stored for both consumers to query off disk. This is a **pull-through** cache,
+exactly like Terrapod's binary/provider caches: the
 sheet is fetched **on demand** when it's missing or stale, not on a schedule. No
 operator scheduling, no interval to tune. Air-gapped deployments pre-seed the
 cached object or point ``cost_estimation.prices_url`` at an internal mirror.
@@ -21,8 +21,8 @@ and storage streaming are kept off the event loop (rule 13) and land on the
 attached PVC, never ``/tmp`` (rule 14) — the same discipline as
 ``provider_cache_service``.
 
-The engine that reads this CSV is :mod:`terrapod.services.cost` (a native
-OpenInfraQuote-compatible port); this module only manages the cached data.
+The engine that reads this sheet is :mod:`terrapod.services.cost` (Terrapod's
+native cost engine); this module only manages the cached data.
 """
 
 from __future__ import annotations

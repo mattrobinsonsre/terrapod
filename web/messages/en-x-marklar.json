@@ -1979,7 +1979,6 @@
       "unpricedTitle": "{count, plural, one {# unpriced resource} other {# unpriced resources}}",
       "unpricedHint": "Nothing in the pricing data matched these — an unmapped type, a resource with no direct cost, or a provider not yet covered.",
       "indicative": "Estimates are indicative; actual cost depends on usage, region, commitments, and discounts.",
-      "credit": "Cost data from <oiq>OpenInfraQuote</oiq>.",
       "asOfState": "as of marklar v{serial}",
       "noState": "No marklar yet — appears after the first marklar.",
       "usageBand": "{dimension}: {typical} {unit} marklar (marklar {low}–{high})",
