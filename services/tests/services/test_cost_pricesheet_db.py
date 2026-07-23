@@ -1,8 +1,8 @@
 """SQLite pricesheet index — build + query (#1034).
 
 Covers the `yaml.parse` event-streaming build (the core of #1034 — the whole
-sheet is never materialised), the CSV build, the `(type, region)` candidate
-narrowing, and an end-to-end `estimate()` through the YAML path.
+sheet is never materialised), the `(type, region)` candidate narrowing, and an
+end-to-end `estimate()` through the YAML path.
 """
 
 from __future__ import annotations
@@ -40,13 +40,6 @@ products:
   price_type: d
 """
 
-_CSV = (
-    "service,product_family,match_set,pricing_match_set,price,price_type,ccy\n"
-    "AmazonEC2,Compute Instance,type=aws_instance&values.instance_type=m5.large,"
-    "region=us-east-1&service_class=instance&os=linux&start_usage_amount=0&end_usage_amount=Inf,"
-    "0.0960000000,t,USD\n"
-)
-
 
 def test_yaml_event_build_extracts_type_region_currency():
     idx = PricesheetIndex.build_temp(io.StringIO(_YAML))
@@ -67,14 +60,6 @@ def test_candidates_narrow_by_type_and_region():
     # s3 is only in us-east-1 → empty in another region
     assert list(idx.candidates("aws_s3_bucket", "eu-west-1")) == []
     assert len(list(idx.candidates("aws_s3_bucket", "us-east-1"))) == 1
-
-
-def test_csv_build_matches_yaml():
-    y = PricesheetIndex.build_temp(io.StringIO(_YAML))
-    c = PricesheetIndex.build_temp(io.StringIO(_CSV))
-    yp = list(y.candidates("aws_instance", "us-east-1"))
-    cp = list(c.candidates("aws_instance", "us-east-1"))
-    assert yp[0].price.value == cp[0].price.value == 0.096
 
 
 def test_estimate_end_to_end_through_yaml_event_path():

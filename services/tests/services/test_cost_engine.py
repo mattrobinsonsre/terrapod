@@ -1,12 +1,9 @@
 """Tests for the native cost-estimation engine (issue #871).
 
-The engine is a faithful Python port of OpenInfraQuote's matcher + pricer. These
-tests pin the ported behaviour with hand-verified fixtures — a tiny pricesheet +
-plan/state whose totals can be computed by hand — plus focused unit coverage of
-each primitive (match sets, the match-query language, CSV product parsing, the
-plan/state adapters, and the usage catalogue). Bit-exact agreement with the real
-``oiq`` binary is pinned separately by the differential oracle in
-``test_cost_differential.py``.
+Pin the engine's behaviour with hand-verified fixtures — a tiny pricesheet plus a
+plan/state whose totals can be computed by hand — alongside focused unit coverage
+of each primitive: match sets, the match-query language, YAML product parsing, the
+plan/state adapters, and the usage catalogue.
 """
 
 from __future__ import annotations
@@ -18,8 +15,8 @@ import pytest
 from terrapod.services.cost import estimate
 from terrapod.services.cost.match_query import MatchQuery
 from terrapod.services.cost.match_set import MatchSet
-from terrapod.services.cost.prices import EmptyMatchSet, PriceKind, product_of_row
-from terrapod.services.cost.range import Range, overlap
+from terrapod.services.cost.prices import EmptyMatchSet, PriceKind, product_from_yaml
+from terrapod.services.cost.range import Range, intersect
 from terrapod.services.cost.tf import (
     Resource,
     flatten,
@@ -34,8 +31,8 @@ from terrapod.services.cost.usage import DATA, bound_to_usage_amount, default_en
 # ---------------------------------------------------------------------------
 
 
-def test_match_set_of_string_parses_and_pct_decodes():
-    ms = MatchSet.of_string("type=aws_instance&values.name=my%20box&empty=")
+def test_match_set_parse_and_pct_decodes():
+    ms = MatchSet.parse("type=aws_instance&values.name=my%20box&empty=")
     assert ms.contains("type", "aws_instance")
     assert ms.contains("values.name", "my box")  # percent-decoded
     assert ms.contains("empty", "")
@@ -43,22 +40,22 @@ def test_match_set_of_string_parses_and_pct_decodes():
 
 
 def test_match_set_drops_empty_segments():
-    assert MatchSet.of_string("&&a=b&&") == MatchSet.of_list([("a", "b")])
+    assert MatchSet.parse("&&a=b&&") == MatchSet.from_pairs([("a", "b")])
 
 
 def test_match_set_missing_equals_raises():
     with pytest.raises(ValueError):
-        MatchSet.of_string("novalue")
+        MatchSet.parse("novalue")
 
 
 def test_match_set_subset_and_union():
-    resource = MatchSet.of_list(
+    resource = MatchSet.from_pairs(
         [("type", "aws_instance"), ("values.size", "large"), ("mode", "managed")]
     )
-    product = MatchSet.of_list([("type", "aws_instance")])
+    product = MatchSet.from_pairs([("type", "aws_instance")])
     assert product.is_subset_of(resource)
     assert not resource.is_subset_of(product)
-    u = product.union(MatchSet.of_list([("region", "us-east-1")]))
+    u = product.union(MatchSet.from_pairs([("region", "us-east-1")]))
     assert u.contains("type", "aws_instance") and u.contains("region", "us-east-1")
 
 
@@ -68,35 +65,35 @@ def test_match_set_subset_and_union():
 
 
 def _ms(*pairs: tuple[str, str]) -> MatchSet:
-    return MatchSet.of_list(list(pairs))
+    return MatchSet.from_pairs(list(pairs))
 
 
 def test_match_query_equals_and_key():
     ms = _ms(("type", "aws_instance"), ("os", "linux"))
-    assert MatchQuery.of_string("type = aws_instance").eval(ms)
-    assert not MatchQuery.of_string("type = aws_lambda_function").eval(ms)
-    assert MatchQuery.of_string("os").eval(ms)  # key existence
-    assert not MatchQuery.of_string("region").eval(ms)
+    assert MatchQuery.parse("type = aws_instance").eval(ms)
+    assert not MatchQuery.parse("type = aws_lambda_function").eval(ms)
+    assert MatchQuery.parse("os").eval(ms)  # key existence
+    assert not MatchQuery.parse("region").eval(ms)
 
 
 def test_match_query_boolean_precedence_and_parens():
     ms = _ms(("a", "1"), ("b", "2"))
     # OR < AND < NOT: `a = 1 and b = 3 or a = 1` -> (a=1 and b=3) or a=1 -> True
-    assert MatchQuery.of_string("a = 1 and b = 3 or a = 1").eval(ms)
-    assert not MatchQuery.of_string("a = 1 and b = 3").eval(ms)
-    assert MatchQuery.of_string("not b = 3").eval(ms)
-    assert MatchQuery.of_string("(a = 1 or a = 9) and b = 2").eval(ms)
-    assert not MatchQuery.of_string("not (a = 1)").eval(ms)
+    assert MatchQuery.parse("a = 1 and b = 3 or a = 1").eval(ms)
+    assert not MatchQuery.parse("a = 1 and b = 3").eval(ms)
+    assert MatchQuery.parse("not b = 3").eval(ms)
+    assert MatchQuery.parse("(a = 1 or a = 9) and b = 2").eval(ms)
+    assert not MatchQuery.parse("not (a = 1)").eval(ms)
 
 
 def test_match_query_empty_matches_everything():
-    assert MatchQuery.of_string("").eval(_ms())
-    assert MatchQuery.of_string("   ").eval(_ms(("x", "y")))
+    assert MatchQuery.parse("").eval(_ms())
+    assert MatchQuery.parse("   ").eval(_ms(("x", "y")))
 
 
 def test_match_query_real_usage_entry_with_not_and_parens():
-    # From the vendored usage.json (Lambda x86 arch entry).
-    q = MatchQuery.of_string(
+    # From the default usage catalogue (Lambda x86 arch entry).
+    q = MatchQuery.parse(
         "type = aws_lambda_function and service_class = duration "
         "and (not values.architectures or values.architectures=x86) and arch=x86"
     )
@@ -120,22 +117,35 @@ def test_match_query_real_usage_entry_with_not_and_parens():
 # ---------------------------------------------------------------------------
 
 
-def test_product_of_row_price_types():
-    base = ["AmazonEC2", "Compute", "type=aws_instance", "region=us-east-1", "0.10", "t", "USD"]
-    assert product_of_row(base).price.kind is PriceKind.PER_TIME
-    assert product_of_row([*base[:5], "o", "USD"]).price.kind is PriceKind.PER_OPERATION
-    assert product_of_row([*base[:5], "d", "USD"]).price.kind is PriceKind.PER_DATA
-    attr = product_of_row([*base[:5], "a=values.storage", "USD"])
+def _yaml_product(match="type=aws_instance", price_type="t"):
+    return {
+        "service": "AmazonEC2",
+        "family": "Compute",
+        "match": match,
+        "pricing": "region=us-east-1",
+        "price": "0.10",
+        "price_type": price_type,
+    }
+
+
+def test_product_from_yaml_price_types():
+    assert product_from_yaml(_yaml_product(price_type="t"), "USD").price.kind is PriceKind.PER_TIME
+    assert (
+        product_from_yaml(_yaml_product(price_type="o"), "USD").price.kind
+        is PriceKind.PER_OPERATION
+    )
+    assert product_from_yaml(_yaml_product(price_type="d"), "USD").price.kind is PriceKind.PER_DATA
+    attr = product_from_yaml(_yaml_product(price_type="a=values.storage"), "USD")
     assert attr.price.kind is PriceKind.ATTR and attr.price.attr == "values.storage"
 
 
-def test_product_of_row_empty_match_set_skipped():
+def test_product_from_yaml_empty_match_set_skipped():
     with pytest.raises(EmptyMatchSet):
-        product_of_row(["S", "F", "", "region=x", "0.1", "t", "USD"])
+        product_from_yaml(_yaml_product(match=""), "USD")
 
 
 def test_load_pricesheet_reads_terrapod_yaml():
-    # the format pricegen publishes (#893) — auto-detected via the schema line.
+    # the YAML format pricegen publishes (#893).
     import io
 
     from terrapod.services.cost.prices import PriceKind, load_pricesheet
@@ -163,19 +173,6 @@ def test_load_pricesheet_reads_terrapod_yaml():
     assert p.service == "AmazonEC2" and p.ccy == "USD"
     assert p.price.kind is PriceKind.PER_TIME and p.price.value == 0.096
     assert p.match_set.contains("values.instance_type", "m5.large")
-
-
-def test_load_pricesheet_still_reads_csv():
-    import io
-
-    from terrapod.services.cost.prices import load_pricesheet
-
-    sheet = (
-        "service,product_family,match_set,pricing_match_set,price,price_type,ccy\n"
-        "AmazonEC2,Compute,type=aws_instance&values.x=1,region=us-east-1,0.10,t,USD\n"
-    )
-    products = list(load_pricesheet(io.StringIO(sheet)))
-    assert len(products) == 1 and products[0].service == "AmazonEC2"
 
 
 # ---------------------------------------------------------------------------
@@ -269,7 +266,8 @@ def test_resources_from_state_v4_lifts_attributes():
 
 def test_default_usage_catalogue_loads():
     entries = default_entries()
-    # 18 vendored from OpenInfraQuote + Terrapod additions: RDS provisioned IOPS
+    # Terrapod's default usage catalogue: 18 base entries + additions — RDS
+    # provisioned IOPS
     # io1/io2 (#928) + Azure Linux VM hours (#931) + GCP Compute hours (#933) +
     # NAT gateway hours+data (#966) + Elastic IP hours (#973) + load balancer
     # hours+LCU (#977) + classic ELB hours+data (#979) + EBS snapshot storage
@@ -301,7 +299,7 @@ def test_bound_to_usage_amount_clamps_to_tier():
     entry = Entry(
         description="d",
         divisor=None,
-        match_query=MatchQuery.of_string(""),
+        match_query=MatchQuery.parse(""),
         usage=Usage.from_data_range(Range(50, 900)),
     )
     # usage 50..900 clamped into tier [0, 100]: min stays 50, max caps at the
@@ -312,7 +310,7 @@ def test_bound_to_usage_amount_clamps_to_tier():
     point = Entry(
         description="d",
         divisor=None,
-        match_query=MatchQuery.of_string(""),
+        match_query=MatchQuery.parse(""),
         usage=Usage.from_data_range(Range(900, 900)),
     )
     got = bound_to_usage_amount(DATA, Range(0, 100), point)
@@ -321,9 +319,14 @@ def test_bound_to_usage_amount_clamps_to_tier():
     assert bound_to_usage_amount(DATA, Range(2000, 3000), entry) is None
 
 
-def test_range_overlap():
-    assert overlap(Range(0, 5), Range(3, 10)) == Range(3, 5)
-    assert overlap(Range(0, 5), Range(6, 10)) is None
+def test_range_intersect():
+    assert intersect(Range(0, 5), Range(3, 10)) == Range(3, 5)
+    assert intersect(Range(0, 5), Range(6, 10)) is None
+
+
+def test_range_add_and_subtract_fold_both_bounds():
+    assert Range(1, 2) + Range(10, 20) == Range(11, 22)
+    assert Range(10, 20) - Range(1, 2) == Range(9, 18)
 
 
 # ---------------------------------------------------------------------------
@@ -335,13 +338,23 @@ def test_range_overlap():
 _EC2_ROW = (
     "AmazonEC2,Compute Instance,type=aws_instance,"
     "service_class=instance&purchase_option=on_demand&os=linux&region=us-east-1,"
-    "0.1000000000,t,USD\n"
+    "0.1000000000,t,USD"
 )
-_PRICESHEET = "service,product_family,match_set,pricing_match_set,price,price_type,ccy\n" + _EC2_ROW
+
+
+def _yaml_sheet(*rows: str) -> io.StringIO:
+    """Build a Terrapod YAML pricesheet stream from comma-delimited
+    ``service,product_family,match,pricing,price,price_type,ccy`` rows."""
+    import yaml
+
+    keys = ("service", "family", "match", "pricing", "price", "price_type")
+    products = [dict(zip(keys, row.split(","), strict=False)) for row in rows]
+    doc = {"schema": "terrapod-pricesheet/v1", "currency": "USD", "products": products}
+    return io.StringIO(yaml.safe_dump(doc, sort_keys=False))
 
 
 def _sheet() -> io.StringIO:
-    return io.StringIO(_PRICESHEET)
+    return _yaml_sheet(_EC2_ROW)
 
 
 def test_estimate_plan_add_hand_verified():
@@ -476,12 +489,11 @@ def test_provider_regions_extracts_constant_only():
 
 # Two identical EC2 products differing only by region+price. A per-plan region
 # would mis-price the other resource; per-resource region prices each correctly.
-_MULTI_REGION_SHEET = (
-    "service,product_family,match_set,pricing_match_set,price,price_type,ccy\n"
+_MULTI_REGION_ROWS = (
     "AmazonEC2,Compute,type=aws_instance,"
-    "service_class=instance&purchase_option=on_demand&os=linux&region=us-east-1,0.10,t,USD\n"
+    "service_class=instance&purchase_option=on_demand&os=linux&region=us-east-1,0.10,t,USD",
     "AmazonEC2,Compute,type=aws_instance,"
-    "service_class=instance&purchase_option=on_demand&os=linux&region=eu-west-1,0.20,t,USD\n"
+    "service_class=instance&purchase_option=on_demand&os=linux&region=eu-west-1,0.20,t,USD",
 )
 
 
@@ -492,7 +504,7 @@ def test_estimate_prices_each_resource_in_its_own_region():
             _res("aws_instance.eu", "aws_instance", "eu", {"region": "eu-west-1"}),
         ]
     )
-    est = estimate(plan, io.StringIO(_MULTI_REGION_SHEET))
+    est = estimate(plan, _yaml_sheet(*_MULTI_REGION_ROWS))
     by_addr = {r.address: r for r in est.resources}
     # us-east-1 @ $0.10/hr * 730 = $73; eu-west-1 @ $0.20/hr * 730 = $146.
     assert by_addr["aws_instance.us"].monthly_min == pytest.approx(73.0)

@@ -2,7 +2,7 @@
 
 pricegen (#893) generates the pricesheet; this asserts that rows in the shape
 pricegen actually emits **price correctly through the real consumer engine** —
-the guard that row-parity-against-oiq could not give us. It embeds a small
+the guard that row-parity checks alone could not give us. It embeds a small
 curated sheet in pricegen's exact output shape and runs synthetic plans through
 ``estimate``.
 
@@ -27,7 +27,6 @@ from terrapod.services.cost.engine import estimate
 # license_model (the #924 fix); storage is priced a=values.allocated_storage
 # and keyed only by (storage_type, multi_az) — engine-independent (#920).
 _ROWS = [
-    "service,product_family,match_set,pricing_match_set,price,price_type,ccy",
     # postgres db.t3.medium single-AZ instance — one license -> exact price.
     "AmazonRDS,Database Instance,type=aws_db_instance&values.engine=postgres&values.instance_class=db.t3.medium&values.multi_az=false,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=instance&start_usage_amount=0&end_usage_amount=Inf,0.0720000000,t,USD",
     # oracle-se2 db.t3.xlarge single-AZ — BYOL vs License-included, same key,
@@ -63,8 +62,8 @@ _ROWS = [
     "AmazonApiGateway,API Calls,type=aws_api_gateway_rest_api,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=requests&start_usage_amount=0&end_usage_amount=333000000,0.0000035000,o,USD",
     "AmazonApiGateway,API Calls,type=aws_apigatewayv2_api&values.protocol_type=HTTP,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=requests&start_usage_amount=0&end_usage_amount=300000000,0.0000010000,o,USD",
     # SQS — first request tier for a standard (fifo=false) and a FIFO queue. The
-    # CORRECT mapping: FIFO is pricier ($0.50/M) than Standard ($0.40/M); oiq has
-    # these inverted, so this row set deliberately does NOT match oiq.
+    # CORRECT AWS mapping: FIFO is pricier ($0.50/M) than Standard ($0.40/M), so
+    # these rows deliberately price FIFO above Standard.
     "AWSQueueService,API Request,type=aws_sqs_queue&values.fifo_queue=false,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=requests&start_usage_amount=0&end_usage_amount=100000000000,0.0000004000,o,USD",
     "AWSQueueService,API Request,type=aws_sqs_queue&values.fifo_queue=true,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=requests&start_usage_amount=0&end_usage_amount=100000000000,0.0000005000,o,USD",
     # Lambda — requests (arch-independent) + duration first tier, x86 and arm64.
@@ -180,7 +179,13 @@ _ROWS = [
 
 
 def _sheet() -> io.StringIO:
-    return io.StringIO("\n".join(_ROWS))
+    """The curated rows as a Terrapod YAML pricesheet stream (pricegen's format)."""
+    import yaml
+
+    keys = ("service", "family", "match", "pricing", "price", "price_type")
+    products = [dict(zip(keys, row.split(","), strict=False)) for row in _ROWS]
+    doc = {"schema": "terrapod-pricesheet/v1", "currency": "USD", "products": products}
+    return io.StringIO(yaml.safe_dump(doc, sort_keys=False))
 
 
 def _plan(resources):
@@ -438,8 +443,8 @@ def test_gcp_compute_instance_prices_with_zone_derived_region():
 
 def test_sqs_queue_fifo_is_pricier_than_standard():
     """SQS request pricing, and the correctness check: FIFO ($0.50/M) costs more
-    than Standard ($0.40/M). oiq has these inverted; we map by the real AWS
-    meaning, so this asserts the RIGHT answer, not oiq's (#893)."""
+    than Standard ($0.40/M). We map by the real AWS meaning, so this asserts the
+    correct answer (#893)."""
     plan = {
         "format_version": "1.2",
         "terraform_version": "1.9.0",

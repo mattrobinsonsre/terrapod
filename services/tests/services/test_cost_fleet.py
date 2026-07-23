@@ -14,14 +14,24 @@ import io
 from terrapod.services.cost.engine import estimate
 
 # m5.large $0.096/hr, Standard_D2s_v5 $0.096/hr, n2-standard-4 $0.194236/hr.
-_SHEET = "\n".join(
-    [
-        "service,product_family,match_set,pricing_match_set,price,price_type,ccy",
-        "AmazonEC2,Compute Instance,type=aws_instance&values.instance_type=m5.large,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=instance&os=linux&start_usage_amount=0&end_usage_amount=Inf,0.0960000000,t,USD",
-        "Virtual Machines,Virtual Machines,type=azurerm_linux_virtual_machine&values.size=Standard_D2s_v5,service_provider=azure&purchase_option=on_demand&region=eastus&service_class=instance&os=linux&start_usage_amount=0&end_usage_amount=Inf,0.096,t,USD",
-        "Compute Engine,Compute Instance,type=google_compute_instance&values.machine_type=n2-standard-4,service_provider=gcp&purchase_option=on_demand&region=us-central1&service_class=instance&start_usage_amount=0&end_usage_amount=Inf,0.1942360000,t,USD",
-    ]
-)
+_ROWS = [
+    "AmazonEC2,Compute Instance,type=aws_instance&values.instance_type=m5.large,service_provider=aws&purchase_option=on_demand&region=us-east-1&service_class=instance&os=linux&start_usage_amount=0&end_usage_amount=Inf,0.0960000000,t,USD",
+    "Virtual Machines,Virtual Machines,type=azurerm_linux_virtual_machine&values.size=Standard_D2s_v5,service_provider=azure&purchase_option=on_demand&region=eastus&service_class=instance&os=linux&start_usage_amount=0&end_usage_amount=Inf,0.096,t,USD",
+    "Compute Engine,Compute Instance,type=google_compute_instance&values.machine_type=n2-standard-4,service_provider=gcp&purchase_option=on_demand&region=us-central1&service_class=instance&start_usage_amount=0&end_usage_amount=Inf,0.1942360000,t,USD",
+]
+
+
+def _yaml_sheet(rows: list[str]) -> str:
+    """The comma-delimited rows as a Terrapod YAML pricesheet (pricegen's format)."""
+    import yaml
+
+    keys = ("service", "family", "match", "pricing", "price", "price_type")
+    products = [dict(zip(keys, row.split(","), strict=False)) for row in rows]
+    doc = {"schema": "terrapod-pricesheet/v1", "currency": "USD", "products": products}
+    return yaml.safe_dump(doc, sort_keys=False)
+
+
+_SHEET = _yaml_sheet(_ROWS)
 
 
 def _r(rtype, resname, **values):

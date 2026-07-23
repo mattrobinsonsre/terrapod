@@ -13,9 +13,16 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from terrapod.services import cost_pricesheet_service as svc
 
-_CSV = (
-    b"service,product_family,match_set,pricing_match_set,price,price_type,ccy\n"
-    b"AmazonEC2,Compute,type=aws_instance,region=us-east-1,0.10,t,USD\n"
+_YAML = (
+    b"schema: terrapod-pricesheet/v1\n"
+    b"currency: USD\n"
+    b"products:\n"
+    b"- service: AmazonEC2\n"
+    b"  family: Compute\n"
+    b"  match: type=aws_instance\n"
+    b"  pricing: region=us-east-1\n"
+    b"  price: '0.10'\n"
+    b"  price_type: t\n"
 )
 
 
@@ -83,7 +90,7 @@ def _meta(age: timedelta) -> MagicMock:
 
 async def test_refresh_downloads_builds_sqlite_index_and_stores():
     # refresh now gunzips → builds a SQLite index → stores the .sqlite (#1034).
-    gz = gzip.compress(_CSV)
+    gz = gzip.compress(_YAML)
     captured: dict = {}
     storage = _storage_capturing(captured)
 
@@ -95,7 +102,7 @@ async def test_refresh_downloads_builds_sqlite_index_and_stores():
     assert size == len(captured["data"]) > 0
     assert captured["data"][:16].startswith(b"SQLite format 3")  # real sqlite file
 
-    # the stored index is queryable and has the CSV's product
+    # the stored index is queryable and has the sheet's product
     import os
     import tempfile
 
@@ -118,11 +125,11 @@ async def test_pricesheet_available_and_download_url():
     storage = AsyncMock()
     storage.exists = AsyncMock(return_value=True)
     presigned = MagicMock()
-    presigned.url = "https://example/presigned/prices.csv"
+    presigned.url = "https://example/presigned/prices.sqlite"
     storage.presigned_get_url = AsyncMock(return_value=presigned)
 
     assert await svc.pricesheet_available(storage) is True
-    assert await svc.pricesheet_download_url(storage) == "https://example/presigned/prices.csv"
+    assert await svc.pricesheet_download_url(storage) == "https://example/presigned/prices.sqlite"
     storage.exists.assert_awaited_with("cache/cost/prices.sqlite")
 
 

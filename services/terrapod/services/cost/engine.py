@@ -1,7 +1,7 @@
-"""Top-level cost engine — port of OpenInfraQuote's ``oiq.ml`` orchestration.
+"""Top-level cost engine — the orchestration that ties the pieces together.
 
 :func:`estimate` is the one public entry point. Given ``terraform show -json``
-(plan or state, or a raw state v4 file) and an open ``prices.csv``, it:
+(plan or state, or a raw state v4 file) and a pricesheet, it:
 
 1. flattens each resource to a match set (:mod:`terrapod.services.cost.tf`),
 2. streams the pricesheet once, attaching every product whose match set is a
@@ -110,8 +110,8 @@ def estimate(
                     runner pass the cached ``.sqlite`` so the 260k-product sheet is
                     parsed once per refresh, not per request, #1034). Exactly one
                     of ``pricesheet`` / ``index`` is used.
-    ``usage_json`` — optional user usage overrides; prepended to the vendored
-                    OpenInfraQuote defaults.
+    ``usage_json`` — optional user usage overrides; prepended to the built-in
+                    default usage catalogue.
     ``default_region`` — fallback region for a resource whose region can't be
                     resolved from its attributes or provider config. Region is
                     resolved **per resource** (a plan can span regions, #871).

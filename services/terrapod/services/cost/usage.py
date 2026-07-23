@@ -1,16 +1,17 @@
-"""Usage assumptions — port of OpenInfraQuote's ``oiq_usage.ml`` (MPL-2.0).
+"""Usage assumptions — default consumption for usage-priced components.
 
 Many resources cost nothing to *declare*; their price depends on runtime usage
-(S3 GB stored, Lambda invocations, RDS IOPS). OpenInfraQuote ships default
-assumed usage as a catalogue of *entries* — each a match query plus assumed
-``time`` / ``operations`` / ``data`` amounts (as ranges, so the estimate itself
-is a range). The first entry whose query matches a product's combined match set
-supplies that product's usage.
+(S3 GB stored, Lambda invocations, RDS IOPS). Terrapod carries a catalogue of
+default assumptions as *entries* — each a match query plus assumed ``time`` /
+``operations`` / ``data`` amounts (as ranges, so the estimate itself is a range).
+The first entry whose query matches a product's combined match set supplies that
+product's usage.
 
-The default catalogue is vendored verbatim from OpenInfraQuote at
-``usage_defaults.json`` (MPL-2.0). ``time`` for compute is 730 (hours/month);
-storage/operations have their own defaults. An entry may carry a ``divisor``
-(e.g. price is "per 1,000 operations").
+The catalogue lives in ``usage_defaults.json``. ``time`` for compute is 730
+(hours/month); storage/operations have their own defaults. An entry may carry a
+``divisor`` (e.g. price is "per 1,000 operations") and — for a usage-driven
+component whose quantity is a genuine assumption — low/typical/high bands so the
+estimate can flag it and the AI layer can refine it per-resource (#962).
 """
 
 from __future__ import annotations
@@ -36,7 +37,7 @@ class Usage:
 
     @staticmethod
     def from_data_range(rng: Range[int]) -> Usage:
-        """``oiq_usage.Usage.make`` — data set, time/operations default."""
+        """Usage with only the ``data`` dimension set (time/operations zero)."""
         return Usage(time=_ZERO, operations=_ZERO, data=rng)
 
 
@@ -129,10 +130,9 @@ DATA = Accessor(
 def bound_to_usage_amount(accessor: Accessor, tier: Range[int], entry: Entry) -> Entry | None:
     """Bound an entry's usage to a pricing tier ``[tier.min, tier.max]``.
 
-    Mirrors ``oiq_usage.Entry.bound_to_usage_amount``: returns ``None`` when the
-    entry's assumed usage doesn't reach this tier, else clamps the usage to the
-    portion that falls within it (so tiered per-usage prices can each be applied
-    to their own slice). ``entry.usage`` must be set.
+    Returns ``None`` when the entry's assumed usage doesn't reach this tier, else
+    clamps the usage to the portion that falls within it (so tiered per-usage
+    prices can each be applied to their own slice). ``entry.usage`` must be set.
     """
     assert entry.usage is not None
     current = accessor.get(entry.usage)
@@ -150,7 +150,7 @@ def _entry_from_obj(obj: dict[str, Any]) -> Entry:
     return Entry(
         description=obj["description"],
         divisor=obj.get("divisor"),
-        match_query=MatchQuery.of_string(obj["match_query"]),
+        match_query=MatchQuery.parse(obj["match_query"]),
         usage=_parse_usage(obj.get("usage")),
         assumption=bool(obj.get("assumption", False)),
         bands=obj.get("bands"),
@@ -168,7 +168,7 @@ _DEFAULTS: list[Entry] | None = None
 
 
 def default_entries() -> list[Entry]:
-    """The vendored OpenInfraQuote default usage catalogue (cached)."""
+    """The built-in default usage catalogue (cached)."""
     global _DEFAULTS
     if _DEFAULTS is None:
         _DEFAULTS = _load_defaults()
@@ -182,7 +182,7 @@ def load_usage(user_entries_json: list[dict[str, Any]] | None = None) -> list[En
 
 
 def match_entry(ms: MatchSet, entries: list[Entry]) -> Entry | None:
-    """First entry whose query matches the given match set (``oiq_usage.match_``)."""
+    """First entry whose query matches the given match set."""
     for entry in entries:
         if entry.match_query.eval(ms):
             return entry
