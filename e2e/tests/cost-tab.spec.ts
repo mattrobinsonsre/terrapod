@@ -2,7 +2,7 @@
  * Cost tab (#871) — desktop guard.
  *
  * The run page's Cost tab renders the runner-produced cost estimate (a native
- * OpenInfraQuote-port estimate of the plan's monthly cost delta). The E2E stack
+ * native estimate of the plan's monthly cost delta). The E2E stack
  * has no runner pool, so a seeded run never produces a cost estimate — which is
  * exactly the gating contract this spec pins through the full BFF chain:
  *
@@ -12,11 +12,11 @@
  *     run's `has-cost-estimate` attribute).
  *
  * The rendered panel itself (headline cards, per-resource table on desktop /
- * stacked cards on mobile, unpriced bucket, OpenInfraQuote credit) is verified
+ * stacked cards on mobile, unpriced bucket) is verified
  * on the live Tilt stack, where a real run produces a cost estimate — the panel
  * is unreachable in CI without one, the same as the Impact tab.
  *
- * The AI cost estimate section (#871 — the model pricing what oiq couldn't,
+ * The AI cost estimate section (#871 — the model pricing what the engine couldn't,
  * plus savings advisories and a narrative) lives on this same tab, below the
  * deterministic panel, and self-hides (renders nothing) when no cost-summary
  * row exists (404). It is behind the SAME gate: no runner in CI means no cost

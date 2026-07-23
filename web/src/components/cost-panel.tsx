@@ -10,7 +10,7 @@
 //                       which state version it priced. Every resource is a noop,
 //                       so the per-resource Change column is dropped.
 //
-// Every figure here is DATA — oiq-derived, no AI. The AI enhancement (narrative,
+// Every figure here is DATA — engine-derived, no AI. The AI enhancement (narrative,
 // savings advisories, chat) is a separate follow-up that rides the plan-analysis
 // AI switch; it renders alongside, clearly flagged, never blended into these.
 import { Fragment, useEffect, useState } from 'react'
@@ -322,24 +322,9 @@ export function CostPanel({ runId, workspaceId }: { runId?: string; workspaceId?
         </div>
       )}
 
-      {/* Provenance + credit — cost data comes from OpenInfraQuote. */}
+      {/* Provenance — cost figures are indicative estimates. */}
       <div className="text-xs text-slate-500">
         <p>{t('cost.indicative')}</p>
-        <p className="mt-1">
-          {t.rich('cost.credit', {
-            oiq: (chunks) => (
-              <a
-                href="https://github.com/terrateamio/openinfraquote"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-brand-400 hover:underline"
-                dir="ltr"
-              >
-                {chunks}
-              </a>
-            ),
-          })}
-        </p>
       </div>
     </div>
   )

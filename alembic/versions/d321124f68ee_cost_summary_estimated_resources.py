@@ -1,10 +1,10 @@
-"""cost_summaries.estimated_resources — AI estimates for what oiq can't price (#871)
+"""cost_summaries.estimated_resources — AI estimates for what the engine can't price (#871)
 
 The cost AI's PRIMARY output: the model's own monthly estimate for resources the
-deterministic oiq engine could not price (the unpriced bucket + providers oiq
+deterministic engine could not price (the unpriced bucket + providers the engine
 doesn't cover + usage-driven dimensions it omits). Each entry is tagged
 `source: "ai-estimate"`, shown as a separate overlay, and never summed into the
-authoritative oiq total.
+authoritative deterministic total.
 
 Purely additive: a JSONB column with a `[]` server default, no backfill.
 
@@ -13,9 +13,8 @@ Revises: 05af36ae12f9
 """
 
 import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
-
 from alembic import op
+from sqlalchemy.dialects import postgresql
 
 revision = "d321124f68ee"
 down_revision = "05af36ae12f9"

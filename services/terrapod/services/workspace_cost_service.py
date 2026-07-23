@@ -1,7 +1,7 @@
 """Workspace state-cost service (#871).
 
 Prices a workspace's **current managed infrastructure** by running its latest
-Terraform state through the native OpenInfraQuote-port cost engine
+Terraform state through the native cost engine
 (:mod:`terrapod.services.cost`) — the state analogue of the runner's plan-cost
 phase (:mod:`terrapod.runner.phases.cost`), which prices a plan *delta*. This
 powers the workspace cost card (current monthly managed-infra cost).
@@ -14,8 +14,8 @@ decrypt + parse, and streaming a ~200k-row pricesheet — runs via
 ``/tmp`` (rule 14). A workspace with no state yet is a normal condition, not an
 error: it returns a zeroed estimate with ``state_version = None``.
 
-Credit: the pricing data and matcher/pricer design are OpenInfraQuote's (by
-Terrateam); Terrapod ships a native reader engine and consumes their prices.csv.
+The estimate is computed by Terrapod's native cost engine over its own
+self-generated pricesheet.
 """
 
 from __future__ import annotations

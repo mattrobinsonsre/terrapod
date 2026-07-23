@@ -1979,7 +1979,6 @@
       "unpricedTitle": "{count, plural, one {# resource zonder prijs} other {# resources zonder prijs}}",
       "unpricedHint": "Niets in de prijsgegevens kwam overeen met deze — een niet-toegewezen type, een resource zonder directe kosten of een provider die nog niet wordt ondersteund.",
       "indicative": "Ramingen zijn indicatief; de werkelijke kosten hangen af van gebruik, regio, verplichtingen en kortingen.",
-      "credit": "Kostengegevens van <oiq>OpenInfraQuote</oiq>.",
       "asOfState": "vanaf status v{serial}",
       "noState": "Nog geen kosten — verschijnt na de eerste toepassing.",
       "usageBand": "{dimension}: {typical} {unit} typisch (bereik {low}–{high})",

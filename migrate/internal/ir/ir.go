@@ -5,7 +5,7 @@
 // a source plugin (atlantis, tfe) only knows how to produce Plan and the
 // items inside it; the writer only knows how to translate Plan items
 // into Terrapod API calls. Adding a third source later (Digger,
-// Terrateam) is one new directory under internal/sources/ — no writer
+// Spacelift) is one new directory under internal/sources/ — no writer
 // changes required.
 //
 // Every item carries SourceID (an opaque string the source uses to

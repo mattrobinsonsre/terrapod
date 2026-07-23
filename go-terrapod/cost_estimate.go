@@ -61,17 +61,13 @@ type UnpricedResource struct {
 	Change  string `json:"change"`
 }
 
-// CostEstimate is the native OpenInfraQuote-port estimate of a plan's monthly
+// CostEstimate is the native cost estimate of a plan's monthly
 // cost, derived server-side from the run's stored plan JSON and served to the
 // run-page Cost tab (#871).
 //
-// Every figure here is DATA (oiq-derived) — no AI is involved. Total is the
+// Every figure here is DATA (engine-derived) — no AI is involved. Total is the
 // projected monthly spend of the planned state, Diff is the monthly delta this
 // run introduces (adds positive, removes negative), and Previous is Total-Diff.
-//
-// Credit: the pricing data + matcher/pricer design are OpenInfraQuote's (by
-// Terrateam); Terrapod ships a native reader engine and consumes their
-// prices.csv.
 type CostEstimate struct {
 	// RunID is the bare run UUID (the "run-" prefix is stripped), resolved
 	// from the `run` relationship.
@@ -130,14 +126,13 @@ type CostStateVersion struct {
 	CreatedAt string `json:"created-at"`
 }
 
-// WorkspaceCostEstimate is the native OpenInfraQuote-port estimate of a
+// WorkspaceCostEstimate is the native cost estimate of a
 // workspace's CURRENT managed infrastructure, derived server-side from its
 // latest Terraform state (#871). It is the state analogue of CostEstimate's
 // plan-delta view: Total is the current projected monthly spend, Diff is zero
 // (state carries no change), and every resource is a "noop".
 //
-// Every figure is DATA (oiq-derived) — no AI involved. Credit: pricing data +
-// matcher/pricer design are OpenInfraQuote's (by Terrateam).
+// Every figure is DATA (engine-derived) — no AI involved.
 type WorkspaceCostEstimate struct {
 	// WorkspaceID is the bare workspace UUID (the "ws-" prefix is stripped),
 	// resolved from the `workspace` relationship.
@@ -196,7 +191,7 @@ func (c *Client) GetWorkspaceCostEstimate(ctx context.Context, workspaceID strin
 // CostAdvisory is one AI-suggested savings opportunity attached to a run's cost
 // narrative (#871). It is AI *polish*, never an authoritative figure:
 // MonthlySaving is the model's ESTIMATE and Source is always "ai-estimate"
-// (stamped server-side); render it distinctly from the oiq cost figures and
+// (stamped server-side); render it distinctly from the deterministic cost figures and
 // never treat it as a computed total.
 type CostAdvisory struct {
 	Kind          string     `json:"kind"` // savings_plan|reserved|spot|rightsizing|other
@@ -207,9 +202,9 @@ type CostAdvisory struct {
 }
 
 // CostEstimatedResource is an AI monthly estimate for a resource the
-// deterministic oiq engine could NOT price (#871) — the PRIMARY output of the
+// deterministic engine could NOT price (#871) — the PRIMARY output of the
 // cost AI. Monthly is always an ESTIMATE (Source == "ai-estimate"), shown as a
-// separate overlay and never summed into the authoritative oiq total; Basis is
+// separate overlay and never summed into the authoritative deterministic total; Basis is
 // the model's one-line justification/assumption.
 type CostEstimatedResource struct {
 	Address string    `json:"address"`
@@ -220,8 +215,8 @@ type CostEstimatedResource struct {
 }
 
 // CostSummary is the optional AI *enhancement* of a run's cost estimate (#871).
-// Its PRIMARY value is EstimatedResources — the model pricing what oiq couldn't
-// (the unpriced set + providers oiq doesn't cover + usage-driven costs). The
+// Its PRIMARY value is EstimatedResources — the model pricing what the engine couldn't
+// (the unpriced set + providers the engine doesn't cover + usage-driven costs). The
 // narrative + advisories are the secondary, human-readable bonus. Everything
 // here is AI estimate/polish — the authoritative figures live on CostEstimate
 // (GetRunCostEstimate) and are never restated.

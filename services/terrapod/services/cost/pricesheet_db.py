@@ -14,15 +14,15 @@ Neither ever holds the whole sheet:
   ``yaml.parse`` — the low-level **event** parser, which emits scalars/mapping
   markers incrementally and never materialises the document — and inserts rows.
   Peak memory is one product + the parser buffer (~23 MB for the full sheet),
-  regardless of sheet size. The CSV path streams row-by-row as before.
+  regardless of sheet size.
 * **Query** (per estimate): :class:`PricesheetIndex` narrows 260k products to the
   handful sharing a resource's ``type`` + resolved ``region`` (plus region-
   agnostic rows) *before* the existing subset-match runs — bounded memory, and
   a few milliseconds per plan.
 
-A raw ``prices_url`` (CSV mirror, small YAML) still works: :meth:`build_temp`
-builds a **file-backed** index from any stream into a temp file (auto-cleaned),
-so the engine has one code path and never holds the DB in memory.
+A small ``prices_url`` mirror still works the same way: :meth:`build_temp` builds
+a **file-backed** index from any stream into a temp file (auto-cleaned), so the
+engine has one code path and never holds the DB in memory.
 """
 
 from __future__ import annotations
@@ -36,7 +36,6 @@ from typing import IO
 
 from terrapod.services.cost.match_set import MatchSet
 from terrapod.services.cost.prices import (
-    _YAML_SCHEMA_PREFIX,
     EmptyMatchSet,
     Product,
     _parse_price_type,
@@ -67,17 +66,6 @@ def _record(
         price_type,
         ccy,
     )
-
-
-def _stream_csv_records(fp: IO[str]) -> Iterator[_Record]:
-    """Yield records from a CSV sheet (the header line already consumed)."""
-    import csv
-
-    for row in csv.reader(fp):
-        if len(row) != 7 or row[2] == "":  # skip blanks + empty-match rows
-            continue
-        service, family, match, pricing, price, price_type, ccy = row
-        yield _record(service, family, match, pricing, price, price_type, ccy)
 
 
 def _stream_yaml_records(first: str, fp: IO[str]) -> Iterator[_Record]:
@@ -156,16 +144,13 @@ def _stream_yaml_records(first: str, fp: IO[str]) -> Iterator[_Record]:
 
 
 def stream_records(fp: IO[str]) -> Iterator[_Record]:
-    """Stream ``(type, region, …)`` records from a sheet, bounded memory.
+    """Stream ``(type, region, …)`` records from a Terrapod YAML pricesheet.
 
-    Auto-detects Terrapod YAML (``schema: terrapod-pricesheet/vN`` first line,
-    parsed as events) vs CSV (streamed row-by-row).
+    Parses the ``schema: terrapod-pricesheet/vN`` document as a ``yaml.parse``
+    event stream — bounded memory, the document is never materialised.
     """
     first = fp.readline()
-    if first.lstrip().startswith("schema:") and _YAML_SCHEMA_PREFIX in first:
-        yield from _stream_yaml_records(first, fp)
-    else:
-        yield from _stream_csv_records(fp)
+    yield from _stream_yaml_records(first, fp)
 
 
 _SCHEMA = (
@@ -221,7 +206,7 @@ class PricesheetIndex:
     @classmethod
     def build_temp(cls, fp: IO[str], dir: str | None = None) -> PricesheetIndex:
         """Build a **file-backed** index from a raw stream into a temp file, for
-        tests and small CSV/YAML mirrors (the API/runner use a pre-built cached
+        tests and small YAML mirrors (the API/runner use a pre-built cached
         file via :meth:`open`). Streamed build (bounded memory); the temp file is
         deleted on :meth:`close`. Never an in-memory DB — the index is always a
         real file so the query stays paged off disk.
@@ -251,8 +236,8 @@ class PricesheetIndex:
                 yield Product(
                     service=service,
                     product_family=family,
-                    match_set=MatchSet.of_string(match),
-                    pricing_match_set=MatchSet.of_string(pricing),
+                    match_set=MatchSet.parse(match),
+                    pricing_match_set=MatchSet.parse(pricing),
                     price=_parse_price_type(price_type, float(price)),
                     ccy=ccy,
                 )

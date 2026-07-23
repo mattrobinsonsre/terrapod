@@ -118,8 +118,8 @@ FAILURE_ANALYSIS_TOOL: dict = {
 
 # --- Cost summary (#871) -----------------------------------------------------
 # The AI *enhancement* of a run's cost estimate: a plain-language narrative of
-# the (authoritative, oiq-derived) figures + optional savings advisories. HARD
-# provenance: the model is told never to restate/override the oiq total, and
+# the (authoritative, engine-derived) figures + optional savings advisories. HARD
+# provenance: the model is told never to restate/override the deterministic total, and
 # every advisory dollar amount is an AI ESTIMATE (the API stamps
 # `source: "ai-estimate"` on each advisory server-side; the schema does not let
 # the model claim otherwise).
@@ -660,7 +660,7 @@ def render_prompt(
 # --- Cost summary prompt (#871) ---------------------------------------------
 COST_SUMMARY_SKILL_PROMPT = """\
 You are a senior cloud FinOps engineer. A deterministic pricing engine \
-(OpenInfraQuote) has ALREADY priced the resources it has data for; those \
+has ALREADY priced the resources it has data for; those \
 figures are authoritative and shown to the user separately. Some resources it \
 could NOT price — they are listed under UNPRICED (unmapped types, or \
 providers/regions its pricesheet doesn't cover, e.g. Azure/GCP).
@@ -700,7 +700,7 @@ def render_cost_prompt(
 ) -> tuple[str, str]:
     """Render the (system, user) messages for the cost-summary request.
 
-    ``estimate_json`` is the authoritative oiq cost estimate (the
+    ``estimate_json`` is the authoritative deterministic cost estimate (the
     ``cost_estimate.json`` artifact body). ``plan_json`` is optional extra
     context (the structured plan) — pass "" to omit it. The output contract is
     the ``submit_cost_summary`` tool; provenance guardrails live in the skill

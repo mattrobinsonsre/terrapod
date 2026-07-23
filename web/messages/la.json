@@ -1979,7 +1979,6 @@
       "unpricedTitle": "{count, plural, one {# fons pretio non taxatus} other {# fontes pretio non taxati}}",
       "unpricedHint": "Nihil in datis pretiorum his congruebat — genus non designatum, fons sine impensa directa, vel provisor nondum comprehensus.",
       "indicative": "Aestimationes indicativae sunt; impensa vera ab usu, regione, obligationibus et deductionibus pendet.",
-      "credit": "Data impensae ex <oiq>OpenInfraQuote</oiq>.",
       "asOfState": "secundum statum v{serial}",
       "noState": "Nullus sumptus adhuc — post primam applicationem apparet.",
       "usageBand": "{dimension}: {typical} {unit} usitate (ambitus {low}–{high})",

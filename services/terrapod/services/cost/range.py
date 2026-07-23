@@ -1,33 +1,42 @@
-"""Numeric ranges — port of OpenInfraQuote's ``oiq_range.ml`` (MPL-2.0).
+"""Bounded numeric intervals used throughout cost estimation.
 
-A ``Range`` is a ``(min, max)`` pair. Cost estimates are ranges because usage
-assumptions (and, when unfiltered, the cheapest-vs-dearest matching product)
-give a lower and upper bound rather than a single number.
+Every figure the engine produces is an interval, not a single number: usage
+assumptions give a low/high band, and where a resource matches several products
+(cheapest vs dearest) the quote spans both. :class:`Range` carries that
+``(min, max)`` pair and supports ordinary ``+`` / ``-`` so totals and deltas fold
+naturally; :func:`intersect` returns the overlapping sub-interval (or ``None``).
 """
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
 class Range[T: (int, float)]:
+    """A closed ``[min, max]`` interval of numbers.
+
+    Addition and subtraction act on both bounds independently, so a sum of
+    intervals is the interval of sums and a difference is the interval of
+    differences — exactly how monthly totals and plan deltas combine.
+    """
+
     min: T
     max: T
 
+    def __add__(self, other: Range[T]) -> Range[T]:
+        return Range(self.min + other.min, self.max + other.max)
 
-def append[T: (int, float)](f: Callable[[T, T], T], t1: Range[T], t2: Range[T]) -> Range[T]:
-    """Combine two ranges component-wise (e.g. ``append(add, a, b)`` sums them)."""
-    return Range(min=f(t1.min, t2.min), max=f(t1.max, t2.max))
+    def __sub__(self, other: Range[T]) -> Range[T]:
+        return Range(self.min - other.min, self.max - other.max)
 
 
-def overlap[T: (int, float)](t1: Range[T], t2: Range[T]) -> Range[T] | None:
-    """Intersection of two ranges, or ``None`` if they don't overlap.
+def intersect[T: (int, float)](a: Range[T], b: Range[T]) -> Range[T] | None:
+    """The overlapping sub-interval of ``a`` and ``b``, or ``None`` if disjoint.
 
-    Mirrors ``oiq_range.overlap``: no overlap when ``t1.max < t2.min`` or
-    ``t2.max < t1.min``; otherwise ``(max(mins), min(maxes))``.
+    They are disjoint when one ends before the other begins; otherwise the
+    overlap runs from the larger lower bound to the smaller upper bound.
     """
-    if t1.max < t2.min or t2.max < t1.min:
+    if a.max < b.min or b.max < a.min:
         return None
-    return Range(min=max(t1.min, t2.min), max=min(t1.max, t2.max))
+    return Range(min=max(a.min, b.min), max=min(a.max, b.max))

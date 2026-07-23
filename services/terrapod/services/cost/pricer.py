@@ -1,15 +1,14 @@
-"""Pricer — port of OpenInfraQuote's ``oiq_pricer.ml`` price path (MPL-2.0).
+"""Pricer — turn matched (resource, products) into a monthly cost range.
 
-Given resources matched to products, this computes each resource's monthly cost
-range: group a resource's products by their default-usage entry, bound usage to
-any per-usage / provision tiers, quote each product as
+Given resources already matched to products, this computes each resource's
+monthly cost range: group a resource's products by their default-usage entry,
+bound usage to any per-usage / provision tiers, quote each product as
 ``usage_bound / divisor * unit_price``, and take the cheapest and dearest quote
 as the resource's ``(min, max)``. Removed resources are negated; the run-level
 ``diff`` sums adds+removes; ``prev = total - diff``.
 
-Only the numeric pricing is here — matching (resource ↔ product) is done in
-:mod:`terrapod.services.cost.engine`. The optional ``--match-query`` product
-filter of the upstream CLI is not needed by Terrapod and is omitted.
+Only the numeric pricing lives here — matching (resource ↔ product) is done in
+:mod:`terrapod.services.cost.engine`.
 """
 
 from __future__ import annotations
@@ -20,7 +19,7 @@ from dataclasses import dataclass, field, replace
 from terrapod.services.cost import usage as usage_mod
 from terrapod.services.cost.match_set import MatchSet
 from terrapod.services.cost.prices import PriceKind, Product
-from terrapod.services.cost.range import Range, append, overlap
+from terrapod.services.cost.range import Range, intersect
 from terrapod.services.cost.tf import Change, Resource
 from terrapod.services.cost.usage import Entry, Usage
 
@@ -71,7 +70,7 @@ class PriceResult:
     currency: str
 
 
-# --- the four transform steps (mirror oiq_pricer) ---------------------------
+# --- the transform steps of the price chain ---------------------------------
 
 
 def _synthesize_usage_from_attr(
@@ -106,7 +105,7 @@ def _apply_provision_amount(entry: Entry, products: list[Product]) -> tuple[Entr
         if spa is not None and epa is not None:
             provision = Range(_int_of_usage(spa[1]), _int_of_usage(epa[1]))
             priced_by = _priced_by_range(product, entry.usage)
-            if overlap(provision, priced_by) is not None:
+            if intersect(provision, priced_by) is not None:
                 kept.append(product)
         elif spa is None and epa is None:
             kept.append(product)
@@ -309,7 +308,7 @@ def _quote_group(
 def _sum_price(priced_products: list[PricedProduct]) -> Range[float]:
     summed = Range(0.0, 0.0)
     for pp in priced_products:
-        summed = append(lambda a, b: a + b, summed, pp.price)
+        summed = summed + pp.price
     return summed
 
 
@@ -396,9 +395,9 @@ def _count_factor(entry: Entry, resource_ms: MatchSet) -> float:
 def _region_matches(product: Product, region: str | None) -> bool:
     """Keep region-agnostic products and region-specific products in ``region``.
 
-    OpenInfraQuote's ``--region`` filters globally; we instead filter each
-    resource's products to *its own* resolved region (#871), because a plan can
-    span regions (AWS provider v6 puts ``region`` on every resource; Azure/GCP
+    Rather than a single global region filter, each resource's products are
+    filtered to *its own* resolved region (#871), because a plan can span
+    regions (AWS provider v6 puts ``region`` on every resource; Azure/GCP
     have per-resource ``location``/``region``). Products with no ``region`` in
     their pricing match set are global (e.g. Route53) and always kept.
     """
@@ -480,7 +479,7 @@ def price(
             sign = -1.0 if change == "remove" else 1.0
             summed = Range(0.0, 0.0)
             for pp in priced_products:
-                summed = append(lambda a, b: a + b, summed, pp.price)
+                summed = summed + pp.price
             resource_price = Range(sign * summed.min, sign * summed.max)
             # Collect the usage assumptions that fed this resource's cost (one per
             # dimension) — the usage-driven entries that matched its products.
@@ -517,12 +516,12 @@ def price(
 
     total = Range(0.0, 0.0)
     for pr in priced_resources:
-        total = append(lambda a, b: a + b, total, pr.price)
+        total = total + pr.price
     diff = Range(0.0, 0.0)
     for pr in priced_resources:
         if pr.change in ("add", "remove"):
-            diff = append(lambda a, b: a + b, diff, pr.price)
-    prev = append(lambda a, b: a - b, total, diff)
+            diff = diff + pr.price
+    prev = total - diff
 
     result = PriceResult(
         total=total, diff=diff, prev=prev, resources=priced_resources, currency=currency

@@ -942,7 +942,7 @@ Returns the AI-generated plan summary (or failure analysis on errored plans) whe
 
 All five payloads carry `{run_id, workspace_id}` at minimum. The UI re-fetches the summary on any of them. For VCS-driven runs, the per-workspace PR/MR status comment is edited in place to include the summary content when it lands.
 
-The **AI cost estimate** (#871 — the optional AI layer over the data-only cost estimate, riding this same `ai_summary.enabled` switch + per-workspace mode) emits its own lifecycle events on the same per-workspace channel: `cost_summary_pending`, `cost_summary_ready`, `cost_summary_errored`, `cost_summary_skipped` (workspace opted out / daily budget hit / no estimate), and `cost_summary_message_posted` (a cost-chat follow-up turn landed — carries `message_id`; refetch the transcript). Each carries `{run_id, workspace_id}`. Its primary output is estimates for resources the pricesheet couldn't price; the authoritative figures stay on the data-only cost-estimate endpoint, and every AI dollar amount is tagged `source: "ai-estimate"`, never summed into the oiq total.
+The **AI cost estimate** (#871 — the optional AI layer over the data-only cost estimate, riding this same `ai_summary.enabled` switch + per-workspace mode) emits its own lifecycle events on the same per-workspace channel: `cost_summary_pending`, `cost_summary_ready`, `cost_summary_errored`, `cost_summary_skipped` (workspace opted out / daily budget hit / no estimate), and `cost_summary_message_posted` (a cost-chat follow-up turn landed — carries `message_id`; refetch the transcript). Each carries `{run_id, workspace_id}`. Its primary output is estimates for resources the pricesheet couldn't price; the authoritative figures stay on the data-only cost-estimate endpoint, and every AI dollar amount is tagged `source: "ai-estimate"`, never summed into the deterministic total.
 
 ### Regenerate Plan Summary
 
@@ -3323,9 +3323,9 @@ The raw D2 query results + the import-only verdict (JSON object; non-JSON or non
 
 ## Cost Estimation
 
-Terrapod estimates the monthly cost of Terraform/OpenTofu-managed infrastructure using a **native, pure-Python reader engine that is compatible with — and consumes the published pricesheet of — [OpenInfraQuote](https://github.com/terrateamio/openinfraquote) (oiq, by Terrateam, MPL-2.0)**. Terrapod ships **no binary and shells out to nothing**; it downloads oiq's `prices.csv` and matches plan/state resources against it. The pricing data and matcher/pricer design are OpenInfraQuote's; Terrapod credits them wherever cost is shown.
+Terrapod estimates the monthly cost of Terraform/OpenTofu-managed infrastructure using a **native, pure-Python engine over its own self-generated pricesheet** — produced by `pricegen` from official cloud vendor pricing data and published weekly to a rolling GitHub Release. Terrapod ships **no binary and shells out to nothing**; it downloads the gzipped pricesheet and matches plan/state resources against it in-process.
 
-Every figure returned here is **data** (oiq-derived) — no AI is involved. (An optional AI *enhancement* — narrative + savings advisories — is a separate surface that rides the plan-analysis AI switch and is always flagged distinctly; it never blends into these authoritative numbers.)
+Every figure returned here is **data** (engine-derived) — no AI is involved. (An optional AI *enhancement* — narrative + savings advisories — is a separate surface that rides the plan-analysis AI switch and is always flagged distinctly; it never blends into these authoritative numbers.)
 
 Cost estimation is **on by default** (Helm: `api.config.cost_estimation.enabled`, default `true`); when disabled the endpoints below return `404`. The pricesheet is a **pull-through cache** (mirrored into object storage on demand, no schedule) — air-gapped deployments pre-seed the cached object or point `cost_estimation.prices_url` at an internal mirror. `cost_estimation.default_region` is only the fallback for a resource whose region can't be resolved from its own attributes or provider config (region is resolved **per resource**).
 
@@ -3418,7 +3418,7 @@ The download endpoint is pull-through: a cold or stale cache is fetched from `co
 
 ### AI cost estimate (summary + advisories + chat)
 
-The optional AI layer over the data-only estimate (rides `ai_summary.enabled` + the per-workspace mode). Its **primary** output is estimates for the resources the pricesheet couldn't price; secondary are savings advisories and a short narrative. Every dollar figure is tagged `source: "ai-estimate"`, shown separately from the authoritative oiq total and never summed into it.
+The optional AI layer over the data-only estimate (rides `ai_summary.enabled` + the per-workspace mode). Its **primary** output is estimates for the resources the pricesheet couldn't price; secondary are savings advisories and a short narrative. Every dollar figure is tagged `source: "ai-estimate"`, shown separately from the authoritative deterministic total and never summed into it.
 
 ```
 GET  /api/terrapod/v1/runs/{run_id}/cost-summary[?locale=<code>]

@@ -44,7 +44,7 @@ def plan_json_output_key(workspace_id: str, run_id: str) -> str:
 def cost_estimate_key(workspace_id: str, run_id: str) -> str:
     """Key for a run's cost estimate (`cost_estimate.json`, #871).
 
-    The native OpenInfraQuote-port estimate of the plan's monthly cost delta,
+    The native cost estimate of the plan's monthly cost delta,
     produced by the runner from the plan JSON and uploaded as a run artifact —
     the cost analogue of `plan_json_output_key`.
     """
@@ -148,15 +148,6 @@ def binary_cache_sums_key(tool: str, version: str) -> str:
 def binary_cache_sums_sig_key(tool: str, version: str) -> str:
     """Key for the cached detached GPG signature over the SHA256SUMS manifest."""
     return f"cache/binaries/{tool}/{version}/SHA256SUMS.sig"
-
-
-def cost_pricesheet_key() -> str:
-    """Key for the cached OpenInfraQuote pricesheet (decompressed CSV, #871).
-
-    Mirrored from the configured `cost_estimation.prices_url` into object storage
-    so runners and the API read a cached copy with no per-run egress.
-    """
-    return "cache/cost/prices.csv"
 
 
 def cost_pricesheet_db_key() -> str:

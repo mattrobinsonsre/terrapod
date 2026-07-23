@@ -1,15 +1,12 @@
 # pricegen — self-generated cloud pricing data (#893)
 
 Terrapod's cost engine ([`services/terrapod/services/cost/`](../services/terrapod/services/cost/))
-is a native, MPL-2.0 reimplementation of [OpenInfraQuote](https://github.com/terrateamio/openinfraquote)'s
-(oiq, by Terrateam) matcher + pricer. We ship no binary and shell out to nothing
-— but until now we **consumed oiq's published `prices.csv`** (`cost_estimation.prices_url`)
-verbatim. That is an undocumented data dependency on a free feed with no stated
-terms, SLA, or coverage guarantee, and it inherits oiq's coverage (AWS only).
+prices Terraform/OpenTofu resources against a pricesheet — a native, pure-Python
+matcher/pricer that ships no binary and shells out to nothing.
 
-`pricegen` removes that dependency: it **generates the price sheet ourselves,
-directly from the official cloud pricing APIs**, and opens the door to Azure/GCP
-(which oiq doesn't cover).
+`pricegen` **produces that pricesheet ourselves, directly from the official cloud
+pricing APIs**, so Terrapod depends on no third-party hosted feed — and it covers
+AWS, Azure, and GCP.
 
 ## Hard constraint
 
@@ -29,7 +26,7 @@ Adding a cloud = an adapter + recipes; the engine never changes.
 pricegen/
   models.py              # Unit(family, attrs, prices[])  — the normalized shape
   engine.py              # recipes × Units → rows   (regex-capable, tier-aware)
-  generate.py            # CLI: pick provider, run engine, (AWS) row-parity vs oiq
+  generate.py            # CLI: pick provider, run engine, inspect a recipe's rows
   providers/
     aws/   { adapter.py, defaults.yaml, recipes/*.yaml }
     azure/ { adapter.py, defaults.yaml, recipes/*.yaml }   # VM proven
@@ -60,22 +57,16 @@ pricegen/
   live in a small, stable per-resource `tier_bounds` table — exactly the
   "exceptions layered on the pattern" model.
 
-## Go/no-go findings (AWS Phase 0 — validated)
+## Coverage & accuracy
 
-Row-parity against oiq's own `prices.csv` (order-independent) for `us-east-1`:
+- **`aws_instance`: 1362 rows** for `us-east-1`, carrying the newest instance
+  families at current rates.
+- **`aws_ebs_volume` (composite: storage + IOPS)** prices every tier, including
+  io2's storage + base-IOPS tier.
 
-- **`aws_instance`: 1362 rows byte-match oiq.** Every divergence is explained —
-  we carry the *newest* instance families oiq's snapshot lacks (**more current**),
-  and where a shared row differs, **oiq's price is stale** (e.g. h1 @ oiq's $4.40
-  vs the current $3.744).
-- **`aws_ebs_volume` (composite: storage + IOPS): reproduces 10/10 of oiq's rows.**
-  Our two extra rows are io2's storage + base-IOPS tier, which **oiq omits
-  entirely** — we're also **more complete**.
-
-Bottom line: **prices/rates are 100% in the AWS API; the mapping is thin recipes;
-a small, stable exceptions layer covers the tier facts the API doesn't structure.**
-Mirroring AWS ourselves is low-risk, and the result is *more* accurate than the
-feed we depend on today. Azure is a direct map + regex extraction; GCP is
+Bottom line: **prices/rates come straight from the official cloud APIs; the
+mapping is thin recipes; a small, stable exceptions layer covers the tier facts
+the API doesn't structure.** Azure is a direct map + regex extraction; GCP is
 **computed** (an instance = Σ vCPU-core + RAM-GB skus × a machine-type catalog)
 and needs a free read-only API key.
 
@@ -105,11 +96,11 @@ curl -s "https://pricing.us-east-1.amazonaws.com$(curl -s \
   | python3 -c "import sys,json;print(json.load(sys.stdin)['regions']['us-east-1']['currentVersionUrl'])")" \
   -o pricegen/.cache/ec2-us-east-1.json
 
-# generate + row-parity-check against oiq (from the repo root)
+# generate + inspect one recipe's rows + drift diagnostics (from the repo root)
 python3 -m pricegen.generate --provider aws --recipe aws_instance \
-  --offer pricegen/.cache/ec2-us-east-1.json --compare-oiq us-east-1
+  --offer pricegen/.cache/ec2-us-east-1.json
 
-# write a sheet (CSV interim; gzipped YAML is the published format)
+# write a sheet (CSV for dev inspection; gzipped YAML is the published format)
 python3 -m pricegen.generate --provider aws --recipe aws_ebs_volume \
   --offer pricegen/.cache/ec2-us-east-1.json --out /tmp/ebs.csv
 ```
@@ -153,11 +144,11 @@ python3 -m pricegen.merge --sheets 'partial-*.prices.yaml.gz' \
 With **no** flags, `fetch_offers`/`publish` process every recipe across the
 `regions:` set in `recipes.yaml` (a curated set so a local single-runner pass
 stays quick) in one go — the local-dev default. The standalone `generate` CLI
-above still runs one offer at a time (for row-parity diffing).
+above still runs one offer at a time (for inspection).
 
 ## Output + publishing
 
-CSV is interim — only to row-parity-diff against oiq. The **published** format is
+CSV is a dev-inspection format. The **published** format is
 gzipped, normalized YAML (`prices.yaml.gz`), produced by a scheduled CI generator
 and pushed to a **rolling GitHub Release** (asset clobbered each run) — the same
 GitHub-hosted, no-extra-infra story as the container images and Helm chart.
@@ -177,7 +168,7 @@ operators mirror it as today. Weekly regeneration is the target cadence.
 - [x] AWS breadth: `aws_sqs_queue`, `aws_lambda_function`, `aws_s3_bucket`, `aws_dynamodb_table`, `aws_nat_gateway`, `aws_eip`, `aws_lb` (ALB+NLB), `aws_elb`, `aws_ebs_snapshot`, `aws_efs_file_system`, `aws_kms_key` ($1 flat), `aws_secretsmanager_secret` ($0.40 flat), `aws_sns_topic` (publishes band), `aws_kinesis_stream` (shards × count), `aws_elasticache_cluster` (nodes × count), `aws_api_gateway_rest_api` + `aws_apigatewayv2_api` (tiered request bands) (deterministic + usage-driven, with low/typical/high cost bands)
 - [x] Count-multiply engine feature (a component's cost × a resource attribute) + `aws_elasticache_cluster` (per-node × num_cache_nodes, by node_type + engine)
 - [x] Multi-region (#1025): the published sheet covers **every** region, generated by a CI **fan-out** — one shard per AWS region (discovered live from the EC2 region index) + AWS-global + Azure (all regions, one pass) + GCP (native all-region), each emitting a partial sheet that `pricegen.merge` combines. Generate/consumer are unchanged: each row carries its region (AWS `regionCode`, Azure `armRegionName`, GCP `serviceRegions`) and the consumer resolves region per-resource (#871). `pricegen.shard` keeps `fetch_offers`+`publish` selecting the same slice. Sharding is what keeps each runner flat (the AmazonEC2 offer is ≈458 MB per region)
-- [ ] More AWS breadth (CloudWatch, Redshift, MSK, OpenSearch) + a row-parity CI gate across regions
+- [ ] More AWS breadth (CloudWatch, Redshift, MSK, OpenSearch) + an end-to-end pricing CI gate across regions
 - [x] Cloud SQL (`google_sql_database_instance`): db-custom-N-M COMPUTED (vCPU + RAM parsed from the tier) + storage (Zonal PostgreSQL/MySQL)
 - [x] Azure `azurerm_postgresql_flexible_server` (COMPUTED per vCore, tier derived from sku_name via resource_derivations)
 - [ ] Azure `azurerm_mssql_database` (same pattern); Regional-HA + predefined Cloud SQL tiers

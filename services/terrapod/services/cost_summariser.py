@@ -1,15 +1,15 @@
 """AI *enhancement* of a run's cost estimate (#871).
 
-This is the optional AI layer over the deterministic, oiq-derived cost estimate.
+This is the optional AI layer over the deterministic, engine-derived cost estimate.
 It rides the SAME switch as the plan summary (``ai_summary.enabled`` + the
 per-workspace mode) and reuses the plan summariser's model plumbing — the
 LiteLLM tool-calling call (:func:`summariser._call_model`), the shared daily
 token budget, and the per-workspace run-events SSE channel.
 
-**Its PRIMARY job is to price what oiq can't (#871 reframe).** The deterministic
+**Its PRIMARY job is to price what the engine can't (#871 reframe).** The deterministic
 engine prices what its pricesheet covers; this service uses the model's own cost
-knowledge to ESTIMATE the resources oiq could NOT price — the ``unpriced`` bucket
-(unmapped types, and providers oiq doesn't cover, e.g. Azure/GCP) plus obviously
+knowledge to ESTIMATE the resources the engine could NOT price — the ``unpriced`` bucket
+(unmapped types, and providers the engine doesn't cover, e.g. Azure/GCP) plus obviously
 usage-driven costs it omits. Those estimates are the ``estimated_resources``
 primary output. A human-readable ``narrative`` + savings ``advisories`` are the
 secondary bonus.
@@ -17,7 +17,7 @@ secondary bonus.
 **Provenance is a hard invariant.** Every figure this service stores — each
 estimated resource and each advisory — is tagged ``source: "ai-estimate"``
 **server-side here**, regardless of what the model returns. It is shown as a
-separate overlay, NEVER summed into or substituted for the authoritative oiq
+separate overlay, NEVER summed into or substituted for the authoritative deterministic
 total (which stays on the data-only ``/runs/{id}/cost-estimate`` endpoint), and
 is never a gate.
 
@@ -125,7 +125,7 @@ async def _upsert_cost_summary(
 def _normalise_estimated_resources(raw: object) -> list[dict]:
     """Coerce the model's per-resource estimates into the stored shape.
 
-    The PRIMARY output (#871): AI estimates for resources oiq couldn't price.
+    The PRIMARY output (#871): AI estimates for resources the engine couldn't price.
     Each becomes ``{address, type, monthly: {min, max}, basis, source:
     "ai-estimate"}``. ``source`` is forced here — the model can never claim a
     computed figure. Entries missing a numeric range or an address are dropped.
@@ -288,7 +288,7 @@ async def handle_ai_cost_summary(payload: dict) -> None:
 
         # A non-dict tool result is the only genuine failure — the model
         # returned something unusable. Empty estimates/advisories/narrative are
-        # ALL legitimate "ready" states (oiq priced everything; nothing for the
+        # ALL legitimate "ready" states (the engine priced everything; nothing for the
         # AI to add), so we don't error on them.
         if not isinstance(args, dict):
             await _upsert_cost_summary(
@@ -330,7 +330,7 @@ async def handle_ai_cost_summary(payload: dict) -> None:
 _COST_CHAT_SYSTEM = (
     "You are a FinOps assistant answering follow-up questions about a single "
     "Terraform/OpenTofu plan's cost estimate. You are given: (1) the "
-    "deterministic cost estimate (from OpenInfraQuote pricing data — these "
+    "deterministic cost estimate (from Terrapod pricing data — these "
     "figures are computed and authoritative), and (2) the AI-estimated figures "
     "for resources the pricing data could not cover (these are ESTIMATES, not "
     "computed). Answer concisely in {language}, grounded ONLY in the materials "
@@ -353,7 +353,7 @@ def _render_cost_chat_context(estimate_json: str, summary: CostSummary) -> str:
         "narrative": summary.narrative,
     }
     return (
-        "DETERMINISTIC_COST_ESTIMATE (OpenInfraQuote — computed, authoritative):\n"
+        "DETERMINISTIC_COST_ESTIMATE (computed, authoritative):\n"
         f"{estimate_json}\n\n"
         "AI_ESTIMATES (source: ai-estimate — NOT computed):\n"
         f"{json.dumps(ai, ensure_ascii=False)}"

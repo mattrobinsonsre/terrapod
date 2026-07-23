@@ -37,7 +37,7 @@ otherwise click through in the web UI or call over the API, expressed as HCL:
 `terrapod_user`, `terrapod_vcs_connection`, `terrapod_catalog_instances`.
 
 `terrapod_workspace_cost` reports a workspace's current monthly managed-infra
-cost (from its latest state, via the native OpenInfraQuote-port engine) — useful
+cost (from its latest state, via the native cost engine) — useful
 for budget guardrails and reporting. Example:
 
 ```hcl

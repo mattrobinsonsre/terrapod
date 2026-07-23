@@ -1,4 +1,4 @@
-"""Terraform plan/state adapter — port of OpenInfraQuote's ``oiq_tf.ml`` (MPL-2.0).
+"""Terraform plan/state adapter.
 
 Turns ``terraform show -json`` output — of a **plan** or of **state** — into a
 flat list of ``(resource, change)`` pairs, where each resource is flattened
@@ -73,11 +73,12 @@ def _derive(rtype: str, pairs: list[tuple[str, str]]) -> list[tuple[str, str]]:
 Change = Literal["noop", "add", "remove"]
 
 
-def _ocaml_string_of_float(f: float) -> str:
-    """Match OCaml ``string_of_float`` (``1.0`` → ``"1."``, ``2.5`` → ``"2.5"``).
+def _float_key(f: float) -> str:
+    """Stringify a float for use as a match-set value (``1.0`` → ``"1."``,
+    ``2.5`` → ``"2.5"``).
 
-    Terraform rarely uses float-valued *match* attributes, but staying faithful
-    keeps the differential test against ``oiq`` exact.
+    Float-valued *match* attributes are rare in Terraform; the trailing-dot form
+    keeps a whole-number float reading as a float in the key, stably.
     """
     s = f"{f:.12g}"
     if "." not in s and "e" not in s and "E" not in s and "n" not in s:
@@ -88,10 +89,9 @@ def _ocaml_string_of_float(f: float) -> str:
 def flatten(value: Any, prefix: str = "") -> list[tuple[str, str]]:
     """Flatten a JSON value into ``(dotted_key, string_value)`` pairs.
 
-    Mirrors ``oiq_tf.Resource.flatten``: dicts recurse with ``prefix.key``;
-    **lists reuse the same prefix for every item** (no index), so list-valued
-    attributes collapse into the set; scalars stringify (bool → ``true``/
-    ``false``, null → ``null``).
+    Dicts recurse with ``prefix.key``; **lists reuse the same prefix for every
+    item** (no index), so list-valued attributes collapse into the set; scalars
+    stringify (bool → ``true``/``false``, null → ``null``).
     """
     out: list[tuple[str, str]] = []
     if isinstance(value, dict):
@@ -106,7 +106,7 @@ def flatten(value: Any, prefix: str = "") -> list[tuple[str, str]]:
     elif isinstance(value, int):
         out.append((prefix, str(value)))
     elif isinstance(value, float):
-        out.append((prefix, _ocaml_string_of_float(value)))
+        out.append((prefix, _float_key(value)))
     elif value is None:
         out.append((prefix, "null"))
     elif isinstance(value, str):
@@ -125,7 +125,7 @@ class Resource:
 
     def to_match_set(self) -> MatchSet:
         pairs = flatten(self.data)
-        return MatchSet.of_list(pairs + _derive(self.type, pairs))
+        return MatchSet.from_pairs(pairs + _derive(self.type, pairs))
 
 
 def _resource_of_obj(obj: dict[str, Any]) -> Resource:
@@ -170,7 +170,7 @@ def resources_from_plan(json: dict[str, Any]) -> list[tuple[Resource, Change]]:
     planned_addrs = set(planned_by_addr)
 
     out: list[tuple[Resource, Change]] = []
-    # noop: present in both — take the prior object (mirrors CCSet.inter s1 s2).
+    # noop: present in both — take the prior object as the baseline.
     for addr in prior_addrs & planned_addrs:
         out.append((prior_by_addr[addr], "noop"))
     for addr in planned_addrs - prior_addrs:

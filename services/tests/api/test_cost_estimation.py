@@ -100,7 +100,7 @@ class TestAdminSurfaces:
         assert resp.status_code == 200
         body = resp.json()
         assert body["enabled"] is True and body["available"] is True
-        assert "OpenInfraQuote" in body["source"]
+        assert "Terrapod" in body["source"]
 
     async def test_status_non_admin_forbidden(self, *mocks):
         app = _make_app(_user(roles=["everyone"]))

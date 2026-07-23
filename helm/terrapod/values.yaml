@@ -364,10 +364,9 @@ api:
     # egress). On by default (first-class feature); because the cache is
     # pull-through, nothing is fetched until a cost surface is used. This is an
     # API-side setting — the API instructs runners per-run whether to estimate
-    # (falling back to yes). Defaults to Terrapod's self-generated, multi-region
-    # pricesheet (#893/#1025); the reader also accepts an OpenInfraQuote-compatible
-    # CSV (MPL-2.0). Air-gapped: pre-seed the cached object or point prices_url at
-    # an internal mirror.
+    # (falling back to yes). Serves Terrapod's self-generated, multi-region
+    # pricesheet (#893/#1025). Air-gapped: pre-seed the cached object or point
+    # prices_url at an internal mirror.
     cost_estimation:
       enabled: true
       prices_url: "https://github.com/mattrobinsonsre/terrapod/releases/download/pricesheet/prices.yaml.gz"

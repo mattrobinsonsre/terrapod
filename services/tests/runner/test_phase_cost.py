@@ -16,11 +16,18 @@ from terrapod.runner.download import DownloadResult
 from terrapod.runner.phases import cost
 from terrapod.runner.runner_config import RunnerConfig
 
-# One on-demand Linux EC2 instance in us-east-1 @ $0.10/hr × 730h = $73/mo.
+# One on-demand Linux EC2 instance in us-east-1 @ $0.10/hr × 730h = $73/mo,
+# in the Terrapod YAML pricesheet shape pricegen emits.
 _SHEET = (
-    "service,product_family,match_set,pricing_match_set,price,price_type,ccy\n"
-    "AmazonEC2,Compute,type=aws_instance,"
-    "service_class=instance&purchase_option=on_demand&os=linux&region=us-east-1,0.10,t,USD\n"
+    "schema: terrapod-pricesheet/v1\n"
+    "currency: USD\n"
+    "products:\n"
+    "- service: AmazonEC2\n"
+    "  family: Compute\n"
+    "  match: type=aws_instance\n"
+    "  pricing: service_class=instance&purchase_option=on_demand&os=linux&region=us-east-1\n"
+    "  price: '0.10'\n"
+    "  price_type: t\n"
 )
 
 _PLAN = {

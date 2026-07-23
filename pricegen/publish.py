@@ -6,10 +6,9 @@ artifacts:
 
 * ``prices.yaml.gz`` — the combined pricesheet in Terrapod's own **YAML** schema
   (``schema: terrapod-pricesheet/v1``), gzipped. This is what a Terrapod instance
-  consumes (via ``cost_estimation.prices_url``), replacing the dependency on
-  OpenInfraQuote's hosted CSV. YAML (not CSV) because it is self-describing,
-  versioned, and extensible; gzip because the row set, while far smaller and more
-  targeted than a 200k-row flat CSV, still compresses well.
+  consumes (via ``cost_estimation.prices_url``), so it depends on no third-party
+  hosted feed. YAML because it is self-describing, versioned, and extensible;
+  gzip because the row set, while targeted, still compresses well.
 * ``manifest.json`` — the aggregated per-recipe **drift diagnostics** (row
   counts, price ranges, and the unmapped-value signal). The scheduled publish
   workflow diffs this against the last published manifest to detect that a cloud

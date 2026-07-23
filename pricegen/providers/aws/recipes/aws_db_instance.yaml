@@ -1,5 +1,5 @@
 # RDS -> aws_db_instance. Composite: the DB instance (hourly) + its storage
-# (per-GB). The oiq `engine` value combines AWS's databaseEngine + databaseEdition
+# (per-GB). The `engine` value combines AWS's databaseEngine + databaseEdition
 # (SQL Server + Enterprise -> sqlserver-ee), so `match.engine` uses a composite
 # `from` map. `multi_az` comes from deploymentOption. On-demand only for now;
 # Reserved (the bulk of RDS) is a separate follow-on.
@@ -19,7 +19,7 @@ _engine: &engine
     "Oracle|Enterprise": oracle-ee
     "Oracle|Standard Two": oracle-se2
     # Aurora is deliberately NOT here: in Terraform it's aws_rds_cluster_instance,
-    # not aws_db_instance (oiq conflates them). It gets its own recipe.
+    # not aws_db_instance (they are distinct). It gets its own recipe.
 _multi_az: &multi_az
   attr: deploymentOption
   map: { Single-AZ: "false", Multi-AZ: "true" }
@@ -34,7 +34,7 @@ components:
   # rows; under the consumer's SUBSET matching that means postgres/mysql (one
   # license) price to a single value, while SQL Server / Oracle (License-included
   # vs BYOL, different prices, same key) price to a min..max RANGE — the honest
-  # answer when the plan doesn't pin the license. (oiq's "ambiguous duplicate"
+  # answer when the plan doesn't pin the license. (These "ambiguous duplicate"
   # rows are the same thing; under subset matching a range is correct, not a bug,
   # which is why the earlier attempt to disambiguate via license_model was wrong.)
   - product_family: "^Database Instance$"
@@ -58,12 +58,12 @@ components:
   # $0.115, io1/io2 $0.125, magnetic $0.10) — the engine tag is cosmetic. Since
   # the consumer matches by SUBSET, we omit `engine` entirely: one row per
   # (storage_type, multi_az) correctly prices every engine, and dedup collapses
-  # the redundant per-engine SKUs. (oiq instead expands one price into 17
-  # engine-keyed rows — same result, more noise.) `volumeType` -> the Terraform
+  # the redundant per-engine SKUs. (Expanding one price into 17 engine-keyed
+  # rows would give the same result with more noise.) `volumeType` -> the Terraform
   # `storage_type`; unmapped types (the Aurora variants) resolve to None and are
   # skipped, keeping Aurora out of aws_db_instance. Priced with `a=` (read the
-  # real `allocated_storage` attr) rather than oiq's `d` (which falls back to a
-  # 1-GB usage default because tf-flattening never feeds allocated_storage into
+  # real `allocated_storage` attr) rather than a `d` price type (which falls back
+  # to a 1-GB usage default because tf-flattening never feeds allocated_storage into
   # usage.data) — same choice as aws_ebs_volume's `a=values.size`, and accurate.
   - product_family: "^Database Storage$"
     service_class: storage

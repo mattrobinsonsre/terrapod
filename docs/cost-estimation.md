@@ -2,7 +2,7 @@
 
 Terrapod estimates the **monthly cost** of the infrastructure a workspace manages, both as a per-plan *delta* on every run and as the *current* total on a workspace. The numbers are data — no AI, no guesswork — so you can read the price of a change before you apply it and see what a workspace is costing you today.
 
-Cost estimation is powered by a **native, pure-Python reader engine** whose matcher/pricer design is compatible with [OpenInfraQuote](https://github.com/terrateamio/openinfraquote) (oiq, by Terrateam, MPL-2.0) — Terrapod credits them for the format and the algorithm, and the engine still reads an oiq-compatible CSV. By default, though, it consumes **Terrapod's own self-generated, multi-region pricesheet** (#893/#1025), published weekly to a rolling GitHub Release — so Terrapod depends on no third-party hosted feed. Terrapod ships **no binary and shells out to nothing**: it fetches the gzipped sheet, decompresses it, and matches plan/state resources against it in-process (the reader auto-detects the sheet format).
+Cost estimation is powered by a **native, pure-Python engine** that matches each resource against **Terrapod's own self-generated, multi-region pricesheet** (#893/#1025) — produced by `pricegen` from official cloud vendor pricing data and published weekly to a rolling GitHub Release, so Terrapod depends on no third-party hosted feed. Terrapod ships **no binary and shells out to nothing**: it fetches the gzipped sheet, streams it once into a compact index, and matches plan/state resources against it in-process.
 
 ---
 
@@ -30,7 +30,7 @@ api:
 
 - **Region is resolved per resource** — from the resource's own attributes (`region`/`location`), then its provider config, and only then the `default_region` fallback.
 - The pricesheet is a **pull-through cache**: it is mirrored into object storage on first use (no schedule, no extra Helm wiring), and a stale copy is served if a refresh fails so a transient upstream outage never breaks a run.
-- **Air-gapped / restricted-network** deployments pre-seed the cached object or point `cost_estimation.prices_url` at an internal mirror of the pricesheet (the self-generated `prices.yaml.gz`, or an oiq-compatible `prices.csv.gz` — the reader accepts either).
+- **Air-gapped / restricted-network** deployments pre-seed the cached object or point `cost_estimation.prices_url` at an internal mirror of the self-generated pricesheet (`prices.yaml.gz`).
 
 ## How it works
 
@@ -104,5 +104,5 @@ The authoritative figures always live on the data-only cost-estimate endpoint an
 - [API Reference → Cost Estimation](api-reference.md#cost-estimation) — full endpoint shapes.
 - [AI Plan Summary](ai-plan-summary.md) — the switch the optional cost AI rides.
 - [MCP](mcp.md) — the `terrapod_run_cost` / `terrapod_workspace_cost` agent tools.
-- [OpenInfraQuote](https://github.com/terrateamio/openinfraquote) — the pricesheet and matcher design Terrapod's engine is compatible with.
+- [pricegen](../pricegen/README.md) — how Terrapod self-generates the pricesheet.
 - Original feature request: <https://github.com/mattrobinsonsre/terrapod/issues/871>

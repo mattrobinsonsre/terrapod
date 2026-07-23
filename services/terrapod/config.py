@@ -749,21 +749,21 @@ class CatalogConfig(BaseModel):
 
 
 class CostEstimationConfig(BaseModel):
-    """Cost estimation via a cached OpenInfraQuote pricesheet (#871).
+    """Cost estimation via a cached pricesheet (#871).
 
-    Terrapod estimates monthly cost by matching plan/state resources against
-    OpenInfraQuote's published ``prices.csv`` (https://github.com/terrateamio/openinfraquote,
-    MPL-2.0). The gzipped sheet is mirrored into object storage on a schedule so
-    runners (plan path) and the API (state/workspace path) read a cached copy —
-    no per-run egress. Air-gapped deployments pre-seed the cached object or point
-    ``prices_url`` at an internal mirror; the refresh is best-effort and never
-    required at request time.
+    Terrapod estimates monthly cost by matching plan/state resources against its
+    own self-generated pricesheet (produced by ``pricegen`` from cloud vendor
+    pricing data and published weekly to a rolling GitHub Release). The gzipped
+    sheet is mirrored into object storage on a schedule so runners (plan path)
+    and the API (state/workspace path) read a cached copy — no per-run egress.
+    Air-gapped deployments pre-seed the cached object or point ``prices_url`` at
+    an internal mirror; the refresh is best-effort and never required at request
+    time.
 
     On by default — it's a first-class feature. Because the cache is
     pull-through, enabling it costs nothing until a cost surface is actually
     used (no startup egress); set ``enabled: false`` to turn the feature off
-    entirely. The pricing data and engine design are OpenInfraQuote's; Terrapod
-    credits them wherever cost is shown.
+    entirely.
     """
 
     enabled: bool = Field(default=True)
@@ -774,7 +774,7 @@ class CostEstimationConfig(BaseModel):
             "multi-region pricesheet published weekly to a rolling GitHub Release "
             "(#893). Fetched on demand (pull-through) when the cached copy is "
             "missing or stale — no schedule. The reader auto-detects the format "
-            "(Terrapod YAML or an OpenInfraQuote-compatible CSV), so an internal "
+            "(the self-generated `prices.yaml.gz`), so an internal "
             "mirror of either shape works for air-gapped deployments."
         ),
     )

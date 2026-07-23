@@ -6,7 +6,7 @@
  *  1. The workspace Cost tab renders the current managed-infra cost from the
  *     latest state. A freshly-created workspace has NO state, so the endpoint
  *     returns a zeroed estimate with `state-version: null` WITHOUT needing the
- *     external OpenInfraQuote pricesheet — a deterministic empty state ("No cost
+ *     the pricesheet — a deterministic empty state ("No cost
  *     yet…"). The priced table (per-resource names + costs) is verified on the
  *     live Tilt stack, where a real state exists and the pricesheet is cached.
  *

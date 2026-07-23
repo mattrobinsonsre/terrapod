@@ -5,7 +5,7 @@ estimates the plan's monthly cost *delta* natively (no third-party binary,
 matching the "orchestrate, don't reimplement — but where we do, do it in pure
 Python" stance):
 
-  1. fetch the cached OpenInfraQuote pricesheet (``prices.csv``) from the API's
+  1. fetch the cached pricesheet index from the API's
      pull-through cache endpoint (302 → presigned storage URL), and
   2. run the native cost engine (:mod:`terrapod.services.cost`) over the plan
      JSON, resolving each resource's region independently, and
@@ -20,8 +20,7 @@ default yes) — the runner never self-configures cost. ``cost_default_region``
 is only the fallback for a resource whose region can't be resolved from its own
 attributes or provider config.
 
-Credit: the pricing data and the matcher/pricer design are OpenInfraQuote's
-(by Terrateam); see :mod:`terrapod.services.cost`.
+See :mod:`terrapod.services.cost` for the engine that computes the estimate.
 """
 
 from __future__ import annotations
