@@ -132,6 +132,7 @@ Everything below is implemented and shipped today.
 |---|---|
 | Label-based RBAC | Roles with granular `resource:verb` capabilities (e.g. `run:plan` without `run:apply`); read/plan/write/admin levels remain as authoring shorthand |
 | Policy-as-code (OPA) | Rego enforcement on plan JSON — the open-source equivalent of Sentinel. Advisory or mandatory sets, label-scoped to workspaces, evaluated on the runner, with admin override |
+| IaC security scanning | Checkov/Trivy misconfiguration scanning of the plan JSON with maintained rule catalogues — per-workspace `off`/`advisory`/`enforced`, severity threshold, skip rules; enforced holds the run at the gate on a failed finding, with admin override |
 | SSO (OIDC / SAML) | Pluggable identity providers (Auth0, Okta, Azure AD, any standards-compliant IdP) |
 | Audit logging | Immutable event log with configurable retention |
 | Cloud credentials | Zero static keys — dynamic credentials via K8s workload identity (AWS IRSA, GCP WIF, Azure WI); passwordless DB and Redis IAM auth |
@@ -386,6 +387,7 @@ See [docs/authentication.md](docs/authentication.md) for setup guides.
 | [VCS Integration](docs/vcs-integration.md) | GitHub and GitLab setup, polling, webhooks |
 | [VCS Workflows](docs/vcs-workflows.md) | PR/MR comment commands, speculative plans, apply-on-merge |
 | [Policies (OPA)](docs/policies.md) | Rego policy authoring, advisory vs mandatory enforcement, label-based scoping, admin override |
+| [Security Scanning](docs/security-scanning.md) | Checkov/Trivy IaC scanning on the plan JSON, advisory vs enforced, severity threshold, skip rules, admin override |
 | [Autodiscovery](docs/autodiscovery.md) | Atlantis-style monorepo workspace autodiscovery |
 | [Drift Detection](docs/drift-detection.md) | Scheduled plan-only runs to detect infrastructure drift |
 | [Drift Ignore Rules](docs/drift-ignore-rules.md) | Suppress known/expected drift by resource address or attribute |

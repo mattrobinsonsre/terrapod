@@ -45,6 +45,7 @@ Beyond broad TFE compatibility, Terrapod is built with three deliberate design f
 | **Run Tasks** | Pre/post-plan webhook hooks for external validation |
 | **Execution Hooks** | **Custom execution steps** — admin-managed shell run in the runner Job at five run-lifecycle points, associated with workspaces (`pre_init` is the setup/tooling/auth slot; custom runner images cover heavier needs) |
 | **Policy-as-Code** | OPA/Rego policy sets evaluated on every run; advisory or mandatory enforcement, label-scoped |
+| **IaC Security Scanning** | Checkov/Trivy misconfiguration scanning of the plan JSON; per-workspace advisory or enforced, severity threshold, skip rules |
 | **Drift Detection** | Scheduled plan-only runs to detect out-of-band infrastructure changes |
 | **Workspace Health** | Per-workspace health conditions with status indicators on workspace list |
 | **Cloud Credentials** | Dynamic provider credentials via Kubernetes workload identity (AWS IRSA, GCP WIF, Azure WI) |
@@ -146,6 +147,7 @@ See [Architecture](architecture.md) for the full breakdown.
 | [Run Tasks](run-tasks.md) | Pre/post-plan webhook hooks for external validation |
 | [Execution Hooks](execution-hooks.md) | Custom shell steps in the runner Job at five lifecycle points |
 | [Policy-as-Code](policies.md) | OPA/Rego policy sets, advisory/mandatory enforcement, label scoping |
+| [Security Scanning](security-scanning.md) | Checkov/Trivy IaC scanning, advisory/enforced, severity threshold, skip rules, admin override |
 | [Audit Logging](audit-logging.md) | Immutable event log, query API, retention |
 | [Artifact Retention](artifact-retention.md) | Automated cleanup of old state versions, run logs, cache entries |
 | [Runners](runners.md) | Custom runner images, private registries, Job configuration |

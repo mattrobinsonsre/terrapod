@@ -111,4 +111,19 @@ func registerAct(s *mcp.Server, c *terrapod.Client) {
 		}
 		return nil, run, nil
 	})
+
+	// ── terrapod_run_security_scan_override ──────────────────────────
+	mcp.AddTool(s, &mcp.Tool{
+		Name:        "terrapod_run_security_scan_override",
+		Description: "Override a run's blocking IaC security scan so it can proceed despite failed/errored findings. Requires workspace admin. A run held in planning by an enforced scan is re-driven immediately. Use deliberately — this bypasses a security gate; prefer fixing the finding or adding a skip rule.",
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in runIDIn) (*mcp.CallToolResult, *terrapod.SecurityScan, error) {
+		if in.RunID == "" {
+			return errText("run_id is required"), nil, nil
+		}
+		sc, err := c.OverrideRunSecurityScan(ctx, in.RunID)
+		if err != nil {
+			return errResult(err), nil, nil
+		}
+		return nil, sc, nil
+	})
 }

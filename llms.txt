@@ -64,6 +64,7 @@ Build/lint/test all run in Docker via `make` (`make test`, `make lint`, `make de
 - [Drift Detection](docs/drift-detection.md) and [Drift Ignore Rules](docs/drift-ignore-rules.md): scheduled plan-only drift checks with a per-workspace noise allowlist.
 - [Run Triggers](docs/run-triggers.md): cross-workspace dependency chains.
 - [Policy-as-Code (OPA)](docs/policies.md): **Open Policy Agent / Rego** policy sets — the open-source equivalent of TFE's Sentinel — evaluated on the runner against the plan JSON, with advisory/mandatory enforcement, label-scoped to workspaces, and admin-override on mandatory blocks.
+- [IaC Security Scanning (Checkov/Trivy)](docs/security-scanning.md): deterministic misconfiguration scanning of the plan JSON with maintained rule catalogues — per-workspace enforcement (`off`/`advisory`/`enforced`), severity threshold, skip rules. `advisory` records-but-never-blocks; `enforced` holds the run at the gate on a failed/errored scan until fixed or admin-overridden. Enable via `security_scan_enforcement` on the workspace.
 - [Run Tasks](docs/run-tasks.md): pre/post-plan external webhook validation hooks.
 - [Execution Hooks](docs/execution-hooks.md): Terrapod's **custom execution steps** — admin-managed custom shell run in the runner Job at five run-lifecycle points (pre_init/pre_plan/post_plan/pre_apply/post_apply), as reusable workspace-associated library entries with priority ordering, fail-the-run semantics, audit logging, and a kill-switch. `pre_init` is the pre-`init` setup slot (install tooling, authenticate, fetch certs); heavier customization uses a custom runner image.
 - [Notifications](docs/notifications.md): webhook (HMAC), Slack Block Kit, email on run events.
@@ -108,6 +109,7 @@ How each capability is turned on. **Platform-level** features are Helm values un
 | State resource graph | Always on — the workspace **State Graph** tab; current state version by default with an older-version picker; requires `state:read`; no config | [state-resource-graph.md](docs/state-resource-graph.md) |
 | Execution hooks | Admin defines hooks + associates workspaces via API/UI/provider; runner Helm kill-switch `runners.hooksEnabled` (default true) gates delivery | [execution-hooks.md](docs/execution-hooks.md) |
 | Policy-as-code | Create a policy set, attach to workspaces by label | [policies.md](docs/policies.md) |
+| IaC security scanning (Checkov/Trivy) | Set `security_scan_enforcement` on the workspace (`off`/`advisory`/`enforced`) + optional engine/threshold/skip-rules; no platform-wide flag | [security-scanning.md](docs/security-scanning.md) |
 | Autodiscovery | Per-VCS-connection rules (glob patterns + workspace template) | [autodiscovery.md](docs/autodiscovery.md) |
 | Run triggers | Link source→destination workspaces | [run-triggers.md](docs/run-triggers.md) |
 | Agent execution | Create an agent pool + a join token, deploy a runner listener | [runners.md](docs/runners.md) |

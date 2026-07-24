@@ -842,6 +842,21 @@ Deriving the graph on the server (rather than shipping the raw, possibly multi-M
 
 **Required permission:** `read` on the workspace. Returns **404** when the run produced no JSON plan output.
 
+### Security Scan (#1036)
+
+The deterministic Checkov/Trivy IaC security-scan result for a run — the structural twin of the OPA policy endpoints. See [security-scanning.md](security-scanning.md) for the feature guide; the per-workspace config attributes (`security-scan-*`) are documented in the workspace attributes table above.
+
+```
+GET  /api/terrapod/v1/runs/{run_id}/security-scan                     # read the result (workspace read)
+POST /api/terrapod/v1/runs/{run_id}/actions/override-security-scan    # override a blocking scan (workspace admin)
+```
+
+**GET** returns `{"data": <resource>|null, "meta": {"summary": {...}}}`. `data` is `null` when the workspace has scanning off or the run wasn't scanned. The resource `attributes` are: `engine`, `enforcement-level`, `severity-threshold`, `outcome` (`passed`/`failed`/`errored`), `findings` (list of `{engine, rule_id, severity, title, resource, file, line, guideline}`), `summary` (`{total, blocking, by_severity, …}`), `error`, `overridden-by`, `overridden-at`, `created-at`. `meta.summary` carries a compact `{status, outcome, engine, total, blocking}` for the badge (`status` = `blocked` | `advisory-failed` | `passed`). Requires `read` on the workspace.
+
+**POST override** marks a failed/errored result overridden and, when the run is still held in `planning` by an enforced scan, re-drives it immediately (mirrors the policy override). Requires **admin** on the workspace; audit-logged. Prefer fixing the finding or adding a skip rule.
+
+The runner protocol (runner-token, run_id-scoped) — `GET .../security-scan-config` and `POST .../security-scan-results` — is internal to the runner and mirrors the OPA `policy-bundle`/`policy-results` pair; the enforcement level and severity threshold are re-resolved **server-side from the workspace** on results POST, never trusted from the runner body.
+
 ### Estate Graph
 
 ```

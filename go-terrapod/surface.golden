@@ -583,6 +583,26 @@ field RunTrigger.WorkspaceID string `json:"workspace-id"`
 field RunTrigger.WorkspaceName string `json:"workspace-name"`
 field SearchWorkspacesResult.Matched int `json:"matched"`
 field SearchWorkspacesResult.Workspaces []WorkspaceSummary `json:"workspaces"`
+field SecurityScan.CreatedAt string `json:"created-at,omitempty"`
+field SecurityScan.EnforcementLevel string `json:"enforcement-level"`
+field SecurityScan.Engine string `json:"engine"`
+field SecurityScan.Error string `json:"error,omitempty"`
+field SecurityScan.Findings []SecurityScanFinding `json:"findings,omitempty"`
+field SecurityScan.ID string `json:"id"`
+field SecurityScan.Outcome string `json:"outcome"`
+field SecurityScan.OverriddenAt string `json:"overridden-at,omitempty"`
+field SecurityScan.OverriddenBy string `json:"overridden-by,omitempty"`
+field SecurityScan.RunID string `json:"-"`
+field SecurityScan.SeverityThreshold string `json:"severity-threshold"`
+field SecurityScan.Summary map[string]any `json:"summary,omitempty"`
+field SecurityScanFinding.Engine string `json:"engine"`
+field SecurityScanFinding.File string `json:"file"`
+field SecurityScanFinding.Guideline string `json:"guideline"`
+field SecurityScanFinding.Line int `json:"line"`
+field SecurityScanFinding.Resource string `json:"resource"`
+field SecurityScanFinding.RuleID string `json:"rule_id"`
+field SecurityScanFinding.Severity string `json:"severity"`
+field SecurityScanFinding.Title string `json:"title"`
 field StateEdge.Kind string `json:"kind"`
 field StateEdge.Source string `json:"source"`
 field StateEdge.Target string `json:"target"`
@@ -1003,6 +1023,7 @@ method (*Client) GetRunCostEstimate(ctx context.Context, runID string) (*CostEst
 method (*Client) GetRunCostSummary(ctx context.Context, runID string) (*CostSummary, error)
 method (*Client) GetRunImpactGraph(ctx context.Context, runID string) (*ImpactGraph, error)
 method (*Client) GetRunPlanJSON(ctx context.Context, runID string) ([]byte, error)
+method (*Client) GetRunSecurityScan(ctx context.Context, runID string) (*SecurityScan, error)
 method (*Client) GetRunTask(ctx context.Context, id string) (*RunTask, error)
 method (*Client) GetRunTrigger(ctx context.Context, id string) (*RunTrigger, error)
 method (*Client) GetStateGraph(ctx context.Context, workspaceID, stateVersionID string) (*StateGraph, error)
@@ -1058,6 +1079,7 @@ method (*Client) ListVarsetVariables(ctx context.Context, varsetID string) ([]Va
 method (*Client) ListWorkspaceRuns(ctx context.Context, workspaceID string, pageNumber, pageSize int) ([]Run, error)
 method (*Client) ListWorkspaces(ctx context.Context, opts WorkspaceListOptions) (*WorkspaceList, error)
 method (*Client) OrphanCatalogInstance(ctx context.Context, wsID string) error
+method (*Client) OverrideRunSecurityScan(ctx context.Context, runID string) (*SecurityScan, error)
 method (*Client) Patch(ctx context.Context, path string, payload []byte) ([]byte, error)
 method (*Client) Post(ctx context.Context, path string, payload []byte) ([]byte, error)
 method (*Client) PostPlanSummaryMessage(ctx context.Context, runID, content string) (*PlanSummaryMessage, error)
@@ -1203,6 +1225,8 @@ type RunStatusTimestamps struct
 type RunTask struct
 type RunTrigger struct
 type SearchWorkspacesResult struct
+type SecurityScan struct
+type SecurityScanFinding struct
 type StateEdge struct
 type StateGraph struct
 type StateGraphMeta struct
