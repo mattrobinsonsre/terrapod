@@ -397,6 +397,39 @@ class Workspace(Base):
         JSONB, nullable=False, server_default="[]", default=list
     )
 
+    # Security scanning (#1036) — a deterministic Checkov/Trivy IaC-misconfig
+    # scan stage on the plan JSON, per-run results in SecurityScanResult.
+    #   off       — the scan is skipped
+    #   advisory  — scan runs and findings surface, but NEVER block or wait;
+    #               the run applies as soon as the plan completes (findings land
+    #               moments later via the same plan Job's interim-POST pattern)
+    #   enforced  — the run WAITS for the scan and findings ≥ threshold BLOCK
+    #               apply (admin-override-able), exactly like a mandatory OPA
+    #               policy
+    # Default is `advisory` (valuable + non-blocking → on by default, like cost
+    # estimation; the scanners ship prebuilt checks so there's no authoring
+    # barrier). A workspace may opt out with `off`; there is no platform-wide
+    # Helm switch — enablement is purely per-workspace.
+    security_scan_enforcement: Mapped[str] = mapped_column(
+        String(20), nullable=False, server_default="advisory", default="advisory"
+    )
+    # Which engine(s) run: checkov | trivy | both (union of findings, deduped).
+    security_scan_engine: Mapped[str] = mapped_column(
+        String(20), nullable=False, server_default="checkov", default="checkov"
+    )
+    # Minimum severity that BLOCKS under `enforced`: critical > high > medium >
+    # low. A finding whose severity is unknown (e.g. Checkov OSS reports none)
+    # fails closed — it counts as blocking, so an enforced gate can't be evaded
+    # by an unclassified finding.
+    security_scan_severity_threshold: Mapped[str] = mapped_column(
+        String(20), nullable=False, server_default="high", default="high"
+    )
+    # Rule ids to skip (Checkov check ids like CKV_AWS_24 / Trivy AVD ids) —
+    # silence false-positives or rules irrelevant to this workspace.
+    security_scan_skip_rules: Mapped[list[str]] = mapped_column(
+        JSONB, nullable=False, server_default="[]", default=list
+    )
+
     # State divergence — set when an apply Job succeeds but state upload fails
     state_diverged: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
 
@@ -2094,6 +2127,55 @@ class PolicyEvaluation(Base):
         sa.UniqueConstraint("run_id", "policy_set_id", name="uq_policy_evaluations_run_set"),
         Index("ix_policy_evaluations_run_id", "run_id"),
         Index("ix_policy_evaluations_policy_set_id", "policy_set_id"),
+    )
+
+
+class SecurityScanResult(Base):
+    """The deterministic IaC-security-scan outcome for one run (#1036).
+
+    One row per run (the scan may run one or both engines; each finding carries
+    its own ``engine`` tag). Parallel to :class:`PolicyEvaluation` — the OPA
+    policy gate's structural twin, but the rules are prebuilt (Checkov/Trivy)
+    instead of operator-authored Rego. ``enforcement_level`` and
+    ``severity_threshold`` are snapshotted at scan time so a later workspace
+    edit can't retroactively change a recorded run's gating.
+    """
+
+    __tablename__ = "security_scan_results"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=generate_uuid7
+    )
+    run_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("runs.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    # Engine(s) that produced this result: "checkov", "trivy", or "both".
+    engine: Mapped[str] = mapped_column(String(20), nullable=False, default="")
+    # Snapshotted at scan time (see class docstring).
+    enforcement_level: Mapped[str] = mapped_column(String(20), nullable=False)
+    severity_threshold: Mapped[str] = mapped_column(String(20), nullable=False, default="high")
+    outcome: Mapped[str] = mapped_column(String(20), nullable=False)  # passed, failed, errored
+    # Normalized findings: list of {engine, rule_id, severity, title, resource,
+    # resource_type, file, start_line, end_line, remediation}.
+    findings: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list, nullable=False)
+    # Severity histogram + counts: {critical, high, medium, low, unknown, total,
+    # blocking}.
+    summary: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, nullable=False)
+    # Scanner error text when outcome == "errored" (surfaced to the operator).
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    overridden_by: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    overridden_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc, nullable=False
+    )
+
+    __table_args__ = (
+        sa.UniqueConstraint("run_id", name="uq_security_scan_results_run"),
+        Index("ix_security_scan_results_run_id", "run_id"),
     )
 
 

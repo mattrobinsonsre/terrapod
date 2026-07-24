@@ -78,6 +78,10 @@ type workspaceModel struct {
 	DriftIgnoreRules              types.List   `tfsdk:"drift_ignore_rules"`
 	DriftDetectionEnabled         types.Bool   `tfsdk:"drift_detection_enabled"`
 	DriftDetectionIntervalSeconds types.Int64  `tfsdk:"drift_detection_interval_seconds"`
+	SecurityScanEnforcement       types.String `tfsdk:"security_scan_enforcement"`
+	SecurityScanEngine            types.String `tfsdk:"security_scan_engine"`
+	SecurityScanSeverityThreshold types.String `tfsdk:"security_scan_severity_threshold"`
+	SecurityScanSkipRules         types.List   `tfsdk:"security_scan_skip_rules"`
 	PlanExpirySeconds             types.Int64  `tfsdk:"plan_expiry_seconds"`
 	AISummaryMode                 types.String `tfsdk:"ai_summary_mode"`
 	AISummaryContext              types.String `tfsdk:"ai_summary_context"`

@@ -385,6 +385,10 @@ Workspaces support the following drift detection attributes (settable on create 
 | `drift-detection-interval-seconds` | integer | `86400` | How often to run drift detection checks (minimum: 3600 seconds / 1 hour) |
 | `plan-expiry-seconds` | integer / null | `null` | Per-workspace plan-expiry TTL (#646). When set, an apply-capable run that has sat in `planned` longer than this (from plan completion) is auto-discarded and must be re-planned. `null` / `0` = disabled (default) |
 | `drift-ignore-rules` | list[string] | `[]` | Glob-aware patterns silenced by the drift-result classifier (#482). Each rule is a Terraform address optionally suffixed with a dotted attribute path; `*` matches zero or more non-`.` chars (spans `[N]` indices), `[*]` matches any bracketed index. A bare address with no attribute suffix silences any change to that resource — including destroys — so use carefully. Max 50 entries, ≤ 500 chars each. Examples: `aws_iam_role.foo.tags.Environment`, `aws_autoscaling_group.workers[*].desired_capacity`, `module.eks*.argocd_cluster.*.config.tls_client_config.ca_data`. Affects drift-detection runs only — regular plan/apply is untouched. See [drift-ignore-rules.md](drift-ignore-rules.md) for the full grammar and recipes |
+| `security-scan-enforcement` | string | `advisory` | IaC security-scan (Checkov/Trivy) enforcement (#1036): `off` (skip the stage), `advisory` (scan and record findings, never block apply — the default), or `enforced` (a failed/errored scan holds the run in `planning` until the finding is fixed or a workspace admin overrides it) |
+| `security-scan-engine` | string | `checkov` | Which scanner(s) run: `checkov`, `trivy`, or `both` (union of findings, deduped) |
+| `security-scan-severity-threshold` | string | `high` | Lowest finding severity that counts as a scan failure: `critical`, `high`, `medium`, or `low` |
+| `security-scan-skip-rules` | list[string] | `[]` | Scanner rule-ids to suppress (Checkov `CKV_*` / Trivy `AVD-*`). Max 200 entries, ≤ 100 chars each |
 
 ### Terragrunt Attributes
 

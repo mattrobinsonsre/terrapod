@@ -890,6 +890,17 @@ async def complete_plan(
     if gate != policy_set_service.GATE_PASSED:
         return run
 
+    # Post-plan security-scan gate (#1036) — the deterministic Checkov/Trivy
+    # twin of the policy gate above, with identical semantics: an enforced
+    # blocking/errored scan holds the run in `planning` (surfaced via the run's
+    # security-scan attribute) so an admin override re-drives cleanly. off /
+    # advisory never block.
+    from terrapod.services import security_scan_service
+
+    scan_gate = await security_scan_service.evaluate_post_plan(db, run)
+    if scan_gate != security_scan_service.GATE_PASSED:
+        return run
+
     run = await transition_run(db, run, "planned")
 
     # Unlock workspace for plan-only runs — they make no further state moves.

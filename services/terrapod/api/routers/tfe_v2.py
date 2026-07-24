@@ -231,6 +231,37 @@ def _validate_drift_ignore_rules(raw: object) -> list[str]:
     return result
 
 
+def _scan_enum(value: object, valid: frozenset[str], field: str, default: str) -> str:
+    """Validate a security-scan enum field (#1036); 422 on an unknown value."""
+    s = str(value if value is not None else default)
+    if s not in valid:
+        raise HTTPException(status_code=422, detail=f"{field} must be one of {sorted(valid)}")
+    return s
+
+
+def _validate_scan_skip_rules(raw: object) -> list[str]:
+    """Validate `security-scan-skip-rules` (#1036): a list of non-empty rule-id
+    strings (Checkov CKV_* / Trivy AVD-* ids), capped for sanity."""
+    if raw is None:
+        return []
+    if not isinstance(raw, list):
+        raise HTTPException(status_code=422, detail="security-scan-skip-rules must be a list")
+    if len(raw) > 200:
+        raise HTTPException(status_code=422, detail="security-scan-skip-rules: maximum 200 entries")
+    out: list[str] = []
+    for v in raw:
+        if not isinstance(v, str) or not v.strip():
+            raise HTTPException(
+                status_code=422, detail="security-scan-skip-rules entries must be non-empty strings"
+            )
+        if len(v) > 100:
+            raise HTTPException(
+                status_code=422, detail="security-scan-skip-rules entries must be ≤ 100 characters"
+            )
+        out.append(v.strip())
+    return out
+
+
 _WORKSPACE_NAME_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_-]*$")
 
 
@@ -681,6 +712,11 @@ def _workspace_json(
                 "slack-channel": ws.slack_channel,
                 "drift-detection-enabled": ws.drift_detection_enabled,
                 "drift-detection-interval-seconds": ws.drift_detection_interval_seconds,
+                # Security scanning (#1036): deterministic Checkov/Trivy scan stage.
+                "security-scan-enforcement": ws.security_scan_enforcement,
+                "security-scan-engine": ws.security_scan_engine,
+                "security-scan-severity-threshold": ws.security_scan_severity_threshold,
+                "security-scan-skip-rules": ws.security_scan_skip_rules or [],
                 # Per-workspace plan expiry TTL (#646); null = disabled (default).
                 "plan-expiry-seconds": ws.plan_expiry_seconds,
                 "drift-last-checked-at": _rfc3339(ws.drift_last_checked_at),
@@ -1004,6 +1040,27 @@ async def create_workspace(
         var_files=_validate_var_files(attrs.get("var-files", [])),
         trigger_prefixes=_validate_trigger_prefixes(attrs.get("trigger-prefixes", [])),
         drift_ignore_rules=_validate_drift_ignore_rules(attrs.get("drift-ignore-rules", [])),
+        security_scan_enforcement=_scan_enum(
+            attrs.get("security-scan-enforcement"),
+            frozenset({"off", "advisory", "enforced"}),
+            "security-scan-enforcement",
+            "advisory",
+        ),
+        security_scan_engine=_scan_enum(
+            attrs.get("security-scan-engine"),
+            frozenset({"checkov", "trivy", "both"}),
+            "security-scan-engine",
+            "checkov",
+        ),
+        security_scan_severity_threshold=_scan_enum(
+            attrs.get("security-scan-severity-threshold"),
+            frozenset({"critical", "high", "medium", "low"}),
+            "security-scan-severity-threshold",
+            "high",
+        ),
+        security_scan_skip_rules=_validate_scan_skip_rules(
+            attrs.get("security-scan-skip-rules", [])
+        ),
         drift_detection_enabled=attrs.get(
             "drift-detection-enabled",
             True if vcs_connection_id else False,
@@ -1525,6 +1582,30 @@ async def update_workspace(
         ws.drift_detection_interval_seconds = _clamp_drift_interval(
             attrs["drift-detection-interval-seconds"]
         )
+    # Security scanning (#1036)
+    if "security-scan-enforcement" in attrs:
+        ws.security_scan_enforcement = _scan_enum(
+            attrs["security-scan-enforcement"],
+            frozenset({"off", "advisory", "enforced"}),
+            "security-scan-enforcement",
+            "advisory",
+        )
+    if "security-scan-engine" in attrs:
+        ws.security_scan_engine = _scan_enum(
+            attrs["security-scan-engine"],
+            frozenset({"checkov", "trivy", "both"}),
+            "security-scan-engine",
+            "checkov",
+        )
+    if "security-scan-severity-threshold" in attrs:
+        ws.security_scan_severity_threshold = _scan_enum(
+            attrs["security-scan-severity-threshold"],
+            frozenset({"critical", "high", "medium", "low"}),
+            "security-scan-severity-threshold",
+            "high",
+        )
+    if "security-scan-skip-rules" in attrs:
+        ws.security_scan_skip_rules = _validate_scan_skip_rules(attrs["security-scan-skip-rules"])
     if "plan-expiry-seconds" in attrs:
         ws.plan_expiry_seconds = _parse_plan_expiry(attrs["plan-expiry-seconds"])
 

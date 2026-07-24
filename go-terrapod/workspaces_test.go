@@ -130,6 +130,63 @@ func TestCreateWorkspace_Happy(t *testing.T) {
 	}
 }
 
+func TestWorkspace_SecurityScanFields_RoundTrip(t *testing.T) {
+	f := newWorkspaceFixtureServer(t)
+	// Read side: server returns the four security-scan attributes.
+	f.readHandler = func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(minimalWorkspaceBody("ws-scan", "scanned", map[string]any{
+			"security-scan-enforcement":        "enforced",
+			"security-scan-engine":             "both",
+			"security-scan-severity-threshold": "critical",
+			"security-scan-skip-rules":         []any{"CKV_AWS_18", "AVD-AWS-0107"},
+		})))
+	}
+	c := f.client()
+	ws, err := c.GetWorkspace(t.Context(), "ws-scan")
+	if err != nil {
+		t.Fatalf("GetWorkspace: %v", err)
+	}
+	if ws.SecurityScanEnforcement != "enforced" || ws.SecurityScanEngine != "both" ||
+		ws.SecurityScanSeverityThreshold != "critical" {
+		t.Errorf("scan fields not decoded: %+v", ws)
+	}
+	if len(ws.SecurityScanSkipRules) != 2 || ws.SecurityScanSkipRules[0] != "CKV_AWS_18" {
+		t.Errorf("skip rules not decoded: %+v", ws.SecurityScanSkipRules)
+	}
+
+	// Write side: request body carries the scan attributes.
+	f.createHandler = func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(minimalWorkspaceBody("ws-scan", "scanned", nil)))
+	}
+	if _, err := c.CreateWorkspace(t.Context(), CreateWorkspaceRequest{
+		Name:                          "scanned",
+		SecurityScanEnforcement:       "enforced",
+		SecurityScanEngine:            "trivy",
+		SecurityScanSeverityThreshold: "medium",
+		SecurityScanSkipRules:         []string{"CKV_AWS_18"},
+	}); err != nil {
+		t.Fatalf("CreateWorkspace: %v", err)
+	}
+	var req struct {
+		Data struct {
+			Attributes map[string]any `json:"attributes"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(f.lastBody, &req); err != nil {
+		t.Fatalf("request body: %v", err)
+	}
+	if req.Data.Attributes["security-scan-enforcement"] != "enforced" ||
+		req.Data.Attributes["security-scan-engine"] != "trivy" ||
+		req.Data.Attributes["security-scan-severity-threshold"] != "medium" {
+		t.Errorf("scan attrs missing from request: %+v", req.Data.Attributes)
+	}
+	skip, ok := req.Data.Attributes["security-scan-skip-rules"].([]any)
+	if !ok || len(skip) != 1 || skip[0] != "CKV_AWS_18" {
+		t.Errorf("skip rules missing from request: %+v", req.Data.Attributes)
+	}
+}
+
 func TestCreateWorkspace_WithVCSConnection_BuildsRelationship(t *testing.T) {
 	f := newWorkspaceFixtureServer(t)
 	f.createHandler = func(w http.ResponseWriter, r *http.Request) {
