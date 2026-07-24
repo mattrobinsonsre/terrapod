@@ -43,7 +43,7 @@ RUN ARCH="${TARGETARCH:-$(dpkg --print-architecture)}" \
 # Trivy (Go binary) — IaC config scanner for the security-scan phase (#1036).
 # Downloaded + checksum-verified here; COPY'd into the runtime so it stays free
 # of curl, exactly like OPA.
-ARG TRIVY_VERSION=0.58.1
+ARG TRIVY_VERSION=0.72.0
 RUN ARCH="${TARGETARCH:-$(dpkg --print-architecture)}" \
     && case "$ARCH" in \
         amd64) TARCH="Linux-64bit" ;; \
