@@ -224,6 +224,43 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 					int64planmodifier.UseStateForUnknown(),
 				},
 			},
+			// Security-scan (Checkov/Trivy IaC misconfig scanning, #1036). All four
+			// are Optional+Computed with UseStateForUnknown for the same reason as
+			// drift_ignore_rules (#684): the server holds defaults the config need
+			// not set, so omitting one means "leave alone", not "force null".
+			"security_scan_enforcement": schema.StringAttribute{
+				Description: "IaC security-scan enforcement: `off` (skip), `advisory` (scan, never block — the default), or `enforced` (a failed/errored scan blocks apply until fixed or overridden).",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"security_scan_engine": schema.StringAttribute{
+				Description: "Which scanner(s) run: `checkov` (default), `trivy`, or `both` (union of findings, deduped).",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"security_scan_severity_threshold": schema.StringAttribute{
+				Description: "Lowest finding severity that counts as a failure: `critical`, `high` (default), `medium`, or `low`.",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"security_scan_skip_rules": schema.ListAttribute{
+				Description: "Scanner rule-ids to suppress (Checkov `CKV_*` / Trivy `AVD-*`). Empty list (default) skips nothing.",
+				Optional:    true,
+				Computed:    true,
+				ElementType: types.StringType,
+				PlanModifiers: []planmodifier.List{
+					listplanmodifier.UseStateForUnknown(),
+				},
+			},
 			"plan_expiry_seconds": schema.Int64Attribute{
 				Description: "Per-workspace plan expiry TTL in seconds (#646). An apply-capable planned run older than this is auto-discarded and must be re-planned. Unset / 0 = disabled (the default).",
 				Optional:    true,
@@ -630,6 +667,22 @@ func buildCreateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 		v := m.DriftDetectionIntervalSeconds.ValueInt64()
 		req.DriftDetectionIntervalSeconds = &v
 	}
+	if !m.SecurityScanEnforcement.IsNull() && !m.SecurityScanEnforcement.IsUnknown() {
+		req.SecurityScanEnforcement = m.SecurityScanEnforcement.ValueString()
+	}
+	if !m.SecurityScanEngine.IsNull() && !m.SecurityScanEngine.IsUnknown() {
+		req.SecurityScanEngine = m.SecurityScanEngine.ValueString()
+	}
+	if !m.SecurityScanSeverityThreshold.IsNull() && !m.SecurityScanSeverityThreshold.IsUnknown() {
+		req.SecurityScanSeverityThreshold = m.SecurityScanSeverityThreshold.ValueString()
+	}
+	if !m.SecurityScanSkipRules.IsNull() && !m.SecurityScanSkipRules.IsUnknown() {
+		rules := []string{}
+		for _, v := range m.SecurityScanSkipRules.Elements() {
+			rules = append(rules, v.(types.String).ValueString())
+		}
+		req.SecurityScanSkipRules = rules
+	}
 	if !m.PlanExpirySeconds.IsNull() && !m.PlanExpirySeconds.IsUnknown() {
 		v := m.PlanExpirySeconds.ValueInt64()
 		req.PlanExpirySeconds = &v
@@ -745,6 +798,22 @@ func buildUpdateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 		v := m.DriftDetectionIntervalSeconds.ValueInt64()
 		req.DriftDetectionIntervalSeconds = &v
 	}
+	if !m.SecurityScanEnforcement.IsNull() && !m.SecurityScanEnforcement.IsUnknown() {
+		req.SecurityScanEnforcement = m.SecurityScanEnforcement.ValueString()
+	}
+	if !m.SecurityScanEngine.IsNull() && !m.SecurityScanEngine.IsUnknown() {
+		req.SecurityScanEngine = m.SecurityScanEngine.ValueString()
+	}
+	if !m.SecurityScanSeverityThreshold.IsNull() && !m.SecurityScanSeverityThreshold.IsUnknown() {
+		req.SecurityScanSeverityThreshold = m.SecurityScanSeverityThreshold.ValueString()
+	}
+	if !m.SecurityScanSkipRules.IsNull() && !m.SecurityScanSkipRules.IsUnknown() {
+		rules := []string{}
+		for _, v := range m.SecurityScanSkipRules.Elements() {
+			rules = append(rules, v.(types.String).ValueString())
+		}
+		req.SecurityScanSkipRules = rules
+	}
 	if !m.PlanExpirySeconds.IsNull() && !m.PlanExpirySeconds.IsUnknown() {
 		v := m.PlanExpirySeconds.ValueInt64()
 		req.PlanExpirySeconds = &v
@@ -826,6 +895,11 @@ func readWorkspaceIntoModel(ctx context.Context, ws *terrapod.Workspace, m *work
 	} else {
 		m.DriftDetectionIntervalSeconds = types.Int64Null()
 	}
+
+	// Security-scan (#1036) — server-provided, always defaulted.
+	m.SecurityScanEnforcement = types.StringValue(ws.SecurityScanEnforcement)
+	m.SecurityScanEngine = types.StringValue(ws.SecurityScanEngine)
+	m.SecurityScanSeverityThreshold = types.StringValue(ws.SecurityScanSeverityThreshold)
 	if ws.PlanExpirySeconds != nil && *ws.PlanExpirySeconds > 0 {
 		m.PlanExpirySeconds = types.Int64Value(*ws.PlanExpirySeconds)
 	} else {
@@ -947,6 +1021,15 @@ func readWorkspaceIntoModel(ctx context.Context, ws *terrapod.Workspace, m *work
 		dirVal, dirDiag := types.ListValueFrom(ctx, types.StringType, ws.DriftIgnoreRules)
 		diags.Append(dirDiag...)
 		m.DriftIgnoreRules = dirVal
+	}
+
+	// Security-scan skip rules (#1036) — same null-vs-empty rule as drift_ignore_rules.
+	if m.SecurityScanSkipRules.IsNull() && len(ws.SecurityScanSkipRules) == 0 {
+		m.SecurityScanSkipRules = types.ListNull(types.StringType)
+	} else {
+		ssVal, ssDiag := types.ListValueFrom(ctx, types.StringType, ws.SecurityScanSkipRules)
+		diags.Append(ssDiag...)
+		m.SecurityScanSkipRules = ssVal
 	}
 
 	// Labels — same null-vs-empty-map rule as trigger_prefixes above.

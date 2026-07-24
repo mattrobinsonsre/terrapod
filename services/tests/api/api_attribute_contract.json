@@ -529,6 +529,18 @@
     "translated",
     "updated-at"
   ],
+  "security_scanning._scan_json": [
+    "created-at",
+    "enforcement-level",
+    "engine",
+    "error",
+    "findings",
+    "outcome",
+    "overridden-at",
+    "overridden-by",
+    "severity-threshold",
+    "summary"
+  ],
   "tfe_v2._state_version_json": [
     "created-at",
     "created-by",
@@ -571,6 +583,10 @@
     "plan-expiry-seconds",
     "resource-cpu",
     "resource-memory",
+    "security-scan-enforcement",
+    "security-scan-engine",
+    "security-scan-severity-threshold",
+    "security-scan-skip-rules",
     "slack-channel",
     "state-diverged",
     "tag-names",

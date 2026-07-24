@@ -258,6 +258,10 @@ field CreateWorkspaceRequest.OwnerEmail string `json:"owner-email,omitempty"`
 field CreateWorkspaceRequest.PlanExpirySeconds *int64 `json:"plan-expiry-seconds,omitempty"`
 field CreateWorkspaceRequest.ResourceCPU string `json:"resource-cpu,omitempty"`
 field CreateWorkspaceRequest.ResourceMemory string `json:"resource-memory,omitempty"`
+field CreateWorkspaceRequest.SecurityScanEnforcement string `json:"security-scan-enforcement,omitempty"`
+field CreateWorkspaceRequest.SecurityScanEngine string `json:"security-scan-engine,omitempty"`
+field CreateWorkspaceRequest.SecurityScanSeverityThreshold string `json:"security-scan-severity-threshold,omitempty"`
+field CreateWorkspaceRequest.SecurityScanSkipRules []string `json:"security-scan-skip-rules,omitempty"`
 field CreateWorkspaceRequest.SlackChannel string `json:"slack-channel,omitempty"`
 field CreateWorkspaceRequest.TerraformVersion string `json:"terraform-version,omitempty"`
 field CreateWorkspaceRequest.TerragruntEnabled *bool `json:"terragrunt-enabled,omitempty"`
@@ -709,6 +713,10 @@ field UpdateWorkspaceRequest.Name string `json:"name,omitempty"`
 field UpdateWorkspaceRequest.PlanExpirySeconds *int64 `json:"plan-expiry-seconds,omitempty"`
 field UpdateWorkspaceRequest.ResourceCPU string `json:"resource-cpu,omitempty"`
 field UpdateWorkspaceRequest.ResourceMemory string `json:"resource-memory,omitempty"`
+field UpdateWorkspaceRequest.SecurityScanEnforcement string `json:"security-scan-enforcement,omitempty"`
+field UpdateWorkspaceRequest.SecurityScanEngine string `json:"security-scan-engine,omitempty"`
+field UpdateWorkspaceRequest.SecurityScanSeverityThreshold string `json:"security-scan-severity-threshold,omitempty"`
+field UpdateWorkspaceRequest.SecurityScanSkipRules []string `json:"security-scan-skip-rules,omitempty"`
 field UpdateWorkspaceRequest.SlackChannel *string `json:"slack-channel,omitempty"`
 field UpdateWorkspaceRequest.TerraformVersion string `json:"terraform-version,omitempty"`
 field UpdateWorkspaceRequest.TerragruntEnabled *bool `json:"terragrunt-enabled,omitempty"`
@@ -817,6 +825,10 @@ field Workspace.OwnerEmail string `json:"owner-email,omitempty"`
 field Workspace.PlanExpirySeconds *int64 `json:"plan-expiry-seconds,omitempty"`
 field Workspace.ResourceCPU string `json:"resource-cpu,omitempty"`
 field Workspace.ResourceMemory string `json:"resource-memory,omitempty"`
+field Workspace.SecurityScanEnforcement string `json:"security-scan-enforcement,omitempty"`
+field Workspace.SecurityScanEngine string `json:"security-scan-engine,omitempty"`
+field Workspace.SecurityScanSeverityThreshold string `json:"security-scan-severity-threshold,omitempty"`
+field Workspace.SecurityScanSkipRules []string `json:"security-scan-skip-rules,omitempty"`
 field Workspace.SlackChannel string `json:"slack-channel,omitempty"`
 field Workspace.StateDiverged bool `json:"state-diverged"`
 field Workspace.TerraformVersion string `json:"terraform-version,omitempty"`

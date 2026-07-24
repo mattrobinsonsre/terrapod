@@ -54,6 +54,13 @@ type Workspace struct {
 	DriftIgnoreRules              []string `json:"drift-ignore-rules,omitempty"`
 	DriftDetectionEnabled         bool     `json:"drift-detection-enabled"`
 	DriftDetectionIntervalSeconds *int64   `json:"drift-detection-interval-seconds,omitempty"`
+	// Security-scan (Checkov/Trivy IaC misconfig scanning, #1036): enforcement
+	// off|advisory|enforced, engine checkov|trivy|both, severity threshold
+	// critical|high|medium|low, and a list of scanner rule-ids to skip.
+	SecurityScanEnforcement       string   `json:"security-scan-enforcement,omitempty"`
+	SecurityScanEngine            string   `json:"security-scan-engine,omitempty"`
+	SecurityScanSeverityThreshold string   `json:"security-scan-severity-threshold,omitempty"`
+	SecurityScanSkipRules         []string `json:"security-scan-skip-rules,omitempty"`
 	// PlanExpirySeconds is the per-workspace plan-expiry TTL (#646); nil =
 	// disabled (the default). An apply-capable plan older than this is
 	// auto-discarded and must be re-planned.
@@ -136,6 +143,10 @@ type CreateWorkspaceRequest struct {
 	DriftIgnoreRules              []string          `json:"drift-ignore-rules,omitempty"`
 	DriftDetectionEnabled         *bool             `json:"drift-detection-enabled,omitempty"`
 	DriftDetectionIntervalSeconds *int64            `json:"drift-detection-interval-seconds,omitempty"`
+	SecurityScanEnforcement       string            `json:"security-scan-enforcement,omitempty"`
+	SecurityScanEngine            string            `json:"security-scan-engine,omitempty"`
+	SecurityScanSeverityThreshold string            `json:"security-scan-severity-threshold,omitempty"`
+	SecurityScanSkipRules         []string          `json:"security-scan-skip-rules,omitempty"`
 	PlanExpirySeconds             *int64            `json:"plan-expiry-seconds,omitempty"`
 	// AISummaryMode is the three-state per-workspace override (#401):
 	// "default" | "enabled" | "disabled". Empty string omits the field
@@ -182,6 +193,10 @@ type UpdateWorkspaceRequest struct {
 	DriftIgnoreRules              []string          `json:"drift-ignore-rules,omitempty"`
 	DriftDetectionEnabled         *bool             `json:"drift-detection-enabled,omitempty"`
 	DriftDetectionIntervalSeconds *int64            `json:"drift-detection-interval-seconds,omitempty"`
+	SecurityScanEnforcement       string            `json:"security-scan-enforcement,omitempty"`
+	SecurityScanEngine            string            `json:"security-scan-engine,omitempty"`
+	SecurityScanSeverityThreshold string            `json:"security-scan-severity-threshold,omitempty"`
+	SecurityScanSkipRules         []string          `json:"security-scan-skip-rules,omitempty"`
 	PlanExpirySeconds             *int64            `json:"plan-expiry-seconds,omitempty"`
 	// AISummaryMode see CreateWorkspaceRequest. On UPDATE, empty string
 	// leaves the existing value untouched — to explicitly set "follow
@@ -451,6 +466,18 @@ func workspaceCreateAttrs(req CreateWorkspaceRequest) map[string]any {
 	if req.DriftDetectionIntervalSeconds != nil {
 		attrs["drift-detection-interval-seconds"] = *req.DriftDetectionIntervalSeconds
 	}
+	if req.SecurityScanEnforcement != "" {
+		attrs["security-scan-enforcement"] = req.SecurityScanEnforcement
+	}
+	if req.SecurityScanEngine != "" {
+		attrs["security-scan-engine"] = req.SecurityScanEngine
+	}
+	if req.SecurityScanSeverityThreshold != "" {
+		attrs["security-scan-severity-threshold"] = req.SecurityScanSeverityThreshold
+	}
+	if req.SecurityScanSkipRules != nil {
+		attrs["security-scan-skip-rules"] = req.SecurityScanSkipRules
+	}
 	if req.PlanExpirySeconds != nil {
 		attrs["plan-expiry-seconds"] = *req.PlanExpirySeconds
 	}
@@ -539,6 +566,18 @@ func workspaceUpdateAttrs(req UpdateWorkspaceRequest) map[string]any {
 	if req.DriftDetectionIntervalSeconds != nil {
 		attrs["drift-detection-interval-seconds"] = *req.DriftDetectionIntervalSeconds
 	}
+	if req.SecurityScanEnforcement != "" {
+		attrs["security-scan-enforcement"] = req.SecurityScanEnforcement
+	}
+	if req.SecurityScanEngine != "" {
+		attrs["security-scan-engine"] = req.SecurityScanEngine
+	}
+	if req.SecurityScanSeverityThreshold != "" {
+		attrs["security-scan-severity-threshold"] = req.SecurityScanSeverityThreshold
+	}
+	if req.SecurityScanSkipRules != nil {
+		attrs["security-scan-skip-rules"] = req.SecurityScanSkipRules
+	}
 	if req.PlanExpirySeconds != nil {
 		attrs["plan-expiry-seconds"] = *req.PlanExpirySeconds
 	}
@@ -587,47 +626,51 @@ func parseWorkspace(body []byte) (*Workspace, error) {
 // the single-resource path.
 func workspaceFromResource(res *Resource) *Workspace {
 	ws := &Workspace{
-		ID:                    res.ID,
-		Name:                  GetStringAttr(res, "name"),
-		ExecutionMode:         GetStringAttr(res, "execution-mode"),
-		ExecutionBackend:      GetStringAttr(res, "execution-backend"),
-		AutoApply:             GetBoolAttr(res, "auto-apply"),
-		TerraformVersion:      GetStringAttr(res, "terraform-version"),
-		TerragruntEnabled:     GetBoolAttr(res, "terragrunt-enabled"),
-		TerragruntVersion:     GetStringAttr(res, "terragrunt-version"),
-		WorkingDirectory:      GetStringAttr(res, "working-directory"),
-		ResourceCPU:           GetStringAttr(res, "resource-cpu"),
-		ResourceMemory:        GetStringAttr(res, "resource-memory"),
-		VCSRepoURL:            GetStringAttr(res, "vcs-repo-url"),
-		VCSBranch:             GetStringAttr(res, "vcs-branch"),
-		VCSWorkflow:           GetStringAttr(res, "vcs-workflow"),
-		VCSConnectionID:       GetRelationshipID(res, "vcs-connection"),
-		AgentPoolID:           GetStringAttr(res, "agent-pool-id"),
-		AutoMerge:             GetBoolAttr(res, "auto-merge"),
-		AutoMergeStrategy:     GetStringAttr(res, "auto-merge-strategy"),
-		OwnerEmail:            GetStringAttr(res, "owner-email"),
-		Locked:                GetBoolAttr(res, "locked"),
-		Labels:                GetMapAttr(res, "labels"),
-		VarFiles:              GetListAttr(res, "var-files"),
-		TriggerPrefixes:       GetListAttr(res, "trigger-prefixes"),
-		DriftIgnoreRules:      GetListAttr(res, "drift-ignore-rules"),
-		DriftDetectionEnabled: GetBoolAttr(res, "drift-detection-enabled"),
-		DriftStatus:           GetStringAttr(res, "drift-status"),
-		DriftLastCheckedAt:    GetStringAttr(res, "drift-last-checked-at"),
-		DriftLatestRunID:      GetStringAttr(res, "drift-latest-run-id"),
-		StateDiverged:         GetBoolAttr(res, "state-diverged"),
-		LifecycleState:        GetStringAttr(res, "lifecycle-state"),
-		LifecycleReason:       GetStringAttr(res, "lifecycle-reason"),
-		VCSLastPolledAt:       GetStringAttr(res, "vcs-last-polled-at"),
-		VCSLastError:          GetStringAttr(res, "vcs-last-error"),
-		VCSLastErrorAt:        GetStringAttr(res, "vcs-last-error-at"),
-		AgentPoolName:         GetStringAttr(res, "agent-pool-name"),
-		VCSConnectionName:     GetStringAttr(res, "vcs-connection-name"),
-		AISummaryMode:         GetStringAttr(res, "ai-summary-mode"),
-		AISummaryContext:      GetStringAttr(res, "ai-summary-context"),
-		SlackChannel:          GetStringAttr(res, "slack-channel"),
-		CreatedAt:             GetStringAttr(res, "created-at"),
-		UpdatedAt:             GetStringAttr(res, "updated-at"),
+		ID:                            res.ID,
+		Name:                          GetStringAttr(res, "name"),
+		ExecutionMode:                 GetStringAttr(res, "execution-mode"),
+		ExecutionBackend:              GetStringAttr(res, "execution-backend"),
+		AutoApply:                     GetBoolAttr(res, "auto-apply"),
+		TerraformVersion:              GetStringAttr(res, "terraform-version"),
+		TerragruntEnabled:             GetBoolAttr(res, "terragrunt-enabled"),
+		TerragruntVersion:             GetStringAttr(res, "terragrunt-version"),
+		WorkingDirectory:              GetStringAttr(res, "working-directory"),
+		ResourceCPU:                   GetStringAttr(res, "resource-cpu"),
+		ResourceMemory:                GetStringAttr(res, "resource-memory"),
+		VCSRepoURL:                    GetStringAttr(res, "vcs-repo-url"),
+		VCSBranch:                     GetStringAttr(res, "vcs-branch"),
+		VCSWorkflow:                   GetStringAttr(res, "vcs-workflow"),
+		VCSConnectionID:               GetRelationshipID(res, "vcs-connection"),
+		AgentPoolID:                   GetStringAttr(res, "agent-pool-id"),
+		AutoMerge:                     GetBoolAttr(res, "auto-merge"),
+		AutoMergeStrategy:             GetStringAttr(res, "auto-merge-strategy"),
+		OwnerEmail:                    GetStringAttr(res, "owner-email"),
+		Locked:                        GetBoolAttr(res, "locked"),
+		Labels:                        GetMapAttr(res, "labels"),
+		VarFiles:                      GetListAttr(res, "var-files"),
+		TriggerPrefixes:               GetListAttr(res, "trigger-prefixes"),
+		DriftIgnoreRules:              GetListAttr(res, "drift-ignore-rules"),
+		DriftDetectionEnabled:         GetBoolAttr(res, "drift-detection-enabled"),
+		SecurityScanEnforcement:       GetStringAttr(res, "security-scan-enforcement"),
+		SecurityScanEngine:            GetStringAttr(res, "security-scan-engine"),
+		SecurityScanSeverityThreshold: GetStringAttr(res, "security-scan-severity-threshold"),
+		SecurityScanSkipRules:         GetListAttr(res, "security-scan-skip-rules"),
+		DriftStatus:                   GetStringAttr(res, "drift-status"),
+		DriftLastCheckedAt:            GetStringAttr(res, "drift-last-checked-at"),
+		DriftLatestRunID:              GetStringAttr(res, "drift-latest-run-id"),
+		StateDiverged:                 GetBoolAttr(res, "state-diverged"),
+		LifecycleState:                GetStringAttr(res, "lifecycle-state"),
+		LifecycleReason:               GetStringAttr(res, "lifecycle-reason"),
+		VCSLastPolledAt:               GetStringAttr(res, "vcs-last-polled-at"),
+		VCSLastError:                  GetStringAttr(res, "vcs-last-error"),
+		VCSLastErrorAt:                GetStringAttr(res, "vcs-last-error-at"),
+		AgentPoolName:                 GetStringAttr(res, "agent-pool-name"),
+		VCSConnectionName:             GetStringAttr(res, "vcs-connection-name"),
+		AISummaryMode:                 GetStringAttr(res, "ai-summary-mode"),
+		AISummaryContext:              GetStringAttr(res, "ai-summary-context"),
+		SlackChannel:                  GetStringAttr(res, "slack-channel"),
+		CreatedAt:                     GetStringAttr(res, "created-at"),
+		UpdatedAt:                     GetStringAttr(res, "updated-at"),
 	}
 	if v := GetIntAttr(res, "drift-detection-interval-seconds"); v > 0 {
 		ws.DriftDetectionIntervalSeconds = &v

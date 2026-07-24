@@ -47,6 +47,10 @@ def _mock_workspace(ws_id=None, name="test-ws", **overrides):
     ws.owner_email = "test@example.com"
     ws.drift_detection_enabled = overrides.get("drift_detection_enabled", False)
     ws.drift_detection_interval_seconds = overrides.get("drift_detection_interval_seconds", 86400)
+    ws.security_scan_enforcement = overrides.get("security_scan_enforcement", "advisory")
+    ws.security_scan_engine = overrides.get("security_scan_engine", "checkov")
+    ws.security_scan_severity_threshold = overrides.get("security_scan_severity_threshold", "high")
+    ws.security_scan_skip_rules = overrides.get("security_scan_skip_rules", [])
     ws.plan_expiry_seconds = overrides.get("plan_expiry_seconds")
     ws.drift_last_checked_at = overrides.get("drift_last_checked_at", None)
     ws.drift_status = overrides.get("drift_status", "")

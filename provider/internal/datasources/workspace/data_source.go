@@ -46,6 +46,10 @@ type workspaceDataSourceModel struct {
 	DriftIgnoreRules              types.List   `tfsdk:"drift_ignore_rules"`
 	DriftDetectionEnabled         types.Bool   `tfsdk:"drift_detection_enabled"`
 	DriftDetectionIntervalSeconds types.Int64  `tfsdk:"drift_detection_interval_seconds"`
+	SecurityScanEnforcement       types.String `tfsdk:"security_scan_enforcement"`
+	SecurityScanEngine            types.String `tfsdk:"security_scan_engine"`
+	SecurityScanSeverityThreshold types.String `tfsdk:"security_scan_severity_threshold"`
+	SecurityScanSkipRules         types.List   `tfsdk:"security_scan_skip_rules"`
 	PlanExpirySeconds             types.Int64  `tfsdk:"plan_expiry_seconds"`
 	AISummaryMode                 types.String `tfsdk:"ai_summary_mode"`
 	AISummaryContext              types.String `tfsdk:"ai_summary_context"`
@@ -101,6 +105,10 @@ func (d *workspaceDataSource) Schema(_ context.Context, _ datasource.SchemaReque
 			"drift_ignore_rules":               computedList("Glob-aware patterns suppressed by the drift-result classifier (#482). See the resource attribute docs for syntax."),
 			"drift_detection_enabled":          computedBool("Drift detection enabled."),
 			"drift_detection_interval_seconds": computedInt64("Drift detection interval."),
+			"security_scan_enforcement":        computedString("IaC security-scan enforcement (#1036): 'off', 'advisory' (default), or 'enforced'."),
+			"security_scan_engine":             computedString("Security-scan engine (#1036): 'checkov' (default), 'trivy', or 'both'."),
+			"security_scan_severity_threshold": computedString("Lowest severity that counts as a scan failure (#1036): 'critical', 'high' (default), 'medium', or 'low'."),
+			"security_scan_skip_rules":         computedList("Scanner rule-ids to suppress (#1036; Checkov CKV_* / Trivy AVD-*)."),
 			"plan_expiry_seconds":              computedInt64("Per-workspace plan expiry TTL in seconds (#646); null/0 = disabled."),
 			"ai_summary_mode":                  computedString("Per-workspace AI plan-summary mode: 'default' (follow deployment global), 'enabled' (always summarise), or 'disabled' (never summarise)."),
 			"ai_summary_context":               computedString("Workspace-specific context appended to the AI summariser prompt."),
@@ -180,6 +188,10 @@ func readDataSourceModel(ctx context.Context, res *terrapod.Resource, m *workspa
 	m.CreatedAt = types.StringValue(terrapod.GetStringAttr(res, "created-at"))
 	m.UpdatedAt = types.StringValue(terrapod.GetStringAttr(res, "updated-at"))
 	m.DriftDetectionEnabled = types.BoolValue(terrapod.GetBoolAttr(res, "drift-detection-enabled"))
+	// Security-scan (#1036)
+	m.SecurityScanEnforcement = types.StringValue(terrapod.GetStringAttr(res, "security-scan-enforcement"))
+	m.SecurityScanEngine = types.StringValue(terrapod.GetStringAttr(res, "security-scan-engine"))
+	m.SecurityScanSeverityThreshold = types.StringValue(terrapod.GetStringAttr(res, "security-scan-severity-threshold"))
 	// AI plan summary (#401)
 	mode := terrapod.GetStringAttr(res, "ai-summary-mode")
 	if mode == "" {
@@ -247,6 +259,14 @@ func readDataSourceModel(ctx context.Context, res *terrapod.Resource, m *workspa
 		m.DriftIgnoreRules = val
 	} else {
 		m.DriftIgnoreRules = types.ListNull(types.StringType)
+	}
+
+	if skip := terrapod.GetListAttr(res, "security-scan-skip-rules"); len(skip) > 0 {
+		val, d := types.ListValueFrom(ctx, types.StringType, skip)
+		diags.Append(d...)
+		m.SecurityScanSkipRules = val
+	} else {
+		m.SecurityScanSkipRules = types.ListNull(types.StringType)
 	}
 
 	if labels := terrapod.GetMapAttr(res, "labels"); len(labels) > 0 {
