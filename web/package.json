@@ -43,12 +43,12 @@
     "@types/three": "^0.185.1",
     "eslint": "^9.39.5",
     "eslint-config-next": "^16.2.10",
-    "postcss": "^8.5.13",
+    "postcss": "^8.5.23",
     "tailwindcss": "^4.3.2",
     "typescript": "^6.0.3"
   },
   "overrides": {
-    "postcss": "^8.5.13",
+    "postcss": "^8.5.23",
     "@babel/core": "^7.29.6",
     "brace-expansion": "^2.0.2",
     "sharp": "^0.35.3"
