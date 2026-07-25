@@ -230,6 +230,100 @@ COST_SUMMARY_TOOL: dict = {
 }
 
 
+# --- Architecture critique (#963/#1036) -------------------------------------
+# The AI *reasoning* layer over a run's PROPOSED infrastructure. A senior
+# cloud/platform architect reviews the plan JSON `planned_values` and returns a
+# prose critique + an overall qualitative risk grade + discrete findings across
+# the architecture dimensions (security posture, reliability/HA,
+# cost-efficiency, operational excellence, scalability, best-practice
+# adherence). It is advisory reasoning only — it never gates a run and never
+# restates or replaces the deterministic Checkov/Trivy security-scan verdict it
+# renders on top of.
+ARCHITECTURE_CRITIQUE_JSON_SCHEMA: dict = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["critique", "risk_level", "findings"],
+    "properties": {
+        "critique": {
+            "type": "string",
+            "description": (
+                "Plain-language architectural review of the PROPOSED "
+                "infrastructure — up to ~600 words. Assess the design across "
+                "security posture, reliability/HA, cost-efficiency, operational "
+                "excellence, scalability, and best-practice adherence. Refer to "
+                "resources by their terraform address. Advisory only; do not "
+                "restate the deterministic security-scan verdict. No "
+                "chain-of-thought, no preamble."
+            ),
+        },
+        "risk_level": {
+            "type": "string",
+            "enum": ["critical", "high", "medium", "low", "none"],
+            "description": (
+                "Overall qualitative architectural risk grade. 'critical' for "
+                "design choices that will cause data loss, a serious security "
+                "exposure, or an outage as proposed. 'high' for a significant "
+                "unmitigated weakness. 'medium' for notable gaps worth fixing. "
+                "'low' for minor polish. 'none' when the proposed architecture "
+                "is sound with nothing material to flag."
+            ),
+        },
+        "findings": {
+            "type": "array",
+            "description": (
+                "Discrete architectural findings, ordered worst-first. Empty "
+                "array is valid when risk_level == 'none'."
+            ),
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["severity", "category", "title", "detail"],
+                "properties": {
+                    "severity": {
+                        "type": "string",
+                        "enum": ["critical", "high", "medium", "low", "info"],
+                    },
+                    "category": {
+                        "type": "string",
+                        "enum": [
+                            "security",
+                            "reliability",
+                            "cost",
+                            "operations",
+                            "scalability",
+                            "other",
+                        ],
+                    },
+                    "title": {"type": "string", "maxLength": 120},
+                    "detail": {"type": "string", "maxLength": 600},
+                    "address": {
+                        "type": "string",
+                        "description": (
+                            "Terraform address of the resource the finding "
+                            "attaches to, when applicable."
+                        ),
+                    },
+                },
+            },
+        },
+    },
+}
+
+
+ARCHITECTURE_CRITIQUE_TOOL: dict = {
+    "type": "function",
+    "function": {
+        "name": "submit_architecture_critique",
+        "description": (
+            "Submit your architectural critique. Call this tool exactly once "
+            "with the prose critique, the overall risk_level, and the discrete "
+            "findings across the architecture dimensions."
+        ),
+        "parameters": ARCHITECTURE_CRITIQUE_JSON_SCHEMA,
+    },
+}
+
+
 def tool_for_kind(kind: str) -> dict:
     """Return the LiteLLM tool definition matching this summariser kind."""
     if kind == "plan_summary":
@@ -238,6 +332,8 @@ def tool_for_kind(kind: str) -> dict:
         return FAILURE_ANALYSIS_TOOL
     if kind == "cost_summary":
         return COST_SUMMARY_TOOL
+    if kind == "architecture_critique":
+        return ARCHITECTURE_CRITIQUE_TOOL
     raise ValueError(f"unknown summariser kind: {kind!r}")
 
 
@@ -752,6 +848,125 @@ def render_cost_prompt(
         "only where the resource's own context (name, config, workspace) clearly "
         "suggests it — say whether its real usage sits toward the low or high end "
         "of the band. Do not restate the deterministic figures as your own."
+    )
+
+    user_message = "\n\n".join(user_parts)
+    return system_message, user_message
+
+
+# --- Architecture critique prompt (#963/#1036) ------------------------------
+ARCHITECTURE_CRITIQUE_SKILL_PROMPT = """\
+You are a senior cloud/platform architect performing a design review of the
+infrastructure a terraform/tofu plan PROPOSES to stand up. A team is about to
+apply this change; your job is to judge the architecture it produces — not to
+re-run the security scanner, and not to redesign the whole estate.
+
+You review across these dimensions and weigh the worst one when grading:
+  • Security posture — exposure, over-broad IAM, missing encryption, public
+    endpoints, secrets handling, network segmentation.
+  • Reliability / HA — single points of failure, missing multi-AZ / replicas,
+    absent backups or health checks, fragile dependencies.
+  • Cost-efficiency — obviously oversized or always-on resources, missing
+    lifecycle/retention, patterns that will scale cost non-linearly.
+  • Operational excellence — observability gaps, missing tags/labels, manual
+    toil the design bakes in, poor upgrade/rollback story.
+  • Scalability — headroom, hardcoded limits, patterns that won't grow.
+  • Best-practice adherence — deviations from well-established provider and
+    Terraform conventions.
+
+You will receive these inputs in the user message:
+  • PLAN_JSON — `tofu show -json` output for the proposed changes. Its
+    `planned_values` describe the infrastructure as it will exist after apply;
+    no-op / sensitive-value noise has been stripped before you see it.
+  • CODE_CONTEXT — concatenated *.tf source for this run (may be absent).
+    Background only, to look up declarations referenced by the plan.
+  • FLEET_CONTEXT — deployment-wide notes from the operator. May be empty.
+  • WORKSPACE_CONTEXT — workspace-specific notes. May be empty.
+
+You submit your answer by calling the `submit_architecture_critique` tool
+exactly once. The tool's parameters carry the schema; the provider guarantees
+your arguments are well-formed JSON. Do not respond with prose, do not
+paraphrase the JSON in your message body — just call the tool.
+
+Hard rules:
+  • This is ADVISORY reasoning. It never gates the run, and it never restates,
+    overrides, or duplicates the deterministic Checkov/Trivy security-scan
+    verdict shown separately. Add architectural judgement the scanner can't —
+    reliability, cost, operations, scalability, and design-level security — not
+    a re-listing of individual scanner rules.
+  • `risk_level` and `findings` are paired. An elevated grade
+    (medium/high/critical) REQUIRES at least one finding that justifies it; an
+    empty `findings` array is valid ONLY at `none`. If you can't name a
+    concrete finding, the grade is `none` with `[]`.
+  • Each finding names a concrete thing in the plan and why it matters, picks
+    the `category` that fits, and — whenever it attaches to a specific resource
+    — sets `address` to that resource's terraform address. Give each
+    materially-distinct issue its own finding; don't fold two into one or split
+    one across several. Order findings worst-first; the overall `risk_level`
+    equals the highest finding severity.
+  • Judge the STATE the proposed design leaves the world in, by consequence —
+    do not alarm-by-keyword. A sound, well-scoped design is `none`/`low`; say
+    so plainly rather than manufacturing findings.
+  • Refer to resources by terraform address. Do not invent resources or
+    addresses not present in the plan or CODE_CONTEXT.
+
+Style:
+  • Operator-facing, terse, professional. No emojis. No first-person narration.
+  • CONSISTENT TONE across `critique` and `findings[].detail` — both are prose
+    at the same register. `critique` is one to three short paragraphs separated
+    by blank lines; NO bold section headers, NO bullet lists, NO heading levels.
+  • Backticks for terraform addresses, attribute names, and short identifiers
+    are allowed and encouraged in BOTH `critique` and `findings[].detail`.
+  • `findings[].title` is a short plain-text label, no backticks;
+    `findings[].detail` is one or two sentences of prose at the same tone.\
+"""
+
+
+def render_architecture_critique_prompt(
+    *,
+    plan_json: str,
+    code_context: str = "",
+    fleet_context: str = "",
+    workspace_context: str = "",
+    prompt_prefix: str = "",
+    prompt_suffix: str = "",
+    output_language: str = "",
+) -> tuple[str, str]:
+    """Render the (system, user) messages for the architecture-critique request.
+
+    ``plan_json`` is the cleaned + bounded plan JSON (``planned_values`` and the
+    informative resource changes; sensitive values already stripped by the
+    plan-summary path's ``_clean_plan_json_bytes`` / ``_fit_plan_json``). The
+    output contract is the ``submit_architecture_critique`` tool. Clones
+    ``render_cost_prompt``'s structure.
+    """
+    parts: list[str] = []
+    if prompt_prefix.strip():
+        parts.append(prompt_prefix.strip())
+    parts.append(ARCHITECTURE_CRITIQUE_SKILL_PROMPT)
+    if prompt_suffix.strip():
+        parts.append(prompt_suffix.strip())
+    if output_language.strip() and output_language.strip().lower() != "english":
+        parts.append(
+            f"OUTPUT_LANGUAGE: Write every natural-language field you emit — the "
+            f"critique and each finding's title and detail — in "
+            f"{output_language.strip()}. Keep all identifiers verbatim and "
+            f"untranslated: resource addresses, provider and module names, HCL "
+            f"keywords, CLI flags, file paths, and anything inside backticks."
+        )
+    system_message = "\n\n".join(parts)
+
+    user_parts: list[str] = []
+    if fleet_context.strip():
+        user_parts.append(f"FLEET_CONTEXT:\n{fleet_context.strip()}")
+    if workspace_context.strip():
+        user_parts.append(f"WORKSPACE_CONTEXT:\n{workspace_context.strip()}")
+    user_parts.append(f"PLAN_JSON:\n```json\n{plan_json}\n```")
+    if code_context.strip():
+        user_parts.append(f"CODE_CONTEXT:\n```hcl\n{code_context}\n```")
+    user_parts.append(
+        "Now call the `submit_architecture_critique` tool exactly once with your "
+        "structured architectural review."
     )
 
     user_message = "\n\n".join(user_parts)

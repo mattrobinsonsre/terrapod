@@ -32,6 +32,7 @@ from terrapod.api.dependencies import (
 )
 from terrapod.auth import capabilities as cap
 from terrapod.auth.capabilities import has_capability
+from terrapod.config import settings
 from terrapod.db.models import Run, Workspace
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
@@ -105,10 +106,17 @@ async def get_run_security_scan(
     run = await _get_run_for_read(db, run_id, user)
     scan = await security_scan_service.get_run_scan(db, run.id)
     summary = await security_scan_service.run_scan_summary(db, run.id)
+    meta: dict = {"summary": summary}
+    # Advertise the AI architecture-critique URL when AI is enabled (#963/#1036),
+    # mirroring how the cost estimate advertises `ai-summary-url`. The critique is
+    # the optional AI reasoning layer the UI renders on top of this scan panel; it
+    # self-hides on 404. AI is advisory polish only — this never gates the scan.
+    if settings.ai_summary.enabled:
+        meta["ai-critique-url"] = f"/api/terrapod/v1/runs/{run.id}/architecture-critique"
     return JSONResponse(
         content={
             "data": _scan_json(scan) if scan is not None else None,
-            "meta": {"summary": summary},
+            "meta": meta,
         }
     )
 

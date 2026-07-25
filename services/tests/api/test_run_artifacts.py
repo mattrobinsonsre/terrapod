@@ -463,11 +463,18 @@ class TestUploadPlanJsonOutput:
             )
 
         assert resp.status_code == 204
-        mock_enq.assert_awaited_once()
-        args, kwargs = mock_enq.call_args
-        assert args[0] == "ai_plan_summary"
-        assert args[1] == {"run_id": str(run_id), "kind": "plan_summary"}
-        assert kwargs.get("dedup_key") == f"aisum:{run_id}:plan_summary"
+        # Fires the plan-summary trigger AND the architecture-critique trigger
+        # (#963/#1036) — both read this plan JSON, so both enqueue here after it
+        # lands. A non-drift run enqueues exactly these two.
+        by_trigger = {c.args[0]: c for c in mock_enq.call_args_list}
+        assert "ai_plan_summary" in by_trigger
+        ps_args, ps_kwargs = by_trigger["ai_plan_summary"]
+        assert ps_args[1] == {"run_id": str(run_id), "kind": "plan_summary"}
+        assert ps_kwargs.get("dedup_key") == f"aisum:{run_id}:plan_summary"
+        assert "ai_architecture_critique" in by_trigger
+        ac_args, ac_kwargs = by_trigger["ai_architecture_critique"]
+        assert ac_args[1] == {"run_id": str(run_id)}
+        assert ac_kwargs.get("dedup_key") == f"arch:{run_id}"
 
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
