@@ -40,6 +40,35 @@ RUN ARCH="${TARGETARCH:-$(dpkg --print-architecture)}" \
     && rm /tmp/opa.sha256 \
     && chmod 0755 /tmp/opa
 
+# Trivy (Go binary) — IaC config scanner for the security-scan phase (#1036).
+# Downloaded + checksum-verified here; COPY'd into the runtime so it stays free
+# of curl, exactly like OPA.
+ARG TRIVY_VERSION=0.72.0
+RUN ARCH="${TARGETARCH:-$(dpkg --print-architecture)}" \
+    && case "$ARCH" in \
+        amd64) TARCH="Linux-64bit" ;; \
+        arm64) TARCH="Linux-ARM64" ;; \
+        *) echo "unsupported arch: $ARCH" && exit 1 ;; \
+    esac \
+    && BASE="https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}" \
+    && curl -fsSL --retry 6 --retry-delay 4 --retry-all-errors -o /tmp/trivy.tar.gz "${BASE}/trivy_${TRIVY_VERSION}_${TARCH}.tar.gz" \
+    && curl -fsSL --retry 6 --retry-delay 4 --retry-all-errors -o /tmp/trivy.sums "${BASE}/trivy_${TRIVY_VERSION}_checksums.txt" \
+    && EXPECTED="$(grep "trivy_${TRIVY_VERSION}_${TARCH}.tar.gz" /tmp/trivy.sums | cut -d' ' -f1)" \
+    && echo "${EXPECTED}  /tmp/trivy.tar.gz" | sha256sum -c - \
+    && tar -xzf /tmp/trivy.tar.gz -C /tmp trivy \
+    && chmod 0755 /tmp/trivy \
+    && rm /tmp/trivy.tar.gz /tmp/trivy.sums
+
+# Checkov (plan-fed IaC misconfig scanner, #1036) — the default/recommended
+# engine. Installed into an ISOLATED venv so its large, tightly-pinned
+# dependency tree can never collide with the runner's own deps. The scan phase
+# invokes the `checkov` CLI (subprocess), not the library, so a self-contained
+# venv is all it needs. Multi-arch: pip builds for the target arch (checkov's
+# standalone binary is x86_64-only, hence the venv).
+RUN python -m venv /opt/checkov \
+    && /opt/checkov/bin/pip install --no-cache-dir checkov \
+    && /opt/checkov/bin/checkov --version
+
 WORKDIR /build
 COPY services/pyproject-runner.toml pyproject.toml
 RUN pip install --no-cache-dir .
@@ -61,6 +90,14 @@ RUN echo "apt-refresh=${APT_REFRESH}" \
 # OPA from the builder stage. Verified there; just copy it.
 COPY --from=builder /tmp/opa /usr/local/bin/opa
 RUN /usr/local/bin/opa version
+
+# Security-scan engines (#1036). Trivy is a single verified Go binary; Checkov
+# is the isolated venv from the builder, exposed via a CLI symlink (the venv's
+# absolute /opt/checkov path is preserved so its python shebang resolves).
+COPY --from=builder /tmp/trivy /usr/local/bin/trivy
+RUN /usr/local/bin/trivy --version
+COPY --from=builder /opt/checkov /opt/checkov
+RUN ln -s /opt/checkov/bin/checkov /usr/local/bin/checkov && /usr/local/bin/checkov --version
 
 # terrapod-query — tofu-native discovery engine (#823), pre-built for this arch
 # by the build-query CI job (or the local go build) and staged in the build
