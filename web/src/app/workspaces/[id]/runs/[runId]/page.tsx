@@ -603,6 +603,13 @@ function RunDetailPageInner() {
   const [securityInfo, setSecurityInfo] = useState<
     { present: boolean; status?: string; blocking?: number; engine?: string } | null
   >(null)
+  // The AI architecture critic is independent of the deterministic scan — it
+  // reads plan JSON, not scan findings. Track its presence separately so the
+  // Security tab/card/render surface whenever EITHER has content (an operator
+  // may run the critic with deterministic scanning off, and vice versa).
+  const [critiqueInfo, setCritiqueInfo] = useState<{ present: boolean; riskLevel?: string } | null>(
+    null,
+  )
 
   // Offset tracking for incremental log fetching (byte position in raw log data)
   const planLogOffset = useRef(0)
@@ -710,6 +717,23 @@ function RunDetailPageInner() {
     }
   }, [runId])
 
+  // Presence of the AI architecture critique — drives the Security tab/card
+  // independently of the deterministic scan. Pending/ready/errored are
+  // "something to show"; a 404 (never generated) or a skipped critique are not.
+  const loadCritiqueInfo = useCallback(async () => {
+    try {
+      const res = await apiFetch(`/api/terrapod/v1/runs/${runId}/architecture-critique`)
+      if (!res.ok) { setCritiqueInfo({ present: false }); return }
+      const d = await res.json()
+      const a = d.data?.attributes
+      const status = a?.status
+      const present = !!a && status !== 'skipped'
+      setCritiqueInfo({ present, riskLevel: present ? a?.['risk-level'] : undefined })
+    } catch {
+      /* rollup is best-effort chrome */
+    }
+  }, [runId])
+
   useEffect(() => {
     if (!getAuthState()) { router.push('/login'); return }
     loadRun()
@@ -721,6 +745,11 @@ function RunDetailPageInner() {
   useEffect(() => { loadAiInfo() }, [loadAiInfo, aiSummaryRefresh])
   useEffect(() => { loadPolicyInfo() }, [loadPolicyInfo, run?.attributes.status])
   useEffect(() => { loadSecurityInfo() }, [loadSecurityInfo, run?.attributes.status])
+  // Critique presence: on mount, on run-status change, and whenever an
+  // architecture_critique_* SSE event bumps the refresh counter.
+  useEffect(() => {
+    loadCritiqueInfo()
+  }, [loadCritiqueInfo, run?.attributes.status, architectureCritiqueRefresh])
 
   // Real-time updates via SSE — reload run on status change, refresh logs on log_updated
   const { connected: sseConnected } = useRunEvents(workspaceId, useCallback((event) => {
@@ -992,7 +1021,9 @@ function RunDetailPageInner() {
     ['overview', t('tabs.overview'), t('tabs.overview')],
     ...((aiInfo?.present ? [['ai', t('tabs.ai'), t('tabs.aiFull')]] : []) as [RunView, React.ReactNode, string][]),
     ...((policyInfo?.present ? [['opa', t('tabs.opa'), t('tabs.opaFull')]] : []) as [RunView, React.ReactNode, string][]),
-    ...((securityInfo?.present ? [['security', t('tabs.security'), t('tabs.securityFull')]] : []) as [RunView, React.ReactNode, string][]),
+    ...((securityInfo?.present || critiqueInfo?.present
+      ? [['security', t('tabs.security'), t('tabs.securityFull')]]
+      : []) as [RunView, React.ReactNode, string][]),
     ...((attrs['has-json-output']
       ? [['impact', t('tabs.impact'), t('tabs.impactFull')]]
       : []) as [RunView, React.ReactNode, string][]),
@@ -1075,11 +1106,21 @@ function RunDetailPageInner() {
   })()
 
   const securityCard: { value: string; sub?: string; tone: CardTone; clickable: boolean } = (() => {
-    if (!securityInfo) return { value: '…', tone: 'neutral', clickable: false }
-    if (!securityInfo.present) return { value: t('security.none'), tone: 'neutral', clickable: false }
-    if (securityInfo.status === 'blocked')
-      return { value: t('security.blocked'), sub: t('security.blockingSub', { count: securityInfo.blocking ?? 0 }), tone: 'bad', clickable: true }
-    return { value: t('security.passed'), tone: 'good', clickable: true }
+    if (!securityInfo && !critiqueInfo) return { value: '…', tone: 'neutral', clickable: false }
+    // The deterministic scan is the headline security signal when present.
+    if (securityInfo?.present) {
+      if (securityInfo.status === 'blocked')
+        return { value: t('security.blocked'), sub: t('security.blockingSub', { count: securityInfo.blocking ?? 0 }), tone: 'bad', clickable: true }
+      return { value: t('security.passed'), tone: 'good', clickable: true }
+    }
+    // No deterministic scan, but the AI critic flagged architectural risk —
+    // surface its risk level so the card still points into the Security tab.
+    if (critiqueInfo?.present) {
+      const rl = critiqueInfo.riskLevel || 'none'
+      const tone: CardTone = rl === 'critical' || rl === 'high' ? 'bad' : rl === 'medium' ? 'warn' : 'good'
+      return { value: t(`architectureCritique.risk.${rl}`), tone, clickable: true }
+    }
+    return { value: t('security.none'), tone: 'neutral', clickable: false }
   })()
 
   const resourceCard: { value: string; sub?: string; tone: CardTone } = (() => {
@@ -1358,7 +1399,7 @@ function RunDetailPageInner() {
             tone={policyCard.tone}
             onClick={policyCard.clickable ? () => switchView('opa') : undefined}
           />
-          {securityInfo?.present && (
+          {(securityInfo?.present || critiqueInfo?.present) && (
             <SummaryCard
               label={t('cards.security')}
               value={securityCard.value}
