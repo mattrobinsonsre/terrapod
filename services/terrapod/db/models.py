@@ -2434,6 +2434,117 @@ class CostSummaryMessage(Base):
     )
 
 
+class ArchitectureCritique(Base):
+    """LLM-generated senior-architect critique of a run's *proposed* infra (#963/#1036).
+
+    One-to-one with Run, keyed by (run_id). Rides the SAME switch as the plan
+    and cost summaries (``ai_summary.enabled`` + the per-workspace mode) and is
+    stored separately from ``runs`` for the same footprint/cold-read reasons.
+
+    The critic reads the run's **plan JSON ``planned_values``** — the same
+    plan-time artifact the deterministic security scan consumes — through the
+    plan-summary path's existing clean+bound helpers, so no sensitive state
+    attribute value ever reaches the model. It renders in the web UI *on top of*
+    the deterministic Security-scan panel: the scan is the deterministic
+    Checkov/Trivy layer (:class:`SecurityScanResult`); this critique is the AI
+    *reasoning* layer above it. They are distinct rows.
+
+    The critique is advisory reasoning only — it never gates a run and never
+    restates or replaces the deterministic scan verdict.
+
+    ``findings`` is a list of ``{severity, category, title, detail, address}``
+    objects (``severity`` ∈ critical / high / medium / low / info; ``category``
+    e.g. security / reliability / cost / operations / scalability). ``risk_level``
+    is an overall qualitative grade (critical / high / medium / low / none).
+
+    Status values mirror PlanSummary/CostSummary: pending / ready / skipped /
+    errored. The handler upserts on (run_id) so retries are idempotent and a
+    ``ready`` row is never overwritten by a later errored attempt.
+    """
+
+    __tablename__ = "architecture_critiques"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=generate_uuid7
+    )
+    run_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("runs.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
+
+    # Model output — populated when status == "ready".
+    critique: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    findings: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list, nullable=False)
+    risk_level: Mapped[str] = mapped_column(String(20), nullable=False, default="")
+
+    # Telemetry / debugging
+    model: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    input_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    output_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    error_message: Mapped[str] = mapped_column(Text, nullable=False, default="")
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False
+    )
+
+    __table_args__ = (sa.UniqueConstraint("run_id", name="uq_architecture_critiques_run"),)
+
+
+class ArchitectureCritiqueMessage(Base):
+    """One turn in the AI architecture-critique chat thread (#963/#1036).
+
+    The architecture-critic analogue of :class:`CostSummaryMessage` — attached
+    to an :class:`ArchitectureCritique`, it stores conversational follow-ups
+    (operator questions + model replies) grounded in the same plan-JSON
+    ``planned_values`` the initial critique read (never Terraform state).
+
+    Roles: ``"user"`` / ``"assistant"``. Assistant rows carry telemetry so the
+    daily budget debits per turn; user rows have zero tokens. Ordering is
+    ``(architecture_critique_id, created_at)``.
+    """
+
+    __tablename__ = "architecture_critique_messages"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=generate_uuid7
+    )
+    architecture_critique_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("architecture_critiques.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    role: Mapped[str] = mapped_column(String(20), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False, default="")
+
+    # Telemetry — meaningful on assistant rows, zero on user rows.
+    model: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    input_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    output_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    error_message: Mapped[str] = mapped_column(Text, nullable=False, default="")
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc, nullable=False
+    )
+
+    __table_args__ = (
+        sa.CheckConstraint(
+            "role IN ('user', 'assistant')",
+            name="ck_architecture_critique_messages_role",
+        ),
+        sa.Index(
+            "ix_architecture_critique_messages_critique_created",
+            "architecture_critique_id",
+            "created_at",
+        ),
+    )
+
+
 # Onboarding session lifecycle (#824 P2). A session is workspace-scoped and
 # discovers existing, unmanaged cloud resources, then generates copy-pasteable
 # ``resource`` + ``import {}`` config. The stages map onto where each runs:
