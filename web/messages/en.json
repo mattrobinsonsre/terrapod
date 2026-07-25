@@ -1831,6 +1831,8 @@
       "aiFull": "AI analysis",
       "opa": "OPA",
       "opaFull": "OPA policies",
+      "security": "Security",
+      "securityFull": "Security scan",
       "impact": "Impact",
       "impactFull": "Impact graph",
       "cost": "Cost",
@@ -1852,6 +1854,7 @@
       "changes": "Changes",
       "aiAnalysis": "AI analysis",
       "policyChecks": "Policy checks",
+      "security": "Security scan",
       "resources": "Resources"
     },
     "changes": {
@@ -1878,6 +1881,12 @@
       "failedSub": "{count, plural, one {# failed} other {# failed}}",
       "advisoryIssues": "Advisory issues",
       "passedSub": "{passed}/{total} passed",
+      "passed": "Passed"
+    },
+    "security": {
+      "none": "None",
+      "blocked": "Blocked",
+      "blockingSub": "{count, plural, one {# blocking finding} other {# blocking findings}}",
       "passed": "Passed"
     },
     "resources": {
@@ -1956,6 +1965,26 @@
         "passed": "passed",
         "failed": "failed",
         "errored": "errored"
+      }
+    },
+    "securityPanel": {
+      "heading": "Security Scan",
+      "engineLabel": "{engine}",
+      "thresholdLabel": "threshold: {threshold}",
+      "blockedMessage": "This run is <strong>blocked by {count, plural, one {# security finding} other {# security findings}}</strong> at or above the threshold. It will not apply until the findings are resolved or an admin overrides.",
+      "overriding": "Overriding...",
+      "overrideContinue": "Override & Continue",
+      "overrideConfirm": "Override the security scan and allow this run to apply despite the blocking findings?",
+      "overrideFailed": "Override failed",
+      "overrideFailedStatus": "Override failed ({status})",
+      "overriddenBy": "overridden by {by}",
+      "passed": "No findings at or above the threshold.",
+      "guideline": "View guideline",
+      "severity": {
+        "critical": "critical",
+        "high": "high",
+        "medium": "medium",
+        "low": "low"
       }
     },
     "cost": {
