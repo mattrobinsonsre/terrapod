@@ -187,6 +187,7 @@ Everything below is implemented and shipped today.
 | Feature | Description |
 |---|---|
 | AI plan review | LLM change summary + risk assessment on every plan, failure analysis on errored plans, and a chat to interrogate a run — provider-agnostic via LiteLLM (AWS Bedrock, OpenAI, Anthropic, Gemini, Azure OpenAI, vLLM). IAM-native auth for Bedrock (IRSA + optional cross-account `sts:AssumeRole`) |
+| Architecture critique | Senior cloud-architect AI review of a run's *proposed* infrastructure — prose critique + overall risk level + structured findings (security/reliability/cost/operations/scalability) + a grounded chat. Reads the plan JSON (never state); renders on top of the deterministic Checkov/Trivy security scan; **advisory only, never gates a run**. Shares the AI plan-review switch (no new config key) |
 
 </details>
 
@@ -396,6 +397,7 @@ See [docs/authentication.md](docs/authentication.md) for setup guides.
 | [Terragrunt](docs/terragrunt.md) | CLI-driven and agent-mode Terragrunt support |
 | [Remote State](docs/remote-state.md) | State versioning, locking, rollback, the `cloud` backend |
 | [AI Plan Summary](docs/ai-plan-summary.md) | LLM plan summaries, risk assessment, failure analysis, chat |
+| [Architecture Critique](docs/architecture-critique.md) | Optional senior-architect AI review of a run's proposed infrastructure (prose + risk level + structured findings + chat); renders on top of the deterministic security scan; advisory only, never gates a run; shares the AI plan-summary switch |
 | [Impact Graph](docs/impact-graph.md) | Interactive dependency + blast-radius view of a plan on the run page, clustered by module |
 | [Estate Topology](docs/estate-topology.md) | Whole-estate dependency + module-impact graph, grouped by any axis you choose; accessible table fallback |
 | [State Resource Graph](docs/state-resource-graph.md) | Per-workspace resource dependency graph from Terraform state, with an older-version picker; accessible table fallback |

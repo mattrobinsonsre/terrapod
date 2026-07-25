@@ -46,6 +46,7 @@ Beyond broad TFE compatibility, Terrapod is built with three deliberate design f
 | **Execution Hooks** | **Custom execution steps** — admin-managed shell run in the runner Job at five run-lifecycle points, associated with workspaces (`pre_init` is the setup/tooling/auth slot; custom runner images cover heavier needs) |
 | **Policy-as-Code** | OPA/Rego policy sets evaluated on every run; advisory or mandatory enforcement, label-scoped |
 | **IaC Security Scanning** | Checkov/Trivy misconfiguration scanning of the plan JSON; per-workspace advisory or enforced, severity threshold, skip rules |
+| **Architecture Critique** | Optional senior-architect AI review of a run's proposed infrastructure — prose critique + risk level + structured findings + grounded chat; renders on top of the security scan; advisory only, never gates a run; shares the AI plan-summary switch |
 | **Drift Detection** | Scheduled plan-only runs to detect out-of-band infrastructure changes |
 | **Workspace Health** | Per-workspace health conditions with status indicators on workspace list |
 | **Cloud Credentials** | Dynamic provider credentials via Kubernetes workload identity (AWS IRSA, GCP WIF, Azure WI) |
@@ -140,6 +141,7 @@ See [Architecture](architecture.md) for the full breakdown.
 | [Terragrunt](terragrunt.md) | CLI-driven and agent-mode Terragrunt support, the agent-mode `terragrunt_enabled` flag, and current limitations |
 | [Remote State](remote-state.md) | Cross-workspace `terraform_remote_state` composition with producer-controlled allowlist |
 | [AI Plan Summary](ai-plan-summary.md) | LLM-generated change summary + risk assessment on every plan; failure analysis on errored plans. Bedrock, OpenAI, Anthropic, Gemini, vLLM — any provider via LiteLLM |
+| [Architecture Critique](architecture-critique.md) | Optional senior cloud-architect AI review of a run's proposed infrastructure (prose critique + risk level + structured findings + chat); reads the plan JSON, sits on top of the deterministic security scan, advisory only; shares the AI plan-summary switch |
 | [Impact Graph](impact-graph.md) | Interactive dependency + blast-radius view of a plan on the run page, clustered by module; click a resource to light up its transitive downstream impact |
 | [Estate Topology](estate-topology.md) | Whole-estate dependency + module-impact graph — workspaces + modules wired by run-triggers, remote-state, and module links; group by any label / pool / name prefix; RBAC-filtered; accessible table fallback |
 | [State Resource Graph](state-resource-graph.md) | Per-workspace resource dependency graph from Terraform state — resources wired by `depends-on`; current state version by default with an older-version picker; group by type / module / provider / mode; accessible table fallback |
