@@ -13,7 +13,7 @@ from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519
 from cryptography.x509.oid import NameOID
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.logging_config import get_logger
@@ -259,6 +259,11 @@ def parse_san_uris(cert: x509.Certificate) -> dict[str, str]:
 
 # ── Lifecycle ────────────────────────────────────────────────────────────
 
+# Stable, arbitrary key for the Postgres advisory lock that serializes CA
+# initialization across API replicas (#1060). Any fixed bigint works; it only
+# needs to be unique among advisory-lock keys the app uses.
+_CA_INIT_ADVISORY_LOCK = 776699001122
+
 
 async def init_ca(db: AsyncSession) -> CertificateAuthority:
     """Initialize the CA singleton from database, falling back to generate + persist.
@@ -273,6 +278,17 @@ async def init_ca(db: AsyncSession) -> CertificateAuthority:
 
     global _ca  # noqa: PLW0603
 
+    # Serialize the check-then-create across replicas with a transaction-scoped
+    # Postgres advisory lock (multi-replica safe, no leader election — same
+    # mutual-exclusion philosophy as the scheduler's Redis mutex). Without this,
+    # two API replicas starting against a fresh (CA-less) database each see
+    # "no CA", each generate one, and each insert a row — leaving the replicas
+    # caching *different* CAs and permanently disagreeing, which breaks listener
+    # cert validation ("Certificate not signed by this CA"). The lock makes
+    # concurrent starters queue: the first creates the CA, the rest load it. The
+    # lock releases automatically when this transaction commits below (#1060).
+    await db.execute(text("SELECT pg_advisory_xact_lock(:k)"), {"k": _CA_INIT_ADVISORY_LOCK})
+
     result = await db.execute(
         select(CertificateAuthorityModel)
         .order_by(CertificateAuthorityModel.created_at.desc())
@@ -285,6 +301,9 @@ async def init_ca(db: AsyncSession) -> CertificateAuthority:
             ca_record.ca_cert.encode(),
             ca_record.ca_key_pem.encode(),
         )
+        # Release the advisory lock (held on this transaction) now that the
+        # read is done; nothing was written.
+        await db.commit()
         logger.info(
             "Loaded CA from database",
             fingerprint=get_certificate_fingerprint(ca.ca_cert)[:16],
