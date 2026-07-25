@@ -550,7 +550,36 @@ jobs:
       - name: Install dependencies
         run: npm ci
       - name: Run npm audit
-        run: npm audit --audit-level=high
+        # Fail on any high/critical advisory EXCEPT explicitly-allowlisted ones
+        # (mirrors pip-audit's --ignore-vuln and trivy's .trivyignore). Each
+        # allowlisted advisory is build/lint-only, non-reachable, and awaiting a
+        # fix that only lands via a major toolchain upgrade — keep each with a
+        # reason + tracking issue, and drop it the moment the upgrade is taken:
+        #   GHSA-mh99-v99m-4gvg  brace-expansion ReDoS — a devDependency only
+        #     (eslint -> minimatch -> brace-expansion; never sees runtime/user
+        #     input). Patched only in brace-expansion 5.0.8, whose new export
+        #     shape breaks the eslint chain's minimatch, so the real fix is a
+        #     major `eslint` 10 upgrade. Tracked in #1058.
+        run: |
+          npm audit --audit-level=high --json > audit.json || true
+          node -e '
+            const a = require("./audit.json");
+            const allow = new Set(["GHSA-mh99-v99m-4gvg"]);
+            const bad = [];
+            for (const [name, v] of Object.entries(a.vulnerabilities || {})) {
+              if (!["high", "critical"].includes(v.severity)) continue;
+              const ids = (v.via || [])
+                .filter((x) => x && typeof x === "object" && x.url)
+                .map((x) => x.url.split("/").pop());
+              const unhandled = ids.filter((id) => !allow.has(id));
+              if (unhandled.length) bad.push(`${name} [${v.severity}]: ${unhandled.join(", ")}`);
+            }
+            if (bad.length) {
+              console.error("Non-allowlisted high/critical npm advisories:\n" + bad.join("\n"));
+              process.exit(1);
+            }
+            console.log("npm audit: clean (only allowlisted advisories remain — see step comment).");
+          '
 
   # ── Secret Scanning (gitleaks) ────────────────────────
   secret-scan:
