@@ -16,7 +16,7 @@ import (
 func registerObserve(s *mcp.Server, c *terrapod.Client) {
 	// ── terrapod_workspace_list ──────────────────────────────────────
 	type workspaceListIn struct {
-		PageSize int `json:"page_size,omitempty" jsonschema:"max workspaces to return in this page (default 50)"`
+		PageSize int    `json:"page_size,omitempty" jsonschema:"max workspaces to return in this page (default 50)"`
 		Search   string `json:"search,omitempty" jsonschema:"filter workspaces by name substring"`
 	}
 	type workspaceSummary struct {
@@ -218,6 +218,25 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 			return errResult(err), nil, nil
 		}
 		return nil, e, nil
+	})
+
+	// ── terrapod_run_security_scan ───────────────────────────────────
+	type runScanIn struct {
+		RunID string `json:"run_id" jsonschema:"the run id (run-... or a bare uuid) whose IaC security-scan result to fetch"`
+	}
+	mcp.AddTool(s, &mcp.Tool{
+		Name:        "terrapod_run_security_scan",
+		Description: "Get a run's deterministic IaC security-scan result (Checkov/Trivy misconfiguration scan). Returns the engine, enforcement level (off/advisory/enforced), severity threshold, outcome (passed/failed/errored), the normalised findings (rule id, severity, resource, file:line), a summary (total + blocking counts), and any override. Returns null when the workspace has scanning off or the run wasn't scanned.",
+		Annotations: readOnly,
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in runScanIn) (*mcp.CallToolResult, *terrapod.SecurityScan, error) {
+		if in.RunID == "" {
+			return errText("run_id is required"), nil, nil
+		}
+		sc, err := c.GetRunSecurityScan(ctx, in.RunID)
+		if err != nil {
+			return errResult(err), nil, nil
+		}
+		return nil, sc, nil
 	})
 }
 
