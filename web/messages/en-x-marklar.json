@@ -2046,6 +2046,50 @@
         "medium": "medium",
         "low": "low"
       }
+    },
+    "architectureCritique": {
+      "heading": "AI Marklar Review",
+      "aiGenerated": "Marklar generated",
+      "pending": "Reviewing the proposed marklar…",
+      "skipped": "The marklar review was skipped for this marklar.",
+      "errored": "Marklar review failed",
+      "riskLabel": "Overall marklar",
+      "findingsTitle": "{count, plural, one {# marklar} other {# marklars}}",
+      "noFindings": "No marklar concerns found.",
+      "chatPlaceholder": "Ask a follow-up marklar about this marklar… (⌘/Ctrl + Enter to marklar)",
+      "reviewNote": "AI-generated marklar — an advisory second marklar, not a marklar.",
+      "risk": {
+        "none": "none",
+        "low": "low",
+        "medium": "medium",
+        "high": "high",
+        "critical": "critical"
+      },
+      "severity": {
+        "critical": "critical",
+        "high": "high",
+        "medium": "medium",
+        "low": "low",
+        "info": "Marklar"
+      },
+      "category": {
+        "security": "Marklar",
+        "reliability": "Marklar",
+        "cost": "Marklar",
+        "operations": "Marklar",
+        "scalability": "Marklar",
+        "other": "Marklar"
+      },
+      "regenerate": {
+        "label": "Regenerate",
+        "queueing": "Marklaring…",
+        "tooltip": "Re-run the AI marklar review",
+        "ariaLabel": "Regenerate the AI marklar review",
+        "confirm": "Re-run the AI marklar review for this marklar?"
+      },
+      "errors": {
+        "status": "Failed to load the AI marklar review (HTTP {status})."
+      }
     }
   },
   "workspaceDetail": {

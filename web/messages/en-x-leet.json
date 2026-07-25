@@ -2046,6 +2046,50 @@
         "medium": "m3d1um",
         "low": "l0w"
       }
+    },
+    "architectureCritique": {
+      "heading": "AI Arch173c7ur3 R3v13w",
+      "aiGenerated": "41-g3n3r473d",
+      "pending": "R3v13w1ng 7h3 pr0p053d 4rch173c7ur3…",
+      "skipped": "7h3 4rch173c7ur3 r3v13w w45 5k1pp3d f0r 7h15 run.",
+      "errored": "Arch173c7ur3 r3v13w f41l3d",
+      "riskLabel": "0v3r4ll r15k",
+      "findingsTitle": "{count, plural, one {# f1nd1ng} other {# f1nd1ng5}}",
+      "noFindings": "N0 4rch173c7ur4l c0nc3rn5 f0und.",
+      "chatPlaceholder": "A5k 4 f0ll0w-up qu35710n 4b0u7 7h15 4rch173c7ur3… (⌘/Ctrl + Enter 70 53nd)",
+      "reviewNote": "AI-g3n3r473d r3v13w — 4n 4dv150ry 53c0nd 0p1n10n, n07 4 g473.",
+      "risk": {
+        "none": "n0n3",
+        "low": "l0w",
+        "medium": "m3d1um",
+        "high": "h1gh",
+        "critical": "cr171c4l"
+      },
+      "severity": {
+        "critical": "cr171c4l",
+        "high": "h1gh",
+        "medium": "m3d1um",
+        "low": "l0w",
+        "info": "1nf0"
+      },
+      "category": {
+        "security": "53cur17y",
+        "reliability": "R3l14b1l17y",
+        "cost": "C057",
+        "operations": "0p3r4710n5",
+        "scalability": "5c4l4b1l17y",
+        "other": "07h3r"
+      },
+      "regenerate": {
+        "label": "R3g3n3r473",
+        "queueing": "Qu3u1ng…",
+        "tooltip": "R3-run 7h3 AI 4rch173c7ur3 r3v13w",
+        "ariaLabel": "R3g3n3r473 AI 4rch173c7ur3 r3v13w",
+        "confirm": "R3-run 7h3 AI 4rch173c7ur3 r3v13w f0r 7h15 run?"
+      },
+      "errors": {
+        "status": "F41l3d 70 l04d AI 4rch173c7ur3 r3v13w (HTTP {status})."
+      }
     }
   },
   "workspaceDetail": {

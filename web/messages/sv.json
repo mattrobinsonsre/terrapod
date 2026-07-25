@@ -2046,6 +2046,50 @@
         "medium": "medel",
         "low": "låg"
       }
+    },
+    "architectureCritique": {
+      "heading": "AI-arkitekturgranskning",
+      "aiGenerated": "AI-genererad",
+      "pending": "Granskar den föreslagna arkitekturen…",
+      "skipped": "Arkitekturgranskningen hoppades över för den här körningen.",
+      "errored": "Arkitekturgranskningen misslyckades",
+      "riskLabel": "Total risk",
+      "findingsTitle": "{count, plural, one {# fynd} other {# fynd}}",
+      "noFindings": "Inga arkitekturproblem hittades.",
+      "chatPlaceholder": "Ställ en följdfråga om den här arkitekturen… (⌘/Ctrl + Retur för att skicka)",
+      "reviewNote": "AI-genererad granskning — en rådgivande andra åsikt, inte en grind.",
+      "risk": {
+        "none": "ingen",
+        "low": "låg",
+        "medium": "medel",
+        "high": "hög",
+        "critical": "kritisk"
+      },
+      "severity": {
+        "critical": "kritisk",
+        "high": "hög",
+        "medium": "medel",
+        "low": "låg",
+        "info": "Info"
+      },
+      "category": {
+        "security": "Säkerhet",
+        "reliability": "Tillförlitlighet",
+        "cost": "Kostnad",
+        "operations": "Drift",
+        "scalability": "Skalbarhet",
+        "other": "Övrigt"
+      },
+      "regenerate": {
+        "label": "Generera om",
+        "queueing": "Köar…",
+        "tooltip": "Kör AI-arkitekturgranskningen igen",
+        "ariaLabel": "Generera om AI-arkitekturgranskningen",
+        "confirm": "Kör AI-arkitekturgranskningen igen för den här körningen?"
+      },
+      "errors": {
+        "status": "Det gick inte att läsa in AI-arkitekturgranskningen (HTTP {status})."
+      }
     }
   },
   "workspaceDetail": {

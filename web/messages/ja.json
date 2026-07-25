@@ -2046,6 +2046,50 @@
         "medium": "中",
         "low": "低"
       }
+    },
+    "architectureCritique": {
+      "heading": "AI アーキテクチャレビュー",
+      "aiGenerated": "AI生成",
+      "pending": "提案されたアーキテクチャをレビューしています…",
+      "skipped": "この実行のアーキテクチャレビューはスキップされました。",
+      "errored": "アーキテクチャレビューに失敗しました",
+      "riskLabel": "総合リスク",
+      "findingsTitle": "{count, plural, other {# 件の指摘}}",
+      "noFindings": "アーキテクチャ上の懸念は見つかりませんでした。",
+      "chatPlaceholder": "このアーキテクチャについてフォローアップの質問をどうぞ…（⌘/Ctrl + Enter で送信）",
+      "reviewNote": "AI 生成のレビュー — ゲートではなく、助言的なセカンドオピニオンです。",
+      "risk": {
+        "none": "なし",
+        "low": "低",
+        "medium": "中",
+        "high": "高",
+        "critical": "重大"
+      },
+      "severity": {
+        "critical": "重大",
+        "high": "高",
+        "medium": "中",
+        "low": "低",
+        "info": "情報"
+      },
+      "category": {
+        "security": "セキュリティ",
+        "reliability": "信頼性",
+        "cost": "コスト",
+        "operations": "運用",
+        "scalability": "スケーラビリティ",
+        "other": "その他"
+      },
+      "regenerate": {
+        "label": "再生成",
+        "queueing": "キューに追加中…",
+        "tooltip": "AI アーキテクチャレビューを再実行",
+        "ariaLabel": "AI アーキテクチャレビューを再生成",
+        "confirm": "この実行の AI アーキテクチャレビューを再実行しますか？"
+      },
+      "errors": {
+        "status": "AI アーキテクチャレビューを読み込めませんでした（HTTP {status}）。"
+      }
     }
   },
   "workspaceDetail": {

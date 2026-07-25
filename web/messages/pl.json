@@ -2046,6 +2046,50 @@
         "medium": "średni",
         "low": "niski"
       }
+    },
+    "architectureCritique": {
+      "heading": "Przegląd architektury przez SI",
+      "aiGenerated": "Wygenerowano przez AI",
+      "pending": "Trwa przegląd proponowanej architektury…",
+      "skipped": "Przegląd architektury został pominięty dla tego uruchomienia.",
+      "errored": "Przegląd architektury nie powiódł się",
+      "riskLabel": "Ryzyko ogólne",
+      "findingsTitle": "{count, plural, one {# ustalenie} few {# ustalenia} many {# ustaleń} other {# ustaleń}}",
+      "noFindings": "Nie znaleziono problemów architektonicznych.",
+      "chatPlaceholder": "Zadaj pytanie uzupełniające o tej architekturze… (⌘/Ctrl + Enter, aby wysłać)",
+      "reviewNote": "Przegląd wygenerowany przez SI — doradcza druga opinia, a nie bramka.",
+      "risk": {
+        "none": "brak",
+        "low": "niskie",
+        "medium": "średnie",
+        "high": "wysokie",
+        "critical": "krytyczne"
+      },
+      "severity": {
+        "critical": "krytyczny",
+        "high": "wysoki",
+        "medium": "średni",
+        "low": "niski",
+        "info": "Info"
+      },
+      "category": {
+        "security": "Bezpieczeństwo",
+        "reliability": "Niezawodność",
+        "cost": "Koszt",
+        "operations": "Operacje",
+        "scalability": "Skalowalność",
+        "other": "Inne"
+      },
+      "regenerate": {
+        "label": "Wygeneruj ponownie",
+        "queueing": "Kolejkowanie…",
+        "tooltip": "Ponownie uruchom przegląd architektury przez SI",
+        "ariaLabel": "Wygeneruj ponownie przegląd architektury przez SI",
+        "confirm": "Ponownie uruchomić przegląd architektury przez SI dla tego uruchomienia?"
+      },
+      "errors": {
+        "status": "Nie udało się wczytać przeglądu architektury przez SI (HTTP {status})."
+      }
     }
   },
   "workspaceDetail": {

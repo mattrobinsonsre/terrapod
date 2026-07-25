@@ -2046,6 +2046,50 @@
         "medium": "medium",
         "low": "lo"
       }
+    },
+    "architectureCritique": {
+      "heading": "AI Arkitekcher Reevew",
+      "aiGenerated": "AI generated",
+      "pending": "Reeveweing da proposd arkitekcher…",
+      "skipped": "Da arkitekcher reevew wuz skippd for dis run.",
+      "errored": "Arkitekcher reevew brokd",
+      "riskLabel": "Overol risk",
+      "findingsTitle": "{count, plural, one {# findin} other {# findins}}",
+      "noFindings": "No arkitekcher worriez found. yay.",
+      "chatPlaceholder": "Ask a folowup kwestion bout dis arkitekcher… (⌘/Ctrl + Enter 2 send)",
+      "reviewNote": "AI-maded reevew — a advisin secund opinyun, not a gate.",
+      "risk": {
+        "none": "none",
+        "low": "low",
+        "medium": "medium",
+        "high": "high",
+        "critical": "critical"
+      },
+      "severity": {
+        "critical": "kritikal",
+        "high": "hai",
+        "medium": "medium",
+        "low": "lo",
+        "info": "Info"
+      },
+      "category": {
+        "security": "Sekurity",
+        "reliability": "Relaibiliteh",
+        "cost": "Cost",
+        "operations": "Operashunz",
+        "scalability": "Skalabiliteh",
+        "other": "Uther"
+      },
+      "regenerate": {
+        "label": "Regeneratez",
+        "queueing": "Queuein…",
+        "tooltip": "Run da AI arkitekcher reevew agin",
+        "ariaLabel": "Regenerate da AI arkitekcher reevew",
+        "confirm": "Run da AI arkitekcher reevew agin for dis run?"
+      },
+      "errors": {
+        "status": "Cudnt load da AI arkitekcher reevew (HTTP {status})."
+      }
     }
   },
   "workspaceDetail": {

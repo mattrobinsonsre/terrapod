@@ -2046,6 +2046,50 @@
         "medium": "medio",
         "low": "bajo"
       }
+    },
+    "architectureCritique": {
+      "heading": "Revisión de arquitectura con IA",
+      "aiGenerated": "Generado por IA",
+      "pending": "Revisando la arquitectura propuesta…",
+      "skipped": "La revisión de arquitectura se omitió para esta ejecución.",
+      "errored": "La revisión de arquitectura falló",
+      "riskLabel": "Riesgo general",
+      "findingsTitle": "{count, plural, one {# hallazgo} other {# hallazgos}}",
+      "noFindings": "No se encontraron problemas de arquitectura.",
+      "chatPlaceholder": "Haz una pregunta de seguimiento sobre esta arquitectura… (⌘/Ctrl + Intro para enviar)",
+      "reviewNote": "Revisión generada por IA: una segunda opinión consultiva, no un control.",
+      "risk": {
+        "none": "ninguno",
+        "low": "bajo",
+        "medium": "medio",
+        "high": "alto",
+        "critical": "crítico"
+      },
+      "severity": {
+        "critical": "crítico",
+        "high": "alto",
+        "medium": "medio",
+        "low": "bajo",
+        "info": "Info"
+      },
+      "category": {
+        "security": "Seguridad",
+        "reliability": "Fiabilidad",
+        "cost": "Coste",
+        "operations": "Operaciones",
+        "scalability": "Escalabilidad",
+        "other": "Otros"
+      },
+      "regenerate": {
+        "label": "Regenerar",
+        "queueing": "En cola…",
+        "tooltip": "Volver a ejecutar la revisión de arquitectura con IA",
+        "ariaLabel": "Regenerar la revisión de arquitectura con IA",
+        "confirm": "¿Volver a ejecutar la revisión de arquitectura con IA para esta ejecución?"
+      },
+      "errors": {
+        "status": "No se pudo cargar la revisión de arquitectura con IA (HTTP {status})."
+      }
     }
   },
   "workspaceDetail": {

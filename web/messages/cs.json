@@ -2046,6 +2046,50 @@
         "medium": "střední",
         "low": "nízká"
       }
+    },
+    "architectureCritique": {
+      "heading": "Kontrola architektury pomocí AI",
+      "aiGenerated": "Vygenerováno AI",
+      "pending": "Probíhá kontrola navržené architektury…",
+      "skipped": "Kontrola architektury byla pro tento běh přeskočena.",
+      "errored": "Kontrola architektury se nezdařila",
+      "riskLabel": "Celkové riziko",
+      "findingsTitle": "{count, plural, one {# zjištění} few {# zjištění} many {# zjištění} other {# zjištění}}",
+      "noFindings": "Nebyly nalezeny žádné architektonické problémy.",
+      "chatPlaceholder": "Položte doplňující dotaz k této architektuře… (⌘/Ctrl + Enter pro odeslání)",
+      "reviewNote": "Kontrola vygenerovaná AI — poradní druhý názor, nikoli brána.",
+      "risk": {
+        "none": "žádné",
+        "low": "nízké",
+        "medium": "střední",
+        "high": "vysoké",
+        "critical": "kritické"
+      },
+      "severity": {
+        "critical": "kritická",
+        "high": "vysoká",
+        "medium": "střední",
+        "low": "nízká",
+        "info": "Info"
+      },
+      "category": {
+        "security": "Zabezpečení",
+        "reliability": "Spolehlivost",
+        "cost": "Náklady",
+        "operations": "Provoz",
+        "scalability": "Škálovatelnost",
+        "other": "Ostatní"
+      },
+      "regenerate": {
+        "label": "Vygenerovat znovu",
+        "queueing": "Řazení do fronty…",
+        "tooltip": "Znovu spustit kontrolu architektury pomocí AI",
+        "ariaLabel": "Znovu vygenerovat kontrolu architektury pomocí AI",
+        "confirm": "Znovu spustit kontrolu architektury pomocí AI pro tento běh?"
+      },
+      "errors": {
+        "status": "Kontrolu architektury pomocí AI se nepodařilo načíst (HTTP {status})."
+      }
     }
   },
   "workspaceDetail": {

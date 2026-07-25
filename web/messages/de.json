@@ -2046,6 +2046,50 @@
         "medium": "mittel",
         "low": "niedrig"
       }
+    },
+    "architectureCritique": {
+      "heading": "KI-Architekturprüfung",
+      "aiGenerated": "KI-generiert",
+      "pending": "Die vorgeschlagene Architektur wird geprüft…",
+      "skipped": "Die Architekturprüfung wurde für diesen Lauf übersprungen.",
+      "errored": "Architekturprüfung fehlgeschlagen",
+      "riskLabel": "Gesamtrisiko",
+      "findingsTitle": "{count, plural, one {# Befund} other {# Befunde}}",
+      "noFindings": "Keine architektonischen Bedenken gefunden.",
+      "chatPlaceholder": "Stelle eine Folgefrage zu dieser Architektur… (⌘/Strg + Eingabe zum Senden)",
+      "reviewNote": "KI-generierte Prüfung — eine beratende Zweitmeinung, kein Gate.",
+      "risk": {
+        "none": "keins",
+        "low": "niedrig",
+        "medium": "mittel",
+        "high": "hoch",
+        "critical": "kritisch"
+      },
+      "severity": {
+        "critical": "kritisch",
+        "high": "hoch",
+        "medium": "mittel",
+        "low": "niedrig",
+        "info": "Info"
+      },
+      "category": {
+        "security": "Sicherheit",
+        "reliability": "Zuverlässigkeit",
+        "cost": "Kosten",
+        "operations": "Betrieb",
+        "scalability": "Skalierbarkeit",
+        "other": "Sonstiges"
+      },
+      "regenerate": {
+        "label": "Neu generieren",
+        "queueing": "Wird eingereiht…",
+        "tooltip": "Die KI-Architekturprüfung erneut ausführen",
+        "ariaLabel": "KI-Architekturprüfung neu generieren",
+        "confirm": "Die KI-Architekturprüfung für diesen Lauf erneut ausführen?"
+      },
+      "errors": {
+        "status": "KI-Architekturprüfung konnte nicht geladen werden (HTTP {status})."
+      }
     }
   },
   "workspaceDetail": {

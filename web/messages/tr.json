@@ -2046,6 +2046,50 @@
         "medium": "orta",
         "low": "düşük"
       }
+    },
+    "architectureCritique": {
+      "heading": "Yapay zeka mimari incelemesi",
+      "aiGenerated": "AI üretti",
+      "pending": "Önerilen mimari inceleniyor…",
+      "skipped": "Bu çalıştırma için mimari inceleme atlandı.",
+      "errored": "Mimari inceleme başarısız oldu",
+      "riskLabel": "Genel risk",
+      "findingsTitle": "{count, plural, one {# bulgu} other {# bulgu}}",
+      "noFindings": "Mimariyle ilgili sorun bulunamadı.",
+      "chatPlaceholder": "Bu mimari hakkında bir takip sorusu sorun… (⌘/Ctrl + Enter ile gönderin)",
+      "reviewNote": "Yapay zeka tarafından oluşturulan inceleme — bir kapı değil, danışma niteliğinde ikinci görüş.",
+      "risk": {
+        "none": "yok",
+        "low": "düşük",
+        "medium": "orta",
+        "high": "yüksek",
+        "critical": "kritik"
+      },
+      "severity": {
+        "critical": "kritik",
+        "high": "yüksek",
+        "medium": "orta",
+        "low": "düşük",
+        "info": "Bilgi"
+      },
+      "category": {
+        "security": "Güvenlik",
+        "reliability": "Güvenilirlik",
+        "cost": "Maliyet",
+        "operations": "Operasyonlar",
+        "scalability": "Ölçeklenebilirlik",
+        "other": "Diğer"
+      },
+      "regenerate": {
+        "label": "Yeniden oluştur",
+        "queueing": "Sıraya alınıyor…",
+        "tooltip": "Yapay zeka mimari incelemesini yeniden çalıştır",
+        "ariaLabel": "Yapay zeka mimari incelemesini yeniden oluştur",
+        "confirm": "Bu çalıştırma için yapay zeka mimari incelemesi yeniden çalıştırılsın mı?"
+      },
+      "errors": {
+        "status": "Yapay zeka mimari incelemesi yüklenemedi (HTTP {status})."
+      }
     }
   },
   "workspaceDetail": {

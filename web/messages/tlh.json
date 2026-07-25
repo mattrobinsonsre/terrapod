@@ -2046,6 +2046,50 @@
         "medium": "botlh",
         "low": "Sup"
       }
+    },
+    "architectureCritique": {
+      "heading": "AI qach nISwI''",
+      "aiGenerated": "AI chenmoHlu'pu'",
+      "pending": "qach ''oS luq''a''ghach nISlu''taH…",
+      "skipped": "qatlh vam vangbogh qach nIS luchoqlu''pu''.",
+      "errored": "qach nIS luj",
+      "riskLabel": "Qob naQ",
+      "findingsTitle": "{count, plural, other {# tu''lu''ghach}}",
+      "noFindings": "qach QaghmeymeH pagh tu''lu''.",
+      "chatPlaceholder": "qach vam yuQ tlhob… (⌘/Ctrl + Enter ngeHmeH)",
+      "reviewNote": "AI chenmoHta'' nIS — qeS cha''DIch, ''ach lojmIt ghobe''.",
+      "risk": {
+        "none": "pagh",
+        "low": "puj",
+        "medium": "botlh",
+        "high": "jen",
+        "critical": "Qob'a'"
+      },
+      "severity": {
+        "critical": "ghuHqu''",
+        "high": "jen",
+        "medium": "botlh",
+        "low": "Sup",
+        "info": "De''"
+      },
+      "category": {
+        "security": "Hurgh QaD",
+        "reliability": "voqmoHlaHghach",
+        "cost": "wagh",
+        "operations": "vangmeH",
+        "scalability": "tebmeH",
+        "other": "latlh"
+      },
+      "regenerate": {
+        "label": "chenmoHqa'",
+        "queueing": "tlhamDaq…",
+        "tooltip": "AI qach nISwI'' qaSqa''moH",
+        "ariaLabel": "AI qach nISwI'' chenqa''moH",
+        "confirm": "vam vangbogh AI qach nISwI'' qaSqa''moH''a''?"
+      },
+      "errors": {
+        "status": "AI qach nISwI'' laDlaHbe'' (HTTP {status})."
+      }
     }
   },
   "workspaceDetail": {

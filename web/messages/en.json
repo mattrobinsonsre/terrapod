@@ -2046,6 +2046,50 @@
       "errors": {
         "status": "Failed to load AI cost estimate (HTTP {status})."
       }
+    },
+    "architectureCritique": {
+      "heading": "AI architecture review",
+      "aiGenerated": "AI-generated",
+      "pending": "Reviewing the proposed architecture…",
+      "skipped": "The architecture review was skipped for this run.",
+      "errored": "Architecture review failed",
+      "riskLabel": "Overall risk",
+      "findingsTitle": "{count, plural, one {# finding} other {# findings}}",
+      "noFindings": "No architectural concerns found.",
+      "chatPlaceholder": "Ask a follow-up question about this architecture… (⌘/Ctrl + Enter to send)",
+      "reviewNote": "AI-generated review — an advisory second opinion, not a gate.",
+      "risk": {
+        "none": "none",
+        "low": "low",
+        "medium": "medium",
+        "high": "high",
+        "critical": "critical"
+      },
+      "severity": {
+        "critical": "critical",
+        "high": "high",
+        "medium": "medium",
+        "low": "low",
+        "info": "info"
+      },
+      "category": {
+        "security": "Security",
+        "reliability": "Reliability",
+        "cost": "Cost",
+        "operations": "Operations",
+        "scalability": "Scalability",
+        "other": "Other"
+      },
+      "regenerate": {
+        "label": "Regenerate",
+        "queueing": "Queuing…",
+        "tooltip": "Re-run the AI architecture review",
+        "ariaLabel": "Regenerate AI architecture review",
+        "confirm": "Re-run the AI architecture review for this run?"
+      },
+      "errors": {
+        "status": "Failed to load AI architecture review (HTTP {status})."
+      }
     }
   },
   "workspaceDetail": {

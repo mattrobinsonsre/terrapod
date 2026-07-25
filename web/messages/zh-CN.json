@@ -2046,6 +2046,50 @@
         "medium": "中",
         "low": "低"
       }
+    },
+    "architectureCritique": {
+      "heading": "AI 架构评审",
+      "aiGenerated": "AI 生成",
+      "pending": "正在评审拟议的架构…",
+      "skipped": "已跳过此次运行的架构评审。",
+      "errored": "架构评审失败",
+      "riskLabel": "总体风险",
+      "findingsTitle": "{count, plural, other {# 项发现}}",
+      "noFindings": "未发现架构方面的问题。",
+      "chatPlaceholder": "就此架构提出后续问题…（⌘/Ctrl + Enter 发送）",
+      "reviewNote": "AI 生成的评审——供参考的第二意见，而非门禁。",
+      "risk": {
+        "none": "无",
+        "low": "低",
+        "medium": "中",
+        "high": "高",
+        "critical": "严重"
+      },
+      "severity": {
+        "critical": "严重",
+        "high": "高",
+        "medium": "中",
+        "low": "低",
+        "info": "信息"
+      },
+      "category": {
+        "security": "安全",
+        "reliability": "可靠性",
+        "cost": "成本",
+        "operations": "运维",
+        "scalability": "可扩展性",
+        "other": "其他"
+      },
+      "regenerate": {
+        "label": "重新生成",
+        "queueing": "正在排队…",
+        "tooltip": "重新运行 AI 架构评审",
+        "ariaLabel": "重新生成 AI 架构评审",
+        "confirm": "为此次运行重新运行 AI 架构评审？"
+      },
+      "errors": {
+        "status": "无法加载 AI 架构评审（HTTP {status}）。"
+      }
     }
   },
   "workspaceDetail": {

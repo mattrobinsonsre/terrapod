@@ -35,6 +35,13 @@ const CostAiSummary = dynamic(
   () => import('@/components/cost-ai-summary').then((m) => m.CostAiSummary),
   { loading: () => null },
 )
+// AI architecture critic (#963/#1036) — a senior-architect review of the proposed
+// infrastructure; renders on top of SecurityPanel in the Security tab. Its own
+// SSE-driven refresh (architecture_critique_* events). Self-hides when off (404).
+const ArchitectureCritique = dynamic(
+  () => import('@/components/architecture-critique').then((m) => m.ArchitectureCritique),
+  { loading: () => null },
+)
 
 interface RunActions {
   'is-confirmable': boolean
@@ -578,6 +585,9 @@ function RunDetailPageInner() {
   // Bumped on the SSE cost_summary_* events so CostAiSummary refetches live
   // (#871) without reloading the whole run.
   const [costSummaryRefresh, setCostSummaryRefresh] = useState(0)
+  // Bumped on the SSE architecture_critique_* events so ArchitectureCritique
+  // refetches live (#963/#1036) without reloading the whole run.
+  const [architectureCritiqueRefresh, setArchitectureCritiqueRefresh] = useState(0)
 
   // Lightweight status of the AI analysis + policy checks, used by the
   // Overview summary cards and to decide whether the AI / OPA tabs appear.
@@ -748,6 +758,19 @@ function RunDetailPageInner() {
       ].includes(event.event) && event.run_id === bareId
     ) {
       setCostSummaryRefresh((n) => n + 1)
+    }
+    // AI architecture-critic lifecycle events (incl. a chat turn) → refetch the
+    // ArchitectureCritique panel + its chat thread.
+    if (
+      [
+        'architecture_critique_ready',
+        'architecture_critique_pending',
+        'architecture_critique_errored',
+        'architecture_critique_skipped',
+        'architecture_critique_message_posted',
+      ].includes(event.event) && event.run_id === bareId
+    ) {
+      setArchitectureCritiqueRefresh((n) => n + 1)
     }
   }, [runId, loadRun]))
 
@@ -1376,16 +1399,24 @@ function RunDetailPageInner() {
 
         {/* Security-scan tab (#1036) — deterministic Checkov/Trivy findings +
             admin override; the tab only appears when the run has a scan result.
-            The AI architecture critic (#963) will render on top of this panel. */}
+            The AI architecture critic (#963) renders on top of this panel. */}
         {view === 'security' && (
-          <SecurityPanel
-            runId={runId}
-            runStatus={attrs.status}
-            onChanged={() => {
-              loadRun()
-              loadSecurityInfo()
-            }}
-          />
+          <div className="flex flex-col gap-6">
+            {/* AI architecture critic (#963) renders ON TOP of the deterministic
+                scan; it self-hides when the feature is off (404). */}
+            <ArchitectureCritique
+              runId={runId.replace(/^run-/, '')}
+              refreshKey={architectureCritiqueRefresh}
+            />
+            <SecurityPanel
+              runId={runId}
+              runStatus={attrs.status}
+              onChanged={() => {
+                loadRun()
+                loadSecurityInfo()
+              }}
+            />
+          </div>
         )}
 
         {/* Impact graph tab (#761) — interactive plan dependency + blast-radius

@@ -2046,6 +2046,50 @@
         "medium": "middlin'",
         "low": "low"
       }
+    },
+    "architectureCritique": {
+      "heading": "AI Architecture Review",
+      "aiGenerated": "AI-conjured",
+      "pending": "Surveyin'' the proposed architecture…",
+      "skipped": "The architecture review were skipped for this here run.",
+      "errored": "Architecture review be scuttled",
+      "riskLabel": "Overall risk",
+      "findingsTitle": "{count, plural, one {# findin''} other {# findin''s}}",
+      "noFindings": "No architectural worries be found, matey.",
+      "chatPlaceholder": "Ask a follow-up question ''bout this architecture… (⌘/Ctrl + Enter to send)",
+      "reviewNote": "AI-spun review — an advisin'' second opinion, not a gate, arr.",
+      "risk": {
+        "none": "none",
+        "low": "low",
+        "medium": "middlin''",
+        "high": "high",
+        "critical": "critical"
+      },
+      "severity": {
+        "critical": "critical",
+        "high": "high",
+        "medium": "middlin'",
+        "low": "low",
+        "info": "Info"
+      },
+      "category": {
+        "security": "Security",
+        "reliability": "Reliability",
+        "cost": "Cost",
+        "operations": "Operations",
+        "scalability": "Scalability",
+        "other": "Other"
+      },
+      "regenerate": {
+        "label": "Conjure anew",
+        "queueing": "In th'' queue…",
+        "tooltip": "Run the AI architecture review again",
+        "ariaLabel": "Regenerate the AI architecture review",
+        "confirm": "Run the AI architecture review again for this here run?"
+      },
+      "errors": {
+        "status": "Failed to load the AI architecture review (HTTP {status})."
+      }
     }
   },
   "workspaceDetail": {

@@ -2046,6 +2046,50 @@
         "medium": "moyen",
         "low": "faible"
       }
+    },
+    "architectureCritique": {
+      "heading": "Revue d'architecture par IA",
+      "aiGenerated": "Généré par IA",
+      "pending": "Analyse de l'architecture proposée…",
+      "skipped": "La revue d'architecture a été ignorée pour cette exécution.",
+      "errored": "Échec de la revue d'architecture",
+      "riskLabel": "Risque global",
+      "findingsTitle": "{count, plural, one {# constat} other {# constats}}",
+      "noFindings": "Aucun problème d'architecture détecté.",
+      "chatPlaceholder": "Posez une question de suivi sur cette architecture… (⌘/Ctrl + Entrée pour envoyer)",
+      "reviewNote": "Revue générée par IA — un second avis consultatif, pas un blocage.",
+      "risk": {
+        "none": "aucun",
+        "low": "faible",
+        "medium": "moyen",
+        "high": "élevé",
+        "critical": "critique"
+      },
+      "severity": {
+        "critical": "critique",
+        "high": "élevé",
+        "medium": "moyen",
+        "low": "faible",
+        "info": "Info"
+      },
+      "category": {
+        "security": "Sécurité",
+        "reliability": "Fiabilité",
+        "cost": "Coût",
+        "operations": "Exploitation",
+        "scalability": "Évolutivité",
+        "other": "Autre"
+      },
+      "regenerate": {
+        "label": "Régénérer",
+        "queueing": "Mise en file…",
+        "tooltip": "Relancer la revue d'architecture par IA",
+        "ariaLabel": "Régénérer la revue d'architecture par IA",
+        "confirm": "Relancer la revue d'architecture par IA pour cette exécution ?"
+      },
+      "errors": {
+        "status": "Impossible de charger la revue d'architecture par IA (HTTP {status})."
+      }
     }
   },
   "workspaceDetail": {

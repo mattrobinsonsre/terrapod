@@ -2046,6 +2046,50 @@
         "medium": "keskitaso",
         "low": "matala"
       }
+    },
+    "architectureCritique": {
+      "heading": "Tekoälyn arkkitehtuuriarvio",
+      "aiGenerated": "Tekoälyn luoma",
+      "pending": "Ehdotettua arkkitehtuuria arvioidaan…",
+      "skipped": "Arkkitehtuuriarvio ohitettiin tässä ajossa.",
+      "errored": "Arkkitehtuuriarvio epäonnistui",
+      "riskLabel": "Kokonaisriski",
+      "findingsTitle": "{count, plural, one {# havainto} other {# havaintoa}}",
+      "noFindings": "Arkkitehtuuriongelmia ei löytynyt.",
+      "chatPlaceholder": "Esitä jatkokysymys tästä arkkitehtuurista… (⌘/Ctrl + Enter lähettää)",
+      "reviewNote": "Tekoälyn tuottama arvio — neuvoa-antava toinen mielipide, ei portti.",
+      "risk": {
+        "none": "ei mitään",
+        "low": "matala",
+        "medium": "keskitaso",
+        "high": "korkea",
+        "critical": "kriittinen"
+      },
+      "severity": {
+        "critical": "kriittinen",
+        "high": "korkea",
+        "medium": "keskitaso",
+        "low": "matala",
+        "info": "Tiedot"
+      },
+      "category": {
+        "security": "Turvallisuus",
+        "reliability": "Luotettavuus",
+        "cost": "Kustannus",
+        "operations": "Toiminta",
+        "scalability": "Skaalautuvuus",
+        "other": "Muu"
+      },
+      "regenerate": {
+        "label": "Luo uudelleen",
+        "queueing": "Asetetaan jonoon…",
+        "tooltip": "Suorita tekoälyn arkkitehtuuriarvio uudelleen",
+        "ariaLabel": "Luo tekoälyn arkkitehtuuriarvio uudelleen",
+        "confirm": "Suoritetaanko tekoälyn arkkitehtuuriarvio uudelleen tälle ajolle?"
+      },
+      "errors": {
+        "status": "Tekoälyn arkkitehtuuriarviota ei voitu ladata (HTTP {status})."
+      }
     }
   },
   "workspaceDetail": {
