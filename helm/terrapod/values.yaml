@@ -1518,7 +1518,13 @@ priorityClasses:
     value: 1000000
   # Lower-priority class for runner Jobs — so runners are evicted before the
   # control plane under node pressure. Set enabled=false to skip it (runner
-  # Jobs then fall back to the cluster's global-default priority).
+  # Jobs then fall back to the cluster's global-default priority). The default
+  # 100000 keeps runners below the control plane (1000000) but ABOVE un-classed
+  # pods (0); with an EXTERNAL managed Postgres/Redis (the standard topology)
+  # that's every in-cluster deployment pod. If you run other un-classed
+  # workloads (or the embedded eval datastores) on the SAME nodes as runner
+  # Jobs and want runners reaped before those too, set a NEGATIVE value (valid
+  # Kubernetes, below the un-classed default of 0) — e.g. value: -10000.
   runner:
     enabled: true
     name: terrapod-runner

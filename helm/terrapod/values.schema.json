@@ -1047,7 +1047,7 @@
             },
             "value": {
               "type": "integer",
-              "minimum": 0,
+              "minimum": -2000000000,
               "maximum": 1000000000
             }
           }

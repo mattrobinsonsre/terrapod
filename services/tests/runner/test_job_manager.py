@@ -3,7 +3,7 @@ fallback used when the pod has been GC'd before the listener could read
 its terminated state."""
 
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 from kubernetes.client.rest import ApiException
 
@@ -141,7 +141,10 @@ class TestDefaultNamespace:
 
 def _pod(phase, sched_status="True", reason=None):
     cond = SimpleNamespace(type="PodScheduled", status=sched_status, reason=reason)
-    return SimpleNamespace(status=SimpleNamespace(phase=phase, conditions=[cond]))
+    return SimpleNamespace(
+        metadata=SimpleNamespace(name="tprun-x-plan-pod"),
+        status=SimpleNamespace(phase=phase, conditions=[cond]),
+    )
 
 
 def _job(succeeded=None, failed=None, active=None):
@@ -165,7 +168,28 @@ class TestUnschedulableDetection:
         mock_core.return_value.list_namespaced_pod.return_value = SimpleNamespace(
             items=[_pod("Pending", sched_status="False", reason="Unschedulable")]
         )
+        # No scale-up in progress → genuinely stuck → flagged unschedulable.
+        mock_core.return_value.list_namespaced_event.return_value = SimpleNamespace(items=[])
         assert await get_job_status("tprun-x-plan") == "unschedulable"
+
+    @patch("terrapod.runner.job_manager._get_core_api")
+    @patch("terrapod.runner.job_manager._get_batch_api")
+    @patch("terrapod.runner.job_manager._default_namespace", return_value="terrapod")
+    async def test_unschedulable_but_scaleup_pending_is_running(self, _ns, mock_batch, mock_core):
+        # Graceful degradation: a cluster autoscaler is provisioning a node
+        # (TriggeredScaleUp event), so the pod is Unschedulable only transiently.
+        # It must NOT be flagged as failed — keep waiting (reported "running")
+        # until the new node joins.
+        from terrapod.runner.job_manager import get_job_status
+
+        mock_batch.return_value.read_namespaced_job.return_value = _job(active=1)
+        mock_core.return_value.list_namespaced_pod.return_value = SimpleNamespace(
+            items=[_pod("Pending", sched_status="False", reason="Unschedulable")]
+        )
+        mock_core.return_value.list_namespaced_event.return_value = SimpleNamespace(
+            items=[SimpleNamespace(reason="TriggeredScaleUp")]
+        )
+        assert await get_job_status("tprun-x-plan") == "running"
 
     @patch("terrapod.runner.job_manager._get_core_api")
     @patch("terrapod.runner.job_manager._get_batch_api")
@@ -248,18 +272,40 @@ class TestCountActiveRunnerJobs:
 
     @patch("terrapod.runner.job_manager._get_batch_api")
     @patch("terrapod.runner.job_manager._default_namespace", return_value="terrapod")
-    async def test_k8s_error_fails_open_to_zero(self, _ns, mock_batch):
+    async def test_k8s_error_fails_closed_to_none(self, _ns, mock_batch):
+        # A persistent K8s list error must fail CLOSED (return None), NOT
+        # fail-open to 0. Returning 0 would read as "full capacity available"
+        # and let the listener over-launch a whole batch onto a struggling
+        # apiserver — the over-launch storm this guards against.
         from terrapod.runner.job_manager import count_active_runner_jobs
 
         mock_batch.return_value.list_namespaced_job.side_effect = ApiException(status=500)
-        assert await count_active_runner_jobs() == 0
+        assert await count_active_runner_jobs(retries=1) is None
 
     @patch("terrapod.runner.job_manager._get_batch_api")
     @patch("terrapod.runner.job_manager._default_namespace", return_value="terrapod")
-    async def test_uninitialised_client_fails_open_to_zero(self, _ns, mock_batch):
-        # A not-yet-initialised K8s client (e.g. init_k8s never ran) must fail
-        # open too — the client acquisition is inside the guarded block.
+    async def test_uninitialised_client_fails_closed_to_none(self, _ns, mock_batch):
+        # A not-yet-initialised K8s client (e.g. init_k8s never ran) must also
+        # fail closed — the client acquisition is inside the retried block.
         from terrapod.runner.job_manager import count_active_runner_jobs
 
         mock_batch.side_effect = RuntimeError("k8s config not loaded")
-        assert await count_active_runner_jobs() == 0
+        assert await count_active_runner_jobs(retries=1) is None
+
+    @patch("terrapod.runner.job_manager.asyncio.sleep", new_callable=AsyncMock)
+    @patch("terrapod.runner.job_manager._get_batch_api")
+    @patch("terrapod.runner.job_manager._default_namespace", return_value="terrapod")
+    async def test_transient_error_retried_then_succeeds(self, _ns, mock_batch, mock_sleep):
+        # A transient list error is retried with backoff; once it succeeds the
+        # real count is returned (not None) — a blip must not fail closed.
+        from terrapod.runner.job_manager import count_active_runner_jobs
+
+        one_active = SimpleNamespace(
+            items=[SimpleNamespace(status=SimpleNamespace(active=1, succeeded=None, failed=None))]
+        )
+        mock_batch.return_value.list_namespaced_job.side_effect = [
+            ApiException(status=500),  # first attempt fails
+            one_active,  # retry succeeds
+        ]
+        assert await count_active_runner_jobs(retries=3) == 1
+        mock_sleep.assert_awaited()  # backed off between attempts

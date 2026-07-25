@@ -117,14 +117,19 @@ class TestHandleRunAvailable:
         """204 response means no runs — graceful no-op."""
         listener = _make_listener(fresh_shutdown_event)
 
-        mock_response = MagicMock()
-        mock_response.status_code = 204
+        empty = MagicMock()
+        empty.status_code = 204
 
         mock_client = AsyncMock()
-        mock_client.get.return_value = mock_response
+        mock_client.get.side_effect = [empty]
         listener._http_client = mock_client
 
-        await listener._handle_run_available()
+        listener._launch_run = AsyncMock()
+        with patch(
+            "terrapod.runner.job_manager.count_active_runner_jobs",
+            AsyncMock(return_value=0),
+        ):
+            await listener._handle_run_available()
 
         mock_client.get.assert_called_once()
 

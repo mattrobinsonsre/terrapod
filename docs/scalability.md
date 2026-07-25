@@ -145,27 +145,98 @@ ingress** (CDN → ingress → BFF → API), starting from idle (API 2 / web 1):
 > also carries all SSE/long-lived streams, so size it for concurrent
 > *connections*, not just request rate.)
 
-### 4. Run scheduling — correct concurrent dispatch, exactly once
+### 4. Run scheduling — the control plane stays healthy; execution backs up sanely
 
-Job scheduling is the sharp end of "at scale". Flooding the queue with plan-only
-runs against pool-assigned workspaces (trivial provider-free configs), the
-control plane accepted them at ~18 runs/s and the dispatcher drove them through
-the full lifecycle as real Kubernetes Jobs:
+Job scheduling is the sharp end of "at scale", and the design goal is specific:
+**the control plane stays responsive under an arbitrarily large run backlog, and
+execution concurrency is bounded by the compute you give the runner Jobs — with
+the excess backing up gracefully, not collapsing anything.** These are two
+independent axes:
 
-- 8 runs queued → **all 8 claimed and launched as concurrent plan Jobs**, then
-  reached a terminal state. time-to-dispatch (queued → claimed) p50 **6.2 s**
-  (the reconciler/SSE cadence); time-to-terminal (queued → planned) p50 **12.3 s**
-  (dispatch + Job launch + `init` + `plan` + result upload).
-- **Correctness: 8/8 terminal, 0 stuck — every run was claimed exactly once.**
-  This is the `SELECT … FOR UPDATE SKIP LOCKED` + no-leader-election guarantee,
-  observed live: no double-claim, no lost run, across a multi-replica control
-  plane. That exactly-once dispatch is what scales — add API replicas and runner
-  listeners and the same queue drains faster without coordination.
+- **Control plane** (API, listener, web) — stateless, all behind HPAs, no leader
+  election. Under load they scale out and drain the run queue with
+  `SELECT … FOR UPDATE SKIP LOCKED`, so every run is claimed exactly once with no
+  coordination. Correctness (exactly-once dispatch, no lost/double-claimed runs)
+  holds across a multi-replica control plane.
+- **Execution** (runner Jobs) — bounded by real CPU/memory. Each run becomes a
+  Kubernetes Job requesting the workspace's `resource_cpu`/`resource_memory`.
+  When the cluster has capacity the Jobs run; when it doesn't, they stay
+  **`Pending`** — which is **correct backpressure, not a scaling failure** — and
+  drain as capacity frees. On a cluster-autoscaling setup (Karpenter, ASGs with
+  headroom), those `Pending` Jobs are exactly the signal that adds nodes, so the
+  backlog then executes on fresh compute. Terrapod **waits out that
+  provisioning** — a Job whose pod a cluster autoscaler is actively adding a node
+  for (`TriggeredScaleUp` / `Nominated`) is *not* failed as "unschedulable"; only
+  a pod with no path to scheduling is failed, and then fast with an actionable
+  "insufficient resources / unsatisfiable nodeSelector" message. And when the run
+  queue is drained under load, the listener admits Jobs **against the live K8s
+  active-Job count** and **fails closed** (defers, leaving runs queued) if it
+  can't confirm capacity — so a burst never stampedes the apiserver into an
+  over-launch storm.
 
-The number of runs executing *at once* is bounded by the execution cluster
-(node CPU, `listener.maxConcurrent`, agent-pool count), not by the control
-plane — which is why execution capacity is scaled by adding runner listeners /
-pools / nodes, independently of the API.
+So the honest way to read a huge backlog is: **a large number of *queued* runs is
+the platform working, not failing** — it means more execution compute is needed,
+which you add by scaling the runner side (nodes / agent pools / listeners),
+independently of the control plane. What must NOT happen is the control plane
+degrading under that backlog; that stays healthy by scaling out (HPAs) and, when
+runner Jobs share compute with it, by out-prioritising them (see
+[Troubleshooting](#troubleshooting-protecting-the-control-plane-from-runner-jobs)).
+
+> **On the single-node reference rig this is only partly observable.** A fixed,
+> co-located 8-vCPU node is precisely the *resource-exhaustion* case — there's no
+> second node to autoscale onto and the runner Jobs share the node with the
+> control plane. You can see the backpressure engage (Jobs correctly held
+> `Pending` once the node's requestable CPU is full), but a clean end-to-end drain
+> of an overwhelming backlog needs either headroom to autoscale into or the
+> control-plane priority protection below — it is not a property a single shared
+> node can demonstrate on its own. Reproduce the full picture on a multi-node or
+> autoscaling cluster.
+
+## Troubleshooting: protecting the control plane from runner Jobs
+
+The control plane (API, listener, web) and the runner Jobs only contend for
+resources when they **share compute**. In the standard topology they don't —
+runner Jobs run in agent pools on their own nodes, separate from the API — so
+there is nothing to tune. Two situations change that:
+
+- **A cluster that autoscales with headroom (Karpenter, ASGs with high
+  ceilings).** You generally don't need to do anything. When runner Jobs can't
+  fit, they go `Pending`, the autoscaler adds nodes, and they schedule on fresh
+  compute. There's no exhaustion, so there's no contention to protect against —
+  you can get away without priority classes entirely.
+- **A fixed or capacity-constrained cluster where runner Jobs can land on the
+  same nodes as the control plane.** Here a burst of Terraform Jobs can exhaust a
+  node and degrade the co-located API/listener. **In this case — and only when
+  there is a real risk of resource exhaustion — runner Jobs MUST be given lower
+  scheduling priority than the control-plane (and other long-lived deployment)
+  pods**, so the scheduler places the control plane first and reaps runner Jobs
+  first under pressure.
+
+The requirement is only that **runner Jobs end up lower priority than the
+deployment pods** — how the PriorityClasses come to exist is the operator's
+choice:
+
+- **Your cluster already has suitable PriorityClasses** (e.g. an org-wide
+  "platform-high / batch-low" scheme)? Just point Terrapod's components at them
+  and leave `priorityClasses.create: false` — set `api.priorityClassName` /
+  `listener.priorityClassName` / `web.priorityClassName` to the higher class and
+  `runners.priorityClassName` to the lower one. No need to have the chart create
+  more.
+- **Otherwise, let the chart create them:** `priorityClasses.create: true`
+  renders a control-plane class (auto-applied to api/listener/web) and a lower
+  runner class (auto-applied to runner Jobs). If runner Jobs may also share nodes
+  with *un-classed* pods you want them to yield to (e.g. an in-cluster
+  Postgres/Redis, or the metrics-server), set `priorityClasses.runner.value`
+  **negative** so runner Jobs sit beneath everything.
+
+One caveat to set expectations: a PriorityClass governs **scheduling,
+preemption, and eviction** — it does **not** change runtime CPU (CFS) shares. So
+it reliably protects the control plane on the *scheduling and memory-pressure*
+axis (control-plane pods get placed first; runner Jobs get evicted first), but it
+is not a fix for sustained CPU starvation of a control plane that is genuinely
+sharing a saturated node. For that, the answer is topology — give runner Jobs
+their own nodes (agent pools / `nodeSelector` + taints), or let the cluster
+autoscale — rather than co-locating heavy Terraform execution with the API.
 
 ## What scales, and what is bounded by your cluster
 
@@ -174,19 +245,29 @@ pools / nodes, independently of the API.
 | Read/API throughput | Adding stateless API replicas (HPA); no leader contention | The load balancer and Postgres/Redis you point it at |
 | List latency at large workspace counts | O(page) paginated reads | — (flat) |
 | Run **dispatch** (claim → state transition) | Multiple replicas draining one queue via `SKIP LOCKED` | Postgres write throughput |
-| Run **execution** (concurrent Terraform Jobs) | More runner listeners / agent pools / nodes; `listener.maxConcurrent` | Real CPU/memory of your execution cluster — this is where a single node is the ceiling, not Terrapod |
+| Run **execution** (concurrent Terraform Jobs) | More runner listeners / agent pools / nodes; a cluster-autoscaler adds nodes when Jobs go `Pending` | Real CPU/memory of your execution cluster. Excess Jobs back up (`Pending`/queued) — correct backpressure, not a platform limit |
 
 The control plane (everything except running Terraform itself) scales
 horizontally. Terraform execution is bounded by the compute you give the runner
 Jobs — which you scale independently by adding nodes or agent pools, exactly as
-you would size any CI fleet.
+you would size any CI fleet. A large backlog of *queued* runs is the platform
+working as designed (more execution compute is needed), not the platform
+failing — provided the control plane stays healthy, which is what the
+autoscaling + priority guidance above ensures.
 
 ## Honest limits of the reference measurement
 
 - Single node, so it demonstrates *properties* (flat per-item latency, correct
-  concurrent dispatch, linear replica throughput) rather than an absolute
-  concurrent-Jobs figure. Reproduce on a multi-node cluster to measure execution
-  throughput at your own scale.
+  concurrent dispatch, linear replica throughput, backpressure engaging) rather
+  than an absolute concurrent-Jobs figure. Reproduce on a multi-node cluster to
+  measure execution throughput at your own scale.
+- A single node is also, by definition, the *resource-exhaustion* case: runner
+  Jobs share it with the control plane and there's no second node to autoscale
+  onto. So it is the one topology where the control-plane priority protection
+  (above) matters most — and even that protects scheduling/eviction, not runtime
+  CPU. The realistic deployments (separate runner nodes, or an autoscaling
+  cluster) don't have this contention; don't read the single-node ceiling as a
+  Terrapod limit.
 - The embedded Postgres/Redis in `values-scale.yaml` are eval/dev datastores
   sized to not be the bottleneck for the test; production should use a managed
   Postgres and Redis.

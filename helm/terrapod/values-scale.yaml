@@ -59,17 +59,48 @@ api:
       max_overflow: 15
       pool_pre_ping: true
 
-# The listener admits more concurrent run launches so the run queue can actually
-# drain during the flood test (still ultimately bounded by node CPU + the
-# per-workspace resource requests). Its own HPA is on too — multiple listeners
-# in a pool compete for queued runs via SELECT … FOR UPDATE SKIP LOCKED (no
-# leader election), so scaling listeners scales Job-launch throughput.
+# PriorityClasses so the ephemeral runner Jobs rank BELOW every long-lived
+# deployment pod. This is a cluster SCHEDULING choice (see the priority-class note
+# in docs/scalability.md's troubleshooting section), and it's worth turning on
+# when runner Jobs share a cluster/node with the control plane: it makes the
+# scheduler place control-plane replicas AHEAD of runner Jobs and reap runner Jobs
+# FIRST under node MEMORY pressure. #751's chart mechanism creates the classes and
+# auto-wires api/listener/web to the higher one; runner.value is NEGATIVE here so
+# runner Jobs sit under even the un-classed embedded Postgres/Redis + metrics-server.
+#
+# IMPORTANT (measured, do not overclaim): PriorityClass governs scheduling /
+# preemption / eviction — it does NOT change runtime CPU CFS shares. So it does
+# NOT, on its own, stop a burst of `tofu` processes from CPU-starving a CO-LOCATED
+# control plane. In the load test, at ~48 concurrent Jobs the node hit ~98% CPU and
+# the (co-located, CPU-throttled) listener's liveness probe still timed out →
+# SIGKILL/restart → in-flight runs re-queued, EVEN WITH these priority classes. The
+# genuine fixes for CPU starvation are (1) TOPOLOGY — run runner Jobs on their own
+# nodes, the standard production layout, where there's no contention to begin with;
+# and (2) not over-subscribing the node (keep concurrency within its CPU). Priority
+# classes remain the right call for the memory/scheduling axis; they're just not a
+# CPU-starvation fix.
+priorityClasses:
+  create: true
+  runner:
+    enabled: true
+    value: -10000
+
+# maxConcurrent is the per-listener launch cap; with the listener HPA below it
+# multiplies across replicas. It's kept moderate — the goal is NOT to maximise
+# concurrent Jobs on one node, but to keep the control plane healthy under load
+# while excess runner Jobs back up (Pending/queued) as correct backpressure.
 listener:
-  maxConcurrent: 12
+  maxConcurrent: 24
+  # ALL control-plane tiers (api, listener, web) autoscale AND outrank runner Jobs
+  # (priorityClasses above). Under load the listener scales OUT — more aggregate CPU
+  # share + redundancy — so a single CPU-starved replica can't take the tier down and
+  # re-queue everything (that was the failure when it was pinned to 1 replica).
+  # minReplicas: 2 gives baseline redundancy; on a real multi-node deployment the
+  # added listeners land on fresh runner-node compute and add real launch throughput.
   autoscaling:
     enabled: true
-    minReplicas: 1
-    maxReplicas: 3
+    minReplicas: 2
+    maxReplicas: 4
 
 # The web/BFF tier is stateless too; a small HPA demonstrates it scales with the
 # API. (It is not the scaling focus — the API + scheduler are.)
