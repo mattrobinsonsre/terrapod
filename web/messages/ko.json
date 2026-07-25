@@ -1839,7 +1839,9 @@
       "applyLabel": "적용<log>로그</log>",
       "planFull": "계획 로그",
       "applyFull": "적용 로그",
-      "details": "세부 정보"
+      "details": "세부 정보",
+      "security": "보안",
+      "securityFull": "보안 스캔"
     },
     "banner": {
       "destroy": "이것은 <strong>삭제</strong> 실행입니다 — 적용되면 관리 중인 모든 리소스가 삭제됩니다.",
@@ -1852,7 +1854,8 @@
       "changes": "변경 사항",
       "aiAnalysis": "AI 분석",
       "policyChecks": "정책 검사",
-      "resources": "리소스"
+      "resources": "리소스",
+      "security": "보안 스캔"
     },
     "changes": {
       "noChanges": "변경 없음",
@@ -2016,6 +2019,32 @@
       },
       "errors": {
         "status": "AI 비용 추정을 불러오지 못했습니다 (HTTP {status})."
+      }
+    },
+    "security": {
+      "none": "없음",
+      "blocked": "차단됨",
+      "blockingSub": "{count, plural, other {차단 발견 #건}}",
+      "passed": "통과"
+    },
+    "securityPanel": {
+      "heading": "보안 스캔",
+      "engineLabel": "{engine}",
+      "thresholdLabel": "임계값: {threshold}",
+      "blockedMessage": "이 실행은 임계값 이상의 <strong>보안 발견 {count, plural, other {#건}}으로 차단</strong>되었습니다. 발견 사항이 해결되거나 관리자가 재정의할 때까지 적용되지 않습니다.",
+      "overriding": "재정의 중...",
+      "overrideContinue": "재정의 및 계속",
+      "overrideConfirm": "보안 스캔을 재정의하고 차단 발견에도 불구하고 이 실행을 적용하시겠습니까?",
+      "overrideFailed": "재정의에 실패했습니다",
+      "overrideFailedStatus": "재정의 실패 ({status})",
+      "overriddenBy": "{by}에 의해 재정의됨",
+      "passed": "임계값 이상의 발견 사항이 없습니다.",
+      "guideline": "가이드라인 보기",
+      "severity": {
+        "critical": "치명적",
+        "high": "높음",
+        "medium": "중간",
+        "low": "낮음"
       }
     }
   },

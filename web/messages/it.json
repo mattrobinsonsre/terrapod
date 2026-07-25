@@ -1839,7 +1839,9 @@
       "applyLabel": "Apply<log>Log</log>",
       "planFull": "Log del plan",
       "applyFull": "Log dell''apply",
-      "details": "Dettagli"
+      "details": "Dettagli",
+      "security": "Sicurezza",
+      "securityFull": "Analisi di sicurezza"
     },
     "banner": {
       "destroy": "Questa è un''esecuzione di <strong>distruzione</strong> — tutte le risorse gestite verranno distrutte quando applicata.",
@@ -1852,7 +1854,8 @@
       "changes": "Modifiche",
       "aiAnalysis": "Analisi IA",
       "policyChecks": "Controlli dei criteri",
-      "resources": "Risorse"
+      "resources": "Risorse",
+      "security": "Analisi di sicurezza"
     },
     "changes": {
       "noChanges": "Nessuna modifica",
@@ -2016,6 +2019,32 @@
       },
       "errors": {
         "status": "Impossibile caricare la stima dei costi tramite IA (HTTP {status})."
+      }
+    },
+    "security": {
+      "none": "Nessuno",
+      "blocked": "Bloccato",
+      "blockingSub": "{count, plural, one {# risultato bloccante} other {# risultati bloccanti}}",
+      "passed": "Superato"
+    },
+    "securityPanel": {
+      "heading": "Analisi di sicurezza",
+      "engineLabel": "{engine}",
+      "thresholdLabel": "soglia: {threshold}",
+      "blockedMessage": "Questa esecuzione è <strong>bloccata da {count, plural, one {# risultato di sicurezza} other {# risultati di sicurezza}}</strong> pari o superiori alla soglia. Non verrà applicata finché i risultati non saranno risolti o un amministratore non li ignorerà.",
+      "overriding": "Sovrascrittura in corso...",
+      "overrideContinue": "Sovrascrivi e continua",
+      "overrideConfirm": "Ignorare l'analisi di sicurezza e consentire l'applicazione di questa esecuzione nonostante i risultati bloccanti?",
+      "overrideFailed": "Sovrascrittura non riuscita",
+      "overrideFailedStatus": "Sovrascrittura non riuscita ({status})",
+      "overriddenBy": "sovrascritto da {by}",
+      "passed": "Nessun risultato pari o superiore alla soglia.",
+      "guideline": "Vedi linea guida",
+      "severity": {
+        "critical": "critico",
+        "high": "alto",
+        "medium": "medio",
+        "low": "basso"
       }
     }
   },

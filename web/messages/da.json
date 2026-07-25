@@ -1839,7 +1839,9 @@
       "applyLabel": "Apply<log>log</log>",
       "planFull": "Plan-log",
       "applyFull": "Apply-log",
-      "details": "Detaljer"
+      "details": "Detaljer",
+      "security": "Sikkerhed",
+      "securityFull": "Sikkerhedsscanning"
     },
     "banner": {
       "destroy": "Dette er en <strong>nedrivnings</strong>kørsel — alle styrede ressourcer nedrives, når den anvendes.",
@@ -1852,7 +1854,8 @@
       "changes": "Ændringer",
       "aiAnalysis": "AI-analyse",
       "policyChecks": "Politiktjek",
-      "resources": "Ressourcer"
+      "resources": "Ressourcer",
+      "security": "Sikkerhedsscanning"
     },
     "changes": {
       "noChanges": "Ingen ændringer",
@@ -2016,6 +2019,32 @@
       },
       "errors": {
         "status": "Kunne ikke indlæse AI-omkostningsestimatet (HTTP {status})."
+      }
+    },
+    "security": {
+      "none": "Ingen",
+      "blocked": "Blokeret",
+      "blockingSub": "{count, plural, one {# blokerende fund} other {# blokerende fund}}",
+      "passed": "Bestået"
+    },
+    "securityPanel": {
+      "heading": "Sikkerhedsscanning",
+      "engineLabel": "{engine}",
+      "thresholdLabel": "tærskel: {threshold}",
+      "blockedMessage": "Denne kørsel er <strong>blokeret af {count, plural, one {# sikkerhedsfund} other {# sikkerhedsfund}}</strong> på eller over tærsklen. Den anvendes ikke, før fundene er løst, eller en administrator tilsidesætter dem.",
+      "overriding": "Tilsidesætter...",
+      "overrideContinue": "Tilsidesæt og fortsæt",
+      "overrideConfirm": "Tilsidesæt sikkerhedsscanningen, og lad denne kørsel blive anvendt trods de blokerende fund?",
+      "overrideFailed": "Tilsidesættelse mislykkedes",
+      "overrideFailedStatus": "Tilsidesættelse mislykkedes ({status})",
+      "overriddenBy": "tilsidesat af {by}",
+      "passed": "Ingen fund på eller over tærsklen.",
+      "guideline": "Se retningslinje",
+      "severity": {
+        "critical": "kritisk",
+        "high": "høj",
+        "medium": "mellem",
+        "low": "lav"
       }
     }
   },

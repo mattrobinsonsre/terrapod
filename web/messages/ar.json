@@ -1839,7 +1839,9 @@
       "applyLabel": "التطبيق<log>سجل</log>",
       "planFull": "سجل التخطيط",
       "applyFull": "سجل التطبيق",
-      "details": "التفاصيل"
+      "details": "التفاصيل",
+      "security": "الأمان",
+      "securityFull": "فحص الأمان"
     },
     "banner": {
       "destroy": "هذا تشغيل <strong>تدمير</strong> — سيتم تدمير جميع الموارد المُدارة عند التطبيق.",
@@ -1852,7 +1854,8 @@
       "changes": "التغييرات",
       "aiAnalysis": "تحليل الذكاء الاصطناعي",
       "policyChecks": "فحوصات السياسات",
-      "resources": "الموارد"
+      "resources": "الموارد",
+      "security": "فحص الأمان"
     },
     "changes": {
       "noChanges": "لا توجد تغييرات",
@@ -2016,6 +2019,32 @@
       },
       "errors": {
         "status": "تعذّر تحميل تقدير التكلفة بالذكاء الاصطناعي (HTTP {status})."
+      }
+    },
+    "security": {
+      "none": "لا شيء",
+      "blocked": "محظور",
+      "blockingSub": "{count, plural, zero {# نتيجة حاجبة} one {نتيجة حاجبة واحدة} two {نتيجتان حاجبتان} few {# نتائج حاجبة} many {# نتيجة حاجبة} other {# نتيجة حاجبة}}",
+      "passed": "ناجح"
+    },
+    "securityPanel": {
+      "heading": "فحص الأمان",
+      "engineLabel": "{engine}",
+      "thresholdLabel": "الحد: {threshold}",
+      "blockedMessage": "هذا التشغيل <strong>محجوب بسبب نتائج أمان</strong> عند الحد أو أعلى منه ({count}). لن يتم تطبيقه حتى تُحلّ النتائج أو يتجاوزها المسؤول.",
+      "overriding": "جارٍ التجاوز...",
+      "overrideContinue": "تجاوز ومتابعة",
+      "overrideConfirm": "هل تريد تجاوز فحص الأمان والسماح بتطبيق هذا التشغيل رغم النتائج الحاجبة؟",
+      "overrideFailed": "فشل التجاوز",
+      "overrideFailedStatus": "فشل التجاوز ({status})",
+      "overriddenBy": "تم التجاوز بواسطة {by}",
+      "passed": "لا توجد نتائج عند الحد أو أعلى منه.",
+      "guideline": "عرض الإرشاد",
+      "severity": {
+        "critical": "حرج",
+        "high": "عالٍ",
+        "medium": "متوسط",
+        "low": "منخفض"
       }
     }
   },

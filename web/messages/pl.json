@@ -1839,7 +1839,9 @@
       "applyLabel": "Zastosuj<log>Dziennik</log>",
       "planFull": "Dziennik planu",
       "applyFull": "Dziennik zastosowania",
-      "details": "Szczegóły"
+      "details": "Szczegóły",
+      "security": "Bezpieczeństwo",
+      "securityFull": "Skan bezpieczeństwa"
     },
     "banner": {
       "destroy": "To jest przebieg <strong>niszczący</strong> — wszystkie zarządzane zasoby zostaną zniszczone po zastosowaniu.",
@@ -1852,7 +1854,8 @@
       "changes": "Zmiany",
       "aiAnalysis": "Analiza AI",
       "policyChecks": "Sprawdzenia zasad",
-      "resources": "Zasoby"
+      "resources": "Zasoby",
+      "security": "Skan bezpieczeństwa"
     },
     "changes": {
       "noChanges": "Brak zmian",
@@ -2016,6 +2019,32 @@
       },
       "errors": {
         "status": "Nie udało się załadować szacunku kosztów AI (HTTP {status})."
+      }
+    },
+    "security": {
+      "none": "Brak",
+      "blocked": "Zablokowane",
+      "blockingSub": "{count, plural, one {# blokujące wykrycie} few {# blokujące wykrycia} many {# blokujących wykryć} other {# blokujących wykryć}}",
+      "passed": "Zaliczone"
+    },
+    "securityPanel": {
+      "heading": "Skan bezpieczeństwa",
+      "engineLabel": "{engine}",
+      "thresholdLabel": "próg: {threshold}",
+      "blockedMessage": "To uruchomienie jest <strong>zablokowane przez wykrycia bezpieczeństwa</strong> na poziomie progu lub powyżej ({count}). Nie zostanie zastosowane, dopóki wykrycia nie zostaną rozwiązane lub administrator ich nie zastąpi.",
+      "overriding": "Nadpisywanie...",
+      "overrideContinue": "Nadpisz i kontynuuj",
+      "overrideConfirm": "Zastąpić skan bezpieczeństwa i zezwolić na zastosowanie tego uruchomienia mimo blokujących wykryć?",
+      "overrideFailed": "Nadpisanie nie powiodło się",
+      "overrideFailedStatus": "Nadpisanie nie powiodło się ({status})",
+      "overriddenBy": "nadpisane przez {by}",
+      "passed": "Brak wykryć na poziomie progu lub powyżej.",
+      "guideline": "Zobacz wytyczną",
+      "severity": {
+        "critical": "krytyczny",
+        "high": "wysoki",
+        "medium": "średni",
+        "low": "niski"
       }
     }
   },

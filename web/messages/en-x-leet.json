@@ -1839,7 +1839,9 @@
       "applyLabel": "4pply<log>L0g</log>",
       "planFull": "Pl4n l0g",
       "applyFull": "4pply l0g",
-      "details": "D3741l5"
+      "details": "D3741l5",
+      "security": "53cur17y",
+      "securityFull": "53cur17y 5c4n"
     },
     "banner": {
       "destroy": "7h15 15 4 <strong>d357r0y</strong> run — 4ll m4n4g3d r350urc35 w1ll b3 d357r0y3d wh3n 4ppl13d.",
@@ -1852,7 +1854,8 @@
       "changes": "Ch4ng35",
       "aiAnalysis": "41 4n4ly515",
       "policyChecks": "P0l1cy ch3ck5",
-      "resources": "R350urc35"
+      "resources": "R350urc35",
+      "security": "53cur17y 5c4n"
     },
     "changes": {
       "noChanges": "N0 ch4ng35",
@@ -2016,6 +2019,32 @@
       },
       "errors": {
         "status": "F41l3d 70 l04d 41 c057 3571m473 (H77P {status})."
+      }
+    },
+    "security": {
+      "none": "N0n3",
+      "blocked": "Bl0ck3d",
+      "blockingSub": "{count, plural, one {# bl0ck1ng f1nd1ng} other {# bl0ck1ng f1nd1ng5}}",
+      "passed": "P4553d"
+    },
+    "securityPanel": {
+      "heading": "53cur17y 5c4n",
+      "engineLabel": "{engine}",
+      "thresholdLabel": "7hr35h0ld: {threshold}",
+      "blockedMessage": "7h15 run 15 <strong>bl0ck3d by {count, plural, one {# 53cur17y f1nd1ng} other {# 53cur17y f1nd1ng5}}</strong> 47 0r 4b0v3 7h3 7hr35h0ld. 17 w1ll n07 4pply un71l 7h3 f1nd1ng5 4r3 r350lv3d 0r 4n 4dm1n 0v3rr1d35.",
+      "overriding": "0v3rr1d1ng...",
+      "overrideContinue": "0v3rr1d3 & C0n71nu3",
+      "overrideConfirm": "0v3rr1d3 7h3 53cur17y 5c4n 4nd 4ll0w 7h15 run 70 4pply d35p173 7h3 bl0ck1ng f1nd1ng5?",
+      "overrideFailed": "0v3rr1d3 f41l3d",
+      "overrideFailedStatus": "0v3rr1d3 f41l3d ({status})",
+      "overriddenBy": "0v3rr1dd3n by {by}",
+      "passed": "N0 f1nd1ng5 47 0r 4b0v3 7h3 7hr35h0ld.",
+      "guideline": "V13w gu1d3l1n3",
+      "severity": {
+        "critical": "cr171c4l",
+        "high": "h1gh",
+        "medium": "m3d1um",
+        "low": "l0w"
       }
     }
   },

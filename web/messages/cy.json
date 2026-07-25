@@ -1839,7 +1839,9 @@
       "applyLabel": "Gweithredu<log>Log</log>",
       "planFull": "Log cynllun",
       "applyFull": "Log gweithredu",
-      "details": "Manylion"
+      "details": "Manylion",
+      "security": "Diogelwch",
+      "securityFull": "Sgan diogelwch"
     },
     "banner": {
       "destroy": "Mae hwn yn rhediad <strong>dinistrio</strong> — dinistrir pob adnodd a reolir wrth ei weithredu.",
@@ -1852,7 +1854,8 @@
       "changes": "Newidiadau",
       "aiAnalysis": "Dadansoddiad AI",
       "policyChecks": "Gwiriadau polisi",
-      "resources": "Adnoddau"
+      "resources": "Adnoddau",
+      "security": "Sgan diogelwch"
     },
     "changes": {
       "noChanges": "Dim newidiadau",
@@ -2016,6 +2019,32 @@
       },
       "errors": {
         "status": "Methwyd â llwytho''r amcangyfrif cost gan AI (HTTP {status})."
+      }
+    },
+    "security": {
+      "none": "Dim",
+      "blocked": "Rhwystrwyd",
+      "blockingSub": "{count, plural, one {# canfyddiad rhwystro} other {# canfyddiad rhwystro}}",
+      "passed": "Pasiwyd"
+    },
+    "securityPanel": {
+      "heading": "Sgan diogelwch",
+      "engineLabel": "{engine}",
+      "thresholdLabel": "trothwy: {threshold}",
+      "blockedMessage": "Mae'r rhediad hwn wedi'i <strong>rwystro gan {count, plural, one {# canfyddiad diogelwch} other {# canfyddiad diogelwch}}</strong> ar y trothwy neu'n uwch. Ni fydd yn cael ei gymhwyso nes i'r canfyddiadau gael eu datrys neu i weinyddwr eu diystyru.",
+      "overriding": "Wrthi'n diystyru...",
+      "overrideContinue": "Diystyru a Pharhau",
+      "overrideConfirm": "Diystyru'r sgan diogelwch a chaniatáu i'r rhediad hwn gael ei gymhwyso er gwaethaf y canfyddiadau rhwystro?",
+      "overrideFailed": "Methodd y diystyru",
+      "overrideFailedStatus": "Methodd y diystyru ({status})",
+      "overriddenBy": "diystyrwyd gan {by}",
+      "passed": "Dim canfyddiadau ar y trothwy neu'n uwch.",
+      "guideline": "Gweld y canllaw",
+      "severity": {
+        "critical": "critigol",
+        "high": "uchel",
+        "medium": "canolig",
+        "low": "isel"
       }
     }
   },

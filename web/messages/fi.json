@@ -1839,7 +1839,9 @@
       "applyLabel": "Käyttöönotto<log>Loki</log>",
       "planFull": "Suunnitelmaloki",
       "applyFull": "Käyttöönottoloki",
-      "details": "Tiedot"
+      "details": "Tiedot",
+      "security": "Turvallisuus",
+      "securityFull": "Turvatarkistus"
     },
     "banner": {
       "destroy": "Tämä on <strong>tuhoajo</strong> — kaikki hallitut resurssit tuhotaan käyttöönotettaessa.",
@@ -1852,7 +1854,8 @@
       "changes": "Muutokset",
       "aiAnalysis": "Tekoälyanalyysi",
       "policyChecks": "Käytäntötarkistukset",
-      "resources": "Resurssit"
+      "resources": "Resurssit",
+      "security": "Turvatarkistus"
     },
     "changes": {
       "noChanges": "Ei muutoksia",
@@ -2016,6 +2019,32 @@
       },
       "errors": {
         "status": "Tekoälyn kustannusarvion lataus epäonnistui (HTTP {status})."
+      }
+    },
+    "security": {
+      "none": "Ei mitään",
+      "blocked": "Estetty",
+      "blockingSub": "{count, plural, one {# estävä havainto} other {# estävää havaintoa}}",
+      "passed": "Läpäisi"
+    },
+    "securityPanel": {
+      "heading": "Turvatarkistus",
+      "engineLabel": "{engine}",
+      "thresholdLabel": "kynnys: {threshold}",
+      "blockedMessage": "Tämä ajo on <strong>estetty {count, plural, one {# turvahavainnon} other {# turvahavainnon}} vuoksi</strong> kynnyksellä tai sen yli. Sitä ei sovelleta ennen kuin havainnot on ratkaistu tai ylläpitäjä ohittaa ne.",
+      "overriding": "Ohitetaan...",
+      "overrideContinue": "Ohita ja jatka",
+      "overrideConfirm": "Ohitetaanko turvatarkistus ja sallitaanko tämän ajon soveltaminen estävistä havainnoista huolimatta?",
+      "overrideFailed": "Ohitus epäonnistui",
+      "overrideFailedStatus": "Ohitus epäonnistui ({status})",
+      "overriddenBy": "ohittanut {by}",
+      "passed": "Ei havaintoja kynnyksellä tai sen yli.",
+      "guideline": "Näytä ohje",
+      "severity": {
+        "critical": "kriittinen",
+        "high": "korkea",
+        "medium": "keskitaso",
+        "low": "matala"
       }
     }
   },

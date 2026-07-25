@@ -1839,7 +1839,9 @@
       "applyLabel": "Apply<log>Log</log>",
       "planFull": "Plan log",
       "applyFull": "Apply log",
-      "details": "Detailz"
+      "details": "Detailz",
+      "security": "Sekurity",
+      "securityFull": "Sekurity scan"
     },
     "banner": {
       "destroy": "Dis iz a <strong>destroy</strong> run — all managd resourcez wil be destroyd when applyd.",
@@ -1852,7 +1854,8 @@
       "changes": "Chaenges",
       "aiAnalysis": "AI analysis",
       "policyChecks": "Policy checkz",
-      "resources": "Resorcez"
+      "resources": "Resorcez",
+      "security": "Sekurity scan"
     },
     "changes": {
       "noChanges": "No changez",
@@ -2016,6 +2019,32 @@
       },
       "errors": {
         "status": "Could not load AI cost estim8 (HTTP {status})."
+      }
+    },
+    "security": {
+      "none": "Noes",
+      "blocked": "Blockd",
+      "blockingSub": "{count, plural, one {# blockin findin} other {# blockin findins}}",
+      "passed": "Passd"
+    },
+    "securityPanel": {
+      "heading": "Sekurity Scan",
+      "engineLabel": "{engine}",
+      "thresholdLabel": "threshold: {threshold}",
+      "blockedMessage": "Dis run iz <strong>blockd by {count, plural, one {# sekurity findin} other {# sekurity findins}}</strong> at or ovr da threshold. It no can haz apply til da findins getz fixd or a admin sez okai.",
+      "overriding": "Overridin...",
+      "overrideContinue": "Override & Continyoo",
+      "overrideConfirm": "Override da sekurity scan an let dis run apply even wif da blockin findins?",
+      "overrideFailed": "Override failed",
+      "overrideFailedStatus": "Override failed ({status})",
+      "overriddenBy": "overridd by {by}",
+      "passed": "No findins at or ovr da threshold. yay.",
+      "guideline": "Vew guidelin",
+      "severity": {
+        "critical": "kritikal",
+        "high": "hai",
+        "medium": "medium",
+        "low": "lo"
       }
     }
   },

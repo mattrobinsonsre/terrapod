@@ -1839,7 +1839,9 @@
       "applyLabel": "lo''<log>teywI''</log>",
       "planFull": "nab teywI'",
       "applyFull": "lo' teywI'",
-      "details": "De'De'"
+      "details": "De'De'",
+      "security": "Hurgh QaD",
+      "securityFull": "Hurgh QaD wanI''"
     },
     "banner": {
       "destroy": "<strong>Qaw''</strong> Sar vam — lo''lu''DI'' vu''lu''bogh Sepmey Hoch Qaw''lu''.",
@@ -1852,7 +1854,8 @@
       "changes": "choHmey",
       "aiAnalysis": "AI Qel",
       "policyChecks": "chut toblu'mey",
-      "resources": "Sep"
+      "resources": "Sep",
+      "security": "Hurgh QaD wanI''"
     },
     "changes": {
       "noChanges": "choHbe'lu'",
@@ -2016,6 +2019,32 @@
       },
       "errors": {
         "status": "AI wagh Qel laDlaHbe' (HTTP {status})."
+      }
+    },
+    "security": {
+      "none": "pagh",
+      "blocked": "botlu'pu'",
+      "blockingSub": "{count, plural, other {# QaD botlh}}",
+      "passed": "Qappu'"
+    },
+    "securityPanel": {
+      "heading": "Hurgh QaD wanI''",
+      "engineLabel": "{engine}",
+      "thresholdLabel": "''ampas: {threshold}",
+      "blockedMessage": "vaj <strong>QaD botlh botlhpu''</strong> ''ampas ghap ''ampas Dung ({count}). QaD boQmeH pagh la'' pIn botlhbe''chugh, lo''lu''be''.",
+      "overriding": "DIvI'moHtaH...",
+      "overrideContinue": "DIvI'moH 'ej taH",
+      "overrideConfirm": "QaD wanI'' lo''Ha'' ''ej QaD botlh tu''lu''chugh vaj vaj lo''lu''nIS''a''?",
+      "overrideFailed": "DIvI'moH lujpu'",
+      "overrideFailedStatus": "DIvI'moH lujpu' ({status})",
+      "overriddenBy": "{by} DIvI'moHlu'pu'",
+      "passed": "''ampas ghap Dung QaD tu''be''lu''.",
+      "guideline": "chut legh",
+      "severity": {
+        "critical": "ghuHqu''",
+        "high": "jen",
+        "medium": "botlh",
+        "low": "Sup"
       }
     }
   },

@@ -1839,7 +1839,9 @@
       "applyLabel": "Apply<log>logg</log>",
       "planFull": "Plan-logg",
       "applyFull": "Apply-logg",
-      "details": "Detaljer"
+      "details": "Detaljer",
+      "security": "Säkerhet",
+      "securityFull": "Säkerhetsskanning"
     },
     "banner": {
       "destroy": "Detta är en <strong>förstörelsekörning</strong> — alla hanterade resurser förstörs vid applicering.",
@@ -1852,7 +1854,8 @@
       "changes": "Ändringar",
       "aiAnalysis": "AI-analys",
       "policyChecks": "Policykontroller",
-      "resources": "Resurser"
+      "resources": "Resurser",
+      "security": "Säkerhetsskanning"
     },
     "changes": {
       "noChanges": "Inga ändringar",
@@ -2016,6 +2019,32 @@
       },
       "errors": {
         "status": "Det gick inte att läsa in AI-kostnadsuppskattningen (HTTP {status})."
+      }
+    },
+    "security": {
+      "none": "Ingen",
+      "blocked": "Blockerad",
+      "blockingSub": "{count, plural, one {# blockerande fynd} other {# blockerande fynd}}",
+      "passed": "Godkänd"
+    },
+    "securityPanel": {
+      "heading": "Säkerhetsskanning",
+      "engineLabel": "{engine}",
+      "thresholdLabel": "tröskel: {threshold}",
+      "blockedMessage": "Den här körningen är <strong>blockerad av {count, plural, one {# säkerhetsfynd} other {# säkerhetsfynd}}</strong> vid eller över tröskeln. Den tillämpas inte förrän fynden är åtgärdade eller en administratör åsidosätter dem.",
+      "overriding": "Åsidosätter...",
+      "overrideContinue": "Åsidosätt och fortsätt",
+      "overrideConfirm": "Åsidosätt säkerhetsskanningen och låt körningen tillämpas trots de blockerande fynden?",
+      "overrideFailed": "Åsidosättning misslyckades",
+      "overrideFailedStatus": "Åsidosättning misslyckades ({status})",
+      "overriddenBy": "åsidosatt av {by}",
+      "passed": "Inga fynd vid eller över tröskeln.",
+      "guideline": "Visa riktlinje",
+      "severity": {
+        "critical": "kritisk",
+        "high": "hög",
+        "medium": "medel",
+        "low": "låg"
       }
     }
   },

@@ -1839,7 +1839,9 @@
       "applyLabel": "Apply<log>Ship''s Log</log>",
       "planFull": "Plan ship''s log",
       "applyFull": "Apply ship''s log",
-      "details": "Details"
+      "details": "Details",
+      "security": "Security",
+      "securityFull": "Security scan"
     },
     "banner": {
       "destroy": "This be a <strong>send t'' Davy Jones</strong> run — all managed resources will be sent t'' th'' depths when applied.",
@@ -1852,7 +1854,8 @@
       "changes": "Changes",
       "aiAnalysis": "AI analysis",
       "policyChecks": "Policy checks",
-      "resources": "Resources"
+      "resources": "Resources",
+      "security": "Security scan"
     },
     "changes": {
       "noChanges": "Nay changes",
@@ -2016,6 +2019,32 @@
       },
       "errors": {
         "status": "Could nay load th'' AI booty reckonin'' (HTTP {status})."
+      }
+    },
+    "security": {
+      "none": "None",
+      "blocked": "Blocked",
+      "blockingSub": "{count, plural, one {# blockin' finding} other {# blockin' findings}}",
+      "passed": "Passed"
+    },
+    "securityPanel": {
+      "heading": "Security Scan",
+      "engineLabel": "{engine}",
+      "thresholdLabel": "threshold: {threshold}",
+      "blockedMessage": "This here run be <strong>blocked by {count, plural, one {# security finding} other {# security findings}}</strong> at or above the threshold, arr. It'll not apply till the findings be resolved or an admin overrides 'em.",
+      "overriding": "Overridin''...",
+      "overrideContinue": "Override & Continue",
+      "overrideConfirm": "Override the security scan an' let this run apply despite the blockin' findings, ye scallywag?",
+      "overrideFailed": "Override foundered",
+      "overrideFailedStatus": "Override foundered ({status})",
+      "overriddenBy": "overridden by {by}",
+      "passed": "No findings at or above the threshold, matey.",
+      "guideline": "Spy the guideline",
+      "severity": {
+        "critical": "critical",
+        "high": "high",
+        "medium": "middlin'",
+        "low": "low"
       }
     }
   },

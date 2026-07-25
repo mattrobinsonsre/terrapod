@@ -1839,7 +1839,9 @@
       "applyLabel": "Uygulama<log>Günlüğü</log>",
       "planFull": "Plan günlüğü",
       "applyFull": "Uygulama günlüğü",
-      "details": "Ayrıntılar"
+      "details": "Ayrıntılar",
+      "security": "Güvenlik",
+      "securityFull": "Güvenlik taraması"
     },
     "banner": {
       "destroy": "Bu bir <strong>yok etme</strong> çalıştırmasıdır — uygulandığında yönetilen tüm kaynaklar yok edilecek.",
@@ -1852,7 +1854,8 @@
       "changes": "Değişiklikler",
       "aiAnalysis": "AI analizi",
       "policyChecks": "Politika denetimleri",
-      "resources": "Kaynaklar"
+      "resources": "Kaynaklar",
+      "security": "Güvenlik taraması"
     },
     "changes": {
       "noChanges": "Değişiklik yok",
@@ -2016,6 +2019,32 @@
       },
       "errors": {
         "status": "AI maliyet tahmini yüklenemedi (HTTP {status})."
+      }
+    },
+    "security": {
+      "none": "Yok",
+      "blocked": "Engellendi",
+      "blockingSub": "{count, plural, one {# engelleyen bulgu} other {# engelleyen bulgu}}",
+      "passed": "Geçti"
+    },
+    "securityPanel": {
+      "heading": "Güvenlik taraması",
+      "engineLabel": "{engine}",
+      "thresholdLabel": "eşik: {threshold}",
+      "blockedMessage": "Bu çalıştırma, eşik değerinde veya üzerinde <strong>{count, plural, one {# güvenlik bulgusu} other {# güvenlik bulgusu}} tarafından engellendi</strong>. Bulgular çözülene veya bir yönetici geçersiz kılana kadar uygulanmayacak.",
+      "overriding": "Geçersiz kılınıyor...",
+      "overrideContinue": "Geçersiz Kıl ve Devam Et",
+      "overrideConfirm": "Güvenlik taramasını geçersiz kılıp engelleyen bulgulara rağmen bu çalıştırmanın uygulanmasına izin verilsin mi?",
+      "overrideFailed": "Geçersiz kılma başarısız",
+      "overrideFailedStatus": "Geçersiz kılma başarısız ({status})",
+      "overriddenBy": "{by} tarafından geçersiz kılındı",
+      "passed": "Eşik değerinde veya üzerinde bulgu yok.",
+      "guideline": "Kılavuzu görüntüle",
+      "severity": {
+        "critical": "kritik",
+        "high": "yüksek",
+        "medium": "orta",
+        "low": "düşük"
       }
     }
   },

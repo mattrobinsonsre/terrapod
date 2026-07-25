@@ -1839,7 +1839,9 @@
       "applyLabel": "Apply<log>Log</log>",
       "planFull": "Log plánu",
       "applyFull": "Log apply",
-      "details": "Podrobnosti"
+      "details": "Podrobnosti",
+      "security": "Zabezpečení",
+      "securityFull": "Bezpečnostní kontrola"
     },
     "banner": {
       "destroy": "Toto je <strong>destroy</strong> běh — všechny spravované prostředky budou při aplikaci zničeny.",
@@ -1852,7 +1854,8 @@
       "changes": "Změny",
       "aiAnalysis": "AI analýza",
       "policyChecks": "Kontroly zásad",
-      "resources": "Prostředky"
+      "resources": "Prostředky",
+      "security": "Bezpečnostní kontrola"
     },
     "changes": {
       "noChanges": "Žádné změny",
@@ -2016,6 +2019,32 @@
       },
       "errors": {
         "status": "Nepodařilo se načíst odhad nákladů od AI (HTTP {status})."
+      }
+    },
+    "security": {
+      "none": "Žádné",
+      "blocked": "Blokováno",
+      "blockingSub": "{count, plural, one {# blokující nález} few {# blokující nálezy} many {# blokujících nálezů} other {# blokujících nálezů}}",
+      "passed": "Prošlo"
+    },
+    "securityPanel": {
+      "heading": "Bezpečnostní kontrola",
+      "engineLabel": "{engine}",
+      "thresholdLabel": "práh: {threshold}",
+      "blockedMessage": "Tento běh je <strong>blokován bezpečnostními nálezy</strong> na úrovni prahu nebo vyšší ({count}). Nebude použit, dokud nebudou nálezy vyřešeny nebo je správce nepřepíše.",
+      "overriding": "Přepisování...",
+      "overrideContinue": "Přepsat a pokračovat",
+      "overrideConfirm": "Přepsat bezpečnostní kontrolu a povolit použití tohoto běhu navzdory blokujícím nálezům?",
+      "overrideFailed": "Přepsání selhalo",
+      "overrideFailedStatus": "Přepsání selhalo ({status})",
+      "overriddenBy": "přepsal {by}",
+      "passed": "Žádné nálezy na úrovni prahu nebo vyšší.",
+      "guideline": "Zobrazit doporučení",
+      "severity": {
+        "critical": "kritická",
+        "high": "vysoká",
+        "medium": "střední",
+        "low": "nízká"
       }
     }
   },
