@@ -75,6 +75,24 @@ async def test_free_capacity_claims():
 
 
 @pytest.mark.asyncio
+async def test_capacity_unknown_fails_closed():
+    """K8s occupancy unknown (count returns None after retries) → the listener
+    defers the whole pass and does NOT claim. This is the fail-closed guard that
+    stops a transient apiserver blip from triggering an over-launch storm."""
+    calls = {"next": 0}
+    async with _counting_client(calls) as client:
+        listener = _make_listener(client)
+        listener._max_concurrent = 10  # plenty of nominal headroom
+        listener._active_launches = 0
+        with patch(
+            "terrapod.runner.job_manager.count_active_runner_jobs",
+            AsyncMock(return_value=None),
+        ):
+            await listener._handle_run_available()
+    assert calls["next"] == 0  # deferred despite headroom — occupancy unknown
+
+
+@pytest.mark.asyncio
 async def test_launches_plus_jobs_sum_to_capacity_blocks():
     """In-flight launches + running Jobs together reaching the cap blocks a claim
     (the create window is counted so a Job mid-launch isn't double-admitted)."""

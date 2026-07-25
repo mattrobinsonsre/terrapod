@@ -177,6 +177,38 @@ async def _check_pod_stuck(job_name: str, namespace: str) -> str | None:
     return None
 
 
+# Event reasons a cluster autoscaler emits on a Pending pod while it is
+# provisioning a node for it: cluster-autoscaler's `TriggeredScaleUp` and
+# Karpenter's `Nominated`. While one of these is present the pod is Unschedulable
+# only TRANSIENTLY — a node is on the way — so it must NOT be failed as
+# "insufficient resources". That would turn graceful scale-up backpressure into a
+# spurious run error the moment provisioning takes longer than the launch grace.
+_SCALEUP_PENDING_REASONS = frozenset({"TriggeredScaleUp", "Nominated"})
+
+
+async def _pod_scaleup_pending(pod_name: str, namespace: str) -> bool:
+    """True if a cluster autoscaler is provisioning a node for this Pending pod.
+
+    Best-effort — on any K8s error returns False, so the caller falls back to the
+    normal unschedulable timeout (a fixed cluster with no autoscaler simply never
+    has these events, and behaves exactly as before).
+    """
+    core_api = _get_core_api()
+    try:
+        loop = asyncio.get_event_loop()
+        events = await loop.run_in_executor(
+            _executor,
+            lambda: core_api.list_namespaced_event(
+                namespace=namespace,
+                field_selector=f"involvedObject.name={pod_name}",
+            ),
+        )
+        core_api.api_client.last_response = None
+        return any(e.reason in _SCALEUP_PENDING_REASONS for e in events.items)
+    except Exception:
+        return False
+
+
 async def _pod_unschedulable(job_name: str, namespace: str) -> bool:
     """True if the Job's pod is Pending and the scheduler has declared it
     Unschedulable — insufficient cluster resources, or an unsatisfiable
@@ -186,6 +218,15 @@ async def _pod_unschedulable(job_name: str, namespace: str) -> bool:
     run looks "running" and only fails at the 1h stale timeout. We key off the
     scheduler's own `PodScheduled=False, reason=Unschedulable` condition (not a
     bare Pending) so a pod that's merely mid-scheduling is not misflagged.
+
+    Exception — **graceful degradation on autoscaling clusters**: if a cluster
+    autoscaler is actively provisioning a node for the pod (see
+    `_pod_scaleup_pending`), it is Unschedulable only until that node joins, so
+    this returns False. The run then keeps waiting (up to the 1h stale timeout,
+    ample for any autoscaler) instead of being errored the instant provisioning
+    outruns the short launch grace. On a fixed cluster with no autoscaler the
+    scale-up events never appear, so this is a no-op and the pod is flagged
+    unschedulable as before.
     """
     core_api = _get_core_api()
     try:
@@ -208,6 +249,10 @@ async def _pod_unschedulable(job_name: str, namespace: str) -> bool:
                     and cond.status == "False"
                     and cond.reason == "Unschedulable"
                 ):
+                    # A node may be on the way (cluster autoscaler) — that's
+                    # transient backpressure, not a failure. Keep waiting.
+                    if await _pod_scaleup_pending(pod.metadata.name, namespace):
+                        return False
                     return True
     except Exception:
         return False
@@ -287,17 +332,19 @@ async def get_job_status(job_name: str, namespace: str = "") -> str | None:
         raise
 
 
-async def count_active_runner_jobs(namespace: str = "") -> int:
+async def count_active_runner_jobs(
+    namespace: str = "", *, retries: int = 3, backoff_base: float = 0.2
+) -> int | None:
     """Count runner Jobs currently occupying capacity in the namespace — i.e.
     non-terminal Jobs with at least one active (Pending or Running) pod (#749).
 
-    The listener admits runs up to `max_concurrent`, but its in-process
-    `_active_launches` counter only tracks launch *operations* (the brief
-    create window), not Jobs that are actually running. On a fixed-size
-    cluster that let the listener over-admit: it would keep claiming runs and
-    spawning Jobs that then sit Pending, unschedulable. Counting real Jobs
-    from K8s — the authoritative source — keeps the listener stateless and
-    makes admission reflect actual occupancy.
+    Kubernetes is the source of truth for occupancy, so this queries it live on
+    every call rather than trusting a local counter (which would drift as Jobs
+    complete, get evicted, or are launched by other listener replicas). The
+    listener admits runs up to `max_concurrent`; its in-process
+    `_active_launches` counter only tracks the brief launch-create window, so
+    counting real Jobs from K8s is what makes admission reflect actual occupancy
+    and keeps the listener stateless.
 
     Selects by the runner component label (`app.kubernetes.io/component=runner`)
     that every runner Job carries, scoped to `namespace`. Terminal Jobs
@@ -305,40 +352,63 @@ async def count_active_runner_jobs(namespace: str = "") -> int:
     exists but has no active pod yet is covered by `_active_launches` on the
     listener, so it is not double-counted here.
 
-    Best-effort: on any K8s API error returns 0 (fail-open). A transient list
-    error must not wedge the whole pool, and #748 is the backstop — if
-    fail-open lets a Job launch that can't be placed, the scheduler declares it
-    unschedulable and the reconciler fails it fast with a clear reason.
+    The list is **retried with bounded backoff** on transient errors. On
+    persistent failure it returns **None** ("occupancy unknown"), NOT 0 — and
+    the caller MUST treat None as *fail-closed* (defer launching). Returning 0
+    on error is fail-OPEN and dangerous under load: a struggling apiserver times
+    out the list → "0 active" reads as full capacity → the listener launches a
+    whole batch → that adds apiserver load and more list timeouts → a runaway
+    over-launch storm. Failing closed keeps the runs queued (recoverable, and
+    re-driven by the next `run_available`/poll) instead of stampeding a
+    struggling apiserver. (#748's reconciler remains the backstop for any Job
+    that does slip through and can't be placed.)
     """
     if not namespace:
         namespace = _default_namespace()
 
-    try:
-        # Inside the try so a not-yet-initialised client also fails open —
-        # the whole helper is best-effort (see docstring), not just the list.
-        batch_api = _get_batch_api()
-        loop = asyncio.get_event_loop()
-        jobs = await loop.run_in_executor(
-            _executor,
-            lambda: batch_api.list_namespaced_job(
-                namespace=namespace,
-                label_selector="app.kubernetes.io/component=runner",
-            ),
-        )
-        batch_api.api_client.last_response = None
+    last_error: Exception | None = None
+    for attempt in range(max(1, retries)):
+        try:
+            # Inside the try so a not-yet-initialised client is treated as a
+            # transient failure (retried, then fail-closed) rather than crashing
+            # the caller mid-drain.
+            batch_api = _get_batch_api()
+            loop = asyncio.get_event_loop()
+            # bind batch_api as a default arg (B023): it's reassigned each retry
+            # iteration, and the executor runs the lambda immediately, but the
+            # explicit binding keeps the closure unambiguous.
+            jobs = await loop.run_in_executor(
+                _executor,
+                lambda b=batch_api: b.list_namespaced_job(
+                    namespace=namespace,
+                    label_selector="app.kubernetes.io/component=runner",
+                ),
+            )
+            batch_api.api_client.last_response = None
 
-        count = 0
-        for job in jobs.items:
-            st = job.status
-            if not st:
-                continue
-            if (st.succeeded and st.succeeded > 0) or (st.failed and st.failed > 0):
-                continue  # terminal — no longer occupies a slot
-            if st.active and st.active > 0:
-                count += 1
-        return count
-    except Exception:
-        return 0
+            count = 0
+            for job in jobs.items:
+                st = job.status
+                if not st:
+                    continue
+                if (st.succeeded and st.succeeded > 0) or (st.failed and st.failed > 0):
+                    continue  # terminal — no longer occupies a slot
+                if st.active and st.active > 0:
+                    count += 1
+            return count
+        except Exception as e:  # noqa: BLE001 — any K8s/list error is retryable
+            last_error = e
+            if attempt < retries - 1:
+                await asyncio.sleep(backoff_base * (attempt + 1))
+
+    # Persistent failure → fail CLOSED (caller defers launching). See docstring.
+    logger.warning(
+        "Could not determine active runner-Job count from K8s after retries — "
+        "reporting unknown; admission will fail closed",
+        error=str(last_error),
+        retries=retries,
+    )
+    return None
 
 
 async def get_pod_terminated_info(

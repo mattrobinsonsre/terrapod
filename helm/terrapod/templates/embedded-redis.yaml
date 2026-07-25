@@ -47,7 +47,10 @@ spec:
         - name: redis
           image: {{ .Values.redis.embedded.image }}
           imagePullPolicy: IfNotPresent
-          args: ["--save", "", "--appendonly", "no"]
+          # Base args (no persistence — eval/dev) plus any extraArgs, e.g.
+          # ["--maxmemory","512mb","--maxmemory-policy","allkeys-lru"] from
+          # values-scale.yaml so Redis has headroom under load.
+          args: {{ concat (list "--save" "" "--appendonly" "no") .Values.redis.embedded.extraArgs | toJson }}
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true

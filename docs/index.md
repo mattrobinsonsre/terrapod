@@ -159,6 +159,7 @@ See [Architecture](architecture.md) for the full breakdown.
 | [Cost Estimation](cost-estimation.md) | Monthly cost of managed infrastructure — a per-plan delta (run) and the current state total (workspace); native cost engine (data) + optional AI layer (estimates unpriced resources, advisories, grounded chat); Cost tab on both pages + MCP tools |
 | [Monitoring](monitoring.md) | Prometheus metrics, scraping, shipped Grafana dashboard + alert rules (with per-alert runbooks) |
 | [Deployment](deployment.md) | Production Helm deployment, storage backends, scaling |
+| [Scalability](scalability.md) | How Terrapod scales to large workspace counts (stateless API replicas, no leader election, O(page) list reads), a reproducible load-test harness, measured results, and the horizontal-scale Helm profile |
 | [Split-networking deployments](deployment-network-isolation.md) | Three-Ingress model: management / webhook / internal agent path, with split-hostname runner config |
 | [Optional split webhook ingress](deployment-webhook-ingress.md) | Optional second Ingress for the public-must-reach surface (VCS webhooks, run-task callbacks) |
 | [Forward proxy & custom CA trust](deployment-proxy.md) | Route all outbound HTTP(S) through a corporate proxy and trust a private/MITM CA, across every component including runner Jobs |

@@ -377,13 +377,17 @@ class RunnerListener:
         """
         # Report the real running-Job count from K8s, not the launch counter,
         # so the pool/listener status operators see reflects actual occupancy
-        # (#749). Best-effort — a K8s blip returns 0 and the value self-heals
-        # on the next heartbeat.
+        # (#749). On a transient K8s blip the count is unknown (None) — keep the
+        # last observed value rather than zeroing it; it self-heals on the next
+        # heartbeat.
         from terrapod.runner.job_manager import count_active_runner_jobs
 
-        self._active_runs_observed = await count_active_runner_jobs(
-            self.runner_config.runner_namespace
-        )
+        # retries=1: the heartbeat occupancy figure is best-effort status only
+        # (it self-heals on the next heartbeat), so it must not spend admission-
+        # style retry latency on a K8s blip. None → keep the last value.
+        observed = await count_active_runner_jobs(self.runner_config.runner_namespace, retries=1)
+        if observed is not None:
+            self._active_runs_observed = observed
 
         await arequest_with_retry(
             self._http_client,
@@ -620,6 +624,19 @@ class RunnerListener:
             # count lags a just-created Job (its pod isn't active yet), so
             # `launched` prevents a single drain pass from over-admitting.
             active_jobs = await count_active_runner_jobs(self.runner_config.runner_namespace)
+            if active_jobs is None:
+                # Fail CLOSED: K8s (the source of truth for occupancy) was
+                # unreachable after retries. Defer this drain pass rather than
+                # launch blind — the runs stay queued and the next
+                # `run_available`/poll re-drives them. This is what stops a
+                # transient apiserver blip from snowballing into an over-launch
+                # storm (see count_active_runner_jobs).
+                logger.warning(
+                    "Deferring run claim — active-Job count unknown from K8s (fail-closed)",
+                    active_launches=self._active_launches,
+                    launched=launched,
+                )
+                return
             if self._active_launches + active_jobs + launched >= self._max_concurrent:
                 if launched == 0:
                     logger.debug(

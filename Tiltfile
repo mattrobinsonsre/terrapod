@@ -11,6 +11,15 @@ allow_k8s_contexts([
     'orbstack',
 ])
 
+# Opt-in horizontal-scale profile (#1056): `tilt up -- --scale` layers
+# helm/terrapod/values-scale.yaml on top of the dev overrides — API/web/listener
+# HPAs, a sized embedded Postgres + Redis, and multi-replica-on-filesystem
+# (single-node only). Used for the local load test; see docs/scalability.md.
+config.define_bool('scale')
+_scale = config.parse().get('scale', False)
+if _scale:
+    warn('SCALE profile ON: values-scale.yaml layered — HA/autoscaling for load testing.')
+
 # Ensure namespace exists
 local('kubectl create namespace terrapod --dry-run=client -o yaml | kubectl apply -f -')
 
@@ -144,20 +153,35 @@ local_resource(
     labels=['build'],
 )
 
-# Web UI (Next.js) — use builder stage for dev mode with hot reload
-docker_build(
-    'terrapod-web',
-    context='.',
-    dockerfile='docker/Dockerfile.web',
-    target='builder',
-    entrypoint=['npx', 'next', 'dev', '-H', '0.0.0.0'],
-    live_update=[
-        sync('./web/src', '/app/src'),
-        sync('./web/public', '/app/public'),
-        sync('./web/messages', '/app/messages'),
-        sync('./web/next.config.js', '/app/next.config.js'),
-    ],
-)
+# Web UI (Next.js).
+#
+# Default dev loop: build the `builder` stage and run `next dev` for hot reload.
+# Under `--scale` (the load-test profile) that dev server is NOT representative —
+# `next dev` is a slow, single-process JIT compiler that bottlenecks the BFF on
+# latency, not CPU, and taints any frontend/BFF scalability measurement. So scale
+# mode builds the PRODUCTION image instead (the final Dockerfile.web stage:
+# `npm run build` standalone output, `NODE_ENV=production`, `node server.js`) —
+# the same frontend that ships — with no entrypoint override and no live_update.
+if _scale:
+    docker_build(
+        'terrapod-web',
+        context='.',
+        dockerfile='docker/Dockerfile.web',
+    )
+else:
+    docker_build(
+        'terrapod-web',
+        context='.',
+        dockerfile='docker/Dockerfile.web',
+        target='builder',
+        entrypoint=['npx', 'next', 'dev', '-H', '0.0.0.0'],
+        live_update=[
+            sync('./web/src', '/app/src'),
+            sync('./web/public', '/app/public'),
+            sync('./web/messages', '/app/messages'),
+            sync('./web/next.config.js', '/app/next.config.js'),
+        ],
+    )
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Infrastructure (PostgreSQL + Redis)
@@ -196,11 +220,16 @@ watch_file('helm/terrapod/values.yaml')
 watch_file('helm/terrapod/values-local.yaml')
 watch_file('helm/terrapod/templates')
 
+_values = ['helm/terrapod/values.yaml', 'helm/terrapod/values-local.yaml']
+if _scale:
+    watch_file('helm/terrapod/values-scale.yaml')
+    _values.append('helm/terrapod/values-scale.yaml')
+
 k8s_yaml(helm(
     'helm/terrapod',
     name='terrapod',
     namespace='terrapod',
-    values=['helm/terrapod/values.yaml', 'helm/terrapod/values-local.yaml'],
+    values=_values,
     set=[
         'api.image.repository=terrapod-api',
         'api.image.tag=latest',
