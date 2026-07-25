@@ -51,6 +51,7 @@ from terrapod.runner.phases import (
     opa,
     plan_apply,
     resource_profile,
+    security_scan,
     terragrunt,
     tf_args,
     tfvars,
@@ -312,11 +313,42 @@ def _run_plan_phase(
         log.error("policy evaluation failed", err=str(exc))
         return 1
 
+    # Security scan (#1036). Non-fatal throughout — the server's post-plan gate
+    # enforces (a missing enforced result is failed-closed there). Ordering:
+    # an ENFORCED scan on a non-plan-only run must post its result BEFORE the
+    # plan-result POST, because plan-result drives complete_plan → the gate,
+    # which must see the recorded result. Everything else (advisory, plan-only,
+    # off) scans as add-on work AFTER plan-result so apply isn't made to wait —
+    # "advisory = no wait, enforced = wait".
+    scan_cfg = None
+    try:
+        scan_cfg = security_scan.fetch_scan_config(cfg)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("scan config fetch raised (non-fatal)", err=str(exc))
+    scan_before = bool(
+        scan_cfg
+        and scan_cfg.get("enabled")
+        and scan_cfg.get("enforcement_level") == "enforced"
+        and not cfg.plan_only
+    )
+    if scan_before:
+        try:
+            security_scan.run_and_post(cfg, scan_cfg, plan_json=_PLAN_JSON)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("security scan raised (non-fatal, pre-result)", err=str(exc))
+
     # plan-result POST.
     try:
         uploads.post_plan_result(cfg, has_changes=plan_result.has_changes)
     except Exception as exc:  # noqa: BLE001
         log.warning("plan-result raised (non-fatal)", err=str(exc))
+
+    # Advisory / plan-only scan runs AFTER plan-result (no-wait add-on work).
+    if scan_cfg and scan_cfg.get("enabled") and not scan_before:
+        try:
+            security_scan.run_and_post(cfg, scan_cfg, plan_json=_PLAN_JSON)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("security scan raised (non-fatal, post-result)", err=str(exc))
 
     # Plan binary upload (skip for plan-only).
     if plan_file.exists() and not cfg.plan_only:
