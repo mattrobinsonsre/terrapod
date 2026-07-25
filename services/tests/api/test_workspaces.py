@@ -1104,6 +1104,20 @@ def _list_db(workspaces):
     return db
 
 
+def _list_db_seeall(total, page_ws):
+    """Mock DB for the admin/audit see-all fast path (#1056): the three calls are
+    COUNT (scalar) -> page rows (LIMIT/OFFSET) -> latest runs."""
+    count_result = MagicMock()
+    count_result.scalar_one.return_value = total
+    page_result = MagicMock()
+    page_result.scalars.return_value.all.return_value = page_ws
+    runs_result = MagicMock()
+    runs_result.scalars.return_value.all.return_value = []
+    db = AsyncMock()
+    db.execute.side_effect = [count_result, page_result, runs_result]
+    return db
+
+
 class TestListWorkspacesPagination:
     """The #862 bug fix: /api/v2 workspace list honours page[size] and always
     emits meta.pagination, while absent params / page[size]=0 return the full
@@ -1222,3 +1236,82 @@ class TestListWorkspacesPagination:
         assert len(body["data"]) == 1
         assert body["meta"]["pagination"]["total-count"] == 2  # visible only
         assert body["meta"]["pagination"]["total-pages"] == 2
+
+
+class TestListWorkspacesSeeAllFastPath:
+    """#1056: a platform admin/auditor is visible on every workspace, so a paged
+    list slices in SQL (COUNT + LIMIT/OFFSET) — O(page), not O(estate). The
+    ``total-count`` comes from the SQL COUNT and so exceeds the returned page,
+    which is impossible on the load-all path and thus proves the fast path ran.
+    Absent paging params still return the full list (backward compat), and a
+    non-see-all principal always takes the RBAC-filtered general path.
+    """
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_capabilities_for")
+    async def test_admin_paged_counts_and_slices_in_sql(self, mock_resolve, *mocks):
+        mock_resolve.return_value = caps_for_level("admin")
+        page_ws = [_mock_workspace(name=f"ws-{i}") for i in range(20)]
+        app, _ = _make_app(_user(roles=["admin"]), mock_db=_list_db_seeall(1000, page_ws))
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get(
+                "/api/v2/organizations/default/workspaces?page[size]=20", headers=_AUTH
+            )
+
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert len(body["data"]) == 20  # only the page, not all 1000
+        assert body["meta"]["pagination"] == {
+            "current-page": 1,
+            "page-size": 20,
+            "total-count": 1000,  # from SQL COUNT — the fast-path signature
+            "total-pages": 50,
+        }
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_capabilities_for")
+    async def test_audit_paged_counts_and_slices_in_sql(self, mock_resolve, *mocks):
+        mock_resolve.return_value = caps_for_level("read")
+        page_ws = [_mock_workspace(name=f"ws-{i}") for i in range(5)]
+        app, _ = _make_app(_user(roles=["audit"]), mock_db=_list_db_seeall(300, page_ws))
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get(
+                "/api/v2/organizations/default/workspaces?page[size]=5&page[number]=2",
+                headers=_AUTH,
+            )
+
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert len(body["data"]) == 5
+        assert body["meta"]["pagination"] == {
+            "current-page": 2,
+            "page-size": 5,
+            "total-count": 300,
+            "total-pages": 60,
+        }
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_capabilities_for")
+    async def test_admin_absent_params_uses_general_path(self, mock_resolve, *mocks):
+        # No paging params → full list even for an admin (backward compat). The
+        # 2-call general mock (not the 3-call see-all mock) is what serves this,
+        # proving the fast path did NOT run without an explicit page[size].
+        mock_resolve.return_value = caps_for_level("admin")
+        wss = [_mock_workspace(name=f"ws-{i}") for i in range(3)]
+        app, _ = _make_app(_user(roles=["admin"]), mock_db=_list_db(wss))
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get("/api/v2/organizations/default/workspaces", headers=_AUTH)
+
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert len(body["data"]) == 3
+        assert body["meta"]["pagination"]["total-count"] == 3

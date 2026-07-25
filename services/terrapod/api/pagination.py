@@ -55,6 +55,36 @@ def parse_page_params(request: Request | None) -> tuple[int, int | None]:
     return number, size
 
 
+def build_meta(total: int, number: int, size: int | None) -> dict:
+    """Construct the ``meta.pagination`` block for a list whose page was sliced
+    in SQL (``LIMIT``/``OFFSET``) rather than in Python.
+
+    Use this on the fast path where an endpoint counts + pages in the database
+    instead of materialising the whole list — it produces the identical shape
+    ``paginate`` emits, so the two paths are wire-compatible. ``size`` ``None``
+    means the non-paged single-page result.
+    """
+    if size is None:
+        return {
+            "pagination": {
+                "current-page": 1,
+                "page-size": total or 1,
+                "total-count": total,
+                "total-pages": 1,
+            }
+        }
+    size = min(size, MAX_PAGE_SIZE)
+    total_pages = (total + size - 1) // size if total > 0 else 0
+    return {
+        "pagination": {
+            "current-page": number,
+            "page-size": size,
+            "total-count": total,
+            "total-pages": total_pages,
+        }
+    }
+
+
 def paginate(items: list[Any], request: Request | None) -> tuple[list[Any], dict]:
     """Apply optional JSON:API pagination to an already-materialised list.
 

@@ -11,6 +11,15 @@ allow_k8s_contexts([
     'orbstack',
 ])
 
+# Opt-in horizontal-scale profile (#1056): `tilt up -- --scale` layers
+# helm/terrapod/values-scale.yaml on top of the dev overrides — API/web/listener
+# HPAs, a sized embedded Postgres + Redis, and multi-replica-on-filesystem
+# (single-node only). Used for the local load test; see docs/scalability.md.
+config.define_bool('scale')
+_scale = config.parse().get('scale', False)
+if _scale:
+    warn('SCALE profile ON: values-scale.yaml layered — HA/autoscaling for load testing.')
+
 # Ensure namespace exists
 local('kubectl create namespace terrapod --dry-run=client -o yaml | kubectl apply -f -')
 
@@ -196,11 +205,16 @@ watch_file('helm/terrapod/values.yaml')
 watch_file('helm/terrapod/values-local.yaml')
 watch_file('helm/terrapod/templates')
 
+_values = ['helm/terrapod/values.yaml', 'helm/terrapod/values-local.yaml']
+if _scale:
+    watch_file('helm/terrapod/values-scale.yaml')
+    _values.append('helm/terrapod/values-scale.yaml')
+
 k8s_yaml(helm(
     'helm/terrapod',
     name='terrapod',
     namespace='terrapod',
-    values=['helm/terrapod/values.yaml', 'helm/terrapod/values-local.yaml'],
+    values=_values,
     set=[
         'api.image.repository=terrapod-api',
         'api.image.tag=latest',

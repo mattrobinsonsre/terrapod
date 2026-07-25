@@ -1432,6 +1432,11 @@ postgresql:
   deploy: false
   embedded:
     image: postgres:16-alpine
+    # Extra server args passed straight to `postgres` (eval/dev tuning only).
+    # Empty by default; values-scale.yaml raises max_connections / shared_buffers
+    # so the embedded datastore is not the bottleneck under load, e.g.
+    # ["-c","max_connections=300","-c","shared_buffers=512MB"].
+    extraArgs: []
     # A fixed password for the embedded DB (eval only). Leave empty to have the
     # chart generate one (stable across upgrades via a lookup on the Secret).
     password: ""
@@ -1458,6 +1463,10 @@ redis:
   deploy: false
   embedded:
     image: redis:7-alpine
+    # Extra args appended after the base (no-persistence) args (eval/dev only),
+    # e.g. ["--maxmemory","512mb","--maxmemory-policy","allkeys-lru"] from
+    # values-scale.yaml so Redis has headroom under load.
+    extraArgs: []
     resources:
       requests:
         cpu: 50m
@@ -1467,6 +1476,13 @@ redis:
 # Filesystem PVC — only created when storage.backend=filesystem
 storage:
   filesystem:
+    # Escape hatch for a SINGLE-NODE dev/eval cluster only: normally the chart
+    # refuses multiple API replicas on filesystem storage (a ReadWriteOnce PVC
+    # can't be shared across nodes). On one node every replica co-locates and
+    # shares the RWO PVC fine, so this relaxes the guard for the local
+    # horizontal-scale test (values-scale.yaml). NEVER set true in production —
+    # use a cloud object-storage backend for real multi-replica.
+    allowMultiReplica: false
     persistence:
       enabled: true
       size: 50Gi
