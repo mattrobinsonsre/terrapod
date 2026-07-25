@@ -254,8 +254,8 @@ Validate storage configuration — exactly one backend must be configured.
   {{- end -}}
 {{- end -}}
 {{- if eq $backend "filesystem" -}}
-  {{- if or (gt (int .Values.api.replicas) 1) .Values.api.autoscaling.enabled -}}
-  {{- fail "Filesystem storage backend does not support multiple API replicas. Set api.replicas=1 and api.autoscaling.enabled=false, or use a cloud storage backend (s3, azure, gcs)." -}}
+  {{- if and (or (gt (int .Values.api.replicas) 1) .Values.api.autoscaling.enabled) (not .Values.storage.filesystem.allowMultiReplica) -}}
+  {{- fail "Filesystem storage backend does not support multiple API replicas. Set api.replicas=1 and api.autoscaling.enabled=false, or use a cloud storage backend (s3, azure, gcs). (Single-node dev/eval only: storage.filesystem.allowMultiReplica=true relaxes this — safe ONLY when every replica lands on the one node sharing the ReadWriteOnce PVC.)" -}}
   {{- end -}}
 {{- end -}}
 {{- end -}}

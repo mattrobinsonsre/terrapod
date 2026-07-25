@@ -95,6 +95,14 @@ spec:
         - name: postgresql
           image: {{ .Values.postgresql.embedded.image }}
           imagePullPolicy: IfNotPresent
+          {{- with .Values.postgresql.embedded.extraArgs }}
+          # Server tuning passed straight to `postgres` (e.g.
+          # ["-c","max_connections=300","-c","shared_buffers=512MB"]). Used by
+          # values-scale.yaml so the eval datastore is not the bottleneck under
+          # load; empty in prod/eval/dev where the defaults are fine.
+          args:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           env:
             - name: POSTGRES_USER
               value: terrapod

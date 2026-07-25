@@ -42,7 +42,7 @@ from datetime import UTC, datetime
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request, Response, status
 from fastapi.responses import JSONResponse
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.api.dependencies import (
@@ -53,7 +53,7 @@ from terrapod.api.dependencies import (
     require_non_runner,
 )
 from terrapod.api.labels import validate_labels
-from terrapod.api.pagination import paginate
+from terrapod.api.pagination import MAX_PAGE_SIZE, build_meta, paginate, parse_page_params
 from terrapod.auth import capabilities as cap
 from terrapod.auth.capabilities import has_capability
 from terrapod.db.models import (
@@ -857,6 +857,24 @@ def _parse_tag_filters(request: Request) -> list[tuple[str, str | None]]:
     return filters
 
 
+async def _latest_runs_for(ws_ids: list, db: AsyncSession) -> dict:
+    """Map ``workspace_id -> latest primary Run`` for the given workspaces in a
+    single ``DISTINCT ON`` query (empty dict for no ids). Shared by the see-all
+    fast path and the general path in ``list_workspaces``."""
+    latest_runs: dict = {}
+    if ws_ids:
+        latest_run_q = (
+            select(Run)
+            .where(Run.workspace_id.in_(ws_ids), _primary_run_filter())
+            .order_by(Run.workspace_id, Run.created_at.desc())
+            .distinct(Run.workspace_id)
+        )
+        run_result = await db.execute(latest_run_q)
+        for run in run_result.scalars().all():
+            latest_runs[run.workspace_id] = run
+    return latest_runs
+
+
 @router.get("/organizations/default/workspaces")
 async def list_workspaces(
     user: AuthenticatedUser = Depends(get_current_user),
@@ -881,22 +899,39 @@ async def list_workspaces(
             else:
                 query = query.where(Workspace.labels.contains({k: v}))
 
+    # Fast path for see-all principals at scale (#1056). A platform admin or
+    # auditor is visible on EVERY workspace, so the RBAC filter is a no-op — and
+    # loading + serialising the whole table on every paged request is O(N) work
+    # thrown away (it dominated list latency once the estate grew to thousands
+    # of workspaces). When such a principal asks for a specific page, count +
+    # slice in SQL (LIMIT/OFFSET) so the cost is O(page), not O(estate). The
+    # ordering, filters, and wire shape are identical to the general path below.
+    page_number, page_size = parse_page_params(request)
+    platform_roles = effective_platform_roles(user)
+    sees_all = "admin" in platform_roles or "audit" in platform_roles
+    if sees_all and page_size is not None:
+        total = (await db.execute(select(func.count()).select_from(query.subquery()))).scalar_one()
+        capped = min(page_size, MAX_PAGE_SIZE)
+        page_ws = (
+            (await db.execute(query.limit(capped).offset((page_number - 1) * capped)))
+            .scalars()
+            .all()
+        )
+        latest_runs = await _latest_runs_for([ws.id for ws in page_ws], db)
+        data = []
+        for ws in page_ws:
+            caps = await resolve_workspace_capabilities_for(db, user, ws)
+            data.append(_workspace_json(ws, caps, latest_run=latest_runs.get(ws.id))["data"])
+        return JSONResponse(
+            content={"data": data, "meta": build_meta(total, page_number, page_size)},
+            headers=_tfe_headers(),
+        )
+
     result = await db.execute(query)
     workspaces = result.scalars().all()
 
     # Batch-load latest run per workspace using DISTINCT ON
-    ws_ids = [ws.id for ws in workspaces]
-    latest_runs: dict = {}
-    if ws_ids:
-        latest_run_q = (
-            select(Run)
-            .where(Run.workspace_id.in_(ws_ids), _primary_run_filter())
-            .order_by(Run.workspace_id, Run.created_at.desc())
-            .distinct(Run.workspace_id)
-        )
-        run_result = await db.execute(latest_run_q)
-        for run in run_result.scalars().all():
-            latest_runs[run.workspace_id] = run
+    latest_runs = await _latest_runs_for([ws.id for ws in workspaces], db)
 
     # Filter to workspaces user has at least read access to
     visible = []
