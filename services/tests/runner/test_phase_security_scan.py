@@ -208,7 +208,11 @@ class TestFetchScanConfig:
             return httpx.Response(503)
 
         client = httpx.Client(transport=httpx.MockTransport(handler))
-        assert scan.fetch_scan_config(cfg, client=client, sleep=lambda s: sleeps.append(s)) is None
+        # Call outside the assert: the sleep callback mutates `sleeps`, and an
+        # assert expression with a side effect is stripped under `python -O`
+        # (py/side-effect-in-assert).
+        result = scan.fetch_scan_config(cfg, client=client, sleep=lambda s: sleeps.append(s))
+        assert result is None
         assert len(sleeps) == 2  # 3 attempts, 2 sleeps
 
     def test_no_api_returns_none(self) -> None:
