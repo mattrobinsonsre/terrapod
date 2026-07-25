@@ -153,20 +153,35 @@ local_resource(
     labels=['build'],
 )
 
-# Web UI (Next.js) — use builder stage for dev mode with hot reload
-docker_build(
-    'terrapod-web',
-    context='.',
-    dockerfile='docker/Dockerfile.web',
-    target='builder',
-    entrypoint=['npx', 'next', 'dev', '-H', '0.0.0.0'],
-    live_update=[
-        sync('./web/src', '/app/src'),
-        sync('./web/public', '/app/public'),
-        sync('./web/messages', '/app/messages'),
-        sync('./web/next.config.js', '/app/next.config.js'),
-    ],
-)
+# Web UI (Next.js).
+#
+# Default dev loop: build the `builder` stage and run `next dev` for hot reload.
+# Under `--scale` (the load-test profile) that dev server is NOT representative —
+# `next dev` is a slow, single-process JIT compiler that bottlenecks the BFF on
+# latency, not CPU, and taints any frontend/BFF scalability measurement. So scale
+# mode builds the PRODUCTION image instead (the final Dockerfile.web stage:
+# `npm run build` standalone output, `NODE_ENV=production`, `node server.js`) —
+# the same frontend that ships — with no entrypoint override and no live_update.
+if _scale:
+    docker_build(
+        'terrapod-web',
+        context='.',
+        dockerfile='docker/Dockerfile.web',
+    )
+else:
+    docker_build(
+        'terrapod-web',
+        context='.',
+        dockerfile='docker/Dockerfile.web',
+        target='builder',
+        entrypoint=['npx', 'next', 'dev', '-H', '0.0.0.0'],
+        live_update=[
+            sync('./web/src', '/app/src'),
+            sync('./web/public', '/app/public'),
+            sync('./web/messages', '/app/messages'),
+            sync('./web/next.config.js', '/app/next.config.js'),
+        ],
+    )
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Infrastructure (PostgreSQL + Redis)

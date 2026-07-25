@@ -46,7 +46,9 @@ drives the API through the canonical go-terrapod SDK (the same client the
 provider and migration tools use), so it exercises the real request path.
 
 ```sh
-# 1. bring the dev stack up in the horizontal-scale profile
+# 1. bring the stack up in the horizontal-scale profile. This builds the
+#    PRODUCTION web image (standalone `node server.js`), not the Tilt dev
+#    `next dev` server, so the BFF is measured as it actually ships.
 tilt up -- --scale
 
 # 2. seed a large estate, then benchmark the read surface
@@ -117,18 +119,31 @@ without paging still returns everything (backward compatible); only paged access
 from admins/auditors takes the fast path. Seeding itself ran clean at
 150–180 workspaces/s (rate limiter off).
 
-### 3. Horizontal API scaling — multi-replica, no leader election
+### 3. Horizontal scaling — both tiers auto-scale, no leader election
 
-On the scaled profile the API runs behind an HPA (min 2, max 6). Under a
-sustained 48-client read load against the **load-balanced ingress**, the API ran
-at **6 replicas and served 7,941 requests with zero errors**, with CPU spread
-across all six pods (~205 mCPU each) and the HPA actively tracking its 60% CPU
-target — i.e. work distributes across stateless replicas with no leader
-contention, exactly as designed. (The absolute throughput in that run was bound
-by the dev BFF — Tilt runs the frontend as `next dev`, which adds ~250 ms/request
-of proxy overhead; production runs it as a thin `next start`. The point of the
-run is the *distribution* and *correctness* across replicas, not the dev-mode
-req/s number.)
+The API and the BFF/web tier both run behind HPAs (API min 2 / max 6, web min 1
+/ max 3). Under sustained 64-client load through the **load-balanced production
+ingress** (CDN → ingress → BFF → API), starting from idle (API 2 / web 1):
+
+- CPU on both tiers crossed the HPA target (API peaked ~270% of its 60% target,
+  web ~219% of 70%), and **both tiers scaled up: API 2 → 4 → 6 replicas, web
+  1 → 3 replicas.** As the added replicas came online, CPU% fell back toward
+  target (API to ~96%, web to ~96%) — the added capacity absorbed the load.
+- At steady state (6 API / 3 web) the stack served **9,441 requests with 0
+  errors at 315 req/s** (p50 175 ms) through the full proxy chain — on one
+  8-vCPU node, so the *absolute* number is node-bound; the point is that both
+  stateless tiers scale out under load, with no leader contention, and load
+  distributes across every replica.
+
+> **The BFF scales too.** The frontend/BFF is stateless (it proxies `/api/*` and
+> does SSR) and horizontally scalable — the run above scaled it 1 → 3 under load.
+> **This must be measured with the production web image** (`node server.js` on
+> the standalone build), which the `--scale` profile builds. The Tilt dev image
+> (`next dev`) is a single-process JIT dev server that bottlenecks on latency,
+> not CPU, so it neither represents production nor trips a CPU-based HPA — do not
+> benchmark the BFF against it. (One sizing note CPU-HPA doesn't capture: the BFF
+> also carries all SSE/long-lived streams, so size it for concurrent
+> *connections*, not just request rate.)
 
 ### 4. Run scheduling — correct concurrent dispatch, exactly once
 

@@ -78,6 +78,13 @@ web:
     enabled: true
     minReplicas: 1
     maxReplicas: 3
+  # Scale mode runs the PRODUCTION web image (standalone `node server.js`), which
+  # has the built `.next` baked in. values-local mounts a dev `next-cache`
+  # emptyDir at /app/.next (for `next dev` hot reload) — that empty dir would
+  # SHADOW the production build and make the standalone server report "no
+  # production build". Null the dev volumes out so the real /app/.next is used.
+  extraVolumeMounts: []
+  extraVolumes: []
 
 # Embedded Postgres — sized so it is NOT the bottleneck (the user's explicit
 # ask). More connections for the replica pools, bigger shared_buffers, and real
