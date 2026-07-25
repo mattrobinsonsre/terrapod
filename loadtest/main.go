@@ -193,6 +193,7 @@ func cmdSeed(ctx context.Context, args []string) error {
 	prefix := fs.String("prefix", "lt", "workspace name prefix")
 	cpu := fs.String("cpu", "250m", "per-workspace resource-cpu request (low so jobs pack)")
 	mem := fs.String("mem", "256Mi", "per-workspace resource-memory request")
+	pool := fs.String("pool", "", "agent pool id (apool-...) to assign — required for runs to dispatch in `flood`")
 	_ = fs.Parse(args)
 
 	c, addr, err := newClient(*conc)
@@ -218,6 +219,7 @@ func cmdSeed(ctx context.Context, args []string) error {
 					ExecutionMode:  agent,
 					ResourceCPU:    *cpu,
 					ResourceMemory: *mem,
+					AgentPoolID:    *pool,
 					Labels:         map[string]string{"loadtest": "true", "batch": batch},
 				})
 				if err != nil {

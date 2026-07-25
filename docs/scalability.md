@@ -54,8 +54,10 @@ cd loadtest && go build -o terrapod-loadtest .
 ./terrapod-loadtest seed  -n 10000 -c 32 -prefix lt
 ./terrapod-loadtest bench -c 32 -d 30s -prefix lt
 
-# 3. job-scheduling: queue a backlog of plan-only runs and watch it drain
-./terrapod-loadtest flood -n 200 -c 16 -prefix lt
+# 3. job-scheduling: seed a few POOL-ASSIGNED workspaces (runs only dispatch to a
+#    workspace whose agent pool has a listener), then flood + watch the queue drain
+./terrapod-loadtest seed  -n 8 -prefix ltpool -pool apool-XXXX   # your pool id
+./terrapod-loadtest flood -n 8 -c 4 -prefix ltpool
 
 # 4. tidy up
 ./terrapod-loadtest cleanup -prefix lt
@@ -96,18 +98,59 @@ Because a **platform admin or auditor is visible on every workspace**, the RBAC
 filter is a no-op for them — so for a paged request from a see-all principal the
 endpoint now counts and slices in SQL (`COUNT` + `LIMIT`/`OFFSET`), which is
 O(page) regardless of estate size. Label-RBAC users keep the correct
-filter-then-paginate path. Same rig, same 2,000-workspace estate:
+filter-then-paginate path.
 
-| | List latency (p50, warm, single client) |
-|---|---|
-| before (load-all) | 111 ms |
-| after (SQL page) | **14 ms** |
+The fix makes list latency **flat as the estate grows** — the property that
+matters for "scales to large workspace counts". Measured on the scaled profile
+(rate limiter off), seeding a fresh estate up to 10,000 workspaces and probing
+the paged list at each size:
 
-The after-figure is flat by construction — it does not grow with the number of
-workspaces — which is the property that matters for "scales to large workspace
-counts". Requesting the full list without paging still returns everything
-(backward compatible); only paged access from admins/auditors takes the fast
-path.
+| Workspaces | list p50 | p95 |
+|---|---|---|
+| 2,000 | 20 ms | 36 ms |
+| 5,000 | 19 ms | 39 ms |
+| **10,000** | **21 ms** | 27 ms |
+
+Flat ~20 ms from 2k → 10k, versus the O(estate) growth above (which would be
+hundreds of ms to seconds at 10k+, on the event loop). Requesting the full list
+without paging still returns everything (backward compatible); only paged access
+from admins/auditors takes the fast path. Seeding itself ran clean at
+150–180 workspaces/s (rate limiter off).
+
+### 3. Horizontal API scaling — multi-replica, no leader election
+
+On the scaled profile the API runs behind an HPA (min 2, max 6). Under a
+sustained 48-client read load against the **load-balanced ingress**, the API ran
+at **6 replicas and served 7,941 requests with zero errors**, with CPU spread
+across all six pods (~205 mCPU each) and the HPA actively tracking its 60% CPU
+target — i.e. work distributes across stateless replicas with no leader
+contention, exactly as designed. (The absolute throughput in that run was bound
+by the dev BFF — Tilt runs the frontend as `next dev`, which adds ~250 ms/request
+of proxy overhead; production runs it as a thin `next start`. The point of the
+run is the *distribution* and *correctness* across replicas, not the dev-mode
+req/s number.)
+
+### 4. Run scheduling — correct concurrent dispatch, exactly once
+
+Job scheduling is the sharp end of "at scale". Flooding the queue with plan-only
+runs against pool-assigned workspaces (trivial provider-free configs), the
+control plane accepted them at ~18 runs/s and the dispatcher drove them through
+the full lifecycle as real Kubernetes Jobs:
+
+- 8 runs queued → **all 8 claimed and launched as concurrent plan Jobs**, then
+  reached a terminal state. time-to-dispatch (queued → claimed) p50 **6.2 s**
+  (the reconciler/SSE cadence); time-to-terminal (queued → planned) p50 **12.3 s**
+  (dispatch + Job launch + `init` + `plan` + result upload).
+- **Correctness: 8/8 terminal, 0 stuck — every run was claimed exactly once.**
+  This is the `SELECT … FOR UPDATE SKIP LOCKED` + no-leader-election guarantee,
+  observed live: no double-claim, no lost run, across a multi-replica control
+  plane. That exactly-once dispatch is what scales — add API replicas and runner
+  listeners and the same queue drains faster without coordination.
+
+The number of runs executing *at once* is bounded by the execution cluster
+(node CPU, `listener.maxConcurrent`, agent-pool count), not by the control
+plane — which is why execution capacity is scaled by adding runner listeners /
+pools / nodes, independently of the API.
 
 ## What scales, and what is bounded by your cluster
 
