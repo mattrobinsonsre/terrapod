@@ -885,6 +885,21 @@ Returns the **single-workspace resource dependency graph** behind the [State Res
 
 **Required permission:** `state:read` on the workspace (the graph is derived from the secret-bearing state blob, so it requires the same access as downloading raw state).
 
+### AI Architecture Critique (Terrapod Extension)
+
+State-based, whole-system critique (#1036 Part 2). Reviews the workspace's deployed system **as it exists** — inferred from its current Terraform state (+ the resource graph, the deterministic cost estimate, and the deterministic security-scan findings) and critiqued across resilience / security / cost / well-architected. Distinct from the per-run [Plan Summary](#plan-summary), which reviews a *change*. Enabled by the independent `ai_architecture` config (off by default).
+
+```
+GET  /api/terrapod/v1/workspaces/{workspace_id}/architecture-critique
+POST /api/terrapod/v1/workspaces/{workspace_id}/architecture-critique/regenerate
+```
+
+`GET` returns the critique for the workspace's current state version: `{"data": {"type": "architecture-critiques", "attributes": {"status": "ready|pending|skipped|errored", "risk-level": "low|medium|high|critical", "architecture": {...}, "findings": [{"severity", "category", "title", "detail", "resource-address"|"resource_address", "recommendation", "grounded_in"}], "deferred": [...], "state-serial": N, ...}}}`. Returns **404** when the feature is disabled, the workspace has no state, or no critique has been generated for the current state yet. `POST .../regenerate` queues a fresh critique (202) and mutates no infrastructure.
+
+**Required permission:** `state:read` on the workspace (the critique reasons over the secret-bearing state, so it requires the same access as downloading raw state).
+
+**SSE:** progress rides the existing per-workspace [run-events channel](#workspace-events-sse) as `architecture_critique_pending` / `architecture_critique_ready` / `architecture_critique_skipped` / `architecture_critique_errored`.
+
 ### Plan Summary
 
 ```

@@ -816,3 +816,263 @@ def render_cost_prompt(
 
     user_message = "\n\n".join(user_parts)
     return system_message, user_message
+
+
+# ── AI architecture critic (#1036 Part 2 / #963) ───────────────────────────
+# The state-based, whole-system critic. Reviews the deployed system AS IT
+# EXISTS, reconstructed from a workspace's Terraform STATE (+ the resource
+# dependency graph, the deterministic cost estimate, and the deterministic
+# security-scan findings) — distinct from PLAN_SUMMARY, which reviews a change.
+# Prompt validated in the #1036 Part 2 spike (synthetic ground-truth set = 10/10
+# recall, 0 hallucinations; confirmed on a real 204-resource prod workspace).
+
+ARCHITECTURE_CRITIQUE_JSON_SCHEMA: dict = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["architecture", "risk_level", "findings"],
+    "properties": {
+        "architecture": {
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["summary"],
+            "description": "Your inference of the system as it exists, grounded in addresses.",
+            "properties": {
+                "summary": {
+                    "type": "string",
+                    "maxLength": 1200,
+                    "description": (
+                        "2–4 sentences: what kind of system this is, its tiers, "
+                        "data stores, network exposure, and where the blast "
+                        "radius concentrates. Ground every claim in specific "
+                        "resource addresses."
+                    ),
+                },
+                "tiers": {
+                    "type": "array",
+                    "items": {"type": "string", "maxLength": 300},
+                    "description": "Each tier/component and the resources that make it up.",
+                },
+                "data_stores": {
+                    "type": "array",
+                    "items": {"type": "string", "maxLength": 300},
+                    "description": "Each data store (address) and what it holds.",
+                },
+                "blast_radius": {
+                    "type": "string",
+                    "maxLength": 600,
+                    "description": "Where failure/coupling concentrates (hubs, single-AZ, shared deps).",
+                },
+            },
+        },
+        "risk_level": {
+            "type": "string",
+            "enum": ["low", "medium", "high", "critical"],
+            "description": (
+                "The single overall grade for the system's architectural health, "
+                "driven by the most severe finding. 'critical'/'high' is for a "
+                "real, unmitigated data-loss or availability exposure."
+            ),
+        },
+        "findings": {
+            "type": "array",
+            "description": (
+                "Discrete critique items, ranked by real operational risk. A few "
+                "high-signal findings beat an exhaustive list. A healthy design is "
+                "NOT a finding. Empty array is valid for a well-architected system."
+            ),
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["severity", "category", "title", "detail", "resource_address"],
+                "properties": {
+                    "severity": {
+                        "type": "string",
+                        "enum": ["low", "medium", "high", "critical"],
+                    },
+                    "category": {
+                        "type": "string",
+                        "enum": [
+                            "reliability",
+                            "security",
+                            "cost",
+                            "operations",
+                            "scalability",
+                        ],
+                        "description": (
+                            "reliability = HA/DR/SPOF; security = ONLY by "
+                            "prioritising provided scan findings; cost = grounded "
+                            "in the cost figures; operations = well-architected/"
+                            "deprecated/hygiene; scalability = horizontal scale."
+                        ),
+                    },
+                    "title": {"type": "string", "maxLength": 160},
+                    "detail": {
+                        "type": "string",
+                        "maxLength": 900,
+                        "description": "Why it matters for THIS system, grounded in state.",
+                    },
+                    "resource_address": {
+                        "type": "string",
+                        "description": "Exact resource address from state the finding anchors to.",
+                    },
+                    "recommendation": {
+                        "type": "string",
+                        "maxLength": 600,
+                        "description": "A specific, actionable change — not a platitude.",
+                    },
+                    "grounded_in": {
+                        "type": "string",
+                        "maxLength": 120,
+                        "description": (
+                            "Provenance: 'state', a scanner rule id (e.g. "
+                            "'CKV_AWS_24') for security findings, or 'cost'."
+                        ),
+                    },
+                },
+            },
+        },
+        "deferred": {
+            "type": "array",
+            "items": {"type": "string", "maxLength": 300},
+            "description": (
+                "Concerns you could NOT judge from the data given (the "
+                "'needs attribute review' list) — surfaced so operators see the "
+                "gaps rather than you guessing. Empty array is fine."
+            ),
+        },
+    },
+}
+
+
+ARCHITECTURE_CRITIQUE_TOOL: dict = {
+    "type": "function",
+    "function": {
+        "name": "submit_architecture_critique",
+        "description": (
+            "Submit your architecture critique. Call this tool exactly once. "
+            "Infer the architecture, then critique it — every finding grounded in "
+            "the provided state / scan / cost, anchored to a resource address."
+        ),
+        "parameters": ARCHITECTURE_CRITIQUE_JSON_SCHEMA,
+    },
+}
+
+
+ARCHITECTURE_CRITIC_SKILL_PROMPT = """\
+You are a senior cloud infrastructure architect reviewing a DEPLOYED system as \
+it currently exists, reconstructed from its Terraform state. This is NOT a \
+review of a change — there is no plan or diff. You are looking at what is \
+actually running and assessing how well it is architected.
+
+You are given (all under STATE below):
+- RESOURCES — each managed resource address with the subset of attributes \
+recorded in state, plus its `instances` count. An attribute that is ABSENT was \
+not recorded — treat it as UNKNOWN, never as false/empty. Reason only over \
+attributes that are present.
+- EDGES — depends-on relationships (the resource dependency graph).
+- SECURITY_FINDINGS (when present) — deterministic Checkov/Trivy results. These \
+are GROUND TRUTH for security. You do not run your own scan; you prioritise and \
+contextualise THESE findings against the architecture, citing the rule id.
+- COST_ESTIMATE (when present) — deterministic per-resource monthly cost. This \
+is GROUND TRUTH for cost. Cite these figures; never invent a dollar amount.
+
+Your task:
+1. Infer the architecture (2–4 sentences): what kind of system this is, its \
+tiers, data stores, network exposure, and where the blast radius concentrates — \
+grounded in specific addresses.
+2. Critique it across: reliability (HA/DR — SPOFs, single-AZ where multi-AZ \
+belongs, standalone where an ASG belongs, missing replicas/backups/PITR/deletion \
+protection); security (ONLY by prioritising the provided SECURITY_FINDINGS in \
+architectural context, citing rule id — do NOT generate findings the scanner did \
+not report); cost (over-provisioning / right-sizing / cheaper-equivalent grounded \
+in the COST_ESTIMATE figures, naming the monthly figure and its share of total); \
+operations/well-architected (deprecated/previous-gen types, missing safeguards, \
+visible-in-state only).
+
+Emit at least one DISTINCT cost finding (category: "cost") whenever a resource is \
+a dominant cost line (>~25% of total) or looks over-provisioned — with a concrete \
+cheaper-equivalent (e.g. db.r5.2xlarge -> Graviton db.r6g.2xlarge, or a smaller \
+size). Do not fold the cost recommendation into a reliability finding and leave it \
+at that; the cost lens must stand on its own when the data warrants it.
+
+Hard rules (you will be judged on these):
+- `instances=N` is the count/for_each fan-out of ONE address into N deployed \
+resources. ALWAYS judge redundancy from `instances`, never from how many times a \
+type appears. A NAT-gateway address with instances=3 is THREE NAT gateways (one \
+per AZ) = HA, not a SPOF.
+- Never invent resource data. If something needed to judge a concern is not in \
+state, put it in `deferred` ("... — requires attribute data") rather than \
+asserting it. Do not claim encrypted/unencrypted, public/private, backed-up/not \
+unless a state attribute says so.
+- A healthy design is NOT a finding. A tier already multi-AZ and autoscaled is \
+correct — do not flag it. A 0.0.0.0/0 rule on port 443 for a public web app is \
+expected — do not flag it. Only surface genuine weaknesses.
+- Security findings come from the scanner, not from you. Judgment (prioritisation, \
+blast-radius context) is yours; the facts are the scanner's.
+- Anchor every finding to a specific resource_address with a specific, actionable \
+recommendation. `risk_level` is the single overall grade. Prefer a few \
+high-signal findings over an exhaustive list. No chain-of-thought, no preamble.\
+"""
+
+
+def render_architecture_prompt(
+    *,
+    resources_json: str,
+    edges_json: str,
+    security_findings: str = "",
+    cost_estimate: str = "",
+    workspace_context: str = "",
+    prompt_prefix: str = "",
+    prompt_suffix: str = "",
+    output_language: str = "",
+) -> tuple[str, str]:
+    """Render the (system, user) messages for the architecture-critic request.
+
+    ``resources_json`` is the compacted per-resource attribute view (addresses +
+    curated attrs + ``instances``); ``edges_json`` the depends-on graph.
+    ``security_findings`` / ``cost_estimate`` are the deterministic grounding
+    inputs — pass "" to omit (the prompt tolerates their absence and leans on
+    structure). Output contract is the ``submit_architecture_critique`` tool.
+    """
+    parts: list[str] = []
+    if prompt_prefix.strip():
+        parts.append(prompt_prefix.strip())
+    parts.append(ARCHITECTURE_CRITIC_SKILL_PROMPT)
+    if prompt_suffix.strip():
+        parts.append(prompt_suffix.strip())
+    if output_language.strip() and output_language.strip().lower() != "english":
+        parts.append(
+            f"OUTPUT_LANGUAGE: Write every natural-language field you emit — the "
+            f"architecture summary/tiers/data_stores/blast_radius, each finding's "
+            f"title/detail/recommendation, and the deferred items — in "
+            f"{output_language.strip()}. Keep all identifiers verbatim and "
+            f"untranslated: resource addresses, provider/module names, HCL "
+            f"keywords, scanner rule ids, currency codes, and anything in backticks."
+        )
+    system_message = "\n\n".join(parts)
+
+    user_parts: list[str] = [
+        "STATE — the current deployed system reconstructed from Terraform state.",
+        f"RESOURCES (address + recorded attributes + `instances`):\n```json\n{resources_json}\n```",
+        f"EDGES (depends-on):\n```json\n{edges_json}\n```",
+    ]
+    if workspace_context.strip():
+        user_parts.append(f"WORKSPACE_CONTEXT (operator-supplied):\n{workspace_context.strip()}")
+    if security_findings.strip():
+        user_parts.append(
+            "SECURITY_FINDINGS (deterministic Checkov/Trivy — GROUND TRUTH for "
+            f"security; cite rule ids, do not invent):\n```json\n{security_findings}\n```"
+        )
+    if cost_estimate.strip():
+        user_parts.append(
+            "COST_ESTIMATE (deterministic per-resource monthly cost — GROUND "
+            f"TRUTH for cost; cite figures, never invent):\n```json\n{cost_estimate}\n```"
+        )
+    user_parts.append(
+        "Now call the `submit_architecture_critique` tool exactly once: infer the "
+        "architecture, then critique it. Judge redundancy from `instances`; ground "
+        "security in the scan and cost in the figures; put anything you cannot "
+        "judge from the data into `deferred` rather than guessing."
+    )
+    user_message = "\n\n".join(user_parts)
+    return system_message, user_message
