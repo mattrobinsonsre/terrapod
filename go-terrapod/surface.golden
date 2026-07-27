@@ -34,28 +34,6 @@ field AgentPoolToken.IsRevoked bool `json:"is-revoked"`
 field AgentPoolToken.MaxUses int64 `json:"max-uses,omitempty"`
 field AgentPoolToken.Token string `json:"token,omitempty"`
 field AgentPoolToken.UseCount int64 `json:"use-count"`
-field ArchitectureCritique.CreatedAt string `json:"created-at"`
-field ArchitectureCritique.Critique string `json:"critique"`
-field ArchitectureCritique.ErrorMessage string `json:"error-message"`
-field ArchitectureCritique.Findings []CritiqueFinding `json:"findings"`
-field ArchitectureCritique.ID string `json:"-"`
-field ArchitectureCritique.InputTokens int `json:"input-tokens"`
-field ArchitectureCritique.Language string `json:"-"`
-field ArchitectureCritique.Model string `json:"model"`
-field ArchitectureCritique.OutputTokens int `json:"output-tokens"`
-field ArchitectureCritique.RiskLevel string `json:"risk-level"`
-field ArchitectureCritique.RunID string `json:"-"`
-field ArchitectureCritique.Status string `json:"status"`
-field ArchitectureCritique.Translated bool `json:"-"`
-field ArchitectureCritique.UpdatedAt string `json:"updated-at"`
-field ArchitectureCritiqueMessage.Content string `json:"content"`
-field ArchitectureCritiqueMessage.CreatedAt string `json:"created-at,omitempty"`
-field ArchitectureCritiqueMessage.ErrorMessage string `json:"error-message,omitempty"`
-field ArchitectureCritiqueMessage.ID string `json:"id"`
-field ArchitectureCritiqueMessage.InputTokens int `json:"input-tokens"`
-field ArchitectureCritiqueMessage.Model string `json:"model,omitempty"`
-field ArchitectureCritiqueMessage.OutputTokens int `json:"output-tokens"`
-field ArchitectureCritiqueMessage.Role string `json:"role"`
 field AuthenticationError.Detail string
 field AuthorizationError.Detail string
 field AutodiscoveryRule.Attributes map[string]any
@@ -295,11 +273,6 @@ field CreateWorkspaceRequest.VCSRepoURL string `json:"vcs-repo-url,omitempty"`
 field CreateWorkspaceRequest.VCSWorkflow string `json:"vcs-workflow,omitempty"`
 field CreateWorkspaceRequest.VarFiles []string `json:"var-files,omitempty"`
 field CreateWorkspaceRequest.WorkingDirectory string `json:"working-directory,omitempty"`
-field CritiqueFinding.Address string `json:"address,omitempty"`
-field CritiqueFinding.Category string `json:"category"`
-field CritiqueFinding.Detail string `json:"detail"`
-field CritiqueFinding.Severity string `json:"severity"`
-field CritiqueFinding.Title string `json:"title"`
 field DiscoverySurface.Count int `json:"count"`
 field DiscoverySurface.DataSources []OnboardingDataSource `json:"data_sources"`
 field Document.Data json.RawMessage `json:"data"`
@@ -455,6 +428,7 @@ field PlanSummaryMessage.InputTokens int `json:"input-tokens"`
 field PlanSummaryMessage.Model string `json:"model,omitempty"`
 field PlanSummaryMessage.OutputTokens int `json:"output-tokens"`
 field PlanSummaryMessage.Role string `json:"role"`
+field PlanSummaryRiskFactor.Category string `json:"category,omitempty"`
 field PlanSummaryRiskFactor.Detail string `json:"detail"`
 field PlanSummaryRiskFactor.ResourceAddress string `json:"resource_address,omitempty"`
 field PlanSummaryRiskFactor.Severity string `json:"severity"`
@@ -1046,7 +1020,6 @@ method (*Client) GetRemoteStateConsumer(ctx context.Context, id string) (*Remote
 method (*Client) GetRole(ctx context.Context, name string) (*Role, error)
 method (*Client) GetRoleAssignment(ctx context.Context, providerName, email, roleName string) (*RoleAssignment, error)
 method (*Client) GetRun(ctx context.Context, runID string) (*Run, error)
-method (*Client) GetRunArchitectureCritique(ctx context.Context, runID string) (*ArchitectureCritique, error)
 method (*Client) GetRunCostEstimate(ctx context.Context, runID string) (*CostEstimate, error)
 method (*Client) GetRunCostSummary(ctx context.Context, runID string) (*CostSummary, error)
 method (*Client) GetRunImpactGraph(ctx context.Context, runID string) (*ImpactGraph, error)
@@ -1096,7 +1069,6 @@ method (*Client) ListRemoteStateConsumers(ctx context.Context, producerWorkspace
 method (*Client) ListRoleAssignments(ctx context.Context) ([]RoleAssignment, error)
 method (*Client) ListRoleAssignmentsForIdentity(ctx context.Context, providerName, email string) ([]RoleAssignment, error)
 method (*Client) ListRoles(ctx context.Context) ([]Role, error)
-method (*Client) ListRunArchitectureCritiqueMessages(ctx context.Context, runID string) ([]*ArchitectureCritiqueMessage, error)
 method (*Client) ListRunCostSummaryMessages(ctx context.Context, runID string) ([]*CostSummaryMessage, error)
 method (*Client) ListRunTasks(ctx context.Context, workspaceID string) ([]RunTask, error)
 method (*Client) ListUserAPITokens(ctx context.Context, userID string) ([]APIToken, error)
@@ -1112,14 +1084,12 @@ method (*Client) OverrideRunSecurityScan(ctx context.Context, runID string) (*Se
 method (*Client) Patch(ctx context.Context, path string, payload []byte) ([]byte, error)
 method (*Client) Post(ctx context.Context, path string, payload []byte) ([]byte, error)
 method (*Client) PostPlanSummaryMessage(ctx context.Context, runID, content string) (*PlanSummaryMessage, error)
-method (*Client) PostRunArchitectureCritiqueMessage(ctx context.Context, runID, content string) (*ArchitectureCritiqueMessage, error)
 method (*Client) PostRunCostSummaryMessage(ctx context.Context, runID, content string) (*CostSummaryMessage, error)
 method (*Client) ProvisionCatalogItem(ctx context.Context, itemID string, attrs map[string]any) (*CatalogInstance, error)
 method (*Client) Put(ctx context.Context, path string, payload []byte) ([]byte, error)
 method (*Client) PutRaw(ctx context.Context, path, contentType string, payload []byte) ([]byte, error)
 method (*Client) ReconfigureCatalogInstance(ctx context.Context, wsID string, attrs map[string]any) (*CatalogRunRef, error)
 method (*Client) RegeneratePlanSummary(ctx context.Context, runID string) (*PlanSummary, error)
-method (*Client) RegenerateRunArchitectureCritique(ctx context.Context, runID string) (*ArchitectureCritique, error)
 method (*Client) RegenerateRunCostSummary(ctx context.Context, runID string) (*CostSummary, error)
 method (*Client) RemoveRoleFromIdentity(ctx context.Context, providerName, email, roleName string) error
 method (*Client) RetagAPIToken(ctx context.Context, tokenID, kind string, pinnedRoles []string) (*APIToken, error)
@@ -1167,8 +1137,6 @@ type APIToken struct
 type AddPolicyRequest struct
 type AgentPool struct
 type AgentPoolToken struct
-type ArchitectureCritique struct
-type ArchitectureCritiqueMessage struct
 type AuthenticationError struct
 type AuthorizationError struct
 type AutodiscoveryRule struct
@@ -1211,7 +1179,6 @@ type CreateVariableRequest struct
 type CreateVariableSetRequest struct
 type CreateVarsetVariableRequest struct
 type CreateWorkspaceRequest struct
-type CritiqueFinding struct
 type DiscoverySurface struct
 type Document struct
 type EncryptionStatus struct
