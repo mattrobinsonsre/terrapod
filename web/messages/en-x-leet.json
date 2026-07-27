@@ -2055,6 +2055,59 @@
         "medium": "m3d1um",
         "low": "l0w"
       }
+    },
+    "architecture": {
+      "loadError": "F41l3d 70 l04d 7h3 4rch173c7ur3 cr171qu3.",
+      "notEnabled": "7h3 41 4rch173c7ur3 cr171c 15 n07 3n4bl3d 0n 7h15 d3pl0ym3n7.",
+      "absent": "N0 4rch173c7ur3 cr171qu3 h45 b33n g3n3r473d f0r 7h3 curr3n7 57473 y37.",
+      "generate": "G3n3r473 cr171qu3",
+      "regenerate": "R3g3n3r473",
+      "regenerating": "Qu3u1ng…",
+      "regenerateConfirm": "Qu3u3 4 fr35h 4rch173c7ur3 cr171qu3 f0r 7h3 curr3n7 57473?",
+      "regenerateError": "F41l3d 70 qu3u3 4 n3w cr171qu3.",
+      "pending": "G3n3r471ng 7h3 4rch173c7ur3 cr171qu3…",
+      "errored": "7h3 4rch173c7ur3 cr171qu3 f41l3d 70 g3n3r473.",
+      "skipped": "7h3 4rch173c7ur3 cr171qu3 w45 5k1pp3d (n0 57473, 0r 7h3 d41ly budg37 w45 r34ch3d).",
+      "asOfState": "45 0f 57473 #{serial}",
+      "systemTitle": "1nf3rr3d 4rch173c7ur3",
+      "tiers": "713r5",
+      "dataStores": "D474 570r35",
+      "blastRadius": "Bl457 r4d1u5",
+      "noFindings": "N0 4rch173c7ur4l r15k5 w3r3 fl4gg3d — 7h15 5y573m l00k5 w3ll-4rch173c73d f0r 7h3 d474 r3v13w3d.",
+      "recommendation": "R3c0mm3nd4710n",
+      "groundedIn": "gr0und3d 1n {source}",
+      "deferredTitle": "N33d5 477r1bu73 r3v13w",
+      "deferredHint": "C0nc3rn5 7h3 cr171c c0uld n07 judg3 fr0m 7h3 57473 477r1bu735 17 w45 g1v3n — r3v13w 7h353 m4nu4lly r47h3r 7h4n 455um1ng 7h3y'r3 f1n3.",
+      "provenance": "4n 41 455355m3n7 0f 7h3 d3pl0y3d 5y573m, gr0und3d 1n 7h3 d373rm1n1571c 53cur17y 5c4n, c057 3ng1n3, 4nd r350urc3 gr4ph. R3v13w f1nd1ng5 b3f0r3 4c71ng.",
+      "severity": {
+        "low": "L0w",
+        "medium": "M3d1um",
+        "high": "H1gh",
+        "critical": "Cr171c4l"
+      },
+      "category": {
+        "reliability": "R3l14b1l17y",
+        "security": "53cur17y",
+        "cost": "C057",
+        "operations": "0p3r4710n5",
+        "scalability": "5c4l4b1l17y"
+      },
+      "heading": "41 4rch173c7ur3 cr171qu3",
+      "aiGenerated": "41-g3n3r473d",
+      "findingsHeading": "F1nd1ng5",
+      "tokens": "{input} 1n / {output} 0u7 70k3n5",
+      "chat": {
+        "heading": "45k 4 f0ll0w-up",
+        "sharedThreadNote": "5h4r3d 7hr34d — v151bl3 70 4ny0n3 w17h w0rk5p4c3 4cc355",
+        "placeholder": "45k 4b0u7 7h15 5y573m — 3.g. \"h0w w0uld 1 m4k3 7h3 d474 713r H4?\" (⌘/C7rl+3n73r 70 53nd)",
+        "send": "53nd",
+        "thinking": "7h1nk1ng…",
+        "you": "Y0u",
+        "assistant": "Cr171c",
+        "loadError": "F41l3d 70 l04d 7h3 ch47 7hr34d.",
+        "sendError": "F41l3d 70 53nd y0ur m3554g3."
+      },
+      "translatedNote": "7r4n5l473d fr0m 7h3 0r1g1n4l 0n v13w."
     }
   },
   "workspaceDetail": {
@@ -2108,7 +2161,10 @@
       "runTriggers": "Run 7r1gg3r5",
       "sharing": "5h4r1ng",
       "selectLabel": "W0rk5p4c3 53c710n",
-      "cost": "C057"
+      "cost": "C057",
+      "architecture": "4rch173c7ur3",
+      "insights": "1n51gh75",
+      "automation": "4u70m4710n"
     },
     "lifecycle": {
       "pendingDeletion": "P3nd1ng d3l3710n",
@@ -2496,6 +2552,14 @@
       "stateActionFailed": "57473 4c710n f41l3d",
       "uploadState": "F41l3d 70 upl04d 57473",
       "uploadStateFile": "F41l3d 70 upl04d 57473 f1l3"
+    },
+    "subtabs": {
+      "state": "57473",
+      "stateGraph": "Gr4ph",
+      "cost": "C057",
+      "architecture": "4rch173c7ur3",
+      "runTasks": "745k5",
+      "runTriggers": "7r1gg3r5"
     }
   },
   "graphs": {

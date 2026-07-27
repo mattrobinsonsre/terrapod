@@ -2198,6 +2198,31 @@ async def upload_state_content(
     if ws:
         await _update_state_index(ws.name, str(ws.id), key, sv.serial)
 
+    # Best-effort: enqueue an AI architecture critique for the new state (#1036
+    # Part 2). The critic infers the architecture from this state version and
+    # critiques resilience/security/cost/well-architected, grounded in the scan
+    # + cost data. force=False so it only generates when a critique doesn't yet
+    # exist for this exact state version (idempotent per serial). Gated on the
+    # dedicated ai_architecture workload being enabled; must never break state
+    # upload, so any failure here is swallowed.
+    from terrapod.config import settings as _settings
+
+    if _settings.ai_architecture.enabled:
+        try:
+            from terrapod.services.scheduler import enqueue_trigger
+
+            await enqueue_trigger(
+                "architecture_critique",
+                {"workspace_id": str(sv.workspace_id), "force": False},
+                dedup_key=f"arch-state:{sv.workspace_id}:{sv.serial}",
+            )
+        except Exception:
+            logger.warning(
+                "failed to enqueue architecture critique after state upload",
+                sv_id=str(sv.id),
+                exc_info=True,
+            )
+
     return Response(status_code=200)
 
 

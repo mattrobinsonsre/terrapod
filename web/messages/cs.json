@@ -2055,6 +2055,59 @@
         "medium": "střední",
         "low": "nízká"
       }
+    },
+    "architecture": {
+      "loadError": "Nepodařilo se načíst kritiku architektury.",
+      "notEnabled": "AI kritik architektury není v tomto nasazení povolen.",
+      "absent": "Pro aktuální stav zatím nebyla vygenerována žádná kritika architektury.",
+      "generate": "Vygenerovat kritiku",
+      "regenerate": "Vygenerovat znovu",
+      "regenerating": "Zařazování do fronty…",
+      "regenerateConfirm": "Zařadit do fronty novou kritiku architektury pro aktuální stav?",
+      "regenerateError": "Nepodařilo se zařadit do fronty novou kritiku.",
+      "pending": "Generování kritiky architektury…",
+      "errored": "Kritiku architektury se nepodařilo vygenerovat.",
+      "skipped": "Kritika architektury byla přeskočena (žádný stav nebo byl dosažen denní rozpočet).",
+      "asOfState": "podle stavu č. {serial}",
+      "systemTitle": "Odvozená architektura",
+      "tiers": "Vrstvy",
+      "dataStores": "Datová úložiště",
+      "blastRadius": "Rozsah dopadu",
+      "noFindings": "Nebyla označena žádná architektonická rizika — podle přezkoumaných dat vypadá systém dobře navržený.",
+      "recommendation": "Doporučení",
+      "groundedIn": "na základě {source}",
+      "deferredTitle": "Vyžaduje kontrolu atributů",
+      "deferredHint": "Otázky, které kritik nedokázal posoudit z dostupných atributů stavu — zkontrolujte je ručně, místo abyste předpokládali, že jsou v pořádku.",
+      "provenance": "Posouzení nasazeného systému pomocí AI, založené na deterministickém bezpečnostním skenu, nákladovém enginu a grafu zdrojů. Před jednáním zkontrolujte zjištění.",
+      "severity": {
+        "low": "Nízká",
+        "medium": "Střední",
+        "high": "Vysoká",
+        "critical": "Kritická"
+      },
+      "category": {
+        "reliability": "Spolehlivost",
+        "security": "Zabezpečení",
+        "cost": "Náklady",
+        "operations": "Provoz",
+        "scalability": "Škálovatelnost"
+      },
+      "heading": "AI kritika architektury",
+      "aiGenerated": "Vygenerováno AI",
+      "findingsHeading": "Zjištění",
+      "tokens": "{input} vstupních / {output} výstupních tokenů",
+      "chat": {
+        "heading": "Návazný dotaz",
+        "sharedThreadNote": "sdílené vlákno — viditelné pro každého s přístupem k pracovnímu prostoru",
+        "placeholder": "Zeptejte se na tento systém — např. „jak zajistit vysokou dostupnost datové vrstvy?“ (⌘/Ctrl+Enter pro odeslání)",
+        "send": "Odeslat",
+        "thinking": "Přemýšlím…",
+        "you": "Vy",
+        "assistant": "Kritik",
+        "loadError": "Nepodařilo se načíst vlákno chatu.",
+        "sendError": "Nepodařilo se odeslat zprávu."
+      },
+      "translatedNote": "Přeloženo z originálu při zobrazení."
     }
   },
   "workspaceDetail": {
@@ -2108,7 +2161,10 @@
       "runTriggers": "Run triggery",
       "sharing": "Sdílení",
       "selectLabel": "Sekce pracovního prostoru",
-      "cost": "Náklady"
+      "cost": "Náklady",
+      "architecture": "Architektura",
+      "insights": "Přehledy",
+      "automation": "Automatizace"
     },
     "lifecycle": {
       "pendingDeletion": "Čeká na smazání",
@@ -2496,6 +2552,14 @@
       "stateActionFailed": "Akce se stavem selhala",
       "uploadState": "Nepodařilo se nahrát stav",
       "uploadStateFile": "Nepodařilo se nahrát soubor stavu"
+    },
+    "subtabs": {
+      "state": "Stav",
+      "stateGraph": "Graf",
+      "cost": "Náklady",
+      "architecture": "Architektura",
+      "runTasks": "Úkoly",
+      "runTriggers": "Triggery"
     }
   },
   "graphs": {

@@ -900,6 +900,10 @@ POST /api/terrapod/v1/workspaces/{workspace_id}/architecture-critique/regenerate
 
 **SSE:** progress rides the existing per-workspace [run-events channel](#workspace-events-sse) as `architecture_critique_pending` / `architecture_critique_ready` / `architecture_critique_skipped` / `architecture_critique_errored`.
 
+**Auto-generation:** a critique is enqueued automatically when a new **state version's content** is uploaded (after an apply, or a manual state push), best-effort and idempotent per state serial — so the current state always has an up-to-date critique without a manual trigger. `POST .../regenerate` forces a fresh one.
+
+**Consumers:** go-terrapod (`GetArchitectureCritique` / `RegenerateArchitectureCritique`), the MCP tool `terrapod_workspace_architecture_critique` (read; inherits `state:read`), the Terraform provider **data source** `terrapod_architecture_critique`, and the workspace **Architecture** tab in the web UI. See [architecture-critique.md](architecture-critique.md).
+
 ### Plan Summary
 
 ```

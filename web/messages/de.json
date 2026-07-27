@@ -2055,6 +2055,59 @@
         "medium": "mittel",
         "low": "niedrig"
       }
+    },
+    "architecture": {
+      "loadError": "Die Architekturkritik konnte nicht geladen werden.",
+      "notEnabled": "Der KI-Architekturkritiker ist in dieser Installation nicht aktiviert.",
+      "absent": "Für den aktuellen Zustand wurde noch keine Architekturkritik generiert.",
+      "generate": "Kritik generieren",
+      "regenerate": "Neu generieren",
+      "regenerating": "Wird eingereiht…",
+      "regenerateConfirm": "Eine neue Architekturkritik für den aktuellen Zustand einreihen?",
+      "regenerateError": "Eine neue Kritik konnte nicht eingereiht werden.",
+      "pending": "Architekturkritik wird generiert…",
+      "errored": "Die Architekturkritik konnte nicht generiert werden.",
+      "skipped": "Die Architekturkritik wurde übersprungen (kein Zustand oder das Tagesbudget wurde erreicht).",
+      "asOfState": "Stand: Zustand #{serial}",
+      "systemTitle": "Abgeleitete Architektur",
+      "tiers": "Schichten",
+      "dataStores": "Datenspeicher",
+      "blastRadius": "Auswirkungsbereich",
+      "noFindings": "Es wurden keine Architekturrisiken markiert — dieses System wirkt für die geprüften Daten gut konzipiert.",
+      "recommendation": "Empfehlung",
+      "groundedIn": "gestützt auf {source}",
+      "deferredTitle": "Attributprüfung erforderlich",
+      "deferredHint": "Punkte, die der Kritiker anhand der übergebenen Zustandsattribute nicht beurteilen konnte — prüfen Sie diese manuell, statt anzunehmen, dass sie in Ordnung sind.",
+      "provenance": "Eine KI-Bewertung des bereitgestellten Systems, gestützt auf den deterministischen Sicherheitsscan, die Kostenengine und den Ressourcengraphen. Prüfen Sie die Befunde, bevor Sie handeln.",
+      "severity": {
+        "low": "Niedrig",
+        "medium": "Mittel",
+        "high": "Hoch",
+        "critical": "Kritisch"
+      },
+      "category": {
+        "reliability": "Zuverlässigkeit",
+        "security": "Sicherheit",
+        "cost": "Kosten",
+        "operations": "Betrieb",
+        "scalability": "Skalierbarkeit"
+      },
+      "heading": "KI-Architekturkritik",
+      "aiGenerated": "KI-generiert",
+      "findingsHeading": "Befunde",
+      "tokens": "{input} Eingabe / {output} Ausgabe Token",
+      "chat": {
+        "heading": "Rückfrage",
+        "sharedThreadNote": "Gemeinsamer Thread — sichtbar für alle mit Zugriff auf den Arbeitsbereich",
+        "placeholder": "Fragen Sie zu diesem System — z. B. \"wie mache ich die Datenschicht HA?\" (⌘/Ctrl+Enter zum Senden)",
+        "send": "Senden",
+        "thinking": "Denkt nach…",
+        "you": "Sie",
+        "assistant": "Kritiker",
+        "loadError": "Chat-Thread konnte nicht geladen werden.",
+        "sendError": "Ihre Nachricht konnte nicht gesendet werden."
+      },
+      "translatedNote": "Beim Anzeigen aus dem Original übersetzt."
     }
   },
   "workspaceDetail": {
@@ -2108,7 +2161,10 @@
       "runTriggers": "Ausführungsauslöser",
       "sharing": "Freigabe",
       "selectLabel": "Arbeitsbereichsabschnitt",
-      "cost": "Kosten"
+      "cost": "Kosten",
+      "architecture": "Architektur",
+      "insights": "Einblicke",
+      "automation": "Automatisierung"
     },
     "lifecycle": {
       "pendingDeletion": "Löschung ausstehend",
@@ -2496,6 +2552,14 @@
       "stateActionFailed": "Zustandsaktion fehlgeschlagen",
       "uploadState": "Zustand konnte nicht hochgeladen werden",
       "uploadStateFile": "Zustandsdatei konnte nicht hochgeladen werden"
+    },
+    "subtabs": {
+      "state": "Zustand",
+      "stateGraph": "Graph",
+      "cost": "Kosten",
+      "architecture": "Architektur",
+      "runTasks": "Aufgaben",
+      "runTriggers": "Auslöser"
     }
   },
   "graphs": {

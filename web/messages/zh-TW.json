@@ -2055,6 +2055,59 @@
         "medium": "中",
         "low": "低"
       }
+    },
+    "architecture": {
+      "loadError": "無法載入架構評審。",
+      "notEnabled": "此部署未啟用 AI 架構評審。",
+      "absent": "尚未為目前狀態生成架構評審。",
+      "generate": "生成評審",
+      "regenerate": "重新生成",
+      "regenerating": "正在排隊…",
+      "regenerateConfirm": "為目前狀態排隊生成一份新的架構評審嗎？",
+      "regenerateError": "無法排隊生成新的評審。",
+      "pending": "正在生成架構評審…",
+      "errored": "架構評審生成失敗。",
+      "skipped": "已跳過架構評審（無狀態，或已達到每日額度）。",
+      "asOfState": "截至狀態 #{serial}",
+      "systemTitle": "推斷的架構",
+      "tiers": "層級",
+      "dataStores": "資料存放區",
+      "blastRadius": "影響範圍",
+      "noFindings": "未發現架構風險 — 就所審查的資料而言，此系統的架構設計良好。",
+      "recommendation": "建議",
+      "groundedIn": "基於 {source}",
+      "deferredTitle": "需要屬性審查",
+      "deferredHint": "評審無法根據所提供的狀態屬性做出判斷的疑慮 — 請勿想當然地認為沒有問題，應手動審查這些項目。",
+      "provenance": "對已部署系統的 AI 評估，基於確定性安全掃描、成本引擎和資源圖。在採取行動前請審查發現事項。",
+      "severity": {
+        "low": "低",
+        "medium": "中",
+        "high": "高",
+        "critical": "嚴重"
+      },
+      "category": {
+        "reliability": "可靠性",
+        "security": "安全",
+        "cost": "成本",
+        "operations": "維運",
+        "scalability": "可擴展性"
+      },
+      "heading": "AI 架構評審",
+      "aiGenerated": "AI 生成",
+      "findingsHeading": "發現事項",
+      "tokens": "{input} 輸入 / {output} 輸出 令牌",
+      "chat": {
+        "heading": "追問",
+        "sharedThreadNote": "共享執行緒 — 對任何具有工作區存取權限的人可見",
+        "placeholder": "詢問關於此系統的問題 — 例如「如何讓資料層實現高可用（HA）？」（⌘/Ctrl+Enter 傳送）",
+        "send": "傳送",
+        "thinking": "正在思考…",
+        "you": "你",
+        "assistant": "評審",
+        "loadError": "無法載入聊天執行緒。",
+        "sendError": "無法傳送您的訊息。"
+      },
+      "translatedNote": "檢視時從原文翻譯。"
     }
   },
   "workspaceDetail": {
@@ -2108,7 +2161,10 @@
       "runTriggers": "執行觸發器",
       "sharing": "共享",
       "selectLabel": "工作區部分",
-      "cost": "成本"
+      "cost": "成本",
+      "architecture": "架構",
+      "insights": "洞察",
+      "automation": "自動化"
     },
     "lifecycle": {
       "pendingDeletion": "待刪除",
@@ -2496,6 +2552,14 @@
       "stateActionFailed": "狀態操作失敗",
       "uploadState": "上傳狀態失敗",
       "uploadStateFile": "上傳狀態檔案失敗"
+    },
+    "subtabs": {
+      "state": "狀態",
+      "stateGraph": "圖",
+      "cost": "成本",
+      "architecture": "架構",
+      "runTasks": "任務",
+      "runTriggers": "觸發器"
     }
   },
   "graphs": {

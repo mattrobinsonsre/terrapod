@@ -284,3 +284,114 @@ async def test_normalize_falls_back_to_original_on_failure():
     ):
         out = await st.normalize_to_system_language("Frage", reader_locale="de")
     assert out == "Frage"  # a stray foreign prompt beats a dropped question
+
+
+# ── translate_architecture_critique (#1036) ──────────────────────────────────
+
+
+async def test_translate_architecture_skips_untranslatable_locale(_no_cache):
+    with patch.object(st.settings.ai_summary, "summary_language", "en"):
+        out = await st.translate_architecture_critique(
+            critique_id="a1",
+            architecture={"summary": "hi"},
+            findings=[],
+            deferred=[],
+            reader_locale="en-x-leet",
+        )
+    assert out is None
+
+
+async def test_translate_architecture_empty_is_none(_no_cache):
+    with patch.object(st.settings.ai_summary, "summary_language", "en"):
+        out = await st.translate_architecture_critique(
+            critique_id="a1", architecture={}, findings=[], deferred=[], reader_locale="de"
+        )
+    assert out is None
+
+
+async def test_translate_architecture_translates_prose_preserves_code_fields(_no_cache):
+    # summary/tiers/data_stores/blast_radius + finding title/detail/recommendation
+    # + deferred are translated; severity/category/resource_address/grounded_in stay.
+    translated_json = json.dumps(
+        {
+            "architecture": {
+                "summary": "Zusammenfassung DE",
+                "tiers": ["Netz-Tier"],
+                "data_stores": ["DB"],
+                "blast_radius": "Radius DE",
+            },
+            "findings": [
+                {"title": "Titel DE", "detail": "Detail DE", "recommendation": "Empfehlung DE"}
+            ],
+            "deferred": ["Zurückgestellt DE"],
+        }
+    )
+    with (
+        patch.object(st.settings.ai_summary, "summary_language", "en"),
+        patch.object(st, "_translate_call", AsyncMock(return_value=(translated_json, 42))),
+    ):
+        out = await st.translate_architecture_critique(
+            critique_id="a1",
+            architecture={
+                "summary": "EN summary",
+                "tiers": ["net"],
+                "data_stores": ["db"],
+                "blast_radius": "R",
+            },
+            findings=[
+                {
+                    "severity": "high",
+                    "category": "reliability",
+                    "title": "T",
+                    "detail": "D",
+                    "recommendation": "Rec",
+                    "resource_address": "aws_db_instance.main",
+                    "grounded_in": "security-scan",
+                }
+            ],
+            deferred=["deferred EN"],
+            reader_locale="de",
+        )
+    assert out["architecture"]["summary"] == "Zusammenfassung DE"
+    assert out["architecture"]["blast_radius"] == "Radius DE"
+    f = out["findings"][0]
+    assert f["title"] == "Titel DE" and f["detail"] == "Detail DE"
+    assert f["recommendation"] == "Empfehlung DE"
+    # code-shaped fields preserved verbatim
+    assert f["severity"] == "high"
+    assert f["category"] == "reliability"
+    assert f["resource_address"] == "aws_db_instance.main"
+    assert f["grounded_in"] == "security-scan"
+    assert out["deferred"] == ["Zurückgestellt DE"]
+
+
+async def test_translate_architecture_budget_exhausted_serves_canonical(_no_cache):
+    with (
+        patch.object(st.settings.ai_summary, "summary_language", "en"),
+        patch.object(st, "_budget_ok", AsyncMock(return_value=False)),
+        patch.object(st, "_translate_call", AsyncMock()) as call,
+    ):
+        out = await st.translate_architecture_critique(
+            critique_id="a1",
+            architecture={"summary": "x"},
+            findings=[],
+            deferred=[],
+            reader_locale="de",
+        )
+    assert out is None
+    call.assert_not_called()
+
+
+async def test_translate_architecture_model_failure_falls_back(_no_cache):
+    with (
+        patch.object(st.settings.ai_summary, "summary_language", "en"),
+        patch.object(st, "_translate_call", AsyncMock(side_effect=RuntimeError("boom"))),
+    ):
+        out = await st.translate_architecture_critique(
+            critique_id="a1",
+            architecture={"summary": "x"},
+            findings=[],
+            deferred=[],
+            reader_locale="de",
+        )
+    assert out is None

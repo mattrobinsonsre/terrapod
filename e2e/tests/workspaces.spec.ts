@@ -63,10 +63,13 @@ test.describe('Workspaces', () => {
       await expect(page.locator(`text=${name}`).first()).toBeVisible({ timeout: 10_000 });
     }
 
-    // Open the destination workspace's Run Triggers tab
+    // Open the destination workspace's Run Triggers tab. Run Triggers now lives
+    // under the merged "Automation" group (#1036 tab consolidation): open the
+    // group, then its "Triggers" sub-view.
     await page.goto('/workspaces');
     await page.click(`text=${dest}`);
-    await page.getByRole('button', { name: 'Run Triggers' }).click();
+    await page.getByRole('button', { name: 'Automation', exact: true }).click();
+    await page.getByRole('button', { name: 'Triggers', exact: true }).click();
 
     // The picker is a search box + clickable list — NOT a free-text name input
     // (a typo can't 404 any more). Filter to the source, then click to add.

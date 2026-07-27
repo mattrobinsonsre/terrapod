@@ -2055,6 +2055,59 @@
         "medium": "middel",
         "low": "laag"
       }
+    },
+    "architecture": {
+      "loadError": "Kan de architectuurkritiek niet laden.",
+      "notEnabled": "De AI-architectuurcriticus is niet ingeschakeld in deze installatie.",
+      "absent": "Er is nog geen architectuurkritiek gegenereerd voor de huidige state.",
+      "generate": "Kritiek genereren",
+      "regenerate": "Opnieuw genereren",
+      "regenerating": "In wachtrij zetten…",
+      "regenerateConfirm": "Een nieuwe architectuurkritiek voor de huidige state in de wachtrij zetten?",
+      "regenerateError": "Kan geen nieuwe kritiek in de wachtrij zetten.",
+      "pending": "Architectuurkritiek wordt gegenereerd…",
+      "errored": "Het genereren van de architectuurkritiek is mislukt.",
+      "skipped": "De architectuurkritiek is overgeslagen (geen state of het dagbudget is bereikt).",
+      "asOfState": "per state #{serial}",
+      "systemTitle": "Afgeleide architectuur",
+      "tiers": "Lagen",
+      "dataStores": "Dataopslag",
+      "blastRadius": "Impactbereik",
+      "noFindings": "Er zijn geen architectuurrisico''s gemarkeerd — dit systeem lijkt goed ontworpen voor de beoordeelde gegevens.",
+      "recommendation": "Aanbeveling",
+      "groundedIn": "gebaseerd op {source}",
+      "deferredTitle": "Attribuutcontrole nodig",
+      "deferredHint": "Aandachtspunten die de criticus niet kon beoordelen op basis van de meegegeven state-attributen — controleer deze handmatig in plaats van aan te nemen dat ze in orde zijn.",
+      "provenance": "Een AI-beoordeling van het geïmplementeerde systeem, gebaseerd op de deterministische beveiligingsscan, de kostenengine en de resourcegraaf. Beoordeel de bevindingen voordat u handelt.",
+      "severity": {
+        "low": "Laag",
+        "medium": "Gemiddeld",
+        "high": "Hoog",
+        "critical": "Kritiek"
+      },
+      "category": {
+        "reliability": "Betrouwbaarheid",
+        "security": "Beveiliging",
+        "cost": "Kosten",
+        "operations": "Beheer",
+        "scalability": "Schaalbaarheid"
+      },
+      "heading": "AI-architectuurkritiek",
+      "aiGenerated": "Door AI gegenereerd",
+      "findingsHeading": "Bevindingen",
+      "tokens": "{input} in / {output} uit tokens",
+      "chat": {
+        "heading": "Vervolgvraag",
+        "sharedThreadNote": "Gedeelde thread — zichtbaar voor iedereen met toegang tot de workspace",
+        "placeholder": "Stel een vraag over dit systeem — bijv. \"hoe maak ik de datalaag HA?\" (⌘/Ctrl+Enter om te verzenden)",
+        "send": "Verzenden",
+        "thinking": "Bezig met nadenken…",
+        "you": "U",
+        "assistant": "Criticus",
+        "loadError": "Kan de chatthread niet laden.",
+        "sendError": "Kan uw bericht niet verzenden."
+      },
+      "translatedNote": "Bij weergave vertaald vanuit het origineel."
     }
   },
   "workspaceDetail": {
@@ -2108,7 +2161,10 @@
       "runTriggers": "Run-triggers",
       "sharing": "Delen",
       "selectLabel": "Workspacesectie",
-      "cost": "Kosten"
+      "cost": "Kosten",
+      "architecture": "Architectuur",
+      "insights": "Inzichten",
+      "automation": "Automatisering"
     },
     "lifecycle": {
       "pendingDeletion": "In afwachting van verwijdering",
@@ -2496,6 +2552,14 @@
       "stateActionFailed": "State-actie mislukt",
       "uploadState": "Kan state niet uploaden",
       "uploadStateFile": "Kan state-bestand niet uploaden"
+    },
+    "subtabs": {
+      "state": "State",
+      "stateGraph": "Grafiek",
+      "cost": "Kosten",
+      "architecture": "Architectuur",
+      "runTasks": "Taken",
+      "runTriggers": "Triggers"
     }
   },
   "graphs": {

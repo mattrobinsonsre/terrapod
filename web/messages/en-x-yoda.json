@@ -2055,6 +2055,59 @@
         "medium": "medium",
         "low": "low"
       }
+    },
+    "architecture": {
+      "loadError": "Load the architecture critique, I could not.",
+      "notEnabled": "Enabled on this deployment, the AI architecture critic is not.",
+      "absent": "Generated for the current state yet, no architecture critique has been.",
+      "generate": "Critique, generate",
+      "regenerate": "Regenerate",
+      "regenerating": "Queuing…",
+      "regenerateConfirm": "Queue a fresh architecture critique for the current state, shall we?",
+      "regenerateError": "Queue a new critique, I could not.",
+      "pending": "Generating the architecture critique, I am…",
+      "errored": "Generate, the architecture critique failed to.",
+      "skipped": "Skipped, the architecture critique was (no state, or reached the daily budget was).",
+      "asOfState": "of state #{serial}, as",
+      "systemTitle": "Architecture, inferred",
+      "tiers": "Tiers",
+      "dataStores": "Stores, data",
+      "blastRadius": "Radius, blast",
+      "noFindings": "Flagged, no architectural risks were — well-architected for the data reviewed, this system looks.",
+      "recommendation": "Recommendation",
+      "groundedIn": "in {source}, grounded",
+      "deferredTitle": "Attribute review, needs",
+      "deferredHint": "Judge from the state attributes it was given, the critic could not — manually review these, you must, rather than assume fine they are.",
+      "provenance": "An AI assessment of the deployed system this is, grounded in the deterministic security scan, cost engine, and resource graph. Before acting, review the findings, you must.",
+      "severity": {
+        "low": "Low",
+        "medium": "Medium",
+        "high": "High",
+        "critical": "Critical"
+      },
+      "category": {
+        "reliability": "Reliability",
+        "security": "Security",
+        "cost": "Cost",
+        "operations": "Operations",
+        "scalability": "Scalability"
+      },
+      "heading": "Critique, AI architecture",
+      "aiGenerated": "AI-generated",
+      "findingsHeading": "Findings",
+      "tokens": "{input} in / {output} out, tokens",
+      "chat": {
+        "heading": "A follow-up, ask",
+        "sharedThreadNote": "shared thread — to anyone with workspace access, visible",
+        "placeholder": "About this system, ask — e.g. \"HA, how would I make the data tier?\" (⌘/Ctrl+Enter to send)",
+        "send": "Send",
+        "thinking": "Thinking…",
+        "you": "You",
+        "assistant": "Critic",
+        "loadError": "Load the chat thread, I could not.",
+        "sendError": "Send your message, I could not."
+      },
+      "translatedNote": "From the original on view, translated."
     }
   },
   "workspaceDetail": {
@@ -2108,7 +2161,10 @@
       "runTriggers": "Triggers, Run",
       "sharing": "Sharing",
       "selectLabel": "section, Workspace",
-      "cost": "Cost"
+      "cost": "Cost",
+      "architecture": "Architecture",
+      "insights": "Insights",
+      "automation": "Automation"
     },
     "lifecycle": {
       "pendingDeletion": "Deletion, pending",
@@ -2496,6 +2552,14 @@
       "stateActionFailed": "Failed, the state action did",
       "uploadState": "Upload the state, it did not",
       "uploadStateFile": "Upload the state file, it did not"
+    },
+    "subtabs": {
+      "state": "State",
+      "stateGraph": "Graph",
+      "cost": "Cost",
+      "architecture": "Architecture",
+      "runTasks": "Tasks",
+      "runTriggers": "Triggers"
     }
   },
   "graphs": {

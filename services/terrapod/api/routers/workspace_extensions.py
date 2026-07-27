@@ -238,7 +238,8 @@ def _rfc3339(value) -> str:
     return value.isoformat().replace("+00:00", "Z") if value else ""
 
 
-def _critique_json(c) -> dict:
+def _critique_json(c, *, translated_fields: dict | None = None, translated: bool = False) -> dict:
+    tf = translated_fields or {}
     return {
         "data": {
             "id": f"architecture-critique-{c.id}",
@@ -247,9 +248,10 @@ def _critique_json(c) -> dict:
                 "status": c.status,
                 "state-serial": c.state_serial,
                 "risk-level": c.risk_level,
-                "architecture": c.architecture,
-                "findings": c.findings,
-                "deferred": c.deferred,
+                "architecture": tf.get("architecture", c.architecture),
+                "findings": tf.get("findings", c.findings),
+                "deferred": tf.get("deferred", c.deferred),
+                "translated": translated,
                 "model": c.model,
                 "input-tokens": c.input_tokens,
                 "output-tokens": c.output_tokens,
@@ -279,6 +281,7 @@ async def _resolve_workspace_state_read(
 
 @router.get("/workspaces/{workspace_id}/architecture-critique")
 async def get_architecture_critique(
+    request: Request,
     workspace_id: str = Path(...),
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -288,6 +291,11 @@ async def get_architecture_critique(
     Terrapod-native, gated on ``state:read``. 404 when the feature is disabled,
     the workspace has no state, or no critique has been generated for the current
     state yet (the UI treats 404 as "absent" and offers to generate).
+
+    When ``locale`` is supplied, a ready critique's prose (architecture summary,
+    findings, deferred) is translated on view into that language and cached in
+    Redis (#767/#1036) — the code-shaped fields (severity/category/addresses)
+    stay verbatim. Falls back to the canonical text if translation doesn't apply.
     """
     from sqlalchemy import select
 
@@ -315,6 +323,25 @@ async def get_architecture_critique(
     ).scalar_one_or_none()
     if critique is None:
         raise HTTPException(status_code=404, detail="no critique for current state")
+
+    # Read the optional locale off the raw request (not a declared Query param)
+    # so the released route signature is unchanged — the contract-safe pattern
+    # (AGENTS.md pagination convention).
+    locale = request.query_params.get("locale")
+    if locale and critique.status == "ready":
+        from terrapod.services import summary_translation
+
+        tr = await summary_translation.translate_architecture_critique(
+            critique_id=str(critique.id),
+            architecture=critique.architecture or {},
+            findings=critique.findings or [],
+            deferred=critique.deferred or [],
+            reader_locale=locale,
+        )
+        if tr is not None:
+            return JSONResponse(
+                content=_critique_json(critique, translated_fields=tr, translated=True)
+            )
     return JSONResponse(content=_critique_json(critique))
 
 
@@ -354,3 +381,114 @@ async def regenerate_architecture_critique(
             }
         },
     )
+
+
+def _critique_message_json(m, *, content: str | None = None) -> dict:
+    return {
+        "id": f"architecture-critique-message-{m.id}",
+        "type": "architecture-critique-messages",
+        "attributes": {
+            "role": m.role,
+            "content": content if content is not None else m.content,
+            "model": m.model,
+            "input-tokens": m.input_tokens,
+            "output-tokens": m.output_tokens,
+            "error-message": m.error_message,
+            "created-at": _rfc3339(m.created_at),
+        },
+    }
+
+
+async def _translated_message_json(m, reader_locale: str | None) -> dict:
+    """Serialize a chat message, translating an assistant reply's prose on view
+    (#767) when a reader locale is set. User rows + errored rows pass through."""
+    if reader_locale and m.role == "assistant" and m.content and not m.error_message:
+        from terrapod.services import summary_translation
+
+        tr = await summary_translation.translate_message(
+            message_id=str(m.id), content=m.content, reader_locale=reader_locale
+        )
+        if tr is not None:
+            return _critique_message_json(m, content=tr)
+    return _critique_message_json(m)
+
+
+@router.get("/workspaces/{workspace_id}/architecture-critique/messages")
+async def list_architecture_critique_messages(
+    request: Request,
+    workspace_id: str = Path(...),
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """The follow-up chat thread for the workspace's current architecture critique.
+
+    Gated on ``state:read`` (same as the critique itself). 404 when the feature
+    is disabled or there's no critique for the current state. Empty list is fine.
+    Assistant replies are translated on view into ``locale`` when supplied.
+    """
+    from terrapod.config import settings
+    from terrapod.services import architecture_critic_service as critic
+
+    if not settings.ai_architecture.enabled:
+        raise HTTPException(status_code=404, detail="architecture critic not enabled")
+    ws = await _resolve_workspace_state_read(db, user, workspace_id)
+    critique = await critic.current_critique_for_workspace(db, ws.id)
+    if critique is None:
+        raise HTTPException(status_code=404, detail="no critique for current state")
+    msgs = await critic.list_critique_messages(db, critique.id)
+    locale = request.query_params.get("locale")  # off Request → contract-safe
+    data = [await _translated_message_json(m, locale) for m in msgs]
+    return JSONResponse(content={"data": data})
+
+
+@router.post("/workspaces/{workspace_id}/architecture-critique/messages")
+async def post_architecture_critique_message(
+    request: Request,
+    workspace_id: str = Path(...),
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Post one operator follow-up against the current critique; returns the
+    assistant reply. Gated on ``state:read``. 503/409/429 map to feature-off /
+    cap-reached / budget-exhausted (mirroring the plan-summary chat)."""
+    from terrapod.config import settings
+    from terrapod.services import architecture_critic_service as critic
+    from terrapod.services.summariser import (
+        FollowupBudgetExhausted,
+        FollowupCapReached,
+        FollowupDisabled,
+        FollowupError,
+    )
+
+    if not settings.ai_architecture.enabled:
+        raise HTTPException(status_code=404, detail="architecture critic not enabled")
+    ws = await _resolve_workspace_state_read(db, user, workspace_id)
+
+    try:
+        body = await request.json()
+        attrs = body["data"]["attributes"]
+        content = str(attrs["content"] or "").strip()
+        locale = str(attrs["locale"]) if attrs.get("locale") else None
+    except (KeyError, TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="malformed body") from None
+    if not content:
+        raise HTTPException(status_code=422, detail="content is required")
+
+    # Normalise the question into the system language so the stored thread stays
+    # monolingual/authoritative, then translate the reply back for display (#767).
+    if locale:
+        from terrapod.services import summary_translation
+
+        content = await summary_translation.normalize_to_system_language(content, locale)
+
+    try:
+        assistant = await critic.post_critique_followup(db, ws.id, content)
+    except FollowupDisabled as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+    except FollowupCapReached as e:
+        raise HTTPException(status_code=409, detail=str(e)) from e
+    except FollowupBudgetExhausted as e:
+        raise HTTPException(status_code=429, detail=str(e)) from e
+    except FollowupError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return JSONResponse(content={"data": await _translated_message_json(assistant, locale)})

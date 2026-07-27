@@ -2055,6 +2055,59 @@
         "medium": "botlh",
         "low": "Sup"
       }
+    },
+    "architecture": {
+      "loadError": "qach tI'ang ghelmeH lujpu'.",
+      "notEnabled": "nIvbogh Deghvam AI qach tI'angwI' chu'be'.",
+      "absent": "DaH Sep qach tI'ang chenmoHbe'lu'.",
+      "generate": "qach tI'ang chenmoH",
+      "regenerate": "chenmoHqa'",
+      "regenerating": "tlheghtaH…",
+      "regenerateConfirm": "DaH Sep qach tI'ang chu' tlhegh'a'?",
+      "regenerateError": "qach tI'ang chu' tlheghmeH lujpu'.",
+      "pending": "qach tI'ang chenmoHtaH…",
+      "errored": "qach tI'ang chenmoHmeH lujpu'.",
+      "skipped": "qach tI'ang lajbe'lu' (Sep tu'be', pagh jajlo' wagh Sumpu').",
+      "asOfState": "Sep #{serial} rurbogh",
+      "systemTitle": "noHbogh qach",
+      "tiers": "patlhmey",
+      "dataStores": "De' polmey",
+      "blastRadius": "jor chuq",
+      "noFindings": "Qob tu'be'lu' — laDpu'bogh De' patvaD QaQ patvam.",
+      "recommendation": "chup",
+      "groundedIn": "{source} rurbogh",
+      "deferredTitle": "Segh tI'ang poQ",
+      "deferredHint": "Sep Seghmey noHlaHbe' tI'angwI' — DaH tlhIH tI'ang, QaQ 'e' Har 'e' yImevQo'.",
+      "provenance": "De'wI' noH ghItlhpu'bogh patvaD, ghItlhpu'bogh Hurgh QaD lIS, wagh jonpaH, De' chart je rurbogh. yISeH pa' tu'bogh yIlaD.",
+      "severity": {
+        "low": "ram",
+        "medium": "botlh",
+        "high": "jen",
+        "critical": "Qob'a'"
+      },
+      "category": {
+        "reliability": "voqmoHlaHghach",
+        "security": "Hurgh QaD",
+        "cost": "wagh",
+        "operations": "vangmey",
+        "scalability": "tImHa'laHghach"
+      },
+      "heading": "AI qach tI'ang",
+      "aiGenerated": "AI chenmoHpu'",
+      "findingsHeading": "tu'boghmey",
+      "tokens": "{input} 'el / {output} mej token",
+      "chat": {
+        "heading": "tlha'meH yIghel",
+        "sharedThreadNote": "boqbogh tlhegh — Qumwo' laHbogh Hoch legh",
+        "placeholder": "patvam yIghel — e.g. \"chay' De' patlh HA vIchenmoH?\" (⌘/Ctrl+Enter ngeHmeH)",
+        "send": "ngeH",
+        "thinking": "QubtaH…",
+        "you": "SoH",
+        "assistant": "tI'angwI'",
+        "loadError": "tlhegh ghelmeH lujpu'.",
+        "sendError": "QIn ngeHmeH lujpu'."
+      },
+      "translatedNote": "legh'eghmeH mughlu'pu'."
     }
   },
   "workspaceDetail": {
@@ -2108,7 +2161,10 @@
       "runTriggers": "Sar taghwI'mey",
       "sharing": "HuvmoH",
       "selectLabel": "Qumwo' 'ay'",
-      "cost": "wagh"
+      "cost": "wagh",
+      "architecture": "qach",
+      "insights": "Sovmey",
+      "automation": "SeHmeH pat"
     },
     "lifecycle": {
       "pendingDeletion": "Qaw' loStaH",
@@ -2496,6 +2552,14 @@
       "stateActionFailed": "Dotlh vang lujpu'",
       "uploadState": "Dotlh lI'meH lujpu'",
       "uploadStateFile": "Dotlh teywI' lI'meH lujpu'"
+    },
+    "subtabs": {
+      "state": "Sep",
+      "stateGraph": "chart",
+      "cost": "wagh",
+      "architecture": "qach",
+      "runTasks": "Qu'mey",
+      "runTriggers": "taghwI'mey"
     }
   },
   "graphs": {

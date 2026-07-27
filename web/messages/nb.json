@@ -2055,6 +2055,59 @@
         "medium": "middels",
         "low": "lav"
       }
+    },
+    "architecture": {
+      "loadError": "Kunne ikke laste arkitekturkritikken.",
+      "notEnabled": "AI-arkitekturkritikeren er ikke aktivert i denne installasjonen.",
+      "absent": "Det er ennå ikke generert noen arkitekturkritikk for gjeldende tilstand.",
+      "generate": "Generer kritikk",
+      "regenerate": "Generer på nytt",
+      "regenerating": "Legger i kø …",
+      "regenerateConfirm": "Legge en ny arkitekturkritikk i kø for gjeldende tilstand?",
+      "regenerateError": "Kunne ikke legge en ny kritikk i kø.",
+      "pending": "Genererer arkitekturkritikk …",
+      "errored": "Arkitekturkritikken kunne ikke genereres.",
+      "skipped": "Arkitekturkritikken ble hoppet over (ingen tilstand, eller det daglige budsjettet ble nådd).",
+      "asOfState": "per tilstand #{serial}",
+      "systemTitle": "Utledet arkitektur",
+      "tiers": "Lag",
+      "dataStores": "Datalagre",
+      "blastRadius": "Påvirkningsområde",
+      "noFindings": "Ingen arkitekturrisikoer ble flagget — dette systemet ser godt arkitektert ut for dataene som ble gjennomgått.",
+      "recommendation": "Anbefaling",
+      "groundedIn": "basert på {source}",
+      "deferredTitle": "Attributtgjennomgang kreves",
+      "deferredHint": "Forhold som kritikeren ikke kunne vurdere ut fra tilstandsattributtene den fikk — gjennomgå disse manuelt i stedet for å anta at de er i orden.",
+      "provenance": "En AI-vurdering av det utrullede systemet, basert på den deterministiske sikkerhetsskanningen, kostnadsmotoren og ressursgrafen. Gjennomgå funnene før du handler.",
+      "severity": {
+        "low": "Lav",
+        "medium": "Middels",
+        "high": "Høy",
+        "critical": "Kritisk"
+      },
+      "category": {
+        "reliability": "Pålitelighet",
+        "security": "Sikkerhet",
+        "cost": "Kostnad",
+        "operations": "Drift",
+        "scalability": "Skalerbarhet"
+      },
+      "heading": "AI-arkitekturkritikk",
+      "aiGenerated": "AI-generert",
+      "findingsHeading": "Funn",
+      "tokens": "{input} inn / {output} ut tokener",
+      "chat": {
+        "heading": "Oppfølging",
+        "sharedThreadNote": "Delt tråd — synlig for alle med tilgang til arbeidsområdet",
+        "placeholder": "Spør om dette systemet — f.eks. \"hvordan gjør jeg datalaget HA?\" (⌘/Ctrl+Enter for å sende)",
+        "send": "Send",
+        "thinking": "Tenker …",
+        "you": "Du",
+        "assistant": "Kritiker",
+        "loadError": "Kunne ikke laste chattråden.",
+        "sendError": "Kunne ikke sende meldingen din."
+      },
+      "translatedNote": "Oversatt fra originalen ved visning."
     }
   },
   "workspaceDetail": {
@@ -2108,7 +2161,10 @@
       "runTriggers": "Kjøringsutløsere",
       "sharing": "Deling",
       "selectLabel": "Arbeidsområdeseksjon",
-      "cost": "Kostnad"
+      "cost": "Kostnad",
+      "architecture": "Arkitektur",
+      "insights": "Innsikt",
+      "automation": "Automatisering"
     },
     "lifecycle": {
       "pendingDeletion": "Venter på sletting",
@@ -2496,6 +2552,14 @@
       "stateActionFailed": "Tilstandshandling mislyktes",
       "uploadState": "Kunne ikke laste opp tilstand",
       "uploadStateFile": "Kunne ikke laste opp tilstandsfil"
+    },
+    "subtabs": {
+      "state": "Tilstand",
+      "stateGraph": "Graf",
+      "cost": "Kostnad",
+      "architecture": "Arkitektur",
+      "runTasks": "Oppgaver",
+      "runTriggers": "Utløsere"
     }
   },
   "graphs": {

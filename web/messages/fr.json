@@ -2055,6 +2055,59 @@
         "medium": "moyen",
         "low": "faible"
       }
+    },
+    "architecture": {
+      "loadError": "Impossible de charger la critique d''architecture.",
+      "notEnabled": "Le critique d''architecture par IA n''est pas activé sur ce déploiement.",
+      "absent": "Aucune critique d''architecture n''a encore été générée pour l''état actuel.",
+      "generate": "Générer la critique",
+      "regenerate": "Régénérer",
+      "regenerating": "Mise en file d''attente…",
+      "regenerateConfirm": "Mettre en file d''attente une nouvelle critique d''architecture pour l''état actuel ?",
+      "regenerateError": "Impossible de mettre en file d''attente une nouvelle critique.",
+      "pending": "Génération de la critique d''architecture…",
+      "errored": "Échec de la génération de la critique d''architecture.",
+      "skipped": "La critique d''architecture a été ignorée (aucun état, ou le budget quotidien a été atteint).",
+      "asOfState": "à l''état #{serial}",
+      "systemTitle": "Architecture déduite",
+      "tiers": "Niveaux",
+      "dataStores": "Magasins de données",
+      "blastRadius": "Rayon d''impact",
+      "noFindings": "Aucun risque architectural n''a été signalé — ce système semble bien conçu pour les données examinées.",
+      "recommendation": "Recommandation",
+      "groundedIn": "fondé sur {source}",
+      "deferredTitle": "Attributs à examiner",
+      "deferredHint": "Points que le critique n''a pas pu évaluer à partir des attributs d''état fournis — examinez-les manuellement plutôt que de les supposer corrects.",
+      "provenance": "Une évaluation par IA du système déployé, fondée sur l''analyse de sécurité déterministe, le moteur de coûts et le graphe de ressources. Examinez les constats avant d''agir.",
+      "severity": {
+        "low": "Faible",
+        "medium": "Moyen",
+        "high": "Élevé",
+        "critical": "Critique"
+      },
+      "category": {
+        "reliability": "Fiabilité",
+        "security": "Sécurité",
+        "cost": "Coût",
+        "operations": "Exploitation",
+        "scalability": "Évolutivité"
+      },
+      "heading": "Critique d''architecture par IA",
+      "aiGenerated": "Généré par IA",
+      "findingsHeading": "Constats",
+      "tokens": "{input} tokens en entrée / {output} en sortie",
+      "chat": {
+        "heading": "Poser une question de suivi",
+        "sharedThreadNote": "fil partagé — visible par quiconque a accès à l''espace de travail",
+        "placeholder": "Posez une question sur ce système — p. ex. « comment rendre la couche de données HA ? » (⌘/Ctrl+Enter pour envoyer)",
+        "send": "Envoyer",
+        "thinking": "Réflexion…",
+        "you": "Vous",
+        "assistant": "Critique",
+        "loadError": "Impossible de charger le fil de discussion.",
+        "sendError": "Impossible d''envoyer votre message."
+      },
+      "translatedNote": "Traduit de l''original à l''affichage."
     }
   },
   "workspaceDetail": {
@@ -2108,7 +2161,10 @@
       "runTriggers": "Déclencheurs d'exécution",
       "sharing": "Partage",
       "selectLabel": "Section de l'espace de travail",
-      "cost": "Coût"
+      "cost": "Coût",
+      "architecture": "Architecture",
+      "insights": "Perspectives",
+      "automation": "Automatisation"
     },
     "lifecycle": {
       "pendingDeletion": "Suppression en attente",
@@ -2496,6 +2552,14 @@
       "stateActionFailed": "Échec de l'action sur l'état",
       "uploadState": "Échec du téléversement de l'état",
       "uploadStateFile": "Échec du téléversement du fichier d'état"
+    },
+    "subtabs": {
+      "state": "État",
+      "stateGraph": "Graphe",
+      "cost": "Coût",
+      "architecture": "Architecture",
+      "runTasks": "Tâches",
+      "runTriggers": "Déclencheurs"
     }
   },
   "graphs": {

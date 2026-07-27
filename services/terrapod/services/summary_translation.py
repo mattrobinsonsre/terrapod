@@ -409,6 +409,108 @@ async def translate_cost_summary(
     }
 
 
+async def translate_architecture_critique(
+    *,
+    critique_id: str,
+    architecture: dict[str, Any],
+    findings: list[dict[str, Any]],
+    deferred: list[str],
+    reader_locale: str | None,
+) -> dict[str, Any] | None:
+    """Translate a ready architecture critique's prose into the reader's locale,
+    or None (#1036 — the architecture analogue of :func:`translate_summary`).
+
+    Returns ``{"architecture": {...}, "findings": [...], "deferred": [...]}`` with
+    only the natural-language fields translated — the architecture summary/tiers/
+    data_stores/blast_radius, and each finding's title/detail/recommendation.
+    Every code-shaped field (severity, category, resource_address, grounded_in,
+    risk-level) is preserved verbatim. Returns None when no translation applies
+    (locale not a target, same language, budget exhausted, or the model fails) —
+    the caller then serves the canonical text.
+    """
+    target = target_language(reader_locale, settings.ai_summary.summary_language)
+    if target is None:
+        return None
+    arch = architecture or {}
+    if not (arch.get("summary") or findings or deferred):
+        return None
+
+    arch_min = {
+        "summary": arch.get("summary", ""),
+        "tiers": arch.get("tiers", []),
+        "data_stores": arch.get("data_stores", []),
+        "blast_radius": arch.get("blast_radius", ""),
+    }
+    find_min = [
+        {
+            "title": f.get("title", ""),
+            "detail": f.get("detail", ""),
+            "recommendation": f.get("recommendation", ""),
+        }
+        for f in findings
+    ]
+    canonical = json.dumps(
+        {"architecture": arch_min, "findings": find_min, "deferred": deferred},
+        ensure_ascii=False,
+        sort_keys=True,
+    )
+    key = _cache_key("architecture_critique", critique_id, target, _hash(canonical))
+
+    cached = await _cache_get(key)
+    if cached is None:
+        if not await _budget_ok():
+            logger.info(
+                "architecture_translation_skipped_budget", critique_id=critique_id, target=target
+            )
+            return None
+        try:
+            raw, out_tok = await _translate_call(
+                _TRANSLATE_JSON_SYSTEM.format(target=target),
+                canonical,
+                max_tokens=settings.ai_architecture.max_output_tokens,
+            )
+            await _charge(out_tok)
+            cached = _strip_json_fence(raw)
+            json.loads(cached)  # validate before caching
+            await _cache_set(key, cached)
+        except Exception as exc:  # noqa: BLE001 — never break the view
+            logger.warning(
+                "architecture_translation_failed",
+                critique_id=critique_id,
+                target=target,
+                error=str(exc),
+            )
+            return None
+
+    try:
+        payload = json.loads(cached)
+    except (ValueError, TypeError):
+        return None
+
+    out_arch = dict(arch)
+    ta = payload.get("architecture", {})
+    if isinstance(ta, dict):
+        for k in ("summary", "tiers", "data_stores", "blast_radius"):
+            if k in ta:
+                out_arch[k] = ta[k]
+
+    tf = payload.get("findings", [])
+    out_find: list[dict[str, Any]] = []
+    for i, orig in enumerate(findings):
+        merged = dict(orig)
+        if i < len(tf) and isinstance(tf[i], dict):
+            for k in ("title", "detail", "recommendation"):
+                if tf[i].get(k):
+                    merged[k] = tf[i][k]
+        out_find.append(merged)
+
+    return {
+        "architecture": out_arch,
+        "findings": out_find,
+        "deferred": payload.get("deferred", deferred),
+    }
+
+
 async def translate_message(
     *, message_id: str, content: str, reader_locale: str | None
 ) -> str | None:

@@ -6,7 +6,9 @@ truncation), the prompt render (grounding sections present/absent), result
 coercion, and the trigger handler's disabled/invalid-payload no-ops.
 """
 
-from unittest.mock import AsyncMock, patch
+import uuid
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -218,3 +220,139 @@ class TestHandlerGating:
         with patch.object(svc, "generate_critique", new=AsyncMock()) as gen:
             await svc.handle_architecture_critique({"not_workspace": "x"})
             gen.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_ws_prefixed_id_parses(self, monkeypatch):
+        """Regression: the regenerate endpoint enqueues the ``ws-``-prefixed path
+        param verbatim. The handler must strip the prefix — ``uuid.UUID('ws-…')``
+        raises, so without stripping a normal regenerate would silently no-op."""
+        import uuid
+
+        monkeypatch.setattr(svc.settings.ai_architecture, "enabled", True)
+        wid = uuid.uuid4()
+        with patch.object(svc, "generate_critique", new=AsyncMock()) as gen:
+            await svc.handle_architecture_critique({"workspace_id": f"ws-{wid}", "force": True})
+            gen.assert_awaited_once_with(wid, force=True)
+
+    @pytest.mark.asyncio
+    async def test_bare_uuid_id_parses(self, monkeypatch):
+        """The state-upload auto-hook enqueues the bare UUID; it must parse too."""
+        import uuid
+
+        monkeypatch.setattr(svc.settings.ai_architecture, "enabled", True)
+        wid = uuid.uuid4()
+        with patch.object(svc, "generate_critique", new=AsyncMock()) as gen:
+            await svc.handle_architecture_critique({"workspace_id": str(wid), "force": False})
+            gen.assert_awaited_once_with(wid, force=False)
+
+
+class TestPostCritiqueFollowup:
+    """Chat gating for post_critique_followup (#1036) — every guard maps to a
+    Followup* the router turns into 4xx, plus the happy + model-failure paths."""
+
+    async def test_disabled_feature_raises(self):
+        with patch.object(svc.settings.ai_architecture, "enabled", False):
+            with pytest.raises(svc.FollowupDisabled):
+                await svc.post_critique_followup(AsyncMock(), uuid.uuid4(), "hi")
+
+    async def test_zero_message_cap_raises(self):
+        with (
+            patch.object(svc.settings.ai_architecture, "enabled", True),
+            patch.object(svc.settings.ai_architecture, "followup_max_messages", 0),
+        ):
+            with pytest.raises(svc.FollowupDisabled):
+                await svc.post_critique_followup(AsyncMock(), uuid.uuid4(), "hi")
+
+    async def test_no_ready_critique_raises(self):
+        with (
+            patch.object(svc.settings.ai_architecture, "enabled", True),
+            patch.object(svc.settings.ai_architecture, "followup_max_messages", 20),
+            patch.object(svc, "current_critique_for_workspace", AsyncMock(return_value=None)),
+        ):
+            with pytest.raises(svc.FollowupDisabled):
+                await svc.post_critique_followup(AsyncMock(), uuid.uuid4(), "hi")
+
+    async def test_non_ready_critique_raises(self):
+        crit = SimpleNamespace(id=uuid.uuid4(), status="pending")
+        with (
+            patch.object(svc.settings.ai_architecture, "enabled", True),
+            patch.object(svc.settings.ai_architecture, "followup_max_messages", 20),
+            patch.object(svc, "current_critique_for_workspace", AsyncMock(return_value=crit)),
+        ):
+            with pytest.raises(svc.FollowupDisabled):
+                await svc.post_critique_followup(AsyncMock(), uuid.uuid4(), "hi")
+
+    async def test_cap_reached_raises(self):
+        crit = SimpleNamespace(id=uuid.uuid4(), status="ready")
+        prior = [
+            SimpleNamespace(role="user", content="q1"),
+            SimpleNamespace(role="assistant", content="a1"),
+            SimpleNamespace(role="user", content="q2"),
+        ]
+        with (
+            patch.object(svc.settings.ai_architecture, "enabled", True),
+            patch.object(svc.settings.ai_architecture, "followup_max_messages", 2),
+            patch.object(svc, "current_critique_for_workspace", AsyncMock(return_value=crit)),
+            patch.object(svc, "list_critique_messages", AsyncMock(return_value=prior)),
+        ):
+            with pytest.raises(svc.FollowupCapReached):
+                await svc.post_critique_followup(AsyncMock(), uuid.uuid4(), "hi")
+
+    async def test_budget_exhausted_raises(self):
+        crit = SimpleNamespace(id=uuid.uuid4(), status="ready")
+        with (
+            patch.object(svc.settings.ai_architecture, "enabled", True),
+            patch.object(svc.settings.ai_architecture, "followup_max_messages", 20),
+            patch.object(svc, "current_critique_for_workspace", AsyncMock(return_value=crit)),
+            patch.object(svc, "list_critique_messages", AsyncMock(return_value=[])),
+            patch.object(svc, "_budget_remaining", AsyncMock(return_value=0)),
+        ):
+            with pytest.raises(svc.FollowupBudgetExhausted):
+                await svc.post_critique_followup(AsyncMock(), uuid.uuid4(), "hi")
+
+    async def test_happy_path_persists_reply_and_emits(self):
+        crit = SimpleNamespace(id=uuid.uuid4(), status="ready")
+        db = AsyncMock()
+        db.add = MagicMock()  # SQLAlchemy add is synchronous
+        emit = AsyncMock()
+        with (
+            patch.object(svc.settings.ai_architecture, "enabled", True),
+            patch.object(svc.settings.ai_architecture, "followup_max_messages", 20),
+            patch.object(svc, "current_critique_for_workspace", AsyncMock(return_value=crit)),
+            patch.object(svc, "list_critique_messages", AsyncMock(return_value=[])),
+            patch.object(svc, "_budget_remaining", AsyncMock(return_value=None)),
+            patch.object(svc, "_critique_grounding", return_value="GROUNDING"),
+            patch.object(svc, "_call_chat_model", AsyncMock(return_value=("the answer", 5, 10))),
+            patch.object(svc, "_budget_charge", AsyncMock()) as charge,
+            patch.object(svc, "_emit_event", emit),
+        ):
+            out = await svc.post_critique_followup(db, uuid.uuid4(), "how would I make it HA?")
+        assert out.role == "assistant"
+        assert out.content == "the answer"
+        assert out.input_tokens == 5 and out.output_tokens == 10
+        assert not out.error_message
+        charge.assert_awaited_once_with(15)  # in + out charged together
+        emit.assert_awaited()  # architecture_critique_message_posted
+
+    async def test_model_failure_persists_error_message_without_raising(self):
+        crit = SimpleNamespace(id=uuid.uuid4(), status="ready")
+        with (
+            patch.object(svc.settings.ai_architecture, "enabled", True),
+            patch.object(svc.settings.ai_architecture, "followup_max_messages", 20),
+            patch.object(svc, "current_critique_for_workspace", AsyncMock(return_value=crit)),
+            patch.object(svc, "list_critique_messages", AsyncMock(return_value=[])),
+            patch.object(svc, "_budget_remaining", AsyncMock(return_value=None)),
+            patch.object(svc, "_critique_grounding", return_value="GROUNDING"),
+            patch.object(
+                svc, "_call_chat_model", AsyncMock(side_effect=RuntimeError("model boom"))
+            ),
+            patch.object(svc, "_budget_charge", AsyncMock()),
+            patch.object(svc, "_emit_event", AsyncMock()),
+        ):
+            db = AsyncMock()
+            db.add = MagicMock()
+            out = await svc.post_critique_followup(db, uuid.uuid4(), "q")
+        # The assistant row is still persisted, carrying the error for the UI.
+        assert out.role == "assistant"
+        assert "model boom" in out.error_message
+        assert out.content == ""

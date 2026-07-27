@@ -2055,6 +2055,59 @@
         "medium": "medel",
         "low": "låg"
       }
+    },
+    "architecture": {
+      "loadError": "Det gick inte att läsa in arkitekturkritiken.",
+      "notEnabled": "AI-arkitekturkritikern är inte aktiverad i denna installation.",
+      "absent": "Ingen arkitekturkritik har ännu genererats för det aktuella tillståndet.",
+      "generate": "Generera kritik",
+      "regenerate": "Generera om",
+      "regenerating": "Köar…",
+      "regenerateConfirm": "Köa en ny arkitekturkritik för det aktuella tillståndet?",
+      "regenerateError": "Det gick inte att köa en ny kritik.",
+      "pending": "Genererar arkitekturkritik…",
+      "errored": "Det gick inte att generera arkitekturkritiken.",
+      "skipped": "Arkitekturkritiken hoppades över (inget tillstånd, eller den dagliga budgeten nåddes).",
+      "asOfState": "per tillstånd #{serial}",
+      "systemTitle": "Härledd arkitektur",
+      "tiers": "Nivåer",
+      "dataStores": "Datalager",
+      "blastRadius": "Påverkansområde",
+      "noFindings": "Inga arkitekturrisker flaggades — det här systemet ser välarkitekterat ut för de granskade uppgifterna.",
+      "recommendation": "Rekommendation",
+      "groundedIn": "grundad i {source}",
+      "deferredTitle": "Attributgranskning krävs",
+      "deferredHint": "Frågor som kritikern inte kunde bedöma utifrån de tillståndsattribut den fick — granska dessa manuellt i stället för att anta att de är i sin ordning.",
+      "provenance": "En AI-bedömning av det driftsatta systemet, grundad i den deterministiska säkerhetsskanningen, kostnadsmotorn och resursgrafen. Granska fynden innan du agerar.",
+      "severity": {
+        "low": "Låg",
+        "medium": "Medel",
+        "high": "Hög",
+        "critical": "Kritisk"
+      },
+      "category": {
+        "reliability": "Tillförlitlighet",
+        "security": "Säkerhet",
+        "cost": "Kostnad",
+        "operations": "Drift",
+        "scalability": "Skalbarhet"
+      },
+      "heading": "AI-arkitekturkritik",
+      "aiGenerated": "AI-genererad",
+      "findingsHeading": "Fynd",
+      "tokens": "{input} in / {output} ut tokens",
+      "chat": {
+        "heading": "Uppföljning",
+        "sharedThreadNote": "Delad tråd — synlig för alla med åtkomst till arbetsytan",
+        "placeholder": "Fråga om det här systemet — t.ex. \"hur gör jag datanivån HA?\" (⌘/Ctrl+Enter för att skicka)",
+        "send": "Skicka",
+        "thinking": "Tänker…",
+        "you": "Du",
+        "assistant": "Kritiker",
+        "loadError": "Det gick inte att läsa in chattråden.",
+        "sendError": "Det gick inte att skicka ditt meddelande."
+      },
+      "translatedNote": "Översatt från originalet vid visning."
     }
   },
   "workspaceDetail": {
@@ -2108,7 +2161,10 @@
       "runTriggers": "Körningsutlösare",
       "sharing": "Delning",
       "selectLabel": "Arbetsytesektion",
-      "cost": "Kostnad"
+      "cost": "Kostnad",
+      "architecture": "Arkitektur",
+      "insights": "Insikter",
+      "automation": "Automatisering"
     },
     "lifecycle": {
       "pendingDeletion": "Väntar på borttagning",
@@ -2496,6 +2552,14 @@
       "stateActionFailed": "Tillståndsåtgärd misslyckades",
       "uploadState": "Det gick inte att ladda upp tillstånd",
       "uploadStateFile": "Det gick inte att ladda upp tillståndsfilen"
+    },
+    "subtabs": {
+      "state": "Tillstånd",
+      "stateGraph": "Graf",
+      "cost": "Kostnad",
+      "architecture": "Arkitektur",
+      "runTasks": "Uppgifter",
+      "runTriggers": "Utlösare"
     }
   },
   "graphs": {

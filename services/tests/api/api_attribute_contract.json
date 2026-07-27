@@ -736,7 +736,17 @@
     "risk-level",
     "state-serial",
     "status",
+    "translated",
     "updated-at"
+  ],
+  "workspace_extensions._critique_message_json": [
+    "content",
+    "created-at",
+    "error-message",
+    "input-tokens",
+    "model",
+    "output-tokens",
+    "role"
   ],
   "workspace_extensions.dismiss_drift": [
     "drift-detection-enabled",

@@ -6,6 +6,7 @@ FastAPI request path.
 """
 
 import hashlib
+import uuid
 
 import pytest
 
@@ -199,6 +200,71 @@ class TestStateVersions:
             content=state_bytes,
         )
         assert upload_resp.status_code == 200
+
+    async def test_state_content_upload_enqueues_architecture_critique(
+        self, app, client, monkeypatch
+    ):
+        """When ai_architecture is enabled, a state-content upload enqueues the
+        architecture-critique trigger for the workspace's new state (#1036)."""
+        import terrapod.services.scheduler as scheduler
+        from terrapod.config import settings
+
+        calls: list[tuple] = []
+
+        async def _fake_enqueue(name, payload, dedup_key=None):
+            calls.append((name, payload, dedup_key))
+
+        monkeypatch.setattr(scheduler, "enqueue_trigger", _fake_enqueue)
+        monkeypatch.setattr(settings.ai_architecture, "enabled", True)
+
+        set_auth(app, admin_user())
+        create = await client.post(WS_ENDPOINT, json=_ws_body("arch-enq-ws"), headers=AUTH)
+        ws_id = create.json()["data"]["id"]
+        sv_resp = await client.post(
+            f"/api/v2/workspaces/{ws_id}/state-versions", json=_sv_body(1), headers=AUTH
+        )
+        sv_id = sv_resp.json()["data"]["id"]
+        up = await client.put(
+            f"/api/v2/state-versions/{sv_id}/content",
+            content=b'{"serial": 1, "lineage": "test-lineage"}',
+        )
+        assert up.status_code == 200
+
+        arch_calls = [c for c in calls if c[0] == "architecture_critique"]
+        assert len(arch_calls) == 1, f"expected one architecture_critique enqueue, got {calls}"
+        _, payload, dedup = arch_calls[0]
+        assert payload["force"] is False  # idempotent per state serial, not a forced regen
+        # The hook passes the bare workspace UUID; the handler tolerates both
+        # this and the "ws-"-prefixed form.
+        uuid.UUID(payload["workspace_id"])  # parses as a bare UUID
+        assert dedup == f"arch-state:{payload['workspace_id']}:1"
+
+    async def test_state_content_upload_no_critique_when_disabled(self, app, client, monkeypatch):
+        """With ai_architecture disabled (the default), no critique is enqueued."""
+        import terrapod.services.scheduler as scheduler
+        from terrapod.config import settings
+
+        calls: list[tuple] = []
+
+        async def _fake_enqueue(name, payload, dedup_key=None):
+            calls.append((name, payload, dedup_key))
+
+        monkeypatch.setattr(scheduler, "enqueue_trigger", _fake_enqueue)
+        monkeypatch.setattr(settings.ai_architecture, "enabled", False)
+
+        set_auth(app, admin_user())
+        create = await client.post(WS_ENDPOINT, json=_ws_body("arch-off-ws"), headers=AUTH)
+        ws_id = create.json()["data"]["id"]
+        sv_resp = await client.post(
+            f"/api/v2/workspaces/{ws_id}/state-versions", json=_sv_body(1), headers=AUTH
+        )
+        sv_id = sv_resp.json()["data"]["id"]
+        up = await client.put(
+            f"/api/v2/state-versions/{sv_id}/content",
+            content=b'{"serial": 1, "lineage": "test-lineage"}',
+        )
+        assert up.status_code == 200
+        assert not [c for c in calls if c[0] == "architecture_critique"]
 
     async def test_state_serial_conflict_returns_409(self, app, client):
         set_auth(app, admin_user())
