@@ -105,10 +105,11 @@ async def get_run_security_scan(
     run = await _get_run_for_read(db, run_id, user)
     scan = await security_scan_service.get_run_scan(db, run.id)
     summary = await security_scan_service.run_scan_summary(db, run.id)
+    meta: dict = {"summary": summary}
     return JSONResponse(
         content={
             "data": _scan_json(scan) if scan is not None else None,
-            "meta": {"summary": summary},
+            "meta": meta,
         }
     )
 

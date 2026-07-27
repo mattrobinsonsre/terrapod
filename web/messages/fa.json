@@ -1740,7 +1740,16 @@
       "assistant": "دستیار"
     },
     "translatedNote": "به‌طور خودکار به زبان شما ترجمه شده است. خلاصهٔ معتبر همان نسخهٔ اصلی است.",
-    "translating": "در حال ترجمه…"
+    "translating": "در حال ترجمه…",
+    "category": {
+      "security": "امنیت",
+      "reliability": "قابلیت اطمینان",
+      "cost": "هزینه",
+      "operations": "عملیات",
+      "scalability": "مقیاس‌پذیری",
+      "change": "تغییر",
+      "other": "سایر"
+    }
   },
   "runDetail": {
     "notFound": "اجرا یافت نشد",
@@ -1839,7 +1848,9 @@
       "applyLabel": "اعمال<log>گزارش</log>",
       "planFull": "گزارش برنامه",
       "applyFull": "گزارش اعمال",
-      "details": "جزئیات"
+      "details": "جزئیات",
+      "security": "امنیت",
+      "securityFull": "اسکن امنیتی"
     },
     "banner": {
       "destroy": "این یک اجرای <strong>تخریب</strong> است — با اعمال آن، تمام منابع مدیریت‌شده تخریب خواهند شد.",
@@ -1852,7 +1863,8 @@
       "changes": "تغییرات",
       "aiAnalysis": "تحلیل هوش مصنوعی",
       "policyChecks": "بررسی‌های سیاست",
-      "resources": "منابع"
+      "resources": "منابع",
+      "security": "اسکن امنیتی"
     },
     "changes": {
       "noChanges": "بدون تغییر",
@@ -2016,6 +2028,32 @@
       },
       "errors": {
         "status": "بارگیری برآورد هزینه با هوش مصنوعی ناموفق بود (HTTP {status})."
+      }
+    },
+    "security": {
+      "none": "هیچ‌کدام",
+      "blocked": "مسدودشده",
+      "blockingSub": "{count, plural, one {# یافتهٔ مسدودکننده} other {# یافتهٔ مسدودکننده}}",
+      "passed": "قبول‌شده"
+    },
+    "securityPanel": {
+      "heading": "اسکن امنیتی",
+      "engineLabel": "{engine}",
+      "thresholdLabel": "آستانه: {threshold}",
+      "blockedMessage": "این اجرا <strong>به دلیل یافته‌های امنیتی</strong> در آستانه یا بالاتر مسدود شده است ({count}). تا زمانی که یافته‌ها برطرف نشوند یا مدیر آن‌ها را نادیده نگیرد، اعمال نخواهد شد.",
+      "overriding": "در حال نادیده‌گیری...",
+      "overrideContinue": "نادیده‌گیری و ادامه",
+      "overrideConfirm": "اسکن امنیتی نادیده گرفته شود و اجازهٔ اعمال این اجرا با وجود یافته‌های مسدودکننده داده شود؟",
+      "overrideFailed": "نادیده‌گیری ناموفق بود",
+      "overrideFailedStatus": "نادیده‌گیری ناموفق بود ({status})",
+      "overriddenBy": "نادیده‌گرفته‌شده توسط {by}",
+      "passed": "هیچ یافته‌ای در آستانه یا بالاتر نیست.",
+      "guideline": "مشاهدهٔ راهنما",
+      "severity": {
+        "critical": "بحرانی",
+        "high": "بالا",
+        "medium": "متوسط",
+        "low": "پایین"
       }
     }
   },

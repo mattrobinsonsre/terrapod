@@ -1740,7 +1740,16 @@
       "assistant": "アシスタント"
     },
     "translatedNote": "お使いの言語に自動翻訳されています。正式なサマリーは原文です。",
-    "translating": "翻訳中…"
+    "translating": "翻訳中…",
+    "category": {
+      "security": "セキュリティ",
+      "reliability": "信頼性",
+      "cost": "コスト",
+      "operations": "運用",
+      "scalability": "スケーラビリティ",
+      "change": "変更",
+      "other": "その他"
+    }
   },
   "runDetail": {
     "notFound": "実行が見つかりません",
@@ -1839,7 +1848,9 @@
       "applyLabel": "適用<log>ログ</log>",
       "planFull": "プランログ",
       "applyFull": "適用ログ",
-      "details": "詳細"
+      "details": "詳細",
+      "security": "セキュリティ",
+      "securityFull": "セキュリティスキャン"
     },
     "banner": {
       "destroy": "これは<strong>破棄</strong>実行です — 適用するとすべての管理対象リソースが破棄されます。",
@@ -1852,7 +1863,8 @@
       "changes": "変更",
       "aiAnalysis": "AI分析",
       "policyChecks": "ポリシーチェック",
-      "resources": "リソース"
+      "resources": "リソース",
+      "security": "セキュリティスキャン"
     },
     "changes": {
       "noChanges": "変更なし",
@@ -2016,6 +2028,32 @@
       },
       "errors": {
         "status": "AI コスト見積もりの読み込みに失敗しました（HTTP {status}）。"
+      }
+    },
+    "security": {
+      "none": "なし",
+      "blocked": "ブロック済み",
+      "blockingSub": "{count, plural, other {# 件のブロック検出}}",
+      "passed": "合格"
+    },
+    "securityPanel": {
+      "heading": "セキュリティスキャン",
+      "engineLabel": "{engine}",
+      "thresholdLabel": "しきい値: {threshold}",
+      "blockedMessage": "この実行はしきい値以上の<strong>{count, plural, other {# 件のセキュリティ検出}}によってブロック</strong>されています。検出が解決されるか、管理者が上書きするまで適用されません。",
+      "overriding": "オーバーライド中...",
+      "overrideContinue": "オーバーライドして続行",
+      "overrideConfirm": "セキュリティスキャンを上書きし、ブロック検出があってもこの実行を適用しますか？",
+      "overrideFailed": "オーバーライドに失敗しました",
+      "overrideFailedStatus": "オーバーライドに失敗しました（{status}）",
+      "overriddenBy": "{by} によりオーバーライド",
+      "passed": "しきい値以上の検出はありません。",
+      "guideline": "ガイドラインを表示",
+      "severity": {
+        "critical": "重大",
+        "high": "高",
+        "medium": "中",
+        "low": "低"
       }
     }
   },

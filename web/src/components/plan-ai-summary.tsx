@@ -28,11 +28,35 @@ import { PlanSummaryChat } from '@/components/plan-summary-chat'
 
 type Severity = 'low' | 'medium' | 'high' | 'critical' | ''
 
+type RiskCategory =
+  | 'security'
+  | 'reliability'
+  | 'cost'
+  | 'operations'
+  | 'scalability'
+  | 'change'
+  | 'other'
+
 interface RiskFactor {
   severity: Severity
   title: string
   detail: string
+  /** Grounded design-review dimension (#963/#1036). Optional; absent/`change`
+      = a plain change risk (the original plan-review lens). */
+  category?: RiskCategory
   resource_address?: string
+}
+
+// Neutral dimension chips — deliberately NOT severity-coloured (severity is the
+// icon + risk pill's job); the category just says which lens flagged it.
+const CATEGORY_STYLES: Record<RiskCategory, string> = {
+  security: 'bg-purple-900/40 text-purple-300 border border-purple-800/50',
+  reliability: 'bg-sky-900/40 text-sky-300 border border-sky-800/50',
+  cost: 'bg-teal-900/40 text-teal-300 border border-teal-800/50',
+  operations: 'bg-indigo-900/40 text-indigo-300 border border-indigo-800/50',
+  scalability: 'bg-cyan-900/40 text-cyan-300 border border-cyan-800/50',
+  change: 'bg-slate-700 text-slate-300',
+  other: 'bg-slate-700 text-slate-300',
 }
 
 interface PlanSummary {
@@ -316,8 +340,12 @@ function RiskPill({ level }: { level: Severity }) {
 }
 
 function RiskFactorRow({ factor }: { factor: RiskFactor }) {
+  const t = useTranslations('planSummary')
   const style = RISK_STYLES[factor.severity] ?? RISK_STYLES['']
   const Icon = style.icon
+  // Only badge the grounded design-review dimensions; a plain change risk
+  // (absent / 'change') gets no chip so existing summaries look unchanged.
+  const showCategory = factor.category && factor.category !== 'change'
   return (
     <li className="flex gap-3">
       <Icon
@@ -334,9 +362,20 @@ function RiskFactorRow({ factor }: { factor: RiskFactor }) {
       />
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline gap-2 flex-wrap">
+          {showCategory && (
+            <span
+              className={`inline-flex items-center px-1.5 py-0.5 rounded text-[0.65rem] font-medium uppercase tracking-wide ${
+                CATEGORY_STYLES[factor.category as RiskCategory]
+              }`}
+            >
+              {t(`category.${factor.category}`)}
+            </span>
+          )}
           <span className="text-sm text-slate-200 font-medium">{factor.title}</span>
           {factor.resource_address && (
-            <span className="font-mono text-xs text-brand-300">{factor.resource_address}</span>
+            <span className="font-mono text-xs text-brand-300" dir="ltr">
+              {factor.resource_address}
+            </span>
           )}
         </div>
         {/* Match the description: ReactMarkdown so backticks render as

@@ -1740,7 +1740,16 @@
       "assistant": "Adiutor"
     },
     "translatedNote": "Automatice in linguam tuam translatum. Summarium auctoritativum est originale.",
-    "translating": "Vertens…"
+    "translating": "Vertens…",
+    "category": {
+      "security": "Securitas",
+      "reliability": "Fidelitas",
+      "cost": "Sumptus",
+      "operations": "Operationes",
+      "scalability": "Scalabilitas",
+      "change": "Mutatio",
+      "other": "Aliud"
+    }
   },
   "runDetail": {
     "notFound": "Exsecutio non inventa",
@@ -1839,7 +1848,9 @@
       "applyLabel": "Applicatio<log>Diarium</log>",
       "planFull": "Diarium consilii",
       "applyFull": "Diarium applicationis",
-      "details": "Particularia"
+      "details": "Particularia",
+      "security": "Securitas",
+      "securityFull": "Perscrutatio securitatis"
     },
     "banner": {
       "destroy": "Haec est exsecutio <strong>destructionis</strong> — omnes facultates administratae destruentur cum applicatur.",
@@ -1852,7 +1863,8 @@
       "changes": "Mutationes",
       "aiAnalysis": "Analysis AI",
       "policyChecks": "Probationes regularum",
-      "resources": "Facultates"
+      "resources": "Facultates",
+      "security": "Perscrutatio securitatis"
     },
     "changes": {
       "noChanges": "Nullae mutationes",
@@ -2016,6 +2028,32 @@
       },
       "errors": {
         "status": "Aestimatio impensae per AI onerari non potuit (HTTP {status})."
+      }
+    },
+    "security": {
+      "none": "Nullae",
+      "blocked": "Obstructum",
+      "blockingSub": "{count, plural, one {# inventum impediens} other {# inventa impedientia}}",
+      "passed": "Probata"
+    },
+    "securityPanel": {
+      "heading": "Perscrutatio securitatis",
+      "engineLabel": "{engine}",
+      "thresholdLabel": "limen: {threshold}",
+      "blockedMessage": "Haec executio <strong>ab inventis securitatis impedita est</strong> in limine aut supra ({count}). Non applicabitur donec inventa soluta sint aut administrator ea neglegat.",
+      "overriding": "Superseditur...",
+      "overrideContinue": "Supersedere et Pergere",
+      "overrideConfirm": "Perscrutationem securitatis neglegere et hanc executionem applicari sinere quamquam inventa impediunt?",
+      "overrideFailed": "Supersessio defecit",
+      "overrideFailedStatus": "Supersessio defecit ({status})",
+      "overriddenBy": "supersessum ab {by}",
+      "passed": "Nulla inventa in limine aut supra.",
+      "guideline": "Regulam videre",
+      "severity": {
+        "critical": "criticus",
+        "high": "altus",
+        "medium": "medius",
+        "low": "humilis"
       }
     }
   },

@@ -907,6 +907,8 @@ service=terrapod-api logger=terrapod.services.vcs_status_dispatcher
 - New plans land with `plan_summaries.status='ready'` rather than `skipped`.
 - The run-detail UI panel re-renders with markdown content within ~30 seconds of the plan reaching `planned`.
 
+> **The AI cost estimate shares this same daily budget counter and provider path**, as does the plan summary's [grounded design review](ai-plan-summary.md#grounded-design-review) (extra `risk_factors` on the same `plan_summaries` row). They ride the same `ai_summary.enabled` switch, so a budget exhaustion or a provider outage mutes these surfaces the same way (`cost_summaries` rows land `status='skipped'` / `'errored'`, and the plan summary loses its design-review factors), and the same reset / re-enable steps recover them. None of the AI surfaces gate a run, so a muted AI surface is purely cosmetic.
+
 ---
 
 ## AI plan-summary provider outage / credential failure

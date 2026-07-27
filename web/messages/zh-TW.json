@@ -1740,7 +1740,16 @@
       "assistant": "助手"
     },
     "translatedNote": "已自動翻譯為您的語言。以原文摘要為準。",
-    "translating": "正在翻譯…"
+    "translating": "正在翻譯…",
+    "category": {
+      "security": "安全",
+      "reliability": "可靠性",
+      "cost": "成本",
+      "operations": "維運",
+      "scalability": "可擴展性",
+      "change": "變更",
+      "other": "其他"
+    }
   },
   "runDetail": {
     "notFound": "未找到執行",
@@ -1839,7 +1848,9 @@
       "applyLabel": "應用<log>日誌</log>",
       "planFull": "計畫日誌",
       "applyFull": "應用日誌",
-      "details": "詳情"
+      "details": "詳情",
+      "security": "安全",
+      "securityFull": "安全掃描"
     },
     "banner": {
       "destroy": "這是一次<strong>銷毀</strong>執行 — 應用時所有受管理的資源都將被銷毀。",
@@ -1852,7 +1863,8 @@
       "changes": "更改",
       "aiAnalysis": "AI 分析",
       "policyChecks": "策略檢查",
-      "resources": "資源"
+      "resources": "資源",
+      "security": "安全掃描"
     },
     "changes": {
       "noChanges": "無更改",
@@ -2016,6 +2028,32 @@
       },
       "errors": {
         "status": "無法載入 AI 成本估算（HTTP {status}）。"
+      }
+    },
+    "security": {
+      "none": "無",
+      "blocked": "已阻止",
+      "blockingSub": "{count, plural, other {# 項阻斷性發現}}",
+      "passed": "已透過"
+    },
+    "securityPanel": {
+      "heading": "安全掃描",
+      "engineLabel": "{engine}",
+      "thresholdLabel": "閾值：{threshold}",
+      "blockedMessage": "此執行因達到或超過閾值的 <strong>{count, plural, other {# 項安全發現}}而被封鎖</strong>。在解決這些發現或管理員覆寫之前，它不會套用。",
+      "overriding": "正在覆蓋...",
+      "overrideContinue": "覆蓋並繼續",
+      "overrideConfirm": "覆寫安全掃描並允許此執行在存在阻斷性發現的情況下套用？",
+      "overrideFailed": "覆蓋失敗",
+      "overrideFailedStatus": "覆蓋失敗（{status}）",
+      "overriddenBy": "由 {by} 覆蓋",
+      "passed": "沒有達到或超過閾值的發現。",
+      "guideline": "檢視指南",
+      "severity": {
+        "critical": "嚴重",
+        "high": "高",
+        "medium": "中",
+        "low": "低"
       }
     }
   },

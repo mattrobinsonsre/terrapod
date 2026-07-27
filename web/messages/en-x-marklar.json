@@ -1740,7 +1740,16 @@
       "assistant": "Marklar"
     },
     "translatedNote": "Automatically translated to your marklar. The authoritative marklar is the marklar.",
-    "translating": "Marklaring…"
+    "translating": "Marklaring…",
+    "category": {
+      "security": "Marklar",
+      "reliability": "Marklar",
+      "cost": "Marklar",
+      "operations": "Marklar",
+      "scalability": "Marklar",
+      "change": "Marklar",
+      "other": "Marklar"
+    }
   },
   "runDetail": {
     "notFound": "Marklar not found",
@@ -1839,7 +1848,9 @@
       "applyLabel": "Marklar<log>Marklar</log>",
       "planFull": "Marklar marklar",
       "applyFull": "Marklar marklar",
-      "details": "Marklars"
+      "details": "Marklars",
+      "security": "Marklar",
+      "securityFull": "Marklar scan"
     },
     "banner": {
       "destroy": "This is a <strong>destroy</strong> marklar — all managed marklars will be destroyed when applied.",
@@ -1852,7 +1863,8 @@
       "changes": "Marklars",
       "aiAnalysis": "Marklar marklar",
       "policyChecks": "Marklar marklars",
-      "resources": "Marklars"
+      "resources": "Marklars",
+      "security": "Marklar scan"
     },
     "changes": {
       "noChanges": "No marklars",
@@ -2016,6 +2028,32 @@
       },
       "errors": {
         "status": "Could not load AI marklar estimate (Marklar {status})."
+      }
+    },
+    "security": {
+      "none": "None",
+      "blocked": "Blocked",
+      "blockingSub": "{count, plural, one {# blocking marklar} other {# blocking marklars}}",
+      "passed": "Passed"
+    },
+    "securityPanel": {
+      "heading": "Marklar Scan",
+      "engineLabel": "{engine}",
+      "thresholdLabel": "marklar: {threshold}",
+      "blockedMessage": "This marklar is <strong>blocked by {count, plural, one {# marklar} other {# marklars}}</strong> at or above the marklar. It will not marklar until the marklars are resolved or a marklar overrides them.",
+      "overriding": "Overriding...",
+      "overrideContinue": "Override & Continue",
+      "overrideConfirm": "Override the marklar and allow this marklar to apply despite the blocking marklars?",
+      "overrideFailed": "Marklar failed",
+      "overrideFailedStatus": "Marklar failed ({status})",
+      "overriddenBy": "overridden by {by}",
+      "passed": "No marklars at or above the marklar.",
+      "guideline": "View marklar",
+      "severity": {
+        "critical": "critical",
+        "high": "high",
+        "medium": "medium",
+        "low": "low"
       }
     }
   },

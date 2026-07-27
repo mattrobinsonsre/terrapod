@@ -1740,7 +1740,16 @@
       "assistant": "助手"
     },
     "translatedNote": "已自动翻译为您的语言。以原文摘要为准。",
-    "translating": "正在翻译…"
+    "translating": "正在翻译…",
+    "category": {
+      "security": "安全",
+      "reliability": "可靠性",
+      "cost": "成本",
+      "operations": "运维",
+      "scalability": "可扩展性",
+      "change": "变化",
+      "other": "其他"
+    }
   },
   "runDetail": {
     "notFound": "未找到运行",
@@ -1839,7 +1848,9 @@
       "applyLabel": "应用<log>日志</log>",
       "planFull": "计划日志",
       "applyFull": "应用日志",
-      "details": "详情"
+      "details": "详情",
+      "security": "安全",
+      "securityFull": "安全扫描"
     },
     "banner": {
       "destroy": "这是一次<strong>销毁</strong>运行 — 应用时所有受管理的资源都将被销毁。",
@@ -1852,7 +1863,8 @@
       "changes": "更改",
       "aiAnalysis": "AI 分析",
       "policyChecks": "策略检查",
-      "resources": "资源"
+      "resources": "资源",
+      "security": "安全扫描"
     },
     "changes": {
       "noChanges": "无更改",
@@ -2016,6 +2028,32 @@
       },
       "errors": {
         "status": "无法加载 AI 成本估算（HTTP {status}）。"
+      }
+    },
+    "security": {
+      "none": "无",
+      "blocked": "已阻止",
+      "blockingSub": "{count, plural, other {# 项阻断性发现}}",
+      "passed": "已通过"
+    },
+    "securityPanel": {
+      "heading": "安全扫描",
+      "engineLabel": "{engine}",
+      "thresholdLabel": "阈值：{threshold}",
+      "blockedMessage": "此运行因达到或超过阈值的 <strong>{count, plural, other {# 项安全发现}}而被阻止</strong>。在解决这些发现或管理员覆盖之前，它不会应用。",
+      "overriding": "正在覆盖...",
+      "overrideContinue": "覆盖并继续",
+      "overrideConfirm": "覆盖安全扫描并允许此运行在存在阻断性发现的情况下应用？",
+      "overrideFailed": "覆盖失败",
+      "overrideFailedStatus": "覆盖失败（{status}）",
+      "overriddenBy": "由 {by} 覆盖",
+      "passed": "没有达到或超过阈值的发现。",
+      "guideline": "查看指南",
+      "severity": {
+        "critical": "严重",
+        "high": "高",
+        "medium": "中",
+        "low": "低"
       }
     }
   },

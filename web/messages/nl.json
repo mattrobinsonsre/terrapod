@@ -1740,7 +1740,16 @@
       "assistant": "Assistent"
     },
     "translatedNote": "Automatisch vertaald naar uw taal. De gezaghebbende samenvatting is het origineel.",
-    "translating": "Bezig met vertalen…"
+    "translating": "Bezig met vertalen…",
+    "category": {
+      "security": "Beveiliging",
+      "reliability": "Betrouwbaarheid",
+      "cost": "Kosten",
+      "operations": "Beheer",
+      "scalability": "Schaalbaarheid",
+      "change": "Wijziging",
+      "other": "Overig"
+    }
   },
   "runDetail": {
     "notFound": "Uitvoering niet gevonden",
@@ -1839,7 +1848,9 @@
       "applyLabel": "Apply<log>-logboek</log>",
       "planFull": "Plan-logboek",
       "applyFull": "Apply-logboek",
-      "details": "Details"
+      "details": "Details",
+      "security": "Beveiliging",
+      "securityFull": "Beveiligingsscan"
     },
     "banner": {
       "destroy": "Dit is een <strong>destroy</strong>-uitvoering — alle beheerde resources worden vernietigd bij toepassing.",
@@ -1852,7 +1863,8 @@
       "changes": "Wijzigingen",
       "aiAnalysis": "AI-analyse",
       "policyChecks": "Beleidscontroles",
-      "resources": "Resources"
+      "resources": "Resources",
+      "security": "Beveiligingsscan"
     },
     "changes": {
       "noChanges": "Geen wijzigingen",
@@ -2016,6 +2028,32 @@
       },
       "errors": {
         "status": "AI-kostenraming kan niet worden geladen (HTTP {status})."
+      }
+    },
+    "security": {
+      "none": "Geen",
+      "blocked": "Geblokkeerd",
+      "blockingSub": "{count, plural, one {# blokkerende bevinding} other {# blokkerende bevindingen}}",
+      "passed": "Geslaagd"
+    },
+    "securityPanel": {
+      "heading": "Beveiligingsscan",
+      "engineLabel": "{engine}",
+      "thresholdLabel": "drempel: {threshold}",
+      "blockedMessage": "Deze uitvoering is <strong>geblokkeerd door {count, plural, one {# beveiligingsbevinding} other {# beveiligingsbevindingen}}</strong> op of boven de drempel. Ze wordt pas toegepast als de bevindingen zijn opgelost of een beheerder ze overschrijft.",
+      "overriding": "Bezig met overschrijven...",
+      "overrideContinue": "Overschrijven & doorgaan",
+      "overrideConfirm": "De beveiligingsscan overschrijven en deze uitvoering laten toepassen ondanks de blokkerende bevindingen?",
+      "overrideFailed": "Overschrijven mislukt",
+      "overrideFailedStatus": "Overschrijven mislukt ({status})",
+      "overriddenBy": "overschreven door {by}",
+      "passed": "Geen bevindingen op of boven de drempel.",
+      "guideline": "Richtlijn bekijken",
+      "severity": {
+        "critical": "kritiek",
+        "high": "hoog",
+        "medium": "middel",
+        "low": "laag"
       }
     }
   },

@@ -186,7 +186,7 @@ Everything below is implemented and shipped today.
 
 | Feature | Description |
 |---|---|
-| AI plan review | LLM change summary + risk assessment on every plan, failure analysis on errored plans, and a chat to interrogate a run — provider-agnostic via LiteLLM (AWS Bedrock, OpenAI, Anthropic, Gemini, Azure OpenAI, vLLM). IAM-native auth for Bedrock (IRSA + optional cross-account `sts:AssumeRole`) |
+| AI plan review | LLM change summary + risk assessment on every plan, failure analysis on errored plans, and a chat to interrogate a run — provider-agnostic via LiteLLM (AWS Bedrock, OpenAI, Anthropic, Gemini, Azure OpenAI, vLLM). IAM-native auth for Bedrock (IRSA + optional cross-account `sts:AssumeRole`). When security scanning and/or cost estimation are on, the same summary adds a **grounded design review** — extra `risk_factors` tagged with a category (security/reliability/cost/operations/scalability/change/other), grounded in the deterministic Checkov/Trivy findings and the cost estimate; **advisory only, never gates a run** |
 
 </details>
 
@@ -395,7 +395,7 @@ See [docs/authentication.md](docs/authentication.md) for setup guides.
 | [Run Triggers](docs/run-triggers.md) | Cross-workspace dependency chains |
 | [Terragrunt](docs/terragrunt.md) | CLI-driven and agent-mode Terragrunt support |
 | [Remote State](docs/remote-state.md) | State versioning, locking, rollback, the `cloud` backend |
-| [AI Plan Summary](docs/ai-plan-summary.md) | LLM plan summaries, risk assessment, failure analysis, chat |
+| [AI Plan Summary](docs/ai-plan-summary.md) | LLM plan summaries, risk assessment, failure analysis, chat; plus a grounded design review (security/reliability/cost/operational risk factors) when security scanning and/or cost estimation are on |
 | [Impact Graph](docs/impact-graph.md) | Interactive dependency + blast-radius view of a plan on the run page, clustered by module |
 | [Estate Topology](docs/estate-topology.md) | Whole-estate dependency + module-impact graph, grouped by any axis you choose; accessible table fallback |
 | [State Resource Graph](docs/state-resource-graph.md) | Per-workspace resource dependency graph from Terraform state, with an older-version picker; accessible table fallback |

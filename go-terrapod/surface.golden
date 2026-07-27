@@ -428,6 +428,7 @@ field PlanSummaryMessage.InputTokens int `json:"input-tokens"`
 field PlanSummaryMessage.Model string `json:"model,omitempty"`
 field PlanSummaryMessage.OutputTokens int `json:"output-tokens"`
 field PlanSummaryMessage.Role string `json:"role"`
+field PlanSummaryRiskFactor.Category string `json:"category,omitempty"`
 field PlanSummaryRiskFactor.Detail string `json:"detail"`
 field PlanSummaryRiskFactor.ResourceAddress string `json:"resource_address,omitempty"`
 field PlanSummaryRiskFactor.Severity string `json:"severity"`

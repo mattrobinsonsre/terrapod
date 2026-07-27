@@ -1740,7 +1740,16 @@
       "assistant": "Assistent"
     },
     "translatedNote": "Automatisk oversatt til språket ditt. Det autoritative sammendraget er originalen.",
-    "translating": "Oversetter …"
+    "translating": "Oversetter …",
+    "category": {
+      "security": "Sikkerhet",
+      "reliability": "Pålitelighet",
+      "cost": "Kostnad",
+      "operations": "Drift",
+      "scalability": "Skalerbarhet",
+      "change": "Endring",
+      "other": "Annet"
+    }
   },
   "runDetail": {
     "notFound": "Kjøring ikke funnet",
@@ -1839,7 +1848,9 @@
       "applyLabel": "Anvend<log>Logg</log>",
       "planFull": "Planlogg",
       "applyFull": "Anvendelseslogg",
-      "details": "Detaljer"
+      "details": "Detaljer",
+      "security": "Sikkerhet",
+      "securityFull": "Sikkerhetsskanning"
     },
     "banner": {
       "destroy": "Dette er en <strong>nedrivings</strong>kjøring – alle administrerte ressurser vil bli revet ned når den anvendes.",
@@ -1852,7 +1863,8 @@
       "changes": "Endringer",
       "aiAnalysis": "AI-analyse",
       "policyChecks": "Regelkontroller",
-      "resources": "Ressurser"
+      "resources": "Ressurser",
+      "security": "Sikkerhetsskanning"
     },
     "changes": {
       "noChanges": "Ingen endringer",
@@ -2016,6 +2028,32 @@
       },
       "errors": {
         "status": "Kunne ikke laste AI-kostnadsestimatet (HTTP {status})."
+      }
+    },
+    "security": {
+      "none": "Ingen",
+      "blocked": "Blokkert",
+      "blockingSub": "{count, plural, one {# blokkerende funn} other {# blokkerende funn}}",
+      "passed": "Bestått"
+    },
+    "securityPanel": {
+      "heading": "Sikkerhetsskanning",
+      "engineLabel": "{engine}",
+      "thresholdLabel": "terskel: {threshold}",
+      "blockedMessage": "Denne kjøringen er <strong>blokkert av {count, plural, one {# sikkerhetsfunn} other {# sikkerhetsfunn}}</strong> på eller over terskelen. Den blir ikke anvendt før funnene er løst eller en administrator overstyrer dem.",
+      "overriding": "Overstyrer …",
+      "overrideContinue": "Overstyr og fortsett",
+      "overrideConfirm": "Overstyre sikkerhetsskanningen og la denne kjøringen bli anvendt til tross for de blokkerende funnene?",
+      "overrideFailed": "Overstyring mislyktes",
+      "overrideFailedStatus": "Overstyring mislyktes ({status})",
+      "overriddenBy": "overstyrt av {by}",
+      "passed": "Ingen funn på eller over terskelen.",
+      "guideline": "Se retningslinje",
+      "severity": {
+        "critical": "kritisk",
+        "high": "høy",
+        "medium": "middels",
+        "low": "lav"
       }
     }
   },

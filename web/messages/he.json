@@ -1740,7 +1740,16 @@
       "assistant": "עוזר"
     },
     "translatedNote": "תורגם אוטומטית לשפתך. הסיכום המחייב הוא המקור.",
-    "translating": "מתרגם…"
+    "translating": "מתרגם…",
+    "category": {
+      "security": "אבטחה",
+      "reliability": "אמינות",
+      "cost": "עלות",
+      "operations": "תפעול",
+      "scalability": "מדרגיות",
+      "change": "שינוי",
+      "other": "אחר"
+    }
   },
   "runDetail": {
     "notFound": "הרצה לא נמצאה",
@@ -1839,7 +1848,9 @@
       "applyLabel": "יישום<log>יומן</log>",
       "planFull": "יומן תכנון",
       "applyFull": "יומן יישום",
-      "details": "פרטים"
+      "details": "פרטים",
+      "security": "אבטחה",
+      "securityFull": "סריקת אבטחה"
     },
     "banner": {
       "destroy": "זוהי הרצת <strong>השמדה</strong> — כל המשאבים המנוהלים יושמדו בעת ההחלה.",
@@ -1852,7 +1863,8 @@
       "changes": "שינויים",
       "aiAnalysis": "ניתוח AI",
       "policyChecks": "בדיקות מדיניות",
-      "resources": "משאבים"
+      "resources": "משאבים",
+      "security": "סריקת אבטחה"
     },
     "changes": {
       "noChanges": "אין שינויים",
@@ -2016,6 +2028,32 @@
       },
       "errors": {
         "status": "טעינת אומדן העלות מבוסס ה-AI נכשלה (HTTP {status})."
+      }
+    },
+    "security": {
+      "none": "ללא",
+      "blocked": "חסום",
+      "blockingSub": "{count, plural, one {ממצא חוסם אחד} two {# ממצאים חוסמים} many {# ממצאים חוסמים} other {# ממצאים חוסמים}}",
+      "passed": "עבר"
+    },
+    "securityPanel": {
+      "heading": "סריקת אבטחה",
+      "engineLabel": "{engine}",
+      "thresholdLabel": "סף: {threshold}",
+      "blockedMessage": "הרצה זו <strong>חסומה על ידי ממצאי אבטחה</strong> בסף או מעליו ({count}). היא לא תוחל עד שהממצאים ייפתרו או שמנהל יעקוף אותם.",
+      "overriding": "עוקף...",
+      "overrideContinue": "עקוף והמשך",
+      "overrideConfirm": "לעקוף את סריקת האבטחה ולאפשר להרצה זו לחול למרות הממצאים החוסמים?",
+      "overrideFailed": "העקיפה נכשלה",
+      "overrideFailedStatus": "העקיפה נכשלה ({status})",
+      "overriddenBy": "נעקף על ידי {by}",
+      "passed": "אין ממצאים בסף או מעליו.",
+      "guideline": "הצג הנחיה",
+      "severity": {
+        "critical": "קריטי",
+        "high": "גבוה",
+        "medium": "בינוני",
+        "low": "נמוך"
       }
     }
   },

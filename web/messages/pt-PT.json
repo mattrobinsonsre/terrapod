@@ -1740,7 +1740,16 @@
       "assistant": "Assistente"
     },
     "translatedNote": "Traduzido automaticamente para o seu idioma. O resumo autoritativo é o original.",
-    "translating": "A traduzir…"
+    "translating": "A traduzir…",
+    "category": {
+      "security": "Segurança",
+      "reliability": "Fiabilidade",
+      "cost": "Custo",
+      "operations": "Operações",
+      "scalability": "Escalabilidade",
+      "change": "Alteração",
+      "other": "Outros"
+    }
   },
   "runDetail": {
     "notFound": "Execução não encontrada",
@@ -1839,7 +1848,9 @@
       "applyLabel": "Apply<log>Log</log>",
       "planFull": "Log do plan",
       "applyFull": "Log do apply",
-      "details": "Detalhes"
+      "details": "Detalhes",
+      "security": "Segurança",
+      "securityFull": "Análise de segurança"
     },
     "banner": {
       "destroy": "Esta é uma execução de <strong>destroy</strong> — todos os recursos geridos serão destruídos quando aplicada.",
@@ -1852,7 +1863,8 @@
       "changes": "Alterações",
       "aiAnalysis": "Análise de IA",
       "policyChecks": "Verificações de política",
-      "resources": "Recursos"
+      "resources": "Recursos",
+      "security": "Análise de segurança"
     },
     "changes": {
       "noChanges": "Nenhuma alteração",
@@ -2016,6 +2028,32 @@
       },
       "errors": {
         "status": "Falha ao carregar a estimativa de custo por IA (HTTP {status})."
+      }
+    },
+    "security": {
+      "none": "Nenhuma",
+      "blocked": "Bloqueado",
+      "blockingSub": "{count, plural, one {# resultado bloqueante} other {# resultados bloqueantes}}",
+      "passed": "Aprovada"
+    },
+    "securityPanel": {
+      "heading": "Análise de segurança",
+      "engineLabel": "{engine}",
+      "thresholdLabel": "limiar: {threshold}",
+      "blockedMessage": "Esta execução está <strong>bloqueada por {count, plural, one {# resultado de segurança} other {# resultados de segurança}}</strong> igual ou acima do limiar. Não será aplicada até que os resultados sejam resolvidos ou um administrador os ignore.",
+      "overriding": "A substituir...",
+      "overrideContinue": "Substituir e Continuar",
+      "overrideConfirm": "Ignorar a análise de segurança e permitir que esta execução seja aplicada apesar dos resultados bloqueantes?",
+      "overrideFailed": "Falha na substituição",
+      "overrideFailedStatus": "Falha na substituição ({status})",
+      "overriddenBy": "substituído por {by}",
+      "passed": "Nenhum resultado igual ou acima do limiar.",
+      "guideline": "Ver diretriz",
+      "severity": {
+        "critical": "crítico",
+        "high": "alto",
+        "medium": "médio",
+        "low": "baixo"
       }
     }
   },

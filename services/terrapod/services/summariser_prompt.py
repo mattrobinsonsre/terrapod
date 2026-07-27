@@ -69,6 +69,25 @@ PLAN_SUMMARY_JSON_SCHEMA: dict = {
                     },
                     "title": {"type": "string", "maxLength": 120},
                     "detail": {"type": "string", "maxLength": 600},
+                    "category": {
+                        "type": "string",
+                        "enum": [
+                            "security",
+                            "reliability",
+                            "cost",
+                            "operations",
+                            "scalability",
+                            "change",
+                            "other",
+                        ],
+                        "description": (
+                            "Which review dimension this factor belongs to. "
+                            "'change' = a risk of the change itself (the "
+                            "original plan-review lens); the others are the "
+                            "grounded design-review dimensions. Optional; omit "
+                            "for a plain change risk."
+                        ),
+                    },
                     "resource_address": {
                         "type": "string",
                         "description": (
@@ -254,8 +273,11 @@ accountable on two fronts, and a good review serves both:
 
 You receive the proposed changes from the plan and the HCL that produced
 them. Explain what the plan changes and rate its risk with that dual
-responsibility in mind. Nothing else — you are reviewing this change, not
-redesigning the system.
+responsibility in mind. You are reviewing this change — not redesigning the
+wider system — but you also weigh the design quality of the resources this
+change itself creates or modifies, across security, reliability, cost, and
+operations, grounded in the deterministic signals below (see "Grounded design
+review").
 
 You will receive these inputs in the user message:
   • PLAN_JSON — `tofu show -json` output for the proposed changes.
@@ -273,6 +295,11 @@ You will receive these inputs in the user message:
     drift-detection check, not a response to a configuration change.
     It changes how you frame the whole summary — see the drift-detection
     rule below.
+  • SECURITY_FINDINGS (when present) — the deterministic Checkov/Trivy
+    security scan for this plan: authoritative, already-computed findings
+    (rule id, severity, resource). Ground truth for the security dimension.
+  • COST_ESTIMATE (when present) — the deterministic per-resource monthly
+    cost estimate for this plan. Ground truth for the cost dimension.
 
 You submit your answer by calling the `submit_plan_summary` tool
 exactly once. The tool's parameters carry the schema; the provider
@@ -461,6 +488,31 @@ Other rules:
     identity even when it looks the same.
   • Do not invent resources or addresses not in the plan or CODE_DIFF.
 
+Grounded design review (in addition to change risk):
+
+  When SECURITY_FINDINGS and/or COST_ESTIMATE are present, extend your
+  review beyond the change's blast radius to the design quality of the
+  resources this plan creates or modifies — as ADDITIONAL `risk_factors`,
+  each tagged with the matching `category`:
+    • security — driven by SECURITY_FINDINGS. The scanner is ground truth:
+      surface and prioritise its material findings in context (exposure,
+      over-broad IAM, missing encryption, public endpoints), anchored to the
+      resource address. Do NOT re-list every rule mechanically, and do NOT
+      invent security issues the scanner did not report.
+    • cost — driven by COST_ESTIMATE. Its figures are ground truth: flag
+      obviously oversized / always-on resources or a cost this change adds
+      that looks disproportionate, and cite the monthly figure.
+    • reliability — SPOFs, single-AZ, no replica/backup/PITR, fragile
+      dependencies among the resources this change stands up.
+    • operations — missing tags/labels, no lifecycle, poor rollback story.
+
+  These design factors are ADDITIVE to the change-risk factors; the change
+  risks themselves keep `category: change` or omit the category. `risk_level`
+  remains the single overall grade — raise it only for a genuine, consequential
+  problem, never for a scanner nit on a throwaway fixture (weigh FLEET_CONTEXT,
+  same "don't cry wolf" bar). If SECURITY_FINDINGS and COST_ESTIMATE are both
+  absent, review the change exactly as before and add nothing.
+
 Style:
   • Operator-facing, terse, professional. No emojis. No first-person
     narration ("I will...", "Let me...").
@@ -579,6 +631,8 @@ def render_prompt(
     prompt_suffix: str = "",
     state_diverged: bool = False,
     drift_detection: bool = False,
+    security_findings: str = "",
+    cost_estimate: str = "",
     output_language: str = "",
 ) -> tuple[str, str]:
     """Render the system + user messages for the Chat Completions request.
@@ -649,6 +703,12 @@ def render_prompt(
         user_parts.append(f"CODE_DIFF:\n```diff\n{code_diff}\n```")
     if code_context_truncated.strip():
         user_parts.append(f"CODE_CONTEXT:\n```hcl\n{code_context_truncated}\n```")
+    # Grounded design-review signals (secondary, ground-truth context). Only
+    # present for plan_summary runs where the scan / cost artifacts exist.
+    if security_findings.strip():
+        user_parts.append(f"SECURITY_FINDINGS:\n```json\n{security_findings}\n```")
+    if cost_estimate.strip():
+        user_parts.append(f"COST_ESTIMATE:\n```json\n{cost_estimate}\n```")
 
     tool_name = "submit_plan_summary" if kind == "plan_summary" else "submit_failure_analysis"
     user_parts.append(f"Now call the `{tool_name}` tool exactly once with your structured answer.")

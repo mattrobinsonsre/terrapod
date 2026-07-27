@@ -45,11 +45,19 @@ type PlanSummary struct {
 // PlanSummaryRiskFactor is one entry in PlanSummary.RiskFactors.
 // For Kind="plan_summary" entries describe a risk; for
 // Kind="failure_analysis" entries describe a suggested fix.
+//
+// Category is an optional grounded design-review dimension. When the
+// workspace has security scanning and/or cost estimation enabled, the
+// plan summary additionally surfaces design-review risk factors tagged
+// with a category — one of security|reliability|cost|operations|
+// scalability|change|other. Untagged factors (the classic change-risk
+// entries) leave it empty.
 type PlanSummaryRiskFactor struct {
 	Severity        string `json:"severity"`
 	Title           string `json:"title"`
 	Detail          string `json:"detail"`
 	ResourceAddress string `json:"resource_address,omitempty"`
+	Category        string `json:"category,omitempty"`
 }
 
 // GetPlanSummary fetches the AI summary for one plan.

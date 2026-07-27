@@ -1740,7 +1740,16 @@
       "assistant": "Assistant"
     },
     "translatedNote": "To your language, automatically translated. The original, the authoritative summary is.",
-    "translating": "Translating, I am…"
+    "translating": "Translating, I am…",
+    "category": {
+      "security": "Security",
+      "reliability": "Reliability",
+      "cost": "Cost",
+      "operations": "Operations",
+      "scalability": "Scalability",
+      "change": "Change",
+      "other": "Other"
+    }
   },
   "runDetail": {
     "notFound": "Found, the run was not",
@@ -1839,7 +1848,9 @@
       "applyLabel": "Apply<log>Log</log>",
       "planFull": "log, Plan",
       "applyFull": "log, Apply",
-      "details": "Details"
+      "details": "Details",
+      "security": "Security",
+      "securityFull": "Security scan"
     },
     "banner": {
       "destroy": "A <strong>destroy</strong> run, this is — when applied, destroyed all managed resources will be.",
@@ -1852,7 +1863,8 @@
       "changes": "Changes",
       "aiAnalysis": "analysis, AI",
       "policyChecks": "checks, Policy",
-      "resources": "Resources"
+      "resources": "Resources",
+      "security": "Security scan"
     },
     "changes": {
       "noChanges": "changes, No",
@@ -2016,6 +2028,32 @@
       },
       "errors": {
         "status": "Load the AI cost estimate, failed it did (HTTP {status})."
+      }
+    },
+    "security": {
+      "none": "None",
+      "blocked": "Blocked",
+      "blockingSub": "{count, plural, one {# blocking finding} other {# blocking findings}}",
+      "passed": "Passed"
+    },
+    "securityPanel": {
+      "heading": "Security Scan",
+      "engineLabel": "{engine}",
+      "thresholdLabel": "threshold: {threshold}",
+      "blockedMessage": "Blocked by <strong>{count, plural, one {# security finding} other {# security findings}}</strong> at or above the threshold, this run is. Apply, it will not, until resolved the findings are, or override them, an admin does.",
+      "overriding": "Overriding, we are...",
+      "overrideContinue": "Override and Continue",
+      "overrideConfirm": "Override the security scan, and apply this run despite the blocking findings, you will?",
+      "overrideFailed": "Failed, the override did",
+      "overrideFailedStatus": "Failed, the override did ({status})",
+      "overriddenBy": "by {by}, overridden",
+      "passed": "At or above the threshold, no findings there are.",
+      "guideline": "The guideline, view",
+      "severity": {
+        "critical": "critical",
+        "high": "high",
+        "medium": "medium",
+        "low": "low"
       }
     }
   },

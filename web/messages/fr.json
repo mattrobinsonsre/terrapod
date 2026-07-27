@@ -1740,7 +1740,16 @@
       "assistant": "Assistant"
     },
     "translatedNote": "Traduit automatiquement dans votre langue. Le résumé faisant foi est l'original.",
-    "translating": "Traduction en cours…"
+    "translating": "Traduction en cours…",
+    "category": {
+      "security": "Sécurité",
+      "reliability": "Fiabilité",
+      "cost": "Coût",
+      "operations": "Exploitation",
+      "scalability": "Évolutivité",
+      "change": "Modification",
+      "other": "Autre"
+    }
   },
   "runDetail": {
     "notFound": "Exécution introuvable",
@@ -1839,7 +1848,9 @@
       "applyLabel": "Apply<log>Journal</log>",
       "planFull": "Journal du plan",
       "applyFull": "Journal de l'application",
-      "details": "Détails"
+      "details": "Détails",
+      "security": "Sécurité",
+      "securityFull": "Analyse de sécurité"
     },
     "banner": {
       "destroy": "Ceci est une exécution de <strong>destruction</strong> — toutes les ressources gérées seront détruites lors de l'application.",
@@ -1852,7 +1863,8 @@
       "changes": "Modifications",
       "aiAnalysis": "Analyse IA",
       "policyChecks": "Vérifications de politiques",
-      "resources": "Ressources"
+      "resources": "Ressources",
+      "security": "Analyse de sécurité"
     },
     "changes": {
       "noChanges": "Aucune modification",
@@ -2016,6 +2028,32 @@
       },
       "errors": {
         "status": "Échec du chargement de l''estimation de coût par IA (HTTP {status})."
+      }
+    },
+    "security": {
+      "none": "Aucune",
+      "blocked": "Bloqué",
+      "blockingSub": "{count, plural, one {# résultat bloquant} other {# résultats bloquants}}",
+      "passed": "Réussi"
+    },
+    "securityPanel": {
+      "heading": "Analyse de sécurité",
+      "engineLabel": "{engine}",
+      "thresholdLabel": "seuil : {threshold}",
+      "blockedMessage": "Cette exécution est <strong>bloquée par {count, plural, one {# résultat de sécurité} other {# résultats de sécurité}}</strong> au niveau ou au-dessus du seuil. Elle ne s'appliquera pas tant que les résultats ne seront pas résolus ou qu'un administrateur ne les aura pas ignorés.",
+      "overriding": "Contournement...",
+      "overrideContinue": "Contourner et continuer",
+      "overrideConfirm": "Ignorer l'analyse de sécurité et laisser cette exécution s'appliquer malgré les résultats bloquants ?",
+      "overrideFailed": "Échec du contournement",
+      "overrideFailedStatus": "Échec du contournement ({status})",
+      "overriddenBy": "contourné par {by}",
+      "passed": "Aucun résultat au niveau ou au-dessus du seuil.",
+      "guideline": "Voir la recommandation",
+      "severity": {
+        "critical": "critique",
+        "high": "élevé",
+        "medium": "moyen",
+        "low": "faible"
       }
     }
   },

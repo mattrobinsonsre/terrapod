@@ -396,3 +396,68 @@ def test_plan_summary_user_message_ignores_state_diverged_flag():
         state_diverged=True,  # ignored for this kind
     )
     assert "STATE_DIVERGED" not in user
+
+
+# ── Grounded design review: SECURITY_FINDINGS + COST_ESTIMATE (#963/#1036) ───
+
+
+def test_grounded_signals_render_after_plan_before_tool_call():
+    """Scan + cost sections appear as secondary context, after PLAN_JSON and
+    before the trailing tool-call line."""
+    _, user = render_prompt(
+        kind="plan_summary",
+        fleet_context="",
+        workspace_context="",
+        primary_input='{"resource_changes":[]}',
+        primary_input_label="PLAN_JSON",
+        primary_input_lang="json",
+        code_context_truncated="",
+        security_findings='{"findings":[{"rule_id":"CKV_AWS_24"}]}',
+        cost_estimate='{"currency":"USD","total":{"min":10,"max":20}}',
+    )
+    assert "SECURITY_FINDINGS" in user
+    assert "COST_ESTIMATE" in user
+    assert "CKV_AWS_24" in user
+    p_idx = user.index("PLAN_JSON")
+    s_idx = user.index("SECURITY_FINDINGS")
+    c_idx = user.index("COST_ESTIMATE")
+    tool_idx = user.index("submit_plan_summary")
+    assert p_idx < s_idx < tool_idx
+    assert p_idx < c_idx < tool_idx
+
+
+def test_grounded_signals_omitted_when_absent():
+    """With no scan/cost supplied the prompt is unchanged — the grounded review
+    is strictly additive, so an ungrounded summary behaves exactly as before."""
+    _, user = render_prompt(
+        kind="plan_summary",
+        fleet_context="",
+        workspace_context="",
+        primary_input="{}",
+        primary_input_label="PLAN_JSON",
+        primary_input_lang="json",
+        code_context_truncated="",
+    )
+    assert "SECURITY_FINDINGS" not in user
+    assert "COST_ESTIMATE" not in user
+
+
+def test_skill_prompt_carries_grounded_design_review():
+    """The senior-SRE skill prompt gained the grounded-design-review section +
+    the category-tagged dimensions (guards against a future edit dropping it)."""
+    assert "Grounded design review" in PLAN_SUMMARY_SKILL_PROMPT
+    assert "SECURITY_FINDINGS" in PLAN_SUMMARY_SKILL_PROMPT
+    assert "COST_ESTIMATE" in PLAN_SUMMARY_SKILL_PROMPT
+    for dim in ("security", "reliability", "cost", "operations"):
+        assert dim in PLAN_SUMMARY_SKILL_PROMPT
+
+
+def test_risk_factor_schema_allows_optional_category():
+    """`category` is an optional enum on risk_factors items — not required (so
+    plain change risks omit it), and it carries the design-review dimensions."""
+    item = PLAN_SUMMARY_JSON_SCHEMA["properties"]["risk_factors"]["items"]
+    assert "category" in item["properties"]
+    assert "category" not in item["required"]
+    enum = item["properties"]["category"]["enum"]
+    for dim in ("security", "reliability", "cost", "operations", "scalability", "change", "other"):
+        assert dim in enum

@@ -1740,7 +1740,16 @@
       "assistant": "Assistent"
     },
     "translatedNote": "Automatisch in Ihre Sprache übersetzt. Maßgeblich ist die ursprüngliche Zusammenfassung.",
-    "translating": "Wird übersetzt…"
+    "translating": "Wird übersetzt…",
+    "category": {
+      "security": "Sicherheit",
+      "reliability": "Zuverlässigkeit",
+      "cost": "Kosten",
+      "operations": "Betrieb",
+      "scalability": "Skalierbarkeit",
+      "change": "Änderung",
+      "other": "Sonstiges"
+    }
   },
   "runDetail": {
     "notFound": "Ausführung nicht gefunden",
@@ -1839,7 +1848,9 @@
       "applyLabel": "Anwenden<log>-Protokoll</log>",
       "planFull": "Plan-Protokoll",
       "applyFull": "Anwenden-Protokoll",
-      "details": "Details"
+      "details": "Details",
+      "security": "Sicherheit",
+      "securityFull": "Sicherheits-Scan"
     },
     "banner": {
       "destroy": "Dies ist eine <strong>Zerstörungsausführung</strong> — beim Anwenden werden alle verwalteten Ressourcen zerstört.",
@@ -1852,7 +1863,8 @@
       "changes": "Änderungen",
       "aiAnalysis": "KI-Analyse",
       "policyChecks": "Richtlinienprüfungen",
-      "resources": "Ressourcen"
+      "resources": "Ressourcen",
+      "security": "Sicherheits-Scan"
     },
     "changes": {
       "noChanges": "Keine Änderungen",
@@ -2016,6 +2028,32 @@
       },
       "errors": {
         "status": "KI-Kostenschätzung konnte nicht geladen werden (HTTP {status})."
+      }
+    },
+    "security": {
+      "none": "Keine",
+      "blocked": "Blockiert",
+      "blockingSub": "{count, plural, one {# blockierender Fund} other {# blockierende Funde}}",
+      "passed": "Bestanden"
+    },
+    "securityPanel": {
+      "heading": "Sicherheits-Scan",
+      "engineLabel": "{engine}",
+      "thresholdLabel": "Schwellenwert: {threshold}",
+      "blockedMessage": "Dieser Lauf ist <strong>durch {count, plural, one {# Sicherheitsfund} other {# Sicherheitsfunde}}</strong> auf oder über dem Schwellenwert blockiert. Er wird erst angewendet, wenn die Funde behoben sind oder ein Admin sie überschreibt.",
+      "overriding": "Wird überschrieben...",
+      "overrideContinue": "Überschreiben und fortfahren",
+      "overrideConfirm": "Den Sicherheits-Scan überschreiben und diesen Lauf trotz der blockierenden Funde anwenden lassen?",
+      "overrideFailed": "Überschreiben fehlgeschlagen",
+      "overrideFailedStatus": "Überschreiben fehlgeschlagen ({status})",
+      "overriddenBy": "überschrieben von {by}",
+      "passed": "Keine Funde auf oder über dem Schwellenwert.",
+      "guideline": "Richtlinie ansehen",
+      "severity": {
+        "critical": "kritisch",
+        "high": "hoch",
+        "medium": "mittel",
+        "low": "niedrig"
       }
     }
   },

@@ -68,6 +68,7 @@ from terrapod.storage import get_storage
 from terrapod.storage.keys import (
     apply_log_key,
     config_version_key,
+    cost_estimate_key,
     plan_json_output_key,
     plan_log_key,
 )
@@ -554,6 +555,75 @@ async def _find_previously_applied_cv_id(
         .limit(1)
     )
     return (await db.execute(stmt)).scalar_one_or_none()
+
+
+async def _load_scan_findings(db: AsyncSession, run: Run) -> str:
+    """Best-effort compact JSON of the run's deterministic security scan.
+
+    Ground truth for the plan summary's security dimension. Returns "" when
+    scanning is off / no result is persisted yet (grounding is additive, so an
+    empty string simply omits the SECURITY_FINDINGS section — see the prompt).
+    """
+    try:
+        from terrapod.services import security_scan_service
+
+        scan = await security_scan_service.get_run_scan(db, run.id)
+        if scan is None:
+            return ""
+        findings = [
+            {
+                "engine": f.get("engine"),
+                "rule_id": f.get("rule_id"),
+                "severity": f.get("severity"),
+                "title": f.get("title"),
+                "resource": f.get("resource"),
+            }
+            for f in (scan.findings or [])[:100]
+        ]
+        payload = {
+            "engine": scan.engine,
+            "enforcement": scan.enforcement_level,
+            "threshold": scan.severity_threshold,
+            "outcome": scan.outcome,
+            "summary": scan.summary or {},
+            "findings": findings,
+        }
+        return json.dumps(payload, default=str)
+    except Exception as exc:  # best-effort; never break the summary
+        logger.debug("scan-findings load failed (non-fatal)", error=str(exc))
+        return ""
+
+
+async def _load_cost_estimate(run: Run) -> str:
+    """Best-effort compact JSON of the run's deterministic cost estimate.
+
+    Ground truth for the plan summary's cost dimension. Returns "" when no
+    estimate exists (feature off / not uploaded), omitting COST_ESTIMATE.
+    """
+    if not getattr(run, "has_cost_estimate", False):
+        return ""
+    try:
+        storage = get_storage()
+        key = cost_estimate_key(str(run.workspace_id), str(run.id))
+        raw = await storage.get(key)
+        data = json.loads(raw.decode() if isinstance(raw, bytes) else raw)
+        payload = {
+            "currency": data.get("currency"),
+            "total": data.get("total"),
+            "diff": data.get("diff"),
+            "resources": [
+                {"address": r.get("address"), "type": r.get("type"), "monthly": r.get("monthly")}
+                for r in (data.get("resources") or [])[:200]
+            ],
+            "unpriced": [
+                {"address": u.get("address"), "type": u.get("type")}
+                for u in (data.get("unpriced") or [])[:200]
+            ],
+        }
+        return json.dumps(payload, default=str)
+    except Exception as exc:  # best-effort
+        logger.debug("cost-estimate load failed (non-fatal)", error=str(exc))
+        return ""
 
 
 async def _gather_inputs(db: AsyncSession, run: Run, kind: str) -> tuple[str, str, str, str, str]:
@@ -1315,6 +1385,12 @@ async def _summarise_one(payload: dict, _slack: dict) -> None:
             await _emit_summary_event("plan_summary_errored", ws.id, run_id)
             return
 
+        # Grounded design-review signals (plan_summary only; #963/#1036) —
+        # deterministic scan + cost fed as ground truth. Best-effort: absent →
+        # empty → the prompt reviews the change exactly as before.
+        security_findings = await _load_scan_findings(db, run) if kind == "plan_summary" else ""
+        cost_estimate = await _load_cost_estimate(run) if kind == "plan_summary" else ""
+
         system_message, user_message = render_prompt(
             kind=kind,
             fleet_context=cfg.context.fleet_context,
@@ -1328,6 +1404,8 @@ async def _summarise_one(payload: dict, _slack: dict) -> None:
             prompt_suffix=cfg.context.prompt_suffix,
             state_diverged=bool(ws.state_diverged),
             drift_detection=bool(run.is_drift_detection),
+            security_findings=security_findings,
+            cost_estimate=cost_estimate,
             output_language=_output_language(),
         )
 

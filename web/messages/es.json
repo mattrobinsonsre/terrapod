@@ -1740,7 +1740,16 @@
       "assistant": "Asistente"
     },
     "translatedNote": "Traducido automáticamente a su idioma. El resumen de referencia es el original.",
-    "translating": "Traduciendo…"
+    "translating": "Traduciendo…",
+    "category": {
+      "security": "Seguridad",
+      "reliability": "Fiabilidad",
+      "cost": "Coste",
+      "operations": "Operaciones",
+      "scalability": "Escalabilidad",
+      "change": "Cambio",
+      "other": "Otros"
+    }
   },
   "runDetail": {
     "notFound": "Ejecución no encontrada",
@@ -1839,7 +1848,9 @@
       "applyLabel": "Apply<log>Registro</log>",
       "planFull": "Registro del plan",
       "applyFull": "Registro del apply",
-      "details": "Detalles"
+      "details": "Detalles",
+      "security": "Seguridad",
+      "securityFull": "Análisis de seguridad"
     },
     "banner": {
       "destroy": "Esta es una ejecución de <strong>destrucción</strong> — todos los recursos gestionados se destruirán al aplicar.",
@@ -1852,7 +1863,8 @@
       "changes": "Cambios",
       "aiAnalysis": "Análisis de IA",
       "policyChecks": "Comprobaciones de políticas",
-      "resources": "Recursos"
+      "resources": "Recursos",
+      "security": "Análisis de seguridad"
     },
     "changes": {
       "noChanges": "Sin cambios",
@@ -2016,6 +2028,32 @@
       },
       "errors": {
         "status": "No se pudo cargar la estimación de coste por IA (HTTP {status})."
+      }
+    },
+    "security": {
+      "none": "Ninguna",
+      "blocked": "Bloqueado",
+      "blockingSub": "{count, plural, one {# hallazgo bloqueante} other {# hallazgos bloqueantes}}",
+      "passed": "Superadas"
+    },
+    "securityPanel": {
+      "heading": "Análisis de seguridad",
+      "engineLabel": "{engine}",
+      "thresholdLabel": "umbral: {threshold}",
+      "blockedMessage": "Esta ejecución está <strong>bloqueada por {count, plural, one {# hallazgo de seguridad} other {# hallazgos de seguridad}}</strong> en o por encima del umbral. No se aplicará hasta que se resuelvan los hallazgos o un administrador los anule.",
+      "overriding": "Anulando...",
+      "overrideContinue": "Anular y continuar",
+      "overrideConfirm": "¿Anular el análisis de seguridad y permitir que esta ejecución se aplique a pesar de los hallazgos bloqueantes?",
+      "overrideFailed": "Error al anular",
+      "overrideFailedStatus": "Error al anular ({status})",
+      "overriddenBy": "anulado por {by}",
+      "passed": "Sin hallazgos en o por encima del umbral.",
+      "guideline": "Ver guía",
+      "severity": {
+        "critical": "crítico",
+        "high": "alto",
+        "medium": "medio",
+        "low": "bajo"
       }
     }
   },
