@@ -219,6 +219,16 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         description="AI-polish an onboarding session's generated config (naming/grouping/comments)",
     )
 
+    # AI architecture critic (#1036 Part 2) — state-based whole-system critique.
+    # Always registered; the handler self-gates on settings.ai_architecture.enabled.
+    from terrapod.services.architecture_critic_service import handle_architecture_critique
+
+    register_trigger_handler(
+        "architecture_critique",
+        handler=handle_architecture_critique,
+        description="Generate the AI architecture critique for a workspace's current state",
+    )
+
     # Slack app run notifications (#556) — approval / applied / errored / drift.
     # Registered only when the Slack app is enabled; the handler also no-ops
     # unless the target workspace opted in with its own channel.

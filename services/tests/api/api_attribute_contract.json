@@ -724,9 +724,26 @@
     "status",
     "updated-at"
   ],
+  "workspace_extensions._critique_json": [
+    "architecture",
+    "created-at",
+    "deferred",
+    "error-message",
+    "findings",
+    "input-tokens",
+    "model",
+    "output-tokens",
+    "risk-level",
+    "state-serial",
+    "status",
+    "updated-at"
+  ],
   "workspace_extensions.dismiss_drift": [
     "drift-detection-enabled",
     "drift-last-checked-at",
     "drift-status"
+  ],
+  "workspace_extensions.regenerate_architecture_critique": [
+    "status"
   ]
 }

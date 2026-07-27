@@ -225,3 +225,132 @@ async def show_state_graph(
     return JSONResponse(
         content={"data": {"id": "state-graph", "type": "state-graphs", "attributes": graph}}
     )
+
+
+# ── AI architecture critic (#1036 Part 2 / #963) ─────────────────────────────
+# State-based, whole-system critique. Read is gated on `state:read` (same trust
+# as the state-graph — derived from the secret-bearing state). The critique is
+# generated server-side by `architecture_critic_service` and rides the existing
+# per-workspace run-events SSE channel (architecture_critique_{pending,ready,…}).
+
+
+def _rfc3339(value) -> str:
+    return value.isoformat().replace("+00:00", "Z") if value else ""
+
+
+def _critique_json(c) -> dict:
+    return {
+        "data": {
+            "id": f"architecture-critique-{c.id}",
+            "type": "architecture-critiques",
+            "attributes": {
+                "status": c.status,
+                "state-serial": c.state_serial,
+                "risk-level": c.risk_level,
+                "architecture": c.architecture,
+                "findings": c.findings,
+                "deferred": c.deferred,
+                "model": c.model,
+                "input-tokens": c.input_tokens,
+                "output-tokens": c.output_tokens,
+                "error-message": c.error_message,
+                "created-at": _rfc3339(c.created_at),
+                "updated-at": _rfc3339(c.updated_at),
+            },
+        }
+    }
+
+
+async def _resolve_workspace_state_read(
+    db: AsyncSession, user: AuthenticatedUser, workspace_id: str
+):
+    """Resolve the workspace and enforce ``state:read``; return the Workspace."""
+    from terrapod.api.routers.tfe_v2 import _get_workspace_by_id
+
+    ws = await _get_workspace_by_id(workspace_id, db)
+    caps = await resolve_workspace_capabilities_for(db, user, ws)
+    if not has_capability(caps, cap.STATE_READ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Requires state:read permission on workspace",
+        )
+    return ws
+
+
+@router.get("/workspaces/{workspace_id}/architecture-critique")
+async def get_architecture_critique(
+    workspace_id: str = Path(...),
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """The AI architecture critique for the workspace's CURRENT state version.
+
+    Terrapod-native, gated on ``state:read``. 404 when the feature is disabled,
+    the workspace has no state, or no critique has been generated for the current
+    state yet (the UI treats 404 as "absent" and offers to generate).
+    """
+    from sqlalchemy import select
+
+    from terrapod.config import settings
+    from terrapod.db.models import ArchitectureCritique, StateVersion
+
+    if not settings.ai_architecture.enabled:
+        raise HTTPException(status_code=404, detail="architecture critic not enabled")
+
+    ws = await _resolve_workspace_state_read(db, user, workspace_id)
+    sv = (
+        await db.execute(
+            select(StateVersion)
+            .where(StateVersion.workspace_id == ws.id)
+            .order_by(StateVersion.serial.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    if sv is None:
+        raise HTTPException(status_code=404, detail="workspace has no state")
+    critique = (
+        await db.execute(
+            select(ArchitectureCritique).where(ArchitectureCritique.state_version_id == sv.id)
+        )
+    ).scalar_one_or_none()
+    if critique is None:
+        raise HTTPException(status_code=404, detail="no critique for current state")
+    return JSONResponse(content=_critique_json(critique))
+
+
+@router.post("/workspaces/{workspace_id}/architecture-critique/regenerate")
+async def regenerate_architecture_critique(
+    workspace_id: str = Path(...),
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Queue a fresh architecture critique for the workspace's current state.
+
+    Gated on ``state:read`` (the critique reasons over the secret-bearing state).
+    Mutates no infrastructure — it enqueues the async critic. Returns 202; the UI
+    picks up ``architecture_critique_{pending,ready}`` via the workspace SSE.
+    """
+    from terrapod.config import settings
+
+    if not settings.ai_architecture.enabled:
+        raise HTTPException(status_code=404, detail="architecture critic not enabled")
+
+    await _resolve_workspace_state_read(db, user, workspace_id)
+
+    from terrapod.services.scheduler import enqueue_trigger
+
+    await enqueue_trigger(
+        "architecture_critique",
+        {"workspace_id": workspace_id, "force": True},
+        dedup_key=f"arch-regen:{workspace_id}",
+    )
+    return JSONResponse(
+        status_code=202,
+        content={
+            "data": {
+                "id": f"architecture-critique-regenerate-{workspace_id}",
+                "type": "architecture-critiques",
+                "attributes": {"status": "pending"},
+            }
+        },
+    )
