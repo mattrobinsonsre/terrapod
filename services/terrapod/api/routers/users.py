@@ -12,6 +12,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.api.dependencies import AuthenticatedUser, require_admin, require_admin_or_audit
+from terrapod.api.pagination import build_meta
 from terrapod.auth.passwords import hash_password, validate_password_strength
 from terrapod.db.models import (
     PlatformRoleAssignment,
@@ -145,14 +146,7 @@ async def list_users(
 
     return {
         "data": [_user_to_jsonapi(u) for u in users],
-        "meta": {
-            "pagination": {
-                "current-page": page_number,
-                "page-size": page_size,
-                "total-count": total,
-                "total-pages": (total + page_size - 1) // page_size if total > 0 else 0,
-            }
-        },
+        "meta": build_meta(total, page_number, page_size),
     }
 
 

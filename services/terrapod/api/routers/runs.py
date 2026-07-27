@@ -44,6 +44,7 @@ from terrapod.api.dependencies import (
     get_current_user,
     get_listener_identity,
 )
+from terrapod.api.pagination import build_meta
 from terrapod.auth import capabilities as cap
 from terrapod.auth.capabilities import has_capability
 from terrapod.config import settings
@@ -637,14 +638,7 @@ async def list_workspace_runs(
                 _run_json(r, workspace_name=ws.name, workspace_has_vcs=has_vcs)["data"]
                 for r in runs
             ],
-            "meta": {
-                "pagination": {
-                    "current-page": page_number,
-                    "page-size": page_size,
-                    "total-count": total,
-                    "total-pages": (total + page_size - 1) // page_size if total > 0 else 0,
-                }
-            },
+            "meta": build_meta(total, page_number, page_size),
         }
     )
 

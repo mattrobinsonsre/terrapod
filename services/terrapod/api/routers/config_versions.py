@@ -29,6 +29,7 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user
+from terrapod.api.pagination import build_meta
 from terrapod.auth import capabilities as cap
 from terrapod.auth import download_tickets
 from terrapod.auth.capabilities import has_capability
@@ -215,12 +216,7 @@ async def list_configuration_versions(
         content={
             "data": [_cv_json(cv)["data"] for cv in cvs],
             "meta": {
-                "pagination": {
-                    "current-page": page_number,
-                    "page-size": page_size,
-                    "total-count": total,
-                    "total-pages": (total + page_size - 1) // page_size if total else 0,
-                },
+                **build_meta(total, page_number, page_size),
                 "current-id": f"cv-{current_cv_uuid}" if current_cv_uuid else None,
             },
         }
