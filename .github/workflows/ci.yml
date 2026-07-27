@@ -713,6 +713,14 @@ jobs:
           echo "$out" | grep -q "cost_estimation:" || { echo "FAIL: cost_estimation config not rendered into config.yaml (#871)"; exit 1; }
           echo "$out" | grep -q "prices_url:" || { echo "FAIL: cost_estimation.prices_url not rendered (#871)"; exit 1; }
           echo "$out" | grep -q "default_region:" || { echo "FAIL: cost_estimation.default_region not rendered (#871)"; exit 1; }
+          # AI architecture critic (#1036 Part 2): non-secret config renders into
+          # config.yaml; the auth api_key is NEVER rendered (secret via env only).
+          echo "$out" | grep -q "ai_architecture:" || { echo "FAIL: ai_architecture config not rendered into config.yaml (#1036)"; exit 1; }
+          echo "$out" | grep -q 'aws_session_name: "terrapod-ai-architecture"' || { echo "FAIL: ai_architecture auth not rendered (#1036)"; exit 1; }
+          # The auth api_key must never render as a config KEY (it arrives via env
+          # only). Match `api_key:` specifically — the block's explanatory comment
+          # mentions "api_key" in prose, which is not a leak.
+          echo "$out" | grep -qE '^\s*api_key:' && { echo "FAIL: api_key rendered as a config key in the ConfigMap"; exit 1; } || true
           echo "values-local renders OK (incl. Slack config + secretKeyRef)"
       - name: Eval values render (embedded Postgres/Redis)
         run: |

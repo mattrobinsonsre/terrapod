@@ -557,6 +557,45 @@ api:
         aws_session_name: "terrapod-ai-onboarding"
         aws_external_id: ""
 
+    # AI Architecture Critic (#1036 Part 2). A THIRD independent AI workload,
+    # separate from ai_summary and ai_onboarding above. Reviews the system
+    # **as it exists** — it infers a workspace's architecture from its current
+    # Terraform state (+ the state resource graph, cost estimate, and
+    # deterministic security-scan findings) and critiques resilience / security
+    # / cost / well-architected. Distinct from ai_summary, which reviews a
+    # *change* (a plan). Its own switch, model, endpoint, secret, and token
+    # budget: because it reasons over a large context (whole-workspace state) it
+    # plausibly wants a stronger model (Opus) and an independent budget that
+    # won't starve, or be starved by, the frequent per-run summaries.
+    ai_architecture:
+      enabled: false
+      # LiteLLM model string (same format as ai_summary.model). The critic
+      # reasons over a large context, so a stronger model is warranted:
+      #   bedrock/anthropic.claude-opus-4-8       (default — recommended)
+      #   bedrock/us.anthropic.claude-sonnet-4-6  (cheaper alternative)
+      # `enabled: false` keeps the feature double-opt-in even with a model set.
+      model: "bedrock/anthropic.claude-opus-4-8"
+      # Override the upstream base URL (self-hosted OpenAI-compat / Azure only).
+      api_base: ""
+      max_output_tokens: 16384
+      request_timeout_seconds: 180
+      # Cap on output tokens per UTC day across architecture critiques — its OWN
+      # Redis counter, separate from ai_summary and ai_onboarding. 0 = unlimited.
+      daily_token_budget: 0
+      # Optional operator context prepended to the critic prompt (house
+      # standards, accepted-risk register, required regions/AZs). Guides
+      # judgment; never a substitute for the grounded state/scan/cost inputs.
+      context: ""
+      auth:
+        # api_key is injected via env var (TERRAPOD_AI_ARCHITECTURE__AUTH__API_KEY)
+        # from a K8s Secret — set it through api.extraEnv / extraEnvFrom; it is
+        # never rendered into the ConfigMap. Ignored for bedrock/ models (AWS
+        # credential chain / IRSA).
+        aws_region: "us-east-1"
+        aws_role_arn: ""
+        aws_session_name: "terrapod-ai-architecture"
+        aws_external_id: ""
+
     # Drift Detection — scheduled plan-only runs to detect infrastructure drift
     drift_detection:
       enabled: true

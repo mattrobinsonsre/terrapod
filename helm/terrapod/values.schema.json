@@ -2015,6 +2015,57 @@
             }
           }
         },
+        "ai_architecture": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "model": {
+              "type": "string"
+            },
+            "api_base": {
+              "type": "string"
+            },
+            "max_output_tokens": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "request_timeout_seconds": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "daily_token_budget": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "context": {
+              "type": "string"
+            },
+            "auth": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "api_key": {
+                  "type": "string"
+                },
+                "aws_region": {
+                  "type": "string"
+                },
+                "aws_role_arn": {
+                  "type": "string"
+                },
+                "aws_session_name": {
+                  "type": "string"
+                },
+                "aws_external_id": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
         "drift_detection": {
           "type": "object",
           "additionalProperties": false,
