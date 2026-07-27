@@ -110,14 +110,6 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
     },
     {
-      // #963/#1036: the AI architecture-critic panel on the run's Security tab —
-      // renders on top of the deterministic SecurityPanel, refetches on the
-      // architecture_critique_* SSE events, and self-hides when off (404).
-      name: 'architecture-critique',
-      testMatch: 'architecture-critique.spec.ts',
-      use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
-    },
-    {
       // #871: the workspace Cost tab (current managed-infra cost from state) +
       // the Overview→Configuration / Configurations→Versions tab renames
       // (query string carries the new keys).

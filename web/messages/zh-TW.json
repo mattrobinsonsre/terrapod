@@ -1740,7 +1740,16 @@
       "assistant": "助手"
     },
     "translatedNote": "已自動翻譯為您的語言。以原文摘要為準。",
-    "translating": "正在翻譯…"
+    "translating": "正在翻譯…",
+    "category": {
+      "security": "安全",
+      "reliability": "可靠性",
+      "cost": "成本",
+      "operations": "維運",
+      "scalability": "可擴展性",
+      "change": "變更",
+      "other": "其他"
+    }
   },
   "runDetail": {
     "notFound": "未找到執行",
@@ -2045,50 +2054,6 @@
         "high": "高",
         "medium": "中",
         "low": "低"
-      }
-    },
-    "architectureCritique": {
-      "heading": "AI 架構評審",
-      "aiGenerated": "AI 生成",
-      "pending": "正在評審擬議的架構…",
-      "skipped": "已略過此次執行的架構評審。",
-      "errored": "架構評審失敗",
-      "riskLabel": "整體風險",
-      "findingsTitle": "{count, plural, other {# 項發現}}",
-      "noFindings": "未發現架構方面的問題。",
-      "chatPlaceholder": "就此架構提出後續問題…（⌘/Ctrl + Enter 傳送）",
-      "reviewNote": "AI 生成的評審——供參考的第二意見，而非門禁。",
-      "risk": {
-        "none": "無",
-        "low": "低",
-        "medium": "中",
-        "high": "高",
-        "critical": "嚴重"
-      },
-      "severity": {
-        "critical": "嚴重",
-        "high": "高",
-        "medium": "中",
-        "low": "低",
-        "info": "資訊"
-      },
-      "category": {
-        "security": "安全",
-        "reliability": "可靠性",
-        "cost": "成本",
-        "operations": "維運",
-        "scalability": "可擴展性",
-        "other": "其他"
-      },
-      "regenerate": {
-        "label": "重新產生",
-        "queueing": "正在排入佇列…",
-        "tooltip": "重新執行 AI 架構評審",
-        "ariaLabel": "重新產生 AI 架構評審",
-        "confirm": "為此次執行重新執行 AI 架構評審？"
-      },
-      "errors": {
-        "status": "無法載入 AI 架構評審（HTTP {status}）。"
       }
     }
   },

@@ -212,7 +212,14 @@ export function SecurityPanel({
                 )}
               </div>
               {f.title && <p className="mt-1 text-sm text-slate-200">{f.title}</p>}
-              {f.guideline && (
+              {/* Only render a "guideline" link when it's actually reliable.
+                  Trivy's PrimaryURL (aquasec AVD) is stable, so keep it.
+                  Checkov's `guideline` deep-links into Prisma docs, which have
+                  restructured and now soft-404 (HTTP 200 serving a "page not
+                  found" SPA) with no stable replacement URL — so we do NOT link
+                  it; the durable check id (e.g. CKV_AWS_24) + title above are the
+                  actionable signal an operator looks up. */}
+              {f.engine !== 'checkov' && f.guideline && (
                 <a
                   href={f.guideline}
                   target="_blank"

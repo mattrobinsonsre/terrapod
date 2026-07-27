@@ -1740,7 +1740,16 @@
       "assistant": "Assistant"
     },
     "translatedNote": "To your language, automatically translated. The original, the authoritative summary is.",
-    "translating": "Translating, I am…"
+    "translating": "Translating, I am…",
+    "category": {
+      "security": "Security",
+      "reliability": "Reliability",
+      "cost": "Cost",
+      "operations": "Operations",
+      "scalability": "Scalability",
+      "change": "Change",
+      "other": "Other"
+    }
   },
   "runDetail": {
     "notFound": "Found, the run was not",
@@ -2045,50 +2054,6 @@
         "high": "high",
         "medium": "medium",
         "low": "low"
-      }
-    },
-    "architectureCritique": {
-      "heading": "AI Architecture Review",
-      "aiGenerated": "generated, AI",
-      "pending": "The proposed architecture, reviewing it is…",
-      "skipped": "Skipped for this run, the architecture review was.",
-      "errored": "Failed, the architecture review has",
-      "riskLabel": "Overall risk",
-      "findingsTitle": "{count, plural, one {# finding} other {# findings}}",
-      "noFindings": "No architectural concerns, found there are.",
-      "chatPlaceholder": "About this architecture, a follow-up question ask… (⌘/Ctrl + Enter to send)",
-      "reviewNote": "AI-generated review — an advisory second opinion, a gate it is not.",
-      "risk": {
-        "none": "none",
-        "low": "low",
-        "medium": "medium",
-        "high": "high",
-        "critical": "critical"
-      },
-      "severity": {
-        "critical": "critical",
-        "high": "high",
-        "medium": "medium",
-        "low": "low",
-        "info": "Info"
-      },
-      "category": {
-        "security": "Security",
-        "reliability": "Reliability",
-        "cost": "Cost",
-        "operations": "Operations",
-        "scalability": "Scalability",
-        "other": "Other"
-      },
-      "regenerate": {
-        "label": "Regenerate",
-        "queueing": "Queuing, we are…",
-        "tooltip": "The AI architecture review, run again you will",
-        "ariaLabel": "Regenerate the AI architecture review, you shall",
-        "confirm": "For this run, the AI architecture review run again, will you?"
-      },
-      "errors": {
-        "status": "Load the AI architecture review, I could not (HTTP {status})."
       }
     }
   },

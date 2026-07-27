@@ -1740,7 +1740,16 @@
       "assistant": "Assistente"
     },
     "translatedNote": "Tradotto automaticamente nella tua lingua. Il riepilogo autorevole è l''originale.",
-    "translating": "Traduzione in corso…"
+    "translating": "Traduzione in corso…",
+    "category": {
+      "security": "Sicurezza",
+      "reliability": "Affidabilità",
+      "cost": "Costo",
+      "operations": "Operazioni",
+      "scalability": "Scalabilità",
+      "change": "Variazione",
+      "other": "Altro"
+    }
   },
   "runDetail": {
     "notFound": "Esecuzione non trovata",
@@ -2045,50 +2054,6 @@
         "high": "alto",
         "medium": "medio",
         "low": "basso"
-      }
-    },
-    "architectureCritique": {
-      "heading": "Revisione dell'architettura con IA",
-      "aiGenerated": "Generato dall''IA",
-      "pending": "Revisione dell'architettura proposta in corso…",
-      "skipped": "La revisione dell'architettura è stata saltata per questa esecuzione.",
-      "errored": "Revisione dell'architettura non riuscita",
-      "riskLabel": "Rischio complessivo",
-      "findingsTitle": "{count, plural, one {# risultato} other {# risultati}}",
-      "noFindings": "Nessun problema di architettura rilevato.",
-      "chatPlaceholder": "Poni una domanda di follow-up su questa architettura… (⌘/Ctrl + Invio per inviare)",
-      "reviewNote": "Revisione generata dall'IA: un secondo parere consultivo, non un blocco.",
-      "risk": {
-        "none": "nessuno",
-        "low": "basso",
-        "medium": "medio",
-        "high": "alto",
-        "critical": "critico"
-      },
-      "severity": {
-        "critical": "critico",
-        "high": "alto",
-        "medium": "medio",
-        "low": "basso",
-        "info": "Info"
-      },
-      "category": {
-        "security": "Sicurezza",
-        "reliability": "Affidabilità",
-        "cost": "Costo",
-        "operations": "Operazioni",
-        "scalability": "Scalabilità",
-        "other": "Altro"
-      },
-      "regenerate": {
-        "label": "Rigenera",
-        "queueing": "In coda…",
-        "tooltip": "Rieseguire la revisione dell'architettura con IA",
-        "ariaLabel": "Rigenerare la revisione dell'architettura con IA",
-        "confirm": "Rieseguire la revisione dell'architettura con IA per questa esecuzione?"
-      },
-      "errors": {
-        "status": "Impossibile caricare la revisione dell'architettura con IA (HTTP {status})."
       }
     }
   },

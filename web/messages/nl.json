@@ -1740,7 +1740,16 @@
       "assistant": "Assistent"
     },
     "translatedNote": "Automatisch vertaald naar uw taal. De gezaghebbende samenvatting is het origineel.",
-    "translating": "Bezig met vertalen…"
+    "translating": "Bezig met vertalen…",
+    "category": {
+      "security": "Beveiliging",
+      "reliability": "Betrouwbaarheid",
+      "cost": "Kosten",
+      "operations": "Beheer",
+      "scalability": "Schaalbaarheid",
+      "change": "Wijziging",
+      "other": "Overig"
+    }
   },
   "runDetail": {
     "notFound": "Uitvoering niet gevonden",
@@ -2045,50 +2054,6 @@
         "high": "hoog",
         "medium": "middel",
         "low": "laag"
-      }
-    },
-    "architectureCritique": {
-      "heading": "AI-architectuurbeoordeling",
-      "aiGenerated": "Door AI gegenereerd",
-      "pending": "De voorgestelde architectuur wordt beoordeeld…",
-      "skipped": "De architectuurbeoordeling is voor deze uitvoering overgeslagen.",
-      "errored": "Architectuurbeoordeling mislukt",
-      "riskLabel": "Totaalrisico",
-      "findingsTitle": "{count, plural, one {# bevinding} other {# bevindingen}}",
-      "noFindings": "Geen architectuurproblemen gevonden.",
-      "chatPlaceholder": "Stel een vervolgvraag over deze architectuur… (⌘/Ctrl + Enter om te verzenden)",
-      "reviewNote": "Door AI gegenereerde beoordeling — een adviserende second opinion, geen poort.",
-      "risk": {
-        "none": "geen",
-        "low": "laag",
-        "medium": "gemiddeld",
-        "high": "hoog",
-        "critical": "kritiek"
-      },
-      "severity": {
-        "critical": "kritiek",
-        "high": "hoog",
-        "medium": "middel",
-        "low": "laag",
-        "info": "Info"
-      },
-      "category": {
-        "security": "Beveiliging",
-        "reliability": "Betrouwbaarheid",
-        "cost": "Kosten",
-        "operations": "Beheer",
-        "scalability": "Schaalbaarheid",
-        "other": "Overig"
-      },
-      "regenerate": {
-        "label": "Opnieuw genereren",
-        "queueing": "In wachtrij…",
-        "tooltip": "De AI-architectuurbeoordeling opnieuw uitvoeren",
-        "ariaLabel": "AI-architectuurbeoordeling opnieuw genereren",
-        "confirm": "De AI-architectuurbeoordeling voor deze uitvoering opnieuw uitvoeren?"
-      },
-      "errors": {
-        "status": "Kan de AI-architectuurbeoordeling niet laden (HTTP {status})."
       }
     }
   },

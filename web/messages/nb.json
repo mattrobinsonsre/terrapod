@@ -1740,7 +1740,16 @@
       "assistant": "Assistent"
     },
     "translatedNote": "Automatisk oversatt til språket ditt. Det autoritative sammendraget er originalen.",
-    "translating": "Oversetter …"
+    "translating": "Oversetter …",
+    "category": {
+      "security": "Sikkerhet",
+      "reliability": "Pålitelighet",
+      "cost": "Kostnad",
+      "operations": "Drift",
+      "scalability": "Skalerbarhet",
+      "change": "Endring",
+      "other": "Annet"
+    }
   },
   "runDetail": {
     "notFound": "Kjøring ikke funnet",
@@ -2045,50 +2054,6 @@
         "high": "høy",
         "medium": "middels",
         "low": "lav"
-      }
-    },
-    "architectureCritique": {
-      "heading": "AI-arkitekturgjennomgang",
-      "aiGenerated": "AI-generert",
-      "pending": "Gjennomgår den foreslåtte arkitekturen…",
-      "skipped": "Arkitekturgjennomgangen ble hoppet over for denne kjøringen.",
-      "errored": "Arkitekturgjennomgangen mislyktes",
-      "riskLabel": "Samlet risiko",
-      "findingsTitle": "{count, plural, one {# funn} other {# funn}}",
-      "noFindings": "Ingen arkitekturproblemer funnet.",
-      "chatPlaceholder": "Still et oppfølgingsspørsmål om denne arkitekturen… (⌘/Ctrl + Enter for å sende)",
-      "reviewNote": "AI-generert gjennomgang — en rådgivende andremening, ikke en port.",
-      "risk": {
-        "none": "ingen",
-        "low": "lav",
-        "medium": "middels",
-        "high": "høy",
-        "critical": "kritisk"
-      },
-      "severity": {
-        "critical": "kritisk",
-        "high": "høy",
-        "medium": "middels",
-        "low": "lav",
-        "info": "Info"
-      },
-      "category": {
-        "security": "Sikkerhet",
-        "reliability": "Pålitelighet",
-        "cost": "Kostnad",
-        "operations": "Drift",
-        "scalability": "Skalerbarhet",
-        "other": "Annet"
-      },
-      "regenerate": {
-        "label": "Generer på nytt",
-        "queueing": "Legger i kø…",
-        "tooltip": "Kjør AI-arkitekturgjennomgangen på nytt",
-        "ariaLabel": "Generer AI-arkitekturgjennomgangen på nytt",
-        "confirm": "Kjøre AI-arkitekturgjennomgangen på nytt for denne kjøringen?"
-      },
-      "errors": {
-        "status": "Kunne ikke laste AI-arkitekturgjennomgangen (HTTP {status})."
       }
     }
   },

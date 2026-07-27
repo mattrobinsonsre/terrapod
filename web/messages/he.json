@@ -1740,7 +1740,16 @@
       "assistant": "עוזר"
     },
     "translatedNote": "תורגם אוטומטית לשפתך. הסיכום המחייב הוא המקור.",
-    "translating": "מתרגם…"
+    "translating": "מתרגם…",
+    "category": {
+      "security": "אבטחה",
+      "reliability": "אמינות",
+      "cost": "עלות",
+      "operations": "תפעול",
+      "scalability": "מדרגיות",
+      "change": "שינוי",
+      "other": "אחר"
+    }
   },
   "runDetail": {
     "notFound": "הרצה לא נמצאה",
@@ -2045,50 +2054,6 @@
         "high": "גבוה",
         "medium": "בינוני",
         "low": "נמוך"
-      }
-    },
-    "architectureCritique": {
-      "heading": "סקירת ארכיטקטורה מבוססת בינה מלאכותית",
-      "aiGenerated": "נוצר על ידי AI",
-      "pending": "סוקר את הארכיטקטורה המוצעת…",
-      "skipped": "סקירת הארכיטקטורה דולגה עבור הרצה זו.",
-      "errored": "סקירת הארכיטקטורה נכשלה",
-      "riskLabel": "סיכון כולל",
-      "findingsTitle": "{count, plural, one {ממצא אחד} two {# ממצאים} many {# ממצאים} other {# ממצאים}}",
-      "noFindings": "לא נמצאו בעיות ארכיטקטורה.",
-      "chatPlaceholder": "שאל שאלת המשך על ארכיטקטורה זו… (⌘/Ctrl + Enter לשליחה)",
-      "reviewNote": "סקירה שנוצרה על ידי בינה מלאכותית — חוות דעת שנייה מייעצת, לא שער.",
-      "risk": {
-        "none": "ללא",
-        "low": "נמוך",
-        "medium": "בינוני",
-        "high": "גבוה",
-        "critical": "קריטי"
-      },
-      "severity": {
-        "critical": "קריטי",
-        "high": "גבוה",
-        "medium": "בינוני",
-        "low": "נמוך",
-        "info": "מידע"
-      },
-      "category": {
-        "security": "אבטחה",
-        "reliability": "אמינות",
-        "cost": "עלות",
-        "operations": "תפעול",
-        "scalability": "מדרגיות",
-        "other": "אחר"
-      },
-      "regenerate": {
-        "label": "יצירה מחדש",
-        "queueing": "מוסיף לתור…",
-        "tooltip": "הרץ מחדש את סקירת הארכיטקטורה המבוססת בינה מלאכותית",
-        "ariaLabel": "צור מחדש את סקירת הארכיטקטורה המבוססת בינה מלאכותית",
-        "confirm": "להריץ מחדש את סקירת הארכיטקטורה המבוססת בינה מלאכותית עבור הרצה זו?"
-      },
-      "errors": {
-        "status": "טעינת סקירת הארכיטקטורה המבוססת בינה מלאכותית נכשלה (HTTP {status})."
       }
     }
   },

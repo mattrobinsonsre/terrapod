@@ -1740,7 +1740,16 @@
       "assistant": "어시스턴트"
     },
     "translatedNote": "사용자의 언어로 자동 번역되었습니다. 권위 있는 요약은 원본입니다.",
-    "translating": "번역 중…"
+    "translating": "번역 중…",
+    "category": {
+      "security": "보안",
+      "reliability": "신뢰성",
+      "cost": "비용",
+      "operations": "운영",
+      "scalability": "확장성",
+      "change": "변경",
+      "other": "기타"
+    }
   },
   "runDetail": {
     "notFound": "실행을 찾을 수 없습니다",
@@ -2045,50 +2054,6 @@
         "high": "높음",
         "medium": "중간",
         "low": "낮음"
-      }
-    },
-    "architectureCritique": {
-      "heading": "AI 아키텍처 검토",
-      "aiGenerated": "AI 생성",
-      "pending": "제안된 아키텍처를 검토하는 중…",
-      "skipped": "이 실행에 대한 아키텍처 검토를 건너뛰었습니다.",
-      "errored": "아키텍처 검토 실패",
-      "riskLabel": "전체 위험",
-      "findingsTitle": "{count, plural, other {발견 #건}}",
-      "noFindings": "아키텍처 관련 문제가 발견되지 않았습니다.",
-      "chatPlaceholder": "이 아키텍처에 대해 후속 질문을 해보세요… (⌘/Ctrl + Enter로 전송)",
-      "reviewNote": "AI 생성 검토 — 차단 게이트가 아닌 자문용 참고 의견입니다.",
-      "risk": {
-        "none": "없음",
-        "low": "낮음",
-        "medium": "중간",
-        "high": "높음",
-        "critical": "심각"
-      },
-      "severity": {
-        "critical": "치명적",
-        "high": "높음",
-        "medium": "중간",
-        "low": "낮음",
-        "info": "정보"
-      },
-      "category": {
-        "security": "보안",
-        "reliability": "신뢰성",
-        "cost": "비용",
-        "operations": "운영",
-        "scalability": "확장성",
-        "other": "기타"
-      },
-      "regenerate": {
-        "label": "다시 생성",
-        "queueing": "대기열에 추가 중…",
-        "tooltip": "AI 아키텍처 검토 다시 실행",
-        "ariaLabel": "AI 아키텍처 검토 다시 생성",
-        "confirm": "이 실행에 대해 AI 아키텍처 검토를 다시 실행하시겠습니까?"
-      },
-      "errors": {
-        "status": "AI 아키텍처 검토를 불러오지 못했습니다 (HTTP {status})."
       }
     }
   },

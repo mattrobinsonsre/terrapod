@@ -1740,7 +1740,16 @@
       "assistant": "Assistent"
     },
     "translatedNote": "Automatisk oversat til dit sprog. Den autoritative oversigt er originalen.",
-    "translating": "Oversætter…"
+    "translating": "Oversætter…",
+    "category": {
+      "security": "Sikkerhed",
+      "reliability": "Pålidelighed",
+      "cost": "Omkostning",
+      "operations": "Drift",
+      "scalability": "Skalerbarhed",
+      "change": "Ændring",
+      "other": "Andet"
+    }
   },
   "runDetail": {
     "notFound": "Kørsel ikke fundet",
@@ -2045,50 +2054,6 @@
         "high": "høj",
         "medium": "mellem",
         "low": "lav"
-      }
-    },
-    "architectureCritique": {
-      "heading": "AI-arkitekturgennemgang",
-      "aiGenerated": "AI-genereret",
-      "pending": "Gennemgår den foreslåede arkitektur…",
-      "skipped": "Arkitekturgennemgangen blev sprunget over for denne kørsel.",
-      "errored": "Arkitekturgennemgangen mislykkedes",
-      "riskLabel": "Samlet risiko",
-      "findingsTitle": "{count, plural, one {# fund} other {# fund}}",
-      "noFindings": "Ingen arkitekturproblemer fundet.",
-      "chatPlaceholder": "Stil et opfølgende spørgsmål om denne arkitektur… (⌘/Ctrl + Enter for at sende)",
-      "reviewNote": "AI-genereret gennemgang — en rådgivende ekstra vurdering, ikke en port.",
-      "risk": {
-        "none": "ingen",
-        "low": "lav",
-        "medium": "mellem",
-        "high": "høj",
-        "critical": "kritisk"
-      },
-      "severity": {
-        "critical": "kritisk",
-        "high": "høj",
-        "medium": "mellem",
-        "low": "lav",
-        "info": "Info"
-      },
-      "category": {
-        "security": "Sikkerhed",
-        "reliability": "Pålidelighed",
-        "cost": "Omkostning",
-        "operations": "Drift",
-        "scalability": "Skalerbarhed",
-        "other": "Andet"
-      },
-      "regenerate": {
-        "label": "Generér igen",
-        "queueing": "Sætter i kø…",
-        "tooltip": "Kør AI-arkitekturgennemgangen igen",
-        "ariaLabel": "Generér AI-arkitekturgennemgangen igen",
-        "confirm": "Kør AI-arkitekturgennemgangen igen for denne kørsel?"
-      },
-      "errors": {
-        "status": "AI-arkitekturgennemgangen kunne ikke indlæses (HTTP {status})."
       }
     }
   },

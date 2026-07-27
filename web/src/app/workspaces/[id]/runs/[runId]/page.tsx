@@ -35,13 +35,6 @@ const CostAiSummary = dynamic(
   () => import('@/components/cost-ai-summary').then((m) => m.CostAiSummary),
   { loading: () => null },
 )
-// AI architecture critic (#963/#1036) — a senior-architect review of the proposed
-// infrastructure; renders on top of SecurityPanel in the Security tab. Its own
-// SSE-driven refresh (architecture_critique_* events). Self-hides when off (404).
-const ArchitectureCritique = dynamic(
-  () => import('@/components/architecture-critique').then((m) => m.ArchitectureCritique),
-  { loading: () => null },
-)
 
 interface RunActions {
   'is-confirmable': boolean
@@ -585,9 +578,6 @@ function RunDetailPageInner() {
   // Bumped on the SSE cost_summary_* events so CostAiSummary refetches live
   // (#871) without reloading the whole run.
   const [costSummaryRefresh, setCostSummaryRefresh] = useState(0)
-  // Bumped on the SSE architecture_critique_* events so ArchitectureCritique
-  // refetches live (#963/#1036) without reloading the whole run.
-  const [architectureCritiqueRefresh, setArchitectureCritiqueRefresh] = useState(0)
 
   // Lightweight status of the AI analysis + policy checks, used by the
   // Overview summary cards and to decide whether the AI / OPA tabs appear.
@@ -603,13 +593,6 @@ function RunDetailPageInner() {
   const [securityInfo, setSecurityInfo] = useState<
     { present: boolean; status?: string; blocking?: number; engine?: string } | null
   >(null)
-  // The AI architecture critic is independent of the deterministic scan — it
-  // reads plan JSON, not scan findings. Track its presence separately so the
-  // Security tab/card/render surface whenever EITHER has content (an operator
-  // may run the critic with deterministic scanning off, and vice versa).
-  const [critiqueInfo, setCritiqueInfo] = useState<{ present: boolean; riskLevel?: string } | null>(
-    null,
-  )
 
   // Offset tracking for incremental log fetching (byte position in raw log data)
   const planLogOffset = useRef(0)
@@ -717,23 +700,6 @@ function RunDetailPageInner() {
     }
   }, [runId])
 
-  // Presence of the AI architecture critique — drives the Security tab/card
-  // independently of the deterministic scan. Pending/ready/errored are
-  // "something to show"; a 404 (never generated) or a skipped critique are not.
-  const loadCritiqueInfo = useCallback(async () => {
-    try {
-      const res = await apiFetch(`/api/terrapod/v1/runs/${runId}/architecture-critique`)
-      if (!res.ok) { setCritiqueInfo({ present: false }); return }
-      const d = await res.json()
-      const a = d.data?.attributes
-      const status = a?.status
-      const present = !!a && status !== 'skipped'
-      setCritiqueInfo({ present, riskLevel: present ? a?.['risk-level'] : undefined })
-    } catch {
-      /* rollup is best-effort chrome */
-    }
-  }, [runId])
-
   useEffect(() => {
     if (!getAuthState()) { router.push('/login'); return }
     loadRun()
@@ -745,11 +711,6 @@ function RunDetailPageInner() {
   useEffect(() => { loadAiInfo() }, [loadAiInfo, aiSummaryRefresh])
   useEffect(() => { loadPolicyInfo() }, [loadPolicyInfo, run?.attributes.status])
   useEffect(() => { loadSecurityInfo() }, [loadSecurityInfo, run?.attributes.status])
-  // Critique presence: on mount, on run-status change, and whenever an
-  // architecture_critique_* SSE event bumps the refresh counter.
-  useEffect(() => {
-    loadCritiqueInfo()
-  }, [loadCritiqueInfo, run?.attributes.status, architectureCritiqueRefresh])
 
   // Real-time updates via SSE — reload run on status change, refresh logs on log_updated
   const { connected: sseConnected } = useRunEvents(workspaceId, useCallback((event) => {
@@ -787,19 +748,6 @@ function RunDetailPageInner() {
       ].includes(event.event) && event.run_id === bareId
     ) {
       setCostSummaryRefresh((n) => n + 1)
-    }
-    // AI architecture-critic lifecycle events (incl. a chat turn) → refetch the
-    // ArchitectureCritique panel + its chat thread.
-    if (
-      [
-        'architecture_critique_ready',
-        'architecture_critique_pending',
-        'architecture_critique_errored',
-        'architecture_critique_skipped',
-        'architecture_critique_message_posted',
-      ].includes(event.event) && event.run_id === bareId
-    ) {
-      setArchitectureCritiqueRefresh((n) => n + 1)
     }
   }, [runId, loadRun]))
 
@@ -1017,22 +965,30 @@ function RunDetailPageInner() {
   })
   // Each tab carries a rich label (for the desktop bar) AND a plain-text label
   // (for the mobile <select>, whose <option>s can't hold JSX).
+  // Tab order (#1036 review): Overview → Plan → Cost → Security → OPA → Impact
+  // → AI → Details → Apply. The AI tab is the capstone SYNTHESIS — it consumes
+  // the deterministic signals (plan, cost, scan) — so it sits AFTER everything
+  // that feeds it, just past Impact. Plan is early (you review the change
+  // first); Apply is last (it only exists post-apply). OPA rides next to
+  // Security as the other governance gate. The AI tab shows if EITHER AI engine
+  // has output — the plan summary or the architecture critique. Conditional tabs
+  // collapse out when their data is absent.
   const tabs: [RunView, React.ReactNode, string][] = [
     ['overview', t('tabs.overview'), t('tabs.overview')],
-    ...((aiInfo?.present ? [['ai', t('tabs.ai'), t('tabs.aiFull')]] : []) as [RunView, React.ReactNode, string][]),
-    ...((policyInfo?.present ? [['opa', t('tabs.opa'), t('tabs.opaFull')]] : []) as [RunView, React.ReactNode, string][]),
-    ...((securityInfo?.present || critiqueInfo?.present
-      ? [['security', t('tabs.security'), t('tabs.securityFull')]]
-      : []) as [RunView, React.ReactNode, string][]),
-    ...((attrs['has-json-output']
-      ? [['impact', t('tabs.impact'), t('tabs.impactFull')]]
-      : []) as [RunView, React.ReactNode, string][]),
+    ['plan', planLabel, t('tabs.planFull')],
     ...((attrs['has-cost-estimate']
       ? [['cost', t('tabs.cost'), t('tabs.costFull')]]
       : []) as [RunView, React.ReactNode, string][]),
-    ['plan', planLabel, t('tabs.planFull')],
-    ...((attrs['plan-only'] ? [] : [['apply', applyLabel, t('tabs.applyFull')]]) as [RunView, React.ReactNode, string][]),
+    ...((securityInfo?.present
+      ? [['security', t('tabs.security'), t('tabs.securityFull')]]
+      : []) as [RunView, React.ReactNode, string][]),
+    ...((policyInfo?.present ? [['opa', t('tabs.opa'), t('tabs.opaFull')]] : []) as [RunView, React.ReactNode, string][]),
+    ...((attrs['has-json-output']
+      ? [['impact', t('tabs.impact'), t('tabs.impactFull')]]
+      : []) as [RunView, React.ReactNode, string][]),
+    ...((aiInfo?.present ? [['ai', t('tabs.ai'), t('tabs.aiFull')]] : []) as [RunView, React.ReactNode, string][]),
     ['details', t('tabs.details'), t('tabs.details')],
+    ...((attrs['plan-only'] ? [] : [['apply', applyLabel, t('tabs.applyFull')]]) as [RunView, React.ReactNode, string][]),
   ]
   const availableViews = new Set(tabs.map((t) => t[0]))
   const view: RunView = availableViews.has(activeView) ? activeView : 'overview'
@@ -1106,21 +1062,11 @@ function RunDetailPageInner() {
   })()
 
   const securityCard: { value: string; sub?: string; tone: CardTone; clickable: boolean } = (() => {
-    if (!securityInfo && !critiqueInfo) return { value: '…', tone: 'neutral', clickable: false }
-    // The deterministic scan is the headline security signal when present.
-    if (securityInfo?.present) {
-      if (securityInfo.status === 'blocked')
-        return { value: t('security.blocked'), sub: t('security.blockingSub', { count: securityInfo.blocking ?? 0 }), tone: 'bad', clickable: true }
-      return { value: t('security.passed'), tone: 'good', clickable: true }
-    }
-    // No deterministic scan, but the AI critic flagged architectural risk —
-    // surface its risk level so the card still points into the Security tab.
-    if (critiqueInfo?.present) {
-      const rl = critiqueInfo.riskLevel || 'none'
-      const tone: CardTone = rl === 'critical' || rl === 'high' ? 'bad' : rl === 'medium' ? 'warn' : 'good'
-      return { value: t(`architectureCritique.risk.${rl}`), tone, clickable: true }
-    }
-    return { value: t('security.none'), tone: 'neutral', clickable: false }
+    if (!securityInfo) return { value: '…', tone: 'neutral', clickable: false }
+    if (!securityInfo.present) return { value: t('security.none'), tone: 'neutral', clickable: false }
+    if (securityInfo.status === 'blocked')
+      return { value: t('security.blocked'), sub: t('security.blockingSub', { count: securityInfo.blocking ?? 0 }), tone: 'bad', clickable: true }
+    return { value: t('security.passed'), tone: 'good', clickable: true }
   })()
 
   const resourceCard: { value: string; sub?: string; tone: CardTone } = (() => {
@@ -1399,7 +1345,7 @@ function RunDetailPageInner() {
             tone={policyCard.tone}
             onClick={policyCard.clickable ? () => switchView('opa') : undefined}
           />
-          {(securityInfo?.present || critiqueInfo?.present) && (
+          {securityInfo?.present && (
             <SummaryCard
               label={t('cards.security')}
               value={securityCard.value}
@@ -1419,8 +1365,10 @@ function RunDetailPageInner() {
         </>
         )}
 
-        {/* AI analysis tab (#401) — its own full panel; the tab only appears
-            when the run has an AI summary. */}
+        {/* AI analysis tab (#401) — the run's single AI analysis: a plan summary
+            + a GROUNDED design review (security/reliability/cost/ops, #963/#1036)
+            folded into its risk factors, fed by the deterministic scan + cost.
+            The tab only appears when the run has an AI summary. */}
         {view === 'ai' && (
           <PlanAiSummary runId={runId.replace(/^run-/, '')} refreshKey={aiSummaryRefresh} />
         )}
@@ -1438,26 +1386,18 @@ function RunDetailPageInner() {
           />
         )}
 
-        {/* Security-scan tab (#1036) — deterministic Checkov/Trivy findings +
-            admin override; the tab only appears when the run has a scan result.
-            The AI architecture critic (#963) renders on top of this panel. */}
+        {/* Security-scan tab (#1036) — the deterministic Checkov/Trivy findings
+            + block/override. (The AI architecture critic moved to the AI tab —
+            it's a broad, grounded design review, not security-specific.) */}
         {view === 'security' && (
-          <div className="flex flex-col gap-6">
-            {/* AI architecture critic (#963) renders ON TOP of the deterministic
-                scan; it self-hides when the feature is off (404). */}
-            <ArchitectureCritique
-              runId={runId.replace(/^run-/, '')}
-              refreshKey={architectureCritiqueRefresh}
-            />
-            <SecurityPanel
-              runId={runId}
-              runStatus={attrs.status}
-              onChanged={() => {
-                loadRun()
-                loadSecurityInfo()
-              }}
-            />
-          </div>
+          <SecurityPanel
+            runId={runId}
+            runStatus={attrs.status}
+            onChanged={() => {
+              loadRun()
+              loadSecurityInfo()
+            }}
+          />
         )}
 
         {/* Impact graph tab (#761) — interactive plan dependency + blast-radius

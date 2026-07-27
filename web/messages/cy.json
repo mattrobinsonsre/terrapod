@@ -1740,7 +1740,16 @@
       "assistant": "Cynorthwyydd"
     },
     "translatedNote": "Cyfieithwyd yn awtomatig i'ch iaith. Y crynodeb awdurdodol yw'r gwreiddiol.",
-    "translating": "Yn cyfieithu…"
+    "translating": "Yn cyfieithu…",
+    "category": {
+      "security": "Diogelwch",
+      "reliability": "Dibynadwyedd",
+      "cost": "Cost",
+      "operations": "Gweithrediadau",
+      "scalability": "Graddadwyedd",
+      "change": "Newid",
+      "other": "Arall"
+    }
   },
   "runDetail": {
     "notFound": "Ni chanfuwyd y rhediad",
@@ -2045,50 +2054,6 @@
         "high": "uchel",
         "medium": "canolig",
         "low": "isel"
-      }
-    },
-    "architectureCritique": {
-      "heading": "Adolygiad pensaernïaeth AI",
-      "aiGenerated": "Cynhyrchwyd gan AI",
-      "pending": "Yn adolygu'r bensaernïaeth arfaethedig…",
-      "skipped": "Cafodd yr adolygiad pensaernïaeth ei hepgor ar gyfer y rhediad hwn.",
-      "errored": "Methodd yr adolygiad pensaernïaeth",
-      "riskLabel": "Risg gyffredinol",
-      "findingsTitle": "{count, plural, one {# canfyddiad} other {# canfyddiad}}",
-      "noFindings": "Ni chanfuwyd unrhyw bryderon pensaernïol.",
-      "chatPlaceholder": "Gofynnwch gwestiwn dilynol am y bensaernïaeth hon… (⌘/Ctrl + Enter i anfon)",
-      "reviewNote": "Adolygiad a gynhyrchwyd gan AI — ail farn gynghori, nid giât.",
-      "risk": {
-        "none": "dim",
-        "low": "isel",
-        "medium": "canolig",
-        "high": "uchel",
-        "critical": "critigol"
-      },
-      "severity": {
-        "critical": "critigol",
-        "high": "uchel",
-        "medium": "canolig",
-        "low": "isel",
-        "info": "Gwybodaeth"
-      },
-      "category": {
-        "security": "Diogelwch",
-        "reliability": "Dibynadwyedd",
-        "cost": "Cost",
-        "operations": "Gweithrediadau",
-        "scalability": "Graddadwyedd",
-        "other": "Arall"
-      },
-      "regenerate": {
-        "label": "Ailgynhyrchu",
-        "queueing": "Yn ciwio…",
-        "tooltip": "Ailredeg yr adolygiad pensaernïaeth AI",
-        "ariaLabel": "Ail-gynhyrchu'r adolygiad pensaernïaeth AI",
-        "confirm": "Ailredeg yr adolygiad pensaernïaeth AI ar gyfer y rhediad hwn?"
-      },
-      "errors": {
-        "status": "Methwyd â llwytho'r adolygiad pensaernïaeth AI (HTTP {status})."
       }
     }
   },

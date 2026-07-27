@@ -1740,7 +1740,16 @@
       "assistant": "Adiutor"
     },
     "translatedNote": "Automatice in linguam tuam translatum. Summarium auctoritativum est originale.",
-    "translating": "Vertens…"
+    "translating": "Vertens…",
+    "category": {
+      "security": "Securitas",
+      "reliability": "Fidelitas",
+      "cost": "Sumptus",
+      "operations": "Operationes",
+      "scalability": "Scalabilitas",
+      "change": "Mutatio",
+      "other": "Aliud"
+    }
   },
   "runDetail": {
     "notFound": "Exsecutio non inventa",
@@ -2045,50 +2054,6 @@
         "high": "altus",
         "medium": "medius",
         "low": "humilis"
-      }
-    },
-    "architectureCritique": {
-      "heading": "Recognitio architecturae ab AI",
-      "aiGenerated": "AI generatum",
-      "pending": "Architectura proposita recognoscitur…",
-      "skipped": "Recognitio architecturae huic executioni praetermissa est.",
-      "errored": "Recognitio architecturae defecit",
-      "riskLabel": "Periculum totale",
-      "findingsTitle": "{count, plural, one {# inventum} other {# inventa}}",
-      "noFindings": "Nullae difficultates architecturae inventae.",
-      "chatPlaceholder": "Interroga quaestionem sequentem de hac architectura… (⌘/Ctrl + Enter ad mittendum)",
-      "reviewNote": "Recognitio ab AI generata — altera sententia consultiva, non porta.",
-      "risk": {
-        "none": "nullum",
-        "low": "humile",
-        "medium": "medium",
-        "high": "altum",
-        "critical": "criticum"
-      },
-      "severity": {
-        "critical": "criticus",
-        "high": "altus",
-        "medium": "medius",
-        "low": "humilis",
-        "info": "Informatio"
-      },
-      "category": {
-        "security": "Securitas",
-        "reliability": "Fidelitas",
-        "cost": "Sumptus",
-        "operations": "Operationes",
-        "scalability": "Scalabilitas",
-        "other": "Aliud"
-      },
-      "regenerate": {
-        "label": "Regenerare",
-        "queueing": "In ordine…",
-        "tooltip": "Recognitionem architecturae ab AI iterum exsequi",
-        "ariaLabel": "Recognitionem architecturae ab AI regenerare",
-        "confirm": "Recognitionem architecturae ab AI huic executioni iterum exsequi?"
-      },
-      "errors": {
-        "status": "Recognitio architecturae ab AI onerari non potuit (HTTP {status})."
       }
     }
   },
