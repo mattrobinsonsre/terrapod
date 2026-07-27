@@ -627,7 +627,33 @@ def create_application() -> FastAPI:
     # specific message (e.g. catalog "name already exists"); this is the net so
     # the generic case is 409, not 500. Registered before the Exception handler
     # so the more specific type wins.
+    from fastapi.exceptions import RequestValidationError
     from sqlalchemy.exc import IntegrityError
+    from starlette.exceptions import HTTPException as StarletteHTTPException
+
+    from terrapod.api.errors import jsonapi_error_response
+
+    # JSON:API house style (#1063): every error body carries a JSON:API
+    # `errors` array AND the legacy top-level `detail`. Purely additive — old
+    # clients keep reading `detail`; go-terrapod / JSON:API clients read
+    # `errors`. Covers the ~740 `raise HTTPException(detail=…)` sites uniformly.
+    @app.exception_handler(StarletteHTTPException)
+    async def http_exception_handler(request: Request, exc: StarletteHTTPException) -> JSONResponse:
+        return jsonapi_error_response(
+            exc.detail, exc.status_code, headers=getattr(exc, "headers", None)
+        )
+
+    @app.exception_handler(RequestValidationError)
+    async def validation_exception_handler(
+        request: Request, exc: RequestValidationError
+    ) -> JSONResponse:
+        # Keep FastAPI's 422 `detail` list verbatim; add the `errors` array.
+        # `exc.errors()` can carry non-JSON-serialisable `ctx` values (Pydantic
+        # v2), so run it through jsonable_encoder exactly as FastAPI's default
+        # handler does before it reaches the response.
+        from fastapi.encoders import jsonable_encoder
+
+        return jsonapi_error_response(jsonable_encoder(exc.errors()), 422)
 
     @app.exception_handler(IntegrityError)
     async def integrity_error_handler(request: Request, exc: IntegrityError) -> JSONResponse:
@@ -636,20 +662,14 @@ def create_application() -> FastAPI:
             path=str(request.url.path),
             error=str(getattr(exc, "orig", exc)),
         )
-        return JSONResponse(
-            status_code=409,
-            content={"detail": "Resource already exists or violates a constraint"},
-        )
+        return jsonapi_error_response("Resource already exists or violates a constraint", 409)
 
     # Global exception handler
     @app.exception_handler(Exception)
     async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
         """Global exception handler for unhandled errors."""
         logger.error("Unhandled exception", exc_info=exc, path=str(request.url.path))
-        return JSONResponse(
-            status_code=500,
-            content={"detail": "Internal server error"},
-        )
+        return jsonapi_error_response("Internal server error", 500)
 
     # ── API prefix conventions ──────────────────────────────────────
     #

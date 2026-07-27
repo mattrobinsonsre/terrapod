@@ -443,6 +443,38 @@ multi-language implementation ships in the same PR**:
     `ListAll*` loop helpers; the web UI, which deliberately shows whole lists and
     filters client-side (**no page-through UX**), fetches via `fetchAllPages()`
     in `web/src/lib/api.ts`.
+- **The API house style is JSON:API (convention)** — the API has **one** house
+  style, and both surfaces (`/api/v2` + `/api/terrapod/v1`) follow it. A new or
+  changed endpoint conforms to all of it:
+  - **`data` envelope** — a resource is `{"data": {"type", "id", "attributes",
+    "relationships"?}}`; a collection is `{"data": [...], "meta": {...}}`.
+  - **kebab-case attribute names** (`created-at`, `agent-pool-id`), never
+    snake_case, in both request and response bodies.
+  - **typed-prefixed ids** (`ws-…`, `run-…`, `cv-…`, `apool-…`); accept the id
+    both prefixed and raw on input where practical.
+  - **links as `relationships`** — a link to another resource is a JSON:API
+    relationship (`"relationships": {"workspace": {"data": {"id": "ws-…",
+    "type": "workspaces"}}}`). A redundant `*-id` **attribute** may also be
+    emitted for back-compat, but the relationship is the canonical form; new
+    links add the relationship.
+  - **dual-key error envelope** — errors carry **both** the JSON:API
+    `{"errors": [{"detail": …, "status": "404"}]}` array **and** the legacy
+    top-level `{"detail": …}`. This is automatic: `raise HTTPException(detail=…)`
+    goes through the shared handler in `api/app.py` (helper: `api/errors.py`).
+    Don't hand-build a bare `{"detail": …}` JSONResponse.
+  - **shared pagination** — list endpoints emit `meta.pagination` via
+    `api/pagination.py` (`paginate()` / `build_meta()`), never a hand-rolled
+    block (see the pagination convention above).
+  - **Deliberate flat-body exceptions (do NOT `data`-wrap):** the
+    **runner/listener protocol** endpoints (their own wire contract) and the
+    **OAuth token** endpoints (`grant_types`, `expires_in`, … — RFC 6749 shapes)
+    return flat, non-`data` bodies on purpose. These are the only sanctioned
+    deviations; everything else on the native surface is JSON:API.
+
+  This is enforced additively: the route/attribute/wire contract snapshots keep
+  every existing shape, so conforming an endpoint means *adding* the canonical
+  form (a `relationships` block, an `errors` array) alongside what's already
+  there — never removing a byte a lagging consumer reads.
 - **The config-channel contract (hard requirement)** — a three-way contract
   binding the **config code**, the **Helm chart**, and the **chart tests**:
   the in-code config models (the API's Pydantic `Settings`, the listener's
