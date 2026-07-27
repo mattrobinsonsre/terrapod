@@ -851,7 +851,7 @@ GET  /api/terrapod/v1/runs/{run_id}/security-scan                     # read the
 POST /api/terrapod/v1/runs/{run_id}/actions/override-security-scan    # override a blocking scan (workspace admin)
 ```
 
-**GET** returns `{"data": <resource>|null, "meta": {"summary": {...}, "ai-critique-url": "..."}}`. `data` is `null` when the workspace has scanning off or the run wasn't scanned. The resource `attributes` are: `engine`, `enforcement-level`, `severity-threshold`, `outcome` (`passed`/`failed`/`errored`), `findings` (list of `{engine, rule_id, severity, title, resource, file, line, guideline}`), `summary` (`{total, blocking, by_severity, …}`), `error`, `overridden-by`, `overridden-at`, `created-at`. `meta.summary` carries a compact `{status, outcome, engine, total, blocking}` for the badge (`status` = `blocked` | `advisory-failed` | `passed`). `meta.ai-critique-url` points at the run's [Architecture Critique](#architecture-critique-9631036) endpoint — the optional AI reasoning layer the UI renders on top of this deterministic panel (self-hides on `404`). Requires `read` on the workspace.
+**GET** returns `{"data": <resource>|null, "meta": {"summary": {...}}}`. `data` is `null` when the workspace has scanning off or the run wasn't scanned. The resource `attributes` are: `engine`, `enforcement-level`, `severity-threshold`, `outcome` (`passed`/`failed`/`errored`), `findings` (list of `{engine, rule_id, severity, title, resource, file, line, guideline}`), `summary` (`{total, blocking, by_severity, …}`), `error`, `overridden-by`, `overridden-at`, `created-at`. `meta.summary` carries a compact `{status, outcome, engine, total, blocking}` for the badge (`status` = `blocked` | `advisory-failed` | `passed`). Requires `read` on the workspace.
 
 **POST override** marks a failed/errored result overridden and, when the run is still held in `planning` by an enforced scan, re-drives it immediately (mirrors the policy override). Requires **admin** on the workspace; audit-logged. Prefer fixing the finding or adding a skip rule.
 
@@ -944,7 +944,7 @@ Returns the AI-generated plan summary (or failure analysis on errored plans) whe
 | `status` | string | `"pending"` (handler running), `"ready"` (model returned a parseable response), `"skipped"` (workspace disabled or daily budget hit — see `error-message`), or `"errored"` (model call failed — see `error-message`). |
 | `description` | string | Markdown body. For `kind=plan_summary`, ~600 words describing the proposed changes. For `kind=failure_analysis`, root-cause explanation. |
 | `risk-level` | string | One of `"low"`, `"medium"`, `"high"`, `"critical"`. Reflects blast radius + reversibility, not novelty. |
-| `risk-factors` | array of object | Each item carries `severity` (same enum as `risk-level`), `title` (max 120 chars), `detail` (max 600 chars), and optional `resource_address` (terraform address). For `kind=failure_analysis` these are suggested fixes ordered most-likely-to-resolve first. |
+| `risk-factors` | array of object | Each item carries `severity` (same enum as `risk-level`), `title` (max 120 chars), `detail` (max 600 chars), optional `resource_address` (terraform address), and optional `category` (one of `security` / `reliability` / `cost` / `operations` / `scalability` / `change` / `other`). The `category` tag is present on the grounded design-review factors that the summary additionally surfaces when the workspace has security scanning and/or cost estimation enabled (Checkov/Trivy findings are the ground truth for `security`, the cost estimate for `cost`); the classic change-risk factors leave it empty. For `kind=failure_analysis` these are suggested fixes ordered most-likely-to-resolve first. |
 | `model` | string | LiteLLM model string used for this summary (e.g. `bedrock/us.anthropic.claude-opus-4-8`). |
 | `input-tokens` / `output-tokens` | integer | Telemetry counts reported by the upstream provider. |
 | `error-message` | string | Populated only for `status=errored` or `status=skipped`. Empty for `ready`. |
@@ -963,7 +963,7 @@ All five payloads carry `{run_id, workspace_id}` at minimum. The UI re-fetches t
 
 The **AI cost estimate** (#871 — the optional AI layer over the data-only cost estimate, riding this same `ai_summary.enabled` switch + per-workspace mode) emits its own lifecycle events on the same per-workspace channel: `cost_summary_pending`, `cost_summary_ready`, `cost_summary_errored`, `cost_summary_skipped` (workspace opted out / daily budget hit / no estimate), and `cost_summary_message_posted` (a cost-chat follow-up turn landed — carries `message_id`; refetch the transcript). Each carries `{run_id, workspace_id}`. Its primary output is estimates for resources the pricesheet couldn't price; the authoritative figures stay on the data-only cost-estimate endpoint, and every AI dollar amount is tagged `source: "ai-estimate"`, never summed into the deterministic total.
 
-The **AI architecture critique** (#963/#1036 — the optional senior-architect AI review over the plan, riding the same `ai_summary.enabled` switch + per-workspace mode) emits the analogous lifecycle events on the same per-workspace channel: `architecture_critique_pending`, `architecture_critique_ready`, `architecture_critique_errored`, `architecture_critique_skipped` (workspace opted out / daily budget hit / no plan JSON), and `architecture_critique_message_posted` (a critique-chat follow-up turn landed — carries `message_id`; refetch the transcript). Each carries `{run_id, workspace_id}`. It is advisory reasoning only and never gates a run. See [Architecture Critique](#architecture-critique-9631036).
+When the workspace has security scanning and/or cost estimation enabled, the same plan summary additionally emits **grounded design-review risk factors** — ordinary `risk-factors[]` items tagged with a `category` (`security` / `reliability` / `cost` / `operations` / `scalability` / `change` / `other`), with the deterministic Checkov/Trivy findings as the ground truth for `security` and the cost estimate as the ground truth for `cost`. This is additive: with those signals off, the summary behaves exactly as before, and there is no separate endpoint or SSE event — it is one AI analysis per run, delivered through the existing `plan_summary_*` lifecycle above.
 
 ### Regenerate Plan Summary
 
@@ -3484,92 +3484,6 @@ POST /api/terrapod/v1/runs/{run_id}/cost-summary/messages
 ```
 
 `GET` returns the transcript (`cost-summary-messages`, chronological; each message translated on view when `?locale=` is set, with a per-message `translated` flag). `POST` a body of `{"data": {"attributes": {"content": "…", "locale": "de"}}}` to ask a question and get the synchronous assistant reply (`201`). Read-on-workspace auth. Error mapping mirrors the plan chat: `409` (per-run message cap hit, or the summary isn't `ready`), `429` (daily token budget hit), `503` (chat disabled), `400` (empty/oversize body), `502` (model failure — the user turn is still recorded). The model answers from the estimate only and keeps computed-vs-estimated figures distinct.
-
-## Architecture Critique (#963/#1036)
-
-The optional **senior cloud-architect AI review** of the infrastructure a run *proposes* — a reasoning layer the UI renders **on top of** the deterministic [Security Scan](#security-scan-1036) panel. Rides the same switch as the [Plan Summary](#plan-summary) and [AI cost estimate](#ai-cost-estimate-summary--advisories--chat): global `ai_summary.enabled` **plus** the per-workspace `ai_summary_mode`, and the shared daily token budget. It is **advisory reasoning only** — it never gates, delays, or fails a run, and never restates the deterministic scan's verdict. See [architecture-critique.md](architecture-critique.md) for the operator-side setup.
-
-Its input is the run's **plan JSON `planned_values`** (the same plan-time artifact the security scan consumes), sanitised through the plan-summary path's clean+bound helpers — **no Terraform state is ever sent to the model** (guardrail-pinned).
-
-```
-GET  /api/terrapod/v1/runs/{run_id}/architecture-critique[?locale=<code>]           # read the critique (workspace read)
-POST /api/terrapod/v1/runs/{run_id}/architecture-critique/regenerate                # re-fire (workspace read)
-GET  /api/terrapod/v1/runs/{run_id}/architecture-critique/messages[?locale=<code>]  # chat transcript
-POST /api/terrapod/v1/runs/{run_id}/architecture-critique/messages                  # post a question, get a reply
-```
-
-**Required permission:** `read` on the workspace for all four (they mutate no infrastructure; cost is centrally gated by `ai_summary.daily_token_budget`).
-
-### Show Architecture Critique
-
-`GET` returns the critique for the run. `404` until one has been generated — either the feature is globally disabled, the workspace opted out (`ai-summary-mode: disabled`), the run has no plan JSON, or the handler hasn't run yet. The UI treats `404` as "no AI surface" and renders nothing above the scan panel.
-
-**Response (`ready`):**
-```json
-{
-  "data": {
-    "id": "architecture-critique-<uuid>",
-    "type": "architecture-critiques",
-    "attributes": {
-      "status": "ready",
-      "critique": "The plan stands up a public-facing ALB in front of an ASG with no ...",
-      "risk-level": "medium",
-      "findings": [
-        {
-          "severity": "high",
-          "category": "reliability",
-          "title": "Single-AZ database",
-          "detail": "aws_db_instance.main sets multi_az = false; an AZ outage takes the workspace down ...",
-          "address": "aws_db_instance.main"
-        }
-      ],
-      "model": "bedrock/us.anthropic.claude-opus-4-8",
-      "input-tokens": 2140,
-      "output-tokens": 310,
-      "error-message": "",
-      "language": "en",
-      "translated": false,
-      "created-at": "2026-07-01T12:00:00Z",
-      "updated-at": "2026-07-01T12:00:40Z"
-    },
-    "relationships": {
-      "run": { "data": { "id": "run-<uuid>", "type": "runs" } }
-    }
-  }
-}
-```
-
-**Attribute reference:**
-
-| Attribute | Type | Description |
-|---|---|---|
-| `status` | string | `"pending"` (handler running), `"ready"` (model returned a parseable response), `"skipped"` (workspace disabled / daily budget hit / no plan JSON — see `error-message`), or `"errored"` (model call failed — see `error-message`). |
-| `critique` | string | Markdown prose: a senior architect's read of the proposed infrastructure, referring to resources by terraform address. |
-| `risk-level` | string | Overall qualitative grade: one of `"critical"`, `"high"`, `"medium"`, `"low"`, `"none"`. |
-| `findings` | array of object | Each item is `{severity, category, title, detail, address}`: `severity` ∈ `critical`/`high`/`medium`/`low`/`info`; `category` ∈ `security`/`reliability`/`cost`/`operations`/`scalability`/`other`; `address` is the affected terraform resource address (optional). |
-| `model` | string | LiteLLM model string used (e.g. `bedrock/us.anthropic.claude-opus-4-8`). |
-| `input-tokens` / `output-tokens` | integer | Telemetry counts reported by the upstream provider. |
-| `error-message` | string | Populated only for `status=errored` or `status=skipped`. Empty for `ready`. |
-| `language` | string | The language the prose was generated in (the deployment's `ai_summary.summary_language`). |
-| `translated` | boolean | `true` when the response was translated on view into a `?locale=` different from `language`. |
-
-With `?locale=<code>` set to a real language different from the deployment's `ai_summary.summary_language`, the `critique` prose and each finding's `title`/`detail` are translated on view (best-effort, Redis-cached), and `translated`/`language` reflect that.
-
-### Regenerate Architecture Critique
-
-`POST .../regenerate` re-fires the critique handler. Upserts the row to `pending`, bypasses the auto-dedup so operator clicks always go through, and enqueues the `ai_architecture_critique` trigger; budget gating still applies handler-side.
-
-- **202 Accepted** — pending row upserted and trigger enqueued (response shape matches the GET with `status=pending`).
-- **409 Conflict** — the run has no plan JSON yet (still planning, or errored before plan).
-- **503 Service Unavailable** — AI is globally disabled (`api.config.ai_summary.enabled: false`).
-
-### Architecture-Critique Chat
-
-A follow-up Q&A thread grounded in the same plan context (the architecture-critic analogue of the [plan-summary chat](#list-plan-summary-chat-messages)), one shared thread per run — anyone with workspace `read` can see and post.
-
-`GET .../messages[?locale=<code>]` returns the transcript (`architecture-critique-messages`, chronological; each message translated on view when `?locale=` is set, with a per-message `translated` flag). `POST .../messages` with a body of `{"data": {"attributes": {"content": "…", "locale": "de"}}}` posts a user turn and returns the synchronous assistant reply (`201`); the optional `locale` normalises the incoming prompt into the system language (so the stored thread stays monolingual) and translates the reply back for the response. No Terraform state is sent on the chat path either — it reuses the same sanitised plan-JSON prefix. Error mapping mirrors the plan chat: `409` (per-run message cap hit, or the critique isn't `ready`), `429` (daily token budget hit), `503` (chat disabled), `400` (empty/oversize body), `502` (model failure — the user turn is still recorded), `404` (no initial critique).
-
-**Real-time updates:** the per-workspace SSE channel emits `architecture_critique_pending` / `_ready` / `_errored` / `_skipped` / `_message_posted` (the last carries `message_id`) as the critique progresses — see the SSE event notes under [Plan Summary](#plan-summary). Each payload carries `{run_id, workspace_id}`; the UI re-fetches on any of them.
 
 ## Service Catalog
 

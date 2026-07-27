@@ -50,6 +50,43 @@ Both kinds are persisted in the `plan_summaries` table, returned by
 per-workspace SSE channel as a `plan_summary_ready` event so the UI
 re-fetches without polling.
 
+## Grounded design review
+
+When a workspace has [security scanning](security-scanning.md) and/or
+[cost estimation](cost-estimation.md) turned on, the plan summary does
+**more than describe the change**: it additionally performs a grounded
+**design review** of the infrastructure the run proposes — the kind of
+read an experienced platform engineer gives a change in review, calling
+out security, reliability, cost, operational, and scalability concerns
+before you apply.
+
+These design-review concerns are surfaced as **ordinary
+`risk_factors`** — the same shape as the change-risk factors above — each
+tagged with an optional `category`:
+
+- `category` ∈ `security`, `reliability`, `cost`, `operations`,
+  `scalability`, `change`, `other`
+
+The review is **grounded in deterministic signal**, not free-form
+opinion. The run's Checkov/Trivy scan findings are the ground truth for
+the `security` factors, and the run's cost estimate is the ground truth
+for the `cost` factors — the model reasons over those concrete inputs
+rather than guessing. This keeps the design review anchored to facts the
+platform already computed.
+
+It is **fully additive**. With security scanning and cost estimation both
+off, the summary behaves exactly as before — just the change description
+and change-risk factors, no `category` tags. There is **one AI analysis
+per run**, delivered in the run page's AI tab through the same
+`plan_summary_*` lifecycle; there is **no separate "architecture critic"
+surface, endpoint, or SSE event** — the design review is simply extra
+`risk_factors` on the plan summary you already get.
+
+> A future, distinct workspace-level architecture critic — one that
+> reviews a workspace's *committed state* rather than a single run's plan
+> — is out of scope here and does not exist yet. The grounded design
+> review described above is per-run and plan-based.
+
 ## Quick start
 
 ### AWS Bedrock + Anthropic Claude Opus
