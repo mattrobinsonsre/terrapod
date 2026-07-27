@@ -1545,6 +1545,120 @@ class AIOnboardingConfig(BaseModel):
     auth: AIOnboardingAuthConfig = Field(default_factory=AIOnboardingAuthConfig)
 
 
+class AIArchitectureAuthConfig(BaseModel):
+    """Auth for the AI architecture-critic model (#1036 Part 2 / #963).
+
+    Same shape and LiteLLM auth-selection behaviour as the summariser's and
+    onboarding's auth (the model-string prefix picks the path: ``bedrock/`` →
+    AWS credential chain, ``openai/``/``anthropic/``/… → bearer key).
+    Deliberately a SEPARATE config — the architecture critic is an independent
+    AI workload and may run on a different (typically stronger) model /
+    account than the per-run plan summary.
+    """
+
+    api_key: str = Field(
+        default="",
+        description=(
+            "Bearer API key for non-AWS providers. Inject from a K8s Secret via "
+            "env var (TERRAPOD_AI_ARCHITECTURE__AUTH__API_KEY) — never commit to "
+            "values.yaml. Ignored for ``bedrock/...`` (AWS credential chain)."
+        ),
+    )
+    aws_region: str = Field(
+        default="us-east-1",
+        description="AWS region for Bedrock invocation (``bedrock/`` models only).",
+    )
+    aws_role_arn: str = Field(
+        default="",
+        description=(
+            "Cross-account IAM role to assume for Bedrock. Empty = use the "
+            "pod's ambient (IRSA) credentials directly."
+        ),
+    )
+    aws_session_name: str = Field(
+        default="terrapod-ai-architecture",
+        description="STS session name when assuming aws_role_arn.",
+    )
+    aws_external_id: str = Field(
+        default="",
+        description="Optional STS ExternalId for the assumed role.",
+    )
+
+
+class AIArchitectureConfig(BaseModel):
+    """AI architecture-critic configuration (#1036 Part 2 / #963).
+
+    Drives the *state-based, whole-system* architecture critic: it infers a
+    workspace's architecture from its current Terraform **state** (+ the state
+    resource graph, the cost estimate, and the deterministic security-scan
+    findings) and critiques it across resilience / security / cost /
+    well-architected dimensions. This reviews the system **as it exists**, and
+    is distinct from ``ai_summary``, which reviews a *change* (a plan).
+
+    It gets its OWN config — separate master switch, model, endpoint, auth
+    secret, and token budget — because it is a different workload: infrequent
+    but large-context (whole-workspace state + graph), so it plausibly wants a
+    stronger model (e.g. Opus) and an independent budget that will not starve,
+    or be starved by, the frequent small per-run summaries. Mirrors
+    ``ai_onboarding``.
+
+    All deployments default to disabled — enabling requires this switch AND an
+    explicit model + auth. The underlying LiteLLM client, Redis token-budget
+    accounting, and retry are shared machinery parameterised by this config.
+    """
+
+    enabled: bool = Field(
+        default=False,
+        description="Master switch. Off by default — the critic surface self-gates (404).",
+    )
+    model: str = Field(
+        default="",
+        description=(
+            "LiteLLM model string (same format as ai_summary.model). The critic "
+            "reasons over a large context (whole-workspace state + resource graph "
+            "+ cost + security findings), so a stronger model is warranted — "
+            "Opus (``bedrock/anthropic.claude-opus-4-8``) is the recommended "
+            "default, Sonnet (``bedrock/us.anthropic.claude-sonnet-4-6``) a "
+            "cheaper alternative."
+        ),
+    )
+    api_base: str = Field(
+        default="",
+        description="Override the upstream base URL (self-hosted OpenAI-compat / Azure only).",
+    )
+    max_output_tokens: int = Field(
+        default=16384,
+        description="Upper bound on model response tokens per call (a cap, not a target).",
+    )
+    request_timeout_seconds: int = Field(
+        default=180,
+        description=(
+            "HTTP timeout for a single architecture-critic model call. Higher "
+            "than the summariser's — critiquing a whole system from state is a "
+            "large-context completion."
+        ),
+    )
+    daily_token_budget: int = Field(
+        default=0,
+        description=(
+            "Cap on output tokens spent per UTC day across all architecture "
+            "critiques. 0 = unlimited. Maintained in Redis (its OWN counter, "
+            "separate from ai_summary and ai_onboarding); calls past the cap "
+            "are skipped."
+        ),
+    )
+    context: str = Field(
+        default="",
+        description=(
+            "Optional operator-supplied context prepended to the critic prompt "
+            "(e.g. house standards, an accepted-risk register, required regions/"
+            "AZs). Guides judgment; never a substitute for the grounded state / "
+            "scan / cost inputs."
+        ),
+    )
+    auth: AIArchitectureAuthConfig = Field(default_factory=AIArchitectureAuthConfig)
+
+
 class DatabaseConfig(BaseModel):
     """SQLAlchemy connection pool settings.
 
@@ -1796,6 +1910,7 @@ class Settings(BaseSettings):
     # AI Plan Summary (#401)
     ai_summary: AISummaryConfig = Field(default_factory=AISummaryConfig)
     ai_onboarding: AIOnboardingConfig = Field(default_factory=AIOnboardingConfig)
+    ai_architecture: AIArchitectureConfig = Field(default_factory=AIArchitectureConfig)
 
     # Workspace defaults
     default_execution_backend: str = Field(

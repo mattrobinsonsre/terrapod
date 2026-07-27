@@ -2310,6 +2310,139 @@ class PlanSummaryMessage(Base):
     )
 
 
+class ArchitectureCritique(Base):
+    """State-based, whole-system AI architecture critique (#1036 Part 2 / #963).
+
+    Distinct from PlanSummary (which reviews a *change*, from a plan): this
+    reviews the system **as it exists**, inferred from a workspace's current
+    Terraform **state** — plus the state resource graph, the cost estimate,
+    and the deterministic security-scan findings — and critiques it across
+    resilience / security / cost / well-architected dimensions, grounded in
+    that data (judgment is the model's; the facts are the deterministic
+    inputs').
+
+    One row per critiqued (workspace, state_version): regenerating over the
+    same state version upserts (idempotent — a "ready" row is not overwritten
+    by a later errored attempt for the same state), and a new state version
+    gets a fresh row. Old rows CASCADE away with their state version when
+    retention prunes it; the latest state version (hence the current critique)
+    is never pruned.
+
+    RBAC (hard): the critique is derived from the secret-bearing state blob, so
+    reading it requires ``state:read`` — the same trust as downloading the
+    state it comes from. Stored separately from ``workspaces`` so the large
+    narrative doesn't bloat cold workspace reads and the feature's columns
+    don't burden a table every deployment has.
+
+    Status: "pending" (started, no result), "ready" (parseable result),
+    "skipped" (daily budget hit or workspace mode disabled), "errored"
+    (model HTTP / parse / refusal).
+    """
+
+    __tablename__ = "architecture_critiques"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=generate_uuid7
+    )
+    workspace_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    state_version_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("state_versions.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    # Denormalised for display without a join to state_versions.
+    state_serial: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
+
+    # Model fields — populated when status == "ready".
+    # architecture: the inferred system ({summary, tiers, data_stores, blast_radius}).
+    architecture: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, nullable=False)
+    # risk_level: the overall grade ("low"/"medium"/"high"/"critical", "" for non-ready).
+    risk_level: Mapped[str] = mapped_column(String(20), nullable=False, default="")
+    # findings: discrete critique items, same shape as plan-summary risk_factors
+    # plus a per-item category + recommendation + grounded_in provenance.
+    findings: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list, nullable=False)
+    # deferred: concerns the critic could not judge from the data it was given
+    # (the "needs attribute review" list) — surfaced so operators see the gaps.
+    deferred: Mapped[list[str]] = mapped_column(JSONB, default=list, nullable=False)
+
+    # Telemetry / debugging.
+    model: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    input_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    output_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    error_message: Mapped[str] = mapped_column(Text, nullable=False, default="")
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False
+    )
+
+    __table_args__ = (
+        sa.UniqueConstraint("state_version_id", name="uq_architecture_critiques_state_version"),
+        sa.Index(
+            "ix_architecture_critiques_workspace_created",
+            "workspace_id",
+            "created_at",
+        ),
+    )
+
+
+class ArchitectureCritiqueMessage(Base):
+    """One turn in the AI architecture-critique chat thread (#1036 Part 2).
+
+    Attached to an ArchitectureCritique; the initial structured critique stays
+    on the parent row (architecture + findings). This table stores only
+    conversational follow-ups — operator questions and model replies — that
+    build on that initial critique (e.g. "how would I make the data tier HA?").
+
+    Roles: "user" (operator follow-up), "assistant" (model reply). Each
+    assistant row carries its own telemetry so the daily-budget gate debits per
+    turn; user rows have zero tokens. Ordering is by (critique_id, created_at).
+    """
+
+    __tablename__ = "architecture_critique_messages"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=generate_uuid7
+    )
+    critique_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("architecture_critiques.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    role: Mapped[str] = mapped_column(String(20), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False, default="")
+
+    # Telemetry — meaningful on assistant rows, zero on user rows.
+    model: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    input_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    output_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    error_message: Mapped[str] = mapped_column(Text, nullable=False, default="")
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc, nullable=False
+    )
+
+    __table_args__ = (
+        sa.CheckConstraint(
+            "role IN ('user', 'assistant')",
+            name="ck_architecture_critique_messages_role",
+        ),
+        sa.Index(
+            "ix_architecture_critique_messages_critique_created",
+            "critique_id",
+            "created_at",
+        ),
+    )
+
+
 class CostSummary(Base):
     """LLM-generated *enhancement* of a run's cost estimate (#871).
 
