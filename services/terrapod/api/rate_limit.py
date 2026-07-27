@@ -4,6 +4,8 @@ Multi-replica safe — uses Redis INCR + EXPIRE for distributed counting.
 Disabled by default; enable via config.rate_limit.enabled = true.
 """
 
+import hashlib
+import re
 import time
 from collections.abc import Callable
 
@@ -41,20 +43,72 @@ def _get_client_ip(request: Request) -> str:
     return "unknown"
 
 
+# Capability-scoped read endpoints: the run/plan/apply UUID in the PATH is the
+# capability (go-tfe's LogReader and the web log viewer poll these anonymously —
+# no bearer — matching the state-upload capability pattern). They are polled at
+# high frequency while a run streams (~every 2.5s), so keying them on the source
+# IP collapses every browser's stream into ONE anonymous bucket behind the BFF
+# (the API sees a single web-pod IP) — which live log-tailing then exhausts,
+# 429-ing the poll so the log freezes and never recovers (#1075). Bucketing on
+# the path UUID instead gives each run's stream its own budget, isolating runs
+# from each other and from the shared source IP.
+_CAPABILITY_PATH_RE = re.compile(r"^/api/v2/(?:plans|applies)/([^/]+)/(?:log|json-output)$")
+
+
+def _capability_bucket(path: str) -> str | None:
+    """Per-capability bucket id for UUID-scoped anonymous polling endpoints.
+
+    Returns ``cap:{id}`` for the plan/apply log + plan json-output readers (the
+    id in the path IS the capability, not a secret — no hashing needed), or None
+    for any other path so the caller falls back to credential/IP keying.
+    """
+    m = _CAPABILITY_PATH_RE.match(path)
+    if m is None:
+        return None
+    return "cap:" + m.group(1)
+
+
+def _credential_bucket(auth_header: str, listener_cert: str) -> str | None:
+    """A stable, non-reversible per-principal bucket id from the credential.
+
+    For AUTHENTICATED traffic the rate-limit bucket must key on WHO is calling,
+    not on the source IP: behind the BFF/ingress the API sees a single internal
+    pod IP for every browser, so an IP-keyed authenticated tier collapses the
+    per-user limit into one shared global bucket — which a single live run's
+    log-polling (every 2.5s) then exhausts, 429-ing everyone's log streams
+    (#1075). Keying on a hash of the bearer token / client cert gives each
+    principal its own budget regardless of the shared source IP. Returns None
+    when there is no credential (fall back to IP for the unauthenticated tier).
+    """
+    cred = auth_header or listener_cert
+    if not cred:
+        return None
+    return "cred:" + hashlib.sha256(cred.encode("utf-8")).hexdigest()[:20]
+
+
 class RateLimitMiddleware:
     """Sliding window rate limiter using Redis.
 
     Pure ASGI middleware for correct async behavior.
 
     Tiers:
+    - Capability reads (`/api/v2/{plans,applies}/{id}/log`, `.../json-output`):
+      `authenticated_requests_per_minute`, bucketed per-run on the path UUID
+      (the capability). These authenticate by the UUID in the path — not a
+      header — and are polled continuously while a run streams, so they must
+      NOT share the unauthenticated IP bucket (which behind the BFF is one
+      global bucket that live log-tailing exhausts, freezing the log — #1075).
     - Runner tokens (HMAC-verified inline): `runner_requests_per_minute`
       (default 0 = unlimited). Runners are service-to-service callers and
       burst through the network-mirror and artifact endpoints during
       `tofu init`/`apply`; a low limit starves them.
-    - Authenticated (any `Authorization` header): `authenticated_requests_per_minute`.
+    - Authenticated (any `Authorization` header): `authenticated_requests_per_minute`,
+      bucketed per-principal on a hash of the credential (NOT the source IP —
+      behind the BFF every browser shares one pod IP, so IP-keying collapses
+      the whole tier into one bucket, #1075).
       Interactive users and API-token automation rarely approach this, but
       it stops one noisy client taking the pool.
-    - Unauthenticated: base limit (`requests_per_minute`).
+    - Unauthenticated: base limit (`requests_per_minute`), IP-keyed.
     - Auth endpoints (`/api/terrapod/v1/auth/*`, `/oauth/*`): always `auth_requests_per_minute`
       regardless of who's calling — brute-force defence on login.
     """
@@ -115,7 +169,17 @@ class RateLimitMiddleware:
         listener_cert = request.headers.get("x-terrapod-client-cert", "")
         is_authenticated = bool(auth_header) or bool(listener_cert)
 
-        if is_auth_endpoint:
+        # A UUID-scoped log/json-output reader authenticates by the path
+        # capability and is polled continuously while a run streams. It gets its
+        # own per-run bucket (not the shared anonymous IP bucket) at the
+        # authenticated limit — the capability is a real principal, just carried
+        # in the path rather than a header (#1075).
+        capability = _capability_bucket(path)
+
+        if capability is not None:
+            limit = self.authenticated_requests_per_minute
+            prefix = "api_capability"
+        elif is_auth_endpoint:
             limit = self.auth_requests_per_minute
             prefix = "auth"
         elif is_runner:
@@ -140,11 +204,17 @@ class RateLimitMiddleware:
             await self.app(scope, receive, send)
             return
 
-        client_ip = _get_client_ip(request)
+        # Bucket by WHO, not WHERE, for authenticated traffic — the source IP is
+        # the shared BFF/ingress pod IP behind the proxy, so an IP-keyed
+        # authenticated tier is one global bucket (#1075). Unauthenticated
+        # traffic (login, anon) has no credential and stays IP-keyed.
+        identity = (
+            capability or _credential_bucket(auth_header, listener_cert) or _get_client_ip(request)
+        )
 
         # Sliding window: 60-second buckets
         window_id = int(time.time()) // 60
-        key = f"tp:ratelimit:{prefix}:{client_ip}:{window_id}"
+        key = f"tp:ratelimit:{prefix}:{identity}:{window_id}"
 
         try:
             pipe = redis.pipeline(transaction=False)
