@@ -267,3 +267,107 @@ class TestRateLimitMiddleware:
             "/api/terrapod/v1/auth/login", headers={"Authorization": f"Bearer {token}"}
         )
         assert response.status_code == 429
+
+
+class TestCredentialBucketing:
+    """Authenticated traffic buckets by credential, not IP (#1075).
+
+    Behind the BFF/ingress every browser shares one internal source IP, so an
+    IP-keyed authenticated tier is a single global bucket that a live run's
+    log-polling exhausts, 429-ing everyone's log streams. Keying on the bearer
+    token / client cert gives each principal its own budget.
+    """
+
+    def test_credential_bucket_pure(self):
+        from terrapod.api.rate_limit import _credential_bucket
+
+        a = _credential_bucket("Bearer tokenA", "")
+        b = _credential_bucket("Bearer tokenB", "")
+        again = _credential_bucket("Bearer tokenA", "")
+        assert a and b and a != b  # different tokens → different buckets
+        assert a == again  # stable per token
+        assert a.startswith("cred:") and "tokenA" not in a  # hashed, not reversible
+        assert _credential_bucket("", "cert-pem") is not None  # listener cert counts
+        assert _credential_bucket("", "") is None  # no credential → fall back to IP
+
+    def test_two_tokens_same_ip_get_separate_buckets(self):
+        # Two distinct principals from the SAME source IP (the shared BFF pod IP)
+        # must land in DIFFERENT rate-limit buckets.
+        mock_redis = _make_redis_mock(count=1)
+        app = _make_app(get_redis=lambda: mock_redis, authenticated_rpm=1000)
+        client = TestClient(app)
+
+        client.get("/api/terrapod/v1/workspaces", headers={"Authorization": "Bearer AAA"})
+        client.get("/api/terrapod/v1/workspaces", headers={"Authorization": "Bearer BBB"})
+
+        keys = [c.args[0] for c in mock_redis.pipeline.return_value.incr.call_args_list]
+        assert len(keys) == 2
+        # Same tier prefix + same source IP, but the credential discriminator differs.
+        assert keys[0] != keys[1]
+        assert all(k.startswith("tp:ratelimit:api_authn:cred:") for k in keys)
+
+    def test_same_token_shares_bucket(self):
+        mock_redis = _make_redis_mock(count=1)
+        app = _make_app(get_redis=lambda: mock_redis, authenticated_rpm=1000)
+        client = TestClient(app)
+        client.get("/api/terrapod/v1/workspaces", headers={"Authorization": "Bearer SAME"})
+        client.get("/api/terrapod/v1/workspaces", headers={"Authorization": "Bearer SAME"})
+        keys = [c.args[0] for c in mock_redis.pipeline.return_value.incr.call_args_list]
+        # Same token → same bucket (minus the time-window suffix, which is equal here).
+        assert keys[0] == keys[1]
+
+
+class TestCapabilityBucketing:
+    """Log/json-output readers authenticate by the run UUID in the path and are
+    polled while a run streams. They must bucket per-run — NOT on the shared BFF
+    source IP, which would collapse every browser's log stream into one
+    anonymous bucket that live tailing exhausts, freezing the log (#1075).
+    """
+
+    def test_capability_bucket_pure(self):
+        from terrapod.api.rate_limit import _capability_bucket
+
+        assert _capability_bucket("/api/v2/applies/run-abc/log") == "cap:run-abc"
+        assert _capability_bucket("/api/v2/plans/run-abc/log") == "cap:run-abc"
+        assert _capability_bucket("/api/v2/plans/run-abc/json-output") == "cap:run-abc"
+        # Distinct runs → distinct buckets.
+        assert _capability_bucket("/api/v2/applies/run-A/log") != _capability_bucket(
+            "/api/v2/applies/run-B/log"
+        )
+        # Non-capability paths fall through to credential/IP keying.
+        assert _capability_bucket("/api/terrapod/v1/workspaces") is None
+        assert _capability_bucket("/api/v2/workspaces/ws-1") is None
+
+    def test_log_reader_buckets_per_run_not_shared_ip(self):
+        # Two DIFFERENT runs polled anonymously from the SAME source IP (the
+        # shared BFF pod IP) must land in DIFFERENT buckets under the capability
+        # tier — so one streaming run cannot 429 another's log.
+        mock_redis = _make_redis_mock(count=1)
+        app = _make_app(get_redis=lambda: mock_redis, authenticated_rpm=1000)
+        client = TestClient(app)
+
+        client.get("/api/v2/applies/run-AAA/log")
+        client.get("/api/v2/applies/run-BBB/log")
+
+        keys = [c.args[0] for c in mock_redis.pipeline.return_value.incr.call_args_list]
+        assert len(keys) == 2
+        assert keys[0] != keys[1]
+        assert all(k.startswith("tp:ratelimit:api_capability:cap:") for k in keys)
+
+    def test_same_run_log_shares_bucket(self):
+        mock_redis = _make_redis_mock(count=1)
+        app = _make_app(get_redis=lambda: mock_redis, authenticated_rpm=1000)
+        client = TestClient(app)
+        client.get("/api/v2/applies/run-SAME/log")
+        client.get("/api/v2/applies/run-SAME/log")
+        keys = [c.args[0] for c in mock_redis.pipeline.return_value.incr.call_args_list]
+        assert keys[0] == keys[1]
+
+    def test_capability_tier_uses_authenticated_limit(self):
+        # The capability reader gets the generous authenticated limit, not the
+        # low unauthenticated base — live tailing polls it continuously.
+        mock_redis = _make_redis_mock(count=1)
+        app = _make_app(get_redis=lambda: mock_redis, rpm=100, authenticated_rpm=1000)
+        client = TestClient(app)
+        resp = client.get("/api/v2/applies/run-XYZ/log")
+        assert resp.headers.get("x-ratelimit-limit") == "1000"
