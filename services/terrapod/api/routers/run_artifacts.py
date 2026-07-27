@@ -388,21 +388,6 @@ async def _enqueue_plan_json_followups(run: Run) -> Response:
         except Exception as e:
             logger.debug("Failed to enqueue ai_plan_summary after upload", error=str(e))
 
-        # AI architecture critique (#963/#1036) — the senior-architect reasoning
-        # layer over the proposed infra. Reads this same plan JSON, so it fires
-        # here (after the JSON is committed) alongside the plan summariser.
-        try:
-            from terrapod.services.scheduler import enqueue_trigger
-
-            await enqueue_trigger(
-                "ai_architecture_critique",
-                {"run_id": str(run.id)},
-                dedup_key=f"arch:{run.id}",
-                dedup_ttl=300,
-            )
-        except Exception as e:
-            logger.debug("Failed to enqueue ai_architecture_critique after upload", error=str(e))
-
     # Drift-ignore classifier (#482) — same race as the AI summariser.
     # `handle_drift_run_completed` fires from run_service.transition_run
     # on the `planned` transition, which the runner POSTs BEFORE

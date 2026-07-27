@@ -407,20 +407,6 @@
     "log-read-url",
     "status"
   ],
-  "runs._architecture_critique_json": [
-    "created-at",
-    "critique",
-    "error-message",
-    "findings",
-    "input-tokens",
-    "language",
-    "model",
-    "output-tokens",
-    "risk-level",
-    "status",
-    "translated",
-    "updated-at"
-  ],
   "runs._cost_summary_json": [
     "advisories",
     "created-at",
@@ -492,10 +478,6 @@
     "workspace-has-vcs",
     "workspace-name"
   ],
-  "runs.list_architecture_critique_messages": [
-    "content",
-    "translated"
-  ],
   "runs.list_cost_summary_messages": [
     "content",
     "translated"
@@ -507,10 +489,6 @@
   "runs.list_run_events": [
     "action",
     "created-at"
-  ],
-  "runs.post_architecture_critique_message": [
-    "content",
-    "translated"
   ],
   "runs.post_cost_summary_message": [
     "content",

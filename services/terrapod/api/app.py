@@ -299,17 +299,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
             description="Narrate a run's cost estimate + suggest savings via LLM",
         )
 
-        # AI architecture critique (#963/#1036) — the optional senior-architect
-        # reasoning layer over the run's proposed infrastructure. Rides this
-        # same switch.
-        from terrapod.services.architecture_critic import handle_ai_architecture_critique
-
-        register_trigger_handler(
-            "ai_architecture_critique",
-            handler=handle_ai_architecture_critique,
-            description="Review a run's proposed infrastructure architecture via LLM",
-        )
-
     # Run reconciler (drives run state transitions based on Job outcomes)
     from terrapod.services.run_reconciler import reconcile_runs
 
