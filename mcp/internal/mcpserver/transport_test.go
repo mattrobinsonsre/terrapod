@@ -143,3 +143,55 @@ func TestRefreshTransportNoRetryWhenTokenUnchanged(t *testing.T) {
 		t.Fatalf("calls=%d, want 1 (no retry when re-resolved token is unchanged)", got)
 	}
 }
+
+// The Terrapod API 302-redirects a plan-JSON / state / artifact fetch to a
+// presigned object URL (S3/GCS/Azure) whose query string IS the auth. The
+// bearer token must NOT ride along to that host — S3 rejects a request bearing
+// two auth mechanisms with 400 InvalidArgument (issue #1077). This proves the
+// API host gets the bearer while the (different) presigned host does not.
+func TestRefreshTransportStripsAuthOnPresignedRedirect(t *testing.T) {
+	var presignedAuth, apiAuth string
+	presigned := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		presignedAuth = r.Header.Get("Authorization")
+		_, _ = w.Write([]byte(`{"format_version":"1.0","planned_values":{}}`))
+	}))
+	defer presigned.Close()
+	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		apiAuth = r.Header.Get("Authorization")
+		http.Redirect(w, r, presigned.URL+"/blob?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Signature=abc", http.StatusFound)
+	}))
+	defer api.Close()
+
+	hc := newHTTPClient(api.URL, "tok", false, false)
+	resp, err := hc.Get(api.URL + "/api/v2/plans/plan-x/json-output")
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	body, _ := io.ReadAll(resp.Body)
+
+	if apiAuth != "Bearer tok" {
+		t.Errorf("API host should receive the bearer, got %q", apiAuth)
+	}
+	if presignedAuth != "" {
+		t.Errorf("presigned host must NOT receive Authorization, got %q", presignedAuth)
+	}
+	if !strings.Contains(string(body), "format_version") {
+		t.Errorf("presigned body not returned: %s", body)
+	}
+}
+
+func TestHostOf(t *testing.T) {
+	cases := map[string]string{
+		"https://terrapod.local":           "terrapod.local",
+		"https://terrapod.markupai.ts.net": "terrapod.markupai.ts.net",
+		"terrapod.local":                   "terrapod.local", // bare host, no scheme
+		"http://127.0.0.1:8080":            "127.0.0.1:8080",
+		"":                                 "",
+	}
+	for in, want := range cases {
+		if got := hostOf(in); got != want {
+			t.Errorf("hostOf(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
