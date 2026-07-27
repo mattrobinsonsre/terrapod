@@ -2055,6 +2055,59 @@
         "medium": "canolig",
         "low": "isel"
       }
+    },
+    "architecture": {
+      "loadError": "Methwyd llwytho''r feirniadaeth bensaernïol.",
+      "notEnabled": "Nid yw''r beirniad pensaernïol AI wedi''i alluogi ar y defnydd hwn.",
+      "absent": "Nid oes beirniadaeth bensaernïol wedi''i chynhyrchu ar gyfer y cyflwr presennol eto.",
+      "generate": "Cynhyrchu beirniadaeth",
+      "regenerate": "Ailgynhyrchu",
+      "regenerating": "Wrthi''n ciwio…",
+      "regenerateConfirm": "Ciwio beirniadaeth bensaernïol newydd ar gyfer y cyflwr presennol?",
+      "regenerateError": "Methwyd ciwio beirniadaeth newydd.",
+      "pending": "Wrthi''n cynhyrchu''r feirniadaeth bensaernïol…",
+      "errored": "Methodd y feirniadaeth bensaernïol â chynhyrchu.",
+      "skipped": "Hepgorwyd y feirniadaeth bensaernïol (dim cyflwr, neu cyrhaeddwyd y gyllideb ddyddiol).",
+      "asOfState": "fel ar gyflwr #{serial}",
+      "systemTitle": "Pensaernïaeth a gasglwyd",
+      "tiers": "Haenau",
+      "dataStores": "Storfeydd data",
+      "blastRadius": "Radiws ffrwydrad",
+      "noFindings": "Ni nodwyd unrhyw risgiau pensaernïol — mae''r system hon yn ymddangos wedi''i dylunio''n dda ar gyfer y data a adolygwyd.",
+      "recommendation": "Argymhelliad",
+      "groundedIn": "wedi''i seilio ar {source}",
+      "deferredTitle": "Angen adolygu priodoledd",
+      "deferredHint": "Materion na allai''r beirniad eu barnu o''r priodoleddau cyflwr a roddwyd iddo — adolygwch y rhain â llaw yn hytrach na thybio eu bod yn iawn.",
+      "provenance": "Asesiad AI o''r system a ddefnyddiwyd, wedi''i seilio ar y sgan diogelwch penderfyniadol, y peiriant cost, a''r graff adnoddau. Adolygwch y canfyddiadau cyn gweithredu.",
+      "severity": {
+        "low": "Isel",
+        "medium": "Canolig",
+        "high": "Uchel",
+        "critical": "Critigol"
+      },
+      "category": {
+        "reliability": "Dibynadwyedd",
+        "security": "Diogelwch",
+        "cost": "Cost",
+        "operations": "Gweithrediadau",
+        "scalability": "Graddadwyedd"
+      },
+      "heading": "Beirniadaeth pensaernïol AI",
+      "aiGenerated": "Cynhyrchwyd gan AI",
+      "findingsHeading": "Canfyddiadau",
+      "tokens": "{input} i mewn / {output} allan o docynnau",
+      "chat": {
+        "heading": "Gofynnwch gwestiwn dilynol",
+        "sharedThreadNote": "edefyn a rennir — gweladwy i unrhyw un â mynediad i''r weithfan",
+        "placeholder": "Gofynnwch am y system hon — e.e. \"sut fyddwn i''n gwneud yr haen ddata yn HA?\" (⌘/Ctrl+Enter i anfon)",
+        "send": "Anfon",
+        "thinking": "Wrthi''n meddwl…",
+        "you": "Chi",
+        "assistant": "Beirniad",
+        "loadError": "Methwyd llwytho''r edefyn sgwrs.",
+        "sendError": "Methwyd anfon eich neges."
+      },
+      "translatedNote": "Cyfieithwyd o''r gwreiddiol wrth ei weld."
     }
   },
   "workspaceDetail": {
@@ -2108,7 +2161,10 @@
       "runTriggers": "Sbardunau Rhediad",
       "sharing": "Rhannu",
       "selectLabel": "Adran gweithfan",
-      "cost": "Cost"
+      "cost": "Cost",
+      "architecture": "Pensaernïaeth",
+      "insights": "Mewnwelediadau",
+      "automation": "Awtomeiddio"
     },
     "lifecycle": {
       "pendingDeletion": "Yn aros i'w ddileu",
@@ -2496,6 +2552,14 @@
       "stateActionFailed": "Methodd y weithred gyflwr",
       "uploadState": "Methwyd llwytho'r cyflwr i fyny",
       "uploadStateFile": "Methwyd llwytho'r ffeil gyflwr i fyny"
+    },
+    "subtabs": {
+      "state": "Cyflwr",
+      "stateGraph": "Graff",
+      "cost": "Cost",
+      "architecture": "Pensaernïaeth",
+      "runTasks": "Tasgau",
+      "runTriggers": "Sbardunau"
     }
   },
   "graphs": {

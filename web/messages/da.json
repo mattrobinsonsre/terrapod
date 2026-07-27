@@ -2055,6 +2055,59 @@
         "medium": "mellem",
         "low": "lav"
       }
+    },
+    "architecture": {
+      "loadError": "Arkitekturkritikken kunne ikke indlæses.",
+      "notEnabled": "AI-arkitekturkritikeren er ikke aktiveret i denne installation.",
+      "absent": "Der er endnu ikke genereret nogen arkitekturkritik for den aktuelle tilstand.",
+      "generate": "Generér kritik",
+      "regenerate": "Regenerér",
+      "regenerating": "Sætter i kø…",
+      "regenerateConfirm": "Sæt en ny arkitekturkritik i kø for den aktuelle tilstand?",
+      "regenerateError": "Kunne ikke sætte en ny kritik i kø.",
+      "pending": "Genererer arkitekturkritik…",
+      "errored": "Arkitekturkritikken kunne ikke genereres.",
+      "skipped": "Arkitekturkritikken blev sprunget over (ingen tilstand, eller det daglige budget blev nået).",
+      "asOfState": "pr. tilstand #{serial}",
+      "systemTitle": "Udledt arkitektur",
+      "tiers": "Lag",
+      "dataStores": "Datalagre",
+      "blastRadius": "Påvirkningsområde",
+      "noFindings": "Ingen arkitekturrisici blev markeret — dette system ser velarkitekteret ud for de gennemgåede data.",
+      "recommendation": "Anbefaling",
+      "groundedIn": "baseret på {source}",
+      "deferredTitle": "Attributgennemgang påkrævet",
+      "deferredHint": "Forhold, som kritikeren ikke kunne vurdere ud fra de tilstandsattributter, den fik — gennemgå disse manuelt i stedet for at antage, at de er i orden.",
+      "provenance": "En AI-vurdering af det idriftsatte system, baseret på den deterministiske sikkerhedsscanning, omkostningsmotoren og ressourcegrafen. Gennemgå fundene, før du handler.",
+      "severity": {
+        "low": "Lav",
+        "medium": "Mellem",
+        "high": "Høj",
+        "critical": "Kritisk"
+      },
+      "category": {
+        "reliability": "Pålidelighed",
+        "security": "Sikkerhed",
+        "cost": "Omkostning",
+        "operations": "Drift",
+        "scalability": "Skalerbarhed"
+      },
+      "heading": "AI-arkitekturkritik",
+      "aiGenerated": "AI-genereret",
+      "findingsHeading": "Fund",
+      "tokens": "{input} ind / {output} ud tokens",
+      "chat": {
+        "heading": "Opfølgning",
+        "sharedThreadNote": "Delt tråd — synlig for alle med adgang til arbejdsområdet",
+        "placeholder": "Spørg om dette system — f.eks. \"hvordan gør jeg datalaget HA?\" (⌘/Ctrl+Enter for at sende)",
+        "send": "Send",
+        "thinking": "Tænker…",
+        "you": "Dig",
+        "assistant": "Kritiker",
+        "loadError": "Chattråden kunne ikke indlæses.",
+        "sendError": "Din besked kunne ikke sendes."
+      },
+      "translatedNote": "Oversat fra originalen ved visning."
     }
   },
   "workspaceDetail": {
@@ -2108,7 +2161,10 @@
       "runTriggers": "Kørselstriggere",
       "sharing": "Deling",
       "selectLabel": "Arbejdsområdesektion",
-      "cost": "Omkostning"
+      "cost": "Omkostning",
+      "architecture": "Arkitektur",
+      "insights": "Indsigter",
+      "automation": "Automatisering"
     },
     "lifecycle": {
       "pendingDeletion": "Afventer sletning",
@@ -2496,6 +2552,14 @@
       "stateActionFailed": "Tilstandshandling mislykkedes",
       "uploadState": "Kunne ikke uploade tilstand",
       "uploadStateFile": "Kunne ikke uploade tilstandsfil"
+    },
+    "subtabs": {
+      "state": "Tilstand",
+      "stateGraph": "Graf",
+      "cost": "Omkostning",
+      "architecture": "Arkitektur",
+      "runTasks": "Opgaver",
+      "runTriggers": "Triggere"
     }
   },
   "graphs": {

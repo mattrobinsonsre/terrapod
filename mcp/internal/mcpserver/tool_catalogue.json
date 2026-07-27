@@ -462,6 +462,23 @@
     }
   },
   {
+    "name": "terrapod_workspace_architecture_critique",
+    "read_only": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "workspace_id": {
+          "description": "the workspace id (ws-...) whose current-state architecture critique to fetch",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
     "name": "terrapod_workspace_cost",
     "read_only": true,
     "input_schema": {

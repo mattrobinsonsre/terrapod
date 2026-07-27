@@ -187,6 +187,7 @@ Everything below is implemented and shipped today.
 | Feature | Description |
 |---|---|
 | AI plan review | LLM change summary + risk assessment on every plan, failure analysis on errored plans, and a chat to interrogate a run — provider-agnostic via LiteLLM (AWS Bedrock, OpenAI, Anthropic, Gemini, Azure OpenAI, vLLM). IAM-native auth for Bedrock (IRSA + optional cross-account `sts:AssumeRole`). When security scanning and/or cost estimation are on, the same summary adds a **grounded design review** — extra `risk_factors` tagged with a category (security/reliability/cost/operations/scalability/change/other), grounded in the deterministic Checkov/Trivy findings and the cost estimate; **advisory only, never gates a run** |
+| AI architecture critique | Optional AI review of a workspace's **deployed system as it exists** — inferred from its latest state and critiqued across reliability/security/cost/operations/scalability. Distinct from the per-run plan summary (which reviews a *change*). Grounded, never invented: security ← the Checkov/Trivy scan, cost ← the native cost engine, the rest ← state + the resource graph. Its own `ai_architecture` config (own model + budget, off by default); auto-generated on a new state version + on-demand regenerate |
 
 </details>
 

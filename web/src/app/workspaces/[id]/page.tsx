@@ -18,6 +18,7 @@ import { SensitiveValueInput } from '@/components/sensitive-value-input'
 import { MobileCardList, MobileCard } from '@/components/mobile-card-list'
 import { StateGraphTab } from '@/components/state-graph-tab'
 import { CostPanel } from '@/components/cost-panel'
+import { ArchitectureCritiquePanel } from '@/components/architecture-critique-panel'
 import { useIsTouch } from '@/lib/use-media-query'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch, fetchAllPages } from '@/lib/api'
@@ -218,9 +219,9 @@ const ALL_TRIGGERS = [
 const ALL_STAGES = ['pre_plan', 'post_plan', 'pre_apply'] as const
 const ALL_ENFORCEMENT_LEVELS = ['mandatory', 'advisory'] as const
 
-type Tab = 'configuration' | 'variables' | 'runs' | 'state' | 'state-graph' | 'cost' | 'versions' | 'notifications' | 'run-tasks' | 'run-triggers' | 'sharing'
+type Tab = 'configuration' | 'variables' | 'runs' | 'state' | 'state-graph' | 'cost' | 'architecture' | 'versions' | 'notifications' | 'run-tasks' | 'run-triggers' | 'sharing'
 
-const VALID_TABS: Set<string> = new Set(['configuration', 'variables', 'runs', 'state', 'state-graph', 'cost', 'versions', 'notifications', 'run-tasks', 'run-triggers', 'sharing'])
+const VALID_TABS: Set<string> = new Set(['configuration', 'variables', 'runs', 'state', 'state-graph', 'cost', 'architecture', 'versions', 'notifications', 'run-tasks', 'run-triggers', 'sharing'])
 
 export default function WorkspaceDetailPage() {
   return (
@@ -584,7 +585,39 @@ function WorkspaceDetailContent() {
     if (activeTab === 'run-tasks' && (ev === 'workspace_run_task_change' || reconnect)) loadRunTasks()
     if (activeTab === 'run-triggers' && (ev === 'run_trigger_change' || reconnect)) loadRunTriggers()
     if (activeTab === 'sharing' && (ev === 'remote_state_consumer_change' || reconnect)) loadRemoteStateConsumers()
+    // Architecture critique lifecycle rides the same workspace SSE channel;
+    // bump the panel's refresh key so it re-fetches when the critic finishes.
+    if (ev && ev.startsWith('architecture_critique_')) setArchRefresh((n) => n + 1)
   }, [activeTab, loadRuns, loadWorkspace]))
+  const [archRefresh, setArchRefresh] = useState(0)
+  // Whether the AI architecture critic is enabled on this deployment. The tab is
+  // hidden entirely when it's off (#1036). We probe the critique endpoint once:
+  // a 404 whose detail says "not enabled" ⇒ feature off; anything else (200, or
+  // a 404 for "no critique yet" / "no state") ⇒ enabled, show the tab.
+  const [archEnabled, setArchEnabled] = useState(false)
+  useEffect(() => {
+    if (!workspaceId) return
+    let cancelled = false
+    apiFetch(`/api/terrapod/v1/workspaces/${workspaceId}/architecture-critique`)
+      .then(async (res) => {
+        let off = false
+        if (res.status === 404) {
+          try {
+            const b = await res.json()
+            off = /not enabled/i.test(b?.detail ?? '')
+          } catch {
+            /* treat unparseable 404 as enabled */
+          }
+        }
+        if (!cancelled) setArchEnabled(!off)
+      })
+      .catch(() => {
+        /* transport error — leave the tab hidden rather than guess */
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [workspaceId])
 
   async function loadVariables() {
     try {
@@ -1595,19 +1628,45 @@ function WorkspaceDetailContent() {
     })
   }
 
-  const tabs: { key: Tab; label: string }[] = [
-    { key: 'configuration', label: t('tabs.configuration') },
-    { key: 'variables', label: t('tabs.variables') },
-    { key: 'runs', label: t('tabs.runs') },
-    { key: 'state', label: t('tabs.state') },
-    { key: 'state-graph', label: t('tabs.stateGraph') },
-    { key: 'cost', label: t('tabs.cost') },
-    { key: 'versions', label: t('tabs.versions') },
-    { key: 'notifications', label: t('tabs.notifications') },
-    { key: 'run-tasks', label: t('tabs.runTasks') },
-    { key: 'run-triggers', label: t('tabs.runTriggers') },
-    { key: 'sharing', label: t('tabs.sharing') },
+  // Top-level tab GROUPS (#1036 UX). Related sub-views are merged under one
+  // parent tab with a segmented sub-toggle, so the strip stays short:
+  //   State      = State + State Graph
+  //   Insights   = Cost + Architecture (Architecture only when the AI critic is on)
+  //   Automation = Run Tasks + Run Triggers
+  // A group's `key` is its DEFAULT sub-view (what clicking the parent opens);
+  // `members` are the `?tab=` values it owns. The URL stays the source of truth.
+  const insightsMembers: Tab[] = archEnabled ? ['cost', 'architecture'] : ['cost']
+  const tabGroups: { key: Tab; label: string; members: Tab[] }[] = [
+    { key: 'configuration', label: t('tabs.configuration'), members: ['configuration'] },
+    { key: 'variables', label: t('tabs.variables'), members: ['variables'] },
+    { key: 'runs', label: t('tabs.runs'), members: ['runs'] },
+    { key: 'state', label: t('tabs.state'), members: ['state', 'state-graph'] },
+    { key: 'cost', label: t('tabs.insights'), members: insightsMembers },
+    { key: 'versions', label: t('tabs.versions'), members: ['versions'] },
+    { key: 'notifications', label: t('tabs.notifications'), members: ['notifications'] },
+    { key: 'run-tasks', label: t('tabs.automation'), members: ['run-tasks', 'run-triggers'] },
+    { key: 'sharing', label: t('tabs.sharing'), members: ['sharing'] },
   ]
+  const activeGroup = tabGroups.find((g) => g.members.includes(activeTab)) ?? tabGroups[0]
+  const subTabLabel = (tab: Tab): string =>
+    ({
+      state: t('subtabs.state'),
+      'state-graph': t('subtabs.stateGraph'),
+      cost: t('subtabs.cost'),
+      architecture: t('subtabs.architecture'),
+      'run-tasks': t('subtabs.runTasks'),
+      'run-triggers': t('subtabs.runTriggers'),
+    })[tab as string] ?? tab
+  // A merged group that collapses to a single visible member (e.g. Insights
+  // when the architecture critic is disabled → just Cost) shows that member's
+  // OWN label, not the collective group name — otherwise "Insights" would
+  // stand in for a lone "Cost". Always-single groups keep their group label.
+  const groupLabel = (g: { label: string; members: Tab[] }): string => {
+    if (g.members.length > 1) return g.label
+    const only = g.members[0]
+    const sub = subTabLabel(only)
+    return sub !== only ? sub : g.label
+  }
 
   function statusColor(status: string): string {
     switch (status) {
@@ -1745,34 +1804,54 @@ function WorkspaceDetailContent() {
           </label>
           <select
             id="ws-tab-select"
-            value={activeTab}
+            value={activeGroup.key}
             onChange={(e) => setActiveTab(e.target.value as Tab)}
             className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-sm font-medium text-slate-100 focus:border-brand-500 focus:outline-none"
           >
-            {tabs.map((tab) => (
-              <option key={tab.key} value={tab.key}>
-                {tab.label}
+            {tabGroups.map((g) => (
+              <option key={g.key} value={g.key}>
+                {groupLabel(g)}
               </option>
             ))}
           </select>
         </div>
         <div className="hidden border-b border-slate-700/50 mb-6 md:block overflow-x-auto">
           <div className="flex gap-1 -mb-px whitespace-nowrap">
-            {tabs.map((tab) => (
+            {tabGroups.map((g) => (
               <button
-                key={tab.key}
-                onClick={() => setActiveTab(tab.key)}
+                key={g.key}
+                onClick={() => setActiveTab(g.key)}
                 className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                  activeTab === tab.key
+                  activeGroup.key === g.key
                     ? 'border-brand-500 text-brand-400'
                     : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-600'
                 }`}
               >
-                {tab.label}
+                {groupLabel(g)}
               </button>
             ))}
           </div>
         </div>
+
+        {/* Sub-view toggle — shown only for a merged group (State / Insights /
+            Automation). A segmented control switching the ?tab= within the group. */}
+        {activeGroup.members.length > 1 && (
+          <div className="mb-6 flex flex-wrap gap-1 rounded-lg bg-slate-800/60 p-1 w-fit">
+            {activeGroup.members.map((m) => (
+              <button
+                key={m}
+                onClick={() => setActiveTab(m)}
+                className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                  activeTab === m
+                    ? 'bg-slate-700 text-slate-100'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                {subTabLabel(m)}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Configuration Tab (workspace settings) */}
         {activeTab === 'configuration' && (
@@ -3463,6 +3542,11 @@ function WorkspaceDetailContent() {
         {/* Cost Tab (#871) — current managed-infra cost from latest state */}
         {activeTab === 'cost' && workspace && (
           <CostPanel workspaceId={workspace.id} />
+        )}
+
+        {/* Architecture Tab (#1036) — AI critique of the deployed system from state */}
+        {activeTab === 'architecture' && workspace && (
+          <ArchitectureCritiquePanel workspaceId={workspace.id} refreshKey={archRefresh} />
         )}
 
         {/* Versions Tab (configuration versions) */}

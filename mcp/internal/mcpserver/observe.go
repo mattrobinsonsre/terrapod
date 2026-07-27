@@ -201,6 +201,25 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 		return nil, e, nil
 	})
 
+	// ── terrapod_workspace_architecture_critique ─────────────────────
+	type wsCritiqueIn struct {
+		WorkspaceID string `json:"workspace_id" jsonschema:"the workspace id (ws-...) whose current-state architecture critique to fetch"`
+	}
+	mcp.AddTool(s, &mcp.Tool{
+		Name:        "terrapod_workspace_architecture_critique",
+		Description: "Get the AI architecture critique of a workspace's CURRENT deployed system, inferred from its latest Terraform state (the optional ai_architecture feature). Unlike a run's plan summary — which reviews a change — this reviews the system as it EXISTS, across reliability/security/cost/operations/scalability. Every finding is grounded (security ← the Checkov/Trivy scanner, carrying the rule id in `grounded_in`; cost ← the cost engine; reliability/operations ← state + resource graph) and anchored to a resource address; concerns the model couldn't judge from the data are listed under `deferred` rather than guessed. Returns the inferred `architecture` (summary, tiers, data stores, blast radius), an overall `risk-level`, and ranked `findings`. Returns 'not available' when the feature is disabled, the workspace has no state, or no critique exists for the current state yet. Branch on `status`: ready | pending | skipped | errored.",
+		Annotations: readOnly,
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in wsCritiqueIn) (*mcp.CallToolResult, *terrapod.ArchitectureCritique, error) {
+		if in.WorkspaceID == "" {
+			return errText("workspace_id is required"), nil, nil
+		}
+		cr, err := c.GetArchitectureCritique(ctx, in.WorkspaceID)
+		if err != nil {
+			return errResult(err), nil, nil
+		}
+		return nil, cr, nil
+	})
+
 	// ── terrapod_run_cost ────────────────────────────────────────────
 	type runCostIn struct {
 		RunID string `json:"run_id" jsonschema:"the run id (run-... or a bare uuid) whose plan cost delta to fetch"`

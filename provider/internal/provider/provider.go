@@ -15,6 +15,7 @@ import (
 	"github.com/mattrobinsonsre/terrapod/provider/internal/client"
 	agentPoolDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/agent_pool"
 	catalogInstancesDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/catalog_instances"
+	architectureCritiqueDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/architecture_critique"
 	roleDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/role"
 	userDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/user"
 	vcsConnectionDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/vcs_connection"
@@ -176,6 +177,7 @@ func (p *terrapodProvider) DataSources(_ context.Context) []func() datasource.Da
 	return []func() datasource.DataSource{
 		workspaceDS.NewDataSource,
 		workspaceCostDS.NewDataSource,
+		architectureCritiqueDS.NewDataSource,
 		workspacesDS.NewDataSource,
 		roleDS.NewDataSource,
 		agentPoolDS.NewDataSource,

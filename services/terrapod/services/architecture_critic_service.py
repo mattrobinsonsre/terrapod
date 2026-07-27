@@ -37,7 +37,13 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.config import settings
-from terrapod.db.models import ArchitectureCritique, Run, StateVersion, Workspace
+from terrapod.db.models import (
+    ArchitectureCritique,
+    ArchitectureCritiqueMessage,
+    Run,
+    StateVersion,
+    Workspace,
+)
 from terrapod.db.session import get_db_session
 from terrapod.logging_config import get_logger
 from terrapod.services.state_graph_service import (
@@ -45,6 +51,9 @@ from terrapod.services.state_graph_service import (
     build_graph_from_state,
 )
 from terrapod.services.summariser import (
+    FollowupBudgetExhausted,
+    FollowupCapReached,
+    FollowupDisabled,
     _apply_anthropic_cache_markers,
     _parse_model_json,
     _parse_tool_call_arguments,
@@ -647,8 +656,213 @@ async def handle_architecture_critique(payload: dict) -> None:
     if not settings.ai_architecture.enabled:
         return
     try:
-        workspace_id = uuid.UUID(str(payload["workspace_id"]))
+        # Tolerate both the bare UUID (the state-upload auto-hook passes
+        # str(workspace_id)) and the "ws-"-prefixed form (the regenerate
+        # endpoint passes its path param verbatim). uuid.UUID rejects the
+        # prefix, so strip it first — otherwise a normal ws-… regenerate
+        # would silently no-op here.
+        workspace_id = uuid.UUID(str(payload["workspace_id"]).removeprefix("ws-"))
     except (KeyError, ValueError):
         logger.warning("invalid architecture_critique payload", payload=payload)
         return
     await generate_critique(workspace_id, force=bool(payload.get("force")))
+
+
+# --- Follow-up chat (#1036) --------------------------------------------------
+#
+# A conversational thread hanging off a workspace's CURRENT-state critique,
+# mirroring the plan-summary chat (#463): one shared thread per critique, prose
+# in / prose out, grounded in the critique the operator is looking at ("how
+# would I make the data tier HA?"). Reuses the summariser's Followup* exceptions
+# so the router maps them to the same 4xx/5xx.
+
+
+async def current_critique_for_workspace(
+    db: AsyncSession, workspace_id: uuid.UUID
+) -> ArchitectureCritique | None:
+    """The critique for the workspace's CURRENT (latest) state version, or None.
+
+    The chat only ever attaches to the critique the operator is viewing — the
+    one for the newest state — so a stale critique from an older serial can't
+    accrue turns after new state lands.
+    """
+    sv = (
+        await db.execute(
+            select(StateVersion)
+            .where(StateVersion.workspace_id == workspace_id)
+            .order_by(StateVersion.serial.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    if sv is None:
+        return None
+    return (
+        await db.execute(
+            select(ArchitectureCritique).where(ArchitectureCritique.state_version_id == sv.id)
+        )
+    ).scalar_one_or_none()
+
+
+async def list_critique_messages(
+    db: AsyncSession, critique_id: uuid.UUID
+) -> list[ArchitectureCritiqueMessage]:
+    """The chat thread for a critique, in chronological order (may be empty)."""
+    return list(
+        (
+            await db.execute(
+                select(ArchitectureCritiqueMessage)
+                .where(ArchitectureCritiqueMessage.critique_id == critique_id)
+                .order_by(
+                    ArchitectureCritiqueMessage.created_at,
+                    ArchitectureCritiqueMessage.id,
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+
+
+def _critique_grounding(critique: ArchitectureCritique) -> str:
+    """Serialise the critique into the grounding block the chat reasons over —
+    the inferred architecture + ranked findings + the deferred gaps."""
+    arch = critique.architecture or {}
+    lines: list[str] = ["INFERRED ARCHITECTURE:", str(arch.get("summary", "")).strip()]
+    if arch.get("tiers"):
+        lines.append("Tiers: " + "; ".join(str(x) for x in arch["tiers"]))
+    if arch.get("data_stores"):
+        lines.append("Data stores: " + "; ".join(str(x) for x in arch["data_stores"]))
+    if arch.get("blast_radius"):
+        lines.append("Blast radius: " + str(arch["blast_radius"]))
+    lines.append(f"\nOVERALL RISK: {critique.risk_level or 'unknown'}")
+    findings = critique.findings or []
+    if findings:
+        lines.append("\nFINDINGS:")
+        for f in findings:
+            lines.append(
+                f"- [{f.get('severity')}/{f.get('category')}] {f.get('title')} "
+                f"<{f.get('resource_address')}>: {f.get('detail')} "
+                f"(fix: {f.get('recommendation', '—')}; grounded_in: {f.get('grounded_in', 'state')})"
+            )
+    else:
+        lines.append("\nFINDINGS: none — the system looks well-architected for the data reviewed.")
+    if critique.deferred:
+        lines.append("\nNEEDS ATTRIBUTE REVIEW (could not be judged from state):")
+        lines.extend(f"- {d}" for d in critique.deferred)
+    return "\n".join(lines)
+
+
+_CHAT_SYSTEM = (
+    "You are Terrapod's architecture critic, continuing a conversation about a "
+    "workspace's DEPLOYED system (inferred from its Terraform state). You have "
+    "already produced the structured critique below. Answer the operator's "
+    "follow-up questions in concise prose — no tool calls, no re-listing every "
+    "finding. Stay grounded in this critique and the deployed resources it "
+    "describes; if a question needs data you weren't given (an attribute in the "
+    "'needs attribute review' list, a security scan that wasn't provided, a cost "
+    "figure not shown), say so plainly rather than guessing.\n\n"
+    "{context}{grounding}"
+)
+
+
+async def _call_chat_model(messages: list[dict], max_output_tokens: int) -> tuple[str, int, int]:
+    """Prose completion (no tools) for a follow-up turn. Reuses the critic's
+    model + auth config; returns (text, input_tokens, output_tokens)."""
+    cfg = settings.ai_architecture
+    if not cfg.model:
+        raise RuntimeError("ai_architecture.model must be set")
+    if _supports_anthropic_cache_control(cfg.model):
+        messages = _apply_anthropic_cache_markers(messages)
+    auth = cfg.auth
+    kwargs: dict = {
+        "model": cfg.model,
+        "max_tokens": max_output_tokens,
+        "messages": messages,
+        "timeout": cfg.request_timeout_seconds,
+        "num_retries": _LLM_NUM_RETRIES,
+        "retry_strategy": "exponential_backoff_retry",
+    }
+    if cfg.api_base:
+        kwargs["api_base"] = cfg.api_base
+    if auth.api_key:
+        kwargs["api_key"] = auth.api_key
+    if auth.aws_region:
+        kwargs["aws_region_name"] = auth.aws_region
+    if auth.aws_role_arn:
+        kwargs["aws_role_name"] = auth.aws_role_arn
+        kwargs["aws_session_name"] = auth.aws_session_name
+        if auth.aws_external_id:
+            kwargs["aws_external_id"] = auth.aws_external_id
+    resp = await litellm.acompletion(**kwargs)
+    if not resp.choices:
+        raise RuntimeError("model response had no choices")
+    text = resp.choices[0].message.content or ""
+    usage = getattr(resp, "usage", None)
+    in_tok = int(getattr(usage, "prompt_tokens", 0) or 0) if usage else 0
+    out_tok = int(getattr(usage, "completion_tokens", 0) or 0) if usage else 0
+    return text, in_tok, out_tok
+
+
+async def post_critique_followup(
+    db: AsyncSession, workspace_id: uuid.UUID, text: str
+) -> ArchitectureCritiqueMessage:
+    """Post one operator follow-up against the workspace's current critique and
+    return the persisted assistant reply row.
+
+    Gates (all raised as Followup* → the router maps them to 4xx):
+      - FollowupDisabled: feature off, or ``followup_max_messages == 0``.
+      - FollowupDisabled: no ready critique for the current state to chat about.
+      - FollowupCapReached: the critique already has the max user turns.
+      - FollowupBudgetExhausted: the daily token budget is spent.
+    """
+    cfg = settings.ai_architecture
+    if not cfg.enabled or cfg.followup_max_messages <= 0:
+        raise FollowupDisabled("architecture critique chat is disabled")
+
+    critique = await current_critique_for_workspace(db, workspace_id)
+    if critique is None or critique.status != "ready":
+        raise FollowupDisabled("no architecture critique to chat about yet")
+
+    prior = await list_critique_messages(db, critique.id)
+    user_turns = sum(1 for m in prior if m.role == "user")
+    if user_turns >= cfg.followup_max_messages:
+        raise FollowupCapReached(
+            f"reached the {cfg.followup_max_messages}-message cap for this critique"
+        )
+
+    if (await _budget_remaining()) == 0:
+        raise FollowupBudgetExhausted("daily AI token budget exhausted")
+
+    # Persist the user turn first so it survives a model failure.
+    db.add(ArchitectureCritiqueMessage(critique_id=critique.id, role="user", content=text))
+    await db.commit()
+
+    system = _CHAT_SYSTEM.format(
+        context=(cfg.context.strip() + "\n\n") if cfg.context.strip() else "",
+        grounding=_critique_grounding(critique),
+    )
+    messages: list[dict] = [{"role": "system", "content": system}]
+    for m in prior:
+        if m.role == "assistant" and not m.content.strip():
+            continue  # skip prior errored replies
+        messages.append({"role": m.role, "content": m.content})
+    messages.append({"role": "user", "content": text})
+
+    assistant = ArchitectureCritiqueMessage(critique_id=critique.id, role="assistant", content="")
+    try:
+        reply, in_tok, out_tok = await _call_chat_model(messages, cfg.followup_max_output_tokens)
+        assistant.content = reply
+        assistant.model = cfg.model
+        assistant.input_tokens = in_tok
+        assistant.output_tokens = out_tok
+        await _budget_charge(in_tok + out_tok)
+    except Exception as e:
+        assistant.error_message = str(e)[:2000]
+        logger.warning(
+            "architecture critique chat failed", workspace_id=str(workspace_id), error=str(e)
+        )
+    db.add(assistant)
+    await db.commit()
+    await db.refresh(assistant)
+    await _emit_event(workspace_id, "architecture_critique_message_posted")
+    return assistant

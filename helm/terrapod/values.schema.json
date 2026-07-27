@@ -2040,6 +2040,14 @@
               "type": "integer",
               "minimum": 0
             },
+            "followup_max_messages": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "followup_max_output_tokens": {
+              "type": "integer",
+              "minimum": 1
+            },
             "context": {
               "type": "string"
             },

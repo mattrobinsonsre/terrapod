@@ -2055,6 +2055,59 @@
         "medium": "בינוני",
         "low": "נמוך"
       }
+    },
+    "architecture": {
+      "loadError": "טעינת ביקורת הארכיטקטורה נכשלה.",
+      "notEnabled": "מבקר הארכיטקטורה של AI אינו מופעל בפריסה זו.",
+      "absent": "עדיין לא נוצרה ביקורת ארכיטקטורה עבור המצב הנוכחי.",
+      "generate": "צור ביקורת",
+      "regenerate": "צור מחדש",
+      "regenerating": "מכניס לתור…",
+      "regenerateConfirm": "להוסיף לתור ביקורת ארכיטקטורה חדשה עבור המצב הנוכחי?",
+      "regenerateError": "הוספת ביקורת חדשה לתור נכשלה.",
+      "pending": "מייצר את ביקורת הארכיטקטורה…",
+      "errored": "יצירת ביקורת הארכיטקטורה נכשלה.",
+      "skipped": "ביקורת הארכיטקטורה דולגה (אין מצב, או שתקציב היומי מוצה).",
+      "asOfState": "נכון למצב #{serial}",
+      "systemTitle": "ארכיטקטורה משוערת",
+      "tiers": "שכבות",
+      "dataStores": "מאגרי נתונים",
+      "blastRadius": "רדיוס ההשפעה",
+      "noFindings": "לא סומנו סיכונים ארכיטקטוניים — נראה שהמערכת הזו מתוכננת היטב עבור הנתונים שנבדקו.",
+      "recommendation": "המלצה",
+      "groundedIn": "מבוסס על {source}",
+      "deferredTitle": "דורש בדיקת מאפיינים",
+      "deferredHint": "עניינים שהמבקר לא יכול היה לשפוט מתוך מאפייני המצב שקיבל — בדוק אותם ידנית במקום להניח שהם תקינים.",
+      "provenance": "הערכת AI של המערכת הפרוסה, המבוססת על סריקת האבטחה הדטרמיניסטית, מנוע העלות וגרף המשאבים. בדוק את הממצאים לפני פעולה.",
+      "severity": {
+        "low": "נמוך",
+        "medium": "בינוני",
+        "high": "גבוה",
+        "critical": "קריטי"
+      },
+      "category": {
+        "reliability": "אמינות",
+        "security": "אבטחה",
+        "cost": "עלות",
+        "operations": "תפעול",
+        "scalability": "מדרגיות"
+      },
+      "heading": "ביקורת ארכיטקטורה של AI",
+      "aiGenerated": "נוצר על ידי AI",
+      "findingsHeading": "ממצאים",
+      "tokens": "{input} קלט / {output} פלט אסימונים",
+      "chat": {
+        "heading": "שאל שאלת המשך",
+        "sharedThreadNote": "שרשור משותף — גלוי לכל מי שיש לו גישה לסביבת העבודה",
+        "placeholder": "שאל על המערכת הזו — למשל \"איך אהפוך את שכבת הנתונים ל-HA?\" (⌘/Ctrl+Enter לשליחה)",
+        "send": "שלח",
+        "thinking": "חושב…",
+        "you": "אתה",
+        "assistant": "מבקר",
+        "loadError": "טעינת שרשור השיחה נכשלה.",
+        "sendError": "שליחת ההודעה שלך נכשלה."
+      },
+      "translatedNote": "תורגם מהמקור בעת הצפייה."
     }
   },
   "workspaceDetail": {
@@ -2108,7 +2161,10 @@
       "runTriggers": "טריגרים להרצה",
       "sharing": "שיתוף",
       "selectLabel": "מקטע סביבת עבודה",
-      "cost": "עלות"
+      "cost": "עלות",
+      "architecture": "ארכיטקטורה",
+      "insights": "תובנות",
+      "automation": "אוטומציה"
     },
     "lifecycle": {
       "pendingDeletion": "ממתין למחיקה",
@@ -2496,6 +2552,14 @@
       "stateActionFailed": "פעולת המצב נכשלה",
       "uploadState": "העלאת המצב נכשלה",
       "uploadStateFile": "העלאת קובץ המצב נכשלה"
+    },
+    "subtabs": {
+      "state": "מצב",
+      "stateGraph": "גרף",
+      "cost": "עלות",
+      "architecture": "ארכיטקטורה",
+      "runTasks": "משימות",
+      "runTriggers": "טריגרים"
     }
   },
   "graphs": {

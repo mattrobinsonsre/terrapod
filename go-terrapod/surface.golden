@@ -34,6 +34,38 @@ field AgentPoolToken.IsRevoked bool `json:"is-revoked"`
 field AgentPoolToken.MaxUses int64 `json:"max-uses,omitempty"`
 field AgentPoolToken.Token string `json:"token,omitempty"`
 field AgentPoolToken.UseCount int64 `json:"use-count"`
+field ArchitectureCritique.Architecture ArchitectureCritiqueArchitecture `json:"architecture"`
+field ArchitectureCritique.CreatedAt string `json:"created-at,omitempty"`
+field ArchitectureCritique.Deferred []string `json:"deferred,omitempty"`
+field ArchitectureCritique.ErrorMessage string `json:"error-message,omitempty"`
+field ArchitectureCritique.Findings []ArchitectureCritiqueFinding `json:"findings,omitempty"`
+field ArchitectureCritique.ID string `json:"id"`
+field ArchitectureCritique.InputTokens int `json:"input-tokens"`
+field ArchitectureCritique.Model string `json:"model,omitempty"`
+field ArchitectureCritique.OutputTokens int `json:"output-tokens"`
+field ArchitectureCritique.RiskLevel string `json:"risk-level,omitempty"`
+field ArchitectureCritique.StateSerial int64 `json:"state-serial"`
+field ArchitectureCritique.Status string `json:"status"`
+field ArchitectureCritique.UpdatedAt string `json:"updated-at,omitempty"`
+field ArchitectureCritiqueArchitecture.BlastRadius string `json:"blast_radius,omitempty"`
+field ArchitectureCritiqueArchitecture.DataStores []string `json:"data_stores,omitempty"`
+field ArchitectureCritiqueArchitecture.Summary string `json:"summary,omitempty"`
+field ArchitectureCritiqueArchitecture.Tiers []string `json:"tiers,omitempty"`
+field ArchitectureCritiqueFinding.Category string `json:"category"`
+field ArchitectureCritiqueFinding.Detail string `json:"detail"`
+field ArchitectureCritiqueFinding.GroundedIn string `json:"grounded_in,omitempty"`
+field ArchitectureCritiqueFinding.Recommendation string `json:"recommendation,omitempty"`
+field ArchitectureCritiqueFinding.ResourceAddress string `json:"resource_address"`
+field ArchitectureCritiqueFinding.Severity string `json:"severity"`
+field ArchitectureCritiqueFinding.Title string `json:"title"`
+field ArchitectureCritiqueMessage.Content string `json:"content"`
+field ArchitectureCritiqueMessage.CreatedAt string `json:"created-at,omitempty"`
+field ArchitectureCritiqueMessage.ErrorMessage string `json:"error-message,omitempty"`
+field ArchitectureCritiqueMessage.ID string `json:"id"`
+field ArchitectureCritiqueMessage.InputTokens int `json:"input-tokens"`
+field ArchitectureCritiqueMessage.Model string `json:"model,omitempty"`
+field ArchitectureCritiqueMessage.OutputTokens int `json:"output-tokens"`
+field ArchitectureCritiqueMessage.Role string `json:"role"`
 field AuthenticationError.Detail string
 field AuthorizationError.Detail string
 field AutodiscoveryRule.Attributes map[string]any
@@ -997,6 +1029,7 @@ method (*Client) Get(ctx context.Context, path string) ([]byte, error)
 method (*Client) GetAPIToken(ctx context.Context, tokenID string) (*APIToken, error)
 method (*Client) GetAgentPool(ctx context.Context, id string) (*AgentPool, error)
 method (*Client) GetAgentPoolToken(ctx context.Context, poolID, tokenID string) (*AgentPoolToken, error)
+method (*Client) GetArchitectureCritique( ctx context.Context, workspaceID string, ) (*ArchitectureCritique, error)
 method (*Client) GetAutodiscoveryRule(ctx context.Context, id string) (*AutodiscoveryRule, error)
 method (*Client) GetCatalogInstance(ctx context.Context, wsID string) (*CatalogInstance, error)
 method (*Client) GetCatalogItem(ctx context.Context, id string) (*CatalogItem, error)
@@ -1047,6 +1080,7 @@ method (*Client) ListAllCatalogInstances(ctx context.Context, itemID string) ([]
 method (*Client) ListAllVCSConnections(ctx context.Context) ([]VCSConnection, error)
 method (*Client) ListAllVariables(ctx context.Context, workspaceID string) ([]Variable, error)
 method (*Client) ListAllWorkspaces(ctx context.Context, opts WorkspaceListOptions) ([]Workspace, error)
+method (*Client) ListArchitectureCritiqueMessages( ctx context.Context, workspaceID string, ) ([]ArchitectureCritiqueMessage, error)
 method (*Client) ListCatalogInstances(ctx context.Context, itemID string) ([]CatalogInstance, error)
 method (*Client) ListCatalogItems(ctx context.Context) ([]CatalogItem, error)
 method (*Client) ListExecutionHooks(ctx context.Context) ([]ExecutionHook, error)
@@ -1083,12 +1117,14 @@ method (*Client) OrphanCatalogInstance(ctx context.Context, wsID string) error
 method (*Client) OverrideRunSecurityScan(ctx context.Context, runID string) (*SecurityScan, error)
 method (*Client) Patch(ctx context.Context, path string, payload []byte) ([]byte, error)
 method (*Client) Post(ctx context.Context, path string, payload []byte) ([]byte, error)
+method (*Client) PostArchitectureCritiqueMessage( ctx context.Context, workspaceID, content string, ) (*ArchitectureCritiqueMessage, error)
 method (*Client) PostPlanSummaryMessage(ctx context.Context, runID, content string) (*PlanSummaryMessage, error)
 method (*Client) PostRunCostSummaryMessage(ctx context.Context, runID, content string) (*CostSummaryMessage, error)
 method (*Client) ProvisionCatalogItem(ctx context.Context, itemID string, attrs map[string]any) (*CatalogInstance, error)
 method (*Client) Put(ctx context.Context, path string, payload []byte) ([]byte, error)
 method (*Client) PutRaw(ctx context.Context, path, contentType string, payload []byte) ([]byte, error)
 method (*Client) ReconfigureCatalogInstance(ctx context.Context, wsID string, attrs map[string]any) (*CatalogRunRef, error)
+method (*Client) RegenerateArchitectureCritique( ctx context.Context, workspaceID string, ) (*ArchitectureCritique, error)
 method (*Client) RegeneratePlanSummary(ctx context.Context, runID string) (*PlanSummary, error)
 method (*Client) RegenerateRunCostSummary(ctx context.Context, runID string) (*CostSummary, error)
 method (*Client) RemoveRoleFromIdentity(ctx context.Context, providerName, email, roleName string) error
@@ -1137,6 +1173,10 @@ type APIToken struct
 type AddPolicyRequest struct
 type AgentPool struct
 type AgentPoolToken struct
+type ArchitectureCritique struct
+type ArchitectureCritiqueArchitecture struct
+type ArchitectureCritiqueFinding struct
+type ArchitectureCritiqueMessage struct
 type AuthenticationError struct
 type AuthorizationError struct
 type AutodiscoveryRule struct

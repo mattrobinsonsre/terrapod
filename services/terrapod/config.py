@@ -1656,6 +1656,24 @@ class AIArchitectureConfig(BaseModel):
             "scan / cost inputs."
         ),
     )
+    followup_max_messages: int = Field(
+        default=20,
+        description=(
+            "Cap on user-posted follow-up chat messages per critique (#1036). "
+            "The UI disables the chat input once a critique reaches this many "
+            "user turns. 0 disables the follow-up chat entirely (the initial "
+            "critique still generates). Counts user rows in "
+            "`architecture_critique_messages`; assistant rows don't count."
+        ),
+    )
+    followup_max_output_tokens: int = Field(
+        default=2048,
+        description=(
+            "Upper bound on follow-up reply tokens (#1036). Smaller than "
+            "`max_output_tokens` because follow-ups are conversational text-in/"
+            "text-out, not a full structured re-critique."
+        ),
+    )
     auth: AIArchitectureAuthConfig = Field(default_factory=AIArchitectureAuthConfig)
 
 

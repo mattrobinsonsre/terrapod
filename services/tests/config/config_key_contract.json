@@ -57,6 +57,8 @@
   "ai_architecture.context",
   "ai_architecture.daily_token_budget",
   "ai_architecture.enabled",
+  "ai_architecture.followup_max_messages",
+  "ai_architecture.followup_max_output_tokens",
   "ai_architecture.max_output_tokens",
   "ai_architecture.model",
   "ai_architecture.request_timeout_seconds",

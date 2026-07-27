@@ -2055,6 +2055,59 @@
         "medium": "medius",
         "low": "humilis"
       }
+    },
+    "architecture": {
+      "loadError": "Censura architecturae onerari non potuit.",
+      "notEnabled": "Censor architecturae per AI in hac instructione non est actus.",
+      "absent": "Nulla censura architecturae pro statu praesenti adhuc generata est.",
+      "generate": "Censuram generare",
+      "regenerate": "Regenerare",
+      "regenerating": "In ordinem ponitur…",
+      "regenerateConfirm": "Novam censuram architecturae pro statu praesenti in ordinem ponere?",
+      "regenerateError": "Nova censura in ordinem poni non potuit.",
+      "pending": "Censura architecturae generatur…",
+      "errored": "Censura architecturae generari non potuit.",
+      "skipped": "Censura architecturae praeterita est (nullus status, aut sumptus cotidianus impletus est).",
+      "asOfState": "pro statu #{serial}",
+      "systemTitle": "Architectura deducta",
+      "tiers": "Gradus",
+      "dataStores": "Promptuaria datorum",
+      "blastRadius": "Radius impetus",
+      "noFindings": "Nullum periculum architecturae notatum est — hoc systema bene architectatum pro datis recensitis videtur.",
+      "recommendation": "Commendatio",
+      "groundedIn": "fundatum in {source}",
+      "deferredTitle": "Attributa recensenda",
+      "deferredHint": "Res quas censor ex attributis status datis diiudicare non potuit — has manu recense potius quam eas bene se habere praesumas.",
+      "provenance": "Existimatio per AI systematis instructi, fundata in exploratione securitatis determinata, machina sumptuum et grapho facultatum. Inventa recense antequam agas.",
+      "severity": {
+        "low": "Humile",
+        "medium": "Medium",
+        "high": "Altum",
+        "critical": "Criticum"
+      },
+      "category": {
+        "reliability": "Fidelitas",
+        "security": "Securitas",
+        "cost": "Sumptus",
+        "operations": "Operationes",
+        "scalability": "Scalabilitas"
+      },
+      "heading": "Censura architecturae per AI",
+      "aiGenerated": "AI generatum",
+      "findingsHeading": "Inventa",
+      "tokens": "{input} in / {output} ex tokens",
+      "chat": {
+        "heading": "Quaestionem subsequentem roga",
+        "sharedThreadNote": "filum communis — visibile cuivis cum accessu ad locum operis",
+        "placeholder": "Roga de hoc systemate — e.g. \"quomodo stratum datorum HA faciam?\" (⌘/Ctrl+Enter ut mittas)",
+        "send": "Mittere",
+        "thinking": "Cogitatur…",
+        "you": "Tu",
+        "assistant": "Censor",
+        "loadError": "Filum colloquii onerari non potuit.",
+        "sendError": "Nuntius tuus mitti non potuit."
+      },
+      "translatedNote": "Ex originali in conspectu translatum."
     }
   },
   "workspaceDetail": {
@@ -2108,7 +2161,10 @@
       "runTriggers": "Concitatores Exsecutionis",
       "sharing": "Communicatio",
       "selectLabel": "Sectio loci operis",
-      "cost": "Sumptus"
+      "cost": "Sumptus",
+      "architecture": "Architectura",
+      "insights": "Perspicientiae",
+      "automation": "Automatio"
     },
     "lifecycle": {
       "pendingDeletion": "Deletio pendens",
@@ -2496,6 +2552,14 @@
       "stateActionFailed": "Actio status defecit",
       "uploadState": "Status subdi non potuit",
       "uploadStateFile": "Tabula status subdi non potuit"
+    },
+    "subtabs": {
+      "state": "Status",
+      "stateGraph": "Graphum",
+      "cost": "Sumptus",
+      "architecture": "Architectura",
+      "runTasks": "Munera",
+      "runTriggers": "Concitatores"
     }
   },
   "graphs": {

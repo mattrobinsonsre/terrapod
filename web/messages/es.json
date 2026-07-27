@@ -2055,6 +2055,59 @@
         "medium": "medio",
         "low": "bajo"
       }
+    },
+    "architecture": {
+      "loadError": "No se pudo cargar la crítica de arquitectura.",
+      "notEnabled": "El crítico de arquitectura por IA no está habilitado en esta implementación.",
+      "absent": "Aún no se ha generado ninguna crítica de arquitectura para el estado actual.",
+      "generate": "Generar crítica",
+      "regenerate": "Regenerar",
+      "regenerating": "Poniendo en cola…",
+      "regenerateConfirm": "¿Poner en cola una nueva crítica de arquitectura para el estado actual?",
+      "regenerateError": "No se pudo poner en cola una nueva crítica.",
+      "pending": "Generando la crítica de arquitectura…",
+      "errored": "No se pudo generar la crítica de arquitectura.",
+      "skipped": "Se omitió la crítica de arquitectura (sin estado, o se alcanzó el presupuesto diario).",
+      "asOfState": "según el estado #{serial}",
+      "systemTitle": "Arquitectura inferida",
+      "tiers": "Niveles",
+      "dataStores": "Almacenes de datos",
+      "blastRadius": "Radio de impacto",
+      "noFindings": "No se marcó ningún riesgo arquitectónico — este sistema parece bien diseñado para los datos revisados.",
+      "recommendation": "Recomendación",
+      "groundedIn": "fundamentado en {source}",
+      "deferredTitle": "Requiere revisión de atributos",
+      "deferredHint": "Aspectos que el crítico no pudo evaluar a partir de los atributos de estado disponibles — revíselos manualmente en lugar de dar por hecho que están bien.",
+      "provenance": "Una evaluación por IA del sistema desplegado, fundamentada en el análisis de seguridad determinista, el motor de costes y el grafo de recursos. Revise los hallazgos antes de actuar.",
+      "severity": {
+        "low": "Bajo",
+        "medium": "Medio",
+        "high": "Alto",
+        "critical": "Crítico"
+      },
+      "category": {
+        "reliability": "Fiabilidad",
+        "security": "Seguridad",
+        "cost": "Coste",
+        "operations": "Operaciones",
+        "scalability": "Escalabilidad"
+      },
+      "heading": "Crítica de arquitectura por IA",
+      "aiGenerated": "Generado por IA",
+      "findingsHeading": "Hallazgos",
+      "tokens": "{input} entrada / {output} salida tokens",
+      "chat": {
+        "heading": "Preguntar algo más",
+        "sharedThreadNote": "hilo compartido — visible para cualquiera con acceso al espacio de trabajo",
+        "placeholder": "Pregunte sobre este sistema — p. ej. \"¿cómo haría de alta disponibilidad la capa de datos?\" (⌘/Ctrl+Enter para enviar)",
+        "send": "Enviar",
+        "thinking": "Pensando…",
+        "you": "Usted",
+        "assistant": "Crítico",
+        "loadError": "No se pudo cargar el hilo de chat.",
+        "sendError": "No se pudo enviar el mensaje."
+      },
+      "translatedNote": "Traducido del original al visualizar."
     }
   },
   "workspaceDetail": {
@@ -2108,7 +2161,10 @@
       "runTriggers": "Disparadores de ejecución",
       "sharing": "Compartición",
       "selectLabel": "Sección del espacio de trabajo",
-      "cost": "Coste"
+      "cost": "Coste",
+      "architecture": "Arquitectura",
+      "insights": "Perspectivas",
+      "automation": "Automatización"
     },
     "lifecycle": {
       "pendingDeletion": "Pendiente de eliminación",
@@ -2496,6 +2552,14 @@
       "stateActionFailed": "La acción de estado falló",
       "uploadState": "No se pudo subir el estado",
       "uploadStateFile": "No se pudo subir el archivo de estado"
+    },
+    "subtabs": {
+      "state": "Estado",
+      "stateGraph": "Grafo",
+      "cost": "Coste",
+      "architecture": "Arquitectura",
+      "runTasks": "Tareas",
+      "runTriggers": "Disparadores"
     }
   },
   "graphs": {

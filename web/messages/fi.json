@@ -2055,6 +2055,59 @@
         "medium": "keskitaso",
         "low": "matala"
       }
+    },
+    "architecture": {
+      "loadError": "Arkkitehtuurikritiikin lataaminen epäonnistui.",
+      "notEnabled": "Tekoälyn arkkitehtuurikriitikkoa ei ole otettu käyttöön tässä asennuksessa.",
+      "absent": "Nykyiselle tilalle ei ole vielä luotu arkkitehtuurikritiikkiä.",
+      "generate": "Luo kritiikki",
+      "regenerate": "Luo uudelleen",
+      "regenerating": "Asetetaan jonoon…",
+      "regenerateConfirm": "Asetetaanko uusi arkkitehtuurikritiikki jonoon nykyiselle tilalle?",
+      "regenerateError": "Uuden kritiikin asettaminen jonoon epäonnistui.",
+      "pending": "Luodaan arkkitehtuurikritiikkiä…",
+      "errored": "Arkkitehtuurikritiikin luonti epäonnistui.",
+      "skipped": "Arkkitehtuurikritiikki ohitettiin (ei tilaa tai päivittäinen budjetti saavutettiin).",
+      "asOfState": "tilan #{serial} mukaan",
+      "systemTitle": "Päätelty arkkitehtuuri",
+      "tiers": "Kerrokset",
+      "dataStores": "Tietovarastot",
+      "blastRadius": "Vaikutusalue",
+      "noFindings": "Arkkitehtuuririskejä ei havaittu — järjestelmä vaikuttaa hyvin suunnitellulta tarkastelluille tiedoille.",
+      "recommendation": "Suositus",
+      "groundedIn": "perustuu lähteeseen {source}",
+      "deferredTitle": "Vaatii attribuuttien tarkistuksen",
+      "deferredHint": "Seikat, joita kriitikko ei voinut arvioida saamistaan tila-attribuuteista — tarkista nämä manuaalisesti sen sijaan, että oletat niiden olevan kunnossa.",
+      "provenance": "Tekoälyn arvio käyttöön otetusta järjestelmästä, joka perustuu deterministiseen tietoturvatarkistukseen, kustannusmoottoriin ja resurssigraafiin. Tarkista havainnot ennen toimenpiteitä.",
+      "severity": {
+        "low": "Matala",
+        "medium": "Keskitaso",
+        "high": "Korkea",
+        "critical": "Kriittinen"
+      },
+      "category": {
+        "reliability": "Luotettavuus",
+        "security": "Turvallisuus",
+        "cost": "Kustannus",
+        "operations": "Toiminta",
+        "scalability": "Skaalautuvuus"
+      },
+      "heading": "Tekoälyn arkkitehtuurikritiikki",
+      "aiGenerated": "Tekoälyn luoma",
+      "findingsHeading": "Havainnot",
+      "tokens": "{input} sisään / {output} ulos tokenia",
+      "chat": {
+        "heading": "Jatkokysymys",
+        "sharedThreadNote": "Jaettu keskustelu — näkyvissä kaikille, joilla on pääsy työtilaan",
+        "placeholder": "Kysy tästä järjestelmästä — esim. \"miten teen datakerroksesta HA?\" (⌘/Ctrl+Enter lähettää)",
+        "send": "Lähetä",
+        "thinking": "Ajatellaan…",
+        "you": "Sinä",
+        "assistant": "Kriitikko",
+        "loadError": "Keskusteluketjun lataaminen epäonnistui.",
+        "sendError": "Viestisi lähettäminen epäonnistui."
+      },
+      "translatedNote": "Käännetty alkuperäisestä katselun yhteydessä."
     }
   },
   "workspaceDetail": {
@@ -2108,7 +2161,10 @@
       "runTriggers": "Ajokäynnistimet",
       "sharing": "Jakaminen",
       "selectLabel": "Työtilan osio",
-      "cost": "Kustannukset"
+      "cost": "Kustannukset",
+      "architecture": "Arkkitehtuuri",
+      "insights": "Näkemykset",
+      "automation": "Automaatio"
     },
     "lifecycle": {
       "pendingDeletion": "Odottaa poistoa",
@@ -2496,6 +2552,14 @@
       "stateActionFailed": "Tilatoiminto epäonnistui",
       "uploadState": "Tilan lataaminen epäonnistui",
       "uploadStateFile": "Tilatiedoston lataaminen epäonnistui"
+    },
+    "subtabs": {
+      "state": "Tila",
+      "stateGraph": "Graafi",
+      "cost": "Kustannukset",
+      "architecture": "Arkkitehtuuri",
+      "runTasks": "Tehtävät",
+      "runTriggers": "Käynnistimet"
     }
   },
   "graphs": {

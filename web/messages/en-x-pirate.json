@@ -2055,6 +2055,59 @@
         "medium": "middlin'",
         "low": "low"
       }
+    },
+    "architecture": {
+      "loadError": "Couldn''t haul in th'' architecture critique.",
+      "notEnabled": "Th'' AI architecture critic be not hoisted on this deployment.",
+      "absent": "No architecture critique be charted for th'' current state as yet.",
+      "generate": "Chart critique",
+      "regenerate": "Chart anew",
+      "regenerating": "Queuin''…",
+      "regenerateConfirm": "Queue a fresh architecture critique for th'' current state, aye?",
+      "regenerateError": "Couldn''t queue a new critique.",
+      "pending": "Chartin'' th'' architecture critique…",
+      "errored": "Th'' architecture critique failed to chart.",
+      "skipped": "Th'' architecture critique were skipped (no state, or th'' daily bounty were spent).",
+      "asOfState": "as o'' state #{serial}",
+      "systemTitle": "Reckoned architecture",
+      "tiers": "Decks",
+      "dataStores": "Data holds",
+      "blastRadius": "Blast radius",
+      "noFindings": "No architectural perils were flagged — this vessel be well-built for th'' charts reviewed.",
+      "recommendation": "Orders",
+      "groundedIn": "moored in {source}",
+      "deferredTitle": "Needs a closer squint",
+      "deferredHint": "Matters th'' critic couldn''t judge from th'' state attributes it were handed — inspect these yerself rather than assumin'' they be shipshape.",
+      "provenance": "An AI reckonin'' o'' th'' deployed vessel, moored in th'' deterministic security scan, cost engine, an'' resource chart. Review th'' findings afore ye act.",
+      "severity": {
+        "low": "Low",
+        "medium": "Middlin''",
+        "high": "High",
+        "critical": "Dire"
+      },
+      "category": {
+        "reliability": "Seaworthiness",
+        "security": "Security",
+        "cost": "Bounty",
+        "operations": "Operations",
+        "scalability": "Scalability"
+      },
+      "heading": "AI architecture critique",
+      "aiGenerated": "AI-conjured",
+      "findingsHeading": "Findings",
+      "tokens": "{input} in / {output} out tokens",
+      "chat": {
+        "heading": "Ask a follow-up",
+        "sharedThreadNote": "shared log — seen by any soul with workspace access",
+        "placeholder": "Ask about this vessel — e.g. \"how would I make th'' data deck HA?\" (⌘/Ctrl+Enter to send)",
+        "send": "Send",
+        "thinking": "Ponderin''…",
+        "you": "Ye",
+        "assistant": "Critic",
+        "loadError": "Couldn''t haul in th'' chat log.",
+        "sendError": "Couldn''t send yer message."
+      },
+      "translatedNote": "Translated from th'' original on view."
     }
   },
   "workspaceDetail": {
@@ -2108,7 +2161,10 @@
       "runTriggers": "Voyage Triggers",
       "sharing": "Sharin''",
       "selectLabel": "Work-deck section",
-      "cost": "Booty"
+      "cost": "Booty",
+      "architecture": "Architecture",
+      "insights": "Insights",
+      "automation": "Automation"
     },
     "lifecycle": {
       "pendingDeletion": "Pendin'' send t'' Davy Jones",
@@ -2496,6 +2552,14 @@
       "stateActionFailed": "State action failed",
       "uploadState": "Failed t'' hoist th'' state aboard",
       "uploadStateFile": "Failed t'' hoist th'' state file aboard"
+    },
+    "subtabs": {
+      "state": "State",
+      "stateGraph": "Chart",
+      "cost": "Bounty",
+      "architecture": "Architecture",
+      "runTasks": "Tasks",
+      "runTriggers": "Triggers"
     }
   },
   "graphs": {

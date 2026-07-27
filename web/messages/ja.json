@@ -2055,6 +2055,59 @@
         "medium": "中",
         "low": "低"
       }
+    },
+    "architecture": {
+      "loadError": "アーキテクチャ評価の読み込みに失敗しました。",
+      "notEnabled": "この環境では AI アーキテクチャ評価が有効になっていません。",
+      "absent": "現在の状態に対するアーキテクチャ評価はまだ生成されていません。",
+      "generate": "評価を生成",
+      "regenerate": "再生成",
+      "regenerating": "キューに追加中…",
+      "regenerateConfirm": "現在の状態に対して新しいアーキテクチャ評価をキューに追加しますか？",
+      "regenerateError": "新しい評価をキューに追加できませんでした。",
+      "pending": "アーキテクチャ評価を生成中…",
+      "errored": "アーキテクチャ評価の生成に失敗しました。",
+      "skipped": "アーキテクチャ評価はスキップされました（状態がない、または 1 日の上限に達したため）。",
+      "asOfState": "状態 #{serial} 時点",
+      "systemTitle": "推定アーキテクチャ",
+      "tiers": "階層",
+      "dataStores": "データストア",
+      "blastRadius": "影響範囲",
+      "noFindings": "アーキテクチャ上のリスクは検出されませんでした — レビュー対象のデータの範囲では、このシステムは適切に設計されているようです。",
+      "recommendation": "推奨事項",
+      "groundedIn": "{source} に基づく",
+      "deferredTitle": "属性の確認が必要",
+      "deferredHint": "与えられた状態の属性からは評価が判断できなかった懸念事項です。問題ないと決めつけず、手動で確認してください。",
+      "provenance": "デプロイされたシステムに対する AI 評価で、確定的なセキュリティスキャン、コストエンジン、リソースグラフに基づいています。対応する前に指摘事項を確認してください。",
+      "severity": {
+        "low": "低",
+        "medium": "中",
+        "high": "高",
+        "critical": "重大"
+      },
+      "category": {
+        "reliability": "信頼性",
+        "security": "セキュリティ",
+        "cost": "コスト",
+        "operations": "運用",
+        "scalability": "スケーラビリティ"
+      },
+      "heading": "AI アーキテクチャ評価",
+      "aiGenerated": "AI生成",
+      "findingsHeading": "指摘事項",
+      "tokens": "入力 {input} / 出力 {output} トークン",
+      "chat": {
+        "heading": "フォローアップ",
+        "sharedThreadNote": "共有スレッド — ワークスペースにアクセスできる全員に表示されます",
+        "placeholder": "このシステムについて質問する — 例:「データ層を HA にするには？」（⌘/Ctrl+Enter で送信）",
+        "send": "送信",
+        "thinking": "思考中…",
+        "you": "あなた",
+        "assistant": "レビュアー",
+        "loadError": "チャットスレッドの読み込みに失敗しました。",
+        "sendError": "メッセージの送信に失敗しました。"
+      },
+      "translatedNote": "表示時に原文から翻訳されています。"
     }
   },
   "workspaceDetail": {
@@ -2108,7 +2161,10 @@
       "runTriggers": "実行トリガー",
       "sharing": "共有",
       "selectLabel": "ワークスペースセクション",
-      "cost": "コスト"
+      "cost": "コスト",
+      "architecture": "アーキテクチャ",
+      "insights": "インサイト",
+      "automation": "自動化"
     },
     "lifecycle": {
       "pendingDeletion": "削除保留中",
@@ -2496,6 +2552,14 @@
       "stateActionFailed": "状態操作に失敗しました",
       "uploadState": "状態のアップロードに失敗しました",
       "uploadStateFile": "状態ファイルのアップロードに失敗しました"
+    },
+    "subtabs": {
+      "state": "状態",
+      "stateGraph": "グラフ",
+      "cost": "コスト",
+      "architecture": "アーキテクチャ",
+      "runTasks": "タスク",
+      "runTriggers": "トリガー"
     }
   },
   "graphs": {

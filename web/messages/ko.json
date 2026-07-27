@@ -2055,6 +2055,59 @@
         "medium": "중간",
         "low": "낮음"
       }
+    },
+    "architecture": {
+      "loadError": "아키텍처 평가를 불러오지 못했습니다.",
+      "notEnabled": "이 배포에서는 AI 아키텍처 평가가 활성화되어 있지 않습니다.",
+      "absent": "현재 상태에 대한 아키텍처 평가가 아직 생성되지 않았습니다.",
+      "generate": "평가 생성",
+      "regenerate": "재생성",
+      "regenerating": "대기열에 추가 중…",
+      "regenerateConfirm": "현재 상태에 대해 새로운 아키텍처 평가를 대기열에 추가하시겠습니까?",
+      "regenerateError": "새 평가를 대기열에 추가하지 못했습니다.",
+      "pending": "아키텍처 평가를 생성하는 중…",
+      "errored": "아키텍처 평가 생성에 실패했습니다.",
+      "skipped": "아키텍처 평가를 건너뛰었습니다(상태가 없거나 일일 한도에 도달함).",
+      "asOfState": "상태 #{serial} 기준",
+      "systemTitle": "추론된 아키텍처",
+      "tiers": "계층",
+      "dataStores": "데이터 저장소",
+      "blastRadius": "영향 범위",
+      "noFindings": "아키텍처 상의 위험이 발견되지 않았습니다 — 검토한 데이터 기준으로 이 시스템은 잘 설계된 것으로 보입니다.",
+      "recommendation": "권장 사항",
+      "groundedIn": "{source} 기반",
+      "deferredTitle": "속성 검토 필요",
+      "deferredHint": "제공된 상태 속성만으로는 평가가 판단할 수 없었던 우려 사항입니다. 괜찮다고 단정하지 말고 수동으로 검토하세요.",
+      "provenance": "배포된 시스템에 대한 AI 평가로, 결정적 보안 스캔, 비용 엔진, 리소스 그래프를 기반으로 합니다. 조치하기 전에 발견 사항을 검토하세요.",
+      "severity": {
+        "low": "낮음",
+        "medium": "중간",
+        "high": "높음",
+        "critical": "치명적"
+      },
+      "category": {
+        "reliability": "신뢰성",
+        "security": "보안",
+        "cost": "비용",
+        "operations": "운영",
+        "scalability": "확장성"
+      },
+      "heading": "AI 아키텍처 평가",
+      "aiGenerated": "AI 생성",
+      "findingsHeading": "발견 사항",
+      "tokens": "입력 {input} / 출력 {output} 토큰",
+      "chat": {
+        "heading": "후속 질문",
+        "sharedThreadNote": "공유 스레드 — 워크스페이스에 접근할 수 있는 모든 사람에게 표시됩니다",
+        "placeholder": "이 시스템에 대해 질문하세요 — 예: “데이터 계층을 HA로 만들려면?” (⌘/Ctrl+Enter로 전송)",
+        "send": "전송",
+        "thinking": "생각 중…",
+        "you": "나",
+        "assistant": "평가자",
+        "loadError": "채팅 스레드를 불러오지 못했습니다.",
+        "sendError": "메시지를 전송하지 못했습니다."
+      },
+      "translatedNote": "보기 시 원문에서 번역되었습니다."
     }
   },
   "workspaceDetail": {
@@ -2108,7 +2161,10 @@
       "runTriggers": "실행 트리거",
       "sharing": "공유",
       "selectLabel": "워크스페이스 섹션",
-      "cost": "비용"
+      "cost": "비용",
+      "architecture": "아키텍처",
+      "insights": "인사이트",
+      "automation": "자동화"
     },
     "lifecycle": {
       "pendingDeletion": "삭제 대기 중",
@@ -2496,6 +2552,14 @@
       "stateActionFailed": "상태 작업에 실패했습니다",
       "uploadState": "상태를 업로드하지 못했습니다",
       "uploadStateFile": "상태 파일을 업로드하지 못했습니다"
+    },
+    "subtabs": {
+      "state": "상태",
+      "stateGraph": "그래프",
+      "cost": "비용",
+      "architecture": "아키텍처",
+      "runTasks": "작업",
+      "runTriggers": "트리거"
     }
   },
   "graphs": {

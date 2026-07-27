@@ -2055,6 +2055,59 @@
         "medium": "orta",
         "low": "düşük"
       }
+    },
+    "architecture": {
+      "loadError": "Mimari eleştirisi yüklenemedi.",
+      "notEnabled": "AI mimari eleştirmeni bu dağıtımda etkin değil.",
+      "absent": "Geçerli durum için henüz bir mimari eleştirisi üretilmedi.",
+      "generate": "Eleştiri üret",
+      "regenerate": "Yeniden üret",
+      "regenerating": "Sıraya alınıyor…",
+      "regenerateConfirm": "Geçerli durum için yeni bir mimari eleştirisi sıraya alınsın mı?",
+      "regenerateError": "Yeni bir eleştiri sıraya alınamadı.",
+      "pending": "Mimari eleştirisi üretiliyor…",
+      "errored": "Mimari eleştirisi üretilemedi.",
+      "skipped": "Mimari eleştirisi atlandı (durum yok veya günlük bütçeye ulaşıldı).",
+      "asOfState": "durum #{serial} itibarıyla",
+      "systemTitle": "Çıkarımlanan mimari",
+      "tiers": "Katmanlar",
+      "dataStores": "Veri depoları",
+      "blastRadius": "Etki alanı",
+      "noFindings": "Herhangi bir mimari risk işaretlenmedi — bu sistem, incelenen veriler için iyi tasarlanmış görünüyor.",
+      "recommendation": "Öneri",
+      "groundedIn": "{source} temel alınarak",
+      "deferredTitle": "Öznitelik incelemesi gerekli",
+      "deferredHint": "Eleştirmenin, kendisine verilen durum öznitelikleri üzerinden değerlendiremediği konular — bunları sorunsuz varsaymak yerine elle inceleyin.",
+      "provenance": "Dağıtılan sistemin, deterministik güvenlik taraması, maliyet motoru ve kaynak grafiğine dayanan bir AI değerlendirmesi. Harekete geçmeden önce bulguları inceleyin.",
+      "severity": {
+        "low": "Düşük",
+        "medium": "Orta",
+        "high": "Yüksek",
+        "critical": "Kritik"
+      },
+      "category": {
+        "reliability": "Güvenilirlik",
+        "security": "Güvenlik",
+        "cost": "Maliyet",
+        "operations": "Operasyonlar",
+        "scalability": "Ölçeklenebilirlik"
+      },
+      "heading": "AI mimari eleştirisi",
+      "aiGenerated": "AI üretti",
+      "findingsHeading": "Bulgular",
+      "tokens": "{input} giriş / {output} çıkış belirteci",
+      "chat": {
+        "heading": "Bir izleme sorusu sorun",
+        "sharedThreadNote": "paylaşılan konu — çalışma alanı erişimi olan herkes tarafından görülebilir",
+        "placeholder": "Bu sistem hakkında sorun — örn. \"veri katmanını nasıl HA yaparım?\" (göndermek için ⌘/Ctrl+Enter)",
+        "send": "Gönder",
+        "thinking": "Düşünüyor…",
+        "you": "Siz",
+        "assistant": "Eleştirmen",
+        "loadError": "Sohbet konusu yüklenemedi.",
+        "sendError": "Mesajınız gönderilemedi."
+      },
+      "translatedNote": "Görüntülenirken orijinalinden çevrildi."
     }
   },
   "workspaceDetail": {
@@ -2108,7 +2161,10 @@
       "runTriggers": "Çalıştırma Tetikleyicileri",
       "sharing": "Paylaşım",
       "selectLabel": "Çalışma alanı bölümü",
-      "cost": "Maliyet"
+      "cost": "Maliyet",
+      "architecture": "Mimari",
+      "insights": "İçgörüler",
+      "automation": "Otomasyon"
     },
     "lifecycle": {
       "pendingDeletion": "Silinmeyi bekliyor",
@@ -2496,6 +2552,14 @@
       "stateActionFailed": "Durum eylemi başarısız",
       "uploadState": "Durum yüklenemedi",
       "uploadStateFile": "Durum dosyası yüklenemedi"
+    },
+    "subtabs": {
+      "state": "Durum",
+      "stateGraph": "Grafik",
+      "cost": "Maliyet",
+      "architecture": "Mimari",
+      "runTasks": "Görevler",
+      "runTriggers": "Tetikleyiciler"
     }
   },
   "graphs": {

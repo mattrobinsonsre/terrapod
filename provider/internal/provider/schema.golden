@@ -5,6 +5,19 @@ data terrapod_agent_pool.labels required=false optional=false computed=true sens
 data terrapod_agent_pool.name required=true optional=false computed=false sensitive=false type=basetypes.StringType
 data terrapod_agent_pool.owner_email required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_agent_pool.updated_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
+data terrapod_architecture_critique.architecture required=false optional=false computed=true sensitive=false type=types.ObjectType["blast_radius":basetypes.StringType, "data_stores":types.ListType[basetypes.StringType], "summary":basetypes.StringType, "tiers":types.ListType[basetypes.StringType]]
+data terrapod_architecture_critique.created_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
+data terrapod_architecture_critique.deferred required=false optional=false computed=true sensitive=false type=types.ListType[basetypes.StringType]
+data terrapod_architecture_critique.error_message required=false optional=false computed=true sensitive=false type=basetypes.StringType
+data terrapod_architecture_critique.findings required=false optional=false computed=true sensitive=false type=types.ListType[types.ObjectType["category":basetypes.StringType, "detail":basetypes.StringType, "grounded_in":basetypes.StringType, "recommendation":basetypes.StringType, "resource_address":basetypes.StringType, "severity":basetypes.StringType, "title":basetypes.StringType]]
+data terrapod_architecture_critique.input_tokens required=false optional=false computed=true sensitive=false type=basetypes.Int64Type
+data terrapod_architecture_critique.model required=false optional=false computed=true sensitive=false type=basetypes.StringType
+data terrapod_architecture_critique.output_tokens required=false optional=false computed=true sensitive=false type=basetypes.Int64Type
+data terrapod_architecture_critique.risk_level required=false optional=false computed=true sensitive=false type=basetypes.StringType
+data terrapod_architecture_critique.state_serial required=false optional=false computed=true sensitive=false type=basetypes.Int64Type
+data terrapod_architecture_critique.status required=false optional=false computed=true sensitive=false type=basetypes.StringType
+data terrapod_architecture_critique.updated_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
+data terrapod_architecture_critique.workspace_id required=true optional=false computed=false sensitive=false type=basetypes.StringType
 data terrapod_catalog_instances.catalog_item_id required=true optional=false computed=false sensitive=false type=basetypes.StringType
 data terrapod_catalog_instances.instances required=false optional=false computed=true sensitive=false type=types.ListType[types.ObjectType["agent_pool_id":basetypes.StringType, "id":basetypes.StringType, "name":basetypes.StringType, "version_pin":basetypes.StringType]]
 data terrapod_catalog_instances.name_contains required=false optional=true computed=false sensitive=false type=basetypes.StringType

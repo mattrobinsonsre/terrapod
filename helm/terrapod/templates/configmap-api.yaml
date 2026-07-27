@@ -450,6 +450,8 @@ data:
       # int64 cast prevents Helm's float formatter from emitting scientific
       # notation for large values, which Pydantic refuses as an int.
       daily_token_budget: {{ .Values.api.config.ai_architecture.daily_token_budget | default 0 | int64 }}
+      followup_max_messages: {{ .Values.api.config.ai_architecture.followup_max_messages | default 20 | int64 }}
+      followup_max_output_tokens: {{ .Values.api.config.ai_architecture.followup_max_output_tokens | default 2048 | int64 }}
       {{- if .Values.api.config.ai_architecture.context }}
       context: {{ .Values.api.config.ai_architecture.context | quote }}
       {{- end }}

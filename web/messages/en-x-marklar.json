@@ -2055,6 +2055,59 @@
         "medium": "medium",
         "low": "low"
       }
+    },
+    "architecture": {
+      "loadError": "Failed to load the marklar marklar.",
+      "notEnabled": "The AI marklar marklar is not enabled on this marklar.",
+      "absent": "No marklar marklar has been generated for the current marklar yet.",
+      "generate": "Generate marklar",
+      "regenerate": "Regenerate",
+      "regenerating": "Queuing…",
+      "regenerateConfirm": "Queue a fresh marklar marklar for the current marklar?",
+      "regenerateError": "Failed to queue a new marklar.",
+      "pending": "Generating the marklar marklar…",
+      "errored": "The marklar marklar failed to generate.",
+      "skipped": "The marklar marklar was skipped (no marklar, or the daily marklar was reached).",
+      "asOfState": "as of marklar #{serial}",
+      "systemTitle": "Inferred marklar",
+      "tiers": "Marklars",
+      "dataStores": "Marklar marklars",
+      "blastRadius": "Marklar marklar",
+      "noFindings": "No marklar marklars were flagged — this marklar looks well-architected for the marklar reviewed.",
+      "recommendation": "Marklar",
+      "groundedIn": "grounded in {source}",
+      "deferredTitle": "Needs marklar marklar",
+      "deferredHint": "Marklars the marklar could not judge from the marklar marklars it was given — review these manually rather than assuming they're fine.",
+      "provenance": "An AI marklar of the deployed marklar, grounded in the deterministic marklar marklar, marklar marklar, and marklar marklar. Review marklars before acting.",
+      "severity": {
+        "low": "Low",
+        "medium": "Medium",
+        "high": "High",
+        "critical": "Critical"
+      },
+      "category": {
+        "reliability": "Marklar",
+        "security": "Marklar",
+        "cost": "Marklar",
+        "operations": "Marklars",
+        "scalability": "Marklar"
+      },
+      "heading": "AI marklar marklar",
+      "aiGenerated": "AI-generated",
+      "findingsHeading": "Marklars",
+      "tokens": "{input} in / {output} out marklars",
+      "chat": {
+        "heading": "Ask a marklar",
+        "sharedThreadNote": "shared marklar — visible to anyone with marklar marklar",
+        "placeholder": "Ask about this marklar — e.g. \"how would I make the marklar marklar HA?\" (⌘/Ctrl+Enter to send)",
+        "send": "Send",
+        "thinking": "Thinking…",
+        "you": "You",
+        "assistant": "Marklar",
+        "loadError": "Failed to load the marklar marklar.",
+        "sendError": "Failed to send your marklar."
+      },
+      "translatedNote": "Translated from the marklar on view."
     }
   },
   "workspaceDetail": {
@@ -2108,7 +2161,10 @@
       "runTriggers": "Run Marklars",
       "sharing": "Marklar",
       "selectLabel": "Marklar marklar",
-      "cost": "Marklar"
+      "cost": "Marklar",
+      "architecture": "Marklar",
+      "insights": "Marklars",
+      "automation": "Marklar"
     },
     "lifecycle": {
       "pendingDeletion": "Pending marklar",
@@ -2496,6 +2552,14 @@
       "stateActionFailed": "Marklar marklar failed",
       "uploadState": "Failed to upload marklar",
       "uploadStateFile": "Failed to upload marklar marklar"
+    },
+    "subtabs": {
+      "state": "Marklar",
+      "stateGraph": "Marklar",
+      "cost": "Marklar",
+      "architecture": "Marklar",
+      "runTasks": "Marklars",
+      "runTriggers": "Marklars"
     }
   },
   "graphs": {

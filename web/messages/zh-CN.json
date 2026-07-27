@@ -2055,6 +2055,59 @@
         "medium": "中",
         "low": "低"
       }
+    },
+    "architecture": {
+      "loadError": "无法加载架构评审。",
+      "notEnabled": "此部署未启用 AI 架构评审。",
+      "absent": "尚未为当前状态生成架构评审。",
+      "generate": "生成评审",
+      "regenerate": "重新生成",
+      "regenerating": "正在排队…",
+      "regenerateConfirm": "为当前状态排队生成一份新的架构评审吗？",
+      "regenerateError": "无法排队生成新的评审。",
+      "pending": "正在生成架构评审…",
+      "errored": "架构评审生成失败。",
+      "skipped": "已跳过架构评审（无状态，或已达到每日额度）。",
+      "asOfState": "截至状态 #{serial}",
+      "systemTitle": "推断的架构",
+      "tiers": "层级",
+      "dataStores": "数据存储",
+      "blastRadius": "影响范围",
+      "noFindings": "未发现架构风险 — 就所审查的数据而言，此系统的架构设计良好。",
+      "recommendation": "建议",
+      "groundedIn": "基于 {source}",
+      "deferredTitle": "需要属性审查",
+      "deferredHint": "评审无法根据所提供的状态属性做出判断的疑虑 — 请勿想当然地认为没有问题，应手动审查这些项。",
+      "provenance": "对已部署系统的 AI 评估，基于确定性安全扫描、成本引擎和资源图。在采取行动前请审查发现事项。",
+      "severity": {
+        "low": "低",
+        "medium": "中",
+        "high": "高",
+        "critical": "严重"
+      },
+      "category": {
+        "reliability": "可靠性",
+        "security": "安全",
+        "cost": "成本",
+        "operations": "运维",
+        "scalability": "可扩展性"
+      },
+      "heading": "AI 架构评审",
+      "aiGenerated": "AI 生成",
+      "findingsHeading": "发现事项",
+      "tokens": "{input} 输入 / {output} 输出 令牌",
+      "chat": {
+        "heading": "追问",
+        "sharedThreadNote": "共享线程 — 对任何具有工作区访问权限的人可见",
+        "placeholder": "询问关于此系统的问题 — 例如“如何让数据层实现高可用（HA）？”（⌘/Ctrl+Enter 发送）",
+        "send": "发送",
+        "thinking": "正在思考…",
+        "you": "你",
+        "assistant": "评审",
+        "loadError": "无法加载聊天线程。",
+        "sendError": "无法发送您的消息。"
+      },
+      "translatedNote": "查看时从原文翻译。"
     }
   },
   "workspaceDetail": {
@@ -2108,7 +2161,10 @@
       "runTriggers": "运行触发器",
       "sharing": "共享",
       "selectLabel": "工作区部分",
-      "cost": "成本"
+      "cost": "成本",
+      "architecture": "架构",
+      "insights": "洞察",
+      "automation": "自动化"
     },
     "lifecycle": {
       "pendingDeletion": "待删除",
@@ -2496,6 +2552,14 @@
       "stateActionFailed": "状态操作失败",
       "uploadState": "上传状态失败",
       "uploadStateFile": "上传状态文件失败"
+    },
+    "subtabs": {
+      "state": "状态",
+      "stateGraph": "图",
+      "cost": "成本",
+      "architecture": "架构",
+      "runTasks": "任务",
+      "runTriggers": "触发器"
     }
   },
   "graphs": {

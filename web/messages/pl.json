@@ -2055,6 +2055,59 @@
         "medium": "średni",
         "low": "niski"
       }
+    },
+    "architecture": {
+      "loadError": "Nie udało się wczytać krytyki architektury.",
+      "notEnabled": "Krytyk architektury AI nie jest włączony w tym wdrożeniu.",
+      "absent": "Nie wygenerowano jeszcze krytyki architektury dla bieżącego stanu.",
+      "generate": "Wygeneruj krytykę",
+      "regenerate": "Wygeneruj ponownie",
+      "regenerating": "Kolejkowanie…",
+      "regenerateConfirm": "Zakolejkować nową krytykę architektury dla bieżącego stanu?",
+      "regenerateError": "Nie udało się zakolejkować nowej krytyki.",
+      "pending": "Generowanie krytyki architektury…",
+      "errored": "Nie udało się wygenerować krytyki architektury.",
+      "skipped": "Krytyka architektury została pominięta (brak stanu lub osiągnięto dzienny limit).",
+      "asOfState": "według stanu nr {serial}",
+      "systemTitle": "Wywnioskowana architektura",
+      "tiers": "Warstwy",
+      "dataStores": "Magazyny danych",
+      "blastRadius": "Zasięg oddziaływania",
+      "noFindings": "Nie oznaczono żadnych ryzyk architektonicznych — na podstawie przejrzanych danych system wygląda na dobrze zaprojektowany.",
+      "recommendation": "Rekomendacja",
+      "groundedIn": "w oparciu o {source}",
+      "deferredTitle": "Wymaga przeglądu atrybutów",
+      "deferredHint": "Kwestie, których krytyk nie mógł ocenić na podstawie dostępnych atrybutów stanu — sprawdź je ręcznie, zamiast zakładać, że są w porządku.",
+      "provenance": "Ocena wdrożonego systemu przez AI, oparta na deterministycznym skanie bezpieczeństwa, silniku kosztów i grafie zasobów. Przejrzyj wyniki przed podjęciem działań.",
+      "severity": {
+        "low": "Niski",
+        "medium": "Średni",
+        "high": "Wysoki",
+        "critical": "Krytyczny"
+      },
+      "category": {
+        "reliability": "Niezawodność",
+        "security": "Bezpieczeństwo",
+        "cost": "Koszt",
+        "operations": "Operacje",
+        "scalability": "Skalowalność"
+      },
+      "heading": "Krytyka architektury AI",
+      "aiGenerated": "Wygenerowano przez AI",
+      "findingsHeading": "Wyniki",
+      "tokens": "{input} we / {output} wy tokenów",
+      "chat": {
+        "heading": "Pytanie uzupełniające",
+        "sharedThreadNote": "wspólny wątek — widoczny dla każdego z dostępem do obszaru roboczego",
+        "placeholder": "Zapytaj o ten system — np. „jak uczynić warstwę danych wysokodostępną?” (⌘/Ctrl+Enter, aby wysłać)",
+        "send": "Wyślij",
+        "thinking": "Myślenie…",
+        "you": "Ty",
+        "assistant": "Krytyk",
+        "loadError": "Nie udało się wczytać wątku czatu.",
+        "sendError": "Nie udało się wysłać wiadomości."
+      },
+      "translatedNote": "Przetłumaczono z oryginału podczas wyświetlania."
     }
   },
   "workspaceDetail": {
@@ -2108,7 +2161,10 @@
       "runTriggers": "Wyzwalacze przebiegów",
       "sharing": "Udostępnianie",
       "selectLabel": "Sekcja obszaru roboczego",
-      "cost": "Koszt"
+      "cost": "Koszt",
+      "architecture": "Architektura",
+      "insights": "Analizy",
+      "automation": "Automatyzacja"
     },
     "lifecycle": {
       "pendingDeletion": "Oczekuje na usunięcie",
@@ -2496,6 +2552,14 @@
       "stateActionFailed": "Akcja stanu nie powiodła się",
       "uploadState": "Nie udało się przesłać stanu",
       "uploadStateFile": "Nie udało się przesłać pliku stanu"
+    },
+    "subtabs": {
+      "state": "Stan",
+      "stateGraph": "Graf",
+      "cost": "Koszt",
+      "architecture": "Architektura",
+      "runTasks": "Zadania",
+      "runTriggers": "Wyzwalacze"
     }
   },
   "graphs": {

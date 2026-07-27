@@ -586,6 +586,11 @@ api:
       # standards, accepted-risk register, required regions/AZs). Guides
       # judgment; never a substitute for the grounded state/scan/cost inputs.
       context: ""
+      # Follow-up chat (#1036): cap on user questions per critique (0 disables
+      # the chat; the initial critique still generates) and the reply token
+      # ceiling (smaller than max_output_tokens — chat is conversational).
+      followup_max_messages: 20
+      followup_max_output_tokens: 2048
       auth:
         # api_key is injected via env var (TERRAPOD_AI_ARCHITECTURE__AUTH__API_KEY)
         # from a K8s Secret — set it through api.extraEnv / extraEnvFrom; it is

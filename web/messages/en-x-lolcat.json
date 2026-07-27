@@ -2055,6 +2055,59 @@
         "medium": "medium",
         "low": "lo"
       }
+    },
+    "architecture": {
+      "loadError": "Cudnt lode teh architeksher criteek.",
+      "notEnabled": "Teh AI architeksher critik iz not turnd on on dis deploymint.",
+      "absent": "No architeksher criteek haz ben maed for teh currint stayt yet.",
+      "generate": "Maek criteek",
+      "regenerate": "Maek agin",
+      "regenerating": "Kewin…",
+      "regenerateConfirm": "Kew a fresh architeksher criteek for teh currint stayt?",
+      "regenerateError": "Cudnt kew a noo criteek.",
+      "pending": "Makin teh architeksher criteek…",
+      "errored": "Teh architeksher criteek faild to maek.",
+      "skipped": "Teh architeksher criteek wuz skippd (no stayt, or teh daylee budjit wuz reechd).",
+      "asOfState": "az of stayt #{serial}",
+      "systemTitle": "Gessd architeksher",
+      "tiers": "Teirz",
+      "dataStores": "Data storez",
+      "blastRadius": "Blast radeeus",
+      "noFindings": "No architeksheral risks wuz flaggd — dis sistem lookz wel-bilt for teh data lookd at.",
+      "recommendation": "Rekommendashun",
+      "groundedIn": "groundd in {source}",
+      "deferredTitle": "Needz attribyoot reveew",
+      "deferredHint": "Konsernz teh critik cudnt jujj from teh stayt attribyootz it wuz givin — reveew deez by hand insted of assoomin dey iz fine.",
+      "provenance": "An AI assessmint of teh deployd sistem, groundd in teh determinstik sekurity scan, cost enjin, an resorse graf. Reveew findingz b4 actin.",
+      "severity": {
+        "low": "Lo",
+        "medium": "Meediyum",
+        "high": "Hai",
+        "critical": "Kritikal"
+      },
+      "category": {
+        "reliability": "Relaiabilitee",
+        "security": "Sekuritee",
+        "cost": "Cost",
+        "operations": "Operashunz",
+        "scalability": "Skaylabilitee"
+      },
+      "heading": "AI architeksher criteek",
+      "aiGenerated": "AI-maed",
+      "findingsHeading": "Findingz",
+      "tokens": "{input} in / {output} owt tokenz",
+      "chat": {
+        "heading": "Ask a follo-up",
+        "sharedThreadNote": "shaird thred — vizibul to enywun wif werkspaic akses",
+        "placeholder": "Ask bout dis sistem — e.g. \"how wud I maek teh data teir HA?\" (⌘/Ctrl+Enter to send)",
+        "send": "Send",
+        "thinking": "Thinkin…",
+        "you": "U",
+        "assistant": "Critik",
+        "loadError": "Cudnt lode teh chat thred.",
+        "sendError": "Cudnt send yer messij."
+      },
+      "translatedNote": "Translaytd from teh orijinal on vew."
     }
   },
   "workspaceDetail": {
@@ -2108,7 +2161,10 @@
       "runTriggers": "Run Triggurz",
       "sharing": "Sharin",
       "selectLabel": "Workspace secshun",
-      "cost": "Cost"
+      "cost": "Cost",
+      "architecture": "Architeksher",
+      "insights": "Insightz",
+      "automation": "Awtomashun"
     },
     "lifecycle": {
       "pendingDeletion": "Pendin deleshun",
@@ -2496,6 +2552,14 @@
       "stateActionFailed": "State acshun failz",
       "uploadState": "Failz ta uplod teh state",
       "uploadStateFile": "Failz ta uplod teh state file"
+    },
+    "subtabs": {
+      "state": "Stayt",
+      "stateGraph": "Graf",
+      "cost": "Cost",
+      "architecture": "Architeksher",
+      "runTasks": "Taskz",
+      "runTriggers": "Triggerz"
     }
   },
   "graphs": {
