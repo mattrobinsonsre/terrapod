@@ -167,6 +167,57 @@ All runner Jobs inherit the following settings from `runners.*` in Helm values:
 
 Each workspace has `resource_cpu` and `resource_memory` settings (default: 1 CPU / 2Gi memory) that control the resource **requests** for its runner Jobs. Limits are computed as 2x the requests automatically. These are set via the workspace API or UI.
 
+### Routing a workspace to several pools
+
+Within a pool, multiple listener replicas already give you HA — a listener pod
+dying loses nothing, because a peer claims the run. Across pools there was none:
+if a pool had no healthy listener (a dead cluster, a lost region, a pool scaled
+to zero) every run for its workspaces waited indefinitely.
+
+A workspace can name **several** agent pools. The set is **flat**: a queued run
+is offered to every pool at once and whichever pool has a live listener claims
+it first. There is no primary, no ordering preference and no rotation — order is
+display-only.
+
+**Exactly-once execution is unaffected.** A run is a single row claimed under
+`SELECT … FOR UPDATE SKIP LOCKED`, so offering it to N pools cannot produce N
+claims. On claim the run records the pool that took it, so cancelling, log
+streaming and job-status queries all address the cluster actually running it.
+If that pool goes dark between plan and apply, the apply phase can still fall
+through to another pool in the set.
+
+Set it in the workspace UI (Configuration → Agent pools), or:
+
+```hcl
+resource "terrapod_workspace" "core" {
+  name           = "core"
+  execution_mode = "agent"
+
+  # Both pools are equally eligible. Losing either one does not stop this
+  # workspace — whichever has a live runner picks the work up.
+  agent_pool_ids = [
+    terrapod_agent_pool.eu.id,
+    terrapod_agent_pool.us.id,
+  ]
+}
+```
+
+`pool:assign` is required on **every** pool in the set — a caller may not attach
+a workspace to a pool they could not have attached it to on its own.
+
+The singular `agent_pool_id` still works and reads back as the first pool in the
+set. On write it means "this workspace has exactly this one pool", so it
+**replaces** the set: if you manage `agent_pool_id` from a tool that predates
+multi-pool routing while adding pools elsewhere, that tool will drop them on its
+next apply. Manage the set with `agent_pool_ids` when more than one thing writes
+to it.
+
+**Losing every pool is the alertable condition**, since losing one is now
+survivable. A workspace whose pools have all gone dark raises a
+`no_live_agent_pool` health condition on its overview and is counted by the
+[`terrapod_workspaces_without_live_pool`](monitoring.md) gauge; per-pool
+liveness is `terrapod_pool_live`.
+
 ### Concurrency (`listener.maxConcurrent`)
 
 Each listener pod runs at most `listener.maxConcurrent` runner Jobs at once (default **3**, set in Helm values). Admission is gated on the **real** running-Job count queried from Kubernetes — not an in-memory launch counter — so the listener never exceeds the cap even during a burst, and it drains a backlog as fast as slots free (rather than one run per poll). Watch the per-pool backlog with the [`terrapod_pool_queued_runs`](monitoring.md) gauge.
