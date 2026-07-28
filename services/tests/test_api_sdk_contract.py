@@ -116,8 +116,12 @@ def _extract_workspace_api_attrs() -> set[str]:
     body = m.group(0)
     # Pull the `"attributes": { ... }` block out so we don't pick up
     # `relationships` keys or unrelated dict literals defined later in
-    # the function.
-    attrs_match = re.search(r'"attributes":\s*\{(.*?)\n\s+\}\s*,\s*"relationships"', body, re.S)
+    # the function. Comment lines are allowed to sit between the closing
+    # `},` and `"relationships"` (a comment is not API surface, so it must
+    # not fail this gate — see #1063, which documents the house style there).
+    attrs_match = re.search(
+        r'"attributes":\s*\{(.*?)\n\s+\}\s*,\s*(?:#[^\n]*\n\s*)*"relationships"', body, re.S
+    )
     if attrs_match is None:
         raise AssertionError("Could not locate attributes block inside _workspace_json")
     attrs_block = attrs_match.group(1)

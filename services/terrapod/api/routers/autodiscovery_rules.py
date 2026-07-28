@@ -88,6 +88,22 @@ def _rule_json(rule: AutodiscoveryRule) -> dict:
             "created-at": _rfc3339(rule.created_at),
             "updated-at": _rfc3339(rule.updated_at),
         },
+        # JSON:API house style (#1063): links belong in `relationships`. The
+        # `*-id` attributes above stay indefinitely for back-compat — additive.
+        "relationships": {
+            "vcs-connection": {
+                "data": {"id": f"vcs-{rule.vcs_connection_id}", "type": "vcs-connections"},
+            },
+            **(
+                {
+                    "agent-pool": {
+                        "data": {"id": f"apool-{rule.agent_pool_id}", "type": "agent-pools"},
+                    },
+                }
+                if rule.agent_pool_id
+                else {}
+            ),
+        },
         "links": {"self": f"/api/terrapod/v1/autodiscovery-rules/{rule.id}"},
     }
 

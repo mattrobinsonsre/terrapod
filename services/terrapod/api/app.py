@@ -628,6 +628,8 @@ def create_application() -> FastAPI:
     # the generic case is 409, not 500. Registered before the Exception handler
     # so the more specific type wins.
     from fastapi.exceptions import RequestValidationError
+    from fastapi.responses import Response
+    from fastapi.utils import is_body_allowed_for_status_code
     from sqlalchemy.exc import IntegrityError
     from starlette.exceptions import HTTPException as StarletteHTTPException
 
@@ -638,10 +640,16 @@ def create_application() -> FastAPI:
     # clients keep reading `detail`; go-terrapod / JSON:API clients read
     # `errors`. Covers the ~740 `raise HTTPException(detail=…)` sites uniformly.
     @app.exception_handler(StarletteHTTPException)
-    async def http_exception_handler(request: Request, exc: StarletteHTTPException) -> JSONResponse:
-        return jsonapi_error_response(
-            exc.detail, exc.status_code, headers=getattr(exc, "headers", None)
-        )
+    async def http_exception_handler(request: Request, exc: StarletteHTTPException) -> Response:
+        headers = getattr(exc, "headers", None)
+        # Match FastAPI's default handler exactly for statuses that forbid a
+        # body (1xx / 204 / 304): emit NO body. Without this the dual-key
+        # envelope would put JSON on a 204/304, which is invalid HTTP and
+        # differs from pre-#1063 behaviour. Nothing raises those today, but the
+        # guard keeps this handler a strict superset of FastAPI's.
+        if not is_body_allowed_for_status_code(exc.status_code):
+            return Response(status_code=exc.status_code, headers=headers)
+        return jsonapi_error_response(exc.detail, exc.status_code, headers=headers)
 
     @app.exception_handler(RequestValidationError)
     async def validation_exception_handler(

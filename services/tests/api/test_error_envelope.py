@@ -114,3 +114,97 @@ class TestEnvelopeHelper:
     def test_empty_list_detail_gets_placeholder(self):
         c = jsonapi_error_content([], 422)
         assert c["errors"] == [{"detail": "Validation error", "status": "422"}]
+
+
+class TestNoBodyStatusCodes:
+    """Statuses that forbid a body (1xx/204/304) must emit NO body — matching
+    FastAPI's default handler exactly. Regression guard: the dual-key envelope
+    must not put JSON on a 204/304 (invalid HTTP, and a behaviour change vs
+    pre-#1063). Nothing raises these today; the guard keeps the handler a strict
+    superset of FastAPI's."""
+
+    def _app_with_status(self, status: int) -> FastAPI:
+        from fastapi.responses import Response
+        from fastapi.utils import is_body_allowed_for_status_code
+        from starlette.exceptions import HTTPException as StarletteHTTPException
+
+        from terrapod.api.errors import jsonapi_error_response
+
+        application = FastAPI()
+
+        @application.exception_handler(StarletteHTTPException)
+        async def _http(request, exc):
+            headers = getattr(exc, "headers", None)
+            if not is_body_allowed_for_status_code(exc.status_code):
+                return Response(status_code=exc.status_code, headers=headers)
+            return jsonapi_error_response(exc.detail, exc.status_code, headers=headers)
+
+        @application.get("/x")
+        async def x():
+            raise HTTPException(status_code=status, detail="ignored")
+
+        return application
+
+    async def test_204_has_empty_body(self):
+        async with AsyncClient(
+            transport=ASGITransport(app=self._app_with_status(204)), base_url="http://t"
+        ) as c:
+            resp = await c.get("/x")
+        assert resp.status_code == 204
+        assert resp.content == b""
+
+    async def test_304_has_empty_body(self):
+        async with AsyncClient(
+            transport=ASGITransport(app=self._app_with_status(304)), base_url="http://t"
+        ) as c:
+            resp = await c.get("/x")
+        assert resp.status_code == 304
+        assert resp.content == b""
+
+    async def test_404_still_has_the_dual_key_body(self):
+        async with AsyncClient(
+            transport=ASGITransport(app=self._app_with_status(404)), base_url="http://t"
+        ) as c:
+            resp = await c.get("/x")
+        assert resp.status_code == 404
+        assert resp.json()["detail"] == "ignored"
+        assert resp.json()["errors"][0]["detail"] == "ignored"
+
+
+class TestPaginationRefactorIsByteIdentical:
+    """`build_meta` must reproduce the hand-rolled `meta.pagination` blocks the
+    audit/config_versions/runs/users routers used before #1063, byte for byte.
+    All four clamp `page[size]` to 1..100, so the helper's cap never engages.
+    """
+
+    @staticmethod
+    def _old(total: int, number: int, size: int, *, falsy_guard: bool) -> dict:
+        # `falsy_guard` reproduces config_versions' `if total else 0`; the other
+        # three used `if total > 0 else 0`. Equivalent for non-negative ints.
+        pages = (total + size - 1) // size if (total if falsy_guard else total > 0) else 0
+        return {
+            "pagination": {
+                "current-page": number,
+                "page-size": size,
+                "total-count": total,
+                "total-pages": pages,
+            }
+        }
+
+    def test_matches_across_the_clamped_input_space(self):
+        from terrapod.api.pagination import build_meta
+
+        for total in (0, 1, 2, 19, 20, 21, 99, 100, 101, 1000, 12345):
+            for size in (1, 5, 20, 50, 99, 100):
+                for number in (1, 2, 3, 7, 100):
+                    new = build_meta(total, number, size)
+                    assert new == self._old(total, number, size, falsy_guard=False), (
+                        total,
+                        number,
+                        size,
+                    )
+                    assert new == self._old(total, number, size, falsy_guard=True), (
+                        total,
+                        number,
+                        size,
+                    )
