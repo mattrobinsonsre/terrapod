@@ -789,6 +789,11 @@ def _workspace_json(
                 "lifecycle-reason": ws.lifecycle_reason,
                 "health-conditions": _compute_health_conditions(ws, live_pool_ids),
                 "vcs-last-polled-at": _rfc3339(ws.vcs_last_polled_at),
+                # Advances on every poll ATTEMPT, where `vcs-last-polled-at`
+                # advances only on success. The gap between the two is what
+                # makes a stalled workspace detectable from the API without
+                # having to trust that an error was recorded (#1089).
+                "vcs-last-attempted-at": _rfc3339(ws.vcs_last_attempted_at),
                 "vcs-last-error": ws.vcs_last_error,
                 "vcs-last-error-at": _rfc3339(ws.vcs_last_error_at),
                 "vcs-workflow": ws.vcs_workflow,

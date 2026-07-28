@@ -106,6 +106,7 @@ type workspaceModel struct {
 	LifecycleState     types.String `tfsdk:"lifecycle_state"`
 	LifecycleReason    types.String `tfsdk:"lifecycle_reason"`
 	VCSLastPolledAt    types.String `tfsdk:"vcs_last_polled_at"`
+	VCSLastAttemptedAt types.String `tfsdk:"vcs_last_attempted_at"`
 	VCSLastError       types.String `tfsdk:"vcs_last_error"`
 	VCSLastErrorAt     types.String `tfsdk:"vcs_last_error_at"`
 	AgentPoolName      types.String `tfsdk:"agent_pool_name"`

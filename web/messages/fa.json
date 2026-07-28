@@ -2239,6 +2239,8 @@
     "vcsPolling": {
       "error": "خطا",
       "ok": "درست ({time})",
+      "stalled": "متوقف — آخرین تلاش {attempted}، آخرین موفقیت {succeeded}",
+      "never": "هرگز",
       "notPolled": "هنوز نظرسنجی نشده"
     },
     "lockout": {

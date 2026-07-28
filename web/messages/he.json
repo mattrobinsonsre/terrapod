@@ -2239,6 +2239,8 @@
     "vcsPolling": {
       "error": "שגיאה",
       "ok": "תקין ({time})",
+      "stalled": "תקוע — ניסיון אחרון {attempted}, הצלחה אחרונה {succeeded}",
+      "never": "מעולם לא",
       "notPolled": "טרם נסקר"
     },
     "lockout": {

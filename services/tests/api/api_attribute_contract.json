@@ -600,6 +600,7 @@
     "vcs-branch",
     "vcs-connection-id",
     "vcs-connection-name",
+    "vcs-last-attempted-at",
     "vcs-last-error",
     "vcs-last-error-at",
     "vcs-last-polled-at",

@@ -2239,6 +2239,8 @@
     "vcsPolling": {
       "error": "Error",
       "ok": "OK ({time})",
+      "stalled": "Stagnans — conatus ultimus {attempted}, successus ultimus {succeeded}",
+      "never": "numquam",
       "notPolled": "Nondum interrogatum"
     },
     "lockout": {

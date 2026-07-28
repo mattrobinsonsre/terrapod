@@ -63,6 +63,7 @@ type workspaceDataSourceModel struct {
 	LifecycleState                types.String `tfsdk:"lifecycle_state"`
 	LifecycleReason               types.String `tfsdk:"lifecycle_reason"`
 	VCSLastPolledAt               types.String `tfsdk:"vcs_last_polled_at"`
+	VCSLastAttemptedAt            types.String `tfsdk:"vcs_last_attempted_at"`
 	VCSLastError                  types.String `tfsdk:"vcs_last_error"`
 	VCSLastErrorAt                types.String `tfsdk:"vcs_last_error_at"`
 	AgentPoolName                 types.String `tfsdk:"agent_pool_name"`
@@ -123,6 +124,7 @@ func (d *workspaceDataSource) Schema(_ context.Context, _ datasource.SchemaReque
 			"lifecycle_state":                  computedString("Workspace lifecycle state (e.g. active, or flagged/destroying when its autodiscovery source directory was deleted)."),
 			"lifecycle_reason":                 computedString("Human-readable reason for the current lifecycle state."),
 			"vcs_last_polled_at":               computedString("Timestamp of the most recent successful VCS poll cycle."),
+			"vcs_last_attempted_at":            computedString("Timestamp of the most recent VCS poll attempt, successful or not."),
 			"vcs_last_error":                   computedString("Most recent VCS poll error message. Empty when the last poll succeeded."),
 			"vcs_last_error_at":                computedString("Timestamp of `vcs_last_error`."),
 			"agent_pool_name":                  computedString("Human-readable name of the assigned agent pool, server-derived from `agent_pool_id`."),
@@ -223,6 +225,7 @@ func readDataSourceModel(ctx context.Context, res *terrapod.Resource, m *workspa
 	setOptionalString(&m.LifecycleState, terrapod.GetStringAttr(res, "lifecycle-state"))
 	setOptionalString(&m.LifecycleReason, terrapod.GetStringAttr(res, "lifecycle-reason"))
 	setOptionalString(&m.VCSLastPolledAt, terrapod.GetStringAttr(res, "vcs-last-polled-at"))
+	setOptionalString(&m.VCSLastAttemptedAt, terrapod.GetStringAttr(res, "vcs-last-attempted-at"))
 	setOptionalString(&m.VCSLastError, terrapod.GetStringAttr(res, "vcs-last-error"))
 	setOptionalString(&m.VCSLastErrorAt, terrapod.GetStringAttr(res, "vcs-last-error-at"))
 	setOptionalString(&m.AgentPoolName, terrapod.GetStringAttr(res, "agent-pool-name"))

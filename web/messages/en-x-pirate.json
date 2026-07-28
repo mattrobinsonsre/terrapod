@@ -2239,6 +2239,8 @@
     "vcsPolling": {
       "error": "Squall",
       "ok": "OK ({time})",
+      "stalled": "Becalmed — last try {attempted}, last fair wind {succeeded}",
+      "never": "ne''er",
       "notPolled": "Not polled yet, matey"
     },
     "lockout": {

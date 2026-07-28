@@ -2239,6 +2239,8 @@
     "vcsPolling": {
       "error": "Errur",
       "ok": "OK ({time})",
+      "stalled": "Stukd — last tri wuz {attempted}, last win wuz {succeeded}",
+      "never": "nevar",
       "notPolled": "Not polld yet"
     },
     "lockout": {

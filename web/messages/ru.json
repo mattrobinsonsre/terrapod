@@ -2239,6 +2239,8 @@
     "vcsPolling": {
       "error": "Ошибка",
       "ok": "OK ({time})",
+      "stalled": "Остановлено — последняя попытка {attempted}, последний успех {succeeded}",
+      "never": "никогда",
       "notPolled": "Ещё не опрашивалось"
     },
     "lockout": {

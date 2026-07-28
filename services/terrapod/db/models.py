@@ -327,8 +327,18 @@ class Workspace(Base):
     vcs_branch: Mapped[str] = mapped_column(String(255), nullable=False, default="")
     vcs_last_commit_sha: Mapped[str] = mapped_column(String(40), nullable=False, default="")
 
-    # VCS polling health
+    # VCS polling health.
+    #
+    # `vcs_last_polled_at` advances only on a SUCCESSFUL poll, so on its own it
+    # cannot tell "not due yet" from "failing every cycle" — both look like a
+    # timestamp that stopped moving. `vcs_last_attempted_at` is stamped at the
+    # top of every poll before anything can fail, so a monitor can alert on
+    # `attempted_at - polled_at > threshold` and catch a stall even when the
+    # error field was never written (#1089).
     vcs_last_polled_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    vcs_last_attempted_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
     vcs_last_error: Mapped[str | None] = mapped_column(String(500), nullable=True)

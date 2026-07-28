@@ -2239,6 +2239,8 @@
     "vcsPolling": {
       "error": "Chyba",
       "ok": "OK ({time})",
+      "stalled": "Zastaveno — poslední pokus {attempted}, poslední úspěch {succeeded}",
+      "never": "nikdy",
       "notPolled": "Zatím nepolováno"
     },
     "lockout": {

@@ -65,6 +65,7 @@ def _mock_workspace(ws_id=None, name="test-ws"):
     ws.id = ws_id or uuid.uuid4()
     ws.name = name
     ws.vcs_last_polled_at = None
+    ws.vcs_last_attempted_at = None
     ws.vcs_last_error = None
     ws.vcs_last_error_at = None
     return ws

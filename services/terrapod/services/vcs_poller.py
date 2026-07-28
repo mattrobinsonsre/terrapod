@@ -20,6 +20,7 @@ the scheduler's trigger queue with deduplication.
 import asyncio
 import time as time_mod
 import uuid
+from datetime import UTC, datetime
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -178,27 +179,80 @@ async def _list_open_prs(
 # --- Shared logic ---
 
 
+def describe_vcs_error(e: BaseException) -> str:
+    """Render a provider failure into a message an operator can act on (#1089).
+
+    A VCS-wide stall — provider rate limiting, an outage, an expired
+    credential — hits every workspace at once. Reporting it as a generic
+    per-workspace failure sends triage in exactly the wrong direction, so the
+    message names the HTTP status and, for a rate-limit response, how long
+    until the window resets.
+
+    Both providers call `raise_for_status()`, so the status and headers are
+    already on the exception — they were simply being discarded.
+    """
+    import httpx
+
+    if isinstance(e, httpx.HTTPStatusError):
+        resp = e.response
+        status = resp.status_code
+        # GitHub uses x-ratelimit-*; GitLab uses RateLimit-*. httpx headers are
+        # case-insensitive, so one lookup covers both spellings.
+        remaining = resp.headers.get("x-ratelimit-remaining") or resp.headers.get(
+            "ratelimit-remaining"
+        )
+        reset = resp.headers.get("x-ratelimit-reset") or resp.headers.get("ratelimit-reset")
+        retry_after = resp.headers.get("retry-after")
+
+        if status in (403, 429) and (remaining == "0" or retry_after or status == 429):
+            detail = f"VCS provider rate limit hit (HTTP {status})"
+            if remaining is not None:
+                detail += f", {remaining} requests remaining"
+            if retry_after:
+                detail += f", retry after {retry_after}s"
+            elif reset:
+                try:
+                    secs = int(reset) - int(datetime.now(UTC).timestamp())
+                    if secs > 0:
+                        detail += f", resets in {secs}s"
+                except ValueError:
+                    detail += f", resets at {reset}"
+            return detail
+
+        reason = (resp.reason_phrase or "").strip()
+        return f"VCS provider returned HTTP {status}{f' {reason}' if reason else ''}"
+
+    if isinstance(e, httpx.TimeoutException):
+        return f"VCS provider request timed out: {type(e).__name__}"
+    if isinstance(e, httpx.TransportError):
+        return f"Cannot reach VCS provider: {type(e).__name__}: {e}"
+    # Anything else keeps its own message — it is usually already the clearest
+    # thing available. The type name is only worth adding when the exception
+    # carries no message at all (a bare `KeyError()` would otherwise read as "").
+    text = str(e).strip()
+    return text or type(e).__name__
+
+
 async def _resolve_branch(conn: VCSConnection, ws: Workspace, owner: str, repo: str) -> str | None:
-    """Resolve the tracked branch for a workspace."""
+    """Resolve the tracked branch for a workspace.
+
+    Returns None ONLY when the provider answered successfully but no branch
+    could be determined. A transport or HTTP failure **propagates** (#1089):
+    swallowing it here is what turned a provider 403/429 into the misleading
+    "Cannot determine tracked branch", which reads like per-workspace
+    misconfiguration rather than a shared upstream condition.
+    """
     if ws.vcs_branch:
         return ws.vcs_branch
 
-    try:
-        default_branch = await _get_default_branch(conn, owner, repo)
-        if default_branch:
-            return default_branch
-        logger.warning(
-            "Cannot determine default branch",
-            workspace=ws.name,
-            repo=f"{owner}/{repo}",
-        )
-    except Exception as e:
-        logger.error(
-            "Failed to get default branch",
-            workspace=ws.name,
-            repo=f"{owner}/{repo}",
-            error=str(e),
-        )
+    default_branch = await _get_default_branch(conn, owner, repo)
+    if default_branch:
+        return default_branch
+    logger.warning(
+        "Cannot determine default branch",
+        workspace=ws.name,
+        repo=f"{owner}/{repo}",
+    )
     return None
 
 
@@ -818,6 +872,13 @@ async def _poll_workspace(
     if not ws.vcs_repo_url or not ws.vcs_connection_id:
         return
 
+    # Stamp the attempt BEFORE anything that can fail (#1089). `vcs_last_polled_at`
+    # only advances on success, so a workspace failing every cycle has a frozen
+    # timestamp indistinguishable from "not due yet". This one always moves, which
+    # is what lets a monitor alert on `attempted_at - polled_at > threshold`
+    # regardless of whether an error was recorded.
+    ws.vcs_last_attempted_at = now_utc()
+
     conn = await db.get(VCSConnection, ws.vcs_connection_id)
     if not conn or conn.status != "active":
         ws.vcs_last_error = "VCS connection is not active"
@@ -843,8 +904,22 @@ async def _poll_workspace(
 
     owner, repo = parsed
 
-    branch = await _resolve_branch(conn, ws, owner, repo)
+    try:
+        branch = await _resolve_branch(conn, ws, owner, repo)
+    except Exception as e:
+        # The provider call itself failed — report THAT, not a derived symptom.
+        ws.vcs_last_error = describe_vcs_error(e)[:500]
+        ws.vcs_last_error_at = now_utc()
+        logger.error(
+            "Failed to resolve tracked branch",
+            workspace=ws.name,
+            repo=f"{owner}/{repo}",
+            error=str(e),
+        )
+        return
     if not branch:
+        # Genuinely unresolvable from a SUCCESSFUL response — the only case this
+        # message is now used for.
         ws.vcs_last_error = "Cannot determine tracked branch"
         ws.vcs_last_error_at = now_utc()
         return
@@ -871,7 +946,7 @@ async def _poll_workspace(
             error=str(e),
             exc_info=e,
         )
-        ws.vcs_last_error = str(e)[:500]
+        ws.vcs_last_error = describe_vcs_error(e)[:500]
         ws.vcs_last_error_at = now_utc()
 
 
@@ -921,6 +996,38 @@ async def _poll_workspace_owned(
                 await db.rollback()
             except Exception:
                 pass
+            # The rollback just discarded whatever `_poll_workspace` recorded
+            # about this failure — including the error it may already have set
+            # on the workspace. That is why a stalled workspace could report
+            # `vcs-last-error: null` (#1089). Re-record it in its own
+            # transaction so the failure is never invisible.
+            await _record_poll_failure(ws_id, describe_vcs_error(e))
+
+
+async def _record_poll_failure(ws_id: uuid.UUID, message: str) -> None:
+    """Persist a poll failure in a fresh transaction (#1089).
+
+    Deliberately a targeted UPDATE rather than a re-read + ORM write: the
+    session that failed is unusable, and this must not depend on any of the
+    state that was just rolled back. Best-effort by necessity — if the database
+    itself is what is failing there is nowhere to record anything — but it
+    closes the common case where the poll failed for a VCS reason and the
+    commit or a later statement took the error record down with it.
+    """
+    try:
+        async with get_db_session() as db:
+            await db.execute(
+                update(Workspace)
+                .where(Workspace.id == ws_id)
+                .values(
+                    vcs_last_error=message[:500],
+                    vcs_last_error_at=now_utc(),
+                    vcs_last_attempted_at=now_utc(),
+                )
+            )
+            await db.commit()
+    except Exception:
+        logger.warning("Could not persist VCS poll failure", workspace_id=str(ws_id))
 
 
 async def _select_workspace_ids(
