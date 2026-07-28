@@ -90,6 +90,42 @@ var unmanagedCollections = []struct {
 	{"security_scan_skip_rules", func(m *workspaceModel) attr.Value { return m.SecurityScanSkipRules }},
 }
 
+// agentPoolIDsForRequest returns the pool set to put on the wire, or nil when it
+// must be omitted (#1094).
+//
+// The server rejects a request carrying BOTH `agent-pool-id` and
+// `agent-pool-ids` (422), and the singular already means "this one pool,
+// replacing any existing set" — so when the singular is set, it travels alone.
+//
+// The guard cannot live in ValidateConfig. `agent_pool_ids` is Optional+Computed
+// with UseStateForUnknown, so a config that omits it still gets a KNOWN,
+// non-null planned value: the prior state. Updating a workspace that had a pool
+// set therefore populated both fields and 422'd every time, while create (no
+// prior state, so the plan value is unknown) worked. In the *configuration* only
+// the singular is set — the collision is manufactured from state at
+// request-build time, which is the only place it can be caught.
+func agentPoolIDsForRequest(poolID types.String, poolIDs types.List) []string {
+	if !poolID.IsNull() || poolIDs.IsNull() || poolIDs.IsUnknown() {
+		return nil
+	}
+	out := make([]string, 0, len(poolIDs.Elements()))
+	for _, v := range poolIDs.Elements() {
+		out = append(out, v.(types.String).ValueString())
+	}
+	return out
+}
+
+// onlyPool reports whether a pool-set list holds exactly the one given pool —
+// the case where a singular `agent_pool_id` config genuinely manages the set.
+func onlyPool(v attr.Value, id string) bool {
+	l, ok := v.(types.List)
+	if !ok || l.IsNull() || l.IsUnknown() || len(l.Elements()) != 1 {
+		return false
+	}
+	s, ok := l.Elements()[0].(types.String)
+	return ok && s.ValueString() == id
+}
+
 // hasElements reports whether a list attribute holds at least one element.
 func hasElements(v attr.Value) bool {
 	l, ok := v.(types.List)
@@ -126,9 +162,35 @@ func (r *workspaceResource) ModifyPlan(ctx context.Context, req resource.ModifyP
 	}
 	for _, a := range unmanagedCollections {
 		// `agent_pool_ids` reads back the set that `agent_pool_id` assigns, so a
-		// config using the singular attribute IS managing it — warning there
-		// would fire on every plan and be wrong.
+		// config using the singular IS managing it — as long as the set is
+		// exactly the one pool it names. When the workspace holds MORE pools
+		// than that, the config does not manage the extras and the apply will
+		// drop them (the singular replaces the whole set), so that case must
+		// still warn. Exempting it unconditionally suppressed the warning in
+		// precisely the situation it exists for (#1094).
 		if a.name == "agent_pool_ids" && !cfg.AgentPoolID.IsNull() {
+			if onlyPool(state.AgentPoolIDs, cfg.AgentPoolID.ValueString()) {
+				continue
+			}
+			// The apply is about to replace the set, so the planned value must
+			// NOT be the prior state that UseStateForUnknown supplied — the
+			// framework would compare [A,B] against the applied [A] and fail
+			// with "Provider produced inconsistent result after apply: element 1
+			// has vanished". Mark it unknown so the read-back is authoritative.
+			resp.Diagnostics.Append(
+				resp.Plan.SetAttribute(ctx, path.Root("agent_pool_ids"),
+					types.ListUnknown(types.StringType))...,
+			)
+			resp.Diagnostics.AddAttributeWarning(
+				path.Root("agent_pool_id"),
+				"Applying agent_pool_id will drop the workspace's other agent pools",
+				"The workspace runs on several agent pools, but this configuration sets the "+
+					"singular `agent_pool_id`, which replaces the whole set with that one "+
+					"pool. Terraform reports no change to `agent_pool_ids` because the "+
+					"configuration does not declare it.\n\n"+
+					"To keep the set, use `agent_pool_ids = [...]` instead. Losing pools "+
+					"reduces this workspace to a single point of execution failure.",
+			)
 			continue
 		}
 		if !a.value(&cfg).IsNull() || !hasElements(a.value(&state)) {
@@ -748,13 +810,7 @@ func buildCreateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 	if !m.AgentPoolID.IsNull() {
 		req.AgentPoolID = m.AgentPoolID.ValueString()
 	}
-	if !m.AgentPoolIDs.IsNull() && !m.AgentPoolIDs.IsUnknown() {
-		poolIDs := make([]string, 0, len(m.AgentPoolIDs.Elements()))
-		for _, v := range m.AgentPoolIDs.Elements() {
-			poolIDs = append(poolIDs, v.(types.String).ValueString())
-		}
-		req.AgentPoolIDs = poolIDs
-	}
+	req.AgentPoolIDs = agentPoolIDsForRequest(m.AgentPoolID, m.AgentPoolIDs)
 	if !m.Labels.IsNull() && !m.Labels.IsUnknown() {
 		labels := map[string]string{}
 		for k, v := range m.Labels.Elements() {
@@ -886,13 +942,7 @@ func buildUpdateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 	if !m.AgentPoolID.IsNull() {
 		req.AgentPoolID = m.AgentPoolID.ValueString()
 	}
-	if !m.AgentPoolIDs.IsNull() && !m.AgentPoolIDs.IsUnknown() {
-		poolIDs := make([]string, 0, len(m.AgentPoolIDs.Elements()))
-		for _, v := range m.AgentPoolIDs.Elements() {
-			poolIDs = append(poolIDs, v.(types.String).ValueString())
-		}
-		req.AgentPoolIDs = poolIDs
-	}
+	req.AgentPoolIDs = agentPoolIDsForRequest(m.AgentPoolID, m.AgentPoolIDs)
 	if !m.Labels.IsNull() && !m.Labels.IsUnknown() {
 		labels := map[string]string{}
 		for k, v := range m.Labels.Elements() {

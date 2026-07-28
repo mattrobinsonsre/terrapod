@@ -651,11 +651,16 @@ def _compute_health_conditions(
                 "code": "no_live_agent_pool",
                 "severity": "error",
                 "title": "No agent pool has a live runner",
+                # The negation lives in the subject on BOTH branches. It used to
+                # be carried by a "None of the" prefix that only existed on the
+                # plural branch, so the singular form read "The agent pool ...
+                # currently has a listener sending heartbeats" — the exact
+                # opposite of the title, telling an operator the pool was fine.
                 "detail": (
-                    f"{'None of the ' if plural else 'The '}"
-                    f"{'agent pools' if plural else 'agent pool'} assigned to this "
-                    "workspace currently has a listener sending heartbeats. Runs will "
-                    "queue until one comes back or another pool is assigned."
+                    f"{'No agent pool' if plural else 'The agent pool'} assigned to "
+                    f"this workspace {'has' if plural else 'has no'} "
+                    f"{'a listener' if plural else 'listener'} sending heartbeats. "
+                    "Runs will queue until one comes back or another pool is assigned."
                 ),
             }
         )

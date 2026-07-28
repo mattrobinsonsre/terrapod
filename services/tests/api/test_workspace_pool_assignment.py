@@ -620,3 +620,18 @@ class TestWorkspacePoolSet:
         stranded = [c for c in conditions if c["code"] == "no_live_agent_pool"]
         assert len(stranded) == 1
         assert stranded[0]["severity"] == "error"
+        # The detail must AGREE with the title. The negation used to be carried
+        # by a "None of the" prefix that only existed on the plural branch, so a
+        # single-pool workspace reported "The agent pool ... currently has a
+        # listener sending heartbeats" under the title "No agent pool has a live
+        # runner" — telling an operator the pool was healthy (#1094).
+        detail = stranded[0]["detail"]
+        # Both wordings must carry the negation: the plural puts it in the
+        # subject ("No agent pool ... has a listener"), the singular in the verb
+        # ("The agent pool ... has no listener"). The bug was the singular
+        # losing it, so assert on that exact affirmative phrasing rather than a
+        # substring the (correct) plural form also contains.
+        assert detail.startswith(("No agent pool", "The agent pool")), detail
+        assert "The agent pool assigned to this workspace has a listener" not in detail, (
+            f"detail contradicts the title: {detail}"
+        )

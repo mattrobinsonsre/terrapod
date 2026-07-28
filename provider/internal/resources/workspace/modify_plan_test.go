@@ -86,3 +86,40 @@ func TestUnmanagedCollectionAccessorsAreDistinct(t *testing.T) {
 		}
 	}
 }
+
+// #1094 — `onlyPool` decides whether a singular `agent_pool_id` config genuinely
+// manages the workspace's pool set. It must be true ONLY for the exact
+// single-element match; every other shape means the apply would drop pools the
+// config does not declare, which has to warn.
+func TestOnlyPool(t *testing.T) {
+	list := func(vals ...string) types.List {
+		elems := make([]attr.Value, 0, len(vals))
+		for _, v := range vals {
+			elems = append(elems, types.StringValue(v))
+		}
+		return types.ListValueMust(types.StringType, elems)
+	}
+
+	cases := []struct {
+		name string
+		val  attr.Value
+		id   string
+		want bool
+	}{
+		{"exactly the named pool — config manages the set", list("apool-a"), "apool-a", true},
+		{"named pool plus another — the extra would be dropped", list("apool-a", "apool-b"), "apool-a", false},
+		{"a different single pool", list("apool-b"), "apool-a", false},
+		{"empty set", list(), "apool-a", false},
+		{"null set", types.ListNull(types.StringType), "apool-a", false},
+		{"unknown set", types.ListUnknown(types.StringType), "apool-a", false},
+		{"non-list value", types.StringValue("apool-a"), "apool-a", false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := onlyPool(tc.val, tc.id); got != tc.want {
+				t.Errorf("onlyPool(%v, %q) = %v, want %v", tc.val, tc.id, got, tc.want)
+			}
+		})
+	}
+}
