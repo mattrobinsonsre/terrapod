@@ -1168,6 +1168,80 @@ class EncryptionConfig(BaseModel):
         return v
 
 
+class HAProbeUrlConfig(BaseModel):
+    """Where a node probes to discover whether it currently holds the name.
+
+    The internal name is preferred when set: it avoids hairpin NAT and any
+    CDN/WAF in front of the external name, either of which can cache or filter
+    the probe response.
+    """
+
+    internal: str = Field(default="", description="Preferred probe URL (internal name)")
+    external: str = Field(default="", description="Fallback probe URL (external name)")
+
+
+class HAConfig(BaseModel):
+    """Leader/follower role resolution (#960 phase 1, #1101).
+
+    Terrapod never decides to fail over — a human does, by moving DNS. A node is
+    the leader if and only if it owns the shared name, which it discovers by
+    probing that name and checking whether the answer is itself.
+
+    ``role`` defaults to ``leader`` and that default is deliberate: the
+    overwhelming majority of installs are a single node and must never probe,
+    never transition, and never spend a threshold's worth of time passive after
+    a pod restart. An ``auto`` default would be actively dangerous — a
+    single-node install with no probe URL would fail passive and go inert.
+
+    ``auto`` is therefore opt-in, for a real pair. Running both nodes on
+    explicit ``leader``/``follower`` and setting them by hand at cutover is a
+    supported mode, not a degraded one: role is configuration, and probing is
+    one optional way to derive it.
+    """
+
+    role: str = Field(
+        default="leader",
+        description="leader | follower | auto. `auto` derives the role by probing.",
+    )
+    node_name: str = Field(default="", description="Stable identity for this node")
+    probe_url: HAProbeUrlConfig = Field(default_factory=HAProbeUrlConfig)
+    probe_interval_seconds: int = Field(
+        default=60, ge=10, description="Seconds between probes (floor guards against a hot loop)"
+    )
+    probe_threshold: int = Field(
+        default=3,
+        ge=1,
+        description="Consecutive observations before the role changes, in both directions",
+    )
+
+    @field_validator("role")
+    @classmethod
+    def _valid_role(cls, v: str) -> str:
+        allowed = {"leader", "follower", "auto"}
+        if v not in allowed:
+            raise ValueError(f"ha.role must be one of {sorted(allowed)}")
+        return v
+
+    @model_validator(mode="after")
+    def _auto_needs_a_probe_url(self) -> "HAConfig":
+        # `auto` with nowhere to probe is incoherent, not a state to fail
+        # passive into — catching it here beats going silently inert.
+        if self.role == "auto" and not (self.probe_url.internal or self.probe_url.external):
+            raise ValueError(
+                "ha.role='auto' requires ha.probe_url.internal or ha.probe_url.external"
+            )
+        # Without a name of its own a node cannot recognise itself in the
+        # probe answer, so `auto` cannot resolve at all.
+        if self.role == "auto" and not self.node_name:
+            raise ValueError("ha.role='auto' requires ha.node_name")
+        return self
+
+    @property
+    def effective_probe_url(self) -> str:
+        """The URL to probe — internal preferred, external as fallback."""
+        return self.probe_url.internal or self.probe_url.external
+
+
 class BackupConfig(BaseModel):
     """Logical PostgreSQL backup settings (consumed by terrapod.cli.backup).
 
@@ -1888,6 +1962,9 @@ class Settings(BaseSettings):
 
     # Cost estimation (#871)
     cost_estimation: CostEstimationConfig = Field(default_factory=CostEstimationConfig)
+
+    # Leader/follower role resolution (#960)
+    ha: HAConfig = Field(default_factory=HAConfig)
 
     # VCS
     vcs: VCSConfig = Field(default_factory=VCSConfig)

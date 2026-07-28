@@ -2375,6 +2375,43 @@
               }
             }
           }
+        },
+        "ha": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "role": {
+              "type": "string",
+              "enum": [
+                "leader",
+                "follower",
+                "auto"
+              ]
+            },
+            "node_name": {
+              "type": "string"
+            },
+            "probe_url": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "internal": {
+                  "type": "string"
+                },
+                "external": {
+                  "type": "string"
+                }
+              }
+            },
+            "probe_interval_seconds": {
+              "type": "integer",
+              "minimum": 10
+            },
+            "probe_threshold": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
         }
       }
     }

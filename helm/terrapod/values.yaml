@@ -375,6 +375,35 @@ api:
       # span regions, so this default is used only when a resource has no region.
       default_region: "us-east-1"
 
+    # Leader/follower role resolution (#960).
+    #
+    # `role` defaults to `leader` and that default is deliberate: almost every
+    # install is a single node and must never probe, never transition, and
+    # never spend a threshold's worth of time passive after a pod restart. An
+    # `auto` default would be actively dangerous — a single-node install with
+    # no probe URL would fail passive and go inert.
+    #
+    # `auto` is opt-in, for a real pair, and derives the role by asking the
+    # shared name who it reaches. It requires BOTH a probe_url and a node_name.
+    # Running both nodes on explicit leader/follower and setting them by hand
+    # at cutover is a supported mode, not a degraded one.
+    ha:
+      role: "leader"
+      node_name: ""
+      probe_url:
+        # Internal is preferred: it avoids hairpin NAT and any CDN/WAF in front
+        # of the external name, either of which can cache or filter the probe.
+        # NEVER point this at an in-cluster Service address — that always
+        # resolves to self, so the node would always declare itself leader.
+        internal: ""
+        external: ""
+      # Minutes-scale by design. Failover is a human act, so nothing is racing
+      # to detect it, and a slow probe ignores the transient resolution blips a
+      # fast one would chase. This does NOT govern the cutover overlap — DNS
+      # cache does — so it is not tuned for that.
+      probe_interval_seconds: 60
+      probe_threshold: 3
+
     # VCS Integration
     # VCS connections (GitHub App installations, GitLab tokens) are created
     # dynamically via the API. All credentials are stored on the connection

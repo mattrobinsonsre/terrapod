@@ -272,6 +272,27 @@ POOL_QUEUED_RUNS = Gauge(
     ["pool_id"],
 )
 
+HA_ROLE = Gauge(
+    "terrapod_ha_role",
+    (
+        "1 when this node currently holds the given role, 0 otherwise (#960). "
+        "Two alarms matter and they are opposites: no node reporting leader "
+        "means the estate has silently stopped, and both nodes reporting "
+        "leader means a split. Neither is inferable from a single node."
+    ),
+    ["role"],
+)
+
+HA_PROBE_AGE = Gauge(
+    "terrapod_ha_probe_age_seconds",
+    (
+        "Seconds since this node last completed a leadership probe. Only "
+        "meaningful under ha.role=auto; a stalled probe means the reported "
+        "role is stale, which is a different failure from holding the wrong "
+        "one (#960)."
+    ),
+)
+
 POOL_LIVE = Gauge(
     "terrapod_pool_live",
     (
