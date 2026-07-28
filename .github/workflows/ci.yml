@@ -713,6 +713,10 @@ jobs:
           echo "$out" | grep -q "cost_estimation:" || { echo "FAIL: cost_estimation config not rendered into config.yaml (#871)"; exit 1; }
           echo "$out" | grep -q "prices_url:" || { echo "FAIL: cost_estimation.prices_url not rendered (#871)"; exit 1; }
           echo "$out" | grep -q "default_region:" || { echo "FAIL: cost_estimation.default_region not rendered (#871)"; exit 1; }
+          echo "$out" | grep -q "ha:" || { echo "FAIL: ha config not rendered into config.yaml (#960)"; exit 1; }
+          echo "$out" | grep -q 'role: "leader"' || { echo "FAIL: ha.role must default to leader — an auto default takes single-node installs inert (#960)"; exit 1; }
+          echo "$out" | grep -q "probe_interval_seconds:" || { echo "FAIL: ha.probe_interval_seconds not rendered (#960)"; exit 1; }
+          echo "$out" | grep -q "probe_threshold:" || { echo "FAIL: ha.probe_threshold not rendered (#960)"; exit 1; }
           # AI architecture critic (#1036 Part 2): non-secret config renders into
           # config.yaml; the auth api_key is NEVER rendered (secret via env only).
           echo "$out" | grep -q "ai_architecture:" || { echo "FAIL: ai_architecture config not rendered into config.yaml (#1036)"; exit 1; }

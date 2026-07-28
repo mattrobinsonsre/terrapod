@@ -82,6 +82,7 @@
   "GET /api/terrapod/v1/execution-hooks/{hook_id}",
   "GET /api/terrapod/v1/gpg-keys ?filter_namespace",
   "GET /api/terrapod/v1/gpg-keys/{key_id}",
+  "GET /api/terrapod/v1/ha/whoami",
   "GET /api/terrapod/v1/labels",
   "GET /api/terrapod/v1/labels/{key}",
   "GET /api/terrapod/v1/labels/{key}/{value}",

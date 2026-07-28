@@ -67,6 +67,28 @@ async def _persist_live_log_if_missing(run: Run, phase: str) -> None:
         logger.warning("Failed to persist live log", run_id=run_id, error=str(e))
 
 
+async def _refresh_ha_metrics() -> None:
+    """Publish this node's role and probe freshness (#960).
+
+    Cheap: a static role is answered from configuration, so the common case
+    costs nothing. Both gauges are exported for every role value so a dashboard
+    can alert on the two opposite failures — nobody reporting leader (the
+    estate has silently stopped) and both nodes reporting it (a split).
+    """
+    from terrapod.api.metrics import HA_PROBE_AGE, HA_ROLE
+    from terrapod.services import ha_role
+
+    try:
+        current = await ha_role.get_role()
+        for role in (ha_role.LEADER, ha_role.FOLLOWER):
+            HA_ROLE.labels(role=role).set(1 if role == current else 0)
+        age = await ha_role.last_probe_age_seconds()
+        if age is not None:
+            HA_PROBE_AGE.set(age)
+    except Exception:
+        logger.debug("HA metrics refresh failed", exc_info=True)
+
+
 async def _refresh_pool_queue_depth(db: AsyncSession) -> None:
     """Publish the per-pool `queued` backlog as a Prometheus gauge (#750).
 
@@ -172,6 +194,7 @@ async def reconcile_runs() -> None:
         # return below (#750).
         await _refresh_pool_queue_depth(db)
         await _refresh_pool_liveness(db)
+        await _refresh_ha_metrics()
 
         # `canceling` joins planning/applying here: it's the intermediate
         # state entered when a user cancels an in-flight apply. The

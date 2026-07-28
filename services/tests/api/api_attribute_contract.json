@@ -186,6 +186,10 @@
     "source-url",
     "updated-at"
   ],
+  "ha.whoami": [
+    "node-id",
+    "role"
+  ],
   "notification_configurations._nc_json": [
     "created-at",
     "delivery-responses",

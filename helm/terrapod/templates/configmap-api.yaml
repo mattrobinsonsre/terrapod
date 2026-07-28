@@ -264,6 +264,16 @@ data:
       prices_url: {{ .Values.api.config.cost_estimation.prices_url | quote }}
       default_region: {{ .Values.api.config.cost_estimation.default_region | quote }}
     {{- end }}
+    {{- if .Values.api.config.ha }}
+    ha:
+      role: {{ .Values.api.config.ha.role | default "leader" | quote }}
+      node_name: {{ .Values.api.config.ha.node_name | default "" | quote }}
+      probe_url:
+        internal: {{ .Values.api.config.ha.probe_url.internal | default "" | quote }}
+        external: {{ .Values.api.config.ha.probe_url.external | default "" | quote }}
+      probe_interval_seconds: {{ .Values.api.config.ha.probe_interval_seconds | default 60 }}
+      probe_threshold: {{ .Values.api.config.ha.probe_threshold | default 3 }}
+    {{- end }}
     {{- if .Values.api.config.vcs }}
     vcs:
       enabled: {{ .Values.api.config.vcs.enabled }}

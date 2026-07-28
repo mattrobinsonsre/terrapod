@@ -390,6 +390,22 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
             description="Propagate rotated DEKs to all replicas (multi-replica safe)",
         )
 
+    # Leadership probe (#960). Registered only under `ha.role=auto` — a static
+    # role needs no probing at all, which is the overwhelmingly common case.
+    #
+    # This task must NOT be leadership-gated when the enforcement phase lands:
+    # a follower has to keep probing or it can never discover that it has
+    # become the leader.
+    if settings.ha.role == "auto":
+        from terrapod.services.ha_role import probe_cycle
+
+        register_periodic_task(
+            "ha_probe",
+            interval_seconds=settings.ha.probe_interval_seconds,
+            handler=probe_cycle,
+            description="Resolve this node's leader/follower role from DNS ownership",
+        )
+
     await start_scheduler()
     logger.info("Distributed scheduler started")
 
@@ -980,6 +996,13 @@ def create_application() -> FastAPI:
     from terrapod.api.routers.encryption import router as encryption_router
 
     include_terrapod(encryption_router)
+
+    # Node identity + current role, for leader/follower resolution (#960).
+    # Unauthenticated by necessity: the probe runs before trust exists between
+    # nodes and discloses only an operator-chosen name and a role.
+    from terrapod.api.routers.ha import router as ha_router
+
+    include_terrapod(ha_router)
 
     # User management endpoints — Terrapod-native. Canonical paths at
     # /api/terrapod/v1/users{,/{email}}.
