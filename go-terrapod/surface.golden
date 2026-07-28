@@ -276,6 +276,7 @@ field CreateVarsetVariableRequest.Value string
 field CreateWorkspaceRequest.AISummaryContext string `json:"ai-summary-context,omitempty"`
 field CreateWorkspaceRequest.AISummaryMode string `json:"ai-summary-mode,omitempty"`
 field CreateWorkspaceRequest.AgentPoolID string `json:"agent-pool-id,omitempty"`
+field CreateWorkspaceRequest.AgentPoolIDs []string `json:"agent-pool-ids,omitempty"`
 field CreateWorkspaceRequest.AutoApply *bool `json:"auto-apply,omitempty"`
 field CreateWorkspaceRequest.AutoMerge *bool `json:"auto-merge,omitempty"`
 field CreateWorkspaceRequest.AutoMergeStrategy string `json:"auto-merge-strategy,omitempty"`
@@ -753,6 +754,7 @@ field UpdateVarsetVariableRequest.Value *string
 field UpdateWorkspaceRequest.AISummaryContext *string `json:"ai-summary-context,omitempty"`
 field UpdateWorkspaceRequest.AISummaryMode string `json:"ai-summary-mode,omitempty"`
 field UpdateWorkspaceRequest.AgentPoolID string `json:"agent-pool-id,omitempty"`
+field UpdateWorkspaceRequest.AgentPoolIDs []string `json:"agent-pool-ids,omitempty"`
 field UpdateWorkspaceRequest.AutoApply *bool `json:"auto-apply,omitempty"`
 field UpdateWorkspaceRequest.AutoMerge *bool `json:"auto-merge,omitempty"`
 field UpdateWorkspaceRequest.AutoMergeStrategy string `json:"auto-merge-strategy,omitempty"`
@@ -855,6 +857,7 @@ field WarmResult.Ref string `json:"ref"`
 field Workspace.AISummaryContext string `json:"ai-summary-context,omitempty"`
 field Workspace.AISummaryMode string `json:"ai-summary-mode,omitempty"`
 field Workspace.AgentPoolID string `json:"agent-pool-id,omitempty"`
+field Workspace.AgentPoolIDs []string `json:"agent-pool-ids,omitempty"`
 field Workspace.AgentPoolName string `json:"agent-pool-name,omitempty"`
 field Workspace.AutoApply bool `json:"auto-apply"`
 field Workspace.AutoMerge bool `json:"auto-merge"`

@@ -26,8 +26,9 @@ import (
 )
 
 var (
-	_ resource.Resource                = &workspaceResource{}
-	_ resource.ResourceWithImportState = &workspaceResource{}
+	_ resource.Resource                   = &workspaceResource{}
+	_ resource.ResourceWithImportState    = &workspaceResource{}
+	_ resource.ResourceWithValidateConfig = &workspaceResource{}
 )
 
 // workspaceResource holds two clients during the provider's migration to
@@ -48,6 +49,26 @@ func NewResource() resource.Resource {
 
 func (r *workspaceResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_workspace"
+}
+
+// ValidateConfig rejects a config that sets both agent-pool attributes.
+//
+// The server returns 422 for the same combination (#1085); catching it at plan
+// time turns an apply-time failure into an error the operator sees before
+// anything is sent.
+func (r *workspaceResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	var m workspaceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &m)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	if !m.AgentPoolID.IsNull() && !m.AgentPoolIDs.IsNull() {
+		resp.Diagnostics.AddError(
+			"Conflicting agent pool attributes",
+			"Set either agent_pool_id or agent_pool_ids, not both. agent_pool_id assigns a "+
+				"single pool (replacing any set); agent_pool_ids assigns the whole set.",
+		)
+	}
 }
 
 func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
@@ -169,8 +190,21 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				},
 			},
 			"agent_pool_id": schema.StringAttribute{
-				Description: "Agent pool ID for agent execution mode.",
+				Description: "Agent pool ID for agent execution mode. Assigns exactly one pool, replacing any existing set — use `agent_pool_ids` to assign several. Conflicts with `agent_pool_ids`.",
 				Optional:    true,
+			},
+			"agent_pool_ids": schema.ListAttribute{
+				Description: "Agent pools this workspace's runs may execute on (#1085). The set is flat: a queued run is offered to every pool at once and whichever pool has a live listener claims it first, so losing one pool does not stop the workspace. There is no primary and no ordering preference. `agent_pool_id` reads back as element 0. Conflicts with `agent_pool_id`.",
+				// Optional + Computed with UseStateForUnknown — same rationale as
+				// drift_ignore_rules (#684): the server may hold a set this config
+				// doesn't manage (assigned via the UI or bulk-update), so omitting
+				// it means "leave alone", not "clear".
+				Optional:    true,
+				Computed:    true,
+				ElementType: types.StringType,
+				PlanModifiers: []planmodifier.List{
+					listplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"var_files": schema.ListAttribute{
 				Description: "List of .tfvars file paths passed as -var-file arguments to plan/apply.",
@@ -631,6 +665,13 @@ func buildCreateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 	if !m.AgentPoolID.IsNull() {
 		req.AgentPoolID = m.AgentPoolID.ValueString()
 	}
+	if !m.AgentPoolIDs.IsNull() && !m.AgentPoolIDs.IsUnknown() {
+		poolIDs := make([]string, 0, len(m.AgentPoolIDs.Elements()))
+		for _, v := range m.AgentPoolIDs.Elements() {
+			poolIDs = append(poolIDs, v.(types.String).ValueString())
+		}
+		req.AgentPoolIDs = poolIDs
+	}
 	if !m.Labels.IsNull() && !m.Labels.IsUnknown() {
 		labels := map[string]string{}
 		for k, v := range m.Labels.Elements() {
@@ -762,6 +803,13 @@ func buildUpdateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 	if !m.AgentPoolID.IsNull() {
 		req.AgentPoolID = m.AgentPoolID.ValueString()
 	}
+	if !m.AgentPoolIDs.IsNull() && !m.AgentPoolIDs.IsUnknown() {
+		poolIDs := make([]string, 0, len(m.AgentPoolIDs.Elements()))
+		for _, v := range m.AgentPoolIDs.Elements() {
+			poolIDs = append(poolIDs, v.(types.String).ValueString())
+		}
+		req.AgentPoolIDs = poolIDs
+	}
 	if !m.Labels.IsNull() && !m.Labels.IsUnknown() {
 		labels := map[string]string{}
 		for k, v := range m.Labels.Elements() {
@@ -881,6 +929,16 @@ func readWorkspaceIntoModel(ctx context.Context, ws *terrapod.Workspace, m *work
 		m.AgentPoolID = types.StringValue(ws.AgentPoolID)
 	} else {
 		m.AgentPoolID = types.StringNull()
+	}
+	// Agent pool set (#1085) — same null-vs-empty rule as var_files above: a
+	// config that never declared the attribute must not flip to `[]`, and a
+	// config that declared `[]` must not flip to null.
+	if m.AgentPoolIDs.IsNull() && len(ws.AgentPoolIDs) == 0 {
+		m.AgentPoolIDs = types.ListNull(types.StringType)
+	} else {
+		apVal, apDiag := types.ListValueFrom(ctx, types.StringType, ws.AgentPoolIDs)
+		diags.Append(apDiag...)
+		m.AgentPoolIDs = apVal
 	}
 	if ws.VCSConnectionID != "" {
 		m.VCSConnectionID = types.StringValue(ws.VCSConnectionID)

@@ -41,6 +41,7 @@ type workspaceDataSourceModel struct {
 	VCSBranch                     types.String `tfsdk:"vcs_branch"`
 	VCSConnectionID               types.String `tfsdk:"vcs_connection_id"`
 	AgentPoolID                   types.String `tfsdk:"agent_pool_id"`
+	AgentPoolIDs                  types.List   `tfsdk:"agent_pool_ids"`
 	VarFiles                      types.List   `tfsdk:"var_files"`
 	TriggerPrefixes               types.List   `tfsdk:"trigger_prefixes"`
 	DriftIgnoreRules              types.List   `tfsdk:"drift_ignore_rules"`
@@ -99,7 +100,8 @@ func (d *workspaceDataSource) Schema(_ context.Context, _ datasource.SchemaReque
 			"vcs_repo_url":                     computedString("VCS repo URL."),
 			"vcs_branch":                       computedString("VCS branch."),
 			"vcs_connection_id":                computedString("VCS connection ID."),
-			"agent_pool_id":                    computedString("Agent pool ID."),
+			"agent_pool_id":                    computedString("Agent pool ID — element 0 of `agent_pool_ids`, kept for callers written before multi-pool routing."),
+			"agent_pool_ids":                   computedList("Agent pools this workspace's runs may execute on (#1085). Flat set: a queued run is offered to every pool at once and whichever has a live listener claims it, so losing one pool does not stop the workspace."),
 			"var_files":                        computedList("Var files for -var-file arguments."),
 			"trigger_prefixes":                 computedList("Repo-root-relative paths the VCS sparse-checkout must include in addition to working_directory (e.g. sibling modules referenced via `source = \"../foo\"`)."),
 			"drift_ignore_rules":               computedList("Glob-aware patterns suppressed by the drift-result classifier (#482). See the resource attribute docs for syntax."),
@@ -207,6 +209,14 @@ func readDataSourceModel(ctx context.Context, res *terrapod.Resource, m *workspa
 	setOptionalString(&m.VCSRepoURL, terrapod.GetStringAttr(res, "vcs-repo-url"))
 	setOptionalString(&m.VCSBranch, terrapod.GetStringAttr(res, "vcs-branch"))
 	setOptionalString(&m.AgentPoolID, terrapod.GetStringAttr(res, "agent-pool-id"))
+
+	if poolIDs := terrapod.GetListAttr(res, "agent-pool-ids"); len(poolIDs) > 0 {
+		val, d := types.ListValueFrom(ctx, types.StringType, poolIDs)
+		diags.Append(d...)
+		m.AgentPoolIDs = val
+	} else {
+		m.AgentPoolIDs = types.ListNull(types.StringType)
+	}
 	setOptionalString(&m.DriftStatus, terrapod.GetStringAttr(res, "drift-status"))
 	setOptionalString(&m.DriftLastCheckedAt, terrapod.GetStringAttr(res, "drift-last-checked-at"))
 	setOptionalString(&m.DriftLatestRunID, terrapod.GetStringAttr(res, "drift-latest-run-id"))

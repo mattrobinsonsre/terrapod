@@ -60,6 +60,7 @@ def _mock_ws(
     execution_backend="tofu",
     terraform_version="1.12",
     agent_pool_id=None,
+    agent_pool_extra_ids=None,
     labels=None,
     auto_apply=False,
     var_files=None,
@@ -71,6 +72,9 @@ def _mock_ws(
     w.execution_backend = execution_backend
     w.terraform_version = terraform_version
     w.agent_pool_id = agent_pool_id
+    # Real column, real default — a MagicMock here would never compare equal to
+    # the incoming `[]` and would show up as a spurious diff entry (#1085).
+    w.agent_pool_extra_ids = agent_pool_extra_ids if agent_pool_extra_ids is not None else []
     w.labels = labels if labels is not None else {}
     w.auto_apply = auto_apply
     w.var_files = var_files if var_files is not None else []

@@ -262,12 +262,36 @@ POOL_QUEUED_RUNS = Gauge(
     "terrapod_pool_queued_runs",
     (
         "Runs currently in `queued` state per agent pool — the backlog waiting "
-        "for a listener slot. Refreshed each reconciler cycle (2s) with a "
-        "single grouped COUNT. An operator watches this to see 'N runs waiting "
-        "on pool X' and decide whether the pool needs more listener capacity "
-        "(#750)."
+        "for a listener slot. Refreshed each reconciler cycle (2s). An operator "
+        "watches this to see 'N runs waiting on pool X' and decide whether the "
+        "pool needs more listener capacity (#750). A run whose workspace names "
+        "several pools (#1085) is claimable by each of them and counts toward "
+        "every one, so the sum across pools can exceed the number of queued "
+        "runs."
     ),
     ["pool_id"],
+)
+
+POOL_LIVE = Gauge(
+    "terrapod_pool_live",
+    (
+        "1 when an agent pool has at least one listener sending heartbeats, 0 "
+        "otherwise. Refreshed each reconciler cycle (2s) from the same Redis "
+        "heartbeat data the UI reads, so the dashboard and the alert can never "
+        "disagree (#1085)."
+    ),
+    ["pool_id"],
+)
+
+WORKSPACES_WITHOUT_LIVE_POOL = Gauge(
+    "terrapod_workspaces_without_live_pool",
+    (
+        "Agent-mode workspaces where NO pool in the workspace's pool set has a "
+        "live listener — runs queued against them cannot execute. The SLO to "
+        "alert on for execution-layer HA (#1085): multi-pool routing means "
+        "losing one pool is survivable, so a non-zero value here means a "
+        "workspace has lost all of its execution capacity."
+    ),
 )
 
 

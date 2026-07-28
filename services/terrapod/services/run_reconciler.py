@@ -14,7 +14,7 @@ Registered as a periodic task (2s interval) in app.py.
 import uuid
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.config import load_runner_config
@@ -70,22 +70,31 @@ async def _persist_live_log_if_missing(run: Run, phase: str) -> None:
 async def _refresh_pool_queue_depth(db: AsyncSession) -> None:
     """Publish the per-pool `queued` backlog as a Prometheus gauge (#750).
 
-    One grouped COUNT per reconciler cycle (2s). Every existing pool is given
-    an explicit value (0 when idle) so the series is stable — a pool that drains
-    to empty reads as 0, not absent. Queued runs on a since-deleted pool are
-    still surfaced (they are a real backlog). Best-effort: never raises into the
-    reconcile cycle.
+    Every existing pool is given an explicit value (0 when idle) so the series
+    is stable — a pool that drains to empty reads as 0, not absent. Queued runs
+    on a since-deleted pool are still surfaced (they are a real backlog).
+    Best-effort: never raises into the reconcile cycle.
+
+    A run on a multi-pool workspace (#1085) is claimable by every pool in its
+    candidate set, so it counts toward each of them. The gauge answers "what
+    could this pool be asked to run", which is what capacity alerting needs;
+    the sum across pools therefore exceeds the number of queued runs when
+    workspaces name several pools.
     """
     from terrapod.api.metrics import POOL_QUEUED_RUNS
     from terrapod.db.models import AgentPool
+    from terrapod.services import pool_set
 
     try:
-        counts_result = await db.execute(
-            select(Run.pool_id, func.count())
-            .where(Run.status == "queued", Run.pool_id.isnot(None))
-            .group_by(Run.pool_id)
+        queued_result = await db.execute(
+            select(Run.pool_id, Run.pool_extra_ids).where(
+                Run.status == "queued", Run.pool_id.isnot(None)
+            )
         )
-        counts = {row[0]: row[1] for row in counts_result.all()}
+        counts: dict[uuid.UUID, int] = {}
+        for row in queued_result.all():
+            for pid in pool_set.normalise([row[0], *(row[1] or [])]):
+                counts[pid] = counts.get(pid, 0) + 1
 
         pool_ids_result = await db.execute(select(AgentPool.id))
         pool_ids = {row[0] for row in pool_ids_result.all()}
@@ -97,6 +106,50 @@ async def _refresh_pool_queue_depth(db: AsyncSession) -> None:
             POOL_QUEUED_RUNS.labels(pool_id=str(pid)).set(counts.get(pid, 0))
     except Exception as e:
         logger.debug("Failed to refresh pool queue-depth gauge", error=str(e))
+
+
+async def _refresh_pool_liveness(db: AsyncSession) -> None:
+    """Publish pool liveness and the "no live pool" workspace count (#1085).
+
+    Multi-pool routing means losing one pool is survivable, so the signal that
+    actually matters is "a workspace has no live pool left at all" — that is
+    the alertable SLO, and it is fed from the same Redis heartbeats the UI
+    health banner reads so the two can never disagree.
+
+    Best-effort: never raises into the reconcile cycle.
+    """
+    from terrapod.api.metrics import POOL_LIVE, WORKSPACES_WITHOUT_LIVE_POOL
+    from terrapod.db.models import AgentPool
+    from terrapod.services import agent_pool_service, pool_set
+
+    try:
+        pool_ids = [row[0] for row in (await db.execute(select(AgentPool.id))).all()]
+        live = await agent_pool_service.live_pool_ids(pool_ids)
+        if live is None:
+            # Liveness unknown (Redis unreachable) — leave the previous cycle's
+            # values in place rather than reporting the whole fleet as dead.
+            return
+
+        POOL_LIVE.clear()
+        for pid in pool_ids:
+            POOL_LIVE.labels(pool_id=str(pid)).set(1 if pid in live else 0)
+
+        agent_ws = (
+            await db.execute(
+                select(Workspace.agent_pool_id, Workspace.agent_pool_extra_ids).where(
+                    Workspace.execution_mode == "agent",
+                    Workspace.agent_pool_id.isnot(None),
+                )
+            )
+        ).all()
+        stranded = sum(
+            1
+            for row in agent_ws
+            if not any(p in live for p in pool_set.normalise([row[0], *(row[1] or [])]))
+        )
+        WORKSPACES_WITHOUT_LIVE_POOL.set(stranded)
+    except Exception as e:
+        logger.debug("Failed to refresh pool liveness gauges", error=str(e))
 
 
 async def reconcile_runs() -> None:
@@ -117,6 +170,7 @@ async def reconcile_runs() -> None:
         # independently of in-flight ones, so this must run before the early
         # return below (#750).
         await _refresh_pool_queue_depth(db)
+        await _refresh_pool_liveness(db)
 
         # `canceling` joins planning/applying here: it's the intermediate
         # state entered when a user cancels an in-flight apply. The

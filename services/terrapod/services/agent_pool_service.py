@@ -3,6 +3,7 @@
 import hashlib
 import secrets
 import uuid
+from collections.abc import Iterable
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
@@ -434,6 +435,54 @@ async def list_listeners(pool_id: uuid.UUID) -> list[dict]:
     # Sort by name for consistent ordering
     listeners.sort(key=lambda d: d.get("name", ""))
     return listeners
+
+
+async def live_pool_ids(pool_ids: Iterable[uuid.UUID]) -> set[uuid.UUID] | None:
+    """Return the subset of ``pool_ids`` that currently has a live listener.
+
+    "Live" means at least one listener hash still exists for the pool — the
+    hashes carry a TTL refreshed by heartbeat, so a pool whose listeners have
+    stopped heartbeating drops out within ~5 missed beats.
+
+    Resolved for a batch of pools in **one** Redis round-trip, because the
+    workspace list asks this question for every workspace on the page and a
+    per-workspace call would reintroduce the O(N) cost the paged fast path
+    (#1056) exists to avoid.
+
+    Returns **None** when liveness could not be determined (Redis unreachable).
+    That is deliberately distinct from an empty set: "nothing is live" is an
+    alarm, "I couldn't tell" is not, and conflating them would light up a false
+    "no runner for this workspace" banner across the whole estate the moment
+    Redis blipped. Callers must treat None as "no information" and stay quiet.
+    """
+    unique = list(dict.fromkeys(pool_ids))
+    if not unique:
+        return set()
+
+    try:
+        redis = get_redis_client()
+        pipe = redis.pipeline(transaction=False)
+        for pid in unique:
+            pipe.smembers(f"{_POOL_LISTENERS_PREFIX}{pid}")
+        member_sets = await pipe.execute()
+
+        # A pool-listener set can hold ids whose listener hash has already
+        # expired (the set itself is only lazily cleaned), so membership alone
+        # does not prove liveness — check that at least one hash still exists.
+        candidates: list[tuple[uuid.UUID, str]] = []
+        for pid, members in zip(unique, member_sets, strict=True):
+            candidates.extend((pid, lid) for lid in members or [])
+        if not candidates:
+            return set()
+
+        pipe = redis.pipeline(transaction=False)
+        for _, lid in candidates:
+            pipe.exists(f"{_LISTENER_PREFIX}{lid}")
+        exists = await pipe.execute()
+        return {pid for (pid, _), alive in zip(candidates, exists, strict=True) if alive}
+    except Exception as e:  # never fail a request on a liveness lookup
+        logger.debug("Pool liveness lookup failed", error=str(e))
+        return None
 
 
 async def delete_listener(listener_id: str, name: str, pool_id: str) -> None:
