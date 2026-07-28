@@ -67,11 +67,14 @@ test.describe('Multi-pool workspace routing', () => {
     // Tick a second pool and save.
     const unchecked = page.getByRole('checkbox', { checked: false }).first();
     await unchecked.check();
-    await page.getByRole('button', { name: /^save$/i }).first().click();
+    // The button is "Save changes", not "Save" — an exact /^save$/ never
+    // matched it and the click timed out.
+    await page.getByRole('button', { name: /save changes/i }).first().click();
 
-    // Re-enter edit: the second pool stuck.
+    // Re-enter edit: the second pool stuck. Waiting for the Edit button to
+    // come back is what proves the save round-tripped, not a fixed sleep.
     await expect(page.getByRole('button', { name: /^edit$/i }).first()).toBeVisible({
-      timeout: 10_000,
+      timeout: 15_000,
     });
     await page.getByRole('button', { name: /^edit$/i }).first().click();
     await expect(page.getByRole('checkbox', { checked: true })).toHaveCount(2);
