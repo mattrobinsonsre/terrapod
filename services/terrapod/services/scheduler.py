@@ -40,6 +40,7 @@ from terrapod.api.metrics import (
 )
 from terrapod.logging_config import get_logger
 from terrapod.redis.client import get_redis_client
+from terrapod.services import ha_role
 
 logger = get_logger(__name__)
 
@@ -263,6 +264,19 @@ async def _run_trigger_consumer(shutdown: asyncio.Event) -> None:
             dedup_key = item.get("dedup_key")
 
             handler_def = _trigger_handlers.get(trigger_type)
+
+            # The triggered-task consumer is a SECOND execution path, separate
+            # from the periodic loops and fed directly by request handlers (a
+            # VCS webhook, a policy sync, an onboarding step). A gate placed
+            # around the periodic tasks does not cover it, so a follower would
+            # otherwise create runs from a webhook that happened to land on it.
+            #
+            # The item is dropped rather than requeued: a follower has no
+            # business doing this work, and the leader has its own queue.
+            if handler_def and not await ha_role.is_leader():
+                logger.info("Skipping trigger: not the leader", type=trigger_type)
+                continue
+
             if handler_def:
                 logger.info("Executing trigger", type=trigger_type)
                 try:
