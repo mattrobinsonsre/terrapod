@@ -49,6 +49,7 @@ from terrapod.services import (
 )
 from terrapod.services.scheduler import enqueue_trigger
 from terrapod.services.vcs_archive_cache import VCSArchiveCache, materialize_archive
+from terrapod.services.vcs_metadata_cache import VCSMetadataCache
 from terrapod.services.vcs_provider import (
     PullRequest,
 )
@@ -83,12 +84,36 @@ def _parse_repo_url(conn: VCSConnection, repo_url: str) -> tuple[str, str] | Non
     return _provider_parse_repo_url(conn, repo_url)
 
 
-async def _get_branch_sha(conn: VCSConnection, owner: str, repo: str, branch: str) -> str | None:
-    return await _provider_get_branch_sha(conn, owner, repo, branch)
+async def _get_branch_sha(
+    conn: VCSConnection,
+    owner: str,
+    repo: str,
+    branch: str,
+    meta: VCSMetadataCache | None = None,
+) -> str | None:
+    """Head SHA of `branch`, deduplicated across workspaces in this cycle (#1096).
+
+    Many workspaces share a repo+branch, and the answer is identical for all of
+    them. `meta` is None for one-shot callers, which behave exactly as before.
+    """
+    if meta is None:
+        return await _provider_get_branch_sha(conn, owner, repo, branch)
+    return await meta.get_or_fetch(
+        (str(conn.id), owner, repo, branch),
+        lambda: _provider_get_branch_sha(conn, owner, repo, branch),
+    )
 
 
-async def _get_default_branch(conn: VCSConnection, owner: str, repo: str) -> str | None:
-    return await _provider_get_default_branch(conn, owner, repo)
+async def _get_default_branch(
+    conn: VCSConnection, owner: str, repo: str, meta: VCSMetadataCache | None = None
+) -> str | None:
+    if meta is None:
+        return await _provider_get_default_branch(conn, owner, repo)
+    # "" in the branch slot — this lookup has no branch of its own.
+    return await meta.get_or_fetch(
+        (str(conn.id), owner, repo, ""),
+        lambda: _provider_get_default_branch(conn, owner, repo),
+    )
 
 
 async def _download_archive(conn: VCSConnection, owner: str, repo: str, ref: str) -> bytes:
@@ -159,9 +184,20 @@ async def _list_tags(conn: VCSConnection, owner: str, repo: str) -> list[dict[st
 
 
 async def _list_open_prs(
-    conn: VCSConnection, owner: str, repo: str, base_branch: str
+    conn: VCSConnection,
+    owner: str,
+    repo: str,
+    base_branch: str,
+    meta: VCSMetadataCache | None = None,
 ) -> list[PullRequest]:
-    """List open PRs/MRs via the appropriate provider."""
+    """Open PRs/MRs targeting `base_branch`, deduplicated per cycle (#1096)."""
+    if meta is not None:
+        # Distinct key space from the branch-SHA lookup, which shares the same
+        # (conn, owner, repo, branch) tuple.
+        return await meta.get_or_fetch(
+            (str(conn.id), owner, repo, f"prs:{base_branch}"),
+            lambda: _list_open_prs(conn, owner, repo, base_branch),
+        )
     if conn.provider == "gitlab":
         return await gitlab_service.list_open_prs(conn, owner, repo, base_branch)
     prs = await github_service.list_open_pull_requests(conn, owner, repo, base_branch)
@@ -233,7 +269,13 @@ def describe_vcs_error(e: BaseException) -> str:
     return text or type(e).__name__
 
 
-async def _resolve_branch(conn: VCSConnection, ws: Workspace, owner: str, repo: str) -> str | None:
+async def _resolve_branch(
+    conn: VCSConnection,
+    ws: Workspace,
+    owner: str,
+    repo: str,
+    meta: VCSMetadataCache | None = None,
+) -> str | None:
     """Resolve the tracked branch for a workspace.
 
     Returns None ONLY when the provider answered successfully but no branch
@@ -245,7 +287,7 @@ async def _resolve_branch(conn: VCSConnection, ws: Workspace, owner: str, repo: 
     if ws.vcs_branch:
         return ws.vcs_branch
 
-    default_branch = await _get_default_branch(conn, owner, repo)
+    default_branch = await _get_default_branch(conn, owner, repo, meta)
     if default_branch:
         return default_branch
     logger.warning(
@@ -289,6 +331,7 @@ async def _create_vcs_run(
     pr_number: int | None = None,
     message: str = "",
     cache: VCSArchiveCache | None = None,
+    meta: VCSMetadataCache | None = None,
     fetch_paths: list[str] | None = None,
 ) -> Run | None:
     """Download archive (via cache + streaming), create ConfigurationVersion and Run.
@@ -389,10 +432,11 @@ async def _poll_workspace_branch(
     repo: str,
     branch: str,
     cache: VCSArchiveCache | None = None,
+    meta: VCSMetadataCache | None = None,
     fetch_paths: list[str] | None = None,
 ) -> None:
     """Check the tracked branch for new commits and create a run."""
-    sha = await _get_branch_sha(conn, owner, repo, branch)
+    sha = await _get_branch_sha(conn, owner, repo, branch, meta)
 
     if sha is None:
         logger.warning(
@@ -499,6 +543,7 @@ async def _poll_workspace_branch(
         branch,
         message=f"Triggered by commit {sha[:8]} on {branch}",
         cache=cache,
+        meta=meta,
         fetch_paths=fetch_paths,
     )
 
@@ -704,10 +749,11 @@ async def _poll_workspace_prs(
     repo: str,
     branch: str,
     cache: VCSArchiveCache | None = None,
+    meta: VCSMetadataCache | None = None,
     fetch_paths: list[str] | None = None,
 ) -> None:
     """Check open PRs/MRs targeting the tracked branch for speculative plans."""
-    prs = await _list_open_prs(conn, owner, repo, branch)
+    prs = await _list_open_prs(conn, owner, repo, branch, meta)
 
     # Hook-and-poll fallbacks (#282). Only run for apply-then-merge —
     # default-mode PR runs are plan-only and don't drive any of this.
@@ -825,6 +871,7 @@ async def _poll_workspace_prs(
             pr_number=pr.number,
             message=message,
             cache=cache,
+            meta=meta,
             fetch_paths=fetch_paths,
         )
 
@@ -856,6 +903,7 @@ async def _poll_workspace(
     db: AsyncSession,
     ws: Workspace,
     cache: VCSArchiveCache | None = None,
+    meta: VCSMetadataCache | None = None,
     paths_unions: "PathsUnionMap | None" = None,
 ) -> None:
     """Poll a single workspace: check branch for pushes and PRs for speculative plans.
@@ -905,7 +953,7 @@ async def _poll_workspace(
     owner, repo = parsed
 
     try:
-        branch = await _resolve_branch(conn, ws, owner, repo)
+        branch = await _resolve_branch(conn, ws, owner, repo, meta)
     except Exception as e:
         # The provider call itself failed — report THAT, not a derived symptom.
         ws.vcs_last_error = describe_vcs_error(e)[:500]
@@ -930,10 +978,10 @@ async def _poll_workspace(
 
     try:
         # 1. Check tracked branch for new commits → real runs
-        await _poll_workspace_branch(db, ws, conn, owner, repo, branch, cache, fetch_paths)
+        await _poll_workspace_branch(db, ws, conn, owner, repo, branch, cache, fetch_paths, meta)
 
         # 2. Check open PRs/MRs targeting the tracked branch → speculative plans
-        await _poll_workspace_prs(db, ws, conn, owner, repo, branch, cache, fetch_paths)
+        await _poll_workspace_prs(db, ws, conn, owner, repo, branch, cache, fetch_paths, meta)
 
         # Success: update last-polled timestamp and clear any previous error
         ws.vcs_last_polled_at = now_utc()
@@ -963,6 +1011,7 @@ async def _poll_workspace_owned(
     ws_id: uuid.UUID,
     semaphore: asyncio.Semaphore,
     cache: VCSArchiveCache | None = None,
+    meta: VCSMetadataCache | None = None,
     paths_unions: "PathsUnionMap | None" = None,
 ) -> None:
     """Poll a single workspace in its own DB session, bounded by a semaphore.
@@ -983,7 +1032,7 @@ async def _poll_workspace_owned(
         if ws is None:
             return
         try:
-            await _poll_workspace(db, ws, cache, paths_unions)
+            await _poll_workspace(db, ws, cache=cache, paths_unions=paths_unions, meta=meta)
             await db.commit()
         except Exception as e:
             logger.error(
@@ -1028,6 +1077,37 @@ async def _record_poll_failure(ws_id: uuid.UUID, message: str) -> None:
             await db.commit()
     except Exception:
         logger.warning("Could not persist VCS poll failure", workspace_id=str(ws_id))
+
+
+def _log_cycle_failures(results: list, workspace_ids: list) -> None:
+    """Surface anything `asyncio.gather(return_exceptions=True)` swallowed.
+
+    `_poll_workspace_owned` already records per-workspace VCS failures on the
+    workspace itself, so anything escaping it is a defect in the poller — a
+    wiring or signature error, not a provider problem. Dropping those means VCS
+    change detection can stop dead while the cycle still reports success and
+    nothing anywhere says so. That is the worst failure mode this component has:
+    silence indistinguishable from "no changes".
+
+    Caught for real while building #1096, where a stale call signature made
+    every poll raise TypeError and zero workspaces were polled, with no error
+    surfaced anywhere.
+    """
+    failures = [r for r in results if isinstance(r, BaseException)]
+    if not failures:
+        return
+    logger.error(
+        "VCS poll cycle had workspace polls fail outright",
+        failed=len(failures),
+        total=len(workspace_ids),
+        # One representative — they are usually all the same defect.
+        error=f"{type(failures[0]).__name__}: {failures[0]}",
+    )
+    if len(failures) == len(workspace_ids) and workspace_ids:
+        logger.error(
+            "VCS poll cycle polled NO workspaces successfully — change detection is down",
+            total=len(workspace_ids),
+        )
 
 
 async def _select_workspace_ids(
@@ -1485,11 +1565,21 @@ async def poll_cycle() -> None:
     # One cache instance per cycle — coalesces concurrent (conn, sha, paths)
     # fetches across all workspace polls in this cycle.
     cache = VCSArchiveCache()
+    # One metadata cache per cycle too (#1096). Branch-SHA and open-PR lookups
+    # are identical for every workspace on the same repo+branch; without this,
+    # each workspace re-asked and a modest estate exhausted the provider's
+    # hourly quota. Per-cycle by design — holding results across cycles would
+    # stop the poller noticing new commits.
+    meta = VCSMetadataCache()
     semaphore = asyncio.Semaphore(_MAX_PARALLEL_WORKSPACE_POLLS)
-    await asyncio.gather(
-        *[_poll_workspace_owned(wid, semaphore, cache, paths_unions) for wid in workspace_ids],
+    results = await asyncio.gather(
+        *[
+            _poll_workspace_owned(wid, semaphore, cache=cache, meta=meta, paths_unions=paths_unions)
+            for wid in workspace_ids
+        ],
         return_exceptions=True,
     )
+    _log_cycle_failures(results, workspace_ids)
 
     VCS_POLL_DURATION.labels(provider="all").observe(time_mod.monotonic() - start)
 
@@ -1549,10 +1639,20 @@ async def handle_immediate_poll(payload: dict) -> None:
     # Webhook-triggered polls also share one cache instance — same coalescing
     # benefit when multiple workspaces map to the same repo.
     cache = VCSArchiveCache()
+    # One metadata cache per cycle too (#1096). Branch-SHA and open-PR lookups
+    # are identical for every workspace on the same repo+branch; without this,
+    # each workspace re-asked and a modest estate exhausted the provider's
+    # hourly quota. Per-cycle by design — holding results across cycles would
+    # stop the poller noticing new commits.
+    meta = VCSMetadataCache()
     semaphore = asyncio.Semaphore(_MAX_PARALLEL_WORKSPACE_POLLS)
-    await asyncio.gather(
-        *[_poll_workspace_owned(wid, semaphore, cache, paths_unions) for wid in workspace_ids],
+    results = await asyncio.gather(
+        *[
+            _poll_workspace_owned(wid, semaphore, cache=cache, meta=meta, paths_unions=paths_unions)
+            for wid in workspace_ids
+        ],
         return_exceptions=True,
     )
+    _log_cycle_failures(results, workspace_ids)
 
     VCS_POLL_DURATION.labels(provider="all").observe(time_mod.monotonic() - start)
