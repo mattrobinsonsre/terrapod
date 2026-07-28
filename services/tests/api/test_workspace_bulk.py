@@ -9,6 +9,7 @@ Harness mirrors `test_vcs_connections.py` / `test_autodiscovery_rules.py`.
 """
 
 import uuid
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from httpx import ASGITransport, AsyncClient
@@ -60,7 +61,6 @@ def _mock_ws(
     execution_backend="tofu",
     terraform_version="1.12",
     agent_pool_id=None,
-    agent_pool_extra_ids=None,
     labels=None,
     auto_apply=False,
     var_files=None,
@@ -71,10 +71,12 @@ def _mock_ws(
     w.execution_mode = execution_mode
     w.execution_backend = execution_backend
     w.terraform_version = terraform_version
-    w.agent_pool_id = agent_pool_id
-    # Real column, real default — a MagicMock here would never compare equal to
-    # the incoming `[]` and would show up as a spurious diff entry (#1085).
-    w.agent_pool_extra_ids = agent_pool_extra_ids if agent_pool_extra_ids is not None else []
+    # The pool set is a relationship (#1087) — a MagicMock here would never
+    # read back as a list of links.
+    w.agent_pool_links = [
+        SimpleNamespace(agent_pool_id=p, ordinal=i, agent_pool=None)
+        for i, p in enumerate([agent_pool_id] if agent_pool_id else [])
+    ]
     w.labels = labels if labels is not None else {}
     w.auto_apply = auto_apply
     w.var_files = var_files if var_files is not None else []
@@ -642,5 +644,5 @@ class TestBulkUpdatePoolRbac:
                 headers=_AUTH,
             )
         assert resp.status_code == 200, resp.text
-        assert ws.agent_pool_id == pool.id
+        assert [link.agent_pool_id for link in ws.agent_pool_links] == [pool.id]
         db.commit.assert_awaited_once()

@@ -1,6 +1,7 @@
 """Tests for _compute_health_conditions and workspace JSON serialization."""
 
 import uuid
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 
@@ -17,7 +18,10 @@ def _mock_workspace(**overrides):
     ws.lock_id = None
     ws.resource_cpu = "1"
     ws.resource_memory = "2Gi"
-    ws.agent_pool_id = overrides.get("agent_pool_id", None)
+    _pool = overrides.get("agent_pool_id", None)
+    ws.agent_pool_links = (
+        [SimpleNamespace(agent_pool_id=_pool, ordinal=0, agent_pool=None)] if _pool else []
+    )
     ws.agent_pool = None
     ws.vcs_connection_id = overrides.get("vcs_connection_id", None)
     ws.vcs_connection = None
@@ -67,6 +71,17 @@ class TestComputeHealthConditions:
         assert len(conditions) == 1
         assert conditions[0]["code"] == "no_agent_pool"
         assert conditions[0]["severity"] == "warning"
+
+    def test_agent_mode_with_a_pool_has_no_condition(self):
+        """The positive case — the one that catches a fixture going stale.
+
+        Without it, a fixture that silently stopped assigning a pool would
+        leave every `no_agent_pool` assertion passing for the wrong reason.
+        """
+        from terrapod.api.routers.tfe_v2 import _compute_health_conditions
+
+        ws = _mock_workspace(execution_mode="agent", agent_pool_id=uuid.uuid4())
+        assert _compute_health_conditions(ws) == []
 
     def test_no_agent_pool_local_mode_no_condition(self):
         from terrapod.api.routers.tfe_v2 import _compute_health_conditions

@@ -12,30 +12,37 @@ from types import SimpleNamespace
 from terrapod.services import pool_set
 
 
-def _ws(pool_id=None, extras=None):
-    return SimpleNamespace(agent_pool_id=pool_id, agent_pool_extra_ids=extras or [])
+def _link(pool_id, ordinal=0, name="pool"):
+    return SimpleNamespace(
+        agent_pool_id=pool_id, ordinal=ordinal, agent_pool=SimpleNamespace(name=name)
+    )
+
+
+def _ws(*pool_ids):
+    return SimpleNamespace(
+        agent_pool_links=[_link(p, i, f"pool-{i}") for i, p in enumerate(pool_ids)]
+    )
 
 
 class TestWorkspacePoolIDs:
     def test_no_pool_is_empty_set(self):
         assert pool_set.workspace_pool_ids(_ws()) == []
 
-    def test_single_pool_matches_pre_multi_pool_behaviour(self):
+    def test_single_pool(self):
         p = uuid.uuid4()
         assert pool_set.workspace_pool_ids(_ws(p)) == [p]
 
-    def test_element_zero_first_then_the_rest(self):
+    def test_links_read_back_in_declared_order(self):
         a, b, c = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
-        assert pool_set.workspace_pool_ids(_ws(a, [str(b), str(c)])) == [a, b, c]
+        assert pool_set.workspace_pool_ids(_ws(a, b, c)) == [a, b, c]
 
-    def test_null_extras_column_tolerated(self):
-        # A row written before the column existed reads back as NULL, not [].
-        p = uuid.uuid4()
-        assert pool_set.workspace_pool_ids(_ws(p, None)) == [p]
+    def test_workspace_without_the_relationship_loaded(self):
+        # A lightweight stub, or a row read before the relationship existed.
+        assert pool_set.workspace_pool_ids(SimpleNamespace()) == []
 
-    def test_duplicate_of_element_zero_is_dropped(self):
-        p = uuid.uuid4()
-        assert pool_set.workspace_pool_ids(_ws(p, [str(p)])) == [p]
+    def test_names_track_the_same_order(self):
+        a, b = uuid.uuid4(), uuid.uuid4()
+        assert pool_set.workspace_pool_names(_ws(a, b)) == ["pool-0", "pool-1"]
 
 
 class TestNormalise:
@@ -60,6 +67,8 @@ class TestNormalise:
 
 
 class TestSplit:
+    """`split` now serves only the run snapshot — workspaces use the links."""
+
     def test_empty_set_clears_both_columns(self):
         assert pool_set.split([]) == (None, [])
 
@@ -71,10 +80,11 @@ class TestSplit:
         assert extras == [str(b)]
         assert all(isinstance(e, str) for e in extras)
 
-    def test_round_trips_through_the_workspace_reader(self):
+    def test_feeds_the_run_snapshot_reader(self):
         a, b, c = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
         head, extras = pool_set.split([a, b, c])
-        assert pool_set.workspace_pool_ids(_ws(head, extras)) == [a, b, c]
+        run = SimpleNamespace(pool_id=head, pool_extra_ids=extras)
+        assert pool_set.run_pool_ids(run) == [a, b, c]
 
 
 class TestRunPoolIDs:

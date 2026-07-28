@@ -43,7 +43,7 @@ from terrapod.db.models import (
     Workspace,
 )
 from terrapod.logging_config import get_logger
-from terrapod.services import run_service, variable_service
+from terrapod.services import pool_set, run_service, variable_service
 
 logger = get_logger(__name__)
 
@@ -547,7 +547,6 @@ async def provision_instance(
         auto_apply=auto_apply,
         execution_backend=settings.default_execution_backend,
         terraform_version=settings.default_terraform_version,
-        agent_pool_id=agent_pool_id,
         labels=labels or {},
         owner_email=user_email,
         catalog_item_id=item.id,
@@ -555,6 +554,7 @@ async def provision_instance(
         # catalog_input_values is set by _materialise to the non-sensitive
         # resolved subset (secrets are write-only and never snapshotted here).
     )
+    pool_set.set_workspace_pools(ws, [agent_pool_id])
     db.add(ws)
     await db.flush()  # assign ws.id
 

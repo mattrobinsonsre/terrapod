@@ -294,25 +294,19 @@ class Workspace(Base):
     working_directory: Mapped[str] = mapped_column(String(500), nullable=False, default="")
     locked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     lock_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    agent_pool_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True),
-        ForeignKey("agent_pools.id", ondelete="SET NULL"),
-        nullable=True,
+    # The agent pools this workspace's runs may execute on (#1085, #1087).
+    # A FLAT set: every pool in it is equally eligible to claim a run — there is
+    # no primary and no dispatch preference. `ordinal` is display order only.
+    #
+    # A mapping table rather than columns, because both sides are real foreign
+    # keys: deleting a pool detaches it from every workspace by CASCADE, with no
+    # application-side sweeping to forget. Resolve via
+    # `pool_set.workspace_pool_ids()` rather than walking the links by hand.
+    agent_pool_links: Mapped[list["WorkspaceAgentPool"]] = relationship(
+        cascade="all, delete-orphan",
+        lazy="selectin",
+        order_by="WorkspaceAgentPool.ordinal",
     )
-    agent_pool: Mapped["AgentPool | None"] = relationship(
-        "AgentPool", foreign_keys=[agent_pool_id], lazy="joined"
-    )
-    # Multi-pool routing (#1085). The workspace's pool set is
-    # `[agent_pool_id] + agent_pool_extra_ids` — a FLAT set: every pool in it is
-    # equally eligible to claim a run, there is no primary and no preference.
-    # The split across two columns is a backward-compatibility device, not a
-    # hierarchy: `agent_pool_id` predates multi-pool and is still read by
-    # un-upgraded clients (provider, SDK, MCP, tfci), so it keeps holding
-    # element 0. Storing the whole set in one new column instead would let an
-    # old API replica's write of `agent_pool_id` during a rolling upgrade be
-    # silently ignored — dispatching to pools the operator had just removed.
-    # Always resolve via `pool_set.workspace_pool_ids()`, never read raw.
-    agent_pool_extra_ids: Mapped[list[Any]] = mapped_column(JSONB, default=list, nullable=False)
     resource_cpu: Mapped[str] = mapped_column(String(20), nullable=False, default="1")
     resource_memory: Mapped[str] = mapped_column(String(20), nullable=False, default="2Gi")
 
@@ -1350,6 +1344,37 @@ class VariableSetVariable(Base):
         sa.UniqueConstraint("variable_set_id", "key", name="uq_variable_set_variables"),
         Index("ix_variable_set_variables_set_id", "variable_set_id"),
     )
+
+
+class WorkspaceAgentPool(Base):
+    """Junction table linking workspaces to the agent pools they may run on.
+
+    Multi-pool routing (#1085, #1087): a workspace's runs are offered to every
+    pool in this set at once and whichever pool has a live listener claims
+    first. The set is **flat** — ``ordinal`` fixes display order so the UI and
+    API echo back what the operator typed, and carries no dispatch meaning.
+
+    Both columns are real foreign keys with ``ON DELETE CASCADE``, which is the
+    point: deleting an agent pool detaches it from every workspace that named
+    it, with no application-side cleanup to forget. The composite primary key
+    also makes a pool physically unable to appear twice in one set.
+    """
+
+    __tablename__ = "workspace_agent_pools"
+
+    workspace_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    agent_pool_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("agent_pools.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    ordinal: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    agent_pool: Mapped["AgentPool"] = relationship(lazy="joined")
 
 
 class VariableSetWorkspace(Base):

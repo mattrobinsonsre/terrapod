@@ -2,6 +2,7 @@
 
 import uuid
 from datetime import UTC, datetime
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from httpx import ASGITransport, AsyncClient
@@ -66,7 +67,10 @@ def _mock_workspace(ws_id=None, name="test-ws", **overrides):
     ws.slack_channel = overrides.get("slack_channel", "")
     ws.execution_backend = overrides.get("execution_backend", "tofu")
     ws.agent_pool = None
-    ws.agent_pool_id = overrides.get("agent_pool_id", None)
+    _pool = overrides.get("agent_pool_id", None)
+    ws.agent_pool_links = (
+        [SimpleNamespace(agent_pool_id=_pool, ordinal=0, agent_pool=None)] if _pool else []
+    )
     ws.var_files = []
     ws.trigger_prefixes = []
     ws.drift_ignore_rules = []

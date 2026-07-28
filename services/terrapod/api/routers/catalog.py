@@ -56,7 +56,7 @@ from terrapod.db.models import (
 )
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
-from terrapod.services import catalog_service, run_service
+from terrapod.services import catalog_service, pool_set, run_service
 from terrapod.services.catalog_rbac_service import (
     resolve_catalog_capabilities_for,
 )
@@ -144,7 +144,9 @@ def _instance_json(ws: Workspace) -> dict:
             "name": ws.name,
             "catalog-item-id": str(ws.catalog_item_id) if ws.catalog_item_id else None,
             "catalog-version-pin": ws.catalog_version_pin,
-            "agent-pool-id": f"apool-{ws.agent_pool_id}" if ws.agent_pool_id else None,
+            "agent-pool-id": (
+                f"apool-{_ws_pools[0]}" if (_ws_pools := pool_set.workspace_pool_ids(ws)) else None
+            ),
             "owner-email": ws.owner_email or "",
             "labels": dict(ws.labels or {}),
         },
@@ -164,10 +166,13 @@ def _instance_json(ws: Workspace) -> dict:
             **(
                 {
                     "agent-pool": {
-                        "data": {"id": f"apool-{ws.agent_pool_id}", "type": "agent-pools"},
+                        "data": {
+                            "id": f"apool-{pool_set.workspace_pool_ids(ws)[0]}",
+                            "type": "agent-pools",
+                        },
                     },
                 }
-                if ws.agent_pool_id
+                if pool_set.workspace_pool_ids(ws)
                 else {}
             ),
             "workspace": {"data": {"id": f"ws-{ws.id}", "type": "workspaces"}},

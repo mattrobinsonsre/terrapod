@@ -23,7 +23,6 @@ def _mock_workspace(**overrides):
     ws.terraform_version = "1.11"
     ws.resource_cpu = "1"
     ws.resource_memory = "2Gi"
-    ws.agent_pool_id = None
     ws.owner_email = "test@example.com"
     return ws
 

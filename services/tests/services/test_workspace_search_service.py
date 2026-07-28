@@ -151,7 +151,7 @@ class TestBuildQueryDimensions:
     def test_agent_pool_id_adds_where(self):
         pid = uuid.uuid4()
         q = build_workspace_query(WorkspaceFilter(agent_pool_id=f"apool-{pid}"))
-        assert "workspaces.agent_pool_id" in str(q)
+        assert "workspace_agent_pools.agent_pool_id" in str(q)
 
     def test_agent_pool_id_bad_uuid_raises(self):
         with pytest.raises(WorkspaceFilterError):

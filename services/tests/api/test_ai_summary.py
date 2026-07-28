@@ -53,7 +53,6 @@ def _mock_workspace(ws_id=None, **overrides):
     ws.vcs_branch = ""
     ws.vcs_connection_id = None
     ws.vcs_connection = None
-    ws.agent_pool_id = None
     ws.agent_pool = None
     ws.labels = {}
     ws.owner_email = "test@example.com"

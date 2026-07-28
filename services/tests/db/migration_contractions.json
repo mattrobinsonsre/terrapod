@@ -16,6 +16,10 @@
     "alter_column(api_tokens, created_by)",
     "alter_column(api_tokens, user_email)"
   ],
+  "598eb2329821_workspace_agent_pools": [
+    "drop_column(workspaces, agent_pool_extra_ids)",
+    "drop_column(workspaces, agent_pool_id)"
+  ],
   "7dac5695bc0e_default_tofu_1_12": [
     "alter_column(autodiscovery_rules, terraform_version)",
     "alter_column(workspaces, terraform_version)"

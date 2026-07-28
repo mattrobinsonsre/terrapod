@@ -15,7 +15,7 @@ from sqlalchemy import select
 
 from terrapod.db.models import AgentPool, ConfigurationVersion, Run, Workspace
 from terrapod.db.session import get_db_session
-from terrapod.services import run_service
+from terrapod.services import pool_set, run_service
 
 pytestmark = pytest.mark.integration
 
@@ -28,14 +28,11 @@ async def _seed(pool_names: list[str]) -> tuple[Workspace, list[AgentPool]]:
             db.add(p)
         await db.flush()
 
-        head = pools[0].id
-        extras = [str(p.id) for p in pools[1:]]
         ws = Workspace(
             name=f"multi-pool-{pool_names[0]}",
             execution_mode="agent",
-            agent_pool_id=head,
-            agent_pool_extra_ids=extras,
         )
+        pool_set.set_workspace_pools(ws, [p.id for p in pools])
         db.add(ws)
         await db.flush()
 
@@ -158,3 +155,59 @@ class TestMultiPoolClaim:
             claim = await run_service.claim_next_run(db, _uuid.uuid4(), stranger.id, "outsider")
             await db.commit()
         assert claim is None
+
+
+class TestPoolDeletionCascade:
+    """Deleting a pool detaches it from every workspace (#1087).
+
+    This is the integrity the mapping table exists for: `delete_pool` is a bare
+    DELETE that relies on the foreign key, so a set stored without one would
+    leave the workspace advertising a pool that no longer exists.
+    """
+
+    async def test_deleting_a_pool_removes_it_from_every_set(self, app):
+        ws, pools = await _seed(["cascade-a", "cascade-b"])
+
+        async with get_db_session() as db:
+            doomed = (
+                await db.execute(select(AgentPool).where(AgentPool.id == pools[0].id))
+            ).scalar_one()
+            await db.delete(doomed)
+            await db.commit()
+
+        async with get_db_session() as db:
+            refreshed = (
+                await db.execute(select(Workspace).where(Workspace.id == ws.id))
+            ).scalar_one()
+            assert pool_set.workspace_pool_ids(refreshed) == [pools[1].id]
+
+    async def test_deleting_the_last_pool_empties_the_set(self, app):
+        ws, pools = await _seed(["solo-cascade"])
+
+        async with get_db_session() as db:
+            doomed = (
+                await db.execute(select(AgentPool).where(AgentPool.id == pools[0].id))
+            ).scalar_one()
+            await db.delete(doomed)
+            await db.commit()
+
+        async with get_db_session() as db:
+            refreshed = (
+                await db.execute(select(Workspace).where(Workspace.id == ws.id))
+            ).scalar_one()
+            assert pool_set.workspace_pool_ids(refreshed) == []
+
+    async def test_deleting_a_workspace_leaves_the_pool_alone(self, app):
+        """CASCADE runs the other way too, without taking the pool with it."""
+        ws, pools = await _seed(["ws-delete"])
+
+        async with get_db_session() as db:
+            doomed = (await db.execute(select(Workspace).where(Workspace.id == ws.id))).scalar_one()
+            await db.delete(doomed)
+            await db.commit()
+
+        async with get_db_session() as db:
+            survivors = list(
+                (await db.execute(select(AgentPool).where(AgentPool.id == pools[0].id))).scalars()
+            )
+            assert len(survivors) == 1
