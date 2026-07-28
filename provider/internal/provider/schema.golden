@@ -56,6 +56,7 @@ data terrapod_vcs_connection.status required=false optional=false computed=true 
 data terrapod_vcs_connection.updated_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_vcs_connection.vcs_provider required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.agent_pool_id required=false optional=false computed=true sensitive=false type=basetypes.StringType
+data terrapod_workspace.agent_pool_ids required=false optional=false computed=true sensitive=false type=types.ListType[basetypes.StringType]
 data terrapod_workspace.agent_pool_name required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.ai_summary_context required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.ai_summary_mode required=false optional=false computed=true sensitive=false type=basetypes.StringType
@@ -350,6 +351,7 @@ resource terrapod_vcs_connection.updated_at required=false optional=false comput
 resource terrapod_vcs_connection.vcs_provider required=true optional=false computed=false sensitive=false type=basetypes.StringType
 resource terrapod_vcs_connection.webhook_secret required=false optional=true computed=false sensitive=true type=basetypes.StringType
 resource terrapod_workspace.agent_pool_id required=false optional=true computed=false sensitive=false type=basetypes.StringType
+resource terrapod_workspace.agent_pool_ids required=false optional=true computed=true sensitive=false type=types.ListType[basetypes.StringType]
 resource terrapod_workspace.agent_pool_name required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.ai_summary_context required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.ai_summary_mode required=false optional=true computed=true sensitive=false type=basetypes.StringType

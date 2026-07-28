@@ -43,6 +43,7 @@ from terrapod.db.models import (
 )
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
+from terrapod.services import pool_set
 from terrapod.services.capability_resolver import resolve_capabilities
 from terrapod.services.notification_service import VALID_TRIGGERS
 from terrapod.services.run_task_service import VALID_ENFORCEMENT_LEVELS, VALID_STAGES
@@ -65,7 +66,8 @@ _FIELD_MAP: dict[str, str] = {
     "execution-backend": "execution_backend",
     "execution-mode": "execution_mode",
     "auto-apply": "auto_apply",
-    "agent-pool-id": "agent_pool_id",
+    # NOTE: the agent-pool attributes are deliberately NOT here — one input key
+    # writes two columns, so they are validated by _validate_pool_set below.
     "resource-cpu": "resource_cpu",
     "resource-memory": "resource_memory",
     "var-files": "var_files",
@@ -81,6 +83,7 @@ def _ws_summary(ws: Workspace) -> dict[str, Any]:
         "execution-backend": ws.execution_backend,
         "terraform-version": ws.terraform_version,
         "agent-pool-id": f"apool-{ws.agent_pool_id}" if ws.agent_pool_id else None,
+        "agent-pool-ids": [f"apool-{p}" for p in pool_set.workspace_pool_ids(ws)],
         "labels": ws.labels or {},
     }
 
@@ -177,6 +180,63 @@ def validate_notification_specs(items: Any) -> list[dict]:
     return out
 
 
+async def _validate_pool_set(
+    update: dict, db: AsyncSession, user: AuthenticatedUser
+) -> dict[str, Any]:
+    """Validate the requested agent-pool set, returning the columns to write.
+
+    Mirrors the single-workspace rules (#1085): either `agent-pool-id` (one
+    pool, replacing the whole set) or `agent-pool-ids` (the set), never both,
+    and `pool:assign` on *every* pool named.
+    """
+    has_singular = "agent-pool-id" in update
+    has_plural = "agent-pool-ids" in update
+    if has_singular and has_plural:
+        raise HTTPException(
+            status_code=422,
+            detail="Set either agent-pool-id or agent-pool-ids, not both",
+        )
+    if not has_singular and not has_plural:
+        return {}
+
+    if has_plural:
+        raw = update.get("agent-pool-ids") or []
+        if not isinstance(raw, list):
+            raise HTTPException(status_code=422, detail="agent-pool-ids must be a list")
+    else:
+        singular = update.get("agent-pool-id")
+        raw = [] if singular in (None, "") else [singular]
+
+    requested = pool_set.normalise(raw)
+    if len(requested) != len([r for r in raw if r]):
+        raise HTTPException(status_code=422, detail="agent pool ids must be unique and valid")
+
+    for pid in requested:
+        pool = await db.get(AgentPool, pid)
+        if pool is None:
+            raise HTTPException(status_code=422, detail="agent-pool-id not found")
+        # Assigning a pool requires the pool:assign capability (platform
+        # admin bypass) — mirrors the single-workspace rule (#585).
+        if "admin" not in effective_platform_roles(user):
+            pool_caps = await resolve_capabilities(
+                db,
+                user.email,
+                user.roles,
+                pool.name,
+                pool.labels or {},
+                pool.owner_email,
+                axis="pool",
+            )
+            if not has_capability(pool_caps, cap.POOL_ASSIGN):
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"write permission on agent pool '{pool.name}' is required",
+                )
+
+    head, extras = pool_set.split(requested)
+    return {"agent_pool_id": head, "agent_pool_extra_ids": extras}
+
+
 async def _validate_update(
     update: dict, db: AsyncSession, user: AuthenticatedUser
 ) -> dict[str, Any]:
@@ -207,38 +267,9 @@ async def _validate_update(
         if key == "var-files":
             if not isinstance(val, list):
                 raise HTTPException(status_code=422, detail="var-files must be a list")
-        if key == "agent-pool-id":
-            if val in (None, ""):
-                val = None
-            else:
-                try:
-                    pid = uuid.UUID(str(val).removeprefix("apool-"))
-                except ValueError as e:
-                    raise HTTPException(
-                        status_code=422, detail="agent-pool-id is not a UUID"
-                    ) from e
-                pool = await db.get(AgentPool, pid)
-                if pool is None:
-                    raise HTTPException(status_code=422, detail="agent-pool-id not found")
-                # Assigning a pool requires the pool:assign capability (platform
-                # admin bypass) — mirrors the single-workspace rule (#585).
-                if "admin" not in effective_platform_roles(user):
-                    pool_caps = await resolve_capabilities(
-                        db,
-                        user.email,
-                        user.roles,
-                        pool.name,
-                        pool.labels or {},
-                        pool.owner_email,
-                        axis="pool",
-                    )
-                    if not has_capability(pool_caps, cap.POOL_ASSIGN):
-                        raise HTTPException(
-                            status_code=403,
-                            detail=f"write permission on agent pool '{pool.name}' is required",
-                        )
-                val = pid
         fields[attr] = val
+
+    fields.update(await _validate_pool_set(update, db, user))
 
     run_tasks = validate_run_task_specs(update["run-tasks"]) if "run-tasks" in update else None
     notifications = (

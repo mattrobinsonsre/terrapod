@@ -24,7 +24,7 @@ from terrapod.db.models import (
     now_utc,
 )
 from terrapod.logging_config import get_logger
-from terrapod.services import github_service, gitlab_service
+from terrapod.services import github_service, gitlab_service, pool_set
 from terrapod.services.notification_service import STATUS_TO_TRIGGER
 
 logger = get_logger(__name__)
@@ -226,18 +226,24 @@ async def _enqueue_drift_completed(run: Run) -> None:
 
 
 async def _publish_run_available(run: Run) -> None:
-    """Publish a run_available event to the pool's listener SSE channel.
+    """Publish a run_available event to every candidate pool's SSE channel.
 
     Called when a run transitions to queued or confirmed, notifying listeners
     that there is claimable work.
+
+    A run may name several pools (#1085) and they are all equally eligible, so
+    every one is notified — whichever listener claims first runs it. The event
+    carries the pool it was addressed to, because a listener uses it to decide
+    whether the notification is for a pool it serves.
     """
     try:
         from terrapod.redis.client import publish_listener_event
 
-        await publish_listener_event(
-            str(run.pool_id),
-            {"event": "run_available", "pool_id": str(run.pool_id)},
-        )
+        for pool_id in pool_set.run_pool_ids(run):
+            await publish_listener_event(
+                str(pool_id),
+                {"event": "run_available", "pool_id": str(pool_id)},
+            )
     except Exception as e:
         # Never let SSE publishing break the state machine
         logger.debug("Failed to publish run_available", error=str(e))
@@ -555,7 +561,10 @@ async def create_run(
     if auto_apply is None:
         auto_apply = workspace.auto_apply
 
-    pool_id = workspace.agent_pool_id
+    # Snapshot the workspace's pool set (#1085). Element 0 lands in `pool_id`
+    # and the rest in `pool_extra_ids`; they are equally eligible — the claim
+    # rewrites `pool_id` to whichever pool actually takes the run.
+    pool_id, pool_extra_ids = pool_set.split(pool_set.workspace_pool_ids(workspace))
 
     # Pin the execution version to an exact x.y.z at run creation, the
     # same way CPU/memory are snapshotted. The workspace stores the
@@ -596,6 +605,7 @@ async def create_run(
         resource_cpu=workspace.resource_cpu,
         resource_memory=workspace.resource_memory,
         pool_id=pool_id,
+        pool_extra_ids=pool_extra_ids,
         created_by=created_by,
         is_drift_detection=is_drift_detection,
         target_addrs=target_addrs or None,
@@ -1510,13 +1520,25 @@ async def claim_next_run(
     that ran the plan is no longer available — listeners are stateless.
 
     Uses SELECT ... FOR UPDATE SKIP LOCKED for Postgres job queue pattern.
+
+    A run may name several pools (#1085) and every one of them is equally
+    eligible, so the match is "this pool is anywhere in the run's candidate
+    set". Exactly-once execution is unaffected: the run is still a single row
+    claimed under SKIP LOCKED, so offering it to N pools cannot produce N
+    claims. The winning pool is written back to `run.pool_id` below.
     """
     # Try queued runs first (plan phase), then confirmed runs (apply phase)
     for target_status, phase, next_status in [
         ("queued", "plan", "planning"),
         ("confirmed", "apply", "applying"),
     ]:
-        conditions = [Run.status == target_status, Run.pool_id == pool_id]
+        conditions = [
+            Run.status == target_status,
+            or_(
+                Run.pool_id == pool_id,
+                Run.pool_extra_ids.contains([str(pool_id)]),
+            ),
+        ]
 
         # Per-workspace serialization + manual-lock gate, applied only when
         # STARTING a plan (queued → planning). An apply-capable (plan+apply)
@@ -1564,6 +1586,20 @@ async def claim_next_run(
 
         if run is not None:
             run.listener_id = listener_id
+            # Record where the run is actually executing (#1085). Everything
+            # downstream — cancel_job, check_job_status, log streaming, the
+            # terminal queue re-drive — addresses `run.pool_id`, so on a
+            # multi-pool workspace it must name the pool that won the claim,
+            # not whichever pool happened to be element 0.
+            # The candidate set is preserved, only re-ordered around the
+            # winner: the apply phase is claimed separately and must still be
+            # able to fall through if this pool goes dark between plan and
+            # apply. (Artifacts come from the API, so the apply need not run in
+            # the same cluster as the plan.)
+            claimed_elsewhere = run.pool_id != pool_id
+            candidates = pool_set.run_pool_ids(run)
+            run.pool_id = pool_id
+            run.pool_extra_ids = [str(p) for p in candidates if p != pool_id]
             run = await transition_run(db, run, next_status)
             await db.flush()
 
@@ -1572,6 +1608,8 @@ async def claim_next_run(
                 run_id=str(run.id),
                 listener=listener_name,
                 phase=phase,
+                pool_id=str(pool_id),
+                fell_through=claimed_elsewhere,
             )
 
             return run, phase

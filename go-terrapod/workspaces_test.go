@@ -668,3 +668,85 @@ func TestWorkspaceCreate_DoesNotRetryOn5xx(t *testing.T) {
 		t.Errorf("POST must not retry on 5xx: expected 1 call, got %d", calls)
 	}
 }
+
+// Multi-pool routing (#1085). The set is flat — AgentPoolID is simply element
+// 0, kept so callers written before multi-pool routing keep working.
+func TestWorkspace_AgentPoolSet_RoundTrip(t *testing.T) {
+	f := newWorkspaceFixtureServer(t)
+	f.readHandler = func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(minimalWorkspaceBody("ws-pools", "multi", map[string]any{
+			"agent-pool-id":  "apool-a",
+			"agent-pool-ids": []any{"apool-a", "apool-b"},
+		})))
+	}
+	c := f.client()
+	ws, err := c.GetWorkspace(t.Context(), "ws-pools")
+	if err != nil {
+		t.Fatalf("GetWorkspace: %v", err)
+	}
+	if len(ws.AgentPoolIDs) != 2 || ws.AgentPoolIDs[1] != "apool-b" {
+		t.Errorf("pool set not decoded: %+v", ws.AgentPoolIDs)
+	}
+	if ws.AgentPoolID != "apool-a" {
+		t.Errorf("singular pool should be element 0, got %q", ws.AgentPoolID)
+	}
+
+	f.createHandler = func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(minimalWorkspaceBody("ws-pools", "multi", nil)))
+	}
+	if _, err := c.CreateWorkspace(t.Context(), CreateWorkspaceRequest{
+		Name:         "multi",
+		AgentPoolIDs: []string{"apool-a", "apool-b"},
+	}); err != nil {
+		t.Fatalf("CreateWorkspace: %v", err)
+	}
+	var req struct {
+		Data struct {
+			Attributes map[string]any `json:"attributes"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(f.lastBody, &req); err != nil {
+		t.Fatalf("request body: %v", err)
+	}
+	ids, ok := req.Data.Attributes["agent-pool-ids"].([]any)
+	if !ok || len(ids) != 2 || ids[0] != "apool-a" {
+		t.Errorf("agent-pool-ids missing from request: %+v", req.Data.Attributes)
+	}
+	// The singular attribute must NOT be sent alongside the set — the server
+	// rejects a body carrying both (422).
+	if _, present := req.Data.Attributes["agent-pool-id"]; present {
+		t.Errorf("agent-pool-id must not be sent with agent-pool-ids: %+v", req.Data.Attributes)
+	}
+}
+
+// An un-upgraded caller that only knows the singular attribute must still
+// produce exactly the request it produced before multi-pool routing existed.
+func TestWorkspace_SingularAgentPoolID_UnchangedWire(t *testing.T) {
+	f := newWorkspaceFixtureServer(t)
+	f.createHandler = func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(minimalWorkspaceBody("ws-one", "single", nil)))
+	}
+	c := f.client()
+	if _, err := c.CreateWorkspace(t.Context(), CreateWorkspaceRequest{
+		Name:        "single",
+		AgentPoolID: "apool-a",
+	}); err != nil {
+		t.Fatalf("CreateWorkspace: %v", err)
+	}
+	var req struct {
+		Data struct {
+			Attributes map[string]any `json:"attributes"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(f.lastBody, &req); err != nil {
+		t.Fatalf("request body: %v", err)
+	}
+	if req.Data.Attributes["agent-pool-id"] != "apool-a" {
+		t.Errorf("agent-pool-id missing: %+v", req.Data.Attributes)
+	}
+	if _, present := req.Data.Attributes["agent-pool-ids"]; present {
+		t.Errorf("agent-pool-ids must be absent when unset: %+v", req.Data.Attributes)
+	}
+}

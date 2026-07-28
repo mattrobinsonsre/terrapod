@@ -121,6 +121,10 @@ def _mock_run(**kwargs):
     run.listener_id = kwargs.get("listener_id", None)
     run.locked = kwargs.get("locked", False)
     run.source = kwargs.get("source", "tfe-api")
+    # Multi-pool candidate set (#1085) — real columns with real defaults; a
+    # MagicMock here silently defeats the pool-set resolution.
+    run.pool_id = kwargs.get("pool_id", None)
+    run.pool_extra_ids = kwargs.get("pool_extra_ids", [])
     return run
 
 
@@ -669,6 +673,46 @@ class TestClaimNextRun:
         result = await claim_next_run(db, uuid.uuid4(), pool_id)
         assert result is None
 
+    async def test_claiming_pool_is_recorded_on_the_run(self):
+        """A fallback pool that claims the run becomes the run's pool (#1085).
+
+        Everything downstream — cancel_job, check_job_status, log streaming,
+        the terminal queue re-drive — addresses `run.pool_id`, so it has to
+        name the pool actually executing the run, not whichever pool happened
+        to be element 0 of the workspace's set.
+        """
+        primary = uuid.uuid4()
+        fallback = uuid.uuid4()
+        db = AsyncMock(spec=AsyncSession)
+        run = _mock_run(status="queued", pool_id=primary, pool_extra_ids=[str(fallback)])
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = run
+        db.execute.return_value = mock_result
+
+        result = await claim_next_run(db, uuid.uuid4(), fallback, "listener-b")
+        assert result is not None
+        claimed_run, _ = result
+        assert claimed_run.pool_id == fallback
+        # The candidate set survives the claim, only re-ordered around the
+        # winner: the apply phase is claimed separately and must still be able
+        # to fall through if this pool goes dark between plan and apply.
+        assert claimed_run.pool_extra_ids == [str(primary)]
+
+    async def test_single_pool_claim_leaves_the_set_untouched(self):
+        """Back-compat: a single-pool workspace behaves exactly as before."""
+        pool_id = uuid.uuid4()
+        db = AsyncMock(spec=AsyncSession)
+        run = _mock_run(status="queued", pool_id=pool_id)
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = run
+        db.execute.return_value = mock_result
+
+        result = await claim_next_run(db, uuid.uuid4(), pool_id, "listener-1")
+        assert result is not None
+        claimed_run, _ = result
+        assert claimed_run.pool_id == pool_id
+        assert claimed_run.pool_extra_ids == []
+
 
 # ── _publish_run_event ────────────────────────────────────────────────
 
@@ -716,6 +760,34 @@ class TestPublishRunAvailable:
 
         # Should not raise
         await _publish_run_available(run)
+
+    @patch("terrapod.redis.client.publish_listener_event", new_callable=AsyncMock)
+    async def test_fans_out_to_every_candidate_pool(self, mock_publish):
+        """Every pool in the run's set is notified (#1085).
+
+        The pools are equally eligible, so all of them are told there is
+        claimable work — the first listener to claim wins, and SKIP LOCKED
+        guarantees only one does.
+        """
+        primary = uuid.uuid4()
+        fallback = uuid.uuid4()
+        run = _mock_run(status="queued", pool_id=primary, pool_extra_ids=[str(fallback)])
+
+        await _publish_run_available(run)
+
+        channels = [c.args[0] for c in mock_publish.call_args_list]
+        assert channels == [str(primary), str(fallback)]
+        # Each event names the pool it was addressed to — a listener uses it to
+        # decide whether the notification is for a pool it serves.
+        for call in mock_publish.call_args_list:
+            assert call.args[1]["event"] == "run_available"
+            assert call.args[1]["pool_id"] == call.args[0]
+
+    @patch("terrapod.redis.client.publish_listener_event", new_callable=AsyncMock)
+    async def test_unassigned_run_publishes_nothing(self, mock_publish):
+        run = _mock_run(status="queued", pool_id=None)
+        await _publish_run_available(run)
+        mock_publish.assert_not_called()
 
 
 # ── complete_plan / complete_apply ────────────────────────────────────

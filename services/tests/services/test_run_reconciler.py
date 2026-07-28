@@ -822,13 +822,14 @@ class TestPoolQueueDepth:
         p1 = uuid.uuid4()  # 3 queued
         p2 = uuid.uuid4()  # idle → explicit 0, not absent
 
-        counts_result = MagicMock()
-        counts_result.all.return_value = [(p1, 3)]
+        # Rows are (pool_id, pool_extra_ids) — one row per queued run.
+        queued_result = MagicMock()
+        queued_result.all.return_value = [(p1, []), (p1, []), (p1, [])]
         pools_result = MagicMock()
         pools_result.all.return_value = [(p1,), (p2,)]
 
         db = AsyncMock()
-        db.execute.side_effect = [counts_result, pools_result]
+        db.execute.side_effect = [queued_result, pools_result]
 
         await _refresh_pool_queue_depth(db)
 
@@ -839,17 +840,40 @@ class TestPoolQueueDepth:
         from terrapod.api.metrics import POOL_QUEUED_RUNS
 
         p3 = uuid.uuid4()  # has queued runs but the pool row is gone
-        counts_result = MagicMock()
-        counts_result.all.return_value = [(p3, 2)]
+        queued_result = MagicMock()
+        queued_result.all.return_value = [(p3, []), (p3, [])]
         pools_result = MagicMock()
         pools_result.all.return_value = []
 
         db = AsyncMock()
-        db.execute.side_effect = [counts_result, pools_result]
+        db.execute.side_effect = [queued_result, pools_result]
 
         await _refresh_pool_queue_depth(db)
 
         assert POOL_QUEUED_RUNS.labels(pool_id=str(p3))._value.get() == 2
+
+    async def test_multi_pool_run_counts_toward_every_candidate(self):
+        """A run claimable by two pools is backlog for both (#1085).
+
+        The gauge answers "what could this pool be asked to run", so the same
+        run appears under each pool that could claim it.
+        """
+        from terrapod.api.metrics import POOL_QUEUED_RUNS
+
+        primary = uuid.uuid4()
+        fallback = uuid.uuid4()
+        queued_result = MagicMock()
+        queued_result.all.return_value = [(primary, [str(fallback)])]
+        pools_result = MagicMock()
+        pools_result.all.return_value = [(primary,), (fallback,)]
+
+        db = AsyncMock()
+        db.execute.side_effect = [queued_result, pools_result]
+
+        await _refresh_pool_queue_depth(db)
+
+        assert POOL_QUEUED_RUNS.labels(pool_id=str(primary))._value.get() == 1
+        assert POOL_QUEUED_RUNS.labels(pool_id=str(fallback))._value.get() == 1
 
     async def test_db_error_fails_open(self):
         db = AsyncMock()

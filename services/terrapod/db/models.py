@@ -302,6 +302,17 @@ class Workspace(Base):
     agent_pool: Mapped["AgentPool | None"] = relationship(
         "AgentPool", foreign_keys=[agent_pool_id], lazy="joined"
     )
+    # Multi-pool routing (#1085). The workspace's pool set is
+    # `[agent_pool_id] + agent_pool_extra_ids` — a FLAT set: every pool in it is
+    # equally eligible to claim a run, there is no primary and no preference.
+    # The split across two columns is a backward-compatibility device, not a
+    # hierarchy: `agent_pool_id` predates multi-pool and is still read by
+    # un-upgraded clients (provider, SDK, MCP, tfci), so it keeps holding
+    # element 0. Storing the whole set in one new column instead would let an
+    # old API replica's write of `agent_pool_id` during a rolling upgrade be
+    # silently ignored — dispatching to pools the operator had just removed.
+    # Always resolve via `pool_set.workspace_pool_ids()`, never read raw.
+    agent_pool_extra_ids: Mapped[list[Any]] = mapped_column(JSONB, default=list, nullable=False)
     resource_cpu: Mapped[str] = mapped_column(String(20), nullable=False, default="1")
     resource_memory: Mapped[str] = mapped_column(String(20), nullable=False, default="2Gi")
 
@@ -1538,11 +1549,19 @@ class Run(Base):
     terragrunt_version: Mapped[str] = mapped_column(String(20), nullable=False, default="")
     resource_cpu: Mapped[str] = mapped_column(String(20), nullable=False, default="1")
     resource_memory: Mapped[str] = mapped_column(String(20), nullable=False, default="2Gi")
+    # `pool_id` is the pool this run is currently associated with: at creation
+    # it is element 0 of the workspace's pool set, and on claim it is rewritten
+    # to the pool that actually took the run — so cancellation, job-status
+    # queries and log streaming all address the cluster that is running it.
     pool_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("agent_pools.id", ondelete="SET NULL"),
         nullable=True,
     )
+    # The rest of the candidate pool set, snapshotted at run creation (#1085).
+    # A listener in ANY candidate may claim this run; first claim wins. No FK —
+    # this is a snapshot, and a pool deleted mid-flight must not rewrite it.
+    pool_extra_ids: Mapped[list[Any]] = mapped_column(JSONB, default=list, nullable=False)
     listener_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         nullable=True,

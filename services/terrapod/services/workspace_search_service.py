@@ -20,7 +20,7 @@ import uuid
 from typing import Any
 
 from pydantic import BaseModel, Field
-from sqlalchemy import Select, select
+from sqlalchemy import Select, or_, select
 
 from terrapod.db.models import Workspace
 
@@ -134,7 +134,17 @@ def build_workspace_query(f: WorkspaceFilter) -> Select[tuple[Workspace]]:
     if f.terraform_version is not None:
         q = q.where(Workspace.terraform_version == f.terraform_version)
     if f.agent_pool_id is not None:
-        q = q.where(Workspace.agent_pool_id == _strip_uuid(f.agent_pool_id, "apool-"))
+        # Matches a workspace that names this pool ANYWHERE in its pool set
+        # (#1085) — "which workspaces would this pool have to run?" is the
+        # question an operator is asking, and a workspace that lists the pool
+        # as a fallback is just as much its responsibility.
+        pool_uuid = _strip_uuid(f.agent_pool_id, "apool-")
+        q = q.where(
+            or_(
+                Workspace.agent_pool_id == pool_uuid,
+                Workspace.agent_pool_extra_ids.contains([str(pool_uuid)]),
+            )
+        )
     if f.vcs_connection_id is not None:
         q = q.where(Workspace.vcs_connection_id == _strip_uuid(f.vcs_connection_id, "vcs-"))
     if f.owner_email is not None:

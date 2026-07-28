@@ -306,6 +306,57 @@ POST /api/v2/organizations/default/workspaces
 
 **Required permission:** Any authenticated user can create workspaces (creator becomes owner).
 
+### Agent pool set
+
+A workspace routes its runs to a **set** of agent pools. The set is **flat**:
+a queued run is offered to every pool at once and whichever pool has a live
+listener claims it first. There is no primary, no ordering preference and no
+rotation — losing one pool simply means another claims the work.
+
+Exactly-once execution is unaffected. A run is a single row claimed under
+`SELECT … FOR UPDATE SKIP LOCKED`, so offering it to N pools cannot produce N
+claims. On claim the run records the pool that took it, so cancellation,
+job-status queries and log streaming address the cluster actually running it.
+
+Two attributes carry this, and they are **mutually exclusive on write**:
+
+| Attribute | Type | Meaning |
+|---|---|---|
+| `agent-pool-ids` | list of `apool-…` | The whole set. |
+| `agent-pool-id` | `apool-…` \| `null` | On read, element 0 of the set. On write, "this workspace has exactly this one pool" — it **replaces** the set. `null` clears it. |
+
+Sending both in one request returns **422**. `agent-pool-name` and the
+`agent-pool` relationship also resolve to element 0; an `agent-pools` to-many
+relationship carries the full set.
+
+```json
+{
+  "data": {
+    "type": "workspaces",
+    "attributes": {
+      "agent-pool-ids": ["apool-019e01db-...", "apool-019e02ac-..."]
+    }
+  }
+}
+```
+
+**Required permission:** workspace `admin`, plus `pool:assign` on **every**
+pool in the set — a caller may not attach a workspace to a pool they could not
+have attached it to on its own.
+
+> **Upgrading from a single pool:** `agent-pool-id` keeps working exactly as it
+> did, so no client has to change. Be aware that because it replaces the set, a
+> tool that manages `agent_pool_id` (an un-upgraded Terraform provider, say)
+> will drop pools added elsewhere the next time it applies. Manage the set with
+> `agent-pool-ids` if more than one tool touches it. The removal is
+> audit-logged either way.
+
+A workspace whose pools have **all** gone dark surfaces a
+`no_live_agent_pool` health condition (distinct from `no_agent_pool`, which
+means none is assigned at all) and is counted by the
+`terrapod_workspaces_without_live_pool` metric — the signal to alert on, since
+losing a single pool is now survivable.
+
 ### Update Workspace
 
 ```
@@ -2155,7 +2206,8 @@ Apply `update` to every workspace matching `filter`, in a **single all-or-nothin
 
 Semantics:
 
-- **Validated once up front** — field enums, `labels` reserved-key check, run-task/notification specs, and `agent-pool-id` existence + caller pool-`write` RBAC. Any error ⇒ `422`, **zero mutation**.
+- **Validated once up front** — field enums, `labels` reserved-key check, run-task/notification specs, and agent-pool existence + caller pool-`write` RBAC on **every** pool named. Any error ⇒ `422`, **zero mutation**.
+- **Agent pools** accept either `agent-pool-id` (one pool, replacing the set) or `agent-pool-ids` (the set) — the same mutually-exclusive pair as the workspace endpoints; both in one `update` ⇒ `422`.
 - `run-tasks` / `notification-configurations` **upsert by `(workspace, name)`**: created if absent, updated in place if present (so re-running with a changed `url` rotates it across the fleet).
 - **All-or-nothing**: the whole batch commits or nothing does. `dry_run` (default `true`, not enforced) runs the identical code path and rolls back — the preview is exactly what apply would do, with provably zero side effects.
 - **Triggers no runs** — pure config write; the change lands on each workspace's next normal run. Reversible (it only writes settings rows).

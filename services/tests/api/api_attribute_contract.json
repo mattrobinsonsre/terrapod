@@ -555,6 +555,7 @@
   "tfe_v2._workspace_json": [
     "actions",
     "agent-pool-id",
+    "agent-pool-ids",
     "agent-pool-name",
     "ai-summary-context",
     "ai-summary-mode",

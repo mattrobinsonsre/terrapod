@@ -40,6 +40,7 @@ type Workspace struct {
 	VCSWorkflow       string            `json:"vcs-workflow,omitempty"`
 	VCSConnectionID   string            `json:"vcs-connection-id,omitempty"` // resolved from `vcs-connection` relationship
 	AgentPoolID       string            `json:"agent-pool-id,omitempty"`
+	AgentPoolIDs      []string          `json:"agent-pool-ids,omitempty"` // flat pool set (#1085); AgentPoolID is element 0
 	AutoMerge         bool              `json:"auto-merge"`
 	AutoMergeStrategy string            `json:"auto-merge-strategy,omitempty"`
 	OwnerEmail        string            `json:"owner-email,omitempty"`
@@ -134,6 +135,7 @@ type CreateWorkspaceRequest struct {
 	VCSWorkflow                   string            `json:"vcs-workflow,omitempty"`
 	VCSConnectionID               string            `json:"-"` // → relationship, not attribute
 	AgentPoolID                   string            `json:"agent-pool-id,omitempty"`
+	AgentPoolIDs                  []string          `json:"agent-pool-ids,omitempty"` // whole pool set; mutually exclusive with AgentPoolID (422)
 	AutoMerge                     *bool             `json:"auto-merge,omitempty"`
 	AutoMergeStrategy             string            `json:"auto-merge-strategy,omitempty"`
 	OwnerEmail                    string            `json:"owner-email,omitempty"`
@@ -185,6 +187,7 @@ type UpdateWorkspaceRequest struct {
 	VCSWorkflow                   string            `json:"vcs-workflow,omitempty"`
 	VCSConnectionID               string            `json:"-"`
 	AgentPoolID                   string            `json:"agent-pool-id,omitempty"`
+	AgentPoolIDs                  []string          `json:"agent-pool-ids,omitempty"` // whole pool set; mutually exclusive with AgentPoolID (422)
 	AutoMerge                     *bool             `json:"auto-merge,omitempty"`
 	AutoMergeStrategy             string            `json:"auto-merge-strategy,omitempty"`
 	Labels                        map[string]string `json:"labels,omitempty"`
@@ -439,6 +442,9 @@ func workspaceCreateAttrs(req CreateWorkspaceRequest) map[string]any {
 	if req.AgentPoolID != "" {
 		attrs["agent-pool-id"] = req.AgentPoolID
 	}
+	if req.AgentPoolIDs != nil {
+		attrs["agent-pool-ids"] = req.AgentPoolIDs
+	}
 	if req.AutoMerge != nil {
 		attrs["auto-merge"] = *req.AutoMerge
 	}
@@ -542,6 +548,9 @@ func workspaceUpdateAttrs(req UpdateWorkspaceRequest) map[string]any {
 	if req.AgentPoolID != "" {
 		attrs["agent-pool-id"] = req.AgentPoolID
 	}
+	if req.AgentPoolIDs != nil {
+		attrs["agent-pool-ids"] = req.AgentPoolIDs
+	}
 	if req.AutoMerge != nil {
 		attrs["auto-merge"] = *req.AutoMerge
 	}
@@ -642,6 +651,7 @@ func workspaceFromResource(res *Resource) *Workspace {
 		VCSWorkflow:                   GetStringAttr(res, "vcs-workflow"),
 		VCSConnectionID:               GetRelationshipID(res, "vcs-connection"),
 		AgentPoolID:                   GetStringAttr(res, "agent-pool-id"),
+		AgentPoolIDs:                  GetListAttr(res, "agent-pool-ids"),
 		AutoMerge:                     GetBoolAttr(res, "auto-merge"),
 		AutoMergeStrategy:             GetStringAttr(res, "auto-merge-strategy"),
 		OwnerEmail:                    GetStringAttr(res, "owner-email"),

@@ -67,6 +67,7 @@ from terrapod.db.models import (
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services import agent_pool_service as _agent_pool_service
+from terrapod.services import pool_set
 from terrapod.services.pool_rbac_service import resolve_pool_capabilities_for
 from terrapod.services.workspace_rbac_service import (
     resolve_workspace_capabilities_for,
@@ -599,8 +600,17 @@ async def create_project_unsupported(
 # ── Workspaces ───────────────────────────────────────────────────────────────
 
 
-def _compute_health_conditions(ws: Workspace) -> list[dict]:
-    """Compute all active health conditions from workspace DB fields."""
+def _compute_health_conditions(
+    ws: Workspace, live_pool_ids: frozenset[uuid.UUID] | None = None
+) -> list[dict]:
+    """Compute all active health conditions from workspace DB fields.
+
+    ``live_pool_ids`` is the set of agent pools that currently have a live
+    listener, resolved **once per request** by the caller (see
+    ``_resolve_live_pools``). When it is None the caller had no liveness
+    information available, and the liveness condition is skipped rather than
+    guessed — a false "no runner" banner is worse than a missing one.
+    """
     conditions: list[dict] = []
 
     if ws.state_diverged:
@@ -614,7 +624,9 @@ def _compute_health_conditions(ws: Workspace) -> list[dict]:
             }
         )
 
-    if ws.execution_mode == "agent" and not ws.agent_pool_id:
+    ws_pools = pool_set.workspace_pool_ids(ws)
+
+    if ws.execution_mode == "agent" and not ws_pools:
         conditions.append(
             {
                 "code": "no_agent_pool",
@@ -622,6 +634,29 @@ def _compute_health_conditions(ws: Workspace) -> list[dict]:
                 "title": "No agent pool assigned",
                 "detail": "This workspace is in agent execution mode but has no agent pool. "
                 "Runs will be queued indefinitely because no runner can claim them.",
+            }
+        )
+    elif (
+        ws.execution_mode == "agent"
+        and live_pool_ids is not None
+        and not any(p in live_pool_ids for p in ws_pools)
+    ):
+        # Multi-pool routing (#1085) means a workspace survives losing one of
+        # its pools — but not all of them. This is the "cut over now and
+        # nothing runs" condition, so it is worth its own banner rather than
+        # being inferred from a silent queue.
+        plural = len(ws_pools) > 1
+        conditions.append(
+            {
+                "code": "no_live_agent_pool",
+                "severity": "error",
+                "title": "No agent pool has a live runner",
+                "detail": (
+                    f"{'None of the ' if plural else 'The '}"
+                    f"{'agent pools' if plural else 'agent pool'} assigned to this "
+                    "workspace currently has a listener sending heartbeats. Runs will "
+                    "queue until one comes back or another pool is assigned."
+                ),
             }
         )
 
@@ -659,18 +694,42 @@ def _compute_health_conditions(ws: Workspace) -> list[dict]:
     return conditions
 
 
+async def _resolve_live_pools(workspaces: list[Workspace]) -> frozenset[uuid.UUID] | None:
+    """Resolve, in one Redis round-trip, which of these workspaces' pools are live.
+
+    Called **once per request** and threaded into every ``_workspace_json`` on
+    the page. Doing it per workspace would put a Redis round-trip on every row
+    of the workspace list and undo the paged fast path (#1056).
+
+    Returns None when liveness is unknown (Redis unreachable) so the caller
+    stays quiet rather than claiming every pool is dead.
+    """
+    distinct: list[uuid.UUID] = []
+    for ws in workspaces:
+        for pid in pool_set.workspace_pool_ids(ws):
+            if pid not in distinct:
+                distinct.append(pid)
+    live = await _agent_pool_service.live_pool_ids(distinct)
+    return None if live is None else frozenset(live)
+
+
 def _workspace_json(
     ws: Workspace,
     caps: frozenset[str] | None = None,
     latest_run: Run | None = None,
+    live_pool_ids: frozenset[uuid.UUID] | None = None,
 ) -> dict:
     """Serialize a Workspace to TFE V2 JSON:API format.
 
     When ``caps`` (the caller's resolved capability set on this workspace)
     is provided, the permissions block reflects the user's actual
     capabilities. Otherwise defaults to no access (empty set).
+
+    ``live_pool_ids`` feeds the pool-liveness health condition — see
+    ``_resolve_live_pools``.
     """
     caps = caps or frozenset()
+    ws_pools = pool_set.workspace_pool_ids(ws)
 
     latest_run_attr = None
     if latest_run is not None:
@@ -727,7 +786,7 @@ def _workspace_json(
                 "state-diverged": ws.state_diverged,
                 "lifecycle-state": ws.lifecycle_state,
                 "lifecycle-reason": ws.lifecycle_reason,
-                "health-conditions": _compute_health_conditions(ws),
+                "health-conditions": _compute_health_conditions(ws, live_pool_ids),
                 "vcs-last-polled-at": _rfc3339(ws.vcs_last_polled_at),
                 "vcs-last-error": ws.vcs_last_error,
                 "vcs-last-error-at": _rfc3339(ws.vcs_last_error_at),
@@ -735,7 +794,13 @@ def _workspace_json(
                 "auto-merge": ws.auto_merge,
                 "auto-merge-strategy": ws.auto_merge_strategy,
                 "latest-run": latest_run_attr,
-                "agent-pool-id": f"apool-{ws.agent_pool_id}" if ws.agent_pool_id else None,
+                # Multi-pool routing (#1085). `agent-pool-ids` is the full set;
+                # every pool in it is equally eligible to claim a run. The
+                # singular `agent-pool-id`/`agent-pool-name` are kept
+                # indefinitely for un-upgraded clients and resolve to element 0
+                # — a projection, NOT a preference.
+                "agent-pool-id": f"apool-{ws_pools[0]}" if ws_pools else None,
+                "agent-pool-ids": [f"apool-{p}" for p in ws_pools],
                 "agent-pool-name": ws.agent_pool.name if ws.agent_pool else None,
                 "vcs-connection-name": ws.vcs_connection.name if ws.vcs_connection else None,
                 "labels": ws.labels or {},
@@ -789,14 +854,19 @@ def _workspace_json(
                 ),
                 **(
                     {
+                        # Singular: element 0, for clients that predate the set.
                         "agent-pool": {
                             "data": {
-                                "id": f"apool-{ws.agent_pool_id}",
+                                "id": f"apool-{ws_pools[0]}",
                                 "type": "agent-pools",
                             },
                         },
+                        # Plural: the canonical form of the link (#1085).
+                        "agent-pools": {
+                            "data": [{"id": f"apool-{p}", "type": "agent-pools"} for p in ws_pools],
+                        },
                     }
-                    if ws.agent_pool_id
+                    if ws_pools
                     else {}
                 ),
             },
@@ -933,10 +1003,15 @@ async def list_workspaces(
             .all()
         )
         latest_runs = await _latest_runs_for([ws.id for ws in page_ws], db)
+        live_pools = await _resolve_live_pools(list(page_ws))
         data = []
         for ws in page_ws:
             caps = await resolve_workspace_capabilities_for(db, user, ws)
-            data.append(_workspace_json(ws, caps, latest_run=latest_runs.get(ws.id))["data"])
+            data.append(
+                _workspace_json(
+                    ws, caps, latest_run=latest_runs.get(ws.id), live_pool_ids=live_pools
+                )["data"]
+            )
         return JSONResponse(
             content={"data": data, "meta": build_meta(total, page_number, page_size)},
             headers=_tfe_headers(),
@@ -949,11 +1024,16 @@ async def list_workspaces(
     latest_runs = await _latest_runs_for([ws.id for ws in workspaces], db)
 
     # Filter to workspaces user has at least read access to
+    live_pools = await _resolve_live_pools(list(workspaces))
     visible = []
     for ws in workspaces:
         caps = await resolve_workspace_capabilities_for(db, user, ws)
         if caps:
-            visible.append(_workspace_json(ws, caps, latest_run=latest_runs.get(ws.id))["data"])
+            visible.append(
+                _workspace_json(
+                    ws, caps, latest_run=latest_runs.get(ws.id), live_pool_ids=live_pools
+                )["data"]
+            )
 
     # Optional JSON:API pagination (TFE wire shape). page[size]>=1 returns that
     # page; page[size]=0 or absent params return the full RBAC-filtered list as a
@@ -1003,9 +1083,89 @@ async def show_workspace(
     latest_run = run_result.scalar_one_or_none()
 
     return JSONResponse(
-        content=_workspace_json(ws, caps, latest_run=latest_run),
+        content=_workspace_json(
+            ws, caps, latest_run=latest_run, live_pool_ids=await _resolve_live_pools([ws])
+        ),
         headers=_tfe_headers(),
     )
+
+
+_POOL_SET_UNSET = object()
+
+
+async def _resolve_pool_set_attrs(
+    attrs: dict,
+    db: AsyncSession,
+    user: AuthenticatedUser,
+) -> object | tuple[uuid.UUID | None, list[str]]:
+    """Resolve the requested agent-pool set from workspace write attributes.
+
+    Accepts either form (#1085):
+
+    * ``agent-pool-ids`` — the full set. Every pool in it is equally eligible
+      to claim a run.
+    * ``agent-pool-id`` — the pre-multi-pool singular attribute, still sent by
+      un-upgraded clients. It means "this workspace has exactly this one pool",
+      so it *replaces* the whole set.
+
+    Sending both is rejected rather than silently picking one: the two would
+    disagree the moment a client set them inconsistently, and guessing which
+    the caller meant is exactly the kind of ambiguity that loses a pool.
+
+    Returns ``_POOL_SET_UNSET`` when neither attribute is present (so a PATCH
+    that doesn't mention pools leaves the set alone), otherwise the
+    ``(element 0, remainder)`` storage split. ``pool:assign`` is required on
+    **every** pool in the set — a caller may not attach a workspace to a pool
+    they could not attach it to individually.
+    """
+    has_singular = "agent-pool-id" in attrs
+    has_plural = "agent-pool-ids" in attrs
+    if has_singular and has_plural:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "Set either agent-pool-id or agent-pool-ids, not both. "
+                "agent-pool-id assigns a single pool; agent-pool-ids assigns the full set."
+            ),
+        )
+    if not has_singular and not has_plural:
+        return _POOL_SET_UNSET
+
+    if has_plural:
+        raw = attrs.get("agent-pool-ids") or []
+        if not isinstance(raw, list):
+            raise HTTPException(status_code=422, detail="agent-pool-ids must be a list")
+    else:
+        singular = attrs.get("agent-pool-id")
+        raw = [singular] if singular else []
+
+    try:
+        requested = pool_set.normalise(raw)
+    except Exception:  # pragma: no cover - normalise is total, belt and braces
+        requested = []
+    if len(requested) != len([r for r in raw if r]):
+        raise HTTPException(status_code=422, detail="agent pool ids must be unique and valid")
+
+    for pool_id in requested:
+        target_pool = await _agent_pool_service.get_pool(db, pool_id)
+        if target_pool is None:
+            raise HTTPException(status_code=404, detail="Agent pool not found")
+        pool_caps = await resolve_pool_capabilities_for(
+            db,
+            user,
+            pool_name=target_pool.name,
+            pool_labels=target_pool.labels or {},
+            owner_email=target_pool.owner_email or "",
+        )
+        if not has_capability(pool_caps, cap.POOL_READ):
+            raise HTTPException(status_code=404, detail="Agent pool not found")
+        if not has_capability(pool_caps, cap.POOL_ASSIGN):
+            raise HTTPException(
+                status_code=403,
+                detail="Requires write permission on agent pool",
+            )
+
+    return pool_set.split(requested)
 
 
 @router.post("/organizations/default/workspaces")
@@ -1037,31 +1197,10 @@ async def create_workspace(
 
     from terrapod.config import settings
 
-    # Resolve agent pool ID from attributes (requires write permission on pool)
-    agent_pool_id = None
-    pool_val = attrs.get("agent-pool-id")
-    if pool_val:
-        import uuid as _uuid
-
-        agent_pool_id = _uuid.UUID(str(pool_val).removeprefix("apool-"))
-
-        target_pool = await _agent_pool_service.get_pool(db, agent_pool_id)
-        if target_pool is None:
-            raise HTTPException(status_code=404, detail="Agent pool not found")
-        pool_caps = await resolve_pool_capabilities_for(
-            db,
-            user,
-            pool_name=target_pool.name,
-            pool_labels=target_pool.labels or {},
-            owner_email=target_pool.owner_email or "",
-        )
-        if not has_capability(pool_caps, cap.POOL_READ):
-            raise HTTPException(status_code=404, detail="Agent pool not found")
-        if not has_capability(pool_caps, cap.POOL_ASSIGN):
-            raise HTTPException(
-                status_code=403,
-                detail="Requires write permission on agent pool",
-            )
+    resolved_pools = await _resolve_pool_set_attrs(attrs, db, user)
+    agent_pool_id, agent_pool_extra_ids = (
+        (None, []) if resolved_pools is _POOL_SET_UNSET else resolved_pools
+    )
 
     execution_mode = attrs.get("execution-mode", "local")
     if execution_mode not in ("local", "agent"):
@@ -1084,6 +1223,7 @@ async def create_workspace(
         labels=validate_labels(attrs.get("labels", {})),
         owner_email=user.email,
         agent_pool_id=agent_pool_id,
+        agent_pool_extra_ids=agent_pool_extra_ids,
         vcs_connection_id=vcs_connection_id,
         vcs_repo_url=attrs.get("vcs-repo-url", ""),
         vcs_branch=attrs.get("vcs-branch", ""),
@@ -1284,7 +1424,9 @@ async def show_workspace_by_id(
     latest_run = run_result.scalar_one_or_none()
 
     return JSONResponse(
-        content=_workspace_json(ws, caps, latest_run=latest_run),
+        content=_workspace_json(
+            ws, caps, latest_run=latest_run, live_pool_ids=await _resolve_live_pools([ws])
+        ),
         headers=_tfe_headers(),
     )
 
@@ -1595,33 +1737,24 @@ async def update_workspace(
         ws.trigger_prefixes = _validate_trigger_prefixes(attrs["trigger-prefixes"])
     if "drift-ignore-rules" in attrs:
         ws.drift_ignore_rules = _validate_drift_ignore_rules(attrs["drift-ignore-rules"])
-    if "agent-pool-id" in attrs:
-        import uuid as _uuid
-
-        pool_val = attrs["agent-pool-id"]
-        if pool_val is None:
-            ws.agent_pool_id = None
-        else:
-            new_pool_id = _uuid.UUID(str(pool_val).removeprefix("apool-"))
-            # Check write permission on target pool
-            target_pool = await _agent_pool_service.get_pool(db, new_pool_id)
-            if target_pool is None:
-                raise HTTPException(status_code=404, detail="Agent pool not found")
-            pool_caps = await resolve_pool_capabilities_for(
-                db,
-                user,
-                pool_name=target_pool.name,
-                pool_labels=target_pool.labels or {},
-                owner_email=target_pool.owner_email or "",
+    # Agent pool set (#1085). Either attribute replaces the whole set; a PATCH
+    # that mentions neither leaves it untouched. `pool:assign` is enforced on
+    # every pool by the shared resolver.
+    resolved_pools = await _resolve_pool_set_attrs(attrs, db, user)
+    if resolved_pools is not _POOL_SET_UNSET:
+        previous = pool_set.workspace_pool_ids(ws)
+        ws.agent_pool_id, ws.agent_pool_extra_ids = resolved_pools  # type: ignore[misc]
+        dropped = [p for p in previous if p not in pool_set.workspace_pool_ids(ws)]
+        if dropped and "agent-pool-ids" not in attrs:
+            # A singular write replaced a multi-pool set. That is the documented
+            # semantic, but it is also how an un-upgraded client silently drops
+            # a pool it cannot see — so leave a trail.
+            logger.info(
+                "Workspace pool set replaced by a singular agent-pool-id write",
+                workspace_id=str(ws.id),
+                dropped_pool_ids=[str(p) for p in dropped],
+                actor=user.email,
             )
-            if not has_capability(pool_caps, cap.POOL_READ):
-                raise HTTPException(status_code=404, detail="Agent pool not found")
-            if not has_capability(pool_caps, cap.POOL_ASSIGN):
-                raise HTTPException(
-                    status_code=403,
-                    detail="Requires write permission on agent pool",
-                )
-            ws.agent_pool_id = new_pool_id
     if "drift-detection-enabled" in attrs:
         ws.drift_detection_enabled = attrs["drift-detection-enabled"]
         # Reset drift status when disabling drift detection
@@ -1725,7 +1858,10 @@ async def update_workspace(
             )
         logger.info("Workspace renamed", old_name=old_name, new_name=ws.name)
 
-    return JSONResponse(content=_workspace_json(ws, old_caps), headers=_tfe_headers())
+    return JSONResponse(
+        content=_workspace_json(ws, old_caps, live_pool_ids=await _resolve_live_pools([ws])),
+        headers=_tfe_headers(),
+    )
 
 
 @extensions_router.delete("/workspaces/{workspace_id}")

@@ -25,6 +25,7 @@
 //	"vcs-repo-url"                      → vcs_repo_url        (string, optional)
 //	"vcs-branch"                        → vcs_branch          (string, optional)
 //	"agent-pool-id"                     → agent_pool_id       (string, optional)
+//	"agent-pool-ids"                    → agent_pool_ids      (list, optional+computed)
 //	"var-files"                         → var_files           (list,   optional)
 //	"trigger-prefixes"                  → trigger_prefixes    (list,   optional)
 //	"drift-detection-enabled"           → drift_detection_enabled (bool, optional)
@@ -73,6 +74,7 @@ type workspaceModel struct {
 	AutoMerge                     types.Bool   `tfsdk:"auto_merge"`
 	AutoMergeStrategy             types.String `tfsdk:"auto_merge_strategy"`
 	AgentPoolID                   types.String `tfsdk:"agent_pool_id"`
+	AgentPoolIDs                  types.List   `tfsdk:"agent_pool_ids"`
 	VarFiles                      types.List   `tfsdk:"var_files"`
 	TriggerPrefixes               types.List   `tfsdk:"trigger_prefixes"`
 	DriftIgnoreRules              types.List   `tfsdk:"drift_ignore_rules"`
