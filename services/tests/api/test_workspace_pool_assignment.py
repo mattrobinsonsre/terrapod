@@ -2,6 +2,7 @@
 
 import uuid
 from datetime import UTC, datetime
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from httpx import ASGITransport, AsyncClient
@@ -38,11 +39,14 @@ def _mock_workspace(ws_id=None, pool_id=None, extra_pool_ids=None):
     ws.working_directory = ""
     ws.locked = False
     ws.lock_id = None
-    ws.agent_pool_id = pool_id
-    # Real column, real default (#1085) — a MagicMock here would leak into the
-    # serialized pool set.
-    ws.agent_pool_extra_ids = extra_pool_ids if extra_pool_ids is not None else []
-    ws.agent_pool = None
+    # The pool set is a relationship (#1087). A MagicMock here would leak into
+    # the serialized set, so the links are always a real list.
+    ws.agent_pool_links = [
+        SimpleNamespace(agent_pool_id=p, ordinal=i, agent_pool=SimpleNamespace(name=f"pool-{i}"))
+        for i, p in enumerate(
+            [pool_id, *[uuid.UUID(str(e)) for e in (extra_pool_ids or [])]] if pool_id else []
+        )
+    ]
     ws.resource_cpu = "1"
     ws.resource_memory = "2Gi"
     ws.labels = {}
@@ -327,8 +331,7 @@ class TestWorkspacePoolSet:
         assert res.status_code == 200, res.text
         # Element 0 lands in the pre-existing column, the rest in the new one —
         # a storage split, not a preference.
-        assert ws.agent_pool_id == pool_a.id
-        assert ws.agent_pool_extra_ids == [str(pool_b.id)]
+        assert [link.agent_pool_id for link in ws.agent_pool_links] == [pool_a.id, pool_b.id]
         attrs = res.json()["data"]["attributes"]
         assert attrs["agent-pool-ids"] == [f"apool-{pool_a.id}", f"apool-{pool_b.id}"]
         # The singular attribute stays, resolving to element 0.
@@ -390,7 +393,7 @@ class TestWorkspacePoolSet:
 
         assert res.status_code == 403
         # Nothing was written — the check runs before any mutation.
-        assert ws.agent_pool_extra_ids == []
+        assert ws.agent_pool_links == []
 
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
@@ -469,8 +472,7 @@ class TestWorkspacePoolSet:
             )
 
         assert res.status_code == 200, res.text
-        assert ws.agent_pool_id == new.id
-        assert ws.agent_pool_extra_ids == []
+        assert [link.agent_pool_id for link in ws.agent_pool_links] == [new.id]
 
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
@@ -501,8 +503,7 @@ class TestWorkspacePoolSet:
             )
 
         assert res.status_code == 200, res.text
-        assert ws.agent_pool_id == a
-        assert ws.agent_pool_extra_ids == [str(b)]
+        assert [link.agent_pool_id for link in ws.agent_pool_links] == [a, b]
 
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")

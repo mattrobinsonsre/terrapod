@@ -38,6 +38,7 @@ from terrapod.db.models import (
     Workspace,
     now_utc,
 )
+from terrapod.services import pool_set
 
 # Use stdlib logging — structlog isn't configured yet during bootstrap
 logger = logging.getLogger("terrapod.bootstrap")
@@ -213,10 +214,11 @@ async def _bootstrap_sample_workspace(
         execution_mode="agent",
         execution_backend="tofu",
         terraform_version="1.12",
-        agent_pool_id=pool_id,
         owner_email=owner_email,
         labels={"env": "demo", "team": "platform"},
     )
+    if pool_id:
+        pool_set.set_workspace_pools(workspace, [pool_id])
     session.add(workspace)
     await session.flush()
 

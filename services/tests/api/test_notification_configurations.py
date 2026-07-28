@@ -31,7 +31,6 @@ def _mock_workspace(ws_id=None, name="test-ws"):
     ws.name = name
     ws.auto_apply = False
     ws.execution_backend = "tofu"
-    ws.agent_pool_id = None
     ws.labels = {}
     ws.owner_email = "test@example.com"
     ws.vcs_last_polled_at = None

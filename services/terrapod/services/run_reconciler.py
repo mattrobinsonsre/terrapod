@@ -119,8 +119,8 @@ async def _refresh_pool_liveness(db: AsyncSession) -> None:
     Best-effort: never raises into the reconcile cycle.
     """
     from terrapod.api.metrics import POOL_LIVE, WORKSPACES_WITHOUT_LIVE_POOL
-    from terrapod.db.models import AgentPool
-    from terrapod.services import agent_pool_service, pool_set
+    from terrapod.db.models import AgentPool, WorkspaceAgentPool
+    from terrapod.services import agent_pool_service
 
     try:
         pool_ids = [row[0] for row in (await db.execute(select(AgentPool.id))).all()]
@@ -134,19 +134,20 @@ async def _refresh_pool_liveness(db: AsyncSession) -> None:
         for pid in pool_ids:
             POOL_LIVE.labels(pool_id=str(pid)).set(1 if pid in live else 0)
 
-        agent_ws = (
+        assignments = (
             await db.execute(
-                select(Workspace.agent_pool_id, Workspace.agent_pool_extra_ids).where(
-                    Workspace.execution_mode == "agent",
-                    Workspace.agent_pool_id.isnot(None),
-                )
+                select(WorkspaceAgentPool.workspace_id, WorkspaceAgentPool.agent_pool_id)
+                .join(Workspace, Workspace.id == WorkspaceAgentPool.workspace_id)
+                .where(Workspace.execution_mode == "agent")
             )
         ).all()
-        stranded = sum(
-            1
-            for row in agent_ws
-            if not any(p in live for p in pool_set.normalise([row[0], *(row[1] or [])]))
-        )
+        by_workspace: dict[uuid.UUID, list[uuid.UUID]] = {}
+        for ws_id, agent_pool_id in assignments:
+            by_workspace.setdefault(ws_id, []).append(agent_pool_id)
+        # A workspace with no assignment at all is "no pool assigned", which is
+        # its own health condition — this gauge counts the ones that HAVE pools
+        # and have lost every one of them.
+        stranded = sum(1 for pools in by_workspace.values() if not any(p in live for p in pools))
         WORKSPACES_WITHOUT_LIVE_POOL.set(stranded)
     except Exception as e:
         logger.debug("Failed to refresh pool liveness gauges", error=str(e))

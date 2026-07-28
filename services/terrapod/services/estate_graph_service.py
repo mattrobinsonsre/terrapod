@@ -37,6 +37,7 @@ from terrapod.db.models import (
     Workspace,
     WorkspaceRemoteStateConsumer,
 )
+from terrapod.services import pool_set
 from terrapod.services.workspace_rbac_service import resolve_workspace_capabilities_for
 
 
@@ -56,8 +57,9 @@ async def derive_estate_graph(db: AsyncSession, user: AuthenticatedUser) -> dict
 
     nodes: list[dict] = []
     for ws in visible.values():
-        if ws.agent_pool_id:
-            pool = pool_name.get(ws.agent_pool_id, "(pool)")
+        _ws_pools = pool_set.workspace_pool_ids(ws)
+        if _ws_pools:
+            pool = pool_name.get(_ws_pools[0], "(pool)")
         else:
             pool = "(local)" if ws.execution_mode == "local" else "(no pool)"
         nodes.append(

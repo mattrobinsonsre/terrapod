@@ -1,6 +1,7 @@
 """Tests for estate_graph_service — whole-estate topology derivation (#763)."""
 
 import uuid
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from terrapod.services import estate_graph_service
@@ -12,7 +13,11 @@ POOL = uuid.uuid4()
 
 def _ws(wid, name, labels=None, pool=None, mode="agent"):
     m = MagicMock()
-    m.id, m.name, m.labels, m.agent_pool_id, m.execution_mode = wid, name, labels or {}, pool, mode
+    m.id, m.name, m.labels, m.execution_mode = wid, name, labels or {}, mode
+    # Pool set is a relationship (#1087).
+    m.agent_pool_links = (
+        [SimpleNamespace(agent_pool_id=pool, ordinal=0, agent_pool=None)] if pool else []
+    )
     return m
 
 

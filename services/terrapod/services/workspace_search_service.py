@@ -20,9 +20,9 @@ import uuid
 from typing import Any
 
 from pydantic import BaseModel, Field
-from sqlalchemy import Select, or_, select
+from sqlalchemy import Select, select
 
-from terrapod.db.models import Workspace
+from terrapod.db.models import Workspace, WorkspaceAgentPool
 
 
 class WorkspaceFilterError(ValueError):
@@ -140,10 +140,12 @@ def build_workspace_query(f: WorkspaceFilter) -> Select[tuple[Workspace]]:
         # as a fallback is just as much its responsibility.
         pool_uuid = _strip_uuid(f.agent_pool_id, "apool-")
         q = q.where(
-            or_(
-                Workspace.agent_pool_id == pool_uuid,
-                Workspace.agent_pool_extra_ids.contains([str(pool_uuid)]),
+            select(WorkspaceAgentPool.workspace_id)
+            .where(
+                WorkspaceAgentPool.workspace_id == Workspace.id,
+                WorkspaceAgentPool.agent_pool_id == pool_uuid,
             )
+            .exists()
         )
     if f.vcs_connection_id is not None:
         q = q.where(Workspace.vcs_connection_id == _strip_uuid(f.vcs_connection_id, "vcs-"))

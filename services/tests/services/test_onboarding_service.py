@@ -160,7 +160,7 @@ def _agent_ws():
         execution_backend="tofu",
         terraform_version="1.12",
         execution_mode="agent",
-        agent_pool_id=uuid.uuid4(),
+        agent_pool_links=[SimpleNamespace(agent_pool_id=uuid.uuid4(), ordinal=0, agent_pool=None)],
         auto_apply=False,
         terragrunt_enabled=False,
         terragrunt_version="",
@@ -180,7 +180,7 @@ async def test_start_discovery_requires_schema_ready():
 
 @pytest.mark.asyncio
 async def test_start_discovery_requires_agent_pool():
-    ws = SimpleNamespace(id=uuid.uuid4(), execution_mode="local", agent_pool_id=None)
+    ws = SimpleNamespace(id=uuid.uuid4(), execution_mode="local", agent_pool_links=[])
     session = OnboardingSession(workspace_id=ws.id, provider="aws", status="schema_ready")
     db = _fake_db(session, ws)
     with pytest.raises(svc.OnboardingError):

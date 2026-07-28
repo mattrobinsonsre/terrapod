@@ -730,6 +730,7 @@ def _workspace_json(
     """
     caps = caps or frozenset()
     ws_pools = pool_set.workspace_pool_ids(ws)
+    ws_pool_names = pool_set.workspace_pool_names(ws)
 
     latest_run_attr = None
     if latest_run is not None:
@@ -801,7 +802,7 @@ def _workspace_json(
                 # — a projection, NOT a preference.
                 "agent-pool-id": f"apool-{ws_pools[0]}" if ws_pools else None,
                 "agent-pool-ids": [f"apool-{p}" for p in ws_pools],
-                "agent-pool-name": ws.agent_pool.name if ws.agent_pool else None,
+                "agent-pool-name": (ws_pool_names[0] if ws_pool_names else None),
                 "vcs-connection-name": ws.vcs_connection.name if ws.vcs_connection else None,
                 "labels": ws.labels or {},
                 # `tag-names` is what OpenTofu/Terraform's cloud backend
@@ -1097,7 +1098,7 @@ async def _resolve_pool_set_attrs(
     attrs: dict,
     db: AsyncSession,
     user: AuthenticatedUser,
-) -> object | tuple[uuid.UUID | None, list[str]]:
+) -> object | list[uuid.UUID]:
     """Resolve the requested agent-pool set from workspace write attributes.
 
     Accepts either form (#1085):
@@ -1113,10 +1114,10 @@ async def _resolve_pool_set_attrs(
     the caller meant is exactly the kind of ambiguity that loses a pool.
 
     Returns ``_POOL_SET_UNSET`` when neither attribute is present (so a PATCH
-    that doesn't mention pools leaves the set alone), otherwise the
-    ``(element 0, remainder)`` storage split. ``pool:assign`` is required on
-    **every** pool in the set — a caller may not attach a workspace to a pool
-    they could not attach it to individually.
+    that doesn't mention pools leaves the set alone), otherwise the resolved
+    pool ids in declared order. ``pool:assign`` is required on **every** pool
+    in the set — a caller may not attach a workspace to a pool they could not
+    attach it to individually.
     """
     has_singular = "agent-pool-id" in attrs
     has_plural = "agent-pool-ids" in attrs
@@ -1165,7 +1166,7 @@ async def _resolve_pool_set_attrs(
                 detail="Requires write permission on agent pool",
             )
 
-    return pool_set.split(requested)
+    return requested
 
 
 @router.post("/organizations/default/workspaces")
@@ -1198,9 +1199,7 @@ async def create_workspace(
     from terrapod.config import settings
 
     resolved_pools = await _resolve_pool_set_attrs(attrs, db, user)
-    agent_pool_id, agent_pool_extra_ids = (
-        (None, []) if resolved_pools is _POOL_SET_UNSET else resolved_pools
-    )
+    requested_pool_ids: list = [] if resolved_pools is _POOL_SET_UNSET else resolved_pools
 
     execution_mode = attrs.get("execution-mode", "local")
     if execution_mode not in ("local", "agent"):
@@ -1222,8 +1221,6 @@ async def create_workspace(
         resource_memory=attrs.get("resource-memory", "2Gi"),
         labels=validate_labels(attrs.get("labels", {})),
         owner_email=user.email,
-        agent_pool_id=agent_pool_id,
-        agent_pool_extra_ids=agent_pool_extra_ids,
         vcs_connection_id=vcs_connection_id,
         vcs_repo_url=attrs.get("vcs-repo-url", ""),
         vcs_branch=attrs.get("vcs-branch", ""),
@@ -1262,6 +1259,7 @@ async def create_workspace(
         # Slack opt-in channel (#556): empty = silent for this workspace.
         slack_channel=(attrs.get("slack-channel") or "").strip()[:128],
     )
+    pool_set.set_workspace_pools(ws, requested_pool_ids)
     db.add(ws)
     await db.commit()
     await db.refresh(ws)
@@ -1743,7 +1741,7 @@ async def update_workspace(
     resolved_pools = await _resolve_pool_set_attrs(attrs, db, user)
     if resolved_pools is not _POOL_SET_UNSET:
         previous = pool_set.workspace_pool_ids(ws)
-        ws.agent_pool_id, ws.agent_pool_extra_ids = resolved_pools  # type: ignore[misc]
+        pool_set.set_workspace_pools(ws, resolved_pools)  # type: ignore[arg-type]
         dropped = [p for p in previous if p not in pool_set.workspace_pool_ids(ws)]
         if dropped and "agent-pool-ids" not in attrs:
             # A singular write replaced a multi-pool set. That is the documented

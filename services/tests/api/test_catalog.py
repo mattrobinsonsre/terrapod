@@ -2,6 +2,7 @@
 on management endpoints, catalog-RBAC on read/use, and provision validation."""
 
 import uuid
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -203,7 +204,7 @@ class TestProvision:
         ws.name = "smoke"
         ws.catalog_item_id = uuid.uuid4()
         ws.catalog_version_pin = None
-        ws.agent_pool_id = pool_uuid
+        ws.agent_pool_links = [SimpleNamespace(agent_pool_id=pool_uuid, ordinal=0, agent_pool=None)]
         ws.owner_email = "u@test.com"
         ws.labels = {}
         mock_prov.return_value = ws

@@ -46,6 +46,7 @@ from terrapod.config import settings
 from terrapod.db.models import OnboardingSession, Workspace
 from terrapod.logging_config import get_logger
 from terrapod.redis.client import get_redis_client
+from terrapod.services import pool_set
 
 logger = get_logger(__name__)
 
@@ -217,7 +218,7 @@ async def start_discovery(
     if workspace is None:
         raise OnboardingError("workspace no longer exists")
     # D2/D3 need a runner (cloud creds) — agent execution with an assigned pool.
-    if workspace.execution_mode != "agent" or workspace.agent_pool_id is None:
+    if workspace.execution_mode != "agent" or not pool_set.workspace_pool_ids(workspace):
         raise OnboardingError(
             "discovery requires an agent-mode workspace with an assigned agent pool"
         )

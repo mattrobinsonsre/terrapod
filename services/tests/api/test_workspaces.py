@@ -52,7 +52,6 @@ def _mock_workspace(
     ws.resource_cpu = resource_cpu
     ws.execution_backend = "tofu"
     ws.resource_memory = resource_memory
-    ws.agent_pool_id = None
     ws.agent_pool = None
     ws.catalog_item_id = None
     ws.labels = labels or {}

@@ -82,7 +82,9 @@ def _ws_summary(ws: Workspace) -> dict[str, Any]:
         "execution-mode": ws.execution_mode,
         "execution-backend": ws.execution_backend,
         "terraform-version": ws.terraform_version,
-        "agent-pool-id": f"apool-{ws.agent_pool_id}" if ws.agent_pool_id else None,
+        "agent-pool-id": (
+            f"apool-{_pools[0]}" if (_pools := pool_set.workspace_pool_ids(ws)) else None
+        ),
         "agent-pool-ids": [f"apool-{p}" for p in pool_set.workspace_pool_ids(ws)],
         "labels": ws.labels or {},
     }
@@ -180,6 +182,12 @@ def validate_notification_specs(items: Any) -> list[dict]:
     return out
 
 
+# Sentinel key in the validated plan's `fields` map. The pool set is a
+# relationship, not a column, so `_apply` routes it through
+# `pool_set.set_workspace_pools` instead of setattr.
+_POOL_SET_FIELD = "__agent_pool_set__"
+
+
 async def _validate_pool_set(
     update: dict, db: AsyncSession, user: AuthenticatedUser
 ) -> dict[str, Any]:
@@ -233,8 +241,8 @@ async def _validate_pool_set(
                     detail=f"write permission on agent pool '{pool.name}' is required",
                 )
 
-    head, extras = pool_set.split(requested)
-    return {"agent_pool_id": head, "agent_pool_extra_ids": extras}
+    # Not an ORM column — the caller applies it via pool_set.set_workspace_pools.
+    return {_POOL_SET_FIELD: requested}
 
 
 async def _validate_update(
@@ -310,6 +318,16 @@ def _diff_for(ws: Workspace, plan: dict[str, Any]) -> dict[str, Any]:
     """Compute the per-workspace change set without mutating."""
     diff: dict[str, Any] = {}
     for attr, new in plan["fields"].items():
+        if attr == _POOL_SET_FIELD:
+            # The pool set is a relationship, so the "before" is read through
+            # the same helper every other caller uses, not off a column.
+            old = pool_set.workspace_pool_ids(ws)
+            if old != new:
+                diff["agent-pool-ids"] = {
+                    "from": [f"apool-{p}" for p in old],
+                    "to": [f"apool-{p}" for p in new],
+                }
+            continue
         old = getattr(ws, attr)
         if old != new:
             diff[attr] = {"from": _jsonable(old), "to": _jsonable(new)}
@@ -340,7 +358,10 @@ async def _apply(
         diff = _diff_for(ws, plan)
 
         for attr, new in plan["fields"].items():
-            setattr(ws, attr, new)
+            if attr == _POOL_SET_FIELD:
+                pool_set.set_workspace_pools(ws, new)
+            else:
+                setattr(ws, attr, new)
 
         for spec in plan["run_tasks"] or []:
             existing = (

@@ -2,6 +2,7 @@
 
 import uuid
 from datetime import UTC, datetime
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -401,7 +402,9 @@ def _mock_workspace(**kwargs):
     ws.terragrunt_version = kwargs.get("terragrunt_version", "1.0")
     ws.resource_cpu = kwargs.get("resource_cpu", "1")
     ws.resource_memory = kwargs.get("resource_memory", "2Gi")
-    ws.agent_pool_id = kwargs.get("agent_pool_id", None)
+    # Pool set is a relationship (#1087); a MagicMock here would not read back
+    # as links, so it is always a real list.
+    ws.agent_pool_links = kwargs.get("agent_pool_links", [])
     return ws
 
 
@@ -492,7 +495,9 @@ class TestCreateRun:
     async def test_pool_from_workspace(self, MockRun):
         db = AsyncMock(spec=AsyncSession)
         pool_id = uuid.uuid4()
-        ws = _mock_workspace(agent_pool_id=pool_id)
+        ws = _mock_workspace(
+            agent_pool_links=[SimpleNamespace(agent_pool_id=pool_id, ordinal=0, agent_pool=None)]
+        )
         instance = MockRun.return_value
         instance.id = uuid.uuid4()
         instance.status = "pending"

@@ -45,6 +45,7 @@ from terrapod.db.models import (
     Workspace,
 )
 from terrapod.logging_config import get_logger
+from terrapod.services import pool_set
 from terrapod.services.label_validation import sanitize_labels
 
 logger = get_logger(__name__)
@@ -276,7 +277,6 @@ async def find_or_autocreate_workspace(
         resource_memory=rule.resource_memory,
         auto_apply=rule.auto_apply,
         working_directory=root_directory,
-        agent_pool_id=rule.agent_pool_id,
         labels=safe_labels,
         owner_email=rule.owner_email or "",
         var_files=list(rule.var_files or []),
@@ -295,6 +295,9 @@ async def find_or_autocreate_workspace(
         # working_directory-targeted one from now on.
         trigger_prefixes=[root_directory] if root_directory else [],
     )
+    # The rule's pool template seeds the workspace's pool set (#1087).
+    if rule.agent_pool_id:
+        pool_set.set_workspace_pools(ws, [rule.agent_pool_id])
     db.add(ws)
     try:
         await db.flush()
