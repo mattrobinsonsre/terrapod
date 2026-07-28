@@ -1,4 +1,7 @@
 import { test, expect, type Page, type Route } from '@playwright/test';
+// Lives in helpers/, not here: Playwright forbids a spec importing a spec, and
+// any suite adding a surface should be able to reuse the mobile guard.
+import { expectNoHorizontalPageScroll } from '../helpers/responsive';
 import { getStoredToken, createWorkspace, createUser, createAgentPool, createRegistryModule, seedRun, seedStateVersion, seedStateVersionWithContent, seedRunTask, uniqueName } from '../helpers/api';
 
 /**
@@ -16,21 +19,6 @@ import { getStoredToken, createWorkspace, createUser, createAgentPool, createReg
  * stage of #719 fixes the corresponding surface, so the guard grows with
  * the work and can't silently regress.
  */
-
-/**
- * Asserts the page does not scroll horizontally at the current viewport —
- * the single most important mobile invariant. Allows a 1px rounding slack.
- */
-export async function expectNoHorizontalPageScroll(page: Page) {
-  const overflow = await page.evaluate(() => {
-    const el = document.documentElement;
-    return el.scrollWidth - el.clientWidth;
-  });
-  expect(
-    overflow,
-    `page scrolls horizontally by ${overflow}px at ${page.viewportSize()?.width}px viewport`,
-  ).toBeLessThanOrEqual(1);
-}
 
 test.describe('Responsive harness (phone viewport)', () => {
   test('runs at a phone viewport', async ({ page }) => {

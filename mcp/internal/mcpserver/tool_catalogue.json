@@ -501,8 +501,18 @@
       "additionalProperties": false,
       "properties": {
         "agent_pool_id": {
-          "description": "agent pool id (apool-...) for agent execution mode",
+          "description": "agent pool id (apool-...) for agent execution mode; assigns exactly one pool. Mutually exclusive with agent_pool_ids",
           "type": "string"
+        },
+        "agent_pool_ids": {
+          "description": "agent pools this workspace may run on (apool-...). Flat set: a run is offered to every pool at once and whichever has a live runner claims it first, so losing one does not stop the workspace. Mutually exclusive with agent_pool_id",
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
         },
         "auto_apply": {
           "description": "auto-apply successful plans (default false)",
@@ -619,8 +629,18 @@
       "additionalProperties": false,
       "properties": {
         "agent_pool_id": {
-          "description": "agent pool id (apool-...)",
+          "description": "agent pool id (apool-...); assigns exactly one pool, REPLACING any existing set. Mutually exclusive with agent_pool_ids",
           "type": "string"
+        },
+        "agent_pool_ids": {
+          "description": "replace the workspace''s agent-pool set (apool-...). Flat set — every pool is equally eligible to claim a run. Mutually exclusive with agent_pool_id",
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
         },
         "auto_apply": {
           "description": "auto-apply successful plans",

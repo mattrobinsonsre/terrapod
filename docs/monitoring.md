@@ -197,6 +197,8 @@ These metrics are emitted by the **API server**, since it receives all heartbeat
 | `terrapod_listener_heartbeats_total` | Counter | pool_id | Heartbeats received from listeners |
 | `terrapod_listener_joins_total` | Counter | pool_name | Listener join events |
 | `terrapod_pool_queued_runs` | Gauge | pool_id | Runs waiting for a listener slot per pool (backlog depth). Refreshed each reconciler cycle (2s); reads 0 for an idle pool. A sustained non-zero value means the pool needs more listener capacity. With multiple API replicas the distributed scheduler runs the reconciler on one replica per cycle, so aggregate this gauge with `max by (pool_id)` |
+| `terrapod_pool_live` | Gauge | pool_id | `1` when the pool has at least one listener sending heartbeats, `0` otherwise. Refreshed each reconciler cycle from the same Redis heartbeats the UI reads, so a dashboard and an alert can never disagree. Aggregate with `max by (pool_id)` across API replicas |
+| `terrapod_workspaces_without_live_pool` | Gauge | — | Agent-mode workspaces where **no** pool in the workspace's pool set has a live listener — runs queued against them cannot execute. **This is the execution-HA SLO to alert on**: multi-pool routing (#1085) means losing one pool is survivable, so any non-zero value means a workspace has lost all of its execution capacity. Aggregate with `max` |
 
 ### Listeners (Self-Reported)
 

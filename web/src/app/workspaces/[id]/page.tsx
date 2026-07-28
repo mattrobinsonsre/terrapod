@@ -52,6 +52,9 @@ interface WorkspaceAttrs {
   'resource-cpu': string
   'resource-memory': string
   'agent-pool-id': string | null
+  // The full pool set (#1085). Flat — a run is offered to every pool at once
+  // and whichever has a live runner claims it first.
+  'agent-pool-ids': string[]
   'agent-pool-name': string | null
   labels: Record<string, string>
   'owner-email': string
@@ -262,7 +265,7 @@ function WorkspaceDetailContent() {
   const [editVersion, setEditVersion] = useState('')
   const [editTerragruntEnabled, setEditTerragruntEnabled] = useState(false)
   const [editTerragruntVersion, setEditTerragruntVersion] = useState('')
-  const [editPoolId, setEditPoolId] = useState<string | null>(null)
+  const [editPoolIds, setEditPoolIds] = useState<string[]>([])
   const [editLabels, setEditLabels] = useState<Record<string, string>>({})
   const [editOwner, setEditOwner] = useState('')
   const [editVarFiles, setEditVarFiles] = useState<string[]>([])
@@ -284,9 +287,13 @@ function WorkspaceDetailContent() {
   >('merge')
   const [saving, setSaving] = useState(false)
 
-  // Agent pools
+  // Agent pools. Two lists on purpose: `agentPools` is what the caller may
+  // ASSIGN (pool:assign), `visiblePools` is everything they can read and is
+  // used only to resolve names for display — a workspace can legitimately name
+  // a pool the current user has no write on.
   const [agentPools, setAgentPools] = useState<AgentPool[]>([])
   const [poolsLoaded, setPoolsLoaded] = useState(false)
+  const [visiblePools, setVisiblePools] = useState<AgentPool[]>([])
 
   // VCS connections
   const [vcsConnections, setVcsConnections] = useState<{ id: string; attributes: { name: string; provider: string } }[]>([])
@@ -994,7 +1001,7 @@ function WorkspaceDetailContent() {
     setEditVersion(workspace.attributes['terraform-version'] || '')
     setEditTerragruntEnabled(workspace.attributes['terragrunt-enabled'] ?? false)
     setEditTerragruntVersion(workspace.attributes['terragrunt-version'] || '')
-    setEditPoolId(workspace.attributes['agent-pool-id'])
+    setEditPoolIds(workspace.attributes['agent-pool-ids'] || [])
     setEditLabels(workspace.attributes.labels || {})
     setEditOwner(workspace.attributes['owner-email'] || '')
     setEditVarFiles(workspace.attributes['var-files'] || [])
@@ -1013,6 +1020,7 @@ function WorkspaceDetailContent() {
     setEditing(true)
     if (!poolsLoaded) {
       fetchAllPages<AgentPool>('/api/terrapod/v1/agent-pools').then(allPools => {
+        setVisiblePools(allPools)
         setAgentPools(allPools.filter(p => p.attributes.permission === 'write' || p.attributes.permission === 'admin'))
         setPoolsLoaded(true)
       }).catch(() => {})
@@ -1056,7 +1064,9 @@ function WorkspaceDetailContent() {
               'terraform-version': editVersion,
               'terragrunt-enabled': editTerragruntEnabled,
               'terragrunt-version': editTerragruntVersion || '1.0',
-              'agent-pool-id': editPoolId,
+              // Only the plural form is sent — the API rejects a body carrying
+              // both, and the singular would replace the whole set.
+              'agent-pool-ids': editPoolIds,
               'working-directory': editWorkingDir,
               'var-files': editVarFiles,
               'trigger-prefixes': editTriggerPrefixes,
@@ -1740,6 +1750,21 @@ function WorkspaceDetailContent() {
   const attrs = workspace.attributes
   const perms = attrs.permissions || {} as WorkspacePermissions
 
+  // Rows for the pool-set editor: everything the caller may assign, PLUS any
+  // pool already on the workspace that they may not. Without the second half a
+  // caller lacking pool:assign on one of the pools would silently drop it just
+  // by saving unrelated settings — the set is replaced wholesale on write.
+  const poolRows = [
+    ...agentPools.map((p) => ({ id: p.id, name: p.attributes.name, assignable: true })),
+    ...(attrs['agent-pool-ids'] || [])
+      .filter((id) => !agentPools.some((p) => p.id === id))
+      .map((id) => ({
+        id,
+        name: visiblePools.find((p) => p.id === id)?.attributes.name ?? id,
+        assignable: false,
+      })),
+  ]
+
   return (
     <>
       <NavBar />
@@ -2004,21 +2029,66 @@ function WorkspaceDetailContent() {
                   )}
                 </div>
                 <div>
-                  <dt className="text-xs text-slate-500">{t('fields.agentPool')}</dt>
+                  <dt className="text-xs text-slate-500">{t('fields.agentPools')}</dt>
                   {editing ? (
-                    <select
-                      value={editPoolId || ''}
-                      onChange={(e) => setEditPoolId(e.target.value || null)}
-                      className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                    >
-                      <option value="">{t('common.none')}</option>
-                      {agentPools.map((p) => (
-                        <option key={p.id} value={p.id}>{p.attributes.name}</option>
-                      ))}
-                    </select>
+                    <div className="mt-1 space-y-1">
+                      <p className="text-xs text-slate-400">{t('fields.agentPoolsHint')}</p>
+                      {poolRows.length === 0 ? (
+                        <p className="text-sm text-slate-400">{t('common.none')}</p>
+                      ) : (
+                        <ul className="space-y-1">
+                          {poolRows.map(({ id, name, assignable }) => {
+                            const selected = editPoolIds.includes(id)
+                            return (
+                              <li key={id}>
+                                <label
+                                  className={`flex min-h-11 items-center gap-2 rounded-lg px-3 py-2 text-sm ${
+                                    assignable
+                                      ? 'cursor-pointer bg-slate-700/60 text-slate-100 hover:bg-slate-700'
+                                      : 'cursor-not-allowed bg-slate-800/60 text-slate-400'
+                                  }`}
+                                  title={assignable ? undefined : t('fields.agentPoolsLocked')}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={selected}
+                                    disabled={!assignable}
+                                    onChange={() =>
+                                      setEditPoolIds((prev) =>
+                                        prev.includes(id)
+                                          ? prev.filter((existing) => existing !== id)
+                                          : // Append, so the stored order is the
+                                            // order the operator picked.
+                                            [...prev, id]
+                                      )
+                                    }
+                                    className="h-4 w-4 rounded border-slate-500 bg-slate-800 text-brand-500 focus:ring-1 focus:ring-brand-500"
+                                  />
+                                  <span>{name}</span>
+                                  {!assignable && (
+                                    <span className="ms-auto text-xs">
+                                      {t('fields.agentPoolsLocked')}
+                                    </span>
+                                  )}
+                                </label>
+                              </li>
+                            )
+                          })}
+                        </ul>
+                      )}
+                    </div>
                   ) : (
-                    <dd className="mt-1 text-sm text-slate-200">
-                      {attrs['agent-pool-name'] || (attrs['agent-pool-id'] ? attrs['agent-pool-id'] : t('common.none'))}
+                    <dd className="mt-1 flex flex-wrap gap-1 text-sm text-slate-200">
+                      {(attrs['agent-pool-ids'] || []).length === 0
+                        ? t('common.none')
+                        : (attrs['agent-pool-ids'] || []).map((id) => (
+                            <span
+                              key={id}
+                              className="rounded bg-slate-700 px-2 py-0.5 text-xs text-slate-200"
+                            >
+                              {visiblePools.find((p) => p.id === id)?.attributes.name ?? id}
+                            </span>
+                          ))}
                     </dd>
                   )}
                 </div>

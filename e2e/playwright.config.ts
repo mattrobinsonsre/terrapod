@@ -168,6 +168,14 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
     },
     {
+      // Multi-pool workspace routing (#1085). Desktop project; the spec's
+      // third test sets a phone viewport itself so the pool editor is covered
+      // by the mobile guard too.
+      name: 'multi-pool',
+      testMatch: 'multi-pool.spec.ts',
+      use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
+    },
+    {
       // Catalog admin + browse run as admin; the in-spec RBAC-negative
       // describe overrides storageState to user.json via test.use().
       name: 'catalog',
