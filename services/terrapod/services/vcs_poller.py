@@ -533,19 +533,25 @@ async def _poll_workspace_branch(
                 error=repr(e),
             )
 
-    run = await _create_vcs_run(
-        db,
-        ws,
-        conn,
-        owner,
-        repo,
-        sha,
-        branch,
-        message=f"Triggered by commit {sha[:8]} on {branch}",
-        cache=cache,
-        meta=meta,
-        fetch_paths=fetch_paths,
-    )
+    try:
+        run = await _create_vcs_run(
+            db,
+            ws,
+            conn,
+            owner,
+            repo,
+            sha,
+            branch,
+            message=f"Triggered by commit {sha[:8]} on {branch}",
+            cache=cache,
+            meta=meta,
+            fetch_paths=fetch_paths,
+        )
+    except Exception:
+        # The claim above is already committed, so a rollback cannot undo it.
+        # Release it explicitly or this commit is skipped forever (#1099).
+        await _release_commit_claim(ws.id, sha, old_sha)
+        raise
 
     if run:
         VCS_RUNS_CREATED.labels(provider=conn.provider, type="push").inc()
@@ -1051,6 +1057,69 @@ async def _poll_workspace_owned(
             # `vcs-last-error: null` (#1089). Re-record it in its own
             # transaction so the failure is never invisible.
             await _record_poll_failure(ws_id, describe_vcs_error(e))
+
+
+async def _release_commit_claim(ws_id: uuid.UUID, claimed_sha: str, previous_sha: str) -> None:
+    """Roll the poll cursor back after failing to create a commit's run (#1099).
+
+    `_poll_workspace_branch` advances `vcs_last_commit_sha` *before* fetching the
+    archive and creating the run, so that a concurrent poll cycle cannot produce a
+    duplicate run for the same commit (#217). That ordering is deliberate, but it
+    leaves a window: once the claim is committed, a failure before the run exists
+    would leave the cursor reading "handled" with nothing to show for it, and the
+    next cycle — seeing HEAD unchanged — would skip the commit *permanently*
+    rather than retrying it. The window contains a network archive download, which
+    is the first thing to fail when an installation exhausts its rate limit.
+
+    Releasing the claim re-arms the next cycle. Two guards make it incapable of
+    doing harm:
+
+    * a compare-and-set on the claimed sha, so a newer poll that has already moved
+      the cursor on is never rewound;
+    * a check that no run exists for this commit, so a failure *after* the run was
+      created cannot produce a duplicate on the next cycle.
+
+    Best-effort, and in a fresh session: the session that failed is unusable, and
+    if the database itself is the problem there is nothing to be done. A hard
+    process death between the claim and this handler remains uncovered — nothing
+    in-process can compensate for that; it needs a separate claim column with
+    timeout-based re-drive, which #1099 records as the follow-up.
+    """
+    try:
+        async with get_db_session() as db:
+            existing = await db.execute(
+                select(Run.id)
+                .where(
+                    Run.workspace_id == ws_id,
+                    Run.vcs_commit_sha == claimed_sha,
+                    # A speculative PR run can share the sha; only a branch run
+                    # means this commit was genuinely handled.
+                    Run.vcs_pull_request_number.is_(None),
+                )
+                .limit(1)
+            )
+            if existing.scalar_one_or_none() is not None:
+                return
+
+            await db.execute(
+                update(Workspace)
+                .where(Workspace.id == ws_id)
+                .where(Workspace.vcs_last_commit_sha == claimed_sha)
+                .values(vcs_last_commit_sha=previous_sha)
+            )
+            await db.commit()
+            logger.info(
+                "Released VCS commit claim after run creation failed",
+                workspace_id=str(ws_id),
+                sha=claimed_sha[:8],
+            )
+    except Exception:
+        logger.warning(
+            "Failed to release VCS commit claim; this commit may be skipped",
+            workspace_id=str(ws_id),
+            sha=claimed_sha[:8],
+            exc_info=True,
+        )
 
 
 async def _record_poll_failure(ws_id: uuid.UUID, message: str) -> None:
