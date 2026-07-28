@@ -81,6 +81,7 @@ interface WorkspaceAttrs {
   'lifecycle-state': 'active' | 'pending_deletion' | 'archived'
   'lifecycle-reason': string
   'vcs-last-polled-at': string | null
+  'vcs-last-attempted-at': string | null
   'vcs-last-error': string | null
   'vcs-last-error-at': string | null
   'created-at': string
@@ -1750,6 +1751,15 @@ function WorkspaceDetailContent() {
   const attrs = workspace.attributes
   const perms = attrs.permissions || {} as WorkspacePermissions
 
+  // VCS polling is stalled when the most recent ATTEMPT is newer than the most
+  // recent SUCCESS. Comparing the two needs no knowledge of the poll interval,
+  // and it catches the case an error message alone misses (#1089).
+  const vcsPollStalled =
+    !attrs['vcs-last-error'] &&
+    !!attrs['vcs-last-attempted-at'] &&
+    (!attrs['vcs-last-polled-at'] ||
+      new Date(attrs['vcs-last-attempted-at']) > new Date(attrs['vcs-last-polled-at']))
+
   // Rows for the pool-set editor: everything the caller may assign, PLUS any
   // pool already on the workspace that they may not. Without the second half a
   // caller lacking pool:assign on one of the pools would silently drop it just
@@ -2211,6 +2221,19 @@ function WorkspaceDetailContent() {
                     <dd className="mt-1 text-sm">
                       {attrs['vcs-last-error'] ? (
                         <span className="text-red-400" title={attrs['vcs-last-error']}>{t('vcsPolling.error')}{attrs['vcs-last-error-at'] ? ` (${new Date(attrs['vcs-last-error-at']).toLocaleString()})` : ''}</span>
+                      ) : vcsPollStalled ? (
+                        // No error recorded, but the newest ATTEMPT is newer than the
+                        // newest SUCCESS — the polls are failing without leaving a
+                        // message. Reporting that as green was the misleading half
+                        // of #1089.
+                        <span className="text-amber-400">
+                          {t('vcsPolling.stalled', {
+                            attempted: new Date(attrs['vcs-last-attempted-at']!).toLocaleString(),
+                            succeeded: attrs['vcs-last-polled-at']
+                              ? new Date(attrs['vcs-last-polled-at']).toLocaleString()
+                              : t('vcsPolling.never'),
+                          })}
+                        </span>
                       ) : attrs['vcs-last-polled-at'] ? (
                         <span className="text-green-400">{t('vcsPolling.ok', { time: new Date(attrs['vcs-last-polled-at']).toLocaleString() })}</span>
                       ) : (

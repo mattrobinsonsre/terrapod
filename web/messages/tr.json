@@ -2239,6 +2239,8 @@
     "vcsPolling": {
       "error": "Hata",
       "ok": "TAMAM ({time})",
+      "stalled": "Takıldı — son deneme {attempted}, son başarı {succeeded}",
+      "never": "hiç",
       "notPolled": "Henüz yoklanmadı"
     },
     "lockout": {

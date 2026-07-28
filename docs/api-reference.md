@@ -473,6 +473,24 @@ The following read-only attributes are included in workspace responses when drif
 | `drift-status` | string | Current drift status: `""` (never checked), `"no_drift"`, `"drifted"`, or `"errored"` |
 | `drift-latest-run-id` | string (run-…) or null | ID of the drift run that produced the current `drift-status`. Lets the workspace-list UI link the badge straight to the run that explains the status. Cleared on a successful (non-drift) apply because the previous drift run is no longer the canonical link. Null when drift detection has never run or when the column predates v0.35.3 |
 
+### VCS Polling Health Attributes
+
+Read-only, present on every workspace. The pair is what makes a stalled VCS
+connection detectable from the API alone — `vcs-last-polled-at` advances only on
+a **successful** poll, so on its own a frozen value cannot be told apart from a
+workspace that is simply not due yet.
+
+| Attribute | Type | Description |
+|---|---|---|
+| `vcs-last-polled-at` | string (RFC3339) or null | Timestamp of the last **successful** poll. Null if no poll has ever succeeded |
+| `vcs-last-attempted-at` | string (RFC3339) or null | Timestamp of the last poll **attempt**, successful or not. Stamped before anything in the poll can fail. Null on workspaces not polled since the upgrade that added it |
+| `vcs-last-error` | string or null | The most recent poll failure, named as specifically as the provider allows — a rate limit reports the HTTP status and, when the response carries the headers, how long until the window resets. Cleared on the next successful poll |
+| `vcs-last-error-at` | string (RFC3339) or null | Timestamp of `vcs-last-error` |
+
+To alert on a stalled connection, compare the two timestamps rather than relying
+on `vcs-last-error` being populated: `vcs-last-attempted-at` newer than
+`vcs-last-polled-at` means the most recent attempt did not succeed.
+
 ### Lifecycle Attributes (Autodiscovery)
 
 Workspaces created by autodiscovery carry read-only lifecycle attributes that track rename/delete/orphan reconciliation. They are included in workspace responses and surfaced by the UI as a banner on the workspace detail page and a badge on the workspace list.

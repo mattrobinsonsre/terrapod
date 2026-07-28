@@ -1,5 +1,6 @@
 """Tests for VCS poller — subdirectory filtering and VCS error tracking."""
 
+import asyncio
 import uuid
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -18,6 +19,7 @@ def _mock_workspace(**overrides):
     ws.trigger_prefixes = overrides.get("trigger_prefixes", [])
     ws.vcs_last_commit_sha = overrides.get("vcs_last_commit_sha", "aaa111")
     ws.vcs_last_polled_at = overrides.get("vcs_last_polled_at", None)
+    ws.vcs_last_attempted_at = overrides.get("vcs_last_attempted_at", None)
     ws.vcs_last_error = overrides.get("vcs_last_error", None)
     ws.vcs_last_error_at = overrides.get("vcs_last_error_at", None)
     ws.locked = False
@@ -903,3 +905,228 @@ class TestPollCycleParallel:
             await handle_immediate_poll({"repo": "nobody/has-this"})
 
         mock_poll.assert_not_called()
+
+
+class TestDescribeVCSError:
+    """#1089 — the error a workspace reports must name the actual cause.
+
+    Both providers call `raise_for_status()`, so the status and rate-limit
+    headers are already on the exception. They were being discarded, which is
+    how a provider-wide rate limit came out as a flat per-workspace message.
+    """
+
+    def _status_error(self, status: int, headers: dict[str, str] | None = None):
+        import httpx
+
+        request = httpx.Request("GET", "https://api.github.com/repos/org/repo")
+        response = httpx.Response(status, headers=headers or {}, request=request)
+        return httpx.HTTPStatusError("err", request=request, response=response)
+
+    def test_github_rate_limit_names_the_rate_limit(self):
+        from terrapod.services.vcs_poller import describe_vcs_error
+
+        msg = describe_vcs_error(
+            self._status_error(403, {"x-ratelimit-remaining": "0"}),
+        )
+        assert "rate limit" in msg.lower()
+        assert "403" in msg
+
+    def test_gitlab_spelling_of_the_rate_limit_headers(self):
+        from terrapod.services.vcs_poller import describe_vcs_error
+
+        # GitLab spells them RateLimit-*; httpx headers are case-insensitive so
+        # one lookup must cover both providers.
+        msg = describe_vcs_error(self._status_error(429, {"ratelimit-remaining": "0"}))
+        assert "rate limit" in msg.lower()
+
+    def test_retry_after_is_surfaced(self):
+        from terrapod.services.vcs_poller import describe_vcs_error
+
+        msg = describe_vcs_error(self._status_error(429, {"retry-after": "60"}))
+        assert "60" in msg
+
+    def test_reset_epoch_rendered_as_a_duration(self):
+        from terrapod.services.vcs_poller import describe_vcs_error
+
+        # An absolute epoch is useless in a UI banner; the operator wants "how long".
+        future = int(datetime.now(UTC).timestamp()) + 300
+        msg = describe_vcs_error(
+            self._status_error(
+                403, {"x-ratelimit-remaining": "0", "x-ratelimit-reset": str(future)}
+            )
+        )
+        assert "resets in" in msg
+
+    def test_auth_failure_is_not_reported_as_a_rate_limit(self):
+        from terrapod.services.vcs_poller import describe_vcs_error
+
+        # A 401 has no rate-limit headers — it must not be swept into that branch,
+        # which would send triage in exactly the wrong direction.
+        msg = describe_vcs_error(self._status_error(401))
+        assert "rate limit" not in msg.lower()
+        assert "401" in msg
+
+    def test_403_without_rate_limit_headers_stays_a_403(self):
+        from terrapod.services.vcs_poller import describe_vcs_error
+
+        # A plain permission denial also returns 403. Only the headers distinguish it.
+        msg = describe_vcs_error(self._status_error(403))
+        assert "rate limit" not in msg.lower()
+        assert "403" in msg
+
+    def test_timeout_says_so(self):
+        import httpx
+
+        from terrapod.services.vcs_poller import describe_vcs_error
+
+        msg = describe_vcs_error(httpx.ConnectTimeout("timed out"))
+        assert "timed out" in msg.lower()
+
+    def test_transport_error_says_unreachable(self):
+        import httpx
+
+        from terrapod.services.vcs_poller import describe_vcs_error
+
+        msg = describe_vcs_error(httpx.ConnectError("no route to host"))
+        assert "cannot reach" in msg.lower()
+
+    def test_plain_exception_keeps_its_own_message(self):
+        from terrapod.services.vcs_poller import describe_vcs_error
+
+        assert describe_vcs_error(Exception("403 Forbidden")) == "403 Forbidden"
+
+    def test_message_less_exception_falls_back_to_its_type(self):
+        from terrapod.services.vcs_poller import describe_vcs_error
+
+        assert describe_vcs_error(KeyError()) == "KeyError"
+
+
+class TestPollAttemptedAt:
+    """#1089 — a stalled workspace must be detectable from the API alone.
+
+    `vcs_last_polled_at` only advances on success, so on its own it cannot
+    distinguish "not due yet" from "failing every cycle".
+    """
+
+    @patch("terrapod.services.vcs_poller._poll_workspace_prs")
+    @patch("terrapod.services.vcs_poller._poll_workspace_branch")
+    @patch("terrapod.services.vcs_poller._resolve_branch")
+    @patch("terrapod.services.vcs_poller._parse_repo_url")
+    async def test_stamped_on_success(self, mock_parse, mock_resolve, mock_branch, mock_prs):
+        from terrapod.services.vcs_poller import _poll_workspace
+
+        ws = _mock_workspace()
+        mock_parse.return_value = ("org", "repo")
+        mock_resolve.return_value = "main"
+        mock_branch.return_value = None
+        mock_prs.return_value = None
+        mock_db = AsyncMock()
+        mock_db.get.return_value = _mock_connection()
+
+        await _poll_workspace(mock_db, ws)
+
+        assert ws.vcs_last_attempted_at is not None
+
+    @patch("terrapod.services.vcs_poller._poll_workspace_prs")
+    @patch("terrapod.services.vcs_poller._poll_workspace_branch")
+    @patch("terrapod.services.vcs_poller._resolve_branch")
+    @patch("terrapod.services.vcs_poller._parse_repo_url")
+    async def test_stamped_on_failure_too(self, mock_parse, mock_resolve, mock_branch, mock_prs):
+        from terrapod.services.vcs_poller import _poll_workspace
+
+        ws = _mock_workspace()
+        mock_parse.return_value = ("org", "repo")
+        mock_resolve.return_value = "main"
+        mock_branch.side_effect = Exception("boom")
+        mock_db = AsyncMock()
+        mock_db.get.return_value = _mock_connection()
+
+        await _poll_workspace(mock_db, ws)
+
+        # This is the point: the attempt is recorded even though the poll failed
+        # and `vcs_last_polled_at` never moved.
+        assert ws.vcs_last_attempted_at is not None
+        assert ws.vcs_last_polled_at is None
+
+    async def test_stamped_before_the_connection_lookup_can_fail(self):
+        from terrapod.services.vcs_poller import _poll_workspace
+
+        # An inactive connection returns early. The attempt must still be on record
+        # — otherwise the earliest failures are exactly the invisible ones.
+        ws = _mock_workspace()
+        conn = _mock_connection()
+        conn.status = "inactive"
+        mock_db = AsyncMock()
+        mock_db.get.return_value = conn
+
+        await _poll_workspace(mock_db, ws)
+
+        assert ws.vcs_last_attempted_at is not None
+
+
+class TestPollFailureSurvivesRollback:
+    """#1089 — the rollback used to discard the very error it had just recorded.
+
+    That is why a stalled workspace could report `vcs-last-error: null`: the
+    poll set the error, something later in the transaction failed, and the
+    rollback took the error record down with it.
+    """
+
+    @patch("terrapod.services.vcs_poller._record_poll_failure")
+    @patch("terrapod.services.vcs_poller._poll_workspace")
+    @patch("terrapod.services.vcs_poller.get_db_session")
+    async def test_failure_is_re_recorded_after_rollback(
+        self, mock_session, mock_poll, mock_record
+    ):
+        import contextlib
+
+        from terrapod.services.vcs_poller import _poll_workspace_owned
+
+        ws = _mock_workspace()
+        db = AsyncMock()
+        db.get.return_value = ws
+
+        @contextlib.asynccontextmanager
+        async def _session():
+            yield db
+
+        mock_session.side_effect = lambda: _session()
+        mock_poll.side_effect = Exception("commit blew up")
+
+        await _poll_workspace_owned(ws.id, asyncio.Semaphore(1), None, {})
+
+        db.rollback.assert_awaited()
+        mock_record.assert_awaited_once()
+        # And it re-records the real cause, not a placeholder.
+        assert "commit blew up" in mock_record.await_args.args[1]
+
+    @patch("terrapod.services.vcs_poller.get_db_session")
+    async def test_record_poll_failure_writes_in_its_own_transaction(self, mock_session):
+        import contextlib
+
+        from terrapod.services.vcs_poller import _record_poll_failure
+
+        db = AsyncMock()
+
+        @contextlib.asynccontextmanager
+        async def _session():
+            yield db
+
+        mock_session.side_effect = lambda: _session()
+
+        await _record_poll_failure(uuid.uuid4(), "rate limited")
+
+        # A targeted UPDATE, committed — it must not depend on the session that
+        # just failed, nor on any state that was rolled back.
+        db.execute.assert_awaited_once()
+        db.commit.assert_awaited_once()
+
+    @patch("terrapod.services.vcs_poller.get_db_session")
+    async def test_record_poll_failure_never_raises(self, mock_session):
+        from terrapod.services.vcs_poller import _record_poll_failure
+
+        # If the database is what is failing there is nowhere to record anything,
+        # but that must not take the poll cycle down with it.
+        mock_session.side_effect = Exception("database is down")
+
+        await _record_poll_failure(uuid.uuid4(), "whatever")

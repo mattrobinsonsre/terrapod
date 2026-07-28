@@ -2239,6 +2239,8 @@
     "vcsPolling": {
       "error": "Virhe",
       "ok": "OK ({time})",
+      "stalled": "Jumissa — viimeisin yritys {attempted}, viimeisin onnistuminen {succeeded}",
+      "never": "ei koskaan",
       "notPolled": "Ei vielä kyselty"
     },
     "lockout": {

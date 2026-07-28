@@ -895,6 +895,7 @@ field Workspace.UpdatedAt string `json:"updated-at,omitempty"`
 field Workspace.VCSBranch string `json:"vcs-branch,omitempty"`
 field Workspace.VCSConnectionID string `json:"vcs-connection-id,omitempty"`
 field Workspace.VCSConnectionName string `json:"vcs-connection-name,omitempty"`
+field Workspace.VCSLastAttemptedAt string `json:"vcs-last-attempted-at,omitempty"`
 field Workspace.VCSLastError string `json:"vcs-last-error,omitempty"`
 field Workspace.VCSLastErrorAt string `json:"vcs-last-error-at,omitempty"`
 field Workspace.VCSLastPolledAt string `json:"vcs-last-polled-at,omitempty"`

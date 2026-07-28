@@ -60,6 +60,7 @@ def _mock_workspace(ws_id=None, **overrides):
     ws.trigger_prefixes = []
     ws.drift_ignore_rules = []
     ws.vcs_last_polled_at = None
+    ws.vcs_last_attempted_at = None
     ws.vcs_last_error = None
     ws.vcs_last_error_at = None
     ws.vcs_workflow = "merge_then_apply"

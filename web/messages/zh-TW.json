@@ -2239,6 +2239,8 @@
     "vcsPolling": {
       "error": "錯誤",
       "ok": "正常（{time}）",
+      "stalled": "已停滯 — 最後嘗試 {attempted}，最後成功 {succeeded}",
+      "never": "從未",
       "notPolled": "尚未輪詢"
     },
     "lockout": {

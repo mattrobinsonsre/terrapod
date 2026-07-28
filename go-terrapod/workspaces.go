@@ -86,6 +86,11 @@ type Workspace struct {
 	// VCSLastPolledAt is the timestamp of the most recent successful VCS
 	// poll cycle for this workspace.
 	VCSLastPolledAt string `json:"vcs-last-polled-at,omitempty"`
+	// VCSLastAttemptedAt is the timestamp of the most recent poll ATTEMPT,
+	// successful or not. VCSLastPolledAt only advances on success, so the gap
+	// between the two is what identifies a workspace whose polls are failing
+	// rather than one that is simply not due yet.
+	VCSLastAttemptedAt string `json:"vcs-last-attempted-at,omitempty"`
 	// VCSLastError is the last error from a VCS poll attempt (auth
 	// failure, repo gone, etc.). Empty when the last poll succeeded.
 	VCSLastError string `json:"vcs-last-error,omitempty"`
@@ -672,6 +677,7 @@ func workspaceFromResource(res *Resource) *Workspace {
 		LifecycleState:                GetStringAttr(res, "lifecycle-state"),
 		LifecycleReason:               GetStringAttr(res, "lifecycle-reason"),
 		VCSLastPolledAt:               GetStringAttr(res, "vcs-last-polled-at"),
+		VCSLastAttemptedAt:            GetStringAttr(res, "vcs-last-attempted-at"),
 		VCSLastError:                  GetStringAttr(res, "vcs-last-error"),
 		VCSLastErrorAt:                GetStringAttr(res, "vcs-last-error-at"),
 		AgentPoolName:                 GetStringAttr(res, "agent-pool-name"),

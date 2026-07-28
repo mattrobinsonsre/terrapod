@@ -2239,6 +2239,8 @@
     "vcsPolling": {
       "error": "3rr0r",
       "ok": "0K ({time})",
+      "stalled": "574ll3d — l457 4773mp7 {attempted}, l457 5ucc355 {succeeded}",
+      "never": "n3v3r",
       "notPolled": "N07 p0ll3d y37"
     },
     "lockout": {

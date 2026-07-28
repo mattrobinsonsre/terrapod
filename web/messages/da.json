@@ -2239,6 +2239,8 @@
     "vcsPolling": {
       "error": "Fejl",
       "ok": "OK ({time})",
+      "stalled": "Gået i stå — sidste forsøg {attempted}, sidste succes {succeeded}",
+      "never": "aldrig",
       "notPolled": "Ikke pollet endnu"
     },
     "lockout": {

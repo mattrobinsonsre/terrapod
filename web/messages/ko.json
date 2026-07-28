@@ -2239,6 +2239,8 @@
     "vcsPolling": {
       "error": "오류",
       "ok": "정상 ({time})",
+      "stalled": "중단됨 — 마지막 시도 {attempted}, 마지막 성공 {succeeded}",
+      "never": "없음",
       "notPolled": "아직 폴링되지 않음"
     },
     "lockout": {

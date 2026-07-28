@@ -2239,6 +2239,8 @@
     "vcsPolling": {
       "error": "Gwall",
       "ok": "IAWN ({time})",
+      "stalled": "Wedi stopio — ymgais olaf {attempted}, llwyddiant olaf {succeeded}",
+      "never": "byth",
       "notPolled": "Heb ei bolio eto"
     },
     "lockout": {

@@ -95,6 +95,7 @@ data terrapod_workspace.var_files required=false optional=false computed=true se
 data terrapod_workspace.vcs_branch required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.vcs_connection_id required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.vcs_connection_name required=false optional=false computed=true sensitive=false type=basetypes.StringType
+data terrapod_workspace.vcs_last_attempted_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.vcs_last_error required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.vcs_last_error_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.vcs_last_polled_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
@@ -393,6 +394,7 @@ resource terrapod_workspace.var_files required=false optional=true computed=true
 resource terrapod_workspace.vcs_branch required=false optional=true computed=false sensitive=false type=basetypes.StringType
 resource terrapod_workspace.vcs_connection_id required=false optional=true computed=false sensitive=false type=basetypes.StringType
 resource terrapod_workspace.vcs_connection_name required=false optional=false computed=true sensitive=false type=basetypes.StringType
+resource terrapod_workspace.vcs_last_attempted_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.vcs_last_error required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.vcs_last_error_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.vcs_last_polled_at required=false optional=false computed=true sensitive=false type=basetypes.StringType

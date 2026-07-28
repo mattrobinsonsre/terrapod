@@ -399,6 +399,10 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				Description: "Timestamp of the most recent successful VCS poll cycle. Server-volatile — VCS poller writes this every `vcs.poll_interval_seconds` (default 60s).",
 				Computed:    true,
 			},
+			"vcs_last_attempted_at": schema.StringAttribute{
+				Description: "Timestamp of the most recent VCS poll attempt, successful or not. `vcs_last_polled_at` only advances on success, so a gap between the two identifies a workspace whose polls are failing. Server-volatile.",
+				Computed:    true,
+			},
 			"vcs_last_error": schema.StringAttribute{
 				Description: "Most recent VCS poll error message. Empty when the last poll succeeded. Server-volatile.",
 				Computed:    true,
@@ -998,6 +1002,11 @@ func readWorkspaceIntoModel(ctx context.Context, ws *terrapod.Workspace, m *work
 		m.VCSLastPolledAt = types.StringValue(ws.VCSLastPolledAt)
 	} else {
 		m.VCSLastPolledAt = types.StringNull()
+	}
+	if ws.VCSLastAttemptedAt != "" {
+		m.VCSLastAttemptedAt = types.StringValue(ws.VCSLastAttemptedAt)
+	} else {
+		m.VCSLastAttemptedAt = types.StringNull()
 	}
 	if ws.VCSLastError != "" {
 		m.VCSLastError = types.StringValue(ws.VCSLastError)

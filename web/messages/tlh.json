@@ -2239,6 +2239,8 @@
     "vcsPolling": {
       "error": "Qagh",
       "ok": "lugh ({time})",
+      "stalled": "mevpu'' — nID Qav {attempted}, Qapla'' Qav {succeeded}",
+      "never": "not",
       "notPolled": "ghelqa'be' DaH"
     },
     "lockout": {

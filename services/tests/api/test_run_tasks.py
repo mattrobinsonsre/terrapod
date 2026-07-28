@@ -34,6 +34,7 @@ def _mock_workspace(ws_id=None, name="test-ws"):
     ws.labels = {}
     ws.owner_email = "test@example.com"
     ws.vcs_last_polled_at = None
+    ws.vcs_last_attempted_at = None
     ws.vcs_last_error = None
     ws.vcs_last_error_at = None
     return ws

@@ -2239,6 +2239,8 @@
     "vcsPolling": {
       "error": "Marklar",
       "ok": "OK ({time})",
+      "stalled": "Stalled — last marklar {attempted}, last marklar {succeeded}",
+      "never": "never",
       "notPolled": "Not polled yet"
     },
     "lockout": {

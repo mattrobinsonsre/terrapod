@@ -57,6 +57,7 @@ def _mock_workspace(ws_id=None, pool_id=None, extra_pool_ids=None):
     ws.vcs_branch = ""
     ws.vcs_last_commit_sha = ""
     ws.vcs_last_polled_at = None
+    ws.vcs_last_attempted_at = None
     ws.vcs_last_error = None
     ws.vcs_last_error_at = None
     ws.var_files = []

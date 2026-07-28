@@ -2239,6 +2239,8 @@
     "vcsPolling": {
       "error": "Fout",
       "ok": "OK ({time})",
+      "stalled": "Vastgelopen — laatste poging {attempted}, laatste succes {succeeded}",
+      "never": "nooit",
       "notPolled": "Nog niet gepolld"
     },
     "lockout": {

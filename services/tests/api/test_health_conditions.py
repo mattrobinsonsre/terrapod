@@ -37,6 +37,7 @@ def _mock_workspace(**overrides):
     ws.drift_status = overrides.get("drift_status", "")
     ws.state_diverged = overrides.get("state_diverged", False)
     ws.vcs_last_polled_at = overrides.get("vcs_last_polled_at", None)
+    ws.vcs_last_attempted_at = overrides.get("vcs_last_attempted_at", None)
     ws.vcs_last_error = overrides.get("vcs_last_error", None)
     ws.vcs_last_error_at = overrides.get("vcs_last_error_at", None)
     ws.labels = {}
