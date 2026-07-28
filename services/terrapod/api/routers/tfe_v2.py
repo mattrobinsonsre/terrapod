@@ -768,6 +768,9 @@ def _workspace_json(
                     "is-destroyable": has_capability(caps, cap.WORKSPACE_DELETE),
                 },
             },
+            # JSON:API house style (#1063): links live in `relationships`. The
+            # matching `*-id` attributes above are kept indefinitely for
+            # back-compat — the relationship is the canonical form, additive.
             "relationships": {
                 "organization": {
                     "data": {"id": DEFAULT_ORG, "type": "organizations"},
@@ -782,6 +785,18 @@ def _workspace_json(
                         },
                     }
                     if ws.vcs_connection_id
+                    else {}
+                ),
+                **(
+                    {
+                        "agent-pool": {
+                            "data": {
+                                "id": f"apool-{ws.agent_pool_id}",
+                                "type": "agent-pools",
+                            },
+                        },
+                    }
+                    if ws.agent_pool_id
                     else {}
                 ),
             },

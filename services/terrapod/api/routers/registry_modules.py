@@ -173,6 +173,22 @@ def _module_to_jsonapi(module, caps: frozenset[str] | None = None) -> dict:  # t
                 "can-create-version": has_capability(caps, cap.REGISTRY_WRITE),
             },
         },
+        # JSON:API house style (#1063): links belong in `relationships`. The
+        # `vcs-connection-id` attribute above stays indefinitely for back-compat.
+        "relationships": {
+            **(
+                {
+                    "vcs-connection": {
+                        "data": {
+                            "id": f"vcs-{module.vcs_connection_id}",
+                            "type": "vcs-connections",
+                        },
+                    },
+                }
+                if module.vcs_connection_id
+                else {}
+            ),
+        },
     }
 
 
@@ -859,6 +875,11 @@ def _link_to_jsonapi(link: ModuleWorkspaceLink) -> dict:
             "workspace-name": ws.name if ws else "",
             "created-at": rfc3339(link.created_at),
             "created-by": link.created_by,
+        },
+        # JSON:API house style (#1063): links belong in `relationships`. The
+        # `workspace-id` attribute above stays indefinitely for back-compat.
+        "relationships": {
+            "workspace": {"data": {"id": f"ws-{link.workspace_id}", "type": "workspaces"}},
         },
     }
 

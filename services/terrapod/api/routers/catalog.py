@@ -148,6 +148,30 @@ def _instance_json(ws: Workspace) -> dict:
             "owner-email": ws.owner_email or "",
             "labels": dict(ws.labels or {}),
         },
+        # JSON:API house style (#1063): links belong in `relationships`. The
+        # `*-id` attributes above stay indefinitely for back-compat — this is
+        # purely additive.
+        "relationships": {
+            **(
+                {
+                    "catalog-item": {
+                        "data": {"id": str(ws.catalog_item_id), "type": "catalog-items"},
+                    },
+                }
+                if ws.catalog_item_id
+                else {}
+            ),
+            **(
+                {
+                    "agent-pool": {
+                        "data": {"id": f"apool-{ws.agent_pool_id}", "type": "agent-pools"},
+                    },
+                }
+                if ws.agent_pool_id
+                else {}
+            ),
+            "workspace": {"data": {"id": f"ws-{ws.id}", "type": "workspaces"}},
+        },
         "links": {"self": f"/api/terrapod/v1/workspaces/ws-{ws.id}"},
     }
 

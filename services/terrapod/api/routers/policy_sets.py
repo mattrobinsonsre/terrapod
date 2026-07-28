@@ -135,12 +135,19 @@ def _policy_set_json(ps: PolicySet, *, embed_policies: bool = False) -> dict:
         "updated-at": _rfc3339(ps.updated_at),
     }
     doc: dict = {"id": f"polset-{ps.id}", "type": "policy-sets", "attributes": attrs}
-    if embed_policies:
-        doc["relationships"] = {
-            "policies": {
-                "data": [_policy_json(p) for p in sorted(ps.policies, key=lambda x: x.name)]
-            }
+    # JSON:API house style (#1063): links belong in `relationships`. The
+    # `vcs-connection-id` attribute above stays indefinitely for back-compat.
+    relationships: dict = {}
+    if ps.vcs_connection_id:
+        relationships["vcs-connection"] = {
+            "data": {"id": f"vcs-{ps.vcs_connection_id}", "type": "vcs-connections"},
         }
+    if embed_policies:
+        relationships["policies"] = {
+            "data": [_policy_json(p) for p in sorted(ps.policies, key=lambda x: x.name)]
+        }
+    if relationships:
+        doc["relationships"] = relationships
     return doc
 
 

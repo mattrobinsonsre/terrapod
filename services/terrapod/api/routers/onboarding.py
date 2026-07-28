@@ -141,6 +141,21 @@ def _session_json(
             "created-at": rfc3339(s.created_at),
             "updated-at": rfc3339(s.updated_at),
         },
+        # JSON:API house style (#1063): links belong in `relationships`. The
+        # `*-id` attributes above stay indefinitely for back-compat — additive.
+        "relationships": {
+            "workspace": {"data": {"id": f"ws-{s.workspace_id}", "type": "workspaces"}},
+            **(
+                {"discovery-run": {"data": {"id": f"run-{s.discovery_run_id}", "type": "runs"}}}
+                if s.discovery_run_id
+                else {}
+            ),
+            **(
+                {"result-run": {"data": {"id": f"run-{s.result_run_id}", "type": "runs"}}}
+                if s.result_run_id
+                else {}
+            ),
+        },
     }
 
 
