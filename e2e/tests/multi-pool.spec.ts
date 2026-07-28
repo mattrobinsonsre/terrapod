@@ -6,7 +6,7 @@ import {
   getStoredToken,
   uniqueName,
 } from '../helpers/api.js';
-import { expectNoHorizontalPageScroll } from './responsive.spec.js';
+import { expectNoHorizontalPageScroll } from '../helpers/responsive.js';
 
 /**
  * Multi-pool workspace routing (#1085) — the UI half.
