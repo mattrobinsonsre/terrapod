@@ -372,6 +372,14 @@ multi-language implementation ships in the same PR**:
   etc.
 - **Branches** — feature branches off `main`; never push directly to `main`;
   never stack a PR on another open feature branch (always base on `main`).
+- **Merging — this repo requires branches to be up to date with `main`.** The
+  moment one PR merges, `main` advances and **every other open PR becomes
+  out-of-date and un-mergeable** until it is updated (`gh pr update-branch`).
+  So land PRs **strictly one at a time**: update → merge → *then* update the
+  next. Do **not** arm auto-merge on two or more PRs at once — the second one
+  silently stalls the instant the first lands, looking armed while nothing
+  happens. Don't bypass a failing required check with an admin override; fix
+  the check.
 - **Namespace package (hard requirement)** — `services/terrapod/__init__.py`
   must **not** exist. Its absence enables PEP 420 implicit namespace packages
   so each Docker image can include only the sub-packages it needs.
@@ -557,6 +565,47 @@ multi-language implementation ships in the same PR**:
   Retry transient failures (timeouts, connection errors, 5xx); a definitive
   **4xx is final and never retried**. Deliberately best-effort calls (e.g.
   telemetry) may skip retry but MUST say so in a comment. When in doubt, retry.
+
+- **`tfe_v2.py` is the CLI-contract router — don't put anything else in it.**
+  `services/terrapod/api/routers/tfe_v2.py` implements *only* the TFE V2 subset
+  that the `terraform` / `tofu` CLI actually consumes (catalogued in
+  [`docs/tfe-cli-surface.md`](docs/tfe-cli-surface.md)). Two kinds of route are
+  frequently added there by mistake and belong elsewhere: (a) Terrapod-native
+  extensions, and (b) TFE-V2 endpoints that exist in `go-tfe` but that the CLI
+  never calls (workspace CRUD by id, variables, variable sets, run tasks, run
+  triggers, notifications, registry *management*, token admin, …). Both go in a
+  dedicated router under `/api/terrapod/v1/`. Response *attributes* may include
+  Terrapod-specific fields (TFE clients ignore unknown attributes); it is the
+  endpoint **paths** in this file that must be on the CLI-surface list. Before
+  adding a route here, check it appears in that doc — if it doesn't, it's a
+  native route.
+- **Reserved label keys are validated at every write path (hard requirement).**
+  `RESERVED_LABEL_KEYS` in `services/terrapod/services/label_validation.py`
+  (`status`, `pool`, `mode`, `backend`, `owner`, `drift`, `version`, `vcs`,
+  `locked`, `branch`) are *virtual* filter terms and must never be persisted as
+  real labels. **Every path that writes `labels` to a labelled entity**
+  (workspace, autodiscovery rule, registry module/provider, agent pool) must run
+  them through `validate_labels` and reject with HTTP 422 — on **create** as well
+  as update. A create path that skips the guard lets a reserved key in, and the
+  update path's re-validation then *traps* the entity: it can no longer be
+  edited via PATCH. Non-interactive flows that must not abort (e.g. materialising
+  a workspace from a legacy rule) use `sanitize_labels` (strip-and-log) instead
+  of raising.
+- **Fix the bug you just found, then carry on (hard requirement).** When you hit
+  a bug, error, failing test, or broken endpoint while doing something else —
+  **stop and fix it**, then resume. Don't work around it, don't leave a TODO,
+  don't carry on as though it isn't there. This applies whether it is
+  pre-existing or something you just introduced.
+- **Never label a failure "unrelated" to get past it (hard requirement).** If a
+  build, test, or check fails during your work, the default assumption is that
+  **you** caused it — including when the message looks environmental ("missing
+  binary", "flaky", "wrong arch", "unrelated dependency"). Investigate the real
+  error and fix the root cause. If after investigating you are confident it is
+  pre-existing, say so **with evidence** (the commit where it broke, or the same
+  failure reproducing on `main`) rather than asserting it. The bar for "unrelated"
+  is high; "unrelated" without evidence is a workaround. The same goes for a
+  flaky test: prove it's flaky, then **fix the flake** — re-running until green
+  just hides it for the next person.
 
 ## Content hygiene (hard requirements)
 
