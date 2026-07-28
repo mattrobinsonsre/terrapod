@@ -1284,3 +1284,72 @@ class TestPollCycleFailuresAreNotSilent:
             _log_cycle_failures([], [])
 
         assert not log.error.called
+
+
+class TestCommitClaimReleasedOnFailure:
+    """#1099 — the claim is committed before the run exists, so a failure that
+    does not release it makes the poller skip that commit permanently."""
+
+    @patch("terrapod.services.vcs_poller._release_commit_claim")
+    @patch("terrapod.services.vcs_poller._create_vcs_run")
+    @patch("terrapod.services.vcs_poller._get_branch_sha")
+    async def test_release_on_run_creation_failure(self, mock_sha, mock_create, mock_release):
+        from terrapod.services.vcs_poller import _poll_workspace_branch
+
+        ws = _mock_workspace(vcs_last_commit_sha="aaa111")
+        mock_sha.return_value = "bbb222"
+        mock_create.side_effect = RuntimeError("archive download failed")
+
+        with pytest.raises(RuntimeError, match="archive download failed"):
+            await _poll_workspace_branch(AsyncMock(), ws, _mock_connection(), "org", "repo", "main")
+
+        # Rolled back to the sha we were on before the claim, not to the claim.
+        mock_release.assert_awaited_once_with(ws.id, "bbb222", "aaa111")
+
+    @patch("terrapod.services.vcs_poller._release_commit_claim")
+    @patch("terrapod.services.vcs_poller._create_vcs_run")
+    @patch("terrapod.services.vcs_poller._get_branch_sha")
+    async def test_failure_still_propagates(self, mock_sha, mock_create, mock_release):
+        """The caller records the poll failure (#1089) — releasing must not swallow it."""
+        from terrapod.services.vcs_poller import _poll_workspace_branch
+
+        ws = _mock_workspace(vcs_last_commit_sha="aaa111")
+        mock_sha.return_value = "bbb222"
+        mock_create.side_effect = RuntimeError("boom")
+
+        with pytest.raises(RuntimeError):
+            await _poll_workspace_branch(AsyncMock(), ws, _mock_connection(), "org", "repo", "main")
+
+    @patch("terrapod.services.vcs_poller._release_commit_claim")
+    @patch("terrapod.services.vcs_poller._create_vcs_run")
+    @patch("terrapod.services.vcs_poller._get_branch_sha")
+    async def test_no_release_on_success(self, mock_sha, mock_create, mock_release):
+        from terrapod.services.vcs_poller import _poll_workspace_branch
+
+        ws = _mock_workspace(vcs_last_commit_sha="aaa111")
+        mock_sha.return_value = "bbb222"
+        mock_create.return_value = MagicMock(id=uuid.uuid4())
+
+        await _poll_workspace_branch(AsyncMock(), ws, _mock_connection(), "org", "repo", "main")
+
+        mock_release.assert_not_awaited()
+
+    @patch("terrapod.services.vcs_poller._release_commit_claim")
+    @patch("terrapod.services.vcs_poller._create_vcs_run")
+    @patch("terrapod.services.vcs_poller._get_changed_files")
+    @patch("terrapod.services.vcs_poller._get_branch_sha")
+    async def test_no_release_when_prefixes_deliberately_skip_the_run(
+        self, mock_sha, mock_changed, mock_create, mock_release
+    ):
+        """Skipping because nothing matched the trigger prefixes is a decision,
+        not a failure — the commit really has been handled."""
+        from terrapod.services.vcs_poller import _poll_workspace_branch
+
+        ws = _mock_workspace(working_directory="terraform/prod", vcs_last_commit_sha="aaa111")
+        mock_sha.return_value = "bbb222"
+        mock_changed.return_value = ["docs/README.md"]
+
+        await _poll_workspace_branch(AsyncMock(), ws, _mock_connection(), "org", "repo", "main")
+
+        mock_create.assert_not_called()
+        mock_release.assert_not_awaited()
