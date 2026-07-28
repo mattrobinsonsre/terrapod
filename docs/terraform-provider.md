@@ -133,6 +133,36 @@ either `terraform` or `tofu`.
 - **Six platforms.** `linux/{amd64,arm64}`, `darwin/{amd64,arm64}`,
   `windows/{amd64,arm64}`, built and signed by GoReleaser on release.
 
+## Removing a list attribute does not clear it
+
+A handful of `terrapod_workspace` list attributes are `Optional + Computed`:
+
+`agent_pool_ids`, `var_files`, `trigger_prefixes`, `drift_ignore_rules`,
+`security_scan_skip_rules`.
+
+For these, **omitting the attribute means "leave alone", not "clear"**. Deleting
+the line from your configuration plans as *no changes* and the workspace keeps
+its existing value. To clear one, set it to the empty list:
+
+```hcl
+resource "terrapod_workspace" "example" {
+  # ...
+  var_files = []   # clears it; deleting this line would not
+}
+```
+
+This is deliberate. Terrapod lets these be set outside Terraform — through the
+UI, or the bulk-update endpoint — and the provider cannot tell "removed from the
+configuration" from "never in the configuration": both reach it as an absent
+value over a state value read back from the server. Treating absence as "clear"
+would wipe values that are legitimately managed elsewhere.
+
+Because a silent no-op is still a poor experience, the provider **warns at plan
+time** whenever a workspace holds a non-empty value for one of these attributes
+that your configuration does not declare. If you meant to clear it, set `= []`;
+if the value is managed outside Terraform, declare the attribute explicitly to
+silence the warning.
+
 ## Reserved-name note
 
 Terraform schema attribute names can't be `provider`, so the VCS-connection

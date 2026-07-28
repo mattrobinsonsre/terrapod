@@ -71,6 +71,85 @@ func (r *workspaceResource) ValidateConfig(ctx context.Context, req resource.Val
 	}
 }
 
+// unmanagedCollections are the Optional+Computed collection attributes whose
+// plan value falls back to prior state when the config omits them
+// (`UseStateForUnknown`). That fallback is deliberate — the server may hold a
+// value this config does not manage, set through the UI or the bulk-update
+// endpoint, and clobbering it on every apply would be worse. The cost is that
+// *removing* the attribute from a config is indistinguishable from never having
+// declared it, so it plans as no-change and the server-side value survives
+// (#1091). ModifyPlan below makes that visible rather than silent.
+var unmanagedCollections = []struct {
+	name  string
+	value func(*workspaceModel) attr.Value
+}{
+	{"agent_pool_ids", func(m *workspaceModel) attr.Value { return m.AgentPoolIDs }},
+	{"var_files", func(m *workspaceModel) attr.Value { return m.VarFiles }},
+	{"trigger_prefixes", func(m *workspaceModel) attr.Value { return m.TriggerPrefixes }},
+	{"drift_ignore_rules", func(m *workspaceModel) attr.Value { return m.DriftIgnoreRules }},
+	{"security_scan_skip_rules", func(m *workspaceModel) attr.Value { return m.SecurityScanSkipRules }},
+}
+
+// hasElements reports whether a list attribute holds at least one element.
+func hasElements(v attr.Value) bool {
+	l, ok := v.(types.List)
+	if !ok || l.IsNull() || l.IsUnknown() {
+		return false
+	}
+	return len(l.Elements()) > 0
+}
+
+// ModifyPlan warns when the workspace holds a value for an Optional+Computed
+// collection that the configuration does not declare (#1091).
+//
+// Terraform would otherwise report "no changes" while the config and the remote
+// object genuinely disagree — the shape that bites is deleting a `var_files`
+// line to retire a tfvars file, reading the empty plan as confirmation, and
+// deleting the file while the workspace still passes `-var-file` for it.
+//
+// This is a warning rather than a real diff on purpose. The framework cannot
+// tell "removed from config" from "never in config": both arrive here as a null
+// config value over a state value the read-back populated from the server.
+// Planning a clear would therefore also clear values legitimately managed
+// out-of-band — and, worse, would do it on the first plan after upgrading the
+// provider, silently. A warning costs nothing and cannot destroy anything.
+func (r *workspaceResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	// Nothing to compare on create (no prior state) or destroy (no plan).
+	if req.State.Raw.IsNull() || req.Plan.Raw.IsNull() {
+		return
+	}
+	var cfg, state workspaceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &cfg)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	for _, a := range unmanagedCollections {
+		// `agent_pool_ids` reads back the set that `agent_pool_id` assigns, so a
+		// config using the singular attribute IS managing it — warning there
+		// would fire on every plan and be wrong.
+		if a.name == "agent_pool_ids" && !cfg.AgentPoolID.IsNull() {
+			continue
+		}
+		if !a.value(&cfg).IsNull() || !hasElements(a.value(&state)) {
+			continue
+		}
+		resp.Diagnostics.AddAttributeWarning(
+			path.Root(a.name),
+			"Workspace has "+a.name+" that this configuration does not manage",
+			"The workspace has a non-empty `"+a.name+"` but the configuration does not "+
+				"declare it, so Terraform will report no changes and the existing value "+
+				"will be left in place.\n\n"+
+				"If you removed `"+a.name+"` from the configuration intending to clear it, "+
+				"set `"+a.name+" = []` instead — omitting the attribute means \"leave "+
+				"alone\", not \"clear\".\n\n"+
+				"If the value is managed outside Terraform (the UI or the bulk-update "+
+				"endpoint), this warning is expected; declare the attribute explicitly to "+
+				"silence it.",
+		)
+	}
+}
+
 func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description: "Manages a Terrapod workspace.",
@@ -194,7 +273,7 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				Optional:    true,
 			},
 			"agent_pool_ids": schema.ListAttribute{
-				Description: "Agent pools this workspace's runs may execute on (#1085). The set is flat: a queued run is offered to every pool at once and whichever pool has a live listener claims it first, so losing one pool does not stop the workspace. There is no primary and no ordering preference. `agent_pool_id` reads back as element 0. Conflicts with `agent_pool_id`.",
+				Description: "Agent pools this workspace's runs may execute on (#1085). The set is flat: a queued run is offered to every pool at once and whichever pool has a live listener claims it first, so losing one pool does not stop the workspace. There is no primary and no ordering preference. `agent_pool_id` reads back as element 0. Conflicts with `agent_pool_id`. Omitting this attribute leaves any existing server-side value untouched — it does not clear it; set `agent_pool_ids = []` to clear.",
 				// Optional + Computed with UseStateForUnknown — same rationale as
 				// drift_ignore_rules (#684): the server may hold a set this config
 				// doesn't manage (assigned via the UI or bulk-update), so omitting
@@ -207,7 +286,7 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				},
 			},
 			"var_files": schema.ListAttribute{
-				Description: "List of .tfvars file paths passed as -var-file arguments to plan/apply.",
+				Description: "List of .tfvars file paths passed as -var-file arguments to plan/apply. Omitting this attribute leaves any existing server-side value untouched — it does not clear it; set `var_files = []` to clear.",
 				// Optional + Computed with UseStateForUnknown — same rationale as
 				// drift_ignore_rules (#684): tolerate a server-held value the
 				// config doesn't set. Set `= []` to clear.
@@ -219,7 +298,7 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				},
 			},
 			"trigger_prefixes": schema.ListAttribute{
-				Description: "Repo-root-relative directories to include in the sparse VCS fetch in addition to `working_directory`. Required when the workspace's terraform crosses directory boundaries via relative module sources (`module \"foo\" { source = \"../foo\" }`) — sparse-checkout cone mode includes parents of the listed directories but NOT siblings, so the referenced sibling must be declared here or the runner will error with `Unable to evaluate directory symlink`.",
+				Description: "Repo-root-relative directories to include in the sparse VCS fetch in addition to `working_directory`. Required when the workspace's terraform crosses directory boundaries via relative module sources (`module \"foo\" { source = \"../foo\" }`) — sparse-checkout cone mode includes parents of the listed directories but NOT siblings, so the referenced sibling must be declared here or the runner will error with `Unable to evaluate directory symlink`. Omitting this attribute leaves any existing server-side value untouched — it does not clear it; set `trigger_prefixes = []` to clear.",
 				Optional:    true,
 				Computed:    true,
 				ElementType: types.StringType,
@@ -228,7 +307,7 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				},
 			},
 			"drift_ignore_rules": schema.ListAttribute{
-				Description: "Glob-aware patterns suppressed by the drift-result classifier (#482). Each entry is a Terraform resource address optionally suffixed with a dotted attribute path; `*` matches zero or more non-`.` characters (so it can span `[N]` indices but not segment boundaries), and `[*]` matches any bracketed index. A bare address with no attribute suffix silences any change to that resource — including destroys — so use carefully. Examples: `aws_iam_role.foo.tags.Environment`, `aws_autoscaling_group.workers[*].desired_capacity`, `module.eks*.argocd_cluster.*.config.tls_client_config.ca_data`, `aws_iam_role.foo`. Empty list (the default) means classic drift behaviour: every plan diff counts. Affects drift-detection runs only — regular plan/apply is untouched.",
+				Description: "Glob-aware patterns suppressed by the drift-result classifier (#482). Each entry is a Terraform resource address optionally suffixed with a dotted attribute path; `*` matches zero or more non-`.` characters (so it can span `[N]` indices but not segment boundaries), and `[*]` matches any bracketed index. A bare address with no attribute suffix silences any change to that resource — including destroys — so use carefully. Examples: `aws_iam_role.foo.tags.Environment`, `aws_autoscaling_group.workers[*].desired_capacity`, `module.eks*.argocd_cluster.*.config.tls_client_config.ca_data`, `aws_iam_role.foo`. Empty list (the default) means classic drift behaviour: every plan diff counts. Affects drift-detection runs only — regular plan/apply is untouched. Omitting this attribute leaves any existing server-side value untouched — it does not clear it; set `drift_ignore_rules = []` to clear.",
 				// Optional + Computed: the server may hold a value this config
 				// doesn't set (e.g. set out-of-band via the bulk-update endpoint),
 				// so omitting it must mean "leave alone" (plan = unknown), not
@@ -287,7 +366,7 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				},
 			},
 			"security_scan_skip_rules": schema.ListAttribute{
-				Description: "Scanner rule-ids to suppress (Checkov `CKV_*` / Trivy `AVD-*`). Empty list (default) skips nothing.",
+				Description: "Scanner rule-ids to suppress (Checkov `CKV_*` / Trivy `AVD-*`). Empty list (default) skips nothing. Omitting this attribute leaves any existing server-side value untouched — it does not clear it; set `security_scan_skip_rules = []` to clear.",
 				Optional:    true,
 				Computed:    true,
 				ElementType: types.StringType,
