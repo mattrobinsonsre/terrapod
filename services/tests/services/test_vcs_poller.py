@@ -598,7 +598,7 @@ class TestPollCycleParallel:
         max_in_flight: list[int] = [0]
         entered = 0
 
-        async def fake_owned_poll(ws_id, semaphore, cache=None, paths_unions=None):
+        async def fake_owned_poll(ws_id, semaphore, cache=None, meta=None, paths_unions=None):
             import asyncio as _a
 
             nonlocal entered
@@ -675,7 +675,7 @@ class TestPollCycleParallel:
 
         polled: list[uuid.UUID] = []
 
-        async def fake_owned_poll(ws_id, semaphore, cache=None, paths_unions=None):
+        async def fake_owned_poll(ws_id, semaphore, cache=None, meta=None, paths_unions=None):
             polled.append(ws_id)
 
         with (
@@ -725,7 +725,7 @@ class TestPollCycleParallel:
 
         polled: list[uuid.UUID] = []
 
-        async def fake_owned_poll(ws_id, semaphore, cache=None, paths_unions=None):
+        async def fake_owned_poll(ws_id, semaphore, cache=None, meta=None, paths_unions=None):
             polled.append(ws_id)
 
         with (
@@ -774,7 +774,7 @@ class TestPollCycleParallel:
 
         polled: list[uuid.UUID] = []
 
-        async def fake_owned_poll(ws_id, semaphore, cache=None, paths_unions=None):
+        async def fake_owned_poll(ws_id, semaphore, cache=None, meta=None, paths_unions=None):
             polled.append(ws_id)
 
         with (
@@ -1130,3 +1130,157 @@ class TestPollFailureSurvivesRollback:
         mock_session.side_effect = Exception("database is down")
 
         await _record_poll_failure(uuid.uuid4(), "whatever")
+
+
+class TestMetadataDeduplication:
+    """#1096 — workspaces sharing a repo must not each re-ask the provider.
+
+    The cache lives in `vcs_metadata_cache` and is unit-tested there. These
+    assert the poller's thin provider wrappers are actually wired to it — a
+    cache nothing routes through would save nothing.
+    """
+
+    async def test_branch_sha_deduped_across_workspaces(self):
+        from terrapod.services.vcs_metadata_cache import VCSMetadataCache
+        from terrapod.services.vcs_poller import _get_branch_sha
+
+        conn = _mock_connection()
+        conn.id = uuid.uuid4()
+        meta = VCSMetadataCache()
+
+        with patch(
+            "terrapod.services.vcs_poller._provider_get_branch_sha",
+            new_callable=AsyncMock,
+            return_value="deadbeef",
+        ) as prov:
+            # Eleven workspaces on one repo+branch, as in a real monorepo estate.
+            for _ in range(11):
+                assert await _get_branch_sha(conn, "org", "repo", "main", meta) == "deadbeef"
+
+        assert prov.await_count == 1
+
+    async def test_open_prs_deduped_across_workspaces(self):
+        from terrapod.services.vcs_metadata_cache import VCSMetadataCache
+        from terrapod.services.vcs_poller import _list_open_prs
+
+        conn = _mock_connection()
+        conn.id = uuid.uuid4()
+        meta = VCSMetadataCache()
+
+        with patch(
+            "terrapod.services.github_service.list_open_pull_requests",
+            new_callable=AsyncMock,
+            return_value=[],
+        ) as prov:
+            for _ in range(11):
+                assert await _list_open_prs(conn, "org", "repo", "main", meta) == []
+
+        assert prov.await_count == 1
+
+    async def test_default_branch_deduped_across_workspaces(self):
+        from terrapod.services.vcs_metadata_cache import VCSMetadataCache
+        from terrapod.services.vcs_poller import _get_default_branch
+
+        conn = _mock_connection()
+        conn.id = uuid.uuid4()
+        meta = VCSMetadataCache()
+
+        with patch(
+            "terrapod.services.vcs_poller._provider_get_default_branch",
+            new_callable=AsyncMock,
+            return_value="main",
+        ) as prov:
+            for _ in range(5):
+                assert await _get_default_branch(conn, "org", "repo", meta) == "main"
+
+        assert prov.await_count == 1
+
+    async def test_without_a_cache_behaviour_is_unchanged(self):
+        """One-shot callers (UI-queued runs, module-impact) pass no cache."""
+        from terrapod.services.vcs_poller import _get_branch_sha
+
+        conn = _mock_connection()
+        conn.id = uuid.uuid4()
+
+        with patch(
+            "terrapod.services.vcs_poller._provider_get_branch_sha",
+            new_callable=AsyncMock,
+            return_value="deadbeef",
+        ) as prov:
+            for _ in range(3):
+                await _get_branch_sha(conn, "org", "repo", "main")
+
+        assert prov.await_count == 3, "no cache passed -> no caching, exactly as before"
+
+    async def test_different_branches_are_not_conflated(self):
+        from terrapod.services.vcs_metadata_cache import VCSMetadataCache
+        from terrapod.services.vcs_poller import _get_branch_sha
+
+        conn = _mock_connection()
+        conn.id = uuid.uuid4()
+        meta = VCSMetadataCache()
+
+        async def by_branch(_c, _o, _r, branch):
+            return f"sha-of-{branch}"
+
+        with patch(
+            "terrapod.services.vcs_poller._provider_get_branch_sha",
+            new=AsyncMock(side_effect=by_branch),
+        ) as prov:
+            assert await _get_branch_sha(conn, "org", "repo", "main", meta) == "sha-of-main"
+            assert await _get_branch_sha(conn, "org", "repo", "develop", meta) == "sha-of-develop"
+
+        assert prov.await_count == 2
+
+
+class TestPollCycleFailuresAreNotSilent:
+    """#1096 — a poll cycle must never fail silently.
+
+    `asyncio.gather(return_exceptions=True)` keeps one bad workspace from
+    killing the cycle, which is right. But it also swallowed defects in the
+    poller itself: while building the metadata cache, a stale call signature
+    made every poll raise TypeError, ZERO workspaces were polled, and the cycle
+    still reported success. For VCS change detection that is the worst possible
+    failure — silence is indistinguishable from "nothing changed".
+    """
+
+    def test_partial_failure_is_logged(self):
+        from terrapod.services.vcs_poller import _log_cycle_failures
+
+        ids = [uuid.uuid4() for _ in range(3)]
+        with patch("terrapod.services.vcs_poller.logger") as log:
+            _log_cycle_failures([None, RuntimeError("boom"), None], ids)
+
+        assert log.error.called, "a failed workspace poll must be logged, not dropped"
+        # Partial failure is not the total-outage alarm.
+        msgs = [c.args[0] for c in log.error.call_args_list]
+        assert not any("change detection is down" in m for m in msgs)
+
+    def test_total_failure_raises_the_louder_alarm(self):
+        from terrapod.services.vcs_poller import _log_cycle_failures
+
+        ids = [uuid.uuid4() for _ in range(3)]
+        with patch("terrapod.services.vcs_poller.logger") as log:
+            _log_cycle_failures([TypeError("bad signature")] * 3, ids)
+
+        msgs = [c.args[0] for c in log.error.call_args_list]
+        assert any("change detection is down" in m for m in msgs), (
+            "every workspace failing is an outage and must say so explicitly"
+        )
+
+    def test_clean_cycle_logs_nothing(self):
+        from terrapod.services.vcs_poller import _log_cycle_failures
+
+        with patch("terrapod.services.vcs_poller.logger") as log:
+            _log_cycle_failures([None, None], [uuid.uuid4(), uuid.uuid4()])
+
+        assert not log.error.called
+
+    def test_no_workspaces_is_not_an_outage(self):
+        """An empty estate polls nothing; that is not a failure."""
+        from terrapod.services.vcs_poller import _log_cycle_failures
+
+        with patch("terrapod.services.vcs_poller.logger") as log:
+            _log_cycle_failures([], [])
+
+        assert not log.error.called
