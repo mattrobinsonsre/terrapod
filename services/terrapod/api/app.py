@@ -650,6 +650,7 @@ def create_application() -> FastAPI:
     from starlette.exceptions import HTTPException as StarletteHTTPException
 
     from terrapod.api.errors import jsonapi_error_response
+    from terrapod.services.ha_role import NotLeaderError
 
     # JSON:API house style (#1063): every error body carries a JSON:API
     # `errors` array AND the legacy top-level `detail`. Purely additive — old
@@ -678,6 +679,17 @@ def create_application() -> FastAPI:
         from fastapi.encoders import jsonable_encoder
 
         return jsonapi_error_response(jsonable_encoder(exc.errors()), 422)
+
+    @app.exception_handler(NotLeaderError)
+    async def not_leader_handler(request: Request, exc: NotLeaderError) -> Response:
+        """A write reached a node that does not currently hold the shared name.
+
+        503 rather than 4xx: the request is well-formed and the caller is
+        authorised — this node simply is not the one serving writes. Retry
+        against whoever holds the name.
+        """
+        logger.info("Write refused: not the leader", action=exc.action, path=request.url.path)
+        return jsonapi_error_response(str(exc), 503)
 
     @app.exception_handler(IntegrityError)
     async def integrity_error_handler(request: Request, exc: IntegrityError) -> JSONResponse:

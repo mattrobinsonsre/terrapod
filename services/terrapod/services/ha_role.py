@@ -145,6 +145,7 @@ async def probe_cycle() -> None:
     if count >= settings.ha.probe_threshold:
         await redis.set(_ROLE_KEY, wanted)
         await redis.delete(_STREAK_KEY)
+        await _retire_runs_on_role_change(previous=current, role=wanted)
         logger.warning(
             "HA role changed",
             node=me,
@@ -178,3 +179,89 @@ async def last_probe_age_seconds() -> float | None:
         return None
     value = raw.decode() if isinstance(raw, bytes) else str(raw)
     return time.time() - float(value)
+
+
+class NotLeaderError(RuntimeError):
+    """Raised when a write is attempted on a node that is not the leader.
+
+    Surfaced as HTTP 503: the request is well-formed and the caller is
+    authorised, but this node is not currently the one serving writes. A client
+    should retry against whoever holds the shared name.
+    """
+
+    def __init__(self, action: str) -> None:
+        self.action = action
+        super().__init__(
+            f"this node is not the leader and cannot {action}; "
+            "retry against the node holding the shared name"
+        )
+
+
+async def ensure_leader(action: str) -> None:
+    """Refuse a write unless this node currently leads.
+
+    Called at the *write*, not around the scheduler loops, because the
+    scheduler is not the only thing that writes. The triggered-task consumer is
+    a separate loop fed directly by request handlers, and the Slack socket is an
+    outbound connection each replica dials — neither is reachable from a gate
+    placed around the periodic tasks.
+
+    Under the shipped default (`role: leader`) this always passes, so nothing in
+    normal single-node operation ever reaches the raising branch. Tests are what
+    exercise it; a false positive here takes down writes on a healthy node.
+    """
+    if not await is_leader():
+        raise NotLeaderError(action)
+
+
+async def _retire_runs_on_role_change(*, previous: str, role: str) -> None:
+    """Mark this node's in-flight runs errored when its role changes.
+
+    Not a quarantine subsystem — a predicate in the transition path, because
+    that is all the situation needs.
+
+    On **demotion** the runs in flight here are no longer ours to drive: this
+    node will stop reconciling them, so leaving them `planning`/`applying`
+    forever would strand their workspaces locked.
+
+    On **promotion** the danger is sharper. A node that led before may hold run
+    rows frozen at its last demotion, and several periodic tasks act on old rows
+    without an upper age bound — `lifecycle_destroy_retry` in particular selects
+    errored lifecycle destroys with no ceiling, so a promoted node could queue
+    auto-applying destroys from a previous era. Retiring them first removes that
+    input entirely.
+
+    A direct UPDATE, deliberately: `transition_run` is leadership-gated (so it
+    would refuse on demotion), and routing hundreds of rows through it would
+    fire a notification and a commit status for each. This is bookkeeping, not
+    a lifecycle event.
+    """
+    from sqlalchemy import update
+
+    from terrapod.db.models import Run
+    from terrapod.db.session import get_db_session
+
+    non_terminal = ("pending", "queued", "planning", "planned", "confirmed", "applying")
+    try:
+        async with get_db_session() as db:
+            result = await db.execute(
+                update(Run)
+                .where(Run.status.in_(non_terminal))
+                .values(
+                    status="errored",
+                    error_message=(
+                        f"Node role changed from {previous} to {role}; "
+                        "this run was in flight and cannot be continued here"
+                    ),
+                )
+            )
+            await db.commit()
+            if result.rowcount:
+                logger.warning(
+                    "Retired in-flight runs on role change",
+                    previous=previous,
+                    role=role,
+                    runs=result.rowcount,
+                )
+    except Exception:
+        logger.warning("Failed to retire in-flight runs on role change", exc_info=True)

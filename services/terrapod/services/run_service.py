@@ -24,7 +24,7 @@ from terrapod.db.models import (
     now_utc,
 )
 from terrapod.logging_config import get_logger
-from terrapod.services import github_service, gitlab_service, pool_set
+from terrapod.services import github_service, gitlab_service, ha_role, pool_set
 from terrapod.services.notification_service import STATUS_TO_TRIGGER
 
 logger = get_logger(__name__)
@@ -558,6 +558,7 @@ async def create_run(
     The run starts in 'pending' status and transitions to 'queued'
     when a configuration version is uploaded (or immediately if none needed).
     """
+    await ha_role.ensure_leader("create runs")
     if auto_apply is None:
         auto_apply = workspace.auto_apply
 
@@ -642,6 +643,7 @@ async def transition_run(
     error_message: str = "",
 ) -> Run:
     """Transition a run to a new status."""
+    await ha_role.ensure_leader("transition runs")
     if not can_transition(run.status, target_status):
         raise ValueError(f"Invalid transition: {run.status} → {target_status}")
 
@@ -1078,6 +1080,7 @@ async def complete_planned_as_noop(db: AsyncSession, run: Run) -> Run:
 
 async def queue_run(db: AsyncSession, run: Run) -> Run:
     """Queue a run for execution."""
+    await ha_role.ensure_leader("queue runs")
     return await transition_run(db, run, "queued")
 
 
@@ -1251,6 +1254,7 @@ async def confirm_run(db: AsyncSession, run: Run) -> Run:
     with the provider's own language (`dirty` / `blocked` / `behind` /
     `draft` / etc.) attached to the run for the status comment.
     """
+    await ha_role.ensure_leader("confirm runs")
     if run.status != "planned":
         raise ValueError(f"Can only confirm runs in 'planned' status, got '{run.status}'")
     # Manual lock blocks apply — a locked workspace must not start an apply.
@@ -1280,6 +1284,7 @@ async def confirm_run(db: AsyncSession, run: Run) -> Run:
 async def discard_run(db: AsyncSession, run: Run, *, reason: str | None = None) -> Run:
     """Discard a planned run. ``reason`` (state changed / plan expired /
     superseded) is recorded on the run and surfaced to the UI/SDK."""
+    await ha_role.ensure_leader("discard runs")
     if run.status != "planned":
         raise ValueError(f"Can only discard runs in 'planned' status, got '{run.status}'")
     if reason:
@@ -1527,6 +1532,7 @@ async def claim_next_run(
     claimed under SKIP LOCKED, so offering it to N pools cannot produce N
     claims. The winning pool is written back to `run.pool_id` below.
     """
+    await ha_role.ensure_leader("dispatch runs")
     # Try queued runs first (plan phase), then confirmed runs (apply phase)
     for target_status, phase, next_status in [
         ("queued", "plan", "planning"),

@@ -45,7 +45,7 @@ from terrapod.auth import capabilities as cap
 from terrapod.auth.capabilities import has_capability
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
-from terrapod.services import agent_pool_service
+from terrapod.services import agent_pool_service, ha_role
 from terrapod.services.pool_rbac_service import (
     fetch_custom_roles,
     resolve_pool_capabilities_for,
@@ -532,6 +532,7 @@ async def join_listener(
 
     No Bearer auth — the join token in the body IS the credential.
     """
+    await ha_role.ensure_leader("enrol listeners")
     pool = await _get_pool(pool_id, db)
 
     join_token = body.get("join_token", "")
@@ -574,6 +575,7 @@ async def join_listener_by_token(
     The token identifies the pool — no pool ID needed in the URL.
     No Bearer auth — the join token in the body IS the credential.
     """
+    await ha_role.ensure_leader("enrol listeners")
     join_token = body.get("join_token", "")
     name = body.get("name", "")
 

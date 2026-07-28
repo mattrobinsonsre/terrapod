@@ -67,7 +67,10 @@ from terrapod.db.models import (
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services import agent_pool_service as _agent_pool_service
-from terrapod.services import pool_set
+from terrapod.services import (
+    ha_role,  # noqa: F401
+    pool_set,
+)
 from terrapod.services.pool_rbac_service import resolve_pool_capabilities_for
 from terrapod.services.workspace_rbac_service import (
     resolve_workspace_capabilities_for,
@@ -2167,6 +2170,7 @@ async def create_state_version(
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """Create a new state version. Requires write permission."""
+    await ha_role.ensure_leader("accept state versions")
     ws, _ = await _require_ws_capability(workspace_id, cap.STATE_WRITE, user, db)
 
     body = await request.json()
@@ -2414,6 +2418,7 @@ async def lock_workspace(
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """Lock a workspace. Requires plan permission."""
+    await ha_role.ensure_leader("lock workspaces")
     ws, caps = await _require_ws_capability(workspace_id, cap.WORKSPACE_LOCK, user, db)
 
     # Parse lock info from request body
@@ -2454,6 +2459,7 @@ async def unlock_workspace(
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """Unlock a workspace. Plan for own lock, admin for force-unlock."""
+    await ha_role.ensure_leader("unlock workspaces")
     ws = await _get_workspace_by_id(workspace_id, db)
     caps = await resolve_workspace_capabilities_for(db, user, ws)
 
@@ -2498,6 +2504,7 @@ async def force_unlock_workspace(
     a CLI operation crashed mid-run), so it does NOT require the client's lock
     ID to match and is gated on the workspace:force-unlock capability (#662).
     """
+    await ha_role.ensure_leader("unlock workspaces")
     ws = await _get_workspace_by_id(workspace_id, db)
     caps = await resolve_workspace_capabilities_for(db, user, ws)
 
