@@ -83,8 +83,15 @@ whether you are the leader is not a licence to act like one.
 
 A follower refuses to originate change:
 
-- **Writes are refused at the service layer** — creating, queueing, confirming,
-  discarding, or transitioning a run, and handing work to a listener.
+- **Every mutating request is refused, by default.** `POST`, `PUT`, `PATCH` and
+  `DELETE` return `503` on a follower unless the path is on a small allow-list
+  (below). This is a single chokepoint rather than a guard per endpoint, so a
+  surface added later is covered without anyone remembering to cover it.
+- **Writes are refused at the service layer too** — creating, queueing,
+  confirming, discarding, or transitioning a run, and handing work to a
+  listener. The service-layer guards are not redundant: the scheduler and the
+  triggered-task consumer write without an HTTP request anywhere in sight, and
+  no request-level gate can see them.
 - **Scheduled work does not run.** This is not merely an optimisation: letting
   `vcs_poll` run and fail at the last step would still burn the installation's
   VCS API quota every cycle, advance its own poll cursor, and record a spurious
@@ -95,6 +102,31 @@ make the role permanently sticky, so a follower could never discover it has been
 promoted), encryption-key refresh (a follower that stops propagating rotated
 keys cannot decrypt anything written afterwards, and finds out at promotion —
 during the incident), and the two replication tasks.
+
+**Refusing is kinder than allowing.** Replication flows leader → follower only,
+so a change made on a follower is not a change that goes anywhere: the next
+backfill reconciles against the leader and the row is silently reverted. The
+operator would watch the write succeed and then watch it disappear. A `503` —
+well-formed request, authorised caller, wrong node — says what is actually true.
+
+### What a follower still accepts
+
+Only what **records or reduces access on this node**, never what changes
+platform state:
+
+| Path | Why |
+|---|---|
+| `POST /auth/local/authorize`, `/auth/local/login`, `/auth/saml/acs`, `/auth/token` | An operator has to open the standby's UI and read its HA status *before* deciding to move DNS. Sessions live in this node's own Redis; the only Postgres side effect is `last_login_at` |
+| `POST /auth/logout`, `/auth/logout/all`, `DELETE /auth/sessions/user/{email}` | Node-local, and they only ever remove access |
+
+`POST /oauth/token` is deliberately **not** on that list. The `terraform login`
+flow mints an API token, and API tokens are replicated — so a token minted on a
+follower is erased at the next reconciliation. Handing out a credential that
+later vanishes is worse than refusing it. Point `terraform login` at the shared
+name.
+
+On a single node none of this is reachable: `role: leader` is the default, the
+check is a configuration read with no I/O, and it always passes.
 
 ## The peer link
 

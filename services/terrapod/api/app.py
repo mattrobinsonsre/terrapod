@@ -584,6 +584,15 @@ def create_application() -> FastAPI:
     async def custom_redoc() -> HTMLResponse:
         return HTMLResponse(_REDOC_HTML)
 
+    # Follower write gate (#1130). Registered FIRST, which makes it the
+    # innermost user middleware: a refusal still passes back out through the
+    # audit log, the security headers and the metrics counter on its way to the
+    # client. Under the shipped `role: leader` default it is a config read that
+    # always passes.
+    from terrapod.api.follower_gate import follower_write_gate
+
+    app.middleware("http")(follower_write_gate)
+
     # Rate limiting middleware (before metrics so 429 responses are counted)
     if settings.rate_limit.enabled:
         from terrapod.api.rate_limit import RateLimitMiddleware
