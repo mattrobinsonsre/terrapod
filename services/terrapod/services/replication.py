@@ -25,6 +25,8 @@ authenticated peer link as plaintext, and is re-encrypted under the receiving
 node's own key on write. Neither node needs the other's key.
 """
 
+import base64
+import json
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -33,7 +35,7 @@ from decimal import Decimal
 from typing import Any
 
 import structlog
-from sqlalchemy import delete, select
+from sqlalchemy import and_, delete, or_, select, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
@@ -68,7 +70,11 @@ class ReplicatedClass:
 
     name: str
     model: type
-    pk_attr: str = "id"
+    #: Primary-key columns, in order. A tuple because several replicated
+    #: classes are junction tables — role assignments are keyed by
+    #: (provider_name, email), and a promoted node with users and roles but no
+    #: mapping between them has nobody with any permissions (#1119).
+    pk_attrs: tuple[str, ...] = ("id",)
     #: Columns never sent (server-managed, or meaningless on the other node).
     exclude: frozenset[str] = frozenset()
     #: Counters that may only ever increase.
@@ -129,6 +135,76 @@ def get(name: str) -> ReplicatedClass | None:
 
 
 # --------------------------------------------------------------------------
+# Entity ids
+# --------------------------------------------------------------------------
+
+
+def encode_entity_id(spec: ReplicatedClass, values: list[Any]) -> str:
+    """Render a row's key as one string.
+
+    Single-key classes keep their plain id — unchanged on the wire and in the
+    outbox, so nothing already written needs re-encoding.
+
+    Composite keys are base64url(JSON), which survives the outbox column, a URL
+    path segment, and a set comparison without escaping. Naive concatenation
+    would not: an email or provider name can contain almost any separator, so
+    two distinct assignments could alias to the same id and one would silently
+    overwrite the other.
+    """
+    if len(spec.pk_attrs) == 1:
+        return str(values[0])
+    raw = json.dumps([str(v) for v in values], separators=(",", ":")).encode()
+    return base64.urlsafe_b64encode(raw).decode().rstrip("=")
+
+
+def decode_entity_id(spec: ReplicatedClass, entity_id: str) -> list[str] | None:
+    """Recover the key components, or None if the id is unusable."""
+    if len(spec.pk_attrs) == 1:
+        return [entity_id]
+    try:
+        padded = entity_id + "=" * (-len(entity_id) % 4)
+        parts = json.loads(base64.urlsafe_b64decode(padded.encode()))
+    except (ValueError, TypeError):
+        return None
+    if not isinstance(parts, list) or len(parts) != len(spec.pk_attrs):
+        return None
+    return [str(p) for p in parts]
+
+
+def _pk_columns(spec: ReplicatedClass) -> list[Any]:
+    return [getattr(spec.model, name) for name in spec.pk_attrs]
+
+
+def _coerce_pk(column: Any, raw: str) -> Any:
+    """Turn one wire key component into the column's native type."""
+    if column.expression.type.python_type is uuid.UUID:
+        return uuid.UUID(raw)
+    return raw
+
+
+def _pk_filter(spec: ReplicatedClass, parts: list[str]) -> Any:
+    """An AND over every key component."""
+    conditions = [
+        col == _coerce_pk(col, part) for col, part in zip(_pk_columns(spec), parts, strict=True)
+    ]
+    return and_(*conditions)
+
+
+def row_entity_id(spec: ReplicatedClass, obj: Any) -> str | None:
+    values = [getattr(obj, name, None) for name in spec.pk_attrs]
+    if any(v is None for v in values):
+        return None
+    return encode_entity_id(spec, values)
+
+
+def payload_entity_id(spec: ReplicatedClass, payload: dict) -> str | None:
+    values = [payload.get(name) for name in spec.pk_attrs]
+    if any(v is None for v in values):
+        return None
+    return encode_entity_id(spec, values)
+
+
+# --------------------------------------------------------------------------
 # Serialisation
 # --------------------------------------------------------------------------
 
@@ -184,13 +260,13 @@ def _coerce(spec: ReplicatedClass, payload: dict) -> dict:
 
 
 def _record(session: Session, spec: ReplicatedClass, obj: Any, op: str, origin: str) -> None:
-    entity_id = getattr(obj, spec.pk_attr, None)
+    entity_id = row_entity_id(spec, obj)
     if entity_id is None:
         return
     session.add(
         ReplicationEvent(
             entity_class=spec.name,
-            entity_id=str(entity_id),
+            entity_id=entity_id,
             op=op,
             occurred_at=datetime.now(UTC),
             origin_node=origin,
@@ -289,14 +365,13 @@ async def read_events(db: AsyncSession, after: int, limit: int = 500) -> EventPa
 
 async def read_entity(db: AsyncSession, spec: ReplicatedClass, entity_id: str) -> dict | None:
     """Fetch one row's current state, or None if it no longer exists."""
-    pk = getattr(spec.model, spec.pk_attr)
-    value: Any = entity_id
-    if pk.expression.type.python_type is uuid.UUID:
-        try:
-            value = uuid.UUID(entity_id)
-        except ValueError:
-            return None
-    obj = await db.scalar(select(spec.model).where(pk == value))
+    parts = decode_entity_id(spec, entity_id)
+    if parts is None:
+        return None
+    try:
+        obj = await db.scalar(select(spec.model).where(_pk_filter(spec, parts)))
+    except ValueError:
+        return None  # a component that will not coerce is not a row we have
     return serialize_row(spec, obj) if obj is not None else None
 
 
@@ -304,16 +379,20 @@ async def read_backfill(
     db: AsyncSession, spec: ReplicatedClass, after: str = "", limit: int = 200
 ) -> list[dict]:
     """A page of a class's rows, ordered by primary key so it is resumable."""
-    pk = getattr(spec.model, spec.pk_attr)
-    stmt = select(spec.model).order_by(pk).limit(limit)
+    cols = _pk_columns(spec)
+    stmt = select(spec.model).order_by(*cols).limit(limit)
     if after:
-        value: Any = after
-        if pk.expression.type.python_type is uuid.UUID:
-            try:
-                value = uuid.UUID(after)
-            except ValueError:
-                return []
-        stmt = stmt.where(pk > value)
+        parts = decode_entity_id(spec, after)
+        if parts is None:
+            return []
+        try:
+            values = [_coerce_pk(col, part) for col, part in zip(cols, parts, strict=True)]
+        except ValueError:
+            return []
+        # Row-value comparison so a composite key pages in the same order it is
+        # sorted by; comparing only the first column would skip or repeat rows
+        # that share it.
+        stmt = stmt.where(tuple_(*cols) > tuple_(*values) if len(cols) > 1 else cols[0] > values[0])
     rows = (await db.execute(stmt)).scalars().all()
     return [serialize_row(spec, r) for r in rows]
 
@@ -345,16 +424,15 @@ def _merge(spec: ReplicatedClass, existing: Any, values: dict) -> dict:
 async def apply_upsert(db: AsyncSession, spec: ReplicatedClass, payload: dict) -> None:
     """Insert or update a row from a peer, preserving its identity."""
     values = _coerce(spec, payload)
-    pk_value = values.get(spec.pk_attr)
-    if pk_value is None:
+    if any(values.get(name) is None for name in spec.pk_attrs):
         return
-    pk = getattr(spec.model, spec.pk_attr)
-    existing = await db.scalar(select(spec.model).where(pk == pk_value))
+    parts = [str(values[name]) for name in spec.pk_attrs]
+    existing = await db.scalar(select(spec.model).where(_pk_filter(spec, parts)))
     if existing is None:
         db.add(spec.model(**values))
         return
     for key, value in _merge(spec, existing, values).items():
-        if key != spec.pk_attr:
+        if key not in spec.pk_attrs:
             setattr(existing, key, value)
 
 
@@ -379,20 +457,22 @@ async def reconcile_deletions(
     Returns the ids removed. The caller MUST only invoke this after a complete,
     error-free pass: a truncated `seen_ids` would read as mass deletion.
     """
-    pk = getattr(spec.model, spec.pk_attr)
-    local = [str(row) for row in (await db.execute(select(pk))).scalars().all()]
+    cols = _pk_columns(spec)
+    rows = (await db.execute(select(*cols))).all()
+    local = {encode_entity_id(spec, list(row)): list(row) for row in rows}
     extra = [row_id for row_id in local if row_id not in seen_ids]
     if not extra:
         return []
 
-    # Delete by explicit id rather than a NOT IN over the whole set, so the
-    # statement size tracks what is being removed, not the size of the class.
+    # Delete by explicit key rather than a NOT IN over the whole class, so the
+    # statement size tracks what is being removed, not how much there is.
     for chunk_start in range(0, len(extra), _DELETE_CHUNK):
         chunk = extra[chunk_start : chunk_start + _DELETE_CHUNK]
-        values: list[Any] = chunk
-        if pk.expression.type.python_type is uuid.UUID:
-            values = [uuid.UUID(v) for v in chunk]
-        await db.execute(delete(spec.model).where(pk.in_(values)))
+        await db.execute(
+            delete(spec.model).where(
+                or_(*[_pk_filter(spec, [str(v) for v in local[row_id]]) for row_id in chunk])
+            )
+        )
 
     # This is the one place replication removes data that was never deleted
     # locally. It must never be silent — an operator failing back needs to see
@@ -408,14 +488,13 @@ async def reconcile_deletions(
 
 
 async def apply_delete(db: AsyncSession, spec: ReplicatedClass, entity_id: str) -> None:
-    pk = getattr(spec.model, spec.pk_attr)
-    value: Any = entity_id
-    if pk.expression.type.python_type is uuid.UUID:
-        try:
-            value = uuid.UUID(entity_id)
-        except ValueError:
-            return
-    await db.execute(delete(spec.model).where(pk == value))
+    parts = decode_entity_id(spec, entity_id)
+    if parts is None:
+        return
+    try:
+        await db.execute(delete(spec.model).where(_pk_filter(spec, parts)))
+    except ValueError:
+        return  # a component that will not coerce is not a row we have
 
 
 # --------------------------------------------------------------------------

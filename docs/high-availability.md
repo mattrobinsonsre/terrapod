@@ -161,9 +161,13 @@ key. Neither node holds the other's key.
 
 | Class | Status |
 |---|---|
-| Agent pools | Replicated |
-| Agent pool join tokens | Replicated |
-| Workspaces, variables, roles, VCS connections, policy sets, registry, users, the CA | In development |
+| Agent pools, join tokens | Replicated |
+| Users, roles, role assignments, platform role assignments, API tokens | Replicated |
+| Workspaces, variables, VCS connections, policy sets, registry, the CA | In development |
+
+Identity comes first deliberately. A node holding the whole estate but no users,
+roles or assignments has nobody able to touch it — and API tokens are the class
+where a missed deletion is a revoked credential that starts working again.
 
 Runs and state versions are a separate phase.
 
