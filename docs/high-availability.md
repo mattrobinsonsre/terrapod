@@ -176,7 +176,7 @@ where a missed deletion is a revoked credential that starts working again.
 Runs and state versions are a separate phase.
 
 Each class carries a full test matrix — backfill from empty, delta apply,
-idempotent re-apply, delete, role-change conflict, plus a monotonic-merge or
+idempotent re-apply, delete, deletion converging through a backfill, plus an
 encrypted-column row where the class has one. The required rows are derived from
 the class definition rather than declared, and CI fails until they exist. A class
 that is registered but not tested does not converge, and the symptom appears at a
