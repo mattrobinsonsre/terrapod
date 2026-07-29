@@ -165,9 +165,31 @@ class TestPeriodicTasksAreGated:
     """
 
     def test_only_self_maintenance_tasks_are_exempt(self):
+        """Pinned as an exact set: an exemption added casually is how a follower
+        starts originating change again."""
         from terrapod.services.scheduler import _FOLLOWER_SAFE_TASKS
 
-        assert _FOLLOWER_SAFE_TASKS == {"ha_probe", "encryption_key_refresh"}
+        assert _FOLLOWER_SAFE_TASKS == {
+            "ha_probe",
+            "encryption_key_refresh",
+            "replication_sync",
+            "replication_purge",
+        }
+
+    def test_the_pull_loop_is_exempt(self):
+        """Gating it would be self-defeating — converging with the leader is the
+        entire job of a follower, and one that stops replicating promotes with
+        stale settings."""
+        from terrapod.services.scheduler import _FOLLOWER_SAFE_TASKS
+
+        assert "replication_sync" in _FOLLOWER_SAFE_TASKS
+
+    def test_the_outbox_purge_is_exempt(self):
+        """A follower still records events (origin-tagged, so the pair cannot
+        echo), so without the purge its own outbox grows without bound."""
+        from terrapod.services.scheduler import _FOLLOWER_SAFE_TASKS
+
+        assert "replication_purge" in _FOLLOWER_SAFE_TASKS
 
     def test_the_probe_is_exempt(self):
         """Gating it would make the role permanently sticky — a follower could

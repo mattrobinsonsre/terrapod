@@ -59,3 +59,67 @@ class TestEffectiveProbeUrl:
     def test_falls_back_to_external(self):
         cfg = HAConfig(role="auto", node_name="a", probe_url={"external": "https://e"})
         assert cfg.effective_probe_url == "https://e"
+
+
+class TestReplicationConfig:
+    """Settings replication (#960 phase 3, #1110)."""
+
+    def test_off_by_default(self):
+        """Replication is meaningless without a peer, and the overwhelming
+        majority of installs are a single node."""
+        cfg = HAConfig()
+
+        assert cfg.replication.enabled is False
+        assert cfg.peer.url == ""
+
+    def test_enabling_without_a_peer_url_is_rejected(self):
+        """Enabled-but-unreachable looks configured while replicating nothing —
+        and the operator finds out at promotion."""
+        with pytest.raises(ValidationError, match="ha.peer.url"):
+            HAConfig(
+                node_name="a",
+                replication={"enabled": True},
+                peer={"client_id": "peer-b"},
+            )
+
+    def test_enabling_without_a_client_id_is_rejected(self):
+        with pytest.raises(ValidationError, match="ha.peer.client_id"):
+            HAConfig(
+                node_name="a",
+                replication={"enabled": True},
+                peer={"url": "https://peer.example"},
+            )
+
+    def test_enabling_without_a_node_name_is_rejected(self):
+        """Events are origin-tagged to stop the pair echoing changes back at
+        each other; an unnamed node cannot recognise its own."""
+        with pytest.raises(ValidationError, match="ha.node_name"):
+            HAConfig(
+                replication={"enabled": True},
+                peer={"url": "https://peer.example", "client_id": "peer-b"},
+            )
+
+    def test_a_complete_config_validates(self):
+        cfg = HAConfig(
+            node_name="node-b",
+            replication={"enabled": True},
+            peer={"url": "https://peer.example", "client_id": "peer-a"},
+        )
+
+        assert cfg.replication.enabled is True
+
+    def test_the_interval_has_a_floor(self):
+        """Guards against a hot loop hammering the peer."""
+        with pytest.raises(ValidationError):
+            HAConfig(replication={"interval_seconds": 1})
+
+    def test_retention_cannot_be_zero(self):
+        """A zero window would purge events the follower has not read yet, and
+        force a full backfill on every cycle."""
+        with pytest.raises(ValidationError):
+            HAConfig(replication={"retention_days": 0})
+
+    def test_the_secret_is_not_a_configmap_value(self):
+        """It is defaulted empty and supplied via env from a K8s Secret — the
+        chart must never render it into config.yaml."""
+        assert HAConfig().peer.client_secret == ""

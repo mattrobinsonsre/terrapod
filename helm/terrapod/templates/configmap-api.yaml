@@ -273,6 +273,20 @@ data:
         external: {{ .Values.api.config.ha.probe_url.external | default "" | quote }}
       probe_interval_seconds: {{ .Values.api.config.ha.probe_interval_seconds | default 60 }}
       probe_threshold: {{ .Values.api.config.ha.probe_threshold | default 3 }}
+      {{- with .Values.api.config.ha.peer }}
+      peer:
+        url: {{ .url | default "" | quote }}
+        client_id: {{ .client_id | default "" | quote }}
+        {{- /* client_secret is deliberately absent: it arrives as
+               TERRAPOD_HA__PEER__CLIENT_SECRET from a Secret, never a ConfigMap. */}}
+      {{- end }}
+      {{- with .Values.api.config.ha.replication }}
+      replication:
+        enabled: {{ .enabled | default false }}
+        interval_seconds: {{ .interval_seconds | default 60 }}
+        batch_size: {{ .batch_size | default 500 }}
+        retention_days: {{ .retention_days | default 7 }}
+      {{- end }}
     {{- end }}
     {{- if .Values.api.config.vcs }}
     vcs:
