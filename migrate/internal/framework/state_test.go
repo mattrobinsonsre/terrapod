@@ -59,7 +59,11 @@ func TestRoundTrip_PreservesEverything(t *testing.T) {
 		t.Fatalf("Load: %v", err)
 	}
 	if out == nil {
+		// The explicit return is for staticcheck (SA5011): it cannot prove
+		// t.Fatal does not return, so every dereference below reads as a
+		// possible nil deref without it.
 		t.Fatal("Load returned nil after a successful Save")
+		return
 	}
 	// Spot-check rather than DeepEqual — timestamps are set by Save
 	// and won't match the zero-valued input.
