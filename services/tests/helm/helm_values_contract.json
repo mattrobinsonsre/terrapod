@@ -109,6 +109,7 @@
   "api.config.ha.component_status.instance",
   "api.config.ha.component_status.interval_seconds",
   "api.config.ha.component_status.namespace",
+  "api.config.ha.component_status.read_nodes",
   "api.config.ha.node_name",
   "api.config.ha.peer.client_id",
   "api.config.ha.peer.existingSecret",

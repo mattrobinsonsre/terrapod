@@ -30,6 +30,9 @@ rules:
   - apiGroups: ["apps"]
     resources: ["deployments"]
     verbs: ["get", "list"]
+  - apiGroups: ["policy"]
+    resources: ["poddisruptionbudgets"]
+    verbs: ["get", "list"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -42,6 +45,51 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
   name: {{ include "terrapod.fullname" . }}-component-status
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "terrapod.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+{{- end }}
+{{- end }}
+{{- /*
+Cluster-scoped node read (#1128), on by default, `read_nodes: false` to decline.
+
+Zone labels live on Nodes, so telling an AVOIDABLE concentration from an
+inevitable one needs cluster scope — a single-node k3s cluster puts every
+replica on one node necessarily, and reporting that as a gap would be a false
+finding.
+
+It is cluster-scoped but read-only, and among the least sensitive such reads:
+node names, labels and conditions. No secrets, no workloads from other
+namespaces. Declining it does not disable placement reporting — node
+concentration is still found wherever Terrapod's own pods prove more than one
+node exists; only zone spread goes unknown, because those labels live solely
+on Nodes.
+*/ -}}
+{{- if and .Values.api.enabled (.Values.api.config.ha).component_status }}
+{{- if and (.Values.api.config.ha).component_status.enabled (.Values.api.config.ha).component_status.read_nodes }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "terrapod.fullname" . }}-node-reader
+  labels:
+    {{- include "terrapod.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "terrapod.fullname" . }}-node-reader
+  labels:
+    {{- include "terrapod.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "terrapod.fullname" . }}-node-reader
 subjects:
   - kind: ServiceAccount
     name: {{ include "terrapod.serviceAccountName" . }}

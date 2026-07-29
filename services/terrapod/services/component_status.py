@@ -29,7 +29,7 @@ all visible from a pod list.
 
 import asyncio
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 
 import structlog
 
@@ -53,16 +53,46 @@ _NAMESPACE_FILE = "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
 
 @dataclass
 class ComponentReplicas:
-    """One component's readiness.
+    """One component's readiness and placement.
 
     ``desired`` comes from the Deployment rather than being inferred from the
     pod list — that is what makes `1/3` legible as an incident rather than as a
     deliberately small deployment.
+
+    ``nodes`` and ``zones`` are **observations**, never judgements. Three
+    replicas on one node is inevitable on a single-node cluster and a real gap
+    on a four-node one; which it is depends on the cluster, so the finding is
+    raised elsewhere and only when the spread was actually achievable.
+    ``zones`` is None when node labels are not readable.
     """
 
     name: str
     ready: int = 0
     desired: int = 0
+    #: Distinct nodes hosting this component's ready pods.
+    nodes: int = 0
+    #: Distinct zones, or None when node labels are not readable.
+    zones: int | None = None
+    #: Name of the PodDisruptionBudget covering it, or "" if none.
+    pdb: str = ""
+    #: Whether that PDB actually permits a voluntary eviction. A budget that
+    #: permits none looks protective and is the opposite — it blocks node
+    #: drains rather than making them safe.
+    pdb_permits_disruption: bool | None = None
+
+
+@dataclass
+class Finding:
+    """A specific, actionable gap — never a verdict on the deployment.
+
+    Only raised where the cluster could have done better. "Every replica on one
+    node" is not a finding on a one-node cluster, and "one zone" is not a
+    finding where there is one zone.
+    """
+
+    component: str
+    kind: str
+    detail: str
 
 
 @dataclass
@@ -73,6 +103,12 @@ class ComponentStatus:
     #: was missing.
     components: list[ComponentReplicas] | None = None
     sampled_at: str | None = None
+    #: Cluster shape, and the reason findings can be raised at all. None means
+    #: node reads were declined — in which case concentration is reported but
+    #: never called a problem, because we cannot know it was avoidable.
+    schedulable_nodes: int | None = None
+    cluster_zones: int | None = None
+    findings: list[Finding] = field(default_factory=list)
     #: Set when the Role is absent. Not an error — an operator may decline the
     #: permission, and the honest answer is then "unknown".
     unavailable_reason: str = ""
@@ -94,9 +130,98 @@ def _namespace() -> str:
         return ""
 
 
-def _sample_blocking(namespace: str, instance: str) -> list[ComponentReplicas]:
-    """Read pod readiness and Deployment intent. Synchronous — see the module
-    docstring; the caller offloads it."""
+def _observed_nodes(core, namespace: str, instance: str) -> int:
+    """Distinct nodes hosting ANY pod we can already see in this namespace.
+
+    The fallback when cluster-scoped node reads are declined, and safe because
+    it is **asymmetric**: seeing two nodes PROVES spread was possible; seeing
+    one proves nothing, because every pod may simply have landed together.
+
+    That asymmetry points the right way — proof is only needed to *raise* a
+    finding, never to suppress one. It under-reports (a four-node cluster whose
+    pods all happen to sit on one node yields nothing) and never false-reports,
+    which is the trade this whole feature is built around.
+    """
+    selector = f"app.kubernetes.io/instance={instance}" if instance else None
+    try:
+        pods = core.list_namespaced_pod(namespace, label_selector=selector)
+    except Exception:  # noqa: BLE001
+        return 0
+    return len({p.spec.node_name for p in pods.items if p.spec and p.spec.node_name})
+
+
+def _read_cluster_shape(core) -> tuple[int | None, int | None, dict[str, str]]:
+    """Schedulable nodes, distinct zones, and a node -> zone map.
+
+    Returns ``(None, None, {})`` when node reads are declined — deliberately
+    distinct from ``(1, 1, ...)``. Not knowing the cluster's shape means no
+    concentration finding can be raised, because we cannot tell an inevitable
+    single node from an avoidable one.
+    """
+    if not settings.ha.component_status.read_nodes:
+        return None, None, {}
+    try:
+        nodes = core.list_node()
+    except Exception:  # noqa: BLE001 — a declined ClusterRole is a normal answer
+        return None, None, {}
+
+    zone_of: dict[str, str] = {}
+    schedulable = 0
+    for node in nodes.items:
+        # An unschedulable node cannot host a replica, so counting it would
+        # invent spread that was never available.
+        if (node.spec and node.spec.unschedulable) or False:
+            continue
+        schedulable += 1
+        labels = node.metadata.labels or {}
+        zone = labels.get("topology.kubernetes.io/zone") or labels.get(
+            "failure-domain.beta.kubernetes.io/zone"
+        )
+        if zone:
+            zone_of[node.metadata.name] = zone
+
+    # None and 1 mean genuinely different things and must not be conflated:
+    #
+    #   None -> no node carries a zone label. Bare metal, on-prem, an unzoned
+    #           environment. Nothing can be said about zone redundancy, so
+    #           nothing is.
+    #   1    -> labels ARE present and every node reports the same zone. That
+    #           is a zoned environment with the whole cluster in one AZ, which
+    #           is worth saying even though no scheduling choice fixes it.
+    zones = set(zone_of.values())
+    return schedulable, (len(zones) if zones else None), zone_of
+
+
+def _pdb_permits_disruption(pdb, ready: int) -> bool:
+    """Whether a voluntary eviction is possible under this budget.
+
+    `status.disruptionsAllowed` is the cluster's own answer and is preferred.
+    Falling back to the spec matters because the status is briefly absent on a
+    freshly created PDB, and reporting "blocks eviction" for a few seconds
+    after every deploy would be noise.
+    """
+    allowed = getattr(pdb.status, "disruptions_allowed", None) if pdb.status else None
+    if allowed is not None:
+        return allowed > 0
+
+    spec = pdb.spec
+    if spec.max_unavailable is not None:
+        return str(spec.max_unavailable) not in ("0", "0%")
+    if spec.min_available is not None and ready:
+        raw = str(spec.min_available)
+        if raw.endswith("%"):
+            return int(raw[:-1]) < 100
+        return int(raw) < ready
+    return True
+
+
+def _sample_blocking(
+    namespace: str, instance: str
+) -> tuple[list[ComponentReplicas], int | None, int | None]:
+    """Read pod readiness, Deployment intent, PDB coverage and placement.
+
+    Synchronous — see the module docstring; the caller offloads it.
+    """
     from kubernetes import client, config
 
     try:
@@ -106,6 +231,22 @@ def _sample_blocking(namespace: str, instance: str) -> list[ComponentReplicas]:
 
     core = client.CoreV1Api()
     apps = client.AppsV1Api()
+    policy = client.PolicyV1Api()
+
+    schedulable_nodes, cluster_zones, zone_of = _read_cluster_shape(core)
+    if schedulable_nodes is None:
+        # Node reads declined. Fall back to what our own pods prove — see
+        # `_observed_nodes`. Zones have no equivalent: the labels live only on
+        # Nodes, so zone spread stays genuinely unknown.
+        observed = _observed_nodes(core, namespace, instance)
+        if observed > 1:
+            schedulable_nodes = observed
+
+    try:
+        budgets = policy.list_namespaced_pod_disruption_budget(namespace).items
+    except Exception:  # noqa: BLE001 — reported as "no PDB visible", not an error
+        budgets = []
+
     out: list[ComponentReplicas] = []
 
     for component in COMPONENTS:
@@ -114,21 +255,133 @@ def _sample_blocking(namespace: str, instance: str) -> list[ComponentReplicas]:
             selector += f",app.kubernetes.io/instance={instance}"
 
         pods = core.list_namespaced_pod(namespace, label_selector=selector)
-        ready = sum(
-            1
+        ready_pods = [
+            pod
             for pod in pods.items
             if any(c.type == "Ready" and c.status == "True" for c in (pod.status.conditions or []))
-        )
+        ]
 
         deployments = apps.list_namespaced_deployment(namespace, label_selector=selector)
         desired = sum(d.spec.replicas or 0 for d in deployments.items)
 
-        # A component with no Deployment is not deployed at all (web can be
-        # disabled). Reporting 0/0 says that plainly; omitting it would look
-        # like a gap in the sample.
-        out.append(ComponentReplicas(name=component, ready=ready, desired=desired))
+        node_names = {p.spec.node_name for p in ready_pods if p.spec and p.spec.node_name}
+        zones = len({zone_of[n] for n in node_names if n in zone_of}) or None if zone_of else None
 
-    return out
+        # Match a PDB by its selector against this component's label, rather
+        # than by name — an operator's own PDB is as valid as the chart's.
+        covering = next(
+            (
+                b
+                for b in budgets
+                if (b.spec.selector.match_labels or {}).get("app.kubernetes.io/component")
+                == component
+            ),
+            None,
+        )
+
+        out.append(
+            ComponentReplicas(
+                name=component,
+                ready=len(ready_pods),
+                desired=desired,
+                nodes=len(node_names),
+                zones=zones,
+                pdb=covering.metadata.name if covering else "",
+                pdb_permits_disruption=(
+                    _pdb_permits_disruption(covering, len(ready_pods)) if covering else None
+                ),
+            )
+        )
+
+    return out, schedulable_nodes, cluster_zones
+
+
+def derive_findings(
+    components: list[ComponentReplicas],
+    schedulable_nodes: int | None,
+    cluster_zones: int | None,
+) -> list[Finding]:
+    """Raise a finding only where the cluster could have done better.
+
+    This is the whole safety property. A single-node k3s or kind cluster puts
+    every replica on one node necessarily; an on-prem or single-AZ deployment
+    cannot spread across zones. Reporting either would be a false finding, and
+    false findings in an HA readout are worse than silence — they teach an
+    operator to ignore it.
+    """
+    findings: list[Finding] = []
+
+    # Cluster-level, and distinct from any component's placement. A zoned
+    # environment whose every node sits in one availability zone is not
+    # something Terrapod can schedule around — but it IS a real gap in the
+    # deployment, and the zone labels are what make it safe to say. With no
+    # labels at all (`cluster_zones is None`) the environment is unzoned and
+    # nothing is claimed.
+    if cluster_zones == 1:
+        findings.append(
+            Finding(
+                component="cluster",
+                kind="single-zone-cluster",
+                detail=(
+                    "every node reports the same availability zone — the cluster itself "
+                    "is not zone-redundant, so no placement of replicas can survive "
+                    "losing that zone"
+                ),
+            )
+        )
+
+    for c in components:
+        if c.ready <= 1:
+            # A single-replica component is already reported through
+            # `single-replica-components`; piling on adds noise, not signal.
+            continue
+
+        if not c.pdb:
+            findings.append(
+                Finding(
+                    component=c.name,
+                    kind="no-pdb",
+                    detail=(
+                        f"{c.ready} replicas with no PodDisruptionBudget — "
+                        "a node drain can evict all of them at once"
+                    ),
+                )
+            )
+        elif c.pdb_permits_disruption is False:
+            findings.append(
+                Finding(
+                    component=c.name,
+                    kind="pdb-blocks-eviction",
+                    detail=(
+                        f"PodDisruptionBudget {c.pdb} permits no voluntary eviction, "
+                        "so a node drain will stall rather than proceed safely"
+                    ),
+                )
+            )
+
+        # Concentration is only a finding when spread was available.
+        if schedulable_nodes is not None and schedulable_nodes > 1 and c.nodes == 1:
+            findings.append(
+                Finding(
+                    component=c.name,
+                    kind="node-concentration",
+                    detail=(
+                        f"{c.ready} replicas on 1 node, with at least {schedulable_nodes} "
+                        "available — losing that node loses the component"
+                    ),
+                )
+            )
+
+        if cluster_zones is not None and cluster_zones > 1 and c.zones == 1:
+            findings.append(
+                Finding(
+                    component=c.name,
+                    kind="zone-concentration",
+                    detail=(f"{c.ready} replicas in 1 zone, with {cluster_zones} available"),
+                )
+            )
+
+    return findings
 
 
 async def sample() -> ComponentStatus:
@@ -140,7 +393,7 @@ async def sample() -> ComponentStatus:
         return ComponentStatus(unavailable_reason="not running in a Kubernetes namespace")
 
     try:
-        components = await asyncio.to_thread(
+        components, schedulable_nodes, cluster_zones = await asyncio.to_thread(
             _sample_blocking, namespace, settings.ha.component_status.instance
         )
     except Exception as exc:  # noqa: BLE001 — a missing Role is a normal answer
@@ -152,6 +405,9 @@ async def sample() -> ComponentStatus:
     status = ComponentStatus(
         components=components,
         sampled_at=datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+        schedulable_nodes=schedulable_nodes,
+        cluster_zones=cluster_zones,
+        findings=derive_findings(components, schedulable_nodes, cluster_zones),
     )
     await _store(status)
     return status
@@ -186,6 +442,9 @@ async def read() -> ComponentStatus:
         components=[ComponentReplicas(**c) for c in comps] if comps is not None else None,
         sampled_at=data.get("sampled_at"),
         unavailable_reason=data.get("unavailable_reason", ""),
+        schedulable_nodes=data.get("schedulable_nodes"),
+        cluster_zones=data.get("cluster_zones"),
+        findings=[Finding(**f) for f in data.get("findings", [])],
     )
 
 
@@ -209,6 +468,8 @@ __all__ = [
     "COMPONENTS",
     "ComponentReplicas",
     "ComponentStatus",
+    "Finding",
+    "derive_findings",
     "read",
     "sample",
     "sample_cycle",

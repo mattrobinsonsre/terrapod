@@ -180,6 +180,7 @@
   "ha.component_status.instance",
   "ha.component_status.interval_seconds",
   "ha.component_status.namespace",
+  "ha.component_status.read_nodes",
   "ha.node_name",
   "ha.peer.client_id",
   "ha.peer.client_secret",
