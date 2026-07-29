@@ -109,10 +109,13 @@ async def backfill(
     if spec is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown entity class")
     rows = await replication.read_backfill(db, spec, after=after, limit=limit)
-    last = str(rows[-1][spec.pk_attr]) if rows else after
+    ids = [replication.payload_entity_id(spec, row) for row in rows]
     return {
         "data": [
-            {"type": entity_class, "id": str(row[spec.pk_attr]), "attributes": row} for row in rows
+            {"type": entity_class, "id": row_id, "attributes": row}
+            for row_id, row in zip(ids, rows, strict=True)
         ],
-        "meta": {"cursor": last, "complete": len(rows) < limit},
+        # The resume point is the last row's full key, so a composite class
+        # pages in the same order it is sorted by.
+        "meta": {"cursor": ids[-1] if ids else after, "complete": len(rows) < limit},
     }

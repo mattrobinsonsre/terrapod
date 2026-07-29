@@ -20,7 +20,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from terrapod.db.models import AgentPool, AgentPoolToken, ReplicationEvent
+from terrapod.db.models import (
+    AgentPool,
+    AgentPoolToken,
+    PlatformRoleAssignment,
+    ReplicationEvent,
+)
 from terrapod.services import replication, replication_registry
 
 POOLS = replication_registry.AGENT_POOLS
@@ -541,9 +546,11 @@ class TestBackfillConvergesDeletion:
     """
 
     async def _db_with_local_ids(self, ids):
+        """`select(*pk_columns)` yields key tuples, not scalars — composite
+        classes have more than one component per row."""
         db = AsyncMock()
         result = MagicMock()
-        result.scalars.return_value.all.return_value = ids
+        result.all.return_value = [(i,) for i in ids]
         db.execute.return_value = result
         return db
 
@@ -587,3 +594,116 @@ class TestBackfillConvergesDeletion:
         removed = await replication.reconcile_deletions(db, POOLS, set())
 
         assert len(removed) == 2
+
+
+class TestCompositePrimaryKeys:
+    """Junction tables key on more than one column (#1119).
+
+    Role assignments are keyed by (provider_name, email); a promoted node with
+    users and roles but no mapping between them has nobody with any
+    permissions, so these classes are not deferrable.
+    """
+
+    COMPOSITE = replication.ReplicatedClass(
+        name="_test_composite",
+        model=PlatformRoleAssignment,
+        pk_attrs=("provider_name", "email", "role_name"),
+    )
+
+    def test_a_single_key_class_keeps_its_plain_id(self):
+        """Unchanged on the wire and in the outbox — nothing already written
+        needs re-encoding."""
+        row_id = uuid.uuid4()
+
+        assert replication.encode_entity_id(POOLS, [row_id]) == str(row_id)
+
+    def test_a_composite_id_round_trips(self):
+        parts = ["local", "a@example.com", "admin"]
+
+        encoded = replication.encode_entity_id(self.COMPOSITE, parts)
+        assert replication.decode_entity_id(self.COMPOSITE, encoded) == parts
+
+    def test_components_that_would_collide_stay_distinct(self):
+        """The reason the encoding is not naive concatenation: a separator can
+        appear inside a component, and two distinct assignments aliasing to one
+        id means a silent overwrite."""
+        a = replication.encode_entity_id(self.COMPOSITE, ["local", "x:y", "admin"])
+        b = replication.encode_entity_id(self.COMPOSITE, ["local:x", "y", "admin"])
+
+        assert a != b
+        assert replication.decode_entity_id(self.COMPOSITE, a) == ["local", "x:y", "admin"]
+        assert replication.decode_entity_id(self.COMPOSITE, b) == ["local:x", "y", "admin"]
+
+    def test_an_id_is_url_path_safe(self):
+        """It travels as a path segment on the entity endpoint."""
+        encoded = replication.encode_entity_id(
+            self.COMPOSITE, ["local", "a+b/c@example.com", "ad min"]
+        )
+
+        assert all(ch.isalnum() or ch in "-_" for ch in encoded), encoded
+
+    def test_a_malformed_composite_id_decodes_to_none(self):
+        """A peer sending nonsense must not wedge the stream."""
+        assert replication.decode_entity_id(self.COMPOSITE, "not-base64!!") is None
+
+    def test_the_wrong_component_count_decodes_to_none(self):
+        """A skewed peer with a different key shape must be refused, not
+        applied against a mismatched filter."""
+        two_parts = replication.encode_entity_id(
+            replication.ReplicatedClass(
+                name="_two", model=PlatformRoleAssignment, pk_attrs=("provider_name", "email")
+            ),
+            ["local", "a@example.com"],
+        )
+
+        assert replication.decode_entity_id(self.COMPOSITE, two_parts) is None
+
+    def test_the_outbox_records_the_full_key(self):
+        session = MagicMock()
+        row = PlatformRoleAssignment(
+            provider_name="local", email="a@example.com", role_name="admin"
+        )
+
+        replication._record(session, self.COMPOSITE, row, replication.UPSERT, "node-a")
+
+        event = session.add.call_args[0][0]
+        assert replication.decode_entity_id(self.COMPOSITE, event.entity_id) == [
+            "local",
+            "a@example.com",
+            "admin",
+        ]
+
+    def test_a_row_missing_a_component_records_nothing(self):
+        session = MagicMock()
+        row = PlatformRoleAssignment(provider_name="local", email=None, role_name="admin")
+
+        replication._record(session, self.COMPOSITE, row, replication.UPSERT, "node-a")
+
+        session.add.assert_not_called()
+
+    async def test_upsert_matches_on_every_component(self):
+        """Filtering on only the first would update the wrong assignment."""
+        db = AsyncMock()
+        db.scalar.return_value = None
+
+        await replication.apply_upsert(
+            db,
+            self.COMPOSITE,
+            {"provider_name": "local", "email": "a@example.com", "role_name": "admin"},
+        )
+
+        added = db.add.call_args[0][0]
+        assert (added.provider_name, added.email, added.role_name) == (
+            "local",
+            "a@example.com",
+            "admin",
+        )
+
+    async def test_upsert_skips_a_payload_missing_a_component(self):
+        db = AsyncMock()
+
+        await replication.apply_upsert(
+            db, self.COMPOSITE, {"provider_name": "local", "role_name": "admin"}
+        )
+
+        db.add.assert_not_called()
