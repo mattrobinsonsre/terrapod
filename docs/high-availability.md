@@ -135,6 +135,19 @@ unbounded growth and blocking on a dead peer.
 Backfill is also the *ordinary* path, not an error path: adding a second node to
 a running install has no deltas at all.
 
+A complete backfill also **removes rows the peer no longer has**. That is not
+tidiness — without it a deletion can never converge through the recovery path,
+and the concrete failure is a revoked API token surviving on the follower and
+working again after a failover. It is safe because everything replicated
+originates on the leader and a follower originates nothing, so a row the
+follower holds and the leader does not is a row the leader deleted.
+
+It only happens on a complete, error-free pass, and every removal is logged. A
+node that has just stopped being the leader may hold writes from the moments
+before cutover that never replicated; those are lost either way under
+asynchronous replication, but the log is what lets an operator see exactly what
+was discarded to reach convergence.
+
 **Encryption is per-node.** Values are decrypted by the sender, cross the
 authenticated peer link, and are re-encrypted under the receiving node's own
 key. Neither node holds the other's key.
