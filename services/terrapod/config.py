@@ -1246,6 +1246,16 @@ class ComponentStatusConfig(BaseModel):
     interval_seconds: int = Field(
         default=60, ge=15, description="Seconds between samples (floor guards the cluster API)"
     )
+    read_nodes: bool = Field(
+        default=True,
+        description=(
+            "Read cluster Nodes to tell an avoidable single-node/single-zone concentration "
+            "from an inevitable one. Cluster-scoped but read-only and among the least "
+            "sensitive such reads. Turn off for a locked-down install: node concentration is "
+            "then still found where our own pods prove more than one node exists, and only "
+            "zone spread goes unknown."
+        ),
+    )
     namespace: str = Field(
         default="", description="Override the namespace; defaults to this pod's own"
     )

@@ -242,6 +242,7 @@ from one API pod. The same status endpoint reports in-cluster readiness:
 |---|---|
 | `components` | Ready **and desired** replicas per component. Desired comes from the Deployment — without it, `1` cannot be told apart from `1 of 3, mid-incident` |
 | `single-replica-components` | Components on exactly one ready replica, named directly |
+| `ha-findings` | Specific, named gaps — see below. An **empty list means nothing avoidable was found**, not that nothing was checked |
 | `components-unavailable-reason` | Set when the API could not read its namespace |
 
 **API and web come from Kubernetes; listeners do not.** A listener may be in a
@@ -258,8 +259,42 @@ empty `components` with a reason set means *"I cannot see"*, never *"nothing is
 running"*.
 
 It reports **readiness, not a verdict**. "2 of 3 API replicas ready" is a fact;
-"HA is configured correctly" is not something a pod list can support, since
-PodDisruptionBudgets, anti-affinity and topology spread are chart-level.
+"HA is configured correctly" is not — so the endpoint never claims it. What it
+does claim is specific, named gaps.
+
+### Findings: disruption budgets and placement
+
+Replica counts alone miss the two ways a well-replicated component still dies as
+one: a node drain that evicts every replica at once, and every replica sitting on
+one node or in one zone. Both are reported as `ha-findings`:
+
+| `kind` | What it means |
+|---|---|
+| `no-pdb` | The component has several replicas and no PodDisruptionBudget, so a node drain can take all of them together |
+| `pdb-blocks-eviction` | The *opposite* trap, and the easier one to miss: a PDB that permits **no** voluntary eviction. Nothing is evicted, so a node drain stalls instead of proceeding — a cluster upgrade hangs on it |
+| `node-concentration` | Every replica is on one node, **and more than one node was available** |
+| `zone-concentration` | Every replica is in one zone, **and more than one zone was available** |
+| `single-zone-cluster` | Every node reports the same availability zone. Cluster-level, not a component's fault — no placement of replicas survives losing that zone |
+
+**The qualifiers are the point.** A finding is raised only where the cluster
+could have done better. A single-node k3s or kind cluster puts every replica on
+one node necessarily; an on-prem cluster with no zone labels cannot spread across
+zones. Neither produces a finding, because neither is a mistake anyone made. A
+readout that cries wolf on a laptop cluster is one an operator learns to ignore,
+which costs more than reporting nothing at all.
+
+That distinction — avoidable versus inevitable — is the only thing that needs
+cluster scope, because node and zone labels live on `Node` objects. The chart
+therefore also creates a **read-only ClusterRole** for `nodes` (`get`, `list`),
+on by default under `api.config.ha.component_status.read_nodes`. It is among the
+least sensitive cluster-scoped reads there is: node names, labels and conditions,
+no secrets and no workloads from other namespaces.
+
+**Declining it is supported.** Set `read_nodes: false` and the ClusterRole is not
+created. Placement is still reported — node concentration is still found wherever
+Terrapod's *own* pods prove more than one node exists — and only zone spread goes
+unknown. What is never done is guess: with nothing to prove spread was possible,
+no finding is raised.
 
 ## Performing a failover
 

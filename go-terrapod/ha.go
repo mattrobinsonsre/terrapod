@@ -52,6 +52,27 @@ type HAStatus struct {
 	ComponentsSampledAt         string              `json:"components-sampled-at,omitempty"`
 	ComponentsUnavailableReason string              `json:"components-unavailable-reason,omitempty"`
 	SingleReplicaComponents     []string            `json:"single-replica-components,omitempty"`
+
+	// Cluster shape, and the reason a finding can be raised at all. Nil means
+	// node reads were declined (they need a cluster-scoped Role and are
+	// opt-in): placement is still reported, but never called a problem,
+	// because an inevitable single node cannot be told from an avoidable one.
+	SchedulableNodes *int64 `json:"schedulable-nodes,omitempty"`
+	ClusterZones     *int64 `json:"cluster-zones,omitempty"`
+
+	// Specific and actionable, raised ONLY where the cluster could have done
+	// better. A one-node k3s cluster and a single-AZ deployment produce none,
+	// because neither could have spread. This is never a verdict on the
+	// deployment as a whole.
+	HAFindings []HAFinding `json:"ha-findings,omitempty"`
+}
+
+// HAFinding is one specific gap: no-pdb, pdb-blocks-eviction,
+// node-concentration or zone-concentration.
+type HAFinding struct {
+	Component string `json:"component"`
+	Kind      string `json:"kind"`
+	Detail    string `json:"detail"`
 }
 
 // ComponentReplicas is one Terrapod component's readiness in this namespace.
@@ -62,6 +83,20 @@ type ComponentReplicas struct {
 	Name    string `json:"name"`
 	Ready   int64  `json:"ready"`
 	Desired int64  `json:"desired"`
+
+	// Placement observations, never judgements. Three replicas on one node is
+	// inevitable on a single-node cluster and a real gap on a four-node one;
+	// which it is lives in HAFindings. Zones is nil when node labels are not
+	// readable.
+	Nodes int64  `json:"nodes"`
+	Zones *int64 `json:"zones,omitempty"`
+
+	// PDB is the covering PodDisruptionBudget's name, empty if none.
+	// PDBPermitsDisruption false means it blocks voluntary eviction entirely —
+	// which looks protective and is the opposite, since a node drain stalls
+	// rather than proceeding safely.
+	PDB                  string `json:"pdb,omitempty"`
+	PDBPermitsDisruption *bool  `json:"pdb-permits-disruption,omitempty"`
 }
 
 // HANode is a node's identity and the role it currently holds.
@@ -100,7 +135,35 @@ func (c *Client) GetHAStatus(ctx context.Context) (*HAStatus, error) {
 		ComponentsSampledAt:         GetStringAttr(res, "components-sampled-at"),
 		ComponentsUnavailableReason: GetStringAttr(res, "components-unavailable-reason"),
 		SingleReplicaComponents:     GetListAttr(res, "single-replica-components"),
+
+		SchedulableNodes: optionalInt(res, "schedulable-nodes"),
+		ClusterZones:     optionalInt(res, "cluster-zones"),
+		HAFindings:       parseFindings(res),
 	}, nil
+}
+
+func optionalInt(res *Resource, key string) *int64 {
+	raw, ok := res.Attributes[key]
+	if !ok || len(raw) == 0 || string(raw) == "null" {
+		return nil
+	}
+	var v int64
+	if err := json.Unmarshal(raw, &v); err != nil {
+		return nil
+	}
+	return &v
+}
+
+func parseFindings(res *Resource) []HAFinding {
+	raw, ok := res.Attributes["ha-findings"]
+	if !ok || len(raw) == 0 || string(raw) == "null" {
+		return nil
+	}
+	var out []HAFinding
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return nil
+	}
+	return out
 }
 
 func parseComponents(res *Resource) []ComponentReplicas {

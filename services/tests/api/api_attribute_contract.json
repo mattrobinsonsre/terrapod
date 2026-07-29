@@ -188,10 +188,12 @@
   ],
   "ha.status": [
     "backfilling-classes",
+    "cluster-zones",
     "components",
     "components-sampled-at",
     "components-unavailable-reason",
     "events-retained",
+    "ha-findings",
     "in-sync",
     "last-sync-at",
     "node-id",
@@ -201,6 +203,7 @@
     "replication-enabled",
     "retention-seconds",
     "role",
+    "schedulable-nodes",
     "seconds-since-last-sync",
     "single-replica-components"
   ],

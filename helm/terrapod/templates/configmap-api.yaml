@@ -284,6 +284,7 @@ data:
       component_status:
         enabled: {{ .enabled | default false }}
         interval_seconds: {{ .interval_seconds | default 60 }}
+        read_nodes: {{ .read_nodes | default false }}
         namespace: {{ .namespace | default "" | quote }}
         instance: {{ .instance | default $.Release.Name | quote }}
       {{- end }}

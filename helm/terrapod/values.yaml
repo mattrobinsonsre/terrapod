@@ -422,6 +422,18 @@ api:
       component_status:
         enabled: true
         interval_seconds: 60
+        # Cluster-scoped but READ-ONLY, and among the least sensitive such
+        # reads — node names, labels and conditions, no secrets and no
+        # workload data from other namespaces. It is what tells an AVOIDABLE
+        # single-node/single-zone concentration from an inevitable one: a
+        # one-node k3s cluster cannot spread, and reporting that as a gap
+        # would be a false finding.
+        #
+        # Turn it off for an install that forbids ClusterRoles. Node
+        # concentration is then still found wherever Terrapod's own pods
+        # prove more than one node exists; only zone spread goes unknown,
+        # because those labels live solely on Nodes.
+        read_nodes: true
         # Default to this pod's own namespace and the release name.
         namespace: ""
         instance: ""

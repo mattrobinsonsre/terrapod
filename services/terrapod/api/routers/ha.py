@@ -117,8 +117,31 @@ async def status(
                 # flawlessly is still not highly available if it serves from a
                 # single API pod.
                 "components": [
-                    {"name": c.name, "ready": c.ready, "desired": c.desired}
+                    {
+                        "name": c.name,
+                        "ready": c.ready,
+                        "desired": c.desired,
+                        # Observations, not judgements — whether concentration
+                        # is a problem depends on the cluster, and that verdict
+                        # lives in `ha-findings`.
+                        "nodes": c.nodes,
+                        "zones": c.zones,
+                        "pdb": c.pdb,
+                        "pdb-permits-disruption": c.pdb_permits_disruption,
+                    }
                     for c in (components.components or [])
+                ],
+                # Cluster shape, and the reason a finding can be raised at all.
+                # Null means node reads were declined: placement is reported
+                # but never called a problem, because an inevitable single node
+                # cannot be told from an avoidable one.
+                "schedulable-nodes": components.schedulable_nodes,
+                "cluster-zones": components.cluster_zones,
+                # Specific and actionable, raised ONLY where the cluster could
+                # have done better. Never a verdict on the deployment.
+                "ha-findings": [
+                    {"component": f.component, "kind": f.kind, "detail": f.detail}
+                    for f in components.findings
                 ],
                 "components-sampled-at": components.sampled_at,
                 # Distinct from an empty list: "I cannot see" is not "nothing

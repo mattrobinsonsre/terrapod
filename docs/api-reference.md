@@ -3876,6 +3876,24 @@ There is deliberately no "N events behind": that needs the peer's latest event
 id, and seconds-since-the-last-successful-pull is more honest — a pull that
 returned nothing means caught up as of then.
 
+The same response also reports this node's **in-cluster** HA posture, because a
+pair that replicates flawlessly is still not highly available if it is serving
+from one API pod:
+
+| Attribute | Meaning |
+|---|---|
+| `components` | Per component: `ready` and `desired` replicas, the `nodes` and `zones` they occupy, and the PodDisruptionBudget covering them. API and web come from Kubernetes; listeners come from their Redis heartbeats, since a listener may be in another cluster entirely |
+| `single-replica-components` | Components on exactly one ready replica |
+| `schedulable-nodes`, `cluster-zones` | The spread that *was* available. Null when the node read is declined or the environment is unzoned — null means unknown, never one |
+| `ha-findings` | Named gaps: `no-pdb`, `pdb-blocks-eviction`, `node-concentration`, `zone-concentration`, `single-zone-cluster`. Each carries the component and a human-readable detail |
+| `components-unavailable-reason` | Set when the namespace could not be read. An empty `components` with a reason set means *"I cannot see"*, never *"nothing is running"* |
+
+**An empty `ha-findings` means nothing avoidable was found — not that nothing
+was checked.** A finding is only raised where the cluster could have done
+better: a single-node cluster cannot spread replicas and a single-zone one
+cannot spread zones, so neither is reported as a gap. See
+[High availability](high-availability.md#findings-disruption-budgets-and-placement).
+
 ### Peer-only endpoints
 
 `/api/terrapod/v1/ha/replication/*` are consumed **by the peer node**, not by

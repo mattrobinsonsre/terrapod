@@ -2440,6 +2440,9 @@
                   "type": "integer",
                   "minimum": 15
                 },
+                "read_nodes": {
+                  "type": "boolean"
+                },
                 "namespace": {
                   "type": "string"
                 },
