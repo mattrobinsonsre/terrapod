@@ -727,8 +727,8 @@ jobs:
           # would have to be suppressed to stay honest.
           echo "$out" | grep -q "read_nodes: true" || { echo "FAIL: ha.component_status.read_nodes must render and default to true (#1128)"; exit 1; }
           echo "$out" | grep -q "kind: ClusterRole" || { echo "FAIL: the node-reader ClusterRole must render when read_nodes is on (#1128)"; exit 1; }
-          echo "$out" | grep -A8 "name: .*-node-reader" | grep -q 'resources: \["nodes"\]' || { echo "FAIL: the node-reader ClusterRole must grant nodes (#1128)"; exit 1; }
-          echo "$out" | grep -A8 "name: .*-node-reader" | grep -qE 'verbs: \["get", "list"\]' || { echo "FAIL: the node-reader ClusterRole must stay READ-ONLY (#1128)"; exit 1; }
+          echo "$out" | grep -A14 "name: .*-node-reader" | grep -q 'resources: \["nodes"\]' || { echo "FAIL: the node-reader ClusterRole must grant nodes (#1128)"; exit 1; }
+          echo "$out" | grep -A14 "name: .*-node-reader" | grep -qE 'verbs: \["get", "list"\]' || { echo "FAIL: the node-reader ClusterRole must stay READ-ONLY (#1128)"; exit 1; }
           echo "$out" | grep -q "probe_interval_seconds:" || { echo "FAIL: ha.probe_interval_seconds not rendered (#960)"; exit 1; }
           echo "$out" | grep -q "probe_threshold:" || { echo "FAIL: ha.probe_threshold not rendered (#960)"; exit 1; }
           # AI architecture critic (#1036 Part 2): non-secret config renders into
