@@ -442,6 +442,19 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
             description="Trim replication outbox events beyond the retained window",
         )
 
+    # In-cluster component readiness (#1122). Unlike replication this is useful
+    # on ANY multi-replica deployment, pair or not — "am I serving from one
+    # API pod" is an HA question a singleton operator also wants answered.
+    if settings.ha.component_status.enabled:
+        from terrapod.services.component_status import sample_cycle
+
+        register_periodic_task(
+            "component_status_sample",
+            interval_seconds=settings.ha.component_status.interval_seconds,
+            handler=sample_cycle,
+            description="Sample in-cluster component readiness from Kubernetes",
+        )
+
     if settings.ha.replication.enabled:
         register_periodic_task(
             "replication_sync",

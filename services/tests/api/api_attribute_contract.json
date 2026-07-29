@@ -188,6 +188,9 @@
   ],
   "ha.status": [
     "backfilling-classes",
+    "components",
+    "components-sampled-at",
+    "components-unavailable-reason",
     "events-retained",
     "in-sync",
     "last-sync-at",
@@ -198,7 +201,8 @@
     "replication-enabled",
     "retention-seconds",
     "role",
-    "seconds-since-last-sync"
+    "seconds-since-last-sync",
+    "single-replica-components"
   ],
   "ha.whoami": [
     "node-id",

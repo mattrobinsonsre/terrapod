@@ -2429,6 +2429,25 @@
                 }
               }
             },
+            "component_status": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "interval_seconds": {
+                  "type": "integer",
+                  "minimum": 15
+                },
+                "namespace": {
+                  "type": "string"
+                },
+                "instance": {
+                  "type": "string"
+                }
+              }
+            },
             "replication": {
               "type": "object",
               "additionalProperties": false,

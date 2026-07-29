@@ -1,6 +1,9 @@
 package terrapod
 
-import "context"
+import (
+	"context"
+	"encoding/json"
+)
 
 // HAStatus is a node's own view of whether it is converging with its peer.
 //
@@ -36,6 +39,29 @@ type HAStatus struct {
 	OldestEventAgeSeconds int64    `json:"oldest-event-age-seconds,omitempty"`
 	RetentionSeconds      int64    `json:"retention-seconds"`
 	ReplicatedClasses     []string `json:"replicated-classes,omitempty"`
+
+	// In-cluster readiness — the other half of "is this HA". A pair that
+	// replicates flawlessly is still not highly available if it serves from a
+	// single API pod, which SingleReplicaComponents names directly.
+	//
+	// ComponentsUnavailableReason being set means the API could not read its
+	// namespace — usually the operator declined the Role. That is "unknown",
+	// not "nothing is running", so an empty Components with a reason set must
+	// not be read as an outage.
+	Components                  []ComponentReplicas `json:"components,omitempty"`
+	ComponentsSampledAt         string              `json:"components-sampled-at,omitempty"`
+	ComponentsUnavailableReason string              `json:"components-unavailable-reason,omitempty"`
+	SingleReplicaComponents     []string            `json:"single-replica-components,omitempty"`
+}
+
+// ComponentReplicas is one Terrapod component's readiness in this namespace.
+//
+// Desired comes from the Deployment, not inferred from the pod list — without
+// it, "1 ready" cannot be told apart from "1 of 3, mid-incident".
+type ComponentReplicas struct {
+	Name    string `json:"name"`
+	Ready   int64  `json:"ready"`
+	Desired int64  `json:"desired"`
 }
 
 // HANode is a node's identity and the role it currently holds.
@@ -69,7 +95,24 @@ func (c *Client) GetHAStatus(ctx context.Context) (*HAStatus, error) {
 		OldestEventAgeSeconds: GetIntAttr(res, "oldest-event-age-seconds"),
 		RetentionSeconds:      GetIntAttr(res, "retention-seconds"),
 		ReplicatedClasses:     GetListAttr(res, "replicated-classes"),
+
+		Components:                  parseComponents(res),
+		ComponentsSampledAt:         GetStringAttr(res, "components-sampled-at"),
+		ComponentsUnavailableReason: GetStringAttr(res, "components-unavailable-reason"),
+		SingleReplicaComponents:     GetListAttr(res, "single-replica-components"),
 	}, nil
+}
+
+func parseComponents(res *Resource) []ComponentReplicas {
+	raw, ok := res.Attributes["components"]
+	if !ok || len(raw) == 0 || string(raw) == "null" {
+		return nil
+	}
+	var out []ComponentReplicas
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return nil
+	}
+	return out
 }
 
 // WhoAmI reports this node's identity and role.

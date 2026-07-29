@@ -399,3 +399,22 @@ REPLICATION_OLDEST_EVENT_AGE = Gauge(
     "Age of the oldest retained outbox event. Approaching the retention window "
     "means the follower is close to falling off the end and having to backfill",
 )
+
+
+# ── In-cluster component readiness (#1122) ───────────────────────────────
+#
+# Ready AND desired, because `1` alone cannot distinguish a deliberately small
+# deployment from one mid-incident. Absent entirely when the API lacks the
+# namespace Role — a missing permission reports as unknown, not as zero.
+
+COMPONENT_READY_REPLICAS = Gauge(
+    "terrapod_component_ready_replicas",
+    "Ready pods per Terrapod component in this namespace",
+    ["component"],
+)
+
+COMPONENT_DESIRED_REPLICAS = Gauge(
+    "terrapod_component_desired_replicas",
+    "Desired replicas per Terrapod component, from its Deployment",
+    ["component"],
+)

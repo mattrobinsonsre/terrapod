@@ -1230,6 +1230,31 @@ class HAReplicationConfig(BaseModel):
     )
 
 
+class ComponentStatusConfig(BaseModel):
+    """Reporting in-cluster component readiness (#1122).
+
+    A pair that replicates flawlessly is still not highly available if it is
+    serving from one API pod. Reading that needs a namespace-scoped Kubernetes
+    Role, which the chart grants alongside this flag — turning it off here
+    without removing the Role simply stops the sampling.
+    """
+
+    enabled: bool = Field(
+        default=True,
+        description="Sample in-cluster component readiness. Reports 'unknown' if the Role is absent.",
+    )
+    interval_seconds: int = Field(
+        default=60, ge=15, description="Seconds between samples (floor guards the cluster API)"
+    )
+    namespace: str = Field(
+        default="", description="Override the namespace; defaults to this pod's own"
+    )
+    instance: str = Field(
+        default="",
+        description="Helm release name, to scope the label selector when several releases share a namespace",
+    )
+
+
 class HAConfig(BaseModel):
     """Leader/follower role resolution (#960 phase 1, #1101).
 
@@ -1257,6 +1282,7 @@ class HAConfig(BaseModel):
     probe_url: HAProbeUrlConfig = Field(default_factory=HAProbeUrlConfig)
     peer: HAPeerConfig = Field(default_factory=HAPeerConfig)
     replication: HAReplicationConfig = Field(default_factory=HAReplicationConfig)
+    component_status: ComponentStatusConfig = Field(default_factory=ComponentStatusConfig)
     probe_interval_seconds: int = Field(
         default=60, ge=10, description="Seconds between probes (floor guards against a hot loop)"
     )

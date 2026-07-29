@@ -99,6 +99,9 @@ field Client.HTTPClient *http.Client
 field Client.MaxRetries int
 field Client.Token string
 field Client.UserAgent string
+field ComponentReplicas.Desired int64 `json:"desired"`
+field ComponentReplicas.Name string `json:"name"`
+field ComponentReplicas.Ready int64 `json:"ready"`
 field ConflictError.Detail string
 field CostAdvisory.Detail string `json:"detail"`
 field CostAdvisory.Kind string `json:"kind"`
@@ -354,6 +357,9 @@ field GPGKey.UpdatedAt string `json:"updated-at,omitempty"`
 field HANode.NodeID string `json:"node-id"`
 field HANode.Role string `json:"role"`
 field HAStatus.BackfillingClasses []string `json:"backfilling-classes,omitempty"`
+field HAStatus.Components []ComponentReplicas `json:"components,omitempty"`
+field HAStatus.ComponentsSampledAt string `json:"components-sampled-at,omitempty"`
+field HAStatus.ComponentsUnavailableReason string `json:"components-unavailable-reason,omitempty"`
 field HAStatus.EventsRetained int64 `json:"events-retained"`
 field HAStatus.InSync bool `json:"in-sync"`
 field HAStatus.LastSyncAt string `json:"last-sync-at,omitempty"`
@@ -365,6 +371,7 @@ field HAStatus.ReplicationEnabled bool `json:"replication-enabled"`
 field HAStatus.RetentionSeconds int64 `json:"retention-seconds"`
 field HAStatus.Role string `json:"role"`
 field HAStatus.SecondsSinceLastSync int64 `json:"seconds-since-last-sync,omitempty"`
+field HAStatus.SingleReplicaComponents []string `json:"single-replica-components,omitempty"`
 field ImpactGraph.Edges []ImpactGraphEdge `json:"edges"`
 field ImpactGraph.Meta ImpactGraphMeta `json:"meta"`
 field ImpactGraph.Nodes []ImpactGraphNode `json:"nodes"`
@@ -1207,6 +1214,7 @@ type CatalogInstance struct
 type CatalogItem struct
 type CatalogRunRef struct
 type Client struct
+type ComponentReplicas struct
 type ConflictError struct
 type CostAdvisory struct
 type CostEstimate struct

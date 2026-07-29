@@ -116,6 +116,8 @@ scrape_configs:
 
 | Metric | Type | Labels | Description |
 |---|---|---|---|
+| `terrapod_component_ready_replicas` | Gauge | component | Ready pods per Terrapod component. **1 is a single point of failure** |
+| `terrapod_component_desired_replicas` | Gauge | component | Desired replicas from the Deployment — compare against ready to tell a small deployment from an incident |
 | `terrapod_replication_seconds_since_last_sync` | Gauge | — | Seconds since the last successful pull from the HA peer (follower side) |
 | `terrapod_replication_backfilling_classes` | Gauge | — | Classes mid-backfill. **Non-zero means NOT in sync**, however recent the last pull |
 | `terrapod_replication_events_retained` | Gauge | — | Outbox events inside the retention window |
