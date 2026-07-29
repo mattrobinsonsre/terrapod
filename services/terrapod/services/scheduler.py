@@ -202,6 +202,21 @@ async def _clear_dedup(dedup_key: str | None) -> None:
 # ---------------------------------------------------------------------------
 
 
+# Periodic tasks that must keep running on a FOLLOWER (#960).
+#
+# `ha_probe` is how a follower discovers it has become the leader — gating it
+# would make the role permanently sticky, which is the one thing that must
+# never happen.
+#
+# `encryption_key_refresh` propagates rotated DEKs into the in-process cache. A
+# follower that stops running it cannot decrypt anything written after a
+# rotation, and finds out at promotion — during the incident.
+#
+# Both are read-only self-maintenance: neither creates runs, mutates
+# infrastructure, or writes anything an operator would see.
+_FOLLOWER_SAFE_TASKS = frozenset({"ha_probe", "encryption_key_refresh"})
+
+
 async def _run_periodic_loop(
     task: PeriodicTaskDef,
     shutdown: asyncio.Event,
@@ -214,7 +229,15 @@ async def _run_periodic_loop(
     )
     while not shutdown.is_set():
         try:
-            if await try_claim_periodic(task.name, task.interval_seconds):
+            # A follower runs no scheduled work. The write gate would refuse
+            # the outcome anyway, but letting the task run and fail at the last
+            # step is not equivalent to not running it: `vcs_poll` would burn
+            # the installation's VCS API quota on every cycle, advance its own
+            # poll cursor, and record a spurious poll failure on every VCS
+            # workspace. Skipping is the correct behaviour, not an optimisation.
+            if task.name not in _FOLLOWER_SAFE_TASKS and not await ha_role.is_leader():
+                logger.debug("Skipping periodic task: not the leader", task=task.name)
+            elif await try_claim_periodic(task.name, task.interval_seconds):
                 logger.debug("Claimed periodic task", task=task.name)
                 start = time.monotonic()
                 try:
