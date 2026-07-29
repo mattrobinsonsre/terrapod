@@ -53,12 +53,22 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     logger.info("Storage initialized")
 
     # Replication outbox hooks (#960 phase 3, #1110). Installed before any DB
-    # write so no change can slip past unrecorded, and unconditional: a node
-    # that is a leader today may be replicated FROM tomorrow, and an outbox with
-    # a hole in it is worse than one nobody reads.
-    from terrapod.services import replication
+    # write so no change can slip past unrecorded — but ONLY when this node is
+    # actually part of a pair (#1117).
+    #
+    # `ha.peer.url` is the signal because BOTH nodes set it: the leader needs it
+    # for when the roles swap and it becomes the puller. A single-node install
+    # leaves it empty and does no replication work at all.
+    #
+    # An earlier version recorded unconditionally, on the reasoning that a node
+    # which gains a peer later should not have a hole in its outbox. That does
+    # not hold since #1115: the new peer backfills each class from scratch, and
+    # backfill reconciles — so the hole is irrelevant, and the cost was being
+    # paid by the overwhelming majority of installs for nothing.
+    if settings.ha.peer.url:
+        from terrapod.services import replication
 
-    replication.install_outbox_hooks()
+        replication.install_outbox_hooks()
 
     # Initialize app-layer encryption at rest (#553) BEFORE the CA — the CA
     # private key column is EncryptedText, so the service must be ready first.
@@ -417,20 +427,20 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     # Settings replication (#960 phase 3, #1110). Both tasks are in the
     # scheduler's follower-safe set: the pull loop is the follower's entire
     # purpose, and the purge keeps the outbox bounded.
-    from terrapod.services.replication_sync import purge_cycle, sync_cycle
+    from terrapod.services.replication_sync import purge_cycle, sync_cycle  # noqa: F401
 
-    # The purge is registered UNCONDITIONALLY, unlike the pull loop, because
-    # the outbox is recorded unconditionally. A single-node install with
-    # replication off still produces events (so its outbox has no hole the day
-    # it gains a peer) and would otherwise accumulate them forever. The task is
-    # a no-op query against an empty table for the overwhelming majority of
-    # installs, which is a far better trade than an unbounded table.
-    register_periodic_task(
-        "replication_purge",
-        interval_seconds=3600,
-        handler=purge_cycle,
-        description="Trim replication outbox events beyond the retained window",
-    )
+    # Paired only (#1117) — a single-node install records no events, so there is
+    # nothing to trim and no reason to run an hourly task. The purge is still
+    # registered more broadly than the pull loop: BOTH nodes of a pair record
+    # events (a follower tags its own with its origin so the two cannot echo),
+    # so both need their outbox bounded, whereas only the follower pulls.
+    if settings.ha.peer.url:
+        register_periodic_task(
+            "replication_purge",
+            interval_seconds=3600,
+            handler=purge_cycle,
+            description="Trim replication outbox events beyond the retained window",
+        )
 
     if settings.ha.replication.enabled:
         register_periodic_task(
