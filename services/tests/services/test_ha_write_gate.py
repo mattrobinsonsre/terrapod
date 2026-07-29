@@ -153,3 +153,45 @@ class TestRetireRunsOnRoleChange:
         """This runs inside the probe cycle; it must never break role resolution."""
         with patch("terrapod.db.session.get_db_session", side_effect=RuntimeError("db down")):
             await ha_role._retire_runs_on_role_change(previous="follower", role="leader")
+
+
+class TestPeriodicTasksAreGated:
+    """A follower runs no scheduled work.
+
+    The write gate would refuse the outcome anyway, but running the task and
+    failing at the last step is NOT equivalent to not running it: `vcs_poll`
+    would burn the installation's VCS API quota every cycle, advance its own
+    poll cursor, and record a spurious poll failure on every VCS workspace.
+    """
+
+    def test_only_self_maintenance_tasks_are_exempt(self):
+        from terrapod.services.scheduler import _FOLLOWER_SAFE_TASKS
+
+        assert _FOLLOWER_SAFE_TASKS == {"ha_probe", "encryption_key_refresh"}
+
+    def test_the_probe_is_exempt(self):
+        """Gating it would make the role permanently sticky — a follower could
+        never discover it has become the leader."""
+        from terrapod.services.scheduler import _FOLLOWER_SAFE_TASKS
+
+        assert "ha_probe" in _FOLLOWER_SAFE_TASKS
+
+    def test_key_refresh_is_exempt(self):
+        """A follower that stops propagating rotated DEKs cannot decrypt
+        anything written after a rotation, and discovers that at promotion."""
+        from terrapod.services.scheduler import _FOLLOWER_SAFE_TASKS
+
+        assert "encryption_key_refresh" in _FOLLOWER_SAFE_TASKS
+
+    def test_run_creating_tasks_are_not_exempt(self):
+        from terrapod.services.scheduler import _FOLLOWER_SAFE_TASKS
+
+        for task in (
+            "vcs_poll",
+            "drift_check",
+            "run_reconciler",
+            "lifecycle_destroy_retry",
+            "module_impact_poll",
+            "registry_vcs_poll",
+        ):
+            assert task not in _FOLLOWER_SAFE_TASKS, f"{task} must not run on a follower"
