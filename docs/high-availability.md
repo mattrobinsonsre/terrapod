@@ -199,11 +199,24 @@ semantics would only be needed in an active-active design, which this is not.
 |---|---|
 | Agent pools, join tokens | Replicated |
 | Users, roles, role assignments, platform role assignments, API tokens | Replicated |
-| Workspaces, variables, VCS connections, policy sets, registry, the CA | In development |
+| VCS connections | Replicated |
+| Workspaces, variables, policy sets, registry, the CA | In development |
 
 Identity comes first deliberately. A node holding the whole estate but no users,
 roles or assignments has nobody able to touch it — and API tokens are the class
 where a missed deletion is a revoked credential that starts working again.
+
+VCS connections come next because withholding them fails *quietly*: the
+promotion looks successful, and then every VCS-connected workspace simply stops
+seeing pushes and pull requests, because the poller on the promoted node has no
+credentials. They are also what workspaces, autodiscovery rules and the registry
+all hold a foreign key to, so nothing further can replicate before them.
+
+They are the first class carrying credentials, which is where the per-node
+encryption design earns its keep: an encrypted column is read through the ORM
+already decrypted, crosses the authenticated peer link, and is re-encrypted
+under the **receiving** node's own key. Neither node holds the other's key,
+which is what lets a pair span two clouds or two KMS tenancies.
 
 Runs and state versions are a separate phase.
 

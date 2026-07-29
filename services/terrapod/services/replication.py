@@ -225,6 +225,26 @@ def serialize_row(spec: ReplicatedClass, obj: Any) -> dict:
     }
 
 
+def _column_python_type(column_type: Any) -> type | None:
+    """The Python type a column carries, or None when it declines to say.
+
+    Only two answers change anything below — UUID and datetime need reviving
+    from their string form. A type that cannot name itself is therefore never
+    one that needs coercion, so "don't know" and "nothing to do" are the same
+    answer here, and refusing to guess is safe.
+
+    SQLAlchemy's base `TypeEngine.python_type` *raises* rather than returning
+    None, and `TypeDecorator` does not forward the call to its impl. Letting
+    that propagate would take replication down on any custom column type — the
+    first one being `EncryptedText`, i.e. precisely when a credential is in
+    flight.
+    """
+    try:
+        return column_type.python_type  # type: ignore[no-any-return]
+    except NotImplementedError:
+        return None
+
+
 def _coerce(spec: ReplicatedClass, payload: dict) -> dict:
     """Turn a wire payload back into column values for this model."""
     if spec.deserialize is not None:
@@ -237,7 +257,7 @@ def _coerce(spec: ReplicatedClass, payload: dict) -> dict:
         if col.key in spec.exclude or col.key not in payload:
             continue
         raw = payload[col.key]
-        target = col.expression.type.python_type if raw is not None else None
+        target = _column_python_type(col.expression.type) if raw is not None else None
         if raw is not None and target is uuid.UUID and isinstance(raw, str):
             raw = uuid.UUID(raw)
         elif raw is not None and target is datetime and isinstance(raw, str):

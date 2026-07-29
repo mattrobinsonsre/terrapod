@@ -18,6 +18,18 @@ class EncryptedText(TypeDecorator):
     impl = Text
     cache_ok = True
 
+    @property
+    def python_type(self) -> type:
+        """`str`, the same as the TEXT column it decorates.
+
+        `TypeDecorator` does not forward this to its impl, so without it the
+        base `TypeEngine` raises `NotImplementedError` — and anything that
+        introspects column types generically (replication's payload coercion
+        among them) blows up the moment it meets an encrypted column, which is
+        exactly when it is handling a credential.
+        """
+        return str
+
     def process_bind_param(self, value: str | None, dialect) -> str | None:  # type: ignore[no-untyped-def]
         if value is None:
             return None

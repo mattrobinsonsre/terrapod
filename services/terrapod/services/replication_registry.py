@@ -18,6 +18,7 @@ from terrapod.db.models import (
     Role,
     RoleAssignment,
     User,
+    VCSConnection,
 )
 from terrapod.services.replication import ReplicatedClass, register
 
@@ -76,3 +77,23 @@ PLATFORM_ROLE_ASSIGNMENTS = register(
 # both, an offboarded person's token comes back to life at a failover, weeks
 # after the revocation was performed and confirmed.
 API_TOKENS = register(ReplicatedClass(name="api_tokens", model=APIToken))
+
+
+# ---------------------------------------------------------------------------
+# VCS connections (#1132)
+#
+# The first class holding real credentials, and the first to exercise the
+# per-node encryption path end to end: an `EncryptedText` column is read through
+# the ORM already decrypted, crosses the authenticated peer link as plaintext,
+# and is re-encrypted under the RECEIVING node's own key on write. Neither node
+# needs the other's key, which is what lets a pair span two clouds or two KMS
+# tenancies.
+#
+# Withholding it would make a promotion look successful and then do nothing: the
+# poller on the promoted node has no credentials, so every VCS-connected
+# workspace silently stops seeing pushes and pull requests. It is also the
+# prerequisite for replicating workspaces, autodiscovery rules and the registry,
+# all of which hold a foreign key to it.
+# ---------------------------------------------------------------------------
+
+VCS_CONNECTIONS = register(ReplicatedClass(name="vcs_connections", model=VCSConnection))
