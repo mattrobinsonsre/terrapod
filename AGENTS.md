@@ -234,6 +234,18 @@ Routing rules of thumb:
   pattern, so the invariant fails CI loudly if a future change violates it.
 - A **behaviour-changing fix for a reported bug** → a regression test named
   after the failure mode that fails on the pre-fix code and passes after.
+- A **new replicated entity class** (registered in
+  `services/replication_registry.py`) → the **full per-class test matrix**,
+  claimed with `@pytest.mark.replication_matrix("<class>", "<row>")`. Registering
+  a class is one line and the outbox picks it up automatically, so it is easy to
+  ship one that never converges — and the symptom appears at a failover, not in
+  CI. The required rows are **derived** from the class spec and its model (a
+  class declaring `monotonic_fields`, `one_way_true_fields`, or holding an
+  encrypted column gains the matching row automatically), and
+  `tests/services/test_replication_matrix_gate.py` fails the build until they
+  exist. Backfill ships **with** each class, never behind it: adding a second
+  node to a running install has no deltas at all, so a class that only handles
+  deltas produces an empty peer on day one.
 
 E2E isolation invariants (higher worker/shard counts make violations flaky,
 not deterministic): every test creates its own uniquely-named resources and
