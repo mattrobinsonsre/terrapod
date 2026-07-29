@@ -528,3 +528,62 @@ class TestRoleChangeConflict:
         )
 
         assert local.is_revoked is True
+
+
+class TestBackfillConvergesDeletion:
+    """Backfill must remove rows the peer no longer has (#1115).
+
+    Distinct from the `delete` row above, which only exercises the delta path.
+    The gap this covers is a delete that happened while the node was beyond the
+    retained event window — the exact case backfill exists to recover from, and
+    the one where a revoked API token would otherwise survive and work again
+    after a failover.
+    """
+
+    async def _db_with_local_ids(self, ids):
+        db = AsyncMock()
+        result = MagicMock()
+        result.scalars.return_value.all.return_value = ids
+        db.execute.return_value = result
+        return db
+
+    @pytest.mark.replication_matrix("agent_pools", "backfill-converges-deletion")
+    async def test_removes_a_row_the_peer_dropped(self):
+        kept, dropped = uuid.uuid4(), uuid.uuid4()
+        db = await self._db_with_local_ids([kept, dropped])
+
+        removed = await replication.reconcile_deletions(db, POOLS, {str(kept)})
+
+        assert removed == [str(dropped)]
+        db.execute.assert_awaited()
+
+    @pytest.mark.replication_matrix("agent_pool_tokens", "backfill-converges-deletion")
+    async def test_a_revoked_token_does_not_survive(self):
+        """The motivating case: revoked on the leader while this node was too
+        far behind to see the event."""
+        live, revoked = uuid.uuid4(), uuid.uuid4()
+        db = await self._db_with_local_ids([live, revoked])
+
+        removed = await replication.reconcile_deletions(db, TOKENS, {str(live)})
+
+        assert removed == [str(revoked)]
+
+    async def test_an_in_sync_class_removes_nothing(self):
+        """The overwhelmingly common case must not issue a DELETE at all."""
+        a, b = uuid.uuid4(), uuid.uuid4()
+        db = await self._db_with_local_ids([a, b])
+
+        removed = await replication.reconcile_deletions(db, POOLS, {str(a), str(b)})
+
+        assert removed == []
+        # One SELECT for the local ids, and no DELETE.
+        assert db.execute.await_count == 1
+
+    async def test_the_peer_having_nothing_clears_the_class(self):
+        """Legitimate — the leader really may have deleted every row — but it
+        is the highest-blast-radius case, so it is pinned deliberately."""
+        db = await self._db_with_local_ids([uuid.uuid4(), uuid.uuid4()])
+
+        removed = await replication.reconcile_deletions(db, POOLS, set())
+
+        assert len(removed) == 2

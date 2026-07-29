@@ -13,6 +13,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
+import pytest
 
 from terrapod.db.models import ReplicationCursor
 from terrapod.services import replication_sync
@@ -273,21 +274,25 @@ class TestApplyEvent:
 
 
 class TestBackfillPaging:
+    @patch("terrapod.services.replication.reconcile_deletions", new_callable=AsyncMock)
     @patch("terrapod.services.replication.apply_upsert", new_callable=AsyncMock)
     @patch("terrapod.services.replication_sync.arequest_with_retry", new_callable=AsyncMock)
     @patch("terrapod.services.replication_sync.settings")
-    async def test_walks_pages_until_complete(self, mock_settings, mock_request, mock_upsert):
+    async def test_walks_pages_until_complete(
+        self, mock_settings, mock_request, mock_upsert, mock_reconcile
+    ):
         mock_settings.ha = _cfg()
+        mock_reconcile.return_value = []
         mock_request.side_effect = [
             _resp(
                 body={
-                    "data": [{"attributes": {"id": "1"}}],
+                    "data": [{"id": "1", "attributes": {"id": "1"}}],
                     "meta": {"cursor": "1", "complete": False},
                 }
             ),
             _resp(
                 body={
-                    "data": [{"attributes": {"id": "2"}}],
+                    "data": [{"id": "2", "attributes": {"id": "2"}}],
                     "meta": {"cursor": "2", "complete": True},
                 }
             ),
@@ -299,11 +304,13 @@ class TestBackfillPaging:
         assert count == 2
         assert mock_request.await_count == 2
 
+    @patch("terrapod.services.replication.reconcile_deletions", new_callable=AsyncMock)
     @patch("terrapod.services.replication_sync.arequest_with_retry", new_callable=AsyncMock)
     @patch("terrapod.services.replication_sync.settings")
-    async def test_persists_progress_per_page(self, mock_settings, mock_request):
+    async def test_persists_progress_per_page(self, mock_settings, mock_request, mock_reconcile):
         """An interrupted backfill must resume, not restart a large class."""
         mock_settings.ha = _cfg()
+        mock_reconcile.return_value = []
         mock_request.return_value = _resp(
             body={"data": [], "meta": {"cursor": "abc", "complete": True}}
         )
@@ -360,3 +367,132 @@ class TestOutboxIsBounded:
             "replication_purge must be registered before (and outside) the "
             "enabled gate, or an install with replication off never trims its outbox"
         )
+
+
+class TestBackfillReconciliation:
+    """Backfill removes rows the peer no longer has (#1115) — under guards.
+
+    This is the one place replication deletes data that was never deleted
+    locally, so the conditions under which it does NOT fire matter at least as
+    much as the ones under which it does.
+    """
+
+    @patch("terrapod.services.replication.reconcile_deletions", new_callable=AsyncMock)
+    @patch("terrapod.services.replication.apply_upsert", new_callable=AsyncMock)
+    @patch("terrapod.services.replication_sync.arequest_with_retry", new_callable=AsyncMock)
+    @patch("terrapod.services.replication_sync.settings")
+    async def test_reconciles_after_a_complete_pass(
+        self, mock_settings, mock_request, _upsert, mock_reconcile
+    ):
+        mock_settings.ha = _cfg()
+        mock_reconcile.return_value = []
+        mock_request.return_value = _resp(
+            body={
+                "data": [{"id": "a", "attributes": {"id": "a"}}],
+                "meta": {"cursor": "a", "complete": True},
+            }
+        )
+
+        await replication_sync.backfill_class(
+            _db_with_cursor(""), MagicMock(), "tok", "agent_pools"
+        )
+
+        mock_reconcile.assert_awaited_once()
+        assert mock_reconcile.await_args[0][2] == {"a"}, "must pass the ids it actually saw"
+
+    @patch("terrapod.services.replication.reconcile_deletions", new_callable=AsyncMock)
+    @patch("terrapod.services.replication.apply_upsert", new_callable=AsyncMock)
+    @patch("terrapod.services.replication_sync.arequest_with_retry", new_callable=AsyncMock)
+    @patch("terrapod.services.replication_sync.settings")
+    async def test_a_resumed_pass_does_not_reconcile(
+        self, mock_settings, mock_request, _upsert, mock_reconcile
+    ):
+        """A backfill resuming from a cursor never sees the pages it already
+        applied, so its view of the peer's rows is partial — acting on it would
+        delete everything before the resume point."""
+        mock_settings.ha = _cfg()
+        mock_request.return_value = _resp(
+            body={"data": [], "meta": {"cursor": "z", "complete": True}}
+        )
+
+        await replication_sync.backfill_class(
+            _db_with_cursor("m"), MagicMock(), "tok", "agent_pools"
+        )
+
+        mock_reconcile.assert_not_awaited()
+
+    @patch("terrapod.services.replication.reconcile_deletions", new_callable=AsyncMock)
+    @patch("terrapod.services.replication_sync.arequest_with_retry", new_callable=AsyncMock)
+    @patch("terrapod.services.replication_sync.settings")
+    async def test_a_failed_pass_does_not_reconcile(
+        self, mock_settings, mock_request, mock_reconcile
+    ):
+        """A truncated set would read as mass deletion."""
+        mock_settings.ha = _cfg()
+        mock_request.side_effect = httpx.ConnectError("peer went away")
+
+        with pytest.raises(httpx.ConnectError):
+            await replication_sync.backfill_class(
+                _db_with_cursor(""), MagicMock(), "tok", "agent_pools"
+            )
+
+        mock_reconcile.assert_not_awaited()
+
+
+class TestBackfillIsRepeatable:
+    """The class cursor is a resume point, not a high-water mark.
+
+    Leaving it set after a completed pass means the next backfill resumes past
+    every row it already saw and re-syncs almost nothing — so a node that ages
+    out of the event window a second time would never recover.
+    """
+
+    @patch("terrapod.services.replication.reconcile_deletions", new_callable=AsyncMock)
+    @patch("terrapod.services.replication.apply_upsert", new_callable=AsyncMock)
+    @patch("terrapod.services.replication_sync.arequest_with_retry", new_callable=AsyncMock)
+    @patch("terrapod.services.replication_sync.settings")
+    async def test_the_cursor_is_cleared_on_completion(
+        self, mock_settings, mock_request, _upsert, mock_reconcile
+    ):
+        mock_settings.ha = _cfg()
+        mock_reconcile.return_value = []
+        cursor = ReplicationCursor(entity_class="agent_pools", position="", backfilling=False)
+        db = AsyncMock()
+        db.scalar.return_value = cursor
+        mock_request.return_value = _resp(
+            body={
+                "data": [{"id": "a", "attributes": {"id": "a"}}],
+                "meta": {"cursor": "a", "complete": True},
+            }
+        )
+
+        await replication_sync.backfill_class(db, MagicMock(), "tok", "agent_pools")
+
+        assert cursor.position == "", "a completed backfill must not leave a resume point"
+        assert cursor.backfilling is False
+
+    @patch("terrapod.services.replication.apply_upsert", new_callable=AsyncMock)
+    @patch("terrapod.services.replication_sync.arequest_with_retry", new_callable=AsyncMock)
+    @patch("terrapod.services.replication_sync.settings")
+    async def test_an_incomplete_pass_keeps_its_resume_point(
+        self, mock_settings, mock_request, _upsert
+    ):
+        mock_settings.ha = _cfg()
+        cursor = ReplicationCursor(entity_class="agent_pools", position="", backfilling=False)
+        db = AsyncMock()
+        db.scalar.return_value = cursor
+        mock_request.side_effect = [
+            _resp(
+                body={
+                    "data": [{"id": "a", "attributes": {"id": "a"}}],
+                    "meta": {"cursor": "a", "complete": False},
+                }
+            ),
+            httpx.ConnectError("peer went away"),
+        ]
+
+        with pytest.raises(httpx.ConnectError):
+            await replication_sync.backfill_class(db, MagicMock(), "tok", "agent_pools")
+
+        assert cursor.position == "a", "an interrupted backfill must be resumable"
+        assert cursor.backfilling is True

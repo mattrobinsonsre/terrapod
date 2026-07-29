@@ -28,12 +28,17 @@ from terrapod.crypto.types import EncryptedText
 from terrapod.services import replication
 
 #: Rows every replicated class must cover, whatever it holds.
+#:
+#: `delete` and `backfill-converges-deletion` are deliberately separate: the
+#: first exercises the delta path, the second the recovery path, and #1115 was
+#: exactly the case where one worked and the other silently did not.
 ALWAYS_REQUIRED = frozenset(
     {
         "backfill-from-empty",
         "delta-apply",
         "idempotent-reapply",
         "delete",
+        "backfill-converges-deletion",
         "role-change-conflict",
     }
 )

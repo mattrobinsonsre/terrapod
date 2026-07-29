@@ -146,7 +146,18 @@ async def _apply_event(
 async def backfill_class(
     db: AsyncSession, client: httpx.AsyncClient, token: str, entity_class: str
 ) -> int:
-    """Pull a whole class from the peer, resuming from the stored position."""
+    """Pull a whole class from the peer, resuming from the stored position.
+
+    On a **complete, error-free** pass this also reconciles deletions (#1115):
+    rows this node holds that the peer does not are removed, because backfill
+    otherwise cannot converge a delete that happened while this node was beyond
+    the retained event window — and a revoked API token surviving that gap
+    works again after a failover.
+
+    Reconciliation is deliberately gated on completion. A pass that raised
+    part-way has a truncated view of the peer's rows, and acting on it would
+    read as mass deletion.
+    """
     spec = replication.get(entity_class)
     if spec is None:
         return 0
@@ -155,6 +166,11 @@ async def backfill_class(
     cursor = await _get_cursor(db, entity_class)
     after = cursor.position
     applied = 0
+    # Only meaningful when the pass starts from the beginning; a resumed
+    # backfill has already-applied pages it never sees again, so it cannot
+    # judge what is missing.
+    from_scratch = not after
+    seen: set[str] = set()
 
     while True:
         resp = await arequest_with_retry(
@@ -169,6 +185,7 @@ async def backfill_class(
         body = resp.json()
         for row in body["data"]:
             await replication.apply_upsert(db, spec, row["attributes"])
+            seen.add(str(row["id"]))
             applied += 1
         after = body["meta"]["cursor"]
         # Persist per page so an interrupted backfill resumes rather than
@@ -178,7 +195,26 @@ async def backfill_class(
         if body["meta"]["complete"]:
             break
 
-    logger.info("Backfilled replication class", entity_class=entity_class, rows=applied)
+    removed = 0
+    if from_scratch:
+        removed = len(await replication.reconcile_deletions(db, spec, seen))
+
+    # Clear the resume point now the pass is done. The class cursor is a
+    # position WITHIN an in-progress backfill, not a high-water mark: leaving
+    # it set means the next backfill of this class resumes past every row it
+    # already saw and re-syncs almost nothing — so a node that ages out a
+    # second time would never recover. Clearing it also makes the next pass
+    # eligible to reconcile.
+    await _set_cursor(db, entity_class, "", backfilling=False)
+    await db.commit()
+
+    logger.info(
+        "Backfilled replication class",
+        entity_class=entity_class,
+        rows=applied,
+        removed=removed,
+        reconciled=from_scratch,
+    )
     return applied
 
 

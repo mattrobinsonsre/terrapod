@@ -47,6 +47,9 @@ DELETE = "delete"
 #: Cursor row that tracks the shared event stream rather than a class backfill.
 EVENT_STREAM = "*"
 
+#: Rows removed per statement during backfill reconciliation.
+_DELETE_CHUNK = 500
+
 
 @dataclass(frozen=True)
 class ReplicatedClass:
@@ -353,6 +356,55 @@ async def apply_upsert(db: AsyncSession, spec: ReplicatedClass, payload: dict) -
     for key, value in _merge(spec, existing, values).items():
         if key != spec.pk_attr:
             setattr(existing, key, value)
+
+
+async def reconcile_deletions(
+    db: AsyncSession, spec: ReplicatedClass, seen_ids: set[str]
+) -> list[str]:
+    """Remove local rows of this class that the peer no longer has (#1115).
+
+    Backfill upserts what the peer holds; without this it can never converge a
+    **deletion**. That matters because a delete may have happened while this
+    node was beyond the retained event window — the case backfill exists to
+    recover from. The concrete failure is a revoked API token surviving on the
+    follower and working again after a failover.
+
+    Tombstones would be the obvious alternative and are worse: they need their
+    own retention (so the window problem simply recurs), and they must be
+    written on every delete path including bulk statements that bypass the ORM.
+    The cheaper property is already true — everything replicated originates on
+    the leader and a follower originates nothing, so **a row the follower holds
+    and the peer does not is a row the peer deleted.**
+
+    Returns the ids removed. The caller MUST only invoke this after a complete,
+    error-free pass: a truncated `seen_ids` would read as mass deletion.
+    """
+    pk = getattr(spec.model, spec.pk_attr)
+    local = [str(row) for row in (await db.execute(select(pk))).scalars().all()]
+    extra = [row_id for row_id in local if row_id not in seen_ids]
+    if not extra:
+        return []
+
+    # Delete by explicit id rather than a NOT IN over the whole set, so the
+    # statement size tracks what is being removed, not the size of the class.
+    for chunk_start in range(0, len(extra), _DELETE_CHUNK):
+        chunk = extra[chunk_start : chunk_start + _DELETE_CHUNK]
+        values: list[Any] = chunk
+        if pk.expression.type.python_type is uuid.UUID:
+            values = [uuid.UUID(v) for v in chunk]
+        await db.execute(delete(spec.model).where(pk.in_(values)))
+
+    # This is the one place replication removes data that was never deleted
+    # locally. It must never be silent — an operator failing back needs to see
+    # exactly what was discarded to reach convergence.
+    logger.warning(
+        "Backfill removed rows the peer no longer has",
+        entity_class=spec.name,
+        removed=len(extra),
+        ids=extra[:20],
+        truncated=len(extra) > 20,
+    )
+    return extra
 
 
 async def apply_delete(db: AsyncSession, spec: ReplicatedClass, entity_id: str) -> None:
