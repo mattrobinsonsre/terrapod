@@ -18,6 +18,8 @@ from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+
 from terrapod.db.models import AgentPool, AgentPoolToken, ReplicationEvent
 from terrapod.services import replication, replication_registry
 
@@ -85,6 +87,7 @@ class TestSerialisation:
 class TestMergeRules:
     """The field-level exceptions that blanket last-write-wins gets wrong."""
 
+    @pytest.mark.replication_matrix("agent_pool_tokens", "monotonic-never-regresses")
     def test_counter_never_decreases(self):
         existing = SimpleNamespace(use_count=7, is_revoked=False)
 
@@ -99,6 +102,7 @@ class TestMergeRules:
 
         assert merged["use_count"] == 9
 
+    @pytest.mark.replication_matrix("agent_pool_tokens", "one-way-never-reverts")
     def test_revocation_is_one_way(self):
         existing = SimpleNamespace(use_count=0, is_revoked=True)
 
@@ -228,6 +232,7 @@ class TestApply:
         added = db.add.call_args[0][0]
         assert added.id == pool_id
 
+    @pytest.mark.replication_matrix("agent_pools", "delta-apply")
     async def test_update_applies_onto_the_existing_row(self):
         db = AsyncMock()
         existing = AgentPool(id=uuid.uuid4(), name="old")
@@ -238,6 +243,7 @@ class TestApply:
         assert existing.name == "new"
         db.add.assert_not_called()
 
+    @pytest.mark.replication_matrix("agent_pools", "idempotent-reapply")
     async def test_reapplying_the_same_row_changes_nothing(self):
         db = AsyncMock()
         existing = AgentPool(id=uuid.uuid4(), name="p", labels={"env": "prod"})
@@ -268,6 +274,7 @@ class TestApply:
 
         db.add.assert_not_called()
 
+    @pytest.mark.replication_matrix("agent_pools", "delete")
     async def test_delete_removes_the_row(self):
         db = AsyncMock()
 
@@ -348,6 +355,7 @@ class TestBackfillPaging:
     """Ordered by primary key, not by time, so an interrupted backfill resumes
     instead of restarting a large class."""
 
+    @pytest.mark.replication_matrix("agent_pools", "backfill-from-empty")
     async def test_returns_serialized_rows(self):
         db = AsyncMock()
         rows = [AgentPool(id=uuid.uuid4(), name="a"), AgentPool(id=uuid.uuid4(), name="b")]
@@ -381,3 +389,142 @@ class TestEventPayloadPolicy:
         columns = {c.name for c in event.__table__.columns}
         assert "payload" not in columns
         assert "attributes" not in columns
+
+
+class TestAgentPoolTokensMatrix:
+    """The per-class matrix for join tokens (#1112).
+
+    Tokens get their own block rather than riding the generic tests because
+    they are the class with merge rules — and a class whose counter is only
+    exercised through a shared helper is one whose real apply path was never
+    tried.
+    """
+
+    def _token(self, **kw):
+        base = {
+            "id": uuid.uuid4(),
+            "pool_id": uuid.uuid4(),
+            "token_hash": "h" * 64,
+            "description": "",
+            "max_uses": 10,
+            "use_count": 0,
+            "is_revoked": False,
+            "created_at": datetime.now(UTC),
+            "created_by": "admin",
+        }
+        base.update(kw)
+        return AgentPoolToken(**base)
+
+    @pytest.mark.replication_matrix("agent_pool_tokens", "backfill-from-empty")
+    async def test_backfill_serializes_tokens(self):
+        db = AsyncMock()
+        rows = [self._token(use_count=3)]
+        result = MagicMock()
+        result.scalars.return_value.all.return_value = rows
+        db.execute.return_value = result
+
+        page = await replication.read_backfill(db, TOKENS)
+
+        assert page[0]["use_count"] == 3
+        assert page[0]["token_hash"] == "h" * 64
+
+    @pytest.mark.replication_matrix("agent_pool_tokens", "delta-apply")
+    async def test_delta_applies_onto_an_existing_token(self):
+        db = AsyncMock()
+        existing = self._token(description="old")
+        db.scalar.return_value = existing
+
+        await replication.apply_upsert(
+            db, TOKENS, {"id": str(existing.id), "description": "rotated", "use_count": 0}
+        )
+
+        assert existing.description == "rotated"
+
+    @pytest.mark.replication_matrix("agent_pool_tokens", "idempotent-reapply")
+    async def test_reapplying_a_token_changes_nothing(self):
+        db = AsyncMock()
+        existing = self._token(use_count=4)
+        db.scalar.return_value = existing
+        payload = replication.serialize_row(TOKENS, existing)
+
+        await replication.apply_upsert(db, TOKENS, payload)
+        await replication.apply_upsert(db, TOKENS, payload)
+
+        assert existing.use_count == 4
+        assert existing.is_revoked is False
+
+    @pytest.mark.replication_matrix("agent_pool_tokens", "delete")
+    async def test_a_deleted_token_is_removed(self):
+        db = AsyncMock()
+
+        await replication.apply_delete(db, TOKENS, str(uuid.uuid4()))
+
+        db.execute.assert_awaited()
+
+
+class TestRoleChangeConflict:
+    """What happens when both sides touched the same row (#1112).
+
+    This is the case a failover actually produces: A was written to before the
+    cutover, B after it. There is no clever resolution here, and there should
+    not be — the rules just have to be the intended ones, and stated.
+    """
+
+    @pytest.mark.replication_matrix("agent_pools", "role-change-conflict")
+    async def test_settings_take_the_peers_value(self):
+        """Plain settings are last-writer-wins by arrival, and that is correct:
+        only the leader originates change, so the value arriving from the peer
+        is the one the leader has."""
+        db = AsyncMock()
+        existing = AgentPool(id=uuid.uuid4(), name="edited-locally", description="local")
+        db.scalar.return_value = existing
+
+        await replication.apply_upsert(db, POOLS, {"id": str(existing.id), "name": "from-peer"})
+
+        assert existing.name == "from-peer"
+
+    @pytest.mark.replication_matrix("agent_pool_tokens", "role-change-conflict")
+    async def test_both_sides_spending_the_budget_converges_upward(self):
+        """The real shape of a shared listener fleet across a failover: joins
+        landed on A before the cutover and on B after it. Neither count is
+        'right' — but the token must never end up with MORE budget than the two
+        of them have already spent between them."""
+        db = AsyncMock()
+        local = AgentPoolToken(
+            id=uuid.uuid4(),
+            pool_id=uuid.uuid4(),
+            token_hash="h" * 64,
+            max_uses=10,
+            use_count=6,  # spent here after the cutover
+            is_revoked=False,
+            created_by="admin",
+        )
+        db.scalar.return_value = local
+
+        # The peer reports its own, older count.
+        await replication.apply_upsert(
+            db, TOKENS, {"id": str(local.id), "use_count": 4, "is_revoked": False}
+        )
+
+        assert local.use_count == 6, "converging downward would refund spent uses"
+
+    @pytest.mark.replication_matrix("agent_pool_tokens", "one-way-never-reverts")
+    async def test_a_revocation_on_either_side_sticks(self):
+        """Revoking during an incident, on whichever node answered, must survive
+        replication from a peer that had not seen it yet."""
+        db = AsyncMock()
+        local = AgentPoolToken(
+            id=uuid.uuid4(),
+            pool_id=uuid.uuid4(),
+            token_hash="h" * 64,
+            use_count=1,
+            is_revoked=True,
+            created_by="admin",
+        )
+        db.scalar.return_value = local
+
+        await replication.apply_upsert(
+            db, TOKENS, {"id": str(local.id), "use_count": 1, "is_revoked": False}
+        )
+
+        assert local.is_revoked is True

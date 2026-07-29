@@ -149,6 +149,13 @@ key. Neither node holds the other's key.
 
 Runs and state versions are a separate phase.
 
+Each class carries a full test matrix — backfill from empty, delta apply,
+idempotent re-apply, delete, role-change conflict, plus a monotonic-merge or
+encrypted-column row where the class has one. The required rows are derived from
+the class definition rather than declared, and CI fails until they exist. A class
+that is registered but not tested does not converge, and the symptom appears at a
+failover rather than in a build.
+
 ## Join tokens and the two listener topologies
 
 Both listener topologies work, and neither needs anything beyond a shared CA —

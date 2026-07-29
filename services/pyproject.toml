@@ -139,6 +139,7 @@ testpaths = ["tests"]
 addopts = "-v --tb=short"
 markers = [
     "integration: Integration tests using real Postgres, Redis, and filesystem storage",
+    "replication_matrix(entity_class, row): Claims coverage of one per-class replication test-matrix row (#1112)",
 ]
 
 [tool.mypy]
