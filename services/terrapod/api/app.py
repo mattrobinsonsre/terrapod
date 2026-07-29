@@ -52,6 +52,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     await init_storage()
     logger.info("Storage initialized")
 
+    # Replication outbox hooks (#960 phase 3, #1110). Installed before any DB
+    # write so no change can slip past unrecorded, and unconditional: a node
+    # that is a leader today may be replicated FROM tomorrow, and an outbox with
+    # a hole in it is worse than one nobody reads.
+    from terrapod.services import replication
+
+    replication.install_outbox_hooks()
+
     # Initialize app-layer encryption at rest (#553) BEFORE the CA — the CA
     # private key column is EncryptedText, so the service must be ready first.
     # Fail CLOSED when encryption is enabled (a wrong/missing key must crash);
@@ -404,6 +412,32 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
             interval_seconds=settings.ha.probe_interval_seconds,
             handler=probe_cycle,
             description="Resolve this node's leader/follower role from DNS ownership",
+        )
+
+    # Settings replication (#960 phase 3, #1110). Both tasks are in the
+    # scheduler's follower-safe set: the pull loop is the follower's entire
+    # purpose, and the purge keeps the outbox bounded.
+    from terrapod.services.replication_sync import purge_cycle, sync_cycle
+
+    # The purge is registered UNCONDITIONALLY, unlike the pull loop, because
+    # the outbox is recorded unconditionally. A single-node install with
+    # replication off still produces events (so its outbox has no hole the day
+    # it gains a peer) and would otherwise accumulate them forever. The task is
+    # a no-op query against an empty table for the overwhelming majority of
+    # installs, which is a far better trade than an unbounded table.
+    register_periodic_task(
+        "replication_purge",
+        interval_seconds=3600,
+        handler=purge_cycle,
+        description="Trim replication outbox events beyond the retained window",
+    )
+
+    if settings.ha.replication.enabled:
+        register_periodic_task(
+            "replication_sync",
+            interval_seconds=settings.ha.replication.interval_seconds,
+            handler=sync_cycle,
+            description="Pull settings changes from the peer node",
         )
 
     await start_scheduler()
@@ -1015,6 +1049,12 @@ def create_application() -> FastAPI:
     from terrapod.api.routers.ha import router as ha_router
 
     include_terrapod(ha_router)
+
+    # Peer replication reads (#960 phase 3, #1110). Gated on `get_peer_identity`,
+    # which accepts a `peer` token and which nothing else accepts.
+    from terrapod.api.routers.replication import router as replication_router
+
+    include_terrapod(replication_router)
 
     # User management endpoints — Terrapod-native. Canonical paths at
     # /api/terrapod/v1/users{,/{email}}.

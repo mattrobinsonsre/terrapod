@@ -169,6 +169,7 @@ See [Architecture](architecture.md) for the full breakdown.
 | [Deprecations](deprecations.md) | The authoritative list of deprecated surfaces and their sunset dates, plus how to read the API's `Deprecation`/`Sunset` headers |
 | [Known Limitations](known-limitations.md) | What Terrapod does not (yet) do — deployment, scope, and feature constraints, stated plainly |
 | [Production Checklist](production-checklist.md) | Step-by-step checklist for go-live readiness |
+| [High Availability](high-availability.md) | The leader/follower pair: DNS-derived roles, what a follower refuses to do, the peer link, and settings replication. Failover is a deliberate human act — Terrapod never arbitrates |
 | [Disaster Recovery](disaster-recovery.md) | Break-glass state recovery, shipped DB backup CronJob + restore-verification DR drill, per-backend object-storage protection |
 | [API Reference](api-reference.md) | All API endpoints with examples |
 

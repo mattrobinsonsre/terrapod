@@ -46,6 +46,10 @@ DEFAULT_ORG = "default"
 _TOKEN_ROLES_CACHE_TTL = 60
 _TOKEN_ROLES_PREFIX = "tp:token_roles:"
 
+#: Token kind minted for the HA peer link (#960 phase 2, #1108). Its own class
+#: precisely so peer visibility can never be inherited by a user or a runner.
+PEER_KIND = "peer"
+
 
 @dataclass
 class AuthenticatedUser:
@@ -156,6 +160,15 @@ async def get_current_user(
         # Try API token (fast hash + indexed DB lookup)
         api_token = await validate_api_token(db, token)
         if api_token is not None:
+            # A peer token is NOT a user (#960 phase 3, #1110). It is unbound,
+            # so it resolves to no roles and fails every RBAC check — but a
+            # handful of endpoints require only "some authenticated principal"
+            # (creating a workspace, for one), and a peer would satisfy those.
+            # Peer credentials are accepted by `get_peer_identity` and nowhere
+            # else; refusing here is what makes that true.
+            if api_token.kind == PEER_KIND:
+                raise HTTPException(status_code=401, detail="Not authenticated")
+
             # Resolve roles from DB (cached in Redis for 60s)
             email = api_token.bound_to or ""
             roles = await _resolve_user_roles(db, email) if email else []
@@ -244,6 +257,13 @@ async def authenticate_request(request: Request) -> AuthenticatedUser:
     async with get_db_session() as db:
         api_token = await validate_api_token(db, token)
         if api_token is not None:
+            # A peer is not a user — see the note in get_current_user.
+            if api_token.kind == PEER_KIND:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid or expired token",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
             email = api_token.bound_to or ""
             roles = await _resolve_user_roles(db, email) if email else []
             request.state.user_email = email
@@ -561,3 +581,49 @@ async def get_listener_identity(
         certificate_fingerprint=fingerprint,
         certificate_expires_at=None,  # not needed for auth
     )
+
+
+@dataclass
+class PeerIdentity:
+    """The other node in an HA pair, authenticated over the peer link."""
+
+    client_id: str
+    token_id: str
+
+
+async def get_peer_identity(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> PeerIdentity:
+    """Authenticate the peer node, and only the peer node (#960 phase 3, #1110).
+
+    The replication endpoints are the one place a ``peer`` token is accepted.
+    Everything else refuses it outright — a peer may read entities an ordinary
+    user could not (resolved sensitive variables among them), so the identity is
+    deliberately not expressible in terms of roles that could be granted to a
+    person by accident.
+    """
+    auth_header = request.headers.get("authorization", "")
+    if not auth_header.lower().startswith("bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    api_token = await validate_api_token(db, auth_header[7:])
+    if api_token is None or api_token.kind != PEER_KIND:
+        # Deliberately the same response either way: an unknown token and a
+        # valid-but-non-peer token are indistinguishable to the caller.
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    request.state.user_email = "peer"  # for audit middleware
+    # `created_by` is "oauth-client:<client_id>", set by the client_credentials
+    # grant — the only thing that mints a peer token.
+    created_by = api_token.created_by or ""
+    client_id = created_by.removeprefix("oauth-client:")
+    return PeerIdentity(client_id=client_id, token_id=str(api_token.id))

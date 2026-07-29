@@ -403,6 +403,27 @@ api:
       # cache does — so it is not tuned for that.
       probe_interval_seconds: 60
       probe_threshold: 3
+      # Where this node reaches its peer to replicate settings (#960 phase 3).
+      # Only the FOLLOWER uses these — it is the side that pulls. Leaving them
+      # unset is the normal single-node case and simply means replication never
+      # runs. The client secret is NEVER set here: it arrives as
+      # TERRAPOD_HA__PEER__CLIENT_SECRET from a K8s Secret (peer.existingSecret).
+      peer:
+        url: ""
+        client_id: ""
+        # K8s Secret holding the client secret for the peer's OAuth client.
+        existingSecret: ""
+        existingSecretKey: "client_secret"
+      replication:
+        # Off by default: replication is meaningless without a peer, and the
+        # overwhelming majority of installs are a single node.
+        enabled: false
+        interval_seconds: 60
+        batch_size: 500
+        # Bounding the outbox is safe because a follower whose cursor falls off
+        # the end detects the gap and backfills rather than silently skipping
+        # the rows it missed. That fallback is what makes the window bounded.
+        retention_days: 7
 
     # VCS Integration
     # VCS connections (GitHub App installations, GitLab tokens) are created

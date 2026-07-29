@@ -212,9 +212,19 @@ async def _clear_dedup(dedup_key: str | None) -> None:
 # follower that stops running it cannot decrypt anything written after a
 # rotation, and finds out at promotion — during the incident.
 #
-# Both are read-only self-maintenance: neither creates runs, mutates
-# infrastructure, or writes anything an operator would see.
-_FOLLOWER_SAFE_TASKS = frozenset({"ha_probe", "encryption_key_refresh"})
+# `replication_sync` is the pull loop, and gating it would be self-defeating:
+# converging with the leader is the entire job of a follower, and a follower
+# that stops replicating is one that promotes with stale settings.
+#
+# `replication_purge` trims this node's own outbox. A follower still records
+# events (it tags them with their origin so the pair cannot echo), so exempting
+# the purge is what stops the follower's outbox growing without bound.
+#
+# All four are self-maintenance: none creates runs, mutates infrastructure, or
+# originates a change an operator would see.
+_FOLLOWER_SAFE_TASKS = frozenset(
+    {"ha_probe", "encryption_key_refresh", "replication_sync", "replication_purge"}
+)
 
 
 async def _run_periodic_loop(

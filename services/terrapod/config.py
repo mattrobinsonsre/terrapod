@@ -1189,6 +1189,47 @@ class HAProbeUrlConfig(BaseModel):
     external: str = Field(default="", description="Fallback probe URL (external name)")
 
 
+class HAPeerConfig(BaseModel):
+    """How this node reaches its peer to replicate (#960 phase 3, #1110).
+
+    Only the **follower** uses these — it is the side that pulls. Leaving them
+    unset is the normal single-node case and simply means replication never
+    runs.
+
+    The secret is never carried here from the chart: it arrives as
+    ``TERRAPOD_HA__PEER__CLIENT_SECRET`` from a Kubernetes Secret, the same
+    treatment every other credential gets.
+    """
+
+    url: str = Field(default="", description="Base URL of the peer node's API")
+    client_id: str = Field(
+        default="", description="OAuth client id this node authenticates to the peer with"
+    )
+    client_secret: str = Field(
+        default="",
+        description="Set via TERRAPOD_HA__PEER__CLIENT_SECRET, never in the ConfigMap",
+    )
+
+
+class HAReplicationConfig(BaseModel):
+    """Settings replication between the pair (#960 phase 3, #1110).
+
+    ``retention_days`` bounds the outbox. It is safe to keep short because a
+    follower whose cursor falls off the end detects the gap and backfills the
+    affected classes rather than silently skipping them — the fallback is what
+    lets the window be bounded at all.
+    """
+
+    enabled: bool = Field(default=False, description="Pull settings from the peer")
+    interval_seconds: int = Field(
+        default=60, ge=5, description="Seconds between pulls (floor guards against a hot loop)"
+    )
+    batch_size: int = Field(default=500, ge=1, le=5000, description="Events fetched per pull")
+    retention_days: int = Field(
+        default=7, ge=1, description="How long outbox events are kept before purging"
+    )
+
+
 class HAConfig(BaseModel):
     """Leader/follower role resolution (#960 phase 1, #1101).
 
@@ -1214,6 +1255,8 @@ class HAConfig(BaseModel):
     )
     node_name: str = Field(default="", description="Stable identity for this node")
     probe_url: HAProbeUrlConfig = Field(default_factory=HAProbeUrlConfig)
+    peer: HAPeerConfig = Field(default_factory=HAPeerConfig)
+    replication: HAReplicationConfig = Field(default_factory=HAReplicationConfig)
     probe_interval_seconds: int = Field(
         default=60, ge=10, description="Seconds between probes (floor guards against a hot loop)"
     )
@@ -1243,6 +1286,21 @@ class HAConfig(BaseModel):
         # probe answer, so `auto` cannot resolve at all.
         if self.role == "auto" and not self.node_name:
             raise ValueError("ha.role='auto' requires ha.node_name")
+        return self
+
+    @model_validator(mode="after")
+    def _replication_needs_a_peer(self) -> "HAConfig":
+        # Enabled-but-unreachable would look configured while replicating
+        # nothing, and the operator would find out at promotion.
+        if self.replication.enabled:
+            if not self.peer.url:
+                raise ValueError("ha.replication.enabled requires ha.peer.url")
+            if not self.peer.client_id:
+                raise ValueError("ha.replication.enabled requires ha.peer.client_id")
+            # Events are origin-tagged to stop the pair echoing changes back at
+            # each other; an unnamed node cannot recognise its own.
+            if not self.node_name:
+                raise ValueError("ha.replication.enabled requires ha.node_name")
         return self
 
     @property

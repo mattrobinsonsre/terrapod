@@ -78,6 +78,15 @@ spec:
                   name: {{ .Values.api.tokenSigningKey.existingSecret }}
                   key: {{ .Values.api.tokenSigningKey.existingSecretKey | default "token_signing_key" }}
             {{- end }}
+            {{- if ((.Values.api.config.ha).peer).existingSecret }}
+            # HA peer link (#960 phase 3) — the follower's client_credentials
+            # secret. A credential, so it never touches the ConfigMap.
+            - name: TERRAPOD_HA__PEER__CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.api.config.ha.peer.existingSecret }}
+                  key: {{ .Values.api.config.ha.peer.existingSecretKey | default "client_secret" }}
+            {{- end }}
             {{- if (.Values.api.config.encryption).existingSecret }}
             # App-layer encryption at rest (#553) — KEK secrets via secretKeyRef.
             # optional:true so a single Secret can carry only the key the chosen

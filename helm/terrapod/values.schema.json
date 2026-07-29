@@ -2410,6 +2410,46 @@
             "probe_threshold": {
               "type": "integer",
               "minimum": 1
+            },
+            "peer": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "url": {
+                  "type": "string"
+                },
+                "client_id": {
+                  "type": "string"
+                },
+                "existingSecret": {
+                  "type": "string"
+                },
+                "existingSecretKey": {
+                  "type": "string"
+                }
+              }
+            },
+            "replication": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "interval_seconds": {
+                  "type": "integer",
+                  "minimum": 5
+                },
+                "batch_size": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 5000
+                },
+                "retention_days": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
             }
           }
         }

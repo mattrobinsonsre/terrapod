@@ -2785,3 +2785,62 @@ class OnboardingSession(Base):
     )
 
     __table_args__ = (sa.Index("ix_onboarding_sessions_workspace", "workspace_id", "created_at"),)
+
+
+class ReplicationEvent(Base):
+    """Outbox row: "this entity changed" (#960 phase 3, #1110).
+
+    Deliberately a **notification, not a snapshot**. It records the class, the
+    id and the operation — never the row's contents. The follower fetches the
+    current state when it applies the event, which makes replay idempotent and
+    self-healing: two stale events for the same row both deliver today's value,
+    and an event whose row has since been deleted resolves to nothing rather
+    than resurrecting an old copy. It also means the outbox never has to carry
+    a versioned copy of every entity's schema.
+
+    ``id`` is a plain autoincrementing bigint precisely because it is the
+    replication cursor: it must be monotonic and densely ordered, which a UUIDv7
+    primary key is not (concurrent transactions commit out of key order).
+    """
+
+    __tablename__ = "replication_events"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    entity_class: Mapped[str] = mapped_column(String(64), nullable=False)
+    # String, not UUID: not every replicated entity is UUID-keyed (users are
+    # keyed by email), and the cursor path never needs to interpret it.
+    entity_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    op: Mapped[str] = mapped_column(String(10), nullable=False)  # upsert | delete
+    occurred_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=now_utc
+    )
+    # Which node produced the change. Applying a replicated write must not
+    # generate an event attributed to the applier, or the pair ping-pongs.
+    origin_node: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+
+    __table_args__ = (Index("ix_replication_events_class_id", "entity_class", "entity_id"),)
+
+
+class ReplicationCursor(Base):
+    """How far this node has consumed from its peer (#960 phase 3, #1110).
+
+    Durable rather than Redis-held: losing it silently restarts replication from
+    zero, and the operator would have no way to tell that from "nothing has
+    changed yet". Per-class rather than global so a backfill can resume where it
+    stopped instead of restarting a large class from the beginning.
+
+    ``entity_class`` is the literal ``"*"`` for the shared event-stream cursor;
+    a real class name means a backfill in progress.
+    """
+
+    __tablename__ = "replication_cursors"
+
+    entity_class: Mapped[str] = mapped_column(String(64), primary_key=True)
+    # Event id for "*"; last-seen primary key (as text) for a backfill.
+    position: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    # Set while a backfill is running, cleared when the class is caught up. The
+    # follower must not report itself in sync mid-backfill.
+    backfilling: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=now_utc, onupdate=now_utc
+    )
