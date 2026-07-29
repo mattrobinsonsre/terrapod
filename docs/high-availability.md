@@ -1,5 +1,10 @@
 # High availability
 
+> **A single-node install does none of this.** With the shipped defaults —
+> `ha.role: leader`, no `ha.peer.url` — Terrapod records no replication events,
+> runs no replication tasks, and never probes. The tables exist and stay empty.
+> This is asserted in the test suite, not just intended.
+>
 > **Status: in development.** Role resolution and the peer link are complete;
 > settings replication is being built out class by class. The replication scope
 > today covers **agent pools and join tokens** — see [Replication
