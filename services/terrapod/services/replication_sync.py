@@ -293,11 +293,41 @@ async def sync_cycle() -> None:
 
 
 async def purge_cycle() -> None:
-    """Trim the outbox on the node that produces events."""
+    """Trim the outbox, and refresh the replication gauges.
+
+    The gauges ride this task rather than getting their own: both nodes of a
+    pair run it, the numbers are cheap, and an hourly refresh matches what they
+    describe — retention margin moves in days, and "seconds since last sync" is
+    computed from a timestamp rather than sampled.
+    """
     from terrapod.db.session import get_db_session
 
     async with get_db_session() as db:
         await replication.purge_old_events(db, settings.ha.replication.retention_days)
+        await _refresh_metrics(db)
+
+
+async def _refresh_metrics(db: AsyncSession) -> None:
+    from terrapod.api.metrics import (
+        REPLICATION_BACKFILLING_CLASSES,
+        REPLICATION_EVENTS_RETAINED,
+        REPLICATION_OLDEST_EVENT_AGE,
+        REPLICATION_SECONDS_SINCE_SYNC,
+    )
+
+    state = await replication.read_status(db)
+    now = datetime.now(UTC)
+
+    REPLICATION_BACKFILLING_CLASSES.set(len(state.backfilling))
+    REPLICATION_EVENTS_RETAINED.set(state.events_retained)
+    if state.last_sync_at:
+        REPLICATION_SECONDS_SINCE_SYNC.set(
+            (now - state.last_sync_at.astimezone(UTC)).total_seconds()
+        )
+    if state.oldest_event_at:
+        REPLICATION_OLDEST_EVENT_AGE.set(
+            (now - state.oldest_event_at.astimezone(UTC)).total_seconds()
+        )
 
 
 __all__ = [

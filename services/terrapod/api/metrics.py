@@ -369,3 +369,33 @@ async def metrics_middleware(request: Request, call_next):  # type: ignore[no-un
 async def metrics_endpoint(request: Request) -> Response:
     """Serve Prometheus metrics in exposition format."""
     return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
+
+# ── Replication (#960 phase 3, #1121) ────────────────────────────────────
+#
+# The follower's own view of whether it is converging, and the leader's view of
+# how much margin its follower has. Both are answered from local state — a
+# metric that needs the peer stops working exactly when the peer is the
+# problem, which is when it is being read.
+
+REPLICATION_SECONDS_SINCE_SYNC = Gauge(
+    "terrapod_replication_seconds_since_last_sync",
+    "Seconds since the last successful pull from the peer (follower side)",
+)
+
+REPLICATION_BACKFILLING_CLASSES = Gauge(
+    "terrapod_replication_backfilling_classes",
+    "Entity classes currently mid-backfill. Non-zero means NOT in sync, "
+    "however recent the last cycle",
+)
+
+REPLICATION_EVENTS_RETAINED = Gauge(
+    "terrapod_replication_events_retained",
+    "Outbox events still inside the retention window",
+)
+
+REPLICATION_OLDEST_EVENT_AGE = Gauge(
+    "terrapod_replication_oldest_event_age_seconds",
+    "Age of the oldest retained outbox event. Approaching the retention window "
+    "means the follower is close to falling off the end and having to backfill",
+)

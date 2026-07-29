@@ -186,6 +186,20 @@
     "source-url",
     "updated-at"
   ],
+  "ha.status": [
+    "backfilling-classes",
+    "events-retained",
+    "in-sync",
+    "last-sync-at",
+    "node-id",
+    "oldest-event-age-seconds",
+    "peer-configured",
+    "replicated-classes",
+    "replication-enabled",
+    "retention-seconds",
+    "role",
+    "seconds-since-last-sync"
+  ],
   "ha.whoami": [
     "node-id",
     "role"

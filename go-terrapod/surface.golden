@@ -351,6 +351,20 @@ field GPGKey.Namespace string `json:"namespace,omitempty"`
 field GPGKey.Source string `json:"source,omitempty"`
 field GPGKey.SourceURL string `json:"source-url,omitempty"`
 field GPGKey.UpdatedAt string `json:"updated-at,omitempty"`
+field HANode.NodeID string `json:"node-id"`
+field HANode.Role string `json:"role"`
+field HAStatus.BackfillingClasses []string `json:"backfilling-classes,omitempty"`
+field HAStatus.EventsRetained int64 `json:"events-retained"`
+field HAStatus.InSync bool `json:"in-sync"`
+field HAStatus.LastSyncAt string `json:"last-sync-at,omitempty"`
+field HAStatus.NodeID string `json:"node-id"`
+field HAStatus.OldestEventAgeSeconds int64 `json:"oldest-event-age-seconds,omitempty"`
+field HAStatus.PeerConfigured bool `json:"peer-configured"`
+field HAStatus.ReplicatedClasses []string `json:"replicated-classes,omitempty"`
+field HAStatus.ReplicationEnabled bool `json:"replication-enabled"`
+field HAStatus.RetentionSeconds int64 `json:"retention-seconds"`
+field HAStatus.Role string `json:"role"`
+field HAStatus.SecondsSinceLastSync int64 `json:"seconds-since-last-sync,omitempty"`
 field ImpactGraph.Edges []ImpactGraphEdge `json:"edges"`
 field ImpactGraph.Meta ImpactGraphMeta `json:"meta"`
 field ImpactGraph.Nodes []ImpactGraphNode `json:"nodes"`
@@ -1043,6 +1057,7 @@ method (*Client) GetEncryptionStatus(ctx context.Context) (*EncryptionStatus, er
 method (*Client) GetEstateGraph(ctx context.Context) (*EstateGraph, error)
 method (*Client) GetExecutionHook(ctx context.Context, id string) (*ExecutionHook, error)
 method (*Client) GetGPGKey(ctx context.Context, id string) (*GPGKey, error)
+method (*Client) GetHAStatus(ctx context.Context) (*HAStatus, error)
 method (*Client) GetModuleInterface(ctx context.Context, name, provider, version string) (*ModuleInterface, error)
 method (*Client) GetModuleWorkspaceLink(ctx context.Context, moduleName, moduleProvider, linkID string) (*ModuleWorkspaceLink, error)
 method (*Client) GetNotificationConfiguration(ctx context.Context, id string) (*NotificationConfiguration, error)
@@ -1169,6 +1184,7 @@ method (*Client) UploadProviderSignature(ctx context.Context, name, version stri
 method (*Client) UploadStateContent(ctx context.Context, stateVersionID string, raw []byte) error
 method (*Client) VersionCheck(ctx context.Context) error
 method (*Client) WarmCacheBulk(ctx context.Context, req BulkWarmRequest) (*BulkWarmResponse, error)
+method (*Client) WhoAmI(ctx context.Context) (*HANode, error)
 method (*ConflictError) Error() string
 method (*NotFoundError) Error() string
 method (*ValidationError) Error() string
@@ -1234,6 +1250,8 @@ type EstateGraphMeta struct
 type EstateNode struct
 type ExecutionHook struct
 type GPGKey struct
+type HANode struct
+type HAStatus struct
 type ImpactGraph struct
 type ImpactGraphEdge struct
 type ImpactGraphMeta struct
