@@ -157,6 +157,10 @@ was discarded to reach convergence.
 authenticated peer link, and are re-encrypted under the receiving node's own
 key. Neither node holds the other's key.
 
+**There is no conflict resolution, deliberately.** Only the leader writes, so
+the peer's row is authoritative — applying it is the whole rule. Per-field merge
+semantics would only be needed in an active-active design, which this is not.
+
 ### Replication scope
 
 | Class | Status |
@@ -202,11 +206,9 @@ promoted node accepts the token the fleet already holds.
 > The per-node topology never crosses a boundary and does not have this
 > constraint.
 
-`use_count` replicates, and it replicates **monotonically** — the larger value
-always wins, in both directions and during backfill. Both nodes spend the same
-budget (joins land on A before a failover and on B after one), so a stale copy
-winning on timestamp would hand a spent token its uses back. Revocation is
-one-way for the same reason: a revoked token can never replicate back to usable.
+`use_count` replicates like any other column. There is no merge rule and none
+is needed: only the leader writes, so its count is authoritative and the
+follower simply takes it.
 
 ## Is the follower caught up?
 

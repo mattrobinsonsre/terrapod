@@ -12,9 +12,8 @@ So this fails the build rather than reminding anyone.
 **The requirement is derived, not declared.** A per-class manifest of "which
 rows apply here" is something a contributor can quietly weaken; instead the
 required rows are computed from the class spec and its model. A class that gains
-a counter therefore *starts* failing until its monotonic test exists — which is
-exactly the case where losing an update issues extra credentials rather than
-merely losing information.
+an encrypted column therefore *starts* failing until it proves that column
+survives the per-node decrypt/re-encrypt round trip.
 
 **Coverage is claimed at the test**, with `@pytest.mark.replication_matrix`, not
 in a list of node ids. A manifest rots the moment a test is renamed; a mark
@@ -39,14 +38,16 @@ ALWAYS_REQUIRED = frozenset(
         "idempotent-reapply",
         "delete",
         "backfill-converges-deletion",
-        "role-change-conflict",
     }
 )
 
 #: Rows required only when the class actually has the thing they protect.
+#:
+#: There is no merge-semantics row here. In a leader/follower pair only the
+#: leader writes, so the peer's row is authoritative and there is nothing to
+#: reconcile — the conditional rows that once covered that belonged to an
+#: active-active design dropped before the code existed (#1124).
 CONDITIONAL = {
-    "monotonic-never-regresses": lambda spec: bool(spec.monotonic_fields),
-    "one-way-never-reverts": lambda spec: bool(spec.one_way_true_fields),
     "encrypted-columns": lambda spec: _has_encrypted_column(spec),
 }
 
@@ -120,18 +121,20 @@ class TestMatrixIsComplete:
 class TestTheGateItself:
     """A gate that cannot fail is not a gate."""
 
-    def test_a_counter_class_requires_the_monotonic_row(self):
-        spec = replication.get("agent_pool_tokens")
+    def test_a_class_with_an_encrypted_column_requires_that_row(self):
+        """Per-node encryption is real and unrelated to any merge model:
+        decrypt on send, re-encrypt on receive."""
+        from terrapod.db.models import VCSConnection
+        from terrapod.services.replication import ReplicatedClass
 
-        assert "monotonic-never-regresses" in required_rows(spec)
+        spec = ReplicatedClass(name="_probe", model=VCSConnection)
+
+        assert "encrypted-columns" in required_rows(spec)
 
     def test_a_plain_class_does_not(self):
-        """Requiring a monotonic test of a class with no counter would train
-        people to write empty tests to satisfy the gate."""
         spec = replication.get("agent_pools")
 
-        assert "monotonic-never-regresses" not in required_rows(spec)
-        assert "one-way-never-reverts" not in required_rows(spec)
+        assert "encrypted-columns" not in required_rows(spec)
 
     def test_every_class_always_needs_the_base_rows(self):
         for spec in replication.registered().values():

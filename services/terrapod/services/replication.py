@@ -57,15 +57,11 @@ _DELETE_CHUNK = 500
 class ReplicatedClass:
     """One entity class in the replication scope.
 
-    ``monotonic_fields`` is the sharp edge. Most columns converge fine under
-    last-write-wins, but a counter does not: both nodes increment
-    ``agent_pool_tokens.use_count`` independently (a shared listener fleet
-    re-joins against whichever node currently holds the DNS name), so a stale
-    copy winning on timestamp would hand a spent token its budget back. Fields
-    listed here never decrease — the merge takes the larger value, in both
-    directions and during backfill alike. ``one_way_true_fields`` is the boolean
-    equivalent: once ``is_revoked`` is true it can never be replicated back to
-    false.
+    There is no conflict-resolution here, deliberately. In a leader/follower
+    pair only the leader writes, so **the peer's row is authoritative** —
+    applying it is the whole rule. An earlier active-active design needed
+    per-field merge semantics; that design was dropped from #960 before this
+    code existed, and the machinery it implied went with it (#1124).
     """
 
     name: str
@@ -77,10 +73,6 @@ class ReplicatedClass:
     pk_attrs: tuple[str, ...] = ("id",)
     #: Columns never sent (server-managed, or meaningless on the other node).
     exclude: frozenset[str] = frozenset()
-    #: Counters that may only ever increase.
-    monotonic_fields: frozenset[str] = frozenset()
-    #: Booleans that may only ever go false -> true.
-    one_way_true_fields: frozenset[str] = frozenset()
     #: Optional per-class overrides for entities the generic path cannot handle.
     serialize: Callable[[Any], dict] | None = None
     deserialize: Callable[[dict], dict] | None = None
@@ -402,25 +394,6 @@ async def read_backfill(
 # --------------------------------------------------------------------------
 
 
-def _merge(spec: ReplicatedClass, existing: Any, values: dict) -> dict:
-    """Apply the field-level rules that blanket last-write-wins gets wrong."""
-    merged = dict(values)
-    for name in spec.monotonic_fields:
-        if name not in merged:
-            continue
-        incoming = merged[name] or 0
-        current = getattr(existing, name, 0) or 0
-        # Losing an increment here would hand a spent token its budget back,
-        # so the larger value always wins regardless of which side is newer.
-        merged[name] = max(incoming, current)
-    for name in spec.one_way_true_fields:
-        if name not in merged:
-            continue
-        if getattr(existing, name, False):
-            merged[name] = True
-    return merged
-
-
 async def apply_upsert(db: AsyncSession, spec: ReplicatedClass, payload: dict) -> None:
     """Insert or update a row from a peer, preserving its identity."""
     values = _coerce(spec, payload)
@@ -431,7 +404,9 @@ async def apply_upsert(db: AsyncSession, spec: ReplicatedClass, payload: dict) -
     if existing is None:
         db.add(spec.model(**values))
         return
-    for key, value in _merge(spec, existing, values).items():
+    # The peer's row is authoritative — there is nothing to reconcile, because
+    # a follower originates nothing (#1124).
+    for key, value in values.items():
         if key not in spec.pk_attrs:
             setattr(existing, key, value)
 

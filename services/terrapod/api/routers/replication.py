@@ -31,19 +31,12 @@ async def list_classes(
     The follower reads this rather than carrying its own copy, so a version-skew
     pair converges on what the *sender* actually knows how to serve instead of
     failing on a class one side has never heard of.
+
+    No per-class merge semantics are advertised, because there are none: the
+    peer's row is authoritative (#1124).
     """
     return {
-        "data": [
-            {
-                "type": "replication-classes",
-                "id": name,
-                "attributes": {
-                    "monotonic-fields": sorted(spec.monotonic_fields),
-                    "one-way-true-fields": sorted(spec.one_way_true_fields),
-                },
-            }
-            for name, spec in replication.registered().items()
-        ]
+        "data": [{"type": "replication-classes", "id": name} for name in replication.registered()]
     }
 
 
