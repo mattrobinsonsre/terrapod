@@ -35,7 +35,7 @@ from decimal import Decimal
 from typing import Any
 
 import structlog
-from sqlalchemy import and_, delete, or_, select, tuple_
+from sqlalchemy import and_, delete, func, or_, select, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
@@ -516,3 +516,44 @@ async def purge_old_events(db: AsyncSession, retention_days: int) -> int:
     if count:
         logger.info("Purged replication events", count=count, retention_days=retention_days)
     return count
+
+
+# --------------------------------------------------------------------------
+# Status
+# --------------------------------------------------------------------------
+
+
+@dataclass
+class ReplicationStatus:
+    """What this node can say about replication without asking the peer.
+
+    Deliberately answerable locally: the status path stays fast, and it still
+    works when the peer is the thing that has broken — which is precisely when
+    an operator is looking at it.
+    """
+
+    #: Follower side: when the last pull completed, and whether any class is
+    #: still mid-backfill. A node backfilling is NOT in sync, however recent
+    #: its last cycle.
+    last_sync_at: datetime | None = None
+    backfilling: list[str] = field(default_factory=list)
+    #: Leader side: how much margin the follower has before its cursor falls
+    #: off the retained window and it has to backfill from scratch.
+    events_retained: int = 0
+    oldest_event_at: datetime | None = None
+
+
+async def read_status(db: AsyncSession) -> ReplicationStatus:
+    from terrapod.db.models import ReplicationCursor
+
+    cursors = (await db.execute(select(ReplicationCursor))).scalars().all()
+    stream = next((c for c in cursors if c.entity_class == EVENT_STREAM), None)
+
+    return ReplicationStatus(
+        last_sync_at=stream.updated_at if stream else None,
+        backfilling=sorted(
+            c.entity_class for c in cursors if c.backfilling and c.entity_class != EVENT_STREAM
+        ),
+        events_retained=await db.scalar(select(func.count()).select_from(ReplicationEvent)) or 0,
+        oldest_event_at=await db.scalar(select(func.min(ReplicationEvent.occurred_at))),
+    )

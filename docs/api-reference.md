@@ -3837,6 +3837,52 @@ Deletes the catalog instance's workspace record **without** destroying its infra
 
 ---
 
+## High Availability
+
+Leader/follower pair endpoints (#960). See [High availability](high-availability.md).
+
+### `GET /api/terrapod/v1/ha/whoami`
+
+**Unauthenticated by necessity** — this is what a node probes against the shared
+DNS name to discover whether it owns that name, and the probe runs before any
+trust exists between the two nodes. It discloses only an operator-chosen node
+name and a role. `Cache-Control: no-store`, so a CDN or WAF in front of the
+external name cannot pin leadership to a stale answer.
+
+```json
+{"data": {"type": "ha-nodes", "id": "node-a",
+          "attributes": {"node-id": "node-a", "role": "leader"}}}
+```
+
+### `GET /api/terrapod/v1/ha/status`
+
+**Requires `admin` or `audit`.** Whether this node is converging with its peer —
+the question to answer before moving DNS. Computed entirely from local state, so
+it still works when the peer is the thing that has broken.
+
+| Attribute | Meaning |
+|---|---|
+| `role`, `node-id` | This node's identity and current role |
+| `peer-configured` | False on an ordinary single node; the rest then does not apply |
+| `replication-enabled` | Whether this node pulls from a peer |
+| `in-sync` | **The summary.** True only when a pull has succeeded *and* no class is mid-backfill |
+| `last-sync-at`, `seconds-since-last-sync` | The last successful pull. Null when it has never synced |
+| `backfilling-classes` | Classes still being pulled in full. **Non-empty means not in sync**, however recent the last pull |
+| `events-retained`, `oldest-event-age-seconds` | Leader side: as the oldest event approaches `retention-seconds`, the follower is close to having to backfill from scratch |
+| `retention-seconds` | The retained event window |
+| `replicated-classes` | What a failover would carry |
+
+There is deliberately no "N events behind": that needs the peer's latest event
+id, and seconds-since-the-last-successful-pull is more honest — a pull that
+returned nothing means caught up as of then.
+
+### Peer-only endpoints
+
+`/api/terrapod/v1/ha/replication/*` are consumed **by the peer node**, not by
+users or tooling. They accept a `peer` token and nothing else, and no other
+endpoint accepts one — a peer can read entities an ordinary user cannot, so that
+visibility is deliberately not expressible as roles somebody could be granted.
+
 ## Common Response Codes
 
 | Code | Meaning |

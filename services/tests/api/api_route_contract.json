@@ -86,6 +86,7 @@
   "GET /api/terrapod/v1/ha/replication/classes",
   "GET /api/terrapod/v1/ha/replication/entities/{entity_class}/{entity_id}",
   "GET /api/terrapod/v1/ha/replication/events ?after,limit",
+  "GET /api/terrapod/v1/ha/status",
   "GET /api/terrapod/v1/ha/whoami",
   "GET /api/terrapod/v1/labels",
   "GET /api/terrapod/v1/labels/{key}",

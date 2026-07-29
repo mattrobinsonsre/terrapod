@@ -208,9 +208,32 @@ budget (joins land on A before a failover and on B after one), so a stale copy
 winning on timestamp would hand a spent token its uses back. Revocation is
 one-way for the same reason: a revoked token can never replicate back to usable.
 
+## Is the follower caught up?
+
+`GET /api/terrapod/v1/ha/status` (admin or audit), `terrapod_ha_status` over MCP,
+or `GetHAStatus` in go-terrapod. Answered entirely from local state, so it still
+works when the peer is the thing that has broken — which is when you are reading
+it.
+
+On the **follower**, `in-sync` is the summary. It is false unless a pull has
+succeeded *and* no class is mid-backfill: **a node backfilling is not in sync
+however recent its last cycle**, and reading only the timestamp would give a
+green light to a node still pulling a whole class.
+
+On the **leader**, compare `oldest-event-age-seconds` against
+`retention-seconds`. As those converge the follower is close to falling off the
+end of the retained event window and having to backfill from scratch. That is
+the early warning — it costs nothing to watch and it precedes the problem by
+days.
+
+There is deliberately no "N events behind". That needs the peer's latest event
+id, and seconds-since-the-last-successful-pull is the more honest number: a pull
+that returned nothing means caught up *as of then*, which is the question being
+asked.
+
 ## Performing a failover
 
-1. Confirm the standby is caught up.
+1. Confirm the standby is caught up (above).
 2. Move the DNS record to the standby.
 3. Wait for DNS cache to expire — this, not the probe interval, is what governs
    the overlap.

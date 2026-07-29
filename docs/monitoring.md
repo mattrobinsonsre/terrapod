@@ -116,6 +116,10 @@ scrape_configs:
 
 | Metric | Type | Labels | Description |
 |---|---|---|---|
+| `terrapod_replication_seconds_since_last_sync` | Gauge | — | Seconds since the last successful pull from the HA peer (follower side) |
+| `terrapod_replication_backfilling_classes` | Gauge | — | Classes mid-backfill. **Non-zero means NOT in sync**, however recent the last pull |
+| `terrapod_replication_events_retained` | Gauge | — | Outbox events inside the retention window |
+| `terrapod_replication_oldest_event_age_seconds` | Gauge | — | Age of the oldest retained event. Approaching `ha.replication.retention_days` means the follower is close to having to backfill from scratch |
 | `terrapod_runs_created_total` | Counter | source, plan_only | Runs created |
 | `terrapod_runs_transitioned_total` | Counter | from_status, to_status | Run state transitions |
 | `terrapod_runs_terminal_total` | Counter | status | Runs reaching terminal state |

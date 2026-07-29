@@ -201,6 +201,20 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 		return nil, e, nil
 	})
 
+	// ── terrapod_ha_status ───────────────────────────────────────────
+	type haStatusIn struct{}
+	mcp.AddTool(s, &mcp.Tool{
+		Name:        "terrapod_ha_status",
+		Description: "Report whether this Terrapod node is converging with its HA peer — the question to answer BEFORE a failover. Answered from local state only, so it still works when the peer is the thing that has broken. On a FOLLOWER read `in-sync`, `seconds-since-last-sync` and `backfilling-classes`: a node mid-backfill is NOT in sync however recent its last sync, so treat a non-empty `backfilling-classes` as not-ready regardless of the timestamp. On a LEADER compare `oldest-event-age-seconds` against `retention-seconds`: as they converge the follower is close to falling off the retained event window and having to backfill from scratch. `peer-configured` false means this is an ordinary single node and none of the rest applies. There is deliberately no 'N events behind' — seconds since the last SUCCESSFUL pull is the honest number, because a pull that returned nothing means caught up as of then.",
+		Annotations: readOnly,
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, _ haStatusIn) (*mcp.CallToolResult, *terrapod.HAStatus, error) {
+		st, err := c.GetHAStatus(ctx)
+		if err != nil {
+			return errResult(err), nil, nil
+		}
+		return nil, st, nil
+	})
+
 	// ── terrapod_workspace_architecture_critique ─────────────────────
 	type wsCritiqueIn struct {
 		WorkspaceID string `json:"workspace_id" jsonschema:"the workspace id (ws-...) whose current-state architecture critique to fetch"`
