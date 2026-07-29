@@ -9,11 +9,13 @@ Endpoints:
     POST /oauth/token — exchange auth code for API token
 """
 
+import hashlib
 import hmac
 import os
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, status
 from fastapi.responses import JSONResponse, RedirectResponse
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.auth.api_tokens import create_api_token
@@ -25,6 +27,7 @@ from terrapod.auth.auth_state import (
 )
 from terrapod.auth.pkce import s256_challenge
 from terrapod.config import settings
+from terrapod.db.models import OAuthClient, now_utc
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.redis.client import get_redis_client
@@ -125,13 +128,87 @@ async def oauth_authorize(
     return RedirectResponse(url=f"/login?cli_state={idp_state}", status_code=302)
 
 
+def _hash_client_secret(secret: str) -> str:
+    """SHA-256, matching how API tokens are hashed at rest."""
+    return hashlib.sha256(secret.encode()).hexdigest()
+
+
+async def _client_credentials_grant(
+    db: AsyncSession, client_id: str, client_secret: str
+) -> JSONResponse:
+    """RFC 6749 client-credentials grant, for machine-to-machine callers (#1108).
+
+    Introduced for the HA peer link. Each node registers a client representing
+    its peer and hands over those credentials, so the two authenticate with a
+    standard grant rather than a bespoke handshake — a reviewer can read the
+    RFC and know what it guarantees.
+
+    The resulting token carries `kind="peer"`, its OWN identity class rather
+    than a reuse of the runner-token path. A peer is entitled to see resolved
+    sensitive variables, and granting that must not widen what a runner can
+    reach, nor leave an audit unable to tell the two apart.
+    """
+    if not client_id or not client_secret:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="grant_type=client_credentials requires client_id and client_secret",
+        )
+
+    result = await db.execute(select(OAuthClient).where(OAuthClient.client_id == client_id))
+    client = result.scalar_one_or_none()
+
+    # One message and one code for every failure mode — unknown client,
+    # deactivated client, wrong secret — so the response cannot be used to
+    # enumerate which client ids exist.
+    invalid = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Invalid client credentials",
+    )
+    if client is None or not client.is_active:
+        # Still spend the hash on the miss, so a bad client_id is not
+        # measurably faster to reject than a bad secret.
+        _hash_client_secret(client_secret)
+        raise invalid
+    if not hmac.compare_digest(client.client_secret_hash, _hash_client_secret(client_secret)):
+        raise invalid
+
+    api_token, raw_token = await create_api_token(
+        db=db,
+        bound_to=None,
+        created_by=f"oauth-client:{client.client_id}",
+        kind="peer",
+        description=f"client_credentials grant for {client.name or client.client_id}",
+        lifespan_hours=settings.auth.peer_token_ttl_hours,
+    )
+    client.last_used_at = now_utc()
+    await db.commit()
+
+    logger.info(
+        "Issued peer token via client_credentials",
+        client_id=client.client_id,
+        token_id=str(api_token.id),
+    )
+    return JSONResponse(
+        content={
+            "access_token": raw_token,
+            "token_type": "bearer",
+            "expires_in": settings.auth.peer_token_ttl_hours * 3600,
+        }
+    )
+
+
 @router.post("/oauth/token")
 async def oauth_token(
     grant_type: str = Form(...),
-    code: str = Form(...),
+    # Optional because two grants share this endpoint now. The
+    # authorization_code path still requires both and says so explicitly
+    # below, so an existing caller that omits them gets the same 4xx it
+    # always did — just from a check rather than from FastAPI's validator.
+    code: str = Form(""),
     client_id: str = Form(""),
+    client_secret: str = Form(""),
     redirect_uri: str = Form(""),
-    code_verifier: str = Form(...),
+    code_verifier: str = Form(""),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """Exchange authorization code for API token (terraform CLI flow).
@@ -141,10 +218,19 @@ async def oauth_token(
     returns it. No refresh_token, no expires_in — terraform stores it
     permanently in .terraformrc.
     """
+    if grant_type == "client_credentials":
+        return await _client_credentials_grant(db, client_id, client_secret)
+
     if grant_type != "authorization_code":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Only grant_type=authorization_code is supported",
+            detail="Unsupported grant_type: expected authorization_code or client_credentials",
+        )
+
+    if not code or not code_verifier:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="grant_type=authorization_code requires code and code_verifier",
         )
 
     # Consume the one-time auth code

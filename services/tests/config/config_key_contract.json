@@ -111,6 +111,7 @@
   "auth.callback_base_url",
   "auth.local_enabled",
   "auth.login_token_ttl_hours",
+  "auth.peer_token_ttl_hours",
   "auth.require_external_sso_for_roles",
   "auth.service_token_max_ttl_hours",
   "auth.session_ttl_hours",
