@@ -468,6 +468,15 @@ class AuthConfig(BaseSettings):
         default=12,
         description="Session TTL in hours",
     )
+    peer_token_ttl_hours: int = Field(
+        default=1,
+        ge=1,
+        description=(
+            "Lifetime of a token issued by the client_credentials grant (#1108). "
+            "Short by design: the peer re-authenticates freely, so a leaked token "
+            "is worth little and revocation takes effect quickly."
+        ),
+    )
     api_token_max_ttl_hours: int = Field(
         default=8760,
         description="Maximum interactive API token lifetime in hours (default: 8760 = 1 year). "
