@@ -233,6 +233,34 @@ id, and seconds-since-the-last-successful-pull is the more honest number: a pull
 that returned nothing means caught up *as of then*, which is the question being
 asked.
 
+## The other half: is any component a single point of failure?
+
+A pair that replicates flawlessly is still not highly available if it is serving
+from one API pod. The same status endpoint reports in-cluster readiness:
+
+| Field | Meaning |
+|---|---|
+| `components` | Ready **and desired** replicas per component. Desired comes from the Deployment — without it, `1` cannot be told apart from `1 of 3, mid-incident` |
+| `single-replica-components` | Components on exactly one ready replica, named directly |
+| `components-unavailable-reason` | Set when the API could not read its namespace |
+
+**API and web come from Kubernetes; listeners do not.** A listener may be in a
+different cluster entirely — that is the point of the design — so its replica
+count comes from the Redis heartbeats that already cross that boundary.
+Reporting a listener as absent because it is merely elsewhere would be worse
+than not reporting it.
+
+This needs a namespace-scoped Role (`pods` and `apps/deployments`, read-only),
+created by the chart alongside `api.config.ha.component_status.enabled`.
+**Declining it is supported**: set that to `false` and both the Role and the
+sampling go away, and the endpoint reports `unknown` rather than failing. An
+empty `components` with a reason set means *"I cannot see"*, never *"nothing is
+running"*.
+
+It reports **readiness, not a verdict**. "2 of 3 API replicas ready" is a fact;
+"HA is configured correctly" is not something a pod list can support, since
+PodDisruptionBudgets, anti-affinity and topology spread are chart-level.
+
 ## Performing a failover
 
 1. Confirm the standby is caught up (above).

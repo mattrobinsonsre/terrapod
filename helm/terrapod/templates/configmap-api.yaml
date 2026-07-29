@@ -280,6 +280,13 @@ data:
         {{- /* client_secret is deliberately absent: it arrives as
                TERRAPOD_HA__PEER__CLIENT_SECRET from a Secret, never a ConfigMap. */}}
       {{- end }}
+      {{- with .Values.api.config.ha.component_status }}
+      component_status:
+        enabled: {{ .enabled | default false }}
+        interval_seconds: {{ .interval_seconds | default 60 }}
+        namespace: {{ .namespace | default "" | quote }}
+        instance: {{ .instance | default $.Release.Name | quote }}
+      {{- end }}
       {{- with .Values.api.config.ha.replication }}
       replication:
         enabled: {{ .enabled | default false }}

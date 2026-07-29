@@ -414,6 +414,17 @@ api:
         # K8s Secret holding the client secret for the peer's OAuth client.
         existingSecret: ""
         existingSecretKey: "client_secret"
+      # In-cluster component readiness (#1122). A pair that replicates
+      # flawlessly is still not highly available if it serves from one API pod.
+      # Enabling this also creates a namespace-scoped Role letting the API read
+      # pods + Deployments in its own namespace; set enabled:false to decline
+      # both, and the status endpoint then reports "unknown".
+      component_status:
+        enabled: true
+        interval_seconds: 60
+        # Default to this pod's own namespace and the release name.
+        namespace: ""
+        instance: ""
       replication:
         # Off by default: replication is meaningless without a peer, and the
         # overwhelming majority of installs are a single node.

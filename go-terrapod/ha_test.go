@@ -119,3 +119,53 @@ func TestGetHAStatusPropagatesErrors(t *testing.T) {
 		t.Fatal("expected an error for a non-admin caller")
 	}
 }
+
+const withComponents = `{"data":{"id":"node-a","type":"ha-status","attributes":{
+  "node-id":"node-a","role":"leader","peer-configured":false,"replication-enabled":false,
+  "in-sync":false,"events-retained":0,"retention-seconds":604800,
+  "components":[{"name":"api","ready":3,"desired":3},{"name":"web","ready":1,"desired":1}],
+  "components-sampled-at":"2026-07-29T10:00:00Z",
+  "single-replica-components":["web"]}}}`
+
+const componentsUnavailable = `{"data":{"id":"node-a","type":"ha-status","attributes":{
+  "node-id":"node-a","role":"leader","peer-configured":false,"replication-enabled":false,
+  "in-sync":false,"events-retained":0,"retention-seconds":604800,
+  "components":[],
+  "components-unavailable-reason":"pods is forbidden: cannot list resource \"pods\""}}}`
+
+// The other half of "is this HA": a single node with no peer still wants to
+// know it is serving from one web pod.
+func TestGetHAStatusComponents(t *testing.T) {
+	c := newHAFixture(t, withComponents)
+
+	got, err := c.GetHAStatus(context.Background())
+	if err != nil {
+		t.Fatalf("GetHAStatus: %v", err)
+	}
+	if len(got.Components) != 2 {
+		t.Fatalf("components = %+v", got.Components)
+	}
+	if got.Components[0].Name != "api" || got.Components[0].Ready != 3 || got.Components[0].Desired != 3 {
+		t.Fatalf("api = %+v", got.Components[0])
+	}
+	if len(got.SingleReplicaComponents) != 1 || got.SingleReplicaComponents[0] != "web" {
+		t.Fatalf("single-replica = %v", got.SingleReplicaComponents)
+	}
+}
+
+// A missing Role means "unknown", not "nothing is running". An empty component
+// list carrying a reason must not read as an outage.
+func TestGetHAStatusComponentsUnavailable(t *testing.T) {
+	c := newHAFixture(t, componentsUnavailable)
+
+	got, err := c.GetHAStatus(context.Background())
+	if err != nil {
+		t.Fatalf("GetHAStatus: %v", err)
+	}
+	if got.ComponentsUnavailableReason == "" {
+		t.Fatal("a declined permission must be reported, not silently empty")
+	}
+	if len(got.SingleReplicaComponents) != 0 {
+		t.Fatal("no component can be a single point of failure if none were visible")
+	}
+}

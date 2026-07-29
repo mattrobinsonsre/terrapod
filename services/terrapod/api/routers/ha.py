@@ -23,7 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from terrapod.api.dependencies import AuthenticatedUser, require_admin_or_audit
 from terrapod.config import settings
 from terrapod.db.session import get_db
-from terrapod.services import ha_role, replication
+from terrapod.services import component_status, ha_role, replication
 
 router = APIRouter(prefix="/ha", tags=["ha"])
 
@@ -78,6 +78,7 @@ async def status(
     role = await ha_role.get_role()
     cfg = settings.ha
     state = await replication.read_status(db)
+    components = await component_status.read()
 
     now = datetime.now(UTC)
     since_sync = (
@@ -112,6 +113,22 @@ async def status(
                 "oldest-event-age-seconds": oldest_age,
                 "retention-seconds": cfg.replication.retention_days * 86400,
                 "replicated-classes": sorted(replication.registered()),
+                # In-cluster readiness (#1122). A pair that replicates
+                # flawlessly is still not highly available if it serves from a
+                # single API pod.
+                "components": [
+                    {"name": c.name, "ready": c.ready, "desired": c.desired}
+                    for c in (components.components or [])
+                ],
+                "components-sampled-at": components.sampled_at,
+                # Distinct from an empty list: "I cannot see" is not "nothing
+                # is running", and an operator declining the Role is a normal
+                # answer rather than a fault.
+                "components-unavailable-reason": components.unavailable_reason,
+                # Components on exactly one ready replica. Named rather than
+                # left for the reader to derive, because it is the thing being
+                # looked for.
+                "single-replica-components": components.single_points_of_failure,
             },
         }
     }

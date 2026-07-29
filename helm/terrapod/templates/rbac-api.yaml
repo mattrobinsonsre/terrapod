@@ -1,0 +1,50 @@
+{{- /*
+Namespace-scoped read for the API, so it can report in-cluster component
+readiness (#1122).
+
+A leader/follower pair that replicates flawlessly is still not highly available
+if it is serving from one API pod. Answering that needs the API to see its own
+namespace — which it previously could not, purely because it had no Role at
+all, while the listener has carried a comparable one since it shipped.
+
+Read-only and namespace-scoped: pods to count what is ready, Deployments to
+know what was intended. Without `desired`, "1 replica" cannot be told apart
+from "1 of 3, mid-incident".
+
+Declining this is supported. Set `api.config.ha.component_status.enabled: false`
+and the endpoint reports `unknown` rather than failing.
+*/ -}}
+{{- if and .Values.api.enabled (.Values.api.config.ha).component_status }}
+{{- if (.Values.api.config.ha).component_status.enabled }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "terrapod.fullname" . }}-component-status
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "terrapod.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "terrapod.fullname" . }}-component-status
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "terrapod.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "terrapod.fullname" . }}-component-status
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "terrapod.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+{{- end }}
+{{- end }}
