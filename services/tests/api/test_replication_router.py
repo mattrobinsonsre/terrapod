@@ -48,14 +48,16 @@ class TestClasses:
         ids = [d["id"] for d in resp.json()["data"]]
         assert ids.index("agent_pools") < ids.index("agent_pool_tokens")
 
-    async def test_advertises_the_merge_rules(self):
-        """The follower reads these from the sender rather than assuming, so a
-        skewed pair agrees on how a counter merges."""
+    async def test_advertises_no_merge_semantics(self):
+        """There are none. In a leader/follower pair only the leader writes, so
+        the peer's row is authoritative and there is nothing to reconcile —
+        advertising per-class merge rules was active-active residue (#1124)."""
         resp = await _get(f"{BASE}/classes")
 
-        tokens = next(d for d in resp.json()["data"] if d["id"] == "agent_pool_tokens")
-        assert "use_count" in tokens["attributes"]["monotonic-fields"]
-        assert "is_revoked" in tokens["attributes"]["one-way-true-fields"]
+        for entry in resp.json()["data"]:
+            assert "attributes" not in entry, (
+                "a replication class carries no merge semantics to advertise"
+            )
 
 
 class TestEvents:

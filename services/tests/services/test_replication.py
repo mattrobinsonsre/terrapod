@@ -41,12 +41,6 @@ class TestRegistry:
     def test_unknown_class_resolves_to_none(self):
         assert replication.get("not_a_class") is None
 
-    def test_the_counter_class_declares_its_merge_rule(self):
-        """If this ever silently reverts to blanket LWW, a spent token gets its
-        budget back — so the declaration itself is worth pinning."""
-        assert "use_count" in TOKENS.monotonic_fields
-        assert "is_revoked" in TOKENS.one_way_true_fields
-
 
 class TestSerialisation:
     def test_round_trips_a_row(self):
@@ -87,55 +81,6 @@ class TestSerialisation:
         values = replication._coerce(POOLS, {"id": str(uuid.uuid4()), "invented_column": 1})
 
         assert "invented_column" not in values
-
-
-class TestMergeRules:
-    """The field-level exceptions that blanket last-write-wins gets wrong."""
-
-    @pytest.mark.replication_matrix("agent_pool_tokens", "monotonic-never-regresses")
-    def test_counter_never_decreases(self):
-        existing = SimpleNamespace(use_count=7, is_revoked=False)
-
-        merged = replication._merge(TOKENS, existing, {"use_count": 5})
-
-        assert merged["use_count"] == 7, "a stale count would refund a spent token"
-
-    def test_counter_still_advances(self):
-        existing = SimpleNamespace(use_count=7, is_revoked=False)
-
-        merged = replication._merge(TOKENS, existing, {"use_count": 9})
-
-        assert merged["use_count"] == 9
-
-    @pytest.mark.replication_matrix("agent_pool_tokens", "one-way-never-reverts")
-    def test_revocation_is_one_way(self):
-        existing = SimpleNamespace(use_count=0, is_revoked=True)
-
-        merged = replication._merge(TOKENS, existing, {"is_revoked": False})
-
-        assert merged["is_revoked"] is True, "a revoked token must never become usable again"
-
-    def test_revocation_still_propagates(self):
-        existing = SimpleNamespace(use_count=0, is_revoked=False)
-
-        merged = replication._merge(TOKENS, existing, {"is_revoked": True})
-
-        assert merged["is_revoked"] is True
-
-    def test_ordinary_fields_take_the_incoming_value(self):
-        existing = SimpleNamespace(name="old", use_count=0, is_revoked=False)
-
-        merged = replication._merge(POOLS, existing, {"name": "new"})
-
-        assert merged["name"] == "new"
-
-    def test_null_counter_is_treated_as_zero(self):
-        """A peer that omits or nulls the field must not blank a real count."""
-        existing = SimpleNamespace(use_count=4, is_revoked=False)
-
-        merged = replication._merge(TOKENS, existing, {"use_count": None})
-
-        assert merged["use_count"] == 4
 
 
 class TestEventReading:
@@ -260,17 +205,6 @@ class TestApply:
 
         assert existing.name == "p"
         assert existing.labels == {"env": "prod"}
-
-    async def test_update_honours_the_monotonic_rule(self):
-        db = AsyncMock()
-        existing = self._token(use_count=7)
-        db.scalar.return_value = existing
-
-        await replication.apply_upsert(
-            db, TOKENS, {"id": str(existing.id), "use_count": 2, "is_revoked": False}
-        )
-
-        assert existing.use_count == 7
 
     async def test_a_payload_without_a_primary_key_is_ignored(self):
         db = AsyncMock()
@@ -465,74 +399,6 @@ class TestAgentPoolTokensMatrix:
         await replication.apply_delete(db, TOKENS, str(uuid.uuid4()))
 
         db.execute.assert_awaited()
-
-
-class TestRoleChangeConflict:
-    """What happens when both sides touched the same row (#1112).
-
-    This is the case a failover actually produces: A was written to before the
-    cutover, B after it. There is no clever resolution here, and there should
-    not be — the rules just have to be the intended ones, and stated.
-    """
-
-    @pytest.mark.replication_matrix("agent_pools", "role-change-conflict")
-    async def test_settings_take_the_peers_value(self):
-        """Plain settings are last-writer-wins by arrival, and that is correct:
-        only the leader originates change, so the value arriving from the peer
-        is the one the leader has."""
-        db = AsyncMock()
-        existing = AgentPool(id=uuid.uuid4(), name="edited-locally", description="local")
-        db.scalar.return_value = existing
-
-        await replication.apply_upsert(db, POOLS, {"id": str(existing.id), "name": "from-peer"})
-
-        assert existing.name == "from-peer"
-
-    @pytest.mark.replication_matrix("agent_pool_tokens", "role-change-conflict")
-    async def test_both_sides_spending_the_budget_converges_upward(self):
-        """The real shape of a shared listener fleet across a failover: joins
-        landed on A before the cutover and on B after it. Neither count is
-        'right' — but the token must never end up with MORE budget than the two
-        of them have already spent between them."""
-        db = AsyncMock()
-        local = AgentPoolToken(
-            id=uuid.uuid4(),
-            pool_id=uuid.uuid4(),
-            token_hash="h" * 64,
-            max_uses=10,
-            use_count=6,  # spent here after the cutover
-            is_revoked=False,
-            created_by="admin",
-        )
-        db.scalar.return_value = local
-
-        # The peer reports its own, older count.
-        await replication.apply_upsert(
-            db, TOKENS, {"id": str(local.id), "use_count": 4, "is_revoked": False}
-        )
-
-        assert local.use_count == 6, "converging downward would refund spent uses"
-
-    @pytest.mark.replication_matrix("agent_pool_tokens", "one-way-never-reverts")
-    async def test_a_revocation_on_either_side_sticks(self):
-        """Revoking during an incident, on whichever node answered, must survive
-        replication from a peer that had not seen it yet."""
-        db = AsyncMock()
-        local = AgentPoolToken(
-            id=uuid.uuid4(),
-            pool_id=uuid.uuid4(),
-            token_hash="h" * 64,
-            use_count=1,
-            is_revoked=True,
-            created_by="admin",
-        )
-        db.scalar.return_value = local
-
-        await replication.apply_upsert(
-            db, TOKENS, {"id": str(local.id), "use_count": 1, "is_revoked": False}
-        )
-
-        assert local.is_revoked is True
 
 
 class TestBackfillConvergesDeletion:

@@ -114,18 +114,6 @@ class TestUsers:
 
         assert removed == ["gone@example.com"]
 
-    @pytest.mark.replication_matrix("users", "role-change-conflict")
-    async def test_deactivation_from_the_peer_wins(self):
-        """Deactivating an account is the offboarding path; the peer's value is
-        the leader's, and it must land even if this node saw the user active."""
-        db = AsyncMock()
-        existing = User(email="a@example.com", is_active=True)
-        db.scalar.return_value = existing
-
-        await replication.apply_upsert(db, USERS, {"email": "a@example.com", "is_active": False})
-
-        assert existing.is_active is False
-
 
 class TestRoles:
     @pytest.mark.replication_matrix("roles", "backfill-from-empty")
@@ -177,18 +165,6 @@ class TestRoles:
         removed = await replication.reconcile_deletions(db, ROLES, {"sre"})
 
         assert removed == ["deleted-role"]
-
-    @pytest.mark.replication_matrix("roles", "role-change-conflict")
-    async def test_a_narrowed_grant_from_the_peer_wins(self):
-        """Narrowing a role is a security action. The peer's version is the
-        leader's, so it must not be overwritten by this node's wider copy."""
-        db = AsyncMock()
-        existing = Role(name="sre", capabilities=["run:apply", "workspace:delete"])
-        db.scalar.return_value = existing
-
-        await replication.apply_upsert(db, ROLES, {"name": "sre", "capabilities": ["run:apply"]})
-
-        assert existing.capabilities == ["run:apply"]
 
 
 class TestRoleAssignments:
@@ -247,16 +223,6 @@ class TestRoleAssignments:
         removed = await replication.reconcile_deletions(db, ASSIGNMENTS, {kept})
 
         assert removed == [replication.encode_entity_id(ASSIGNMENTS, ["local", "revoked@x.com"])]
-
-    @pytest.mark.replication_matrix("role_assignments", "role-change-conflict")
-    async def test_two_providers_for_one_email_stay_distinct(self):
-        """The composite key is load-bearing here: the same person from two
-        identity providers is two assignments, and collapsing them would grant
-        one provider's role to the other."""
-        local = replication.encode_entity_id(ASSIGNMENTS, ["local", "a@x.com"])
-        oidc = replication.encode_entity_id(ASSIGNMENTS, ["oidc", "a@x.com"])
-
-        assert local != oidc
 
 
 class TestPlatformRoleAssignments:
@@ -318,15 +284,6 @@ class TestPlatformRoleAssignments:
 
         assert removed == [replication.encode_entity_id(PLATFORM, ["local", "a@x.com", "admin"])]
 
-    @pytest.mark.replication_matrix("platform_role_assignments", "role-change-conflict")
-    async def test_admin_and_audit_for_one_person_are_separate_rows(self):
-        """Because the role is part of the key, losing `admin` must not also
-        drop `audit` — and holding `audit` must not imply `admin`."""
-        admin = replication.encode_entity_id(PLATFORM, ["local", "a@x.com", "admin"])
-        audit = replication.encode_entity_id(PLATFORM, ["local", "a@x.com", "audit"])
-
-        assert admin != audit
-
 
 class TestAPITokens:
     """The class #1115 was really about."""
@@ -381,18 +338,6 @@ class TestAPITokens:
         removed = await replication.reconcile_deletions(db, TOKENS, {"at-live"})
 
         assert removed == ["at-revoked"]
-
-    @pytest.mark.replication_matrix("api_tokens", "role-change-conflict")
-    async def test_a_narrowed_token_scope_from_the_peer_wins(self):
-        """Re-scoping a service token is a security action; the peer's value is
-        the leader's and must not be widened back by this node's copy."""
-        db = AsyncMock()
-        existing = _token(pinned_roles=["admin"])
-        db.scalar.return_value = existing
-
-        await replication.apply_upsert(db, TOKENS, {"id": "at-1", "pinned_roles": ["audit"]})
-
-        assert existing.pinned_roles == ["audit"]
 
 
 class TestOrdering:

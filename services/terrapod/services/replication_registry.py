@@ -30,26 +30,13 @@ AGENT_POOLS = register(
     )
 )
 
-# Join tokens, and the reason `monotonic_fields` exists.
+# Join tokens.
 #
-# `use_count` is the budget `max_uses` is spent against, and BOTH nodes spend
-# it: a shared listener fleet follows the DNS name, so joins land on A before a
-# failover and on B after one. Under blanket last-write-wins a stale copy would
-# regress the count and silently hand the token its spent budget back — the one
-# field where losing an update issues extra credentials rather than merely
-# losing information. `is_revoked` is the same hazard in boolean form: a
-# revoked token must never be replicated back to usable.
-#
-# This is also why a shared fleet wants a long-lived, generously reusable token
-# in the first place: every failover costs one use per listener.
-AGENT_POOL_TOKENS = register(
-    ReplicatedClass(
-        name="agent_pool_tokens",
-        model=AgentPoolToken,
-        monotonic_fields=frozenset({"use_count"}),
-        one_way_true_fields=frozenset({"is_revoked"}),
-    )
-)
+# A shared listener fleet wants a long-lived, generously reusable token: every
+# failover re-points the fleet at the promoted node, each listener re-joins, and
+# each re-join spends one use. A `max_uses` sized for the initial rollout is
+# therefore exhausted by the first real failover.
+AGENT_POOL_TOKENS = register(ReplicatedClass(name="agent_pool_tokens", model=AgentPoolToken))
 
 
 # ---------------------------------------------------------------------------
@@ -88,15 +75,4 @@ PLATFORM_ROLE_ASSIGNMENTS = register(
 # only because the delta path records deletes AND backfill reconciles. Without
 # both, an offboarded person's token comes back to life at a failover, weeks
 # after the revocation was performed and confirmed.
-#
-# `last_used_at` is deliberately NOT monotonic-merged. It is observational, not
-# a budget: each node legitimately sees different usage, and forcing the later
-# value would make "last used" mean "last used on either node", which is not
-# what an operator auditing a single node is reading.
-API_TOKENS = register(
-    ReplicatedClass(
-        name="api_tokens",
-        model=APIToken,
-        pk_attrs=("id",),
-    )
-)
+API_TOKENS = register(ReplicatedClass(name="api_tokens", model=APIToken))
