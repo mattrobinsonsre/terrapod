@@ -143,6 +143,16 @@ async def github_webhook(request: Request) -> Response:
             {"repo": full_name},
             dedup_key=f"module_impact_poll:{full_name}",
         )
+        # A tag push arrives as an ordinary `push` with a refs/tags/... ref.
+        # Gated on that rather than fired for every commit, because only a tag
+        # can produce a new module version — an ordinary push would wake the
+        # tag poller to discover nothing (#1149).
+        if str(body.get("ref", "")).startswith("refs/tags/"):
+            await enqueue_trigger(
+                "registry_vcs_immediate_poll",
+                {"repo": full_name},
+                dedup_key=f"registry_vcs_poll:{full_name}",
+            )
 
     elif event_type == "issue_comment":
         # GitHub fires `issue_comment` for both PR comments and plain
@@ -322,5 +332,12 @@ async def gitlab_webhook(request: Request) -> Response:
             {"repo": path_with_namespace},
             dedup_key=f"module_impact_poll:{path_with_namespace}",
         )
+        # GitLab names the tag case explicitly, so no ref sniffing needed (#1149).
+        if event_type == "Tag Push Hook":
+            await enqueue_trigger(
+                "registry_vcs_immediate_poll",
+                {"repo": path_with_namespace},
+                dedup_key=f"registry_vcs_poll:{path_with_namespace}",
+            )
 
     return JSONResponse(content={"message": "accepted"})

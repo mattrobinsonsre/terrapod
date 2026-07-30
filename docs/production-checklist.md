@@ -103,7 +103,7 @@ A step-by-step checklist for preparing a Terrapod instance for production use. E
 
 - [ ] **VCS connection is configured** -- GitHub App or GitLab access token. See [VCS Integration](vcs-integration.md).
 - [ ] **Webhook secret is set** (GitHub only) -- If using webhook-accelerated polling, set `vcs.github.webhook_secret` and configure the webhook in your GitHub App settings.
-- [ ] **Poll interval is appropriate** -- Default: 60 seconds. Lower values detect changes faster but increase API calls to your VCS provider.
+- [ ] **Poll intervals are appropriate** -- Workspace repos default to 60 seconds; module repos to 300 (`vcs.module_poll_interval_seconds`), since they are far more numerous than they are active. Lower values detect changes faster but multiply VCS API calls across every connected repo. Prefer a webhook over a shorter interval — every VCS poller has an immediate-poll accelerator, including module tag publishing, so with webhooks configured the interval is a fallback floor rather than the latency anyone experiences.
 
 ---
 

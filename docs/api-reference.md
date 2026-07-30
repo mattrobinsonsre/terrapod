@@ -2251,7 +2251,7 @@ Validates HMAC-SHA256 signature and triggers an immediate poll cycle. The webhoo
 POST /api/terrapod/v1/vcs-events/gitlab
 ```
 
-Validates the `X-Gitlab-Token` header (timing-safe comparison against the connection's `webhook-secret`) and triggers an immediate poll cycle. Handles `Push Hook`, `Tag Push Hook`, and `Merge Request Hook` events; other event types are acknowledged and ignored. Like GitHub, webhooks are an **optional accelerator** — the background poller still picks up changes within `vcs.poll_interval_seconds` if no webhook is configured.
+Validates the `X-Gitlab-Token` header (timing-safe comparison against the connection's `webhook-secret`) and triggers an immediate poll cycle. Handles `Push Hook`, `Tag Push Hook`, and `Merge Request Hook` events; other event types are acknowledged and ignored. A `Tag Push Hook` additionally triggers an immediate **module tag** poll, so a new module version publishes within seconds rather than waiting for `vcs.module_poll_interval_seconds`. Like GitHub, webhooks are an **optional accelerator** — the background poller still picks up changes within `vcs.poll_interval_seconds` if no webhook is configured.
 
 ---
 

@@ -300,6 +300,7 @@ data:
     vcs:
       enabled: {{ .Values.api.config.vcs.enabled }}
       poll_interval_seconds: {{ .Values.api.config.vcs.poll_interval_seconds | default 60 }}
+      module_poll_interval_seconds: {{ .Values.api.config.vcs.module_poll_interval_seconds | default 300 }}
       # tmpdir tracks the ephemeralStorage mountPath so the VCS poller writes
       # streamed tarballs onto the PVC, not pod memory. Override
       # api.config.vcs.tmpdir if you remount the PVC elsewhere.

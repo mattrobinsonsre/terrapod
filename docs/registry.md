@@ -201,7 +201,7 @@ Only tags matching the pattern are considered. The prefix before the `*` wildcar
 
 ### Polling Behaviour
 
-- The registry VCS poller runs as a periodic task via the distributed scheduler (default: every 60 seconds, shared with the workspace VCS poller interval)
+- The registry VCS poller runs as a periodic task via the distributed scheduler (default: every 300 seconds, `vcs.module_poll_interval_seconds` — separate from, and longer than, the workspace poller; a tag-push webhook triggers an immediate poll)
 - Exactly one replica executes each poll cycle (multi-replica safe via Redis)
 - Each cycle queries all modules with `source=vcs` and a configured VCS connection, then lists tags from the VCS provider
 
@@ -265,7 +265,7 @@ jobs:
           git push origin "${{ steps.bump.outputs.new_tag }}"
 ```
 
-With this in place, every merge to `main` creates a new patch version tag (e.g. `v0.0.1` → `v0.0.2`), which Terrapod's poller picks up and publishes as a new module version within 60 seconds.
+With this in place, every merge to `main` creates a new patch version tag (e.g. `v0.0.1` → `v0.0.2`), which Terrapod's poller picks up and publishes as a new module version within `vcs.module_poll_interval_seconds` (300s by default) — or within seconds if the module repo has a webhook configured, since a tag push triggers an immediate poll.
 
 ### Version Metadata
 
@@ -426,7 +426,7 @@ For `module-test` runs, Terrapod posts commit statuses and PR comments to the mo
 ### Limitations
 
 - Only works with VCS-connected modules (manual-upload modules don't have a repo to poll)
-- PR polling uses the same interval as the workspace VCS poller (default 60 seconds)
+- PR polling uses the module interval, `vcs.module_poll_interval_seconds` (default 300 seconds). A webhook on the module repo triggers an immediate poll, so PR blast-radius feedback need not wait for it
 - Override mechanism works at the module level — if a workspace uses multiple modules from the same PR, each needs its own link
 
 ---

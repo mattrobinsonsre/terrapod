@@ -1802,6 +1802,10 @@
               "type": "integer",
               "minimum": 1
             },
+            "module_poll_interval_seconds": {
+              "type": "integer",
+              "minimum": 1
+            },
             "tmpdir": {
               "type": "string"
             },

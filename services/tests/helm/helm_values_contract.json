@@ -207,6 +207,7 @@
   "api.config.vcs.github.existingSecretKey",
   "api.config.vcs.gitlab.existingSecret",
   "api.config.vcs.gitlab.existingSecretKey",
+  "api.config.vcs.module_poll_interval_seconds",
   "api.config.vcs.poll_interval_seconds",
   "api.containerSecurityContext.allowPrivilegeEscalation",
   "api.containerSecurityContext.capabilities.drop",

@@ -830,7 +830,27 @@ class VCSConfig(BaseModel):
 
     enabled: bool = Field(default=True, description="Enable VCS integration")
     poll_interval_seconds: int = Field(
-        default=60, description="Polling interval in seconds for VCS changes"
+        default=60,
+        description=(
+            "How often to poll WORKSPACE repos for new commits and PRs. This is the "
+            "latency-sensitive one: it is how long a push waits when no webhook is "
+            "configured. Also used for VCS-connected policy sets, which sync on the same "
+            "cadence and have their own webhook accelerator."
+        ),
+    )
+    module_poll_interval_seconds: int = Field(
+        default=300,
+        description=(
+            "How often to poll MODULE repos — new version tags, and open PRs for "
+            "module-impact analysis (#1149). Separate from, and longer than, the "
+            "workspace interval: module repos are far more numerous than they are "
+            "active, so polling them at workspace cadence spends most of its VCS API "
+            "budget discovering that nothing changed. Both module pollers have webhook "
+            "accelerators — module-impact on PR events, tag publishing on tag pushes "
+            "(added in #1149, since it was the one poller without one) — so with "
+            "webhooks configured this interval is the fallback floor rather than the "
+            "latency anyone experiences."
+        ),
     )
     github: GitHubWebhookConfig = Field(default_factory=GitHubWebhookConfig)
     gitlab: GitLabWebhookConfig = Field(default_factory=GitLabWebhookConfig)
