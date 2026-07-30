@@ -90,6 +90,24 @@ def _dispatch_parse_repo_url(provider: str):  # type: ignore[no-untyped-def]
         raise ValueError(f"Unsupported VCS provider: {provider}")
 
 
+async def handle_registry_vcs_immediate_poll(payload: dict) -> None:
+    """Webhook-triggered immediate tag poll (#1149).
+
+    Tag publishing was the one VCS poller with no webhook accelerator, so its
+    periodic interval WAS the auto-publish latency: push a tag, wait. The events
+    were already arriving — GitHub sends a tag push as an ordinary `push` with a
+    `refs/tags/...` ref, and the GitLab receiver already handled `Tag Push Hook`
+    — they were simply never wired to this poller.
+
+    Runs the full cycle rather than scoping to the payload's repo, matching
+    `handle_module_impact_immediate_poll`. The scheduler's per-repo dedup bounds
+    the rate, and a module with no new tag costs one tag list.
+    """
+    repo = payload.get("repo", "unknown")
+    logger.info("Immediate registry tag poll triggered by webhook", repo=repo)
+    await registry_vcs_poll_cycle()
+
+
 async def registry_vcs_poll_cycle() -> None:
     """Poll VCS providers for new tags and auto-publish module versions."""
     async with get_db_session() as db:

@@ -271,7 +271,8 @@ The chart ships with a `values.schema.json` that validates all values at `helm i
 | Value | Default | Description |
 |---|---|---|
 | `api.config.vcs.enabled` | `true` | Enable VCS integration |
-| `api.config.vcs.poll_interval_seconds` | `60` | Poll interval |
+| `api.config.vcs.poll_interval_seconds` | `60` | Workspace repo poll interval — how long a push waits with no webhook. Also drives policy-set sync |
+| `api.config.vcs.module_poll_interval_seconds` | `300` | Module repo poll interval (version tags + module-impact PRs). Longer by design: module repos are more numerous than they are active |
 | `api.config.vcs.tmpdir` | (matches `api.ephemeralStorage.mountPath`) | Directory for streaming download/strip/upload of VCS tarballs. Falls back to system tempdir if the path doesn't exist |
 | `api.config.vcs.archive_cache_retention_days` | `7` | TTL for cached stripped tarballs in object storage. Evicted by the artifact-retention sweeper |
 | `api.config.vcs.github.existingSecret` | `""` | K8s Secret containing the GitHub webhook HMAC secret |

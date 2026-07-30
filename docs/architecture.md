@@ -553,11 +553,11 @@ Currently registered periodic tasks:
 | Task | Interval | Handler | Description |
 |---|---|---|---|
 | `vcs_poll` | 60s (configurable) | `vcs_poller.poll_cycle` | Poll VCS providers for new commits and PRs |
-| `registry_vcs_poll` | 60s (configurable) | `registry_vcs_poller.poll_cycle` | Poll VCS for new module version tags |
+| `registry_vcs_poll` | 300s (`vcs.module_poll_interval_seconds`) | `registry_vcs_poller.poll_cycle` | Poll VCS for new module version tags |
 | `audit_retention` | 86400s (daily) | `audit_service.purge_old_entries` | Purge audit log entries older than retention period |
 | `drift_check` | 300s (configurable) | `drift_detection_service.drift_check_cycle` | Check workspaces for infrastructure drift |
 | `run_reconciler` | 2s | `run_reconciler.reconcile_runs` | Drive run state transitions based on Job outcomes |
-| `module_impact_poll` | 60s (configurable) | `module_impact_service.module_impact_poll_cycle` | Poll module PRs and create speculative runs on linked workspaces |
+| `module_impact_poll` | 300s (`vcs.module_poll_interval_seconds`) | `module_impact_service.module_impact_poll_cycle` | Poll module PRs and create speculative runs on linked workspaces |
 
 ### Triggered Tasks
 
@@ -574,6 +574,7 @@ Currently registered trigger handlers:
 | `drift_run_completed` | Update workspace drift status when drift run completes | Per run (5 min) |
 | `module_test_completed` | Post VCS commit status and PR comment for module-test runs | Per run (5 min) |
 | `module_impact_immediate_poll` | Webhook-triggered immediate module impact poll | Per repo (5 min) |
+| `registry_vcs_immediate_poll` | Webhook-triggered immediate module **tag** poll, so a new version publishes without waiting for the module interval (#1149) | Per repo (5 min) |
 
 ### Key Redis Patterns
 

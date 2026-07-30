@@ -454,7 +454,17 @@ api:
     # itself — no secrets in Helm values.
     vcs:
       enabled: true
+      # Workspace repos: how long a push waits with no webhook configured.
+      # Also drives VCS-connected policy-set sync.
       poll_interval_seconds: 60
+      # Module repos — new version tags and module-impact PR analysis (#1149).
+      # Deliberately longer: module repos are far more numerous than they are
+      # active, so polling them at workspace cadence spends most of the VCS API
+      # budget discovering nothing changed. Both module pollers have webhook
+      # accelerators (module-impact on PR events, tag publishing on tag pushes),
+      # so with webhooks configured this is the fallback floor rather than the
+      # latency anyone experiences.
+      module_poll_interval_seconds: 300
       github:
         # Optional: K8s Secret containing the webhook HMAC secret.
         # Only needed if GitHub webhooks are enabled for faster feedback.

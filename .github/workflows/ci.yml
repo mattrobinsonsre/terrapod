@@ -729,6 +729,10 @@ jobs:
           echo "$out" | grep -q "kind: ClusterRole" || { echo "FAIL: the node-reader ClusterRole must render when read_nodes is on (#1128)"; exit 1; }
           echo "$out" | grep -A14 "name: .*-node-reader" | grep -q 'resources: \["nodes"\]' || { echo "FAIL: the node-reader ClusterRole must grant nodes (#1128)"; exit 1; }
           echo "$out" | grep -A14 "name: .*-node-reader" | grep -qE 'verbs: \["get", "list"\]' || { echo "FAIL: the node-reader ClusterRole must stay READ-ONLY (#1128)"; exit 1; }
+          # Module repos poll on their own, longer interval (#1149). Both legs
+          # must render: a missing render line makes the value silently inert.
+          echo "$out" | grep -q "poll_interval_seconds: 60" || { echo "FAIL: vcs.poll_interval_seconds must render and default to 60 — the workspace interval is the latency-sensitive one (#1149)"; exit 1; }
+          echo "$out" | grep -q "module_poll_interval_seconds: 300" || { echo "FAIL: vcs.module_poll_interval_seconds must render and default to 300 (#1149)"; exit 1; }
           echo "$out" | grep -q "probe_interval_seconds:" || { echo "FAIL: ha.probe_interval_seconds not rendered (#960)"; exit 1; }
           echo "$out" | grep -q "probe_threshold:" || { echo "FAIL: ha.probe_threshold not rendered (#960)"; exit 1; }
           # AI architecture critic (#1036 Part 2): non-secret config renders into

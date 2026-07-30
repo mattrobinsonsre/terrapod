@@ -128,13 +128,27 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         )
 
         # Registry module VCS publishing (piggybacks on VCS being enabled)
-        from terrapod.services.registry_vcs_poller import registry_vcs_poll_cycle
+        from terrapod.services.registry_vcs_poller import (
+            handle_registry_vcs_immediate_poll,
+            registry_vcs_poll_cycle,
+        )
 
+        # Module repos poll on their own, longer interval (#1149): they are far
+        # more numerous than they are active. No webhook accelerator exists for
+        # tag publishing, so this interval IS the auto-publish latency.
         register_periodic_task(
             "registry_vcs_poll",
-            interval_seconds=settings.vcs.poll_interval_seconds,
+            interval_seconds=settings.vcs.module_poll_interval_seconds,
             handler=registry_vcs_poll_cycle,
             description="Poll VCS providers for new module version tags",
+        )
+        # Tag publishing used to be the only VCS poller with no accelerator, so
+        # its interval was the publish latency. The tag-push events were already
+        # arriving; they just were not wired here (#1149).
+        register_trigger_handler(
+            "registry_vcs_immediate_poll",
+            handler=handle_registry_vcs_immediate_poll,
+            description="Webhook-triggered immediate module tag poll",
         )
 
         # Policy set VCS syncing
@@ -162,9 +176,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
             module_impact_poll_cycle,
         )
 
+        # Also a module repo, so the module interval (#1149). Unlike tag
+        # publishing this one HAS a webhook accelerator
+        # (`module_impact_immediate_poll` below), so PR blast-radius feedback is
+        # not gated on the interval where webhooks are configured.
         register_periodic_task(
             "module_impact_poll",
-            interval_seconds=settings.vcs.poll_interval_seconds,
+            interval_seconds=settings.vcs.module_poll_interval_seconds,
             handler=module_impact_poll_cycle,
             description="Poll VCS-connected modules for open PRs and create speculative runs",
         )
