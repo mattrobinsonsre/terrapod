@@ -237,6 +237,37 @@ _FOLLOWER_SAFE_TASKS = frozenset(
     }
 )
 
+#: Tasks that must run ONLY on a follower — the pull side of replication.
+#:
+#: `_FOLLOWER_SAFE_TASKS` says "allowed on a follower"; it does not say "not on a
+#: leader", so without this the leader pulled from its peer too. Found on a live
+#: pair (#960): both nodes replicated from each other, each minting a token
+#: against the other every cycle, which then tripped the peer's rate limit.
+#:
+#: It is also simply wrong by design. The follower pulls — that is what makes a
+#: peer outage unable to block a healthy leader. A leader that pulls has given
+#: itself a dependency on the node it is supposed to be able to survive.
+_FOLLOWER_ONLY_TASKS = frozenset({"replication_sync", "blob_sync"})
+
+
+def should_run_here(task_name: str, is_leader: bool) -> bool:
+    """Whether this node should run `task_name`, given its role.
+
+    Extracted from the loop so the three-way decision can be asserted directly
+    rather than inferred by driving a `while` loop with a shutdown event. There
+    are three cases and only the middle one is obvious:
+
+    - **follower-only** (the pull side of replication) — the follower runs it,
+      the leader does not.
+    - **follower-safe** — either role may run it.
+    - **everything else** — the leader only.
+    """
+    if task_name in _FOLLOWER_ONLY_TASKS:
+        return not is_leader
+    if task_name in _FOLLOWER_SAFE_TASKS:
+        return True
+    return is_leader
+
 
 async def _run_periodic_loop(
     task: PeriodicTaskDef,
@@ -256,8 +287,8 @@ async def _run_periodic_loop(
             # the installation's VCS API quota on every cycle, advance its own
             # poll cursor, and record a spurious poll failure on every VCS
             # workspace. Skipping is the correct behaviour, not an optimisation.
-            if task.name not in _FOLLOWER_SAFE_TASKS and not await ha_role.is_leader():
-                logger.debug("Skipping periodic task: not the leader", task=task.name)
+            if not should_run_here(task.name, await ha_role.is_leader()):
+                logger.debug("Skipping periodic task: wrong role for this task", task=task.name)
             elif await try_claim_periodic(task.name, task.interval_seconds):
                 logger.debug("Claimed periodic task", task=task.name)
                 start = time.monotonic()
