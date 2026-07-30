@@ -64,7 +64,10 @@ interface HAStatus {
   'last-sync-at': string | null
   'seconds-since-last-sync': number | null
   'backfilling-classes': string[]
-  'inbound-credential': {
+  // Optional on purpose. An API one minor behind does not send it, and a page
+  // that white-screens on a missing additive attribute is precisely the skew
+  // failure the contract programme exists to prevent (#550).
+  'inbound-credential'?: {
     configured: boolean
     'client-id': string | null
     active: boolean | null
@@ -212,15 +215,15 @@ export default function HAPage() {
                   <dt className="text-slate-400">{t('inbound')}</dt>
                   <dd
                     className={
-                      status['inbound-credential']['client-id'] &&
+                      status['inbound-credential']?.['client-id'] &&
                       !status['inbound-credential'].configured
                         ? 'text-amber-300'
                         : undefined
                     }
                   >
-                    {status['inbound-credential'].configured
+                    {status['inbound-credential']?.configured
                       ? t('configured')
-                      : status['inbound-credential']['client-id']
+                      : status['inbound-credential']?.['client-id']
                         ? t('inboundAwaiting')
                         : t('notConfigured')}
                   </dd>
