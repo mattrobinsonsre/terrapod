@@ -205,7 +205,7 @@ semantics would only be needed in an active-active design, which this is not.
 | Variables and variable sets | Replicated |
 | Policy sets, notifications, run tasks, execution hooks, run triggers, remote-state consumers | Replicated |
 | Module and provider content | In development |
-| The CA | Node-local today; whether it should replicate is open (#1143) |
+| The CA, the encryption keys | **Never** — node-local by design (see below) |
 
 **Settings replication is now complete**: everything a workspace's runs depend on
 carries. What remains is run and artifact *history* (a separate phase) and the
@@ -235,11 +235,29 @@ plan. The subtle half is precedence — *priority set → workspace variable →
 non-priority set*. A node that carries every value but disagrees about `priority`
 hands a run a **different** value than the leader would, and nothing reports it.
 
-**The encryption keys themselves are never replicated.** `crypto_keys` holds this
-node's data-encryption key wrapped by *this node's* KEK: it is meaningless to the
-peer, and putting it on the link would leak key material for no benefit. That is
-the whole point of decrypting on send and re-encrypting under the receiver's own
-key — the key never has to travel. A test fails if that class is ever registered.
+### Private keys never travel
+
+Two classes are deliberately outside the replication scope, for the same reason.
+
+**`crypto_keys`** holds this node's data-encryption key wrapped by *this node's*
+KEK. It is meaningless to the peer, and putting it on the link would leak key
+material for no benefit — which is the whole point of decrypting on send and
+re-encrypting under the receiver's own key.
+
+**The CA** (#1143) is node-local by decision, not omission. It signs only
+listener certificates, and those are short-lived and auto-renewed, so no
+artifact's long-term verifiability depends on the pair sharing a CA. A failover
+rebuilds the trust chain by re-joining (above), so replicating the CA would put a
+private key on the peer link and resident on both nodes while buying nothing the
+re-join path does not already deliver.
+
+The one real consequence: every listener re-joins at a failover, spending one
+join-token use each. That is exactly why join tokens for a shared fleet should be
+long-lived and generously reusable.
+
+A test fails if either class is ever registered — and another fails if the CA
+gains a new issuing method, since "everything it signs is short-lived" is the
+premise the decision rests on.
 
 One field is knowingly imperfect: `drift_latest_run_id` points at a run, runs are
 a later phase, and the column is deliberately not a foreign key (so artifact
@@ -269,11 +287,11 @@ failover rather than in a build.
 
 ## Join tokens and the two listener topologies
 
-Both listener topologies work today. Note that each node currently has its own
-CA: `certificate_authority` is **not** a replicated class, so a follower does not
-adopt the leader's. Whether it should is an open decision (#1143) — the
-shared-fleet topology below survives a failover either way, because it heals by
-re-joining rather than by reusing certificates.
+Both listener topologies work, and **neither needs a shared CA**. Each node
+generates and keeps its own; `certificate_authority` is deliberately not
+replicated (#1143). The shared-fleet topology below heals by re-joining rather
+than by reusing certificates, so the trust chain is rebuilt at the failover
+instead of carried through it.
 
 **Per-node fleets.** Each node has its own listeners, pointed at its own name.
 Nothing ever crosses the boundary.
