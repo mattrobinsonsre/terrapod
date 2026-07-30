@@ -203,7 +203,19 @@ semantics would only be needed in an active-active design, which this is not.
 | Registry modules, provider templates, catalog items, autodiscovery rules | Replicated |
 | Workspaces, their agent-pool set, their module links | Replicated |
 | Variables and variable sets | Replicated |
-| Policy sets, notifications, run tasks, hooks, module content, the CA | In development |
+| Policy sets, notifications, run tasks, execution hooks, run triggers, remote-state consumers | Replicated |
+| Module and provider content, the CA | In development |
+
+**Settings replication is now complete**: everything a workspace's runs depend on
+carries. What remains is run and artifact *history* (a separate phase) and the
+object-storage content behind the registry.
+
+Three of the classes above are **gates**, and for a gate the failure mode of
+partial replication is not an error but a silently weaker posture: a mandatory
+policy set that lost its enforcement level is an advisory note, a mandatory run
+task likewise, and the remote-state consumer list is access control whose
+*deletions* matter as much as its rows. Each of those has its own test rather
+than relying on "the row arrived".
 
 Identity comes first deliberately. A node holding the whole estate but no users,
 roles or assignments has nobody able to touch it — and API tokens are the class
