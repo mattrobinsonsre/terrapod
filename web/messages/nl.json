@@ -2865,7 +2865,7 @@
   },
   "adminHa": {
     "title": "Hoge beschikbaarheid",
-    "description": "De rol van deze node, of hij convergeert met zijn peer, en of de objecten die zijn rijen noemen er daadwerkelijk zijn.",
+    "description": "De rol van deze node, of hij convergeert met zijn peer, en of hier iets daadwerkelijk een plan zou kunnen draaien.",
     "roleLabel": "Deze node",
     "role": {
       "leader": "Leider",
@@ -2896,7 +2896,27 @@
       "none": "Geen componenten gerapporteerd.",
       "unavailable": "De gereedheid van de componenten kon niet worden gelezen: {reason}",
       "ready": "{ready} van {desired} gereed",
-      "pdbBlocks": "PDB staat geen enkele eviction toe"
+      "pdbBlocks": "PDB staat geen enkele eviction toe",
+      "restricted": "Gereed-versus-gewenst per component is zichtbaar voor beheerders en auditors. Hier wordt het niet getoond — dat is een recht, geen leeg cluster."
+    },
+    "listeners": {
+      "title": "Runner-gereedheid",
+      "intro": "Een node die vlekkeloos repliceert en geen actieve listener heeft, kan geen enkel plan draaien. De pools die je ziet, en of elk er een heeft.",
+      "unavailable": "Agent-pools konden niet worden gelezen.",
+      "none": "Er zijn geen agent-pools zichtbaar voor jou.",
+      "online": "Listener online",
+      "offline": "Geen actieve listener",
+      "offlineWarning": "Er is geen listener verbonden voor: {pools}. Runs naar deze pools komen in de wachtrij in plaats van te draaien.",
+      "count": "{count, plural, one {# listener} other {# listeners}}"
     }
+  },
+  "haIndicator": {
+    "follower": "Volger",
+    "singleNode": "Enkele node",
+    "inSync": "In sync",
+    "behind": "Achter",
+    "backfilling": "Bijwerken",
+    "aria": "Hoge beschikbaarheid: {role}, {state}",
+    "leader": "Leider"
   }
 }

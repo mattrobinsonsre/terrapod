@@ -2865,7 +2865,7 @@
   },
   "adminHa": {
     "title": "Alta disponibilidad",
-    "description": "El rol de este nodo, si está convergiendo con su par y si los objetos que nombran sus registros están realmente presentes.",
+    "description": "El rol de este nodo, si está convergiendo con su par y si algo aquí podría realmente ejecutar un plan.",
     "roleLabel": "Este nodo",
     "role": {
       "leader": "Líder",
@@ -2896,7 +2896,27 @@
       "none": "No se ha informado de ningún componente.",
       "unavailable": "No se pudo leer la disponibilidad de los componentes: {reason}",
       "ready": "{ready} de {desired} listos",
-      "pdbBlocks": "El PDB no permite ningún desalojo"
+      "pdbBlocks": "El PDB no permite ningún desalojo",
+      "restricted": "El estado listo/deseado de cada componente se muestra a administradores y auditores. Aquí no se muestra: es un permiso, no un clúster vacío."
+    },
+    "listeners": {
+      "title": "Disponibilidad de ejecutores",
+      "intro": "Un nodo que replica sin fallos y no tiene ningún listener activo no puede ejecutar ni un plan. Los pools que ves y si cada uno tiene uno.",
+      "unavailable": "No se pudieron leer los grupos de agentes.",
+      "none": "No hay grupos de agentes visibles para ti.",
+      "online": "Listener en línea",
+      "offline": "Sin listener activo",
+      "offlineWarning": "No hay ningún listener conectado para: {pools}. Las ejecuciones dirigidas a estos grupos se encolarán en lugar de ejecutarse.",
+      "count": "{count, plural, one {# listener} other {# listeners}}"
     }
+  },
+  "haIndicator": {
+    "follower": "Seguidor",
+    "singleNode": "Nodo único",
+    "inSync": "Sincronizado",
+    "behind": "Por detrás",
+    "backfilling": "Rellenando",
+    "aria": "Alta disponibilidad: {role}, {state}",
+    "leader": "Líder"
   }
 }

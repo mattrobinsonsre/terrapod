@@ -2865,7 +2865,7 @@
   },
   "adminHa": {
     "title": "High availability",
-    "description": "This node's role, whether it is converging with its peer, and whether the objects its rows name are actually there.",
+    "description": "This node's role, whether it is converging with its peer, and whether anything here could actually run a plan.",
     "roleLabel": "This node",
     "role": {
       "leader": "Leader",
@@ -2896,7 +2896,27 @@
       "none": "No components reported.",
       "unavailable": "Component readiness could not be read: {reason}",
       "ready": "{ready} of {desired} ready",
-      "pdbBlocks": "PDB permits no eviction"
+      "pdbBlocks": "PDB permits no eviction",
+      "restricted": "Ready-vs-desired per component is shown to administrators and auditors. It is not shown here — that is a permission, not an empty cluster."
+    },
+    "listeners": {
+      "title": "Runner readiness",
+      "intro": "A node that replicates flawlessly and has no live listener cannot run a single plan. Pools you can see, and whether each has one.",
+      "unavailable": "Agent pools could not be read.",
+      "none": "No agent pools are visible to you.",
+      "online": "Listener online",
+      "offline": "No live listener",
+      "offlineWarning": "No listener is connected for: {pools}. Runs routed to these pools will queue rather than execute.",
+      "count": "{count, plural, one {# listener} other {# listeners}}"
     }
+  },
+  "haIndicator": {
+    "follower": "Follower",
+    "singleNode": "Single node",
+    "inSync": "In sync",
+    "behind": "Behind",
+    "backfilling": "Backfilling",
+    "aria": "High availability: {role}, {state}",
+    "leader": "Leader"
   }
 }

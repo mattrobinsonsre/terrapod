@@ -19,6 +19,11 @@ import { expectNoHorizontalPageScroll } from '../helpers/responsive';
 
 const USER_AUTH = path.join(__dirname, '..', '.auth', 'user.json');
 
+/** The page body, excluding the nav chip that now carries the same word. */
+const body = (page: Page) => page.getByRole('main');
+/** The nav-bar HA chip (#1165). */
+const chip = (page: Page) => page.getByRole('navigation').getByRole('link', { name: /High availability/i });
+
 const BASE_STATUS = {
   'node-id': 'node-a',
   role: 'leader',
@@ -56,10 +61,10 @@ async function mockHA(page: Page, status: Record<string, unknown>) {
 test.describe('HA page — role', () => {
   test('a leader with a healthy peer renders in sync', async ({ page }) => {
     await mockHA(page, BASE_STATUS);
-    await page.goto('/admin/ha');
+    await page.goto('/ha');
 
     await expect(page.getByRole('heading', { name: 'High availability' })).toBeVisible();
-    await expect(page.getByText('Leader', { exact: true })).toBeVisible();
+    await expect(body(page).getByText('Leader', { exact: true })).toBeVisible();
     await expect(page.getByText('Caught up as of the last successful pull.')).toBeVisible();
   });
 
@@ -67,9 +72,9 @@ test.describe('HA page — role', () => {
     // Reading the wrong node's UI as the leader is the mistake this prevents,
     // so the role and its consequence both have to be on screen.
     await mockHA(page, { ...BASE_STATUS, role: 'follower' });
-    await page.goto('/admin/ha');
+    await page.goto('/ha');
 
-    await expect(page.getByText('Follower', { exact: true })).toBeVisible();
+    await expect(body(page).getByText('Follower', { exact: true })).toBeVisible();
     await expect(page.getByText(/originates nothing/)).toBeVisible();
     await expect(page.getByText(/503/)).toBeVisible();
   });
@@ -78,9 +83,9 @@ test.describe('HA page — role', () => {
     // A page read during an incident must not be taken down by a value the
     // catalog happens not to know.
     await mockHA(page, { ...BASE_STATUS, role: 'something-new' });
-    await page.goto('/admin/ha');
+    await page.goto('/ha');
 
-    await expect(page.getByText('something-new')).toBeVisible();
+    await expect(body(page).getByText('something-new')).toBeVisible();
   });
 });
 
@@ -95,7 +100,7 @@ test.describe('HA page — replication', () => {
       'seconds-since-last-sync': 4,
       'backfilling-classes': ['registry_modules'],
     });
-    await page.goto('/admin/ha');
+    await page.goto('/ha');
 
     await expect(page.getByText(/Not in sync/)).toBeVisible();
     await expect(page.getByText('Caught up as of the last successful pull.')).toHaveCount(0);
@@ -104,7 +109,7 @@ test.describe('HA page — replication', () => {
 
   test('a single node says so plainly instead of a wall of unknowns', async ({ page }) => {
     await mockHA(page, { ...BASE_STATUS, 'peer-configured': false });
-    await page.goto('/admin/ha');
+    await page.goto('/ha');
 
     await expect(page.getByRole('heading', { name: 'Single node' })).toBeVisible();
     await expect(page.getByText(/ha\.peer\.url/)).toBeVisible();
@@ -114,10 +119,108 @@ test.describe('HA page — replication', () => {
 
   test('a configured peer with replication off says that, not "in sync"', async ({ page }) => {
     await mockHA(page, { ...BASE_STATUS, 'replication-enabled': false });
-    await page.goto('/admin/ha');
+    await page.goto('/ha');
 
     await expect(page.getByText(/replication is switched off/)).toBeVisible();
     await expect(page.getByText('Caught up as of the last successful pull.')).toHaveCount(0);
+  });
+});
+
+test.describe('HA page — runner readiness', () => {
+  const pools = (
+    page: Page,
+    list: Array<{ name: string; status: string; listeners?: number }>,
+  ) =>
+    page.route('**/api/terrapod/v1/agent-pools*', (route: Route) =>
+      route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: list.map((p, i) => ({
+            id: `apool-${i}`,
+            type: 'agent-pools',
+            attributes: {
+              name: p.name,
+              status: p.status,
+              'listener-count': p.listeners ?? (p.status === 'online' ? 1 : 0),
+            },
+          })),
+          meta: {},
+        }),
+      }),
+    );
+
+  test('a pool with no live listener is named, not left to be spotted', async ({ page }) => {
+    // Replicating flawlessly with nothing to run on is a node that looks
+    // healthy and cannot execute a plan — the whole reason this section is
+    // here rather than one page away on agent-pools.
+    await mockHA(page, BASE_STATUS);
+    await pools(page, [
+      { name: 'aws-prod', status: 'online', listeners: 3 },
+      { name: 'on-prem', status: 'offline' },
+    ]);
+    await page.goto('/ha');
+
+    await expect(page.getByText(/No listener is connected for: on-prem/)).toBeVisible();
+    // The count, not just the word: "3 listeners" and "1 listener" are
+    // materially different answers to "can I fail over onto this".
+    await expect(page.getByText('3 listeners', { exact: true })).toBeVisible();
+    await expect(page.getByText('No live listener', { exact: true })).toBeVisible();
+  });
+
+  test('all pools online raises nothing', async ({ page }) => {
+    await mockHA(page, BASE_STATUS);
+    await pools(page, [{ name: 'aws-prod', status: 'online', listeners: 1 }]);
+    await page.goto('/ha');
+
+    // Singular, from the ICU plural — a count of one must not read "1 listeners".
+    await expect(page.getByText('1 listener', { exact: true })).toBeVisible();
+    await expect(page.getByText(/No listener is connected/)).toHaveCount(0);
+  });
+
+  test('no visible pools says so rather than rendering an empty list', async ({ page }) => {
+    await mockHA(page, BASE_STATUS);
+    await pools(page, []);
+    await page.goto('/ha');
+
+    await expect(page.getByText(/No agent pools are visible to you/)).toBeVisible();
+  });
+});
+
+test.describe('HA indicator (nav bar)', () => {
+  test('it is on an ordinary page, carries the role, and opens the HA page', async ({ page }) => {
+    // The whole point of #1165: you learn which node you are on without
+    // navigating anywhere, from any page.
+    await mockHA(page, BASE_STATUS);
+    await page.goto('/workspaces');
+
+    await expect(chip(page)).toBeVisible();
+    // Colour and symbol only — no visible text in any state. The words live in
+    // the accessible name, so nothing is lost to a screen reader and nothing
+    // rests on colour alone (the symbol differs per state too).
+    await expect(chip(page)).toHaveAttribute('aria-label', /Leader/);
+    await expect(chip(page)).toHaveText('');
+
+    await chip(page).click();
+    await expect(page).toHaveURL(/\/ha$/);
+  });
+
+  test('a follower is stated in the chip, not only on the page', async ({ page }) => {
+    await mockHA(page, { ...BASE_STATUS, role: 'follower' });
+    await page.goto('/workspaces');
+
+    // No visible word here either — the state is in the accessible name, which
+    // is what makes a text-free chip legitimate rather than merely terse.
+    await expect(chip(page)).toHaveText('');
+    await expect(chip(page)).toHaveAttribute('aria-label', /Follower/);
+  });
+
+  test('it is not in the Admin menu', async ({ page }) => {
+    // Node disposition is context, not an administrative task. If it reappears
+    // under Admin, the permission story has drifted back too.
+    await mockHA(page, BASE_STATUS);
+    await page.goto('/workspaces');
+
+    await expect(page.locator('a[href="/admin/ha"]')).toHaveCount(0);
   });
 });
 
@@ -131,11 +234,11 @@ test.describe('HA page — mobile', () => {
       'in-sync': false,
       'backfilling-classes': ['registry_modules', 'registry_providers'],
     });
-    await page.goto('/admin/ha');
+    await page.goto('/ha');
 
     // The primary signal — which node this is, and that it is behind — stays
     // visible at phone width rather than being hidden behind a breakpoint.
-    await expect(page.getByText('Follower', { exact: true })).toBeVisible();
+    await expect(body(page).getByText('Follower', { exact: true })).toBeVisible();
     await expect(page.getByText(/Not in sync/)).toBeVisible();
     await expect(page.getByText('registry_modules')).toBeVisible();
     await expectNoHorizontalPageScroll(page);
@@ -145,15 +248,25 @@ test.describe('HA page — mobile', () => {
 test.describe('HA page — RBAC', () => {
   test.use({ storageState: USER_AUTH });
 
-  test('a regular user gets no nav link and no data', async ({ page }) => {
-    await page.goto('/workspaces');
-    await expect(page.locator('a[href="/admin/ha"]')).toHaveCount(0);
+  test('a regular user reaches the page and sees the node role', async ({ page }) => {
+    // #1165 reversed the earlier gate: which node you are talking to is not
+    // privileged information, and the person about to be refused a write is
+    // precisely who needs it.
+    await mockHA(page, { ...BASE_STATUS, role: 'follower', 'components-restricted': true });
+    await page.goto('/ha');
 
-    // Direct navigation is answered by the API, not by the client: the endpoint
-    // requires admin-or-audit, so the page surfaces the refusal rather than
-    // rendering a role it was never told.
-    await page.goto('/admin/ha');
-    await expect(page.getByText('Leader', { exact: true })).toHaveCount(0);
-    await expect(page.getByText('Follower', { exact: true })).toHaveCount(0);
+    await expect(body(page).getByText('Follower', { exact: true })).toBeVisible();
+    await expect(page.getByText(/originates nothing/)).toBeVisible();
+  });
+
+  test('the cluster half is withheld rather than shown empty', async ({ page }) => {
+    // An empty component list would read as "nothing is running". Restricted
+    // means the caller may not ask — a different statement, and the page has to
+    // make it rather than imply the other one.
+    await mockHA(page, { ...BASE_STATUS, 'components-restricted': true, components: [] });
+    await page.goto('/ha');
+
+    await expect(page.getByText(/not shown/i)).toBeVisible();
+    await expect(page.getByText('No components reported.')).toHaveCount(0);
   });
 });

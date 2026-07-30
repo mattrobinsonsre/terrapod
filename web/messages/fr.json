@@ -2865,7 +2865,7 @@
   },
   "adminHa": {
     "title": "Haute disponibilité",
-    "description": "Le rôle de ce nœud, s'il converge avec son pair, et si les objets que ses lignes désignent sont réellement présents.",
+    "description": "Le rôle de ce nœud, s'il converge avec son pair, et si quoi que ce soit ici pourrait réellement exécuter un plan.",
     "roleLabel": "Ce nœud",
     "role": {
       "leader": "Leader",
@@ -2896,7 +2896,27 @@
       "none": "Aucun composant signalé.",
       "unavailable": "La disponibilité des composants n'a pas pu être lue : {reason}",
       "ready": "{ready} sur {desired} prêts",
-      "pdbBlocks": "Le PDB n'autorise aucune éviction"
+      "pdbBlocks": "Le PDB n'autorise aucune éviction",
+      "restricted": "L'état prêt/souhaité de chaque composant est réservé aux administrateurs et aux auditeurs. Il n'est pas affiché ici — c'est une autorisation, pas un cluster vide."
+    },
+    "listeners": {
+      "title": "Disponibilité des exécuteurs",
+      "intro": "Un nœud qui réplique parfaitement et n'a aucun listener actif ne peut exécuter aucun plan. Les pools visibles, et si chacun en a un.",
+      "unavailable": "Les pools d'agents n'ont pas pu être lus.",
+      "none": "Aucun pool d'agents ne vous est visible.",
+      "online": "Listener en ligne",
+      "offline": "Aucun listener actif",
+      "offlineWarning": "Aucun listener n'est connecté pour : {pools}. Les exécutions dirigées vers ces pools resteront en file d'attente.",
+      "count": "{count, plural, one {# listener} other {# listeners}}"
     }
+  },
+  "haIndicator": {
+    "follower": "Suiveur",
+    "singleNode": "Nœud unique",
+    "inSync": "Synchronisé",
+    "behind": "En retard",
+    "backfilling": "Rattrapage",
+    "aria": "Haute disponibilité : {role}, {state}",
+    "leader": "Leader"
   }
 }

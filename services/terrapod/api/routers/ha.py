@@ -20,7 +20,11 @@ from datetime import UTC, datetime
 from fastapi import APIRouter, Depends, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from terrapod.api.dependencies import AuthenticatedUser, require_admin_or_audit
+from terrapod.api.dependencies import (
+    AuthenticatedUser,
+    get_current_user,
+    require_admin_or_audit,
+)
 from terrapod.config import settings
 from terrapod.db.session import get_db
 from terrapod.services import blob_readiness as blob_readiness_service
@@ -52,7 +56,7 @@ def _iso(value: datetime | None) -> str | None:
 
 @router.get("/status")
 async def status(
-    _user: AuthenticatedUser = Depends(require_admin_or_audit),
+    user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """Whether this node is converging with its peer, and how much margin it has.
@@ -74,12 +78,31 @@ async def status(
     and seconds-since-last-successful-pull is the more honest number anyway. A
     completed pull that returned nothing means caught up *as of then*, which is
     what a human is actually asking.
+
+    **Any authenticated user may read the node's own disposition** — its role,
+    whether a peer is configured, and whether it is converging (#1165). Hiding
+    "you are talking to a follower" from the person whose next `apply` is about
+    to be refused is the opposite of useful, and it is not a secret: the follower
+    already says so, loudly, in the 503.
+
+    The **in-cluster** half is different. Ready-vs-desired per component, node
+    and zone concentration, and the disruption-budget findings describe the
+    deployment rather than the node's own posture, so they stay `admin`/`audit`.
+    A caller without that role gets `components-restricted: true` and empty
+    lists — deliberately distinct from `components-unavailable-reason`, which
+    means the cluster could not be read at all. "You may not see this" and "I
+    cannot see this" are different answers and an operator debugging the second
+    must not be shown the first.
     """
     node = ha_role.node_id()
     role = await ha_role.get_role()
     cfg = settings.ha
     state = await replication.read_status(db)
-    components = await component_status.read()
+
+    privileged = bool({"admin", "audit"} & set(user.roles or []))
+    # Not merely filtered out of the response: an unprivileged caller must not
+    # cause the Kubernetes reads at all.
+    components = await component_status.read() if privileged else None
 
     now = datetime.now(UTC)
     since_sync = (
@@ -117,6 +140,9 @@ async def status(
                 # In-cluster readiness (#1122). A pair that replicates
                 # flawlessly is still not highly available if it serves from a
                 # single API pod.
+                # True when the caller lacks admin/audit. Distinct from
+                # `components-unavailable-reason` below — see the docstring.
+                "components-restricted": not privileged,
                 "components": [
                     {
                         "name": c.name,
@@ -130,29 +156,33 @@ async def status(
                         "pdb": c.pdb,
                         "pdb-permits-disruption": c.pdb_permits_disruption,
                     }
-                    for c in (components.components or [])
+                    for c in ((components.components or []) if components else [])
                 ],
                 # Cluster shape, and the reason a finding can be raised at all.
                 # Null means node reads were declined: placement is reported
                 # but never called a problem, because an inevitable single node
                 # cannot be told from an avoidable one.
-                "schedulable-nodes": components.schedulable_nodes,
-                "cluster-zones": components.cluster_zones,
+                "schedulable-nodes": components.schedulable_nodes if components else None,
+                "cluster-zones": components.cluster_zones if components else None,
                 # Specific and actionable, raised ONLY where the cluster could
                 # have done better. Never a verdict on the deployment.
                 "ha-findings": [
                     {"component": f.component, "kind": f.kind, "detail": f.detail}
-                    for f in components.findings
+                    for f in ((components.findings or []) if components else [])
                 ],
-                "components-sampled-at": components.sampled_at,
+                "components-sampled-at": components.sampled_at if components else None,
                 # Distinct from an empty list: "I cannot see" is not "nothing
                 # is running", and an operator declining the Role is a normal
                 # answer rather than a fault.
-                "components-unavailable-reason": components.unavailable_reason,
+                "components-unavailable-reason": (
+                    components.unavailable_reason if components else None
+                ),
                 # Components on exactly one ready replica. Named rather than
                 # left for the reader to derive, because it is the thing being
                 # looked for.
-                "single-replica-components": components.single_points_of_failure,
+                "single-replica-components": (
+                    (components.single_points_of_failure or []) if components else []
+                ),
             },
         }
     }

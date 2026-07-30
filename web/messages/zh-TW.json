@@ -2865,7 +2865,7 @@
   },
   "adminHa": {
     "title": "高可用性",
-    "description": "本節點的角色、是否正在與對等節點收斂，以及資料列所指向的物件是否真的存在。",
+    "description": "本節點的角色、是否正在與對等節點收斂，以及這裡是否真的有東西能跑一個計畫。",
     "roleLabel": "本節點",
     "role": {
       "leader": "主節點",
@@ -2896,7 +2896,27 @@
       "none": "沒有元件回報。",
       "unavailable": "無法讀取元件就緒情況：{reason}",
       "ready": "{desired} 個中有 {ready} 個就緒",
-      "pdbBlocks": "PDB 不允許任何逐出"
+      "pdbBlocks": "PDB 不允許任何逐出",
+      "restricted": "每個元件的就緒數與期望數僅向管理員和稽核員顯示。此處不顯示——這是權限所致，並非叢集為空。"
+    },
+    "listeners": {
+      "title": "執行就緒情況",
+      "intro": "一個複寫毫無問題卻沒有線上監聽器的節點，連一個計畫都跑不了。以下是你可見的資源池及各自是否有監聽器。",
+      "unavailable": "無法讀取代理集區。",
+      "none": "沒有對你可見的代理集區。",
+      "online": "監聽器上線",
+      "offline": "無線上監聽器",
+      "offlineWarning": "以下集區沒有連接監聽器：{pools}。指派到這些集區的執行只會排隊而不會執行。",
+      "count": "{count} 個監聽器"
     }
+  },
+  "haIndicator": {
+    "follower": "從節點",
+    "singleNode": "單一節點",
+    "inSync": "已同步",
+    "behind": "落後",
+    "backfilling": "回補中",
+    "aria": "高可用性：{role}，{state}",
+    "leader": "主節點"
   }
 }

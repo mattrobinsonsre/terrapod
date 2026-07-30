@@ -2865,7 +2865,7 @@
   },
   "adminHa": {
     "title": "Alta disponibilità",
-    "description": "Il ruolo di questo nodo, se sta convergendo con il suo peer e se gli oggetti nominati dalle sue righe ci sono davvero.",
+    "description": "Il ruolo di questo nodo, se sta convergendo con il suo peer e se qui qualcosa potrebbe davvero eseguire un piano.",
     "roleLabel": "Questo nodo",
     "role": {
       "leader": "Leader",
@@ -2896,7 +2896,27 @@
       "none": "Nessun componente segnalato.",
       "unavailable": "Non è stato possibile leggere la prontezza dei componenti: {reason}",
       "ready": "{ready} di {desired} pronti",
-      "pdbBlocks": "Il PDB non consente alcuno sfratto"
+      "pdbBlocks": "Il PDB non consente alcuno sfratto",
+      "restricted": "Lo stato pronti/desiderati per componente è visibile ad amministratori e revisori. Qui non viene mostrato: è un permesso, non un cluster vuoto."
+    },
+    "listeners": {
+      "title": "Prontezza degli esecutori",
+      "intro": "Un nodo che replica alla perfezione e non ha alcun listener attivo non può eseguire nemmeno un piano. I pool che vedi e se ciascuno ne ha uno.",
+      "unavailable": "Non è stato possibile leggere i pool di agenti.",
+      "none": "Nessun pool di agenti è visibile per te.",
+      "online": "Listener online",
+      "offline": "Nessun listener attivo",
+      "offlineWarning": "Nessun listener è connesso per: {pools}. Le esecuzioni indirizzate a questi pool resteranno in coda.",
+      "count": "{count, plural, one {# listener} other {# listener}}"
     }
+  },
+  "haIndicator": {
+    "follower": "Follower",
+    "singleNode": "Nodo singolo",
+    "inSync": "Allineato",
+    "behind": "Indietro",
+    "backfilling": "In recupero",
+    "aria": "Alta disponibilità: {role}, {state}",
+    "leader": "Leader"
   }
 }

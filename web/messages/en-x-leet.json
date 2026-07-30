@@ -2865,7 +2865,7 @@
   },
   "adminHa": {
     "title": "H1gh 4v41l4b1l17y",
-    "description": "7h15 n0d3'5 r0l3, wh37h3r 17 15 c0nv3rg1ng w17h 175 p33r, 4nd wh37h3r 7h3 0bj3c75 175 r0w5 n4m3 4r3 4c7u4lly 7h3r3.",
+    "description": "7h15 n0d3'5 r0l3, wh37h3r 17 15 c0nv3rg1ng w17h 175 p33r, 4nd wh37h3r 4ny7h1ng h3r3 c0uld 4c7u4lly run 4 pl4n.",
     "roleLabel": "7h15 n0d3",
     "role": {
       "leader": "L34d3r",
@@ -2896,7 +2896,27 @@
       "none": "N0 c0mp0n3n75 r3p0r73d.",
       "unavailable": "C0mp0n3n7 r34d1n355 c0uld n07 b3 r34d: {reason}",
       "ready": "{ready} 0f {desired} r34dy",
-      "pdbBlocks": "PDB p3rm175 n0 3v1c710n"
+      "pdbBlocks": "PDB p3rm175 n0 3v1c710n",
+      "restricted": "R34dy-v5-d351r3d p3r c0mp0n3n7 15 5h0wn 70 4dm1n157r470r5 4nd 4ud170r5. 17 15 n07 5h0wn h3r3 — 7h47 15 4 p3rm15510n, n07 4n 3mp7y clu573r."
+    },
+    "listeners": {
+      "title": "Runn3r r34d1n355",
+      "intro": "4 n0d3 7h47 r3pl1c4735 fl4wl355ly 4nd h45 n0 l1v3 l1573n3r c4nn07 run 4 51ngl3 pl4n. P00l5 y0u c4n 533, 4nd wh37h3r 34ch h45 0n3.",
+      "unavailable": "4g3n7 p00l5 c0uld n07 b3 r34d.",
+      "none": "N0 4g3n7 p00l5 4r3 v151bl3 70 y0u.",
+      "online": "L1573n3r 0nl1n3",
+      "offline": "N0 l1v3 l1573n3r",
+      "offlineWarning": "N0 l1573n3r 15 c0nn3c73d f0r: {pools}. Run5 r0u73d 70 7h353 p00l5 w1ll qu3u3 r47h3r 7h4n 3x3cu73.",
+      "count": "{count, plural, one {# l1573n3r} other {# l1573n3r5}}"
     }
+  },
+  "haIndicator": {
+    "follower": "F0ll0w3r",
+    "singleNode": "51ngl3 n0d3",
+    "inSync": "1n 5ync",
+    "behind": "B3h1nd",
+    "backfilling": "B4ckf1ll1ng",
+    "aria": "H1gh 4v41l4b1l17y: {role}, {state}",
+    "leader": "L34d3r"
   }
 }

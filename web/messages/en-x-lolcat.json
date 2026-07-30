@@ -2865,7 +2865,7 @@
   },
   "adminHa": {
     "title": "Hai Availabilitee",
-    "description": "Dis nodez job, whethr it be catchin up wif its budy, an whethr da thingz its rowz point at r actualy DER.",
+    "description": "Dis nodez job, whethr it be catchin up wif its budy, an whethr ANYFING heer cud actualy run a plan.",
     "roleLabel": "Dis node",
     "role": {
       "leader": "Leedr",
@@ -2896,7 +2896,27 @@
       "none": "No bitz reportid.",
       "unavailable": "Cud not reed da bitz reddynes: {reason}",
       "ready": "{ready} ov {desired} reddy",
-      "pdbBlocks": "PDB sez NO kikkin owt"
+      "pdbBlocks": "PDB sez NO kikkin owt",
+      "restricted": "Reddy-vs-wanted per bit iz shown to bosses an chekkerz. It iz not shown heer — dats a permishun fing, NOT an empty clustr."
+    },
+    "listeners": {
+      "title": "Runnr Reddynes",
+      "intro": "A node wot copiez perfektly an haz no liv listenr cant run even ONE plan. Poolz u can see, an whethr each haz wun.",
+      "unavailable": "Cud not reed da agent poolz.",
+      "none": "No agent poolz iz visibul to u.",
+      "online": "Listenr onlien",
+      "offline": "No liv listenr",
+      "offlineWarning": "No listenr iz connectd fur: {pools}. Runz sent to deze poolz will just sit in da queue insted ov runnin.",
+      "count": "{count, plural, one {# listenr} other {# listenrz}}"
     }
+  },
+  "haIndicator": {
+    "follower": "Follwr",
+    "singleNode": "Just wun node",
+    "inSync": "All caught up",
+    "behind": "Behind",
+    "backfilling": "Fillin in",
+    "aria": "Hai availabilitee: {role}, {state}",
+    "leader": "Leedr"
   }
 }

@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import NavBar from '@/components/nav-bar'
@@ -12,7 +13,13 @@ import { getAuthState } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
 
 /**
- * High availability (#1163).
+ * High availability (#1163, #1165).
+ *
+ * Reached by clicking the nav-bar indicator, and open to every signed-in user —
+ * which node you are talking to is context, not an administrative task, and the
+ * person whose next write a follower is about to refuse is precisely who needs
+ * it. The in-cluster half is the exception: it describes the deployment rather
+ * than this node, so it stays admin/audit and says so.
  *
  * Read-only by design. There is no control here that changes a role: failover is
  * moving DNS, and a button that looked like it could fail over would be actively
@@ -34,6 +41,13 @@ interface Component {
   zones: number | null
   pdb: boolean
   'pdb-permits-disruption': boolean | null
+}
+
+interface Pool {
+  id: string
+  name: string
+  status: string
+  listeners: number
 }
 
 interface Finding {
@@ -59,6 +73,7 @@ interface HAStatus {
   'schedulable-nodes': number | null
   'cluster-zones': number | null
   'ha-findings': Finding[]
+  'components-restricted'?: boolean
   'components-sampled-at': string | null
   'components-unavailable-reason': string | null
   'single-replica-components': string[]
@@ -81,6 +96,7 @@ export default function HAPage() {
     t.has(key as 'role.leader') ? t(key as 'role.leader') : fallback
   const router = useRouter()
   const [status, setStatus] = useState<HAStatus | null>(null)
+  const [pools, setPools] = useState<Pool[] | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -90,6 +106,36 @@ export default function HAPage() {
       if (!resp.ok) throw new Error(await resp.text())
       const body = await resp.json()
       setStatus(body.data.attributes)
+
+      // Runner readiness duplicates the agent-pools page, deliberately: "can
+      // this node actually run anything" is part of the HA question, and an
+      // operator deciding whether to fail over should not have to visit two
+      // pages to answer it.
+      //
+      // Read from the pools endpoint rather than a new attribute on /ha/status:
+      // it already derives online/offline from live listeners AND already
+      // filters by pool RBAC, so a second implementation could only drift from
+      // it — and would have to re-decide who may see which pool.
+      const poolsResp = await apiFetch('/api/terrapod/v1/agent-pools')
+      if (poolsResp.ok) {
+        const list = (await poolsResp.json()).data as Array<{
+          id: string
+          attributes: Record<string, string | number>
+        }>
+        setPools(
+          list.map((p) => ({
+            id: p.id,
+            name: String(p.attributes.name),
+            status: String(p.attributes.status || 'offline'),
+            // The server counts only listeners that could actually take work,
+            // from the same predicate `status` comes from — so the number and
+            // the word can never disagree.
+            listeners: Number(p.attributes['listener-count'] ?? 0),
+          })),
+        )
+      } else {
+        setPools(null)
+      }
       setError('')
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
@@ -236,7 +282,12 @@ export default function HAPage() {
                 could have done better, so a one-node cluster shows none. */}
             <section className="rounded-xl border border-slate-800 bg-slate-900/50 p-4 sm:p-6">
               <h2 className="mb-4 text-lg font-medium">{t('components.title')}</h2>
-              {status['components-unavailable-reason'] ? (
+              {status['components-restricted'] ? (
+                // "You may not see this" is a different statement from "I
+                // cannot see this", and from "nothing is running". Saying it
+                // outright is the only one of the three that is true here.
+                <p className="text-sm text-slate-400">{t('components.restricted')}</p>
+              ) : status['components-unavailable-reason'] ? (
                 <p className="text-sm text-slate-400">
                   {t('components.unavailable', {
                     reason: status['components-unavailable-reason'],
@@ -285,6 +336,60 @@ export default function HAPage() {
                       ))}
                     </ul>
                   )}
+                </>
+              )}
+            </section>
+
+            {/* Runner readiness. A node that replicates flawlessly and has no
+                live listener cannot run a single plan, so this belongs beside
+                the rest of the failover decision rather than one page away. */}
+            <section className="mt-6 rounded-xl border border-slate-800 bg-slate-900/50 p-4 sm:p-6">
+              <h2 className="text-lg font-medium">{t('listeners.title')}</h2>
+              <p className="mt-1 max-w-prose text-sm text-slate-400">
+                {t('listeners.intro')}
+              </p>
+              {pools === null ? (
+                <p className="mt-4 text-sm text-slate-400">{t('listeners.unavailable')}</p>
+              ) : pools.length === 0 ? (
+                <p className="mt-4 text-sm text-slate-400">{t('listeners.none')}</p>
+              ) : (
+                <>
+                  {pools.some((p) => p.status !== 'online') && (
+                    // Named rather than left for the reader to spot: a pool with
+                    // no live listener is the thing being looked for.
+                    <p className="mt-4 rounded-lg bg-amber-950/40 px-3 py-2 text-sm text-amber-200">
+                      {t('listeners.offlineWarning', {
+                        pools: pools
+                          .filter((p) => p.status !== 'online')
+                          .map((p) => p.name)
+                          .join(', '),
+                      })}
+                    </p>
+                  )}
+                  <ul className="mt-4 space-y-2">
+                    {pools.map((p) => (
+                      <li
+                        key={p.id}
+                        className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-slate-950/50 px-3 py-2 text-sm"
+                      >
+                        <Link
+                          href={`/admin/agent-pools/${p.id}`}
+                          className="font-mono text-brand-300 hover:text-brand-200"
+                        >
+                          {p.name}
+                        </Link>
+                        <span
+                          className={`tabular-nums ${
+                            p.status === 'online' ? 'text-emerald-300' : 'text-amber-300'
+                          }`}
+                        >
+                          {p.status === 'online'
+                            ? t('listeners.count', { count: p.listeners })
+                            : t('listeners.offline')}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
                 </>
               )}
             </section>

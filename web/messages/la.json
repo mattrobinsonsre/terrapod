@@ -2865,7 +2865,7 @@
   },
   "adminHa": {
     "title": "Alta disponibilitas",
-    "description": "Munus huius nodi, utrum cum pari suo conveniat, et utrum obiecta quae eius versus nominant re vera adsint.",
+    "description": "Munus huius nodi, utrum cum pari suo conveniat, et utrum quicquam hic re vera consilium exsequi possit.",
     "roleLabel": "Hic nodus",
     "role": {
       "leader": "Ductor",
@@ -2896,7 +2896,27 @@
       "none": "Nulla pars nuntiata est.",
       "unavailable": "Paratio partium legi non potuit: {reason}",
       "ready": "{ready} ex {desired} paratae",
-      "pdbBlocks": "PDB nullam eiectionem permittit"
+      "pdbBlocks": "PDB nullam eiectionem permittit",
+      "restricted": "Paratae contra optatas per partes administratoribus et inspectoribus monstrantur. Hic non monstrantur — potestatis res est, non glomus vacuum."
+    },
+    "listeners": {
+      "title": "Paratio exsequendi",
+      "intro": "Nodus qui perfecte replicat et nullum auditorem vivum habet ne unum quidem consilium exsequi potest. Piscinae quas videre potes, et num singulae unum habeant.",
+      "unavailable": "Piscinae procuratorum legi non potuerunt.",
+      "none": "Nullae piscinae procuratorum tibi videntur.",
+      "online": "Auditor vivus",
+      "offline": "Nullus auditor vivus",
+      "offlineWarning": "Nullus auditor his coniunctus est: {pools}. Cursus ad has piscinas missi in ordine manebunt neque exsequentur.",
+      "count": "{count, plural, one {# auditor} other {# auditores}}"
     }
+  },
+  "haIndicator": {
+    "follower": "Sectator",
+    "singleNode": "Nodus singularis",
+    "inSync": "Aequatus",
+    "behind": "Retro",
+    "backfilling": "Replens",
+    "aria": "Alta disponibilitas: {role}, {state}",
+    "leader": "Ductor"
   }
 }

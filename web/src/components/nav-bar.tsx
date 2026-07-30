@@ -41,6 +41,7 @@ import { clearAuth, isAdmin, isAdminOrAudit, getAuthState } from '@/lib/auth'
 import { SessionExpiryBanner } from '@/components/session-expiry-banner'
 import { TokenExpiryBanner } from '@/components/token-expiry-banner'
 import { LocaleSwitcher } from '@/components/locale-switcher'
+import { HAIndicator } from '@/components/ha-indicator'
 
 /**
  * Navigation is one DRY, viewport-driven component (#719). The link model
@@ -85,7 +86,6 @@ const ADMIN_ITEMS: NavItem[] = [
   { href: '/admin/provider-templates', labelKey: 'providerTemplates', icon: Code },
   { href: '/admin/catalog', labelKey: 'catalogAdmin', icon: Boxes },
   { href: '/admin/binary-cache', labelKey: 'cache', icon: HardDrive },
-  { href: '/admin/ha', labelKey: 'ha', icon: Radio },
 ]
 
 const AUDIT_ITEM: NavItem = { href: '/admin/audit-log', labelKey: 'auditLog', icon: FileText }
@@ -441,6 +441,9 @@ export default function NavBar() {
                 </>
               }
             />
+            {/* Last in the bar on purpose: it is ambient status about the node
+                you are talking to, not another control in the cluster. */}
+            <HAIndicator />
           </div>
 
           {/* Mobile top bar — logo + Account trigger + hamburger (below `lg`) */}
@@ -475,6 +478,8 @@ export default function NavBar() {
               >
                 <Menu size={22} />
               </button>
+              {/* Last here too, for the same reason as the desktop bar. */}
+              <HAIndicator />
             </div>
           </div>
 

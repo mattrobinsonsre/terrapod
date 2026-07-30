@@ -2865,7 +2865,7 @@
   },
   "adminHa": {
     "title": "Ever-Afloat",
-    "description": "This vessel's station, whether she be closin' on her consort, and whether the cargo her ledger names be truly in the hold.",
+    "description": "This vessel's station, whether she be closin' on her consort, and whether aught here could truly sail a voyage.",
     "roleLabel": "This vessel",
     "role": {
       "leader": "Flagship",
@@ -2896,7 +2896,27 @@
       "none": "Nary a hand reported.",
       "unavailable": "Could not read the crew's readiness: {reason}",
       "ready": "{ready} of {desired} at their stations",
-      "pdbBlocks": "The PDB suffers none to be put ashore"
+      "pdbBlocks": "The PDB suffers none to be put ashore",
+      "restricted": "Ready against wanted for each hand be shown to captains and inspectors. It be not shown here — that be a matter of leave, not an empty fleet."
+    },
+    "listeners": {
+      "title": "Fitness to sail",
+      "intro": "A vessel that copies the ledger flawlessly and has nary a hand on watch cannot sail a single voyage. The crews ye can see, and whether each has a hand aboard.",
+      "unavailable": "The crews could not be read.",
+      "none": "No crews be visible to ye.",
+      "online": "Hand on watch",
+      "offline": "No hand on watch",
+      "offlineWarning": "Nary a hand be on watch for: {pools}. Voyages set for these crews will wait at anchor rather than sail.",
+      "count": "{count, plural, one {# hand on watch} other {# hands on watch}}"
     }
+  },
+  "haIndicator": {
+    "follower": "Consort",
+    "singleNode": "Sailin' alone",
+    "inSync": "Abreast",
+    "behind": "Astern",
+    "backfilling": "Fillin' the hold",
+    "aria": "Ever-afloat: {role}, {state}",
+    "leader": "Flagship"
   }
 }

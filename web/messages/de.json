@@ -2865,7 +2865,7 @@
   },
   "adminHa": {
     "title": "Hochverfügbarkeit",
-    "description": "Die Rolle dieses Knotens, ob er mit seinem Partner konvergiert und ob die Objekte, die seine Datensätze benennen, tatsächlich vorhanden sind.",
+    "description": "Die Rolle dieses Knotens, ob er mit seinem Partner konvergiert und ob hier überhaupt etwas einen Plan ausführen könnte.",
     "roleLabel": "Dieser Knoten",
     "role": {
       "leader": "Leader",
@@ -2896,7 +2896,27 @@
       "none": "Keine Komponenten gemeldet.",
       "unavailable": "Die Bereitschaft der Komponenten konnte nicht gelesen werden: {reason}",
       "ready": "{ready} von {desired} bereit",
-      "pdbBlocks": "PDB lässt keine Verdrängung zu"
+      "pdbBlocks": "PDB lässt keine Verdrängung zu",
+      "restricted": "Bereit-zu-Soll je Komponente wird Administratoren und Auditoren angezeigt. Hier wird es nicht angezeigt — das ist eine Berechtigung, kein leerer Cluster."
+    },
+    "listeners": {
+      "title": "Runner-Bereitschaft",
+      "intro": "Ein Knoten, der fehlerfrei repliziert und keinen aktiven Listener hat, kann keinen einzigen Plan ausführen. Die für Sie sichtbaren Pools und ob jeder einen hat.",
+      "unavailable": "Agent-Pools konnten nicht gelesen werden.",
+      "none": "Für Sie sind keine Agent-Pools sichtbar.",
+      "online": "Listener online",
+      "offline": "Kein aktiver Listener",
+      "offlineWarning": "Für Folgendes ist kein Listener verbunden: {pools}. Läufe für diese Pools warten in der Warteschlange, statt ausgeführt zu werden.",
+      "count": "{count, plural, one {# Listener} other {# Listener}}"
     }
+  },
+  "haIndicator": {
+    "follower": "Follower",
+    "singleNode": "Einzelner Knoten",
+    "inSync": "Synchron",
+    "behind": "Zurück",
+    "backfilling": "Lädt nach",
+    "aria": "Hochverfügbarkeit: {role}, {state}",
+    "leader": "Leader"
   }
 }
