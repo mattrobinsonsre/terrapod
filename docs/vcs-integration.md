@@ -614,6 +614,73 @@ single-secret deployments are unaffected.
 
 ---
 
+## Sizing polling for a large estate
+
+The defaults suit most installs and need no attention. This section is for
+planning a large estate — many repositories, or a busy monorepo — where it is
+worth knowing how Terrapod spends its VCS API budget and which knobs adjust it.
+
+**Terrapod polls economically by design.** Three things keep the cost down:
+
+- **Lookups are deduplicated per cycle.** The cost is per *distinct* repository +
+  tracked branch, not per workspace. Twenty workspaces on twenty directories of one
+  monorepo cost the same as one workspace, because they share the same branch-head
+  and PR lookups.
+- **Module repositories poll on their own, longer interval.** Module repos are far
+  more numerous than they are active, so they default to 300s while workspace repos
+  default to 60s.
+- **Webhooks make the interval a floor rather than a wait.** With webhooks
+  configured, pushes and PR events arrive immediately and polling becomes the
+  safety net for an undelivered event — so a long interval costs nothing in
+  responsiveness.
+
+A cycle costs roughly two calls per distinct repository + branch (the branch head,
+and the list of open PRs/MRs). A push adds an archive download; autodiscovery adds
+a tree listing. So:
+
+```
+calls per hour ≈ (3600 / poll_interval_seconds) × 2 × distinct repo+branch pairs
+```
+
+Both providers publish your remaining allowance, so you can measure rather than
+estimate — GitHub in `X-RateLimit-Remaining` (and `GET /rate_limit`), GitLab in
+`RateLimit-Remaining`.
+
+### The three knobs
+
+**Lengthen the module interval first.** It is the one with the most headroom, and
+because both module pollers have webhook accelerators, lengthening it costs nothing
+when webhooks are configured:
+
+```yaml
+api:
+  config:
+    vcs:
+      # Module repos — new version tags and module-impact PR analysis.
+      module_poll_interval_seconds: 900
+      # Workspace repos, and VCS-connected policy sets. Without webhooks this
+      # decides how long a push waits, so lengthen it once webhooks are in place.
+      poll_interval_seconds: 120
+```
+
+**Configure webhooks** ([above](#optional-github-webhooks-for-faster-feedback) for
+GitHub, and the GitLab equivalent) and the workspace interval becomes a fallback
+floor, which is what makes a longer one comfortable.
+
+**Give a busy repository its own VCS connection.** Allowances are per credential —
+a GitHub App's is per *installation*, a GitLab token's is per token — so a second
+app or token is a second budget. Terrapod supports as many connections as you like
+and each workspace names the one it uses, so this needs no new concepts: create a
+second app or token, add it as a connection, and repoint some workspaces' `vcs-connection`.
+
+Split **by repository**, not by workspace. Workspaces sharing a repository already
+share one deduplicated lookup, so separating *them* across connections increases
+total calls; separating repositories divides the work. Putting the busiest monorepo
+on its own connection, or module repositories on a different one from workspace
+repositories, also keeps one credential's problems local to it.
+
+---
+
 ## Module Registry VCS Publishing
 
 VCS connections are also used for **automatic module publishing** in the private module registry. When a module is connected to a VCS repository, Terrapod watches for new git tags and publishes matching versions automatically.
@@ -706,6 +773,32 @@ No inbound connections are required for basic operation. The poller makes outbou
 4. **Check permissions**: The VCS provider credentials must have read access to the repository
 5. **Check logs**: Look for "VCS poll cycle" or error messages in the API server logs
 6. **Check database encryption**: Ensure your managed database has encryption-at-rest enabled
+
+### A poll cycle reported a rate limit
+
+Terrapod absorbs short rate-limit bursts on its own: 429s and secondary-rate-limit
+403s are retried with backoff, honouring `Retry-After` and falling back to
+`X-RateLimit-Reset`. So one appearing on the workspace means the allowance was
+still exhausted after those retries, which is a sizing question rather than a
+fault.
+
+Check what Terrapod recorded:
+
+```bash
+curl -s -H "Authorization: Bearer $TOKEN" \
+  "$TERRAPOD_URL/api/v2/workspaces/$WS_ID" \
+| jq '.data.attributes | {vcs_last_error: ."vcs-last-error", at: ."vcs-last-error-at"}'
+```
+
+A rate limit reads as an HTTP **429**, or a **403** whose body mentions a secondary
+rate limit. If that is what you see, [Sizing polling for a large
+estate](#sizing-polling-for-a-large-estate) has the three knobs — lengthen the
+module interval, add webhooks, or give a busy repository its own connection.
+
+Two things that look similar but are not rate limits: a **consistent** 404 on one
+repository is permission drift (removed from the App installation, or a narrowed
+token scope), and a GitHub installation token is cached for 50 minutes, so a
+permission change can take that long to take effect.
 
 ### GitHub authentication errors
 
