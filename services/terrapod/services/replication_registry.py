@@ -16,12 +16,19 @@ from terrapod.db.models import (
     APIToken,
     AutodiscoveryRule,
     CatalogItem,
+    ExecutionHook,
+    ExecutionHookWorkspace,
     ModuleWorkspaceLink,
+    NotificationConfiguration,
     PlatformRoleAssignment,
+    Policy,
+    PolicySet,
     ProviderTemplate,
     RegistryModule,
     Role,
     RoleAssignment,
+    RunTask,
+    RunTrigger,
     User,
     Variable,
     VariableSet,
@@ -30,6 +37,7 @@ from terrapod.db.models import (
     VCSConnection,
     Workspace,
     WorkspaceAgentPool,
+    WorkspaceRemoteStateConsumer,
 )
 from terrapod.services.replication import ReplicatedClass, register
 
@@ -244,6 +252,58 @@ VARIABLE_SET_WORKSPACES = register(
         model=VariableSetWorkspace,
         pk_attrs=("variable_set_id", "workspace_id"),
     )
+)
+
+
+# ---------------------------------------------------------------------------
+# How a workspace's runs behave (#1141)
+#
+# Three of these are GATES, and for a gate the failure mode of partial
+# replication is not an error — it is a silently weaker posture. A promoted node
+# that carries a mandatory policy set but loses its `enforcement_level` has
+# turned a hard stop into an advisory note, and nothing anywhere says so.
+# ---------------------------------------------------------------------------
+
+# Policy sets and their policies — the governance gap, and the worst of the
+# three. A promoted node with none of these applies infrastructure with no
+# policy evaluation at all: every guardrail absent, no error raised.
+POLICY_SETS = register(ReplicatedClass(name="policy_sets", model=PolicySet))
+
+POLICIES = register(ReplicatedClass(name="policies", model=Policy))
+
+# Nobody is told anything without these — approvals, failures and drift all go
+# unannounced at precisely the moment people most need to know. `token` is
+# `EncryptedText`, so it takes the per-node path from #1132.
+NOTIFICATION_CONFIGURATIONS = register(
+    ReplicatedClass(name="notification_configurations", model=NotificationConfiguration)
+)
+
+# Pre/post-plan external validation. A mandatory task that vanishes is the second
+# gate silently removed.
+RUN_TASKS = register(ReplicatedClass(name="run_tasks", model=RunTask))
+
+# Hooks do not merely add a step: they are how operators inject the setup a run
+# depends on, so losing them changes what the run IS. `priority` decides
+# execution order, which is behaviour rather than presentation.
+EXECUTION_HOOKS = register(ReplicatedClass(name="execution_hooks", model=ExecutionHook))
+
+EXECUTION_HOOK_WORKSPACES = register(
+    ReplicatedClass(
+        name="execution_hook_workspaces",
+        model=ExecutionHookWorkspace,
+        pk_attrs=("hook_id", "workspace_id"),
+    )
+)
+
+# Cross-workspace dependency chains. Without them downstream workspaces quietly
+# stop tracking upstream applies — no failure, just drift that nobody queued.
+RUN_TRIGGERS = register(ReplicatedClass(name="run_triggers", model=RunTrigger))
+
+# The allow-list for cross-workspace state reads: the third gate. It is access
+# control, so its DELETIONS matter as much as its rows — a consumer that comes
+# back to life can read state somebody deliberately cut it off from.
+WORKSPACE_REMOTE_STATE_CONSUMERS = register(
+    ReplicatedClass(name="workspace_remote_state_consumers", model=WorkspaceRemoteStateConsumer)
 )
 
 
