@@ -16,6 +16,7 @@ from terrapod.db.models import (
     APIToken,
     AutodiscoveryRule,
     CatalogItem,
+    ModuleWorkspaceLink,
     PlatformRoleAssignment,
     ProviderTemplate,
     RegistryModule,
@@ -23,6 +24,8 @@ from terrapod.db.models import (
     RoleAssignment,
     User,
     VCSConnection,
+    Workspace,
+    WorkspaceAgentPool,
 )
 from terrapod.services.replication import ReplicatedClass, register
 
@@ -147,3 +150,55 @@ CATALOG_ITEMS = register(ReplicatedClass(name="catalog_items", model=CatalogItem
 # cannot reconcile, and the safe-by-default answer it would fall back to is not
 # the one the operator configured.
 AUTODISCOVERY_RULES = register(ReplicatedClass(name="autodiscovery_rules", model=AutodiscoveryRule))
+
+
+# ---------------------------------------------------------------------------
+# Workspaces (#1136)
+#
+# Nothing is excluded, and that is the considered answer rather than the lazy
+# one. Several columns look like node-local operational state and are not:
+#
+#   vcs_last_commit_sha  The poller cursor, and the most dangerous omission in
+#                        the class. A promoted node that has not seen it treats
+#                        every tracked branch as changed and queues a plan AND
+#                        APPLY on every VCS-connected workspace at once — a
+#                        fleet-wide event triggered by the failover itself.
+#   locked / lock_id     The CLI state lock. Dropping a held lock at promotion
+#                        lets two writers collide on state; carrying a stale one
+#                        costs a manual unlock. Fail closed.
+#   state_diverged       An apply succeeded but its state upload did not. A node
+#                        that loses this believes state is good when it is not.
+#   lifecycle_state      `pending_deletion` is a workspace awaiting a human
+#                        decision; resetting it to `active` discards that.
+#   drift_status         Continuity, and it stops the promoted node re-checking
+#                        the entire fleet at once.
+#
+# `drift_latest_run_id` is carried and WILL dangle — runs are a later phase, and
+# that column is deliberately not a foreign key so artifact retention cannot
+# cascade into workspace deletion. The UI handles a 404 on click-through. Better
+# a dead link than a special case here.
+WORKSPACES = register(ReplicatedClass(name="workspaces", model=Workspace))
+
+# The agent-pool set (#1087). Composite key, and the first replicated class
+# edited as a *collection*.
+#
+# Adding or removing a pool mutates `workspace.agent_pool_links`, and the outbox
+# hook deliberately asks `is_modified(..., include_collections=False)` — so the
+# workspace row is NOT what records a membership change. These rows are, because
+# they are a registered class in their own right and land in the session's
+# new/deleted sets. If that were wrong, pool membership edits would silently
+# never replicate, and a promoted node would dispatch runs to the wrong pools.
+WORKSPACE_AGENT_POOLS = register(
+    ReplicatedClass(
+        name="workspace_agent_pools",
+        model=WorkspaceAgentPool,
+        pk_attrs=("workspace_id", "agent_pool_id"),
+    )
+)
+
+# Module-impact analysis. Without it a promoted node stops queueing speculative
+# plans when a PR is opened against a module repo, so the blast radius of a
+# module change becomes invisible exactly when the estate is least stable.
+MODULE_WORKSPACE_LINKS = register(
+    ReplicatedClass(name="module_workspace_links", model=ModuleWorkspaceLink)
+)
