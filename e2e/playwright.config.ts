@@ -183,6 +183,16 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
     },
     {
+      // The HA admin page (#1163). Runs as admin against mocked `/ha/*`
+      // fixtures — the e2e stack is a healthy single node, so a follower, a
+      // backfilling class and a sampled blob check are only reachable from a
+      // fixture. The spec's last two describes override viewport/storageState
+      // themselves for the mobile guard and the RBAC negative.
+      name: 'ha',
+      testMatch: 'ha.spec.ts',
+      use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
+    },
+    {
       name: 'sse-live-update',
       testMatch: 'sse-live-update.spec.ts',
       use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },

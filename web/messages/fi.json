@@ -30,7 +30,8 @@
     "menu": "Valikko",
     "openMenu": "Avaa valikko",
     "openAccountMenu": "Avaa tilivalikko",
-    "closeMenu": "Sulje valikko"
+    "closeMenu": "Sulje valikko",
+    "ha": "Korkea käytettävyys"
   },
   "switcher": {
     "language": "Kieli",
@@ -2860,6 +2861,66 @@
       "run_created": "Tuontiajo luotu",
       "errored": "Virhe",
       "canceled": "Peruutettu"
+    }
+  },
+  "adminHa": {
+    "title": "Korkea käytettävyys",
+    "description": "Tämän solmun rooli, konvergoiko se parinsa kanssa ja ovatko sen rivien nimeämät objektit todella olemassa.",
+    "roleLabel": "Tämä solmu",
+    "role": {
+      "leader": "Johtaja",
+      "follower": "Seuraaja",
+      "auto": "Selvitetään"
+    },
+    "followerNote": "Tämä solmu ottaa vastaan lukuja ja replikoi, mutta ei tuota mitään itse. Muuttavat pyynnöt palauttavat 503.",
+    "nodeId": "Solmu",
+    "peer": "Pari",
+    "configured": "Määritetty",
+    "notConfigured": "Ei määritetty",
+    "singleNode": {
+      "title": "Yksittäinen solmu",
+      "body": "Paria ei ole määritetty, joten mitään ei replikoida eikä vikasietosiirto ole mahdollinen. Tämä on tavallinen kokoonpano yhdelle instanssille — aseta ha.peer.url parittaaksesi toisen solmun kanssa."
+    },
+    "replication": {
+      "title": "Asetusten replikointi",
+      "disabled": "Pari on määritetty, mutta replikointi on pois päältä, joten asetuksia ei haeta.",
+      "inSync": "Ajan tasalla viimeisimmän onnistuneen haun mukaan.",
+      "notInSync": "Ei synkronissa. Vielä täydentyvä luokka tarkoittaa, että tämä solmu on jäljessä, olipa viimeisin kierros kuinka tuore tahansa.",
+      "sinceSync": "Viimeisimmästä hausta",
+      "backfilling": "Täydentyvät luokat",
+      "retained": "Säilytetyt tapahtumat",
+      "oldestEvent": "Vanhin tapahtuma / säilytys"
+    },
+    "components": {
+      "title": "Valmius klusterissa",
+      "none": "Yhtään komponenttia ei raportoitu.",
+      "unavailable": "Komponenttien valmiutta ei voitu lukea: {reason}",
+      "ready": "{ready}/{desired} valmiina",
+      "pdbBlocks": "PDB ei salli yhtään häätöä"
+    },
+    "blobs": {
+      "title": "Objektivarasto",
+      "intro": "Replikointi kuljettaa tietokantarivejä; rivien nimeämät objektit ovat objektivarastossa. Rivit ilman objektejaan tarkoittavat solmua, joka näyttää terveeltä eikä pysty palvelemaan ajoa. Tämä tarkistus tekee oikeita pyyntöjä varastoon, joten se suoritetaan vain pyydettäessä.",
+      "check": "Tarkista nyt",
+      "checking": "Tarkistetaan…",
+      "fullLabel": "Tarkista jokainen objekti (hidas suuressa ympäristössä)",
+      "sampled": "Otos — vain kunkin luokan uusimmat objektit tarkistettiin, ei koko ympäristöä. Vertaa alla tarkistettujen määrää kunkin luokan kokonaismäärään.",
+      "full": "Täysi tarkistus — jokainen objekti jokaisesta tarkistetusta luokasta.",
+      "unavailable": "Objektivarastoa ei voitu lukea: {reason}",
+      "irreplaceableMissing": "Objekteja puuttuu luokista, joiden menetys on lopullinen: {classes}. Älä tee vikasietosiirtoa tähän solmuun.",
+      "irreplaceableUnchecked": "Seuraavista ei väitetä mitään: {classes}. Ne ovat pois päältä tai niitä ei voi varmentaa tietokannasta, joten nolla puuttuvaa ei tarkoita olemassa olevaa.",
+      "class": "Luokka",
+      "tier": "Taso",
+      "mode": "Tila",
+      "checked": "Tarkistettu",
+      "missing": "Puuttuu",
+      "note": "Huomautus",
+      "complete": "Täydellinen"
+    },
+    "tier": {
+      "irreplaceable": "Korvaamaton",
+      "history": "Historia",
+      "rederivable": "Uudelleen johdettavissa"
     }
   }
 }

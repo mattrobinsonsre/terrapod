@@ -30,7 +30,8 @@
     "menu": "Menu",
     "openMenu": "Ouvrir le menu",
     "openAccountMenu": "Ouvrir le menu du compte",
-    "closeMenu": "Fermer le menu"
+    "closeMenu": "Fermer le menu",
+    "ha": "Haute disponibilité"
   },
   "switcher": {
     "language": "Langue",
@@ -2860,6 +2861,66 @@
       "run_created": "Exécution d import créée",
       "errored": "En erreur",
       "canceled": "Annulé"
+    }
+  },
+  "adminHa": {
+    "title": "Haute disponibilité",
+    "description": "Le rôle de ce nœud, s'il converge avec son pair, et si les objets que ses lignes désignent sont réellement présents.",
+    "roleLabel": "Ce nœud",
+    "role": {
+      "leader": "Leader",
+      "follower": "Suiveur",
+      "auto": "En cours de résolution"
+    },
+    "followerNote": "Ce nœud accepte les lectures et réplique, mais n'initie rien. Les requêtes modifiantes renvoient 503.",
+    "nodeId": "Nœud",
+    "peer": "Pair",
+    "configured": "Configuré",
+    "notConfigured": "Non configuré",
+    "singleNode": {
+      "title": "Nœud unique",
+      "body": "Aucun pair n'est configuré : rien n'est répliqué et aucun basculement n'est possible. C'est la configuration normale pour une instance unique — définissez ha.peer.url pour appairer un second nœud."
+    },
+    "replication": {
+      "title": "Réplication des paramètres",
+      "disabled": "Un pair est configuré mais la réplication est désactivée : aucun paramètre n'est récupéré.",
+      "inSync": "À jour au dernier tirage réussi.",
+      "notInSync": "Non synchronisé. Une classe encore en rattrapage signifie que ce nœud est en retard, aussi récent soit le dernier cycle.",
+      "sinceSync": "Depuis le dernier tirage",
+      "backfilling": "Classes en rattrapage",
+      "retained": "Événements conservés",
+      "oldestEvent": "Événement le plus ancien / rétention"
+    },
+    "components": {
+      "title": "Disponibilité dans le cluster",
+      "none": "Aucun composant signalé.",
+      "unavailable": "La disponibilité des composants n'a pas pu être lue : {reason}",
+      "ready": "{ready} sur {desired} prêts",
+      "pdbBlocks": "Le PDB n'autorise aucune éviction"
+    },
+    "blobs": {
+      "title": "Stockage d'objets",
+      "intro": "La réplication transporte des lignes de base de données ; les objets que ces lignes désignent résident dans le stockage d'objets. Des lignes présentes sans leurs objets donnent un nœud qui paraît sain et ne peut pas servir une exécution. Cette vérification effectue de vraies requêtes vers le stockage : elle ne s'exécute donc qu'à la demande.",
+      "check": "Vérifier maintenant",
+      "checking": "Vérification…",
+      "fullLabel": "Vérifier chaque objet (lent sur un grand parc)",
+      "sampled": "Échantillon — seuls les objets les plus récents de chaque classe ont été vérifiés, pas l'ensemble du parc. Comparez ci-dessous le nombre vérifié au total de chaque classe.",
+      "full": "Vérification complète — chaque objet de chaque classe vérifiée.",
+      "unavailable": "Le stockage d'objets n'a pas pu être lu : {reason}",
+      "irreplaceableMissing": "Des objets manquent dans des classes dont la perte est définitive : {classes}. Ne basculez pas sur ce nœud.",
+      "irreplaceableUnchecked": "Aucune affirmation n'est faite au sujet de : {classes}. Ces classes sont désactivées ou ne peuvent pas être vérifiées depuis la base de données : zéro manquant ne signifie donc pas présent.",
+      "class": "Classe",
+      "tier": "Niveau",
+      "mode": "Mode",
+      "checked": "Vérifiés",
+      "missing": "Manquants",
+      "note": "Remarque",
+      "complete": "Complet"
+    },
+    "tier": {
+      "irreplaceable": "Irremplaçable",
+      "history": "Historique",
+      "rederivable": "Redérivable"
     }
   }
 }

@@ -30,7 +30,8 @@
     "menu": "Menu",
     "openMenu": "Abrir menu",
     "openAccountMenu": "Abrir menu da conta",
-    "closeMenu": "Fechar menu"
+    "closeMenu": "Fechar menu",
+    "ha": "Alta disponibilidade"
   },
   "switcher": {
     "language": "Idioma",
@@ -2860,6 +2861,66 @@
       "run_created": "Execução de importação criada",
       "errored": "Com erro",
       "canceled": "Cancelado"
+    }
+  },
+  "adminHa": {
+    "title": "Alta disponibilidade",
+    "description": "O papel deste nó, se ele está convergindo com seu par e se os objetos que suas linhas nomeiam realmente estão lá.",
+    "roleLabel": "Este nó",
+    "role": {
+      "leader": "Líder",
+      "follower": "Seguidor",
+      "auto": "Resolvendo"
+    },
+    "followerNote": "Este nó aceita leituras e replica, mas não origina nada. Requisições que alteram dados retornam 503.",
+    "nodeId": "Nó",
+    "peer": "Par",
+    "configured": "Configurado",
+    "notConfigured": "Não configurado",
+    "singleNode": {
+      "title": "Nó único",
+      "body": "Nenhum par está configurado, então nada é replicado e não há failover possível. Essa é a configuração normal para uma única instância — defina ha.peer.url para emparelhar com um segundo nó."
+    },
+    "replication": {
+      "title": "Replicação de configurações",
+      "disabled": "Há um par configurado, mas a replicação está desligada, então nenhuma configuração está sendo puxada.",
+      "inSync": "Em dia até a última busca bem-sucedida.",
+      "notInSync": "Fora de sincronia. Uma classe ainda em backfill significa que este nó está atrasado, por mais recente que tenha sido o último ciclo.",
+      "sinceSync": "Desde a última busca",
+      "backfilling": "Classes em backfill",
+      "retained": "Eventos retidos",
+      "oldestEvent": "Evento mais antigo / retenção"
+    },
+    "components": {
+      "title": "Prontidão no cluster",
+      "none": "Nenhum componente reportado.",
+      "unavailable": "Não foi possível ler a prontidão dos componentes: {reason}",
+      "ready": "{ready} de {desired} prontos",
+      "pdbBlocks": "O PDB não permite nenhum despejo"
+    },
+    "blobs": {
+      "title": "Armazenamento de objetos",
+      "intro": "A replicação carrega linhas do banco de dados; os objetos que essas linhas nomeiam ficam no armazenamento de objetos. Linhas presentes com objetos ausentes é um nó que parece saudável e não consegue atender a uma execução. Esta verificação faz requisições reais ao armazenamento, por isso só roda quando você pede.",
+      "check": "Verificar agora",
+      "checking": "Verificando…",
+      "fullLabel": "Verificar todos os objetos (lento em um parque grande)",
+      "sampled": "Amostragem — foram verificados apenas os objetos mais recentes de cada classe, não o parque inteiro. Compare abaixo o verificado com o total de cada classe.",
+      "full": "Verificação completa — todos os objetos de todas as classes verificadas.",
+      "unavailable": "Não foi possível ler o armazenamento de objetos: {reason}",
+      "irreplaceableMissing": "Faltam objetos em classes cuja perda é permanente: {classes}. Não faça failover para este nó.",
+      "irreplaceableUnchecked": "Nada foi afirmado sobre: {classes}. Elas estão desligadas ou não podem ser verificadas a partir do banco de dados, então zero ausentes não significa presentes.",
+      "class": "Classe",
+      "tier": "Camada",
+      "mode": "Modo",
+      "checked": "Verificados",
+      "missing": "Ausentes",
+      "note": "Observação",
+      "complete": "Completo"
+    },
+    "tier": {
+      "irreplaceable": "Insubstituível",
+      "history": "Histórico",
+      "rederivable": "Rederivável"
     }
   }
 }

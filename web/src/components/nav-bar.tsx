@@ -12,6 +12,7 @@ import {
   Key,
   Activity,
   HardDrive,
+  Radio,
   GitBranch,
   Users,
   Shield,
@@ -84,6 +85,7 @@ const ADMIN_ITEMS: NavItem[] = [
   { href: '/admin/provider-templates', labelKey: 'providerTemplates', icon: Code },
   { href: '/admin/catalog', labelKey: 'catalogAdmin', icon: Boxes },
   { href: '/admin/binary-cache', labelKey: 'cache', icon: HardDrive },
+  { href: '/admin/ha', labelKey: 'ha', icon: Radio },
 ]
 
 const AUDIT_ITEM: NavItem = { href: '/admin/audit-log', labelKey: 'auditLog', icon: FileText }

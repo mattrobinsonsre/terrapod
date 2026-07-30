@@ -30,7 +30,8 @@
     "menu": "Menü",
     "openMenu": "Menüyü aç",
     "openAccountMenu": "Hesap menüsünü aç",
-    "closeMenu": "Menüyü kapat"
+    "closeMenu": "Menüyü kapat",
+    "ha": "Yüksek erişilebilirlik"
   },
   "switcher": {
     "language": "Dil",
@@ -2860,6 +2861,66 @@
       "run_created": "İçe aktarma çalıştırması oluşturuldu",
       "errored": "Hata",
       "canceled": "İptal edildi"
+    }
+  },
+  "adminHa": {
+    "title": "Yüksek erişilebilirlik",
+    "description": "Bu düğümün rolü, eşiyle yakınsayıp yakınsamadığı ve satırlarının adlandırdığı nesnelerin gerçekten orada olup olmadığı.",
+    "roleLabel": "Bu düğüm",
+    "role": {
+      "leader": "Lider",
+      "follower": "Takipçi",
+      "auto": "Belirleniyor"
+    },
+    "followerNote": "Bu düğüm okumaları kabul eder ve çoğaltır, ancak kendisi hiçbir şey üretmez. Değiştiren istekler 503 döndürür.",
+    "nodeId": "Düğüm",
+    "peer": "Eş",
+    "configured": "Yapılandırıldı",
+    "notConfigured": "Yapılandırılmadı",
+    "singleNode": {
+      "title": "Tek düğüm",
+      "body": "Yapılandırılmış bir eş yok; bu nedenle hiçbir şey çoğaltılmıyor ve yük devretme mümkün değil. Tek örnekli kurulumda bu normaldir — ikinci bir düğümle eşleştirmek için ha.peer.url değerini ayarlayın."
+    },
+    "replication": {
+      "title": "Ayarların çoğaltılması",
+      "disabled": "Bir eş yapılandırılmış ancak çoğaltma kapalı, bu yüzden hiçbir ayar çekilmiyor.",
+      "inSync": "Son başarılı çekim itibarıyla güncel.",
+      "notInSync": "Eşitlenmemiş. Hâlâ geri dolduran bir sınıf varsa, son döngü ne kadar yeni olursa olsun bu düğüm geridedir.",
+      "sinceSync": "Son çekimden bu yana",
+      "backfilling": "Geri dolan sınıflar",
+      "retained": "Saklanan olaylar",
+      "oldestEvent": "En eski olay / saklama"
+    },
+    "components": {
+      "title": "Küme içi hazırlık",
+      "none": "Hiçbir bileşen bildirilmedi.",
+      "unavailable": "Bileşenlerin hazır durumu okunamadı: {reason}",
+      "ready": "{desired} bileşenden {ready} tanesi hazır",
+      "pdbBlocks": "PDB hiçbir tahliyeye izin vermiyor"
+    },
+    "blobs": {
+      "title": "Nesne deposu",
+      "intro": "Çoğaltma veritabanı satırlarını taşır; o satırların adlandırdığı nesneler nesne deposunda durur. Satırların var olup nesnelerin olmaması, sağlıklı görünen ama bir çalıştırmayı karşılayamayan bir düğüm demektir. Bu denetim depoya gerçek istekler gönderir, bu yüzden yalnızca siz istediğinizde çalışır.",
+      "check": "Şimdi denetle",
+      "checking": "Denetleniyor…",
+      "fullLabel": "Her nesneyi denetle (büyük ortamlarda yavaştır)",
+      "sampled": "Örnekleme — yalnızca her sınıftaki en yeni nesneler denetlendi, ortamın tamamı değil. Aşağıda her sınıf için denetleneni toplamla karşılaştırın.",
+      "full": "Tam denetim — denetlenen her sınıfın her nesnesi.",
+      "unavailable": "Nesne deposu okunamadı: {reason}",
+      "irreplaceableMissing": "Kaybı kalıcı olan sınıflarda nesneler eksik: {classes}. Bu düğüme yük devretmeyin.",
+      "irreplaceableUnchecked": "Şunlar hakkında hiçbir şey iddia edilmedi: {classes}. Bunlar kapalı ya da veritabanından doğrulanamıyor; dolayısıyla sıfır eksik, var demek değildir.",
+      "class": "Sınıf",
+      "tier": "Katman",
+      "mode": "Mod",
+      "checked": "Denetlenen",
+      "missing": "Eksik",
+      "note": "Not",
+      "complete": "Tam"
+    },
+    "tier": {
+      "irreplaceable": "Yeri doldurulamaz",
+      "history": "Geçmiş",
+      "rederivable": "Yeniden türetilebilir"
     }
   }
 }

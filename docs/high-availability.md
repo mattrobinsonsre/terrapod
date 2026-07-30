@@ -5,11 +5,12 @@
 > runs no replication tasks, and never probes. The tables exist and stay empty.
 > This is asserted in the test suite, not just intended.
 >
-> **Status: in development.** Role resolution and the peer link are complete;
-> settings replication is being built out class by class. The replication scope
-> today covers **agent pools and join tokens** — see [Replication
-> scope](#replication-scope) before planning around it. Everything on this page
-> is off by default and inert on a single-node install.
+> **Status: in development.** Role resolution, the peer link and **settings
+> replication** are complete — everything a workspace's runs depend on carries.
+> Object-store content has a per-class policy (verify or copy); run and artifact
+> *history* is a later phase. See [Replication scope](#replication-scope) before
+> planning around it. Everything on this page is off by default and inert on a
+> single-node install.
 
 Terrapod's high-availability model is a **leader/follower pair**, and the single
 most important thing about it is what it does *not* do:
@@ -226,12 +227,12 @@ semantics would only be needed in an active-active design, which this is not.
 | Workspaces, their agent-pool set, their module links | Replicated |
 | Variables and variable sets | Replicated |
 | Policy sets, notifications, run tasks, execution hooks, run triggers, remote-state consumers | Replicated |
-| Module and provider content | In development |
+| Object-store content (state, registry, caches, logs) | Per-class policy — see [Choosing verify or copy](#choosing-verify-or-copy-per-class) |
 | The CA, the encryption keys | **Never** — node-local by design (see below) |
 
 **Settings replication is now complete**: everything a workspace's runs depend on
-carries. What remains is run and artifact *history* (a separate phase) and the
-object-storage content behind the registry.
+carries. What remains is run and artifact *history* — a separate phase. The
+objects those rows name are a different question with its own answer, below.
 
 Three of the classes above are **gates**, and for a gate the failure mode of
 partial replication is not an error but a silently weaker posture: a mandatory
@@ -339,6 +340,32 @@ rebuilt at the failover, not carried through it.
 `use_count` replicates like any other column. There is no merge rule and none
 is needed: only the leader writes, so its count is authoritative and the
 follower simply takes it.
+
+## Reading all of this in the UI
+
+**Admin → High availability** (`/admin/ha`) is every check on this page in one
+screen: the node's role, whether it is converging with its peer, in-cluster
+readiness with its findings, and — on demand — object-store readiness. It needs
+the `admin` or `audit` role, the same gate as the endpoints it reads.
+
+It is **read-only on purpose**. There is no promote button, no failover button.
+A failover is moving DNS (see [Performing a failover](#performing-a-failover));
+a control that looked like it could do it from here would be actively dangerous,
+because the one thing this page must never do is invite an action that leaves
+two leaders.
+
+Three things it is careful about, because they are the ways a status screen
+misleads:
+
+- A **follower** is stated plainly, with what it means — a node that replicates
+  and originates nothing. Reading the wrong node's UI as the leader is the
+  mistake worth designing against.
+- A class still backfilling shows **not in sync** even beside a fresh
+  timestamp, matching the rule below.
+- The object-store check runs **only when you ask** — it makes real requests to
+  the store — and a sampled result says so, with each class's checked count
+  beside its total. A class nobody could verify is listed as *unchecked*, never
+  folded into a zero-missing pass.
 
 ## Is the follower caught up?
 

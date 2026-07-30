@@ -30,7 +30,8 @@
     "menu": "메뉴",
     "openMenu": "메뉴 열기",
     "openAccountMenu": "계정 메뉴 열기",
-    "closeMenu": "메뉴 닫기"
+    "closeMenu": "메뉴 닫기",
+    "ha": "고가용성"
   },
   "switcher": {
     "language": "언어",
@@ -2860,6 +2861,66 @@
       "run_created": "import 실행 생성됨",
       "errored": "오류",
       "canceled": "취소됨"
+    }
+  },
+  "adminHa": {
+    "title": "고가용성",
+    "description": "이 노드의 역할, 피어와 수렴하고 있는지, 그리고 행이 가리키는 객체가 실제로 존재하는지.",
+    "roleLabel": "이 노드",
+    "role": {
+      "leader": "리더",
+      "follower": "팔로워",
+      "auto": "확인 중"
+    },
+    "followerNote": "이 노드는 읽기를 받아들이고 복제하지만 스스로 무언가를 만들지는 않습니다. 변경 요청은 503을 반환합니다.",
+    "nodeId": "노드",
+    "peer": "피어",
+    "configured": "구성됨",
+    "notConfigured": "구성되지 않음",
+    "singleNode": {
+      "title": "단일 노드",
+      "body": "피어가 구성되어 있지 않아 아무것도 복제되지 않으며 장애 조치도 불가능합니다. 단일 인스턴스에서는 정상적인 구성입니다 — 두 번째 노드와 짝을 지으려면 ha.peer.url을 설정하세요."
+    },
+    "replication": {
+      "title": "설정 복제",
+      "disabled": "피어는 구성되어 있지만 복제가 꺼져 있어 설정을 가져오지 않습니다.",
+      "inSync": "마지막으로 성공한 가져오기 시점 기준으로 최신입니다.",
+      "notInSync": "동기화되지 않았습니다. 아직 백필 중인 클래스가 있다면 마지막 주기가 아무리 최근이어도 이 노드는 뒤처져 있는 것입니다.",
+      "sinceSync": "마지막 가져오기 이후",
+      "backfilling": "백필 중인 클래스",
+      "retained": "보관된 이벤트",
+      "oldestEvent": "가장 오래된 이벤트 / 보관 기간"
+    },
+    "components": {
+      "title": "클러스터 내 준비 상태",
+      "none": "보고된 구성 요소가 없습니다.",
+      "unavailable": "구성 요소의 준비 상태를 읽을 수 없습니다: {reason}",
+      "ready": "{desired}개 중 {ready}개 준비됨",
+      "pdbBlocks": "PDB가 어떤 축출도 허용하지 않습니다"
+    },
+    "blobs": {
+      "title": "오브젝트 스토어",
+      "intro": "복제가 옮기는 것은 데이터베이스 행이며, 그 행이 가리키는 객체는 오브젝트 스토어에 있습니다. 행은 있는데 객체가 없다면 건강해 보이지만 실행을 처리할 수 없는 노드입니다. 이 점검은 스토어에 실제 요청을 보내므로 요청할 때만 실행됩니다.",
+      "check": "지금 점검",
+      "checking": "점검 중…",
+      "fullLabel": "모든 객체 점검(대규모 환경에서는 느림)",
+      "sampled": "표본 — 클래스별 최신 객체 몇 개만 점검했으며 전체 환경은 아닙니다. 아래에서 클래스별 점검 수와 총계를 비교하세요.",
+      "full": "전체 점검 — 점검 대상 모든 클래스의 모든 객체.",
+      "unavailable": "오브젝트 스토어를 읽을 수 없습니다: {reason}",
+      "irreplaceableMissing": "잃으면 영구적으로 복구할 수 없는 클래스에서 객체가 누락되었습니다: {classes}. 이 노드로 장애 조치하지 마세요.",
+      "irreplaceableUnchecked": "다음에 대해서는 어떤 판단도 하지 않았습니다: {classes}. 꺼져 있거나 데이터베이스로 검증할 수 없으므로 누락 0이 곧 존재를 뜻하지는 않습니다.",
+      "class": "클래스",
+      "tier": "계층",
+      "mode": "모드",
+      "checked": "점검됨",
+      "missing": "누락",
+      "note": "참고",
+      "complete": "완전"
+    },
+    "tier": {
+      "irreplaceable": "대체 불가",
+      "history": "이력",
+      "rederivable": "재생성 가능"
     }
   }
 }

@@ -30,7 +30,8 @@
     "menu": "選單",
     "openMenu": "開啟選單",
     "openAccountMenu": "開啟帳戶選單",
-    "closeMenu": "關閉選單"
+    "closeMenu": "關閉選單",
+    "ha": "高可用性"
   },
   "switcher": {
     "language": "語言",
@@ -2860,6 +2861,66 @@
       "run_created": "已建立匯入執行",
       "errored": "發生錯誤",
       "canceled": "已取消"
+    }
+  },
+  "adminHa": {
+    "title": "高可用性",
+    "description": "本節點的角色、是否正在與對等節點收斂，以及資料列所指向的物件是否真的存在。",
+    "roleLabel": "本節點",
+    "role": {
+      "leader": "主節點",
+      "follower": "從節點",
+      "auto": "判定中"
+    },
+    "followerNote": "本節點接受讀取並進行複寫，但不會自行產生任何資料。變更類請求會回傳 503。",
+    "nodeId": "節點",
+    "peer": "對等節點",
+    "configured": "已設定",
+    "notConfigured": "未設定",
+    "singleNode": {
+      "title": "單一節點",
+      "body": "未設定對等節點，因此不會複寫任何內容，也無法進行容錯移轉。這對單一執行個體而言是正常狀態——設定 ha.peer.url 即可與第二個節點配對。"
+    },
+    "replication": {
+      "title": "設定複寫",
+      "disabled": "已設定對等節點，但複寫處於關閉狀態，因此不會拉取任何設定。",
+      "inSync": "截至最近一次成功拉取，已保持同步。",
+      "notInSync": "未同步。只要還有類別在回補，無論最近一輪多新，本節點都落後於對等節點。",
+      "sinceSync": "距上次拉取",
+      "backfilling": "回補中的類別",
+      "retained": "保留的事件",
+      "oldestEvent": "最早事件 / 保留期"
+    },
+    "components": {
+      "title": "叢集內就緒情況",
+      "none": "沒有元件回報。",
+      "unavailable": "無法讀取元件就緒情況：{reason}",
+      "ready": "{desired} 個中有 {ready} 個就緒",
+      "pdbBlocks": "PDB 不允許任何逐出"
+    },
+    "blobs": {
+      "title": "物件儲存",
+      "intro": "複寫搬運的是資料庫列，而這些列所指向的物件存放在物件儲存中。列在而物件不在，就是一個看起來健康卻無法承接執行的節點。此檢查會向儲存發出真實請求，因此只在你要求時才執行。",
+      "check": "立即檢查",
+      "checking": "檢查中…",
+      "fullLabel": "檢查每一個物件（規模大時較慢）",
+      "sampled": "抽樣——只檢查了每個類別中最新的少數物件，而非全部資產。請在下方比較每個類別的已檢查數與總數。",
+      "full": "完整檢查——每個受檢類別的每一個物件。",
+      "unavailable": "無法讀取物件儲存：{reason}",
+      "irreplaceableMissing": "以下遺失即無法復原的類別中存在缺少的物件：{classes}。請勿容錯移轉到本節點。",
+      "irreplaceableUnchecked": "未對以下類別做出任何判斷：{classes}。它們已關閉或無法透過資料庫驗證，因此缺少為零並不代表物件存在。",
+      "class": "類別",
+      "tier": "層級",
+      "mode": "模式",
+      "checked": "已檢查",
+      "missing": "缺少",
+      "note": "說明",
+      "complete": "完整"
+    },
+    "tier": {
+      "irreplaceable": "不可取代",
+      "history": "歷史",
+      "rederivable": "可重新產生"
     }
   }
 }

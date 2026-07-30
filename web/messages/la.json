@@ -30,7 +30,8 @@
     "menu": "Index",
     "openMenu": "Indicem aperire",
     "openAccountMenu": "Indicem rationis aperire",
-    "closeMenu": "Indicem claudere"
+    "closeMenu": "Indicem claudere",
+    "ha": "Alta disponibilitas"
   },
   "switcher": {
     "language": "Lingua",
@@ -2860,6 +2861,66 @@
       "run_created": "Cursus importationis creatus",
       "errored": "Erratum",
       "canceled": "Abrogatum"
+    }
+  },
+  "adminHa": {
+    "title": "Alta disponibilitas",
+    "description": "Munus huius nodi, utrum cum pari suo conveniat, et utrum obiecta quae eius versus nominant re vera adsint.",
+    "roleLabel": "Hic nodus",
+    "role": {
+      "leader": "Ductor",
+      "follower": "Sectator",
+      "auto": "Determinatur"
+    },
+    "followerNote": "Hic nodus lectiones accipit et replicat, sed nihil ipse gignit. Petitiones mutantes 503 reddunt.",
+    "nodeId": "Nodus",
+    "peer": "Par",
+    "configured": "Configuratus",
+    "notConfigured": "Non configuratus",
+    "singleNode": {
+      "title": "Nodus singularis",
+      "body": "Nullus par configuratus est, itaque nihil replicatur neque translatio in defectu fieri potest. Haec est ordinaria compositio unius exemplaris — ha.peer.url pone ut cum altero nodo coniungas."
+    },
+    "replication": {
+      "title": "Replicatio optionum",
+      "disabled": "Par configuratus est sed replicatio exstincta est, itaque nullae optiones trahuntur.",
+      "inSync": "Ad ultimam tractionem felicem aequatus.",
+      "notInSync": "Non aequatus. Classis adhuc replens significat hunc nodum retro esse, quamvis recens fuerit ultimus circulus.",
+      "sinceSync": "Ab ultima tractione",
+      "backfilling": "Classes replentes",
+      "retained": "Eventus retenti",
+      "oldestEvent": "Eventus vetustissimus / retentio"
+    },
+    "components": {
+      "title": "Paratio in glomere",
+      "none": "Nulla pars nuntiata est.",
+      "unavailable": "Paratio partium legi non potuit: {reason}",
+      "ready": "{ready} ex {desired} paratae",
+      "pdbBlocks": "PDB nullam eiectionem permittit"
+    },
+    "blobs": {
+      "title": "Repositorium obiectorum",
+      "intro": "Replicatio versus datorum portat; obiecta quae illi versus nominant in repositorio obiectorum habitant. Versus praesentes sine obiectis suis nodum faciunt qui sanus videtur nec cursum servire potest. Haec inspectio veras petitiones ad repositorium mittit, ideoque solum cum poscis exsequitur.",
+      "check": "Nunc inspicere",
+      "checking": "Inspicitur…",
+      "fullLabel": "Omne obiectum inspicere (lentum in magno patrimonio)",
+      "sampled": "Exemplum — sola obiecta recentissima cuiusque classis inspecta sunt, non totum patrimonium. Infra numerum inspectorum cum summa cuiusque classis compara.",
+      "full": "Inspectio plena — omne obiectum cuiusque classis inspectae.",
+      "unavailable": "Repositorium obiectorum legi non potuit: {reason}",
+      "irreplaceableMissing": "Obiecta desunt in classibus quarum iactura perpetua est: {classes}. Noli ad hunc nodum transferre.",
+      "irreplaceableUnchecked": "Nihil affirmatum est de: {classes}. Hae exstinctae sunt aut ex datorum basi comprobari non possunt, itaque nulla deesse non significat adesse.",
+      "class": "Classis",
+      "tier": "Gradus",
+      "mode": "Modus",
+      "checked": "Inspecta",
+      "missing": "Desunt",
+      "note": "Nota",
+      "complete": "Plenum"
+    },
+    "tier": {
+      "irreplaceable": "Irreparabile",
+      "history": "Historia",
+      "rederivable": "Rederivabile"
     }
   }
 }
