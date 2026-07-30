@@ -30,7 +30,8 @@
     "menu": "Menu",
     "openMenu": "Abrir menu",
     "openAccountMenu": "Abrir menu da conta",
-    "closeMenu": "Fechar menu"
+    "closeMenu": "Fechar menu",
+    "ha": "Alta disponibilidade"
   },
   "switcher": {
     "language": "Idioma",
@@ -2860,6 +2861,42 @@
       "run_created": "Execução de importação criada",
       "errored": "Com erro",
       "canceled": "Cancelado"
+    }
+  },
+  "adminHa": {
+    "title": "Alta disponibilidade",
+    "description": "O papel deste nó, se está a convergir com o seu par e se os objetos que as suas linhas nomeiam existem de facto.",
+    "roleLabel": "Este nó",
+    "role": {
+      "leader": "Líder",
+      "follower": "Seguidor",
+      "auto": "A resolver"
+    },
+    "followerNote": "Este nó aceita leituras e replica, mas não origina nada. Os pedidos que alteram dados devolvem 503.",
+    "nodeId": "Nó",
+    "peer": "Par",
+    "configured": "Configurado",
+    "notConfigured": "Não configurado",
+    "singleNode": {
+      "title": "Nó único",
+      "body": "Não há nenhum par configurado, por isso nada é replicado e não é possível qualquer failover. Esta é a configuração normal para uma única instância — defina ha.peer.url para emparelhar com um segundo nó."
+    },
+    "replication": {
+      "title": "Replicação de definições",
+      "disabled": "Existe um par configurado, mas a replicação está desligada, pelo que não estão a ser obtidas definições.",
+      "inSync": "Em dia à data da última obtenção bem-sucedida.",
+      "notInSync": "Fora de sincronia. Uma classe ainda em recuperação significa que este nó está atrasado, por muito recente que tenha sido o último ciclo.",
+      "sinceSync": "Desde a última obtenção",
+      "backfilling": "Classes em recuperação",
+      "retained": "Eventos retidos",
+      "oldestEvent": "Evento mais antigo / retenção"
+    },
+    "components": {
+      "title": "Prontidão no cluster",
+      "none": "Nenhum componente reportado.",
+      "unavailable": "Não foi possível ler a prontidão dos componentes: {reason}",
+      "ready": "{ready} de {desired} prontos",
+      "pdbBlocks": "O PDB não permite qualquer despejo"
     }
   }
 }

@@ -30,7 +30,8 @@
     "menu": "Menu",
     "openMenu": "Open menu",
     "openAccountMenu": "Open account menu",
-    "closeMenu": "Close menu"
+    "closeMenu": "Close menu",
+    "ha": "High availability"
   },
   "switcher": {
     "language": "Language",
@@ -2860,6 +2861,42 @@
       "run_created": "Import run created",
       "errored": "Errored",
       "canceled": "Canceled"
+    }
+  },
+  "adminHa": {
+    "title": "High availability",
+    "description": "This node's role, whether it is converging with its peer, and whether the objects its rows name are actually there.",
+    "roleLabel": "This node",
+    "role": {
+      "leader": "Leader",
+      "follower": "Follower",
+      "auto": "Resolving"
+    },
+    "followerNote": "This node accepts reads and replicates, but originates nothing. Mutating requests return 503.",
+    "nodeId": "Node",
+    "peer": "Peer",
+    "configured": "Configured",
+    "notConfigured": "Not configured",
+    "singleNode": {
+      "title": "Single node",
+      "body": "No peer is configured, so nothing is replicated and no failover is possible. This is the normal setup for one instance — set ha.peer.url to pair with a second node."
+    },
+    "replication": {
+      "title": "Settings replication",
+      "disabled": "A peer is configured but replication is switched off, so no settings are being pulled.",
+      "inSync": "Caught up as of the last successful pull.",
+      "notInSync": "Not in sync. A class still backfilling means this node is behind, however recent the last cycle was.",
+      "sinceSync": "Since last pull",
+      "backfilling": "Backfilling classes",
+      "retained": "Events retained",
+      "oldestEvent": "Oldest event / retention"
+    },
+    "components": {
+      "title": "In-cluster readiness",
+      "none": "No components reported.",
+      "unavailable": "Component readiness could not be read: {reason}",
+      "ready": "{ready} of {desired} ready",
+      "pdbBlocks": "PDB permits no eviction"
     }
   }
 }

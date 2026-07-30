@@ -30,7 +30,8 @@
     "menu": "菜单",
     "openMenu": "打开菜单",
     "openAccountMenu": "打开账户菜单",
-    "closeMenu": "关闭菜单"
+    "closeMenu": "关闭菜单",
+    "ha": "高可用"
   },
   "switcher": {
     "language": "语言",
@@ -2860,6 +2861,42 @@
       "run_created": "已创建导入运行",
       "errored": "出错",
       "canceled": "已取消"
+    }
+  },
+  "adminHa": {
+    "title": "高可用",
+    "description": "本节点的角色、是否正在与对端收敛，以及数据行所指向的对象是否真的存在。",
+    "roleLabel": "本节点",
+    "role": {
+      "leader": "主节点",
+      "follower": "从节点",
+      "auto": "判定中"
+    },
+    "followerNote": "本节点接受读取并进行复制，但不产生任何新数据。变更类请求返回 503。",
+    "nodeId": "节点",
+    "peer": "对端",
+    "configured": "已配置",
+    "notConfigured": "未配置",
+    "singleNode": {
+      "title": "单节点",
+      "body": "未配置对端，因此不会复制任何内容，也无法进行故障转移。这对单实例部署是正常状态——设置 ha.peer.url 即可与第二个节点配对。"
+    },
+    "replication": {
+      "title": "配置复制",
+      "disabled": "已配置对端，但复制处于关闭状态，因此不会拉取任何配置。",
+      "inSync": "截至最近一次成功拉取，已保持同步。",
+      "notInSync": "未同步。只要还有类别在回填，无论最近一轮多新，本节点都落后于对端。",
+      "sinceSync": "距上次拉取",
+      "backfilling": "回填中的类别",
+      "retained": "保留的事件",
+      "oldestEvent": "最早事件 / 保留期"
+    },
+    "components": {
+      "title": "集群内就绪情况",
+      "none": "没有组件上报。",
+      "unavailable": "无法读取组件就绪情况：{reason}",
+      "ready": "{desired} 个中有 {ready} 个就绪",
+      "pdbBlocks": "PDB 不允许任何驱逐"
     }
   }
 }

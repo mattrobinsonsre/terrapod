@@ -30,7 +30,8 @@
     "menu": "Menu",
     "openMenu": "Apri menu",
     "openAccountMenu": "Apri menu account",
-    "closeMenu": "Chiudi menu"
+    "closeMenu": "Chiudi menu",
+    "ha": "Alta disponibilità"
   },
   "switcher": {
     "language": "Lingua",
@@ -2860,6 +2861,42 @@
       "run_created": "Esecuzione di import creata",
       "errored": "In errore",
       "canceled": "Annullato"
+    }
+  },
+  "adminHa": {
+    "title": "Alta disponibilità",
+    "description": "Il ruolo di questo nodo, se sta convergendo con il suo peer e se gli oggetti nominati dalle sue righe ci sono davvero.",
+    "roleLabel": "Questo nodo",
+    "role": {
+      "leader": "Leader",
+      "follower": "Follower",
+      "auto": "In risoluzione"
+    },
+    "followerNote": "Questo nodo accetta letture e replica, ma non origina nulla. Le richieste che modificano restituiscono 503.",
+    "nodeId": "Nodo",
+    "peer": "Peer",
+    "configured": "Configurato",
+    "notConfigured": "Non configurato",
+    "singleNode": {
+      "title": "Nodo singolo",
+      "body": "Non è configurato alcun peer, quindi non viene replicato nulla e non è possibile alcun failover. È la configurazione normale per una singola istanza: imposta ha.peer.url per accoppiare un secondo nodo."
+    },
+    "replication": {
+      "title": "Replica delle impostazioni",
+      "disabled": "Un peer è configurato ma la replica è disattivata, quindi non viene prelevata alcuna impostazione.",
+      "inSync": "Allineato all'ultimo prelievo riuscito.",
+      "notInSync": "Non allineato. Una classe ancora in recupero significa che questo nodo è indietro, per quanto recente sia l'ultimo ciclo.",
+      "sinceSync": "Dall'ultimo prelievo",
+      "backfilling": "Classi in recupero",
+      "retained": "Eventi conservati",
+      "oldestEvent": "Evento più vecchio / conservazione"
+    },
+    "components": {
+      "title": "Prontezza nel cluster",
+      "none": "Nessun componente segnalato.",
+      "unavailable": "Non è stato possibile leggere la prontezza dei componenti: {reason}",
+      "ready": "{ready} di {desired} pronti",
+      "pdbBlocks": "Il PDB non consente alcuno sfratto"
     }
   }
 }

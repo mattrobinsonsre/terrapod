@@ -30,7 +30,8 @@
     "menu": "Meny",
     "openMenu": "Åpne meny",
     "openAccountMenu": "Åpne kontomeny",
-    "closeMenu": "Lukk meny"
+    "closeMenu": "Lukk meny",
+    "ha": "Høy tilgjengelighet"
   },
   "switcher": {
     "language": "Språk",
@@ -2860,6 +2861,42 @@
       "run_created": "Importkjøring opprettet",
       "errored": "Feilet",
       "canceled": "Avbrutt"
+    }
+  },
+  "adminHa": {
+    "title": "Høy tilgjengelighet",
+    "description": "Rollen til denne noden, om den konvergerer med peeren sin, og om objektene radene dens navngir faktisk finnes.",
+    "roleLabel": "Denne noden",
+    "role": {
+      "leader": "Leder",
+      "follower": "Følger",
+      "auto": "Avgjøres"
+    },
+    "followerNote": "Denne noden tar imot lesing og replikerer, men skaper ingenting selv. Endrende forespørsler svarer 503.",
+    "nodeId": "Node",
+    "peer": "Peer",
+    "configured": "Konfigurert",
+    "notConfigured": "Ikke konfigurert",
+    "singleNode": {
+      "title": "Enkelt node",
+      "body": "Ingen peer er konfigurert, så ingenting replikeres og failover er ikke mulig. Dette er det normale oppsettet for én instans — sett ha.peer.url for å pare med en node nummer to."
+    },
+    "replication": {
+      "title": "Replikering av innstillinger",
+      "disabled": "En peer er konfigurert, men replikering er slått av, så ingen innstillinger hentes.",
+      "inSync": "À jour per siste vellykkede henting.",
+      "notInSync": "Ikke i synk. En klasse som fortsatt etterfyller betyr at denne noden ligger etter, uansett hvor fersk siste syklus var.",
+      "sinceSync": "Siden siste henting",
+      "backfilling": "Klasser som etterfyller",
+      "retained": "Bevarte hendelser",
+      "oldestEvent": "Eldste hendelse / oppbevaring"
+    },
+    "components": {
+      "title": "Beredskap i klyngen",
+      "none": "Ingen komponenter rapportert.",
+      "unavailable": "Beredskapen til komponentene kunne ikke leses: {reason}",
+      "ready": "{ready} av {desired} klare",
+      "pdbBlocks": "PDB tillater ingen eviction"
     }
   }
 }

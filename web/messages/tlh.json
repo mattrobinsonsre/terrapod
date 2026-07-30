@@ -30,7 +30,8 @@
     "menu": "tetlh",
     "openMenu": "tetlh poSmoH",
     "openAccountMenu": "lo'wI' tetlh poSmoH",
-    "closeMenu": "tetlh SoQmoH"
+    "closeMenu": "tetlh SoQmoH",
+    "ha": "taH laH"
   },
   "switcher": {
     "language": "Hol",
@@ -2860,6 +2861,42 @@
       "run_created": "import qoj chenmoHlu''pu''",
       "errored": "lujpu''",
       "canceled": "qILpu''"
+    }
+  },
+  "adminHa": {
+    "title": "taH laH",
+    "description": "De'wI' vumwI' patlh, chaq jIH De'wI'Daj rurmoH'a', 'ej chaq De'mey pongbogh vaghmey tu'lu''a'.",
+    "roleLabel": "De'wI'vam",
+    "role": {
+      "leader": "DevwI'",
+      "follower": "tlhavwI'",
+      "auto": "wIvlI'"
+    },
+    "followerNote": "laDmeH ra'ghomvam lajlaH 'ej velqa'moH, 'ach pagh chenmoH. choHmeH ra'ghommey chaq 503 chegh.",
+    "nodeId": "De'wI'",
+    "peer": "jIH",
+    "configured": "cherlu'pu'",
+    "notConfigured": "cherlu'be'pu'",
+    "singleNode": {
+      "title": "wa' De'wI' neH",
+      "body": "pagh jIH cherlu'pu', vaj pagh velqa'lu' 'ej choHmeH laH tu'be'lu'. wa' patmey cherlu'chugh, ghu'vam motlh — ha.peer.url yIcher, cha'DIch De'wI' DaghomnISchugh."
+    },
+    "replication": {
+      "title": "chermeH velqa'",
+      "disabled": "jIH cherlu'pu' 'ach velqa' chu'Ha'lu'pu', vaj pagh chermey qellu'.",
+      "inSync": "Qapchu'bogh Qav qellu'pu'DI', rurchu'.",
+      "notInSync": "rurbe'. teblI'bogh Segh tu'lu'chugh, De'wI'vam tlha' — Qav ghurmeH poH chu'chugh je.",
+      "sinceSync": "Qav qelmeH poH",
+      "backfilling": "teblI'bogh Seghmey",
+      "retained": "polbogh wanI'mey",
+      "oldestEvent": "wanI' qan law' / polmeH poH"
+    },
+    "components": {
+      "title": "ghomDaq ghuHtaHghach",
+      "none": "pagh chenmoHwI' ja'lu'.",
+      "unavailable": "chenmoHwI' ghuHtaHghach laDlaHbe'lu': {reason}",
+      "ready": "{desired} chenmoHwI'mey {ready} ghuHtaH",
+      "pdbBlocks": "pagh teqmeH chaw' PDB"
     }
   }
 }

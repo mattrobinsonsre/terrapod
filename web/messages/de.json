@@ -30,7 +30,8 @@
     "menu": "Menü",
     "openMenu": "Menü öffnen",
     "openAccountMenu": "Kontomenü öffnen",
-    "closeMenu": "Menü schließen"
+    "closeMenu": "Menü schließen",
+    "ha": "Hochverfügbarkeit"
   },
   "switcher": {
     "language": "Sprache",
@@ -2860,6 +2861,42 @@
       "run_created": "Import-Lauf erstellt",
       "errored": "Fehlgeschlagen",
       "canceled": "Abgebrochen"
+    }
+  },
+  "adminHa": {
+    "title": "Hochverfügbarkeit",
+    "description": "Die Rolle dieses Knotens, ob er mit seinem Partner konvergiert und ob die Objekte, die seine Datensätze benennen, tatsächlich vorhanden sind.",
+    "roleLabel": "Dieser Knoten",
+    "role": {
+      "leader": "Leader",
+      "follower": "Follower",
+      "auto": "Wird ermittelt"
+    },
+    "followerNote": "Dieser Knoten nimmt Lesezugriffe an und repliziert, erzeugt aber nichts selbst. Ändernde Anfragen liefern 503.",
+    "nodeId": "Knoten",
+    "peer": "Partner",
+    "configured": "Konfiguriert",
+    "notConfigured": "Nicht konfiguriert",
+    "singleNode": {
+      "title": "Einzelner Knoten",
+      "body": "Es ist kein Partner konfiguriert, daher wird nichts repliziert und ein Failover ist nicht möglich. Das ist der normale Aufbau für eine einzelne Instanz — setzen Sie ha.peer.url, um einen zweiten Knoten zu koppeln."
+    },
+    "replication": {
+      "title": "Replikation der Einstellungen",
+      "disabled": "Ein Partner ist konfiguriert, die Replikation ist jedoch abgeschaltet, daher werden keine Einstellungen abgerufen.",
+      "inSync": "Auf dem Stand des letzten erfolgreichen Abrufs.",
+      "notInSync": "Nicht synchron. Eine Klasse, die noch nachlädt, bedeutet, dass dieser Knoten zurückliegt — egal wie aktuell der letzte Zyklus war.",
+      "sinceSync": "Seit dem letzten Abruf",
+      "backfilling": "Klassen im Nachladen",
+      "retained": "Aufbewahrte Ereignisse",
+      "oldestEvent": "Ältestes Ereignis / Aufbewahrung"
+    },
+    "components": {
+      "title": "Bereitschaft im Cluster",
+      "none": "Keine Komponenten gemeldet.",
+      "unavailable": "Die Bereitschaft der Komponenten konnte nicht gelesen werden: {reason}",
+      "ready": "{ready} von {desired} bereit",
+      "pdbBlocks": "PDB lässt keine Verdrängung zu"
     }
   }
 }

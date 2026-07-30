@@ -30,7 +30,8 @@
     "menu": "Menu",
     "openMenu": "Ouvrir le menu",
     "openAccountMenu": "Ouvrir le menu du compte",
-    "closeMenu": "Fermer le menu"
+    "closeMenu": "Fermer le menu",
+    "ha": "Haute disponibilité"
   },
   "switcher": {
     "language": "Langue",
@@ -2860,6 +2861,42 @@
       "run_created": "Exécution d import créée",
       "errored": "En erreur",
       "canceled": "Annulé"
+    }
+  },
+  "adminHa": {
+    "title": "Haute disponibilité",
+    "description": "Le rôle de ce nœud, s'il converge avec son pair, et si les objets que ses lignes désignent sont réellement présents.",
+    "roleLabel": "Ce nœud",
+    "role": {
+      "leader": "Leader",
+      "follower": "Suiveur",
+      "auto": "En cours de résolution"
+    },
+    "followerNote": "Ce nœud accepte les lectures et réplique, mais n'initie rien. Les requêtes modifiantes renvoient 503.",
+    "nodeId": "Nœud",
+    "peer": "Pair",
+    "configured": "Configuré",
+    "notConfigured": "Non configuré",
+    "singleNode": {
+      "title": "Nœud unique",
+      "body": "Aucun pair n'est configuré : rien n'est répliqué et aucun basculement n'est possible. C'est la configuration normale pour une instance unique — définissez ha.peer.url pour appairer un second nœud."
+    },
+    "replication": {
+      "title": "Réplication des paramètres",
+      "disabled": "Un pair est configuré mais la réplication est désactivée : aucun paramètre n'est récupéré.",
+      "inSync": "À jour au dernier tirage réussi.",
+      "notInSync": "Non synchronisé. Une classe encore en rattrapage signifie que ce nœud est en retard, aussi récent soit le dernier cycle.",
+      "sinceSync": "Depuis le dernier tirage",
+      "backfilling": "Classes en rattrapage",
+      "retained": "Événements conservés",
+      "oldestEvent": "Événement le plus ancien / rétention"
+    },
+    "components": {
+      "title": "Disponibilité dans le cluster",
+      "none": "Aucun composant signalé.",
+      "unavailable": "La disponibilité des composants n'a pas pu être lue : {reason}",
+      "ready": "{ready} sur {desired} prêts",
+      "pdbBlocks": "Le PDB n'autorise aucune éviction"
     }
   }
 }

@@ -30,7 +30,8 @@
     "menu": "Menu",
     "openMenu": "Otwórz menu",
     "openAccountMenu": "Otwórz menu konta",
-    "closeMenu": "Zamknij menu"
+    "closeMenu": "Zamknij menu",
+    "ha": "Wysoka dostępność"
   },
   "switcher": {
     "language": "Język",
@@ -2860,6 +2861,42 @@
       "run_created": "Utworzono uruchomienie importu",
       "errored": "Błąd",
       "canceled": "Anulowano"
+    }
+  },
+  "adminHa": {
+    "title": "Wysoka dostępność",
+    "description": "Rola tego węzła, to czy zbiega się ze swoim partnerem, oraz to czy obiekty wskazywane przez jego wiersze faktycznie istnieją.",
+    "roleLabel": "Ten węzeł",
+    "role": {
+      "leader": "Lider",
+      "follower": "Naśladowca",
+      "auto": "Ustalanie"
+    },
+    "followerNote": "Ten węzeł przyjmuje odczyty i replikuje, ale niczego sam nie tworzy. Żądania zmieniające dane zwracają 503.",
+    "nodeId": "Węzeł",
+    "peer": "Partner",
+    "configured": "Skonfigurowany",
+    "notConfigured": "Nieskonfigurowany",
+    "singleNode": {
+      "title": "Pojedynczy węzeł",
+      "body": "Nie skonfigurowano partnera, więc nic nie jest replikowane i przełączenie awaryjne nie jest możliwe. To normalna konfiguracja dla jednej instancji — ustaw ha.peer.url, aby sparować z drugim węzłem."
+    },
+    "replication": {
+      "title": "Replikacja ustawień",
+      "disabled": "Partner jest skonfigurowany, ale replikacja jest wyłączona, więc żadne ustawienia nie są pobierane.",
+      "inSync": "Aktualne na moment ostatniego udanego pobrania.",
+      "notInSync": "Brak synchronizacji. Klasa wciąż uzupełniana oznacza, że ten węzeł jest w tyle, choćby ostatni cykl był bardzo świeży.",
+      "sinceSync": "Od ostatniego pobrania",
+      "backfilling": "Klasy w uzupełnianiu",
+      "retained": "Zachowane zdarzenia",
+      "oldestEvent": "Najstarsze zdarzenie / retencja"
+    },
+    "components": {
+      "title": "Gotowość w klastrze",
+      "none": "Żaden komponent się nie zgłosił.",
+      "unavailable": "Nie udało się odczytać gotowości komponentów: {reason}",
+      "ready": "Gotowe {ready} z {desired}",
+      "pdbBlocks": "PDB nie zezwala na żadną eksmisję"
     }
   }
 }

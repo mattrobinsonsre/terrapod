@@ -30,7 +30,8 @@
     "menu": "Menü",
     "openMenu": "Menüyü aç",
     "openAccountMenu": "Hesap menüsünü aç",
-    "closeMenu": "Menüyü kapat"
+    "closeMenu": "Menüyü kapat",
+    "ha": "Yüksek erişilebilirlik"
   },
   "switcher": {
     "language": "Dil",
@@ -2860,6 +2861,42 @@
       "run_created": "İçe aktarma çalıştırması oluşturuldu",
       "errored": "Hata",
       "canceled": "İptal edildi"
+    }
+  },
+  "adminHa": {
+    "title": "Yüksek erişilebilirlik",
+    "description": "Bu düğümün rolü, eşiyle yakınsayıp yakınsamadığı ve satırlarının adlandırdığı nesnelerin gerçekten orada olup olmadığı.",
+    "roleLabel": "Bu düğüm",
+    "role": {
+      "leader": "Lider",
+      "follower": "Takipçi",
+      "auto": "Belirleniyor"
+    },
+    "followerNote": "Bu düğüm okumaları kabul eder ve çoğaltır, ancak kendisi hiçbir şey üretmez. Değiştiren istekler 503 döndürür.",
+    "nodeId": "Düğüm",
+    "peer": "Eş",
+    "configured": "Yapılandırıldı",
+    "notConfigured": "Yapılandırılmadı",
+    "singleNode": {
+      "title": "Tek düğüm",
+      "body": "Yapılandırılmış bir eş yok; bu nedenle hiçbir şey çoğaltılmıyor ve yük devretme mümkün değil. Tek örnekli kurulumda bu normaldir — ikinci bir düğümle eşleştirmek için ha.peer.url değerini ayarlayın."
+    },
+    "replication": {
+      "title": "Ayarların çoğaltılması",
+      "disabled": "Bir eş yapılandırılmış ancak çoğaltma kapalı, bu yüzden hiçbir ayar çekilmiyor.",
+      "inSync": "Son başarılı çekim itibarıyla güncel.",
+      "notInSync": "Eşitlenmemiş. Hâlâ geri dolduran bir sınıf varsa, son döngü ne kadar yeni olursa olsun bu düğüm geridedir.",
+      "sinceSync": "Son çekimden bu yana",
+      "backfilling": "Geri dolan sınıflar",
+      "retained": "Saklanan olaylar",
+      "oldestEvent": "En eski olay / saklama"
+    },
+    "components": {
+      "title": "Küme içi hazırlık",
+      "none": "Hiçbir bileşen bildirilmedi.",
+      "unavailable": "Bileşenlerin hazır durumu okunamadı: {reason}",
+      "ready": "{desired} bileşenden {ready} tanesi hazır",
+      "pdbBlocks": "PDB hiçbir tahliyeye izin vermiyor"
     }
   }
 }

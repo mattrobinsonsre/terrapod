@@ -30,7 +30,8 @@
     "menu": "Dewislen",
     "openMenu": "Agor y ddewislen",
     "openAccountMenu": "Agor dewislen y cyfrif",
-    "closeMenu": "Cau'r ddewislen"
+    "closeMenu": "Cau'r ddewislen",
+    "ha": "Argaeledd uchel"
   },
   "switcher": {
     "language": "Iaith",
@@ -2860,6 +2861,42 @@
       "run_created": "Rhediad mewnforio wedi''i greu",
       "errored": "Gwall",
       "canceled": "Wedi''i ganslo"
+    }
+  },
+  "adminHa": {
+    "title": "Argaeledd uchel",
+    "description": "Rôl y nod hwn, a yw'n cydgyfeirio â'i bartner, ac a yw'r gwrthrychau y mae ei resi'n eu henwi yno mewn gwirionedd.",
+    "roleLabel": "Y nod hwn",
+    "role": {
+      "leader": "Arweinydd",
+      "follower": "Dilynwr",
+      "auto": "Wrthi'n penderfynu"
+    },
+    "followerNote": "Mae'r nod hwn yn derbyn darlleniadau ac yn dyblygu, ond nid yw'n tarddu dim. Mae ceisiadau sy'n newid data yn dychwelyd 503.",
+    "nodeId": "Nod",
+    "peer": "Partner",
+    "configured": "Wedi'i ffurfweddu",
+    "notConfigured": "Heb ei ffurfweddu",
+    "singleNode": {
+      "title": "Un nod",
+      "body": "Nid oes partner wedi'i ffurfweddu, felly nid oes dim yn cael ei ddyblygu ac nid oes modd trosglwyddo wrth fethiant. Dyma'r gosodiad arferol ar gyfer un enghraifft — gosodwch ha.peer.url i baru ag ail nod."
+    },
+    "replication": {
+      "title": "Dyblygu gosodiadau",
+      "disabled": "Mae partner wedi'i ffurfweddu ond mae dyblygu wedi'i ddiffodd, felly nid oes gosodiadau'n cael eu tynnu.",
+      "inSync": "Yn gyfredol hyd at y tyniad llwyddiannus diwethaf.",
+      "notInSync": "Heb gydamseru. Mae dosbarth sy'n dal i lenwi'n ôl yn golygu bod y nod hwn ar ei hôl hi, pa mor ddiweddar bynnag oedd y cylch diwethaf.",
+      "sinceSync": "Ers y tyniad diwethaf",
+      "backfilling": "Dosbarthiadau sy'n llenwi'n ôl",
+      "retained": "Digwyddiadau a gedwir",
+      "oldestEvent": "Digwyddiad hynaf / cadw"
+    },
+    "components": {
+      "title": "Parodrwydd yn y clwstwr",
+      "none": "Ni adroddwyd am unrhyw gydrannau.",
+      "unavailable": "Nid oedd modd darllen parodrwydd y cydrannau: {reason}",
+      "ready": "{ready} o {desired} yn barod",
+      "pdbBlocks": "Nid yw'r PDB yn caniatáu unrhyw droi allan"
     }
   }
 }

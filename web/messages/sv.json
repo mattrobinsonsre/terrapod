@@ -30,7 +30,8 @@
     "menu": "Meny",
     "openMenu": "Öppna meny",
     "openAccountMenu": "Öppna kontomeny",
-    "closeMenu": "Stäng meny"
+    "closeMenu": "Stäng meny",
+    "ha": "Hög tillgänglighet"
   },
   "switcher": {
     "language": "Språk",
@@ -2860,6 +2861,42 @@
       "run_created": "Importkörning skapad",
       "errored": "Fel",
       "canceled": "Avbruten"
+    }
+  },
+  "adminHa": {
+    "title": "Hög tillgänglighet",
+    "description": "Den här nodens roll, om den konvergerar med sin peer och om de objekt som dess rader namnger faktiskt finns.",
+    "roleLabel": "Den här noden",
+    "role": {
+      "leader": "Ledare",
+      "follower": "Följare",
+      "auto": "Fastställs"
+    },
+    "followerNote": "Den här noden tar emot läsningar och replikerar, men skapar ingenting själv. Förändrande anrop svarar 503.",
+    "nodeId": "Nod",
+    "peer": "Peer",
+    "configured": "Konfigurerad",
+    "notConfigured": "Inte konfigurerad",
+    "singleNode": {
+      "title": "Enskild nod",
+      "body": "Ingen peer är konfigurerad, så ingenting replikeras och failover är inte möjligt. Det här är den normala uppsättningen för en enda instans — sätt ha.peer.url för att para ihop med en andra nod."
+    },
+    "replication": {
+      "title": "Replikering av inställningar",
+      "disabled": "En peer är konfigurerad men replikeringen är avstängd, så inga inställningar hämtas.",
+      "inSync": "Ikapp per den senaste lyckade hämtningen.",
+      "notInSync": "Inte i synk. En klass som fortfarande fyller på betyder att noden ligger efter, hur färsk den senaste cykeln än var.",
+      "sinceSync": "Sedan senaste hämtningen",
+      "backfilling": "Klasser som fyller på",
+      "retained": "Bevarade händelser",
+      "oldestEvent": "Äldsta händelse / bevarande"
+    },
+    "components": {
+      "title": "Beredskap i klustret",
+      "none": "Inga komponenter rapporterade.",
+      "unavailable": "Komponenternas beredskap kunde inte läsas: {reason}",
+      "ready": "{ready} av {desired} klara",
+      "pdbBlocks": "PDB tillåter ingen eviction"
     }
   }
 }

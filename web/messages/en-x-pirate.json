@@ -30,7 +30,8 @@
     "menu": "Menu",
     "openMenu": "Open th'' menu",
     "openAccountMenu": "Open yer account menu",
-    "closeMenu": "Batten th'' menu"
+    "closeMenu": "Batten th'' menu",
+    "ha": "Ever-Afloat"
   },
   "switcher": {
     "language": "Tongue",
@@ -2860,6 +2861,42 @@
       "run_created": "Import run created",
       "errored": "Errored",
       "canceled": "Canceled"
+    }
+  },
+  "adminHa": {
+    "title": "Ever-Afloat",
+    "description": "This vessel's station, whether she be closin' on her consort, and whether the cargo her ledger names be truly in the hold.",
+    "roleLabel": "This vessel",
+    "role": {
+      "leader": "Flagship",
+      "follower": "Consort",
+      "auto": "Takin' a bearin'"
+    },
+    "followerNote": "This vessel takes on readin's and copies 'em, but sets nothin' in motion herself. Orders that alter the log be answered with 503.",
+    "nodeId": "Vessel",
+    "peer": "Consort",
+    "configured": "Rigged",
+    "notConfigured": "Not rigged",
+    "singleNode": {
+      "title": "Sailin' alone",
+      "body": "No consort be rigged, so nothin' be copied and no handover be possible. That be the ordinary way of a lone ship — set ha.peer.url to sail in company with a second vessel."
+    },
+    "replication": {
+      "title": "Copyin' the orders",
+      "disabled": "A consort be rigged but the copyin' be struck, so no orders be fetched.",
+      "inSync": "Abreast as of the last fetch that made port.",
+      "notInSync": "Adrift. A hold still fillin' means this vessel lags astern, however fresh the last watch may be.",
+      "sinceSync": "Since the last fetch",
+      "backfilling": "Holds still fillin'",
+      "retained": "Log entries kept",
+      "oldestEvent": "Oldest entry / how long she be kept"
+    },
+    "components": {
+      "title": "Readiness aboard the fleet",
+      "none": "Nary a hand reported.",
+      "unavailable": "Could not read the crew's readiness: {reason}",
+      "ready": "{ready} of {desired} at their stations",
+      "pdbBlocks": "The PDB suffers none to be put ashore"
     }
   }
 }

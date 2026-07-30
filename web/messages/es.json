@@ -30,7 +30,8 @@
     "menu": "Menú",
     "openMenu": "Abrir menú",
     "openAccountMenu": "Abrir menú de cuenta",
-    "closeMenu": "Cerrar menú"
+    "closeMenu": "Cerrar menú",
+    "ha": "Alta disponibilidad"
   },
   "switcher": {
     "language": "Idioma",
@@ -2860,6 +2861,42 @@
       "run_created": "Ejecución de importación creada",
       "errored": "Con error",
       "canceled": "Cancelado"
+    }
+  },
+  "adminHa": {
+    "title": "Alta disponibilidad",
+    "description": "El rol de este nodo, si está convergiendo con su par y si los objetos que nombran sus registros están realmente presentes.",
+    "roleLabel": "Este nodo",
+    "role": {
+      "leader": "Líder",
+      "follower": "Seguidor",
+      "auto": "Resolviendo"
+    },
+    "followerNote": "Este nodo acepta lecturas y replica, pero no origina nada. Las peticiones que modifican devuelven 503.",
+    "nodeId": "Nodo",
+    "peer": "Par",
+    "configured": "Configurado",
+    "notConfigured": "Sin configurar",
+    "singleNode": {
+      "title": "Nodo único",
+      "body": "No hay ningún par configurado, así que no se replica nada y no es posible conmutar por error. Esta es la configuración normal para una sola instancia: define ha.peer.url para emparejar con un segundo nodo."
+    },
+    "replication": {
+      "title": "Replicación de ajustes",
+      "disabled": "Hay un par configurado, pero la replicación está desactivada, así que no se está trayendo ningún ajuste.",
+      "inSync": "Al día según la última descarga correcta.",
+      "notInSync": "Sin sincronizar. Una clase que aún se está rellenando significa que este nodo va por detrás, por reciente que sea el último ciclo.",
+      "sinceSync": "Desde la última descarga",
+      "backfilling": "Clases rellenándose",
+      "retained": "Eventos conservados",
+      "oldestEvent": "Evento más antiguo / retención"
+    },
+    "components": {
+      "title": "Disponibilidad en el clúster",
+      "none": "No se ha informado de ningún componente.",
+      "unavailable": "No se pudo leer la disponibilidad de los componentes: {reason}",
+      "ready": "{ready} de {desired} listos",
+      "pdbBlocks": "El PDB no permite ningún desalojo"
     }
   }
 }

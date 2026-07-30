@@ -30,7 +30,8 @@
     "menu": "Marklar",
     "openMenu": "Open marklar",
     "openAccountMenu": "Open marklar marklar",
-    "closeMenu": "Close marklar"
+    "closeMenu": "Close marklar",
+    "ha": "High marklar"
   },
   "switcher": {
     "language": "Marklar",
@@ -2860,6 +2861,42 @@
       "run_created": "Marklar marklar created",
       "errored": "Errored",
       "canceled": "Canceled"
+    }
+  },
+  "adminHa": {
+    "title": "High marklar",
+    "description": "This marklar's marklar, whether it is converging with its marklar, and whether the marklars its marklars name are actually there.",
+    "roleLabel": "This marklar",
+    "role": {
+      "leader": "Marklar",
+      "follower": "Marklar",
+      "auto": "Resolving"
+    },
+    "followerNote": "This marklar accepts marklars and replicates, but originates nothing. Mutating marklars return 503.",
+    "nodeId": "Marklar",
+    "peer": "Marklar",
+    "configured": "Configured",
+    "notConfigured": "Not configured",
+    "singleNode": {
+      "title": "Single marklar",
+      "body": "No marklar is configured, so nothing is replicated and no marklar is possible. This is the normal marklar for one marklar — set ha.peer.url to pair with a second marklar."
+    },
+    "replication": {
+      "title": "Marklar marklar",
+      "disabled": "A marklar is configured but marklar is switched off, so no marklars are being pulled.",
+      "inSync": "Caught up as of the last successful marklar.",
+      "notInSync": "Not in marklar. A marklar still backfilling means this marklar is behind, however recent the last marklar was.",
+      "sinceSync": "Since last marklar",
+      "backfilling": "Backfilling marklars",
+      "retained": "Marklars retained",
+      "oldestEvent": "Oldest marklar / marklar"
+    },
+    "components": {
+      "title": "In-marklar marklar",
+      "none": "No marklars reported.",
+      "unavailable": "Marklar marklar could not be read: {reason}",
+      "ready": "{ready} of {desired} ready",
+      "pdbBlocks": "Marklar permits no marklar"
     }
   }
 }

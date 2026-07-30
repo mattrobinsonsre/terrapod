@@ -30,7 +30,8 @@
     "menu": "Menu",
     "openMenu": "Opun menu",
     "openAccountMenu": "Opun akkount menu",
-    "closeMenu": "Cloze menu"
+    "closeMenu": "Cloze menu",
+    "ha": "Hai Availabilitee"
   },
   "switcher": {
     "language": "Langwidge",
@@ -2860,6 +2861,42 @@
       "run_created": "Import run kreated",
       "errored": "Errord",
       "canceled": "Kanseld"
+    }
+  },
+  "adminHa": {
+    "title": "Hai Availabilitee",
+    "description": "Dis nodez job, whethr it be catchin up wif its budy, an whethr da thingz its rowz point at r actualy DER.",
+    "roleLabel": "Dis node",
+    "role": {
+      "leader": "Leedr",
+      "follower": "Follwr",
+      "auto": "Figgerin it owt"
+    },
+    "followerNote": "Dis node takez reedz an copiez stuf, but makez nuffin ov its own. Changey requestz getz 503.",
+    "nodeId": "Nohd",
+    "peer": "Budy",
+    "configured": "Set up",
+    "notConfigured": "Not set up",
+    "singleNode": {
+      "title": "Just wun node",
+      "body": "No budy iz set up, so nuffin getz copied an no failovr can hapen. Dis iz totaly normul fur wun instanse — set ha.peer.url to pair wif a secund node."
+    },
+    "replication": {
+      "title": "Settingz copyin",
+      "disabled": "A budy iz set up but copyin iz turnd off, so no settingz r bein pulld.",
+      "inSync": "All caught up as ov da last gud pull.",
+      "notInSync": "Not caught up. A clas still fillin in meenz dis node iz behind, no mattr how fresh da last cycle woz.",
+      "sinceSync": "Sinse last pull",
+      "backfilling": "Clasez fillin in",
+      "retained": "Eventz keptid",
+      "oldestEvent": "Oldist evnt / keepin tiem"
+    },
+    "components": {
+      "title": "Reddynes in da clustr",
+      "none": "No bitz reportid.",
+      "unavailable": "Cud not reed da bitz reddynes: {reason}",
+      "ready": "{ready} ov {desired} reddy",
+      "pdbBlocks": "PDB sez NO kikkin owt"
     }
   }
 }

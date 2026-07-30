@@ -30,7 +30,8 @@
     "menu": "Index",
     "openMenu": "Indicem aperire",
     "openAccountMenu": "Indicem rationis aperire",
-    "closeMenu": "Indicem claudere"
+    "closeMenu": "Indicem claudere",
+    "ha": "Alta disponibilitas"
   },
   "switcher": {
     "language": "Lingua",
@@ -2860,6 +2861,42 @@
       "run_created": "Cursus importationis creatus",
       "errored": "Erratum",
       "canceled": "Abrogatum"
+    }
+  },
+  "adminHa": {
+    "title": "Alta disponibilitas",
+    "description": "Munus huius nodi, utrum cum pari suo conveniat, et utrum obiecta quae eius versus nominant re vera adsint.",
+    "roleLabel": "Hic nodus",
+    "role": {
+      "leader": "Ductor",
+      "follower": "Sectator",
+      "auto": "Determinatur"
+    },
+    "followerNote": "Hic nodus lectiones accipit et replicat, sed nihil ipse gignit. Petitiones mutantes 503 reddunt.",
+    "nodeId": "Nodus",
+    "peer": "Par",
+    "configured": "Configuratus",
+    "notConfigured": "Non configuratus",
+    "singleNode": {
+      "title": "Nodus singularis",
+      "body": "Nullus par configuratus est, itaque nihil replicatur neque translatio in defectu fieri potest. Haec est ordinaria compositio unius exemplaris — ha.peer.url pone ut cum altero nodo coniungas."
+    },
+    "replication": {
+      "title": "Replicatio optionum",
+      "disabled": "Par configuratus est sed replicatio exstincta est, itaque nullae optiones trahuntur.",
+      "inSync": "Ad ultimam tractionem felicem aequatus.",
+      "notInSync": "Non aequatus. Classis adhuc replens significat hunc nodum retro esse, quamvis recens fuerit ultimus circulus.",
+      "sinceSync": "Ab ultima tractione",
+      "backfilling": "Classes replentes",
+      "retained": "Eventus retenti",
+      "oldestEvent": "Eventus vetustissimus / retentio"
+    },
+    "components": {
+      "title": "Paratio in glomere",
+      "none": "Nulla pars nuntiata est.",
+      "unavailable": "Paratio partium legi non potuit: {reason}",
+      "ready": "{ready} ex {desired} paratae",
+      "pdbBlocks": "PDB nullam eiectionem permittit"
     }
   }
 }

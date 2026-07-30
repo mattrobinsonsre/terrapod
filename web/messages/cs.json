@@ -30,7 +30,8 @@
     "menu": "Nabídka",
     "openMenu": "Otevřít nabídku",
     "openAccountMenu": "Otevřít nabídku účtu",
-    "closeMenu": "Zavřít nabídku"
+    "closeMenu": "Zavřít nabídku",
+    "ha": "Vysoká dostupnost"
   },
   "switcher": {
     "language": "Jazyk",
@@ -2860,6 +2861,42 @@
       "run_created": "Vytvořen běh importu",
       "errored": "Chyba",
       "canceled": "Zrušeno"
+    }
+  },
+  "adminHa": {
+    "title": "Vysoká dostupnost",
+    "description": "Role tohoto uzlu, zda konverguje se svým protějškem a zda objekty, na které jeho záznamy odkazují, skutečně existují.",
+    "roleLabel": "Tento uzel",
+    "role": {
+      "leader": "Vedoucí",
+      "follower": "Následovník",
+      "auto": "Zjišťuje se"
+    },
+    "followerNote": "Tento uzel přijímá čtení a replikuje, ale sám nic nevytváří. Požadavky, které mění data, vracejí 503.",
+    "nodeId": "Uzel",
+    "peer": "Protějšek",
+    "configured": "Nakonfigurováno",
+    "notConfigured": "Nenakonfigurováno",
+    "singleNode": {
+      "title": "Jediný uzel",
+      "body": "Není nakonfigurován žádný protějšek, takže se nic nereplikuje a převzetí služeb není možné. Pro jednu instanci je to běžné nastavení — nastavte ha.peer.url, chcete-li spárovat druhý uzel."
+    },
+    "replication": {
+      "title": "Replikace nastavení",
+      "disabled": "Protějšek je nakonfigurován, ale replikace je vypnutá, takže se žádná nastavení nestahují.",
+      "inSync": "Aktuální k poslednímu úspěšnému stažení.",
+      "notInSync": "Nesynchronizováno. Třída, která se stále doplňuje, znamená, že tento uzel zaostává, jakkoli čerstvý byl poslední cyklus.",
+      "sinceSync": "Od posledního stažení",
+      "backfilling": "Doplňované třídy",
+      "retained": "Uchované události",
+      "oldestEvent": "Nejstarší událost / uchování"
+    },
+    "components": {
+      "title": "Připravenost v clusteru",
+      "none": "Žádná komponenta se nehlásí.",
+      "unavailable": "Připravenost komponent se nepodařilo načíst: {reason}",
+      "ready": "Připraveno {ready} z {desired}",
+      "pdbBlocks": "PDB nepovoluje žádné vystěhování"
     }
   }
 }

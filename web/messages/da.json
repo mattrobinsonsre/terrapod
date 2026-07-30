@@ -30,7 +30,8 @@
     "menu": "Menu",
     "openMenu": "Åbn menu",
     "openAccountMenu": "Åbn kontomenu",
-    "closeMenu": "Luk menu"
+    "closeMenu": "Luk menu",
+    "ha": "Høj tilgængelighed"
   },
   "switcher": {
     "language": "Sprog",
@@ -2860,6 +2861,42 @@
       "run_created": "Importkørsel oprettet",
       "errored": "Fejlet",
       "canceled": "Annulleret"
+    }
+  },
+  "adminHa": {
+    "title": "Høj tilgængelighed",
+    "description": "Denne nodes rolle, om den konvergerer med sin peer, og om de objekter, dens rækker navngiver, rent faktisk findes.",
+    "roleLabel": "Denne node",
+    "role": {
+      "leader": "Leder",
+      "follower": "Følger",
+      "auto": "Afgøres"
+    },
+    "followerNote": "Denne node tager imod læsninger og replikerer, men skaber ikke noget selv. Ændrende kald svarer 503.",
+    "nodeId": "Node",
+    "peer": "Peer",
+    "configured": "Konfigureret",
+    "notConfigured": "Ikke konfigureret",
+    "singleNode": {
+      "title": "Enkelt node",
+      "body": "Der er ingen peer konfigureret, så intet replikeres, og failover er ikke muligt. Det er den normale opsætning for én instans — sæt ha.peer.url for at parre med en anden node."
+    },
+    "replication": {
+      "title": "Replikering af indstillinger",
+      "disabled": "Der er konfigureret en peer, men replikering er slået fra, så der hentes ingen indstillinger.",
+      "inSync": "Ajour pr. den seneste vellykkede hentning.",
+      "notInSync": "Ikke synkroniseret. En klasse, der stadig efterfylder, betyder at noden er bagud, uanset hvor ny den seneste cyklus var.",
+      "sinceSync": "Siden seneste hentning",
+      "backfilling": "Klasser der efterfylder",
+      "retained": "Bevarede hændelser",
+      "oldestEvent": "Ældste hændelse / opbevaring"
+    },
+    "components": {
+      "title": "Parathed i klyngen",
+      "none": "Ingen komponenter rapporteret.",
+      "unavailable": "Komponenternes parathed kunne ikke læses: {reason}",
+      "ready": "{ready} af {desired} klar",
+      "pdbBlocks": "PDB tillader ingen eviction"
     }
   }
 }

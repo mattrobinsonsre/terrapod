@@ -30,7 +30,8 @@
     "menu": "Menu",
     "openMenu": "Menu openen",
     "openAccountMenu": "Accountmenu openen",
-    "closeMenu": "Menu sluiten"
+    "closeMenu": "Menu sluiten",
+    "ha": "Hoge beschikbaarheid"
   },
   "switcher": {
     "language": "Taal",
@@ -2860,6 +2861,42 @@
       "run_created": "Import-uitvoering gemaakt",
       "errored": "Mislukt",
       "canceled": "Geannuleerd"
+    }
+  },
+  "adminHa": {
+    "title": "Hoge beschikbaarheid",
+    "description": "De rol van deze node, of hij convergeert met zijn peer, en of de objecten die zijn rijen noemen er daadwerkelijk zijn.",
+    "roleLabel": "Deze node",
+    "role": {
+      "leader": "Leider",
+      "follower": "Volger",
+      "auto": "Wordt bepaald"
+    },
+    "followerNote": "Deze node accepteert leesverzoeken en repliceert, maar initieert niets. Wijzigende verzoeken geven 503 terug.",
+    "nodeId": "Node",
+    "peer": "Peer",
+    "configured": "Geconfigureerd",
+    "notConfigured": "Niet geconfigureerd",
+    "singleNode": {
+      "title": "Enkele node",
+      "body": "Er is geen peer geconfigureerd, dus er wordt niets gerepliceerd en failover is niet mogelijk. Dit is de normale opzet voor één instantie — stel ha.peer.url in om aan een tweede node te koppelen."
+    },
+    "replication": {
+      "title": "Replicatie van instellingen",
+      "disabled": "Er is een peer geconfigureerd maar replicatie staat uit, dus er worden geen instellingen opgehaald.",
+      "inSync": "Bij sinds het laatste geslaagde ophalen.",
+      "notInSync": "Niet in sync. Een klasse die nog bijwerkt betekent dat deze node achterloopt, hoe recent de laatste cyclus ook was.",
+      "sinceSync": "Sinds het laatste ophalen",
+      "backfilling": "Klassen die bijwerken",
+      "retained": "Bewaarde gebeurtenissen",
+      "oldestEvent": "Oudste gebeurtenis / bewaartermijn"
+    },
+    "components": {
+      "title": "Gereedheid in het cluster",
+      "none": "Geen componenten gerapporteerd.",
+      "unavailable": "De gereedheid van de componenten kon niet worden gelezen: {reason}",
+      "ready": "{ready} van {desired} gereed",
+      "pdbBlocks": "PDB staat geen enkele eviction toe"
     }
   }
 }
