@@ -11,9 +11,9 @@ loses `priority` hands a run a **different** value than the leader would, and
 nothing anywhere reports a problem. Those two booleans get their own assertions
 rather than being left implied by "the columns carry".
 
-`TestTheKeysThemselvesNeverTravel` is the other half of the same story: these
-classes carry the most secret material over the peer link, and the key that
-protects it must not go with them.
+These classes carry the most secret material over the peer link. The key that
+protects it does not go with them — see `test_replication_node_local.py` for that
+rule and the two classes it covers.
 """
 
 from datetime import UTC, datetime
@@ -23,7 +23,6 @@ import pytest
 
 from terrapod.crypto.types import EncryptedText
 from terrapod.db.models import (
-    CryptoKey,
     Variable,
     VariableSet,
     VariableSetVariable,
@@ -188,28 +187,9 @@ class TestSensitiveValuesTravelUnmasked:
         assert existing.value == SECRET
 
 
-class TestTheKeysThemselvesNeverTravel:
-    """`crypto_keys` holds this node's data-encryption key wrapped by THIS node's
-    KEK. Sending it is useless to the peer — it cannot unwrap it — and it puts key
-    material on a link that has no need of it.
-
-    Per-node encryption exists precisely so the key never has to travel: values
-    are decrypted on send and re-encrypted under the receiver's own key. This is
-    asserted next to the classes that carry the secrets, because that is where
-    someone would be tempted to "just replicate the keys too" to make it simpler.
-    """
-
-    def test_crypto_keys_is_not_registered(self):
-        assert "crypto_keys" not in replication.registered(), (
-            "crypto_keys must never replicate: the wrapped DEK is meaningless to "
-            "the peer and putting it on the link leaks key material for nothing"
-        )
-
-    def test_no_registered_class_is_the_crypto_key_model(self):
-        """Belt and braces: catches a registration under a different class name."""
-        models = {spec.model for spec in replication.registered().values()}
-
-        assert CryptoKey not in models
+# The "keys never travel" rule lives in test_replication_node_local.py, so that
+# `crypto_keys` and the CA (#1143) are enforced in one place rather than beside
+# whichever class happened to prompt the question.
 
 
 class TestVariables:
