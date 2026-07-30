@@ -365,40 +365,74 @@ class GCSStore:
             metadata=user_metadata,
         )
 
-    async def list_prefix(self, prefix: str) -> list[ObjectMeta]:
+    async def list_prefix(
+        self,
+        prefix: str,
+        *,
+        after: str = "",
+        limit: int | None = None,
+    ) -> list[ObjectMeta]:
+        """List objects under `prefix`, in key order.
+
+        **This follows `nextPageToken`.** The GCS JSON API caps a response at
+        `maxResults` (1000 by default), so a single call returns a partial list
+        with nothing to say it was partial — which silently truncated every
+        caller that asked for a prefix holding more than a thousand objects, the
+        break-glass state index among them.
+
+        `startOffset` narrows server-side, but it is *inclusive*, so `after`
+        still needs the boundary key dropped locally.
+        """
         storage = await self._get_aio_storage()
         full_prefix = self._full_key(prefix)
         results: list[ObjectMeta] = []
 
-        try:
-            blobs = await storage.list_objects(self._bucket_name, params={"prefix": full_prefix})
-        except Exception as e:
-            raise ObjectStoreError(str(e)) from e
+        params: dict[str, str] = {"prefix": full_prefix}
+        if after:
+            params["startOffset"] = self._full_key(after)
+        if limit is not None:
+            # A ceiling on the page, not on the walk — the loop below stops once
+            # `limit` entries have been collected.
+            params["maxResults"] = str(limit)
 
-        for item in blobs.get("items", []):
-            key = self._strip_prefix(item.get("name", ""))
-            size = int(item.get("size", 0))
-            content_type = item.get("contentType", "application/octet-stream")
-            etag = item.get("etag", "").strip('"')
-            updated = item.get("updated", "")
-            last_modified = datetime.now(UTC)
-            if updated:
-                try:
-                    last_modified = datetime.fromisoformat(updated.replace("Z", "+00:00"))
-                except ValueError:
-                    pass
+        while True:
+            try:
+                blobs = await storage.list_objects(self._bucket_name, params=dict(params))
+            except Exception as e:
+                raise ObjectStoreError(str(e)) from e
 
-            results.append(
-                ObjectMeta(
-                    key=key,
-                    size_bytes=size,
-                    content_type=content_type,
-                    etag=etag,
-                    last_modified=last_modified,
+            for item in blobs.get("items", []):
+                key = self._strip_prefix(item.get("name", ""))
+                # `startOffset` is inclusive; the contract is strictly-greater.
+                if after and key <= after:
+                    continue
+                size = int(item.get("size", 0))
+                content_type = item.get("contentType", "application/octet-stream")
+                etag = item.get("etag", "").strip('"')
+                updated = item.get("updated", "")
+                last_modified = datetime.now(UTC)
+                if updated:
+                    try:
+                        last_modified = datetime.fromisoformat(updated.replace("Z", "+00:00"))
+                    except ValueError:
+                        pass
+
+                results.append(
+                    ObjectMeta(
+                        key=key,
+                        size_bytes=size,
+                        content_type=content_type,
+                        etag=etag,
+                        last_modified=last_modified,
+                    )
                 )
-            )
+                if limit is not None and len(results) >= limit:
+                    return results
 
-        return results
+            token = blobs.get("nextPageToken")
+            if not token:
+                return results
+            params["pageToken"] = token
 
     async def presigned_get_url(
         self,

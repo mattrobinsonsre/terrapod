@@ -121,6 +121,110 @@ class TestGCSStoreUnit:
             assert results[0].key == "logs/a.txt"
             assert results[1].key == "logs/b.txt"
 
+    async def test_list_prefix_follows_every_page(self, store: GCSStore) -> None:
+        """The bug this fixes (#1155).
+
+        The GCS JSON API caps a response at `maxResults` (1000 by default) and
+        hands back a `nextPageToken`. The previous implementation called
+        `list_objects` once and ignored the token, so **any prefix holding more
+        than a thousand objects returned a partial list with nothing to say it
+        was partial** — including `state/`, which the break-glass recovery index
+        is built from, and `vcs_archives/`, which the retention sweep walks.
+        """
+
+        def page(names: list[str], token: str | None) -> dict:
+            body: dict = {
+                "items": [
+                    {
+                        "name": n,
+                        "size": "1",
+                        "contentType": "text/plain",
+                        "etag": "e",
+                        "updated": "2025-01-01T00:00:00Z",
+                    }
+                    for n in names
+                ]
+            }
+            if token:
+                body["nextPageToken"] = token
+            return body
+
+        mock_storage = AsyncMock()
+        mock_storage.list_objects.side_effect = [
+            page(["terrapod/logs/a.txt", "terrapod/logs/b.txt"], "tok-1"),
+            page(["terrapod/logs/c.txt"], "tok-2"),
+            page(["terrapod/logs/d.txt"], None),
+        ]
+
+        with patch.object(store, "_get_aio_storage", return_value=mock_storage):
+            results = await store.list_prefix("logs/")
+
+        assert [m.key for m in results] == [
+            "logs/a.txt",
+            "logs/b.txt",
+            "logs/c.txt",
+            "logs/d.txt",
+        ]
+        assert mock_storage.list_objects.await_count == 3
+        # Each continuation carries the token the previous page returned.
+        tokens = [
+            call.kwargs["params"].get("pageToken")
+            for call in mock_storage.list_objects.await_args_list
+        ]
+        assert tokens == [None, "tok-1", "tok-2"]
+
+    async def test_list_prefix_narrows_server_side_with_start_offset(self, store: GCSStore) -> None:
+        """`startOffset` keeps the cursor server-side rather than filtering a
+        full listing locally — and because it is *inclusive*, the boundary key
+        still has to be dropped to honour strictly-greater."""
+        mock_storage = AsyncMock()
+        mock_storage.list_objects.return_value = {
+            "items": [
+                {
+                    "name": f"terrapod/logs/{n}",
+                    "size": "1",
+                    "contentType": "text/plain",
+                    "etag": "e",
+                    "updated": "2025-01-01T00:00:00Z",
+                }
+                for n in ("a.txt", "b.txt")
+            ]
+        }
+
+        with patch.object(store, "_get_aio_storage", return_value=mock_storage):
+            results = await store.list_prefix("logs/", after="logs/a.txt")
+
+        params = mock_storage.list_objects.await_args.kwargs["params"]
+        assert params["startOffset"] == "terrapod/logs/a.txt"
+        assert [m.key for m in results] == ["logs/b.txt"], (
+            "startOffset is inclusive, so the boundary key must be dropped"
+        )
+
+    async def test_list_prefix_stops_at_the_limit_across_pages(self, store: GCSStore) -> None:
+        """`maxResults` bounds a page; the walk has to bound itself."""
+        mock_storage = AsyncMock()
+        mock_storage.list_objects.return_value = {
+            "items": [
+                {
+                    "name": f"terrapod/logs/{n}.txt",
+                    "size": "1",
+                    "contentType": "text/plain",
+                    "etag": "e",
+                    "updated": "2025-01-01T00:00:00Z",
+                }
+                for n in ("a", "b", "c")
+            ],
+            # A token that would go on forever if the limit were not honoured.
+            "nextPageToken": "more",
+        }
+
+        with patch.object(store, "_get_aio_storage", return_value=mock_storage):
+            results = await store.list_prefix("logs/", limit=2)
+
+        assert [m.key for m in results] == ["logs/a.txt", "logs/b.txt"]
+        assert mock_storage.list_objects.await_count == 1
+        assert mock_storage.list_objects.await_args.kwargs["params"]["maxResults"] == "2"
+
     async def test_put_stream_uses_sync_client(self, store: GCSStore) -> None:
         mock_blob = MagicMock()
         mock_blob.upload_from_file = MagicMock()

@@ -185,14 +185,31 @@ class ObjectStore(Protocol):
         """
         ...
 
-    async def list_prefix(self, prefix: str) -> list[ObjectMeta]:
-        """List objects matching a key prefix.
+    async def list_prefix(
+        self,
+        prefix: str,
+        *,
+        after: str = "",
+        limit: int | None = None,
+    ) -> list[ObjectMeta]:
+        """List objects matching a key prefix, in lexicographic key order.
+
+        **Ordering is part of the contract**, not an accident of the backend: a
+        key cursor is meaningless without it, and every backend already returned
+        keys in this order.
+
+        Passing neither `after` nor `limit` returns every matching object —
+        which callers rely on, so a backend whose API paginates internally must
+        follow its own continuation tokens rather than returning the first page.
 
         Args:
             prefix: Key prefix to filter by.
+            after: Return only keys strictly greater than this one. The cursor
+                for resuming a walk: pass the last key you saw.
+            limit: Stop after this many entries. `None` means no bound.
 
         Returns:
-            List of object metadata entries matching the prefix.
+            Object metadata entries, ordered by key.
         """
         ...
 
@@ -357,10 +374,16 @@ class InstrumentedStore:
             self._record("head", start, error=True)
             raise
 
-    async def list_prefix(self, prefix: str) -> list[ObjectMeta]:
+    async def list_prefix(
+        self,
+        prefix: str,
+        *,
+        after: str = "",
+        limit: int | None = None,
+    ) -> list[ObjectMeta]:
         start = time.monotonic()
         try:
-            result = await self._inner.list_prefix(prefix)
+            result = await self._inner.list_prefix(prefix, after=after, limit=limit)
             self._record("list_prefix", start)
             return result
         except Exception:
