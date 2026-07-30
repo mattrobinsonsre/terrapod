@@ -1220,26 +1220,24 @@ class HAProbeUrlConfig(BaseModel):
 
 
 class HAPeerInboundConfig(BaseModel):
-    """The credential this node ACCEPTS from its peer (#1169).
+    """The credential this node ACCEPTS when its peer pulls from it (#1169).
 
-    The counterpart to the outbound fields on ``HAPeerConfig``, and the half
-    that is genuinely this node's to own: the follower pulls, so node B presents
-    a credential that node A accepts — one row on A, one secret held by B.
+    There are two credentials per node, and they point in opposite directions:
 
-    This is the **CA pattern applied to peering**: config states the intent, and
-    startup reconciles it into a persisted ``oauth_clients`` row. Config remains
-    the input rather than becoming a second writer, so it and the database
-    cannot disagree about what is configured.
+    - **outbound** (``ha.peer.client_id`` / ``client_secret``) — what this node
+      presents when it pulls from its peer.
+    - **inbound** (here) — what it accepts when its peer pulls from it.
 
-    Supply ``client_secret`` (from a Kubernetes Secret, never the ConfigMap) and
-    setup is fully declarative — put the same value in this node's inbound and
-    the peer's outbound and the link needs no CLI, no UI, and no manual step.
+    A real pair configures BOTH on BOTH nodes, because ``role: auto`` lets the
+    relationship reverse when the shared DNS name moves. Setting up only the
+    current follower's outbound direction works right up until the failover it
+    exists for, and then does not.
 
-    Name the ``client_id`` and omit the secret and the reconcile deliberately
-    does **nothing**: a secret minted at startup is hashed immediately and
-    nobody can ever read it, so inventing one would leave an operator with a
-    credential they cannot give their peer. Mint it with ``peer_client``
-    instead, which shows it exactly once, to a human.
+    **Config is the only source of truth.** There is no database row: both halves
+    are declared here, so the grant compares what is presented against this
+    directly (#1171). Nothing is generated, so there is nothing to persist —
+    unlike the CA, whose keypair the node creates and must keep. Rotation is
+    therefore just editing the values and restarting.
     """
 
     client_id: str = Field(
@@ -1249,7 +1247,8 @@ class HAPeerInboundConfig(BaseModel):
         default="",
         description=(
             "Set via TERRAPOD_HA__PEER__INBOUND__CLIENT_SECRET, never in the ConfigMap. "
-            "Omit to mint with `peer_client` instead"
+            "Must match the peer's outbound client_secret. Without it this node "
+            "accepts nothing, so the peer cannot pull from it"
         ),
     )
     name: str = Field(default="", description="Human label for the credential, e.g. 'Node B'")
@@ -1258,9 +1257,13 @@ class HAPeerInboundConfig(BaseModel):
 class HAPeerConfig(BaseModel):
     """How this node reaches its peer to replicate (#960 phase 3, #1110).
 
-    Only the **follower** uses these — it is the side that pulls. Leaving them
-    unset is the normal single-node case and simply means replication never
-    runs.
+    Only whichever node is currently the **follower** actually uses these — it
+    is the side that pulls. But both nodes configure them, because ``role: auto``
+    derives the role from DNS and the relationship reverses on failover; a pair
+    set up in one direction only works right up until the moment it is needed.
+
+    Leaving them unset is the normal single-node case and simply means
+    replication never runs.
 
     The secret is never carried here from the chart: it arrives as
     ``TERRAPOD_HA__PEER__CLIENT_SECRET`` from a Kubernetes Secret, the same

@@ -27,9 +27,21 @@ _EXEMPT_PATHS = frozenset({"/health", "/ready", "/metrics"})
 # terraform-login flow.
 _AUTH_PREFIXES = ("/api/terrapod/v1/auth/", "/oauth/")
 
+# ...except the token endpoint. `auth_requests_per_minute` (10/min) exists to
+# slow password guessing against the LOGIN endpoints. `/oauth/token` is not that:
+# it is reached with an authorization code or a 32-byte machine client secret,
+# both already verified, and it carries the HA peer link's client_credentials
+# grant. Sharing the login bucket meant a Terrapod pair could rate-limit its own
+# replication into permanent failure — found on a live pair (#960). It falls back
+# to the ordinary unauthenticated limit, which a secret of that entropy makes
+# irrelevant as a guessing surface.
+_AUTH_PREFIX_EXCEPTIONS = ("/oauth/token",)
+
 
 def _is_auth_path(path: str) -> bool:
-    """Check if a path is an auth endpoint."""
+    """Whether a path belongs to the strict login bucket."""
+    if any(path.startswith(p) for p in _AUTH_PREFIX_EXCEPTIONS):
+        return False
     return any(path.startswith(p) for p in _AUTH_PREFIXES)
 
 

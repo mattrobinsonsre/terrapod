@@ -260,9 +260,16 @@ async def sync_cycle() -> None:
     async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
         try:
             token = await _peer_token(client)
-        except Exception:
+        except Exception as exc:
             # A peer that is down must not turn into a follower that crashes.
-            reset_token_cache()
+            #
+            # Only drop the cached token when the peer actually REJECTED the
+            # credential. A 429 or a 5xx says nothing about whether it is valid,
+            # and discarding it there guarantees another mint next cycle — which
+            # is how a transient rate limit became permanent on a live pair
+            # (#960): reset, retry, get limited, reset again.
+            if isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code in (401, 403):
+                reset_token_cache()
             logger.warning("Could not authenticate to peer; will retry", exc_info=True)
             return
 

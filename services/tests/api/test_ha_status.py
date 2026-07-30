@@ -31,11 +31,23 @@ def _app(roles: list[str] | None = None) -> FastAPI:
     return app
 
 
-def _ha(role="leader", peer_url="https://peer", enabled=True, retention_days=7):
+def _ha(
+    role="leader",
+    peer_url="https://peer",
+    enabled=True,
+    retention_days=7,
+    inbound_id="peer-b",
+    inbound_secret="s3cret",
+):
     return SimpleNamespace(
         role=role,
         node_name="node-a",
-        peer=SimpleNamespace(url=peer_url),
+        peer=SimpleNamespace(
+            url=peer_url,
+            # The credential this node accepts. Config is the whole story —
+            # there is no row to look up (#1171).
+            inbound=SimpleNamespace(client_id=inbound_id, client_secret=inbound_secret),
+        ),
         replication=SimpleNamespace(enabled=enabled, retention_days=retention_days),
     )
 

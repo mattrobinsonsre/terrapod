@@ -70,8 +70,6 @@ interface HAStatus {
   'inbound-credential'?: {
     configured: boolean
     'client-id': string | null
-    active: boolean | null
-    'last-used-at': string | null
   }
   'events-behind': number | null
   'behind-seconds': number | null

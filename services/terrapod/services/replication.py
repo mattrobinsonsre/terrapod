@@ -267,59 +267,115 @@ def _coerce(spec: ReplicatedClass, payload: dict) -> dict:
 # --------------------------------------------------------------------------
 
 
-def _record(session: Session, spec: ReplicatedClass, obj: Any, op: str, origin: str) -> None:
+#: Set once `install_outbox_hooks` has attached its listeners to the global
+#: Session class, so a second call cannot double every event.
+_hooks_installed = False
+
+
+def _pending_event(spec: ReplicatedClass, obj: Any, op: str, origin: str) -> dict | None:
+    """The outbox row for one write, or None when the entity has no id yet."""
     entity_id = row_entity_id(spec, obj)
     if entity_id is None:
-        return
-    session.add(
-        ReplicationEvent(
-            entity_class=spec.name,
-            entity_id=entity_id,
-            op=op,
-            occurred_at=datetime.now(UTC),
-            origin_node=origin,
-        )
-    )
+        return None
+    return {
+        "entity_class": spec.name,
+        "entity_id": entity_id,
+        "op": op,
+        "occurred_at": datetime.now(UTC),
+        "origin_node": origin,
+    }
 
 
 def install_outbox_hooks() -> None:
     """Emit an outbox row for every ORM write to a registered class.
 
-    Hooked on ``before_flush`` rather than ``after_flush`` because the outbox
-    rows are themselves ORM objects: ``before_flush`` is the documented point at
-    which the session may still be modified, and it is where ``session.deleted``
-    is populated.
+    **Two hooks, because the two things this needs are true at different
+    moments.** Neither point alone is sufficient, and using only one was the bug
+    (#1173):
+
+    - ``before_flush`` is the only place that knows *what is being written*.
+      ``session.deleted`` is populated here, and ``is_modified`` still has the
+      attribute history it needs — the flush consumes that history, so asking
+      afterwards reports nothing as modified and every UPDATE goes unrecorded.
+    - ``after_flush`` is the only place that knows *which row it was*. A pending
+      INSERT has no primary key beforehand: almost every model takes its id from
+      a column ``default=`` (``generate_uuid7``), evaluated during the flush. So
+      ``row_entity_id`` returned None and the event was silently dropped —
+      creating a workspace replicated **nothing**. The one class that appeared to
+      work, ``api_tokens``, only did so because its creation path assigns the id
+      itself, which is exactly why the gap looked like it did not exist.
+
+    That failure is invisible from inside a single node: the row lands, the API
+    returns 201, and the only symptom is a promoted follower that has never heard
+    of the workspace. It survived CI because the tests here introspect this
+    function's source rather than flushing a real row.
+
+    So: decide in ``before_flush``, stash on the session, emit in ``after_flush``
+    once the ids exist. The rows go in with a Core ``insert()`` rather than
+    ``session.add`` — the ORM unit of work for this flush is already built, so a
+    new ORM object would not be picked up, but Core SQL on the session's own
+    connection joins the same transaction and commits or rolls back atomically
+    with the write it describes.
 
     **Known gap, deliberate:** bulk ``update()``/``delete()`` statements bypass
     ORM events entirely and will not produce an event. Every current write path
     for a registered class goes through the ORM; the CI gate in slice 2 is what
     keeps that true.
+
+    Calling this more than once is a no-op. The listeners attach to the global
+    ``Session`` class, so a second call would register a second pair and every
+    write would be recorded twice — a duplicate event is not harmful downstream
+    (apply is an idempotent upsert) but it doubles the outbox and makes the
+    "how far behind" figure a lie.
     """
-    from sqlalchemy import event
+    global _hooks_installed
+    if _hooks_installed:
+        return
+    _hooks_installed = True
+
+    from sqlalchemy import event, insert
 
     from terrapod.config import settings
 
     _ensure_loaded()
 
+    #: Key under which the pending (spec, obj, op) triples ride on session.info
+    #: between the two hooks.
+    stash = "_terrapod_replication_pending"
+
     @event.listens_for(Session, "before_flush")
     def _before_flush(session: Session, _flush_context: Any, _instances: Any) -> None:
         if not _BY_MODEL:
             return
-        origin = settings.ha.node_name
+        pending: list[tuple[ReplicatedClass, Any, str]] = session.info.setdefault(stash, [])
         for obj in session.new:
             spec = _BY_MODEL.get(type(obj))
             if spec is not None:
-                _record(session, spec, obj, UPSERT, origin)
+                pending.append((spec, obj, UPSERT))
         for obj in session.dirty:
             if not session.is_modified(obj, include_collections=False):
                 continue
             spec = _BY_MODEL.get(type(obj))
             if spec is not None:
-                _record(session, spec, obj, UPSERT, origin)
+                pending.append((spec, obj, UPSERT))
         for obj in session.deleted:
             spec = _BY_MODEL.get(type(obj))
             if spec is not None:
-                _record(session, spec, obj, DELETE, origin)
+                pending.append((spec, obj, DELETE))
+
+    @event.listens_for(Session, "after_flush")
+    def _after_flush(session: Session, _flush_context: Any) -> None:
+        pending = session.info.pop(stash, None)
+        if not pending:
+            return
+        origin = settings.ha.node_name
+        rows = [
+            row
+            for spec, obj, op in pending
+            if (row := _pending_event(spec, obj, op, origin)) is not None
+        ]
+        if rows:
+            session.execute(insert(ReplicationEvent), rows)
 
 
 # --------------------------------------------------------------------------

@@ -1,0 +1,78 @@
+# Node A of a local two-node HA pair (#960).
+#
+# Deployed alongside the Tilt stack (node A, namespace `terrapod`) as an
+# ordinary Helm release in its own namespace, with its own Postgres and Redis —
+# two nodes means two of everything, which is the point.
+#
+# The peer link runs over in-cluster Service DNS rather than an ingress. That is
+# not a shortcut: `ha.peer.url` must be the peer's DIRECT per-node address, and a
+# Service name is exactly that. The shared name resolves to whichever node
+# currently leads, which may be this one.
+#
+# Roles are set explicitly rather than probed. Running a pair on explicit
+# leader/follower is a supported mode, not a degraded one, and it lets the
+# verification exercise replication without also depending on DNS behaviour it
+# cannot control locally. Reversal is exercised by swapping the two values.
+#
+# BOTH directions are configured even though only B pulls today. That is the
+# shape a real pair must have: role:auto reverses the relationship when DNS
+# moves, so a pair configured one way works right up until failover.
+
+nameOverride: ""
+fullnameOverride: "terrapod-a"
+
+postgresql:
+  deploy: true
+redis:
+  deploy: true
+
+storage:
+  filesystem:
+    persistence:
+      enabled: true
+      size: 1Gi
+
+ingress:
+  enabled: false
+
+web:
+  enabled: false
+listener:
+  enabled: false
+
+api:
+  replicas: 1
+  # Both nodes of the pair land on the same single-node local cluster, so the
+  # default required anti-affinity deadlocks a rolling update: the new replica
+  # cannot schedule until the old one goes, and the old one will not go until
+  # the new one is ready. The chart documents this case; a real pair on real
+  # nodes leaves it on.
+  podAntiAffinity:
+    enabled: false
+  image:
+    pullPolicy: Never
+  config:
+    external_url: "http://terrapod-a-api:8000"
+    storage:
+      # Node B's own store. The follower copies objects into it; asserting they
+      # arrive is the object-store half of the exercise (#1114).
+      filesystem:
+        base_url: "http://terrapod-a-api:8000"
+    ha:
+      role: leader
+      node_name: node-a
+      peer:
+        # Node B's direct address — never the shared name.
+        url: "http://terrapod-b-api.terrapod-b.svc.cluster.local:8000"
+        client_id: a-to-b
+        existingSecret: terrapod-peer-a-to-b
+        inbound:
+          client_id: b-to-a
+          name: "Node B"
+          existingSecret: terrapod-peer-b-to-a
+      replication:
+        enabled: true
+        interval_seconds: 5
+      blobs:
+        mode: copy
+        interval_seconds: 30

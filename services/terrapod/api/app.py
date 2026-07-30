@@ -95,21 +95,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     except Exception as e:
         logger.warning("CA initialization skipped (migration may be pending)", error=str(e))
 
-    # Reconcile the configured inbound peer credential into its persisted row
-    # (#1169). Same pattern as the CA immediately above: config states the
-    # intent, the database holds the materialised state, and startup makes one
-    # match the other — so peering is set up in one place rather than split
-    # across a values file and a kubectl exec.
-    from terrapod.services.peer_link import reconcile_inbound_client
-
-    try:
-        async with get_db_session() as db:
-            outcome = await reconcile_inbound_client(db)
-        if outcome:
-            logger.info("Peer credential reconciled", outcome=outcome)
-    except Exception as e:
-        logger.warning("Peer credential reconcile skipped (migration may be pending)", error=str(e))
-
     # Register and start distributed scheduler (multi-replica safe)
     from terrapod.services.scheduler import (
         register_periodic_task,

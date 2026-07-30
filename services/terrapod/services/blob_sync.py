@@ -289,10 +289,14 @@ async def run_cycle() -> SyncResult:
     async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
         try:
             token = await _peer_token(client)
-        except Exception:
-            from terrapod.services.replication_sync import reset_token_cache
+        except Exception as exc:
+            # Same rule as the settings puller: only drop the cached token when
+            # the peer REJECTED it. A 429 or 5xx says nothing about validity, and
+            # discarding it there guarantees another mint next cycle (#960).
+            if isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code in (401, 403):
+                from terrapod.services.replication_sync import reset_token_cache
 
-            reset_token_cache()
+                reset_token_cache()
             logger.warning("Could not authenticate to peer for blob copy", exc_info=True)
             return SyncResult(skipped_reason="peer authentication failed")
 

@@ -15,8 +15,7 @@ believes it is in sync while silently missing every purged change.
 
 import uuid
 from datetime import UTC, datetime, timedelta
-from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -255,39 +254,40 @@ class TestRetention:
 
 
 class TestOutboxHooks:
-    """The hook is what makes registration the whole opt-in — no write path has
-    to remember to emit an event, and none can forget."""
+    """The shape of one outbox row.
 
-    def test_records_inserts_updates_and_deletes(self):
-        session = MagicMock()
+    These cover the pure part only. Whether the hook actually FIRES, and whether
+    an id exists by the time it does, is not something a mock can answer — an
+    earlier version of these tests asserted on a mocked `session.add` and passed
+    happily against a hook that recorded nothing for any INSERT (#1173). That
+    half is now pinned against a real flush in
+    `tests/integration/test_replication_outbox.py`, which is the only place it
+    can be pinned honestly.
+    """
+
+    def test_describes_the_row_that_was_written(self):
         pool = AgentPool(id=uuid.uuid4(), name="p")
-        session.new = [pool]
-        session.dirty = []
-        session.deleted = []
 
-        with patch("terrapod.config.settings") as mock_settings:
-            mock_settings.ha = SimpleNamespace(node_name="node-a")
-            replication._record(session, POOLS, pool, replication.UPSERT, "node-a")
+        row = replication._pending_event(POOLS, pool, replication.UPSERT, "node-a")
 
-        event = session.add.call_args[0][0]
-        assert event.entity_class == "agent_pools"
-        assert event.entity_id == str(pool.id)
-        assert event.op == replication.UPSERT
+        assert row["entity_class"] == "agent_pools"
+        assert row["entity_id"] == str(pool.id)
+        assert row["op"] == replication.UPSERT
 
     def test_tags_the_origin_so_the_pair_cannot_echo(self):
-        session = MagicMock()
         pool = AgentPool(id=uuid.uuid4(), name="p")
 
-        replication._record(session, POOLS, pool, replication.UPSERT, "node-a")
+        row = replication._pending_event(POOLS, pool, replication.UPSERT, "node-a")
 
-        assert session.add.call_args[0][0].origin_node == "node-a"
+        assert row["origin_node"] == "node-a"
 
-    def test_a_row_with_no_primary_key_records_nothing(self):
-        session = MagicMock()
-
-        replication._record(session, POOLS, AgentPool(name="p"), replication.UPSERT, "node-a")
-
-        session.add.assert_not_called()
+    def test_a_row_with_no_primary_key_yields_nothing(self):
+        """The caller emits after the flush precisely so this does not happen to
+        an INSERT; it remains the correct answer for a row with no key at all."""
+        assert (
+            replication._pending_event(POOLS, AgentPool(name="p"), replication.UPSERT, "node-a")
+            is None
+        )
 
 
 class TestBackfillPaging:
@@ -525,27 +525,22 @@ class TestCompositePrimaryKeys:
         assert replication.decode_entity_id(self.COMPOSITE, two_parts) is None
 
     def test_the_outbox_records_the_full_key(self):
-        session = MagicMock()
         row = PlatformRoleAssignment(
             provider_name="local", email="a@example.com", role_name="admin"
         )
 
-        replication._record(session, self.COMPOSITE, row, replication.UPSERT, "node-a")
+        event = replication._pending_event(self.COMPOSITE, row, replication.UPSERT, "node-a")
 
-        event = session.add.call_args[0][0]
-        assert replication.decode_entity_id(self.COMPOSITE, event.entity_id) == [
+        assert replication.decode_entity_id(self.COMPOSITE, event["entity_id"]) == [
             "local",
             "a@example.com",
             "admin",
         ]
 
     def test_a_row_missing_a_component_records_nothing(self):
-        session = MagicMock()
         row = PlatformRoleAssignment(provider_name="local", email=None, role_name="admin")
 
-        replication._record(session, self.COMPOSITE, row, replication.UPSERT, "node-a")
-
-        session.add.assert_not_called()
+        assert replication._pending_event(self.COMPOSITE, row, replication.UPSERT, "node-a") is None
 
     async def test_upsert_matches_on_every_component(self):
         """Filtering on only the first would update the wrong assignment."""

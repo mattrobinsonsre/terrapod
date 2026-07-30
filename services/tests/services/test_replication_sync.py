@@ -80,16 +80,41 @@ class TestPeerOutage:
             await replication_sync.sync_cycle()  # must not raise
 
     @patch("terrapod.services.replication_sync.settings")
-    async def test_auth_failure_drops_the_cached_token(self, mock_settings):
-        """A cached token from before an outage may well be dead; keeping it
-        would make every subsequent cycle fail on a stale credential."""
+    async def test_a_transient_failure_keeps_the_cached_token(self, mock_settings):
+        """Only a REJECTION means the credential is wrong (#1171).
+
+        A timeout, a 5xx or a 429 says nothing about validity, and discarding
+        the token there guarantees a fresh mint next cycle — which is how a live
+        pair rate-limited its own replication into permanent failure: refused,
+        reset, mint, refused again."""
         mock_settings.ha = _cfg()
-        replication_sync._token = SimpleNamespace(value="old", expires_at=None)
+        token = SimpleNamespace(value="old", expires_at=None)
+        replication_sync._token = token
 
         with patch(
             "terrapod.services.replication_sync._peer_token",
             new_callable=AsyncMock,
             side_effect=RuntimeError("boom"),
+        ):
+            await replication_sync.sync_cycle()
+
+        assert replication_sync._token is token
+
+    @patch("terrapod.services.replication_sync.settings")
+    async def test_a_rejected_credential_does_drop_the_cached_token(self, mock_settings):
+        """The other half: a 401 means this token really is dead, and holding
+        it would make every later cycle fail on a stale credential."""
+        mock_settings.ha = _cfg()
+        replication_sync._token = SimpleNamespace(value="old", expires_at=None)
+        request = httpx.Request("POST", "https://peer/oauth/token")
+        rejected = httpx.HTTPStatusError(
+            "denied", request=request, response=httpx.Response(401, request=request)
+        )
+
+        with patch(
+            "terrapod.services.replication_sync._peer_token",
+            new_callable=AsyncMock,
+            side_effect=rejected,
         ):
             await replication_sync.sync_cycle()
 
