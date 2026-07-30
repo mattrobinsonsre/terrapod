@@ -154,3 +154,101 @@ class TestIsolation:
         second = VCSMetadataCache()
         assert await second.get_or_fetch(key, fetch) == "sha-2"
         assert calls == 2
+
+
+class TestOneCallersCancellationStaysItsOwn:
+    """Why the fetch runs in the caller's own coroutine rather than a shared task (#1156).
+
+    A shared `asyncio.Task` makes cancellation contagious. `Task.cancel()`
+    cancels whatever the task is awaiting, so cancelling *one* caller cancelled
+    the task every other caller for that key was waiting on — and left a
+    cancelled task in the cache, so every later caller inherited it too.
+
+    In the poller that is not hypothetical: workspaces are polled concurrently
+    under a semaphore, so one workspace's poll being cancelled (a timeout,
+    shutdown, a task group tearing down) took every other workspace sharing that
+    repository with it, and then every workspace on that repository for the rest
+    of the cycle.
+    """
+
+    async def test_cancelling_one_caller_does_not_cancel_another(self):
+        started = asyncio.Event()
+
+        async def fetch():
+            started.set()
+            await asyncio.sleep(0.05)
+            return "sha"
+
+        cache = VCSMetadataCache()
+        key = ("c", "o", "r", "main")
+        a = asyncio.create_task(cache.get_or_fetch(key, fetch))
+        await started.wait()
+        b = asyncio.create_task(cache.get_or_fetch(key, fetch))
+        await asyncio.sleep(0)  # let B reach its await
+        a.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await a
+
+        assert await b == "sha", (
+            "B was collaterally cancelled by A — it asked about a repository and "
+            "had nothing to do with A"
+        )
+
+    async def test_a_cancelled_caller_does_not_poison_the_key(self):
+        """A cancelled caller is not a failed repository. The next caller should
+        get a real attempt rather than inherit somebody else's cancellation."""
+        attempts = 0
+        release = asyncio.Event()
+
+        async def fetch():
+            nonlocal attempts
+            attempts += 1
+            if attempts == 1:
+                release.set()
+                await asyncio.sleep(10)
+            return f"sha-{attempts}"
+
+        cache = VCSMetadataCache()
+        key = ("c", "o", "r", "main")
+        first = asyncio.create_task(cache.get_or_fetch(key, fetch))
+        await release.wait()
+        first.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await first
+
+        assert await cache.get_or_fetch(key, fetch) == "sha-2"
+        assert attempts == 2
+
+    async def test_the_lock_is_released_when_a_caller_is_cancelled(self):
+        """The corollary — a cancellation that left the per-key lock held would
+        wedge every later caller for that repository for the rest of the cycle."""
+        release = asyncio.Event()
+
+        async def slow():
+            release.set()
+            await asyncio.sleep(10)
+            return "never"
+
+        async def quick():
+            return "ok"
+
+        cache = VCSMetadataCache()
+        key = ("c", "o", "r", "main")
+        first = asyncio.create_task(cache.get_or_fetch(key, slow))
+        await release.wait()
+        first.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await first
+
+        assert await asyncio.wait_for(cache.get_or_fetch(key, quick), timeout=1) == "ok"
+
+    def test_no_raw_task_is_created(self):
+        """The rule this was flagged by (`terrapod-no-raw-background-tasks`)
+        guards a real invariant, so satisfying it is pinned rather than left to
+        the scanner."""
+        import inspect
+
+        source = inspect.getsource(VCSMetadataCache)
+
+        assert "create_task" not in source
+        assert "asyncio.Lock()" in source
