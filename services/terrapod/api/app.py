@@ -481,6 +481,25 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
             description="Pull settings changes from the peer node",
         )
 
+    # Object-store copying (#960 phase 4, #1159). Registered whenever any class
+    # is set to `copy` — the default is `verify` everywhere, so on almost every
+    # install this is not registered at all. Gated on the peer URL too: there is
+    # nowhere to copy from without one, and registering a task that can only log
+    # "no peer configured" every five minutes is noise.
+    from terrapod.services import blob_classes
+
+    if settings.ha.peer.url and any(
+        blob_classes.effective_mode(c) == blob_classes.COPY for c in blob_classes.CLASSES
+    ):
+        from terrapod.services.blob_sync import sync_cycle as blob_sync_cycle
+
+        register_periodic_task(
+            "blob_sync",
+            interval_seconds=settings.ha.blobs.interval_seconds,
+            handler=blob_sync_cycle,
+            description="Copy object-store classes marked `copy` from the peer node",
+        )
+
     await start_scheduler()
     logger.info("Distributed scheduler started")
 

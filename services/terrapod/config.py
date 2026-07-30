@@ -1326,6 +1326,36 @@ class HABlobsConfig(BaseModel):
         "platform_provider_cache, cost_pricesheet, vcs_archives, module_overrides). "
         "Unknown names are rejected rather than ignored.",
     )
+    interval_seconds: int = Field(
+        default=300,
+        ge=30,
+        description="Seconds between copy cycles on the follower. Deliberately "
+        "slower than settings replication: objects are immutable once written, so "
+        "there is nothing to converge on quickly — a missed object is still there "
+        "next cycle. The floor guards against a hot loop.",
+    )
+    concurrency: int = Field(
+        default=4,
+        ge=1,
+        le=32,
+        description="Objects copied in parallel. Low by default: this shares the "
+        "peer link with a leader that is serving users.",
+    )
+    max_bytes_per_second: int = Field(
+        default=25_000_000,
+        ge=0,
+        description="Ceiling on copy throughput, in bytes per second (0 disables "
+        "the throttle). Backfilling a registry or an estate's state history is not "
+        "free, and the default is chosen to be unremarkable on a 1 Gbit link "
+        "rather than to finish quickly.",
+    )
+    max_bytes_per_cycle: int = Field(
+        default=0,
+        ge=0,
+        description="Stop a cycle after copying this many bytes (0 = no cap). A "
+        "cycle that stops early says so in its log line and metrics — a silent cap "
+        "would read as 'finished'.",
+    )
 
     @field_validator("mode")
     @classmethod

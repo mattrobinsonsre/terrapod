@@ -220,10 +220,21 @@ async def _clear_dedup(dedup_key: str | None) -> None:
 # events (it tags them with their origin so the pair cannot echo), so exempting
 # the purge is what stops the follower's outbox growing without bound.
 #
-# All four are self-maintenance: none creates runs, mutates infrastructure, or
+# `blob_sync` is the object-store half of the same pull loop (#1159), and the
+# same argument applies with more force: a follower that stops copying state
+# promotes with rows whose objects are not there — the failure that looks like
+# success. It writes only into its own object store, never the leader's.
+#
+# All five are self-maintenance: none creates runs, mutates infrastructure, or
 # originates a change an operator would see.
 _FOLLOWER_SAFE_TASKS = frozenset(
-    {"ha_probe", "encryption_key_refresh", "replication_sync", "replication_purge"}
+    {
+        "ha_probe",
+        "encryption_key_refresh",
+        "replication_sync",
+        "replication_purge",
+        "blob_sync",
+    }
 )
 
 

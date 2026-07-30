@@ -3941,6 +3941,18 @@ See [High availability](high-availability.md#the-other-data-plane-is-the-object-
 
 ### Peer-only endpoints
 
+`GET /api/terrapod/v1/ha/replication/blobs/{class}` lists an object-store class's
+objects (key, size, etag) in key order with `after`/`limit` paging, and
+`GET .../blobs/{class}/content?key=…` streams one object. Both are how a follower
+copies the object store (see [High availability](high-availability.md#choosing-verify-or-copy-per-class)).
+
+Two properties worth knowing if you are reading the code: the key is checked
+against the class that **owns** it before a byte is served — a peer token reads
+more than a user's, so this must not become an arbitrary-read primitive — and
+`meta.cursor`/`meta.complete` are derived from what the *store* returned, not from
+what survived the ownership filter, so a page thinned by the filter is a short
+page rather than the end of the class.
+
 `/api/terrapod/v1/ha/replication/*` are consumed **by the peer node**, not by
 users or tooling. They accept a `peer` token and nothing else, and no other
 endpoint accepts one — a peer can read entities an ordinary user cannot, so that

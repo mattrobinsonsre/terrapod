@@ -298,6 +298,19 @@ data:
       {{- with .Values.api.config.ha.blobs }}
       blobs:
         mode: {{ .mode | default "verify" | quote }}
+        interval_seconds: {{ .interval_seconds | default 300 }}
+        concurrency: {{ .concurrency | default 4 }}
+        {{- /* Two traps in one line each.
+               No `| default`: 0 is meaningful for both (it disables the throttle
+               / the per-cycle cap) and Helm's `default` would silently rewrite a
+               configured 0.
+               `| int64` because Helm renders a large integer in scientific
+               notation — 25000000 becomes 2.5e+07, which is a float, not the int
+               the config model wants. That is the v0.30.1 hotfix all over again
+               (`daily_token_budget`), and these are the only two byte-count
+               values in the chart big enough to trip it. */}}
+        max_bytes_per_second: {{ .max_bytes_per_second | int64 }}
+        max_bytes_per_cycle: {{ .max_bytes_per_cycle | int64 }}
         {{- /* Omitted when empty rather than rendered as `{}`: the code default
                is an empty map, so the two are identical, and the house pattern
                for optional maps is to leave the key out. An unknown class name

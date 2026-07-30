@@ -401,6 +401,40 @@ REPLICATION_OLDEST_EVENT_AGE = Gauge(
 )
 
 
+# ── Object-store copying (#960 phase 4, #1159) ────────────────────────────
+#
+# Bandwidth honesty: copying an estate's state history or a registry is not
+# free, so what it cost is a number rather than an impression. Counters per
+# class, because "we copied 40 GB" and "we copied 40 GB of provider cache while
+# state fell behind" are different situations.
+
+BLOB_COPY_OBJECTS = Counter(
+    "terrapod_blob_copy_objects_total",
+    "Objects copied from the peer, by object-store class",
+    ["blob_class"],
+)
+
+BLOB_COPY_BYTES = Counter(
+    "terrapod_blob_copy_bytes_total",
+    "Bytes copied from the peer, by object-store class",
+    ["blob_class"],
+)
+
+BLOB_COPY_FAILURES = Counter(
+    "terrapod_blob_copy_failures_total",
+    "Objects that could not be copied, by object-store class. A few are "
+    "expected (an object deleted between the listing and the fetch); a rising "
+    "count is not",
+    ["blob_class"],
+)
+
+BLOB_COPY_STOPPED_EARLY = Gauge(
+    "terrapod_blob_copy_classes_stopped_early",
+    "Classes whose last copy cycle did NOT finish — hit the byte cap, or could "
+    "not be listed. Non-zero means the copy is behind however many bytes moved",
+)
+
+
 # ── In-cluster component readiness (#1122) ───────────────────────────────
 #
 # Ready AND desired, because `1` alone cannot distinguish a deliberately small
