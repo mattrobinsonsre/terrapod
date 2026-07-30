@@ -200,7 +200,8 @@ semantics would only be needed in an active-active design, which this is not.
 | Agent pools, join tokens | Replicated |
 | Users, roles, role assignments, platform role assignments, API tokens | Replicated |
 | VCS connections | Replicated |
-| Workspaces, variables, policy sets, registry, the CA | In development |
+| Registry modules, provider templates, catalog items, autodiscovery rules | Replicated |
+| Workspaces, variables, policy sets, module content, the CA | In development |
 
 Identity comes first deliberately. A node holding the whole estate but no users,
 roles or assignments has nobody able to touch it — and API tokens are the class
