@@ -201,13 +201,26 @@ semantics would only be needed in an active-active design, which this is not.
 | Users, roles, role assignments, platform role assignments, API tokens | Replicated |
 | VCS connections | Replicated |
 | Registry modules, provider templates, catalog items, autodiscovery rules | Replicated |
-| Workspaces, variables, policy sets, module content, the CA | In development |
+| Workspaces, their agent-pool set, their module links | Replicated |
+| Variables, policy sets, module content, the CA | In development |
 
 Identity comes first deliberately. A node holding the whole estate but no users,
 roles or assignments has nobody able to touch it — and API tokens are the class
 where a missed deletion is a revoked credential that starts working again.
 
-VCS connections come next because withholding them fails *quietly*: the
+Nothing is excluded from a workspace, which is a decision rather than a
+shortcut. `vcs_last_commit_sha` is the one that matters most: it is the poller
+cursor, and a promoted node that has not seen it treats every tracked branch as
+changed — queueing a plan *and apply* on every VCS-connected workspace at once.
+Likewise a held state lock, `state_diverged`, and a `pending_deletion` lifecycle
+state all carry, because losing any of them is worse than carrying it stale.
+
+One field is knowingly imperfect: `drift_latest_run_id` points at a run, runs are
+a later phase, and the column is deliberately not a foreign key (so artifact
+retention cannot cascade into workspace deletion). On a promoted node the drift
+badge can therefore link to a run that is not there. The UI handles the 404.
+
+VCS connections come earlier because withholding them fails *quietly*: the
 promotion looks successful, and then every VCS-connected workspace simply stops
 seeing pushes and pull requests, because the poller on the promoted node has no
 credentials. They are also what workspaces, autodiscovery rules and the registry
