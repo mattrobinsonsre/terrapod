@@ -159,40 +159,6 @@ class PlatformRoleAssignment(Base):
     )
 
 
-class OAuthClient(Base):
-    """A registered OAuth client, for the `client_credentials` grant (#1108).
-
-    Introduced for the HA peer link: each node registers a client representing
-    its peer and hands over those credentials, so the two authenticate to each
-    other with a standard grant rather than a bespoke handshake. A reviewer can
-    read the RFC and know what it guarantees.
-
-    The secret is SHA-256 hashed at rest and returned exactly once, at
-    creation — the same contract as an API token.
-
-    `kind` keeps the peer identity its OWN class rather than reusing the
-    runner-token path. That matters: a peer is entitled to see resolved
-    sensitive variables, and granting that must not widen what a runner can
-    reach, nor leave an audit unable to tell the two apart.
-    """
-
-    __tablename__ = "oauth_clients"
-
-    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=generate_uuid7)
-    client_id: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
-    client_secret_hash: Mapped[str] = mapped_column(String(64), nullable=False)
-    name: Mapped[str] = mapped_column(String(255), nullable=False, default="")
-    # "peer" today. Kept open so a future non-peer machine client does not
-    # inherit peer visibility by accident.
-    kind: Mapped[str] = mapped_column(String(20), nullable=False, default="peer")
-    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-    created_by: Mapped[str] = mapped_column(String(255), nullable=False, default="")
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=now_utc
-    )
-    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-
-
 class APIToken(Base):
     """Long-lived API tokens for terraform CLI and automation.
 

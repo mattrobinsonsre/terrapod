@@ -3,6 +3,9 @@
     "alter_column(runs, terraform_version)",
     "alter_column(workspaces, terraform_version)"
   ],
+  "0c328eb42b84_drop_oauth_clients": [
+    "drop_table(oauth_clients)"
+  ],
   "166efacb7b5d_ca_key_truthful_name": [
     "alter_column(certificate_authority, ca_key_encrypted)"
   ],

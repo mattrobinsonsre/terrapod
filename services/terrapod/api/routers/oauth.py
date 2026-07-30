@@ -15,7 +15,6 @@ import os
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, status
 from fastapi.responses import JSONResponse, RedirectResponse
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.auth.api_tokens import create_api_token
@@ -27,7 +26,6 @@ from terrapod.auth.auth_state import (
 )
 from terrapod.auth.pkce import s256_challenge
 from terrapod.config import settings
-from terrapod.db.models import OAuthClient, now_utc
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.redis.client import get_redis_client
@@ -136,17 +134,24 @@ def _hash_client_secret(secret: str) -> str:
 async def _client_credentials_grant(
     db: AsyncSession, client_id: str, client_secret: str
 ) -> JSONResponse:
-    """RFC 6749 client-credentials grant, for machine-to-machine callers (#1108).
+    """RFC 6749 client-credentials grant, for the HA peer link (#1108).
 
-    Introduced for the HA peer link. Each node registers a client representing
-    its peer and hands over those credentials, so the two authenticate with a
-    standard grant rather than a bespoke handshake — a reviewer can read the
-    RFC and know what it guarantees.
+    The two nodes authenticate with a standard grant rather than a bespoke
+    handshake, so a reviewer can read the RFC and know what it guarantees.
 
-    The resulting token carries `kind="peer"`, its OWN identity class rather
-    than a reuse of the runner-token path. A peer is entitled to see resolved
-    sensitive variables, and granting that must not widen what a runner can
-    reach, nor leave an audit unable to tell the two apart.
+    **The expected credential is config, not a database row.** Both halves are
+    already declared in the chart, and persisting a hash of what config states
+    would make the database a second copy of the same fact — one that can then
+    disagree with it. The CA is persisted because the node *generates* the
+    keypair and it must survive a restart; nothing is generated here, so there
+    is nothing to preserve. Dropping the row also drops a startup reconcile, its
+    advisory lock, and the whole class of "rotating by editing the chart
+    silently does nothing" (#1171).
+
+    The issued token carries `kind="peer"`, its OWN identity class rather than a
+    reuse of the runner-token path. A peer is entitled to see resolved sensitive
+    variables, and granting that must not widen what a runner can reach, nor
+    leave an audit unable to tell the two apart.
     """
     if not client_id or not client_secret:
         raise HTTPException(
@@ -154,38 +159,44 @@ async def _client_credentials_grant(
             detail="grant_type=client_credentials requires client_id and client_secret",
         )
 
-    result = await db.execute(select(OAuthClient).where(OAuthClient.client_id == client_id))
-    client = result.scalar_one_or_none()
-
-    # One message and one code for every failure mode — unknown client,
-    # deactivated client, wrong secret — so the response cannot be used to
-    # enumerate which client ids exist.
+    # One message and one code for every failure mode — unknown client id,
+    # peering not configured, wrong secret — so the response cannot be used to
+    # enumerate anything.
     invalid = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Invalid client credentials",
     )
-    if client is None or not client.is_active:
-        # Still spend the hash on the miss, so a bad client_id is not
-        # measurably faster to reject than a bad secret.
+
+    expected = settings.ha.peer.inbound
+    # Both must be non-empty. Without this an unpaired node — where both are ""
+    # — would accept an empty client_id and secret, which compare_digest would
+    # happily call a match.
+    if not expected.client_id or not expected.client_secret:
         _hash_client_secret(client_secret)
         raise invalid
-    if not hmac.compare_digest(client.client_secret_hash, _hash_client_secret(client_secret)):
+
+    # Both compared in constant time, and both always compared, so a wrong
+    # client id is not measurably faster to reject than a wrong secret.
+    id_ok = hmac.compare_digest(expected.client_id, client_id)
+    secret_ok = hmac.compare_digest(
+        _hash_client_secret(expected.client_secret), _hash_client_secret(client_secret)
+    )
+    if not (id_ok and secret_ok):
         raise invalid
 
     api_token, raw_token = await create_api_token(
         db=db,
         bound_to=None,
-        created_by=f"oauth-client:{client.client_id}",
+        created_by=f"oauth-client:{client_id}",
         kind="peer",
-        description=f"client_credentials grant for {client.name or client.client_id}",
+        description=f"client_credentials grant for {expected.name or client_id}",
         lifespan_hours=settings.auth.peer_token_ttl_hours,
     )
-    client.last_used_at = now_utc()
     await db.commit()
 
     logger.info(
         "Issued peer token via client_credentials",
-        client_id=client.client_id,
+        client_id=client_id,
         token_id=str(api_token.id),
     )
     return JSONResponse(

@@ -206,47 +206,19 @@ That is the whole setup. No CLI, no UI, no manual step, and nothing to remember
 at cutover — the credentials for the reversed direction are already in place, so
 moving DNS is genuinely the only act.
 
-**Rotating** is editing the Secret. The reconcile updates the stored hash on the
-next start, and the previous secret stops working immediately.
+**Rotating** is editing the Secret and restarting. The new value takes effect
+immediately and the previous one stops working, because there is nothing stored
+to fall out of step with it.
 
-**Tearing down** is removing the config. With no peering declared, no peer token
-is issued and none is accepted, so a credential row left behind is inert —
-withdrawing the configuration withdraws the capability rather than leaving a
-forgotten credential with full read of the estate.
+**Tearing down** is removing the config. There is no credential anywhere else —
+no row, no minted secret, nothing left behind to forget about — so withdrawing
+the configuration genuinely withdraws the capability. No peer token is issued
+and none is accepted.
 
-### Minting instead, if you would rather not generate the secret yourself
+There is deliberately **no CLI and no admin UI** for any of this. The credential
+is two strings in a values file; a second way to set it could only disagree with
+the first.
 
-Name the `client_id` and omit the secret, and the reconcile deliberately does
-**nothing** — a secret generated at startup is hashed immediately and could
-never be read, leaving you a credential you cannot give your peer. `/ha` reports
-the credential as named-but-unset, and you mint it explicitly:
-
-```zsh
-# On node A: mint the credential node B will use to read from A
-kubectl exec deploy/terrapod-api -- \
-  python -m terrapod.cli.peer_client create --client-id peer-b --name "Node B"
-```
-
-It prints the secret **once** — only its SHA-256 is stored, the same contract as
-an API token. Lost means rotated (`--rotate`), which is also how you replace a
-credential you suspect has leaked. Set it on node B as its outbound secret.
-
-This is the fallback, and it is also the answer when the chart is the thing you
-cannot reach.
-
-Then configure the node that will use it:
-
-```yaml
-api:
-  config:
-    ha:
-      peer:
-        url: https://node-b.example.com
-        client_id: peer-b
-        existingSecret: terrapod-peer     # the client secret, from a K8s Secret
-      replication:
-        enabled: true
-```
 
 The client secret is **never** set in `values.yaml`. It is injected as
 `TERRAPOD_HA__PEER__CLIENT_SECRET` from a Kubernetes Secret, like every other

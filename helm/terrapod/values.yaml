@@ -425,17 +425,12 @@ api:
         existingSecret: ""
         existingSecretKey: "client_secret"
         # INBOUND — the credential this node ACCEPTS when its peer pulls from
-        # it. This one it owns, so config states the intent and startup
-        # reconciles it into a persisted row — the same pattern as the CA
-        # (#1169). Supply the secret and setup is fully declarative: use the
-        # same value here as in the PEER's outbound secret and the link needs
-        # no CLI and no manual step.
+        # it. Config is the whole story: both halves are declared here, so the
+        # grant compares against them directly and nothing is persisted (#1171).
+        # Rotate by editing the values and restarting.
         #
-        # Name the client_id and omit the secret and nothing is minted: a
-        # secret generated at startup is hashed immediately and could never be
-        # read, leaving you a credential you cannot give your peer. Mint it
-        # with `python -m terrapod.cli.peer_client create` instead, which shows
-        # it exactly once.
+        # Set the same value here as in the PEER's outbound secret. Without a
+        # secret this node accepts nothing, so its peer cannot pull from it.
         inbound:
           client_id: ""
           name: ""

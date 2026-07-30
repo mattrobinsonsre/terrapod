@@ -28,7 +28,7 @@ from terrapod.api.dependencies import (
 from terrapod.config import settings
 from terrapod.db.session import get_db
 from terrapod.services import blob_readiness as blob_readiness_service
-from terrapod.services import component_status, ha_role, peer_link, replication
+from terrapod.services import component_status, ha_role, replication
 
 router = APIRouter(prefix="/ha", tags=["ha"])
 
@@ -98,8 +98,16 @@ async def status(
     role = await ha_role.get_role()
     cfg = settings.ha
     state = await replication.read_status(db)
-    inbound = await peer_link.inbound_status(db)
-    inbound["last-used-at"] = _iso(inbound["last-used-at"])
+    # Read from config, not a row. The credential is declared in the chart and
+    # nowhere else, so config is the only thing that can be authoritative about
+    # whether this node will accept its peer (#1171).
+    inbound_cfg = cfg.peer.inbound
+    inbound = {
+        # Configured means the credential can actually be presented — a name
+        # written in a values file with no secret beside it cannot.
+        "configured": bool(inbound_cfg.client_id and inbound_cfg.client_secret),
+        "client-id": inbound_cfg.client_id or None,
+    }
 
     privileged = bool({"admin", "audit"} & set(user.roles or []))
     # Not merely filtered out of the response: an unprivileged caller must not
