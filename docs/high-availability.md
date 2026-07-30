@@ -404,13 +404,57 @@ Terrapod's *own* pods prove more than one node exists — and only zone spread g
 unknown. What is never done is guess: with nothing to prove spread was possible,
 no finding is raised.
 
+## The other data plane: is the object store actually there?
+
+Replication carries database rows. State files, configuration tarballs, module
+and provider artifacts live in the **object store**, which is a second data plane
+— and the dangerous state a pair can reach is **rows present, blobs absent**.
+
+A node in that state looks entirely healthy. The workspace list renders, run
+history is there, the registry lists every module. Then somebody queues a run and
+`terraform init` 404s, several layers from the cause.
+
+`GET /api/terrapod/v1/ha/blob-readiness` detects it cheaply, because the database
+row already names the key — so the check is a HEAD:
+
+| Field | Meaning |
+|---|---|
+| `irreplaceable-missing` | **The list that should stop a failover.** Classes whose absence is permanent: state, the recovery index, configuration versions, module and provider artifacts |
+| `classes[]` | Per class: `tier`, `total-rows`, `checked`, `missing`, a few `missing-examples`, and `complete` |
+| `sampled` | Whether this checked everything or a sample |
+| `unavailable-reason` | Set when the store could not be read at all — *"I could not look"*, not *"all is well"* |
+
+**A sample is reported as a sample.** By default each class is sampled to its 25
+newest rows, and `checked` against `total-rows` says how much of the class the
+answer covers. `complete` is true only when nothing was held back. Reading a clean
+sample as a clean estate is precisely the false confidence the check exists to
+remove, so the response is built to make that misreading impossible rather than
+merely discouraged. `?full=true` verifies everything — thousands of round trips on
+a real estate, which is why it is opt-in.
+
+**Worth running whoever does the replicating.** Under provider-native bucket
+replication it catches a misconfigured prefix, or a lifecycle rule that expired
+objects out from under the rows. Under Terrapod-side copying it catches a class
+that never ran. It is the same instinct as the restore-verification DR drill: a
+real check beats a documented intention.
+
+The **tier** is a property of the deployment as much as the artifact. A cold
+provider cache re-warms itself on first use — unless the node is sealed
+(`cache_only`), where it can never run anything again and belongs in the same tier
+as state. That is why the endpoint reports the tier and leaves the judgement to
+the operator.
+
+Copying the object store (rather than only verifying it) is tracked in #1114.
+
 ## Performing a failover
 
 1. Confirm the standby is caught up (above).
-2. Move the DNS record to the standby.
-3. Wait for DNS cache to expire — this, not the probe interval, is what governs
+2. Check `GET /api/terrapod/v1/ha/blob-readiness` — `irreplaceable-missing` must
+   be empty. Rows without blobs is the failure that looks like success.
+3. Move the DNS record to the standby.
+4. Wait for DNS cache to expire — this, not the probe interval, is what governs
    the overlap.
-4. On `auto`, both nodes converge on their own once the probe threshold is met.
+5. On `auto`, both nodes converge on their own once the probe threshold is met.
    On explicit roles, set `ha.role` on each node and roll them.
 
 There is no step where Terrapod decides anything. That is the point.
