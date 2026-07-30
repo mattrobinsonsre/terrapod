@@ -2865,7 +2865,7 @@
   },
   "adminHa": {
     "title": "Yüksek erişilebilirlik",
-    "description": "Bu düğümün rolü, eşiyle yakınsayıp yakınsamadığı ve satırlarının adlandırdığı nesnelerin gerçekten orada olup olmadığı.",
+    "description": "Bu düğümün rolü, eşiyle yakınsayıp yakınsamadığı ve burada gerçekten bir planı çalıştırabilecek bir şey olup olmadığı.",
     "roleLabel": "Bu düğüm",
     "role": {
       "leader": "Lider",
@@ -2898,6 +2898,16 @@
       "ready": "{desired} bileşenden {ready} tanesi hazır",
       "pdbBlocks": "PDB hiçbir tahliyeye izin vermiyor",
       "restricted": "Bileşen başına hazır/istenen sayısı yöneticilere ve denetçilere gösterilir. Burada gösterilmez — bu bir yetki meselesidir, boş bir küme değil."
+    },
+    "listeners": {
+      "title": "Çalıştırma hazırlığı",
+      "intro": "Kusursuz çoğaltan ama canlı dinleyicisi olmayan bir düğüm tek bir planı bile çalıştıramaz. Görebildiğiniz havuzlar ve her birinin dinleyicisi olup olmadığı.",
+      "unavailable": "Ajan havuzları okunamadı.",
+      "none": "Size görünen hiçbir ajan havuzu yok.",
+      "online": "Dinleyici çevrimiçi",
+      "offline": "Canlı dinleyici yok",
+      "offlineWarning": "Şu havuzlar için bağlı dinleyici yok: {pools}. Bu havuzlara yönlendirilen çalıştırmalar yürütülmek yerine kuyrukta bekler.",
+      "count": "{count} dinleyici"
     }
   },
   "haIndicator": {

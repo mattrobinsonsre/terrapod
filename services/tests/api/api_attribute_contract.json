@@ -12,6 +12,7 @@
     "created-at",
     "description",
     "labels",
+    "listener-count",
     "name",
     "owner-email",
     "permission",

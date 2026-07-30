@@ -417,7 +417,6 @@ export default function NavBar() {
             {adminOrAudit && (
               <NavDropdown label={t('admin')} icon={Cog} items={adminMenuItems} active={adminActive} align="end" />
             )}
-            <HAIndicator />
             <LocaleSwitcher />
             <NavDropdown label={t('help')} icon={BookOpen} items={HELP_ITEMS} active={helpActive} align="end" />
             <NavDropdown
@@ -442,6 +441,9 @@ export default function NavBar() {
                 </>
               }
             />
+            {/* Last in the bar on purpose: it is ambient status about the node
+                you are talking to, not another control in the cluster. */}
+            <HAIndicator />
           </div>
 
           {/* Mobile top bar — logo + Account trigger + hamburger (below `lg`) */}
@@ -452,7 +454,6 @@ export default function NavBar() {
               {version && <span className="text-xs text-slate-500 font-normal">{version}</span>}
             </Link>
             <div className="flex items-center gap-1">
-              <HAIndicator compact />
               <button
                 onClick={() => {
                   setAccountOpen(true)
@@ -477,6 +478,8 @@ export default function NavBar() {
               >
                 <Menu size={22} />
               </button>
+              {/* Last here too, for the same reason as the desktop bar. */}
+              <HAIndicator />
             </div>
           </div>
 

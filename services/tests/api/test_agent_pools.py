@@ -1189,3 +1189,51 @@ class TestRenewListenerCert:
 
         assert res.status_code == 401
         assert "X-Terrapod-Client-Cert" in res.json()["detail"]
+
+
+class TestListenerCount:
+    """#1165 — the HA page needs a number, not just online/offline.
+
+    The invariant worth pinning is that the count and the status come from the
+    same predicate: a pool can never say "online" with a count of zero, nor
+    "offline" with a count above it.
+    """
+
+    @staticmethod
+    def _listener(hours: int) -> dict:
+        return {
+            "status": "online",
+            "certificate_expires_at": (datetime.now(UTC) + timedelta(hours=hours)).isoformat(),
+        }
+
+    def test_counts_only_listeners_that_could_take_work(self):
+        from terrapod.api.routers.agent_pools import _live_listener_count
+
+        # The third heartbeats but 401s every authenticated call, so counting it
+        # would tell an operator they have capacity they do not have.
+        listeners = [self._listener(1), self._listener(1), self._listener(-1)]
+
+        assert _live_listener_count(listeners) == 2
+
+    def test_an_empty_pool_counts_zero(self):
+        from terrapod.api.routers.agent_pools import _live_listener_count
+
+        assert _live_listener_count([]) == 0
+
+    def test_the_count_never_contradicts_the_status(self):
+        from terrapod.api.routers.agent_pools import (
+            _derive_pool_status,
+            _live_listener_count,
+        )
+
+        for listeners in (
+            [],
+            [self._listener(-1)],
+            [self._listener(1)],
+            [self._listener(1), self._listener(-1)],
+        ):
+            status = _derive_pool_status(listeners)
+            count = _live_listener_count(listeners)
+            assert (status == "online") == (count > 0), (
+                f"status {status!r} disagrees with count {count} for {listeners}"
+            )

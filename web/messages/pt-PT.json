@@ -2865,7 +2865,7 @@
   },
   "adminHa": {
     "title": "Alta disponibilidade",
-    "description": "O papel deste nó, se está a convergir com o seu par e se os objetos que as suas linhas nomeiam existem de facto.",
+    "description": "O papel deste nó, se está a convergir com o seu par e se algo aqui conseguiria de facto executar um plano.",
     "roleLabel": "Este nó",
     "role": {
       "leader": "Líder",
@@ -2898,6 +2898,16 @@
       "ready": "{ready} de {desired} prontos",
       "pdbBlocks": "O PDB não permite qualquer despejo",
       "restricted": "O estado pronto/desejado de cada componente é mostrado a administradores e auditores. Aqui não é apresentado — é uma permissão, não um cluster vazio."
+    },
+    "listeners": {
+      "title": "Prontidão dos executores",
+      "intro": "Um nó que replica na perfeição e não tem qualquer listener ativo não consegue executar um único plano. Os pools que vê e se cada um tem um.",
+      "unavailable": "Não foi possível ler os pools de agentes.",
+      "none": "Não há pools de agentes visíveis para si.",
+      "online": "Listener online",
+      "offline": "Sem listener ativo",
+      "offlineWarning": "Não há qualquer listener ligado para: {pools}. As execuções encaminhadas para estes pools ficarão em fila em vez de correr.",
+      "count": "{count, plural, one {# listener} other {# listeners}}"
     }
   },
   "haIndicator": {

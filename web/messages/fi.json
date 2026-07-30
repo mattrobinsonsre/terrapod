@@ -2865,7 +2865,7 @@
   },
   "adminHa": {
     "title": "Korkea käytettävyys",
-    "description": "Tämän solmun rooli, konvergoiko se parinsa kanssa ja ovatko sen rivien nimeämät objektit todella olemassa.",
+    "description": "Tämän solmun rooli, konvergoiko se parinsa kanssa ja voisiko täällä mikään oikeasti ajaa suunnitelmaa.",
     "roleLabel": "Tämä solmu",
     "role": {
       "leader": "Johtaja",
@@ -2898,6 +2898,16 @@
       "ready": "{ready}/{desired} valmiina",
       "pdbBlocks": "PDB ei salli yhtään häätöä",
       "restricted": "Valmiit/halutut komponenttia kohden näytetään ylläpitäjille ja tarkastajille. Tässä sitä ei näytetä — kyse on oikeudesta, ei tyhjästä klusterista."
+    },
+    "listeners": {
+      "title": "Suoritusvalmius",
+      "intro": "Solmu, joka replikoi moitteettomasti mutta jolla ei ole elävää kuuntelijaa, ei voi ajaa yhtäkään suunnitelmaa. Näkemäsi altaat ja se, onko kullakin sellainen.",
+      "unavailable": "Agenttialtaita ei voitu lukea.",
+      "none": "Sinulle ei näy yhtään agenttiallasta.",
+      "online": "Kuuntelija verkossa",
+      "offline": "Ei elävää kuuntelijaa",
+      "offlineWarning": "Yhtään kuuntelijaa ei ole yhdistetty näille: {pools}. Näihin altaisiin ohjatut ajot jäävät jonoon suorittamisen sijaan.",
+      "count": "{count, plural, one {# kuuntelija} other {# kuuntelijaa}}"
     }
   },
   "haIndicator": {

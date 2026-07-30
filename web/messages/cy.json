@@ -2865,7 +2865,7 @@
   },
   "adminHa": {
     "title": "Argaeledd uchel",
-    "description": "Rôl y nod hwn, a yw'n cydgyfeirio â'i bartner, ac a yw'r gwrthrychau y mae ei resi'n eu henwi yno mewn gwirionedd.",
+    "description": "Rôl y nod hwn, a yw'n cydgyfeirio â'i bartner, ac a allai unrhyw beth yma redeg cynllun mewn gwirionedd.",
     "roleLabel": "Y nod hwn",
     "role": {
       "leader": "Arweinydd",
@@ -2898,6 +2898,16 @@
       "ready": "{ready} o {desired} yn barod",
       "pdbBlocks": "Nid yw'r PDB yn caniatáu unrhyw droi allan",
       "restricted": "Dangosir parod-yn-erbyn-dymunol fesul cydran i weinyddwyr ac archwilwyr. Ni chaiff ei ddangos yma — mater o ganiatâd yw hynny, nid clwstwr gwag."
+    },
+    "listeners": {
+      "title": "Parodrwydd rhedeg",
+      "intro": "Ni all nod sy'n dyblygu'n ddi-fai ac sydd heb wrandäwr byw redeg yr un cynllun. Y pyllau y gallwch eu gweld, ac a oes gan bob un un.",
+      "unavailable": "Nid oedd modd darllen y pyllau asiant.",
+      "none": "Nid oes unrhyw byllau asiant yn weladwy i chi.",
+      "online": "Gwrandäwr ar-lein",
+      "offline": "Dim gwrandäwr byw",
+      "offlineWarning": "Nid oes gwrandäwr wedi'i gysylltu ar gyfer: {pools}. Bydd rhediadau a anfonir i'r pyllau hyn yn ciwio yn hytrach na rhedeg.",
+      "count": "{count, plural, one {# gwrandäwr} other {# gwrandäwr}}"
     }
   },
   "haIndicator": {

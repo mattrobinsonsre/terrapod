@@ -2865,7 +2865,7 @@
   },
   "adminHa": {
     "title": "taH laH",
-    "description": "De'wI' vumwI' patlh, chaq jIH De'wI'Daj rurmoH'a', 'ej chaq De'mey pongbogh vaghmey tu'lu''a'.",
+    "description": "De'wI'vam patlh, chaq jIH rurmoH'a', 'ej chaq naDev nab qaSmoHlaH vay''a'.",
     "roleLabel": "De'wI'vam",
     "role": {
       "leader": "DevwI'",
@@ -2898,6 +2898,16 @@
       "ready": "{desired} chenmoHwI'mey {ready} ghuHtaH",
       "pdbBlocks": "pagh teqmeH chaw' PDB",
       "restricted": "Hoch chenmoHwI' ghuHtaHghach vu'wI'pu' 'ej nItebHa'wI'pu' luleghlu'. naDev cha'lu'be' — chaw' ghu' 'oH, ghom chImbe'."
+    },
+    "listeners": {
+      "title": "QaptaHmeH ghuHtaHghach",
+      "intro": "velqa'chu'bogh De'wI' 'ach yIntaHbogh 'Ijwl' Hutlhbogh, wa' nab je qaSmoHlaHbe'. DaleghlaHbogh ghommey, 'ej chaq Hoch 'Ijwl' ghaj.",
+      "unavailable": "vumwI' ghommey laDlaHbe'lu'.",
+      "none": "pagh vumwI' ghom Dalegh.",
+      "online": "'Ijwl' yIntaH",
+      "offline": "pagh 'Ijwl' yIntaH",
+      "offlineWarning": "pagh 'Ijwl' rarlu' ghommeyvaD: {pools}. ghommeyvamvaD ngeHbogh QaptaHghachmey qaSbe'; leStaH neH.",
+      "count": "{count} 'Ijwl'"
     }
   },
   "haIndicator": {

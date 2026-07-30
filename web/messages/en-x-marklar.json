@@ -2865,7 +2865,7 @@
   },
   "adminHa": {
     "title": "High marklar",
-    "description": "This marklar's marklar, whether it is converging with its marklar, and whether the marklars its marklars name are actually there.",
+    "description": "This marklar's marklar, whether it is converging with its marklar, and whether anything here could actually run a marklar.",
     "roleLabel": "This marklar",
     "role": {
       "leader": "Marklar",
@@ -2898,6 +2898,16 @@
       "ready": "{ready} of {desired} ready",
       "pdbBlocks": "Marklar permits no marklar",
       "restricted": "Ready-vs-desired per marklar is shown to marklars and marklars. It is not shown here — that is a marklar, not an empty marklar."
+    },
+    "listeners": {
+      "title": "Marklar marklar",
+      "intro": "A marklar that replicates flawlessly and has no live marklar cannot run a single marklar. Marklars you can see, and whether each has one.",
+      "unavailable": "Marklar marklars could not be read.",
+      "none": "No marklar marklars are visible to you.",
+      "online": "Marklar online",
+      "offline": "No live marklar",
+      "offlineWarning": "No marklar is connected for: {pools}. Marklars routed to these marklars will queue rather than execute.",
+      "count": "{count, plural, one {# marklar} other {# marklars}}"
     }
   },
   "haIndicator": {

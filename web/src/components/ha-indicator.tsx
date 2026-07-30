@@ -24,10 +24,15 @@ import { getAuthState } from '@/lib/auth'
  *  - **Colour is never the only signal.** Each state has its own icon and its
  *    own word, so it survives colour-blindness and a monochrome screenshot.
  *
- * It renders as a bordered chip carrying the node's ROLE, not a bare dot. A
- * lone icon, in a bar where every other control is icon-plus-text, reads as
- * decoration and gets missed entirely — which is exactly what happened to the
- * first version of this.
+ * It renders as a bordered chip, not a bare dot: a lone icon, in a bar where
+ * every other control is icon-plus-text, reads as decoration and gets missed
+ * entirely — which is exactly what happened to the first version of this.
+ *
+ * It carries **no visible text in any state** — colour and symbol only. The
+ * words live in the tooltip and the accessible name, which is where they can be
+ * as precise as they like without competing with the nav for width. Nothing is
+ * lost to a screen reader, and nothing depends on colour alone, because the
+ * symbol differs per state too.
  */
 
 type Tone = 'ok' | 'warn' | 'passive' | 'down'
@@ -120,7 +125,7 @@ const TONES = {
   down: 'border-red-800/60 bg-red-950/50 text-red-200 hover:bg-red-950/80',
 } as const
 
-export function HAIndicator({ compact = false }: { compact?: boolean }) {
+export function HAIndicator() {
   const t = useTranslations('haIndicator')
   const [, force] = useState(0)
 
@@ -132,9 +137,6 @@ export function HAIndicator({ compact = false }: { compact?: boolean }) {
 
   const tone = toneOf(snapshot)
   const Icon = ICONS[tone]
-  // The chip carries the ROLE, because the question being asked is "which node
-  // am I talking to". Colour and icon carry its health; the tooltip and the
-  // accessible name carry the detail — so nothing lives only in the colour.
   const role = tone === 'passive' ? t('follower') : t('leader')
   const detail = !snapshot.peerConfigured
     ? t('singleNode')
@@ -143,16 +145,14 @@ export function HAIndicator({ compact = false }: { compact?: boolean }) {
       : tone === 'ok'
         ? t('inSync')
         : t('behind')
-
   return (
     <Link
       href="/ha"
       title={`${role} — ${detail}`}
       aria-label={t('aria', { role, state: detail })}
-      className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-sm font-medium transition-colors ${TONES[tone]}`}
+      className={`flex items-center rounded-lg border p-1.5 transition-colors ${TONES[tone]}`}
     >
-      <Icon size={15} aria-hidden="true" />
-      {!compact && <span>{role}</span>}
+      <Icon size={17} aria-hidden="true" />
     </Link>
   )
 }

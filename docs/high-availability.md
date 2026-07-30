@@ -371,6 +371,15 @@ misleads:
 - A class still backfilling shows **not in sync** even beside a fresh
   timestamp, matching the rule below.
 
+It also shows **runner readiness**: the agent pools you can see, how many live
+listeners each has, and any pool with none called out by name. That duplicates
+the agent-pools page on purpose — "can this node actually run anything" is part
+of the failover decision, and a node that replicates flawlessly with no listener
+anywhere cannot execute a single plan. The count comes from the same predicate
+as the pool's online/offline status, so the two can never disagree: a listener
+that heartbeats with an expired certificate 401s every authenticated call, and
+counting it would report capacity that does not exist.
+
 Object-store readiness is **not** on this page. It makes real requests to the
 store, which is why it is a deliberate command rather than something a page load
 triggers — run it from the API, MCP or go-terrapod when you want it (see [The

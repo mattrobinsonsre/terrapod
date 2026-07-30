@@ -2865,7 +2865,7 @@
   },
   "adminHa": {
     "title": "Høy tilgjengelighet",
-    "description": "Rollen til denne noden, om den konvergerer med peeren sin, og om objektene radene dens navngir faktisk finnes.",
+    "description": "Rollen til denne noden, om den konvergerer med peeren sin, og om noe her faktisk kunne kjøre en plan.",
     "roleLabel": "Denne noden",
     "role": {
       "leader": "Leder",
@@ -2898,6 +2898,16 @@
       "ready": "{ready} av {desired} klare",
       "pdbBlocks": "PDB tillater ingen eviction",
       "restricted": "Klar mot ønsket per komponent vises for administratorer og revisorer. Det vises ikke her — det er en rettighet, ikke en tom klynge."
+    },
+    "listeners": {
+      "title": "Kjøreberedskap",
+      "intro": "En node som replikerer feilfritt og ikke har noen levende listener, kan ikke kjøre en eneste plan. Poolene du ser, og om hver har en.",
+      "unavailable": "Agentpooler kunne ikke leses.",
+      "none": "Ingen agentpooler er synlige for deg.",
+      "online": "Listener online",
+      "offline": "Ingen levende listener",
+      "offlineWarning": "Ingen listener er tilkoblet for: {pools}. Kjøringer til disse poolene havner i kø i stedet for å kjøre.",
+      "count": "{count, plural, one {# listener} other {# listenere}}"
     }
   },
   "haIndicator": {

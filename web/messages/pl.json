@@ -2865,7 +2865,7 @@
   },
   "adminHa": {
     "title": "Wysoka dostępność",
-    "description": "Rola tego węzła, to czy zbiega się ze swoim partnerem, oraz to czy obiekty wskazywane przez jego wiersze faktycznie istnieją.",
+    "description": "Rola tego węzła, to czy zbiega się ze swoim partnerem, oraz to czy cokolwiek tutaj faktycznie uruchomiłoby plan.",
     "roleLabel": "Ten węzeł",
     "role": {
       "leader": "Lider",
@@ -2898,6 +2898,16 @@
       "ready": "Gotowe {ready} z {desired}",
       "pdbBlocks": "PDB nie zezwala na żadną eksmisję",
       "restricted": "Gotowe względem oczekiwanych dla każdego komponentu widzą administratorzy i audytorzy. Tutaj nie jest to pokazywane — to kwestia uprawnień, a nie pustego klastra."
+    },
+    "listeners": {
+      "title": "Gotowość do uruchamiania",
+      "intro": "Węzeł, który replikuje bez zarzutu i nie ma żywego listenera, nie uruchomi ani jednego planu. Widoczne dla Ciebie pule i to, czy każda go ma.",
+      "unavailable": "Nie udało się odczytać pul agentów.",
+      "none": "Nie widzisz żadnej puli agentów.",
+      "online": "Listener online",
+      "offline": "Brak żywego listenera",
+      "offlineWarning": "Żaden listener nie jest podłączony do: {pools}. Uruchomienia kierowane do tych pul trafią do kolejki zamiast się wykonać.",
+      "count": "{count, plural, one {# listener} few {# listenery} many {# listenerów} other {# listenera}}"
     }
   },
   "haIndicator": {

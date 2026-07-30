@@ -2865,7 +2865,7 @@
   },
   "adminHa": {
     "title": "Høj tilgængelighed",
-    "description": "Denne nodes rolle, om den konvergerer med sin peer, og om de objekter, dens rækker navngiver, rent faktisk findes.",
+    "description": "Denne nodes rolle, om den konvergerer med sin peer, og om noget her rent faktisk kunne køre en plan.",
     "roleLabel": "Denne node",
     "role": {
       "leader": "Leder",
@@ -2898,6 +2898,16 @@
       "ready": "{ready} af {desired} klar",
       "pdbBlocks": "PDB tillader ingen eviction",
       "restricted": "Klar-mod-ønsket pr. komponent vises for administratorer og revisorer. Det vises ikke her — det er en rettighed, ikke en tom klynge."
+    },
+    "listeners": {
+      "title": "Kørselsparathed",
+      "intro": "En node, der replikerer fejlfrit og ikke har nogen levende listener, kan ikke køre en eneste plan. De puljer, du kan se, og om hver har en.",
+      "unavailable": "Agentpuljer kunne ikke læses.",
+      "none": "Der er ingen agentpuljer synlige for dig.",
+      "online": "Listener online",
+      "offline": "Ingen levende listener",
+      "offlineWarning": "Ingen listener er forbundet for: {pools}. Kørsler til disse puljer sættes i kø i stedet for at køre.",
+      "count": "{count, plural, one {# listener} other {# listeners}}"
     }
   },
   "haIndicator": {

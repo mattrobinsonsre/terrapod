@@ -2865,7 +2865,7 @@
   },
   "adminHa": {
     "title": "Vysoká dostupnost",
-    "description": "Role tohoto uzlu, zda konverguje se svým protějškem a zda objekty, na které jeho záznamy odkazují, skutečně existují.",
+    "description": "Role tohoto uzlu, zda konverguje se svým protějškem a zda by tu vůbec něco dokázalo spustit plán.",
     "roleLabel": "Tento uzel",
     "role": {
       "leader": "Vedoucí",
@@ -2898,6 +2898,16 @@
       "ready": "Připraveno {ready} z {desired}",
       "pdbBlocks": "PDB nepovoluje žádné vystěhování",
       "restricted": "Připravené vůči požadovaným pro každou komponentu vidí administrátoři a auditoři. Zde se nezobrazuje — jde o oprávnění, ne o prázdný cluster."
+    },
+    "listeners": {
+      "title": "Připravenost ke spouštění",
+      "intro": "Uzel, který bezchybně replikuje a nemá živý listener, nespustí ani jeden plán. Fondy, které vidíte, a zda každý nějaký má.",
+      "unavailable": "Fondy agentů se nepodařilo načíst.",
+      "none": "Nevidíte žádné fondy agentů.",
+      "online": "Listener online",
+      "offline": "Žádný živý listener",
+      "offlineWarning": "K těmto fondům není připojen žádný listener: {pools}. Běhy směrované do nich se zařadí do fronty místo spuštění.",
+      "count": "{count, plural, one {# listener} few {# listenery} many {# listeneru} other {# listenerů}}"
     }
   },
   "haIndicator": {

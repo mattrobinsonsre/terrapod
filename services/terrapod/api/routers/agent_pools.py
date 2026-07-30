@@ -88,12 +88,24 @@ def _validate_owner_email(email: str | None) -> str | None:
     return email
 
 
-def _pool_json(pool, status: str | None = None, permission: str | None = None) -> dict:
+def _pool_json(
+    pool,
+    status: str | None = None,
+    permission: str | None = None,
+    listener_count: int | None = None,
+) -> dict:
     """Format an AgentPool as JSON:API.
 
     `status` is "online" if at least one live listener is registered for the pool,
     "offline" otherwise. None means "don't include" (used by endpoints that
     don't need to fetch listeners — e.g. create/update responses).
+
+    `listener-count` (#1165) is how many of those listeners are actually usable —
+    the same predicate `status` is derived from, so the two can never disagree.
+    A heartbeating listener with an expired cert 401s every authenticated call,
+    so counting it would inflate the number an operator is using to decide
+    whether a pool has capacity. It rides along with `status` for free: both
+    come from one already-fetched list, so no endpoint gains a round trip.
     """
     attrs: dict = {
         "name": pool.name,
@@ -105,6 +117,8 @@ def _pool_json(pool, status: str | None = None, permission: str | None = None) -
     }
     if status is not None:
         attrs["status"] = status
+    if listener_count is not None:
+        attrs["listener-count"] = listener_count
     if permission is not None:
         attrs["permission"] = permission
     return {
@@ -183,6 +197,17 @@ def _derive_pool_status(listeners: list[dict]) -> str:
     if all(s == "cert-expired" for s in statuses):
         return "degraded"
     return "offline"
+
+
+def _live_listener_count(listeners: list[dict]) -> int:
+    """How many listeners could actually take work.
+
+    Deliberately the same predicate `_derive_pool_status` uses, so a pool can
+    never report "online" with a count of zero, or "offline" with a count above
+    it. A cert-expired listener heartbeats but 401s every authenticated call —
+    counting it would tell an operator they have capacity they do not have.
+    """
+    return sum(1 for item in listeners if _derive_listener_status(item) == "online")
 
 
 def _listener_json(listener: dict, replica_count: int | None = None) -> dict:
@@ -300,7 +325,14 @@ async def list_pools(
         # not enough — a listener with an expired cert keeps heartbeating but
         # 401s every authenticated call, so we cross-check cert expiry too.
         status = _derive_pool_status(listeners)
-        result.append(_pool_json(p, status=status, permission=perm))
+        result.append(
+            _pool_json(
+                p,
+                status=status,
+                permission=perm,
+                listener_count=_live_listener_count(listeners),
+            )
+        )
     page_items, meta = paginate(result, request)
     return JSONResponse(content={"data": page_items, "meta": meta})
 
@@ -342,7 +374,16 @@ async def show_pool(
     perm = await _require_pool_capability(pool, user, db, cap.POOL_READ)
     listeners = await agent_pool_service.list_listeners(pool.id)
     status = _derive_pool_status(listeners)
-    return JSONResponse(content={"data": _pool_json(pool, status=status, permission=perm)})
+    return JSONResponse(
+        content={
+            "data": _pool_json(
+                pool,
+                status=status,
+                permission=perm,
+                listener_count=_live_listener_count(listeners),
+            )
+        }
+    )
 
 
 @router.patch("/agent-pools/{pool_id}")

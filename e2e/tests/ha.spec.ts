@@ -126,6 +126,66 @@ test.describe('HA page — replication', () => {
   });
 });
 
+test.describe('HA page — runner readiness', () => {
+  const pools = (
+    page: Page,
+    list: Array<{ name: string; status: string; listeners?: number }>,
+  ) =>
+    page.route('**/api/terrapod/v1/agent-pools*', (route: Route) =>
+      route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: list.map((p, i) => ({
+            id: `apool-${i}`,
+            type: 'agent-pools',
+            attributes: {
+              name: p.name,
+              status: p.status,
+              'listener-count': p.listeners ?? (p.status === 'online' ? 1 : 0),
+            },
+          })),
+          meta: {},
+        }),
+      }),
+    );
+
+  test('a pool with no live listener is named, not left to be spotted', async ({ page }) => {
+    // Replicating flawlessly with nothing to run on is a node that looks
+    // healthy and cannot execute a plan — the whole reason this section is
+    // here rather than one page away on agent-pools.
+    await mockHA(page, BASE_STATUS);
+    await pools(page, [
+      { name: 'aws-prod', status: 'online', listeners: 3 },
+      { name: 'on-prem', status: 'offline' },
+    ]);
+    await page.goto('/ha');
+
+    await expect(page.getByText(/No listener is connected for: on-prem/)).toBeVisible();
+    // The count, not just the word: "3 listeners" and "1 listener" are
+    // materially different answers to "can I fail over onto this".
+    await expect(page.getByText('3 listeners')).toBeVisible();
+    await expect(page.getByText('No live listener')).toBeVisible();
+  });
+
+  test('all pools online raises nothing', async ({ page }) => {
+    await mockHA(page, BASE_STATUS);
+    await pools(page, [{ name: 'aws-prod', status: 'online', listeners: 1 }]);
+    await page.goto('/ha');
+
+    // Singular, from the ICU plural — a count of one must not read "1 listeners".
+    await expect(page.getByText('1 listener', { exact: true })).toBeVisible();
+    await expect(page.getByText(/No listener is connected/)).toHaveCount(0);
+  });
+
+  test('no visible pools says so rather than rendering an empty list', async ({ page }) => {
+    await mockHA(page, BASE_STATUS);
+    await pools(page, []);
+    await page.goto('/ha');
+
+    await expect(page.getByText(/No agent pools are visible to you/)).toBeVisible();
+  });
+});
+
 test.describe('HA indicator (nav bar)', () => {
   test('it is on an ordinary page, carries the role, and opens the HA page', async ({ page }) => {
     // The whole point of #1165: you learn which node you are on without
@@ -134,7 +194,11 @@ test.describe('HA indicator (nav bar)', () => {
     await page.goto('/workspaces');
 
     await expect(chip(page)).toBeVisible();
-    await expect(chip(page)).toContainText('Leader');
+    // Colour and symbol only — no visible text in any state. The words live in
+    // the accessible name, so nothing is lost to a screen reader and nothing
+    // rests on colour alone (the symbol differs per state too).
+    await expect(chip(page)).toHaveAttribute('aria-label', /Leader/);
+    await expect(chip(page)).toHaveText('');
 
     await chip(page).click();
     await expect(page).toHaveURL(/\/ha$/);
@@ -144,9 +208,9 @@ test.describe('HA indicator (nav bar)', () => {
     await mockHA(page, { ...BASE_STATUS, role: 'follower' });
     await page.goto('/workspaces');
 
-    await expect(chip(page)).toContainText('Follower');
-    // Colour is not the only signal: the accessible name carries the detail
-    // too, so the state survives a monochrome screenshot and a screen reader.
+    // No visible word here either — the state is in the accessible name, which
+    // is what makes a text-free chip legitimate rather than merely terse.
+    await expect(chip(page)).toHaveText('');
     await expect(chip(page)).toHaveAttribute('aria-label', /Follower/);
   });
 
