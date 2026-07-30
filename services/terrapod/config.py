@@ -1205,8 +1205,18 @@ class HAProbeUrlConfig(BaseModel):
     the probe response.
     """
 
-    internal: str = Field(default="", description="Preferred probe URL (internal name)")
-    external: str = Field(default="", description="Fallback probe URL (external name)")
+    internal: str = Field(
+        default="",
+        description=(
+            "Preferred: a private-network path to the SHARED name. Never an "
+            "in-cluster Service address — that always resolves to self, so both "
+            "nodes would declare themselves leader"
+        ),
+    )
+    external: str = Field(
+        default="",
+        description="Fallback: the public shared name. Used only when internal is unset",
+    )
 
 
 class HAPeerInboundConfig(BaseModel):
@@ -1257,7 +1267,13 @@ class HAPeerConfig(BaseModel):
     treatment every other credential gets.
     """
 
-    url: str = Field(default="", description="Base URL of the peer node's API")
+    url: str = Field(
+        default="",
+        description=(
+            "The peer's DIRECT per-node address — never the shared name, which "
+            "resolves to whichever node currently leads and may be this one"
+        ),
+    )
     client_id: str = Field(
         default="", description="OAuth client id this node authenticates to the peer with"
     )
@@ -1529,6 +1545,25 @@ class HAConfig(BaseModel):
             if not self.node_name:
                 raise ValueError("ha.replication.enabled requires ha.node_name")
         return self
+
+    @property
+    def peering_configured(self) -> bool:
+        """Whether this deployment has declared any intent to peer (#1169).
+
+        True when either direction is set up: an outbound URL (this node pulls)
+        or an inbound client id (this node is pulled from). A real pair sets
+        both, because `role: auto` reverses the relationship when DNS moves.
+
+        Derived rather than a separate `ha.enabled` switch, so peering cannot be
+        configured and then left off by accident.
+
+        What it gates is the peer identity itself: with no peering declared, no
+        peer token is issued and none is accepted. That makes **withdrawing the
+        config withdraw the capability** — otherwise a credential left behind by
+        an abandoned pairing keeps full read of decrypted variables and raw
+        state, with nothing in the values file to suggest it exists.
+        """
+        return bool(self.peer.url or self.peer.inbound.client_id)
 
     @property
     def effective_probe_url(self) -> str:

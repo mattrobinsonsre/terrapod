@@ -229,3 +229,88 @@ class TestStatus:
         blob = repr(status)
         assert "s3cret" not in blob
         assert peer_link.hash_secret("s3cret") not in blob
+
+
+class TestPeeringGate:
+    """Withdrawing the config withdraws the capability (#1169).
+
+    A credential left behind by a torn-down pairing otherwise keeps full read of
+    decrypted variables and raw state, with nothing in the values file to
+    suggest it exists. These pin that the peer identity is refused outright when
+    no peering is declared — regardless of what rows survive.
+    """
+
+    @staticmethod
+    def _ha(url: str = "", inbound_id: str = ""):
+        """The real config object, not a stub — the gate reads a derived
+        property, and a SimpleNamespace would only prove the patch worked."""
+        from terrapod.config import HAConfig, HAPeerConfig, HAPeerInboundConfig
+
+        return HAConfig(
+            peer=HAPeerConfig(url=url, inbound=HAPeerInboundConfig(client_id=inbound_id))
+        )
+
+    def test_a_default_install_has_not_declared_peering(self):
+        from terrapod.config import HAConfig
+
+        assert HAConfig().peering_configured is False
+
+    def test_either_direction_counts_as_declared(self):
+        from terrapod.config import HAConfig, HAPeerConfig, HAPeerInboundConfig
+
+        # A real pair sets both, because role:auto reverses the relationship. But
+        # either alone is still an intent to peer and must arm the surface.
+        outbound_only = HAConfig(peer=HAPeerConfig(url="https://peer"))
+        inbound_only = HAConfig(peer=HAPeerConfig(inbound=HAPeerInboundConfig(client_id="peer-b")))
+
+        assert outbound_only.peering_configured is True
+        assert inbound_only.peering_configured is True
+
+    async def test_a_surviving_credential_is_inert_once_the_config_is_gone(self, app, client):
+        """The case the gate exists for: an operator unpaired months ago and the
+        row is still there."""
+        await _reconcile(client_id="peer-b", client_secret="s3cret")
+
+        # The credential still authenticates — the grant is a separate concern...
+        resp = await client.post(
+            "/oauth/token",
+            data={
+                "grant_type": "client_credentials",
+                "client_id": "peer-b",
+                "client_secret": "s3cret",
+            },
+        )
+        assert resp.status_code == 200
+        token = resp.json()["access_token"]
+
+        # ...but with no peering declared it opens nothing.
+        with patch("terrapod.api.dependencies.settings.ha", self._ha()):
+            refused = await client.get(
+                "/api/terrapod/v1/ha/replication/events",
+                headers={"Authorization": f"Bearer {token}"},
+            )
+        assert refused.status_code == 401, (
+            "a credential from a torn-down pairing must not still read the estate"
+        )
+
+    async def test_the_same_token_works_once_peering_is_declared(self, app, client):
+        """The negative above is only meaningful if the positive holds — otherwise
+        it would pass against a gate that refuses everything."""
+        await _reconcile(client_id="peer-b", client_secret="s3cret")
+        resp = await client.post(
+            "/oauth/token",
+            data={
+                "grant_type": "client_credentials",
+                "client_id": "peer-b",
+                "client_secret": "s3cret",
+            },
+        )
+        token = resp.json()["access_token"]
+
+        with patch("terrapod.api.dependencies.settings.ha", self._ha(inbound_id="peer-b")):
+            allowed = await client.get(
+                "/api/terrapod/v1/ha/replication/events",
+                headers={"Authorization": f"Bearer {token}"},
+            )
+
+        assert allowed.status_code == 200, allowed.text

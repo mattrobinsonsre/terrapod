@@ -3854,6 +3854,12 @@ external name cannot pin leadership to a stale answer.
           "attributes": {"node-id": "node-a", "role": "leader"}}}
 ```
 
+> **The replication surface is inert until peering is declared.** With neither
+> `ha.peer.url` nor `ha.peer.inbound.client_id` set, no peer token is issued and
+> none is accepted, so `/ha/replication/*` refuses every request with 401 —
+> including one bearing a credential left behind by a pairing that was torn down.
+> Withdrawing the configuration withdraws the capability.
+
 ### `GET /api/terrapod/v1/ha/status`
 
 **Requires authentication; the in-cluster half additionally requires `admin` or

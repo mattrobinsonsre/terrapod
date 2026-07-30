@@ -29,6 +29,7 @@ from terrapod.auth.sessions import (
     get_session,
     refresh_session,
 )
+from terrapod.config import settings
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 
@@ -603,6 +604,17 @@ async def get_peer_identity(
     deliberately not expressible in terms of roles that could be granted to a
     person by accident.
     """
+    # A deployment that has not declared peering accepts no peer identity, even
+    # if a credential row survives from one that was torn down (#1169). Config
+    # expresses intent; withdrawing it withdraws the capability, rather than
+    # leaving a forgotten credential with full read of decrypted variables.
+    if not settings.ha.peering_configured:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     auth_header = request.headers.get("authorization", "")
     if not auth_header.lower().startswith("bearer "):
         raise HTTPException(

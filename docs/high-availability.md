@@ -154,43 +154,65 @@ differs:
 The follower pulls, so node B presents a credential that node A accepts: one row
 on A, one secret held by B.
 
-### Setting it up declaratively
+### Both directions, always
 
-Generate one secret, put it in a Kubernetes Secret on **both** nodes, and
-reference it as A's inbound and B's outbound:
+`role: auto` swaps the roles when DNS moves — that is the entire point — so
+**every node carries both halves from the start**. Configure only one direction
+and the pair works perfectly right up until you fail over, at which moment the
+new follower has no outbound credential and the new leader no inbound row, and
+replication stops silently at exactly the wrong time.
+
+So: **two secrets, each held by both nodes.**
+
+| Secret | On node A | On node B |
+|---|---|---|
+| `secret-ab` | outbound — what A presents | inbound — what B accepts |
+| `secret-ba` | inbound — what A accepts | outbound — what B presents |
+
+### Setting it up
+
+Generate both secrets (`openssl rand -base64 32`), put each in a Kubernetes
+Secret on both nodes, and reference them:
 
 ```yaml
-# On node A — the credential it accepts from B
+# Node A
 api:
   config:
     ha:
+      role: auto
+      node_name: node-a
+      probe_url:
+        internal: https://terrapod.example.com   # the SHARED name
       peer:
+        url: https://node-b.example.com          # B's DIRECT address
+        client_id: a-to-b
+        existingSecret: secret-ab                # presented when A follows
         inbound:
-          client_id: peer-b
+          client_id: b-to-a
           name: "Node B"
-          existingSecret: terrapod-peer
+          existingSecret: secret-ba              # accepted when A leads
 ```
 
-```yaml
-# On node B — the credential it presents to A
-api:
-  config:
-    ha:
-      peer:
-        url: https://node-a.example.com
-        client_id: peer-b
-        existingSecret: terrapod-peer
-```
+Node B is the mirror image: `peer.url` points at A's direct address, its
+outbound is `b-to-a`/`secret-ba`, its inbound `a-to-b`/`secret-ab`.
+
+> **`peer.url` must be the peer's direct per-node address, never the shared
+> name.** The shared name resolves to whichever node currently leads — which may
+> be this one, in which case a node would try to replicate from itself. Same
+> trap as `probe_url`, opposite direction: the probe wants the shared name, the
+> peer link wants the specific one.
 
 That is the whole setup. No CLI, no UI, no manual step, and nothing to remember
-at cutover — peering is declared in the same place as everything else, and there
-is no second writer, so config and the database cannot disagree about what is
-configured.
+at cutover — the credentials for the reversed direction are already in place, so
+moving DNS is genuinely the only act.
 
 **Rotating** is editing the Secret. The reconcile updates the stored hash on the
-next start, and the previous secret stops working immediately. For a pair where
-either node may be promoted, do it in both directions: node A also accepts a
-credential from B if B is ever the leader.
+next start, and the previous secret stops working immediately.
+
+**Tearing down** is removing the config. With no peering declared, no peer token
+is issued and none is accepted, so a credential row left behind is inert —
+withdrawing the configuration withdraws the capability rather than leaving a
+forgotten credential with full read of the estate.
 
 ### Minting instead, if you would rather not generate the secret yourself
 

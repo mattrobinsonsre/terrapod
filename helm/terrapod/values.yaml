@@ -411,6 +411,14 @@ api:
       peer:
         # OUTBOUND — how this node reaches its peer when it pulls. A credential
         # this node holds but does not own, so it stays purely config.
+        #
+        # `url` must be the peer's DIRECT per-node address, never the shared
+        # name — the shared name resolves to whichever node currently leads,
+        # which may be this one.
+        #
+        # A real pair configures BOTH directions on BOTH nodes: role:auto
+        # reverses the relationship when DNS moves, and a half-configured pair
+        # works perfectly until the moment you fail over.
         url: ""
         client_id: ""
         # K8s Secret holding the client secret for the peer's OAuth client.
