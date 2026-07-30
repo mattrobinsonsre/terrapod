@@ -865,7 +865,13 @@ class GPGKey(Base):
     ascii_armor: Mapped[str] = mapped_column(Text, nullable=False)
     source: Mapped[str] = mapped_column(String(63), nullable=False, default="terrapod")
     source_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
-    private_key: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # The GPG **private** key, when Terrapod holds one for server-side signing.
+    # The most sensitive column in this table by a wide margin: it is what proves
+    # a published provider came from this registry. EncryptedText over the
+    # existing TEXT column (#1140) — no migration, and the `IS NOT NULL`
+    # predicates that select signing-capable keys still work, because NULL is
+    # preserved rather than encrypted.
+    private_key: Mapped[str | None] = mapped_column(EncryptedText, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=now_utc, nullable=False
@@ -1963,7 +1969,12 @@ class RunTask(Base):
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     url: Mapped[str] = mapped_column(String(2000), nullable=False)
-    hmac_key: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # The shared secret Terrapod signs task webhooks with. Anyone holding it can
+    # forge a task result, and a task result gates the apply when the task is
+    # mandatory — so it is exactly as sensitive as the notification token beside
+    # it (#1140). EncryptedText over the existing TEXT column: no migration, and
+    # reads pass legacy plaintext through unchanged.
+    hmac_key: Mapped[str | None] = mapped_column(EncryptedText, nullable=True)
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     stage: Mapped[str] = mapped_column(String(20), nullable=False)  # pre_plan, post_plan, pre_apply
     enforcement_level: Mapped[str] = mapped_column(

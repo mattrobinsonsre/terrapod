@@ -417,6 +417,46 @@ class TestRunTasks:
 
         assert removed == [ID_B]
 
+    @pytest.mark.replication_matrix("run_tasks", "encrypted-columns")
+    async def test_the_hmac_key_survives_the_per_node_round_trip(self):
+        """`hmac_key` became `EncryptedText` in #1140, which is what made the
+        matrix gate start demanding this row — the gate derives it from the model,
+        so a class that gains an encrypted column fails until the round trip is
+        proven.
+
+        The property: the payload carries the key decrypted (the peer cannot use
+        this node's ciphertext), and applying writes it back through the column so
+        the receiving node re-encrypts under its own key."""
+        from sqlalchemy import inspect as sa_inspect
+
+        from terrapod.crypto.types import EncryptedText as _Enc
+
+        column = sa_inspect(RunTask).local_table.c["hmac_key"]
+        assert isinstance(column.type, _Enc)
+
+        assert replication.serialize_row(RUN_TASKS, _run_task())["hmac_key"] == "shared"
+
+        db = AsyncMock()
+        existing = _run_task(hmac_key="theirs")
+        db.scalar.return_value = existing
+
+        await replication.apply_upsert(db, RUN_TASKS, {"id": ID_A, "hmac_key": "rotated"})
+
+        assert existing.hmac_key == "rotated"
+
+    async def test_a_task_with_no_hmac_key_stays_without_one(self):
+        """An unsigned task is a real configuration. `None` must stay `None`
+        rather than becoming a string the dispatcher would then sign with."""
+        db = AsyncMock()
+        existing = _run_task(hmac_key="stale")
+        db.scalar.return_value = existing
+
+        await replication.apply_upsert(
+            db, RUN_TASKS, replication.serialize_row(RUN_TASKS, _run_task(hmac_key=None))
+        )
+
+        assert existing.hmac_key is None
+
 
 class TestExecutionHooks:
     @pytest.mark.replication_matrix("execution_hooks", "backfill-from-empty")
