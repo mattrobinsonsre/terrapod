@@ -2889,7 +2889,10 @@
       "sinceSync": "منذ آخر جلب",
       "backfilling": "أصناف قيد الاستكمال",
       "retained": "الأحداث المحفوظة",
-      "oldestEvent": "أقدم حدث / مدة الحفظ"
+      "oldestEvent": "أقدم حدث / مدة الحفظ",
+      "behind": "التأخر",
+      "caughtUp": "محدّثة",
+      "behindCount": "{count, plural, zero {لا أحداث} one {حدث واحد} two {حدثان} few {# أحداث} many {# حدثاً} other {# حدث}} ({age})"
     },
     "components": {
       "title": "الجاهزية داخل العنقود",

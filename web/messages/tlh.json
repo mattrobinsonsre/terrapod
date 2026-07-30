@@ -2889,7 +2889,10 @@
       "sinceSync": "Qav qelmeH poH",
       "backfilling": "teblI'bogh Seghmey",
       "retained": "polbogh wanI'mey",
-      "oldestEvent": "wanI' qan law' / polmeH poH"
+      "oldestEvent": "wanI' qan law' / polmeH poH",
+      "behind": "tlha'",
+      "caughtUp": "rurchu'",
+      "behindCount": "{count} wanI'mey ({age})"
     },
     "components": {
       "title": "ghomDaq ghuHtaHghach",

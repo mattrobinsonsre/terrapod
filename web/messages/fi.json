@@ -2889,7 +2889,10 @@
       "sinceSync": "Viimeisimmästä hausta",
       "backfilling": "Täydentyvät luokat",
       "retained": "Säilytetyt tapahtumat",
-      "oldestEvent": "Vanhin tapahtuma / säilytys"
+      "oldestEvent": "Vanhin tapahtuma / säilytys",
+      "behind": "Jäljessä",
+      "caughtUp": "Ajan tasalla",
+      "behindCount": "{count, plural, one {# tapahtuma} other {# tapahtumaa}} ({age})"
     },
     "components": {
       "title": "Valmius klusterissa",

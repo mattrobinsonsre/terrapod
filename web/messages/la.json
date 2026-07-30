@@ -2889,7 +2889,10 @@
       "sinceSync": "Ab ultima tractione",
       "backfilling": "Classes replentes",
       "retained": "Eventus retenti",
-      "oldestEvent": "Eventus vetustissimus / retentio"
+      "oldestEvent": "Eventus vetustissimus / retentio",
+      "behind": "Retro",
+      "caughtUp": "Aequatus",
+      "behindCount": "{count, plural, one {# eventus} other {# eventus}} ({age})"
     },
     "components": {
       "title": "Paratio in glomere",

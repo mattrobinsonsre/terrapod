@@ -2889,7 +2889,10 @@
       "sinceSync": "51nc3 l457 pull",
       "backfilling": "B4ckf1ll1ng cl45535",
       "retained": "3v3n75 r3741n3d",
-      "oldestEvent": "0ld357 3v3n7 / r373n710n"
+      "oldestEvent": "0ld357 3v3n7 / r373n710n",
+      "behind": "B3h1nd by",
+      "caughtUp": "C4ugh7 up",
+      "behindCount": "{count, plural, one {# event} other {# events}} ({age})"
     },
     "components": {
       "title": "1n-clu573r r34d1n355",

@@ -2889,7 +2889,10 @@
       "sinceSync": "Siden seneste hentning",
       "backfilling": "Klasser der efterfylder",
       "retained": "Bevarede hændelser",
-      "oldestEvent": "Ældste hændelse / opbevaring"
+      "oldestEvent": "Ældste hændelse / opbevaring",
+      "behind": "Bagud med",
+      "caughtUp": "Ajour",
+      "behindCount": "{count, plural, one {# hændelse} other {# hændelser}} ({age})"
     },
     "components": {
       "title": "Parathed i klyngen",

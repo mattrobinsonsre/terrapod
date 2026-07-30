@@ -2889,7 +2889,10 @@
       "sinceSync": "Siden siste henting",
       "backfilling": "Klasser som etterfyller",
       "retained": "Bevarte hendelser",
-      "oldestEvent": "Eldste hendelse / oppbevaring"
+      "oldestEvent": "Eldste hendelse / oppbevaring",
+      "behind": "Bak med",
+      "caughtUp": "À jour",
+      "behindCount": "{count, plural, one {# hendelse} other {# hendelser}} ({age})"
     },
     "components": {
       "title": "Beredskap i klyngen",

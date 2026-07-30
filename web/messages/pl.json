@@ -2889,7 +2889,10 @@
       "sinceSync": "Od ostatniego pobrania",
       "backfilling": "Klasy w uzupełnianiu",
       "retained": "Zachowane zdarzenia",
-      "oldestEvent": "Najstarsze zdarzenie / retencja"
+      "oldestEvent": "Najstarsze zdarzenie / retencja",
+      "behind": "W tyle o",
+      "caughtUp": "Aktualne",
+      "behindCount": "{count, plural, one {# zdarzenie} few {# zdarzenia} many {# zdarzeń} other {# zdarzenia}} ({age})"
     },
     "components": {
       "title": "Gotowość w klastrze",

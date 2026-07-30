@@ -206,3 +206,48 @@ class TestWhoMaySeeWhat:
         resp = await _get(ReplicationStatus(), roles=["admin"])
 
         assert resp.json()["data"]["attributes"]["components-restricted"] is False
+
+
+class TestHowFarBehind:
+    """#1165 — "not in sync" is not an answer to "how far behind?".
+
+    The distinction these pin is `None` vs `0`. Unknown and caught-up must never
+    render the same, because an operator reads one as "fine" and would be right
+    only half the time.
+    """
+
+    async def test_a_node_that_has_never_pulled_says_unknown_not_zero(self):
+        resp = await _get(ReplicationStatus(), ha=_ha(role="follower"))
+
+        attrs = resp.json()["data"]["attributes"]
+        assert attrs["events-behind"] is None
+        assert attrs["behind-seconds"] is None
+
+    async def test_caught_up_is_zero_not_unknown(self):
+        resp = await _get(
+            ReplicationStatus(last_sync_at=datetime.now(UTC), events_behind=0),
+            ha=_ha(role="follower"),
+        )
+
+        assert resp.json()["data"]["attributes"]["events-behind"] == 0
+
+    async def test_behind_reports_the_count(self):
+        resp = await _get(
+            ReplicationStatus(last_sync_at=datetime.now(UTC), events_behind=42),
+            ha=_ha(role="follower"),
+        )
+
+        assert resp.json()["data"]["attributes"]["events-behind"] == 42
+
+    async def test_the_age_of_the_oldest_unapplied_change_is_a_duration(self):
+        resp = await _get(
+            ReplicationStatus(
+                last_sync_at=datetime.now(UTC),
+                events_behind=3,
+                oldest_unapplied_at=datetime.now(UTC) - timedelta(minutes=5),
+            ),
+            ha=_ha(role="follower"),
+        )
+
+        behind = resp.json()["data"]["attributes"]["behind-seconds"]
+        assert 290 <= behind <= 310, behind

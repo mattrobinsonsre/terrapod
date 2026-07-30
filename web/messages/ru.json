@@ -2889,7 +2889,10 @@
       "sinceSync": "С последней выборки",
       "backfilling": "Классы в дозагрузке",
       "retained": "Сохранённые события",
-      "oldestEvent": "Самое старое событие / хранение"
+      "oldestEvent": "Самое старое событие / хранение",
+      "behind": "Отставание",
+      "caughtUp": "Актуально",
+      "behindCount": "{count, plural, one {# событие} few {# события} many {# событий} other {# события}} ({age})"
     },
     "components": {
       "title": "Готовность в кластере",

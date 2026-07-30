@@ -2889,7 +2889,10 @@
       "sinceSync": "Ers y tyniad diwethaf",
       "backfilling": "Dosbarthiadau sy'n llenwi'n ôl",
       "retained": "Digwyddiadau a gedwir",
-      "oldestEvent": "Digwyddiad hynaf / cadw"
+      "oldestEvent": "Digwyddiad hynaf / cadw",
+      "behind": "Ar ei hôl hi o",
+      "caughtUp": "Yn gyfredol",
+      "behindCount": "{count, plural, one {# digwyddiad} other {# digwyddiad}} ({age})"
     },
     "components": {
       "title": "Parodrwydd yn y clwstwr",

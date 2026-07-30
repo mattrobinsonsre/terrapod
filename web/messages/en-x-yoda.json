@@ -2889,7 +2889,10 @@
       "sinceSync": "Since the last pull",
       "backfilling": "Classes backfilling",
       "retained": "Events retained",
-      "oldestEvent": "Event, oldest / retention"
+      "oldestEvent": "Event, oldest / retention",
+      "behind": "Behind by",
+      "caughtUp": "Caught up",
+      "behindCount": "{count, plural, one {# event} other {# events}} ({age})"
     },
     "components": {
       "title": "Readiness within the cluster",

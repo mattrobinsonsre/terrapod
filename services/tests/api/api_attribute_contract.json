@@ -198,11 +198,13 @@
   ],
   "ha.status": [
     "backfilling-classes",
+    "behind-seconds",
     "cluster-zones",
     "components",
     "components-restricted",
     "components-sampled-at",
     "components-unavailable-reason",
+    "events-behind",
     "events-retained",
     "ha-findings",
     "in-sync",
