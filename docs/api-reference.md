@@ -3894,6 +3894,37 @@ better: a single-node cluster cannot spread replicas and a single-zone one
 cannot spread zones, so neither is reported as a gap. See
 [High availability](high-availability.md#findings-disruption-budgets-and-placement).
 
+### `GET /api/terrapod/v1/ha/blob-readiness`
+
+**Requires `admin` or `audit`.** Are the objects this node's rows name actually in
+its object store? Replication carries database rows; the object store is a second
+data plane, and **rows present with blobs absent** is a node that looks healthy
+and cannot serve a single run.
+
+| Query | Default | Meaning |
+|---|---|---|
+| `full` | `false` | Check every row of every class. Thousands of round trips on a real estate, hence opt-in |
+| `sample` | `25` | Newest rows per class when not running full |
+
+| Attribute | Meaning |
+|---|---|
+| `irreplaceable-missing` | **The list that should stop a failover** — classes whose absence is permanent |
+| `missing-total` | Missing objects among those **checked** |
+| `sampled` | Whether this was a sample rather than a full verification |
+| `classes[]` | Per class: `name`, `tier` (`irreplaceable`\|`history`\|`rederivable`), `total-rows`, `checked`, `missing`, `missing-examples` (capped), `complete`, `error` |
+| `unavailable-reason` | Set when the store could not be read — *"I could not look"*, distinct from *"all is well"* |
+| `duration-ms` | What the check cost |
+
+**A clean sample is not a clean estate.** `complete` is true only when nothing was
+held back; otherwise compare `checked` against `total-rows`. `missing == 0` on a
+sample means *no missing objects among those sampled*.
+
+Deliberately **not** folded into `/ha/status`: that endpoint is answered from local
+state in milliseconds and is refreshed freely, while this one does real
+object-store I/O.
+
+See [High availability](high-availability.md#the-other-data-plane-is-the-object-store-actually-there).
+
 ### Peer-only endpoints
 
 `/api/terrapod/v1/ha/replication/*` are consumed **by the peer node**, not by

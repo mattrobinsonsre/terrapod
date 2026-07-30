@@ -23,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from terrapod.api.dependencies import AuthenticatedUser, require_admin_or_audit
 from terrapod.config import settings
 from terrapod.db.session import get_db
+from terrapod.services import blob_readiness as blob_readiness_service
 from terrapod.services import component_status, ha_role, replication
 
 router = APIRouter(prefix="/ha", tags=["ha"])
@@ -152,6 +153,67 @@ async def status(
                 # left for the reader to derive, because it is the thing being
                 # looked for.
                 "single-replica-components": components.single_points_of_failure,
+            },
+        }
+    }
+
+
+@router.get("/blob-readiness")
+async def blob_readiness(
+    full: bool = False,
+    sample: int = blob_readiness_service.DEFAULT_SAMPLE,
+    _user: AuthenticatedUser = Depends(require_admin_or_audit),
+) -> dict:
+    """Are the objects this node's rows name actually in its object store? (#1147)
+
+    Separate from `/status` on purpose. `/status` is answered from local state in
+    milliseconds and an operator refreshes it freely; this one makes real
+    round trips to the object store, so putting it inline would make the cheap
+    endpoint expensive and tempt callers to poll it.
+
+    `full=true` checks every row of every class — thousands of requests on a real
+    estate. The default samples, and the response says which it did: `sampled`
+    plus per-class `checked` against `total-rows`, so nobody can read a clean
+    sample as a clean estate.
+    """
+    result = await blob_readiness_service.check(full=full, sample=sample)
+
+    return {
+        "data": {
+            "type": "ha-blob-readiness",
+            "id": ha_role.node_id() or "unknown",
+            "attributes": {
+                # The honest headline. `missing-total` is a count over what was
+                # CHECKED; `sampled` says whether that was everything.
+                "sampled": result.sampled,
+                "missing-total": result.missing_total,
+                # The list that should stop a failover. Everything else is a
+                # judgement call about a given deployment; this is not.
+                "irreplaceable-missing": result.irreplaceable_missing,
+                "duration-ms": result.duration_ms,
+                "unavailable-reason": result.unavailable_reason,
+                "classes": [
+                    {
+                        "name": c.name,
+                        # irreplaceable | history | rederivable, from #1114. The
+                        # tier is a property of the deployment as much as the
+                        # artifact: a cold provider cache re-warms itself unless
+                        # the node is sealed, in which case it is fatal.
+                        "tier": c.tier,
+                        "total-rows": c.total_rows,
+                        "checked": c.checked,
+                        "missing": c.missing,
+                        # A few, not all. A wholly absent class would otherwise
+                        # return a wall of keys nobody reads.
+                        "missing-examples": c.missing_examples,
+                        # True only when nothing was held back, so `missing` is
+                        # the complete answer for this class rather than a
+                        # sample's worth.
+                        "complete": c.complete,
+                        "error": c.error,
+                    }
+                    for c in result.classes
+                ],
             },
         }
     }

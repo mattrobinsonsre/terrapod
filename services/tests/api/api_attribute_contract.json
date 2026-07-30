@@ -186,6 +186,14 @@
     "source-url",
     "updated-at"
   ],
+  "ha.blob_readiness": [
+    "classes",
+    "duration-ms",
+    "irreplaceable-missing",
+    "missing-total",
+    "sampled",
+    "unavailable-reason"
+  ],
   "ha.status": [
     "backfilling-classes",
     "cluster-zones",
