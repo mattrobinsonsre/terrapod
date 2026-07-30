@@ -199,6 +199,7 @@
     "backfilling-classes",
     "cluster-zones",
     "components",
+    "components-restricted",
     "components-sampled-at",
     "components-unavailable-reason",
     "events-retained",

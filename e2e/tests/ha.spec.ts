@@ -19,6 +19,11 @@ import { expectNoHorizontalPageScroll } from '../helpers/responsive';
 
 const USER_AUTH = path.join(__dirname, '..', '.auth', 'user.json');
 
+/** The page body, excluding the nav chip that now carries the same word. */
+const body = (page: Page) => page.getByRole('main');
+/** The nav-bar HA chip (#1165). */
+const chip = (page: Page) => page.getByRole('navigation').getByRole('link', { name: /High availability/i });
+
 const BASE_STATUS = {
   'node-id': 'node-a',
   role: 'leader',
@@ -59,7 +64,7 @@ test.describe('HA page — role', () => {
     await page.goto('/ha');
 
     await expect(page.getByRole('heading', { name: 'High availability' })).toBeVisible();
-    await expect(page.getByText('Leader', { exact: true })).toBeVisible();
+    await expect(body(page).getByText('Leader', { exact: true })).toBeVisible();
     await expect(page.getByText('Caught up as of the last successful pull.')).toBeVisible();
   });
 
@@ -69,7 +74,7 @@ test.describe('HA page — role', () => {
     await mockHA(page, { ...BASE_STATUS, role: 'follower' });
     await page.goto('/ha');
 
-    await expect(page.getByText('Follower', { exact: true })).toBeVisible();
+    await expect(body(page).getByText('Follower', { exact: true })).toBeVisible();
     await expect(page.getByText(/originates nothing/)).toBeVisible();
     await expect(page.getByText(/503/)).toBeVisible();
   });
@@ -80,7 +85,7 @@ test.describe('HA page — role', () => {
     await mockHA(page, { ...BASE_STATUS, role: 'something-new' });
     await page.goto('/ha');
 
-    await expect(page.getByText('something-new')).toBeVisible();
+    await expect(body(page).getByText('something-new')).toBeVisible();
   });
 });
 
@@ -121,6 +126,40 @@ test.describe('HA page — replication', () => {
   });
 });
 
+test.describe('HA indicator (nav bar)', () => {
+  test('it is on an ordinary page, carries the role, and opens the HA page', async ({ page }) => {
+    // The whole point of #1165: you learn which node you are on without
+    // navigating anywhere, from any page.
+    await mockHA(page, BASE_STATUS);
+    await page.goto('/workspaces');
+
+    await expect(chip(page)).toBeVisible();
+    await expect(chip(page)).toContainText('Leader');
+
+    await chip(page).click();
+    await expect(page).toHaveURL(/\/ha$/);
+  });
+
+  test('a follower is stated in the chip, not only on the page', async ({ page }) => {
+    await mockHA(page, { ...BASE_STATUS, role: 'follower' });
+    await page.goto('/workspaces');
+
+    await expect(chip(page)).toContainText('Follower');
+    // Colour is not the only signal: the accessible name carries the detail
+    // too, so the state survives a monochrome screenshot and a screen reader.
+    await expect(chip(page)).toHaveAttribute('aria-label', /Follower/);
+  });
+
+  test('it is not in the Admin menu', async ({ page }) => {
+    // Node disposition is context, not an administrative task. If it reappears
+    // under Admin, the permission story has drifted back too.
+    await mockHA(page, BASE_STATUS);
+    await page.goto('/workspaces');
+
+    await expect(page.locator('a[href="/admin/ha"]')).toHaveCount(0);
+  });
+});
+
 test.describe('HA page — mobile', () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
@@ -135,7 +174,7 @@ test.describe('HA page — mobile', () => {
 
     // The primary signal — which node this is, and that it is behind — stays
     // visible at phone width rather than being hidden behind a breakpoint.
-    await expect(page.getByText('Follower', { exact: true })).toBeVisible();
+    await expect(body(page).getByText('Follower', { exact: true })).toBeVisible();
     await expect(page.getByText(/Not in sync/)).toBeVisible();
     await expect(page.getByText('registry_modules')).toBeVisible();
     await expectNoHorizontalPageScroll(page);
@@ -152,7 +191,7 @@ test.describe('HA page — RBAC', () => {
     await mockHA(page, { ...BASE_STATUS, role: 'follower', 'components-restricted': true });
     await page.goto('/ha');
 
-    await expect(page.getByText('Follower', { exact: true })).toBeVisible();
+    await expect(body(page).getByText('Follower', { exact: true })).toBeVisible();
     await expect(page.getByText(/originates nothing/)).toBeVisible();
   });
 
