@@ -140,6 +140,28 @@ token paths. A peer is entitled to read things an ordinary user is not, and that
 visibility must not be grantable to a person by accident. A peer token resolves
 to no roles and is refused by every endpoint except the replication surface.
 
+### Minting the credential
+
+Run this **on the node that will be asked**, and give the output to the node that
+will be **asking**. The follower pulls, so the credential flows the opposite way
+to the data:
+
+```zsh
+# On node A: mint the credential node B will use to read from A
+kubectl exec deploy/terrapod-api -- \
+  python -m terrapod.cli.peer_client create --client-id peer-b --name "Node B"
+```
+
+It prints the secret **once** — only its SHA-256 is stored, the same contract as an
+API token. Lost means rotated (`--rotate`), which is also how you replace a
+credential you suspect has leaked; the previous secret stops working immediately.
+
+For a pair where either node may be promoted, do it in both directions: node A
+mints `peer-b`, node B mints `peer-a`. `peer_client list` shows what is registered
+(never a secret).
+
+Then configure the node that will use it:
+
 ```yaml
 api:
   config:

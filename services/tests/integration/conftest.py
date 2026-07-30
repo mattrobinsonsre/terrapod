@@ -31,44 +31,28 @@ os.environ.setdefault("TERRAPOD_JSON_LOGS", "false")
 os.environ.setdefault("TERRAPOD_LOG_LEVEL", "WARNING")
 os.environ.setdefault("TERRAPOD_RATE_LIMIT__ENABLED", "false")
 
-# All tables for TRUNCATE CASCADE (order doesn't matter with CASCADE)
-_ALL_TABLES = [
-    "onboarding_sessions",
-    "task_stage_results",
-    "task_stages",
-    "run_tasks",
-    "notification_configurations",
-    "run_triggers",
-    "audit_logs",
-    "runs",
-    "configuration_versions",
-    "variable_set_workspaces",
-    "variable_set_variables",
-    "variable_sets",
-    "variables",
-    "state_versions",
-    "module_workspace_links",
-    "cached_binaries",
-    "cached_provider_packages",
-    "registry_provider_platforms",
-    "registry_provider_versions",
-    "registry_module_versions",
-    "registry_modules",
-    "registry_providers",
-    "gpg_keys",
-    "agent_pool_tokens",
-    "agent_pools",
-    "api_tokens",
-    "role_assignments",
-    "platform_role_assignments",
-    "roles",
-    "workspaces",
-    "vcs_connections",
-    "certificate_authority",
-    "users",
-]
 
-_TRUNCATE_SQL = "TRUNCATE " + ", ".join(_ALL_TABLES) + " CASCADE"
+# Tables to TRUNCATE between tests, DERIVED from the models (#1161).
+#
+# This was a hand-maintained list, and it had drifted: 23 of 56 tables were
+# missing, so isolation was silently broken for everything added since somebody
+# last remembered to append to it — replication, execution hooks, policies, the
+# catalog, the AI surfaces, and `oauth_clients`, which is what surfaced it (a peer
+# client created by one test was still there for the next, which then hit the
+# duplicate-refusal path and failed only when the file ran as a whole).
+#
+# Derived, so it cannot drift again. `crypto_keys` is deliberately included: with
+# every other table emptied there is nothing left encrypted under the old DEK, and
+# a stale key surviving into a test that writes an encrypted column is the subtler
+# hazard. Names come from the model metadata, never from input, so the
+# TRUNCATE below is still built from trusted strings.
+def _all_tables() -> list[str]:
+    from terrapod.db.models import Base
+
+    return [table.name for table in Base.metadata.sorted_tables]
+
+
+_TRUNCATE_SQL = "TRUNCATE " + ", ".join(_all_tables()) + " CASCADE"
 
 
 # ---------------------------------------------------------------------------
@@ -261,9 +245,9 @@ async def clean_db(app):
     from terrapod.db.session import get_db_session
 
     async with get_db_session() as session:
-        # _TRUNCATE_SQL is built from a hard-coded table list (see top of file),
-        # not from any request/user input — no injection surface in this test
-        # cleanup fixture.
+        # _TRUNCATE_SQL is built from the model metadata's table names (see top
+        # of file), not from any request/user input — no injection surface in
+        # this test cleanup fixture.
         # nosemgrep: python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text
         await session.execute(text(_TRUNCATE_SQL))
 
