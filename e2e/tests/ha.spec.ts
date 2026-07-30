@@ -163,8 +163,8 @@ test.describe('HA page — runner readiness', () => {
     await expect(page.getByText(/No listener is connected for: on-prem/)).toBeVisible();
     // The count, not just the word: "3 listeners" and "1 listener" are
     // materially different answers to "can I fail over onto this".
-    await expect(page.getByText('3 listeners')).toBeVisible();
-    await expect(page.getByText('No live listener')).toBeVisible();
+    await expect(page.getByText('3 listeners', { exact: true })).toBeVisible();
+    await expect(page.getByText('No live listener', { exact: true })).toBeVisible();
   });
 
   test('all pools online raises nothing', async ({ page }) => {
