@@ -825,6 +825,43 @@ This usually means **the runner image is from before policy-as-code support / do
 
 ---
 
+## VCS poll cycle rate-limited
+
+**Symptom**: a workspace's `vcs-last-error` shows an HTTP 429, or a 403 mentioning a secondary rate limit. Pushes may be picked up a cycle late while it persists.
+
+**Why**: the VCS provider's API allowance for that credential was exhausted. Terrapod already retries 429s and secondary-rate-limit 403s with backoff (honouring `Retry-After`, falling back to `X-RateLimit-Reset`, capped at 60s so a poll-cycle coroutine is never parked for an hour), so short bursts are absorbed without surfacing. One that reaches the workspace means the allowance was still exhausted after those retries — a sizing question rather than a fault.
+
+A poll cycle costs roughly two calls per **distinct** repository + tracked branch (branch head, open PRs/MRs) — deduplicated within the cycle, so a twenty-workspace monorepo costs the same as one workspace. Pushes add an archive download; autodiscovery adds a tree listing.
+
+```
+calls per hour = (3600 / poll_interval_seconds) x 2 x distinct repo+branch pairs
+```
+
+### Diagnosis
+
+1. **Read what Terrapod recorded** — `vcs-last-error` / `vcs-last-error-at` on the workspace (`GET /api/v2/workspaces/{id}`), or the `vcs_error` health condition in the UI.
+2. **Ask the provider for the remaining allowance.** GitHub: `GET /rate_limit` with the installation token, or `X-RateLimit-Remaining` on any response. GitLab: the `RateLimit-Remaining` response header.
+3. **Count distinct repositories, not workspaces** — the per-cycle deduplication means workspace count is the wrong number to reason with.
+4. **Rule out the look-alikes**: a *consistent* 404 on one repository is permission drift (removed from the App installation, narrowed token scope); connect-timeout or TLS errors point at the network path to a self-hosted instance; a GitHub installation token is cached for 50 minutes, so a permission change takes that long to take effect.
+
+### Resolution
+
+The three knobs, in the order worth trying:
+
+- **Lengthen `vcs.module_poll_interval_seconds`** (default 300). It has the most headroom, and both module pollers have webhook accelerators, so lengthening it costs nothing when webhooks are configured.
+- **Configure webhooks**, then lengthen `vcs.poll_interval_seconds` too. With webhooks the interval becomes a fallback floor for an undelivered event rather than the wait anyone experiences, which is what makes a longer one comfortable.
+- **Give the busy repository its own VCS connection.** Allowances are per credential: a GitHub App's is per *installation*, a GitLab token's per token. Split **by repository**, not by workspace — workspaces sharing a repository already share one deduplicated lookup, so separating them across connections increases total calls.
+
+Full guidance: [VCS integration → Sizing polling for a large estate](vcs-integration.md#sizing-polling-for-a-large-estate).
+
+### Verification
+
+- `vcs-last-error` is null on the affected workspaces after a couple of cycles.
+- A push is picked up within the configured interval (or immediately, with webhooks).
+- The provider's remaining-allowance header stays clear of zero across a busy hour.
+
+---
+
 ## VCS commit status missing after run completion
 
 **Symptom**: a workspace run completes but the corresponding commit status / PR check on GitHub or GitLab stays in `pending` / `running` forever. The Terrapod UI shows the run as `applied` / `errored` / `planned`. The PR check never advances.
