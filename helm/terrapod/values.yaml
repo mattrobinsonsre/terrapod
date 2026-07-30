@@ -483,6 +483,24 @@ api:
         #     configuration_versions: copy
         #     run_logs: "off"
         classes: {}
+        # Copy cadence and cost, all only in play for classes set to `copy`.
+        # Deliberately slower than settings replication: objects are immutable
+        # once written, so there is nothing to converge on quickly — a missed
+        # object is still there next cycle.
+        interval_seconds: 300
+        # Objects copied in parallel. Low by default: this shares the peer link
+        # with a leader that is serving users.
+        concurrency: 4
+        # Throughput ceiling in bytes/sec (0 disables the throttle). Chosen to be
+        # unremarkable on a 1 Gbit link rather than to finish quickly — copying an
+        # estate's state history is not free, and starving the live leader to
+        # finish sooner is the wrong trade.
+        max_bytes_per_second: 25000000
+        # Stop a cycle after this many bytes (0 = no cap). A cycle that stops
+        # early says so in its log line and in
+        # terrapod_blob_copy_classes_stopped_early — a silent cap would read as
+        # "finished".
+        max_bytes_per_cycle: 0
 
     # VCS Integration
     # VCS connections (GitHub App installations, GitLab tokens) are created

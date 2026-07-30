@@ -2485,6 +2485,23 @@
                   "type": "string",
                   "enum": ["off", "verify", "copy"]
                 },
+                "interval_seconds": {
+                  "type": "integer",
+                  "minimum": 30
+                },
+                "concurrency": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 32
+                },
+                "max_bytes_per_second": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "max_bytes_per_cycle": {
+                  "type": "integer",
+                  "minimum": 0
+                },
                 "classes": {
                   "type": "object",
                   "additionalProperties": false,

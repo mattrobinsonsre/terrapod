@@ -508,7 +508,58 @@ Sealing escalates the **tier**, never the **mode**. The tier is a fact about the
 deployment; whether to spend bandwidth copying is a decision about your topology,
 and Terrapod does not make it for you.
 
-Copying itself — and the bandwidth honesty around it — is tracked in #1114.
+### What copying actually does
+
+For each class set to `copy`, the follower asks the leader what it has, checks its
+own store, and streams across what is missing. Same direction as settings
+replication: **the follower pulls**, so a follower that is down, slow, or
+throttled simply stops asking.
+
+**Irreplaceable classes go first.** A cycle that runs out of its byte budget runs
+out of it having copied state and configuration versions, not run logs.
+
+**It is resumable because it is diff-driven.** Each key is checked against this
+node's store and skipped if present, so a cycle that dies halfway leaves the
+copied objects copied and the next cycle re-diffs. There is no cursor to corrupt.
+An object that arrives at the wrong size is deleted rather than left where the
+next `exists()` would call it present — a partial object would otherwise outlive
+every retry.
+
+**It is streamed** (these are the large objects), and one unreadable object is
+counted and skipped rather than abandoning the class it was in.
+
+### Bandwidth
+
+Copying a registry or an estate's state history is not free, so it is measured,
+capped, and reported:
+
+```yaml
+api:
+  config:
+    ha:
+      blobs:
+        interval_seconds: 300          # objects are immutable; nothing to converge on quickly
+        concurrency: 4                 # shares the peer link with a leader serving users
+        max_bytes_per_second: 25000000 # 0 disables the throttle
+        max_bytes_per_cycle: 0         # 0 = no per-cycle cap
+```
+
+| Metric | What it says |
+|---|---|
+| `terrapod_blob_copy_objects_total{blob_class}` | Objects copied, per class |
+| `terrapod_blob_copy_bytes_total{blob_class}` | Bytes copied, per class — "40 GB" and "40 GB of provider cache while state fell behind" are different situations |
+| `terrapod_blob_copy_failures_total{blob_class}` | Objects that could not be copied. A few are expected (deleted between listing and fetch); a rising count is not |
+| `terrapod_blob_copy_classes_stopped_early` | **Classes whose last cycle did not finish.** Non-zero means the copy is behind, however many bytes moved |
+
+That last one is the point of the section. A cycle that stops at its budget has
+copied a great deal *and* is not finished, and only one of those shows up in a
+byte count — so it is named, in the metric and in the cycle's log line. A silent
+cap would read as "finished", which is exactly the false confidence the whole
+phase exists to remove.
+
+The copier is registered as a scheduled task **only** when at least one class is
+set to `copy` and a peer URL is configured. On a default install it does not
+exist.
 
 ## Performing a failover
 

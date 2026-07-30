@@ -434,6 +434,62 @@ def get(name: str) -> BlobClass:
     return _BY_NAME[name]
 
 
+def is_safe_key(key: str) -> bool:
+    """Whether `key` is a plain, forward-only object key.
+
+    A prefix test is not a containment test: ``state/../cache/binaries/tofu``
+    starts with ``state/`` and leaves it. Whether the backend then resolves the
+    ``..`` varies — the filesystem store would, an object store would treat it as
+    a literal key — and "it depends on the backend" is not a property to rest a
+    security gate on.
+
+    So a key that is not already normal belongs to no class, which makes the
+    question moot rather than backend-specific.
+    """
+    if not key or key.startswith("/") or "\\" in key or "\x00" in key:
+        return False
+    segments = key.split("/")
+    # No traversal, no absolute-ish or empty segments, no bare `.`. An empty
+    # trailing segment would mean a key ending in `/`, which names no object.
+    return all(seg not in ("", ".", "..") for seg in segments)
+
+
+def owning_class(key: str) -> BlobClass | None:
+    """The class a key belongs to, by **most specific** prefix.
+
+    Prefixes overlap: `state/index.yaml` sits under `state/`, but it is its own
+    class because losing the recovery index is a different problem from losing a
+    state version. Matching on "first prefix that matches" would put the index in
+    two classes at once — counted twice in a readiness report, copied twice by the
+    copier, and configured by whichever entry the operator happened not to mean.
+
+    Longest match wins, which resolves it without anybody having to remember the
+    ordering. Returns None for a key under no registered prefix, and for a key
+    that is not a plain forward-only path (see :func:`is_safe_key`).
+    """
+    if not is_safe_key(key):
+        return None
+    best: BlobClass | None = None
+    best_len = -1
+    for cls in CLASSES:
+        for prefix in cls.prefixes:
+            if key.startswith(prefix) and len(prefix) > best_len:
+                best, best_len = cls, len(prefix)
+    return best
+
+
+def owns(cls: BlobClass, key: str) -> bool:
+    """Whether `key` belongs to `cls` — and to no more specific class.
+
+    The gate the peer content endpoint uses. A prefix test alone is not enough:
+    it would let a peer ask for `state/index.yaml` under the `state` class, and
+    more importantly it is the shape that lets a crafted key escape a prefix
+    entirely. Resolving the owner first means a key is served under exactly the
+    class that owns it, or not at all.
+    """
+    return owning_class(key) is cls
+
+
 def _blobs_config():
     from terrapod.config import settings
 

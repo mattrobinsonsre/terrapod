@@ -738,6 +738,12 @@ jobs:
           # missing render line would make the whole block silently inert.
           echo "$out" | grep -q "blobs:" || { echo "FAIL: ha.blobs not rendered into config.yaml (#1151)"; exit 1; }
           echo "$out" | grep -A2 "blobs:" | grep -q 'mode: "verify"' || { echo "FAIL: ha.blobs.mode must render and default to verify (#1151)"; exit 1; }
+          # The copy budget (#1159). `| int64` in the template is load-bearing:
+          # Helm renders 25000000 as 2.5e+07 without it, which is a float and not
+          # the int the config model wants — the v0.30.1 hotfix all over again.
+          echo "$out" | grep -q "max_bytes_per_second: 25000000" || { echo "FAIL: ha.blobs.max_bytes_per_second must render as an INTEGER, not scientific notation (#1159)"; exit 1; }
+          echo "$out" | grep -q "max_bytes_per_cycle: 0" || { echo "FAIL: ha.blobs.max_bytes_per_cycle must render, and 0 must survive (0 = no cap) (#1159)"; exit 1; }
+          echo "$out" | grep -q "interval_seconds: 300" || { echo "FAIL: ha.blobs.interval_seconds must render (#1159)"; exit 1; }
           echo "$out" | grep -q "probe_interval_seconds:" || { echo "FAIL: ha.probe_interval_seconds not rendered (#960)"; exit 1; }
           echo "$out" | grep -q "probe_threshold:" || { echo "FAIL: ha.probe_threshold not rendered (#960)"; exit 1; }
           # AI architecture critic (#1036 Part 2): non-secret config renders into

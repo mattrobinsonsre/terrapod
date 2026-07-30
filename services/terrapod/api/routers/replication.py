@@ -13,11 +13,12 @@ deliberately not expressible as a set of roles somebody could be granted.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.api.dependencies import PeerIdentity, get_peer_identity
 from terrapod.db.session import get_db
-from terrapod.services import replication
+from terrapod.services import blob_classes, replication
 
 router = APIRouter(prefix="/ha/replication", tags=["ha"])
 
@@ -112,3 +113,134 @@ async def backfill(
         # pages in the same order it is sorted by.
         "meta": {"cursor": ids[-1] if ids else after, "complete": len(rows) < limit},
     }
+
+
+# ---------------------------------------------------------------------------
+# Object store (#960 phase 4, #1159)
+#
+# The database half of replication moves rows; these two move the objects those
+# rows name. Same direction — the follower pulls — and the same peer-token gate.
+# ---------------------------------------------------------------------------
+
+
+@router.get("/blobs/{blob_class}")
+async def list_blobs(
+    blob_class: str,
+    after: str = Query(default="", description="Last key already consumed"),
+    limit: int = Query(default=500, ge=1, le=2000),
+    _peer: PeerIdentity = Depends(get_peer_identity),
+) -> dict:
+    """A page of the class's objects, in key order.
+
+    Size and etag come back with the key so the follower can decide what it needs
+    without fetching anything — the diff is the cheap half, and keeping it cheap
+    is what lets the copy be throttled.
+
+    Ordered by key, so it resumes: pass the last key back as `after`. That rides
+    the storage cursor from #1155, so a page costs a page rather than a full
+    listing sliced afterwards.
+
+    Keys owned by a **more specific** class are excluded. `state/index.yaml` lives
+    under `state/` but is its own class, and returning it here would have the
+    follower copy it twice and count it twice. That filter is why `cursor` and
+    `complete` are derived from **what the store returned**, not from what
+    survived it: a page thinned by the filter is a short page, not the end of the
+    class, and reporting it as the end would silently stop a backfill part-way.
+    """
+    try:
+        cls = blob_classes.get(blob_class)
+    except KeyError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Unknown blob class"
+        ) from None
+
+    # Every registered class has exactly one prefix, and a single `after` cursor
+    # only has a meaning for one. A multi-prefix class would need a cursor per
+    # prefix; refusing here beats paging one prefix and silently dropping the
+    # rest, which is what a naive loop over `cls.prefixes` would do.
+    if len(cls.prefixes) != 1:
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail=(
+                f"Blob class {blob_class!r} spans {len(cls.prefixes)} prefixes; "
+                "paging needs a per-prefix cursor"
+            ),
+        )
+
+    from terrapod.storage import get_storage
+
+    store = get_storage()
+    raw = await store.list_prefix(cls.prefixes[0], after=after, limit=limit)
+    entries = [
+        {
+            "type": "replication-blobs",
+            "id": meta.key,
+            "attributes": {
+                "key": meta.key,
+                "size-bytes": meta.size_bytes,
+                "etag": meta.etag,
+            },
+        }
+        for meta in raw
+        if blob_classes.owns(cls, meta.key)
+    ]
+
+    return {
+        "data": entries,
+        "meta": {
+            # The last key the STORE returned, so the next page resumes past the
+            # filtered-out ones rather than fetching them again forever.
+            "cursor": raw[-1].key if raw else after,
+            "complete": len(raw) < limit,
+        },
+    }
+
+
+@router.get("/blobs/{blob_class}/content")
+async def read_blob(
+    blob_class: str,
+    key: str = Query(description="Object key, as returned by the listing"),
+    _peer: PeerIdentity = Depends(get_peer_identity),
+) -> StreamingResponse:
+    """Stream one object's bytes.
+
+    **The key is checked against the class that owns it before a byte is
+    served.** A peer token already reads more than a user's, so this must not
+    become a way to read any key in the store: a prefix test alone would admit a
+    crafted key, and `blob_classes.owns` resolves the owning class instead — the
+    key is served under exactly the class that owns it, or refused.
+
+    Streamed rather than read (rule 14): these are the large objects, and a state
+    file or provider zip must cross the link without either side holding it.
+    """
+    try:
+        cls = blob_classes.get(blob_class)
+    except KeyError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Unknown blob class"
+        ) from None
+
+    if not blob_classes.owns(cls, key):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Key is not owned by blob class {blob_class!r}",
+        )
+
+    from terrapod.storage import get_storage
+    from terrapod.storage.protocol import ObjectNotFoundError
+
+    store = get_storage()
+    try:
+        meta = await store.head(key)
+    except ObjectNotFoundError:
+        # A normal answer, like the entity endpoint's 404: the object was deleted
+        # between the listing and the fetch. The follower skips it.
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Object not found"
+        ) from None
+
+    return StreamingResponse(
+        store.get_stream(key),
+        media_type="application/octet-stream",
+        headers={"Content-Length": str(meta.size_bytes)},
+    )

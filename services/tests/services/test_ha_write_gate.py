@@ -174,7 +174,18 @@ class TestPeriodicTasksAreGated:
             "encryption_key_refresh",
             "replication_sync",
             "replication_purge",
+            "blob_sync",
         }
+
+    def test_the_object_store_copier_is_exempt(self):
+        """The object-store half of the same pull loop (#1159), and the argument
+        is the settings one with more force: a follower that stops copying
+        promotes with rows whose objects are not there — present rows, absent
+        blobs, the failure that looks like success. It writes only into its own
+        object store, never the leader's."""
+        from terrapod.services.scheduler import _FOLLOWER_SAFE_TASKS
+
+        assert "blob_sync" in _FOLLOWER_SAFE_TASKS
 
     def test_the_pull_loop_is_exempt(self):
         """Gating it would be self-defeating — converging with the leader is the

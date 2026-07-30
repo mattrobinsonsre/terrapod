@@ -373,6 +373,11 @@
     "created-by",
     "producer-workspace-name"
   ],
+  "replication.list_blobs": [
+    "etag",
+    "key",
+    "size-bytes"
+  ],
   "role_assignments._assignment_json": [
     "created-at",
     "email",
