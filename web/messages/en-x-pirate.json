@@ -2889,7 +2889,10 @@
       "sinceSync": "Since the last fetch",
       "backfilling": "Holds still fillin'",
       "retained": "Log entries kept",
-      "oldestEvent": "Oldest entry / how long she be kept"
+      "oldestEvent": "Oldest entry / how long she be kept",
+      "behind": "Astern by",
+      "caughtUp": "Abreast",
+      "behindCount": "{count, plural, one {# entry} other {# entries}} ({age})"
     },
     "components": {
       "title": "Readiness aboard the fleet",

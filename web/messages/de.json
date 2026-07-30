@@ -2889,7 +2889,10 @@
       "sinceSync": "Seit dem letzten Abruf",
       "backfilling": "Klassen im Nachladen",
       "retained": "Aufbewahrte Ereignisse",
-      "oldestEvent": "Ältestes Ereignis / Aufbewahrung"
+      "oldestEvent": "Ältestes Ereignis / Aufbewahrung",
+      "behind": "Rückstand",
+      "caughtUp": "Aufgeholt",
+      "behindCount": "{count, plural, one {# Ereignis} other {# Ereignisse}} ({age})"
     },
     "components": {
       "title": "Bereitschaft im Cluster",

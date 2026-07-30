@@ -2889,7 +2889,10 @@
       "sinceSync": "Sedan senaste hämtningen",
       "backfilling": "Klasser som fyller på",
       "retained": "Bevarade händelser",
-      "oldestEvent": "Äldsta händelse / bevarande"
+      "oldestEvent": "Äldsta händelse / bevarande",
+      "behind": "Efter med",
+      "caughtUp": "Ikapp",
+      "behindCount": "{count, plural, one {# händelse} other {# händelser}} ({age})"
     },
     "components": {
       "title": "Beredskap i klustret",

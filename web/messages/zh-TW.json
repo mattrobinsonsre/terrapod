@@ -2889,7 +2889,10 @@
       "sinceSync": "距上次拉取",
       "backfilling": "回補中的類別",
       "retained": "保留的事件",
-      "oldestEvent": "最早事件 / 保留期"
+      "oldestEvent": "最早事件 / 保留期",
+      "behind": "落後",
+      "caughtUp": "已追平",
+      "behindCount": "{count} 個事件（{age}）"
     },
     "components": {
       "title": "叢集內就緒情況",

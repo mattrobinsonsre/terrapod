@@ -2889,7 +2889,10 @@
       "sinceSync": "Depuis le dernier tirage",
       "backfilling": "Classes en rattrapage",
       "retained": "Événements conservés",
-      "oldestEvent": "Événement le plus ancien / rétention"
+      "oldestEvent": "Événement le plus ancien / rétention",
+      "behind": "En retard de",
+      "caughtUp": "À jour",
+      "behindCount": "{count, plural, one {# événement} other {# événements}} ({age})"
     },
     "components": {
       "title": "Disponibilité dans le cluster",

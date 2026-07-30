@@ -403,10 +403,30 @@ end of the retained event window and having to backfill from scratch. That is
 the early warning — it costs nothing to watch and it precedes the problem by
 days.
 
-There is deliberately no "N events behind". That needs the peer's latest event
-id, and seconds-since-the-last-successful-pull is the more honest number: a pull
-that returned nothing means caught up *as of then*, which is the question being
-asked.
+### How far behind, concretely
+
+`events-behind` and `behind-seconds` answer the question the sync timestamp
+cannot: not "when did it last work" but **how much is outstanding**.
+
+The follower cannot work this out alone — its page from the leader is capped at
+the batch size, so a full page means "there is more" and nothing about how much
+more. So the leader says: every events response now carries its newest event id
+and the timestamp of the oldest event it is handing back, and the follower keeps
+both alongside its cursor.
+
+Two properties to read them by:
+
+- **Null is not zero.** A node that has never pulled, or whose peer runs older
+  code, reports `null` — *unknown*. Zero means *caught up*. An operator reads a
+  zero as "fine" and would be right only half the time if the two were
+  conflated.
+- **They describe the last successful pull, not this instant.** That is
+  deliberate: the status endpoint answers from local state so it still works
+  when the peer is the thing that has broken, which is when it is read. Pair
+  them with seconds-since-last-pull to know how old the answer is.
+
+A node mid-backfill is still **not in sync** whatever these say — the rule above
+is unchanged, and it takes precedence.
 
 ## The other half: is any component a single point of failure?
 

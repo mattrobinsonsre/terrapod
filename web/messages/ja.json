@@ -2889,7 +2889,10 @@
       "sinceSync": "前回の取得からの経過",
       "backfilling": "バックフィル中のクラス",
       "retained": "保持中のイベント",
-      "oldestEvent": "最古のイベント / 保持期間"
+      "oldestEvent": "最古のイベント / 保持期間",
+      "behind": "遅延",
+      "caughtUp": "追いついています",
+      "behindCount": "{count} 件 ({age})"
     },
     "components": {
       "title": "クラスター内の準備状況",

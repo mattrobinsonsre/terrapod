@@ -2889,7 +2889,10 @@
       "sinceSync": "Від останнього завантаження",
       "backfilling": "Класи в довантаженні",
       "retained": "Збережені події",
-      "oldestEvent": "Найстаріша подія / зберігання"
+      "oldestEvent": "Найстаріша подія / зберігання",
+      "behind": "Відставання",
+      "caughtUp": "Актуально",
+      "behindCount": "{count, plural, one {# подія} few {# події} many {# подій} other {# події}} ({age})"
     },
     "components": {
       "title": "Готовність у кластері",

@@ -12,6 +12,8 @@ point: a peer can read entities an ordinary user could not, so the identity is
 deliberately not expressible as a set of roles somebody could be granted.
 """
 
+from datetime import UTC, datetime
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,6 +21,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from terrapod.api.dependencies import PeerIdentity, get_peer_identity
 from terrapod.db.session import get_db
 from terrapod.services import blob_classes, replication
+
+
+def _iso(value: datetime | None) -> str | None:
+    """RFC3339 with a trailing Z, per the house rule — never `+00:00`."""
+    return value.astimezone(UTC).isoformat().replace("+00:00", "Z") if value else None
+
 
 router = APIRouter(prefix="/ha/replication", tags=["ha"])
 
@@ -55,11 +63,21 @@ async def list_events(
     caller must backfill instead. Reporting it here — rather than returning an
     innocent-looking empty page — is what stops a lagging follower from
     believing it is in sync.
+
+    ``meta.latest-id`` and ``meta.oldest-unapplied-at`` let the caller say how
+    far behind it is (#1165), which it cannot work out alone: the page it
+    receives is capped at ``limit``, so a full page means "there is more" and
+    nothing about how much more. Both are additive.
     """
     page = await replication.read_events(db, after=after, limit=limit)
     return {
         "data": page.events,
-        "meta": {"cursor": page.cursor, "stale-cursor": page.stale_cursor},
+        "meta": {
+            "cursor": page.cursor,
+            "stale-cursor": page.stale_cursor,
+            "latest-id": page.latest_id,
+            "oldest-unapplied-at": _iso(page.oldest_unapplied_at),
+        },
     }
 
 

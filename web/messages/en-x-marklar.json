@@ -2889,7 +2889,10 @@
       "sinceSync": "Since last marklar",
       "backfilling": "Backfilling marklars",
       "retained": "Marklars retained",
-      "oldestEvent": "Oldest marklar / marklar"
+      "oldestEvent": "Oldest marklar / marklar",
+      "behind": "Behind by",
+      "caughtUp": "Caught up",
+      "behindCount": "{count, plural, one {# marklar} other {# marklars}} ({age})"
     },
     "components": {
       "title": "In-marklar marklar",

@@ -2889,7 +2889,10 @@
       "sinceSync": "Sinds het laatste ophalen",
       "backfilling": "Klassen die bijwerken",
       "retained": "Bewaarde gebeurtenissen",
-      "oldestEvent": "Oudste gebeurtenis / bewaartermijn"
+      "oldestEvent": "Oudste gebeurtenis / bewaartermijn",
+      "behind": "Achter met",
+      "caughtUp": "Bij",
+      "behindCount": "{count, plural, one {# gebeurtenis} other {# gebeurtenissen}} ({age})"
     },
     "components": {
       "title": "Gereedheid in het cluster",

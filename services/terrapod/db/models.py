@@ -2852,6 +2852,18 @@ class ReplicationCursor(Base):
     # Set while a backfill is running, cleared when the class is caught up. The
     # follower must not report itself in sync mid-backfill.
     backfilling: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # What the peer said its newest event was, at the last successful pull
+    # (#1165). Stored rather than derived because the follower cannot work it
+    # out alone: its page is capped, so a full page means "there is more" and
+    # nothing about how much more. Nullable — a node that has never pulled, or
+    # whose peer predates this, has no answer rather than a misleading zero.
+    peer_latest_position: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # When the oldest event this node had NOT yet applied was recorded, as of
+    # that same pull. Turns a count of events into a duration. Null when caught
+    # up.
+    oldest_unapplied_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=now_utc, onupdate=now_utc
     )

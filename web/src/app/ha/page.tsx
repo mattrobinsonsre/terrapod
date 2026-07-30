@@ -64,6 +64,8 @@ interface HAStatus {
   'last-sync-at': string | null
   'seconds-since-last-sync': number | null
   'backfilling-classes': string[]
+  'events-behind': number | null
+  'behind-seconds': number | null
   'in-sync': boolean
   'events-retained': number
   'oldest-event-age-seconds': number | null
@@ -238,6 +240,22 @@ export default function HAPage() {
                         <dt className="text-slate-400">{t('replication.sinceSync')}</dt>
                         <dd className="tabular-nums">
                           {duration(status['seconds-since-last-sync'])}
+                        </dd>
+                      </div>
+                      <div className="flex justify-between gap-4">
+                        <dt className="text-slate-400">{t('replication.behind')}</dt>
+                        <dd className="tabular-nums">
+                          {/* Null is unknown — never pulled, or a peer that
+                              does not report it — and must not render as the
+                              zero that means caught up. */}
+                          {status['events-behind'] === null
+                            ? '—'
+                            : status['events-behind'] === 0
+                              ? t('replication.caughtUp')
+                              : t('replication.behindCount', {
+                                  count: status['events-behind'],
+                                  age: duration(status['behind-seconds']),
+                                })}
                         </dd>
                       </div>
                       <div className="flex justify-between gap-4">

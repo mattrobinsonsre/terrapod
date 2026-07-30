@@ -2889,7 +2889,10 @@
       "sinceSync": "마지막 가져오기 이후",
       "backfilling": "백필 중인 클래스",
       "retained": "보관된 이벤트",
-      "oldestEvent": "가장 오래된 이벤트 / 보관 기간"
+      "oldestEvent": "가장 오래된 이벤트 / 보관 기간",
+      "behind": "지연",
+      "caughtUp": "최신 상태",
+      "behindCount": "{count}건 ({age})"
     },
     "components": {
       "title": "클러스터 내 준비 상태",

@@ -2889,7 +2889,10 @@
       "sinceSync": "Sinse last pull",
       "backfilling": "Clasez fillin in",
       "retained": "Eventz keptid",
-      "oldestEvent": "Oldist evnt / keepin tiem"
+      "oldestEvent": "Oldist evnt / keepin tiem",
+      "behind": "Behind by",
+      "caughtUp": "All caught up",
+      "behindCount": "{count, plural, one {# evnt} other {# evntz}} ({age})"
     },
     "components": {
       "title": "Reddynes in da clustr",

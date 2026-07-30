@@ -2889,7 +2889,10 @@
       "sinceSync": "Son çekimden bu yana",
       "backfilling": "Geri dolan sınıflar",
       "retained": "Saklanan olaylar",
-      "oldestEvent": "En eski olay / saklama"
+      "oldestEvent": "En eski olay / saklama",
+      "behind": "Geride",
+      "caughtUp": "Güncel",
+      "behindCount": "{count} olay ({age})"
     },
     "components": {
       "title": "Küme içi hazırlık",

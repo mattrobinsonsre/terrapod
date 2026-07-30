@@ -2889,7 +2889,10 @@
       "sinceSync": "Dall'ultimo prelievo",
       "backfilling": "Classi in recupero",
       "retained": "Eventi conservati",
-      "oldestEvent": "Evento più vecchio / conservazione"
+      "oldestEvent": "Evento più vecchio / conservazione",
+      "behind": "In ritardo di",
+      "caughtUp": "Allineato",
+      "behindCount": "{count, plural, one {# evento} other {# eventi}} ({age})"
     },
     "components": {
       "title": "Prontezza nel cluster",

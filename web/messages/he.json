@@ -2889,7 +2889,10 @@
       "sinceSync": "מאז המשיכה האחרונה",
       "backfilling": "מחלקות בהשלמה",
       "retained": "אירועים שנשמרו",
-      "oldestEvent": "האירוע הישן ביותר / שמירה"
+      "oldestEvent": "האירוע הישן ביותר / שמירה",
+      "behind": "פיגור",
+      "caughtUp": "מעודכן",
+      "behindCount": "{count, plural, one {אירוע אחד} two {שני אירועים} other {# אירועים}} ({age})"
     },
     "components": {
       "title": "מוכנות בתוך האשכול",

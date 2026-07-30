@@ -105,6 +105,27 @@ async def _set_cursor(
     row.updated_at = datetime.now(UTC)
 
 
+def _record_lag(row, meta: dict) -> None:
+    """Keep what the peer said about the end of its stream (#1165).
+
+    Written from the SAME response the cursor advances from, so the pair is
+    always consistent: `peer_latest_position` minus the cursor is how far behind
+    this node was at the moment of that pull, and it is honest about being a
+    statement about that moment rather than a live measurement.
+
+    A peer that does not send the fields (older code) leaves them untouched
+    rather than zeroed — "unknown" and "caught up" must not look the same.
+    """
+    latest = meta.get("latest-id")
+    if latest is not None:
+        row.peer_latest_position = str(latest)
+    if "oldest-unapplied-at" in meta:
+        raw = meta["oldest-unapplied-at"]
+        row.oldest_unapplied_at = (
+            datetime.fromisoformat(raw.replace("Z", "+00:00")) if raw else None
+        )
+
+
 # --------------------------------------------------------------------------
 # The cycle
 # --------------------------------------------------------------------------
@@ -268,6 +289,7 @@ async def sync_cycle() -> None:
                 logger.info("Replication cursor is stale; backfilling", after=after)
                 await backfill_all(db, client, token)
                 await _set_cursor(db, replication.EVENT_STREAM, str(body["meta"]["cursor"]))
+                _record_lag(await _get_cursor(db, replication.EVENT_STREAM), body["meta"])
                 await db.commit()
                 return
 
@@ -282,6 +304,7 @@ async def sync_cycle() -> None:
                 applied += 1
 
             await _set_cursor(db, replication.EVENT_STREAM, str(body["meta"]["cursor"]))
+            _record_lag(await _get_cursor(db, replication.EVENT_STREAM), body["meta"])
             await db.commit()
 
             if applied:

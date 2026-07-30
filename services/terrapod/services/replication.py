@@ -334,6 +334,14 @@ class EventPage:
     #: True when the requested cursor predates the retained window, so the
     #: caller has a gap it cannot close by replaying and must backfill.
     stale_cursor: bool = False
+    #: The newest event id on this node, so the caller can say how far behind
+    #: it is rather than only how long ago it last succeeded (#1165). One
+    #: `max(id)` on an indexed primary key — cheap enough to send every cycle.
+    latest_id: int = 0
+    #: When the oldest event in THIS page was recorded — which, at the moment
+    #: the page is built, is the oldest change the caller has not yet applied.
+    #: Turns a count into a duration. None when the caller is already caught up.
+    oldest_unapplied_at: datetime | None = None
 
 
 async def read_events(db: AsyncSession, after: int, limit: int = 500) -> EventPage:
@@ -354,6 +362,8 @@ async def read_events(db: AsyncSession, after: int, limit: int = 500) -> EventPa
         .scalars()
         .all()
     )
+    latest_id = await db.scalar(select(func.max(ReplicationEvent.id))) or 0
+
     return EventPage(
         events=[
             {
@@ -368,6 +378,8 @@ async def read_events(db: AsyncSession, after: int, limit: int = 500) -> EventPa
         ],
         cursor=rows[-1].id if rows else after,
         stale_cursor=stale,
+        latest_id=latest_id,
+        oldest_unapplied_at=rows[0].occurred_at if rows else None,
     )
 
 
@@ -532,6 +544,13 @@ class ReplicationStatus:
     #: off the retained window and it has to backfill from scratch.
     events_retained: int = 0
     oldest_event_at: datetime | None = None
+    #: Follower side: how far behind this node was at the last successful pull
+    #: (#1165). None means unknown — never pulled, or a peer that does not
+    #: report it. Deliberately distinct from 0, which means caught up.
+    events_behind: int | None = None
+    #: When the oldest change this node had not applied was recorded, as of that
+    #: same pull. None when caught up (or unknown).
+    oldest_unapplied_at: datetime | None = None
 
 
 async def read_status(db: AsyncSession) -> ReplicationStatus:
@@ -540,8 +559,17 @@ async def read_status(db: AsyncSession) -> ReplicationStatus:
     cursors = (await db.execute(select(ReplicationCursor))).scalars().all()
     stream = next((c for c in cursors if c.entity_class == EVENT_STREAM), None)
 
+    behind: int | None = None
+    if stream is not None and stream.peer_latest_position:
+        # Clamped at zero: the peer's newest id is from the last pull, so a
+        # local cursor that has since moved past it would otherwise produce a
+        # negative "behind", which is not a thing.
+        behind = max(0, int(stream.peer_latest_position) - int(stream.position or 0))
+
     return ReplicationStatus(
         last_sync_at=stream.updated_at if stream else None,
+        events_behind=behind,
+        oldest_unapplied_at=stream.oldest_unapplied_at if stream else None,
         backfilling=sorted(
             c.entity_class for c in cursors if c.backfilling and c.entity_class != EVENT_STREAM
         ),

@@ -3856,9 +3856,14 @@ external name cannot pin leadership to a stale answer.
 
 ### `GET /api/terrapod/v1/ha/status`
 
-**Requires `admin` or `audit`.** Whether this node is converging with its peer —
-the question to answer before moving DNS. Computed entirely from local state, so
-it still works when the peer is the thing that has broken.
+**Requires authentication; the in-cluster half additionally requires `admin` or
+`audit`.** Whether this node is converging with its peer — the question to
+answer before moving DNS. Computed entirely from local state, so it still works
+when the peer is the thing that has broken.
+
+The node's own disposition (role, peer, sync state) is readable by **any
+authenticated user**: hiding "you are talking to a follower" from the person
+whose next write is about to be refused with a 503 is the opposite of useful.
 
 | Attribute | Meaning |
 |---|---|
@@ -3870,11 +3875,17 @@ it still works when the peer is the thing that has broken.
 | `backfilling-classes` | Classes still being pulled in full. **Non-empty means not in sync**, however recent the last pull |
 | `events-retained`, `oldest-event-age-seconds` | Leader side: as the oldest event approaches `retention-seconds`, the follower is close to having to backfill from scratch |
 | `retention-seconds` | The retained event window |
+| `events-behind` | How many events outstanding as of the last successful pull. **`null` is unknown** (never pulled, or a peer that does not report it) and is NOT the same as `0`, which means caught up |
+| `behind-seconds` | How old the oldest un-applied change was at that same pull. Null when caught up or unknown |
 | `replicated-classes` | What a failover would carry |
 
-There is deliberately no "N events behind": that needs the peer's latest event
-id, and seconds-since-the-last-successful-pull is more honest — a pull that
-returned nothing means caught up as of then.
+`events-behind` needs the peer's latest event id, which the follower cannot
+derive alone — its page is capped at the batch size, so a full page means "there
+is more" and nothing about how much more. The leader therefore reports its
+newest event id (and the timestamp of the oldest event in the page) on every
+events response, and the follower stores both alongside its cursor. Both figures
+describe **the last successful pull**, not this instant — pair them with
+`seconds-since-last-sync` to know how old the answer is.
 
 The same response also reports this node's **in-cluster** HA posture, because a
 pair that replicates flawlessly is still not highly available if it is serving
@@ -3882,6 +3893,7 @@ from one API pod:
 
 | Attribute | Meaning |
 |---|---|
+| `components-restricted` | True when the caller lacks `admin`/`audit`. The component fields below are then empty because they were **not read**, which is deliberately distinct from `components-unavailable-reason` ("the cluster could not be read") and from an empty list ("nothing is running") |
 | `components` | Per component: `ready` and `desired` replicas, the `nodes` and `zones` they occupy, and the PodDisruptionBudget covering them. API and web come from Kubernetes; listeners come from their Redis heartbeats, since a listener may be in another cluster entirely |
 | `single-replica-components` | Components on exactly one ready replica |
 | `schedulable-nodes`, `cluster-zones` | The spread that *was* available. Null when the node read is declined or the environment is unzoned — null means unknown, never one |

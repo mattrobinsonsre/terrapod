@@ -2889,7 +2889,10 @@
       "sinceSync": "Od posledního stažení",
       "backfilling": "Doplňované třídy",
       "retained": "Uchované události",
-      "oldestEvent": "Nejstarší událost / uchování"
+      "oldestEvent": "Nejstarší událost / uchování",
+      "behind": "Pozadu o",
+      "caughtUp": "Aktuální",
+      "behindCount": "{count, plural, one {# událost} few {# události} many {# události} other {# událostí}} ({age})"
     },
     "components": {
       "title": "Připravenost v clusteru",

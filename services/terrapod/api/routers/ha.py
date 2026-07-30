@@ -129,6 +129,18 @@ async def status(
                 "last-sync-at": _iso(state.last_sync_at),
                 "seconds-since-last-sync": since_sync,
                 "backfilling-classes": state.backfilling,
+                # How far behind, concretely (#1165). Null is "unknown" — never
+                # pulled, or a peer that does not report it — and is
+                # deliberately NOT the same as 0, which means caught up. Both
+                # describe the last successful pull rather than this instant,
+                # which is the honest thing they can describe without asking the
+                # peer on the status path.
+                "events-behind": state.events_behind,
+                "behind-seconds": (
+                    int((now - state.oldest_unapplied_at.astimezone(UTC)).total_seconds())
+                    if state.oldest_unapplied_at
+                    else None
+                ),
                 "in-sync": cfg.replication.enabled
                 and not state.backfilling
                 and since_sync is not None,

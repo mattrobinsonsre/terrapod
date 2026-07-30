@@ -2889,7 +2889,10 @@
       "sinceSync": "距上次拉取",
       "backfilling": "回填中的类别",
       "retained": "保留的事件",
-      "oldestEvent": "最早事件 / 保留期"
+      "oldestEvent": "最早事件 / 保留期",
+      "behind": "落后",
+      "caughtUp": "已追平",
+      "behindCount": "{count} 个事件（{age}）"
     },
     "components": {
       "title": "集群内就绪情况",
