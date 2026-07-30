@@ -295,6 +295,18 @@ data:
         batch_size: {{ .batch_size | default 500 }}
         retention_days: {{ .retention_days | default 7 }}
       {{- end }}
+      {{- with .Values.api.config.ha.blobs }}
+      blobs:
+        mode: {{ .mode | default "verify" | quote }}
+        {{- /* Omitted when empty rather than rendered as `{}`: the code default
+               is an empty map, so the two are identical, and the house pattern
+               for optional maps is to leave the key out. An unknown class name
+               here is REJECTED at startup, not ignored. */}}
+        {{- if .classes }}
+        classes:
+          {{- toYaml .classes | nindent 10 }}
+        {{- end }}
+      {{- end }}
     {{- end }}
     {{- if .Values.api.config.vcs }}
     vcs:

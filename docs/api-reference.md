@@ -3909,15 +3909,29 @@ and cannot serve a single run.
 | Attribute | Meaning |
 |---|---|
 | `irreplaceable-missing` | **The list that should stop a failover** — classes whose absence is permanent |
+| `irreplaceable-unchecked` | Irreplaceable classes this run made **no claim about** — switched off, or not verifiable from rows. What makes the list above trustworthy |
 | `missing-total` | Missing objects among those **checked** |
 | `sampled` | Whether this was a sample rather than a full verification |
-| `classes[]` | Per class: `name`, `tier` (`irreplaceable`\|`history`\|`rederivable`), `total-rows`, `checked`, `missing`, `missing-examples` (capped), `complete`, `error` |
+| `classes[]` | Per class: `name`, `tier` (`irreplaceable`\|`history`\|`rederivable`), `mode` (`off`\|`verify`\|`copy`), `verifiable`, `note`, `total-rows`, `checked`, `missing`, `missing-examples` (capped), `complete`, `error` |
 | `unavailable-reason` | Set when the store could not be read — *"I could not look"*, distinct from *"all is well"* |
 | `duration-ms` | What the check cost |
 
 **A clean sample is not a clean estate.** `complete` is true only when nothing was
 held back; otherwise compare `checked` against `total-rows`. `missing == 0` on a
 sample means *no missing objects among those sampled*.
+
+**Nor is a clean report a covered store.** `mode` reflects `ha.blobs` — a class set
+to `off` is reported with `checked: 0` and a `note` saying so, never omitted.
+`verifiable: false` marks a class no database row guarantees (a run's logs exist
+only if it got that far; a pull-through cache holds whatever it holds), so presence
+cannot be derived and the report says as much instead of implying a pass.
+`irreplaceable-unchecked` names any of those that matter.
+
+**`tier` is the effective tier for this deployment.** On a sealed
+(`registry.cache_only`) node the upstream-fed caches report as `irreplaceable`,
+because a promoted node with a cold cache cannot reach upstream to re-warm and so
+can never run anything. Terrapod derives that rather than asking an operator to
+restate it.
 
 Deliberately **not** folded into `/ha/status`: that endpoint is answered from local
 state in milliseconds and is refreshed freely, while this one does real

@@ -1250,6 +1250,106 @@ class HAReplicationConfig(BaseModel):
     )
 
 
+#: The object-store prefix classes an operator can set a policy on, in the order
+#: the register lists them (irreplaceable first). Declared here, not imported from
+#: `services/blob_classes.py`, for two reasons that both bite hard:
+#:
+#: 1. **`config.py` must stay a leaf.** It is imported during startup before
+#:    anything else, and by the config-channel contract check in a minimal
+#:    pydantic-only environment. Reaching into the services layer from a validator
+#:    pulls in SQLAlchemy and the storage package — and the storage package imports
+#:    `settings` back, so the import lands mid-initialisation and the API refuses
+#:    to boot.
+#: 2. The vocabulary **is** part of the operator contract: it is what somebody
+#:    types into `values.yaml`, so it belongs beside the field that accepts it.
+#:
+#: `services/blob_classes.py` raises at import if its register disagrees with this
+#: list, so the duplication cannot drift — and `values.schema.json` is held to the
+#: same list by a test, so `helm lint` rejects a typo before install too.
+BLOB_CLASS_NAMES: tuple[str, ...] = (
+    "state",
+    "state_index",
+    "configuration_versions",
+    "registry_modules",
+    "registry_providers",
+    "run_logs",
+    "run_plans",
+    "run_vars",
+    "provider_cache",
+    "binary_cache",
+    "platform_provider_cache",
+    "cost_pricesheet",
+    "vcs_archives",
+    "module_overrides",
+)
+
+#: What Terrapod does about a class. See `HABlobsConfig`.
+BLOB_MODES: tuple[str, ...] = ("off", "verify", "copy")
+
+
+class HABlobsConfig(BaseModel):
+    """What Terrapod does about each class of the object store (#960 phase 4, #1114).
+
+    The object store is a second data plane, and unlike the database it often
+    already has a replicator: provider-native cross-region replication, a
+    storage-level mirror, a shared bucket. Where that is true, Terrapod's job is to
+    **prove it happened**, not to duplicate it. Where it is not — cross-CSP,
+    on-prem, air-gapped — Terrapod copies.
+
+    The choice is **per class**, because within one deployment it genuinely
+    differs: copying state and configuration versions across a region boundary
+    while letting a re-warmable provider cache stay cold is a coherent position
+    that no bucket-level policy can express.
+
+    ``mode`` is the default for every class; ``classes`` overrides it for named
+    ones. The default is ``verify``, which observes the whole store, costs nothing
+    until the readiness endpoint is called, and commits the operator to nothing —
+    #1114's stated non-goal is deciding for them.
+
+    Class names are validated against the register in
+    ``services/blob_classes.py``. A typo would otherwise be the worst outcome
+    available: a class the operator believes they configured, silently on the
+    default.
+    """
+
+    mode: str = Field(
+        default="verify",
+        description="Default for every class: off | verify | copy. `verify` checks that "
+        "the objects this node's rows name are present (whoever did the replicating); "
+        "`copy` also copies them to the peer; `off` neither.",
+    )
+    classes: dict[str, str] = Field(
+        default_factory=dict,
+        description="Per-class override of `mode`, keyed by class name (state, "
+        "state_index, configuration_versions, registry_modules, registry_providers, "
+        "run_logs, run_plans, run_vars, provider_cache, binary_cache, "
+        "platform_provider_cache, cost_pricesheet, vcs_archives, module_overrides). "
+        "Unknown names are rejected rather than ignored.",
+    )
+
+    @field_validator("mode")
+    @classmethod
+    def _valid_mode(cls, v: str) -> str:
+        if v not in BLOB_MODES:
+            raise ValueError(f"ha.blobs.mode must be one of {sorted(BLOB_MODES)}")
+        return v
+
+    @field_validator("classes")
+    @classmethod
+    def _valid_classes(cls, v: dict[str, str]) -> dict[str, str]:
+        for name, mode in v.items():
+            if name not in BLOB_CLASS_NAMES:
+                raise ValueError(
+                    f"ha.blobs.classes: unknown class {name!r}; known classes are "
+                    f"{sorted(BLOB_CLASS_NAMES)}"
+                )
+            if mode not in BLOB_MODES:
+                raise ValueError(
+                    f"ha.blobs.classes.{name} must be one of {sorted(BLOB_MODES)}, got {mode!r}"
+                )
+        return v
+
+
 class ComponentStatusConfig(BaseModel):
     """Reporting in-cluster component readiness (#1122).
 
@@ -1312,6 +1412,7 @@ class HAConfig(BaseModel):
     probe_url: HAProbeUrlConfig = Field(default_factory=HAProbeUrlConfig)
     peer: HAPeerConfig = Field(default_factory=HAPeerConfig)
     replication: HAReplicationConfig = Field(default_factory=HAReplicationConfig)
+    blobs: HABlobsConfig = Field(default_factory=HABlobsConfig)
     component_status: ComponentStatusConfig = Field(default_factory=ComponentStatusConfig)
     probe_interval_seconds: int = Field(
         default=60, ge=10, description="Seconds between probes (floor guards against a hot loop)"

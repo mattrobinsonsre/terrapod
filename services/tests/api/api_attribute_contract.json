@@ -190,6 +190,7 @@
     "classes",
     "duration-ms",
     "irreplaceable-missing",
+    "irreplaceable-unchecked",
     "missing-total",
     "sampled",
     "unavailable-reason"

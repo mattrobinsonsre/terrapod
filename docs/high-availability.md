@@ -420,7 +420,8 @@ row already names the key — so the check is a HEAD:
 | Field | Meaning |
 |---|---|
 | `irreplaceable-missing` | **The list that should stop a failover.** Classes whose absence is permanent: state, the recovery index, configuration versions, module and provider artifacts |
-| `classes[]` | Per class: `tier`, `total-rows`, `checked`, `missing`, a few `missing-examples`, and `complete` |
+| `irreplaceable-unchecked` | The counterpart that makes the list above trustworthy. A class that is switched off, or that no row guarantees, produces zero missing objects — indistinguishable from a pass unless it is named |
+| `classes[]` | Per class: `tier`, `mode`, `verifiable`, `note`, `total-rows`, `checked`, `missing`, a few `missing-examples`, and `complete` |
 | `sampled` | Whether this checked everything or a sample |
 | `unavailable-reason` | Set when the store could not be read at all — *"I could not look"*, not *"all is well"* |
 
@@ -438,19 +439,85 @@ objects out from under the rows. Under Terrapod-side copying it catches a class
 that never ran. It is the same instinct as the restore-verification DR drill: a
 real check beats a documented intention.
 
-The **tier** is a property of the deployment as much as the artifact. A cold
-provider cache re-warms itself on first use — unless the node is sealed
-(`cache_only`), where it can never run anything again and belongs in the same tier
-as state. That is why the endpoint reports the tier and leaves the judgement to
-the operator.
+**Two things a class can be, and the difference is stated rather than hidden.** A
+class is *verifiable* only when a database row **guarantees** the object exists —
+that promise is what makes an absent object a finding rather than a guess. Where no
+row makes it (a run writes its logs only once it reaches the phase that produces
+them; a pull-through cache holds whatever it happens to hold), presence cannot be
+derived from the database. Those classes are still listed, with `verifiable: false`
+and the reason in `note`, because a class quietly left out of a clean report reads
+as a class that passed.
 
-Copying the object store (rather than only verifying it) is tracked in #1114.
+### Choosing verify or copy, per class
+
+The object store often already has a replicator — provider-native cross-region
+replication, a storage-level mirror. Where that is true, Terrapod's job is to
+**prove it happened**, not duplicate it. Where it is not — cross-CSP, on-prem,
+air-gapped — Terrapod copies.
+
+That choice is made **per class**, because within one deployment it genuinely
+differs: copying state and configuration versions across a region boundary while
+letting a re-warmable provider cache stay cold is a coherent position that no
+bucket-level replication policy can express.
+
+```yaml
+api:
+  config:
+    ha:
+      blobs:
+        # off | verify | copy — the default for every class.
+        mode: verify
+        classes:
+          state: copy
+          configuration_versions: copy
+          registry_providers: copy
+          run_logs: "off"
+```
+
+| Mode | What Terrapod does |
+|---|---|
+| `off` | Neither checks nor copies. Reported as skipped, never quietly dropped |
+| `verify` | Checks presence; does not copy. **The default** |
+| `copy` | Copies to the peer, and verifies |
+
+The default is `verify` everywhere: it observes the whole store, costs nothing
+until this endpoint is called, and commits you to nothing.
+
+The classes, in the order a report lists them:
+
+| Tier | Classes |
+|---|---|
+| Irreplaceable | `state`, `state_index`, `configuration_versions`, `registry_modules`, `registry_providers` |
+| History | `run_logs`, `run_plans`, `run_vars` |
+| Re-derivable | `provider_cache`, `binary_cache`, `platform_provider_cache`, `cost_pricesheet`, `vcs_archives`, `module_overrides` |
+
+An unknown class name is **rejected** — by `helm lint` before install, and again at
+startup for the paths the chart never sees. A typo that silently left a class on
+the default would be the worst outcome available.
+
+**The tier is a property of the deployment as much as the artifact, and Terrapod
+derives it rather than asking you to remember it.** A cold provider cache re-warms
+itself on first use — unless the node is sealed (`registry.cache_only`), where
+reaching upstream is exactly what is forbidden, so a promoted node with a cold cache
+has no terraform binary and no providers and can never run anything again. On a
+sealed node the four upstream-fed cache classes are therefore reported as
+`irreplaceable`. `vcs_archives` and `module_overrides` are not: `cache_only` seals
+upstream *registries*, not your own git, so those genuinely do re-derive.
+
+Sealing escalates the **tier**, never the **mode**. The tier is a fact about the
+deployment; whether to spend bandwidth copying is a decision about your topology,
+and Terrapod does not make it for you.
+
+Copying itself — and the bandwidth honesty around it — is tracked in #1114.
 
 ## Performing a failover
 
 1. Confirm the standby is caught up (above).
 2. Check `GET /api/terrapod/v1/ha/blob-readiness` — `irreplaceable-missing` must
-   be empty. Rows without blobs is the failure that looks like success.
+   be empty. Rows without blobs is the failure that looks like success. Read
+   `irreplaceable-unchecked` in the same breath: it names any irreplaceable class
+   the check made no claim about, which is what stops an empty
+   `irreplaceable-missing` being mistaken for a verified store.
 3. Move the DNS record to the standby.
 4. Wait for DNS cache to expire — this, not the probe interval, is what governs
    the overlap.

@@ -1,4 +1,4 @@
-"""The blob-readiness endpoint (#1147).
+"""The blob-readiness endpoint (#1147, #1151).
 
 Separate from `/ha/status` deliberately: status is answered from local state in
 milliseconds and an operator refreshes it freely, while this one makes real round
@@ -7,7 +7,9 @@ expensive and tempt callers to poll it.
 
 The response shape carries the honesty the service is careful about — `sampled`,
 plus per-class `checked` against `total-rows` — so nobody can read a clean sample
-as a clean estate. That is what these assert.
+as a clean estate. #1151 added the other half of it: once a class can be turned
+off, or can be one no row guarantees, the report has to say which classes it
+actually covered. That is what these assert.
 """
 
 from unittest.mock import AsyncMock, patch
@@ -141,3 +143,71 @@ class TestItIsNotOnTheCheapEndpoint:
             assert "require_admin_or_audit" in names
             return
         raise AssertionError("route not found")
+
+
+class TestTheReportSaysWhatItDidNotCover:
+    """The counterpart that makes `irreplaceable-missing` trustworthy. A class
+    that is off, or that no row guarantees, produces zero missing objects — which
+    is indistinguishable from a pass unless the response names it."""
+
+    async def test_unchecked_irreplaceable_classes_are_named(self):
+        result = _result(
+            classes=[
+                blob_readiness.ClassReadiness(
+                    name="state",
+                    tier=blob_readiness.IRREPLACEABLE,
+                    total_rows=10,
+                    checked=10,
+                    missing=0,
+                    complete=True,
+                ),
+                blob_readiness.ClassReadiness(
+                    name="cost_pricesheet",
+                    tier=blob_readiness.IRREPLACEABLE,
+                    mode="verify",
+                    verifiable=False,
+                    note="a single cache object with no row behind it",
+                ),
+            ]
+        )
+        with patch.object(blob_readiness, "check", new=AsyncMock(return_value=result)):
+            body = (await _get(BASE)).json()["data"]["attributes"]
+
+        assert body["irreplaceable-missing"] == []
+        assert body["irreplaceable-unchecked"] == ["cost_pricesheet"]
+
+    async def test_each_class_reports_its_mode(self):
+        """Answers 'why is this class empty' without a second look at the config."""
+        result = _result(
+            classes=[
+                blob_readiness.ClassReadiness(
+                    name="run_logs",
+                    tier=blob_readiness.HISTORY,
+                    mode="off",
+                    note="configured off, so nothing was checked",
+                )
+            ]
+        )
+        with patch.object(blob_readiness, "check", new=AsyncMock(return_value=result)):
+            cls = (await _get(BASE)).json()["data"]["attributes"]["classes"][0]
+
+        assert cls["mode"] == "off"
+        assert cls["verifiable"] is True
+        assert cls["note"] == "configured off, so nothing was checked"
+
+    async def test_a_copy_only_class_carries_its_reason(self):
+        result = _result(
+            classes=[
+                blob_readiness.ClassReadiness(
+                    name="vcs_archives",
+                    tier=blob_readiness.REDERIVABLE,
+                    verifiable=False,
+                    note="a content-addressed cache with no table behind it",
+                )
+            ]
+        )
+        with patch.object(blob_readiness, "check", new=AsyncMock(return_value=result)):
+            cls = (await _get(BASE)).json()["data"]["attributes"]["classes"][0]
+
+        assert cls["verifiable"] is False
+        assert cls["note"]
