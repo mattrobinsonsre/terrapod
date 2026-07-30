@@ -82,6 +82,7 @@
   "GET /api/terrapod/v1/execution-hooks/{hook_id}",
   "GET /api/terrapod/v1/gpg-keys ?filter_namespace",
   "GET /api/terrapod/v1/gpg-keys/{key_id}",
+  "GET /api/terrapod/v1/ha/blob-readiness ?full,sample",
   "GET /api/terrapod/v1/ha/replication/backfill/{entity_class} ?after,limit",
   "GET /api/terrapod/v1/ha/replication/classes",
   "GET /api/terrapod/v1/ha/replication/entities/{entity_class}/{entity_id}",
