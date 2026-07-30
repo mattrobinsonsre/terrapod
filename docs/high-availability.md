@@ -204,7 +204,8 @@ semantics would only be needed in an active-active design, which this is not.
 | Workspaces, their agent-pool set, their module links | Replicated |
 | Variables and variable sets | Replicated |
 | Policy sets, notifications, run tasks, execution hooks, run triggers, remote-state consumers | Replicated |
-| Module and provider content, the CA | In development |
+| Module and provider content | In development |
+| The CA | Node-local today; whether it should replicate is open (#1143) |
 
 **Settings replication is now complete**: everything a workspace's runs depend on
 carries. What remains is run and artifact *history* (a separate phase) and the
@@ -268,8 +269,11 @@ failover rather than in a build.
 
 ## Join tokens and the two listener topologies
 
-Both listener topologies work, and neither needs anything beyond a shared CA —
-which the pair has, because the follower adopts the leader's.
+Both listener topologies work today. Note that each node currently has its own
+CA: `certificate_authority` is **not** a replicated class, so a follower does not
+adopt the leader's. Whether it should is an open decision (#1143) — the
+shared-fleet topology below survives a failover either way, because it heals by
+re-joining rather than by reusing certificates.
 
 **Per-node fleets.** Each node has its own listeners, pointed at its own name.
 Nothing ever crosses the boundary.
@@ -277,7 +281,9 @@ Nothing ever crosses the boundary.
 **One shared fleet following the shared DNS name.** At cutover the fleet
 re-points at the promoted node. The old certificates stop authenticating, each
 listener re-joins, and it heals itself — because join tokens replicate, so the
-promoted node accepts the token the fleet already holds.
+promoted node accepts the token the fleet already holds. This is what makes the
+CA question above a design choice rather than a blocker: the trust chain is
+rebuilt at the failover, not carried through it.
 
 > **Size join tokens for the shared-fleet topology accordingly: long-lived, and
 > generously reusable.**
