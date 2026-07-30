@@ -83,9 +83,6 @@ _REGISTRY: dict[str, ReplicatedClass] = {}
 _BY_MODEL: dict[type, ReplicatedClass] = {}
 
 
-_loaded = False
-
-
 def _ensure_loaded() -> None:
     """Import the registry module so the scope is populated.
 
@@ -96,10 +93,9 @@ def _ensure_loaded() -> None:
     instead. The registry is a fixed module in this repo, not a plugin system,
     so there is nothing to discover and no ordering to get wrong.
     """
-    global _loaded
-    if _loaded:
-        return
-    _loaded = True
+    # No once-guard: Python already memoises imports, so a second call is a
+    # `sys.modules` dict lookup. A hand-rolled flag would only be another thing
+    # able to be wrong.
     from terrapod.services import replication_registry  # noqa: F401
 
 
