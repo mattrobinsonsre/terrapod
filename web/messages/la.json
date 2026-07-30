@@ -2897,30 +2897,6 @@
       "unavailable": "Paratio partium legi non potuit: {reason}",
       "ready": "{ready} ex {desired} paratae",
       "pdbBlocks": "PDB nullam eiectionem permittit"
-    },
-    "blobs": {
-      "title": "Repositorium obiectorum",
-      "intro": "Replicatio versus datorum portat; obiecta quae illi versus nominant in repositorio obiectorum habitant. Versus praesentes sine obiectis suis nodum faciunt qui sanus videtur nec cursum servire potest. Haec inspectio veras petitiones ad repositorium mittit, ideoque solum cum poscis exsequitur.",
-      "check": "Nunc inspicere",
-      "checking": "Inspicitur…",
-      "fullLabel": "Omne obiectum inspicere (lentum in magno patrimonio)",
-      "sampled": "Exemplum — sola obiecta recentissima cuiusque classis inspecta sunt, non totum patrimonium. Infra numerum inspectorum cum summa cuiusque classis compara.",
-      "full": "Inspectio plena — omne obiectum cuiusque classis inspectae.",
-      "unavailable": "Repositorium obiectorum legi non potuit: {reason}",
-      "irreplaceableMissing": "Obiecta desunt in classibus quarum iactura perpetua est: {classes}. Noli ad hunc nodum transferre.",
-      "irreplaceableUnchecked": "Nihil affirmatum est de: {classes}. Hae exstinctae sunt aut ex datorum basi comprobari non possunt, itaque nulla deesse non significat adesse.",
-      "class": "Classis",
-      "tier": "Gradus",
-      "mode": "Modus",
-      "checked": "Inspecta",
-      "missing": "Desunt",
-      "note": "Nota",
-      "complete": "Plenum"
-    },
-    "tier": {
-      "irreplaceable": "Irreparabile",
-      "history": "Historia",
-      "rederivable": "Rederivabile"
     }
   }
 }

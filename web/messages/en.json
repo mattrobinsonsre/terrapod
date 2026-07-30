@@ -2897,30 +2897,6 @@
       "unavailable": "Component readiness could not be read: {reason}",
       "ready": "{ready} of {desired} ready",
       "pdbBlocks": "PDB permits no eviction"
-    },
-    "blobs": {
-      "title": "Object store",
-      "intro": "Replication carries database rows; the objects those rows name live in the object store. Rows present with objects absent is a node that looks healthy and cannot serve a run. This check makes real requests to the store, so it runs only when you ask.",
-      "check": "Check now",
-      "checking": "Checking…",
-      "fullLabel": "Check every object (slow on a large estate)",
-      "sampled": "Sampled — this checked the newest few objects per class, not the whole estate. Compare checked against total for each class below.",
-      "full": "Full check — every object of every checked class.",
-      "unavailable": "The object store could not be read: {reason}",
-      "irreplaceableMissing": "Objects are missing from classes whose loss is permanent: {classes}. Do not fail over onto this node.",
-      "irreplaceableUnchecked": "No claim was made about: {classes}. These are switched off or cannot be verified from the database, so zero missing does not mean present.",
-      "class": "Class",
-      "tier": "Tier",
-      "mode": "Mode",
-      "checked": "Checked",
-      "missing": "Missing",
-      "note": "Note",
-      "complete": "Complete"
-    },
-    "tier": {
-      "irreplaceable": "Irreplaceable",
-      "history": "History",
-      "rederivable": "Re-derivable"
     }
   }
 }

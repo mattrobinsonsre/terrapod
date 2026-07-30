@@ -2897,30 +2897,6 @@
       "unavailable": "Could not read the crew's readiness: {reason}",
       "ready": "{ready} of {desired} at their stations",
       "pdbBlocks": "The PDB suffers none to be put ashore"
-    },
-    "blobs": {
-      "title": "The hold",
-      "intro": "Copyin' carries the ledger; the cargo that ledger names lies in the hold. A ledger full with an empty hold be a ship that looks seaworthy and cannot sail a voyage. This inspection hails the hold in earnest, so she only runs when ye call for her.",
-      "check": "Inspect now",
-      "checking": "Inspectin'…",
-      "fullLabel": "Inspect every crate (slow with a great cargo)",
-      "sampled": "A spot check — only the freshest crates of each kind were opened, not the whole hold. Weigh inspected against the full tally for each kind below.",
-      "full": "Full inspection — every crate of every kind inspected.",
-      "unavailable": "Could not read the hold: {reason}",
-      "irreplaceableMissing": "Cargo be missin' from kinds ye can never recover: {classes}. Do not hand the wheel to this vessel.",
-      "irreplaceableUnchecked": "No word be given on: {classes}. These be struck or cannot be vouched for from the ledger, so nought missin' don't mean aboard.",
-      "class": "Kind",
-      "tier": "Worth",
-      "mode": "Manner",
-      "checked": "Inspected",
-      "missing": "Missin'",
-      "note": "Remark",
-      "complete": "Whole"
-    },
-    "tier": {
-      "irreplaceable": "Beyond Recoverin'",
-      "history": "The Log",
-      "rederivable": "Fashioned Anew"
     }
   }
 }

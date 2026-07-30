@@ -2897,30 +2897,6 @@
       "unavailable": "Komponenttien valmiutta ei voitu lukea: {reason}",
       "ready": "{ready}/{desired} valmiina",
       "pdbBlocks": "PDB ei salli yhtään häätöä"
-    },
-    "blobs": {
-      "title": "Objektivarasto",
-      "intro": "Replikointi kuljettaa tietokantarivejä; rivien nimeämät objektit ovat objektivarastossa. Rivit ilman objektejaan tarkoittavat solmua, joka näyttää terveeltä eikä pysty palvelemaan ajoa. Tämä tarkistus tekee oikeita pyyntöjä varastoon, joten se suoritetaan vain pyydettäessä.",
-      "check": "Tarkista nyt",
-      "checking": "Tarkistetaan…",
-      "fullLabel": "Tarkista jokainen objekti (hidas suuressa ympäristössä)",
-      "sampled": "Otos — vain kunkin luokan uusimmat objektit tarkistettiin, ei koko ympäristöä. Vertaa alla tarkistettujen määrää kunkin luokan kokonaismäärään.",
-      "full": "Täysi tarkistus — jokainen objekti jokaisesta tarkistetusta luokasta.",
-      "unavailable": "Objektivarastoa ei voitu lukea: {reason}",
-      "irreplaceableMissing": "Objekteja puuttuu luokista, joiden menetys on lopullinen: {classes}. Älä tee vikasietosiirtoa tähän solmuun.",
-      "irreplaceableUnchecked": "Seuraavista ei väitetä mitään: {classes}. Ne ovat pois päältä tai niitä ei voi varmentaa tietokannasta, joten nolla puuttuvaa ei tarkoita olemassa olevaa.",
-      "class": "Luokka",
-      "tier": "Taso",
-      "mode": "Tila",
-      "checked": "Tarkistettu",
-      "missing": "Puuttuu",
-      "note": "Huomautus",
-      "complete": "Täydellinen"
-    },
-    "tier": {
-      "irreplaceable": "Korvaamaton",
-      "history": "Historia",
-      "rederivable": "Uudelleen johdettavissa"
     }
   }
 }

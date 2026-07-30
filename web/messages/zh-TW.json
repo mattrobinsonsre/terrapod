@@ -2897,30 +2897,6 @@
       "unavailable": "無法讀取元件就緒情況：{reason}",
       "ready": "{desired} 個中有 {ready} 個就緒",
       "pdbBlocks": "PDB 不允許任何逐出"
-    },
-    "blobs": {
-      "title": "物件儲存",
-      "intro": "複寫搬運的是資料庫列，而這些列所指向的物件存放在物件儲存中。列在而物件不在，就是一個看起來健康卻無法承接執行的節點。此檢查會向儲存發出真實請求，因此只在你要求時才執行。",
-      "check": "立即檢查",
-      "checking": "檢查中…",
-      "fullLabel": "檢查每一個物件（規模大時較慢）",
-      "sampled": "抽樣——只檢查了每個類別中最新的少數物件，而非全部資產。請在下方比較每個類別的已檢查數與總數。",
-      "full": "完整檢查——每個受檢類別的每一個物件。",
-      "unavailable": "無法讀取物件儲存：{reason}",
-      "irreplaceableMissing": "以下遺失即無法復原的類別中存在缺少的物件：{classes}。請勿容錯移轉到本節點。",
-      "irreplaceableUnchecked": "未對以下類別做出任何判斷：{classes}。它們已關閉或無法透過資料庫驗證，因此缺少為零並不代表物件存在。",
-      "class": "類別",
-      "tier": "層級",
-      "mode": "模式",
-      "checked": "已檢查",
-      "missing": "缺少",
-      "note": "說明",
-      "complete": "完整"
-    },
-    "tier": {
-      "irreplaceable": "不可取代",
-      "history": "歷史",
-      "rederivable": "可重新產生"
     }
   }
 }

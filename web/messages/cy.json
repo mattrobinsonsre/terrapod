@@ -2897,30 +2897,6 @@
       "unavailable": "Nid oedd modd darllen parodrwydd y cydrannau: {reason}",
       "ready": "{ready} o {desired} yn barod",
       "pdbBlocks": "Nid yw'r PDB yn caniatáu unrhyw droi allan"
-    },
-    "blobs": {
-      "title": "Storfa gwrthrychau",
-      "intro": "Mae dyblygu'n cludo rhesi cronfa ddata; mae'r gwrthrychau y mae'r rhesi hynny'n eu henwi'n byw yn y storfa gwrthrychau. Rhesi'n bresennol heb eu gwrthrychau yw nod sy'n edrych yn iach ac na all wasanaethu rhediad. Mae'r gwiriad hwn yn gwneud ceisiadau go iawn i'r storfa, felly dim ond pan ofynnwch amdano y mae'n rhedeg.",
-      "check": "Gwirio nawr",
-      "checking": "Wrthi'n gwirio…",
-      "fullLabel": "Gwirio pob gwrthrych (araf ar ystad fawr)",
-      "sampled": "Sampl — dim ond y gwrthrychau diweddaraf ym mhob dosbarth a wiriwyd, nid yr ystad gyfan. Cymharwch isod y nifer a wiriwyd â chyfanswm pob dosbarth.",
-      "full": "Gwiriad llawn — pob gwrthrych ym mhob dosbarth a wiriwyd.",
-      "unavailable": "Nid oedd modd darllen y storfa gwrthrychau: {reason}",
-      "irreplaceableMissing": "Mae gwrthrychau ar goll o ddosbarthiadau y mae eu colli'n barhaol: {classes}. Peidiwch â throsglwyddo i'r nod hwn.",
-      "irreplaceableUnchecked": "Ni wnaed unrhyw honiad am: {classes}. Mae'r rhain wedi'u diffodd neu ni ellir eu gwirio o'r gronfa ddata, felly nid yw dim ar goll yn golygu eu bod yno.",
-      "class": "Dosbarth",
-      "tier": "Haen",
-      "mode": "Modd",
-      "checked": "Wedi'u gwirio",
-      "missing": "Ar goll",
-      "note": "Nodyn",
-      "complete": "Cyflawn"
-    },
-    "tier": {
-      "irreplaceable": "Anadferadwy",
-      "history": "Hanes",
-      "rederivable": "Ailddeilliadwy"
     }
   }
 }

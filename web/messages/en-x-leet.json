@@ -2897,30 +2897,6 @@
       "unavailable": "C0mp0n3n7 r34d1n355 c0uld n07 b3 r34d: {reason}",
       "ready": "{ready} 0f {desired} r34dy",
       "pdbBlocks": "PDB p3rm175 n0 3v1c710n"
-    },
-    "blobs": {
-      "title": "0bj3c7 570r3",
-      "intro": "R3pl1c4710n c4rr135 d474b453 r0w5; 7h3 0bj3c75 7h053 r0w5 n4m3 l1v3 1n 7h3 0bj3c7 570r3. R0w5 pr353n7 w17h 0bj3c75 4b53n7 15 4 n0d3 7h47 l00k5 h34l7hy 4nd c4nn07 53rv3 4 run. 7h15 ch3ck m4k35 r34l r3qu3575 70 7h3 570r3, 50 17 run5 0nly wh3n y0u 45k.",
-      "check": "Ch3ck n0w",
-      "checking": "Ch3ck1ng…",
-      "fullLabel": "Ch3ck 3v3ry 0bj3c7 (5l0w 0n 4 l4rg3 357473)",
-      "sampled": "54mpl3d — 7h15 ch3ck3d 7h3 n3w357 f3w 0bj3c75 p3r cl455, n07 7h3 wh0l3 357473. C0mp4r3 ch3ck3d 4g41n57 7074l f0r 34ch cl455 b3l0w.",
-      "full": "Full ch3ck — 3v3ry 0bj3c7 0f 3v3ry ch3ck3d cl455.",
-      "unavailable": "7h3 0bj3c7 570r3 c0uld n07 b3 r34d: {reason}",
-      "irreplaceableMissing": "0bj3c75 4r3 m1551ng fr0m cl45535 wh053 l055 15 p3rm4n3n7: {classes}. D0 n07 f41l 0v3r 0n70 7h15 n0d3.",
-      "irreplaceableUnchecked": "N0 cl41m w45 m4d3 4b0u7: {classes}. 7h353 4r3 5w17ch3d 0ff 0r c4nn07 b3 v3r1f13d fr0m 7h3 d474b453, 50 z3r0 m1551ng d035 n07 m34n pr353n7.",
-      "class": "Cl455",
-      "tier": "713r",
-      "mode": "M0d3",
-      "checked": "Ch3ck3d",
-      "missing": "M1551ng",
-      "note": "N073",
-      "complete": "C0mpl373"
-    },
-    "tier": {
-      "irreplaceable": "1rr3pl4c34bl3",
-      "history": "H1570ry",
-      "rederivable": "R3-d3r1v4bl3"
     }
   }
 }

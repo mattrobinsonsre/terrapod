@@ -2897,30 +2897,6 @@
       "unavailable": "Cud not reed da bitz reddynes: {reason}",
       "ready": "{ready} ov {desired} reddy",
       "pdbBlocks": "PDB sez NO kikkin owt"
-    },
-    "blobs": {
-      "title": "Objekt Stoar",
-      "intro": "Copyin carriez databais rowz; da objektz doze rowz point at liv in da objekt stoar. Rowz heer wif objektz gon iz a node dat lukz helthy an cant do a run. Dis chek makez REEL requestz to da stoar, so it onlee runz when u ask.",
-      "check": "Chek nao",
-      "checking": "Chekkin…",
-      "fullLabel": "Chek evry objekt (slo on a big pile)",
-      "sampled": "Sampld — dis chekd da newist few objektz per clas, not da hole pile. Compair chekd agenst totul fur each clas belo.",
-      "full": "Ful chek — evry objekt ov evry chekd clas.",
-      "unavailable": "Cud not reed da objekt stoar: {reason}",
-      "irreplaceableMissing": "Objektz r gon frum clasez wot u can nevr getz bak: {classes}. DO NOT failovr onto dis node.",
-      "irreplaceableUnchecked": "No claim woz maded bowt: {classes}. Deze iz turnd off or cant be chekd frum da databais, so zeero missin duz NOT meen dey iz der.",
-      "class": "Clas",
-      "tier": "Teir",
-      "mode": "Moad",
-      "checked": "Chekd",
-      "missing": "Missin",
-      "note": "Noat",
-      "complete": "Compleet"
-    },
-    "tier": {
-      "irreplaceable": "Cant Replais It",
-      "history": "Histry",
-      "rederivable": "Can Maek Agen"
     }
   }
 }

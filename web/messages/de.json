@@ -2897,30 +2897,6 @@
       "unavailable": "Die Bereitschaft der Komponenten konnte nicht gelesen werden: {reason}",
       "ready": "{ready} von {desired} bereit",
       "pdbBlocks": "PDB lässt keine Verdrängung zu"
-    },
-    "blobs": {
-      "title": "Objektspeicher",
-      "intro": "Die Replikation überträgt Datenbankzeilen; die Objekte, die diese Zeilen benennen, liegen im Objektspeicher. Vorhandene Zeilen ohne die zugehörigen Objekte ergeben einen Knoten, der gesund aussieht und keinen Lauf bedienen kann. Diese Prüfung stellt echte Anfragen an den Speicher und läuft daher nur auf Anforderung.",
-      "check": "Jetzt prüfen",
-      "checking": "Wird geprüft…",
-      "fullLabel": "Jedes Objekt prüfen (langsam bei großem Bestand)",
-      "sampled": "Stichprobe — geprüft wurden nur die neuesten Objekte je Klasse, nicht der gesamte Bestand. Vergleichen Sie unten je Klasse „Geprüft“ mit der Gesamtzahl.",
-      "full": "Vollständige Prüfung — jedes Objekt jeder geprüften Klasse.",
-      "unavailable": "Der Objektspeicher konnte nicht gelesen werden: {reason}",
-      "irreplaceableMissing": "In Klassen, deren Verlust endgültig ist, fehlen Objekte: {classes}. Führen Sie kein Failover auf diesen Knoten durch.",
-      "irreplaceableUnchecked": "Zu Folgendem wurde keine Aussage getroffen: {classes}. Diese sind abgeschaltet oder lassen sich nicht aus der Datenbank verifizieren — null fehlende Objekte bedeutet hier nicht „vorhanden“.",
-      "class": "Klasse",
-      "tier": "Stufe",
-      "mode": "Modus",
-      "checked": "Geprüft",
-      "missing": "Fehlend",
-      "note": "Hinweis",
-      "complete": "Vollständig"
-    },
-    "tier": {
-      "irreplaceable": "Unersetzlich",
-      "history": "Historie",
-      "rederivable": "Wiederherstellbar"
     }
   }
 }

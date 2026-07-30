@@ -2897,30 +2897,6 @@
       "unavailable": "Nie udało się odczytać gotowości komponentów: {reason}",
       "ready": "Gotowe {ready} z {desired}",
       "pdbBlocks": "PDB nie zezwala na żadną eksmisję"
-    },
-    "blobs": {
-      "title": "Magazyn obiektów",
-      "intro": "Replikacja przenosi wiersze bazy danych; obiekty wskazywane przez te wiersze leżą w magazynie obiektów. Wiersze bez obiektów to węzeł, który wygląda zdrowo i nie jest w stanie obsłużyć uruchomienia. Ta kontrola wysyła prawdziwe żądania do magazynu, więc uruchamia się tylko na żądanie.",
-      "check": "Sprawdź teraz",
-      "checking": "Sprawdzanie…",
-      "fullLabel": "Sprawdź każdy obiekt (wolne przy dużym środowisku)",
-      "sampled": "Próbka — sprawdzono tylko najnowsze obiekty w każdej klasie, nie całe środowisko. Porównaj poniżej liczbę sprawdzonych z sumą dla każdej klasy.",
-      "full": "Pełna kontrola — każdy obiekt każdej sprawdzanej klasy.",
-      "unavailable": "Nie udało się odczytać magazynu obiektów: {reason}",
-      "irreplaceableMissing": "Brakuje obiektów w klasach, których utrata jest nieodwracalna: {classes}. Nie przełączaj awaryjnie na ten węzeł.",
-      "irreplaceableUnchecked": "Nic nie stwierdzono na temat: {classes}. Są wyłączone albo nie da się ich zweryfikować z bazy danych, więc zero brakujących nie oznacza, że są obecne.",
-      "class": "Klasa",
-      "tier": "Poziom",
-      "mode": "Tryb",
-      "checked": "Sprawdzone",
-      "missing": "Brakujące",
-      "note": "Uwaga",
-      "complete": "Kompletne"
-    },
-    "tier": {
-      "irreplaceable": "Niezastąpione",
-      "history": "Historia",
-      "rederivable": "Odtwarzalne"
     }
   }
 }

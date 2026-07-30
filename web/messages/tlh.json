@@ -2897,30 +2897,6 @@
       "unavailable": "chenmoHwI' ghuHtaHghach laDlaHbe'lu': {reason}",
       "ready": "{desired} chenmoHwI'mey {ready} ghuHtaH",
       "pdbBlocks": "pagh teqmeH chaw' PDB"
-    },
-    "blobs": {
-      "title": "vagh pat",
-      "intro": "De'mey qengbogh velqa'; De'meyvam pongbogh vaghmey, vagh patDaq luH. De'mey tu'lu' 'ach vaghmey tu'be'lu'chugh, pIvbogh rur De'wI' 'ach Qap qaSmoHlaHbe'. teblu'meH vagh patvaD ra'ghommey ngeH; vaj DapoQDI' neH qaS.",
-      "check": "DaH yIqel",
-      "checking": "qellI'…",
-      "fullLabel": "Hoch vagh yIqel (ngIm law'chugh, QIt)",
-      "sampled": "puS qellu' — Segh Hoch chu'bogh vaghmey neH qellu', Hoch pat qelbe'lu'. bIngDaq Segh Hoch qellu'bogh 'ej Hoch nIteb yIrur.",
-      "full": "Hoch qellu' — qellu'bogh Segh Hoch vagh.",
-      "unavailable": "vagh pat laDlaHbe'lu': {reason}",
-      "irreplaceableMissing": "chIlchugh ngeHbe'lu'bogh Seghmey vaghmey tu'be'lu': {classes}. De'wI'vamDaq yIchoHQo'.",
-      "irreplaceableUnchecked": "pagh ja'lu' Seghmeyvam: {classes}. chu'Ha'lu'pu' pagh De' patvo' teblu'laHbe'; vaj pagh tu'be'lu' 'e' 'oHbe' tu'lu'.",
-      "class": "Segh",
-      "tier": "patlh",
-      "mode": "mIw",
-      "checked": "qellu'pu'",
-      "missing": "tu'be'lu'",
-      "note": "QIn",
-      "complete": "naQ"
-    },
-    "tier": {
-      "irreplaceable": "ngeHlaHbe'",
-      "history": "qun",
-      "rederivable": "chenqa'laH"
     }
   }
 }

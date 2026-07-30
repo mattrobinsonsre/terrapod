@@ -2897,30 +2897,6 @@
       "unavailable": "Připravenost komponent se nepodařilo načíst: {reason}",
       "ready": "Připraveno {ready} z {desired}",
       "pdbBlocks": "PDB nepovoluje žádné vystěhování"
-    },
-    "blobs": {
-      "title": "Úložiště objektů",
-      "intro": "Replikace přenáší řádky databáze; objekty, na které tyto řádky odkazují, leží v úložišti objektů. Řádky bez objektů znamenají uzel, který vypadá zdravě a nedokáže obsloužit běh. Tato kontrola posílá do úložiště skutečné požadavky, a proto běží jen na vyžádání.",
-      "check": "Zkontrolovat teď",
-      "checking": "Kontroluje se…",
-      "fullLabel": "Zkontrolovat každý objekt (pomalé u velkého prostředí)",
-      "sampled": "Vzorek — zkontrolovány byly jen nejnovější objekty v každé třídě, ne celé prostředí. Porovnejte níže počet zkontrolovaných s celkem u každé třídy.",
-      "full": "Úplná kontrola — každý objekt každé kontrolované třídy.",
-      "unavailable": "Úložiště objektů se nepodařilo načíst: {reason}",
-      "irreplaceableMissing": "Ve třídách, jejichž ztráta je nevratná, chybí objekty: {classes}. Nepřepínejte služby na tento uzel.",
-      "irreplaceableUnchecked": "O těchto se netvrdí nic: {classes}. Jsou vypnuté nebo je nelze ověřit z databáze, takže nula chybějících neznamená, že jsou přítomné.",
-      "class": "Třída",
-      "tier": "Úroveň",
-      "mode": "Režim",
-      "checked": "Zkontrolováno",
-      "missing": "Chybí",
-      "note": "Poznámka",
-      "complete": "Úplné"
-    },
-    "tier": {
-      "irreplaceable": "Nenahraditelné",
-      "history": "Historie",
-      "rederivable": "Znovu odvoditelné"
     }
   }
 }

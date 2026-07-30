@@ -2897,30 +2897,6 @@
       "unavailable": "No se pudo leer la disponibilidad de los componentes: {reason}",
       "ready": "{ready} de {desired} listos",
       "pdbBlocks": "El PDB no permite ningún desalojo"
-    },
-    "blobs": {
-      "title": "Almacén de objetos",
-      "intro": "La replicación transporta filas de la base de datos; los objetos que esas filas nombran viven en el almacén de objetos. Filas presentes con objetos ausentes es un nodo que parece sano y no puede servir una ejecución. Esta comprobación hace peticiones reales al almacén, así que solo se ejecuta cuando la pides.",
-      "check": "Comprobar ahora",
-      "checking": "Comprobando…",
-      "fullLabel": "Comprobar todos los objetos (lento en un parque grande)",
-      "sampled": "Muestreo: se han comprobado solo los objetos más recientes de cada clase, no todo el parque. Compara abajo lo comprobado con el total de cada clase.",
-      "full": "Comprobación completa: todos los objetos de todas las clases comprobadas.",
-      "unavailable": "No se pudo leer el almacén de objetos: {reason}",
-      "irreplaceableMissing": "Faltan objetos en clases cuya pérdida es permanente: {classes}. No conmutes por error a este nodo.",
-      "irreplaceableUnchecked": "No se afirma nada sobre: {classes}. Están desactivadas o no se pueden verificar desde la base de datos, así que cero ausentes no significa presentes.",
-      "class": "Clase",
-      "tier": "Nivel",
-      "mode": "Modo",
-      "checked": "Comprobados",
-      "missing": "Ausentes",
-      "note": "Nota",
-      "complete": "Completo"
-    },
-    "tier": {
-      "irreplaceable": "Irreemplazable",
-      "history": "Histórico",
-      "rederivable": "Rederivable"
     }
   }
 }

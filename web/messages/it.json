@@ -2897,30 +2897,6 @@
       "unavailable": "Non è stato possibile leggere la prontezza dei componenti: {reason}",
       "ready": "{ready} di {desired} pronti",
       "pdbBlocks": "Il PDB non consente alcuno sfratto"
-    },
-    "blobs": {
-      "title": "Archivio oggetti",
-      "intro": "La replica trasporta righe di database; gli oggetti che quelle righe nominano vivono nell'archivio oggetti. Righe presenti con oggetti assenti sono un nodo che sembra sano e non può servire un'esecuzione. Questo controllo effettua richieste reali all'archivio, quindi viene eseguito solo su richiesta.",
-      "check": "Controlla ora",
-      "checking": "Controllo in corso…",
-      "fullLabel": "Controlla ogni oggetto (lento su un parco grande)",
-      "sampled": "Campione: sono stati controllati solo gli oggetti più recenti per classe, non l'intero parco. Confronta sotto i controllati con il totale di ciascuna classe.",
-      "full": "Controllo completo: ogni oggetto di ogni classe controllata.",
-      "unavailable": "Non è stato possibile leggere l'archivio oggetti: {reason}",
-      "irreplaceableMissing": "Mancano oggetti in classi la cui perdita è definitiva: {classes}. Non eseguire il failover su questo nodo.",
-      "irreplaceableUnchecked": "Non è stata fatta alcuna affermazione su: {classes}. Sono disattivate o non verificabili dal database, quindi zero mancanti non significa presenti.",
-      "class": "Classe",
-      "tier": "Livello",
-      "mode": "Modalità",
-      "checked": "Controllati",
-      "missing": "Mancanti",
-      "note": "Nota",
-      "complete": "Completo"
-    },
-    "tier": {
-      "irreplaceable": "Insostituibile",
-      "history": "Storico",
-      "rederivable": "Riderivabile"
     }
   }
 }

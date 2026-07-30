@@ -2897,30 +2897,6 @@
       "unavailable": "Beredskapen til komponentene kunne ikke leses: {reason}",
       "ready": "{ready} av {desired} klare",
       "pdbBlocks": "PDB tillater ingen eviction"
-    },
-    "blobs": {
-      "title": "Objektlager",
-      "intro": "Replikeringen bærer databaserader; objektene radene navngir ligger i objektlageret. Rader som finnes uten objektene sine gir en node som ser frisk ut og ikke kan betjene en kjøring. Denne sjekken gjør reelle kall mot lageret, og kjøres derfor bare når du ber om det.",
-      "check": "Sjekk nå",
-      "checking": "Sjekker…",
-      "fullLabel": "Sjekk hvert eneste objekt (tregt i et stort miljø)",
-      "sampled": "Stikkprøve — bare de nyeste objektene per klasse ble sjekket, ikke hele miljøet. Sammenlign nedenfor antall sjekkede med totalen for hver klasse.",
-      "full": "Full sjekk — hvert objekt i hver sjekket klasse.",
-      "unavailable": "Objektlageret kunne ikke leses: {reason}",
-      "irreplaceableMissing": "Det mangler objekter i klasser der tap er permanent: {classes}. Ikke gjør failover til denne noden.",
-      "irreplaceableUnchecked": "Det sies ingenting om: {classes}. De er slått av eller lar seg ikke verifisere fra databasen, så null manglende betyr ikke til stede.",
-      "class": "Klasse",
-      "tier": "Nivå",
-      "mode": "Modus",
-      "checked": "Sjekket",
-      "missing": "Mangler",
-      "note": "Merknad",
-      "complete": "Fullstendig"
-    },
-    "tier": {
-      "irreplaceable": "Uerstattelig",
-      "history": "Historikk",
-      "rederivable": "Gjenskapbar"
     }
   }
 }

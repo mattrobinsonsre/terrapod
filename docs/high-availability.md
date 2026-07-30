@@ -343,9 +343,8 @@ follower simply takes it.
 
 ## Reading all of this in the UI
 
-**Admin → High availability** (`/admin/ha`) is every check on this page in one
-screen: the node's role, whether it is converging with its peer, in-cluster
-readiness with its findings, and — on demand — object-store readiness. It needs
+**Admin → High availability** (`/admin/ha`) shows the node's role, whether it is
+converging with its peer, and in-cluster readiness with its findings. It needs
 the `admin` or `audit` role, the same gate as the endpoints it reads.
 
 It is **read-only on purpose**. There is no promote button, no failover button.
@@ -354,7 +353,7 @@ a control that looked like it could do it from here would be actively dangerous,
 because the one thing this page must never do is invite an action that leaves
 two leaders.
 
-Three things it is careful about, because they are the ways a status screen
+Two things it is careful about, because they are the ways a status screen
 misleads:
 
 - A **follower** is stated plainly, with what it means — a node that replicates
@@ -362,10 +361,11 @@ misleads:
   mistake worth designing against.
 - A class still backfilling shows **not in sync** even beside a fresh
   timestamp, matching the rule below.
-- The object-store check runs **only when you ask** — it makes real requests to
-  the store — and a sampled result says so, with each class's checked count
-  beside its total. A class nobody could verify is listed as *unchecked*, never
-  folded into a zero-missing pass.
+
+Object-store readiness is **not** on this page. It makes real requests to the
+store, which is why it is a deliberate command rather than something a page load
+triggers — run it from the API, MCP or go-terrapod when you want it (see [The
+other data plane](#the-other-data-plane-is-the-object-store-actually-there)).
 
 ## Is the follower caught up?
 

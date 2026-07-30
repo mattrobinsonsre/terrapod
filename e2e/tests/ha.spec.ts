@@ -7,16 +7,14 @@ import { expectNoHorizontalPageScroll } from '../helpers/responsive';
  *
  * Driven against mocked `/ha/*` responses rather than the live stack. That is
  * deliberate and is the only way this suite earns its keep: the e2e stack is a
- * healthy single node, so every honesty property this page exists for — a
- * follower banner, a backfilling class, a sampled blob check, an irreplaceable
- * class nobody verified — is unreachable without a fixture. Testing it against
- * the real single-node stack would assert only that the happy path renders,
- * which is precisely the case that cannot mislead anyone.
+ * healthy single node, so every state this page exists to make legible — a
+ * follower banner, a class mid-backfill, replication switched off — is
+ * unreachable without a fixture. Testing it against the real single-node stack
+ * would assert only that the happy path renders, which is precisely the case
+ * that cannot mislead anyone.
  *
- * The properties under test are the three the page must never get wrong:
- *   1. backfilling ⇒ NOT in sync, however fresh the last cycle was;
- *   2. a SAMPLED blob check is never presented as a verdict on the estate;
- *   3. an unchecked irreplaceable class is never presented as a pass.
+ * The property this leans on hardest: a class still backfilling means NOT in
+ * sync, however fresh the last cycle was.
  */
 
 const USER_AUTH = path.join(__dirname, '..', '.auth', 'user.json');
@@ -45,52 +43,14 @@ const BASE_STATUS = {
   'single-replica-components': [] as string[],
 };
 
-const BASE_READINESS = {
-  sampled: true,
-  'missing-total': 0,
-  'irreplaceable-missing': [] as string[],
-  'irreplaceable-unchecked': [] as string[],
-  'duration-ms': 12,
-  'unavailable-reason': null,
-  classes: [
-    {
-      name: 'state',
-      tier: 'irreplaceable',
-      mode: 'copy',
-      verifiable: true,
-      note: '',
-      'total-rows': 400,
-      checked: 20,
-      missing: 0,
-      'missing-examples': [] as string[],
-      complete: false,
-      error: null,
-    },
-  ],
-};
-
-/** Serve `/ha/status` (and optionally `/ha/blob-readiness`) from a fixture. */
-async function mockHA(
-  page: Page,
-  status: Record<string, unknown>,
-  readiness?: Record<string, unknown>,
-) {
+/** Serve `/ha/status` from a fixture. */
+async function mockHA(page: Page, status: Record<string, unknown>) {
   await page.route('**/api/terrapod/v1/ha/status', (route: Route) =>
     route.fulfill({
       contentType: 'application/json',
       body: JSON.stringify({ data: { type: 'ha-status', id: 'node-a', attributes: status } }),
     }),
   );
-  if (readiness) {
-    await page.route('**/api/terrapod/v1/ha/blob-readiness*', (route: Route) =>
-      route.fulfill({
-        contentType: 'application/json',
-        body: JSON.stringify({
-          data: { type: 'ha-blob-readiness', id: 'node-a', attributes: readiness },
-        }),
-      }),
-    );
-  }
 }
 
 test.describe('HA page — role', () => {
@@ -161,84 +121,6 @@ test.describe('HA page — replication', () => {
   });
 });
 
-test.describe('HA page — object store readiness', () => {
-  test('nothing is checked until asked', async ({ page }) => {
-    // The check makes real object-store round trips, which is why it is not on
-    // `/ha/status` and not polled. If results rendered on load, that design
-    // would have been undone.
-    let calls = 0;
-    await page.route('**/api/terrapod/v1/ha/blob-readiness*', (route: Route) => {
-      calls += 1;
-      return route.fulfill({
-        contentType: 'application/json',
-        body: JSON.stringify({
-          data: { type: 'ha-blob-readiness', id: 'node-a', attributes: BASE_READINESS },
-        }),
-      });
-    });
-    await mockHA(page, BASE_STATUS);
-    await page.goto('/admin/ha');
-
-    await expect(page.getByRole('heading', { name: 'Object store' })).toBeVisible();
-    await expect(page.getByText('state', { exact: true })).toHaveCount(0);
-    expect(calls, 'blob readiness must not run on page load').toBe(0);
-
-    await page.getByRole('button', { name: 'Check now' }).click();
-    await expect(page.getByText('state', { exact: true }).first()).toBeVisible();
-    expect(calls).toBe(1);
-  });
-
-  test('a sampled result is never presented as a verdict on the estate', async ({ page }) => {
-    await mockHA(page, BASE_STATUS, BASE_READINESS);
-    await page.goto('/admin/ha');
-    await page.getByRole('button', { name: 'Check now' }).click();
-
-    await expect(page.getByText(/^Sampled —/)).toBeVisible();
-    // …and the per-class counts have to make the sample's size legible, so
-    // "0 missing" can be read against how little was actually looked at.
-    await expect(page.getByText('20 / 400').first()).toBeVisible();
-  });
-
-  test('an unchecked irreplaceable class is not a pass', async ({ page }) => {
-    // Zero missing out of zero checked is the failure mode this line exists to
-    // stop an operator reading as a green light.
-    await mockHA(page, BASE_STATUS, {
-      ...BASE_READINESS,
-      'irreplaceable-unchecked': ['state'],
-    });
-    await page.goto('/admin/ha');
-    await page.getByRole('button', { name: 'Check now' }).click();
-
-    await expect(page.getByText(/No claim was made about/)).toBeVisible();
-    await expect(page.getByText(/zero missing does not mean present/)).toBeVisible();
-  });
-
-  test('missing irreplaceable objects say do not fail over', async ({ page }) => {
-    await mockHA(page, BASE_STATUS, {
-      ...BASE_READINESS,
-      'missing-total': 3,
-      'irreplaceable-missing': ['state'],
-      classes: [{ ...BASE_READINESS.classes[0], missing: 3 }],
-    });
-    await page.goto('/admin/ha');
-    await page.getByRole('button', { name: 'Check now' }).click();
-
-    await expect(page.getByText(/Do not fail over onto this node/)).toBeVisible();
-  });
-
-  test('an unreadable store reports the reason instead of an empty table', async ({ page }) => {
-    await mockHA(page, BASE_STATUS, {
-      ...BASE_READINESS,
-      'unavailable-reason': 'connection refused',
-      classes: [],
-    });
-    await page.goto('/admin/ha');
-    await page.getByRole('button', { name: 'Check now' }).click();
-
-    await expect(page.getByText(/connection refused/)).toBeVisible();
-  });
-});
-
 test.describe('HA page — mobile', () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
@@ -248,20 +130,14 @@ test.describe('HA page — mobile', () => {
       role: 'follower',
       'in-sync': false,
       'backfilling-classes': ['registry_modules', 'registry_providers'],
-    }, BASE_READINESS);
+    });
     await page.goto('/admin/ha');
 
+    // The primary signal — which node this is, and that it is behind — stays
+    // visible at phone width rather than being hidden behind a breakpoint.
     await expect(page.getByText('Follower', { exact: true })).toBeVisible();
-    await expectNoHorizontalPageScroll(page);
-
-    await page.getByRole('button', { name: 'Check now' }).click();
-    // The desktop table is hidden; the same rows render as cards, and the
-    // primary signal (class, tier, missing count) stays visible rather than
-    // being hidden behind a breakpoint.
-    await expect(page.locator('table')).toBeHidden();
-    await expect(page.getByText('state', { exact: true }).first()).toBeVisible();
-    await expect(page.getByText('Irreplaceable').first()).toBeVisible();
-    await expect(page.getByText(/Missing: 0/)).toBeVisible();
+    await expect(page.getByText(/Not in sync/)).toBeVisible();
+    await expect(page.getByText('registry_modules')).toBeVisible();
     await expectNoHorizontalPageScroll(page);
   });
 });
@@ -279,6 +155,5 @@ test.describe('HA page — RBAC', () => {
     await page.goto('/admin/ha');
     await expect(page.getByText('Leader', { exact: true })).toHaveCount(0);
     await expect(page.getByText('Follower', { exact: true })).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'Check now' })).toHaveCount(0);
   });
 });

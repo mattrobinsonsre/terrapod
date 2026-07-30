@@ -2897,30 +2897,6 @@
       "unavailable": "De gereedheid van de componenten kon niet worden gelezen: {reason}",
       "ready": "{ready} van {desired} gereed",
       "pdbBlocks": "PDB staat geen enkele eviction toe"
-    },
-    "blobs": {
-      "title": "Objectopslag",
-      "intro": "Replicatie draagt databaserijen over; de objecten die die rijen noemen staan in de objectopslag. Rijen aanwezig zonder hun objecten levert een node op die gezond lijkt en geen run kan bedienen. Deze controle doet echte verzoeken aan de opslag en draait daarom alleen wanneer je erom vraagt.",
-      "check": "Nu controleren",
-      "checking": "Bezig met controleren…",
-      "fullLabel": "Elk object controleren (traag bij een groot landschap)",
-      "sampled": "Steekproef — alleen de nieuwste objecten per klasse zijn gecontroleerd, niet het hele landschap. Vergelijk hieronder per klasse het gecontroleerde aantal met het totaal.",
-      "full": "Volledige controle — elk object van elke gecontroleerde klasse.",
-      "unavailable": "De objectopslag kon niet worden gelezen: {reason}",
-      "irreplaceableMissing": "Er ontbreken objecten in klassen waarvan het verlies definitief is: {classes}. Voer geen failover uit naar deze node.",
-      "irreplaceableUnchecked": "Over het volgende is geen uitspraak gedaan: {classes}. Deze staan uit of zijn niet vanuit de database te verifiëren, dus nul ontbrekend betekent hier niet aanwezig.",
-      "class": "Klasse",
-      "tier": "Niveau",
-      "mode": "Modus",
-      "checked": "Gecontroleerd",
-      "missing": "Ontbrekend",
-      "note": "Opmerking",
-      "complete": "Volledig"
-    },
-    "tier": {
-      "irreplaceable": "Onvervangbaar",
-      "history": "Historie",
-      "rederivable": "Herafleidbaar"
     }
   }
 }

@@ -2897,30 +2897,6 @@
       "unavailable": "Bileşenlerin hazır durumu okunamadı: {reason}",
       "ready": "{desired} bileşenden {ready} tanesi hazır",
       "pdbBlocks": "PDB hiçbir tahliyeye izin vermiyor"
-    },
-    "blobs": {
-      "title": "Nesne deposu",
-      "intro": "Çoğaltma veritabanı satırlarını taşır; o satırların adlandırdığı nesneler nesne deposunda durur. Satırların var olup nesnelerin olmaması, sağlıklı görünen ama bir çalıştırmayı karşılayamayan bir düğüm demektir. Bu denetim depoya gerçek istekler gönderir, bu yüzden yalnızca siz istediğinizde çalışır.",
-      "check": "Şimdi denetle",
-      "checking": "Denetleniyor…",
-      "fullLabel": "Her nesneyi denetle (büyük ortamlarda yavaştır)",
-      "sampled": "Örnekleme — yalnızca her sınıftaki en yeni nesneler denetlendi, ortamın tamamı değil. Aşağıda her sınıf için denetleneni toplamla karşılaştırın.",
-      "full": "Tam denetim — denetlenen her sınıfın her nesnesi.",
-      "unavailable": "Nesne deposu okunamadı: {reason}",
-      "irreplaceableMissing": "Kaybı kalıcı olan sınıflarda nesneler eksik: {classes}. Bu düğüme yük devretmeyin.",
-      "irreplaceableUnchecked": "Şunlar hakkında hiçbir şey iddia edilmedi: {classes}. Bunlar kapalı ya da veritabanından doğrulanamıyor; dolayısıyla sıfır eksik, var demek değildir.",
-      "class": "Sınıf",
-      "tier": "Katman",
-      "mode": "Mod",
-      "checked": "Denetlenen",
-      "missing": "Eksik",
-      "note": "Not",
-      "complete": "Tam"
-    },
-    "tier": {
-      "irreplaceable": "Yeri doldurulamaz",
-      "history": "Geçmiş",
-      "rederivable": "Yeniden türetilebilir"
     }
   }
 }

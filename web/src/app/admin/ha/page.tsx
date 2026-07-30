@@ -64,30 +64,6 @@ interface HAStatus {
   'single-replica-components': string[]
 }
 
-interface BlobClass {
-  name: string
-  tier: string
-  mode: string
-  verifiable: boolean
-  note: string
-  'total-rows': number
-  checked: number
-  missing: number
-  'missing-examples': string[]
-  complete: boolean
-  error: string | null
-}
-
-interface BlobReadiness {
-  sampled: boolean
-  'missing-total': number
-  'irreplaceable-missing': string[]
-  'irreplaceable-unchecked': string[]
-  'duration-ms': number
-  'unavailable-reason': string | null
-  classes: BlobClass[]
-}
-
 function duration(seconds: number | null): string {
   if (seconds === null) return '—'
   if (seconds < 60) return `${seconds}s`
@@ -107,10 +83,6 @@ export default function HAPage() {
   const [status, setStatus] = useState<HAStatus | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-
-  const [readiness, setReadiness] = useState<BlobReadiness | null>(null)
-  const [checking, setChecking] = useState(false)
-  const [full, setFull] = useState(false)
 
   const load = useCallback(async () => {
     try {
@@ -139,22 +111,6 @@ export default function HAPage() {
   // cheap and keeps a role change visible without a reload. Blob readiness is
   // deliberately NOT polled — see below.
   usePollingInterval(true, 15000, load)
-
-  const runReadiness = useCallback(async () => {
-    setChecking(true)
-    try {
-      const resp = await apiFetch(
-        `/api/terrapod/v1/ha/blob-readiness${full ? '?full=true' : ''}`
-      )
-      if (!resp.ok) throw new Error(await resp.text())
-      setReadiness((await resp.json()).data.attributes)
-      setError('')
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
-    } finally {
-      setChecking(false)
-    }
-  }, [full])
 
   if (loading) return <LoadingSpinner />
 
@@ -278,7 +234,7 @@ export default function HAPage() {
 
             {/* Component readiness — findings appear ONLY where the cluster
                 could have done better, so a one-node cluster shows none. */}
-            <section className="mb-6 rounded-xl border border-slate-800 bg-slate-900/50 p-4 sm:p-6">
+            <section className="rounded-xl border border-slate-800 bg-slate-900/50 p-4 sm:p-6">
               <h2 className="mb-4 text-lg font-medium">{t('components.title')}</h2>
               {status['components-unavailable-reason'] ? (
                 <p className="text-sm text-slate-400">
@@ -333,165 +289,9 @@ export default function HAPage() {
               )}
             </section>
 
-            {/* Blob readiness. On demand, never polled: it makes real
-                object-store round trips, which is why it was kept off /ha/status
-                in the first place — polling it here would undo that. */}
-            <section className="rounded-xl border border-slate-800 bg-slate-900/50 p-4 sm:p-6">
-              <h2 className="text-lg font-medium">{t('blobs.title')}</h2>
-              <p className="mt-1 max-w-prose text-sm text-slate-400">{t('blobs.intro')}</p>
-
-              <div className="mt-4 flex flex-wrap items-center gap-3">
-                <button
-                  onClick={runReadiness}
-                  disabled={checking}
-                  className="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-medium hover:bg-brand-500 disabled:opacity-50"
-                >
-                  {checking ? t('blobs.checking') : t('blobs.check')}
-                </button>
-                <label className="flex items-center gap-2 text-xs text-slate-400">
-                  <input
-                    type="checkbox"
-                    checked={full}
-                    onChange={(e) => setFull(e.target.checked)}
-                    className="rounded border-slate-700 bg-slate-900"
-                  />
-                  {t('blobs.fullLabel')}
-                </label>
-              </div>
-
-              {readiness && (
-                <div className="mt-4">
-                  {readiness['unavailable-reason'] ? (
-                    <p className="rounded-lg bg-amber-950/40 px-3 py-2 text-sm text-amber-200">
-                      {t('blobs.unavailable', { reason: readiness['unavailable-reason'] })}
-                    </p>
-                  ) : (
-                    <>
-                      {/* The honesty banner. A sample is never a verdict on the
-                          estate, and this is where that is said. */}
-                      <p
-                        className={`rounded-lg px-3 py-2 text-sm ${
-                          readiness.sampled
-                            ? 'bg-amber-950/40 text-amber-200'
-                            : 'bg-slate-950/60 text-slate-300'
-                        }`}
-                      >
-                        {readiness.sampled ? t('blobs.sampled') : t('blobs.full')}
-                      </p>
-
-                      {readiness['irreplaceable-missing'].length > 0 && (
-                        <p className="mt-3 rounded-lg bg-red-950/50 px-3 py-2 text-sm font-medium text-red-200">
-                          {t('blobs.irreplaceableMissing', {
-                            classes: readiness['irreplaceable-missing'].join(', '),
-                          })}
-                        </p>
-                      )}
-
-                      {/* The counterpart that makes the line above trustworthy:
-                          zero missing out of zero checked is not a pass. */}
-                      {readiness['irreplaceable-unchecked'].length > 0 && (
-                        <p className="mt-3 rounded-lg bg-amber-950/40 px-3 py-2 text-sm text-amber-200">
-                          {t('blobs.irreplaceableUnchecked', {
-                            classes: readiness['irreplaceable-unchecked'].join(', '),
-                          })}
-                        </p>
-                      )}
-
-                      <div className="mt-4 hidden overflow-x-auto md:block">
-                        <table className="w-full text-left text-sm">
-                          <thead className="text-xs uppercase tracking-wide text-slate-400">
-                            <tr>
-                              <th className="py-2 pr-4">{t('blobs.class')}</th>
-                              <th className="py-2 pr-4">{t('blobs.tier')}</th>
-                              <th className="py-2 pr-4">{t('blobs.mode')}</th>
-                              <th className="py-2 pr-4 text-right">{t('blobs.checked')}</th>
-                              <th className="py-2 pr-4 text-right">{t('blobs.missing')}</th>
-                              <th className="py-2">{t('blobs.note')}</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {readiness.classes.map((c) => (
-                              <tr key={c.name} className="border-t border-slate-800">
-                                <td className="py-2 pr-4 font-mono">{c.name}</td>
-                                <td className="py-2 pr-4">
-                                  <TierBadge tier={c.tier} label={label(`tier.${c.tier}`, c.tier)} />
-                                </td>
-                                <td className="py-2 pr-4 font-mono text-xs">{c.mode}</td>
-                                <td className="py-2 pr-4 text-right tabular-nums">
-                                  {c.checked} / {c['total-rows']}
-                                </td>
-                                <td
-                                  className={`py-2 pr-4 text-right tabular-nums ${
-                                    c.missing > 0 ? 'text-red-300' : 'text-slate-400'
-                                  }`}
-                                >
-                                  {c.missing}
-                                </td>
-                                <td className="py-2 text-xs text-slate-400">
-                                  {c.error || c.note || (c.complete ? t('blobs.complete') : '')}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-
-                      {/* Mobile: the same rows as cards. Class, tier and missing
-                          count are the primary signal and stay visible; the rest
-                          reflows rather than being hidden. Deliberately OUTSIDE
-                          the overflow-x wrapper above — cards must not sit in
-                          their own scroll container on a phone. */}
-                      <ul className="mt-4 space-y-2 md:hidden">
-                            {readiness.classes.map((c) => (
-                              <li
-                                key={c.name}
-                                className="rounded-lg bg-slate-950/50 px-3 py-2 text-sm"
-                              >
-                                <div className="flex items-center justify-between gap-2">
-                                  <span className="font-mono">{c.name}</span>
-                                  <TierBadge tier={c.tier} label={label(`tier.${c.tier}`, c.tier)} />
-                                </div>
-                                <div className="mt-1 flex flex-wrap gap-x-4 text-xs text-slate-400">
-                                  <span>
-                                    {t('blobs.mode')}: <span className="font-mono">{c.mode}</span>
-                                  </span>
-                                  <span className="tabular-nums">
-                                    {t('blobs.checked')}: {c.checked} / {c['total-rows']}
-                                  </span>
-                                  <span
-                                    className={`tabular-nums ${
-                                      c.missing > 0 ? 'text-red-300' : ''
-                                    }`}
-                                  >
-                                    {t('blobs.missing')}: {c.missing}
-                                  </span>
-                                </div>
-                                {(c.error || c.note) && (
-                                  <p className="mt-1 text-xs text-slate-400">
-                                    {c.error || c.note}
-                                  </p>
-                                )}
-                              </li>
-                            ))}
-                      </ul>
-                    </>
-                  )}
-                </div>
-              )}
-            </section>
           </>
         )}
       </main>
     </div>
   )
-}
-
-function TierBadge({ tier, label }: { tier: string; label: string }) {
-  const tone =
-    tier === 'irreplaceable'
-      ? 'bg-red-950/40 text-red-200'
-      : tier === 'history'
-        ? 'bg-slate-800 text-slate-300'
-        : 'bg-slate-800 text-slate-400'
-  return <span className={`rounded px-2 py-0.5 text-xs ${tone}`}>{label}</span>
 }

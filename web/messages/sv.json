@@ -2897,30 +2897,6 @@
       "unavailable": "Komponenternas beredskap kunde inte läsas: {reason}",
       "ready": "{ready} av {desired} klara",
       "pdbBlocks": "PDB tillåter ingen eviction"
-    },
-    "blobs": {
-      "title": "Objektlagring",
-      "intro": "Replikeringen bär databasrader; objekten som de raderna namnger ligger i objektlagringen. Rader som finns utan sina objekt ger en nod som ser frisk ut och inte kan betjäna en körning. Den här kontrollen gör riktiga anrop mot lagringen och körs därför bara när du ber om den.",
-      "check": "Kontrollera nu",
-      "checking": "Kontrollerar…",
-      "fullLabel": "Kontrollera varje objekt (långsamt i en stor miljö)",
-      "sampled": "Stickprov — bara de senaste objekten per klass kontrollerades, inte hela miljön. Jämför nedan antalet kontrollerade med totalen för varje klass.",
-      "full": "Fullständig kontroll — varje objekt i varje kontrollerad klass.",
-      "unavailable": "Objektlagringen kunde inte läsas: {reason}",
-      "irreplaceableMissing": "Objekt saknas i klasser vars förlust är permanent: {classes}. Gör ingen failover till den här noden.",
-      "irreplaceableUnchecked": "Inget påstås om: {classes}. De är avstängda eller går inte att verifiera från databasen, så noll saknade betyder inte att de finns.",
-      "class": "Klass",
-      "tier": "Nivå",
-      "mode": "Läge",
-      "checked": "Kontrollerade",
-      "missing": "Saknade",
-      "note": "Notering",
-      "complete": "Fullständig"
-    },
-    "tier": {
-      "irreplaceable": "Oersättlig",
-      "history": "Historik",
-      "rederivable": "Återskapningsbar"
     }
   }
 }

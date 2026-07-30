@@ -2897,30 +2897,6 @@
       "unavailable": "Não foi possível ler a prontidão dos componentes: {reason}",
       "ready": "{ready} de {desired} prontos",
       "pdbBlocks": "O PDB não permite nenhum despejo"
-    },
-    "blobs": {
-      "title": "Armazenamento de objetos",
-      "intro": "A replicação carrega linhas do banco de dados; os objetos que essas linhas nomeiam ficam no armazenamento de objetos. Linhas presentes com objetos ausentes é um nó que parece saudável e não consegue atender a uma execução. Esta verificação faz requisições reais ao armazenamento, por isso só roda quando você pede.",
-      "check": "Verificar agora",
-      "checking": "Verificando…",
-      "fullLabel": "Verificar todos os objetos (lento em um parque grande)",
-      "sampled": "Amostragem — foram verificados apenas os objetos mais recentes de cada classe, não o parque inteiro. Compare abaixo o verificado com o total de cada classe.",
-      "full": "Verificação completa — todos os objetos de todas as classes verificadas.",
-      "unavailable": "Não foi possível ler o armazenamento de objetos: {reason}",
-      "irreplaceableMissing": "Faltam objetos em classes cuja perda é permanente: {classes}. Não faça failover para este nó.",
-      "irreplaceableUnchecked": "Nada foi afirmado sobre: {classes}. Elas estão desligadas ou não podem ser verificadas a partir do banco de dados, então zero ausentes não significa presentes.",
-      "class": "Classe",
-      "tier": "Camada",
-      "mode": "Modo",
-      "checked": "Verificados",
-      "missing": "Ausentes",
-      "note": "Observação",
-      "complete": "Completo"
-    },
-    "tier": {
-      "irreplaceable": "Insubstituível",
-      "history": "Histórico",
-      "rederivable": "Rederivável"
     }
   }
 }

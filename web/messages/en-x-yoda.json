@@ -2897,30 +2897,6 @@
       "unavailable": "Read, the readiness of the components could not be: {reason}",
       "ready": "Ready, {ready} of {desired} are",
       "pdbBlocks": "No eviction, the PDB permits"
-    },
-    "blobs": {
-      "title": "Store of objects",
-      "intro": "Rows of the database, replication carries; in the object store, the objects those rows name live. A node that healthy looks and serve a run cannot, rows present with objects absent are. Real requests to the store this check makes, so only when ask you do, run it will.",
-      "check": "Check, now",
-      "checking": "Checking, it is…",
-      "fullLabel": "Every object check (slow on a large estate, it is)",
-      "sampled": "Sampled it was — the newest few objects per class checked this did, not the whole estate. Against the total for each class below, checked compare you must.",
-      "full": "Full the check was — every object of every class checked.",
-      "unavailable": "Read, the object store could not be: {reason}",
-      "irreplaceableMissing": "Missing from classes whose loss permanent is, objects are: {classes}. Onto this node, fail over you must not.",
-      "irreplaceableUnchecked": "Made about these, no claim was: {classes}. Switched off they are, or from the database verified they cannot be — so present, zero missing does not mean.",
-      "class": "Class",
-      "tier": "Tier",
-      "mode": "Mode",
-      "checked": "Checked",
-      "missing": "Missing",
-      "note": "Note",
-      "complete": "Complete"
-    },
-    "tier": {
-      "irreplaceable": "Irreplaceable",
-      "history": "History",
-      "rederivable": "Re-derivable"
     }
   }
 }
