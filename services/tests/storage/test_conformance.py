@@ -73,6 +73,49 @@ async def _conformance_list_prefix(store: ObjectStore) -> None:
     assert "conformance/other/gamma.txt" not in keys
 
 
+async def _conformance_list_paging(store: ObjectStore) -> None:
+    """Test: `after` and `limit` bound a listing, in key order.
+
+    Run against every backend rather than unit-tested per backend, because the
+    whole point of putting the cursor in the protocol is that a caller can page
+    without knowing which backend is underneath. The mechanisms differ wildly —
+    S3 `StartAfter`, GCS `startOffset` + `nextPageToken`, an Azure skip-while, a
+    filesystem sort — so only a shared test says they agree.
+    """
+    prefix = "conformance/paging/"
+    keys = [f"{prefix}{i:02d}.txt" for i in range(6)]
+    for key in keys:
+        await store.put(key, b"x")
+
+    everything = [m.key for m in await store.list_prefix(prefix)]
+    assert everything == keys, "listing must be in lexicographic key order"
+
+    first_two = [m.key for m in await store.list_prefix(prefix, limit=2)]
+    assert first_two == keys[:2]
+
+    # `after` is strictly greater: the boundary key itself is not returned.
+    after_first = [m.key for m in await store.list_prefix(prefix, after=keys[0])]
+    assert after_first == keys[1:]
+
+    page = [m.key for m in await store.list_prefix(prefix, after=keys[1], limit=2)]
+    assert page == keys[2:4]
+
+    # Walking with the cursor visits every key exactly once, which is what a
+    # resumable backfill depends on.
+    walked: list[str] = []
+    cursor = ""
+    while True:
+        batch = await store.list_prefix(prefix, after=cursor, limit=2)
+        if not batch:
+            break
+        walked.extend(m.key for m in batch)
+        cursor = batch[-1].key
+    assert walked == keys
+
+    # Past the end is empty, not a wrap-around.
+    assert await store.list_prefix(prefix, after=keys[-1]) == []
+
+
 async def _conformance_put_stream_get_stream(store: ObjectStore) -> None:
     """Test: put_stream/get_stream roundtrip produces identical data."""
 
@@ -147,6 +190,9 @@ class TestFilesystemConformance:
     async def test_list_prefix(self, conformance_fs_store: FilesystemStore) -> None:
         await _conformance_list_prefix(conformance_fs_store)
 
+    async def test_list_paging(self, conformance_fs_store: FilesystemStore) -> None:
+        await _conformance_list_paging(conformance_fs_store)
+
     async def test_put_stream_get_stream(self, conformance_fs_store: FilesystemStore) -> None:
         await _conformance_put_stream_get_stream(conformance_fs_store)
 
@@ -210,6 +256,9 @@ class TestS3Conformance:
 
     async def test_list_prefix(self, conformance_s3_store: object) -> None:
         await _conformance_list_prefix(conformance_s3_store)  # type: ignore[arg-type]
+
+    async def test_list_paging(self, conformance_s3_store: object) -> None:
+        await _conformance_list_paging(conformance_s3_store)  # type: ignore[arg-type]
 
     async def test_put_stream_get_stream(self, conformance_s3_store: object) -> None:
         await _conformance_put_stream_get_stream(conformance_s3_store)  # type: ignore[arg-type]

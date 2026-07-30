@@ -124,6 +124,52 @@ class TestAzureStoreUnit:
         assert meta.content_type == "text/plain"
         assert meta.metadata["key"] == "value"
 
+    async def test_list_prefix_applies_the_cursor_and_the_limit(self, store: AzureStore) -> None:
+        """Azure has no arbitrary key cursor (#1155).
+
+        List Blobs offers a continuation token, not a `StartAfter`, so `after` is
+        applied as results stream past. That bounds memory and the returned page
+        but not the server-side scan — which is a real difference from S3 and GCS
+        and worth pinning so nobody "optimises" the skip away believing the SDK
+        is doing it.
+        """
+
+        def blob(name: str) -> MagicMock:
+            b = MagicMock()
+            b.name = name
+            b.size = 1
+            b.content_settings = None
+            b.etag = '"e"'
+            b.last_modified = datetime(2025, 1, 1, tzinfo=UTC)
+            b.metadata = None
+            return b
+
+        names = [f"terrapod/logs/{c}.txt" for c in "abcde"]
+
+        def make_container() -> MagicMock:
+            container = MagicMock()
+
+            async def _iter(**_kwargs):
+                for n in names:
+                    yield blob(n)
+
+            container.list_blobs = _iter
+            return container
+
+        with patch.object(store, "_get_container_client", return_value=make_container()):
+            everything = await store.list_prefix("logs/")
+        assert [m.key for m in everything] == [f"logs/{c}.txt" for c in "abcde"]
+
+        with patch.object(store, "_get_container_client", return_value=make_container()):
+            after = await store.list_prefix("logs/", after="logs/b.txt")
+        assert [m.key for m in after] == ["logs/c.txt", "logs/d.txt", "logs/e.txt"], (
+            "after is strictly greater — the boundary key is not returned"
+        )
+
+        with patch.object(store, "_get_container_client", return_value=make_container()):
+            page = await store.list_prefix("logs/", after="logs/a.txt", limit=2)
+        assert [m.key for m in page] == ["logs/b.txt", "logs/c.txt"]
+
     async def test_put_stream_staged_blocks(self, store: AzureStore) -> None:
         mock_container = _make_mock_container()
         mock_blob_client = mock_container.get_blob_client.return_value

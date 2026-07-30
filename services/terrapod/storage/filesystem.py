@@ -213,7 +213,13 @@ class FilesystemStore:
             metadata=metadata,
         )
 
-    async def list_prefix(self, prefix: str) -> list[ObjectMeta]:
+    async def list_prefix(
+        self,
+        prefix: str,
+        *,
+        after: str = "",
+        limit: int | None = None,
+    ) -> list[ObjectMeta]:
         prefix_path = self._full_path(prefix) if prefix else self._root
         results: list[ObjectMeta] = []
 
@@ -223,12 +229,24 @@ class FilesystemStore:
             return results
 
         prefix_str = prefix if prefix else ""
-        for path in sorted(search_dir.rglob("*")):
-            if path.is_file() and not path.name.endswith(".meta"):
-                key = self._key_from_path(path)
-                if key.startswith(prefix_str):
-                    meta = await self.head(key)
-                    results.append(meta)
+        # Collect keys first, then `head()` only the ones being returned. The old
+        # shape stat'd every file in the tree before any filtering, so a bounded
+        # page still paid for the whole walk. Sorted on the KEY rather than the
+        # Path so the order matches what the object-store backends produce.
+        keys = sorted(
+            self._key_from_path(path)
+            for path in search_dir.rglob("*")
+            if path.is_file() and not path.name.endswith(".meta")
+        )
+
+        for key in keys:
+            if not key.startswith(prefix_str):
+                continue
+            if after and key <= after:
+                continue
+            results.append(await self.head(key))
+            if limit is not None and len(results) >= limit:
+                break
 
         return results
 

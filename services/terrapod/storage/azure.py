@@ -293,13 +293,32 @@ class AzureStore:
             metadata=dict(props.metadata) if props.metadata else {},
         )
 
-    async def list_prefix(self, prefix: str) -> list[ObjectMeta]:
+    async def list_prefix(
+        self,
+        prefix: str,
+        *,
+        after: str = "",
+        limit: int | None = None,
+    ) -> list[ObjectMeta]:
+        """List objects under `prefix`, in key order.
+
+        Honest about what this bounds and what it does not. Azure's List Blobs
+        has a continuation token but **no arbitrary key cursor**, so `after` is
+        applied as the results stream past: memory and the returned page are
+        bounded, the server-side scan is not. Results arrive lexicographically
+        ordered, so skipping until past `after` is correct — just not free.
+
+        S3 and GCS take the cursor server-side; this is the one backend where a
+        deep cursor still costs a walk.
+        """
         container = await self._get_container_client()
         full_prefix = self._full_key(prefix)
         results: list[ObjectMeta] = []
 
         async for blob in container.list_blobs(name_starts_with=full_prefix):
             key = self._strip_prefix(blob.name)
+            if after and key <= after:
+                continue
             results.append(
                 ObjectMeta(
                     key=key,
@@ -314,6 +333,8 @@ class AzureStore:
                     metadata=dict(blob.metadata) if blob.metadata else {},
                 )
             )
+            if limit is not None and len(results) >= limit:
+                break
 
         return results
 

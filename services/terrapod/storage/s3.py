@@ -297,13 +297,29 @@ class S3Store:
             metadata=response.get("Metadata", {}),
         )
 
-    async def list_prefix(self, prefix: str) -> list[ObjectMeta]:
+    async def list_prefix(
+        self,
+        prefix: str,
+        *,
+        after: str = "",
+        limit: int | None = None,
+    ) -> list[ObjectMeta]:
         client = await self._get_client()
         full_prefix = self._full_key(prefix)
         results: list[ObjectMeta] = []
 
+        # `StartAfter` is exactly a key cursor, and `MaxItems` bounds the walk
+        # across pages — so a page here costs a page upstream, not a full listing
+        # sliced afterwards. `StartAfter` is compared against the stored key, so
+        # it needs the bucket prefix applied like any other key.
+        params: dict[str, object] = {"Bucket": self._bucket, "Prefix": full_prefix}
+        if after:
+            params["StartAfter"] = self._full_key(after)
+        if limit is not None:
+            params["PaginationConfig"] = {"MaxItems": limit}
+
         paginator = client.get_paginator("list_objects_v2")
-        async for page in paginator.paginate(Bucket=self._bucket, Prefix=full_prefix):
+        async for page in paginator.paginate(**params):
             for obj in page.get("Contents", []):
                 key = self._strip_prefix(obj["Key"])
                 results.append(
