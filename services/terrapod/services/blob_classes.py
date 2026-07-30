@@ -60,6 +60,7 @@ from dataclasses import dataclass
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from terrapod.config import BLOB_CLASS_NAMES, BLOB_MODES
 from terrapod.storage import keys
 
 #: What losing a class costs, from #1114.
@@ -72,7 +73,7 @@ OFF = "off"
 VERIFY = "verify"
 COPY = "copy"
 
-MODES = (OFF, VERIFY, COPY)
+MODES = BLOB_MODES
 
 #: Resolvers return ``(total_rows, keys_to_check)``. The split is load-bearing: a
 #: class can hold ten thousand rows and be sampled to twenty-five keys, and a
@@ -403,6 +404,27 @@ CLASSES: tuple[BlobClass, ...] = (
 )
 
 CLASS_NAMES: tuple[str, ...] = tuple(c.name for c in CLASSES)
+
+# The operator-facing vocabulary is declared in `config.py`, because `config.py`
+# has to stay a leaf: it is imported before anything else at startup and,
+# separately, by the config-channel contract check in a pydantic-only
+# environment. A validator reaching in here would pull in SQLAlchemy and the
+# storage package — which imports `settings` back, so the import would land
+# mid-initialisation and the API would refuse to boot.
+#
+# That leaves the names written down twice, so they are bound together here and
+# the check fails at import rather than at the first mismatched lookup. Ordering
+# is part of it: the register's order is what a readiness report and a copier both
+# follow, and the config's list documents it.
+if CLASS_NAMES != BLOB_CLASS_NAMES:
+    raise RuntimeError(
+        "blob class register and config.BLOB_CLASS_NAMES disagree.\n"
+        f"  register: {CLASS_NAMES}\n"
+        f"  config:   {BLOB_CLASS_NAMES}\n"
+        "Both must list the same classes in the same order — the config's copy is "
+        "what validates an operator's `ha.blobs.classes`, so a class missing there "
+        "is one they cannot configure."
+    )
 
 _BY_NAME = {c.name: c for c in CLASSES}
 

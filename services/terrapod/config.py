@@ -1250,6 +1250,43 @@ class HAReplicationConfig(BaseModel):
     )
 
 
+#: The object-store prefix classes an operator can set a policy on, in the order
+#: the register lists them (irreplaceable first). Declared here, not imported from
+#: `services/blob_classes.py`, for two reasons that both bite hard:
+#:
+#: 1. **`config.py` must stay a leaf.** It is imported during startup before
+#:    anything else, and by the config-channel contract check in a minimal
+#:    pydantic-only environment. Reaching into the services layer from a validator
+#:    pulls in SQLAlchemy and the storage package — and the storage package imports
+#:    `settings` back, so the import lands mid-initialisation and the API refuses
+#:    to boot.
+#: 2. The vocabulary **is** part of the operator contract: it is what somebody
+#:    types into `values.yaml`, so it belongs beside the field that accepts it.
+#:
+#: `services/blob_classes.py` raises at import if its register disagrees with this
+#: list, so the duplication cannot drift — and `values.schema.json` is held to the
+#: same list by a test, so `helm lint` rejects a typo before install too.
+BLOB_CLASS_NAMES: tuple[str, ...] = (
+    "state",
+    "state_index",
+    "configuration_versions",
+    "registry_modules",
+    "registry_providers",
+    "run_logs",
+    "run_plans",
+    "run_vars",
+    "provider_cache",
+    "binary_cache",
+    "platform_provider_cache",
+    "cost_pricesheet",
+    "vcs_archives",
+    "module_overrides",
+)
+
+#: What Terrapod does about a class. See `HABlobsConfig`.
+BLOB_MODES: tuple[str, ...] = ("off", "verify", "copy")
+
+
 class HABlobsConfig(BaseModel):
     """What Terrapod does about each class of the object store (#960 phase 4, #1114).
 
@@ -1293,26 +1330,22 @@ class HABlobsConfig(BaseModel):
     @field_validator("mode")
     @classmethod
     def _valid_mode(cls, v: str) -> str:
-        from terrapod.services.blob_classes import MODES
-
-        if v not in MODES:
-            raise ValueError(f"ha.blobs.mode must be one of {sorted(MODES)}")
+        if v not in BLOB_MODES:
+            raise ValueError(f"ha.blobs.mode must be one of {sorted(BLOB_MODES)}")
         return v
 
     @field_validator("classes")
     @classmethod
     def _valid_classes(cls, v: dict[str, str]) -> dict[str, str]:
-        from terrapod.services.blob_classes import CLASS_NAMES, MODES
-
         for name, mode in v.items():
-            if name not in CLASS_NAMES:
+            if name not in BLOB_CLASS_NAMES:
                 raise ValueError(
                     f"ha.blobs.classes: unknown class {name!r}; known classes are "
-                    f"{sorted(CLASS_NAMES)}"
+                    f"{sorted(BLOB_CLASS_NAMES)}"
                 )
-            if mode not in MODES:
+            if mode not in BLOB_MODES:
                 raise ValueError(
-                    f"ha.blobs.classes.{name} must be one of {sorted(MODES)}, got {mode!r}"
+                    f"ha.blobs.classes.{name} must be one of {sorted(BLOB_MODES)}, got {mode!r}"
                 )
         return v
 
