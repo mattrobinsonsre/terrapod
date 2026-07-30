@@ -2896,7 +2896,17 @@
       "none": "没有组件上报。",
       "unavailable": "无法读取组件就绪情况：{reason}",
       "ready": "{desired} 个中有 {ready} 个就绪",
-      "pdbBlocks": "PDB 不允许任何驱逐"
+      "pdbBlocks": "PDB 不允许任何驱逐",
+      "restricted": "每个组件的就绪数与期望数仅向管理员和审计员展示。此处不显示——这是权限所致，并非集群为空。"
     }
+  },
+  "haIndicator": {
+    "follower": "从节点",
+    "singleNode": "单节点",
+    "inSync": "已同步",
+    "behind": "落后",
+    "backfilling": "回填中",
+    "aria": "高可用：{role}，{state}",
+    "leader": "主节点"
   }
 }

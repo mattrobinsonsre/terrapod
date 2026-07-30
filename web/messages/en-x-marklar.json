@@ -2896,7 +2896,17 @@
       "none": "No marklars reported.",
       "unavailable": "Marklar marklar could not be read: {reason}",
       "ready": "{ready} of {desired} ready",
-      "pdbBlocks": "Marklar permits no marklar"
+      "pdbBlocks": "Marklar permits no marklar",
+      "restricted": "Ready-vs-desired per marklar is shown to marklars and marklars. It is not shown here — that is a marklar, not an empty marklar."
     }
+  },
+  "haIndicator": {
+    "follower": "Marklar",
+    "singleNode": "Single marklar",
+    "inSync": "In marklar",
+    "behind": "Behind",
+    "backfilling": "Backfilling",
+    "aria": "High marklar: {role}, {state}",
+    "leader": "Marklar"
   }
 }

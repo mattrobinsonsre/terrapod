@@ -2896,7 +2896,17 @@
       "none": "Nulla pars nuntiata est.",
       "unavailable": "Paratio partium legi non potuit: {reason}",
       "ready": "{ready} ex {desired} paratae",
-      "pdbBlocks": "PDB nullam eiectionem permittit"
+      "pdbBlocks": "PDB nullam eiectionem permittit",
+      "restricted": "Paratae contra optatas per partes administratoribus et inspectoribus monstrantur. Hic non monstrantur — potestatis res est, non glomus vacuum."
     }
+  },
+  "haIndicator": {
+    "follower": "Sectator",
+    "singleNode": "Nodus singularis",
+    "inSync": "Aequatus",
+    "behind": "Retro",
+    "backfilling": "Replens",
+    "aria": "Alta disponibilitas: {role}, {state}",
+    "leader": "Ductor"
   }
 }

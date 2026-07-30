@@ -2896,7 +2896,17 @@
       "none": "pagh chenmoHwI' ja'lu'.",
       "unavailable": "chenmoHwI' ghuHtaHghach laDlaHbe'lu': {reason}",
       "ready": "{desired} chenmoHwI'mey {ready} ghuHtaH",
-      "pdbBlocks": "pagh teqmeH chaw' PDB"
+      "pdbBlocks": "pagh teqmeH chaw' PDB",
+      "restricted": "Hoch chenmoHwI' ghuHtaHghach vu'wI'pu' 'ej nItebHa'wI'pu' luleghlu'. naDev cha'lu'be' — chaw' ghu' 'oH, ghom chImbe'."
     }
+  },
+  "haIndicator": {
+    "follower": "tlhavwI'",
+    "singleNode": "wa' De'wI'",
+    "inSync": "rurchu'",
+    "behind": "tlha'",
+    "backfilling": "teblI'",
+    "aria": "taH laH: {role}, {state}",
+    "leader": "DevwI'"
   }
 }

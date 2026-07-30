@@ -2896,7 +2896,17 @@
       "none": "No bitz reportid.",
       "unavailable": "Cud not reed da bitz reddynes: {reason}",
       "ready": "{ready} ov {desired} reddy",
-      "pdbBlocks": "PDB sez NO kikkin owt"
+      "pdbBlocks": "PDB sez NO kikkin owt",
+      "restricted": "Reddy-vs-wanted per bit iz shown to bosses an chekkerz. It iz not shown heer — dats a permishun fing, NOT an empty clustr."
     }
+  },
+  "haIndicator": {
+    "follower": "Follwr",
+    "singleNode": "Just wun node",
+    "inSync": "All caught up",
+    "behind": "Behind",
+    "backfilling": "Fillin in",
+    "aria": "Hai availabilitee: {role}, {state}",
+    "leader": "Leedr"
   }
 }

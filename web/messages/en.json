@@ -2896,7 +2896,17 @@
       "none": "No components reported.",
       "unavailable": "Component readiness could not be read: {reason}",
       "ready": "{ready} of {desired} ready",
-      "pdbBlocks": "PDB permits no eviction"
+      "pdbBlocks": "PDB permits no eviction",
+      "restricted": "Ready-vs-desired per component is shown to administrators and auditors. It is not shown here — that is a permission, not an empty cluster."
     }
+  },
+  "haIndicator": {
+    "follower": "Follower",
+    "singleNode": "Single node",
+    "inSync": "In sync",
+    "behind": "Behind",
+    "backfilling": "Backfilling",
+    "aria": "High availability: {role}, {state}",
+    "leader": "Leader"
   }
 }

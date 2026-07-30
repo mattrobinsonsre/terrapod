@@ -2896,7 +2896,17 @@
       "none": "Reported, no components have.",
       "unavailable": "Read, the readiness of the components could not be: {reason}",
       "ready": "Ready, {ready} of {desired} are",
-      "pdbBlocks": "No eviction, the PDB permits"
+      "pdbBlocks": "No eviction, the PDB permits",
+      "restricted": "To administrators and auditors, ready-versus-desired per component shown is. Shown here, it is not — a permission that is, not an empty cluster."
     }
+  },
+  "haIndicator": {
+    "follower": "Follower",
+    "singleNode": "Node, a single one",
+    "inSync": "In sync",
+    "behind": "Behind",
+    "backfilling": "Backfilling",
+    "aria": "Availability, high: {role}, {state}",
+    "leader": "Leader"
   }
 }

@@ -2896,7 +2896,17 @@
       "none": "Inga komponenter rapporterade.",
       "unavailable": "Komponenternas beredskap kunde inte läsas: {reason}",
       "ready": "{ready} av {desired} klara",
-      "pdbBlocks": "PDB tillåter ingen eviction"
+      "pdbBlocks": "PDB tillåter ingen eviction",
+      "restricted": "Klara mot önskade per komponent visas för administratörer och revisorer. Det visas inte här — det är en behörighet, inte ett tomt kluster."
     }
+  },
+  "haIndicator": {
+    "follower": "Följare",
+    "singleNode": "Enskild nod",
+    "inSync": "I synk",
+    "behind": "Efter",
+    "backfilling": "Fyller på",
+    "aria": "Hög tillgänglighet: {role}, {state}",
+    "leader": "Ledare"
   }
 }

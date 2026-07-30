@@ -2896,7 +2896,17 @@
       "none": "보고된 구성 요소가 없습니다.",
       "unavailable": "구성 요소의 준비 상태를 읽을 수 없습니다: {reason}",
       "ready": "{desired}개 중 {ready}개 준비됨",
-      "pdbBlocks": "PDB가 어떤 축출도 허용하지 않습니다"
+      "pdbBlocks": "PDB가 어떤 축출도 허용하지 않습니다",
+      "restricted": "구성 요소별 준비/목표 수는 관리자와 감사자에게 표시됩니다. 여기에는 표시되지 않습니다 — 권한 문제이지 클러스터가 비어 있는 것이 아닙니다."
     }
+  },
+  "haIndicator": {
+    "follower": "팔로워",
+    "singleNode": "단일 노드",
+    "inSync": "동기화됨",
+    "behind": "지연",
+    "backfilling": "백필 중",
+    "aria": "고가용성: {role}, {state}",
+    "leader": "리더"
   }
 }

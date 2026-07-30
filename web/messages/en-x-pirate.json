@@ -2896,7 +2896,17 @@
       "none": "Nary a hand reported.",
       "unavailable": "Could not read the crew's readiness: {reason}",
       "ready": "{ready} of {desired} at their stations",
-      "pdbBlocks": "The PDB suffers none to be put ashore"
+      "pdbBlocks": "The PDB suffers none to be put ashore",
+      "restricted": "Ready against wanted for each hand be shown to captains and inspectors. It be not shown here — that be a matter of leave, not an empty fleet."
     }
+  },
+  "haIndicator": {
+    "follower": "Consort",
+    "singleNode": "Sailin' alone",
+    "inSync": "Abreast",
+    "behind": "Astern",
+    "backfilling": "Fillin' the hold",
+    "aria": "Ever-afloat: {role}, {state}",
+    "leader": "Flagship"
   }
 }

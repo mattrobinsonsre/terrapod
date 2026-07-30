@@ -2896,7 +2896,17 @@
       "none": "Ni adroddwyd am unrhyw gydrannau.",
       "unavailable": "Nid oedd modd darllen parodrwydd y cydrannau: {reason}",
       "ready": "{ready} o {desired} yn barod",
-      "pdbBlocks": "Nid yw'r PDB yn caniatáu unrhyw droi allan"
+      "pdbBlocks": "Nid yw'r PDB yn caniatáu unrhyw droi allan",
+      "restricted": "Dangosir parod-yn-erbyn-dymunol fesul cydran i weinyddwyr ac archwilwyr. Ni chaiff ei ddangos yma — mater o ganiatâd yw hynny, nid clwstwr gwag."
     }
+  },
+  "haIndicator": {
+    "follower": "Dilynwr",
+    "singleNode": "Un nod",
+    "inSync": "Wedi cydamseru",
+    "behind": "Ar ei hôl hi",
+    "backfilling": "Llenwi'n ôl",
+    "aria": "Argaeledd uchel: {role}, {state}",
+    "leader": "Arweinydd"
   }
 }

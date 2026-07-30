@@ -2896,7 +2896,17 @@
       "none": "No se ha informado de ningún componente.",
       "unavailable": "No se pudo leer la disponibilidad de los componentes: {reason}",
       "ready": "{ready} de {desired} listos",
-      "pdbBlocks": "El PDB no permite ningún desalojo"
+      "pdbBlocks": "El PDB no permite ningún desalojo",
+      "restricted": "El estado listo/deseado de cada componente se muestra a administradores y auditores. Aquí no se muestra: es un permiso, no un clúster vacío."
     }
+  },
+  "haIndicator": {
+    "follower": "Seguidor",
+    "singleNode": "Nodo único",
+    "inSync": "Sincronizado",
+    "behind": "Por detrás",
+    "backfilling": "Rellenando",
+    "aria": "Alta disponibilidad: {role}, {state}",
+    "leader": "Líder"
   }
 }

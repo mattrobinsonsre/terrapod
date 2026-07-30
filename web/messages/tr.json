@@ -2896,7 +2896,17 @@
       "none": "Hiçbir bileşen bildirilmedi.",
       "unavailable": "Bileşenlerin hazır durumu okunamadı: {reason}",
       "ready": "{desired} bileşenden {ready} tanesi hazır",
-      "pdbBlocks": "PDB hiçbir tahliyeye izin vermiyor"
+      "pdbBlocks": "PDB hiçbir tahliyeye izin vermiyor",
+      "restricted": "Bileşen başına hazır/istenen sayısı yöneticilere ve denetçilere gösterilir. Burada gösterilmez — bu bir yetki meselesidir, boş bir küme değil."
     }
+  },
+  "haIndicator": {
+    "follower": "Takipçi",
+    "singleNode": "Tek düğüm",
+    "inSync": "Eşitlendi",
+    "behind": "Geride",
+    "backfilling": "Geri dolduruyor",
+    "aria": "Yüksek erişilebilirlik: {role}, {state}",
+    "leader": "Lider"
   }
 }

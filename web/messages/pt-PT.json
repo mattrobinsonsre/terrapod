@@ -2896,7 +2896,17 @@
       "none": "Nenhum componente reportado.",
       "unavailable": "Não foi possível ler a prontidão dos componentes: {reason}",
       "ready": "{ready} de {desired} prontos",
-      "pdbBlocks": "O PDB não permite qualquer despejo"
+      "pdbBlocks": "O PDB não permite qualquer despejo",
+      "restricted": "O estado pronto/desejado de cada componente é mostrado a administradores e auditores. Aqui não é apresentado — é uma permissão, não um cluster vazio."
     }
+  },
+  "haIndicator": {
+    "follower": "Seguidor",
+    "singleNode": "Nó único",
+    "inSync": "Em sincronia",
+    "behind": "Atrasado",
+    "backfilling": "Em recuperação",
+    "aria": "Alta disponibilidade: {role}, {state}",
+    "leader": "Líder"
   }
 }

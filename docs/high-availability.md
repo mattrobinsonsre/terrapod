@@ -343,9 +343,18 @@ follower simply takes it.
 
 ## Reading all of this in the UI
 
-**Admin → High availability** (`/admin/ha`) shows the node's role, whether it is
-converging with its peer, and in-cluster readiness with its findings. It needs
-the `admin` or `audit` role, the same gate as the endpoints it reads.
+The **HA indicator in the nav bar** is on every page, for every signed-in user,
+and clicking it opens the HA page (`/ha`). Which node you are talking to, and
+whether it is converging, is context rather than an administrative task — and
+the person whose next write is about to be refused by a follower is precisely
+the person who needs it.
+
+The page shows the node's role, whether it is converging with its peer, and
+in-cluster readiness. That last part — ready-vs-desired per component, node and
+zone concentration, the disruption-budget findings — describes the *deployment*
+rather than this node's own posture, so it stays `admin`/`audit`. Everyone else
+is told plainly that it is withheld, rather than shown an empty list that would
+read as "nothing is running".
 
 It is **read-only on purpose**. There is no promote button, no failover button.
 A failover is moving DNS (see [Performing a failover](#performing-a-failover));

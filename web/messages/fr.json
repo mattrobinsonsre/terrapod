@@ -2896,7 +2896,17 @@
       "none": "Aucun composant signalé.",
       "unavailable": "La disponibilité des composants n'a pas pu être lue : {reason}",
       "ready": "{ready} sur {desired} prêts",
-      "pdbBlocks": "Le PDB n'autorise aucune éviction"
+      "pdbBlocks": "Le PDB n'autorise aucune éviction",
+      "restricted": "L'état prêt/souhaité de chaque composant est réservé aux administrateurs et aux auditeurs. Il n'est pas affiché ici — c'est une autorisation, pas un cluster vide."
     }
+  },
+  "haIndicator": {
+    "follower": "Suiveur",
+    "singleNode": "Nœud unique",
+    "inSync": "Synchronisé",
+    "behind": "En retard",
+    "backfilling": "Rattrapage",
+    "aria": "Haute disponibilité : {role}, {state}",
+    "leader": "Leader"
   }
 }

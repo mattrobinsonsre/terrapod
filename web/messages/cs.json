@@ -2896,7 +2896,17 @@
       "none": "Žádná komponenta se nehlásí.",
       "unavailable": "Připravenost komponent se nepodařilo načíst: {reason}",
       "ready": "Připraveno {ready} z {desired}",
-      "pdbBlocks": "PDB nepovoluje žádné vystěhování"
+      "pdbBlocks": "PDB nepovoluje žádné vystěhování",
+      "restricted": "Připravené vůči požadovaným pro každou komponentu vidí administrátoři a auditoři. Zde se nezobrazuje — jde o oprávnění, ne o prázdný cluster."
     }
+  },
+  "haIndicator": {
+    "follower": "Následovník",
+    "singleNode": "Jediný uzel",
+    "inSync": "Synchronizováno",
+    "behind": "Pozadu",
+    "backfilling": "Doplňuje",
+    "aria": "Vysoká dostupnost: {role}, {state}",
+    "leader": "Vedoucí"
   }
 }

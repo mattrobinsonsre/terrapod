@@ -2896,7 +2896,17 @@
       "none": "沒有元件回報。",
       "unavailable": "無法讀取元件就緒情況：{reason}",
       "ready": "{desired} 個中有 {ready} 個就緒",
-      "pdbBlocks": "PDB 不允許任何逐出"
+      "pdbBlocks": "PDB 不允許任何逐出",
+      "restricted": "每個元件的就緒數與期望數僅向管理員和稽核員顯示。此處不顯示——這是權限所致，並非叢集為空。"
     }
+  },
+  "haIndicator": {
+    "follower": "從節點",
+    "singleNode": "單一節點",
+    "inSync": "已同步",
+    "behind": "落後",
+    "backfilling": "回補中",
+    "aria": "高可用性：{role}，{state}",
+    "leader": "主節點"
   }
 }

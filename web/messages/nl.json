@@ -2896,7 +2896,17 @@
       "none": "Geen componenten gerapporteerd.",
       "unavailable": "De gereedheid van de componenten kon niet worden gelezen: {reason}",
       "ready": "{ready} van {desired} gereed",
-      "pdbBlocks": "PDB staat geen enkele eviction toe"
+      "pdbBlocks": "PDB staat geen enkele eviction toe",
+      "restricted": "Gereed-versus-gewenst per component is zichtbaar voor beheerders en auditors. Hier wordt het niet getoond — dat is een recht, geen leeg cluster."
     }
+  },
+  "haIndicator": {
+    "follower": "Volger",
+    "singleNode": "Enkele node",
+    "inSync": "In sync",
+    "behind": "Achter",
+    "backfilling": "Bijwerken",
+    "aria": "Hoge beschikbaarheid: {role}, {state}",
+    "leader": "Leider"
   }
 }

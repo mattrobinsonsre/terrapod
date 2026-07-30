@@ -2896,7 +2896,17 @@
       "none": "N0 c0mp0n3n75 r3p0r73d.",
       "unavailable": "C0mp0n3n7 r34d1n355 c0uld n07 b3 r34d: {reason}",
       "ready": "{ready} 0f {desired} r34dy",
-      "pdbBlocks": "PDB p3rm175 n0 3v1c710n"
+      "pdbBlocks": "PDB p3rm175 n0 3v1c710n",
+      "restricted": "R34dy-v5-d351r3d p3r c0mp0n3n7 15 5h0wn 70 4dm1n157r470r5 4nd 4ud170r5. 17 15 n07 5h0wn h3r3 — 7h47 15 4 p3rm15510n, n07 4n 3mp7y clu573r."
     }
+  },
+  "haIndicator": {
+    "follower": "F0ll0w3r",
+    "singleNode": "51ngl3 n0d3",
+    "inSync": "1n 5ync",
+    "behind": "B3h1nd",
+    "backfilling": "B4ckf1ll1ng",
+    "aria": "H1gh 4v41l4b1l17y: {role}, {state}",
+    "leader": "L34d3r"
   }
 }

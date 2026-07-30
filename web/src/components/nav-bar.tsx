@@ -41,6 +41,7 @@ import { clearAuth, isAdmin, isAdminOrAudit, getAuthState } from '@/lib/auth'
 import { SessionExpiryBanner } from '@/components/session-expiry-banner'
 import { TokenExpiryBanner } from '@/components/token-expiry-banner'
 import { LocaleSwitcher } from '@/components/locale-switcher'
+import { HAIndicator } from '@/components/ha-indicator'
 
 /**
  * Navigation is one DRY, viewport-driven component (#719). The link model
@@ -85,7 +86,6 @@ const ADMIN_ITEMS: NavItem[] = [
   { href: '/admin/provider-templates', labelKey: 'providerTemplates', icon: Code },
   { href: '/admin/catalog', labelKey: 'catalogAdmin', icon: Boxes },
   { href: '/admin/binary-cache', labelKey: 'cache', icon: HardDrive },
-  { href: '/admin/ha', labelKey: 'ha', icon: Radio },
 ]
 
 const AUDIT_ITEM: NavItem = { href: '/admin/audit-log', labelKey: 'auditLog', icon: FileText }
@@ -417,6 +417,7 @@ export default function NavBar() {
             {adminOrAudit && (
               <NavDropdown label={t('admin')} icon={Cog} items={adminMenuItems} active={adminActive} align="end" />
             )}
+            <HAIndicator />
             <LocaleSwitcher />
             <NavDropdown label={t('help')} icon={BookOpen} items={HELP_ITEMS} active={helpActive} align="end" />
             <NavDropdown
@@ -451,6 +452,7 @@ export default function NavBar() {
               {version && <span className="text-xs text-slate-500 font-normal">{version}</span>}
             </Link>
             <div className="flex items-center gap-1">
+              <HAIndicator compact />
               <button
                 onClick={() => {
                   setAccountOpen(true)

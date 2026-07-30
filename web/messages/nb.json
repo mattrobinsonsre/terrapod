@@ -2896,7 +2896,17 @@
       "none": "Ingen komponenter rapportert.",
       "unavailable": "Beredskapen til komponentene kunne ikke leses: {reason}",
       "ready": "{ready} av {desired} klare",
-      "pdbBlocks": "PDB tillater ingen eviction"
+      "pdbBlocks": "PDB tillater ingen eviction",
+      "restricted": "Klar mot ønsket per komponent vises for administratorer og revisorer. Det vises ikke her — det er en rettighet, ikke en tom klynge."
     }
+  },
+  "haIndicator": {
+    "follower": "Følger",
+    "singleNode": "Enkelt node",
+    "inSync": "I synk",
+    "behind": "Bak",
+    "backfilling": "Etterfyller",
+    "aria": "Høy tilgjengelighet: {role}, {state}",
+    "leader": "Leder"
   }
 }

@@ -2896,7 +2896,17 @@
       "none": "Żaden komponent się nie zgłosił.",
       "unavailable": "Nie udało się odczytać gotowości komponentów: {reason}",
       "ready": "Gotowe {ready} z {desired}",
-      "pdbBlocks": "PDB nie zezwala na żadną eksmisję"
+      "pdbBlocks": "PDB nie zezwala na żadną eksmisję",
+      "restricted": "Gotowe względem oczekiwanych dla każdego komponentu widzą administratorzy i audytorzy. Tutaj nie jest to pokazywane — to kwestia uprawnień, a nie pustego klastra."
     }
+  },
+  "haIndicator": {
+    "follower": "Naśladowca",
+    "singleNode": "Pojedynczy węzeł",
+    "inSync": "Zsynchronizowany",
+    "behind": "W tyle",
+    "backfilling": "Uzupełnia",
+    "aria": "Wysoka dostępność: {role}, {state}",
+    "leader": "Lider"
   }
 }

@@ -2896,7 +2896,17 @@
       "none": "Ingen komponenter rapporteret.",
       "unavailable": "Komponenternes parathed kunne ikke læses: {reason}",
       "ready": "{ready} af {desired} klar",
-      "pdbBlocks": "PDB tillader ingen eviction"
+      "pdbBlocks": "PDB tillader ingen eviction",
+      "restricted": "Klar-mod-ønsket pr. komponent vises for administratorer og revisorer. Det vises ikke her — det er en rettighed, ikke en tom klynge."
     }
+  },
+  "haIndicator": {
+    "follower": "Følger",
+    "singleNode": "Enkelt node",
+    "inSync": "Synkroniseret",
+    "behind": "Bagud",
+    "backfilling": "Efterfylder",
+    "aria": "Høj tilgængelighed: {role}, {state}",
+    "leader": "Leder"
   }
 }

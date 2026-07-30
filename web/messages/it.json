@@ -2896,7 +2896,17 @@
       "none": "Nessun componente segnalato.",
       "unavailable": "Non è stato possibile leggere la prontezza dei componenti: {reason}",
       "ready": "{ready} di {desired} pronti",
-      "pdbBlocks": "Il PDB non consente alcuno sfratto"
+      "pdbBlocks": "Il PDB non consente alcuno sfratto",
+      "restricted": "Lo stato pronti/desiderati per componente è visibile ad amministratori e revisori. Qui non viene mostrato: è un permesso, non un cluster vuoto."
     }
+  },
+  "haIndicator": {
+    "follower": "Follower",
+    "singleNode": "Nodo singolo",
+    "inSync": "Allineato",
+    "behind": "Indietro",
+    "backfilling": "In recupero",
+    "aria": "Alta disponibilità: {role}, {state}",
+    "leader": "Leader"
   }
 }

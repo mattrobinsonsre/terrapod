@@ -12,7 +12,13 @@ import { getAuthState } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
 
 /**
- * High availability (#1163).
+ * High availability (#1163, #1165).
+ *
+ * Reached by clicking the nav-bar indicator, and open to every signed-in user —
+ * which node you are talking to is context, not an administrative task, and the
+ * person whose next write a follower is about to refuse is precisely who needs
+ * it. The in-cluster half is the exception: it describes the deployment rather
+ * than this node, so it stays admin/audit and says so.
  *
  * Read-only by design. There is no control here that changes a role: failover is
  * moving DNS, and a button that looked like it could fail over would be actively
@@ -59,6 +65,7 @@ interface HAStatus {
   'schedulable-nodes': number | null
   'cluster-zones': number | null
   'ha-findings': Finding[]
+  'components-restricted'?: boolean
   'components-sampled-at': string | null
   'components-unavailable-reason': string | null
   'single-replica-components': string[]
@@ -236,7 +243,12 @@ export default function HAPage() {
                 could have done better, so a one-node cluster shows none. */}
             <section className="rounded-xl border border-slate-800 bg-slate-900/50 p-4 sm:p-6">
               <h2 className="mb-4 text-lg font-medium">{t('components.title')}</h2>
-              {status['components-unavailable-reason'] ? (
+              {status['components-restricted'] ? (
+                // "You may not see this" is a different statement from "I
+                // cannot see this", and from "nothing is running". Saying it
+                // outright is the only one of the three that is true here.
+                <p className="text-sm text-slate-400">{t('components.restricted')}</p>
+              ) : status['components-unavailable-reason'] ? (
                 <p className="text-sm text-slate-400">
                   {t('components.unavailable', {
                     reason: status['components-unavailable-reason'],

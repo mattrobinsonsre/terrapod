@@ -2896,7 +2896,17 @@
       "none": "Keine Komponenten gemeldet.",
       "unavailable": "Die Bereitschaft der Komponenten konnte nicht gelesen werden: {reason}",
       "ready": "{ready} von {desired} bereit",
-      "pdbBlocks": "PDB lässt keine Verdrängung zu"
+      "pdbBlocks": "PDB lässt keine Verdrängung zu",
+      "restricted": "Bereit-zu-Soll je Komponente wird Administratoren und Auditoren angezeigt. Hier wird es nicht angezeigt — das ist eine Berechtigung, kein leerer Cluster."
     }
+  },
+  "haIndicator": {
+    "follower": "Follower",
+    "singleNode": "Einzelner Knoten",
+    "inSync": "Synchron",
+    "behind": "Zurück",
+    "backfilling": "Lädt nach",
+    "aria": "Hochverfügbarkeit: {role}, {state}",
+    "leader": "Leader"
   }
 }
