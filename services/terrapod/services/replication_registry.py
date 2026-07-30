@@ -14,7 +14,11 @@ from terrapod.db.models import (
     AgentPool,
     AgentPoolToken,
     APIToken,
+    AutodiscoveryRule,
+    CatalogItem,
     PlatformRoleAssignment,
+    ProviderTemplate,
+    RegistryModule,
     Role,
     RoleAssignment,
     User,
@@ -97,3 +101,49 @@ API_TOKENS = register(ReplicatedClass(name="api_tokens", model=APIToken))
 # ---------------------------------------------------------------------------
 
 VCS_CONNECTIONS = register(ReplicatedClass(name="vcs_connections", model=VCSConnection))
+
+
+# ---------------------------------------------------------------------------
+# What a workspace points at (#1134)
+#
+# Every one of a workspace's `vcs_connection_id`, `autodiscovery_rule_id` and
+# `catalog_item_id` is a real foreign key, and a *nullable* foreign key is still
+# an enforced one — so none of it can be deferred by nulling the column on the
+# follower. Nor should it be: `workspace_rbac_service` clamps permissions on a
+# `catalog_item_id`-bearing workspace, so dropping that id would WIDEN access at
+# exactly the moment of a failover.
+# ---------------------------------------------------------------------------
+
+# The module row, and deliberately not its versions.
+#
+# `registry_module_versions` rows point at tarballs in object storage, and object
+# storage is #1114. A version row without its tarball is a promise this node
+# cannot keep: `terraform init` would resolve the version, fetch it, and get a
+# 404 mid-run. Withholding the versions fails more honestly — the module exists
+# (so catalog items and module-workspace links have their foreign-key target) and
+# the registry reports no matching version, which is at least true.
+REGISTRY_MODULES = register(ReplicatedClass(name="registry_modules", model=RegistryModule))
+
+# The parameterised provider configurations a catalog item renders into its
+# generated root module. No foreign keys of its own, and referenced from a
+# catalog item only by a JSONB id list — so nothing *enforces* this order. It is
+# still the right one: a catalog item whose provider templates are missing gets
+# through registration and then fails at provision, which is a worse way to find
+# out than not having the item at all.
+PROVIDER_TEMPLATES = register(ReplicatedClass(name="provider_templates", model=ProviderTemplate))
+
+# A blessed designation over a module. `provider_template_ids` and
+# `allowed_agent_pool_ids` are JSONB id lists rather than real foreign keys, so
+# they impose no ordering the database will check — but the ids still have to
+# resolve on the promoted node, which is what puts both of those classes above.
+CATALOG_ITEMS = register(ReplicatedClass(name="catalog_items", model=CatalogItem))
+
+# Monorepo discovery. Points at both a connection and (optionally) a pool, so it
+# comes after both.
+#
+# Withholding it costs more than new directories going undiscovered: the
+# lifecycle reconciler reads `on_directory_delete` off the rule to decide what a
+# removed directory means. A promoted node without the rule has workspaces it
+# cannot reconcile, and the safe-by-default answer it would fall back to is not
+# the one the operator configured.
+AUTODISCOVERY_RULES = register(ReplicatedClass(name="autodiscovery_rules", model=AutodiscoveryRule))
