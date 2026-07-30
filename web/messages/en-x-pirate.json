@@ -2911,7 +2911,9 @@
       "offline": "No hand on watch",
       "offlineWarning": "Nary a hand be on watch for: {pools}. Voyages set for these crews will wait at anchor rather than sail.",
       "count": "{count, plural, one {# hand on watch} other {# hands on watch}}"
-    }
+    },
+    "inbound": "Accepts from consort",
+    "inboundAwaiting": "Named, no token"
   },
   "haIndicator": {
     "follower": "Consort",

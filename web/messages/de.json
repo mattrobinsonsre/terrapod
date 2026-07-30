@@ -2911,7 +2911,9 @@
       "offline": "Kein aktiver Listener",
       "offlineWarning": "Für Folgendes ist kein Listener verbunden: {pools}. Läufe für diese Pools warten in der Warteschlange, statt ausgeführt zu werden.",
       "count": "{count, plural, one {# Listener} other {# Listener}}"
-    }
+    },
+    "inbound": "Akzeptiert vom Partner",
+    "inboundAwaiting": "Benannt, kein Secret"
   },
   "haIndicator": {
     "follower": "Follower",

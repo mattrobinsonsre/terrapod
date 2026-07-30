@@ -208,6 +208,7 @@
     "events-retained",
     "ha-findings",
     "in-sync",
+    "inbound-credential",
     "last-sync-at",
     "node-id",
     "oldest-event-age-seconds",

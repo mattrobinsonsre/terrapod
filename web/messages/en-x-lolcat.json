@@ -2911,7 +2911,9 @@
       "offline": "No liv listenr",
       "offlineWarning": "No listenr iz connectd fur: {pools}. Runz sent to deze poolz will just sit in da queue insted ov runnin.",
       "count": "{count, plural, one {# listenr} other {# listenrz}}"
-    }
+    },
+    "inbound": "Takez frum budy",
+    "inboundAwaiting": "Namd, no secrit"
   },
   "haIndicator": {
     "follower": "Follwr",

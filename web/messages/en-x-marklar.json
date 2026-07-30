@@ -2911,7 +2911,9 @@
       "offline": "No live marklar",
       "offlineWarning": "No marklar is connected for: {pools}. Marklars routed to these marklars will queue rather than execute.",
       "count": "{count, plural, one {# marklar} other {# marklars}}"
-    }
+    },
+    "inbound": "Accepts from marklar",
+    "inboundAwaiting": "Named, no marklar"
   },
   "haIndicator": {
     "follower": "Marklar",

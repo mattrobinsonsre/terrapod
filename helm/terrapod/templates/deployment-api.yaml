@@ -87,6 +87,17 @@ spec:
                   name: {{ .Values.api.config.ha.peer.existingSecret }}
                   key: {{ .Values.api.config.ha.peer.existingSecretKey | default "client_secret" }}
             {{- end }}
+            {{- if (((.Values.api.config.ha).peer).inbound).existingSecret }}
+            # The other half of the link (#1169) — the credential this node
+            # ACCEPTS from its peer. Supplying it here is what makes peering
+            # fully declarative: startup reconciles it into the persisted row,
+            # so no CLI step is needed.
+            - name: TERRAPOD_HA__PEER__INBOUND__CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.api.config.ha.peer.inbound.existingSecret }}
+                  key: {{ .Values.api.config.ha.peer.inbound.existingSecretKey | default "client_secret" }}
+            {{- end }}
             {{- if (.Values.api.config.encryption).existingSecret }}
             # App-layer encryption at rest (#553) — KEK secrets via secretKeyRef.
             # optional:true so a single Secret can carry only the key the chosen

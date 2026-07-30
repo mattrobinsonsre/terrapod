@@ -2911,7 +2911,9 @@
       "offline": "稼働中のリスナーなし",
       "offlineWarning": "次のプールにリスナーが接続されていません: {pools}。これらのプールに割り当てられた実行は待機したままになります。",
       "count": "リスナー {count} 個"
-    }
+    },
+    "inbound": "ピアから受け入れ",
+    "inboundAwaiting": "名前のみ、シークレット未設定"
   },
   "haIndicator": {
     "follower": "フォロワー",

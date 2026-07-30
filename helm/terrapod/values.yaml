@@ -409,11 +409,30 @@ api:
       # runs. The client secret is NEVER set here: it arrives as
       # TERRAPOD_HA__PEER__CLIENT_SECRET from a K8s Secret (peer.existingSecret).
       peer:
+        # OUTBOUND — how this node reaches its peer when it pulls. A credential
+        # this node holds but does not own, so it stays purely config.
         url: ""
         client_id: ""
         # K8s Secret holding the client secret for the peer's OAuth client.
         existingSecret: ""
         existingSecretKey: "client_secret"
+        # INBOUND — the credential this node ACCEPTS when its peer pulls from
+        # it. This one it owns, so config states the intent and startup
+        # reconciles it into a persisted row — the same pattern as the CA
+        # (#1169). Supply the secret and setup is fully declarative: use the
+        # same value here as in the PEER's outbound secret and the link needs
+        # no CLI and no manual step.
+        #
+        # Name the client_id and omit the secret and nothing is minted: a
+        # secret generated at startup is hashed immediately and could never be
+        # read, leaving you a credential you cannot give your peer. Mint it
+        # with `python -m terrapod.cli.peer_client create` instead, which shows
+        # it exactly once.
+        inbound:
+          client_id: ""
+          name: ""
+          existingSecret: ""
+          existingSecretKey: "client_secret"
       # In-cluster component readiness (#1122). A pair that replicates
       # flawlessly is still not highly available if it serves from one API pod.
       # Enabling this also creates a namespace-scoped Role letting the API read

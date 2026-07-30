@@ -2911,7 +2911,9 @@
       "offline": "Dim gwrandäwr byw",
       "offlineWarning": "Nid oes gwrandäwr wedi'i gysylltu ar gyfer: {pools}. Bydd rhediadau a anfonir i'r pyllau hyn yn ciwio yn hytrach na rhedeg.",
       "count": "{count, plural, one {# gwrandäwr} other {# gwrandäwr}}"
-    }
+    },
+    "inbound": "Derbyn gan y partner",
+    "inboundAwaiting": "Wedi'i enwi, dim cyfrinach"
   },
   "haIndicator": {
     "follower": "Dilynwr",

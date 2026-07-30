@@ -2911,7 +2911,9 @@
       "offline": "Žádný živý listener",
       "offlineWarning": "K těmto fondům není připojen žádný listener: {pools}. Běhy směrované do nich se zařadí do fronty místo spuštění.",
       "count": "{count, plural, one {# listener} few {# listenery} many {# listeneru} other {# listenerů}}"
-    }
+    },
+    "inbound": "Přijímá od protějšku",
+    "inboundAwaiting": "Pojmenováno, bez tajemství"
   },
   "haIndicator": {
     "follower": "Následovník",

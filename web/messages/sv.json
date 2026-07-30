@@ -2911,7 +2911,9 @@
       "offline": "Ingen levande listener",
       "offlineWarning": "Ingen listener är ansluten för: {pools}. Körningar till dessa pooler köas i stället för att köra.",
       "count": "{count, plural, one {# listener} other {# listeners}}"
-    }
+    },
+    "inbound": "Accepterar från peer",
+    "inboundAwaiting": "Namngiven, ingen hemlighet"
   },
   "haIndicator": {
     "follower": "Följare",

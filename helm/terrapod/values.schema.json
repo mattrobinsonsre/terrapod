@@ -2430,6 +2430,24 @@
                 },
                 "existingSecretKey": {
                   "type": "string"
+                },
+                "inbound": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "client_id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "existingSecret": {
+                      "type": "string"
+                    },
+                    "existingSecretKey": {
+                      "type": "string"
+                    }
+                  }
                 }
               }
             },

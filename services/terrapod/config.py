@@ -1209,6 +1209,42 @@ class HAProbeUrlConfig(BaseModel):
     external: str = Field(default="", description="Fallback probe URL (external name)")
 
 
+class HAPeerInboundConfig(BaseModel):
+    """The credential this node ACCEPTS from its peer (#1169).
+
+    The counterpart to the outbound fields on ``HAPeerConfig``, and the half
+    that is genuinely this node's to own: the follower pulls, so node B presents
+    a credential that node A accepts — one row on A, one secret held by B.
+
+    This is the **CA pattern applied to peering**: config states the intent, and
+    startup reconciles it into a persisted ``oauth_clients`` row. Config remains
+    the input rather than becoming a second writer, so it and the database
+    cannot disagree about what is configured.
+
+    Supply ``client_secret`` (from a Kubernetes Secret, never the ConfigMap) and
+    setup is fully declarative — put the same value in this node's inbound and
+    the peer's outbound and the link needs no CLI, no UI, and no manual step.
+
+    Name the ``client_id`` and omit the secret and the reconcile deliberately
+    does **nothing**: a secret minted at startup is hashed immediately and
+    nobody can ever read it, so inventing one would leave an operator with a
+    credential they cannot give their peer. Mint it with ``peer_client``
+    instead, which shows it exactly once, to a human.
+    """
+
+    client_id: str = Field(
+        default="", description="OAuth client id this node accepts from its peer"
+    )
+    client_secret: str = Field(
+        default="",
+        description=(
+            "Set via TERRAPOD_HA__PEER__INBOUND__CLIENT_SECRET, never in the ConfigMap. "
+            "Omit to mint with `peer_client` instead"
+        ),
+    )
+    name: str = Field(default="", description="Human label for the credential, e.g. 'Node B'")
+
+
 class HAPeerConfig(BaseModel):
     """How this node reaches its peer to replicate (#960 phase 3, #1110).
 
@@ -1229,6 +1265,10 @@ class HAPeerConfig(BaseModel):
         default="",
         description="Set via TERRAPOD_HA__PEER__CLIENT_SECRET, never in the ConfigMap",
     )
+    #: The other direction. `url`/`client_id`/`client_secret` above are OUTBOUND
+    #: — what this node presents when it pulls. This is INBOUND — what it
+    #: accepts when its peer pulls from it. Two credentials, opposite ownership.
+    inbound: HAPeerInboundConfig = Field(default_factory=HAPeerInboundConfig)
 
 
 class HAReplicationConfig(BaseModel):

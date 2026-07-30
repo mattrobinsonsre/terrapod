@@ -28,7 +28,7 @@ from terrapod.api.dependencies import (
 from terrapod.config import settings
 from terrapod.db.session import get_db
 from terrapod.services import blob_readiness as blob_readiness_service
-from terrapod.services import component_status, ha_role, replication
+from terrapod.services import component_status, ha_role, peer_link, replication
 
 router = APIRouter(prefix="/ha", tags=["ha"])
 
@@ -98,6 +98,8 @@ async def status(
     role = await ha_role.get_role()
     cfg = settings.ha
     state = await replication.read_status(db)
+    inbound = await peer_link.inbound_status(db)
+    inbound["last-used-at"] = _iso(inbound["last-used-at"])
 
     privileged = bool({"admin", "audit"} & set(user.roles or []))
     # Not merely filtered out of the response: an unprivileged caller must not
@@ -124,6 +126,12 @@ async def status(
                 "node-id": node,
                 "role": role,
                 "peer-configured": bool(cfg.peer.url),
+                # The other half of the link: whether the credential this node
+                # ACCEPTS from its peer actually exists, and when it was last
+                # used. `peer-configured` above is outbound — the two can be
+                # set up independently, and a pair with only one of them is a
+                # pair that will not replicate (#1169).
+                "inbound-credential": inbound,
                 "replication-enabled": cfg.replication.enabled,
                 # Follower side.
                 "last-sync-at": _iso(state.last_sync_at),

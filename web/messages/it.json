@@ -2911,7 +2911,9 @@
       "offline": "Nessun listener attivo",
       "offlineWarning": "Nessun listener è connesso per: {pools}. Le esecuzioni indirizzate a questi pool resteranno in coda.",
       "count": "{count, plural, one {# listener} other {# listener}}"
-    }
+    },
+    "inbound": "Accetta dal peer",
+    "inboundAwaiting": "Nominato, senza segreto"
   },
   "haIndicator": {
     "follower": "Follower",

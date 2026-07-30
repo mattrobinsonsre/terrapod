@@ -2911,7 +2911,9 @@
       "offline": "Brak żywego listenera",
       "offlineWarning": "Żaden listener nie jest podłączony do: {pools}. Uruchomienia kierowane do tych pul trafią do kolejki zamiast się wykonać.",
       "count": "{count, plural, one {# listener} few {# listenery} many {# listenerów} other {# listenera}}"
-    }
+    },
+    "inbound": "Akceptuje od partnera",
+    "inboundAwaiting": "Nazwany, bez sekretu"
   },
   "haIndicator": {
     "follower": "Naśladowca",
