@@ -2911,7 +2911,9 @@
       "offline": "Sem listener ativo",
       "offlineWarning": "Não há qualquer listener ligado para: {pools}. As execuções encaminhadas para estes pools ficarão em fila em vez de correr.",
       "count": "{count, plural, one {# listener} other {# listeners}}"
-    }
+    },
+    "inbound": "Aceita do par",
+    "inboundAwaiting": "Nomeado, sem segredo"
   },
   "haIndicator": {
     "follower": "Seguidor",

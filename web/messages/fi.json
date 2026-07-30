@@ -2911,7 +2911,9 @@
       "offline": "Ei elävää kuuntelijaa",
       "offlineWarning": "Yhtään kuuntelijaa ei ole yhdistetty näille: {pools}. Näihin altaisiin ohjatut ajot jäävät jonoon suorittamisen sijaan.",
       "count": "{count, plural, one {# kuuntelija} other {# kuuntelijaa}}"
-    }
+    },
+    "inbound": "Hyväksyy parilta",
+    "inboundAwaiting": "Nimetty, ei salaisuutta"
   },
   "haIndicator": {
     "follower": "Seuraaja",

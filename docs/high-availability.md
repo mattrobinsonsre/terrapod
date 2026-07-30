@@ -141,11 +141,85 @@ token paths. A peer is entitled to read things an ordinary user is not, and that
 visibility must not be grantable to a person by accident. A peer token resolves
 to no roles and is refused by every endpoint except the replication surface.
 
-### Minting the credential
+### Two credentials, not one
 
-Run this **on the node that will be asked**, and give the output to the node that
-will be **asking**. The follower pulls, so the credential flows the opposite way
-to the data:
+Each node has **two**, and they are treated differently because their ownership
+differs:
+
+| | What it is | Where it lives |
+|---|---|---|
+| **Outbound** | The client id + secret this node **presents** when it pulls | `ha.peer.client_id` + a Secret. A credential it holds but does not own, so there is nothing to persist — the same treatment an SSO client secret gets |
+| **Inbound** | The client this node **accepts** when its peer pulls from it | `ha.peer.inbound.*`. It owns this one, so config states the intent and startup reconciles it into a persisted row — the same pattern as the CA |
+
+The follower pulls, so node B presents a credential that node A accepts: one row
+on A, one secret held by B.
+
+### Both directions, always
+
+`role: auto` swaps the roles when DNS moves — that is the entire point — so
+**every node carries both halves from the start**. Configure only one direction
+and the pair works perfectly right up until you fail over, at which moment the
+new follower has no outbound credential and the new leader no inbound row, and
+replication stops silently at exactly the wrong time.
+
+So: **two secrets, each held by both nodes.**
+
+| Secret | On node A | On node B |
+|---|---|---|
+| `secret-ab` | outbound — what A presents | inbound — what B accepts |
+| `secret-ba` | inbound — what A accepts | outbound — what B presents |
+
+### Setting it up
+
+Generate both secrets (`openssl rand -base64 32`), put each in a Kubernetes
+Secret on both nodes, and reference them:
+
+```yaml
+# Node A
+api:
+  config:
+    ha:
+      role: auto
+      node_name: node-a
+      probe_url:
+        internal: https://terrapod.example.com   # the SHARED name
+      peer:
+        url: https://node-b.example.com          # B's DIRECT address
+        client_id: a-to-b
+        existingSecret: secret-ab                # presented when A follows
+        inbound:
+          client_id: b-to-a
+          name: "Node B"
+          existingSecret: secret-ba              # accepted when A leads
+```
+
+Node B is the mirror image: `peer.url` points at A's direct address, its
+outbound is `b-to-a`/`secret-ba`, its inbound `a-to-b`/`secret-ab`.
+
+> **`peer.url` must be the peer's direct per-node address, never the shared
+> name.** The shared name resolves to whichever node currently leads — which may
+> be this one, in which case a node would try to replicate from itself. Same
+> trap as `probe_url`, opposite direction: the probe wants the shared name, the
+> peer link wants the specific one.
+
+That is the whole setup. No CLI, no UI, no manual step, and nothing to remember
+at cutover — the credentials for the reversed direction are already in place, so
+moving DNS is genuinely the only act.
+
+**Rotating** is editing the Secret. The reconcile updates the stored hash on the
+next start, and the previous secret stops working immediately.
+
+**Tearing down** is removing the config. With no peering declared, no peer token
+is issued and none is accepted, so a credential row left behind is inert —
+withdrawing the configuration withdraws the capability rather than leaving a
+forgotten credential with full read of the estate.
+
+### Minting instead, if you would rather not generate the secret yourself
+
+Name the `client_id` and omit the secret, and the reconcile deliberately does
+**nothing** — a secret generated at startup is hashed immediately and could
+never be read, leaving you a credential you cannot give your peer. `/ha` reports
+the credential as named-but-unset, and you mint it explicitly:
 
 ```zsh
 # On node A: mint the credential node B will use to read from A
@@ -153,13 +227,12 @@ kubectl exec deploy/terrapod-api -- \
   python -m terrapod.cli.peer_client create --client-id peer-b --name "Node B"
 ```
 
-It prints the secret **once** — only its SHA-256 is stored, the same contract as an
-API token. Lost means rotated (`--rotate`), which is also how you replace a
-credential you suspect has leaked; the previous secret stops working immediately.
+It prints the secret **once** — only its SHA-256 is stored, the same contract as
+an API token. Lost means rotated (`--rotate`), which is also how you replace a
+credential you suspect has leaked. Set it on node B as its outbound secret.
 
-For a pair where either node may be promoted, do it in both directions: node A
-mints `peer-b`, node B mints `peer-a`. `peer_client list` shows what is registered
-(never a secret).
+This is the fallback, and it is also the answer when the chart is the thing you
+cannot reach.
 
 Then configure the node that will use it:
 

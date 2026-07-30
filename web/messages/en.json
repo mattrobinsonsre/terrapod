@@ -2911,7 +2911,9 @@
       "offline": "No live listener",
       "offlineWarning": "No listener is connected for: {pools}. Runs routed to these pools will queue rather than execute.",
       "count": "{count, plural, one {# listener} other {# listeners}}"
-    }
+    },
+    "inbound": "Accepts from peer",
+    "inboundAwaiting": "Named, no secret"
   },
   "haIndicator": {
     "follower": "Follower",

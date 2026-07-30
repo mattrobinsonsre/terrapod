@@ -2911,7 +2911,9 @@
       "offline": "Sin listener activo",
       "offlineWarning": "No hay ningún listener conectado para: {pools}. Las ejecuciones dirigidas a estos grupos se encolarán en lugar de ejecutarse.",
       "count": "{count, plural, one {# listener} other {# listeners}}"
-    }
+    },
+    "inbound": "Acepta del par",
+    "inboundAwaiting": "Nombrado, sin secreto"
   },
   "haIndicator": {
     "follower": "Seguidor",

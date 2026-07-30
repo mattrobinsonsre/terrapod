@@ -2911,7 +2911,9 @@
       "offline": "활성 리스너 없음",
       "offlineWarning": "다음 풀에 연결된 리스너가 없습니다: {pools}. 이 풀로 보내진 실행은 수행되지 않고 대기합니다.",
       "count": "리스너 {count}개"
-    }
+    },
+    "inbound": "피어로부터 수락",
+    "inboundAwaiting": "이름만 있고 시크릿 없음"
   },
   "haIndicator": {
     "follower": "팔로워",

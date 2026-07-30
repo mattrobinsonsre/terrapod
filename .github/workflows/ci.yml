@@ -718,6 +718,19 @@ jobs:
           echo "$out" | grep -q "replication:" || { echo "FAIL: ha.replication not rendered into config.yaml (#1110)"; exit 1; }
           echo "$out" | grep -A2 "replication:" | grep -q "enabled: false" || { echo "FAIL: ha.replication.enabled must default to false — replication is meaningless without a peer (#1110)"; exit 1; }
           if echo "$out" | grep -q "client_secret"; then echo "FAIL: the peer client secret must never reach the ConfigMap — it is a credential (#1110)"; exit 1; fi
+
+          # Peering is Helm-seeded and database-persisted (#1169): the inbound
+          # client id must reach the ConfigMap (or the reconcile has nothing to
+          # act on and the operator's values are silently inert), while its
+          # secret must arrive by secretKeyRef like every other credential.
+          inbound=$(helm template ./helm/terrapod \
+            --set api.config.ha.peer.inbound.client_id=peer-b \
+            --set api.config.ha.peer.inbound.name="Node B" \
+            --set api.config.ha.peer.inbound.existingSecret=tp-peer)
+          echo "$inbound" | grep -q "inbound:" || { echo "FAIL: ha.peer.inbound not rendered into config.yaml (#1169)"; exit 1; }
+          echo "$inbound" | grep -q 'client_id: "peer-b"' || { echo "FAIL: ha.peer.inbound.client_id not rendered — the reconcile would have nothing to act on (#1169)"; exit 1; }
+          echo "$inbound" | grep -q "TERRAPOD_HA__PEER__INBOUND__CLIENT_SECRET" || { echo "FAIL: the inbound secret must reach the pod by secretKeyRef, or declarative setup is impossible (#1169)"; exit 1; }
+          if echo "$inbound" | grep -A6 "inbound:" | grep -q "client_secret"; then echo "FAIL: the inbound secret must never reach the ConfigMap — it is a credential (#1169)"; exit 1; fi
           echo "$out" | grep -q "component_status:" || { echo "FAIL: ha.component_status not rendered into config.yaml (#1122)"; exit 1; }
           echo "$out" | grep -q "kind: Role" || { echo "FAIL: the API component-status Role must render when enabled (#1122)"; exit 1; }
           echo "$out" | grep -A16 "name: .*-component-status" | grep -q 'resources: \["deployments"\]' || { echo "FAIL: the component-status Role needs Deployments for ready-vs-desired, not just pods (#1122)"; exit 1; }

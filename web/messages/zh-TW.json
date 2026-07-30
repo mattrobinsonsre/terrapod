@@ -2911,7 +2911,9 @@
       "offline": "無線上監聽器",
       "offlineWarning": "以下集區沒有連接監聽器：{pools}。指派到這些集區的執行只會排隊而不會執行。",
       "count": "{count} 個監聽器"
-    }
+    },
+    "inbound": "接受對端憑證",
+    "inboundAwaiting": "已命名，未設密鑰"
   },
   "haIndicator": {
     "follower": "從節點",

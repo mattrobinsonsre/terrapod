@@ -2911,7 +2911,9 @@
       "offline": "Nullus auditor vivus",
       "offlineWarning": "Nullus auditor his coniunctus est: {pools}. Cursus ad has piscinas missi in ordine manebunt neque exsequentur.",
       "count": "{count, plural, one {# auditor} other {# auditores}}"
-    }
+    },
+    "inbound": "A pari accipit",
+    "inboundAwaiting": "Nominatum, sine arcano"
   },
   "haIndicator": {
     "follower": "Sectator",

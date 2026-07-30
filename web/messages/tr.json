@@ -2911,7 +2911,9 @@
       "offline": "Canlı dinleyici yok",
       "offlineWarning": "Şu havuzlar için bağlı dinleyici yok: {pools}. Bu havuzlara yönlendirilen çalıştırmalar yürütülmek yerine kuyrukta bekler.",
       "count": "{count} dinleyici"
-    }
+    },
+    "inbound": "Eşten kabul eder",
+    "inboundAwaiting": "Adlandırılmış, gizli anahtar yok"
   },
   "haIndicator": {
     "follower": "Takipçi",

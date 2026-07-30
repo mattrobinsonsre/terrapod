@@ -2911,7 +2911,9 @@
       "offline": "pagh 'Ijwl' yIntaH",
       "offlineWarning": "pagh 'Ijwl' rarlu' ghommeyvaD: {pools}. ghommeyvamvaD ngeHbogh QaptaHghachmey qaSbe'; leStaH neH.",
       "count": "{count} 'Ijwl'"
-    }
+    },
+    "inbound": "jIHvo' laj",
+    "inboundAwaiting": "ponglu', 'ach pegh Hutlh"
   },
   "haIndicator": {
     "follower": "tlhavwI'",

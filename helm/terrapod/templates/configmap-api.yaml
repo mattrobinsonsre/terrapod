@@ -279,6 +279,14 @@ data:
         client_id: {{ .client_id | default "" | quote }}
         {{- /* client_secret is deliberately absent: it arrives as
                TERRAPOD_HA__PEER__CLIENT_SECRET from a Secret, never a ConfigMap. */}}
+        {{- with .inbound }}
+        inbound:
+          client_id: {{ .client_id | default "" | quote }}
+          name: {{ .name | default "" | quote }}
+          {{- /* Same treatment for the inbound secret: it arrives as
+                 TERRAPOD_HA__PEER__INBOUND__CLIENT_SECRET. Startup reconciles
+                 it into the persisted oauth_clients row (#1169). */}}
+        {{- end }}
       {{- end }}
       {{- with .Values.api.config.ha.component_status }}
       component_status:

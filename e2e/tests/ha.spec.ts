@@ -46,6 +46,12 @@ const BASE_STATUS = {
   'components-sampled-at': '2026-01-01T00:00:00Z',
   'components-unavailable-reason': null,
   'single-replica-components': [] as string[],
+  'inbound-credential': {
+    configured: true,
+    'client-id': 'peer-b',
+    active: true,
+    'last-used-at': '2026-01-01T00:00:00Z',
+  },
 };
 
 /** Serve `/ha/status` from a fixture. */
@@ -115,6 +121,34 @@ test.describe('HA page — replication', () => {
     await expect(page.getByText(/ha\.peer\.url/)).toBeVisible();
     // No peer means the replication panel is meaningless — it must not render.
     await expect(page.getByRole('heading', { name: 'Settings replication' })).toHaveCount(0);
+  });
+
+  test('a node whose peer cannot authenticate to it says so', async ({ page }) => {
+    // A pair with only one side set up will not replicate, and the outbound
+    // row cannot say so on its own (#1169).
+    await mockHA(page, {
+      ...BASE_STATUS,
+      'inbound-credential': {
+        configured: false,
+        'client-id': 'peer-b',
+        active: null,
+        'last-used-at': null,
+      },
+    });
+    await page.goto('/ha');
+
+    await expect(body(page).getByText('Named, no secret')).toBeVisible();
+  });
+
+  test('a page served by an API that predates the field still renders', async ({ page }) => {
+    // Additive attributes must not white-screen a lagging consumer — that is
+    // precisely the skew failure the contract programme exists to prevent.
+    const older: Record<string, unknown> = { ...BASE_STATUS };
+    delete older['inbound-credential'];
+    await mockHA(page, older);
+    await page.goto('/ha');
+
+    await expect(page.getByRole('heading', { name: 'High availability' })).toBeVisible();
   });
 
   test('a configured peer with replication off says that, not "in sync"', async ({ page }) => {

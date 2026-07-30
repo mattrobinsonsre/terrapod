@@ -2911,7 +2911,9 @@
       "offline": "אין מאזין פעיל",
       "offlineWarning": "אין מאזין מחובר עבור: {pools}. הרצות שמנותבות למאגרים אלה ימתינו בתור במקום לרוץ.",
       "count": "{count, plural, one {מאזין אחד} two {שני מאזינים} other {# מאזינים}}"
-    }
+    },
+    "inbound": "מקבל מהעמית",
+    "inboundAwaiting": "נקוב בשם, ללא סוד"
   },
   "haIndicator": {
     "follower": "עוקב",

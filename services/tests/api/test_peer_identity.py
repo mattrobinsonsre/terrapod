@@ -82,14 +82,48 @@ class TestPeerIsNotAUser:
         assert user.email == "a@example.com"
 
 
+def _peering(url: str = "https://peer", inbound_id: str = "peer-b"):
+    """A config in which peering has been declared (#1169).
+
+    The peer identity is refused outright when it has not been, so every test
+    that expects a peer token to work has to say so. The real config object
+    rather than a stub: the gate reads a derived property.
+    """
+    from terrapod.config import HAConfig, HAPeerConfig, HAPeerInboundConfig
+
+    return patch(
+        "terrapod.api.dependencies.settings.ha",
+        HAConfig(peer=HAPeerConfig(url=url, inbound=HAPeerInboundConfig(client_id=inbound_id))),
+    )
+
+
 class TestGetPeerIdentity:
     @patch("terrapod.api.dependencies.validate_api_token", new_callable=AsyncMock)
     async def test_accepts_a_peer_token(self, mock_validate):
         mock_validate.return_value = _token()
 
-        peer = await get_peer_identity(_request(), AsyncMock())
+        with _peering():
+            peer = await get_peer_identity(_request(), AsyncMock())
 
         assert peer.client_id == "peer-b"
+
+    @patch("terrapod.api.dependencies.validate_api_token", new_callable=AsyncMock)
+    async def test_refuses_a_valid_peer_token_when_peering_is_not_declared(self, mock_validate):
+        """Withdrawing the config withdraws the capability (#1169).
+
+        A credential row surviving a torn-down pairing must not still open the
+        replication surface — and the token here is otherwise perfectly valid,
+        which is exactly the case that would be missed.
+        """
+        mock_validate.return_value = _token()
+
+        from terrapod.config import HAConfig
+
+        with patch("terrapod.api.dependencies.settings.ha", HAConfig()):
+            with pytest.raises(HTTPException) as exc:
+                await get_peer_identity(_request(), AsyncMock())
+
+        assert exc.value.status_code == 401
 
     @patch("terrapod.api.dependencies.validate_api_token", new_callable=AsyncMock)
     async def test_rejects_an_ordinary_user_token(self, mock_validate):
@@ -97,7 +131,7 @@ class TestGetPeerIdentity:
         perfectly valid token — that is how a peer's wider visibility leaks."""
         mock_validate.return_value = _token(kind="interactive")
 
-        with pytest.raises(HTTPException) as exc:
+        with _peering(), pytest.raises(HTTPException) as exc:
             await get_peer_identity(_request(), AsyncMock())
 
         assert exc.value.status_code == 401

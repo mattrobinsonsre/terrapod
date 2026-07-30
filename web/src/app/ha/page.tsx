@@ -64,6 +64,15 @@ interface HAStatus {
   'last-sync-at': string | null
   'seconds-since-last-sync': number | null
   'backfilling-classes': string[]
+  // Optional on purpose. An API one minor behind does not send it, and a page
+  // that white-screens on a missing additive attribute is precisely the skew
+  // failure the contract programme exists to prevent (#550).
+  'inbound-credential'?: {
+    configured: boolean
+    'client-id': string | null
+    active: boolean | null
+    'last-used-at': string | null
+  }
   'events-behind': number | null
   'behind-seconds': number | null
   'in-sync': boolean
@@ -200,6 +209,24 @@ export default function HAPage() {
                   <dd className="font-mono">{status['node-id'] || '—'}</dd>
                   <dt className="text-slate-400">{t('peer')}</dt>
                   <dd>{status['peer-configured'] ? t('configured') : t('notConfigured')}</dd>
+                  {/* The other half of the link. A pair with only one side set
+                      up will not replicate, and the outbound row above cannot
+                      say so on its own. */}
+                  <dt className="text-slate-400">{t('inbound')}</dt>
+                  <dd
+                    className={
+                      status['inbound-credential']?.['client-id'] &&
+                      !status['inbound-credential'].configured
+                        ? 'text-amber-300'
+                        : undefined
+                    }
+                  >
+                    {status['inbound-credential']?.configured
+                      ? t('configured')
+                      : status['inbound-credential']?.['client-id']
+                        ? t('inboundAwaiting')
+                        : t('notConfigured')}
+                  </dd>
                 </dl>
               </div>
             </section>
