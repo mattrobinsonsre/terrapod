@@ -202,7 +202,8 @@ semantics would only be needed in an active-active design, which this is not.
 | VCS connections | Replicated |
 | Registry modules, provider templates, catalog items, autodiscovery rules | Replicated |
 | Workspaces, their agent-pool set, their module links | Replicated |
-| Variables, policy sets, module content, the CA | In development |
+| Variables and variable sets | Replicated |
+| Policy sets, notifications, run tasks, hooks, module content, the CA | In development |
 
 Identity comes first deliberately. A node holding the whole estate but no users,
 roles or assignments has nobody able to touch it — and API tokens are the class
@@ -214,6 +215,18 @@ cursor, and a promoted node that has not seen it treats every tracked branch as
 changed — queueing a plan *and apply* on every VCS-connected workspace at once.
 Likewise a held state lock, `state_diverged`, and a `pending_deletion` lifecycle
 state all carry, because losing any of them is worse than carrying it stale.
+
+Variables matter for a blunter reason: a promoted node with workspaces but no
+variables is terraform with no inputs and no credentials, so every run fails at
+plan. The subtle half is precedence — *priority set → workspace variable →
+non-priority set*. A node that carries every value but disagrees about `priority`
+hands a run a **different** value than the leader would, and nothing reports it.
+
+**The encryption keys themselves are never replicated.** `crypto_keys` holds this
+node's data-encryption key wrapped by *this node's* KEK: it is meaningless to the
+peer, and putting it on the link would leak key material for no benefit. That is
+the whole point of decrypting on send and re-encrypting under the receiver's own
+key — the key never has to travel. A test fails if that class is ever registered.
 
 One field is knowingly imperfect: `drift_latest_run_id` points at a run, runs are
 a later phase, and the column is deliberately not a foreign key (so artifact

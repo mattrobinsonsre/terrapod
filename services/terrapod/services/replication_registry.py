@@ -23,6 +23,10 @@ from terrapod.db.models import (
     Role,
     RoleAssignment,
     User,
+    Variable,
+    VariableSet,
+    VariableSetVariable,
+    VariableSetWorkspace,
     VCSConnection,
     Workspace,
     WorkspaceAgentPool,
@@ -202,3 +206,57 @@ WORKSPACE_AGENT_POOLS = register(
 MODULE_WORKSPACE_LINKS = register(
     ReplicatedClass(name="module_workspace_links", model=ModuleWorkspaceLink)
 )
+
+
+# ---------------------------------------------------------------------------
+# Variables and variable sets (#1138)
+#
+# The classes that decide whether a failover works at all. A promoted node with
+# workspaces but no variables is terraform with no inputs and no credentials:
+# every run fails at plan, on every workspace, immediately. Not degraded — dead.
+#
+# Precedence is the subtle part, and it fails silently rather than loudly:
+# priority set -> workspace variable -> non-priority set. A node that carries
+# every value but loses `priority` hands a run a DIFFERENT value than the leader
+# would, with nothing anywhere reporting a problem.
+#
+# `variables.value` and `variable_set_variables.value` are `EncryptedText`, so
+# they take the same per-node path #1132 established: decrypted on read, carried
+# over the authenticated peer link, re-encrypted under the receiving node's own
+# key. Note what is deliberately NOT sent alongside them — see
+# `crypto_keys` below.
+# ---------------------------------------------------------------------------
+
+VARIABLES = register(ReplicatedClass(name="variables", model=Variable))
+
+VARIABLE_SETS = register(ReplicatedClass(name="variable_sets", model=VariableSet))
+
+VARIABLE_SET_VARIABLES = register(
+    ReplicatedClass(name="variable_set_variables", model=VariableSetVariable)
+)
+
+# Which workspaces a set applies to. Composite key, and like the agent-pool set
+# it is edited as a collection on its parent — the junction rows are what record
+# an assignment change, not the set row.
+VARIABLE_SET_WORKSPACES = register(
+    ReplicatedClass(
+        name="variable_set_workspaces",
+        model=VariableSetWorkspace,
+        pk_attrs=("variable_set_id", "workspace_id"),
+    )
+)
+
+
+# ---------------------------------------------------------------------------
+# What must NEVER be replicated
+#
+# `crypto_keys` holds this node's data-encryption key wrapped by THIS node's
+# KEK. Sending it is useless to the peer, which cannot unwrap it, and it puts key
+# material on a link that has no need of it. The per-node encryption design —
+# decrypt on send, re-encrypt under the receiver's own key — exists precisely so
+# that the key never has to travel.
+#
+# There is nothing to write here; the point is that nothing is written here.
+# `TestTheKeysThemselvesNeverTravel` in tests/services/test_replication_variables.py
+# fails if that class is ever registered.
+# ---------------------------------------------------------------------------
