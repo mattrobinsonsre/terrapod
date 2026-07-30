@@ -733,6 +733,11 @@ jobs:
           # must render: a missing render line makes the value silently inert.
           echo "$out" | grep -q "poll_interval_seconds: 60" || { echo "FAIL: vcs.poll_interval_seconds must render and default to 60 — the workspace interval is the latency-sensitive one (#1149)"; exit 1; }
           echo "$out" | grep -q "module_poll_interval_seconds: 300" || { echo "FAIL: vcs.module_poll_interval_seconds must render and default to 300 (#1149)"; exit 1; }
+          # Per-class object-store policy (#1151). `verify` observes the whole
+          # store and commits the operator to nothing, so it is the default; a
+          # missing render line would make the whole block silently inert.
+          echo "$out" | grep -q "blobs:" || { echo "FAIL: ha.blobs not rendered into config.yaml (#1151)"; exit 1; }
+          echo "$out" | grep -A2 "blobs:" | grep -q 'mode: "verify"' || { echo "FAIL: ha.blobs.mode must render and default to verify (#1151)"; exit 1; }
           echo "$out" | grep -q "probe_interval_seconds:" || { echo "FAIL: ha.probe_interval_seconds not rendered (#960)"; exit 1; }
           echo "$out" | grep -q "probe_threshold:" || { echo "FAIL: ha.probe_threshold not rendered (#960)"; exit 1; }
           # AI architecture critic (#1036 Part 2): non-secret config renders into
@@ -756,6 +761,28 @@ jobs:
           # still reported from our own pods, only zone spread goes unknown.
           echo "$out" | grep -q "name: .*-component-status" || { echo "FAIL: declining the node read must not disable component status (#1128)"; exit 1; }
           echo "read_nodes opt-out renders OK"
+      - name: Per-class object-store policy renders, and a typo is refused (#1151)
+        run: |
+          out=$(docker run --rm -v "$PWD:/chart" -w /chart alpine/helm:3.17.2 \
+            template terrapod helm/terrapod \
+              --values helm/terrapod/values.yaml \
+              --set api.config.ha.blobs.classes.state=copy \
+              --set api.config.ha.blobs.classes.run_logs=off)
+          echo "$out" | grep -A4 "blobs:" | grep -q "state: copy" || { echo "FAIL: a per-class override must reach the ConfigMap (#1151)"; exit 1; }
+          # The selectivity #1114 asks for: copy what cannot be regenerated,
+          # ignore the history. Both halves have to survive the render.
+          echo "$out" | grep -A4 "blobs:" | grep -q "run_logs:" || { echo "FAIL: an 'off' class must reach the ConfigMap too (#1151)"; exit 1; }
+          # A typo'd class name is the worst outcome available — a class the
+          # operator believes they configured, silently on the default. The
+          # schema refuses it here; HABlobsConfig refuses it again at startup for
+          # the paths the chart never sees.
+          if docker run --rm -v "$PWD:/chart" -w /chart alpine/helm:3.17.2 \
+               template terrapod helm/terrapod \
+                 --values helm/terrapod/values.yaml \
+                 --set api.config.ha.blobs.classes.stat=copy >/dev/null 2>&1; then
+            echo "FAIL: an unknown blob class name must be rejected by values.schema.json (#1151)"; exit 1
+          fi
+          echo "per-class blob policy renders OK, unknown class refused"
       - name: Eval values render (embedded Postgres/Redis)
         run: |
           out=$(docker run --rm -v "$PWD:/chart" -w /chart alpine/helm:3.17.2 \

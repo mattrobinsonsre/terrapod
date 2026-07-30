@@ -1,4 +1,4 @@
-"""Is the object store actually there? (#1147, first slice of #1114)
+"""Is the object store actually there? (#1147 and #1151, slices of #1114)
 
 The dangerous state a leader/follower pair can reach is **rows present, blobs
 absent**: a promoted node that believes it has four hundred workspaces and cannot
@@ -15,13 +15,21 @@ replication it catches a misconfigured prefix or a lifecycle rule that expired
 objects out from under the rows; under Terrapod-side copying it catches a class
 that never ran.
 
+Which classes it looks at, and what tier each sits in, come from
+:mod:`terrapod.services.blob_classes` — the same register the copier reads, so the
+two can never disagree about what the store contains. A class configured ``off`` is
+**reported as skipped**, never quietly dropped: a clean report has to distinguish
+"nothing missing" from "nobody looked".
+
 Three properties this file is careful about:
 
 **It never claims more than it checked.** A sample is reported as a sample, with
 the numbers, and `missing == 0` on a sample is stated as *no missing objects among
 those sampled* — not as "ready". Reporting readiness off fifty spot checks out of
 forty thousand objects would be exactly the false confidence the check exists to
-remove.
+remove. The same honesty covers classes that are not verifiable from rows at all:
+they are listed, with the reason, rather than left out where their absence would
+read as a pass.
 
 **It is bounded.** A full verify over an estate's state history is thousands of
 round trips. Sampling with an explicit cap is the default; full is opt-in; both
@@ -36,16 +44,33 @@ from __future__ import annotations
 
 import asyncio
 import time
-from collections.abc import Awaitable, Callable, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 
 import structlog
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from terrapod.storage import keys
+from terrapod.services.blob_classes import (
+    CLASSES,
+    HISTORY,
+    IRREPLACEABLE,
+    OFF,
+    REDERIVABLE,
+    effective_mode,
+    effective_tier,
+)
 
 logger = structlog.get_logger(__name__)
+
+__all__ = [
+    "CLASSES",
+    "DEFAULT_SAMPLE",
+    "HISTORY",
+    "IRREPLACEABLE",
+    "REDERIVABLE",
+    "BlobReadiness",
+    "ClassReadiness",
+    "check",
+]
 
 #: How many objects a class is sampled down to when not verifying in full.
 DEFAULT_SAMPLE = 25
@@ -54,24 +79,19 @@ DEFAULT_SAMPLE = 25
 #: low enough that a readiness check never looks like a load test.
 _CONCURRENCY = 8
 
-#: What losing a class costs. The tiering is from #1114, and the important part
-#: is that it is a property of the DEPLOYMENT, not only of the artifact: a cold
-#: provider cache re-warms itself on first use — unless the node is sealed
-#: (`cache_only`), in which case it can never run anything again and belongs in
-#: the same tier as state.
-IRREPLACEABLE = "irreplaceable"
-HISTORY = "history"
-REDERIVABLE = "rederivable"
-
 
 @dataclass(frozen=True)
 class ClassReadiness:
     """The result for one prefix class."""
 
     name: str
+    #: Tier on *this* deployment — sealing escalates a cache to irreplaceable,
+    #: because a sealed node cannot re-warm one.
     tier: str
-    #: Rows the database holds for this class. None when it was not counted
-    #: (a class can be skipped without being unknown).
+    #: off | verify | copy, as configured for this class.
+    mode: str = "verify"
+    #: Rows the database holds for this class. Zero when it was not counted (a
+    #: class can be skipped without being unknown).
     total_rows: int = 0
     checked: int = 0
     missing: int = 0
@@ -83,6 +103,12 @@ class ClassReadiness:
     #: Set when the class could not be checked at all, e.g. the store rejected
     #: the request. Distinct from "checked and found nothing missing".
     error: str | None = None
+    #: False when no row guarantees these objects exist, so presence cannot be
+    #: derived from the database. A boundary of the method, stated rather than
+    #: hidden by omitting the class.
+    verifiable: bool = True
+    #: Why nothing was checked, when nothing was.
+    note: str = ""
 
     @property
     def healthy(self) -> bool:
@@ -90,7 +116,7 @@ class ClassReadiness:
 
         Deliberately not called `ready`: on a sample this is the weaker claim,
         and the distinction is the whole point. `complete` is what says whether
-        it is the strong one.
+        it is the strong one, and `checked` whether there was a claim at all.
         """
         return self.error is None and self.missing == 0
 
@@ -115,155 +141,20 @@ class BlobReadiness:
         """
         return [c.name for c in self.classes if c.tier == IRREPLACEABLE and c.missing > 0]
 
+    @property
+    def irreplaceable_unchecked(self) -> list[str]:
+        """Irreplaceable classes this run made no claim about.
 
-# ---------------------------------------------------------------------------
-# Resolving keys from rows
-#
-# Each resolver returns (total_rows, keys_to_check). The split matters: a class
-# can have ten thousand rows and be sampled down to twenty-five keys, and the
-# report has to carry both numbers or the reader cannot tell how much of the
-# class the answer covers.
-# ---------------------------------------------------------------------------
-
-
-async def _resolve_state(db: AsyncSession, limit: int | None) -> tuple[int, list[str]]:
-    """Every state version, not only the latest.
-
-    Rollback is a shipped feature, so a node holding only HEAD has silently lost
-    rollback depth — and would look perfectly healthy doing it.
-    """
-    from terrapod.db.models import StateVersion
-
-    total = await _count(db, StateVersion)
-    stmt = select(StateVersion.workspace_id, StateVersion.id).order_by(
-        StateVersion.created_at.desc()
-    )
-    if limit is not None:
-        stmt = stmt.limit(limit)
-    rows = (await db.execute(stmt)).all()
-    return total, [keys.state_key(str(ws), str(sv)) for ws, sv in rows]
-
-
-async def _resolve_config_versions(db: AsyncSession, limit: int | None) -> tuple[int, list[str]]:
-    """The sharpest omission in the whole store.
-
-    A VCS-connected workspace can refetch its configuration. A CLI-uploaded,
-    catalog-provisioned or migrated one cannot — this tarball is the only copy.
-    Losing it means those workspaces can never run again, while the UI still
-    lists them as healthy.
-    """
-    from terrapod.db.models import ConfigurationVersion
-
-    total = await _count(db, ConfigurationVersion)
-    stmt = select(ConfigurationVersion.workspace_id, ConfigurationVersion.id).where(
-        ConfigurationVersion.status == "uploaded"
-    )
-    stmt = stmt.order_by(ConfigurationVersion.created_at.desc())
-    if limit is not None:
-        stmt = stmt.limit(limit)
-    rows = (await db.execute(stmt)).all()
-    return total, [keys.config_version_key(str(ws), str(cv)) for ws, cv in rows]
-
-
-async def _resolve_modules(db: AsyncSession, limit: int | None) -> tuple[int, list[str]]:
-    """Module tarballs. The rows say the module exists, so the registry *looks*
-    fine and every `terraform init` fails."""
-    from terrapod.db.models import RegistryModule, RegistryModuleVersion
-
-    total = await _count(db, RegistryModuleVersion)
-    stmt = (
-        select(
-            RegistryModule.namespace,
-            RegistryModule.name,
-            RegistryModule.provider,
-            RegistryModuleVersion.version,
-        )
-        .join(RegistryModuleVersion, RegistryModuleVersion.module_id == RegistryModule.id)
-        .order_by(RegistryModuleVersion.created_at.desc())
-    )
-    if limit is not None:
-        stmt = stmt.limit(limit)
-    rows = (await db.execute(stmt)).all()
-    return total, [keys.module_tarball_key(ns, n, p, v) for ns, n, p, v in rows]
-
-
-async def _resolve_provider_binaries(db: AsyncSession, limit: int | None) -> tuple[int, list[str]]:
-    """Provider platform zips, plus the signed manifest that makes them
-    installable.
-
-    Provider versions are client-signed and immutable: they cannot be
-    regenerated server-side, only re-published by whoever holds the signing key.
-    That makes a missing one closer to state than to a cache.
-    """
-    from terrapod.db.models import (
-        RegistryProvider,
-        RegistryProviderPlatform,
-        RegistryProviderVersion,
-    )
-
-    total = await _count(db, RegistryProviderPlatform)
-    stmt = (
-        select(
-            RegistryProvider.namespace,
-            RegistryProvider.name,
-            RegistryProviderVersion.version,
-            RegistryProviderPlatform.os,
-            RegistryProviderPlatform.arch,
-        )
-        .join(
-            RegistryProviderVersion,
-            RegistryProviderVersion.provider_id == RegistryProvider.id,
-        )
-        .join(
-            RegistryProviderPlatform,
-            RegistryProviderPlatform.version_id == RegistryProviderVersion.id,
-        )
-        .order_by(RegistryProviderPlatform.created_at.desc())
-    )
-    if limit is not None:
-        stmt = stmt.limit(limit)
-    rows = (await db.execute(stmt)).all()
-
-    out: list[str] = []
-    for ns, name, version, os_, arch in rows:
-        out.append(keys.provider_binary_key(ns, name, version, os_, arch))
-        # The manifest and its signature are what make the binary installable;
-        # a present zip with an absent SHA256SUMS still fails `terraform init`.
-        out.append(keys.provider_shasums_key(ns, name, version))
-        out.append(keys.provider_shasums_sig_key(ns, name, version))
-    return total, out
-
-
-async def _resolve_state_index(db: AsyncSession, limit: int | None) -> tuple[int, list[str]]:
-    """The break-glass recovery index.
-
-    Worse than absent if it is stale on the promoted node: it points at objects
-    that are not there while looking authoritative. Presence is all this checks —
-    freshness would need the index parsed, which is a separate job.
-    """
-    from terrapod.db.models import StateVersion
-
-    total = 1 if await _count(db, StateVersion) else 0
-    return total, [keys.state_index_key()] if total else []
-
-
-#: Registered classes, in the order #1114 sets out: irreplaceable first, because
-#: that is the order a human reads them in and the order a copier should use.
-RESOLVERS: list[
-    tuple[str, str, Callable[[AsyncSession, int | None], Awaitable[tuple[int, list[str]]]]]
-] = [
-    ("state", IRREPLACEABLE, _resolve_state),
-    ("state_index", IRREPLACEABLE, _resolve_state_index),
-    ("configuration_versions", IRREPLACEABLE, _resolve_config_versions),
-    ("registry_modules", IRREPLACEABLE, _resolve_modules),
-    ("registry_providers", IRREPLACEABLE, _resolve_provider_binaries),
-]
-
-
-async def _count(db: AsyncSession, model: type) -> int:
-    from sqlalchemy import func
-
-    return int((await db.execute(select(func.count()).select_from(model))).scalar() or 0)
+        The counterpart to the list above, and the reason it can be trusted. A
+        class that is off, or not verifiable from rows, produces zero missing
+        objects — which looks identical to a pass unless it is named. On a sealed
+        node this is where the escalated caches surface.
+        """
+        return [
+            c.name
+            for c in self.classes
+            if c.tier == IRREPLACEABLE and c.checked == 0 and c.error is None
+        ]
 
 
 async def _check_keys(store, blob_keys: Sequence[str]) -> tuple[int, list[str]]:
@@ -314,24 +205,52 @@ async def check(*, full: bool = False, sample: int = DEFAULT_SAMPLE) -> BlobRead
     limit = None if full else max(1, sample)
     results: list[ClassReadiness] = []
 
-    for name, tier, resolver in RESOLVERS:
+    for cls in CLASSES:
+        tier = effective_tier(cls)
+        mode = effective_mode(cls)
+
+        if mode == OFF:
+            results.append(
+                ClassReadiness(
+                    name=cls.name,
+                    tier=tier,
+                    mode=mode,
+                    verifiable=cls.resolver is not None,
+                    note="configured off, so nothing was checked",
+                )
+            )
+            continue
+
+        if cls.resolver is None:
+            results.append(
+                ClassReadiness(
+                    name=cls.name,
+                    tier=tier,
+                    mode=mode,
+                    verifiable=False,
+                    note=cls.unverifiable_reason,
+                )
+            )
+            continue
+
         # A short-lived session per class rather than one held across the whole
         # check: the presence checks are the slow part, and holding a pooled
         # connection through them is how an observability feature starves the
         # thing it is observing.
         try:
             async with get_db_session() as db:
-                total, blob_keys = await resolver(db, limit)
+                total, blob_keys = await cls.resolver(db, limit)
         except Exception as exc:  # noqa: BLE001
-            logger.warning("blob readiness: could not resolve class", cls=name, exc_info=True)
-            results.append(ClassReadiness(name=name, tier=tier, error=str(exc)))
+            logger.warning("blob readiness: could not resolve class", cls=cls.name, exc_info=True)
+            results.append(ClassReadiness(name=cls.name, tier=tier, mode=mode, error=str(exc)))
             continue
 
         missing, examples = await _check_keys(store, blob_keys)
         results.append(
             ClassReadiness(
-                name=name,
+                name=cls.name,
                 tier=tier,
+                mode=mode,
                 total_rows=total,
                 checked=len(blob_keys),
                 missing=missing,

@@ -176,6 +176,8 @@
   "encryption.vault_mount",
   "encryption.vault_namespace",
   "external_url",
+  "ha.blobs.classes",
+  "ha.blobs.mode",
   "ha.component_status.enabled",
   "ha.component_status.instance",
   "ha.component_status.interval_seconds",

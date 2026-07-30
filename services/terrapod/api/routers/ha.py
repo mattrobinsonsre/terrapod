@@ -190,6 +190,12 @@ async def blob_readiness(
                 # The list that should stop a failover. Everything else is a
                 # judgement call about a given deployment; this is not.
                 "irreplaceable-missing": result.irreplaceable_missing,
+                # The counterpart that makes the list above trustworthy: an
+                # irreplaceable class that is configured off, or that no row
+                # guarantees, produces zero missing objects — indistinguishable
+                # from a pass unless it is named. On a sealed node this is where
+                # the escalated caches surface.
+                "irreplaceable-unchecked": result.irreplaceable_unchecked,
                 "duration-ms": result.duration_ms,
                 "unavailable-reason": result.unavailable_reason,
                 "classes": [
@@ -198,8 +204,19 @@ async def blob_readiness(
                         # irreplaceable | history | rederivable, from #1114. The
                         # tier is a property of the deployment as much as the
                         # artifact: a cold provider cache re-warms itself unless
-                        # the node is sealed, in which case it is fatal.
+                        # the node is sealed, in which case it is fatal. This is
+                        # the EFFECTIVE tier — sealing escalates it here rather
+                        # than expecting the operator to remember the rule.
                         "tier": c.tier,
+                        # off | verify | copy, from `ha.blobs`. Answers "why is
+                        # this class empty" without a second look at the config.
+                        "mode": c.mode,
+                        # False when no row guarantees these objects exist, so
+                        # presence cannot be derived from the database. A stated
+                        # boundary of the method, not a gap to be filled later.
+                        "verifiable": c.verifiable,
+                        # Why nothing was checked, when nothing was.
+                        "note": c.note,
                         "total-rows": c.total_rows,
                         "checked": c.checked,
                         "missing": c.missing,

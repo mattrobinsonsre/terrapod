@@ -1,4 +1,4 @@
-"""Blob readiness: proving the object store is there (#1147).
+"""Blob readiness: proving the object store is there (#1147, #1151).
 
 The failure this exists to catch is **rows present, blobs absent** — a promoted
 node that believes it has four hundred workspaces and cannot serve one. It looks
@@ -11,18 +11,24 @@ than it is takes care. Specifically:
 - a sample must never be reportable as a clean estate;
 - "I could not look" must be distinguishable from "I looked and all is well";
 - the thing that should stop a failover must be named, not left for the reader to
-  derive from a list of classes.
+  derive from a list of classes;
+- a class nobody looked at must not read as a class that passed.
+
+That last one arrived with #1151, which made the set of classes configurable. The
+moment a class can be turned off, "no missing objects" stops meaning "all present"
+unless the report says which classes it actually covered.
 
 The last one matters most. An operator reads this while deciding whether to move
 DNS, and a readout that requires interpretation at that moment is a readout that
 gets interpreted wrong.
 """
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from terrapod.services import blob_readiness
+from terrapod.services import blob_classes, blob_readiness
+from terrapod.services.blob_classes import BlobClass
 
 
 class FakeStore:
@@ -42,6 +48,12 @@ class FakeStore:
 
 def _class(name="state", tier=blob_readiness.IRREPLACEABLE, **kw):
     return blob_readiness.ClassReadiness(name=name, tier=tier, **kw)
+
+
+def _reg(name, *, tier=blob_readiness.IRREPLACEABLE, **kw):
+    """A throwaway register entry, so a test can drive `check()` over classes of
+    its own rather than the real fourteen."""
+    return BlobClass(name=name, tier=tier, prefixes=(f"{name}/",), **kw)
 
 
 class TestTheHeadlineCannotBeMisread:
@@ -173,88 +185,6 @@ class TestPresenceChecking:
         assert peak <= blob_readiness._CONCURRENCY
 
 
-class TestTheClassesCover_1114sIrreplaceableTier:
-    """#1114 lists what is permanently lost if it is absent. Each entry is here
-    for a reason worth stating, so the list cannot be trimmed casually."""
-
-    def test_the_irreplaceable_classes_are_registered(self):
-        registered = {name for name, _, _ in blob_readiness.RESOLVERS}
-
-        assert registered == {
-            "state",
-            "state_index",
-            "configuration_versions",
-            "registry_modules",
-            "registry_providers",
-        }
-
-    def test_all_registered_classes_are_irreplaceable(self):
-        """History and re-derivable classes are deliberately not checked yet:
-        the point of going first was the tier where absence is permanent."""
-        assert all(tier == blob_readiness.IRREPLACEABLE for _, tier, _ in blob_readiness.RESOLVERS)
-
-    def test_state_is_checked_first(self):
-        """Order is the order an operator reads, and the order a copier should
-        use — irreplaceable first, state before everything."""
-        assert blob_readiness.RESOLVERS[0][0] == "state"
-
-
-class TestResolvers:
-    """Each resolver turns rows into the keys they imply. The interesting part is
-    what each one is careful to include."""
-
-    def _db(self, rows, count=0):
-        db = AsyncMock()
-        result = MagicMock()
-        result.all.return_value = rows
-        result.scalar.return_value = count
-        db.execute.return_value = result
-        return db
-
-    async def test_state_resolves_every_version_not_just_the_latest(self):
-        """Rollback is a shipped feature, so a node holding only HEAD has
-        silently lost rollback depth — and looks healthy doing it."""
-        db = self._db([("ws-1", "sv-1"), ("ws-1", "sv-2")], count=2)
-
-        total, resolved = await blob_readiness._resolve_state(db, None)
-
-        assert total == 2
-        assert resolved == ["state/ws-1/sv-1.tfstate", "state/ws-1/sv-2.tfstate"]
-
-    async def test_a_provider_platform_also_pulls_its_signed_manifest(self):
-        """A present zip with an absent SHA256SUMS still fails `terraform init`,
-        so checking only the binary would report a working registry that is not."""
-        db = self._db([("default", "aws", "1.0.0", "linux", "amd64")], count=1)
-
-        _, resolved = await blob_readiness._resolve_provider_binaries(db, None)
-
-        assert resolved == [
-            "registry/providers/default/aws/1.0.0/aws_1.0.0_linux_amd64.zip",
-            "registry/providers/default/aws/1.0.0/SHA256SUMS",
-            "registry/providers/default/aws/1.0.0/SHA256SUMS.sig",
-        ]
-
-    async def test_config_versions_resolve_to_their_tarball(self):
-        """The sharpest omission in the store: a VCS workspace can refetch, a
-        CLI-uploaded or catalog-provisioned one cannot — this is the only copy."""
-        db = self._db([("ws-1", "cv-1")], count=1)
-
-        _, resolved = await blob_readiness._resolve_config_versions(db, None)
-
-        assert resolved == ["config/ws-1/cv-1.tar.gz"]
-
-    async def test_the_state_index_is_only_expected_when_state_exists(self):
-        """It is the break-glass recovery index. On an empty install its absence
-        is correct, and reporting it missing would be noise."""
-        empty = self._db([], count=0)
-        total, resolved = await blob_readiness._resolve_state_index(empty, None)
-        assert (total, resolved) == (0, [])
-
-        populated = self._db([], count=7)
-        total, resolved = await blob_readiness._resolve_state_index(populated, None)
-        assert (total, resolved) == (1, ["state/index.yaml"])
-
-
 class TestTheCheckIsSafeToRun:
     async def test_an_unavailable_store_is_a_readout_not_an_exception(self):
         """The caller is an operator deciding whether to fail over. An exception
@@ -281,15 +211,11 @@ class TestTheCheckIsSafeToRun:
             patch("terrapod.db.session.get_db_session") as session,
             patch.object(
                 blob_readiness,
-                "RESOLVERS",
-                [
-                    ("broken", blob_readiness.IRREPLACEABLE, boom),
-                    (
-                        "fine",
-                        blob_readiness.IRREPLACEABLE,
-                        AsyncMock(return_value=(1, ["state/a/b.tfstate"])),
-                    ),
-                ],
+                "CLASSES",
+                (
+                    _reg("broken", resolver=boom),
+                    _reg("fine", resolver=AsyncMock(return_value=(1, ["state/a/b.tfstate"]))),
+                ),
             ),
         ):
             session.return_value.__aenter__ = AsyncMock(return_value=AsyncMock())
@@ -312,9 +238,7 @@ class TestTheCheckIsSafeToRun:
         with (
             patch("terrapod.storage.get_storage", return_value=FakeStore()),
             patch("terrapod.db.session.get_db_session") as session,
-            patch.object(
-                blob_readiness, "RESOLVERS", [("x", blob_readiness.IRREPLACEABLE, resolver)]
-            ),
+            patch.object(blob_readiness, "CLASSES", (_reg("x", resolver=resolver),)),
         ):
             session.return_value.__aenter__ = AsyncMock(return_value=AsyncMock())
             session.return_value.__aexit__ = AsyncMock(return_value=False)
@@ -334,14 +258,8 @@ class TestTheCheckIsSafeToRun:
             patch("terrapod.db.session.get_db_session") as session,
             patch.object(
                 blob_readiness,
-                "RESOLVERS",
-                [
-                    (
-                        "x",
-                        blob_readiness.IRREPLACEABLE,
-                        AsyncMock(return_value=(9999, ["state/a/b.tfstate"])),
-                    )
-                ],
+                "CLASSES",
+                (_reg("x", resolver=AsyncMock(return_value=(9999, ["state/a/b.tfstate"]))),),
             ),
         ):
             session.return_value.__aenter__ = AsyncMock(return_value=AsyncMock())
@@ -367,9 +285,7 @@ class TestTheCheckIsSafeToRun:
         with (
             patch("terrapod.storage.get_storage", return_value=FakeStore()),
             patch("terrapod.db.session.get_db_session") as session,
-            patch.object(
-                blob_readiness, "RESOLVERS", [("x", blob_readiness.IRREPLACEABLE, resolver)]
-            ),
+            patch.object(blob_readiness, "CLASSES", (_reg("x", resolver=resolver),)),
         ):
             session.return_value.__aenter__ = AsyncMock(return_value=AsyncMock())
             session.return_value.__aexit__ = AsyncMock(return_value=False)
@@ -386,7 +302,109 @@ class TestTheCheckIsSafeToRun:
 
         source = inspect.getsource(blob_readiness.check)
 
-        resolve_at = source.index("await resolver(")
+        resolve_at = source.index("await cls.resolver(")
         exit_at = source.index("await _check_keys(")
         assert resolve_at < exit_at
         assert "async with get_db_session() as db:" in source
+
+
+class TestAClassNobodyLookedAtDoesNotReadAsAPass:
+    """The honesty property #1151 had to add. Once a class can be turned off, or
+    can be one no row guarantees, "nothing missing" stops meaning "all present"
+    unless the report says what it actually covered."""
+
+    def test_an_unchecked_irreplaceable_class_is_named(self):
+        readiness = blob_readiness.BlobReadiness(
+            classes=[
+                _class(name="state", total_rows=10, checked=10, missing=0),
+                _class(name="cost_pricesheet", checked=0, verifiable=False, note="no row"),
+            ]
+        )
+
+        assert readiness.irreplaceable_missing == []
+        assert readiness.irreplaceable_unchecked == ["cost_pricesheet"], (
+            "zero missing objects out of zero checked is indistinguishable from a "
+            "pass unless the class is named"
+        )
+
+    def test_a_class_that_errored_is_not_reported_as_merely_unchecked(self):
+        """It already has its own signal. Listing it in both would double-count
+        one problem as two."""
+        readiness = blob_readiness.BlobReadiness(
+            classes=[_class(name="state", checked=0, error="store unreachable")]
+        )
+
+        assert readiness.irreplaceable_unchecked == []
+        assert readiness.classes[0].healthy is False
+
+    async def test_a_class_configured_off_is_reported_skipped_not_dropped(self):
+        store = FakeStore()
+        resolver = AsyncMock(return_value=(5, ["state/a/b.tfstate"]))
+
+        with (
+            patch("terrapod.storage.get_storage", return_value=store),
+            patch("terrapod.db.session.get_db_session") as session,
+            patch.object(blob_readiness, "CLASSES", (_reg("x", resolver=resolver),)),
+            # Patched on the READER, not the definer: `blob_readiness` imported the
+            # name, so rebinding it in `blob_classes` would not be seen.
+            patch.object(blob_readiness, "effective_mode", return_value=blob_classes.OFF),
+        ):
+            session.return_value.__aenter__ = AsyncMock(return_value=AsyncMock())
+            session.return_value.__aexit__ = AsyncMock(return_value=False)
+            result = await blob_readiness.check()
+
+        assert len(result.classes) == 1, "an off class must still appear in the report"
+        assert result.classes[0].mode == blob_classes.OFF
+        assert result.classes[0].checked == 0
+        assert result.classes[0].note
+        resolver.assert_not_called()
+        assert store.checked == [], "off means no round trips, not quiet ones"
+
+    async def test_a_copy_only_class_is_listed_with_its_reason(self):
+        """A class no row guarantees cannot be verified. Omitting it would leave
+        its absence reading as a pass; listing it with the reason makes the
+        boundary of the method visible."""
+        with (
+            patch("terrapod.storage.get_storage", return_value=FakeStore()),
+            patch("terrapod.db.session.get_db_session") as session,
+            patch.object(
+                blob_readiness,
+                "CLASSES",
+                (_reg("run_logs", resolver=None, unverifiable_reason="written only if it ran"),),
+            ),
+        ):
+            session.return_value.__aenter__ = AsyncMock(return_value=AsyncMock())
+            session.return_value.__aexit__ = AsyncMock(return_value=False)
+            result = await blob_readiness.check()
+
+        only = result.classes[0]
+        assert only.verifiable is False
+        assert only.note == "written only if it ran"
+        assert only.checked == 0
+
+    async def test_the_reported_tier_is_the_effective_one(self):
+        """A sealed node's cache is not re-derivable — it is the difference
+        between a working promotion and a node with no providers at all. The
+        report has to show the tier that applies here, not the nominal one."""
+        with (
+            patch("terrapod.storage.get_storage", return_value=FakeStore()),
+            patch("terrapod.db.session.get_db_session") as session,
+            patch.object(
+                blob_readiness,
+                "CLASSES",
+                (
+                    _reg(
+                        "provider_cache",
+                        tier=blob_readiness.REDERIVABLE,
+                        sealed_is_fatal=True,
+                        resolver=AsyncMock(return_value=(1, ["cache/providers/x"])),
+                    ),
+                ),
+            ),
+            patch.object(blob_classes, "_sealed", return_value=True),
+        ):
+            session.return_value.__aenter__ = AsyncMock(return_value=AsyncMock())
+            session.return_value.__aexit__ = AsyncMock(return_value=False)
+            result = await blob_readiness.check()
+
+        assert result.classes[0].tier == blob_readiness.IRREPLACEABLE

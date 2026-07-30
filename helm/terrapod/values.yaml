@@ -447,6 +447,42 @@ api:
         # the end detects the gap and backfills rather than silently skipping
         # the rows it missed. That fallback is what makes the window bounded.
         retention_days: 7
+      # The object store is a second data plane (#960 phase 4), and unlike the
+      # database it often already has a replicator: provider-native cross-region
+      # replication, a storage-level mirror. Where that is true Terrapod's job is
+      # to PROVE it happened, not duplicate it; where it is not — cross-CSP,
+      # on-prem, air-gapped — Terrapod copies.
+      #
+      # The choice is per class because within one deployment it genuinely
+      # differs: copying state and configuration versions across a region
+      # boundary while letting a re-warmable provider cache stay cold is a
+      # coherent position no bucket-level policy can express.
+      blobs:
+        # off | verify | copy. Default `verify`: it observes the whole store,
+        # costs nothing until the blob-readiness endpoint is called, and commits
+        # you to nothing.
+        mode: "verify"
+        # Per-class override of `mode`. Unknown class names are REJECTED at
+        # startup rather than ignored, so a typo cannot leave a class you believe
+        # you configured sitting on the default. Known names:
+        #   irreplaceable — state, state_index, configuration_versions,
+        #                   registry_modules, registry_providers
+        #   history       — run_logs, run_plans, run_vars
+        #   re-derivable  — provider_cache, binary_cache,
+        #                   platform_provider_cache, cost_pricesheet,
+        #                   vcs_archives, module_overrides
+        #
+        # The cache classes stop being re-derivable on a sealed
+        # (registry.cache_only) node — it is forbidden to reach upstream, so a
+        # promoted node with a cold cache has no binary and no providers. That
+        # escalation is derived, not something to restate here.
+        #
+        # e.g.
+        #   classes:
+        #     state: copy
+        #     configuration_versions: copy
+        #     run_logs: "off"
+        classes: {}
 
     # VCS Integration
     # VCS connections (GitHub App installations, GitLab tokens) are created
