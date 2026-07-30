@@ -774,10 +774,14 @@ jobs:
               --values helm/terrapod/values.yaml \
               --set api.config.ha.blobs.classes.state=copy \
               --set api.config.ha.blobs.classes.run_logs=off)
-          echo "$out" | grep -A4 "blobs:" | grep -q "state: copy" || { echo "FAIL: a per-class override must reach the ConfigMap (#1151)"; exit 1; }
+          # The -A window must clear every scalar BETWEEN `blobs:` and `classes:`
+          # (mode + the four copy-budget keys), so it is generous on purpose:
+          # a window sized to today's block silently stops reaching the thing it
+          # asserts the moment a key is added above it.
+          echo "$out" | grep -A12 "blobs:" | grep -q "state: copy" || { echo "FAIL: a per-class override must reach the ConfigMap (#1151)"; exit 1; }
           # The selectivity #1114 asks for: copy what cannot be regenerated,
           # ignore the history. Both halves have to survive the render.
-          echo "$out" | grep -A4 "blobs:" | grep -q "run_logs:" || { echo "FAIL: an 'off' class must reach the ConfigMap too (#1151)"; exit 1; }
+          echo "$out" | grep -A12 "blobs:" | grep -q "run_logs:" || { echo "FAIL: an 'off' class must reach the ConfigMap too (#1151)"; exit 1; }
           # A typo'd class name is the worst outcome available — a class the
           # operator believes they configured, silently on the default. The
           # schema refuses it here; HABlobsConfig refuses it again at startup for
