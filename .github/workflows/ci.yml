@@ -128,7 +128,10 @@ jobs:
     needs: prepare
     if: needs.prepare.outputs.images_exist != 'true'
     runs-on: ubuntu-latest
-    container: ${{ env.NODE_IMAGE }}
+    # Literal, not ${{ env.* }}: the env context is NOT available in a job's
+    # `container:` or in `services:` — using it there makes the whole workflow
+    # invalid, which GitHub reports as NO checks rather than a failing one.
+    container: ghcr.io/mattrobinsonsre/mirror/node:24-alpine
     defaults:
       run:
         working-directory: web
@@ -516,7 +519,8 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: ${{ env.POSTGRES_IMAGE }}
+        # Literal for the same reason as `container:` above.
+        image: ghcr.io/mattrobinsonsre/mirror/postgres:16-alpine
         env:
           POSTGRES_USER: terrapod
           POSTGRES_PASSWORD: terrapod
@@ -546,7 +550,10 @@ jobs:
     needs: prepare
     if: needs.prepare.outputs.images_exist != 'true'
     runs-on: ubuntu-latest
-    container: ${{ env.PY_IMAGE }}
+    # Literal, not ${{ env.* }}: the env context is NOT available in a job's
+    # `container:` or in `services:` — using it there makes the whole workflow
+    # invalid, which GitHub reports as NO checks rather than a failing one.
+    container: ghcr.io/mattrobinsonsre/mirror/python:3.13-slim
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Install Poetry and export plugin
@@ -571,7 +578,10 @@ jobs:
     needs: prepare
     if: needs.prepare.outputs.images_exist != 'true'
     runs-on: ubuntu-latest
-    container: ${{ env.NODE_IMAGE }}
+    # Literal, not ${{ env.* }}: the env context is NOT available in a job's
+    # `container:` or in `services:` — using it there makes the whole workflow
+    # invalid, which GitHub reports as NO checks rather than a failing one.
+    container: ghcr.io/mattrobinsonsre/mirror/node:24-alpine
     defaults:
       run:
         working-directory: web
