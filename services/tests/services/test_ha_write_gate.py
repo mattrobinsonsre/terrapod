@@ -92,10 +92,20 @@ class TestEveryGatedEntryPointRefuses:
 
     @patch("terrapod.services.ha_role.settings")
     async def test_claim_next_run(self, mock_settings):
-        """A listener pointed at a follower must be handed nothing."""
+        """A listener pointed at a follower must be handed nothing.
+
+        Nothing, not an error. The invariant is unchanged — a follower
+        dispatches no work — but it is now expressed as an empty answer rather
+        than a raised one, because a listener should not have to know which
+        node it reached. Raising made every poll from an attached listener a
+        503 it retried forever, which is what stopped a standby's fleet from
+        ever being ready before promotion (#1191).
+        """
         mock_settings.ha = _static("follower")
-        with pytest.raises(NotLeaderError):
-            await run_service.claim_next_run(AsyncMock(), MagicMock(), "listener-1")
+
+        claim = await run_service.claim_next_run(AsyncMock(), MagicMock(), "listener-1")
+
+        assert claim is None
 
 
 class TestLeaderStillWorks:

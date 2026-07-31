@@ -1532,7 +1532,13 @@ async def claim_next_run(
     claimed under SKIP LOCKED, so offering it to N pools cannot produce N
     claims. The winning pool is written back to `run.pool_id` below.
     """
-    await ha_role.ensure_leader("dispatch runs")
+    # A follower has no work to give, and that is not a failure — it is the
+    # steady state. Raising here turned every poll from an attached listener
+    # into a 503 it retried forever, which is how a listener ended up needing
+    # to know which node it was talking to (#1191). Returning "nothing to do"
+    # says the same thing in the vocabulary the caller already speaks.
+    if not await ha_role.is_leader():
+        return None
     # Try queued runs first (plan phase), then confirmed runs (apply phase)
     for target_status, phase, next_status in [
         ("queued", "plan", "planning"),
