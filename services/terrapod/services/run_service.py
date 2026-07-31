@@ -1364,7 +1364,7 @@ async def cancel_run(
     # before transitioning so a same-tick run_status_change observer
     # sees the cancel intent reflected when it polls. The publish path
     # is wrapped — SSE plumbing failures must never break the cancel.
-    await _publish_cancel_job(run)
+    await publish_cancel_job(run)
 
     return await transition_run(db, run, target)
 
@@ -1446,7 +1446,7 @@ async def resolve_canceling_run(db: AsyncSession, run: Run, *, job_status: str) 
     return run
 
 
-async def _publish_cancel_job(run: Run) -> None:
+async def publish_cancel_job(run: Run) -> None:
     """Send a `cancel_job` SSE event to the pool's listeners.
 
     The reconciler's check_job_status / stream_logs events publish on

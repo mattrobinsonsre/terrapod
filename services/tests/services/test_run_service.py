@@ -1033,7 +1033,7 @@ class TestCancelWhileApplying:
 
         with (
             patch.object(run_service, "transition_run", new=AsyncMock(side_effect=_transition)),
-            patch.object(run_service, "_publish_cancel_job", new=AsyncMock()) as mock_publish,
+            patch.object(run_service, "publish_cancel_job", new=AsyncMock()) as mock_publish,
         ):
             result = await run_service.cancel_run(db, run)
 
@@ -1073,7 +1073,7 @@ class TestCancelWhileApplying:
 
         with (
             patch.object(run_service, "transition_run", new=AsyncMock(side_effect=_transition)),
-            patch.object(run_service, "_publish_cancel_job", new=AsyncMock()),
+            patch.object(run_service, "publish_cancel_job", new=AsyncMock()),
         ):
             result = await run_service.cancel_run(db, run)
 
