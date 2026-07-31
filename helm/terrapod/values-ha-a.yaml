@@ -47,6 +47,13 @@ web:
 # Service the harness creates.
 listener:
   enabled: true
+  # Same single-node deadlock the API notes below: the default required
+  # anti-affinity stops a rolling update replacing the listener, because the
+  # new pod cannot schedule until the old one goes and the old one waits for
+  # the new one. It resolves eventually, but it makes every `helm upgrade`
+  # here take minutes. A real pair on real nodes leaves it on.
+  podAntiAffinity:
+    enabled: false
   name: ha-a-listener
   joinToken: "ha-smoke-join-token-a-not-for-real-use"
   image:
@@ -91,6 +98,14 @@ api:
       # arrive is the object-store half of the exercise (#1114).
       filesystem:
         base_url: "http://terrapod-a-api:8000"
+    # The pair re-joins its fleets repeatedly — every table run flips roles at
+    # least twice, and the shared-fleet row deliberately forces a re-join. Two
+    # uses (the shipped default) is right for a real install bootstrapping once;
+    # here it would exhaust on the second run and report a fleet failure that is
+    # really a rig artefact.
+    agent_pools:
+      default_join_token_max_uses: 200
+      default_join_token_ttl_seconds: 604800
     ha:
       role: leader
       node_name: node-a
