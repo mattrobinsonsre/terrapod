@@ -21,12 +21,12 @@ Both smokes read the token from the credentials file (or
 `$TERRAPOD_TOKEN`).
 
 You also need:
-- `docker compose` (for minio in the migrate smoke)
+- `docker compose` (for LocalStack in the migrate smoke)
 - `tofu` or `terraform` on PATH
 - `go` (for building the migrator + provider locally)
 - `git` (the migrate smoke seeds a fake clone)
 
-## `smoke-migrate-s3.sh` — terrapod-migrate end-to-end against minio
+## `smoke-migrate-s3.sh` — terrapod-migrate end-to-end against LocalStack
 
 ```sh
 scripts/smoke/smoke-migrate-s3.sh
@@ -34,22 +34,22 @@ scripts/smoke/smoke-migrate-s3.sh
 
 What it does:
 
-1. `docker compose up` — boots minio at `127.0.0.1:9100`
+1. `docker compose up` — boots LocalStack at `127.0.0.1:4666`
 2. Generates a one-project Atlantis fixture with an S3-backed terraform module
-3. Runs `terraform apply` to seed minio with real state
+3. Runs `terraform apply` to seed LocalStack with real state
 4. Builds the migrator from current source
 5. Runs `terrapod-migrate apply --dry-run` then `--apply`
 6. Runs `terrapod-migrate verify` (confirms workspace + state landed on Terrapod)
 7. Runs `terrapod-migrate cutover --write-handover` (writes MIGRATION-HANDOVER.md)
 8. Re-runs `apply` to confirm state migration is idempotent (must report `state: "unchanged"` for every workspace)
 
-Leaves minio running so you can iterate; tear down with:
+Leaves LocalStack running so you can iterate; tear down with:
 
 ```sh
 docker compose -f scripts/smoke/docker-compose.yml down -v
 ```
 
-The minio bucket is wiped on `down -v`. The fixture and state file live in `/tmp/terrapod-smoke-*` — also wiped on reboot.
+The LocalStack bucket is wiped on `down -v`. The fixture and state file live in `/tmp/terrapod-smoke-*` — also wiped on reboot.
 
 ## `smoke-provider.sh` — terraform-provider-terrapod against Tilt
 
@@ -99,7 +99,7 @@ you can re-run the smoke without colliding with leftover resources.
 ```
 scripts/smoke/
 ├── README.md                  # this file
-├── docker-compose.yml         # minio service + bucket-init container
+├── docker-compose.yml         # LocalStack service + bucket-init container
 ├── seed-fixture.sh            # generates the migrate-smoke atlantis fixture
 ├── smoke-migrate-s3.sh        # the migrate smoke driver
 ├── smoke-provider.sh          # the provider smoke driver

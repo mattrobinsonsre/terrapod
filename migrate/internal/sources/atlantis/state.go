@@ -4,7 +4,7 @@
 // package, finds the backend declaration, and downloads the current
 // state via the appropriate native cloud-vendor SDK.
 //
-// Supported backends today: local, s3 (incl. minio via --s3-endpoint-
+// Supported backends today: local, s3 (incl. non-AWS endpoints via --s3-endpoint-
 // url-equivalent on the operator's AWS_CONFIG), gcs, azurerm. Other
 // kinds (consul, etcd, http, ...) are surfaced as skipped items in
 // the report — the operator migrates state for those by hand.
@@ -39,23 +39,23 @@ import (
 // inside this tool would just produce a worse version.
 //
 // The fields below are the *non-credential* overrides the chains
-// can't infer: a custom endpoint URL (minio / LocalStack / VPC
-// endpoint) and S3 path-style addressing (mandatory for minio).
-// For minio smoke tests, operators point AWS_ACCESS_KEY_ID /
-// AWS_SECRET_ACCESS_KEY (or an AWS_PROFILE) at the minio creds —
+// can't infer: a custom endpoint URL (LocalStack / VPC
+// endpoint) and S3 path-style addressing (mandatory for most of them).
+// For local smoke tests, operators point AWS_ACCESS_KEY_ID /
+// AWS_SECRET_ACCESS_KEY (or an AWS_PROFILE) at the endpoint's creds —
 // the SDK picks them up the same way it would for real S3.
 type StateOptions struct {
 	// S3Endpoint, if set, overrides the AWS S3 endpoint URL. Set
-	// this to the minio endpoint URL (e.g. "http://localhost:9000")
-	// for smoke tests against minio.
+	// this to the endpoint URL (e.g. "http://localhost:4566")
+	// for smoke tests against a local S3 endpoint.
 	S3Endpoint string
 
 	// S3ForcePathStyle uses path-style addressing (bucket in path
-	// rather than subdomain). Required for minio; AWS S3 itself
+	// rather than subdomain). Required by most non-AWS endpoints; AWS S3 itself
 	// works either way.
 	S3ForcePathStyle bool
 
-	// S3Region overrides the resolved region. Useful for minio
+	// S3Region overrides the resolved region. Useful for local
 	// (whose region is arbitrary) and for explicit pinning when the
 	// backend HCL omits a region.
 	S3Region string
@@ -211,7 +211,7 @@ func readLocalState(projectDir, configuredPath string) ([]byte, error) {
 	return raw, nil
 }
 
-// ── S3 backend (also minio) ──────────────────────────────────────────
+// ── S3 backend (also non-AWS S3 endpoints) ───────────────────────────
 
 func readS3State(ctx context.Context, settings map[string]string, opts StateOptions) ([]byte, error) {
 	bucket := settings["bucket"]

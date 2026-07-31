@@ -45,8 +45,8 @@ func applyCmd(args []string) int {
 		// ~/.aws/credentials with AWS_PROFILE, AWS SSO, IAM roles,
 		// IRSA, EC2/ECS instance metadata) — same chain every other
 		// AWS-aware tool uses. We do not reinvent it.
-		s3Endpoint  = fs.String("s3-endpoint-url", os.Getenv("AWS_ENDPOINT_URL_S3"), "S3 endpoint override (e.g. http://localhost:9000 for minio; or AWS_ENDPOINT_URL_S3)")
-		s3PathStyle = fs.Bool("s3-force-path-style", os.Getenv("AWS_S3_FORCE_PATH_STYLE") == "true", "Use S3 path-style addressing (required for minio)")
+		s3Endpoint  = fs.String("s3-endpoint-url", os.Getenv("AWS_ENDPOINT_URL_S3"), "S3 endpoint override (e.g. http://localhost:4566 for LocalStack, or a VPC endpoint; or AWS_ENDPOINT_URL_S3)")
+		s3PathStyle = fs.Bool("s3-force-path-style", os.Getenv("AWS_S3_FORCE_PATH_STYLE") == "true", "Use S3 path-style addressing (required by most non-AWS S3 endpoints)")
 		s3Region    = fs.String("s3-region", "", "S3 region override (default: AWS_REGION env, or read from backend HCL)")
 		target      = fs.String("target", os.Getenv("TERRAPOD_HOSTNAME"), "Terrapod base URL (or TERRAPOD_HOSTNAME)")
 		token       = fs.String("token", os.Getenv("TERRAPOD_TOKEN"), "Terrapod API token (or TERRAPOD_TOKEN)")
