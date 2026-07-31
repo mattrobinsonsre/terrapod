@@ -196,6 +196,24 @@ class TestTheAllowListIsPinned:
         assert is_follower_writable("/api/terrapod/v1/listeners/listener-1/heartbeat")
         assert is_follower_writable("/api/terrapod/v1/listeners/listener-1/renew")
 
+    def test_the_keepalive_constant_is_what_drives_the_predicate(self):
+        """`_LISTENER_KEEPALIVE` reads as the allow-list and carries the comment
+        explaining which neighbouring paths are deliberately excluded. It has to
+        be the thing actually consulted, or that comment describes an intent the
+        code no longer implements — which is what CodeQL noticed when the
+        predicate kept its own hard-coded copy of the terminal segments and the
+        constant went unread.
+        """
+        from terrapod.api.follower_gate import _LISTENER_KEEPALIVE
+
+        for template in _LISTENER_KEEPALIVE:
+            assert is_follower_writable(template.replace("{id}", "listener-1")), template
+
+        # Adding a template admits exactly that path and nothing adjacent to it.
+        assert not is_follower_writable("/api/terrapod/v1/listeners/listener-1/heartbeat/x")
+        assert not is_follower_writable("/api/terrapod/v1/listeners/heartbeat")
+        assert not is_follower_writable("/api/terrapod/v1/other/listener-1/heartbeat")
+
     def test_the_run_lifecycle_calls_stay_refused(self):
         """Enrolment is node-local; reporting on a run is not.
 

@@ -12,7 +12,6 @@ import {
   Key,
   Activity,
   HardDrive,
-  Radio,
   GitBranch,
   Users,
   Shield,

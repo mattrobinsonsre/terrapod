@@ -118,7 +118,7 @@ const ansiConverter = new Convert({
 })
 
 function stripAnsi(text: string): string {
-  // eslint-disable-next-line no-control-regex
+  // \x1b is the ESC that opens every SGR colour sequence terraform emits.
   return text.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '')
 }
 

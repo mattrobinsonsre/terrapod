@@ -791,6 +791,15 @@ function WorkspacesPageInner() {
                     aria-label={t('filter.ariaLabel')}
                     role="combobox"
                     aria-expanded={suggestOpen && suggestions.length > 0}
+                    aria-controls="workspace-filter-suggestions"
+                    // Without this the highlight moves silently: a screen reader
+                    // announces the listbox but never which option the arrow keys
+                    // landed on.
+                    aria-activedescendant={
+                      suggestOpen && suggestIndex >= 0
+                        ? `workspace-filter-suggestion-${suggestIndex}`
+                        : undefined
+                    }
                     aria-autocomplete="list"
                     autoComplete="off"
                     className="w-full px-3 py-2 rounded-lg bg-slate-800/50 border border-slate-700/50 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-brand-500"
@@ -798,12 +807,14 @@ function WorkspacesPageInner() {
                   {suggestOpen && suggestions.length > 0 && (
                     <div
                       role="listbox"
+                      id="workspace-filter-suggestions"
                       data-testid="filter-suggestions"
                       className="absolute start-0 end-0 z-20 mt-1 rounded-lg bg-slate-800 border border-slate-700 shadow-xl py-1 max-h-72 overflow-y-auto"
                     >
                       {suggestions.map((s, i) => (
                         <button
                           key={`${s.kind}:${s.insert}`}
+                          id={`workspace-filter-suggestion-${i}`}
                           type="button"
                           role="option"
                           aria-selected={i === suggestIndex}
