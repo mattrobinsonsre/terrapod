@@ -64,9 +64,12 @@ listener:
 
 runners:
   image:
-    # Built by `tilt trigger build-runner-image`; never pulled.
+    # Same reasoning as the API and migrations images: the pair runs a tag it
+    # owns, re-tagged from what Tilt built, so a rebuild in the dev stack cannot
+    # leave a runner Job in ErrImageNeverPull. `ha-smoke.sh up` does the
+    # re-tagging; `tilt trigger build-runner-image` is what produces the source.
     repository: terrapod-runner
-    tag: local
+    tag: ha
     pullPolicy: Never
 
 # Pre-install so the pool exists before the listener rolls out — otherwise

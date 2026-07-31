@@ -73,15 +73,24 @@ cmd_up() {
   [[ -n "$api_src" && -n "$mig_src" ]] \
     || fail "no tilt-built images — run 'tilt up' once so the pair has something to run"
 
+  # The runner image is built by a Tilt `local_resource` under a fixed `:local`
+  # tag rather than a content hash, so it does not move — but nothing references
+  # it between runs either, which leaves it eligible for kubelet image GC. Same
+  # symptom, so same treatment.
+  local runner_src="terrapod-runner:local"
+  docker image inspect "$runner_src" >/dev/null 2>&1 \
+    || fail "no $runner_src — run 'tilt trigger build-runner-image' so the pair can execute runs"
+
   # Re-tag unless the caller has already staged its own build under :ha (which
   # is how a fix is tried on the pair before it exists in the dev stack).
   local api_image="terrapod-api:ha" mig_image="terrapod-migrations:ha"
   if [[ "${HA_KEEP_IMAGES:-}" != "1" ]]; then
     docker tag "$api_src" "$api_image"
     docker tag "$mig_src" "$mig_image"
-    info "pinned $api_src -> $api_image, $mig_src -> $mig_image"
+    docker tag "$runner_src" "terrapod-runner:ha"
+    info "pinned $api_src -> $api_image, $mig_src -> $mig_image, $runner_src -> terrapod-runner:ha"
   else
-    info "HA_KEEP_IMAGES=1 — reusing whatever is tagged $api_image / $mig_image"
+    info "HA_KEEP_IMAGES=1 — reusing whatever is tagged :ha"
   fi
 
   local node ns
