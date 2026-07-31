@@ -129,3 +129,40 @@ class TestATransientFailureKeepsTheCachedToken:
 
         assert result.skipped_reason == "peer authentication failed"
         assert bool(cleared) is should_reset
+
+
+class TestAFollowerHandsOutNoWork:
+    """#1191 — a listener must not have to know which node it reached.
+
+    A follower cannot dispatch, but saying so with an exception turned every
+    poll from an attached listener into a 503 it retried forever. "Nothing to
+    do" is the same statement in the vocabulary the caller already speaks, and
+    it is what lets a standby's fleet sit attached and idle until promotion.
+    """
+
+    async def test_claim_returns_nothing_rather_than_raising(self):
+        import uuid
+        from unittest.mock import AsyncMock, patch
+
+        from terrapod.services import run_service
+
+        with patch("terrapod.services.ha_role.is_leader", AsyncMock(return_value=False)):
+            claim = await run_service.claim_next_run(
+                AsyncMock(), listener_id=uuid.uuid4(), pool_id=uuid.uuid4()
+            )
+
+        assert claim is None, "a follower must answer 'no work', not fail the poll"
+
+    async def test_a_leader_still_dispatches(self):
+        """The false branch is the one that matters, but a gate that refuses
+        everything would pass that test too."""
+        import inspect
+
+        from terrapod.services import run_service
+
+        src = inspect.getsource(run_service.claim_next_run)
+        assert "if not await ha_role.is_leader():" in src
+        assert "return None" in src
+        assert "ensure_leader" not in src, (
+            "the raising form is what made a follower's poll an error"
+        )
