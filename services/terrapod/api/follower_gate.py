@@ -63,6 +63,21 @@ FOLLOWER_WRITABLE_PATHS = frozenset(
         "/api/terrapod/v1/auth/token",
         "/api/terrapod/v1/auth/logout",
         "/api/terrapod/v1/auth/logout/all",
+        # A listener must be able to enrol against whichever node it is pointed
+        # at, and stay enrolled. It should not have to know, or care, whether
+        # that node currently leads — a follower simply never sends it work
+        # (`claim_next_run` returns nothing rather than failing), so there is no
+        # work to leak by letting it attach.
+        #
+        # Enrolling records node-local state only: the listener lives in THIS
+        # node's Redis with a TTL, and its certificate is signed by THIS node's
+        # CA, neither of which replicates (#1143). That is the allow-list's
+        # stated rule — records state on this node, does not change platform
+        # state — so it belongs here rather than being a standing exception.
+        #
+        # Without this the whole listener protocol is refused on a follower, so
+        # a standby's fleet can never be ready before promotion (#1191).
+        "/api/terrapod/v1/agent-pools/join",
     }
 )
 
@@ -70,11 +85,50 @@ FOLLOWER_WRITABLE_PATHS = frozenset(
 #:
 #: Session revocation only ever *removes* access, and only on this node, so it
 #: is safe on a follower for the same reason logout is.
-FOLLOWER_WRITABLE_PREFIXES: tuple[str, ...] = ("/api/terrapod/v1/auth/sessions/user/",)
+#: Keeping a listener alive is likewise node-local: the heartbeat refreshes a
+#: Redis TTL, and a renewal re-signs against this node's own CA. The pool-scoped
+#: join carries the pool id in the path, so it needs a prefix rather than an
+#: exact match.
+#:
+#: Deliberately NOT here: the run-lifecycle calls under
+#: `/listeners/{id}/runs/...` (job-launched, job-status, the PATCH). Those touch
+#: run rows, which DO replicate. A follower dispatches nothing, so a listener
+#: attached to one never has a run to report on — leaving them gated costs
+#: nothing and keeps the boundary where the replication story needs it.
+_LISTENER_KEEPALIVE = (
+    "/api/terrapod/v1/listeners/{id}/heartbeat",
+    "/api/terrapod/v1/listeners/{id}/renew",
+)
+
+FOLLOWER_WRITABLE_PREFIXES: tuple[str, ...] = (
+    "/api/terrapod/v1/auth/sessions/user/",
+    "/api/terrapod/v1/agent-pools/",  # …/{pool_id}/listeners/join — see below
+)
+
+
+def _is_listener_keepalive(path: str) -> bool:
+    """True for a listener's heartbeat or certificate renewal.
+
+    Matched structurally rather than by prefix so that the run-lifecycle calls
+    under the same `/listeners/{id}/` root stay refused.
+    """
+    parts = path.strip("/").split("/")
+    return (
+        len(parts) == 6
+        and parts[:3] == ["api", "terrapod", "v1"]
+        and parts[3] == "listeners"
+        and parts[5] in {"heartbeat", "renew"}
+    )
 
 
 def is_follower_writable(path: str) -> bool:
-    return path in FOLLOWER_WRITABLE_PATHS or path.startswith(FOLLOWER_WRITABLE_PREFIXES)
+    if path in FOLLOWER_WRITABLE_PATHS or _is_listener_keepalive(path):
+        return True
+    # The agent-pool prefix is deliberately narrow: only the pool-scoped join,
+    # never pool or token administration, which changes platform state.
+    if path.startswith("/api/terrapod/v1/agent-pools/") and path.endswith("/listeners/join"):
+        return True
+    return path.startswith(FOLLOWER_WRITABLE_PREFIXES[:1])
 
 
 async def follower_write_gate(

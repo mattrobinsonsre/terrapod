@@ -167,22 +167,58 @@ class TestTheAllowListIsPinned:
             "/api/terrapod/v1/auth/token",
             "/api/terrapod/v1/auth/logout",
             "/api/terrapod/v1/auth/logout/all",
+            "/api/terrapod/v1/agent-pools/join",
         }, (
             "The follower allow-list changed. Every entry must be something that "
             "RECORDS or REDUCES access on this node — never something that changes "
             "platform state, because a follower cannot carry that anywhere."
         )
 
-    def test_the_prefix_list_is_exactly_this(self):
-        assert FOLLOWER_WRITABLE_PREFIXES == ("/api/terrapod/v1/auth/sessions/user/",)
+    def test_every_allowed_path_is_auth_or_listener_enrolment(self):
+        """A structural restatement of the principle.
 
-    def test_every_allowed_path_is_under_auth(self):
-        """A structural restatement of the principle: nothing outside the auth
-        surface has any business being writable on a follower."""
+        Two categories qualify, and only two. **Auth** — an operator has to be
+        able to read a follower's status before deciding to move DNS. And
+        **listener enrolment** — a listener records itself in THIS node's Redis
+        and takes a certificate from THIS node's CA, neither of which
+        replicates, so attaching to a follower changes nothing shared. It also
+        gains the listener nothing until promotion, because a follower hands
+        out no work (#1191).
+        """
+        allowed_roots = ("/api/terrapod/v1/auth/", "/api/terrapod/v1/agent-pools/")
         for path in FOLLOWER_WRITABLE_PATHS:
-            assert path.startswith("/api/terrapod/v1/auth/"), path
-        for prefix in FOLLOWER_WRITABLE_PREFIXES:
-            assert prefix.startswith("/api/terrapod/v1/auth/"), prefix
+            assert path.startswith(allowed_roots), path
+
+    def test_a_listener_can_enrol_and_stay_alive_on_a_follower(self):
+        """The listener protocol must not depend on which node it reached."""
+        assert is_follower_writable("/api/terrapod/v1/agent-pools/join")
+        assert is_follower_writable("/api/terrapod/v1/agent-pools/pool-1/listeners/join")
+        assert is_follower_writable("/api/terrapod/v1/listeners/listener-1/heartbeat")
+        assert is_follower_writable("/api/terrapod/v1/listeners/listener-1/renew")
+
+    def test_the_run_lifecycle_calls_stay_refused(self):
+        """Enrolment is node-local; reporting on a run is not.
+
+        Run rows replicate, so a follower must not accept them. It costs
+        nothing to refuse: a follower dispatches no work, so a listener
+        attached to one never has a run to report on in the first place.
+        """
+        base = "/api/terrapod/v1/listeners/listener-1/runs"
+        assert not is_follower_writable(f"{base}/run-1/job-launched")
+        assert not is_follower_writable(f"{base}/run-1/job-status")
+        assert not is_follower_writable(f"{base}/run-1/runner-token")
+        assert not is_follower_writable(f"{base}/run-1/log-stream")
+        assert not is_follower_writable(f"{base}/run-1")
+
+    def test_pool_administration_stays_refused(self):
+        """The agent-pool prefix must not widen into managing pools.
+
+        Creating a pool or minting a join token IS platform state, and a
+        follower cannot carry it anywhere.
+        """
+        assert not is_follower_writable("/api/terrapod/v1/agent-pools")
+        assert not is_follower_writable("/api/terrapod/v1/agent-pools/pool-1")
+        assert not is_follower_writable("/api/terrapod/v1/agent-pools/pool-1/tokens")
 
     def test_the_gate_covers_every_mutating_method(self):
         assert WRITE_METHODS == {"POST", "PUT", "PATCH", "DELETE"}
