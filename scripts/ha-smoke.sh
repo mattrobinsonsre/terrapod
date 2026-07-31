@@ -8,6 +8,7 @@
 #   scripts/ha-smoke.sh up      deploy both nodes and the shared peer secrets
 #   scripts/ha-smoke.sh verify  assert the pair actually converges
 #   scripts/ha-smoke.sh reverse swap the roles and assert it works both ways
+#   scripts/ha-smoke.sh table   walk the #960 release-gate table, honestly
 #   scripts/ha-smoke.sh down    remove node B
 #
 # The peer link runs over in-cluster Service DNS. That is not a shortcut:
@@ -319,6 +320,7 @@ case "${1:-}" in
   up) cmd_up ;;
   verify) cmd_verify ;;
   reverse) cmd_reverse ;;
+  table) python3 "$REPO_ROOT/scripts/ha_smoke_table.py" ;;
   down) cmd_down ;;
-  *) print "usage: $0 {up|verify|reverse|down}"; exit 2 ;;
+  *) print "usage: $0 {up|verify|reverse|table|down}"; exit 2 ;;
 esac
