@@ -16,6 +16,7 @@ from terrapod.db.models import (
     APIToken,
     AutodiscoveryRule,
     CatalogItem,
+    ConfigurationVersion,
     ExecutionHook,
     ExecutionHookWorkspace,
     ModuleWorkspaceLink,
@@ -29,6 +30,7 @@ from terrapod.db.models import (
     RoleAssignment,
     RunTask,
     RunTrigger,
+    StateVersion,
     User,
     Variable,
     VariableSet,
@@ -305,6 +307,69 @@ RUN_TRIGGERS = register(ReplicatedClass(name="run_triggers", model=RunTrigger))
 WORKSPACE_REMOTE_STATE_CONSUMERS = register(
     ReplicatedClass(name="workspace_remote_state_consumers", model=WorkspaceRemoteStateConsumer)
 )
+
+
+# ---------------------------------------------------------------------------
+# The artifact plane (#1175)
+#
+# Everything above describes how the estate is CONFIGURED. These two describe
+# what it has actually DONE, and they are the rows that name objects in the
+# store.
+#
+# They were absent while the object store was unreplicated, which was coherent:
+# a row naming a blob this node does not hold is a promise it cannot keep. #1114
+# copies the blobs, which inverts the argument — the object now arrives and
+# nothing points at it. A live pair showed exactly that: the state file present
+# on the follower, the workspace present, and zero state versions.
+#
+# That is the worse of the two failures. An absent state version reads as "this
+# workspace has never run", so a promoted node does not error — it plans the
+# entire estate as a first-time create. The operator sees a plan, not a fault.
+# ---------------------------------------------------------------------------
+
+# Every state version, not only the current one: rollback is a shipped feature,
+# so a node holding only HEAD has silently lost rollback depth while looking
+# perfectly healthy. Matches what `blob_classes._resolve_state` already copies.
+#
+# `run_id` is excluded because `runs` is deliberately not replicated (below).
+# The column is a nullable FK with ON DELETE SET NULL, so carrying it would make
+# the insert fail on the follower against a run that is not there — trading a
+# missing provenance link for a missing state version.
+STATE_VERSIONS = register(
+    ReplicatedClass(
+        name="state_versions",
+        model=StateVersion,
+        exclude=frozenset({"run_id"}),
+    )
+)
+
+# The tarball's row. #1114 calls this the sharpest omission and it is right: a
+# VCS-connected workspace can refetch its configuration, but a CLI-uploaded,
+# catalog-provisioned or migrated one cannot — this tarball is the only copy.
+# Losing the row means those workspaces can never run again, while the UI still
+# lists them as healthy.
+CONFIGURATION_VERSIONS = register(
+    ReplicatedClass(name="configuration_versions", model=ConfigurationVersion)
+)
+
+
+# ---------------------------------------------------------------------------
+# What is deliberately NOT replicated, and why
+#
+# `runs` — a run row is not history, it is a live execution: `job_name`, the
+# claiming pool, and the state the reconciler drives against a Kubernetes Job it
+# can see. Replicating it hands the follower runs it believes itself to be
+# executing, and a reconciler that will act on them. The run LOG and plan
+# artifacts are history worth keeping and are copied as blobs; the row that
+# drives execution is not, and a promoted node starting with an empty run queue
+# is the correct outcome rather than a gap.
+#
+# `registry_*_versions` and the provider platform rows are a separate question
+# with the same shape as the two above, and are tracked in #1175 rather than
+# folded in here: a provider version is client-signed and immutable, so its row
+# has to carry signature metadata that wants its own thought, and it needs
+# `registry_providers` and `gpg_keys` registered ahead of it.
+# ---------------------------------------------------------------------------
 
 
 # ---------------------------------------------------------------------------
