@@ -17,7 +17,7 @@ cd "$(dirname "$0")/.."
 
 RELEASE="${RELEASE:-terrapod}"
 NAMESPACE="${NAMESPACE:-terrapod}"
-HELM_IMAGE="alpine/helm:3.17.2"
+HELM_IMAGE="${HELM_IMAGE:-alpine/helm:3.17.2}"
 
 extra=()
 [ -n "${VALUES:-}" ] && extra+=(-f "$VALUES")

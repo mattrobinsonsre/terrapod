@@ -16,8 +16,8 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-HELM_IMAGE="alpine/helm:3.17.2"
-PY_IMAGE="python:3.13-slim"
+HELM_IMAGE="${HELM_IMAGE:-alpine/helm:3.17.2}"
+PY_IMAGE="${PY_IMAGE:-python:3.13-slim}"
 RENDER_DIR=".helmrender"
 PROFILES=(values.yaml values-local.yaml values-eval.yaml)
 

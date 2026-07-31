@@ -4,7 +4,12 @@
 # Multi-stage: builder has gcc for compiling C extensions (asyncpg),
 # runtime image is slim with only runtime libraries.
 
-FROM python:3.13-slim AS builder
+# Base image, overridable so CI can pull it from our GHCR mirror instead of
+# Docker Hub, whose anonymous pull limit is shared across GitHub runners and
+# turns unrelated PRs red (#1186). The default is the upstream reference, so a
+# local build needs no mirror access and behaves exactly as before.
+ARG BASE_IMAGE=python:3.13-slim
+FROM ${BASE_IMAGE} AS builder
 
 # Install build + runtime dependencies
 # apt-get upgrade picks up security patches for base OS packages
@@ -45,7 +50,7 @@ RUN "$POETRY_HOME"/bin/poetry lock --no-interaction --no-ansi \
     && pip install --no-cache-dir -r /tmp/requirements.txt
 
 # ── Runtime stage ─────────────────────────────────────────────────────────────
-FROM python:3.13-slim
+FROM ${BASE_IMAGE}
 LABEL org.opencontainers.image.source=https://github.com/mattrobinsonsre/terrapod
 
 # Runtime-only system libraries (no gcc, no -dev headers)

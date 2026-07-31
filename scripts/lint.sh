@@ -15,7 +15,7 @@ lint_python() {
 
 lint_web() {
   info "Linting frontend..."
-  docker run --rm -v "$REPO_ROOT/web:/app" -w /app node:24-alpine sh -c "npm ci && npm run lint && npm run type-check"
+  docker run --rm -v "$REPO_ROOT/web:/app" -w /app "${NODE_IMAGE:-node:24-alpine}" sh -c "npm ci && npm run lint && npm run type-check"
   success "Frontend lint passed"
 }
 
