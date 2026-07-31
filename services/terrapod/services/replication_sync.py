@@ -239,6 +239,42 @@ async def backfill_class(
     return applied
 
 
+async def backfill_new_classes(
+    db: AsyncSession, client: httpx.AsyncClient, token: str
+) -> list[str]:
+    """Backfill any class this node has never pulled, and say which.
+
+    A class that is newly REGISTERED has the same problem as a newly ADDED
+    node: there are no deltas to carry it. Everything that existed before the
+    upgrade predates the event stream this node is following, and anything
+    written during the rolling upgrade — while this node still had the older
+    code — was skipped as an unknown class and its cursor advanced past it.
+    Deltas never replay, so without this the class stays empty on the follower
+    indefinitely, and the gap only shows at a promotion (#1175).
+
+    Keyed on the absence of a cursor row rather than on a version number, so it
+    needs nothing declared and cannot be forgotten when the next class is
+    registered: registering one is still the whole opt-in.
+
+    Cheap in the steady state — one indexed cursor lookup per class per cycle,
+    and nothing to do once each has been pulled once.
+    """
+    started: list[str] = []
+    for entity_class in replication.registered():
+        row = await db.scalar(
+            select(ReplicationCursor).where(ReplicationCursor.entity_class == entity_class)
+        )
+        if row is not None:
+            continue
+        logger.info(
+            "Backfilling a newly registered class; it has no deltas to carry it",
+            entity_class=entity_class,
+        )
+        await backfill_class(db, client, token, entity_class)
+        started.append(entity_class)
+    return started
+
+
 async def backfill_all(db: AsyncSession, client: httpx.AsyncClient, token: str) -> None:
     """Backfill every class, in registration (dependency) order.
 
@@ -299,6 +335,11 @@ async def sync_cycle() -> None:
                 _record_lag(await _get_cursor(db, replication.EVENT_STREAM), body["meta"])
                 await db.commit()
                 return
+
+            # Before applying deltas: pull anything registered since this node
+            # last ran. A class with no cursor has never been backfilled, and
+            # no delta will ever carry what predates its registration.
+            await backfill_new_classes(db, client, token)
 
             own = settings.ha.node_name
             applied = 0
