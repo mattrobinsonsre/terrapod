@@ -190,9 +190,26 @@ region B: listeners ──▶ terrapod-b.example.com
 
 **Choose this when** the execution clusters are themselves regional, when the
 two sides have different network reachability or different cloud credentials, or
-when you want the standby's capacity proven continuously rather than at the
-failover. It is the simpler operational story: nothing re-points, nothing
-re-joins, and each side's listeners are exercised by whichever node is leading.
+when you want the standby's execution path proven **before** you need it rather
+than at the failover. Nothing re-points at a cutover and no listener changes the
+name it talks to.
+
+> **A standby's fleet attaches and stays attached, before it is ever needed.**
+>
+> A listener does not have to know whether the node it reached currently leads
+> — it enrols, heartbeats and renews against a follower exactly as it would
+> against a leader, because all of that records state on that node alone. The
+> follower simply hands it no work, so the fleet sits attached and idle until
+> promotion, at which point it is already there.
+>
+> This is what the dedicated topology buys over the shared one: the standby's
+> execution path is proven — the pool is joined, the certificate is valid, the
+> SSE connection is up — while the shared fleet's equivalent proof only happens
+> at the cutover, when it re-joins.
+>
+> (Before [#1191](https://github.com/mattrobinsonsre/terrapod/issues/1191) this
+> was not true: the whole listener protocol was refused on a follower, so a
+> standby's fleet crash-looped and `helm install --wait` failed on it.)
 
 The trade is that node B's listeners sit idle while A leads (they are cheap —
 they launch Jobs, they do not run terraform), and each side's pools must be
