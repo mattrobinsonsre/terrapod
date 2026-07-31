@@ -19,6 +19,7 @@ from terrapod.db.models import (
     ConfigurationVersion,
     ExecutionHook,
     ExecutionHookWorkspace,
+    GPGKey,
     ModuleWorkspaceLink,
     NotificationConfiguration,
     PlatformRoleAssignment,
@@ -26,6 +27,10 @@ from terrapod.db.models import (
     PolicySet,
     ProviderTemplate,
     RegistryModule,
+    RegistryModuleVersion,
+    RegistryProvider,
+    RegistryProviderPlatform,
+    RegistryProviderVersion,
     Role,
     RoleAssignment,
     RunTask,
@@ -131,15 +136,70 @@ VCS_CONNECTIONS = register(ReplicatedClass(name="vcs_connections", model=VCSConn
 # exactly the moment of a failover.
 # ---------------------------------------------------------------------------
 
-# The module row, and deliberately not its versions.
+# The module row and, since #1175, its versions.
 #
-# `registry_module_versions` rows point at tarballs in object storage, and object
-# storage is #1114. A version row without its tarball is a promise this node
-# cannot keep: `terraform init` would resolve the version, fetch it, and get a
-# 404 mid-run. Withholding the versions fails more honestly — the module exists
-# (so catalog items and module-workspace links have their foreign-key target) and
-# the registry reports no matching version, which is at least true.
+# The versions were withheld while the object store was unreplicated, and the
+# reasoning was sound at the time: a version row without its tarball is a promise
+# this node cannot keep — `terraform init` would resolve the version, fetch it,
+# and get a 404 mid-run. Withholding failed more honestly, because "no matching
+# version" is at least true.
+#
+# #1114 copies the tarballs, which reverses it. The tarball now arrives and the
+# row does not, so the registry reports no version for a module whose bytes are
+# sitting in the store — the same lie in the other direction, and this one wastes
+# a working artifact.
 REGISTRY_MODULES = register(ReplicatedClass(name="registry_modules", model=RegistryModule))
+
+REGISTRY_MODULE_VERSIONS = register(
+    ReplicatedClass(name="registry_module_versions", model=RegistryModuleVersion)
+)
+
+
+# ---------------------------------------------------------------------------
+# Provider registry (#1175)
+#
+# A published provider version is client-signed and immutable. Terrapod never
+# re-signs — the publisher owns the signature — so a promoted node cannot
+# reconstruct any of this. It either has the rows or the provider is gone.
+# ---------------------------------------------------------------------------
+
+# The public keys the download response advertises. Without them a follower can
+# serve provider binaries that no client will install: `terraform init` verifies
+# the signature against the key the registry names, and a registry that names no
+# key fails closed.
+#
+# `private_key` is excluded. It is the one genuinely dangerous column here, and
+# nothing on the receiving node needs it: `sign_data` exists in
+# `gpg_key_service` but has no caller, because the server does not sign. Sending
+# a signing key over the peer link would widen what a compromised peer costs, in
+# exchange for a capability neither node uses.
+GPG_KEYS = register(
+    ReplicatedClass(
+        name="gpg_keys",
+        model=GPGKey,
+        exclude=frozenset({"private_key"}),
+    )
+)
+
+# The provider, then its versions, then the per-platform rows — foreign-key
+# order, and also the order in which they stop being useful: a platform row
+# without its version is unreachable, a version without its provider is orphaned.
+REGISTRY_PROVIDERS = register(ReplicatedClass(name="registry_providers", model=RegistryProvider))
+
+# `shasums_uploaded` / `shasums_sig_uploaded` are the publish protocol's state:
+# binaries are refused until the signature has been verified against a registered
+# key. Carrying them keeps that gate's answer, so a promoted node does not offer
+# a half-published version as complete.
+REGISTRY_PROVIDER_VERSIONS = register(
+    ReplicatedClass(name="registry_provider_versions", model=RegistryProviderVersion)
+)
+
+# `shasum` and `h1_hash` are what the client checks the downloaded zip against.
+# A platform row that arrives without them is worse than absent: the download
+# proceeds and the verification has nothing to compare.
+REGISTRY_PROVIDER_PLATFORMS = register(
+    ReplicatedClass(name="registry_provider_platforms", model=RegistryProviderPlatform)
+)
 
 # The parameterised provider configurations a catalog item renders into its
 # generated root module. No foreign keys of its own, and referenced from a

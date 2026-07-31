@@ -185,12 +185,18 @@ class TestRegistryModules:
 
         assert removed == [OTHER_ID]
 
-    def test_module_versions_are_deliberately_out_of_scope(self):
-        """A version row points at a tarball in object storage (#1114). Shipping
-        the row without the content makes `terraform init` resolve a version and
-        then 404 mid-run; withholding it makes the registry report no matching
-        version, which is at least true."""
-        assert "registry_module_versions" not in replication.registered()
+    def test_module_versions_are_in_scope_now_that_their_tarballs_copy(self):
+        """This assertion used to be its inverse, and the reasoning was sound at
+        the time: a version row points at a tarball in object storage, and
+        shipping the row without the content makes `terraform init` resolve a
+        version and then 404 mid-run. Withholding it made the registry report no
+        matching version, which was at least true.
+
+        #1114 copies the tarballs, which reverses the argument — the content now
+        arrives and the row does not, so the registry reports no version for a
+        module whose bytes are sitting in the store. Same lie, other direction,
+        and this one wastes a working artifact (#1175)."""
+        assert "registry_module_versions" in replication.registered()
 
 
 class TestProviderTemplates:
