@@ -1,0 +1,95 @@
+name: Mirror third-party images
+
+# Copies the images in .github/mirror-images.txt from Docker Hub into GHCR, so
+# CI does not depend on a third-party registry being reachable for jobs that
+# have nothing to do with it (#1186).
+#
+# A copy, not a rebuild: `imagetools create` republishes the source manifest by
+# digest, so the multi-arch index and every layer digest are preserved and the
+# mirrored image is bit-identical to what Docker Hub served.
+
+on:
+  schedule:
+    # Weekly. The tags are pinned, so this is about the mirror still existing
+    # and picking up rebuilt-in-place tags, not about chasing new versions.
+    - cron: "17 4 * * 1"
+  workflow_dispatch:
+  pull_request:
+    # Validate the list itself when it changes — a typo here would otherwise
+    # surface as a missing mirror on the next scheduled run, long after review.
+    paths:
+      - .github/mirror-images.txt
+      - .github/workflows/mirror-images.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mirror-images
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    name: Mirror to GHCR
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Resolve the list
+        id: list
+        run: |
+          # Comments and blank lines out; anything left must look like repo:tag.
+          images=$(grep -vE '^\s*(#|$)' .github/mirror-images.txt)
+          if [ -z "$images" ]; then echo "the image list is empty"; exit 1; fi
+          bad=$(echo "$images" | grep -vE '^[a-z0-9._/-]+:[a-zA-Z0-9._-]+$' || true)
+          if [ -n "$bad" ]; then
+            echo "not a repo:tag reference:"; echo "$bad"; exit 1
+          fi
+          echo "count=$(echo "$images" | wc -l | tr -d ' ')" >> "$GITHUB_OUTPUT"
+          { echo "images<<EOF"; echo "$images"; echo "EOF"; } >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
+        if: github.event_name != 'pull_request'
+
+      - name: Log in to GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Copy each image
+        if: github.event_name != 'pull_request'
+        env:
+          IMAGES: ${{ steps.list.outputs.images }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          set -euo pipefail
+          failed=""
+          while IFS= read -r src; do
+            [ -n "$src" ] || continue
+            repo="${src%:*}"; tag="${src##*:}"
+            # Flatten the path so alpine/helm and a hypothetical other "helm"
+            # cannot collide in one flat mirror namespace.
+            flat="${repo//\//-}"
+            dst="ghcr.io/${OWNER,,}/mirror/${flat}:${tag}"
+            echo "::group::$src -> $dst"
+            if docker buildx imagetools create --tag "$dst" "docker.io/${src}"; then
+              docker buildx imagetools inspect "$dst" --format '{{json .Manifest.Digest}}'
+            else
+              # One image failing must not hide the rest — report them all, then
+              # fail once, so a single upstream hiccup does not mask a real typo.
+              echo "FAILED: $src"
+              failed="${failed} ${src}"
+            fi
+            echo "::endgroup::"
+          done <<< "$IMAGES"
+          if [ -n "$failed" ]; then
+            echo "could not mirror:${failed}"
+            exit 1
+          fi
+          echo "mirrored ${{ steps.list.outputs.count }} images"

@@ -1,0 +1,31 @@
+# Third-party images CI pulls, mirrored into GHCR (#1186).
+#
+# Docker Hub rate-limits anonymous pulls per source IP, and GitHub-hosted
+# runners share address space, so a pull here fails at whatever frequency the
+# shared pool dictates — four red PRs in one morning, none of them the change's
+# fault. A red check has to mean "the change is wrong"; every avoidable
+# infrastructure red erodes that, and the erosion is the real cost.
+#
+# The mirror workflow copies each of these to
+#   ghcr.io/<owner>/mirror/<repo-with-slashes-flattened>:<tag>
+# by digest, preserving the multi-arch index — it is a copy, not a rebuild.
+#
+# CONSUMPTION IS OPT-IN. Every call site keeps its Docker Hub reference as the
+# default and reads an override, which only CI sets. So a contributor building
+# locally is unaffected and needs no access to our GHCR packages, while CI
+# stops depending on a third-party registry being reachable for jobs that have
+# nothing to do with it.
+#
+# Adding an image here is not enough on its own — wire the override at the call
+# site too, or the mirror copy sits unused.
+
+python:3.13-slim
+node:26-alpine
+node:24-alpine
+postgres:16-alpine
+redis:7-alpine
+registry:2
+alpine/helm:3.17.2
+semgrep/semgrep:1.117
+localstack/localstack:4
+moby/buildkit:buildx-stable-1
