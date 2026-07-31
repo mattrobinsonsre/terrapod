@@ -421,6 +421,7 @@ See [docs/authentication.md](docs/authentication.md) for setup guides.
 | [Production Checklist](docs/production-checklist.md) | Pre-go-live checklist for a production deployment |
 | [High Availability](docs/high-availability.md) | The leader/follower pair: DNS-derived roles, what a follower refuses to do, the peer link, and settings replication |
 | [HA Topologies](docs/ha-topologies.md) | Where to put the pieces: single-region, two-region, two-cloud and air-gapped layouts; dedicated vs shared listener fleets; multi-pool execution routing; a worked layout and how to rehearse a failover |
+| [HA Operations](docs/ha-operations.md) | The operator procedures: the shared-vs-per-node naming model, planned and unplanned failover, failback, maintenance, adding and removing a node, and version skew across the pair |
 | [Disaster Recovery](docs/disaster-recovery.md) | Break-glass state recovery, shipped DB backup CronJob + restore-verification DR drill, per-backend object-storage protection |
 | [Encryption at Rest](docs/encryption-at-rest.md) | Optional off-by-default app-layer (BYOK) envelope encryption of DB secrets and state files — for no-/niche-CSP, bare-metal, or air-gapped deployments (static / Vault Transit / AWS KMS) |
 

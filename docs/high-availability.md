@@ -699,6 +699,10 @@ exist.
 
 ## Performing a failover
 
+The full procedures — including failback, maintenance, adding and removing a
+node, and the naming model you need right before you touch DNS — are in
+[HA operations](ha-operations.md). The short form:
+
 1. Confirm the standby is caught up (above).
 2. Check `GET /api/terrapod/v1/ha/blob-readiness` — `irreplaceable-missing` must
    be empty. Rows without blobs is the failure that looks like success. Read
@@ -717,6 +721,8 @@ There is no step where Terrapod decides anything. That is the point.
 
 - [HA topologies](ha-topologies.md) — multi-region, multi-cloud, listener
   placement, and multi-pool execution routing
+- [HA operations](ha-operations.md) — the naming model, failover, failback,
+  maintenance, and version skew
 
 - [Disaster recovery](disaster-recovery.md)
 - [Agent pools and runners](runners.md)

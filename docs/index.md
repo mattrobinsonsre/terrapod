@@ -171,6 +171,7 @@ See [Architecture](architecture.md) for the full breakdown.
 | [Production Checklist](production-checklist.md) | Step-by-step checklist for go-live readiness |
 | [High Availability](high-availability.md) | The leader/follower pair: DNS-derived roles, what a follower refuses to do, the peer link, and settings replication. Failover is a deliberate human act — Terrapod never arbitrates |
 | [HA Topologies](ha-topologies.md) | Where to put the pieces: single-region, two-region, two-cloud and air-gapped layouts; dedicated vs shared listener fleets; multi-pool execution routing; a worked layout and how to rehearse a failover |
+| [HA Operations](ha-operations.md) | The operator procedures: the shared-vs-per-node naming model, planned and unplanned failover, failback, maintenance, adding and removing a node, and version skew across the pair |
 | [Disaster Recovery](disaster-recovery.md) | Break-glass state recovery, shipped DB backup CronJob + restore-verification DR drill, per-backend object-storage protection |
 | [API Reference](api-reference.md) | All API endpoints with examples |
 
