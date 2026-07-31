@@ -188,11 +188,25 @@ region A: listeners ──▶ terrapod-a.example.com
 region B: listeners ──▶ terrapod-b.example.com
 ```
 
-**Choose this when** the execution clusters are themselves regional, when the
-two sides have different network reachability or different cloud credentials, or
-when you want the standby's capacity proven continuously rather than at the
-failover. It is the simpler operational story: nothing re-points, nothing
-re-joins, and each side's listeners are exercised by whichever node is leading.
+**Choose this when** the execution clusters are themselves regional, or when the
+two sides have different network reachability or different cloud credentials.
+Nothing re-points at a cutover and no listener changes the name it talks to.
+
+> **A standby's fleet cannot join until that node is promoted.**
+>
+> Enrolling a listener is a write, and a follower refuses writes — so a listener
+> pointed at a node that has never led retries indefinitely and never becomes
+> ready, which also makes `helm install --wait` fail on that node
+> ([#1191](https://github.com/mattrobinsonsre/terrapod/issues/1191)).
+>
+> Practical consequence: **neither topology gives you a standby fleet proven
+> before promotion.** They differ in *how* they heal at cutover — the shared
+> fleet re-joins because its certificates stop authenticating, the per-node
+> fleet joins for the first time — not in whether.
+>
+> The workaround, if you want a per-node fleet ready in advance, is to bring the
+> node up **as leader** once so its fleet joins, then demote it. The credentials
+> Secret persists, so the listeners do not re-join afterwards.
 
 The trade is that node B's listeners sit idle while A leads (they are cheap —
 they launch Jobs, they do not run terraform), and each side's pools must be
