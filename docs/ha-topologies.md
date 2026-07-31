@@ -317,6 +317,8 @@ supposed to prevent.
 
 - [High availability](high-availability.md) — the mechanism: roles, the peer
   link, replication, what a follower refuses to do
+- [HA operations](ha-operations.md) — the naming model, failover, failback,
+  maintenance, and version skew
 - [Disaster recovery](disaster-recovery.md) — backups, restore, and the
   break-glass state index
 - [Agent execution & runners](runners.md) — agent pools, listeners, and pool sets
