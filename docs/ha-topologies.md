@@ -204,9 +204,10 @@ Nothing re-points at a cutover and no listener changes the name it talks to.
 > fleet re-joins because its certificates stop authenticating, the per-node
 > fleet joins for the first time — not in whether.
 >
-> The workaround, if you want a per-node fleet ready in advance, is to bring the
-> node up **as leader** once so its fleet joins, then demote it. The credentials
-> Secret persists, so the listeners do not re-join afterwards.
+> There is currently **no workaround**. Joining as leader and then demoting does
+> not help: an already-joined listener's heartbeat is also a write, so it is
+> refused too and the listener expires from the node's Redis a few minutes
+> later. Plan for the standby's fleet to become useful at promotion, not before.
 
 The trade is that node B's listeners sit idle while A leads (they are cheap —
 they launch Jobs, they do not run terraform), and each side's pools must be
