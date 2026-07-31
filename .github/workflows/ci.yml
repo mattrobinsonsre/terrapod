@@ -128,7 +128,7 @@ jobs:
     needs: prepare
     if: needs.prepare.outputs.images_exist != 'true'
     runs-on: ubuntu-latest
-    container: "${NODE_IMAGE:-node:24-alpine}"
+    container: ${{ env.NODE_IMAGE }}
     defaults:
       run:
         working-directory: web
@@ -546,7 +546,7 @@ jobs:
     needs: prepare
     if: needs.prepare.outputs.images_exist != 'true'
     runs-on: ubuntu-latest
-    container: "${PY_IMAGE:-python:3.13-slim}"
+    container: ${{ env.PY_IMAGE }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Install Poetry and export plugin
@@ -571,7 +571,7 @@ jobs:
     needs: prepare
     if: needs.prepare.outputs.images_exist != 'true'
     runs-on: ubuntu-latest
-    container: "${NODE_IMAGE:-node:24-alpine}"
+    container: ${{ env.NODE_IMAGE }}
     defaults:
       run:
         working-directory: web
