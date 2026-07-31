@@ -191,6 +191,70 @@ asyncio.run(main())
 " 2>/dev/null | tail -1)
   [[ "$code" == "503" ]] || fail "follower answered $code to a mutating request, expected 503"
   ok "follower returns 503 on writes"
+
+  # The row and the object are two halves of one artifact, and they were built
+  # and tested separately. Each was correct on its own terms; nothing asserted
+  # the pair. #1175 was exactly that gap - the state file arrived on the
+  # follower and no row pointed at it, so a promoted node would have planned the
+  # whole estate as a first-time create.
+  info "state arrives as BOTH a row and an object"
+  local sname="ha-state-$(date +%s)"
+  local skey
+  skey=$(api_a python -c "
+import asyncio, uuid
+from terrapod.db.session import get_db_session, init_db
+from terrapod.db.models import Workspace, StateVersion
+from terrapod.services import replication
+from terrapod.storage import get_storage, init_storage, keys
+
+async def main():
+    await init_db(); await init_storage()
+    replication.install_outbox_hooks()
+    async with get_db_session() as db:
+        ws = Workspace(name='$sname'); db.add(ws); await db.flush()
+        sv = StateVersion(workspace_id=ws.id, serial=1, md5='0'*32, lineage=str(uuid.uuid4()))
+        db.add(sv); await db.flush()
+        key = keys.state_key(str(ws.id), str(sv.id))
+        await db.commit()
+    await get_storage().put(key, b'{\"version\":4,\"serial\":1}')
+    print(key)
+asyncio.run(main())
+" 2>/dev/null | tail -1)
+  [[ -n "$skey" ]] || fail "could not write a state version on the leader"
+
+  local got=""
+  for i in {1..40}; do
+    got=$(api_b python -c "
+import asyncio
+from sqlalchemy import select
+from terrapod.db.session import get_db_session, init_db
+from terrapod.db.models import Workspace, StateVersion
+from terrapod.storage import get_storage, init_storage
+
+async def main():
+    await init_db(); await init_storage()
+    async with get_db_session() as db:
+        ws = await db.scalar(select(Workspace).where(Workspace.name == '$sname'))
+        rows = 0
+        if ws:
+            rows = len((await db.scalars(select(StateVersion).where(StateVersion.workspace_id == ws.id))).all())
+    try:
+        await get_storage().get('$skey'); blob = 1
+    except Exception:
+        blob = 0
+    print(f'{rows}:{blob}')
+asyncio.run(main())
+" 2>/dev/null | tail -1)
+    [[ "$got" == "1:1" ]] && break
+    sleep 3
+  done
+
+  case "$got" in
+    1:1) ok "the state version arrived as a row AND an object" ;;
+    0:1) fail "the object copied but no row names it - a promoted node would plan the estate as a first-time create (#1175)" ;;
+    1:0) fail "the row replicated but its object did not - the workspace lists a version that cannot be read" ;;
+    *)   fail "state reached the follower as neither a row nor an object (got '$got')" ;;
+  esac
 }
 
 cmd_reverse() {
