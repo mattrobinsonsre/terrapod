@@ -38,8 +38,21 @@ def _resp(status=200, body=None):
     return r
 
 
+def _db(**kw):
+    """An AsyncMock session whose `begin_nested()` behaves like the real
+    `AsyncSession`'s — an async context manager, not a coroutine.
+
+    Every row now applies inside a savepoint so one bad row cannot stop the
+    stream (#1180). A mock that cannot open one makes every row look unappliable,
+    which is a lie about the code under test rather than a finding.
+    """
+    db = AsyncMock(**kw)
+    db.begin_nested = MagicMock(return_value=MagicMock())
+    return db
+
+
 def _db_with_cursor(position="0"):
-    db = AsyncMock()
+    db = _db()
     db.scalar.return_value = ReplicationCursor(
         entity_class="*", position=position, backfilling=False
     )
@@ -256,7 +269,7 @@ class TestApplyEvent:
         delete event settles it; failing here would wedge the whole stream."""
         mock_settings.ha = _cfg()
         mock_request.return_value = _resp(status=404)
-        db = AsyncMock()
+        db = _db()
 
         await replication_sync._apply_event(
             db,
@@ -272,7 +285,7 @@ class TestApplyEvent:
         """A newer peer replicating a class this node lacks must not wedge the
         stream on one unrecognised row."""
         mock_settings.ha = _cfg()
-        db = AsyncMock()
+        db = _db()
 
         await replication_sync._apply_event(
             db,
@@ -349,7 +362,7 @@ class TestBackfillPaging:
     async def test_an_unknown_class_backfills_nothing(self, mock_settings):
         mock_settings.ha = _cfg()
 
-        count = await replication_sync.backfill_class(AsyncMock(), MagicMock(), "t", "nope")
+        count = await replication_sync.backfill_class(_db(), MagicMock(), "t", "nope")
 
         assert count == 0
 
@@ -359,7 +372,7 @@ class TestBackfillPaging:
         """A join token cannot be inserted before its pool exists."""
         mock_settings.ha = _cfg()
 
-        await replication_sync.backfill_all(AsyncMock(), MagicMock(), "tok")
+        await replication_sync.backfill_all(_db(), MagicMock(), "tok")
 
         order = [c.args[3] for c in mock_class.await_args_list]
         assert order.index("agent_pools") < order.index("agent_pool_tokens")
@@ -482,7 +495,7 @@ class TestBackfillIsRepeatable:
         mock_settings.ha = _cfg()
         mock_reconcile.return_value = []
         cursor = ReplicationCursor(entity_class="agent_pools", position="", backfilling=False)
-        db = AsyncMock()
+        db = _db()
         db.scalar.return_value = cursor
         mock_request.return_value = _resp(
             body={
@@ -504,7 +517,7 @@ class TestBackfillIsRepeatable:
     ):
         mock_settings.ha = _cfg()
         cursor = ReplicationCursor(entity_class="agent_pools", position="", backfilling=False)
-        db = AsyncMock()
+        db = _db()
         db.scalar.return_value = cursor
         mock_request.side_effect = [
             _resp(

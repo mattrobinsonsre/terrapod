@@ -458,7 +458,7 @@ class TestNewlyRegisteredClassesBackfill:
             return 0
 
         with patch.object(replication_sync, "backfill_class", fake_backfill):
-            started = await replication_sync.backfill_new_classes(db, AsyncMock(), "tok")
+            started = await replication_sync.backfill_pending_classes(db, AsyncMock(), "tok")
 
         assert "registry_module_versions" in started
         assert "state_versions" in started
@@ -471,7 +471,8 @@ class TestNewlyRegisteredClassesBackfill:
         from terrapod.services import replication_sync
 
         db = AsyncMock()
-        db.scalar.return_value = MagicMock()  # a cursor exists for every class
+        # A cursor exists for every class, and none is mid-backfill.
+        db.scalar.return_value = MagicMock(backfilling=False)
         pulled = []
 
         async def fake_backfill(_db, _client, _token, entity_class):
@@ -479,18 +480,133 @@ class TestNewlyRegisteredClassesBackfill:
             return 0
 
         with patch.object(replication_sync, "backfill_class", fake_backfill):
-            started = await replication_sync.backfill_new_classes(db, AsyncMock(), "tok")
+            started = await replication_sync.backfill_pending_classes(db, AsyncMock(), "tok")
 
         assert started == []
         assert pulled == []
 
-    def test_it_runs_before_deltas_are_applied(self):
-        """Order matters: a delta for a class that has not been backfilled can
-        reference a parent row that is not there yet."""
+    async def test_a_class_stuck_mid_backfill_is_retried(self):
+        """A pass that never finished — a pod restart part-way, or rows that
+        would not land — must be picked up again. Its cursor row exists, so
+        keying on "no cursor" alone would leave it half-populated forever."""
+        from unittest.mock import patch
+
+        from terrapod.services import replication_sync
+
+        db = AsyncMock()
+        db.scalar.return_value = MagicMock(backfilling=True)
+        pulled = []
+
+        async def fake_backfill(_db, _client, _token, entity_class):
+            pulled.append(entity_class)
+            return 0
+
+        with patch.object(replication_sync, "backfill_class", fake_backfill):
+            started = await replication_sync.backfill_pending_classes(db, AsyncMock(), "tok")
+
+        assert "state_versions" in started
+        assert pulled == started
+
+    def test_it_runs_after_deltas_are_applied(self):
+        """The ordering that looks right is the wrong way round (#1180).
+
+        Backfilling first pulled a configuration version whose workspace was
+        still sitting unapplied in the same batch — because the parent of a
+        newly registered child class is usually an ESTABLISHED class, whose
+        rows arrive only as deltas. The reverse hazard (a delta referencing a
+        parent that is only obtainable by backfill) is handled by the per-row
+        savepoint and retry instead, which costs nothing when it does not fire.
+        """
         import inspect as py_inspect
 
         from terrapod.services import replication_sync
 
         source = py_inspect.getsource(replication_sync.sync_cycle)
 
-        assert source.index("backfill_new_classes") < source.index("_apply_event")
+        assert source.index("_try_apply") < source.index("backfill_pending_classes")
+
+
+class TestOneBadRowDoesNotStopTheStream:
+    """#1180 — found on the live pair.
+
+    A foreign-key violation on ONE configuration version aborted the whole
+    cycle. The transaction rolled back, the cursor never moved, and the next
+    cycle re-fetched the same row and failed identically: replication stopped
+    for every class, silently, with the gap only discovered at a failover.
+    """
+
+    async def test_a_failing_row_is_deferred_not_raised(self):
+        from unittest.mock import patch
+
+        from terrapod.services import replication_sync
+
+        db = AsyncMock()
+        # `begin_nested()` returns an async context manager, not a coroutine —
+        # mocking it as one would make the savepoint a no-op and this test a lie.
+        db.begin_nested = MagicMock(return_value=MagicMock())
+        event = {
+            "id": 7,
+            "entity-class": "configuration_versions",
+            "entity-id": "cv-1",
+            "op": "upsert",
+            "origin-node": "leader",
+        }
+
+        async def boom(*_a, **_kw):
+            raise RuntimeError("violates foreign key constraint")
+
+        with patch.object(replication_sync, "_apply_event", boom):
+            ok = await replication_sync._try_apply(db, AsyncMock(), "tok", event)
+
+        assert ok is False, "a row that cannot land must be reported, not raised"
+        db.begin_nested.assert_called_once(), "it must roll back only its own row"
+
+    async def test_a_deferred_row_holds_the_cursor_where_it_is(self):
+        """The cursor may not advance past a row that has not been applied, or
+        the row is lost — the next pull starts after it and nothing replays."""
+        import inspect as py_inspect
+
+        from terrapod.services import replication_sync
+
+        source = py_inspect.getsource(replication_sync.sync_cycle)
+
+        # The advance is conditional on a settled position, never the batch end.
+        assert "if safe_cursor is not None:" in source
+        assert "blocked = True" in source
+        # And the batch end is only taken once nothing is left deferred.
+        assert (
+            'if not deferred:\n                    safe_cursor = body["meta"]["cursor"]' in source
+        )
+
+    async def test_backfill_defers_a_bad_row_rather_than_aborting_the_class(self):
+        from unittest.mock import patch
+
+        from terrapod.services import replication_sync
+
+        db = AsyncMock()
+        db.begin_nested = MagicMock(return_value=MagicMock())
+
+        async def boom(*_a, **_kw):
+            raise RuntimeError("violates foreign key constraint")
+
+        with patch.object(replication_sync.replication, "apply_upsert", boom):
+            ok = await replication_sync._try_upsert(db, MagicMock(name="spec"), {"id": "x"})
+
+        assert ok is False
+
+    def test_an_incomplete_backfill_stays_pending(self):
+        """Leaving `backfilling` set is what makes the class retry; clearing it
+        would record a half-populated class as finished. Reconciliation must be
+        skipped too — a partial view of the peer's rows reads as mass deletion.
+        """
+        import inspect as py_inspect
+
+        from terrapod.services import replication_sync
+
+        source = py_inspect.getsource(replication_sync.backfill_class)
+
+        # The early return on leftovers comes before both reconciliation and
+        # the completion write that clears `backfilling`.
+        leftover = source.index("the class stays pending")
+        assert leftover < source.index("reconcile_deletions")
+        assert leftover < source.index('_set_cursor(db, entity_class, "", backfilling=False)')

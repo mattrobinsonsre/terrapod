@@ -164,6 +164,48 @@ async def _apply_event(
     await replication.apply_upsert(db, spec, resp.json()["data"]["attributes"])
 
 
+async def _try_apply(db: AsyncSession, client: httpx.AsyncClient, token: str, event: dict) -> bool:
+    """Apply one event inside its own savepoint. False when it could not land.
+
+    One row must never be able to stop the stream. Before this, an apply that
+    raised aborted the whole cycle and left the cursor unmoved, so the next
+    cycle re-fetched the same row and failed identically — replication for
+    EVERY class stopped, silently, until someone noticed at a failover (#1180).
+
+    `_apply_event` already reasons this way for a class the peer knows and this
+    node does not ("failing would wedge the whole stream on one unknown row").
+    This is the same argument applied to the rows themselves.
+    """
+    try:
+        async with db.begin_nested():
+            await _apply_event(db, client, token, event)
+        return True
+    except Exception:
+        logger.warning(
+            "Could not apply a replicated row; deferring it",
+            entity_class=event["entity-class"],
+            entity_id=event["entity-id"],
+            op=event["op"],
+            exc_info=True,
+        )
+        return False
+
+
+async def _try_upsert(db: AsyncSession, spec, attributes: dict) -> bool:
+    """Backfill's equivalent of `_try_apply` — one row, one savepoint."""
+    try:
+        async with db.begin_nested():
+            await replication.apply_upsert(db, spec, attributes)
+        return True
+    except Exception:
+        logger.warning(
+            "Could not apply a backfilled row; deferring it",
+            entity_class=spec.name,
+            exc_info=True,
+        )
+        return False
+
+
 async def backfill_class(
     db: AsyncSession, client: httpx.AsyncClient, token: str, entity_class: str
 ) -> int:
@@ -192,6 +234,14 @@ async def backfill_class(
     # judge what is missing.
     from_scratch = not after
     seen: set[str] = set()
+    deferred: list[dict] = []
+
+    # Claim the class as in-progress before the first page. Completion clears
+    # it, so `backfilling` is an unambiguous "this pass never finished" — which
+    # is what `backfill_pending_classes` retries on, and is why a pod restart
+    # part-way through a large class now resumes instead of being forgotten.
+    await _set_cursor(db, entity_class, after or "", backfilling=True)
+    await db.commit()
 
     while True:
         resp = await arequest_with_retry(
@@ -205,9 +255,11 @@ async def backfill_class(
         resp.raise_for_status()
         body = resp.json()
         for row in body["data"]:
-            await replication.apply_upsert(db, spec, row["attributes"])
-            seen.add(str(row["id"]))
-            applied += 1
+            if await _try_upsert(db, spec, row["attributes"]):
+                seen.add(str(row["id"]))
+                applied += 1
+            else:
+                deferred.append(row)
         after = body["meta"]["cursor"]
         # Persist per page so an interrupted backfill resumes rather than
         # restarting a large class from the beginning.
@@ -215,6 +267,34 @@ async def backfill_class(
         await db.commit()
         if body["meta"]["complete"]:
             break
+
+    # One retry pass over the rows that would not land. Ordering within a class
+    # is the usual reason (a row referencing another row of the same class that
+    # had not arrived yet), and retrying resolves it without a dependency graph.
+    if deferred:
+        still: list[dict] = []
+        for row in deferred:
+            if await _try_upsert(db, spec, row["attributes"]):
+                seen.add(str(row["id"]))
+                applied += 1
+            else:
+                still.append(row)
+        deferred = still
+        await db.commit()
+
+    if deferred:
+        # An incomplete pass must not be recorded as finished: leaving
+        # `backfilling` set is what makes the next cycle try this class again.
+        # Reconciliation is skipped for the same reason it is skipped on a
+        # resumed pass — `seen` is not the peer's full set, and acting on a
+        # partial view reads as mass deletion.
+        logger.warning(
+            "Backfill left rows unapplied; the class stays pending",
+            entity_class=entity_class,
+            unapplied=len(deferred),
+            applied=applied,
+        )
+        return applied
 
     removed = 0
     if from_scratch:
@@ -239,10 +319,10 @@ async def backfill_class(
     return applied
 
 
-async def backfill_new_classes(
+async def backfill_pending_classes(
     db: AsyncSession, client: httpx.AsyncClient, token: str
 ) -> list[str]:
-    """Backfill any class this node has never pulled, and say which.
+    """Backfill any class that has never completed a pull, and say which.
 
     A class that is newly REGISTERED has the same problem as a newly ADDED
     node: there are no deltas to carry it. Everything that existed before the
@@ -252,23 +332,27 @@ async def backfill_new_classes(
     Deltas never replay, so without this the class stays empty on the follower
     indefinitely, and the gap only shows at a promotion (#1175).
 
-    Keyed on the absence of a cursor row rather than on a version number, so it
+    "Never completed" covers two states, and both need the same treatment: no
+    cursor row at all (never started), and a cursor still marked `backfilling`
+    (started, never finished — a pod restart part-way, or a pass that could not
+    land every row). Keying on those rather than on a version number means it
     needs nothing declared and cannot be forgotten when the next class is
     registered: registering one is still the whole opt-in.
 
     Cheap in the steady state — one indexed cursor lookup per class per cycle,
-    and nothing to do once each has been pulled once.
+    and nothing to do once each has completed once.
     """
     started: list[str] = []
     for entity_class in replication.registered():
         row = await db.scalar(
             select(ReplicationCursor).where(ReplicationCursor.entity_class == entity_class)
         )
-        if row is not None:
+        if row is not None and not row.backfilling:
             continue
         logger.info(
-            "Backfilling a newly registered class; it has no deltas to carry it",
+            "Backfilling a class that has never completed a pull",
             entity_class=entity_class,
+            resuming=row is not None,
         )
         await backfill_class(db, client, token, entity_class)
         started.append(entity_class)
@@ -336,24 +420,70 @@ async def sync_cycle() -> None:
                 await db.commit()
                 return
 
-            # Before applying deltas: pull anything registered since this node
-            # last ran. A class with no cursor has never been backfilled, and
-            # no delta will ever carry what predates its registration.
-            await backfill_new_classes(db, client, token)
-
             own = settings.ha.node_name
             applied = 0
+            deferred: list[dict] = []
+            # The cursor may only advance across a contiguous run of settled
+            # events: the first deferred one caps it, so it is re-fetched next
+            # cycle rather than lost. Re-applying the events after it costs
+            # nothing — an event is a notification, not a snapshot, so every
+            # apply is an idempotent upsert of the peer's current state.
+            safe_cursor: int | None = None
+            blocked = False
+
             for event in body["data"]:
                 # Origin tags stop the pair echoing changes at each other: a row
                 # this node originated must not be applied back onto itself.
                 if event["origin-node"] and event["origin-node"] == own:
+                    if not blocked:
+                        safe_cursor = event["id"]
                     continue
-                await _apply_event(db, client, token, event)
-                applied += 1
+                if await _try_apply(db, client, token, event):
+                    applied += 1
+                    if not blocked:
+                        safe_cursor = event["id"]
+                else:
+                    deferred.append(event)
+                    blocked = True
 
-            await _set_cursor(db, replication.EVENT_STREAM, str(body["meta"]["cursor"]))
+            # A child whose parent arrives later in the same batch fails on the
+            # first pass and lands on this one, which is the common ordering
+            # case and needs no dependency graph to resolve.
+            if deferred:
+                still: list[dict] = []
+                for event in deferred:
+                    if await _try_apply(db, client, token, event):
+                        applied += 1
+                    else:
+                        still.append(event)
+                deferred = still
+                if not deferred:
+                    safe_cursor = body["meta"]["cursor"]
+
+            if safe_cursor is not None:
+                await _set_cursor(db, replication.EVENT_STREAM, str(safe_cursor))
             _record_lag(await _get_cursor(db, replication.EVENT_STREAM), body["meta"])
+
+            # AFTER the deltas, not before. A class registered since this node
+            # last ran has no deltas to carry it, but its rows routinely point
+            # at parents in ESTABLISHED classes whose own rows are still sitting
+            # unapplied in this batch — backfilling first pulled a configuration
+            # version whose workspace did not exist yet (#1180).
+            await backfill_pending_classes(db, client, token)
             await db.commit()
+
+            if deferred:
+                # Holding the cursor is also what makes this visible without a
+                # new signal: the lag recorded above is peer-latest minus the
+                # cursor, so a row that never lands shows as replication lag
+                # that climbs and does not recover — which the HA page and the
+                # existing gauges already report.
+                logger.warning(
+                    "Replication rows could not be applied; holding the cursor",
+                    unapplied=len(deferred),
+                    classes=sorted({e["entity-class"] for e in deferred}),
+                    cursor_held_at=safe_cursor,
+                )
 
             if applied:
                 logger.info(
