@@ -686,6 +686,32 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Two installs in one cluster cannot collide on a cluster-scoped name
+        run: |
+          # Terrapod is single-organization, so separating business units means
+          # running an instance per tenant — two in one cluster is a topology we
+          # recommend. A cluster-scoped object has no namespace to disambiguate
+          # it, so the SAME release name in two namespaces must still render
+          # distinct names, or one install silently breaks the other (#1181).
+          render() {
+            docker run --rm -v "$PWD:/chart" -w /chart alpine/helm:3.17.2 \
+              template terrapod helm/terrapod --namespace "$1" \
+              --set postgresql.url=postgresql+asyncpg://t:t@db:5432/terrapod \
+              --set redis.url=redis://redis:6379 \
+            | awk '/^kind: Cluster|^kind: PriorityClass|^kind: .*WebhookConfiguration/ {k=1}
+                   k && /^  name:/ {print $2; k=0}'
+          }
+          a=$(render bu-alpha)
+          b=$(render bu-beta)
+          echo "bu-alpha: $a"
+          echo "bu-beta:  $b"
+          if [ -z "$a" ]; then echo "no cluster-scoped objects found — check the awk filter"; exit 1; fi
+          if [ -n "$(comm -12 <(echo "$a" | sort) <(echo "$b" | sort))" ]; then
+            echo "FAIL: a cluster-scoped name is identical across namespaces."
+            echo "Use the terrapod.clusterScopedName helper, not terrapod.fullname."
+            exit 1
+          fi
+
       - name: Stock install renders a working stack (web + Ingress + bootstrap)
         run: |
           out=$(docker run --rm -v "$PWD:/chart" -w /chart alpine/helm:3.17.2 \

@@ -22,6 +22,27 @@ Create a default fully qualified app name.
 {{- end }}
 
 {{/*
+Name for a CLUSTER-SCOPED object. Use this for every ClusterRole,
+ClusterRoleBinding, PriorityClass, webhook configuration — anything without a
+namespace — and never `terrapod.fullname` on its own.
+
+Terrapod is single-organization by design, so separating business units means
+running an instance per tenant, and two instances in one cluster is a topology
+we actively recommend. `terrapod.fullname` is derived from the release name, so
+two installs in different namespaces that share one — `helm install terrapod` in
+each, the obvious thing to do — render the IDENTICAL cluster-scoped object.
+
+Then either the second install fails outright (the object is owned by another
+release), or, if it is adopted, the binding's subjects are replaced and the first
+install silently loses the permission; and `helm uninstall` of either deletes the
+shared object out from under the one still running. Qualifying with the namespace
+makes the name unique by construction rather than by operator convention (#1181).
+*/}}
+{{- define "terrapod.clusterScopedName" -}}
+{{- printf "%s-%s" (include "terrapod.fullname" .) .Release.Namespace | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
+{{/*
 Create chart name and version as used by the chart label.
 */}}
 {{- define "terrapod.chart" -}}
