@@ -12,6 +12,7 @@ Run:  scripts/ha-smoke.sh table
 
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
 import time
@@ -30,19 +31,33 @@ def _k(*args: str, check: bool = True) -> str:
         ["kubectl", "--context", CTX, *args], capture_output=True, text=True
     )
     if check and out.returncode != 0:
-        raise RuntimeError(f"kubectl {' '.join(args)} failed:\n{out.stderr[-2000:]}")
+        raise RuntimeError(f"kubectl {' '.join(args)} failed:\n{_trim(out.stderr)}")
     return out.stdout
 
 
+def _trim(text: str, head: int = 1500, tail: int = 1200) -> str:
+    """Keep both ends. A Python traceback names the exception at the end of the
+    message and SQLAlchemy then prints the whole statement after it, so keeping
+    only the tail throws away the one line that says what went wrong."""
+    if len(text) <= head + tail:
+        return text
+    return f"{text[:head]}\n  … {len(text) - head - tail} characters elided …\n{text[-tail:]}"
+
+
 PRELUDE = """
-import asyncio, sys, json
+import asyncio, sys, json, uuid
 from sqlalchemy import select, delete, func
 from terrapod.db.session import get_db_session, init_db
+from terrapod.redis.client import init_redis
 from terrapod.db import models as m
-from terrapod.services import replication
+from terrapod.services import replication, run_service, pool_set, agent_pool_service
 
 async def main():
     await init_db()
+    # Redis as well as the database: the listener registry lives there, so a
+    # snippet that asks "which listeners has this node got" needs it, and the
+    # cost on the snippets that do not is one connection.
+    await init_redis()
     # The outbox is installed by the API's startup, and this is not that
     # process. Without it a row lands and no event is ever recorded, and the
     # pair looks broken when it is not.
@@ -81,6 +96,23 @@ def scale(ns: str, replicas: int) -> None:
             time.sleep(2)
 
 
+def _helm(ns: str, *overrides: str, timeout: str = "8m") -> None:
+    """`helm upgrade` on one node of the pair, with helm's own error on failure.
+
+    `subprocess.run(check=True)` raises a CalledProcessError whose message is
+    the argv and nothing else, so a failed upgrade used to report only that it
+    had failed — which is no use at 03:00 or in a table run.
+    """
+    out = subprocess.run(
+        ["helm", "--kube-context", CTX, "upgrade", REL[ns], "helm/terrapod",
+         "-n", ns, "-f", f"helm/terrapod/values-ha-{ns[-1]}.yaml",
+         *overrides, "--reuse-values", "--wait", "--timeout", timeout],
+        capture_output=True, text=True,
+    )
+    if out.returncode != 0:
+        raise RuntimeError(f"helm upgrade {REL[ns]} failed:\n{_trim(out.stderr or out.stdout)}")
+
+
 def set_role(ns: str, role: str) -> None:
     """Flip a node's role the way an operator would — through Helm.
 
@@ -90,14 +122,25 @@ def set_role(ns: str, role: str) -> None:
     Drop the stale ownership (`kubectl patch deploy … --type=json -p
     '[{"op":"remove","path":"/metadata/managedFields"}]'`) and upgrade again.
     Roll images through Helm on this pair and it never arises.
+
+    Note the explicit `--set` alongside `-f`: `--reuse-values` does NOT protect
+    a value the values file also sets. The file is re-applied over the reused
+    values, so `helm upgrade -f values-ha-a.yaml --reuse-values` on its own puts
+    node A back to `role: leader` no matter what it was before — quietly, and
+    only visible in the rendered ConfigMap.
     """
-    subprocess.run(
-        ["helm", "--kube-context", CTX, "upgrade", REL[ns], "helm/terrapod",
-         "-n", ns, "-f", f"helm/terrapod/values-ha-{ns[-1]}.yaml",
-         "--set", f"api.config.ha.role={role}", "--reuse-values",
-         "--wait", "--timeout", "5m"],
-        check=True, capture_output=True, text=True,
-    )
+    _helm(ns, "--set", f"api.config.ha.role={role}")
+
+
+def set_role_and_listener(ns: str, *, role: str, api_url: str) -> None:
+    """`set_role`, plus the listener's view of where the API lives.
+
+    Slower than it looks: changing `listener.apiUrl` replaces the listener pod,
+    and on this single-node cluster the outgoing one has to finish terminating
+    before the new one can schedule. Hence the longer timeout.
+    """
+    _helm(ns, "--set", f"api.config.ha.role={role}", "--set", f"listener.apiUrl={api_url}",
+          timeout="10m")
 
 
 def record(row: str, name: str, verdict: str, detail: str = "") -> None:
@@ -302,47 +345,343 @@ def row_7_unplanned_failover(stamp: str) -> None:
            "PASS" if ok else "FAIL")
 
 
-def restore(stamp: str) -> None:
+def reset_roles() -> None:
+    """Back to the pair's canonical arrangement: A leads, B follows."""
     set_role(NS_A, "leader")
     set_role(NS_B, "follower")
+
+
+def restore(stamp: str) -> None:
+    reset_roles()
     name = f"ha-failback-{stamp}"
     make_ws(NS_A, name)
     record("6b", "Fail back to A and re-converge",
            "PASS" if poll(NS_B, sees_ws(name), tries=30) else "FAIL")
 
 
+def _listener_names(ns: str) -> list[str]:
+    """The listeners this node currently has registered, from its own Redis."""
+    out = run(
+        ns,
+        "names = []\n"
+        "for p in (await db.execute(select(m.AgentPool))).scalars().all():\n"
+        "    for lst in await agent_pool_service.list_listeners(str(p.id)):\n"
+        "        names.append(lst.get('name') or '')\n"
+        "print('LISTENERS', json.dumps(sorted(n for n in names if n)))",
+        check=False,
+    )
+    try:
+        return json.loads(out.split("LISTENERS ")[-1].splitlines()[0])
+    except (ValueError, IndexError):
+        return []
+
+
+def _scale_listener(ns: str, replicas: int) -> None:
+    _k("-n", ns, "scale", f"deploy/{REL[ns]}-listener", f"--replicas={replicas}")
+    if replicas:
+        _k("-n", ns, "rollout", "status", f"deploy/{REL[ns]}-listener", "--timeout=180s")
+
+
+# The run held across the cutover asks for more CPU than the cluster has, so its
+# Job is created and its pod never schedules. That is a real in-flight run — the
+# platform waiting on capacity is an ordinary thing — and it removes the race
+# against a runner that would otherwise exit within a second or two of starting.
+# The reconciler's own unschedulable timeout is 300s, which is an order of
+# magnitude more than a demotion needs.
+_UNSCHEDULABLE_CPU = "64"
+
+
+def _delete_pinned_jobs() -> None:
+    """Remove the Jobs whose pods were never going to schedule.
+
+    The listener admits work against the count of *running* Jobs (#749), and a
+    Job stuck Pending on capacity counts. Since #1198 the reconciler reaps these
+    itself once the launch timeout expires, but row 9 cuts over long before
+    that, so the row would otherwise hand the next one a listener at capacity —
+    which is exactly how row 9 failed the first time it ran, reporting "no
+    listener claimed the run" for a reason that had nothing to do with the
+    cutover.
+    """
+    for ns in (NS_A, NS_B):
+        names = _k("-n", ns, "get", "job", "-o",
+                   "jsonpath={.items[*].metadata.name}", check=False).split()
+        for name in names:
+            pending = _k("-n", ns, "get", "pod", "--selector", f"job-name={name}",
+                         "-o", "jsonpath={.items[*].status.phase}", check=False)
+            if "Pending" in pending:
+                _k("-n", ns, "delete", "job", name, "--ignore-not-found", check=False)
+
+
+def row_9_cutover_midrun(stamp: str) -> None:
+    """A genuinely in-flight run, held across a demotion.
+
+    Row 14 seeds a run row and calls the retirement predicate directly. This one
+    is claimed by a real listener over SSE and backed by a real Kubernetes Job,
+    which is the difference that matters: it exercises the *wiring*, not the
+    predicate. That distinction is what found #1197 — the predicate had a single
+    caller, reachable only under `ha.role: auto`, so the demotion step the
+    operations runbook prescribes never reached it and the node's in-flight runs
+    stayed `planning` for as long as it remained a follower.
+    """
+    reset_roles()
+    ws = f"ha-midrun-{stamp}"
+    pools = run(
+        NS_A,
+        "ids = [str(p.id) for p in (await db.execute(select(m.AgentPool))).scalars().all()]\n"
+        "print('POOLS', json.dumps(ids))",
+    )
+    pool_ids = json.loads(pools.split("POOLS ")[-1].splitlines()[0])
+    if not pool_ids:
+        record("9", "Cut over mid-run", "FAIL", "node A has no agent pool to route to")
+        return
+
+    run(
+        NS_A,
+        f"ws = m.Workspace(name='{ws}', execution_mode='agent',"
+        f" resource_cpu='{_UNSCHEDULABLE_CPU}')\n"
+        f"pool_set.set_workspace_pools(ws, {pool_ids!r})\n"
+        "db.add(ws)\n"
+        "await db.flush()\n"
+        "run_row = await run_service.create_run(db, ws, message='row 9')\n"
+        "await run_service.queue_run(db, run_row)\n"
+        "await db.commit()\n"
+        "print('RUN', run_row.id)",
+    )
+
+    claimed = f"""
+row = await db.scalar(select(m.Run).join(m.Workspace)
+                      .where(m.Workspace.name == '{ws}')
+                      .order_by(m.Run.created_at.desc()).limit(1))
+print('OK' if row is not None and row.status == 'planning' and row.job_name else 'no')
+"""
+    if not poll(NS_A, claimed, tries=15, delay=2.0):
+        record("9", "Cut over mid-run", "FAIL",
+               "no listener claimed the run, so there was nothing in flight to cut over")
+        return
+
+    set_role(NS_A, "follower")
+
+    verdict = run(NS_A, f"""
+row = await db.scalar(select(m.Run).join(m.Workspace)
+                      .where(m.Workspace.name == '{ws}')
+                      .order_by(m.Run.created_at.desc()).limit(1))
+wsrow = await db.scalar(select(m.Workspace).where(m.Workspace.name == '{ws}'))
+print('VERDICT', json.dumps({{
+    'status': row.status,
+    'by_role_change': 'role changed' in (row.error_message or ''),
+    'workspace_locked': bool(wsrow.locked),
+}}))
+""")
+    state = json.loads(verdict.split("VERDICT ")[-1].splitlines()[0])
+    retired = state["status"] == "errored" and state["by_role_change"]
+
+    # The other half of the row: the workspace must be immediately usable on the
+    # node that took over. A frozen `planning` row would hold the per-workspace
+    # serialization gate, and no operator can clear it — `workspace.locked` is
+    # untouched, so there is nothing to unlock. Re-pointing at the surviving
+    # fleet is the per-node-fleet cutover step, not a workaround.
+    set_role(NS_B, "leader")
+    poll(NS_B, sees_ws(ws), tries=30)
+    run(NS_B, f"""
+wsrow = await db.scalar(select(m.Workspace).where(m.Workspace.name == '{ws}'))
+wsrow.resource_cpu = '1'
+ids = [str(p.id) for p in (await db.execute(select(m.AgentPool))).scalars().all()]
+pool_set.set_workspace_pools(wsrow, ids)
+await db.flush()
+run_row = await run_service.create_run(db, wsrow, message='row 9 requeue')
+await run_service.queue_run(db, run_row)
+await db.commit()
+print('REQUEUED', run_row.id)
+""", check=False)
+    requeued = poll(NS_B, f"""
+row = await db.scalar(select(m.Run).join(m.Workspace)
+                      .where(m.Workspace.name == '{ws}', m.Run.message == 'row 9 requeue')
+                      .order_by(m.Run.created_at.desc()).limit(1))
+print('OK' if row is not None and row.status in ('planning', 'planned', 'errored') else 'no')
+""", tries=20, delay=3.0)
+
+    _delete_pinned_jobs()
+
+    ok = retired and not state["workspace_locked"] and requeued
+    record("9", "Cut over mid-run", "PASS" if ok else "FAIL",
+           f"in-flight run → {state['status']}"
+           + (" by the role change" if state["by_role_change"] else " by something else")
+           + (", workspace not locked" if not state["workspace_locked"] else ", WORKSPACE LEFT LOCKED")
+           + (", re-queue dispatched on the promoted node" if requeued
+              else ", RE-QUEUE NEVER DISPATCHED"))
+
+
+_SHARED_SVC = "terrapod-shared-api"
+
+
+def _point_shared_name_at(target_ns: str) -> None:
+    """Move the shared name, the way moving DNS moves it.
+
+    An ExternalName Service is the closest thing this rig has to a name whose
+    answer changes: the listener's configuration never changes, only what its
+    hostname resolves to — which is exactly the shared-fleet topology.
+    """
+    manifest = f"""
+apiVersion: v1
+kind: Service
+metadata:
+  name: {_SHARED_SVC}
+  namespace: {NS_A}
+spec:
+  type: ExternalName
+  externalName: {REL[target_ns]}-api.{target_ns}.svc.cluster.local
+"""
+    subprocess.run(
+        ["kubectl", "--context", CTX, "apply", "-f", "-"],
+        input=manifest, text=True, check=True, capture_output=True,
+    )
+
+
+def row_10_listener_topologies(stamp: str) -> None:
+    """Both fleets, and a re-join that needs no operator.
+
+    Per-node is the pair's steady state and is already proven by row 9 — node A's
+    listener claimed that run against node A. This exercises the other topology:
+    one fleet addressing a *shared* name, which after a cutover finds itself
+    talking to a node whose CA never issued its certificate. It must recover on
+    its own, and the mechanism it recovers by is the join token, which is why the
+    assertion is that a token's `use_count` moved rather than merely that a
+    listener reappeared.
+    """
+    reset_roles()
+    per_node = _listener_names(NS_A)
+    if not per_node:
+        record("10", "Cut over with each listener topology", "FAIL",
+               "node A's own fleet is not registered, so neither topology can be judged")
+        return
+
+    before = run(NS_B, """
+tok = await db.scalar(select(m.AgentPoolToken).order_by(m.AgentPoolToken.created_at))
+print('USES', tok.use_count if tok else -1)
+""")
+    uses_before = int(before.split("USES ")[-1].splitlines()[0])
+
+    # Establish the shared-fleet topology *before* the cutover, because that is
+    # the order it happens in: the fleet has been addressing the shared name all
+    # along, and the cutover is what changes the answer underneath it.
+    _point_shared_name_at(NS_A)
+    rejoined = False
+    uses_after = uses_before
+    try:
+        set_role_and_listener(NS_A, role="leader", api_url=f"http://{_SHARED_SVC}:8000")
+
+        # The cutover. Demoting A rolls its API, which drops the fleet's SSE
+        # connection — that is what makes it resolve the name again and find B.
+        # A shared fleet that never lost its connection would have no reason to
+        # look, which is why the demotion has to come after the re-pointing and
+        # not before.
+        set_role(NS_B, "leader")
+        _point_shared_name_at(NS_B)
+        set_role(NS_A, "follower")
+
+        rejoined = False
+        for _ in range(40):
+            if any(n.startswith("ha-a-listener") for n in _listener_names(NS_B)):
+                rejoined = True
+                break
+            time.sleep(6)
+
+        after = run(NS_B, """
+tok = await db.scalar(select(m.AgentPoolToken).order_by(m.AgentPoolToken.created_at))
+print('USES', tok.use_count if tok else -1)
+""")
+        uses_after = int(after.split("USES ")[-1].splitlines()[0])
+    finally:
+        # Undo only what this row changed. The roles are put back by main(),
+        # always and for every invocation, so a single-row run cannot leave the
+        # pair with two leaders for the next one to trip over.
+        set_role_and_listener(NS_A, role="leader", api_url="")
+        _point_shared_name_at(NS_A)
+
+    ok = rejoined and uses_after > uses_before
+    record("10", "Cut over with each listener topology", "PASS" if ok else "FAIL",
+           "per-node fleet claimed row 9's run; shared fleet "
+           + ("re-joined the promoted node unattended" if rejoined else "NEVER RE-JOINED")
+           + f", token use_count {uses_before}→{uses_after}")
+
+
+# Every row, in the order the table runs them. Named so a single row can be
+# re-run while it is being worked on — a full pass takes the better part of an
+# hour, which is far too slow a loop to develop a row against.
+ROWS: dict[str, object] = {
+    "2": row_2_deltas,
+    "1": row_1_backfill,
+    "3": row_3_brief_outage,
+    "4": row_4_past_retention,
+    "5": row_5_peer_outage,
+    "8": row_8_follower_inert,
+    "11": row_11_sensitive,
+    "12": row_12_token,
+    "14": row_14_stale_runs,
+    "6": row_6_planned_failover,
+    "7": row_7_unplanned_failover,
+    "6b": restore,
+    # Last, because they leave and restore the pair's roles and its listener
+    # wiring, and because they are the slowest rows by a wide margin.
+    "9": row_9_cutover_midrun,
+    "10": row_10_listener_topologies,
+}
+
+
 def main() -> int:
-    stamp = _k("-n", NS_A, "get", "ns", NS_A, "-o", "jsonpath={.metadata.uid}")[:8]
-    print(f"{CYAN}==>{RESET} #960 release-gate table against {NS_A} / {NS_B}\n")
+    wanted = [a for a in sys.argv[1:] if not a.startswith("-")]
+    unknown = [w for w in wanted if w not in ROWS and w != "13"]
+    if unknown:
+        print(f"unknown row(s): {', '.join(unknown)}; known: {', '.join(ROWS)}")
+        return 2
 
-    row_2_deltas(stamp)
-    row_1_backfill(stamp)
-    row_3_brief_outage(stamp)
-    row_4_past_retention(stamp)
-    row_5_peer_outage(stamp)
-    row_8_follower_inert(stamp)
-    row_11_sensitive(stamp)
-    row_12_token(stamp)
-    row_14_stale_runs(stamp)
-    row_6_planned_failover(stamp)
-    row_7_unplanned_failover(stamp)
-    restore(stamp)
+    # The namespace UID identifies the pair; the clock suffix identifies the
+    # run. Without the suffix a second table run against a live pair collides on
+    # the first name it re-creates, and the pair is meant to be re-runnable —
+    # rows 1 and 3 clear the follower, never the leader.
+    stamp = (
+        _k("-n", NS_A, "get", "ns", NS_A, "-o", "jsonpath={.metadata.uid}")[:8]
+        + f"-{int(time.time()) % 100000:05d}"
+    )
+    scope = f" (rows {', '.join(wanted)})" if wanted else ""
+    print(f"{CYAN}==>{RESET} #960 release-gate table against {NS_A} / {NS_B}{scope}\n")
 
-    # Recorded, not silently omitted. Each needs execution infrastructure the
-    # pair deliberately does not deploy — two API nodes, no listeners, no
-    # runners — so claiming them would be claiming something never observed.
-    record("9", "Cut over mid-run", "SKIP",
-           "needs a run in flight: a listener and a runner Job in the pair")
-    record("10", "Cut over with each listener topology", "SKIP",
-           "needs a listener fleet and certificate portability across both topologies")
-    record("13", "terraform init against a private module and provider on B", "SKIP",
-           "rows and blobs are verified present on B (#1114); the CLI leg needs a "
-           "terraform binary pointed at the promoted node")
+    try:
+        for name, fn in ROWS.items():
+            if wanted and name not in wanted:
+                continue
+            fn(stamp)  # type: ignore[operator]
+    finally:
+        # Always, including on the way out of a failure and including a
+        # single-row run. A row that leaves the pair with two leaders makes the
+        # NEXT run open by reporting replication as broken, which is true and
+        # completely misleading — the cause is two rows earlier and in a
+        # different invocation.
+        reset_roles()
+
+    if not wanted or "13" in wanted:
+        # Recorded, not silently omitted. The data half is already proven — the
+        # registry rows and their blobs are confirmed present on the promoted
+        # node (#1114) — so what is missing is a client actually installing from
+        # it. Terraform's registry discovery is HTTPS-only with no plaintext
+        # fallback, and the pair runs with `ingress.enabled: false` and no
+        # certificate, so an `init` from outside the cluster has nothing to
+        # connect to. The route in is a real run on the promoted node whose
+        # configuration sources the private module: the runner writes a
+        # CLI-config `host` block redirecting the public hostname to its
+        # plaintext internal API, which is precisely the mechanism that makes
+        # this work in a split or HTTP-internal deployment.
+        record("13", "terraform init against a private module and provider on B", "SKIP",
+               "needs a config-version tarball on B and a runner that can fetch a "
+               "terraform binary; the rows and blobs themselves are verified (#1114)")
 
     failed = [r for r in results if r[2] == "FAIL"]
     skipped = [r for r in results if r[2] == "SKIP"]
     passed = [r for r in results if r[2] == "PASS"]
-    print(f"\n{CYAN}==>{RESET} {len(passed)} passed, {len(failed)} failed, {len(skipped)} not exercised")
+    print(
+        f"\n{CYAN}==>{RESET} {len(passed)} passed, {len(failed)} failed, "
+        f"{len(skipped)} not exercised"
+    )
     return 1 if failed else 0
 
 

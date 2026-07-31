@@ -9,6 +9,7 @@
 #   scripts/ha-smoke.sh verify  assert the pair actually converges
 #   scripts/ha-smoke.sh reverse swap the roles and assert it works both ways
 #   scripts/ha-smoke.sh table   walk the #960 release-gate table, honestly
+#   scripts/ha-smoke.sh table 10   …or just one row, while working on it
 #   scripts/ha-smoke.sh down    remove node B
 #
 # The peer link runs over in-cluster Service DNS. That is not a shortcut:
@@ -54,18 +55,34 @@ cmd_up() {
   done
   ok "peer secrets present in both namespaces"
 
-  # Both nodes run the image Tilt already built — no separate build, and it
-  # guarantees the pair is the same code. The dev stack itself is untouched.
-  # Both nodes run the images Tilt already built. The migrations job is a
-  # SEPARATE image from the API — pinning only the API leaves the pre-install
+  # Both nodes run what Tilt already built — no separate build, and it
+  # guarantees the pair is the same code as the dev stack. The migrations job is
+  # a SEPARATE image from the API: pinning only the API leaves the pre-install
   # hook pulling from GHCR, which on a local cluster never succeeds and shows up
   # as an inscrutable "Job in progress" timeout.
-  local api_image mig_image
-  api_image=$(docker images --format '{{.Repository}}:{{.Tag}}' | grep '^terrapod-api:tilt-' | head -1)
-  mig_image=$(docker images --format '{{.Repository}}:{{.Tag}}' | grep '^terrapod-migrations:tilt-' | head -1)
-  [[ -n "$api_image" && -n "$mig_image" ]] \
+  #
+  # But the pair does NOT run the `tilt-<hash>` tags directly. Those move: edit
+  # a source file and Tilt rebuilds under a new hash, and the tag the pair
+  # pinned can stop resolving — with `pullPolicy: Never` that is
+  # `ErrImageNeverPull` on a pre-upgrade hook, i.e. a helm timeout minutes later
+  # blaming a Job for something that is really a vanished tag. So the images are
+  # re-tagged into a namespace the pair owns and Tilt never touches.
+  local api_src mig_src
+  api_src=$(docker images --format '{{.Repository}}:{{.Tag}}' | grep '^terrapod-api:tilt-' | head -1)
+  mig_src=$(docker images --format '{{.Repository}}:{{.Tag}}' | grep '^terrapod-migrations:tilt-' | head -1)
+  [[ -n "$api_src" && -n "$mig_src" ]] \
     || fail "no tilt-built images — run 'tilt up' once so the pair has something to run"
-  info "pair on $api_image + $mig_image"
+
+  # Re-tag unless the caller has already staged its own build under :ha (which
+  # is how a fix is tried on the pair before it exists in the dev stack).
+  local api_image="terrapod-api:ha" mig_image="terrapod-migrations:ha"
+  if [[ "${HA_KEEP_IMAGES:-}" != "1" ]]; then
+    docker tag "$api_src" "$api_image"
+    docker tag "$mig_src" "$mig_image"
+    info "pinned $api_src -> $api_image, $mig_src -> $mig_image"
+  else
+    info "HA_KEEP_IMAGES=1 — reusing whatever is tagged $api_image / $mig_image"
+  fi
 
   local node ns
   for node in a b; do
@@ -320,7 +337,7 @@ case "${1:-}" in
   up) cmd_up ;;
   verify) cmd_verify ;;
   reverse) cmd_reverse ;;
-  table) python3 "$REPO_ROOT/scripts/ha_smoke_table.py" ;;
+  table) shift; python3 "$REPO_ROOT/scripts/ha_smoke_table.py" "$@" ;;
   down) cmd_down ;;
-  *) print "usage: $0 {up|verify|reverse|table|down}"; exit 2 ;;
+  *) print "usage: $0 {up|verify|reverse|table [row...]|down}"; exit 2 ;;
 esac

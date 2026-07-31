@@ -880,3 +880,117 @@ class TestPoolQueueDepth:
         db.execute.side_effect = RuntimeError("db down")
         # Must not raise into the reconcile cycle.
         await _refresh_pool_queue_depth(db)
+
+
+# ── Job reaping on abandonment (#1198) ────────────────────────────────
+
+
+class TestAbandonedJobsAreReaped:
+    """A Job whose run the reconciler gives up on must not keep its capacity.
+
+    `count_active_runner_jobs` counts non-terminal Jobs with a **Pending** or
+    Running pod, and the listener admits work against that count. A Job left
+    behind by an unschedulable or abandoned run therefore holds a slot for the
+    life of the listener — nothing else reaps it, because
+    `ttlSecondsAfterFinished` only applies to a Job that finished and one whose
+    pod never scheduled never does. At the shipped `maxConcurrent: 3`, three of
+    them and the pool stops claiming altogether, silently.
+    """
+
+    @patch("terrapod.services.run_reconciler.load_runner_config")
+    @patch("terrapod.services.run_service.publish_cancel_job", new_callable=AsyncMock)
+    @patch("terrapod.services.run_reconciler._handle_failed", new_callable=AsyncMock)
+    async def test_unschedulable_reaps_the_job(self, mock_handle, mock_cancel, mock_config):
+        mock_config.return_value = MagicMock(launch_timeout_seconds=300)
+        db = AsyncMock()
+        run = _mock_run(
+            status="planning",
+            plan_started_at=datetime.now(UTC) - timedelta(seconds=400),
+        )
+
+        await _check_unschedulable(db, run)
+
+        mock_handle.assert_awaited_once()
+        mock_cancel.assert_awaited_once_with(run)
+
+    @patch("terrapod.services.run_reconciler.load_runner_config")
+    @patch("terrapod.services.run_service.publish_cancel_job", new_callable=AsyncMock)
+    @patch("terrapod.services.run_reconciler._handle_failed", new_callable=AsyncMock)
+    async def test_within_grace_reaps_nothing(self, mock_handle, mock_cancel, mock_config):
+        """The scheduler may still place the pod — reaping here would destroy a
+        run that was about to start."""
+        mock_config.return_value = MagicMock(launch_timeout_seconds=300)
+        db = AsyncMock()
+        run = _mock_run(
+            status="planning",
+            plan_started_at=datetime.now(UTC) - timedelta(seconds=30),
+        )
+
+        await _check_unschedulable(db, run)
+
+        mock_handle.assert_not_awaited()
+        mock_cancel.assert_not_awaited()
+
+    @patch("terrapod.services.run_reconciler.load_runner_config")
+    @patch("terrapod.services.run_service.publish_cancel_job", new_callable=AsyncMock)
+    @patch("terrapod.services.run_reconciler._handle_failed", new_callable=AsyncMock)
+    async def test_stale_with_a_job_reaps_it(self, mock_handle, mock_cancel, mock_config):
+        """Also stops terraform running unattended against real infrastructure
+        after we have stopped watching it."""
+        mock_config.return_value = MagicMock(
+            stale_timeout_seconds=DEFAULT_STALE_TIMEOUT_SECONDS, launch_timeout_seconds=300
+        )
+        db = AsyncMock()
+        run = _mock_run(
+            status="planning",
+            job_name="tprun-abc123-plan",
+            plan_started_at=datetime.now(UTC)
+            - timedelta(seconds=DEFAULT_STALE_TIMEOUT_SECONDS)
+            - timedelta(minutes=5),
+        )
+
+        await _check_stale(db, run)
+
+        mock_cancel.assert_awaited_once_with(run)
+
+    @patch("terrapod.services.run_reconciler.load_runner_config")
+    @patch("terrapod.services.run_service.publish_cancel_job", new_callable=AsyncMock)
+    @patch("terrapod.services.run_reconciler._handle_failed", new_callable=AsyncMock)
+    async def test_no_job_name_reaps_nothing(self, mock_handle, mock_cancel, mock_config):
+        """Pre-launch timeout: the listener never reported a Job, so there is
+        nothing to delete and nothing occupying a slot."""
+        mock_config.return_value = MagicMock(
+            stale_timeout_seconds=DEFAULT_STALE_TIMEOUT_SECONDS, launch_timeout_seconds=300
+        )
+        db = AsyncMock()
+        run = _mock_run(
+            status="planning",
+            job_name=None,
+            plan_started_at=datetime.now(UTC) - timedelta(seconds=400),
+        )
+
+        await _check_stale(db, run)
+
+        mock_handle.assert_awaited_once()
+        mock_cancel.assert_not_awaited()
+
+    @patch("terrapod.services.run_reconciler.load_runner_config")
+    @patch("terrapod.services.run_service.publish_cancel_job", new_callable=AsyncMock)
+    @patch("terrapod.services.run_reconciler._handle_failed", new_callable=AsyncMock)
+    async def test_a_failing_reap_never_masks_the_failure(
+        self, mock_handle, mock_cancel, mock_config
+    ):
+        """Cleanup is secondary. If it throws, the run must still be errored and
+        the operator must still get the message that explains why."""
+        mock_config.return_value = MagicMock(launch_timeout_seconds=300)
+        mock_cancel.side_effect = RuntimeError("redis is down")
+        db = AsyncMock()
+        run = _mock_run(
+            status="planning",
+            plan_started_at=datetime.now(UTC) - timedelta(seconds=400),
+        )
+
+        await _check_unschedulable(db, run)
+
+        mock_handle.assert_awaited_once()
+        assert "insufficient cluster resources" in mock_handle.call_args.args[2]

@@ -188,3 +188,152 @@ class TestProbeCycle:
         await ha_role.probe_cycle()
 
         redis.set.assert_any_await(ha_role._STREAK_KEY, "leader:1")
+
+
+class TestStartupRoleReconciliation:
+    """A static demotion is only ever observable at startup (#1197).
+
+    `probe_cycle` returns immediately unless the role is `auto`, so before this
+    the retirement predicate was unreachable on the path the operations runbook
+    actually prescribes — `helm upgrade --set api.config.ha.role=follower` —
+    and the node's in-flight runs stayed `planning` for the life of the row.
+    """
+
+    @patch("terrapod.services.ha_role._retire_runs_on_role_change")
+    @patch("terrapod.services.ha_role.get_redis_client")
+    @patch("terrapod.services.ha_role.settings")
+    async def test_demotion_across_a_restart_retires(
+        self, mock_settings, mock_get_redis, mock_retire
+    ):
+        mock_settings.ha = _cfg(role="follower")
+        redis = AsyncMock()
+        redis.get.return_value = b"leader"
+        mock_get_redis.return_value = redis
+
+        await ha_role.reconcile_role_on_startup()
+
+        mock_retire.assert_awaited_once_with(previous="leader", role="follower")
+        redis.set.assert_any_await(ha_role._LAST_ROLE_KEY, "follower")
+
+    @patch("terrapod.services.ha_role._retire_runs_on_role_change")
+    @patch("terrapod.services.ha_role.get_redis_client")
+    @patch("terrapod.services.ha_role.settings")
+    async def test_promotion_across_a_restart_retires(
+        self, mock_settings, mock_get_redis, mock_retire
+    ):
+        """The sharper direction: a node promoted back must not inherit frozen
+        rows from its previous era, because several periodic tasks act on old
+        rows with no upper age bound."""
+        mock_settings.ha = _cfg(role="leader")
+        redis = AsyncMock()
+        redis.get.return_value = b"follower"
+        mock_get_redis.return_value = redis
+
+        await ha_role.reconcile_role_on_startup()
+
+        mock_retire.assert_awaited_once_with(previous="follower", role="leader")
+
+    @patch("terrapod.services.ha_role._retire_runs_on_role_change")
+    @patch("terrapod.services.ha_role.get_redis_client")
+    @patch("terrapod.services.ha_role.settings")
+    async def test_an_ordinary_restart_retires_nothing(
+        self, mock_settings, mock_get_redis, mock_retire
+    ):
+        """The most important negative. A rolling upgrade restarts every replica
+        on an unchanged role; killing the in-flight runs there would make a
+        routine deploy destructive, and the sibling replica is still driving
+        them."""
+        mock_settings.ha = _cfg(role="leader")
+        redis = AsyncMock()
+        redis.get.return_value = b"leader"
+        mock_get_redis.return_value = redis
+
+        await ha_role.reconcile_role_on_startup()
+
+        mock_retire.assert_not_awaited()
+        redis.set.assert_any_await(ha_role._LAST_ROLE_KEY, "leader")
+
+    @patch("terrapod.services.ha_role._retire_runs_on_role_change")
+    @patch("terrapod.services.ha_role.get_redis_client")
+    @patch("terrapod.services.ha_role.settings")
+    async def test_no_recorded_role_records_without_retiring(
+        self, mock_settings, mock_get_redis, mock_retire
+    ):
+        """First boot, or a Redis that lost its data. "Cannot tell" must not
+        become "kill the runs"."""
+        mock_settings.ha = _cfg(role="leader")
+        redis = AsyncMock()
+        redis.get.return_value = None
+        mock_get_redis.return_value = redis
+
+        await ha_role.reconcile_role_on_startup()
+
+        mock_retire.assert_not_awaited()
+        redis.set.assert_any_await(ha_role._LAST_ROLE_KEY, "leader")
+
+    @patch("terrapod.services.ha_role._retire_runs_on_role_change")
+    @patch("terrapod.services.ha_role.get_redis_client")
+    @patch("terrapod.services.ha_role.settings")
+    async def test_unreachable_redis_never_blocks_startup(
+        self, mock_settings, mock_get_redis, mock_retire
+    ):
+        mock_settings.ha = _cfg(role="leader")
+        mock_get_redis.side_effect = RuntimeError("no redis")
+
+        await ha_role.reconcile_role_on_startup()
+
+        mock_retire.assert_not_awaited()
+
+    @patch("terrapod.services.ha_role._retire_runs_on_role_change")
+    @patch("terrapod.services.ha_role._observe")
+    @patch("terrapod.services.ha_role.get_redis_client")
+    @patch("terrapod.services.ha_role.settings")
+    async def test_the_probe_records_the_role_it_moved_to(
+        self, mock_settings, mock_get_redis, mock_observe, mock_retire
+    ):
+        """Both paths write the same key, so a restart straight after a
+        probe-driven change sees no difference and stays quiet."""
+        mock_settings.ha = _cfg(role="auto", node_name="a", internal="https://x", threshold=1)
+        redis = AsyncMock()
+        redis.get.side_effect = [b"follower", None]
+        mock_get_redis.return_value = redis
+        mock_observe.return_value = "a"
+
+        await ha_role.probe_cycle()
+
+        redis.set.assert_any_await(ha_role._LAST_ROLE_KEY, "leader")
+
+
+class TestStartupReconciliationIsWired:
+    """#1197 was a wiring bug, not a logic bug — the predicate was correct and
+    unreachable. A unit test of the predicate would have stayed green through
+    the whole defect, so the invariant worth pinning is that startup calls it.
+    """
+
+    def test_the_lifespan_awaits_it(self):
+        import inspect
+
+        from terrapod.api import app as app_module
+
+        source = inspect.getsource(app_module)
+        assert "await reconcile_role_on_startup()" in source, (
+            "the API lifespan must reconcile this node's role at startup, or a "
+            "demotion by `helm upgrade --set api.config.ha.role=follower` — the "
+            "step the operations runbook prescribes — leaves the node's "
+            "in-flight runs frozen in `planning` (#1197)"
+        )
+
+    def test_it_runs_regardless_of_the_role_mode(self):
+        """Not inside the `role == "auto"` branch. Under a static role the probe
+        never runs at all, which is precisely the case that was broken."""
+        import inspect
+
+        from terrapod.api import app as app_module
+
+        source = inspect.getsource(app_module)
+        call = source.index("await reconcile_role_on_startup()")
+        guard = source.index('if settings.ha.role == "auto":')
+        assert call < guard, (
+            "reconcile_role_on_startup must be called before (and outside) the "
+            "`auto`-only probe registration"
+        )

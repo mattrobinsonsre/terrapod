@@ -432,6 +432,17 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     # This task must NOT be leadership-gated when the enforcement phase lands:
     # a follower has to keep probing or it can never discover that it has
     # become the leader.
+
+    # A demotion by `helm upgrade --set api.config.ha.role=follower` — the step
+    # the operations runbook prescribes — is only observable at startup, because
+    # under a static role the probe below never runs. So the retirement
+    # predicate has to be reached from here as well, or this node's in-flight
+    # runs sit in `planning` for as long as it stays a follower (#1197). It is a
+    # no-op on an ordinary restart that did not change the role.
+    from terrapod.services.ha_role import reconcile_role_on_startup
+
+    await reconcile_role_on_startup()
+
     if settings.ha.role == "auto":
         from terrapod.services.ha_role import probe_cycle
 

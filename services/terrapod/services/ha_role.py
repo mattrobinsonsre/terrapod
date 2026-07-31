@@ -46,6 +46,12 @@ _PREFIX = "tp:ha"
 _ROLE_KEY = f"{_PREFIX}:role"
 _STREAK_KEY = f"{_PREFIX}:streak"
 _PROBED_AT_KEY = f"{_PREFIX}:probed_at"
+# The last role this node is known to have *held*, as opposed to the role it
+# currently resolves to. Under `auto` those are the same key's job; under a
+# static role there is no key at all, so a demotion by `helm upgrade --set
+# api.config.ha.role=follower` would otherwise be invisible to the process that
+# comes up afterwards (#1197).
+_LAST_ROLE_KEY = f"{_PREFIX}:last_role"
 
 # A probe is a single attempt with a short timeout, deliberately *not* wrapped
 # in the shared retry helper. Retrying inside one probe would blur the
@@ -145,6 +151,7 @@ async def probe_cycle() -> None:
     if count >= settings.ha.probe_threshold:
         await redis.set(_ROLE_KEY, wanted)
         await redis.delete(_STREAK_KEY)
+        await redis.set(_LAST_ROLE_KEY, wanted)
         await _retire_runs_on_role_change(previous=current, role=wanted)
         logger.warning(
             "HA role changed",
@@ -165,6 +172,50 @@ async def probe_cycle() -> None:
         )
 
     await redis.set(_PROBED_AT_KEY, str(time.time()))
+
+
+async def reconcile_role_on_startup() -> None:
+    """Retire in-flight runs if this node booted into a different role (#1197).
+
+    The probe handles a role change that happens *while the node is running*,
+    and only under `auto`. A static role can only change across a restart —
+    `helm upgrade --set api.config.ha.role=follower`, which is the demotion step
+    the operations runbook actually tells people to perform — so without this
+    the retirement predicate is never reached on the documented path.
+
+    What that costs is a run left in `planning` for as long as the node stays a
+    follower, holding its workspace at the per-workspace serialization gate. It
+    cannot even time out there: `_check_stale` resolves through
+    `transition_run`, which a follower refuses. A later promotion does
+    eventually shed it — after another reconciler timeout — but "eventually,
+    once you promote it again" is not a property to rely on, and a node parked
+    as standby for a week holds those rows for a week.
+
+    The trigger is strictly *the recorded role differs from the current one*,
+    never *the process started*. A rolling restart on an unchanged role must
+    retire nothing — the sibling replica is still driving those runs and their
+    Jobs are still executing.
+
+    No recorded role at all means this is a first boot, or a Redis that lost its
+    data. Both record and do nothing: "cannot tell" must not become "kill the
+    runs".
+
+    Safe to run on every replica. Retirement is one idempotent bulk `UPDATE`, so
+    whichever replica gets there first does the work and the rest find nothing.
+    """
+    role = await get_role()
+    try:
+        redis = get_redis_client()
+        recorded = await redis.get(_LAST_ROLE_KEY)
+        previous = recorded.decode() if isinstance(recorded, bytes) else (recorded or "")
+        if previous and previous != role:
+            logger.warning("Node booted into a different role", previous=previous, role=role)
+            await _retire_runs_on_role_change(previous=previous, role=role)
+        await redis.set(_LAST_ROLE_KEY, role)
+    except Exception:
+        # Never block startup on this. Failing to retire leaves the pre-#1197
+        # behaviour, which is inert rather than harmful.
+        logger.warning("Could not reconcile the node's role at startup", exc_info=True)
 
 
 async def last_probe_age_seconds() -> float | None:

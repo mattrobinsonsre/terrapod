@@ -33,8 +33,48 @@ ingress:
 
 web:
   enabled: false
+# A real execution fleet on each node. Without it the pair can prove that
+# settings and artifacts replicate, but not that a RUN survives a cutover —
+# which is the part of the gate a two-API-node pair could not reach (#1188).
+#
+# Per-node fleets: each listener points at its OWN node, so nothing crosses the
+# boundary and each side's capacity is exercised while that side leads. The
+# shared-fleet topology is exercised separately by re-pointing at the shared
+# Service the harness creates.
 listener:
-  enabled: false
+  enabled: true
+  # Same single-node deadlock the API notes below: the default required
+  # anti-affinity stops a rolling update replacing the listener, because the
+  # new pod cannot schedule until the old one goes and the old one waits for
+  # the new one. It resolves eventually, but it makes every `helm upgrade`
+  # here take minutes. A real pair on real nodes leaves it on.
+  podAntiAffinity:
+    enabled: false
+  name: ha-b-listener
+  joinToken: "ha-smoke-join-token-b-not-for-real-use"
+  image:
+    # Built locally by the harness; never pulled.
+    repository: terrapod-listener
+    tag: local
+    pullPolicy: Never
+
+runners:
+  image:
+    # Built by `tilt trigger build-runner-image`; never pulled.
+    repository: terrapod-runner
+    tag: local
+    pullPolicy: Never
+
+# Pre-install so the pool exists before the listener rolls out — otherwise
+# `helm --wait` deadlocks on a listener whose readiness gates on joining a pool
+# that does not exist yet. Same reasoning as the eval profile.
+bootstrap:
+  hook: "pre-install,pre-upgrade"
+  hookWeight: "-3"
+  adminEmail: admin
+  adminPassword: terrapod
+  poolName: ha-b-pool
+  poolToken: "ha-smoke-join-token-b-not-for-real-use"
 
 api:
   replicas: 1
@@ -54,6 +94,14 @@ api:
       # arrive is the object-store half of the exercise (#1114).
       filesystem:
         base_url: "http://terrapod-b-api:8000"
+    # The pair re-joins its fleets repeatedly — every table run flips roles at
+    # least twice, and the shared-fleet row deliberately forces a re-join. Two
+    # uses (the shipped default) is right for a real install bootstrapping once;
+    # here it would exhaust on the second run and report a fleet failure that is
+    # really a rig artefact.
+    agent_pools:
+      default_join_token_max_uses: 200
+      default_join_token_ttl_seconds: 604800
     ha:
       role: follower
       node_name: node-b

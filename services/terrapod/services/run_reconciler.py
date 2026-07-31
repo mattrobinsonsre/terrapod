@@ -411,6 +411,44 @@ async def _handle_failed(db: AsyncSession, run: Run, error_message: str) -> None
     logger.info("Run errored", run_id=str(run.id), reason=error_message)
 
 
+async def _reap_abandoned_job(run: Run) -> None:
+    """Delete the Job of a run the reconciler is abandoning (#1198).
+
+    Only for the paths where the Job is **not** terminal — a pod that never
+    scheduled, or a Job we have stopped waiting on. Those keep counting toward
+    `count_active_runner_jobs`, which is what the listener admits work against,
+    so a Job left behind here holds a capacity slot for the rest of the
+    listener's life: at the shipped `maxConcurrent: 3`, three of them and the
+    pool never claims again. Nothing reaps them on its own either —
+    `ttlSecondsAfterFinished` only applies to a Job that finished, and one whose
+    pod never ran never does.
+
+    Not called from the ordinary failed-Job path. That Job is terminal, so it
+    occupies nothing, the TTL controller collects it on schedule, and leaving it
+    lets an operator `kubectl describe` it while the failure is still fresh.
+
+    Reuses the cancel path rather than adding machinery: the listener already
+    deletes the Job on `cancel_job`, and doing it twice is harmless. (That is
+    what made `publish_cancel_job` public — it has a second caller now, and it
+    is a cleanup primitive rather than a detail of the user-cancel flow.)
+
+    Reaping a Job that may still be mid-apply is deliberate, not an oversight.
+    The run has already been errored and its workspace unlocked by this point,
+    so the alternative is terraform continuing to mutate real infrastructure
+    with nothing watching it and a later run free to race it. Deleting the Job
+    is the same path a user-initiated cancel takes, which gives the runner its
+    termination grace period to interrupt terraform and upload state.
+    """
+    if not run.job_name:
+        return
+    from terrapod.services.run_service import publish_cancel_job
+
+    try:
+        await publish_cancel_job(run)
+    except Exception:  # never let cleanup mask the failure being reported
+        logger.warning("Could not reap the abandoned Job", run_id=str(run.id), exc_info=True)
+
+
 async def _check_unschedulable(db: AsyncSession, run: Run) -> None:
     """Fail a run whose pod has been Unschedulable past the launch grace, with
     an explicit "insufficient cluster resources" reason (#748).
@@ -436,6 +474,7 @@ async def _check_unschedulable(db: AsyncSession, run: Run) -> None:
         f"room. Reduce the request, free capacity, or add a node."
     )
     await _handle_failed(db, run, msg)
+    await _reap_abandoned_job(run)
     logger.warning(
         "Run errored: pod unschedulable past grace",
         run_id=str(run.id),
@@ -480,6 +519,7 @@ async def _check_stale(db: AsyncSession, run: Run) -> None:
             await _handle_failed(
                 db, run, f"Drift run exceeded max duration ({cfg.drift_max_duration_seconds}s)"
             )
+            await _reap_abandoned_job(run)
             logger.warning(
                 "Drift run errored: max duration exceeded",
                 run_id=str(run.id),
@@ -497,6 +537,7 @@ async def _check_stale(db: AsyncSession, run: Run) -> None:
 
     if now - phase_start > timeout:
         await _handle_failed(db, run, f"{message_prefix} — no progress for >{timeout}")
+        await _reap_abandoned_job(run)
         if run.job_name is None:
             from terrapod.api.metrics import LISTENER_PRELAUNCH_TIMEOUTS
 
