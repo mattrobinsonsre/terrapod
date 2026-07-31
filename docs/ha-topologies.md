@@ -188,26 +188,28 @@ region A: listeners ──▶ terrapod-a.example.com
 region B: listeners ──▶ terrapod-b.example.com
 ```
 
-**Choose this when** the execution clusters are themselves regional, or when the
-two sides have different network reachability or different cloud credentials.
-Nothing re-points at a cutover and no listener changes the name it talks to.
+**Choose this when** the execution clusters are themselves regional, when the
+two sides have different network reachability or different cloud credentials, or
+when you want the standby's execution path proven **before** you need it rather
+than at the failover. Nothing re-points at a cutover and no listener changes the
+name it talks to.
 
-> **A standby's fleet cannot join until that node is promoted.**
+> **A standby's fleet attaches and stays attached, before it is ever needed.**
 >
-> Enrolling a listener is a write, and a follower refuses writes — so a listener
-> pointed at a node that has never led retries indefinitely and never becomes
-> ready, which also makes `helm install --wait` fail on that node
-> ([#1191](https://github.com/mattrobinsonsre/terrapod/issues/1191)).
+> A listener does not have to know whether the node it reached currently leads
+> — it enrols, heartbeats and renews against a follower exactly as it would
+> against a leader, because all of that records state on that node alone. The
+> follower simply hands it no work, so the fleet sits attached and idle until
+> promotion, at which point it is already there.
 >
-> Practical consequence: **neither topology gives you a standby fleet proven
-> before promotion.** They differ in *how* they heal at cutover — the shared
-> fleet re-joins because its certificates stop authenticating, the per-node
-> fleet joins for the first time — not in whether.
+> This is what the dedicated topology buys over the shared one: the standby's
+> execution path is proven — the pool is joined, the certificate is valid, the
+> SSE connection is up — while the shared fleet's equivalent proof only happens
+> at the cutover, when it re-joins.
 >
-> There is currently **no workaround**. Joining as leader and then demoting does
-> not help: an already-joined listener's heartbeat is also a write, so it is
-> refused too and the listener expires from the node's Redis a few minutes
-> later. Plan for the standby's fleet to become useful at promotion, not before.
+> (Before [#1191](https://github.com/mattrobinsonsre/terrapod/issues/1191) this
+> was not true: the whole listener protocol was refused on a follower, so a
+> standby's fleet crash-looped and `helm install --wait` failed on it.)
 
 The trade is that node B's listeners sit idle while A leads (they are cheap —
 they launch Jobs, they do not run terraform), and each side's pools must be
