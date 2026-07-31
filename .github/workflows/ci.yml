@@ -33,6 +33,7 @@ jobs:
       is_tag: ${{ steps.meta.outputs.is_tag }}
       is_pr: ${{ steps.meta.outputs.is_pr }}
       version: ${{ steps.meta.outputs.version }}
+      pkg_refresh: ${{ steps.meta.outputs.pkg_refresh }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -41,6 +42,16 @@ jobs:
         run: |
           sha_short="${GITHUB_SHA::7}"
           echo "sha_short=$sha_short" >> "$GITHUB_OUTPUT"
+
+          # Busts the images' apt-upgrade layer once a day, so Debian security
+          # patches published since the last build actually land. The Dockerfiles
+          # carry a hardcoded default for local builds; leaving CI on that default
+          # meant the layer stayed cached from whenever a human last bumped it,
+          # and the upgrade silently stopped upgrading (#1177).
+          #
+          # Daily rather than per-run deliberately: $GITHUB_RUN_ID would rebuild
+          # every image on every build and throw the cache away entirely.
+          echo "pkg_refresh=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
 
           is_tag=false
           is_pr=false
@@ -1238,6 +1249,8 @@ jobs:
           push: ${{ needs.prepare.outputs.is_pr != 'true' }}
           load: ${{ needs.prepare.outputs.is_pr == 'true' }}
           tags: ${{ env.REGISTRY }}/${{ matrix.image }}:sha-${{ needs.prepare.outputs.sha_short }}-amd64
+          build-args: |
+            PKG_REFRESH=${{ needs.prepare.outputs.pkg_refresh }}
           cache-from: type=gha,scope=${{ matrix.image }}-amd64
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}-amd64
 
@@ -1313,6 +1326,8 @@ jobs:
           push: ${{ needs.prepare.outputs.is_pr != 'true' }}
           load: ${{ needs.prepare.outputs.is_pr == 'true' }}
           tags: ${{ env.REGISTRY }}/${{ matrix.image }}:sha-${{ needs.prepare.outputs.sha_short }}-arm64
+          build-args: |
+            PKG_REFRESH=${{ needs.prepare.outputs.pkg_refresh }}
           cache-from: type=gha,scope=${{ matrix.image }}-arm64
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}-arm64
 
