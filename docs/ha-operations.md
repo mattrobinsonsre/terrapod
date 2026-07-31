@@ -245,9 +245,11 @@ scripts/ha-smoke.sh down
 
 The table walks planned failover, unplanned failover, fail-back, a peer outage,
 catch-up inside retention, fallback to backfill past retention, and the follower
-refusing writes through the real API path. It reports honestly, including the
-rows it did not exercise and why — because a partial rehearsal reported as a
-full one is worse than none.
+refusing writes through the real API path, a run held in flight across a
+cutover, both listener topologies, and installing a private module from the
+promoted node. Every row prints a verdict, and a row that cannot run says so
+rather than quietly not appearing — a partial rehearsal reported as a full one
+is worse than none.
 
 ## Related
 

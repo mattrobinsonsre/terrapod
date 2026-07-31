@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """The #960 release-gate table, run against the live two-node pair.
 
-`ha-smoke.sh up` builds the pair; this walks the fourteen scenarios #960 names
-as the gate for any release touching HA, and prints an honest result for each —
-including the rows it did not exercise and why. A partial run reported as a full
-one is the failure this script exists to prevent, so every row prints a verdict:
-PASS, FAIL, or SKIP with a reason.
+`ha-smoke.sh up` builds the pair; this walks the scenarios #960 names as the
+gate for any release touching HA, and prints a verdict for each: PASS, FAIL, or
+SKIP with a reason. Every row is exercised as of #1200 — the SKIP path stays
+because a partial run reported as a full one is the failure this script exists
+to prevent, and a row that cannot run should say so rather than quietly not
+appear.
 
-Run:  scripts/ha-smoke.sh table
+Run:  scripts/ha-smoke.sh table        every row
+      scripts/ha-smoke.sh table 10     one row, while working on it
 """
 
 from __future__ import annotations
@@ -605,6 +607,161 @@ print('USES', tok.use_count if tok else -1)
            + f", token use_count {uses_before}→{uses_after}")
 
 
+_PUBLIC_HOST = "terrapod.example.com"
+_MODULE_HCL = 'output "ok" {\n  value = "from the registry"\n}\n'
+_MODULE = ("default", "hagate", "null")
+
+
+def _publish_module(ns: str, version: str = "1.0.0") -> bool:
+    """Publish a tiny module version on this node: rows plus tarball."""
+    namespace, name, provider = _MODULE
+    out = run(ns, f"""
+import io, tarfile
+from terrapod.storage import init_storage, get_storage
+from terrapod.storage.keys import module_tarball_key
+await init_storage()
+mod = await db.scalar(select(m.RegistryModule).where(
+    m.RegistryModule.namespace == '{namespace}', m.RegistryModule.name == '{name}',
+    m.RegistryModule.provider == '{provider}'))
+if mod is None:
+    mod = m.RegistryModule(namespace='{namespace}', name='{name}', provider='{provider}',
+                           status='active', owner_email='admin')
+    db.add(mod)
+    await db.flush()
+ver = await db.scalar(select(m.RegistryModuleVersion).where(
+    m.RegistryModuleVersion.module_id == mod.id,
+    m.RegistryModuleVersion.version == '{version}'))
+if ver is None:
+    ver = m.RegistryModuleVersion(module_id=mod.id, version='{version}')
+    db.add(ver)
+    await db.flush()
+# A module with no resources and no providers: what is being tested is that the
+# runner can RESOLVE and FETCH it, not what it declares.
+buf = io.BytesIO()
+with tarfile.open(fileobj=buf, mode='w:gz') as tf:
+    body = {_MODULE_HCL!r}.encode()
+    info = tarfile.TarInfo('main.tf'); info.size = len(body)
+    tf.addfile(info, io.BytesIO(body))
+await get_storage().put(
+    module_tarball_key('{namespace}', '{name}', '{provider}', '{version}'), buf.getvalue())
+ver.upload_status = 'uploaded'
+await db.commit()
+print('PUBLISHED', mod.id)
+""", check=False)
+    return "PUBLISHED" in out
+
+
+def row_13_install_from_promoted(stamp: str) -> None:
+    """Install a private module FROM the promoted node, not merely find its rows.
+
+    #1114 proves the registry rows and their blobs arrive. That is the half a
+    replication test can see. The half an operator cares about is whether a
+    client can then install from it — a registry whose rows replicated but whose
+    downloads 404 passes every other row in this table.
+
+    Driven through a real run rather than a local `tofu init`, because
+    terraform's registry discovery is HTTPS-only with no plaintext fallback and
+    the pair has no ingress and no certificate. The runner writes a CLI-config
+    `host{}` block redirecting the public hostname's discovery to its own
+    plaintext internal API, which is exactly the mechanism a split-networking
+    deployment relies on — so going through the platform tests a real shape
+    rather than a test-only one.
+    """
+    reset_roles()
+    namespace, name, provider = _MODULE
+    if not _publish_module(NS_A):
+        record("13", "terraform init against a private module on the promoted node",
+               "FAIL", "could not publish the module on node A")
+        return
+
+    replicated = poll(NS_B, f"""
+mod = await db.scalar(select(m.RegistryModule).where(m.RegistryModule.name == '{name}'))
+if mod is None:
+    print('no')
+else:
+    v = await db.scalar(select(m.RegistryModuleVersion).where(
+        m.RegistryModuleVersion.module_id == mod.id,
+        m.RegistryModuleVersion.upload_status == 'uploaded'))
+    print('OK' if v else 'no')
+""", tries=30)
+    if not replicated:
+        record("13", "terraform init against a private module on the promoted node",
+               "FAIL", "the module never replicated to B, so the install could not be attempted")
+        return
+
+    # Promote B and consume the module from it. The blob has to be there too —
+    # rows alone would resolve the version and then 404 the download, which is
+    # the failure this row exists to catch.
+    set_role(NS_B, "leader")
+    ws = f"ha-modinstall-{stamp}"
+    hcl = (
+        f'module "m" {{\n'
+        f'  source  = "{_PUBLIC_HOST}/{namespace}/{name}/{provider}"\n'
+        f'  version = "1.0.0"\n'
+        f'}}\n'
+    )
+    started = run(NS_B, f"""
+import io, tarfile
+from terrapod.storage import init_storage, get_storage
+from terrapod.storage.keys import config_version_key
+await init_storage()
+pools = [str(p.id) for p in (await db.execute(select(m.AgentPool))).scalars().all()]
+ws = m.Workspace(name='{ws}', execution_mode='agent')
+pool_set.set_workspace_pools(ws, pools)
+db.add(ws)
+await db.flush()
+cv = m.ConfigurationVersion(workspace_id=ws.id, source='tfe-api', status='pending')
+db.add(cv)
+await db.flush()
+buf = io.BytesIO()
+with tarfile.open(fileobj=buf, mode='w:gz') as tf:
+    body = {hcl!r}.encode()
+    info = tarfile.TarInfo('main.tf'); info.size = len(body)
+    tf.addfile(info, io.BytesIO(body))
+await get_storage().put(config_version_key(str(ws.id), str(cv.id)), buf.getvalue())
+cv.status = 'uploaded'
+run_row = await run_service.create_run(db, ws, message='row 13',
+                                       configuration_version_id=cv.id, plan_only=True)
+await run_service.queue_run(db, run_row)
+await db.commit()
+print('QUEUED', run_row.id)
+""", check=False)
+    if "QUEUED" not in started:
+        record("13", "terraform init against a private module on the promoted node",
+               "FAIL", "could not queue the run on the promoted node")
+        return
+
+    settled = poll(NS_B, f"""
+row = await db.scalar(select(m.Run).join(m.Workspace)
+                      .where(m.Workspace.name == '{ws}')
+                      .order_by(m.Run.created_at.desc()).limit(1))
+print('OK' if row is not None and row.status in ('planned', 'errored') else 'no')
+""", tries=40, delay=6.0)
+
+    verdict = run(NS_B, f"""
+row = await db.scalar(select(m.Run).join(m.Workspace)
+                      .where(m.Workspace.name == '{ws}')
+                      .order_by(m.Run.created_at.desc()).limit(1))
+print('VERDICT', json.dumps({{'status': row.status if row else 'missing',
+                             'error': (row.error_message or '')[:200] if row else ''}}))
+""", check=False)
+    try:
+        state = json.loads(verdict.split("VERDICT ")[-1].splitlines()[0])
+    except (ValueError, IndexError):
+        state = {"status": "unknown", "error": ""}
+
+    # `planned` is the assertion. A plan cannot complete without init having
+    # resolved and downloaded the module from this node's registry, so reaching
+    # it proves the install; anything else is reported with the run's own error
+    # rather than guessed at.
+    ok = settled and state["status"] == "planned"
+    record("13", "terraform init against a private module on the promoted node",
+           "PASS" if ok else "FAIL",
+           f"run {state['status']} on the promoted node"
+           + (f" — {state['error']}" if state["error"] else "")
+           + ("" if settled else " (never reached a terminal state)"))
+
+
 # Every row, in the order the table runs them. Named so a single row can be
 # re-run while it is being worked on — a full pass takes the better part of an
 # hour, which is far too slow a loop to develop a row against.
@@ -625,12 +782,13 @@ ROWS: dict[str, object] = {
     # wiring, and because they are the slowest rows by a wide margin.
     "9": row_9_cutover_midrun,
     "10": row_10_listener_topologies,
+    "13": row_13_install_from_promoted,
 }
 
 
 def main() -> int:
     wanted = [a for a in sys.argv[1:] if not a.startswith("-")]
-    unknown = [w for w in wanted if w not in ROWS and w != "13"]
+    unknown = [w for w in wanted if w not in ROWS]
     if unknown:
         print(f"unknown row(s): {', '.join(unknown)}; known: {', '.join(ROWS)}")
         return 2
@@ -658,22 +816,6 @@ def main() -> int:
         # completely misleading — the cause is two rows earlier and in a
         # different invocation.
         reset_roles()
-
-    if not wanted or "13" in wanted:
-        # Recorded, not silently omitted. The data half is already proven — the
-        # registry rows and their blobs are confirmed present on the promoted
-        # node (#1114) — so what is missing is a client actually installing from
-        # it. Terraform's registry discovery is HTTPS-only with no plaintext
-        # fallback, and the pair runs with `ingress.enabled: false` and no
-        # certificate, so an `init` from outside the cluster has nothing to
-        # connect to. The route in is a real run on the promoted node whose
-        # configuration sources the private module: the runner writes a
-        # CLI-config `host` block redirecting the public hostname to its
-        # plaintext internal API, which is precisely the mechanism that makes
-        # this work in a split or HTTP-internal deployment.
-        record("13", "terraform init against a private module and provider on B", "SKIP",
-               "needs a config-version tarball on B and a runner that can fetch a "
-               "terraform binary; the rows and blobs themselves are verified (#1114)")
 
     failed = [r for r in results if r[2] == "FAIL"]
     skipped = [r for r in results if r[2] == "SKIP"]
