@@ -104,7 +104,14 @@ The rehearsed path. Everything here is checkable before you touch DNS.
    which is what stops an empty `irreplaceable-missing` being mistaken for a
    verified store. *Rows without blobs is the failure that looks like success.*
 3. **Quiesce the outgoing node** — set `ha.role: follower` on it and roll it. It
-   stops originating writes and stops all scheduled work.
+   stops originating writes, stops all scheduled work, and **retires its
+   in-flight runs**: anything mid-plan or mid-apply ends `errored`, naming the
+   role change as the reason. That last part matters more than it sounds. A run
+   left sitting in `planning` would hold its workspace at the per-workspace
+   serialization gate, and no operator could clear it — `workspace.locked` is
+   untouched, so there is nothing to unlock; the block is the row itself.
+   Retiring them means the workspace is usable on the incoming node straight
+   away, and re-queueing is the recovery.
 4. **Confirm it has stood down.** Its own `/ha` page reports its role. A write
    against it now returns 503.
 5. **Move the shared names** — internal, external, and webhook.
@@ -137,6 +144,11 @@ The same, minus the step you cannot take.
 gone — its Job was launched from a cluster the new leader does not drive. The
 run's workspace is not corrupted, and re-queueing is the recovery. Anything that
 had already reached a terminal state is safe.
+
+There was no chance to quiesce, so those runs are still sitting on the node that
+vanished. It resolves them itself the moment it comes back: a node that starts
+in a different role from the one it last held retires them before it does
+anything else, so it never carries a previous era's work into a new one.
 
 **What you also lose: replication lag.** Writes the leader accepted but had not
 yet been pulled are not on the survivor. This is the honest cost of asynchronous
