@@ -47,6 +47,14 @@ web:
 # Service the harness creates.
 listener:
   enabled: true
+  # The shared external name, identical on both nodes — it is the name
+  # that moves at a cutover, so it cannot be per-node. Nothing resolves it
+  # in this rig and nothing needs to: its only job here is to differ from
+  # the in-cluster API URL, which is what makes the runner write the
+  # registry `host{}` redirect. That redirect is how a private module
+  # resolves in a split-networking deployment, and row 13 is the test of
+  # it, so the pair has to be in that shape to exercise it at all.
+  publicApiUrl: "https://terrapod.example.com"
   # Same single-node deadlock the API notes below: the default required
   # anti-affinity stops a rolling update replacing the listener, because the
   # new pod cannot schedule until the old one goes and the old one waits for
