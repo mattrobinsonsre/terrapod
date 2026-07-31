@@ -37,8 +37,41 @@ ingress:
 
 web:
   enabled: false
+# A real execution fleet on each node. Without it the pair can prove that
+# settings and artifacts replicate, but not that a RUN survives a cutover —
+# which is the part of the gate a two-API-node pair could not reach (#1188).
+#
+# Per-node fleets: each listener points at its OWN node, so nothing crosses the
+# boundary and each side's capacity is exercised while that side leads. The
+# shared-fleet topology is exercised separately by re-pointing at the shared
+# Service the harness creates.
 listener:
-  enabled: false
+  enabled: true
+  name: ha-a-listener
+  joinToken: "ha-smoke-join-token-a-not-for-real-use"
+  image:
+    # Built locally by the harness; never pulled.
+    repository: terrapod-listener
+    tag: local
+    pullPolicy: Never
+
+runners:
+  image:
+    # Built by `tilt trigger build-runner-image`; never pulled.
+    repository: terrapod-runner
+    tag: local
+    pullPolicy: Never
+
+# Pre-install so the pool exists before the listener rolls out — otherwise
+# `helm --wait` deadlocks on a listener whose readiness gates on joining a pool
+# that does not exist yet. Same reasoning as the eval profile.
+bootstrap:
+  hook: "pre-install,pre-upgrade"
+  hookWeight: "-3"
+  adminEmail: admin
+  adminPassword: terrapod
+  poolName: ha-a-pool
+  poolToken: "ha-smoke-join-token-a-not-for-real-use"
 
 api:
   replicas: 1
