@@ -715,6 +715,40 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: No third-party image is pulled straight from Docker Hub
+        run: |
+          # The first pass at the mirror MISSED e2e/docker-compose.e2e.yml, which
+          # duly failed a docs-only PR an hour later on a postgres pull. Grepping
+          # for the shape is cheaper than remembering (#1186).
+          #
+          # The rule is OVERRIDABLE, not mirrored: every call site keeps its
+          # Docker Hub reference as the default so a local run is unaffected and
+          # needs no access to our packages. Only CI sets the override.
+          third_party='postgres|redis|localstack/localstack|node|python|alpine/helm|semgrep/semgrep|aquasec/trivy|registry|moby/buildkit'
+          files=$(git ls-files 'docker-compose*.yml' '*/docker-compose*.yml')
+          if [ -z "$files" ]; then echo "no compose files found — the guard is not looking anywhere"; exit 1; fi
+          echo "checking: $files"
+          bad=$(grep -HnE "^[[:space:]]*image:[[:space:]]*($third_party)[:@]" $files || true)
+          if [ -n "$bad" ]; then
+            echo "These pull straight from Docker Hub, whose anonymous rate limit"
+            echo "turns unrelated PRs red:"
+            echo "$bad"
+            echo
+            echo 'Wrap as ${VAR:-upstream-ref} and add VAR to the env block in'
+            echo "ci.yml. See .github/mirror-images.txt."
+            exit 1
+          fi
+          # And every mirror image ci.yml names must actually be on the list, or
+          # the copy never happens and CI asks GHCR for something absent.
+          listed=$(grep -vE '^\s*(#|$)' .github/mirror-images.txt | sed 's|/|-|g; s|:.*||' | sort -u)
+          used=$(grep -oE 'ghcr\.io/[^/]+/mirror/[a-z0-9-]+:' .github/workflows/ci.yml \
+                 | sed 's|.*/mirror/||; s|:$||' | sort -u)
+          missing=$(comm -13 <(echo "$listed") <(echo "$used"))
+          if [ -n "$missing" ]; then
+            echo "ci.yml points at mirror images not in the list: $missing"; exit 1
+          fi
+          echo "all third-party images are overridable, and every mirror ref is listed"
+
       - name: Two installs in one cluster cannot collide on a cluster-scoped name
         run: |
           # Terrapod is single-organization, so separating business units means
