@@ -19,6 +19,25 @@ concurrency:
 env:
   REGISTRY: ghcr.io/mattrobinsonsre
 
+  # Third-party images, pulled from our GHCR mirror rather than Docker Hub,
+  # whose anonymous pull limit is shared across GitHub runners and turned four
+  # unrelated PRs red in one morning (#1186). Every consuming script and
+  # Dockerfile keeps its Docker Hub reference as the default, so a local build
+  # is unaffected and needs no access to these packages; only CI overrides.
+  # Refreshed by .github/workflows/mirror-images.yml from .github/mirror-images.txt.
+  MIRROR: ghcr.io/mattrobinsonsre/mirror
+  PYTHON_BASE_IMAGE: ghcr.io/mattrobinsonsre/mirror/python:3.13-slim
+  NODE_BASE_IMAGE: ghcr.io/mattrobinsonsre/mirror/node:26-alpine
+  NODE_IMAGE: ghcr.io/mattrobinsonsre/mirror/node:24-alpine
+  POSTGRES_IMAGE: ghcr.io/mattrobinsonsre/mirror/postgres:16-alpine
+  REDIS_IMAGE: ghcr.io/mattrobinsonsre/mirror/redis:7-alpine
+  LOCALSTACK_IMAGE: ghcr.io/mattrobinsonsre/mirror/localstack-localstack:4
+  HELM_IMAGE: ghcr.io/mattrobinsonsre/mirror/alpine-helm:3.17.2
+  PY_IMAGE: ghcr.io/mattrobinsonsre/mirror/python:3.13-slim
+  SEMGREP_IMAGE: ghcr.io/mattrobinsonsre/mirror/semgrep-semgrep:1.117
+  BUILDKIT_IMAGE: ghcr.io/mattrobinsonsre/mirror/moby-buildkit:buildx-stable-1
+  K3D_REGISTRY_IMAGE: ghcr.io/mattrobinsonsre/mirror/registry:2
+
 jobs:
   # ── Prepare ────────────────────────────────────────────
   prepare:
@@ -109,7 +128,10 @@ jobs:
     needs: prepare
     if: needs.prepare.outputs.images_exist != 'true'
     runs-on: ubuntu-latest
-    container: node:24-alpine
+    # Literal, not ${{ env.* }}: the env context is NOT available in a job's
+    # `container:` or in `services:` — using it there makes the whole workflow
+    # invalid, which GitHub reports as NO checks rather than a failing one.
+    container: ghcr.io/mattrobinsonsre/mirror/node:24-alpine
     defaults:
       run:
         working-directory: web
@@ -497,7 +519,8 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:16-alpine
+        # Literal for the same reason as `container:` above.
+        image: ghcr.io/mattrobinsonsre/mirror/postgres:16-alpine
         env:
           POSTGRES_USER: terrapod
           POSTGRES_PASSWORD: terrapod
@@ -527,7 +550,10 @@ jobs:
     needs: prepare
     if: needs.prepare.outputs.images_exist != 'true'
     runs-on: ubuntu-latest
-    container: python:3.13-slim
+    # Literal, not ${{ env.* }}: the env context is NOT available in a job's
+    # `container:` or in `services:` — using it there makes the whole workflow
+    # invalid, which GitHub reports as NO checks rather than a failing one.
+    container: ghcr.io/mattrobinsonsre/mirror/python:3.13-slim
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Install Poetry and export plugin
@@ -552,7 +578,10 @@ jobs:
     needs: prepare
     if: needs.prepare.outputs.images_exist != 'true'
     runs-on: ubuntu-latest
-    container: node:24-alpine
+    # Literal, not ${{ env.* }}: the env context is NOT available in a job's
+    # `container:` or in `services:` — using it there makes the whole workflow
+    # invalid, which GitHub reports as NO checks rather than a failing one.
+    container: ghcr.io/mattrobinsonsre/mirror/node:24-alpine
     defaults:
       run:
         working-directory: web
@@ -666,12 +695,12 @@ jobs:
       - name: Helm lint (default values)
         run: |
           docker run --rm -v "$PWD:/chart" -w /chart \
-            alpine/helm:3.17.2 \
+            "${HELM_IMAGE:-alpine/helm:3.17.2}" \
             lint helm/terrapod --values helm/terrapod/values.yaml
       - name: Helm lint (local dev values)
         run: |
           docker run --rm -v "$PWD:/chart" -w /chart \
-            alpine/helm:3.17.2 \
+            "${HELM_IMAGE:-alpine/helm:3.17.2}" \
             lint helm/terrapod --values helm/terrapod/values.yaml --values helm/terrapod/values-local.yaml
 
   # ── Helm Smoke (render assertions) ─────────────────────
@@ -694,7 +723,7 @@ jobs:
           # it, so the SAME release name in two namespaces must still render
           # distinct names, or one install silently breaks the other (#1181).
           render() {
-            docker run --rm -v "$PWD:/chart" -w /chart alpine/helm:3.17.2 \
+            docker run --rm -v "$PWD:/chart" -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \
               template terrapod helm/terrapod --namespace "$1" \
               --set postgresql.url=postgresql+asyncpg://t:t@db:5432/terrapod \
               --set redis.url=redis://redis:6379 \
@@ -714,7 +743,7 @@ jobs:
 
       - name: Stock install renders a working stack (web + Ingress + bootstrap)
         run: |
-          out=$(docker run --rm -v "$PWD:/chart" -w /chart alpine/helm:3.17.2 \
+          out=$(docker run --rm -v "$PWD:/chart" -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \
             template terrapod helm/terrapod \
               --namespace terrapod \
               --set ingress.enabled=true \
@@ -736,7 +765,7 @@ jobs:
           echo "Stock install renders web + Ingress + bootstrap + hooks_enabled OK"
       - name: Local dev values render
         run: |
-          out=$(docker run --rm -v "$PWD:/chart" -w /chart alpine/helm:3.17.2 \
+          out=$(docker run --rm -v "$PWD:/chart" -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \
             template terrapod helm/terrapod \
               --values helm/terrapod/values.yaml \
               --values helm/terrapod/values-local.yaml)
@@ -807,7 +836,7 @@ jobs:
           echo "values-local renders OK (incl. Slack config + secretKeyRef)"
       - name: Declining the node read is supported (#1128)
         run: |
-          out=$(docker run --rm -v "$PWD:/chart" -w /chart alpine/helm:3.17.2 \
+          out=$(docker run --rm -v "$PWD:/chart" -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \
             template terrapod helm/terrapod \
               --values helm/terrapod/values.yaml \
               --values helm/terrapod/values-local.yaml \
@@ -819,7 +848,7 @@ jobs:
           echo "read_nodes opt-out renders OK"
       - name: Per-class object-store policy renders, and a typo is refused (#1151)
         run: |
-          out=$(docker run --rm -v "$PWD:/chart" -w /chart alpine/helm:3.17.2 \
+          out=$(docker run --rm -v "$PWD:/chart" -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \
             template terrapod helm/terrapod \
               --values helm/terrapod/values.yaml \
               --set api.config.ha.blobs.classes.state=copy \
@@ -836,7 +865,7 @@ jobs:
           # operator believes they configured, silently on the default. The
           # schema refuses it here; HABlobsConfig refuses it again at startup for
           # the paths the chart never sees.
-          if docker run --rm -v "$PWD:/chart" -w /chart alpine/helm:3.17.2 \
+          if docker run --rm -v "$PWD:/chart" -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \
                template terrapod helm/terrapod \
                  --values helm/terrapod/values.yaml \
                  --set api.config.ha.blobs.classes.stat=copy >/dev/null 2>&1; then
@@ -845,7 +874,7 @@ jobs:
           echo "per-class blob policy renders OK, unknown class refused"
       - name: Eval values render (embedded Postgres/Redis)
         run: |
-          out=$(docker run --rm -v "$PWD:/chart" -w /chart alpine/helm:3.17.2 \
+          out=$(docker run --rm -v "$PWD:/chart" -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \
             template terrapod helm/terrapod \
               --values helm/terrapod/values-eval.yaml)
           echo "$out" | grep -q "component: postgresql" || { echo "FAIL: values-eval did not render embedded Postgres"; exit 1; }
@@ -854,7 +883,7 @@ jobs:
           echo "values-eval renders embedded datastores OK"
       - name: Forward proxy + custom CA bundle render (#592)
         run: |
-          out=$(docker run --rm -v "$PWD:/chart" -w /chart alpine/helm:3.17.2 \
+          out=$(docker run --rm -v "$PWD:/chart" -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \
             template terrapod helm/terrapod \
               --set postgresql.url=postgresql+asyncpg://t:t@db:5432/terrapod \
               --set redis.url=redis://redis:6379 \
@@ -886,7 +915,7 @@ jobs:
           for f in helm/terrapod/dashboards/*.json; do
             jq -e . "$f" > /dev/null || { echo "FAIL: invalid dashboard JSON: $f"; exit 1; }
           done
-          out=$(docker run --rm -v "$PWD:/chart" -w /chart alpine/helm:3.17.2 \
+          out=$(docker run --rm -v "$PWD:/chart" -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \
             template terrapod helm/terrapod \
               --set postgresql.url=postgresql+asyncpg://t:t@db:5432/terrapod \
               --set redis.url=redis://redis:6379 \
@@ -898,7 +927,7 @@ jobs:
           echo "$out" | grep -q "grafana_dashboard:" || { echo "FAIL: Grafana dashboard sidecar label missing"; exit 1; }
           echo "$out" | grep -q "terrapod-overview.json:" || { echo "FAIL: dashboard ConfigMap key missing"; exit 1; }
           # Off by default: a stock render emits neither.
-          stock=$(docker run --rm -v "$PWD:/chart" -w /chart alpine/helm:3.17.2 \
+          stock=$(docker run --rm -v "$PWD:/chart" -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \
             template terrapod helm/terrapod \
               --set postgresql.url=postgresql+asyncpg://t:t@db:5432/terrapod \
               --set redis.url=redis://redis:6379)
@@ -906,7 +935,7 @@ jobs:
           echo "observability bundle renders OK and is off by default (#546)"
       - name: Backup + DR-drill CronJobs render and are off by default (#545)
         run: |
-          out=$(docker run --rm -v "$PWD:/chart" -w /chart alpine/helm:3.17.2 \
+          out=$(docker run --rm -v "$PWD:/chart" -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \
             template terrapod helm/terrapod \
               --set postgresql.url=postgresql+asyncpg://t:t@db:5432/terrapod \
               --set redis.url=redis://redis:6379 \
@@ -920,7 +949,7 @@ jobs:
           # config.yaml carries the backup settings (config-channel contract).
           echo "$out" | grep -q "retention_keep:" || { echo "FAIL: backup config not rendered into config.yaml"; exit 1; }
           # Off by default.
-          stock=$(docker run --rm -v "$PWD:/chart" -w /chart alpine/helm:3.17.2 \
+          stock=$(docker run --rm -v "$PWD:/chart" -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \
             template terrapod helm/terrapod \
               --set postgresql.url=postgresql+asyncpg://t:t@db:5432/terrapod \
               --set redis.url=redis://redis:6379)
@@ -928,7 +957,7 @@ jobs:
           echo "backup + DR-drill CronJobs render OK and are off by default (#545)"
       - name: Preflight identity-doctor Jobs render and are off by default (#571)
         run: |
-          out=$(docker run --rm -v "$PWD:/chart" -w /chart alpine/helm:3.17.2 \
+          out=$(docker run --rm -v "$PWD:/chart" -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \
             template terrapod helm/terrapod \
               --set postgresql.url=postgresql+asyncpg://t:t@db:5432/terrapod \
               --set redis.url=redis://redis:6379 \
@@ -939,7 +968,7 @@ jobs:
           echo "$out" | grep -q "preflight-runner" || { echo "FAIL: runner-SA preflight Job missing (s3 backend)"; exit 1; }
           echo "$out" | grep -q 'helm.sh/hook' || { echo "FAIL: preflight not a Helm hook"; exit 1; }
           # Off by default.
-          stock=$(docker run --rm -v "$PWD:/chart" -w /chart alpine/helm:3.17.2 \
+          stock=$(docker run --rm -v "$PWD:/chart" -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \
             template terrapod helm/terrapod \
               --set postgresql.url=postgresql+asyncpg://t:t@db:5432/terrapod \
               --set redis.url=redis://redis:6379)
@@ -947,7 +976,7 @@ jobs:
           echo "preflight Jobs render OK and are off by default (#571)"
       - name: Encryption-at-rest config + secret wiring (#553)
         run: |
-          out=$(docker run --rm -v "$PWD:/chart" -w /chart alpine/helm:3.17.2 \
+          out=$(docker run --rm -v "$PWD:/chart" -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \
             template terrapod helm/terrapod \
               --set postgresql.url=postgresql+asyncpg://t:t@db:5432/terrapod \
               --set redis.url=redis://redis:6379 \
@@ -959,7 +988,7 @@ jobs:
           # Secret values never rendered into a ConfigMap.
           echo "$out" | awk '/kind: ConfigMap/,/^---/' | grep -q "static_key\|vault_token" && { echo "FAIL: secret key leaked into ConfigMap"; exit 1; }
           # Off by default — no encryption block enabled.
-          stock=$(docker run --rm -v "$PWD:/chart" -w /chart alpine/helm:3.17.2 \
+          stock=$(docker run --rm -v "$PWD:/chart" -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \
             template terrapod helm/terrapod \
               --set postgresql.url=postgresql+asyncpg://t:t@db:5432/terrapod \
               --set redis.url=redis://redis:6379)
@@ -967,7 +996,7 @@ jobs:
           echo "encryption-at-rest config + secret wiring OK and off by default (#553)"
       - name: Control-plane PriorityClasses render and are off by default (#751)
         run: |
-          out=$(docker run --rm -v "$PWD:/chart" -w /chart alpine/helm:3.17.2 \
+          out=$(docker run --rm -v "$PWD:/chart" -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \
             template terrapod helm/terrapod \
               --set postgresql.url=postgresql+asyncpg://t:t@db:5432/terrapod \
               --set redis.url=redis://redis:6379 \
@@ -981,7 +1010,7 @@ jobs:
           # runner config carries the runner class (config-channel contract).
           echo "$out" | grep -q 'priority_class_name: "terrapod-runner"' || { echo "FAIL: runner priority_class_name not rendered"; exit 1; }
           # Off by default — no PriorityClass object, no priorityClassName default.
-          stock=$(docker run --rm -v "$PWD:/chart" -w /chart alpine/helm:3.17.2 \
+          stock=$(docker run --rm -v "$PWD:/chart" -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \
             template terrapod helm/terrapod \
               --set postgresql.url=postgresql+asyncpg://t:t@db:5432/terrapod \
               --set redis.url=redis://redis:6379)
@@ -1094,7 +1123,8 @@ jobs:
             # registry pull is deterministic and works identically on PR + branch
             # builds. #975.
             reg_port=5111
-            k3d registry create eval-registry.localhost --port "$reg_port"
+            k3d registry create eval-registry.localhost --port "$reg_port" \
+              --image "${K3D_REGISTRY_IMAGE}"
             k3d cluster create terrapod-eval \
               --registry-use "k3d-eval-registry.localhost:${reg_port}" \
               --wait --timeout 120s
@@ -1181,7 +1211,7 @@ jobs:
         run: |
           docker run --rm \
             -v "$PWD:/src" \
-            semgrep/semgrep:1.117 \
+            "${SEMGREP_IMAGE:-semgrep/semgrep:1.117}" \
             semgrep scan /src \
               --config "p/python" \
               --config "p/owasp-top-ten" \
@@ -1242,6 +1272,8 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4
+        with:
+          driver-opts: image=${{ env.BUILDKIT_IMAGE }}
 
       - name: Log in to GHCR
         uses: ./.github/actions/ghcr-login
@@ -1277,6 +1309,7 @@ jobs:
           tags: ${{ env.REGISTRY }}/${{ matrix.image }}:sha-${{ needs.prepare.outputs.sha_short }}-amd64
           build-args: |
             PKG_REFRESH=${{ needs.prepare.outputs.pkg_refresh }}
+            BASE_IMAGE=${{ matrix.image == 'terrapod-web' && env.NODE_BASE_IMAGE || env.PYTHON_BASE_IMAGE }}
           cache-from: type=gha,scope=${{ matrix.image }}-amd64
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}-amd64
 
@@ -1322,6 +1355,8 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4
+        with:
+          driver-opts: image=${{ env.BUILDKIT_IMAGE }}
 
       - name: Log in to GHCR
         uses: ./.github/actions/ghcr-login
@@ -1354,6 +1389,7 @@ jobs:
           tags: ${{ env.REGISTRY }}/${{ matrix.image }}:sha-${{ needs.prepare.outputs.sha_short }}-arm64
           build-args: |
             PKG_REFRESH=${{ needs.prepare.outputs.pkg_refresh }}
+            BASE_IMAGE=${{ matrix.image == 'terrapod-web' && env.NODE_BASE_IMAGE || env.PYTHON_BASE_IMAGE }}
           cache-from: type=gha,scope=${{ matrix.image }}-arm64
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}-arm64
 

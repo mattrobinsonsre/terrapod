@@ -4,7 +4,7 @@
 
 services:
   localstack:
-    image: localstack/localstack:4
+    image: ${LOCALSTACK_IMAGE:-localstack/localstack:4}
     environment:
       SERVICES: s3
       DEFAULT_REGION: us-east-1
@@ -16,7 +16,7 @@ services:
       start_period: 10s
 
   postgres:
-    image: postgres:16-alpine
+    image: ${POSTGRES_IMAGE:-postgres:16-alpine}
     environment:
       POSTGRES_USER: terrapod
       POSTGRES_PASSWORD: terrapod
@@ -28,7 +28,7 @@ services:
       retries: 10
 
   redis:
-    image: redis:7-alpine
+    image: ${REDIS_IMAGE:-redis:7-alpine}
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 3s

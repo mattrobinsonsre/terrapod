@@ -2,7 +2,12 @@
 # Minimal image for Alembic database migrations.
 # Only includes SQLAlchemy, asyncpg, and alembic.
 
-FROM python:3.13-slim AS builder
+# Base image, overridable so CI can pull it from our GHCR mirror instead of
+# Docker Hub, whose anonymous pull limit is shared across GitHub runners and
+# turns unrelated PRs red (#1186). The default is the upstream reference, so a
+# local build needs no mirror access and behaves exactly as before.
+ARG BASE_IMAGE=python:3.13-slim
+FROM ${BASE_IMAGE} AS builder
 
 RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
     pkg-config \
@@ -15,7 +20,7 @@ COPY services/pyproject-migrations.toml pyproject.toml
 RUN pip install --no-cache-dir .
 
 # ── Runtime stage ─────────────────────────────────────────────────────────────
-FROM python:3.13-slim
+FROM ${BASE_IMAGE}
 LABEL org.opencontainers.image.source=https://github.com/mattrobinsonsre/terrapod
 
 # see Dockerfile.api. No new packages installed — just upgrades.

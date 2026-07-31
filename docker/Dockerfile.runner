@@ -20,7 +20,12 @@
 # Two jobs: install the runner Python deps, AND download+verify OPA. OPA
 # lives in the builder so the runtime image stays free of curl; the
 # binary is COPY'd into the runtime stage below.
-FROM python:3.13-slim AS builder
+# Base image, overridable so CI can pull it from our GHCR mirror instead of
+# Docker Hub, whose anonymous pull limit is shared across GitHub runners and
+# turns unrelated PRs red (#1186). The default is the upstream reference, so a
+# local build needs no mirror access and behaves exactly as before.
+ARG BASE_IMAGE=python:3.13-slim
+FROM ${BASE_IMAGE} AS builder
 
 # curl + ca-certificates for the OPA download — present only in the
 # builder image, not the runtime.
@@ -74,7 +79,7 @@ COPY services/pyproject-runner.toml pyproject.toml
 RUN pip install --no-cache-dir .
 
 # ── Runtime ────────────────────────────────────────────────────────────
-FROM python:3.13-slim
+FROM ${BASE_IMAGE}
 LABEL org.opencontainers.image.source=https://github.com/mattrobinsonsre/terrapod
 
 # The distro publishes security patches continuously, but this layer caches: an
