@@ -7,7 +7,7 @@
 #   <fixture>/.git                      — initialised + a fake origin URL
 #
 # After `terraform apply` is run in <fixture>/example, the state lives
-# in minio (s3://tfstate/example/terraform.tfstate) and the migrator
+# in LocalStack (s3://tfstate/example/terraform.tfstate) and the migrator
 # can read it via the same AWS SDK code path that real S3 uses.
 #
 # Usage: scripts/smoke/seed-fixture.sh <dest-dir>

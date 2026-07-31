@@ -1,51 +1,39 @@
 # Smoke-test infra for terrapod-migrate.
 #
-# Two services:
-#   minio    — S3-compatible object store. Stand-in for AWS S3 in
-#              the Atlantis state-migration smoke (the migrator
-#              reads from minio via aws-sdk-go-v2 + --s3-endpoint-url).
-#   minio-init — One-shot container that creates a bucket the
-#                fixture uses for state storage.
+#   localstack — a local S3 endpoint standing in for AWS S3 in the Atlantis
+#                state-migration smoke. The migrator reads from it with
+#                aws-sdk-go-v2 plus --s3-endpoint-url, exactly as it would
+#                against any non-AWS endpoint.
 #
-# Networking: minio listens on host:9100 (S3) and host:9101 (console).
-# The 9000/9001 defaults clash with too many other dev tools — using
-# 9100/9101 keeps this isolated.
+# LocalStack rather than MinIO deliberately (#1195): MinIO's upstream is
+# abandoned, and `docker-compose.test.yml` already uses LocalStack for this
+# same job. One fake for one purpose.
+#
+# The bucket is created by an init hook LocalStack runs when it becomes ready,
+# so there is no second container to orchestrate and no "did the init run yet"
+# race for the caller to think about.
+#
+# Networking: 127.0.0.1:4666, shifted off LocalStack's default 4566 so this
+# harness cannot collide with a LocalStack someone already has running.
 #
 # Start with: docker compose -f scripts/smoke/docker-compose.yml up -d
 # Tear down:  docker compose -f scripts/smoke/docker-compose.yml down -v
 
 services:
-  minio:
-    image: minio/minio:latest
-    container_name: terrapod-smoke-minio
-    command: server /data --console-address ":9001"
+  localstack:
+    image: ${LOCALSTACK_IMAGE:-localstack/localstack:4}
+    container_name: terrapod-smoke-localstack
     environment:
-      MINIO_ROOT_USER: minio-smoke
-      MINIO_ROOT_PASSWORD: minio-smoke-secret
+      SERVICES: s3
+      DEFAULT_REGION: us-east-1
     ports:
-      - "127.0.0.1:9100:9000"
-      - "127.0.0.1:9101:9001"
+      - "127.0.0.1:4666:4566"
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:9000/minio/health/live"]
+      # `s3` reaching "running" is the signal the bucket hook can have run —
+      # a plain port check would go green before S3 could serve anything.
+      test: ["CMD-SHELL", "curl -sf http://localhost:4566/_localstack/health | grep -q '\"s3\": \"running\"'"]
       interval: 2s
       timeout: 5s
       retries: 30
     volumes:
-      - minio-data:/data
-
-  # Run once after minio is healthy; creates the smoke bucket and exits.
-  minio-init:
-    image: minio/mc:latest
-    container_name: terrapod-smoke-minio-init
-    depends_on:
-      minio:
-        condition: service_healthy
-    entrypoint: ["/bin/sh", "-c"]
-    command: |
-      "set -euo pipefail;
-       mc alias set smoke http://minio:9000 minio-smoke minio-smoke-secret;
-       mc mb --ignore-existing smoke/tfstate;
-       echo 'bucket smoke/tfstate is ready';"
-
-volumes:
-  minio-data:
+      - ./localstack-init:/etc/localstack/init/ready.d:ro
