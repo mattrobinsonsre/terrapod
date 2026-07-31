@@ -106,19 +106,28 @@ FOLLOWER_WRITABLE_PREFIXES: tuple[str, ...] = (
 )
 
 
+def _matches_template(path: str, template: str) -> bool:
+    """Exact segment-for-segment match, with `{...}` segments as wildcards."""
+    parts = path.strip("/").split("/")
+    expected = template.strip("/").split("/")
+    if len(parts) != len(expected):
+        return False
+    return all(e.startswith("{") or e == p for e, p in zip(expected, parts, strict=True))
+
+
 def _is_listener_keepalive(path: str) -> bool:
     """True for a listener's heartbeat or certificate renewal.
 
-    Matched structurally rather than by prefix so that the run-lifecycle calls
-    under the same `/listeners/{id}/` root stay refused.
+    Driven off `_LISTENER_KEEPALIVE` so the templates above are the single
+    source of truth. They previously read as the allow-list while this function
+    kept its own copy of the terminal segments, which agreed by luck: an edit to
+    either one would not have reached the other, and the comment explaining
+    which paths are deliberately excluded sits on the constant.
+
+    Matched structurally rather than by prefix, so the run-lifecycle calls under
+    the same `/listeners/{id}/` root stay refused.
     """
-    parts = path.strip("/").split("/")
-    return (
-        len(parts) == 6
-        and parts[:3] == ["api", "terrapod", "v1"]
-        and parts[3] == "listeners"
-        and parts[5] in {"heartbeat", "renew"}
-    )
+    return any(_matches_template(path, t) for t in _LISTENER_KEEPALIVE)
 
 
 def is_follower_writable(path: str) -> bool:
