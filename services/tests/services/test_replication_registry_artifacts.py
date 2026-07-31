@@ -94,10 +94,12 @@ class TestGPGKeys:
         `gpg_key_service` and has no caller, because Terrapod does not re-sign.
         Sending a signing key would widen what a compromised peer costs in
         exchange for a capability neither node uses."""
-        # nosemgrep: generic.secrets.security.detected-pgp-private-key-block.detected-pgp-private-key-block
         # Not a key — the body is literally the word "secret". It has to LOOK
         # like one for the assertions below to mean anything, which is exactly
-        # the shape the secret scanner is built to flag.
+        # the shape the secret scanner is built to flag. The suppression has to
+        # sit on the line DIRECTLY above the finding; a comment in between
+        # silently breaks it.
+        # nosemgrep: generic.secrets.security.detected-pgp-private-key-block.detected-pgp-private-key-block
         key = self._key(private_key="-----BEGIN PGP PRIVATE KEY BLOCK-----\nsecret\n-----END-----")
 
         payload = replication.serialize_row(GPG_KEYS, key)
