@@ -565,6 +565,8 @@ print('USES', tok.use_count if tok else -1)
     # the order it happens in: the fleet has been addressing the shared name all
     # along, and the cutover is what changes the answer underneath it.
     _point_shared_name_at(NS_A)
+    rejoined = False
+    uses_after = uses_before
     try:
         set_role_and_listener(NS_A, role="leader", api_url=f"http://{_SHARED_SVC}:8000")
 
@@ -590,6 +592,9 @@ print('USES', tok.use_count if tok else -1)
 """)
         uses_after = int(after.split("USES ")[-1].splitlines()[0])
     finally:
+        # Undo only what this row changed. The roles are put back by main(),
+        # always and for every invocation, so a single-row run cannot leave the
+        # pair with two leaders for the next one to trip over.
         set_role_and_listener(NS_A, role="leader", api_url="")
         _point_shared_name_at(NS_A)
 
@@ -641,10 +646,18 @@ def main() -> int:
     scope = f" (rows {', '.join(wanted)})" if wanted else ""
     print(f"{CYAN}==>{RESET} #960 release-gate table against {NS_A} / {NS_B}{scope}\n")
 
-    for name, fn in ROWS.items():
-        if wanted and name not in wanted:
-            continue
-        fn(stamp)  # type: ignore[operator]
+    try:
+        for name, fn in ROWS.items():
+            if wanted and name not in wanted:
+                continue
+            fn(stamp)  # type: ignore[operator]
+    finally:
+        # Always, including on the way out of a failure and including a
+        # single-row run. A row that leaves the pair with two leaders makes the
+        # NEXT run open by reporting replication as broken, which is true and
+        # completely misleading — the cause is two rows earlier and in a
+        # different invocation.
+        reset_roles()
 
     if not wanted or "13" in wanted:
         # Recorded, not silently omitted. The data half is already proven — the
@@ -661,9 +674,6 @@ def main() -> int:
         record("13", "terraform init against a private module and provider on B", "SKIP",
                "needs a config-version tarball on B and a runner that can fetch a "
                "terraform binary; the rows and blobs themselves are verified (#1114)")
-
-    if not wanted:
-        reset_roles()
 
     failed = [r for r in results if r[2] == "FAIL"]
     skipped = [r for r in results if r[2] == "SKIP"]
