@@ -18,6 +18,8 @@ Terrapod is deliberately **single-organization**: there is exactly one implicit 
 
 **What you give up, and why it's worth it.** You cannot present several *named* organizations through one endpoint. In exchange, the platform sheds an entire axis of complexity — no org column on every table, no org-scoped RBAC and membership, no org switcher — that a single-company, self-hosted deployment does not need. If your requirement is truly multi-tenant (separate, mutually-distrusting tenants), run an instance per tenant; if it is segmentation within one company, labels already do it.
 
+**Running several instances in one cluster is supported.** Each install is a separate release in its own namespace, with its own database, object storage and Redis — nothing is shared, and the namespace is the boundary. Give each install its **own release name** as well; the chart namespace-qualifies the cluster-scoped objects it creates (a `ClusterRole` and binding for reading nodes), so identical release names in different namespaces no longer collide, but distinct release names keep every object name obviously attributable to one install.
+
 ---
 
 ## System Components
