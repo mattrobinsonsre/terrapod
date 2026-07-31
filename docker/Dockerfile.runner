@@ -77,10 +77,17 @@ RUN pip install --no-cache-dir .
 FROM python:3.13-slim
 LABEL org.opencontainers.image.source=https://github.com/mattrobinsonsre/terrapod
 
-# Bump APT_REFRESH to bust the cached apt layer and re-pull Debian
-# security patches. See Dockerfile.api for the same pattern.
-ARG APT_REFRESH=2026-07-13
-RUN echo "apt-refresh=${APT_REFRESH}" \
+# The distro publishes security patches continuously, but this layer caches: an
+# unchanged RUN keeps whatever package versions were current when the cache entry
+# was written. PKG_REFRESH is what invalidates it.
+#
+# CI passes today's date, so the upgrade re-runs on the first build of each day
+# with nobody needing to remember anything. The default below is for local
+# builds and is deliberately NOT what keeps CI current — a hand-bumped constant
+# works only until someone forgets, which is how five already-patched libexpat
+# CVEs stayed in the images for 18 days (#1177).
+ARG PKG_REFRESH=2026-07-13
+RUN echo "pkg-refresh=${PKG_REFRESH}" \
     && apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
         git \
         openssh-client \
