@@ -12,6 +12,10 @@
 > planning around it. Everything on this page is off by default and inert on a
 > single-node install.
 
+> **Looking for layouts rather than mechanism?** [HA topologies](ha-topologies.md)
+> covers multi-region, multi-cloud and air-gapped pairs, dedicated versus shared
+> listener fleets, and how multi-pool execution routing composes with the pair.
+
 Terrapod's high-availability model is a **leader/follower pair**, and the single
 most important thing about it is what it does *not* do:
 
@@ -710,6 +714,9 @@ exist.
 There is no step where Terrapod decides anything. That is the point.
 
 ## Related
+
+- [HA topologies](ha-topologies.md) — multi-region, multi-cloud, listener
+  placement, and multi-pool execution routing
 
 - [Disaster recovery](disaster-recovery.md)
 - [Agent pools and runners](runners.md)
