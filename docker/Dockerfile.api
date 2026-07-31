@@ -49,16 +49,18 @@ FROM python:3.13-slim
 LABEL org.opencontainers.image.source=https://github.com/mattrobinsonsre/terrapod
 
 # Runtime-only system libraries (no gcc, no -dev headers)
-# apt-get upgrade picks up security patches for base OS packages (e.g. glibc)
 # `git` is required for VCS sparse fetch (subprocess driver in services/git_fetch.py).
+# The distro publishes security patches continuously, but this layer caches: an
+# unchanged RUN keeps whatever package versions were current when the cache entry
+# was written. PKG_REFRESH is what invalidates it.
 #
-# Bump APT_REFRESH to invalidate the cached layer and re-pull Debian
-# security patches (e.g. libnghttp2-14 1.64.0-1.1+deb13u1 for
-# CVE-2026-27135). Without this the apt-upgrade layer is reused from
-# before the patch was published — same cache-staleness issue the
-# runner image's APK_REFRESH solves.
-ARG APT_REFRESH=2026-07-13
-RUN echo "apt-refresh=${APT_REFRESH}" \
+# CI passes today's date, so the upgrade re-runs on the first build of each day
+# with nobody needing to remember anything. The default below is for local
+# builds and is deliberately NOT what keeps CI current — a hand-bumped constant
+# works only until someone forgets, which is how five already-patched libexpat
+# CVEs stayed in the images for 18 days (#1177).
+ARG PKG_REFRESH=2026-07-13
+RUN echo "pkg-refresh=${PKG_REFRESH}" \
     && apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
     curl \
     git \
