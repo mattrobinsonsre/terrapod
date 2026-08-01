@@ -565,6 +565,7 @@ function WorkspaceDetailContent() {
     if (activeTab === 'notifications') loadNotifications()
     if (activeTab === 'run-tasks') loadRunTasks()
     if (activeTab === 'run-triggers') loadRunTriggers()
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- loads are dispatched by the active tab; the loaders are hoisted function declarations recreated each render, so depending on them would re-fetch on every render
   }, [activeTab, workspace, loadRuns])
 
   // Load VCS refs when plan options panel opens on a VCS-connected workspace
@@ -596,6 +597,7 @@ function WorkspaceDetailContent() {
     // Architecture critique lifecycle rides the same workspace SSE channel;
     // bump the panel's refresh key so it re-fetches when the critic finishes.
     if (ev && ev.startsWith('architecture_critique_')) setArchRefresh((n) => n + 1)
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- the callback is deliberately referentially stable — adding the loader would re-create it every render and churn the SSE subscription
   }, [activeTab, loadRuns, loadWorkspace]))
   const [archRefresh, setArchRefresh] = useState(0)
   // Whether the AI architecture critic is enabled on this deployment. The tab is

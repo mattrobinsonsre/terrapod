@@ -210,6 +210,7 @@ export default function ModuleDetailPage() {
     if (!getAuthState()) { router.push('/login'); return }
     loadModule()
     loadWorkspaceLinks()
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- initial mount load; the loader is a hoisted function declaration recreated each render, so depending on it would re-fetch on every render
   }, [router, name, provider])
 
   usePollingInterval(!loading, 60_000, loadModule)

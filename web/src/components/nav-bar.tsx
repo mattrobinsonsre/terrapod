@@ -402,6 +402,7 @@ export default function NavBar() {
               content beneath it. Below `lg` we use the clean hamburger instead. */}
           <div className="hidden lg:flex items-center gap-1 py-2">
             <Link href="/" className="flex items-center gap-2 me-3 flex-shrink-0">
+              {/* eslint-disable-next-line @next/next/no-img-element -- a static local SVG at a fixed size — next/image does not optimise SVG without dangerouslyAllowSVG and would add a loader for no benefit */}
               <img src="/logo.svg" alt="Terrapod" className="w-7 h-7" />
               <span className="font-bold text-lg text-slate-100">Terrapod</span>
               {version && <span className="text-xs text-slate-500 font-normal">{version}</span>}
@@ -448,6 +449,7 @@ export default function NavBar() {
           {/* Mobile top bar — logo + Account trigger + hamburger (below `lg`) */}
           <div className="lg:hidden flex items-center justify-between h-14">
             <Link href="/" className="flex items-center gap-2">
+              {/* eslint-disable-next-line @next/next/no-img-element -- a static local SVG at a fixed size — next/image does not optimise SVG without dangerouslyAllowSVG and would add a loader for no benefit */}
               <img src="/logo.svg" alt="Terrapod" className="w-7 h-7" />
               <span className="font-bold text-lg text-slate-100">Terrapod</span>
               {version && <span className="text-xs text-slate-500 font-normal">{version}</span>}

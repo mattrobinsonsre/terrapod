@@ -69,6 +69,7 @@ export default function PolicySetsPage() {
     if (!getAuthState()) { router.push('/login'); return }
     if (!isAdmin()) { router.push('/'); return }
     loadSets()
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- initial mount load; the loader is a hoisted function declaration recreated each render, so depending on it would re-fetch on every render
   }, [router])
 
   usePollingInterval(!loading, 60_000, loadSets)
