@@ -598,8 +598,14 @@ jobs:
         #   GHSA-mh99-v99m-4gvg  brace-expansion ReDoS — a devDependency only
         #     (eslint -> minimatch -> brace-expansion; never sees runtime/user
         #     input). Patched only in brace-expansion 5.0.8, whose new export
-        #     shape breaks the eslint chain's minimatch, so the real fix is a
-        #     major `eslint` 10 upgrade. Tracked in #1058.
+        #     shape breaks the eslint chain's minimatch. Tracked in #1058.
+        #     RE-TESTED 2026-08-01 against eslint 10.8.0, which was the
+        #     presumed fix path: it does NOT resolve this. `npm run lint` on
+        #     eslint 10.8.0 dies with the same
+        #     `(0, brace_expansion_1.expand) is not a function` inside
+        #     @eslint/config-array's bundled minimatch. So the upgrade is not
+        #     an available fix today — don't re-run that experiment without
+        #     first checking @eslint/config-array's minimatch pin upstream.
         run: |
           npm audit --audit-level=high --json > audit.json || true
           node -e '
@@ -1611,6 +1617,34 @@ jobs:
   # in the release manifest too, and arch-specific base layers can differ.
   # Trivy reads image layers/package DBs without executing the binary, so an
   # arm64 image scans fine on an amd64 runner.
+  # ── Image CVE gate ─────────────────────────────────────
+  #
+  # This job BLOCKS PUBLICATION. `create-manifests` requires it to
+  # succeed, so an image carrying a fixable HIGH/CRITICAL never becomes
+  # a multi-arch tag and never reaches a release. It is a gate, not a
+  # report. Policy: docs/cve-policy.md.
+  #
+  # Two settings decide what "fixable" means, and both are deliberate:
+  #
+  #   ignore-unfixed: true — a vulnerability with no patched version
+  #     available anywhere cannot be actioned by a build. Failing on it
+  #     would only teach people to bypass the gate. Note the
+  #     consequence, because it is the honest cost of this choice: a
+  #     CVE becomes visible to us on the *day upstream publishes a fix*,
+  #     which may be well after disclosure. Our answer to that window is
+  #     release cadence (roughly weekly), not a lower gate.
+  #
+  #   trivyignores: pentest/trivy/.trivyignore — the accepted-risk
+  #     register. Every entry states why the vulnerable code is
+  #     unreachable in Terrapod and the exact condition that removes it,
+  #     and the pre-release audit re-checks all of them each
+  #     release. Preferring an upstream bump over a new entry is the
+  #     rule; entries are deleted in the same PR as the bump.
+  #
+  # Operators run their own scanners and will still see whatever is in
+  # that register — it suppresses nothing outside this pipeline, which
+  # is why each entry is written to be read by someone outside the
+  # project.
   scan-images:
     name: Scan ${{ matrix.image }} (${{ matrix.arch }})
     needs: [prepare, build-images-amd64, build-images-arm64]

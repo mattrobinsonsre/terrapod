@@ -55,10 +55,23 @@ If you are unable to use GitHub's reporting, email the maintainer directly.
 
 ### Dependency Security
 
-- `pip-audit` (Python) is available for dependency vulnerability scanning.
-- Container images are scanned with Trivy for HIGH/CRITICAL CVEs.
-- Static analysis via Semgrep with OWASP Top 10 and custom project rules.
+- Container images are scanned with Trivy for HIGH/CRITICAL CVEs, and the scan
+  **blocks publication** — an image carrying a fixable HIGH/CRITICAL never
+  becomes a published tag.
+- `pip-audit` (Python) and `npm audit` (frontend) gate dependencies; Dependabot
+  raises upgrade pull requests continuously.
+- Static analysis via CodeQL and Semgrep with OWASP Top 10 and custom project rules.
 - Dynamic application security testing via Nuclei with custom templates.
+
+**If you gate on HIGH/CRITICAL CVEs, read the [CVE policy](docs/cve-policy.md).**
+It states exactly what the image gate guarantees, the honest limits of
+`ignore-unfixed` (a vulnerability becomes visible to the gate when a fix ships,
+which may be after disclosure — we answer that with roughly weekly releases, not
+a lower bar), why a scan of an older release legitimately reports findings a
+newer one has already fixed, and the reasoning behind every entry in the
+accepted-risk register. Those suppressions are local to our pipeline and
+suppress nothing in your scanners, so each is written to be evaluated — and
+disagreed with — from outside the project.
 
 ### Release Artifact Provenance
 
