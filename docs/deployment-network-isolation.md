@@ -33,6 +33,7 @@ The table above is about traffic coming *in*. This one is the half that decides 
 | The API reaches | When | Removing the internet dependency |
 |---|---|---|
 | terraform / tofu / terragrunt release hosts | Filling the binary cache | Point the download base + version index at an internal mirror |
+| OPA / Trivy / Checkov release hosts | Filling the binary cache for the platform tools — OPA when a policy set applies, the scan engines when scanning is on | Point `registry.platform_tools.*_mirror_url` at an internal mirror. Checkov has no checksum file upstream, so a mirror that cannot serve the GitHub release API needs `platform_tools.verify: off` |
 | Upstream provider registries | Filling the provider network mirror | Point at an internal registry mirror |
 | GitHub releases (Terrapod's own provider) | Serving the platform provider | Internal mirror override |
 | The cost pricesheet object | Cost estimation (on by default) | Pre-seed the cached object, or set `cost_estimation.prices_url` to an internal copy |

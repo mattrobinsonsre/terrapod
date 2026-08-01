@@ -149,14 +149,38 @@ the set name is retained for display).
 
 ## Operational notes
 
-- The `opa` binary is **bundled in both the runner and the API images**
-  at a pinned version (currently OPA 1.18.0). The runner is where
-  evaluation actually happens — it has the plan JSON locally and scales
-  out with K8s. The API keeps OPA only for `opa check` (write-time Rego
+- The `opa` binary is **not bundled in the images**. It is pulled through
+  the binary cache on demand, and its version is an ordinary Helm value:
+
+  ```yaml
+  api:
+    config:
+      registry:
+        platform_tools:
+          opa_version: "1.19.0"
+  ```
+
+  One version for the whole deployment — there is no per-policy-set
+  selection. The upside over baking it in is that an upstream OPA fix
+  reaches you with a `helm upgrade` instead of waiting for a Terrapod
+  release. The runner fetches it **only when a policy set actually
+  applies to the run**, so a deployment with no policies never downloads
+  it.
+- **The runner's policy path fails closed.** If OPA cannot be obtained
+  and policy sets apply, the run errors rather than proceeding. A policy
+  that cannot be evaluated must not pass a gate it was meant to block.
+- The API also uses OPA, for `opa check` only — write-time Rego syntax
   validation, so broken syntax is rejected at policy save time rather
-  than at the next run). The operator controls the OPA version by
-  choosing the Terrapod image tag; there is no per-policy-set version
-  selection.
+  than at the next run. **That path degrades rather than failing:** if
+  OPA is unavailable, the save is accepted with a warning that validation
+  was skipped. Rego that slips past a *syntax* check is still evaluated
+  on the runner, which fails closed — whereas refusing the write would
+  leave you unable to edit any policy because of an unrelated fetch
+  failure.
+- **Air-gapped / sealed installs** must pre-warm OPA like any other
+  cached artifact. The bulk-warm endpoint and the post-install warm Job
+  include it automatically — they derive the entry from the configured
+  version, so there is nothing to add to a warm manifest.
 - Policy enforcement is **opt-in**: with no policy sets defined, runs
   behave exactly as before.
 - See the [runbook](runbooks.md#policy-enforcement-blocking-all-runs)
