@@ -2055,7 +2055,10 @@
         "high": "yüksek",
         "medium": "orta",
         "low": "düşük"
-      }
+      },
+      "enforcementLabel": "uygulama: {level}",
+      "erroredMessage": "Tarama tamamlanmadı, bu nedenle bu çalıştırma denetlenmedi.",
+      "blockedErroredMessage": "Güvenlik taraması tamamlanmadığı için bu çalıştırma engellendi. Nedenini giderip yeniden plan yapın veya bir yöneticiden geçersiz kılmasını isteyin."
     },
     "architecture": {
       "loadError": "Mimari eleştirisi yüklenemedi.",

@@ -2055,7 +2055,10 @@
         "high": "jen",
         "medium": "botlh",
         "low": "Sup"
-      }
+      },
+      "enforcementLabel": "ra'': {level}",
+      "erroredMessage": "rInbe'' QaD; vaj wanI'' buSlu''be''.",
+      "blockedErroredMessage": "rInbe'' Hurgh QaD; vaj botlhlu'' wanI''. meq tI''; nu'' nuq; ghap la'' pIn yIrI''."
     },
     "architecture": {
       "loadError": "qach tI'ang ghelmeH lujpu'.",

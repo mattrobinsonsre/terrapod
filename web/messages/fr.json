@@ -2055,7 +2055,10 @@
         "high": "élevé",
         "medium": "moyen",
         "low": "faible"
-      }
+      },
+      "enforcementLabel": "application : {level}",
+      "erroredMessage": "L''analyse ne s''est pas terminée, cette exécution n''a donc pas été vérifiée.",
+      "blockedErroredMessage": "Cette exécution est bloquée car l''analyse de sécurité ne s''est pas terminée. Corrigez la cause et relancez la planification, ou demandez à un administrateur de la contourner."
     },
     "architecture": {
       "loadError": "Impossible de charger la critique d''architecture.",

@@ -2055,7 +2055,10 @@
         "high": "hai",
         "medium": "medium",
         "low": "lo"
-      }
+      },
+      "enforcementLabel": "enforcementz: {level}",
+      "erroredMessage": "Da scan no finishd, so dis run no getz checkd. sad.",
+      "blockedErroredMessage": "Dis run iz blockd cuz da sekurity scan no finishd. Fix wat brokd it an plan agin, or ask a admin to sez okai."
     },
     "architecture": {
       "loadError": "Cudnt lode teh architeksher criteek.",

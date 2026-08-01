@@ -2055,7 +2055,10 @@
         "high": "高",
         "medium": "中",
         "low": "低"
-      }
+      },
+      "enforcementLabel": "强制级别：{level}",
+      "erroredMessage": "扫描未完成，因此本次运行尚未检查。",
+      "blockedErroredMessage": "本次运行已被阻止，因为安全扫描未完成。请修复原因后重新执行计划，或请管理员覆盖。"
     },
     "architecture": {
       "loadError": "无法加载架构评审。",

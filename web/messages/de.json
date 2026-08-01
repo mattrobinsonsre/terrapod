@@ -2055,7 +2055,10 @@
         "high": "hoch",
         "medium": "mittel",
         "low": "niedrig"
-      }
+      },
+      "enforcementLabel": "Durchsetzung: {level}",
+      "erroredMessage": "Der Scan wurde nicht abgeschlossen, daher wurde dieser Lauf nicht geprüft.",
+      "blockedErroredMessage": "Dieser Lauf ist blockiert, weil der Sicherheitsscan nicht abgeschlossen wurde. Beheben Sie die Ursache und planen Sie erneut, oder bitten Sie einen Administrator um eine Übersteuerung."
     },
     "architecture": {
       "loadError": "Die Architekturkritik konnte nicht geladen werden.",

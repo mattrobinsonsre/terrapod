@@ -2055,7 +2055,10 @@
         "high": "vysoká",
         "medium": "střední",
         "low": "nízká"
-      }
+      },
+      "enforcementLabel": "vynucování: {level}",
+      "erroredMessage": "Kontrola nebyla dokončena, takže tento běh nebyl prověřen.",
+      "blockedErroredMessage": "Tento běh je zablokován, protože bezpečnostní kontrola nebyla dokončena. Odstraňte příčinu a naplánujte znovu, nebo požádejte správce o přepsání."
     },
     "architecture": {
       "loadError": "Nepodařilo se načíst kritiku architektury.",

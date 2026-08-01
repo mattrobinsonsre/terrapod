@@ -2055,7 +2055,10 @@
         "high": "uchel",
         "medium": "canolig",
         "low": "isel"
-      }
+      },
+      "enforcementLabel": "gorfodi: {level}",
+      "erroredMessage": "Ni chwblhawyd y sgan, felly nid yw''r rhediad hwn wedi''i wirio.",
+      "blockedErroredMessage": "Mae''r rhediad hwn wedi''i rwystro am na chwblhawyd y sgan diogelwch. Cywirwch yr achos a chynlluniwch eto, neu gofynnwch i weinyddwr ei ddiystyru."
     },
     "architecture": {
       "loadError": "Methwyd llwytho''r feirniadaeth bensaernïol.",

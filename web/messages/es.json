@@ -2055,7 +2055,10 @@
         "high": "alto",
         "medium": "medio",
         "low": "bajo"
-      }
+      },
+      "enforcementLabel": "aplicación: {level}",
+      "erroredMessage": "El análisis no se completó, por lo que esta ejecución no se ha comprobado.",
+      "blockedErroredMessage": "Esta ejecución está bloqueada porque el análisis de seguridad no se completó. Corrija la causa y vuelva a planificar, o pida a un administrador que lo anule."
     },
     "architecture": {
       "loadError": "No se pudo cargar la crítica de arquitectura.",

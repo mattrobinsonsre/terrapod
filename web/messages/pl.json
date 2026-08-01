@@ -2055,7 +2055,10 @@
         "high": "wysoki",
         "medium": "średni",
         "low": "niski"
-      }
+      },
+      "enforcementLabel": "egzekwowanie: {level}",
+      "erroredMessage": "Skanowanie nie zostało ukończone, więc to uruchomienie nie zostało sprawdzone.",
+      "blockedErroredMessage": "To uruchomienie jest zablokowane, ponieważ skanowanie bezpieczeństwa nie zostało ukończone. Usuń przyczynę i zaplanuj ponownie lub poproś administratora o obejście."
     },
     "architecture": {
       "loadError": "Nie udało się wczytać krytyki architektury.",

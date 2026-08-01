@@ -2055,7 +2055,10 @@
         "high": "alto",
         "medium": "medio",
         "low": "basso"
-      }
+      },
+      "enforcementLabel": "applicazione: {level}",
+      "erroredMessage": "La scansione non è stata completata, quindi questa esecuzione non è stata verificata.",
+      "blockedErroredMessage": "Questa esecuzione è bloccata perché la scansione di sicurezza non è stata completata. Correggi la causa ed esegui di nuovo il piano, oppure chiedi a un amministratore di ignorarla."
     },
     "architecture": {
       "loadError": "Impossibile caricare la critica dell''architettura.",

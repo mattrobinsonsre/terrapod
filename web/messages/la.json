@@ -2055,7 +2055,10 @@
         "high": "altus",
         "medium": "medius",
         "low": "humilis"
-      }
+      },
+      "enforcementLabel": "coactio: {level}",
+      "erroredMessage": "Perscrutatio non perfecta est, itaque haec executio explorata non est.",
+      "blockedErroredMessage": "Haec executio impedita est quia perscrutatio securitatis non perfecta est. Causam corrige et iterum consilium fac, aut administratorem roga ut eam neglegat."
     },
     "architecture": {
       "loadError": "Censura architecturae onerari non potuit.",

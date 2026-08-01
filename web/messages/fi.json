@@ -2055,7 +2055,10 @@
         "high": "korkea",
         "medium": "keskitaso",
         "low": "matala"
-      }
+      },
+      "enforcementLabel": "valvonta: {level}",
+      "erroredMessage": "Tarkistus ei valmistunut, joten tätä ajoa ei ole tarkastettu.",
+      "blockedErroredMessage": "Tämä ajo on estetty, koska tietoturvatarkistus ei valmistunut. Korjaa syy ja suunnittele uudelleen, tai pyydä ylläpitäjää ohittamaan."
     },
     "architecture": {
       "loadError": "Arkkitehtuurikritiikin lataaminen epäonnistui.",

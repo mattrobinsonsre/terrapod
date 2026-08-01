@@ -2055,7 +2055,10 @@
         "high": "high",
         "medium": "middlin'",
         "low": "low"
-      }
+      },
+      "enforcementLabel": "enforcement: {level}",
+      "erroredMessage": "The scan never made port, so this here run be unchecked, arr.",
+      "blockedErroredMessage": "This here run be blocked on account o'' the security scan never makin'' port. Mend the cause and chart a new plan, or have an admin wave it through."
     },
     "architecture": {
       "loadError": "Couldn''t haul in th'' architecture critique.",

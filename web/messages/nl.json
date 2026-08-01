@@ -2055,7 +2055,10 @@
         "high": "hoog",
         "medium": "middel",
         "low": "laag"
-      }
+      },
+      "enforcementLabel": "handhaving: {level}",
+      "erroredMessage": "De scan is niet voltooid, dus deze uitvoering is niet gecontroleerd.",
+      "blockedErroredMessage": "Deze uitvoering is geblokkeerd omdat de beveiligingsscan niet is voltooid. Los de oorzaak op en plan opnieuw, of vraag een beheerder om dit te negeren."
     },
     "architecture": {
       "loadError": "Kan de architectuurkritiek niet laden.",
