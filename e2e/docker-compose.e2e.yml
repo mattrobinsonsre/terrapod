@@ -63,7 +63,10 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-sf", "http://localhost:8000/health"]
+      # The api image carries no curl (it was only ever there for a Docker
+      # HEALTHCHECK that Kubernetes never runs). Same stdlib check the image
+      # itself uses: non-2xx or a refused connection raises and exits non-zero.
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=4)"]
       interval: 5s
       timeout: 5s
       retries: 20
