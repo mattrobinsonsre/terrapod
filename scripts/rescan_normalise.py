@@ -55,20 +55,46 @@ def from_pip_audit(data) -> list[dict]:
     for dep in (data or {}).get("dependencies") or []:
         for v in dep.get("vulns") or []:
             fixes = v.get("fix_versions") or []
+            if not fixes:
+                # Same ignore-unfixed policy as the other two legs: nothing to
+                # bump to means nothing a patch release can do.
+                continue
             out.append({
                 "id": v.get("id", "?"),
                 "package": dep.get("name", "?"),
                 "installed": dep.get("version", "?"),
-                "fixed": ", ".join(fixes) if fixes else "none published",
+                "fixed": ", ".join(fixes),
                 "severity": "HIGH",   # pip-audit does not grade; the gate treats all as actionable
             })
     return out
+
+
+def _npm_fix(v) -> str | None:
+    """The upgrade that resolves this advisory, or None when there isn't one.
+
+    `fixAvailable` is `false` when nothing upstream fixes it yet, an object
+    naming the upgrade when there is one, and `true` when npm can resolve it
+    within the existing ranges.
+    """
+    fix = v.get("fixAvailable")
+    if fix is False or fix is None:
+        return None
+    if isinstance(fix, dict):
+        target = f"{fix.get('name', '?')}@{fix.get('version', '?')}"
+        return f"{target} (major)" if fix.get("isSemVerMajor") else target
+    return "npm audit fix"
 
 
 def from_npm_audit(data, allowlist: set[str]) -> list[dict]:
     out = []
     for name, v in ((data or {}).get("vulnerabilities") or {}).items():
         if v.get("severity") not in ("high", "critical"):
+            continue
+        fixed = _npm_fix(v)
+        if fixed is None:
+            # Match the artifact leg's ignore-unfixed policy. An advisory with
+            # no available fix cannot be actioned by a patch release, and
+            # listing it only pads the report with rows nobody can close.
             continue
         ids = [
             x["url"].rstrip("/").split("/")[-1]
@@ -82,7 +108,7 @@ def from_npm_audit(data, allowlist: set[str]) -> list[dict]:
                 "id": advisory,
                 "package": name,
                 "installed": (v.get("range") or "?"),
-                "fixed": "see advisory",
+                "fixed": fixed,
                 "severity": v.get("severity", "?").upper(),
             })
     return out
