@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.config import WarmBinaryEntry, WarmPlatform, WarmProviderEntry, settings
 from terrapod.logging_config import get_logger
-from terrapod.services import binary_cache_service, provider_cache_service
+from terrapod.services import binary_cache_service, platform_tools, provider_cache_service
 from terrapod.storage.protocol import ObjectStore
 
 logger = get_logger(__name__)
@@ -62,11 +62,29 @@ def _provider_default_platforms() -> list[WarmPlatform]:
     ]
 
 
+def platform_tool_entries() -> list[WarmBinaryEntry]:
+    """Warm entries for the platform tools, derived from config (#1208).
+
+    Unlike terraform/tofu — where the operator has to list which versions their
+    workspaces use — there is exactly one version of each platform tool per
+    deployment and it is already in the config. So a sealed install never has to
+    remember to add opa/trivy/checkov to its warm manifest: forgetting would seal
+    an install whose policy gate cannot run, which is the failure this derivation
+    exists to make impossible.
+    """
+    return [
+        WarmBinaryEntry(tool=tool, version=platform_tools.configured_version(tool))
+        for tool in sorted(platform_tools.PLATFORM_TOOLS)
+    ]
+
+
 async def warm_from_manifest(
     db: AsyncSession,
     storage: ObjectStore,
     binaries: list[WarmBinaryEntry],
     providers: list[WarmProviderEntry],
+    *,
+    include_platform_tools: bool = True,
 ) -> WarmSummary:
     """Pre-pull every listed binary + provider platform into the cache.
 
@@ -74,8 +92,18 @@ async def warm_from_manifest(
     returned summary and warming continues. Honours the per-cache `enabled`
     flags — a disabled cache marks its entries failed with a clear reason rather
     than silently skipping (so the caller sees why nothing landed).
+
+    `include_platform_tools` adds the derived opa/trivy/checkov entries. It is on
+    by default because this routine backs the seed-then-seal path, where missing
+    them is exactly the mistake worth preventing. Re-warming an already-cached
+    artifact is a cache hit, so the repetition is cheap.
     """
     summary = WarmSummary()
+
+    if include_platform_tools:
+        # Derived entries first: an explicit entry for the same tool+version
+        # later in the list is then a cache hit rather than a duplicate fetch.
+        binaries = platform_tool_entries() + list(binaries)
 
     binary_enabled = settings.registry.binary_cache.enabled
     for entry in binaries:

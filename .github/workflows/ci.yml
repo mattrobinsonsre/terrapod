@@ -842,6 +842,15 @@ jobs:
           echo "$out" | grep -q "cost_estimation:" || { echo "FAIL: cost_estimation config not rendered into config.yaml (#871)"; exit 1; }
           echo "$out" | grep -q "prices_url:" || { echo "FAIL: cost_estimation.prices_url not rendered (#871)"; exit 1; }
           echo "$out" | grep -q "default_region:" || { echo "FAIL: cost_estimation.default_region not rendered (#871)"; exit 1; }
+          # Platform tools (#1208): opa/trivy/checkov are no longer baked into the
+          # images, so these versions are the ONLY thing telling a runner what to
+          # fetch. A missing render line leaves the value inert and the code default
+          # silently wins — which for the policy gate means a run that cannot be
+          # evaluated. Assert the block and every version reaches the ConfigMap.
+          echo "$out" | grep -q "platform_tools:" || { echo "FAIL: platform_tools config not rendered into config.yaml (#1208)"; exit 1; }
+          echo "$out" | grep -q "opa_version:" || { echo "FAIL: platform_tools.opa_version not rendered — the policy gate would have no binary to fetch (#1208)"; exit 1; }
+          echo "$out" | grep -q "trivy_version:" || { echo "FAIL: platform_tools.trivy_version not rendered (#1208)"; exit 1; }
+          echo "$out" | grep -q "checkov_version:" || { echo "FAIL: platform_tools.checkov_version not rendered — checkov is the default scan engine (#1208)"; exit 1; }
           echo "$out" | grep -q "ha:" || { echo "FAIL: ha config not rendered into config.yaml (#960)"; exit 1; }
           echo "$out" | grep -q 'role: "leader"' || { echo "FAIL: ha.role must default to leader — an auto default takes single-node installs inert (#960)"; exit 1; }
           echo "$out" | grep -q "replication:" || { echo "FAIL: ha.replication not rendered into config.yaml (#1110)"; exit 1; }

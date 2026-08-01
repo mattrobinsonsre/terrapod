@@ -12,6 +12,7 @@ UX CONTRACT: Admin cache endpoints are consumed by the web frontend:
   matched by corresponding updates to that frontend page.
 
 Endpoints:
+    GET    /api/terrapod/v1/platform-tools                                                    — pinned opa/trivy/checkov versions
     GET    /api/terrapod/v1/binary-cache/{tool}/{version}/{os}/{arch}                        — download (redirect)
     GET    /api/terrapod/v1/admin/binary-cache                                                — list cached binaries
     POST   /api/terrapod/v1/admin/binary-cache/warm                                           — pre-warm binary
@@ -58,6 +59,41 @@ class WarmBinaryRequest(BaseModel):
     version: str
     os: str = "linux"
     arch: str = "amd64"
+
+
+# --- Platform tools ---
+
+
+@router.get("/platform-tools")
+async def platform_tool_versions(
+    current_user: AuthenticatedUser = Depends(get_current_user),
+) -> JSONResponse:
+    """The opa/trivy/checkov versions this deployment pins (#1208).
+
+    The runner reads this to know what to ask the binary cache for. It is a
+    platform-scoped setting, so there is one answer for the whole deployment and
+    it does not vary by workspace or run — which is why this is a plain read
+    rather than another field on the per-run payload, and why the runner/listener
+    wire protocol did not have to move to carry it.
+
+    Available to any authenticated caller, runner tokens included: the pinned
+    version of a third-party tool is not sensitive, and the runner has to be able
+    to ask for it before it can fetch anything.
+    """
+    cfg = settings.registry.platform_tools
+    return JSONResponse(
+        content={
+            "data": {
+                "type": "platform-tools",
+                "id": "default",
+                "attributes": {
+                    "opa-version": cfg.opa_version,
+                    "trivy-version": cfg.trivy_version,
+                    "checkov-version": cfg.checkov_version,
+                },
+            }
+        }
+    )
 
 
 # --- Version suggestions ---

@@ -392,3 +392,80 @@ class TestProviderCacheAdmin:
             )
         assert resp.status_code == 200
         assert resp.json() == {"status": "purged", "count": 3}
+
+
+class TestPlatformToolVersions:
+    """The endpoint the runner reads to learn what to fetch (#1208)."""
+
+    _URL = "/api/terrapod/v1/platform-tools"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_reports_the_pinned_versions(self, *mocks):
+        app = _make_app(_user(roles=["everyone"]))
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get(self._URL, headers=_AUTH)
+        assert resp.status_code == 200
+        attrs = resp.json()["data"]["attributes"]
+        cfg = settings.registry.platform_tools
+        assert attrs == {
+            "opa-version": cfg.opa_version,
+            "trivy-version": cfg.trivy_version,
+            "checkov-version": cfg.checkov_version,
+        }
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_requires_authentication(self, *mocks):
+        """Not sensitive, but not anonymous either — the runner authenticates
+        for everything else it asks the API."""
+        app = create_app()
+        app.dependency_overrides[get_db] = lambda: AsyncMock()
+        app.dependency_overrides[get_storage] = lambda: AsyncMock()
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get(self._URL)
+        assert resp.status_code == 401
+
+
+class TestPlatformToolDownload:
+    """Platform tools ride the generic binary-cache route, so the runner needs
+    no new download path — but the failure modes must still read clearly."""
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.binary_cache.get_or_cache_binary", new_callable=AsyncMock)
+    async def test_serves_a_platform_tool_through_the_same_route(self, mock_get, *mocks):
+        mock_get.return_value = "https://storage.example/opa"
+        app = _make_app(_user(roles=["everyone"]))
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get(
+                "/api/terrapod/v1/binary-cache/opa/1.19.0/linux/amd64",
+                headers=_AUTH,
+                follow_redirects=False,
+            )
+        assert resp.status_code == 302
+        assert resp.headers["location"] == "https://storage.example/opa"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.binary_cache.get_or_cache_binary", new_callable=AsyncMock)
+    async def test_a_platform_the_publisher_does_not_build_is_a_400(self, mock_get, *mocks):
+        """UnsupportedPlatformError subclasses ValueError so it lands as a clear
+        400 — "we can't get you that" — rather than a 502 that reads like the
+        publisher being down and invites a pointless retry."""
+        from terrapod.services.platform_tools import UnsupportedPlatformError
+
+        mock_get.side_effect = UnsupportedPlatformError(
+            "opa publishes no static asset for windows/amd64"
+        )
+        app = _make_app(_user(roles=["everyone"]))
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get(
+                "/api/terrapod/v1/binary-cache/opa/1.19.0/windows/amd64", headers=_AUTH
+            )
+        assert resp.status_code == 400
+        assert "publishes no static asset" in resp.text
