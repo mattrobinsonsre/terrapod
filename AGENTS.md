@@ -618,6 +618,71 @@ multi-language implementation ships in the same PR**:
   flaky test: prove it's flaky, then **fix the flake** — re-running until green
   just hides it for the next person.
 
+## Patching an older release line
+
+Ordinary releases are cut by tagging `main`. A **patch for a line that `main`
+has already moved past** is different, and this is the procedure — introduced
+alongside the scheduled release re-scan (#1212), which is what surfaces the need
+for one.
+
+[`SECURITY.md`](SECURITY.md) offers *"security fixes only"* for the previous
+minor, so this path exists to discharge that promise. The re-scan reports which
+supported releases have actionable findings; this is how you act on one.
+
+**The tag push is the gate.** There is no separate verification step, because a
+cherry-picked commit is a *new* commit: no `sha-<short>` images exist for it, so
+the tag workflow runs the full lint, test and build set before it publishes
+anything. If any of it fails, the `Cleanup Tag` job deletes the tag, no release
+is created and no version images are retagged — so the version is back to
+"never released" and re-tagging the same version after a fix is safe and
+expected.
+
+```sh
+git fetch origin --tags
+git checkout -b release/v1.1 v1.1.1        # branch from the tag, not from main
+git cherry-pick -x <sha> [<sha> ...]        # -x records where each came from
+git push -u origin release/v1.1
+git tag v1.1.2 && git push origin v1.1.2    # this is the gate and the release
+```
+
+Then watch the pipeline through, and verify the published artifacts the same way
+as any release (`docker manifest inspect`, `helm pull`).
+
+### The trap: a patch with nothing to cherry-pick
+
+Some findings need **no code change at all** — a base-image CVE is cleared by
+rebuilding against a refreshed base. It is tempting to tag the existing commit.
+
+**Don't.** The pipeline skips building when `sha-<short>` images already exist
+for that commit, so tagging the commit an existing release already points at
+**retags the old images under a new version number**. The result is a release
+that claims to fix something and ships the identical bytes. The daily
+apt-refresh that would have picked up the fix only applies when a build actually
+runs.
+
+Give it a new commit so a real build happens:
+
+```sh
+git commit --allow-empty -m "chore: rebuild v1.1.x against a refreshed base image"
+```
+
+### Rules
+
+- **Cherry-pick, never merge `main`.** The point is the fix without the features;
+  merging defeats it and turns a patch into an untested minor.
+- **Never merge the release branch back into `main`.** Its commits are already
+  there — that is where they were picked from. Keep the branch; it is where the
+  next patch on that line starts.
+- **`-x` on every cherry-pick.** When someone asks in six months whether a fix is
+  in a line, the recorded origin is the answer.
+- **A patch stays a patch.** If what you are picking needs a schema migration, a
+  config key, or anything else that changes a public surface, it is not patch
+  material — see [Versioning & support](docs/versioning-and-support.md).
+- **Suppressions are not backported.** `pentest/trivy/.trivyignore` and the audit
+  ignore files describe what we accept *now*; they are read from the current
+  branch by both the release gate and the re-scan, and an older line does not
+  carry its own copy.
+
 ## Content hygiene (hard requirements)
 
 These protect the public repository. Git history, PRs, and source are
