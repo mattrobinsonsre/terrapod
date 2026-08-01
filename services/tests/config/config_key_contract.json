@@ -218,6 +218,7 @@
   "public_webhook_url",
   "rate_limit.auth_requests_per_minute",
   "rate_limit.authenticated_requests_per_minute",
+  "rate_limit.distinct_credentials_per_minute",
   "rate_limit.enabled",
   "rate_limit.requests_per_minute",
   "rate_limit.runner_requests_per_minute",

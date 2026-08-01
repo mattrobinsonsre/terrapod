@@ -603,5 +603,6 @@ data:
       authenticated_requests_per_minute: {{ .Values.api.config.rate_limit.authenticated_requests_per_minute }}
       runner_requests_per_minute: {{ .Values.api.config.rate_limit.runner_requests_per_minute }}
       auth_requests_per_minute: {{ .Values.api.config.rate_limit.auth_requests_per_minute }}
+      distinct_credentials_per_minute: {{ .Values.api.config.rate_limit.distinct_credentials_per_minute }}
     {{- end }}
 {{- end }}

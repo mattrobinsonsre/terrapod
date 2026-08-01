@@ -848,6 +848,14 @@ api:
       # Auth endpoints (/api/terrapod/v1/auth/*, /oauth/*) — brute-force defence,
       # applies to all callers regardless of credentials.
       auth_requests_per_minute: 10
+      # Ceiling on how many DISTINCT credentials one source IP may present per
+      # minute. The authenticated tier buckets per-credential, and the credential
+      # is not verified in middleware, so without this a caller rotating a random
+      # Authorization value gets a fresh bucket every request and is never
+      # limited. Only a first-seen credential counts, so normal traffic (one per
+      # user per minute) never approaches it. Raise it if one egress IP genuinely
+      # fronts more distinct API clients than this. 0 = unlimited.
+      distinct_credentials_per_minute: 200
 
     # Prometheus metrics
     metrics:

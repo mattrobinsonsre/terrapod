@@ -1146,6 +1146,19 @@ class RateLimitConfig(BaseModel):
         default=10,
         description="Max requests per minute for auth endpoints (login). 0 = unlimited.",
     )
+    distinct_credentials_per_minute: int = Field(
+        default=200,
+        description=(
+            "Max DISTINCT credentials one source IP may present per minute. The "
+            "authenticated tier is bucketed per-credential (#1075), and the "
+            "credential is not verified in middleware — so without this ceiling a "
+            "caller sending a different random Authorization value each request "
+            "lands in a fresh bucket every time and is never limited at all. Only "
+            "a first-seen credential counts against it, so ordinary traffic (one "
+            "per user per minute) is unaffected. Raise it if a single egress IP "
+            "genuinely fronts more distinct API clients than this. 0 = unlimited."
+        ),
+    )
 
 
 # --- Metrics Configuration ---

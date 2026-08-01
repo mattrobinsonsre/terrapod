@@ -160,6 +160,7 @@
   "api.config.public_webhook_url",
   "api.config.rate_limit.auth_requests_per_minute",
   "api.config.rate_limit.authenticated_requests_per_minute",
+  "api.config.rate_limit.distinct_credentials_per_minute",
   "api.config.rate_limit.enabled",
   "api.config.rate_limit.requests_per_minute",
   "api.config.rate_limit.runner_requests_per_minute",
