@@ -11,13 +11,22 @@ no foreign key — left a dangling id in every set that named a deleted pool.
 Both sides of the mapping table CASCADE, so a pool deletion now detaches
 cleanly everywhere with no application-side sweeping.
 
-**This drops two columns (a contraction).** Migrations run as a Helm
-`pre-upgrade` hook, so during a rolling upgrade the new schema lands before the
-new pods: an API replica still on the previous release will error on workspace
-queries until the rollout completes. That is a rollout-window cost, minutes
-long and self-healing. It is not a compatibility break — the database is not a
-public surface, and the API's `agent-pool-id` / `agent-pool-ids` attributes are
-unchanged.
+**`workspaces.agent_pool_id` is deliberately NOT dropped here.** Migrations run
+as a Helm `pre-upgrade` hook, so the new schema lands *before* the new pods: for
+the length of the rollout every serving replica is still on the previous
+release, and that release maps `agent_pool_id` with `lazy="joined"` — a LEFT
+JOIN naming the column on *every* Workspace load, not just pool-aware queries.
+Dropping it here would make workspace lookup, lock/unlock and **state-version
+upload** raise `UndefinedColumn` on those replicas, so an in-flight apply could
+fail to upload its state.
+
+That is exactly what expand/contract exists to prevent (see
+docs/versioning-and-support.md). This release expands and stops reading the
+column; a later minor contracts it, once no supported release still reads it.
+
+`agent_pool_extra_ids` IS dropped, and that is safe: it was added earlier in
+this same release cycle and has never appeared in a published version, so no
+running replica knows about it.
 
 Revision ID: 598eb2329821
 Revises: 9b7161d25c9e
@@ -80,14 +89,15 @@ def upgrade() -> None:
     )
 
     op.drop_column("workspaces", "agent_pool_extra_ids")
-    op.drop_column("workspaces", "agent_pool_id")
+    # NOT dropped: workspaces.agent_pool_id. The previous release still reads it
+    # on every Workspace load and is still serving during the rollout — see the
+    # module docstring. It is left in place, unread by this release, for a later
+    # minor to contract.
 
 
 def downgrade() -> None:
-    op.add_column(
-        "workspaces",
-        sa.Column("agent_pool_id", postgresql.UUID(as_uuid=True), nullable=True),
-    )
+    # agent_pool_id was never dropped, so there is nothing to re-add — only the
+    # JSONB half and the foreign key come back.
     op.add_column(
         "workspaces",
         sa.Column(
@@ -97,14 +107,8 @@ def downgrade() -> None:
             nullable=False,
         ),
     )
-    op.create_foreign_key(
-        "workspaces_agent_pool_id_fkey",
-        "workspaces",
-        "agent_pools",
-        ["agent_pool_id"],
-        ["id"],
-        ondelete="SET NULL",
-    )
+    # The foreign key came back with the column — neither was dropped — so it
+    # is not recreated here. Only the values need restoring.
     op.execute(
         """
         UPDATE workspaces w
