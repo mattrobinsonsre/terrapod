@@ -2227,6 +2227,10 @@
             "auth_requests_per_minute": {
               "type": "integer",
               "minimum": 0
+            },
+            "distinct_credentials_per_minute": {
+              "type": "integer",
+              "minimum": 0
             }
           }
         },

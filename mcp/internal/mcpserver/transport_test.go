@@ -183,11 +183,11 @@ func TestRefreshTransportStripsAuthOnPresignedRedirect(t *testing.T) {
 
 func TestHostOf(t *testing.T) {
 	cases := map[string]string{
-		"https://terrapod.local":           "terrapod.local",
-		"https://terrapod.markupai.ts.net": "terrapod.markupai.ts.net",
-		"terrapod.local":                   "terrapod.local", // bare host, no scheme
-		"http://127.0.0.1:8080":            "127.0.0.1:8080",
-		"":                                 "",
+		"https://terrapod.local":          "terrapod.local",
+		"https://terrapod.example.ts.net": "terrapod.example.ts.net",
+		"terrapod.local":                  "terrapod.local", // bare host, no scheme
+		"http://127.0.0.1:8080":           "127.0.0.1:8080",
+		"":                                "",
 	}
 	for in, want := range cases {
 		if got := hostOf(in); got != want {

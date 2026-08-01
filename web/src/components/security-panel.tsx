@@ -38,6 +38,9 @@ interface SecurityScanAttrs {
   }
   'overridden-by': string | null
   'overridden-at'?: string
+  // Why the scan produced nothing. Set when outcome === 'errored' — the scanner
+  // crashed, the binary could not be fetched, or the plan JSON was missing.
+  error?: string | null
 }
 
 interface SecuritySummaryMeta {
@@ -120,6 +123,10 @@ export function SecurityPanel({
   const blocked = summary?.status === 'blocked'
   const findings = attrs.findings || []
   const overriddenBy = attrs['overridden-by']
+  // An errored scan is NOT a clean scan. On an advisory workspace nothing blocks
+  // and the finding list is empty, so without this the operator was shown a
+  // green "no findings" for a scan that never ran.
+  const errored = attrs.outcome === 'errored'
 
   async function override() {
     // Overriding lets a blocking run apply anyway — irreversible enough to
@@ -153,16 +160,23 @@ export function SecurityPanel({
           {t('securityPanel.engineLabel', { engine: attrs.engine })}
           {' · '}
           {t('securityPanel.thresholdLabel', { threshold: attrs['severity-threshold'] })}
+          {' · '}
+          {t('securityPanel.enforcementLabel', { level: attrs['enforcement-level'] })}
         </span>
       </div>
 
       {blocked && (
         <div className="mb-3 p-3 bg-red-900/20 rounded-lg border border-red-800/50">
           <p className="text-sm text-red-300">
-            {t.rich('securityPanel.blockedMessage', {
-              count: attrs.summary?.blocking ?? findings.length,
-              strong: (chunks) => <strong>{chunks}</strong>,
-            })}
+            {/* An enforced run also blocks when the scan ERRORED, in which case
+                the blocking count is 0 — "blocked by 0 findings" reads as a bug.
+                Say what actually happened instead. */}
+            {errored
+              ? t('securityPanel.blockedErroredMessage')
+              : t.rich('securityPanel.blockedMessage', {
+                  count: attrs.summary?.blocking ?? findings.length,
+                  strong: (chunks) => <strong>{chunks}</strong>,
+                })}
           </p>
           {isAdmin() && (
             <button
@@ -180,7 +194,15 @@ export function SecurityPanel({
           {t('securityPanel.overriddenBy', { by: overriddenBy })}
         </p>
       )}
-      {!blocked && findings.length === 0 && (
+      {errored && (
+        <div className="mb-3 p-3 bg-amber-900/20 rounded-lg border border-amber-800/50">
+          <p className="text-sm text-amber-300">{t('securityPanel.erroredMessage')}</p>
+          {attrs.error && (
+            <p className="mt-1 text-xs text-amber-400/80 break-words">{attrs.error}</p>
+          )}
+        </div>
+      )}
+      {!errored && !blocked && findings.length === 0 && (
         <p className="text-sm text-emerald-400">{t('securityPanel.passed')}</p>
       )}
       {err && <p className="mb-3 text-sm text-red-400">{err}</p>}

@@ -391,7 +391,7 @@ def _core_shape():
                 {"platform_version": "eks.15"},
             ),
             (
-                "module.spiredb[0].aws_db_instance.this[0]",
+                "module.appdb[0].aws_db_instance.this[0]",
                 {"latest_restorable_time": "2026-06-16T11:31:10Z"},
                 {"latest_restorable_time": "2026-07-09T12:03:17Z"},
             ),
@@ -433,7 +433,7 @@ class TestResourceDriftRelevance:
         plan = _drift_plan(
             drift=[
                 (
-                    "module.spiredb[0].aws_db_instance.this[0]",
+                    "module.appdb[0].aws_db_instance.this[0]",
                     {"latest_restorable_time": "a"},
                     {"latest_restorable_time": "b"},
                 ),

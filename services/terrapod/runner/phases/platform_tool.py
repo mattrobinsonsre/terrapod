@@ -25,6 +25,7 @@ which the runner image deliberately does not carry. The two are kept honest by
 
 from __future__ import annotations
 
+import shutil
 import tarfile
 import zipfile
 from dataclasses import dataclass
@@ -37,6 +38,15 @@ from terrapod.runner.download import download_to_file
 from terrapod.runner.runner_config import RunnerConfig
 
 logger = structlog.get_logger("runner.phase.platform_tool")
+
+
+class PlatformToolsUnsupported(Exception):
+    """The API has no platform-tool cache endpoint (it predates the feature).
+
+    Distinct from PlatformToolError, which means the fetch was possible and
+    went wrong. This one means "do not ask" — the deployment is an older
+    supported release whose runner image still carried the binaries.
+    """
 
 
 class PlatformToolError(RuntimeError):
@@ -83,13 +93,28 @@ def fetch_versions(cfg: RunnerConfig, *, client: httpx.Client | None = None) -> 
     try:
         headers = {"Authorization": f"Bearer {cfg.auth_token}"} if cfg.auth_token else {}
         resp = c.get(_versions_url(cfg), headers=headers)
+        if resp.status_code == 404:
+            # The endpoint is new in the release that stopped baking these
+            # binaries in. A 404 means the API predates it — a supported skew
+            # (docs/versioning-and-support.md promises a newer runner works
+            # against an older API within the window), so this is "the API has
+            # nothing to tell me", not a failure. The caller falls back to
+            # whatever is on PATH, which on such a deployment is the baked-in
+            # binary that older API expects to be there.
+            #
+            # ONLY 404. A 5xx, a timeout or an auth error means the endpoint
+            # exists and something is wrong, and those must stay fatal — a
+            # policy gate that cannot be evaluated must never be skipped.
+            raise PlatformToolsUnsupported(
+                "this Terrapod API predates the platform-tool cache endpoint"
+            )
         if resp.status_code != 200:
             raise PlatformToolError(
                 f"could not read the pinned platform-tool versions from the API "
                 f"(HTTP {resp.status_code})"
             )
         attrs = (resp.json().get("data") or {}).get("attributes") or {}
-    except PlatformToolError:
+    except (PlatformToolError, PlatformToolsUnsupported):
         raise
     except Exception as exc:  # noqa: BLE001 — network/JSON, all equally fatal here
         raise PlatformToolError(f"could not read the pinned platform-tool versions: {exc}") from exc
@@ -158,7 +183,21 @@ def ensure_tool(
             f"cannot fetch {tool}: no Terrapod API URL is configured for this runner"
         )
 
-    resolved = (versions or fetch_versions(cfg, client=client)).get(tool, "")
+    try:
+        resolved = (versions or fetch_versions(cfg, client=client)).get(tool, "")
+    except PlatformToolsUnsupported:
+        # A runner newer than its API — supported skew, and the API is from a
+        # release whose runner image still shipped these binaries. An on-PATH
+        # copy is the correct answer here, not a silent downgrade: there is
+        # nothing to fetch because that deployment never expected a fetch.
+        on_path = shutil.which(tool)
+        if on_path:
+            logger.info("using on-PATH platform tool (API predates the cache)", tool=tool)
+            return Path(on_path)
+        raise PlatformToolError(
+            f"{tool} is not available: this Terrapod API predates the platform-tool "
+            f"cache endpoint and no {tool} binary is on PATH"
+        ) from None
     if not resolved:
         raise PlatformToolError(f"the deployment pins no version for {tool}")
 

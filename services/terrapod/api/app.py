@@ -651,6 +651,7 @@ def create_application() -> FastAPI:
             authenticated_requests_per_minute=settings.rate_limit.authenticated_requests_per_minute,
             runner_requests_per_minute=settings.rate_limit.runner_requests_per_minute,
             auth_requests_per_minute=settings.rate_limit.auth_requests_per_minute,
+            distinct_credentials_per_minute=settings.rate_limit.distinct_credentials_per_minute,
         )
 
     # Prometheus metrics middleware + endpoint

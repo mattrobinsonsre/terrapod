@@ -15,11 +15,11 @@ register's declaration order: the register is right today, and a sort that
 quietly stopped honouring it would only show up at a failover.
 """
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from terrapod.config import HABlobsConfig
+from terrapod.config import HABlobsConfig, settings
 from terrapod.services import blob_classes, blob_sync
 from terrapod.services.blob_classes import COPY, HISTORY, IRREPLACEABLE, VERIFY, BlobClass
 
@@ -399,3 +399,55 @@ class TestOwningClassResolvesOverlaps:
         everything."""
         assert blob_classes.is_safe_key("state/ws-1/sv-1.tfstate") is True
         assert blob_classes.owns(blob_classes.get("state"), "state/ws-1/sv-1.tfstate") is True
+
+
+class TestPerNodeEncryptedClassesAreNotCopied:
+    """A byte-for-byte copy of a per-node-encrypted class is worse than none.
+
+    With `encryption.enabled` each node envelopes state with ITS OWN data key,
+    and `crypto_keys` is deliberately never replicated. Copying the ciphertext
+    puts every object on the peer, so readiness reports a clean bill of health
+    and the failure first appears at failover — as an AES-GCM tag error on every
+    state file at once, which is total state loss with a green light in front of
+    it. The column path is fine (decrypt on read, re-encrypt on write); the blob
+    path has no such step, so it declines instead.
+    """
+
+    async def test_the_state_class_is_skipped_when_encryption_is_on(self):
+        cls = blob_classes.get("state")
+        assert cls.encrypted_at_rest, "state is enveloped per node — see #635"
+
+        with patch.object(settings.encryption, "enabled", True):
+            result = await blob_sync._sync_class(
+                MagicMock(), "tok", "https://peer.test", cls, MagicMock()
+            )
+
+        assert result.copied == 0
+        assert result.examined == 0
+        assert "undecryptable" in (result.stopped_early or "")
+
+    async def test_it_copies_normally_when_encryption_is_off(self):
+        """The default. Nothing about this feature changes for the vast majority
+        of deployments, which do not turn app-layer encryption on."""
+        cls = blob_classes.get("state")
+
+        client_resp = MagicMock()
+        client_resp.json.return_value = {"data": [], "meta": {"cursor": "", "complete": True}}
+        client_resp.raise_for_status = MagicMock()
+        throttle = MagicMock()
+        throttle.cap_reached.return_value = False
+
+        with (
+            patch.object(settings.encryption, "enabled", False),
+            patch("terrapod.storage.get_storage", return_value=AsyncMock()),
+            patch("terrapod.services.blob_sync.arequest_with_retry", return_value=client_resp),
+        ):
+            result = await blob_sync._sync_class(
+                AsyncMock(), "tok", "https://peer.test", cls, throttle
+            )
+
+        assert result.stopped_early is None or "undecryptable" not in result.stopped_early
+
+    async def test_an_unencrypted_class_is_never_skipped_for_this_reason(self):
+        cls = blob_classes.get("registry_modules")
+        assert not cls.encrypted_at_rest

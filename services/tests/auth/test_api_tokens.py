@@ -285,12 +285,30 @@ class TestRotateToken:
 class TestRevokeAllForUser:
     async def test_revoke_all_returns_count(self):
         mock_db = AsyncMock(spec=AsyncSession)
+        tokens = [MagicMock(id=f"at-{i}") for i in range(3)]
         r = MagicMock()
-        r.rowcount = 3
+        r.scalars.return_value.all.return_value = tokens
         mock_db.execute.return_value = r
+
         count = await revoke_all_for_user(mock_db, "leaver@example.com")
+
         assert count == 3
         mock_db.flush.assert_awaited_once()
+
+    async def test_each_token_is_deleted_through_the_orm(self):
+        """Not a bulk DELETE. The replication outbox builds its events from
+        `session.deleted`, which a Core statement never populates — so a bulk
+        revoke would drop the tokens here and leave them live on the standby,
+        which is the whole thing offboarding needs to prevent."""
+        mock_db = AsyncMock(spec=AsyncSession)
+        tokens = [MagicMock(id="at-1"), MagicMock(id="at-2")]
+        r = MagicMock()
+        r.scalars.return_value.all.return_value = tokens
+        mock_db.execute.return_value = r
+
+        await revoke_all_for_user(mock_db, "leaver@example.com")
+
+        assert [c.args[0] for c in mock_db.delete.await_args_list] == tokens
 
 
 class TestListUserTokens:

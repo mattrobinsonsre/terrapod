@@ -2055,7 +2055,10 @@
         "high": "h1gh",
         "medium": "m3d1um",
         "low": "l0w"
-      }
+      },
+      "enforcementLabel": "3nf0rc3m3n7: {level}",
+      "erroredMessage": "7h3 5c4n d1d n07 c0mpl373, 50 7h15 run h45 n07 b33n ch3ck3d.",
+      "blockedErroredMessage": "7h15 run 15 bl0ck3d b3c4u53 7h3 53cur17y 5c4n d1d n07 c0mpl373. F1x 7h3 c4u53 4nd r3-pl4n, 0r 45k 4n 4dm1n 70 0v3rr1d3."
     },
     "architecture": {
       "loadError": "F41l3d 70 l04d 7h3 4rch173c7ur3 cr171qu3.",

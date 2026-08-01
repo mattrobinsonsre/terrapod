@@ -471,7 +471,13 @@ async def _poll_workspace_branch(
             sha=sha[:8],
         )
         return
-    # Keep the in-memory ORM state consistent with the DB.
+    # Keep the in-memory ORM state consistent with the DB — and note that this
+    # line is LOAD-BEARING for replication, not just tidiness. The CAS above
+    # must stay a Core statement (the compare-and-swap with RETURNING is the
+    # concurrency control), and a Core statement emits no outbox event; it is
+    # this ORM assignment that puts the workspace in `session.dirty` so the
+    # poller cursor reaches the standby. Delete it and the follower silently
+    # stops tracking VCS progress.
     ws.vcs_last_commit_sha = sha
     await db.commit()
 
@@ -1101,12 +1107,38 @@ async def _release_commit_claim(ws_id: uuid.UUID, claimed_sha: str, previous_sha
             if existing.scalar_one_or_none() is not None:
                 return
 
-            await db.execute(
+            # Load the row FIRST so the session holds it at `claimed_sha`, then
+            # compare-and-swap, then assign on the ORM object. Exactly the shape
+            # the forward claim uses, and for the same two reasons:
+            #
+            #  - the CAS has to be a Core statement, because that is the
+            #    concurrency control (it must not revert a claim another replica
+            #    has since re-advanced);
+            #  - the ORM assignment after it is what puts the workspace in
+            #    `session.dirty`, and that is the ONLY thing that makes the
+            #    replication outbox emit an event. A bulk statement on its own
+            #    reverted the SHA here and told the standby nothing, so a
+            #    promoted node kept the advanced SHA and skipped the commit for
+            #    good. Do not remove the assignment as redundant — it is not.
+            #
+            # A row lock would be the obvious alternative and does not work:
+            # Workspace eager-loads relationships, and Postgres rejects
+            # FOR UPDATE against the nullable side of an outer join.
+            ws_row = (
+                await db.execute(select(Workspace).where(Workspace.id == ws_id))
+            ).scalar_one_or_none()
+            if ws_row is None or ws_row.vcs_last_commit_sha != claimed_sha:
+                return
+            reverted = await db.execute(
                 update(Workspace)
                 .where(Workspace.id == ws_id)
                 .where(Workspace.vcs_last_commit_sha == claimed_sha)
                 .values(vcs_last_commit_sha=previous_sha)
+                .returning(Workspace.id)
             )
+            if reverted.scalar_one_or_none() is None:
+                return
+            ws_row.vcs_last_commit_sha = previous_sha
             await db.commit()
             logger.info(
                 "Released VCS commit claim after run creation failed",

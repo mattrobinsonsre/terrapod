@@ -45,6 +45,16 @@ class TestHelpers:
         assert _get_client_ip(request) == "10.0.0.1"
 
 
+def _tier_key(mock_redis) -> str:  # type: ignore[no-untyped-def]
+    """The tier bucket key — always the FIRST incr of a request.
+
+    Authenticated requests that mint a new credential bucket issue a SECOND
+    incr for the credential-churn ceiling, so `call_args` (the last call) is
+    not the tier key.
+    """
+    return mock_redis.pipeline.return_value.incr.call_args_list[0].args[0]
+
+
 def _make_redis_mock(count: int = 1, error: Exception | None = None) -> MagicMock:
     """Create a mock Redis client with configurable pipeline behavior.
 
@@ -70,6 +80,7 @@ def _make_app(
     auth_rpm: int = 2,
     authenticated_rpm: int = 1000,
     runner_rpm: int = 0,
+    distinct_credentials_rpm: int = 200,
 ) -> FastAPI:
     """Create a minimal FastAPI app with rate limiting middleware."""
     app = FastAPI()
@@ -92,6 +103,7 @@ def _make_app(
         authenticated_requests_per_minute=authenticated_rpm,
         runner_requests_per_minute=runner_rpm,
         auth_requests_per_minute=auth_rpm,
+        distinct_credentials_per_minute=distinct_credentials_rpm,
         get_redis=get_redis,
     )
     return app
@@ -196,9 +208,7 @@ class TestRateLimitMiddleware:
         )
         assert response.status_code == 200
         # Should have hit the authenticated bucket, not bypassed
-        mock_redis.pipeline.assert_called_once()
-        incr_call = mock_redis.pipeline.return_value.incr.call_args
-        assert "api_authn" in incr_call[0][0]
+        assert "api_authn" in _tier_key(mock_redis)
         assert response.headers["X-Ratelimit-Limit"] == "10"
 
     def test_authenticated_header_uses_higher_tier(self):
@@ -210,8 +220,7 @@ class TestRateLimitMiddleware:
             "/api/terrapod/v1/workspaces", headers={"Authorization": "Bearer some-api-token"}
         )
         assert response.status_code == 200
-        incr_call = mock_redis.pipeline.return_value.incr.call_args
-        assert "api_authn" in incr_call[0][0]
+        assert "api_authn" in _tier_key(mock_redis)
         assert response.headers["X-Ratelimit-Limit"] == "500"
 
     def test_unauthenticated_uses_base_tier(self):
@@ -221,8 +230,7 @@ class TestRateLimitMiddleware:
         client = TestClient(app)
         response = client.get("/api/terrapod/v1/workspaces")
         assert response.status_code == 200
-        incr_call = mock_redis.pipeline.return_value.incr.call_args
-        key = incr_call[0][0]
+        key = _tier_key(mock_redis)
         assert ":api:" in key
         assert "api_authn" not in key
         assert response.headers["X-Ratelimit-Limit"] == "5"
@@ -244,8 +252,7 @@ class TestRateLimitMiddleware:
             headers={"X-Terrapod-Client-Cert": "base64-cert-bytes-here"},
         )
         assert response.status_code == 200
-        incr_call = mock_redis.pipeline.return_value.incr.call_args
-        assert "api_authn" in incr_call[0][0]
+        assert "api_authn" in _tier_key(mock_redis)
         assert response.headers["X-Ratelimit-Limit"] == "500"
 
     def test_zero_limit_means_unlimited(self):
@@ -300,7 +307,11 @@ class TestCredentialBucketing:
         client.get("/api/terrapod/v1/workspaces", headers={"Authorization": "Bearer AAA"})
         client.get("/api/terrapod/v1/workspaces", headers={"Authorization": "Bearer BBB"})
 
-        keys = [c.args[0] for c in mock_redis.pipeline.return_value.incr.call_args_list]
+        keys = [
+            c.args[0]
+            for c in mock_redis.pipeline.return_value.incr.call_args_list
+            if ":churn:" not in c.args[0]
+        ]
         assert len(keys) == 2
         # Same tier prefix + same source IP, but the credential discriminator differs.
         assert keys[0] != keys[1]
@@ -312,9 +323,91 @@ class TestCredentialBucketing:
         client = TestClient(app)
         client.get("/api/terrapod/v1/workspaces", headers={"Authorization": "Bearer SAME"})
         client.get("/api/terrapod/v1/workspaces", headers={"Authorization": "Bearer SAME"})
-        keys = [c.args[0] for c in mock_redis.pipeline.return_value.incr.call_args_list]
+        keys = [
+            c.args[0]
+            for c in mock_redis.pipeline.return_value.incr.call_args_list
+            if ":churn:" not in c.args[0]
+        ]
         # Same token → same bucket (minus the time-window suffix, which is equal here).
         assert keys[0] == keys[1]
+
+
+class TestCredentialChurnCeiling:
+    """Per-credential bucketing (#1075) is only safe with a churn ceiling.
+
+    The credential is deliberately NOT verified in middleware, so a caller who
+    sends a different random Authorization value on every request gets a fresh
+    bucket each time — count always 1, never limited. That is a total bypass of
+    the tier, landing the attacker in a BETTER position than the anonymous
+    tier they avoided. The ceiling caps how fast one source IP may mint NEW
+    buckets, which rotation trips and ordinary traffic never approaches.
+    """
+
+    def test_rotating_credentials_are_blocked_once_churn_exceeds_the_ceiling(self):
+        # Every INCR returns 4 — i.e. the per-credential bucket is fresh-ish but
+        # the churn counter for this IP has passed the ceiling of 3.
+        mock_redis = _make_redis_mock(count=1)
+        calls = {"n": 0}
+
+        async def execute():
+            # First execute() per request is the credential bucket (count 1 =
+            # newly minted); the second is the churn counter, which climbs.
+            calls["n"] += 1
+            return [1] if calls["n"] % 2 == 1 else [calls["n"]]
+
+        mock_redis.pipeline.return_value.execute = AsyncMock(side_effect=execute)
+        app = _make_app(
+            get_redis=lambda: mock_redis, authenticated_rpm=1000, distinct_credentials_rpm=3
+        )
+        client = TestClient(app)
+
+        codes = [
+            client.get(
+                "/api/terrapod/v1/workspaces", headers={"Authorization": f"Bearer random-{i}"}
+            ).status_code
+            for i in range(5)
+        ]
+        # The per-credential counter never exceeds 1, so without the ceiling
+        # every one of these would be a 200.
+        assert 429 in codes, f"rotating credentials were never limited: {codes}"
+
+    def test_a_repeat_credential_does_not_consume_churn(self):
+        # Only a first-in-window bucket (INCR == 1) touches the churn counter, so
+        # a real caller reusing one token must not be charged for it repeatedly.
+        mock_redis = _make_redis_mock(count=7)  # bucket already exists this window
+        app = _make_app(get_redis=lambda: mock_redis, authenticated_rpm=1000)
+        client = TestClient(app)
+
+        client.get("/api/terrapod/v1/workspaces", headers={"Authorization": "Bearer SAME"})
+
+        keys = [c.args[0] for c in mock_redis.pipeline.return_value.incr.call_args_list]
+        assert not any("churn" in k for k in keys), (
+            "an existing credential bucket must not consume churn budget"
+        )
+
+    def test_anonymous_traffic_does_not_consume_churn(self):
+        # Unauthenticated requests are already IP-keyed, so identity == the IP
+        # and there is no bucket-minting to police.
+        mock_redis = _make_redis_mock(count=1)
+        app = _make_app(get_redis=lambda: mock_redis, rpm=5)
+        client = TestClient(app)
+
+        client.get("/api/terrapod/v1/workspaces")
+
+        keys = [c.args[0] for c in mock_redis.pipeline.return_value.incr.call_args_list]
+        assert not any("churn" in k for k in keys)
+
+    def test_zero_ceiling_means_unlimited(self):
+        mock_redis = _make_redis_mock(count=1)
+        app = _make_app(
+            get_redis=lambda: mock_redis, authenticated_rpm=1000, distinct_credentials_rpm=0
+        )
+        client = TestClient(app)
+        for i in range(5):
+            r = client.get(
+                "/api/terrapod/v1/workspaces", headers={"Authorization": f"Bearer random-{i}"}
+            )
+            assert r.status_code == 200
 
 
 class TestCapabilityBucketing:
@@ -349,7 +442,11 @@ class TestCapabilityBucketing:
         client.get("/api/v2/applies/run-AAA/log")
         client.get("/api/v2/applies/run-BBB/log")
 
-        keys = [c.args[0] for c in mock_redis.pipeline.return_value.incr.call_args_list]
+        keys = [
+            c.args[0]
+            for c in mock_redis.pipeline.return_value.incr.call_args_list
+            if ":churn:" not in c.args[0]
+        ]
         assert len(keys) == 2
         assert keys[0] != keys[1]
         assert all(k.startswith("tp:ratelimit:api_capability:cap:") for k in keys)

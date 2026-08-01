@@ -22,6 +22,7 @@ from terrapod.runner.phases import platform_tool
 from terrapod.runner.phases.platform_tool import (
     UNPACK,
     PlatformToolError,
+    PlatformToolsUnsupported,
     ensure_tool,
     fetch_versions,
     tool_path_or_name,
@@ -228,6 +229,58 @@ class TestEnsureTool:
                 tmp_dir=tmp_path,
                 bin_dir=tmp_path / "bin",
             )
+
+
+class TestOlderApiSkew:
+    """A newer runner against an older API — a documented supported skew.
+
+    docs/versioning-and-support.md promises that direction works within the
+    window. An API predating the platform-tool cache is from a release whose
+    runner image still shipped opa/trivy/checkov, so a 404 on the versions
+    endpoint means "there is nothing to fetch here", not a failure. Treating it
+    as fatal turned every policy run into a hard failure on a partial upgrade.
+    """
+
+    def test_a_404_is_reported_as_unsupported_not_a_failure(self):
+        client = MagicMock()
+        client.get.return_value = MagicMock(status_code=404)
+        with pytest.raises(PlatformToolsUnsupported):
+            fetch_versions(_cfg(), client=client)
+
+    def test_ensure_tool_falls_back_to_the_on_path_binary(self, tmp_path):
+        client = MagicMock()
+        client.get.return_value = MagicMock(status_code=404)
+        with patch(
+            "terrapod.runner.phases.platform_tool.shutil.which", return_value="/usr/bin/opa"
+        ):
+            got = ensure_tool(
+                _cfg(), "opa", tmp_dir=tmp_path, bin_dir=tmp_path / "bin", client=client
+            )
+        assert got == Path("/usr/bin/opa")
+
+    def test_it_still_fails_when_nothing_is_on_path(self, tmp_path):
+        """No fetch and no binary is a genuine dead end — a policy gate that
+        cannot be evaluated must never be skipped."""
+        client = MagicMock()
+        client.get.return_value = MagicMock(status_code=404)
+        with patch("terrapod.runner.phases.platform_tool.shutil.which", return_value=None):
+            with pytest.raises(PlatformToolError, match="no opa binary is on PATH"):
+                ensure_tool(
+                    _cfg(), "opa", tmp_dir=tmp_path, bin_dir=tmp_path / "bin", client=client
+                )
+
+    def test_a_5xx_stays_fatal(self, tmp_path):
+        """Only 404 means "the endpoint does not exist". A 5xx means it does and
+        something is wrong, so falling back would skip a gate that should hold."""
+        client = MagicMock()
+        client.get.return_value = MagicMock(status_code=503)
+        with patch(
+            "terrapod.runner.phases.platform_tool.shutil.which", return_value="/usr/bin/opa"
+        ):
+            with pytest.raises(PlatformToolError, match="could not read"):
+                ensure_tool(
+                    _cfg(), "opa", tmp_dir=tmp_path, bin_dir=tmp_path / "bin", client=client
+                )
 
 
 class TestToolPathOrName:

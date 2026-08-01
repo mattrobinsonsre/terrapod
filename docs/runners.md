@@ -1,6 +1,6 @@
 # Runners
 
-Runners are ephemeral Kubernetes Jobs that execute `terraform` or `tofu` plan and apply operations. The default runner image is a slim Debian (`python:3.13-slim`) container with `git`, `openssh-client`, `ca-certificates`, and a pinned `opa` binary -- no terraform/tofu binary baked in. The correct version is downloaded at runtime from the [binary cache](registry.md). The whole runner orchestrator is Python; nothing from the bash era survives.
+Runners are ephemeral Kubernetes Jobs that execute `terraform` or `tofu` plan and apply operations. The default runner image is a slim Debian (`python:3.13-slim`) container with `git`, `openssh-client` and `ca-certificates` -- no terraform/tofu binary baked in, and since #1208 no `opa`, `trivy` or `checkov` either. Every one of them is downloaded at runtime from the [binary cache](registry.md). The whole runner orchestrator is Python; nothing from the bash era survives.
 
 ---
 
@@ -342,7 +342,7 @@ Sequence inside the Python runner orchestrator (`services/terrapod/runner/job_en
    - `POST /api/terrapod/v1/runs/{id}/policy-results` — uploads the aggregated results. Persisted via Postgres `ON CONFLICT DO NOTHING` on `(run_id, policy_set_id)` so retries are idempotent.
 3. The runner posts `plan-result`. The API's post-plan gate is now a pure DB query — by this point the policy_evaluation rows already exist (or there were no applicable sets, which is the right answer too).
 
-If `tofu show -json` failed but the plan succeeded, the runner records an `errored` outcome for every applicable set (fail-closed for mandatory sets). The OPA binary is pinned + SHA-verified in `docker/Dockerfile.runner` and the version is kept in sync with `Dockerfile.api` and `Dockerfile.test` — currently **OPA v1.18.0** with the **Rego v1 syntax** (`package … if {}` form). Bumping requires editing the `ARG OPA_VERSION=` in all three Dockerfiles and the matching `OPA_SHA256_*` constants.
+If `tofu show -json` failed but the plan succeeded, the runner records an `errored` outcome for every applicable set (fail-closed for mandatory sets). The OPA binary is **not in the runner image** (#1208). It is pulled through the binary cache and checksum-verified against the sibling `.sha256` OPA publishes, and its version is an ordinary Helm value — `api.config.registry.platform_tools.opa_version` — so bumping it is a `helm upgrade`, not a Terrapod release. The fetch happens **only when a policy set actually applies to the run**, so a deployment with no policies never downloads it, and a fetch failure is **fatal to the run** rather than a silently skipped gate. Rego must be **v1 syntax** (`package … if {}` form).
 
 This places eval workload exactly where the plan workload already lives — same pod, same resource budget, same K8s autoscaling. The API server stays out of the per-run hot path entirely; its only policy responsibilities are CRUD, write-time validation, the bundle endpoint, the results endpoint, and the gate query.
 

@@ -178,11 +178,33 @@ async def _sync_class(
     cls: blob_classes.BlobClass,
     throttle: _Throttle,
 ) -> ClassResult:
+    result = ClassResult(name=cls.name, tier=blob_classes.effective_tier(cls))
+    # Refuse to copy a class whose objects are enveloped by app-layer
+    # encryption (#635). Each node wraps with ITS OWN data key and `crypto_keys`
+    # is deliberately never replicated, so a byte-for-byte copy lands on the
+    # peer as ciphertext it holds no key for. Every object would be present,
+    # readiness would report a clean bill of health, and the failure would first
+    # appear at failover as an AES-GCM tag error on every state file at once.
+    #
+    # Refusing is the honest answer: an empty class the operator can see beats a
+    # full one they cannot decrypt. The column path is unaffected — it decrypts
+    # on read and the peer re-encrypts on write; the blob path has no such step.
+    if cls.encrypted_at_rest and settings.encryption.enabled:
+        result.stopped_early = (
+            "app-layer encryption is on and this class is enveloped per-node — "
+            "copied bytes would be undecryptable on the peer"
+        )
+        logger.warning(
+            "skipping blob class: encrypted per-node, a copy would not be readable",
+            blob_class=cls.name,
+        )
+        return result
+
     from terrapod.storage import get_storage
 
     store = get_storage()
-    result = ClassResult(name=cls.name, tier=blob_classes.effective_tier(cls))
     cfg = settings.ha.blobs
+
     semaphore = asyncio.Semaphore(cfg.concurrency)
     cursor = ""
 

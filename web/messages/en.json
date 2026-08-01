@@ -1995,7 +1995,10 @@
         "high": "high",
         "medium": "medium",
         "low": "low"
-      }
+      },
+      "enforcementLabel": "enforcement: {level}",
+      "erroredMessage": "The scan did not complete, so this run has not been checked.",
+      "blockedErroredMessage": "This run is blocked because the security scan did not complete. Fix the cause and re-plan, or ask an admin to override."
     },
     "architecture": {
       "loadError": "Failed to load the architecture critique.",

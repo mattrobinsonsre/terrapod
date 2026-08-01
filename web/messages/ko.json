@@ -2055,7 +2055,10 @@
         "high": "높음",
         "medium": "중간",
         "low": "낮음"
-      }
+      },
+      "enforcementLabel": "적용: {level}",
+      "erroredMessage": "스캔이 완료되지 않아 이 실행은 검사되지 않았습니다.",
+      "blockedErroredMessage": "보안 스캔이 완료되지 않아 이 실행이 차단되었습니다. 원인을 해결하고 다시 계획하거나 관리자에게 재정의를 요청하세요."
     },
     "architecture": {
       "loadError": "아키텍처 평가를 불러오지 못했습니다.",

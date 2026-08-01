@@ -2055,7 +2055,10 @@
         "high": "高",
         "medium": "中",
         "low": "低"
-      }
+      },
+      "enforcementLabel": "強制層級：{level}",
+      "erroredMessage": "掃描未完成，因此本次執行尚未檢查。",
+      "blockedErroredMessage": "本次執行已被封鎖，因為安全掃描未完成。請修正原因後重新執行規劃，或請管理員覆寫。"
     },
     "architecture": {
       "loadError": "無法載入架構評審。",

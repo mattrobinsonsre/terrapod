@@ -331,8 +331,18 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				},
 			},
 			"agent_pool_id": schema.StringAttribute{
-				Description: "Agent pool ID for agent execution mode. Assigns exactly one pool, replacing any existing set — use `agent_pool_ids` to assign several. Conflicts with `agent_pool_ids`.",
-				Optional:    true,
+				Description: "Agent pool ID for agent execution mode. Assigns exactly one pool, replacing any existing set — use `agent_pool_ids` to assign several. Reads back as element 0 of the set. Conflicts with `agent_pool_ids`.",
+				// Optional + Computed, same #684 rationale as agent_pool_ids: the
+				// server ALWAYS answers this attribute with element 0 of the pool
+				// set (tfe_v2.py, "a projection, NOT a preference"). So a config
+				// that assigns pools via the plural and omits this one plans null
+				// and applies "apool-<first>" — "inconsistent result after apply",
+				// which aborts the create outright. Computed lets the server own it.
+				Optional: true,
+				Computed: true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"agent_pool_ids": schema.ListAttribute{
 				Description: "Agent pools this workspace's runs may execute on (#1085). The set is flat: a queued run is offered to every pool at once and whichever pool has a live listener claims it first, so losing one pool does not stop the workspace. There is no primary and no ordering preference. `agent_pool_id` reads back as element 0. Conflicts with `agent_pool_id`. Omitting this attribute leaves any existing server-side value untouched — it does not clear it; set `agent_pool_ids = []` to clear.",

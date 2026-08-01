@@ -2055,7 +2055,10 @@
         "high": "høy",
         "medium": "middels",
         "low": "lav"
-      }
+      },
+      "enforcementLabel": "håndheving: {level}",
+      "erroredMessage": "Skanningen ble ikke fullført, så denne kjøringen er ikke kontrollert.",
+      "blockedErroredMessage": "Denne kjøringen er blokkert fordi sikkerhetsskanningen ikke ble fullført. Rett årsaken og planlegg på nytt, eller be en administrator om å overstyre."
     },
     "architecture": {
       "loadError": "Kunne ikke laste arkitekturkritikken.",

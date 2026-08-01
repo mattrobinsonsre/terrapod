@@ -2055,7 +2055,10 @@
         "high": "高",
         "medium": "中",
         "low": "低"
-      }
+      },
+      "enforcementLabel": "適用: {level}",
+      "erroredMessage": "スキャンが完了しなかったため、この実行は検査されていません。",
+      "blockedErroredMessage": "セキュリティスキャンが完了しなかったため、この実行はブロックされています。原因を修正して再度プランを実行するか、管理者に上書きを依頼してください。"
     },
     "architecture": {
       "loadError": "アーキテクチャ評価の読み込みに失敗しました。",

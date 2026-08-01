@@ -153,10 +153,10 @@ differs:
 | | What it is | Where it lives |
 |---|---|---|
 | **Outbound** | The client id + secret this node **presents** when it pulls | `ha.peer.client_id` + a Secret. A credential it holds but does not own, so there is nothing to persist — the same treatment an SSO client secret gets |
-| **Inbound** | The client this node **accepts** when its peer pulls from it | `ha.peer.inbound.*`. It owns this one, so config states the intent and startup reconciles it into a persisted row — the same pattern as the CA |
+| **Inbound** | The client this node **accepts** when its peer pulls from it | `ha.peer.inbound.*` + a Secret. Also not persisted — the running config *is* the accepted credential, compared in constant time on each token request |
 
-The follower pulls, so node B presents a credential that node A accepts: one row
-on A, one secret held by B.
+The follower pulls, so node B presents a credential that node A accepts: one
+secret configured on A as inbound, the same secret held by B as outbound.
 
 ### Both directions, always
 
@@ -260,6 +260,19 @@ was discarded to reach convergence.
 **Encryption is per-node.** Values are decrypted by the sender, cross the
 authenticated peer link, and are re-encrypted under the receiving node's own
 key. Neither node holds the other's key.
+
+That describes the **column** path, which decrypts on read and re-encrypts on
+write. The **object-store** path has no such step — it copies bytes — so with
+`encryption.enabled` a copied state object would arrive as ciphertext the peer
+holds no key for. Rather than mirror objects nobody can read, the copier
+**declines** the `state` class outright while app-layer encryption is on, and
+says so in the sync result. An empty class you can see beats a full one you
+cannot decrypt: the alternative is a peer that looks completely healthy right up
+until failover, when every state file fails to decrypt at once.
+
+If you run app-layer encryption and want the peer's object store populated,
+replicate at the storage layer instead (bucket replication, or a shared bucket),
+where the ciphertext and its key management stay consistent.
 
 **There is no conflict resolution, deliberately.** Only the leader writes, so
 the peer's row is authoritative — applying it is the whole rule. Per-field merge

@@ -2055,7 +2055,10 @@
         "high": "high",
         "medium": "medium",
         "low": "low"
-      }
+      },
+      "enforcementLabel": "marklar: {level}",
+      "erroredMessage": "The marklar did not complete, so this marklar has not been checked.",
+      "blockedErroredMessage": "This marklar is blocked because the marklar did not complete. Fix the marklar and re-marklar, or ask a marklar to override."
     },
     "architecture": {
       "loadError": "Failed to load the marklar marklar.",

@@ -84,7 +84,13 @@ ROLE_ASSIGNMENTS = register(
     ReplicatedClass(
         name="role_assignments",
         model=RoleAssignment,
-        pk_attrs=("provider_name", "email"),
+        # All THREE PK columns. A user may hold several roles under one
+        # (provider, email), so a two-column key collapses them: every row
+        # encodes to the same entity_id, read_entity returns an arbitrary one,
+        # apply_upsert mutates role_name on the existing row instead of
+        # inserting a second, and the backfill cursor pages straight past the
+        # siblings. The follower ends up granting one arbitrary role.
+        pk_attrs=("provider_name", "email", "role_name"),
     )
 )
 

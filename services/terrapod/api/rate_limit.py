@@ -132,6 +132,7 @@ class RateLimitMiddleware:
         authenticated_requests_per_minute: int = 1000,
         runner_requests_per_minute: int = 0,
         auth_requests_per_minute: int = 10,
+        distinct_credentials_per_minute: int = 200,
         get_redis: Callable | None = None,
     ) -> None:
         self.app = app
@@ -139,6 +140,7 @@ class RateLimitMiddleware:
         self.authenticated_requests_per_minute = authenticated_requests_per_minute
         self.runner_requests_per_minute = runner_requests_per_minute
         self.auth_requests_per_minute = auth_requests_per_minute
+        self.distinct_credentials_per_minute = distinct_credentials_per_minute
         self._get_redis = get_redis
 
     def _resolve_redis(self):  # type: ignore[no-untyped-def]
@@ -220,9 +222,9 @@ class RateLimitMiddleware:
         # the shared BFF/ingress pod IP behind the proxy, so an IP-keyed
         # authenticated tier is one global bucket (#1075). Unauthenticated
         # traffic (login, anon) has no credential and stays IP-keyed.
-        identity = (
-            capability or _credential_bucket(auth_header, listener_cert) or _get_client_ip(request)
-        )
+        client_ip = _get_client_ip(request)
+        credential = _credential_bucket(auth_header, listener_cert)
+        identity = capability or credential or client_ip
 
         # Sliding window: 60-second buckets
         window_id = int(time.time()) // 60
@@ -238,6 +240,49 @@ class RateLimitMiddleware:
             logger.warning("Rate limit Redis error, failing open", exc_info=True)
             await self.app(scope, receive, send)
             return
+
+        # Bucket-churn ceiling. Keying the authenticated tier on the credential
+        # (#1075) is right, but the credential is deliberately NOT verified
+        # here — so a caller who sends a DIFFERENT random Authorization value on
+        # every request lands in a brand-new bucket each time, whose count is
+        # always 1, and is never limited at all. That is a worse position than
+        # the anonymous tier it bypasses, and each request still costs a token
+        # lookup downstream before the 401.
+        #
+        # An IP ceiling on the tier as a whole would undo #1075 (behind the BFF
+        # every browser shares one pod IP). So cap the rate at which ONE source
+        # can MINT buckets instead: only a first-in-window bucket (INCR == 1)
+        # touches the churn counter. A real caller mints one per credential per
+        # minute; a rotating attacker mints one per request and is capped.
+        #
+        # Scoped to CREDENTIAL buckets only. The capability bucket (a run UUID in
+        # the path) is minted legitimately once per run being tailed, and behind
+        # the BFF that is every browser's runs against one IP — charging it here
+        # could re-freeze live logs, which is the bug #1075 existed to fix.
+        if count == 1 and credential is not None and identity == credential:
+            try:
+                churn_key = f"tp:ratelimit:churn:{client_ip}:{window_id}"
+                pipe = redis.pipeline(transaction=False)
+                pipe.incr(churn_key)
+                pipe.expire(churn_key, 120)
+                churn = (await pipe.execute())[0]
+            except Exception:
+                logger.warning("Rate limit churn check failed, failing open", exc_info=True)
+                churn = 0
+            if churn > self.distinct_credentials_per_minute > 0:
+                logger.warning(
+                    "Credential churn limit exceeded — rotating credentials?",
+                    client_ip=client_ip,
+                    distinct=churn,
+                )
+                retry_after = 60 - (int(time.time()) % 60)
+                response = JSONResponse(
+                    status_code=429,
+                    content={"errors": [{"status": "429", "title": "Rate limit exceeded"}]},
+                    headers={"Retry-After": str(retry_after)},
+                )
+                await response(scope, receive, send)
+                return
 
         if count > limit:
             retry_after = 60 - (int(time.time()) % 60)

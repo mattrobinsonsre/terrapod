@@ -2055,7 +2055,10 @@
         "high": "hög",
         "medium": "medel",
         "low": "låg"
-      }
+      },
+      "enforcementLabel": "tillämpning: {level}",
+      "erroredMessage": "Skanningen slutfördes inte, så den här körningen har inte kontrollerats.",
+      "blockedErroredMessage": "Den här körningen är blockerad eftersom säkerhetsskanningen inte slutfördes. Åtgärda orsaken och planera om, eller be en administratör att åsidosätta."
     },
     "architecture": {
       "loadError": "Det gick inte att läsa in arkitekturkritiken.",
