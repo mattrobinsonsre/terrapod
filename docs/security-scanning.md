@@ -111,11 +111,33 @@ the caller's RBAC.
 See [`api-reference.md`](api-reference.md) for the full endpoint + attribute
 reference.
 
-## Runner image
+## Where the engines come from
 
-The runner image bundles both engines — Trivy as a checksum-verified binary and
-Checkov in an isolated virtualenv (so its dependency tree never collides with
-the runner's own). A runner image older than this feature simply records no scan
-result; for an `enforced` workspace the server fails closed (synthesises an
-errored result and blocks) until the runner image is rolled forward, so an
-out-of-date runner can never silently skip an enforced gate.
+Neither engine is bundled in the runner image. Both are pulled through the
+binary cache at run time, checksum-verified against what the publisher
+publishes, and their versions are Helm values:
+
+```yaml
+api:
+  config:
+    registry:
+      platform_tools:
+        checkov_version: "3.3.8"
+        trivy_version: "0.72.0"
+```
+
+Only the engine a run actually selects is fetched — a Checkov workspace never
+downloads Trivy. The benefit over baking them in is that an upstream fix reaches
+you with a `helm upgrade` rather than waiting for a Terrapod release; the cost is
+a first-run download per runner (served from your own object storage after the
+first fetch, so it is a local read thereafter).
+
+**A failed fetch is recorded, not raised.** It lands as an `errored` scan result,
+which for an `enforced` workspace the server turns into a block — the same
+fail-closed behaviour as a crashed scanner, and the same behaviour a runner image
+older than this feature gets. An out-of-date or offline runner can never silently
+skip an enforced gate.
+
+**Air-gapped / sealed installs** pre-warm both engines like any other cached
+artifact; the bulk-warm endpoint and post-install warm Job include them
+automatically, derived from the configured versions.

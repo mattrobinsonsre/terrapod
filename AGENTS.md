@@ -618,6 +618,33 @@ multi-language implementation ships in the same PR**:
   flaky test: prove it's flaky, then **fix the flake** — re-running until green
   just hides it for the next person.
 
+## Every minor release reviews the platform-tool versions
+
+`opa`, `trivy` and `checkov` are not baked into Terrapod's images — they are
+pulled through the binary cache, and their versions are Helm values in
+`registry.platform_tools` (#1208). That makes an upstream fix a `helm upgrade`
+for operators instead of a Terrapod release, which is the whole point; the
+trade is that **nothing bumps them but us**.
+
+So **every minor release checks and updates those three defaults in
+`values.yaml`**. It takes a minute:
+
+```sh
+gh api repos/open-policy-agent/opa/releases/latest --jq .tag_name
+gh api repos/aquasecurity/trivy/releases/latest    --jq .tag_name
+gh api repos/bridgecrewio/checkov/releases/latest  --jq .tag_name
+```
+
+This is now the mechanism that clears a whole class of finding. Before #1208
+these tools' vendored modules were reported against Terrapod's own artifacts and
+the only response was to argue reachability in the accepted-risk register; four
+such entries existed at once and none could be fixed, because you cannot rebuild
+someone else's release binary. Bumping the default is the fix that replaced that
+argument — skip it for a few releases and the register starts refilling with
+things a version bump would have cleared.
+
+Patch releases may skip it unless the patch is *about* one of these tools.
+
 ## Patching an older release line
 
 Ordinary releases are cut by tagging `main`. A **patch for a line that `main`
