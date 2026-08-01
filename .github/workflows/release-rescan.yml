@@ -1,0 +1,307 @@
+name: Release Re-scan
+
+# Re-scans the releases we still support against *current* advisory data and
+# *current* rules, and raises an issue when something actionable appears (#1212).
+#
+# The release-time gate in ci.yml uses `ignore-unfixed`, so a vulnerability
+# becomes visible to it only once upstream publishes a fix. A released image is
+# immutable and nothing re-checks it, so without this the first we hear about a
+# newly-fixable CVE in a shipped release is when an operator scans it and opens
+# an issue — which is exactly how #1206 reached us.
+#
+# It also makes an existing promise operable: SECURITY.md offers "security fixes
+# only" for the previous minor, and until now nothing told us a fix was needed.
+#
+# Two scan families:
+#   artifacts — Trivy against the published images, per architecture
+#   source    — pip-audit, npm audit and Semgrep against the source at the tag
+#
+# Both apply TODAY'S suppressions and TODAY'S rules deliberately. The current
+# accepted-risk register is the reasoning we stand behind now: an entry we have
+# since dropped must not go on suppressing a finding in a version we still
+# support, and a rule we have since added is the entire point of re-scanning.
+#
+# This is a reporter, not a gate. It does not fail on findings — the release-time
+# `scan-images` job is the gate, and a permanently red scheduled job is the same
+# failure mode as a noisy one: muted, then ignored when it matters.
+
+on:
+  schedule:
+    # Wednesdays, offset from pricesheet.yml (Mondays 06:17) so two scheduled
+    # jobs are not competing for runners or attention on the same morning.
+    - cron: "23 5 * * 3"
+  workflow_dispatch:
+    inputs:
+      tags:
+        description: "Comma-separated tags to scan (blank = latest patch of the supported minors)"
+        required: false
+        default: ""
+      minors:
+        description: "How many recent minors to cover when tags is blank"
+        required: false
+        default: "2"
+
+permissions:
+  contents: read
+
+env:
+  REGISTRY: ghcr.io/mattrobinsonsre
+  SEMGREP_IMAGE: semgrep/semgrep:1.117
+
+jobs:
+  discover:
+    name: Discover supported releases
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      tags: ${{ steps.pick.outputs.tags }}
+      list: ${{ steps.pick.outputs.list }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Pick the latest patch of each supported minor
+        id: pick
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          INPUT_TAGS: ${{ inputs.tags }}
+          INPUT_MINORS: ${{ inputs.minors || '2' }}
+        run: |
+          set -euo pipefail
+          gh api "repos/${GITHUB_REPOSITORY}/releases" --paginate \
+            --jq '.[] | select(.draft == false) | .tag_name' > all-tags.txt || true
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json, os, re
+
+          explicit = [t.strip() for t in os.environ.get("INPUT_TAGS", "").split(",") if t.strip()]
+          if explicit:
+              tags = explicit
+          else:
+              # Group semver release tags by minor, keep the highest patch in
+              # each, then take the N most recent minors. Non-semver tags (the
+              # rolling `pricesheet` release) are skipped rather than sorted.
+              latest: dict[tuple[int, int], tuple[int, str]] = {}
+              for line in open("all-tags.txt"):
+                  m = re.fullmatch(r"v(\d+)\.(\d+)\.(\d+)", line.strip())
+                  if not m:
+                      continue
+                  major, minor, patch = (int(g) for g in m.groups())
+                  key = (major, minor)
+                  if key not in latest or patch > latest[key][0]:
+                      latest[key] = (patch, line.strip())
+              n = int(os.environ.get("INPUT_MINORS") or 2)
+              ordered = sorted(latest, reverse=True)[:n]
+              tags = [latest[k][1] for k in ordered]
+
+          print(f"tags={json.dumps(tags)}")
+          print(f"list={' '.join(tags)}")
+          PY
+          echo "Selected: $(grep '^list=' "$GITHUB_OUTPUT" | tail -1)"
+
+  artifacts:
+    name: Scan ${{ matrix.image }} ${{ matrix.tag }} (${{ matrix.arch }})
+    needs: discover
+    if: needs.discover.outputs.tags != '[]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    strategy:
+      fail-fast: false
+      matrix:
+        tag: ${{ fromJSON(needs.discover.outputs.tags) }}
+        image: [terrapod-api, terrapod-web, terrapod-runner, terrapod-listener, terrapod-migrations]
+        arch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Log in to GHCR
+        uses: ./.github/actions/ghcr-login
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ github.actor }}
+
+      - name: Trivy
+        continue-on-error: true   # a missing image for an older tag must not sink the run
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        env:
+          # A released tag is a multi-arch manifest; without this Trivy resolves
+          # to the runner's own platform and the arm64 leg scans amd64.
+          TRIVY_PLATFORM: linux/${{ matrix.arch }}
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ matrix.image }}:${{ matrix.tag }}
+          format: json
+          output: raw.json
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          trivyignores: pentest/trivy/.trivyignore
+          exit-code: '0'          # reporter, not a gate
+
+      - name: Normalise
+        run: |
+          python3 scripts/rescan_normalise.py trivy raw.json \
+            "${{ matrix.tag }}" "image:${{ matrix.image }} (${{ matrix.arch }})" \
+            "finding.json"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: rescan-${{ matrix.tag }}-${{ matrix.image }}-${{ matrix.arch }}
+          path: finding.json
+          retention-days: 7
+
+  source:
+    name: Scan source ${{ matrix.tag }}
+    needs: discover
+    if: needs.discover.outputs.tags != '[]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        tag: ${{ fromJSON(needs.discover.outputs.tags) }}
+    steps:
+      # The released source...
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ matrix.tag }}
+          path: release
+      # ...scanned with current rules and current suppressions. Two checkouts
+      # rather than one, because "old code, today's opinion of it" is the whole
+      # point and conflating them would silently scan old code with old rules.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          path: current
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.13'
+
+      - name: pip-audit
+        continue-on-error: true
+        working-directory: release/services
+        run: |
+          set -uo pipefail
+          pip install --quiet poetry poetry-plugin-export pip-audit
+          poetry export -f requirements.txt -o requirements.txt --without-hashes
+          ignores=()
+          while read -r line; do
+            line="${line%%#*}"; line="$(echo "$line" | tr -d '[:space:]')"
+            [ -n "$line" ] && ignores+=(--ignore-vuln "$line")
+          done < "$GITHUB_WORKSPACE/current/pentest/pip-audit-ignore.txt"
+          pip-audit -r requirements.txt --format json --output "$GITHUB_WORKSPACE/pip.json" \
+            "${ignores[@]}" || true
+
+      # No setup-node: the runner's preinstalled Node is sufficient. `npm audit`
+      # resolves the lockfile and queries the advisory API — it does not build
+      # anything, so pinning a major here would add an action dependency for no
+      # behavioural difference.
+      - name: npm audit
+        continue-on-error: true
+        working-directory: release/web
+        run: |
+          set -uo pipefail
+          # --ignore-scripts: we only need the resolved tree, not a working
+          # build, and native postinstalls on an older lockfile are a slow way
+          # to fail for reasons that have nothing to do with security.
+          npm ci --ignore-scripts --no-audit --no-fund > /dev/null 2>&1 || true
+          npm audit --audit-level=high --json > "$GITHUB_WORKSPACE/npm.json" || true
+
+      - name: Semgrep
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE/release:/src" \
+            -v "$GITHUB_WORKSPACE/current/pentest:/rules" \
+            -v "$GITHUB_WORKSPACE:/out" \
+            "${SEMGREP_IMAGE}" \
+            semgrep scan /src \
+              --config "p/python" \
+              --config "p/owasp-top-ten" \
+              --config "p/secrets" \
+              --config "/rules/semgrep/.semgrep.yml" \
+              --exclude "web/node_modules" \
+              --exclude ".next" \
+              --exclude "dist" \
+              --exclude "alembic/versions" \
+              --exclude "reports" \
+              --exclude "services/ai_eval" \
+              --exclude-rule "python.lang.security.insecure-hash-algorithms-md5.insecure-hash-algorithm-md5" \
+              --exclude-rule "python.lang.security.audit.logging.logger-credential-leak.python-logger-credential-disclosure" \
+              --exclude-rule "python.flask.security.audit.directly-returned-format-string.directly-returned-format-string" \
+              --json --output /out/semgrep.json || true
+
+      - name: Normalise
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          python3 current/scripts/rescan_normalise.py pip-audit pip.json \
+            "${{ matrix.tag }}" "source:python" "finding-pip.json"
+          python3 current/scripts/rescan_normalise.py npm-audit npm.json \
+            "${{ matrix.tag }}" "source:frontend" "finding-npm.json" \
+            current/pentest/npm-audit-allow.txt
+          python3 current/scripts/rescan_normalise.py semgrep semgrep.json \
+            "${{ matrix.tag }}" "source:semgrep" "finding-semgrep.json"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: rescan-${{ matrix.tag }}-source
+          path: finding-*.json
+          retention-days: 7
+
+  report:
+    name: Report
+    needs: [discover, artifacts, source]
+    if: always() && needs.discover.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          path: findings
+          pattern: rescan-*
+
+      - name: Build the report
+        id: build
+        run: |
+          python3 scripts/rescan_report.py findings body.md \
+            ${{ needs.discover.outputs.list }} >> "$GITHUB_OUTPUT"
+
+      - name: Open or refresh the tracking issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TITLE: "Security: findings in supported releases"
+          HAS_FINDINGS: ${{ steps.build.outputs.has_findings }}
+          FINGERPRINT: ${{ steps.build.outputs.fingerprint }}
+        run: |
+          set -euo pipefail
+          existing=$(gh issue list --state open --search "$TITLE in:title" \
+            --json number,body --jq '.[0] // empty')
+
+          if [ "$HAS_FINDINGS" != "true" ]; then
+            # Nothing actionable. Leave any open issue alone rather than
+            # auto-closing it: a human may still be mid-patch-release on it, and
+            # a findings list that empties because a scan leg was skipped should
+            # not read as "resolved".
+            echo "No findings. Nothing to raise."
+            exit 0
+          fi
+
+          if [ -n "$existing" ]; then
+            number=$(echo "$existing" | jq -r '.number')
+            if echo "$existing" | jq -r '.body' | grep -q "terrapod-release-rescan:$FINGERPRINT"; then
+              echo "Issue #$number already reports this exact finding set — not re-notifying."
+              exit 0
+            fi
+            gh issue edit "$number" --body-file body.md
+            gh issue comment "$number" --body \
+              "The finding set changed on the latest re-scan — body updated above."
+            echo "Refreshed issue #$number"
+          else
+            gh issue create --title "$TITLE" --body-file body.md --label security 2>/dev/null \
+              || gh issue create --title "$TITLE" --body-file body.md
+          fi

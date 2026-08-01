@@ -562,15 +562,18 @@ jobs:
         run: poetry export -f requirements.txt -o requirements.txt --without-hashes
         working-directory: services
       - name: Run pip-audit
-        # PYSEC-2025-183 (pyjwt): disputed by the supplier — the advisory
-        # concerns weak HMAC keys, but key length is controlled by the
-        # application that uses the library, not by the library. No fix
-        # version is published. Suppress until a fix lands or the dispute
-        # is resolved upstream.
+        # Accepted advisories live in pentest/pip-audit-ignore.txt, each with
+        # its reasoning and exit condition. Read from the file rather than
+        # inlined here so that release-rescan.yml — which re-checks supported
+        # releases against current reasoning — cannot drift from this gate.
         run: |
           pip install pip-audit
-          pip-audit -r services/requirements.txt --strict --desc \
-            --ignore-vuln PYSEC-2025-183
+          ignores=()
+          while read -r line; do
+            line="${line%%#*}"; line="$(echo "$line" | tr -d '[:space:]')"
+            [ -n "$line" ] && ignores+=(--ignore-vuln "$line")
+          done < pentest/pip-audit-ignore.txt
+          pip-audit -r services/requirements.txt --strict --desc "${ignores[@]}"
 
   # ── Dependency Audit (npm) ────────────────────────────
   npm-audit:
@@ -590,27 +593,18 @@ jobs:
       - name: Install dependencies
         run: npm ci
       - name: Run npm audit
-        # Fail on any high/critical advisory EXCEPT explicitly-allowlisted ones
-        # (mirrors pip-audit's --ignore-vuln and trivy's .trivyignore). Each
-        # allowlisted advisory is build/lint-only, non-reachable, and awaiting a
-        # fix that only lands via a major toolchain upgrade — keep each with a
-        # reason + tracking issue, and drop it the moment the upgrade is taken:
-        #   GHSA-mh99-v99m-4gvg  brace-expansion ReDoS — a devDependency only
-        #     (eslint -> minimatch -> brace-expansion; never sees runtime/user
-        #     input). Patched only in brace-expansion 5.0.8, whose new export
-        #     shape breaks the eslint chain's minimatch. Tracked in #1058.
-        #     RE-TESTED 2026-08-01 against eslint 10.8.0, which was the
-        #     presumed fix path: it does NOT resolve this. `npm run lint` on
-        #     eslint 10.8.0 dies with the same
-        #     `(0, brace_expansion_1.expand) is not a function` inside
-        #     @eslint/config-array's bundled minimatch. So the upgrade is not
-        #     an available fix today — don't re-run that experiment without
-        #     first checking @eslint/config-array's minimatch pin upstream.
+        # Fail on any high/critical advisory except those allowlisted in
+        # pentest/npm-audit-allow.txt, which carries the reasoning and exit
+        # condition for each (mirrors pip-audit's ignore file and trivy's
+        # .trivyignore). Shared with release-rescan.yml so the two cannot drift.
         run: |
           npm audit --audit-level=high --json > audit.json || true
           node -e '
             const a = require("./audit.json");
-            const allow = new Set(["GHSA-mh99-v99m-4gvg"]);
+            const allow = new Set(
+              require("fs").readFileSync("../pentest/npm-audit-allow.txt", "utf8")
+                .split("\n").map((l) => l.split("#")[0].trim()).filter(Boolean),
+            );
             const bad = [];
             for (const [name, v] of Object.entries(a.vulnerabilities || {})) {
               if (!["high", "critical"].includes(v.severity)) continue;
