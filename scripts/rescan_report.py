@@ -33,6 +33,57 @@ import sys
 
 MARKER = "terrapod-release-rescan"
 
+# Report copy lives here rather than inline in the list literals below.
+# Implicit concatenation inside a list is how a missing comma silently merges
+# two entries into one and looks exactly like deliberate line-wrapping, so the
+# prose is assembled in parentheses where there is no comma to lose.
+_INTRO = (
+    "Automated re-scan of the releases we still support. Raised by "
+    "`.github/workflows/release-rescan.yml`; the policy it enforces is "
+    "[docs/cve-policy.md](../blob/main/docs/cve-policy.md)."
+)
+_WHY = (
+    "**Why this can appear on a release that was clean when it shipped:** the "
+    "release gate uses `ignore-unfixed`, so a vulnerability only becomes "
+    "actionable once upstream publishes a fix. Everything below has a fix "
+    "available *now* that did not exist, or was not yet taken, when the "
+    "release was cut."
+)
+_SCOPE = (
+    "**This report covers dependency findings only.** Code findings from the "
+    "source scan go to code scanning, which is visible to write-access users "
+    "rather than the world — a static-analysis hit in Terrapod's own source is "
+    "a potential undisclosed vulnerability, and this issue is public."
+)
+_CLEAN = (
+    "Every supported release is clean against current advisory data and "
+    "current rules, with the accepted-risk register applied."
+)
+_TRIAGE_HEAD = (
+    "Each release above needs a judgement call, not an automatic patch. Worth "
+    "checking in this order:"
+)
+_TRIAGE_FIXED = (
+    "1. **Is it already fixed on `main`?** If so the fix needs backporting "
+    "to that release line, which is what the patch release carries."
+)
+_TRIAGE_REACHABLE = (
+    "2. **Is it reachable in the way Terrapod uses the component?** If not, "
+    "it belongs in the accepted-risk register with its reasoning and exit "
+    "condition — not silently ignored, and not patched for appearance."
+)
+_TRIAGE_URGENCY = (
+    "3. **Does it warrant a patch release on its own**, or can it wait for "
+    "the next scheduled one? Cadence is roughly weekly; an unreachable "
+    "medium-impact finding can reasonably wait, a reachable critical one "
+    "cannot."
+)
+_TRIAGE = [_TRIAGE_FIXED, _TRIAGE_REACHABLE, _TRIAGE_URGENCY]
+_FOOTER = (
+    "This issue is refreshed in place while the finding set is unchanged, so "
+    "it will not re-notify on every run."
+)
+
 
 def load(directory: pathlib.Path) -> list[dict]:
     reports = []
@@ -42,8 +93,21 @@ def load(directory: pathlib.Path) -> list[dict]:
         except (json.JSONDecodeError, OSError) as exc:
             print(f"skipping unreadable {path}: {exc}", file=sys.stderr)
             continue
-        if isinstance(data, dict) and "release" in data:
-            reports.append(data)
+        if not (isinstance(data, dict) and "release" in data):
+            continue
+        if data.get("kind") == "code":
+            # The workflow sends code findings to code scanning and never here,
+            # but this report is published as a PUBLIC issue — so refuse them at
+            # the door rather than relying on the caller to have got it right.
+            # Silently dropping would be worse: it would look like the scan
+            # found nothing.
+            print(
+                f"REFUSING code-kind findings from {path}: this report is public, "
+                "and code findings belong in code scanning",
+                file=sys.stderr,
+            )
+            continue
+        reports.append(data)
     return reports
 
 
@@ -78,16 +142,6 @@ def _dependency_table(findings: list[dict]) -> list[str]:
     return lines
 
 
-def _code_table(findings: list[dict]) -> list[str]:
-    lines = ["| Severity | Rule | Location | Seen in |", "|---|---|---|---|"]
-    for f in sorted(findings, key=lambda x: (x.get("severity", ""), x.get("id", ""))):
-        where = ", ".join(sorted(set(f.get("sources") or [])))
-        lines.append(
-            f"| {f.get('severity', '?')} | `{f.get('id', '?')}` "
-            f"| `{f.get('package', '?')}` | {where} |"
-        )
-    return lines
-
 
 def merge(reports: list[dict]) -> dict[str, dict[str, list[dict]]]:
     """release -> kind -> findings, deduplicated, recording where each was seen."""
@@ -112,32 +166,18 @@ def render(reports: list[dict], scanned: list[str]) -> tuple[str, str, bool]:
     body = [
         f"<!-- {MARKER}:{fp} -->",
         "",
-        "Automated re-scan of the releases we still support. Raised by "
-        "`.github/workflows/release-rescan.yml`; the policy it enforces is "
-        "[docs/cve-policy.md](../blob/main/docs/cve-policy.md).",
+        _INTRO,
         "",
-        "**Why this can appear on a release that was clean when it shipped:** the "
-        "release gate uses `ignore-unfixed`, so a vulnerability only becomes "
-        "actionable once upstream publishes a fix. Everything below has a fix "
-        "available *now* that did not exist, or was not yet taken, when the "
-        "release was cut.",
+        _WHY,
         "",
-        "**This report covers dependency findings only.** Code findings from the "
-        "source scan go to code scanning, which is visible to write-access users "
-        "rather than the world — a static-analysis hit in Terrapod's own source is "
-        "a potential undisclosed vulnerability, and this issue is public.",
+        _SCOPE,
         "",
         f"Scanned: {', '.join(scanned) if scanned else '(none)'}",
         "",
     ]
 
     if not total:
-        body += [
-            "## No findings",
-            "",
-            "Every supported release is clean against current advisory data and "
-            "current rules, with the accepted-risk register applied.",
-        ]
+        body += ["## No findings", "", _CLEAN]
         return "\n".join(body), fp, False
 
     for release in sorted(merged, reverse=True):
@@ -148,29 +188,10 @@ def render(reports: list[dict], scanned: list[str]) -> tuple[str, str, bool]:
             body += ["**Dependencies and packages**", ""]
             body += _dependency_table(kinds["dependency"])
             body += [""]
-        if kinds.get("code"):
-            body += ["**Code**", ""]
-            body += _code_table(kinds["code"])
-            body += [""]
 
-    body += [
-        "## What to do with this",
-        "",
-        "Each release above needs a judgement call, not an automatic patch. Worth "
-        "checking in this order:",
-        "",
-        "1. **Is it already fixed on `main`?** If so the fix needs backporting to "
-        "that release line, which is what the patch release carries.",
-        "2. **Is it reachable in the way Terrapod uses the component?** If not, it "
-        "belongs in the accepted-risk register with its reasoning and exit "
-        "condition — not silently ignored, and not patched for appearance.",
-        "3. **Does it warrant a patch release on its own**, or can it wait for the "
-        "next scheduled one? Cadence is roughly weekly; an unreachable medium-"
-        "impact finding can reasonably wait, a reachable critical one cannot.",
-        "",
-        "This issue is refreshed in place while the finding set is unchanged, so "
-        "it will not re-notify on every run.",
-    ]
+    body += ["## What to do with this", "", _TRIAGE_HEAD, ""]
+    body += _TRIAGE
+    body += ["", _FOOTER]
     return "\n".join(body), fp, True
 
 
