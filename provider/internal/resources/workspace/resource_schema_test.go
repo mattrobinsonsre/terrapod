@@ -39,6 +39,38 @@ func TestListAttributesAreComputed(t *testing.T) {
 	}
 }
 
+// TestServerProjectedScalarsAreComputed is the same #684 guard for SCALAR
+// attributes, which the list-shaped guard above cannot see.
+//
+// agent_pool_id is the case that motivated it. Since #1085 the server answers it
+// unconditionally with element 0 of the workspace's pool set — a projection of
+// agent_pool_ids, not an independently-stored value. A config that assigns pools
+// through the plural and omits the singular therefore plans `null` and applies
+// `"apool-<first>"`, and the plugin framework aborts the create with "Provider
+// produced inconsistent result after apply". Optional-only is wrong for any
+// attribute the server will fill in on its own.
+func TestServerProjectedScalarsAreComputed(t *testing.T) {
+	var resp resource.SchemaResponse
+	NewResource().Schema(context.Background(), resource.SchemaRequest{}, &resp)
+	if resp.Diagnostics.HasError() {
+		t.Fatalf("schema build error: %v", resp.Diagnostics)
+	}
+
+	for _, name := range []string{"agent_pool_id"} {
+		attr, ok := resp.Schema.Attributes[name]
+		if !ok {
+			t.Fatalf("attribute %q missing from schema", name)
+		}
+		if !attr.IsComputed() {
+			t.Errorf("attribute %q must be Computed (#684): the server projects a value "+
+				"for it even when the config omits it, so Optional-only makes apply fail", name)
+		}
+		if !attr.IsOptional() {
+			t.Errorf("attribute %q must stay Optional", name)
+		}
+	}
+}
+
 // TestUnmanagedCollectionDescriptionsDocumentClearing is the regression guard
 // for #1091.
 //
