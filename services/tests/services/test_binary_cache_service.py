@@ -467,3 +467,83 @@ class TestVersionIndexConfigDefaults:
             cfg.terragrunt_version_index_url
             == "https://api.github.com/repos/gruntwork-io/terragrunt/releases"
         )
+
+
+class TestPlatformToolsShareTheCache:
+    """opa/trivy/checkov ride the same cache as the CLI tools (#1208), but the
+    rules that only make sense for a user-chosen version must not follow them."""
+
+    @pytest.mark.parametrize("tool", ["opa", "trivy", "checkov"])
+    def test_accepted_as_valid_tools(self, tool: str) -> None:
+        from terrapod.services.binary_cache_service import VALID_TOOLS
+
+        assert tool in VALID_TOOLS
+
+    @pytest.mark.parametrize("tool", ["opa", "trivy", "checkov"])
+    async def test_resolves_to_the_pinned_version_when_unspecified(self, tool: str) -> None:
+        from terrapod.services.binary_cache_service import resolve_version
+        from terrapod.services.platform_tools import configured_version
+
+        for asked in ("", "latest"):
+            assert await resolve_version(tool, asked) == configured_version(tool)
+
+    async def test_an_explicit_version_is_honoured(self) -> None:
+        """An operator pinning an exact version gets exactly that, with no
+        partial-resolution round trip to an upstream index that doesn't exist."""
+        from terrapod.services.binary_cache_service import resolve_version
+
+        assert await resolve_version("opa", "1.2.3") == "1.2.3"
+
+    @pytest.mark.parametrize("tool", ["opa", "trivy", "checkov"])
+    async def test_lists_only_the_pinned_version(self, tool: str) -> None:
+        from terrapod.services.binary_cache_service import list_available_versions
+        from terrapod.services.platform_tools import configured_version
+
+        assert await list_available_versions(tool) == [configured_version(tool)]
+
+    async def test_sha256sums_are_refused_rather_than_404ing(self) -> None:
+        """None of the three publishes a signed manifest. Saying so beats a
+        not-found that reads like a merely-cold cache."""
+        from terrapod.services.binary_cache_service import get_or_cache_sums
+
+        with pytest.raises(ValueError, match="no GPG-signed SHA256SUMS"):
+            await get_or_cache_sums(MagicMock(), "opa", "1.19.0")
+
+    async def test_prerelease_policy_does_not_gate_a_platform_tool(self) -> None:
+        """`allow_prerelease` governs the version a *user* picks for a
+        workspace. Second-guessing an operator who deliberately pinned an OPA
+        release candidate in Helm would just be confusing."""
+        from terrapod.services import binary_cache_service as svc
+
+        db, storage = AsyncMock(), AsyncMock()
+        with (
+            patch.object(svc, "_get_cached", AsyncMock(return_value=None)),
+            patch.object(svc, "_sealed", return_value=False),
+            patch.object(svc, "_fetch_and_store_binary", AsyncMock(return_value=("abc123", 10))),
+            patch.object(svc, "verify_platform_tool", AsyncMock()),
+        ):
+            storage.presigned_get_url = AsyncMock(return_value=MagicMock(url="https://x/y"))
+            url = await svc.get_or_cache_binary(db, storage, "opa", "1.19.0-rc1", "linux", "amd64")
+        assert url == "https://x/y"
+
+    async def test_a_failed_checksum_deletes_the_object_and_raises(self) -> None:
+        """Fail closed: the DB row is what gates serving, so a tampered artifact
+        must never reach the INSERT — and must not linger in storage either."""
+        from terrapod.services import binary_cache_service as svc
+        from terrapod.services.artifact_verification import VerificationError
+
+        db, storage = AsyncMock(), AsyncMock()
+        with (
+            patch.object(svc, "_get_cached", AsyncMock(return_value=None)),
+            patch.object(svc, "_sealed", return_value=False),
+            patch.object(svc, "_fetch_and_store_binary", AsyncMock(return_value=("bad", 10))),
+            patch.object(
+                svc,
+                "verify_platform_tool",
+                AsyncMock(side_effect=VerificationError("mismatch")),
+            ),
+        ):
+            with pytest.raises(VerificationError):
+                await svc.get_or_cache_binary(db, storage, "trivy", "0.72.0", "linux", "amd64")
+        storage.delete.assert_awaited_once()
+        db.add.assert_not_called()

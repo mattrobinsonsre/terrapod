@@ -249,6 +249,33 @@ data:
           {{- toYaml .Values.api.config.registry.binary_cache.signing_keys | nindent 10 }}
         {{- end }}
       {{- end }}
+      {{- if .Values.api.config.registry.platform_tools }}
+      platform_tools:
+        {{- if .Values.api.config.registry.platform_tools.opa_version }}
+        opa_version: {{ .Values.api.config.registry.platform_tools.opa_version | quote }}
+        {{- end }}
+        {{- if .Values.api.config.registry.platform_tools.trivy_version }}
+        trivy_version: {{ .Values.api.config.registry.platform_tools.trivy_version | quote }}
+        {{- end }}
+        {{- if .Values.api.config.registry.platform_tools.checkov_version }}
+        checkov_version: {{ .Values.api.config.registry.platform_tools.checkov_version | quote }}
+        {{- end }}
+        {{- if .Values.api.config.registry.platform_tools.opa_mirror_url }}
+        opa_mirror_url: {{ .Values.api.config.registry.platform_tools.opa_mirror_url | quote }}
+        {{- end }}
+        {{- if .Values.api.config.registry.platform_tools.trivy_mirror_url }}
+        trivy_mirror_url: {{ .Values.api.config.registry.platform_tools.trivy_mirror_url | quote }}
+        {{- end }}
+        {{- if .Values.api.config.registry.platform_tools.checkov_mirror_url }}
+        checkov_mirror_url: {{ .Values.api.config.registry.platform_tools.checkov_mirror_url | quote }}
+        {{- end }}
+        {{- if .Values.api.config.registry.platform_tools.checkov_checksum_api_url }}
+        checkov_checksum_api_url: {{ .Values.api.config.registry.platform_tools.checkov_checksum_api_url | quote }}
+        {{- end }}
+        {{- if .Values.api.config.registry.platform_tools.verify }}
+        verify: {{ .Values.api.config.registry.platform_tools.verify | quote }}
+        {{- end }}
+      {{- end }}
       {{- if .Values.api.config.registry.module_interface }}
       module_interface:
         enabled: {{ .Values.api.config.registry.module_interface.enabled }}

@@ -340,6 +340,39 @@ api:
         #       -----BEGIN PGP PUBLIC KEY BLOCK-----
         #       ...
         signing_keys: {}
+      # Platform-scoped third-party tools (#1208). These used to be baked into
+      # the api/runner images; they are now pulled through the binary cache like
+      # terraform/tofu, so an upstream fix reaches you with a `helm upgrade`
+      # instead of waiting for a Terrapod release, and their vendored modules
+      # stop being reported against Terrapod's own artifacts.
+      #
+      # REVIEW THESE AT EVERY MINOR RELEASE — that check is what clears this
+      # class of CVE now. Pin exact versions: unlike the CLI tools there is no
+      # partial-version resolution here.
+      #
+      # They are fetched lazily and only when needed: opa when a policy set
+      # applies to a run, trivy only when it is the selected scan engine.
+      platform_tools:
+        opa_version: "1.19.0"
+        trivy_version: "0.72.0"
+        checkov_version: "3.3.8"
+        opa_mirror_url: "https://github.com/open-policy-agent/opa/releases/download"
+        trivy_mirror_url: "https://github.com/aquasecurity/trivy/releases/download"
+        checkov_mirror_url: "https://github.com/bridgecrewio/checkov/releases/download"
+        # Checkov publishes NO checksum file next to its release assets, so the
+        # only verification material available is the digest the GitHub release
+        # API reports — registry-computed, not a publisher attestation, and
+        # weaker than the sibling manifests OPA and Trivy publish. Set verify to
+        # 'off' if this endpoint is unreachable (air-gapped mirrors), accepting
+        # that trade knowingly.
+        checkov_checksum_api_url: "https://api.github.com/repos/bridgecrewio/checkov/releases/tags"
+        # Integrity verification for platform tools. One of: off, checksum.
+        # 'checksum' (default, fail-closed) checks the downloaded artifact's
+        # SHA-256 against the publisher's published sum before caching. There is
+        # no 'signature' level: none of the three publishes a GPG-signed
+        # manifest — which is exactly what the Dockerfiles did before, a checksum
+        # and nothing more.
+        verify: checksum
       module_interface:
         enabled: true
 

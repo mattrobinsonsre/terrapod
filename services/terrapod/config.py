@@ -567,7 +567,7 @@ class WarmBinaryEntry(BaseModel):
     just {tool, version}.
     """
 
-    tool: Literal["terraform", "tofu", "terragrunt"] = "terraform"
+    tool: Literal["terraform", "tofu", "terragrunt", "opa", "trivy", "checkov"] = "terraform"
     version: str
     platforms: list[WarmPlatform] = Field(default_factory=list)
 
@@ -708,6 +708,84 @@ class BinaryCacheConfig(BaseModel):
     )
 
 
+class PlatformToolsConfig(BaseModel):
+    """Platform-scoped third-party tools, pull-through cached rather than
+    vendored into Terrapod's published images (#1208).
+
+    `opa`, `trivy` and `checkov` used to be baked into the api/runner images.
+    Scanners read their embedded build information and reported every module
+    they vendor against *Terrapod's* artifacts, including code paths Terrapod
+    never executes — that was the entire content of the accepted-risk register.
+    More importantly, a fix published upstream could not reach an operator until
+    Terrapod cut a release.
+
+    They are fetched on demand through the same binary cache as
+    terraform/tofu/terragrunt, so the version is an operator-set Helm value and
+    an upstream fix is one `helm upgrade` away. **This does not reduce attack
+    surface** — the same code still executes on the runner. It moves the
+    component out of Terrapod's artifact and makes it operator-versioned and
+    verified per fetch.
+
+    Unlike the CLI tools these are **platform-scoped**: one version for the whole
+    deployment, no per-workspace field, no partial-version resolution and no
+    interaction with `allow_prerelease`. Pin an exact version.
+    """
+
+    opa_version: str = Field(
+        default="1.19.0",
+        description="OPA version used for policy evaluation on the runner and Rego "
+        "syntax validation on the API. Exact version — no partial resolution. "
+        "Review this at every minor release.",
+    )
+    trivy_version: str = Field(
+        default="0.72.0",
+        description="Trivy version used for IaC security scanning on the runner "
+        "(only fetched when trivy is the selected engine). Exact version.",
+    )
+    checkov_version: str = Field(
+        default="3.3.8",
+        description="Checkov version used for IaC security scanning on the runner "
+        "(the default engine). Exact version.",
+    )
+    opa_mirror_url: str = Field(
+        default="https://github.com/open-policy-agent/opa/releases/download",
+        description="Upstream download base for OPA. Assets are bare per-platform "
+        "binaries (opa_<os>_<arch>_static) with a sibling .sha256 file. A mirror "
+        "must serve the same asset layout.",
+    )
+    trivy_mirror_url: str = Field(
+        default="https://github.com/aquasecurity/trivy/releases/download",
+        description="Upstream download base for Trivy. Assets are per-platform "
+        ".tar.gz archives with a single trivy_<version>_checksums.txt manifest "
+        "covering the release. A mirror must serve the same asset layout.",
+    )
+    checkov_mirror_url: str = Field(
+        default="https://github.com/bridgecrewio/checkov/releases/download",
+        description="Upstream download base for Checkov. Assets are per-platform "
+        "zips containing a single self-contained dist/checkov executable.",
+    )
+    checkov_checksum_api_url: str = Field(
+        default="https://api.github.com/repos/bridgecrewio/checkov/releases/tags",
+        description="Where to obtain Checkov's expected SHA-256. Checkov publishes "
+        "NO checksum file alongside its release assets, so the only material "
+        "available is the digest the GitHub release API reports for the asset — a "
+        "registry-computed digest, not a publisher attestation, and weaker than "
+        "the sibling manifests OPA and Trivy publish. Set verify='off' if this "
+        "endpoint is unreachable (air-gapped mirrors), accepting that trade "
+        "knowingly.",
+    )
+    verify: Literal["off", "checksum"] = Field(
+        default="checksum",
+        description="Integrity verification for platform tools fetched from upstream. "
+        "'checksum' (default, fail-closed): verify the downloaded artifact's SHA-256 "
+        "against the publisher's published checksum before caching. 'off': no "
+        "verification (NOT recommended — these binaries are executed). There is no "
+        "'signature' level: none of the three publishes a GPG-signed manifest, which "
+        "is exactly what the images did before — the Dockerfiles checked a checksum "
+        "and nothing more.",
+    )
+
+
 class ModuleInterfaceConfig(BaseModel):
     """Module interface extraction (inputs/outputs from HCL)."""
 
@@ -741,6 +819,7 @@ class RegistryConfig(BaseModel):
     )
     provider_cache: ProviderCacheConfig = Field(default_factory=ProviderCacheConfig)
     binary_cache: BinaryCacheConfig = Field(default_factory=BinaryCacheConfig)
+    platform_tools: PlatformToolsConfig = Field(default_factory=PlatformToolsConfig)
     module_interface: ModuleInterfaceConfig = Field(default_factory=ModuleInterfaceConfig)
 
 
