@@ -67,7 +67,6 @@ LABEL org.opencontainers.image.source=https://github.com/mattrobinsonsre/terrapo
 ARG PKG_REFRESH=2026-07-13
 RUN echo "pkg-refresh=${PKG_REFRESH}" \
     && apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
-    curl \
     git \
     postgresql-client \
     xmlsec1 \
@@ -123,9 +122,15 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app \
     PORT=8000
 
-# Health check
+# Health check.
+#
+# Kubernetes does NOT use this — the chart defines its own httpGet liveness and
+# readiness probes. It exists for a plain `docker run`, and it used to be the
+# only reason curl was installed. curl has generated real CVE findings against
+# our published images, so the check is now a stdlib urlopen: same behaviour
+# (non-2xx or a connection error raises, which exits non-zero) and no package.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
+    CMD ["python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=4)"]
 
 # Expose port
 EXPOSE 8000

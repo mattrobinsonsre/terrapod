@@ -34,9 +34,11 @@ LABEL org.opencontainers.image.source=https://github.com/mattrobinsonsre/terrapo
 # works only until someone forgets, which is how five already-patched libexpat
 # CVEs stayed in the images for 18 days (#1177).
 ARG PKG_REFRESH=2026-07-13
+# The listener installs NO extra packages — it is Python talking to the K8s API
+# and the Terrapod API, and nothing else. The upgrade still runs, because that
+# is what picks up base-image security patches.
 RUN echo "pkg-refresh=${PKG_REFRESH}" \
-    && apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
-    curl \
+    && apt-get update && apt-get upgrade -y \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -62,8 +64,15 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONPATH=/app
 
+# Health check.
+#
+# Kubernetes does NOT use this — the chart defines its own httpGet liveness and
+# readiness probes. It exists for a plain `docker run`, and it used to be the
+# only reason curl was installed. curl has generated real CVE findings against
+# our published images, so the check is now a stdlib urlopen: same behaviour
+# (non-2xx or a connection error raises, which exits non-zero) and no package.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:8081/health || exit 1
+    CMD ["python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8081/health', timeout=4)"]
 
 EXPOSE 8081
 
