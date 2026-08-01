@@ -73,6 +73,7 @@ export default function AgentPoolsPage() {
   useEffect(() => {
     if (!getAuthState()) { router.push('/login'); return }
     loadPools()
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- initial mount load; the loader is a hoisted function declaration recreated each render, so depending on it would re-fetch on every render
   }, [router])
 
   usePollingInterval(!loading, 30_000, loadPools)

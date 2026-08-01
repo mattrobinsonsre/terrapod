@@ -749,6 +749,7 @@ function RunDetailPageInner() {
     ) {
       setCostSummaryRefresh((n) => n + 1)
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- the callback is deliberately referentially stable — adding the loader would re-create it every render and churn the SSE subscription
   }, [runId, loadRun]))
 
   useEffect(() => {
@@ -762,6 +763,7 @@ function RunDetailPageInner() {
       setApplyLogLoading(prev => applyLog === null ? true : prev)
       loadApplyLog(true).finally(() => setApplyLogLoading(false))
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- deliberately keyed on the run's id + status — depending on the log state or the loaders would loop, since this effect is what sets them
   }, [run?.id, run?.attributes.status])
 
   // Poll the streaming phase's log on a short interval (#722). SSE
