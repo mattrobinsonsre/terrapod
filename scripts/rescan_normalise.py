@@ -135,6 +135,22 @@ def from_semgrep(data) -> list[dict]:
     return out
 
 
+def count_semgrep_sarif(data) -> int:
+    """How many error-level results, and nothing else.
+
+    A count is not a disclosure — the detail is. This exists so the public
+    report can say "3 code findings on v1.1.1, see code scanning" instead of
+    staying silent about them, which would leave a maintainer reading the issue
+    with no idea they existed.
+    """
+    total = 0
+    for run in (data or {}).get("runs") or []:
+        for r in run.get("results") or []:
+            if (r.get("level") or "").lower() == "error":
+                total += 1
+    return total
+
+
 def main() -> int:
     if len(sys.argv) < 6:
         print(__doc__, file=sys.stderr)
@@ -156,6 +172,14 @@ def main() -> int:
         findings, report_kind = from_npm_audit(data, allow), "dependency"
     elif kind == "semgrep":
         findings, report_kind = from_semgrep(data), "code"
+    elif kind == "semgrep-count":
+        # Count only. Deliberately does not go through the findings path.
+        pathlib.Path(out).write_text(json.dumps({
+            "release": release,
+            "code_findings": count_semgrep_sarif(data),
+        }, indent=2))
+        print(f"{label}: {count_semgrep_sarif(data)} code finding(s) (count only)")
+        return 0
     else:
         print(f"unknown scanner {kind!r}", file=sys.stderr)
         return 2
