@@ -51,13 +51,25 @@ owning state and the run lifecycle. CLI-driven Terragrunt runs need no config. S
 
 ## Can Terrapod run in an air-gapped or firewall-restricted environment?
 
-Yes — this is a core design focus. Runners connect **outbound only** (over SSE)
-and create Kubernetes Jobs locally, so the control plane needs **no inbound
-network access** into your execution clusters. VCS integration is **polling-first**
-(inbound webhooks optional), and a pull-through provider mirror + CLI binary cache
-(with an **air-gap sealed mode**) let runners resolve providers/binaries with **no
-upstream internet** for cached platforms. See
-[Network-isolated deployments](deployment-network-isolation.md).
+Yes for the execution clusters, and yes for inbound — with one honest caveat about
+the API.
+
+Runners connect **outbound only** (over SSE) and create Kubernetes Jobs locally, so
+the control plane needs **no inbound network access** into your execution clusters.
+VCS integration is **polling-first** (inbound webhooks optional), and a pull-through
+provider mirror + CLI binary cache (with an **air-gap sealed mode**) let runners
+resolve providers/binaries with **no upstream internet** for cached platforms.
+
+**The API itself does need outbound access.** Its caches are pull-through, so
+something has to fill them, and only the API can. That access can be entirely
+internal — every upstream is overridable to a mirror you host — and it can go
+through a [forward proxy with your own CA](deployment-proxy.md). So Terrapod runs
+happily with **no internet**; it does not run with **no egress from the API**. Once
+the caches hold what you need, `registry.cache_only` seals them so they never reach
+upstream again.
+
+See [Network-isolated deployments](deployment-network-isolation.md) for the full
+list of what the API reaches and how to redirect each one.
 
 ## Is Terrapod production-ready / stable?
 

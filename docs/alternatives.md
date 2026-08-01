@@ -70,7 +70,9 @@ head-to-head in the [README](../README.md#terrakube).
   control plane needs **no inbound reach** into your execution clusters. VCS is
   **polling-first** (webhooks optional), so it works with **no inbound webhooks**.
   A pull-through provider mirror + CLI binary cache (with an air-gap *sealed mode*)
-  mean runners need **no upstream internet** for cached platforms. See
+  mean runners need **no upstream internet** for cached platforms. The API itself
+  does need outbound access to fill those caches, but it can be pointed entirely at
+  internal mirrors and through a forward proxy. See
   [Split-networking / network-isolated deployments](deployment-network-isolation.md).
 - **You use Terragrunt.** A per-workspace flag runs agent-mode runs under
   `terragrunt` while Terrapod keeps owning state and the run lifecycle. See
