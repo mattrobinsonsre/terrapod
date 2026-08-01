@@ -419,6 +419,7 @@ function WorkspacesPageInner() {
   useEffect(() => {
     if (!getAuthState()) { router.push('/login'); return }
     loadWorkspaces()
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- initial mount load; the loader is a hoisted function declaration recreated each render, so depending on it would re-fetch on every render
   }, [router])
 
   // Real-time workspace list updates via SSE. Always-on (not gated on
@@ -427,6 +428,7 @@ function WorkspacesPageInner() {
   // manual refresh — the empty state is exactly where live-update matters most.
   const { connected: sseConnected } = useWorkspaceListEvents(true, useCallback(() => {
     loadWorkspaces()
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- the callback is deliberately referentially stable — adding the loader would re-create it every render and churn the SSE subscription
   }, []))
 
   // Load VCS connections and agent pools when form opens

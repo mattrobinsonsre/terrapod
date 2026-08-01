@@ -204,6 +204,7 @@ export default function CatalogItemPage() {
 
     load()
     return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot fetch; `t` is only used to build an error message, and depending on it would re-fetch whenever the locale changes
   }, [itemId, router, loadInstances])
 
   // Pools the user may pick: when the item restricts pools, intersect with its

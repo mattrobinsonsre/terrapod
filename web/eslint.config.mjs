@@ -17,12 +17,16 @@ const eslintConfig = defineConfig([
     // CodeQL reported it, which is a slow and expensive way to learn something
     // the linter already knew.
     //
-    // Promoted here rather than by flipping the whole gate to
-    // `--max-warnings 0`: the remaining warnings are almost all
-    // `react-hooks/exhaustive-deps`, which are genuine judgement calls and need
-    // triaging one at a time (#1203). These two are not judgement calls — dead
-    // code is dead, and an ARIA role missing its required attributes is a bug
-    // for anyone using a screen reader.
+    // These two are not judgement calls — dead code is dead, and an ARIA role
+    // missing its required attributes is a bug for anyone using a screen
+    // reader — so they are errors rather than warnings.
+    //
+    // The gate itself is now `--max-warnings 0` (#1203): every remaining
+    // `react-hooks/exhaustive-deps` and `no-img-element` site was triaged
+    // individually and carries a per-line disable stating why the omission is
+    // correct. A warning can no longer accumulate unread, and because
+    // `reportUnusedDisableDirectives` is an error below, a directive that stops
+    // being needed fails the build rather than lingering.
     rules: {
       '@typescript-eslint/no-unused-vars': 'error',
       'jsx-a11y/role-has-required-aria-props': 'error',

@@ -52,6 +52,7 @@ export default function SessionsPage() {
     const isAdminUser = isAdmin()
     setAdmin(isAdminUser)
     loadSessions(isAdminUser)
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- initial mount load; the loader is a hoisted function declaration recreated each render, so depending on it would re-fetch on every render
   }, [router])
 
   async function loadSessions(adminView: boolean) {

@@ -6,7 +6,7 @@
     "dev": "next dev --turbopack --port 3000",
     "build": "next build",
     "start": "next start --port 3000",
-    "lint": "eslint src/",
+    "lint": "eslint src/ --max-warnings 0",
     "type-check": "tsc --noEmit",
     "i18n:check": "node scripts/check-i18n-completeness.mjs",
     "i18n:lint": "node scripts/check-no-hardcoded-strings.mjs"

@@ -57,6 +57,7 @@ export default function ModulesPage() {
     if (!getAuthState()) { router.push('/login'); return }
     loadModules()
     loadVcsConnections()
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- initial mount load; the loader is a hoisted function declaration recreated each render, so depending on it would re-fetch on every render
   }, [router])
 
   usePollingInterval(!loading, 60_000, loadModules)

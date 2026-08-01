@@ -62,6 +62,7 @@ function LoginContent() {
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false))
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot fetch; `t` is only used to build an error message, and depending on it would re-fetch whenever the locale changes
   }, [])
 
   const handleLocalLogin = async (e: React.FormEvent) => {
@@ -178,6 +179,7 @@ function LoginContent() {
     <main className="h-dvh flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
+          {/* eslint-disable-next-line @next/next/no-img-element -- a static local SVG at a fixed size — next/image does not optimise SVG without dangerouslyAllowSVG and would add a loader for no benefit */}
           <img src="/logo.svg" alt="Terrapod" className="w-24 h-24 mx-auto mb-4" />
           <h1 className="text-3xl font-bold">Terrapod</h1>
           <p className="text-slate-400 mt-2">
