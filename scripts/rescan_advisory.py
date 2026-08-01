@@ -69,18 +69,32 @@ def load(directory: pathlib.Path) -> dict[str, list[dict]]:
     return {r: list(v.values()) for r, v in out.items()}
 
 
+# Prose kept out of the list literals below: a wrapped string sitting next to a
+# comma-separated sibling is indistinguishable from a missing comma, both to a
+# reader and to static analysis (CodeQL py/implicit-string-concatenation-in-list).
+_RAISED_BY = (
+    "raised automatically by the release re-scan "
+    "(`.github/workflows/release-rescan.yml`)."
+)
+_DRAFT_NOTE = (
+    "This is a **draft** — private to maintainers, and not published. It becomes "
+    "the public record when the patch release that fixes it ships."
+)
+_FIX_AVAILABLE = (
+    "Everything below has a fix available upstream *now* that did not exist, or "
+    "was not taken, when this release was cut."
+)
+
+
 def describe(release: str, findings: list[dict], code_count: int) -> str:
     lines = [
         f"<!-- {MARKER}:{release} -->",
         "",
-        f"Findings in **{release}**, raised automatically by the release "
-        "re-scan (`.github/workflows/release-rescan.yml`).",
+        f"Findings in **{release}**, {_RAISED_BY}",
         "",
-        "This is a **draft** — private to maintainers, and not published. It "
-        "becomes the public record when the patch release that fixes it ships.",
+        _DRAFT_NOTE,
         "",
-        "Everything below has a fix available upstream *now* that did not "
-        "exist, or was not taken, when this release was cut.",
+        _FIX_AVAILABLE,
         "",
         "| Severity | Package | Installed | Fixed in | Advisory |",
         "|---|---|---|---|---|",
@@ -92,11 +106,11 @@ def describe(release: str, findings: list[dict], code_count: int) -> str:
             f"| {f.get('id', '?')} |"
         )
     if code_count:
-        lines += [
-            "",
+        note = (
             f"Plus **{code_count} code finding(s)** from static analysis of the "
-            "source at this tag — see code scanning.",
-        ]
+            f"source at this tag — see code scanning."
+        )
+        lines += ["", note]
     return "\n".join(lines)
 
 
