@@ -263,6 +263,10 @@ jobs:
           python3 current/scripts/rescan_normalise.py npm-audit npm.json \
             "${{ matrix.tag }}" "source:frontend" "finding-npm.json" \
             current/pentest/npm-audit-allow.txt
+          # Count only — so the public report can say code findings exist and
+          # point at code scanning, without publishing what they are.
+          python3 current/scripts/rescan_normalise.py semgrep-count semgrep.sarif \
+            "${{ matrix.tag }}" "source:semgrep" "codecount.json"
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
@@ -271,6 +275,7 @@ jobs:
           path: |
             finding-pip.json
             finding-npm.json
+            codecount.json
           retention-days: 7
 
   report:
