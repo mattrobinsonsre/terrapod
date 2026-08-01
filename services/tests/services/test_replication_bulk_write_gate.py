@@ -56,6 +56,12 @@ ALLOWED = {
     # Runs in a fresh session AFTER the failing one was rolled back, so it
     # cannot re-read through the ORM. vcs_last_error* are node-local
     # diagnostics about THIS node's polling, not shared state.
+    # The claim-release CAS, same shape and same reason as the forward claim
+    # above: Core statement for the compare-and-swap, ORM assignment right after
+    # it to emit the event.
+    "terrapod/services/vcs_poller.py::_release_commit_claim::update(Workspace)": (
+        "compare-and-swap; the following ORM assignment emits the event"
+    ),
     "terrapod/services/vcs_poller.py::_record_poll_failure::update(Workspace)": (
         "post-rollback diagnostic write; the columns are node-local"
     ),

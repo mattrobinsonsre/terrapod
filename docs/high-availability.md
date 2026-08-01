@@ -261,6 +261,19 @@ was discarded to reach convergence.
 authenticated peer link, and are re-encrypted under the receiving node's own
 key. Neither node holds the other's key.
 
+That describes the **column** path, which decrypts on read and re-encrypts on
+write. The **object-store** path has no such step — it copies bytes — so with
+`encryption.enabled` a copied state object would arrive as ciphertext the peer
+holds no key for. Rather than mirror objects nobody can read, the copier
+**declines** the `state` class outright while app-layer encryption is on, and
+says so in the sync result. An empty class you can see beats a full one you
+cannot decrypt: the alternative is a peer that looks completely healthy right up
+until failover, when every state file fails to decrypt at once.
+
+If you run app-layer encryption and want the peer's object store populated,
+replicate at the storage layer instead (bucket replication, or a shared bucket),
+where the ciphertext and its key management stay consistent.
+
 **There is no conflict resolution, deliberately.** Only the leader writes, so
 the peer's row is authoritative — applying it is the whole rule. Per-field merge
 semantics would only be needed in an active-active design, which this is not.

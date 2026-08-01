@@ -1107,17 +1107,36 @@ async def _release_commit_claim(ws_id: uuid.UUID, claimed_sha: str, previous_sha
             if existing.scalar_one_or_none() is not None:
                 return
 
-            # Row-lock + ORM write, NOT a bulk `update(Workspace)`. The lock
-            # gives the same mutual exclusion the CAS did, and the ORM
-            # assignment is what puts the row in `session.dirty` so the
-            # replication outbox emits an event. A bulk statement reverted the
-            # SHA here and told the standby nothing, so a promoted node kept
-            # the advanced SHA and skipped this commit for good.
-            locked = await db.execute(
-                select(Workspace).where(Workspace.id == ws_id).with_for_update()
-            )
-            ws_row = locked.scalar_one_or_none()
+            # Load the row FIRST so the session holds it at `claimed_sha`, then
+            # compare-and-swap, then assign on the ORM object. Exactly the shape
+            # the forward claim uses, and for the same two reasons:
+            #
+            #  - the CAS has to be a Core statement, because that is the
+            #    concurrency control (it must not revert a claim another replica
+            #    has since re-advanced);
+            #  - the ORM assignment after it is what puts the workspace in
+            #    `session.dirty`, and that is the ONLY thing that makes the
+            #    replication outbox emit an event. A bulk statement on its own
+            #    reverted the SHA here and told the standby nothing, so a
+            #    promoted node kept the advanced SHA and skipped the commit for
+            #    good. Do not remove the assignment as redundant — it is not.
+            #
+            # A row lock would be the obvious alternative and does not work:
+            # Workspace eager-loads relationships, and Postgres rejects
+            # FOR UPDATE against the nullable side of an outer join.
+            ws_row = (
+                await db.execute(select(Workspace).where(Workspace.id == ws_id))
+            ).scalar_one_or_none()
             if ws_row is None or ws_row.vcs_last_commit_sha != claimed_sha:
+                return
+            reverted = await db.execute(
+                update(Workspace)
+                .where(Workspace.id == ws_id)
+                .where(Workspace.vcs_last_commit_sha == claimed_sha)
+                .values(vcs_last_commit_sha=previous_sha)
+                .returning(Workspace.id)
+            )
+            if reverted.scalar_one_or_none() is None:
                 return
             ws_row.vcs_last_commit_sha = previous_sha
             await db.commit()

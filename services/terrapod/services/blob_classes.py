@@ -104,6 +104,13 @@ class BlobClass:
     #: Why the class is not verifiable, surfaced to the operator so the gap reads
     #: as a considered boundary rather than a missing feature.
     unverifiable_reason: str = ""
+    #: True when the objects are enveloped by app-layer encryption
+    #: (`encryption.enabled`, #635). Each node wraps with ITS OWN data key and
+    #: `crypto_keys` is deliberately never replicated, so a byte-for-byte copy
+    #: of these lands on the peer as ciphertext it holds no key for. The copier
+    #: refuses rather than producing a full, healthy-looking, undecryptable
+    #: mirror — see `blob_sync`.
+    encrypted_at_rest: bool = False
 
 
 async def _count(db: AsyncSession, model: type) -> int:
@@ -292,6 +299,7 @@ async def _resolve_binary_cache(db: AsyncSession, limit: int | None) -> tuple[in
 CLASSES: tuple[BlobClass, ...] = (
     BlobClass(
         name="state",
+        encrypted_at_rest=True,
         tier=IRREPLACEABLE,
         prefixes=("state/",),
         resolver=_resolve_state,
