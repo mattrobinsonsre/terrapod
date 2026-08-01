@@ -156,6 +156,10 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      # Required to upload SARIF. Its absence is why code findings never
+      # reached code scanning: the step "succeeded" and warned in its log,
+      # because continue-on-error swallowed the failure.
+      security-events: write
     strategy:
       fail-fast: false
       matrix:
@@ -253,6 +257,7 @@ jobs:
       # uploaded as a workflow artifact: on a public repository, artifacts and
       # job logs are world-readable.
       - name: Upload code findings to code scanning (private)
+        id: sarif
         if: always()
         continue-on-error: true
         uses: github/codeql-action/upload-sarif@7188fc363630916deb702c7fdcf4e481b751f97a # v4
@@ -275,7 +280,19 @@ jobs:
           python3 current/scripts/rescan_normalise.py semgrep-count semgrep.sarif \
             "${{ matrix.tag }}" "source:semgrep" "codecount.json"
 
+      # A silent upload failure is how this went unnoticed for three runs.
+      # continue-on-error stays — one broken scanner must not sink the run —
+      # but the outcome is now stated rather than buried in a warning.
+      - name: Fail visibly if code findings could not be recorded
+        if: always() && steps.sarif.outcome == 'failure'
+        run: |
+          echo "::error::SARIF upload FAILED for ${{ matrix.tag }}. Code findings" \
+               "were found but are NOT in code scanning. The advisory and issue" \
+               "will point at a page that does not have them."
+          exit 1
+
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always()
         with:
           name: rescan-${{ matrix.tag }}-source
           # finding-pip / finding-npm only. Never semgrep.sarif — see above.
