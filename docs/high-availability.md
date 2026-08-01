@@ -153,10 +153,10 @@ differs:
 | | What it is | Where it lives |
 |---|---|---|
 | **Outbound** | The client id + secret this node **presents** when it pulls | `ha.peer.client_id` + a Secret. A credential it holds but does not own, so there is nothing to persist — the same treatment an SSO client secret gets |
-| **Inbound** | The client this node **accepts** when its peer pulls from it | `ha.peer.inbound.*`. It owns this one, so config states the intent and startup reconciles it into a persisted row — the same pattern as the CA |
+| **Inbound** | The client this node **accepts** when its peer pulls from it | `ha.peer.inbound.*` + a Secret. Also not persisted — the running config *is* the accepted credential, compared in constant time on each token request |
 
-The follower pulls, so node B presents a credential that node A accepts: one row
-on A, one secret held by B.
+The follower pulls, so node B presents a credential that node A accepts: one
+secret configured on A as inbound, the same secret held by B as outbound.
 
 ### Both directions, always
 
