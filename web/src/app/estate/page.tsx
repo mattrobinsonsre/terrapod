@@ -67,6 +67,7 @@ export default function EstatePage() {
     return () => {
       cancelled = true
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot fetch; `t` is only used to build an error message, and depending on it would re-fetch whenever the locale changes
   }, [])
 
   const axes = useMemo(() => (graph ? groupAxes(graph.nodes) : []), [graph])

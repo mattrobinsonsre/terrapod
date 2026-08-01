@@ -103,6 +103,7 @@ export default function TokensPage() {
   useEffect(() => {
     if (!userId) return
     loadTokens()
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- initial mount load; the loader is a hoisted function declaration recreated each render, so depending on it would re-fetch on every render
   }, [userId, showAll, kindFilter])
 
   // Detached tokens pin an absolute scope from any role; only admins create
