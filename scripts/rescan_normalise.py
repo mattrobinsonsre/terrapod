@@ -36,9 +36,24 @@ def _read(path: pathlib.Path):
         return None
 
 
+# GitHub advisories accept a fixed set of ecosystems; anything we cannot map
+# confidently is "other", which is accurate rather than a guess.
+_TRIVY_ECOSYSTEM = {
+    "gobinary": "go",
+    "gomod": "go",
+    "node-pkg": "npm",
+    "npm": "npm",
+    "yarn": "npm",
+    "python-pkg": "pip",
+    "pip": "pip",
+    "poetry": "pip",
+}
+
+
 def from_trivy(data) -> list[dict]:
     out = []
     for result in (data or {}).get("Results") or []:
+        ecosystem = _TRIVY_ECOSYSTEM.get(result.get("Type", ""), "other")
         for v in result.get("Vulnerabilities") or []:
             out.append({
                 "id": v.get("VulnerabilityID", "?"),
@@ -46,6 +61,7 @@ def from_trivy(data) -> list[dict]:
                 "installed": v.get("InstalledVersion", "?"),
                 "fixed": v.get("FixedVersion", "?"),
                 "severity": v.get("Severity", "?"),
+                "ecosystem": ecosystem,
             })
     return out
 
@@ -65,6 +81,7 @@ def from_pip_audit(data) -> list[dict]:
                 "installed": dep.get("version", "?"),
                 "fixed": ", ".join(fixes),
                 "severity": "HIGH",   # pip-audit does not grade; the gate treats all as actionable
+                "ecosystem": "pip",
             })
     return out
 
@@ -110,6 +127,7 @@ def from_npm_audit(data, allowlist: set[str]) -> list[dict]:
                 "installed": (v.get("range") or "?"),
                 "fixed": fixed,
                 "severity": v.get("severity", "?").upper(),
+                "ecosystem": "npm",
             })
     return out
 
@@ -145,8 +163,17 @@ def count_semgrep_sarif(data) -> int:
     """
     total = 0
     for run in (data or {}).get("runs") or []:
+        # Build ruleId -> level from the driver, because Semgrep puts severity
+        # on the rule definition and usually omits it on the result. Reading
+        # result["level"] alone counted 0 while Semgrep reported 8.
+        levels = {}
+        for rule in ((run.get("tool") or {}).get("driver") or {}).get("rules") or []:
+            lvl = ((rule.get("defaultConfiguration") or {}).get("level") or "").lower()
+            if rule.get("id"):
+                levels[rule["id"]] = lvl
         for r in run.get("results") or []:
-            if (r.get("level") or "").lower() == "error":
+            level = (r.get("level") or levels.get(r.get("ruleId", ""), "") or "").lower()
+            if level == "error":
                 total += 1
     return total
 

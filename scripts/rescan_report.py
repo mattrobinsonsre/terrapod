@@ -1,27 +1,22 @@
 #!/usr/bin/env python3
-"""Aggregate release re-scan findings into an issue body (#1212).
+"""Build the public notification for the release re-scan (#1212).
 
-Every scanner in the re-scan workflow normalises its output to one JSON file
-per (release, source) with a common shape, and this collapses the lot into a
-single report:
+This issue is **public**, so it deliberately carries no detail: no advisory
+ids, no package versions, not even which releases are affected. Naming a
+supported release alongside what is wrong with it is a map for anyone deciding
+where to look, and the people who need the detail are maintainers — who can
+read it in the draft advisory.
 
-    {"release": "v1.1.1",
-     "source": "image:terrapod-api (amd64)",
-     "kind": "dependency" | "code",
-     "findings": [{...}]}
+    draft security advisory   the findings, per release   private
+    code scanning             static-analysis findings    private
+    this issue                "there is something to do"  public
 
-Two things here matter more than the formatting.
+What it does carry is a fingerprint of the finding set, so an unchanged set
+does not re-notify. The body is refreshed every run regardless: those are two
+different decisions, and conflating them once left the issue displaying stale
+information after the tooling had already improved.
 
-**The fingerprint.** A scheduled job that re-notifies on an unchanged finding
-set gets muted within a week, and then the one time it matters nobody looks. So
-the body carries a fingerprint of the finding *set* (not the run, not the
-timestamp), and the workflow only touches the issue when that changes. Re-runs
-that find the same things are silent by construction rather than by someone
-remembering to check.
-
-**Grouping by release.** The follow-up action is a patch release, and a patch
-release is per-release — so that is the axis the report is organised on, even
-though scanning is organised by image and architecture.
+    rescan_report.py <findings-dir> <out.md> [advisory-urls.json]
 """
 
 from __future__ import annotations
@@ -33,68 +28,36 @@ import pathlib
 import sys
 
 MARKER = "terrapod-release-rescan"
-
-# Issue bodies do not resolve relative links the way a file in the repo does,
-# so every link here is absolute, built from the repository the run belongs to.
 _REPO = os.environ.get("GITHUB_REPOSITORY", "mattrobinsonsre/terrapod")
 _REPO_URL = f"https://github.com/{_REPO}"
 
-# Report copy lives here rather than inline in the list literals below.
-# Implicit concatenation inside a list is how a missing comma silently merges
-# two entries into one and looks exactly like deliberate line-wrapping, so the
-# prose is assembled in parentheses where there is no comma to lose.
-_INTRO = (
-    "Automated re-scan of the releases we still support. Raised by "
-    "`.github/workflows/release-rescan.yml`; the policy it enforces is "
-    f"[docs/cve-policy.md]({_REPO_URL}/blob/main/docs/cve-policy.md)."
-)
-_WHY = (
-    "**Why this can appear on a release that was clean when it shipped:** the "
-    "release gate uses `ignore-unfixed`, so a vulnerability only becomes "
-    "actionable once upstream publishes a fix. Everything below has a fix "
-    "available *now* that did not exist, or was not yet taken, when the "
-    "release was cut."
-)
-_SCOPE = (
-    "**This report covers dependency findings only.** Code findings from the "
-    "source scan go to code scanning, which is visible to write-access users "
-    "rather than the world — a static-analysis hit in Terrapod's own source is "
-    "a potential undisclosed vulnerability, and this issue is public."
-)
-_CLEAN = (
-    "Every supported release is clean against current advisory data and "
-    "current rules, with the accepted-risk register applied."
-)
-_TRIAGE_HEAD = (
-    "Each release above needs a judgement call, not an automatic patch. Worth "
-    "checking in this order:"
-)
-_TRIAGE_FIXED = (
-    "1. **Is it already fixed on `main`?** If so the fix needs backporting "
-    "to that release line, which is what the patch release carries."
-)
-_TRIAGE_REACHABLE = (
-    "2. **Is it reachable in the way Terrapod uses the component?** If not, "
-    "it belongs in the accepted-risk register with its reasoning and exit "
-    "condition — not silently ignored, and not patched for appearance."
-)
-_TRIAGE_URGENCY = (
-    "3. **Does it warrant a patch release on its own**, or can it wait for "
-    "the next scheduled one? Cadence is roughly weekly; an unreachable "
-    "medium-impact finding can reasonably wait, a reachable critical one "
-    "cannot."
-)
-_TRIAGE = [_TRIAGE_FIXED, _TRIAGE_REACHABLE, _TRIAGE_URGENCY]
-_FOOTER = (
-    "This issue is refreshed in place while the finding set is unchanged, so "
-    "it will not re-notify on every run."
-)
 
-
-def load_code_counts(directory: pathlib.Path) -> dict[str, int]:
-    """release -> number of code findings, from the count-only files."""
-    counts: dict[str, int] = {}
+def load(directory: pathlib.Path) -> list[dict]:
+    """Dependency findings only. Code findings are refused, not skipped."""
+    reports = []
     for path in sorted(directory.rglob("*.json")):
+        try:
+            data = json.loads(path.read_text())
+        except (json.JSONDecodeError, OSError) as exc:
+            print(f"skipping unreadable {path}: {exc}", file=sys.stderr)
+            continue
+        # Must carry findings: the count-only files also have a "release", and
+        # accepting one registers the release as present-but-empty.
+        if not (isinstance(data, dict) and "release" in data and "findings" in data):
+            continue
+        if data.get("kind") == "code":
+            print(
+                f"REFUSING code-kind findings from {path}: this issue is public",
+                file=sys.stderr,
+            )
+            continue
+        reports.append(data)
+    return reports
+
+
+def code_counts(directory: pathlib.Path) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for path in directory.rglob("*.json"):
         try:
             data = json.loads(path.read_text())
         except (json.JSONDecodeError, OSError):
@@ -104,156 +67,104 @@ def load_code_counts(directory: pathlib.Path) -> dict[str, int]:
     return counts
 
 
-def load(directory: pathlib.Path) -> list[dict]:
-    reports = []
-    for path in sorted(directory.rglob("*.json")):
-        try:
-            data = json.loads(path.read_text())
-        except (json.JSONDecodeError, OSError) as exc:
-            print(f"skipping unreadable {path}: {exc}", file=sys.stderr)
-            continue
-        # Must carry findings. The count-only files also have a "release", and
-        # accepting one here registers the release as present-but-empty, which
-        # is enough to hide a code-only release from the branch that reports it.
-        if not (isinstance(data, dict) and "release" in data and "findings" in data):
-            continue
-        if data.get("kind") == "code":
-            # The workflow sends code findings to code scanning and never here,
-            # but this report is published as a PUBLIC issue — so refuse them at
-            # the door rather than relying on the caller to have got it right.
-            # Silently dropping would be worse: it would look like the scan
-            # found nothing.
-            print(
-                f"REFUSING code-kind findings from {path}: this report is public, "
-                "and code findings belong in code scanning",
-                file=sys.stderr,
-            )
-            continue
-        reports.append(data)
-    return reports
+def fingerprint(reports: list[dict], counts: dict[str, int]) -> str:
+    """Identity of the finding set — computed, never displayed.
 
-
-def fingerprint(reports: list[dict]) -> str:
-    """Identity of the finding *set*, stable across runs and orderings.
-
-    Deliberately excludes the source: the same CVE found in five images of one
-    release is one problem to fix, and letting the image list move the
-    fingerprint would re-notify on noise (an image list changing between
-    releases, a scan legitimately skipped).
+    Excludes which image or architecture saw a finding: the same advisory
+    across five images is one thing to fix, and letting the image list move the
+    fingerprint would re-notify on noise.
     """
-    keys = set()
-    for report in reports:
-        for finding in report.get("findings") or []:
-            keys.add(f"{report['release']}|{finding.get('id', '')}")
-    digest = hashlib.sha256("\n".join(sorted(keys)).encode()).hexdigest()[:16]
-    return digest
+    keys = {
+        f"{r['release']}|{f.get('id', '')}"
+        for r in reports
+        for f in (r.get("findings") or [])
+    }
+    keys |= {f"{rel}|code:{n}" for rel, n in counts.items() if n}
+    return hashlib.sha256("\n".join(sorted(keys)).encode()).hexdigest()[:16]
 
 
-def _code_pointer(release: str, count: int) -> str:
-    """Say that code findings exist and where, without saying what they are."""
-    return (
-        f"> **{count} code finding(s)** from the source scan of `{release}`, "
-        "not listed here. Details are in "
-        f"[code scanning]({_REPO_URL}/security/code-scanning?query=is%3Aopen) "
-        "under the "
-        f"`release-rescan-{release}` category — this issue is public, and a "
-        "static-analysis hit in Terrapod's own source is a potential "
-        "undisclosed vulnerability."
-    )
-
-
-def _dependency_table(findings: list[dict]) -> list[str]:
-    lines = [
-        "| Severity | Package | Installed | Fixed in | Advisory | Seen in |",
-        "|---|---|---|---|---|---|",
-    ]
-    for f in sorted(findings, key=lambda x: (x.get("severity", ""), x.get("id", ""))):
-        where = ", ".join(sorted(set(f.get("sources") or [])))
-        lines.append(
-            f"| {f.get('severity', '?')} | `{f.get('package', '?')}` "
-            f"| {f.get('installed', '?')} | **{f.get('fixed', '?')}** "
-            f"| {f.get('id', '?')} | {where} |"
-        )
-    return lines
-
-
-
-def merge(reports: list[dict]) -> dict[str, dict[str, list[dict]]]:
-    """release -> kind -> findings, deduplicated, recording where each was seen."""
-    out: dict[str, dict[str, dict[str, dict]]] = {}
-    for report in reports:
-        release = report["release"]
-        kind = report.get("kind", "dependency")
-        source = report.get("source", "?")
-        bucket = out.setdefault(release, {}).setdefault(kind, {})
-        for finding in report.get("findings") or []:
-            key = f"{finding.get('id')}|{finding.get('package')}"
-            entry = bucket.setdefault(key, {**finding, "sources": []})
-            entry["sources"].append(source)
-    return {r: {k: list(v.values()) for k, v in kinds.items()} for r, kinds in out.items()}
-
-
-def render(
-    reports: list[dict], scanned: list[str], code_counts: dict[str, int] | None = None
-) -> tuple[str, str, bool]:
-    code_counts = code_counts or {}
-    merged = merge(reports)
-    fp = fingerprint(reports)
-    total = sum(len(f) for kinds in merged.values() for f in kinds.values())
-
-    body = [
-        f"<!-- {MARKER}:{fp} -->",
-        "",
-        _INTRO,
-        "",
-        _WHY,
-        "",
-        _SCOPE,
-        "",
-        f"Scanned: {', '.join(scanned) if scanned else '(none)'}",
-        "",
-    ]
-
-    # Releases with no dependency findings but some code findings still need
-    # saying, or the issue reads as "clean" when it is not.
-    for release in sorted(set(code_counts) - set(merged), reverse=True):
-        if code_counts[release]:
-            body += [f"## {release} — code findings only", "",
-                     _code_pointer(release, code_counts[release]), ""]
-            total += code_counts[release]
-
-    if not total:
-        body += ["## No findings", "", _CLEAN]
-        return "\n".join(body), fp, False
-
-    for release in sorted(merged, reverse=True):
-        kinds = merged[release]
-        count = sum(len(v) for v in kinds.values())
-        body += [f"## {release} — {count} finding(s)", ""]
-        if code_counts.get(release):
-            body += [_code_pointer(release, code_counts[release]), ""]
-        if kinds.get("dependency"):
-            body += ["**Dependencies and packages**", ""]
-            body += _dependency_table(kinds["dependency"])
-            body += [""]
-
-    body += ["## What to do with this", "", _TRIAGE_HEAD, ""]
-    body += _TRIAGE
-    body += ["", _FOOTER]
-    return "\n".join(body), fp, True
+_LEDE = (
+    "The scheduled re-scan of supported releases has findings that need "
+    "attention."
+)
+_WHY_EMPTY = (
+    "**Deliberately no detail here.** This issue is public, and naming a "
+    "supported release together with what is wrong with it tells anyone "
+    "reading exactly where to look. The findings are recorded privately "
+    "instead:"
+)
+_ADVISORIES = (
+    f"- **[Security advisories]({_REPO_URL}/security/advisories)** — a draft "
+    "per affected release: package, installed version, fixed version, advisory "
+    "id. Drafts are visible to maintainers only."
+)
+_CODESCAN = (
+    f"- **[Code scanning]({_REPO_URL}/security/code-scanning)** — static "
+    "analysis findings in Terrapod's own source at that tag."
+)
+_PUBLISH = (
+    "Drafts are published when the patch release that fixes them ships — that "
+    "is what turns them into the operator-facing record."
+)
+_REFS = (
+    f"Policy: [docs/cve-policy.md]({_REPO_URL}/blob/main/docs/cve-policy.md). "
+    "Procedure: *Patching an older release line* in "
+    f"[AGENTS.md]({_REPO_URL}/blob/main/AGENTS.md)."
+)
+_FOOTER = (
+    "Refreshed in place; only notifies when the finding set actually changes."
+)
 
 
 def main() -> int:
     if len(sys.argv) < 3:
-        print("usage: rescan_report.py <findings-dir> <out.md> [tag ...]", file=sys.stderr)
+        print(__doc__, file=sys.stderr)
         return 2
     directory, out = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2])
-    scanned = sys.argv[3:]
+
     reports = load(directory)
-    body, fp, has_findings = render(reports, scanned, load_code_counts(directory))
-    out.write_text(body)
+    counts = code_counts(directory)
+    total = sum(len(r.get("findings") or []) for r in reports) + sum(counts.values())
+    fp = fingerprint(reports, counts)
+
+    if not total:
+        out.write_text(f"<!-- {MARKER}:{fp} -->\n\nNo findings.\n")
+        print(f"fingerprint={fp}")
+        print("has_findings=false")
+        return 0
+
+    body = [
+        f"<!-- {MARKER}:{fp} -->",
+        "",
+        _LEDE,
+        "",
+        _WHY_EMPTY,
+        "",
+        _ADVISORIES,
+        _CODESCAN,
+        "",
+        _PUBLISH,
+        "",
+        _REFS,
+        "",
+        _FOOTER,
+    ]
+
+    # Advisory URLs are safe to include: a draft is unreadable without
+    # repository access, so the link discloses nothing on its own.
+    if len(sys.argv) > 3 and pathlib.Path(sys.argv[3]).exists():
+        try:
+            urls = json.loads(pathlib.Path(sys.argv[3]).read_text())
+        except (json.JSONDecodeError, OSError):
+            urls = {}
+        live = [u for u in urls.values() if u]
+        if live:
+            body += ["", "Drafts raised or refreshed this run:"]
+            body += [f"- {u}" for u in live]
+
+    out.write_text("\n".join(body) + "\n")
     print(f"fingerprint={fp}")
-    print(f"has_findings={'true' if has_findings else 'false'}")
+    print("has_findings=true")
     return 0
 
 

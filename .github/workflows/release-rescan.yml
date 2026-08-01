@@ -173,6 +173,13 @@ jobs:
         with:
           path: current
 
+      # The tag's OWN commit. Passing github.sha (main's HEAD) with a tag ref
+      # is a mismatched pair: GitHub accepts the upload, reports success, and
+      # discards the analysis. Nothing ever reached code scanning.
+      - name: Resolve the tag's commit
+        id: tagsha
+        run: echo "sha=$(git -C release rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: '3.13'
@@ -253,7 +260,7 @@ jobs:
           sarif_file: semgrep.sarif
           category: release-rescan-${{ matrix.tag }}
           ref: refs/tags/${{ matrix.tag }}
-          sha: ${{ github.sha }}
+          sha: ${{ steps.tagsha.outputs.sha }}
 
       - name: Normalise
         run: |
@@ -294,11 +301,19 @@ jobs:
           path: findings
           pattern: rescan-*
 
-      - name: Build the report
+      # Findings go into a DRAFT advisory per release — private to
+      # maintainers. Never published: publishing is irreversible and would make
+      # an unfixed vulnerability public, so it stays a human act at patch time.
+      - name: Record findings in draft advisories
+        env:
+          ADVISORY_TOKEN: ${{ secrets.SECURITY_ADVISORY_AUTH }}
+        run: python3 scripts/rescan_advisory.py findings advisory-urls.json
+
+      - name: Build the public notification
         id: build
         run: |
-          python3 scripts/rescan_report.py findings body.md \
-            ${{ needs.discover.outputs.list }} >> "$GITHUB_OUTPUT"
+          python3 scripts/rescan_report.py findings body.md advisory-urls.json \
+            >> "$GITHUB_OUTPUT"
 
       - name: Open or refresh the tracking issue
         env:
@@ -322,14 +337,17 @@ jobs:
 
           if [ -n "$existing" ]; then
             number=$(echo "$existing" | jq -r '.number')
-            if echo "$existing" | jq -r '.body' | grep -q "terrapod-release-rescan:$FINGERPRINT"; then
-              echo "Issue #$number already reports this exact finding set — not re-notifying."
-              exit 0
-            fi
+            # Always refresh the body; only COMMENT when the set changed. These
+            # are two decisions, and gating both on the fingerprint once left
+            # the issue showing stale content after the tooling improved.
             gh issue edit "$number" --body-file body.md
-            gh issue comment "$number" --body \
-              "The finding set changed on the latest re-scan — body updated above."
-            echo "Refreshed issue #$number"
+            if echo "$existing" | jq -r '.body' | grep -q "terrapod-release-rescan:$FINGERPRINT"; then
+              echo "Issue #$number refreshed; finding set unchanged, not re-notifying."
+            else
+              gh issue comment "$number" --body \
+                "The finding set changed on the latest re-scan. Details are in the draft advisories."
+              echo "Refreshed issue #$number and notified"
+            fi
           else
             gh issue create --title "$TITLE" --body-file body.md --label security 2>/dev/null \
               || gh issue create --title "$TITLE" --body-file body.md
