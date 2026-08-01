@@ -165,3 +165,38 @@ class TestTheGateItself:
         stray = set(_collect_marks()) - registered
 
         assert not stray, f"coverage claimed for classes that are not registered: {sorted(stray)}"
+
+
+class TestPrimaryKeyConsistency:
+    """A class's `pk_attrs` must be exactly its model's primary key.
+
+    Every identity operation keys off `pk_attrs`: `entity_id` encoding,
+    `read_entity`'s filter, `apply_upsert`'s "which columns are the key and
+    which do I overwrite" split, `read_backfill`'s ordering and cursor, and
+    `reconcile_deletions`' local index.
+
+    Declaring FEWER columns than the PK collapses sibling rows onto one id:
+    the read returns an arbitrary one, the upsert mutates a real key column on
+    the existing row rather than inserting the second, and the backfill cursor
+    pages straight past the rest. Declaring MORE (or different) columns filters
+    on something that is not unique.
+
+    This was `role_assignments`, which declared (provider_name, email) against a
+    three-column PK — so a user holding two roles converged to one arbitrary
+    role on the standby. Nothing else in the gate compares the two, and the
+    symptom only appears at a failover.
+    """
+
+    def test_pk_attrs_match_the_model_primary_key(self):
+        from sqlalchemy import inspect as sa_inspect
+
+        mismatched = {}
+        for name, spec in replication.registered().items():
+            model_pk = tuple(col.name for col in sa_inspect(spec.model).primary_key)
+            if tuple(spec.pk_attrs) != model_pk:
+                mismatched[name] = {"declared": tuple(spec.pk_attrs), "model": model_pk}
+
+        assert not mismatched, (
+            "pk_attrs must equal the model primary key exactly — a short key "
+            f"silently collapses sibling rows at a failover: {mismatched}"
+        )

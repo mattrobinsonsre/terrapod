@@ -168,7 +168,13 @@ class TestRoles:
 
 
 class TestRoleAssignments:
-    """Composite key: (provider_name, email)."""
+    """Three-column key: (provider_name, email, role_name).
+
+    One person may hold several roles under one (provider, email), so the
+    role name is part of the identity, not a mutable attribute of it. A
+    two-column key collapsed the siblings onto one entity_id and a promoted
+    node granted whichever one it happened to read.
+    """
 
     @pytest.mark.replication_matrix("role_assignments", "backfill-from-empty")
     async def test_backfill_serializes_assignments(self):
@@ -179,10 +185,15 @@ class TestRoleAssignments:
         assert (page[0]["provider_name"], page[0]["email"]) == ("local", "a@x.com")
 
     @pytest.mark.replication_matrix("role_assignments", "delta-apply")
-    async def test_delta_applies_on_the_full_key(self):
+    async def test_a_second_role_for_one_person_is_a_new_row(self):
+        """The same person gaining a second role must INSERT, not overwrite.
+
+        role_name is part of the key, so `viewer` and `sre` are two distinct
+        entities. Treating it as a mutable attribute is what silently turned
+        two grants into one.
+        """
         db = AsyncMock()
-        existing = RoleAssignment(provider_name="local", email="a@x.com", role_name="viewer")
-        db.scalar.return_value = existing
+        db.scalar.return_value = None  # no row for (local, a@x.com, sre) yet
 
         await replication.apply_upsert(
             db,
@@ -190,7 +201,19 @@ class TestRoleAssignments:
             {"provider_name": "local", "email": "a@x.com", "role_name": "sre"},
         )
 
-        assert existing.role_name == "sre"
+        db.add.assert_called_once()
+        added = db.add.call_args.args[0]
+        assert (added.provider_name, added.email, added.role_name) == ("local", "a@x.com", "sre")
+
+    @pytest.mark.replication_matrix("role_assignments", "delta-apply")
+    async def test_each_role_gets_its_own_entity_id(self):
+        """Two grants for one person must not encode to the same id — that is
+        what made the read return an arbitrary one and the backfill cursor page
+        straight past the sibling."""
+        viewer = replication.encode_entity_id(ASSIGNMENTS, ["local", "a@x.com", "viewer"])
+        sre = replication.encode_entity_id(ASSIGNMENTS, ["local", "a@x.com", "sre"])
+
+        assert viewer != sre
 
     @pytest.mark.replication_matrix("role_assignments", "idempotent-reapply")
     async def test_reapplying_changes_nothing(self):
@@ -207,7 +230,7 @@ class TestRoleAssignments:
     @pytest.mark.replication_matrix("role_assignments", "delete")
     async def test_delete_applies_on_the_full_key(self):
         db = AsyncMock()
-        entity_id = replication.encode_entity_id(ASSIGNMENTS, ["local", "a@x.com"])
+        entity_id = replication.encode_entity_id(ASSIGNMENTS, ["local", "a@x.com", "sre"])
 
         await replication.apply_delete(db, ASSIGNMENTS, entity_id)
 
@@ -217,12 +240,14 @@ class TestRoleAssignments:
     async def test_a_revoked_assignment_does_not_survive_a_backfill(self):
         """Removing someone's role is an access revocation. It must converge
         through the recovery path, not just the delta path."""
-        kept = replication.encode_entity_id(ASSIGNMENTS, ["local", "stays@x.com"])
-        db = _keys_db([("local", "stays@x.com"), ("local", "revoked@x.com")])
+        kept = replication.encode_entity_id(ASSIGNMENTS, ["local", "who@x.com", "viewer"])
+        # Same person, two roles: one kept, one revoked. With a short key both
+        # rows collapsed to a single id and the revocation could not be seen.
+        db = _keys_db([("local", "who@x.com", "viewer"), ("local", "who@x.com", "sre")])
 
         removed = await replication.reconcile_deletions(db, ASSIGNMENTS, {kept})
 
-        assert removed == [replication.encode_entity_id(ASSIGNMENTS, ["local", "revoked@x.com"])]
+        assert removed == [replication.encode_entity_id(ASSIGNMENTS, ["local", "who@x.com", "sre"])]
 
 
 class TestPlatformRoleAssignments:
