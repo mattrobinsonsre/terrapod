@@ -682,6 +682,33 @@ git commit --allow-empty -m "chore: rebuild v1.1.x against a refreshed base imag
   ignore files describe what we accept *now*; they are read from the current
   branch by both the release gate and the re-scan, and an older line does not
   carry its own copy.
+- **A security-driven patch is still a release.** Being prompted by a scanner
+  earns it no shortcut: it goes through the same pre-release process as any
+  other patch, including the independent third-party review. A patch cut in a
+  hurry against a supported line that people are already running is, if
+  anything, the one you least want to skip checks on.
+- **Say what it fixes.** The release notes name the advisories the patch
+  clears, so an operator can match them against their own scan output without
+  guessing. That is the whole reason they are running a scanner.
+
+### Where findings are published
+
+The re-scan raises a **public issue** for dependency findings and sends code
+findings to **code scanning**, and the split is deliberate.
+
+Dependency findings are already public — published advisories against public
+dependency versions of a public project, reproducible by anyone with
+`trivy image ghcr.io/…/terrapod-api:vX.Y.Z`. Publishing them tells operators
+what is in the version they are running, and withholding them would protect
+nobody.
+
+A static-analysis hit in **Terrapod's own source** is the opposite: a potential
+undisclosed vulnerability, and [`SECURITY.md`](SECURITY.md) asks people not to
+open a public issue for those. Auto-posting one would breach our own disclosure
+process on a schedule. Code scanning alerts are visible only to write-access
+users, which is the right audience. **On a public repository, Actions logs and
+artifacts are world-readable too** — which is why the Semgrep step emits SARIF
+and is never uploaded as an artifact.
 
 ## Content hygiene (hard requirements)
 

@@ -120,8 +120,12 @@ def render(reports: list[dict], scanned: list[str]) -> tuple[str, str, bool]:
         "release gate uses `ignore-unfixed`, so a vulnerability only becomes "
         "actionable once upstream publishes a fix. Everything below has a fix "
         "available *now* that did not exist, or was not yet taken, when the "
-        "release was cut. Code findings can also appear because the rule set has "
-        "improved since.",
+        "release was cut.",
+        "",
+        "**This report covers dependency findings only.** Code findings from the "
+        "source scan go to code scanning, which is visible to write-access users "
+        "rather than the world — a static-analysis hit in Terrapod's own source is "
+        "a potential undisclosed vulnerability, and this issue is public.",
         "",
         f"Scanned: {', '.join(scanned) if scanned else '(none)'}",
         "",

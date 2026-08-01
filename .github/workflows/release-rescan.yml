@@ -234,7 +234,26 @@ jobs:
               --exclude-rule "python.lang.security.insecure-hash-algorithms-md5.insecure-hash-algorithm-md5" \
               --exclude-rule "python.lang.security.audit.logging.logger-credential-leak.python-logger-credential-disclosure" \
               --exclude-rule "python.flask.security.audit.directly-returned-format-string.directly-returned-format-string" \
-              --json --output /out/semgrep.json || true
+              --sarif --output /out/semgrep.sarif || true
+
+      # Code findings go to code scanning, NOT to the report. A Semgrep hit in
+      # Terrapod's own source is a potential undisclosed vulnerability in
+      # Terrapod, and the report is published as a public issue — auto-posting
+      # one there would breach the private-disclosure process SECURITY.md sets
+      # out, on a schedule, for a release people are running. Code scanning
+      # alerts are visible only to write-access users, which is the correct
+      # audience. This is also why Semgrep emits SARIF above and is never
+      # uploaded as a workflow artifact: on a public repository, artifacts and
+      # job logs are world-readable.
+      - name: Upload code findings to code scanning (private)
+        if: always()
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@7188fc363630916deb702c7fdcf4e481b751f97a # v4
+        with:
+          sarif_file: semgrep.sarif
+          category: release-rescan-${{ matrix.tag }}
+          ref: refs/tags/${{ matrix.tag }}
+          sha: ${{ github.sha }}
 
       - name: Normalise
         run: |
@@ -244,13 +263,14 @@ jobs:
           python3 current/scripts/rescan_normalise.py npm-audit npm.json \
             "${{ matrix.tag }}" "source:frontend" "finding-npm.json" \
             current/pentest/npm-audit-allow.txt
-          python3 current/scripts/rescan_normalise.py semgrep semgrep.json \
-            "${{ matrix.tag }}" "source:semgrep" "finding-semgrep.json"
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: rescan-${{ matrix.tag }}-source
-          path: finding-*.json
+          # finding-pip / finding-npm only. Never semgrep.sarif — see above.
+          path: |
+            finding-pip.json
+            finding-npm.json
           retention-days: 7
 
   report:
