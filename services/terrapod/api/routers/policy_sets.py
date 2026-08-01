@@ -434,7 +434,17 @@ async def _validate_rego(rego: str) -> None:
             ),
         )
     err = await policy_engine.check_rego(rego)
-    if err is not None:
+    if err == policy_engine.VALIDATION_UNAVAILABLE:
+        # OPA could not be obtained (#1208). Warn and accept: refusing the write
+        # would leave the operator unable to edit any policy because of an
+        # unrelated fetch failure, and the check being skipped is a *syntax*
+        # check — the runner still evaluates this Rego, and fails closed if it
+        # does not compile there.
+        logger.warning(
+            "accepting policy Rego without write-time validation — OPA unavailable",
+            policy_len=len(rego),
+        )
+    elif err is not None:
         raise HTTPException(status_code=422, detail=f"Rego failed to compile: {err}")
 
 

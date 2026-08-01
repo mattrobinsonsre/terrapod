@@ -74,21 +74,13 @@ RUN echo "pkg-refresh=${PKG_REFRESH}" \
     libxmlsec1-openssl \
     && rm -rf /var/lib/apt/lists/*
 
-# OPA (Open Policy Agent) — the policy-as-code evaluation engine (#343).
-# Pinned, statically-linked binary, verified against its published SHA256.
-# Bumped deliberately with Terrapod releases (the operator controls the
-# OPA version via the image tag — see docs/policies.md). TARGETARCH is set
-# by buildx; fall back to dpkg for a plain `docker build`.
-ARG TARGETARCH
-ARG OPA_VERSION=1.19.0
-RUN ARCH="${TARGETARCH:-$(dpkg --print-architecture)}" \
-    && BASE="https://github.com/open-policy-agent/opa/releases/download/v${OPA_VERSION}" \
-    && curl -fsSL --retry 6 --retry-delay 4 --retry-all-errors -o /usr/local/bin/opa "${BASE}/opa_linux_${ARCH}_static" \
-    && curl -fsSL --retry 6 --retry-delay 4 --retry-all-errors -o /tmp/opa.sha256 "${BASE}/opa_linux_${ARCH}_static.sha256" \
-    && echo "$(cut -d' ' -f1 /tmp/opa.sha256)  /usr/local/bin/opa" | sha256sum -c - \
-    && rm /tmp/opa.sha256 \
-    && chmod 0755 /usr/local/bin/opa \
-    && /usr/local/bin/opa version
+# OPA is deliberately NOT baked in (#1208). The API uses it for one thing —
+# `opa check`, the write-time Rego syntax check — and it now fetches it on
+# demand to the ephemeral PVC, so the version is a Helm value
+# (registry.platform_tools.opa_version) instead of something frozen into this
+# image, and OPA's vendored Go modules stop being reported against Terrapod's
+# artifacts. The fetch degrades rather than failing: see
+# terrapod/services/api_opa.py.
 
 # terrapod-query — the tofu-native discovery engine (#823), pre-built for this
 # arch by the build-query CI job (or the local Tilt/Make go build) and staged at

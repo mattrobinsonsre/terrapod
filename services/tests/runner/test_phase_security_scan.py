@@ -25,6 +25,16 @@ def _cfg(**overrides) -> RunnerConfig:
     return RunnerConfig.from_env(env=base)
 
 
+def _fetched(tool_name: str = "/tmp/bin/engine"):
+    """Stub the platform-tool fetch (#1208).
+
+    The engines are no longer on PATH — `run_and_post` pulls them from the
+    binary cache — so a test about scan *outcomes* has to say the fetch
+    succeeded before it can exercise the thing it is actually about.
+    """
+    return patch.object(scan.platform_tool, "tool_path_or_name", return_value=(tool_name, None))
+
+
 # ── severity helpers ──────────────────────────────────────────────────────
 
 
@@ -374,6 +384,7 @@ class TestRunAndPost:
         plan.write_text('{"x":1}')
         posted = {}
         with (
+            _fetched(),
             patch.object(
                 scan,
                 "_run_checkov",
@@ -394,6 +405,7 @@ class TestRunAndPost:
         plan.write_text('{"x":1}')
         posted = {}
         with (
+            _fetched(),
             patch.object(
                 scan,
                 "_run_checkov",
@@ -418,9 +430,31 @@ class TestRunAndPost:
         plan.write_text('{"x":1}')
         posted = {}
         with (
+            _fetched(),
             patch.object(scan, "_run_checkov", return_value=(False, [], "checkov exploded")),
             patch.object(scan, "post_scan_result", side_effect=lambda cfg, **kw: posted.update(kw)),
         ):
             outcome = scan.run_and_post(cfg, {"engine": "checkov"}, plan_json=plan)
         assert outcome == "errored"
         assert "checkov exploded" in posted["error"]
+
+    def test_an_engine_that_cannot_be_fetched_is_errored_not_fatal(self, tmp_path: Path) -> None:
+        """#1208: the engines are pulled at run time now, so "could not fetch"
+        is a new failure mode. It must land as an errored *result* — which the
+        server's gate then fails closed on for an enforced workspace — rather
+        than raising and taking the whole run down."""
+        cfg = _cfg()
+        plan = tmp_path / "plan.json"
+        plan.write_text('{"x":1}')
+        posted = {}
+        with (
+            patch.object(
+                scan.platform_tool,
+                "tool_path_or_name",
+                return_value=("", "binary cache unreachable"),
+            ),
+            patch.object(scan, "post_scan_result", side_effect=lambda cfg, **kw: posted.update(kw)),
+        ):
+            outcome = scan.run_and_post(cfg, {"engine": "checkov"}, plan_json=plan)
+        assert outcome == "errored"
+        assert "binary cache unreachable" in posted["error"]

@@ -20,10 +20,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxmlsec1-openssl \
     && rm -rf /var/lib/apt/lists/*
 
-# OPA — so the policy-engine tests (#343) exercise the real binary
-# rather than skipping. Kept in sync with docker/Dockerfile.api; both
-# pin and verify the same OPA_VERSION + SHA256 so a bump in one without
-# the other can't silently land an unverified binary in either image.
+# OPA — so the policy-engine tests (#343) exercise the real binary rather than
+# skipping. This is the ONE image that still bakes it in: the api and runner
+# images fetch it at run time now (#1208), but a test image that did the same
+# would need upstream reach on every CI run to test a code path that has nothing
+# to do with fetching. Not a published image, so it carries no CVE surface for
+# operators. Keep the version roughly in step with
+# `registry.platform_tools.opa_version` in values.yaml — the tests exercise
+# `opa check` behaviour, so a large drift would test something operators do not
+# run.
 ARG TARGETARCH
 ARG OPA_VERSION=1.19.0
 RUN ARCH="${TARGETARCH:-$(dpkg --print-architecture)}" \

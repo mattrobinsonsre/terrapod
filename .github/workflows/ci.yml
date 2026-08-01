@@ -952,7 +952,14 @@ jobs:
           echo "$out" | grep -q "component: postgresql" || { echo "FAIL: values-eval did not render embedded Postgres"; exit 1; }
           echo "$out" | grep -q "component: redis" || { echo "FAIL: values-eval did not render embedded Redis"; exit 1; }
           echo "$out" | grep -q "kind: PersistentVolumeClaim" || { echo "FAIL: embedded Postgres PVC missing"; exit 1; }
-          echo "values-eval renders embedded datastores OK"
+          # Platform tools (#1208): the eval profile must still pin opa/trivy/checkov,
+          # or a one-command eval silently loses policy evaluation and security
+          # scanning the moment someone tries them. The eval stack fetches them on
+          # first use — the same egress it already needs for the provider and
+          # binary caches — so what has to hold here is that it knows WHAT to fetch.
+          echo "$out" | grep -q "opa_version:" || { echo "FAIL: values-eval renders no opa_version — eval would lose policy evaluation (#1208)"; exit 1; }
+          echo "$out" | grep -q "checkov_version:" || { echo "FAIL: values-eval renders no checkov_version — eval would lose security scanning (#1208)"; exit 1; }
+          echo "values-eval renders embedded datastores + platform-tool versions OK"
       - name: Forward proxy + custom CA bundle render (#592)
         run: |
           out=$(docker run --rm -v "$PWD:/chart" -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \

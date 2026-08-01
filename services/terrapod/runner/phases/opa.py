@@ -37,6 +37,7 @@ from pathlib import Path
 import httpx
 import structlog
 
+from terrapod.runner.phases import platform_tool
 from terrapod.runner.runner_config import RunnerConfig
 
 logger = structlog.get_logger("runner.opa")
@@ -339,17 +340,36 @@ def evaluate_policies(
     *,
     plan_json: Path,
     work_dir: Path,
-    opa_binary: str = "opa",
+    opa_binary: str | None = None,
     client: httpx.Client | None = None,
 ) -> int:
     """Drive the whole OPA phase. Returns the number of policy sets
     evaluated (0 = nothing applicable, caller may skip). Raises
-    PolicyEvaluationError on FATAL bundle-fetch / POST failures."""
+    PolicyEvaluationError on FATAL bundle-fetch / POST failures.
+
+    `opa_binary` defaults to fetching OPA from the binary cache (#1208) — but
+    only *after* the bundle turns out to have applicable sets, so a run with no
+    policy never pays for a download it will not use. Tests pass an explicit
+    path."""
     bundle = fetch_policy_bundle(cfg, client=client)
     policy_sets = bundle.get("policy_sets") or []
     if not policy_sets:
         logger.info("no applicable policy sets — skipping evaluation")
         return 0
+
+    if opa_binary is None:
+        # FATAL, deliberately. OPA is no longer baked into the runner image, so
+        # there is nothing on PATH to fall back to — and even if there were,
+        # letting a policy set go unevaluated because its engine did not arrive
+        # would pass a gate that was supposed to block. Failing the run is the
+        # only safe reading of "we could not evaluate your policy".
+        try:
+            opa_binary = str(platform_tool.ensure_tool(cfg, "opa", client=client))
+        except platform_tool.PlatformToolError as exc:
+            raise PolicyEvaluationError(
+                f"{len(policy_sets)} policy set(s) apply to this run but OPA could "
+                f"not be obtained, so they cannot be evaluated: {exc}"
+            ) from exc
 
     work_dir.mkdir(parents=True, exist_ok=True)
     context_path = work_dir / "policy-context.json"

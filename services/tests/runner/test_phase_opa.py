@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import json
-from unittest.mock import patch
+from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import httpx
 import pytest
@@ -287,3 +288,67 @@ class TestEvaluatePolicies:
             client=client,
         )
         assert n == 0
+
+
+class TestOPAIsFetchedNotBaked:
+    """#1208: OPA is pulled from the binary cache, and the policy gate is the
+    one path where a failed fetch must stop the run."""
+
+    def test_no_fetch_when_no_policy_set_applies(self, tmp_path: Path) -> None:
+        """Most runs have no policy. They must not pay for a ~50MB download
+        they will never execute."""
+        fetch = MagicMock()
+        with (
+            patch.object(opa, "fetch_policy_bundle", return_value={"policy_sets": []}),
+            patch.object(opa.platform_tool, "ensure_tool", fetch),
+        ):
+            count = opa.evaluate_policies(
+                _cfg(), plan_json=tmp_path / "plan.json", work_dir=tmp_path / "w"
+            )
+        assert count == 0
+        fetch.assert_not_called()
+
+    def test_a_failed_fetch_fails_the_run_closed(self, tmp_path: Path) -> None:
+        """Letting a policy set go unevaluated because its engine did not arrive
+        would pass a gate that was supposed to block — a worse defect than the
+        CVE exposure #1208 removes."""
+        plan = tmp_path / "plan.json"
+        plan.write_text("{}")
+        bundle = {
+            "policy_sets": [
+                {"id": "ps-1", "name": "prod", "enforcement_level": "mandatory", "policies": []}
+            ],
+            "context": {},
+        }
+        with (
+            patch.object(opa, "fetch_policy_bundle", return_value=bundle),
+            patch.object(
+                opa.platform_tool,
+                "ensure_tool",
+                side_effect=opa.platform_tool.PlatformToolError("cache unreachable"),
+            ),
+        ):
+            with pytest.raises(opa.PolicyEvaluationError, match="cannot be evaluated"):
+                opa.evaluate_policies(_cfg(), plan_json=plan, work_dir=tmp_path / "w")
+
+    def test_an_explicit_binary_skips_the_fetch(self, tmp_path: Path) -> None:
+        """Callers that already have a path — tests, and the baked test image —
+        must not trigger a network fetch."""
+        plan = tmp_path / "plan.json"
+        plan.write_text("{}")
+        bundle = {
+            "policy_sets": [
+                {"id": "ps-1", "name": "prod", "enforcement_level": "advisory", "policies": []}
+            ],
+            "context": {},
+        }
+        fetch = MagicMock()
+        with (
+            patch.object(opa, "fetch_policy_bundle", return_value=bundle),
+            patch.object(opa.platform_tool, "ensure_tool", fetch),
+            patch.object(opa, "post_results"),
+        ):
+            opa.evaluate_policies(
+                _cfg(), plan_json=plan, work_dir=tmp_path / "w", opa_binary="/usr/bin/opa"
+            )
+        fetch.assert_not_called()
