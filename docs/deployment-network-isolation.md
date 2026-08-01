@@ -24,6 +24,29 @@ This is independent of the [webhook split](deployment-webhook-ingress.md). They 
 
 All three terminate at the same `<fullname>-web` Service — the Next.js BFF. The difference is **which network the request entered through**, not what API it talks to. Listener auth (bearer cert), runner-token auth, and TFE-V2 session auth all work uniformly regardless of Ingress.
 
+## Outbound — what the API itself reaches
+
+The table above is about traffic coming *in*. This one is the half that decides whether "air-gapped" is achievable for you, and it is the part most easily glossed over.
+
+**Terrapod can run with no internet. It cannot run with no egress from the API.** Every upstream below can be redirected to something inside your network, and all of them honour the [forward proxy and custom CA](deployment-proxy.md) — but the API always needs a path to *something*. The caches in particular are **pull-through**: they have to be filled before they can serve, and only the API can fill them.
+
+| The API reaches | When | Removing the internet dependency |
+|---|---|---|
+| terraform / tofu / terragrunt release hosts | Filling the binary cache | Point the download base + version index at an internal mirror |
+| Upstream provider registries | Filling the provider network mirror | Point at an internal registry mirror |
+| GitHub releases (Terrapod's own provider) | Serving the platform provider | Internal mirror override |
+| The cost pricesheet object | Cost estimation (on by default) | Pre-seed the cached object, or set `cost_estimation.prices_url` to an internal copy |
+| Your VCS host | Polling branches and pull requests | Already internal if you self-host GitHub Enterprise or GitLab |
+| Your identity provider | SSO discovery / JWKS | Already internal if the IdP is |
+| Slack, webhook and SMTP targets | Notifications, if configured | Point at internal endpoints, or leave notifications off |
+| External run-task services | Run tasks, if configured | Internal services, or leave run tasks off |
+| A model endpoint | The AI layer, **off by default** | Self-hosted model, or leave it off |
+| The peer node | HA replication, if configured | A private link — never the internet |
+
+**Sealed mode is the end state, not the starting state.** `registry.cache_only: true` is a hard guarantee that the caches never reach upstream — but it is something you switch on *after* the caches hold what you need. The documented order is: populate with `cache_only` off (upstream overrides pointed at your internal mirrors, then [bulk warm](registry.md#cache-pre-population)), then seal. See [Sealed (cache-only) mode](registry.md#sealed-cache-only-mode), which spells out the workflow and the cache-miss behaviour.
+
+The consequence worth planning for: a sealed deployment cannot fetch a terraform version or provider nobody warmed. That is the intended behaviour — it fails with an actionable error rather than silently reaching out — but it means cache population is an operational task with a lifecycle, not a one-off at install.
+
 ## Helm values
 
 ```yaml
@@ -182,4 +205,5 @@ After enabling `internalIngress`:
 
 - **Not a multi-tenant networking model.** Terrapod is single-organisation by design. The three Ingresses serve different *audiences* of the same Terrapod instance, not different tenants.
 - **Not authentication.** Listener cert and runner-token auth apply on every endpoint regardless of which Ingress the request entered through. An attacker landing on the internal Ingress without a valid cert/token gets the same 401 as on the public one.
+- **Not zero-egress.** The page title says air-gapped because that is what people search for, and the *execution* clusters genuinely can be sealed. The API is a different matter: it needs an outbound path to fill its pull-through caches and to reach whatever VCS, IdP and notification targets you have configured. Those can all be internal, and a forward proxy is supported — but "no outbound from the API at all" is not a configuration Terrapod supports. See [Outbound — what the API itself reaches](#outbound--what-the-api-itself-reaches).
 - **Not a substitute for in-cluster reachability** for same-cluster deployments. Where the API runs in the same cluster as the listener, `listener.apiUrl: ""` (the chart's in-cluster Service default) is the right answer and no Ingress hop is needed.
