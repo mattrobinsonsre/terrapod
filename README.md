@@ -53,7 +53,7 @@ Everything you'd expect from the platform tier is here and first-class:
 
 And a few standout, first-class features you may really like:
 
-- **Runs anywhere your network is awkward.** Runners dial *out* and create Kubernetes Jobs locally, so the control plane never needs inbound reach into an execution cluster — isolated VPCs, other regions, on-prem, or behind egress-only firewalls. VCS is polled outbound, and a pull-through provider mirror + binary cache (with an air-gap sealed mode) lets runs resolve providers and binaries with no upstream internet.
+- **Runs anywhere your network is awkward.** Runners dial *out* and create Kubernetes Jobs locally, so the control plane never needs inbound reach into an execution cluster — isolated VPCs, other regions, on-prem, or behind egress-only firewalls. VCS is polled outbound, and a pull-through provider mirror + binary cache (with an air-gap sealed mode) lets runners resolve providers and binaries with no upstream internet for cached platforms. (The API itself still needs an outbound path to fill those caches — internal mirrors and a forward proxy both work; see [network isolation](docs/deployment-network-isolation.md).)
 - **Zero static cloud credentials.** Runs and the platform reach cloud APIs through Kubernetes workload identity (AWS IRSA, GCP WIF, Azure WI) — nothing long-lived to store, leak, or rotate.
 - **Cost visibility built in** — no third-party service. See the monthly cost of your managed infrastructure right in the run and workspace: a per-plan cost *delta* on every run and the current *total* on each workspace, priced by a native engine over Terrapod's own self-generated pricesheet (AWS, Azure, GCP; air-gap-friendly). On by default; an optional AI layer estimates what the engine can't price and answers a grounded [cost chat](docs/cost-estimation.md).
 - **An AI-augmented review layer** — optional and off by default — plan change-summaries, risk assessment, failure analysis, and a chat to interrogate a run.
@@ -152,7 +152,7 @@ Everything below is implemented and shipped today.
 | Private provider registry | Publish, version, and share providers with GPG signing and network-mirror caching |
 | Binary caching | Pull-through cache for the terraform / tofu / terragrunt CLI binaries |
 | Cache pre-population | Bulk-warm the binary + provider caches ahead of time via an admin endpoint + UI panel (for restricted-network / fast-first-run deployments) |
-| Sealed (cache-only) mode | Air-gap switch (`registry.cache_only`) guaranteeing no upstream fetch — cache-backed version resolution, actionable cache-miss errors, retention skips the caches |
+| Sealed (cache-only) mode | Air-gap switch (`registry.cache_only`) guaranteeing no upstream fetch — flipped on *after* the caches are populated — cache-backed version resolution, actionable cache-miss errors, retention skips the caches |
 
 ### Integrations & operations
 
