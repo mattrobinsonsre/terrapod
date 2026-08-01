@@ -471,7 +471,13 @@ async def _poll_workspace_branch(
             sha=sha[:8],
         )
         return
-    # Keep the in-memory ORM state consistent with the DB.
+    # Keep the in-memory ORM state consistent with the DB — and note that this
+    # line is LOAD-BEARING for replication, not just tidiness. The CAS above
+    # must stay a Core statement (the compare-and-swap with RETURNING is the
+    # concurrency control), and a Core statement emits no outbox event; it is
+    # this ORM assignment that puts the workspace in `session.dirty` so the
+    # poller cursor reaches the standby. Delete it and the follower silently
+    # stops tracking VCS progress.
     ws.vcs_last_commit_sha = sha
     await db.commit()
 
@@ -1101,12 +1107,19 @@ async def _release_commit_claim(ws_id: uuid.UUID, claimed_sha: str, previous_sha
             if existing.scalar_one_or_none() is not None:
                 return
 
-            await db.execute(
-                update(Workspace)
-                .where(Workspace.id == ws_id)
-                .where(Workspace.vcs_last_commit_sha == claimed_sha)
-                .values(vcs_last_commit_sha=previous_sha)
+            # Row-lock + ORM write, NOT a bulk `update(Workspace)`. The lock
+            # gives the same mutual exclusion the CAS did, and the ORM
+            # assignment is what puts the row in `session.dirty` so the
+            # replication outbox emits an event. A bulk statement reverted the
+            # SHA here and told the standby nothing, so a promoted node kept
+            # the advanced SHA and skipped this commit for good.
+            locked = await db.execute(
+                select(Workspace).where(Workspace.id == ws_id).with_for_update()
             )
+            ws_row = locked.scalar_one_or_none()
+            if ws_row is None or ws_row.vcs_last_commit_sha != claimed_sha:
+                return
+            ws_row.vcs_last_commit_sha = previous_sha
             await db.commit()
             logger.info(
                 "Released VCS commit claim after run creation failed",

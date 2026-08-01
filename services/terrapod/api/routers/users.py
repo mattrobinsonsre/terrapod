@@ -8,7 +8,7 @@ UX CONTRACT: User management endpoints are consumed by the web frontend:
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import delete, func, select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.api.dependencies import AuthenticatedUser, require_admin, require_admin_or_audit
@@ -254,9 +254,20 @@ async def delete_user(
 
     await _revoke_all_user_access(db, email)
 
-    # Delete role assignments
-    await db.execute(delete(RoleAssignment).where(RoleAssignment.email == email))
-    await db.execute(delete(PlatformRoleAssignment).where(PlatformRoleAssignment.email == email))
+    # Delete role assignments — through the ORM, one row at a time, NOT as bulk
+    # Core DELETEs. Both tables are replicated, and the outbox hook reads
+    # `session.deleted`, which a bulk statement never populates. A bulk delete
+    # therefore removed the grants here and emitted nothing, so a deleted admin
+    # kept `admin` on the standby — and since SSO users have no `users` row at
+    # all, the identity would still authenticate and pick the grant back up.
+    for assignment_model in (RoleAssignment, PlatformRoleAssignment):
+        rows = (
+            (await db.execute(select(assignment_model).where(assignment_model.email == email)))
+            .scalars()
+            .all()
+        )
+        for row in rows:
+            await db.delete(row)
 
     # Delete user
     await db.delete(target)

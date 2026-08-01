@@ -17,7 +17,7 @@ import hashlib
 import secrets
 from datetime import datetime, timedelta
 
-from sqlalchemy import delete, or_, select, update
+from sqlalchemy import or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.auth.recent_users import user_seen_within_window
@@ -301,12 +301,23 @@ async def revoke_token(db: AsyncSession, token_id: str) -> bool:
 async def revoke_all_for_user(db: AsyncSession, email: str) -> int:
     """Revoke (delete) every token bound to an identity (urgent offboarding, #495).
 
-    Single DELETE over ``bound_to == email`` (detached tokens, bound_to NULL,
-    are untouched). Returns the number of tokens removed. The caller is
-    responsible for invalidating the cached roles for the email after commit.
+    Detached tokens (``bound_to`` NULL) are untouched. Returns the number of
+    tokens removed. The caller is responsible for invalidating the cached roles
+    for the email after commit.
+
+    Deleted through the ORM, one row at a time, NOT as a bulk Core DELETE. The
+    replication outbox hook reads ``session.deleted``, which a bulk statement
+    never populates — so a bulk delete revoked the tokens locally and emitted
+    no event, leaving them live on the standby indefinitely. `api_tokens` is a
+    replicated class precisely so an offboarded person's token cannot come back
+    at a failover; a silent revocation is the failure that rule exists to stop.
+    Offboarding is rare and a person holds few tokens, so the per-row cost is
+    irrelevant next to that.
     """
-    result = await db.execute(delete(APIToken).where(APIToken.bound_to == email))
+    rows = (await db.execute(select(APIToken).where(APIToken.bound_to == email))).scalars().all()
+    for row in rows:
+        await db.delete(row)
     await db.flush()
-    count = result.rowcount or 0
+    count = len(rows)
     logger.info("Revoked all tokens for user", email=email, count=count)
     return count
