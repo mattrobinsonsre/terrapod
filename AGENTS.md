@@ -715,10 +715,21 @@ git commit --allow-empty -m "chore: rebuild v1.1.x against a refreshed base imag
 - **A patch stays a patch.** If what you are picking needs a schema migration, a
   config key, or anything else that changes a public surface, it is not patch
   material — see [Versioning & support](docs/versioning-and-support.md).
-- **Suppressions are not backported.** `pentest/trivy/.trivyignore` and the audit
-  ignore files describe what we accept *now*; they are read from the current
-  branch by both the release gate and the re-scan, and an older line does not
-  carry its own copy.
+- **Bring the accepted-risk register forward with the patch.**
+  `pentest/trivy/.trivyignore` and the audit ignore files describe what we
+  accept *now*, and both the release gate and the re-scan read them **from the
+  branch they are running on**. The re-scan runs on `main`, so it always sees
+  the current register. The release pipeline runs on the *release branch*, so
+  an old line carries an old register and will block itself on risks we have
+  already considered and accepted since. Copying the current register onto the
+  release branch is not changing our position — it is applying the position we
+  already hold, and it belongs in the same commit as the fixes.
+- **Rebuilding an old tag runs today's advisory data against yesterday's tree.**
+  Expect the first attempt to fail, and expect it to fail on something that had
+  not been published when the tag was cut. That is the mechanism doing its job,
+  not a broken pipeline. Read each failure on its merits: prefer the upstream
+  fix (a targeted version bump on the branch), and reach for the register only
+  where no fix exists.
 - **A security-driven patch is still a release.** Being prompted by a scanner
   earns it no shortcut: it goes through the same pre-release process as any
   other patch, including the independent third-party review. A patch cut in a
