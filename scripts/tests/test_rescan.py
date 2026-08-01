@@ -13,6 +13,7 @@ name what is wrong with which release.
 from __future__ import annotations
 
 import json
+import pathlib
 
 import pytest
 from conftest import advisory, normalise, report
@@ -385,7 +386,7 @@ def test_advisory_never_publishes():
     """Publishing is irreversible and makes an unfixed vulnerability public, so
     it stays a deliberate human act. A scheduled job holding a token that *can*
     publish must not be one keystroke from doing it by accident."""
-    source = (advisory.__file__ and open(advisory.__file__).read()) or ""
+    source = pathlib.Path(advisory.__file__).read_text()
     assert '"published"' not in source
     assert "'published'" not in source
     assert "state=published" not in source
