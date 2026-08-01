@@ -640,10 +640,44 @@ expected.
 ```sh
 git fetch origin --tags
 git checkout -b release/v1.1 v1.1.1        # branch from the tag, not from main
-git cherry-pick -x <sha> [<sha> ...]        # -x records where each came from
+# ...then whichever of the two mechanisms below fits...
 git push -u origin release/v1.1
 git tag v1.1.2 && git push origin v1.1.2    # this is the gate and the release
 ```
+
+### Two mechanisms, and picking the right one
+
+**Cherry-pick**, when the fix already exists on `main` as a discrete commit
+that still applies:
+
+```sh
+git cherry-pick -x <sha> [<sha> ...]   # -x records where each came from
+```
+
+**A minimal fix or version bump made directly on the release branch**, when it
+does not. This is not a fallback — for some fixes it is the only correct
+mechanism.
+
+The case that forces it: a vulnerable dependency, where the fix on `main` is a
+lockfile regenerated a whole minor later. Cherry-picking that lockfile drags
+`main`'s entire dependency tree onto the older line, which is exactly the
+"fix without the features" rule being violated by the tool meant to uphold it.
+Bump the specific packages on the release branch instead and regenerate only
+what that requires:
+
+```sh
+npm install next@16.2.11 sharp@0.35.3     # on release/v1.1, not main
+```
+
+The same applies to a base-image CVE (no code change at all — see the trap
+below), a one-line fix that has since been refactored beyond recognition on
+`main`, or anything where the upstream commit carries unrelated changes.
+
+**The test is not "did it come from `main`" but "is this the smallest change
+that fixes it".** Prefer a cherry-pick when one exists and applies cleanly,
+because `-x` records the provenance for free. Write the minimal change directly
+when it doesn't, and say so in the commit message — a reviewer needs to know a
+patch-branch commit has no counterpart on `main` and why.
 
 Then watch the pipeline through, and verify the published artifacts the same way
 as any release (`docker manifest inspect`, `helm pull`).
@@ -668,20 +702,34 @@ git commit --allow-empty -m "chore: rebuild v1.1.x against a refreshed base imag
 
 ### Rules
 
-- **Cherry-pick, never merge `main`.** The point is the fix without the features;
-  merging defeats it and turns a patch into an untested minor.
+- **Never merge `main`.** The point is the fix without the features; merging
+  defeats it and turns a patch into an untested minor. Cherry-pick or write the
+  minimal fix — see above — but never merge.
 - **Never merge the release branch back into `main`.** Its commits are already
   there — that is where they were picked from. Keep the branch; it is where the
   next patch on that line starts.
-- **`-x` on every cherry-pick.** When someone asks in six months whether a fix is
-  in a line, the recorded origin is the answer.
+- **`-x` on every cherry-pick**, and an explicit note on every commit that is
+  *not* one. When someone asks in six months whether a fix is in a line, the
+  recorded origin is the answer — and where there is no origin to record, say
+  so, or the absence reads as an oversight.
 - **A patch stays a patch.** If what you are picking needs a schema migration, a
   config key, or anything else that changes a public surface, it is not patch
   material — see [Versioning & support](docs/versioning-and-support.md).
-- **Suppressions are not backported.** `pentest/trivy/.trivyignore` and the audit
-  ignore files describe what we accept *now*; they are read from the current
-  branch by both the release gate and the re-scan, and an older line does not
-  carry its own copy.
+- **Bring the accepted-risk register forward with the patch.**
+  `pentest/trivy/.trivyignore` and the audit ignore files describe what we
+  accept *now*, and both the release gate and the re-scan read them **from the
+  branch they are running on**. The re-scan runs on `main`, so it always sees
+  the current register. The release pipeline runs on the *release branch*, so
+  an old line carries an old register and will block itself on risks we have
+  already considered and accepted since. Copying the current register onto the
+  release branch is not changing our position — it is applying the position we
+  already hold, and it belongs in the same commit as the fixes.
+- **Rebuilding an old tag runs today's advisory data against yesterday's tree.**
+  Expect the first attempt to fail, and expect it to fail on something that had
+  not been published when the tag was cut. That is the mechanism doing its job,
+  not a broken pipeline. Read each failure on its merits: prefer the upstream
+  fix (a targeted version bump on the branch), and reach for the register only
+  where no fix exists.
 - **A security-driven patch is still a release.** Being prompted by a scanner
   earns it no shortcut: it goes through the same pre-release process as any
   other patch, including the independent third-party review. A patch cut in a
