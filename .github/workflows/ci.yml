@@ -568,12 +568,17 @@ jobs:
         # releases against current reasoning — cannot drift from this gate.
         run: |
           pip install pip-audit
-          ignores=()
+          # POSIX sh, not bash: this job runs in a slim container whose shell
+          # has no arrays. $ignores is intentionally unquoted below so the
+          # accumulated flags word-split into separate arguments.
+          ignores=""
           while read -r line; do
-            line="${line%%#*}"; line="$(echo "$line" | tr -d '[:space:]')"
-            [ -n "$line" ] && ignores+=(--ignore-vuln "$line")
+            line="${line%%#*}"
+            line="$(echo "$line" | tr -d '[:space:]')"
+            [ -n "$line" ] && ignores="$ignores --ignore-vuln $line"
           done < pentest/pip-audit-ignore.txt
-          pip-audit -r services/requirements.txt --strict --desc "${ignores[@]}"
+          # shellcheck disable=SC2086
+          pip-audit -r services/requirements.txt --strict --desc $ignores
 
   # ── Dependency Audit (npm) ────────────────────────────
   npm-audit:

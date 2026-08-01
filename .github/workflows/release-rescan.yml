@@ -184,13 +184,17 @@ jobs:
           set -uo pipefail
           pip install --quiet poetry poetry-plugin-export pip-audit
           poetry export -f requirements.txt -o requirements.txt --without-hashes
-          ignores=()
+          # Same POSIX form as the ci.yml gate — one shape to reason about,
+          # and it does not depend on which shell the runner resolves.
+          ignores=""
           while read -r line; do
-            line="${line%%#*}"; line="$(echo "$line" | tr -d '[:space:]')"
-            [ -n "$line" ] && ignores+=(--ignore-vuln "$line")
+            line="${line%%#*}"
+            line="$(echo "$line" | tr -d '[:space:]')"
+            [ -n "$line" ] && ignores="$ignores --ignore-vuln $line"
           done < "$GITHUB_WORKSPACE/current/pentest/pip-audit-ignore.txt"
-          pip-audit -r requirements.txt --format json --output "$GITHUB_WORKSPACE/pip.json" \
-            "${ignores[@]}" || true
+          # shellcheck disable=SC2086
+          pip-audit -r requirements.txt --format json \
+            --output "$GITHUB_WORKSPACE/pip.json" $ignores || true
 
       # No setup-node: the runner's preinstalled Node is sufficient. `npm audit`
       # resolves the lockfile and queries the advisory API — it does not build
