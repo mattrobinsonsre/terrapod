@@ -101,6 +101,11 @@
     "shasum",
     "version"
   ],
+  "binary_cache.platform_tool_versions": [
+    "checkov-version",
+    "opa-version",
+    "trivy-version"
+  ],
   "catalog._instance_json": [
     "agent-pool-id",
     "catalog-item-id",

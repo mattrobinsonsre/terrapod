@@ -1756,6 +1756,40 @@
                 }
               }
             },
+            "platform_tools": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "opa_version": {
+                  "type": "string"
+                },
+                "trivy_version": {
+                  "type": "string"
+                },
+                "checkov_version": {
+                  "type": "string"
+                },
+                "opa_mirror_url": {
+                  "type": "string"
+                },
+                "trivy_mirror_url": {
+                  "type": "string"
+                },
+                "checkov_mirror_url": {
+                  "type": "string"
+                },
+                "checkov_checksum_api_url": {
+                  "type": "string"
+                },
+                "verify": {
+                  "type": "string",
+                  "enum": [
+                    "off",
+                    "checksum"
+                  ]
+                }
+              }
+            },
             "module_interface": {
               "type": "object",
               "additionalProperties": false,

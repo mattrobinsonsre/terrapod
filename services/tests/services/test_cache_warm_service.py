@@ -24,7 +24,11 @@ class TestWarmFromManifest:
             cache_warm_service.binary_cache_service, "warm_binary", new_callable=AsyncMock
         ) as mock_warm:
             summary = await warm_from_manifest(
-                db, storage, [WarmBinaryEntry(tool="tofu", version="1.9.0")], []
+                db,
+                storage,
+                [WarmBinaryEntry(tool="tofu", version="1.9.0")],
+                [],
+                include_platform_tools=False,
             )
         # Empty platforms → default linux/amd64 + linux/arm64 = 2 warm calls.
         assert mock_warm.await_count == 2
@@ -50,6 +54,7 @@ class TestWarmFromManifest:
                     )
                 ],
                 [],
+                include_platform_tools=False,
             )
         assert mock_warm.await_count == 1
         _, _, tool, version, os_, arch = mock_warm.await_args.args
@@ -65,7 +70,11 @@ class TestWarmFromManifest:
             side_effect=[RuntimeError("upstream 404"), "ok-url"],
         ):
             summary = await warm_from_manifest(
-                db, storage, [WarmBinaryEntry(tool="tofu", version="1.9.0")], []
+                db,
+                storage,
+                [WarmBinaryEntry(tool="tofu", version="1.9.0")],
+                [],
+                include_platform_tools=False,
             )
         assert summary.total == 2
         assert summary.succeeded == 1
@@ -108,7 +117,11 @@ class TestWarmFromManifest:
         ) as mock_warm:
             with patch.object(cache_warm_service.settings.registry.binary_cache, "enabled", False):
                 summary = await warm_from_manifest(
-                    db, storage, [WarmBinaryEntry(tool="tofu", version="1.9.0")], []
+                    db,
+                    storage,
+                    [WarmBinaryEntry(tool="tofu", version="1.9.0")],
+                    [],
+                    include_platform_tools=False,
                 )
         mock_warm.assert_not_called()
         assert summary.failed == 2
@@ -124,3 +137,60 @@ class TestWarmEntryValidation:
     def test_invalid_provider_source_rejected(self, bad):
         with pytest.raises(ValueError):
             WarmProviderEntry(source=bad, version="5.0.0")
+
+
+class TestPlatformToolDerivation:
+    """The warm manifest derives opa/trivy/checkov rather than making the
+    operator list them (#1208).
+
+    Sealing an install whose policy gate cannot run is the failure this
+    derivation exists to make impossible: unlike terraform/tofu there is exactly
+    one version of each in the config already, so there is nothing for a human
+    to remember and no reason to make them.
+    """
+
+    def test_derives_one_entry_per_platform_tool(self):
+        entries = cache_warm_service.platform_tool_entries()
+        assert {e.tool for e in entries} == {"opa", "trivy", "checkov"}
+        assert all(e.version for e in entries)
+
+    async def test_warms_platform_tools_without_being_asked(self):
+        db, storage = _db(), AsyncMock()
+        with patch.object(
+            cache_warm_service.binary_cache_service, "warm_binary", new_callable=AsyncMock
+        ) as mock_warm:
+            await warm_from_manifest(db, storage, [], [])
+        warmed = {call.args[2] for call in mock_warm.await_args_list}
+        assert warmed == {"opa", "trivy", "checkov"}
+        # Three tools x the two default platforms.
+        assert mock_warm.await_count == 6
+
+    async def test_opting_out_leaves_the_manifest_alone(self):
+        db, storage = _db(), AsyncMock()
+        with patch.object(
+            cache_warm_service.binary_cache_service, "warm_binary", new_callable=AsyncMock
+        ) as mock_warm:
+            await warm_from_manifest(
+                db,
+                storage,
+                [WarmBinaryEntry(tool="tofu", version="1.9.0")],
+                [],
+                include_platform_tools=False,
+            )
+        assert {call.args[2] for call in mock_warm.await_args_list} == {"tofu"}
+
+    async def test_a_platform_tool_failure_does_not_abort_the_batch(self):
+        """One unreachable publisher must not cost the operator the rest of the
+        seed — the same resilience the manifest entries already have."""
+        db, storage = _db(), AsyncMock()
+        with patch.object(
+            cache_warm_service.binary_cache_service,
+            "warm_binary",
+            new_callable=AsyncMock,
+            side_effect=RuntimeError("upstream down"),
+        ):
+            summary = await warm_from_manifest(
+                db, storage, [WarmBinaryEntry(tool="tofu", version="1.9.0")], []
+            )
+        assert summary.failed == summary.total
+        assert summary.total == 8  # 3 platform tools + 1 listed entry, x2 platforms

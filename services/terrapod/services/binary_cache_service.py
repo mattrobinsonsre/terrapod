@@ -21,6 +21,17 @@ from terrapod.logging_config import get_logger
 from terrapod.services.artifact_verification import VerificationError, verify_binary
 from terrapod.services.cache_errors import CacheOnlyError
 from terrapod.services.hashing_stream import HashingStream
+from terrapod.services.platform_tools import (
+    PLATFORM_TOOLS,
+    configured_version,
+    verify_platform_tool,
+)
+from terrapod.services.platform_tools import (
+    SPECS as PLATFORM_TOOL_SPECS,
+)
+from terrapod.services.platform_tools import (
+    download_url as _platform_download_url,
+)
 from terrapod.storage.keys import (
     binary_cache_key,
     binary_cache_sums_key,
@@ -30,7 +41,14 @@ from terrapod.storage.protocol import ObjectStore
 
 logger = get_logger(__name__)
 
-VALID_TOOLS = {"terraform", "tofu", "terragrunt"}
+# The per-workspace CLI tools: partial-version resolution, prerelease tiering,
+# GPG-signed publisher manifests.
+CLI_TOOLS = {"terraform", "tofu", "terragrunt"}
+# The platform-scoped tools (#1208): one operator-pinned version per deployment,
+# no partial resolution, checksum-only verification. They share this cache's
+# storage, route and warm path — see services/platform_tools.py for why they are
+# fetched rather than baked into the images.
+VALID_TOOLS = CLI_TOOLS | PLATFORM_TOOLS
 VALID_OS = {"linux", "darwin", "windows", "freebsd", "openbsd", "solaris"}
 VALID_ARCH = {"amd64", "arm64", "arm", "386"}
 
@@ -180,8 +198,12 @@ async def get_or_cache_binary(
     if arch not in VALID_ARCH:
         raise ValueError(f"Invalid arch: {arch}. Must be one of {VALID_ARCH}")
 
+    # The prerelease policy governs the *per-workspace* CLI tools, where a user
+    # picks the version. Platform tools are pinned by the operator in Helm — if
+    # they deliberately pin an OPA release candidate, second-guessing them with a
+    # policy aimed at a different decision would just be confusing.
     policy = settings.registry.binary_cache.allow_prerelease
-    if not _is_version_allowed(version, policy):
+    if tool in CLI_TOOLS and not _is_version_allowed(version, policy):
         raise ValueError(
             f"Pre-release version {version!r} is not allowed by the current "
             f"binary_cache.allow_prerelease policy ({policy!r}). Set the "
@@ -219,17 +241,26 @@ async def get_or_cache_binary(
         arch=arch,
     )
 
-    if tool == "terraform":
+    is_platform_tool = tool in PLATFORM_TOOLS
+    if is_platform_tool:
+        # Raises UnsupportedPlatformError for an os/arch the publisher does not
+        # build — clearer than letting it 404 downstream.
+        download_url = _platform_download_url(tool, version, os_, arch)
+        content_type = PLATFORM_TOOL_SPECS[tool].content_type
+    elif tool == "terraform":
         download_url = _terraform_download_url(version, os_, arch)
+        content_type = "application/zip"
     elif tool == "terragrunt":
+        # terragrunt ships a bare per-platform binary, not a zip.
         download_url = _terragrunt_download_url(version, os_, arch)
+        content_type = "application/octet-stream"
     else:
         download_url = _tofu_download_url(version, os_, arch)
+        content_type = "application/zip"
 
-    # Stream directly to object storage. terraform/tofu ship a zip; terragrunt
-    # ships a bare per-platform binary, so the stored content type differs.
+    # Stream directly to object storage — never buffer the artifact in memory
+    # (the checkov bundle alone is ~60MB).
     key = binary_cache_key(tool, version, os_, arch)
-    content_type = "application/octet-stream" if tool == "terragrunt" else "application/zip"
     shasum, size_bytes = await _fetch_and_store_binary(
         storage, key, download_url, content_type=content_type
     )
@@ -240,8 +271,21 @@ async def get_or_cache_binary(
     # below means a tampered binary is never served. On failure we also delete
     # the just-written object so it doesn't linger orphaned in storage. The
     # binary is *executed* on every run, so this is fail-closed by default.
-    verify_level = settings.registry.binary_cache.verify
-    if verify_level != "off":
+    #
+    # Platform tools (#1208) take the same gate with different material: none of
+    # the three publishes a GPG-signed manifest, so it is a checksum against the
+    # publisher's own published sum. Same fail-closed behaviour.
+    manifest: bytes = b""
+    sig: bytes | None = None
+    if is_platform_tool:
+        try:
+            async with httpx.AsyncClient(follow_redirects=True) as vclient:
+                await verify_platform_tool(vclient, tool, version, os_, arch, shasum)
+        except VerificationError:
+            await storage.delete(key)
+            BINARY_CACHE_REQUESTS.labels(tool=tool, result="verify_failed").inc()
+            raise
+    elif (verify_level := settings.registry.binary_cache.verify) != "off":
         try:
             async with httpx.AsyncClient(follow_redirects=True) as vclient:
                 manifest, sig = await verify_binary(
@@ -319,6 +363,14 @@ async def get_or_cache_sums(storage: ObjectStore, tool: str, version: str) -> tu
     """
     if tool not in VALID_TOOLS:
         raise ValueError(f"Invalid tool: {tool}. Must be one of {VALID_TOOLS}")
+    if tool in PLATFORM_TOOLS:
+        # No signed manifest exists for any of the three (#1208), so there is
+        # nothing to serve and nothing for a runner to re-verify against. Say so
+        # rather than 404-ing as if the cache were merely cold.
+        raise ValueError(
+            f"{tool} publishes no GPG-signed SHA256SUMS — platform tools are "
+            f"verified by checksum at fetch time, not by a served signature."
+        )
 
     sums_key = binary_cache_sums_key(tool, version)
     sig_key = binary_cache_sums_sig_key(tool, version)
@@ -410,6 +462,11 @@ async def list_available_versions(tool: str) -> list[str]:
     """
     if tool not in VALID_TOOLS:
         raise ValueError(f"Invalid tool: {tool}. Must be one of {VALID_TOOLS}")
+
+    # A platform tool has exactly one version: the one this deployment pins
+    # (#1208). There is no menu to offer and no upstream index to consult.
+    if tool in PLATFORM_TOOLS:
+        return [configured_version(tool)]
 
     # Sealed mode: list ONLY cached versions, never the upstream index.
     if _sealed():
@@ -574,6 +631,13 @@ async def resolve_version(tool: str, partial_version: str) -> str:
 
     Results are cached in Redis for 1 hour.
     """
+    # Platform tools are pinned exactly in Helm (#1208) — there is nothing to
+    # resolve. An empty/"latest" request means "whatever this deployment pins",
+    # which is the same answer sealed or not, so this precedes the sealed branch.
+    if tool in PLATFORM_TOOLS:
+        want = (partial_version or "").strip()
+        return configured_version(tool) if not want or want.lower() == "latest" else want
+
     # Sealed mode: resolve ONLY against cached entries, never the upstream index.
     if _sealed():
         return await _sealed_resolve(tool, partial_version)
