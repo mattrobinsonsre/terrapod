@@ -42,6 +42,7 @@ from typing import Any
 import httpx
 import structlog
 
+from terrapod.runner.phases import platform_tool
 from terrapod.runner.runner_config import RunnerConfig
 
 logger = structlog.get_logger("runner.security_scan")
@@ -370,23 +371,40 @@ def run_and_post(
     errors: list[str] = []
     any_errored = False
 
+    # The engines are fetched from the binary cache rather than baked into the
+    # image (#1208), and only the ones this run actually selected — a checkov
+    # workspace never pulls trivy. A fetch failure is recorded as an errored
+    # engine rather than raised: this whole phase is best-effort, and the
+    # server's post-plan gate already fails closed on an errored result for an
+    # enforced workspace. Crashing here would take out the *run*, which is a
+    # heavier response than the scan being unavailable warrants.
     if engine in ("checkov", "both"):
-        ok, ck_findings, err = _run_checkov(plan_json, skip_rules)
-        if ok:
-            findings += ck_findings
-        else:
+        binary, why = platform_tool.tool_path_or_name(cfg, "checkov", client=client)
+        if not binary:
             any_errored = True
-            if err:
-                errors.append(f"checkov: {err}")
+            errors.append(f"checkov: {why}")
+        else:
+            ok, ck_findings, err = _run_checkov(plan_json, skip_rules, binary=binary)
+            if ok:
+                findings += ck_findings
+            else:
+                any_errored = True
+                if err:
+                    errors.append(f"checkov: {err}")
 
     if engine in ("trivy", "both"):
-        ok, tv_findings, err = _run_trivy(plan_json, skip_rules)
-        if ok:
-            findings += tv_findings
-        else:
+        binary, why = platform_tool.tool_path_or_name(cfg, "trivy", client=client)
+        if not binary:
             any_errored = True
-            if err:
-                errors.append(f"trivy: {err}")
+            errors.append(f"trivy: {why}")
+        else:
+            ok, tv_findings, err = _run_trivy(plan_json, skip_rules, binary=binary)
+            if ok:
+                findings += tv_findings
+            else:
+                any_errored = True
+                if err:
+                    errors.append(f"trivy: {err}")
 
     outcome, summary = compute_outcome(findings, threshold, errored=any_errored)
     logger.info(

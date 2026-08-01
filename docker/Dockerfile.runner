@@ -9,7 +9,11 @@
 #   - git + openssh-client + ca-certificates — for module sources
 #     resolved by `tofu init` (terraform's `git::ssh://...` /
 #     `git::https://...` schemes shell out to system git)
-#   - opa — for the runner-side OPA policy evaluation (#343)
+#
+# opa, trivy and checkov are NOT here (#1208). They are pulled through the
+# binary cache at run time, and only when a run needs them, so their version
+# is an operator-set Helm value and their vendored modules stop being
+# reported against Terrapod's own artifacts.
 #
 # Other tools the bash era pulled in (curl, jq, tar, unzip, openssl) are
 # no longer installed. The Python phase modules use httpx for HTTP,
@@ -17,62 +21,14 @@
 # TLS stack.
 
 # ── Builder ────────────────────────────────────────────────────────────
-# Two jobs: install the runner Python deps, AND download+verify OPA. OPA
-# lives in the builder so the runtime image stays free of curl; the
-# binary is COPY'd into the runtime stage below.
+# One job now: install the runner Python deps. The tool downloads that used
+# to live here moved to run time (#1208), which is also why curl is gone.
 # Base image, overridable so CI can pull it from our GHCR mirror instead of
 # Docker Hub, whose anonymous pull limit is shared across GitHub runners and
 # turns unrelated PRs red (#1186). The default is the upstream reference, so a
 # local build needs no mirror access and behaves exactly as before.
 ARG BASE_IMAGE=python:3.13-slim
 FROM ${BASE_IMAGE} AS builder
-
-# curl + ca-certificates for the OPA download — present only in the
-# builder image, not the runtime.
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        curl ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
-
-ARG TARGETARCH
-ARG OPA_VERSION=1.19.0
-# GitHub Releases intermittently 5xx; --retry-all-errors covers 5xx as
-# well as transport errors. 6 attempts × 4s base = ~25s ceiling.
-RUN ARCH="${TARGETARCH:-$(dpkg --print-architecture)}" \
-    && BASE="https://github.com/open-policy-agent/opa/releases/download/v${OPA_VERSION}" \
-    && curl -fsSL --retry 6 --retry-delay 4 --retry-all-errors -o /tmp/opa "${BASE}/opa_linux_${ARCH}_static" \
-    && curl -fsSL --retry 6 --retry-delay 4 --retry-all-errors -o /tmp/opa.sha256 "${BASE}/opa_linux_${ARCH}_static.sha256" \
-    && echo "$(cut -d' ' -f1 /tmp/opa.sha256)  /tmp/opa" | sha256sum -c - \
-    && rm /tmp/opa.sha256 \
-    && chmod 0755 /tmp/opa
-
-# Trivy (Go binary) — IaC config scanner for the security-scan phase (#1036).
-# Downloaded + checksum-verified here; COPY'd into the runtime so it stays free
-# of curl, exactly like OPA.
-ARG TRIVY_VERSION=0.72.0
-RUN ARCH="${TARGETARCH:-$(dpkg --print-architecture)}" \
-    && case "$ARCH" in \
-        amd64) TARCH="Linux-64bit" ;; \
-        arm64) TARCH="Linux-ARM64" ;; \
-        *) echo "unsupported arch: $ARCH" && exit 1 ;; \
-    esac \
-    && BASE="https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}" \
-    && curl -fsSL --retry 6 --retry-delay 4 --retry-all-errors -o /tmp/trivy.tar.gz "${BASE}/trivy_${TRIVY_VERSION}_${TARCH}.tar.gz" \
-    && curl -fsSL --retry 6 --retry-delay 4 --retry-all-errors -o /tmp/trivy.sums "${BASE}/trivy_${TRIVY_VERSION}_checksums.txt" \
-    && EXPECTED="$(grep "trivy_${TRIVY_VERSION}_${TARCH}.tar.gz" /tmp/trivy.sums | cut -d' ' -f1)" \
-    && echo "${EXPECTED}  /tmp/trivy.tar.gz" | sha256sum -c - \
-    && tar -xzf /tmp/trivy.tar.gz -C /tmp trivy \
-    && chmod 0755 /tmp/trivy \
-    && rm /tmp/trivy.tar.gz /tmp/trivy.sums
-
-# Checkov (plan-fed IaC misconfig scanner, #1036) — the default/recommended
-# engine. Installed into an ISOLATED venv so its large, tightly-pinned
-# dependency tree can never collide with the runner's own deps. The scan phase
-# invokes the `checkov` CLI (subprocess), not the library, so a self-contained
-# venv is all it needs. Multi-arch: pip builds for the target arch (checkov's
-# standalone binary is x86_64-only, hence the venv).
-RUN python -m venv /opt/checkov \
-    && /opt/checkov/bin/pip install --no-cache-dir checkov \
-    && /opt/checkov/bin/checkov --version
 
 WORKDIR /build
 COPY services/pyproject-runner.toml pyproject.toml
@@ -98,18 +54,6 @@ RUN echo "pkg-refresh=${PKG_REFRESH}" \
         openssh-client \
         ca-certificates \
     && rm -rf /var/lib/apt/lists/*
-
-# OPA from the builder stage. Verified there; just copy it.
-COPY --from=builder /tmp/opa /usr/local/bin/opa
-RUN /usr/local/bin/opa version
-
-# Security-scan engines (#1036). Trivy is a single verified Go binary; Checkov
-# is the isolated venv from the builder, exposed via a CLI symlink (the venv's
-# absolute /opt/checkov path is preserved so its python shebang resolves).
-COPY --from=builder /tmp/trivy /usr/local/bin/trivy
-RUN /usr/local/bin/trivy --version
-COPY --from=builder /opt/checkov /opt/checkov
-RUN ln -s /opt/checkov/bin/checkov /usr/local/bin/checkov && /usr/local/bin/checkov --version
 
 # terrapod-query — tofu-native discovery engine (#823), pre-built for this arch
 # by the build-query CI job (or the local go build) and staged in the build
