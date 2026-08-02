@@ -68,10 +68,20 @@ cmd_up() {
   # blaming a Job for something that is really a vanished tag. So the images are
   # re-tagged into a namespace the pair owns and Tilt never touches.
   local api_src mig_src
-  api_src=$(docker images --format '{{.Repository}}:{{.Tag}}' | grep '^terrapod-api:tilt-' | head -1)
-  mig_src=$(docker images --format '{{.Repository}}:{{.Tag}}' | grep '^terrapod-migrations:tilt-' | head -1)
-  [[ -n "$api_src" && -n "$mig_src" ]] \
-    || fail "no tilt-built images — run 'tilt up' once so the pair has something to run"
+  # `|| true` is load-bearing. Under `set -e` a command substitution whose
+  # pipeline exits non-zero kills the script AT THE ASSIGNMENT — so a missing
+  # image aborted `up` silently, before the guard below could say which one,
+  # printing nothing but the preceding "ok" line. Which is a miserable thing to
+  # debug at midnight. Let the assignment succeed empty and let the guard talk.
+  api_src=$(docker images --format '{{.Repository}}:{{.Tag}}' | grep '^terrapod-api:tilt-' | head -1 || true)
+  mig_src=$(docker images --format '{{.Repository}}:{{.Tag}}' | grep '^terrapod-migrations:tilt-' | head -1 || true)
+  # Name the one that is missing. "no tilt-built images" sends you looking at
+  # the wrong thing when the API image is sitting right there and it is the
+  # migrations image — a separate build — that got collected.
+  [[ -n "$api_src" ]] \
+    || fail "no terrapod-api:tilt-* image — run 'tilt up', or 'tilt trigger terrapod-api'"
+  [[ -n "$mig_src" ]] \
+    || fail "no terrapod-migrations:tilt-* image — run 'tilt trigger terrapod-migrations-1'"
 
   # The runner image is built by a Tilt `local_resource` under a fixed `:local`
   # tag rather than a content hash, so it does not move — but nothing references
