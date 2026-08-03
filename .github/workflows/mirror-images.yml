@@ -51,7 +51,7 @@ jobs:
           echo "count=$(echo "$images" | wc -l | tr -d ' ')" >> "$GITHUB_OUTPUT"
           { echo "images<<EOF"; echo "$images"; echo "EOF"; } >> "$GITHUB_OUTPUT"
 
-      - uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
+      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v3
         if: github.event_name != 'pull_request'
 
       - name: Log in to GHCR
