@@ -8,6 +8,8 @@ is ABSENT (canonical "apply only where present") or its value is allowed.
 
 from __future__ import annotations
 
+import pytest
+
 import pricegen.fetch_offers as fo
 from pricegen.shard import ALL
 
@@ -182,3 +184,72 @@ def test_fetch_azure_all_regions_drops_filter(monkeypatch):
     out = fo.fetch_azure({"service_name": "Storage"}, ALL)
     assert "armRegionName" not in captured["url"]  # no region filter
     assert {i["armRegionName"] for i in out["Items"]} == {"eastus", "westus"}
+
+
+class TestUrlopenRetrying:
+    """Bounded retry around the offer downloads (#1251).
+
+    The weekly publish fans out to ~36 AWS regions, and every shard must
+    succeed for the pricesheet to be published. Before this, each download was
+    a bare `urlopen`, so one transient reset failed a shard and with it the
+    whole run — which is exactly what happened on 2026-07-27:
+    `ConnectionResetError [Errno 104]` mid-TLS-handshake for ap-southeast-2.
+
+    The offers are large (an EC2 region offer is hundreds of MB) and pulled
+    from public endpoints, so a mid-flight cut is not rare — it is the expected
+    failure mode at this size and fan-out.
+    """
+
+    @staticmethod
+    def _patch(monkeypatch, impl):
+        calls = {"n": 0}
+
+        def wrapped(req, timeout=None):
+            calls["n"] += 1
+            return impl(calls["n"])
+
+        monkeypatch.setattr(fo.urllib.request, "urlopen", wrapped)
+        monkeypatch.setattr(fo, "_BACKOFF", 0.001)
+        return calls
+
+    def test_recovers_from_a_transient_reset(self, monkeypatch):
+        sentinel = object()
+
+        def impl(n):
+            if n < 3:
+                raise fo.urllib.error.URLError(ConnectionResetError(104, "reset"))
+            return sentinel
+
+        calls = self._patch(monkeypatch, impl)
+        assert fo._urlopen_retrying("https://example.invalid/o.json") is sentinel
+        assert calls["n"] == 3
+
+    def test_gives_up_after_a_bounded_number_of_attempts(self, monkeypatch):
+        def impl(_n):
+            raise fo.urllib.error.URLError(ConnectionResetError(104, "reset"))
+
+        calls = self._patch(monkeypatch, impl)
+        with pytest.raises(RuntimeError, match="giving up"):
+            fo._urlopen_retrying("https://example.invalid/o.json")
+        assert calls["n"] == fo._RETRIES
+
+    def test_a_4xx_is_final_and_not_retried(self, monkeypatch):
+        """A 404 is a real answer — a withdrawn offer or a wrong URL. Retrying
+        it just delays a failure that will not change."""
+
+        def impl(_n):
+            raise fo.urllib.error.HTTPError("u", 404, "Not Found", {}, None)
+
+        calls = self._patch(monkeypatch, impl)
+        with pytest.raises(fo.urllib.error.HTTPError):
+            fo._urlopen_retrying("https://example.invalid/gone.json")
+        assert calls["n"] == 1
+
+    def test_a_5xx_is_retried(self, monkeypatch):
+        def impl(_n):
+            raise fo.urllib.error.HTTPError("u", 503, "Unavailable", {}, None)
+
+        calls = self._patch(monkeypatch, impl)
+        with pytest.raises(RuntimeError):
+            fo._urlopen_retrying("https://example.invalid/o.json")
+        assert calls["n"] == fo._RETRIES

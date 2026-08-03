@@ -22,6 +22,8 @@ import argparse
 import json
 import os
 import shutil
+import time
+import ssl
 import sys
 import tempfile
 import urllib.parse
@@ -40,10 +42,54 @@ _AWS_BULK = "https://pricing.us-east-1.amazonaws.com"
 _BIG_OFFER_CACHE: dict[str, str] = {}
 
 
+#: Bounded retry for the offer downloads. These are large files (an EC2 region
+#: offer is hundreds of MB) pulled from public cloud endpoints, and a single
+#: transient reset used to fail the whole shard — and with it the fan-out and
+#: the weekly publish. Seen live: the 2026-07-27 run died on
+#: `ConnectionReset [Errno 104]` mid-TLS-handshake for one of ~36 regions.
+_RETRIES = 4
+_BACKOFF = 3.0  # seconds, doubled per attempt: 3, 6, 12
+
+
+def _urlopen_retrying(url: str, *, timeout: int = 300):
+    """`urlopen` with bounded backoff on transient failures.
+
+    Retries connection errors, timeouts, and 5xx/429. A definitive 4xx is a
+    real answer — a wrong URL or a withdrawn offer — so it raises immediately
+    rather than burning four attempts on it.
+    """
+    req = urllib.request.Request(url, headers=_UA)
+    for attempt in range(_RETRIES):
+        try:
+            return urllib.request.urlopen(req, timeout=timeout)  # noqa: S310 — pinned cloud hosts
+        except urllib.error.HTTPError as e:
+            if e.code < 500 and e.code != 429:
+                raise
+            last: Exception = e
+        except (
+            urllib.error.URLError,
+            TimeoutError,
+            ConnectionError,
+            ssl.SSLError,
+        ) as e:
+            last = e
+        if attempt == _RETRIES - 1:
+            raise RuntimeError(
+                f"giving up on {url} after {_RETRIES} attempts: {last!r}"
+            ) from last
+        delay = _BACKOFF * (2**attempt)
+        print(
+            f"  transient fetch failure ({last!r}); retrying in {delay:.0f}s "
+            f"[{attempt + 1}/{_RETRIES - 1}]",
+            file=sys.stderr,
+            flush=True,
+        )
+        time.sleep(delay)
+    raise AssertionError("unreachable")
+
+
 def _get_json(url: str) -> dict:
-    with urllib.request.urlopen(  # noqa: S310 — trusted pinned cloud hosts
-        urllib.request.Request(url, headers=_UA)
-    ) as resp:
+    with _urlopen_retrying(url) as resp:
         return json.load(resp)
 
 
@@ -77,9 +123,7 @@ def _stream_filter_aws(region_url: str, families: list, keep_attrs: dict) -> dic
         fd, tmp = tempfile.mkstemp(suffix=".json")
         os.close(fd)
         with (
-            urllib.request.urlopen(  # noqa: S310 — trusted pinned host
-                urllib.request.Request(region_url, headers=_UA)
-            ) as resp,
+            _urlopen_retrying(region_url) as resp,
             open(tmp, "wb") as out,
         ):
             shutil.copyfileobj(resp, out)  # stream to disk, low RAM
