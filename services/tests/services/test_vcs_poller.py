@@ -1353,3 +1353,87 @@ class TestCommitClaimReleasedOnFailure:
 
         mock_create.assert_not_called()
         mock_release.assert_not_awaited()
+
+
+class TestPollWorkspacePassesMetadataCacheCorrectly:
+    """Regression: the poll-cycle argument binding into the per-repo helpers.
+
+    v1.3.0 shipped a total VCS outage — every VCS-connected workspace failed
+    every cycle with `'list' object has no attribute 'get_or_fetch'`. The tail
+    of `_poll_workspace_branch`/`_poll_workspace_prs` is
+    `(cache, meta, fetch_paths)`, but `_poll_workspace` passed them positionally
+    as `(cache, fetch_paths, meta)`, so the `fetch_paths` LIST landed in the
+    `meta` slot and the metadata cache landed in `fetch_paths`.
+
+    Nothing caught it because every other `_poll_workspace` test omits `meta`
+    entirely (taking the `meta is None` short-circuit inside the helpers), and
+    the tests that do build a `VCSMetadataCache` call the inner helpers
+    directly. Production is the only caller that passes BOTH — which is exactly
+    what these tests do, mocking only at the provider boundary so the real
+    argument binding is exercised.
+    """
+
+    @patch("terrapod.services.vcs_poller.github_service.list_open_pull_requests")
+    @patch("terrapod.services.vcs_poller._provider_get_branch_sha")
+    @patch("terrapod.services.vcs_poller._parse_repo_url")
+    async def test_poll_with_meta_and_fetch_paths_does_not_error(
+        self, mock_parse, mock_sha, mock_prs
+    ):
+        from terrapod.services.vcs_metadata_cache import VCSMetadataCache
+        from terrapod.services.vcs_poller import _poll_workspace
+
+        ws = _mock_workspace(vcs_last_commit_sha="aaa111")
+        conn = _mock_connection()
+        mock_parse.return_value = ("org", "repo")
+        # No new commit and no open PRs: the poll should be a clean no-op.
+        mock_sha.return_value = "aaa111"
+        mock_prs.return_value = []
+
+        mock_db = AsyncMock()
+        mock_db.get.return_value = conn
+
+        meta = VCSMetadataCache()
+        paths_unions = {(conn.id, "org", "repo"): ["environments/dev"]}
+
+        await _poll_workspace(mock_db, ws, meta=meta, paths_unions=paths_unions)
+
+        # The transposition surfaced as a caught exception recorded on the
+        # workspace, not a raise — so asserting "no error" is the real check.
+        assert ws.vcs_last_error is None, f"poll recorded an error: {ws.vcs_last_error}"
+        assert ws.vcs_last_polled_at is not None
+
+    @patch("terrapod.services.vcs_poller._poll_workspace_prs")
+    @patch("terrapod.services.vcs_poller._poll_workspace_branch")
+    @patch("terrapod.services.vcs_poller._resolve_branch")
+    @patch("terrapod.services.vcs_poller._parse_repo_url")
+    async def test_meta_and_fetch_paths_bind_to_their_own_parameters(
+        self, mock_parse, mock_resolve, mock_branch, mock_prs
+    ):
+        """Pin the binding itself, so a future positional call fails loudly."""
+        from terrapod.services.vcs_metadata_cache import VCSMetadataCache
+        from terrapod.services.vcs_poller import _poll_workspace
+
+        ws = _mock_workspace()
+        conn = _mock_connection()
+        mock_parse.return_value = ("org", "repo")
+        mock_resolve.return_value = "main"
+        mock_branch.return_value = None
+        mock_prs.return_value = None
+
+        mock_db = AsyncMock()
+        mock_db.get.return_value = conn
+
+        meta = VCSMetadataCache()
+        await _poll_workspace(
+            mock_db,
+            ws,
+            meta=meta,
+            paths_unions={(conn.id, "org", "repo"): ["environments/dev"]},
+        )
+
+        for mock in (mock_branch, mock_prs):
+            kwargs = mock.call_args.kwargs
+            assert kwargs["meta"] is meta, (
+                f"{mock._mock_name or 'helper'} got meta={type(kwargs['meta']).__name__}"
+            )
+            assert kwargs["fetch_paths"] == ["environments/dev"]

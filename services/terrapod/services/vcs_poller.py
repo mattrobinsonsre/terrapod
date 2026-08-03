@@ -990,10 +990,18 @@ async def _poll_workspace(
 
     try:
         # 1. Check tracked branch for new commits → real runs
-        await _poll_workspace_branch(db, ws, conn, owner, repo, branch, cache, fetch_paths, meta)
+        # Keyword-only past `branch`: the tail of both signatures is
+        # (cache, meta, fetch_paths), and passing them positionally silently
+        # transposed `fetch_paths` into `meta` — every poll then died on
+        # `'list' object has no attribute 'get_or_fetch'`. Keep these named.
+        await _poll_workspace_branch(
+            db, ws, conn, owner, repo, branch, cache=cache, meta=meta, fetch_paths=fetch_paths
+        )
 
         # 2. Check open PRs/MRs targeting the tracked branch → speculative plans
-        await _poll_workspace_prs(db, ws, conn, owner, repo, branch, cache, fetch_paths, meta)
+        await _poll_workspace_prs(
+            db, ws, conn, owner, repo, branch, cache=cache, meta=meta, fetch_paths=fetch_paths
+        )
 
         # Success: update last-polled timestamp and clear any previous error
         ws.vcs_last_polled_at = now_utc()
