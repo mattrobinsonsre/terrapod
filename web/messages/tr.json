@@ -1914,7 +1914,9 @@
       "prMr": "PR/MR",
       "stateVersion": "Durum Sürümü",
       "viewState": "Durumu Görüntüle",
-      "runOptions": "Çalıştırma Seçenekleri"
+      "runOptions": "Çalıştırma Seçenekleri",
+      "agentPool": "Aracı havuzu",
+      "agentPoolCandidates": "{count, plural, other {# aday havuz}}"
     },
     "timeline": {
       "heading": "Zaman Çizelgesi",

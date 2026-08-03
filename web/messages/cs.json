@@ -1914,7 +1914,9 @@
       "prMr": "PR/MR",
       "stateVersion": "Verze stavu",
       "viewState": "Zobrazit stav",
-      "runOptions": "Možnosti běhu"
+      "runOptions": "Možnosti běhu",
+      "agentPool": "Fond agentů",
+      "agentPoolCandidates": "{count, plural, one {# kandidátský fond} few {# kandidátské fondy} other {# kandidátských fondů}}"
     },
     "timeline": {
       "heading": "Časová osa",

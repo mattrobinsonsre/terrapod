@@ -1914,7 +1914,9 @@
       "prMr": "PR/MR",
       "stateVersion": "Tilaversio",
       "viewState": "Näytä tila",
-      "runOptions": "Ajon vaihtoehdot"
+      "runOptions": "Ajon vaihtoehdot",
+      "agentPool": "Agenttiryhmä",
+      "agentPoolCandidates": "{count, plural, one {# ehdokasryhmä} other {# ehdokasryhmää}}"
     },
     "timeline": {
       "heading": "Aikajana",

@@ -1914,7 +1914,9 @@
       "prMr": "طلب السحب/الدمج",
       "stateVersion": "إصدار الحالة",
       "viewState": "عرض الحالة",
-      "runOptions": "خيارات التشغيل"
+      "runOptions": "خيارات التشغيل",
+      "agentPool": "مجموعة الوكلاء",
+      "agentPoolCandidates": "{count, plural, other {# مجموعة مرشحة}}"
     },
     "timeline": {
       "heading": "الجدول الزمني",

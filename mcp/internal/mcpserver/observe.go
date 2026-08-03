@@ -108,6 +108,9 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 		HasChanges *bool  `json:"has_changes,omitempty"`
 		Source     string `json:"source,omitempty"`
 		CreatedAt  string `json:"created_at,omitempty"`
+		// Which agent pool actually ran it (#1231) — on a multi-pool
+		// workspace this is the only place the answer is visible.
+		AgentPoolID string `json:"agent_pool_id,omitempty"`
 	}
 	type runListOut struct {
 		Count int          `json:"count"`
@@ -135,6 +138,7 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 			out.Runs = append(out.Runs, runSummary{
 				ID: r.ID, Status: r.Status, PlanOnly: r.PlanOnly, IsDestroy: r.IsDestroy,
 				HasChanges: r.HasChanges, Source: r.Source, CreatedAt: r.CreatedAt,
+				AgentPoolID: r.AgentPoolID,
 			})
 		}
 		return nil, out, nil
@@ -146,7 +150,7 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "terrapod_run_get",
-		Description: "Get one run's full status incl. Terrapod-native detail: has-changes, drift flag, error message, the resource profile (peak memory / runner exit), and which lifecycle actions (apply/discard/cancel) are currently permitted.",
+		Description: "Get one run's full status incl. Terrapod-native detail: has-changes, drift flag, error message, the resource profile (peak memory / runner exit), which agent pool executed it (and which pools could have), and which lifecycle actions (apply/discard/cancel) are currently permitted.",
 		Annotations: readOnly,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in runGetIn) (*mcp.CallToolResult, *terrapod.Run, error) {
 		if in.RunID == "" {

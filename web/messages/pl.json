@@ -1914,7 +1914,9 @@
       "prMr": "PR/MR",
       "stateVersion": "Wersja stanu",
       "viewState": "Wyświetl stan",
-      "runOptions": "Opcje przebiegu"
+      "runOptions": "Opcje przebiegu",
+      "agentPool": "Pula agentów",
+      "agentPoolCandidates": "{count, plural, one {# pula kandydatów} few {# pule kandydatów} other {# pul kandydatów}}"
     },
     "timeline": {
       "heading": "Oś czasu",

@@ -1914,7 +1914,9 @@
       "prMr": "PR/MR",
       "stateVersion": "Versio Status",
       "viewState": "Statum Videre",
-      "runOptions": "Optiones Exsecutionis"
+      "runOptions": "Optiones Exsecutionis",
+      "agentPool": "Copia agentium",
+      "agentPoolCandidates": "{count, plural, one {# copia candidata} other {# copiae candidatae}}"
     },
     "timeline": {
       "heading": "Series Temporum",

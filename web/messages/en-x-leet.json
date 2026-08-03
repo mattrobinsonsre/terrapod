@@ -1914,7 +1914,9 @@
       "prMr": "PR/MR",
       "stateVersion": "57473 V3r510n",
       "viewState": "V13w 57473",
-      "runOptions": "Run 0p710n5"
+      "runOptions": "Run 0p710n5",
+      "agentPool": "4g3n7 p00l",
+      "agentPoolCandidates": "{count, plural, one {# candidate pool} other {# candidate pools}}"
     },
     "timeline": {
       "heading": "71m3l1n3",

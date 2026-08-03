@@ -1914,7 +1914,9 @@
       "prMr": "PR/MR",
       "stateVersion": "Версия состояния",
       "viewState": "Просмотр состояния",
-      "runOptions": "Параметры запуска"
+      "runOptions": "Параметры запуска",
+      "agentPool": "Пул агентов",
+      "agentPoolCandidates": "{count, plural, one {# пул-кандидат} few {# пула-кандидата} other {# пулов-кандидатов}}"
     },
     "timeline": {
       "heading": "Хронология",

@@ -61,7 +61,7 @@ from terrapod.db.models import (
 )
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
-from terrapod.services import agent_pool_service, plan_graph_service, run_service
+from terrapod.services import agent_pool_service, plan_graph_service, pool_set, run_service
 from terrapod.services.workspace_rbac_service import (
     resolve_workspace_capabilities_for,
 )
@@ -146,6 +146,27 @@ def _run_json(
                 "terragrunt-version": run.terragrunt_version,
                 "resource-cpu": run.resource_cpu,
                 "resource-memory": run.resource_memory,
+                # Which agent pool has this run (#1231). At creation this is
+                # element 0 of the workspace's pool set; on claim it is
+                # REWRITTEN to the pool that actually took it. So on a finished
+                # run this answers "where did this execute?" — which with
+                # multi-pool routing (#1085) is the first thing you want to know
+                # and was previously only visible in the database.
+                #
+                # Note this differs from the same-named attribute on a
+                # workspace, where it is always a projection of element 0. On a
+                # run it is the claimant. Null on local-execution runs, and on
+                # agent runs whose pool has since been deleted.
+                "agent-pool-id": (f"apool-{run.pool_id}" if run.pool_id else None),
+                # Every pool that COULD have claimed it, snapshotted at run
+                # creation and preserved (only re-ordered) across the claim.
+                # Deliberately named apart from the workspace's
+                # `agent-pool-ids`, because that is the live configured set
+                # and this is a point-in-time snapshot that does not move when
+                # the workspace is later re-pointed. Together with the
+                # attribute above: "these were the candidates, that one took
+                # it."
+                "candidate-agent-pool-ids": [f"apool-{p}" for p in pool_set.run_pool_ids(run)],
                 # Runner resource profile + OOM detection (#430). All
                 # nullable / empty-string for runs that pre-date the
                 # feature (or where the runner died before capturing).
@@ -233,6 +254,15 @@ def _run_json(
             "relationships": {
                 "workspace": {
                     "data": {"id": f"ws-{run.workspace_id}", "type": "workspaces"},
+                },
+                # The canonical link form for the pool that has the run; the
+                # `agent-pool-id` attribute above is kept alongside it (#1063).
+                "agent-pool": {
+                    "data": (
+                        {"id": f"apool-{run.pool_id}", "type": "agent-pools"}
+                        if run.pool_id
+                        else None
+                    ),
                 },
                 "configuration-version": {
                     "data": (

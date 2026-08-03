@@ -1914,7 +1914,9 @@
       "prMr": "Marklar/Marklar",
       "stateVersion": "Marklar Marklar",
       "viewState": "View Marklar",
-      "runOptions": "Marklar Marklars"
+      "runOptions": "Marklar Marklars",
+      "agentPool": "Marklar marklar",
+      "agentPoolCandidates": "{count, plural, one {# candidate marklar} other {# candidate marklars}}"
     },
     "timeline": {
       "heading": "Marklar",

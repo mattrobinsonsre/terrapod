@@ -1914,7 +1914,9 @@
       "prMr": "PR/MR",
       "stateVersion": "状態バージョン",
       "viewState": "状態を表示",
-      "runOptions": "実行オプション"
+      "runOptions": "実行オプション",
+      "agentPool": "エージェントプール",
+      "agentPoolCandidates": "{count, plural, other {候補プール #件}}"
     },
     "timeline": {
       "heading": "タイムライン",

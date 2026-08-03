@@ -1920,7 +1920,9 @@
       "prMr": "PR/MR",
       "stateVersion": "State Version",
       "viewState": "View State",
-      "runOptions": "Run Options"
+      "runOptions": "Run Options",
+      "agentPool": "Agent pool",
+      "agentPoolCandidates": "{count, plural, one {# candidate pool} other {# candidate pools}}"
     },
     "timeline": {
       "heading": "Timeline",
