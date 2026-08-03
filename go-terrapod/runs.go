@@ -87,6 +87,17 @@ type Run struct {
 	// Workspace context.
 	WorkspaceID   string `json:"workspace-id,omitempty"` // from the `workspace` relationship
 	WorkspaceName string `json:"workspace-name,omitempty"`
+	// Which agent pool has this run. At creation it is element 0 of the
+	// workspace's pool set; on claim it is rewritten to the pool that actually
+	// took it, so on a finished run this is where it executed. Empty for
+	// local-execution runs. Note this differs from the same-named field on a
+	// Workspace, which is always a projection of element 0.
+	AgentPoolID string `json:"agent-pool-id,omitempty"`
+	// Every pool that could have claimed the run, snapshotted at creation and
+	// preserved across the claim. Named apart from Workspace.AgentPoolIDs
+	// because that is the live configured set; this is a point-in-time
+	// snapshot that does not move when the workspace is later re-pointed.
+	CandidateAgentPoolIDs []string `json:"candidate-agent-pool-ids,omitempty"`
 	// VCS metadata (empty / nil for CLI runs).
 	VCSCommitSHA         string `json:"vcs-commit-sha,omitempty"`
 	VCSBranch            string `json:"vcs-branch,omitempty"`
@@ -331,14 +342,21 @@ func runFromResource(res *Resource) *Run {
 		HasCostEstimate:   GetBoolAttr(res, "has-cost-estimate"),
 		CostCurrency:      GetStringAttr(res, "cost-currency"),
 		WorkspaceName:     GetStringAttr(res, "workspace-name"),
-		VCSCommitSHA:      GetStringAttr(res, "vcs-commit-sha"),
-		VCSBranch:         GetStringAttr(res, "vcs-branch"),
-		CreatedBy:         GetStringAttr(res, "created-by"),
-		CreatedAt:         GetStringAttr(res, "created-at"),
-		UpdatedAt:         GetStringAttr(res, "updated-at"),
+		// #1231. The relationship below wins when present; the attribute is
+		// the fallback for a server that only emits the flat form.
+		AgentPoolID:           GetStringAttr(res, "agent-pool-id"),
+		CandidateAgentPoolIDs: GetListAttr(res, "candidate-agent-pool-ids"),
+		VCSCommitSHA:          GetStringAttr(res, "vcs-commit-sha"),
+		VCSBranch:             GetStringAttr(res, "vcs-branch"),
+		CreatedBy:             GetStringAttr(res, "created-by"),
+		CreatedAt:             GetStringAttr(res, "created-at"),
+		UpdatedAt:             GetStringAttr(res, "updated-at"),
 	}
 	if v := GetRelationshipID(res, "workspace"); v != "" {
 		r.WorkspaceID = v
+	}
+	if v := GetRelationshipID(res, "agent-pool"); v != "" {
+		r.AgentPoolID = v
 	}
 	r.PeakMemoryBytes = nullableInt(res, "peak-memory-bytes")
 	r.PeakCPUUsec = nullableInt(res, "peak-cpu-usec")

@@ -50,6 +50,9 @@ interface RunAttrs {
   'discard-reason': string | null
   'error-message': string | null
   'execution-backend': string
+  // Which pool actually ran it, and which could have (#1231).
+  'agent-pool-id'?: string | null
+  'candidate-agent-pool-ids'?: string[]
   'created-at': string
   'auto-apply': boolean
   'plan-only': boolean
@@ -1443,6 +1446,26 @@ function RunDetailPageInner() {
               <dt className="text-xs text-slate-500">{t('details.source')}</dt>
               <dd className="mt-1 text-sm text-slate-200">{attrs.source}</dd>
             </div>
+            {attrs['agent-pool-id'] ? (
+              <div>
+                <dt className="text-xs text-slate-500">{t('details.agentPool')}</dt>
+                <dd className="mt-1 text-sm text-slate-200">
+                  <Link
+                    href={`/admin/agent-pools/${attrs['agent-pool-id']}`}
+                    className="hover:text-brand-400 transition-colors"
+                  >
+                    {attrs['agent-pool-id']}
+                  </Link>
+                  {(attrs['candidate-agent-pool-ids']?.length ?? 0) > 1 ? (
+                    <span className="block text-xs text-slate-500 mt-0.5">
+                      {t('details.agentPoolCandidates', {
+                        count: attrs['candidate-agent-pool-ids']!.length,
+                      })}
+                    </span>
+                  ) : null}
+                </dd>
+              </div>
+            ) : null}
             <div>
               <dt className="text-xs text-slate-500">{t('details.autoApply')}</dt>
               <dd className="mt-1 text-sm text-slate-200">{attrs['auto-apply'] ? t('common.yes') : t('common.no')}</dd>

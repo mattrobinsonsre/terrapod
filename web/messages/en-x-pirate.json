@@ -1914,7 +1914,9 @@
       "prMr": "PR/MR",
       "stateVersion": "State Version",
       "viewState": "View State",
-      "runOptions": "Run Options"
+      "runOptions": "Run Options",
+      "agentPool": "Agent crew",
+      "agentPoolCandidates": "{count, plural, one {# candidate crew} other {# candidate crews}}"
     },
     "timeline": {
       "heading": "Timeline",

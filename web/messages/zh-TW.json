@@ -1914,7 +1914,9 @@
       "prMr": "PR/MR",
       "stateVersion": "狀態版本",
       "viewState": "檢視狀態",
-      "runOptions": "執行選項"
+      "runOptions": "執行選項",
+      "agentPool": "代理集區",
+      "agentPoolCandidates": "{count, plural, other {# 個候選集區}}"
     },
     "timeline": {
       "heading": "時間線",

@@ -1914,7 +1914,9 @@
       "prMr": "PR/MR",
       "stateVersion": "State-versie",
       "viewState": "State bekijken",
-      "runOptions": "Uitvoeringsopties"
+      "runOptions": "Uitvoeringsopties",
+      "agentPool": "Agentpool",
+      "agentPoolCandidates": "{count, plural, one {# kandidaat-pool} other {# kandidaat-pools}}"
     },
     "timeline": {
       "heading": "Tijdlijn",

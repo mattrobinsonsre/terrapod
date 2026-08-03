@@ -1914,7 +1914,9 @@
       "prMr": "PR/MR",
       "stateVersion": "Versión de estado",
       "viewState": "Ver estado",
-      "runOptions": "Opciones de ejecución"
+      "runOptions": "Opciones de ejecución",
+      "agentPool": "Grupo de agentes",
+      "agentPoolCandidates": "{count, plural, one {# grupo candidato} other {# grupos candidatos}}"
     },
     "timeline": {
       "heading": "Cronología",

@@ -1914,7 +1914,9 @@
       "prMr": "PR/MR",
       "stateVersion": "Fersiwn Cyflwr",
       "viewState": "Gweld y Cyflwr",
-      "runOptions": "Opsiynau Rhediad"
+      "runOptions": "Opsiynau Rhediad",
+      "agentPool": "Pwll asiant",
+      "agentPoolCandidates": "{count, plural, one {# pwll ymgeisydd} other {# pyllau ymgeisydd}}"
     },
     "timeline": {
       "heading": "Llinell Amser",

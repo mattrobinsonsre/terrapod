@@ -1914,7 +1914,9 @@
       "prMr": "PR/MR",
       "stateVersion": "Dotlh mI'",
       "viewState": "Dotlh legh",
-      "runOptions": "Sar wIvmey"
+      "runOptions": "Sar wIvmey",
+      "agentPool": "toy''wI'' ghom",
+      "agentPoolCandidates": "{count, plural, one {# ghom wIvlu''bogh} other {# ghom wIvlu''bogh}}"
     },
     "timeline": {
       "heading": "poH tlhegh",

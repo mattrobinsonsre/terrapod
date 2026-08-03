@@ -795,6 +795,28 @@ OOM (`exit 137 + reason "OOMKilled"`) is uncatchable, so the runner path never f
 
 See [runners.md — Memory Pressure & OOM Visibility](runners.md#memory-pressure--oom-visibility-430) for the operator-facing tuning workflow.
 
+### Run Response Attributes (Agent Pool)
+
+Which agent pool has a run, and which pools could have claimed it. With multi-pool
+workspace routing (#1085) a queued run is offered to every pool in the workspace's set
+at once and whichever has a live listener claims it first — so "where did this actually
+execute?" is not answerable from the workspace's configuration alone.
+
+| Attribute | Type | Description |
+|---|---|---|
+| `agent-pool-id` | string or null | The pool that has the run. At creation this is element 0 of the workspace's pool set; **on claim it is rewritten to the pool that actually took the run**, so on a finished run it is where the run executed. `null` for local-execution runs, and for agent runs whose pool has since been deleted |
+| `candidate-agent-pool-ids` | array of string | Every pool that could have claimed the run, snapshotted at run creation and preserved (only re-ordered, winner first) across the claim |
+
+The `agent-pool` relationship carries the same id as `agent-pool-id` and is the canonical
+link form; the attribute is kept alongside it.
+
+> **Note the difference from a workspace.** On a workspace, `agent-pool-id` is always a
+> projection of `agent-pool-ids[0]` and carries no routing preference. On a run it is the
+> *claimant*. Likewise `candidate-agent-pool-ids` is deliberately named apart from the
+> workspace's `agent-pool-ids`: the workspace attribute is the live configured set, while
+> the run attribute is a point-in-time snapshot that does not move when the workspace is
+> later re-pointed at different pools.
+
 ### Show Run
 
 ```

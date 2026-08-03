@@ -1914,7 +1914,9 @@
       "prMr": "PR/MR",
       "stateVersion": "גרסת מצב",
       "viewState": "הצג מצב",
-      "runOptions": "אפשרויות הרצה"
+      "runOptions": "אפשרויות הרצה",
+      "agentPool": "מאגר סוכנים",
+      "agentPoolCandidates": "{count, plural, other {# מאגרים מועמדים}}"
     },
     "timeline": {
       "heading": "ציר זמן",

@@ -1914,7 +1914,9 @@
       "prMr": "PR/MR",
       "stateVersion": "Tilstandsversjon",
       "viewState": "Vis tilstand",
-      "runOptions": "Kjøringsalternativer"
+      "runOptions": "Kjøringsalternativer",
+      "agentPool": "Agentgruppe",
+      "agentPoolCandidates": "{count, plural, one {# kandidatgruppe} other {# kandidatgrupper}}"
     },
     "timeline": {
       "heading": "Tidslinje",

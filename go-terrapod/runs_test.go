@@ -22,6 +22,8 @@ const runAttrs = `{
   "has-cost-estimate":true,"cost-currency":"USD","cost-monthly-min":12.5,"cost-monthly-max":40.0,
   "peak-memory-bytes":536870912,"peak-cpu-usec":null,"runner-exit-code":0,
   "runner-exit-reason":"","workspace-name":"app",
+  "agent-pool-id":"apool-11111111-1111-1111-1111-111111111111",
+  "candidate-agent-pool-ids":["apool-11111111-1111-1111-1111-111111111111","apool-22222222-2222-2222-2222-222222222222"],
   "vcs-commit-sha":"abc123","vcs-branch":"main","vcs-pull-request-number":null,
   "created-by":"alice@example.com",
   "created-at":"2026-07-17T10:00:00Z","updated-at":"2026-07-17T10:05:00Z",
@@ -31,7 +33,7 @@ const runAttrs = `{
 
 func runPayload(id string) string {
 	return `{"data":{"id":"` + id + `","type":"runs","attributes":` + runAttrs +
-		`,"relationships":{"workspace":{"data":{"id":"ws-app","type":"workspaces"}}}}}`
+		`,"relationships":{"workspace":{"data":{"id":"ws-app","type":"workspaces"}},"agent-pool":{"data":{"id":"apool-11111111-1111-1111-1111-111111111111","type":"agent-pools"}}}}}`
 }
 
 func newRunsFixture(t *testing.T) *Client {
@@ -136,6 +138,14 @@ func TestGetRunParsesNativeFields(t *testing.T) {
 	// Workspace comes from the relationship.
 	if run.WorkspaceID != "ws-app" {
 		t.Errorf("workspace id: %q", run.WorkspaceID)
+	}
+	// Which pool ran it, and which could have (#1231).
+	if run.AgentPoolID != "apool-11111111-1111-1111-1111-111111111111" {
+		t.Errorf("agent-pool-id: %q", run.AgentPoolID)
+	}
+	if len(run.CandidateAgentPoolIDs) != 2 ||
+		run.CandidateAgentPoolIDs[0] != "apool-11111111-1111-1111-1111-111111111111" {
+		t.Errorf("candidate-agent-pool-ids: %+v", run.CandidateAgentPoolIDs)
 	}
 	// Terrapod-native fields go-tfe can't model.
 	if !run.HasJSONOutput {

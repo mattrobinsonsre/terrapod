@@ -1914,7 +1914,9 @@
       "prMr": "PR/MR",
       "stateVersion": "상태 버전",
       "viewState": "상태 보기",
-      "runOptions": "실행 옵션"
+      "runOptions": "실행 옵션",
+      "agentPool": "에이전트 풀",
+      "agentPoolCandidates": "{count, plural, other {후보 풀 #개}}"
     },
     "timeline": {
       "heading": "타임라인",

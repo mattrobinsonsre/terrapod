@@ -1914,7 +1914,9 @@
       "prMr": "PR/MR",
       "stateVersion": "State Vershun",
       "viewState": "View State",
-      "runOptions": "Run Opshuns"
+      "runOptions": "Run Opshuns",
+      "agentPool": "Agent Poolz",
+      "agentPoolCandidates": "{count, plural, one {# candidat poolz} other {# candidat poolz}}"
     },
     "timeline": {
       "heading": "Timeline",

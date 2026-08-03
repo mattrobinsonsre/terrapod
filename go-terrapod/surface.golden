@@ -579,8 +579,10 @@ field RoleAssignment.Email string `json:"email"`
 field RoleAssignment.ProviderName string `json:"provider-name"`
 field RoleAssignment.RoleName string `json:"role-name"`
 field Run.Actions RunActions `json:"actions"`
+field Run.AgentPoolID string `json:"agent-pool-id,omitempty"`
 field Run.AllowEmptyApply bool `json:"allow-empty-apply"`
 field Run.AutoApply bool `json:"auto-apply"`
+field Run.CandidateAgentPoolIDs []string `json:"candidate-agent-pool-ids,omitempty"`
 field Run.CostCurrency string `json:"cost-currency,omitempty"`
 field Run.CostMonthlyMax *float64 `json:"cost-monthly-max,omitempty"`
 field Run.CostMonthlyMin *float64 `json:"cost-monthly-min,omitempty"`

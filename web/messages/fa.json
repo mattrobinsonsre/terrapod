@@ -1914,7 +1914,9 @@
       "prMr": "PR/MR",
       "stateVersion": "نسخهٔ وضعیت",
       "viewState": "مشاهدهٔ وضعیت",
-      "runOptions": "گزینه‌های اجرا"
+      "runOptions": "گزینه‌های اجرا",
+      "agentPool": "استخر عامل",
+      "agentPoolCandidates": "{count, plural, other {# استخر نامزد}}"
     },
     "timeline": {
       "heading": "خط زمانی",

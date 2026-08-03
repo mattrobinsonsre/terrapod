@@ -483,8 +483,10 @@
   ],
   "runs._run_json": [
     "actions",
+    "agent-pool-id",
     "allow-empty-apply",
     "auto-apply",
+    "candidate-agent-pool-ids",
     "cost-currency",
     "cost-monthly-max",
     "cost-monthly-min",

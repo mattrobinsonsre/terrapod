@@ -1914,7 +1914,9 @@
       "prMr": "PR/MR",
       "stateVersion": "Tillståndsversion",
       "viewState": "Visa tillstånd",
-      "runOptions": "Körningsalternativ"
+      "runOptions": "Körningsalternativ",
+      "agentPool": "Agentpool",
+      "agentPoolCandidates": "{count, plural, one {# kandidatpool} other {# kandidatpooler}}"
     },
     "timeline": {
       "heading": "Tidslinje",
