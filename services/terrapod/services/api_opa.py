@@ -74,23 +74,39 @@ async def _download(version: str, dest: Path) -> None:
     # API fetching for its own use, so it goes direct rather than back through
     # its own HTTP surface.
     url = download_url("opa", version, "linux", arch)
-    tmp = dest.with_suffix(".partial")
+    # A UNIQUE scratch file per fetch, not a fixed `<dest>.partial`. Two
+    # concurrent fetchers (two policy-set writes arriving together, or two
+    # pytest-xdist workers) would otherwise stream into the same path, and the
+    # first `replace(dest)` renames it out from under the second — which then
+    # dies on `stat()` with ENOENT and reports OPA unavailable despite having
+    # just downloaded it successfully. `mkstemp` in the destination directory
+    # keeps the final `replace` on one filesystem, so it stays atomic.
+    fd, tmp_name = tempfile.mkstemp(dir=dest.parent, prefix=f"{dest.name}.", suffix=".partial")
+    os.close(fd)
+    tmp = Path(tmp_name)
     digest = hashlib.sha256()
-    async with httpx.AsyncClient(follow_redirects=True, timeout=120) as client:
-        async with client.stream("GET", url) as resp:
-            if resp.status_code != 200:
-                raise RuntimeError(f"HTTP {resp.status_code} fetching {url}")
-            with tmp.open("wb") as fh:
-                async for chunk in resp.aiter_bytes(1024 * 256):
-                    digest.update(chunk)
-                    await asyncio.to_thread(fh.write, chunk)
-        # Fail closed on the artifact even though the *feature* degrades: "we
-        # could not get OPA" is a fine outcome, "we ran an unverified binary"
-        # is not.
-        await verify_platform_tool(client, "opa", version, "linux", arch, digest.hexdigest())
+    try:
+        async with httpx.AsyncClient(follow_redirects=True, timeout=120) as client:
+            async with client.stream("GET", url) as resp:
+                if resp.status_code != 200:
+                    raise RuntimeError(f"HTTP {resp.status_code} fetching {url}")
+                with tmp.open("wb") as fh:
+                    async for chunk in resp.aiter_bytes(1024 * 256):
+                        digest.update(chunk)
+                        await asyncio.to_thread(fh.write, chunk)
+            # Fail closed on the artifact even though the *feature* degrades:
+            # "we could not get OPA" is a fine outcome, "we ran an unverified
+            # binary" is not.
+            await verify_platform_tool(client, "opa", version, "linux", arch, digest.hexdigest())
 
-    tmp.chmod(tmp.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
-    tmp.replace(dest)
+        tmp.chmod(tmp.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+        # Last writer wins, and every writer wrote a checksum-verified binary,
+        # so whichever lands is correct.
+        tmp.replace(dest)
+    except BaseException:
+        # Don't leave scratch files behind on the PVC when a fetch fails.
+        tmp.unlink(missing_ok=True)
+        raise
 
 
 async def opa_binary() -> str | None:

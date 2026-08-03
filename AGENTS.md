@@ -234,6 +234,18 @@ Routing rules of thumb:
   pattern, so the invariant fails CI loudly if a future change violates it.
 - A **behaviour-changing fix for a reported bug** → a regression test named
   after the failure mode that fails on the pre-fix code and passes after.
+- A **new optional parameter that gates a wrapper, cache, or alternate code
+  path** → a test that exercises the path **with the parameter supplied**,
+  driven through the real caller. This is its own routing rule because the
+  default is the trap: an optional parameter makes the *bypass* the default, and
+  tests take defaults. Adding one to an existing function therefore ships a code
+  path that every pre-existing test skips, and a green suite says nothing about
+  it. Mock at the boundary *below* the new wrapper, not at the wrapper itself —
+  patching the wrapper is how the tests end up asserting on a function that
+  never runs in production's configuration. This is exactly how a total VCS
+  outage shipped in v1.3.0 (#1244): the per-cycle metadata cache was reached
+  through an optional `meta`, every poll-cycle test omitted it, and the wrapper
+  was never once executed through the caller that uses it.
 - A **new replicated entity class** (registered in
   `services/replication_registry.py`) → the **full per-class test matrix**,
   claimed with `@pytest.mark.replication_matrix("<class>", "<row>")`. Registering
