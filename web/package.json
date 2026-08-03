@@ -42,7 +42,7 @@
     "@types/react-dom": "^19",
     "@types/three": "^0.185.1",
     "eslint": "^9.39.5",
-    "eslint-config-next": "^16.2.10",
+    "eslint-config-next": "^16.2.12",
     "postcss": "^8.5.23",
     "tailwindcss": "^4.3.3",
     "typescript": "^6.0.3"
