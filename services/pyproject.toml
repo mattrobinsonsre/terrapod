@@ -61,7 +61,7 @@ aiosmtplib = "^5.1.0"
 # SSE (Server-Sent Events) for real-time run status updates
 sse-starlette = "^3.3.2"
 # Prometheus metrics exposition
-prometheus-client = ">=0.24,<0.26"
+prometheus-client = ">=0.24,<0.27"
 # imghdr removed in Python 3.13; pgpy still imports it
 standard-imghdr = "^3.13"
 # LiteLLM SDK for the AI plan-summary feature (#401). One library, every
@@ -100,7 +100,7 @@ pytest-cov = "^7.0.0"
 # default — `pytest` itself in the test container still runs
 # serial unless `-n` is passed.
 pytest-xdist = "^3.6.0"
-ruff = "^0.15.0"
+ruff = ">=0.15,<0.17"
 mypy = ">=1.14,<3.0"
 
 [build-system]
