@@ -82,3 +82,66 @@ class TestCheckRegoDegrades:
         err = await policy_engine.check_rego("package terrapod\n\nthis is not rego {{{")
         assert err is not None
         assert err != policy_engine.VALIDATION_UNAVAILABLE
+
+
+class TestConcurrentDownloadsDoNotClobber:
+    """Two fetches racing into the same destination must both succeed.
+
+    `_download` used a fixed `<dest>.partial` scratch path. The in-process
+    `asyncio.Lock` around `opa_binary` hides that from a single process, but it
+    does nothing across processes — two pytest-xdist workers, or two API
+    replicas sharing the ephemeral PVC. Both stream into the same file, the
+    first `replace(dest)` renames it away, and the second dies on `stat()` with
+    ENOENT: "OPA binary not available" reported by a fetch that in fact
+    succeeded.
+
+    This reproduces the interleaving directly, bypassing the lock by calling
+    `_download` rather than `opa_binary`.
+    """
+
+    async def test_two_concurrent_downloads_both_succeed(self, tmp_path):
+        import asyncio
+
+        payload = b"#!/bin/sh\necho opa\n"
+
+        class _FakeStream:
+            status_code = 200
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *exc):
+                return False
+
+            async def aiter_bytes(self, _size):
+                # Yield in two parts with a suspension between, so the two
+                # coroutines are guaranteed to interleave mid-write.
+                yield payload[:5]
+                await asyncio.sleep(0)
+                yield payload[5:]
+
+        class _FakeClient:
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *exc):
+                return False
+
+            def stream(self, _method, _url):
+                return _FakeStream()
+
+        dest = tmp_path / "opa-1.19.0"
+        with (
+            patch.object(api_opa.httpx, "AsyncClient", lambda **kw: _FakeClient()),
+            patch.object(api_opa, "download_url", lambda *a: "https://example.invalid/opa"),
+            patch.object(api_opa, "verify_platform_tool", AsyncMock()),
+        ):
+            await asyncio.gather(
+                api_opa._download("1.19.0", dest),
+                api_opa._download("1.19.0", dest),
+            )
+
+        assert dest.exists()
+        assert dest.read_bytes() == payload
+        # And no scratch files left behind.
+        assert [p.name for p in tmp_path.iterdir()] == [dest.name]
