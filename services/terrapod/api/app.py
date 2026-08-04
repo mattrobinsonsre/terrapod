@@ -1124,6 +1124,12 @@ def create_application() -> FastAPI:
 
     include_terrapod(encryption_router)
 
+    # Undelete surface for deleted workspaces (admin only) — Terrapod-specific
+    # (#1253). Not a TFE concept; there is no CLI client for it.
+    from terrapod.api.routers.deleted_workspaces import router as deleted_workspaces_router
+
+    include_terrapod(deleted_workspaces_router)
+
     # Node identity + current role, for leader/follower resolution (#960).
     # Unauthenticated by necessity: the probe runs before trust exists between
     # nodes and discloses only an operator-chosen name and a role.
