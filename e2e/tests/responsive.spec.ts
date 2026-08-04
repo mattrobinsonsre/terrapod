@@ -37,14 +37,17 @@ test.describe('Responsive harness (phone viewport)', () => {
     })
 
     await page.goto('/admin/deleted-workspaces')
-    await expect(page.getByText(name)).toBeVisible({ timeout: 10_000 })
+    // Scoped to the card: the name appears in BOTH renders (the desktop table
+    // is in the DOM, just hidden), so an unscoped getByText is ambiguous —
+    // which is itself evidence the dual-render is present.
+    const card = page.locator('ul > li').filter({ hasText: name })
+    await expect(card).toBeVisible({ timeout: 10_000 })
     await expectNoHorizontalPageScroll(page)
 
     // Now the assertion bites: rows exist, so the desktop table is present in
     // the tree and must be hidden by width, with the card list rendering in
     // its place. One component driven by the breakpoint, not a forked build.
     await expect(page.locator('table')).toBeHidden()
-    await expect(page.locator('ul > li').filter({ hasText: name })).toBeVisible()
   })
 
   test('runs at a phone viewport', async ({ page }) => {
