@@ -2388,6 +2388,10 @@
             "module_overrides_retention_days": {
               "type": "integer",
               "minimum": 0
+            },
+            "deleted_workspace_retention_days": {
+              "type": "integer",
+              "minimum": 0
             }
           }
         },
@@ -2539,7 +2543,11 @@
               "properties": {
                 "mode": {
                   "type": "string",
-                  "enum": ["off", "verify", "copy"]
+                  "enum": [
+                    "off",
+                    "verify",
+                    "copy"
+                  ]
                 },
                 "interval_seconds": {
                   "type": "integer",
@@ -2562,9 +2570,13 @@
                   "type": "object",
                   "additionalProperties": false,
                   "patternProperties": {
-                    "^(state|state_index|configuration_versions|registry_modules|registry_providers|run_logs|run_plans|run_vars|provider_cache|binary_cache|platform_provider_cache|cost_pricesheet|vcs_archives|module_overrides)$": {
+                    "^(state|state_index|configuration_versions|registry_modules|registry_providers|deleted_workspace_markers|run_logs|run_plans|run_vars|provider_cache|binary_cache|platform_provider_cache|cost_pricesheet|vcs_archives|module_overrides)$": {
                       "type": "string",
-                      "enum": ["off", "verify", "copy"]
+                      "enum": [
+                        "off",
+                        "verify",
+                        "copy"
+                      ]
                     }
                   }
                 }

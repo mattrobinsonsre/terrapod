@@ -15,6 +15,7 @@ Safety invariants:
 """
 
 import time
+import uuid
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import func, select
@@ -74,6 +75,11 @@ async def artifact_retention_cycle() -> None:
                 "vcs_archives",
                 _cleanup_vcs_archives,
                 settings.vcs.archive_cache_retention_days,
+            ),
+            (
+                "deleted_workspaces",
+                _cleanup_deleted_workspaces,
+                cfg.deleted_workspace_retention_days,
             ),
         ]
 
@@ -583,3 +589,116 @@ async def _cleanup_vcs_archives(
         RETENTION_DELETED.labels(category="vcs_archives").inc(deleted)
 
     return deleted
+
+
+async def _cleanup_deleted_workspaces(
+    db: AsyncSession,
+    storage: ObjectStore,
+    retention_days: int,
+    batch_size: int,
+) -> int:
+    """Reap state left behind by deleted workspaces (#1253).
+
+    Every other category here walks DB rows and deletes the blobs they point
+    at. This one cannot: deleting a workspace CASCADEs its `StateVersion` rows
+    away, so by the time the state is garbage there is no row left to find it
+    from. Its blobs become permanently invisible to the row-driven reaper —
+    which is why, before this existed, every workspace ever deleted still
+    occupied storage forever.
+
+    So the orphan set is computed the only way still available: list the state
+    prefixes present in storage, subtract the workspaces that still exist.
+
+    **Discovery stamps; it never deletes.** An orphan with no marker gets one
+    written dated now, and is left alone until a later cycle. That is what
+    makes the retention window mean something: nothing is reaped that has not
+    been *visible as recoverable* for the full window. Dating from the newest
+    blob instead would expire a workspace that was last applied months before
+    someone deleted it, giving no undelete window at all — and a workspace
+    deleted before this feature shipped would be reaped on the first cycle.
+    """
+    from terrapod.services import deleted_workspace_service as dws
+    from terrapod.storage.keys import DELETED_MARKER_PREFIX
+
+    # Prefixes look like `state/{workspace_id}/{version}.tfstate`. The marker
+    # prefix and the DR index live under `state/` too and are not workspaces.
+    seen: set[str] = set()
+    for obj in await storage.list_prefix("state/"):
+        key = obj.key
+        if key.startswith(DELETED_MARKER_PREFIX) or "/" not in key[len("state/") :]:
+            continue
+        candidate = key[len("state/") :].split("/", 1)[0]
+        # `Workspace.id` is a UUID column, so a stray non-UUID directory would
+        # raise on bind and — swallowed by this cycle's per-category except —
+        # silently kill the reaper for good. Skip anything unparseable rather
+        # than letting one junk prefix disable reaping for every workspace.
+        try:
+            uuid.UUID(candidate)
+        except ValueError:
+            logger.warning("Ignoring non-UUID prefix under state/", prefix=candidate)
+            continue
+        seen.add(candidate)
+
+    if not seen:
+        return 0
+
+    live = {
+        str(w)
+        for w in (await db.execute(select(Workspace.id).where(Workspace.id.in_(seen)))).scalars()
+    }
+    orphans = sorted(seen - live)
+
+    now = datetime.now(UTC)
+    reaped = 0
+    for ws_id in orphans[:batch_size]:
+        marker = await dws.read_marker(storage, ws_id)
+
+        if marker is None:
+            # First sight (or an unreadable marker): start the clock, delete
+            # nothing this cycle.
+            await dws.write_marker(storage, ws_id, dws.build_discovery_marker(ws_id, now))
+            logger.info("Stamped orphaned workspace state for retention", workspace_id=ws_id)
+            continue
+
+        age = dws.marker_age_days(marker, now)
+        if age is None:
+            # A marker we cannot date is treated as unstamped rather than as
+            # expired — re-stamping restarts the window instead of reaping now.
+            await dws.write_marker(storage, ws_id, dws.build_discovery_marker(ws_id, now))
+            continue
+        if age < retention_days:
+            continue
+
+        # Belt and braces against a listing/DB skew: never reap a prefix that
+        # still has a live state-version row.
+        still_referenced = (
+            await db.execute(
+                select(StateVersion.id).where(StateVersion.workspace_id == ws_id).limit(1)
+            )
+        ).scalar_one_or_none()
+        if still_referenced is not None:
+            logger.warning(
+                "Orphan still has state-version rows — not reaping",
+                workspace_id=ws_id,
+            )
+            continue
+
+        for obj in await storage.list_prefix(f"state/{ws_id}/"):
+            try:
+                await storage.delete(obj.key)
+            except Exception as e:  # noqa: BLE001 — best-effort, matches this module
+                logger.warning("Failed to delete orphaned state object", key=obj.key, error=str(e))
+        try:
+            await storage.delete(dws.deleted_workspace_marker_key(ws_id))
+        except Exception as e:  # noqa: BLE001
+            logger.warning("Failed to delete marker", workspace_id=ws_id, error=str(e))
+
+        logger.info(
+            "Reaped state for deleted workspace past its retention window",
+            workspace_id=ws_id,
+            workspace_name=marker.get("workspace_name"),
+            age_days=round(age, 1),
+        )
+        reaped += 1
+
+    return reaped

@@ -1900,9 +1900,22 @@ async def delete_workspace(
             ),
         )
     ws_name = ws.name
+    ws_id = str(ws.id)
+
+    # Build the undelete marker BEFORE the delete, while the row and its
+    # variables/state-versions are still readable (#1253). The write itself
+    # happens after the commit — a marker for a workspace that then failed to
+    # delete would be a lie, and the delete must not fail because storage is
+    # briefly unavailable.
+    from terrapod.services import deleted_workspace_service as dws
+
+    marker = await dws.build_marker(db, ws, deleted_by=user.email)
+
     await db.delete(ws)
     await db.commit()
     logger.info("Workspace deleted", workspace=ws_name)
+
+    await dws.write_marker_best_effort(ws_id, marker)
 
     # Best-effort remove from DR state index
     await _remove_state_index_entry(ws_name)

@@ -778,6 +778,31 @@ jobs:
           fi
           echo "all third-party images are overridable, and every mirror ref is listed"
 
+      - name: Every retention key in values.yaml reaches the rendered ConfigMap
+        run: |
+          # Leg 3 of the config-channel contract. A key can be in values.yaml
+          # and in values.schema.json and still be inert, because the operator
+          # sets it, it never reaches the pod, and the code default silently
+          # wins — the failure is invisible until someone notices retention
+          # didn't do what they configured. Grep the RENDERED output, not the
+          # template text, which is what catches a missing render line.
+          docker run --rm -v "$PWD:/chart" -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \
+            template terrapod helm/terrapod \
+            --set postgresql.url=postgresql+asyncpg://t:t@db:5432/terrapod \
+            --set redis.url=redis://redis:6379 > /tmp/rendered.yaml
+          keys=$(awk '/^    artifact_retention:/{f=1;next} f&&/^      [a-z_]+:/{gsub(/:.*/,"");gsub(/ /,"");print} f&&/^    [a-z]/{exit}' helm/terrapod/values.yaml)
+          if [ -z "$keys" ]; then echo "no artifact_retention keys found — check the awk filter"; exit 1; fi
+          missing=""
+          for k in $keys; do
+            grep -q "^ *$k:" /tmp/rendered.yaml || missing="$missing $k"
+          done
+          if [ -n "$missing" ]; then
+            echo "These retention values never reach the pod — add a render line"
+            echo "to templates/configmap-api.yaml:$missing"
+            exit 1
+          fi
+          echo "all retention keys render:" $keys
+
       - name: Two installs in one cluster cannot collide on a cluster-scoped name
         run: |
           # Terrapod is single-organization, so separating business units means
