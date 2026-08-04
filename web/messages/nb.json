@@ -31,7 +31,8 @@
     "openMenu": "Åpne meny",
     "openAccountMenu": "Åpne kontomeny",
     "closeMenu": "Lukk meny",
-    "ha": "Høy tilgjengelighet"
+    "ha": "Høy tilgjengelighet",
+    "deletedWorkspaces": "Slettede arbeidsområder"
   },
   "switcher": {
     "language": "Språk",
@@ -2928,5 +2929,22 @@
     "backfilling": "Etterfyller",
     "aria": "Høy tilgjengelighet: {role}, {state}",
     "leader": "Leder"
+  },
+  "adminDeletedWorkspaces": {
+    "title": "Slettede arbeidsområder",
+    "description": "Arbeidsområder der state fortsatt kan reddes. Gjenoppretting lager et NYTT arbeidsområde med den reddede staten — det er ikke en angre-funksjon, og vinduet er begrenset.",
+    "empty": "Ingen slettede arbeidsområder har state som kan gjenopprettes.",
+    "colName": "Arbeidsområde",
+    "colDeleted": "Slettet",
+    "colVersions": "State-versjoner",
+    "colUntil": "Kan gjenopprettes til",
+    "colActions": "Handlinger",
+    "unknownName": "Navn ikke registrert",
+    "orphanBadge": "Funnet av reaperen",
+    "retentionDisabled": "Ingen utløp",
+    "restore": "Gjenopprett",
+    "restoring": "Gjenoppretter…",
+    "restoreConfirm": "Gjenopprette state for «{name}»?\n\nDette lager et NYTT arbeidsområde — originalen kommer ikke tilbake. Det kommer tilbake med auto-apply og driftdeteksjon av og uten VCS-tilkobling; variabler og kjørehistorikk kommer ikke tilbake. Bare state reddes.",
+    "restoreDone": "Gjenopprettet {versions, plural, one {# state-versjon} other {# state-versjoner}} til det nye arbeidsområdet «{name}». Sjekk innstillingene før du slår på auto-apply eller VCS."
   }
 }

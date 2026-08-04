@@ -31,7 +31,8 @@
     "openMenu": "메뉴 열기",
     "openAccountMenu": "계정 메뉴 열기",
     "closeMenu": "메뉴 닫기",
-    "ha": "고가용성"
+    "ha": "고가용성",
+    "deletedWorkspaces": "삭제된 워크스페이스"
   },
   "switcher": {
     "language": "언어",
@@ -2928,5 +2929,22 @@
     "backfilling": "백필 중",
     "aria": "고가용성: {role}, {state}",
     "leader": "리더"
+  },
+  "adminDeletedWorkspaces": {
+    "title": "삭제된 워크스페이스",
+    "description": "상태를 아직 복구할 수 있는 워크스페이스입니다. 복원하면 복구된 상태를 가진 새 워크스페이스가 만들어집니다. 실행 취소가 아니며 기간도 제한됩니다.",
+    "empty": "복구 가능한 상태를 가진 삭제된 워크스페이스가 없습니다.",
+    "colName": "워크스페이스",
+    "colDeleted": "삭제됨",
+    "colVersions": "상태 버전",
+    "colUntil": "복원 가능 기한",
+    "colActions": "작업",
+    "unknownName": "이름이 기록되지 않음",
+    "orphanBadge": "리퍼가 발견",
+    "retentionDisabled": "만료 없음",
+    "restore": "복원",
+    "restoring": "복원 중…",
+    "restoreConfirm": "\"{name}\"의 상태를 복원할까요?\n\n새 워크스페이스가 만들어집니다. 원본은 돌아오지 않습니다. 자동 적용과 드리프트 감지가 꺼진 채, VCS 연결 없이 복원되며 변수와 실행 기록은 돌아오지 않습니다. 복구되는 것은 상태뿐입니다.",
+    "restoreDone": "{versions, plural, other {상태 버전 #개}}를 새 워크스페이스 \"{name}\"에 복구했습니다. 자동 적용이나 VCS를 켜기 전에 설정을 확인하세요."
   }
 }

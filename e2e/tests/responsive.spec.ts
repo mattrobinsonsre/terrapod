@@ -52,7 +52,9 @@ test.describe('Responsive harness (phone viewport)', () => {
       if (!(await menu.isVisible())) await hamburger.click();
       await expect(menu).toBeVisible({ timeout: 1000 });
     }).toPass({ timeout: 15000 });
-    await expect(menu.getByRole('link', { name: 'Workspaces' })).toBeVisible();
+    // exact: the Admin group also carries a "Deleted workspaces" link (#1253),
+    // which a substring match would pick up as a second element.
+    await expect(menu.getByRole('link', { name: 'Workspaces', exact: true })).toBeVisible();
     await expect(menu.getByText('Registry', { exact: true })).toBeVisible();
     await expect(menu.getByText('Help', { exact: true })).toBeVisible();
     await expect(menu.getByRole('link', { name: 'Modules' })).toBeVisible();
@@ -428,4 +430,15 @@ test.describe('Tablet width (md–lg dead-zone, #839)', () => {
     // contained by overflow-x-auto on its wrapper (the #839 fix).
     await expectNoHorizontalPageScroll(page);
   });
-});
+
+  test('deleted-workspaces admin page adapts to mobile (#1253)', async ({ page }) => {
+    await page.goto('/admin/deleted-workspaces')
+    await expectNoHorizontalPageScroll(page)
+
+    // The desktop table is hidden below md and a card list renders in its
+    // place — one component tree driven by width, not a forked mobile build.
+    // Asserted whether or not the deployment has any deleted workspaces: the
+    // empty state must be phone-safe too.
+    await expect(page.locator('table')).toBeHidden()
+  })
+})

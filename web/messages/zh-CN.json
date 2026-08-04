@@ -31,7 +31,8 @@
     "openMenu": "打开菜单",
     "openAccountMenu": "打开账户菜单",
     "closeMenu": "关闭菜单",
-    "ha": "高可用"
+    "ha": "高可用",
+    "deletedWorkspaces": "已删除的工作区"
   },
   "switcher": {
     "language": "语言",
@@ -2928,5 +2929,22 @@
     "backfilling": "回填中",
     "aria": "高可用：{role}，{state}",
     "leader": "主节点"
+  },
+  "adminDeletedWorkspaces": {
+    "title": "已删除的工作区",
+    "description": "状态仍可恢复的工作区。恢复会创建一个新的工作区来承载抢救出的状态——这不是撤销，且时间窗口有限。",
+    "empty": "没有可恢复状态的已删除工作区。",
+    "colName": "工作区",
+    "colDeleted": "删除时间",
+    "colVersions": "状态版本",
+    "colUntil": "可恢复至",
+    "colActions": "操作",
+    "unknownName": "未记录名称",
+    "orphanBadge": "由回收器发现",
+    "retentionDisabled": "永不过期",
+    "restore": "恢复",
+    "restoring": "正在恢复…",
+    "restoreConfirm": "要恢复“{name}”的状态吗？\n\n这会创建一个新的工作区——原工作区不会回来。它恢复后自动应用与漂移检测均为关闭，且没有 VCS 连接；变量和运行历史不会恢复。只有状态会被抢救回来。",
+    "restoreDone": "已将 {versions, plural, other {# 个状态版本}} 恢复到新工作区“{name}”。启用自动应用或 VCS 之前请检查其设置。"
   }
 }

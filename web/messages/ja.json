@@ -31,7 +31,8 @@
     "openMenu": "メニューを開く",
     "openAccountMenu": "アカウントメニューを開く",
     "closeMenu": "メニューを閉じる",
-    "ha": "高可用性"
+    "ha": "高可用性",
+    "deletedWorkspaces": "削除されたワークスペース"
   },
   "switcher": {
     "language": "言語",
@@ -2928,5 +2929,22 @@
     "backfilling": "バックフィル中",
     "aria": "高可用性: {role}、{state}",
     "leader": "リーダー"
+  },
+  "adminDeletedWorkspaces": {
+    "title": "削除されたワークスペース",
+    "description": "ステートがまだ復旧可能なワークスペースです。復元すると、救出したステートを持つ新しいワークスペースが作成されます。取り消しではなく、期間にも限りがあります。",
+    "empty": "復旧可能なステートを持つ削除済みワークスペースはありません。",
+    "colName": "ワークスペース",
+    "colDeleted": "削除日時",
+    "colVersions": "ステートバージョン",
+    "colUntil": "復元可能期限",
+    "colActions": "操作",
+    "unknownName": "名前は記録されていません",
+    "orphanBadge": "リーパーが検出",
+    "retentionDisabled": "期限なし",
+    "restore": "復元",
+    "restoring": "復元中…",
+    "restoreConfirm": "「{name}」のステートを復元しますか？\n\n新しいワークスペースが作成されます。元のワークスペースは戻りません。自動適用とドリフト検出は無効、VCS 接続もない状態で復元され、変数と実行履歴は戻りません。復旧されるのはステートのみです。",
+    "restoreDone": "{versions, plural, other {# 件のステートバージョン}}を新しいワークスペース「{name}」に復旧しました。自動適用や VCS を有効にする前に設定を確認してください。"
   }
 }

@@ -31,7 +31,8 @@
     "openMenu": "The menu, open",
     "openAccountMenu": "The account menu, open",
     "closeMenu": "The menu, close",
-    "ha": "Availability, high"
+    "ha": "Availability, high",
+    "deletedWorkspaces": "Workspaces deleted"
   },
   "switcher": {
     "language": "Language",
@@ -2928,5 +2929,22 @@
     "backfilling": "Backfilling",
     "aria": "Availability, high: {role}, {state}",
     "leader": "Leader"
+  },
+  "adminDeletedWorkspaces": {
+    "title": "Workspaces deleted",
+    "description": "Recoverable still, the state of these workspaces is. A NEW workspace holding the rescued state, restoring creates — an undo it is not, and limited the window is.",
+    "empty": "Recoverable state, no deleted workspace has.",
+    "colName": "Workspace",
+    "colDeleted": "Deleted",
+    "colVersions": "Versions, state",
+    "colUntil": "Restorable until",
+    "colActions": "Actions",
+    "unknownName": "Recorded, the name was not",
+    "orphanBadge": "By the reaper, found",
+    "retentionDisabled": "Expiry, there is none",
+    "restore": "Restore",
+    "restoring": "Restoring, it is…",
+    "restoreConfirm": "The state of \"{name}\", restore you would?\n\nA NEW workspace, this creates — back the original comes not. With auto-apply and drift detection off it returns, and no VCS connection; back its variables and run history come not. Only the state, recovered is.",
+    "restoreDone": "Into the new workspace \"{name}\", {versions, plural, one {# state version} other {# state versions}} recovered were. Before auto-apply or VCS you enable, its settings check you must."
   }
 }

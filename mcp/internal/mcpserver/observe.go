@@ -275,6 +275,33 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 		}
 		return nil, sc, nil
 	})
+
+	// ── terrapod_deleted_workspace_list ──────────────────────────────
+	type deletedWSIn struct{}
+	type deletedWSOut struct {
+		Count   int                         `json:"count"`
+		Deleted []terrapod.DeletedWorkspace `json:"deleted_workspaces"`
+	}
+	mcp.AddTool(s, &mcp.Tool{
+		Name: "terrapod_deleted_workspace_list",
+		Description: "List deleted workspaces whose state is still recoverable. Requires platform admin. " +
+			"Deleting a workspace removes its rows but not its state blobs; a delete marker keeps them findable " +
+			"until the retention window expires, after which they are reaped and the workspace is gone for good — " +
+			"so `restorable-until` is the field to act on, and an empty value means retention is disabled and " +
+			"nothing is reaped automatically. `marker-reason` distinguishes `deleted` (written by the delete, so " +
+			"`deleted-at` is the real deletion time) from `discovered-orphaned` (the reaper found state with no " +
+			"marker, so `deleted-at` is merely when it was first seen — treat that date as a floor, not a fact). " +
+			"`state-versions-available` is counted from storage at request time, so a partial reap shows up there " +
+			"rather than in the marker. `variable-names` carries names and categories ONLY — values are never " +
+			"recorded — so use it to tell the user what they will have to recreate after a restore.",
+		Annotations: readOnly,
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, _ deletedWSIn) (*mcp.CallToolResult, *deletedWSOut, error) {
+		items, err := c.ListAllDeletedWorkspaces(ctx)
+		if err != nil {
+			return errResult(err), nil, nil
+		}
+		return nil, &deletedWSOut{Count: len(items), Deleted: items}, nil
+	})
 }
 
 // errResult turns a go-terrapod error into an agent-facing tool error,

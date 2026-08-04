@@ -31,7 +31,8 @@
     "openMenu": "Opun menu",
     "openAccountMenu": "Opun akkount menu",
     "closeMenu": "Cloze menu",
-    "ha": "Hai Availabilitee"
+    "ha": "Hai Availabilitee",
+    "deletedWorkspaces": "Deletd Werkspacez"
   },
   "switcher": {
     "language": "Langwidge",
@@ -2928,5 +2929,22 @@
     "backfilling": "Fillin in",
     "aria": "Hai availabilitee: {role}, {state}",
     "leader": "Leedr"
+  },
+  "adminDeletedWorkspaces": {
+    "title": "Deletd Werkspacez",
+    "description": "Werkspacez whoz state can still be savd. Restorin makez a NEW werkspace wif da rescued state — is not an undo, an da window iz smol.",
+    "empty": "No deletd werkspacez has savable state. sad.",
+    "colName": "Werkspace",
+    "colDeleted": "Deletd",
+    "colVersions": "State Verzhunz",
+    "colUntil": "Restorabul til",
+    "colActions": "Akshunz",
+    "unknownName": "Naem not writd down",
+    "orphanBadge": "Foundz by da reapr",
+    "retentionDisabled": "No expiry evar",
+    "restore": "Restoar",
+    "restoring": "Restoarin…",
+    "restoreConfirm": "Restoar da state ov \"{name}\"?\n\nDis makez a NEW werkspace — da orijinal duz not come bak. It cumz bak wif auto-apply an drift detekshun offs an no VCS, an itz variablez an run histry duz not come bak. Only da state getz savd.",
+    "restoreDone": "Savd {versions, plural, one {# state verzhun} other {# state verzhunz}} intoo da new werkspace \"{name}\". Chek itz settingz b4 u turn on auto-apply or VCS. kthxbai"
   }
 }

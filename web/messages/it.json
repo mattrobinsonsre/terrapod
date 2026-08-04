@@ -31,7 +31,8 @@
     "openMenu": "Apri menu",
     "openAccountMenu": "Apri menu account",
     "closeMenu": "Chiudi menu",
-    "ha": "Alta disponibilità"
+    "ha": "Alta disponibilità",
+    "deletedWorkspaces": "Workspace eliminati"
   },
   "switcher": {
     "language": "Lingua",
@@ -2928,5 +2929,22 @@
     "backfilling": "In recupero",
     "aria": "Alta disponibilità: {role}, {state}",
     "leader": "Leader"
+  },
+  "adminDeletedWorkspaces": {
+    "title": "Workspace eliminati",
+    "description": "Workspace il cui stato è ancora recuperabile. Il ripristino crea un NUOVO workspace con lo stato recuperato: non è un annullamento e la finestra è limitata.",
+    "empty": "Nessun workspace eliminato ha stato recuperabile.",
+    "colName": "Workspace",
+    "colDeleted": "Eliminato",
+    "colVersions": "Versioni di stato",
+    "colUntil": "Recuperabile fino al",
+    "colActions": "Azioni",
+    "unknownName": "Nome non registrato",
+    "orphanBadge": "Trovato dal reaper",
+    "retentionDisabled": "Nessuna scadenza",
+    "restore": "Ripristina",
+    "restoring": "Ripristino…",
+    "restoreConfirm": "Ripristinare lo stato di «{name}»?\n\nQuesto crea un NUOVO workspace: l''originale non torna. Torna senza auto-apply, senza rilevamento del drift e senza connessione VCS; variabili e cronologia delle esecuzioni non tornano. Viene recuperato solo lo stato.",
+    "restoreDone": "{versions, plural, one {# versione di stato recuperata} other {# versioni di stato recuperate}} nel nuovo workspace «{name}». Controlla le impostazioni prima di attivare auto-apply o VCS."
   }
 }

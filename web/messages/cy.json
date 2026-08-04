@@ -31,7 +31,8 @@
     "openMenu": "Agor y ddewislen",
     "openAccountMenu": "Agor dewislen y cyfrif",
     "closeMenu": "Cau'r ddewislen",
-    "ha": "Argaeledd uchel"
+    "ha": "Argaeledd uchel",
+    "deletedWorkspaces": "Gweithfannau wedi''u dileu"
   },
   "switcher": {
     "language": "Iaith",
@@ -2928,5 +2929,22 @@
     "backfilling": "Llenwi'n ôl",
     "aria": "Argaeledd uchel: {role}, {state}",
     "leader": "Arweinydd"
+  },
+  "adminDeletedWorkspaces": {
+    "title": "Gweithfannau wedi''u dileu",
+    "description": "Gweithfannau y mae eu cyflwr yn dal i fod yn adferadwy. Mae adfer yn creu gweithfan NEWYDD sy''n dal y cyflwr a achubwyd — nid dadwneud mohono, ac mae''r ffenestr yn gyfyngedig.",
+    "empty": "Nid oes gan unrhyw weithfan a ddilëwyd gyflwr adferadwy.",
+    "colName": "Gweithfan",
+    "colDeleted": "Dilëwyd",
+    "colVersions": "Fersiynau cyflwr",
+    "colUntil": "Adferadwy tan",
+    "colActions": "Gweithredoedd",
+    "unknownName": "Ni chofnodwyd yr enw",
+    "orphanBadge": "Wedi''i ganfod gan y medelwr",
+    "retentionDisabled": "Dim dod i ben",
+    "restore": "Adfer",
+    "restoring": "Wrthi''n adfer…",
+    "restoreConfirm": "Adfer cyflwr „{name}”?\n\nMae hyn yn creu gweithfan NEWYDD — nid yw''r un wreiddiol yn dod yn ôl. Daw''n ôl heb awto-osod, heb ganfod drifft a heb gysylltiad VCS; nid yw''r newidynnau na''r hanes rhedeg yn dod yn ôl. Dim ond y cyflwr a achubir.",
+    "restoreDone": "Adferwyd {versions, plural, one {# fersiwn cyflwr} other {# fersiwn cyflwr}} i''r weithfan newydd „{name}”. Gwiriwch ei gosodiadau cyn galluogi awto-osod neu VCS."
   }
 }

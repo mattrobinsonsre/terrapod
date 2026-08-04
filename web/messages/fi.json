@@ -31,7 +31,8 @@
     "openMenu": "Avaa valikko",
     "openAccountMenu": "Avaa tilivalikko",
     "closeMenu": "Sulje valikko",
-    "ha": "Korkea käytettävyys"
+    "ha": "Korkea käytettävyys",
+    "deletedWorkspaces": "Poistetut työtilat"
   },
   "switcher": {
     "language": "Kieli",
@@ -2928,5 +2929,22 @@
     "backfilling": "Täydentää",
     "aria": "Korkea käytettävyys: {role}, {state}",
     "leader": "Johtaja"
+  },
+  "adminDeletedWorkspaces": {
+    "title": "Poistetut työtilat",
+    "description": "Työtilat, joiden tila on yhä palautettavissa. Palautus luo UUDEN työtilan pelastetulla tilalla — se ei ole kumoaminen, ja aikaikkuna on rajallinen.",
+    "empty": "Yhdelläkään poistetulla työtilalla ei ole palautettavaa tilaa.",
+    "colName": "Työtila",
+    "colDeleted": "Poistettu",
+    "colVersions": "Tilaversiot",
+    "colUntil": "Palautettavissa asti",
+    "colActions": "Toiminnot",
+    "unknownName": "Nimeä ei tallennettu",
+    "orphanBadge": "Keräimen löytämä",
+    "retentionDisabled": "Ei vanhenemista",
+    "restore": "Palauta",
+    "restoring": "Palautetaan…",
+    "restoreConfirm": "Palautetaanko kohteen ”{name}” tila?\n\nTämä luo UUDEN työtilan — alkuperäinen ei palaa. Se palaa automaattinen käyttöönotto ja poikkeamien tunnistus pois päältä eikä siinä ole VCS-yhteyttä; muuttujat ja ajohistoria eivät palaa. Vain tila pelastetaan.",
+    "restoreDone": "Palautettiin {versions, plural, one {# tilaversio} other {# tilaversiota}} uuteen työtilaan ”{name}”. Tarkista asetukset ennen automaattisen käyttöönoton tai VCS:n kytkemistä."
   }
 }

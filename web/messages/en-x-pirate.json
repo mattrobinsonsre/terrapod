@@ -31,7 +31,8 @@
     "openMenu": "Open th'' menu",
     "openAccountMenu": "Open yer account menu",
     "closeMenu": "Batten th'' menu",
-    "ha": "Ever-Afloat"
+    "ha": "Ever-Afloat",
+    "deletedWorkspaces": "Scuttled work-decks"
   },
   "switcher": {
     "language": "Tongue",
@@ -2928,5 +2929,22 @@
     "backfilling": "Fillin' the hold",
     "aria": "Ever-afloat: {role}, {state}",
     "leader": "Flagship"
+  },
+  "adminDeletedWorkspaces": {
+    "title": "Scuttled work-decks",
+    "description": "Work-decks whose state be still salvageable. Hauling one up builds a NEW work-deck holdin' the salvaged state — 'tis no undoin' of the deed, and the tide waits not.",
+    "empty": "Nay a scuttled work-deck has salvageable state.",
+    "colName": "Work-deck",
+    "colDeleted": "Scuttled",
+    "colVersions": "State versions",
+    "colUntil": "Salvageable till",
+    "colActions": "Deeds",
+    "unknownName": "Name never logged",
+    "orphanBadge": "Fished out by the reaper",
+    "retentionDisabled": "Never lost",
+    "restore": "Salvage",
+    "restoring": "Haulin' her up…",
+    "restoreConfirm": "Salvage the state o'' \"{name}\"?\n\nThis builds a NEW work-deck — the old one be gone to the depths for good. She comes up with auto-apply and drift-watch doused and nary a VCS line; her variables and voyage log do not come back. Only the state be salvaged.",
+    "restoreDone": "Salvaged {versions, plural, one {# state version} other {# state versions}} into the new work-deck \"{name}\". Inspect her riggin'' afore ye hoist auto-apply or VCS."
   }
 }

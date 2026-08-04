@@ -31,7 +31,8 @@
     "openMenu": "Öppna meny",
     "openAccountMenu": "Öppna kontomeny",
     "closeMenu": "Stäng meny",
-    "ha": "Hög tillgänglighet"
+    "ha": "Hög tillgänglighet",
+    "deletedWorkspaces": "Borttagna arbetsytor"
   },
   "switcher": {
     "language": "Språk",
@@ -2928,5 +2929,22 @@
     "backfilling": "Fyller på",
     "aria": "Hög tillgänglighet: {role}, {state}",
     "leader": "Ledare"
+  },
+  "adminDeletedWorkspaces": {
+    "title": "Borttagna arbetsytor",
+    "description": "Arbetsytor vars state fortfarande går att återskapa. Återställning skapar en NY arbetsyta med det räddade statet — det är inte en ångra-funktion, och fönstret är begränsat.",
+    "empty": "Ingen borttagen arbetsyta har återskapningsbart state.",
+    "colName": "Arbetsyta",
+    "colDeleted": "Borttagen",
+    "colVersions": "State-versioner",
+    "colUntil": "Återställningsbar till",
+    "colActions": "Åtgärder",
+    "unknownName": "Namn ej registrerat",
+    "orphanBadge": "Hittad av reapern",
+    "retentionDisabled": "Ingen förfallotid",
+    "restore": "Återställ",
+    "restoring": "Återställer…",
+    "restoreConfirm": "Återställa statet för ”{name}”?\n\nDetta skapar en NY arbetsyta — originalet kommer inte tillbaka. Den kommer tillbaka med auto-apply och driftdetektering avstängda och utan VCS-anslutning; variabler och körhistorik kommer inte tillbaka. Endast statet räddas.",
+    "restoreDone": "Återskapade {versions, plural, one {# state-version} other {# state-versioner}} till den nya arbetsytan ”{name}”. Kontrollera inställningarna innan du slår på auto-apply eller VCS."
   }
 }

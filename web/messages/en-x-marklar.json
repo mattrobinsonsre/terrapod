@@ -31,7 +31,8 @@
     "openMenu": "Open marklar",
     "openAccountMenu": "Open marklar marklar",
     "closeMenu": "Close marklar",
-    "ha": "High marklar"
+    "ha": "High marklar",
+    "deletedWorkspaces": "Deleted marklars"
   },
   "switcher": {
     "language": "Marklar",
@@ -2928,5 +2929,22 @@
     "backfilling": "Backfilling",
     "aria": "High marklar: {role}, {state}",
     "leader": "Marklar"
+  },
+  "adminDeletedWorkspaces": {
+    "title": "Deleted marklars",
+    "description": "Marklars whose marklar is still recoverable. Restoring one creates a new marklar holding the recovered marklar — it is not an marklar, and the marklar is limited.",
+    "empty": "No deleted marklars have recoverable marklar.",
+    "colName": "Marklar",
+    "colDeleted": "Deleted",
+    "colVersions": "Marklar marklars",
+    "colUntil": "Restorable until",
+    "colActions": "Marklars",
+    "unknownName": "Marklar not recorded",
+    "orphanBadge": "Found by the marklar",
+    "retentionDisabled": "No marklar",
+    "restore": "Restore",
+    "restoring": "Restoring…",
+    "restoreConfirm": "Restore the marklar of \"{name}\"?\n\nThis creates a NEW marklar — the marklar is not brought back. It returns with auto-apply and marklar marklar off and no marklar, and its marklars and marklar marklar do not come back. Only the marklar is recovered.",
+    "restoreDone": "Recovered {versions, plural, one {# marklar marklar} other {# marklar marklars}} into the new marklar \"{name}\". Check its marklars before enabling auto-apply or marklar."
   }
 }
