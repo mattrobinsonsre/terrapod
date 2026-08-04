@@ -348,10 +348,20 @@ jobs:
           format: json
           output: trivy-${{ matrix.image }}.json
           severity: HIGH,CRITICAL
-          # `ignore-unfixed` stays ON while `trivyignores` is deliberately
-          # ABSENT. Together those two mean exactly "everything we suppress
-          # that now has a fix" — which is the whole question this job asks.
-          ignore-unfixed: true
+          # Both `trivyignores` and `ignore-unfixed` are deliberately ABSENT,
+          # and the second one is the correction from #1257.
+          #
+          # Carrying `ignore-unfixed` over from the gate looked right — the gate
+          # only reports fixable findings, so surely the review should too. It
+          # is exactly wrong. An entry is in the register BECAUSE it is unfixed,
+          # so fix-only scanning renders every legitimate entry invisible, and
+          # the review then reports it as matching nothing — telling you to
+          # delete a live suppression.
+          #
+          # Scanning everything gives both signals from one pass, the way
+          # pip-audit already worked: present with a `FixedVersion` means take
+          # the fix, present without one means the entry is still doing its
+          # job, and absent means genuinely stale.
           exit-code: '0'
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7

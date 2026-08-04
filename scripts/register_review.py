@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
 """Review the accepted-risk register against current advisory data (#1255).
 
-Every entry in the register exists because there was no fix to take. The
-release gate enforces that: it runs with `ignore-unfixed` alongside the
-register, so a suppressed advisory is one the gate would not have reported
-anyway. Re-running each scanner with the **register disabled** and **fix-only
-kept** therefore yields exactly one thing — the entries that have since become
-fixable. No advisory API, no version comparison of our own; the scanners
-already know what they would tell us if we stopped suppressing.
+Every entry in the register exists because there was no fix to take. Re-running
+each scanner with the **register disabled** shows what we would be told if we
+stopped suppressing — no advisory API and no version comparison of our own,
+because the scanners already know.
+
+**The scan must include unfixed findings**, and getting that wrong was #1257.
+The release gate runs `ignore-unfixed`, so carrying that setting over here
+looks natural and is exactly backwards: an entry is in the register BECAUSE it
+is unfixed, so a fix-only scan renders every legitimate entry invisible and the
+review reports it as matching nothing — telling you to delete a live
+suppression. Scanning everything yields both signals from one pass instead.
 
 That matters because re-reading an entry by hand checks the wrong thing. An
 entry's stated exit condition is a *prediction* about how upstream will fix it,
@@ -94,10 +98,11 @@ def _load(path: pathlib.Path):
 def from_trivy(data) -> dict[str, dict]:
     """{id: {package, installed, fixed}} from a Trivy JSON report.
 
-    The report is produced WITHOUT the ignore file, so an id appearing here is
-    unsuppressed; and WITH `ignore-unfixed`, so it appearing at all means a fix
-    exists. `FixedVersion` is recorded anyway — the report should say what to
-    bump to, not merely that one could.
+    Produced WITHOUT the ignore file and WITHOUT `ignore-unfixed`, so presence
+    means "still there" and `FixedVersion` alone decides whether anything can be
+    done about it — the same shape pip-audit has always had. See the module
+    docstring for why fix-only scanning here is a bug rather than an
+    optimisation (#1257).
     """
     found: dict[str, dict] = {}
     for result in (data or {}).get("Results") or []:
@@ -266,9 +271,9 @@ def main() -> int:
         f"([policy](https://github.com/{_REPO}/blob/main/docs/cve-policy.md)).",
         "",
         "Each entry was accepted because no fix existed. This re-runs every scanner "
-        "with the register **disabled** and fix-only reporting **kept**, so anything "
-        "listed below is an accepted risk that upstream has since fixed, or an entry "
-        "that no longer matches anything.",
+        "with the register **disabled**, so anything listed below is either an "
+        "accepted risk that upstream has since fixed, or an entry that no longer "
+        "matches anything at all.",
         "",
     ]
 
@@ -291,11 +296,16 @@ def main() -> int:
         body += [
             "## Matching nothing — delete",
             "",
-            "Reported by no scanner. Rule 4: a stale entry is a liability rather than a "
-            "leftover, because it silently shadows the regression that would bring the "
-            "finding back.",
+            "Reported by no scanner, including as an unfixed finding. Rule 4: a stale "
+            "entry is a liability rather than a leftover, because it silently shadows "
+            "the regression that would bring the finding back.",
             "",
-            *_table(unmatched, with_fix=False),
+            "| Advisory | Register |",
+            "|---|---|",
+            *[
+                f"| `{r['id']}` | {REGISTERS.get(r['scanner'], r['scanner'])} |"
+                for r in unmatched
+            ],
             "",
         ]
 
