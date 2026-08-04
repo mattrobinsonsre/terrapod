@@ -270,10 +270,12 @@ def main() -> int:
         "Automated review of the accepted-risk register "
         f"([policy](https://github.com/{_REPO}/blob/main/docs/cve-policy.md)).",
         "",
-        "Each entry was accepted because no fix existed. This re-runs every scanner "
-        "with the register **disabled**, so anything listed below is either an "
-        "accepted risk that upstream has since fixed, or an entry that no longer "
-        "matches anything at all.",
+        (
+            "Each entry was accepted because no fix existed. This re-runs every "
+            "scanner with the register **disabled**, so anything listed below is "
+            "either an accepted risk that upstream has since fixed, or an entry "
+            "that no longer matches anything at all."
+        ),
         "",
     ]
 
@@ -281,14 +283,20 @@ def main() -> int:
         body += [
             "## Fixable now — take the fix",
             "",
-            "A patched version exists. Rule 1 of the register: bump to it, and delete "
-            "the entry in the **same** pull request rather than leaving it behind.",
+            (
+                "A patched version exists. Rule 1 of the register: bump to it, and "
+                "delete the entry in the **same** pull request rather than leaving "
+                "it behind."
+            ),
             "",
             *_table(fixable, with_fix=True),
             "",
-            "Check the advisory's own affected/patched ranges rather than the entry's "
-            "written exit condition — the exit is a guess about how upstream would fix "
-            "it, and a backport to an older line is exactly the case that guess misses.",
+            (
+                "Check the advisory's own affected/patched ranges rather than the "
+                "entry's written exit condition — the exit is a guess about how "
+                "upstream would fix it, and a backport to an older line is exactly "
+                "the case that guess misses."
+            ),
             "",
         ]
 
@@ -296,9 +304,11 @@ def main() -> int:
         body += [
             "## Matching nothing — delete",
             "",
-            "Reported by no scanner, including as an unfixed finding. Rule 4: a stale "
-            "entry is a liability rather than a leftover, because it silently shadows "
-            "the regression that would bring the finding back.",
+            (
+                "Reported by no scanner, including as an unfixed finding. Rule 4: a "
+                "stale entry is a liability rather than a leftover, because it "
+                "silently shadows the regression that would bring the finding back."
+            ),
             "",
             "| Advisory | Register |",
             "|---|---|",
