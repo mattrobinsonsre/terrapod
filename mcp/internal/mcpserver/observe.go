@@ -300,6 +300,19 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 		if err != nil {
 			return errResult(err), nil, nil
 		}
+		// A nil map/slice marshals to `null`, which fails the tool's derived
+		// output schema ("want object") and takes the whole call down rather
+		// than degrading. The server always sends `{}`/`[]` today, but a
+		// marker written by another version need not, and one absent field
+		// should not cost the agent the entire listing.
+		for i := range items {
+			if items[i].Settings == nil {
+				items[i].Settings = map[string]any{}
+			}
+			if items[i].VariableNames == nil {
+				items[i].VariableNames = []terrapod.DeletedWorkspaceVariable{}
+			}
+		}
 		return nil, &deletedWSOut{Count: len(items), Deleted: items}, nil
 	})
 }
