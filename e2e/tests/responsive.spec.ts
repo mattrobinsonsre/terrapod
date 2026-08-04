@@ -2,6 +2,9 @@ import { test, expect, type Page, type Route } from '@playwright/test';
 // Lives in helpers/, not here: Playwright forbids a spec importing a spec, and
 // any suite adding a surface should be able to reuse the mobile guard.
 import { expectNoHorizontalPageScroll } from '../helpers/responsive';
+import { getStoredToken, createWorkspace, uniqueName } from '../helpers/api';
+
+const API_URL = process.env.API_URL || 'http://localhost:8000';
 import { getStoredToken, createWorkspace, createUser, createAgentPool, createRegistryModule, seedRun, seedStateVersion, seedStateVersionWithContent, seedRunTask, uniqueName } from '../helpers/api';
 
 /**
@@ -432,13 +435,26 @@ test.describe('Tablet width (md–lg dead-zone, #839)', () => {
   });
 
   test('deleted-workspaces admin page adapts to mobile (#1253)', async ({ page }) => {
+    // Seed a real deleted workspace first. Asserting the table is hidden on an
+    // EMPTY page proves nothing — with no rows the component renders an empty
+    // state and there is no table in the DOM at all, so the assertion passes
+    // however the breakpoints are written.
+    const token = getStoredToken()
+    const name = uniqueName('e2eresp')
+    const wsId = await createWorkspace(token, name)
+    await fetch(`${API_URL}/api/terrapod/v1/workspaces/${wsId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
     await page.goto('/admin/deleted-workspaces')
+    await expect(page.getByText(name)).toBeVisible({ timeout: 10_000 })
     await expectNoHorizontalPageScroll(page)
 
-    // The desktop table is hidden below md and a card list renders in its
-    // place — one component tree driven by width, not a forked mobile build.
-    // Asserted whether or not the deployment has any deleted workspaces: the
-    // empty state must be phone-safe too.
+    // Now the assertion bites: rows exist, so the desktop table is present in
+    // the tree and must be hidden by width, with the card list rendering in
+    // its place. One component driven by the breakpoint, not a forked build.
     await expect(page.locator('table')).toBeHidden()
+    await expect(page.locator('ul > li').filter({ hasText: name })).toBeVisible()
   })
 })
