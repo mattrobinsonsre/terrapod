@@ -52,7 +52,9 @@ test.describe('Responsive harness (phone viewport)', () => {
       if (!(await menu.isVisible())) await hamburger.click();
       await expect(menu).toBeVisible({ timeout: 1000 });
     }).toPass({ timeout: 15000 });
-    await expect(menu.getByRole('link', { name: 'Workspaces' })).toBeVisible();
+    // exact: the Admin group also carries a "Deleted workspaces" link (#1253),
+    // which a substring match would pick up as a second element.
+    await expect(menu.getByRole('link', { name: 'Workspaces', exact: true })).toBeVisible();
     await expect(menu.getByText('Registry', { exact: true })).toBeVisible();
     await expect(menu.getByText('Help', { exact: true })).toBeVisible();
     await expect(menu.getByRole('link', { name: 'Modules' })).toBeVisible();
