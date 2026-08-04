@@ -33,17 +33,26 @@ connection is referenced by id; its credential is never copied here.
 
 from __future__ import annotations
 
+import asyncio
+import hashlib
 import json
-from datetime import UTC, datetime
+import uuid as uuid_mod
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from terrapod.crypto.state import decrypt_state_bytes, encrypt_state_bytes
 from terrapod.db.models import StateVersion, Variable, Workspace
 from terrapod.logging_config import get_logger
+from terrapod.services.label_validation import sanitize_labels
 from terrapod.storage import get_storage
-from terrapod.storage.keys import deleted_workspace_marker_key
+from terrapod.storage.keys import (
+    DELETED_MARKER_PREFIX,
+    deleted_workspace_marker_key,
+    state_key,
+)
 from terrapod.storage.protocol import ObjectNotFoundError, ObjectStore
 
 logger = get_logger(__name__)
@@ -234,3 +243,301 @@ def marker_age_days(body: dict[str, Any], now: datetime | None = None) -> float 
     if ts.tzinfo is None:
         ts = ts.replace(tzinfo=UTC)
     return ((now or datetime.now(UTC)) - ts).total_seconds() / 86400.0
+
+
+# ---------------------------------------------------------------------------
+# Restore (#1253 slice 2)
+# ---------------------------------------------------------------------------
+#
+# Restore deliberately creates a **new workspace with a new id** and copies the
+# state across, rather than re-attaching the original id to a fresh row.
+#
+# Re-attaching would be cheaper — the old prefix is already in the right place,
+# so it would need no copy at all. It is not done, on purpose. Deleting a
+# workspace should stay a consequential act; a one-keystroke undo that puts
+# everything back exactly as it was invites casual deletion. Recovery here is a
+# distinct, explicit, admin-only operation that produces a *new* workspace and
+# says so — recoverable, but never free.
+#
+# The copy also leaves the original prefix and its marker untouched, so the
+# retention window still governs the original and a restore can be repeated or
+# reversed by deleting the restored copy.
+
+
+def _state_object_keys(objects: list[Any], workspace_id: str) -> list[str]:
+    """State-version blobs for a workspace, excluding backups.
+
+    `state_backup_key` writes `{id}.backup.tfstate` into the same prefix; those
+    are backups of a version, not versions, and restoring them would fabricate
+    extra history.
+    """
+    prefix = f"state/{workspace_id}/"
+    return sorted(
+        o.key
+        for o in objects
+        if o.key.startswith(prefix)
+        and o.key.endswith(".tfstate")
+        and not o.key.endswith(".backup.tfstate")
+    )
+
+
+def _state_facts(plaintext: bytes) -> dict[str, Any]:
+    """Recover a state version's metadata from the state document itself.
+
+    This is the whole reason restore is not simply a row insert: deleting the
+    workspace CASCADEd its `StateVersion` rows away, so serial and lineage no
+    longer exist anywhere except inside the blobs. Reading them back is what
+    makes the restored workspace continue the original state rather than start
+    a new one — a fresh lineage would make the next apply fail on mismatch, or
+    worse, treat live infrastructure as unmanaged.
+
+    Runs in a worker thread (rule 13): both the parse and the digests are
+    synchronous CPU over what can be a very large document.
+    """
+    doc = json.loads(plaintext)
+    if not isinstance(doc, dict):
+        raise ValueError("state document is not an object")
+    serial = doc.get("serial")
+    if not isinstance(serial, int):
+        raise ValueError(f"state document has no usable serial: {serial!r}")
+    return {
+        "serial": serial,
+        "lineage": str(doc.get("lineage") or ""),
+        "md5": hashlib.md5(plaintext).hexdigest(),  # noqa: S324 — TFE protocol field
+        "sha256": hashlib.sha256(plaintext).hexdigest(),
+        "size": len(plaintext),
+    }
+
+
+async def _unique_name(db: AsyncSession, wanted: str) -> str:
+    """A free workspace name, suffixed if `wanted` is taken.
+
+    The original name is very often free — TFE semantics release it the moment
+    the workspace is deleted, which is exactly why the row is not soft-deleted.
+    But it may have been reused since, and a restore must never fail for a
+    reason the operator cannot fix from the UI.
+    """
+    base = (wanted or "restored-workspace")[:80]
+    taken = await db.execute(select(Workspace.id).where(Workspace.name == base).limit(1))
+    if taken.scalar_one_or_none() is None:
+        return base
+    for n in range(2, 100):
+        candidate = f"{base}-restored-{n}"[:90]
+        exists = await db.execute(select(Workspace.id).where(Workspace.name == candidate).limit(1))
+        if exists.scalar_one_or_none() is None:
+            return candidate
+    raise ValueError(f"could not find a free name based on {base!r}")
+
+
+async def restore_workspace(
+    db: AsyncSession,
+    storage: ObjectStore,
+    workspace_id: str,
+    *,
+    restored_by: str,
+    name: str | None = None,
+) -> tuple[Workspace, dict[str, Any]]:
+    """Recover a deleted workspace as a NEW workspace holding its state history.
+
+    Returns the new workspace and a report of everything that was deliberately
+    *not* carried over, so the caller can show the operator what to re-enable.
+
+    Three constraints shape this, in order of how much damage getting them
+    wrong would do:
+
+    1. **Lineage and serial are preserved exactly.** They come from the state
+       documents (see `_state_facts`). This is the one hard correctness
+       requirement; everything else is recoverable by editing the workspace.
+    2. **It comes back inert.** Auto-apply off, drift detection off, VCS not
+       connected — regardless of what the snapshot says. A restored workspace
+       that immediately applies against infrastructure which has drifted, or
+       been partly torn down since the delete, is the worst thing this feature
+       could do. Re-enabling is a deliberate act.
+    3. **Dangling references are dropped, never re-attached.** The VCS
+       connection recorded in the marker may since have been deleted and its
+       id reused. Silently binding the restored workspace to whatever now holds
+       that id could point it at an entirely different repository.
+    """
+    marker = await read_marker(storage, workspace_id)
+    if marker is None:
+        raise LookupError(f"no delete marker for workspace {workspace_id}")
+
+    objects = await storage.list_prefix(f"state/{workspace_id}/")
+    keys = _state_object_keys(objects, workspace_id)
+
+    settings = marker.get("settings") or {}
+    report: dict[str, Any] = {
+        "source_workspace_id": workspace_id,
+        "source_workspace_name": marker.get("workspace_name"),
+        "state_versions_restored": 0,
+        "state_versions_skipped": [],
+        "suppressed": [],
+        "dropped_references": [],
+    }
+
+    # Labels went through validation on the way in, but a marker is a file in a
+    # bucket: it may predate a key becoming reserved, or have been edited. Strip
+    # rather than reject — refusing to restore because of a label would be a
+    # poor trade.
+    labels, stripped = sanitize_labels(settings.get("labels"))
+    if stripped:
+        report["dropped_references"].append({"field": "labels", "keys": stripped})
+
+    ws = Workspace(
+        id=uuid_mod.uuid4(),
+        name=await _unique_name(db, name or marker.get("workspace_name") or ""),
+        labels=labels,
+        owner_email=settings.get("owner_email") or restored_by,
+        execution_mode=settings.get("execution_mode") or "local",
+        execution_backend=settings.get("execution_backend") or "tofu",
+        terraform_version=settings.get("terraform_version") or "1.12",
+        terragrunt_enabled=bool(settings.get("terragrunt_enabled")),
+        terragrunt_version=settings.get("terragrunt_version") or "1.0",
+        working_directory=settings.get("working_directory") or "",
+        var_files=list(settings.get("var_files") or []),
+        resource_cpu=settings.get("resource_cpu") or "1",
+        resource_memory=settings.get("resource_memory") or "2Gi",
+        drift_ignore_rules=list(settings.get("drift_ignore_rules") or []),
+        # Constraint 2 — inert on return.
+        auto_apply=False,
+        drift_detection_enabled=False,
+    )
+    if settings.get("auto_apply"):
+        report["suppressed"].append("auto_apply")
+    if settings.get("drift_detection_enabled"):
+        report["suppressed"].append("drift_detection_enabled")
+    # Constraint 3 — VCS is described, never re-attached.
+    if settings.get("vcs_connection_id") or settings.get("vcs_repo_url"):
+        report["dropped_references"].append(
+            {
+                "field": "vcs",
+                "connection_id": settings.get("vcs_connection_id"),
+                "repo_url": settings.get("vcs_repo_url"),
+                "branch": settings.get("vcs_branch"),
+            }
+        )
+        report["suppressed"].append("vcs_connection")
+
+    db.add(ws)
+    await db.flush()
+
+    new_id = str(ws.id)
+    seen_serials: set[int] = set()
+    for key in keys:
+        raw = await storage.get(key)
+        try:
+            plaintext = await decrypt_state_bytes(raw)
+            facts = await asyncio.to_thread(_state_facts, plaintext)
+        except Exception as e:  # noqa: BLE001 — one bad blob must not sink the restore
+            logger.warning("Skipping unreadable state blob during restore", key=key, error=str(e))
+            report["state_versions_skipped"].append({"key": key, "reason": str(e)})
+            continue
+
+        # `(workspace_id, serial)` is unique. Two blobs claiming one serial can
+        # only be a duplicate write; keeping the first (keys sort by the
+        # time-ordered uuid7 id) is arbitrary but stable, and inserting both
+        # would abort the whole transaction.
+        if facts["serial"] in seen_serials:
+            report["state_versions_skipped"].append(
+                {"key": key, "reason": f"duplicate serial {facts['serial']}"}
+            )
+            continue
+        seen_serials.add(facts["serial"])
+
+        sv = StateVersion(
+            workspace_id=ws.id,
+            serial=facts["serial"],
+            lineage=facts["lineage"],
+            md5=facts["md5"],
+            sha256=facts["sha256"],
+            state_size=facts["size"],
+        )
+        db.add(sv)
+        await db.flush()
+
+        # Re-encrypt rather than copying the source bytes: the source may have
+        # been written under a DEK version that has since been rotated away,
+        # and a restore is the right moment to bring it onto the active key.
+        await storage.put(
+            state_key(new_id, str(sv.id)),
+            await encrypt_state_bytes(plaintext),
+            content_type="application/json",
+        )
+        report["state_versions_restored"] += 1
+
+    return ws, report
+
+
+async def list_deleted(
+    db: AsyncSession, storage: ObjectStore, retention_days: int
+) -> list[dict[str, Any]]:
+    """Every deleted workspace still recoverable, newest deletion first.
+
+    Driven by the markers, not by a scan of state prefixes: a marker is the
+    thing that says a workspace *was* deleted, and the reaper writes one for
+    any orphan it finds without. A prefix with no marker yet is not omitted
+    from the world, it is simply not yet stamped — it will appear after the
+    next retention cycle.
+
+    A workspace whose id is live again is filtered out rather than shown as
+    deleted. That happens when a marker write raced a recreate, or when a
+    restore reused the name; either way the operator should not be offered a
+    recovery for something that exists.
+    """
+    markers: list[dict[str, Any]] = []
+    for obj in await storage.list_prefix(DELETED_MARKER_PREFIX):
+        if not obj.key.endswith(".json"):
+            continue
+        ws_id = obj.key[len(DELETED_MARKER_PREFIX) : -len(".json")]
+        try:
+            uuid_mod.UUID(ws_id)
+        except ValueError:
+            logger.warning("Ignoring non-UUID delete marker", key=obj.key)
+            continue
+        body = await read_marker(storage, ws_id)
+        if body is None:
+            continue
+        markers.append(body)
+
+    if not markers:
+        return []
+
+    ids = [m["workspace_id"] for m in markers if m.get("workspace_id")]
+    live = {
+        str(w)
+        for w in (await db.execute(select(Workspace.id).where(Workspace.id.in_(ids)))).scalars()
+    }
+
+    out: list[dict[str, Any]] = []
+    for m in markers:
+        ws_id = m.get("workspace_id") or ""
+        if ws_id in live:
+            continue
+        age = marker_age_days(m)
+        restorable_until = None
+        if retention_days > 0 and isinstance(m.get("deleted_at"), str):
+            try:
+                ts = datetime.fromisoformat(m["deleted_at"].replace("Z", "+00:00"))
+                restorable_until = (
+                    (ts + timedelta(days=retention_days)).isoformat().replace("+00:00", "Z")
+                )
+            except ValueError:
+                restorable_until = None
+
+        objects = await storage.list_prefix(f"state/{ws_id}/")
+        out.append(
+            {
+                **m,
+                # Counted from storage rather than trusted from the marker: the
+                # marker's count was true at delete time, but a later reap or a
+                # partial replication is exactly what an operator needs to see
+                # before deciding whether a restore is worth attempting.
+                "state_versions_available": len(_state_object_keys(objects, ws_id)),
+                "age_days": round(age, 2) if age is not None else None,
+                # `0 = disabled` matches the retention service: no expiry.
+                "restorable_until": restorable_until,
+            }
+        )
+
+    out.sort(key=lambda m: m.get("deleted_at") or "", reverse=True)
+    return out

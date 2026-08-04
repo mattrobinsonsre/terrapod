@@ -313,6 +313,25 @@ field CreateWorkspaceRequest.VCSRepoURL string `json:"vcs-repo-url,omitempty"`
 field CreateWorkspaceRequest.VCSWorkflow string `json:"vcs-workflow,omitempty"`
 field CreateWorkspaceRequest.VarFiles []string `json:"var-files,omitempty"`
 field CreateWorkspaceRequest.WorkingDirectory string `json:"working-directory,omitempty"`
+field DeletedWorkspace.AgeDays *float64 `json:"age-days"`
+field DeletedWorkspace.DeletedAt string `json:"deleted-at"`
+field DeletedWorkspace.DeletedBy string `json:"deleted-by"`
+field DeletedWorkspace.LastSerial int `json:"last-serial"`
+field DeletedWorkspace.Lineage string `json:"lineage"`
+field DeletedWorkspace.MarkerReason string `json:"marker-reason"`
+field DeletedWorkspace.RestorableUntil string `json:"restorable-until"`
+field DeletedWorkspace.Settings map[string]any `json:"settings"`
+field DeletedWorkspace.StateVersionsAvailable int `json:"state-versions-available"`
+field DeletedWorkspace.VariableNames []DeletedWorkspaceVariable `json:"variable-names"`
+field DeletedWorkspace.WorkspaceID string `json:"workspace-id"`
+field DeletedWorkspace.WorkspaceName string `json:"workspace-name"`
+field DeletedWorkspaceList.Items []DeletedWorkspace
+field DeletedWorkspaceList.Meta ListMeta
+field DeletedWorkspaceListOptions.PageNumber int
+field DeletedWorkspaceListOptions.PageSize int
+field DeletedWorkspaceVariable.Category string `json:"category"`
+field DeletedWorkspaceVariable.Key string `json:"key"`
+field DeletedWorkspaceVariable.Sensitive bool `json:"sensitive"`
 field DiscoverySurface.Count int `json:"count"`
 field DiscoverySurface.DataSources []OnboardingDataSource `json:"data_sources"`
 field Document.Data json.RawMessage `json:"data"`
@@ -560,6 +579,13 @@ field Resource.Attributes map[string]json.RawMessage `json:"attributes"`
 field Resource.ID string `json:"id"`
 field Resource.Relationships map[string]Relationship `json:"relationships,omitempty"`
 field Resource.Type string `json:"type"`
+field RestoredWorkspace.DroppedReferences []map[string]any `json:"dropped-references"`
+field RestoredWorkspace.ID string `json:"-"`
+field RestoredWorkspace.Name string `json:"name"`
+field RestoredWorkspace.RestoredFrom string `json:"restored-from"`
+field RestoredWorkspace.StateVersionsRestored int `json:"state-versions-restored"`
+field RestoredWorkspace.StateVersionsSkipped []map[string]any `json:"state-versions-skipped"`
+field RestoredWorkspace.Suppressed []string `json:"suppressed"`
 field Role.AllowLabels map[string]string `json:"allow-labels,omitempty"`
 field Role.AllowNames []string `json:"allow-names,omitempty"`
 field Role.BuiltIn bool `json:"built-in"`
@@ -1072,6 +1098,7 @@ method (*Client) GetCatalogInstance(ctx context.Context, wsID string) (*CatalogI
 method (*Client) GetCatalogItem(ctx context.Context, id string) (*CatalogItem, error)
 method (*Client) GetCatalogItemForm(ctx context.Context, id string) (map[string]any, error)
 method (*Client) GetCurrentStateVersion(ctx context.Context, workspaceID string) (*StateVersion, error)
+method (*Client) GetDeletedWorkspace(ctx context.Context, workspaceID string) (*DeletedWorkspace, error)
 method (*Client) GetEncryptionStatus(ctx context.Context) (*EncryptionStatus, error)
 method (*Client) GetEstateGraph(ctx context.Context) (*EstateGraph, error)
 method (*Client) GetExecutionHook(ctx context.Context, id string) (*ExecutionHook, error)
@@ -1115,12 +1142,14 @@ method (*Client) ListAgentPools(ctx context.Context) ([]AgentPool, error)
 method (*Client) ListAllAPITokens(ctx context.Context, kind string) ([]APIToken, error)
 method (*Client) ListAllAgentPools(ctx context.Context) ([]AgentPool, error)
 method (*Client) ListAllCatalogInstances(ctx context.Context, itemID string) ([]CatalogInstance, error)
+method (*Client) ListAllDeletedWorkspaces(ctx context.Context) ([]DeletedWorkspace, error)
 method (*Client) ListAllVCSConnections(ctx context.Context) ([]VCSConnection, error)
 method (*Client) ListAllVariables(ctx context.Context, workspaceID string) ([]Variable, error)
 method (*Client) ListAllWorkspaces(ctx context.Context, opts WorkspaceListOptions) ([]Workspace, error)
 method (*Client) ListArchitectureCritiqueMessages( ctx context.Context, workspaceID string, ) ([]ArchitectureCritiqueMessage, error)
 method (*Client) ListCatalogInstances(ctx context.Context, itemID string) ([]CatalogInstance, error)
 method (*Client) ListCatalogItems(ctx context.Context) ([]CatalogItem, error)
+method (*Client) ListDeletedWorkspaces(ctx context.Context, opts DeletedWorkspaceListOptions) (*DeletedWorkspaceList, error)
 method (*Client) ListExecutionHooks(ctx context.Context) ([]ExecutionHook, error)
 method (*Client) ListExpiringAPITokens(ctx context.Context) ([]APIToken, error)
 method (*Client) ListGPGKeys(ctx context.Context) ([]GPGKey, error)
@@ -1166,6 +1195,7 @@ method (*Client) RegenerateArchitectureCritique( ctx context.Context, workspaceI
 method (*Client) RegeneratePlanSummary(ctx context.Context, runID string) (*PlanSummary, error)
 method (*Client) RegenerateRunCostSummary(ctx context.Context, runID string) (*CostSummary, error)
 method (*Client) RemoveRoleFromIdentity(ctx context.Context, providerName, email, roleName string) error
+method (*Client) RestoreDeletedWorkspace(ctx context.Context, workspaceID, name string) (*RestoredWorkspace, error)
 method (*Client) RetagAPIToken(ctx context.Context, tokenID, kind string, pinnedRoles []string) (*APIToken, error)
 method (*Client) RevokeAPIToken(ctx context.Context, tokenID string) error
 method (*Client) RevokeAllAPITokensForUser(ctx context.Context, email string) (int64, error)
@@ -1259,6 +1289,10 @@ type CreateVariableRequest struct
 type CreateVariableSetRequest struct
 type CreateVarsetVariableRequest struct
 type CreateWorkspaceRequest struct
+type DeletedWorkspace struct
+type DeletedWorkspaceList struct
+type DeletedWorkspaceListOptions struct
+type DeletedWorkspaceVariable struct
 type DiscoverySurface struct
 type Document struct
 type EncryptionStatus struct
@@ -1301,6 +1335,7 @@ type Relationship struct
 type RelationshipResource struct
 type RemoteStateConsumer struct
 type Resource struct
+type RestoredWorkspace struct
 type Role struct
 type RoleAssignment struct
 type Run struct

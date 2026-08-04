@@ -3998,6 +3998,86 @@ users or tooling. They accept a `peer` token and nothing else, and no other
 endpoint accepts one — a peer can read entities an ordinary user cannot, so that
 visibility is deliberately not expressible as roles somebody could be granted.
 
+## Deleted Workspaces (undelete)
+
+Deleting a workspace removes its rows but not its state blobs. A delete marker
+written at delete time keeps that state findable and gives the retention reaper
+something to age; these endpoints are how an operator sees and recovers it.
+
+The window is finite — once a marker is older than
+`api.config.artifact_retention.deleted_workspace_retention_days` (default 30)
+the state is reaped and the workspace is gone for good. Set the value to `0` to
+disable reaping entirely.
+
+**Platform admin only, on every route including the reads.** A marker names a
+workspace, its labels and its variable names, and a restore materialises its
+state — and therefore its secrets — into a workspace the caller can then read.
+The original workspace's ACL died with its rows, so there is nothing to
+delegate to; it fails closed to admin.
+
+### List Deleted Workspaces
+
+```
+GET /api/terrapod/v1/deleted-workspaces
+```
+
+Newest deletion first. Supports the standard `page[number]` / `page[size]`.
+
+Notable attributes:
+
+| Attribute | Meaning |
+|---|---|
+| `marker-reason` | `deleted` — written by the delete, so `deleted-at` is the true deletion time. `discovered-orphaned` — the reaper found state with no marker (deleted before this feature shipped, or the marker write failed), so `deleted-at` is when it was first seen |
+| `state-versions-available` | Counted from storage at request time, not taken from the marker — a partial reap or an incomplete replication shows up here and nowhere else |
+| `restorable-until` | When the state becomes eligible for reaping. Empty when retention is disabled |
+| `variable-names` | Names and categories only. Values are **never** recorded: the marker is a plain object in the bucket and replicates to any standby |
+
+### Show Deleted Workspace
+
+```
+GET /api/terrapod/v1/deleted-workspaces/{workspace_id}
+```
+
+### Restore a Deleted Workspace
+
+```
+POST /api/terrapod/v1/deleted-workspaces/{workspace_id}/restore
+```
+
+Optional body: `{"data": {"attributes": {"name": "..."}}}`. When omitted the
+original name is reused, suffixed if it has been taken since.
+
+This creates a **new workspace with a new id** and copies the state history
+into it. It is not an in-place revival, and that is deliberate: re-attaching
+the original id would need no copy at all and would make deletion a
+one-keystroke mistake to undo, which makes deletion feel free. Recovery is an
+explicit operation that yields a visibly new workspace.
+
+Three properties worth knowing before you call it:
+
+- **Lineage and serial are preserved exactly**, recovered from inside the state
+  documents. This is the hard correctness constraint — a fresh lineage would
+  make the next apply fail on a mismatch, or treat live infrastructure as
+  unmanaged.
+- **It comes back inert.** Auto-apply and drift detection are forced off and the
+  VCS connection is not re-attached, whatever the snapshot said. A restored
+  workspace that applied immediately, against infrastructure that may have
+  drifted or been partly torn down since the delete, is the failure this
+  prevents. The response's `suppressed` list says what to re-enable.
+- **Dangling references are dropped, not re-attached.** A recorded VCS
+  connection id may since have been reused by a different connection; the
+  response reports it in `dropped-references` rather than binding to it.
+
+The source prefix and its marker are left untouched, so the original remains
+recoverable until its window expires.
+
+| Code | Meaning |
+|---|---|
+| `201` | Restored. The body carries the new workspace id and the suppression report |
+| `403` | Not a platform admin |
+| `404` | No delete marker for that id |
+| `409` | No state could be recovered — already reaped. Nothing is created; an empty restore is reported as a failure rather than handing back a bare workspace |
+
 ## Common Response Codes
 
 | Code | Meaning |

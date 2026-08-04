@@ -169,6 +169,28 @@
     "ticket",
     "url"
   ],
+  "deleted_workspaces._marker_json": [
+    "age-days",
+    "deleted-at",
+    "deleted-by",
+    "last-serial",
+    "lineage",
+    "marker-reason",
+    "restorable-until",
+    "settings",
+    "state-versions-available",
+    "variable-names",
+    "workspace-id",
+    "workspace-name"
+  ],
+  "deleted_workspaces.restore_deleted_workspace": [
+    "dropped-references",
+    "name",
+    "restored-from",
+    "state-versions-restored",
+    "state-versions-skipped",
+    "suppressed"
+  ],
   "encryption.rotate_data_encryption_key": [
     "rotated_to_version"
   ],
