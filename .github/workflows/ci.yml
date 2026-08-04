@@ -1869,13 +1869,109 @@ jobs:
   # process saturates the runner's cores when crunching its own
   # platform matrix.
 
+  # ── Quality gate for releases (#1263) ──────────────────
+  #
+  # Every lint and test job, aggregated once, so the release chain can depend
+  # on "the checks passed" instead of on a hand-listed subset of them.
+  #
+  # v1.2.2 published while `Migrate Lint` was red. Neither the release chain
+  # nor `cleanup-tag` mentioned that job — both enumerated only the build,
+  # scan and release-* jobs, a list written when those were the only jobs and
+  # never extended as lint and test jobs were added. The artifacts happened to
+  # be fine; nothing verified that they were.
+  #
+  # `ci-pass` cannot serve this purpose: it needs `release-finalize`, so
+  # gating the release on it would be circular. This runs BEFORE the release
+  # chain rather than after everything.
+  #
+  # `skipped` counts as a pass: on a tag whose images already exist the build
+  # and test jobs are deliberately skipped. Only a failure or a cancellation
+  # stops a release.
+  quality-gate:
+    name: Quality Gate
+    if: always()
+    needs:
+      - python-lint
+      - frontend-lint
+      - provider-lint
+      - provider-test
+      - go-terrapod-lint
+      - go-terrapod-test
+      - migrate-lint
+      - migrate-test
+      - publish-lint
+      - publish-test
+      - query-lint
+      - query-test
+      - mcp-lint
+      - mcp-test
+      - python-test
+      - pricegen-test
+      - rescan-test
+      - migration-check
+      - python-audit
+      - npm-audit
+      - secret-scan
+      - helm-lint
+      - helm-smoke
+      - helm-config-contract
+      - sast
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check results
+        env:
+          # Space-separated name=result pairs, so the check below is a plain
+          # loop rather than 25 hand-written comparisons that can drift.
+          RESULTS: >-
+            python-lint=${{ needs.python-lint.result }}
+            frontend-lint=${{ needs.frontend-lint.result }}
+            provider-lint=${{ needs.provider-lint.result }}
+            provider-test=${{ needs.provider-test.result }}
+            go-terrapod-lint=${{ needs.go-terrapod-lint.result }}
+            go-terrapod-test=${{ needs.go-terrapod-test.result }}
+            migrate-lint=${{ needs.migrate-lint.result }}
+            migrate-test=${{ needs.migrate-test.result }}
+            publish-lint=${{ needs.publish-lint.result }}
+            publish-test=${{ needs.publish-test.result }}
+            query-lint=${{ needs.query-lint.result }}
+            query-test=${{ needs.query-test.result }}
+            mcp-lint=${{ needs.mcp-lint.result }}
+            mcp-test=${{ needs.mcp-test.result }}
+            python-test=${{ needs.python-test.result }}
+            pricegen-test=${{ needs.pricegen-test.result }}
+            rescan-test=${{ needs.rescan-test.result }}
+            migration-check=${{ needs.migration-check.result }}
+            python-audit=${{ needs.python-audit.result }}
+            npm-audit=${{ needs.npm-audit.result }}
+            secret-scan=${{ needs.secret-scan.result }}
+            helm-lint=${{ needs.helm-lint.result }}
+            helm-smoke=${{ needs.helm-smoke.result }}
+            helm-config-contract=${{ needs.helm-config-contract.result }}
+            sast=${{ needs.sast.result }}
+        run: |
+          set -eu
+          bad=""
+          for entry in $RESULTS; do
+            case "${entry#*=}" in
+              success|skipped) ;;
+              *) bad="$bad $entry" ;;
+            esac
+          done
+          if [ -n "$bad" ]; then
+            echo "Quality gate failed —$bad"
+            echo "No release is created while any check is red."
+            exit 1
+          fi
+          echo "Quality gate passed"
+
   release-create:
     name: Release — Create empty GitHub Release
-    needs: [prepare, create-manifests]
+    needs: [prepare, create-manifests, quality-gate]
     if: |
       always()
       && needs.prepare.outputs.is_tag == 'true'
       && needs.prepare.result == 'success'
+      && needs.quality-gate.result == 'success'
       && (needs.create-manifests.result == 'success' || needs.create-manifests.result == 'skipped')
     runs-on: ubuntu-latest
     permissions:
@@ -2443,11 +2539,11 @@ jobs:
   # ── Cleanup Tag on Failure ─────────────────────────────
   cleanup-tag:
     name: Cleanup Tag
-    needs: [prepare, build-images-amd64, build-images-arm64, build-query, scan-images, create-manifests, release-create, release-images, release-provider, release-migrate, release-publish, release-query, release-mcp, release-finalize]
+    needs: [prepare, quality-gate, build-images-amd64, build-images-arm64, build-query, scan-images, create-manifests, release-create, release-images, release-provider, release-migrate, release-publish, release-query, release-mcp, release-finalize]
     if: |
       always()
       && needs.prepare.outputs.is_tag == 'true'
-      && (needs.build-images-amd64.result == 'failure' || needs.build-images-arm64.result == 'failure' || needs.build-query.result == 'failure' || needs.scan-images.result == 'failure' || needs.create-manifests.result == 'failure' || needs.release-create.result == 'failure' || needs.release-images.result == 'failure' || needs.release-provider.result == 'failure' || needs.release-migrate.result == 'failure' || needs.release-publish.result == 'failure' || needs.release-query.result == 'failure' || needs.release-mcp.result == 'failure' || needs.release-finalize.result == 'failure')
+      && (needs.quality-gate.result == 'failure' || needs.build-images-amd64.result == 'failure' || needs.build-images-arm64.result == 'failure' || needs.build-query.result == 'failure' || needs.scan-images.result == 'failure' || needs.create-manifests.result == 'failure' || needs.release-create.result == 'failure' || needs.release-images.result == 'failure' || needs.release-provider.result == 'failure' || needs.release-migrate.result == 'failure' || needs.release-publish.result == 'failure' || needs.release-query.result == 'failure' || needs.release-mcp.result == 'failure' || needs.release-finalize.result == 'failure')
     runs-on: ubuntu-latest
     permissions:
       contents: write
