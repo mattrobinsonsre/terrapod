@@ -31,7 +31,8 @@
     "openMenu": "Otevřít nabídku",
     "openAccountMenu": "Otevřít nabídku účtu",
     "closeMenu": "Zavřít nabídku",
-    "ha": "Vysoká dostupnost"
+    "ha": "Vysoká dostupnost",
+    "deletedWorkspaces": "Smazané pracovní prostory"
   },
   "switcher": {
     "language": "Jazyk",
@@ -2928,5 +2929,22 @@
     "backfilling": "Doplňuje",
     "aria": "Vysoká dostupnost: {role}, {state}",
     "leader": "Vedoucí"
+  },
+  "adminDeletedWorkspaces": {
+    "title": "Smazané pracovní prostory",
+    "description": "Pracovní prostory, jejichž stav lze ještě obnovit. Obnovení vytvoří NOVÝ pracovní prostor se zachráněným stavem — není to vrácení zpět a okno je omezené.",
+    "empty": "Žádný smazaný pracovní prostor nemá obnovitelný stav.",
+    "colName": "Pracovní prostor",
+    "colDeleted": "Smazáno",
+    "colVersions": "Verze stavu",
+    "colUntil": "Obnovitelné do",
+    "colActions": "Akce",
+    "unknownName": "Název nezaznamenán",
+    "orphanBadge": "Nalezeno reaperem",
+    "retentionDisabled": "Bez vypršení",
+    "restore": "Obnovit",
+    "restoring": "Obnovování…",
+    "restoreConfirm": "Obnovit stav „{name}“?\n\nVytvoří se NOVÝ pracovní prostor — původní se nevrátí. Vrátí se s vypnutým auto-apply i detekcí driftu a bez připojení VCS; proměnné ani historie běhů se nevrátí. Obnoví se pouze stav.",
+    "restoreDone": "Obnoveno {versions, plural, one {# verze stavu} few {# verze stavu} many {# verze stavu} other {# verzí stavu}} do nového pracovního prostoru „{name}“. Před zapnutím auto-apply nebo VCS zkontrolujte nastavení."
   }
 }

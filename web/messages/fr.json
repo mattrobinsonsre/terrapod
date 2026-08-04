@@ -31,7 +31,8 @@
     "openMenu": "Ouvrir le menu",
     "openAccountMenu": "Ouvrir le menu du compte",
     "closeMenu": "Fermer le menu",
-    "ha": "Haute disponibilité"
+    "ha": "Haute disponibilité",
+    "deletedWorkspaces": "Workspaces supprimés"
   },
   "switcher": {
     "language": "Langue",
@@ -2928,5 +2929,22 @@
     "backfilling": "Rattrapage",
     "aria": "Haute disponibilité : {role}, {state}",
     "leader": "Leader"
+  },
+  "adminDeletedWorkspaces": {
+    "title": "Workspaces supprimés",
+    "description": "Workspaces dont l''état reste récupérable. Une restauration crée un NOUVEAU workspace contenant l''état récupéré — ce n''est pas une annulation, et la fenêtre est limitée.",
+    "empty": "Aucun workspace supprimé n''a d''état récupérable.",
+    "colName": "Workspace",
+    "colDeleted": "Supprimé",
+    "colVersions": "Versions d''état",
+    "colUntil": "Récupérable jusqu''au",
+    "colActions": "Actions",
+    "unknownName": "Nom non enregistré",
+    "orphanBadge": "Trouvé par le collecteur",
+    "retentionDisabled": "Sans expiration",
+    "restore": "Restaurer",
+    "restoring": "Restauration…",
+    "restoreConfirm": "Restaurer l''état de « {name} » ?\n\nCela crée un NOUVEAU workspace — l''original n''est pas rétabli. Il revient sans auto-apply, sans détection de dérive et sans connexion VCS ; les variables et l''historique des exécutions ne reviennent pas. Seul l''état est récupéré.",
+    "restoreDone": "{versions, plural, one {# version d''état récupérée} other {# versions d''état récupérées}} dans le nouveau workspace « {name} ». Vérifiez ses paramètres avant d''activer l''auto-apply ou le VCS."
   }
 }

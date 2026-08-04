@@ -31,7 +31,8 @@
     "openMenu": "0p3n m3nu",
     "openAccountMenu": "0p3n 4cc0un7 m3nu",
     "closeMenu": "Cl053 m3nu",
-    "ha": "H1gh 4v41l4b1l17y"
+    "ha": "H1gh 4v41l4b1l17y",
+    "deletedWorkspaces": "D3l373d w0rk5p4c35"
   },
   "switcher": {
     "language": "L4ngu4g3",
@@ -2928,5 +2929,22 @@
     "backfilling": "B4ckf1ll1ng",
     "aria": "H1gh 4v41l4b1l17y: {role}, {state}",
     "leader": "L34d3r"
+  },
+  "adminDeletedWorkspaces": {
+    "title": "D3l373d w0rk5p4c35",
+    "description": "W0rk5p4c35 wh053 57473 15 571ll r3c0v3r4bl3. R3570r1ng 0n3 cr34735 4 n3w w0rk5p4c3 h0ld1ng 7h3 r3c0v3r3d 57473 — 17 15 n07 4n und0, 4nd 7h3 w1nd0w 15 l1m173d.",
+    "empty": "N0 d3l373d w0rk5p4c35 h4v3 r3c0v3r4bl3 57473.",
+    "colName": "W0rk5p4c3",
+    "colDeleted": "D3l373d",
+    "colVersions": "57473 v3r510n5",
+    "colUntil": "R3570r4bl3 un71l",
+    "colActions": "4c710n5",
+    "unknownName": "N4m3 n07 r3c0rd3d",
+    "orphanBadge": "F0und by 7h3 r34p3r",
+    "retentionDisabled": "N0 3xp1ry",
+    "restore": "R3570r3",
+    "restoring": "R3570r1ng…",
+    "restoreConfirm": "R3570r3 7h3 57473 0f \"{name}\"?\n\n7h15 cr34735 4 N3W w0rk5p4c3 — 7h3 0r1g1n4l 15 n07 br0ugh7 b4ck. 17 r37urn5 w17h 4u70-4pply 4nd dr1f7 d373c710n 0ff 4nd n0 VC5 c0nn3c710n, 4nd 175 v4r14bl35 4nd run h1570ry d0 n07 c0m3 b4ck. 0nly 7h3 57473 15 r3c0v3r3d.",
+    "restoreDone": "R3c0v3r3d {versions, plural, one {# state version} other {# state versions}} 1n70 7h3 n3w w0rk5p4c3 \"{name}\". Ch3ck 175 53771ng5 b3f0r3 3n4bl1ng 4u70-4pply 0r VC5."
   }
 }

@@ -31,7 +31,8 @@
     "openMenu": "פתיחת תפריט",
     "openAccountMenu": "פתיחת תפריט חשבון",
     "closeMenu": "סגירת תפריט",
-    "ha": "זמינות גבוהה"
+    "ha": "זמינות גבוהה",
+    "deletedWorkspaces": "סביבות עבודה שנמחקו"
   },
   "switcher": {
     "language": "שפה",
@@ -2928,5 +2929,22 @@
     "backfilling": "בהשלמה",
     "aria": "זמינות גבוהה: {role}, {state}",
     "leader": "מוביל"
+  },
+  "adminDeletedWorkspaces": {
+    "title": "סביבות עבודה שנמחקו",
+    "description": "סביבות עבודה שה-state שלהן עדיין ניתן לשחזור. שחזור יוצר סביבת עבודה חדשה עם ה-state שניצל — זו אינה פעולת ביטול, והחלון מוגבל.",
+    "empty": "לאף סביבת עבודה שנמחקה אין state שניתן לשחזור.",
+    "colName": "סביבת עבודה",
+    "colDeleted": "נמחק",
+    "colVersions": "גרסאות state",
+    "colUntil": "ניתן לשחזור עד",
+    "colActions": "פעולות",
+    "unknownName": "השם לא נרשם",
+    "orphanBadge": "נמצא על ידי הקוצר",
+    "retentionDisabled": "ללא תפוגה",
+    "restore": "שחזר",
+    "restoring": "משחזר…",
+    "restoreConfirm": "לשחזר את ה-state של \"{name}\"?\n\nפעולה זו יוצרת סביבת עבודה חדשה — המקורית לא חוזרת. היא חוזרת עם החלה אוטומטית וזיהוי סטייה כבויים וללא חיבור VCS; המשתנים והיסטוריית ההרצות אינם חוזרים. רק ה-state ניצל.",
+    "restoreDone": "שוחזרו {versions, plural, one {גרסת state אחת} two {שתי גרסאות state} many {# גרסאות state} other {# גרסאות state}} לסביבת העבודה החדשה \"{name}\". בדוק את ההגדרות לפני הפעלת החלה אוטומטית או VCS."
   }
 }

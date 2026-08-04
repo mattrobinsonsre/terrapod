@@ -33,6 +33,7 @@ import {
   Cog,
   User,
   ChevronDown,
+  ArchiveRestore,
   type LucideIcon,
 } from 'lucide-react'
 import { useTranslations } from 'next-intl'
@@ -84,6 +85,7 @@ const ADMIN_ITEMS: NavItem[] = [
   { href: '/admin/policy-sets', labelKey: 'policySets', icon: ScrollText },
   { href: '/admin/provider-templates', labelKey: 'providerTemplates', icon: Code },
   { href: '/admin/catalog', labelKey: 'catalogAdmin', icon: Boxes },
+  { href: '/admin/deleted-workspaces', labelKey: 'deletedWorkspaces', icon: ArchiveRestore },
   { href: '/admin/binary-cache', labelKey: 'cache', icon: HardDrive },
 ]
 

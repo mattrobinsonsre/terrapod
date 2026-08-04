@@ -31,7 +31,8 @@
     "openMenu": "Menu openen",
     "openAccountMenu": "Accountmenu openen",
     "closeMenu": "Menu sluiten",
-    "ha": "Hoge beschikbaarheid"
+    "ha": "Hoge beschikbaarheid",
+    "deletedWorkspaces": "Verwijderde workspaces"
   },
   "switcher": {
     "language": "Taal",
@@ -2928,5 +2929,22 @@
     "backfilling": "Bijwerken",
     "aria": "Hoge beschikbaarheid: {role}, {state}",
     "leader": "Leider"
+  },
+  "adminDeletedWorkspaces": {
+    "title": "Verwijderde workspaces",
+    "description": "Workspaces waarvan de state nog te herstellen is. Herstellen maakt een NIEUWE workspace met de geredde state — het is geen ongedaan maken, en het venster is beperkt.",
+    "empty": "Geen verwijderde workspace heeft herstelbare state.",
+    "colName": "Workspace",
+    "colDeleted": "Verwijderd",
+    "colVersions": "State-versies",
+    "colUntil": "Herstelbaar tot",
+    "colActions": "Acties",
+    "unknownName": "Naam niet vastgelegd",
+    "orphanBadge": "Gevonden door de reaper",
+    "retentionDisabled": "Geen vervaldatum",
+    "restore": "Herstellen",
+    "restoring": "Bezig met herstellen…",
+    "restoreConfirm": "De state van ''{name}'' herstellen?\n\nDit maakt een NIEUWE workspace — het origineel komt niet terug. Hij komt terug zonder auto-apply, zonder driftdetectie en zonder VCS-verbinding; variabelen en runhistorie komen niet terug. Alleen de state wordt gered.",
+    "restoreDone": "{versions, plural, one {# state-versie} other {# state-versies}} hersteld in de nieuwe workspace ''{name}''. Controleer de instellingen voordat je auto-apply of VCS inschakelt."
   }
 }

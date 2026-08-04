@@ -31,7 +31,8 @@
     "openMenu": "Abrir menú",
     "openAccountMenu": "Abrir menú de cuenta",
     "closeMenu": "Cerrar menú",
-    "ha": "Alta disponibilidad"
+    "ha": "Alta disponibilidad",
+    "deletedWorkspaces": "Workspaces eliminados"
   },
   "switcher": {
     "language": "Idioma",
@@ -2928,5 +2929,22 @@
     "backfilling": "Rellenando",
     "aria": "Alta disponibilidad: {role}, {state}",
     "leader": "Líder"
+  },
+  "adminDeletedWorkspaces": {
+    "title": "Workspaces eliminados",
+    "description": "Workspaces cuyo estado aún se puede recuperar. Restaurar crea un workspace NUEVO con el estado recuperado: no es deshacer, y la ventana es limitada.",
+    "empty": "Ningún workspace eliminado tiene estado recuperable.",
+    "colName": "Workspace",
+    "colDeleted": "Eliminado",
+    "colVersions": "Versiones de estado",
+    "colUntil": "Recuperable hasta",
+    "colActions": "Acciones",
+    "unknownName": "Nombre no registrado",
+    "orphanBadge": "Encontrado por el recolector",
+    "retentionDisabled": "Sin caducidad",
+    "restore": "Restaurar",
+    "restoring": "Restaurando…",
+    "restoreConfirm": "¿Restaurar el estado de «{name}»?\n\nEsto crea un workspace NUEVO: el original no vuelve. Vuelve sin auto-apply, sin detección de deriva y sin conexión VCS; las variables y el historial de ejecuciones no vuelven. Solo se recupera el estado.",
+    "restoreDone": "{versions, plural, one {# versión de estado recuperada} other {# versiones de estado recuperadas}} en el nuevo workspace «{name}». Revisa su configuración antes de activar auto-apply o VCS."
   }
 }

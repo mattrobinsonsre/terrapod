@@ -31,7 +31,8 @@
     "openMenu": "Open menu",
     "openAccountMenu": "Open account menu",
     "closeMenu": "Close menu",
-    "ha": "High availability"
+    "ha": "High availability",
+    "deletedWorkspaces": "Deleted workspaces"
   },
   "switcher": {
     "language": "Language",
@@ -2928,5 +2929,22 @@
     "backfilling": "Backfilling",
     "aria": "High availability: {role}, {state}",
     "leader": "Leader"
+  },
+  "adminDeletedWorkspaces": {
+    "title": "Deleted workspaces",
+    "description": "Workspaces whose state is still recoverable. Restoring one creates a new workspace holding the recovered state — it is not an undo, and the window is limited.",
+    "empty": "No deleted workspaces have recoverable state.",
+    "colName": "Workspace",
+    "colDeleted": "Deleted",
+    "colVersions": "State versions",
+    "colUntil": "Restorable until",
+    "colActions": "Actions",
+    "unknownName": "Name not recorded",
+    "orphanBadge": "Found by the reaper",
+    "retentionDisabled": "No expiry",
+    "restore": "Restore",
+    "restoring": "Restoring…",
+    "restoreConfirm": "Restore the state of \"{name}\"?\n\nThis creates a NEW workspace — the original is not brought back. It returns with auto-apply and drift detection off and no VCS connection, and its variables and run history do not come back. Only the state is recovered.",
+    "restoreDone": "Recovered {versions, plural, one {# state version} other {# state versions}} into the new workspace \"{name}\". Check its settings before enabling auto-apply or VCS."
   }
 }

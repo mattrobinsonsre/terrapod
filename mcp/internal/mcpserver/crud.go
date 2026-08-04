@@ -109,7 +109,7 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "terrapod_workspace_delete",
-		Description: "Delete a workspace and its Terrapod-side records (variables, run history, state versions). This does NOT destroy the real infrastructure the state tracks — to tear that down, queue a destroy run first (terrapod_run_create is_destroy=true) and apply it. Catalog-managed workspaces are rejected (409); destroy the catalog instance instead. Irreversible — confirm with the user.",
+		Description: "Delete a workspace and its Terrapod-side records (variables, run history, state versions). This does NOT destroy the real infrastructure the state tracks — to tear that down, queue a destroy run first (terrapod_run_create is_destroy=true) and apply it. Catalog-managed workspaces are rejected (409); destroy the catalog instance instead. Confirm with the user before calling it. The state blobs outlive the delete for a limited window (default 30 days), so a platform admin can SALVAGE them with terrapod_deleted_workspace_restore — but that is a recovery operation, not an undo: it yields a NEW workspace with a new id, it comes back inert with auto-apply and VCS off, the variables and run history do not come back, and once the window passes the state is reaped for good. Do not offer the delete as something easily reversed.",
 		Annotations: destructive,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in workspaceDeleteIn) (*mcp.CallToolResult, *deleteOut, error) {
 		if in.WorkspaceID == "" {

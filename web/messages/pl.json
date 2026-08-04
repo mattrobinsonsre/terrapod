@@ -31,7 +31,8 @@
     "openMenu": "Otwórz menu",
     "openAccountMenu": "Otwórz menu konta",
     "closeMenu": "Zamknij menu",
-    "ha": "Wysoka dostępność"
+    "ha": "Wysoka dostępność",
+    "deletedWorkspaces": "Usunięte przestrzenie robocze"
   },
   "switcher": {
     "language": "Język",
@@ -2928,5 +2929,22 @@
     "backfilling": "Uzupełnia",
     "aria": "Wysoka dostępność: {role}, {state}",
     "leader": "Lider"
+  },
+  "adminDeletedWorkspaces": {
+    "title": "Usunięte przestrzenie robocze",
+    "description": "Przestrzenie robocze, których stan wciąż można odzyskać. Przywrócenie tworzy NOWĄ przestrzeń roboczą z odzyskanym stanem — to nie jest cofnięcie, a okno jest ograniczone.",
+    "empty": "Żadna usunięta przestrzeń robocza nie ma odzyskiwalnego stanu.",
+    "colName": "Przestrzeń robocza",
+    "colDeleted": "Usunięto",
+    "colVersions": "Wersje stanu",
+    "colUntil": "Przywracalne do",
+    "colActions": "Akcje",
+    "unknownName": "Nazwa niezapisana",
+    "orphanBadge": "Znalezione przez reaper",
+    "retentionDisabled": "Bez wygaśnięcia",
+    "restore": "Przywróć",
+    "restoring": "Przywracanie…",
+    "restoreConfirm": "Przywrócić stan „{name}”?\n\nZostanie utworzona NOWA przestrzeń robocza — oryginał nie wraca. Wraca z wyłączonym auto-apply i wykrywaniem dryfu oraz bez połączenia VCS; zmienne i historia uruchomień nie wracają. Odzyskiwany jest tylko stan.",
+    "restoreDone": "Odzyskano {versions, plural, one {# wersję stanu} few {# wersje stanu} many {# wersji stanu} other {# wersji stanu}} do nowej przestrzeni roboczej „{name}”. Sprawdź ustawienia przed włączeniem auto-apply lub VCS."
   }
 }

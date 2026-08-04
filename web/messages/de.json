@@ -31,7 +31,8 @@
     "openMenu": "Menü öffnen",
     "openAccountMenu": "Kontomenü öffnen",
     "closeMenu": "Menü schließen",
-    "ha": "Hochverfügbarkeit"
+    "ha": "Hochverfügbarkeit",
+    "deletedWorkspaces": "Gelöschte Workspaces"
   },
   "switcher": {
     "language": "Sprache",
@@ -2928,5 +2929,22 @@
     "backfilling": "Lädt nach",
     "aria": "Hochverfügbarkeit: {role}, {state}",
     "leader": "Leader"
+  },
+  "adminDeletedWorkspaces": {
+    "title": "Gelöschte Workspaces",
+    "description": "Workspaces, deren State noch wiederherstellbar ist. Eine Wiederherstellung erzeugt einen NEUEN Workspace mit dem geretteten State — sie macht das Löschen nicht rückgängig, und das Zeitfenster ist begrenzt.",
+    "empty": "Kein gelöschter Workspace hat wiederherstellbaren State.",
+    "colName": "Workspace",
+    "colDeleted": "Gelöscht",
+    "colVersions": "State-Versionen",
+    "colUntil": "Wiederherstellbar bis",
+    "colActions": "Aktionen",
+    "unknownName": "Name nicht erfasst",
+    "orphanBadge": "Vom Reaper gefunden",
+    "retentionDisabled": "Kein Ablauf",
+    "restore": "Wiederherstellen",
+    "restoring": "Wird wiederhergestellt…",
+    "restoreConfirm": "Den State von „{name}“ wiederherstellen?\n\nDabei entsteht ein NEUER Workspace — das Original kommt nicht zurück. Er startet ohne Auto-Apply, ohne Drift-Erkennung und ohne VCS-Verbindung; Variablen und Run-Historie kehren nicht zurück. Nur der State wird gerettet.",
+    "restoreDone": "{versions, plural, one {# State-Version} other {# State-Versionen}} in den neuen Workspace „{name}“ übernommen. Prüfen Sie die Einstellungen, bevor Sie Auto-Apply oder VCS aktivieren."
   }
 }

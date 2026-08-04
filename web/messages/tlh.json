@@ -31,7 +31,8 @@
     "openMenu": "tetlh poSmoH",
     "openAccountMenu": "lo'wI' tetlh poSmoH",
     "closeMenu": "tetlh SoQmoH",
-    "ha": "taH laH"
+    "ha": "taH laH",
+    "deletedWorkspaces": "Qumwo'mey Qaw'lu'bogh"
   },
   "switcher": {
     "language": "Hol",
@@ -2928,5 +2929,22 @@
     "backfilling": "teblI'",
     "aria": "taH laH: {role}, {state}",
     "leader": "DevwI'"
+  },
+  "adminDeletedWorkspaces": {
+    "title": "Qumwo'mey Qaw'lu'bogh",
+    "description": "Qumwo'mey Dotlh chegh laH. cheghmoHmeH Qumwo' chu' chenlu' — Qaw'ghach chImmoHbe'; poH machqu'.",
+    "empty": "Dotlh chegh laHbogh Qumwo' Qaw'lu'bogh tu'lu'be'.",
+    "colName": "Qumwo'",
+    "colDeleted": "Qaw'lu'ta'",
+    "colVersions": "Dotlh mI'mey",
+    "colUntil": "cheghlaH poH",
+    "colActions": "vangmeH",
+    "unknownName": "pong qonlu'be'",
+    "orphanBadge": "wa'DIch tu'lu'",
+    "retentionDisabled": "poH Hutlh",
+    "restore": "cheghmoH",
+    "restoring": "cheghmoHtaH…",
+    "restoreConfirm": "«{name}» Dotlh DacheghmoH''a''?\n\nQumwo' CHU' chenlu' — Qumwo' Qaw'lu'ta'bogh cheghbe'. chegh 'ach auto-apply drift je chu'Ha'lu', VCS Hutlh; mI'mey qunmeyDaj je cheghbe'. Dotlh neH cheghlu'.",
+    "restoreDone": "{versions, plural, one {# Dotlh mI''} other {# Dotlh mI'mey}} Qumwo' chu' «{name}» chegh. auto-apply VCS joq Dachu'pa' DuHmey yIlegh."
   }
 }

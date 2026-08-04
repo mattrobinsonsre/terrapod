@@ -428,4 +428,15 @@ test.describe('Tablet width (md–lg dead-zone, #839)', () => {
     // contained by overflow-x-auto on its wrapper (the #839 fix).
     await expectNoHorizontalPageScroll(page);
   });
-});
+
+  test('deleted-workspaces admin page adapts to mobile (#1253)', async ({ page }) => {
+    await page.goto('/admin/deleted-workspaces')
+    await expectNoHorizontalPageScroll(page)
+
+    // The desktop table is hidden below md and a card list renders in its
+    // place — one component tree driven by width, not a forked mobile build.
+    // Asserted whether or not the deployment has any deleted workspaces: the
+    // empty state must be phone-safe too.
+    await expect(page.locator('table')).toBeHidden()
+  })
+})

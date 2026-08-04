@@ -126,4 +126,32 @@ func registerAct(s *mcp.Server, c *terrapod.Client) {
 		}
 		return nil, sc, nil
 	})
+
+	// ── terrapod_deleted_workspace_restore ───────────────────────────
+	type restoreIn struct {
+		WorkspaceID string `json:"workspace_id" jsonschema:"the id of the DELETED workspace to recover (the bare uuid from terrapod_deleted_workspace_list, not a ws- prefixed id)"`
+		Name        string `json:"name,omitempty" jsonschema:"optional name for the recovered workspace; when omitted the original name is reused, suffixed if it has since been taken"`
+	}
+	mcp.AddTool(s, &mcp.Tool{
+		Name: "terrapod_deleted_workspace_restore",
+		Description: "Recover a deleted workspace's state into a NEW workspace. Requires platform admin. " +
+			"This is a salvage operation, not an undo, and should be presented to the user that way: it creates a " +
+			"workspace with a NEW id (the original is not revived), it comes back INERT with auto-apply and drift " +
+			"detection off and the VCS connection not re-attached, and variables and run history do not come back — " +
+			"only the state. The response's `suppressed` and `dropped-references` say what was deliberately left off " +
+			"for the user to re-enable deliberately. Lineage and serial ARE preserved exactly, so the recovered " +
+			"workspace continues the original state rather than starting a new one. Fails with a conflict if the " +
+			"retention window has passed and the state has been reaped — check `restorable-until` from " +
+			"terrapod_deleted_workspace_list first. Because a restore materialises state (and therefore secrets) " +
+			"into a workspace the caller can read, confirm with the user before calling it.",
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in restoreIn) (*mcp.CallToolResult, *terrapod.RestoredWorkspace, error) {
+		if in.WorkspaceID == "" {
+			return errText("workspace_id is required"), nil, nil
+		}
+		w, err := c.RestoreDeletedWorkspace(ctx, in.WorkspaceID, in.Name)
+		if err != nil {
+			return errResult(err), nil, nil
+		}
+		return nil, w, nil
+	})
 }

@@ -31,7 +31,8 @@
     "openMenu": "Menüyü aç",
     "openAccountMenu": "Hesap menüsünü aç",
     "closeMenu": "Menüyü kapat",
-    "ha": "Yüksek erişilebilirlik"
+    "ha": "Yüksek erişilebilirlik",
+    "deletedWorkspaces": "Silinmiş çalışma alanları"
   },
   "switcher": {
     "language": "Dil",
@@ -2928,5 +2929,22 @@
     "backfilling": "Geri dolduruyor",
     "aria": "Yüksek erişilebilirlik: {role}, {state}",
     "leader": "Lider"
+  },
+  "adminDeletedWorkspaces": {
+    "title": "Silinmiş çalışma alanları",
+    "description": "State''i hâlâ kurtarılabilir olan çalışma alanları. Geri yükleme, kurtarılan state''i taşıyan YENİ bir çalışma alanı oluşturur — bu bir geri alma değildir ve süre sınırlıdır.",
+    "empty": "Kurtarılabilir state''e sahip silinmiş çalışma alanı yok.",
+    "colName": "Çalışma alanı",
+    "colDeleted": "Silinme",
+    "colVersions": "State sürümleri",
+    "colUntil": "Şu tarihe kadar kurtarılabilir",
+    "colActions": "Eylemler",
+    "unknownName": "Ad kaydedilmemiş",
+    "orphanBadge": "Toplayıcı buldu",
+    "retentionDisabled": "Süre sınırı yok",
+    "restore": "Geri yükle",
+    "restoring": "Geri yükleniyor…",
+    "restoreConfirm": "\"{name}\" state''i geri yüklensin mi?\n\nBu YENİ bir çalışma alanı oluşturur — orijinali geri gelmez. Otomatik uygulama ve drift algılama kapalı, VCS bağlantısı olmadan döner; değişkenler ve çalıştırma geçmişi geri gelmez. Yalnızca state kurtarılır.",
+    "restoreDone": "{versions, plural, other {# state sürümü}} yeni \"{name}\" çalışma alanına kurtarıldı. Otomatik uygulamayı veya VCS''yi açmadan önce ayarlarını kontrol edin."
   }
 }

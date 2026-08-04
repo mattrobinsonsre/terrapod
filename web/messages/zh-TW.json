@@ -31,7 +31,8 @@
     "openMenu": "開啟選單",
     "openAccountMenu": "開啟帳戶選單",
     "closeMenu": "關閉選單",
-    "ha": "高可用性"
+    "ha": "高可用性",
+    "deletedWorkspaces": "已刪除的工作區"
   },
   "switcher": {
     "language": "語言",
@@ -2928,5 +2929,22 @@
     "backfilling": "回補中",
     "aria": "高可用性：{role}，{state}",
     "leader": "主節點"
+  },
+  "adminDeletedWorkspaces": {
+    "title": "已刪除的工作區",
+    "description": "狀態仍可復原的工作區。還原會建立一個新的工作區來承載搶救出的狀態——這不是復原操作，且時間視窗有限。",
+    "empty": "沒有可復原狀態的已刪除工作區。",
+    "colName": "工作區",
+    "colDeleted": "刪除時間",
+    "colVersions": "狀態版本",
+    "colUntil": "可還原至",
+    "colActions": "操作",
+    "unknownName": "未記錄名稱",
+    "orphanBadge": "由回收器發現",
+    "retentionDisabled": "永不過期",
+    "restore": "還原",
+    "restoring": "正在還原…",
+    "restoreConfirm": "要還原「{name}」的狀態嗎？\n\n這會建立一個新的工作區——原工作區不會回來。還原後自動套用與漂移偵測皆為關閉，且沒有 VCS 連線；變數和執行紀錄不會回來。只有狀態會被搶救回來。",
+    "restoreDone": "已將 {versions, plural, other {# 個狀態版本}} 還原至新工作區「{name}」。啟用自動套用或 VCS 之前請檢查其設定。"
   }
 }

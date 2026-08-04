@@ -31,7 +31,8 @@
     "openMenu": "Åbn menu",
     "openAccountMenu": "Åbn kontomenu",
     "closeMenu": "Luk menu",
-    "ha": "Høj tilgængelighed"
+    "ha": "Høj tilgængelighed",
+    "deletedWorkspaces": "Slettede arbejdsområder"
   },
   "switcher": {
     "language": "Sprog",
@@ -2928,5 +2929,22 @@
     "backfilling": "Efterfylder",
     "aria": "Høj tilgængelighed: {role}, {state}",
     "leader": "Leder"
+  },
+  "adminDeletedWorkspaces": {
+    "title": "Slettede arbejdsområder",
+    "description": "Arbejdsområder, hvis state stadig kan reddes. Gendannelse opretter et NYT arbejdsområde med den reddede state — det er ikke en fortryd-funktion, og vinduet er begrænset.",
+    "empty": "Intet slettet arbejdsområde har state, der kan gendannes.",
+    "colName": "Arbejdsområde",
+    "colDeleted": "Slettet",
+    "colVersions": "State-versioner",
+    "colUntil": "Kan gendannes indtil",
+    "colActions": "Handlinger",
+    "unknownName": "Navn ikke registreret",
+    "orphanBadge": "Fundet af reaperen",
+    "retentionDisabled": "Ingen udløb",
+    "restore": "Gendan",
+    "restoring": "Gendanner…",
+    "restoreConfirm": "Gendan state for ”{name}”?\n\nDette opretter et NYT arbejdsområde — originalen kommer ikke tilbage. Det kommer tilbage med auto-apply og driftregistrering slået fra og uden VCS-forbindelse; variabler og kørselshistorik kommer ikke tilbage. Kun state reddes.",
+    "restoreDone": "Gendannede {versions, plural, one {# state-version} other {# state-versioner}} til det nye arbejdsområde ”{name}”. Tjek indstillingerne, før du slår auto-apply eller VCS til."
   }
 }
