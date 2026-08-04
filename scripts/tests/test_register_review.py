@@ -166,6 +166,70 @@ def test_entry_with_a_fix_is_fixable_and_one_without_is_holding():
     assert unmatched == []
 
 
+def test_an_unfixed_trivy_finding_is_holding_not_stale():
+    """The #1257 regression, and the reason the scan must not use
+    `ignore-unfixed`.
+
+    An entry is in the register BECAUSE it is unfixed, so it comes back from
+    Trivy with an empty `FixedVersion`. If that reads as "nothing to do" it is
+    fine; if the scan never reports it at all — which is what `ignore-unfixed`
+    causes — the entry looks stale, and this report tells you to DELETE a live
+    suppression. That is the one direction this tool must never be wrong in.
+    """
+    found = rr.from_trivy(
+        {
+            "Results": [
+                {
+                    "Vulnerabilities": [
+                        {
+                            "VulnerabilityID": "CVE-2025-69720",
+                            "PkgName": "libncursesw6",
+                            "InstalledVersion": "6.5+20250216-2",
+                            "FixedVersion": "",
+                        }
+                    ]
+                }
+            ]
+        }
+    )
+    fixable, unmatched, holding = rr.classify(
+        {"trivy": ["CVE-2025-69720"], "pip-audit": [], "npm-audit": []},
+        {"trivy": found},
+    )
+    assert [r["id"] for r in holding] == ["CVE-2025-69720"]
+    assert unmatched == [], "an unfixed entry must never be reported as stale"
+    assert fixable == []
+
+
+def test_the_workflow_does_not_scan_fix_only():
+    """Guards the setting itself, not just the parser.
+
+    The bug was in the workflow rather than the code: the parser handled an
+    empty `FixedVersion` correctly all along, but Trivy was never asked for
+    those rows. A unit test of the parser cannot see that, so this reads the
+    register scan job and asserts the setting is absent.
+    """
+    wf = (
+        pathlib.Path(__file__).resolve().parents[2]
+        / ".github/workflows/release-rescan.yml"
+    )
+    text = wf.read_text()
+    start = text.index("register-scan:")
+    end = text.index("\n  register:", start)
+    # Match the YAML key, not the substring: the block deliberately *mentions*
+    # ignore-unfixed in a comment explaining why it is absent, and a naive
+    # substring check fails on its own documentation.
+    settings = [
+        ln.strip()
+        for ln in text[start:end].splitlines()
+        if ln.strip().startswith("ignore-unfixed:")
+    ]
+    assert settings == [], (
+        f"the register scan must include unfixed findings, or every legitimate "
+        f"entry reads as stale — see #1257 (found {settings})"
+    )
+
+
 def test_entry_reported_by_nobody_is_stale():
     fixable, unmatched, holding = rr.classify(
         {"trivy": ["CVE-GONE"], "pip-audit": [], "npm-audit": []}, {"trivy": {}}
