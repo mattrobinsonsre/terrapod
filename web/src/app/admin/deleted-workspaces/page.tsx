@@ -100,7 +100,13 @@ export default function DeletedWorkspacesPage() {
     try {
       const res = await apiFetch(
         `/api/terrapod/v1/deleted-workspaces/${w.attributes['workspace-id']}/restore`,
-        { method: 'POST', body: JSON.stringify({ data: { attributes: {} } }) }
+        {
+          method: 'POST',
+          // apiFetch does not set a content-type; without this the body
+          // arrives as a raw string and the endpoint rejects it with 422.
+          headers: { 'Content-Type': 'application/vnd.api+json' },
+          body: JSON.stringify({ data: { type: 'workspaces', attributes: {} } }),
+        }
       )
       const body = await res.json()
       const attrs = body?.data?.attributes ?? {}
