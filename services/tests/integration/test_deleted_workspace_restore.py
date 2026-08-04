@@ -358,3 +358,148 @@ class TestDeletedWorkspaceRBAC:
             WS_ENDPOINT, params={"search[name]": "rbac-restore"}, headers=AUTH
         )
         assert listing.json()["data"] == []
+
+
+class TestRestoreResilience:
+    """The paths a real deployment hits that the happy path doesn't.
+
+    Restore reads blobs written by an older Terrapod, possibly under a rotated
+    key, possibly with a marker the reaper synthesised rather than the delete
+    path writing. None of that should turn into a failed recovery.
+    """
+
+    async def test_restores_from_a_reaper_written_marker(self, app, client):
+        """The pre-existing-orphan case — very likely the FIRST real restore.
+
+        A workspace deleted before this feature shipped has no marker until the
+        reaper stamps one, and a discovery marker carries no name and an empty
+        `settings`. Restore must fall back to defaults across the board rather
+        than KeyError its way out, because this is exactly the workspace an
+        operator most wants back.
+        """
+        set_auth(app, admin_user())
+        old_id = await _delete_with_state(client, "restore-orphan", [7], "lin-orphan")
+
+        storage = get_storage()
+        # Replace the real marker with the reaper's synthesised one.
+        await dws.write_marker(storage, old_id, dws.build_discovery_marker(old_id))
+        marker = await dws.read_marker(storage, old_id)
+        assert marker["marker_reason"] == dws.REASON_DISCOVERED
+        assert marker["settings"] == {}
+        assert marker["workspace_name"] is None
+
+        resp = await client.post(
+            f"/api/terrapod/v1/deleted-workspaces/{old_id}/restore", headers=AUTH
+        )
+        assert resp.status_code == 201, resp.text
+        attrs = resp.json()["data"]["attributes"]
+        assert attrs["state-versions-restored"] == 1
+        # Named from the fallback, since the marker records no name.
+        assert attrs["name"]
+
+        # And the serial/lineage still come from the state itself, not the
+        # marker — which is why an unnamed orphan is still worth recovering.
+        new_id = resp.json()["data"]["id"]
+        current = await client.get(
+            f"/api/v2/workspaces/{new_id}/current-state-version", headers=AUTH
+        )
+        assert current.json()["data"]["attributes"]["serial"] == 7
+        assert current.json()["data"]["attributes"]["lineage"] == "lin-orphan"
+
+    async def test_an_unreadable_blob_is_skipped_and_reported(self, app, client):
+        """One corrupt object must not sink the whole recovery.
+
+        Reporting it matters as much as surviving it: a silently-dropped
+        version would leave the operator believing they got everything back.
+        """
+        set_auth(app, admin_user())
+        old_id = await _delete_with_state(client, "restore-corrupt", [1, 2], "lin-corrupt")
+
+        storage = get_storage()
+        keys = sorted(
+            o.key
+            for o in await storage.list_prefix(f"state/{old_id}/")
+            if o.key.endswith(".tfstate")
+        )
+        await storage.put(keys[0], b"this is not json at all", content_type="application/json")
+
+        resp = await client.post(
+            f"/api/terrapod/v1/deleted-workspaces/{old_id}/restore", headers=AUTH
+        )
+        assert resp.status_code == 201, resp.text
+        attrs = resp.json()["data"]["attributes"]
+        assert attrs["state-versions-restored"] == 1
+        skipped = attrs["state-versions-skipped"]
+        assert len(skipped) == 1
+        assert keys[0] in skipped[0]["key"]
+        assert skipped[0]["reason"]
+
+    async def test_a_state_document_with_no_serial_is_skipped(self, app, client):
+        """Serial is what makes a version a version; without one there is
+        nothing to reconstruct and guessing would corrupt the history."""
+        set_auth(app, admin_user())
+        old_id = await _delete_with_state(client, "restore-noserial", [1], "lin-noserial")
+
+        storage = get_storage()
+        keys = [
+            o.key
+            for o in await storage.list_prefix(f"state/{old_id}/")
+            if o.key.endswith(".tfstate")
+        ]
+        await storage.put(
+            keys[0],
+            json.dumps({"version": 4, "lineage": "lin-noserial"}).encode(),
+            content_type="application/json",
+        )
+
+        resp = await client.post(
+            f"/api/terrapod/v1/deleted-workspaces/{old_id}/restore", headers=AUTH
+        )
+        # Nothing recoverable is a conflict, not an empty success.
+        assert resp.status_code == 409
+
+    async def test_two_blobs_claiming_one_serial_do_not_abort_the_restore(self, app, client):
+        """`(workspace_id, serial)` is unique, so inserting both would roll the
+        whole transaction back and lose an otherwise fine recovery."""
+        set_auth(app, admin_user())
+        old_id = await _delete_with_state(client, "restore-dupserial", [1], "lin-dup")
+
+        storage = get_storage()
+        # A second object under the same prefix carrying the same serial.
+        await storage.put(
+            f"state/{old_id}/00000000-0000-4000-8000-00000000dead.tfstate",
+            json.dumps({"version": 4, "serial": 1, "lineage": "lin-dup", "resources": []}).encode(),
+            content_type="application/json",
+        )
+
+        resp = await client.post(
+            f"/api/terrapod/v1/deleted-workspaces/{old_id}/restore", headers=AUTH
+        )
+        assert resp.status_code == 201, resp.text
+        attrs = resp.json()["data"]["attributes"]
+        assert attrs["state-versions-restored"] == 1
+        assert any("duplicate serial" in s["reason"] for s in attrs["state-versions-skipped"])
+
+    async def test_a_reserved_label_in_the_marker_is_stripped_not_fatal(self, app, client):
+        """Markers are files in a bucket and can predate a key becoming
+        reserved. Refusing to restore over a label would be a poor trade, so
+        it is stripped and reported."""
+        set_auth(app, admin_user())
+        old_id = await _delete_with_state(client, "restore-badlabel", [1], "lin-label")
+
+        storage = get_storage()
+        marker = await dws.read_marker(storage, old_id)
+        marker["settings"]["labels"] = {"team": "platform", "status": "not-allowed"}
+        await dws.write_marker(storage, old_id, marker)
+
+        resp = await client.post(
+            f"/api/terrapod/v1/deleted-workspaces/{old_id}/restore", headers=AUTH
+        )
+        assert resp.status_code == 201, resp.text
+        dropped = resp.json()["data"]["attributes"]["dropped-references"]
+        assert any(d.get("field") == "labels" and "status" in d["keys"] for d in dropped)
+
+        new_id = resp.json()["data"]["id"]
+        ws = await client.get(f"/api/v2/workspaces/{new_id}", headers=AUTH)
+        labels = ws.json()["data"]["attributes"]["labels"]
+        assert labels == {"team": "platform"}
