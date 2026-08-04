@@ -23,7 +23,8 @@ async function createAndDelete(
   token: string,
   name: string,
 ): Promise<string> {
-  const wsId = await createWorkspace(token, name);
+  // auto-apply ON so the 'comes back inert' assertion has something to prove.
+  const wsId = await createWorkspace(token, name, { 'auto-apply': true });
   await seedStateVersionWithContent(token, wsId, [
     { mode: 'managed', type: 'null_resource', name: 'a', instances: [{ attributes: {} }] },
   ]);
@@ -76,37 +77,31 @@ test.describe('Deleted workspaces (undelete)', () => {
       dialogText = d.message();
       void d.accept();
     });
-    await row.getByRole('button', { name: /restore/i }).click();
 
-    await expect(page.getByText(/Recovered/i)).toBeVisible({ timeout: 20_000 });
+    // Read the RESPONSE rather than inferring success from on-screen text.
+    // The success copy starts "Recovered ..." and the 409 reads "No state
+    // could be recovered", so any case-insensitive match on "recovered"
+    // passes on failure too — the test would sail past a broken restore and
+    // then fail later somewhere less informative.
+    const [res] = await Promise.all([
+      page.waitForResponse(
+        (r) => r.url().includes('/restore') && r.request().method() === 'POST',
+        { timeout: 20_000 },
+      ),
+      row.getByRole('button', { name: /restore/i }).click(),
+    ]);
+    expect(res.status(), `restore failed: ${await res.text()}`).toBe(201);
     expect(dialogText).toContain('NEW');
+
+    const restored = (await res.json()).data;
+    expect(restored.id.replace(/^ws-/, ''), 'restore must mint a new id').not.toBe(rawId);
+    expect(restored.attributes['state-versions-restored']).toBe(1);
+    // Auto-apply was ON before the delete and must come back OFF.
+    expect(restored.attributes.suppressed).toContain('auto_apply');
 
     // The source is a copy, not a move: the original stays recoverable until
     // its retention window closes.
     await expect(page.locator(`tr:has-text("${name}")`).first()).toBeVisible();
-
-    // The recovered workspace exists and came back inert. Paged explicitly and
-    // encoded, and the failure message carries what was actually returned —
-    // a bare toBeTruthy() here says only "not found", which is the least
-    // useful thing it could say.
-    const list = await fetch(
-      `${API_URL}/api/v2/organizations/default/workspaces` +
-        `?search[name]=${encodeURIComponent(name)}&page[size]=100`,
-      { headers: { Authorization: `Bearer ${token}` } },
-    );
-    const body = await list.json();
-    const names: string[] = (body.data ?? []).map(
-      (w: { attributes: { name: string } }) => w.attributes.name,
-    );
-    const restored = (body.data ?? []).find(
-      (w: { attributes: { name: string } }) => w.attributes.name.startsWith(name),
-    );
-    expect(
-      restored,
-      `expected a workspace starting "${name}"; status=${list.status} returned=${JSON.stringify(names)}`,
-    ).toBeTruthy();
-    expect(restored.id.replace(/^ws-/, ''), 'restore must mint a new id').not.toBe(rawId);
-    expect(restored.attributes['auto-apply']).toBe(false);
   });
 
   test('a non-admin cannot reach the undelete surface', async ({ browser }) => {
