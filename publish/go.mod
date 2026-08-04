@@ -1,6 +1,6 @@
 module github.com/mattrobinsonsre/terrapod/publish
 
-go 1.26
+go 1.26.5
 
 require (
 	github.com/ProtonMail/go-crypto v1.4.1
