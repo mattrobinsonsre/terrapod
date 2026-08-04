@@ -124,7 +124,8 @@ class TestRetentionWindow:
         store = FakeStore([f"state/{WS_A}/1.tfstate"])
         store.objects[deleted_workspace_marker_key(WS_A)] = _marker(WS_A, age_days=5)
 
-        assert await _cleanup_deleted_workspaces(_db(live_ids=[]), store, 30, 100) == 0
+        reaped = await _cleanup_deleted_workspaces(_db(live_ids=[]), store, 30, 100)
+        assert reaped == 0
         assert store.deleted == []
 
     async def test_orphan_past_the_window_is_reaped_with_its_marker(self):
@@ -145,14 +146,16 @@ class TestRetentionWindow:
         store = FakeStore([f"state/{WS_A}/1.tfstate"])
         store.objects[deleted_workspace_marker_key(WS_A)] = _marker(WS_A, age_days=999)
 
-        assert await _cleanup_deleted_workspaces(_db(live_ids=[]), store, 30, 100) == 1
+        reaped = await _cleanup_deleted_workspaces(_db(live_ids=[]), store, 30, 100)
+        assert reaped == 1
 
 
 class TestNeverReapsLiveState:
     async def test_a_live_workspace_prefix_is_never_touched(self):
         store = FakeStore([f"state/{WS_B}/1.tfstate"])
 
-        assert await _cleanup_deleted_workspaces(_db(live_ids=[WS_B]), store, 30, 100) == 0
+        reaped = await _cleanup_deleted_workspaces(_db(live_ids=[WS_B]), store, 30, 100)
+        assert reaped == 0
         assert store.deleted == []
         assert deleted_workspace_marker_key(WS_B) not in store.objects
 
@@ -175,7 +178,8 @@ class TestNeverReapsLiveState:
         stamp markers for imaginary workspaces."""
         store = FakeStore([f"state/deleted/{WS_A}.json", "state/index.yaml"])
 
-        assert await _cleanup_deleted_workspaces(_db(live_ids=[]), store, 30, 100) == 0
+        reaped = await _cleanup_deleted_workspaces(_db(live_ids=[]), store, 30, 100)
+        assert reaped == 0
         assert store.deleted == []
         assert not any(k.endswith("index.yaml.json") for k in store.objects)
 

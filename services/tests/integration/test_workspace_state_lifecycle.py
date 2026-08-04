@@ -139,9 +139,11 @@ class TestWorkspaceLifecycle:
         create = await client.post(WS_ENDPOINT, json=_ws_body("marked-ws"), headers=AUTH)
         ws_id = create.json()["data"]["id"]
 
-        assert (
-            await client.delete(f"/api/terrapod/v1/workspaces/{ws_id}", headers=AUTH)
-        ).status_code == 204
+        # The request is made outside the assert: under `python -O` asserts are
+        # stripped, and a DELETE that only happens inside one would silently not
+        # happen at all (py/side-effect-in-assert).
+        resp = await client.delete(f"/api/terrapod/v1/workspaces/{ws_id}", headers=AUTH)
+        assert resp.status_code == 204
 
         # The marker is keyed by the RAW uuid, matching the `state/{uuid}/`
         # prefix the reaper walks — not the `ws-`-prefixed JSON:API id.
