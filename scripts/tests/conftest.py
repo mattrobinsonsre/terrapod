@@ -25,3 +25,4 @@ def _load(name: str):
 normalise = _load("rescan_normalise")
 report = _load("rescan_report")
 advisory = _load("rescan_advisory")
+register_review = _load("register_review")
