@@ -99,6 +99,7 @@
   "artifact_retention.binary_cache_retention_days",
   "artifact_retention.config_versions_keep",
   "artifact_retention.config_versions_retention_days",
+  "artifact_retention.deleted_workspace_retention_days",
   "artifact_retention.enabled",
   "artifact_retention.module_overrides_retention_days",
   "artifact_retention.poll_interval_seconds",

@@ -17,4 +17,9 @@ dependencies = [
     # standard-imghdr backfills the stdlib imghdr pgpy imports (removed in 3.13).
     "pgpy>=0.6.0",
     "standard-imghdr>=3.13",
+    # Pin cryptography forward for CVE-2026-69247 (see the migrations
+    # pyproject). It arrives transitively via pgpy, which the runner uses for
+    # signature verification only — never PKCS#7 decryption — so this is
+    # defence in depth, but the image should not ship an affected version.
+    "cryptography>=50.0.0",
 ]

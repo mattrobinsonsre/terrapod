@@ -11,6 +11,27 @@ def state_index_key() -> str:
     return "state/index.yaml"
 
 
+#: Prefix for workspace delete markers (#1253). Deliberately a FLAT prefix
+#: rather than a marker nested inside each workspace's `state/{id}/`:
+#:
+#:   * the `state` blob class is `encrypted_at_rest`, and replication declines
+#:     that whole class when app-layer encryption is on — a nested marker would
+#:     inherit that and leave an encrypted deployment's standby with no
+#:     undelete index at all;
+#:   * markers are tiny, so they can be `copy`-replicated even where state
+#:     itself is `verify`-only;
+#:   * listing the undelete set is one flat listing rather than a walk over
+#:     every workspace prefix, and the restore path can copy a workspace's
+#:     state prefix wholesale without dragging a marker into the workspace it
+#:     just restored.
+DELETED_MARKER_PREFIX = "state/deleted/"
+
+
+def deleted_workspace_marker_key(workspace_id: str) -> str:
+    """Key for a deleted workspace's marker."""
+    return f"{DELETED_MARKER_PREFIX}{workspace_id}.json"
+
+
 def state_key(workspace_id: str, version_id: str) -> str:
     """Key for a workspace state version."""
     return f"state/{workspace_id}/{version_id}.tfstate"

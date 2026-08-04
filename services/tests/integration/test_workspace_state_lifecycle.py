@@ -125,6 +125,36 @@ class TestWorkspaceLifecycle:
         resp = await client.get(f"/api/v2/workspaces/{ws_id}", headers=AUTH)
         assert resp.status_code == 404
 
+    async def test_delete_writes_an_undelete_marker(self, app, client):
+        """#1253. Deleting CASCADEs the rows away but leaves the state blobs, so
+        the marker is the only record of which id held which name — without it
+        the state is unrecoverable in practice and invisible to the reaper
+        forever. It must be built *before* the delete (the row is gone after)
+        and written *after* the commit (so a rollback leaves no marker for a
+        workspace that still exists)."""
+        from terrapod.services import deleted_workspace_service as dws
+        from terrapod.storage import get_storage
+
+        set_auth(app, admin_user())
+        create = await client.post(WS_ENDPOINT, json=_ws_body("marked-ws"), headers=AUTH)
+        ws_id = create.json()["data"]["id"]
+
+        # The request is made outside the assert: under `python -O` asserts are
+        # stripped, and a DELETE that only happens inside one would silently not
+        # happen at all (py/side-effect-in-assert).
+        resp = await client.delete(f"/api/terrapod/v1/workspaces/{ws_id}", headers=AUTH)
+        assert resp.status_code == 204
+
+        # The marker is keyed by the RAW uuid, matching the `state/{uuid}/`
+        # prefix the reaper walks — not the `ws-`-prefixed JSON:API id.
+        marker = await dws.read_marker(get_storage(), ws_id.removeprefix("ws-"))
+        assert marker is not None, "no undelete marker written on delete"
+        assert marker["workspace_name"] == "marked-ws"
+        assert marker["marker_reason"] == dws.REASON_DELETED
+        assert marker["deleted_by"]
+        # Fresh marker — the reaper must see it as brand new, not expired.
+        assert dws.marker_age_days(marker) < 1
+
     async def test_list_workspaces_filtered_by_search(self, app, client):
         set_auth(app, admin_user())
 

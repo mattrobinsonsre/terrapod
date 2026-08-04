@@ -329,6 +329,30 @@ CLASSES: tuple[BlobClass, ...] = (
         resolver=_resolve_provider_binaries,
     ),
     BlobClass(
+        name="deleted_workspace_markers",
+        # HISTORY, not IRREPLACEABLE, and the reason is the readiness report
+        # rather than sentiment about the data. `irreplaceable_unchecked` is
+        # what makes `irreplaceable_missing` trustworthy before a failover, and
+        # a class that cannot be verified from rows sits in it permanently — so
+        # registering this one as irreplaceable would put a line an operator can
+        # never clear into the list they are meant to read, and train them to
+        # ignore it. What is genuinely irreplaceable here is the state the
+        # marker points at, and that is already covered by the `state` class.
+        #
+        # Its own prefix rather than living inside `state/` (#1253): `state` is
+        # `encrypted_at_rest`, which replication declines wholesale when
+        # app-layer encryption is on. A marker nested there would inherit that
+        # and leave an encrypted deployment's standby with no undelete index at
+        # all — the one thing this class exists to carry.
+        tier=HISTORY,
+        prefixes=(keys.DELETED_MARKER_PREFIX,),
+        unverifiable_reason=(
+            "A marker's whole point is that the workspace it names no longer has "
+            "rows — there is nothing left to promise it exists, so an absent one "
+            "is not a finding."
+        ),
+    ),
+    BlobClass(
         name="run_logs",
         tier=HISTORY,
         prefixes=("logs/",),

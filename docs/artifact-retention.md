@@ -17,6 +17,7 @@ When enabled, a daily background task (via the distributed scheduler) iterates s
 | **Provider cache** | `provider_cache_retention_days` | 30 days | Cached upstream provider binaries not accessed within the retention window |
 | **Binary cache** | `binary_cache_retention_days` | 30 days | Cached terraform/tofu CLI binaries not accessed within the retention window |
 | **Module overrides** | `module_overrides_retention_days` | 14 days | Module impact analysis override tarballs from completed speculative runs |
+| **Deleted workspaces** | `deleted_workspace_retention_days` | 30 days | State left behind by a deleted workspace, once it has been recoverable for the full window |
 
 Set any per-category value to `0` to disable cleanup for that category.
 
@@ -40,6 +41,7 @@ api:
       provider_cache_retention_days: 30    # days since last access before provider cache entry is deleted
       binary_cache_retention_days: 30      # days since last access before binary cache entry is deleted
       module_overrides_retention_days: 14  # days before module override tarballs are deleted
+      deleted_workspace_retention_days: 30 # days a deleted workspace's state stays recoverable
 ```
 
 ### Enabled by Default
@@ -82,6 +84,40 @@ The retention system enforces several invariants to prevent data loss:
 
 - **Only overrides from terminal runs are deleted.** Active speculative runs retain their override tarballs.
 - The `module_overrides` JSONB field on the run is set to `NULL` after storage objects are deleted.
+
+### Deleted Workspaces
+
+Deleting a workspace CASCADEs its `StateVersion` rows away but leaves the state
+blobs at `state/{workspace_id}/`. Every other category above finds its blobs
+*through* those rows, so before this existed the state of every deleted
+workspace was invisible to retention and occupied storage permanently.
+
+The orphan set is therefore computed by listing the `state/` prefixes present in
+storage and subtracting the workspaces that still exist. Three invariants:
+
+- **Discovery stamps, it never deletes.** An orphan with no delete marker gets
+  one written, dated now, and is left alone until a later cycle. So nothing is
+  ever reaped that has not been *visible as recoverable* for the full retention
+  window — including workspaces deleted before this feature shipped, whose clock
+  starts at discovery rather than retroactively.
+- **The window is measured from the marker body**, not from any object's
+  modification time. Dating from the newest blob would expire a workspace that
+  was last applied months before someone deleted it, giving no window at all;
+  and a replicated object arrives on a standby with a fresh `LastModified`,
+  which would reset the clock on every replication cycle.
+- **A prefix with surviving `StateVersion` rows is never reaped**, and neither
+  is one that is back in the live set because the workspace was restored.
+
+Set `deleted_workspace_retention_days: 0` to disable reaping entirely; markers
+are still written, so deleted workspaces remain discoverable and their state is
+kept indefinitely.
+
+The marker itself (`state/deleted/{workspace_id}.json`) records the workspace's
+name, deletion time and actor, its state serial and lineage, its settings
+(labels, ownership, execution mode, VCS wiring) and its **variable names** — so
+an operator can tell what was lost and what to recreate. It contains **no
+secrets**: variable *values* are never written, and the VCS connection is
+referenced by id only.
 
 ### Best-Effort Deletes
 

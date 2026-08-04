@@ -1183,6 +1183,16 @@ class ArtifactRetentionConfig(BaseModel):
         default=20,
         description="Number of state versions to keep per workspace (0 = disabled)",
     )
+    deleted_workspace_retention_days: int = Field(
+        default=30,
+        description=(
+            "Days to keep the state of a DELETED workspace before reaping it, so "
+            "an accidental deletion can still be undone (0 = keep forever). The "
+            "clock starts when the workspace is deleted, or when the reaper first "
+            "observes an orphan it has no marker for — never from the last state "
+            "write, which would give a long-idle workspace no window at all."
+        ),
+    )
     run_artifacts_retention_days: int = Field(
         default=90,
         description="Days to keep run logs + plans for terminal runs (0 = disabled)",
@@ -1423,6 +1433,7 @@ BLOB_CLASS_NAMES: tuple[str, ...] = (
     "configuration_versions",
     "registry_modules",
     "registry_providers",
+    "deleted_workspace_markers",
     "run_logs",
     "run_plans",
     "run_vars",
