@@ -1,6 +1,6 @@
 module github.com/mattrobinsonsre/terrapod/provider
 
-go 1.26
+go 1.26.5
 
 require (
 	github.com/hashicorp/terraform-plugin-framework v1.13.0
