@@ -85,16 +85,26 @@ test.describe('Deleted workspaces (undelete)', () => {
     // its retention window closes.
     await expect(page.locator(`tr:has-text("${name}")`).first()).toBeVisible();
 
-    // The recovered workspace exists and came back inert.
+    // The recovered workspace exists and came back inert. Paged explicitly and
+    // encoded, and the failure message carries what was actually returned —
+    // a bare toBeTruthy() here says only "not found", which is the least
+    // useful thing it could say.
     const list = await fetch(
-      `${API_URL}/api/v2/organizations/default/workspaces?search[name]=${name}`,
+      `${API_URL}/api/v2/organizations/default/workspaces` +
+        `?search[name]=${encodeURIComponent(name)}&page[size]=100`,
       { headers: { Authorization: `Bearer ${token}` } },
     );
     const body = await list.json();
+    const names: string[] = (body.data ?? []).map(
+      (w: { attributes: { name: string } }) => w.attributes.name,
+    );
     const restored = (body.data ?? []).find(
       (w: { attributes: { name: string } }) => w.attributes.name.startsWith(name),
     );
-    expect(restored, 'a restored workspace should exist').toBeTruthy();
+    expect(
+      restored,
+      `expected a workspace starting "${name}"; status=${list.status} returned=${JSON.stringify(names)}`,
+    ).toBeTruthy();
     expect(restored.id.replace(/^ws-/, ''), 'restore must mint a new id').not.toBe(rawId);
     expect(restored.attributes['auto-apply']).toBe(false);
   });

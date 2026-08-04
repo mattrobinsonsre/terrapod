@@ -23,6 +23,30 @@ const API_URL = process.env.API_URL || 'http://localhost:8000';
  */
 
 test.describe('Responsive harness (phone viewport)', () => {
+  test('deleted-workspaces admin page adapts to mobile (#1253)', async ({ page }) => {
+    // Seed a real deleted workspace first. Asserting the table is hidden on an
+    // EMPTY page proves nothing — with no rows the component renders an empty
+    // state and there is no table in the DOM at all, so the assertion passes
+    // however the breakpoints are written.
+    const token = getStoredToken()
+    const name = uniqueName('e2eresp')
+    const wsId = await createWorkspace(token, name)
+    await fetch(`${API_URL}/api/terrapod/v1/workspaces/${wsId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    await page.goto('/admin/deleted-workspaces')
+    await expect(page.getByText(name)).toBeVisible({ timeout: 10_000 })
+    await expectNoHorizontalPageScroll(page)
+
+    // Now the assertion bites: rows exist, so the desktop table is present in
+    // the tree and must be hidden by width, with the card list rendering in
+    // its place. One component driven by the breakpoint, not a forked build.
+    await expect(page.locator('table')).toBeHidden()
+    await expect(page.locator('ul > li').filter({ hasText: name })).toBeVisible()
+  })
+
   test('runs at a phone viewport', async ({ page }) => {
     const vp = page.viewportSize();
     expect(vp, 'responsive project must set a viewport').not.toBeNull();
@@ -433,27 +457,4 @@ test.describe('Tablet width (md–lg dead-zone, #839)', () => {
     await expectNoHorizontalPageScroll(page);
   });
 
-  test('deleted-workspaces admin page adapts to mobile (#1253)', async ({ page }) => {
-    // Seed a real deleted workspace first. Asserting the table is hidden on an
-    // EMPTY page proves nothing — with no rows the component renders an empty
-    // state and there is no table in the DOM at all, so the assertion passes
-    // however the breakpoints are written.
-    const token = getStoredToken()
-    const name = uniqueName('e2eresp')
-    const wsId = await createWorkspace(token, name)
-    await fetch(`${API_URL}/api/terrapod/v1/workspaces/${wsId}`, {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${token}` },
-    })
-
-    await page.goto('/admin/deleted-workspaces')
-    await expect(page.getByText(name)).toBeVisible({ timeout: 10_000 })
-    await expectNoHorizontalPageScroll(page)
-
-    // Now the assertion bites: rows exist, so the desktop table is present in
-    // the tree and must be hidden by width, with the card list rendering in
-    // its place. One component driven by the breakpoint, not a forked build.
-    await expect(page.locator('table')).toBeHidden()
-    await expect(page.locator('ul > li').filter({ hasText: name })).toBeVisible()
-  })
 })
