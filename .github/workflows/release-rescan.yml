@@ -302,6 +302,149 @@ jobs:
             codecount.json
           retention-days: 7
 
+  # ── Accepted-risk register review (#1255) ────────────────────────────
+  #
+  # Different question from everything above, and a different issue. The jobs
+  # above ask "is there anything wrong with a release we support"; this one asks
+  # "is anything in our accepted-risk register no longer worth accepting".
+  #
+  # Every entry in the register exists because there was no fix to take, and the
+  # release gate agrees by construction: it runs `ignore-unfixed` alongside the
+  # register. So re-running each scanner with the register DISABLED and fix-only
+  # KEPT reports exactly the entries upstream has since fixed. No advisory API,
+  # no version arithmetic of our own.
+  #
+  # It targets `main` rather than the released tags above: the register lives on
+  # main, and what we act on is a bump there.
+  register-scan:
+    name: Scan ${{ matrix.image }} without the register
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    strategy:
+      fail-fast: false
+      matrix:
+        # amd64 only, deliberately. A suppression is per-package and the
+        # register has never carried an arch-specific entry, so scanning both
+        # would double the work to re-confirm the same package list.
+        image: [terrapod-api, terrapod-web, terrapod-runner, terrapod-listener, terrapod-migrations]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Log in to GHCR
+        uses: ./.github/actions/ghcr-login
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ github.actor }}
+
+      - name: Trivy
+        continue-on-error: true
+        env:
+          TRIVY_PLATFORM: linux/amd64
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ matrix.image }}:latest
+          format: json
+          output: trivy-${{ matrix.image }}.json
+          severity: HIGH,CRITICAL
+          # `ignore-unfixed` stays ON while `trivyignores` is deliberately
+          # ABSENT. Together those two mean exactly "everything we suppress
+          # that now has a fix" — which is the whole question this job asks.
+          ignore-unfixed: true
+          exit-code: '0'
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: register-${{ matrix.image }}
+          path: trivy-${{ matrix.image }}.json
+          retention-days: 7
+
+  register:
+    name: Review the accepted-risk register
+    needs: register-scan
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          path: scans
+          pattern: register-*
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.13'
+
+      # No --ignore-vuln, and `-r requirements.txt` rather than the ambient
+      # environment: the gate audits what we ship, and auditing the runner's own
+      # toolchain would report dev-only packages as accepted risks of ours.
+      - name: pip-audit without the register
+        continue-on-error: true
+        working-directory: services
+        run: |
+          set -uo pipefail
+          pip install --quiet poetry poetry-plugin-export pip-audit
+          poetry export -f requirements.txt -o requirements.txt --without-hashes
+          pip-audit -r requirements.txt --format json \
+            --output "$GITHUB_WORKSPACE/scans/pip-audit.json" || true
+
+      - name: npm audit without the allowlist
+        continue-on-error: true
+        working-directory: web
+        run: |
+          set -uo pipefail
+          npm ci --ignore-scripts --no-audit --no-fund > /dev/null 2>&1 || true
+          npm audit --audit-level=high --json > "$GITHUB_WORKSPACE/scans/npm-audit.json" || true
+
+      - name: Compare against the register
+        id: review
+        run: python3 scripts/register_review.py scans body.md >> "$GITHUB_OUTPUT"
+
+      # Unlike the report job below, this issue carries full detail. Every id in
+      # it is already committed in the register files, whose headers say the
+      # reasoning is written to be read from outside the project — so listing
+      # them discloses nothing, and the detail is the actionable part.
+      - name: Open or refresh the register issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TITLE: "Security: accepted risks that can now be resolved"
+          HAS_FINDINGS: ${{ steps.review.outputs.has_findings }}
+          FINGERPRINT: ${{ steps.review.outputs.fingerprint }}
+        run: |
+          set -euo pipefail
+          existing=$(gh issue list --state open --search "$TITLE in:title" \
+            --json number,body --jq '.[0] // empty')
+
+          if [ "$HAS_FINDINGS" != "true" ]; then
+            # An empty register review is the goal, not an event. Any open issue
+            # is left alone: someone may be mid-bump on it, and a list that
+            # empties because a scan leg was skipped must not read as "done".
+            echo "Register is clean. Nothing to raise."
+            exit 0
+          fi
+
+          if [ -n "$existing" ]; then
+            number=$(echo "$existing" | jq -r '.number')
+            # Refresh the body every run; comment only when the set changed.
+            # Two decisions — conflating them leaves stale content on the issue.
+            gh issue edit "$number" --body-file body.md
+            if echo "$existing" | jq -r '.body' | grep -q "terrapod-register-review:$FINGERPRINT"; then
+              echo "Issue #$number refreshed; entry set unchanged, not re-notifying."
+            else
+              gh issue comment "$number" --body \
+                "The register review changed: an accepted risk became resolvable, or an entry stopped matching."
+              echo "Refreshed issue #$number and notified"
+            fi
+          else
+            gh issue create --title "$TITLE" --body-file body.md --label security 2>/dev/null \
+              || gh issue create --title "$TITLE" --body-file body.md
+          fi
+
   report:
     name: Report
     needs: [discover, artifacts, source]
