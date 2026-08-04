@@ -16,5 +16,9 @@ dependencies = [
     # key before executing it. pgpy is pure-Python OpenPGP (pulls cryptography).
     # standard-imghdr backfills the stdlib imghdr pgpy imports (removed in 3.13).
     "pgpy>=0.6.0",
-    "standard-imghdr>=3.13",
+    "standard-imghdr>=3.13",    # Pin cryptography forward for CVE-2026-69247 (PKCS#7 EnvelopedData
+    # decryption exposes a Bleichenbacher oracle; affects 44.0.0 to 49.x).
+    # Transitive here, so without an explicit floor this image keeps
+    # resolving an affected version.
+    "cryptography>=50.0.0",
 ]
