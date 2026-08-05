@@ -1,5 +1,6 @@
 /**
- * Log follow engages when an apply starts (#1270).
+ * Log follow: engages when an apply starts (#1270), and can be turned off by
+ * scrolling up to read (#1271).
  *
  * Confirming a planned run switches to the Apply tab BEFORE the run is
  * refetched, so `LogPanel` mounts while the run still reports its pre-confirm
@@ -14,10 +15,12 @@
  *    correct — the test would pass on the broken code. The status is moved in
  *    place instead, via an SSE-driven refetch.
  *
- *  - **Assert on scroll position, not the toggle.** `aria-pressed` reads
- *    `true` in BOTH arms; only the actual scroll offset distinguishes them
- *    (measured: 59,528px adrift before the fix, 0px after, 3 runs each side
- *    with no variance). Asserting the toggle alone is a test that cannot fail.
+ *  - **Assert on scroll position, not just the toggle.** Measured: 59,528px
+ *    adrift before the #1270 fix, 0px after, 3 runs each side with no
+ *    variance. And when the toggle IS asserted, select it BY NAME — the Color
+ *    toggle also carries `aria-pressed` and comes first in the DOM, so
+ *    `locator('button[aria-pressed]').first()` reads colorMode, which is
+ *    always true and can never fail.
  *
  * The E2E stack has no runner pool, so a seeded run never really applies. The
  * bug is entirely client-side — `isStreaming` is just `status === 'applying'`
@@ -31,7 +34,7 @@ import { getStoredToken, createWorkspace, seedRun, uniqueName } from '../helpers
 const LOG_LINES = 3000;
 
 test.describe('Run log follow', () => {
-  test('engages when a confirmed run starts applying', async ({ page }) => {
+  test('engages when a confirmed run starts applying, and disengages on scroll', async ({ page }) => {
     // Login, seeding, the confirm round-trip and an SSE reconnect all happen
     // before the assertion — the default budget leaves too little for the
     // retry window, which would surface a real failure as a bare test timeout.
@@ -138,12 +141,33 @@ test.describe('Run log follow', () => {
       expect(distanceFromTail).toBeLessThan(60);
     }).toPass({ timeout: 30_000 });
 
-    // And it says so. (True on the broken code too — kept as a consistency
-    // check between what the pane does and what the control claims, never as
-    // the discriminating assertion.)
-    await expect(page.locator('button[aria-pressed]').first()).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
+    // And the control says so. Select it by NAME: the Color toggle also
+    // carries aria-pressed and comes first in the DOM, so
+    // `locator('button[aria-pressed]').first()` silently reads colorMode —
+    // which is always true, and therefore an assertion that cannot fail.
+    const follow = page.getByRole('button', { name: /follow/i });
+    await expect(follow).toHaveAttribute('aria-pressed', 'true');
+
+    // #1271: scrolling up to read must disengage follow. The panel mounts with
+    // no <pre> in this flow, so a plain ref left the scroll listener with
+    // nothing to attach to and no dependency change to make it retry — the
+    // listener was never registered and follow could not be turned off by
+    // scrolling at all.
+    //
+    // A real wheel over the pane, not a synthetic scroll event: the point is
+    // that the browser's own scroll reaches a registered listener.
+    await pane.hover();
+    await page.mouse.wheel(0, -40_000);
+
+    await expect(follow).toHaveAttribute('aria-pressed', 'false');
+    // It must STAY off — an operator scrolled up to read, and the next log
+    // chunk must not yank them back to the tail.
+    await expect(async () => {
+      const distanceFromTail = await pane.evaluate(
+        (el) => el.scrollHeight - el.scrollTop - el.clientHeight,
+      );
+      expect(distanceFromTail).toBeGreaterThan(60);
+    }).toPass({ timeout: 10_000 });
+    await expect(follow).toHaveAttribute('aria-pressed', 'false');
   });
 });
