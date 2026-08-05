@@ -343,7 +343,14 @@ function LogPanel({
     if (isStreaming) setFollowing(true)
   }
   const [copied, setCopied] = useState(false)
-  const preRef = useRef<HTMLPreElement>(null)
+  // A callback ref, not `useRef`, because this panel renders an empty state
+  // until the log arrives: on the first render there is no <pre> at all. A
+  // plain ref leaves the scroll effect below with nothing to attach to AND no
+  // dependency change to make it retry once the element appears, so the
+  // listener is simply never registered — which is how follow became
+  // impossible to disengage by scrolling (#1271). Holding the node in state
+  // makes its arrival a render, so everything keyed on it re-runs.
+  const [pre, setPre] = useState<HTMLPreElement | null>(null)
 
   const cleanLog = useMemo(() => (log ? stripStxEtx(log) : null), [log])
 
@@ -364,18 +371,17 @@ function LogPanel({
       const doc = document.documentElement
       return window.innerHeight + window.scrollY >= doc.scrollHeight - 80
     }
-    const el = preRef.current
-    if (!el) return true
-    return el.scrollHeight - el.scrollTop - el.clientHeight < 60
-  }, [isTouch])
+    if (!pre) return true
+    return pre.scrollHeight - pre.scrollTop - pre.clientHeight < 60
+  }, [isTouch, pre])
 
   const scrollToBottom = useCallback(
     (smooth = false) => {
       const opts: ScrollToOptions = { behavior: smooth ? 'smooth' : 'auto' }
       if (isTouch) window.scrollTo({ top: document.documentElement.scrollHeight, ...opts })
-      else preRef.current?.scrollTo({ top: preRef.current.scrollHeight, ...opts })
+      else pre?.scrollTo({ top: pre.scrollHeight, ...opts })
     },
-    [isTouch],
+    [isTouch, pre],
   )
 
   // Pin the active scroller to the tail when following and the content changes.
@@ -392,12 +398,15 @@ function LogPanel({
     const onScroll = () => {
       setFollowing(isAtBottom())
     }
-    const el = isTouch ? window : preRef.current
+    const el = isTouch ? window : pre
     if (!el) return
     el.addEventListener('scroll', onScroll, { passive: true })
+    // Seed from the current position. This runs after the layout effect above
+    // has already pinned the tail, so attaching mid-stream does not read a
+    // stale "not at bottom" and immediately disengage follow.
     onScroll()
     return () => el.removeEventListener('scroll', onScroll)
-  }, [isTouch, isAtBottom])
+  }, [isTouch, isAtBottom, pre])
 
   if (loading) {
     return (
@@ -536,14 +545,14 @@ function LogPanel({
           the JS tail-follow logic agree. */}
       {colorMode ? (
         <pre
-          ref={preRef}
+          ref={setPre}
           data-testid={`log-pre-${phase}`}
           className="p-4 text-sm text-slate-300 font-mono whitespace-pre-wrap break-words fine:max-h-[70vh] fine:overflow-y-auto"
           dangerouslySetInnerHTML={{ __html: htmlContent }}
         />
       ) : (
         <pre
-          ref={preRef}
+          ref={setPre}
           data-testid={`log-pre-${phase}`}
           className="p-4 text-sm text-slate-300 font-mono whitespace-pre-wrap break-words fine:max-h-[70vh] fine:overflow-y-auto"
         >
