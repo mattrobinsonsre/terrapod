@@ -331,6 +331,17 @@ function LogPanel({
   // Follow the tail by default while streaming; a static (finished) log opens
   // at the top so the operator reads from the start.
   const [following, setFollowing] = useState(isStreaming)
+  // `useState` reads its argument once, and this panel routinely mounts before
+  // the run is streaming — confirming an apply switches to this tab while the
+  // run is still `confirmed`. Re-engage on the false->true edge, adjusted
+  // during render so there is no frame with follow wrongly off. Only the edge:
+  // tracking `isStreaming` wholesale would re-pin the tail on every render and
+  // fight an operator who scrolled up to read.
+  const [wasStreaming, setWasStreaming] = useState(isStreaming)
+  if (wasStreaming !== isStreaming) {
+    setWasStreaming(isStreaming)
+    if (isStreaming) setFollowing(true)
+  }
   const [copied, setCopied] = useState(false)
   const preRef = useRef<HTMLPreElement>(null)
 
