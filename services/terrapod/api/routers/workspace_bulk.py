@@ -246,7 +246,7 @@ async def _validate_pool_set(
     return {_POOL_SET_FIELD: requested}
 
 
-async def _validate_auto_apply(update: dict[str, Any], fields: dict[str, Any]) -> dict[str, Any]:
+def _validate_auto_apply(update: dict[str, Any], fields: dict[str, Any]) -> dict[str, Any]:
     """Resolve the auto-apply pair for a bulk update (#1274).
 
     `auto-apply-mode` writes BOTH columns, so it can't go through _FIELD_MAP.
@@ -278,7 +278,9 @@ async def _validate_auto_apply(update: dict[str, Any], fields: dict[str, Any]) -
     return {}
 
 
-def _validate_update(update: dict, db: AsyncSession, user: AuthenticatedUser) -> dict[str, Any]:
+async def _validate_update(
+    update: dict, db: AsyncSession, user: AuthenticatedUser
+) -> dict[str, Any]:
     """Validate the homogeneous `update` payload ONCE (it is applied
     identically to every matched workspace). Raises HTTP 422 with zero
     mutation on any problem. Returns a normalised plan.

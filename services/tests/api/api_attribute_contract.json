@@ -43,6 +43,7 @@
   "autodiscovery_rules._rule_json": [
     "agent-pool-id",
     "auto-apply",
+    "auto-apply-mode",
     "branch",
     "created-at",
     "enabled",
