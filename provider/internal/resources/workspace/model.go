@@ -59,6 +59,7 @@ type workspaceModel struct {
 	Name                          types.String `tfsdk:"name"`
 	ExecutionMode                 types.String `tfsdk:"execution_mode"`
 	AutoApply                     types.Bool   `tfsdk:"auto_apply"`
+	AutoApplyMode                 types.String `tfsdk:"auto_apply_mode"`
 	ExecutionBackend              types.String `tfsdk:"execution_backend"`
 	TerraformVersion              types.String `tfsdk:"terraform_version"`
 	TerragruntEnabled             types.Bool   `tfsdk:"terragrunt_enabled"`

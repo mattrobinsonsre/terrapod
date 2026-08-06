@@ -70,6 +70,7 @@ from terrapod.services import agent_pool_service as _agent_pool_service
 from terrapod.services import (
     ha_role,  # noqa: F401
     pool_set,
+    run_service,
 )
 from terrapod.services.pool_rbac_service import resolve_pool_capabilities_for
 from terrapod.services.workspace_rbac_service import (
@@ -756,6 +757,11 @@ def _workspace_json(
             "attributes": {
                 "name": ws.name,
                 "auto-apply": ws.auto_apply,
+                # Conditional auto-apply (#1274). `auto-apply` remains the
+                # boolean projection — true whenever the workspace applies
+                # unattended at all — so an un-upgraded client is unaffected;
+                # `auto-apply-mode` carries which flavour.
+                "auto-apply-mode": run_service.resolve_auto_apply_mode(ws),
                 "execution-mode": ws.execution_mode,
                 "operations": ws.execution_mode == "agent",
                 "execution-backend": ws.execution_backend,
@@ -1221,10 +1227,30 @@ async def create_workspace(
             detail="execution-mode must be 'local' or 'agent'",
         )
 
+    # Conditional auto-apply (#1274) — same either/or rule as PATCH, and the
+    # two columns are always written together so they cannot disagree.
+    if "auto-apply" in attrs and "auto-apply-mode" in attrs:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "Set either auto-apply or auto-apply-mode, not both — "
+                "auto-apply-mode supersedes the boolean"
+            ),
+        )
+    auto_apply_mode = attrs.get(
+        "auto-apply-mode", "always" if attrs.get("auto-apply", False) else "never"
+    )
+    if auto_apply_mode not in run_service.AUTO_APPLY_MODES:
+        raise HTTPException(
+            status_code=422,
+            detail="auto-apply-mode must be one of: " + ", ".join(run_service.AUTO_APPLY_MODES),
+        )
+
     ws = Workspace(
         name=name,
         execution_mode=execution_mode,
-        auto_apply=attrs.get("auto-apply", False),
+        auto_apply=auto_apply_mode != "never",
+        auto_apply_mode=auto_apply_mode,
         execution_backend=attrs.get("execution-backend", settings.default_execution_backend),
         terraform_version=attrs.get("terraform-version", settings.default_terraform_version),
         terragrunt_enabled=bool(attrs.get("terragrunt-enabled", False)),
@@ -1601,8 +1627,31 @@ async def update_workspace(
                 detail="execution-mode must be 'local' or 'agent'",
             )
         ws.execution_mode = attrs["execution-mode"]
+    if "auto-apply" in attrs and "auto-apply-mode" in attrs:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "Set either auto-apply or auto-apply-mode, not both — "
+                "auto-apply-mode supersedes the boolean"
+            ),
+        )
     if "auto-apply" in attrs:
+        # The old boolean still means exactly what it always did.
         ws.auto_apply = attrs["auto-apply"]
+        ws.auto_apply_mode = "always" if attrs["auto-apply"] else "never"
+    if "auto-apply-mode" in attrs:
+        mode = attrs["auto-apply-mode"]
+        if mode not in run_service.AUTO_APPLY_MODES:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "auto-apply-mode must be one of: " + ", ".join(run_service.AUTO_APPLY_MODES)
+                ),
+            )
+        # Write BOTH columns together so the boolean projection an old client
+        # reads never contradicts the mode.
+        ws.auto_apply_mode = mode
+        ws.auto_apply = mode != "never"
 
     # VCS workflow + auto-merge (#282). We only validate when the relevant
     # fields are actually being touched in this PATCH — unrelated updates
@@ -1641,7 +1690,9 @@ async def update_workspace(
     # the post-update state so the user can flip vcs_workflow and
     # auto_apply in one PATCH.
     pending_workflow = ws.vcs_workflow
-    pending_auto_apply = attrs.get("auto-apply", ws.auto_apply)
+    # Read the post-update value: a PATCH may have set it via either
+    # attribute, and both paths have already landed on `ws` above.
+    pending_auto_apply = ws.auto_apply
     if pending_workflow == "apply_then_merge" and (
         "vcs-workflow" in attrs or "auto-apply" in attrs
     ):

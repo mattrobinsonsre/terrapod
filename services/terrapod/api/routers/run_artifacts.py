@@ -341,7 +341,11 @@ async def upload_plan_json_output(
             run.resource_destructions = summary["destructions"]
             run.resource_replacements = summary["replacements"]
             run.resource_imports = summary["imports"]
+            conditional_auto_apply = True
         else:
+            # Counts unknown, so the plan's shape is unknown: a conditional
+            # auto-apply must not run. Leaving it `planned` is the point.
+            conditional_auto_apply = False
             logger.warning(
                 "plan_json_output.summary_unparseable",
                 run_id=str(run.id),
@@ -349,6 +353,15 @@ async def upload_plan_json_output(
                 body_bytes=body_bytes,
             )
         await db.commit()
+        # Conditional auto-apply (#1274) decides HERE, not in `complete_plan`:
+        # this is the first point at which the plan's shape is known, because
+        # the runner POSTs plan-result (which drives complete_plan) before it
+        # uploads this JSON. A run whose counts didn't parse is left alone —
+        # the helper treats unknown shape as "do not auto-apply".
+        if conditional_auto_apply:
+            from terrapod.services import run_service
+
+            await run_service.evaluate_conditional_auto_apply(db, run)
         return await _enqueue_plan_json_followups(run)
     finally:
         try:

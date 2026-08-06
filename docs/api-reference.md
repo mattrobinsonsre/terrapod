@@ -270,6 +270,29 @@ GET /api/v2/workspaces/{id}
 POST /api/v2/organizations/default/workspaces
 ```
 
+**Auto-apply modes (`auto-apply-mode`)**
+
+| Mode | Applies automatically when |
+|---|---|
+| `never` | Never — every plan waits for a human. |
+| `always` | Always, on any successful plan. |
+| `create` | The plan only **adds** resources. |
+| `create_update` | The plan only adds resources and **updates them in place**. |
+
+`create` and `create_update` never auto-apply a plan that **destroys or
+replaces** a resource — that run stays `planned` for a human, and the run's
+`auto-apply-declined-reason` says why (for example `2 destroys, 1 replace`).
+
+Because those two modes need to know the shape of the plan, they are decided
+once the plan JSON has been uploaded — a moment later than `always`, which is
+decided as soon as the plan finishes. If the plan JSON never arrives, the run
+is left for a human rather than applied.
+
+`auto-apply` is retained as the boolean projection: it reads `true` for any
+mode that auto-applies at all, and writing it still works (`true` → `always`,
+`false` → `never`). Setting **both** `auto-apply` and `auto-apply-mode` in one
+request is rejected with `422` rather than guessing which was meant.
+
 **Request body:**
 ```json
 {
@@ -278,6 +301,7 @@ POST /api/v2/organizations/default/workspaces
     "attributes": {
       "name": "my-workspace",
       "auto-apply": false,
+      "auto-apply-mode": "create_update",
       "execution-mode": "agent",
       "terraform-version": "1.9.8",
       "resource-cpu": "1",

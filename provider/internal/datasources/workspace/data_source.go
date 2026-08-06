@@ -29,6 +29,7 @@ type workspaceDataSourceModel struct {
 	Name                          types.String `tfsdk:"name"`
 	ExecutionMode                 types.String `tfsdk:"execution_mode"`
 	AutoApply                     types.Bool   `tfsdk:"auto_apply"`
+	AutoApplyMode                 types.String `tfsdk:"auto_apply_mode"`
 	ExecutionBackend              types.String `tfsdk:"execution_backend"`
 	TerraformVersion              types.String `tfsdk:"terraform_version"`
 	TerragruntEnabled             types.Bool   `tfsdk:"terragrunt_enabled"`
@@ -90,6 +91,7 @@ func (d *workspaceDataSource) Schema(_ context.Context, _ datasource.SchemaReque
 			"name":                             requiredString("Workspace name to look up."),
 			"execution_mode":                   computedString("Execution mode."),
 			"auto_apply":                       computedBool("Auto-apply setting."),
+			"auto_apply_mode":                  computedString("Conditional auto-apply mode: never, always, create or create_update."),
 			"execution_backend":                computedString("Execution backend."),
 			"terraform_version":                computedString("Terraform/tofu version."),
 			"terragrunt_enabled":               computedBool("Whether terragrunt wraps tofu/terraform for agent-mode runs."),

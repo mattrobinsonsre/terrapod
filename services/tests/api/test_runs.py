@@ -43,6 +43,11 @@ def _mock_run(
     run.message = message
     run.is_destroy = False
     run.auto_apply = auto_apply
+    # #1274: the mode snapshotted at creation, and the reason a conditional
+    # auto-apply declined. Defaults mirror the flat boolean so every existing
+    # test keeps describing exactly the run it always did.
+    run.auto_apply_mode = "always" if auto_apply else "never"
+    run.auto_apply_declined_reason = None
     run.plan_only = plan_only
     run.source = "tfe-api"
     run.terraform_version = "1.11"

@@ -2,6 +2,7 @@
 
 import json
 import uuid
+from typing import Any
 
 from sqlalchemy import and_, func, not_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -28,6 +29,90 @@ from terrapod.services import github_service, gitlab_service, ha_role, pool_set
 from terrapod.services.notification_service import STATUS_TO_TRIGGER
 
 logger = get_logger(__name__)
+
+# Conditional auto-apply (#1274). `never`/`always` are the historical
+# boolean; `create`/`create_update` auto-apply only when the plan's shape is
+# within the operator's declared comfort zone.
+AUTO_APPLY_MODES = ("never", "always", "create", "create_update")
+
+#: Modes whose decision needs the per-action counts, which are only parsed
+#: once the plan JSON lands — strictly after the `plan-result` POST that
+#: drives `complete_plan`. These defer to `evaluate_conditional_auto_apply`.
+CONDITIONAL_AUTO_APPLY_MODES = ("create", "create_update")
+
+
+def resolve_auto_apply_mode(obj: Any) -> str:
+    """Resolve the effective auto-apply mode of a workspace or a run.
+
+    Two columns describe one setting: the historical `auto_apply` boolean
+    (still written by an un-upgraded API replica, and by any client that
+    only knows the old attribute) and the newer `auto_apply_mode`. A rolling
+    upgrade can therefore observe them disagreeing, and this is where that
+    is settled — never by reading either column directly.
+
+    The composition is deliberately asymmetric: `auto_apply == False` always
+    wins and means `never`. So the worst a skewed write can do is auto-apply
+    LESS than the operator asked for, never more. Failing towards "a human
+    looks at it" is the only safe direction for a setting that applies
+    infrastructure changes unattended.
+    """
+    if not getattr(obj, "auto_apply", False):
+        return "never"
+    mode = getattr(obj, "auto_apply_mode", None)
+    if mode in CONDITIONAL_AUTO_APPLY_MODES:
+        return mode
+    # `auto_apply` is true and the mode column says nothing conditional
+    # (unset, "never" from an old row, or an unrecognised value written by a
+    # newer replica): fall back to the boolean's own meaning.
+    return "always"
+
+
+def plan_shape_permits_auto_apply(run: Run, mode: str) -> bool | None:
+    """Does this run's plan satisfy `mode`?
+
+    Returns None when the answer is not yet knowable — the plan JSON has not
+    landed, or it failed to parse, so the counts are null. Callers must treat
+    None as "do not auto-apply", not as a pass: a plan whose shape we cannot
+    read is exactly the one a human should look at.
+
+    A *replacement* is counted separately from a *destruction* by
+    `plan_summary._count_changes` (it is the `{create, delete}` action pair),
+    so both have to be zero or a recreate would sail through a naive
+    "no destroys" check.
+    """
+    if mode not in CONDITIONAL_AUTO_APPLY_MODES:
+        return None
+    counts = (
+        run.resource_additions,
+        run.resource_changes,
+        run.resource_destructions,
+        run.resource_replacements,
+    )
+    if any(c is None for c in counts):
+        return None
+    additions, changes, destructions, replacements = counts
+    if destructions or replacements:
+        return False
+    if mode == "create" and changes:
+        return False
+    # `additions` is deliberately unconstrained: an add-only plan of any size
+    # is still add-only, and imports do not mutate infrastructure.
+    _ = additions
+    return True
+
+
+def describe_plan_shape(run: Run) -> str:
+    """Human-readable reason a conditional auto-apply declined, for the UI."""
+    parts = []
+    for label, value in (
+        ("destroy", run.resource_destructions),
+        ("replace", run.resource_replacements),
+        ("update", run.resource_changes),
+    ):
+        if value:
+            parts.append(f"{value} {label}{'s' if value != 1 else ''}")
+    return ", ".join(parts) if parts else "plan shape unavailable"
+
 
 # Valid state transitions
 VALID_TRANSITIONS: dict[str, set[str]] = {
@@ -559,8 +644,15 @@ async def create_run(
     when a configuration version is uploaded (or immediately if none needed).
     """
     await ha_role.ensure_leader("create runs")
+    # An explicit `auto_apply` argument (the CLI/API asking for a specific
+    # behaviour on this one run) still means exactly what it says, so it maps
+    # onto the flat modes. Only an unset argument inherits the workspace's
+    # conditional mode (#1274).
     if auto_apply is None:
         auto_apply = workspace.auto_apply
+        auto_apply_mode = resolve_auto_apply_mode(workspace)
+    else:
+        auto_apply_mode = "always" if auto_apply else "never"
 
     # Snapshot the workspace's pool set (#1085). Element 0 lands in `pool_id`
     # and the rest in `pool_extra_ids`; they are equally eligible — the claim
@@ -597,6 +689,7 @@ async def create_run(
         message=message,
         is_destroy=is_destroy,
         auto_apply=auto_apply,
+        auto_apply_mode=auto_apply_mode,
         plan_only=plan_only,
         source=source,
         execution_backend=workspace.execution_backend,
@@ -831,6 +924,72 @@ async def transition_run(
     return run
 
 
+async def _auto_apply_if_permitted(db: AsyncSession, run: Run) -> Run:
+    """Confirm a `planned` run on the auto-apply path, honouring the guards.
+
+    Shared by both auto-apply entry points (`always` from `complete_plan`,
+    and the conditional modes from `evaluate_conditional_auto_apply`) so the
+    guard set cannot drift between them — the composition of staleness and
+    the manual lock is the part that must stay identical.
+    """
+    locked_ws = await db.get(Workspace, run.workspace_id)
+    # Defensive staleness guard on the auto-apply path (#646/#647): if the
+    # state moved or the TTL lapsed between plan completion and this
+    # transition, discard rather than auto-apply a stale plan.
+    stale = await _staleness_reason(db, run, locked_ws)
+    if stale is not None:
+        run = await discard_run(db, run, reason=stale)
+        logger.info("Auto-apply plan stale — discarded", run_id=str(run.id), reason=stale)
+        return run
+    # Respect a manual workspace lock even on auto-apply: leave the run
+    # `planned` for a human to apply after unlocking, rather than
+    # auto-applying past the operator's lock.
+    if locked_ws is None or not locked_ws.locked:
+        run = await transition_run(db, run, "confirmed")
+    return run
+
+
+async def evaluate_conditional_auto_apply(db: AsyncSession, run: Run) -> Run:
+    """Decide a `create` / `create_update` auto-apply once the counts exist.
+
+    Called from the plan-JSON upload, which is the first moment the plan's
+    shape is known (the runner POSTs `plan-result` — and so drives
+    `complete_plan` — before it uploads the JSON).
+
+    Every exit that is not an unambiguous "yes" leaves the run `planned` for
+    a human. That includes the plan JSON never arriving at all: the upload is
+    best-effort, so a failed upload simply means nobody auto-applies, which
+    is the correct direction to fail.
+    """
+    if run.status != "planned" or run.plan_only:
+        return run
+    mode = resolve_auto_apply_mode(run)
+    if mode not in CONDITIONAL_AUTO_APPLY_MODES:
+        return run
+
+    permitted = plan_shape_permits_auto_apply(run, mode)
+    if permitted is None:
+        logger.info(
+            "Conditional auto-apply skipped — plan shape unknown",
+            run_id=str(run.id),
+            mode=mode,
+        )
+        return run
+    if not permitted:
+        run.auto_apply_declined_reason = describe_plan_shape(run)
+        await db.commit()
+        logger.info(
+            "Conditional auto-apply declined — held for review",
+            run_id=str(run.id),
+            mode=mode,
+            reason=run.auto_apply_declined_reason,
+        )
+        return run
+
+    logger.info("Conditional auto-apply permitted", run_id=str(run.id), mode=mode)
+    return await _auto_apply_if_permitted(db, run)
+
+
 async def complete_plan(
     db: AsyncSession,
     run: Run,
@@ -930,21 +1089,14 @@ async def complete_plan(
         logger.info("Plan succeeded — no changes, skipping apply", run_id=str(run.id))
         return run
 
-    if run.auto_apply and not run.plan_only:
-        locked_ws = await db.get(Workspace, run.workspace_id)
-        # Defensive staleness guard on the auto-apply path (#646/#647): if the
-        # state moved or the TTL lapsed between plan completion and this
-        # transition, discard rather than auto-apply a stale plan.
-        stale = await _staleness_reason(db, run, locked_ws)
-        if stale is not None:
-            run = await discard_run(db, run, reason=stale)
-            logger.info("Auto-apply plan stale — discarded", run_id=str(run.id), reason=stale)
-            return run
-        # Respect a manual workspace lock even on auto-apply: leave the run
-        # `planned` for a human to apply after unlocking, rather than
-        # auto-applying past the operator's lock.
-        if locked_ws is None or not locked_ws.locked:
-            run = await transition_run(db, run, "confirmed")
+    # `always` decides here, on the plan-result POST, exactly as it always
+    # has. The conditional modes need the per-action counts, which only land
+    # with the plan JSON (strictly later) — they are driven from
+    # `evaluate_conditional_auto_apply` instead. Keeping `always` here means
+    # an existing auto-applying workspace is untouched by #1274, including
+    # its timing, and never becomes dependent on a best-effort upload.
+    if resolve_auto_apply_mode(run) == "always" and not run.plan_only:
+        run = await _auto_apply_if_permitted(db, run)
 
     # Born-superseded (planning race): a run that settled into `planned`
     # awaiting confirmation, only to find a newer full run already waiting,

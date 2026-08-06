@@ -234,10 +234,15 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				Default:     stringdefault.StaticString("local"),
 			},
 			"auto_apply": schema.BoolAttribute{
-				Description: "Automatically apply successful plans.",
+				Description: "Automatically apply successful plans. Superseded by `auto_apply_mode` when that is set; prefer `auto_apply_mode` for new configurations.",
 				Optional:    true,
 				Computed:    true,
 				Default:     booldefault.StaticBool(false),
+			},
+			"auto_apply_mode": schema.StringAttribute{
+				Description: "Conditional auto-apply: `never`, `always`, `create` (apply only plans that add resources) or `create_update` (also allow in-place updates). `create` and `create_update` never apply a plan that destroys or replaces a resource — that is left for a human. Optional + Computed with no default, so a configuration that does not set it inherits whatever the workspace has and never drifts.",
+				Optional:    true,
+				Computed:    true,
 			},
 			"execution_backend": schema.StringAttribute{
 				Description: "Execution backend: terraform or tofu.",
@@ -772,7 +777,13 @@ func buildCreateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 	if !m.ExecutionMode.IsNull() && !m.ExecutionMode.IsUnknown() {
 		req.ExecutionMode = m.ExecutionMode.ValueString()
 	}
-	if !m.AutoApply.IsNull() && !m.AutoApply.IsUnknown() {
+	// `auto_apply` has a schema Default, so it is always known here — sending
+	// it alongside `auto_apply_mode` would hit the API's either/or 422. The
+	// mode is the richer setting, so it wins and the boolean is left off.
+	if !m.AutoApplyMode.IsNull() && !m.AutoApplyMode.IsUnknown() && m.AutoApplyMode.ValueString() != "" {
+		v := m.AutoApplyMode.ValueString()
+		req.AutoApplyMode = &v
+	} else if !m.AutoApply.IsNull() && !m.AutoApply.IsUnknown() {
 		v := m.AutoApply.ValueBool()
 		req.AutoApply = &v
 	}
@@ -904,7 +915,13 @@ func buildUpdateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 	if !m.ExecutionMode.IsNull() && !m.ExecutionMode.IsUnknown() {
 		req.ExecutionMode = m.ExecutionMode.ValueString()
 	}
-	if !m.AutoApply.IsNull() && !m.AutoApply.IsUnknown() {
+	// `auto_apply` has a schema Default, so it is always known here — sending
+	// it alongside `auto_apply_mode` would hit the API's either/or 422. The
+	// mode is the richer setting, so it wins and the boolean is left off.
+	if !m.AutoApplyMode.IsNull() && !m.AutoApplyMode.IsUnknown() && m.AutoApplyMode.ValueString() != "" {
+		v := m.AutoApplyMode.ValueString()
+		req.AutoApplyMode = &v
+	} else if !m.AutoApply.IsNull() && !m.AutoApply.IsUnknown() {
 		v := m.AutoApply.ValueBool()
 		req.AutoApply = &v
 	}
@@ -1033,6 +1050,7 @@ func readWorkspaceIntoModel(ctx context.Context, ws *terrapod.Workspace, m *work
 	m.Name = types.StringValue(ws.Name)
 	m.ExecutionMode = types.StringValue(ws.ExecutionMode)
 	m.AutoApply = types.BoolValue(ws.AutoApply)
+	m.AutoApplyMode = types.StringValue(ws.AutoApplyMode)
 	m.ExecutionBackend = types.StringValue(ws.ExecutionBackend)
 	m.WorkingDirectory = types.StringValue(ws.WorkingDirectory)
 	m.ResourceCPU = types.StringValue(ws.ResourceCPU)
