@@ -557,6 +557,13 @@
             "boolean"
           ]
         },
+        "auto_apply_mode": {
+          "description": "conditional auto-apply: never, always, create (only plans that add resources), create_update (also in-place updates). create and create_update never auto-apply a destroy or replace. Set this OR auto_apply, not both.",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
         "execution_backend": {
           "description": "tofu or terraform (default: server default)",
           "type": "string"
@@ -683,6 +690,13 @@
           "type": [
             "null",
             "boolean"
+          ]
+        },
+        "auto_apply_mode": {
+          "description": "conditional auto-apply: never, always, create, create_update. Set this OR auto_apply, not both.",
+          "type": [
+            "null",
+            "string"
           ]
         },
         "execution_backend": {

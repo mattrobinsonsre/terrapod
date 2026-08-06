@@ -23,6 +23,7 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		ExecutionBackend string            `json:"execution_backend,omitempty" jsonschema:"tofu or terraform (default: server default)"`
 		TerraformVersion string            `json:"terraform_version,omitempty" jsonschema:"partial version like 1.15 (means 1.15.*); no HCL operators"`
 		AutoApply        *bool             `json:"auto_apply,omitempty" jsonschema:"auto-apply successful plans (default false)"`
+		AutoApplyMode    *string           `json:"auto_apply_mode,omitempty" jsonschema:"conditional auto-apply: never, always, create (only plans that add resources), create_update (also in-place updates). create and create_update never auto-apply a destroy or replace. Set this OR auto_apply, not both."`
 		AgentPoolID      string            `json:"agent_pool_id,omitempty" jsonschema:"agent pool id (apool-...) for agent execution mode; assigns exactly one pool. Mutually exclusive with agent_pool_ids"`
 		AgentPoolIDs     []string          `json:"agent_pool_ids,omitempty" jsonschema:"agent pools this workspace may run on (apool-...). Flat set: a run is offered to every pool at once and whichever has a live runner claims it first, so losing one does not stop the workspace. Mutually exclusive with agent_pool_id"`
 		WorkingDirectory string            `json:"working_directory,omitempty" jsonschema:"subdirectory within the repo"`
@@ -46,6 +47,7 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 			ExecutionBackend: in.ExecutionBackend,
 			TerraformVersion: in.TerraformVersion,
 			AutoApply:        in.AutoApply,
+			AutoApplyMode:    in.AutoApplyMode,
 			AgentPoolID:      in.AgentPoolID,
 			AgentPoolIDs:     in.AgentPoolIDs,
 			WorkingDirectory: in.WorkingDirectory,
@@ -69,6 +71,7 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		ExecutionBackend string            `json:"execution_backend,omitempty" jsonschema:"tofu or terraform"`
 		TerraformVersion string            `json:"terraform_version,omitempty" jsonschema:"partial version like 1.15"`
 		AutoApply        *bool             `json:"auto_apply,omitempty" jsonschema:"auto-apply successful plans"`
+		AutoApplyMode    *string           `json:"auto_apply_mode,omitempty" jsonschema:"conditional auto-apply: never, always, create, create_update. Set this OR auto_apply, not both."`
 		AgentPoolID      string            `json:"agent_pool_id,omitempty" jsonschema:"agent pool id (apool-...); assigns exactly one pool, REPLACING any existing set. Mutually exclusive with agent_pool_ids"`
 		AgentPoolIDs     []string          `json:"agent_pool_ids,omitempty" jsonschema:"replace the workspace''s agent-pool set (apool-...). Flat set — every pool is equally eligible to claim a run. Mutually exclusive with agent_pool_id"`
 		WorkingDirectory string            `json:"working_directory,omitempty" jsonschema:"subdirectory within the repo"`
@@ -88,6 +91,7 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 			ExecutionBackend: in.ExecutionBackend,
 			TerraformVersion: in.TerraformVersion,
 			AutoApply:        in.AutoApply,
+			AutoApplyMode:    in.AutoApplyMode,
 			AgentPoolID:      in.AgentPoolID,
 			AgentPoolIDs:     in.AgentPoolIDs,
 			WorkingDirectory: in.WorkingDirectory,
