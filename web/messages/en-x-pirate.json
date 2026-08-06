@@ -1681,6 +1681,12 @@
       "addEmail": "Add email",
       "triggers": "Triggers",
       "addNotification": "Add notification"
+    },
+    "autoApplyMode": {
+      "never": "nary",
+      "always": "allus",
+      "create": "hoist",
+      "createUpdate": "hoist/mend"
     }
   },
   "planSummary": {
@@ -1917,7 +1923,8 @@
       "viewState": "View State",
       "runOptions": "Run Options",
       "agentPool": "Agent crew",
-      "agentPoolCandidates": "{count, plural, one {# candidate crew} other {# candidate crews}}"
+      "agentPoolCandidates": "{count, plural, one {# candidate crew} other {# candidate crews}}",
+      "autoApplyHeld": "belayed"
     },
     "timeline": {
       "heading": "Timeline",

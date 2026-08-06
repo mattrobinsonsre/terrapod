@@ -1681,6 +1681,12 @@
       "addEmail": "افزودن ایمیل",
       "triggers": "محرک‌ها",
       "addNotification": "افزودن اعلان"
+    },
+    "autoApplyMode": {
+      "never": "هرگز",
+      "always": "همیشه",
+      "create": "ایجاد",
+      "createUpdate": "ایجاد/به‌روزرسانی"
     }
   },
   "planSummary": {
@@ -1917,7 +1923,8 @@
       "viewState": "مشاهدهٔ وضعیت",
       "runOptions": "گزینه‌های اجرا",
       "agentPool": "استخر عامل",
-      "agentPoolCandidates": "{count, plural, other {# استخر نامزد}}"
+      "agentPoolCandidates": "{count, plural, other {# استخر نامزد}}",
+      "autoApplyHeld": "نگه‌داشته"
     },
     "timeline": {
       "heading": "خط زمانی",

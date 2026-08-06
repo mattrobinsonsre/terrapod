@@ -1681,6 +1681,12 @@
       "addEmail": "Додати ел. пошту",
       "triggers": "Тригери",
       "addNotification": "Додати сповіщення"
+    },
+    "autoApplyMode": {
+      "never": "ніколи",
+      "always": "завжди",
+      "create": "створення",
+      "createUpdate": "створення/зміна"
     }
   },
   "planSummary": {
@@ -1917,7 +1923,8 @@
       "viewState": "Переглянути стан",
       "runOptions": "Опції запуску",
       "agentPool": "Пул агентів",
-      "agentPoolCandidates": "{count, plural, one {# пул-кандидат} few {# пули-кандидати} other {# пулів-кандидатів}}"
+      "agentPoolCandidates": "{count, plural, one {# пул-кандидат} few {# пули-кандидати} other {# пулів-кандидатів}}",
+      "autoApplyHeld": "відкладено"
     },
     "timeline": {
       "heading": "Хронологія",

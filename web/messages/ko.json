@@ -1681,6 +1681,12 @@
       "addEmail": "이메일 추가",
       "triggers": "트리거",
       "addNotification": "알림 추가"
+    },
+    "autoApplyMode": {
+      "never": "안 함",
+      "always": "항상",
+      "create": "생성",
+      "createUpdate": "생성/수정"
     }
   },
   "planSummary": {
@@ -1917,7 +1923,8 @@
       "viewState": "상태 보기",
       "runOptions": "실행 옵션",
       "agentPool": "에이전트 풀",
-      "agentPoolCandidates": "{count, plural, other {후보 풀 #개}}"
+      "agentPoolCandidates": "{count, plural, other {후보 풀 #개}}",
+      "autoApplyHeld": "보류"
     },
     "timeline": {
       "heading": "타임라인",

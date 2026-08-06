@@ -1681,6 +1681,12 @@
       "addEmail": "E-mail toevoegen",
       "triggers": "Triggers",
       "addNotification": "Notificatie toevoegen"
+    },
+    "autoApplyMode": {
+      "never": "nooit",
+      "always": "altijd",
+      "create": "aanmaken",
+      "createUpdate": "aanmaken/bijwerken"
     }
   },
   "planSummary": {
@@ -1917,7 +1923,8 @@
       "viewState": "State bekijken",
       "runOptions": "Uitvoeringsopties",
       "agentPool": "Agentpool",
-      "agentPoolCandidates": "{count, plural, one {# kandidaat-pool} other {# kandidaat-pools}}"
+      "agentPoolCandidates": "{count, plural, one {# kandidaat-pool} other {# kandidaat-pools}}",
+      "autoApplyHeld": "vastgehouden"
     },
     "timeline": {
       "heading": "Tijdlijn",

@@ -1681,6 +1681,12 @@
       "addEmail": "Ychwanegu e-bost",
       "triggers": "Sbardunau",
       "addNotification": "Ychwanegu hysbysiad"
+    },
+    "autoApplyMode": {
+      "never": "byth",
+      "always": "bob amser",
+      "create": "creu",
+      "createUpdate": "creu/diweddaru"
     }
   },
   "planSummary": {
@@ -1917,7 +1923,8 @@
       "viewState": "Gweld y Cyflwr",
       "runOptions": "Opsiynau Rhediad",
       "agentPool": "Pwll asiant",
-      "agentPoolCandidates": "{count, plural, one {# pwll ymgeisydd} other {# pyllau ymgeisydd}}"
+      "agentPoolCandidates": "{count, plural, one {# pwll ymgeisydd} other {# pyllau ymgeisydd}}",
+      "autoApplyHeld": "dal"
     },
     "timeline": {
       "heading": "Llinell Amser",

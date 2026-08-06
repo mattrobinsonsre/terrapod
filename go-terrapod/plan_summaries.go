@@ -24,12 +24,12 @@ import (
 //   - RiskFactors: discrete risks OR suggested fixes (same shape;
 //     the UI / your consumer decides how to render them)
 type PlanSummary struct {
-	ID          string `json:"id"`
-	RunID       string `json:"-"` // resolved from `run` relationship
-	Kind        string `json:"kind"`
-	Status      string `json:"status"`
-	Description string `json:"description,omitempty"`
-	RiskLevel   string `json:"risk-level,omitempty"`
+	ID          string                  `json:"id"`
+	RunID       string                  `json:"-"` // resolved from `run` relationship
+	Kind        string                  `json:"kind"`
+	Status      string                  `json:"status"`
+	Description string                  `json:"description,omitempty"`
+	RiskLevel   string                  `json:"risk-level,omitempty"`
 	RiskFactors []PlanSummaryRiskFactor `json:"risk-factors,omitempty"`
 
 	// Telemetry / debugging
@@ -158,7 +158,7 @@ func (c *Client) RegeneratePlanSummary(ctx context.Context, runID string) (*Plan
 // conversational follow-ups that build on top of it.
 type PlanSummaryMessage struct {
 	ID           string `json:"id"`
-	Role         string `json:"role"`    // "user" or "assistant"
+	Role         string `json:"role"` // "user" or "assistant"
 	Content      string `json:"content"`
 	Model        string `json:"model,omitempty"`
 	InputTokens  int    `json:"input-tokens"`

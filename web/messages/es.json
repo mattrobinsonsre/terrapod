@@ -1681,6 +1681,12 @@
       "addEmail": "Añadir correo electrónico",
       "triggers": "Disparadores",
       "addNotification": "Añadir notificación"
+    },
+    "autoApplyMode": {
+      "never": "nunca",
+      "always": "siempre",
+      "create": "crear",
+      "createUpdate": "crear/actualizar"
     }
   },
   "planSummary": {
@@ -1917,7 +1923,8 @@
       "viewState": "Ver estado",
       "runOptions": "Opciones de ejecución",
       "agentPool": "Grupo de agentes",
-      "agentPoolCandidates": "{count, plural, one {# grupo candidato} other {# grupos candidatos}}"
+      "agentPoolCandidates": "{count, plural, one {# grupo candidato} other {# grupos candidatos}}",
+      "autoApplyHeld": "retenido"
     },
     "timeline": {
       "heading": "Cronología",

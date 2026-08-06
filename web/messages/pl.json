@@ -1681,6 +1681,12 @@
       "addEmail": "Dodaj e-mail",
       "triggers": "Wyzwalacze",
       "addNotification": "Dodaj powiadomienie"
+    },
+    "autoApplyMode": {
+      "never": "nigdy",
+      "always": "zawsze",
+      "create": "tworzenie",
+      "createUpdate": "tworzenie/aktualizacja"
     }
   },
   "planSummary": {
@@ -1917,7 +1923,8 @@
       "viewState": "Wyświetl stan",
       "runOptions": "Opcje przebiegu",
       "agentPool": "Pula agentów",
-      "agentPoolCandidates": "{count, plural, one {# pula kandydatów} few {# pule kandydatów} other {# pul kandydatów}}"
+      "agentPoolCandidates": "{count, plural, one {# pula kandydatów} few {# pule kandydatów} other {# pul kandydatów}}",
+      "autoApplyHeld": "wstrzymano"
     },
     "timeline": {
       "heading": "Oś czasu",

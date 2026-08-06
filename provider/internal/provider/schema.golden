@@ -136,6 +136,7 @@ resource terrapod_agent_pool_token.token required=false optional=false computed=
 resource terrapod_agent_pool_token.use_count required=false optional=false computed=true sensitive=false type=basetypes.Int64Type
 resource terrapod_autodiscovery_rule.agent_pool_id required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_autodiscovery_rule.auto_apply required=false optional=true computed=true sensitive=false type=basetypes.BoolType
+resource terrapod_autodiscovery_rule.auto_apply_mode required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_autodiscovery_rule.branch required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_autodiscovery_rule.created_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_autodiscovery_rule.enabled required=false optional=true computed=true sensitive=false type=basetypes.BoolType

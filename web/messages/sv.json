@@ -1681,6 +1681,12 @@
       "addEmail": "Lägg till e-post",
       "triggers": "Utlösare",
       "addNotification": "Lägg till avisering"
+    },
+    "autoApplyMode": {
+      "never": "aldrig",
+      "always": "alltid",
+      "create": "skapa",
+      "createUpdate": "skapa/uppdatera"
     }
   },
   "planSummary": {
@@ -1917,7 +1923,8 @@
       "viewState": "Visa tillstånd",
       "runOptions": "Körningsalternativ",
       "agentPool": "Agentpool",
-      "agentPoolCandidates": "{count, plural, one {# kandidatpool} other {# kandidatpooler}}"
+      "agentPoolCandidates": "{count, plural, one {# kandidatpool} other {# kandidatpooler}}",
+      "autoApplyHeld": "pausad"
     },
     "timeline": {
       "heading": "Tidslinje",

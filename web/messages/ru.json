@@ -1681,6 +1681,12 @@
       "addEmail": "Добавить адрес",
       "triggers": "Триггеры",
       "addNotification": "Добавить уведомление"
+    },
+    "autoApplyMode": {
+      "never": "никогда",
+      "always": "всегда",
+      "create": "создание",
+      "createUpdate": "создание/изменение"
     }
   },
   "planSummary": {
@@ -1917,7 +1923,8 @@
       "viewState": "Просмотр состояния",
       "runOptions": "Параметры запуска",
       "agentPool": "Пул агентов",
-      "agentPoolCandidates": "{count, plural, one {# пул-кандидат} few {# пула-кандидата} other {# пулов-кандидатов}}"
+      "agentPoolCandidates": "{count, plural, one {# пул-кандидат} few {# пула-кандидата} other {# пулов-кандидатов}}",
+      "autoApplyHeld": "отложено"
     },
     "timeline": {
       "heading": "Хронология",

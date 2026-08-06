@@ -609,6 +609,8 @@ field Run.Actions RunActions `json:"actions"`
 field Run.AgentPoolID string `json:"agent-pool-id,omitempty"`
 field Run.AllowEmptyApply bool `json:"allow-empty-apply"`
 field Run.AutoApply bool `json:"auto-apply"`
+field Run.AutoApplyDeclinedReason string `json:"auto-apply-declined-reason"`
+field Run.AutoApplyMode string `json:"auto-apply-mode"`
 field Run.CandidateAgentPoolIDs []string `json:"candidate-agent-pool-ids,omitempty"`
 field Run.CostCurrency string `json:"cost-currency,omitempty"`
 field Run.CostMonthlyMax *float64 `json:"cost-monthly-max,omitempty"`

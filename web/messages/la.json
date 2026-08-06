@@ -1681,6 +1681,12 @@
       "addEmail": "Inscriptionem addere",
       "triggers": "Concitatores",
       "addNotification": "Nuntiationem addere"
+    },
+    "autoApplyMode": {
+      "never": "numquam",
+      "always": "semper",
+      "create": "creare",
+      "createUpdate": "creare/mutare"
     }
   },
   "planSummary": {
@@ -1917,7 +1923,8 @@
       "viewState": "Statum Videre",
       "runOptions": "Optiones Exsecutionis",
       "agentPool": "Copia agentium",
-      "agentPoolCandidates": "{count, plural, one {# copia candidata} other {# copiae candidatae}}"
+      "agentPoolCandidates": "{count, plural, one {# copia candidata} other {# copiae candidatae}}",
+      "autoApplyHeld": "retentum"
     },
     "timeline": {
       "heading": "Series Temporum",

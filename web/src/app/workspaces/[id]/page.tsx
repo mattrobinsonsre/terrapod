@@ -228,6 +228,12 @@ type Tab = 'configuration' | 'variables' | 'runs' | 'state' | 'state-graph' | 'c
 
 const VALID_TABS: Set<string> = new Set(['configuration', 'variables', 'runs', 'state', 'state-graph', 'cost', 'architecture', 'versions', 'notifications', 'run-tasks', 'run-triggers', 'sharing'])
 
+
+/** Mode value -> i18n key. The API value is snake_case; the key is camel. */
+function autoApplyModeKey(mode: string): string {
+  return mode === 'create_update' ? 'createUpdate' : mode
+}
+
 export default function WorkspaceDetailPage() {
   return (
     <Suspense fallback={<><NavBar /><main className="px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto"><LoadingSpinner /></main></>}>
@@ -238,6 +244,9 @@ export default function WorkspaceDetailPage() {
 
 function WorkspaceDetailContent() {
   const t = useTranslations('workspaceDetail')
+  // Shared mode labels live in the top-level `common` namespace because
+  // the run page renders the same four values.
+  const tMode = useTranslations('common.autoApplyMode')
   const router = useRouter()
   const params = useParams()
   const searchParams = useSearchParams()
@@ -1962,16 +1971,14 @@ function WorkspaceDetailContent() {
                       onChange={(e) => setEditAutoApplyMode(e.target.value)}
                       className="mt-1 w-full px-2 py-1 text-sm rounded bg-slate-700 border border-slate-600 text-slate-200"
                     >
-                      {/* API enum identifiers, not prose — shown verbatim so
-                          they match the values in the API, provider and docs,
-                          exactly as `execution-mode` above does. */}
-                      <option value="never">never</option>{/* i18n-ignore */}
-                      <option value="always">always</option>{/* i18n-ignore */}
-                      <option value="create">create</option>{/* i18n-ignore */}
-                      <option value="create_update">create_update</option>{/* i18n-ignore */}
+                      {/* Values are the API enum; the labels are translated. */}
+                      <option value="never">{tMode('never')}</option>
+                      <option value="always">{tMode('always')}</option>
+                      <option value="create">{tMode('create')}</option>
+                      <option value="create_update">{tMode('createUpdate')}</option>
                     </select>
                   ) : (
-                    <dd className="mt-1 text-sm text-slate-200">{attrs['auto-apply-mode'] || (attrs['auto-apply'] ? 'always' : 'never')}</dd>
+                    <dd className="mt-1 text-sm text-slate-200">{tMode(autoApplyModeKey(attrs['auto-apply-mode'] || (attrs['auto-apply'] ? 'always' : 'never')))}</dd>
                   )}
                 </div>
                 <div>

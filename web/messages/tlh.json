@@ -1681,6 +1681,12 @@
       "addEmail": "QIn Sum chel",
       "triggers": "taghwI'mey",
       "addNotification": "QIn chel"
+    },
+    "autoApplyMode": {
+      "never": "not",
+      "always": "reH",
+      "create": "chenmoH",
+      "createUpdate": "chenmoH/choH"
     }
   },
   "planSummary": {
@@ -1917,7 +1923,8 @@
       "viewState": "Dotlh legh",
       "runOptions": "Sar wIvmey",
       "agentPool": "toy''wI'' ghom",
-      "agentPoolCandidates": "{count, plural, one {# ghom wIvlu''bogh} other {# ghom wIvlu''bogh}}"
+      "agentPoolCandidates": "{count, plural, one {# ghom wIvlu''bogh} other {# ghom wIvlu''bogh}}",
+      "autoApplyHeld": "loS"
     },
     "timeline": {
       "heading": "poH tlhegh",

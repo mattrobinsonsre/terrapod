@@ -38,12 +38,12 @@ type CreateNotificationConfigurationRequest struct {
 // UpdateNotificationConfigurationRequest is the partial-update shape.
 // Token is empty ⇒ leave alone, non-empty ⇒ rotate.
 type UpdateNotificationConfigurationRequest struct {
-	Name            string
-	URL             *string
-	Token           string
-	Enabled         *bool
-	Triggers        *[]string
-	EmailAddresses  *[]string
+	Name           string
+	URL            *string
+	Token          string
+	Enabled        *bool
+	Triggers       *[]string
+	EmailAddresses *[]string
 }
 
 // CreateNotificationConfiguration creates a new notification target

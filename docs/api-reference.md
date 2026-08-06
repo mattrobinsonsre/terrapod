@@ -293,6 +293,16 @@ mode that auto-applies at all, and writing it still works (`true` → `always`,
 `false` → `never`). Setting **both** `auto-apply` and `auto-apply-mode` in one
 request is rejected with `422` rather than guessing which was meant.
 
+Runs carry the decision too: `auto-apply-mode` is the mode snapshotted when the
+run was created (editing the workspace mid-run cannot retroactively change how an
+in-flight run decides), and `auto-apply-declined-reason` says why a conditional
+mode refused this plan — for example `2 destroys, 1 replace`. It is null unless
+the run was actually held.
+
+The bulk-update endpoint (`POST /api/terrapod/v1/workspaces/actions/bulk-update`)
+and the autodiscovery rule template both accept `auto-apply-mode` under the same
+either/or rule.
+
 **Request body:**
 ```json
 {

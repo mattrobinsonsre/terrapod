@@ -1681,6 +1681,12 @@
       "addEmail": "הוספת אימייל",
       "triggers": "טריגרים",
       "addNotification": "הוספת התראה"
+    },
+    "autoApplyMode": {
+      "never": "לעולם לא",
+      "always": "תמיד",
+      "create": "יצירה",
+      "createUpdate": "יצירה/עדכון"
     }
   },
   "planSummary": {
@@ -1917,7 +1923,8 @@
       "viewState": "הצג מצב",
       "runOptions": "אפשרויות הרצה",
       "agentPool": "מאגר סוכנים",
-      "agentPoolCandidates": "{count, plural, other {# מאגרים מועמדים}}"
+      "agentPoolCandidates": "{count, plural, other {# מאגרים מועמדים}}",
+      "autoApplyHeld": "מוחזק"
     },
     "timeline": {
       "heading": "ציר זמן",

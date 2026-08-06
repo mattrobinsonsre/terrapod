@@ -55,6 +55,8 @@ interface RunAttrs {
   'candidate-agent-pool-ids'?: string[]
   'created-at': string
   'auto-apply': boolean
+  'auto-apply-mode': string
+  'auto-apply-declined-reason': string | null
   'plan-only': boolean
   'is-destroy': boolean
   'target-addrs': string[]
@@ -567,6 +569,12 @@ function LogPanel({
 // useSearchParams() requires a Suspense boundary or `next build` fails to
 // statically analyse the route (Next 16). Matches the convention used by every
 // other useSearchParams page (login, workspaces, labels, …).
+
+/** Mode value -> i18n key. The API value is snake_case; the key is camel. */
+function autoApplyModeKey(mode: string): string {
+  return mode === 'create_update' ? 'createUpdate' : mode
+}
+
 export default function RunDetailPage() {
   return (
     <Suspense fallback={null}>
@@ -577,6 +585,8 @@ export default function RunDetailPage() {
 
 function RunDetailPageInner() {
   const t = useTranslations('runDetail')
+  // Shared with the workspace page — same four values, one set of labels.
+  const tMode = useTranslations('common.autoApplyMode')
   const router = useRouter()
   const params = useParams()
   const workspaceId = params.id as string
@@ -1488,7 +1498,20 @@ function RunDetailPageInner() {
             ) : null}
             <div>
               <dt className="text-xs text-slate-500">{t('details.autoApply')}</dt>
-              <dd className="mt-1 text-sm text-slate-200">{attrs['auto-apply'] ? t('common.yes') : t('common.no')}</dd>
+              {/* The mode this run was created under, shown as its raw enum
+                  value like `execution-backend` beside it — an API identifier,
+                  not prose. Yes/No lost the distinction between `always` and
+                  the conditional modes. When a conditional mode declined, the
+                  server's reason is appended so a run parked in `planned`
+                  explains itself instead of looking stuck (#1274). */}
+              <dd className="mt-1 text-sm text-slate-200">
+                {tMode(autoApplyModeKey(attrs['auto-apply-mode'] || (attrs['auto-apply'] ? 'always' : 'never')))}
+                {attrs['auto-apply-declined-reason'] ? (
+                  <span className="text-amber-300">
+                    {' — '}{t('details.autoApplyHeld')}: {attrs['auto-apply-declined-reason']}
+                  </span>
+                ) : null}
+              </dd>
             </div>
             <div>
               <dt className="text-xs text-slate-500">{t('details.planOnly')}</dt>

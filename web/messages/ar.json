@@ -1681,6 +1681,12 @@
       "addEmail": "إضافة بريد إلكتروني",
       "triggers": "المُشغّلات",
       "addNotification": "إضافة إشعار"
+    },
+    "autoApplyMode": {
+      "never": "أبدًا",
+      "always": "دائمًا",
+      "create": "إنشاء",
+      "createUpdate": "إنشاء/تحديث"
     }
   },
   "planSummary": {
@@ -1917,7 +1923,8 @@
       "viewState": "عرض الحالة",
       "runOptions": "خيارات التشغيل",
       "agentPool": "مجموعة الوكلاء",
-      "agentPoolCandidates": "{count, plural, other {# مجموعة مرشحة}}"
+      "agentPoolCandidates": "{count, plural, other {# مجموعة مرشحة}}",
+      "autoApplyHeld": "معلّق"
     },
     "timeline": {
       "heading": "الجدول الزمني",

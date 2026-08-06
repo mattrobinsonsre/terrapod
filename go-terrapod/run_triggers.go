@@ -12,9 +12,9 @@ import (
 // destination, which is why creation is workspace-scoped.
 type RunTrigger struct {
 	ID             string `json:"id"`
-	WorkspaceID    string `json:"workspace-id"`         // destination
+	WorkspaceID    string `json:"workspace-id"` // destination
 	WorkspaceName  string `json:"workspace-name"`
-	SourceID       string `json:"sourceable-id"`        // source
+	SourceID       string `json:"sourceable-id"` // source
 	SourceableName string `json:"sourceable-name"`
 	CreatedAt      string `json:"created-at,omitempty"`
 }

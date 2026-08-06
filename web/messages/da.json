@@ -1681,6 +1681,12 @@
       "addEmail": "Tilføj e-mail",
       "triggers": "Triggere",
       "addNotification": "Tilføj notifikation"
+    },
+    "autoApplyMode": {
+      "never": "aldrig",
+      "always": "altid",
+      "create": "opret",
+      "createUpdate": "opret/opdater"
     }
   },
   "planSummary": {
@@ -1917,7 +1923,8 @@
       "viewState": "Vis tilstand",
       "runOptions": "Kørselsindstillinger",
       "agentPool": "Agentpulje",
-      "agentPoolCandidates": "{count, plural, one {# kandidatpulje} other {# kandidatpuljer}}"
+      "agentPoolCandidates": "{count, plural, one {# kandidatpulje} other {# kandidatpuljer}}",
+      "autoApplyHeld": "afventer"
     },
     "timeline": {
       "heading": "Tidslinje",

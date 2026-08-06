@@ -1681,6 +1681,12 @@
       "addEmail": "E-posta ekle",
       "triggers": "Tetikleyiciler",
       "addNotification": "Bildirim ekle"
+    },
+    "autoApplyMode": {
+      "never": "asla",
+      "always": "her zaman",
+      "create": "oluşturma",
+      "createUpdate": "oluşturma/güncelleme"
     }
   },
   "planSummary": {
@@ -1917,7 +1923,8 @@
       "viewState": "Durumu Görüntüle",
       "runOptions": "Çalıştırma Seçenekleri",
       "agentPool": "Aracı havuzu",
-      "agentPoolCandidates": "{count, plural, other {# aday havuz}}"
+      "agentPoolCandidates": "{count, plural, other {# aday havuz}}",
+      "autoApplyHeld": "beklemede"
     },
     "timeline": {
       "heading": "Zaman Çizelgesi",
