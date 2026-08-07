@@ -45,15 +45,17 @@ func applyCmd(args []string) int {
 		// ~/.aws/credentials with AWS_PROFILE, AWS SSO, IAM roles,
 		// IRSA, EC2/ECS instance metadata) — same chain every other
 		// AWS-aware tool uses. We do not reinvent it.
-		s3Endpoint  = fs.String("s3-endpoint-url", os.Getenv("AWS_ENDPOINT_URL_S3"), "S3 endpoint override (e.g. http://localhost:4566 for LocalStack, or a VPC endpoint; or AWS_ENDPOINT_URL_S3)")
-		s3PathStyle = fs.Bool("s3-force-path-style", os.Getenv("AWS_S3_FORCE_PATH_STYLE") == "true", "Use S3 path-style addressing (required by most non-AWS S3 endpoints)")
-		s3Region    = fs.String("s3-region", "", "S3 region override (default: AWS_REGION env, or read from backend HCL)")
-		target      = fs.String("target", os.Getenv("TERRAPOD_HOSTNAME"), "Terrapod base URL (or TERRAPOD_HOSTNAME)")
-		token       = fs.String("token", os.Getenv("TERRAPOD_TOKEN"), "Terrapod API token (or TERRAPOD_TOKEN)")
-		statePath   = fs.String("state-file", framework.DefaultStateFile, "Path to the migration state JSON file")
-		apply       = fs.Bool("apply", false, "Actually write to Terrapod (default is dry-run)")
-		jsonReport  = fs.Bool("json", false, "Emit the final Report as JSON instead of a text summary")
-		skipTLS     = fs.Bool("skip-tls-verify", false, "Skip TLS certificate verification (dev only)")
+		s3Endpoint           = fs.String("s3-endpoint-url", os.Getenv("AWS_ENDPOINT_URL_S3"), "S3 endpoint override (e.g. http://localhost:4566 for LocalStack, or a VPC endpoint; or AWS_ENDPOINT_URL_S3)")
+		s3PathStyle          = fs.Bool("s3-force-path-style", os.Getenv("AWS_S3_FORCE_PATH_STYLE") == "true", "Use S3 path-style addressing (required by most non-AWS S3 endpoints)")
+		s3Region             = fs.String("s3-region", "", "S3 region override (default: AWS_REGION env, or read from backend HCL)")
+		target               = fs.String("target", os.Getenv("TERRAPOD_HOSTNAME"), "Terrapod base URL (or TERRAPOD_HOSTNAME)")
+		token                = fs.String("token", os.Getenv("TERRAPOD_TOKEN"), "Terrapod API token (or TERRAPOD_TOKEN)")
+		statePath            = fs.String("state-file", framework.DefaultStateFile, "Path to the migration state JSON file")
+		apply                = fs.Bool("apply", false, "Actually write to Terrapod (default is dry-run)")
+		jsonReport           = fs.Bool("json", false, "Emit the final Report as JSON instead of a text summary")
+		skipTLS              = fs.Bool("skip-tls-verify", false, "Skip TLS certificate verification (dev only)")
+		allowVersionMismatch = fs.Bool("allow-api-version-mismatch", false,
+			"Run even when this tool's version is incompatible with the target Terrapod API")
 	)
 	if err := fs.Parse(args); err != nil {
 		return 2
@@ -136,7 +138,10 @@ func applyCmd(args []string) int {
 		fmt.Fprintf(os.Stderr, "apply: build terrapod client: %v\n", err)
 		return 1
 	}
-	warnVersionMismatch(c)
+	if err := checkAPIVersion(c, *allowVersionMismatch); err != nil {
+		fmt.Fprintf(os.Stderr, "apply: %v\n", err)
+		return 1
+	}
 
 	// --workspace mode: pre-seed the state file with the existing
 	// workspace's Terrapod ID so the writer takes the "reused" path

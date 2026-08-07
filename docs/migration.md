@@ -106,6 +106,36 @@ is advisory by policy; the registry artefacts below are limited by the
 - `terrapod-migrate cutover` — lock/unlock the source TFE workspaces and
   write the handover document (TFE source only).
 
+### Tool ↔ API version compatibility
+
+`terrapod-migrate` writes workspaces, variables, state and registry data, so
+it checks at startup that its own version is compatible with the target
+Terrapod API (same major, and the API no older than the tool) and **refuses
+to run** when it is not. The check reads
+[`/.well-known/terraform.json`](https://developer.hashicorp.com/terraform/internals/remote-service-discovery),
+which Terrapod has reported a version in since v0.24.
+
+The failure this prevents is a quiet one: an API that does not recognise an
+attribute the tool sends **ignores it and still answers `200`**, so a
+version-skewed migration can appear to succeed while silently dropping
+settings.
+
+```
+terrapod-migrate apply --allow-api-version-mismatch ...
+```
+
+overrides the refusal — use it for a development build, or a deliberate
+hot-patch within a patch series. It is accepted by `apply`, `verify` and
+`rollback`.
+
+Two cases are **not** refused, with or without the flag:
+
+- **A build from source.** Its version is unset, so there is nothing to
+  compare and the check is skipped.
+- **A probe that fails** (the discovery endpoint is unreachable, times out,
+  or errors). A version check that cannot complete must not stand between
+  you and a migration; the tool warns and continues.
+
 ## Quickstart
 
 ### From TFE / HCP Terraform
