@@ -1024,3 +1024,54 @@ func TestWriter_DryRun_PlansStateWithoutUpload(t *testing.T) {
 		t.Fatalf("planned state metadata wrong: %+v", so)
 	}
 }
+
+// TestWriter_Apply_SendsAutoApplyModeNotBoolean pins what actually goes on
+// the wire. The API rejects a body carrying BOTH auto-apply and
+// auto-apply-mode with a 422, so "sends the mode" is only half the
+// requirement — the boolean must be absent, and a test that checked only
+// the mode would pass right up until every workspace create started
+// failing.
+func TestWriter_Apply_SendsAutoApplyModeNotBoolean(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		mode string
+		want string
+	}{
+		{"explicit mode is passed through", "create_update", "create_update"},
+		{"always survives", "always", "always"},
+		// A source with no opinion (Atlantis has no auto-apply concept)
+		// must land on never — the same workspace the old explicit
+		// auto-apply:false produced, and the safe way to guess.
+		{"empty resolves to never", "", "never"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			fs, c := newFakeServer(t)
+			w := New(c, &framework.State{}, "")
+
+			plan := ir.Plan{
+				Source:     "tfe",
+				Workspaces: []ir.Workspace{{SourceID: "s1", Name: "app", AutoApplyMode: tc.mode}},
+			}
+			if _, err := w.Run(t.Context(), plan, Options{}); err != nil {
+				t.Fatalf("Run: %v", err)
+			}
+
+			var got struct {
+				Data struct {
+					Attributes map[string]any `json:"attributes"`
+				} `json:"data"`
+			}
+			if err := json.Unmarshal(fs.lastWorkspaceBody, &got); err != nil {
+				t.Fatalf("unmarshal workspace body: %v (body=%s)", err, fs.lastWorkspaceBody)
+			}
+			attrs := got.Data.Attributes
+
+			if attrs["auto-apply-mode"] != tc.want {
+				t.Errorf("auto-apply-mode = %v, want %q (body=%s)", attrs["auto-apply-mode"], tc.want, fs.lastWorkspaceBody)
+			}
+			if _, present := attrs["auto-apply"]; present {
+				t.Errorf("auto-apply must not be sent alongside the mode — the API 422s on the pair (body=%s)", fs.lastWorkspaceBody)
+			}
+		})
+	}
+}
