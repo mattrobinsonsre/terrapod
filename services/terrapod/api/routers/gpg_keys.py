@@ -8,12 +8,23 @@ admin endpoint. They're Terrapod-native management surface and live at
 The historical TFE-shaped path was `/api/registry/private/v2/gpg-keys`;
 it was removed in v0.24.0 (see #278) and is no longer routable.
 
-Endpoints (canonical):
-    POST   /api/terrapod/v1/gpg-keys                  — create
-    GET    /api/terrapod/v1/gpg-keys                   — list
-    GET    /api/terrapod/v1/gpg-keys/{key_id}          — show
-    POST   /api/terrapod/v1/gpg-keys/{key_id}/revoke   — revoke (#640)
-    DELETE /api/terrapod/v1/gpg-keys/{key_id}          — delete
+Endpoints (canonical), with the permission each requires:
+    POST   /api/terrapod/v1/gpg-keys                  — create  · registry:admin
+    GET    /api/terrapod/v1/gpg-keys                   — list    · any authenticated
+    GET    /api/terrapod/v1/gpg-keys/{key_id}          — show    · any authenticated
+    POST   /api/terrapod/v1/gpg-keys/{key_id}/revoke   — revoke  · registry:admin (#640)
+    DELETE /api/terrapod/v1/gpg-keys/{key_id}          — delete  · registry:admin
+
+**Reads are open, writes are not, and the asymmetry is deliberate** (#1300).
+The reads return public key material — the same bytes `terraform init` already
+receives in every provider download response — so gating them would protect
+nothing while breaking the ability to check which keys an instance trusts.
+
+Registering one is the opposite: a signing key is a *trust anchor*. Every
+provider version signed by it becomes installable by every runner on the
+instance, so create / revoke / delete require `registry:admin`. Before v1.4.0
+authentication alone sufficed, which let any account add a trust anchor; see
+`docs/registry-publishing.md` for what publishers need to do about it.
 """
 
 import uuid
@@ -134,8 +145,18 @@ async def _require_gpg_key_capability(
     user: AuthenticatedUser,
     required_cap: str,
 ) -> None:
-    """Check the required registry capability on the GPG key store or raise 403."""
-    caps = await resolve_registry_capabilities_for(db, user, "", {}, "")
+    """Check the required registry capability on the GPG key store or raise 403.
+
+    `unscoped=True` because the key store is the registry itself rather than a
+    thing inside it. Without it the ordinary allow rules cannot match an empty
+    name and empty labels, so *only platform admin* ever resolved the
+    capability — a role explicitly granted `registry_permission: admin` was
+    locked out and `registry:admin` here named something undelegable (#1300).
+    An unscoped registry-admin role now resolves; a label- or name-scoped one
+    still does not, because a signing key is a trust anchor for the whole
+    registry and not for that role's slice of it.
+    """
+    caps = await resolve_registry_capabilities_for(db, user, "", {}, "", unscoped=True)
     if not has_capability(caps, required_cap):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

@@ -45,11 +45,17 @@ async def resolve_registry_capabilities_for(
     *,
     preloaded_roles: list[Role] | None = None,
     token_preloaded_roles: list[Role] | None = None,
+    unscoped: bool = False,
 ) -> frozenset[str]:
     """Capability set a principal holds on a registry resource (#585).
 
     Registry-typed wrapper over ``capability_resolver`` (axis="registry"; the
-    runner-token read floor is applied inside via ``user.auth_method``)."""
+    runner-token read floor is applied inside via ``user.auth_method``).
+
+    ``unscoped`` is for the registry-wide GPG signing-key store, which has no
+    name, labels or owner of its own — see ``_role_matches`` (#1300). Leave it
+    False for every resource that is a *thing in* the registry.
+    """
     from terrapod.services.capability_resolver import resolve_capabilities_for
 
     return await resolve_capabilities_for(
@@ -61,4 +67,5 @@ async def resolve_registry_capabilities_for(
         axis="registry",
         preloaded_roles=preloaded_roles,
         token_preloaded_roles=token_preloaded_roles,
+        unscoped=unscoped,
     )

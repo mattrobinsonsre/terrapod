@@ -16,6 +16,19 @@ for every public surface below.
 | **MINOR** (`0.58.0 → 0.59.0`) | New, **backward-compatible** features. Existing routes, response attributes, wire protocol, SDK methods, Helm values, and config keys keep working unchanged. Additive only. Safe to take without config changes. |
 | **MAJOR** (`0.x → 1.0`, `1.x → 2.0`) | The only release that may contain a **breaking change** to a stable surface — and only after the deprecation window below. Read the migration notes before upgrading. |
 
+> **The one exception: closing a security hole.** A MINOR may *tighten* a
+> permission on a surface that was wrongly open, because leaving it open is
+> itself the harm and a deprecation window would mean shipping a known hole for
+> two more minors. This is narrow — it covers removing access that should never
+> have been granted, never removing a route, an attribute, or a config key. It
+> has been used once, in **v1.4.0**, when GPG signing-key registration went from
+> "any authenticated caller" to requiring `registry:admin`; an unprivileged
+> account could otherwise add a trust anchor for the whole provider registry.
+> When it is used, the release notes say so plainly and the affected doc pages
+> carry the migration step, so an operator meets it before their next apply
+> fails rather than after — see
+> [registry-publishing.md](registry-publishing.md#1-register-the-publishers-gpg-public-key).
+
 > **Stability note.** As of **`1.0.0`**, the MAJOR/MINOR/PATCH contract below is
 > absolute and enforced in CI: no stable surface is removed, renamed, or retyped
 > outside a MAJOR release that has completed the deprecation window. (Before

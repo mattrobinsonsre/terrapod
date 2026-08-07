@@ -48,7 +48,7 @@ func (r *gpgKeyResource) Metadata(_ context.Context, req resource.MetadataReques
 
 func (r *gpgKeyResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Manages a GPG key for provider signing in the Terrapod registry.",
+		Description: "Manages a GPG key for provider signing in the Terrapod registry. Requires registry admin as of Terrapod v1.4.0 — before that, authentication alone sufficed. A key is a trust anchor: every provider signed by it becomes installable instance-wide, so an existing resource managed by a service token whose role lacks registry admin will start failing on its next apply. Grant it with registry_permission = \"admin\" and no allow_names or allow_labels — a role scoped to part of the registry deliberately cannot register a key.",
 		Attributes: map[string]schema.Attribute{
 			"id":          schema.StringAttribute{Computed: true, Description: "GPG key ID.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
 			"ascii_armor": schema.StringAttribute{Required: true, Sensitive: true, Description: "ASCII-armored PGP public key (write-only).", PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
