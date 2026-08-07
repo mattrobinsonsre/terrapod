@@ -424,6 +424,15 @@ data:
     metrics:
       enabled: {{ .Values.api.config.metrics.enabled }}
     {{- end }}
+    {{- with .Values.api.config.scheduler }}
+    scheduler:
+      {{- with .lane_consumers }}
+      lane_consumers:
+        {{- range $lane, $count := . }}
+        {{ $lane }}: {{ int $count }}
+        {{- end }}
+      {{- end }}
+    {{- end }}
     runner_artifacts:
       # int64 cast keeps Helm from emitting YAML scientific notation
       # for values above ~1M (Pydantic refuses to parse those as int).

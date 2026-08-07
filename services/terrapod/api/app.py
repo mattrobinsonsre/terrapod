@@ -97,6 +97,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
 
     # Register and start distributed scheduler (multi-replica safe)
     from terrapod.services.scheduler import (
+        AI_LANE,
         register_periodic_task,
         register_trigger_handler,
         start_scheduler,
@@ -333,6 +334,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
             "ai_plan_summary",
             handler=handle_ai_plan_summary,
             description="Summarise plan changes or analyse plan failures via LLM",
+            # Its own lane: independent, I/O-bound model calls that a VCS poll
+            # emits in bursts. Left in the default lane they were drained one
+            # at a time behind (and in front of) sub-second status posts.
+            lane=AI_LANE,
         )
 
         # AI cost narrative (#871) — the optional enhancement over the
@@ -343,6 +348,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
             "ai_cost_summary",
             handler=handle_ai_cost_summary,
             description="Narrate a run's cost estimate + suggest savings via LLM",
+            lane=AI_LANE,
         )
 
     # Run reconciler (drives run state transitions based on Job outcomes)

@@ -2583,6 +2583,20 @@
               }
             }
           }
+        },
+        "scheduler": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "lane_consumers": {
+              "type": "object",
+              "description": "Consumers per replica for each triggered-task lane, as {lane: count}. Unset lanes fall back to their built-in default.",
+              "additionalProperties": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          }
         }
       }
     }

@@ -858,6 +858,26 @@ api:
       # fronts more distinct API clients than this. 0 = unlimited.
       distinct_credentials_per_minute: 200
 
+    # Background triggered-task scheduler (#1296).
+    #
+    # Consumers PER REPLICA for each lane; deployment-wide concurrency is this
+    # times the replica count. Lanes are independent queues, so these numbers
+    # do not interact.
+    #
+    # `default` stays at 1: that work is sub-second, and more consumers would
+    # buy nothing. `ai` is 10 because those items are independent, I/O-bound
+    # model calls — they were previously drained one at a time behind the
+    # sub-second majority, which turned a single VCS poll cycle across many
+    # workspaces into minutes of queue for a user-visible feature.
+    #
+    # Raise `ai` to drain a backlog faster; lower it if your model provider's
+    # rate limits complain. Watch `terrapod_scheduler_queue_depth{lane="ai"}`
+    # and `terrapod_scheduler_trigger_wait_seconds` to decide which.
+    scheduler:
+      lane_consumers:
+        default: 1
+        ai: 10
+
     # Prometheus metrics
     metrics:
       enabled: true

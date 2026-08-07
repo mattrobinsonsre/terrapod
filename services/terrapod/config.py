@@ -1254,6 +1254,25 @@ class RunnerArtifactsConfig(BaseModel):
     )
 
 
+class SchedulerConfig(BaseModel):
+    """Background triggered-task scheduler (#1296)."""
+
+    lane_consumers: dict[str, int] = Field(
+        default_factory=dict,
+        description=(
+            "Concurrent consumers PER REPLICA for each triggered-task lane, as "
+            "{lane: count}. Deployment-wide concurrency for a lane is this "
+            "times the replica count. Unset lanes use their built-in default: "
+            "1 for `default` (sub-second work, where more would buy nothing) "
+            "and 10 for `ai` (independent, I/O-bound model calls that were "
+            "previously drained one at a time). Raise `ai` to clear a backlog "
+            "faster, lower it to stay inside a model provider's rate limits. "
+            "Values below 1 are clamped up — a lane with no consumers would "
+            "accept work and never drain it."
+        ),
+    )
+
+
 class MetricsConfig(BaseModel):
     """Prometheus metrics configuration."""
 
@@ -2424,6 +2443,7 @@ class Settings(BaseSettings):
 
     # Metrics
     metrics: MetricsConfig = Field(default_factory=MetricsConfig)
+    scheduler: SchedulerConfig = Field(default_factory=SchedulerConfig)
 
     # Artifact Retention
     artifact_retention: ArtifactRetentionConfig = Field(default_factory=ArtifactRetentionConfig)

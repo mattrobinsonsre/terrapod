@@ -257,6 +257,7 @@
   "registry.provider_cache.warm_on_first_request",
   "registry.signing_key",
   "runner_artifacts.plan_artifacts_max_bytes",
+  "scheduler.lane_consumers",
   "slack.app_token",
   "slack.bot_token",
   "slack.command",
