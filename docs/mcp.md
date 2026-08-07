@@ -107,6 +107,7 @@ Every tool is namespaced `terrapod_*` and carries a safety annotation
 | `terrapod_run_plan_json` | The structured JSON plan output (`tofu show -json`) — reason precisely about resource changes. |
 | `terrapod_run_cost` | A run's monthly cost estimate — the plan's cost *delta* (projected total, this-run delta, previous, per-resource, unpriced). Data only, no AI. |
 | `terrapod_workspace_cost` | A workspace's *current* monthly cost from its latest state — total, per-resource, unpriced, and which state version was priced. Data only, no AI. |
+| `terrapod_deleted_workspace_list` | Deleted workspaces whose state is still recoverable — name, when and by whom, how many state versions survive, when the window closes, and whether it has already been restored. Platform admin only. |
 
 ### Act (gated) — the normal run lifecycle
 
@@ -123,7 +124,8 @@ Every tool is namespaced `terrapod_*` and carries a safety annotation
 |---|---|---|
 | `terrapod_workspace_create` | — | Create a workspace (name required; execution mode, VCS wiring, agent pool, labels, …). |
 | `terrapod_workspace_update` | — | Update a workspace's settings (only the fields you pass change; applies on its next run). |
-| `terrapod_workspace_delete` | destructive | Delete a workspace + its Terrapod records. Does **not** destroy the tracked infra — queue a destroy run first. Catalog-managed workspaces are refused. |
+| `terrapod_workspace_delete` | destructive | Delete a workspace + its Terrapod records. Does **not** destroy the tracked infra — queue a destroy run first. Catalog-managed workspaces are refused. Its **state survives** and stays recoverable for the deployment's retention window (default 30 days) via `terrapod_deleted_workspace_restore`, but recovery yields a NEW workspace with a NEW id and is admin-only — so this is reversible-with-effort, not undoable. |
+| `terrapod_deleted_workspace_restore` | destructive | Recover a deleted workspace's state into a **new** workspace. Platform admin only. A salvage operation, not an undo: new id, comes back inert (auto-apply and drift off, VCS not re-attached), variables and run history do not return. Refuses a second restore of the same deletion. |
 | `terrapod_variable_list` | read-only | List a workspace's variables (sensitive values masked). |
 | `terrapod_variable_set` | — | Upsert a variable by key (terraform or env; `hcl` for non-string values). |
 | `terrapod_variable_delete` | destructive | Delete a variable by key. |

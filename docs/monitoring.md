@@ -210,8 +210,11 @@ depth alone — a deep queue that drains fast is fine.
 | Metric | Type | Labels | Description |
 |---|---|---|---|
 | `terrapod_retention_deleted_total` | Counter | category | Artifacts deleted by retention cleanup |
+| `terrapod_retention_orphan_reap_blocked` | Gauge | — | `1` while the deleted-workspace reaper is refusing to reap. Alert on it: nothing is being reclaimed, and a stale database is one of the causes |
 | `terrapod_retention_errors_total` | Counter | category | Errors during retention cleanup |
 | `terrapod_retention_duration_seconds` | Histogram | -- | Duration of retention cleanup cycle |
+
+> `category="deleted_workspaces"` counts **irreversible destruction of customer state** — the reaper deleting the state of a workspace past its undelete window. It is the one category worth alerting on rather than merely graphing.
 
 Categories: `state_versions`, `run_artifacts`, `config_versions`, `provider_cache`, `binary_cache`, `module_overrides`.
 

@@ -163,3 +163,21 @@ Project / Group access tokens need `api` scope (the existing requirement covers 
 - [`docs/vcs-integration.md`](vcs-integration.md) — VCS connection setup
 - [`docs/rbac.md`](rbac.md) — Terrapod's RBAC (which does *not* gate comment-driven applies)
 - [`docs/audit-logging.md`](audit-logging.md) — dual-actor audit model
+
+
+## `apply_then_merge` and auto-apply are incompatible
+
+A workspace using `apply_then_merge` cannot have auto-apply enabled, in any
+mode. The API refuses the pair with a `422` — on workspace create, on PATCH, and
+on bulk-update, which checks it against every matched workspace before touching
+any of them.
+
+The reason is the ordering the workflow is named for. Under `apply_then_merge`
+the apply runs **before** the PR merges, so an auto-apply would apply
+infrastructure changes from a branch nobody has approved — which is precisely
+what the workflow exists to prevent. Under the default `merge_then_apply` the
+review has already happened by the time the apply is queued, so auto-apply is
+compatible there.
+
+To move a workspace between them, change one setting at a time: turn auto-apply
+off first, then switch the workflow.

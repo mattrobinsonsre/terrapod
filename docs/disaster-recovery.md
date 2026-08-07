@@ -221,6 +221,18 @@ per-backend toggles below.
 Object storage holds state, config tarballs, logs, registry artifacts **and**
 (when enabled) the DB dumps above. Turn on the provider's native protections:
 
+> **For a workspace deleted by mistake, try undelete first.** Deleting a
+> workspace does not delete its state — a marker keeps it findable and
+> recoverable for
+> `api.config.artifact_retention.deleted_workspace_retention_days` (default 30),
+> from **Admin → Deleted workspaces**. That is a two-click recovery and does not
+> need bucket versioning at all. See
+> [the runbook](runbooks.md#i-deleted-a-workspace-by-mistake).
+>
+> Bucket versioning below is the layer *beneath* that: it is what remains once
+> the retention window has passed and the reaper has deleted the state for
+> good, and it is the only thing that can recover from that. Keep it on.
+
 | Backend | Versioning (undo overwrite/delete) | Off-site copy |
 |---|---|---|
 | **AWS S3** | `aws s3api put-bucket-versioning --versioning-configuration Status=Enabled` | S3 Cross-Region Replication (CRR) to a bucket in another account/region |

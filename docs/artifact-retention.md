@@ -148,8 +148,11 @@ Three Prometheus metrics track retention activity:
 | Metric | Type | Labels | Description |
 |---|---|---|---|
 | `terrapod_retention_deleted_total` | Counter | category | Artifacts successfully deleted |
+| `terrapod_retention_orphan_reap_blocked` | Gauge | — | `1` while the deleted-workspace reaper is refusing to reap an implausibly large orphan set (the signature of a stale or repointed database). **Alert on this** — while it is `1` nothing is reclaimed, and if the cause really is a stale database then reaping is exactly what must not happen. See [the runbook](runbooks.md#orphaned-state-reaper-refusing-to-reap-terrapod_retention_orphan_reap_blocked--1) |
 | `terrapod_retention_errors_total` | Counter | category | Per-item deletion errors |
 | `terrapod_retention_duration_seconds` | Histogram | -- | Wall-clock duration of the full cleanup cycle |
+
+> `category="deleted_workspaces"` counts **irreversible destruction of customer state** — the reaper deleting the state of a workspace past its undelete window. It is the one category worth alerting on rather than merely graphing.
 
 Categories: `state_versions`, `run_artifacts`, `config_versions`, `config_versions_count`, `provider_cache`, `binary_cache`, `module_overrides`, `vcs_archives`.
 

@@ -135,6 +135,11 @@ Two cases are **not** refused, with or without the flag:
 - **A probe that fails** (the discovery endpoint is unreachable, times out,
   or errors). A version check that cannot complete must not stand between
   you and a migration; the tool warns and continues.
+- **An API that reports no version at all** (`ErrVersionUnreported`) — an
+  instance older than v0.24, before the discovery document carried one. There
+  is nothing to compare, so the tool warns and continues, exactly as for a
+  failed probe. Only a version it can read *and* finds incompatible is
+  refused.
 
 ## Quickstart
 

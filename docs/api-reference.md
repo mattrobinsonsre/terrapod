@@ -430,6 +430,18 @@ All workspace responses (show and list) include a `permissions` object reflectin
 DELETE /api/terrapod/v1/workspaces/{id}
 ```
 
+**Deleting does not delete the state.** The state blobs stay in object storage
+and a delete marker records what they belonged to, so a mistaken delete is
+recoverable for
+`api.config.artifact_retention.deleted_workspace_retention_days` (default 30)
+— see [Deleted Workspaces (undelete)](#deleted-workspaces-undelete) and
+[the runbook](runbooks.md#i-deleted-a-workspace-by-mistake). After that window
+the reaper removes the state permanently and it is unrecoverable.
+
+Recovery produces a **new workspace with a new id**, so anything referencing the
+old id needs repointing — it is a salvage operation, not an undo.
+
+
 **Required permission:** `admin` on the workspace.
 
 ### Lock Workspace
@@ -4079,6 +4091,12 @@ Notable attributes:
 | `marker-reason` | `deleted` — written by the delete, so `deleted-at` is the true deletion time. `discovered-orphaned` — the reaper found state with no marker (deleted before this feature shipped, or the marker write failed), so `deleted-at` is when it was first seen |
 | `state-versions-available` | Counted from storage at request time, not taken from the marker — a partial reap or an incomplete replication shows up here and nowhere else |
 | `restorable-until` | When the state becomes eligible for reaping. Empty when retention is disabled |
+| `workspace-id` | The deleted workspace's id — also the resource `id`. Accepted bare or `ws-`-prefixed on the routes below |
+| `workspace-name` | Its name at delete time. `null` on a reaper-discovered marker, which has no name to record |
+| `deleted-at` / `deleted-by` | When, and by whom. On a `discovered-orphaned` marker `deleted-at` is when the reaper first *saw* it, not when it was deleted |
+| `age-days` | Days since `deleted-at`, rounded — what the retention window is measured against |
+| `last-serial` / `lineage` | The state's serial and lineage at delete time, so you can tell which workspace's state this is before restoring |
+| `settings` | The workspace's non-secret configuration snapshot (labels, owner, execution mode, VCS reference, …), used to rebuild it |
 | `restored-to` | Workspace ids this deletion has already been restored into; empty until the first restore. Check it before offering a restore — a repeat would produce a second live workspace over the same infrastructure |
 | `restored-at` / `restored-by` | When and by whom the most recent restore happened |
 | `variable-names` | Names and categories only. Values are **never** recorded: the marker is a plain object in the bucket and replicates to any standby |
@@ -4145,6 +4163,17 @@ Three properties worth knowing before you call it:
   drift. The second attempt is refused with a `409` naming the workspace that
   already exists. Pass `force` only when that earlier restore is known to be
   gone.
+
+Response attributes:
+
+| Attribute | Meaning |
+|---|---|
+| `name` | The new workspace's name — the original if free, suffixed if taken, or the one you supplied |
+| `restored-from` | The deleted workspace's id, so the provenance is on the record |
+| `state-versions-restored` | How many were copied |
+| `state-versions-skipped` | Each with a `key` and a `reason` — unreadable blob, duplicate serial, or beyond the version cap. **A partial-failure signal**: a caller that ignores it can believe it recovered history it did not |
+| `suppressed` | Settings forced off (`auto_apply`, `drift_detection_enabled`, `vcs_connection`) — what to re-enable deliberately |
+| `dropped-references` | Things pointing at other resources that were not re-attached, e.g. a VCS connection whose id may since have been reused |
 
 The source prefix and its marker are left untouched, so the original remains
 recoverable until its window expires.

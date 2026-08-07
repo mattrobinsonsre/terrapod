@@ -127,6 +127,7 @@ Everything below is implemented and shipped today.
 | TFE V2 CLI surface | The `cloud`-backend subset of the TFE V2 API (JSON:API) consumed by `terraform`/`tofu` + `terraform login` — not the full TFE V2 API |
 | Run triggers | Cross-workspace dependency chains — a source apply triggers downstream runs |
 | Conditional auto-apply | Auto-apply only when the plan is within a declared safety standard — adds only, or adds and in-place updates. Anything that destroys or replaces a resource stops for a human |
+| Workspace undelete | Deleting a workspace leaves its state behind a delete marker, so an admin can salvage it into a new workspace within the retention window. A salvage operation, not an undo — the recovered workspace has a new id and comes back inert |
 | Stale-plan guards | Auto-discard a plan that no longer reflects reality: state-version drift (always on) + optional per-workspace time-based plan expiry |
 
 ### Governance & security

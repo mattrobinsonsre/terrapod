@@ -637,8 +637,20 @@ The classes, in the order a report lists them:
 | Tier | Classes |
 |---|---|
 | Irreplaceable | `state`, `state_index`, `configuration_versions`, `registry_modules`, `registry_providers` |
-| History | `run_logs`, `run_plans`, `run_vars` |
+| History | `run_logs`, `run_plans`, `run_vars`, `deleted_workspace_markers` |
 | Re-derivable | `provider_cache`, `binary_cache`, `platform_provider_cache`, `cost_pricesheet`, `vcs_archives`, `module_overrides` |
+
+> **`deleted_workspace_markers` is History, and it must be replicated.** The
+> markers are what makes deleted-workspace state findable again — the undelete
+> index. It sits at its own prefix (`state/deleted/`) rather than inside
+> `state/` precisely so that it is *not* the `state` class, which is
+> `encrypted_at_rest` and which replication declines wholesale when app-layer
+> encryption is on. Excluding this class on an encrypted deployment leaves the
+> standby with no undelete index at all — the state blobs would be there and
+> nothing would know which workspace they belonged to. It is History rather
+> than Irreplaceable only because a marker cannot be verified from database
+> rows (that is its whole point), and an unverifiable class in the
+> irreplaceable tier puts a line in the readiness report nobody can ever clear.
 
 An unknown class name is **rejected** — by `helm lint` before install, and again at
 startup for the paths the chart never sees. A typo that silently left a class on
