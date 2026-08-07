@@ -179,3 +179,44 @@ resource/data source uses `vcs_provider` for the provider-kind attribute
   Atlantis estates onto Terrapod.
 - [API reference](api-reference.md) — the underlying `/api/terrapod/v1` surface
   the provider drives via `go-terrapod`.
+
+
+## Tool ↔ API version compatibility
+
+From Terrapod v1.4.0 the provider compares its own build version against the
+API's during `Configure` and raises a **warning diagnostic** on a mismatch. It
+appears on every plan and apply against a skewed instance:
+
+```
+Warning: Terrapod API version mismatch
+```
+
+It is a warning, never an error — the plan and apply proceed. It exists so a
+provider several minors adrift of the instance is visible before it produces a
+confusing failure, rather than after. Align the two versions to silence it. A
+provider built from source reports itself as `dev`, which the SDK treats as
+"cannot compare" and skips, so local development is unaffected.
+
+## `auto_apply_mode`
+
+`terrapod_workspace` carries both `auto_apply` (boolean) and `auto_apply_mode`
+(`never` / `always` / `create` / `create_update`). The mode is the richer form:
+the conditional values apply a successful plan only when its shape is within the
+declared standard, and **never** auto-apply a plan containing a destroy or a
+replace.
+
+**Set one or the other, not both.** The API rejects a request carrying both, and
+the provider mirrors that: when `auto_apply_mode` is configured, a configured
+`auto_apply` is dropped from the request rather than sent alongside it. If you
+set both in HCL you will get the mode's behaviour and the boolean will appear to
+have been ignored — because it was. Configure the mode alone:
+
+```hcl
+resource "terrapod_workspace" "app" {
+  name            = "app-prod"
+  auto_apply_mode = "create_update"   # not auto_apply
+}
+```
+
+Both attributes are `Optional + Computed`, so a configuration that manages
+neither will not drift when the server projects one from the other.

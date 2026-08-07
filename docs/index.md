@@ -28,6 +28,8 @@ Beyond broad TFE compatibility, Terrapod is built with three deliberate design f
 | **Remote State Management** | Versioned state storage with locking, rollback, encryption at rest via CSP services |
 | **Agent Execution** | Plan/apply runs on the server via K8s Job-based runner infrastructure |
 | **VCS Integration** | GitHub (App) and GitLab (access token); inbound webhooks supported (GitHub HMAC + GitLab token) for instant triggers, plus outbound polling so webhooks are optional, never required |
+| **Conditional auto-apply** | Per-workspace `auto_apply_mode` — apply automatically only when the plan is within a declared safety standard (`create`, `create_update`); anything that destroys or replaces stops for a human |
+| **Workspace undelete** | Deleting a workspace leaves its state behind a delete marker; an admin can salvage it into a new workspace within the retention window. See [runbooks.md](runbooks.md#i-deleted-a-workspace-by-mistake) |
 | **VCS Workflows** | Default merge-then-apply (TFE standard) plus opt-in apply-then-merge mode (Atlantis-style: PR comments drive applies, `terrapod apply` from a PR comment, auto-merge after apply) |
 | **Variables & Secrets** | Per-workspace env and Terraform variables; sensitive values protected by database encryption-at-rest; variable sets |
 | **Private Module Source Auth** | First-class auth for private `git::https://` / `git::ssh://` module sources — a scoped `git_http_auth` / `git_ssh_auth` variable (static token or minted from a VCS connection), ssh↔https protocol rewrite, log-safe per-run-Secret delivery ([module-auth.md](module-auth.md)) |
@@ -174,6 +176,7 @@ See [Architecture](architecture.md) for the full breakdown.
 | [HA Topologies](ha-topologies.md) | Where to put the pieces: single-region, two-region, two-cloud and air-gapped layouts; dedicated vs shared listener fleets; multi-pool execution routing; a worked layout and how to rehearse a failover |
 | [HA Operations](ha-operations.md) | The operator procedures: the shared-vs-per-node naming model, planned and unplanned failover, failback, maintenance, adding and removing a node, and version skew across the pair |
 | [Disaster Recovery](disaster-recovery.md) | Break-glass state recovery, shipped DB backup CronJob + restore-verification DR drill, per-backend object-storage protection |
+| [Runbooks](runbooks.md) | Incident procedures — including **recovering a workspace deleted by mistake**, what to do when the orphan reaper has destroyed state, and why a workspace has stopped auto-applying |
 | [API Reference](api-reference.md) | All API endpoints with examples |
 
 ---

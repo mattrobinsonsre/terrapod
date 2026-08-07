@@ -1417,3 +1417,183 @@ stops reaping entirely, which is a bigger hammer and hides the signal.
 - Alert on the gauge. While it is `1`, storage is not being reclaimed — and if
   the cause is a stale database, reaping is exactly what must not happen.
 - Never point a Terrapod deployment at another deployment's storage prefix.
+
+---
+
+## I deleted a workspace by mistake
+
+Deleting a workspace removes its rows, but **not its state**. The state blobs
+stay in object storage and a delete marker records what they belonged to, so a
+mistaken delete is recoverable — for a while.
+
+**Act promptly.** The window is
+`api.config.artifact_retention.deleted_workspace_retention_days` (default 30);
+once it passes, the reaper deletes the state permanently and there is nothing
+left to recover.
+
+### Recovery
+
+1. Find it. **Admin only** — on every route, including the reads, because a
+   marker names a workspace and its variable *names* and a restore materialises
+   its state (and therefore its secrets) into a workspace the caller can read.
+   The original's ACL died with its rows, so there is nothing to delegate to.
+
+   UI: **Admin → Deleted workspaces**. API:
+   ```
+   GET /api/terrapod/v1/deleted-workspaces
+   ```
+   Check `restorable-until` before anything else. `state-versions-available` is
+   counted from storage at request time, so it tells you what is actually
+   recoverable rather than what existed at delete time.
+
+2. Restore it.
+   ```
+   POST /api/terrapod/v1/deleted-workspaces/{workspace_id}/restore
+   ```
+   Optionally `{"data":{"attributes":{"name":"..."}}}` to name it.
+
+### What you get back, and what you do not
+
+Read this before telling anyone the workspace is "back":
+
+- **A NEW workspace with a NEW id.** Not a revival. Anything referencing the old
+  id — `terraform_remote_state` consumers, run triggers, bookmarks, the
+  `cloud {}` block if it pinned an id — needs repointing. This is deliberate: a
+  one-keystroke undo makes deletion feel free, and deletion should not feel free.
+- **Lineage and serial are preserved exactly**, recovered from inside the state
+  documents. This is the part that matters — it means the next plan continues
+  the original state rather than treating live infrastructure as unmanaged.
+- **It comes back inert.** Auto-apply off, drift detection off, VCS *not*
+  re-attached, whatever the workspace had before. The response's `suppressed`
+  and `dropped-references` list what to switch back on. Re-enabling is a
+  deliberate act, because a restored workspace that applies immediately —
+  against infrastructure that may have drifted or been partly torn down since
+  the delete — is the worst thing this feature could do.
+- **Variables and run history do not come back.** The marker records variable
+  *names* and categories so you know what to recreate; values were never stored
+  in it.
+- **Only the newest state versions are copied**, bounded by
+  `state_versions_keep`. Anything beyond that is listed in
+  `state-versions-skipped` rather than dropped silently.
+
+### One restore per deletion
+
+A second restore would produce a second live workspace holding the same state
+lineage over the same real infrastructure — after which an apply in either makes
+the other's next plan read as wholesale drift. The API refuses it with a `409`
+naming the workspace that already exists. `{"force": true}` overrides, and is
+only correct when that earlier restore is genuinely gone.
+
+### If the window has passed
+
+`409 No state could be recovered` means the reaper has already run. Fall back to
+bucket-level protection (S3 Versioning, Azure soft-delete, GCS Object
+Versioning) if you enabled it — see
+[disaster-recovery.md](disaster-recovery.md). Nothing in Terrapod can help at
+that point.
+
+### Prevention
+
+- Raise `deleted_workspace_retention_days` if 30 is tight for your review cycle.
+  `0` disables reaping entirely — deleted state is kept forever.
+- Keep bucket versioning on. It is the only thing that survives the reaper.
+
+---
+
+## The reaper permanently deleted state
+
+The orphaned-state reaper irreversibly deletes everything under `state/{id}/`
+once its marker is older than the retention window. There is no undo. If storage
+has shrunk unexpectedly, or a workspace has vanished from **Admin → Deleted
+workspaces**, this is the first thing to check.
+
+### Diagnosis
+
+```bash
+# What has it reclaimed, and when?
+terrapod_retention_deleted_total{category="deleted_workspaces"}
+```
+
+Then the logs: a reap emits `Reaped state for deleted workspace past its
+retention window` with the workspace id, name and age. Every reap is logged, so
+absence of the line means it was not the reaper.
+
+**Is it refusing to reap instead?** Check
+`terrapod_retention_orphan_reap_blocked`. While that is `1` nothing is being
+reclaimed — see [the reaper-guard runbook
+above](#orphaned-state-reaper-refusing-to-reap-terrapod_retention_orphan_reap_blocked--1).
+
+### Resolution
+
+The state is gone. Recovery is only possible from outside Terrapod:
+
+1. **Bucket versioning**, if enabled — the reaper issues deletes, so a versioned
+   bucket keeps the prior versions and they can be restored. This is why
+   [disaster-recovery.md](disaster-recovery.md) recommends it.
+2. **A bucket-level backup or replica**, if you keep one.
+3. Otherwise: the state is unrecoverable. The infrastructure still exists; it is
+   now unmanaged, and the path back is `terraform import` (or Terrapod's
+   [onboarding](onboarding.md) flow) against a fresh workspace.
+
+### Prevention
+
+- **`deleted_workspace_retention_days: 0` is the kill switch** — it disables the
+  category entirely and keeps deleted state forever. The cost is storage; the
+  benefit is that nothing is ever reaped by a clock.
+- Alert on `terrapod_retention_orphan_reap_blocked`, which fires when the reaper
+  distrusts its own view of the database.
+- Enable bucket versioning. It is the only layer beneath this one.
+
+---
+
+## My workspace stopped auto-applying
+
+A workspace configured with a conditional auto-apply mode (`create` or
+`create_update`) leaves the run at `planned` whenever the plan contains
+something the mode does not auto-apply. That is the feature working.
+
+### Diagnosis
+
+Look at the run's `auto-apply-declined-reason`:
+
+```
+GET /api/v2/runs/{run_id}
+```
+
+- **A reason like `2 destroys, 1 replace`** — the plan contained an action the
+  mode refuses. Confirm or discard it yourself; the run is confirmable. This is
+  the intended behaviour, not a fault.
+- **No reason, and the run is still `planned`** — the plan's *shape was never
+  known*. `plan_shape_permits_auto_apply` returns "undecidable" when the
+  resource counts are null, which happens when the plan JSON never arrived or
+  did not parse. The upload is best-effort, so a failed upload means nobody
+  auto-applies — the correct direction to fail, but it leaves no explanation on
+  the run. Check the runner log for the plan-json upload, and whether
+  `has-json-output` is true.
+- **The workspace is manually locked** — the lock is honoured even on the
+  auto-apply path, and the run is left `planned` for a human rather than applied
+  past the lock. Unlock, then confirm.
+- **The plan went stale** — if state moved between the plan and the decision the
+  run is *discarded*, not held, with a `discard-reason` saying so. Queue a fresh
+  run.
+
+### Resolution
+
+Confirm the run yourself once you have read the plan, or switch the workspace's
+`auto-apply-mode` if the guardrail is tighter than you want:
+
+| Mode | Applies |
+|---|---|
+| `never` | nothing — always waits for a human |
+| `create` | plans containing only additions |
+| `create_update` | additions and in-place updates |
+| `always` | every successful plan |
+
+Neither conditional mode ever auto-applies a **destroy** or a **replace**. A
+replace is the create+delete action pair and is counted separately, so a "no
+destroys" reading of a plan is not the same thing.
+
+### Verification
+
+The next run with a qualifying plan auto-applies without intervention, and a run
+that is held shows a reason explaining which action stopped it.

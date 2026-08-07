@@ -58,6 +58,13 @@ are best managed declaratively with the `terrapod` Terraform provider in
 a small platform-config repo, so they live in version control and can
 be reviewed — but the equivalent API calls are shown for completeness.
 
+> **A version-mismatch warning on stderr is expected, not an error.** From
+> v1.4.0 `terrapod-publish` compares its own build version against the API's and
+> prints `warning: ...` on a mismatch. It is a *warning* — the publish proceeds.
+> A released binary talking to an API more than a minor apart is the case it
+> exists to surface; a source build (`go run`) reports itself as `dev` and skips
+> the check entirely. Upgrade the binary to match the instance to silence it.
+
 ### 1. Register the publisher's GPG public key
 
 The server verifies provider signatures against keys you register ahead
