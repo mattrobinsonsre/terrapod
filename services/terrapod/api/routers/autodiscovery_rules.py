@@ -41,6 +41,7 @@ from terrapod.api.routers.workspace_bulk import (
 from terrapod.db.models import AgentPool, AutodiscoveryRule, VCSConnection
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
+from terrapod.services import run_service
 
 router = APIRouter(tags=["autodiscovery-rules"])
 logger = get_logger(__name__)
@@ -76,6 +77,7 @@ def _rule_json(rule: AutodiscoveryRule) -> dict:
             "resource-cpu": rule.resource_cpu,
             "resource-memory": rule.resource_memory,
             "auto-apply": rule.auto_apply,
+            "auto-apply-mode": run_service.resolve_auto_apply_mode(rule),
             "on-directory-delete": rule.on_directory_delete,
             "labels": dict(rule.labels or {}),
             "owner-email": rule.owner_email or "",
@@ -234,8 +236,27 @@ def _coerce_attrs(attrs: dict, *, on_create: bool) -> dict[str, Any]:
         out["resource_cpu"] = str(attrs["resource-cpu"])
     if "resource-memory" in attrs:
         out["resource_memory"] = str(attrs["resource-memory"])
+    if "auto-apply" in attrs and "auto-apply-mode" in attrs:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "Set either auto-apply or auto-apply-mode, not both — "
+                "auto-apply-mode supersedes the boolean"
+            ),
+        )
     if "auto-apply" in attrs:
         out["auto_apply"] = bool(attrs["auto-apply"])
+        out["auto_apply_mode"] = "always" if attrs["auto-apply"] else "never"
+    if "auto-apply-mode" in attrs:
+        mode = attrs["auto-apply-mode"]
+        if mode not in run_service.AUTO_APPLY_MODES:
+            raise HTTPException(
+                status_code=422,
+                detail="auto-apply-mode must be one of: " + ", ".join(run_service.AUTO_APPLY_MODES),
+            )
+        # Both columns together, so the pair can never disagree (#1274).
+        out["auto_apply_mode"] = mode
+        out["auto_apply"] = mode != "never"
     if "on-directory-delete" in attrs:
         odd = str(attrs["on-directory-delete"])
         if odd not in ("flag", "destroy"):
@@ -484,6 +505,7 @@ def _build_transient_rule(fields: dict[str, Any], conn: VCSConnection) -> Autodi
         resource_cpu=fields.get("resource_cpu", "1"),
         resource_memory=fields.get("resource_memory", "2Gi"),
         auto_apply=fields.get("auto_apply", False),
+        auto_apply_mode=fields.get("auto_apply_mode", "never"),
         labels=fields.get("labels", {}),
         owner_email=fields.get("owner_email"),
         agent_pool_id=fields.get("agent_pool_id"),

@@ -138,6 +138,12 @@ def _run_json(
                 "discard-reason": run.discard_reason,
                 "is-destroy": run.is_destroy,
                 "auto-apply": run.auto_apply,
+                # Conditional auto-apply (#1274): the mode this run was
+                # created under, and — when it declined — why, so the UI can
+                # explain a run sitting in `planned` rather than leaving the
+                # operator to infer it from the counts.
+                "auto-apply-mode": run.auto_apply_mode,
+                "auto-apply-declined-reason": run.auto_apply_declined_reason,
                 "plan-only": run.plan_only,
                 "source": run.source,
                 "execution-backend": run.execution_backend,

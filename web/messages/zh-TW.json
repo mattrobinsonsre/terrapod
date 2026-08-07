@@ -1681,6 +1681,12 @@
       "addEmail": "新增電子郵箱",
       "triggers": "觸發器",
       "addNotification": "新增通知"
+    },
+    "autoApplyMode": {
+      "never": "從不",
+      "always": "一律",
+      "create": "建立",
+      "createUpdate": "建立/更新"
     }
   },
   "planSummary": {
@@ -1917,7 +1923,8 @@
       "viewState": "檢視狀態",
       "runOptions": "執行選項",
       "agentPool": "代理集區",
-      "agentPoolCandidates": "{count, plural, other {# 個候選集區}}"
+      "agentPoolCandidates": "{count, plural, other {# 個候選集區}}",
+      "autoApplyHeld": "已保留"
     },
     "timeline": {
       "heading": "時間線",

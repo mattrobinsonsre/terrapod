@@ -205,6 +205,9 @@ class TestRunDriftAttributes:
         run.message = "Drift detection check"
         run.is_destroy = False
         run.auto_apply = False
+        # #1274: conditional auto-apply fields the run serializer emits.
+        run.auto_apply_mode = "never"
+        run.auto_apply_declined_reason = None
         run.plan_only = True
         run.source = "drift-detection"
         run.terraform_version = "1.11"

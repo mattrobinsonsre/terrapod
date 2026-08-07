@@ -26,6 +26,11 @@ type Workspace struct {
 	ExecutionMode    string `json:"execution-mode"`
 	ExecutionBackend string `json:"execution-backend,omitempty"`
 	AutoApply        bool   `json:"auto-apply"`
+	// AutoApplyMode is the conditional auto-apply setting (#1274):
+	// "never", "always", "create" or "create_update". AutoApply stays the
+	// boolean projection — true whenever the workspace applies unattended
+	// at all — so code that only reads it keeps working unchanged.
+	AutoApplyMode    string `json:"auto-apply-mode"`
 	TerraformVersion string `json:"terraform-version,omitempty"`
 	// TerragruntEnabled wraps tofu/terraform with terragrunt for agent-mode
 	// runs; TerragruntVersion pins the terragrunt CLI version (partial like
@@ -125,10 +130,13 @@ type Workspace struct {
 // than a free-form map so callers get type safety and the Terrapod
 // schema stays singular-sourced in this file.
 type CreateWorkspaceRequest struct {
-	Name                          string            `json:"name"`
-	ExecutionMode                 string            `json:"execution-mode,omitempty"`
-	ExecutionBackend              string            `json:"execution-backend,omitempty"`
-	AutoApply                     *bool             `json:"auto-apply,omitempty"`
+	Name             string `json:"name"`
+	ExecutionMode    string `json:"execution-mode,omitempty"`
+	ExecutionBackend string `json:"execution-backend,omitempty"`
+	AutoApply        *bool  `json:"auto-apply,omitempty"`
+	// Set AutoApplyMode OR AutoApply, never both — the API rejects the
+	// pair with 422 rather than guessing which the caller meant.
+	AutoApplyMode                 *string           `json:"auto-apply-mode,omitempty"`
 	TerraformVersion              string            `json:"terraform-version,omitempty"`
 	TerragruntEnabled             *bool             `json:"terragrunt-enabled,omitempty"`
 	TerragruntVersion             string            `json:"terragrunt-version,omitempty"`
@@ -177,10 +185,13 @@ type CreateWorkspaceRequest struct {
 // flip a workspace's auto-apply to false on every PATCH that didn't
 // explicitly set it.
 type UpdateWorkspaceRequest struct {
-	Name                          string            `json:"name,omitempty"`
-	ExecutionMode                 string            `json:"execution-mode,omitempty"`
-	ExecutionBackend              string            `json:"execution-backend,omitempty"`
-	AutoApply                     *bool             `json:"auto-apply,omitempty"`
+	Name             string `json:"name,omitempty"`
+	ExecutionMode    string `json:"execution-mode,omitempty"`
+	ExecutionBackend string `json:"execution-backend,omitempty"`
+	AutoApply        *bool  `json:"auto-apply,omitempty"`
+	// Set AutoApplyMode OR AutoApply, never both — the API rejects the
+	// pair with 422 rather than guessing which the caller meant.
+	AutoApplyMode                 *string           `json:"auto-apply-mode,omitempty"`
 	TerraformVersion              string            `json:"terraform-version,omitempty"`
 	TerragruntEnabled             *bool             `json:"terragrunt-enabled,omitempty"`
 	TerragruntVersion             string            `json:"terragrunt-version,omitempty"`
@@ -417,6 +428,9 @@ func workspaceCreateAttrs(req CreateWorkspaceRequest) map[string]any {
 	if req.AutoApply != nil {
 		attrs["auto-apply"] = *req.AutoApply
 	}
+	if req.AutoApplyMode != nil {
+		attrs["auto-apply-mode"] = *req.AutoApplyMode
+	}
 	if req.TerraformVersion != "" {
 		attrs["terraform-version"] = req.TerraformVersion
 	}
@@ -522,6 +536,9 @@ func workspaceUpdateAttrs(req UpdateWorkspaceRequest) map[string]any {
 	}
 	if req.AutoApply != nil {
 		attrs["auto-apply"] = *req.AutoApply
+	}
+	if req.AutoApplyMode != nil {
+		attrs["auto-apply-mode"] = *req.AutoApplyMode
 	}
 	if req.TerraformVersion != "" {
 		attrs["terraform-version"] = req.TerraformVersion
@@ -645,6 +662,7 @@ func workspaceFromResource(res *Resource) *Workspace {
 		ExecutionMode:                 GetStringAttr(res, "execution-mode"),
 		ExecutionBackend:              GetStringAttr(res, "execution-backend"),
 		AutoApply:                     GetBoolAttr(res, "auto-apply"),
+		AutoApplyMode:                 GetStringAttr(res, "auto-apply-mode"),
 		TerraformVersion:              GetStringAttr(res, "terraform-version"),
 		TerragruntEnabled:             GetBoolAttr(res, "terragrunt-enabled"),
 		TerragruntVersion:             GetStringAttr(res, "terragrunt-version"),

@@ -126,6 +126,7 @@ Everything below is implemented and shipped today.
 | Agent pools | Named runner-listener groups; join-token → certificate exchange for auth |
 | TFE V2 CLI surface | The `cloud`-backend subset of the TFE V2 API (JSON:API) consumed by `terraform`/`tofu` + `terraform login` — not the full TFE V2 API |
 | Run triggers | Cross-workspace dependency chains — a source apply triggers downstream runs |
+| Conditional auto-apply | Auto-apply only when the plan is within a declared safety standard — adds only, or adds and in-place updates. Anything that destroys or replaces a resource stops for a human |
 | Stale-plan guards | Auto-discard a plan that no longer reflects reality: state-version drift (always on) + optional per-workspace time-based plan expiry |
 
 ### Governance & security

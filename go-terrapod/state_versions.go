@@ -14,13 +14,13 @@ import (
 // separately via UploadStateContent (the standard TFE two-step
 // create-then-PUT pattern).
 type StateVersion struct {
-	ID                string `json:"id"`
-	Serial            int64  `json:"serial"`
-	Lineage           string `json:"lineage"`
-	MD5               string `json:"md5,omitempty"`
-	StateSize         int64  `json:"state-size,omitempty"`
-	HostedStateDLURL  string `json:"hosted-state-download-url,omitempty"`
-	CreatedAt         string `json:"created-at,omitempty"`
+	ID               string `json:"id"`
+	Serial           int64  `json:"serial"`
+	Lineage          string `json:"lineage"`
+	MD5              string `json:"md5,omitempty"`
+	StateSize        int64  `json:"state-size,omitempty"`
+	HostedStateDLURL string `json:"hosted-state-download-url,omitempty"`
+	CreatedAt        string `json:"created-at,omitempty"`
 }
 
 // CreateStateVersionRequest is the input shape for CreateStateVersion.

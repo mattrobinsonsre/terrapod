@@ -276,6 +276,10 @@ async def find_or_autocreate_workspace(
         resource_cpu=rule.resource_cpu,
         resource_memory=rule.resource_memory,
         auto_apply=rule.auto_apply,
+        # Inherit the rule's conditional mode too (#1274) — carrying only
+        # the boolean would turn a `create_update` rule into `always` on
+        # every workspace it materialises.
+        auto_apply_mode=getattr(rule, "auto_apply_mode", "never"),
         working_directory=root_directory,
         labels=safe_labels,
         owner_email=rule.owner_email or "",

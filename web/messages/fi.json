@@ -1681,6 +1681,12 @@
       "addEmail": "Lisää sähköposti",
       "triggers": "Käynnistimet",
       "addNotification": "Lisää ilmoitus"
+    },
+    "autoApplyMode": {
+      "never": "ei koskaan",
+      "always": "aina",
+      "create": "luonti",
+      "createUpdate": "luonti/päivitys"
     }
   },
   "planSummary": {
@@ -1917,7 +1923,8 @@
       "viewState": "Näytä tila",
       "runOptions": "Ajon vaihtoehdot",
       "agentPool": "Agenttiryhmä",
-      "agentPoolCandidates": "{count, plural, one {# ehdokasryhmä} other {# ehdokasryhmää}}"
+      "agentPoolCandidates": "{count, plural, one {# ehdokasryhmä} other {# ehdokasryhmää}}",
+      "autoApplyHeld": "odottaa"
     },
     "timeline": {
       "heading": "Aikajana",

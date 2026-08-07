@@ -8,7 +8,7 @@
 // connections, audit log, RBAC roles + assignments, policy sets (OPA),
 // and remote-state consumer allowlists.
 //
-// Consumers
+// # Consumers
 //
 // The SDK is used by:
 //
@@ -21,7 +21,7 @@
 //
 // All three landed in v0.27.0 as part of one release.
 //
-// Version contract
+// # Version contract
 //
 // The SDK targets one Terrapod API version per Go module version. A
 // build-time-pinned version (see VersionCheck) refuses to talk to a
@@ -29,7 +29,7 @@
 // unless the caller explicitly opts out. This guards against schema
 // drift between the SDK and the server during operator upgrades.
 //
-// Stability
+// # Stability
 //
 // During the v0.x.y series the public surface may evolve as the
 // migration tool's needs surface gaps. Breaking changes are called

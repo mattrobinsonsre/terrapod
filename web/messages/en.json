@@ -1681,6 +1681,12 @@
       "addEmail": "Add email",
       "triggers": "Triggers",
       "addNotification": "Add notification"
+    },
+    "autoApplyMode": {
+      "never": "never",
+      "always": "always",
+      "create": "create",
+      "createUpdate": "create/update"
     }
   },
   "planSummary": {
@@ -1923,7 +1929,8 @@
       "viewState": "View State",
       "runOptions": "Run Options",
       "agentPool": "Agent pool",
-      "agentPoolCandidates": "{count, plural, one {# candidate pool} other {# candidate pools}}"
+      "agentPoolCandidates": "{count, plural, one {# candidate pool} other {# candidate pools}}",
+      "autoApplyHeld": "held"
     },
     "timeline": {
       "heading": "Timeline",

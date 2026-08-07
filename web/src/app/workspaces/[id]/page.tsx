@@ -44,6 +44,7 @@ interface WorkspaceAttrs {
   'execution-mode': string
   'execution-backend': string
   'auto-apply': boolean
+  'auto-apply-mode': string
   'terraform-version': string
   'terragrunt-enabled': boolean
   'terragrunt-version': string
@@ -227,6 +228,12 @@ type Tab = 'configuration' | 'variables' | 'runs' | 'state' | 'state-graph' | 'c
 
 const VALID_TABS: Set<string> = new Set(['configuration', 'variables', 'runs', 'state', 'state-graph', 'cost', 'architecture', 'versions', 'notifications', 'run-tasks', 'run-triggers', 'sharing'])
 
+
+/** Mode value -> i18n key. The API value is snake_case; the key is camel. */
+function autoApplyModeKey(mode: string): string {
+  return mode === 'create_update' ? 'createUpdate' : mode
+}
+
 export default function WorkspaceDetailPage() {
   return (
     <Suspense fallback={<><NavBar /><main className="px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto"><LoadingSpinner /></main></>}>
@@ -237,6 +244,9 @@ export default function WorkspaceDetailPage() {
 
 function WorkspaceDetailContent() {
   const t = useTranslations('workspaceDetail')
+  // Shared mode labels live in the top-level `common` namespace because
+  // the run page renders the same four values.
+  const tMode = useTranslations('common.autoApplyMode')
   const router = useRouter()
   const params = useParams()
   const searchParams = useSearchParams()
@@ -260,7 +270,10 @@ function WorkspaceDetailContent() {
   const [nameChanged, setNameChanged] = useState(false)
   const [editCpu, setEditCpu] = useState('')
   const [editMemory, setEditMemory] = useState('')
-  const [editAutoApply, setEditAutoApply] = useState(false)
+  // #1274: the four-value mode supersedes the old boolean. Rendered as its
+  // raw enum value, matching `execution-mode` immediately above it — these
+  // are API identifiers, not prose, so they are not translated.
+  const [editAutoApplyMode, setEditAutoApplyMode] = useState('never')
   const [editExecMode, setEditExecMode] = useState('')
   const [editBackend, setEditBackend] = useState('')
   const [editVersion, setEditVersion] = useState('')
@@ -998,7 +1011,7 @@ function WorkspaceDetailContent() {
     setNameChanged(false)
     setEditCpu(workspace.attributes['resource-cpu'])
     setEditMemory(workspace.attributes['resource-memory'])
-    setEditAutoApply(workspace.attributes['auto-apply'])
+    setEditAutoApplyMode(workspace.attributes['auto-apply-mode'] || (workspace.attributes['auto-apply'] ? 'always' : 'never'))
     setEditExecMode(workspace.attributes['execution-mode'])
     setEditBackend(workspace.attributes['execution-backend'] || 'tofu')
     setEditVersion(workspace.attributes['terraform-version'] || '')
@@ -1061,7 +1074,7 @@ function WorkspaceDetailContent() {
               name: editName,
               'resource-cpu': editCpu,
               'resource-memory': editMemory,
-              'auto-apply': editAutoApply,
+              'auto-apply-mode': editAutoApplyMode,
               'execution-mode': editExecMode,
               'execution-backend': editBackend,
               'terraform-version': editVersion,
@@ -1953,12 +1966,19 @@ function WorkspaceDetailContent() {
                 <div>
                   <dt className="text-xs text-slate-500">{t('fields.autoApply')}</dt>
                   {editing ? (
-                    <label className="flex items-center gap-2 mt-1">
-                      <input type="checkbox" checked={editAutoApply} onChange={(e) => setEditAutoApply(e.target.checked)} className="rounded border-slate-600 bg-slate-700 text-brand-600" />
-                      <span className="text-sm text-slate-200">{editAutoApply ? t('common.enabled') : t('common.disabled')}</span>
-                    </label>
+                    <select
+                      value={editAutoApplyMode}
+                      onChange={(e) => setEditAutoApplyMode(e.target.value)}
+                      className="mt-1 w-full px-2 py-1 text-sm rounded bg-slate-700 border border-slate-600 text-slate-200"
+                    >
+                      {/* Values are the API enum; the labels are translated. */}
+                      <option value="never">{tMode('never')}</option>
+                      <option value="always">{tMode('always')}</option>
+                      <option value="create">{tMode('create')}</option>
+                      <option value="create_update">{tMode('createUpdate')}</option>
+                    </select>
                   ) : (
-                    <dd className="mt-1 text-sm text-slate-200">{attrs['auto-apply'] ? t('common.enabled') : t('common.disabled')}</dd>
+                    <dd className="mt-1 text-sm text-slate-200">{tMode(autoApplyModeKey(attrs['auto-apply-mode'] || (attrs['auto-apply'] ? 'always' : 'never')))}</dd>
                   )}
                 </div>
                 <div>

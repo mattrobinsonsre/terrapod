@@ -43,7 +43,7 @@ from terrapod.db.models import (
 )
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
-from terrapod.services import pool_set
+from terrapod.services import pool_set, run_service
 from terrapod.services.capability_resolver import resolve_capabilities
 from terrapod.services.notification_service import VALID_TRIGGERS
 from terrapod.services.run_task_service import VALID_ENFORCEMENT_LEVELS, VALID_STAGES
@@ -66,8 +66,9 @@ _FIELD_MAP: dict[str, str] = {
     "execution-backend": "execution_backend",
     "execution-mode": "execution_mode",
     "auto-apply": "auto_apply",
-    # NOTE: the agent-pool attributes are deliberately NOT here — one input key
-    # writes two columns, so they are validated by _validate_pool_set below.
+    # NOTE: neither the agent-pool attributes nor `auto-apply-mode` are here —
+    # each writes two columns from one input key, so they are validated
+    # separately (_validate_pool_set / _validate_auto_apply below).
     "resource-cpu": "resource_cpu",
     "resource-memory": "resource_memory",
     "var-files": "var_files",
@@ -245,6 +246,38 @@ async def _validate_pool_set(
     return {_POOL_SET_FIELD: requested}
 
 
+def _validate_auto_apply(update: dict[str, Any], fields: dict[str, Any]) -> dict[str, Any]:
+    """Resolve the auto-apply pair for a bulk update (#1274).
+
+    `auto-apply-mode` writes BOTH columns, so it can't go through _FIELD_MAP.
+    Mirrors the single-workspace API exactly: either key alone is fine, both
+    together is a 422 rather than a guess, and the two columns are always
+    written together so they cannot end up disagreeing.
+    """
+    has_bool = "auto-apply" in update
+    has_mode = "auto-apply-mode" in update
+    if has_bool and has_mode:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "Set either auto-apply or auto-apply-mode, not both — "
+                "auto-apply-mode supersedes the boolean"
+            ),
+        )
+    if has_mode:
+        mode = update["auto-apply-mode"]
+        if mode not in run_service.AUTO_APPLY_MODES:
+            raise HTTPException(
+                status_code=422,
+                detail="auto-apply-mode must be one of: " + ", ".join(run_service.AUTO_APPLY_MODES),
+            )
+        return {"auto_apply_mode": mode, "auto_apply": mode != "never"}
+    if has_bool:
+        # The boolean maps onto the flat modes, same as everywhere else.
+        return {"auto_apply_mode": "always" if fields.get("auto_apply") else "never"}
+    return {}
+
+
 async def _validate_update(
     update: dict, db: AsyncSession, user: AuthenticatedUser
 ) -> dict[str, Any]:
@@ -277,6 +310,7 @@ async def _validate_update(
                 raise HTTPException(status_code=422, detail="var-files must be a list")
         fields[attr] = val
 
+    fields.update(_validate_auto_apply(update, fields))
     fields.update(await _validate_pool_set(update, db, user))
 
     run_tasks = validate_run_task_specs(update["run-tasks"]) if "run-tasks" in update else None

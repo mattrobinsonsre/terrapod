@@ -285,6 +285,7 @@ field CreateWorkspaceRequest.AISummaryMode string `json:"ai-summary-mode,omitemp
 field CreateWorkspaceRequest.AgentPoolID string `json:"agent-pool-id,omitempty"`
 field CreateWorkspaceRequest.AgentPoolIDs []string `json:"agent-pool-ids,omitempty"`
 field CreateWorkspaceRequest.AutoApply *bool `json:"auto-apply,omitempty"`
+field CreateWorkspaceRequest.AutoApplyMode *string `json:"auto-apply-mode,omitempty"`
 field CreateWorkspaceRequest.AutoMerge *bool `json:"auto-merge,omitempty"`
 field CreateWorkspaceRequest.AutoMergeStrategy string `json:"auto-merge-strategy,omitempty"`
 field CreateWorkspaceRequest.DriftDetectionEnabled *bool `json:"drift-detection-enabled,omitempty"`
@@ -608,6 +609,8 @@ field Run.Actions RunActions `json:"actions"`
 field Run.AgentPoolID string `json:"agent-pool-id,omitempty"`
 field Run.AllowEmptyApply bool `json:"allow-empty-apply"`
 field Run.AutoApply bool `json:"auto-apply"`
+field Run.AutoApplyDeclinedReason string `json:"auto-apply-declined-reason"`
+field Run.AutoApplyMode string `json:"auto-apply-mode"`
 field Run.CandidateAgentPoolIDs []string `json:"candidate-agent-pool-ids,omitempty"`
 field Run.CostCurrency string `json:"cost-currency,omitempty"`
 field Run.CostMonthlyMax *float64 `json:"cost-monthly-max,omitempty"`
@@ -815,6 +818,7 @@ field UpdateWorkspaceRequest.AISummaryMode string `json:"ai-summary-mode,omitemp
 field UpdateWorkspaceRequest.AgentPoolID string `json:"agent-pool-id,omitempty"`
 field UpdateWorkspaceRequest.AgentPoolIDs []string `json:"agent-pool-ids,omitempty"`
 field UpdateWorkspaceRequest.AutoApply *bool `json:"auto-apply,omitempty"`
+field UpdateWorkspaceRequest.AutoApplyMode *string `json:"auto-apply-mode,omitempty"`
 field UpdateWorkspaceRequest.AutoMerge *bool `json:"auto-merge,omitempty"`
 field UpdateWorkspaceRequest.AutoMergeStrategy string `json:"auto-merge-strategy,omitempty"`
 field UpdateWorkspaceRequest.DriftDetectionEnabled *bool `json:"drift-detection-enabled,omitempty"`
@@ -919,6 +923,7 @@ field Workspace.AgentPoolID string `json:"agent-pool-id,omitempty"`
 field Workspace.AgentPoolIDs []string `json:"agent-pool-ids,omitempty"`
 field Workspace.AgentPoolName string `json:"agent-pool-name,omitempty"`
 field Workspace.AutoApply bool `json:"auto-apply"`
+field Workspace.AutoApplyMode string `json:"auto-apply-mode"`
 field Workspace.AutoMerge bool `json:"auto-merge"`
 field Workspace.AutoMergeStrategy string `json:"auto-merge-strategy,omitempty"`
 field Workspace.CreatedAt string `json:"created-at,omitempty"`

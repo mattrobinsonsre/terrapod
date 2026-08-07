@@ -1681,6 +1681,12 @@
       "addEmail": "Přidat e-mail",
       "triggers": "Triggery",
       "addNotification": "Přidat oznámení"
+    },
+    "autoApplyMode": {
+      "never": "nikdy",
+      "always": "vždy",
+      "create": "vytvoření",
+      "createUpdate": "vytvoření/změna"
     }
   },
   "planSummary": {
@@ -1917,7 +1923,8 @@
       "viewState": "Zobrazit stav",
       "runOptions": "Možnosti běhu",
       "agentPool": "Fond agentů",
-      "agentPoolCandidates": "{count, plural, one {# kandidátský fond} few {# kandidátské fondy} other {# kandidátských fondů}}"
+      "agentPoolCandidates": "{count, plural, one {# kandidátský fond} few {# kandidátské fondy} other {# kandidátských fondů}}",
+      "autoApplyHeld": "pozastaveno"
     },
     "timeline": {
       "heading": "Časová osa",

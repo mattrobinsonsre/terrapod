@@ -28,7 +28,7 @@ type CreateRunTaskRequest struct {
 	URL              string
 	Stage            string
 	EnforcementLevel string
-	Enabled          *bool  // nil ⇒ server default (true)
+	Enabled          *bool // nil ⇒ server default (true)
 	HMACKey          string
 }
 

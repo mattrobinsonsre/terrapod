@@ -100,6 +100,9 @@ def _mock_run(
     run.message = ""
     run.is_destroy = False
     run.auto_apply = False
+    # #1274: conditional auto-apply fields the run serializer emits.
+    run.auto_apply_mode = "never"
+    run.auto_apply_declined_reason = None
     run.plan_only = False
     run.execution_backend = "tofu"
     run.terraform_version = "1.11"

@@ -27,6 +27,7 @@
 //	"resource-cpu"       -> resource_cpu        (string, optional, default "1")
 //	"resource-memory"    -> resource_memory     (string, optional, default "2Gi")
 //	"auto-apply"         -> auto_apply          (bool, optional, default false)
+//	"auto-apply-mode"    -> auto_apply_mode     (string, optional+computed)
 //	"labels"             -> labels              (map[string]string, optional)
 //	"owner-email"        -> owner_email         (string, optional)
 //	"on-directory-delete" -> on_directory_delete (string, optional;
@@ -97,6 +98,7 @@ type autodiscoveryRuleModel struct {
 	ResourceCPU       types.String `tfsdk:"resource_cpu"`
 	ResourceMemory    types.String `tfsdk:"resource_memory"`
 	AutoApply         types.Bool   `tfsdk:"auto_apply"`
+	AutoApplyMode     types.String `tfsdk:"auto_apply_mode"`
 	Labels            types.Map    `tfsdk:"labels"`
 	OwnerEmail        types.String `tfsdk:"owner_email"`
 	OnDirectoryDelete types.String `tfsdk:"on_directory_delete"`
@@ -252,6 +254,14 @@ func (r *autodiscoveryRuleResource) Schema(_ context.Context, _ resource.SchemaR
 				Default:     booldefault.StaticBool(false),
 				PlanModifiers: []planmodifier.Bool{
 					boolplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"auto_apply_mode": schema.StringAttribute{
+				Description: "Conditional auto-apply mode templated onto created workspaces: `never`, `always`, `create` (apply only plans that add resources) or `create_update` (also allow in-place updates). Supersedes `auto_apply` when set. Optional + Computed with no default so a rule that does not set it never drifts.",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"labels": schema.MapAttribute{
@@ -565,7 +575,11 @@ func buildAutodiscoveryRuleAttrs(m *autodiscoveryRuleModel) map[string]any {
 		attrs["resource-memory"] = m.ResourceMemory.ValueString()
 	}
 	if !m.AutoApply.IsNull() && !m.AutoApply.IsUnknown() {
-		attrs["auto-apply"] = m.AutoApply.ValueBool()
+		if !m.AutoApplyMode.IsNull() && !m.AutoApplyMode.IsUnknown() && m.AutoApplyMode.ValueString() != "" {
+			attrs["auto-apply-mode"] = m.AutoApplyMode.ValueString()
+		} else {
+			attrs["auto-apply"] = m.AutoApply.ValueBool()
+		}
 	}
 
 	if !m.Labels.IsNull() && !m.Labels.IsUnknown() {
@@ -711,6 +725,7 @@ func readAutodiscoveryRuleIntoModel(ctx context.Context, res *terrapod.Resource,
 	m.ResourceCPU = types.StringValue(terrapod.GetStringAttr(res, "resource-cpu"))
 	m.ResourceMemory = types.StringValue(terrapod.GetStringAttr(res, "resource-memory"))
 	m.AutoApply = types.BoolValue(terrapod.GetBoolAttr(res, "auto-apply"))
+	m.AutoApplyMode = types.StringValue(terrapod.GetStringAttr(res, "auto-apply-mode"))
 
 	labels := terrapod.GetMapAttr(res, "labels")
 	if labels == nil {

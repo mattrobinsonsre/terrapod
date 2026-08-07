@@ -42,11 +42,11 @@ type CostResource struct {
 // component), distinct from a genuine $0.
 type UsageAssumption struct {
 	Description string  `json:"description"`
-	Dimension  string  `json:"dimension"`
-	Unit       string  `json:"unit"`
-	Low        float64 `json:"low"`
-	Typical    float64 `json:"typical"`
-	High       float64 `json:"high"`
+	Dimension   string  `json:"dimension"`
+	Unit        string  `json:"unit"`
+	Low         float64 `json:"low"`
+	Typical     float64 `json:"typical"`
+	High        float64 `json:"high"`
 
 	CostLow     *float64 `json:"cost_low,omitempty"`
 	CostTypical *float64 `json:"cost_typical,omitempty"`
@@ -121,7 +121,7 @@ func (c *Client) GetRunCostEstimate(ctx context.Context, runID string) (*CostEst
 // CostStateVersion identifies the state version a workspace cost estimate was
 // derived from. Nil on a WorkspaceCostEstimate when the workspace has no state.
 type CostStateVersion struct {
-	ID        string `json:"id"`     // prefixed "sv-<uuid>"
+	ID        string `json:"id"` // prefixed "sv-<uuid>"
 	Serial    int    `json:"serial"`
 	CreatedAt string `json:"created-at"`
 }
@@ -236,10 +236,10 @@ type CostSummary struct {
 	// Language is the canonical language the prose is stored in; Translated is
 	// true when the served narrative/basis/advisory text was translated on view
 	// for a reader locale (#871). Request a locale via GetRunCostSummaryLocale.
-	Language     string `json:"-"`
-	Translated   bool   `json:"-"`
-	CreatedAt    string `json:"created-at"`
-	UpdatedAt    string `json:"updated-at"`
+	Language   string `json:"-"`
+	Translated bool   `json:"-"`
+	CreatedAt  string `json:"created-at"`
+	UpdatedAt  string `json:"updated-at"`
 }
 
 func costSummaryFromResource(res *Resource) *CostSummary {

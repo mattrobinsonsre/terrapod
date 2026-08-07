@@ -1681,6 +1681,12 @@
       "addEmail": "Add email",
       "triggers": "Triggrs",
       "addNotification": "Add notificashun"
+    },
+    "autoApplyMode": {
+      "never": "nevr",
+      "always": "alwaiz",
+      "create": "makez",
+      "createUpdate": "makez/fixez"
     }
   },
   "planSummary": {
@@ -1917,7 +1923,8 @@
       "viewState": "View State",
       "runOptions": "Run Opshuns",
       "agentPool": "Agent Poolz",
-      "agentPoolCandidates": "{count, plural, one {# candidat poolz} other {# candidat poolz}}"
+      "agentPoolCandidates": "{count, plural, one {# candidat poolz} other {# candidat poolz}}",
+      "autoApplyHeld": "holdin"
     },
     "timeline": {
       "heading": "Timeline",

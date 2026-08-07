@@ -44,16 +44,21 @@ type RunStatusTimestamps struct {
 // RunnerExitCode (unset until the Job reports a profile), and
 // VCSPullRequestNumber (nil for branch/CLI runs).
 type Run struct {
-	ID               string `json:"id"`
-	Status           string `json:"status"`
-	Message          string `json:"message,omitempty"`
-	DiscardReason    string `json:"discard-reason,omitempty"`
-	IsDestroy        bool   `json:"is-destroy"`
-	AutoApply        bool   `json:"auto-apply"`
-	PlanOnly         bool   `json:"plan-only"`
-	Source           string `json:"source,omitempty"`
-	ExecutionBackend string `json:"execution-backend,omitempty"`
-	TerraformVersion string `json:"terraform-version,omitempty"`
+	ID            string `json:"id"`
+	Status        string `json:"status"`
+	Message       string `json:"message,omitempty"`
+	DiscardReason string `json:"discard-reason,omitempty"`
+	IsDestroy     bool   `json:"is-destroy"`
+	AutoApply     bool   `json:"auto-apply"`
+	// AutoApplyMode is the mode snapshotted at run creation (#1274), and
+	// AutoApplyDeclinedReason says why a conditional mode refused to apply
+	// this plan — empty unless the run is parked for a human.
+	AutoApplyMode           string `json:"auto-apply-mode"`
+	AutoApplyDeclinedReason string `json:"auto-apply-declined-reason"`
+	PlanOnly                bool   `json:"plan-only"`
+	Source                  string `json:"source,omitempty"`
+	ExecutionBackend        string `json:"execution-backend,omitempty"`
+	TerraformVersion        string `json:"terraform-version,omitempty"`
 	// Terragrunt* echo the workspace's terragrunt wrapping for this run.
 	TerragruntEnabled bool   `json:"terragrunt-enabled"`
 	TerragruntVersion string `json:"terragrunt-version,omitempty"`
@@ -314,34 +319,36 @@ func parseRun(body []byte) (*Run, error) {
 
 func runFromResource(res *Resource) *Run {
 	r := &Run{
-		ID:                res.ID,
-		Status:            GetStringAttr(res, "status"),
-		Message:           GetStringAttr(res, "message"),
-		DiscardReason:     GetStringAttr(res, "discard-reason"),
-		IsDestroy:         GetBoolAttr(res, "is-destroy"),
-		AutoApply:         GetBoolAttr(res, "auto-apply"),
-		PlanOnly:          GetBoolAttr(res, "plan-only"),
-		Source:            GetStringAttr(res, "source"),
-		ExecutionBackend:  GetStringAttr(res, "execution-backend"),
-		TerraformVersion:  GetStringAttr(res, "terraform-version"),
-		TerragruntEnabled: GetBoolAttr(res, "terragrunt-enabled"),
-		TerragruntVersion: GetStringAttr(res, "terragrunt-version"),
-		ResourceCPU:       GetStringAttr(res, "resource-cpu"),
-		ResourceMemory:    GetStringAttr(res, "resource-memory"),
-		RunnerExitReason:  GetStringAttr(res, "runner-exit-reason"),
-		RunnerExitStatus:  GetStringAttr(res, "runner-exit-status"),
-		ErrorMessage:      GetStringAttr(res, "error-message"),
-		TargetAddrs:       GetListAttr(res, "target-addrs"),
-		ReplaceAddrs:      GetListAttr(res, "replace-addrs"),
-		RefreshOnly:       GetBoolAttr(res, "refresh-only"),
-		Refresh:           GetBoolAttr(res, "refresh"),
-		AllowEmptyApply:   GetBoolAttr(res, "allow-empty-apply"),
-		IsDriftDetection:  GetBoolAttr(res, "is-drift-detection"),
-		HasJSONOutput:     GetBoolAttr(res, "has-json-output"),
-		StateDiverged:     GetBoolAttr(res, "state-diverged"),
-		HasCostEstimate:   GetBoolAttr(res, "has-cost-estimate"),
-		CostCurrency:      GetStringAttr(res, "cost-currency"),
-		WorkspaceName:     GetStringAttr(res, "workspace-name"),
+		ID:                      res.ID,
+		Status:                  GetStringAttr(res, "status"),
+		Message:                 GetStringAttr(res, "message"),
+		DiscardReason:           GetStringAttr(res, "discard-reason"),
+		IsDestroy:               GetBoolAttr(res, "is-destroy"),
+		AutoApply:               GetBoolAttr(res, "auto-apply"),
+		AutoApplyMode:           GetStringAttr(res, "auto-apply-mode"),
+		AutoApplyDeclinedReason: GetStringAttr(res, "auto-apply-declined-reason"),
+		PlanOnly:                GetBoolAttr(res, "plan-only"),
+		Source:                  GetStringAttr(res, "source"),
+		ExecutionBackend:        GetStringAttr(res, "execution-backend"),
+		TerraformVersion:        GetStringAttr(res, "terraform-version"),
+		TerragruntEnabled:       GetBoolAttr(res, "terragrunt-enabled"),
+		TerragruntVersion:       GetStringAttr(res, "terragrunt-version"),
+		ResourceCPU:             GetStringAttr(res, "resource-cpu"),
+		ResourceMemory:          GetStringAttr(res, "resource-memory"),
+		RunnerExitReason:        GetStringAttr(res, "runner-exit-reason"),
+		RunnerExitStatus:        GetStringAttr(res, "runner-exit-status"),
+		ErrorMessage:            GetStringAttr(res, "error-message"),
+		TargetAddrs:             GetListAttr(res, "target-addrs"),
+		ReplaceAddrs:            GetListAttr(res, "replace-addrs"),
+		RefreshOnly:             GetBoolAttr(res, "refresh-only"),
+		Refresh:                 GetBoolAttr(res, "refresh"),
+		AllowEmptyApply:         GetBoolAttr(res, "allow-empty-apply"),
+		IsDriftDetection:        GetBoolAttr(res, "is-drift-detection"),
+		HasJSONOutput:           GetBoolAttr(res, "has-json-output"),
+		StateDiverged:           GetBoolAttr(res, "state-diverged"),
+		HasCostEstimate:         GetBoolAttr(res, "has-cost-estimate"),
+		CostCurrency:            GetStringAttr(res, "cost-currency"),
+		WorkspaceName:           GetStringAttr(res, "workspace-name"),
 		// #1231. The relationship below wins when present; the attribute is
 		// the fallback for a server that only emits the flat form.
 		AgentPoolID:           GetStringAttr(res, "agent-pool-id"),

@@ -1681,6 +1681,12 @@
       "addEmail": "Add marklar",
       "triggers": "Marklars",
       "addNotification": "Add marklar"
+    },
+    "autoApplyMode": {
+      "never": "never",
+      "always": "always",
+      "create": "marklar",
+      "createUpdate": "marklar/marklar"
     }
   },
   "planSummary": {
@@ -1917,7 +1923,8 @@
       "viewState": "View Marklar",
       "runOptions": "Marklar Marklars",
       "agentPool": "Marklar marklar",
-      "agentPoolCandidates": "{count, plural, one {# candidate marklar} other {# candidate marklars}}"
+      "agentPoolCandidates": "{count, plural, one {# candidate marklar} other {# candidate marklars}}",
+      "autoApplyHeld": "held"
     },
     "timeline": {
       "heading": "Marklar",

@@ -61,6 +61,7 @@ data terrapod_workspace.agent_pool_name required=false optional=false computed=t
 data terrapod_workspace.ai_summary_context required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.ai_summary_mode required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.auto_apply required=false optional=false computed=true sensitive=false type=basetypes.BoolType
+data terrapod_workspace.auto_apply_mode required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.created_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.drift_detection_enabled required=false optional=false computed=true sensitive=false type=basetypes.BoolType
 data terrapod_workspace.drift_detection_interval_seconds required=false optional=false computed=true sensitive=false type=basetypes.Int64Type
@@ -135,6 +136,7 @@ resource terrapod_agent_pool_token.token required=false optional=false computed=
 resource terrapod_agent_pool_token.use_count required=false optional=false computed=true sensitive=false type=basetypes.Int64Type
 resource terrapod_autodiscovery_rule.agent_pool_id required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_autodiscovery_rule.auto_apply required=false optional=true computed=true sensitive=false type=basetypes.BoolType
+resource terrapod_autodiscovery_rule.auto_apply_mode required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_autodiscovery_rule.branch required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_autodiscovery_rule.created_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_autodiscovery_rule.enabled required=false optional=true computed=true sensitive=false type=basetypes.BoolType
@@ -357,6 +359,7 @@ resource terrapod_workspace.agent_pool_name required=false optional=false comput
 resource terrapod_workspace.ai_summary_context required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.ai_summary_mode required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.auto_apply required=false optional=true computed=true sensitive=false type=basetypes.BoolType
+resource terrapod_workspace.auto_apply_mode required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.auto_merge required=false optional=true computed=true sensitive=false type=basetypes.BoolType
 resource terrapod_workspace.auto_merge_strategy required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.created_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
