@@ -40,6 +40,7 @@ interface AutodiscoveryRule {
     'resource-cpu': string
     'resource-memory': string
     'auto-apply': boolean
+    'auto-apply-mode'?: string
     'on-directory-delete': 'flag' | 'destroy'
     labels: Record<string, string>
     'owner-email': string
@@ -72,6 +73,7 @@ type SortKey = 'name' | 'repo' | 'pattern' | 'enabled' | 'created'
 export default function AutodiscoveryPage() {
   const router = useRouter()
   const t = useTranslations('adminAutodiscovery')
+  const tMode = useTranslations('common.autoApplyMode')
   const fmt = useFormat()
   const [rules, setRules] = useState<AutodiscoveryRule[]>([])
   const [connections, setConnections] = useState<VCSConnection[]>([])
@@ -98,7 +100,7 @@ export default function AutodiscoveryPage() {
   const [terraformVersion, setTerraformVersion] = useState('1.11')
   const [resourceCpu, setResourceCpu] = useState('1')
   const [resourceMemory, setResourceMemory] = useState('2Gi')
-  const [autoApply, setAutoApply] = useState(false)
+  const [autoApplyMode, setAutoApplyMode] = useState('never')
   const [onDirectoryDelete, setOnDirectoryDelete] = useState<'flag' | 'destroy'>('flag')
   const [labels, setLabels] = useState<Record<string, string>>({})
   const [ownerEmail, setOwnerEmail] = useState('')
@@ -188,7 +190,7 @@ export default function AutodiscoveryPage() {
     setTerraformVersion('1.11')
     setResourceCpu('1')
     setResourceMemory('2Gi')
-    setAutoApply(false)
+    setAutoApplyMode('never')
     setOnDirectoryDelete('flag')
     setLabels({})
     setOwnerEmail('')
@@ -220,7 +222,8 @@ export default function AutodiscoveryPage() {
     setTerraformVersion(a['terraform-version'])
     setResourceCpu(a['resource-cpu'])
     setResourceMemory(a['resource-memory'])
-    setAutoApply(a['auto-apply'])
+    // Fall back to the boolean for a rule created before #1274.
+    setAutoApplyMode(a['auto-apply-mode'] || (a['auto-apply'] ? 'always' : 'never'))
     setOnDirectoryDelete(a['on-directory-delete'] === 'destroy' ? 'destroy' : 'flag')
     setLabels(a.labels || {})
     setOwnerEmail(a['owner-email'] || '')
@@ -257,7 +260,7 @@ export default function AutodiscoveryPage() {
       'terraform-version': terraformVersion,
       'resource-cpu': resourceCpu,
       'resource-memory': resourceMemory,
-      'auto-apply': autoApply,
+      'auto-apply-mode': autoApplyMode,
       'on-directory-delete': onDirectoryDelete,
       labels,
       'owner-email': ownerEmail,
@@ -368,7 +371,7 @@ export default function AutodiscoveryPage() {
             'terraform-version': terraformVersion,
             'resource-cpu': resourceCpu,
             'resource-memory': resourceMemory,
-            'auto-apply': autoApply,
+            'auto-apply-mode': autoApplyMode,
             labels,
             'owner-email': ownerEmail,
           },
@@ -615,12 +618,17 @@ export default function AutodiscoveryPage() {
                 </div>
                 <div className="flex items-center gap-4 pt-6">
                   <label className="flex items-center gap-2 text-sm text-slate-300">
-                    <input
-                      type="checkbox"
-                      checked={autoApply}
-                      onChange={e => setAutoApply(e.target.checked)}
-                    />
                     {t('form.autoApply')}
+                    <select
+                      value={autoApplyMode}
+                      onChange={e => setAutoApplyMode(e.target.value)}
+                      className="px-2 py-1 text-sm rounded bg-slate-700 border border-slate-600 text-slate-200"
+                    >
+                      <option value="never">{tMode('never')}</option>
+                      <option value="always">{tMode('always')}</option>
+                      <option value="create">{tMode('create')}</option>
+                      <option value="create_update">{tMode('createUpdate')}</option>
+                    </select>
                   </label>
                   <label className="flex items-center gap-2 text-sm text-slate-300">
                     <input

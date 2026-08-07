@@ -78,6 +78,7 @@ function fmtVal(v: unknown, noneLabel: string): string {
 export default function BulkUpdatePage() {
   const router = useRouter()
   const t = useTranslations('adminBulkUpdate')
+  const tMode = useTranslations('common.autoApplyMode')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [pools, setPools] = useState<AgentPool[]>([])
@@ -99,7 +100,8 @@ export default function BulkUpdatePage() {
   const [uTfVersion, setUTfVersion] = useState('')
   const [uExecBackend, setUExecBackend] = useState('')
   const [uExecMode, setUExecMode] = useState('')
-  const [uAutoApply, setUAutoApply] = useState('')
+  // '' means "leave unchanged"; anything else is an auto-apply mode (#1276).
+  const [uAutoApplyMode, setUAutoApplyMode] = useState('')
   const [uAgentPoolId, setUAgentPoolId] = useState('')
   const [uResourceCpu, setUResourceCpu] = useState('')
   const [uResourceMemory, setUResourceMemory] = useState('')
@@ -163,7 +165,8 @@ export default function BulkUpdatePage() {
     if (uTfVersion.trim()) u['terraform-version'] = uTfVersion.trim()
     if (uExecBackend) u['execution-backend'] = uExecBackend
     if (uExecMode) u['execution-mode'] = uExecMode
-    if (uAutoApply) u['auto-apply'] = uAutoApply === 'true'
+    // Send the mode, never the boolean — the endpoint 422s if both are set.
+    if (uAutoApplyMode) u['auto-apply-mode'] = uAutoApplyMode
     if (uAgentPoolId) u['agent-pool-id'] = uAgentPoolId
     if (uResourceCpu.trim()) u['resource-cpu'] = uResourceCpu.trim()
     if (uResourceMemory.trim()) u['resource-memory'] = uResourceMemory.trim()
@@ -493,13 +496,15 @@ export default function BulkUpdatePage() {
             <div>
               <label className={labelCls}>{t('update.autoApply')}</label>
               <select
-                value={uAutoApply}
-                onChange={(e) => setUAutoApply(e.target.value)}
+                value={uAutoApplyMode}
+                onChange={(e) => setUAutoApplyMode(e.target.value)}
                 className={inputCls}
               >
                 <option value="">{t('unchangedOption')}</option>
-                <option value="true">true</option>
-                <option value="false">false</option>
+                <option value="never">{tMode('never')}</option>
+                <option value="always">{tMode('always')}</option>
+                <option value="create">{tMode('create')}</option>
+                <option value="create_update">{tMode('createUpdate')}</option>
               </select>
             </div>
             <div>
