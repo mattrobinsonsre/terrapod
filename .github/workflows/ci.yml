@@ -2101,10 +2101,35 @@ jobs:
           version="${{ needs.prepare.outputs.version }}"
           chart_version="${version#v}"
 
+          # Keyless signing reaches out to the Actions OIDC endpoint, Fulcio and
+          # Rekor, so it fails for the usual transient network reasons — and a
+          # release is an expensive thing to lose to one of them. A v1.4.0 tag
+          # died on a single TLS handshake timeout fetching the OIDC token.
+          #
+          # The retry also side-steps the way that failure presents: with no
+          # ambient token, cosign falls back to the interactive device flow,
+          # prints a verification URL no one is watching, and waits out the full
+          # five-minute code validity before failing. The next attempt fetches
+          # the token normally.
+          sign() {
+            local subject="$1"
+            for attempt in 1 2 3; do
+              if cosign sign "$subject"; then
+                return 0
+              fi
+              echo "cosign sign failed for $subject (attempt $attempt/3)"
+              if [ "$attempt" -lt 3 ]; then
+                sleep $((attempt * 15))
+              fi
+            done
+            echo "::error::cosign sign gave up on $subject after 3 attempts"
+            return 1
+          }
+
           for image in terrapod-api terrapod-web terrapod-runner terrapod-listener terrapod-migrations; do
             digest=$(docker buildx imagetools inspect "$REGISTRY/$image:$version" --format '{{.Manifest.Digest}}')
             echo "Signing $image@$digest"
-            cosign sign "$REGISTRY/$image@$digest"
+            sign "$REGISTRY/$image@$digest"
             # Expose the digest (hyphens → underscores for the output key) so the
             # SBOM + SLSA provenance steps below can attest the same immutable
             # subject as OCI 1.1 referrers.
@@ -2113,7 +2138,7 @@ jobs:
 
           # Helm chart OCI artifact (cosign resolves the tag to its digest).
           echo "Signing Helm chart terrapod:$chart_version"
-          cosign sign "$REGISTRY/terrapod:$chart_version"
+          sign "$REGISTRY/terrapod:$chart_version"
 
       # SLSA build provenance per image, published as an OCI referrer next to
       # the image (verifiable with `gh attestation verify` / `cosign verify-attestation`).
