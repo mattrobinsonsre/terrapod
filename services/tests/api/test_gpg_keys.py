@@ -30,6 +30,16 @@ def _user(roles=None):
     )
 
 
+def _admin():
+    """A principal that holds the registry capability the mutating routes need.
+
+    Platform admin is step 1 of the capability resolver, so this exercises the
+    real resolution path rather than patching it out — the point of these
+    tests after the fix is that the gate is genuinely consulted.
+    """
+    return _user(roles=["admin"])
+
+
 def _make_app(user=None):
     app = create_app()
     if user is not None:
@@ -81,7 +91,7 @@ class TestCreate:
     @patch("terrapod.api.routers.gpg_keys.create_gpg_key", new_callable=AsyncMock)
     async def test_happy_path_201(self, mock_create, *mocks):
         mock_create.return_value = _mock_key()
-        app = _make_app(_user())
+        app = _make_app(_admin())
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.post(_KEYS, json=_create_body(), headers=_AUTH)
         assert resp.status_code == 201
@@ -96,7 +106,7 @@ class TestCreate:
     @patch("terrapod.api.routers.gpg_keys.create_gpg_key", new_callable=AsyncMock)
     async def test_invalid_armor_422(self, mock_create, *mocks):
         mock_create.side_effect = ValueError("no PGP block found")
-        app = _make_app(_user())
+        app = _make_app(_admin())
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.post(_KEYS, json=_create_body(), headers=_AUTH)
         assert resp.status_code == 422
@@ -105,7 +115,7 @@ class TestCreate:
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
     async def test_missing_armor_422(self, *mocks):
-        app = _make_app(_user())
+        app = _make_app(_admin())
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.post(
                 _KEYS,
@@ -183,7 +193,7 @@ class TestRevoke:
     async def test_revoke_happy_200(self, mock_revoke, *mocks):
         key = _mock_key()
         mock_revoke.return_value = key
-        app = _make_app(_user())
+        app = _make_app(_admin())
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.post(f"{_KEYS}/{key.id}/revoke", json=_revoke_body(), headers=_AUTH)
         assert resp.status_code == 200
@@ -195,7 +205,7 @@ class TestRevoke:
     @patch("terrapod.api.routers.gpg_keys.revoke_gpg_key", new_callable=AsyncMock)
     async def test_revoke_invalid_cert_422(self, mock_revoke, *mocks):
         mock_revoke.side_effect = ValueError("not a valid self-revocation certificate for this key")
-        app = _make_app(_user())
+        app = _make_app(_admin())
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.post(
                 f"{_KEYS}/{uuid.uuid4()}/revoke", json=_revoke_body(), headers=_AUTH
@@ -208,7 +218,7 @@ class TestRevoke:
     @patch("terrapod.api.routers.gpg_keys.revoke_gpg_key", new_callable=AsyncMock)
     async def test_revoke_not_found_404(self, mock_revoke, *mocks):
         mock_revoke.return_value = None
-        app = _make_app(_user())
+        app = _make_app(_admin())
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.post(
                 f"{_KEYS}/{uuid.uuid4()}/revoke", json=_revoke_body(), headers=_AUTH
@@ -219,7 +229,7 @@ class TestRevoke:
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
     async def test_revoke_bad_uuid_404(self, *mocks):
-        app = _make_app(_user())
+        app = _make_app(_admin())
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.post(f"{_KEYS}/xyz/revoke", json=_revoke_body(), headers=_AUTH)
         assert resp.status_code == 404
@@ -232,7 +242,7 @@ class TestDelete:
     @patch("terrapod.api.routers.gpg_keys.delete_gpg_key", new_callable=AsyncMock)
     async def test_delete_happy_204(self, mock_delete, *mocks):
         mock_delete.return_value = True
-        app = _make_app(_user())
+        app = _make_app(_admin())
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.delete(f"{_KEYS}/{uuid.uuid4()}", headers=_AUTH)
         assert resp.status_code == 204
@@ -243,7 +253,7 @@ class TestDelete:
     @patch("terrapod.api.routers.gpg_keys.delete_gpg_key", new_callable=AsyncMock)
     async def test_delete_not_found_404(self, mock_delete, *mocks):
         mock_delete.return_value = False
-        app = _make_app(_user())
+        app = _make_app(_admin())
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.delete(f"{_KEYS}/{uuid.uuid4()}", headers=_AUTH)
         assert resp.status_code == 404
@@ -252,7 +262,76 @@ class TestDelete:
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
     async def test_delete_bad_uuid_404(self, *mocks):
-        app = _make_app(_user())
+        app = _make_app(_admin())
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.delete(f"{_KEYS}/xyz", headers=_AUTH)
         assert resp.status_code == 404
+
+
+class TestTrustAnchorAuthorization:
+    """The GPG key store is the trust anchor for provider signature
+    verification: `_verify_and_store_shasums_signature` reads the issuer key id
+    out of a publisher's detached SHA256SUMS.sig and verifies it against
+    whichever registered key matches. Every route here was previously gated on
+    `get_current_user` alone, so any authenticated principal could register a
+    key of their own and have Terrapod accept signatures they made, or delete a
+    legitimate publisher's key and break verification for them.
+
+    These pin the gate per route, because a check added to two of three
+    mutating endpoints is the same hole with a smaller entrance.
+    """
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.gpg_keys.create_gpg_key", new_callable=AsyncMock)
+    async def test_ordinary_principal_cannot_add_a_trust_anchor(self, mock_create, *mocks):
+        mock_create.return_value = _mock_key()
+        app = _make_app(_user())  # authenticated, holds only `everyone`
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(_KEYS, json=_create_body(), headers=_AUTH)
+        assert resp.status_code == 403
+        # The service must not have been reached — a 403 raised after the write
+        # would be a different bug wearing the same status code.
+        mock_create.assert_not_called()
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.gpg_keys.revoke_gpg_key", new_callable=AsyncMock)
+    async def test_ordinary_principal_cannot_revoke(self, mock_revoke, *mocks):
+        app = _make_app(_user())
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                f"{_KEYS}/{uuid.uuid4()}/revoke", json=_revoke_body(), headers=_AUTH
+            )
+        # A valid body on purpose: with an invalid one FastAPI answers 422 from
+        # request validation before the authz check runs, which would prove
+        # nothing about the gate.
+        assert resp.status_code == 403
+        mock_revoke.assert_not_called()
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.gpg_keys.delete_gpg_key", new_callable=AsyncMock)
+    async def test_ordinary_principal_cannot_delete(self, mock_delete, *mocks):
+        app = _make_app(_user())
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.delete(f"{_KEYS}/{uuid.uuid4()}", headers=_AUTH)
+        assert resp.status_code == 403
+        mock_delete.assert_not_called()
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.gpg_keys.list_gpg_keys", new_callable=AsyncMock)
+    async def test_reads_stay_open_to_any_authenticated_principal(self, mock_list, *mocks):
+        """Deliberately NOT gated. These are public keys, and this ships in a
+        patch to supported lines — tightening a read buys no security and can
+        break a consumer that was legitimately listing them."""
+        mock_list.return_value = [_mock_key()]
+        app = _make_app(_user())
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get(_KEYS, headers=_AUTH)
+        assert resp.status_code == 200
