@@ -73,6 +73,7 @@ from terrapod.services import (
     run_service,
 )
 from terrapod.services.pool_rbac_service import resolve_pool_capabilities_for
+from terrapod.services.workspace_name import validate_workspace_name
 from terrapod.services.workspace_rbac_service import (
     resolve_workspace_capabilities_for,
 )
@@ -267,28 +268,18 @@ def _validate_scan_skip_rules(raw: object) -> list[str]:
     return out
 
 
-_WORKSPACE_NAME_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_-]*$")
-
-
 def _validate_workspace_name(name: str) -> str:
-    """Validate and sanitize a workspace name.
+    """HTTP wrapper over the canonical rule in `services.workspace_name`.
 
-    Rules:
-    - Must start with alphanumeric
-    - May contain alphanumeric, hyphens, underscores
-    - Max 90 characters (matches DB column String(90))
+    The rule itself moved out of this router (#1299) because more than one
+    path creates a workspace and the newest of them — undelete/restore —
+    was checking only "non-empty string". A validator only one caller uses
+    is one the next caller forgets.
     """
-    cleaned = name.strip()
-    if not cleaned:
-        raise HTTPException(status_code=422, detail="Workspace name is required")
-    if len(cleaned) > 90:
-        raise HTTPException(status_code=422, detail="Workspace name must be 90 characters or fewer")
-    if not _WORKSPACE_NAME_RE.match(cleaned):
-        raise HTTPException(
-            status_code=422,
-            detail="Workspace name must start with a letter or number and contain only letters, numbers, hyphens, and underscores",
-        )
-    return cleaned
+    try:
+        return validate_workspace_name(name)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
 
 
 def _labels_to_tag_names(labels: dict | None) -> list[str]:

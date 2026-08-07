@@ -12,12 +12,16 @@
     "input_schema": {
       "additionalProperties": false,
       "properties": {
+        "force": {
+          "description": "restore again even though this deletion has already been restored. Only set this when the earlier restored workspace is known to be gone — otherwise it produces a second live workspace over the same infrastructure",
+          "type": "boolean"
+        },
         "name": {
-          "description": "optional name for the recovered workspace; when omitted the original name is reused, suffixed if it has since been taken",
+          "description": "optional name for the recovered workspace; when omitted the original name is reused, suffixed if it has since been taken. Must start with a letter or number and contain only letters, numbers, hyphens and underscores",
           "type": "string"
         },
         "workspace_id": {
-          "description": "the id of the DELETED workspace to recover (the bare uuid from terrapod_deleted_workspace_list, not a ws- prefixed id)",
+          "description": "the id of the DELETED workspace to recover, from terrapod_deleted_workspace_list; either the bare uuid or the ws- prefixed form",
           "type": "string"
         }
       },

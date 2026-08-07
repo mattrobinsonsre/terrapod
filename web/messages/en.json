@@ -2948,10 +2948,12 @@
     "colActions": "Actions",
     "unknownName": "Name not recorded",
     "orphanBadge": "Found by the reaper",
+    "restoredBadge": "Already restored",
     "retentionDisabled": "No expiry",
     "restore": "Restore",
     "restoring": "Restoring…",
     "restoreConfirm": "Restore the state of \"{name}\"?\n\nThis creates a NEW workspace — the original is not brought back. It returns with auto-apply and drift detection off and no VCS connection, and its variables and run history do not come back. Only the state is recovered.",
-    "restoreDone": "Recovered {versions, plural, one {# state version} other {# state versions}} into the new workspace \"{name}\". Check its settings before enabling auto-apply or VCS."
+    "restoreDone": "Recovered {versions, plural, one {# state version} other {# state versions}} into the new workspace \"{name}\". Check its settings before enabling auto-apply or VCS.",
+    "restoreAgainConfirm": "\"{name}\" has already been restored, into {existing}.\n\nRestoring it again creates a SECOND workspace holding the same state lineage over the same infrastructure. Applying in either will then make the other's next plan look like wholesale drift.\n\nOnly continue if the earlier restored workspace is gone."
   }
 }

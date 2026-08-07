@@ -2948,10 +2948,12 @@
     "colActions": "Ações",
     "unknownName": "Nome não registrado",
     "orphanBadge": "Encontrado pelo coletor",
+    "restoredBadge": "Já restaurado",
     "retentionDisabled": "Sem expiração",
     "restore": "Restaurar",
     "restoring": "Restaurando…",
     "restoreConfirm": "Restaurar o estado de \"{name}\"?\n\nIsto cria um NOVO workspace — o original não volta. Ele volta sem auto-apply, sem detecção de drift e sem conexão VCS; variáveis e histórico de execuções não voltam. Apenas o estado é recuperado.",
-    "restoreDone": "{versions, plural, one {# versão de estado recuperada} other {# versões de estado recuperadas}} no novo workspace \"{name}\". Confira as configurações antes de ativar auto-apply ou VCS."
+    "restoreDone": "{versions, plural, one {# versão de estado recuperada} other {# versões de estado recuperadas}} no novo workspace \"{name}\". Confira as configurações antes de ativar auto-apply ou VCS.",
+    "restoreAgainConfirm": "“{name}” já foi restaurado, para {existing}.\n\nRestaurar de novo cria um SEGUNDO workspace com a mesma linhagem de state sobre a mesma infraestrutura. Um apply em qualquer um deles fará o próximo plano do outro parecer um drift total.\n\nContinue apenas se o workspace restaurado antes não existir mais."
   }
 }

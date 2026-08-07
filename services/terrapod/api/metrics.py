@@ -366,6 +366,17 @@ RETENTION_DURATION = Histogram(
     "Duration of retention cleanup cycle",
 )
 
+#: 1 while the orphaned-state reaper is refusing to reap because the orphan set
+#: is implausibly large for the number of live workspaces — the signature of a
+#: database restored from an older backup or a repointed `DATABASE_URL`, where
+#: every workspace missing from the DB looks like a deleted one (#1299). Alert
+#: on this: while it is 1, nothing is being reclaimed, and if the cause really
+#: is a stale database then reaping is exactly what must not happen.
+RETENTION_ORPHAN_REAP_BLOCKED = Gauge(
+    "terrapod_retention_orphan_reap_blocked",
+    "1 when the deleted-workspace reaper is refusing to reap an implausibly large orphan set",
+)
+
 
 def _get_path_template(request: Request) -> str:
     """Extract the FastAPI route pattern to avoid high-cardinality raw paths."""

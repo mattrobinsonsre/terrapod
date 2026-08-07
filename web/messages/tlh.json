@@ -2948,10 +2948,12 @@
     "colActions": "vangmeH",
     "unknownName": "pong qonlu'be'",
     "orphanBadge": "wa'DIch tu'lu'",
+    "restoredBadge": "chochoHta''bogh",
     "retentionDisabled": "poH Hutlh",
     "restore": "cheghmoH",
     "restoring": "cheghmoHtaH…",
     "restoreConfirm": "«{name}» Dotlh DacheghmoH''a''?\n\nQumwo' CHU' chenlu' — Qumwo' Qaw'lu'ta'bogh cheghbe'. chegh 'ach auto-apply drift je chu'Ha'lu', VCS Hutlh; mI'mey qunmeyDaj je cheghbe'. Dotlh neH cheghlu'.",
-    "restoreDone": "{versions, plural, one {# Dotlh mI''} other {# Dotlh mI'mey}} Qumwo' chu' «{name}» chegh. auto-apply VCS joq Dachu'pa' DuHmey yIlegh."
+    "restoreDone": "{versions, plural, one {# Dotlh mI''} other {# Dotlh mI'mey}} Qumwo' chu' «{name}» chegh. auto-apply VCS joq Dachu'pa' DuHmey yIlegh.",
+    "restoreAgainConfirm": "\"{name}\" chochoHta''bogh {existing} Daq.\n\nlatlh chochoH ''e'' chenmoHlu''chugh, cha''DIch workspace chenlu'', rap state tlhegh, rap infrastructure Daq. wa'' Daq apply Dalo''chugh, latlh nab veb Dalegh ''ej Hoch drift rur.\n\nvaj taH neH wej workspace chochoHta''bogh Hegh''a''."
   }
 }

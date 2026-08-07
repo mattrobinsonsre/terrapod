@@ -4064,6 +4064,8 @@ Notable attributes:
 | `marker-reason` | `deleted` — written by the delete, so `deleted-at` is the true deletion time. `discovered-orphaned` — the reaper found state with no marker (deleted before this feature shipped, or the marker write failed), so `deleted-at` is when it was first seen |
 | `state-versions-available` | Counted from storage at request time, not taken from the marker — a partial reap or an incomplete replication shows up here and nowhere else |
 | `restorable-until` | When the state becomes eligible for reaping. Empty when retention is disabled |
+| `restored-to` | Workspace ids this deletion has already been restored into; empty until the first restore. Check it before offering a restore — a repeat would produce a second live workspace over the same infrastructure |
+| `restored-at` / `restored-by` | When and by whom the most recent restore happened |
 | `variable-names` | Names and categories only. Values are **never** recorded: the marker is a plain object in the bucket and replicates to any standby |
 
 ### Show Deleted Workspace
@@ -4072,14 +4074,27 @@ Notable attributes:
 GET /api/terrapod/v1/deleted-workspaces/{workspace_id}
 ```
 
+`{workspace_id}` is accepted both bare (`0192f3a1-…`, as the list emits it) and
+`ws-`-prefixed, on this route and on the restore below.
+
 ### Restore a Deleted Workspace
 
 ```
 POST /api/terrapod/v1/deleted-workspaces/{workspace_id}/restore
 ```
 
-Optional body: `{"data": {"attributes": {"name": "..."}}}`. When omitted the
-original name is reused, suffixed if it has been taken since.
+Optional body: `{"data": {"attributes": {"name": "...", "force": false}}}`.
+
+`name` — when omitted the original is reused, suffixed if it has been taken
+since. It must meet the same format contract as any other workspace name
+(start with a letter or number; letters, numbers, hyphens and underscores; 90
+characters or fewer), because the name is what the `cloud {}` block matches on
+and what `/app/{org}/{name}` redirects by. A name that came from the marker
+rather than the caller is sanitized instead of rejected, so a hand-edited
+marker cannot make a recoverable workspace un-restorable.
+
+`force` — permits restoring a deletion that has already been restored. Without
+it the request is refused; see below.
 
 This creates a **new workspace with a new id** and copies the state history
 into it. It is not an in-place revival, and that is deliberate: re-attaching
@@ -4102,6 +4117,20 @@ Three properties worth knowing before you call it:
   connection id may since have been reused by a different connection; the
   response reports it in `dropped-references` rather than binding to it.
 
+- **Only the newest state versions are copied**, bounded by
+  `api.config.artifact_retention.state_versions_keep`. Anything beyond the cap
+  is listed in `state-versions-skipped` with a reason rather than dropped
+  silently. Without a bound, one request walks every version ever written
+  through the API pod — decrypt, re-encrypt, put, per document, inside a single
+  open transaction — and a large state exhausts the ingress timeout long before
+  it finishes.
+- **A deletion is restored once.** A repeat would create a *second* live
+  workspace holding the same state lineage over the same real infrastructure,
+  after which an apply in either makes the other's next plan read as wholesale
+  drift. The second attempt is refused with a `409` naming the workspace that
+  already exists. Pass `force` only when that earlier restore is known to be
+  gone.
+
 The source prefix and its marker are left untouched, so the original remains
 recoverable until its window expires.
 
@@ -4110,7 +4139,8 @@ recoverable until its window expires.
 | `201` | Restored. The body carries the new workspace id and the suppression report |
 | `403` | Not a platform admin |
 | `404` | No delete marker for that id |
-| `409` | No state could be recovered — already reaped. Nothing is created; an empty restore is reported as a failure rather than handing back a bare workspace |
+| `409` | Either no state could be recovered (already reaped) or this deletion has already been restored. Nothing is created; an empty restore is reported as a failure rather than handing back a bare workspace |
+| `422` | The supplied `name` does not meet the workspace name format |
 
 ## Common Response Codes
 

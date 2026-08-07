@@ -321,6 +321,9 @@ field DeletedWorkspace.LastSerial int `json:"last-serial"`
 field DeletedWorkspace.Lineage string `json:"lineage"`
 field DeletedWorkspace.MarkerReason string `json:"marker-reason"`
 field DeletedWorkspace.RestorableUntil string `json:"restorable-until"`
+field DeletedWorkspace.RestoredAt string `json:"restored-at"`
+field DeletedWorkspace.RestoredBy string `json:"restored-by"`
+field DeletedWorkspace.RestoredTo []string `json:"restored-to"`
 field DeletedWorkspace.Settings map[string]any `json:"settings"`
 field DeletedWorkspace.StateVersionsAvailable int `json:"state-versions-available"`
 field DeletedWorkspace.VariableNames []DeletedWorkspaceVariable `json:"variable-names"`
@@ -580,6 +583,8 @@ field Resource.Attributes map[string]json.RawMessage `json:"attributes"`
 field Resource.ID string `json:"id"`
 field Resource.Relationships map[string]Relationship `json:"relationships,omitempty"`
 field Resource.Type string `json:"type"`
+field RestoreOptions.Force bool
+field RestoreOptions.Name string
 field RestoredWorkspace.DroppedReferences []map[string]any `json:"dropped-references"`
 field RestoredWorkspace.ID string `json:"-"`
 field RestoredWorkspace.Name string `json:"name"`
@@ -1200,7 +1205,7 @@ method (*Client) RegenerateArchitectureCritique( ctx context.Context, workspaceI
 method (*Client) RegeneratePlanSummary(ctx context.Context, runID string) (*PlanSummary, error)
 method (*Client) RegenerateRunCostSummary(ctx context.Context, runID string) (*CostSummary, error)
 method (*Client) RemoveRoleFromIdentity(ctx context.Context, providerName, email, roleName string) error
-method (*Client) RestoreDeletedWorkspace(ctx context.Context, workspaceID, name string) (*RestoredWorkspace, error)
+method (*Client) RestoreDeletedWorkspace(ctx context.Context, workspaceID string, opts RestoreOptions) (*RestoredWorkspace, error)
 method (*Client) RetagAPIToken(ctx context.Context, tokenID, kind string, pinnedRoles []string) (*APIToken, error)
 method (*Client) RevokeAPIToken(ctx context.Context, tokenID string) error
 method (*Client) RevokeAllAPITokensForUser(ctx context.Context, email string) (int64, error)
@@ -1340,6 +1345,7 @@ type Relationship struct
 type RelationshipResource struct
 type RemoteStateConsumer struct
 type Resource struct
+type RestoreOptions struct
 type RestoredWorkspace struct
 type Role struct
 type RoleAssignment struct

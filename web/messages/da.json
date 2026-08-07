@@ -2948,10 +2948,12 @@
     "colActions": "Handlinger",
     "unknownName": "Navn ikke registreret",
     "orphanBadge": "Fundet af reaperen",
+    "restoredBadge": "Allerede gendannet",
     "retentionDisabled": "Ingen udløb",
     "restore": "Gendan",
     "restoring": "Gendanner…",
     "restoreConfirm": "Gendan state for ”{name}”?\n\nDette opretter et NYT arbejdsområde — originalen kommer ikke tilbage. Det kommer tilbage med auto-apply og driftregistrering slået fra og uden VCS-forbindelse; variabler og kørselshistorik kommer ikke tilbage. Kun state reddes.",
-    "restoreDone": "Gendannede {versions, plural, one {# state-version} other {# state-versioner}} til det nye arbejdsområde ”{name}”. Tjek indstillingerne, før du slår auto-apply eller VCS til."
+    "restoreDone": "Gendannede {versions, plural, one {# state-version} other {# state-versioner}} til det nye arbejdsområde ”{name}”. Tjek indstillingerne, før du slår auto-apply eller VCS til.",
+    "restoreAgainConfirm": "“{name}” er allerede gendannet, til {existing}.\n\nAt gendanne igen opretter et ANDET workspace med den samme state-slægt over den samme infrastruktur. En apply i det ene får så det andets næste plan til at se ud som omfattende drift.\n\nFortsæt kun, hvis det tidligere gendannede workspace er væk."
   }
 }

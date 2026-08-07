@@ -230,3 +230,113 @@ async def test_zero_retention_disables_the_category(days):
     from terrapod.config import settings
 
     assert settings.artifact_retention.deleted_workspace_retention_days >= 0
+
+
+class TestReapIsObservable:
+    """Every other retention category increments `RETENTION_DELETED`; this one
+    did not (#1299) — leaving the only category that irreversibly destroys
+    customer state as the only one an operator could not graph, alert on, or
+    reconcile against afterwards. A deletion nobody can see happen is
+    indistinguishable from one that never happened."""
+
+    async def test_a_reap_increments_the_retention_counter(self):
+        from terrapod.api.metrics import RETENTION_DELETED
+
+        counter = RETENTION_DELETED.labels(category="deleted_workspaces")
+        before = counter._value.get()
+
+        store = FakeStore([f"state/{WS_A}/1.tfstate"])
+        store.objects[deleted_workspace_marker_key(WS_A)] = _marker(WS_A, age_days=31)
+        reaped = await _cleanup_deleted_workspaces(_db(live_ids=[]), store, 30, 100)
+
+        assert reaped == 1
+        assert counter._value.get() == before + 1
+
+    async def test_a_cycle_that_reaps_nothing_does_not_move_the_counter(self):
+        """A counter that ticks on every cycle regardless is worse than none —
+        it makes "did we destroy anything last night" unanswerable."""
+        from terrapod.api.metrics import RETENTION_DELETED
+
+        counter = RETENTION_DELETED.labels(category="deleted_workspaces")
+        before = counter._value.get()
+
+        store = FakeStore([f"state/{WS_B}/1.tfstate"])
+        store.objects[deleted_workspace_marker_key(WS_B)] = _marker(WS_B, age_days=5)
+        assert await _cleanup_deleted_workspaces(_db(live_ids=[]), store, 30, 100) == 0
+
+        assert counter._value.get() == before
+
+
+class TestMassOrphanBreaker:
+    """This category inverts the safety property of every other one: it deletes
+    what the DB does not claim, so what it destroys depends on the database
+    being COMPLETE, not on it being correct. A database restored from an older
+    backup, or a `DATABASE_URL` repointed mid-migration, makes every missing
+    workspace read as an orphan — and the existing `still_referenced` re-check
+    cannot help, because missing rows are exactly what a stale DB has (#1299).
+    """
+
+    @staticmethod
+    def _expired_orphans(n: int) -> FakeStore:
+        store = FakeStore()
+        for i in range(n):
+            ws = f"0192f3a1-0000-7000-8000-{i:012d}"
+            store.objects[f"state/{ws}/1.tfstate"] = b"{}"
+            store.objects[deleted_workspace_marker_key(ws)] = _marker(ws, age_days=31)
+        return store
+
+    @staticmethod
+    def _db_with_live_count(live_total: int):
+        """Distinguishes the live-workspace COUNT from the per-orphan
+        state-version safety check, which both read `scalar_one_or_none` but
+        must answer differently — a shared value would make every orphan look
+        still-referenced and the assertions pass vacuously."""
+
+        async def execute(stmt, *a, **kw):
+            res = MagicMock()
+            res.scalars.return_value = []
+            res.scalar_one_or_none.return_value = (
+                live_total if "count(" in str(stmt).lower() else None
+            )
+            return res
+
+        db = AsyncMock()
+        db.execute = execute
+        return db
+
+    async def test_an_implausible_orphan_set_reaps_nothing(self):
+        # 40 expired orphans against 10 live workspaces: far past the 0.5 ratio.
+        store = self._expired_orphans(40)
+        reaped = await _cleanup_deleted_workspaces(self._db_with_live_count(10), store, 30, 100)
+
+        assert reaped == 0
+        # Not one object touched — the refusal is total, not partial.
+        assert store.deleted == []
+
+    async def test_the_refusal_is_visible_to_an_operator(self):
+        from terrapod.api.metrics import RETENTION_ORPHAN_REAP_BLOCKED
+
+        store = self._expired_orphans(40)
+        await _cleanup_deleted_workspaces(self._db_with_live_count(10), store, 30, 100)
+        assert RETENTION_ORPHAN_REAP_BLOCKED._value.get() == 1
+
+        # ...and clears itself once the ratio is plausible again, so the alert
+        # resolves without an operator having to reset anything.
+        small = self._expired_orphans(3)
+        await _cleanup_deleted_workspaces(self._db_with_live_count(100), small, 30, 100)
+        assert RETENTION_ORPHAN_REAP_BLOCKED._value.get() == 0
+
+    async def test_a_small_orphan_set_is_never_blocked(self):
+        """A pure ratio would refuse to reap on a brand-new deployment with
+        nothing live to protect, and on a small one that legitimately has more
+        deleted workspaces than live ones."""
+        store = self._expired_orphans(3)
+        reaped = await _cleanup_deleted_workspaces(self._db_with_live_count(0), store, 30, 100)
+        assert reaped == 3
+
+    async def test_a_large_but_proportionate_orphan_set_still_reaps(self):
+        """The breaker must not become a permanent stop on a big deployment
+        that deletes workspaces at a normal rate."""
+        store = self._expired_orphans(30)
+        reaped = await _cleanup_deleted_workspaces(self._db_with_live_count(500), store, 30, 100)
+        assert reaped == 30

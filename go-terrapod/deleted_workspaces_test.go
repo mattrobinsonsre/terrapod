@@ -2,6 +2,7 @@ package terrapod
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -119,7 +120,7 @@ func TestDiscoveredOrphanDecodesWithNullFields(t *testing.T) {
 func TestRestoreDeletedWorkspace(t *testing.T) {
 	c := newDeletedWorkspaceFixture(t)
 	got, err := c.RestoreDeletedWorkspace(
-		context.Background(), "11111111-1111-4111-8111-111111111111", "")
+		context.Background(), "11111111-1111-4111-8111-111111111111", RestoreOptions{})
 	if err != nil {
 		t.Fatalf("RestoreDeletedWorkspace: %v", err)
 	}
@@ -137,6 +138,59 @@ func TestRestoreDeletedWorkspace(t *testing.T) {
 	// workspace comes back inert and the caller decides what to re-enable.
 	if len(got.Suppressed) != 2 || len(got.DroppedReferences) != 1 {
 		t.Errorf("suppression report not decoded: %+v / %+v", got.Suppressed, got.DroppedReferences)
+	}
+}
+
+func TestRestoreOptionsReachTheWire(t *testing.T) {
+	// Force is the difference between "refuse, this was already restored" and
+	// "do it anyway"; a flag that never leaves the client would silently make
+	// the guard unbypassable and look like a server bug.
+	var sent map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			Data struct {
+				Attributes map[string]any `json:"attributes"`
+			} `json:"data"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		sent = body.Data.Attributes
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"data":{"id":"ws-x","type":"workspaces","attributes":{}}}`))
+	}))
+	defer srv.Close()
+	c, err := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+
+	if _, err := c.RestoreDeletedWorkspace(
+		context.Background(), "abc", RestoreOptions{Name: "recovered", Force: true}); err != nil {
+		t.Fatalf("RestoreDeletedWorkspace: %v", err)
+	}
+	if sent["name"] != "recovered" || sent["force"] != true {
+		t.Errorf("options did not reach the wire: %+v", sent)
+	}
+
+	// Neither is sent when unset, so the server keeps its own defaults rather
+	// than being handed an explicit empty name or an explicit force:false.
+	if _, err := c.RestoreDeletedWorkspace(
+		context.Background(), "abc", RestoreOptions{}); err != nil {
+		t.Fatalf("RestoreDeletedWorkspace: %v", err)
+	}
+	if len(sent) != 0 {
+		t.Errorf("unset options should send nothing, sent %+v", sent)
+	}
+}
+
+func TestRestoredToDecodes(t *testing.T) {
+	c := newDeletedWorkspaceFixture(t)
+	list, err := c.ListDeletedWorkspaces(context.Background(), DeletedWorkspaceListOptions{})
+	if err != nil {
+		t.Fatalf("ListDeletedWorkspaces: %v", err)
+	}
+	// Absent on a never-restored marker: nil, not a decode failure.
+	if list.Items[0].RestoredTo != nil {
+		t.Errorf("want nil restored-to on a fresh marker, got %v", list.Items[0].RestoredTo)
 	}
 }
 

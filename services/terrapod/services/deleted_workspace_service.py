@@ -47,6 +47,7 @@ from terrapod.crypto.state import decrypt_state_bytes, encrypt_state_bytes
 from terrapod.db.models import StateVersion, Variable, Workspace
 from terrapod.logging_config import get_logger
 from terrapod.services.label_validation import sanitize_labels
+from terrapod.services.workspace_name import validate_workspace_name
 from terrapod.storage import get_storage
 from terrapod.storage.keys import (
     DELETED_MARKER_PREFIX,
@@ -310,14 +311,36 @@ def _state_facts(plaintext: bytes) -> dict[str, Any]:
 
 
 async def _unique_name(db: AsyncSession, wanted: str) -> str:
-    """A free workspace name, suffixed if `wanted` is taken.
+    """A free, VALID workspace name, suffixed if `wanted` is taken.
 
     The original name is very often free — TFE semantics release it the moment
     the workspace is deleted, which is exactly why the row is not soft-deleted.
     But it may have been reused since, and a restore must never fail for a
     reason the operator cannot fix from the UI.
+
+    `wanted` has two sources and only one is a request body: it also arrives
+    from `marker["workspace_name"]`, read out of a JSON object in the bucket
+    rather than from the database. Both used to be trusted unchecked, so a
+    restore could mint a workspace whose name violates the format contract —
+    and the name is load-bearing (the key `cloud {}` matches on, the `/app`
+    redirect, the DR state index, VCS status contexts) (#1299).
+
+    This end SANITIZES rather than raises, following the same split as
+    labels: `validate_labels` rejects interactive input, `sanitize_labels`
+    strips-and-logs for a flow that must not abort. A hand-edited or corrupt
+    marker should not make an otherwise-recoverable workspace permanently
+    un-restorable — the operator can rename afterwards. The router validates
+    the *supplied* name strictly, because that one a human can just retype.
     """
-    base = (wanted or "restored-workspace")[:80]
+    try:
+        base = validate_workspace_name(wanted)[:80]
+    except ValueError as e:
+        logger.warning(
+            "Restore name unusable — falling back",
+            wanted=wanted,
+            reason=str(e),
+        )
+        base = "restored-workspace"
     taken = await db.execute(select(Workspace.id).where(Workspace.name == base).limit(1))
     if taken.scalar_one_or_none() is None:
         return base
@@ -329,6 +352,16 @@ async def _unique_name(db: AsyncSession, wanted: str) -> str:
     raise ValueError(f"could not find a free name based on {base!r}")
 
 
+#: Upper bound on how many state versions one restore will copy when the
+#: deployment's own `state_versions_keep` is disabled (0 = keep everything).
+#: Without a bound, one request walks every version ever written through the
+#: pod's heap — decrypt, re-encrypt, put, per document — inside a single open
+#: transaction, and a workspace with a large state will exhaust the ingress
+#: timeout long before it finishes (#1299). The client then sees a failure
+#: while the server keeps copying.
+DEFAULT_MAX_RESTORE_VERSIONS = 20
+
+
 async def restore_workspace(
     db: AsyncSession,
     storage: ObjectStore,
@@ -336,6 +369,7 @@ async def restore_workspace(
     *,
     restored_by: str,
     name: str | None = None,
+    max_versions: int | None = None,
 ) -> tuple[Workspace, dict[str, Any]]:
     """Recover a deleted workspace as a NEW workspace holding its state history.
 
@@ -365,12 +399,24 @@ async def restore_workspace(
     objects = await storage.list_prefix(f"state/{workspace_id}/")
     keys = _state_object_keys(objects, workspace_id)
 
+    # Keys sort by the time-ordered uuid7 state-version id, so the newest
+    # versions are at the end. When the cap bites, keep those: a restore is
+    # about resuming from where the workspace left off, and the current serial
+    # is the one the next plan reads.
+    cap = max_versions if max_versions and max_versions > 0 else DEFAULT_MAX_RESTORE_VERSIONS
+    beyond_cap: list[str] = []
+    if len(keys) > cap:
+        beyond_cap = keys[:-cap]
+        keys = keys[-cap:]
+
     settings = marker.get("settings") or {}
     report: dict[str, Any] = {
         "source_workspace_id": workspace_id,
         "source_workspace_name": marker.get("workspace_name"),
         "state_versions_restored": 0,
-        "state_versions_skipped": [],
+        "state_versions_skipped": [
+            {"key": k, "reason": f"beyond the {cap}-version restore cap"} for k in beyond_cap
+        ],
         "suppressed": [],
         "dropped_references": [],
     }
@@ -468,6 +514,116 @@ async def restore_workspace(
     return ws, report
 
 
+async def record_restore(
+    storage: ObjectStore, workspace_id: str, *, new_workspace_id: str, restored_by: str
+) -> None:
+    """Stamp the marker with where this deletion was restored to.
+
+    Nothing about restore is exclusive: the marker is not consumed, the source
+    prefix is untouched, and `_unique_name` suffixes rather than conflicting —
+    so a second restore quietly succeeds and yields a second live workspace
+    with the SAME lineage and serial over the same real infrastructure. An
+    apply in either then makes the other's next plan read as wholesale drift,
+    and nothing in the API said it had happened (#1299).
+
+    Stamping is what lets the restore endpoint refuse a repeat, and lets the
+    list surface show one has already occurred. Best-effort by design — the
+    restore itself has committed, and failing the request over a marker write
+    would report a failure for a workspace that exists.
+    """
+    marker = await read_marker(storage, workspace_id)
+    if marker is None:
+        return
+    history = marker.get("restored_to")
+    marker["restored_to"] = (
+        [*history, new_workspace_id] if isinstance(history, list) else [new_workspace_id]
+    )
+    marker["restored_at"] = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+    marker["restored_by"] = restored_by
+    await write_marker(storage, workspace_id, marker)
+
+
+def prior_restores(marker: dict[str, Any]) -> list[str]:
+    """Workspace ids this deletion has already been restored into."""
+    history = marker.get("restored_to")
+    return [str(i) for i in history] if isinstance(history, list) else []
+
+
+def _restorable_until(marker: dict[str, Any], retention_days: int) -> str | None:
+    """When this deletion stops being recoverable. `0 = disabled` (no expiry),
+    matching the retention service."""
+    if retention_days <= 0 or not isinstance(marker.get("deleted_at"), str):
+        return None
+    try:
+        ts = datetime.fromisoformat(marker["deleted_at"].replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return (ts + timedelta(days=retention_days)).isoformat().replace("+00:00", "Z")
+
+
+def _decorate(marker: dict[str, Any], retention_days: int) -> dict[str, Any]:
+    """Marker plus the derived fields the undelete surface needs.
+
+    Deliberately excludes `state_versions_available`, which costs a storage
+    listing per marker — see `attach_state_counts`.
+    """
+    age = marker_age_days(marker)
+    return {
+        **marker,
+        "age_days": round(age, 2) if age is not None else None,
+        "restorable_until": _restorable_until(marker, retention_days),
+        "restored_to": prior_restores(marker),
+    }
+
+
+async def attach_state_counts(
+    storage: ObjectStore, markers: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """Fill in `state_versions_available` for the markers given.
+
+    Counted from storage rather than trusted from the marker: the marker's
+    count was true at delete time, but a later reap or a partial replication is
+    exactly what an operator needs to see before deciding whether a restore is
+    worth attempting.
+
+    Separated from `list_deleted` because it costs one full prefix listing per
+    marker, and the list endpoint used to pay that for **every** deleted
+    workspace ever, before pagination had a chance to narrow it (#1299). The
+    caller pages first and decorates only what it is about to return.
+    """
+    for m in markers:
+        ws_id = m.get("workspace_id") or ""
+        objects = await storage.list_prefix(f"state/{ws_id}/")
+        m["state_versions_available"] = len(_state_object_keys(objects, ws_id))
+    return markers
+
+
+async def get_deleted(
+    db: AsyncSession, storage: ObjectStore, workspace_id: str, retention_days: int
+) -> dict[str, Any] | None:
+    """One deleted workspace, read directly by id.
+
+    Reads the single marker rather than building the whole list and scanning it
+    for a match — which is what this did, making a request for one workspace
+    cost a listing of every marker plus a state listing for each (#1299).
+    """
+    try:
+        uuid_mod.UUID(workspace_id)
+    except ValueError:
+        return None
+    marker = await read_marker(storage, workspace_id)
+    if marker is None:
+        return None
+    # A live id is not a deleted workspace, however stale the marker is.
+    live = await db.execute(select(Workspace.id).where(Workspace.id == workspace_id).limit(1))
+    if live.scalar_one_or_none() is not None:
+        return None
+    marker["workspace_id"] = workspace_id
+    decorated = _decorate(marker, retention_days)
+    await attach_state_counts(storage, [decorated])
+    return decorated
+
+
 async def list_deleted(
     db: AsyncSession, storage: ObjectStore, retention_days: int
 ) -> list[dict[str, Any]]:
@@ -497,6 +653,12 @@ async def list_deleted(
         body = await read_marker(storage, ws_id)
         if body is None:
             continue
+        # The KEY is the authority for the id, not the body. The key was just
+        # UUID-validated; the body is a hand-editable JSON file, and a
+        # non-UUID `workspace_id` in one used to reach the `Workspace.id.in_()`
+        # below and 500 the whole endpoint for every admin — one bad object
+        # taking out the entire undelete surface (#1299).
+        body["workspace_id"] = ws_id
         markers.append(body)
 
     if not markers:
@@ -508,36 +670,8 @@ async def list_deleted(
         for w in (await db.execute(select(Workspace.id).where(Workspace.id.in_(ids)))).scalars()
     }
 
-    out: list[dict[str, Any]] = []
-    for m in markers:
-        ws_id = m.get("workspace_id") or ""
-        if ws_id in live:
-            continue
-        age = marker_age_days(m)
-        restorable_until = None
-        if retention_days > 0 and isinstance(m.get("deleted_at"), str):
-            try:
-                ts = datetime.fromisoformat(m["deleted_at"].replace("Z", "+00:00"))
-                restorable_until = (
-                    (ts + timedelta(days=retention_days)).isoformat().replace("+00:00", "Z")
-                )
-            except ValueError:
-                restorable_until = None
-
-        objects = await storage.list_prefix(f"state/{ws_id}/")
-        out.append(
-            {
-                **m,
-                # Counted from storage rather than trusted from the marker: the
-                # marker's count was true at delete time, but a later reap or a
-                # partial replication is exactly what an operator needs to see
-                # before deciding whether a restore is worth attempting.
-                "state_versions_available": len(_state_object_keys(objects, ws_id)),
-                "age_days": round(age, 2) if age is not None else None,
-                # `0 = disabled` matches the retention service: no expiry.
-                "restorable_until": restorable_until,
-            }
-        )
-
+    out = [
+        _decorate(m, retention_days) for m in markers if (m.get("workspace_id") or "") not in live
+    ]
     out.sort(key=lambda m: m.get("deleted_at") or "", reverse=True)
     return out
