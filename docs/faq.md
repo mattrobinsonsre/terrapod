@@ -11,7 +11,9 @@ Enterprise (TFE) and HCP Terraform / Terraform Cloud (TFC)**. It provides the
 collaboration, governance, state-management, and UI layer around `terraform` or
 OpenTofu (`tofu`) as pluggable execution backends. It is **not** a fork of the
 Terraform/OpenTofu engine — it orchestrates them. Deployed via a Helm chart on
-Kubernetes. License: MPL-2.0. Current release: **v1.0.0** (stable).
+Kubernetes. License: MPL-2.0. Stable, on the **1.x** line — see
+[Releases](https://github.com/mattrobinsonsre/terrapod/releases) for the current
+version.
 
 ## Is Terrapod free / open source? Will it always be?
 
@@ -73,9 +75,12 @@ list of what the API reaches and how to redirect each one.
 
 ## Is Terrapod production-ready / stable?
 
-Yes — **v1.0.0** is released, with a SemVer compatibility contract enforced in CI
-across every public surface (API, wire protocol, config, Helm values, DB schema,
-SDK, provider). See [Versioning & support](versioning-and-support.md).
+Yes — Terrapod passed **1.0** and is on the 1.x line, with a SemVer compatibility
+contract enforced in CI across every public surface (API, wire protocol, config,
+Helm values, DB schema, SDK, provider). A minor never breaks any of them. See
+[Versioning & support](versioning-and-support.md), and
+[Releases](https://github.com/mattrobinsonsre/terrapod/releases) for the current
+version.
 
 ## Do I need Kubernetes to run Terrapod? Isn't that a heavy requirement?
 
