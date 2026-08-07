@@ -33,21 +33,28 @@ def _state_doc(serial: int, lineage: str) -> bytes:
     ).encode()
 
 
-async def _delete_with_state(client, name: str, serials: list[int], lineage: str) -> str:
-    """Create a workspace, give it state versions, delete it. Returns its raw id."""
+async def _delete_with_state(
+    client, name: str, serials: list[int], lineage: str, **extra_attrs
+) -> str:
+    """Create a workspace, give it state versions, delete it. Returns its raw id.
+
+    Restore refuses a workspace with no recoverable state, so anything testing
+    the restore path has to go through here rather than creating a bare one.
+    """
+    attributes = {
+        "name": name,
+        "auto-apply": True,
+        "drift-detection-enabled": True,
+        "labels": {"team": "platform"},
+    }
+    attributes.update(extra_attrs)
+    # The API rejects both forms at once — the mode supersedes the boolean — so
+    # a caller asking for a mode drops the default boolean rather than 422ing.
+    if "auto-apply-mode" in extra_attrs:
+        attributes.pop("auto-apply", None)
     create = await client.post(
         WS_ENDPOINT,
-        json={
-            "data": {
-                "type": "workspaces",
-                "attributes": {
-                    "name": name,
-                    "auto-apply": True,
-                    "drift-detection-enabled": True,
-                    "labels": {"team": "platform"},
-                },
-            }
-        },
+        json={"data": {"type": "workspaces", "attributes": attributes}},
         headers=AUTH,
     )
     assert create.status_code == 201, create.text
@@ -167,6 +174,52 @@ class TestRestore:
 
         # Non-dangerous settings ARE carried over — the restore is still useful.
         assert ws.json()["data"]["attributes"]["labels"] == {"team": "platform"}
+
+    async def test_a_conditional_guardrail_is_recorded_and_not_downgraded(self, app, client):
+        """A `create_update` workspace must not come back as `always` (#1313).
+
+        The `auto_apply` boolean is true for every non-`never` mode, so a marker
+        recording only the boolean tells an operator auto-apply was on but not
+        that it was deliberately held back from changes and destroys — and the
+        obvious way to switch it back on is `always`, which applies destroys.
+        The restore stays inert in *both* columns, and the marker keeps the
+        original mode so the guardrail can be put back as it was.
+        """
+        set_auth(app, admin_user())
+        old_id = await _delete_with_state(
+            client,
+            "restore-guardrail",
+            [1],
+            "lin-guardrail",
+            **{
+                "auto-apply-mode": "create_update",
+                "security-scan-enforcement": "enforced",
+                "security-scan-severity-threshold": "medium",
+            },
+        )
+
+        # The marker is the only surviving account of what the workspace was.
+        marker = await dws.read_marker(get_storage(), old_id)
+        assert marker["settings"]["auto_apply_mode"] == "create_update"
+        assert marker["settings"]["security_scan_enforcement"] == "enforced"
+
+        resp = await client.post(
+            f"/api/terrapod/v1/deleted-workspaces/{old_id}/restore", headers=AUTH
+        )
+        assert resp.status_code == 201, resp.text
+        assert "auto_apply" in resp.json()["data"]["attributes"]["suppressed"]
+
+        attrs = (
+            await client.get(f"/api/v2/workspaces/{resp.json()['data']['id']}", headers=AUTH)
+        ).json()["data"]["attributes"]
+        # Inert in both columns — never `always`, and never a boolean that
+        # disagrees with the mode.
+        assert attrs["auto-apply"] is False
+        assert attrs["auto-apply-mode"] == "never"
+        # Evaluation settings cannot start a run, so they come back as they
+        # were rather than silently reverting to the defaults.
+        assert attrs["security-scan-enforcement"] == "enforced"
+        assert attrs["security-scan-severity-threshold"] == "medium"
 
     async def test_restore_renames_when_the_name_is_taken(self, app, client):
         """The original name is usually free, but must never block a restore."""

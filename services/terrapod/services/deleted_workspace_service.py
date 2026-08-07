@@ -97,6 +97,24 @@ def _settings_snapshot(ws: Workspace) -> dict[str, Any]:
         "resource_cpu": ws.resource_cpu,
         "resource_memory": ws.resource_memory,
         "auto_apply": ws.auto_apply,
+        # The boolean above is only a projection — it is true for `always`,
+        # `create` and `create_update` alike. Recording the mode as well is what
+        # makes a guardrail recoverable: without it an operator restoring a
+        # `create_update` workspace knows auto-apply was on but not that it was
+        # deliberately held back from changes and destroys, and the obvious way
+        # to turn it back on is `always` (#1313).
+        "auto_apply_mode": ws.auto_apply_mode,
+        "auto_merge": ws.auto_merge,
+        "auto_merge_strategy": ws.auto_merge_strategy,
+        "plan_expiry_seconds": ws.plan_expiry_seconds,
+        "security_scan_enforcement": ws.security_scan_enforcement,
+        "security_scan_engine": ws.security_scan_engine,
+        "security_scan_severity_threshold": ws.security_scan_severity_threshold,
+        "security_scan_skip_rules": list(ws.security_scan_skip_rules or []),
+        "ai_summary_mode": ws.ai_summary_mode,
+        "ai_summary_context": ws.ai_summary_context,
+        "slack_channel": ws.slack_channel,
+        "trigger_prefixes": list(ws.trigger_prefixes or []),
         "vcs_connection_id": str(ws.vcs_connection_id) if ws.vcs_connection_id else None,
         "vcs_repo_url": ws.vcs_repo_url,
         "vcs_branch": ws.vcs_branch,
@@ -444,14 +462,41 @@ async def restore_workspace(
         resource_cpu=settings.get("resource_cpu") or "1",
         resource_memory=settings.get("resource_memory") or "2Gi",
         drift_ignore_rules=list(settings.get("drift_ignore_rules") or []),
-        # Constraint 2 — inert on return.
+        # Settings that only describe how a run is evaluated, and cannot start
+        # one, come back as they were. Restoring a workspace with its security
+        # scanning silently back at the defaults would be its own quiet
+        # downgrade (#1313).
+        plan_expiry_seconds=settings.get("plan_expiry_seconds"),
+        security_scan_enforcement=settings.get("security_scan_enforcement") or "advisory",
+        security_scan_engine=settings.get("security_scan_engine") or "checkov",
+        security_scan_severity_threshold=(
+            settings.get("security_scan_severity_threshold") or "high"
+        ),
+        security_scan_skip_rules=list(settings.get("security_scan_skip_rules") or []),
+        ai_summary_mode=settings.get("ai_summary_mode") or "default",
+        ai_summary_context=settings.get("ai_summary_context") or "",
+        slack_channel=settings.get("slack_channel") or "",
+        trigger_prefixes=list(settings.get("trigger_prefixes") or []),
+        auto_merge_strategy=settings.get("auto_merge_strategy") or "merge",
+        # Constraint 2 — inert on return. Anything that can act on its own is
+        # off, whatever it was: auto-apply (in both columns, so the boolean and
+        # the mode cannot disagree), drift detection, and auto-merge, which
+        # writes to a VCS provider.
         auto_apply=False,
+        auto_apply_mode="never",
         drift_detection_enabled=False,
+        auto_merge=False,
     )
     if settings.get("auto_apply"):
+        # Plain field names, so the list stays machine-readable. What it *was*
+        # — which matters, because "auto_apply" alone would send an operator
+        # restoring a `create_update` workspace to `always` — is on the
+        # marker's `settings`, which the undelete surface returns (#1313).
         report["suppressed"].append("auto_apply")
     if settings.get("drift_detection_enabled"):
         report["suppressed"].append("drift_detection_enabled")
+    if settings.get("auto_merge"):
+        report["suppressed"].append("auto_merge")
     # Constraint 3 — VCS is described, never re-attached.
     if settings.get("vcs_connection_id") or settings.get("vcs_repo_url"):
         report["dropped_references"].append(
