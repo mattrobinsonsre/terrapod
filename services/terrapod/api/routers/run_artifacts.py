@@ -362,7 +362,7 @@ async def upload_plan_json_output(
             from terrapod.services import run_service
 
             await run_service.evaluate_conditional_auto_apply(db, run)
-        return await _enqueue_plan_json_followups(run)
+        return await _enqueue_plan_json_followups(run, db)
     finally:
         try:
             await asyncio.to_thread(os.unlink, tmp_path)
@@ -370,7 +370,7 @@ async def upload_plan_json_output(
             pass
 
 
-async def _enqueue_plan_json_followups(run: Run) -> Response:
+async def _enqueue_plan_json_followups(run: Run, db: AsyncSession) -> Response:
     """Fire the AI-summary + drift-completion triggers after plan-JSON lands.
 
     Split out of `upload_plan_json_output` so the streamed-tempfile
@@ -391,6 +391,7 @@ async def _enqueue_plan_json_followups(run: Run) -> Response:
     if settings.ai_summary.enabled:
         try:
             from terrapod.services.scheduler import enqueue_trigger
+            from terrapod.services.summariser import mark_summary_queued
 
             await enqueue_trigger(
                 "ai_plan_summary",
@@ -398,6 +399,15 @@ async def _enqueue_plan_json_followups(run: Run) -> Response:
                 dedup_key=f"aisum:{run.id}:plan_summary",
                 dedup_ttl=300,
             )
+            # Placeholder row so the summary endpoint stops 404ing the moment
+            # the work exists, rather than only once a consumer picks it up
+            # (#1295). Written after the enqueue so a failed enqueue leaves no
+            # row: a summary stuck at `pending` forever would be a worse lie
+            # than the 404 it replaces. Insert-if-absent, so if a consumer has
+            # already finished — entirely possible now the AI lane runs several
+            # at once — the real result stands.
+            await mark_summary_queued(db, run_id=run.id, kind="plan_summary")
+            await db.commit()
         except Exception as e:
             logger.debug("Failed to enqueue ai_plan_summary after upload", error=str(e))
 
