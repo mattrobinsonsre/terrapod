@@ -1683,9 +1683,17 @@ async def update_workspace(
     pending_workflow = ws.vcs_workflow
     # Read the post-update value: a PATCH may have set it via either
     # attribute, and both paths have already landed on `ws` above.
+    #
+    # The trigger set below must therefore name BOTH attributes too.
+    # `auto-apply-mode` writes `ws.auto_apply` just as `auto-apply` does
+    # (see the paired write above), so omitting it from the trigger let a
+    # mode-only PATCH set auto_apply=True on an apply_then_merge workspace
+    # while skipping this block entirely — reaching by curl exactly the
+    # state the boolean attribute is refused for. Any future attribute
+    # that writes `auto_apply` belongs in this list.
     pending_auto_apply = ws.auto_apply
     if pending_workflow == "apply_then_merge" and (
-        "vcs-workflow" in attrs or "auto-apply" in attrs
+        "vcs-workflow" in attrs or "auto-apply" in attrs or "auto-apply-mode" in attrs
     ):
         if ws.vcs_connection_id is None:
             raise HTTPException(

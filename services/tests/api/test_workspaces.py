@@ -976,6 +976,92 @@ class TestVcsWorkflowAttributes:
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
     @patch("terrapod.api.routers.tfe_v2.resolve_workspace_capabilities_for")
+    async def test_apply_then_merge_guard_also_fires_for_auto_apply_mode(
+        self, mock_resolve, *_mocks
+    ):
+        """The same invariant, reached via the newer attribute (#1294).
+
+        `auto-apply-mode` writes `ws.auto_apply` exactly as the boolean does,
+        but the guard's trigger set originally named only `vcs-workflow` and
+        `auto-apply`. A mode-only PATCH therefore set auto_apply=True on an
+        apply_then_merge workspace and skipped the check entirely — reaching
+        by curl the precise state the test above proves is refused. The UI
+        now sends only the new attribute, so the invariant was unenforceable
+        through the primary consumer.
+        """
+        mock_resolve.return_value = caps_for_level("admin")
+        ws = _mock_workspace(auto_apply=False)
+        ws.vcs_workflow = "apply_then_merge"
+        ws.vcs_connection_id = uuid.uuid4()
+        app, mock_db = _make_app(_user())
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = ws
+        mock_db.execute.return_value = mock_result
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                f"/api/v2/workspaces/ws-{ws.id}",
+                json={"data": {"attributes": {"auto-apply-mode": "always"}}},
+                headers=_AUTH,
+            )
+        assert resp.status_code == 422, "a mode-only PATCH must not bypass the invariant"
+        assert "auto-apply" in resp.json()["detail"]
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_capabilities_for")
+    async def test_a_conditional_mode_is_refused_on_apply_then_merge_too(
+        self, mock_resolve, *_mocks
+    ):
+        """`create` is still auto-apply — the server derives auto_apply=True
+        from any non-`never` mode, so the incompatibility is not limited to
+        the unconditional case."""
+        mock_resolve.return_value = caps_for_level("admin")
+        ws = _mock_workspace(auto_apply=False)
+        ws.vcs_workflow = "apply_then_merge"
+        ws.vcs_connection_id = uuid.uuid4()
+        app, mock_db = _make_app(_user())
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = ws
+        mock_db.execute.return_value = mock_result
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                f"/api/v2/workspaces/ws-{ws.id}",
+                json={"data": {"attributes": {"auto-apply-mode": "create_update"}}},
+                headers=_AUTH,
+            )
+        assert resp.status_code == 422
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_capabilities_for")
+    async def test_never_is_still_allowed_on_apply_then_merge(self, mock_resolve, *_mocks):
+        """The negative case — the guard must not have become a blanket ban.
+        `never` means no auto-apply, which is the whole point of the mode."""
+        mock_resolve.return_value = caps_for_level("admin")
+        ws = _mock_workspace(auto_apply=True)
+        ws.vcs_workflow = "apply_then_merge"
+        ws.vcs_connection_id = uuid.uuid4()
+        app, mock_db = _make_app(_user())
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = ws
+        mock_db.execute.return_value = mock_result
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                f"/api/v2/workspaces/ws-{ws.id}",
+                json={"data": {"attributes": {"auto-apply-mode": "never"}}},
+                headers=_AUTH,
+            )
+        assert resp.status_code == 200, resp.text
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_capabilities_for")
     async def test_combined_flip_off_auto_apply_and_into_apply_then_merge_succeeds(
         self, mock_resolve, *_mocks
     ):

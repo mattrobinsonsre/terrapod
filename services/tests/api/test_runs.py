@@ -1719,3 +1719,91 @@ class TestListRunsPagination:
 
         assert resp.status_code == 200, resp.text
         assert mock_list.await_args.args[2:] == (1, 20)
+
+
+class TestHeldConditionalRunIsActionable:
+    """A conditional run that was held must offer the action that resolves it.
+
+    `create_run` sets `run.auto_apply = True` for *every* non-`never` mode, so
+    keying `is-confirmable` off that boolean hid Confirm on exactly the runs
+    that need it: a `create_update` run correctly held back because its plan
+    contained a destroy rendered the "held" banner and then no button, in the
+    UI, the SDK and MCP alike — while `confirm_run` (which only checks
+    `status == "planned"`) would have accepted it. The flagship feature failed
+    at the moment it exists for (#1294).
+    """
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
+    @patch("terrapod.api.routers.runs.run_service.get_run")
+    async def test_a_held_conditional_run_is_confirmable(self, mock_get_run, mock_resolve, *mocks):
+        mock_resolve.return_value = caps_for_level("write")
+        run = _mock_run(status="planned", auto_apply=True)
+        run.auto_apply_mode = "create_update"
+        run.auto_apply_declined_reason = "2 to destroy"
+        run.has_changes = True
+        mock_get_run.return_value = run
+
+        ws = _mock_workspace(ws_id=run.workspace_id)
+        app, mock_db = _make_app(_user())
+        mock_db.get.return_value = ws
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get(f"/api/v2/runs/run-{run.id}", headers=_AUTH)
+
+        attrs = resp.json()["data"]["attributes"]
+        assert attrs["actions"]["is-confirmable"] is True, (
+            "a held run must offer the one action that resolves it"
+        )
+        assert attrs["permissions"]["can-apply"] is True
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
+    @patch("terrapod.api.routers.runs.run_service.get_run")
+    async def test_an_always_run_still_hides_confirm(self, mock_get_run, mock_resolve, *mocks):
+        """The behaviour that must NOT change: an `always` run applies itself,
+        so offering Confirm would be offering to do what is already happening."""
+        mock_resolve.return_value = caps_for_level("write")
+        run = _mock_run(status="planned", auto_apply=True)
+        run.auto_apply_mode = "always"
+        run.has_changes = True
+        mock_get_run.return_value = run
+
+        ws = _mock_workspace(ws_id=run.workspace_id)
+        app, mock_db = _make_app(_user())
+        mock_db.get.return_value = ws
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get(f"/api/v2/runs/run-{run.id}", headers=_AUTH)
+
+        assert resp.json()["data"]["attributes"]["actions"]["is-confirmable"] is False
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
+    @patch("terrapod.api.routers.runs.run_service.get_run")
+    async def test_a_no_op_conditional_run_is_still_not_confirmable(
+        self, mock_get_run, mock_resolve, *mocks
+    ):
+        """The has_changes guard is unaffected — a no-op plan stays
+        unconfirmable regardless of mode, or we hand the user the
+        state-upload 500 path."""
+        mock_resolve.return_value = caps_for_level("write")
+        run = _mock_run(status="planned", auto_apply=True)
+        run.auto_apply_mode = "create"
+        run.has_changes = False
+        mock_get_run.return_value = run
+
+        ws = _mock_workspace(ws_id=run.workspace_id)
+        app, mock_db = _make_app(_user())
+        mock_db.get.return_value = ws
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get(f"/api/v2/runs/run-{run.id}", headers=_AUTH)
+
+        assert resp.json()["data"]["attributes"]["actions"]["is-confirmable"] is False
