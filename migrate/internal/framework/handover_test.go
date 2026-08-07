@@ -61,10 +61,10 @@ func TestRenderHandoverMarkdown_Deterministic(t *testing.T) {
 	// Same inputs → same bytes. Lets the doc be checked into version
 	// control and diffed across runs.
 	state := &State{
-		Source:    "atlantis",
+		Source:     "atlantis",
 		SourceHost: "github.com",
-		DestHost:  "terrapod.example.com",
-		UpdatedAt: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
+		DestHost:   "terrapod.example.com",
+		UpdatedAt:  time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
 		Workspaces: []WorkspaceRecord{
 			{SourceName: "b-second", TerrapodID: "ws-2", State: "created"},
 			{SourceName: "a-first", TerrapodID: "ws-1", State: "created"},

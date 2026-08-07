@@ -61,11 +61,11 @@ type costResourceObj struct {
 // the cost assumes `typical`, and could sit anywhere in `low`–`high`.
 type usageAssumptionObj struct {
 	Description types.String  `tfsdk:"description"`
-	Dimension  types.String  `tfsdk:"dimension"`
-	Unit       types.String  `tfsdk:"unit"`
-	Low        types.Float64 `tfsdk:"low"`
-	Typical    types.Float64 `tfsdk:"typical"`
-	High       types.Float64 `tfsdk:"high"`
+	Dimension   types.String  `tfsdk:"dimension"`
+	Unit        types.String  `tfsdk:"unit"`
+	Low         types.Float64 `tfsdk:"low"`
+	Typical     types.Float64 `tfsdk:"typical"`
+	High        types.Float64 `tfsdk:"high"`
 	// Monthly cost at low/typical/high usage — null when the server couldn't
 	// price the band.
 	CostLow     types.Float64 `tfsdk:"cost_low"`
@@ -161,9 +161,9 @@ func (d *workspaceCostDataSource) Schema(_ context.Context, _ datasource.SchemaR
 							Computed: true,
 							NestedObject: schema.NestedAttributeObject{
 								Attributes: map[string]schema.Attribute{
-									"description": schema.StringAttribute{Description: "Human-readable label for the assumption.", Computed: true},
-									"dimension":   schema.StringAttribute{Description: "What is being metered (e.g. \"data processed\").", Computed: true},
-									"unit":        schema.StringAttribute{Description: "Unit of the band bounds (e.g. \"GB/month\").", Computed: true},
+									"description":  schema.StringAttribute{Description: "Human-readable label for the assumption.", Computed: true},
+									"dimension":    schema.StringAttribute{Description: "What is being metered (e.g. \"data processed\").", Computed: true},
+									"unit":         schema.StringAttribute{Description: "Unit of the band bounds (e.g. \"GB/month\").", Computed: true},
 									"low":          schema.Float64Attribute{Description: "Low-usage bound (quantity).", Computed: true},
 									"typical":      schema.Float64Attribute{Description: "Typical (assumed) usage quantity — the point estimate the monthly cost is based on.", Computed: true},
 									"high":         schema.Float64Attribute{Description: "High-usage bound (quantity).", Computed: true},

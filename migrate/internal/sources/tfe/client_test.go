@@ -19,10 +19,10 @@ import (
 // Each handler is keyed by URL pattern; missing patterns 404 so a
 // test exercises only what it sets up.
 type fakeTFE struct {
-	t       *testing.T
-	server  *httptest.Server
-	mux     *http.ServeMux
-	calls   []string // ordered record of every path the test caused
+	t      *testing.T
+	server *httptest.Server
+	mux    *http.ServeMux
+	calls  []string // ordered record of every path the test caused
 }
 
 func newFakeTFE(t *testing.T) *fakeTFE {

@@ -14,11 +14,11 @@ import (
 // cloud{}/backend"remote"{} blocks in a local directory to point at
 // Terrapod. Two modes:
 //
-//   * state-driven (default): read SourceHost/DestHost/workspace
+//   - state-driven (default): read SourceHost/DestHost/workspace
 //     mapping from the migration state file produced by `apply`. This
 //     is what operators use after running apply against a real source.
 //
-//   * explicit-flags: pass --source-host / --dest-host directly. Used
+//   - explicit-flags: pass --source-host / --dest-host directly. Used
 //     for one-off rewrites without going through apply (e.g. an
 //     operator who already migrated state by hand and just wants the
 //     HCL pointed at Terrapod).

@@ -56,8 +56,8 @@ func (r *variableSetVariableResource) Schema(_ context.Context, _ resource.Schem
 	resp.Schema = schema.Schema{
 		Description: "Manages a variable within a Terrapod variable set.",
 		Attributes: map[string]schema.Attribute{
-			"id": schema.StringAttribute{Computed: true, Description: "Variable ID.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
-			"varset_id": schema.StringAttribute{Required: true, Description: "Variable set ID this variable belongs to.", PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
+			"id":          schema.StringAttribute{Computed: true, Description: "Variable ID.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
+			"varset_id":   schema.StringAttribute{Required: true, Description: "Variable set ID this variable belongs to.", PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
 			"key":         schema.StringAttribute{Required: true, Description: "Variable name."},
 			"value":       schema.StringAttribute{Optional: true, Sensitive: true, Description: "Variable value. Sensitive variables are write-only."},
 			"category":    schema.StringAttribute{Required: true, Description: "Category: terraform, env, git_http_auth, or git_ssh_auth.", PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},

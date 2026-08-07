@@ -48,9 +48,9 @@ func (r *registryProviderResource) Schema(_ context.Context, _ resource.SchemaRe
 	resp.Schema = schema.Schema{
 		Description: "Manages a private provider in the Terrapod registry.",
 		Attributes: map[string]schema.Attribute{
-			"id":   schema.StringAttribute{Computed: true, Description: "Provider ID.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
-			"name": schema.StringAttribute{Required: true, Description: "Provider name.", PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
-			"labels": schema.MapAttribute{Optional: true, ElementType: types.StringType, Description: "Labels for RBAC evaluation."},
+			"id":          schema.StringAttribute{Computed: true, Description: "Provider ID.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
+			"name":        schema.StringAttribute{Required: true, Description: "Provider name.", PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
+			"labels":      schema.MapAttribute{Optional: true, ElementType: types.StringType, Description: "Labels for RBAC evaluation."},
 			"namespace":   schema.StringAttribute{Computed: true, Description: "Namespace (always default).", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
 			"owner_email": schema.StringAttribute{Computed: true, Description: "Owner email.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
 			"created_at":  schema.StringAttribute{Computed: true, Description: "Creation timestamp.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
