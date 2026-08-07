@@ -202,7 +202,7 @@ func probeTokenTier(ctx context.Context, api *tfe.Client, orgName string) (Token
 
 // normaliseAddress trims trailing slashes and adds the https:// scheme
 // when operators paste a bare host. Mirrors what we do for the
-// migrate target URL in internal/version.Check — gives operators the
+// migrate target URL — gives operators the
 // "paste your host name, scheme is implicit" UX.
 func normaliseAddress(raw string) string {
 	addr := strings.TrimSpace(raw)

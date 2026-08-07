@@ -48,13 +48,15 @@ import (
 func rollbackCmd(args []string) int {
 	fs := flag.NewFlagSet("rollback", flag.ContinueOnError)
 	var (
-		target    = fs.String("target", os.Getenv("TERRAPOD_HOSTNAME"), "Terrapod base URL (or TERRAPOD_HOSTNAME)")
-		token     = fs.String("token", os.Getenv("TERRAPOD_TOKEN"), "Terrapod API token (or TERRAPOD_TOKEN)")
-		statePath = fs.String("state-file", framework.DefaultStateFile, "Path to the migration state JSON file")
-		apply     = fs.Bool("apply", false, "Actually delete (default is dry-run)")
-		force     = fs.Bool("force", false, "Delete even workspaces whose state has advanced past the migrated serial (DANGEROUS — destroys post-migration work)")
-		jsonOut   = fs.Bool("json", false, "Emit the rollback report as JSON")
-		skipTLS   = fs.Bool("skip-tls-verify", false, "Skip TLS certificate verification (dev only)")
+		target               = fs.String("target", os.Getenv("TERRAPOD_HOSTNAME"), "Terrapod base URL (or TERRAPOD_HOSTNAME)")
+		token                = fs.String("token", os.Getenv("TERRAPOD_TOKEN"), "Terrapod API token (or TERRAPOD_TOKEN)")
+		statePath            = fs.String("state-file", framework.DefaultStateFile, "Path to the migration state JSON file")
+		apply                = fs.Bool("apply", false, "Actually delete (default is dry-run)")
+		force                = fs.Bool("force", false, "Delete even workspaces whose state has advanced past the migrated serial (DANGEROUS — destroys post-migration work)")
+		jsonOut              = fs.Bool("json", false, "Emit the rollback report as JSON")
+		skipTLS              = fs.Bool("skip-tls-verify", false, "Skip TLS certificate verification (dev only)")
+		allowVersionMismatch = fs.Bool("allow-api-version-mismatch", false,
+			"Run even when this tool's version is incompatible with the target Terrapod API")
 	)
 	if err := fs.Parse(args); err != nil {
 		return 2
@@ -88,7 +90,10 @@ func rollbackCmd(args []string) int {
 		fmt.Fprintf(os.Stderr, "rollback: build terrapod client: %v\n", err)
 		return 1
 	}
-	warnVersionMismatch(c)
+	if err := checkAPIVersion(c, *allowVersionMismatch); err != nil {
+		fmt.Fprintf(os.Stderr, "rollback: %v\n", err)
+		return 1
+	}
 
 	report := runRollback(context.Background(), c, state, *statePath, *apply, *force)
 

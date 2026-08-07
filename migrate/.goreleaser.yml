@@ -32,8 +32,9 @@ builds:
     flags:
       - -trimpath
     ldflags:
-      # main.Version is stamped at link time so the build-time-pinned
-      # version (consumed by internal/version.Check) is the release semver.
+      # main.Version is stamped at link time. It identifies the tool in the
+      # User-Agent and state file, and is handed to go-terrapod's SDKVersion
+      # so the API compatibility gate has a real version to compare (#1286).
       - "-s -w -X main.Version={{ .Version }}"
     goos:
       - linux
