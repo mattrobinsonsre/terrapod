@@ -62,7 +62,18 @@ type terrapodProviderModel struct {
 }
 
 // New returns a new provider.Provider.
+//
+// Hands our build-time version to the SDK so the compatibility check in
+// Configure has something to compare against. Without this it can never fire:
+// VersionCheck returns nil immediately when SDKVersion is "dev", SDKVersion
+// defaults to "dev", and the provider's GoReleaser stamps main.version — not
+// the SDK's variable. terrapod-mcp already does the same assignment; this
+// brings the provider in line (#1287).
+//
+// A source build passes "dev", which the SDK treats as "cannot compare" and
+// skips, so local provider development is unaffected.
 func New(version string) func() provider.Provider {
+	terrapod.SDKVersion = version
 	return func() provider.Provider {
 		return &terrapodProvider{version: version}
 	}

@@ -26,6 +26,20 @@ func warnVersionMismatch(c *terrapod.Client) {
 // Version is stamped at build time via -ldflags "-X main.Version=...".
 var Version = "dev"
 
+// init hands our stamped version to the SDK so its VersionCheck has something
+// to compare against.
+//
+// Without this the warning above can never fire: VersionCheck returns nil
+// immediately when SDKVersion is "dev", SDKVersion defaults to "dev", and this
+// tool's GoReleaser stamps main.Version — not the SDK's variable. terrapod-mcp
+// already does the same assignment; this brings publish in line (#1287).
+//
+// A source build leaves Version as "dev", which the SDK treats as "cannot
+// compare" and skips, so `go run` keeps working.
+func init() {
+	terrapod.SDKVersion = Version
+}
+
 func main() {
 	if len(os.Args) < 2 {
 		usage()
