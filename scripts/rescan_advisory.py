@@ -77,8 +77,11 @@ _RAISED_BY = (
     "(`.github/workflows/release-rescan.yml`)."
 )
 _DRAFT_NOTE = (
-    "This is a **draft** — private to maintainers, and not published. It becomes "
-    "the public record when the patch release that fixes it ships."
+    "This is a **draft**, and it stays one. Publishing a repository advisory is "
+    "irreversible — GitHub refuses to close a published advisory — so this is "
+    "never published, and is closed once the patch release that fixes it ships. "
+    "The operator-facing record is the release notes and the public re-scan "
+    "issue, both of which already name the advisories a patch clears."
 )
 _FIX_AVAILABLE = (
     "Everything below has a fix available upstream *now* that did not exist, or "
@@ -145,8 +148,16 @@ def main() -> int:
         if isinstance(d, dict) and "code_findings" in d:
             code_counts[d["release"]] = code_counts.get(d["release"], 0) + int(d["code_findings"])
 
-    if not any(by_release.values()) and not any(code_counts.values()):
-        print("nothing to record")
+    # Gate on DEPENDENCY findings alone. A code-finding count is not advisory
+    # material: an advisory's payload is its `vulnerabilities` array, which is
+    # built from dependency rows, so a release with only code findings produces
+    # an advisory whose table is a bare header and whose vulnerabilities array
+    # is empty. Those findings are already in code scanning — the correct
+    # private channel, and the one this workflow deliberately sends them to.
+    # Raising an advisory to say "look over there" adds an irreversible-if-ever-
+    # published artifact carrying nothing the other channel does not hold.
+    if not any(by_release.values()):
+        print("no dependency findings — nothing to record in an advisory")
         urls_out.write_text("{}")
         return 0
 
@@ -169,10 +180,10 @@ def main() -> int:
     }
 
     urls: dict[str, str] = {}
-    for release in sorted(set(by_release) | set(code_counts), reverse=True):
+    for release in sorted(by_release, reverse=True):
         findings = by_release.get(release, [])
         code = code_counts.get(release, 0)
-        if not findings and not code:
+        if not findings:
             continue
         summary = f"Findings in {release}"
         payload = {
