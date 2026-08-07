@@ -220,6 +220,77 @@ class TestMarkerContents:
         assert offenders == [], f"secret-shaped key in marker snapshot: {offenders}"
         assert "labels" in snap and "owner_email" in snap
 
+    def test_the_snapshot_covers_every_configured_workspace_setting(self):
+        """A setting the marker never records cannot be recovered from anywhere
+        — the workspace row is gone and the marker is the only account of what
+        it was. This shipped having quietly dropped twelve of them, including
+        the whole security-scan config and the conditional auto-apply mode
+        (#1313), so the coverage is asserted rather than maintained by hand.
+
+        Adding a column to `Workspace` therefore forces a decision: snapshot it,
+        or name it below as runtime state that would be meaningless restored.
+        """
+        from terrapod.db.models import Workspace
+
+        # Identity, lifecycle bookkeeping, and state observed *about* a
+        # workspace rather than configured *on* it. Restoring any of these
+        # would be restoring a stale observation.
+        runtime_or_identity = {
+            "id",
+            "name",
+            "created_at",
+            "updated_at",
+            "locked",
+            "lock_id",
+            "lock_reason",
+            "last_state_at",
+            "state_stale_at",
+            "state_diverged",
+            "deleted_at",
+            "lifecycle_state",
+            "lifecycle_reason",
+            "drift_status",
+            "drift_last_checked_at",
+            "drift_latest_run_id",
+            "vcs_last_commit_sha",
+            "vcs_last_polled_at",
+            "vcs_last_attempted_at",
+            "vcs_last_error",
+            "vcs_last_error_at",
+            "autodiscovery_rule_id",
+            "autodiscovery_pr_number",
+            # Catalog-managed workspaces are restored through the catalog, not
+            # through undelete — the wrapper config is regenerated, not copied.
+            "catalog_item_id",
+            "catalog_version_pin",
+            "catalog_input_values",
+        }
+
+        ws = MagicMock()
+        ws.labels = {}
+        snapshotted = set(dws._settings_snapshot(ws))
+        columns = {c.name for c in Workspace.__table__.columns}
+        unaccounted = sorted(columns - snapshotted - runtime_or_identity)
+        assert unaccounted == [], (
+            "workspace settings the delete marker would silently lose: "
+            f"{unaccounted} — snapshot them in `_settings_snapshot`, or add "
+            "them above if they are runtime state rather than configuration"
+        )
+
+    def test_a_conditional_auto_apply_mode_reaches_the_marker(self):
+        """The `auto_apply` boolean is only a projection — true for `always`,
+        `create` and `create_update` alike. Recording it alone tells a restoring
+        operator that auto-apply was on but not that it was deliberately held
+        back from changes and destroys, and the obvious way to turn it back on
+        is `always`, which applies destroys (#1313)."""
+        ws = MagicMock()
+        ws.labels = {}
+        ws.auto_apply = True
+        ws.auto_apply_mode = "create_update"
+        snap = dws._settings_snapshot(ws)
+        assert snap["auto_apply"] is True
+        assert snap["auto_apply_mode"] == "create_update"
+
 
 @contextlib.asynccontextmanager
 async def _fake_db_session():

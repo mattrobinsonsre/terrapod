@@ -4172,7 +4172,7 @@ Response attributes:
 | `restored-from` | The deleted workspace's id, so the provenance is on the record |
 | `state-versions-restored` | How many were copied |
 | `state-versions-skipped` | Each with a `key` and a `reason` — unreadable blob, duplicate serial, or beyond the version cap. **A partial-failure signal**: a caller that ignores it can believe it recovered history it did not |
-| `suppressed` | Settings forced off (`auto_apply`, `drift_detection_enabled`, `vcs_connection`) — what to re-enable deliberately |
+| `suppressed` | Settings forced off (`auto_apply`, `drift_detection_enabled`, `auto_merge`, `vcs_connection`) — what to re-enable deliberately. **What each one *was* is on the deleted workspace's `settings`**, which the list and show endpoints return: `auto_apply` is only a boolean projection, so a workspace held at `create` or `create_update` reads `auto_apply_mode` there to put the same guardrail back rather than re-enabling it as `always` |
 | `dropped-references` | Things pointing at other resources that were not re-attached, e.g. a VCS connection whose id may since have been reused |
 
 The source prefix and its marker are left untouched, so the original remains

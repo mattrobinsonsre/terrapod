@@ -1463,12 +1463,21 @@ Read this before telling anyone the workspace is "back":
 - **Lineage and serial are preserved exactly**, recovered from inside the state
   documents. This is the part that matters — it means the next plan continues
   the original state rather than treating live infrastructure as unmanaged.
-- **It comes back inert.** Auto-apply off, drift detection off, VCS *not*
-  re-attached, whatever the workspace had before. The response's `suppressed`
-  and `dropped-references` list what to switch back on. Re-enabling is a
-  deliberate act, because a restored workspace that applies immediately —
+- **It comes back inert.** Auto-apply off, drift detection off, auto-merge off,
+  VCS *not* re-attached, whatever the workspace had before. The response's
+  `suppressed` and `dropped-references` list what to switch back on. Re-enabling
+  is a deliberate act, because a restored workspace that applies immediately —
   against infrastructure that may have drifted or been partly torn down since
   the delete — is the worst thing this feature could do.
+- **Check the mode before re-enabling auto-apply.** `suppressed` says auto-apply
+  was on; it does not say *how*. A workspace deliberately held at `create` or
+  `create_update` — auto-applying creations while holding anything that changes
+  or destroys — reads as plain "on", and the obvious way to turn it back on is
+  `always`, which applies destroys. The original `auto_apply_mode` is on the
+  deleted workspace's `settings` (`GET /deleted-workspaces/{id}`), which is also
+  where the security-scan, plan-expiry and AI-summary settings are recorded.
+  Settings that only affect how a run is *evaluated* — the security-scan config
+  among them — are restored as they were, since they cannot start anything.
 - **Variables and run history do not come back.** The marker records variable
   *names* and categories so you know what to recreate; values were never stored
   in it.
