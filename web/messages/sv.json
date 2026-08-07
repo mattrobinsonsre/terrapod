@@ -2948,10 +2948,12 @@
     "colActions": "Åtgärder",
     "unknownName": "Namn ej registrerat",
     "orphanBadge": "Hittad av reapern",
+    "restoredBadge": "Redan återställd",
     "retentionDisabled": "Ingen förfallotid",
     "restore": "Återställ",
     "restoring": "Återställer…",
     "restoreConfirm": "Återställa statet för ”{name}”?\n\nDetta skapar en NY arbetsyta — originalet kommer inte tillbaka. Den kommer tillbaka med auto-apply och driftdetektering avstängda och utan VCS-anslutning; variabler och körhistorik kommer inte tillbaka. Endast statet räddas.",
-    "restoreDone": "Återskapade {versions, plural, one {# state-version} other {# state-versioner}} till den nya arbetsytan ”{name}”. Kontrollera inställningarna innan du slår på auto-apply eller VCS."
+    "restoreDone": "Återskapade {versions, plural, one {# state-version} other {# state-versioner}} till den nya arbetsytan ”{name}”. Kontrollera inställningarna innan du slår på auto-apply eller VCS.",
+    "restoreAgainConfirm": "”{name}” har redan återställts, till {existing}.\n\nAtt återställa igen skapar ett ANDRA workspace med samma state-härstamning över samma infrastruktur. En apply i något av dem får då den andras nästa plan att se ut som total drift.\n\nFortsätt bara om det tidigare återställda workspacet är borta."
   }
 }

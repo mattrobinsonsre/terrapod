@@ -25,6 +25,11 @@ interface DeletedWorkspace {
     'state-versions-available': number
     'age-days': number | null
     'restorable-until': string | null
+    // Workspaces this deletion has already been restored into. Not
+    // bookkeeping: a second restore puts a second live workspace with the
+    // same state lineage over the same infrastructure, so this is what the
+    // operator needs to see BEFORE clicking Restore (#1299).
+    'restored-to': string[]
     settings: Record<string, unknown>
     'variable-names': { key: string; category: string; sensitive: boolean }[]
   }
@@ -89,11 +94,20 @@ export default function DeletedWorkspacesPage() {
 
   async function restore(w: DeletedWorkspace) {
     const name = w.attributes['workspace-name'] || w.attributes['workspace-id']
+    const prior = w.attributes['restored-to'] ?? []
     // Confirmed on BOTH pointer types, not touch only. Restore is not a
     // destructive action, but it is not an undo either — the dialog spells
     // out what the operator actually gets, so a restore is never a casual
     // click that leaves them expecting the original workspace back.
-    if (!window.confirm(t('restoreConfirm', { name }))) return
+    //
+    // A repeat gets its own wording, because the risk is different in kind:
+    // the outcome is two live workspaces over one set of infrastructure. The
+    // server refuses by default, so confirming here is what sends force —
+    // consent to that specific consequence, not a generic "are you sure".
+    const confirmed = prior.length
+      ? window.confirm(t('restoreAgainConfirm', { name, existing: prior.join(', ') }))
+      : window.confirm(t('restoreConfirm', { name }))
+    if (!confirmed) return
 
     setRestoring(w.id)
     setNotice('')
@@ -105,7 +119,9 @@ export default function DeletedWorkspacesPage() {
           // apiFetch does not set a content-type; without this the body
           // arrives as a raw string and the endpoint rejects it with 422.
           headers: { 'Content-Type': 'application/vnd.api+json' },
-          body: JSON.stringify({ data: { type: 'workspaces', attributes: {} } }),
+          body: JSON.stringify({
+            data: { type: 'workspaces', attributes: prior.length ? { force: true } : {} },
+          }),
         }
       )
       const body = await res.json()
@@ -190,6 +206,11 @@ export default function DeletedWorkspacesPage() {
                             {t('orphanBadge')}
                           </span>
                         )}
+                        {(w.attributes['restored-to'] ?? []).length > 0 && (
+                          <span className="mt-1 ms-1 inline-block rounded bg-sky-900/40 px-2 py-0.5 text-xs text-sky-300">
+                            {t('restoredBadge')}
+                          </span>
+                        )}
                       </td>
                       <td className="px-3 py-2 text-slate-300">
                         {formatDate(w.attributes['deleted-at'])}
@@ -242,6 +263,11 @@ export default function DeletedWorkspacesPage() {
                   {w.attributes['marker-reason'] === 'discovered-orphaned' && (
                     <span className="mt-2 inline-block rounded bg-amber-900/40 px-2 py-0.5 text-xs text-amber-300">
                       {t('orphanBadge')}
+                    </span>
+                  )}
+                  {(w.attributes['restored-to'] ?? []).length > 0 && (
+                    <span className="mt-2 ms-1 inline-block rounded bg-sky-900/40 px-2 py-0.5 text-xs text-sky-300">
+                      {t('restoredBadge')}
                     </span>
                   )}
                   <dl className="mt-3 space-y-1 text-sm">

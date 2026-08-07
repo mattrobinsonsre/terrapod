@@ -21,6 +21,7 @@ from terrapod.config import settings
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services import deleted_workspace_service as dws
+from terrapod.services.workspace_name import validate_workspace_name
 from terrapod.storage import get_storage
 
 logger = get_logger(__name__)
@@ -52,8 +53,27 @@ def _marker_json(m: dict) -> dict:
             "restorable-until": m.get("restorable_until"),
             "settings": m.get("settings") or {},
             "variable-names": m.get("variable_names") or [],
+            # Empty until this deletion has been restored at least once. A
+            # second restore over the same lineage is the failure mode this
+            # exists to make visible (#1299).
+            "restored-to": [f"ws-{i}" for i in m.get("restored_to") or []],
+            "restored-at": m.get("restored_at"),
+            "restored-by": m.get("restored_by"),
         },
     }
+
+
+def _raw_id(workspace_id: str) -> str:
+    """Accept a workspace id in either form.
+
+    Marker ids are bare UUIDs — the marker key is `state/deleted/{uuid}.json`,
+    written before any serializer sees it — while every other workspace id in
+    this API is `ws-`-prefixed. Rejecting the prefixed form made callers keep
+    two spellings of the same id straight, and was conspicuous enough that the
+    MCP tool description had to warn about it (#1299). Accepting both costs
+    nothing; the emitted id stays bare so existing consumers are unaffected.
+    """
+    return workspace_id.removeprefix("ws-")
 
 
 @router.get("/deleted-workspaces")
@@ -63,11 +83,17 @@ async def list_deleted_workspaces(
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """Deleted workspaces still recoverable, newest deletion first."""
+    storage = get_storage()
     markers = await dws.list_deleted(
-        db, get_storage(), settings.artifact_retention.deleted_workspace_retention_days
+        db, storage, settings.artifact_retention.deleted_workspace_retention_days
     )
-    page, meta = paginate([_marker_json(m) for m in markers], request)
-    return {"data": page, "meta": meta}
+    # Page FIRST, then count state versions: the count costs a full prefix
+    # listing per marker, and paying it for every deleted workspace ever before
+    # discarding all but one page is what made this endpoint scale with the
+    # deployment's whole deletion history (#1299).
+    page, meta = paginate(markers, request)
+    await dws.attach_state_counts(storage, page)
+    return {"data": [_marker_json(m) for m in page], "meta": meta}
 
 
 @router.get("/deleted-workspaces/{workspace_id}")
@@ -77,13 +103,15 @@ async def get_deleted_workspace(
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """One deleted workspace's marker, with its recoverable state count."""
-    markers = await dws.list_deleted(
-        db, get_storage(), settings.artifact_retention.deleted_workspace_retention_days
+    marker = await dws.get_deleted(
+        db,
+        get_storage(),
+        _raw_id(workspace_id),
+        settings.artifact_retention.deleted_workspace_retention_days,
     )
-    for m in markers:
-        if m.get("workspace_id") == workspace_id:
-            return {"data": _marker_json(m)}
-    raise HTTPException(status_code=404, detail="Deleted workspace not found")
+    if marker is None:
+        raise HTTPException(status_code=404, detail="Deleted workspace not found")
+    return {"data": _marker_json(marker)}
 
 
 @router.post("/deleted-workspaces/{workspace_id}/restore", status_code=201)
@@ -105,18 +133,62 @@ async def restore_deleted_workspace(
     Returns the new workspace id plus a report of what was deliberately not
     carried over, so the operator knows what to re-enable.
     """
+    workspace_id = _raw_id(workspace_id)
+    storage = get_storage()
+
     name = None
+    force = False
     if isinstance(payload, dict):
         attrs = (payload.get("data") or {}).get("attributes") or {}
+        force = bool(attrs.get("force"))
         raw = attrs.get("name")
         if raw is not None:
-            if not isinstance(raw, str) or not raw.strip():
+            if not isinstance(raw, str):
                 raise HTTPException(status_code=422, detail="name must be a non-empty string")
-            name = raw.strip()
+            # The full format contract, not just "non-empty" (#1299). Every
+            # other workspace-creating path enforces it, and the name is
+            # load-bearing downstream: it is what the `cloud {}` block matches
+            # on, what `/app/{org}/{name}` redirects by, and what appears in
+            # the DR state index and VCS status contexts. Strict here because
+            # this one came from a human who can simply retype it; the
+            # marker-derived fallback sanitizes instead, so a corrupt marker
+            # cannot make a recoverable workspace un-restorable.
+            try:
+                name = validate_workspace_name(raw)
+            except ValueError as e:
+                raise HTTPException(status_code=422, detail=str(e)) from e
+
+    if not force:
+        # A repeat restore yields a SECOND live workspace holding the same
+        # lineage and serial over the same real infrastructure — after which an
+        # apply in either makes the other's next plan read as wholesale drift.
+        # Nothing else prevents it: the marker is not consumed and `_unique_name`
+        # suffixes rather than conflicting, so it used to succeed silently
+        # (#1299). Refuse by default and name what already exists; `force` is
+        # there for the case where the first restore was itself discarded.
+        existing = await dws.read_marker(storage, workspace_id)
+        prior = dws.prior_restores(existing) if existing else []
+        if prior:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "This deletion has already been restored, into workspace(s) "
+                    + ", ".join(f"ws-{i}" for i in prior)
+                    + ". Restoring again would produce a second workspace holding "
+                    "the same state lineage over the same infrastructure. Delete "
+                    'the earlier restore first, or pass {"force": true} if it is '
+                    "no longer live."
+                ),
+            )
 
     try:
         ws, report = await dws.restore_workspace(
-            db, get_storage(), workspace_id, restored_by=user.email, name=name
+            db,
+            storage,
+            workspace_id,
+            restored_by=user.email,
+            name=name,
+            max_versions=settings.artifact_retention.state_versions_keep,
         )
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
@@ -138,6 +210,10 @@ async def restore_deleted_workspace(
         )
 
     await db.commit()
+    # After the commit, so the marker never claims a restore that rolled back.
+    await dws.record_restore(
+        storage, workspace_id, new_workspace_id=str(ws.id), restored_by=user.email
+    )
     logger.info(
         "Restored deleted workspace",
         source_workspace_id=workspace_id,

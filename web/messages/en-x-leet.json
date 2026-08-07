@@ -2948,10 +2948,12 @@
     "colActions": "4c710n5",
     "unknownName": "N4m3 n07 r3c0rd3d",
     "orphanBadge": "F0und by 7h3 r34p3r",
+    "restoredBadge": "4lr34dy r3570r3d",
     "retentionDisabled": "N0 3xp1ry",
     "restore": "R3570r3",
     "restoring": "R3570r1ng…",
     "restoreConfirm": "R3570r3 7h3 57473 0f \"{name}\"?\n\n7h15 cr34735 4 N3W w0rk5p4c3 — 7h3 0r1g1n4l 15 n07 br0ugh7 b4ck. 17 r37urn5 w17h 4u70-4pply 4nd dr1f7 d373c710n 0ff 4nd n0 VC5 c0nn3c710n, 4nd 175 v4r14bl35 4nd run h1570ry d0 n07 c0m3 b4ck. 0nly 7h3 57473 15 r3c0v3r3d.",
-    "restoreDone": "R3c0v3r3d {versions, plural, one {# state version} other {# state versions}} 1n70 7h3 n3w w0rk5p4c3 \"{name}\". Ch3ck 175 53771ng5 b3f0r3 3n4bl1ng 4u70-4pply 0r VC5."
+    "restoreDone": "R3c0v3r3d {versions, plural, one {# state version} other {# state versions}} 1n70 7h3 n3w w0rk5p4c3 \"{name}\". Ch3ck 175 53771ng5 b3f0r3 3n4bl1ng 4u70-4pply 0r VC5.",
+    "restoreAgainConfirm": "\"{name}\" h45 4lr34dy b33n r3570r3d, 1n70 {existing}.\n\nR3570r1ng 17 4g41n cr34735 4 53C0ND w0rk5p4c3 h0ld1ng 7h3 54m3 57473 l1n34g3 0v3r 7h3 54m3 1nfr457ruc7ur3. Applying 1n 317h3r w1ll 7h3n m4k3 7h3 07h3r''5 n3x7 pl4n l00k l1k3 wh0l3s4l3 dr1f7.\n\n0nly c0n71nu3 1f 7h3 34rl13r r3570r3d w0rk5p4c3 15 g0n3."
   }
 }

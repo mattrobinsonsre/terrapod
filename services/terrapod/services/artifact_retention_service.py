@@ -591,6 +591,70 @@ async def _cleanup_vcs_archives(
     return deleted
 
 
+#: Below this many orphans, the plausibility check never fires. A small
+#: deployment legitimately has more deleted workspaces than live ones, and a
+#: brand-new one has none live at all — a pure ratio would refuse to reap
+#: exactly where there is nothing to protect.
+_ORPHAN_ALARM_FLOOR = 25
+
+#: Above this fraction of the live workspace count, an orphan set stops looking
+#: like deletions and starts looking like a database that has lost rows.
+_ORPHAN_ALARM_RATIO = 0.5
+
+
+async def _orphan_set_is_implausible(db: AsyncSession, orphan_count: int) -> bool:
+    """Refuse to reap when the orphan set is too large to be real deletions.
+
+    This category inverts the safety property of every other one. The others
+    walk DB rows and delete the blobs those rows reference, so what is deleted
+    depends on the database being **correct**. This one lists blobs and deletes
+    whatever the database does not claim — so what is deleted depends on the
+    database being **complete**.
+
+    That difference matters because a database can be incomplete without being
+    wrong. Restore Postgres from a backup taken before a batch of workspaces
+    was created, or repoint `DATABASE_URL` at the wrong instance during a
+    migration, and every one of those workspaces reads as an orphan: stamped on
+    the first cycle, then permanently deleted a retention window later. The
+    existing `still_referenced` re-check cannot catch it, because missing rows
+    are precisely what a stale database has.
+
+    Nothing available here can tell "the DB lost rows" from "someone deleted a
+    lot of workspaces". What it can do is notice that the ratio is implausible
+    and decline to act — reclaiming storage is never urgent, and the failure
+    modes are not symmetric: a delayed reap costs disk, a wrong one costs the
+    only remaining copy of a customer's state.
+    """
+    # Imported here, like every other metric in this module: `api.metrics`
+    # pulls in the app, and this service is imported from it.
+    from terrapod.api.metrics import RETENTION_ORPHAN_REAP_BLOCKED
+
+    if orphan_count <= _ORPHAN_ALARM_FLOOR:
+        RETENTION_ORPHAN_REAP_BLOCKED.set(0)
+        return False
+
+    live_total = (
+        await db.execute(select(func.count()).select_from(Workspace))
+    ).scalar_one_or_none() or 0
+    if orphan_count <= live_total * _ORPHAN_ALARM_RATIO:
+        RETENTION_ORPHAN_REAP_BLOCKED.set(0)
+        return False
+
+    RETENTION_ORPHAN_REAP_BLOCKED.set(1)
+    logger.error(
+        "Refusing to reap orphaned workspace state — the orphan set is implausibly "
+        "large for the number of live workspaces, which is what a database restored "
+        "from an older backup or a repointed DATABASE_URL looks like. No state has "
+        "been deleted. Confirm the database is the right one and complete; reaping "
+        "resumes on its own once the ratio is plausible.",
+        orphans=orphan_count,
+        live_workspaces=live_total,
+        ratio_threshold=_ORPHAN_ALARM_RATIO,
+        floor=_ORPHAN_ALARM_FLOOR,
+    )
+    return True
+
+
 async def _cleanup_deleted_workspaces(
     db: AsyncSession,
     storage: ObjectStore,
@@ -648,6 +712,9 @@ async def _cleanup_deleted_workspaces(
     }
     orphans = sorted(seen - live)
 
+    if await _orphan_set_is_implausible(db, len(orphans)):
+        return 0
+
     now = datetime.now(UTC)
     reaped = 0
     for ws_id in orphans[:batch_size]:
@@ -700,5 +767,16 @@ async def _cleanup_deleted_workspaces(
             age_days=round(age, 1),
         )
         reaped += 1
+
+    if reaped:
+        # Every other retention category counts what it removed; this one did
+        # not, which left the ONLY category that irreversibly destroys customer
+        # state as the only one an operator could not graph, alert on, or
+        # reconcile against afterwards (#1299). A deletion nobody can see
+        # happen is indistinguishable from one that never happened until
+        # somebody goes looking for the data.
+        from terrapod.api.metrics import RETENTION_DELETED
+
+        RETENTION_DELETED.labels(category="deleted_workspaces").inc(reaped)
 
     return reaped

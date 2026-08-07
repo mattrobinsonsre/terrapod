@@ -47,6 +47,16 @@ type DeletedWorkspace struct {
 
 	Settings      map[string]any             `json:"settings"`
 	VariableNames []DeletedWorkspaceVariable `json:"variable-names"`
+
+	// RestoredTo lists the workspaces this deletion has already been restored
+	// into, empty until the first restore. It is not bookkeeping: a second
+	// restore yields a second live workspace holding the SAME state lineage
+	// and serial over the same infrastructure, after which an apply in either
+	// makes the other's next plan read as wholesale drift. Check this before
+	// offering a restore; the server refuses a repeat unless forced.
+	RestoredTo []string `json:"restored-to"`
+	RestoredAt string   `json:"restored-at"`
+	RestoredBy string   `json:"restored-by"`
 }
 
 // DeletedWorkspaceVariable names a variable the deleted workspace had.
@@ -169,18 +179,38 @@ func (c *Client) GetDeletedWorkspace(ctx context.Context, workspaceID string) (*
 	return &doc.Data.Attributes, nil
 }
 
+// RestoreOptions tunes a restore.
+type RestoreOptions struct {
+	// Name for the recovered workspace. Empty reuses the original, suffixed if
+	// it has been taken since.
+	Name string
+
+	// Force permits restoring a deletion that has already been restored once.
+	// Without it the server refuses, because the repeat would produce a second
+	// live workspace over the same infrastructure with the same lineage. Set
+	// it only when the earlier restore is known to be gone.
+	Force bool
+}
+
 // RestoreDeletedWorkspace recovers a deleted workspace's state into a new
 // workspace. Requires platform admin.
 //
-// name is optional; when empty the original name is reused, suffixed if it has
-// been taken since. Returns a ConflictError when no state could be recovered —
-// the retention window has passed and the blobs are gone — which is reported
-// as a failure rather than an empty success so a caller is never handed a bare
-// workspace and told the restore worked.
-func (c *Client) RestoreDeletedWorkspace(ctx context.Context, workspaceID, name string) (*RestoredWorkspace, error) {
+// Returns a ConflictError in two cases, both of which are failures rather than
+// empty successes so a caller is never handed a bare workspace and told the
+// restore worked: no state could be recovered (the retention window has passed
+// and the blobs are gone), or this deletion has already been restored — see
+// RestoreOptions.Force.
+//
+// Only the newest state versions are copied, bounded by the server's
+// state_versions_keep; anything beyond that is reported in
+// RestoredWorkspace.StateVersionsSkipped rather than silently dropped.
+func (c *Client) RestoreDeletedWorkspace(ctx context.Context, workspaceID string, opts RestoreOptions) (*RestoredWorkspace, error) {
 	attrs := map[string]any{}
-	if name != "" {
-		attrs["name"] = name
+	if opts.Name != "" {
+		attrs["name"] = opts.Name
+	}
+	if opts.Force {
+		attrs["force"] = true
 	}
 	payload, err := json.Marshal(map[string]any{
 		"data": map[string]any{"type": "workspaces", "attributes": attrs},

@@ -2948,10 +2948,12 @@
     "colActions": "Deeds",
     "unknownName": "Name never logged",
     "orphanBadge": "Fished out by the reaper",
+    "restoredBadge": "Already hauled back",
     "retentionDisabled": "Never lost",
     "restore": "Salvage",
     "restoring": "Haulin' her up…",
     "restoreConfirm": "Salvage the state o'' \"{name}\"?\n\nThis builds a NEW work-deck — the old one be gone to the depths for good. She comes up with auto-apply and drift-watch doused and nary a VCS line; her variables and voyage log do not come back. Only the state be salvaged.",
-    "restoreDone": "Salvaged {versions, plural, one {# state version} other {# state versions}} into the new work-deck \"{name}\". Inspect her riggin'' afore ye hoist auto-apply or VCS."
+    "restoreDone": "Salvaged {versions, plural, one {# state version} other {# state versions}} into the new work-deck \"{name}\". Inspect her riggin'' afore ye hoist auto-apply or VCS.",
+    "restoreAgainConfirm": "\"{name}\" has already been hauled back from the deep, into {existing}.\n\nHaulin'' her back again spawns a SECOND vessel carryin'' the same state lineage over the same waters. An apply aboard either will then make the other''s next plan read like the whole fleet has drifted.\n\nOnly sail on if the earlier salvaged vessel be sunk."
   }
 }

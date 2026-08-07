@@ -1348,3 +1348,72 @@ Map the failure to the provider:
 ### Prevention
 
 - Back up the KEK out-of-band **before** enabling (esp. `static`). Schedule the doctor so a broken key path is caught before a restart forces it. Never change the provider/key on a deployment with encrypted rows without proving the new path unwraps the existing DEKs first. See [encryption-at-rest.md](encryption-at-rest.md#recovery).
+
+---
+
+## Orphaned-state reaper refusing to reap (`terrapod_retention_orphan_reap_blocked` = 1)
+
+The deleted-workspace reaper has decided the orphan set is too large to be real
+deletions and is declining to delete anything. **No state has been lost** — this
+is the guard doing its job. It exists because this one retention category
+inverts the safety property of all the others.
+
+Every other category walks database rows and deletes the blobs those rows point
+at, so what it removes depends on the database being *correct*. This one lists
+blobs and deletes whatever the database does not claim, so what it removes
+depends on the database being *complete* — and a database can be incomplete
+without being wrong. Restore Postgres from a backup taken before a batch of
+workspaces was created, or repoint `DATABASE_URL` at the wrong instance during a
+migration, and every one of those live workspaces reads as an orphan.
+
+### Symptoms
+
+- The gauge `terrapod_retention_orphan_reap_blocked` is `1`.
+- An API log line at ERROR: *"Refusing to reap orphaned workspace state — the
+  orphan set is implausibly large…"*, carrying `orphans` and `live_workspaces`.
+- Storage under `state/` stops shrinking; nothing appears in
+  `terrapod_retention_deleted_total{category="deleted_workspaces"}`.
+
+### Diagnosis
+
+The log line gives you both numbers. Decide which explanation fits:
+
+1. **The database is not the one that owns this bucket.** Check that
+   `DATABASE_URL` points where you think, and that a `GET
+   /api/terrapod/v1/workspaces` returns roughly the workspace count you expect.
+   A recent restore, failover, or migration is the usual cause.
+2. **The database is right and a genuinely large deletion happened.** Confirm
+   from the audit log that the deletions were deliberate:
+   ```
+   GET /api/terrapod/v1/audit?action=delete&resource_type=workspace
+   ```
+3. **The bucket is shared.** Two deployments pointed at one object store makes
+   each other's workspaces look orphaned to both. They must not share a prefix.
+
+### Resolution
+
+- **If the database is wrong or incomplete:** fix that first — repoint
+  `DATABASE_URL`, finish the restore, complete the failover. Nothing else is
+  needed; the reaper resumes on its own next cycle once the ratio is plausible,
+  and until then it has destroyed nothing.
+- **If the deletions were genuine:** the guard clears itself as the ratio comes
+  back into range — either as more workspaces are created, or as you delete the
+  orphaned state deliberately. To reclaim it now, list the orphan prefixes and
+  remove them with your object-store tooling, having first confirmed each id is
+  absent from `GET /api/terrapod/v1/deleted-workspaces` **and** that you do not
+  want it restorable. That deletion is irreversible.
+
+Do not "fix" this by disabling retention: `deleted_workspace_retention_days: 0`
+stops reaping entirely, which is a bigger hammer and hides the signal.
+
+### Verification
+
+- `terrapod_retention_orphan_reap_blocked` returns to `0` on the next cycle.
+- `terrapod_retention_deleted_total{category="deleted_workspaces"}` starts
+  advancing again when there is genuinely expired state to reclaim.
+
+### Prevention
+
+- Alert on the gauge. While it is `1`, storage is not being reclaimed — and if
+  the cause is a stale database, reaping is exactly what must not happen.
+- Never point a Terrapod deployment at another deployment's storage prefix.

@@ -17,6 +17,7 @@ import json
 
 import pytest
 
+from terrapod.config import settings
 from terrapod.services import deleted_workspace_service as dws
 from terrapod.storage import get_storage
 from tests.integration.conftest import AUTH, admin_user, regular_user, set_auth
@@ -199,6 +200,48 @@ class TestRestore:
         assert resp.status_code == 201
         assert resp.json()["data"]["attributes"]["name"] == "recovered-by-hand"
 
+    @pytest.mark.parametrize(
+        "bad",
+        ["has space", "../etc/passwd", "-leading-hyphen", "dots.not.allowed", "", "a" * 200],
+    )
+    async def test_an_explicit_name_must_meet_the_format_contract(self, app, client, bad):
+        """Restore was the newest workspace-creating path and the only one
+        checking merely "non-empty string" (#1299). A name is load-bearing —
+        it is what the `cloud {}` block matches on and what `/app/{org}/{name}`
+        redirects by — so a workspace created here with a name no other path
+        would accept is one some surfaces cannot address."""
+        set_auth(app, admin_user())
+        old_id = await _delete_with_state(
+            client, f"restore-badname-{abs(hash(bad)) % 9999}", [1], "lin-bad"
+        )
+
+        resp = await client.post(
+            f"/api/terrapod/v1/deleted-workspaces/{old_id}/restore",
+            json={"data": {"attributes": {"name": bad}}},
+            headers=AUTH,
+        )
+        assert resp.status_code == 422
+
+    async def test_a_rejected_name_leaves_the_deleted_workspace_restorable(self, app, client):
+        """A 422 must be a retryable typo, not a way to burn the one recovery."""
+        set_auth(app, admin_user())
+        old_id = await _delete_with_state(client, "restore-retry", [1], "lin-retry")
+
+        bad = await client.post(
+            f"/api/terrapod/v1/deleted-workspaces/{old_id}/restore",
+            json={"data": {"attributes": {"name": "no good"}}},
+            headers=AUTH,
+        )
+        assert bad.status_code == 422
+
+        good = await client.post(
+            f"/api/terrapod/v1/deleted-workspaces/{old_id}/restore",
+            json={"data": {"attributes": {"name": "no-good"}}},
+            headers=AUTH,
+        )
+        assert good.status_code == 201
+        assert good.json()["data"]["attributes"]["name"] == "no-good"
+
     async def test_restore_with_no_recoverable_state_is_a_conflict(self, app, client):
         """An empty restore is a failure, not an empty success.
 
@@ -255,6 +298,152 @@ class TestRestore:
         new_id = resp.json()["data"]["id"]
         listing = await client.get(f"/api/v2/workspaces/{new_id}/state-versions", headers=AUTH)
         assert [v["attributes"]["serial"] for v in listing.json()["data"]] == [1]
+
+
+class TestRestoreIsNotRepeatable:
+    """A second restore of the same deletion produces a second live workspace
+    holding the SAME lineage and serial over the same real infrastructure —
+    after which an apply in either makes the other's next plan read as
+    wholesale drift. Nothing stopped it: the marker is not consumed and
+    `_unique_name` suffixes rather than conflicting (#1299)."""
+
+    async def test_a_second_restore_is_refused_and_names_the_first(self, app, client):
+        set_auth(app, admin_user())
+        old_id = await _delete_with_state(client, "restore-once", [1], "lin-once")
+
+        first = await client.post(
+            f"/api/terrapod/v1/deleted-workspaces/{old_id}/restore", headers=AUTH
+        )
+        assert first.status_code == 201
+        first_ws = first.json()["data"]["id"]
+
+        second = await client.post(
+            f"/api/terrapod/v1/deleted-workspaces/{old_id}/restore", headers=AUTH
+        )
+        assert second.status_code == 409
+        # Naming it is the point: the operator needs to find the earlier one.
+        assert first_ws in second.json()["detail"]
+
+    async def test_force_allows_a_repeat_for_a_discarded_first_attempt(self, app, client):
+        """The escape hatch has to exist — a first restore that was itself
+        deleted leaves a marker claiming a restore that is no longer live."""
+        set_auth(app, admin_user())
+        old_id = await _delete_with_state(client, "restore-forced", [1], "lin-forced")
+
+        first = await client.post(
+            f"/api/terrapod/v1/deleted-workspaces/{old_id}/restore", headers=AUTH
+        )
+        assert first.status_code == 201
+
+        forced = await client.post(
+            f"/api/terrapod/v1/deleted-workspaces/{old_id}/restore",
+            json={"data": {"attributes": {"force": True}}},
+            headers=AUTH,
+        )
+        assert forced.status_code == 201
+        assert forced.json()["data"]["id"] != first.json()["data"]["id"]
+
+    async def test_the_restore_is_visible_on_the_marker_afterwards(self, app, client):
+        """Refusing is only half of it — the list surface has to say a restore
+        already happened, or an operator cannot tell before trying."""
+        set_auth(app, admin_user())
+        old_id = await _delete_with_state(client, "restore-recorded", [1], "lin-recorded")
+
+        resp = await client.post(
+            f"/api/terrapod/v1/deleted-workspaces/{old_id}/restore", headers=AUTH
+        )
+        new_ws = resp.json()["data"]["id"]
+
+        one = await client.get(f"/api/terrapod/v1/deleted-workspaces/{old_id}", headers=AUTH)
+        assert one.status_code == 200
+        attrs = one.json()["data"]["attributes"]
+        assert attrs["restored-to"] == [new_ws]
+        assert attrs["restored-at"]
+        assert attrs["restored-by"] == admin_user().email
+
+    async def test_a_failed_restore_does_not_claim_one_happened(self, app, client):
+        """The marker is stamped after the commit, so a restore that 409s on
+        having nothing to recover must leave the deletion still restorable."""
+        set_auth(app, admin_user())
+        old_id = await _delete_with_state(client, "restore-unstamped", [1], "lin-unstamped")
+
+        storage = get_storage()
+        for obj in await storage.list_prefix(f"state/{old_id}/"):
+            await storage.delete(obj.key)
+
+        assert (
+            await client.post(f"/api/terrapod/v1/deleted-workspaces/{old_id}/restore", headers=AUTH)
+        ).status_code == 409
+
+        marker = await dws.read_marker(storage, old_id)
+        assert dws.prior_restores(marker) == []
+
+
+class TestRestoreIsBounded:
+    async def test_the_cap_keeps_the_newest_and_reports_the_rest(self, app, client):
+        """Restore used to walk EVERY version under the prefix, doing a full
+        get -> decrypt -> re-encrypt -> put per document inside one open
+        transaction — which for a large state exhausts the ingress timeout
+        while the server keeps copying (#1299). The newest are kept, because a
+        restore is about resuming from where the workspace left off.
+
+        Driven through the endpoint rather than the service so it also proves
+        the router threads the deployment's own `state_versions_keep` in.
+        """
+        set_auth(app, admin_user())
+        old_id = await _delete_with_state(client, "restore-capped", [1, 2, 3, 4, 5], "lin-capped")
+
+        original = settings.artifact_retention.state_versions_keep
+        settings.artifact_retention.state_versions_keep = 2
+        try:
+            resp = await client.post(
+                f"/api/terrapod/v1/deleted-workspaces/{old_id}/restore", headers=AUTH
+            )
+        finally:
+            settings.artifact_retention.state_versions_keep = original
+
+        assert resp.status_code == 201, resp.text
+        attrs = resp.json()["data"]["attributes"]
+        assert attrs["state-versions-restored"] == 2
+        # Reported, not silently dropped — an operator must not believe they
+        # got history back that was never copied.
+        assert (
+            sorted(s["reason"] for s in attrs["state-versions-skipped"])
+            == ["beyond the 2-version restore cap"] * 3
+        )
+
+        listing = await client.get(
+            f"/api/v2/workspaces/{resp.json()['data']['id']}/state-versions", headers=AUTH
+        )
+        assert [v["attributes"]["serial"] for v in listing.json()["data"]] == [5, 4]
+
+
+class TestPrefixedIdsAreTolerated:
+    """Marker ids are bare UUIDs while every other workspace id in the API is
+    `ws-`-prefixed. Rejecting the prefixed form made callers keep two spellings
+    of one id straight — conspicuous enough that the MCP tool description had
+    to warn about it (#1299)."""
+
+    async def test_get_accepts_the_prefixed_form(self, app, client):
+        set_auth(app, admin_user())
+        old_id = await _delete_with_state(client, "restore-prefixget", [1], "lin-prefixget")
+
+        bare = await client.get(f"/api/terrapod/v1/deleted-workspaces/{old_id}", headers=AUTH)
+        prefixed = await client.get(
+            f"/api/terrapod/v1/deleted-workspaces/ws-{old_id}", headers=AUTH
+        )
+        assert bare.status_code == prefixed.status_code == 200
+        assert bare.json() == prefixed.json()
+
+    async def test_restore_accepts_the_prefixed_form(self, app, client):
+        set_auth(app, admin_user())
+        old_id = await _delete_with_state(client, "restore-prefixpost", [1], "lin-prefixpost")
+
+        resp = await client.post(
+            f"/api/terrapod/v1/deleted-workspaces/ws-{old_id}/restore", headers=AUTH
+        )
+        assert resp.status_code == 201
+        assert resp.json()["data"]["attributes"]["restored-from"] == old_id
 
 
 class TestDeletedWorkspaceList:
@@ -479,6 +668,35 @@ class TestRestoreResilience:
         attrs = resp.json()["data"]["attributes"]
         assert attrs["state-versions-restored"] == 1
         assert any("duplicate serial" in s["reason"] for s in attrs["state-versions-skipped"])
+
+    async def test_an_unusable_name_in_the_marker_is_sanitized_not_fatal(self, app, client):
+        """The marker-derived name follows the `sanitize_labels` precedent, not
+        the `validate_labels` one (#1299): the caller supplied nothing, so
+        raising would make a recoverable workspace permanently un-restorable
+        over a field the operator never chose and cannot edit. The strict check
+        belongs on the name a human typed, which they can simply retype."""
+        set_auth(app, admin_user())
+        old_id = await _delete_with_state(client, "restore-uglyname", [1], "lin-ugly")
+
+        storage = get_storage()
+        marker = await dws.read_marker(storage, old_id)
+        marker["workspace_name"] = "../../etc/passwd"
+        await dws.write_marker(storage, old_id, marker)
+
+        resp = await client.post(
+            f"/api/terrapod/v1/deleted-workspaces/{old_id}/restore", headers=AUTH
+        )
+        assert resp.status_code == 201, resp.text
+        name = resp.json()["data"]["attributes"]["name"]
+        assert "/" not in name and ".." not in name
+        # And the state still came back — the point of tolerating the name.
+        assert resp.json()["data"]["attributes"]["state-versions-restored"] == 1
+
+        # The workspace it produced is addressable by every normal path.
+        new_id = resp.json()["data"]["id"]
+        ws = await client.get(f"/api/v2/workspaces/{new_id}", headers=AUTH)
+        assert ws.status_code == 200
+        assert ws.json()["data"]["attributes"]["name"] == name
 
     async def test_a_reserved_label_in_the_marker_is_stripped_not_fatal(self, app, client):
         """Markers are files in a bucket and can predate a key becoming

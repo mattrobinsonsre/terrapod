@@ -129,8 +129,9 @@ func registerAct(s *mcp.Server, c *terrapod.Client) {
 
 	// ── terrapod_deleted_workspace_restore ───────────────────────────
 	type restoreIn struct {
-		WorkspaceID string `json:"workspace_id" jsonschema:"the id of the DELETED workspace to recover (the bare uuid from terrapod_deleted_workspace_list, not a ws- prefixed id)"`
-		Name        string `json:"name,omitempty" jsonschema:"optional name for the recovered workspace; when omitted the original name is reused, suffixed if it has since been taken"`
+		WorkspaceID string `json:"workspace_id" jsonschema:"the id of the DELETED workspace to recover, from terrapod_deleted_workspace_list; either the bare uuid or the ws- prefixed form"`
+		Name        string `json:"name,omitempty" jsonschema:"optional name for the recovered workspace; when omitted the original name is reused, suffixed if it has since been taken. Must start with a letter or number and contain only letters, numbers, hyphens and underscores"`
+		Force       bool   `json:"force,omitempty" jsonschema:"restore again even though this deletion has already been restored. Only set this when the earlier restored workspace is known to be gone — otherwise it produces a second live workspace over the same infrastructure"`
 	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "terrapod_deleted_workspace_restore",
@@ -142,13 +143,17 @@ func registerAct(s *mcp.Server, c *terrapod.Client) {
 			"for the user to re-enable deliberately. Lineage and serial ARE preserved exactly, so the recovered " +
 			"workspace continues the original state rather than starting a new one. Fails with a conflict if the " +
 			"retention window has passed and the state has been reaped — check `restorable-until` from " +
-			"terrapod_deleted_workspace_list first. Because a restore materialises state (and therefore secrets) " +
-			"into a workspace the caller can read, confirm with the user before calling it.",
+			"terrapod_deleted_workspace_list first. Also fails with a conflict if this deletion has ALREADY been " +
+			"restored (see `restored-to`), because a second restore would put a second live workspace with the same " +
+			"state lineage over the same infrastructure; only pass force if the earlier one is known to be gone. " +
+			"Only the newest state versions are copied — anything beyond the server's cap is reported in " +
+			"`state-versions-skipped` rather than dropped silently. Because a restore materialises state (and " +
+			"therefore secrets) into a workspace the caller can read, confirm with the user before calling it.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in restoreIn) (*mcp.CallToolResult, *terrapod.RestoredWorkspace, error) {
 		if in.WorkspaceID == "" {
 			return errText("workspace_id is required"), nil, nil
 		}
-		w, err := c.RestoreDeletedWorkspace(ctx, in.WorkspaceID, in.Name)
+		w, err := c.RestoreDeletedWorkspace(ctx, in.WorkspaceID, terrapod.RestoreOptions{Name: in.Name, Force: in.Force})
 		if err != nil {
 			return errResult(err), nil, nil
 		}
