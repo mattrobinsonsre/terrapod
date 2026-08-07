@@ -1369,3 +1369,151 @@ class TestPlanStaleness:
         # Guarded: discarded as stale — NOT auto-applied (confirmed/applying).
         assert after["status"] == "discarded", after["status"]
         assert "state changed" in (after["discard-reason"] or "")
+
+
+class TestRunTriggerRunsAreApplicable:
+    """A run created by a run trigger on a VCS-connected agent workspace must
+    be applicable (#1307).
+
+    It was not. `fire_run_triggers` created the run with `source="tfe-api"` —
+    the CLI-upload source — and the apply guard keyed off the run's source, so
+    a triggered run was refused for not being VCS-managed while pointing at the
+    destination's latest VCS-fetched CV. The downstream half of run triggers
+    was non-functional on exactly the workspaces most likely to use it.
+
+    The guard now tests the CONFIGURATION VERSION's source, which is what it
+    was always trying to ask.
+    """
+
+    @staticmethod
+    async def _attach_vcs_connection(client, ws_id, name):
+        """Attach a VCS connection to an existing workspace, in the DB.
+
+        Deliberately not through the API: creating a VCS-connected workspace
+        (or a run on one) makes the server resolve refs against the live
+        provider, which a test has no business doing. The guard reads exactly
+        one thing — `ws.vcs_connection_id is not None` — so attaching it
+        directly puts the workspace in precisely the state under test without
+        dragging the network in.
+
+        Called AFTER the plan, so the run gets created and planned normally and
+        only the confirm meets the guard, which is where it lives.
+        """
+        import uuid as _uuid
+
+        from terrapod.db.models import VCSConnection, Workspace
+        from terrapod.db.session import get_db_session
+
+        async with get_db_session() as db:
+            conn = VCSConnection(
+                name=f"conn-{name}",
+                provider="gitlab",
+                server_url="https://example.invalid",
+                token="not-used-by-this-test",
+            )
+            db.add(conn)
+            await db.flush()
+            ws = await db.get(Workspace, _uuid.UUID(ws_id.removeprefix("ws-")))
+            ws.vcs_connection_id = conn.id
+            ws.vcs_repo_url = "https://example.invalid/org/repo"
+            ws.vcs_branch = "main"
+            await db.commit()
+
+    @staticmethod
+    async def _set_cv_source(ws_id, source):
+        """Mark the workspace's CV as VCS- or API-sourced.
+
+        Set directly because the API has no way to declare a CV VCS-sourced —
+        only the poller writes those — and the guard reads exactly this field.
+        """
+        import uuid as _uuid
+
+        from sqlalchemy import select
+
+        from terrapod.db.models import ConfigurationVersion
+        from terrapod.db.session import get_db_session
+
+        async with get_db_session() as db:
+            res = await db.execute(
+                select(ConfigurationVersion).where(
+                    ConfigurationVersion.workspace_id == _uuid.UUID(ws_id.removeprefix("ws-"))
+                )
+            )
+            for cv in res.scalars().all():
+                cv.source = source
+            await db.commit()
+
+    @staticmethod
+    async def _set_run_source(run_id, source):
+        """What `fire_run_triggers` stamps. Set directly rather than firing a
+        real trigger, so the test is about the guard rather than about the
+        upstream apply that would drive it."""
+        import uuid as _uuid
+
+        from terrapod.db.models import Run
+        from terrapod.db.session import get_db_session
+
+        async with get_db_session() as db:
+            r = await db.get(Run, _uuid.UUID(run_id.removeprefix("run-")))
+            r.source = source
+            await db.commit()
+
+    async def test_a_triggered_run_against_vcs_code_can_be_applied(self, app, client, setup):
+        pool_id, listener_id = setup
+        ws_id = await _create_remote_workspace(client, pool_id, "trigger-dest-vcs")
+        await self._set_cv_source(ws_id, "vcs")
+
+        run = await _create_run(client, ws_id)
+        await self._set_run_source(run["id"], "run-trigger")
+        await _run_plan_lifecycle(client, listener_id, run["id"])
+        assert (await _get_run(client, run["id"]))["attributes"]["status"] == "planned"
+
+        await self._attach_vcs_connection(client, ws_id, "vcs")
+
+        resp = await client.post(f"/api/v2/runs/{run['id']}/actions/apply", headers=AUTH)
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["data"]["attributes"]["status"] == "confirmed"
+
+    async def test_a_run_against_cli_uploaded_code_is_still_refused(self, app, client, setup):
+        """The property the guard exists for. A CV that came in over the API on
+        a VCS-connected workspace must still not be applicable, whatever the
+        run's source says."""
+        pool_id, listener_id = setup
+        ws_id = await _create_remote_workspace(client, pool_id, "trigger-dest-cli")
+        await self._set_cv_source(ws_id, "tfe-api")
+
+        run = await _create_run(client, ws_id)
+        await self._set_run_source(run["id"], "run-trigger")
+        await _run_plan_lifecycle(client, listener_id, run["id"])
+        await self._attach_vcs_connection(client, ws_id, "cli")
+
+        resp = await client.post(f"/api/v2/runs/{run['id']}/actions/apply", headers=AUTH)
+        assert resp.status_code == 422, resp.text
+        # Names the CV's origin rather than blaming the caller for using a CLI
+        # they may never have touched.
+        assert "configuration version" in resp.text.lower()
+
+    async def test_a_destroy_is_still_exempt(self, app, client, setup):
+        """Destroys don't depend on uploaded code at all."""
+        pool_id, listener_id = setup
+        ws_id = await _create_remote_workspace(client, pool_id, "trigger-dest-destroy")
+        await self._set_cv_source(ws_id, "tfe-api")
+
+        run = await _create_run(client, ws_id, **{"is-destroy": True})
+        await _run_plan_lifecycle(client, listener_id, run["id"])
+        await self._attach_vcs_connection(client, ws_id, "destroy")
+
+        resp = await client.post(f"/api/v2/runs/{run['id']}/actions/apply", headers=AUTH)
+        assert resp.status_code == 200, resp.text
+
+    async def test_a_non_vcs_workspace_is_unaffected(self, app, client, setup):
+        """CLI apply on a plain agent workspace is a supported workflow and
+        must keep working — the guard is scoped to VCS-connected ones."""
+        pool_id, listener_id = setup
+        ws_id = await _create_remote_workspace(client, pool_id, "trigger-dest-plain")
+
+        run = await _create_run(client, ws_id)
+        await _run_plan_lifecycle(client, listener_id, run["id"])
+
+        resp = await client.post(f"/api/v2/runs/{run['id']}/actions/apply", headers=AUTH)
+        assert resp.status_code == 200, resp.text

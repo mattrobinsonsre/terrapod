@@ -13,6 +13,18 @@ This is useful for multi-layer infrastructure where changes in a base layer (e.g
 3. For each trigger, a new run is created and queued in the destination workspace
 4. The triggered run respects the destination workspace's `auto_apply` setting
 
+Triggered runs carry `source = "run-trigger"`, so they are distinguishable from
+CLI-initiated ones in the UI, the API, the audit log and the SDK — "why did this
+workspace just apply?" is answerable from the run itself.
+
+**On a VCS-connected workspace, a triggered run applies the code the VCS poller
+last fetched.** Terrapod picks the destination's latest uploaded configuration
+version; on a VCS-connected workspace that is the poller's, so the run is
+applying VCS-managed code and is confirmable like any other. If the latest
+configuration version was instead uploaded over the API, the apply is refused —
+a VCS-connected workspace applies VCS-managed code only, and that rule is not
+weakened by the run having arrived via a trigger.
+
 No data is passed between workspaces via the trigger mechanism. Downstream workspaces read outputs from upstream workspaces using the `terraform_remote_state` data source independently.
 
 ---
