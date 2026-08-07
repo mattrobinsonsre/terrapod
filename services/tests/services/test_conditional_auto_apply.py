@@ -6,10 +6,13 @@ run apply itself or wait for a human? Every ambiguous case must resolve to
 infrastructure changes nobody looked at.
 """
 
+import uuid
 from types import SimpleNamespace
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from terrapod.services import run_service
 from terrapod.services.run_service import (
     AUTO_APPLY_MODES,
     describe_plan_shape,
@@ -147,3 +150,144 @@ def test_mode_list_is_the_documented_set():
     # The API validates against this tuple and the docs enumerate it; a
     # silent addition would be accepted by the API but understood by nothing.
     assert AUTO_APPLY_MODES == ("never", "always", "create", "create_update")
+
+
+# ── The decider, not just the decision (#1294) ─────────────────────────────
+#
+# Everything above tests the pure predicates. These test the function that
+# *acts* on them — which had no coverage at all, and which is where the
+# release review found three of its four blockers. A green predicate suite
+# proved the decision was right while the decider was entirely unexercised.
+
+
+def _decider_run(**kw):
+    """A `planned`, apply-capable run on a conditional mode."""
+    base = {
+        "id": uuid.uuid4(),
+        "workspace_id": uuid.uuid4(),
+        "status": "planned",
+        "plan_only": False,
+        # what create_run sets for any non-`never` mode
+        "auto_apply": True,
+        "auto_apply_mode": "create",
+        "auto_apply_declined_reason": None,
+        "resource_additions": 1,
+        "resource_changes": 0,
+        "resource_destructions": 0,
+        "resource_replacements": 0,
+        "has_changes": True,
+    }
+    base.update(kw)
+    return SimpleNamespace(**base)
+
+
+class TestEvaluateConditionalAutoApply:
+    async def test_a_permitted_plan_is_confirmed(self):
+        run = _decider_run()
+        db = AsyncMock()
+        with patch.object(
+            run_service, "_auto_apply_if_permitted", AsyncMock(return_value=run)
+        ) as gate:
+            await run_service.evaluate_conditional_auto_apply(db, run)
+        gate.assert_awaited_once()
+
+    async def test_a_destroy_is_declined_and_the_reason_recorded(self):
+        # `create` must never apply a plan that destroys. The reason is what
+        # the UI renders to explain why the run is sitting there.
+        run = _decider_run(resource_destructions=2)
+        db = AsyncMock()
+        with patch.object(run_service, "_auto_apply_if_permitted", AsyncMock()) as gate:
+            await run_service.evaluate_conditional_auto_apply(db, run)
+        gate.assert_not_awaited()
+        assert run.status == "planned"
+        assert run.auto_apply_declined_reason, "the operator needs to know why it stopped"
+
+    async def test_an_unknown_plan_shape_is_declined(self):
+        # Plan JSON never arrived / failed to parse — fail toward "a human
+        # looks at it", never toward applying something unexamined.
+        run = _decider_run(
+            resource_additions=None, resource_changes=None, resource_destructions=None
+        )
+        db = AsyncMock()
+        with patch.object(run_service, "_auto_apply_if_permitted", AsyncMock()) as gate:
+            await run_service.evaluate_conditional_auto_apply(db, run)
+        gate.assert_not_awaited()
+        assert run.status == "planned"
+
+    async def test_a_run_that_is_not_planned_is_left_alone(self):
+        # Without this guard a run already applying/errored/discarded would be
+        # driven to `confirmed` a second time.
+        for status in ("planning", "applying", "errored", "discarded", "applied"):
+            run = _decider_run(status=status)
+            db = AsyncMock()
+            with patch.object(run_service, "_auto_apply_if_permitted", AsyncMock()) as gate:
+                await run_service.evaluate_conditional_auto_apply(db, run)
+            gate.assert_not_awaited(), f"status={status} must not auto-apply"
+
+    async def test_a_plan_only_run_never_auto_applies(self):
+        run = _decider_run(plan_only=True)
+        db = AsyncMock()
+        with patch.object(run_service, "_auto_apply_if_permitted", AsyncMock()) as gate:
+            await run_service.evaluate_conditional_auto_apply(db, run)
+        gate.assert_not_awaited()
+
+    async def test_always_and_never_do_not_travel_this_path(self):
+        # `always` decides in complete_plan (on the plan-result POST, before
+        # the counts exist); `never` decides nowhere. Only the conditional
+        # modes are settled here.
+        for mode in ("always", "never"):
+            run = _decider_run(auto_apply_mode=mode)
+            db = AsyncMock()
+            with patch.object(run_service, "_auto_apply_if_permitted", AsyncMock()) as gate:
+                await run_service.evaluate_conditional_auto_apply(db, run)
+            gate.assert_not_awaited(), f"mode={mode} must not decide here"
+
+
+class TestAutoApplyGuardsAreSharedByBothEntryPoints:
+    """`_auto_apply_if_permitted` was extracted so `always` and the
+    conditional modes cannot drift apart on the guards. Nothing pinned that
+    the new caller actually honours them — which is the whole point of the
+    extraction."""
+
+    async def test_a_manual_workspace_lock_blocks_the_conditional_path(self):
+        # An unattended apply past an operator's explicit lock is exactly the
+        # failure the lock exists to prevent.
+        run = _decider_run()
+        ws = SimpleNamespace(id=run.workspace_id, locked=True, lock_id="held-by-a-human")
+        db = AsyncMock()
+        db.get = AsyncMock(return_value=ws)
+        with (
+            patch.object(run_service, "_staleness_reason", AsyncMock(return_value=None)),
+            patch.object(run_service, "transition_run", AsyncMock()) as transition,
+        ):
+            await run_service._auto_apply_if_permitted(db, run)
+        transition.assert_not_awaited(), "must not confirm past a manual lock"
+
+    async def test_an_unlocked_workspace_is_confirmed(self):
+        run = _decider_run()
+        ws = SimpleNamespace(id=run.workspace_id, locked=False, lock_id=None)
+        db = AsyncMock()
+        db.get = AsyncMock(return_value=ws)
+        with (
+            patch.object(run_service, "_staleness_reason", AsyncMock(return_value=None)),
+            patch.object(run_service, "transition_run", AsyncMock(return_value=run)) as transition,
+        ):
+            await run_service._auto_apply_if_permitted(db, run)
+        assert transition.await_args.args[2] == "confirmed"
+
+    async def test_a_stale_plan_is_discarded_not_applied(self):
+        # #646/#647: state moved or the TTL lapsed between plan and apply.
+        run = _decider_run()
+        ws = SimpleNamespace(id=run.workspace_id, locked=False, lock_id=None)
+        db = AsyncMock()
+        db.get = AsyncMock(return_value=ws)
+        with (
+            patch.object(
+                run_service, "_staleness_reason", AsyncMock(return_value="state moved on")
+            ),
+            patch.object(run_service, "discard_run", AsyncMock(return_value=run)) as discard,
+            patch.object(run_service, "transition_run", AsyncMock()) as transition,
+        ):
+            await run_service._auto_apply_if_permitted(db, run)
+        discard.assert_awaited_once()
+        transition.assert_not_awaited(), "a stale plan must never be applied"
