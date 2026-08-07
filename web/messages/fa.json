@@ -67,6 +67,7 @@
       "agentPool": "استخر عامل",
       "none": "هیچ‌کدام",
       "autoApply": "اعمال خودکار",
+      "autoApplyModeHint": "never: همیشه منتظر یک انسان بمان. always: هر طرح موفق را اعمال کن. create / create/update: فقط طرح‌هایی را اعمال کن که به همان کنش‌ها محدودند — هرگز حذف یا جایگزینی.",
       "enabled": "فعال",
       "workingDirectory": "پوشهٔ کاری",
       "workingDirectoryPlaceholder": "مثلاً environments/dev",

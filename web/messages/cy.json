@@ -67,6 +67,7 @@
       "agentPool": "Pwll Asiantau",
       "none": "Dim",
       "autoApply": "Gweithredu Awtomatig",
+      "autoApplyModeHint": "never: aros am berson bob tro. always: cymhwyso pob cynllun llwyddiannus. create / create/update: cymhwyso dim ond cynlluniau sy''n gyfyngedig i''r camau hynny — byth dileu na disodli.",
       "enabled": "Wedi'i alluogi",
       "workingDirectory": "Cyfeiriadur Gwaith",
       "workingDirectoryPlaceholder": "e.e. environments/dev",

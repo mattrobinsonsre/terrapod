@@ -67,6 +67,7 @@
       "agentPool": "Fond agentů",
       "none": "Žádný",
       "autoApply": "Automatické použití",
+      "autoApplyModeHint": "never: vždy počkat na člověka. always: aplikovat každý úspěšný plán. create / create/update: aplikovat jen plány omezené na tyto akce — nikdy ne mazání ani nahrazení.",
       "enabled": "Povoleno",
       "workingDirectory": "Pracovní adresář",
       "workingDirectoryPlaceholder": "např. environments/dev",

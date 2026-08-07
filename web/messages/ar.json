@@ -67,6 +67,7 @@
       "agentPool": "مجموعة الوكلاء",
       "none": "لا شيء",
       "autoApply": "التطبيق التلقائي",
+      "autoApplyModeHint": "never: انتظر إنسانًا دائمًا. always: طبّق كل خطة ناجحة. create / create/update: طبّق فقط الخطط المقتصرة على تلك الإجراءات — ولا تطبّق أبدًا حذفًا أو استبدالًا.",
       "enabled": "مُفعّل",
       "workingDirectory": "دليل العمل",
       "workingDirectoryPlaceholder": "مثل environments/dev",

@@ -272,7 +272,7 @@
       "additionalProperties": false,
       "properties": {
         "auto_apply": {
-          "description": "auto-apply on success (default: the workspace setting)",
+          "description": "auto-apply on success. Omit to use the workspace setting. Passing true does NOT mean 'use the workspace setting' — on a workspace configured with a conditional mode (create / create_update) an explicit true maps the run to 'always', applying it past a guardrail the operator set, including a plan containing destroys. Only pass it when you intend that for this one run.",
           "type": [
             "null",
             "boolean"

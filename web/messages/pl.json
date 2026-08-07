@@ -67,6 +67,7 @@
       "agentPool": "Pula agentów",
       "none": "Brak",
       "autoApply": "Automatyczne zastosowanie",
+      "autoApplyModeHint": "never: zawsze czekaj na człowieka. always: zastosuj każdy udany plan. create / create/update: zastosuj tylko plany ograniczone do tych działań — nigdy usunięcia ani zastąpienia.",
       "enabled": "Włączone",
       "workingDirectory": "Katalog roboczy",
       "workingDirectoryPlaceholder": "np. environments/dev",

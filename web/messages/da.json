@@ -67,6 +67,7 @@
       "agentPool": "Agentpulje",
       "none": "Ingen",
       "autoApply": "Anvend automatisk",
+      "autoApplyModeHint": "never: vent altid på et menneske. always: anvend hver vellykket plan. create / create/update: anvend kun planer begrænset til de handlinger — aldrig en sletning eller en udskiftning.",
       "enabled": "Aktiveret",
       "workingDirectory": "Arbejdsmappe",
       "workingDirectoryPlaceholder": "f.eks. environments/dev",

@@ -67,6 +67,7 @@
       "agentPool": "Copia Actorum",
       "none": "Nullus",
       "autoApply": "Applicatio Automatica",
+      "autoApplyModeHint": "never: semper hominem exspecta. always: omne consilium prosperum applica. create / create/update: sola consilia iis actionibus circumscripta applica — numquam deletionem aut substitutionem.",
       "enabled": "Activatum",
       "workingDirectory": "Directorium Operandi",
       "workingDirectoryPlaceholder": "e.g. environments/dev",

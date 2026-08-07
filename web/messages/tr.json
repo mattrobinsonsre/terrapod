@@ -67,6 +67,7 @@
       "agentPool": "Agent Havuzu",
       "none": "Yok",
       "autoApply": "Otomatik Uygula",
+      "autoApplyModeHint": "never: her zaman bir insanı bekle. always: başarılı her planı uygula. create / create/update: yalnızca bu işlemlerle sınırlı planları uygula — asla bir silme ya da değiştirme.",
       "enabled": "Etkin",
       "workingDirectory": "Çalışma Dizini",
       "workingDirectoryPlaceholder": "örn. environments/dev",

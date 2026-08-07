@@ -67,6 +67,7 @@
       "agentPool": "Agent-pool",
       "none": "Geen",
       "autoApply": "Automatisch toepassen",
+      "autoApplyModeHint": "never: wacht altijd op een mens. always: pas elk geslaagd plan toe. create / create/update: pas alleen plannen toe die tot die acties beperkt zijn — nooit een verwijdering of een vervanging.",
       "enabled": "Ingeschakeld",
       "workingDirectory": "Werkmap",
       "workingDirectoryPlaceholder": "bijv. environments/dev",

@@ -204,3 +204,24 @@ func TestGetDeletedWorkspaceNotFound(t *testing.T) {
 		t.Errorf("want a NotFoundError, got %T: %v", err, err)
 	}
 }
+
+func TestListDeletedWorkspacesRejectsUnparseableMeta(t *testing.T) {
+	// Silently discarded, TotalPages stayed 0 and ListAllDeletedWorkspaces
+	// stopped after page one — returning a TRUNCATED list as a success. For
+	// undelete that fails in the worst direction: "there is nothing else to
+	// restore" is exactly the answer an operator must not be given wrongly
+	// (#1301).
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_, _ = w.Write([]byte(`{"data":[],"meta":{"pagination":"not-an-object"}}`))
+	}))
+	defer srv.Close()
+	c, err := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+
+	if _, err := c.ListDeletedWorkspaces(context.Background(), DeletedWorkspaceListOptions{}); err == nil {
+		t.Fatal("want an error for unparseable pagination, got nil — a truncated list would be reported as success")
+	}
+}

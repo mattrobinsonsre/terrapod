@@ -141,9 +141,15 @@ func (c *Client) ListDeletedWorkspaces(ctx context.Context, opts DeletedWorkspac
 		out.Items = append(out.Items, d.Attributes)
 	}
 	meta, err := parseListMeta(body)
-	if err == nil {
-		out.Meta = meta
+	if err != nil {
+		// Not swallowed (#1301). With meta discarded, TotalPages stays 0 and
+		// ListAllDeletedWorkspaces below stops after page one — returning a
+		// truncated list as a SUCCESS. For this feature that fails in the
+		// worst direction: "there is nothing else to restore" is exactly the
+		// answer an operator must not be given wrongly.
+		return nil, fmt.Errorf("decode deleted workspaces pagination: %w", err)
 	}
+	out.Meta = meta
 	return out, nil
 }
 

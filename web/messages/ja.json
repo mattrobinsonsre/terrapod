@@ -67,6 +67,7 @@
       "agentPool": "エージェントプール",
       "none": "なし",
       "autoApply": "自動適用",
+      "autoApplyModeHint": "never: 常に人の確認を待ちます。always: 成功したプランをすべて適用します。create / create/update: それらの操作だけに限られたプランのみを適用し、破棄や置換は決して適用しません。",
       "enabled": "有効",
       "workingDirectory": "作業ディレクトリ",
       "workingDirectoryPlaceholder": "例: environments/dev",

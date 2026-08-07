@@ -67,6 +67,7 @@
       "agentPool": "Pool, Agent",
       "none": "None",
       "autoApply": "Apply, Auto",
+      "autoApplyModeHint": "never: wait for a human, always you must. always: apply every successful plan, it does. create / create/update: only plans limited to those actions, apply it will — a destroy or a replace, never.",
       "enabled": "Enabled",
       "workingDirectory": "Directory, Working",
       "workingDirectoryPlaceholder": "e.g. environments/dev",

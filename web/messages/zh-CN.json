@@ -67,6 +67,7 @@
       "agentPool": "代理池",
       "none": "无",
       "autoApply": "自动应用",
+      "autoApplyModeHint": "never：始终等待人工确认。always：应用每一个成功的计划。create / create/update：只应用仅限于这些操作的计划——绝不应用销毁或替换。",
       "enabled": "已启用",
       "workingDirectory": "工作目录",
       "workingDirectoryPlaceholder": "例如 environments/dev",

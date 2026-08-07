@@ -67,6 +67,7 @@
       "agentPool": "מאגר סוכנים",
       "none": "ללא",
       "autoApply": "החלה אוטומטית",
+      "autoApplyModeHint": "never: תמיד להמתין לאדם. always: להחיל כל תוכנית מוצלחת. create / create/update: להחיל רק תוכניות המוגבלות לפעולות אלה — לעולם לא מחיקה או החלפה.",
       "enabled": "מופעל",
       "workingDirectory": "ספריית עבודה",
       "workingDirectoryPlaceholder": "למשל environments/dev",
