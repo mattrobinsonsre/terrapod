@@ -102,6 +102,35 @@ SCHEDULER_TRIGGER_PROCESSED = Counter(
     ["type", "status"],
 )
 
+SCHEDULER_QUEUE_DEPTH = Gauge(
+    "terrapod_scheduler_queue_depth",
+    (
+        "Triggered tasks currently waiting in each queue lane. Deployment-wide "
+        "concurrency is (replicas x consumers-per-lane), so a lane whose depth "
+        "climbs and does not drain is one whose producers are outrunning its "
+        "consumers. Depth is the signal that matters rather than per-item cost: "
+        "a VCS poll cycle enqueues one AI item per changed workspace at once, so "
+        "even individually quick items become minutes of user-visible latency "
+        "when they are drained one at a time (#1296). Before this gauge existed "
+        "a deep backlog was invisible until somebody noticed a missing summary."
+    ),
+    ["lane"],
+)
+
+SCHEDULER_TRIGGER_WAIT = Histogram(
+    "terrapod_scheduler_trigger_wait_seconds",
+    (
+        "Time a triggered task spent queued, from enqueue to the moment a "
+        "consumer picked it up. Deliberately separate from the handler's own "
+        "duration, because the two call for different fixes and conflating them "
+        "sends you after the wrong one: wait time is removed by more consumers, "
+        "execution time is not. Buckets run to an hour — a saturated lane is "
+        "minutes deep even when every individual item is quick."
+    ),
+    ["type"],
+    buckets=(0.1, 0.5, 1, 5, 15, 30, 60, 120, 300, 600, 1800, 3600),
+)
+
 # ---------------------------------------------------------------------------
 # VCS metrics
 # ---------------------------------------------------------------------------

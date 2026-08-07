@@ -137,6 +137,27 @@ scrape_configs:
 | `terrapod_scheduler_trigger_enqueued_total` | Counter | type | Triggers enqueued |
 | `terrapod_scheduler_trigger_deduplicated_total` | Counter | type | Triggers skipped (dedup) |
 | `terrapod_scheduler_trigger_processed_total` | Counter | type, status | Triggers processed |
+| `terrapod_scheduler_queue_depth` | Gauge | lane | Items waiting in each lane. Sampled every 15s by every replica against one shared list, so aggregate with `max()` |
+| `terrapod_scheduler_trigger_wait_seconds` | Histogram | type | Time queued before a consumer picked the item up — **not** how long the handler then ran |
+
+### Reading the two queue signals together
+
+They answer different questions, and keeping them apart is the point:
+
+- **Wait high, handler duration normal** → not enough consumers. Raise
+  `api.config.scheduler.lane_consumers` for that lane (or add replicas — the
+  two multiply).
+- **Wait low, handler duration high** → the handler itself got slower. More
+  consumers will not help.
+- **Depth climbing and not returning to zero** → producers are outpacing that
+  lane over a sustained period, not just bursting.
+
+The `ai` lane is the one worth an alert. Its items are enqueued in bursts (a
+VCS poll cycle emits one per changed workspace) and back a user-visible
+feature, so a sustained backlog shows up as "my plan summary never appeared"
+long before anything else complains. Alert on
+`terrapod_scheduler_trigger_wait_seconds` at the lane's p95 rather than on
+depth alone — a deep queue that drains fast is fine.
 
 ### VCS
 

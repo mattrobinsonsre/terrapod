@@ -196,6 +196,8 @@
   "api.config.registry.provider_cache.upstream_registries",
   "api.config.registry.provider_cache.verify",
   "api.config.registry.provider_cache.warm_on_first_request",
+  "api.config.scheduler.lane_consumers.ai",
+  "api.config.scheduler.lane_consumers.default",
   "api.config.slack.command",
   "api.config.slack.enabled",
   "api.config.slack.existingSecret",

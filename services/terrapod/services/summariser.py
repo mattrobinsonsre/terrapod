@@ -1170,6 +1170,50 @@ async def _emit_ready_event(workspace_id: uuid.UUID, run_id: uuid.UUID) -> None:
     await _emit_summary_event("plan_summary_ready", workspace_id, run_id)
 
 
+async def mark_summary_queued(
+    db: AsyncSession,
+    *,
+    run_id: uuid.UUID,
+    kind: str = "plan_summary",
+) -> None:
+    """Create a `pending` placeholder the moment the work is enqueued.
+
+    Without this the row only appeared when a consumer *started* the item, so
+    for the whole time it sat in the queue `GET /runs/{id}/plan-summary`
+    returned 404 — identical to "this run has no summary and never will".
+    There was no way, from the API, the SDK, the MCP tools or the UI, to tell
+    "queued, N minutes out" from "broken" (#1295). Diagnosing which it was
+    once cost an afternoon of log archaeology, and the answer was "queued".
+
+    `ON CONFLICT DO NOTHING` rather than an upsert, deliberately: this races
+    the consumer pool, and if a handler has already finished the run's real
+    result must win. A placeholder is only ever allowed to fill a gap, never
+    to overwrite an outcome.
+
+    Called AFTER a successful enqueue, so a failed enqueue leaves no row —
+    a permanently-`pending` summary would be a worse lie than the 404 was.
+    """
+    stmt = (
+        pg_insert(PlanSummary)
+        .values(
+            id=uuid.uuid4(),
+            run_id=run_id,
+            kind=kind,
+            status="pending",
+            description="",
+            risk_level="",
+            risk_factors=[],
+            model=settings.ai_summary.model,
+            input_tokens=0,
+            output_tokens=0,
+            error_message="",
+            updated_at=now_utc(),
+        )
+        .on_conflict_do_nothing(index_elements=["run_id"])
+    )
+    await db.execute(stmt)
+
+
 async def _upsert_summary(
     db: AsyncSession,
     *,
