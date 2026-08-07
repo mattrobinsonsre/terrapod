@@ -1243,6 +1243,10 @@ jobs:
             done
           fi
       - name: make eval (install into the cluster)
+        # Bounded below the job's own timeout so an install that will not
+        # converge FAILS this step — leaving budget for diagnostics and
+        # teardown — instead of cancelling the job and skipping both.
+        timeout-minutes: 12
         env:
           CI: "1"
           EVAL_NO_PORT_FORWARD: "1"
@@ -1287,14 +1291,24 @@ jobs:
           ctx=$([ "${{ matrix.tool }}" = "kind" ] && echo kind-terrapod-eval || echo k3d-terrapod-eval)
           scripts/eval-smoke-plan.sh "$ctx" terrapod-eval
       - name: Diagnostics on failure
-        if: failure()
+        # `failure()` alone does NOT run when the job is cancelled by its own
+        # timeout-minutes — only `always()`/`cancelled()` do. A hung boot is
+        # exactly the case we most want diagnostics for, and it is the case
+        # this condition used to skip.
+        if: failure() || cancelled()
+        timeout-minutes: 3
         run: |
           ctx=$([ "${{ matrix.tool }}" = "kind" ] && echo kind-terrapod-eval || echo k3d-terrapod-eval)
           kubectl --context "$ctx" -n terrapod-eval get pods,jobs || true
           kubectl --context "$ctx" -n terrapod-eval logs deploy/terrapod-listener --tail=80 || true
           kubectl --context "$ctx" -n terrapod-eval logs -l app.kubernetes.io/name=terrapod-runner --tail=120 --prefix || true
       - name: Teardown
+        # `k3d cluster delete` has hung for 23 minutes here, consuming the rest
+        # of the job budget and turning "one step failed" into "the whole job
+        # was killed" — which is a much harder thing to read. A cluster delete
+        # that cannot finish in 3 minutes is not going to.
         if: always()
+        timeout-minutes: 3
         env:
           TERRAPOD_EVAL_TOOL: ${{ matrix.tool }}
         run: scripts/eval.sh down

@@ -14,20 +14,17 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# Build images if they don't exist
-info "Ensuring Docker images exist..."
-if ! docker image inspect terrapod-api:local > /dev/null 2>&1; then
-  info "Building terrapod-api:local..."
-  docker build -f "$REPO_ROOT/docker/Dockerfile.api" -t terrapod-api:local "$REPO_ROOT"
-fi
-if ! docker image inspect terrapod-web:local > /dev/null 2>&1; then
-  info "Building terrapod-web:local..."
-  docker build -f "$REPO_ROOT/docker/Dockerfile.web" -t terrapod-web:local "$REPO_ROOT"
-fi
-if ! docker image inspect terrapod-migrations:local > /dev/null 2>&1; then
-  info "Building terrapod-migrations:local..."
-  docker build -f "$REPO_ROOT/docker/Dockerfile.migrations" -t terrapod-migrations:local "$REPO_ROOT"
-fi
+# Always rebuild. This used to build only when the image was ABSENT, which
+# meant the suite ran against whatever `terrapod-api:local` happened to be —
+# potentially weeks old — while the specs came from the working tree. That
+# produces false failures (a spec written for a feature the image predates)
+# and, worse, false passes: a spec written to guard a regression passes
+# happily against an image built before the regression existed. Layer caching
+# makes a no-change rebuild cheap, so the guard bought very little. (#1281)
+info "Building images from the working tree..."
+docker build -f "$REPO_ROOT/docker/Dockerfile.api" -t terrapod-api:local "$REPO_ROOT"
+docker build -f "$REPO_ROOT/docker/Dockerfile.web" -t terrapod-web:local "$REPO_ROOT"
+docker build -f "$REPO_ROOT/docker/Dockerfile.migrations" -t terrapod-migrations:local "$REPO_ROOT"
 
 # Start the stack
 info "Starting E2E stack..."
