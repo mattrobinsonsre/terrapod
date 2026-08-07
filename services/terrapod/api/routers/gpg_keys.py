@@ -26,6 +26,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user
 from terrapod.api.pagination import paginate
 from terrapod.api.serialization import rfc3339
+from terrapod.auth import capabilities as cap
+from terrapod.auth.capabilities import has_capability
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services.gpg_key_service import (
@@ -34,6 +36,9 @@ from terrapod.services.gpg_key_service import (
     get_gpg_key,
     list_gpg_keys,
     revoke_gpg_key,
+)
+from terrapod.services.registry_rbac_service import (
+    resolve_registry_capabilities_for,
 )
 
 router = APIRouter(tags=["gpg-keys"])
@@ -101,6 +106,39 @@ def _gpg_key_to_jsonapi(key) -> dict:  # type: ignore[no-untyped-def]
 # --- Endpoints ---
 
 
+# The GPG key store is the trust anchor for provider signature verification:
+# `registry_provider_service._verify_and_store_shasums_signature` reads the
+# issuer key id out of a publisher's detached SHA256SUMS.sig and verifies the
+# signature against whichever registered GPGKey matches. Being able to add a
+# key therefore means being able to have Terrapod accept a signature you made;
+# being able to delete one means being able to break verification for a
+# publisher who did nothing wrong. Both are registry-administration acts, and
+# were previously gated on nothing beyond "is authenticated".
+#
+# GPGKey carries no owner or labels — it is one platform-wide list — so the
+# capability is resolved against a stable resource name with an empty label
+# set. That is deliberate rather than incidental: an empty label set matches
+# no allow_labels rule (`matches_labels` requires the key to be present on the
+# resource), so the grant paths are platform admin, or a registry role naming
+# this resource in its allow_names. An operator who runs the registry without
+# being a platform admin can be given it explicitly.
+GPG_KEY_RESOURCE = "gpg-keys"
+
+
+async def _require_gpg_key_capability(
+    db: AsyncSession,
+    user: AuthenticatedUser,
+    required_cap: str,
+) -> None:
+    """Check the required registry capability on the GPG key store or raise 403."""
+    caps = await resolve_registry_capabilities_for(db, user, GPG_KEY_RESOURCE, {}, "")
+    if not has_capability(caps, required_cap):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Requires {required_cap} capability on the GPG key store",
+        )
+
+
 @router.post("/gpg-keys")
 async def create_gpg_key_endpoint(
     body: CreateGPGKeyRequest,
@@ -108,6 +146,7 @@ async def create_gpg_key_endpoint(
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """Create a new GPG key. Parses key_id from the ASCII armor block."""
+    await _require_gpg_key_capability(db, user, cap.REGISTRY_ADMIN)
     attrs = body.data.attributes
     try:
         key = await create_gpg_key(
@@ -175,6 +214,7 @@ async def revoke_gpg_key_endpoint(
     """Revoke a registered GPG key by applying an owner-issued revocation
     certificate (#640). The key stays registered but all signature verification
     fails closed for it. 422 if the certificate is not a valid self-revocation."""
+    await _require_gpg_key_capability(db, user, cap.REGISTRY_ADMIN)
     try:
         key_uuid = uuid.UUID(key_id)
     except ValueError:
@@ -199,6 +239,7 @@ async def delete_gpg_key_endpoint(
     db: AsyncSession = Depends(get_db),
 ) -> Response:
     """Delete a GPG key."""
+    await _require_gpg_key_capability(db, user, cap.REGISTRY_ADMIN)
     try:
         key_uuid = uuid.UUID(key_id)
     except ValueError:
