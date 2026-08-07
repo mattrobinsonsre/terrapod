@@ -103,8 +103,10 @@ _CODESCAN = (
     "analysis findings in Terrapod's own source at that tag."
 )
 _PUBLISH = (
-    "Drafts are published when the patch release that fixes them ships — that "
-    "is what turns them into the operator-facing record."
+    "Those drafts stay drafts. Publishing a repository advisory is irreversible "
+    "— GitHub refuses to close a published one — so they are closed, not "
+    "published, once the patch that fixes them ships. The operator-facing "
+    "record is the release notes, which name the advisories the patch clears."
 )
 _REFS = (
     f"Policy: [docs/cve-policy.md]({_REPO_URL}/blob/main/docs/cve-policy.md). "

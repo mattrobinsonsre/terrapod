@@ -390,3 +390,52 @@ def test_advisory_never_publishes():
     assert '"published"' not in source
     assert "'published'" not in source
     assert "state=published" not in source
+
+
+def test_advisory_not_raised_for_code_findings_alone(tmp_path, monkeypatch):
+    """A code-finding count must not mint an advisory.
+
+    An advisory's payload is its `vulnerabilities` array, built from dependency
+    rows. With none, the result is a table that is a bare header and an empty
+    vulnerabilities array — an advisory that says only "look at code scanning",
+    which is where those findings already are. This is what raised the two
+    content-free drafts behind #1269.
+
+    Asserting on the token is the sharp end: the script demands ADVISORY_TOKEN
+    the moment it decides to write, so reaching the API at all would fail here.
+    """
+    monkeypatch.delenv("ADVISORY_TOKEN", raising=False)
+    _write(tmp_path, "codecount.json",
+           {"release": "v1.3.2", "code_findings": 8, "findings": []})
+    urls = tmp_path / "urls.json"
+    advisory.main.__globals__["sys"].argv = ["x", str(tmp_path), str(urls)]
+
+    assert advisory.main() == 0
+    assert json.loads(urls.read_text()) == {}
+
+
+def test_advisory_still_raised_when_a_dependency_finding_exists(tmp_path, monkeypatch):
+    """The gate is on dependency findings, not on silence. One real row still
+    raises, and the code-finding count still rides along as context."""
+    body = advisory.describe(
+        "v1.3.2",
+        [{"severity": "high", "package": "js-yaml", "installed": "4.3.0",
+          "fixed": "4.3.1", "id": "GHSA-x"}],
+        code_count=8,
+    )
+    assert "js-yaml" in body
+    assert "8 code finding(s)" in body
+
+
+def test_advisory_note_does_not_promise_publication():
+    """The note used to say the draft 'becomes the public record' when the patch
+    ships. It cannot: a published advisory is permanent and GitHub refuses to
+    close one. Two were published on that promise and are stuck. The code never
+    published — only the text said it would, which is how a wording bug becomes
+    an irreversible act performed by a human following instructions."""
+    body = advisory.describe("v1.3.2", [], code_count=0)
+    assert "becomes the public record" not in body
+    assert "irreversible" in body
+
+    report_source = pathlib.Path(report.__file__).read_text()
+    assert "Drafts are published when" not in report_source
