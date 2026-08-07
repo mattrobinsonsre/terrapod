@@ -227,9 +227,19 @@ def _run_json(
                 # only possible for legacy runs created before that fix.
                 # Hide the buttons so the UI doesn't push users into the
                 # state-upload 500 path.
+                #
+                # The auto-apply test is on the resolved MODE, not the boolean
+                # column. `create_run` sets `run.auto_apply = True` for every
+                # non-`never` mode, so keying off the boolean hid Confirm on a
+                # conditional run that had been *held* — the run sat in
+                # `planned` with a declined-reason and no consumer offered the
+                # one action that resolves it, while `confirm_run` (which only
+                # checks `status == "planned"`) would have accepted it. Only
+                # `always` genuinely needs the button hidden: such a run
+                # applies itself and never waits for a human.
                 "actions": {
                     "is-confirmable": run.status == "planned"
-                    and not run.auto_apply
+                    and run_service.resolve_auto_apply_mode(run) != "always"
                     and not run.plan_only
                     and run.has_changes is not False,
                     "is-discardable": run.status == "planned"

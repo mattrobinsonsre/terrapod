@@ -1098,6 +1098,24 @@ async def complete_plan(
     if resolve_auto_apply_mode(run) == "always" and not run.plan_only:
         run = await _auto_apply_if_permitted(db, run)
 
+    # ...and the conditional modes get a second chance here, because the
+    # plan-JSON upload is not always the last thing to happen.
+    #
+    # `evaluate_conditional_auto_apply` returns immediately unless the run
+    # is already `planned`. When a post-plan gate is outstanding — a run
+    # task stage, a mandatory OPA policy, an enforced security scan — this
+    # function leaves the run in `planning`, and the runner uploads the
+    # plan JSON *after* the plan-result POST. So on a gated workspace the
+    # upload-side evaluation always fired against a `planning` run and
+    # declined, and nothing evaluated again when the gate cleared and the
+    # reconciler re-drove us to `planned`: the run parked in `planned`
+    # forever with no error and no declined-reason. Re-running it here
+    # covers every path that reaches `planned` late. It is idempotent —
+    # the status guard makes the common (ungated) case a no-op, since the
+    # upload-side call already settled it.
+    if not run.plan_only and run.status == "planned":
+        run = await evaluate_conditional_auto_apply(db, run)
+
     # Born-superseded (planning race): a run that settled into `planned`
     # awaiting confirmation, only to find a newer full run already waiting,
     # was superseded while it planned — the queued-time supersede couldn't

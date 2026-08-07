@@ -247,11 +247,14 @@ func (r *autodiscoveryRuleResource) Schema(_ context.Context, _ resource.SchemaR
 				Computed:    true,
 				Default:     stringdefault.StaticString("2Gi"),
 			},
+			// No schema default — see the matching note on
+			// terrapod_workspace.auto_apply. The server derives this from
+			// auto_apply_mode, so a known planned `false` against an applied
+			// `true` fails the run with "inconsistent result after apply".
 			"auto_apply": schema.BoolAttribute{
-				Description: "Default auto-apply setting for created workspaces. Defaults to false.",
+				Description: "Default auto-apply setting for created workspaces. Superseded by `auto_apply_mode` when that is set.",
 				Optional:    true,
 				Computed:    true,
-				Default:     booldefault.StaticBool(false),
 				PlanModifiers: []planmodifier.Bool{
 					boolplanmodifier.UseStateForUnknown(),
 				},
@@ -574,12 +577,17 @@ func buildAutodiscoveryRuleAttrs(m *autodiscoveryRuleModel) map[string]any {
 	if !m.ResourceMemory.IsNull() && !m.ResourceMemory.IsUnknown() {
 		attrs["resource-memory"] = m.ResourceMemory.ValueString()
 	}
-	if !m.AutoApply.IsNull() && !m.AutoApply.IsUnknown() {
-		if !m.AutoApplyMode.IsNull() && !m.AutoApplyMode.IsUnknown() && m.AutoApplyMode.ValueString() != "" {
-			attrs["auto-apply-mode"] = m.AutoApplyMode.ValueString()
-		} else {
-			attrs["auto-apply"] = m.AutoApply.ValueBool()
-		}
+	// Mode first, and deliberately NOT nested inside the auto_apply guard.
+	// The two are alternatives (the API 422s if both are sent), so the mode
+	// has to be reachable whether or not the boolean happens to be known.
+	// Nesting it worked only while `auto_apply` carried a schema default
+	// that made it always known; the moment that default goes, the outer
+	// guard fails on an unconfigured boolean and the mode silently stops
+	// being sent at all.
+	if !m.AutoApplyMode.IsNull() && !m.AutoApplyMode.IsUnknown() && m.AutoApplyMode.ValueString() != "" {
+		attrs["auto-apply-mode"] = m.AutoApplyMode.ValueString()
+	} else if !m.AutoApply.IsNull() && !m.AutoApply.IsUnknown() {
+		attrs["auto-apply"] = m.AutoApply.ValueBool()
 	}
 
 	if !m.Labels.IsNull() && !m.Labels.IsUnknown() {
