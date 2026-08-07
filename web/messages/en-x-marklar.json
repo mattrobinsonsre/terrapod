@@ -67,6 +67,7 @@
       "agentPool": "Marklar Marklar",
       "none": "None",
       "autoApply": "Auto Apply",
+      "autoApplyModeHint": "never: always wait for a marklar. always: apply every successful marklar. create / create/update: apply only marklars limited to those marklars — never a marklar or a marklar.",
       "enabled": "Enabled",
       "workingDirectory": "Marklar Marklar",
       "workingDirectoryPlaceholder": "e.g. environments/dev",

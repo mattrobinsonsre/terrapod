@@ -67,6 +67,7 @@
       "agentPool": "Agenttipooli",
       "none": "Ei mitään",
       "autoApply": "Automaattinen käyttöönotto",
+      "autoApplyModeHint": "never: odota aina ihmistä. always: toteuta jokainen onnistunut suunnitelma. create / create/update: toteuta vain niihin toimiin rajoittuvat suunnitelmat — ei koskaan poistoa tai korvausta.",
       "enabled": "Käytössä",
       "workingDirectory": "Työhakemisto",
       "workingDirectoryPlaceholder": "esim. environments/dev",

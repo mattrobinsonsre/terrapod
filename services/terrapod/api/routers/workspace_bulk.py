@@ -278,6 +278,61 @@ def _validate_auto_apply(update: dict[str, Any], fields: dict[str, Any]) -> dict
     return {}
 
 
+def _validate_update_fields_for_test(update: dict) -> dict[str, Any]:
+    """The field-validation half of `_validate_update`, without the DB.
+
+    `_validate_update` is async and resolves agent pools against the database,
+    which is irrelevant to the scalar field rules — so tests drive this rather
+    than re-implementing the loop and drifting from it.
+    """
+    fields: dict[str, Any] = {}
+    for key, attr in _FIELD_MAP.items():
+        if key not in update:
+            continue
+        val = update[key]
+        if key == "auto-apply" and not isinstance(val, bool):
+            raise HTTPException(
+                status_code=422,
+                detail="auto-apply must be true or false, not a string or number",
+            )
+        fields[attr] = val
+    fields.update(_validate_auto_apply(update, fields))
+    return fields
+
+
+def _reject_auto_apply_on_apply_then_merge(fields: dict[str, Any], workspaces: list) -> None:
+    """Refuse to switch auto-apply on for an `apply_then_merge` workspace.
+
+    The single-workspace PATCH has always refused this pair: under
+    `apply_then_merge` the apply runs BEFORE the PR merges, so auto-applying
+    would apply infrastructure changes from a branch nobody has approved —
+    which is the whole thing that workflow exists to prevent. Bulk-update had
+    no such check at all, so the one path that can hit a hundred workspaces at
+    once was the one that could set it (#1301).
+
+    It cannot be checked in `_validate_update`, which validates the homogeneous
+    payload once with no workspace in hand — so it runs against the matched set
+    instead, before any mutation, and names the offenders. All-or-nothing,
+    matching the endpoint's own contract: a partial application here would be
+    worse than a refusal.
+    """
+    if not fields.get("auto_apply"):
+        return
+    offenders = [w.name for w in workspaces if getattr(w, "vcs_workflow", "") == "apply_then_merge"]
+    if not offenders:
+        return
+    shown = ", ".join(sorted(offenders)[:10])
+    more = f" (and {len(offenders) - 10} more)" if len(offenders) > 10 else ""
+    raise HTTPException(
+        status_code=422,
+        detail=(
+            "auto-apply is incompatible with the 'apply_then_merge' VCS workflow, and "
+            f"{len(offenders)} matched workspace(s) use it: {shown}{more}. "
+            "Narrow the filter, or change those workspaces' workflow first."
+        ),
+    )
+
+
 async def _validate_update(
     update: dict, db: AsyncSession, user: AuthenticatedUser
 ) -> dict[str, Any]:
@@ -304,7 +359,17 @@ async def _validate_update(
         if key == "labels":
             val = validate_labels(val)  # reserved-key chokepoint (#316) → 422
         if key == "auto-apply":
-            val = bool(val)
+            # Type-check rather than coerce (#1301). `bool("false")` is True,
+            # so a JSON string sailed through as an enable AND — since the
+            # pairing landed — wrote the string itself into a Boolean column
+            # while `auto_apply_mode` was set to "always". A caller who typed
+            # the value wrong gets told, instead of getting the opposite of
+            # what they asked for.
+            if not isinstance(val, bool):
+                raise HTTPException(
+                    status_code=422,
+                    detail="auto-apply must be true or false, not a string or number",
+                )
         if key == "var-files":
             if not isinstance(val, list):
                 raise HTTPException(status_code=422, detail="var-files must be a list")
@@ -470,6 +535,7 @@ async def bulk_update_workspaces(
     plan = await _validate_update(body.get("update", {}), db, user)
 
     workspaces = list((await db.execute(query)).scalars().all())
+    _reject_auto_apply_on_apply_then_merge(plan["fields"], workspaces)
 
     try:
         changed, unchanged = await _apply(db, workspaces, plan, user.email)

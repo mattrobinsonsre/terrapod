@@ -67,6 +67,7 @@
       "agentPool": "Agentpool",
       "none": "Ingen",
       "autoApply": "Auto-applicera",
+      "autoApplyModeHint": "never: vänta alltid på en människa. always: tillämpa varje lyckad plan. create / create/update: tillämpa endast planer begränsade till dessa åtgärder — aldrig en borttagning eller en ersättning.",
       "enabled": "Aktiverad",
       "workingDirectory": "Arbetskatalog",
       "workingDirectoryPlaceholder": "t.ex. environments/dev",

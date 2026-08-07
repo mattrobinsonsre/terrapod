@@ -67,6 +67,7 @@
       "agentPool": "Duy bIQ'a'",
       "none": "pagh",
       "autoApply": "tlhoS lo'",
+      "autoApplyModeHint": "never: reH Human loSlu''. always: Hoch nab Qapchu''bogh lo''lu''. create / create/update: neH nabmey vetlh vangmeH poHmey lo''lu'' — not QIH ''ej not chIl.",
       "enabled": "chu'lu'pu'",
       "workingDirectory": "vum tetlh",
       "workingDirectoryPlaceholder": "Da environments/dev",

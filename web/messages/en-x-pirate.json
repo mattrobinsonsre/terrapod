@@ -67,6 +67,7 @@
       "agentPool": "Agent Crew",
       "none": "None",
       "autoApply": "Auto Apply",
+      "autoApplyModeHint": "never: always await a livin'' soul. always: apply every plan that sails true. create / create/update: apply only plans holdin'' to those deeds — never a scuttlin'' nor a swappin''.",
       "enabled": "Enabled",
       "workingDirectory": "Workin'' Directory",
       "workingDirectoryPlaceholder": "e.g. environments/dev",

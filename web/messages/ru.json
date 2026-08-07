@@ -67,6 +67,7 @@
       "agentPool": "Пул агентов",
       "none": "Нет",
       "autoApply": "Автоприменение",
+      "autoApplyModeHint": "never: всегда ждать человека. always: применять каждый успешный план. create / create/update: применять только планы, ограниченные этими действиями, — никогда удаление или замену.",
       "enabled": "Включено",
       "workingDirectory": "Рабочий каталог",
       "workingDirectoryPlaceholder": "например, environments/dev",

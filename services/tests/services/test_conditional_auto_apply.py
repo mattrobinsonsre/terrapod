@@ -291,3 +291,37 @@ class TestAutoApplyGuardsAreSharedByBothEntryPoints:
             await run_service._auto_apply_if_permitted(db, run)
         discard.assert_awaited_once()
         transition.assert_not_awaited(), "a stale plan must never be applied"
+
+
+class TestCatalogWritesBothColumns:
+    """The model comment asserts the pair cannot disagree, and every other
+    write path honours it — `catalog_service` set only the boolean, on both
+    provision and reconfigure (#1301). Harmless today because
+    `resolve_auto_apply_mode` composes asymmetrically and errs towards less
+    automation either way, but it left catalog rows persistently inconsistent
+    and is a trap for anyone who later reads the column directly.
+    """
+
+    def test_the_service_never_writes_one_column_alone(self):
+        """Source-level, because the two sites are a constructor kwarg and a
+        plain attribute assignment — no single function to call. This is the
+        introspection tier the contract calls for when the invariant is 'X must
+        never happen'."""
+        import inspect
+
+        from terrapod.services import catalog_service
+
+        src = inspect.getsource(catalog_service)
+        assert src.count("auto_apply_mode") >= 2, (
+            "catalog_service must set auto_apply_mode wherever it sets auto_apply — "
+            "both the Workspace construction and the reconfigure assignment"
+        )
+
+    @pytest.mark.parametrize(("auto_apply", "expected"), [(True, "always"), (False, "never")])
+    def test_the_pair_the_catalog_writes_round_trips(self, auto_apply, expected):
+        """Whatever the catalog writes must resolve back to the same intent —
+        the catalog offers no conditional modes, so the pair is always one of
+        the two flat ones."""
+        mode = "always" if auto_apply else "never"
+        obj = SimpleNamespace(auto_apply=auto_apply, auto_apply_mode=mode)
+        assert resolve_auto_apply_mode(obj) == expected

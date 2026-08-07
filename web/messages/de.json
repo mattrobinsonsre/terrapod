@@ -67,6 +67,7 @@
       "agentPool": "Agent-Pool",
       "none": "Keiner",
       "autoApply": "Automatisch anwenden",
+      "autoApplyModeHint": "never: immer auf einen Menschen warten. always: jeden erfolgreichen Plan anwenden. create / create/update: nur Pläne anwenden, die auf diese Aktionen beschränkt sind — niemals ein Löschen oder Ersetzen.",
       "enabled": "Aktiviert",
       "workingDirectory": "Arbeitsverzeichnis",
       "workingDirectoryPlaceholder": "z. B. environments/dev",

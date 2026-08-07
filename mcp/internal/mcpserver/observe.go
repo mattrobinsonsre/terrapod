@@ -111,6 +111,13 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 		// Which agent pool actually ran it (#1231) — on a multi-pool
 		// workspace this is the only place the answer is visible.
 		AgentPoolID string `json:"agent_pool_id,omitempty"`
+		// Conditional auto-apply (#1274/#1301). A run held back by its mode
+		// sits at `planned` looking exactly like one awaiting a human — the
+		// reason is the only thing that distinguishes them, and held runs are
+		// the interesting case when listing. Without these an agent has to
+		// fetch every run individually to find out which need attention.
+		AutoApplyMode           string `json:"auto_apply_mode,omitempty"`
+		AutoApplyDeclinedReason string `json:"auto_apply_declined_reason,omitempty"`
 	}
 	type runListOut struct {
 		Count int          `json:"count"`
@@ -118,7 +125,7 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "terrapod_run_list",
-		Description: "List recent runs for a workspace (newest first) with status, whether each is plan-only/destroy, and whether the plan had changes.",
+		Description: "List recent runs for a workspace (newest first) with status, whether each is plan-only/destroy, whether the plan had changes, and — for conditional auto-apply — the run's mode and why it was held. A run showing auto_apply_declined_reason reached `planned` and stopped because its plan contained something its mode does not auto-apply (a destroy or replace, or an in-place update under `create`); it is waiting for a human to confirm or discard.",
 		Annotations: readOnly,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in runListIn) (*mcp.CallToolResult, runListOut, error) {
 		if in.WorkspaceID == "" {
@@ -138,7 +145,9 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 			out.Runs = append(out.Runs, runSummary{
 				ID: r.ID, Status: r.Status, PlanOnly: r.PlanOnly, IsDestroy: r.IsDestroy,
 				HasChanges: r.HasChanges, Source: r.Source, CreatedAt: r.CreatedAt,
-				AgentPoolID: r.AgentPoolID,
+				AgentPoolID:             r.AgentPoolID,
+				AutoApplyMode:           r.AutoApplyMode,
+				AutoApplyDeclinedReason: r.AutoApplyDeclinedReason,
 			})
 		}
 		return nil, out, nil

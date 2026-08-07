@@ -78,6 +78,7 @@ function WorkspacesPageInner() {
   const searchParams = useSearchParams()
   const t = useTranslations('workspaces')
   const ts = useTranslations('status')
+  const tMode = useTranslations('common.autoApplyMode')
   const fmt = useFormat()
   // Translate a filter-suggestion's category hint (its stable English key stays
   // the internal value; only the displayed label is localized).
@@ -219,7 +220,10 @@ function WorkspacesPageInner() {
   const [showCreate, setShowCreate] = useState(false)
   const [newName, setNewName] = useState('')
   const [newExecMode, setNewExecMode] = useState('local')
-  const [newAutoApply, setNewAutoApply] = useState(false)
+  // The mode, not the boolean (#1301). The API accepts `auto-apply-mode` on
+  // POST, but this form only ever sent `auto-apply` — so a conditional mode
+  // could only be reached by creating the workspace and then editing it.
+  const [newAutoApplyMode, setNewAutoApplyMode] = useState('never')
   const [newBackend, setNewBackend] = useState('tofu')
   const [newVersion, setNewVersion] = useState('1.11')
   const [newCpu, setNewCpu] = useState('1')
@@ -487,7 +491,10 @@ function WorkspacesPageInner() {
               'execution-mode': newExecMode,
               'execution-backend': newBackend,
               'terraform-version': newVersion,
-              'auto-apply': newAutoApply,
+              // Send the mode alone. The API derives `auto-apply` from it and
+              // rejects both keys in one request, so sending the pair would be
+              // a 422.
+              'auto-apply-mode': newAutoApplyMode,
               'resource-cpu': newCpu,
               'resource-memory': newMemory,
               'working-directory': newWorkingDir,
@@ -513,7 +520,7 @@ function WorkspacesPageInner() {
       setNewExecMode('local')
       setNewBackend('tofu')
       setNewVersion('1.11')
-      setNewAutoApply(false)
+      setNewAutoApplyMode('never')
       setNewCpu('1')
       setNewMemory('2Gi')
       setNewWorkingDir('')
@@ -657,16 +664,19 @@ function WorkspacesPageInner() {
               </div>
               )}
               <div>
-                <span className="block text-sm font-medium text-slate-300 mb-1">{t('form.autoApply')}</span>
-                <label className="flex items-center gap-2 h-[42px] px-3 cursor-pointer border border-slate-600 rounded-lg bg-slate-700">
-                  <input
-                    type="checkbox"
-                    checked={newAutoApply}
-                    onChange={(e) => setNewAutoApply(e.target.checked)}
-                    className="rounded border-slate-600 bg-slate-700 text-brand-600 focus:ring-brand-500"
-                  />
-                  <span className="text-sm text-slate-300">{t('form.enabled')}</span>
-                </label>
+                <label htmlFor="ws-auto-apply-mode" className="block text-sm font-medium text-slate-300 mb-1">{t('form.autoApply')}</label>
+                <select
+                  id="ws-auto-apply-mode"
+                  value={newAutoApplyMode}
+                  onChange={(e) => setNewAutoApplyMode(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                >
+                  <option value="never">{tMode('never')}</option>
+                  <option value="always">{tMode('always')}</option>
+                  <option value="create">{tMode('create')}</option>
+                  <option value="create_update">{tMode('createUpdate')}</option>
+                </select>
+                <p className="mt-1 text-xs text-slate-500">{t('form.autoApplyModeHint')}</p>
               </div>
               <div>
                 <label htmlFor="ws-workdir" className="block text-sm font-medium text-slate-300 mb-1">{t('form.workingDirectory')}</label>

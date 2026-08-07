@@ -67,6 +67,7 @@
       "agentPool": "에이전트 풀",
       "none": "없음",
       "autoApply": "자동 적용",
+      "autoApplyModeHint": "never: 항상 사람의 확인을 기다립니다. always: 성공한 모든 플랜을 적용합니다. create / create/update: 해당 작업으로만 이루어진 플랜만 적용하며, 삭제나 교체는 절대 적용하지 않습니다.",
       "enabled": "사용",
       "workingDirectory": "작업 디렉터리",
       "workingDirectoryPlaceholder": "예: environments/dev",

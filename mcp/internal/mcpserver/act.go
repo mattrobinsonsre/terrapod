@@ -32,7 +32,7 @@ func registerAct(s *mcp.Server, c *terrapod.Client) {
 		PlanOnly  *bool  `json:"plan_only,omitempty" jsonschema:"plan only, no apply (default true — the safe choice)"`
 		IsDestroy bool   `json:"is_destroy,omitempty" jsonschema:"plan a destroy (tear-down) run"`
 		Message   string `json:"message,omitempty" jsonschema:"an optional human message describing why"`
-		AutoApply *bool  `json:"auto_apply,omitempty" jsonschema:"auto-apply on success (default: the workspace setting)"`
+		AutoApply *bool  `json:"auto_apply,omitempty" jsonschema:"auto-apply on success. Omit to use the workspace setting. Passing true does NOT mean 'use the workspace setting' — on a workspace configured with a conditional mode (create / create_update) an explicit true maps the run to 'always', applying it past a guardrail the operator set, including a plan containing destroys. Only pass it when you intend that for this one run."`
 		Refresh   *bool  `json:"refresh,omitempty" jsonschema:"refresh state before planning (default true)"`
 	}
 	mcp.AddTool(s, &mcp.Tool{

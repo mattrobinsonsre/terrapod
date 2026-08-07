@@ -67,6 +67,7 @@
       "agentPool": "Grupo de agentes",
       "none": "Ninguno",
       "autoApply": "Aplicación automática",
+      "autoApplyModeHint": "never: esperar siempre a una persona. always: aplicar todos los planes correctos. create / create/update: aplicar solo los planes limitados a esas acciones — nunca una destrucción ni un reemplazo.",
       "enabled": "Habilitado",
       "workingDirectory": "Directorio de trabajo",
       "workingDirectoryPlaceholder": "p. ej. environments/dev",

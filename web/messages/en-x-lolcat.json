@@ -67,6 +67,7 @@
       "agentPool": "Agent Pool",
       "none": "Noes",
       "autoApply": "Auto Apploy",
+      "autoApplyModeHint": "never: alwayz waits for a hooman. always: applyz every gud plan. create / create/update: onlee applyz planz wif just dose akshuns — NEVAR a destroy or a replace. srsly.",
       "enabled": "Enabuld",
       "workingDirectory": "Werkin Direktoree",
       "workingDirectoryPlaceholder": "e.g. environments/dev",
