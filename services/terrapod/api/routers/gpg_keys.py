@@ -115,14 +115,18 @@ def _gpg_key_to_jsonapi(key) -> dict:  # type: ignore[no-untyped-def]
 # publisher who did nothing wrong. Both are registry-administration acts, and
 # were previously gated on nothing beyond "is authenticated".
 #
-# GPGKey carries no owner or labels — it is one platform-wide list — so the
-# capability is resolved against a stable resource name with an empty label
-# set. That is deliberate rather than incidental: an empty label set matches
-# no allow_labels rule (`matches_labels` requires the key to be present on the
-# resource), so the grant paths are platform admin, or a registry role naming
-# this resource in its allow_names. An operator who runs the registry without
-# being a platform admin can be given it explicitly.
-GPG_KEY_RESOURCE = "gpg-keys"
+# GPGKey carries no owner and no labels — it is one platform-wide list, not a
+# per-resource thing — so there is nothing to scope the capability against and
+# no name is invented for it. The empty resource means only the unscoped grants
+# resolve: platform admin (and audit's read floor). A role's allow_labels
+# cannot match, because `matches_labels` requires the label key to be present
+# on the resource.
+#
+# An earlier version of this passed the literal "gpg-keys" as a resource name
+# so a registry role could name it in allow_names. That put a magic string into
+# the same namespace as real provider names (`_require_provider_capability`
+# passes `provider.name`), so a provider called "gpg-keys" would have collided
+# with the trust-anchor store in both directions. Not worth the flexibility.
 
 
 async def _require_gpg_key_capability(
@@ -131,7 +135,7 @@ async def _require_gpg_key_capability(
     required_cap: str,
 ) -> None:
     """Check the required registry capability on the GPG key store or raise 403."""
-    caps = await resolve_registry_capabilities_for(db, user, GPG_KEY_RESOURCE, {}, "")
+    caps = await resolve_registry_capabilities_for(db, user, "", {}, "")
     if not has_capability(caps, required_cap):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
