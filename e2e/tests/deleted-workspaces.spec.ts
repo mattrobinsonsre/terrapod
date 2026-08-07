@@ -5,8 +5,10 @@ import {
   seedStateVersionWithContent,
   uniqueName,
 } from '../helpers/api';
+import path from 'path';
 
 const API_URL = process.env.API_URL || 'http://localhost:8000';
+const USER_AUTH = path.join(__dirname, '..', '.auth', 'user.json');
 
 /**
  * Undelete surface (#1253).
@@ -104,15 +106,45 @@ test.describe('Deleted workspaces (undelete)', () => {
     await expect(page.locator(`tr:has-text("${name}")`).first()).toBeVisible();
   });
 
-  test('a non-admin cannot reach the undelete surface', async ({ browser }) => {
-    // Reads are admin-only too: a marker names a workspace and its variable
-    // names, and a restore materialises its state — and so its secrets.
+  test('an anonymous caller cannot reach the undelete surface', async ({ browser }) => {
     const ctx = await browser.newContext({ storageState: undefined });
     const page = await ctx.newPage();
     const res = await page.request.get(
       `${API_URL}/api/terrapod/v1/deleted-workspaces`,
     );
     expect([401, 403]).toContain(res.status());
+    await ctx.close();
+  });
+
+  test('an authenticated non-admin cannot reach the undelete surface', async ({ browser }) => {
+    // This is the test that matters, and it was missing (#1297). The
+    // anonymous case above passes on 401 alone, so it would still be green if
+    // `require_admin` were downgraded to `get_current_user` — the exact
+    // regression that would expose every marker to every logged-in user.
+    //
+    // Reads are admin-only for the same reason writes are: a marker names a
+    // workspace, its labels and its variable names, and a restore
+    // materialises its state — and therefore its secrets — into a workspace
+    // the caller can then read. The original's ACL died with its rows, so
+    // there is nothing to delegate to.
+    const ctx = await browser.newContext({ storageState: USER_AUTH });
+    const page = await ctx.newPage();
+
+    for (const path of [
+      '/api/terrapod/v1/deleted-workspaces',
+      '/api/terrapod/v1/deleted-workspaces/00000000-0000-4000-8000-000000000000',
+    ]) {
+      const res = await page.request.get(`${API_URL}${path}`);
+      expect(res.status(), `${path} must be forbidden for a non-admin`).toBe(403);
+    }
+
+    // ...and the restore itself, which is the one that would materialise
+    // somebody else's secrets.
+    const restore = await page.request.post(
+      `${API_URL}/api/terrapod/v1/deleted-workspaces/00000000-0000-4000-8000-000000000000/restore`,
+    );
+    expect(restore.status()).toBe(403);
+
     await ctx.close();
   });
 });

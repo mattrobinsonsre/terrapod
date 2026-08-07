@@ -1401,3 +1401,158 @@ class TestListWorkspacesSeeAllFastPath:
         body = resp.json()
         assert len(body["data"]) == 3
         assert body["meta"]["pagination"]["total-count"] == 3
+
+
+class TestAutoApplyModeOnTheWorkspaceEndpoints:
+    """The single-workspace create/update paths for `auto-apply-mode` (#1274).
+
+    `test_auto_apply_mode_admin.py` opens by saying the two admin write paths
+    get their own tests "rather than riding on the single-workspace ones" —
+    and the single-workspace ones did not exist. That absence concealed a live
+    guard bypass, fixed under #1294 (#1297).
+
+    The pair of columns is the thing under test: `auto_apply_mode` carries the
+    intent and `auto_apply` is its boolean projection, and every path that
+    writes one must write the other, or a replica reading the projection
+    across a rolling upgrade sees a different answer from the one configured.
+    """
+
+    @staticmethod
+    def _created(mock_db):
+        """The Workspace handed to db.add() by the create path."""
+        assert mock_db.add.call_count == 1
+        return mock_db.add.call_args.args[0]
+
+    async def _create(self, attrs):
+        user = _user(roles=["admin"])
+        app, mock_db = _make_app(user)
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None
+        mock_db.execute.return_value = mock_result
+        mock_db.refresh = AsyncMock()
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/v2/organizations/default/workspaces",
+                json={"data": {"type": "workspaces", "attributes": {"name": "m", **attrs}}},
+                headers=_AUTH,
+            )
+        return resp, mock_db
+
+    async def _patch(self, attrs, ws=None):
+        ws = ws or _mock_workspace()
+        app, mock_db = _make_app(_user(roles=["admin"]))
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = ws
+        mock_db.execute.return_value = mock_result
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                f"/api/v2/workspaces/ws-{ws.id}",
+                json={"data": {"attributes": attrs}},
+                headers=_AUTH,
+            )
+        return resp, ws
+
+    # ── create ────────────────────────────────────────────────────────
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.redis.client.publish_workspace_event", new_callable=AsyncMock)
+    async def test_create_with_a_mode_writes_both_columns(self, *mocks):
+        resp, mock_db = await self._create({"auto-apply-mode": "create"})
+        assert resp.status_code == 201, resp.text
+        ws = self._created(mock_db)
+        assert ws.auto_apply_mode == "create"
+        assert ws.auto_apply is True
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.redis.client.publish_workspace_event", new_callable=AsyncMock)
+    async def test_create_with_never_clears_the_boolean(self, *mocks):
+        resp, mock_db = await self._create({"auto-apply-mode": "never"})
+        assert resp.status_code == 201, resp.text
+        ws = self._created(mock_db)
+        assert ws.auto_apply_mode == "never"
+        assert ws.auto_apply is False
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.redis.client.publish_workspace_event", new_callable=AsyncMock)
+    async def test_create_with_only_the_legacy_boolean_still_works(self, *mocks):
+        """An un-upgraded client sends the boolean alone and must be unaffected."""
+        resp, mock_db = await self._create({"auto-apply": True})
+        assert resp.status_code == 201, resp.text
+        ws = self._created(mock_db)
+        assert ws.auto_apply_mode == "always"
+        assert ws.auto_apply is True
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_create_rejects_both_at_once(self, *mocks):
+        """Two sources of truth in one request is ambiguous, not resolvable —
+        so it is refused rather than silently ranked."""
+        resp, _ = await self._create({"auto-apply": True, "auto-apply-mode": "create"})
+        assert resp.status_code == 422
+        assert "not both" in resp.text
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_create_rejects_an_unknown_mode(self, *mocks):
+        resp, _ = await self._create({"auto-apply-mode": "whenever-you-like"})
+        assert resp.status_code == 422
+        # The message enumerates the real set, so the caller can fix it.
+        assert "create_update" in resp.text
+
+    # ── update ────────────────────────────────────────────────────────
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_capabilities_for")
+    async def test_patching_a_mode_writes_both_columns(self, mock_resolve, *mocks):
+        mock_resolve.return_value = caps_for_level("admin")
+        resp, ws = await self._patch({"auto-apply-mode": "create_update"})
+        assert resp.status_code == 200, resp.text
+        assert ws.auto_apply_mode == "create_update"
+        assert ws.auto_apply is True
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_capabilities_for")
+    async def test_patching_the_boolean_off_clears_the_mode(self, mock_resolve, *mocks):
+        """The consistency has to hold in BOTH directions. An old client turning
+        auto-apply off must not leave a conditional mode behind that a newer
+        replica would still act on."""
+        mock_resolve.return_value = caps_for_level("admin")
+        ws = _mock_workspace()
+        ws.auto_apply, ws.auto_apply_mode = True, "create"
+        resp, ws = await self._patch({"auto-apply": False}, ws=ws)
+        assert resp.status_code == 200, resp.text
+        assert ws.auto_apply is False
+        assert ws.auto_apply_mode == "never"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_capabilities_for")
+    async def test_patch_rejects_both_at_once(self, mock_resolve, *mocks):
+        mock_resolve.return_value = caps_for_level("admin")
+        resp, _ = await self._patch({"auto-apply": True, "auto-apply-mode": "never"})
+        assert resp.status_code == 422
+        assert "not both" in resp.text
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_capabilities_for")
+    async def test_patch_rejects_an_unknown_mode(self, mock_resolve, *mocks):
+        mock_resolve.return_value = caps_for_level("admin")
+        resp, ws = await self._patch({"auto-apply-mode": "sometimes"})
+        assert resp.status_code == 422
+        # ...and leaves the workspace exactly as it was.
+        assert ws.auto_apply_mode != "sometimes"

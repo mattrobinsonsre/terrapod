@@ -369,3 +369,110 @@ class TestAutodiscoverBaselineSha:
             foc.return_value = (MagicMock(), True)
             await autodiscover_for_paths(db, [rule], ["accounts/a/network/main.tf"])
         assert foc.await_args.kwargs["baseline_sha"] is None
+
+
+def _materialise_rule(**overrides):
+    """A rule with every field materialisation reads, as real values.
+
+    MagicMock defaults would let a missing assignment pass silently — the
+    Workspace would carry a mock rather than the rule's value, and nothing
+    would notice until an operator looked at the workspace.
+    """
+    r = _rule()
+    defaults = {
+        "execution_mode": "agent",
+        "execution_backend": "tofu",
+        "terraform_version": "1.12",
+        "resource_cpu": "1",
+        "resource_memory": "2Gi",
+        "auto_apply": True,
+        "auto_apply_mode": "create_update",
+        "owner_email": "platform@example.com",
+        "var_files": [],
+        "vcs_connection_id": uuid.uuid4(),
+        "repo_url": "https://example.invalid/org/repo",
+        "branch": "main",
+        "labels": {},
+        "run_task_templates": [],
+        "notification_templates": [],
+        "execution_hook_ids": [],
+        "agent_pool_id": None,
+        "terragrunt_enabled": False,
+        "terragrunt_version": "1.0",
+        "drift_detection_enabled": False,
+        "drift_detection_interval_seconds": 300,
+        "on_directory_delete": "flag",
+    }
+    for k, v in {**defaults, **overrides}.items():
+        setattr(r, k, v)
+    return r
+
+
+def _autocreate_db() -> AsyncMock:
+    """A session where neither the directory nor the name is taken, so
+    `find_or_autocreate_workspace` takes the create branch."""
+    db = AsyncMock()
+    empty = MagicMock()
+    empty.all = MagicMock(return_value=[])
+    empty.scalar_one_or_none = MagicMock(return_value=None)
+    db.execute = AsyncMock(return_value=empty)
+    db.add = MagicMock()
+    return db
+
+
+class TestMaterialisationInheritsTheRule:
+    """The read half of the autodiscovery template.
+
+    `test_auto_apply_mode_admin.py` covers the *write* half — the rule's two
+    columns staying consistent — but nothing asserted the workspace actually
+    inherits the mode when the rule materialises one. Carrying only the
+    boolean would silently turn a `create_update` rule into `always` on every
+    workspace it creates: the operator configured "apply additions and updates
+    only" and gets "apply anything", including destroys (#1297).
+    """
+
+    @pytest.mark.asyncio
+    async def test_the_conditional_mode_is_carried_across(self):
+        from terrapod.services.workspace_autodiscovery_service import (
+            find_or_autocreate_workspace,
+        )
+
+        rule = _materialise_rule(auto_apply=True, auto_apply_mode="create_update")
+        db = _autocreate_db()
+
+        ws, created = await find_or_autocreate_workspace(db, rule, "accounts/prod/vpc")
+
+        assert created is True
+        assert ws.auto_apply_mode == "create_update"
+        assert ws.auto_apply is True
+
+    @pytest.mark.asyncio
+    async def test_a_never_rule_materialises_a_never_workspace(self):
+        from terrapod.services.workspace_autodiscovery_service import (
+            find_or_autocreate_workspace,
+        )
+
+        rule = _materialise_rule(auto_apply=False, auto_apply_mode="never")
+        db = _autocreate_db()
+
+        ws, _ = await find_or_autocreate_workspace(db, rule, "accounts/dev/vpc")
+
+        assert ws.auto_apply_mode == "never"
+        assert ws.auto_apply is False
+
+    @pytest.mark.asyncio
+    async def test_a_legacy_rule_without_the_column_defaults_to_never(self):
+        """A rule row written before the column existed reads as absent. The
+        safe reading is `never` — inventing `always` from a missing field
+        would auto-apply workspaces nobody configured to."""
+        from terrapod.services.workspace_autodiscovery_service import (
+            find_or_autocreate_workspace,
+        )
+
+        rule = _materialise_rule(auto_apply=False)
+        del rule.auto_apply_mode
+        db = _autocreate_db()
+
+        ws, _ = await find_or_autocreate_workspace(db, rule, "accounts/legacy/vpc")
+
+        assert ws.auto_apply_mode == "never"

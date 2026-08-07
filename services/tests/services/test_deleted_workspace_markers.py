@@ -14,11 +14,10 @@ that follow from that and are easy to regress:
 
 from __future__ import annotations
 
+import contextlib
 import json
 from datetime import UTC, datetime, timedelta
-from unittest.mock import AsyncMock, MagicMock
-
-import pytest
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from terrapod.services import deleted_workspace_service as dws
 from terrapod.services.artifact_retention_service import _cleanup_deleted_workspaces
@@ -222,14 +221,115 @@ class TestMarkerContents:
         assert "labels" in snap and "owner_email" in snap
 
 
-@pytest.mark.parametrize("days", [0])
-async def test_zero_retention_disables_the_category(days):
-    """`0 = disabled` is the convention every other retention category follows;
-    the dispatch loop skips on threshold 0, so an operator opting out keeps
-    deleted state forever rather than losing it immediately."""
-    from terrapod.config import settings
+@contextlib.asynccontextmanager
+async def _fake_db_session():
+    """The cycle opens a session per category; none of these tests touch the
+    database, so a stub keeps the run about dispatch rather than about
+    connectivity."""
+    yield AsyncMock()
 
-    assert settings.artifact_retention.deleted_workspace_retention_days >= 0
+
+async def test_zero_retention_never_reaches_the_reaper():
+    """`0 = disabled` is the convention every other retention category
+    follows, and the direction matters more than the convention: an operator
+    opting out must keep deleted state **forever**, not lose it immediately.
+
+    It is enforced by the dispatch loop, not by the handler — pass 0 straight
+    to `_cleanup_deleted_workspaces` and it happily reaps everything, because
+    every marker is older than a zero-day window. So this drives the cycle and
+    asserts the handler is never reached at all.
+
+    (Replaces a test that asserted the configured value was `>= 0`, which is
+    true of every possible configuration including the broken one — #1297.)
+    """
+    from terrapod.config import settings
+    from terrapod.services import artifact_retention_service as ars
+
+    original = settings.artifact_retention.deleted_workspace_retention_days
+    settings.artifact_retention.deleted_workspace_retention_days = 0
+    called = False
+
+    async def _spy(*a, **kw):
+        nonlocal called
+        called = True
+        return 0
+
+    try:
+        with (
+            patch.object(ars, "_cleanup_deleted_workspaces", _spy),
+            patch("terrapod.storage.get_storage", return_value=FakeStore()),
+            patch("terrapod.db.session.get_db_session", _fake_db_session),
+        ):
+            await ars.artifact_retention_cycle()
+    finally:
+        settings.artifact_retention.deleted_workspace_retention_days = original
+
+    assert not called, "a zero window must disable the category, not expire everything in it"
+
+
+async def test_a_positive_retention_does_reach_the_reaper():
+    """Pins the contrast, so the test above cannot pass merely because the
+    category has been unregistered or the cycle is broken outright."""
+    from terrapod.config import settings
+    from terrapod.services import artifact_retention_service as ars
+
+    original = settings.artifact_retention.deleted_workspace_retention_days
+    settings.artifact_retention.deleted_workspace_retention_days = 30
+    called = False
+
+    async def _spy(*a, **kw):
+        nonlocal called
+        called = True
+        return 0
+
+    try:
+        with (
+            patch.object(ars, "_cleanup_deleted_workspaces", _spy),
+            patch("terrapod.storage.get_storage", return_value=FakeStore()),
+            patch("terrapod.db.session.get_db_session", _fake_db_session),
+        ):
+            await ars.artifact_retention_cycle()
+    finally:
+        settings.artifact_retention.deleted_workspace_retention_days = original
+
+    assert called
+
+
+class TestMarkerWriteNeverFailsTheDelete:
+    """`write_marker_best_effort` exists for exactly one reason: the delete has
+    already committed by the time it runs. Raising would return a 500 for a
+    workspace that IS gone — the operator retries, gets a 404, and is left
+    believing the delete failed (#1297). Only the happy path was exercised.
+    """
+
+    async def test_a_storage_failure_is_swallowed(self):
+        storage = MagicMock()
+        storage.put = AsyncMock(side_effect=RuntimeError("bucket unreachable"))
+        with patch.object(dws, "get_storage", return_value=storage):
+            await dws.write_marker_best_effort(WS_A, {"workspace_id": WS_A})
+
+    async def test_an_unresolvable_store_is_swallowed_too(self):
+        """Resolving the store is inside the guard, not before it: an
+        unconfigured or unavailable backend must degrade to "no marker" — the
+        reaper stamps one on a later cycle — never to a failed delete."""
+        with patch.object(dws, "get_storage", side_effect=RuntimeError("no storage configured")):
+            await dws.write_marker_best_effort(WS_A, {"workspace_id": WS_A})
+
+    async def test_an_unserialisable_body_is_swallowed(self):
+        """The failure need not come from the network. A body carrying
+        something json cannot encode still must not sink the delete."""
+        storage = MagicMock()
+        storage.put = AsyncMock()
+        with patch.object(dws, "get_storage", return_value=storage):
+            await dws.write_marker_best_effort(WS_A, {"bad": object()})
+
+    async def test_the_happy_path_still_writes_the_marker(self):
+        """Swallowing everything is only correct if the normal case works —
+        otherwise the guard would hide a permanently broken writer."""
+        store = FakeStore()
+        with patch.object(dws, "get_storage", return_value=store):
+            await dws.write_marker_best_effort(WS_A, {"workspace_id": WS_A})
+        assert deleted_workspace_marker_key(WS_A) in store.objects
 
 
 class TestReapIsObservable:

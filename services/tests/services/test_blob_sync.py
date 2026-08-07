@@ -353,6 +353,24 @@ class TestOwningClassResolvesOverlaps:
         assert blob_classes.owning_class("state/index.yaml").name == "state_index"
         assert blob_classes.owning_class("state/ws-1/sv-1.tfstate").name == "state"
 
+    def test_delete_markers_are_their_own_class_not_state(self):
+        """`state/deleted/` sits under `state/` too, and the whole reason it is
+        a separate class is that `state` is `encrypted_at_rest` — which
+        replication declines wholesale when app-layer encryption is on. If
+        ownership resolved to `state`, an encrypted deployment's standby would
+        carry no undelete index at all: precisely what the flat prefix exists
+        to prevent, and invisible until somebody needed to restore (#1297).
+        """
+        marker = "state/deleted/0192f3a1-0000-7000-8000-00000000000a.json"
+        owner = blob_classes.owning_class(marker)
+        assert owner is not None
+        assert owner.name == "deleted_workspace_markers"
+        assert not owner.encrypted_at_rest
+
+        # ...and a real state object under the same root still resolves to
+        # `state`, so the narrower prefix has not swallowed its neighbour.
+        assert blob_classes.owning_class("state/0192f3a1/sv-1.tfstate").name == "state"
+
     def test_an_unregistered_key_belongs_to_nothing(self):
         assert blob_classes.owning_class("nowhere/x") is None
 

@@ -35,6 +35,8 @@ def _mock_run(
     auto_apply=False,
     plan_only=False,
     message="",
+    pool_id=None,
+    pool_extra_ids=None,
 ):
     run = MagicMock()
     run.id = run_id or uuid.uuid4()
@@ -102,6 +104,13 @@ def _mock_run(
     run.runner_exit_code = None
     run.runner_exit_reason = ""
     run.runner_exit_status = ""
+    # #1231/#960: the executing pool and the candidate set. Left unset these
+    # serialise from a MagicMock, so `agent-pool-id` came out as a repr of a
+    # mock rather than `apool-<uuid>` and nothing noticed — while the UI's
+    # pool link is built from exactly that prefix (#1297). None is the honest
+    # default: a run on a local-execution workspace has no pool.
+    run.pool_id = pool_id
+    run.pool_extra_ids = list(pool_extra_ids or [])
     return run
 
 
@@ -1807,3 +1816,84 @@ class TestHeldConditionalRunIsActionable:
             resp = await c.get(f"/api/v2/runs/run-{run.id}", headers=_AUTH)
 
         assert resp.json()["data"]["attributes"]["actions"]["is-confirmable"] is False
+
+
+class TestExecutingPoolSerialisation:
+    """#1231 exposes the pool that ran a run, and the UI builds its pool link
+    from the `apool-` prefix. `_mock_run` never set `pool_id`, so every test in
+    this file serialised it from a MagicMock — a repr, not an id — and nothing
+    noticed (#1297)."""
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
+    @patch("terrapod.api.routers.runs.run_service.get_run")
+    async def test_the_executing_pool_is_a_prefixed_id(self, mock_get_run, mock_resolve, *mocks):
+        mock_resolve.return_value = caps_for_level("read")
+        pool_id = uuid.uuid4()
+        run = _mock_run(status="applied", pool_id=pool_id)
+        mock_get_run.return_value = run
+
+        ws = _mock_workspace(ws_id=run.workspace_id)
+        app, mock_db = _make_app(_user())
+        mock_db.get.return_value = ws
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get(f"/api/v2/runs/run-{run.id}", headers=_AUTH)
+
+        body = resp.json()["data"]
+        assert body["attributes"]["agent-pool-id"] == f"apool-{pool_id}"
+        assert body["attributes"]["candidate-agent-pool-ids"] == [f"apool-{pool_id}"]
+        # The relationship is the canonical link form; the attribute above is
+        # the back-compat projection of it (#1063).
+        assert body["relationships"]["agent-pool"]["data"]["id"] == f"apool-{pool_id}"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
+    @patch("terrapod.api.routers.runs.run_service.get_run")
+    async def test_a_run_with_no_pool_serialises_null_not_a_repr(
+        self, mock_get_run, mock_resolve, *mocks
+    ):
+        """A local-execution run genuinely has no pool. `null` says that;
+        `apool-<MagicMock id=...>` says something the UI would try to link to."""
+        mock_resolve.return_value = caps_for_level("read")
+        run = _mock_run(status="applied")
+        mock_get_run.return_value = run
+
+        ws = _mock_workspace(ws_id=run.workspace_id)
+        app, mock_db = _make_app(_user())
+        mock_db.get.return_value = ws
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get(f"/api/v2/runs/run-{run.id}", headers=_AUTH)
+
+        body = resp.json()["data"]
+        assert body["attributes"]["agent-pool-id"] is None
+        assert body["attributes"]["candidate-agent-pool-ids"] == []
+        assert body["relationships"]["agent-pool"]["data"] is None
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
+    @patch("terrapod.api.routers.runs.run_service.get_run")
+    async def test_the_candidate_set_carries_every_pool(self, mock_get_run, mock_resolve, *mocks):
+        """A multi-pool run (#960) shows where it ran AND where it could have."""
+        mock_resolve.return_value = caps_for_level("read")
+        primary, fallback = uuid.uuid4(), uuid.uuid4()
+        run = _mock_run(status="applied", pool_id=primary, pool_extra_ids=[str(fallback)])
+        mock_get_run.return_value = run
+
+        ws = _mock_workspace(ws_id=run.workspace_id)
+        app, mock_db = _make_app(_user())
+        mock_db.get.return_value = ws
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get(f"/api/v2/runs/run-{run.id}", headers=_AUTH)
+
+        attrs = resp.json()["data"]["attributes"]
+        assert attrs["agent-pool-id"] == f"apool-{primary}"
+        assert set(attrs["candidate-agent-pool-ids"]) == {f"apool-{primary}", f"apool-{fallback}"}
