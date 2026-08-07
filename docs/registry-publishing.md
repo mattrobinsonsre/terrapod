@@ -64,6 +64,27 @@ The server verifies provider signatures against keys you register ahead
 of time. Register the **public** half of the key `terrapod-publish` will
 sign with.
 
+> **Registering a key requires registry admin — this changed in v1.4.0.**
+> Before v1.4.0 any authenticated account could register a signing key.
+> That was a hole: a key is a *trust anchor*, so anyone who could add one
+> could make a provider of their choosing installable by every runner on
+> the instance. Create, revoke and delete now require `registry:admin`;
+> reading keys is still open to any authenticated caller, because the
+> reads return public key material that `terraform init` already sees.
+>
+> **If you publish with a service token, this step now needs a token
+> whose role grants registry admin**, or it will fail with `403 Requires
+> registry:admin capability on the GPG key store` — including on the next
+> `terraform apply` of an existing `terrapod_gpg_key` resource. Grant it
+> by giving the role `registry_permission = "admin"` **without**
+> `allow_names` or `allow_labels`: a role scoped to a subset of the
+> registry deliberately cannot register a key, because a key is not
+> scoped to a subset. Platform admins are unaffected.
+>
+> The rest of publishing — uploading versions, shasums and binaries —
+> still needs only `registry:write`, so a narrow publishing token remains
+> the right thing for CI. Registering the key is a one-off setup step.
+
 Declaratively (recommended), in your platform-config repo:
 
 ```hcl

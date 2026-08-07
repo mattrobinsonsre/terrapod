@@ -39,8 +39,32 @@ def role_effective_capabilities(role: Role) -> frozenset[str]:
     return frozenset(cap.normalize_capabilities(role.capabilities))
 
 
-def _role_matches(role: Role, resource_name: str, resource_labels: dict) -> bool:
-    """Deny-then-allow label/name match (the shared per-role gate)."""
+def _role_matches(
+    role: Role, resource_name: str, resource_labels: dict, *, unscoped: bool = False
+) -> bool:
+    """Deny-then-allow label/name match (the shared per-role gate).
+
+    `unscoped` is for a resource that is the axis ITSELF rather than a thing
+    within it — the GPG signing-key store is the only one today (#1300). Such a
+    resource has no name, no labels and no owner, so the ordinary allow rules
+    can never match it: `allow_names` has nothing to compare against and
+    `matches_labels` requires the key to be present on the resource. Without
+    this flag the capability is reachable only by platform admin, whatever a
+    role was granted — which makes the `registry:admin` name a lie.
+
+    A role matches an unscoped resource only when it is itself unscoped: no
+    `allow_names` and no `allow_labels`. That distinction is the point. A role
+    granted authority over *some* providers must not be able to register a
+    signing key, because a key is a trust anchor for the whole registry — every
+    provider signed by it becomes installable, including ones outside that
+    role's scope. A role granted registry admin over everything already has
+    that reach, so letting it manage keys widens nothing.
+
+    Deny rules are inert here for the same reason allow rules are — there is no
+    name or label to match — so an unscoped role cannot be excluded by them.
+    That is why the unscoped grant is deliberately narrow: it is all-or-nothing
+    by construction.
+    """
     deny_labels: dict[str, set[str]] = {}
     merge_labels(deny_labels, role.deny_labels)
     if resource_name in set(role.deny_names):
@@ -52,7 +76,9 @@ def _role_matches(role: Role, resource_name: str, resource_labels: dict) -> bool
     merge_labels(allow_labels, role.allow_labels)
     if resource_name in set(role.allow_names):
         return True
-    return matches_labels(resource_labels, allow_labels)
+    if matches_labels(resource_labels, allow_labels):
+        return True
+    return unscoped and not role.allow_names and not allow_labels
 
 
 async def resolve_capabilities(
@@ -68,6 +94,7 @@ async def resolve_capabilities(
     apply_everyone_floor: bool = True,
     auth_method: str = "",
     is_catalog_managed: bool = False,
+    unscoped: bool = False,
 ) -> frozenset[str]:
     """The capability set a principal holds on a resource, for one axis.
 
@@ -110,7 +137,7 @@ async def resolve_capabilities(
             result = await db.execute(select(Role).where(Role.name.in_(custom_role_names)))
             roles = list(result.scalars().all())
         for role in roles:
-            if _role_matches(role, resource_name, resource_labels):
+            if _role_matches(role, resource_name, resource_labels, unscoped=unscoped):
                 caps |= role_effective_capabilities(role) & all_caps
 
     # 6. everyone-floor: read on resources labelled access=everyone. Catalog has
@@ -136,6 +163,7 @@ async def resolve_capabilities_for(
     preloaded_roles: list[Role] | None = None,
     token_preloaded_roles: list[Role] | None = None,
     is_catalog_managed: bool = False,
+    unscoped: bool = False,
 ) -> frozenset[str]:
     """Kind-aware capability set (#495): interactive → user roles;
     service_bound → user ∩ token; service_detached → token only (no owner
@@ -154,6 +182,7 @@ async def resolve_capabilities_for(
             apply_everyone_floor=False,
             auth_method="",
             is_catalog_managed=is_catalog_managed,
+            unscoped=unscoped,
         )
 
     user_caps = await resolve_capabilities(
@@ -167,6 +196,7 @@ async def resolve_capabilities_for(
         preloaded_roles=preloaded_roles,
         auth_method=auth_method,
         is_catalog_managed=is_catalog_managed,
+        unscoped=unscoped,
     )
     if user.kind == "service_bound":
         token_caps = await resolve_capabilities(
@@ -181,6 +211,7 @@ async def resolve_capabilities_for(
             apply_everyone_floor=False,
             auth_method="",
             is_catalog_managed=is_catalog_managed,
+            unscoped=unscoped,
         )
         return user_caps & token_caps
     return user_caps

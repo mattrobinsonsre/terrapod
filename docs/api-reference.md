@@ -1865,13 +1865,28 @@ All provider responses (show and list) include a `permissions` object:
 
 ### GPG Keys
 
-```
-GET    /api/terrapod/v1/gpg-keys
-POST   /api/terrapod/v1/gpg-keys
-GET    /api/terrapod/v1/gpg-keys/{id}
-POST   /api/terrapod/v1/gpg-keys/{id}/revoke
-DELETE /api/terrapod/v1/gpg-keys/{id}
-```
+| Endpoint | Permission |
+|---|---|
+| `GET /api/terrapod/v1/gpg-keys` | Any authenticated caller |
+| `GET /api/terrapod/v1/gpg-keys/{id}` | Any authenticated caller |
+| `POST /api/terrapod/v1/gpg-keys` | `registry:admin` |
+| `POST /api/terrapod/v1/gpg-keys/{id}/revoke` | `registry:admin` |
+| `DELETE /api/terrapod/v1/gpg-keys/{id}` | `registry:admin` |
+
+**The read/write split is deliberate.** The reads return public key material —
+the same bytes `terraform init` receives in every provider download response —
+so gating them would protect nothing while removing the ability to check which
+keys an instance trusts. A *registration* is the opposite: it adds a trust
+anchor, and every provider version signed by that key becomes installable by
+every runner on the instance.
+
+**The writes were open before v1.4.0** (authentication alone sufficed), so a
+service token that registers keys now needs a role granting registry admin —
+see [registry-publishing.md](registry-publishing.md#1-register-the-publishers-gpg-public-key).
+Grant it with `registry_permission = "admin"` and **no** `allow_names` or
+`allow_labels`: a role scoped to part of the registry cannot register a key,
+because a key is not scoped to part of the registry. Denied requests return
+`403 Requires registry:admin capability on the GPG key store`.
 
 The **public** key registered here is the trust anchor for client-signed
 provider publishing: `PUT .../shasums.sig` is verified against it. Register

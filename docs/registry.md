@@ -439,6 +439,17 @@ Publish, version, and share Terraform providers internally with GPG signing.
 
 ### GPG Key Management
 
+**Permissions (changed in v1.4.0):** registering, revoking and deleting a
+signing key require `registry:admin`; listing and showing keys are open to any
+authenticated caller. The split is deliberate — the reads return public key
+material `terraform init` already receives, while a registration adds a *trust
+anchor* that makes every provider signed by that key installable instance-wide.
+
+A role grants it via `registry_permission = "admin"` with no `allow_names` or
+`allow_labels`: a role scoped to part of the registry cannot register a key,
+because a key is not scoped to part of the registry. See
+[registry-publishing.md](registry-publishing.md#1-register-the-publishers-gpg-public-key).
+
 Before publishing providers, register a GPG key for signature verification:
 
 ```zsh
