@@ -1325,7 +1325,12 @@ async def fire_run_triggers(
             message=f"Triggered by successful apply in workspace '{source_name}'",
             auto_apply=dest_ws.auto_apply,
             plan_only=False,
-            source="tfe-api",
+            # Its own source (#1307). `tfe-api` is the CLI-upload source, and
+            # labelling a triggered run with it made it indistinguishable from
+            # a CLI run in the UI, the API, the audit log and the SDK — so
+            # "why did this workspace just apply?" had no answer on the run
+            # itself. Every other non-CLI origin already has its own source.
+            source="run-trigger",
             configuration_version_id=latest_cv_id,
         )
         await queue_run(db, run)

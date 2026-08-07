@@ -49,6 +49,7 @@ from terrapod.auth import capabilities as cap
 from terrapod.auth.capabilities import has_capability
 from terrapod.config import settings
 from terrapod.db.models import (
+    ConfigurationVersion,
     CostSummary,
     CostSummaryMessage,
     PlanSummary,
@@ -712,22 +713,39 @@ async def confirm_run(
             detail="Plan reported no changes — there is nothing to apply.",
         )
 
-    # Block apply for CLI-uploaded code on VCS-connected agent workspaces.
-    # Destroy runs are exempt — they don't depend on uploaded code.
-    # Runs with vcs_commit_sha were fetched from VCS (UI-queued or poller)
-    # and are safe to apply even if source is "tfe-api".
-    if (
-        run.source not in ("vcs", "drift-detection")
-        and not run.is_destroy
-        and not run.vcs_commit_sha
-    ):
+    # Block apply of CLI-uploaded code on VCS-connected agent workspaces.
+    #
+    # The test is the CONFIGURATION VERSION's source, not the run's (#1307).
+    # What this guard protects against is applying code that came in over the
+    # API on a workspace whose code is supposed to come from VCS — that is a
+    # property of the code, and the code is the CV. Keying it off the run's
+    # source instead made it a proxy that was wrong in one direction: a run
+    # trigger fired by an upstream apply created its run with `source="tfe-api"`
+    # and pointed it at the destination's latest VCS-fetched CV, so it was
+    # refused for not being VCS-managed while applying VCS-managed code. That
+    # left the downstream half of run triggers non-functional on exactly the
+    # workspaces most likely to use them.
+    #
+    # Exempt for the same reasons as before: destroys don't depend on uploaded
+    # code at all, and a run already carrying a `vcs_commit_sha` was fetched
+    # from VCS by the poller or a UI-queued ref.
+    if not run.is_destroy and not run.vcs_commit_sha and run.source != "drift-detection":
         ws = await db.get(Workspace, run.workspace_id)
         if ws and ws.execution_mode == "agent" and ws.vcs_connection_id is not None:
-            raise HTTPException(
-                status_code=422,
-                detail="Apply is not supported for CLI-uploaded code on VCS-connected agent workspaces. "
-                "Only VCS-managed code can be applied on VCS-connected workspaces.",
-            )
+            cv_source = ""
+            if run.configuration_version_id:
+                cv = await db.get(ConfigurationVersion, run.configuration_version_id)
+                cv_source = (cv.source if cv else "") or ""
+            if cv_source != "vcs":
+                raise HTTPException(
+                    status_code=422,
+                    detail=(
+                        "This run's configuration version was uploaded over the API "
+                        f"(source '{cv_source or 'unknown'}'), and this workspace is "
+                        "VCS-connected — only VCS-managed code can be applied here. "
+                        "Push the change and let the VCS poller create the run."
+                    ),
+                )
 
     try:
         run = await run_service.confirm_run(db, run)

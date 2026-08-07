@@ -3887,7 +3887,7 @@ Queues an `is_destroy` run with source **`catalog-lifecycle`**. On a **successfu
 
 Returns a reference to the queued destroy run. **Required permission:** catalog `use`.
 
-> **Run sources:** catalog runs carry `source = "catalog"` (provision / reconfigure) or `source = "catalog-lifecycle"` (destroy → archive). These appear on the run object alongside the existing sources (`tfe-api`, `vcs`, `drift-detection`, `autodiscovery-lifecycle`, `module-test`, `module-publish`, `onboarding-discovery`).
+> **Run sources:** catalog runs carry `source = "catalog"` (provision / reconfigure) or `source = "catalog-lifecycle"` (destroy → archive). These appear on the run object alongside the existing sources (`tfe-api`, `vcs`, `run-trigger`, `drift-detection`, `autodiscovery-lifecycle`, `module-test`, `module-publish`, `onboarding-discovery`).
 
 ### Confirm / Discard a Catalog Instance Run
 
