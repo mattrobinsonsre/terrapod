@@ -5,10 +5,8 @@ import {
   seedStateVersionWithContent,
   uniqueName,
 } from '../helpers/api';
-import path from 'path';
 
 const API_URL = process.env.API_URL || 'http://localhost:8000';
-const USER_AUTH = path.join(__dirname, '..', '.auth', 'user.json');
 
 /**
  * Undelete surface (#1253).
@@ -127,21 +125,30 @@ test.describe('Deleted workspaces (undelete)', () => {
     // materialises its state — and therefore its secrets — into a workspace
     // the caller can then read. The original's ACL died with its rows, so
     // there is nothing to delegate to.
-    const ctx = await browser.newContext({ storageState: USER_AUTH });
+    // The token lives in localStorage, not a cookie, so a storageState alone
+    // authenticates the *app* and not `page.request` — sending it explicitly
+    // is what makes this an authenticated call rather than an anonymous one
+    // (the difference between asserting 403 and re-asserting the 401 above).
+    const userToken = getStoredToken('user.json');
+    expect(userToken, 'the non-admin auth state must carry a token').toBeTruthy();
+    const auth = { Authorization: `Bearer ${userToken}` };
+
+    const ctx = await browser.newContext();
     const page = await ctx.newPage();
 
-    for (const path of [
+    for (const p of [
       '/api/terrapod/v1/deleted-workspaces',
       '/api/terrapod/v1/deleted-workspaces/00000000-0000-4000-8000-000000000000',
     ]) {
-      const res = await page.request.get(`${API_URL}${path}`);
-      expect(res.status(), `${path} must be forbidden for a non-admin`).toBe(403);
+      const res = await page.request.get(`${API_URL}${p}`, { headers: auth });
+      expect(res.status(), `${p} must be forbidden for a non-admin`).toBe(403);
     }
 
     // ...and the restore itself, which is the one that would materialise
     // somebody else's secrets.
     const restore = await page.request.post(
       `${API_URL}/api/terrapod/v1/deleted-workspaces/00000000-0000-4000-8000-000000000000/restore`,
+      { headers: auth },
     );
     expect(restore.status()).toBe(403);
 
