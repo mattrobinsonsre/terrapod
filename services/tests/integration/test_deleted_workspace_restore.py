@@ -222,6 +222,37 @@ class TestRestore:
         )
         assert resp.status_code == 422
 
+    @pytest.mark.parametrize("bad", [42, True, [], {}, {"name": "nested"}])
+    async def test_a_non_string_name_is_a_422_not_a_500(self, app, client, bad):
+        """A wrong-typed name must be a validation failure, not a crash inside
+        the validator — the difference between "fix your request" and "the
+        server is broken" (#1297)."""
+        set_auth(app, admin_user())
+        old_id = await _delete_with_state(
+            client, f"restore-badtype-{abs(hash(str(bad))) % 9999}", [1], "lin-badtype"
+        )
+
+        resp = await client.post(
+            f"/api/terrapod/v1/deleted-workspaces/{old_id}/restore",
+            json={"data": {"attributes": {"name": bad}}},
+            headers=AUTH,
+        )
+        assert resp.status_code == 422, resp.text
+
+    async def test_an_absent_name_still_uses_the_marker(self, app, client):
+        """Omitting the key is not the same as sending an empty one: absent
+        means "use the original", and must not trip the validator."""
+        set_auth(app, admin_user())
+        old_id = await _delete_with_state(client, "restore-noname", [1], "lin-noname")
+
+        resp = await client.post(
+            f"/api/terrapod/v1/deleted-workspaces/{old_id}/restore",
+            json={"data": {"attributes": {}}},
+            headers=AUTH,
+        )
+        assert resp.status_code == 201, resp.text
+        assert resp.json()["data"]["attributes"]["name"].startswith("restore-noname")
+
     async def test_a_rejected_name_leaves_the_deleted_workspace_restorable(self, app, client):
         """A 422 must be a retryable typo, not a way to burn the one recovery."""
         set_auth(app, admin_user())

@@ -979,6 +979,235 @@ class TestRunSerializationAndLocking:
         assert (await _get_run(client, run_id))["attributes"]["status"] == "confirmed"
 
 
+# ---------------------------------------------------------------------------
+# Conditional auto-apply (#1274) — the orchestrator, not the predicate
+# ---------------------------------------------------------------------------
+#
+# `tests/services/test_conditional_auto_apply.py` covers the pure decision
+# functions exhaustively and stops there. What was untested is everything
+# that runs *around* them: the guards `_auto_apply_if_permitted` shares with
+# the `always` path, the early returns, the declined path that records a
+# reason, and `complete_plan`'s narrowing from `if run.auto_apply` to
+# `resolve_auto_apply_mode(run) == "always"` — a regression to the old
+# predicate would auto-apply every conditional run on plan-result, before the
+# counts that decide it even exist (#1297).
+
+
+def _plan_json(*, add=0, change=0, destroy=0, replace=0) -> bytes:
+    """A plan JSON whose resource_changes produce the requested counts.
+
+    A replace is the {create, delete} action pair — the shape a "no destroys"
+    check misses, because it is counted as a replacement rather than a
+    destruction.
+    """
+    changes = []
+    for i in range(add):
+        changes.append({"address": f"null_resource.add{i}", "change": {"actions": ["create"]}})
+    for i in range(change):
+        changes.append({"address": f"null_resource.upd{i}", "change": {"actions": ["update"]}})
+    for i in range(destroy):
+        changes.append({"address": f"null_resource.del{i}", "change": {"actions": ["delete"]}})
+    for i in range(replace):
+        changes.append(
+            {"address": f"null_resource.rep{i}", "change": {"actions": ["create", "delete"]}}
+        )
+    return json.dumps({"format_version": "1.2", "resource_changes": changes}).encode()
+
+
+async def _create_conditional_workspace(client, pool_id: str, name: str, mode: str) -> str:
+    resp = await client.post(
+        WS_ENDPOINT,
+        json={
+            "data": {
+                "type": "workspaces",
+                "attributes": {
+                    "name": name,
+                    "execution-mode": "agent",
+                    "agent-pool-id": pool_id,
+                    "auto-apply-mode": mode,
+                },
+            }
+        },
+        headers=AUTH,
+    )
+    assert resp.status_code == 201, resp.text
+    ws_id = resp.json()["data"]["id"]
+    await _seed_uploaded_cv(client, ws_id)
+    return ws_id
+
+
+async def _plan_then_upload_json(client, listener_id: str, ws_id: str, plan_json: bytes) -> dict:
+    """Drive a run through plan, then upload the plan JSON — the real order.
+
+    The runner POSTs plan-result (which drives `complete_plan`) BEFORE it
+    uploads the JSON, so the conditional decision genuinely happens after the
+    run has already reached `planned`. Reproducing that order is the point:
+    a `complete_plan` that auto-applied on the boolean alone would have
+    applied by the time the JSON arrives.
+    """
+    run = await _create_run(client, ws_id)
+    run_id = run["id"]
+    runner_token = await _run_plan_lifecycle(client, listener_id, run_id)
+
+    assert (
+        await _upload_artifact(client, run_id, "plan-json-output", plan_json, runner_token)
+    ) == 204
+    return await _get_run(client, run_id)
+
+
+class TestConditionalAutoApplyOrchestration:
+    async def test_create_mode_applies_a_pure_addition(self, app, client, setup):
+        pool_id, listener_id = setup
+        ws_id = await _create_conditional_workspace(client, pool_id, "cond-create", "create")
+
+        run = await _plan_then_upload_json(client, listener_id, ws_id, _plan_json(add=3))
+
+        assert run["attributes"]["status"] == "confirmed"
+        assert run["attributes"]["auto-apply-declined-reason"] in (None, "")
+
+    async def test_create_mode_holds_an_update_and_says_why(self, app, client, setup):
+        """The declined path is the one a human reads. A hold with no reason
+        is indistinguishable from a run nobody got to."""
+        pool_id, listener_id = setup
+        ws_id = await _create_conditional_workspace(client, pool_id, "cond-create-upd", "create")
+
+        run = await _plan_then_upload_json(client, listener_id, ws_id, _plan_json(add=1, change=2))
+
+        assert run["attributes"]["status"] == "planned"
+        assert "2 updates" in (run["attributes"]["auto-apply-declined-reason"] or "")
+
+    async def test_create_update_mode_applies_additions_and_updates(self, app, client, setup):
+        pool_id, listener_id = setup
+        ws_id = await _create_conditional_workspace(client, pool_id, "cond-cu", "create_update")
+
+        run = await _plan_then_upload_json(client, listener_id, ws_id, _plan_json(add=2, change=2))
+
+        assert run["attributes"]["status"] == "confirmed"
+
+    async def test_a_replacement_is_held_in_every_conditional_mode(self, app, client, setup):
+        """The case a naive "no destroys" check sails straight past."""
+        pool_id, listener_id = setup
+        for mode in ("create", "create_update"):
+            ws_id = await _create_conditional_workspace(client, pool_id, f"cond-rep-{mode}", mode)
+            run = await _plan_then_upload_json(
+                client, listener_id, ws_id, _plan_json(add=1, replace=1)
+            )
+            assert run["attributes"]["status"] == "planned", mode
+            assert "1 replace" in (run["attributes"]["auto-apply-declined-reason"] or ""), mode
+
+    async def test_complete_plan_does_not_apply_before_the_counts_exist(self, app, client, setup):
+        """The narrowing in `complete_plan`.
+
+        A conditional run reaches `planned` on plan-result and must STAY there
+        until the JSON arrives. If that condition regressed to the old
+        `if run.auto_apply` — which is True for every non-`never` mode — every
+        conditional run would auto-apply here, before anything had looked at
+        its shape.
+        """
+        pool_id, listener_id = setup
+        ws_id = await _create_conditional_workspace(client, pool_id, "cond-noearly", "create")
+
+        run = await _create_run(client, ws_id)
+        await _run_plan_lifecycle(client, listener_id, run["id"])
+
+        after_plan = await _get_run(client, run["id"])
+        assert after_plan["attributes"]["status"] == "planned"
+
+    async def test_a_plan_json_that_never_arrives_leaves_the_run_for_a_human(
+        self, app, client, setup
+    ):
+        """The upload is best-effort, so failing to arrive must mean "nobody
+        auto-applies" — never "apply anyway"."""
+        pool_id, listener_id = setup
+        ws_id = await _create_conditional_workspace(client, pool_id, "cond-nojson", "create")
+
+        run = await _create_run(client, ws_id)
+        await _run_plan_lifecycle(client, listener_id, run["id"])
+
+        from terrapod.services.run_reconciler import reconcile_runs
+
+        await reconcile_runs()
+        assert (await _get_run(client, run["id"]))["attributes"]["status"] == "planned"
+
+    async def test_an_unparseable_plan_json_holds_rather_than_applies(self, app, client, setup):
+        """Unknown shape is not a pass — it is exactly the run to look at."""
+        pool_id, listener_id = setup
+        ws_id = await _create_conditional_workspace(client, pool_id, "cond-badjson", "create")
+
+        run = await _plan_then_upload_json(client, listener_id, ws_id, b"not json at all")
+
+        assert run["attributes"]["status"] == "planned"
+
+
+class TestConditionalAutoApplySharesTheGuards:
+    """`_auto_apply_if_permitted` was extracted so the conditional path would
+    inherit the `always` path's guards. Nothing pinned that it does — and both
+    guards protect against applying something a human did not sanction."""
+
+    async def test_a_manual_lock_holds_a_permitted_conditional_run(self, app, client, setup):
+        pool_id, listener_id = setup
+        ws_id = await _create_conditional_workspace(client, pool_id, "cond-locked", "create")
+
+        run = await _create_run(client, ws_id)
+        runner_token = await _run_plan_lifecycle(client, listener_id, run["id"])
+        # Lock AFTER the plan: the operator's lock has to win over a decision
+        # that would otherwise be an unambiguous yes.
+        await _lock_workspace(client, ws_id)
+
+        assert (
+            await _upload_artifact(
+                client, run["id"], "plan-json-output", _plan_json(add=1), runner_token
+            )
+        ) == 204
+
+        held = await _get_run(client, run["id"])
+        assert held["attributes"]["status"] == "planned"
+
+        # ...and it is still applicable once the lock comes off, rather than
+        # having been discarded.
+        await _unlock_workspace(client, ws_id)
+        resp = await client.post(f"{RUNS_ENDPOINT}/{run['id']}/actions/apply", headers=AUTH)
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["data"]["attributes"]["status"] == "confirmed"
+
+    async def test_a_stale_plan_is_discarded_not_auto_applied(self, app, client, setup):
+        """State moved between plan and decision. Applying a plan computed
+        against state that no longer exists is the worst outcome available."""
+        import uuid as _uuid
+
+        from terrapod.db.models import StateVersion
+        from terrapod.db.session import get_db_session
+
+        pool_id, listener_id = setup
+        ws_id = await _create_conditional_workspace(client, pool_id, "cond-stale", "create")
+        ws_uuid = _uuid.UUID(ws_id.removeprefix("ws-"))
+
+        # A baseline the plan can be measured stale against. Without one the
+        # guard correctly declines to call anything stale, so seeding it is
+        # what makes this test about the guard rather than about its absence.
+        async with get_db_session() as db:
+            db.add(StateVersion(workspace_id=ws_uuid, serial=1, lineage="x"))
+            await db.commit()
+
+        run = await _create_run(client, ws_id)
+        runner_token = await _run_plan_lifecycle(client, listener_id, run["id"])
+
+        # Somebody else writes state under it, between the plan and the
+        # decision.
+        async with get_db_session() as db:
+            db.add(StateVersion(workspace_id=ws_uuid, serial=2, lineage="x"))
+            await db.commit()
+
+        assert (
+            await _upload_artifact(
+                client, run["id"], "plan-json-output", _plan_json(add=1), runner_token
+            )
+        ) == 204
+
+        stale = await _get_run(client, run["id"])
+        assert stale["attributes"]["status"] == "discarded"
+
+
 class TestPlanStaleness:
     """State-drift (#647, always on) and time-based expiry (#646, per-workspace)
     auto-discard of stale apply-capable planned runs — against real Postgres

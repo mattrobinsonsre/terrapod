@@ -25,6 +25,11 @@ const ADMIN_LINKS = [
   '/admin/bulk-update',
   '/admin/catalog',
   '/admin/provider-templates',
+  // The most sensitive new admin page was the one not covered (#1297): a
+  // delete marker names a workspace and its variable names, and a restore
+  // materialises its state — and therefore its secrets — into a workspace
+  // the caller can then read.
+  '/admin/deleted-workspaces',
 ];
 
 test.describe('RBAC — regular user is blocked from admin', () => {

@@ -38,8 +38,19 @@ import (
 // A source build leaves Version as "dev", which the SDK treats as "cannot
 // compare" and skips — so `go run ./cmd/terrapod-migrate` keeps working
 // without the override flag.
-func init() {
+// wireSDKVersion is the assignment itself, named so a test can drive it.
+//
+// A test that only reads terrapod.SDKVersion after init() cannot tell the
+// assignment happened: in a source build Version is "dev" and SDKVersion
+// already defaults to "dev", so the comparison holds either way and deleting
+// the line leaves the suite green — which is the failure mode this whole
+// exercise is about (#1297).
+func wireSDKVersion() {
 	terrapod.SDKVersion = Version
+}
+
+func init() {
+	wireSDKVersion()
 }
 
 // checkAPIVersion gates a run on tool↔API compatibility (#550).

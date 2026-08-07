@@ -335,3 +335,82 @@ class TestTrustAnchorAuthorization:
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.get(_KEYS, headers=_AUTH)
         assert resp.status_code == 200
+
+
+class TestNonPlatformAdminGrant:
+    """The allow path for a role-granted registry admin.
+
+    Every existing test here uses platform admin, which is step 1 of the
+    capability resolver — so nothing proved a *role*-granted registry admin
+    actually resolves through the empty resource this gate passes
+    (`resolve_registry_capabilities_for(db, user, "", {}, "")`) (#1297).
+
+    The empty resource is deliberate: the GPG store is a single trust anchor
+    with no name of its own, so only unscoped grants can match. A role's
+    `allow_labels` cannot — `matches_labels` requires the key to be present on
+    the resource — and an earlier version that passed a literal "gpg-keys"
+    name put a magic string in the same namespace as real provider names. So
+    "does an ordinary registry-admin role actually work here" is a real
+    question, not a formality.
+    """
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.gpg_keys.create_gpg_key", new_callable=AsyncMock)
+    @patch("terrapod.api.routers.gpg_keys.resolve_registry_capabilities_for")
+    async def test_a_role_granted_registry_admin_may_create(
+        self, mock_resolve, mock_create, *mocks
+    ):
+        from terrapod.auth.capabilities import _REGISTRY_LEVELS
+
+        mock_resolve.return_value = _REGISTRY_LEVELS["admin"]
+        mock_create.return_value = _mock_key()
+
+        app = _make_app(_user(roles=["registry-owner"]))
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(_KEYS, json=_create_body(), headers=_AUTH)
+
+        assert resp.status_code == 201, resp.text
+        # The gate is consulted against the unscoped store — no name, no
+        # labels, no owner — which is what makes a label-scoped role unable to
+        # reach it and a plain registry-admin role able to.
+        args = mock_resolve.await_args.args
+        assert args[2] == "" and args[3] == {} and args[4] == ""
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.gpg_keys.resolve_registry_capabilities_for")
+    async def test_registry_read_is_not_enough_to_register_a_key(self, mock_resolve, *mocks):
+        """Registering a signing key is adding a trust anchor: every provider
+        signed by it is then installable. Read is not that."""
+        from terrapod.auth.capabilities import _REGISTRY_LEVELS
+
+        mock_resolve.return_value = _REGISTRY_LEVELS["read"]
+
+        app = _make_app(_user(roles=["registry-reader"]))
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(_KEYS, json=_create_body(), headers=_AUTH)
+
+        assert resp.status_code == 403
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.gpg_keys.list_gpg_keys", new_callable=AsyncMock)
+    @patch("terrapod.api.routers.gpg_keys.resolve_registry_capabilities_for")
+    async def test_registry_read_can_list(self, mock_resolve, mock_list, *mocks):
+        """Public keys are public by nature — reading them is not the
+        privileged act, registering one is."""
+        from terrapod.auth.capabilities import _REGISTRY_LEVELS
+
+        mock_resolve.return_value = _REGISTRY_LEVELS["read"]
+        mock_list.return_value = [_mock_key()]
+
+        app = _make_app(_user(roles=["registry-reader"]))
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get(_KEYS, headers=_AUTH)
+
+        assert resp.status_code == 200
+        assert len(resp.json()["data"]) == 1
