@@ -1967,6 +1967,7 @@ function WorkspaceDetailContent() {
                   <dt className="text-xs text-slate-500">{t('fields.autoApply')}</dt>
                   {editing ? (
                     <select
+                      aria-label={t('fields.autoApply')}
                       value={editAutoApplyMode}
                       onChange={(e) => setEditAutoApplyMode(e.target.value)}
                       className="mt-1 w-full px-2 py-1 text-sm rounded bg-slate-700 border border-slate-600 text-slate-200"

@@ -1,4 +1,5 @@
 import { test, expect } from '../fixtures/auth.js';
+import { getStoredToken, createWorkspace, uniqueName } from '../helpers/api.js';
 
 test.describe('Admin access control', () => {
   test('admin user sees admin nav links', async ({ adminPage }) => {
@@ -77,5 +78,49 @@ test.describe('Cache bulk-warm (#606)', () => {
       .isVisible()
       .catch(() => false);
     expect(hasContent).toBe(false);
+  });
+});
+
+test.describe('Bulk update — auto-apply mode (#1276)', () => {
+  // This page had no functional spec at all, only a redirect check in
+  // rbac-negatives. The mode select is worth covering specifically because it
+  // is one of the two paths that writes TWO columns from a single input:
+  // auto_apply_mode AND the legacy auto_apply boolean. If they ever drift
+  // apart, a workspace claims one thing in the projection and does another.
+  test('a conditional mode previews as a change to BOTH auto-apply columns', async ({ adminPage }) => {
+    const token = getStoredToken();
+    const prefix = uniqueName('e2e-bulkmode');
+    await createWorkspace(token, `${prefix}-a`);
+    await createWorkspace(token, `${prefix}-b`);
+
+    await adminPage.goto('/admin/bulk-update');
+
+    // 1. Select by name prefix — scoped to this test's own workspaces so the
+    //    assertions never depend on what else is in the org.
+    await adminPage.getByPlaceholder('prod-').fill(prefix);
+    await adminPage.getByRole('button', { name: 'Search' }).click();
+    await expect(adminPage.getByText(/Matched/)).toContainText('2');
+
+    // 2. The control must be the four-value mode select, not a boolean.
+    const mode = adminPage.getByRole('combobox', { name: 'Auto-apply' });
+    await expect(mode).toHaveValue(''); // "(unchanged)" — absent must not write
+    await mode.selectOption('create_update');
+
+    // 3. Dry run is on by default, so nothing is written by this assertion.
+    await adminPage.getByRole('button', { name: 'Preview (dry run)' }).click();
+
+    // Both workspaces are affected — the summary states it, and the diff table
+    // heading is the section we then read the per-column changes out of.
+    await expect(adminPage.getByText(/2 would change/)).toBeVisible({ timeout: 15_000 });
+    await expect(
+      adminPage.getByRole('heading', { name: /Would change \(2\)/ }),
+    ).toBeVisible();
+
+    // Both columns move together. Asserting only the mode would pass even if
+    // the boolean were left stale, which is the bug this guards.
+    const table = adminPage.locator('table').last();
+    await expect(table).toContainText('auto_apply_mode');
+    await expect(table).toContainText('create_update');
+    await expect(table).toContainText('auto_apply');
   });
 });

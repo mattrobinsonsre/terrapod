@@ -149,10 +149,17 @@ test.describe('Workspaces', () => {
     // Click Edit on the overview tab
     await page.click('button:has-text("Edit")');
 
-    // Toggle auto-apply (it's a checkbox or toggle)
-    const autoApplyToggle = page.locator('input[type="checkbox"]').first();
-    const wasBefore = await autoApplyToggle.isChecked();
-    await autoApplyToggle.click();
+    // Auto-apply is a four-value mode select, not a boolean (#1274). Locate it
+    // by its accessible name, NOT positionally: this test used to say
+    // `input[type=checkbox].first()`, which silently re-aimed at the Terragrunt
+    // checkbox when the control became a select, and kept passing while testing
+    // nothing (#1280). A named locator fails closed instead.
+    const autoApply = page.getByRole('combobox', { name: 'Auto Apply' });
+    await expect(autoApply).toHaveValue('never'); // default for a new workspace
+
+    // Pick a conditional mode — the interesting case, since it has to survive
+    // the round trip as a mode rather than collapsing back to a boolean.
+    await autoApply.selectOption('create_update');
 
     // Save
     await page.click('button:has-text("Save")');
@@ -160,13 +167,13 @@ test.describe('Workspaces', () => {
     // Wait for save to complete (Edit button re-appears)
     await expect(page.locator('button:has-text("Edit")')).toBeVisible({ timeout: 10_000 });
 
-    // Reload and verify the toggle changed
-    await page.reload();
+    // The read view must name the mode, not a yes/no.
+    await expect(page.getByText('create/update', { exact: true })).toBeVisible();
 
-    // Click Edit again to check the value
+    // Reload proves it persisted server-side rather than living in React state.
+    await page.reload();
     await page.click('button:has-text("Edit")');
-    const isAfter = await page.locator('input[type="checkbox"]').first().isChecked();
-    expect(isAfter).not.toBe(wasBefore);
+    await expect(page.getByRole('combobox', { name: 'Auto Apply' })).toHaveValue('create_update');
   });
 
   test('terragrunt toggle + version persists through settings (#534)', async ({ page }) => {

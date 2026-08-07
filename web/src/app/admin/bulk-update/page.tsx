@@ -496,6 +496,7 @@ export default function BulkUpdatePage() {
             <div>
               <label className={labelCls}>{t('update.autoApply')}</label>
               <select
+                aria-label={t('update.autoApply')}
                 value={uAutoApplyMode}
                 onChange={(e) => setUAutoApplyMode(e.target.value)}
                 className={inputCls}
