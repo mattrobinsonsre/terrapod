@@ -99,12 +99,19 @@ type Workspace struct {
 	TerraformVersion string            `json:"terraform_version,omitempty"` // "1.12", "1.12.3", etc — Terrapod accepts partials
 	WorkingDirectory string            `json:"working_directory,omitempty"` // relative path within the repo
 	Labels           map[string]string `json:"labels,omitempty"`            // TFE tags translate here: "k:v" → {k: "v"}, "k" → {k: ""}
-	AutoApply        bool              `json:"auto_apply,omitempty"`
-	OwnerEmail       string            `json:"owner_email,omitempty"`        // set on creation; defaults to migrating user
-	VCSConnectionRef string            `json:"vcs_connection_ref,omitempty"` // references VCSConnection.SourceID
-	VCSRepoURL       string            `json:"vcs_repo_url,omitempty"`
-	VCSBranch        string            `json:"vcs_branch,omitempty"`
-	Variables        []Variable        `json:"variables,omitempty"`
+	// AutoApplyMode is the conditional auto-apply setting: "never",
+	// "always", "create" or "create_update". Deliberately a mode rather
+	// than the older boolean — the boolean is only a projection of it, so
+	// it can express at most two of the four settings, and a migrator's
+	// whole job is deciding what a workspace looks like on arrival. Empty
+	// means the source had no opinion; the writer resolves that to
+	// "never", the safe direction.
+	AutoApplyMode    string     `json:"auto_apply_mode,omitempty"`
+	OwnerEmail       string     `json:"owner_email,omitempty"`        // set on creation; defaults to migrating user
+	VCSConnectionRef string     `json:"vcs_connection_ref,omitempty"` // references VCSConnection.SourceID
+	VCSRepoURL       string     `json:"vcs_repo_url,omitempty"`
+	VCSBranch        string     `json:"vcs_branch,omitempty"`
+	Variables        []Variable `json:"variables,omitempty"`
 	// State and ConfigurationVersion stay external to the Workspace struct
 	// because (a) they're large blobs we don't want serialised into the
 	// state file and (b) they may need their own retry/streaming policy.

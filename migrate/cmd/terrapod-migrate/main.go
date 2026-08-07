@@ -36,11 +36,18 @@ func warnVersionMismatch(c *terrapod.Client) {
 	}
 }
 
-// Version is the build-time-pinned tool version. It MUST match the target
-// Terrapod API's reported version on startup (compared via
-// /.well-known/terraform.json); mismatch refuses to run unless the operator
-// passes --allow-api-version-mismatch. Mutation is intentional: GoReleaser
-// stamps the actual semver at release time via -ldflags="-X main.Version=...".
+// Version is the build-time-pinned tool version. It identifies the tool in
+// the User-Agent and in the migration state file, and backs `--version`.
+// Mutation is intentional: GoReleaser stamps the actual semver at release
+// time via -ldflags="-X main.Version=...".
+//
+// A version mismatch against the target API WARNS, it does not refuse —
+// see warnVersionMismatch above. This comment previously described a
+// strict gate refusing to run unless the operator passed
+// --allow-api-version-mismatch; no such flag is wired up, and the strict
+// gate in internal/version is not imported by anything. Since a stale
+// tool's failure mode is an unknown attribute the API silently ignores
+// rather than an error, the difference matters: read the warning.
 var Version = "dev"
 
 func main() {

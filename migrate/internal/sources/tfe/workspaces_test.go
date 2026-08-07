@@ -105,8 +105,14 @@ func TestEmitWorkspaces_Happy(t *testing.T) {
 	if ws[0].ExecutionMode != "agent" {
 		t.Errorf("remote→agent translation: got %q", ws[0].ExecutionMode)
 	}
-	if ws[1].ExecutionMode != "agent" || !ws[1].AutoApply {
+	// TFE's boolean becomes a mode. Both endpoints are asserted: mapping
+	// only the true case would let false silently produce "" and inherit
+	// whatever the writer or server happens to default to.
+	if ws[1].ExecutionMode != "agent" || ws[1].AutoApplyMode != "always" {
 		t.Errorf("agent + auto-apply: %+v", ws[1])
+	}
+	if ws[0].AutoApplyMode != "never" {
+		t.Errorf("auto-apply false should map to never, got %q", ws[0].AutoApplyMode)
 	}
 	if ws[0].TerraformVersion != "1.12.0" || ws[1].TerraformVersion != "1.11.4" {
 		t.Errorf("terraform versions: %q %q", ws[0].TerraformVersion, ws[1].TerraformVersion)

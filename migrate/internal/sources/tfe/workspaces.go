@@ -94,7 +94,7 @@ func (c *Client) EmitWorkspaces(ctx context.Context) ([]ir.Workspace, []ir.VCSCo
 			ExecutionMode:    execMode,
 			TerraformVersion: w.TerraformVersion,
 			WorkingDirectory: w.WorkingDirectory,
-			AutoApply:        w.AutoApply,
+			AutoApplyMode:    autoApplyMode(w.AutoApply),
 			Labels:           labels,
 		}
 
@@ -298,4 +298,17 @@ func sortVCSConnectionsByName(conns []ir.VCSConnection) {
 			j--
 		}
 	}
+}
+
+// autoApplyMode maps TFE's boolean onto a Terrapod auto-apply mode.
+//
+// TFE has no conditional setting, so a migrated workspace can only ever
+// land on the two endpoints. An operator who wants "create" or
+// "create_update" chooses it after migrating; guessing one here would be
+// inventing a policy the source never expressed.
+func autoApplyMode(autoApply bool) string {
+	if autoApply {
+		return "always"
+	}
+	return "never"
 }

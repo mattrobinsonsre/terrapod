@@ -472,13 +472,27 @@ func (w *Writer) applyWorkspace(ctx context.Context, ws *ir.Workspace, connByRef
 		return out
 	}
 
-	autoApply := ws.AutoApply
+	// Send the mode, never the boolean — the API rejects a body carrying
+	// both with a 422 rather than guessing which was meant. An empty mode
+	// means the source had no opinion (Atlantis has no such concept), and
+	// resolves to "never": the same workspace the old explicit
+	// `auto-apply: false` produced, and the safe direction to guess in.
+	//
+	// Not validated against a known set on purpose. The server is the
+	// authority on which modes exist, so an allow-list here would reject a
+	// mode Terrapod gains later until migrate is re-released — exactly the
+	// coupling this change removes. A bad value fails that one workspace
+	// with the server's own 422.
+	autoApplyMode := ws.AutoApplyMode
+	if autoApplyMode == "" {
+		autoApplyMode = "never"
+	}
 	req := terrapod.CreateWorkspaceRequest{
 		Name:             ws.Name,
 		ExecutionMode:    ws.ExecutionMode,
 		TerraformVersion: ws.TerraformVersion,
 		WorkingDirectory: ws.WorkingDirectory,
-		AutoApply:        &autoApply,
+		AutoApplyMode:    &autoApplyMode,
 		Labels:           ws.Labels,
 		OwnerEmail:       ws.OwnerEmail,
 		VCSRepoURL:       ws.VCSRepoURL,
