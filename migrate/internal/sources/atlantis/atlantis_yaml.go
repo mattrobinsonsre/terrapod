@@ -9,7 +9,7 @@
 // Subsequent increments fill in:
 //   - vcs.go            VCS reader (fetches atlantis.yaml from GitHub/GitLab)
 //   - emit.go           Projects → ir.Plan emitter (with autodiscovery
-//                       heuristic and per-project field translation)
+//     heuristic and per-project field translation)
 //   - state.go strategy The leave-state-in-place vs --migrate-state decision
 //
 // This file is the pure-data parser. Hand-rolled `yaml:"..."` tags
@@ -77,7 +77,7 @@ type Project struct {
 	// ApplyRequirements (`approved`, `mergeable`, `undiverged`) have no
 	// direct Terrapod equivalent — recorded for the handover doc but
 	// don't influence the migrated workspace.
-	ApplyRequirements []string `yaml:"apply_requirements,omitempty"`
+	ApplyRequirements  []string `yaml:"apply_requirements,omitempty"`
 	ImportRequirements []string `yaml:"import_requirements,omitempty"`
 	// Workflow references a key in the top-level `workflows:` map. If
 	// non-empty the emitter records the project as "uses custom
@@ -111,11 +111,11 @@ type AutoPlan struct {
 // inspect their contents; we only need to know a project *uses* a
 // workflow (then we record an unsupported skipped-item).
 type Workflow struct {
-	Plan       *WorkflowStage `yaml:"plan,omitempty"`
-	Apply      *WorkflowStage `yaml:"apply,omitempty"`
+	Plan        *WorkflowStage `yaml:"plan,omitempty"`
+	Apply       *WorkflowStage `yaml:"apply,omitempty"`
 	PolicyCheck *WorkflowStage `yaml:"policy_check,omitempty"`
-	Import     *WorkflowStage `yaml:"import,omitempty"`
-	StateRm    *WorkflowStage `yaml:"state_rm,omitempty"`
+	Import      *WorkflowStage `yaml:"import,omitempty"`
+	StateRm     *WorkflowStage `yaml:"state_rm,omitempty"`
 }
 
 // WorkflowStage is the steps slice for one workflow stage. Each step
@@ -129,8 +129,8 @@ type WorkflowStage struct {
 
 // AutoDiscover is the Atlantis-side autodiscovery config (v0.27+).
 type AutoDiscover struct {
-	Mode         string   `yaml:"mode,omitempty"` // "auto" | "enabled" | "disabled"
-	IgnorePaths  []string `yaml:"ignore_paths,omitempty"`
+	Mode        string   `yaml:"mode,omitempty"` // "auto" | "enabled" | "disabled"
+	IgnorePaths []string `yaml:"ignore_paths,omitempty"`
 }
 
 // ErrUnsupportedVersion is returned for atlantis.yaml documents whose

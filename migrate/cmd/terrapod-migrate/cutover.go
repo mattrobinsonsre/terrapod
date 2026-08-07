@@ -15,8 +15,8 @@ import (
 // side (currently TFE-only — Atlantis has no notion of "lock the
 // platform"):
 //
-//   --lock   lock every source workspace recorded in the state file
-//   --unlock the reverse — for rollback
+//	--lock   lock every source workspace recorded in the state file
+//	--unlock the reverse — for rollback
 //
 // Cutover also generates the operator handover doc — a Markdown
 // runbook next to the state file — every time it's invoked (with or

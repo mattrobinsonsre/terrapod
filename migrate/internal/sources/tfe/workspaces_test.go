@@ -199,7 +199,7 @@ func TestEmitWorkspaces_UnrecognisedExecutionModeSkipped(t *testing.T) {
 func TestTranslateExecutionMode(t *testing.T) {
 	cases := []struct{ tfe, want string }{
 		{"agent", "agent"},
-		{"remote", "agent"},  // the headline rule
+		{"remote", "agent"}, // the headline rule
 		{"local", "local"},
 		{"", ""},             // empty mode → unrecognised
 		{"experimental", ""}, // future-TFE mode we don't know
@@ -241,7 +241,7 @@ func TestGuessProviderFromRepoURL(t *testing.T) {
 
 func TestDeriveServerURL(t *testing.T) {
 	cases := []struct{ in, want string }{
-		{"https://github.com/acme/infra", ""},  // common-case host → empty (provider default)
+		{"https://github.com/acme/infra", ""}, // common-case host → empty (provider default)
 		{"https://gitlab.com/acme/infra", ""},
 		{"https://gitlab.example.com/acme/infra", "https://gitlab.example.com"},
 		{"https://ghe.example.com/acme/infra", "https://ghe.example.com"},

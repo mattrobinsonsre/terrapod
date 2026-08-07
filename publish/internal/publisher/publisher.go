@@ -42,7 +42,7 @@ func PublishProvider(ctx context.Context, c *terrapod.Client, in ProviderInput, 
 	if len(in.Binaries) == 0 {
 		return fmt.Errorf("no platform binaries to publish")
 	}
-	zips := make(map[string][]byte, len(in.Binaries)) // platform -> zip
+	zips := make(map[string][]byte, len(in.Binaries))  // platform -> zip
 	files := make(map[string][]byte, len(in.Binaries)) // filename -> zip (for the manifest)
 	for platform, bin := range in.Binaries {
 		goos, goarch, err := splitPlatform(platform)

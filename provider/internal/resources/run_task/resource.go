@@ -38,17 +38,17 @@ func (r *runTaskResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 	resp.Schema = schema.Schema{
 		Description: "Manages a run task (pre/post-plan or pre-apply webhook) for a Terrapod workspace.",
 		Attributes: map[string]schema.Attribute{
-			"id": schema.StringAttribute{Computed: true, Description: "Run task ID.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
-			"workspace_id": schema.StringAttribute{Required: true, Description: "Workspace ID.", PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
-			"name":             schema.StringAttribute{Required: true, Description: "Task name."},
-			"url":              schema.StringAttribute{Required: true, Description: "Webhook URL."},
-			"enabled":          schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(true), Description: "Whether the task is enabled."},
-			"stage":            schema.StringAttribute{Required: true, Description: "Stage: pre_plan, post_plan, or pre_apply."},
+			"id":                schema.StringAttribute{Computed: true, Description: "Run task ID.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
+			"workspace_id":      schema.StringAttribute{Required: true, Description: "Workspace ID.", PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
+			"name":              schema.StringAttribute{Required: true, Description: "Task name."},
+			"url":               schema.StringAttribute{Required: true, Description: "Webhook URL."},
+			"enabled":           schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(true), Description: "Whether the task is enabled."},
+			"stage":             schema.StringAttribute{Required: true, Description: "Stage: pre_plan, post_plan, or pre_apply."},
 			"enforcement_level": schema.StringAttribute{Required: true, Description: "Enforcement: mandatory or advisory."},
-			"hmac_key":         schema.StringAttribute{Optional: true, Sensitive: true, Description: "HMAC signing key (write-only)."},
-			"has_hmac_key":     schema.BoolAttribute{Computed: true, Description: "Whether an HMAC key is configured."},
-			"created_at":       schema.StringAttribute{Computed: true, Description: "Creation timestamp.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
-			"updated_at":       schema.StringAttribute{Computed: true, Description: "Update timestamp."},
+			"hmac_key":          schema.StringAttribute{Optional: true, Sensitive: true, Description: "HMAC signing key (write-only)."},
+			"has_hmac_key":      schema.BoolAttribute{Computed: true, Description: "Whether an HMAC key is configured."},
+			"created_at":        schema.StringAttribute{Computed: true, Description: "Creation timestamp.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
+			"updated_at":        schema.StringAttribute{Computed: true, Description: "Update timestamp."},
 		},
 	}
 }

@@ -8,3 +8,13 @@ linters:
     - ineffassign
     - staticcheck
     - unused
+
+# Formatting is a linter, not a habit. These files drifted out of gofmt
+# across several modules without CI noticing, because v2 keeps formatters
+# in their own section and none were enabled — `default: none` above only
+# governs the `linters` list. Enabling gofmt here gates every module (each
+# has its own *-lint job sharing this config), so it cannot re-accumulate.
+# Run `golangci-lint fmt` (or plain `gofmt -w`) to fix.
+formatters:
+  enable:
+    - gofmt

@@ -148,10 +148,10 @@ func TestHostFromRepoURL(t *testing.T) {
 	// the first `:` or `/` so SSH-style `git@host:org/repo` URLs
 	// collapse to the bare hostname.
 	cases := map[string]string{
-		"https://github.com/acme/infra":       "github.com",
-		"http://github.com/acme/infra":        "github.com",
-		"git@github.com:acme/infra.git":       "github.com",
-		"https://gitlab.example.com/g/repo":   "gitlab.example.com",
+		"https://github.com/acme/infra":     "github.com",
+		"http://github.com/acme/infra":      "github.com",
+		"git@github.com:acme/infra.git":     "github.com",
+		"https://gitlab.example.com/g/repo": "gitlab.example.com",
 	}
 	for in, want := range cases {
 		if got := hostFromRepoURL(in); got != want {

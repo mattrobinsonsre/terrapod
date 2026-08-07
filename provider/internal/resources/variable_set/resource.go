@@ -53,15 +53,15 @@ func (r *variableSetResource) Schema(_ context.Context, _ resource.SchemaRequest
 	resp.Schema = schema.Schema{
 		Description: "Manages a variable set in Terrapod.",
 		Attributes: map[string]schema.Attribute{
-			"id":          schema.StringAttribute{Computed: true, Description: "Variable set ID.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
-			"name":        schema.StringAttribute{Required: true, Description: "The variable set name."},
-			"description": schema.StringAttribute{Optional: true, Description: "Description of the variable set."},
-			"global":      schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(false), Description: "Apply this variable set to all workspaces."},
-			"priority":    schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(false), Description: "Priority variable sets override workspace variables."},
-			"var_count":   schema.Int64Attribute{Computed: true, Description: "Number of variables in this set."},
+			"id":              schema.StringAttribute{Computed: true, Description: "Variable set ID.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
+			"name":            schema.StringAttribute{Required: true, Description: "The variable set name."},
+			"description":     schema.StringAttribute{Optional: true, Description: "Description of the variable set."},
+			"global":          schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(false), Description: "Apply this variable set to all workspaces."},
+			"priority":        schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(false), Description: "Priority variable sets override workspace variables."},
+			"var_count":       schema.Int64Attribute{Computed: true, Description: "Number of variables in this set."},
 			"workspace_count": schema.Int64Attribute{Computed: true, Description: "Number of workspaces assigned to this set."},
-			"created_at":  schema.StringAttribute{Computed: true, Description: "Creation timestamp.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
-			"updated_at":  schema.StringAttribute{Computed: true, Description: "Update timestamp."},
+			"created_at":      schema.StringAttribute{Computed: true, Description: "Creation timestamp.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
+			"updated_at":      schema.StringAttribute{Computed: true, Description: "Update timestamp."},
 		},
 	}
 }

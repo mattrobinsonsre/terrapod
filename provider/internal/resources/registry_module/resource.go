@@ -56,9 +56,9 @@ func (r *registryModuleResource) Schema(_ context.Context, _ resource.SchemaRequ
 	resp.Schema = schema.Schema{
 		Description: "Manages a private module in the Terrapod registry.",
 		Attributes: map[string]schema.Attribute{
-			"id":   schema.StringAttribute{Computed: true, Description: "Module ID.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
-			"name": schema.StringAttribute{Required: true, Description: "Module name.", PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
-			"provider_name": schema.StringAttribute{Required: true, Description: "Provider name (e.g. aws, gcp).", PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
+			"id":                schema.StringAttribute{Computed: true, Description: "Module ID.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
+			"name":              schema.StringAttribute{Required: true, Description: "Module name.", PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
+			"provider_name":     schema.StringAttribute{Required: true, Description: "Provider name (e.g. aws, gcp).", PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
 			"labels":            schema.MapAttribute{Optional: true, ElementType: types.StringType, Description: "Labels for RBAC evaluation."},
 			"vcs_connection_id": schema.StringAttribute{Optional: true, Description: "VCS connection ID."},
 			"vcs_repo_url":      schema.StringAttribute{Optional: true, Description: "VCS repo URL."},

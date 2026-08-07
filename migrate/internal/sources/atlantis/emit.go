@@ -42,20 +42,20 @@ type EmitOptions struct {
 //   - workspace=""/"default"  → no workspace suffix on SourceName
 //   - workspace="<other>"     → SourceID/Name suffix "/<workspace>"
 //   - terraform_version       → ir.Workspace.TerraformVersion (verbatim;
-//                                Terrapod accepts partials like "1.12")
+//     Terrapod accepts partials like "1.12")
 //   - terraform_distribution  → ir.Workspace.ExecutionMode is always
-//                                "agent" for Atlantis migrations (Atlantis
-//                                runs the binary itself; the migration
-//                                preserves that operational shape).
-//                                ExecutionBackend is set elsewhere by the
-//                                writer from this field — recorded for
-//                                now in Labels["terraform_distribution"].
+//     "agent" for Atlantis migrations (Atlantis
+//     runs the binary itself; the migration
+//     preserves that operational shape).
+//     ExecutionBackend is set elsewhere by the
+//     writer from this field — recorded for
+//     now in Labels["terraform_distribution"].
 //   - autoplan.enabled=false  → SkippedItem (Terrapod runs plan on PR
-//                                push unconditionally; an explicit
-//                                "no-autoplan" project on Atlantis would
-//                                surprise the operator on Terrapod)
+//     push unconditionally; an explicit
+//     "no-autoplan" project on Atlantis would
+//     surprise the operator on Terrapod)
 //   - workflow != ""          → SkippedItem (custom workflows have no
-//                                Terrapod equivalent — operator handles)
+//     Terrapod equivalent — operator handles)
 //   - apply_requirements      → SkippedItem (advisory metadata)
 //   - custom_policy_check     → SkippedItem (Terrapod uses OPA, see #343)
 //   - execution_order_group   → SkippedItem (Terrapod uses run triggers)

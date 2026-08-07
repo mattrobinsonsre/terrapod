@@ -50,14 +50,14 @@ func (r *gpgKeyResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 	resp.Schema = schema.Schema{
 		Description: "Manages a GPG key for provider signing in the Terrapod registry.",
 		Attributes: map[string]schema.Attribute{
-			"id":         schema.StringAttribute{Computed: true, Description: "GPG key ID.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
+			"id":          schema.StringAttribute{Computed: true, Description: "GPG key ID.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
 			"ascii_armor": schema.StringAttribute{Required: true, Sensitive: true, Description: "ASCII-armored PGP public key (write-only).", PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
-			"namespace":  schema.StringAttribute{Optional: true, Computed: true, Default: stringdefault.StaticString("default"), Description: "Namespace.", PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
-			"source":     schema.StringAttribute{Optional: true, Computed: true, Default: stringdefault.StaticString("terrapod"), Description: "Key source.", PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
-			"source_url": schema.StringAttribute{Optional: true, Description: "Source URL.", PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
-			"key_id":     schema.StringAttribute{Computed: true, Description: "PGP key ID (extracted from armor).", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
-			"created_at": schema.StringAttribute{Computed: true, Description: "Creation timestamp.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
-			"updated_at": schema.StringAttribute{Computed: true, Description: "Update timestamp."},
+			"namespace":   schema.StringAttribute{Optional: true, Computed: true, Default: stringdefault.StaticString("default"), Description: "Namespace.", PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
+			"source":      schema.StringAttribute{Optional: true, Computed: true, Default: stringdefault.StaticString("terrapod"), Description: "Key source.", PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
+			"source_url":  schema.StringAttribute{Optional: true, Description: "Source URL.", PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
+			"key_id":      schema.StringAttribute{Computed: true, Description: "PGP key ID (extracted from armor).", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
+			"created_at":  schema.StringAttribute{Computed: true, Description: "Creation timestamp.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
+			"updated_at":  schema.StringAttribute{Computed: true, Description: "Update timestamp."},
 		},
 	}
 }

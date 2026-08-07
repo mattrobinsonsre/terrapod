@@ -20,21 +20,21 @@ import (
 // applies via terraform-provider-terrapod (terrapod_role +
 // terrapod_role_assignment).
 type RBACTranslation struct {
-	Teams           []TeamMapping            `json:"teams"`
-	UnsupportedFeat []string                 `json:"unsupported_features"`
-	WorkspaceTeams  map[string][]TeamMember  `json:"workspace_team_access,omitempty"`
+	Teams           []TeamMapping           `json:"teams"`
+	UnsupportedFeat []string                `json:"unsupported_features"`
+	WorkspaceTeams  map[string][]TeamMember `json:"workspace_team_access,omitempty"`
 }
 
 // TeamMapping captures one source-side TFE team and the Terrapod
 // role we recommend creating in its place.
 type TeamMapping struct {
-	TFETeamName        string `json:"tfe_team_name"`
-	TFETeamID          string `json:"tfe_team_id"`
-	SuggestedRoleName  string `json:"suggested_role_name"`
-	SuggestedPermLevel string `json:"suggested_permission_level"` // read|plan|write|admin
-	MemberCount        int    `json:"member_count"`
+	TFETeamName        string       `json:"tfe_team_name"`
+	TFETeamID          string       `json:"tfe_team_id"`
+	SuggestedRoleName  string       `json:"suggested_role_name"`
+	SuggestedPermLevel string       `json:"suggested_permission_level"` // read|plan|write|admin
+	MemberCount        int          `json:"member_count"`
 	Members            []TeamMember `json:"members,omitempty"`
-	Notes              string `json:"notes,omitempty"`
+	Notes              string       `json:"notes,omitempty"`
 }
 
 // TeamMember is a single user assignment on a TFE team. Surfaced in

@@ -21,11 +21,11 @@ import (
 	"path/filepath"
 	"strings"
 
+	gcs "cloud.google.com/go/storage"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	gcs "cloud.google.com/go/storage"
 
 	"github.com/mattrobinsonsre/terrapod/migrate/internal/hcl"
 	"github.com/mattrobinsonsre/terrapod/migrate/internal/writer"

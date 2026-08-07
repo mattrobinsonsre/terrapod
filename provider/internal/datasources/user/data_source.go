@@ -42,13 +42,13 @@ func (d *userDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, r
 	resp.Schema = schema.Schema{
 		Description: "Look up a Terrapod user by email.",
 		Attributes: map[string]schema.Attribute{
-			"email":        schema.StringAttribute{Required: true, Description: "User email."},
-			"display_name": schema.StringAttribute{Computed: true, Description: "Display name."},
-			"is_active":    schema.BoolAttribute{Computed: true, Description: "Whether the user is active."},
-			"has_password": schema.BoolAttribute{Computed: true, Description: "Whether the user has a local password."},
+			"email":         schema.StringAttribute{Required: true, Description: "User email."},
+			"display_name":  schema.StringAttribute{Computed: true, Description: "Display name."},
+			"is_active":     schema.BoolAttribute{Computed: true, Description: "Whether the user is active."},
+			"has_password":  schema.BoolAttribute{Computed: true, Description: "Whether the user has a local password."},
 			"last_login_at": schema.StringAttribute{Computed: true, Description: "Last login timestamp."},
-			"created_at":   schema.StringAttribute{Computed: true, Description: "Creation timestamp."},
-			"updated_at":   schema.StringAttribute{Computed: true, Description: "Update timestamp."},
+			"created_at":    schema.StringAttribute{Computed: true, Description: "Creation timestamp."},
+			"updated_at":    schema.StringAttribute{Computed: true, Description: "Update timestamp."},
 		},
 	}
 }
