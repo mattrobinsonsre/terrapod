@@ -162,9 +162,14 @@ unchanged, lives in `registry_rbac_service`.)
 | admin | `registry:admin` | DELETE module/provider/version/platform; PATCH module/provider (labels) — **owner reassignment additionally requires platform admin**; PATCH module vcs; POST/DELETE workspace-links |
 
 `platform:registry-admin` (not registry-RBAC) covers: binary-cache + provider-cache
-admin endpoints, and registry resource **owner** reassignment. **Gap flagged:**
-`gpg_keys.py` CRUD is currently authenticated-only (no registry or admin gate) —
-a pre-existing surface noted for follow-up, not changed by the faithful migration.
+admin endpoints, and registry resource **owner** reassignment.
+
+**GPG signing keys** are the provider registry's trust anchor, so registering,
+revoking or deleting one requires `registry:admin`. Reads stay open to any
+authenticated caller — a public key is not secret, and `terraform init` needs to
+see it. Note this resolves against an empty resource (a `GPGKey` carries no owner
+and no labels — it is one platform-wide list, not a per-resource thing), so only
+unscoped grants apply.
 
 ---
 

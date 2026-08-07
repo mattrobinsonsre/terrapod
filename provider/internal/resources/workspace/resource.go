@@ -11,7 +11,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
@@ -233,11 +232,26 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				Computed:    true,
 				Default:     stringdefault.StaticString("local"),
 			},
+			// No schema default, deliberately — same shape as `auto_merge`
+			// below and as `auto_apply_mode` above.
+			//
+			// The server derives this boolean from the mode (`auto_apply =
+			// mode != "never"`), and when a mode is configured the request
+			// builder sends ONLY the mode. A `booldefault.StaticBool(false)`
+			// therefore made the planned value a *known* false while the
+			// applied value came back true, which Terraform core rejects
+			// outright: "Provider produced inconsistent result after apply:
+			// .auto_apply: was cty.False, but now cty.True". That made every
+			// non-`never` mode un-appliable. Optional+Computed with
+			// UseStateForUnknown lets the server's projection land without a
+			// planned value to contradict it.
 			"auto_apply": schema.BoolAttribute{
 				Description: "Automatically apply successful plans. Superseded by `auto_apply_mode` when that is set; prefer `auto_apply_mode` for new configurations.",
 				Optional:    true,
 				Computed:    true,
-				Default:     booldefault.StaticBool(false),
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"auto_apply_mode": schema.StringAttribute{
 				Description: "Conditional auto-apply: `never`, `always`, `create` (apply only plans that add resources) or `create_update` (also allow in-place updates). `create` and `create_update` never apply a plan that destroys or replaces a resource — that is left for a human. Optional + Computed with no default, so a configuration that does not set it inherits whatever the workspace has and never drifts.",
