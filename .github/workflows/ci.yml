@@ -1349,7 +1349,7 @@ jobs:
 
       - name: Upload SARIF
         if: always()
-        uses: github/codeql-action/upload-sarif@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4
+        uses: github/codeql-action/upload-sarif@d1ba80a13dd99fba24a470575428917156a28b43 # v4
         with:
           sarif_file: semgrep-results.sarif
           category: semgrep
@@ -1807,7 +1807,7 @@ jobs:
 
       - name: Upload SARIF
         if: always()
-        uses: github/codeql-action/upload-sarif@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4
+        uses: github/codeql-action/upload-sarif@d1ba80a13dd99fba24a470575428917156a28b43 # v4
         with:
           sarif_file: trivy-${{ matrix.image }}-${{ matrix.arch }}.sarif
           category: trivy-${{ matrix.image }}-${{ matrix.arch }}
