@@ -18,6 +18,7 @@ the scheduler's trigger queue with deduplication.
 """
 
 import asyncio
+import hashlib
 import time as time_mod
 import uuid
 from datetime import UTC, datetime
@@ -119,22 +120,37 @@ async def _get_default_branch(
 # A PR head the trigger-prefix filter rejected. Remembered so the decision is
 # made once per PR head rather than once per poll cycle (#1330).
 #
-# Keying on the head SHA is sound because the filter compares
-# `ws.vcs_last_commit_sha ... pr.head_sha` (three-dot): the PR head is fixed
-# while the tracked branch only moves forward, so that diff can only shrink and
-# a skip stays a skip. The TTL covers the one case where it could grow again —
-# a force-push or re-seed that rewinds the workspace's last-seen commit.
+# The key carries every input the decision depends on: the PR head SHA and the
+# resolved prefixes. Changing the filter is therefore a cache miss, so an
+# operator who widens a prefix sees the PR re-evaluated on the next cycle rather
+# than staying silently suppressed (#1332). The tracked-branch SHA is
+# deliberately NOT in the key — it advances constantly, and including it would
+# invalidate the memo on every push to the branch, which is the cost this exists
+# to avoid.
+#
+# Leaving it out is sound in the ordinary case: the filter compares
+# `ws.vcs_last_commit_sha ... pr.head_sha` (three-dot), and as the tracked branch
+# advances the merge base advances with it, so the diff normally only shrinks and
+# a skip stays a skip. Two residual cases can make it grow again — a force-push
+# that rewinds the tracked branch, and a merge base that advances past a commit
+# on the PR branch (a stacked or partially-merged PR) so a change-then-revert
+# pair stops cancelling out. Both are rare, both resolve as soon as the PR is
+# pushed to, and the TTL bounds them; `DEL tp:pr_skip:*` clears one by hand.
 _PR_SKIP_TTL_SECONDS = 30 * 24 * 60 * 60
 
 
-def _pr_skip_key(workspace_id: uuid.UUID, pr_number: int, head_sha: str) -> str:
-    return f"tp:pr_skip:{workspace_id}:{pr_number}:{head_sha}"
+def _pr_skip_key(
+    workspace_id: uuid.UUID, pr_number: int, head_sha: str, prefixes: list[str]
+) -> str:
+    # Order-insensitive: reordering the prefixes does not change the decision.
+    digest = hashlib.sha256("\x00".join(sorted(prefixes)).encode()).hexdigest()[:12]
+    return f"tp:pr_skip:{workspace_id}:{pr_number}:{head_sha}:{digest}"
 
 
 async def _pr_decision_is_remembered(
-    workspace_id: uuid.UUID, pr_number: int, head_sha: str
+    workspace_id: uuid.UUID, pr_number: int, head_sha: str, prefixes: list[str]
 ) -> bool:
-    """True if this PR head was already evaluated and skipped for this workspace.
+    """True if this PR head was already evaluated and skipped under these prefixes.
 
     Fails open: if Redis is unavailable we return False and re-evaluate, which
     costs one provider call and behaves exactly as before. The opposite default
@@ -143,29 +159,31 @@ async def _pr_decision_is_remembered(
     try:
         from terrapod.redis.client import get_redis_client
 
-        return bool(
-            await get_redis_client().exists(_pr_skip_key(workspace_id, pr_number, head_sha))
-        )
+        key = _pr_skip_key(workspace_id, pr_number, head_sha, prefixes)
+        return bool(await get_redis_client().exists(key))
     except Exception:
         return False
 
 
-async def _remember_pr_decision(workspace_id: uuid.UUID, pr_number: int, head_sha: str) -> None:
+async def _remember_pr_decision(
+    workspace_id: uuid.UUID, pr_number: int, head_sha: str, prefixes: list[str]
+) -> None:
     """Record that this PR head was evaluated and did not warrant a run."""
     try:
         from terrapod.redis.client import get_redis_client
 
-        await get_redis_client().set(
-            _pr_skip_key(workspace_id, pr_number, head_sha), "1", ex=_PR_SKIP_TTL_SECONDS
-        )
-    except Exception:
+        key = _pr_skip_key(workspace_id, pr_number, head_sha, prefixes)
+        await get_redis_client().set(key, "1", ex=_PR_SKIP_TTL_SECONDS)
+    except Exception as e:
         # Best effort. Losing the marker costs a repeated provider call, never
-        # correctness.
+        # correctness. Logged without a traceback: a sustained Redis outage
+        # reaches this line once per filtered PR per cycle, and stack traces at
+        # that rate bury everything else.
         logger.warning(
             "Could not record skipped-PR decision; it will be re-evaluated",
             workspace_id=str(workspace_id),
             pr_number=pr_number,
-            exc_info=True,
+            error=repr(e),
         )
 
 
@@ -845,6 +863,26 @@ async def _poll_workspace_prs(
         if existing.scalar_one_or_none() is not None:
             continue
 
+        # VCS subdirectory filtering for PRs: compare PR head against tracked branch.
+        # Resolved before anything else in the loop does work, because a PR we have
+        # already decided not to run is done, exactly as a PR we have run is done —
+        # but only a run leaves a row for the guard above to find. Without the memo
+        # the skip is indistinguishable from "never processed" and is recomputed, at
+        # the cost of one provider call, every cycle forever (#1330). Checking it here
+        # rather than further down also keeps a permanently-filtered PR from
+        # incrementing VCS_PRS_DETECTED and logging "New PR commit detected" on every
+        # cycle, which would leave the counter useless for alerting (#1332).
+        pr_prefixes = (
+            ws.trigger_prefixes
+            if ws.trigger_prefixes
+            else ([ws.working_directory] if ws.working_directory else [])
+        )
+        prefix_filtered = bool(pr_prefixes and ws.vcs_last_commit_sha)
+        if prefix_filtered and await _pr_decision_is_remembered(
+            ws.id, pr.number, pr.head_sha, pr_prefixes
+        ):
+            continue
+
         # Cancel any existing non-terminal runs for this PR (superseded by new commit)
         stale_result = await db.execute(
             select(Run).where(
@@ -880,20 +918,7 @@ async def _poll_workspace_prs(
             title=pr.title,
         )
 
-        # VCS subdirectory filtering for PRs: compare PR head against tracked branch
-        pr_prefixes = (
-            ws.trigger_prefixes
-            if ws.trigger_prefixes
-            else ([ws.working_directory] if ws.working_directory else [])
-        )
-        if pr_prefixes and ws.vcs_last_commit_sha:
-            # A PR we have already decided not to run is done, exactly as a PR
-            # we have run is done — but only a run leaves a row for the guard
-            # above to find, so without this the skip is indistinguishable from
-            # "never processed" and is recomputed, at the cost of one provider
-            # call, every cycle forever (#1330).
-            if await _pr_decision_is_remembered(ws.id, pr.number, pr.head_sha):
-                continue
+        if prefix_filtered:
             try:
                 changed = await _get_changed_files(
                     conn, owner, repo, ws.vcs_last_commit_sha, pr.head_sha
@@ -908,7 +933,7 @@ async def _poll_workspace_prs(
                         changed_files=changed[:20],
                         changed_files_count=len(changed),
                     )
-                    await _remember_pr_decision(ws.id, pr.number, pr.head_sha)
+                    await _remember_pr_decision(ws.id, pr.number, pr.head_sha, pr_prefixes)
                     continue
             except Exception as e:
                 logger.warning(

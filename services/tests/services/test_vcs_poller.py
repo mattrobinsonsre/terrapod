@@ -1439,9 +1439,32 @@ class TestPollWorkspacePassesMetadataCacheCorrectly:
             assert kwargs["fetch_paths"] == ["environments/dev"]
 
 
+class _FakeRedis:
+    """Enough of the Redis surface for the skip marker, and nothing else.
+
+    Deliberately a fake rather than a mock of `_pr_decision_is_remembered` /
+    `_remember_pr_decision`: those two wrappers ARE the fix, so mocking them
+    leaves their bodies — the key format, the TTL, the bool coercion, the
+    swallowing `except` — unexecuted, and a regression in any of them would
+    silently restore #1330 with a green suite. This mocks the boundary below
+    them instead, per the AGENTS.md rule (#1332).
+    """
+
+    def __init__(self):
+        self.store: dict[str, str] = {}
+        self.set_calls: list[tuple[str, int | None]] = []
+
+    async def exists(self, key):
+        return 1 if key in self.store else 0
+
+    async def set(self, key, value, ex=None):
+        self.store[key] = value
+        self.set_calls.append((key, ex))
+
+
 class TestFilteredPRIsDecidedOnce:
     """A PR the trigger-prefix filter rejects must be decided once, not once
-    per cycle (#1330).
+    per cycle (#1330) — and the decision must not outlive its inputs (#1332).
 
     The loop's "already handled" guard looks for a Run, so every path that
     creates one terminates. The filter is the only path that creates no run —
@@ -1468,74 +1491,127 @@ class TestFilteredPRIsDecidedOnce:
         db.execute = AsyncMock(return_value=result)
         return db
 
-    @patch("terrapod.services.vcs_poller._remember_pr_decision")
-    @patch("terrapod.services.vcs_poller._pr_decision_is_remembered")
+    async def _cycle(self, ws, redis, prs):
+        """One poll cycle against a real Redis-backed memo."""
+        from terrapod.services.vcs_poller import _poll_workspace_prs
+
+        with patch("terrapod.redis.client.get_redis_client", return_value=redis):
+            await _poll_workspace_prs(
+                self._db_with_no_existing_run(), ws, _mock_connection(), "org", "repo", "main"
+            )
+        return prs
+
     @patch("terrapod.services.vcs_poller._create_vcs_run")
     @patch("terrapod.services.vcs_poller._get_changed_files")
     @patch("terrapod.services.vcs_poller._list_open_prs")
-    async def test_a_skip_is_recorded(
-        self, mock_prs, mock_changed, mock_create, mock_remembered, mock_remember
+    async def test_the_second_cycle_costs_no_provider_call(
+        self, mock_prs, mock_changed, mock_create
     ):
-        from terrapod.services.vcs_poller import _poll_workspace_prs
-
+        """The defect itself, driven end to end: two cycles, one compare call."""
+        redis = _FakeRedis()
         ws = _mock_workspace(trigger_prefixes=["terraform/auth0"], vcs_last_commit_sha="aaa111")
         mock_prs.return_value = self._prs()
         mock_changed.return_value = ["frontend/app.tsx"]  # no prefix match
-        mock_remembered.return_value = False
 
-        await _poll_workspace_prs(
-            self._db_with_no_existing_run(), ws, _mock_connection(), "org", "repo", "main"
-        )
+        await self._cycle(ws, redis, mock_prs)
+        assert mock_changed.await_count == 1
+        assert len(redis.store) == 1, "the skip was not recorded"
 
+        # Nothing about the PR or the workspace has changed, so the second
+        # cycle must reach its decision from the marker alone.
+        await self._cycle(ws, redis, mock_prs)
+        assert mock_changed.await_count == 1, "re-evaluated a PR already decided"
         mock_create.assert_not_called()
-        mock_remember.assert_awaited_once_with(ws.id, 7, "ccc333")
 
-    @patch("terrapod.services.vcs_poller._remember_pr_decision")
-    @patch("terrapod.services.vcs_poller._pr_decision_is_remembered")
     @patch("terrapod.services.vcs_poller._create_vcs_run")
     @patch("terrapod.services.vcs_poller._get_changed_files")
     @patch("terrapod.services.vcs_poller._list_open_prs")
-    async def test_a_remembered_skip_costs_no_provider_call(
-        self, mock_prs, mock_changed, mock_create, mock_remembered, mock_remember
-    ):
-        """The defect itself: the second cycle must not re-fetch changed files."""
+    async def test_editing_the_prefixes_re_evaluates(self, mock_prs, mock_changed, mock_create):
+        """#1332: widening a prefix is exactly what an operator does when a PR
+        is not planning, so it must dislodge the skip rather than be swallowed
+        by it for the TTL."""
+        redis = _FakeRedis()
+        ws = _mock_workspace(trigger_prefixes=["terraform/auth0"], vcs_last_commit_sha="aaa111")
+        mock_prs.return_value = self._prs()
+        mock_changed.return_value = ["frontend/app.tsx"]
+        mock_create.return_value = MagicMock(id=uuid.uuid4())
+
+        await self._cycle(ws, redis, mock_prs)
+        assert mock_changed.await_count == 1
+        mock_create.assert_not_called()
+
+        # The operator notices the prefix was wrong and widens it.
+        ws.trigger_prefixes = ["frontend"]
+
+        await self._cycle(ws, redis, mock_prs)
+        assert mock_changed.await_count == 2, "stale marker suppressed the re-evaluation"
+        mock_create.assert_called_once()
+
+    @patch("terrapod.services.vcs_poller._create_vcs_run")
+    @patch("terrapod.services.vcs_poller._get_changed_files")
+    @patch("terrapod.services.vcs_poller._list_open_prs")
+    async def test_a_new_head_sha_is_evaluated_afresh(self, mock_prs, mock_changed, mock_create):
+        """A PR update is a new head SHA, so it must not inherit the old skip."""
+        redis = _FakeRedis()
+        ws = _mock_workspace(trigger_prefixes=["terraform/auth0"], vcs_last_commit_sha="aaa111")
+        mock_prs.return_value = self._prs()
+        mock_changed.return_value = ["frontend/app.tsx"]
+        mock_create.return_value = MagicMock(id=uuid.uuid4())
+
+        await self._cycle(ws, redis, mock_prs)
+        assert mock_changed.await_count == 1
+
+        # The author pushes a commit that does touch the watched subtree.
+        mock_prs.return_value = self._prs(head_sha="ddd444")
+        mock_changed.return_value = ["terraform/auth0/main.tf"]
+
+        await self._cycle(ws, redis, mock_prs)
+        assert mock_changed.await_count == 2, "a new head SHA reused the old decision"
+        mock_create.assert_called_once()
+
+    @patch("terrapod.services.vcs_poller._create_vcs_run")
+    @patch("terrapod.services.vcs_poller._get_changed_files")
+    @patch("terrapod.services.vcs_poller._list_open_prs")
+    async def test_the_marker_carries_a_bounded_ttl(self, mock_prs, mock_changed, mock_create):
+        """A marker that never expired would make a rewound tracked branch a
+        permanent suppression rather than a temporary one."""
+        from terrapod.services.vcs_poller import _PR_SKIP_TTL_SECONDS
+
+        redis = _FakeRedis()
+        ws = _mock_workspace(trigger_prefixes=["terraform/auth0"], vcs_last_commit_sha="aaa111")
+        mock_prs.return_value = self._prs()
+        mock_changed.return_value = ["frontend/app.tsx"]
+
+        await self._cycle(ws, redis, mock_prs)
+
+        assert len(redis.set_calls) == 1
+        key, ttl = redis.set_calls[0]
+        assert ttl == _PR_SKIP_TTL_SECONDS
+        assert key.startswith("tp:pr_skip:")
+        assert "ccc333" in key, "the head SHA must scope the marker"
+
+    @patch("terrapod.services.vcs_poller._create_vcs_run")
+    @patch("terrapod.services.vcs_poller._get_changed_files")
+    @patch("terrapod.services.vcs_poller._list_open_prs")
+    async def test_a_redis_outage_fails_open(self, mock_prs, mock_changed, mock_create):
+        """Losing Redis must cost a repeated provider call, never a lost run —
+        the pre-#1330 behaviour, which was wasteful but correct."""
         from terrapod.services.vcs_poller import _poll_workspace_prs
 
         ws = _mock_workspace(trigger_prefixes=["terraform/auth0"], vcs_last_commit_sha="aaa111")
         mock_prs.return_value = self._prs()
-        mock_remembered.return_value = True  # decided on a previous cycle
-
-        await _poll_workspace_prs(
-            self._db_with_no_existing_run(), ws, _mock_connection(), "org", "repo", "main"
-        )
-
-        mock_changed.assert_not_called()
-        mock_create.assert_not_called()
-
-    @patch("terrapod.services.vcs_poller._remember_pr_decision")
-    @patch("terrapod.services.vcs_poller._pr_decision_is_remembered")
-    @patch("terrapod.services.vcs_poller._create_vcs_run")
-    @patch("terrapod.services.vcs_poller._get_changed_files")
-    @patch("terrapod.services.vcs_poller._list_open_prs")
-    async def test_a_new_head_sha_is_evaluated_afresh(
-        self, mock_prs, mock_changed, mock_create, mock_remembered, mock_remember
-    ):
-        """A PR update is a new head SHA, so it must not inherit the old skip."""
-        from terrapod.services.vcs_poller import _poll_workspace_prs
-
-        ws = _mock_workspace(trigger_prefixes=["terraform/auth0"], vcs_last_commit_sha="aaa111")
-        mock_prs.return_value = self._prs(head_sha="ddd444")
-        mock_remembered.return_value = False  # keyed on head SHA, so a miss
-        mock_changed.return_value = ["terraform/auth0/main.tf"]  # now matches
+        mock_changed.return_value = ["terraform/auth0/main.tf"]  # matches: must run
         mock_create.return_value = MagicMock(id=uuid.uuid4())
 
-        await _poll_workspace_prs(
-            self._db_with_no_existing_run(), ws, _mock_connection(), "org", "repo", "main"
-        )
+        with patch(
+            "terrapod.redis.client.get_redis_client", side_effect=RuntimeError("redis is down")
+        ):
+            await _poll_workspace_prs(
+                self._db_with_no_existing_run(), ws, _mock_connection(), "org", "repo", "main"
+            )
 
         mock_changed.assert_awaited_once()
         mock_create.assert_called_once()
-        mock_remember.assert_not_awaited()  # it ran; nothing to remember
 
     @patch("terrapod.services.vcs_poller._pr_decision_is_remembered")
     @patch("terrapod.services.vcs_poller._create_vcs_run")
@@ -1545,7 +1621,9 @@ class TestFilteredPRIsDecidedOnce:
         self, mock_prs, mock_changed, mock_create, mock_remembered
     ):
         """No prefixes means the filter block is never entered, so the new
-        lookup must not run either — these workspaces were never the problem."""
+        lookup must not run either — these workspaces were never the problem.
+        (Patching the wrapper is legitimate here: the assertion is that it is
+        never called, so its body is not under test.)"""
         from terrapod.services.vcs_poller import _poll_workspace_prs
 
         ws = _mock_workspace(trigger_prefixes=[], working_directory="")

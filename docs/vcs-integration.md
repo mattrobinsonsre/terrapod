@@ -387,6 +387,8 @@ Now commits to `modules/vpc/main.tf` will trigger runs for this workspace.
 - When `trigger-prefixes` is set, the working directory is NOT automatically included — add it explicitly if needed
 - Set to `[]` (empty list) to revert to default working directory filtering
 
+**The decision is cached per pull-request head.** Working out that a pull request touches nothing under the prefixes costs one call to the VCS provider, and the answer cannot change until the pull request is pushed to — so Terrapod records it in Redis (`tp:pr_skip:…`, 30-day TTL) rather than recomputing it on every poll cycle. The key includes the resolved prefixes, so **editing `trigger-prefixes` or `working-directory` re-evaluates every open pull request on the next cycle** — you do not have to wait out the TTL or push a commit to see the effect of a change. If you ever need to force a re-evaluation without changing anything (for instance after force-pushing the tracked branch), delete the key: `DEL tp:pr_skip:{workspace-id}:{pr-number}:{head-sha}:*`, or simply push to the pull request.
+
 **Sparse fetch implication.** `working-directory` and `trigger-prefixes` also narrow the actual git fetch — Terrapod only downloads blobs reachable under those paths. For a workspace tracking `environments/dev` of a 500 MB monorepo, the wire fetch is bounded by the size of `environments/dev/` plus any declared `trigger-prefixes`, not the full repo.
 
 ### Supported URL Formats

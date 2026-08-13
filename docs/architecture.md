@@ -587,6 +587,7 @@ Currently registered trigger handlers:
 | `tp:sched:{name}:last` | Last completed execution timestamp | -- |
 | `tp:sched:triggers` | Triggered task queue (Redis LIST) | -- |
 | `tp:sched:trigger:{dedup}` | Trigger deduplication key | 5 min |
+| `tp:pr_skip:{workspace}:{pr}:{head-sha}:{prefix-digest}` | A pull request the trigger-prefix filter rejected, so the decision is made once per PR head rather than once per poll cycle. The digest covers the resolved prefixes, so editing them re-evaluates. Safe to delete by hand. | 30 days |
 
 ### Adding New Scheduled Tasks
 
