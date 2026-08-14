@@ -25,7 +25,7 @@ from terrapod.db.models import (
 )
 from terrapod.db.session import get_db_session
 from terrapod.logging_config import get_logger
-from terrapod.services import run_service
+from terrapod.services import run_service, vcs_rate_limit
 
 logger = get_logger(__name__)
 
@@ -335,6 +335,7 @@ async def _create_drift_run_non_vcs(
     return run
 
 
+@vcs_rate_limit.attributed("drift-detection")
 async def drift_check_cycle() -> None:
     """Execute one drift check cycle: scan all drift-enabled workspaces.
 

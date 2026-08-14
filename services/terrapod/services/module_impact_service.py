@@ -28,7 +28,7 @@ from terrapod.db.models import (
 )
 from terrapod.db.session import get_db_session
 from terrapod.logging_config import get_logger
-from terrapod.services import github_service, gitlab_service, run_service
+from terrapod.services import github_service, gitlab_service, run_service, vcs_rate_limit
 from terrapod.services.archive_utils import strip_archive_top_level_dir_async
 from terrapod.services.vcs_provider import PullRequest
 from terrapod.storage import get_storage
@@ -91,6 +91,7 @@ async def handle_module_impact_immediate_poll(payload: dict) -> None:
     await module_impact_poll_cycle()
 
 
+@vcs_rate_limit.attributed("module-impact")
 async def module_impact_poll_cycle() -> None:
     """Poll VCS-connected modules (with workspace links) for open PRs."""
     async with get_db_session() as db:

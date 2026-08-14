@@ -259,7 +259,9 @@ class TestGithubRequestRetry:
             patch("terrapod.services.github_service.asyncio.sleep", new=AsyncMock()) as mock_sleep,
             patch("httpx.AsyncClient", return_value=_patched_client([first, second])),
         ):
-            resp = await _github_request("GET", "https://api.github.com/x", "tok")
+            resp = await _github_request(
+                "GET", "https://api.github.com/x", "tok", conn=_mock_conn()
+            )
 
         assert resp is second
         assert mock_sleep.await_count == 1
@@ -283,7 +285,9 @@ class TestGithubRequestRetry:
             patch("terrapod.services.github_service.asyncio.sleep", new=AsyncMock()),
             patch("httpx.AsyncClient", return_value=_patched_client([first, second])),
         ):
-            resp = await _github_request("GET", "https://api.github.com/x", "tok")
+            resp = await _github_request(
+                "GET", "https://api.github.com/x", "tok", conn=_mock_conn()
+            )
 
         assert resp is second
 
@@ -309,7 +313,9 @@ class TestGithubRequestRetry:
             patch("terrapod.services.github_service.asyncio.sleep", new=AsyncMock()),
             patch("httpx.AsyncClient", return_value=_patched_client([binary_403])) as m_cls,
         ):
-            resp = await _github_request("GET", "https://api.github.com/tarball", "tok")
+            resp = await _github_request(
+                "GET", "https://api.github.com/tarball", "tok", conn=_mock_conn()
+            )
 
         assert resp is binary_403
         # Only one request — not retried
@@ -328,7 +334,9 @@ class TestGithubRequestRetry:
             patch("terrapod.services.github_service.asyncio.sleep", new=AsyncMock()),
             patch("httpx.AsyncClient", return_value=_patched_client([first, second])),
         ):
-            resp = await _github_request("GET", "https://api.github.com/x", "tok")
+            resp = await _github_request(
+                "GET", "https://api.github.com/x", "tok", conn=_mock_conn()
+            )
 
         assert resp is second
 
@@ -346,7 +354,9 @@ class TestGithubRequestRetry:
             patch("terrapod.services.github_service.asyncio.sleep", new=AsyncMock()),
             patch("httpx.AsyncClient", return_value=_patched_client([failure])) as m_cls,
         ):
-            resp = await _github_request("POST", "https://api.github.com/x", "tok")
+            resp = await _github_request(
+                "POST", "https://api.github.com/x", "tok", conn=_mock_conn()
+            )
 
         assert resp is failure
         assert m_cls.return_value.request.await_count == 1
@@ -366,7 +376,9 @@ class TestGithubRequestRetry:
             patch("terrapod.services.github_service.asyncio.sleep", new=AsyncMock()),
             patch("httpx.AsyncClient", return_value=_patched_client([first, second])),
         ):
-            resp = await _github_request("POST", "https://api.github.com/x", "tok", retry_5xx=True)
+            resp = await _github_request(
+                "POST", "https://api.github.com/x", "tok", retry_5xx=True, conn=_mock_conn()
+            )
 
         assert resp is second
 
@@ -385,7 +397,9 @@ class TestGithubRequestRetry:
             patch("terrapod.services.github_service.asyncio.sleep", new=AsyncMock()),
             patch("httpx.AsyncClient", return_value=_patched_client([first, second])),
         ):
-            resp = await _github_request("POST", "https://api.github.com/x", "tok")
+            resp = await _github_request(
+                "POST", "https://api.github.com/x", "tok", conn=_mock_conn()
+            )
 
         assert resp is second
 
@@ -405,7 +419,9 @@ class TestGithubRequestRetry:
             patch("terrapod.services.github_service.asyncio.sleep", new=AsyncMock()),
             patch("httpx.AsyncClient", return_value=_patched_client([err, success])),
         ):
-            resp = await _github_request("POST", "https://api.github.com/x", "tok")
+            resp = await _github_request(
+                "POST", "https://api.github.com/x", "tok", conn=_mock_conn()
+            )
 
         assert resp is success
 
@@ -428,7 +444,7 @@ class TestGithubRequestRetry:
             ),
             pytest.raises(httpx.ReadTimeout),
         ):
-            await _github_request("GET", "https://api.github.com/x", "tok")
+            await _github_request("GET", "https://api.github.com/x", "tok", conn=_mock_conn())
 
     @pytest.mark.asyncio
     async def test_retries_exhausted_returns_last_response(self):
@@ -445,7 +461,9 @@ class TestGithubRequestRetry:
                 return_value=_patched_client([stuck, stuck, stuck, stuck]),
             ) as m_cls,
         ):
-            resp = await _github_request("GET", "https://api.github.com/x", "tok")
+            resp = await _github_request(
+                "GET", "https://api.github.com/x", "tok", conn=_mock_conn()
+            )
 
         assert resp is stuck
         assert m_cls.return_value.request.await_count == 4
@@ -462,7 +480,9 @@ class TestGithubRequestRetry:
             patch("terrapod.services.github_service.asyncio.sleep", new=AsyncMock()),
             patch("httpx.AsyncClient", return_value=_patched_client([notfound])) as m_cls,
         ):
-            resp = await _github_request("GET", "https://api.github.com/x", "tok")
+            resp = await _github_request(
+                "GET", "https://api.github.com/x", "tok", conn=_mock_conn()
+            )
 
         assert resp is notfound
         assert m_cls.return_value.request.await_count == 1

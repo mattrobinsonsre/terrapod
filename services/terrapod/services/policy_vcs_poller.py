@@ -24,7 +24,7 @@ from sqlalchemy.orm import joinedload, selectinload
 from terrapod.db.models import Policy, PolicySet, VCSConnection, now_utc
 from terrapod.db.session import get_db_session
 from terrapod.logging_config import get_logger
-from terrapod.services import github_service, gitlab_service
+from terrapod.services import github_service, gitlab_service, vcs_rate_limit
 from terrapod.services.scheduler import enqueue_trigger
 from terrapod.services.vcs_provider import (
     get_branch_sha as _provider_get_branch_sha,
@@ -252,6 +252,7 @@ async def handle_policy_vcs_sync(payload: dict) -> None:
         await db.commit()
 
 
+@vcs_rate_limit.attributed("policy-sets")
 async def policy_vcs_poll_cycle() -> None:
     """Fan-out: enumerate VCS policy sets and enqueue one sync trigger per set.
 
