@@ -1,6 +1,6 @@
 module github.com/mattrobinsonsre/terrapod/mcp
 
-go 1.26.5
+go 1.26.6
 
 require (
 	github.com/mattrobinsonsre/terrapod/go-terrapod v0.0.0
