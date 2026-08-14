@@ -90,12 +90,21 @@ async def _get_branch_sha(
     owner: str,
     repo: str,
     branch: str,
-    meta: VCSMetadataCache | None = None,
+    *,
+    meta: VCSMetadataCache | None,
 ) -> str | None:
     """Head SHA of `branch`, deduplicated across workspaces in this cycle (#1096).
 
     Many workspaces share a repo+branch, and the answer is identical for all of
-    them. `meta` is None for one-shot callers, which behave exactly as before.
+    them.
+
+    `meta` is keyword-only and has no default on purpose (#1329). As an optional
+    trailing argument it made the *uncached* path the default, so a call site
+    that forgot it looked correct, read correctly in review, and silently spent
+    provider quota — which is how the autodiscovery pass ended up re-fetching
+    metadata the workspace poll had already cached in the same cycle. Omitting
+    it is now a TypeError, so every caller has to say which it wants; one-shot
+    callers with no cycle to share pass `meta=None` explicitly.
     """
     if meta is None:
         return await _provider_get_branch_sha(conn, owner, repo, branch)
@@ -106,8 +115,12 @@ async def _get_branch_sha(
 
 
 async def _get_default_branch(
-    conn: VCSConnection, owner: str, repo: str, meta: VCSMetadataCache | None = None
+    conn: VCSConnection, owner: str, repo: str, *, meta: VCSMetadataCache | None
 ) -> str | None:
+    """Default branch, deduplicated across workspaces in this cycle (#1096).
+
+    `meta` is keyword-only and required — see `_get_branch_sha` (#1329).
+    """
     if meta is None:
         return await _provider_get_default_branch(conn, owner, repo)
     # "" in the branch slot — this lookup has no branch of its own.
@@ -259,15 +272,19 @@ async def _list_open_prs(
     owner: str,
     repo: str,
     base_branch: str,
-    meta: VCSMetadataCache | None = None,
+    *,
+    meta: VCSMetadataCache | None,
 ) -> list[PullRequest]:
-    """Open PRs/MRs targeting `base_branch`, deduplicated per cycle (#1096)."""
+    """Open PRs/MRs targeting `base_branch`, deduplicated per cycle (#1096).
+
+    `meta` is keyword-only and required — see `_get_branch_sha` (#1329).
+    """
     if meta is not None:
         # Distinct key space from the branch-SHA lookup, which shares the same
         # (conn, owner, repo, branch) tuple.
         return await meta.get_or_fetch(
             (str(conn.id), owner, repo, f"prs:{base_branch}"),
-            lambda: _list_open_prs(conn, owner, repo, base_branch),
+            lambda: _list_open_prs(conn, owner, repo, base_branch, meta=None),
         )
     if conn.provider == "gitlab":
         return await gitlab_service.list_open_prs(conn, owner, repo, base_branch)
@@ -358,7 +375,7 @@ async def _resolve_branch(
     if ws.vcs_branch:
         return ws.vcs_branch
 
-    default_branch = await _get_default_branch(conn, owner, repo, meta)
+    default_branch = await _get_default_branch(conn, owner, repo, meta=meta)
     if default_branch:
         return default_branch
     logger.warning(
@@ -507,7 +524,7 @@ async def _poll_workspace_branch(
     fetch_paths: list[str] | None = None,
 ) -> None:
     """Check the tracked branch for new commits and create a run."""
-    sha = await _get_branch_sha(conn, owner, repo, branch, meta)
+    sha = await _get_branch_sha(conn, owner, repo, branch, meta=meta)
 
     if sha is None:
         logger.warning(
@@ -836,7 +853,7 @@ async def _poll_workspace_prs(
     fetch_paths: list[str] | None = None,
 ) -> None:
     """Check open PRs/MRs targeting the tracked branch for speculative plans."""
-    prs = await _list_open_prs(conn, owner, repo, branch, meta)
+    prs = await _list_open_prs(conn, owner, repo, branch, meta=meta)
 
     # Hook-and-poll fallbacks (#282). Only run for apply-then-merge —
     # default-mode PR runs are plan-only and don't drive any of this.
@@ -1472,6 +1489,8 @@ async def _poll_autodiscovery_for_connection(
     db: AsyncSession,
     conn: VCSConnection,
     rules: list[AutodiscoveryRule],
+    *,
+    meta: VCSMetadataCache | None,
 ) -> int:
     """Scan open PRs for one connection's rules and auto-create workspaces.
 
@@ -1501,7 +1520,7 @@ async def _poll_autodiscovery_for_connection(
         target_branch = branch
         if not target_branch:
             try:
-                target_branch = await _get_default_branch(conn, owner, repo) or "main"
+                target_branch = await _get_default_branch(conn, owner, repo, meta=meta) or "main"
             except Exception:
                 logger.warning(
                     "Autodiscovery: failed to resolve default branch — skipping",
@@ -1516,12 +1535,12 @@ async def _poll_autodiscovery_for_connection(
         # of firing a premature plan+apply for a directory that only
         # exists on the (still-open) PR branch (#313). None on failure —
         # falls back to the prior NULL-seed behaviour.
-        baseline_sha = await _get_branch_sha(conn, owner, repo, target_branch)
+        baseline_sha = await _get_branch_sha(conn, owner, repo, target_branch, meta=meta)
 
         # Pull open PRs and the default-branch tip — both are sources of
         # discoverable changed files.
         try:
-            prs = await _list_open_prs(conn, owner, repo, target_branch)
+            prs = await _list_open_prs(conn, owner, repo, target_branch, meta=meta)
         except Exception:
             logger.warning(
                 "Autodiscovery: failed to list PRs — skipping",
@@ -1649,7 +1668,10 @@ async def _poll_autodiscovery_for_connection(
 
 
 async def _poll_autodiscovery(
-    *, owner_repo: tuple[str, str] | None = None, provider: str | None = None
+    *,
+    meta: VCSMetadataCache | None,
+    owner_repo: tuple[str, str] | None = None,
+    provider: str | None = None,
 ) -> int:
     """Run autodiscovery across every VCS connection that has at least
     one enabled rule.
@@ -1709,7 +1731,7 @@ async def _poll_autodiscovery(
             if conn is None or conn.status != "active":
                 continue
             try:
-                created = await _poll_autodiscovery_for_connection(db, conn, conn_rules)
+                created = await _poll_autodiscovery_for_connection(db, conn, conn_rules, meta=meta)
                 total_created += created
             except Exception:
                 # Per-connection isolation: log and continue.
@@ -1735,11 +1757,20 @@ async def poll_cycle() -> None:
     """
     start = time_mod.monotonic()
 
+    # One metadata cache for the whole cycle (#1096, #1329). Branch-SHA and
+    # open-PR lookups are identical for every workspace on the same repo+branch,
+    # and the autodiscovery pass below asks for the same metadata again; without
+    # this, each caller re-asked and a modest estate exhausted the provider's
+    # hourly quota. Built here, before autodiscovery, so both passes share one
+    # set of answers. Per-cycle by design — holding results across cycles would
+    # stop the poller noticing new commits.
+    meta = VCSMetadataCache()
+
     # Autodiscovery first — any newly-created workspaces will be
     # picked up by the workspace scan below (or, if their query
     # snapshot already ran, by the next cycle).
     try:
-        await _poll_autodiscovery()
+        await _poll_autodiscovery(meta=meta)
     except Exception:
         logger.warning("Autodiscovery pass failed", exc_info=True)
 
@@ -1760,12 +1791,6 @@ async def poll_cycle() -> None:
     # One cache instance per cycle — coalesces concurrent (conn, sha, paths)
     # fetches across all workspace polls in this cycle.
     cache = VCSArchiveCache()
-    # One metadata cache per cycle too (#1096). Branch-SHA and open-PR lookups
-    # are identical for every workspace on the same repo+branch; without this,
-    # each workspace re-asked and a modest estate exhausted the provider's
-    # hourly quota. Per-cycle by design — holding results across cycles would
-    # stop the poller noticing new commits.
-    meta = VCSMetadataCache()
     semaphore = asyncio.Semaphore(_MAX_PARALLEL_WORKSPACE_POLLS)
     results = await asyncio.gather(
         *[
@@ -1801,10 +1826,19 @@ async def handle_immediate_poll(payload: dict) -> None:
     # workspaces get picked up by the workspace scan that follows. The
     # repo string in the webhook payload is "owner/repo" — split for
     # the autodiscovery filter.
+    # One metadata cache for the whole cycle (#1096, #1329). Branch-SHA and
+    # open-PR lookups are identical for every workspace on the same repo+branch,
+    # and the autodiscovery pass below asks for the same metadata again; without
+    # this, each caller re-asked and a modest estate exhausted the provider's
+    # hourly quota. Built here, before autodiscovery, so both passes share one
+    # set of answers. Per-cycle by design — holding results across cycles would
+    # stop the poller noticing new commits.
+    meta = VCSMetadataCache()
+
     if repo and "/" in repo:
         owner, repo_name = repo.split("/", 1)
         try:
-            await _poll_autodiscovery(owner_repo=(owner, repo_name), provider=provider)
+            await _poll_autodiscovery(meta=meta, owner_repo=(owner, repo_name), provider=provider)
         except Exception:
             logger.warning(
                 "Autodiscovery: webhook-triggered scan failed",
@@ -1834,12 +1868,6 @@ async def handle_immediate_poll(payload: dict) -> None:
     # Webhook-triggered polls also share one cache instance — same coalescing
     # benefit when multiple workspaces map to the same repo.
     cache = VCSArchiveCache()
-    # One metadata cache per cycle too (#1096). Branch-SHA and open-PR lookups
-    # are identical for every workspace on the same repo+branch; without this,
-    # each workspace re-asked and a modest estate exhausted the provider's
-    # hourly quota. Per-cycle by design — holding results across cycles would
-    # stop the poller noticing new commits.
-    meta = VCSMetadataCache()
     semaphore = asyncio.Semaphore(_MAX_PARALLEL_WORKSPACE_POLLS)
     results = await asyncio.gather(
         *[

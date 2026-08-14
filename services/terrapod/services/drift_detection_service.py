@@ -223,7 +223,7 @@ async def _create_drift_run_vcs(
         return None
 
     try:
-        sha = await _get_branch_sha(conn, owner, repo, branch)
+        sha = await _get_branch_sha(conn, owner, repo, branch, meta=None)
     except Exception as e:
         logger.error("Failed to get branch SHA for drift check", workspace=ws.name, error=str(e))
         return None
