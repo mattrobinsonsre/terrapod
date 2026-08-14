@@ -1,6 +1,6 @@
 module github.com/mattrobinsonsre/terrapod/query
 
-go 1.26.5
+go 1.26.6
 
 require (
 	github.com/hashicorp/hcl/v2 v2.24.0
