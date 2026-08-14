@@ -1155,7 +1155,7 @@ class TestMetadataDeduplication:
         ) as prov:
             # Eleven workspaces on one repo+branch, as in a real monorepo estate.
             for _ in range(11):
-                assert await _get_branch_sha(conn, "org", "repo", "main", meta) == "deadbeef"
+                assert await _get_branch_sha(conn, "org", "repo", "main", meta=meta) == "deadbeef"
 
         assert prov.await_count == 1
 
@@ -1173,7 +1173,7 @@ class TestMetadataDeduplication:
             return_value=[],
         ) as prov:
             for _ in range(11):
-                assert await _list_open_prs(conn, "org", "repo", "main", meta) == []
+                assert await _list_open_prs(conn, "org", "repo", "main", meta=meta) == []
 
         assert prov.await_count == 1
 
@@ -1191,7 +1191,7 @@ class TestMetadataDeduplication:
             return_value="main",
         ) as prov:
             for _ in range(5):
-                assert await _get_default_branch(conn, "org", "repo", meta) == "main"
+                assert await _get_default_branch(conn, "org", "repo", meta=meta) == "main"
 
         assert prov.await_count == 1
 
@@ -1208,7 +1208,7 @@ class TestMetadataDeduplication:
             return_value="deadbeef",
         ) as prov:
             for _ in range(3):
-                await _get_branch_sha(conn, "org", "repo", "main")
+                await _get_branch_sha(conn, "org", "repo", "main", meta=None)
 
         assert prov.await_count == 3, "no cache passed -> no caching, exactly as before"
 
@@ -1227,8 +1227,10 @@ class TestMetadataDeduplication:
             "terrapod.services.vcs_poller._provider_get_branch_sha",
             new=AsyncMock(side_effect=by_branch),
         ) as prov:
-            assert await _get_branch_sha(conn, "org", "repo", "main", meta) == "sha-of-main"
-            assert await _get_branch_sha(conn, "org", "repo", "develop", meta) == "sha-of-develop"
+            assert await _get_branch_sha(conn, "org", "repo", "main", meta=meta) == "sha-of-main"
+            assert (
+                await _get_branch_sha(conn, "org", "repo", "develop", meta=meta) == "sha-of-develop"
+            )
 
         assert prov.await_count == 2
 
@@ -1637,3 +1639,76 @@ class TestFilteredPRIsDecidedOnce:
         mock_remembered.assert_not_called()
         mock_changed.assert_not_called()
         mock_create.assert_called_once()
+
+
+class TestAutodiscoverySharesTheCycleCache:
+    """The autodiscovery pass must reuse the cycle's metadata cache (#1329).
+
+    Autodiscovery asks for the same default branch, branch SHA and open-PR
+    list that the workspace poll asks for, on the same repos, in the same
+    cycle. Before this it passed no cache and re-fetched all three from the
+    provider every cycle — pure duplicate spend against the rate limit, on
+    exactly the repos the workspace poll had just looked at.
+    """
+
+    async def test_a_second_lookup_in_the_cycle_does_not_hit_the_provider(self):
+        """The cache is what makes the saving, so prove it end to end rather
+        than asserting the argument was passed."""
+        from terrapod.services.vcs_metadata_cache import VCSMetadataCache
+        from terrapod.services.vcs_poller import _get_branch_sha, _get_default_branch
+
+        meta = VCSMetadataCache()
+        conn = _mock_connection()
+
+        with patch(
+            "terrapod.services.vcs_poller._provider_get_default_branch",
+            new=AsyncMock(return_value="main"),
+        ) as prov_default:
+            # The workspace poll asks first...
+            assert await _get_default_branch(conn, "org", "repo", meta=meta) == "main"
+            # ...then the autodiscovery pass asks for the same thing.
+            assert await _get_default_branch(conn, "org", "repo", meta=meta) == "main"
+            assert prov_default.await_count == 1, "autodiscovery re-fetched the default branch"
+
+        with patch(
+            "terrapod.services.vcs_poller._provider_get_branch_sha",
+            new=AsyncMock(return_value="aaa111"),
+        ) as prov_sha:
+            assert await _get_branch_sha(conn, "org", "repo", "main", meta=meta) == "aaa111"
+            assert await _get_branch_sha(conn, "org", "repo", "main", meta=meta) == "aaa111"
+            assert prov_sha.await_count == 1, "autodiscovery re-fetched the branch SHA"
+
+    async def test_omitting_the_cache_is_a_typeerror_not_a_silent_slow_path(self):
+        """The guard that stops #1329 recurring.
+
+        `meta` was an optional trailing argument, which made the uncached path
+        the default and a forgetful call site indistinguishable from a correct
+        one — the same shape as #1244 and #1250. Keyword-only and required
+        means a call site that omits it cannot even be called.
+        """
+        from terrapod.services.vcs_poller import (
+            _get_branch_sha,
+            _get_default_branch,
+            _list_open_prs,
+        )
+
+        conn = _mock_connection()
+        for call in (
+            lambda: _get_default_branch(conn, "org", "repo"),
+            lambda: _get_branch_sha(conn, "org", "repo", "main"),
+            lambda: _list_open_prs(conn, "org", "repo", "main"),
+        ):
+            with pytest.raises(TypeError, match="meta"):
+                await call()
+
+        # And positionally, which is how the old signature accepted it.
+        with pytest.raises(TypeError):
+            await _get_default_branch(conn, "org", "repo", None)  # type: ignore[misc]
+
+    async def test_the_autodiscovery_pass_is_given_the_cycle_cache(self):
+        """Wiring check: the cache reaches the autodiscovery pass at all."""
+        from terrapod.services.vcs_poller import _poll_autodiscovery
+
+        with patch("terrapod.services.vcs_poller.get_db_session"):
+            with pytest.raises(TypeError, match="meta"):
+                await _poll_autodiscovery()  # type: ignore[call-arg]

@@ -385,7 +385,7 @@ async def _fetch_vcs_config(
 
     if ref_override:
         # Try as branch first, then tag, then treat as raw SHA
-        sha = await _get_branch_sha(conn, owner, repo, ref_override)
+        sha = await _get_branch_sha(conn, owner, repo, ref_override, meta=None)
         ref_name = ref_override
         if not sha:
             tags = await _list_tags(conn, owner, repo)
@@ -399,7 +399,7 @@ async def _fetch_vcs_config(
         ref_name = await _resolve_branch(conn, ws, owner, repo) or ""
         if not ref_name:
             raise HTTPException(status_code=422, detail="Cannot determine VCS branch")
-        sha = await _get_branch_sha(conn, owner, repo, ref_name)
+        sha = await _get_branch_sha(conn, owner, repo, ref_name, meta=None)
         if not sha:
             raise HTTPException(status_code=422, detail="Cannot get branch HEAD SHA")
 
