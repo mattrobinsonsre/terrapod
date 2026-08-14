@@ -647,3 +647,69 @@ class TestWebhookSecret:
             )
         assert resp.status_code == 200, resp.text
         assert conn3.webhook_secret == "keep"
+
+
+class TestRateLimitAttributes:
+    """The budget is surfaced on the connection (#1334).
+
+    The distinction the tests exist to protect: null means "the server does not
+    report a rate limit", 0 means "there is none left". Collapsing them would
+    make the indicator either permanently alarming or quietly useless.
+    """
+
+    def _conn(self):
+        from datetime import UTC, datetime
+
+        c = MagicMock()
+        c.id = uuid.uuid4()
+        c.name = "gh"
+        c.provider = "github"
+        c.server_url = ""
+        c.status = "active"
+        c.token = "x"
+        c.webhook_secret = None
+        c.github_app_id = 1
+        c.github_installation_id = 2
+        c.github_account_login = "org"
+        c.github_account_type = "Organization"
+        c.created_at = datetime.now(UTC)
+        c.updated_at = datetime.now(UTC)
+        return c
+
+    def test_a_connection_with_no_observation_reports_null_not_zero(self):
+        from terrapod.api.routers.vcs_connections import _connection_json
+
+        attrs = _connection_json(self._conn(), quota=None)["attributes"]
+        assert attrs["rate-limit"] is None
+        assert attrs["rate-limit-remaining"] is None
+        assert attrs["rate-limit-observed-at"] is None
+
+    def test_an_exhausted_budget_reports_zero_not_null(self):
+        import time
+
+        from terrapod.api.routers.vcs_connections import _connection_json
+        from terrapod.services.vcs_rate_limit import RateLimitSnapshot
+
+        now = int(time.time())
+        snap = RateLimitSnapshot(
+            limit=5000, remaining=0, reset_at=now + 900, observed_at=now, resource="core"
+        )
+        attrs = _connection_json(self._conn(), quota=snap)["attributes"]
+        assert attrs["rate-limit"] == 5000
+        assert attrs["rate-limit-remaining"] == 0, "exhausted must not read as 'not reported'"
+        assert attrs["rate-limit-observed-at"].endswith("Z"), "RFC3339 with Z (rule 10)"
+        assert attrs["rate-limit-reset-at"].endswith("Z")
+
+    def test_the_keys_are_always_present(self):
+        """A consumer should never have to distinguish 'absent key' from 'null'."""
+        from terrapod.api.routers.vcs_connections import _connection_json
+
+        attrs = _connection_json(self._conn(), quota=None)["attributes"]
+        for k in (
+            "rate-limit",
+            "rate-limit-remaining",
+            "rate-limit-resource",
+            "rate-limit-reset-at",
+            "rate-limit-observed-at",
+        ):
+            assert k in attrs

@@ -2956,5 +2956,16 @@
     "restoreConfirm": "Den State von „{name}“ wiederherstellen?\n\nDabei entsteht ein NEUER Workspace — das Original kommt nicht zurück. Er startet ohne Auto-Apply, ohne Drift-Erkennung und ohne VCS-Verbindung; Variablen und Run-Historie kehren nicht zurück. Nur der State wird gerettet.",
     "restoreDone": "{versions, plural, one {# State-Version} other {# State-Versionen}} in den neuen Workspace „{name}“ übernommen. Prüfen Sie die Einstellungen, bevor Sie Auto-Apply oder VCS aktivieren.",
     "restoreAgainConfirm": "„{name}“ wurde bereits wiederhergestellt, nach {existing}.\n\nEine erneute Wiederherstellung erzeugt einen ZWEITEN Workspace mit derselben State-Lineage über derselben Infrastruktur. Ein Apply in einem der beiden lässt den nächsten Plan des anderen dann wie kompletter Drift aussehen.\n\nNur fortfahren, wenn der zuvor wiederhergestellte Workspace nicht mehr existiert."
+  },
+  "vcsConnections": {
+    "table": {
+      "rateLimit": "Ratenlimit"
+    },
+    "rateLimit": {
+      "notReported": "Nicht gemeldet",
+      "remaining": "{remaining} von {limit}",
+      "exhausted": "Erschöpft",
+      "observedAt": "Stand {time}"
+    }
   }
 }

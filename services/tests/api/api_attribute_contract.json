@@ -802,6 +802,11 @@
     "has-webhook-secret",
     "name",
     "provider",
+    "rate-limit",
+    "rate-limit-observed-at",
+    "rate-limit-remaining",
+    "rate-limit-reset-at",
+    "rate-limit-resource",
     "server-url",
     "status",
     "updated-at"

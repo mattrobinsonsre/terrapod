@@ -2956,5 +2956,16 @@
     "restoreConfirm": "Gjenopprette state for «{name}»?\n\nDette lager et NYTT arbeidsområde — originalen kommer ikke tilbake. Det kommer tilbake med auto-apply og driftdeteksjon av og uten VCS-tilkobling; variabler og kjørehistorikk kommer ikke tilbake. Bare state reddes.",
     "restoreDone": "Gjenopprettet {versions, plural, one {# state-versjon} other {# state-versjoner}} til det nye arbeidsområdet «{name}». Sjekk innstillingene før du slår på auto-apply eller VCS.",
     "restoreAgainConfirm": "«{name}» er allerede gjenopprettet, til {existing}.\n\nÅ gjenopprette på nytt lager et ANDRE workspace med samme state-slektslinje over samme infrastruktur. En apply i det ene får da det andres neste plan til å se ut som omfattende drift.\n\nFortsett bare hvis det tidligere gjenopprettede workspacet er borte."
+  },
+  "vcsConnections": {
+    "table": {
+      "rateLimit": "Rategrense"
+    },
+    "rateLimit": {
+      "notReported": "Ikke rapportert",
+      "remaining": "{remaining} av {limit}",
+      "exhausted": "Oppbrukt",
+      "observedAt": "per {time}"
+    }
   }
 }

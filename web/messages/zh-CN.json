@@ -2956,5 +2956,16 @@
     "restoreConfirm": "要恢复“{name}”的状态吗？\n\n这会创建一个新的工作区——原工作区不会回来。它恢复后自动应用与漂移检测均为关闭，且没有 VCS 连接；变量和运行历史不会恢复。只有状态会被抢救回来。",
     "restoreDone": "已将 {versions, plural, other {# 个状态版本}} 恢复到新工作区“{name}”。启用自动应用或 VCS 之前请检查其设置。",
     "restoreAgainConfirm": "“{name}”已经恢复过一次，恢复到了 {existing}。\n\n再次恢复会创建第二个工作区，它在同一套基础设施之上持有相同的 state 血统。此后在任一工作区执行 apply，都会让另一个的下一次计划看起来像是全面漂移。\n\n只有在先前恢复的工作区已经不存在时才继续。"
+  },
+  "vcsConnections": {
+    "table": {
+      "rateLimit": "速率限制"
+    },
+    "rateLimit": {
+      "notReported": "未报告",
+      "remaining": "{limit} 中的 {remaining}",
+      "exhausted": "已用尽",
+      "observedAt": "截至 {time}"
+    }
   }
 }

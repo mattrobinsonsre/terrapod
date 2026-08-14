@@ -17,7 +17,7 @@ Endpoints:
 """
 
 import uuid
-from datetime import UTC
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request
 from fastapi.responses import JSONResponse
@@ -29,6 +29,7 @@ from terrapod.api.pagination import paginate
 from terrapod.db.models import VCSConnection, generate_uuid7
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
+from terrapod.services import vcs_rate_limit
 
 router = APIRouter(tags=["vcs-connections"])
 logger = get_logger(__name__)
@@ -43,8 +44,16 @@ def _rfc3339(dt) -> str:
     return dt.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def _connection_json(conn: VCSConnection) -> dict:
-    """Serialize a VCSConnection to JSON:API format."""
+def _connection_json(conn: VCSConnection, *, quota: object | None) -> dict:
+    """Serialize a VCSConnection to JSON:API format.
+
+    `quota` is the last rate-limit observation for this connection (#1334), or
+    None when nothing is known — either because no call has been made yet or
+    because the server does not report rate limits at all. It is keyword-only
+    and has no default so each caller says which it means; a serializer that
+    silently omitted the budget would be indistinguishable from a connection
+    with no budget left.
+    """
     attrs: dict = {
         "name": conn.name,
         "provider": conn.provider,
@@ -64,6 +73,22 @@ def _connection_json(conn: VCSConnection) -> dict:
         # Write-only: surface only whether a per-connection webhook secret is
         # set, never the value (same pattern as has-token).
         attrs["has-webhook-secret"] = bool(conn.webhook_secret)
+
+    # Rate-limit budget (#1334). Always present as keys so a consumer can tell
+    # "not reported" (null) from "nothing left" (0) — the distinction that
+    # makes the indicator trustworthy. Read from headers the provider returned
+    # on calls we were making anyway, so these are an observation as of
+    # `rate-limit-observed-at`, not a live reading; the timestamp ships with
+    # them precisely so the UI can say so.
+    attrs["rate-limit"] = getattr(quota, "limit", None)
+    attrs["rate-limit-remaining"] = getattr(quota, "remaining", None)
+    attrs["rate-limit-resource"] = getattr(quota, "resource", None)
+    attrs["rate-limit-reset-at"] = (
+        _rfc3339(datetime.fromtimestamp(quota.reset_at, tz=UTC)) if quota is not None else None
+    )
+    attrs["rate-limit-observed-at"] = (
+        _rfc3339(datetime.fromtimestamp(quota.observed_at, tz=UTC)) if quota is not None else None
+    )
 
     return {
         "id": f"vcs-{conn.id}",
@@ -95,7 +120,8 @@ async def list_connections(
 ) -> JSONResponse:
     """List all VCS connections (admin only)."""
     connections = await _list_connections(db)
-    items = [_connection_json(c) for c in connections]
+    quotas = {c.id: await vcs_rate_limit.get_snapshot(c.id) for c in connections}
+    items = [_connection_json(c, quota=quotas.get(c.id)) for c in connections]
     page_items, meta = paginate(items, request)
     return JSONResponse(content={"data": page_items, "meta": meta})
 
@@ -194,7 +220,10 @@ async def create_connection(
         provider=provider,
     )
 
-    return JSONResponse(content={"data": _connection_json(conn)}, status_code=201)
+    return JSONResponse(
+        content={"data": _connection_json(conn, quota=await vcs_rate_limit.get_snapshot(conn.id))},
+        status_code=201,
+    )
 
 
 @router.get("/vcs-connections/{connection_id}")
@@ -208,7 +237,9 @@ async def show_connection(
     conn = await _get_connection(db, conn_uuid)
     if conn is None:
         raise HTTPException(status_code=404, detail="VCS connection not found")
-    return JSONResponse(content={"data": _connection_json(conn)})
+    return JSONResponse(
+        content={"data": _connection_json(conn, quota=await vcs_rate_limit.get_snapshot(conn.id))}
+    )
 
 
 @router.patch("/vcs-connections/{connection_id}")
@@ -300,7 +331,9 @@ async def update_connection(
         provider=conn.provider,
     )
 
-    return JSONResponse(content={"data": _connection_json(conn)})
+    return JSONResponse(
+        content={"data": _connection_json(conn, quota=await vcs_rate_limit.get_snapshot(conn.id))}
+    )
 
 
 @router.delete("/vcs-connections/{connection_id}", status_code=204)

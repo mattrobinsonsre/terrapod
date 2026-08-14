@@ -2,6 +2,7 @@ package terrapod
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"strconv"
@@ -31,6 +32,18 @@ type VCSConnection struct {
 	GithubAccountType    string `json:"github-account-type,omitempty"`
 	CreatedAt            string `json:"created-at,omitempty"`
 	UpdatedAt            string `json:"updated-at,omitempty"`
+
+	// Rate-limit budget as last observed from provider response headers
+	// (#1334). Pointers, because nil ("the server does not report a rate
+	// limit") and 0 ("no budget left") mean opposite things and must not
+	// collapse into the same zero value. RateLimitObservedAt says when the
+	// reading was taken — these ride along on calls Terrapod was making
+	// anyway, so they are an observation, not a live query.
+	RateLimit           *int64 `json:"rate-limit,omitempty"`
+	RateLimitRemaining  *int64 `json:"rate-limit-remaining,omitempty"`
+	RateLimitResource   string `json:"rate-limit-resource,omitempty"`
+	RateLimitResetAt    string `json:"rate-limit-reset-at,omitempty"`
+	RateLimitObservedAt string `json:"rate-limit-observed-at,omitempty"`
 }
 
 // CreateVCSConnectionRequest is the input shape for
@@ -242,9 +255,32 @@ func vcsConnFromResource(res *Resource) *VCSConnection {
 		Status:               GetStringAttr(res, "status"),
 		HasToken:             GetBoolAttr(res, "has-token"),
 		HasWebhookSecret:     GetBoolAttr(res, "has-webhook-secret"),
+		RateLimit:            getOptionalIntAttr(res, "rate-limit"),
+		RateLimitRemaining:   getOptionalIntAttr(res, "rate-limit-remaining"),
+		RateLimitResource:    GetStringAttr(res, "rate-limit-resource"),
+		RateLimitResetAt:     GetStringAttr(res, "rate-limit-reset-at"),
+		RateLimitObservedAt:  GetStringAttr(res, "rate-limit-observed-at"),
 		GithubAccountLogin:   GetStringAttr(res, "github-account-login"),
 		GithubAccountType:    GetStringAttr(res, "github-account-type"),
 		CreatedAt:            GetStringAttr(res, "created-at"),
 		UpdatedAt:            GetStringAttr(res, "updated-at"),
 	}
+}
+
+// getOptionalIntAttr distinguishes an absent or null attribute from a zero.
+// For a rate-limit budget that difference is the whole point: nil means the
+// server does not report one, 0 means it is exhausted.
+func getOptionalIntAttr(res *Resource, name string) *int64 {
+	if res == nil || res.Attributes == nil {
+		return nil
+	}
+	raw, ok := res.Attributes[name]
+	if !ok || len(raw) == 0 || string(raw) == "null" {
+		return nil
+	}
+	var n int64
+	if err := json.Unmarshal(raw, &n); err != nil {
+		return nil
+	}
+	return &n
 }

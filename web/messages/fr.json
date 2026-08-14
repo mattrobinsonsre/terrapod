@@ -2956,5 +2956,16 @@
     "restoreConfirm": "Restaurer l''état de « {name} » ?\n\nCela crée un NOUVEAU workspace — l''original n''est pas rétabli. Il revient sans auto-apply, sans détection de dérive et sans connexion VCS ; les variables et l''historique des exécutions ne reviennent pas. Seul l''état est récupéré.",
     "restoreDone": "{versions, plural, one {# version d''état récupérée} other {# versions d''état récupérées}} dans le nouveau workspace « {name} ». Vérifiez ses paramètres avant d''activer l''auto-apply ou le VCS.",
     "restoreAgainConfirm": "« {name} » a déjà été restauré, vers {existing}.\n\nLe restaurer à nouveau crée un SECOND workspace portant le même lignage d''état sur la même infrastructure. Un apply dans l''un fera alors ressembler le prochain plan de l''autre à une dérive totale.\n\nNe continuez que si le workspace restauré précédemment a disparu."
+  },
+  "vcsConnections": {
+    "table": {
+      "rateLimit": "Limite de débit"
+    },
+    "rateLimit": {
+      "notReported": "Non communiqué",
+      "remaining": "{remaining} sur {limit}",
+      "exhausted": "Épuisé",
+      "observedAt": "au {time}"
+    }
   }
 }
