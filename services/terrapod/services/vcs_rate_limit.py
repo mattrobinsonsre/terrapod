@@ -60,15 +60,24 @@ class CallContext:
     """Who is making the call, and on whose behalf.
 
     `source` is the subsystem (workspace-poll, autodiscovery, …) — useful for
-    "which feature is spending". `repo` and `consumer` are the identity that
-    actually matters during an incident: the question is not which feature is
-    busy, it is which repo or workspace to go and fix. One misconfigured
+    "which feature is spending". `repo`, `consumer` and `kind` are the identity
+    that actually matters during an incident: the question is not which feature
+    is busy, it is which repo or workspace to go and fix. One misconfigured
     workspace among hundreds is invisible in a per-subsystem count.
+
+    `labels` carries the consumer's labels, which is what makes the second
+    remedy actionable. An operator over budget has two moves — poll less often,
+    or split the load across more connections — and splitting needs to be along
+    a line that means something. Terrapod has no teams; labels are how an estate
+    is divided, so a per-label rollup is what turns "this connection is at 140%"
+    into "team=platform is two thirds of it, give them their own connection".
     """
 
     source: str = SOURCE_UNKNOWN
     repo: str = ""
     consumer: str = ""  # workspace name, module coordinate, or policy set
+    kind: str = ""  # workspace | module | policy-set — blank falls back to source
+    labels: tuple[tuple[str, str], ...] = ()  # pairs, not a dict: this is frozen
 
 
 # Default None rather than a shared instance: CallContext is frozen, so sharing
@@ -78,8 +87,35 @@ _ctx: ContextVar[CallContext | None] = ContextVar("vcs_call_ctx", default=None)
 _NO_CONTEXT = CallContext()
 
 
+def _label_pairs(labels: object) -> tuple[tuple[str, str], ...]:
+    """Normalise an entity's labels into hashable, bounded pairs.
+
+    Bounded on purpose: labels are operator-supplied and go on to become Redis
+    hash fields, so a pathological set must not turn one poll into thousands of
+    writes. Truncating is the right failure — a rollup over the first handful of
+    labels still points at the right team.
+    """
+    if not isinstance(labels, dict):
+        return ()
+    out = []
+    for k, v in sorted(labels.items()):
+        if not isinstance(k, str) or k == "":
+            continue
+        out.append((k[:60], str(v)[:60]))
+        if len(out) >= 8:
+            break
+    return tuple(out)
+
+
 @contextlib.contextmanager
-def vcs_source(name: str, *, repo: str = "", consumer: str = "") -> Iterator[None]:
+def vcs_source(
+    name: str,
+    *,
+    repo: str = "",
+    consumer: str = "",
+    kind: str = "",
+    labels: object = None,
+) -> Iterator[None]:
     """Attribute every provider call made in this block.
 
     Nests correctly and restores the previous value, so a subsystem that calls
@@ -87,11 +123,14 @@ def vcs_source(name: str, *, repo: str = "", consumer: str = "") -> Iterator[Non
     a repo keeps the enclosing source.
     """
     outer = _ctx.get() or _NO_CONTEXT
+    pairs = _label_pairs(labels) if labels is not None else ()
     token = _ctx.set(
         CallContext(
             source=name or outer.source,
             repo=repo or outer.repo,
             consumer=consumer or outer.consumer,
+            kind=kind or outer.kind,
+            labels=pairs or outer.labels,
         )
     )
     try:
@@ -101,13 +140,15 @@ def vcs_source(name: str, *, repo: str = "", consumer: str = "") -> Iterator[Non
 
 
 @contextlib.contextmanager
-def vcs_target(*, repo: str = "", consumer: str = "") -> Iterator[None]:
+def vcs_target(
+    *, repo: str = "", consumer: str = "", kind: str = "", labels: object = None
+) -> Iterator[None]:
     """Name what the enclosing subsystem is currently working on.
 
-    Used inside a cycle, per repo/workspace, so the spend lands against the
-    thing an operator can act on rather than only the subsystem.
+    Used inside a cycle, per repo/workspace/module, so the spend lands against
+    the thing an operator can act on rather than only the subsystem.
     """
-    with vcs_source("", repo=repo, consumer=consumer):
+    with vcs_source("", repo=repo, consumer=consumer, kind=kind, labels=labels):
         yield
 
 
@@ -336,23 +377,49 @@ def _consumer_key(connection_id: object) -> str:
     return f"tp:vcs_consumers:{connection_id}"
 
 
+def _label_key(connection_id: object) -> str:
+    return f"tp:vcs_labels:{connection_id}"
+
+
+# Field separator inside the consumer hash. A unit separator rather than a colon
+# because both halves are operator-supplied — a workspace may legitimately be
+# called "a:b", and splitting on the wrong character would file it under a kind
+# that does not exist.
+_FIELD_SEP = "\x1f"
+
+
 async def _tally(connection_id: object, ctx: CallContext) -> None:
-    """Count one call into the rate window and against its consumer."""
+    """Count one call into the rate window, its consumer, and its labels.
+
+    Runs on every provider response, so it is one pipelined round trip rather
+    than six sequential ones. `transaction=False` is required, not incidental:
+    the three keys have different prefixes and therefore hash to different slots
+    on a cluster-mode Redis, where a MULTI across slots is refused outright.
+    """
     try:
         from terrapod.redis.client import get_redis_client
 
         r = get_redis_client()
         minute = int(time.time()) // 60
         mk = _minute_key(connection_id, minute)
-        await r.incr(mk)
-        await r.expire(mk, _BUCKET_TTL_SECONDS)
+        ck = _consumer_key(connection_id)
 
         # Identify by the thing an operator can act on, falling back to the
         # subsystem when a call genuinely has no repo (a token refresh, say).
-        who = ctx.repo or ctx.consumer or f"({ctx.source})"
-        ck = _consumer_key(connection_id)
-        await r.hincrby(ck, who, 1)
-        await r.expire(ck, _CONSUMER_TTL_SECONDS)
+        name = ctx.repo or ctx.consumer or f"({ctx.source})"
+        kind = ctx.kind or ctx.source or SOURCE_UNKNOWN
+
+        pipe = r.pipeline(transaction=False)
+        pipe.incr(mk)
+        pipe.expire(mk, _BUCKET_TTL_SECONDS)
+        pipe.hincrby(ck, f"{kind}{_FIELD_SEP}{name}", 1)
+        pipe.expire(ck, _CONSUMER_TTL_SECONDS)
+        if ctx.labels:
+            lk = _label_key(connection_id)
+            for k, v in ctx.labels:
+                pipe.hincrby(lk, f"{k}={v}", 1)
+            pipe.expire(lk, _CONSUMER_TTL_SECONDS)
+        await pipe.execute()
     except Exception:
         # Same contract as the budget recording: observability must never break
         # the operation that produced it.
@@ -371,6 +438,7 @@ class Consumption:
     verdict: str  # idle | comfortable | tight | will_exhaust | exhausted
     exhausts_in_seconds: int | None
     top_consumers: list[dict]
+    label_totals: list[dict]
 
     def to_attributes(self) -> dict:
         return {
@@ -380,6 +448,7 @@ class Consumption:
             "saturation": self.verdict,
             "exhausts-in-seconds": self.exhausts_in_seconds,
             "top-consumers": self.top_consumers,
+            "label-totals": self.label_totals,
         }
 
 
@@ -409,6 +478,27 @@ def _verdict(rate: int, remaining: int | None, seconds_to_reset: int) -> tuple[s
     return "comfortable", exhausts_in
 
 
+def _decode(v: object) -> str:
+    return v.decode() if isinstance(v, bytes) else str(v)
+
+
+def _rank(raw: object, parse) -> list[dict]:  # type: ignore[no-untyped-def]
+    """Decode a count hash into a descending, truncated list of entries."""
+    entries = []
+    for k, v in (raw or {}).items():  # type: ignore[union-attr]
+        try:
+            count = int(_decode(v))
+        except ValueError:
+            continue
+        entry = parse(_decode(k))
+        if entry is None:
+            continue
+        entry["calls"] = count
+        entries.append(entry)
+    entries.sort(key=lambda e: e["calls"], reverse=True)
+    return entries[:_TOP_CONSUMERS]
+
+
 async def get_consumption(connection_id: object, snapshot: object | None) -> Consumption | None:
     """Rate + verdict + who is spending, or None when nothing is known."""
     try:
@@ -417,20 +507,24 @@ async def get_consumption(connection_id: object, snapshot: object | None) -> Con
         r = get_redis_client()
         now_minute = int(time.time()) // 60
         keys = [_minute_key(connection_id, now_minute - i) for i in range(_RATE_WINDOW_MINUTES)]
-        values = await r.mget(keys)
-        calls = sum(int(v) for v in values if v not in (None, ""))
-        raw = await r.hgetall(_consumer_key(connection_id))
+        pipe = r.pipeline(transaction=False)
+        pipe.mget(keys)
+        pipe.hgetall(_consumer_key(connection_id))
+        pipe.hgetall(_label_key(connection_id))
+        values, raw_consumers, raw_labels = await pipe.execute()
+        calls = sum(int(v) for v in (values or []) if v not in (None, ""))
     except Exception:
         return None
 
-    def _s(v: object) -> str:
-        return v.decode() if isinstance(v, bytes) else str(v)
+    def _consumer(field: str) -> dict | None:
+        # kind\x1fname; a field without the separator predates the split and is
+        # still worth showing, just without a kind.
+        kind, sep, name = field.partition(_FIELD_SEP)
+        return {"name": name, "kind": kind} if sep else {"name": field, "kind": ""}
 
-    consumers = sorted(
-        ({"name": _s(k), "calls": int(_s(v))} for k, v in (raw or {}).items()),
-        key=lambda c: c["calls"],
-        reverse=True,
-    )[:_TOP_CONSUMERS]
+    def _label(field: str) -> dict | None:
+        key, sep, value = field.partition("=")
+        return {"label": field, "key": key, "value": value} if sep else None
 
     remaining = getattr(snapshot, "remaining", None)
     limit = getattr(snapshot, "limit", None)
@@ -445,5 +539,6 @@ async def get_consumption(connection_id: object, snapshot: object | None) -> Con
         limit=limit,
         verdict=verdict,
         exhausts_in_seconds=eta,
-        top_consumers=consumers,
+        top_consumers=_rank(raw_consumers, _consumer),
+        label_totals=_rank(raw_labels, _label),
     )

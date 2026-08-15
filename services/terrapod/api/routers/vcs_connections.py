@@ -104,6 +104,11 @@ def _connection_json(
     attrs["saturation"] = getattr(consumption, "verdict", None)
     attrs["exhausts-in-seconds"] = getattr(consumption, "exhausts_in_seconds", None)
     attrs["top-consumers"] = getattr(consumption, "top_consumers", None) or []
+    # Labels, because the two remedies for an over-budget connection are "poll
+    # less often" and "split the load across more connections", and splitting
+    # needs a line to split along. Terrapod has no teams — labels are how an
+    # estate divides — so this is what turns a list of repos into a decision.
+    attrs["label-totals"] = getattr(consumption, "label_totals", None) or []
 
     return {
         "id": f"vcs-{conn.id}",

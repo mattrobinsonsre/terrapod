@@ -1072,7 +1072,9 @@ async def _poll_workspace(
     # workspace rather than only against "workspace-poll" (#1339). During an
     # incident the useful question is which repo to fix, and one misconfigured
     # workspace is invisible in a per-subsystem total.
-    with vcs_rate_limit.vcs_target(repo=f"{owner}/{repo}", consumer=ws.name):
+    with vcs_rate_limit.vcs_target(
+        repo=f"{owner}/{repo}", consumer=ws.name, kind="workspace", labels=ws.labels
+    ):
         await _poll_workspace_repo(db, ws, conn, owner, repo, cache, meta, paths_unions)
 
 
