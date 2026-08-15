@@ -53,7 +53,9 @@ type VCSConnection struct {
 	// how fast, whether that lands badly before the refill, and which repos,
 	// workspaces or modules are responsible.
 	//
-	// Saturation is one of idle, comfortable, tight, will_exhaust, exhausted.
+	// Saturation is one of idle, comfortable, tight, will_exhaust, exhausted,
+	// or empty when the provider reports no budget — in which case there is
+	// nothing to classify against and only CallsPerHour is meaningful.
 	// It is empty when nothing has been observed for the connection.
 	CallsPerHour      *int64          `json:"calls-per-hour,omitempty"`
 	RateWindowMinutes *int64          `json:"rate-window-minutes,omitempty"`
@@ -62,6 +64,16 @@ type VCSConnection struct {
 	ExhaustsInSeconds *int64          `json:"exhausts-in-seconds,omitempty"`
 	TopConsumers      []VCSConsumer   `json:"top-consumers,omitempty"`
 	LabelTotals       []VCSLabelTotal `json:"label-totals,omitempty"`
+
+	// BudgetWindowSeconds is how long the provider's allowance refills over,
+	// inferred from the reset distance. Do NOT assume an hour: GitHub meters
+	// 5,000 per hour, GitLab.com 2,000 per minute. CallsPerHour must be scaled
+	// to this window before it can be read as a share of Limit.
+	BudgetWindowSeconds *int64 `json:"budget-window-seconds,omitempty"`
+	// ConsumersWindowTotal is the total across every consumer over the window
+	// TopConsumers covers — the denominator for an entry's share. Dividing by
+	// CallsPerHour instead mixes bases and yields shares above 100%.
+	ConsumersWindowTotal *int64 `json:"consumers-window-total,omitempty"`
 }
 
 // VCSConsumer is one repo, workspace, module or policy set and the number of
@@ -303,6 +315,8 @@ func vcsConnFromResource(res *Resource) *VCSConnection {
 		ExhaustsInSeconds:    getOptionalIntAttr(res, "exhausts-in-seconds"),
 		TopConsumers:         decodeJSONAttr[[]VCSConsumer](res, "top-consumers"),
 		LabelTotals:          decodeJSONAttr[[]VCSLabelTotal](res, "label-totals"),
+		BudgetWindowSeconds:  getOptionalIntAttr(res, "budget-window-seconds"),
+		ConsumersWindowTotal: getOptionalIntAttr(res, "consumers-window-total"),
 		GithubAccountLogin:   GetStringAttr(res, "github-account-login"),
 		GithubAccountType:    GetStringAttr(res, "github-account-type"),
 		CreatedAt:            GetStringAttr(res, "created-at"),

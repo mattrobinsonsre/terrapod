@@ -70,12 +70,18 @@ test.describe('Responsive harness (phone viewport)', () => {
       await page.goto('/admin/vcs-connections')
       await expect(page.getByText(name)).toBeVisible({ timeout: 15_000 })
 
-      // A freshly created connection has made no calls, so it reports Idle at
-      // a measured zero rate — not a healthy-looking verdict inferred from
-      // absence, and not "Not reported" either, which is reserved for when we
-      // genuinely have no reading. Knowing it has spent nothing IS a reading.
-      await expect(page.getByText('Idle').first()).toBeVisible({ timeout: 15_000 })
-      await expect(page.getByText('0/hr').first()).toBeVisible()
+      // A freshly created connection has made no calls and the server has
+      // reported no budget, so there is nothing to classify: it reads **Not
+      // reported**.
+      //
+      // This assertion previously expected "Idle", which is what the code did
+      // and exactly the defect (#1345): a verdict was fabricated from the
+      // absence of any reading, so a GitLab connection being polled hard —
+      // GitLab was not instrumented at all — rendered a calm grey badge while
+      // the runbook sent the operator here to diagnose stalled runs. A verdict
+      // is now withheld unless there is a budget to judge against; the rate is
+      // still reported, because that is Terrapod's own tally.
+      await expect(page.getByText('Not reported').first()).toBeVisible({ timeout: 15_000 })
 
       // The connection renders as a panel (#1339) rather than a table row, so
       // it reflows to a single column here — nothing may push the page sideways.

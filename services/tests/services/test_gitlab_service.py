@@ -121,13 +121,14 @@ class TestGetChangedFiles:
         mock_response.raise_for_status = MagicMock()
 
         conn = _mock_conn()
-        with patch("httpx.AsyncClient") as mock_client_cls:
-            mock_client = AsyncMock()
-            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-            mock_client.__aexit__ = AsyncMock(return_value=False)
-            mock_client.get = AsyncMock(return_value=mock_response)
-            mock_client_cls.return_value = mock_client
-
+        # Patched at the service's own request helper, not at httpx: the call
+        # goes through `_gitlab_request` so it is counted against the rate
+        # budget (#1345), and reaching past it would assert on plumbing this
+        # function no longer owns.
+        with patch(
+            "terrapod.services.gitlab_service._gitlab_request",
+            AsyncMock(return_value=mock_response),
+        ):
             from terrapod.services.gitlab_service import get_changed_files
 
             result = await get_changed_files(conn, "group", "repo", "base", "head")
@@ -145,13 +146,14 @@ class TestGetChangedFiles:
         mock_response.raise_for_status = MagicMock()
 
         conn = _mock_conn()
-        with patch("httpx.AsyncClient") as mock_client_cls:
-            mock_client = AsyncMock()
-            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-            mock_client.__aexit__ = AsyncMock(return_value=False)
-            mock_client.get = AsyncMock(return_value=mock_response)
-            mock_client_cls.return_value = mock_client
-
+        # Patched at the service's own request helper, not at httpx: the call
+        # goes through `_gitlab_request` so it is counted against the rate
+        # budget (#1345), and reaching past it would assert on plumbing this
+        # function no longer owns.
+        with patch(
+            "terrapod.services.gitlab_service._gitlab_request",
+            AsyncMock(return_value=mock_response),
+        ):
             from terrapod.services.gitlab_service import get_changed_files
 
             result = await get_changed_files(conn, "group", "repo", "base", "head")

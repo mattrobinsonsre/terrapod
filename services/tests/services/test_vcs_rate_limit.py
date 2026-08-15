@@ -227,24 +227,37 @@ class TestEveryEntryPointIsAttributed:
     so assert the attribution at each entry point rather than trusting review.
     """
 
+    # (module, function, args) — args because not every entry point is a
+    # zero-arg cycle. `_poll_workspace_owned` takes a workspace id and a
+    # semaphore, and calling it bare raised TypeError before the body ran,
+    # which the old expected-exception tuple absorbed as a pass.
     ENTRY_POINTS = [
-        ("terrapod.services.vcs_poller", "_poll_workspace_owned"),
-        ("terrapod.services.module_impact_service", "module_impact_poll_cycle"),
-        ("terrapod.services.registry_vcs_poller", "registry_vcs_poll_cycle"),
-        ("terrapod.services.policy_vcs_poller", "policy_vcs_poll_cycle"),
-        ("terrapod.services.drift_detection_service", "drift_check_cycle"),
+        ("terrapod.services.vcs_poller", "_poll_workspace_owned", "workspace"),
+        ("terrapod.services.module_impact_service", "module_impact_poll_cycle", "none"),
+        ("terrapod.services.registry_vcs_poller", "registry_vcs_poll_cycle", "none"),
+        ("terrapod.services.policy_vcs_poller", "policy_vcs_poll_cycle", "none"),
+        ("terrapod.services.drift_detection_service", "drift_check_cycle", "none"),
     ]
 
-    @pytest.mark.parametrize("module_name,fn_name", ENTRY_POINTS)
-    async def test_entry_point_sets_a_source(self, module_name, fn_name):
+    @pytest.mark.parametrize("module_name,fn_name,arg_kind", ENTRY_POINTS)
+    async def test_entry_point_sets_a_source(self, module_name, fn_name, arg_kind):
         import importlib
+        import uuid as _uuid
 
         mod = importlib.import_module(module_name)
         fn = getattr(mod, fn_name)
+        args: tuple = ()
+        if arg_kind == "workspace":
+            args = (_uuid.uuid4(), asyncio.Semaphore(1))
 
         captured: list[str] = []
 
-        async def spy(*_a, **_k):
+        # A PLAIN def, deliberately. `side_effect=<async def>` makes the mock
+        # *call* it, which returns a coroutine without executing the body — so
+        # `captured` stayed empty, the resulting TypeError was in the expected
+        # tuple below, and `if captured:` skipped the only assertion. All five
+        # cases passed with every @attributed decorator deleted (#1345).
+        def spy(*_a, **_k):
             captured.append(vcs_rate_limit.current_source())
             raise _Stop()
 
@@ -252,12 +265,14 @@ class TestEveryEntryPointIsAttributed:
         # then bail — we are asserting attribution, not the cycle's behaviour.
         with patch.object(mod, "get_db_session", side_effect=spy, create=True):
             with pytest.raises((_Stop, TypeError, AttributeError)):
-                await fn()
+                await fn(*args)
 
-        if captured:
-            assert captured[0] != vcs_rate_limit.SOURCE_UNKNOWN, (
-                f"{module_name}.{fn_name} makes provider calls without attributing them"
-            )
+        # Asserted unconditionally: `if captured:` made an unfired spy a silent
+        # pass, which is precisely the failure this guard exists to catch.
+        assert captured, f"{module_name}.{fn_name} never reached the spy — the guard proved nothing"
+        assert captured[0] != vcs_rate_limit.SOURCE_UNKNOWN, (
+            f"{module_name}.{fn_name} makes provider calls without attributing them"
+        )
 
     def test_the_autodiscovery_pass_is_labelled(self):
         """Its calls run under the poll cycle, so it needs its own label to be
@@ -298,7 +313,7 @@ class TestConsumptionTally:
 
         assert redis.pipelines, "the tally never ran — the fake is swallowing it"
         assert sum(redis.counters.values()) == 3
-        consumers = redis.store["tp:vcs_consumers:conn-1"]
+        consumers = redis.store[vcs_rate_limit._consumer_key("conn-1")]
         assert consumers == {"workspace\x1forg/infra": "3"}
 
     async def test_labels_are_rolled_up_so_the_load_can_be_split(self):
@@ -314,7 +329,7 @@ class TestConsumptionTally:
             redis, {"repo": "org/b", "kind": "workspace", "labels": {"team": "data"}}, n=1
         )
 
-        assert redis.store["tp:vcs_labels:conn-1"] == {
+        assert redis.store[vcs_rate_limit._label_key("conn-1")] == {
             "team=platform": "2",
             "env=prod": "2",
             "team=data": "1",
@@ -324,7 +339,9 @@ class TestConsumptionTally:
         """A token refresh has no repo; it must not vanish from the breakdown."""
         redis = _FakeRedis()
         await self._record_calls(redis, {})
-        assert redis.store["tp:vcs_consumers:conn-1"] == {"workspace-poll\x1f(workspace-poll)": "1"}
+        assert redis.store[vcs_rate_limit._consumer_key("conn-1")] == {
+            "workspace-poll\x1f(workspace-poll)": "1"
+        }
 
     async def test_the_tally_never_breaks_the_call_that_produced_it(self):
         with patch("terrapod.redis.client.get_redis_client", side_effect=RuntimeError("down")):
@@ -335,7 +352,7 @@ class TestConsumptionTally:
         must not turn into a thousand writes."""
         redis = _FakeRedis()
         await self._record_calls(redis, {"repo": "r", "labels": {f"k{i}": "v" for i in range(200)}})
-        assert len(redis.store["tp:vcs_labels:conn-1"]) <= 8
+        assert len(redis.store[vcs_rate_limit._label_key("conn-1")]) <= 8
 
     async def test_the_pipeline_is_not_transactional(self):
         """The three keys have different prefixes, so they hash to different
@@ -343,6 +360,55 @@ class TestConsumptionTally:
         redis = _FakeRedis()
         await self._record_calls(redis, {"repo": "r"})
         assert all(p.transaction is False for p in redis.pipelines)
+
+
+class TestBudgetWindow:
+    """The window is read, never assumed (#1345).
+
+    GitHub refills 5,000 per HOUR; GitLab.com 2,000 per MINUTE. The UI renders
+    the rate as a share of the allowance, so assuming an hour made a GitLab
+    connection read ~60x busier than it was.
+    """
+
+    def test_a_github_shaped_reset_infers_the_hourly_window(self):
+        now = int(time.time())
+        snap = vcs_rate_limit.parse_headers(
+            {
+                "X-RateLimit-Limit": "5000",
+                "X-RateLimit-Remaining": "4000",
+                "X-RateLimit-Reset": str(now + 3000),
+            }
+        )
+        assert snap is not None
+        assert snap.window_seconds == 3600
+
+    def test_a_gitlab_shaped_reset_infers_the_per_minute_window(self):
+        now = int(time.time())
+        snap = vcs_rate_limit.parse_headers(
+            {
+                "RateLimit-Limit": "2000",
+                "RateLimit-Remaining": "1900",
+                "RateLimit-Reset": str(now + 40),
+            }
+        )
+        assert snap is not None
+        assert snap.window_seconds == 60, (
+            "a per-minute throttle must not be reported as an hourly budget"
+        )
+
+    def test_gitlab_names_the_throttle_rather_than_a_resource(self):
+        """`RateLimit-Name` answers the same question as GitHub's
+        `X-RateLimit-Resource` — which budget is this — so it lands in the same
+        field instead of defaulting to GitHub's `core`."""
+        snap = vcs_rate_limit.parse_headers(
+            {
+                "RateLimit-Limit": "2000",
+                "RateLimit-Remaining": "1900",
+                "RateLimit-Name": "throttle_authenticated_api",
+            }
+        )
+        assert snap is not None
+        assert snap.resource == "throttle_authenticated_api"
 
 
 class TestVerdict:
@@ -380,9 +446,18 @@ class TestVerdict:
         assert vcs_rate_limit._verdict(0, 5_000, 3_600)[0] == "idle"
 
     def test_an_unreported_budget_does_not_invent_a_verdict(self):
-        """A server that reports no limit must not be rendered as failing."""
-        assert vcs_rate_limit._verdict(500, None, 0)[0] == "comfortable"
-        assert vcs_rate_limit._verdict(0, None, 0)[0] == "idle"
+        """No budget reported means NO verdict — busy or quiet (#1345).
+
+        Both directions were fabrications: `idle` understated a connection
+        being polled hard, and `comfortable` asserted headroom against a limit
+        we cannot see. The rate is still reported and still answers "how hard
+        are we hitting this"; only the classification is withheld.
+        """
+        assert vcs_rate_limit._verdict(500, None, 0)[0] is None
+        assert vcs_rate_limit._verdict(0, None, 0)[0] is None
+        # A reported budget still classifies normally.
+        assert vcs_rate_limit._verdict(0, 5_000, 3_600)[0] == "idle"
+        assert vcs_rate_limit._verdict(10, 0, 60)[0] == "exhausted"
 
 
 class TestConsumptionReadback:
@@ -405,6 +480,7 @@ class TestConsumptionReadback:
                 reset_at=int(time.time()) + 3600,
                 observed_at=int(time.time()),
                 resource="core",
+                window_seconds=3600,  # GitHub's hourly quota
             )
             got = await vcs_rate_limit.get_consumption("conn-1", snap)
 
@@ -421,7 +497,7 @@ class TestConsumptionReadback:
         with patch("terrapod.redis.client.get_redis_client", return_value=_FakeRedis()):
             got = await vcs_rate_limit.get_consumption("never-seen", None)
         assert got is not None and got.calls_per_hour == 0
-        assert got.verdict == "idle" and got.top_consumers == []
+        assert got.verdict is None and got.top_consumers == []
 
     async def test_redis_being_down_reports_nothing_rather_than_zero(self):
         """Zero traffic and no information are different, and conflating them
@@ -482,6 +558,90 @@ class TestChokepointRecords:
 
         rec.assert_awaited_once()
         assert rec.await_args.kwargs["outcome"] == "200"
+
+    async def test_every_gitlab_response_is_recorded_too(self):
+        """GitLab was uninstrumented entirely (#1345).
+
+        `record()` had exactly one call site — in github_service — so a GitLab
+        connection reported a rate of zero and a fabricated `idle` verdict while
+        the poller hammered it. The docs and the runbook both promised the
+        reading came from the same headers on both providers.
+        """
+        from terrapod.services.gitlab_service import _gitlab_request
+
+        resp = MagicMock()
+        resp.status_code = 200
+        resp.headers = {"RateLimit-Limit": "2000", "RateLimit-Remaining": "1900"}
+
+        client = MagicMock()
+        client.request = AsyncMock(return_value=resp)
+        client.__aenter__ = AsyncMock(return_value=client)
+        client.__aexit__ = AsyncMock(return_value=False)
+
+        with patch("httpx.AsyncClient", return_value=client):
+            with patch.object(vcs_rate_limit, "record", new=AsyncMock()) as rec:
+                await _gitlab_request("GET", "https://gitlab.com/api/v4/x", _conn())
+
+        rec.assert_awaited_once()
+        assert rec.await_args.kwargs["outcome"] == "200"
+
+    async def test_no_provider_call_escapes_the_count(self):
+        """The chokepoint only counts what actually routes through it.
+
+        gitlab_service once had 19 raw `httpx.AsyncClient()` call sites against
+        ONE via the helper, so instrumenting the helper alone measured almost
+        nothing — the panel read "comfortable" while the poll cycle was the
+        thing spending the budget. Rather than pin a list of today's hot paths
+        (which says nothing about the next function someone adds), this asserts
+        the invariant directly: **a function that makes a provider HTTP call
+        must also count it**, either by routing through the retrying helper or,
+        where it cannot (a streaming download, or a write that must never be
+        replayed), by calling `record` itself.
+        """
+        import ast
+        import inspect
+
+        from terrapod.services import github_service, gitlab_service
+
+        # Any of these means the function talks to the provider over HTTP.
+        makes_a_call = (
+            "client.get(",
+            "client.post(",
+            "client.put(",
+            "client.request(",
+            "client.stream(",
+        )
+
+        offenders: list[str] = []
+        inspected = 0
+        for module, helper in (
+            (gitlab_service, "_gitlab_request("),
+            (github_service, "_github_request("),
+        ):
+            module_src = inspect.getsource(module)
+            for node in ast.parse(module_src).body:
+                if not isinstance(node, ast.AsyncFunctionDef):
+                    continue
+                src = ast.get_source_segment(module_src, node) or ""
+                if not (any(m in src for m in makes_a_call) or helper in src):
+                    continue
+                inspected += 1
+                if helper in src or "vcs_rate_limit.record" in src:
+                    continue
+                offenders.append(f"{module.__name__.rsplit('.', 1)[-1]}.{node.name}")
+
+        # Bite-check: a detector that matches nothing passes vacuously, which is
+        # exactly how this gate would rot into decoration.
+        assert inspected >= 35, (
+            f"the detector only found {inspected} provider calls across both modules — "
+            "it has stopped recognising them, so the gate is no longer guarding anything"
+        )
+
+        assert not offenders, (
+            "these provider calls are invisible to the saturation panel — route them "
+            "through the counted helper, or call vcs_rate_limit.record directly if the "
+            f"call streams or must not be retried: {offenders}"
+        )
 
     async def test_a_rate_limited_response_is_recorded_too(self):
         """The 403 that means 'exhausted' carries the most valuable reading of

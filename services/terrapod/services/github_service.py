@@ -388,6 +388,12 @@ async def download_repo_archive_to_file(
     bytes_written = 0
     async with httpx.AsyncClient(follow_redirects=True, timeout=timeout) as client:
         async with client.stream("GET", url, headers=headers) as resp:
+            # Counted here rather than via `_github_request`, which returns a
+            # whole response and cannot stream. Archive fetches are the largest
+            # per-repo cost of a poll cycle, so leaving them out understated
+            # exactly the repos that change most often — the ones the
+            # breakdown exists to identify (#1345).
+            await vcs_rate_limit.record(conn, resp.headers, outcome=str(resp.status_code))
             resp.raise_for_status()
             with open(dest_path, "wb") as f:
                 async for chunk in resp.aiter_bytes(chunk_size=chunk_size):

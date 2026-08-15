@@ -296,3 +296,64 @@ func TestGetVCSConnection_ConsumptionAbsentIsNotAnError(t *testing.T) {
 		t.Errorf("the rest of the connection must still decode, got %q", conn.Name)
 	}
 }
+
+// A remaining budget of zero is "exhausted", not "not reported" — the two mean
+// opposite things and both decode through the same pointer field. Swapping
+// getOptionalIntAttr for GetIntAttr, or slipping in a `!= 0` guard, silently
+// turns an exhausted connection into an unmonitored-looking one; the existing
+// tests cover 30 and absent, so neither would catch it (#1345).
+func TestZeroRemainingDecodesAsZeroNotNil(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_, _ = w.Write([]byte(`{"data":{"id":"vcs-1","type":"vcs-connections","attributes":{
+			"name":"gh","provider":"github",
+			"rate-limit":5000,"rate-limit-remaining":0,
+			"calls-per-hour":4999,"saturation":"exhausted",
+			"budget-window-seconds":3600,"consumers-window-total":4999}}}`))
+	}))
+	defer srv.Close()
+
+	c, err := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+	got, err := c.GetVCSConnection(t.Context(), "vcs-1")
+	if err != nil {
+		t.Fatalf("GetVCSConnection: %v", err)
+	}
+	if got.RateLimitRemaining == nil {
+		t.Fatal("remaining=0 decoded as nil — exhausted is indistinguishable from unreported")
+	}
+	if *got.RateLimitRemaining != 0 {
+		t.Fatalf("remaining = %d, want 0", *got.RateLimitRemaining)
+	}
+	if got.BudgetWindowSeconds == nil || *got.BudgetWindowSeconds != 3600 {
+		t.Fatalf("budget window not decoded: %v", got.BudgetWindowSeconds)
+	}
+	if got.ConsumersWindowTotal == nil || *got.ConsumersWindowTotal != 4999 {
+		t.Fatalf("consumers total not decoded: %v", got.ConsumersWindowTotal)
+	}
+}
+
+// A server that predates the window fields must decode to nil, not 0 — a
+// consumer scaling a rate by a zero window would divide the utilisation away.
+func TestOlderServerLeavesTheWindowFieldsNil(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_, _ = w.Write([]byte(`{"data":{"id":"vcs-1","type":"vcs-connections","attributes":{
+			"name":"gh","provider":"github","calls-per-hour":10}}}`))
+	}))
+	defer srv.Close()
+
+	c, _ := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+	got, err := c.GetVCSConnection(t.Context(), "vcs-1")
+	if err != nil {
+		t.Fatalf("GetVCSConnection: %v", err)
+	}
+	if got.BudgetWindowSeconds != nil {
+		t.Fatalf("absent window should stay nil, got %d", *got.BudgetWindowSeconds)
+	}
+	if got.Saturation != "" {
+		t.Fatalf("absent saturation should stay empty, got %q", got.Saturation)
+	}
+}

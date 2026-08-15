@@ -13,6 +13,7 @@ import httpx
 from terrapod.config import settings
 from terrapod.db.models import VCSConnection
 from terrapod.logging_config import get_logger
+from terrapod.services import vcs_rate_limit
 from terrapod.services.vcs_provider import (
     MergeabilityStatus,
     PRComment,
@@ -134,6 +135,13 @@ async def _gitlab_request(
                 await asyncio.sleep(backoff)
                 continue
 
+            # Before the retry decision, so a 429 from an exhausted budget is
+            # itself an observation — that response carries the headers that
+            # say so. GitLab meters per throttle (`RateLimit-Name`) over a
+            # short window, unlike GitHub's hourly quota; `parse_headers`
+            # reads the window off the headers rather than assuming one.
+            await vcs_rate_limit.record(conn, resp.headers, outcome=str(resp.status_code))
+
             if not _should_retry(resp, method, retry_5xx) or attempt >= _MAX_RETRIES:
                 return resp
 
@@ -188,15 +196,15 @@ async def get_branch_sha(conn: VCSConnection, owner: str, repo: str, branch: str
     api = _api_url(conn)
     project = _project_path(owner, repo)
 
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(
-            f"{api}/projects/{project}/repository/branches/{url_quote(branch, safe='')}",
-            headers=_headers(conn),
-        )
-        if resp.status_code == 404:
-            return None
-        resp.raise_for_status()
-        return resp.json()["commit"]["id"]
+    resp = await _gitlab_request(
+        "GET",
+        f"{api}/projects/{project}/repository/branches/{url_quote(branch, safe='')}",
+        conn,
+    )
+    if resp.status_code == 404:
+        return None
+    resp.raise_for_status()
+    return resp.json()["commit"]["id"]
 
 
 async def get_default_branch(conn: VCSConnection, owner: str, repo: str) -> str | None:
@@ -204,15 +212,11 @@ async def get_default_branch(conn: VCSConnection, owner: str, repo: str) -> str 
     api = _api_url(conn)
     project = _project_path(owner, repo)
 
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(
-            f"{api}/projects/{project}",
-            headers=_headers(conn),
-        )
-        if resp.status_code == 404:
-            return None
-        resp.raise_for_status()
-        return resp.json().get("default_branch")
+    resp = await _gitlab_request("GET", f"{api}/projects/{project}", conn)
+    if resp.status_code == 404:
+        return None
+    resp.raise_for_status()
+    return resp.json().get("default_branch")
 
 
 async def download_archive(conn: VCSConnection, owner: str, repo: str, ref: str) -> bytes:
@@ -225,14 +229,15 @@ async def download_archive(conn: VCSConnection, owner: str, repo: str, ref: str)
     api = _api_url(conn)
     project = _project_path(owner, repo)
 
-    async with httpx.AsyncClient(follow_redirects=True) as client:
-        resp = await client.get(
-            f"{api}/projects/{project}/repository/archive.tar.gz",
-            params={"sha": ref},
-            headers=_headers(conn),
-        )
-        resp.raise_for_status()
-        return resp.content
+    resp = await _gitlab_request(
+        "GET",
+        f"{api}/projects/{project}/repository/archive.tar.gz",
+        conn,
+        follow_redirects=True,
+        params={"sha": ref},
+    )
+    resp.raise_for_status()
+    return resp.content
 
 
 async def download_archive_to_file(
@@ -267,6 +272,11 @@ async def download_archive_to_file(
             params={"sha": ref},
             headers=_headers(conn),
         ) as resp:
+            # Counted here, not via `_gitlab_request`: that returns a whole
+            # response and cannot stream. Archives are the largest per-repo
+            # cost of a cycle, so omitting them understated exactly the repos
+            # that change most often (#1345).
+            await vcs_rate_limit.record(conn, resp.headers, outcome=str(resp.status_code))
             resp.raise_for_status()
             with open(dest_path, "wb") as f:
                 async for chunk in resp.aiter_bytes(chunk_size=chunk_size):
@@ -284,19 +294,19 @@ async def list_open_prs(
     api = _api_url(conn)
     project = _project_path(owner, repo)
 
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(
-            f"{api}/projects/{project}/merge_requests",
-            params={
-                "state": "opened",
-                "target_branch": base_branch,
-                "order_by": "updated_at",
-                "sort": "desc",
-                "per_page": 100,
-            },
-            headers=_headers(conn),
-        )
-        resp.raise_for_status()
+    resp = await _gitlab_request(
+        "GET",
+        f"{api}/projects/{project}/merge_requests",
+        conn,
+        params={
+            "state": "opened",
+            "target_branch": base_branch,
+            "order_by": "updated_at",
+            "sort": "desc",
+            "per_page": 100,
+        },
+    )
+    resp.raise_for_status()
 
     return [
         PullRequest(
@@ -317,13 +327,13 @@ async def list_branches(conn: VCSConnection, owner: str, repo: str) -> list[dict
     api = _api_url(conn)
     project = _project_path(owner, repo)
 
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(
-            f"{api}/projects/{project}/repository/branches",
-            params={"per_page": 100},
-            headers=_headers(conn),
-        )
-        resp.raise_for_status()
+    resp = await _gitlab_request(
+        "GET",
+        f"{api}/projects/{project}/repository/branches",
+        conn,
+        params={"per_page": 100},
+    )
+    resp.raise_for_status()
 
     return [{"name": b["name"], "sha": b["commit"]["id"]} for b in resp.json()]
 
@@ -334,16 +344,15 @@ async def list_tags(conn: VCSConnection, owner: str, repo: str) -> list[dict[str
     Returns a list of dicts with keys: name, sha.
     """
     api = _api_url(conn)
-    tok = _token(conn)
     project = _project_path(owner, repo)
 
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(
-            f"{api}/projects/{project}/repository/tags",
-            params={"per_page": 100},
-            headers={"PRIVATE-TOKEN": tok},
-        )
-        resp.raise_for_status()
+    resp = await _gitlab_request(
+        "GET",
+        f"{api}/projects/{project}/repository/tags",
+        conn,
+        params={"per_page": 100},
+    )
+    resp.raise_for_status()
 
     return [{"name": tag["name"], "sha": tag["commit"]["id"]} for tag in resp.json()]
 
@@ -361,13 +370,13 @@ async def get_changed_files(
     api = _api_url(conn)
     project = _project_path(owner, repo)
 
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(
-            f"{api}/projects/{project}/repository/compare",
-            params={"from": base_sha, "to": head_sha, "per_page": 500},
-            headers=_headers(conn),
-        )
-        resp.raise_for_status()
+    resp = await _gitlab_request(
+        "GET",
+        f"{api}/projects/{project}/repository/compare",
+        conn,
+        params={"from": base_sha, "to": head_sha, "per_page": 500},
+    )
+    resp.raise_for_status()
 
     data = resp.json()
     diffs = data.get("diffs", [])
@@ -397,13 +406,13 @@ async def get_pr_file_changes(
     """
     api = _api_url(conn)
     project = _project_path(owner, repo)
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(
-            f"{api}/projects/{project}/repository/compare",
-            params={"from": base_sha, "to": head_sha, "per_page": 500},
-            headers=_headers(conn),
-        )
-        resp.raise_for_status()
+    resp = await _gitlab_request(
+        "GET",
+        f"{api}/projects/{project}/repository/compare",
+        conn,
+        params={"from": base_sha, "to": head_sha, "per_page": 500},
+    )
+    resp.raise_for_status()
     diffs = resp.json().get("diffs", [])
     if len(diffs) >= 500:
         return None
@@ -440,38 +449,38 @@ async def list_repo_tree(conn: VCSConnection, owner: str, repo: str, ref: str) -
     MAX_PAGES = 200
     PER_PAGE = 100
 
-    async with httpx.AsyncClient() as client:
-        while page <= MAX_PAGES:
-            try:
-                resp = await client.get(
-                    f"{api}/projects/{project}/repository/tree",
-                    params={
-                        "ref": ref,
-                        "recursive": "true",
-                        "per_page": PER_PAGE,
-                        "page": page,
-                    },
-                    headers=_headers(conn),
-                )
-                resp.raise_for_status()
-            except httpx.HTTPError:
-                logger.warning(
-                    "GitLab tree listing failed — autodiscovery initial scan will be incomplete",
-                    project=f"{owner}/{repo}",
-                    ref=ref,
-                    page=page,
-                    exc_info=True,
-                )
-                return None
-            batch = resp.json()
-            if not batch:
-                return files
-            for entry in batch:
-                if entry.get("type") == "blob":
-                    files.append(entry["path"])
-            if len(batch) < PER_PAGE:
-                return files
-            page += 1
+    while page <= MAX_PAGES:
+        try:
+            resp = await _gitlab_request(
+                "GET",
+                f"{api}/projects/{project}/repository/tree",
+                conn,
+                params={
+                    "ref": ref,
+                    "recursive": "true",
+                    "per_page": PER_PAGE,
+                    "page": page,
+                },
+            )
+            resp.raise_for_status()
+        except httpx.HTTPError:
+            logger.warning(
+                "GitLab tree listing failed — autodiscovery initial scan will be incomplete",
+                project=f"{owner}/{repo}",
+                ref=ref,
+                page=page,
+                exc_info=True,
+            )
+            return None
+        batch = resp.json()
+        if not batch:
+            return files
+        for entry in batch:
+            if entry.get("type") == "blob":
+                files.append(entry["path"])
+        if len(batch) < PER_PAGE:
+            return files
+        page += 1
 
     logger.warning(
         "GitLab tree listing hit page cap — autodiscovery initial scan truncated",
@@ -544,6 +553,10 @@ async def create_mr_comment(
             json={"body": body},
             headers=_headers(conn),
         )
+        # Writes keep their own client rather than `_gitlab_request`, which
+        # replays on 5xx and transport errors — a retry loop must never sit in
+        # front of a merge. Counting needs the record, not the retry (#1345).
+        await vcs_rate_limit.record(conn, resp.headers, outcome=str(resp.status_code))
         resp.raise_for_status()
         return resp.json()["id"]
 
@@ -561,6 +574,7 @@ async def update_mr_comment(
             json={"body": body},
             headers=_headers(conn),
         )
+        await vcs_rate_limit.record(conn, resp.headers, outcome=str(resp.status_code))
         resp.raise_for_status()
 
 
@@ -571,14 +585,14 @@ async def list_mr_comments(
     api = _api_url(conn)
     project = _project_path(owner, repo)
 
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(
-            f"{api}/projects/{project}/merge_requests/{mr_number}/notes",
-            params={"per_page": 100, "sort": "desc"},
-            headers=_headers(conn),
-        )
-        resp.raise_for_status()
-        return resp.json()
+    resp = await _gitlab_request(
+        "GET",
+        f"{api}/projects/{project}/merge_requests/{mr_number}/notes",
+        conn,
+        params={"per_page": 100, "sort": "desc"},
+    )
+    resp.raise_for_status()
+    return resp.json()
 
 
 # ── Apply-then-merge surface (#282) ─────────────────────────────────────
@@ -597,14 +611,14 @@ async def get_pull_request(
     """Fetch a single MR's current state."""
     api = _api_url(conn)
     project = _project_path(owner, repo)
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(
-            f"{api}/projects/{project}/merge_requests/{mr_number}",
-            headers=_headers(conn),
-        )
-        if resp.status_code == 404:
-            return None
-        resp.raise_for_status()
+    resp = await _gitlab_request(
+        "GET",
+        f"{api}/projects/{project}/merge_requests/{mr_number}",
+        conn,
+    )
+    if resp.status_code == 404:
+        return None
+    resp.raise_for_status()
     mr = resp.json()
     mr_state = mr.get("state") or ""
     return PullRequest(
@@ -631,12 +645,12 @@ async def get_pull_request_mergeability(
     """
     api = _api_url(conn)
     project = _project_path(owner, repo)
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(
-            f"{api}/projects/{project}/merge_requests/{mr_number}",
-            headers=_headers(conn),
-        )
-        resp.raise_for_status()
+    resp = await _gitlab_request(
+        "GET",
+        f"{api}/projects/{project}/merge_requests/{mr_number}",
+        conn,
+    )
+    resp.raise_for_status()
     mr = resp.json()
     if mr.get("draft", False):
         return MergeabilityStatus(
@@ -711,6 +725,7 @@ async def merge_pull_request(
             json=payload,
             headers=_headers(conn),
         )
+    await vcs_rate_limit.record(conn, resp.headers, outcome=str(resp.status_code))
     if resp.status_code == 200:
         body = resp.json()
         return PRMergeResult(
@@ -741,13 +756,13 @@ async def list_pr_comments_typed(
     """
     api = _api_url(conn)
     project = _project_path(owner, repo)
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(
-            f"{api}/projects/{project}/merge_requests/{mr_number}/notes",
-            params={"per_page": 100, "sort": "asc", "order_by": "updated_at"},
-            headers=_headers(conn),
-        )
-        resp.raise_for_status()
+    resp = await _gitlab_request(
+        "GET",
+        f"{api}/projects/{project}/merge_requests/{mr_number}/notes",
+        conn,
+        params={"per_page": 100, "sort": "asc", "order_by": "updated_at"},
+    )
+    resp.raise_for_status()
     out: list[PRComment] = []
     for n in resp.json():
         if n.get("system"):
@@ -781,12 +796,12 @@ async def list_pr_reviews(
     """
     api = _api_url(conn)
     project = _project_path(owner, repo)
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(
-            f"{api}/projects/{project}/merge_requests/{mr_number}/approvals",
-            headers=_headers(conn),
-        )
-        resp.raise_for_status()
+    resp = await _gitlab_request(
+        "GET",
+        f"{api}/projects/{project}/merge_requests/{mr_number}/approvals",
+        conn,
+    )
+    resp.raise_for_status()
     out: list[PRReview] = []
     for a in resp.json().get("approved_by", []):
         u = a.get("user") or {}

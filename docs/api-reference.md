@@ -2135,6 +2135,8 @@ from rate-limit headers providers already return, so it costs no extra API calls
 | `exhausts-in-seconds` | integer \| null | Projected seconds until the budget runs out at the current rate; `null` when it will not |
 | `top-consumers` | array | `{name, kind, calls}`, descending. `kind` is `workspace`, `module`, `policy-set`, or the subsystem when a call has no owning entity |
 | `label-totals` | array | `{label, key, value, calls}`, descending — calls attributed to consumers carrying each label |
+| `budget-window-seconds` | integer \| null | How long the provider's allowance refills over, inferred from the reset distance. **Do not assume an hour** — GitHub meters 5,000/hour, GitLab.com 2,000/minute. Scale `calls-per-hour` to this before reading it as a share of `rate-limit`. Null when no budget is reported. |
+| `consumers-window-total` | integer | Total calls across **all** consumers over the window `top-consumers` covers. Each entry's share divides by this; dividing by `calls-per-hour` mixes bases. |
 
 **`saturation` is the attribute to act on, not `rate-limit-remaining`.** The
 budget refills on a fixed window, so the remaining count reads healthy right
