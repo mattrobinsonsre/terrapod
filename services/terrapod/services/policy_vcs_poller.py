@@ -248,7 +248,12 @@ async def handle_policy_vcs_sync(payload: dict) -> None:
         ).scalar_one_or_none()
         if ps is None or ps.source != "vcs":
             return
-        await _sync_policy_set(db, ps)
+        # Attribution has to live here, not only on the fan-out cycle: the cycle
+        # enqueues a trigger and returns, so the provider calls happen in this
+        # handler, on a different task with a fresh context. Labelling only the
+        # cycle left every policy-set call recorded as `unknown` (#1339).
+        with vcs_rate_limit.vcs_source("policy-sets", consumer=ps.name, kind="policy-set"):
+            await _sync_policy_set(db, ps)
         await db.commit()
 
 

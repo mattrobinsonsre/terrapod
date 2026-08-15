@@ -389,7 +389,7 @@ See [docs/authentication.md](docs/authentication.md) for setup guides.
 | [Registry](docs/registry.md) | Private module/provider registry, caching layers |
 | [Registry Publishing](docs/registry-publishing.md) | Publishing providers/modules with `terrapod-publish` and the client-signed publish protocol |
 | [Module Source Auth](docs/module-auth.md) | Authenticating private `git::https://` / `git::ssh://` module sources (scoped credentials, ssh↔https rewrite, log-safe delivery) |
-| [VCS Integration](docs/vcs-integration.md) | GitHub and GitLab setup, polling, webhooks |
+| [VCS Integration](docs/vcs-integration.md) | GitHub and GitLab setup, polling, webhooks, API-budget saturation and consumer breakdown |
 | [VCS Workflows](docs/vcs-workflows.md) | PR/MR comment commands, speculative plans, apply-on-merge |
 | [Policies (OPA)](docs/policies.md) | Rego policy authoring, advisory vs mandatory enforcement, label-based scoping, admin override |
 | [Security Scanning](docs/security-scanning.md) | Checkov/Trivy IaC scanning on the plan JSON, advisory vs enforced, severity threshold, skip rules, admin override |

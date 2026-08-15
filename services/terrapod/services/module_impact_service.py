@@ -120,7 +120,15 @@ async def module_impact_poll_cycle() -> None:
 
         for module in modules:
             try:
-                await _poll_module_prs(db, storage, module)
+                # Attribute this module's spend to the module itself (#1339), so
+                # a breakdown can say "this module is a third of the budget"
+                # rather than only "module-impact is".
+                with vcs_rate_limit.vcs_target(
+                    consumer=f"{module.namespace}/{module.name}/{module.provider}",
+                    kind="module",
+                    labels=module.labels,
+                ):
+                    await _poll_module_prs(db, storage, module)
             except Exception:
                 logger.warning(
                     "Module impact poll failed for module",

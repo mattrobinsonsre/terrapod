@@ -761,7 +761,7 @@
       "status": "Status",
       "created": "Oprettet",
       "actions": "Handlinger",
-      "rateLimit": "Hastighedsgrænse"
+      "rateLimit": "API-budget"
     },
     "success": {
       "created": "VCS-forbindelse \"{name}\" oprettet",
@@ -777,10 +777,40 @@
     },
     "rateLimit": {
       "notReported": "Ikke rapporteret",
-      "remaining": "{remaining} af {limit}",
-      "exhausted": "Opbrugt",
-      "observedAt": "pr. {time}"
-    }
+      "observedAt": "pr. {time}",
+      "rate": "{calls}/t",
+      "ofBudget": "{percent} % af budgettet",
+      "resetsIn": "nulstilles om {time}",
+      "runsOutIn": "opbrugt om {time}",
+      "durationS": "{s} s",
+      "durationM": "{m} min",
+      "durationHm": "{h} t {m} min",
+      "showBreakdown": "Vis fordeling",
+      "hideBreakdown": "Skjul fordeling",
+      "consumers": "Største forbrugere",
+      "byLabel": "Efter label",
+      "windowNote": "Over de sidste {minutes} minutter",
+      "saturation": {
+        "idle": "Inaktiv",
+        "comfortable": "Inden for budget",
+        "tight": "Nærmer sig grænsen",
+        "willExhaust": "Over budget",
+        "exhausted": "Opbrugt"
+      },
+      "kinds": {
+        "workspace": "Workspace",
+        "module": "Modul",
+        "policySet": "Politiksæt",
+        "other": "Andet"
+      },
+      "remedies": {
+        "title": "To måder at løse det på",
+        "pollLess": "Forøg VCS-pollingintervallet, så hvert repository tjekkes sjældnere.",
+        "split": "Fordel de travleste forbrugere på flere VCS-forbindelser — én pr. team skalerer bedre end én delt forbindelse."
+      }
+    },
+    "sortBy": "Sortér efter",
+    "createdAt": "Oprettet {date}"
   },
   "adminVariableSets": {
     "title": "Variabelsæt",

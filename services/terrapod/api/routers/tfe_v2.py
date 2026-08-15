@@ -1195,16 +1195,32 @@ async def create_workspace(
     if result.scalar_one_or_none() is not None:
         raise HTTPException(status_code=422, detail=f"Workspace '{name}' already exists")
 
-    # Resolve VCS connection relationship
-    vcs_connection_id = None
+    # Resolve the VCS connection, from either form.
+    #
+    # The read side emits `vcs-connection-id` as an attribute, so a
+    # read-modify-write round-trip naturally sends it back as one — and until
+    # now both create and update accepted only the relationship and dropped the
+    # attribute silently, with a 2xx. Accept both; the relationship stays
+    # canonical and wins when both are present.
+    import uuid as _uuid
+
+    def _parse_conn_id(raw: object) -> "_uuid.UUID | None":
+        if raw in (None, ""):
+            return None
+        try:
+            return _uuid.UUID(str(raw).removeprefix("vcs-"))
+        except ValueError:
+            raise HTTPException(
+                status_code=422, detail=f"Invalid vcs-connection-id: {raw}"
+            ) from None
+
+    vcs_connection_id = _parse_conn_id(attrs.get("vcs-connection-id"))
     relationships = body.get("data", {}).get("relationships", {})
     vcs_conn_data = relationships.get("vcs-connection", {}).get("data", {})
     if vcs_conn_data:
         vcs_conn_id_str = vcs_conn_data.get("id", "")
         if vcs_conn_id_str:
-            import uuid as _uuid
-
-            vcs_connection_id = _uuid.UUID(vcs_conn_id_str.removeprefix("vcs-"))
+            vcs_connection_id = _parse_conn_id(vcs_conn_id_str)
 
     from terrapod.config import settings
 
@@ -1879,6 +1895,29 @@ async def update_workspace(
                 detail="ai-summary-context max length is 4000 characters",
             )
         ws.ai_summary_context = ctx
+
+    # VCS connection. Accepted as an attribute as well as a relationship,
+    # because create takes the attribute (`vcs-connection-id`) and update took
+    # only the relationship — so the obvious PATCH, mirroring the create body
+    # that worked, was accepted with a 200 and silently ignored. Silently
+    # dropping a recognised field is worse than rejecting it: the caller has no
+    # way to tell it did nothing. The relationship stays canonical and wins
+    # when both are present.
+    if "vcs-connection-id" in attrs:
+        import uuid as _uuid
+
+        raw_conn_id = attrs["vcs-connection-id"]
+        if raw_conn_id in (None, ""):
+            ws.vcs_connection_id = None
+        else:
+            try:
+                ws.vcs_connection_id = _uuid.UUID(str(raw_conn_id).removeprefix("vcs-"))
+            except ValueError:
+                raise HTTPException(
+                    status_code=422, detail=f"Invalid vcs-connection-id: {raw_conn_id}"
+                ) from None
+            if "drift-detection-enabled" not in attrs:
+                ws.drift_detection_enabled = True
 
     # VCS connection relationship
     relationships = body.get("data", {}).get("relationships", {})

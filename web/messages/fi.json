@@ -761,7 +761,7 @@
       "status": "Tila",
       "created": "Luotu",
       "actions": "Toiminnot",
-      "rateLimit": "Pyyntöraja"
+      "rateLimit": "API-budjetti"
     },
     "success": {
       "created": "VCS-yhteys \"{name}\" luotu",
@@ -777,10 +777,40 @@
     },
     "rateLimit": {
       "notReported": "Ei raportoitu",
-      "remaining": "{remaining} / {limit}",
-      "exhausted": "Käytetty loppuun",
-      "observedAt": "ajankohtana {time}"
-    }
+      "observedAt": "tilanne {time}",
+      "rate": "{calls}/h",
+      "ofBudget": "{percent} % budjetista",
+      "resetsIn": "nollautuu {time} kuluttua",
+      "runsOutIn": "loppuu {time} kuluttua",
+      "durationS": "{s} s",
+      "durationM": "{m} min",
+      "durationHm": "{h} h {m} min",
+      "showBreakdown": "Näytä erittely",
+      "hideBreakdown": "Piilota erittely",
+      "consumers": "Suurimmat kuluttajat",
+      "byLabel": "Tunnisteen mukaan",
+      "windowNote": "Viimeisten {minutes} minuutin ajalta",
+      "saturation": {
+        "idle": "Ei käytössä",
+        "comfortable": "Budjetin sisällä",
+        "tight": "Lähestyy rajaa",
+        "willExhaust": "Budjetin yli",
+        "exhausted": "Loppunut"
+      },
+      "kinds": {
+        "workspace": "Työtila",
+        "module": "Moduuli",
+        "policySet": "Käytäntöjoukko",
+        "other": "Muu"
+      },
+      "remedies": {
+        "title": "Kaksi tapaa korjata tämä",
+        "pollLess": "Kasvata VCS-kyselyväliä, jotta kutakin repositoriota tarkistetaan harvemmin.",
+        "split": "Jaa vilkkaimmat kuluttajat useammalle VCS-yhteydelle — yksi tiimiä kohden skaalautuu paremmin kuin yksi jaettu yhteys."
+      }
+    },
+    "sortBy": "Lajitteluperuste",
+    "createdAt": "Luotu {date}"
   },
   "adminVariableSets": {
     "title": "Muuttujajoukot",

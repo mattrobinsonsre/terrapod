@@ -761,7 +761,7 @@
       "status": "Status",
       "created": "Criada",
       "actions": "Ações",
-      "rateLimit": "Limite de requisições"
+      "rateLimit": "Orçamento de API"
     },
     "success": {
       "created": "Conexão VCS \"{name}\" criada",
@@ -777,10 +777,40 @@
     },
     "rateLimit": {
       "notReported": "Não informado",
-      "remaining": "{remaining} de {limit}",
-      "exhausted": "Esgotado",
-      "observedAt": "em {time}"
-    }
+      "observedAt": "em {time}",
+      "rate": "{calls}/h",
+      "ofBudget": "{percent}% do orçamento",
+      "resetsIn": "redefine em {time}",
+      "runsOutIn": "esgota em {time}",
+      "durationS": "{s} s",
+      "durationM": "{m} min",
+      "durationHm": "{h} h {m} min",
+      "showBreakdown": "Mostrar detalhamento",
+      "hideBreakdown": "Ocultar detalhamento",
+      "consumers": "Maiores consumidores",
+      "byLabel": "Por rótulo",
+      "windowNote": "Nos últimos {minutes} minutos",
+      "saturation": {
+        "idle": "Ocioso",
+        "comfortable": "Dentro do orçamento",
+        "tight": "Próximo do limite",
+        "willExhaust": "Acima do orçamento",
+        "exhausted": "Esgotado"
+      },
+      "kinds": {
+        "workspace": "Workspace",
+        "module": "Módulo",
+        "policySet": "Conjunto de políticas",
+        "other": "Outro"
+      },
+      "remedies": {
+        "title": "Duas formas de resolver",
+        "pollLess": "Aumente o intervalo de sondagem do VCS para que cada repositório seja verificado com menos frequência.",
+        "split": "Distribua os maiores consumidores entre mais conexões de VCS — uma por equipe escala melhor do que uma conexão compartilhada."
+      }
+    },
+    "sortBy": "Ordenar por",
+    "createdAt": "Criado em {date}"
   },
   "adminVariableSets": {
     "title": "Conjuntos de Variáveis",

@@ -793,13 +793,16 @@
     "version-id"
   ],
   "vcs_connections._connection_json": [
+    "calls-per-hour",
     "created-at",
+    "exhausts-in-seconds",
     "github-account-login",
     "github-account-type",
     "github-app-id",
     "github-installation-id",
     "has-token",
     "has-webhook-secret",
+    "label-totals",
     "name",
     "provider",
     "rate-limit",
@@ -807,8 +810,12 @@
     "rate-limit-remaining",
     "rate-limit-reset-at",
     "rate-limit-resource",
+    "rate-window-minutes",
+    "saturation",
+    "seconds-to-reset",
     "server-url",
     "status",
+    "top-consumers",
     "updated-at"
   ],
   "workspace_extensions._critique_json": [

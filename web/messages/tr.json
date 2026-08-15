@@ -761,7 +761,7 @@
       "status": "Durum",
       "created": "Oluşturulma",
       "actions": "Eylemler",
-      "rateLimit": "İstek limiti"
+      "rateLimit": "API bütçesi"
     },
     "success": {
       "created": "\"{name}\" VCS bağlantısı oluşturuldu",
@@ -777,10 +777,40 @@
     },
     "rateLimit": {
       "notReported": "Bildirilmedi",
-      "remaining": "{limit} içinden {remaining}",
-      "exhausted": "Tükendi",
-      "observedAt": "{time} itibarıyla"
-    }
+      "observedAt": "{time} itibarıyla",
+      "rate": "{calls}/sa",
+      "ofBudget": "bütçenin %{percent} kadarı",
+      "resetsIn": "{time} içinde sıfırlanır",
+      "runsOutIn": "{time} içinde tükenir",
+      "durationS": "{s} sn",
+      "durationM": "{m} dk",
+      "durationHm": "{h} sa {m} dk",
+      "showBreakdown": "Dağılımı göster",
+      "hideBreakdown": "Dağılımı gizle",
+      "consumers": "En çok tüketenler",
+      "byLabel": "Etikete göre",
+      "windowNote": "Son {minutes} dakika boyunca",
+      "saturation": {
+        "idle": "Boşta",
+        "comfortable": "Bütçe dahilinde",
+        "tight": "Limite yaklaşıyor",
+        "willExhaust": "Bütçe aşımı",
+        "exhausted": "Tükendi"
+      },
+      "kinds": {
+        "workspace": "Çalışma alanı",
+        "module": "Modül",
+        "policySet": "Politika kümesi",
+        "other": "Diğer"
+      },
+      "remedies": {
+        "title": "Bunu çözmenin iki yolu",
+        "pollLess": "Her deponun daha seyrek kontrol edilmesi için VCS yoklama aralığını artırın.",
+        "split": "En yoğun tüketicileri daha fazla VCS bağlantısına dağıtın — takım başına bir bağlantı, tek bir paylaşılan bağlantıdan daha iyi ölçeklenir."
+      }
+    },
+    "sortBy": "Sıralama ölçütü",
+    "createdAt": "{date} tarihinde oluşturuldu"
   },
   "adminVariableSets": {
     "title": "Değişken Setleri",

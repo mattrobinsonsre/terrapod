@@ -133,7 +133,12 @@ async def registry_vcs_poll_cycle() -> None:
 
         for module in modules:
             try:
-                await _poll_module(db, storage, module)
+                with vcs_rate_limit.vcs_target(
+                    consumer=f"{module.namespace}/{module.name}/{module.provider}",
+                    kind="module",
+                    labels=module.labels,
+                ):
+                    await _poll_module(db, storage, module)
             except Exception:
                 logger.warning(
                     "Registry VCS poll failed for module",

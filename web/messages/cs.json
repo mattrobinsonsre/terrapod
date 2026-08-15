@@ -761,7 +761,7 @@
       "status": "Stav",
       "created": "Vytvořeno",
       "actions": "Akce",
-      "rateLimit": "Limit požadavků"
+      "rateLimit": "Rozpočet API"
     },
     "success": {
       "created": "VCS připojení „{name}“ vytvořeno",
@@ -777,10 +777,40 @@
     },
     "rateLimit": {
       "notReported": "Nehlášeno",
-      "remaining": "{remaining} z {limit}",
-      "exhausted": "Vyčerpáno",
-      "observedAt": "k {time}"
-    }
+      "observedAt": "k {time}",
+      "rate": "{calls}/h",
+      "ofBudget": "{percent} % rozpočtu",
+      "resetsIn": "reset za {time}",
+      "runsOutIn": "vyčerpání za {time}",
+      "durationS": "{s} s",
+      "durationM": "{m} min",
+      "durationHm": "{h} h {m} min",
+      "showBreakdown": "Zobrazit rozpis",
+      "hideBreakdown": "Skrýt rozpis",
+      "consumers": "Největší spotřebitelé",
+      "byLabel": "Podle štítku",
+      "windowNote": "Za posledních {minutes} minut",
+      "saturation": {
+        "idle": "Nečinné",
+        "comfortable": "V rámci rozpočtu",
+        "tight": "Blíží se limitu",
+        "willExhaust": "Nad rozpočet",
+        "exhausted": "Vyčerpáno"
+      },
+      "kinds": {
+        "workspace": "Pracovní prostor",
+        "module": "Modul",
+        "policySet": "Sada zásad",
+        "other": "Ostatní"
+      },
+      "remedies": {
+        "title": "Dva způsoby, jak to vyřešit",
+        "pollLess": "Zvyšte interval dotazování VCS, aby se každý repozitář kontroloval méně často.",
+        "split": "Rozdělte nejaktivnější spotřebitele mezi více připojení VCS — jedno na tým škáluje lépe než jedno sdílené."
+      }
+    },
+    "sortBy": "Řadit podle",
+    "createdAt": "Vytvořeno {date}"
   },
   "adminVariableSets": {
     "title": "Sady proměnných",

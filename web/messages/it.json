@@ -761,7 +761,7 @@
       "status": "Stato",
       "created": "Creata",
       "actions": "Azioni",
-      "rateLimit": "Limite di richieste"
+      "rateLimit": "Budget API"
     },
     "success": {
       "created": "Connessione VCS \"{name}\" creata",
@@ -777,10 +777,40 @@
     },
     "rateLimit": {
       "notReported": "Non riportato",
-      "remaining": "{remaining} di {limit}",
-      "exhausted": "Esaurito",
-      "observedAt": "al {time}"
-    }
+      "observedAt": "al {time}",
+      "rate": "{calls}/h",
+      "ofBudget": "{percent}% del budget",
+      "resetsIn": "reimpostazione tra {time}",
+      "runsOutIn": "esaurimento tra {time}",
+      "durationS": "{s} s",
+      "durationM": "{m} min",
+      "durationHm": "{h} h {m} min",
+      "showBreakdown": "Mostra dettaglio",
+      "hideBreakdown": "Nascondi dettaglio",
+      "consumers": "Principali consumatori",
+      "byLabel": "Per etichetta",
+      "windowNote": "Negli ultimi {minutes} minuti",
+      "saturation": {
+        "idle": "Inattivo",
+        "comfortable": "Entro il budget",
+        "tight": "Vicino al limite",
+        "willExhaust": "Budget superato",
+        "exhausted": "Esaurito"
+      },
+      "kinds": {
+        "workspace": "Workspace",
+        "module": "Modulo",
+        "policySet": "Set di criteri",
+        "other": "Altro"
+      },
+      "remedies": {
+        "title": "Due modi per risolvere",
+        "pollLess": "Aumenta l'intervallo di polling VCS in modo che ogni repository venga controllato meno spesso.",
+        "split": "Distribuisci i consumatori più attivi su più connessioni VCS: una per team scala meglio di una connessione condivisa."
+      }
+    },
+    "sortBy": "Ordina per",
+    "createdAt": "Creato il {date}"
   },
   "adminVariableSets": {
     "title": "Set di variabili",

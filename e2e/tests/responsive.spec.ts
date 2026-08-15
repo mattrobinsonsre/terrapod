@@ -50,6 +50,44 @@ test.describe('Responsive harness (phone viewport)', () => {
     await expect(page.locator('table')).toBeHidden()
   })
 
+  test('VCS connection consumption renders at phone width (#1339)', async ({ page }) => {
+    // Seed a real connection first. On an empty page the table is not in the
+    // DOM at all, so the assertion would pass however the breakpoints are
+    // written — the same trap as the deleted-workspaces test above.
+    const token = getStoredToken()
+    const name = uniqueName('e2eresp-vcs')
+    const created = await fetch(`${API_URL}/api/terrapod/v1/vcs-connections`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/vnd.api+json' },
+      body: JSON.stringify({
+        data: { type: 'vcs-connections', attributes: { name, provider: 'gitlab', token: 'glpat-e2e-not-a-real-token' } },
+      }),
+    })
+    expect(created.ok).toBeTruthy()
+    const connId = (await created.json()).data.id
+
+    try {
+      await page.goto('/admin/vcs-connections')
+      await expect(page.getByText(name)).toBeVisible({ timeout: 15_000 })
+
+      // A freshly created connection has made no calls, so it reports Idle at
+      // a measured zero rate — not a healthy-looking verdict inferred from
+      // absence, and not "Not reported" either, which is reserved for when we
+      // genuinely have no reading. Knowing it has spent nothing IS a reading.
+      await expect(page.getByText('Idle').first()).toBeVisible({ timeout: 15_000 })
+      await expect(page.getByText('0/hr').first()).toBeVisible()
+
+      // The connection renders as a panel (#1339) rather than a table row, so
+      // it reflows to a single column here — nothing may push the page sideways.
+      await expectNoHorizontalPageScroll(page)
+    } finally {
+      await fetch(`${API_URL}/api/terrapod/v1/vcs-connections/${connId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+    }
+  })
+
   test('runs at a phone viewport', async ({ page }) => {
     const vp = page.viewportSize();
     expect(vp, 'responsive project must set a viewport').not.toBeNull();

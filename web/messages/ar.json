@@ -761,7 +761,7 @@
       "status": "الحالة",
       "created": "أُنشئ في",
       "actions": "الإجراءات",
-      "rateLimit": "حد الطلبات"
+      "rateLimit": "ميزانية API"
     },
     "success": {
       "created": "أُنشئ اتصال نظام التحكم بالإصدارات \"{name}\"",
@@ -777,10 +777,40 @@
     },
     "rateLimit": {
       "notReported": "غير مُبلَّغ عنه",
-      "remaining": "{remaining} من {limit}",
-      "exhausted": "مستنفد",
-      "observedAt": "حتى {time}"
-    }
+      "observedAt": "حتى {time}",
+      "rate": "{calls}/ساعة",
+      "ofBudget": "{percent}% من الميزانية",
+      "resetsIn": "إعادة التعيين خلال {time}",
+      "runsOutIn": "النفاد خلال {time}",
+      "durationS": "{s} ث",
+      "durationM": "{m} د",
+      "durationHm": "{h} س {m} د",
+      "showBreakdown": "إظهار التفصيل",
+      "hideBreakdown": "إخفاء التفصيل",
+      "consumers": "أكبر المستهلكين",
+      "byLabel": "حسب التسمية",
+      "windowNote": "خلال آخر {minutes} دقيقة",
+      "saturation": {
+        "idle": "خامل",
+        "comfortable": "ضمن الميزانية",
+        "tight": "يقترب من الحد",
+        "willExhaust": "تجاوز الميزانية",
+        "exhausted": "نفدت"
+      },
+      "kinds": {
+        "workspace": "مساحة العمل",
+        "module": "وحدة",
+        "policySet": "مجموعة السياسات",
+        "other": "أخرى"
+      },
+      "remedies": {
+        "title": "طريقتان لحل ذلك",
+        "pollLess": "زد فترة استقصاء VCS ليتم فحص كل مستودع بمعدل أقل.",
+        "split": "وزّع أكثر المستهلكين نشاطًا على اتصالات VCS إضافية — اتصال لكل فريق يتوسع أفضل من اتصال مشترك واحد."
+      }
+    },
+    "sortBy": "ترتيب حسب",
+    "createdAt": "أُنشئ في {date}"
   },
   "adminVariableSets": {
     "title": "مجموعات المتغيرات",

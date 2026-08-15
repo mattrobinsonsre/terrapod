@@ -761,7 +761,7 @@
       "status": "Dotlh",
       "created": "chenmoHlu'pu'",
       "actions": "vangmey",
-      "rateLimit": "tlhoy' mI'"
+      "rateLimit": "API Hoch"
     },
     "success": {
       "created": "VCS rar \"{name}\" chenmoHlu'pu'",
@@ -777,10 +777,40 @@
     },
     "rateLimit": {
       "notReported": "ja'be'",
-      "remaining": "{limit} vo' {remaining}",
-      "exhausted": "Natlhlu'pu'",
-      "observedAt": "{time} Daq"
-    }
+      "observedAt": "{time} Daq",
+      "rate": "{calls}/rep",
+      "ofBudget": "Hoch {percent}%",
+      "resetsIn": "{time} tlhoy' chu'choH",
+      "runsOutIn": "{time} natlhlu'",
+      "durationS": "{s} lup",
+      "durationM": "{m} tup",
+      "durationHm": "{h} rep {m} tup",
+      "showBreakdown": "HochHom 'ang",
+      "hideBreakdown": "HochHom So'",
+      "consumers": "natlhwI'pu' potlh",
+      "byLabel": "per: ghom",
+      "windowNote": "{minutes} tup ret",
+      "saturation": {
+        "idle": "leSpu'",
+        "comfortable": "Hoch qav pagh",
+        "tight": "veH Sum",
+        "willExhaust": "Hoch qav wIq",
+        "exhausted": "Natlhlu'pu'"
+      },
+      "kinds": {
+        "workspace": "Daq",
+        "module": "boq",
+        "policySet": "chut ghom",
+        "other": "latlh"
+      },
+      "remedies": {
+        "title": "cha' mIw",
+        "pollLess": "VCS ghelmeH poH tIn'moH, vaj repositories puS ghel.",
+        "split": "natlhwI'pu' potlh VCS rar law' vI'el — ghom Hoch rar wa' 'oH QaQ law' rar hutlh wa' QaQ puS."
+      }
+    },
+    "sortBy": "per choH",
+    "createdAt": "{date} chenmoHlupu"
   },
   "adminVariableSets": {
     "title": "choHlaH Segh",

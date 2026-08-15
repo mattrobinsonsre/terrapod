@@ -44,6 +44,42 @@ type VCSConnection struct {
 	RateLimitResource   string `json:"rate-limit-resource,omitempty"`
 	RateLimitResetAt    string `json:"rate-limit-reset-at,omitempty"`
 	RateLimitObservedAt string `json:"rate-limit-observed-at,omitempty"`
+
+	// Consumption — how fast the budget is being spent, and by what (#1339).
+	//
+	// The budget fields above cannot answer whether a configuration is
+	// straining the limit: the budget refills on a fixed window, so it reads
+	// healthy right after a reset however fast it is being spent. These say
+	// how fast, whether that lands badly before the refill, and which repos,
+	// workspaces or modules are responsible.
+	//
+	// Saturation is one of idle, comfortable, tight, will_exhaust, exhausted.
+	// It is empty when nothing has been observed for the connection.
+	CallsPerHour      *int64          `json:"calls-per-hour,omitempty"`
+	RateWindowMinutes *int64          `json:"rate-window-minutes,omitempty"`
+	SecondsToReset    *int64          `json:"seconds-to-reset,omitempty"`
+	Saturation        string          `json:"saturation,omitempty"`
+	ExhaustsInSeconds *int64          `json:"exhausts-in-seconds,omitempty"`
+	TopConsumers      []VCSConsumer   `json:"top-consumers,omitempty"`
+	LabelTotals       []VCSLabelTotal `json:"label-totals,omitempty"`
+}
+
+// VCSConsumer is one repo, workspace, module or policy set and the number of
+// provider calls attributed to it over the rate window.
+type VCSConsumer struct {
+	Name  string `json:"name"`
+	Kind  string `json:"kind"` // workspace | module | policy-set | subsystem
+	Calls int64  `json:"calls"`
+}
+
+// VCSLabelTotal is one label and the calls attributed to consumers carrying
+// it. Labels are how an estate divides, so this is what says where to split a
+// connection whose budget has been outgrown.
+type VCSLabelTotal struct {
+	Label string `json:"label"` // "key=value", as displayed
+	Key   string `json:"key"`
+	Value string `json:"value"`
+	Calls int64  `json:"calls"`
 }
 
 // CreateVCSConnectionRequest is the input shape for
@@ -260,11 +296,38 @@ func vcsConnFromResource(res *Resource) *VCSConnection {
 		RateLimitResource:    GetStringAttr(res, "rate-limit-resource"),
 		RateLimitResetAt:     GetStringAttr(res, "rate-limit-reset-at"),
 		RateLimitObservedAt:  GetStringAttr(res, "rate-limit-observed-at"),
+		CallsPerHour:         getOptionalIntAttr(res, "calls-per-hour"),
+		RateWindowMinutes:    getOptionalIntAttr(res, "rate-window-minutes"),
+		SecondsToReset:       getOptionalIntAttr(res, "seconds-to-reset"),
+		Saturation:           GetStringAttr(res, "saturation"),
+		ExhaustsInSeconds:    getOptionalIntAttr(res, "exhausts-in-seconds"),
+		TopConsumers:         decodeJSONAttr[[]VCSConsumer](res, "top-consumers"),
+		LabelTotals:          decodeJSONAttr[[]VCSLabelTotal](res, "label-totals"),
 		GithubAccountLogin:   GetStringAttr(res, "github-account-login"),
 		GithubAccountType:    GetStringAttr(res, "github-account-type"),
 		CreatedAt:            GetStringAttr(res, "created-at"),
 		UpdatedAt:            GetStringAttr(res, "updated-at"),
 	}
+}
+
+// decodeJSONAttr decodes a structured attribute (a list of objects) into T.
+// A missing, null or malformed attribute yields the zero value rather than an
+// error: these are observability extras, and a client on a newer SDK than the
+// server it is talking to must still get a usable connection back.
+func decodeJSONAttr[T any](res *Resource, name string) T {
+	var out T
+	if res == nil || res.Attributes == nil {
+		return out
+	}
+	raw, ok := res.Attributes[name]
+	if !ok || len(raw) == 0 || string(raw) == "null" {
+		return out
+	}
+	if err := json.Unmarshal(raw, &out); err != nil {
+		var zero T
+		return zero
+	}
+	return out
 }
 
 // getOptionalIntAttr distinguishes an absent or null attribute from a zero.

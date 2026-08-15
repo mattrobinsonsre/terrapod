@@ -761,7 +761,7 @@
       "status": "Statws",
       "created": "Crëwyd",
       "actions": "Gweithredoedd",
-      "rateLimit": "Terfyn cyfradd"
+      "rateLimit": "Cyllideb API"
     },
     "success": {
       "created": "Crëwyd y cysylltiad VCS \"{name}\"",
@@ -777,10 +777,40 @@
     },
     "rateLimit": {
       "notReported": "Heb ei adrodd",
-      "remaining": "{remaining} o {limit}",
-      "exhausted": "Wedi'i ddisbyddu",
-      "observedAt": "fel ar {time}"
-    }
+      "observedAt": "hyd at {time}",
+      "rate": "{calls}/awr",
+      "ofBudget": "{percent}% o'r gyllideb",
+      "resetsIn": "ailosod ymhen {time}",
+      "runsOutIn": "yn dod i ben ymhen {time}",
+      "durationS": "{s} eil",
+      "durationM": "{m} mun",
+      "durationHm": "{h} awr {m} mun",
+      "showBreakdown": "Dangos y dadansoddiad",
+      "hideBreakdown": "Cuddio'r dadansoddiad",
+      "consumers": "Prif ddefnyddwyr",
+      "byLabel": "Yn ôl label",
+      "windowNote": "Dros y {minutes} munud diwethaf",
+      "saturation": {
+        "idle": "Segur",
+        "comfortable": "O fewn y gyllideb",
+        "tight": "Yn agosáu at y terfyn",
+        "willExhaust": "Dros y gyllideb",
+        "exhausted": "Wedi disbyddu"
+      },
+      "kinds": {
+        "workspace": "Gweithle",
+        "module": "Modiwl",
+        "policySet": "Set bolisi",
+        "other": "Arall"
+      },
+      "remedies": {
+        "title": "Dwy ffordd o ddatrys hyn",
+        "pollLess": "Cynyddwch gyfnod holi VCS fel bod pob ystorfa'n cael ei gwirio'n llai aml.",
+        "split": "Rhannwch y defnyddwyr prysuraf ar draws mwy o gysylltiadau VCS — mae un fesul tîm yn graddio'n well nag un cysylltiad a rennir."
+      }
+    },
+    "sortBy": "Trefnu yn ôl",
+    "createdAt": "Crëwyd {date}"
   },
   "adminVariableSets": {
     "title": "Setiau Newidynnau",

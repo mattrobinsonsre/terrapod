@@ -228,3 +228,71 @@ func TestListAllVCSConnections_LoopsAllPages(t *testing.T) {
 		t.Errorf("requested pages %v, want exactly 3", requested)
 	}
 }
+
+// Consumption decoding (#1339). The saturation verdict and the breakdown are
+// what an operator acts on, so a silently-dropped field here is the whole
+// feature failing quietly.
+func TestGetVCSConnection_DecodesConsumption(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_, _ = w.Write([]byte(`{"data":{"id":"vcs-aaa","type":"vcs-connections","attributes":{
+		  "name":"github-prod","provider":"github","has-token":true,
+		  "rate-limit":5000,"rate-limit-remaining":30,
+		  "calls-per-hour":11400,"rate-window-minutes":60,"seconds-to-reset":1800,
+		  "saturation":"will_exhaust","exhausts-in-seconds":9,
+		  "top-consumers":[{"name":"org/infra","kind":"workspace","calls":9000},
+		                   {"name":"default/vpc/aws","kind":"module","calls":2400}],
+		  "label-totals":[{"label":"team=platform","key":"team","value":"platform","calls":9000}]
+		}}}`))
+	}))
+	defer srv.Close()
+	c, err := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	conn, err := c.GetVCSConnection(t.Context(), "vcs-aaa")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if conn.Saturation != "will_exhaust" {
+		t.Errorf("saturation = %q, want will_exhaust", conn.Saturation)
+	}
+	if conn.CallsPerHour == nil || *conn.CallsPerHour != 11400 {
+		t.Errorf("calls-per-hour = %v, want 11400", conn.CallsPerHour)
+	}
+	if conn.ExhaustsInSeconds == nil || *conn.ExhaustsInSeconds != 9 {
+		t.Errorf("exhausts-in-seconds = %v, want 9", conn.ExhaustsInSeconds)
+	}
+	if len(conn.TopConsumers) != 2 {
+		t.Fatalf("top-consumers = %d entries, want 2", len(conn.TopConsumers))
+	}
+	if conn.TopConsumers[0].Kind != "workspace" || conn.TopConsumers[0].Calls != 9000 {
+		t.Errorf("first consumer = %+v", conn.TopConsumers[0])
+	}
+	if conn.TopConsumers[1].Kind != "module" {
+		t.Errorf("second consumer kind = %q, want module", conn.TopConsumers[1].Kind)
+	}
+	if len(conn.LabelTotals) != 1 || conn.LabelTotals[0].Key != "team" {
+		t.Errorf("label-totals = %+v", conn.LabelTotals)
+	}
+}
+
+// An older server sends none of these. The connection must still decode —
+// version skew across a MINOR must never turn into a client-side failure.
+func TestGetVCSConnection_ConsumptionAbsentIsNotAnError(t *testing.T) {
+	c, _, _ := newVCSConnFixture(t)
+	conn, err := c.GetVCSConnection(t.Context(), "vcs-aaa")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if conn.Saturation != "" || conn.CallsPerHour != nil {
+		t.Errorf("absent consumption should stay absent, got %+v", conn)
+	}
+	if conn.TopConsumers != nil || conn.LabelTotals != nil {
+		t.Errorf("absent breakdown should be nil, got %+v / %+v", conn.TopConsumers, conn.LabelTotals)
+	}
+	if conn.Name != "github-prod" {
+		t.Errorf("the rest of the connection must still decode, got %q", conn.Name)
+	}
+}

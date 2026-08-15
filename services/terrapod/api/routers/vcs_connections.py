@@ -44,7 +44,9 @@ def _rfc3339(dt) -> str:
     return dt.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def _connection_json(conn: VCSConnection, *, quota: object | None) -> dict:
+def _connection_json(
+    conn: VCSConnection, *, quota: object | None, consumption: object | None = None
+) -> dict:
     """Serialize a VCSConnection to JSON:API format.
 
     `quota` is the last rate-limit observation for this connection (#1334), or
@@ -90,6 +92,24 @@ def _connection_json(conn: VCSConnection, *, quota: object | None) -> dict:
         _rfc3339(datetime.fromtimestamp(quota.observed_at, tz=UTC)) if quota is not None else None
     )
 
+    # Consumption (#1339). The budget level above says how much is left at an
+    # instant, which cannot tell you whether the configuration is straining the
+    # limit — the budget refills on a window, so it reads healthy right after a
+    # reset however fast it is being spent. These say how fast, how long until
+    # the refill, whether that combination lands badly, and which repo or
+    # workspace is responsible.
+    attrs["calls-per-hour"] = getattr(consumption, "calls_per_hour", None)
+    attrs["rate-window-minutes"] = getattr(consumption, "window_minutes", None)
+    attrs["seconds-to-reset"] = getattr(consumption, "seconds_to_reset", None)
+    attrs["saturation"] = getattr(consumption, "verdict", None)
+    attrs["exhausts-in-seconds"] = getattr(consumption, "exhausts_in_seconds", None)
+    attrs["top-consumers"] = getattr(consumption, "top_consumers", None) or []
+    # Labels, because the two remedies for an over-budget connection are "poll
+    # less often" and "split the load across more connections", and splitting
+    # needs a line to split along. Terrapod has no teams — labels are how an
+    # estate divides — so this is what turns a list of repos into a decision.
+    attrs["label-totals"] = getattr(consumption, "label_totals", None) or []
+
     return {
         "id": f"vcs-{conn.id}",
         "type": "vcs-connections",
@@ -121,7 +141,13 @@ async def list_connections(
     """List all VCS connections (admin only)."""
     connections = await _list_connections(db)
     quotas = {c.id: await vcs_rate_limit.get_snapshot(c.id) for c in connections}
-    items = [_connection_json(c, quota=quotas.get(c.id)) for c in connections]
+    usage = {
+        c.id: await vcs_rate_limit.get_consumption(c.id, quotas.get(c.id)) for c in connections
+    }
+    items = [
+        _connection_json(c, quota=quotas.get(c.id), consumption=usage.get(c.id))
+        for c in connections
+    ]
     page_items, meta = paginate(items, request)
     return JSONResponse(content={"data": page_items, "meta": meta})
 
@@ -221,7 +247,13 @@ async def create_connection(
     )
 
     return JSONResponse(
-        content={"data": _connection_json(conn, quota=await vcs_rate_limit.get_snapshot(conn.id))},
+        content={
+            "data": _connection_json(
+                conn,
+                quota=(q := await vcs_rate_limit.get_snapshot(conn.id)),
+                consumption=await vcs_rate_limit.get_consumption(conn.id, q),
+            )
+        },
         status_code=201,
     )
 
@@ -238,7 +270,13 @@ async def show_connection(
     if conn is None:
         raise HTTPException(status_code=404, detail="VCS connection not found")
     return JSONResponse(
-        content={"data": _connection_json(conn, quota=await vcs_rate_limit.get_snapshot(conn.id))}
+        content={
+            "data": _connection_json(
+                conn,
+                quota=(q := await vcs_rate_limit.get_snapshot(conn.id)),
+                consumption=await vcs_rate_limit.get_consumption(conn.id, q),
+            )
+        }
     )
 
 
@@ -332,7 +370,13 @@ async def update_connection(
     )
 
     return JSONResponse(
-        content={"data": _connection_json(conn, quota=await vcs_rate_limit.get_snapshot(conn.id))}
+        content={
+            "data": _connection_json(
+                conn,
+                quota=(q := await vcs_rate_limit.get_snapshot(conn.id)),
+                consumption=await vcs_rate_limit.get_consumption(conn.id, q),
+            )
+        }
     )
 
 

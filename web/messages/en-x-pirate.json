@@ -777,10 +777,40 @@
     },
     "rateLimit": {
       "notReported": "Nary a word",
-      "remaining": "{remaining} o' {limit}",
-      "exhausted": "All spent, matey",
-      "observedAt": "as o' {time}"
-    }
+      "observedAt": "as o' {time}",
+      "rate": "{calls}/bell",
+      "ofBudget": "{percent}% o' the ration",
+      "resetsIn": "refills in {time}",
+      "runsOutIn": "runs dry in {time}",
+      "durationS": "{s}s",
+      "durationM": "{m}m",
+      "durationHm": "{h}h {m}m",
+      "showBreakdown": "Show the manifest",
+      "hideBreakdown": "Stow the manifest",
+      "consumers": "Greediest hands",
+      "byLabel": "By marking",
+      "windowNote": "These past {minutes} minutes at sea",
+      "saturation": {
+        "idle": "Becalmed",
+        "comfortable": "Well provisioned",
+        "tight": "Runnin' low",
+        "willExhaust": "Over the ration",
+        "exhausted": "All spent, matey"
+      },
+      "kinds": {
+        "workspace": "Berth",
+        "module": "Module",
+        "policySet": "Set o' articles",
+        "other": "Other"
+      },
+      "remedies": {
+        "title": "Two ways to right this",
+        "pollLess": "Lengthen the VCS watch, so each repo be sighted less often.",
+        "split": "Spread the greediest hands across more VCS lines — one per crew carries further than one shared line."
+      }
+    },
+    "sortBy": "Sort by",
+    "createdAt": "Logged {date}"
   },
   "adminVariableSets": {
     "title": "Variable Sets",

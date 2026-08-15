@@ -17,10 +17,72 @@ def _conn(**over):
     return c
 
 
+class _FakePipeline:
+    """Queues commands and applies them on execute, like the real client.
+
+    It exists because the tally is pipelined, and a fake without it makes the
+    tally's own try/except swallow an AttributeError — leaving the suite green
+    on code that never ran. That is not hypothetical: it is what this fake did
+    before, and it hid the tally completely.
+    """
+
+    def __init__(self, redis, transaction):
+        self.redis = redis
+        self.transaction = transaction
+        self.queued: list = []
+
+    def incr(self, key):
+        self.queued.append(("incr", key))
+        return self
+
+    def expire(self, key, ttl):
+        self.queued.append(("expire", key, ttl))
+        return self
+
+    def hincrby(self, key, field, amount):
+        self.queued.append(("hincrby", key, field, amount))
+        return self
+
+    def mget(self, keys):
+        self.queued.append(("mget", keys))
+        return self
+
+    def hgetall(self, key):
+        self.queued.append(("hgetall", key))
+        return self
+
+    async def execute(self):
+        out = []
+        for cmd in self.queued:
+            if cmd[0] == "incr":
+                self.redis.counters[cmd[1]] = self.redis.counters.get(cmd[1], 0) + 1
+                out.append(self.redis.counters[cmd[1]])
+            elif cmd[0] == "expire":
+                self.redis.ttls[cmd[1]] = cmd[2]
+                out.append(True)
+            elif cmd[0] == "hincrby":
+                h = self.redis.store.setdefault(cmd[1], {})
+                h[cmd[2]] = str(int(h.get(cmd[2], 0)) + cmd[3])
+                out.append(int(h[cmd[2]]))
+            elif cmd[0] == "mget":
+                out.append([self.redis.counters.get(k) for k in cmd[1]])
+            elif cmd[0] == "hgetall":
+                out.append(self.redis.store.get(cmd[1], {}))
+        self.queued = []
+        return out
+
+
 class _FakeRedis:
     def __init__(self):
         self.store: dict[str, dict] = {}
+        self.counters: dict[str, int] = {}
         self.ttls: dict[str, int] = {}
+        self.pipelines: list[_FakePipeline] = []
+
+    def pipeline(self, transaction=True):
+        p = _FakePipeline(self, transaction)
+        self.pipelines.append(p)
+        return p
 
     async def hset(self, key, mapping=None):
         self.store.setdefault(key, {}).update({k: str(v) for k, v in (mapping or {}).items()})
@@ -214,6 +276,190 @@ class TestEveryEntryPointIsAttributed:
 
 class _Stop(Exception):
     pass
+
+
+class TestConsumptionTally:
+    """The tally is driven through `record`, its real caller.
+
+    Deliberately not by calling `_tally` directly: the tally is best-effort and
+    swallows its own failures, so a test that reaches past `record` would keep
+    passing if the two ever stopped being connected.
+    """
+
+    async def _record_calls(self, redis, ctx_kwargs, n=1):
+        with patch("terrapod.redis.client.get_redis_client", return_value=redis):
+            with vcs_rate_limit.vcs_source("workspace-poll", **ctx_kwargs):
+                for _ in range(n):
+                    await vcs_rate_limit.record(_conn(), {}, outcome="200")
+
+    async def test_calls_land_in_the_rate_window_and_against_a_consumer(self):
+        redis = _FakeRedis()
+        await self._record_calls(redis, {"repo": "org/infra", "kind": "workspace"}, n=3)
+
+        assert redis.pipelines, "the tally never ran — the fake is swallowing it"
+        assert sum(redis.counters.values()) == 3
+        consumers = redis.store["tp:vcs_consumers:conn-1"]
+        assert consumers == {"workspace\x1forg/infra": "3"}
+
+    async def test_labels_are_rolled_up_so_the_load_can_be_split(self):
+        """The rollup is the actionable half: an operator over budget splits the
+        connection, and labels are the only line an estate divides along."""
+        redis = _FakeRedis()
+        await self._record_calls(
+            redis,
+            {"repo": "org/a", "kind": "workspace", "labels": {"team": "platform", "env": "prod"}},
+            n=2,
+        )
+        await self._record_calls(
+            redis, {"repo": "org/b", "kind": "workspace", "labels": {"team": "data"}}, n=1
+        )
+
+        assert redis.store["tp:vcs_labels:conn-1"] == {
+            "team=platform": "2",
+            "env=prod": "2",
+            "team=data": "1",
+        }
+
+    async def test_a_call_with_no_repo_still_names_something_actionable(self):
+        """A token refresh has no repo; it must not vanish from the breakdown."""
+        redis = _FakeRedis()
+        await self._record_calls(redis, {})
+        assert redis.store["tp:vcs_consumers:conn-1"] == {"workspace-poll\x1f(workspace-poll)": "1"}
+
+    async def test_the_tally_never_breaks_the_call_that_produced_it(self):
+        with patch("terrapod.redis.client.get_redis_client", side_effect=RuntimeError("down")):
+            await vcs_rate_limit.record(_conn(), {}, outcome="200")  # must not raise
+
+    async def test_pathological_label_sets_are_bounded(self):
+        """Labels are operator-supplied and become Redis fields, so one poll
+        must not turn into a thousand writes."""
+        redis = _FakeRedis()
+        await self._record_calls(redis, {"repo": "r", "labels": {f"k{i}": "v" for i in range(200)}})
+        assert len(redis.store["tp:vcs_labels:conn-1"]) <= 8
+
+    async def test_the_pipeline_is_not_transactional(self):
+        """The three keys have different prefixes, so they hash to different
+        slots on a cluster-mode Redis, where a MULTI across slots is refused."""
+        redis = _FakeRedis()
+        await self._record_calls(redis, {"repo": "r"})
+        assert all(p.transaction is False for p in redis.pipelines)
+
+
+class TestVerdict:
+    """The verdict compares projected spend against what is left.
+
+    Not the level, and not the rate in isolation — that is the whole point. A
+    budget that refills hourly reads healthy right after a reset however fast it
+    is being spent, which is exactly how a connection burning twice its budget
+    looked fine for part of every hour.
+    """
+
+    def test_a_hopeless_rate_is_called_out_even_on_a_full_budget(self):
+        # 11,400/hr against 5,000 remaining and a full hour to go.
+        verdict, eta = vcs_rate_limit._verdict(11_400, 5_000, 3_600)
+        assert verdict == "will_exhaust"
+        assert 1_500 < eta < 1_700  # ~26 minutes
+
+    def test_a_high_rate_close_to_the_reset_is_fine(self):
+        verdict, _ = vcs_rate_limit._verdict(4_000, 4_500, 60)
+        assert verdict == "comfortable"
+
+    def test_a_modest_rate_against_a_nearly_empty_budget_is_not(self):
+        verdict, _ = vcs_rate_limit._verdict(500, 200, 3_600)
+        assert verdict == "will_exhaust"
+
+    def test_approaching_the_limit_reads_tight_before_it_reads_doomed(self):
+        # Projected spend lands between 70% and 100% of what is left.
+        verdict, _ = vcs_rate_limit._verdict(800, 1_000, 3_600)
+        assert verdict == "tight"
+
+    def test_exhausted_is_its_own_verdict(self):
+        assert vcs_rate_limit._verdict(100, 0, 600) == ("exhausted", 0)
+
+    def test_no_traffic_is_idle_not_healthy(self):
+        assert vcs_rate_limit._verdict(0, 5_000, 3_600)[0] == "idle"
+
+    def test_an_unreported_budget_does_not_invent_a_verdict(self):
+        """A server that reports no limit must not be rendered as failing."""
+        assert vcs_rate_limit._verdict(500, None, 0)[0] == "comfortable"
+        assert vcs_rate_limit._verdict(0, None, 0)[0] == "idle"
+
+
+class TestConsumptionReadback:
+    async def test_rate_verdict_and_breakdown_round_trip(self):
+        redis = _FakeRedis()
+        with patch("terrapod.redis.client.get_redis_client", return_value=redis):
+            with vcs_rate_limit.vcs_source(
+                "workspace-poll", repo="org/busy", kind="workspace", labels={"team": "platform"}
+            ):
+                for _ in range(40):
+                    await vcs_rate_limit.record(_conn(), {}, outcome="200")
+            with vcs_rate_limit.vcs_source(
+                "registry-tags", consumer="default/vpc/aws", kind="module"
+            ):
+                await vcs_rate_limit.record(_conn(), {}, outcome="200")
+
+            snap = vcs_rate_limit.RateLimitSnapshot(
+                limit=5000,
+                remaining=30,
+                reset_at=int(time.time()) + 3600,
+                observed_at=int(time.time()),
+                resource="core",
+            )
+            got = await vcs_rate_limit.get_consumption("conn-1", snap)
+
+        assert got is not None
+        assert got.calls_per_hour == 41
+        assert got.verdict == "will_exhaust"
+        assert got.top_consumers[0] == {"name": "org/busy", "kind": "workspace", "calls": 40}
+        assert {"name": "default/vpc/aws", "kind": "module", "calls": 1} in got.top_consumers
+        assert got.label_totals == [
+            {"label": "team=platform", "key": "team", "value": "platform", "calls": 40}
+        ]
+
+    async def test_a_connection_nothing_is_known_about_reports_nothing(self):
+        with patch("terrapod.redis.client.get_redis_client", return_value=_FakeRedis()):
+            got = await vcs_rate_limit.get_consumption("never-seen", None)
+        assert got is not None and got.calls_per_hour == 0
+        assert got.verdict == "idle" and got.top_consumers == []
+
+    async def test_redis_being_down_reports_nothing_rather_than_zero(self):
+        """Zero traffic and no information are different, and conflating them
+        would show a healthy verdict for a connection we cannot see."""
+        with patch("terrapod.redis.client.get_redis_client", side_effect=RuntimeError("down")):
+            assert await vcs_rate_limit.get_consumption("conn-1", None) is None
+
+
+class TestConsumerAttribution:
+    """Every subsystem must name what it is polling, not just itself.
+
+    A per-subsystem total cannot answer the question an operator actually has,
+    which is which repo, workspace or module to go and fix.
+    """
+
+    def test_the_policy_sync_handler_attributes_its_own_calls(self):
+        """The fan-out cycle only enqueues triggers, so the decorator on it
+        labels nothing — the provider calls happen in the handler, on a fresh
+        task with a fresh context."""
+        src = _source("policy_vcs_poller.py")
+        handler = src[src.index("async def handle_policy_vcs_sync") :]
+        handler = handler[: handler.index("\n@vcs_rate_limit")]
+        assert "vcs_rate_limit.vcs_source(" in handler
+
+    @pytest.mark.parametrize(
+        "filename", ["module_impact_service.py", "registry_vcs_poller.py", "vcs_poller.py"]
+    )
+    def test_the_pollers_name_the_thing_they_are_polling(self, filename):
+        assert "vcs_rate_limit.vcs_target(" in _source(filename)
+
+
+def _source(filename: str) -> str:
+    from pathlib import Path
+
+    packaged = Path(f"/app/terrapod/services/{filename}")
+    return (
+        packaged if packaged.exists() else Path(f"services/terrapod/services/{filename}")
+    ).read_text()
 
 
 class TestChokepointRecords:

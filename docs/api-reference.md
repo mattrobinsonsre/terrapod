@@ -2113,6 +2113,34 @@ POST /api/terrapod/v1/vcs-connections
 GET /api/terrapod/v1/vcs-connections/{id}
 ```
 
+#### API budget and consumption attributes
+
+Read-only, on every connection in both the list and show responses. They report
+the provider allowance and how fast it is being spent. Everything here is derived
+from rate-limit headers providers already return, so it costs no extra API calls
+— and is an observation as of the last call Terrapod made, not a live query.
+
+| Attribute | Type | Description |
+|---|---|---|
+| `rate-limit` | integer \| null | Total budget the provider reports. `null` when the server reports no rate limit at all |
+| `rate-limit-remaining` | integer \| null | Requests left in the current window. `0` (exhausted) and `null` (not reported) are different — do not conflate them |
+| `rate-limit-resource` | string \| null | Metered resource (GitHub meters `core`, `search` and `graphql` separately) |
+| `rate-limit-reset-at` | RFC3339 \| null | When the budget refills |
+| `rate-limit-observed-at` | RFC3339 \| null | When the reading was taken |
+| `calls-per-hour` | integer \| null | Calls counted over the rate window |
+| `rate-window-minutes` | integer \| null | Width of that window (60) |
+| `seconds-to-reset` | integer \| null | Seconds until the budget refills |
+| `saturation` | string \| null | `idle` \| `comfortable` \| `tight` \| `will_exhaust` \| `exhausted` |
+| `exhausts-in-seconds` | integer \| null | Projected seconds until the budget runs out at the current rate; `null` when it will not |
+| `top-consumers` | array | `{name, kind, calls}`, descending. `kind` is `workspace`, `module`, `policy-set`, or the subsystem when a call has no owning entity |
+| `label-totals` | array | `{label, key, value, calls}`, descending — calls attributed to consumers carrying each label |
+
+**`saturation` is the attribute to act on, not `rate-limit-remaining`.** The
+budget refills on a fixed window, so the remaining count reads healthy right
+after a reset however fast it is being spent; the verdict compares projected
+spend over the rest of the window against what is actually left. See
+[VCS integration → Reading the consumption indicator](vcs-integration.md#reading-the-consumption-indicator).
+
 ### Update Connection
 
 ```

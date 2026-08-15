@@ -761,7 +761,7 @@
       "status": "Статус",
       "created": "Створено",
       "actions": "Дії",
-      "rateLimit": "Ліміт запитів"
+      "rateLimit": "Бюджет API"
     },
     "success": {
       "created": "Підключення VCS \"{name}\" створено",
@@ -776,11 +776,41 @@
       "updateStatus": "Не вдалося оновити підключення ({status})"
     },
     "rateLimit": {
-      "notReported": "Не повідомляється",
-      "remaining": "{remaining} з {limit}",
-      "exhausted": "Вичерпано",
-      "observedAt": "станом на {time}"
-    }
+      "notReported": "Немає даних",
+      "observedAt": "станом на {time}",
+      "rate": "{calls}/год",
+      "ofBudget": "{percent} % бюджету",
+      "resetsIn": "скидання через {time}",
+      "runsOutIn": "вичерпання через {time}",
+      "durationS": "{s} с",
+      "durationM": "{m} хв",
+      "durationHm": "{h} год {m} хв",
+      "showBreakdown": "Показати розподіл",
+      "hideBreakdown": "Сховати розподіл",
+      "consumers": "Основні споживачі",
+      "byLabel": "За міткою",
+      "windowNote": "За останні {minutes} хвилин",
+      "saturation": {
+        "idle": "Простій",
+        "comfortable": "У межах бюджету",
+        "tight": "Наближається до ліміту",
+        "willExhaust": "Перевищення бюджету",
+        "exhausted": "Вичерпано"
+      },
+      "kinds": {
+        "workspace": "Робоча область",
+        "module": "Модуль",
+        "policySet": "Набір політик",
+        "other": "Інше"
+      },
+      "remedies": {
+        "title": "Два способи це виправити",
+        "pollLess": "Збільште інтервал опитування VCS, щоб кожен репозиторій перевірявся рідше.",
+        "split": "Розподіліть найактивніших споживачів між кількома підключеннями VCS — одне на команду масштабується краще, ніж одне спільне."
+      }
+    },
+    "sortBy": "Сортувати за",
+    "createdAt": "Створено {date}"
   },
   "adminVariableSets": {
     "title": "Набори змінних",

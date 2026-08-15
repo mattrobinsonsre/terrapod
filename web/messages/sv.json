@@ -761,7 +761,7 @@
       "status": "Status",
       "created": "Skapad",
       "actions": "Åtgärder",
-      "rateLimit": "Hastighetsgräns"
+      "rateLimit": "API-budget"
     },
     "success": {
       "created": "VCS-anslutning \"{name}\" skapad",
@@ -776,11 +776,41 @@
       "updateStatus": "Det gick inte att uppdatera anslutningen ({status})"
     },
     "rateLimit": {
-      "notReported": "Rapporteras inte",
-      "remaining": "{remaining} av {limit}",
-      "exhausted": "Förbrukad",
-      "observedAt": "per {time}"
-    }
+      "notReported": "Ej rapporterat",
+      "observedAt": "per {time}",
+      "rate": "{calls}/tim",
+      "ofBudget": "{percent} % av budgeten",
+      "resetsIn": "återställs om {time}",
+      "runsOutIn": "tar slut om {time}",
+      "durationS": "{s} s",
+      "durationM": "{m} min",
+      "durationHm": "{h} tim {m} min",
+      "showBreakdown": "Visa fördelning",
+      "hideBreakdown": "Dölj fördelning",
+      "consumers": "Största förbrukare",
+      "byLabel": "Efter etikett",
+      "windowNote": "Under de senaste {minutes} minuterna",
+      "saturation": {
+        "idle": "Inaktiv",
+        "comfortable": "Inom budget",
+        "tight": "Närmar sig gränsen",
+        "willExhaust": "Över budget",
+        "exhausted": "Förbrukad"
+      },
+      "kinds": {
+        "workspace": "Workspace",
+        "module": "Modul",
+        "policySet": "Policyuppsättning",
+        "other": "Övrigt"
+      },
+      "remedies": {
+        "title": "Två sätt att lösa detta",
+        "pollLess": "Öka VCS-pollningsintervallet så att varje repository kontrolleras mer sällan.",
+        "split": "Fördela de mest aktiva förbrukarna över fler VCS-anslutningar — en per team skalar bättre än en delad anslutning."
+      }
+    },
+    "sortBy": "Sortera efter",
+    "createdAt": "Skapad {date}"
   },
   "adminVariableSets": {
     "title": "Variabeluppsättningar",

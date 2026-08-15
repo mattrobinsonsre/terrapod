@@ -761,7 +761,7 @@
       "status": "Status",
       "created": "Maekd",
       "actions": "Akshunz",
-      "rateLimit": "Ratez Limitz"
+      "rateLimit": "API budgit"
     },
     "success": {
       "created": "VCS connekshun \"{name}\" haz been maded",
@@ -777,10 +777,40 @@
     },
     "rateLimit": {
       "notReported": "Nope, no sayz",
-      "remaining": "{remaining} of {limit}",
-      "exhausted": "All gawn!",
-      "observedAt": "as of {time}"
-    }
+      "observedAt": "as ov {time}",
+      "rate": "{calls}/hr ov nomz",
+      "ofBudget": "{percent}% ov teh budgit",
+      "resetsIn": "resetz in {time}",
+      "runsOutIn": "all gawn in {time}",
+      "durationS": "{s}s",
+      "durationM": "{m}m",
+      "durationHm": "{h}h {m}m",
+      "showBreakdown": "Show meh teh detailz",
+      "hideBreakdown": "Hied teh detailz",
+      "consumers": "Biggest nomerz",
+      "byLabel": "By labul",
+      "windowNote": "Ovr teh last {minutes} minitz",
+      "saturation": {
+        "idle": "Sleepin",
+        "comfortable": "Iz fine",
+        "tight": "Gettin close",
+        "willExhaust": "2 much nom!",
+        "exhausted": "All gawn!"
+      },
+      "kinds": {
+        "workspace": "Wurkspase",
+        "module": "Modul",
+        "policySet": "Polisy set",
+        "other": "Uthr"
+      },
+      "remedies": {
+        "title": "2 wayz 2 fix dis",
+        "pollLess": "Maek teh VCS poll slowr so each repo getz checkd less offen.",
+        "split": "Split teh hungriest nomerz akross moar VCS connekshunz — one per team scaelz bettr than one shard."
+      }
+    },
+    "sortBy": "Sortz by",
+    "createdAt": "Maekd {date}"
   },
   "adminVariableSets": {
     "title": "Variabul Setz",

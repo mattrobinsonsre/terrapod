@@ -867,7 +867,9 @@ field User.HasPassword bool `json:"has-password"`
 field User.IsActive bool `json:"is-active"`
 field User.LastLoginAt string `json:"last-login-at,omitempty"`
 field User.UpdatedAt string `json:"updated-at,omitempty"`
+field VCSConnection.CallsPerHour *int64 `json:"calls-per-hour,omitempty"`
 field VCSConnection.CreatedAt string `json:"created-at,omitempty"`
+field VCSConnection.ExhaustsInSeconds *int64 `json:"exhausts-in-seconds,omitempty"`
 field VCSConnection.GithubAccountLogin string `json:"github-account-login,omitempty"`
 field VCSConnection.GithubAccountType string `json:"github-account-type,omitempty"`
 field VCSConnection.GithubAppID int64 `json:"github-app-id,omitempty"`
@@ -875,6 +877,7 @@ field VCSConnection.GithubInstallationID int64 `json:"github-installation-id,omi
 field VCSConnection.HasToken bool `json:"has-token"`
 field VCSConnection.HasWebhookSecret bool `json:"has-webhook-secret"`
 field VCSConnection.ID string `json:"id"`
+field VCSConnection.LabelTotals []VCSLabelTotal `json:"label-totals,omitempty"`
 field VCSConnection.Name string `json:"name"`
 field VCSConnection.Provider string `json:"provider"`
 field VCSConnection.RateLimit *int64 `json:"rate-limit,omitempty"`
@@ -882,9 +885,20 @@ field VCSConnection.RateLimitObservedAt string `json:"rate-limit-observed-at,omi
 field VCSConnection.RateLimitRemaining *int64 `json:"rate-limit-remaining,omitempty"`
 field VCSConnection.RateLimitResetAt string `json:"rate-limit-reset-at,omitempty"`
 field VCSConnection.RateLimitResource string `json:"rate-limit-resource,omitempty"`
+field VCSConnection.RateWindowMinutes *int64 `json:"rate-window-minutes,omitempty"`
+field VCSConnection.Saturation string `json:"saturation,omitempty"`
+field VCSConnection.SecondsToReset *int64 `json:"seconds-to-reset,omitempty"`
 field VCSConnection.ServerURL string `json:"server-url,omitempty"`
 field VCSConnection.Status string `json:"status,omitempty"`
+field VCSConnection.TopConsumers []VCSConsumer `json:"top-consumers,omitempty"`
 field VCSConnection.UpdatedAt string `json:"updated-at,omitempty"`
+field VCSConsumer.Calls int64 `json:"calls"`
+field VCSConsumer.Kind string `json:"kind"`
+field VCSConsumer.Name string `json:"name"`
+field VCSLabelTotal.Calls int64 `json:"calls"`
+field VCSLabelTotal.Key string `json:"key"`
+field VCSLabelTotal.Label string `json:"label"`
+field VCSLabelTotal.Value string `json:"value"`
 field ValidationError.Detail string
 field Variable.Category string `json:"category"`
 field Variable.CreatedAt string `json:"created-at,omitempty"`
@@ -1387,6 +1401,8 @@ type UpdateWorkspaceRequest struct
 type UsageAssumption struct
 type User struct
 type VCSConnection struct
+type VCSConsumer struct
+type VCSLabelTotal struct
 type ValidationError struct
 type Variable struct
 type VariableSet struct

@@ -761,7 +761,7 @@
       "status": "Status",
       "created": "Created",
       "actions": "Actions",
-      "rateLimit": "Limit of rate"
+      "rateLimit": "Budget of API"
     },
     "success": {
       "created": "VCS connection \"{name}\", created it was",
@@ -777,10 +777,40 @@
     },
     "rateLimit": {
       "notReported": "Reported, it is not",
-      "remaining": "Of {limit}, {remaining} there are",
-      "exhausted": "Exhausted, it is",
-      "observedAt": "As of {time}, this is"
-    }
+      "observedAt": "As of {time}, this is",
+      "rate": "{calls} per hour, there are",
+      "ofBudget": "Of the budget, {percent}% it is",
+      "resetsIn": "Reset in {time}, it will",
+      "runsOutIn": "Run out in {time}, it will",
+      "durationS": "{s}s",
+      "durationM": "{m}m",
+      "durationHm": "{h}h {m}m",
+      "showBreakdown": "The breakdown, show",
+      "hideBreakdown": "The breakdown, hide",
+      "consumers": "Consumers greatest, these are",
+      "byLabel": "By label, sorted",
+      "windowNote": "The last {minutes} minutes, this covers",
+      "saturation": {
+        "idle": "Idle, it is",
+        "comfortable": "Within budget, you are",
+        "tight": "The limit, approaching you are",
+        "willExhaust": "Over budget, you are",
+        "exhausted": "Exhausted, it is"
+      },
+      "kinds": {
+        "workspace": "Workspace",
+        "module": "Module",
+        "policySet": "Set of policy",
+        "other": "Other"
+      },
+      "remedies": {
+        "title": "Two ways to fix this, there are",
+        "pollLess": "Longer the VCS poll interval make, so checked less often each repository is.",
+        "split": "Across more VCS connections the busiest consumers split — further scales one per team than one shared connection does."
+      }
+    },
+    "sortBy": "By this, sorted",
+    "createdAt": "Created {date}, it was"
   },
   "adminVariableSets": {
     "title": "Sets, Variable",
