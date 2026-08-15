@@ -88,6 +88,24 @@ test.describe('Responsive harness (phone viewport)', () => {
     }
   })
 
+  test('both queue buttons are reachable at phone width (#1340)', async ({ page }) => {
+    const token = getStoredToken()
+    const wsId = await createWorkspace(token, uniqueName('e2eresp-queue'))
+
+    await page.goto(`/workspaces/${wsId}?tab=runs`)
+
+    // Plan-vs-apply is the decision that matters every time, so neither button
+    // may be hidden behind a breakpoint — a phone must be able to make the
+    // same choice a desktop can.
+    await expect(page.getByRole('button', { name: 'Plan', exact: true })).toBeVisible({
+      timeout: 15_000,
+    })
+    await expect(page.getByRole('button', { name: 'Plan + apply', exact: true })).toBeVisible()
+
+    // Four buttons on one row is where a phone starts scrolling sideways.
+    await expectNoHorizontalPageScroll(page)
+  })
+
   test('runs at a phone viewport', async ({ page }) => {
     const vp = page.viewportSize();
     expect(vp, 'responsive project must set a viewport').not.toBeNull();

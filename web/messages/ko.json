@@ -1863,7 +1863,8 @@
       "discarding": "폐기 중…",
       "cancelShort": "취소",
       "cancelFull": "실행 취소",
-      "canceling": "취소 중…"
+      "canceling": "취소 중…",
+      "queuing": "대기열에 추가 중…"
     },
     "confirm": {
       "apply": "이 실행을 적용하시겠습니까? 계획을 적용하고 인프라를 변경합니다.",
@@ -2160,6 +2161,13 @@
         "sendError": "메시지를 전송하지 못했습니다."
       },
       "translatedNote": "보기 시 원문에서 번역되었습니다."
+    },
+    "drift": {
+      "remediate": "플랜 + 적용",
+      "remediateTitle": "인프라를 구성에 다시 맞추기 위해 플랜 + 적용 실행을 대기열에 추가합니다",
+      "remediateConfirm": "이 워크스페이스에 대해 플랜 + 적용 실행을 대기열에 추가할까요?",
+      "remediateMessage": "드리프트 검사에서 대기열에 추가됨",
+      "remediateFailed": "수정 실행을 대기열에 추가하지 못했습니다"
     }
   },
   "workspaceDetail": {
@@ -2397,19 +2405,18 @@
     "runs": {
       "options": "옵션",
       "hideOptions": "옵션 숨기기",
-      "queueDestroy": "삭제 대기",
+      "queueDestroy": "파기",
       "queueDestroyTitle": "삭제 계획 대기",
       "destroyAllConfirm": "모든 리소스를 삭제하시겠습니까?",
       "confirmDestroy": "삭제 확인",
-      "queuePlan": "계획 대기",
-      "queueRun": "실행 대기",
+      "queuePlan": "플랜",
+      "queueRun": "플랜 + 적용",
       "queuePlanConfirm": "이 워크스페이스에 대한 예상 계획을 대기하시겠습니까?",
       "queueApplyConfirm": "계획 + 적용 실행을 대기하시겠습니까? 인프라가 변경될 수 있습니다.",
       "planOptions": "계획 옵션",
       "targetResources": "대상 리소스",
       "replaceResources": "교체 리소스",
       "commaSeparated": "(쉼표로 구분)",
-      "planOnly": "계획 전용",
       "refreshOnly": "새로 고침 전용",
       "skipRefresh": "새로 고침 건너뛰기",
       "allowEmptyApply": "빈 적용 허용",
@@ -2431,7 +2438,9 @@
       "typePlanOnly": "계획 전용",
       "typePlanApply": "계획 + 적용",
       "sourceModuleTest": "모듈 테스트",
-      "sourceModulePublish": "모듈 게시"
+      "sourceModulePublish": "모듈 게시",
+      "queueApplyTitle": "플랜 + 적용 실행을 대기열에 추가",
+      "queueApplyRefBlocked": "브랜치, 태그 또는 커밋이 선택된 동안에는 적용할 수 없습니다. 해당 실행은 항상 플랜 전용입니다"
     },
     "state": {
       "deleteConfirm": "상태 버전 #{serial}을(를) 삭제하시겠습니까? 이 작업은 취소할 수 없습니다.",

@@ -1863,7 +1863,8 @@
       "discarding": "woDtaH…",
       "cancelShort": "qIl",
       "cancelFull": "Sar qIl",
-      "canceling": "qIltaH…"
+      "canceling": "qIltaH…",
+      "queuing": "lI'taH…"
     },
     "confirm": {
       "apply": "Sar vam lo''a'? nab lo'vam 'ej nISwI' choHvam.",
@@ -2160,6 +2161,13 @@
         "sendError": "QIn ngeHmeH lujpu'."
       },
       "translatedNote": "legh'eghmeH mughlu'pu'."
+    },
+    "drift": {
+      "remediate": "nab + ta",
+      "remediateTitle": "cham chenmoHwI' rap 'e' luqaSmoH nab + ta lI'",
+      "remediateConfirm": "DaqvamvaD nab + ta DalI''a'?",
+      "remediateMessage": "Deq wIv lo''egh lI'lu'",
+      "remediateFailed": "tI'wI' lI'laHbe'"
     }
   },
   "workspaceDetail": {
@@ -2397,19 +2405,18 @@
     "runs": {
       "options": "wIvmey",
       "hideOptions": "wIvmey So'",
-      "queueDestroy": "Qaw' tlham",
+      "queueDestroy": "Qaw'",
       "queueDestroyTitle": "Qaw' nab tlham",
       "destroyAllConfirm": "Hoch Sepmey Qaw''a'?",
       "confirmDestroy": "Qaw' tob",
-      "queuePlan": "nab tlham",
-      "queueRun": "Sar tlham",
+      "queuePlan": "nab",
+      "queueRun": "nab + ta",
       "queuePlanConfirm": "Qumwo'vamvaD Hech nab tlham'a'?",
       "queueApplyConfirm": "nab + lo' Sar tlham'a'? nISwI' choHlaH vam.",
       "planOptions": "nab wIvmey",
       "targetResources": "DoS Sepmey",
       "replaceResources": "Sepmey chartlh",
       "commaSeparated": "(HIvje' chevlu')",
-      "planOnly": "nab neH",
       "refreshOnly": "tI'ang qa' neH",
       "skipRefresh": "tI'ang qa' jump",
       "allowEmptyApply": "chIm lo' chaw'",
@@ -2431,7 +2438,9 @@
       "typePlanOnly": "nab neH",
       "typePlanApply": "nab + lo'",
       "sourceModuleTest": "Segh toblu'",
-      "sourceModulePublish": "Segh chum"
+      "sourceModulePublish": "Segh chum",
+      "queueApplyTitle": "nab + ta qaStaHvIS lI",
+      "queueApplyRefBlocked": "wIv ramus, per ghap commit qaStaHvIS talaHbe — nab neH bIH"
     },
     "state": {
       "deleteConfirm": "Dotlh mI' #{serial} Qaw''a'? choHlaHbe'lu'.",

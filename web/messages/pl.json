@@ -1863,7 +1863,8 @@
       "discarding": "Odrzucanie…",
       "cancelShort": "Anuluj",
       "cancelFull": "Anuluj przebieg",
-      "canceling": "Anulowanie…"
+      "canceling": "Anulowanie…",
+      "queuing": "Dodawanie do kolejki…"
     },
     "confirm": {
       "apply": "Zastosować ten przebieg? Spowoduje to zastosowanie planu i zmianę infrastruktury.",
@@ -2160,6 +2161,13 @@
         "sendError": "Nie udało się wysłać wiadomości."
       },
       "translatedNote": "Przetłumaczono z oryginału podczas wyświetlania."
+    },
+    "drift": {
+      "remediate": "Plan + apply",
+      "remediateTitle": "Dodaj do kolejki uruchomienie plan + apply, aby ponownie dopasować infrastrukturę do konfiguracji",
+      "remediateConfirm": "Dodać do kolejki uruchomienie plan + apply dla tej przestrzeni roboczej?",
+      "remediateMessage": "Dodane do kolejki z kontroli rozbieżności",
+      "remediateFailed": "Nie udało się dodać uruchomienia naprawczego do kolejki"
     }
   },
   "workspaceDetail": {
@@ -2397,19 +2405,18 @@
     "runs": {
       "options": "Opcje",
       "hideOptions": "Ukryj opcje",
-      "queueDestroy": "Umieść niszczenie w kolejce",
+      "queueDestroy": "Zniszcz",
       "queueDestroyTitle": "Umieść w kolejce plan niszczenia",
       "destroyAllConfirm": "Zniszczyć wszystkie zasoby?",
       "confirmDestroy": "Potwierdź niszczenie",
-      "queuePlan": "Umieść plan w kolejce",
-      "queueRun": "Umieść przebieg w kolejce",
+      "queuePlan": "Plan",
+      "queueRun": "Plan + apply",
       "queuePlanConfirm": "Umieścić w kolejce plan spekulatywny dla tego obszaru roboczego?",
       "queueApplyConfirm": "Umieścić w kolejce przebieg plan + apply? Może to zmienić infrastrukturę.",
       "planOptions": "Opcje planu",
       "targetResources": "Docelowe zasoby",
       "replaceResources": "Zastąp zasoby",
       "commaSeparated": "(oddzielone przecinkami)",
-      "planOnly": "Tylko plan",
       "refreshOnly": "Tylko odświeżenie",
       "skipRefresh": "Pomiń odświeżenie",
       "allowEmptyApply": "Zezwól na puste zastosowanie",
@@ -2431,7 +2438,9 @@
       "typePlanOnly": "tylko plan",
       "typePlanApply": "plan + apply",
       "sourceModuleTest": "test modułu",
-      "sourceModulePublish": "publikacja modułu"
+      "sourceModulePublish": "publikacja modułu",
+      "queueApplyTitle": "Dodaj do kolejki uruchomienie plan + apply",
+      "queueApplyRefBlocked": "Apply jest niedostępne, gdy wybrano gałąź, tag lub commit — takie uruchomienia są zawsze tylko plan"
     },
     "state": {
       "deleteConfirm": "Usunąć wersję stanu #{serial}? Tej operacji nie można cofnąć.",

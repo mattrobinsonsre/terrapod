@@ -1863,7 +1863,8 @@
       "discarding": "דוחה…",
       "cancelShort": "בטל",
       "cancelFull": "בטל הרצה",
-      "canceling": "מבטל…"
+      "canceling": "מבטל…",
+      "queuing": "מוסיף לתור…"
     },
     "confirm": {
       "apply": "להחיל את ההרצה הזו? פעולה זו מחילה את התכנון ומשנה את התשתית.",
@@ -2160,6 +2161,13 @@
         "sendError": "שליחת ההודעה שלך נכשלה."
       },
       "translatedNote": "תורגם מהמקור בעת הצפייה."
+    },
+    "drift": {
+      "remediate": "תכנון + החלה",
+      "remediateTitle": "הוספת הרצת תכנון + החלה לתור כדי ליישר מחדש את התשתית עם התצורה",
+      "remediateConfirm": "להוסיף הרצת תכנון + החלה לתור עבור סביבת עבודה זו?",
+      "remediateMessage": "נוסף לתור מבדיקת סטייה",
+      "remediateFailed": "לא ניתן היה להוסיף את הרצת התיקון לתור"
     }
   },
   "workspaceDetail": {
@@ -2397,19 +2405,18 @@
     "runs": {
       "options": "אפשרויות",
       "hideOptions": "הסתרת אפשרויות",
-      "queueDestroy": "הוספת השמדה לתור",
+      "queueDestroy": "השמדה",
       "queueDestroyTitle": "הוספת תוכנית השמדה לתור",
       "destroyAllConfirm": "להשמיד את כל המשאבים?",
       "confirmDestroy": "אישור השמדה",
-      "queuePlan": "הוספת תוכנית לתור",
-      "queueRun": "הוספת הרצה לתור",
+      "queuePlan": "תכנון",
+      "queueRun": "תכנון + החלה",
       "queuePlanConfirm": "להוסיף תוכנית ספקולטיבית לתור עבור סביבת עבודה זו?",
       "queueApplyConfirm": "להוסיף הרצת תכנון + יישום לתור? זה עשוי לשנות תשתית.",
       "planOptions": "אפשרויות תוכנית",
       "targetResources": "משאבי יעד",
       "replaceResources": "החלפת משאבים",
       "commaSeparated": "(מופרד בפסיקים)",
-      "planOnly": "תוכנית בלבד",
       "refreshOnly": "רענון בלבד",
       "skipRefresh": "דילוג על רענון",
       "allowEmptyApply": "אפשר החלה ריקה",
@@ -2431,7 +2438,9 @@
       "typePlanOnly": "תוכנית בלבד",
       "typePlanApply": "תכנון + יישום",
       "sourceModuleTest": "בדיקת מודול",
-      "sourceModulePublish": "פרסום מודול"
+      "sourceModulePublish": "פרסום מודול",
+      "queueApplyTitle": "הוספת הרצת תכנון + החלה לתור",
+      "queueApplyRefBlocked": "החלה אינה זמינה כאשר נבחרו ענף, תגית או קומיט — הרצות אלה הן תמיד תכנון בלבד"
     },
     "state": {
       "deleteConfirm": "למחוק את גרסת המצב #{serial}? לא ניתן לבטל זאת.",

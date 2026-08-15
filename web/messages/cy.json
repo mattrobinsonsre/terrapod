@@ -1863,7 +1863,8 @@
       "discarding": "Wrthi'n taflu…",
       "cancelShort": "Canslo",
       "cancelFull": "Canslo'r Rhediad",
-      "canceling": "Wrthi'n canslo…"
+      "canceling": "Wrthi'n canslo…",
+      "queuing": "Yn ciwio…"
     },
     "confirm": {
       "apply": "Gweithredu'r rhediad hwn? Mae hyn yn gweithredu'r cynllun ac yn newid seilwaith.",
@@ -2160,6 +2161,13 @@
         "sendError": "Methwyd anfon eich neges."
       },
       "translatedNote": "Cyfieithwyd o''r gwreiddiol wrth ei weld."
+    },
+    "drift": {
+      "remediate": "Cynllun + gweithredu",
+      "remediateTitle": "Ciwio rhediad cynllun + gweithredu i ailalinio''r seilwaith â''r ffurfweddiad",
+      "remediateConfirm": "Ciwio rhediad cynllun + gweithredu ar gyfer y gweithle hwn?",
+      "remediateMessage": "Wedii giwio o wiriad drifft",
+      "remediateFailed": "Methwyd â chiwio''r rhediad cywiro"
     }
   },
   "workspaceDetail": {
@@ -2397,19 +2405,18 @@
     "runs": {
       "options": "Opsiynau",
       "hideOptions": "Cuddio Opsiynau",
-      "queueDestroy": "Ciwio Dinistrio",
+      "queueDestroy": "Dinistrio",
       "queueDestroyTitle": "Ciwio cynllun dinistrio",
       "destroyAllConfirm": "Dinistrio pob adnodd?",
       "confirmDestroy": "Cadarnhau Dinistrio",
-      "queuePlan": "Ciwio Cynllun",
-      "queueRun": "Ciwio Rhediad",
+      "queuePlan": "Cynllun",
+      "queueRun": "Cynllun + gweithredu",
       "queuePlanConfirm": "Ciwio cynllun tybiannol ar gyfer y weithfan hon?",
       "queueApplyConfirm": "Ciwio rhediad cynllun + gweithredu? Gall hyn newid seilwaith.",
       "planOptions": "Opsiynau Cynllun",
       "targetResources": "Adnoddau targed",
       "replaceResources": "Amnewid adnoddau",
       "commaSeparated": "(wedi'u gwahanu â choma)",
-      "planOnly": "Cynllun yn Unig",
       "refreshOnly": "Adnewyddu'n Unig",
       "skipRefresh": "Hepgor Adnewyddu",
       "allowEmptyApply": "Caniatáu Gweithredu Gwag",
@@ -2431,7 +2438,9 @@
       "typePlanOnly": "cynllun yn unig",
       "typePlanApply": "cynllun + gweithredu",
       "sourceModuleTest": "prawf modiwl",
-      "sourceModulePublish": "cyhoeddi modiwl"
+      "sourceModulePublish": "cyhoeddi modiwl",
+      "queueApplyTitle": "Ciwio rhediad cynllun + gweithredu",
+      "queueApplyRefBlocked": "Nid yw gweithredu ar gael tra bo cangen, tag neu ymrwymiad wedii ddewis — maer rhediadau hynny bob amser yn gynllun yn unig"
     },
     "state": {
       "deleteConfirm": "Dileu fersiwn cyflwr #{serial}? Ni ellir dadwneud hyn.",

@@ -698,6 +698,10 @@ class TestPermissionsBlock:
         assert perms["can-destroy"] is False
         assert perms["can-queue-run"] is False
         assert perms["can-lock"] is False
+        # Plan and apply are separate grants (#1340). A read-only caller must
+        # not be told it may apply — the UI decides whether to offer the button
+        # from this, so a wrong value here becomes a control that 403s.
+        assert perms["can-queue-apply"] is False
 
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
@@ -722,6 +726,34 @@ class TestPermissionsBlock:
         assert perms["can-queue-run"] is True
         assert perms["can-lock"] is True
         assert perms["can-force-unlock"] is True
+        assert perms["can-queue-apply"] is True
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_capabilities_for")
+    async def test_plan_without_apply_is_expressible(self, mock_resolve, *mocks):
+        """The case the two flags exist for: may plan, may not apply.
+
+        `plan` grants run:plan but not run:apply. Before they were separate the
+        UI saw one "can queue a run" flag and had to either hide the apply from
+        everyone or offer it to people the API would refuse.
+        """
+        mock_resolve.return_value = caps_for_level("plan")
+        ws = _mock_workspace()
+        app, mock_db = _make_app(_user())
+        ws_result = MagicMock()
+        ws_result.scalar_one_or_none.return_value = ws
+        no_run_result = MagicMock()
+        no_run_result.scalar_one_or_none.return_value = None
+        mock_db.execute.side_effect = [ws_result, no_run_result]
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get(f"/api/v2/workspaces/ws-{ws.id}", headers=_AUTH)
+
+        perms = resp.json()["data"]["attributes"]["permissions"]
+        assert perms["can-queue-run"] is True, "plan level must be able to queue a plan"
+        assert perms["can-queue-apply"] is False, "plan level must NOT be offered an apply"
 
 
 # ── Tag bindings (terraform key-value tag support probe) ───────────────

@@ -1863,7 +1863,8 @@
       "discarding": "Abandon…",
       "cancelShort": "Annuler",
       "cancelFull": "Annuler l'exécution",
-      "canceling": "Annulation…"
+      "canceling": "Annulation…",
+      "queuing": "Mise en file…"
     },
     "confirm": {
       "apply": "Appliquer cette exécution ? Cela applique le plan et modifie l'infrastructure.",
@@ -2160,6 +2161,13 @@
         "sendError": "Impossible d''envoyer votre message."
       },
       "translatedNote": "Traduit de l''original à l''affichage."
+    },
+    "drift": {
+      "remediate": "Plan + apply",
+      "remediateTitle": "Mettre en file un run plan + apply pour réaligner l''infrastructure sur la configuration",
+      "remediateConfirm": "Mettre en file un run plan + apply pour cet espace de travail ?",
+      "remediateMessage": "Mis en file depuis un contrôle de dérive",
+      "remediateFailed": "Impossible de mettre en file le run de correction"
     }
   },
   "workspaceDetail": {
@@ -2397,19 +2405,18 @@
     "runs": {
       "options": "Options",
       "hideOptions": "Masquer les options",
-      "queueDestroy": "Mettre en file d'attente une destruction",
+      "queueDestroy": "Détruire",
       "queueDestroyTitle": "Mettre en file d'attente un plan de destruction",
       "destroyAllConfirm": "Détruire toutes les ressources ?",
       "confirmDestroy": "Confirmer la destruction",
-      "queuePlan": "Mettre en file d'attente un plan",
-      "queueRun": "Mettre en file d'attente une exécution",
+      "queuePlan": "Plan",
+      "queueRun": "Plan + apply",
       "queuePlanConfirm": "Mettre en file d'attente un plan spéculatif pour cet espace de travail ?",
       "queueApplyConfirm": "Mettre en file d'attente une exécution plan + apply ? Cela peut modifier l'infrastructure.",
       "planOptions": "Options du plan",
       "targetResources": "Ressources ciblées",
       "replaceResources": "Ressources à remplacer",
       "commaSeparated": "(séparées par des virgules)",
-      "planOnly": "Plan uniquement",
       "refreshOnly": "Actualisation uniquement",
       "skipRefresh": "Ignorer l'actualisation",
       "allowEmptyApply": "Autoriser une application vide",
@@ -2431,7 +2438,9 @@
       "typePlanOnly": "plan uniquement",
       "typePlanApply": "plan + apply",
       "sourceModuleTest": "test de module",
-      "sourceModulePublish": "publication de module"
+      "sourceModulePublish": "publication de module",
+      "queueApplyTitle": "Mettre en file un run plan + apply",
+      "queueApplyRefBlocked": "Apply est indisponible tant quune branche, une étiquette ou un commit est sélectionné — ces runs sont toujours plan-only"
     },
     "state": {
       "deleteConfirm": "Supprimer la version d'état n° {serial} ? Cette action est irréversible.",

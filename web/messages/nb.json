@@ -1863,7 +1863,8 @@
       "discarding": "Forkaster …",
       "cancelShort": "Avbryt",
       "cancelFull": "Avbryt kjøring",
-      "canceling": "Avbryter …"
+      "canceling": "Avbryter …",
+      "queuing": "Legger i kø…"
     },
     "confirm": {
       "apply": "Anvende denne kjøringen? Dette anvender planen og endrer infrastruktur.",
@@ -2160,6 +2161,13 @@
         "sendError": "Kunne ikke sende meldingen din."
       },
       "translatedNote": "Oversatt fra originalen ved visning."
+    },
+    "drift": {
+      "remediate": "Plan + apply",
+      "remediateTitle": "Legg en plan + apply-kjøring i kø for å bringe infrastrukturen på linje med konfigurasjonen igjen",
+      "remediateConfirm": "Legge en plan + apply-kjøring i kø for dette arbeidsområdet?",
+      "remediateMessage": "Lagt i kø fra en avvikskontroll",
+      "remediateFailed": "Kunne ikke legge rettekjøringen i kø"
     }
   },
   "workspaceDetail": {
@@ -2397,19 +2405,18 @@
     "runs": {
       "options": "Alternativer",
       "hideOptions": "Skjul alternativer",
-      "queueDestroy": "Legg nedriving i kø",
+      "queueDestroy": "Ødelegg",
       "queueDestroyTitle": "Legg en nedrivingsplan i kø",
       "destroyAllConfirm": "Rive ned alle ressurser?",
       "confirmDestroy": "Bekreft nedriving",
-      "queuePlan": "Legg plan i kø",
-      "queueRun": "Legg kjøring i kø",
+      "queuePlan": "Plan",
+      "queueRun": "Plan + apply",
       "queuePlanConfirm": "Legge en spekulativ plan i kø for dette arbeidsområdet?",
       "queueApplyConfirm": "Legge en plan + anvend-kjøring i kø? Dette kan endre infrastruktur.",
       "planOptions": "Planalternativer",
       "targetResources": "Målressurser",
       "replaceResources": "Erstatt ressurser",
       "commaSeparated": "(kommaseparert)",
-      "planOnly": "Kun plan",
       "refreshOnly": "Kun oppdater",
       "skipRefresh": "Hopp over oppdatering",
       "allowEmptyApply": "Tillat tom anvendelse",
@@ -2431,7 +2438,9 @@
       "typePlanOnly": "kun plan",
       "typePlanApply": "plan + anvend",
       "sourceModuleTest": "modultest",
-      "sourceModulePublish": "modulpublisering"
+      "sourceModulePublish": "modulpublisering",
+      "queueApplyTitle": "Legg en plan + apply-kjøring i kø",
+      "queueApplyRefBlocked": "Apply er utilgjengelig mens en branch, tag eller commit er valgt — slike kjøringer er alltid kun plan"
     },
     "state": {
       "deleteConfirm": "Slett tilstandsversjon #{serial}? Dette kan ikke angres.",

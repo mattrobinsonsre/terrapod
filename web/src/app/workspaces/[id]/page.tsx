@@ -29,6 +29,9 @@ interface WorkspacePermissions {
   'can-update': boolean
   'can-destroy': boolean
   'can-queue-run': boolean
+  // Plan-only vs apply are separate grants, so the UI needs both to know
+  // whether to offer the apply button at all (#1340).
+  'can-queue-apply'?: boolean
   'can-read-state-versions': boolean
   'can-create-state-versions': boolean
   'can-read-variable': boolean
@@ -357,7 +360,6 @@ function WorkspaceDetailContent() {
   const [planRefreshOnly, setPlanRefreshOnly] = useState(false)
   const [planRefresh, setPlanRefresh] = useState(true)
   const [planAllowEmpty, setPlanAllowEmpty] = useState(false)
-  const [planOnly, setPlanOnly] = useState(true)
   const [queueingDestroy, setQueueingDestroy] = useState(false)
   const [showDestroyConfirm, setShowDestroyConfirm] = useState(false)
 
@@ -587,13 +589,6 @@ function WorkspaceDetailContent() {
       loadVcsRefs()
     }
   }, [showPlanOptions, workspace, loadVcsRefs])
-
-  // Force plan-only when a non-default VCS ref is selected
-  useEffect(() => {
-    if (vcsRef) {
-      setPlanOnly(true)
-    }
-  }, [vcsRef])
 
   // Real-time workspace events via SSE (run status, lock/unlock, state, settings)
   const { connected: sseConnected } = useRunEvents(workspaceId, useCallback((event) => {
@@ -1412,11 +1407,17 @@ function WorkspaceDetailContent() {
     }
   }
 
-  async function handleQueuePlan() {
-    // Touch fat-finger guard — queuing a run is a state change (and on a
-    // non-VCS agent workspace a `plan + apply` run can change infrastructure),
-    // so a stray tap on a touch device (any width) gets a native confirm; a
-    // precise pointer runs immediately.
+  // `planOnly` is the button pressed, not a stored toggle (#1340) — the choice
+  // is per-press, so nothing persists between runs to be misread later.
+  async function handleQueuePlan(planOnly: boolean) {
+    // A non-default VCS ref is forced plan-only server-side. The apply button
+    // is disabled in that state, so reaching here with both set would mean the
+    // guard failed — refuse rather than silently queue the wrong kind of run.
+    if (!planOnly && vcsRef) return
+    // Touch fat-finger guard — queuing a run is a state change (and a
+    // `plan + apply` run can change infrastructure), so a stray tap on a touch
+    // device (any width) gets a native confirm; a precise pointer runs
+    // immediately.
     if (isTouch) {
       const msg = planOnly
         ? t('runs.queuePlanConfirm')
@@ -1468,7 +1469,6 @@ function WorkspaceDetailContent() {
       setPlanRefreshOnly(false)
       setPlanRefresh(true)
       setPlanAllowEmpty(false)
-      setPlanOnly(true)
       setVcsRef('')
       await loadRuns()
     } catch (err) {
@@ -3114,14 +3114,38 @@ function WorkspaceDetailContent() {
                       </button>
                     </div>
                   )}
+                  {/* Two buttons, not a button plus a hidden checkbox (#1340).
+                      Plan-vs-apply is the decision that matters every time, so
+                      it is made by which button you press; the options panel
+                      keeps only the genuinely occasional flags. Pressing Plan
+                      does exactly what it did before. */}
                   <button
-                    onClick={handleQueuePlan}
+                    onClick={() => handleQueuePlan(true)}
                     disabled={queueingPlan || attrs.locked}
                     className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors"
                     title={attrs.locked ? t('common.workspaceLocked') : undefined}
                   >
-                    {queueingPlan ? t('actions.queuing') : planOnly ? t('runs.queuePlan') : t('runs.queueRun')}
+                    {queueingPlan ? t('actions.queuing') : t('runs.queuePlan')}
                   </button>
+                  {perms['can-queue-apply'] && (
+                    <button
+                      onClick={() => handleQueuePlan(false)}
+                      // Disabled on a non-default VCS ref because the server
+                      // forces those runs plan-only. Leaving it enabled would
+                      // promise an apply and quietly deliver a plan.
+                      disabled={queueingPlan || attrs.locked || !!vcsRef}
+                      className="px-4 py-2 rounded-lg text-sm font-medium bg-amber-600 hover:bg-amber-500 disabled:bg-amber-900/40 disabled:text-amber-600/70 text-white transition-colors"
+                      title={
+                        attrs.locked
+                          ? t('common.workspaceLocked')
+                          : vcsRef
+                            ? t('runs.queueApplyRefBlocked')
+                            : t('runs.queueApplyTitle')
+                      }
+                    >
+                      {queueingPlan ? t('actions.queuing') : t('runs.queueRun')}
+                    </button>
+                  )}
                 </div>
                 {showPlanOptions && (
                   <div className="mt-3 p-4 bg-slate-800/50 rounded-lg border border-slate-700/50">
@@ -3149,16 +3173,8 @@ function WorkspaceDetailContent() {
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-4 mt-3">
-                      <label className={`flex items-center gap-2 text-sm cursor-pointer ${vcsRef ? 'text-slate-500' : 'text-slate-300'}`}>
-                        <input
-                          type="checkbox"
-                          checked={planOnly}
-                          onChange={e => setPlanOnly(e.target.checked)}
-                          disabled={!!vcsRef}
-                          className="rounded border-slate-600 bg-slate-900 text-brand-500 focus:ring-brand-500 disabled:opacity-50"
-                        />
-                        {t('runs.planOnly')}
-                      </label>
+                      {/* The plan-only checkbox that used to live here is now
+                          the Plan / Plan + apply button pair above (#1340). */}
                       <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
                         <input
                           type="checkbox"

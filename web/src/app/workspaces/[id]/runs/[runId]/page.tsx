@@ -68,6 +68,7 @@ interface RunAttrs {
   'vcs-branch': string | null
   'vcs-pull-request-number': number | null
   'has-changes': boolean
+  'is-drift-detection': boolean
   'has-json-output'?: boolean
   'has-cost-estimate'?: boolean
   'plan-summary': {
@@ -597,6 +598,11 @@ function RunDetailPageInner() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [actionLoading, setActionLoading] = useState('')
+  // The workspace's RBAC + lock state, for the drift-remediation button
+  // (#1340). The run's own `permissions` block is state-based (can this run be
+  // applied), not "may this user queue an apply" — so it cannot answer it.
+  const [wsCanApply, setWsCanApply] = useState(false)
+  const [wsLocked, setWsLocked] = useState(false)
 
   const [planLog, setPlanLog] = useState<string | null>(null)
   const [applyLog, setApplyLog] = useState<string | null>(null)
@@ -737,6 +743,24 @@ function RunDetailPageInner() {
     if (!getAuthState()) { router.push('/login'); return }
     loadRun()
   }, [router, loadRun])
+
+  // Workspace RBAC + lock, for the drift-remediation button (#1340). The run's
+  // own `permissions` block is state-based ("can this run be applied"), not
+  // "may this user queue an apply", so it cannot answer this. Best-effort: if
+  // the fetch fails the button simply does not appear, which is the safe
+  // direction — never offer an apply we cannot stand behind.
+  useEffect(() => {
+    let cancelled = false
+    apiFetch(`/api/v2/workspaces/${workspaceId}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (cancelled || !d?.data?.attributes) return
+        setWsCanApply(!!d.data.attributes.permissions?.['can-queue-apply'])
+        setWsLocked(!!d.data.attributes.locked)
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [workspaceId])
 
   // Keep the Overview rollups fresh: AI on mount + whenever a summary
   // lifecycle SSE event bumps aiSummaryRefresh; policy on mount + whenever the
@@ -1118,7 +1142,18 @@ function RunDetailPageInner() {
     return { value: '—', tone: 'neutral' }
   })()
 
+  // A drift run that found drift is the one case where the obvious next step
+  // is a fresh remediation run, so offer it right there (#1340). Not shown
+  // when drift found nothing — there is nothing to fix, and an apply button
+  // would only invite a pointless run.
+  const showRemediateDrift =
+    attrs['is-drift-detection'] &&
+    attrs['has-changes'] === true &&
+    wsCanApply &&
+    !wsLocked
+
   const hasActions =
+    showRemediateDrift ||
     actions['is-confirmable'] ||
     actions['is-discardable'] ||
     actions['is-cancelable'] ||
@@ -1148,8 +1183,49 @@ function RunDetailPageInner() {
   // Labels go terse below `md` (Apply / Retry / Cancel) and full at `md+`
   // (Confirm & Apply / Retry Run / Cancel Run). `requestAction` inserts the
   // mobile confirm step; desktop runs immediately.
+  async function remediateDrift() {
+    // Deliberately a NEW run rather than applying this one: a drift run is
+    // plan-only and its plan is a detection artifact, so the right output is an
+    // ordinary run against current config with default options.
+    if (isTouch && !window.confirm(t('drift.remediateConfirm'))) return
+    setActionLoading('remediate')
+    try {
+      const res = await apiFetch('/api/v2/runs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/vnd.api+json' },
+        body: JSON.stringify({
+          data: {
+            type: 'runs',
+            attributes: { 'plan-only': false, message: t('drift.remediateMessage') },
+            relationships: { workspace: { data: { type: 'workspaces', id: workspaceId } } },
+          },
+        }),
+      })
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}))
+        throw new Error(d.detail || t('drift.remediateFailed'))
+      }
+      const newId = (await res.json().catch(() => null))?.data?.id
+      if (newId) router.push(`/workspaces/${workspaceId}/runs/${newId}`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('drift.remediateFailed'))
+    } finally {
+      setActionLoading('')
+    }
+  }
+
   const actionButtons = (
     <>
+      {showRemediateDrift && (
+        <button
+          onClick={remediateDrift}
+          disabled={!!actionLoading}
+          className="px-3 md:px-4 py-2 rounded-lg text-sm font-medium bg-amber-600 hover:bg-amber-500 disabled:bg-amber-900/40 disabled:text-amber-600/70 text-white transition-colors"
+          title={t('drift.remediateTitle')}
+        >
+          {actionLoading === 'remediate' ? t('actions.queuing') : t('drift.remediate')}
+        </button>
+      )}
       {actions['is-retryable'] && (
         <button
           onClick={() => requestAction('retry')}

@@ -1863,7 +1863,8 @@
       "discarding": "Discardin…",
       "cancelShort": "Cancul",
       "cancelFull": "Cancel Run",
-      "canceling": "Cancelin…"
+      "canceling": "Cancelin…",
+      "queuing": "Queuein…"
     },
     "confirm": {
       "apply": "Apply dis run? Dis applys teh plan an changez infrastrukchur.",
@@ -2160,6 +2161,13 @@
         "sendError": "Cudnt send yer messij."
       },
       "translatedNote": "Translaytd from teh orijinal on vew."
+    },
+    "drift": {
+      "remediate": "Plan + do it",
+      "remediateTitle": "Queue a plan + do-it runz so teh infrastruktur matchiz teh config agin",
+      "remediateConfirm": "Queue a plan + do-it runz for dis wurkspase?",
+      "remediateMessage": "Queued from a driftz chek",
+      "remediateFailed": "Culd not queue teh fixin runz"
     }
   },
   "workspaceDetail": {
@@ -2397,19 +2405,18 @@
     "runs": {
       "options": "Opshunz",
       "hideOptions": "Hide Opshunz",
-      "queueDestroy": "Queue Destroy",
+      "queueDestroy": "Destroyz",
       "queueDestroyTitle": "Queue a destroy plan",
       "destroyAllConfirm": "Destroy all resorcez?",
       "confirmDestroy": "Confirm Destroy",
-      "queuePlan": "Queue Plan",
-      "queueRun": "Queue Run",
+      "queuePlan": "Plan",
+      "queueRun": "Plan + do it",
       "queuePlanConfirm": "Queue a speculativ plan fer dis workspace?",
       "queueApplyConfirm": "Queue a plan + apply run? Dis can change infrastruckchure.",
       "planOptions": "Plan Opshunz",
       "targetResources": "Targit resorcez",
       "replaceResources": "Replace resorcez",
       "commaSeparated": "(comma-separaytd)",
-      "planOnly": "Plan Only",
       "refreshOnly": "Refresh Only",
       "skipRefresh": "Skip Refresh",
       "allowEmptyApply": "Allo Empty Apply",
@@ -2431,7 +2438,9 @@
       "typePlanOnly": "plan only",
       "typePlanApply": "plan + apply",
       "sourceModuleTest": "module test",
-      "sourceModulePublish": "module publish"
+      "sourceModulePublish": "module publish",
+      "queueApplyTitle": "Queue a plan + do-it runz",
+      "queueApplyRefBlocked": "No do-it while u picked a branch, tag or commit — dose runz iz alwayz plan only, srsly"
     },
     "state": {
       "deleteConfirm": "Delete state vershun #{serial}? Dis cannot be undun.",

@@ -1863,7 +1863,8 @@
       "discarding": "Descartando…",
       "cancelShort": "Cancelar",
       "cancelFull": "Cancelar ejecución",
-      "canceling": "Cancelando…"
+      "canceling": "Cancelando…",
+      "queuing": "Poniendo en cola…"
     },
     "confirm": {
       "apply": "¿Aplicar esta ejecución? Esto aplica el plan y cambia la infraestructura.",
@@ -2160,6 +2161,13 @@
         "sendError": "No se pudo enviar el mensaje."
       },
       "translatedNote": "Traducido del original al visualizar."
+    },
+    "drift": {
+      "remediate": "Plan + apply",
+      "remediateTitle": "Poner en cola una ejecución plan + apply para volver a alinear la infraestructura con la configuración",
+      "remediateConfirm": "¿Poner en cola una ejecución plan + apply para este espacio de trabajo?",
+      "remediateMessage": "Puesto en cola desde una comprobación de desviación",
+      "remediateFailed": "No se pudo poner en cola la ejecución de corrección"
     }
   },
   "workspaceDetail": {
@@ -2397,19 +2405,18 @@
     "runs": {
       "options": "Opciones",
       "hideOptions": "Ocultar opciones",
-      "queueDestroy": "Poner destrucción en cola",
+      "queueDestroy": "Destruir",
       "queueDestroyTitle": "Poner en cola un plan de destrucción",
       "destroyAllConfirm": "¿Destruir todos los recursos?",
       "confirmDestroy": "Confirmar destrucción",
-      "queuePlan": "Poner plan en cola",
-      "queueRun": "Poner ejecución en cola",
+      "queuePlan": "Plan",
+      "queueRun": "Plan + apply",
       "queuePlanConfirm": "¿Poner en cola un plan especulativo para este espacio de trabajo?",
       "queueApplyConfirm": "¿Poner en cola una ejecución de plan + apply? Esto puede cambiar la infraestructura.",
       "planOptions": "Opciones del plan",
       "targetResources": "Recursos objetivo",
       "replaceResources": "Reemplazar recursos",
       "commaSeparated": "(separados por comas)",
-      "planOnly": "Solo plan",
       "refreshOnly": "Solo actualizar",
       "skipRefresh": "Omitir actualización",
       "allowEmptyApply": "Permitir apply vacío",
@@ -2431,7 +2438,9 @@
       "typePlanOnly": "solo plan",
       "typePlanApply": "plan + apply",
       "sourceModuleTest": "prueba de módulo",
-      "sourceModulePublish": "publicación de módulo"
+      "sourceModulePublish": "publicación de módulo",
+      "queueApplyTitle": "Poner en cola una ejecución de plan + apply",
+      "queueApplyRefBlocked": "Apply no está disponible mientras haya una rama, etiqueta o commit seleccionado: esas ejecuciones son siempre solo de plan"
     },
     "state": {
       "deleteConfirm": "¿Eliminar la versión de estado n.º {serial}? Esto no se puede deshacer.",

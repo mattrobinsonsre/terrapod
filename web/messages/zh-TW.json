@@ -1863,7 +1863,8 @@
       "discarding": "正在丟棄…",
       "cancelShort": "取消",
       "cancelFull": "取消執行",
-      "canceling": "正在取消…"
+      "canceling": "正在取消…",
+      "queuing": "正在加入佇列…"
     },
     "confirm": {
       "apply": "應用此執行？這將應用計畫並更改基礎設施。",
@@ -2160,6 +2161,13 @@
         "sendError": "無法傳送您的訊息。"
       },
       "translatedNote": "檢視時從原文翻譯。"
+    },
+    "drift": {
+      "remediate": "計畫 + 套用",
+      "remediateTitle": "將計畫 + 套用執行加入佇列，使基礎架構重新與組態一致",
+      "remediateConfirm": "要為此工作區加入計畫 + 套用執行嗎？",
+      "remediateMessage": "由偏移檢查加入佇列",
+      "remediateFailed": "無法將修復執行加入佇列"
     }
   },
   "workspaceDetail": {
@@ -2397,19 +2405,18 @@
     "runs": {
       "options": "選項",
       "hideOptions": "隱藏選項",
-      "queueDestroy": "排隊銷毀",
+      "queueDestroy": "銷毀",
       "queueDestroyTitle": "排隊一次銷毀計畫",
       "destroyAllConfirm": "銷毀所有資源？",
       "confirmDestroy": "確認銷毀",
-      "queuePlan": "排隊計畫",
-      "queueRun": "排隊執行",
+      "queuePlan": "計畫",
+      "queueRun": "計畫 + 套用",
       "queuePlanConfirm": "為此工作區排隊一次推測性計畫？",
       "queueApplyConfirm": "排隊一次 plan + apply 執行？這可能會更改基礎設施。",
       "planOptions": "計畫選項",
       "targetResources": "目標資源",
       "replaceResources": "替換資源",
       "commaSeparated": "（逗號分隔）",
-      "planOnly": "僅計畫",
       "refreshOnly": "僅重新整理",
       "skipRefresh": "跳過重新整理",
       "allowEmptyApply": "允許空應用",
@@ -2431,7 +2438,9 @@
       "typePlanOnly": "僅計畫",
       "typePlanApply": "plan + apply",
       "sourceModuleTest": "模組測試",
-      "sourceModulePublish": "模組釋出"
+      "sourceModulePublish": "模組釋出",
+      "queueApplyTitle": "將計畫 + 套用執行加入佇列",
+      "queueApplyRefBlocked": "選取分支、標籤或提交時無法套用——這些執行一律僅為計畫"
     },
     "state": {
       "deleteConfirm": "刪除狀態版本 #{serial}？此操作無法撤銷。",

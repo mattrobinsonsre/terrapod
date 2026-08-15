@@ -1863,7 +1863,8 @@
       "discarding": "Hylätään…",
       "cancelShort": "Peruuta",
       "cancelFull": "Peruuta ajo",
-      "canceling": "Perutaan…"
+      "canceling": "Perutaan…",
+      "queuing": "Lisätään jonoon…"
     },
     "confirm": {
       "apply": "Otetaanko tämä ajo käyttöön? Tämä ottaa suunnitelman käyttöön ja muuttaa infrastruktuuria.",
@@ -2160,6 +2161,13 @@
         "sendError": "Viestisi lähettäminen epäonnistui."
       },
       "translatedNote": "Käännetty alkuperäisestä katselun yhteydessä."
+    },
+    "drift": {
+      "remediate": "Plan + apply",
+      "remediateTitle": "Lisää plan + apply -ajo jonoon, jotta infrastruktuuri saadaan taas vastaamaan konfiguraatiota",
+      "remediateConfirm": "Lisätäänkö plan + apply -ajo jonoon tälle työtilalle?",
+      "remediateMessage": "Lisätty jonoon poikkeamatarkistuksesta",
+      "remediateFailed": "Korjausajoa ei voitu lisätä jonoon"
     }
   },
   "workspaceDetail": {
@@ -2397,19 +2405,18 @@
     "runs": {
       "options": "Vaihtoehdot",
       "hideOptions": "Piilota vaihtoehdot",
-      "queueDestroy": "Aseta tuhoaminen jonoon",
+      "queueDestroy": "Tuhoa",
       "queueDestroyTitle": "Aseta tuhosuunnitelma jonoon",
       "destroyAllConfirm": "Tuhotaanko kaikki resurssit?",
       "confirmDestroy": "Vahvista tuhoaminen",
-      "queuePlan": "Aseta suunnitelma jonoon",
-      "queueRun": "Aseta ajo jonoon",
+      "queuePlan": "Plan",
+      "queueRun": "Plan + apply",
       "queuePlanConfirm": "Asetetaanko spekulatiivinen suunnitelma jonoon tälle työtilalle?",
       "queueApplyConfirm": "Asetetaanko suunnittelu- + käyttöönottoajo jonoon? Tämä voi muuttaa infrastruktuuria.",
       "planOptions": "Suunnitelman vaihtoehdot",
       "targetResources": "Kohderesurssit",
       "replaceResources": "Korvaa resurssit",
       "commaSeparated": "(pilkuin eroteltuna)",
-      "planOnly": "Vain suunnittelu",
       "refreshOnly": "Vain päivitys",
       "skipRefresh": "Ohita päivitys",
       "allowEmptyApply": "Salli tyhjä käyttöönotto",
@@ -2431,7 +2438,9 @@
       "typePlanOnly": "vain suunnittelu",
       "typePlanApply": "suunnittelu + käyttöönotto",
       "sourceModuleTest": "moduulitesti",
-      "sourceModulePublish": "moduulijulkaisu"
+      "sourceModulePublish": "moduulijulkaisu",
+      "queueApplyTitle": "Lisää plan + apply -ajo jonoon",
+      "queueApplyRefBlocked": "Apply ei ole käytettävissä, kun haara, tunniste tai commit on valittuna — nämä ajot ovat aina vain plan"
     },
     "state": {
       "deleteConfirm": "Poistetaanko tilaversio #{serial}? Tätä ei voi kumota.",

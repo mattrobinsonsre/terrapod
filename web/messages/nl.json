@@ -1863,7 +1863,8 @@
       "discarding": "Bezig met verwerpen…",
       "cancelShort": "Annuleren",
       "cancelFull": "Uitvoering annuleren",
-      "canceling": "Bezig met annuleren…"
+      "canceling": "Bezig met annuleren…",
+      "queuing": "In wachtrij zetten…"
     },
     "confirm": {
       "apply": "Deze uitvoering toepassen? Hiermee wordt het plan toegepast en infrastructuur gewijzigd.",
@@ -2160,6 +2161,13 @@
         "sendError": "Kan uw bericht niet verzenden."
       },
       "translatedNote": "Bij weergave vertaald vanuit het origineel."
+    },
+    "drift": {
+      "remediate": "Plan + apply",
+      "remediateTitle": "Een plan + apply-run in de wachtrij zetten om de infrastructuur weer met de configuratie in lijn te brengen",
+      "remediateConfirm": "Een plan + apply-run voor deze workspace in de wachtrij zetten?",
+      "remediateMessage": "In wachtrij gezet vanuit een afwijkingscontrole",
+      "remediateFailed": "Kon de herstelrun niet in de wachtrij zetten"
     }
   },
   "workspaceDetail": {
@@ -2397,19 +2405,18 @@
     "runs": {
       "options": "Opties",
       "hideOptions": "Opties verbergen",
-      "queueDestroy": "Destroy in wachtrij zetten",
+      "queueDestroy": "Vernietigen",
       "queueDestroyTitle": "Zet een destroy-plan in de wachtrij",
       "destroyAllConfirm": "Alle resources vernietigen?",
       "confirmDestroy": "Vernietigen bevestigen",
-      "queuePlan": "Plan in wachtrij zetten",
-      "queueRun": "Uitvoering in wachtrij zetten",
+      "queuePlan": "Plan",
+      "queueRun": "Plan + apply",
       "queuePlanConfirm": "Een speculatief plan voor deze workspace in de wachtrij zetten?",
       "queueApplyConfirm": "Een plan + apply-uitvoering in de wachtrij zetten? Dit kan infrastructuur wijzigen.",
       "planOptions": "Planopties",
       "targetResources": "Doelresources",
       "replaceResources": "Resources vervangen",
       "commaSeparated": "(kommagescheiden)",
-      "planOnly": "Alleen plan",
       "refreshOnly": "Alleen refresh",
       "skipRefresh": "Refresh overslaan",
       "allowEmptyApply": "Lege apply toestaan",
@@ -2431,7 +2438,9 @@
       "typePlanOnly": "alleen plan",
       "typePlanApply": "plan + apply",
       "sourceModuleTest": "moduletest",
-      "sourceModulePublish": "modulepublicatie"
+      "sourceModulePublish": "modulepublicatie",
+      "queueApplyTitle": "Een plan + apply-run in de wachtrij zetten",
+      "queueApplyRefBlocked": "Apply is niet beschikbaar zolang een branch, tag of commit is geselecteerd — die runs zijn altijd alleen plan"
     },
     "state": {
       "deleteConfirm": "State-versie #{serial} verwijderen? Dit kan niet ongedaan worden gemaakt.",
