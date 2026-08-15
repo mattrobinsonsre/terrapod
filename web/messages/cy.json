@@ -808,7 +808,9 @@
         "pollLess": "Cynyddwch gyfnod holi VCS fel bod pob ystorfa'n cael ei gwirio'n llai aml.",
         "split": "Rhannwch y defnyddwyr prysuraf ar draws mwy o gysylltiadau VCS — mae un fesul tîm yn graddio'n well nag un cysylltiad a rennir."
       }
-    }
+    },
+    "sortBy": "Trefnu yn ôl",
+    "createdAt": "Crëwyd {date}"
   },
   "adminVariableSets": {
     "title": "Setiau Newidynnau",

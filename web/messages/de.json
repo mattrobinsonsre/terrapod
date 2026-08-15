@@ -808,7 +808,9 @@
         "pollLess": "Erhöhen Sie das VCS-Abfrageintervall, damit jedes Repository seltener geprüft wird.",
         "split": "Verteilen Sie die aktivsten Verbraucher auf mehrere VCS-Verbindungen – eine pro Team skaliert weiter als eine gemeinsame Verbindung."
       }
-    }
+    },
+    "sortBy": "Sortieren nach",
+    "createdAt": "Erstellt {date}"
   },
   "adminVariableSets": {
     "title": "Variablensätze",

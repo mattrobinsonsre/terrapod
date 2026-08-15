@@ -808,7 +808,9 @@
         "pollLess": "Longer the VCS poll interval make, so checked less often each repository is.",
         "split": "Across more VCS connections the busiest consumers split — further scales one per team than one shared connection does."
       }
-    }
+    },
+    "sortBy": "By this, sorted",
+    "createdAt": "Created {date}, it was"
   },
   "adminVariableSets": {
     "title": "Sets, Variable",

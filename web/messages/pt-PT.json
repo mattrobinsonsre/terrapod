@@ -808,7 +808,9 @@
         "pollLess": "Aumente o intervalo de sondagem do VCS para que cada repositório seja verificado com menos frequência.",
         "split": "Distribua os maiores consumidores por mais ligações VCS — uma por equipa escala melhor do que uma ligação partilhada."
       }
-    }
+    },
+    "sortBy": "Ordenar por",
+    "createdAt": "Criado em {date}"
   },
   "adminVariableSets": {
     "title": "Conjuntos de Variáveis",

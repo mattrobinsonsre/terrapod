@@ -808,7 +808,9 @@
         "pollLess": "Kasvata VCS-kyselyväliä, jotta kutakin repositoriota tarkistetaan harvemmin.",
         "split": "Jaa vilkkaimmat kuluttajat useammalle VCS-yhteydelle — yksi tiimiä kohden skaalautuu paremmin kuin yksi jaettu yhteys."
       }
-    }
+    },
+    "sortBy": "Lajitteluperuste",
+    "createdAt": "Luotu {date}"
   },
   "adminVariableSets": {
     "title": "Muuttujajoukot",

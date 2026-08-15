@@ -808,7 +808,9 @@
         "pollLess": "Aumenta l'intervallo di polling VCS in modo che ogni repository venga controllato meno spesso.",
         "split": "Distribuisci i consumatori più attivi su più connessioni VCS: una per team scala meglio di una connessione condivisa."
       }
-    }
+    },
+    "sortBy": "Ordina per",
+    "createdAt": "Creato il {date}"
   },
   "adminVariableSets": {
     "title": "Set di variabili",

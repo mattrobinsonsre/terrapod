@@ -808,7 +808,9 @@
         "pollLess": "Zwiększ interwał odpytywania VCS, aby każde repozytorium było sprawdzane rzadziej.",
         "split": "Rozłóż najbardziej aktywnych konsumentów na więcej połączeń VCS — jedno na zespół skaluje się lepiej niż jedno wspólne."
       }
-    }
+    },
+    "sortBy": "Sortuj według",
+    "createdAt": "Utworzono {date}"
   },
   "adminVariableSets": {
     "title": "Zestawy zmiennych",

@@ -9,7 +9,6 @@ import { LoadingSpinner } from '@/components/loading-spinner'
 import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
 import { VCSConsumption, type ConnectionConsumption } from '@/components/vcs-consumption'
-import { SortableHeader } from '@/components/sortable-header'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { useConfirm } from '@/lib/use-confirm'
 import { apiFetch, fetchAllPages } from '@/lib/api'
@@ -337,63 +336,72 @@ export default function VCSConnectionsPage() {
         ) : connections.length === 0 ? (
           <EmptyState message={t('empty')} />
         ) : (
-          <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-slate-700/50">
-                  <SortableHeader label={t('table.name')} sortKey="name" sortState={sortState} onSort={toggleSort} />
-                  <SortableHeader label={t('table.provider')} sortKey="provider" sortState={sortState} onSort={toggleSort} />
-                  <SortableHeader label={t('table.serverUrl')} sortKey="server-url" sortState={sortState} onSort={toggleSort} className="hidden sm:table-cell" />
-                  <SortableHeader label={t('table.status')} sortKey="status" sortState={sortState} onSort={toggleSort} className="hidden md:table-cell" />
-                  <th className="px-4 py-3 text-start text-xs font-medium text-slate-400 uppercase tracking-wider hidden sm:table-cell">{t('table.rateLimit')}</th>
-                  <SortableHeader label={t('table.created')} sortKey="created" sortState={sortState} onSort={toggleSort} className="hidden lg:table-cell" />
-                  <th className="px-4 py-3 text-end text-xs font-medium text-slate-400 uppercase tracking-wider">{t('table.actions')}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-700/30">
-                {sortedItems.map((conn) => (
-                  <tr key={conn.id} className="hover:bg-slate-700/20 transition-colors">
-                    <td className="px-4 py-3 text-sm text-slate-200">
-                      <div className="flex items-center gap-2">
-                        <span>{conn.attributes.name}</span>
-                        {/* Below md the STATUS column is hidden — reflow the status pill inline so a
-                            phone doesn't lose the connection health signal (#719). */}
-                        <span className={`md:hidden inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusBadge(conn.attributes.status)}`}>
-                          {conn.attributes.status}
-                        </span>
-                      </div>
-                      <VCSConsumption className="sm:hidden mt-1" attrs={conn.attributes} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${providerBadge(conn.attributes.provider)}`}>
-                        {conn.attributes.provider}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-xs text-slate-400 hidden sm:table-cell">
-                      {conn.attributes['server-url'] || '-'}
-                    </td>
-                    <td className="px-4 py-3 hidden md:table-cell">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusBadge(conn.attributes.status)}`}>
-                        {conn.attributes.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 hidden sm:table-cell">
-                      <VCSConsumption attrs={conn.attributes} />
-                    </td>
-                    <td className="px-4 py-3 text-xs text-slate-500 hidden lg:table-cell">
-                      {fmt.date(conn.attributes['created-at'])}
-                    </td>
-                    <td className="px-4 py-3 text-end">
-                      <div className="flex justify-end gap-2">
-                        <button onClick={() => startEdit(conn)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors">{t('actions.edit')}</button>
-                        <button onClick={() => handleDelete(conn.id)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300 transition-colors">{t('actions.delete')}</button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          /* Panels rather than a table (#1339). A connection now carries a
+             saturation verdict, a consumption rate, a countdown and an
+             expandable per-consumer breakdown — far more than a table cell can
+             hold without becoming a cramped stack of text. Cards give each
+             connection room, and they reflow to one column on a phone for free,
+             so the dual desktop/mobile render the table needed is gone. */
+          <>
+            <div className="flex items-center justify-end gap-2 mb-3">
+              <label htmlFor="vcs-sort" className="text-xs text-slate-500">{t('sortBy')}</label>
+              <select
+                id="vcs-sort"
+                value={`${sortState.key ?? 'name'}:${sortState.direction ?? 'asc'}`}
+                onChange={(e) => {
+                  const [key, dir] = e.target.value.split(':')
+                  // toggleSort flips direction, so call it until both match —
+                  // at most twice, and it keeps one source of sort truth.
+                  if (sortState.key !== key || sortState.direction !== dir) {
+                    toggleSort(key as VCSSortKey)
+                    if (sortState.key === key && sortState.direction !== dir) return
+                    if (sortState.key !== key && dir === 'desc') toggleSort(key as VCSSortKey)
+                  }
+                }}
+                className="px-2 py-1 rounded-lg text-xs bg-slate-700 border border-slate-600 text-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500"
+              >
+                <option value="name:asc">{t('table.name')}</option>
+                <option value="provider:asc">{t('table.provider')}</option>
+                <option value="status:asc">{t('table.status')}</option>
+                <option value="created:desc">{t('table.created')}</option>
+              </select>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+              {sortedItems.map((conn) => (
+                <div
+                  key={conn.id}
+                  className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-4 flex flex-col gap-3"
+                >
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="font-semibold text-slate-200 me-auto break-all">{conn.attributes.name}</h3>
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${providerBadge(conn.attributes.provider)}`}>
+                      {conn.attributes.provider}
+                    </span>
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusBadge(conn.attributes.status)}`}>
+                      {conn.attributes.status}
+                    </span>
+                  </div>
+
+                  {conn.attributes['server-url'] ? (
+                    <p className="text-xs text-slate-500 break-all" dir="ltr">{conn.attributes['server-url']}</p>
+                  ) : null}
+
+                  <div className="pt-3 border-t border-slate-700/50">
+                    <VCSConsumption attrs={conn.attributes} />
+                  </div>
+
+                  <div className="pt-3 border-t border-slate-700/50 flex flex-wrap items-center gap-2">
+                    <span className="text-xs text-slate-500 me-auto">
+                      {t('createdAt', { date: fmt.date(conn.attributes['created-at']) })}
+                    </span>
+                    <button onClick={() => startEdit(conn)} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors">{t('actions.edit')}</button>
+                    <button onClick={() => handleDelete(conn.id)} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300 transition-colors">{t('actions.delete')}</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
         )}
       </main>
     </>

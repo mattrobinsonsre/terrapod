@@ -808,7 +808,9 @@
         "pollLess": "Lengthen the VCS watch, so each repo be sighted less often.",
         "split": "Spread the greediest hands across more VCS lines — one per crew carries further than one shared line."
       }
-    }
+    },
+    "sortBy": "Sort by",
+    "createdAt": "Logged {date}"
   },
   "adminVariableSets": {
     "title": "Variable Sets",

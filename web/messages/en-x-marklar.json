@@ -808,7 +808,9 @@
         "pollLess": "Increase the marklar poll marklar so each marklar is checked less often.",
         "split": "Split the busiest marklars across more marklar marklars — one per marklar scales further than one shared marklar."
       }
-    }
+    },
+    "sortBy": "Marklar by",
+    "createdAt": "Marklar {date}"
   },
   "adminVariableSets": {
     "title": "Marklar Marklars",

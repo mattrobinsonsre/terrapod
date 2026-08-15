@@ -808,7 +808,9 @@
         "pollLess": "Øk VCS-pollingintervallet slik at hvert repositorium sjekkes sjeldnere.",
         "split": "Fordel de travleste forbrukerne på flere VCS-tilkoblinger — én per team skalerer bedre enn én delt tilkobling."
       }
-    }
+    },
+    "sortBy": "Sorter etter",
+    "createdAt": "Opprettet {date}"
   },
   "adminVariableSets": {
     "title": "Variabelsett",

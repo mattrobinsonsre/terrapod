@@ -808,7 +808,9 @@
         "pollLess": "VCS ghelmeH poH tIn'moH, vaj repositories puS ghel.",
         "split": "natlhwI'pu' potlh VCS rar law' vI'el — ghom Hoch rar wa' 'oH QaQ law' rar hutlh wa' QaQ puS."
       }
-    }
+    },
+    "sortBy": "per choH",
+    "createdAt": "{date} chenmoHlupu"
   },
   "adminVariableSets": {
     "title": "choHlaH Segh",

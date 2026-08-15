@@ -808,7 +808,9 @@
         "pollLess": "Maek teh VCS poll slowr so each repo getz checkd less offen.",
         "split": "Split teh hungriest nomerz akross moar VCS connekshunz — one per team scaelz bettr than one shard."
       }
-    }
+    },
+    "sortBy": "Sortz by",
+    "createdAt": "Maekd {date}"
   },
   "adminVariableSets": {
     "title": "Variabul Setz",

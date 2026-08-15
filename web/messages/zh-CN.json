@@ -808,7 +808,9 @@
         "pollLess": "延长 VCS 轮询间隔，降低每个仓库的检查频率。",
         "split": "将消耗最多的对象分散到更多 VCS 连接上——每个团队一个连接比共用一个连接更易扩展。"
       }
-    }
+    },
+    "sortBy": "排序方式",
+    "createdAt": "创建于 {date}"
   },
   "adminVariableSets": {
     "title": "变量集",

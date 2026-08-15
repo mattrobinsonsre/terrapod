@@ -808,7 +808,9 @@
         "pollLess": "Aumente el intervalo de sondeo de VCS para que cada repositorio se compruebe con menos frecuencia.",
         "split": "Reparta los consumidores más activos entre varias conexiones de VCS: una por equipo escala mejor que una conexión compartida."
       }
-    }
+    },
+    "sortBy": "Ordenar por",
+    "createdAt": "Creado el {date}"
   },
   "adminVariableSets": {
     "title": "Conjuntos de variables",

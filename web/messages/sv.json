@@ -808,7 +808,9 @@
         "pollLess": "Öka VCS-pollningsintervallet så att varje repository kontrolleras mer sällan.",
         "split": "Fördela de mest aktiva förbrukarna över fler VCS-anslutningar — en per team skalar bättre än en delad anslutning."
       }
-    }
+    },
+    "sortBy": "Sortera efter",
+    "createdAt": "Skapad {date}"
   },
   "adminVariableSets": {
     "title": "Variabeluppsättningar",

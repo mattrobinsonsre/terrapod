@@ -808,7 +808,9 @@
         "pollLess": "Verhoog het VCS-pollinterval zodat elke repository minder vaak wordt gecontroleerd.",
         "split": "Verdeel de drukste verbruikers over meer VCS-verbindingen — één per team schaalt verder dan één gedeelde verbinding."
       }
-    }
+    },
+    "sortBy": "Sorteren op",
+    "createdAt": "Aangemaakt {date}"
   },
   "adminVariableSets": {
     "title": "Variabelensets",

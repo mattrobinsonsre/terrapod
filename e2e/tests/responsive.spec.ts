@@ -75,8 +75,8 @@ test.describe('Responsive harness (phone viewport)', () => {
       // have no reading on. That distinction is the point of the component.
       await expect(page.getByText('Not reported').first()).toBeVisible()
 
-      // The consumption cell is hidden below sm and reflowed under the name,
-      // so the extra content must not push the page sideways.
+      // The connection renders as a panel (#1339) rather than a table row, so
+      // it reflows to a single column here — nothing may push the page sideways.
       await expectNoHorizontalPageScroll(page)
     } finally {
       await fetch(`${API_URL}/api/terrapod/v1/vcs-connections/${connId}`, {

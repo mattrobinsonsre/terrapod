@@ -97,7 +97,11 @@ export function VCSConsumption({
   // "228% of budget" needs no further explanation.
   const share = rate != null && limit != null && limit > 0 ? Math.round((rate / limit) * 100) : null
   const runsOut = duration(attrs['exhausts-in-seconds'])
-  const resetsIn = duration(attrs['seconds-to-reset'])
+  // Only meaningful when the provider actually reports a budget. Without one
+  // there is no window to reset, and "resets in 0s" reads as a real countdown
+  // that has just expired rather than as an absence of information.
+  const secsToReset = attrs['seconds-to-reset']
+  const resetsIn = limit != null && secsToReset != null && secsToReset > 0 ? duration(secsToReset) : null
 
   const consumers = attrs['top-consumers'] ?? []
   const labels = attrs['label-totals'] ?? []

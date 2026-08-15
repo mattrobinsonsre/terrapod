@@ -808,7 +808,9 @@
         "pollLess": "Her deponun daha seyrek kontrol edilmesi için VCS yoklama aralığını artırın.",
         "split": "En yoğun tüketicileri daha fazla VCS bağlantısına dağıtın — takım başına bir bağlantı, tek bir paylaşılan bağlantıdan daha iyi ölçeklenir."
       }
-    }
+    },
+    "sortBy": "Sıralama ölçütü",
+    "createdAt": "{date} tarihinde oluşturuldu"
   },
   "adminVariableSets": {
     "title": "Değişken Setleri",

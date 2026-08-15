@@ -808,7 +808,9 @@
         "pollLess": "Augmentez l'intervalle d'interrogation VCS afin que chaque dépôt soit vérifié moins souvent.",
         "split": "Répartissez les consommateurs les plus actifs sur plusieurs connexions VCS — une par équipe passe mieux à l'échelle qu'une connexion partagée."
       }
-    }
+    },
+    "sortBy": "Trier par",
+    "createdAt": "Créé le {date}"
   },
   "adminVariableSets": {
     "title": "Ensembles de variables",

@@ -808,7 +808,9 @@
         "pollLess": "Intervallum interrogationis VCS auge, ut singula repositoria rarius inspiciantur.",
         "split": "Consumptores frequentissimos in plures nexus VCS distribue — unus pro quaque turma melius crescit quam unus communis."
       }
-    }
+    },
+    "sortBy": "Ordinare per",
+    "createdAt": "Creatum {date}"
   },
   "adminVariableSets": {
     "title": "Copiae Variabilium",
