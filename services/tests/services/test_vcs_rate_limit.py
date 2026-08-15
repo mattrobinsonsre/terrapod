@@ -585,37 +585,62 @@ class TestChokepointRecords:
         rec.assert_awaited_once()
         assert rec.await_args.kwargs["outcome"] == "200"
 
-    async def test_the_gitlab_poll_paths_go_through_the_counted_helper(self):
+    async def test_no_provider_call_escapes_the_count(self):
         """The chokepoint only counts what actually routes through it.
 
-        gitlab_service had 19 raw `httpx.AsyncClient()` call sites against ONE
-        via the helper, so instrumenting the helper alone measured almost
-        nothing. These are the poll-cycle functions — the traffic that can rail
-        an API — and each must reach `_gitlab_request` or its calls are
-        invisible.
+        gitlab_service once had 19 raw `httpx.AsyncClient()` call sites against
+        ONE via the helper, so instrumenting the helper alone measured almost
+        nothing — the panel read "comfortable" while the poll cycle was the
+        thing spending the budget. Rather than pin a list of today's hot paths
+        (which says nothing about the next function someone adds), this asserts
+        the invariant directly: **a function that makes a provider HTTP call
+        must also count it**, either by routing through the retrying helper or,
+        where it cannot (a streaming download, or a write that must never be
+        replayed), by calling `record` itself.
         """
+        import ast
         import inspect
 
-        from terrapod.services import gitlab_service
+        from terrapod.services import github_service, gitlab_service
 
-        hot = [
-            "get_branch_sha",
-            "get_default_branch",
-            "list_open_prs",
-            "list_branches",
-            "list_tags",
-            "get_changed_files",
-            "get_pr_file_changes",
-            "list_repo_tree",
-        ]
-        unrouted = [
-            name
-            for name in hot
-            if "_gitlab_request" not in inspect.getsource(getattr(gitlab_service, name))
-        ]
-        assert not unrouted, (
-            f"these poll-cycle calls bypass the counted helper and are invisible "
-            f"to the saturation panel: {unrouted}"
+        # Any of these means the function talks to the provider over HTTP.
+        makes_a_call = (
+            "client.get(",
+            "client.post(",
+            "client.put(",
+            "client.request(",
+            "client.stream(",
+        )
+
+        offenders: list[str] = []
+        inspected = 0
+        for module, helper in (
+            (gitlab_service, "_gitlab_request("),
+            (github_service, "_github_request("),
+        ):
+            module_src = inspect.getsource(module)
+            for node in ast.parse(module_src).body:
+                if not isinstance(node, ast.AsyncFunctionDef):
+                    continue
+                src = ast.get_source_segment(module_src, node) or ""
+                if not (any(m in src for m in makes_a_call) or helper in src):
+                    continue
+                inspected += 1
+                if helper in src or "vcs_rate_limit.record" in src:
+                    continue
+                offenders.append(f"{module.__name__.rsplit('.', 1)[-1]}.{node.name}")
+
+        # Bite-check: a detector that matches nothing passes vacuously, which is
+        # exactly how this gate would rot into decoration.
+        assert inspected >= 35, (
+            f"the detector only found {inspected} provider calls across both modules — "
+            "it has stopped recognising them, so the gate is no longer guarding anything"
+        )
+
+        assert not offenders, (
+            "these provider calls are invisible to the saturation panel — route them "
+            "through the counted helper, or call vcs_rate_limit.record directly if the "
+            f"call streams or must not be retried: {offenders}"
         )
 
     async def test_a_rate_limited_response_is_recorded_too(self):

@@ -229,14 +229,15 @@ async def download_archive(conn: VCSConnection, owner: str, repo: str, ref: str)
     api = _api_url(conn)
     project = _project_path(owner, repo)
 
-    async with httpx.AsyncClient(follow_redirects=True) as client:
-        resp = await client.get(
-            f"{api}/projects/{project}/repository/archive.tar.gz",
-            params={"sha": ref},
-            headers=_headers(conn),
-        )
-        resp.raise_for_status()
-        return resp.content
+    resp = await _gitlab_request(
+        "GET",
+        f"{api}/projects/{project}/repository/archive.tar.gz",
+        conn,
+        follow_redirects=True,
+        params={"sha": ref},
+    )
+    resp.raise_for_status()
+    return resp.content
 
 
 async def download_archive_to_file(
@@ -271,6 +272,11 @@ async def download_archive_to_file(
             params={"sha": ref},
             headers=_headers(conn),
         ) as resp:
+            # Counted here, not via `_gitlab_request`: that returns a whole
+            # response and cannot stream. Archives are the largest per-repo
+            # cost of a cycle, so omitting them understated exactly the repos
+            # that change most often (#1345).
+            await vcs_rate_limit.record(conn, resp.headers, outcome=str(resp.status_code))
             resp.raise_for_status()
             with open(dest_path, "wb") as f:
                 async for chunk in resp.aiter_bytes(chunk_size=chunk_size):
@@ -547,6 +553,10 @@ async def create_mr_comment(
             json={"body": body},
             headers=_headers(conn),
         )
+        # Writes keep their own client rather than `_gitlab_request`, which
+        # replays on 5xx and transport errors — a retry loop must never sit in
+        # front of a merge. Counting needs the record, not the retry (#1345).
+        await vcs_rate_limit.record(conn, resp.headers, outcome=str(resp.status_code))
         resp.raise_for_status()
         return resp.json()["id"]
 
@@ -564,6 +574,7 @@ async def update_mr_comment(
             json={"body": body},
             headers=_headers(conn),
         )
+        await vcs_rate_limit.record(conn, resp.headers, outcome=str(resp.status_code))
         resp.raise_for_status()
 
 
@@ -574,14 +585,14 @@ async def list_mr_comments(
     api = _api_url(conn)
     project = _project_path(owner, repo)
 
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(
-            f"{api}/projects/{project}/merge_requests/{mr_number}/notes",
-            params={"per_page": 100, "sort": "desc"},
-            headers=_headers(conn),
-        )
-        resp.raise_for_status()
-        return resp.json()
+    resp = await _gitlab_request(
+        "GET",
+        f"{api}/projects/{project}/merge_requests/{mr_number}/notes",
+        conn,
+        params={"per_page": 100, "sort": "desc"},
+    )
+    resp.raise_for_status()
+    return resp.json()
 
 
 # ── Apply-then-merge surface (#282) ─────────────────────────────────────
@@ -600,14 +611,14 @@ async def get_pull_request(
     """Fetch a single MR's current state."""
     api = _api_url(conn)
     project = _project_path(owner, repo)
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(
-            f"{api}/projects/{project}/merge_requests/{mr_number}",
-            headers=_headers(conn),
-        )
-        if resp.status_code == 404:
-            return None
-        resp.raise_for_status()
+    resp = await _gitlab_request(
+        "GET",
+        f"{api}/projects/{project}/merge_requests/{mr_number}",
+        conn,
+    )
+    if resp.status_code == 404:
+        return None
+    resp.raise_for_status()
     mr = resp.json()
     mr_state = mr.get("state") or ""
     return PullRequest(
@@ -634,12 +645,12 @@ async def get_pull_request_mergeability(
     """
     api = _api_url(conn)
     project = _project_path(owner, repo)
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(
-            f"{api}/projects/{project}/merge_requests/{mr_number}",
-            headers=_headers(conn),
-        )
-        resp.raise_for_status()
+    resp = await _gitlab_request(
+        "GET",
+        f"{api}/projects/{project}/merge_requests/{mr_number}",
+        conn,
+    )
+    resp.raise_for_status()
     mr = resp.json()
     if mr.get("draft", False):
         return MergeabilityStatus(
@@ -714,6 +725,7 @@ async def merge_pull_request(
             json=payload,
             headers=_headers(conn),
         )
+    await vcs_rate_limit.record(conn, resp.headers, outcome=str(resp.status_code))
     if resp.status_code == 200:
         body = resp.json()
         return PRMergeResult(
@@ -744,13 +756,13 @@ async def list_pr_comments_typed(
     """
     api = _api_url(conn)
     project = _project_path(owner, repo)
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(
-            f"{api}/projects/{project}/merge_requests/{mr_number}/notes",
-            params={"per_page": 100, "sort": "asc", "order_by": "updated_at"},
-            headers=_headers(conn),
-        )
-        resp.raise_for_status()
+    resp = await _gitlab_request(
+        "GET",
+        f"{api}/projects/{project}/merge_requests/{mr_number}/notes",
+        conn,
+        params={"per_page": 100, "sort": "asc", "order_by": "updated_at"},
+    )
+    resp.raise_for_status()
     out: list[PRComment] = []
     for n in resp.json():
         if n.get("system"):
@@ -784,12 +796,12 @@ async def list_pr_reviews(
     """
     api = _api_url(conn)
     project = _project_path(owner, repo)
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(
-            f"{api}/projects/{project}/merge_requests/{mr_number}/approvals",
-            headers=_headers(conn),
-        )
-        resp.raise_for_status()
+    resp = await _gitlab_request(
+        "GET",
+        f"{api}/projects/{project}/merge_requests/{mr_number}/approvals",
+        conn,
+    )
+    resp.raise_for_status()
     out: list[PRReview] = []
     for a in resp.json().get("approved_by", []):
         u = a.get("user") or {}
