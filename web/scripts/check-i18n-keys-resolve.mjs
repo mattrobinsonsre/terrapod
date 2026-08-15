@@ -48,16 +48,14 @@ for (const f of readdirSync(MESSAGES).filter((f) => f.endsWith('.json'))) {
   catalogs.set(f.replace(/\.json$/, ''), JSON.parse(readFileSync(join(MESSAGES, f), 'utf8')))
 }
 
-// en-GB is a deliberate spelling-delta subset, so it is excluded here: it holds
-// only the strings that differ from American English by design, and checking it
-// would report thousands of intentional absences.
+// en-GB is a deliberate spelling-delta subset: it carries only the strings that
+// differ from American English. src/i18n/request.ts deep-merges `en` beneath
+// every locale, so those absences are filled at runtime and are not a defect.
+// Checking the file would therefore report thousands of intentional gaps.
 //
-// That exclusion is uncomfortable, because next-intl does NOT deep-merge en
-// beneath it at runtime — those absences really do raise MISSING_MESSAGE in the
-// browser. That is a pre-existing defect tracked separately, not something this
-// gate should paper over or be blocked by. Excluding it costs nothing for the
-// bug this gate exists to catch: a wrong namespace is wrong in every catalog,
-// so the other thirty-one still fail it.
+// Excluding it costs nothing for the bug this gate exists to catch: a key filed
+// under the wrong namespace is missing from the `en` base too, so it fails in
+// all thirty-two of the remaining catalogs.
 catalogs.delete('en-GB')
 const requested = []
 for (const file of walk(SRC)) {
