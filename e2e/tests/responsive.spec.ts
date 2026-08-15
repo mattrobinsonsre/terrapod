@@ -70,10 +70,12 @@ test.describe('Responsive harness (phone viewport)', () => {
       await page.goto('/admin/vcs-connections')
       await expect(page.getByText(name)).toBeVisible({ timeout: 15_000 })
 
-      // A freshly created connection has made no calls, so the honest answer
-      // is "Not reported" — never a healthy-looking verdict for something we
-      // have no reading on. That distinction is the point of the component.
-      await expect(page.getByText('Not reported').first()).toBeVisible()
+      // A freshly created connection has made no calls, so it reports Idle at
+      // a measured zero rate — not a healthy-looking verdict inferred from
+      // absence, and not "Not reported" either, which is reserved for when we
+      // genuinely have no reading. Knowing it has spent nothing IS a reading.
+      await expect(page.getByText('Idle').first()).toBeVisible({ timeout: 15_000 })
+      await expect(page.getByText('0/hr').first()).toBeVisible()
 
       // The connection renders as a panel (#1339) rather than a table row, so
       // it reflows to a single column here — nothing may push the page sideways.
