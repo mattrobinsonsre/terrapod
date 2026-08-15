@@ -354,7 +354,7 @@ api:
       # applies to a run, trivy only when it is the selected scan engine.
       platform_tools:
         opa_version: "1.19.0"
-        trivy_version: "0.73.0"
+        trivy_version: "0.74.0"
         checkov_version: "3.3.9"
         opa_mirror_url: "https://github.com/open-policy-agent/opa/releases/download"
         trivy_mirror_url: "https://github.com/aquasecurity/trivy/releases/download"
