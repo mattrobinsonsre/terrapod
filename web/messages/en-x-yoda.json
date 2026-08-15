@@ -760,7 +760,8 @@
       "serverUrl": "URL, Server",
       "status": "Status",
       "created": "Created",
-      "actions": "Actions"
+      "actions": "Actions",
+      "rateLimit": "Limit of rate"
     },
     "success": {
       "created": "VCS connection \"{name}\", created it was",
@@ -773,6 +774,12 @@
       "delete": "Delete the connection, it did not",
       "createStatus": "Create the connection, it did not ({status})",
       "updateStatus": "Update the connection, it did not ({status})"
+    },
+    "rateLimit": {
+      "notReported": "Reported, it is not",
+      "remaining": "Of {limit}, {remaining} there are",
+      "exhausted": "Exhausted, it is",
+      "observedAt": "As of {time}, this is"
     }
   },
   "adminVariableSets": {
@@ -2956,16 +2963,5 @@
     "restoreConfirm": "The state of \"{name}\", restore you would?\n\nA NEW workspace, this creates — back the original comes not. With auto-apply and drift detection off it returns, and no VCS connection; back its variables and run history come not. Only the state, recovered is.",
     "restoreDone": "Into the new workspace \"{name}\", {versions, plural, one {# state version} other {# state versions}} recovered were. Before auto-apply or VCS you enable, its settings check you must.",
     "restoreAgainConfirm": "Already restored, \"{name}\" has been — into {existing}.\n\nA SECOND workspace, restoring it again creates; the same state lineage over the same infrastructure, it holds. Look like wholesale drift, the other''s next plan then will, if apply in either you do.\n\nOnly if gone the earlier restored workspace is, continue you should."
-  },
-  "vcsConnections": {
-    "table": {
-      "rateLimit": "Limit of rate"
-    },
-    "rateLimit": {
-      "notReported": "Reported, it is not",
-      "remaining": "Of {limit}, {remaining} there are",
-      "exhausted": "Exhausted, it is",
-      "observedAt": "As of {time}, this is"
-    }
   }
 }

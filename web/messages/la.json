@@ -760,7 +760,8 @@
       "serverUrl": "URL Servitoris",
       "status": "Status",
       "created": "Creatum",
-      "actions": "Actiones"
+      "actions": "Actiones",
+      "rateLimit": "Limes petitionum"
     },
     "success": {
       "created": "Nexus VCS \"{name}\" creatus",
@@ -773,6 +774,12 @@
       "delete": "Nexus deleri non potuit",
       "createStatus": "Nexus creari non potuit ({status})",
       "updateStatus": "Nexus renovari non potuit ({status})"
+    },
+    "rateLimit": {
+      "notReported": "Non nuntiatum",
+      "remaining": "{remaining} ex {limit}",
+      "exhausted": "Exhaustum",
+      "observedAt": "ut {time}"
     }
   },
   "adminVariableSets": {
@@ -2956,16 +2963,5 @@
     "restoreConfirm": "Statum „{name}” restituere?\n\nHoc locum operis NOVUM creat — pristinum non redit. Redit sine applicatione automatica, sine deprehensione erroris et sine nexu VCS; variabiles et historia cursuum non redeunt. Solus status servatur.",
     "restoreDone": "{versions, plural, one {# versio status} other {# versiones status}} in locum operis novum „{name}” restituta. Optiones inspice antequam applicationem automaticam vel VCS permittas.",
     "restoreAgainConfirm": "«{name}» iam restitutum est, in {existing}.\n\nIterum restituere SECUNDUM workspace creat, idem status genus super eandem infrastructuram tenens. Apply in alterutro deinde efficiet ut alterius consilium proximum velut universa aberratio appareat.\n\nSolum perge si workspace prius restitutum abiit."
-  },
-  "vcsConnections": {
-    "table": {
-      "rateLimit": "Limes petitionum"
-    },
-    "rateLimit": {
-      "notReported": "Non nuntiatum",
-      "remaining": "{remaining} ex {limit}",
-      "exhausted": "Exhaustum",
-      "observedAt": "ut {time}"
-    }
   }
 }

@@ -30,7 +30,7 @@ export function RateLimitIndicator({
   observedAt: string | null | undefined
   className?: string
 }) {
-  const t = useTranslations('vcsConnections.rateLimit')
+  const t = useTranslations('adminVcs.rateLimit')
   const fmt = useFormatter()
 
   if (limit == null || remaining == null || limit <= 0) {

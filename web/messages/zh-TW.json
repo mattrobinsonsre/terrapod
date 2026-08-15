@@ -760,7 +760,8 @@
       "serverUrl": "伺服器 URL",
       "status": "狀態",
       "created": "建立時間",
-      "actions": "操作"
+      "actions": "操作",
+      "rateLimit": "速率限制"
     },
     "success": {
       "created": "已建立 VCS 連線 \"{name}\"",
@@ -773,6 +774,12 @@
       "delete": "刪除連線失敗",
       "createStatus": "建立連線失敗（{status}）",
       "updateStatus": "更新連線失敗（{status}）"
+    },
+    "rateLimit": {
+      "notReported": "未回報",
+      "remaining": "{limit} 中的 {remaining}",
+      "exhausted": "已用盡",
+      "observedAt": "截至 {time}"
     }
   },
   "adminVariableSets": {
@@ -2956,16 +2963,5 @@
     "restoreConfirm": "要還原「{name}」的狀態嗎？\n\n這會建立一個新的工作區——原工作區不會回來。還原後自動套用與漂移偵測皆為關閉，且沒有 VCS 連線；變數和執行紀錄不會回來。只有狀態會被搶救回來。",
     "restoreDone": "已將 {versions, plural, other {# 個狀態版本}} 還原至新工作區「{name}」。啟用自動套用或 VCS 之前請檢查其設定。",
     "restoreAgainConfirm": "「{name}」已經還原過一次，還原到了 {existing}。\n\n再次還原會建立第二個工作區，它在同一套基礎設施之上持有相同的 state 血統。之後在任一工作區執行 apply，都會讓另一個的下一次計畫看起來像是全面漂移。\n\n只有在先前還原的工作區已經不存在時才繼續。"
-  },
-  "vcsConnections": {
-    "table": {
-      "rateLimit": "速率限制"
-    },
-    "rateLimit": {
-      "notReported": "未回報",
-      "remaining": "{limit} 中的 {remaining}",
-      "exhausted": "已用盡",
-      "observedAt": "截至 {time}"
-    }
   }
 }

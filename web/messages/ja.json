@@ -760,7 +760,8 @@
       "serverUrl": "サーバーURL",
       "status": "ステータス",
       "created": "作成日時",
-      "actions": "操作"
+      "actions": "操作",
+      "rateLimit": "レート制限"
     },
     "success": {
       "created": "VCS接続「{name}」を作成しました",
@@ -773,6 +774,12 @@
       "delete": "接続の削除に失敗しました",
       "createStatus": "接続の作成に失敗しました（{status}）",
       "updateStatus": "接続の更新に失敗しました（{status}）"
+    },
+    "rateLimit": {
+      "notReported": "報告なし",
+      "remaining": "{limit} 中 {remaining}",
+      "exhausted": "上限到達",
+      "observedAt": "{time} 時点"
     }
   },
   "adminVariableSets": {
@@ -2956,16 +2963,5 @@
     "restoreConfirm": "「{name}」のステートを復元しますか？\n\n新しいワークスペースが作成されます。元のワークスペースは戻りません。自動適用とドリフト検出は無効、VCS 接続もない状態で復元され、変数と実行履歴は戻りません。復旧されるのはステートのみです。",
     "restoreDone": "{versions, plural, other {# 件のステートバージョン}}を新しいワークスペース「{name}」に復旧しました。自動適用や VCS を有効にする前に設定を確認してください。",
     "restoreAgainConfirm": "「{name}」はすでに {existing} に復元されています。\n\nもう一度復元すると、同じインフラの上に同じ state リネージを持つ 2 つ目のワークスペースができます。どちらかで apply すると、もう一方の次のプランが全面的なドリフトのように見えます。\n\n以前に復元したワークスペースがすでに存在しない場合にのみ続行してください。"
-  },
-  "vcsConnections": {
-    "table": {
-      "rateLimit": "レート制限"
-    },
-    "rateLimit": {
-      "notReported": "報告なし",
-      "remaining": "{limit} 中 {remaining}",
-      "exhausted": "上限到達",
-      "observedAt": "{time} 時点"
-    }
   }
 }

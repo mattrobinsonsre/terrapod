@@ -760,7 +760,8 @@
       "serverUrl": "URL del servidor",
       "status": "Estado",
       "created": "Creada",
-      "actions": "Acciones"
+      "actions": "Acciones",
+      "rateLimit": "Límite de peticiones"
     },
     "success": {
       "created": "Conexión VCS \"{name}\" creada",
@@ -773,6 +774,12 @@
       "delete": "No se pudo eliminar la conexión",
       "createStatus": "No se pudo crear la conexión ({status})",
       "updateStatus": "No se pudo actualizar la conexión ({status})"
+    },
+    "rateLimit": {
+      "notReported": "No informado",
+      "remaining": "{remaining} de {limit}",
+      "exhausted": "Agotado",
+      "observedAt": "a fecha de {time}"
     }
   },
   "adminVariableSets": {
@@ -2956,16 +2963,5 @@
     "restoreConfirm": "¿Restaurar el estado de «{name}»?\n\nEsto crea un workspace NUEVO: el original no vuelve. Vuelve sin auto-apply, sin detección de deriva y sin conexión VCS; las variables y el historial de ejecuciones no vuelven. Solo se recupera el estado.",
     "restoreDone": "{versions, plural, one {# versión de estado recuperada} other {# versiones de estado recuperadas}} en el nuevo workspace «{name}». Revisa su configuración antes de activar auto-apply o VCS.",
     "restoreAgainConfirm": "«{name}» ya se restauró, en {existing}.\n\nRestaurarlo otra vez crea un SEGUNDO workspace con el mismo linaje de estado sobre la misma infraestructura. Un apply en cualquiera de los dos hará que el siguiente plan del otro parezca una deriva total.\n\nContinúa solo si el workspace restaurado anteriormente ya no existe."
-  },
-  "vcsConnections": {
-    "table": {
-      "rateLimit": "Límite de peticiones"
-    },
-    "rateLimit": {
-      "notReported": "No informado",
-      "remaining": "{remaining} de {limit}",
-      "exhausted": "Agotado",
-      "observedAt": "a fecha de {time}"
-    }
   }
 }

@@ -760,7 +760,8 @@
       "serverUrl": "Sunucu URL''si",
       "status": "Durum",
       "created": "Oluşturulma",
-      "actions": "Eylemler"
+      "actions": "Eylemler",
+      "rateLimit": "İstek limiti"
     },
     "success": {
       "created": "\"{name}\" VCS bağlantısı oluşturuldu",
@@ -773,6 +774,12 @@
       "delete": "Bağlantı silinemedi",
       "createStatus": "Bağlantı oluşturulamadı ({status})",
       "updateStatus": "Bağlantı güncellenemedi ({status})"
+    },
+    "rateLimit": {
+      "notReported": "Bildirilmedi",
+      "remaining": "{limit} içinden {remaining}",
+      "exhausted": "Tükendi",
+      "observedAt": "{time} itibarıyla"
     }
   },
   "adminVariableSets": {
@@ -2956,16 +2963,5 @@
     "restoreConfirm": "\"{name}\" state''i geri yüklensin mi?\n\nBu YENİ bir çalışma alanı oluşturur — orijinali geri gelmez. Otomatik uygulama ve drift algılama kapalı, VCS bağlantısı olmadan döner; değişkenler ve çalıştırma geçmişi geri gelmez. Yalnızca state kurtarılır.",
     "restoreDone": "{versions, plural, other {# state sürümü}} yeni \"{name}\" çalışma alanına kurtarıldı. Otomatik uygulamayı veya VCS''yi açmadan önce ayarlarını kontrol edin.",
     "restoreAgainConfirm": "“{name}” zaten geri yüklendi, {existing} içine.\n\nTekrar geri yüklemek, aynı altyapının üzerinde aynı state soyunu taşıyan İKİNCİ bir workspace oluşturur. Herhangi birinde apply çalıştırmak, diğerinin bir sonraki planını tümüyle drift gibi gösterir.\n\nYalnızca daha önce geri yüklenen workspace ortadan kalktıysa devam edin."
-  },
-  "vcsConnections": {
-    "table": {
-      "rateLimit": "İstek limiti"
-    },
-    "rateLimit": {
-      "notReported": "Bildirilmedi",
-      "remaining": "{limit} içinden {remaining}",
-      "exhausted": "Tükendi",
-      "observedAt": "{time} itibarıyla"
-    }
   }
 }

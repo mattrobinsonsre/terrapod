@@ -760,7 +760,8 @@
       "serverUrl": "Palvelimen URL",
       "status": "Tila",
       "created": "Luotu",
-      "actions": "Toiminnot"
+      "actions": "Toiminnot",
+      "rateLimit": "Pyyntöraja"
     },
     "success": {
       "created": "VCS-yhteys \"{name}\" luotu",
@@ -773,6 +774,12 @@
       "delete": "Yhteyden poistaminen epäonnistui",
       "createStatus": "Yhteyden luominen epäonnistui ({status})",
       "updateStatus": "Yhteyden päivittäminen epäonnistui ({status})"
+    },
+    "rateLimit": {
+      "notReported": "Ei raportoitu",
+      "remaining": "{remaining} / {limit}",
+      "exhausted": "Käytetty loppuun",
+      "observedAt": "ajankohtana {time}"
     }
   },
   "adminVariableSets": {
@@ -2956,16 +2963,5 @@
     "restoreConfirm": "Palautetaanko kohteen ”{name}” tila?\n\nTämä luo UUDEN työtilan — alkuperäinen ei palaa. Se palaa automaattinen käyttöönotto ja poikkeamien tunnistus pois päältä eikä siinä ole VCS-yhteyttä; muuttujat ja ajohistoria eivät palaa. Vain tila pelastetaan.",
     "restoreDone": "Palautettiin {versions, plural, one {# tilaversio} other {# tilaversiota}} uuteen työtilaan ”{name}”. Tarkista asetukset ennen automaattisen käyttöönoton tai VCS:n kytkemistä.",
     "restoreAgainConfirm": "”{name}” on jo palautettu, kohteeseen {existing}.\n\nUusi palautus luo TOISEN workspacen, jolla on sama state-sukulinja saman infrastruktuurin päällä. Apply kummassa tahansa saa toisen seuraavan suunnitelman näyttämään täydeltä ajautumiselta.\n\nJatka vain, jos aiemmin palautettu workspace on poissa."
-  },
-  "vcsConnections": {
-    "table": {
-      "rateLimit": "Pyyntöraja"
-    },
-    "rateLimit": {
-      "notReported": "Ei raportoitu",
-      "remaining": "{remaining} / {limit}",
-      "exhausted": "Käytetty loppuun",
-      "observedAt": "ajankohtana {time}"
-    }
   }
 }

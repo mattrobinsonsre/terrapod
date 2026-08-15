@@ -760,7 +760,8 @@
       "serverUrl": "Marklar URL",
       "status": "Marklar",
       "created": "Created",
-      "actions": "Marklars"
+      "actions": "Marklars",
+      "rateLimit": "Marklar marklar"
     },
     "success": {
       "created": "Marklar marklar \"{name}\" created",
@@ -773,6 +774,12 @@
       "delete": "Failed to delete marklar",
       "createStatus": "Failed to create marklar ({status})",
       "updateStatus": "Failed to update marklar ({status})"
+    },
+    "rateLimit": {
+      "notReported": "Not reported",
+      "remaining": "{remaining} of {limit}",
+      "exhausted": "Exhausted",
+      "observedAt": "as of {time}"
     }
   },
   "adminVariableSets": {
@@ -2956,16 +2963,5 @@
     "restoreConfirm": "Restore the marklar of \"{name}\"?\n\nThis creates a NEW marklar — the marklar is not brought back. It returns with auto-apply and marklar marklar off and no marklar, and its marklars and marklar marklar do not come back. Only the marklar is recovered.",
     "restoreDone": "Recovered {versions, plural, one {# marklar marklar} other {# marklar marklars}} into the new marklar \"{name}\". Check its marklars before enabling auto-apply or marklar.",
     "restoreAgainConfirm": "\"{name}\" has already been restored, into {existing}.\n\nRestoring it again creates a SECOND marklar holding the same marklar marklar over the same marklar. Applying in either will then make the other''s next marklar look like wholesale marklar.\n\nOnly continue if the earlier restored marklar is gone."
-  },
-  "vcsConnections": {
-    "table": {
-      "rateLimit": "Marklar marklar"
-    },
-    "rateLimit": {
-      "notReported": "Not reported",
-      "remaining": "{remaining} of {limit}",
-      "exhausted": "Exhausted",
-      "observedAt": "as of {time}"
-    }
   }
 }
