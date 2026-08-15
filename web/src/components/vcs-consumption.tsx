@@ -35,6 +35,15 @@ export type ConnectionConsumption = {
   'exhausts-in-seconds'?: number | null
   'top-consumers'?: Consumer[] | null
   'label-totals'?: LabelTotal[] | null
+  // The provider's refill window. GitHub is hourly, GitLab.com per-minute, so
+  // a rate must be scaled to this before it can be read as a share of the
+  // allowance — dividing an hourly count by a per-minute limit overstates
+  // utilisation ~60x.
+  'budget-window-seconds'?: number | null
+  // Total across every consumer over the window the breakdown covers. Shares
+  // divide by this, NOT by calls-per-hour: those were different bases, which
+  // is how a consumer came to render as "2400%".
+  'consumers-window-total'?: number | null
 }
 
 const TONE: Record<string, string> = {
@@ -83,19 +92,30 @@ export function VCSConsumption({
   const limit = attrs['rate-limit'] ?? null
   const observedAt = attrs['rate-limit-observed-at'] ?? null
 
-  // Nothing observed and nothing spent: say so rather than showing a healthy
-  // verdict for a connection we have no reading on.
-  if (verdict == null && rate == null) {
+  // No verdict AND no measured rate: we have no reading at all, so say so
+  // rather than painting a reassuring badge. A verdict is withheld whenever the
+  // provider reports no budget, which is why this cannot key off the verdict
+  // alone — a busy connection on a limit-less server has a real rate worth
+  // showing, just nothing to classify it against.
+  if (verdict == null && !rate) {
     return <span className={`text-xs text-slate-500 ${className}`}>{t('notReported')}</span>
   }
 
-  const tone = TONE[verdict ?? 'idle'] ?? TONE.idle
-  const verdictLabel = t(`saturation.${VERDICT_KEY[verdict ?? 'idle'] ?? 'idle'}`)
+  const tone = verdict ? (TONE[verdict] ?? TONE.idle) : TONE.idle
+  const verdictLabel = verdict ? t(`saturation.${VERDICT_KEY[verdict] ?? 'idle'}`) : null
   const strained = verdict === 'tight' || verdict === 'will_exhaust' || verdict === 'exhausted'
 
   // Rate as a share of the budget is the clearest single statement of strain —
-  // "228% of budget" needs no further explanation.
-  const share = rate != null && limit != null && limit > 0 ? Math.round((rate / limit) * 100) : null
+  // "228% of budget" needs no further explanation. The rate is per hour, so it
+  // is scaled to the budget's own window first: against GitLab's per-minute
+  // allowance the unscaled figure reads ~60x too high.
+  const budgetWindow = attrs['budget-window-seconds'] ?? null
+  const callsInWindow =
+    rate != null && budgetWindow ? (rate * budgetWindow) / 3600 : rate
+  const share =
+    callsInWindow != null && limit != null && limit > 0
+      ? Math.round((callsInWindow / limit) * 100)
+      : null
   const runsOut = duration(attrs['exhausts-in-seconds'])
   // Only meaningful when the provider actually reports a budget. Without one
   // there is no window to reset, and "resets in 0s" reads as a real countdown
@@ -109,11 +129,13 @@ export function VCSConsumption({
 
   return (
     <div className={`flex flex-col gap-1 ${className}`}>
-      <span
-        className={`inline-flex w-fit items-center px-2 py-0.5 rounded-full text-xs font-medium ${tone}`}
-      >
-        {verdictLabel}
-      </span>
+      {verdictLabel ? (
+        <span
+          className={`inline-flex w-fit items-center px-2 py-0.5 rounded-full text-xs font-medium ${tone}`}
+        >
+          {verdictLabel}
+        </span>
+      ) : null}
 
       {rate != null ? (
         <span className="text-xs text-slate-300">
@@ -150,7 +172,7 @@ export function VCSConsumption({
             <Breakdown
               consumers={consumers}
               labels={labels}
-              total={rate ?? 0}
+              total={attrs['consumers-window-total'] ?? 0}
               windowMinutes={attrs['rate-window-minutes'] ?? 60}
               strained={strained}
             />

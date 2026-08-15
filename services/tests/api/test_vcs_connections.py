@@ -679,7 +679,7 @@ class TestRateLimitAttributes:
     def test_a_connection_with_no_observation_reports_null_not_zero(self):
         from terrapod.api.routers.vcs_connections import _connection_json
 
-        attrs = _connection_json(self._conn(), quota=None)["attributes"]
+        attrs = _connection_json(self._conn(), quota=None, consumption=None)["attributes"]
         assert attrs["rate-limit"] is None
         assert attrs["rate-limit-remaining"] is None
         assert attrs["rate-limit-observed-at"] is None
@@ -692,9 +692,14 @@ class TestRateLimitAttributes:
 
         now = int(time.time())
         snap = RateLimitSnapshot(
-            limit=5000, remaining=0, reset_at=now + 900, observed_at=now, resource="core"
+            limit=5000,
+            remaining=0,
+            reset_at=now + 900,
+            observed_at=now,
+            resource="core",
+            window_seconds=3600,
         )
-        attrs = _connection_json(self._conn(), quota=snap)["attributes"]
+        attrs = _connection_json(self._conn(), quota=snap, consumption=None)["attributes"]
         assert attrs["rate-limit"] == 5000
         assert attrs["rate-limit-remaining"] == 0, "exhausted must not read as 'not reported'"
         assert attrs["rate-limit-observed-at"].endswith("Z"), "RFC3339 with Z (rule 10)"
@@ -704,7 +709,7 @@ class TestRateLimitAttributes:
         """A consumer should never have to distinguish 'absent key' from 'null'."""
         from terrapod.api.routers.vcs_connections import _connection_json
 
-        attrs = _connection_json(self._conn(), quota=None)["attributes"]
+        attrs = _connection_json(self._conn(), quota=None, consumption=None)["attributes"]
         for k in (
             "rate-limit",
             "rate-limit-remaining",

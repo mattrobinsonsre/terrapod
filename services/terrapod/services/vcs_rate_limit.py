@@ -188,23 +188,30 @@ class RateLimitSnapshot:
     remaining: int
     reset_at: int  # epoch seconds
     observed_at: int  # epoch seconds — this is an observation, not a live read
-    resource: str  # GitHub meters `core`, `search`, `graphql` separately
+    # What the budget is metered on. GitHub: `core`, `search`, `graphql`.
+    # GitLab: the throttle name it applied, e.g. `throttle_authenticated_api`.
+    resource: str
+    # How long the budget's window is. NOT assumed: GitHub refills 5,000 per
+    # HOUR, GitLab.com 2,000 per MINUTE, and a self-managed GitLab is whatever
+    # the admin set. Comparing an hourly call count against a per-minute
+    # allowance overstates utilisation ~60x, so the window travels with the
+    # numbers that only mean anything relative to it.
+    window_seconds: int
 
     @property
     def seconds_until_reset(self) -> int:
         return max(0, self.reset_at - int(time.time()))
 
-    def to_attributes(self) -> dict[str, object]:
-        """JSON:API attribute fragment (kebab-case, RFC3339 handled by caller)."""
-        return {
-            "rate-limit": self.limit,
-            "rate-limit-remaining": self.remaining,
-            "rate-limit-resource": self.resource,
-        }
-
 
 def _quota_key(connection_id: object) -> str:
-    return f"tp:vcs_quota:{connection_id}"
+    # `{...}` is a Redis hash tag: in cluster mode only the tagged part is
+    # hashed, so every key for one connection lands on the same slot. Required
+    # because `get_consumption` reads 6 bucket keys in ONE MGET, and a cluster
+    # refuses a multi-key command whose keys span slots — which failed closed
+    # into "Not reported" with no log line on any cluster-mode deployment
+    # (ElastiCache Serverless is always cluster mode). Standalone Redis ignores
+    # the tag entirely.
+    return f"tp:vcs_quota:{{{connection_id}}}"
 
 
 def parse_headers(headers: object) -> RateLimitSnapshot | None:
@@ -232,7 +239,9 @@ def parse_headers(headers: object) -> RateLimitSnapshot | None:
         return None
 
     raw_reset = first("X-RateLimit-Reset", "RateLimit-Reset")
-    resource = first("X-RateLimit-Resource") or "core"
+    # GitLab names the throttle that fired rather than a resource class; it is
+    # the same question ("which budget is this?") so it lands in the same field.
+    resource = first("X-RateLimit-Resource", "RateLimit-Name") or "core"
 
     try:
         limit = int(raw_limit)
@@ -248,13 +257,36 @@ def parse_headers(headers: object) -> RateLimitSnapshot | None:
     if 0 < reset < 10_000_000:
         reset = now + reset
 
+    # The window, inferred from how far away the reset is. This reads the
+    # remaining window rather than the whole one, so mid-window it under-reads
+    # — rounding up to the nearest familiar bucket (minute/hour) recovers the
+    # intent without hardcoding a provider. Unknown reset ⇒ unknown window.
+    window = _infer_window(reset - now) if reset > 0 else 0
+
     return RateLimitSnapshot(
         limit=limit,
         remaining=remaining,
         reset_at=reset,
         observed_at=now,
         resource=resource,
+        window_seconds=window,
     )
+
+
+def _infer_window(seconds_remaining: int) -> int:
+    """Round a time-to-reset up to the budget window it most likely belongs to.
+
+    Providers do not send the window, only when it next resets, so this maps
+    an observation onto the smallest standard bucket that contains it: GitLab's
+    per-minute throttles land on 60, GitHub's hourly quota on 3600. Anything
+    longer is reported as-is rather than forced into a bucket we invented.
+    """
+    if seconds_remaining <= 0:
+        return 0
+    for bucket in (60, 300, 900, 3600):
+        if seconds_remaining <= bucket:
+            return bucket
+    return seconds_remaining
 
 
 async def record(conn: object, headers: object, *, outcome: str) -> None:
@@ -342,6 +374,7 @@ async def get_snapshot(connection_id: object) -> RateLimitSnapshot | None:
             reset_at=int(field("reset_at") or 0),
             observed_at=int(field("observed_at") or 0),
             resource=field("resource") or "core",
+            window_seconds=int(field("window_seconds") or 0),
         )
     except ValueError:
         return None
@@ -365,20 +398,38 @@ async def get_snapshot(connection_id: object) -> RateLimitSnapshot | None:
 
 _RATE_WINDOW_MINUTES = 60
 _BUCKET_TTL_SECONDS = (_RATE_WINDOW_MINUTES + 5) * 60
-_CONSUMER_TTL_SECONDS = 2 * 60 * 60
 _TOP_CONSUMERS = 10
+
+# The consumer/label tallies are bucketed on the SAME window as the rate, in
+# 10-minute slices read 6 at a time. They used to be one hash per connection
+# with its TTL refreshed on every call — a sliding expiry that, at a 60s poll,
+# never elapsed, so the counts accumulated from the moment the connection was
+# created while `calls_per_hour` stayed a true rolling hour. Dividing one by
+# the other put shares over 100% (a day at a steady 200/hr showed a consumer at
+# "2400%"), and worse, ranked by all-time spend — so a repo hammered last week
+# outranked the one exhausting the budget now, which is the opposite of what
+# the breakdown exists to answer.
+_CONSUMER_BUCKET_SECONDS = 10 * 60
+_CONSUMER_BUCKETS = 6  # 6 x 10min = the 60-minute rate window
+_CONSUMER_TTL_SECONDS = (_CONSUMER_BUCKETS + 1) * _CONSUMER_BUCKET_SECONDS
 
 
 def _minute_key(connection_id: object, minute: int) -> str:
-    return f"tp:vcs_rate:{connection_id}:{minute}"
+    return f"tp:vcs_rate:{{{connection_id}}}:{minute}"
 
 
-def _consumer_key(connection_id: object) -> str:
-    return f"tp:vcs_consumers:{connection_id}"
+def _consumer_bucket(at: int | None = None) -> int:
+    return int(at if at is not None else time.time()) // _CONSUMER_BUCKET_SECONDS
 
 
-def _label_key(connection_id: object) -> str:
-    return f"tp:vcs_labels:{connection_id}"
+def _consumer_key(connection_id: object, bucket: int | None = None) -> str:
+    b = _consumer_bucket() if bucket is None else bucket
+    return f"tp:vcs_consumers:{{{connection_id}}}:{b}"
+
+
+def _label_key(connection_id: object, bucket: int | None = None) -> str:
+    b = _consumer_bucket() if bucket is None else bucket
+    return f"tp:vcs_labels:{{{connection_id}}}:{b}"
 
 
 # Field separator inside the consumer hash. A unit separator rather than a colon
@@ -392,9 +443,10 @@ async def _tally(connection_id: object, ctx: CallContext) -> None:
     """Count one call into the rate window, its consumer, and its labels.
 
     Runs on every provider response, so it is one pipelined round trip rather
-    than six sequential ones. `transaction=False` is required, not incidental:
-    the three keys have different prefixes and therefore hash to different slots
-    on a cluster-mode Redis, where a MULTI across slots is refused outright.
+    than six sequential ones. All the keys are hash-tagged on the connection so
+    they share a slot in cluster mode; `transaction=False` is kept because
+    nothing here needs atomicity — these are independent counters, and a MULTI
+    would only add a round trip and a failure mode.
     """
     try:
         from terrapod.redis.client import get_redis_client
@@ -435,33 +487,45 @@ class Consumption:
     seconds_to_reset: int
     remaining: int | None
     limit: int | None
-    verdict: str  # idle | comfortable | tight | will_exhaust | exhausted
+    # None when the provider reported no budget AND we have spent nothing —
+    # there is no verdict to give, and saying "idle" there was a fabrication
+    # that read identically to a genuinely quiet connection.
+    verdict: str | None  # idle | comfortable | tight | will_exhaust | exhausted
     exhausts_in_seconds: int | None
     top_consumers: list[dict]
     label_totals: list[dict]
-
-    def to_attributes(self) -> dict:
-        return {
-            "calls-per-hour": self.calls_per_hour,
-            "rate-window-minutes": self.window_minutes,
-            "seconds-to-reset": self.seconds_to_reset,
-            "saturation": self.verdict,
-            "exhausts-in-seconds": self.exhausts_in_seconds,
-            "top-consumers": self.top_consumers,
-            "label-totals": self.label_totals,
-        }
+    # How long the provider's budget window is, so a share can be computed on
+    # the same basis. GitHub refills hourly, GitLab.com every minute.
+    budget_window_seconds: int | None
+    # Total calls across ALL consumers in the same window the breakdown covers,
+    # so each entry's share divides like with like. Without it the UI divided a
+    # consumer count by `calls_per_hour`, which are different bases.
+    consumers_window_total: int
 
 
-def _verdict(rate: int, remaining: int | None, seconds_to_reset: int) -> tuple[str, int | None]:
+def _verdict(
+    rate: int, remaining: int | None, seconds_to_reset: int
+) -> tuple[str | None, int | None]:
     """Classify, and say when it runs out if it is going to.
 
     The comparison that matters is projected spend over the rest of the window
     against what is left — not the level, and not the rate in isolation. A high
     rate with a big budget and a near reset is fine; a modest rate against a
     nearly-empty budget is not.
+
+    Returns None when there is nothing to classify: no budget reported and
+    nothing spent. That is "we have no reading", which is a different statement
+    from "quiet", and conflating them is what made an uninstrumented provider
+    render a confident `idle` while it was being polled hard.
     """
     if remaining is None:
-        return ("idle" if rate == 0 else "comfortable"), None
+        # No budget reported at all — a self-managed GitLab with rate limiting
+        # switched off, or a provider that sends no headers. There is no
+        # saturation to classify either way: "idle" would understate a busy
+        # connection and "comfortable" would assert headroom against a limit we
+        # cannot see. The RATE is still reported and still answers "how hard are
+        # we hitting this"; only the verdict is withheld.
+        return None, None
     if remaining <= 0:
         return "exhausted", 0
     if rate <= 0:
@@ -482,21 +546,37 @@ def _decode(v: object) -> str:
     return v.decode() if isinstance(v, bytes) else str(v)
 
 
-def _rank(raw: object, parse) -> list[dict]:  # type: ignore[no-untyped-def]
-    """Decode a count hash into a descending, truncated list of entries."""
+def _merge_buckets(raws: list) -> dict[str, int]:  # type: ignore[no-untyped-def]
+    """Sum several bucket hashes into one field -> count map."""
+    merged: dict[str, int] = {}
+    for raw in raws:
+        for k, v in (raw or {}).items():
+            try:
+                count = int(_decode(v))
+            except ValueError:
+                continue
+            merged[_decode(k)] = merged.get(_decode(k), 0) + count
+    return merged
+
+
+def _rank(counts: dict[str, int], parse) -> tuple[list[dict], int]:  # type: ignore[no-untyped-def]
+    """Descending, truncated entries — plus the total ACROSS ALL of them.
+
+    The total is pre-truncation on purpose: it is the denominator a share is
+    computed against, and dividing by the top-ten subtotal would make the
+    displayed percentages sum to 100% while overstating each one.
+    """
     entries = []
-    for k, v in (raw or {}).items():  # type: ignore[union-attr]
-        try:
-            count = int(_decode(v))
-        except ValueError:
-            continue
-        entry = parse(_decode(k))
+    total = 0
+    for field, count in counts.items():
+        total += count
+        entry = parse(field)
         if entry is None:
             continue
         entry["calls"] = count
         entries.append(entry)
     entries.sort(key=lambda e: e["calls"], reverse=True)
-    return entries[:_TOP_CONSUMERS]
+    return entries[:_TOP_CONSUMERS], total
 
 
 async def get_consumption(connection_id: object, snapshot: object | None) -> Consumption | None:
@@ -507,12 +587,29 @@ async def get_consumption(connection_id: object, snapshot: object | None) -> Con
         r = get_redis_client()
         now_minute = int(time.time()) // 60
         keys = [_minute_key(connection_id, now_minute - i) for i in range(_RATE_WINDOW_MINUTES)]
+        bucket = _consumer_bucket()
+        buckets = [bucket - i for i in range(_CONSUMER_BUCKETS)]
         pipe = r.pipeline(transaction=False)
+        # Safe as one MGET only because the keys are hash-tagged on the
+        # connection; before that this spanned 60 slots and a cluster refused
+        # it, failing closed into "Not reported" with nothing logged.
         pipe.mget(keys)
-        pipe.hgetall(_consumer_key(connection_id))
-        pipe.hgetall(_label_key(connection_id))
-        values, raw_consumers, raw_labels = await pipe.execute()
-        calls = sum(int(v) for v in (values or []) if v not in (None, ""))
+        for b in buckets:
+            pipe.hgetall(_consumer_key(connection_id, b))
+        for b in buckets:
+            pipe.hgetall(_label_key(connection_id, b))
+        results = await pipe.execute()
+        values = results[0]
+        raw_consumers = results[1 : 1 + _CONSUMER_BUCKETS]
+        raw_labels = results[1 + _CONSUMER_BUCKETS :]
+        # Per-entry tolerance: one unparseable bucket must not discard the rate,
+        # the verdict, the consumers and the labels together.
+        calls = 0
+        for v in values or []:
+            try:
+                calls += int(v)
+            except (TypeError, ValueError):
+                continue
     except Exception:
         return None
 
@@ -529,7 +626,11 @@ async def get_consumption(connection_id: object, snapshot: object | None) -> Con
     remaining = getattr(snapshot, "remaining", None)
     limit = getattr(snapshot, "limit", None)
     secs = getattr(snapshot, "seconds_until_reset", 0) if snapshot is not None else 0
+    window = getattr(snapshot, "window_seconds", None) if snapshot is not None else None
     verdict, eta = _verdict(calls, remaining, secs)
+
+    consumers, consumers_total = _rank(_merge_buckets(raw_consumers), _consumer)
+    labels, _ = _rank(_merge_buckets(raw_labels), _label)
 
     return Consumption(
         calls_per_hour=calls,
@@ -539,6 +640,8 @@ async def get_consumption(connection_id: object, snapshot: object | None) -> Con
         limit=limit,
         verdict=verdict,
         exhausts_in_seconds=eta,
-        top_consumers=_rank(raw_consumers, _consumer),
-        label_totals=_rank(raw_labels, _label),
+        top_consumers=consumers,
+        label_totals=labels,
+        budget_window_seconds=window or None,
+        consumers_window_total=consumers_total,
     )

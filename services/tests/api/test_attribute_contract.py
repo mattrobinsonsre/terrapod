@@ -22,6 +22,13 @@ Both forms of serializer are covered: the inline `"attributes": {...}` literal,
 local first). For the variable form we resolve the local's dict-literal keys plus
 any later `attrs["key"] = ...` subscript additions in the same function.
 
+Nested objects are frozen leaf by leaf, as dotted paths: `permissions` *and*
+`permissions.can-queue-apply`. Recording only the container was a real blind
+spot (#1344) — a client reads `permissions.can-queue-apply` and
+`actions.is-confirmable` to decide whether to render a control, so removing one
+made a button silently vanish (or 403 on press) while this gate stayed green.
+The container is kept alongside its leaves so the change was a pure addition.
+
 Scope/limits: keys must be string literals reachable this way. A key computed at
 runtime (a non-literal subscript, a `**spread`, or a dict built by a helper the
 serializer calls) is not frozen — a known gap, never a false failure.
@@ -40,8 +47,27 @@ _ROUTERS_DIR = Path(_routers_pkg.__file__).resolve().parent
 _SNAPSHOT = Path(__file__).parent / "api_attribute_contract.json"
 
 
-def _dict_literal_keys(d: ast.Dict) -> set[str]:
-    return {k.value for k in d.keys if isinstance(k, ast.Constant) and isinstance(k.value, str)}
+def _dict_literal_keys(d: ast.Dict, *, _prefix: str = "") -> set[str]:
+    """String keys of a dict literal, including dotted paths into nested literals.
+
+    Both the container and its leaves are recorded — `permissions` *and*
+    `permissions.can-queue-apply`. Keeping the container means regeneration is
+    purely additive rather than trading one entry for several, and the leaves
+    are what actually needed guarding: a client reads `permissions.can-queue-apply`
+    and `actions.is-confirmable` to decide whether to render a control, so
+    removing one makes a button silently vanish while a flat gate stays green
+    (#1344).
+    """
+    keys: set[str] = set()
+    # A `**spread` contributes a None key; skip it rather than treating it as a name.
+    for key, value in zip(d.keys, d.values, strict=True):
+        if not (isinstance(key, ast.Constant) and isinstance(key.value, str)):
+            continue
+        path = f"{_prefix}{key.value}"
+        keys.add(path)
+        if isinstance(value, ast.Dict):
+            keys |= _dict_literal_keys(value, _prefix=f"{path}.")
+    return keys
 
 
 def _local_dict_keys(fn: ast.AST) -> dict[str, set[str]]:
@@ -68,7 +94,13 @@ def _local_dict_keys(fn: ast.AST) -> dict[str, set[str]]:
                 and isinstance(tgt.slice, ast.Constant)
                 and isinstance(tgt.slice.value, str)
             ):
-                var_keys.setdefault(tgt.value.id, set()).add(tgt.slice.value)
+                path = tgt.slice.value
+                keys = var_keys.setdefault(tgt.value.id, set())
+                keys.add(path)
+                # `attrs["permissions"] = {...}` hides leaves too, same as the
+                # inline form.
+                if isinstance(value, ast.Dict):
+                    keys |= _dict_literal_keys(value, _prefix=f"{path}.")
     return var_keys
 
 
@@ -168,3 +200,49 @@ def test_extractor_finds_the_known_serializers() -> None:
     assert "bound-to" in contract["tokens._token_to_jsonapi"]
     assert "runs._plan_json" in contract
     assert "has-changes" in contract["runs._plan_json"]
+
+
+def test_nested_objects_are_guarded_not_just_their_container() -> None:
+    """Leaves inside `permissions` / `actions` are frozen individually (#1344).
+
+    These are the fields a client reads to decide whether to render a control —
+    the web UI gates the apply button on `permissions.can-queue-apply` and the
+    run action row on `actions.is-confirmable`. While the extractor recorded
+    only the container name, removing one of them left every gate green and the
+    break surfaced as a control that silently vanished, or one that 403s on
+    press. Guard the recursion itself, so a future refactor of the extractor
+    cannot quietly drop it.
+    """
+    contract = extract_attribute_contract()
+
+    ws = contract["tfe_v2._workspace_json"]
+    assert "permissions" in ws, "the container must stay — dropping it would be a breaking regen"
+    assert "permissions.can-queue-apply" in ws
+    assert "permissions.can-queue-run" in ws
+
+    run = contract["runs._run_json"]
+    assert "actions.is-confirmable" in run
+    assert "permissions.can-apply" in run
+
+
+def test_nested_extraction_handles_depth_and_spread() -> None:
+    """Dotted paths at arbitrary depth; a `**spread` contributes no phantom key."""
+    fn = ast.parse(
+        "def s(x):\n"
+        "    return {'attributes': {'top': 1, 'obj': {'leaf': 2, 'deep': {'inner': 3}},\n"
+        "                           **extra}}\n"
+    ).body[0]
+    keys = _attributes_of_function(fn)
+    assert keys == {"top", "obj", "obj.leaf", "obj.deep", "obj.deep.inner"}
+
+
+def test_nested_extraction_covers_the_variable_form() -> None:
+    """`attrs = {...}` and `attrs["k"] = {...}` recurse the same as the inline form."""
+    fn = ast.parse(
+        "def s(x):\n"
+        "    attrs = {'a': 1, 'nested': {'leaf': 2}}\n"
+        "    attrs['later'] = {'also': 3}\n"
+        "    return {'attributes': attrs}\n"
+    ).body[0]
+    keys = _attributes_of_function(fn)
+    assert keys == {"a", "nested", "nested.leaf", "later", "later.also"}

@@ -45,7 +45,7 @@ def _rfc3339(dt) -> str:
 
 
 def _connection_json(
-    conn: VCSConnection, *, quota: object | None, consumption: object | None = None
+    conn: VCSConnection, *, quota: object | None, consumption: object | None
 ) -> dict:
     """Serialize a VCSConnection to JSON:API format.
 
@@ -55,6 +55,11 @@ def _connection_json(
     and has no default so each caller says which it means; a serializer that
     silently omitted the budget would be indistinguishable from a connection
     with no budget left.
+
+    `consumption` is required for the same reason and had a default by
+    oversight: omitting it returned `saturation: null` on a 200, so the UI
+    rendered "Not reported" for a connection that might be exhausted. The
+    argument the paragraph above makes applies to it exactly.
     """
     attrs: dict = {
         "name": conn.name,
@@ -109,6 +114,15 @@ def _connection_json(
     # needs a line to split along. Terrapod has no teams — labels are how an
     # estate divides — so this is what turns a list of repos into a decision.
     attrs["label-totals"] = getattr(consumption, "label_totals", None) or []
+    # The window the provider's budget refills on, so a share can be computed
+    # on the same basis as the allowance. NOT assumed hourly: GitHub refills
+    # 5,000/hour, GitLab.com 2,000/minute, and comparing an hourly call count
+    # against a per-minute allowance overstates utilisation by ~60x.
+    attrs["budget-window-seconds"] = getattr(consumption, "budget_window_seconds", None)
+    # Total across ALL consumers over the same window the breakdown covers.
+    # Each entry's share divides by this, not by `calls-per-hour` — those were
+    # different bases, which is how shares came to exceed 100%.
+    attrs["consumers-window-total"] = getattr(consumption, "consumers_window_total", None)
 
     return {
         "id": f"vcs-{conn.id}",

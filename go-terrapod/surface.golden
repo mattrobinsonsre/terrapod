@@ -867,7 +867,9 @@ field User.HasPassword bool `json:"has-password"`
 field User.IsActive bool `json:"is-active"`
 field User.LastLoginAt string `json:"last-login-at,omitempty"`
 field User.UpdatedAt string `json:"updated-at,omitempty"`
+field VCSConnection.BudgetWindowSeconds *int64 `json:"budget-window-seconds,omitempty"`
 field VCSConnection.CallsPerHour *int64 `json:"calls-per-hour,omitempty"`
+field VCSConnection.ConsumersWindowTotal *int64 `json:"consumers-window-total,omitempty"`
 field VCSConnection.CreatedAt string `json:"created-at,omitempty"`
 field VCSConnection.ExhaustsInSeconds *int64 `json:"exhausts-in-seconds,omitempty"`
 field VCSConnection.GithubAccountLogin string `json:"github-account-login,omitempty"`
