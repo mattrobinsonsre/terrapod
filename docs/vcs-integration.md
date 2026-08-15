@@ -644,9 +644,42 @@ a tree listing. So:
 calls per hour ≈ (3600 / poll_interval_seconds) × 2 × distinct repo+branch pairs
 ```
 
-Both providers publish your remaining allowance, so you can measure rather than
-estimate — GitHub in `X-RateLimit-Remaining` (and `GET /rate_limit`), GitLab in
-`RateLimit-Remaining`.
+You should not have to rely on that arithmetic, though: **Terrapod measures the
+real consumption and shows it per connection**, on **Admin → VCS connections**.
+
+### Reading the consumption indicator
+
+Each connection reports a saturation verdict, the rate it is being spent at as a
+share of the budget, and when it runs out.
+
+**It deliberately does not lead with "4,991 of 5,000 remaining".** A budget level
+cannot tell you whether a configuration is straining the limit, because the budget
+refills on a fixed window — right after a reset it reads healthy however fast it is
+being spent. A connection consuming 11,400 calls/hour against a 5,000/hour budget
+looks completely fine for part of every hour, and then runs stop appearing across
+every workspace on it. What answers the question is the rate against the refill.
+
+| Verdict | Meaning |
+|---|---|
+| **Idle** | No calls observed in the window |
+| **Within budget** | Projected spend comfortably fits before the reset |
+| **Approaching limit** | Projected spend is most of what is left — worth acting on |
+| **Over budget** | Projected spend exceeds what is left; it *will* run out before the reset |
+| **Exhausted** | The provider is refusing calls now |
+
+Expanding the breakdown shows the **top consumers** — repositories, workspaces,
+modules and policy sets, whichever is actually spending — and the **totals by
+label**. Labels are how an estate divides, so the label view is what tells you
+where to split when a connection has outgrown one budget.
+
+The reading is an observation taken from the rate-limit headers providers already
+return on every response, not a live query, so it costs no additional API calls.
+A provider that reports no rate limit at all (a self-hosted GitLab with limiting
+switched off) shows **Not reported** rather than a fabricated verdict.
+
+The same numbers are on the API (`GET /api/terrapod/v1/vcs-connections`, see
+[API reference](api-reference.md#vcs-connections)), in go-terrapod, and as
+Prometheus metrics (see [Monitoring](monitoring.md#vcs-api-budget)).
 
 ### The three knobs
 
@@ -680,6 +713,15 @@ share one deduplicated lookup, so separating *them* across connections increases
 total calls; separating repositories divides the work. Putting the busiest monorepo
 on its own connection, or module repositories on a different one from workspace
 repositories, also keeps one credential's problems local to it.
+
+**Adding one extra connection and attaching everything to it only scales so far** —
+it moves the ceiling once and then you are in the same position. The division that
+keeps working is one connection **per team**, because that is the boundary along
+which an estate actually grows: each team's repositories get their own budget, and
+a team that starts polling harder spends its own rather than everyone's. The
+label totals in the breakdown are there to make that division a decision you can
+read off rather than guess at — the labels are already on the workspaces and
+modules, so the rollup shows which slice of the connection each team is using.
 
 ---
 

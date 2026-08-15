@@ -50,6 +50,42 @@ test.describe('Responsive harness (phone viewport)', () => {
     await expect(page.locator('table')).toBeHidden()
   })
 
+  test('VCS connection consumption renders at phone width (#1339)', async ({ page }) => {
+    // Seed a real connection first. On an empty page the table is not in the
+    // DOM at all, so the assertion would pass however the breakpoints are
+    // written — the same trap as the deleted-workspaces test above.
+    const token = getStoredToken()
+    const name = uniqueName('e2eresp-vcs')
+    const created = await fetch(`${API_URL}/api/terrapod/v1/vcs-connections`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/vnd.api+json' },
+      body: JSON.stringify({
+        data: { type: 'vcs-connections', attributes: { name, provider: 'gitlab', token: 'glpat-e2e-not-a-real-token' } },
+      }),
+    })
+    expect(created.ok).toBeTruthy()
+    const connId = (await created.json()).data.id
+
+    try {
+      await page.goto('/admin/vcs-connections')
+      await expect(page.getByText(name)).toBeVisible({ timeout: 15_000 })
+
+      // A freshly created connection has made no calls, so the honest answer
+      // is "Not reported" — never a healthy-looking verdict for something we
+      // have no reading on. That distinction is the point of the component.
+      await expect(page.getByText('Not reported').first()).toBeVisible()
+
+      // The consumption cell is hidden below sm and reflowed under the name,
+      // so the extra content must not push the page sideways.
+      await expectNoHorizontalPageScroll(page)
+    } finally {
+      await fetch(`${API_URL}/api/terrapod/v1/vcs-connections/${connId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+    }
+  })
+
   test('runs at a phone viewport', async ({ page }) => {
     const vp = page.viewportSize();
     expect(vp, 'responsive project must set a viewport').not.toBeNull();

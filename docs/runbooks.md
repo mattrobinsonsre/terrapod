@@ -840,9 +840,10 @@ calls per hour = (3600 / poll_interval_seconds) x 2 x distinct repo+branch pairs
 ### Diagnosis
 
 1. **Read what Terrapod recorded** — `vcs-last-error` / `vcs-last-error-at` on the workspace (`GET /api/v2/workspaces/{id}`), or the `vcs_error` health condition in the UI.
-2. **Ask the provider for the remaining allowance.** GitHub: `GET /rate_limit` with the installation token, or `X-RateLimit-Remaining` on any response. GitLab: the `RateLimit-Remaining` response header.
-3. **Count distinct repositories, not workspaces** — the per-cycle deduplication means workspace count is the wrong number to reason with.
-4. **Rule out the look-alikes**: a *consistent* 404 on one repository is permission drift (removed from the App installation, narrowed token scope); connect-timeout or TLS errors point at the network path to a self-hosted instance; a GitHub installation token is cached for 50 minutes, so a permission change takes that long to take effect.
+2. **Read the connection's saturation verdict** on **Admin → VCS connections** (or `GET /api/terrapod/v1/vcs-connections`). It reports the consumption rate as a share of the budget and when it runs out. **Read the verdict, not `rate-limit-remaining`**: the budget refills on a fixed window, so the remaining count reads healthy right after a reset however fast it is being spent — that is precisely how a connection consuming twice its budget looks fine for part of every hour. (If you want the provider's own view: GitHub `GET /rate_limit`, GitLab the `RateLimit-Remaining` header. Terrapod's reading comes from the same headers.)
+3. **Expand the breakdown to find the cause.** The top consumers name the repositories, workspaces and modules actually spending, so you can go and fix the one that is misconfigured rather than lengthening every interval. One workspace among hundreds is invisible in a total, which is why this exists.
+4. **Count distinct repositories, not workspaces** — the per-cycle deduplication means workspace count is the wrong number to reason with.
+5. **Rule out the look-alikes**: a *consistent* 404 on one repository is permission drift (removed from the App installation, narrowed token scope); connect-timeout or TLS errors point at the network path to a self-hosted instance; a GitHub installation token is cached for 50 minutes, so a permission change takes that long to take effect.
 
 ### Resolution
 
@@ -850,7 +851,7 @@ The three knobs, in the order worth trying:
 
 - **Lengthen `vcs.module_poll_interval_seconds`** (default 300). It has the most headroom, and both module pollers have webhook accelerators, so lengthening it costs nothing when webhooks are configured.
 - **Configure webhooks**, then lengthen `vcs.poll_interval_seconds` too. With webhooks the interval becomes a fallback floor for an undelivered event rather than the wait anyone experiences, which is what makes a longer one comfortable.
-- **Give the busy repository its own VCS connection.** Allowances are per credential: a GitHub App's is per *installation*, a GitLab token's per token. Split **by repository**, not by workspace — workspaces sharing a repository already share one deduplicated lookup, so separating them across connections increases total calls.
+- **Give the busy repository its own VCS connection.** Allowances are per credential: a GitHub App's is per *installation*, a GitLab token's per token. Split **by repository**, not by workspace — workspaces sharing a repository already share one deduplicated lookup, so separating them across connections increases total calls. One extra connection carrying everything only moves the ceiling once; if the estate keeps growing, divide **per team** — the `label-totals` in the breakdown show which slice of the connection each team is using, so the split is a number you read rather than a guess.
 
 Full guidance: [VCS integration → Sizing polling for a large estate](vcs-integration.md#sizing-polling-for-a-large-estate).
 

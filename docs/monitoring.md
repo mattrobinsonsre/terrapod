@@ -169,6 +169,41 @@ depth alone — a deep queue that drains fast is fine.
 | `terrapod_vcs_runs_created_total` | Counter | provider, type | Runs created by VCS poller |
 | `terrapod_vcs_webhook_received_total` | Counter | provider | Webhook events received |
 
+### VCS API budget
+
+The provider allowance for each connection, and what is spending it. Exhausting
+it stops runs appearing across *every* workspace on that connection — including
+workspaces unrelated to whatever spent it — so this is worth an alert.
+
+| Metric | Type | Labels | Description |
+|---|---|---|---|
+| `terrapod_vcs_api_requests_total` | Counter | provider, source, outcome | Provider API calls, by the subsystem that spent them |
+| `terrapod_vcs_rate_limit` | Gauge | provider, connection, resource | Total budget the provider reports |
+| `terrapod_vcs_rate_limit_remaining` | Gauge | provider, connection, resource | Requests left in the current window |
+| `terrapod_vcs_rate_limit_reset_seconds` | Gauge | provider, connection, resource | Seconds until the budget refills |
+
+All four are read from headers providers already return, so they cost no quota of
+their own. Two consequences worth knowing:
+
+- **They are absent, not zero, for a server that reports no rate limit** (a
+  self-hosted GitLab with limiting off). Alert on the ratio of `_remaining` to
+  `terrapod_vcs_rate_limit`, not an absolute — budgets differ per provider and
+  account — and expect no series at all where nothing is reported.
+- **`_remaining` alone will mislead you.** The budget refills on a fixed window,
+  so it reads healthy right after a reset however fast it is being spent. Alert
+  on the rate against the refill, or read the saturation verdict in the UI, which
+  does that comparison for you ([VCS integration → Reading the consumption
+  indicator](vcs-integration.md#reading-the-consumption-indicator)).
+
+`source=unknown` on the counter means a call path was added without attributing
+it. Treat it as a defect rather than a category — an unattributed path is
+invisible in exactly the situation the counter exists for.
+
+Per-repository and per-workspace attribution is deliberately **not** on these
+metrics: repository and workspace are unbounded label values and would wreck the
+cardinality of the series in a large estate. That breakdown lives on the
+connection in the API and UI instead, bounded to the top consumers.
+
 ### Storage
 
 | Metric | Type | Labels | Description |

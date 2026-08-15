@@ -28,6 +28,7 @@ Beyond broad TFE compatibility, Terrapod is built with three deliberate design f
 | **Remote State Management** | Versioned state storage with locking, rollback, encryption at rest via CSP services |
 | **Agent Execution** | Plan/apply runs on the server via K8s Job-based runner infrastructure |
 | **VCS Integration** | GitHub (App) and GitLab (access token); inbound webhooks supported (GitHub HMAC + GitLab token) for instant triggers, plus outbound polling so webhooks are optional, never required |
+| **VCS API-budget management** | Per-connection saturation verdict, consumption rate against the budget, and a breakdown of the top consumers by kind and by label — so an estate outgrowing one credential can see it before runs stop, and knows where to split. Always on; no configuration, no extra API calls |
 | **Conditional auto-apply** | Per-workspace `auto_apply_mode` — apply automatically only when the plan is within a declared safety standard (`create`, `create_update`); anything that destroys or replaces stops for a human |
 | **Workspace undelete** | Deleting a workspace leaves its state behind a delete marker; an admin can salvage it into a new workspace within the retention window. See [runbooks.md](runbooks.md#i-deleted-a-workspace-by-mistake) |
 | **VCS Workflows** | Default merge-then-apply (TFE standard) plus opt-in apply-then-merge mode (Atlantis-style: PR comments drive applies, `terrapod apply` from a PR comment, auto-merge after apply) |
@@ -131,7 +132,7 @@ See [Architecture](architecture.md) for the full breakdown.
 | [Architecture](architecture.md) | System components, storage, runners, auth flows |
 | [Authentication](authentication.md) | Local auth, OIDC, SAML, terraform login, API tokens, scoped service tokens (bound/detached) + offboarding idle guard |
 | [RBAC](rbac.md) | Permission model, label-based access control, custom roles |
-| [VCS Integration](vcs-integration.md) | GitHub and GitLab setup, polling, webhooks |
+| [VCS Integration](vcs-integration.md) | GitHub and GitLab setup, polling, webhooks, API-budget saturation and consumer breakdown |
 | [VCS Workflows](vcs-workflows.md) | merge_then_apply (default) vs apply_then_merge (Atlantis-style, opt-in) |
 | [Autodiscovery](autodiscovery.md) | Atlantis-style monorepo workspace autodiscovery |
 | [Drift Detection](drift-detection.md) | Scheduled plan-only runs to detect infrastructure drift |
