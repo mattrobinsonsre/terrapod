@@ -363,38 +363,134 @@ class TestConsumptionTally:
 
 
 class TestBudgetWindow:
-    """The window is read, never assumed (#1345).
+    """The window is measured, never assumed (#1345, fixed in #1346).
 
-    GitHub refills 5,000 per HOUR; GitLab.com 2,000 per MINUTE. The UI renders
-    the rate as a share of the allowance, so assuming an hour made a GitLab
-    connection read ~60x busier than it was.
+    GitHub refills per HOUR; GitLab.com per MINUTE. The UI renders the rate as
+    a share of the allowance, so assuming an hour made a GitLab connection read
+    ~60x busier than it was.
+
+    A single response cannot answer this: headers say when the budget next
+    refills, never how wide the window is. It is the gap between consecutive
+    refills, so it is learned across observations.
     """
 
-    def test_a_github_shaped_reset_infers_the_hourly_window(self):
-        now = int(time.time())
-        snap = vcs_rate_limit.parse_headers(
-            {
-                "X-RateLimit-Limit": "5000",
-                "X-RateLimit-Remaining": "4000",
-                "X-RateLimit-Reset": str(now + 3000),
-            }
+    def _snap(self, reset_at: int, window: int = 0):
+        return vcs_rate_limit.RateLimitSnapshot(
+            limit=5000,
+            remaining=4000,
+            reset_at=reset_at,
+            observed_at=reset_at - 10,
+            resource="core",
+            window_seconds=window,
         )
-        assert snap is not None
-        assert snap.window_seconds == 3600
 
-    def test_a_gitlab_shaped_reset_infers_the_per_minute_window(self):
-        now = int(time.time())
+    def test_a_single_response_does_not_claim_to_know_the_window(self):
+        """The bug this replaces: rounding time-to-reset up to a bucket is
+        sampling-dependent. Observed 612s from a GitHub reset it yields 900,
+        not 3600, and every share computed from it is wrong by a factor of
+        four. Better to report nothing than a number that moves with when you
+        happened to look."""
         snap = vcs_rate_limit.parse_headers(
             {
-                "RateLimit-Limit": "2000",
-                "RateLimit-Remaining": "1900",
-                "RateLimit-Reset": str(now + 40),
+                "X-RateLimit-Limit": "15000",
+                "X-RateLimit-Remaining": "12234",
+                "X-RateLimit-Reset": str(int(time.time()) + 612),
             }
         )
         assert snap is not None
-        assert snap.window_seconds == 60, (
-            "a per-minute throttle must not be reported as an hourly budget"
+        assert snap.window_seconds == 0
+
+    def test_an_hourly_refill_is_learned_from_the_gap_between_resets(self):
+        base = int(time.time()) + 600
+        got = vcs_rate_limit._learn_window(self._snap(base), self._snap(base + 3600))
+        assert got == 3600
+
+    def test_a_per_minute_refill_is_learned_the_same_way(self):
+        base = int(time.time()) + 30
+        got = vcs_rate_limit._learn_window(self._snap(base), self._snap(base + 60))
+        assert got == 60, "a per-minute throttle must not be reported as hourly"
+
+    def test_nothing_is_claimed_until_a_refill_has_been_seen(self):
+        base = int(time.time()) + 600
+        assert vcs_rate_limit._learn_window(None, self._snap(base)) == 0
+        # Same window observed twice: still no refill, so still nothing known.
+        assert vcs_rate_limit._learn_window(self._snap(base), self._snap(base)) == 0
+
+    def test_a_quiet_gap_cannot_inflate_a_known_window(self):
+        """Nobody called for three hours, so the reset jumped three windows.
+        A gap can only ever read LONG, never short, so the learned value takes
+        the minimum and converges on the truth from above — without assuming
+        which provider this is."""
+        base = int(time.time()) + 600
+        got = vcs_rate_limit._learn_window(self._snap(base, window=3600), self._snap(base + 10800))
+        assert got == 3600
+
+    def test_a_shorter_observation_corrects_a_longer_one(self):
+        base = int(time.time()) + 600
+        got = vcs_rate_limit._learn_window(self._snap(base, window=3600), self._snap(base + 60))
+        assert got == 60
+
+    def test_an_implausible_gap_is_rejected_rather_than_stored(self):
+        """A clock jump or a provider changing its mind is not a window."""
+        base = int(time.time()) + 600
+        assert vcs_rate_limit._learn_window(self._snap(base, window=60), self._snap(base + 5)) == 60
+        assert (
+            vcs_rate_limit._learn_window(self._snap(base, window=60), self._snap(base + 999_999))
+            == 60
         )
+
+    async def test_the_window_survives_the_round_trip_through_redis(self):
+        """The actual #1345 defect: computed, returned, consumed — never
+        stored. Everything above passes on code that writes nothing."""
+        redis = _FakeRedis()
+        base = int(time.time())
+        with patch("terrapod.redis.client.get_redis_client", return_value=redis):
+            await vcs_rate_limit.record(
+                _conn(),
+                {
+                    "X-RateLimit-Limit": "5000",
+                    "X-RateLimit-Remaining": "4999",
+                    "X-RateLimit-Reset": str(base + 600),
+                },
+                outcome="200",
+            )
+            await vcs_rate_limit.record(
+                _conn(),
+                {
+                    "X-RateLimit-Limit": "5000",
+                    "X-RateLimit-Remaining": "4998",
+                    "X-RateLimit-Reset": str(base + 600 + 3600),
+                },
+                outcome="200",
+            )
+            got = await vcs_rate_limit.get_snapshot("conn-1")
+
+        assert got is not None
+        assert got.window_seconds == 3600
+
+    async def test_every_field_survives_the_round_trip(self):
+        """Guards the CLASS of bug, not just the one field: a value that
+        reaches the dataclass, the parser, the reader, the SDK and the UI but
+        is missing from the write mapping reads back as a default forever, and
+        every test above it still passes."""
+        redis = _FakeRedis()
+        headers = {
+            "X-RateLimit-Limit": "5000",
+            "X-RateLimit-Remaining": "4321",
+            "X-RateLimit-Reset": str(int(time.time()) + 900),
+            "X-RateLimit-Resource": "graphql",
+        }
+        parsed = vcs_rate_limit.parse_headers(headers)
+        assert parsed is not None
+        with patch("terrapod.redis.client.get_redis_client", return_value=redis):
+            await vcs_rate_limit.record(_conn(), headers, outcome="200")
+            got = await vcs_rate_limit.get_snapshot("conn-1")
+
+        assert got is not None
+        for field in ("limit", "remaining", "reset_at", "resource"):
+            assert getattr(got, field) == getattr(parsed, field), (
+                f"{field} did not survive being written to Redis and read back"
+            )
 
     def test_gitlab_names_the_throttle_rather_than_a_resource(self):
         """`RateLimit-Name` answers the same question as GitHub's

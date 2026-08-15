@@ -257,36 +257,55 @@ def parse_headers(headers: object) -> RateLimitSnapshot | None:
     if 0 < reset < 10_000_000:
         reset = now + reset
 
-    # The window, inferred from how far away the reset is. This reads the
-    # remaining window rather than the whole one, so mid-window it under-reads
-    # — rounding up to the nearest familiar bucket (minute/hour) recovers the
-    # intent without hardcoding a provider. Unknown reset ⇒ unknown window.
-    window = _infer_window(reset - now) if reset > 0 else 0
-
+    # The window is NOT knowable from a single response: a header says when the
+    # budget next refills, never how wide the window is. It is learned across
+    # observations instead (`_learn_window`), so a single snapshot carries 0 —
+    # "not known yet" — rather than a guess.
     return RateLimitSnapshot(
         limit=limit,
         remaining=remaining,
         reset_at=reset,
         observed_at=now,
         resource=resource,
-        window_seconds=window,
+        window_seconds=0,
     )
 
 
-def _infer_window(seconds_remaining: int) -> int:
-    """Round a time-to-reset up to the budget window it most likely belongs to.
+# A refill interval outside this range is not a budget window; it is a clock
+# jump, a provider changing its mind, or a parse that went wrong.
+_MIN_WINDOW_SECONDS = 30
+_MAX_WINDOW_SECONDS = 86_400
 
-    Providers do not send the window, only when it next resets, so this maps
-    an observation onto the smallest standard bucket that contains it: GitLab's
-    per-minute throttles land on 60, GitHub's hourly quota on 3600. Anything
-    longer is reported as-is rather than forced into a bucket we invented.
+
+def _learn_window(previous: RateLimitSnapshot | None, current: RateLimitSnapshot) -> int:
+    """Derive the refill window from the distance between consecutive refills.
+
+    `reset_at` advances by exactly one window each time the budget refills, so
+    the delta between two observations that straddle a refill IS the window —
+    3600 on GitHub, 60 on GitLab.com. That is measured, not inferred, which
+    matters because the obvious shortcut (round the *time remaining* up to a
+    familiar bucket) depends on when you happen to sample: 612 seconds from a
+    GitHub reset it yields 900, not 3600, and the share computed from it is
+    then wrong by a factor of four.
+
+    Nothing is reported until a refill has actually been observed. The warm-up
+    costs at most one window, and during it the reader falls back to treating
+    the rate as hourly — exactly the behaviour that shipped in v1.5.0.
+
+    The learned value only ever shrinks. A gap where nobody called spans
+    several refills and reads long; it can never read short. Taking the minimum
+    therefore converges on the true window from above without assuming
+    anything about which provider this is.
     """
-    if seconds_remaining <= 0:
-        return 0
-    for bucket in (60, 300, 900, 3600):
-        if seconds_remaining <= bucket:
-            return bucket
-    return seconds_remaining
+    known = previous.window_seconds if previous is not None else 0
+    if previous is None or previous.reset_at <= 0 or current.reset_at <= 0:
+        return known
+    delta = current.reset_at - previous.reset_at
+    if delta <= 0:
+        return known  # same window, or a clock that went backwards
+    if not (_MIN_WINDOW_SECONDS <= delta <= _MAX_WINDOW_SECONDS):
+        return known
+    return min(known, delta) if known else delta
 
 
 async def record(conn: object, headers: object, *, outcome: str) -> None:
@@ -329,6 +348,10 @@ async def record(conn: object, headers: object, *, outcome: str) -> None:
     try:
         from terrapod.redis.client import get_redis_client
 
+        # The previous reading is what makes the window knowable: it is the
+        # gap between two refills, so it cannot come from this response alone.
+        window = _learn_window(await get_snapshot(connection_id), snapshot)
+
         await get_redis_client().hset(  # type: ignore[misc]
             _quota_key(connection_id),
             mapping={
@@ -337,6 +360,11 @@ async def record(conn: object, headers: object, *, outcome: str) -> None:
                 "reset_at": snapshot.reset_at,
                 "observed_at": snapshot.observed_at,
                 "resource": snapshot.resource,
+                # Persisting this is what #1345 missed: the field existed on the
+                # dataclass, in the parser, the reader, the SDK and the UI, and
+                # was simply never written — so it read back as 0 forever and
+                # the UI silently fell back to assuming an hour.
+                "window_seconds": window,
             },
         )
         await get_redis_client().expire(_quota_key(connection_id), _QUOTA_TTL_SECONDS)
