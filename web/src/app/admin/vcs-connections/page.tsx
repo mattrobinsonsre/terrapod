@@ -367,11 +367,11 @@ export default function VCSConnectionsPage() {
               </select>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               {sortedItems.map((conn) => (
                 <div
                   key={conn.id}
-                  className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-4 flex flex-col gap-3"
+                  className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-4 flex flex-col gap-3 h-full"
                 >
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="font-semibold text-slate-200 me-auto break-all">{conn.attributes.name}</h3>
@@ -391,7 +391,7 @@ export default function VCSConnectionsPage() {
                     <VCSConsumption attrs={conn.attributes} />
                   </div>
 
-                  <div className="pt-3 border-t border-slate-700/50 flex flex-wrap items-center gap-2">
+                  <div className="mt-auto pt-3 border-t border-slate-700/50 flex flex-wrap items-center gap-2">
                     <span className="text-xs text-slate-500 me-auto">
                       {t('createdAt', { date: fmt.date(conn.attributes['created-at']) })}
                     </span>

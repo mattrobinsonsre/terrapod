@@ -326,6 +326,112 @@ class TestUpdateWorkspace:
         assert resp.status_code == 403
 
 
+class TestVCSConnectionAcceptedAsAttribute:
+    """`vcs-connection-id` must be honoured as an attribute, not just a relationship.
+
+    The read side emits it as an attribute, so a read-modify-write round-trip
+    naturally sends it back as one. Both create and update used to accept only
+    the JSON:API relationship and drop the attribute silently, returning 2xx —
+    the caller had no way to tell the write did nothing. That is worse than a
+    rejection, and it is invisible to any test that only exercises the
+    relationship form, which is why these assert the attribute path explicitly.
+    """
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_capabilities_for")
+    async def test_update_sets_the_connection_from_the_attribute(self, mock_resolve, *mocks):
+        mock_resolve.return_value = caps_for_level("admin")
+        ws = _mock_workspace()
+        ws.vcs_connection_id = None
+        app, mock_db = _make_app(_user(roles=["admin"]))
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = ws
+        mock_db.execute.return_value = mock_result
+
+        conn_id = uuid.uuid4()
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                f"/api/v2/workspaces/ws-{ws.id}",
+                json={"data": {"attributes": {"vcs-connection-id": f"vcs-{conn_id}"}}},
+                headers=_AUTH,
+            )
+
+        assert resp.status_code == 200
+        assert ws.vcs_connection_id == conn_id, (
+            "the attribute was accepted with a 2xx but changed nothing"
+        )
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_capabilities_for")
+    async def test_update_accepts_the_raw_uuid_too(self, mock_resolve, *mocks):
+        mock_resolve.return_value = caps_for_level("admin")
+        ws = _mock_workspace()
+        ws.vcs_connection_id = None
+        app, mock_db = _make_app(_user(roles=["admin"]))
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = ws
+        mock_db.execute.return_value = mock_result
+
+        conn_id = uuid.uuid4()
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                f"/api/v2/workspaces/ws-{ws.id}",
+                json={"data": {"attributes": {"vcs-connection-id": str(conn_id)}}},
+                headers=_AUTH,
+            )
+
+        assert resp.status_code == 200
+        assert ws.vcs_connection_id == conn_id
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_capabilities_for")
+    async def test_update_clears_the_connection_on_empty(self, mock_resolve, *mocks):
+        mock_resolve.return_value = caps_for_level("admin")
+        ws = _mock_workspace()
+        ws.vcs_connection_id = uuid.uuid4()
+        app, mock_db = _make_app(_user(roles=["admin"]))
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = ws
+        mock_db.execute.return_value = mock_result
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                f"/api/v2/workspaces/ws-{ws.id}",
+                json={"data": {"attributes": {"vcs-connection-id": None}}},
+                headers=_AUTH,
+            )
+
+        assert resp.status_code == 200
+        assert ws.vcs_connection_id is None
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_capabilities_for")
+    async def test_update_rejects_a_malformed_id(self, mock_resolve, *mocks):
+        """Rejected, not silently dropped — the whole point of the fix."""
+        mock_resolve.return_value = caps_for_level("admin")
+        ws = _mock_workspace()
+        app, mock_db = _make_app(_user(roles=["admin"]))
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = ws
+        mock_db.execute.return_value = mock_result
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                f"/api/v2/workspaces/ws-{ws.id}",
+                json={"data": {"attributes": {"vcs-connection-id": "not-a-uuid"}}},
+                headers=_AUTH,
+            )
+        assert resp.status_code == 422
+
+
 # ── Delete Workspace ──────────────────────────────────────────────────
 
 
