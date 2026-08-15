@@ -413,6 +413,7 @@ All workspace responses (show and list) include a `permissions` object reflectin
     "can-update": true,
     "can-destroy": true,
     "can-queue-run": true,
+    "can-queue-apply": true,
     "can-read-state-versions": true,
     "can-create-state-versions": true,
     "can-read-variable": true,

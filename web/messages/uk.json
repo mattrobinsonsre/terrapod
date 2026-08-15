@@ -1863,7 +1863,8 @@
       "discarding": "Відхилення…",
       "cancelShort": "Скасувати",
       "cancelFull": "Скасувати запуск",
-      "canceling": "Скасування…"
+      "canceling": "Скасування…",
+      "queuing": "Постановка в чергу…"
     },
     "confirm": {
       "apply": "Застосувати цей запуск? Це застосує план і змінить інфраструктуру.",
@@ -2160,6 +2161,13 @@
         "sendError": "Не вдалося надіслати повідомлення."
       },
       "translatedNote": "Перекладено з оригіналу під час перегляду."
+    },
+    "drift": {
+      "remediate": "Plan + apply",
+      "remediateTitle": "Поставити в чергу запуск plan + apply, щоб повернути інфраструктуру у відповідність до конфігурації",
+      "remediateConfirm": "Поставити в чергу запуск plan + apply для цієї робочої області?",
+      "remediateMessage": "Поставлено в чергу за перевіркою розходжень",
+      "remediateFailed": "Не вдалося поставити в чергу запуск виправлення"
     }
   },
   "workspaceDetail": {
@@ -2397,19 +2405,18 @@
     "runs": {
       "options": "Опції",
       "hideOptions": "Приховати опції",
-      "queueDestroy": "Поставити знищення в чергу",
+      "queueDestroy": "Знищити",
       "queueDestroyTitle": "Поставити в чергу план знищення",
       "destroyAllConfirm": "Знищити всі ресурси?",
       "confirmDestroy": "Підтвердити знищення",
-      "queuePlan": "Поставити план у чергу",
-      "queueRun": "Поставити запуск у чергу",
+      "queuePlan": "Plan",
+      "queueRun": "Plan + apply",
       "queuePlanConfirm": "Поставити в чергу спекулятивний план для цього робочого простору?",
       "queueApplyConfirm": "Поставити в чергу запуск plan + apply? Це може змінити інфраструктуру.",
       "planOptions": "Опції плану",
       "targetResources": "Цільові ресурси",
       "replaceResources": "Замінити ресурси",
       "commaSeparated": "(через кому)",
-      "planOnly": "Лише план",
       "refreshOnly": "Лише оновлення",
       "skipRefresh": "Пропустити оновлення",
       "allowEmptyApply": "Дозволити порожнє застосування",
@@ -2431,7 +2438,9 @@
       "typePlanOnly": "лише план",
       "typePlanApply": "план + застосування",
       "sourceModuleTest": "тест модуля",
-      "sourceModulePublish": "публікація модуля"
+      "sourceModulePublish": "публікація модуля",
+      "queueApplyTitle": "Поставити в чергу запуск plan + apply",
+      "queueApplyRefBlocked": "Apply недоступний, поки вибрано гілку, тег або коміт — такі запуски завжди лише plan"
     },
     "state": {
       "deleteConfirm": "Видалити версію стану #{serial}? Це неможливо скасувати.",

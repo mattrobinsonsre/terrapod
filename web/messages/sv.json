@@ -1863,7 +1863,8 @@
       "discarding": "Kasserar…",
       "cancelShort": "Avbryt",
       "cancelFull": "Avbryt körning",
-      "canceling": "Avbryter…"
+      "canceling": "Avbryter…",
+      "queuing": "Köar…"
     },
     "confirm": {
       "apply": "Applicera denna körning? Detta tillämpar planen och ändrar infrastruktur.",
@@ -2160,6 +2161,13 @@
         "sendError": "Det gick inte att skicka ditt meddelande."
       },
       "translatedNote": "Översatt från originalet vid visning."
+    },
+    "drift": {
+      "remediate": "Plan + apply",
+      "remediateTitle": "Köa en plan + apply-körning för att åter få infrastrukturen i linje med konfigurationen",
+      "remediateConfirm": "Köa en plan + apply-körning för denna arbetsyta?",
+      "remediateMessage": "Köad från en avvikelsekontroll",
+      "remediateFailed": "Kunde inte köa rättningskörningen"
     }
   },
   "workspaceDetail": {
@@ -2397,19 +2405,18 @@
     "runs": {
       "options": "Alternativ",
       "hideOptions": "Dölj alternativ",
-      "queueDestroy": "Köa förstörelse",
+      "queueDestroy": "Förstör",
       "queueDestroyTitle": "Köa en förstörelseplan",
       "destroyAllConfirm": "Förstör alla resurser?",
       "confirmDestroy": "Bekräfta förstörelse",
-      "queuePlan": "Köa plan",
-      "queueRun": "Köa körning",
+      "queuePlan": "Plan",
+      "queueRun": "Plan + apply",
       "queuePlanConfirm": "Köa en spekulativ plan för denna arbetsyta?",
       "queueApplyConfirm": "Köa en plan- + apply-körning? Detta kan ändra infrastruktur.",
       "planOptions": "Planalternativ",
       "targetResources": "Målresurser",
       "replaceResources": "Ersätt resurser",
       "commaSeparated": "(kommaseparerat)",
-      "planOnly": "Endast plan",
       "refreshOnly": "Endast uppdatera",
       "skipRefresh": "Hoppa över uppdatering",
       "allowEmptyApply": "Tillåt tom applicering",
@@ -2431,7 +2438,9 @@
       "typePlanOnly": "endast plan",
       "typePlanApply": "plan + apply",
       "sourceModuleTest": "modultest",
-      "sourceModulePublish": "modulpublicering"
+      "sourceModulePublish": "modulpublicering",
+      "queueApplyTitle": "Köa en plan + apply-körning",
+      "queueApplyRefBlocked": "Apply är otillgängligt medan en gren, tagg eller commit är vald — de körningarna är alltid endast plan"
     },
     "state": {
       "deleteConfirm": "Ta bort tillståndsversion #{serial}? Detta kan inte ångras.",

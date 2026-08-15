@@ -482,6 +482,7 @@ Included in workspace show/list responses:
     "can-update": true,
     "can-destroy": true,
     "can-queue-run": true,
+    "can-queue-apply": true,
     "can-read-state-versions": true,
     "can-create-state-versions": true,
     "can-read-variable": true,
@@ -529,6 +530,7 @@ Included in provider show/list responses (same shape as modules):
 | `can-update` | `admin` | `admin` |
 | `can-destroy` | `admin` | `admin` |
 | `can-queue-run` | `plan` | — |
+| `can-queue-apply` | `write` | — |
 | `can-lock` / `can-unlock` | `plan` | — |
 | `can-force-unlock` | `admin` | — |
 | `can-update-variable` | `write` | — |
@@ -544,6 +546,7 @@ The web UI hides or disables controls based on these permission flags:
 | Delete Workspace/Module/Provider | `can-destroy` | Hidden |
 | Lock/Unlock button | `can-lock` | Hidden |
 | Queue Plan button | `can-queue-run` | Hidden |
+| Plan + apply button | `can-queue-apply` | Hidden |
 | Add/Edit/Delete Variable | `can-update-variable` | Hidden |
 | Settings edit fields | `can-update` | Read-only |
 | Add/Edit/Delete Notification | `can-update` | Hidden |

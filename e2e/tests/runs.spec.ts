@@ -15,7 +15,8 @@
  * not here — the E2E stack has no runner pool. We exercise the UI
  * surfaces with API-seeded runs.
  */
-import { test, expect } from '@playwright/test';
+import { test, expect, type Route } from '@playwright/test';
+import { getStoredToken, createWorkspace, uniqueName } from '../helpers/api';
 
 test.describe('Run lifecycle UI', () => {
   test('workspace runs tab renders empty state cleanly', async ({ page }) => {
@@ -55,4 +56,85 @@ test.describe('Run lifecycle UI', () => {
     const runsBtn = page.getByRole('button', { name: 'Runs' });
     await expect(runsBtn).toBeVisible();
   });
+
+  // ── Plan vs plan+apply is chosen by button, not a hidden checkbox (#1340) ──
+
+  test('both queue buttons are offered, and Plan is unchanged', async ({ page }) => {
+    const token = getStoredToken();
+    const wsId = await createWorkspace(token, uniqueName('e2e-queue-buttons'));
+
+    await page.goto(`/workspaces/${wsId}?tab=runs`);
+
+    // The decision that matters is on the surface, not behind "Options".
+    const plan = page.getByRole('button', { name: 'Plan', exact: true });
+    const planApply = page.getByRole('button', { name: 'Plan + apply', exact: true });
+    await expect(plan).toBeVisible({ timeout: 15_000 });
+    await expect(planApply).toBeVisible();
+
+    // The checkbox it replaced must be gone — if it lingered, the two
+    // mechanisms could disagree about what the next run is.
+    await page.getByRole('button', { name: /Options/ }).click();
+    await expect(page.getByText('Plan Only', { exact: true })).toHaveCount(0);
+  });
+
+  test('Plan queues a plan-only run', async ({ page }) => {
+    const token = getStoredToken();
+    const wsId = await createWorkspace(token, uniqueName('e2e-queue-plan'));
+
+    // Assert on what is actually sent: "plan-only" true is the behaviour the
+    // issue promised to leave untouched, and a label alone cannot prove it.
+    let body: string | null = null;
+    await page.route('**/api/v2/runs', async (route: Route) => {
+      if (route.request().method() === 'POST') body = route.request().postData();
+      await route.continue();
+    });
+
+    await page.goto(`/workspaces/${wsId}?tab=runs`);
+    await page.getByRole('button', { name: 'Plan', exact: true }).click();
+
+    await expect.poll(() => body, { timeout: 15_000 }).not.toBeNull();
+    expect(JSON.parse(body!).data.attributes['plan-only']).toBe(true);
+  });
+
+  test('a drift run that found drift offers plan + apply', async ({ page }) => {
+    const token = getStoredToken();
+    const wsId = await createWorkspace(token, uniqueName('e2e-drift-remediate'));
+
+    // The API cannot create a drift run — only the drift checker does, and the
+    // E2E stack has no runner. So the run payload is stubbed: this pins the UI
+    // gate (drift + has-changes ⇒ offer), not the detection itself.
+    await page.route('**/api/v2/runs/run-*', async (route: Route) => {
+      const res = await route.fetch();
+      const json = await res.json().catch(() => null);
+      if (!json?.data?.attributes) return route.fulfill({ response: res });
+      json.data.attributes['is-drift-detection'] = true;
+      json.data.attributes['has-changes'] = true;
+      await route.fulfill({ response: res, json });
+    });
+
+    const runId = await seedDriftShapedRun(token, wsId);
+    await page.goto(`/workspaces/${wsId}/runs/${runId}`);
+
+    await expect(page.getByRole('button', { name: 'Plan + apply', exact: true })).toBeVisible({
+      timeout: 15_000,
+    });
+  });
 });
+
+/** A plan-only run whose payload the test then reshapes into a drift run. */
+async function seedDriftShapedRun(token: string, workspaceId: string): Promise<string> {
+  const API_URL = process.env.API_URL || 'http://localhost:8000';
+  const res = await fetch(`${API_URL}/api/v2/runs`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/vnd.api+json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({
+      data: {
+        type: 'runs',
+        attributes: { 'plan-only': true },
+        relationships: { workspace: { data: { type: 'workspaces', id: workspaceId } } },
+      },
+    }),
+  });
+  if (!res.ok) throw new Error(`seed run failed: ${res.status} ${await res.text()}`);
+  return (await res.json()).data.id as string;
+}

@@ -1863,7 +1863,8 @@
       "discarding": "Scartamento in corso…",
       "cancelShort": "Annulla",
       "cancelFull": "Annulla esecuzione",
-      "canceling": "Annullamento in corso…"
+      "canceling": "Annullamento in corso…",
+      "queuing": "In accodamento…"
     },
     "confirm": {
       "apply": "Applicare questa esecuzione? Questo applica il plan e modifica l''infrastruttura.",
@@ -2160,6 +2161,13 @@
         "sendError": "Impossibile inviare il messaggio."
       },
       "translatedNote": "Tradotto dall''originale alla visualizzazione."
+    },
+    "drift": {
+      "remediate": "Plan + apply",
+      "remediateTitle": "Accoda una esecuzione plan + apply per riallineare l''infrastruttura alla configurazione",
+      "remediateConfirm": "Accodare una esecuzione plan + apply per questo workspace?",
+      "remediateMessage": "Accodato da un controllo di deriva",
+      "remediateFailed": "Impossibile accodare l''esecuzione di correzione"
     }
   },
   "workspaceDetail": {
@@ -2397,19 +2405,18 @@
     "runs": {
       "options": "Opzioni",
       "hideOptions": "Nascondi opzioni",
-      "queueDestroy": "Accoda distruzione",
+      "queueDestroy": "Distruggi",
       "queueDestroyTitle": "Accoda un plan di distruzione",
       "destroyAllConfirm": "Distruggere tutte le risorse?",
       "confirmDestroy": "Conferma distruzione",
-      "queuePlan": "Accoda plan",
-      "queueRun": "Accoda esecuzione",
+      "queuePlan": "Plan",
+      "queueRun": "Plan + apply",
       "queuePlanConfirm": "Accodare un plan speculativo per questo workspace?",
       "queueApplyConfirm": "Accodare un''esecuzione plan + apply? Questo può modificare l''infrastruttura.",
       "planOptions": "Opzioni del plan",
       "targetResources": "Risorse target",
       "replaceResources": "Risorse da sostituire",
       "commaSeparated": "(separate da virgola)",
-      "planOnly": "Solo plan",
       "refreshOnly": "Solo refresh",
       "skipRefresh": "Salta refresh",
       "allowEmptyApply": "Consenti apply vuoto",
@@ -2431,7 +2438,9 @@
       "typePlanOnly": "solo plan",
       "typePlanApply": "plan + apply",
       "sourceModuleTest": "test del modulo",
-      "sourceModulePublish": "pubblicazione del modulo"
+      "sourceModulePublish": "pubblicazione del modulo",
+      "queueApplyTitle": "Accoda una esecuzione plan + apply",
+      "queueApplyRefBlocked": "Apply non è disponibile mentre è selezionato un branch, tag o commit: quelle esecuzioni sono sempre solo plan"
     },
     "state": {
       "deleteConfirm": "Eliminare la versione dello stato #{serial}? Questa azione non può essere annullata.",

@@ -1863,7 +1863,8 @@
       "discarding": "D15c4rd1ng…",
       "cancelShort": "C4nc3l",
       "cancelFull": "C4nc3l Run",
-      "canceling": "C4nc3l1ng…"
+      "canceling": "C4nc3l1ng…",
+      "queuing": "Qu3u31ng…"
     },
     "confirm": {
       "apply": "4pply 7h15 run? 7h15 4ppl135 7h3 pl4n 4nd ch4ng35 1nfr457ruc7ur3.",
@@ -2160,6 +2161,13 @@
         "sendError": "F41l3d 70 53nd y0ur m3554g3."
       },
       "translatedNote": "7r4n5l473d fr0m 7h3 0r1g1n4l 0n v13w."
+    },
+    "drift": {
+      "remediate": "Pl4n + 4pply",
+      "remediateTitle": "Qu3u3 4 pl4n + 4pply run 70 br1ng 1nfr457ruc7ur3 b4ck 1n l1n3 w17h 7h3 c0nf1gur4710n",
+      "remediateConfirm": "Qu3u3 4 pl4n + 4pply run f0r 7h15 w0rk5p4c3?",
+      "remediateMessage": "Qu3u3d fr0m 4 dr1f7 ch3ck",
+      "remediateFailed": "C0uld n07 qu3u3 7h3 r3m3d14710n run"
     }
   },
   "workspaceDetail": {
@@ -2397,19 +2405,18 @@
     "runs": {
       "options": "0p710n5",
       "hideOptions": "H1d3 0p710n5",
-      "queueDestroy": "Qu3u3 D357r0y",
+      "queueDestroy": "D357r0y",
       "queueDestroyTitle": "Qu3u3 4 d357r0y pl4n",
       "destroyAllConfirm": "D357r0y 4ll r350urc35?",
       "confirmDestroy": "C0nf1rm D357r0y",
-      "queuePlan": "Qu3u3 Pl4n",
-      "queueRun": "Qu3u3 Run",
+      "queuePlan": "Pl4n",
+      "queueRun": "Pl4n + 4pply",
       "queuePlanConfirm": "Qu3u3 4 5p3cul471v3 pl4n f0r 7h15 w0rk5p4c3?",
       "queueApplyConfirm": "Qu3u3 4 pl4n + 4pply run? 7h15 c4n ch4ng3 1nfr457ruc7ur3.",
       "planOptions": "Pl4n 0p710n5",
       "targetResources": "74rg37 r350urc35",
       "replaceResources": "R3pl4c3 r350urc35",
       "commaSeparated": "(c0mm4-53p4r473d)",
-      "planOnly": "Pl4n 0nly",
       "refreshOnly": "R3fr35h 0nly",
       "skipRefresh": "5k1p R3fr35h",
       "allowEmptyApply": "4ll0w 3mp7y 4pply",
@@ -2431,7 +2438,9 @@
       "typePlanOnly": "pl4n 0nly",
       "typePlanApply": "pl4n + 4pply",
       "sourceModuleTest": "m0dul3 7357",
-      "sourceModulePublish": "m0dul3 publ15h"
+      "sourceModulePublish": "m0dul3 publ15h",
+      "queueApplyTitle": "Qu3u3 4 pl4n + 4pply run",
+      "queueApplyRefBlocked": "4pply 15 un4v41l4bl3 wh1l3 4 br4nch, 74g 0r c0mm17 15 53l3c73d — 7h053 run5 4r3 4lw4y5 pl4n-0nly"
     },
     "state": {
       "deleteConfirm": "D3l373 57473 v3r510n #{serial}? 7h15 c4nn07 b3 und0n3.",

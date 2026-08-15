@@ -1863,7 +1863,8 @@
       "discarding": "Discarding, we are…",
       "cancelShort": "Cancel",
       "cancelFull": "Run, Cancel",
-      "canceling": "Canceling, we are…"
+      "canceling": "Canceling, we are…",
+      "queuing": "Queued, it is being…"
     },
     "confirm": {
       "apply": "This run, apply? The plan this applies, and infrastructure changes it.",
@@ -2160,6 +2161,13 @@
         "sendError": "Send your message, I could not."
       },
       "translatedNote": "From the original on view, translated."
+    },
+    "drift": {
+      "remediate": "Plan and apply",
+      "remediateTitle": "A plan + apply run, queue — back in line with the configuration, the infrastructure it brings",
+      "remediateConfirm": "For this workspace, a plan + apply run queue?",
+      "remediateMessage": "From a drift check, queued it was",
+      "remediateFailed": "Queued, the remediation run could not be"
     }
   },
   "workspaceDetail": {
@@ -2397,19 +2405,18 @@
     "runs": {
       "options": "Options",
       "hideOptions": "Options, Hide",
-      "queueDestroy": "Destroy, Queue",
+      "queueDestroy": "Destroy",
       "queueDestroyTitle": "A destroy plan, queue",
       "destroyAllConfirm": "All resources, destroy?",
       "confirmDestroy": "Destroy, Confirm",
-      "queuePlan": "Plan, Queue",
-      "queueRun": "Run, Queue",
+      "queuePlan": "Plan",
+      "queueRun": "Plan and apply",
       "queuePlanConfirm": "For this workspace, a speculative plan queue?",
       "queueApplyConfirm": "A plan + apply run, queue? Infrastructure, this can change.",
       "planOptions": "Options, Plan",
       "targetResources": "resources, Target",
       "replaceResources": "resources, Replace",
       "commaSeparated": "(comma-separated)",
-      "planOnly": "Only, Plan",
       "refreshOnly": "Only, Refresh",
       "skipRefresh": "Refresh, Skip",
       "allowEmptyApply": "Apply, Allow Empty",
@@ -2431,7 +2438,9 @@
       "typePlanOnly": "plan only",
       "typePlanApply": "plan + apply",
       "sourceModuleTest": "module test",
-      "sourceModulePublish": "module publish"
+      "sourceModulePublish": "module publish",
+      "queueApplyTitle": "A plan + apply run, queue",
+      "queueApplyRefBlocked": "Unavailable apply is, while selected a branch, tag or commit is — plan-only always, those runs are"
     },
     "state": {
       "deleteConfirm": "State version #{serial}, delete? Undone, this cannot be.",

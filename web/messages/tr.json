@@ -1863,7 +1863,8 @@
       "discarding": "İptal ediliyor…",
       "cancelShort": "İptal",
       "cancelFull": "Çalıştırmayı İptal Et",
-      "canceling": "İptal ediliyor…"
+      "canceling": "İptal ediliyor…",
+      "queuing": "Kuyruğa alınıyor…"
     },
     "confirm": {
       "apply": "Bu çalıştırma uygulansın mı? Bu, planı uygular ve altyapıyı değiştirir.",
@@ -2160,6 +2161,13 @@
         "sendError": "Mesajınız gönderilemedi."
       },
       "translatedNote": "Görüntülenirken orijinalinden çevrildi."
+    },
+    "drift": {
+      "remediate": "Plan + apply",
+      "remediateTitle": "Altyapıyı yeniden yapılandırmayla uyumlu hale getirmek için bir plan + apply çalıştırması kuyruğa al",
+      "remediateConfirm": "Bu çalışma alanı için plan + apply çalıştırması kuyruğa alınsın mı?",
+      "remediateMessage": "Sapma kontrolünden kuyruğa alındı",
+      "remediateFailed": "Düzeltme çalıştırması kuyruğa alınamadı"
     }
   },
   "workspaceDetail": {
@@ -2397,19 +2405,18 @@
     "runs": {
       "options": "Seçenekler",
       "hideOptions": "Seçenekleri Gizle",
-      "queueDestroy": "Yok Etmeyi Sıraya Al",
+      "queueDestroy": "Yok et",
       "queueDestroyTitle": "Bir yok etme planını sıraya al",
       "destroyAllConfirm": "Tüm kaynaklar yok edilsin mi?",
       "confirmDestroy": "Yok Etmeyi Onayla",
-      "queuePlan": "Planı Sıraya Al",
-      "queueRun": "Çalıştırmayı Sıraya Al",
+      "queuePlan": "Plan",
+      "queueRun": "Plan + apply",
       "queuePlanConfirm": "Bu çalışma alanı için spekülatif bir plan sıraya alınsın mı?",
       "queueApplyConfirm": "Bir plan + apply çalıştırması sıraya alınsın mı? Bu, altyapıyı değiştirebilir.",
       "planOptions": "Plan Seçenekleri",
       "targetResources": "Hedef kaynaklar",
       "replaceResources": "Kaynakları değiştir",
       "commaSeparated": "(virgülle ayrılmış)",
-      "planOnly": "Yalnızca Plan",
       "refreshOnly": "Yalnızca Yenile",
       "skipRefresh": "Yenilemeyi Atla",
       "allowEmptyApply": "Boş Uygulamaya İzin Ver",
@@ -2431,7 +2438,9 @@
       "typePlanOnly": "yalnızca plan",
       "typePlanApply": "plan + apply",
       "sourceModuleTest": "modül testi",
-      "sourceModulePublish": "modül yayımlama"
+      "sourceModulePublish": "modül yayımlama",
+      "queueApplyTitle": "Plan + apply çalıştırması kuyruğa al",
+      "queueApplyRefBlocked": "Bir dal, etiket veya commit seçiliyken apply kullanılamaz — bu çalıştırmalar her zaman yalnızca plan olur"
     },
     "state": {
       "deleteConfirm": "#{serial} durum sürümü silinsin mi? Bu geri alınamaz.",

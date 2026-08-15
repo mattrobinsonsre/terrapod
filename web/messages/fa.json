@@ -1863,7 +1863,8 @@
       "discarding": "در حال کنار گذاشتن…",
       "cancelShort": "لغو",
       "cancelFull": "لغو اجرا",
-      "canceling": "در حال لغو…"
+      "canceling": "در حال لغو…",
+      "queuing": "در حال افزودن به صف…"
     },
     "confirm": {
       "apply": "این اجرا اعمال شود؟ این کار برنامه را اعمال کرده و زیرساخت را تغییر می‌دهد.",
@@ -2160,6 +2161,13 @@
         "sendError": "ارسال پیام شما ناموفق بود."
       },
       "translatedNote": "هنگام مشاهده از نسخهٔ اصلی ترجمه شد."
+    },
+    "drift": {
+      "remediate": "طرح + اعمال",
+      "remediateTitle": "افزودن اجرای طرح + اعمال به صف برای هم‌راستا کردن دوبارهٔ زیرساخت با پیکربندی",
+      "remediateConfirm": "اجرای طرح + اعمال برای این فضای کاری به صف افزوده شود؟",
+      "remediateMessage": "از بررسی انحراف به صف افزوده شد",
+      "remediateFailed": "افزودن اجرای اصلاح به صف ممکن نشد"
     }
   },
   "workspaceDetail": {
@@ -2397,19 +2405,18 @@
     "runs": {
       "options": "گزینه‌ها",
       "hideOptions": "پنهان کردن گزینه‌ها",
-      "queueDestroy": "افزودن نابودی به صف",
+      "queueDestroy": "تخریب",
       "queueDestroyTitle": "افزودن یک طرح نابودی به صف",
       "destroyAllConfirm": "همهٔ منابع نابود شوند؟",
       "confirmDestroy": "تأیید نابودی",
-      "queuePlan": "افزودن طرح به صف",
-      "queueRun": "افزودن اجرا به صف",
+      "queuePlan": "طرح",
+      "queueRun": "طرح + اعمال",
       "queuePlanConfirm": "یک طرح احتمالی برای این فضای کاری به صف افزوده شود؟",
       "queueApplyConfirm": "یک اجرای طرح + اعمال به صف افزوده شود؟ این کار می‌تواند زیرساخت را تغییر دهد.",
       "planOptions": "گزینه‌های طرح",
       "targetResources": "منابع هدف",
       "replaceResources": "جایگزینی منابع",
       "commaSeparated": "(با کاما جدا شده)",
-      "planOnly": "فقط طرح",
       "refreshOnly": "فقط تازه‌سازی",
       "skipRefresh": "رد کردن تازه‌سازی",
       "allowEmptyApply": "اجازهٔ اعمال خالی",
@@ -2431,7 +2438,9 @@
       "typePlanOnly": "فقط طرح",
       "typePlanApply": "طرح + اعمال",
       "sourceModuleTest": "آزمون ماژول",
-      "sourceModulePublish": "انتشار ماژول"
+      "sourceModulePublish": "انتشار ماژول",
+      "queueApplyTitle": "افزودن اجرای طرح + اعمال به صف",
+      "queueApplyRefBlocked": "تا زمانی که شاخه، برچسب یا کامیت انتخاب شده باشد اعمال در دسترس نیست — این اجراها همیشه فقط طرح هستند"
     },
     "state": {
       "deleteConfirm": "نسخهٔ وضعیت #{serial} حذف شود؟ این کار قابل‌بازگشت نیست.",

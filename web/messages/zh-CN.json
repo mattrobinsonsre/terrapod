@@ -1863,7 +1863,8 @@
       "discarding": "正在丢弃…",
       "cancelShort": "取消",
       "cancelFull": "取消运行",
-      "canceling": "正在取消…"
+      "canceling": "正在取消…",
+      "queuing": "正在加入队列…"
     },
     "confirm": {
       "apply": "应用此运行？这将应用计划并更改基础设施。",
@@ -2160,6 +2161,13 @@
         "sendError": "无法发送您的消息。"
       },
       "translatedNote": "查看时从原文翻译。"
+    },
+    "drift": {
+      "remediate": "计划 + 应用",
+      "remediateTitle": "将计划 + 应用运行加入队列，使基础设施重新与配置一致",
+      "remediateConfirm": "要为此工作区加入计划 + 应用运行吗？",
+      "remediateMessage": "由漂移检查加入队列",
+      "remediateFailed": "无法将修复运行加入队列"
     }
   },
   "workspaceDetail": {
@@ -2397,19 +2405,18 @@
     "runs": {
       "options": "选项",
       "hideOptions": "隐藏选项",
-      "queueDestroy": "排队销毁",
+      "queueDestroy": "销毁",
       "queueDestroyTitle": "排队一次销毁计划",
       "destroyAllConfirm": "销毁所有资源？",
       "confirmDestroy": "确认销毁",
-      "queuePlan": "排队计划",
-      "queueRun": "排队运行",
+      "queuePlan": "计划",
+      "queueRun": "计划 + 应用",
       "queuePlanConfirm": "为此工作区排队一次推测性计划？",
       "queueApplyConfirm": "排队一次 plan + apply 运行？这可能会更改基础设施。",
       "planOptions": "计划选项",
       "targetResources": "目标资源",
       "replaceResources": "替换资源",
       "commaSeparated": "（逗号分隔）",
-      "planOnly": "仅计划",
       "refreshOnly": "仅刷新",
       "skipRefresh": "跳过刷新",
       "allowEmptyApply": "允许空应用",
@@ -2431,7 +2438,9 @@
       "typePlanOnly": "仅计划",
       "typePlanApply": "plan + apply",
       "sourceModuleTest": "模块测试",
-      "sourceModulePublish": "模块发布"
+      "sourceModulePublish": "模块发布",
+      "queueApplyTitle": "将计划 + 应用运行加入队列",
+      "queueApplyRefBlocked": "选择分支、标签或提交时无法应用——这些运行始终仅为计划"
     },
     "state": {
       "deleteConfirm": "删除状态版本 #{serial}？此操作无法撤销。",

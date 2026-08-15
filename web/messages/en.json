@@ -1863,7 +1863,8 @@
       "discarding": "Discarding…",
       "cancelShort": "Cancel",
       "cancelFull": "Cancel Run",
-      "canceling": "Canceling…"
+      "canceling": "Canceling…",
+      "queuing": "Queueing…"
     },
     "confirm": {
       "apply": "Apply this run? This applies the plan and changes infrastructure.",
@@ -2160,6 +2161,13 @@
       "errors": {
         "status": "Failed to load AI cost estimate (HTTP {status})."
       }
+    },
+    "drift": {
+      "remediate": "Plan + apply",
+      "remediateTitle": "Queue a plan + apply run to bring infrastructure back in line with the configuration",
+      "remediateConfirm": "Queue a plan + apply run for this workspace?",
+      "remediateMessage": "Queued from a drift check",
+      "remediateFailed": "Could not queue the remediation run"
     }
   },
   "workspaceDetail": {
@@ -2405,19 +2413,18 @@
     "runs": {
       "options": "Options",
       "hideOptions": "Hide Options",
-      "queueDestroy": "Queue Destroy",
+      "queueDestroy": "Destroy",
       "queueDestroyTitle": "Queue a destroy plan",
       "destroyAllConfirm": "Destroy all resources?",
       "confirmDestroy": "Confirm Destroy",
-      "queuePlan": "Queue Plan",
-      "queueRun": "Queue Run",
+      "queuePlan": "Plan",
+      "queueRun": "Plan + apply",
       "queuePlanConfirm": "Queue a speculative plan for this workspace?",
       "queueApplyConfirm": "Queue a plan + apply run? This can change infrastructure.",
       "planOptions": "Plan Options",
       "targetResources": "Target resources",
       "replaceResources": "Replace resources",
       "commaSeparated": "(comma-separated)",
-      "planOnly": "Plan Only",
       "refreshOnly": "Refresh Only",
       "skipRefresh": "Skip Refresh",
       "allowEmptyApply": "Allow Empty Apply",
@@ -2439,7 +2446,9 @@
       "typePlanOnly": "plan only",
       "typePlanApply": "plan + apply",
       "sourceModuleTest": "module test",
-      "sourceModulePublish": "module publish"
+      "sourceModulePublish": "module publish",
+      "queueApplyTitle": "Queue a plan + apply run",
+      "queueApplyRefBlocked": "Apply is unavailable while a branch, tag or commit is selected — those runs are always plan-only"
     },
     "state": {
       "deleteConfirm": "Delete state version #{serial}? This cannot be undone.",

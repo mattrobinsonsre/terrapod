@@ -831,6 +831,11 @@ def _workspace_json(
                     "can-update": has_capability(caps, cap.WORKSPACE_SETTINGS),
                     "can-destroy": has_capability(caps, cap.WORKSPACE_DELETE),
                     "can-queue-run": has_capability(caps, cap.RUN_PLAN),
+                    # Distinct from can-queue-run, which is plan-only. Without
+                    # it a UI cannot tell whether to offer an apply, so it either
+                    # hides the capability from people who have it or shows a
+                    # control that 403s on press (#1340).
+                    "can-queue-apply": has_capability(caps, cap.RUN_APPLY),
                     "can-read-state-versions": has_capability(caps, cap.STATE_READ_METADATA),
                     "can-create-state-versions": has_capability(caps, cap.STATE_WRITE),
                     "can-read-variable": has_capability(caps, cap.VAR_READ),

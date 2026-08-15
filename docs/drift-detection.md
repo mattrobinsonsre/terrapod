@@ -103,6 +103,27 @@ The status is updated after each drift run completes. The mapping from run outco
 | `errored` | — | `errored` |
 | `canceled` / `discarded` | — | No update |
 
+### Remediating drift
+
+When you open a drift run that found changes, the run page offers a **Plan + apply**
+button: it queues an ordinary plan-and-apply run against the workspace's current
+configuration, with default plan options.
+
+Drift runs are plan-only and never apply, by design — a scheduled job must not
+change infrastructure on its own. But that leaves the operator on a page that
+reports a problem and offers nothing to do about it; reconciling meant navigating
+back to the workspace and queuing a run by hand. The button is that same run, one
+press from the evidence.
+
+It appears only when the run is a drift run that found changes, and only for a user
+with `run:apply` on the workspace (`can-queue-apply`) — see
+[RBAC](rbac.md#permissions-block-in-api-responses). It is hidden while the workspace
+is locked.
+
+Applying is not the only answer: drift can equally mean the configuration should be
+updated to match what is actually deployed. The button offers the first; the choice
+is yours.
+
 ### Dismissing drift
 
 When a workspace shows `drifted` or `errored` status — for example after you've acknowledged the drift and plan to reconcile it through a real apply — you can clear the reported state without disabling scheduled drift detection.

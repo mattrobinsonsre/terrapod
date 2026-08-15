@@ -1863,7 +1863,8 @@
       "discarding": "Wird verworfen…",
       "cancelShort": "Abbrechen",
       "cancelFull": "Ausführung abbrechen",
-      "canceling": "Wird abgebrochen…"
+      "canceling": "Wird abgebrochen…",
+      "queuing": "Wird eingereiht…"
     },
     "confirm": {
       "apply": "Diese Ausführung anwenden? Dadurch wird der Plan angewendet und die Infrastruktur verändert.",
@@ -2160,6 +2161,13 @@
         "sendError": "Ihre Nachricht konnte nicht gesendet werden."
       },
       "translatedNote": "Beim Anzeigen aus dem Original übersetzt."
+    },
+    "drift": {
+      "remediate": "Plan + Apply",
+      "remediateTitle": "Einen Plan-+-Apply-Lauf einreihen, um die Infrastruktur wieder mit der Konfiguration in Einklang zu bringen",
+      "remediateConfirm": "Einen Plan-+-Apply-Lauf für diesen Workspace einreihen?",
+      "remediateMessage": "Aus einer Abweichungsprüfung eingereiht",
+      "remediateFailed": "Der Behebungslauf konnte nicht eingereiht werden"
     }
   },
   "workspaceDetail": {
@@ -2397,19 +2405,18 @@
     "runs": {
       "options": "Optionen",
       "hideOptions": "Optionen ausblenden",
-      "queueDestroy": "Destroy einreihen",
+      "queueDestroy": "Zerstören",
       "queueDestroyTitle": "Einen Destroy-Plan einreihen",
       "destroyAllConfirm": "Alle Ressourcen zerstören?",
       "confirmDestroy": "Destroy bestätigen",
-      "queuePlan": "Plan einreihen",
-      "queueRun": "Ausführung einreihen",
+      "queuePlan": "Plan",
+      "queueRun": "Plan + Apply",
       "queuePlanConfirm": "Einen spekulativen Plan für diesen Arbeitsbereich einreihen?",
       "queueApplyConfirm": "Eine plan + apply-Ausführung einreihen? Dies kann die Infrastruktur verändern.",
       "planOptions": "Plan-Optionen",
       "targetResources": "Zielressourcen",
       "replaceResources": "Ressourcen ersetzen",
       "commaSeparated": "(durch Kommas getrennt)",
-      "planOnly": "Nur Plan",
       "refreshOnly": "Nur Refresh",
       "skipRefresh": "Refresh überspringen",
       "allowEmptyApply": "Leeres Apply erlauben",
@@ -2431,7 +2438,9 @@
       "typePlanOnly": "nur Plan",
       "typePlanApply": "plan + apply",
       "sourceModuleTest": "Modul-Test",
-      "sourceModulePublish": "Modul-Veröffentlichung"
+      "sourceModulePublish": "Modul-Veröffentlichung",
+      "queueApplyTitle": "Einen Plan-+-Apply-Lauf einreihen",
+      "queueApplyRefBlocked": "Apply ist nicht verfügbar, solange ein Branch, Tag oder Commit ausgewählt ist – solche Läufe sind immer Plan-only"
     },
     "state": {
       "deleteConfirm": "Zustandsversion #{serial} löschen? Dies kann nicht rückgängig gemacht werden.",
