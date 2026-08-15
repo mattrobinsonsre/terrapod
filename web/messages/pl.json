@@ -761,7 +761,7 @@
       "status": "Status",
       "created": "Utworzono",
       "actions": "Akcje",
-      "rateLimit": "Limit żądań"
+      "rateLimit": "Budżet API"
     },
     "success": {
       "created": "Utworzono połączenie VCS \"{name}\"",
@@ -777,9 +777,37 @@
     },
     "rateLimit": {
       "notReported": "Nie zgłoszono",
-      "remaining": "{remaining} z {limit}",
-      "exhausted": "Wyczerpany",
-      "observedAt": "na {time}"
+      "observedAt": "stan na {time}",
+      "rate": "{calls}/godz.",
+      "ofBudget": "{percent}% budżetu",
+      "resetsIn": "reset za {time}",
+      "runsOutIn": "wyczerpanie za {time}",
+      "durationS": "{s} s",
+      "durationM": "{m} min",
+      "durationHm": "{h} godz. {m} min",
+      "showBreakdown": "Pokaż podział",
+      "hideBreakdown": "Ukryj podział",
+      "consumers": "Najwięksi konsumenci",
+      "byLabel": "Według etykiety",
+      "windowNote": "Z ostatnich {minutes} minut",
+      "saturation": {
+        "idle": "Bezczynne",
+        "comfortable": "W ramach budżetu",
+        "tight": "Zbliża się do limitu",
+        "willExhaust": "Powyżej budżetu",
+        "exhausted": "Wyczerpany"
+      },
+      "kinds": {
+        "workspace": "Przestrzeń robocza",
+        "module": "Moduł",
+        "policySet": "Zestaw zasad",
+        "other": "Inne"
+      },
+      "remedies": {
+        "title": "Dwa sposoby, aby to naprawić",
+        "pollLess": "Zwiększ interwał odpytywania VCS, aby każde repozytorium było sprawdzane rzadziej.",
+        "split": "Rozłóż najbardziej aktywnych konsumentów na więcej połączeń VCS — jedno na zespół skaluje się lepiej niż jedno wspólne."
+      }
     }
   },
   "adminVariableSets": {

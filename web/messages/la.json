@@ -761,7 +761,7 @@
       "status": "Status",
       "created": "Creatum",
       "actions": "Actiones",
-      "rateLimit": "Limes petitionum"
+      "rateLimit": "Pensum API"
     },
     "success": {
       "created": "Nexus VCS \"{name}\" creatus",
@@ -777,9 +777,37 @@
     },
     "rateLimit": {
       "notReported": "Non nuntiatum",
-      "remaining": "{remaining} ex {limit}",
-      "exhausted": "Exhaustum",
-      "observedAt": "ut {time}"
+      "observedAt": "ut {time}",
+      "rate": "{calls}/hora",
+      "ofBudget": "{percent}% pensi",
+      "resetsIn": "restituetur post {time}",
+      "runsOutIn": "exhaurietur post {time}",
+      "durationS": "{s} sec.",
+      "durationM": "{m} min.",
+      "durationHm": "{h} hor. {m} min.",
+      "showBreakdown": "Distributionem monstrare",
+      "hideBreakdown": "Distributionem celare",
+      "consumers": "Praecipui consumptores",
+      "byLabel": "Per titulum",
+      "windowNote": "Per {minutes} minuta proxima",
+      "saturation": {
+        "idle": "Otiosum",
+        "comfortable": "Intra pensum",
+        "tight": "Ad limitem appropinquans",
+        "willExhaust": "Supra pensum",
+        "exhausted": "Exhaustum"
+      },
+      "kinds": {
+        "workspace": "Locus operis",
+        "module": "Modulus",
+        "policySet": "Corpus regularum",
+        "other": "Aliud"
+      },
+      "remedies": {
+        "title": "Duae viae hoc corrigendi",
+        "pollLess": "Intervallum interrogationis VCS auge, ut singula repositoria rarius inspiciantur.",
+        "split": "Consumptores frequentissimos in plures nexus VCS distribue — unus pro quaque turma melius crescit quam unus communis."
+      }
     }
   },
   "adminVariableSets": {

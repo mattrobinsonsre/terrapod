@@ -761,7 +761,7 @@
       "status": "狀態",
       "created": "建立時間",
       "actions": "操作",
-      "rateLimit": "速率限制"
+      "rateLimit": "API 預算"
     },
     "success": {
       "created": "已建立 VCS 連線 \"{name}\"",
@@ -777,9 +777,37 @@
     },
     "rateLimit": {
       "notReported": "未回報",
-      "remaining": "{limit} 中的 {remaining}",
-      "exhausted": "已用盡",
-      "observedAt": "截至 {time}"
+      "observedAt": "截至 {time}",
+      "rate": "{calls}/小時",
+      "ofBudget": "預算的 {percent}%",
+      "resetsIn": "{time} 後重設",
+      "runsOutIn": "{time} 後耗盡",
+      "durationS": "{s} 秒",
+      "durationM": "{m} 分鐘",
+      "durationHm": "{h} 小時 {m} 分鐘",
+      "showBreakdown": "顯示明細",
+      "hideBreakdown": "隱藏明細",
+      "consumers": "主要耗用方",
+      "byLabel": "依標籤",
+      "windowNote": "最近 {minutes} 分鐘內",
+      "saturation": {
+        "idle": "閒置",
+        "comfortable": "預算之內",
+        "tight": "接近上限",
+        "willExhaust": "超出預算",
+        "exhausted": "已耗盡"
+      },
+      "kinds": {
+        "workspace": "工作區",
+        "module": "模組",
+        "policySet": "原則集",
+        "other": "其他"
+      },
+      "remedies": {
+        "title": "兩種解決方式",
+        "pollLess": "延長 VCS 輪詢間隔，降低每個儲存庫的檢查頻率。",
+        "split": "將耗用最多的對象分散到更多 VCS 連線——每個團隊一個連線比共用一個連線更易擴充。"
+      }
     }
   },
   "adminVariableSets": {

@@ -761,7 +761,7 @@
       "status": "Estado",
       "created": "Creada",
       "actions": "Acciones",
-      "rateLimit": "Límite de peticiones"
+      "rateLimit": "Presupuesto de API"
     },
     "success": {
       "created": "Conexión VCS \"{name}\" creada",
@@ -777,9 +777,37 @@
     },
     "rateLimit": {
       "notReported": "No informado",
-      "remaining": "{remaining} de {limit}",
-      "exhausted": "Agotado",
-      "observedAt": "a fecha de {time}"
+      "observedAt": "a fecha de {time}",
+      "rate": "{calls}/h",
+      "ofBudget": "{percent} % del presupuesto",
+      "resetsIn": "se restablece en {time}",
+      "runsOutIn": "se agota en {time}",
+      "durationS": "{s} s",
+      "durationM": "{m} min",
+      "durationHm": "{h} h {m} min",
+      "showBreakdown": "Mostrar desglose",
+      "hideBreakdown": "Ocultar desglose",
+      "consumers": "Principales consumidores",
+      "byLabel": "Por etiqueta",
+      "windowNote": "Durante los últimos {minutes} minutos",
+      "saturation": {
+        "idle": "Inactivo",
+        "comfortable": "Dentro del presupuesto",
+        "tight": "Cerca del límite",
+        "willExhaust": "Presupuesto superado",
+        "exhausted": "Agotado"
+      },
+      "kinds": {
+        "workspace": "Espacio de trabajo",
+        "module": "Módulo",
+        "policySet": "Conjunto de políticas",
+        "other": "Otro"
+      },
+      "remedies": {
+        "title": "Dos formas de solucionarlo",
+        "pollLess": "Aumente el intervalo de sondeo de VCS para que cada repositorio se compruebe con menos frecuencia.",
+        "split": "Reparta los consumidores más activos entre varias conexiones de VCS: una por equipo escala mejor que una conexión compartida."
+      }
     }
   },
   "adminVariableSets": {

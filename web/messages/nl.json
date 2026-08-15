@@ -761,7 +761,7 @@
       "status": "Status",
       "created": "Aangemaakt",
       "actions": "Acties",
-      "rateLimit": "Verzoeklimiet"
+      "rateLimit": "API-budget"
     },
     "success": {
       "created": "VCS-verbinding \"{name}\" aangemaakt",
@@ -777,9 +777,37 @@
     },
     "rateLimit": {
       "notReported": "Niet gerapporteerd",
-      "remaining": "{remaining} van {limit}",
-      "exhausted": "Uitgeput",
-      "observedAt": "per {time}"
+      "observedAt": "per {time}",
+      "rate": "{calls}/uur",
+      "ofBudget": "{percent}% van het budget",
+      "resetsIn": "reset over {time}",
+      "runsOutIn": "op over {time}",
+      "durationS": "{s} s",
+      "durationM": "{m} min",
+      "durationHm": "{h} u {m} min",
+      "showBreakdown": "Uitsplitsing tonen",
+      "hideBreakdown": "Uitsplitsing verbergen",
+      "consumers": "Grootste verbruikers",
+      "byLabel": "Per label",
+      "windowNote": "Over de afgelopen {minutes} minuten",
+      "saturation": {
+        "idle": "Inactief",
+        "comfortable": "Binnen budget",
+        "tight": "Nadert limiet",
+        "willExhaust": "Boven budget",
+        "exhausted": "Uitgeput"
+      },
+      "kinds": {
+        "workspace": "Workspace",
+        "module": "Module",
+        "policySet": "Beleidsset",
+        "other": "Overig"
+      },
+      "remedies": {
+        "title": "Twee manieren om dit op te lossen",
+        "pollLess": "Verhoog het VCS-pollinterval zodat elke repository minder vaak wordt gecontroleerd.",
+        "split": "Verdeel de drukste verbruikers over meer VCS-verbindingen — één per team schaalt verder dan één gedeelde verbinding."
+      }
     }
   },
   "adminVariableSets": {

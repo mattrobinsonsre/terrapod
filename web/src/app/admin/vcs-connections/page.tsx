@@ -8,7 +8,7 @@ import { PageHeader } from '@/components/page-header'
 import { LoadingSpinner } from '@/components/loading-spinner'
 import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
-import { RateLimitIndicator } from '@/components/rate-limit-indicator'
+import { VCSConsumption, type ConnectionConsumption } from '@/components/vcs-consumption'
 import { SortableHeader } from '@/components/sortable-header'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { useConfirm } from '@/lib/use-confirm'
@@ -29,11 +29,8 @@ interface VCSConnection {
     'github-account-login': string | null
     'has-token': boolean
     'has-webhook-secret'?: boolean
-    'rate-limit'?: number | null
-    'rate-limit-remaining'?: number | null
-    'rate-limit-observed-at'?: string | null
     'created-at': string
-  }
+  } & ConnectionConsumption
 }
 
 type VCSSortKey = 'name' | 'provider' | 'server-url' | 'status' | 'created'
@@ -365,12 +362,7 @@ export default function VCSConnectionsPage() {
                           {conn.attributes.status}
                         </span>
                       </div>
-                      <RateLimitIndicator
-                        className="sm:hidden mt-1"
-                        limit={conn.attributes['rate-limit']}
-                        remaining={conn.attributes['rate-limit-remaining']}
-                        observedAt={conn.attributes['rate-limit-observed-at']}
-                      />
+                      <VCSConsumption className="sm:hidden mt-1" attrs={conn.attributes} />
                     </td>
                     <td className="px-4 py-3">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${providerBadge(conn.attributes.provider)}`}>
@@ -386,11 +378,7 @@ export default function VCSConnectionsPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3 hidden sm:table-cell">
-                      <RateLimitIndicator
-                        limit={conn.attributes['rate-limit']}
-                        remaining={conn.attributes['rate-limit-remaining']}
-                        observedAt={conn.attributes['rate-limit-observed-at']}
-                      />
+                      <VCSConsumption attrs={conn.attributes} />
                     </td>
                     <td className="px-4 py-3 text-xs text-slate-500 hidden lg:table-cell">
                       {fmt.date(conn.attributes['created-at'])}

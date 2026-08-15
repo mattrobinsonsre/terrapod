@@ -761,7 +761,7 @@
       "status": "Statut",
       "created": "Créé le",
       "actions": "Actions",
-      "rateLimit": "Limite de débit"
+      "rateLimit": "Budget d'API"
     },
     "success": {
       "created": "Connexion VCS « {name} » créée",
@@ -777,9 +777,37 @@
     },
     "rateLimit": {
       "notReported": "Non communiqué",
-      "remaining": "{remaining} sur {limit}",
-      "exhausted": "Épuisé",
-      "observedAt": "au {time}"
+      "observedAt": "au {time}",
+      "rate": "{calls}/h",
+      "ofBudget": "{percent} % du budget",
+      "resetsIn": "réinitialisation dans {time}",
+      "runsOutIn": "épuisé dans {time}",
+      "durationS": "{s} s",
+      "durationM": "{m} min",
+      "durationHm": "{h} h {m} min",
+      "showBreakdown": "Afficher le détail",
+      "hideBreakdown": "Masquer le détail",
+      "consumers": "Principaux consommateurs",
+      "byLabel": "Par étiquette",
+      "windowNote": "Sur les {minutes} dernières minutes",
+      "saturation": {
+        "idle": "Inactif",
+        "comfortable": "Dans le budget",
+        "tight": "Proche de la limite",
+        "willExhaust": "Budget dépassé",
+        "exhausted": "Épuisé"
+      },
+      "kinds": {
+        "workspace": "Espace de travail",
+        "module": "Module",
+        "policySet": "Jeu de politiques",
+        "other": "Autre"
+      },
+      "remedies": {
+        "title": "Deux façons d'y remédier",
+        "pollLess": "Augmentez l'intervalle d'interrogation VCS afin que chaque dépôt soit vérifié moins souvent.",
+        "split": "Répartissez les consommateurs les plus actifs sur plusieurs connexions VCS — une par équipe passe mieux à l'échelle qu'une connexion partagée."
+      }
     }
   },
   "adminVariableSets": {

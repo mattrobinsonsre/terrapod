@@ -761,7 +761,7 @@
       "status": "상태",
       "created": "생성일",
       "actions": "작업",
-      "rateLimit": "요청 한도"
+      "rateLimit": "API 예산"
     },
     "success": {
       "created": "VCS 연결 \"{name}\" 생성됨",
@@ -777,9 +777,37 @@
     },
     "rateLimit": {
       "notReported": "보고되지 않음",
-      "remaining": "{limit} 중 {remaining}",
-      "exhausted": "소진됨",
-      "observedAt": "{time} 기준"
+      "observedAt": "{time} 기준",
+      "rate": "{calls}/시간",
+      "ofBudget": "예산의 {percent}%",
+      "resetsIn": "{time} 후 초기화",
+      "runsOutIn": "{time} 후 소진",
+      "durationS": "{s}초",
+      "durationM": "{m}분",
+      "durationHm": "{h}시간 {m}분",
+      "showBreakdown": "세부 내역 표시",
+      "hideBreakdown": "세부 내역 숨기기",
+      "consumers": "주요 소비자",
+      "byLabel": "레이블별",
+      "windowNote": "최근 {minutes}분 동안",
+      "saturation": {
+        "idle": "유휴",
+        "comfortable": "예산 내",
+        "tight": "한도 근접",
+        "willExhaust": "예산 초과",
+        "exhausted": "소진됨"
+      },
+      "kinds": {
+        "workspace": "워크스페이스",
+        "module": "모듈",
+        "policySet": "정책 세트",
+        "other": "기타"
+      },
+      "remedies": {
+        "title": "해결 방법 두 가지",
+        "pollLess": "VCS 폴링 간격을 늘려 각 저장소를 덜 자주 확인합니다.",
+        "split": "가장 많이 사용하는 소비자를 여러 VCS 연결로 분산합니다. 팀당 하나의 연결이 공유 연결 하나보다 확장성이 좋습니다."
+      }
     }
   },
   "adminVariableSets": {

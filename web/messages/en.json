@@ -761,7 +761,7 @@
       "status": "Status",
       "created": "Created",
       "actions": "Actions",
-      "rateLimit": "Rate limit"
+      "rateLimit": "API budget"
     },
     "success": {
       "created": "VCS connection \"{name}\" created",
@@ -777,9 +777,37 @@
     },
     "rateLimit": {
       "notReported": "Not reported",
-      "remaining": "{remaining} of {limit}",
-      "exhausted": "Exhausted",
-      "observedAt": "as of {time}"
+      "observedAt": "as of {time}",
+      "rate": "{calls}/hr",
+      "ofBudget": "{percent}% of budget",
+      "resetsIn": "resets in {time}",
+      "runsOutIn": "runs out in {time}",
+      "durationS": "{s}s",
+      "durationM": "{m}m",
+      "durationHm": "{h}h {m}m",
+      "showBreakdown": "Show breakdown",
+      "hideBreakdown": "Hide breakdown",
+      "consumers": "Top consumers",
+      "byLabel": "By label",
+      "windowNote": "Over the last {minutes} minutes",
+      "saturation": {
+        "idle": "Idle",
+        "comfortable": "Within budget",
+        "tight": "Approaching limit",
+        "willExhaust": "Over budget",
+        "exhausted": "Exhausted"
+      },
+      "kinds": {
+        "workspace": "Workspace",
+        "module": "Module",
+        "policySet": "Policy set",
+        "other": "Other"
+      },
+      "remedies": {
+        "title": "Two ways to fix this",
+        "pollLess": "Increase the VCS poll interval so each repository is checked less often.",
+        "split": "Split the busiest consumers across more VCS connections — one per team scales further than one shared connection."
+      }
     }
   },
   "adminVariableSets": {

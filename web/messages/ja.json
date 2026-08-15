@@ -761,7 +761,7 @@
       "status": "ステータス",
       "created": "作成日時",
       "actions": "操作",
-      "rateLimit": "レート制限"
+      "rateLimit": "API 予算"
     },
     "success": {
       "created": "VCS接続「{name}」を作成しました",
@@ -776,10 +776,38 @@
       "updateStatus": "接続の更新に失敗しました（{status}）"
     },
     "rateLimit": {
-      "notReported": "報告なし",
-      "remaining": "{limit} 中 {remaining}",
-      "exhausted": "上限到達",
-      "observedAt": "{time} 時点"
+      "notReported": "未報告",
+      "observedAt": "{time} 時点",
+      "rate": "{calls}/時",
+      "ofBudget": "予算の {percent}%",
+      "resetsIn": "{time} 後にリセット",
+      "runsOutIn": "{time} 後に枯渇",
+      "durationS": "{s} 秒",
+      "durationM": "{m} 分",
+      "durationHm": "{h} 時間 {m} 分",
+      "showBreakdown": "内訳を表示",
+      "hideBreakdown": "内訳を非表示",
+      "consumers": "主な消費元",
+      "byLabel": "ラベル別",
+      "windowNote": "直近 {minutes} 分間",
+      "saturation": {
+        "idle": "アイドル",
+        "comfortable": "予算内",
+        "tight": "上限に接近",
+        "willExhaust": "予算超過",
+        "exhausted": "枯渇"
+      },
+      "kinds": {
+        "workspace": "ワークスペース",
+        "module": "モジュール",
+        "policySet": "ポリシーセット",
+        "other": "その他"
+      },
+      "remedies": {
+        "title": "解決する 2 つの方法",
+        "pollLess": "VCS のポーリング間隔を長くして、各リポジトリの確認頻度を下げます。",
+        "split": "最も消費の多い対象を複数の VCS 接続に分割します。チームごとに 1 つの接続のほうが、共有の 1 接続よりも拡張できます。"
+      }
     }
   },
   "adminVariableSets": {

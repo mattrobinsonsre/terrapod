@@ -761,7 +761,7 @@
       "status": "وضعیت",
       "created": "ایجادشده",
       "actions": "کنش‌ها",
-      "rateLimit": "محدودیت نرخ"
+      "rateLimit": "بودجهٔ API"
     },
     "success": {
       "created": "اتصال VCS «{name}» ایجاد شد",
@@ -776,10 +776,38 @@
       "updateStatus": "به‌روزرسانی اتصال ناموفق بود ({status})"
     },
     "rateLimit": {
-      "notReported": "گزارش نشده",
-      "remaining": "{remaining} از {limit}",
-      "exhausted": "تمام‌شده",
-      "observedAt": "تا {time}"
+      "notReported": "گزارش‌نشده",
+      "observedAt": "تا {time}",
+      "rate": "{calls}/ساعت",
+      "ofBudget": "{percent}٪ از بودجه",
+      "resetsIn": "بازنشانی تا {time} دیگر",
+      "runsOutIn": "اتمام تا {time} دیگر",
+      "durationS": "{s} ثانیه",
+      "durationM": "{m} دقیقه",
+      "durationHm": "{h} ساعت {m} دقیقه",
+      "showBreakdown": "نمایش تفکیک",
+      "hideBreakdown": "پنهان کردن تفکیک",
+      "consumers": "بیشترین مصرف‌کنندگان",
+      "byLabel": "بر اساس برچسب",
+      "windowNote": "در {minutes} دقیقهٔ گذشته",
+      "saturation": {
+        "idle": "بی‌کار",
+        "comfortable": "در حد بودجه",
+        "tight": "نزدیک به حد مجاز",
+        "willExhaust": "فراتر از بودجه",
+        "exhausted": "تمام‌شده"
+      },
+      "kinds": {
+        "workspace": "فضای کاری",
+        "module": "ماژول",
+        "policySet": "مجموعه سیاست",
+        "other": "سایر"
+      },
+      "remedies": {
+        "title": "دو راه برای رفع این مشکل",
+        "pollLess": "بازهٔ نظرسنجی VCS را افزایش دهید تا هر مخزن کمتر بررسی شود.",
+        "split": "مصرف‌کنندگان پرترافیک را میان اتصال‌های VCS بیشتری تقسیم کنید — یک اتصال برای هر تیم بهتر از یک اتصال مشترک مقیاس می‌گیرد."
+      }
     }
   },
   "adminVariableSets": {

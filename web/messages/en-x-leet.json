@@ -761,7 +761,7 @@
       "status": "5747u5",
       "created": "Cr3473d",
       "actions": "4c710n5",
-      "rateLimit": "R473 l1m17"
+      "rateLimit": "4P1 budg37"
     },
     "success": {
       "created": "VC5 c0nn3c710n \"{name}\" cr3473d",
@@ -777,9 +777,37 @@
     },
     "rateLimit": {
       "notReported": "N07 r3p0r73d",
-      "remaining": "{remaining} 0f {limit}",
-      "exhausted": "3xh4u573d",
-      "observedAt": "45 0f {time}"
+      "observedAt": "45 0f {time}",
+      "rate": "{calls}/hr",
+      "ofBudget": "{percent}% 0f budg37",
+      "resetsIn": "r35375 1n {time}",
+      "runsOutIn": "run5 0u7 1n {time}",
+      "durationS": "{s}5",
+      "durationM": "{m}m",
+      "durationHm": "{h}h {m}m",
+      "showBreakdown": "5h0w br34kd0wn",
+      "hideBreakdown": "H1d3 br34kd0wn",
+      "consumers": "70p c0n5um3r5",
+      "byLabel": "By l4b3l",
+      "windowNote": "0v3r 7h3 l457 {minutes} m1nu735",
+      "saturation": {
+        "idle": "1dl3",
+        "comfortable": "W17h1n budg37",
+        "tight": "4ppr04ch1ng l1m17",
+        "willExhaust": "0v3r budg37",
+        "exhausted": "3xh4u573d"
+      },
+      "kinds": {
+        "workspace": "W0rk5p4c3",
+        "module": "M0dul3",
+        "policySet": "P0l1cy 537",
+        "other": "07h3r"
+      },
+      "remedies": {
+        "title": "7w0 w4y5 70 f1x 7h15",
+        "pollLess": "1ncr3453 7h3 VC5 p0ll 1n73rv4l 50 34ch r3p05170ry 15 ch3ck3d l355 0f73n.",
+        "split": "5pl17 7h3 bu51357 c0n5um3r5 4cr055 m0r3 VC5 c0nn3c710n5 — 0n3 p3r 734m 5c4l35 fur7h3r 7h4n 0n3 5h4r3d c0nn3c710n."
+      }
     }
   },
   "adminVariableSets": {

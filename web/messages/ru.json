@@ -761,7 +761,7 @@
       "status": "Статус",
       "created": "Создано",
       "actions": "Действия",
-      "rateLimit": "Лимит запросов"
+      "rateLimit": "Бюджет API"
     },
     "success": {
       "created": "Подключение VCS \"{name}\" создано",
@@ -776,10 +776,38 @@
       "updateStatus": "Не удалось обновить подключение ({status})"
     },
     "rateLimit": {
-      "notReported": "Не сообщается",
-      "remaining": "{remaining} из {limit}",
-      "exhausted": "Исчерпан",
-      "observedAt": "по состоянию на {time}"
+      "notReported": "Нет данных",
+      "observedAt": "на {time}",
+      "rate": "{calls}/ч",
+      "ofBudget": "{percent} % бюджета",
+      "resetsIn": "сброс через {time}",
+      "runsOutIn": "исчерпание через {time}",
+      "durationS": "{s} с",
+      "durationM": "{m} мин",
+      "durationHm": "{h} ч {m} мин",
+      "showBreakdown": "Показать разбивку",
+      "hideBreakdown": "Скрыть разбивку",
+      "consumers": "Основные потребители",
+      "byLabel": "По метке",
+      "windowNote": "За последние {minutes} минут",
+      "saturation": {
+        "idle": "Простой",
+        "comfortable": "В пределах бюджета",
+        "tight": "Приближается к лимиту",
+        "willExhaust": "Превышение бюджета",
+        "exhausted": "Исчерпан"
+      },
+      "kinds": {
+        "workspace": "Рабочая область",
+        "module": "Модуль",
+        "policySet": "Набор политик",
+        "other": "Другое"
+      },
+      "remedies": {
+        "title": "Два способа это исправить",
+        "pollLess": "Увеличьте интервал опроса VCS, чтобы каждый репозиторий проверялся реже.",
+        "split": "Распределите самых активных потребителей по нескольким подключениям VCS — одно на команду масштабируется лучше, чем одно общее."
+      }
     }
   },
   "adminVariableSets": {

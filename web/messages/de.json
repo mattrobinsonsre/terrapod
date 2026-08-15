@@ -761,7 +761,7 @@
       "status": "Status",
       "created": "Erstellt",
       "actions": "Aktionen",
-      "rateLimit": "Ratenlimit"
+      "rateLimit": "API-Budget"
     },
     "success": {
       "created": "VCS-Verbindung \"{name}\" erstellt",
@@ -777,9 +777,37 @@
     },
     "rateLimit": {
       "notReported": "Nicht gemeldet",
-      "remaining": "{remaining} von {limit}",
-      "exhausted": "Erschöpft",
-      "observedAt": "Stand {time}"
+      "observedAt": "Stand {time}",
+      "rate": "{calls}/Std.",
+      "ofBudget": "{percent} % des Budgets",
+      "resetsIn": "Zurücksetzung in {time}",
+      "runsOutIn": "erschöpft in {time}",
+      "durationS": "{s} s",
+      "durationM": "{m} min",
+      "durationHm": "{h} Std. {m} min",
+      "showBreakdown": "Aufschlüsselung anzeigen",
+      "hideBreakdown": "Aufschlüsselung ausblenden",
+      "consumers": "Größte Verbraucher",
+      "byLabel": "Nach Label",
+      "windowNote": "Über die letzten {minutes} Minuten",
+      "saturation": {
+        "idle": "Inaktiv",
+        "comfortable": "Im Budget",
+        "tight": "Nähert sich dem Limit",
+        "willExhaust": "Über Budget",
+        "exhausted": "Erschöpft"
+      },
+      "kinds": {
+        "workspace": "Workspace",
+        "module": "Modul",
+        "policySet": "Richtliniensatz",
+        "other": "Sonstige"
+      },
+      "remedies": {
+        "title": "Zwei Wege, das zu beheben",
+        "pollLess": "Erhöhen Sie das VCS-Abfrageintervall, damit jedes Repository seltener geprüft wird.",
+        "split": "Verteilen Sie die aktivsten Verbraucher auf mehrere VCS-Verbindungen – eine pro Team skaliert weiter als eine gemeinsame Verbindung."
+      }
     }
   },
   "adminVariableSets": {

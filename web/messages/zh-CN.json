@@ -761,7 +761,7 @@
       "status": "状态",
       "created": "创建时间",
       "actions": "操作",
-      "rateLimit": "速率限制"
+      "rateLimit": "API 预算"
     },
     "success": {
       "created": "已创建 VCS 连接 \"{name}\"",
@@ -777,9 +777,37 @@
     },
     "rateLimit": {
       "notReported": "未报告",
-      "remaining": "{limit} 中的 {remaining}",
-      "exhausted": "已用尽",
-      "observedAt": "截至 {time}"
+      "observedAt": "截至 {time}",
+      "rate": "{calls}/小时",
+      "ofBudget": "预算的 {percent}%",
+      "resetsIn": "{time} 后重置",
+      "runsOutIn": "{time} 后耗尽",
+      "durationS": "{s} 秒",
+      "durationM": "{m} 分钟",
+      "durationHm": "{h} 小时 {m} 分钟",
+      "showBreakdown": "显示明细",
+      "hideBreakdown": "隐藏明细",
+      "consumers": "主要消耗方",
+      "byLabel": "按标签",
+      "windowNote": "最近 {minutes} 分钟内",
+      "saturation": {
+        "idle": "空闲",
+        "comfortable": "预算之内",
+        "tight": "接近上限",
+        "willExhaust": "超出预算",
+        "exhausted": "已耗尽"
+      },
+      "kinds": {
+        "workspace": "工作区",
+        "module": "模块",
+        "policySet": "策略集",
+        "other": "其他"
+      },
+      "remedies": {
+        "title": "两种解决方式",
+        "pollLess": "延长 VCS 轮询间隔，降低每个仓库的检查频率。",
+        "split": "将消耗最多的对象分散到更多 VCS 连接上——每个团队一个连接比共用一个连接更易扩展。"
+      }
     }
   },
   "adminVariableSets": {

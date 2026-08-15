@@ -761,7 +761,7 @@
       "status": "סטטוס",
       "created": "נוצר",
       "actions": "פעולות",
-      "rateLimit": "מגבלת קצב"
+      "rateLimit": "תקציב API"
     },
     "success": {
       "created": "חיבור ה-VCS \"{name}\" נוצר",
@@ -776,10 +776,38 @@
       "updateStatus": "עדכון החיבור נכשל ({status})"
     },
     "rateLimit": {
-      "notReported": "לא מדווח",
-      "remaining": "{remaining} מתוך {limit}",
-      "exhausted": "מוצה",
-      "observedAt": "נכון ל־{time}"
+      "notReported": "לא דווח",
+      "observedAt": "נכון ל-{time}",
+      "rate": "{calls}/שעה",
+      "ofBudget": "{percent}% מהתקציב",
+      "resetsIn": "איפוס בעוד {time}",
+      "runsOutIn": "ייגמר בעוד {time}",
+      "durationS": "{s} שנ׳",
+      "durationM": "{m} דק׳",
+      "durationHm": "{h} שע׳ {m} דק׳",
+      "showBreakdown": "הצג פירוט",
+      "hideBreakdown": "הסתר פירוט",
+      "consumers": "הצרכנים הגדולים",
+      "byLabel": "לפי תווית",
+      "windowNote": "ב-{minutes} הדקות האחרונות",
+      "saturation": {
+        "idle": "לא פעיל",
+        "comfortable": "בתוך התקציב",
+        "tight": "מתקרב למגבלה",
+        "willExhaust": "חריגה מהתקציב",
+        "exhausted": "אזל"
+      },
+      "kinds": {
+        "workspace": "סביבת עבודה",
+        "module": "מודול",
+        "policySet": "ערכת מדיניות",
+        "other": "אחר"
+      },
+      "remedies": {
+        "title": "שתי דרכים לפתור זאת",
+        "pollLess": "הגדל את מרווח הסקר של VCS כך שכל מאגר ייבדק בתדירות נמוכה יותר.",
+        "split": "פצל את הצרכנים העמוסים ביותר בין חיבורי VCS נוספים — חיבור לכל צוות מתרחב טוב יותר מחיבור משותף אחד."
+      }
     }
   },
   "adminVariableSets": {
