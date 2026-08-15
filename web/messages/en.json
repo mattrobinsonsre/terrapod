@@ -760,7 +760,8 @@
       "serverUrl": "Server URL",
       "status": "Status",
       "created": "Created",
-      "actions": "Actions"
+      "actions": "Actions",
+      "rateLimit": "Rate limit"
     },
     "success": {
       "created": "VCS connection \"{name}\" created",
@@ -773,6 +774,12 @@
       "delete": "Failed to delete connection",
       "createStatus": "Failed to create connection ({status})",
       "updateStatus": "Failed to update connection ({status})"
+    },
+    "rateLimit": {
+      "notReported": "Not reported",
+      "remaining": "{remaining} of {limit}",
+      "exhausted": "Exhausted",
+      "observedAt": "as of {time}"
     }
   },
   "adminVariableSets": {
@@ -2956,16 +2963,5 @@
     "restoreConfirm": "Restore the state of \"{name}\"?\n\nThis creates a NEW workspace — the original is not brought back. It returns with auto-apply and drift detection off and no VCS connection, and its variables and run history do not come back. Only the state is recovered.",
     "restoreDone": "Recovered {versions, plural, one {# state version} other {# state versions}} into the new workspace \"{name}\". Check its settings before enabling auto-apply or VCS.",
     "restoreAgainConfirm": "\"{name}\" has already been restored, into {existing}.\n\nRestoring it again creates a SECOND workspace holding the same state lineage over the same infrastructure. Applying in either will then make the other's next plan look like wholesale drift.\n\nOnly continue if the earlier restored workspace is gone."
-  },
-  "vcsConnections": {
-    "table": {
-      "rateLimit": "Rate limit"
-    },
-    "rateLimit": {
-      "notReported": "Not reported",
-      "remaining": "{remaining} of {limit}",
-      "exhausted": "Exhausted",
-      "observedAt": "as of {time}"
-    }
   }
 }

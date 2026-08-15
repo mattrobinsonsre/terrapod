@@ -760,7 +760,8 @@
       "serverUrl": "서버 URL",
       "status": "상태",
       "created": "생성일",
-      "actions": "작업"
+      "actions": "작업",
+      "rateLimit": "요청 한도"
     },
     "success": {
       "created": "VCS 연결 \"{name}\" 생성됨",
@@ -773,6 +774,12 @@
       "delete": "연결을 삭제하지 못했습니다",
       "createStatus": "연결을 생성하지 못했습니다 ({status})",
       "updateStatus": "연결을 업데이트하지 못했습니다 ({status})"
+    },
+    "rateLimit": {
+      "notReported": "보고되지 않음",
+      "remaining": "{limit} 중 {remaining}",
+      "exhausted": "소진됨",
+      "observedAt": "{time} 기준"
     }
   },
   "adminVariableSets": {
@@ -2956,16 +2963,5 @@
     "restoreConfirm": "\"{name}\"의 상태를 복원할까요?\n\n새 워크스페이스가 만들어집니다. 원본은 돌아오지 않습니다. 자동 적용과 드리프트 감지가 꺼진 채, VCS 연결 없이 복원되며 변수와 실행 기록은 돌아오지 않습니다. 복구되는 것은 상태뿐입니다.",
     "restoreDone": "{versions, plural, other {상태 버전 #개}}를 새 워크스페이스 \"{name}\"에 복구했습니다. 자동 적용이나 VCS를 켜기 전에 설정을 확인하세요.",
     "restoreAgainConfirm": "\"{name}\"은(는) 이미 {existing}(으)로 복원되었습니다.\n\n다시 복원하면 동일한 인프라 위에 동일한 state 계보를 가진 두 번째 워크스페이스가 만들어집니다. 둘 중 하나에서 apply하면 다른 쪽의 다음 플랜이 전면적인 드리프트처럼 보이게 됩니다.\n\n이전에 복원한 워크스페이스가 사라진 경우에만 계속하십시오."
-  },
-  "vcsConnections": {
-    "table": {
-      "rateLimit": "요청 한도"
-    },
-    "rateLimit": {
-      "notReported": "보고되지 않음",
-      "remaining": "{limit} 중 {remaining}",
-      "exhausted": "소진됨",
-      "observedAt": "{time} 기준"
-    }
   }
 }

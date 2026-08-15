@@ -760,7 +760,8 @@
       "serverUrl": "server URL",
       "status": "Dotlh",
       "created": "chenmoHlu'pu'",
-      "actions": "vangmey"
+      "actions": "vangmey",
+      "rateLimit": "tlhoy' mI'"
     },
     "success": {
       "created": "VCS rar \"{name}\" chenmoHlu'pu'",
@@ -773,6 +774,12 @@
       "delete": "rar Qaw'meH lujpu'",
       "createStatus": "rar chenmoHmeH lujpu' ({status})",
       "updateStatus": "rar choHmeH lujpu' ({status})"
+    },
+    "rateLimit": {
+      "notReported": "ja'be'",
+      "remaining": "{limit} vo' {remaining}",
+      "exhausted": "Natlhlu'pu'",
+      "observedAt": "{time} Daq"
     }
   },
   "adminVariableSets": {
@@ -2956,16 +2963,5 @@
     "restoreConfirm": "«{name}» Dotlh DacheghmoH''a''?\n\nQumwo' CHU' chenlu' — Qumwo' Qaw'lu'ta'bogh cheghbe'. chegh 'ach auto-apply drift je chu'Ha'lu', VCS Hutlh; mI'mey qunmeyDaj je cheghbe'. Dotlh neH cheghlu'.",
     "restoreDone": "{versions, plural, one {# Dotlh mI''} other {# Dotlh mI'mey}} Qumwo' chu' «{name}» chegh. auto-apply VCS joq Dachu'pa' DuHmey yIlegh.",
     "restoreAgainConfirm": "\"{name}\" chochoHta''bogh {existing} Daq.\n\nlatlh chochoH ''e'' chenmoHlu''chugh, cha''DIch workspace chenlu'', rap state tlhegh, rap infrastructure Daq. wa'' Daq apply Dalo''chugh, latlh nab veb Dalegh ''ej Hoch drift rur.\n\nvaj taH neH wej workspace chochoHta''bogh Hegh''a''."
-  },
-  "vcsConnections": {
-    "table": {
-      "rateLimit": "tlhoy' mI'"
-    },
-    "rateLimit": {
-      "notReported": "ja'be'",
-      "remaining": "{limit} vo' {remaining}",
-      "exhausted": "Natlhlu'pu'",
-      "observedAt": "{time} Daq"
-    }
   }
 }

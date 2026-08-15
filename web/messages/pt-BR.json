@@ -760,7 +760,8 @@
       "serverUrl": "URL do Servidor",
       "status": "Status",
       "created": "Criada",
-      "actions": "Ações"
+      "actions": "Ações",
+      "rateLimit": "Limite de requisições"
     },
     "success": {
       "created": "Conexão VCS \"{name}\" criada",
@@ -773,6 +774,12 @@
       "delete": "Falha ao excluir a conexão",
       "createStatus": "Falha ao criar a conexão ({status})",
       "updateStatus": "Falha ao atualizar a conexão ({status})"
+    },
+    "rateLimit": {
+      "notReported": "Não informado",
+      "remaining": "{remaining} de {limit}",
+      "exhausted": "Esgotado",
+      "observedAt": "em {time}"
     }
   },
   "adminVariableSets": {
@@ -2956,16 +2963,5 @@
     "restoreConfirm": "Restaurar o estado de \"{name}\"?\n\nIsto cria um NOVO workspace — o original não volta. Ele volta sem auto-apply, sem detecção de drift e sem conexão VCS; variáveis e histórico de execuções não voltam. Apenas o estado é recuperado.",
     "restoreDone": "{versions, plural, one {# versão de estado recuperada} other {# versões de estado recuperadas}} no novo workspace \"{name}\". Confira as configurações antes de ativar auto-apply ou VCS.",
     "restoreAgainConfirm": "“{name}” já foi restaurado, para {existing}.\n\nRestaurar de novo cria um SEGUNDO workspace com a mesma linhagem de state sobre a mesma infraestrutura. Um apply em qualquer um deles fará o próximo plano do outro parecer um drift total.\n\nContinue apenas se o workspace restaurado antes não existir mais."
-  },
-  "vcsConnections": {
-    "table": {
-      "rateLimit": "Limite de requisições"
-    },
-    "rateLimit": {
-      "notReported": "Não informado",
-      "remaining": "{remaining} de {limit}",
-      "exhausted": "Esgotado",
-      "observedAt": "em {time}"
-    }
   }
 }

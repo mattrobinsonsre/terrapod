@@ -760,7 +760,8 @@
       "serverUrl": "Adres URL serwera",
       "status": "Status",
       "created": "Utworzono",
-      "actions": "Akcje"
+      "actions": "Akcje",
+      "rateLimit": "Limit żądań"
     },
     "success": {
       "created": "Utworzono połączenie VCS \"{name}\"",
@@ -773,6 +774,12 @@
       "delete": "Nie udało się usunąć połączenia",
       "createStatus": "Nie udało się utworzyć połączenia ({status})",
       "updateStatus": "Nie udało się zaktualizować połączenia ({status})"
+    },
+    "rateLimit": {
+      "notReported": "Nie zgłoszono",
+      "remaining": "{remaining} z {limit}",
+      "exhausted": "Wyczerpany",
+      "observedAt": "na {time}"
     }
   },
   "adminVariableSets": {
@@ -2956,16 +2963,5 @@
     "restoreConfirm": "Przywrócić stan „{name}”?\n\nZostanie utworzona NOWA przestrzeń robocza — oryginał nie wraca. Wraca z wyłączonym auto-apply i wykrywaniem dryfu oraz bez połączenia VCS; zmienne i historia uruchomień nie wracają. Odzyskiwany jest tylko stan.",
     "restoreDone": "Odzyskano {versions, plural, one {# wersję stanu} few {# wersje stanu} many {# wersji stanu} other {# wersji stanu}} do nowej przestrzeni roboczej „{name}”. Sprawdź ustawienia przed włączeniem auto-apply lub VCS.",
     "restoreAgainConfirm": "„{name}” został już przywrócony, do {existing}.\n\nPonowne przywrócenie tworzy DRUGI workspace z tą samą linią stanu nad tą samą infrastrukturą. Apply w którymkolwiek z nich sprawi wtedy, że kolejny plan drugiego będzie wyglądał jak całkowity drift.\n\nKontynuuj tylko, jeśli wcześniej przywrócony workspace już nie istnieje."
-  },
-  "vcsConnections": {
-    "table": {
-      "rateLimit": "Limit żądań"
-    },
-    "rateLimit": {
-      "notReported": "Nie zgłoszono",
-      "remaining": "{remaining} z {limit}",
-      "exhausted": "Wyczerpany",
-      "observedAt": "na {time}"
-    }
   }
 }
