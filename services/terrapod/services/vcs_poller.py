@@ -1068,6 +1068,15 @@ async def _poll_workspace(
 
     owner, repo = parsed
 
+    # Name what this poll is working on, so the spend lands against a repo and
+    # workspace rather than only against "workspace-poll" (#1339). During an
+    # incident the useful question is which repo to fix, and one misconfigured
+    # workspace is invisible in a per-subsystem total.
+    with vcs_rate_limit.vcs_target(repo=f"{owner}/{repo}", consumer=ws.name):
+        await _poll_workspace_repo(db, ws, conn, owner, repo, cache, meta, paths_unions)
+
+
+async def _poll_workspace_repo(db, ws, conn, owner, repo, cache, meta, paths_unions) -> None:
     try:
         branch = await _resolve_branch(conn, ws, owner, repo, meta)
     except Exception as e:
