@@ -16,7 +16,7 @@
  * surfaces with API-seeded runs.
  */
 import { test, expect, type Route } from '@playwright/test';
-import { getStoredToken, createWorkspace, uniqueName } from '../helpers/api';
+import { getStoredToken, createWorkspace, seedRun, uniqueName } from '../helpers/api';
 
 test.describe('Run lifecycle UI', () => {
   test('workspace runs tab renders empty state cleanly', async ({ page }) => {
@@ -112,7 +112,9 @@ test.describe('Run lifecycle UI', () => {
       await route.fulfill({ response: res, json });
     });
 
-    const runId = await seedDriftShapedRun(token, wsId);
+    // Plain plan-only run (config version and all) — the route mock above is
+    // what makes it read as a drift run.
+    const runId = await seedRun(token, wsId);
     await page.goto(`/workspaces/${wsId}/runs/${runId}`);
 
     await expect(page.getByRole('button', { name: 'Plan + apply', exact: true })).toBeVisible({
@@ -120,21 +122,3 @@ test.describe('Run lifecycle UI', () => {
     });
   });
 });
-
-/** A plan-only run whose payload the test then reshapes into a drift run. */
-async function seedDriftShapedRun(token: string, workspaceId: string): Promise<string> {
-  const API_URL = process.env.API_URL || 'http://localhost:8000';
-  const res = await fetch(`${API_URL}/api/v2/runs`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/vnd.api+json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({
-      data: {
-        type: 'runs',
-        attributes: { 'plan-only': true },
-        relationships: { workspace: { data: { type: 'workspaces', id: workspaceId } } },
-      },
-    }),
-  });
-  if (!res.ok) throw new Error(`seed run failed: ${res.status} ${await res.text()}`);
-  return (await res.json()).data.id as string;
-}
