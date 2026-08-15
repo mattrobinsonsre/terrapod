@@ -8,8 +8,9 @@
     "start": "next start --port 3000",
     "lint": "eslint src/ --max-warnings 0",
     "type-check": "tsc --noEmit",
-    "i18n:check": "node scripts/check-i18n-completeness.mjs",
-    "i18n:lint": "node scripts/check-no-hardcoded-strings.mjs"
+    "i18n:check": "node scripts/check-i18n-completeness.mjs && node scripts/check-i18n-keys-resolve.mjs",
+    "i18n:lint": "node scripts/check-no-hardcoded-strings.mjs",
+    "i18n:resolve": "node scripts/check-i18n-keys-resolve.mjs"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.20",
