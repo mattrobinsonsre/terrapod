@@ -8,6 +8,7 @@ import { PageHeader } from '@/components/page-header'
 import { LoadingSpinner } from '@/components/loading-spinner'
 import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
+import { RateLimitIndicator } from '@/components/rate-limit-indicator'
 import { SortableHeader } from '@/components/sortable-header'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { useConfirm } from '@/lib/use-confirm'
@@ -28,6 +29,9 @@ interface VCSConnection {
     'github-account-login': string | null
     'has-token': boolean
     'has-webhook-secret'?: boolean
+    'rate-limit'?: number | null
+    'rate-limit-remaining'?: number | null
+    'rate-limit-observed-at'?: string | null
     'created-at': string
   }
 }
@@ -344,6 +348,7 @@ export default function VCSConnectionsPage() {
                   <SortableHeader label={t('table.provider')} sortKey="provider" sortState={sortState} onSort={toggleSort} />
                   <SortableHeader label={t('table.serverUrl')} sortKey="server-url" sortState={sortState} onSort={toggleSort} className="hidden sm:table-cell" />
                   <SortableHeader label={t('table.status')} sortKey="status" sortState={sortState} onSort={toggleSort} className="hidden md:table-cell" />
+                  <th className="px-4 py-3 text-start text-xs font-medium text-slate-400 uppercase tracking-wider hidden sm:table-cell">{t('table.rateLimit')}</th>
                   <SortableHeader label={t('table.created')} sortKey="created" sortState={sortState} onSort={toggleSort} className="hidden lg:table-cell" />
                   <th className="px-4 py-3 text-end text-xs font-medium text-slate-400 uppercase tracking-wider">{t('table.actions')}</th>
                 </tr>
@@ -360,6 +365,12 @@ export default function VCSConnectionsPage() {
                           {conn.attributes.status}
                         </span>
                       </div>
+                      <RateLimitIndicator
+                        className="sm:hidden mt-1"
+                        limit={conn.attributes['rate-limit']}
+                        remaining={conn.attributes['rate-limit-remaining']}
+                        observedAt={conn.attributes['rate-limit-observed-at']}
+                      />
                     </td>
                     <td className="px-4 py-3">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${providerBadge(conn.attributes.provider)}`}>
@@ -373,6 +384,13 @@ export default function VCSConnectionsPage() {
                       <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusBadge(conn.attributes.status)}`}>
                         {conn.attributes.status}
                       </span>
+                    </td>
+                    <td className="px-4 py-3 hidden sm:table-cell">
+                      <RateLimitIndicator
+                        limit={conn.attributes['rate-limit']}
+                        remaining={conn.attributes['rate-limit-remaining']}
+                        observedAt={conn.attributes['rate-limit-observed-at']}
+                      />
                     </td>
                     <td className="px-4 py-3 text-xs text-slate-500 hidden lg:table-cell">
                       {fmt.date(conn.attributes['created-at'])}

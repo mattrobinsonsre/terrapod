@@ -165,6 +165,58 @@ VCS_WEBHOOK_RECEIVED = Counter(
     ["provider"],
 )
 
+VCS_API_REQUESTS = Counter(
+    "terrapod_vcs_api_requests_total",
+    (
+        "Provider API calls made, by what spent them (#1334). The budget "
+        "gauges below say whether you are about to fall over; this says who "
+        "is responsible, which is the harder question during an incident. A "
+        "single subsystem climbing away from the others is the shape to look "
+        "for — quota exhaustion has repeatedly turned out to be one pass "
+        "re-asking something it had already been told. `source=unknown` "
+        "means a call path was added without attributing it, and should be "
+        "treated as a defect rather than a category."
+    ),
+    ["provider", "source", "outcome"],
+)
+
+VCS_RATE_LIMIT_LIMIT = Gauge(
+    "terrapod_vcs_rate_limit",
+    (
+        "Total request budget the provider reports for a connection, per "
+        "metered resource (#1334). Read from response headers on calls "
+        "Terrapod was making anyway, so it costs no quota of its own and is "
+        "absent — rather than zero — for a server that does not report it."
+    ),
+    ["provider", "connection", "resource"],
+)
+
+VCS_RATE_LIMIT_REMAINING = Gauge(
+    "terrapod_vcs_rate_limit_remaining",
+    (
+        "Requests left in the current window for a connection (#1334). This "
+        "is the one to alert on: when it reaches zero the provider refuses "
+        "everything, and runs stop appearing across every workspace on that "
+        "connection — including workspaces with no relation to whatever "
+        "spent the budget. Alert on the ratio to `terrapod_vcs_rate_limit` "
+        "rather than an absolute, since budgets differ per provider and "
+        "account. Note this is an observation as of the last call, not a "
+        "live reading, so it goes stale when polling is idle."
+    ),
+    ["provider", "connection", "resource"],
+)
+
+VCS_RATE_LIMIT_RESET_SECONDS = Gauge(
+    "terrapod_vcs_rate_limit_reset_seconds",
+    (
+        "Seconds until the connection's budget refills (#1334). Pair with "
+        "`_remaining` to tell a brief spike apart from sustained "
+        "exhaustion: remaining at zero with a long way to reset means the "
+        "estate is stalled until then."
+    ),
+    ["provider", "connection", "resource"],
+)
+
 # ---------------------------------------------------------------------------
 # Storage metrics
 # ---------------------------------------------------------------------------

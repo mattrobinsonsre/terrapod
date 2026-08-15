@@ -2956,5 +2956,16 @@
     "restoreConfirm": "Obnovit stav „{name}“?\n\nVytvoří se NOVÝ pracovní prostor — původní se nevrátí. Vrátí se s vypnutým auto-apply i detekcí driftu a bez připojení VCS; proměnné ani historie běhů se nevrátí. Obnoví se pouze stav.",
     "restoreDone": "Obnoveno {versions, plural, one {# verze stavu} few {# verze stavu} many {# verze stavu} other {# verzí stavu}} do nového pracovního prostoru „{name}“. Před zapnutím auto-apply nebo VCS zkontrolujte nastavení.",
     "restoreAgainConfirm": "„{name}“ už byl obnoven, do {existing}.\n\nDalší obnovení vytvoří DRUHÝ workspace se stejnou linií stavu nad stejnou infrastrukturou. Apply v kterémkoli z nich pak způsobí, že další plán toho druhého bude vypadat jako rozsáhlý drift.\n\nPokračujte jen tehdy, pokud dříve obnovený workspace už neexistuje."
+  },
+  "vcsConnections": {
+    "table": {
+      "rateLimit": "Limit požadavků"
+    },
+    "rateLimit": {
+      "notReported": "Nehlášeno",
+      "remaining": "{remaining} z {limit}",
+      "exhausted": "Vyčerpáno",
+      "observedAt": "k {time}"
+    }
   }
 }

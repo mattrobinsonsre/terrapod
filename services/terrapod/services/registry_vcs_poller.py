@@ -16,7 +16,7 @@ from sqlalchemy.orm import selectinload
 from terrapod.db.models import RegistryModule, RegistryModuleVersion
 from terrapod.db.session import get_db_session
 from terrapod.logging_config import get_logger
-from terrapod.services import github_service, gitlab_service
+from terrapod.services import github_service, gitlab_service, vcs_rate_limit
 from terrapod.services.archive_utils import strip_archive_top_level_dir_async
 from terrapod.storage import get_storage
 from terrapod.storage.keys import module_tarball_key
@@ -108,6 +108,7 @@ async def handle_registry_vcs_immediate_poll(payload: dict) -> None:
     await registry_vcs_poll_cycle()
 
 
+@vcs_rate_limit.attributed("registry-tags")
 async def registry_vcs_poll_cycle() -> None:
     """Poll VCS providers for new tags and auto-publish module versions."""
     async with get_db_session() as db:

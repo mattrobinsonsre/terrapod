@@ -16,6 +16,7 @@ import jwt
 from terrapod.config import settings
 from terrapod.db.models import VCSConnection
 from terrapod.logging_config import get_logger
+from terrapod.services import vcs_rate_limit
 from terrapod.services.vcs_provider import (
     MergeabilityStatus,
     PRComment,
@@ -123,6 +124,7 @@ async def _github_request(
     url: str,
     token: str,
     *,
+    conn: VCSConnection,
     follow_redirects: bool = False,
     retry_5xx: bool = False,
     **kwargs: object,
@@ -173,6 +175,7 @@ async def _github_request(
                 await asyncio.sleep(_DEFAULT_BACKOFF_SECONDS)
                 continue
 
+            await vcs_rate_limit.record(conn, resp.headers, outcome=str(resp.status_code))
             if not _should_retry(resp, method, retry_5xx):
                 return resp
             if attempt >= _MAX_RETRIES:
@@ -256,6 +259,7 @@ async def get_installation_token(conn: VCSConnection) -> str:
         f"{api_url}/app/installations/{installation_id}/access_tokens",
         app_jwt,
         retry_5xx=True,
+        conn=conn,
     )
     resp.raise_for_status()
     data = resp.json()
@@ -301,7 +305,9 @@ async def get_repo_branch_sha(
     token = await get_installation_token(conn)
     api_url = _api_url(conn)
 
-    resp = await _github_request("GET", f"{api_url}/repos/{owner}/{repo}/branches/{branch}", token)
+    resp = await _github_request(
+        "GET", f"{api_url}/repos/{owner}/{repo}/branches/{branch}", token, conn=conn
+    )
     if resp.status_code == 404:
         return None
     resp.raise_for_status()
@@ -316,7 +322,7 @@ async def get_repo_default_branch(conn: VCSConnection, owner: str, repo: str) ->
     token = await get_installation_token(conn)
     api_url = _api_url(conn)
 
-    resp = await _github_request("GET", f"{api_url}/repos/{owner}/{repo}", token)
+    resp = await _github_request("GET", f"{api_url}/repos/{owner}/{repo}", token, conn=conn)
     if resp.status_code == 404:
         return None
     resp.raise_for_status()
@@ -341,6 +347,7 @@ async def download_repo_archive(conn: VCSConnection, owner: str, repo: str, ref:
         f"{api_url}/repos/{owner}/{repo}/tarball/{ref}",
         token,
         follow_redirects=True,
+        conn=conn,
     )
     resp.raise_for_status()
     return resp.content
@@ -414,6 +421,7 @@ async def list_open_pull_requests(
             "direction": "desc",
             "per_page": 100,
         },
+        conn=conn,
     )
     resp.raise_for_status()
 
@@ -441,6 +449,7 @@ async def list_repo_branches(conn: VCSConnection, owner: str, repo: str) -> list
         f"{api_url}/repos/{owner}/{repo}/branches",
         token,
         params={"per_page": 100},
+        conn=conn,
     )
     resp.raise_for_status()
 
@@ -460,6 +469,7 @@ async def list_repo_tags(conn: VCSConnection, owner: str, repo: str) -> list[dic
         f"{api_url}/repos/{owner}/{repo}/tags",
         token,
         params={"per_page": 100},
+        conn=conn,
     )
     resp.raise_for_status()
 
@@ -482,6 +492,7 @@ async def get_changed_files(
         "GET",
         f"{api_url}/repos/{owner}/{repo}/compare/{base_sha}...{head_sha}",
         token,
+        conn=conn,
     )
     resp.raise_for_status()
 
@@ -514,6 +525,7 @@ async def get_pr_file_changes(
         "GET",
         f"{api_url}/repos/{owner}/{repo}/compare/{base_sha}...{head_sha}",
         token,
+        conn=conn,
     )
     resp.raise_for_status()
     files = resp.json().get("files", [])
@@ -556,6 +568,7 @@ async def list_repo_tree(conn: VCSConnection, owner: str, repo: str, ref: str) -
         "GET",
         f"{api_url}/repos/{owner}/{repo}/git/trees/{ref}?recursive=1",
         token,
+        conn=conn,
     )
     resp.raise_for_status()
 
@@ -608,6 +621,7 @@ async def create_commit_status(
         token,
         json=body,
         retry_5xx=True,
+        conn=conn,
     )
     resp.raise_for_status()
 
@@ -632,6 +646,7 @@ async def create_pr_comment(
         f"{api_url}/repos/{owner}/{repo}/issues/{pr_number}/comments",
         token,
         json={"body": body},
+        conn=conn,
     )
     resp.raise_for_status()
     return resp.json()["id"]
@@ -649,6 +664,7 @@ async def update_pr_comment(
         f"{api_url}/repos/{owner}/{repo}/issues/comments/{comment_id}",
         token,
         json={"body": body},
+        conn=conn,
     )
     resp.raise_for_status()
 
@@ -665,6 +681,7 @@ async def list_pr_comments(
         f"{api_url}/repos/{owner}/{repo}/issues/{pr_number}/comments",
         token,
         params={"per_page": 100},
+        conn=conn,
     )
     resp.raise_for_status()
     return resp.json()
@@ -688,7 +705,9 @@ async def get_pull_request(
     """Fetch a single PR's current state."""
     token = await get_installation_token(conn)
     api_url = _api_url(conn)
-    resp = await _github_request("GET", f"{api_url}/repos/{owner}/{repo}/pulls/{pr_number}", token)
+    resp = await _github_request(
+        "GET", f"{api_url}/repos/{owner}/{repo}/pulls/{pr_number}", token, conn=conn
+    )
     if resp.status_code == 404:
         return None
     resp.raise_for_status()
@@ -717,7 +736,9 @@ async def get_pull_request_mergeability(
     """
     token = await get_installation_token(conn)
     api_url = _api_url(conn)
-    resp = await _github_request("GET", f"{api_url}/repos/{owner}/{repo}/pulls/{pr_number}", token)
+    resp = await _github_request(
+        "GET", f"{api_url}/repos/{owner}/{repo}/pulls/{pr_number}", token, conn=conn
+    )
     resp.raise_for_status()
     pr = resp.json()
     if pr.get("draft", False):
@@ -797,6 +818,7 @@ async def merge_pull_request(
         f"{api_url}/repos/{owner}/{repo}/pulls/{pr_number}/merge",
         token,
         json=payload,
+        conn=conn,
     )
     if resp.status_code == 200:
         body = resp.json()
@@ -836,6 +858,7 @@ async def list_pr_comments_typed(
         f"{api_url}/repos/{owner}/{repo}/issues/{pr_number}/comments",
         token,
         params=params,
+        conn=conn,
     )
     resp.raise_for_status()
     out: list[PRComment] = []
@@ -865,6 +888,7 @@ async def list_pr_reviews(
         f"{api_url}/repos/{owner}/{repo}/pulls/{pr_number}/reviews",
         token,
         params={"per_page": 100},
+        conn=conn,
     )
     resp.raise_for_status()
     out: list[PRReview] = []

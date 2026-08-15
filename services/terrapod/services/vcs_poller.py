@@ -47,6 +47,7 @@ from terrapod.services import (
     github_service,
     gitlab_service,
     run_service,
+    vcs_rate_limit,
 )
 from terrapod.services.scheduler import enqueue_trigger
 from terrapod.services.vcs_archive_cache import VCSArchiveCache, materialize_archive
@@ -1130,6 +1131,7 @@ async def _poll_workspace(
 _MAX_PARALLEL_WORKSPACE_POLLS = 10
 
 
+@vcs_rate_limit.attributed("workspace-poll")
 async def _poll_workspace_owned(
     ws_id: uuid.UUID,
     semaphore: asyncio.Semaphore,
@@ -1770,7 +1772,8 @@ async def poll_cycle() -> None:
     # picked up by the workspace scan below (or, if their query
     # snapshot already ran, by the next cycle).
     try:
-        await _poll_autodiscovery(meta=meta)
+        with vcs_rate_limit.vcs_source("autodiscovery"):
+            await _poll_autodiscovery(meta=meta)
     except Exception:
         logger.warning("Autodiscovery pass failed", exc_info=True)
 
@@ -1838,7 +1841,10 @@ async def handle_immediate_poll(payload: dict) -> None:
     if repo and "/" in repo:
         owner, repo_name = repo.split("/", 1)
         try:
-            await _poll_autodiscovery(meta=meta, owner_repo=(owner, repo_name), provider=provider)
+            with vcs_rate_limit.vcs_source("autodiscovery"):
+                await _poll_autodiscovery(
+                    meta=meta, owner_repo=(owner, repo_name), provider=provider
+                )
         except Exception:
             logger.warning(
                 "Autodiscovery: webhook-triggered scan failed",

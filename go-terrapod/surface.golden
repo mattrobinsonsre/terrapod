@@ -877,6 +877,11 @@ field VCSConnection.HasWebhookSecret bool `json:"has-webhook-secret"`
 field VCSConnection.ID string `json:"id"`
 field VCSConnection.Name string `json:"name"`
 field VCSConnection.Provider string `json:"provider"`
+field VCSConnection.RateLimit *int64 `json:"rate-limit,omitempty"`
+field VCSConnection.RateLimitObservedAt string `json:"rate-limit-observed-at,omitempty"`
+field VCSConnection.RateLimitRemaining *int64 `json:"rate-limit-remaining,omitempty"`
+field VCSConnection.RateLimitResetAt string `json:"rate-limit-reset-at,omitempty"`
+field VCSConnection.RateLimitResource string `json:"rate-limit-resource,omitempty"`
 field VCSConnection.ServerURL string `json:"server-url,omitempty"`
 field VCSConnection.Status string `json:"status,omitempty"`
 field VCSConnection.UpdatedAt string `json:"updated-at,omitempty"`

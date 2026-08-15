@@ -2956,5 +2956,16 @@
     "restoreConfirm": "Restaurar o estado de \"{name}\"?\n\nIsto cria um NOVO workspace — o original não regressa. Regressa sem auto-apply, sem deteção de drift e sem ligação VCS; as variáveis e o histórico de execuções não regressam. Apenas o estado é recuperado.",
     "restoreDone": "{versions, plural, one {# versão de estado recuperada} other {# versões de estado recuperadas}} no novo workspace \"{name}\". Verifique as definições antes de ativar auto-apply ou VCS.",
     "restoreAgainConfirm": "“{name}” já foi restaurado, para {existing}.\n\nRestaurar novamente cria um SEGUNDO workspace com a mesma linhagem de state sobre a mesma infraestrutura. Um apply em qualquer um deles fará o próximo plano do outro parecer um drift total.\n\nContinue apenas se o workspace restaurado anteriormente já não existir."
+  },
+  "vcsConnections": {
+    "table": {
+      "rateLimit": "Limite de pedidos"
+    },
+    "rateLimit": {
+      "notReported": "Não comunicado",
+      "remaining": "{remaining} de {limit}",
+      "exhausted": "Esgotado",
+      "observedAt": "em {time}"
+    }
   }
 }

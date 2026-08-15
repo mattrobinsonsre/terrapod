@@ -2956,5 +2956,16 @@
     "restoreConfirm": "Restoar da state ov \"{name}\"?\n\nDis makez a NEW werkspace — da orijinal duz not come bak. It cumz bak wif auto-apply an drift detekshun offs an no VCS, an itz variablez an run histry duz not come bak. Only da state getz savd.",
     "restoreDone": "Savd {versions, plural, one {# state verzhun} other {# state verzhunz}} intoo da new werkspace \"{name}\". Chek itz settingz b4 u turn on auto-apply or VCS. kthxbai",
     "restoreAgainConfirm": "\"{name}\" haz alreddy been restord, into {existing}.\n\nRestorin it agin makez a SEKOND wurkspace holdin teh same state lineage ovar teh same infrastrukchur. Applyin in eithr will den makez teh othr''s next plan look liek wholesale drift. OH NOES.\n\nOnly continoo if teh earlier restord wurkspace iz gon."
+  },
+  "vcsConnections": {
+    "table": {
+      "rateLimit": "Ratez Limitz"
+    },
+    "rateLimit": {
+      "notReported": "Nope, no sayz",
+      "remaining": "{remaining} of {limit}",
+      "exhausted": "All gawn!",
+      "observedAt": "as of {time}"
+    }
   }
 }
