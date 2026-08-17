@@ -43,7 +43,7 @@ LABEL org.opencontainers.image.source=https://github.com/mattrobinsonsre/terrapo
 # builds and is deliberately NOT what keeps CI current — a hand-bumped constant
 # works only until someone forgets, which is how five already-patched libexpat
 # CVEs stayed in the images for 18 days (#1177).
-ARG PKG_REFRESH=2026-07-13
+ARG PKG_REFRESH=2026-08-17
 # The listener installs NO extra packages — it is Python talking to the K8s API
 # and the Terrapod API, and nothing else. The upgrade still runs, because that
 # is what picks up base-image security patches.
@@ -63,6 +63,22 @@ WORKDIR /app
 RUN pip uninstall -y setuptools
 COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
+
+# Drop pip from the runtime image. Nothing here uses it: packages arrive via the
+# builder's site-packages above, the platform tools (opa/trivy/checkov) are
+# fetched as self-contained bundles and executed directly (#1208), and no code
+# path shells out to pip or builds a venv.
+#
+# It also removes `pip/_vendor`, whose PINNED bundle is what image scanners
+# actually report — msgpack 1.1.2 (GHSA-6v7p-g79w-8964) and setuptools 70.3.0
+# (CVE-2025-47273). Neither is fixable by upgrading: pip 26.2.1 is the current
+# release and vendors exactly those versions, so there is no newer pip to take.
+# Removing the unused component beats accepting the risk.
+#
+# stdlib `ensurepip` is untouched, so pip can be restored in a debug shell.
+RUN rm -rf /usr/local/lib/python3.13/site-packages/pip \
+           /usr/local/lib/python3.13/site-packages/pip-*.dist-info \
+           /usr/local/bin/pip /usr/local/bin/pip3 /usr/local/bin/pip3.13
 
 # Only the modules the listener imports: config, logging_config, http_retry, runner/
 COPY services/terrapod/config.py ./terrapod/config.py
