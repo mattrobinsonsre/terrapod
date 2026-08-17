@@ -12,12 +12,14 @@ Endpoints:
 import asyncio
 import json
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Path, Request, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sse_starlette.sse import EventSourceResponse
 
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user
+from terrapod.api.errors import vcs_unavailable
 from terrapod.auth import capabilities as cap
 from terrapod.auth.capabilities import has_capability
 from terrapod.db.session import get_db
@@ -115,9 +117,15 @@ async def list_vcs_refs(
         raise HTTPException(status_code=422, detail="Cannot parse VCS repo URL")
     owner, repo = parsed
 
-    branches = await _list_branches(conn, owner, repo)
-    tags = await _list_tags(conn, owner, repo)
-    default_branch = await _resolve_branch(conn, ws, owner, repo) or ""
+    # This backs the ref picker in the run dialog, so a provider outage is felt
+    # here before the operator has even pressed anything. Naming the provider
+    # beats a 500 that reads as Terrapod being broken.
+    try:
+        branches = await _list_branches(conn, owner, repo)
+        tags = await _list_tags(conn, owner, repo)
+        default_branch = await _resolve_branch(conn, ws, owner, repo) or ""
+    except httpx.HTTPError as e:
+        raise vcs_unavailable(conn, f"{owner}/{repo}", "", e) from e
 
     return JSONResponse(
         content={

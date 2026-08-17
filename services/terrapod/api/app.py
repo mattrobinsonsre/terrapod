@@ -9,6 +9,7 @@ import uuid
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
+import httpx
 import structlog
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -820,6 +821,50 @@ def create_application() -> FastAPI:
             error=str(getattr(exc, "orig", exc)),
         )
         return jsonapi_error_response("Resource already exists or violates a constraint", 409)
+
+    @app.exception_handler(httpx.HTTPError)
+    async def upstream_error_handler(request: Request, exc: httpx.HTTPError) -> JSONResponse:
+        """An upstream provider failed, so say which one and how.
+
+        Reaching the catch-all below turned every VCS outage into a bare
+        "Internal server error" — during a GitHub incident, queueing a run
+        returned 500 with nothing to distinguish "GitHub is broken" from "you
+        misconfigured this workspace" or "Terrapod has a bug". 502 rather than
+        500 is the honest answer: the request was fine and we are the gateway.
+
+        This is the backstop, not the explanation. A handler that knows what it
+        was doing should catch the failure itself and say so in the caller's
+        terms; this exists so that the ones which don't cannot present someone
+        else's outage as ours.
+        """
+        status = 502
+        upstream = ""
+        request_url = getattr(exc, "request", None)
+        if request_url is not None:
+            # Host and path only. A redirected archive download can carry a
+            # credential in the query string, and this string is returned to
+            # the caller and written to the log.
+            url = request_url.url
+            upstream = f"{url.host}{url.path}"
+        if isinstance(exc, httpx.TimeoutException):
+            status = 504
+            detail = f"Upstream service timed out ({upstream or 'unknown host'})"
+        elif isinstance(exc, httpx.HTTPStatusError):
+            detail = (
+                f"Upstream service returned HTTP {exc.response.status_code} "
+                f"({upstream or 'unknown host'})"
+            )
+        else:
+            detail = f"Could not reach upstream service ({upstream or 'unknown host'})"
+
+        logger.warning(
+            "Upstream provider error",
+            path=str(request.url.path),
+            upstream=upstream,
+            status=status,
+            error=str(exc),
+        )
+        return jsonapi_error_response(detail, status)
 
     # Global exception handler
     @app.exception_handler(Exception)

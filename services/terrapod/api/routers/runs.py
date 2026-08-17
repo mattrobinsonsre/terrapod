@@ -31,6 +31,7 @@ import uuid
 from datetime import UTC
 from typing import Literal
 
+import httpx
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query, Request, Response, status
 from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy import select
@@ -44,6 +45,7 @@ from terrapod.api.dependencies import (
     get_current_user,
     get_listener_identity,
 )
+from terrapod.api.errors import vcs_unavailable
 from terrapod.api.pagination import build_meta
 from terrapod.auth import capabilities as cap
 from terrapod.auth.capabilities import has_capability
@@ -396,10 +398,18 @@ async def _fetch_vcs_config(
                 # Treat as raw SHA — providers accept any git ref
                 sha = ref_override
     else:
-        ref_name = await _resolve_branch(conn, ws, owner, repo) or ""
-        if not ref_name:
-            raise HTTPException(status_code=422, detail="Cannot determine VCS branch")
-        sha = await _get_branch_sha(conn, owner, repo, ref_name, meta=None)
+        # The provider is reached here, so a provider outage lands here too.
+        # These calls RAISE on an error status rather than returning None, so
+        # the `if not sha` guard below never sees one — before this was caught,
+        # a GitHub incident returning 403 propagated to the catch-all handler
+        # and the operator got a bare 500 for someone else's outage.
+        try:
+            ref_name = await _resolve_branch(conn, ws, owner, repo) or ""
+            if not ref_name:
+                raise HTTPException(status_code=422, detail="Cannot determine VCS branch")
+            sha = await _get_branch_sha(conn, owner, repo, ref_name, meta=None)
+        except httpx.HTTPError as e:
+            raise vcs_unavailable(conn, f"{owner}/{repo}", ref_name or ws.vcs_branch, e) from e
         if not sha:
             raise HTTPException(status_code=422, detail="Cannot get branch HEAD SHA")
 
