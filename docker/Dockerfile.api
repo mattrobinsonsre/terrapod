@@ -11,6 +11,16 @@
 ARG BASE_IMAGE=python:3.13-slim
 FROM ${BASE_IMAGE} AS builder
 
+# setuptools ships in the python base image and lags its own security fixes.
+# The runtime stage copies THIS stage's site-packages wholesale, so upgrading
+# here is what actually reaches the shipped image — upgrading in the runtime
+# stage would just be overwritten by that copy.
+#
+# Cleared CVE-2025-47273 (path traversal, fixed in 78.1.1), which failed every
+# image scan on both arches the day it started matching. Kept as a floor rather
+# than a pin so the next base image bump does not silently re-introduce it.
+RUN pip install --no-cache-dir --upgrade "setuptools>=78.1.1"
+
 # Install build + runtime dependencies
 # apt-get upgrade picks up security patches for base OS packages
 RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
@@ -64,7 +74,7 @@ LABEL org.opencontainers.image.source=https://github.com/mattrobinsonsre/terrapo
 # builds and is deliberately NOT what keeps CI current — a hand-bumped constant
 # works only until someone forgets, which is how five already-patched libexpat
 # CVEs stayed in the images for 18 days (#1177).
-ARG PKG_REFRESH=2026-07-13
+ARG PKG_REFRESH=2026-08-17
 RUN echo "pkg-refresh=${PKG_REFRESH}" \
     && apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
     git \
@@ -96,8 +106,31 @@ RUN chmod 0755 /usr/local/bin/terrapod-query && /usr/local/bin/terrapod-query --
 WORKDIR /app
 
 # Copy installed Python packages from builder
+# Remove the base image's own setuptools BEFORE copying the builder's.
+# `COPY` of a directory MERGES into the destination rather than replacing it, so
+# the base's stale `setuptools-<old>.dist-info` would survive alongside the
+# upgraded one — leaving vulnerable *metadata* on disk that scanners read, even
+# though `import setuptools` resolves to the new version. Checking the imported
+# version is therefore not enough to prove this fixed (CVE-2025-47273).
+RUN pip uninstall -y setuptools
 COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
+
+# Drop pip from the runtime image. Nothing here uses it: packages arrive via the
+# builder's site-packages above, the platform tools (opa/trivy/checkov) are
+# fetched as self-contained bundles and executed directly (#1208), and no code
+# path shells out to pip or builds a venv.
+#
+# It also removes `pip/_vendor`, whose PINNED bundle is what image scanners
+# actually report — msgpack 1.1.2 (GHSA-6v7p-g79w-8964) and setuptools 70.3.0
+# (CVE-2025-47273). Neither is fixable by upgrading: pip 26.2.1 is the current
+# release and vendors exactly those versions, so there is no newer pip to take.
+# Removing the unused component beats accepting the risk.
+#
+# stdlib `ensurepip` is untouched, so pip can be restored in a debug shell.
+RUN rm -rf /usr/local/lib/python3.13/site-packages/pip \
+           /usr/local/lib/python3.13/site-packages/pip-*.dist-info \
+           /usr/local/bin/pip /usr/local/bin/pip3 /usr/local/bin/pip3.13
 
 # Copy application code
 COPY services/terrapod ./terrapod
