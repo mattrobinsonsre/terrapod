@@ -72,6 +72,7 @@ function CliCompleteInner() {
   }, [status, code, fetchFailed])
 
   const handleManualRedirect = useCallback(() => {
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- localhostUrl is EXTERNAL (the terraform CLI's local callback listener), not an internal route.
     window.location.href = localhostUrl
   }, [localhostUrl])
 

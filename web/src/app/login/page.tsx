@@ -146,6 +146,7 @@ function LoginContent() {
     // CLI login flow: redirect to the CLI SSO endpoint which carries
     // over the pending auth state from /oauth/authorize
     if (cliState) {
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- not an internal page: this API route 302s to the external SSO provider, so it needs a real browser navigation. router.push() would try to client-route to an API path.
       window.location.href = `/api/terrapod/v1/auth/cli-sso-redirect?provider=${encodeURIComponent(providerName)}&cli_state=${encodeURIComponent(cliState)}`
       return
     }
@@ -169,6 +170,7 @@ function LoginContent() {
         response_type: 'code',
       })
 
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- as above: an API route that redirects to the IdP, not a Next.js page.
       window.location.href = `/api/terrapod/v1/auth/authorize?${params.toString()}`
     } catch (err) {
       setError(err instanceof Error ? err.message : t('errors.startLoginFailed'))
