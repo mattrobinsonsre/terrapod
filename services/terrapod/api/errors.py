@@ -73,50 +73,48 @@ def vcs_unavailable(conn: Any, repo: str, ref: str, exc: Exception) -> HTTPExcep
     A provider call raises rather than returning a falsy value, so a handler's
     own "could not determine X" guard never sees an outage — the exception sails
     past it into the catch-all and the caller gets a bare 500. That is the worst
-    possible message here, because it cannot be told apart from a Terrapod bug
-    or the operator's own misconfiguration. During a GitHub incident that
-    returned 403 on every call, an operator queueing a run saw only "Internal
-    server error".
+    possible message available, because it cannot be told apart from a Terrapod
+    bug or from the operator's own misconfiguration. During the GitHub incident
+    of 2026-08-17, an operator queueing a run saw only "Internal server error".
 
-    So name the provider, the repo, the ref and the upstream status, and say
-    plainly that nothing was created. A 404 is deliberately kept as a 422: a
-    missing repo or branch is the operator's configuration to fix, whereas any
-    other failure is the provider's and not theirs.
+    The diagnosis is delegated to `describe_vcs_error`, which the poller already
+    uses for the workspace's `vcs_last_error` and its health banner. Two reasons
+    that matters more than saving a few lines: the operator reads the SAME
+    sentence in the banner and in the failed request rather than two
+    descriptions of one outage, and it already separates a **rate-limit 403**
+    (reading `x-ratelimit-remaining` / `retry-after`, so it can say how long
+    until the window resets) from a **provider simply returning 403** — which is
+    the distinction that decides whether the operator polls less or waits for
+    someone else's incident to end.
+
+    What is added here is the request's own context: which repo and ref, and
+    that nothing was created. A 404 is deliberately mapped to 422 — a missing
+    repo or branch is the operator's configuration to fix, and sending them to a
+    status page over their own typo would be worse than the 500 was.
     """
     import httpx
     from fastapi import HTTPException
 
+    from terrapod.services.vcs_poller import describe_vcs_error
+
     provider = (
-        str(getattr(conn, "provider", "") or "the VCS provider")
+        str(getattr(conn, "provider", "") or "")
         .replace("github", "GitHub")
         .replace("gitlab", "GitLab")
-    )
+    ) or "the VCS provider"
     where = f"{repo}@{ref}" if ref else repo
 
-    if isinstance(exc, httpx.HTTPStatusError):
-        code = exc.response.status_code
-        if code == 404:
-            return HTTPException(
-                status_code=422,
-                detail=(
-                    f"{provider} has no {where} — check the repository URL and branch, "
-                    f"and that the connection still has access to it."
-                ),
-            )
+    if isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code == 404:
         return HTTPException(
-            status_code=502,
+            status_code=422,
             detail=(
-                f"Could not read {where} from {provider} (HTTP {code}). Nothing was "
-                f"created. If {provider} is healthy, check this connection's saturation "
-                f"and its access to the repository."
+                f"{provider} has no {where} — check the repository URL and branch, and "
+                f"that the connection still has access to it."
             ),
         )
-    if isinstance(exc, httpx.TimeoutException):
-        return HTTPException(
-            status_code=504,
-            detail=f"{provider} timed out reading {where}. Nothing was created.",
-        )
+
+    status = 504 if isinstance(exc, httpx.TimeoutException) else 502
     return HTTPException(
-        status_code=502,
-        detail=f"Could not reach {provider} to read {where}. Nothing was created.",
+        status_code=status,
+        detail=f"Could not read {where} from {provider} — {describe_vcs_error(exc)}. Nothing was created.",
     )

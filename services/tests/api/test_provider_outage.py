@@ -137,6 +137,34 @@ class TestTheOperatorFacingMessage:
         assert exc.status_code == 422
         assert "no acme/infra@main" in exc.detail
 
+    def test_a_rate_limit_403_is_told_apart_from_an_outage_403(self):
+        """The distinction that decides what the operator does next.
+
+        GitHub uses 403 for a secondary rate limit AND for being broken. If we
+        exhausted the budget the answer is to poll less or split the connection;
+        if the provider is simply failing, the answer is to wait. Reusing the
+        poller's describer gets this for free — and keeps the sentence identical
+        to the one in the workspace's health banner.
+        """
+        request = httpx.Request("GET", "https://api.github.com/repos/o/r/branches/main")
+        limited = httpx.HTTPStatusError(
+            "403",
+            request=request,
+            response=httpx.Response(
+                403,
+                request=request,
+                headers={"x-ratelimit-remaining": "0", "retry-after": "812"},
+            ),
+        )
+        exc = vcs_unavailable(_conn(), "acme/infra", "main", limited)
+        assert "rate limit" in exc.detail
+        assert "812" in exc.detail, "the operator needs to know how long to wait"
+
+        # The same status with a healthy budget must NOT be blamed on the budget.
+        outage = vcs_unavailable(_conn(), "acme/infra", "main", _github_error(403))
+        assert "rate limit" not in outage.detail
+        assert "403" in outage.detail
+
     def test_gitlab_is_named_gitlab(self):
         exc = vcs_unavailable(_conn("gitlab"), "grp/proj", "main", _github_error(403))
         assert "GitLab" in exc.detail

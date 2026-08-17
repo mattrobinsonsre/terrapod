@@ -30,6 +30,8 @@ import { clearAuth, getAuthState, loginRedirectUrl, updateExpiresAt } from '@/li
  *   - Non-idempotent methods (POST, PATCH) are NOT retried: the browser can't tell whether
  *     a failed request was delivered, so a retry could double-write. They surface the error.
  *   - A 4xx is never retried (it's a client-side problem; retrying won't help).
+ *   - A 502/504 is never retried either: that is an upstream provider failure, and
+ *     retrying multiplies our load on the thing that is already down.
  *
  * The retry happens BEFORE the 401 handling: a transient network blip is retried, but a
  * genuine 401 response still clears auth and redirects.
@@ -42,6 +44,17 @@ const BACKOFF_BASE_MS = 300
 const BACKOFF_CAP_MS = 1200
 
 const IDEMPOTENT_METHODS = new Set(['GET', 'HEAD', 'OPTIONS', 'PUT', 'DELETE'])
+
+// 502/504 mean an UPSTREAM provider failed, not that Terrapod hiccuped — the API
+// returns them deliberately (see `vcs_unavailable`). Retrying is actively harmful
+// there: each attempt re-runs a handler that calls the provider (the ref picker
+// makes three calls per attempt), so a provider outage got its load tripled by
+// the very clients complaining about it, spending rate-limit budget precisely
+// when it is most precious. A provider outage also will not clear inside a
+// 1.2s backoff, so the retries only delay the message the operator needs.
+// Terrapod already retries genuinely transient provider failures server-side,
+// with backoff, closer to the call.
+const NON_RETRYABLE_STATUSES = new Set([502, 504])
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
@@ -61,7 +74,15 @@ export async function apiFetch(path: string, init?: RequestInit): Promise<Respon
     try {
       res = await fetch(path, { ...init, headers })
       // Idempotent methods retry transient 5xx; non-idempotent never do (may have applied).
-      if (idempotent && res.status >= 500 && res.status <= 599 && attempt < MAX_RETRIES) {
+      // An upstream-failure status is excluded: retrying it multiplies our load on
+      // the provider that is already down (see NON_RETRYABLE_STATUSES).
+      if (
+        idempotent &&
+        res.status >= 500 &&
+        res.status <= 599 &&
+        !NON_RETRYABLE_STATUSES.has(res.status) &&
+        attempt < MAX_RETRIES
+      ) {
         await sleep(Math.min(BACKOFF_BASE_MS * 2 ** attempt, BACKOFF_CAP_MS))
         continue
       }
