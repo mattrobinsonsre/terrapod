@@ -40,6 +40,7 @@ function SlackLinkInner() {
     if (!auth?.token) {
       // Send the user through Terrapod's own login, then back here to finish.
       const back = `/slack/link?state=${encodeURIComponent(state)}`
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- a login redirect is deliberately a full load: it matches apiFetch's 401 handler and guarantees a clean auth bootstrap rather than a client transition carrying stale state.
       window.location.href = `/login?redirect=${encodeURIComponent(back)}`
       return
     }
