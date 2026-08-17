@@ -72,10 +72,14 @@ class TestTheBackstopHandler:
     async def test_an_upstream_error_status_is_a_bad_gateway_not_a_server_error(self):
         res = await self._get(_github_error(403))
         assert res.status_code == 502
-        body = res.json()
-        assert "403" in body["detail"]
-        assert "api.github.com" in body["detail"]
-        assert "Internal server error" not in body["detail"]
+        # Exact equality rather than `"api.github.com" in detail`: a host
+        # substring test reads as incomplete URL sanitization to static analysis
+        # (py/incomplete-url-substring-sanitization), and pinning the whole
+        # sentence is the stronger assertion anyway — it catches the message
+        # silently losing the status or the host, which a substring would not.
+        assert res.json()["detail"] == (
+            "Upstream service returned HTTP 403 (api.github.com/repos/o/r/branches/main)"
+        )
 
     async def test_an_upstream_timeout_is_a_gateway_timeout(self):
         res = await self._get(
@@ -99,7 +103,11 @@ class TestTheBackstopHandler:
         res = await self._get(exc)
         assert "SECRETVALUE" not in res.text
         assert "token=" not in res.text
-        assert "codeload.github.com" in res.json()["detail"]
+        # Exact equality (see the note above): proves the query string was
+        # dropped AND that the host and path survived, in one assertion.
+        assert res.json()["detail"] == (
+            "Upstream service returned HTTP 403 (codeload.github.com/o/r/tar.gz/abc123)"
+        )
 
     async def test_a_genuine_bug_is_still_a_500(self):
         """The net must not swallow our own faults into a provider-shaped
