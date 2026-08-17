@@ -73,6 +73,13 @@ COPY docker/query-bin/terrapod-query /usr/local/bin/terrapod-query
 RUN chmod 0755 /usr/local/bin/terrapod-query && /usr/local/bin/terrapod-query --help >/dev/null
 
 # Python deps from builder
+# Remove the base image's own setuptools BEFORE copying the builder's.
+# `COPY` of a directory MERGES into the destination rather than replacing it, so
+# the base's stale `setuptools-<old>.dist-info` would survive alongside the
+# upgraded one — leaving vulnerable *metadata* on disk that scanners read, even
+# though `import setuptools` resolves to the new version. Checking the imported
+# version is therefore not enough to prove this fixed (CVE-2025-47273).
+RUN pip uninstall -y setuptools
 COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
