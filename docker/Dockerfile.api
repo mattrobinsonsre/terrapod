@@ -11,6 +11,16 @@
 ARG BASE_IMAGE=python:3.13-slim
 FROM ${BASE_IMAGE} AS builder
 
+# setuptools ships in the python base image and lags its own security fixes.
+# The runtime stage copies THIS stage's site-packages wholesale, so upgrading
+# here is what actually reaches the shipped image — upgrading in the runtime
+# stage would just be overwritten by that copy.
+#
+# Cleared CVE-2025-47273 (path traversal, fixed in 78.1.1), which failed every
+# image scan on both arches the day it started matching. Kept as a floor rather
+# than a pin so the next base image bump does not silently re-introduce it.
+RUN pip install --no-cache-dir --upgrade "setuptools>=78.1.1"
+
 # Install build + runtime dependencies
 # apt-get upgrade picks up security patches for base OS packages
 RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
