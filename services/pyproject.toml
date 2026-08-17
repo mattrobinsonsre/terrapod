@@ -20,6 +20,11 @@ fastapi = ">=0.135.2,!=0.136.3,<0.137.0"
 # tests/test_dependency_pins.py — keep the upper bound. Bump this line in
 # lock-step when intentionally taking a new starlette.
 starlette = ">=1.3.1,<1.4.0"
+# msgpack is a transitive (no lockfile is committed — the image build resolves
+# it), so a floor here is the only way to keep the fixed version. GHSA-6v7p-g79w-8964
+# (out-of-bounds read on Unpacker reuse) is HIGH and fixed in 1.2.1; it failed
+# every image scan. Floor, not a pin, so patches still flow.
+msgpack = ">=1.2.1"
 uvicorn = {extras = ["standard"], version = ">=0.42,<0.53"}
 pydantic = "^2.10.0"
 pydantic-settings = "^2.14.2"
