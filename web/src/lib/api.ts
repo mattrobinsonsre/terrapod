@@ -30,6 +30,9 @@ import { clearAuth, getAuthState, loginRedirectUrl, updateExpiresAt } from '@/li
  *   - Non-idempotent methods (POST, PATCH) are NOT retried: the browser can't tell whether
  *     a failed request was delivered, so a retry could double-write. They surface the error.
  *   - A 4xx is never retried (it's a client-side problem; retrying won't help).
+ *   - A 5xx the API marks as an upstream PROVIDER failure is not retried: retrying
+ *     multiplies our load on the thing that is already down. An unmarked 502 (the
+ *     BFF failing to reach the API) still retries — that one is genuinely transient.
  *
  * The retry happens BEFORE the 401 handling: a transient network blip is retried, but a
  * genuine 401 response still clears auth and redirects.
@@ -42,6 +45,28 @@ const BACKOFF_BASE_MS = 300
 const BACKOFF_CAP_MS = 1200
 
 const IDEMPOTENT_METHODS = new Set(['GET', 'HEAD', 'OPTIONS', 'PUT', 'DELETE'])
+
+// A 502 reaches the browser from TWO very different places, and they want
+// opposite handling:
+//
+//   - the BFF's own bare 502, when it briefly cannot reach the API. Transient,
+//     and precisely what this retry exists for.
+//   - a 502/504 the API returned because an upstream PROVIDER failed. Retrying
+//     that multiplies load on something already down — the ref picker makes
+//     three provider calls per attempt, so one open of the run dialog became
+//     nine calls against a failing provider, spending rate-limit budget exactly
+//     when it is scarcest — and a provider outage will not clear inside a 1.2s
+//     backoff, so the retries only delay the message the operator needs.
+//
+// The status cannot tell them apart, so the API marks its own: only a response
+// carrying this header skips the retry. Learned the hard way — suppressing the
+// retry on the status alone broke an unrelated page whose list GET hit a
+// transient BFF 502 and stopped recovering from it.
+const UPSTREAM_FAILURE_HEADER = 'x-terrapod-upstream-failure'
+
+function isUpstreamProviderFailure(res: Response): boolean {
+  return res.headers.get(UPSTREAM_FAILURE_HEADER) !== null
+}
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
@@ -61,7 +86,15 @@ export async function apiFetch(path: string, init?: RequestInit): Promise<Respon
     try {
       res = await fetch(path, { ...init, headers })
       // Idempotent methods retry transient 5xx; non-idempotent never do (may have applied).
-      if (idempotent && res.status >= 500 && res.status <= 599 && attempt < MAX_RETRIES) {
+      // A provider outage the API has marked is excluded — retrying multiplies our
+      // load on something already down (see isUpstreamProviderFailure).
+      if (
+        idempotent &&
+        res.status >= 500 &&
+        res.status <= 599 &&
+        !isUpstreamProviderFailure(res) &&
+        attempt < MAX_RETRIES
+      ) {
         await sleep(Math.min(BACKOFF_BASE_MS * 2 ** attempt, BACKOFF_CAP_MS))
         continue
       }
