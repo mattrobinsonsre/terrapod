@@ -22,6 +22,7 @@ from terrapod.logging_config import configure_logging, get_logger
 from terrapod.redis.client import close_redis, init_redis
 from terrapod.storage import close_storage, init_storage
 
+from .errors import UPSTREAM_FAILURE_HEADER
 from .health import router as health_router
 
 logger = get_logger(__name__)
@@ -864,7 +865,7 @@ def create_application() -> FastAPI:
             status=status,
             error=str(exc),
         )
-        return jsonapi_error_response(detail, status)
+        return jsonapi_error_response(detail, status, headers={UPSTREAM_FAILURE_HEADER: "upstream"})
 
     # Global exception handler
     @app.exception_handler(Exception)

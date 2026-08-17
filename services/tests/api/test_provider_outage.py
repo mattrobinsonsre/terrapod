@@ -27,7 +27,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 from terrapod.api.app import create_application as create_app
-from terrapod.api.errors import vcs_unavailable
+from terrapod.api.errors import UPSTREAM_FAILURE_HEADER, vcs_unavailable
 
 _BASE = "http://test"
 
@@ -107,6 +107,61 @@ class TestTheBackstopHandler:
         res = await self._get(ValueError("a real bug"))
         assert res.status_code == 500
         assert res.json()["detail"] == "Internal server error"
+
+
+class TestTellingTheTwoKindsOf502Apart:
+    """A 502 reaches the browser from two places that want opposite handling.
+
+    The BFF returns its own bare 502 when it briefly cannot reach the API —
+    transient, and exactly what the client's retry is for. The API returns 502
+    when an upstream PROVIDER failed — retrying that multiplies load on
+    something already down. The status cannot distinguish them, so the API
+    marks its own and the client keys off the marker.
+
+    This is not hypothetical: suppressing the client retry on the status alone
+    broke an unrelated page whose list GET hit a transient BFF 502 and stopped
+    recovering from it.
+    """
+
+    async def test_the_backstop_marks_its_response(self):
+        app = create_app()
+
+        @app.get("/_boom")
+        async def boom():  # pragma: no cover - invoked via the client
+            raise _github_error(403)
+
+        transport = ASGITransport(app=app, raise_app_exceptions=False)
+        async with AsyncClient(transport=transport, base_url=_BASE) as client:
+            res = await client.get("/_boom")
+        assert res.status_code == 502
+        assert res.headers.get(UPSTREAM_FAILURE_HEADER) is not None
+
+    def test_the_targeted_error_marks_its_response(self):
+        exc = vcs_unavailable(_conn(), "acme/infra", "main", _github_error(403))
+        assert (exc.headers or {}).get(UPSTREAM_FAILURE_HEADER) is not None
+
+    async def test_an_ordinary_server_error_is_NOT_marked(self):
+        """The marker means "someone else is down", so our own fault must not
+        carry it — otherwise a client would stop retrying a genuinely transient
+        failure."""
+        app = create_app()
+
+        @app.get("/_bug")
+        async def bug():  # pragma: no cover - invoked via the client
+            raise ValueError("a real bug")
+
+        transport = ASGITransport(app=app, raise_app_exceptions=False)
+        async with AsyncClient(transport=transport, base_url=_BASE) as client:
+            res = await client.get("/_bug")
+        assert res.status_code == 500
+        assert res.headers.get(UPSTREAM_FAILURE_HEADER) is None
+
+    def test_a_404_is_not_marked_either(self):
+        """It is mapped to 422 as the operator's own configuration problem, so
+        there is no upstream to blame and nothing for a client to back off from."""
+        exc = vcs_unavailable(_conn(), "acme/infra", "main", _github_error(404))
+        assert exc.status_code == 422
+        assert (exc.headers or {}).get(UPSTREAM_FAILURE_HEADER) is None
 
 
 class TestTheOperatorFacingMessage:

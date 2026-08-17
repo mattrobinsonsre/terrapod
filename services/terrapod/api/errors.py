@@ -21,6 +21,14 @@ from typing import Any
 
 from fastapi.responses import JSONResponse
 
+# Marks a 502/504 that Terrapod returned because an UPSTREAM provider failed,
+# as distinct from the BFF's own bare 502 when it briefly cannot reach the API.
+# Both reach the browser as a 502, so the status alone cannot tell them apart —
+# and they want opposite handling: retrying a provider outage multiplies load on
+# something already down, while a BFF blip is exactly what a retry is for. The
+# API is the only layer that knows which happened, so it says so.
+UPSTREAM_FAILURE_HEADER = "X-Terrapod-Upstream-Failure"
+
 
 def jsonapi_error_content(detail: Any, status_code: int) -> dict[str, Any]:
     """Build the dual-key error body: a JSON:API ``errors`` array plus the
@@ -117,4 +125,5 @@ def vcs_unavailable(conn: Any, repo: str, ref: str, exc: Exception) -> HTTPExcep
     return HTTPException(
         status_code=status,
         detail=f"Could not read {where} from {provider} — {describe_vcs_error(exc)}. Nothing was created.",
+        headers={UPSTREAM_FAILURE_HEADER: "vcs"},
     )
