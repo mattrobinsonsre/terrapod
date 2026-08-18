@@ -1,6 +1,7 @@
 package mcpserver
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -253,8 +254,16 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 			} else {
 				// No offset: keep the END. A failure is reported last, so the
 				// tail is the part worth spending context on.
-				out.Offset = int64(len(raw)) - max
-				raw = raw[int64(len(raw))-max:]
+				start := int64(len(raw)) - max
+				// Advance to a line boundary. A byte-sized tail lands mid-line,
+				// and the severed fragment reads as corrupt output rather than
+				// as a truncation — noise a reader has to reason past. Only
+				// when a newline is actually in range.
+				if nl := bytes.IndexByte(raw[start:], '\n'); nl >= 0 && nl < len(raw[start:])-1 {
+					start += int64(nl) + 1
+				}
+				out.Offset = start
+				raw = raw[start:]
 			}
 		}
 		out.Log = string(raw)

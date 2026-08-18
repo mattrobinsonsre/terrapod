@@ -57,7 +57,7 @@ func newRunsFixture(t *testing.T) *Client {
 				phase = "apply"
 			}
 			q := r.URL.Query()
-			fmt.Fprintf(w, "phase=%s offset=%s limit=%s format=%s",
+			_, _ = fmt.Fprintf(w, "phase=%s offset=%s limit=%s format=%s",
 				phase, q.Get("offset"), q.Get("limit"), q.Get("format"))
 			return
 		case r.Method == http.MethodPost && p == "/api/v2/runs":

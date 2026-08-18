@@ -141,3 +141,33 @@ func TestRunLogsShortLogIsNotMarkedTruncated(t *testing.T) {
 		t.Errorf("a whole-log read starts at 0, got %v", off)
 	}
 }
+
+func TestRunLogsTailStartsAtALineBoundary(t *testing.T) {
+	// A byte-sized tail lands mid-line. Found against a live instance: the
+	// first line came back as a severed base64 fragment from a certificate,
+	// which reads as corrupt output rather than as a truncation.
+	body := strings.Repeat("a line of perfectly ordinary log output here\n", 500) +
+		"Error: the thing that actually went wrong\n"
+	sess := logCaller(t, body, nil)
+
+	out := callLogs(t, sess, map[string]any{"run_id": "run-aaaa", "max_bytes": 200})
+
+	log, _ := out["log"].(string)
+	if !strings.HasPrefix(log, "a line of perfectly ordinary") {
+		t.Errorf("tail should begin at a line start, got %q", log[:min(60, len(log))])
+	}
+	if !strings.Contains(log, "Error: the thing that actually went wrong") {
+		t.Error("trimming to a line boundary must not drop the end of the log")
+	}
+}
+
+func TestRunLogsTailWithNoNewlineIsStillReturned(t *testing.T) {
+	// One enormous line with no newline in the tail window: there is no
+	// boundary to advance to, and returning nothing would be far worse than
+	// returning a mid-line fragment.
+	sess := logCaller(t, strings.Repeat("x", 5000), nil)
+	out := callLogs(t, sess, map[string]any{"run_id": "run-aaaa", "max_bytes": 100})
+	if b, _ := out["bytes"].(float64); b == 0 {
+		t.Error("a log with no newlines must still return its tail")
+	}
+}
