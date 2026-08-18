@@ -10,9 +10,24 @@ name: Mirror third-party images
 
 on:
   schedule:
-    # Weekly. The tags are pinned, so this is about the mirror still existing
+    # Daily. The tags are pinned, so this is about the mirror still existing
     # and picking up rebuilt-in-place tags, not about chasing new versions.
-    - cron: "17 4 * * 1"
+    #
+    # Daily rather than weekly because that second purpose is a security path
+    # (#1367). `python:3.13-slim` is rebuilt in place with refreshed contents,
+    # and our copy only moves when this runs — so anything embedded in the base
+    # that apt does not manage rides this schedule. pip is the case in point:
+    # `pip/_vendor` pins its own msgpack/setuptools, and `apt-get upgrade` will
+    # never move them, so on a weekly sync that class of finding could sit for
+    # a week after upstream had already fixed it. Debian packages are already
+    # covered daily by the CI-dated PKG_REFRESH (#1178); this closes the gap
+    # for everything else.
+    #
+    # It costs nothing to run more often: this is a copy by digest, so on a day
+    # when upstream has not republished, the mirror is unchanged and every
+    # build keeps its layer cache. The cache is invalidated by a real content
+    # change, never by the clock.
+    - cron: "17 4 * * *"
   workflow_dispatch:
   pull_request:
     # Validate the list itself when it changes — a typo here would otherwise
