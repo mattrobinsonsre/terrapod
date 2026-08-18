@@ -427,3 +427,60 @@ func unmarshalAttr(res *Resource, key string, dst any) {
 	}
 	_ = json.Unmarshal(raw, dst)
 }
+
+// LogOptions bounds a run-log read. The zero value reads the whole log from the
+// start, in the provider's raw form.
+type LogOptions struct {
+	// Offset is the byte offset to start from.
+	Offset int64
+	// Limit caps how many bytes are returned. Zero means no limit.
+	Limit int64
+	// Plain strips ANSI escape codes. Terraform colours its output, and those
+	// codes are noise to anything that is not a terminal.
+	Plain bool
+}
+
+func (o *LogOptions) query() string {
+	if o == nil {
+		return ""
+	}
+	q := url.Values{}
+	if o.Offset > 0 {
+		q.Set("offset", strconv.FormatInt(o.Offset, 10))
+	}
+	if o.Limit > 0 {
+		q.Set("limit", strconv.FormatInt(o.Limit, 10))
+	}
+	if o.Plain {
+		q.Set("format", "plain")
+	}
+	if len(q) == 0 {
+		return ""
+	}
+	return "?" + q.Encode()
+}
+
+// GetPlanLog returns the plan-phase log for a run.
+//
+// Plan ids share the run's UUID, so this accepts a run id in any form (bare,
+// "run-<uuid>", or "plan-<uuid>"). Returns the log bytes as-is; a run that has
+// not planned yet simply has a short or empty log rather than an error.
+func (c *Client) GetPlanLog(ctx context.Context, runID string, opts *LogOptions) ([]byte, error) {
+	return c.runLog(ctx, "plans", runID, opts)
+}
+
+// GetApplyLog returns the apply-phase log for a run. Accepts a run id in any
+// form, as GetPlanLog does.
+func (c *Client) GetApplyLog(ctx context.Context, runID string, opts *LogOptions) ([]byte, error) {
+	return c.runLog(ctx, "applies", runID, opts)
+}
+
+// runLog serves both phases: the endpoints are identical apart from the
+// collection segment, and both key on the run's UUID.
+func (c *Client) runLog(ctx context.Context, collection, runID string, opts *LogOptions) ([]byte, error) {
+	id := strings.TrimPrefix(strings.TrimPrefix(strings.TrimPrefix(runID, "plan-"), "apply-"), "run-")
+	if id == "" {
+		return nil, fmt.Errorf("run id is required")
+	}
+	return c.Get(ctx, "/api/v2/"+collection+"/"+url.PathEscape(id)+"/log"+opts.query())
+}

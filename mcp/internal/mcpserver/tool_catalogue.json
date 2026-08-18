@@ -366,6 +366,35 @@
     }
   },
   {
+    "name": "terrapod_run_logs",
+    "read_only": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "max_bytes": {
+          "description": "cap on returned bytes (default 16384)",
+          "type": "integer"
+        },
+        "offset": {
+          "description": "byte offset to read from; omit to get the END of the log, which is where a failure is",
+          "type": "integer"
+        },
+        "phase": {
+          "description": "which phase to read: plan (default) or apply",
+          "type": "string"
+        },
+        "run_id": {
+          "description": "the run id (run-...) whose log to fetch",
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
     "name": "terrapod_run_plan_json",
     "read_only": true,
     "input_schema": {
