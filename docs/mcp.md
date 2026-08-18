@@ -105,6 +105,7 @@ Every tool is namespaced `terrapod_*` and carries a safety annotation
 | `terrapod_run_list` | Recent runs for a workspace (status, plan-only/destroy, has-changes). |
 | `terrapod_run_get` | One run's full status incl. Terrapod-native detail (has-changes, drift, resource profile, permitted actions). |
 | `terrapod_run_plan_json` | The structured JSON plan output (`tofu show -json`) — reason precisely about resource changes. |
+| `terrapod_run_logs` | The plan or apply LOG — the terraform/tofu output, i.e. *why* a run failed rather than merely that it did. Returns the end of the log by default (a failure is reported last, and an apply log can be megabytes), ANSI stripped; `offset` pages further back. |
 | `terrapod_run_cost` | A run's monthly cost estimate — the plan's cost *delta* (projected total, this-run delta, previous, per-resource, unpriced). Data only, no AI. |
 | `terrapod_workspace_cost` | A workspace's *current* monthly cost from its latest state — total, per-resource, unpriced, and which state version was priced. Data only, no AI. |
 | `terrapod_deleted_workspace_list` | Deleted workspaces whose state is still recoverable — name, when and by whom, how many state versions survive, when the window closes, and whether it has already been restored. Platform admin only. |

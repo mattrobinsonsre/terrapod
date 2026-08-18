@@ -2,6 +2,7 @@ package terrapod
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -47,6 +48,18 @@ func newRunsFixture(t *testing.T) *Client {
 		w.Header().Set("Content-Type", "application/vnd.api+json")
 		p := r.URL.Path
 		switch {
+		// Log endpoints: echo back what was asked for so the tests can assert
+		// the query the client built, not just that a request happened.
+		case r.Method == http.MethodGet && (p == "/api/v2/plans/aaaa/log" || p == "/api/v2/applies/aaaa/log"):
+			w.Header().Set("Content-Type", "text/plain")
+			phase := "plan"
+			if strings.HasPrefix(p, "/api/v2/applies/") {
+				phase = "apply"
+			}
+			q := r.URL.Query()
+			fmt.Fprintf(w, "phase=%s offset=%s limit=%s format=%s",
+				phase, q.Get("offset"), q.Get("limit"), q.Get("format"))
+			return
 		case r.Method == http.MethodPost && p == "/api/v2/runs":
 			var doc struct {
 				Data struct {
@@ -248,5 +261,63 @@ func TestGetRunPlanJSONNotFound(t *testing.T) {
 	}
 	if _, ok := err.(*NotFoundError); !ok {
 		t.Errorf("expected *NotFoundError, got %T: %v", err, err)
+	}
+}
+
+func TestGetPlanLogAcceptsAnyIDForm(t *testing.T) {
+	c := newRunsFixture(t)
+	// Plan, apply and bare forms all key on the same run UUID.
+	for _, id := range []string{"aaaa", "run-aaaa", "plan-aaaa"} {
+		got, err := c.GetPlanLog(t.Context(), id, nil)
+		if err != nil {
+			t.Fatalf("%s: %v", id, err)
+		}
+		if !strings.Contains(string(got), "phase=plan") {
+			t.Errorf("%s: got %s", id, got)
+		}
+	}
+}
+
+func TestGetApplyLogHitsTheAppliesCollection(t *testing.T) {
+	c := newRunsFixture(t)
+	got, err := c.GetApplyLog(t.Context(), "apply-aaaa", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(got), "phase=apply") {
+		t.Errorf("got %s", got)
+	}
+}
+
+func TestLogOptionsBecomeQueryParameters(t *testing.T) {
+	c := newRunsFixture(t)
+	got, err := c.GetPlanLog(t.Context(), "run-aaaa", &LogOptions{Offset: 4096, Limit: 16384, Plain: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "offset=4096 limit=16384 format=plain"
+	if !strings.Contains(string(got), want) {
+		t.Errorf("want %q in %q", want, got)
+	}
+}
+
+func TestNilLogOptionsSendsNoQuery(t *testing.T) {
+	// The zero read must not pin defaults the server owns: sending
+	// offset=0&limit=0 would look deliberate and could mean "return nothing"
+	// to a stricter handler.
+	c := newRunsFixture(t)
+	got, err := c.GetPlanLog(t.Context(), "run-aaaa", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(got), "offset= limit= format=") {
+		t.Errorf("expected an unqualified request, got %s", got)
+	}
+}
+
+func TestRunLogRejectsAnEmptyID(t *testing.T) {
+	c := newRunsFixture(t)
+	if _, err := c.GetPlanLog(t.Context(), "run-", nil); err == nil {
+		t.Fatal("expected an error for an id that is only a prefix")
 	}
 }

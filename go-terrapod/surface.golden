@@ -433,6 +433,9 @@ field ListMeta.CurrentPage int `json:"current-page"`
 field ListMeta.PageSize int `json:"page-size"`
 field ListMeta.TotalCount int `json:"total-count"`
 field ListMeta.TotalPages int `json:"total-pages"`
+field LogOptions.Limit int64
+field LogOptions.Offset int64
+field LogOptions.Plain bool
 field ModuleInterface.Inputs []map[string]any `json:"inputs"`
 field ModuleInterface.Outputs []map[string]any `json:"outputs"`
 field ModuleInterface.Version string `json:"version"`
@@ -1123,6 +1126,7 @@ method (*Client) Get(ctx context.Context, path string) ([]byte, error)
 method (*Client) GetAPIToken(ctx context.Context, tokenID string) (*APIToken, error)
 method (*Client) GetAgentPool(ctx context.Context, id string) (*AgentPool, error)
 method (*Client) GetAgentPoolToken(ctx context.Context, poolID, tokenID string) (*AgentPoolToken, error)
+method (*Client) GetApplyLog(ctx context.Context, runID string, opts *LogOptions) ([]byte, error)
 method (*Client) GetArchitectureCritique( ctx context.Context, workspaceID string, ) (*ArchitectureCritique, error)
 method (*Client) GetAutodiscoveryRule(ctx context.Context, id string) (*AutodiscoveryRule, error)
 method (*Client) GetCatalogInstance(ctx context.Context, wsID string) (*CatalogInstance, error)
@@ -1140,6 +1144,7 @@ method (*Client) GetModuleWorkspaceLink(ctx context.Context, moduleName, moduleP
 method (*Client) GetNotificationConfiguration(ctx context.Context, id string) (*NotificationConfiguration, error)
 method (*Client) GetOnboardingAvailability(ctx context.Context) (*OnboardingAvailability, error)
 method (*Client) GetOnboardingSession(ctx context.Context, sessionID string) (*OnboardingSession, error)
+method (*Client) GetPlanLog(ctx context.Context, runID string, opts *LogOptions) ([]byte, error)
 method (*Client) GetPlanSummary(ctx context.Context, planID string) (*PlanSummary, error)
 method (*Client) GetPolicySet(ctx context.Context, id string) (*PolicySet, error)
 method (*Client) GetProviderTemplate(ctx context.Context, id string) (*ProviderTemplate, error)
@@ -1346,6 +1351,7 @@ type LabelEntity struct
 type LabelKey struct
 type LabelValue struct
 type ListMeta struct
+type LogOptions struct
 type ModuleInterface struct
 type ModuleWorkspaceLink struct
 type NotFoundError struct

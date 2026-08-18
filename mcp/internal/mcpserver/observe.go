@@ -195,6 +195,73 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 		return nil, planJSONOut{RunID: in.RunID, PlanJSON: raw}, nil
 	})
 
+	// ── terrapod_run_logs ────────────────────────────────────────────
+	type runLogsIn struct {
+		RunID    string `json:"run_id" jsonschema:"the run id (run-...) whose log to fetch"`
+		Phase    string `json:"phase,omitempty" jsonschema:"which phase to read: plan (default) or apply"`
+		Offset   int64  `json:"offset,omitempty" jsonschema:"byte offset to read from; omit to get the END of the log, which is where a failure is"`
+		MaxBytes int64  `json:"max_bytes,omitempty" jsonschema:"cap on returned bytes (default 16384)"`
+	}
+	type runLogsOut struct {
+		RunID     string `json:"run_id"`
+		Phase     string `json:"phase"`
+		Log       string `json:"log"`
+		Offset    int64  `json:"offset"`
+		Bytes     int64  `json:"bytes"`
+		Truncated bool   `json:"truncated"`
+	}
+	mcp.AddTool(s, &mcp.Tool{
+		Name: "terrapod_run_logs",
+		Description: "Fetch a run's plan or apply LOG — the terraform/tofu output, which is where the reason for a failure actually is. terrapod_run_get reports THAT a run errored and its exit code; this reports WHY. " +
+			"Returns the END of the log by default, because that is where an error is reported and a full apply log can be megabytes; `truncated` says whether earlier output was dropped and `offset` says where the returned chunk starts, so pass that offset back to page further in. ANSI colour codes are stripped. " +
+			"An empty log is not an error: a run that has not reached the phase yet simply has nothing to show.",
+		Annotations: readOnly,
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in runLogsIn) (*mcp.CallToolResult, runLogsOut, error) {
+		if in.RunID == "" {
+			return errText("run_id is required"), runLogsOut{}, nil
+		}
+		phase := in.Phase
+		if phase == "" {
+			phase = "plan"
+		}
+		if phase != "plan" && phase != "apply" {
+			return errText("phase must be 'plan' or 'apply'"), runLogsOut{}, nil
+		}
+
+		opts := &terrapod.LogOptions{Plain: true, Offset: in.Offset}
+		get := c.GetPlanLog
+		if phase == "apply" {
+			get = c.GetApplyLog
+		}
+		raw, err := get(ctx, in.RunID, opts)
+		if err != nil {
+			return errResult(err), runLogsOut{}, nil
+		}
+
+		max := in.MaxBytes
+		if max <= 0 {
+			max = 16384
+		}
+		out := runLogsOut{RunID: in.RunID, Phase: phase, Offset: in.Offset}
+		if int64(len(raw)) > max {
+			out.Truncated = true
+			if in.Offset > 0 {
+				// An explicit offset means the caller is paging forward, so
+				// keep the FRONT of their window; tailing it would silently
+				// skip the very bytes they asked for.
+				raw = raw[:max]
+			} else {
+				// No offset: keep the END. A failure is reported last, so the
+				// tail is the part worth spending context on.
+				out.Offset = int64(len(raw)) - max
+				raw = raw[int64(len(raw))-max:]
+			}
+		}
+		out.Log = string(raw)
+		out.Bytes = int64(len(raw))
+		return nil, out, nil
+	})
+
 	// ── terrapod_workspace_cost ──────────────────────────────────────
 	type wsCostIn struct {
 		WorkspaceID string `json:"workspace_id" jsonschema:"the workspace id (ws-...) whose current managed-infrastructure monthly cost to estimate"`

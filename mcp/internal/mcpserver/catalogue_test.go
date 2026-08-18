@@ -112,6 +112,7 @@ func TestExpectedToolsPresent(t *testing.T) {
 	readOnlyTools := []string{
 		"terrapod_workspace_list", "terrapod_workspace_get",
 		"terrapod_run_list", "terrapod_run_get", "terrapod_run_plan_json",
+		"terrapod_run_logs",
 	}
 	for _, n := range readOnlyTools {
 		e, ok := byName[n]
