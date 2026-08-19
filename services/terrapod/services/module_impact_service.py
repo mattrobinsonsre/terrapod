@@ -36,6 +36,10 @@ from terrapod.storage.keys import config_version_key, module_override_key
 
 logger = get_logger(__name__)
 
+# Distinguishes "the payload did not carry this field" (an older replica's
+# trigger, mid-upgrade) from a genuine None. See _post_module_vcs_status.
+_UNSET = object()
+
 
 # ---------------------------------------------------------------------------
 # VCS dispatch helpers (shared with registry_vcs_poller / vcs_poller)
@@ -479,6 +483,11 @@ async def handle_module_test_completed(payload: dict) -> None:
     """Post VCS commit status to the module's repo when a module-test run finishes."""
     run_id_str = payload.get("run_id", "")
     target_status = payload.get("target_status", "")
+    # `_UNSET` rather than None: None is a meaningful value here ("the plan did
+    # not record it"), so it has to be distinguishable from "the payload predates
+    # this field", which is the case for a trigger enqueued by an older replica
+    # mid-upgrade.
+    payload_has_changes = payload.get("has_changes", _UNSET)
 
     if not run_id_str or not target_status:
         return
@@ -496,7 +505,9 @@ async def handle_module_test_completed(payload: dict) -> None:
         if module is None:
             return
 
-        await _post_module_vcs_status(db, run, module, target_status)
+        await _post_module_vcs_status(
+            db, run, module, target_status, payload_has_changes=payload_has_changes
+        )
 
 
 async def _resolve_module_from_overrides(
@@ -548,8 +559,16 @@ async def _post_module_vcs_status(
     run: Run,
     module: RegistryModule,
     target_status: str,
+    payload_has_changes: object = _UNSET,
 ) -> None:
-    """Post commit status and PR comment to the module's VCS repo."""
+    """Post commit status and PR comment to the module's VCS repo.
+
+    `payload_has_changes` is the value snapshotted at the transition. Prefer it
+    over the row: this handler can run before the transaction that set the
+    status has committed, and reading the row then yields the PREVIOUS value —
+    which rendered a completed plan as "Plan finished" rather than "No changes"
+    (#1378). Falls back to the row when the payload predates the field.
+    """
     from terrapod.config import settings
     from terrapod.services.vcs_status_dispatcher import (
         _build_comment_body,
@@ -583,7 +602,14 @@ async def _post_module_vcs_status(
         )
 
     # Post commit status
-    github_state, gitlab_state, description = _resolve_status(target_status, run.plan_only)
+    has_changes = (
+        payload_has_changes  # type: ignore[assignment]
+        if payload_has_changes is not _UNSET
+        else run.has_changes
+    )
+    github_state, gitlab_state, description = _resolve_status(
+        target_status, run.plan_only, has_changes
+    )
     context = f"terrapod/{ws_name}"
 
     try:
@@ -620,7 +646,7 @@ async def _post_module_vcs_status(
             run_id=f"run-{run.id}",
             run_status=target_status,
             plan_only=run.plan_only,
-            has_changes=run.has_changes,
+            has_changes=has_changes,
             run_url=run_url,
         )
         await _find_or_create_comment(

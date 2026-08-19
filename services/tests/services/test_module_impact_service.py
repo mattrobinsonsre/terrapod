@@ -61,3 +61,71 @@ async def test_fetch_config_non_vcs_with_no_cv_returns_none() -> None:
         result = await module_impact_service._fetch_workspace_config(db, ws, MagicMock())
 
     assert result is None
+
+
+class TestModuleCommentUsesTheSnapshottedResult:
+    """A module PR's comment must not render a plan result that has not landed.
+
+    Two speculative runs on the same module PR, both `planned` with
+    has_changes=False, rendered differently: one "No changes", the other
+    "Plan finished" — which is what `_resolve_status` produces when has_changes
+    is None. The enqueue happens inside the transaction that sets the status,
+    so a consumer on another replica can re-read the row before the commit
+    lands and see the PREVIOUS value. Which run loses the race is timing, which
+    is why it looked arbitrary (#1378).
+
+    The ordinary VCS path already snapshots the value into the payload for
+    exactly this reason; this path did not.
+    """
+
+    def _payload_from_enqueue(self, run, target_status):
+        """Capture what _enqueue_module_test_status puts on the queue."""
+        import asyncio
+
+        from terrapod.services import run_service
+
+        captured = {}
+
+        async def _fake_enqueue(name, payload, **kw):
+            captured.update(payload)
+            return True
+
+        with patch("terrapod.services.scheduler.enqueue_trigger", new=_fake_enqueue):
+            asyncio.run(run_service._enqueue_module_test_status(run, target_status))
+        return captured
+
+    def test_has_changes_is_snapshotted_onto_the_trigger(self):
+        run = MagicMock()
+        run.id = uuid.uuid4()
+        run.has_changes = False
+
+        payload = self._payload_from_enqueue(run, "planned")
+
+        assert "has_changes" in payload, (
+            "without the snapshot the handler re-reads the row and can race the commit"
+        )
+        assert payload["has_changes"] is False
+
+    def test_a_snapshotted_false_renders_no_changes_even_if_the_row_lags(self):
+        """The bug, at the point where it showed: the row still says None
+        (uncommitted) but the payload carries the real answer."""
+        from terrapod.services.vcs_status_dispatcher import _resolve_status
+
+        stale_row_value = None
+        snapshotted = False
+
+        _, _, stale = _resolve_status("planned", True, stale_row_value)
+        _, _, fixed = _resolve_status("planned", True, snapshotted)
+
+        assert stale == "Plan finished"
+        assert fixed == "No changes"
+
+    def test_the_sentinel_keeps_a_genuine_none_distinguishable(self):
+        """None means 'the plan did not record it' and must survive; only an
+        ABSENT field falls back to the row. An older replica's trigger, raised
+        mid-upgrade, carries no field at all."""
+        from terrapod.services.module_impact_service import _UNSET
+
+        assert _UNSET is not None
+        assert {"has_changes": None}.get("has_changes", _UNSET) is None
+        assert {}.get("has_changes", _UNSET) is _UNSET
