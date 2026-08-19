@@ -2559,10 +2559,32 @@ jobs:
           version="${{ needs.prepare.outputs.version }}"
           chart_version="${version#v}"
 
+          # Is this the newest version we have released? GitHub picks "latest"
+          # by PUBLISH TIME, not by version — so a security patch cut for an
+          # older line silently takes the badge from a newer minor, pointing
+          # the repo front page and everything reading /releases/latest at an
+          # older release. That happened with v1.4.2 over v1.5.0 (#1374).
+          #
+          # Compare versions, not branch names: a patch on the NEWEST line
+          # (v1.5.1 over v1.5.0) should take the badge.
+          highest=$(
+            {
+              gh release list --limit 100 --json tagName --jq '.[].tagName'
+              echo "$version"
+            } | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1
+          )
+          if [ "$highest" = "$version" ]; then
+            latest=true
+          else
+            latest=false
+            echo "::notice::$version is not the newest release ($highest is) — not taking the 'Latest' badge"
+          fi
+
           # GoReleaser already created the release with provider binaries.
           # Update title/notes and upload remaining assets.
           gh release edit "$version" \
             --title "$version" \
+            --latest="$latest" \
             --notes-file /tmp/release-notes.md
 
           gh release upload "$version" \
