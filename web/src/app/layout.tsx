@@ -35,8 +35,8 @@ export default async function RootLayout({
   const messages = await getMessages()
   // `dir` mirrors the whole UI for RTL locales (#829). Resolved on the server
   // from the same cookie-driven locale as `lang`, so there is no direction
-  // flash on load. LTR locales (every one currently offered) render `dir="ltr"`
-  // — identical to before — until an RTL locale is added to `locales`.
+  // flash on load. Arabic, Hebrew and Persian resolve to `rtl`; every other
+  // offered locale renders `dir="ltr"`.
   const dir = dirForLocale(locale)
   // The app ships its own professionally-translated catalogs + a language
   // switcher (#767), so tell the browser's built-in translator (Chrome/Edge/

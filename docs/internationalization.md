@@ -16,8 +16,9 @@ catalogs live in `web/messages/<code>.json`.
 | **Asian** | Japanese (`ja`), Korean (`ko`), Chinese — Simplified (`zh-CN`) and Traditional (`zh-TW`), Turkish (`tr`) |
 | **Novelty** | Klingon (`tlh`), Marklar, LOLcat, leetspeak, Pirate, Yoda (`en-x-*`) |
 
-Right-to-left languages (Arabic, Hebrew, Persian) are tracked separately in
-issue #829 — they need `dir="rtl"` + mirrored layout, not just a catalog.
+Right-to-left languages (Arabic, Hebrew, Persian) are supported: selecting one
+sets `dir="rtl"` on the document and mirrors the chrome, while code, resource
+addresses and plan output stay left-to-right.
 
 ## How the locale is chosen
 

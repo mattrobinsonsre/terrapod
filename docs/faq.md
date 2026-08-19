@@ -100,9 +100,10 @@ Terraform-platform replacements generally build on it.
 
 If you specifically want a *single-binary* or *runs-inside-your-existing-CI*
 tool with no orchestrator, a lighter PR-automation tool (Atlantis as one binary,
-Digger inside your CI) has a lower deployment floor — the trade-off is you give
-up the integrated state backend, private registry, RBAC, policy engine, web UI,
-and server-side execution Terrapod provides. See [Alternatives](alternatives.md).
+Digger inside your CI) has a lower deployment floor. The difference is scope:
+those tools focus on PR-driven plan/apply and pair with whatever state backend,
+registry, RBAC and UI you already run, where Terrapod bundles those into one
+control plane. See [Alternatives](alternatives.md).
 
 Just trying it out? `make eval` stands up a throwaway kind/k3d cluster,
 batteries-included (filesystem storage, in-cluster Postgres/Redis, a local
@@ -143,8 +144,7 @@ your repos to adopt Terrapod:
   [Autodiscovery](autodiscovery.md) auto-creates a workspace the first time a PR
   or push touches a directory matching your glob rules (with `ignore_paths`),
   each scoped to its own directory — no pre-provisioning a workspace per folder.
-  Modelled on Atlantis's `autodiscover`, and proven on monorepos with thousands
-  of root modules.
+  Modelled on Atlantis's `autodiscover`.
 - **Mixed repo** (Terraform is one folder beside application code, Helm charts,
   CI config, docs, …). Set the workspace's `working-directory` (or explicit
   `trigger-prefixes`) to the Terraform subtree, and Terrapod **only starts a run
@@ -185,7 +185,7 @@ estimate and never blended into the deterministic total. See
 Both are full self-hosted TFE/TFC replacements at rough feature parity. Terrapod's
 design focus is **restricted-network / multi-cluster execution** (outbound-only
 runners, polling VCS, self-contained caching) plus an **AI-assisted review layer**,
-native Terragrunt, and TFE-V2 API parity. Terrakube is the more mature project and
+native Terragrunt, and compatibility with the TFE V2 surface the `terraform`/`tofu` `cloud` backend consumes (not the full TFE V2 API). Terrakube is the more mature project and
 offers **multi-organization tenancy**, which Terrapod deliberately does not (it's
 single-org with label-based RBAC). Full neutral comparison in the
 [README](../README.md#terrakube).
@@ -193,9 +193,9 @@ single-org with label-based RBAC). Full neutral comparison in the
 ## How is Terrapod different from Atlantis or Digger?
 
 Atlantis and Digger are PR/CI-centric automation. Terrapod is a full platform with
-its own state store, run lifecycle, registry, RBAC, and UI — and it runs execution
-on its own outbound-only Kubernetes runners rather than requiring inbound webhooks
-(Atlantis) or delegating to your CI (Digger). See [Alternatives](alternatives.md).
+its own state store, run lifecycle, registry, RBAC, and UI, and runs execution on
+its own outbound-only Kubernetes runners. Atlantis is webhook-driven in its own
+server; Digger runs inside your existing CI. See [Alternatives](alternatives.md).
 
 ## What does Terrapod cost to run?
 
