@@ -463,6 +463,11 @@ jobs:
     permissions:
       contents: read
       issues: write
+      # Read the triage state of the code findings uploaded above. Counting
+      # raw SARIF results instead meant a DISMISSED alert kept re-raising the
+      # issue forever, with nothing a maintainer could do to discharge it
+      # (#1375).
+      security-events: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -470,6 +475,19 @@ jobs:
         with:
           path: findings
           pattern: rescan-*
+
+      # Replace each release's SARIF-derived code count with the number of
+      # alerts still OPEN for that tag. Dismissal is how a code finding is
+      # accepted -- the counterpart of .trivyignore for dependencies -- so it
+      # has to be what the report reads.
+      #
+      # Fails CLOSED: on any API error the SARIF count is left in place, so a
+      # broken query produces a spurious issue rather than a silent miss.
+      - name: Count open code-scanning alerts per release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAGS: ${{ needs.discover.outputs.tags }}
+        run: python3 scripts/rescan_open_alerts.py findings "$TAGS"
 
       # Findings go into a DRAFT advisory per release — private to
       # maintainers. Never published: publishing is irreversible and would make
