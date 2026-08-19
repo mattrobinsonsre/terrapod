@@ -1,0 +1,29 @@
+# Keep developer state out of the build context.
+#
+# Every Dockerfile installs its own dependencies — Dockerfile.web runs `npm ci`
+# from package-lock.json before it copies the source. Without this file the
+# subsequent `COPY web/ .` overwrites that clean install with whatever is on
+# the developer's disk, so a stale local node_modules silently wins. That
+# happened: a machine still holding next 16.2.12 produced an image whose
+# next and @next/swc disagreed, and the production build failed with an
+# unrelated-looking error. CI never saw it because CI checks out clean.
+#
+# It is also just large: node_modules, .next and .git together are ~800 MB of
+# context uploaded on every build for no reason.
+**/node_modules
+**/.next
+.git
+.github
+
+# Python build/test droppings
+**/__pycache__
+**/*.pyc
+.pytest_cache
+.ruff_cache
+**/.venv
+
+# Local-only output
+reports/
+dist/
+*.tfstate
+*.tfstate.backup
