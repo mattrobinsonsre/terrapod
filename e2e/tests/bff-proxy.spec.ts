@@ -25,11 +25,20 @@ test.describe('BFF proxy routing', () => {
     expect(res.status()).toBe(200);
 
     // The discovery document is what points the CLI at every other endpoint;
-    // if this is served by anything other than the API it is worthless.
+    // if this is served by anything other than the API it is worthless. Index
+    // the keys directly rather than via toHaveProperty — its dotted argument is
+    // a PATH, so `toHaveProperty('modules.v1')` looks for `body.modules.v1`,
+    // and every key here legitimately contains a dot.
     const body = await res.json();
-    expect(body).toHaveProperty('modules.v1');
-    expect(body).toHaveProperty('providers.v1');
-    expect(body).toHaveProperty('state.v2');
+    expect(body['tfe.v2']).toBe('/api/v2/');
+    expect(body['modules.v1']).toBe('/api/v2/registry/modules/');
+    expect(body['providers.v1']).toBe('/api/v2/registry/providers/');
+    // `terraform login` reads its endpoints from here, and they are on another
+    // of the prefixes this change moved.
+    expect(body['login.v1']).toMatchObject({
+      authz: '/oauth/authorize',
+      token: '/oauth/token',
+    });
   });
 
   test('the provider mirror is proxied to the API', async ({ request }) => {
