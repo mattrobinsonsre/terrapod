@@ -261,6 +261,13 @@ async def _enqueue_module_test_status(run: Run, target_status: str) -> None:
             {
                 "run_id": str(run.id),
                 "target_status": target_status,
+                # Snapshotted for the same reason as _enqueue_vcs_status: this
+                # enqueue is inside the transaction that sets the status, so a
+                # consumer on another replica can re-read the row BEFORE the
+                # commit lands and see has_changes still unset. That rendered
+                # "Plan finished" instead of "No changes" on module PRs, with
+                # sibling workspaces disagreeing about identical runs (#1378).
+                "has_changes": run.has_changes,
             },
             dedup_key=f"modtest:{run.id}:{target_status}",
             dedup_ttl=60,
