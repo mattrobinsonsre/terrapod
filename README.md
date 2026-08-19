@@ -30,7 +30,7 @@ storage, a local admin login — with no cloud account and no external
 dependencies. It even seeds a sample workspace + a completed plan, so you land
 on a populated UI, not an empty list:
 
-![Terrapod eval walkthrough — login, sample workspace, and a completed plan](docs/images/eval-demo.gif)
+![Signing in, the workspace list, and a completed run showing its changes, monthly cost, AI risk verdict, policy result and security scan](docs/images/eval-demo.gif)
 
 ```sh
 make eval          # create a local cluster + install Terrapod, then port-forward
@@ -215,43 +215,36 @@ Everything below is implemented and shipped today.
 
 ## Architecture
 
+```mermaid
+flowchart TB
+    user["Browser / CLI"]
+
+    subgraph control["Terrapod control plane"]
+        bff["Next.js BFF<br/>web UI + proxy"]
+        api["FastAPI API<br/>multi-replica, no leader election"]
+    end
+
+    subgraph stores["Your data — never leaves your boundary"]
+        pg[("PostgreSQL<br/>state + metadata")]
+        redis[("Redis<br/>sessions, locks, events")]
+        obj[("Object storage<br/>state, plans, logs")]
+    end
+
+    subgraph exec["Execution cluster — any network"]
+        listener["Runner listener"]
+        job["Ephemeral K8s Job<br/>terraform / tofu"]
+    end
+
+    user -->|HTTPS| bff
+    bff -->|the only ingress| api
+    api --- pg
+    api --- redis
+    api --- obj
+    listener -.->|"outbound SSE - the control plane never dials in"| api
+    listener -->|creates| job
 ```
-              +---------------------+
-              |    Browser / CLI    |
-              +---------------------+
-                         |
-                    HTTPS (TLS)
-                         v
-              +---------------------+
-              |    Next.js  (BFF)   |
-              |    web UI + proxy   |
-              +---------------------+
-                         |   the only ingress; the browser
-                         |   never talks to the API directly
-                         v
-              +---------------------+
-              |  FastAPI API server |
-              |   (multi-replica)   |
-              +---------------------+
-                         |
-                         |     PostgreSQL     state + metadata
-                         |     Redis          sessions, locks
-                         |     Object store   state, plans, logs
-                         |
-                         ^     outbound SSE: the control plane
-                         |     never dials in to the runners
-                         |
-              +---------------------+
-              |   Runner listener   |
-              |  your exec cluster  |
-              +---------------------+
-                         |   creates
-                         v
-              +---------------------+
-              |  Ephemeral K8s Job  |
-              |   terraform / tofu  |
-              +---------------------+
-```
+
+The execution cluster reaches the control plane, never the other way round — which is what lets runners sit in an isolated VPC, another region, or on-prem behind an egress-only firewall. Run lifecycle, the reconciler, storage layout and the runner protocol are in [docs/architecture.md](docs/architecture.md).
 
 The full picture — run lifecycle, the reconciler, storage layout and the
 runner protocol — is in [docs/architecture.md](docs/architecture.md).
