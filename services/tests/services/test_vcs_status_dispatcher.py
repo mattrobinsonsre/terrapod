@@ -484,3 +484,128 @@ class TestFindOrCreateCommentRaceFix:
         )
         # And the update targeted the freshly-created comment, not a phantom one.
         assert update_calls[0] == create_calls[0]
+
+
+class TestStaleStatusDoesNotClobberTheComment:
+    """A late writer must not rewind the comment to a status the run has left.
+
+    The PR comment is shared per (workspace, PR) and written last-wins. The AI
+    summariser re-enqueues this trigger once its summary is ready — but it
+    snapshots the run BEFORE a model call that takes tens of seconds, so on a
+    failed plan it arrived carrying `planning` after the run had already
+    errored. The comment then read "Plan in progress" directly above the
+    failure analysis explaining why the plan failed (#1372).
+    """
+
+    def _session(self, run, ws, conn, latest_run_id):
+        session = MagicMock()
+        session.get = AsyncMock()
+        # Two different queries run here: the latest-run-for-this-PR lookup and
+        # the ready-PlanSummary lookup. Returning one value for both handed the
+        # comment builder a UUID where it expected a summary.
+        latest = MagicMock()
+        latest.scalar_one_or_none = MagicMock(return_value=latest_run_id)
+        no_summary = MagicMock()
+        no_summary.scalar_one_or_none = MagicMock(return_value=None)
+        session.execute = AsyncMock(side_effect=[latest, no_summary])
+
+        async def _get(model, _id):
+            from terrapod.db.models import Run, VCSConnection, Workspace
+
+            return {Run: run, Workspace: ws, VCSConnection: conn}.get(model)
+
+        session.get.side_effect = _get
+        return session
+
+    async def _dispatch(self, *, live_status: str, payload_status: str) -> str:
+        """Run the handler and return the comment body it wrote."""
+        from terrapod.services.vcs_status_dispatcher import handle_vcs_commit_status
+
+        run_id, ws_id, conn_id = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+
+        run = MagicMock()
+        run.id = run_id
+        run.workspace_id = ws_id
+        run.vcs_commit_sha = "cafebabecafebabecafebabecafebabecafebabe"
+        run.vcs_pull_request_number = 97
+        run.plan_only = True
+        run.has_changes = None
+        run.status = live_status
+
+        ws = MagicMock()
+        ws.id = ws_id
+        ws.name = "core-prod"
+        ws.vcs_connection_id = conn_id
+        ws.vcs_repo_url = "https://github.com/example-org/infra"
+
+        conn = MagicMock()
+        conn.provider = "github"
+        conn.status = "active"
+
+        session = self._session(run, ws, conn, latest_run_id=run_id)
+
+        class _Ctx:
+            async def __aenter__(self):
+                return session
+
+            async def __aexit__(self, *a):
+                return False
+
+        with (
+            patch("terrapod.services.vcs_status_dispatcher.get_db_session", lambda: _Ctx()),
+            patch(
+                "terrapod.services.vcs_status_dispatcher.github_service.parse_repo_url",
+                return_value=("example-org", "infra"),
+            ),
+            patch(
+                "terrapod.services.vcs_status_dispatcher.github_service.create_commit_status",
+                new=AsyncMock(),
+            ),
+            patch(
+                "terrapod.services.vcs_status_dispatcher.github_service.create_pr_comment",
+                new=AsyncMock(),
+            ) as mock_create,
+            patch(
+                "terrapod.services.vcs_status_dispatcher.github_service.update_pr_comment",
+                new=AsyncMock(),
+            ),
+            patch(
+                "terrapod.services.vcs_status_dispatcher._find_or_create_comment",
+                new=AsyncMock(),
+            ) as mock_comment,
+        ):
+            await handle_vcs_commit_status(
+                {
+                    "run_id": str(run_id),
+                    "workspace_id": str(ws_id),
+                    "target_status": payload_status,
+                    "has_changes": None,
+                }
+            )
+
+        assert mock_comment.await_count == 1, "expected exactly one comment write"
+        _ = mock_create
+        return mock_comment.await_args.args[5]
+
+    @pytest.mark.asyncio
+    async def test_terminal_live_status_wins_over_a_stale_payload(self):
+        """The reported bug: errored run, payload still says planning."""
+        body = await self._dispatch(live_status="errored", payload_status="planning")
+        assert "Run failed" in body
+        assert "Plan in progress" not in body
+
+    @pytest.mark.asyncio
+    async def test_a_non_terminal_payload_is_still_used_when_the_run_agrees(self):
+        """The payload stays authoritative in the normal case — it exists so the
+        dispatcher does not depend on the transition's DB commit having landed."""
+        body = await self._dispatch(live_status="planning", payload_status="planning")
+        assert "Plan in progress" in body
+
+    @pytest.mark.asyncio
+    async def test_a_terminal_payload_is_never_overridden(self):
+        """A run that has genuinely reached `planned` after the payload was
+        written must not be rewritten by this guard — only NON-terminal payloads
+        are suspect."""
+        body = await self._dispatch(live_status="applied", payload_status="errored")
+        assert "Run failed" in body
+        assert "Apply complete" not in body

@@ -1529,13 +1529,34 @@ async def _summarise_one(payload: dict, _slack: dict) -> None:
         try:
             from terrapod.services.scheduler import enqueue_trigger
 
+            # Re-read the status rather than trusting `run`. That row was
+            # loaded BEFORE the model call, which takes tens of seconds — long
+            # enough for the run to have reached a terminal state since, and
+            # the session is already closed so the object cannot have been
+            # refreshed. Sending the snapshot rewrote the comment with the
+            # status the run had when the summary STARTED: a failed plan ended
+            # up reading "Plan in progress" directly above the failure analysis
+            # explaining why it failed (#1372).
+            status, changed = run.status, run.has_changes
+            try:
+                async with get_db_session() as fresh:
+                    row = (
+                        await fresh.execute(
+                            select(Run.status, Run.has_changes).where(Run.id == run_id)
+                        )
+                    ).first()
+                    if row is not None:
+                        status, changed = row
+            except Exception as e:  # pragma: no cover - best effort refresh
+                logger.debug("Could not refresh run status for comment", error=str(e))
+
             await enqueue_trigger(
                 "vcs_commit_status",
                 {
                     "run_id": str(run_id),
                     "workspace_id": str(ws.id),
-                    "target_status": run.status,
-                    "has_changes": run.has_changes,
+                    "target_status": status,
+                    "has_changes": changed,
                 },
                 dedup_key=f"vcs_status:aisum:{run_id}",
                 dedup_ttl=60,

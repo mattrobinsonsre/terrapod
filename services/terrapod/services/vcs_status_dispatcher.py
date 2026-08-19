@@ -70,6 +70,11 @@ _STATUS_MAP: dict[str, tuple[str, str, str]] = {
     "canceled": ("error", "canceled", "Run canceled"),
 }
 
+# Terminal run states. A run cannot leave one, so a live status in this set is
+# strictly newer than any non-terminal status a trigger payload carries — which
+# is what lets a late writer be corrected rather than trusted (#1372).
+_TERMINAL_STATUSES = frozenset({"applied", "errored", "discarded", "canceled"})
+
 # Status → emoji for PR comments
 _STATUS_EMOJI: dict[str, str] = {
     "pending": ":hourglass:",
@@ -381,6 +386,27 @@ async def handle_vcs_commit_status(payload: dict) -> None:
             if payload_has_changes is not _UNSET
             else run.has_changes
         )
+        # The payload's status is normally authoritative: it is snapshotted at
+        # the transition so the dispatcher does not depend on the DB commit
+        # having landed yet. The exception is a payload that has gone STALE —
+        # a writer that enqueued before a long side task (the AI summary) and
+        # fired after the run finished. Since a terminal state cannot be left,
+        # a terminal live status is strictly newer, so prefer it. Without this
+        # a failed plan's comment read "Plan in progress" above its own failure
+        # analysis (#1372). The comment is a shared, last-write-wins surface,
+        # which is why it needs the same kind of guard as the superseded-run
+        # check further down.
+        if run.status in _TERMINAL_STATUSES and target_status not in _TERMINAL_STATUSES:
+            logger.info(
+                "Preferring terminal run status over stale trigger payload",
+                run_id=run_id_str,
+                payload_status=target_status,
+                live_status=run.status,
+            )
+            target_status = run.status
+            if payload_has_changes is _UNSET:
+                has_changes = run.has_changes
+
         github_state, gitlab_state, description = _resolve_status(
             target_status, run.plan_only, has_changes
         )
