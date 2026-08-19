@@ -33,6 +33,31 @@ const hstsValue = process.env.HSTS ?? HSTS_DEFAULT
 const nextConfig = {
   output: 'standalone',
   allowedDevOrigins: ['terrapod.local'],
+  // Route the BFF's non-/api prefixes onto the shared proxy Route Handler
+  // (#1381). These are INTERNAL rewrites — they do not name the API, they name
+  // a route in this process — so unlike a rewrite pointing at API_URL they are
+  // safe to bake at build time (#47 does not apply).
+  //
+  // Why not three sibling route directories: Next's file-system router ignores
+  // dot-prefixed folders, so `app/.well-known/` would never match. One marker
+  // prefix handles all three uniformly.
+  //
+  // The marker is `/bff`, NOT `/_bff`: a leading underscore marks a PRIVATE
+  // folder in the App Router, so `app/_bff/` is excluded from routing entirely
+  // and every rewrite would 404 — with a green build, because nothing checks
+  // that a rewrite destination resolves. The handler refuses any path that did
+  // not come from one of the sources below, so `/bff` is not a usable alias.
+  //
+  // `beforeFiles` so these win before any page route is considered.
+  async rewrites() {
+    return {
+      beforeFiles: [
+        { source: '/.well-known/:path*', destination: '/bff/.well-known/:path*' },
+        { source: '/oauth/:path*', destination: '/bff/oauth/:path*' },
+        { source: '/v1/:path*', destination: '/bff/v1/:path*' },
+      ],
+    }
+  },
   // Prevent gzip buffering on SSE endpoints. Next.js compression buffers
   // small messages (keepalives, events) indefinitely, breaking real-time
   // streaming. Setting Content-Encoding: none tells the compression

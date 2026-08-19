@@ -168,5 +168,21 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
 # Expose port
 EXPOSE 8000
 
-# Run the application
-CMD ["uvicorn", "terrapod.api.app:app", "--host", "0.0.0.0", "--port", "8000"]
+# Run the application.
+#
+# --timeout-keep-alive: uvicorn defaults to 5s, which is a very short idle
+# window for a server sitting behind a connection-pooling proxy. The BFF keeps
+# pooled connections to this service, and a short server-side idle timeout makes
+# the reuse-vs-close race likely: the pool picks a socket at the moment uvicorn
+# closes it for idleness, and the client cannot tell that apart from the server
+# dying — it surfaces as ECONNRESET / "socket hang up". That cost a run in
+# #1381: one reset in four minutes, with no server-side error of any kind, but
+# enough to fail a `tofu init` that still had a provider to fetch.
+#
+# 75s puts the server's idle timeout comfortably above any client idle window we
+# sit behind (undici pools measure theirs in single-digit seconds; a load
+# balancer's is typically 60s), so the CLIENT is the side that retires an idle
+# socket — which it can do safely, because it is not mid-request. The BFF also
+# retries such a failure now, but that is the backstop; this is the fix.
+CMD ["uvicorn", "terrapod.api.app:app", "--host", "0.0.0.0", "--port", "8000", \
+     "--timeout-keep-alive", "75"]
