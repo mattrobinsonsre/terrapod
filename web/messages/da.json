@@ -1908,6 +1908,7 @@
     },
     "cards": {
       "changes": "Ændringer",
+      "cost": "Omkostning",
       "aiAnalysis": "AI-analyse",
       "policyChecks": "Politiktjek",
       "resources": "Ressourcer",

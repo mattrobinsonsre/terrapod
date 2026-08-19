@@ -1908,6 +1908,7 @@
     },
     "cards": {
       "changes": "Změny",
+      "cost": "Náklady",
       "aiAnalysis": "AI analýza",
       "policyChecks": "Kontroly zásad",
       "resources": "Prostředky",

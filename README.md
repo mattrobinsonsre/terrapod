@@ -2,17 +2,22 @@
 
 [![CI](https://github.com/mattrobinsonsre/terrapod/actions/workflows/ci.yml/badge.svg)](https://github.com/mattrobinsonsre/terrapod/actions/workflows/ci.yml)
 [![License: MPL 2.0](https://img.shields.io/badge/License-MPL%202.0-brightgreen.svg)](LICENSE)
+[![Latest release](https://img.shields.io/github/v/release/mattrobinsonsre/terrapod?sort=semver&label=release)](https://github.com/mattrobinsonsre/terrapod/releases/latest)
 
 **A free, open-source, self-hosted platform replacement for Terraform Enterprise / HCP Terraform.**
 
-Get the collaboration, governance, state, registry, and UI layer of a commercial Terraform platform — self-hosted on your own Kubernetes (a low bar, not a managed-cluster or Kubernetes-expertise requirement: a single-node [k3s](https://k3s.io/) VM is plenty to start), with no per-resource licensing and nothing proprietary in the stack. Terrapod gives you label-based RBAC and OPA/Rego policy-as-code (the open-source equivalent of TFE's Sentinel), versioned remote state, a private module + provider registry, and a modern web UI — all wrapped around `terraform` or `tofu`. It is a drop-in backend for the `cloud` block in `terraform` and `tofu`: it implements the slice of the [TFE V2 API](https://developer.hashicorp.com/terraform/enterprise/api-docs) those CLIs actually consume — the `cloud`/`remote` backend protocol, spoken over [`go-tfe`](https://pkg.go.dev/github.com/hashicorp/go-tfe) — so your existing `cloud` blocks and CI/CD point at a Terrapod instance with usually zero code changes. It does **not** reimplement the whole TFE V2 API: everything past that CLI-consumed slice is Terrapod's own API. It's **MPL-2.0** (the same license as OpenTofu and the historical Terraform codebase), and self-hosted internal use triggers no source-disclosure obligation.
+Terrapod is a **self-hosted, open-source alternative to Terraform Cloud (HCP Terraform) and Terraform Enterprise** — a **TACOS** (Terraform Automation and Collaboration Software) platform for teams standardizing on `terraform`, OpenTofu (`tofu`), or Terragrunt. It is **not** a fork of either engine. It orchestrates them.
 
-Terrapod is **not** a fork of Terraform or OpenTofu. It orchestrates them.
+- **Point your existing `cloud` block at it.** Terrapod implements the slice of the [TFE V2 API](https://developer.hashicorp.com/terraform/enterprise/api-docs) that `terraform` and `tofu` actually consume — the `cloud`/`remote` backend protocol, spoken over [`go-tfe`](https://pkg.go.dev/github.com/hashicorp/go-tfe) — so CLI runs and CI/CD usually move across with zero code changes. (It does *not* reimplement the whole TFE V2 API; everything past that CLI-consumed slice is Terrapod's own.)
+- **Your state and secrets never leave your boundary.** Versioned remote state in your Postgres and object store, cloud credentials via Kubernetes workload identity — nothing long-lived, nothing vendor-held.
+- **Governance included, not upsold.** Label-based RBAC, OPA/Rego policy-as-code (the open-source equivalent of TFE's Sentinel), a private module and provider registry, cost estimation, security scanning, and an AI review layer.
+- **A low bar to run.** Your own Kubernetes — and that means a single-node [k3s](https://k3s.io/) VM is plenty to start, not a managed cluster or Kubernetes expertise.
+- **Free, and staying free.** **MPL-2.0** (the same license as OpenTofu and the historical Terraform codebase); self-hosted internal use triggers no source-disclosure obligation. No commercial edition, no open-core split, no paid tier, no per-resource pricing, now or planned — the complete platform is in this repository.
 
-In short: it's a free, **self-hosted, open-source alternative to Terraform Cloud (HCP Terraform) and Terraform Enterprise** — a **TACOS** (Terraform Automation and Collaboration Software) platform for teams standardizing on `terraform`, OpenTofu (`tofu`), or Terragrunt. And it will **stay** free — there is no commercial edition, no open-core split, no paid tier, and no per-resource pricing, now or planned; the complete platform is in this repository. New here and comparing options? Start with **[Alternatives to Terraform Enterprise / Terraform Cloud](docs/alternatives.md)** and the **[FAQ](docs/faq.md)**.
+Comparing options? Start with **[Alternatives to Terraform Enterprise / Terraform Cloud](docs/alternatives.md)** and the **[FAQ](docs/faq.md)**.
 
-![Terrapod run detail — plan output with an AI change summary, per-policy OPA pass/fail, and resource-change cards](docs/images/run-detail.png)
-*A single run: plan output, an AI-generated change summary and risk assessment, per-policy OPA results, and resource-change cards.*
+![A Terrapod run: what changes, what it costs per month, the AI risk verdict, OPA policy result, and the security scan — as six cards on one screen](docs/images/run-detail.png)
+*One run, one screen: what changes, what it will cost per month, what the AI review makes of the risk, whether policy and the security scan passed. Every number here came from a real plan.*
 
 **Which path are you on?** — [Evaluate](#quick-evaluation) (`make eval`, one command) · [Deploy](#quick-start) (Helm on your cluster) · [Migrate](docs/migration.md) (off TFE / HCP / Atlantis, reversible) · [Contribute](CONTRIBUTING.md)
 
@@ -197,12 +202,19 @@ Everything below is implemented and shipped today.
 ### More screenshots
 
 <details>
-<summary>Workspace overview, variables, and agent pools</summary>
+<summary>The AI review, the run log, the workspace list, and the impact graph</summary>
 
-![Workspace overview with VCS integration, drift detection, and labels](docs/images/workspace-overview.png)
-![Variables with sensitive masking and HCL support](docs/images/workspace-variables.png)
-![Agent pools with listener health monitoring](docs/images/admin-agent-pools.png)
+![An AI plan summary explaining why an ECS service must be replaced rather than updated, citing the immutable fields responsible](docs/images/run-ai-analysis.png)
+*The AI review reads the plan, not a template: here it works out that `launch_type` and `scheduling_strategy` are immutable, which is why the service is replaced rather than updated, and what that means for availability.*
+
+![Plan output showing an ECS service that must be replaced, with launch_type and scheduling_strategy marked "forces replacement"](docs/images/run-log.png)
+*The same run's plan output — the reason a human is asked to approve it. `launch_type` and `scheduling_strategy` are immutable, so the service is destroyed and rebuilt rather than updated, and the log says so in as many words.*
+
+![A workspace list with mixed local and agent execution, per-workspace CPU and memory, and live run status](docs/images/workspaces.png)
+*An estate: per-workspace execution mode, agent pool, runner sizing and live status, filterable by label.*
+
 ![Impact graph: a plan clustered by module with a resource's downstream blast radius highlighted](docs/images/impact-graph.png)
+*The impact graph — a plan clustered by module, with a resource's downstream blast radius highlighted.*
 </details>
 
 ---

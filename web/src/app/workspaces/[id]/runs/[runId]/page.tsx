@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useLayoutEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
-import { useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import Convert from 'ansi-to-html'
@@ -71,6 +71,9 @@ interface RunAttrs {
   'is-drift-detection': boolean
   'has-json-output'?: boolean
   'has-cost-estimate'?: boolean
+  'cost-monthly-min'?: number
+  'cost-monthly-max'?: number
+  'cost-currency'?: string
   'plan-summary': {
     add: number
     change: number
@@ -586,6 +589,7 @@ export default function RunDetailPage() {
 
 function RunDetailPageInner() {
   const t = useTranslations('runDetail')
+  const locale = useLocale()
   // Shared with the workspace page — same four values, one set of labels.
   const tMode = useTranslations('common.autoApplyMode')
   const router = useRouter()
@@ -1054,6 +1058,21 @@ function RunDetailPageInner() {
 
   // ── Overview summary cards ──────────────────────────────────────────
   const ps = attrs['plan-summary']
+  // Money stays LTR + locale-formatted, matching CostPanel's own formatting so
+  // the card and the tab it opens never disagree on the figure.
+  const costRange = (() => {
+    const lo = attrs['cost-monthly-min']
+    const hi = attrs['cost-monthly-max']
+    if (typeof lo !== 'number') return ''
+    const money = (n: number) =>
+      new Intl.NumberFormat(locale, {
+        style: 'currency',
+        currency: attrs['cost-currency'] || 'USD',
+        maximumFractionDigits: 2,
+      }).format(n)
+    return typeof hi === 'number' && hi !== lo ? `${money(lo)} – ${money(hi)}` : money(lo)
+  })()
+
   const changeCard: { value: React.ReactNode; sub?: string; tone: CardTone } = (() => {
     if (attrs['has-changes'] === false && !attrs['plan-only'] && ['planned', 'applied'].includes(attrs.status)) {
       return { value: t('changes.noChanges'), tone: 'neutral' }
@@ -1442,6 +1461,17 @@ function RunDetailPageInner() {
             tone={changeCard.tone}
             onClick={() => switchView('plan')}
           />
+          {/* Cost (#871) — the overview is the at-a-glance rollup, so the
+              headline monthly figure belongs here beside the other signals,
+              not only behind its own tab. Reuses the Cost tab's own strings. */}
+          {attrs['has-cost-estimate'] && typeof attrs['cost-monthly-min'] === 'number' && (
+            <SummaryCard
+              label={t('cards.cost')}
+              value={t('cost.perMonth', { amount: costRange })}
+              sub={t('cost.monthlyTotal')}
+              onClick={() => switchView('cost')}
+            />
+          )}
           <SummaryCard
             label={t('cards.aiAnalysis')}
             value={aiCard.value}

@@ -1908,6 +1908,7 @@
     },
     "cards": {
       "changes": "Изменения",
+      "cost": "Стоимость",
       "aiAnalysis": "ИИ-анализ",
       "policyChecks": "Проверки политик",
       "resources": "Ресурсы",

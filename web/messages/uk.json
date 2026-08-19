@@ -1908,6 +1908,7 @@
     },
     "cards": {
       "changes": "Зміни",
+      "cost": "Вартість",
       "aiAnalysis": "Аналіз ШІ",
       "policyChecks": "Перевірки політик",
       "resources": "Ресурси",

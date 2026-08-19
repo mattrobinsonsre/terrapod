@@ -1908,6 +1908,7 @@
     },
     "cards": {
       "changes": "Değişiklikler",
+      "cost": "Maliyet",
       "aiAnalysis": "AI analizi",
       "policyChecks": "Politika denetimleri",
       "resources": "Kaynaklar",

@@ -1908,6 +1908,7 @@
     },
     "cards": {
       "changes": "변경 사항",
+      "cost": "비용",
       "aiAnalysis": "AI 분석",
       "policyChecks": "정책 검사",
       "resources": "리소스",
