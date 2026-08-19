@@ -1908,6 +1908,7 @@
     },
     "cards": {
       "changes": "Muutokset",
+      "cost": "Kustannus",
       "aiAnalysis": "Tekoälyanalyysi",
       "policyChecks": "Käytäntötarkistukset",
       "resources": "Resurssit",

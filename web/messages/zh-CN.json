@@ -1908,6 +1908,7 @@
     },
     "cards": {
       "changes": "更改",
+      "cost": "成本",
       "aiAnalysis": "AI 分析",
       "policyChecks": "策略检查",
       "resources": "资源",

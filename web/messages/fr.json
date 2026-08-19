@@ -1908,6 +1908,7 @@
     },
     "cards": {
       "changes": "Modifications",
+      "cost": "Coût",
       "aiAnalysis": "Analyse IA",
       "policyChecks": "Vérifications de politiques",
       "resources": "Ressources",
