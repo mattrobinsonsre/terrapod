@@ -40,6 +40,14 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
     {
+      // No storageState: these assert the BFF's proxy WIRING, and an
+      // unauthenticated request proves routing just as well as an authorised
+      // one — the CLI prefixes are reached before any session exists (#1381).
+      name: 'bff-proxy',
+      testMatch: 'bff-proxy.spec.ts',
+      use: { ...devices['Desktop Chrome'] },
+    },
+    {
       name: 'workspaces',
       testMatch: 'workspaces.spec.ts',
       use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },

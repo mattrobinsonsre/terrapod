@@ -147,6 +147,8 @@ jobs:
         run: npm run i18n:check
       - name: i18n no-hardcoded-strings (no new untranslated JSX literals — #767)
         run: npm run i18n:lint
+      - name: Unit tests (node:test — no test framework dependency)
+        run: npm run test:unit
 
   # ── Provider Lint ─────────────────────────────────────
   provider-lint:

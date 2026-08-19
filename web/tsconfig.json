@@ -9,6 +9,10 @@
     "skipLibCheck": true,
     "strict": true,
     "noEmit": true,
+    // node:test runs the unit tests as TypeScript directly (no build step), and
+    // Node's ESM resolver requires the explicit `.ts` specifier. Safe here
+    // because we never emit — tsc only type-checks.
+    "allowImportingTsExtensions": true,
     "esModuleInterop": true,
     "module": "esnext",
     "moduleResolution": "bundler",
