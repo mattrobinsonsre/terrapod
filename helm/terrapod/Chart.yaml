@@ -2,7 +2,11 @@ apiVersion: v2
 name: terrapod
 description: Terrapod - Open-source Terraform Enterprise replacement
 type: application
-kubeVersion: ">= 1.23.0-0"
+# 1.27 is the floor the project actually tests against; the README states the
+# same number. It was previously declared as 1.23, which let the chart install
+# happily on versions nobody has ever exercised — a promise made by accident
+# rather than on purpose (#1387).
+kubeVersion: ">= 1.27.0-0"
 version: 0.0.0
 appVersion: "0.0.0"
 
