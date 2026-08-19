@@ -22,19 +22,30 @@ import { proxy } from '@/lib/bff-proxy'
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
-// This route is reachable directly, not only via the rewrites, so it is pinned
-// to exactly the prefixes those rewrites feed it. Without this, `/bff/<path>`
-// would proxy any path to the API — a wider surface than the three prefixes we
-// mean to expose, for no benefit.
+// This route is reachable directly, not only through the rewrites, so it is
+// pinned to exactly the prefixes those rewrites feed it. Without this,
+// `/bff/<anything>` would proxy any path to the API — a wider surface than the
+// three prefixes we mean to expose, for no benefit.
 const ALLOWED = ['/v1/', '/oauth/', '/.well-known/']
 
+// A rewrite does NOT change the request URL: after `/v1/x` is rewritten here,
+// `request.url` is still `/v1/x`, and only a direct hit carries the `/bff`
+// marker. So the marker is stripped only when it is actually present — both
+// here and in `proxy` — and the allow-list is applied to the real path either
+// way. Assuming the marker is always there silently mangles the path (it slices
+// four characters off `/v1/...`) and every rewritten request 404s.
+const MARKER = '/bff'
+
+function publicPath(url: string): string {
+  const { pathname } = new URL(url)
+  return pathname.startsWith(MARKER + '/') ? pathname.slice(MARKER.length) : pathname
+}
+
 const handler = (request: NextRequest) => {
-  const path = new URL(request.url).pathname.slice('/bff'.length)
-  if (!ALLOWED.some((p) => path.startsWith(p))) {
+  if (!ALLOWED.some((prefix) => publicPath(request.url).startsWith(prefix))) {
     return Promise.resolve(new Response('Not Found', { status: 404 }))
   }
-  // Strip the marker so the API sees the path the client asked for.
-  return proxy(request, '/bff')
+  return proxy(request, MARKER)
 }
 
 export const GET = handler
