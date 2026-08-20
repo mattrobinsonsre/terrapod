@@ -35,8 +35,7 @@ FENCE_RE = re.compile(r"^\s*(`{3,}|~{3,})(.*)$")
 
 
 def sentences(text: str):
-    for s in re.split(r"(?<=[.!?])\s+", text):
-        yield s
+    yield from re.split(r"(?<=[.!?])\s+", text)
 
 
 def main() -> int:
