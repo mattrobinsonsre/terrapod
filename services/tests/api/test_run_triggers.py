@@ -25,7 +25,7 @@ def _user(email="test@example.com", roles=None):
     )
 
 
-def _mock_workspace(ws_id=None, name="test-ws"):
+def _mock_workspace(ws_id=None, name="test-ws", *, vcs=False):
     ws = MagicMock()
     ws.id = ws_id or uuid.uuid4()
     ws.name = name
@@ -35,6 +35,14 @@ def _mock_workspace(ws_id=None, name="test-ws"):
     ws.vcs_last_attempted_at = None
     ws.vcs_last_error = None
     ws.vcs_last_error_at = None
+    # Set explicitly, and default to NOT VCS-connected. An unset MagicMock
+    # attribute is a MagicMock, which is truthy — so every workspace built here
+    # silently looked VCS-connected to any code that tested the field. That went
+    # unnoticed while nothing branched on it; the moment run triggers did
+    # (#1396), these tests took the VCS path by accident.
+    ws.vcs_connection_id = uuid.uuid4() if vcs else None
+    ws.vcs_repo_url = "https://github.com/example/repo" if vcs else ""
+    ws.vcs_branch = "main" if vcs else ""
     return ws
 
 
@@ -480,7 +488,12 @@ class TestFireRunTriggers:
     @patch("terrapod.services.run_service.queue_run")
     @patch("terrapod.services.run_service.create_run")
     async def test_fire_triggers_attaches_latest_cv(self, mock_create, mock_queue):
-        """#439: triggered runs must carry the destination's latest uploaded CV."""
+        """#439: triggered runs must carry the destination's latest uploaded CV.
+
+        Non-VCS destination — the CLI is the only producer of code there, so the
+        last upload is the desired state. A VCS-connected destination fetches
+        instead; see the tests below.
+        """
         from terrapod.services.run_service import fire_run_triggers
 
         source_ws_id = uuid.uuid4()
@@ -493,8 +506,12 @@ class TestFireRunTriggers:
 
         triggers_result = MagicMock()
         triggers_result.scalars.return_value.all.return_value = [trigger]
+        # get_latest_uploaded_cv returns the CV row, not its id — and it filters
+        # out speculative CVs, which the open-coded query it replaced did not.
+        latest_cv = MagicMock()
+        latest_cv.id = latest_cv_id
         cv_result = MagicMock()
-        cv_result.scalar_one_or_none.return_value = latest_cv_id
+        cv_result.scalar_one_or_none.return_value = latest_cv
 
         mock_db = AsyncMock()
         mock_db.execute.side_effect = [triggers_result, cv_result]
@@ -508,6 +525,79 @@ class TestFireRunTriggers:
         mock_create.assert_called_once()
         assert mock_create.call_args.kwargs["configuration_version_id"] == latest_cv_id
         mock_queue.assert_called_once_with(mock_db, downstream_run)
+
+    @patch("terrapod.services.run_service.queue_run")
+    @patch("terrapod.services.run_service.create_run")
+    async def test_a_vcs_destination_fetches_code_rather_than_reusing_a_cv(
+        self, mock_create, mock_queue
+    ):
+        """#1396. A trigger means "reconcile against your desired state", and for
+        a VCS-connected workspace that is the tracked branch — not whichever
+        configuration version happens to be newest.
+
+        Reusing the newest CV was wrong three ways: it could be days stale (a
+        drift check uploads one daily); it could be a drift CV, which the apply
+        guard then refuses outright; and it could be a SPECULATIVE CV from an
+        open pull request, whose source is "vcs" so the guard allowed it — an
+        apply of unmerged code.
+        """
+        from terrapod.services.run_service import fire_run_triggers
+
+        source_ws_id = uuid.uuid4()
+        dest_ws = _mock_workspace(name="downstream", vcs=True)
+        trigger = MagicMock()
+        trigger.workspace = dest_ws
+
+        triggers_result = MagicMock()
+        triggers_result.scalars.return_value.all.return_value = [trigger]
+        mock_db = AsyncMock()
+        mock_db.execute.return_value = triggers_result
+        mock_db.get.return_value = _mock_workspace(ws_id=source_ws_id, name="upstream")
+
+        downstream_run = MagicMock()
+        mock_create.return_value = downstream_run
+
+        fetched_cv_id = uuid.uuid4()
+        with patch(
+            "terrapod.services.vcs_config_service.fetch_config_version",
+            new=AsyncMock(return_value=(fetched_cv_id, "abc1234", "main")),
+        ) as mock_fetch:
+            await fire_run_triggers(mock_db, source_ws_id)
+
+        mock_fetch.assert_awaited_once()
+        assert mock_create.call_args.kwargs["configuration_version_id"] == fetched_cv_id
+        # The sha is what marks the run as carrying VCS code — the same signal a
+        # poller-created run has, and what the apply guard reads.
+        assert downstream_run.vcs_commit_sha == "abc1234"
+        assert downstream_run.vcs_branch == "main"
+
+    @patch("terrapod.services.run_service.queue_run")
+    @patch("terrapod.services.run_service.create_run")
+    async def test_a_failed_fetch_fires_no_run_at_all(self, mock_create, mock_queue):
+        """#1396. No fallback. Every available fallback is "apply some other
+        code instead", and applying code nobody asked for is worse than not
+        running — so a provider outage means the trigger does not fire."""
+        from terrapod.services.run_service import fire_run_triggers
+
+        source_ws_id = uuid.uuid4()
+        dest_ws = _mock_workspace(name="downstream", vcs=True)
+        trigger = MagicMock()
+        trigger.workspace = dest_ws
+
+        triggers_result = MagicMock()
+        triggers_result.scalars.return_value.all.return_value = [trigger]
+        mock_db = AsyncMock()
+        mock_db.execute.return_value = triggers_result
+        mock_db.get.return_value = _mock_workspace(ws_id=source_ws_id, name="upstream")
+
+        with patch(
+            "terrapod.services.vcs_config_service.fetch_config_version",
+            new=AsyncMock(side_effect=RuntimeError("github is having a bad afternoon")),
+        ):
+            await fire_run_triggers(mock_db, source_ws_id)
+
+        mock_create.assert_not_called()
+        mock_queue.assert_not_called()
 
     @patch("terrapod.services.run_service.queue_run")
     @patch("terrapod.services.run_service.create_run")

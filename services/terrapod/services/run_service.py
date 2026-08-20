@@ -651,6 +651,32 @@ async def create_run(
     when a configuration version is uploaded (or immediately if none needed).
     """
     await ha_role.ensure_leader("create runs")
+
+    # A run against a SPECULATIVE configuration version is always plan-only.
+    #
+    # A speculative CV is the artifact of a plan-only run — an unmerged pull
+    # request, or a `tofu plan` upload from the CLI. Its code has not been
+    # merged and may never be. Applying one would put unreviewed code into a
+    # real workspace, so this is not a preference: there is no combination of
+    # arguments that produces an apply-capable run against one.
+    #
+    # This lives HERE, in the service, because that is the one place every
+    # caller passes through. It was previously enforced only in the HTTP
+    # endpoint (#661), which left every internal caller — run triggers, the VCS
+    # poller, drift detection, module impact, autodiscovery — able to create an
+    # apply-capable run against a speculative CV by passing plan_only=False.
+    # `fire_run_triggers` did exactly that (#1396).
+    if configuration_version_id is not None and not plan_only:
+        spec_cv = await db.get(ConfigurationVersion, configuration_version_id)
+        if spec_cv is not None and spec_cv.speculative:
+            logger.warning(
+                "Forcing plan-only: run points at a speculative configuration version",
+                workspace=workspace.name,
+                configuration_version_id=str(configuration_version_id),
+                source=source,
+            )
+            plan_only = True
+
     # An explicit `auto_apply` argument (the CLI/API asking for a specific
     # behaviour on this one run) still means exactly what it says, so it maps
     # onto the flat modes. Only an unset argument inherits the workspace's
@@ -1284,8 +1310,6 @@ async def fire_run_triggers(
     """
     from sqlalchemy.orm import selectinload
 
-    from terrapod.db.models import ConfigurationVersion
-
     result = await db.execute(
         select(RunTrigger)
         .options(selectinload(RunTrigger.workspace))
@@ -1305,18 +1329,50 @@ async def fire_run_triggers(
         if dest_ws is None:
             continue
 
-        # Latest uploaded CV for the destination — required so the
-        # runner has code to plan against.
-        cv_result = await db.execute(
-            select(ConfigurationVersion.id)
-            .where(
-                ConfigurationVersion.workspace_id == dest_ws.id,
-                ConfigurationVersion.status == "uploaded",
-            )
-            .order_by(ConfigurationVersion.created_at.desc())
-            .limit(1)
-        )
-        latest_cv_id = cv_result.scalar_one_or_none()
+        # Where the destination's code comes from.
+        #
+        # VCS-connected: FETCH IT. A trigger means "the thing upstream of you
+        # changed, reconcile" — reconcile against the tracked branch, which is
+        # the workspace's declared desired state. This used to reuse whichever
+        # configuration version happened to be newest, which is not the same
+        # thing and was wrong in three separate ways: it could be days stale
+        # (a drift check uploads a CV daily, so on a quiet repo every one of
+        # the newest CVs is a drift artifact); it could be a drift CV, which
+        # the apply guard then refuses, leaving the trigger permanently unable
+        # to apply; and it could be a SPECULATIVE CV from an open pull request,
+        # whose source is "vcs" so the guard waved it straight through — an
+        # apply of unmerged code (#1396).
+        #
+        # If the fetch fails, the trigger fails. There is no fallback, because
+        # every available fallback is "apply some other code instead", and
+        # applying code nobody asked for is worse than not running.
+        #
+        # Non-VCS: the CLI is the only producer of code, so the last upload is
+        # the desired state. Via get_latest_uploaded_cv, which excludes
+        # speculative CVs — the open-coded query it replaces did not.
+        latest_cv_id = None
+        vcs_sha = ""
+        vcs_ref = ""
+        if dest_ws.vcs_connection_id is not None and dest_ws.vcs_repo_url:
+            try:
+                from terrapod.services import vcs_config_service
+
+                latest_cv_id, vcs_sha, vcs_ref = await vcs_config_service.fetch_config_version(
+                    db, dest_ws
+                )
+            except Exception as e:
+                logger.error(
+                    "Run trigger failed: could not fetch code from VCS",
+                    source_workspace=source_name,
+                    destination_workspace=dest_ws.name,
+                    repo=dest_ws.vcs_repo_url,
+                    error=str(e),
+                    exc_info=True,
+                )
+                continue
+        else:
+            cv = await get_latest_uploaded_cv(db, dest_ws.id)
+            latest_cv_id = cv.id if cv else None
 
         if latest_cv_id is None:
             logger.warning(
@@ -1340,6 +1396,13 @@ async def fire_run_triggers(
             source="run-trigger",
             configuration_version_id=latest_cv_id,
         )
+
+        # Record where the code came from. Beyond provenance in the UI, this is
+        # what marks the run as carrying VCS-fetched code, which the apply guard
+        # reads to exempt it — the same signal a poller-created run carries.
+        if vcs_sha:
+            run.vcs_commit_sha = vcs_sha
+            run.vcs_branch = vcs_ref
         await queue_run(db, run)
 
         logger.info(
@@ -1450,6 +1513,20 @@ async def confirm_run(db: AsyncSession, run: Run) -> Run:
     # reflects the current state, or has aged past the workspace TTL, must not be
     # applied. Auto-discard it (unlocking the workspace) and surface a 409 so the
     # caller re-plans. State drift is the always-on correctness guard.
+    # Second line of defence for the speculative invariant. `create_run` forces
+    # plan-only for a speculative CV, so a run reaching here with one should not
+    # exist — but "should not exist" is not a guarantee for rows already in the
+    # database, written before that guard, or by any future path that builds a
+    # Run without going through it. Applying unmerged pull-request code is bad
+    # enough to be worth checking twice (#1396).
+    if run.configuration_version_id is not None:
+        cv = await db.get(ConfigurationVersion, run.configuration_version_id)
+        if cv is not None and cv.speculative:
+            raise ValueError(
+                "this run's configuration version is speculative (a plan-only "
+                "artifact of an unmerged change) and cannot be applied"
+            )
+
     stale = await _staleness_reason(db, run, workspace)
     if stale is not None:
         await discard_run(db, run, reason=stale)

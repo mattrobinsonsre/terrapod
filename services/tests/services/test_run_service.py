@@ -126,6 +126,11 @@ def _mock_run(**kwargs):
     # MagicMock here silently defeats the pool-set resolution.
     run.pool_id = kwargs.get("pool_id", None)
     run.pool_extra_ids = kwargs.get("pool_extra_ids", [])
+    # Explicit, and None by default, for the same reason as pool_id above: an
+    # unset MagicMock attribute is truthy, so confirm_run's speculative-CV check
+    # (#1396) would look one up and find whatever `db.get` was stubbed with —
+    # usually the workspace, whose `.speculative` is itself a truthy MagicMock.
+    run.configuration_version_id = kwargs.get("configuration_version_id", None)
     return run
 
 
@@ -557,6 +562,21 @@ class TestConfirmRun:
         run = _mock_run(status="planned")
         result = await confirm_run(db, run)
         assert result.status == "confirmed"
+
+    async def test_rejects_a_speculative_configuration_version(self):
+        """#1396. A speculative CV is the artifact of a plan-only run — an
+        unmerged PR, or a `tofu plan` upload. Applying one puts unreviewed code
+        into a real workspace, so confirm refuses even if such a run exists."""
+        db = AsyncMock(spec=AsyncSession)
+        ws = MagicMock()
+        ws.locked = False
+        cv = MagicMock()
+        cv.speculative = True
+        # First lookup is the workspace, second is the configuration version.
+        db.get.side_effect = [ws, cv]
+        run = _mock_run(status="planned", configuration_version_id=uuid.uuid4())
+        with pytest.raises(ValueError, match="speculative"):
+            await confirm_run(db, run)
 
     async def test_rejects_non_planned(self):
         db = AsyncMock(spec=AsyncSession)

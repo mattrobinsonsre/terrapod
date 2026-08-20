@@ -1517,3 +1517,95 @@ class TestRunTriggerRunsAreApplicable:
 
         resp = await client.post(f"/api/v2/runs/{run['id']}/actions/apply", headers=AUTH)
         assert resp.status_code == 200, resp.text
+
+
+class TestSpeculativeConfigVersionsAreNeverApplied:
+    """A speculative configuration version can never be applied. Not by any
+    caller, not by any combination of arguments (#1396).
+
+    A speculative CV is the artifact of a plan-only run — an unmerged pull
+    request, or a `tofu plan` upload. Applying one puts unreviewed code into a
+    real workspace.
+
+    The rule was enforced only in the HTTP endpoint (#661), so every internal
+    caller could opt out of it simply by passing `plan_only=False`.
+    `fire_run_triggers` did, because it selected the newest uploaded CV without
+    excluding speculative ones — and a speculative CV created by the VCS poller
+    for an open PR carries `source="vcs"`, which the apply guard waves through.
+    """
+
+    @staticmethod
+    async def _mark_cv_speculative(ws_id: str):
+        import uuid as _uuid
+
+        from sqlalchemy import select
+
+        from terrapod.db.models import ConfigurationVersion
+        from terrapod.db.session import get_db_session
+
+        async with get_db_session() as db:
+            result = await db.execute(
+                select(ConfigurationVersion)
+                .where(ConfigurationVersion.workspace_id == _uuid.UUID(ws_id.removeprefix("ws-")))
+                .order_by(ConfigurationVersion.created_at.desc())
+                .limit(1)
+            )
+            cv = result.scalar_one_or_none()
+            assert cv is not None
+            cv.speculative = True
+            await db.commit()
+            return cv.id
+
+    async def test_the_service_forces_plan_only_whatever_the_caller_asked_for(
+        self, app, client, setup
+    ):
+        """The chokepoint. Every internal caller goes through `create_run`, so
+        the invariant belongs there rather than in one HTTP handler."""
+        import uuid as _uuid
+
+        from terrapod.db.models import Workspace
+        from terrapod.db.session import get_db_session
+        from terrapod.services import run_service
+
+        pool_id, _ = setup
+        ws_id = await _create_remote_workspace(client, pool_id, "spec-service")
+        cv_id = await self._mark_cv_speculative(ws_id)
+
+        async with get_db_session() as db:
+            ws = await db.get(Workspace, _uuid.UUID(ws_id.removeprefix("ws-")))
+            run = await run_service.create_run(
+                db,
+                workspace=ws,
+                message="asking for an apply against speculative code",
+                plan_only=False,  # explicitly asking for the thing that must not happen
+                configuration_version_id=cv_id,
+            )
+            await db.commit()
+            assert run.plan_only is True, (
+                "an apply-capable run was created against a speculative CV"
+            )
+
+    async def test_confirm_refuses_even_if_such_a_run_exists(self, app, client, setup):
+        """Second line of defence, for rows written before the guard above —
+        which is not hypothetical, since this shipped broken."""
+        import uuid as _uuid
+
+        from terrapod.db.models import Run
+        from terrapod.db.session import get_db_session
+
+        pool_id, listener_id = setup
+        ws_id = await _create_remote_workspace(client, pool_id, "spec-confirm")
+
+        run = await _create_run(client, ws_id)
+        await _run_plan_lifecycle(client, listener_id, run["id"])
+        # Make the CV speculative AFTER the run was created and planned, which
+        # reproduces the pre-fix row shape: plan_only False, speculative CV.
+        await self._mark_cv_speculative(ws_id)
+        async with get_db_session() as db:
+            r = await db.get(Run, _uuid.UUID(run["id"].removeprefix("run-")))
+            r.plan_only = False
+            await db.commit()
+
+        resp = await client.post(f"/api/v2/runs/{run['id']}/actions/apply", headers=AUTH)
+        assert resp.status_code == 409, resp.text
+        assert "speculative" in resp.text.lower()
