@@ -167,11 +167,13 @@ up() {
   # An outer bound, because helm's own --timeout does not always hold it: the
   # 4.2.1 delete-wait above ran well past 600s. Whatever goes wrong, this command
   # ends and says something rather than sitting there.
-  local budget="${TERRAPOD_EVAL_WATCHDOG:-1200}" waited=0 step=20
+  # Poll liveness every second but only report every `step`, so a fast failure
+  # is reported at once. Sleeping the whole reporting interval and checking after
+  # would delay a helm error — which usually arrives in the first seconds, when
+  # the cluster is unreachable — by up to that interval, for no reason.
+  local budget="${TERRAPOD_EVAL_WATCHDOG:-1200}" waited=0 step=20 tick=0
   while kill -0 "$helm_pid" 2>/dev/null; do
-    sleep "$step"; waited=$((waited + step))
-    # helm may have finished during that sleep; without this the loop prints one
-    # last status line on top of the success banner.
+    sleep 1; waited=$((waited + 1)); tick=$((tick + 1))
     kill -0 "$helm_pid" 2>/dev/null || break
     if [ "$waited" -ge "$budget" ]; then
       warn "helm has been running for ${waited}s with no result — giving up."
@@ -179,8 +181,10 @@ up() {
       kubectl --context "$ctx" -n "$NS" get pods || true
       die "install exceeded ${budget}s. Re-run with TERRAPOD_EVAL_WATCHDOG=<seconds> to allow longer, or 'scripts/eval.sh down' to clean up."
     fi
-    # Pods first; before any exist, say which hook helm is on, so the silent
-    # early phase is legible too.
+    [ "$tick" -ge "$step" ] || continue
+    tick=0
+    # Pods first; before any exist, say so, so the silent early phase — when
+    # helm is applying hooks and nothing has been scheduled yet — is legible too.
     local pods
     pods="$(kubectl --context "$ctx" -n "$NS" get pods --no-headers 2>/dev/null || true)"
     if [ -n "$pods" ]; then
