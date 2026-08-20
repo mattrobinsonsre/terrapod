@@ -1920,6 +1920,23 @@ verification honors revocation without shelling out to `gpg`; #640.)
 
 ## Agent Pools
 
+### Pool Response Attributes
+
+| Attribute | Type | Notes |
+|---|---|---|
+| `name` | string | Unique pool name |
+| `description` | string | Free text, `""` when unset |
+| `labels` | object | Label map used for pool RBAC |
+| `owner-email` | string / null | Owner gets `admin` on the pool |
+| `created-at` / `updated-at` | RFC3339 | |
+| `status` | string | `online` if at least one listener could take work, `degraded` if every live listener has an expired certificate, else `offline` |
+| `listener-count` | integer | Listener **identities** that could take work — derived from the same predicate as `status`, so the two can never disagree. A listener that heartbeats with an expired certificate 401s every authenticated call and is not counted |
+| `listener-pod-count` | integer | **Pods** backing those listeners. Replicas of one Deployment share a listener identity, so a redundant pair reports `listener-count: 1` and `listener-pod-count: 2`. **Omitted entirely when unknown** — a listener on a pre-0.19.0 image does not report its pod name, and reporting zero would read as an outage. `0` is meaningful: the listener tracks pods and none are currently heartbeating |
+| `permission` | string | The calling user's resolved permission on this pool (`read`, `write`, `admin`) |
+
+`status` and both counts are present on the list and show endpoints; they are
+omitted from create/update responses, which do not fetch listeners.
+
 ### List Pools
 
 ```
