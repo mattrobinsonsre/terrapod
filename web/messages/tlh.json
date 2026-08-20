@@ -6,7 +6,7 @@
     "modules": "Segh",
     "providers": "nobwI'pu'",
     "catalog": "tetlh",
-    "agentPools": "Duy bIQ'a'mey",
+    "agentPools": "DuHmey",
     "admin": "che'wI'",
     "users": "lo'wI'pu'",
     "roles": "patlhmey",
@@ -32,7 +32,8 @@
     "openAccountMenu": "lo'wI' tetlh poSmoH",
     "closeMenu": "tetlh SoQmoH",
     "ha": "taH laH",
-    "deletedWorkspaces": "Qumwo'mey Qaw'lu'bogh"
+    "deletedWorkspaces": "Qumwo'mey Qaw'lu'bogh",
+    "version": "mI' {version}"
   },
   "switcher": {
     "language": "Hol",

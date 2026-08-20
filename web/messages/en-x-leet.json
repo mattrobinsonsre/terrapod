@@ -6,7 +6,7 @@
     "modules": "M0dul35",
     "providers": "Pr0v1d3r5",
     "catalog": "C474l0g",
-    "agentPools": "4g3n7 P00l5",
+    "agentPools": "4g3n75",
     "admin": "4dm1n",
     "users": "U53r5",
     "roles": "R0l35",
@@ -32,7 +32,8 @@
     "openAccountMenu": "0p3n 4cc0un7 m3nu",
     "closeMenu": "Cl053 m3nu",
     "ha": "H1gh 4v41l4b1l17y",
-    "deletedWorkspaces": "D3l373d w0rk5p4c35"
+    "deletedWorkspaces": "D3l373d w0rk5p4c35",
+    "version": "V3r510n {version}"
   },
   "switcher": {
     "language": "L4ngu4g3",

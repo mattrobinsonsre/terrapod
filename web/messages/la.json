@@ -6,7 +6,7 @@
     "modules": "Moduli",
     "providers": "Praebitores",
     "catalog": "Catalogus",
-    "agentPools": "Copiae Actorum",
+    "agentPools": "Agentes",
     "admin": "Administratio",
     "users": "Usores",
     "roles": "Partes",
@@ -32,7 +32,8 @@
     "openAccountMenu": "Indicem rationis aperire",
     "closeMenu": "Indicem claudere",
     "ha": "Alta disponibilitas",
-    "deletedWorkspaces": "Loca operis deleta"
+    "deletedWorkspaces": "Loca operis deleta",
+    "version": "Versio {version}"
   },
   "switcher": {
     "language": "Lingua",

@@ -6,7 +6,7 @@
     "modules": "模块",
     "providers": "提供程序",
     "catalog": "目录",
-    "agentPools": "代理池",
+    "agentPools": "代理",
     "admin": "管理",
     "users": "用户",
     "roles": "角色",
@@ -32,7 +32,8 @@
     "openAccountMenu": "打开账户菜单",
     "closeMenu": "关闭菜单",
     "ha": "高可用",
-    "deletedWorkspaces": "已删除的工作区"
+    "deletedWorkspaces": "已删除的工作区",
+    "version": "版本 {version}"
   },
   "switcher": {
     "language": "语言",

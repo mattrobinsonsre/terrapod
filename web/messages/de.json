@@ -5,9 +5,9 @@
     "registry": "Registry",
     "modules": "Module",
     "providers": "Anbieter",
-    "catalog": "Dienstleistungskatalog",
-    "agentPools": "Agent-Pools",
-    "admin": "Verwaltung",
+    "catalog": "Katalog",
+    "agentPools": "Agenten",
+    "admin": "Admin",
     "users": "Benutzer",
     "roles": "Rollen",
     "vcsConnections": "VCS-Verbindungen",
@@ -32,7 +32,8 @@
     "openAccountMenu": "Kontomenü öffnen",
     "closeMenu": "Menü schließen",
     "ha": "Hochverfügbarkeit",
-    "deletedWorkspaces": "Gelöschte Workspaces"
+    "deletedWorkspaces": "Gelöschte Workspaces",
+    "version": "Version {version}"
   },
   "switcher": {
     "language": "Sprache",

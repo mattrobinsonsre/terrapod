@@ -6,7 +6,7 @@
     "modules": "Modiwlau",
     "providers": "Darparwyr",
     "catalog": "Catalog",
-    "agentPools": "Pyllau Asiantau",
+    "agentPools": "Asiantau",
     "admin": "Gweinyddu",
     "users": "Defnyddwyr",
     "roles": "Rolau",
@@ -32,7 +32,8 @@
     "openAccountMenu": "Agor dewislen y cyfrif",
     "closeMenu": "Cau'r ddewislen",
     "ha": "Argaeledd uchel",
-    "deletedWorkspaces": "Gweithfannau wedi''u dileu"
+    "deletedWorkspaces": "Gweithfannau wedi''u dileu",
+    "version": "Fersiwn {version}"
   },
   "switcher": {
     "language": "Iaith",

@@ -6,7 +6,7 @@
     "modules": "Moduler",
     "providers": "Providers",
     "catalog": "Katalog",
-    "agentPools": "Agentpooler",
+    "agentPools": "Agenter",
     "admin": "Admin",
     "users": "Användare",
     "roles": "Roller",
@@ -32,7 +32,8 @@
     "openAccountMenu": "Öppna kontomeny",
     "closeMenu": "Stäng meny",
     "ha": "Hög tillgänglighet",
-    "deletedWorkspaces": "Borttagna arbetsytor"
+    "deletedWorkspaces": "Borttagna arbetsytor",
+    "version": "Version {version}"
   },
   "switcher": {
     "language": "Språk",

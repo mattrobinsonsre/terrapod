@@ -6,7 +6,7 @@
     "modules": "Módulos",
     "providers": "Proveedores",
     "catalog": "Catálogo",
-    "agentPools": "Grupos de agentes",
+    "agentPools": "Agentes",
     "admin": "Administración",
     "users": "Usuarios",
     "roles": "Roles",
@@ -32,7 +32,8 @@
     "openAccountMenu": "Abrir menú de cuenta",
     "closeMenu": "Cerrar menú",
     "ha": "Alta disponibilidad",
-    "deletedWorkspaces": "Workspaces eliminados"
+    "deletedWorkspaces": "Workspaces eliminados",
+    "version": "Versión {version}"
   },
   "switcher": {
     "language": "Idioma",

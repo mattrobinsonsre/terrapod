@@ -6,7 +6,7 @@
     "modules": "Moduulit",
     "providers": "Palveluntarjoajat",
     "catalog": "Luettelo",
-    "agentPools": "Agenttipoolit",
+    "agentPools": "Agentit",
     "admin": "Hallinta",
     "users": "Käyttäjät",
     "roles": "Roolit",
@@ -32,7 +32,8 @@
     "openAccountMenu": "Avaa tilivalikko",
     "closeMenu": "Sulje valikko",
     "ha": "Korkea käytettävyys",
-    "deletedWorkspaces": "Poistetut työtilat"
+    "deletedWorkspaces": "Poistetut työtilat",
+    "version": "Versio {version}"
   },
   "switcher": {
     "language": "Kieli",
