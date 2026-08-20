@@ -414,7 +414,7 @@ function MobileDrawer({
   return (
     <div
       id={id}
-      className="lg:hidden fixed top-0 start-0 end-0 h-dvh z-40 bg-slate-900 flex flex-col"
+      className="md:hidden fixed top-0 start-0 end-0 h-dvh z-40 bg-slate-900 flex flex-col"
     >
       <div className="flex items-center justify-between h-14 px-4 border-b border-slate-800 flex-shrink-0">
         <span className="font-bold text-lg text-slate-100">{title}</span>
@@ -520,6 +520,12 @@ export default function NavBar() {
               email) doesn't fit until ~1024, so below `lg` it would wrap into a
               tall, ugly multi-row bar that (being sticky) also covers page
               content beneath it. Below `lg` we use the clean hamburger instead. */}
+          {/* md, not lg: the icon-only bar needs ~650px, so gating the
+              hamburger on lg (1024px) hid a bar that fits, for the whole band
+              between them. The rest of the UI switches to its phone treatment
+              at md — useIsMobile() is `max-width: md`, and the tables flip to
+              cards there — so this is where the nav should switch too, and the
+              two now agree rather than leaving a 256px dead zone. */}
           {/* One definition, rendered twice: the visible bar, and an
               invisible always-labelled copy that "does it fit?" is asked of.
               A literal duplicate would be a bug factory — every future edit
@@ -617,18 +623,28 @@ export default function NavBar() {
             )
             return (
               <>
-                <div
-                  ref={probeRef}
-                  aria-hidden="true"
-                  // @ts-expect-error -- `inert` is valid HTML that React types lag on
-                  inert=""
-                  className="hidden lg:flex items-center gap-1 py-2 absolute invisible pointer-events-none -z-10 whitespace-nowrap"
-                >
-                  {contents(true)}
+                {/* The probe must be measurable without being part of the
+                    page. `invisible` alone is not enough: visibility:hidden
+                    still takes part in layout, so the always-labelled copy —
+                    wider than the bar by definition — extended the document and
+                    gave every width below it a horizontal scrollbar. Clipping
+                    it inside a positioned zero-size box keeps it out of the
+                    document's scroll width; its own scrollWidth still reports
+                    its content width, which is the whole point of it. */}
+                <div className="hidden md:block absolute w-0 h-0 overflow-hidden pointer-events-none -z-10">
+                  <div
+                    ref={probeRef}
+                    aria-hidden="true"
+                    // @ts-expect-error -- `inert` is valid HTML that React types lag on
+                    inert=""
+                    className="flex items-center gap-1 py-2 absolute whitespace-nowrap"
+                  >
+                    {contents(true)}
+                  </div>
                 </div>
                 <div
                   ref={barRef}
-                  className="hidden lg:flex items-center gap-1 py-2 overflow-hidden"
+                  className="hidden md:flex items-center gap-1 py-2 overflow-hidden"
                 >
                   {contents(!compact)}
                 </div>
@@ -637,7 +653,7 @@ export default function NavBar() {
           })()}
 
           {/* Mobile top bar — logo + Account trigger + hamburger (below `lg`) */}
-          <div className="lg:hidden flex items-center justify-between h-14">
+          <div className="md:hidden flex items-center justify-between h-14">
             <Link href="/" className="flex items-center gap-2">
               {/* eslint-disable-next-line @next/next/no-img-element -- a static local SVG at a fixed size — next/image does not optimise SVG without dangerouslyAllowSVG and would add a loader for no benefit */}
               <img src="/logo.svg" alt="Terrapod" className="w-7 h-7" />
