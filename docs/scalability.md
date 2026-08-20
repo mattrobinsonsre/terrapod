@@ -19,7 +19,7 @@ page says so.
 - **Stateless API replicas, no leader election.** The API server runs behind a
   load balancer with any number of replicas. All shared state lives in Postgres
   and Redis; all background work is coordinated by a Redis-based distributed
-  scheduler (`services/scheduler.py`). There is no leader — any replica can serve
+  scheduler (`services/terrapod/services/scheduler.py`). There is no leader — any replica can serve
   any request and run any scheduled task, with Redis providing mutual exclusion.
   Adding replicas adds throughput.
 - **Run dispatch via `SELECT … FOR UPDATE SKIP LOCKED`.** Queued runs are claimed

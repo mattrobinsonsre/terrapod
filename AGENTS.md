@@ -134,7 +134,7 @@ Per-surface verification before you push (lint alone is **not** enough):
     compatibility.
 11. **Multi-replica safe, no leader election** — the API runs with multiple
     replicas behind a load balancer. All background work uses the distributed
-    scheduler (`services/scheduler.py`), which coordinates via Redis. Never use
+    scheduler (`services/terrapod/services/scheduler.py`), which coordinates via Redis. Never use
     in-process state (module globals, `asyncio.Event`, in-memory queues) for
     cross-replica coordination, and never use raw `asyncio.create_task()` for
     background work.
@@ -247,7 +247,7 @@ Routing rules of thumb:
   through an optional `meta`, every poll-cycle test omitted it, and the wrapper
   was never once executed through the caller that uses it.
 - A **new replicated entity class** (registered in
-  `services/replication_registry.py`) → the **full per-class test matrix**,
+  `services/terrapod/services/replication_registry.py`) → the **full per-class test matrix**,
   claimed with `@pytest.mark.replication_matrix("<class>", "<row>")`. Registering
   a class is one line and the outbox picks it up automatically, so it is easy to
   ship one that never converges — and the symptom appears at a failover, not in

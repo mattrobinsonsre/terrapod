@@ -26,7 +26,7 @@ The authoritative source is [AGENTS.md](AGENTS.md). Key invariants an agent must
 - **BFF** — all traffic enters through the Next.js frontend, which proxies `/api/*` to the API; the browser never calls the API directly. New SSE endpoints must be added to `web/next.config.js` `headers()` with `Content-Encoding: none`.
 - **Responsive / mobile-first UI (hard requirement)** — the web UI is responsive and touch-friendly; mobile is a first-class target, not an afterthought. One DRY viewport-driven implementation (no forked mobile/desktop trees, never sniff the user agent); desktop is never sacrificed. A new page/component needs a phone-viewport E2E assertion (the `responsive` Playwright project) in the same PR. Full brief: AGENTS.md → "Responsive / mobile-first UI".
 - **No sync work in `async def` handlers** — wrap blocking/CPU work in `asyncio.to_thread`/`run_in_executor` or use async-native libs; prefer plain `def` endpoints when a sync lib is unavoidable.
-- **Multi-replica, no leader election** — all background work uses the Redis-coordinated distributed scheduler (`services/scheduler.py`); never use `asyncio.create_task()` for background work.
+- **Multi-replica, no leader election** — all background work uses the Redis-coordinated distributed scheduler (`services/terrapod/services/scheduler.py`); never use `asyncio.create_task()` for background work.
 - **RFC3339 timestamps with trailing `Z`** (never `+00:00`) for `go-tfe` compatibility.
 - **Original implementation only** — API *compatibility* with the public TFE V2 spec is the goal; copying HashiCorp implementation code is not.
 - **Substantial API tempfiles go on the attached PVC, not `/tmp`** (which is RAM-backed).

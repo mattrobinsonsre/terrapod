@@ -1258,13 +1258,13 @@ Fires from `TerrapodHighBinaryCacheMissRate` (info): the terraform/tofu binary c
 ### Diagnosis
 
 1. **Version spread** — many distinct tool versions in use means each is a legitimate first-time miss. Check the workspace `terraform_version` distribution.
-2. **Eviction too aggressive** — `registry.cache_ttl_days` (default 30, evicted on last-access) may be reclaiming entries between uses on a low-traffic instance.
+2. **Eviction too aggressive** — `api.config.artifact_retention.binary_cache_retention_days` (default 30, counted from last access) may be reclaiming entries between uses on a low-traffic instance.
 3. **Sealed mode** — if `registry.cache_only` is on, a miss is a hard 404, not a slow fall-through; see [Sealed (cache-only) mode](#sealed-cache-only-mode--runs-failing-with-cache-miss-404) instead.
 
 ### Resolution
 
 - **Pre-warm** the versions your fleet pins via `POST /api/terrapod/v1/admin/binary-cache/warm-bulk` or the **Warm cache** UI panel ([Cache pre-population](registry.md#cache-pre-population)).
-- **Raise** `registry.cache_ttl_days` if eviction is the cause.
+- **Raise** `api.config.artifact_retention.binary_cache_retention_days` if eviction is the cause.
 - **Consolidate** on fewer tool versions where practical.
 
 ### Verification
