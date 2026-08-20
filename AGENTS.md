@@ -46,7 +46,7 @@ if a route is on that list it stays at `/api/v2/`; otherwise it goes under
 | `services/terrapod/` | API server (FastAPI) **and** the runner listener — one codebase, different entrypoints. Implicit namespace package (no `__init__.py`). | Python 3.13 |
 | `web/` | Next.js frontend + BFF (the single ingress; proxies `/api/*` to the API). | TypeScript / React |
 | `go-terrapod/` | Public, canonical Go SDK for the Terrapod API. Source of truth for the Go-side view of every endpoint. | Go |
-| `provider/` | `terraform-provider-terrapod` — the first-class **Terraform / OpenTofu provider for managing Terrapod itself as code** (25 `terrapod_*` resources + 7 data sources); a thin, typed wrapper over go-terrapod. See [`docs/terraform-provider.md`](docs/terraform-provider.md). | Go |
+| `provider/` | `terraform-provider-terrapod` — the first-class **Terraform / OpenTofu provider for managing Terrapod itself as code** (25 `terrapod_*` resources + 9 data sources); a thin, typed wrapper over go-terrapod. See [`docs/terraform-provider.md`](docs/terraform-provider.md). | Go |
 | `migrate/` | `terrapod-migrate` — TFE/HCP + Atlantis migration CLI. | Go |
 | `publish/` | `terrapod-publish` — registry publish CLI (client-signed provider/module uploads). | Go |
 | `query/` | `terrapod-query` — tofu-native discovery engine for onboarding existing resources (schema → filtered data-source query → `import {}` blocks; MPL, no BUSL). Standalone CLI + baked into the api/runner images. | Go |
