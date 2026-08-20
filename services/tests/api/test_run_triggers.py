@@ -528,6 +528,46 @@ class TestFireRunTriggers:
 
     @patch("terrapod.services.run_service.queue_run")
     @patch("terrapod.services.run_service.create_run")
+    async def test_a_non_vcs_destination_skips_a_speculative_only_history(
+        self, mock_create, mock_queue
+    ):
+        """A non-VCS destination whose only uploaded CVs are speculative has
+        nothing apply-able, so the trigger does not fire (#1396).
+
+        This is a deliberate behaviour change. Previously the newest uploaded CV
+        was taken whatever it was, so a `tofu plan` upload sitting on top of the
+        real one meant the trigger ran against a scratch plan rather than the
+        workspace's desired state. Now it selects the newest NON-speculative CV,
+        and where none exists it skips rather than run against a plan.
+
+        Non-VCS is otherwise untouched: a CLI upload is non-speculative by
+        default (`speculative` defaults to False on CV create), so the ordinary
+        CLI-driven workflow selects exactly what it always did.
+        """
+        from terrapod.services.run_service import fire_run_triggers
+
+        source_ws_id = uuid.uuid4()
+        dest_ws = _mock_workspace(name="downstream")  # non-VCS
+        trigger = MagicMock()
+        trigger.workspace = dest_ws
+
+        triggers_result = MagicMock()
+        triggers_result.scalars.return_value.all.return_value = [trigger]
+        # get_latest_uploaded_cv filters speculative out, so it finds nothing.
+        cv_result = MagicMock()
+        cv_result.scalar_one_or_none.return_value = None
+
+        mock_db = AsyncMock()
+        mock_db.execute.side_effect = [triggers_result, cv_result]
+        mock_db.get.return_value = _mock_workspace(ws_id=source_ws_id, name="upstream")
+
+        await fire_run_triggers(mock_db, source_ws_id)
+
+        mock_create.assert_not_called()
+        mock_queue.assert_not_called()
+
+    @patch("terrapod.services.run_service.queue_run")
+    @patch("terrapod.services.run_service.create_run")
     async def test_a_vcs_destination_fetches_code_rather_than_reusing_a_cv(
         self, mock_create, mock_queue
     ):
