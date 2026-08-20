@@ -57,6 +57,35 @@ detect_tool() {
   else die "neither 'kind' nor 'k3d' found — install one: https://kind.sigs.k8s.io or https://k3d.io"; fi
 }
 
+# ── Helm version guard ────────────────────────────────────────────────────────
+# helm 4.2.1 shipped "prevent spurious early exit in WaitForDelete during
+# informer sync" (helm/helm#32081) and reverted it in 4.2.2. While it was in,
+# a hook whose `before-hook-creation` delete finds nothing — i.e. EVERY hook on
+# a fresh install — waits for a full informer sync instead of returning
+# immediately. That is roughly nine minutes each, and this chart has several, so
+# `make eval` sits silent for the best part of an hour and helm's own --timeout
+# does not bound it.
+#
+# It is worth a hard stop rather than a warning: the symptom is indistinguishable
+# from a hang, and the first thing anyone tries is to kill it and start again.
+BAD_HELM_VERSIONS="4.2.1"
+check_helm_version() {
+  local v
+  v="$(helm version --template '{{.Version}}' 2>/dev/null | sed 's/^v//; s/+.*//')" || return 0
+  [ -n "$v" ] || return 0
+  case " $BAD_HELM_VERSIONS " in
+    *" $v "*)
+      die "helm ${v} cannot install this chart in reasonable time.
+
+  It waits ~9 minutes per hook on a fresh install (helm/helm#32081, reverted in
+  4.2.2), so this looks like a hang. Upgrade helm and re-run:
+
+      brew upgrade helm     # or: https://helm.sh/docs/intro/install/
+
+  Any helm other than ${v} is fine." ;;
+  esac
+}
+
 cluster_exists() {
   case "$1" in
     kind) kind get clusters 2>/dev/null | grep -qx "$CLUSTER" ;;
@@ -88,6 +117,7 @@ create_cluster() {
 up() {
   command -v helm >/dev/null 2>&1 || die "helm not found"
   command -v kubectl >/dev/null 2>&1 || die "kubectl not found"
+  check_helm_version
   local tool ctx; tool="$(detect_tool)"; ctx="$(kube_context "$tool")"
   # Preserve the caller's current kubectl context — `kind`/`k3d` create switches
   # it to the new cluster, which would yank your default context (e.g. away from
@@ -114,6 +144,11 @@ up() {
   # job-bootstrap.yaml) so it exists before the listener starts. That ordering is
   # what makes `--wait` safe here: a working server-side-runs stack the moment the
   # install returns, not just pods that exist.
+  # Run helm in the background and report what the cluster is doing while it
+  # works. `helm --wait` prints nothing at all until it returns, so a slow pull
+  # and a genuine hang look identical — and the first one of those is normal on a
+  # first run, which trains people to wait through the second. A status line
+  # every 20s costs nothing and turns "it is stuck" into "it is pulling images".
   helm --kube-context "$ctx" upgrade --install "$RELEASE" "$CHART_DIR" \
     --namespace "$NS" --create-namespace \
     -f "${CHART_DIR}/values-eval.yaml" \
@@ -126,7 +161,36 @@ up() {
     --set "bootstrap.adminEmail=${ADMIN_EMAIL}" \
     --set "bootstrap.adminPassword=${ADMIN_PASSWORD}" \
     --set "api.config.external_url=http://localhost:${PF_PORT}" \
-    --wait --timeout "${TERRAPOD_EVAL_HELM_TIMEOUT:-600s}" || {
+    --wait --timeout "${TERRAPOD_EVAL_HELM_TIMEOUT:-600s}" &
+  local helm_pid=$!
+
+  # An outer bound, because helm's own --timeout does not always hold it: the
+  # 4.2.1 delete-wait above ran well past 600s. Whatever goes wrong, this command
+  # ends and says something rather than sitting there.
+  local budget="${TERRAPOD_EVAL_WATCHDOG:-1200}" waited=0 step=20
+  while kill -0 "$helm_pid" 2>/dev/null; do
+    sleep "$step"; waited=$((waited + step))
+    # helm may have finished during that sleep; without this the loop prints one
+    # last status line on top of the success banner.
+    kill -0 "$helm_pid" 2>/dev/null || break
+    if [ "$waited" -ge "$budget" ]; then
+      warn "helm has been running for ${waited}s with no result — giving up."
+      kill "$helm_pid" 2>/dev/null || true
+      kubectl --context "$ctx" -n "$NS" get pods || true
+      die "install exceeded ${budget}s. Re-run with TERRAPOD_EVAL_WATCHDOG=<seconds> to allow longer, or 'scripts/eval.sh down' to clean up."
+    fi
+    # Pods first; before any exist, say which hook helm is on, so the silent
+    # early phase is legible too.
+    local pods
+    pods="$(kubectl --context "$ctx" -n "$NS" get pods --no-headers 2>/dev/null || true)"
+    if [ -n "$pods" ]; then
+      echo "   … ${waited}s — $(echo "$pods" | awk '$3=="Running"||$3=="Completed"' | wc -l | tr -d ' ')/$(echo "$pods" | wc -l | tr -d ' ') pods ready: $(echo "$pods" | awk '{printf "%s(%s) ", $1, $3}')"
+    else
+      echo "   … ${waited}s — no pods yet (helm is still applying; images pull on first run)"
+    fi
+  done
+
+  wait "$helm_pid" || {
       warn "helm install did not report ready in time — showing pod status:"
       kubectl --context "$ctx" -n "$NS" get pods || true
       die "install failed (see pod status above; 'scripts/eval.sh status' to re-check)"
