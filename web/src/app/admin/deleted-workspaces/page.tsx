@@ -145,7 +145,7 @@ export default function DeletedWorkspacesPage() {
   return (
     <>
       <NavBar />
-      <main className="mx-auto max-w-7xl px-4 py-6">
+      <main className="mx-auto max-w-6xl px-4 py-6">
         <PageHeader title={t('title')} description={t('description')} />
 
         {error && <ErrorBanner message={error} />}
