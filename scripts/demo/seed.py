@@ -31,6 +31,7 @@ import json
 import os
 import pathlib
 import ssl
+import subprocess
 import tarfile
 import time
 import urllib.error
@@ -120,11 +121,39 @@ HERO = ESTATE[0][0]
 POLICY_SET = "production-guardrails"
 
 
+def _tls_context() -> ssl.SSLContext:
+    """A verifying TLS context that also trusts the local development CA.
+
+    The obvious shortcut here is to skip verification, because the dev stack
+    serves a certificate signed by a CA that is not in the system trust store.
+    This used to do exactly that, for any host ending in `.local`, which is both
+    a real weakness and unnecessary: mkcert is already a prerequisite for the dev
+    stack and it installs a root CA whose path it will tell you. Trust that CA
+    and verification simply works — no exception to make, and none to forget to
+    take back out when the script is later pointed at something real.
+
+    SSL_CERT_FILE wins if set, matching what the runner and the CLI already
+    honour.
+    """
+    cafile = os.environ.get("SSL_CERT_FILE") or ""
+    if not cafile:
+        try:
+            root = subprocess.run(
+                ["mkcert", "-CAROOT"], capture_output=True, text=True, timeout=10, check=True
+            ).stdout.strip()
+            candidate = pathlib.Path(root) / "rootCA.pem"
+            if candidate.is_file():
+                cafile = str(candidate)
+        except (OSError, subprocess.SubprocessError):
+            pass  # No mkcert — fall back to the system trust store.
+    return ssl.create_default_context(cafile=cafile or None)
+
+
 class Api:
-    def __init__(self, host: str, token: str, insecure: bool):
+    def __init__(self, host: str, token: str):
         self.base = f"https://{host}"
         self.token = token
-        self.ctx = ssl._create_unverified_context() if insecure else None
+        self.ctx = _tls_context()
 
     def _req(
         self,
@@ -443,18 +472,11 @@ def main() -> int:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--host", default="terrapod.local")
     p.add_argument("--token")
-    p.add_argument(
-        "--insecure",
-        action="store_true",
-        default=None,
-        help="skip TLS verification (default on for terrapod.local)",
-    )
     p.add_argument("--clean", action="store_true", help="delete seeded workspaces, then exit")
     p.add_argument("--no-run", action="store_true", help="seed data but do not execute the plan")
     args = p.parse_args()
 
-    insecure = args.insecure if args.insecure is not None else args.host.endswith(".local")
-    api = Api(args.host, resolve_token(args), insecure)
+    api = Api(args.host, resolve_token(args))
 
     if args.clean:
         print("Removing seeded workspaces:")
