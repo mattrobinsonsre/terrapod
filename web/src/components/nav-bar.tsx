@@ -623,7 +623,18 @@ export default function NavBar() {
             )
             return (
               <>
-                {/* The probe must be measurable without being part of the
+                <div
+                  ref={barRef}
+                  className="hidden md:flex items-center gap-1 py-2 overflow-hidden"
+                >
+                  {contents(!compact)}
+                </div>
+                {/* Rendered after the visible bar on purpose: a `.first()`
+                    text locator should land on the real one. aria-hidden keeps
+                    this copy out of role queries already, but Playwright's text
+                    engine ignores aria-hidden, so DOM order is what saves a
+                    text-based selector from silently matching a clipped node.
+                    The probe must be measurable without being part of the
                     page. `invisible` alone is not enough: visibility:hidden
                     still takes part in layout, so the always-labelled copy —
                     wider than the bar by definition — extended the document and
@@ -641,12 +652,6 @@ export default function NavBar() {
                   >
                     {contents(true)}
                   </div>
-                </div>
-                <div
-                  ref={barRef}
-                  className="hidden md:flex items-center gap-1 py-2 overflow-hidden"
-                >
-                  {contents(!compact)}
                 </div>
               </>
             )
