@@ -85,10 +85,12 @@ helm install terrapod oci://ghcr.io/mattrobinsonsre/terrapod \
   --set redis.url="redis://redis.example.com:6379"
 ```
 
-To install a specific version:
+To install a specific version — chart versions match the release tag without
+the `v` prefix, so `v1.5.0` is chart `1.5.0`; pick one from
+[Releases](https://github.com/mattrobinsonsre/terrapod/releases):
 
 ```zsh
-helm install terrapod oci://ghcr.io/mattrobinsonsre/terrapod --version 0.1.2 \
+helm install terrapod oci://ghcr.io/mattrobinsonsre/terrapod --version X.Y.Z \
   --namespace terrapod \
   --create-namespace
 ```

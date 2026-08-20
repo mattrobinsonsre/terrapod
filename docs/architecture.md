@@ -149,7 +149,7 @@ The polling hook is visibility-aware — it skips intervals when the tab is back
 
 ## Storage Abstraction
 
-Terrapod uses a protocol-based storage abstraction that supports four backends through their native SDKs. There is no S3 compatibility shim or MinIO dependency.
+Terrapod uses a protocol-based storage abstraction with four backends: AWS S3, Azure Blob and GCS through each provider's native SDK, plus a filesystem PVC for development. There is no S3 compatibility shim or MinIO dependency.
 
 ### ObjectStore Protocol
 

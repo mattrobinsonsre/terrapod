@@ -35,6 +35,13 @@ PENDING = re.compile(
     re.I,
 )
 
+# "Follow-up chat" is the NAME of a shipped feature, so the word there is a
+# noun phrase rather than a promise. Neutralise those before matching.
+FEATURE_NAMES = re.compile(
+    r"follow-?up (?=chat|turn|conversation|thread|message|prompt|repl(?:y|ies))",
+    re.I,
+)
+
 # History, not a promise. "Fixed in #123" SHOULD cite a closed issue, and
 # flagging it would make the gate noise the first time someone read it.
 HISTORY = re.compile(
@@ -53,14 +60,33 @@ def refs() -> dict[int, list[str]]:
     ).stdout.split()
     for f in files:
         p = ROOT / f
-        for i, line in enumerate(p.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
+        lines = p.read_text(encoding="utf-8", errors="replace").splitlines()
+        # Scan PARAGRAPHS, not lines. The corpus is hard-wrapped at ~80 columns,
+        # so "Extending coverage is tracked in\n[#709](...)" puts the marker and
+        # the reference on different lines — a line-based scan misses most real
+        # cases, which is exactly how #709 slipped past the first version.
+        para: list[tuple[int, str]] = []
+
+        def flush(para=para, f=f, out=out):
+            if not para:
+                return
+            text = " ".join(t for _, t in para)
+            first = para[0][0]
+            para.clear()
             # Headings NAME things ("## Follow-up chat (#463)"); prose makes
             # claims. Only prose is a promise worth checking.
-            if line.lstrip().startswith("#") or HISTORY.search(line):
-                continue
-            for m in PENDING.finditer(line):
+            if text.lstrip().startswith("#") or HISTORY.search(text):
+                return
+            for m in PENDING.finditer(FEATURE_NAMES.sub("", text)):
                 n = int(m.group(1))
-                out.setdefault(n, []).append(f"{f}:{i}: {line.strip()[:110]}")
+                out.setdefault(n, []).append(f"{f}:{first}: {text.strip()[:130]}")
+
+        for i, line in enumerate(lines, 1):
+            if not line.strip():
+                flush()
+                continue
+            para.append((i, line))
+        flush()
     return out
 
 
