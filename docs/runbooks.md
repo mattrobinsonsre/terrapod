@@ -1545,7 +1545,7 @@ The state is gone. Recovery is only possible from outside Terrapod:
 2. **A bucket-level backup or replica**, if you keep one.
 3. Otherwise: the state is unrecoverable. The infrastructure still exists; it is
    now unmanaged, and the path back is `terraform import` (or Terrapod's
-   [onboarding](onboarding.md) flow) against a fresh workspace.
+   [onboarding](terrapod-query.md) flow) against a fresh workspace.
 
 ### Prevention
 

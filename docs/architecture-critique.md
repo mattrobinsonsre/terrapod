@@ -115,7 +115,7 @@ discipline applies.
   It updates live over the workspace SSE channel
   (`architecture_critique_{pending,ready}`).
 - **API** — `GET /api/terrapod/v1/workspaces/{id}/architecture-critique` and
-  `POST .../regenerate`. See [api-reference.md](api-reference.md#architecture-critique-1036).
+  `POST .../regenerate`. See [api-reference.md](api-reference.md#ai-architecture-critique-terrapod-extension).
 - **go-terrapod** — `GetArchitectureCritique` / `RegenerateArchitectureCritique`.
 - **MCP** — the `terrapod_workspace_architecture_critique` tool lets an AI agent
   read a workspace's critique (Observe; inherits the caller's `state:read` RBAC).

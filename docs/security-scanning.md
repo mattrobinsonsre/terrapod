@@ -4,7 +4,7 @@ Terrapod runs a **deterministic infrastructure-as-code security scan** on every
 plan — [Checkov](https://www.checkov.io/) and/or
 [Trivy](https://trivy.dev/) misconfiguration scanning over the *resolved plan
 JSON* — and can gate applies on the result. It is the structural twin of the
-[OPA policy sets](policy-sets.md) feature: same per-run result model, same
+[OPA policy sets](policies.md) feature: same per-run result model, same
 post-plan gate, same override flow — but the rules are prebuilt by the scanners
 instead of operator-authored Rego, and the config is a per-workspace setting
 rather than a shareable, label-scoped rule set.
