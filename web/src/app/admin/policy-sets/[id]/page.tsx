@@ -205,15 +205,15 @@ export default function PolicySetDetailPage({ params }: { params: Promise<{ id: 
     }
   }
 
-  if (loading) return (<><NavBar /><main className="px-6 py-8 max-w-5xl mx-auto"><LoadingSpinner /></main></>)
-  if (!ps) return (<><NavBar /><main className="px-6 py-8 max-w-5xl mx-auto"><ErrorBanner message={error || t('notFound')} /></main></>)
+  if (loading) return (<><NavBar /><main className="px-6 py-8 max-w-6xl mx-auto"><LoadingSpinner /></main></>)
+  if (!ps) return (<><NavBar /><main className="px-6 py-8 max-w-6xl mx-auto"><ErrorBanner message={error || t('notFound')} /></main></>)
 
   const policies = ps.relationships?.policies?.data || []
 
   return (
     <>
       <NavBar />
-      <main className="px-4 sm:px-6 lg:px-8 py-8 max-w-5xl mx-auto">
+      <main className="px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto">
         <Link href="/admin/policy-sets" className="text-sm text-brand-400 hover:text-brand-300">&larr; {t('backLink')}</Link>
         <PageHeader
           title={ps.attributes.name}
