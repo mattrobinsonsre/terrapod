@@ -888,7 +888,7 @@ class TestCapabilityAuthoring:
                 json={
                     "data": {
                         "name": "bad",
-                        # platform:* is not grantable (it's #642, not this feature).
+                        # platform:* is not grantable — informational only, by decision.
                         "attributes": {"capabilities": ["workspace:read", "platform:role-admin"]},
                     }
                 },

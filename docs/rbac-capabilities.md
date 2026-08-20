@@ -15,7 +15,7 @@
 > returned as a derived summary — a preset name, or `custom` when the set matches
 > no preset). Capabilities are the stored, enforced truth; a role's response
 > always includes its **effective** `capabilities`. Only the grantable tokens
-> below are accepted (the `platform:*` tokens are not yet grantable — see #642).
+> below are accepted (the `platform:*` tokens are informational, not grantable).
 
 ## Model
 
@@ -63,9 +63,9 @@ Capability enforcement covers the **four label-scoped axes** that custom roles
 carry: **workspace, pool, registry, catalog**. The platform-admin gates
 (`require_admin` / `require_admin_or_audit`) stay role-name based; decomposing
 the monolithic platform admin into the scoped `platform:*` capabilities is a
-deliberate follow-up (**#642**). The `platform:*` tokens are listed below for
-honesty of the built-in `admin` capability set, but are not independently
-grantable or enforced in this feature.
+not planned. The `platform:*` tokens are listed below for honesty of the
+built-in `admin` capability set, but are not independently grantable or
+enforced.
 
 Net-new capabilities that **no preset grants** (so no existing role gains them)
 are also out of scope here and tracked separately: a finer state-read tier
@@ -190,7 +190,7 @@ catalog-RBAC.
 
 ---
 
-## Platform capabilities (informational; enforced via role-name until #642)
+## Platform capabilities (informational; enforced via role-name)
 
 `platform:role-admin`, `platform:vcs-admin`, `platform:pool-admin`,
 `platform:registry-admin`, `platform:varset-admin`, `platform:user-admin`,
@@ -202,7 +202,16 @@ These enumerate every `require_admin` / `require_admin_or_audit` surface in the
 API (roles, role-assignments, vcs-connections, pool create, binary/provider
 cache, GPG/owner reassign, variable sets, users, audit log, policy sets,
 autodiscovery rules, catalog items + provider templates, workspace bulk ops,
-encryption settings). They are the target vocabulary for #642.
+encryption settings) — so that the built-in `admin` role can be described
+honestly, rather than as a staging area for a future split.
+
+**Splitting them is not planned.** Two of these powers are already covered
+without it: agent pools and the registry each have their own label-scoped
+read/write/admin RBAC, so running pools without full admin works today. The
+rest — roles, VCS connections, variable sets, users — are admin-shaped:
+someone trusted to rotate a VCS credential or reset a password is someone
+you would trust with admin. A middle tier there would add an axis to reason
+about for very little gain.
 
 ---
 
