@@ -55,16 +55,16 @@ const WORK = path.resolve(repoRoot, '.gif-work')
 const EMAIL = arg('email', 'admin')
 const PASSWORD = arg('password', 'terrapod')
 
-// 1120x660 at 1x. A GIF has no use for a 2x pixel ratio — it doubles the frame
-// area for no legibility gain once quantised to 256 colours — and this is about
-// the width GitHub renders a README image at, so it is displayed near 1:1.
-// Every extra pixel here is paid for in megabytes on the README's first screen
-// — but stay above the nav's collapse breakpoint, or the recording shows the
-// responsive hamburger rather than the navigation a desktop reader will get.
-const VIEWPORT = { width: 1120, height: 660 }
+// 1280 wide, matching capture.mjs. This is not a free choice: below about
+// 1200 the nav bar wraps Catalog and Agent Pools onto a second row, which looks
+// broken beside the stills — where the same nav sits on one line. A GIF still
+// wants no 2x pixel ratio (it doubles the frame area for nothing once quantised
+// to 256 colours), and every pixel is paid for in megabytes on the README's
+// first screen, so the budget is recovered from frame rate and length instead
+// of from width.
+const VIEWPORT = { width: 1280, height: 720 }
 
-// Slow enough to read, quick enough that the loop does not outstay its welcome.
-const BEAT = 1050
+const BEAT = 900
 
 async function main() {
   await rm(WORK, { recursive: true, force: true })
@@ -88,6 +88,17 @@ async function main() {
 
   const beat = (n = 1) => page.waitForTimeout(BEAT * n)
 
+  // Refuse to record while the UI is showing its reconnecting indicator. It is
+  // honest — the SSE stream really is down, typically for a minute after an API
+  // restart — but a "Reconnecting…" badge in a promotional GIF reads as a broken
+  // product rather than as a stack that was bounced thirty seconds ago.
+  const settled = async () => {
+    const badge = page.getByText(/reconnecting/i)
+    for (let i = 0; i < 60 && (await badge.count()) > 0; i++) {
+      await page.waitForTimeout(1000)
+    }
+  }
+
   // 1. Land on the login screen.
   await page.goto(`${URL_BASE}/login`)
   await page.locator('#email, input[name="email"]').first().waitFor({ timeout: 30_000 })
@@ -99,12 +110,16 @@ async function main() {
   await beat(0.5)
   await page.locator('button[type="submit"]').first().click()
   await page.waitForURL((u) => !u.pathname.startsWith('/login'), { timeout: 30_000 })
+  await settled()
   await beat(1.5)
 
   // 3. The workspace list — seeded, so it is a populated screen rather than the
-  //    empty state a fresh install would show.
+  //    empty state a fresh install would show. Wait for an actual ROW, not for
+  //    <main>: <main> is on screen while the list is still a spinner, and a
+  //    frame of a spinner is worse than no frame at all.
   await page.goto(`${URL_BASE}/workspaces`)
-  await page.locator('main').first().waitFor()
+  await page.locator('main a[href*="/workspaces/"]:visible').first()
+    .waitFor({ timeout: 30_000 })
   await beat(1.5)
 
   // 4. Into a workspace. Wait on its tab strip, and do NOT swallow the failure:
@@ -160,7 +175,7 @@ async function main() {
   // with dithering. A single-pass GIF of a dark UI bands badly on the gradients
   // and the syntax colouring.
   const palette = path.join(WORK, 'palette.png')
-  const fps = 10
+  const fps = 9
   const TRIM = '0.8' // seconds of blank page before the app paints
   const filters = `fps=${fps},scale=${VIEWPORT.width}:-1:flags=lanczos`
   await run('ffmpeg', ['-y', '-ss', TRIM, '-i', src, '-vf', `${filters},palettegen=stats_mode=diff`, palette])
