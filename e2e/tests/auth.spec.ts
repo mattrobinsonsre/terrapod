@@ -92,9 +92,12 @@ test.describe('Authentication', () => {
       timeout: 15_000,
     });
 
-    // Log out now lives inside the Account menu (whose desktop trigger is
-    // labelled with the signed-in user's email) — #719 grouped-nav IA.
-    await page.getByRole('button', { name: ADMIN_EMAIL }).click();
+    // Log out lives inside the Account menu. Its trigger is icon-only and
+    // labelled "Account": the signed-in identity moved off the toolbar and
+    // into the menu itself to buy back width (#1400). Assert it is still
+    // shown there — the point of the move was to relocate it, not lose it.
+    await page.getByRole('button', { name: 'Account' }).click();
+    await expect(page.getByRole('menu')).toContainText(ADMIN_EMAIL);
     await page.getByRole('menuitem', { name: 'Log out' }).click();
 
     // Should redirect to /login

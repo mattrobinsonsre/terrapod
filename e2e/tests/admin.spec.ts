@@ -14,7 +14,7 @@ test.describe('Admin access control', () => {
     await expect(adminPage.getByRole('menuitem', { name: 'Users' })).toBeVisible();
     await adminPage.keyboard.press('Escape');
     // Agent Pools stays top-level (visible to all users).
-    await expect(adminPage.locator('nav >> text=Agent Pools')).toBeVisible();
+    await expect(adminPage.locator('nav >> text=Agents')).toBeVisible();
   });
 
   test('regular user does not see admin nav links', async ({ userPage }) => {
@@ -24,7 +24,7 @@ test.describe('Admin access control', () => {
     // A non-admin/non-audit user gets no Admin▾ menu at all.
     await expect(userPage.getByRole('button', { name: 'Admin', exact: true })).not.toBeVisible();
     // Agent Pools is visible to all users (RBAC-filtered server-side)
-    await expect(userPage.locator('nav >> text=Agent Pools')).toBeVisible();
+    await expect(userPage.locator('nav >> text=Agents')).toBeVisible();
   });
 
   test('admin can access roles page', async ({ adminPage }) => {
