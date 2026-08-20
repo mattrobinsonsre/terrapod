@@ -2972,7 +2972,9 @@
       "online": "Online, the listener is",
       "offline": "Live listener, there is none",
       "offlineWarning": "Connected for these, no listener is: {pools}. Queue rather than execute, runs routed to these pools will.",
-      "count": "{count, plural, one {# listener} other {# listeners}}"
+      "count": "{count, plural, one {# listener} other {# listeners}}",
+      "countWithPods": "{count, plural, one {# listener} other {# listeners}} · {pods, plural, one {# pod} other {# pods}}, there are",
+      "singlePod": "Single pod, it is"
     },
     "inbound": "From peer, accepts",
     "inboundAwaiting": "Named it is, secret it has not"

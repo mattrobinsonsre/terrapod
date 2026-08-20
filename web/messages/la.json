@@ -2972,7 +2972,9 @@
       "online": "Auditor vivus",
       "offline": "Nullus auditor vivus",
       "offlineWarning": "Nullus auditor his coniunctus est: {pools}. Cursus ad has piscinas missi in ordine manebunt neque exsequentur.",
-      "count": "{count, plural, one {# auditor} other {# auditores}}"
+      "count": "{count, plural, one {# auditor} other {# auditores}}",
+      "countWithPods": "{count, plural, one {# auscultator} other {# auscultatores}} · {pods, plural, one {# pod} other {# pods}}",
+      "singlePod": "Pod singularis"
     },
     "inbound": "A pari accipit",
     "inboundAwaiting": "Nominatum, sine arcano"

@@ -2972,7 +2972,9 @@
       "online": "شنونده آنلاین",
       "offline": "بدون شنونده فعال",
       "offlineWarning": "هیچ شنونده‌ای برای این‌ها متصل نیست: {pools}. اجراهای هدایت‌شده به این استخرها به‌جای اجرا در صف می‌مانند.",
-      "count": "{count} شنونده"
+      "count": "{count} شنونده",
+      "countWithPods": "{count, plural, one {# شنونده} other {# شنونده}} · {pods, plural, one {# پاد} other {# پاد}}",
+      "singlePod": "تک پاد"
     },
     "inbound": "از همتا می‌پذیرد",
     "inboundAwaiting": "نام‌گذاری‌شده، بدون رمز"

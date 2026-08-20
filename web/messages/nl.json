@@ -2972,7 +2972,9 @@
       "online": "Listener online",
       "offline": "Geen actieve listener",
       "offlineWarning": "Er is geen listener verbonden voor: {pools}. Runs naar deze pools komen in de wachtrij in plaats van te draaien.",
-      "count": "{count, plural, one {# listener} other {# listeners}}"
+      "count": "{count, plural, one {# listener} other {# listeners}}",
+      "countWithPods": "{count, plural, one {# listener} other {# listeners}} · {pods, plural, one {# pod} other {# pods}}",
+      "singlePod": "Eén pod"
     },
     "inbound": "Accepteert van peer",
     "inboundAwaiting": "Benoemd, geen secret"

@@ -2972,7 +2972,9 @@
       "online": "Listener online",
       "offline": "Žádný živý listener",
       "offlineWarning": "K těmto fondům není připojen žádný listener: {pools}. Běhy směrované do nich se zařadí do fronty místo spuštění.",
-      "count": "{count, plural, one {# listener} few {# listenery} many {# listeneru} other {# listenerů}}"
+      "count": "{count, plural, one {# listener} few {# listenery} many {# listeneru} other {# listenerů}}",
+      "countWithPods": "{count, plural, one {# listener} other {# listenerů}} · {pods, plural, one {# pod} other {# podů}}",
+      "singlePod": "Jediný pod"
     },
     "inbound": "Přijímá od protějšku",
     "inboundAwaiting": "Pojmenováno, bez tajemství"

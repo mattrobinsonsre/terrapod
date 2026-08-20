@@ -2972,7 +2972,9 @@
       "online": "Listenr onlien",
       "offline": "No liv listenr",
       "offlineWarning": "No listenr iz connectd fur: {pools}. Runz sent to deze poolz will just sit in da queue insted ov runnin.",
-      "count": "{count, plural, one {# listenr} other {# listenrz}}"
+      "count": "{count, plural, one {# listenr} other {# listenrz}}",
+      "countWithPods": "{count, plural, one {# lisssner} other {# lisssnerz}} · {pods, plural, one {# pod} other {# podz}}",
+      "singlePod": "Only wun pod"
     },
     "inbound": "Takez frum budy",
     "inboundAwaiting": "Namd, no secrit"

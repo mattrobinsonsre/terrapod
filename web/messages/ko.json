@@ -2972,7 +2972,9 @@
       "online": "리스너 온라인",
       "offline": "활성 리스너 없음",
       "offlineWarning": "다음 풀에 연결된 리스너가 없습니다: {pools}. 이 풀로 보내진 실행은 수행되지 않고 대기합니다.",
-      "count": "리스너 {count}개"
+      "count": "리스너 {count}개",
+      "countWithPods": "{count, plural, other {리스너 #개}} · {pods, plural, other {파드 #개}}",
+      "singlePod": "단일 파드"
     },
     "inbound": "피어로부터 수락",
     "inboundAwaiting": "이름만 있고 시크릿 없음"

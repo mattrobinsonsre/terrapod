@@ -2972,7 +2972,9 @@
       "online": "Hand on watch",
       "offline": "No hand on watch",
       "offlineWarning": "Nary a hand be on watch for: {pools}. Voyages set for these crews will wait at anchor rather than sail.",
-      "count": "{count, plural, one {# hand on watch} other {# hands on watch}}"
+      "count": "{count, plural, one {# hand on watch} other {# hands on watch}}",
+      "countWithPods": "{count, plural, one {# lookout} other {# lookouts}} · {pods, plural, one {# hand} other {# hands}}",
+      "singlePod": "One hand only"
     },
     "inbound": "Accepts from consort",
     "inboundAwaiting": "Named, no token"

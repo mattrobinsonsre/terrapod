@@ -48,6 +48,7 @@ interface Pool {
   name: string
   status: string
   listeners: number
+  pods: number | null
 }
 
 interface Finding {
@@ -140,6 +141,16 @@ export default function HAPage() {
             // from the same predicate `status` comes from — so the number and
             // the word can never disagree.
             listeners: Number(p.attributes['listener-count'] ?? 0),
+            // Pods, not listener identities (#1402). Replicas of one Deployment
+            // share a listener identity, so a redundant pair reports one
+            // listener — and on the page that exists to find single points of
+            // failure, that read as exactly the failure it is not. Absent means
+            // unknown (a pre-0.19.0 listener does not report its pod), which is
+            // not the same as none, so it stays null rather than becoming 0.
+            pods:
+              p.attributes['listener-pod-count'] === undefined
+                ? null
+                : Number(p.attributes['listener-pod-count']),
           })),
         )
       } else {
@@ -427,9 +438,23 @@ export default function HAPage() {
                           }`}
                         >
                           {p.status === 'online'
-                            ? t('listeners.count', { count: p.listeners })
+                            ? p.pods === null
+                              ? t('listeners.count', { count: p.listeners })
+                              : t('listeners.countWithPods', {
+                                  count: p.listeners,
+                                  pods: p.pods,
+                                })
                             : t('listeners.offline')}
                         </span>
+                        {/* One pod is one eviction away from no runner at all.
+                            Said here rather than left for the reader to infer,
+                            because inferring it is what the identity count made
+                            impossible. */}
+                        {p.status === 'online' && p.pods === 1 && (
+                          <span className="rounded bg-amber-500/10 px-2 py-0.5 text-xs text-amber-300">
+                            {t('listeners.singlePod')}
+                          </span>
+                        )}
                       </li>
                     ))}
                   </ul>

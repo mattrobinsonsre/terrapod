@@ -2972,7 +2972,9 @@
       "online": "Listener on-line",
       "offline": "Sem listener ativo",
       "offlineWarning": "Nenhum listener está conectado para: {pools}. Execuções direcionadas a esses pools ficarão na fila em vez de rodar.",
-      "count": "{count, plural, one {# listener} other {# listeners}}"
+      "count": "{count, plural, one {# listener} other {# listeners}}",
+      "countWithPods": "{count, plural, one {# listener} other {# listeners}} · {pods, plural, one {# pod} other {# pods}}",
+      "singlePod": "Pod único"
     },
     "inbound": "Aceita do par",
     "inboundAwaiting": "Nomeado, sem segredo"

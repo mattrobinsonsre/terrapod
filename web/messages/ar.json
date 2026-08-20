@@ -2972,7 +2972,9 @@
       "online": "المستمع متصل",
       "offline": "لا يوجد مستمع نشط",
       "offlineWarning": "لا يوجد مستمع متصل لـ: {pools}. عمليات التشغيل الموجّهة إلى هذه المجمّعات ستنتظر في الطابور بدلاً من أن تُنفَّذ.",
-      "count": "{count, plural, zero {لا مستمعين} one {مستمع واحد} two {مستمعان} few {# مستمعين} many {# مستمعاً} other {# مستمع}}"
+      "count": "{count, plural, zero {لا مستمعين} one {مستمع واحد} two {مستمعان} few {# مستمعين} many {# مستمعاً} other {# مستمع}}",
+      "countWithPods": "{count, plural, one {مستمع واحد} other {# مستمعين}} · {pods, plural, one {جراب واحد} other {# أجربة}}",
+      "singlePod": "جراب واحد"
     },
     "inbound": "يقبل من النظير",
     "inboundAwaiting": "مُسمّى، بلا سر"

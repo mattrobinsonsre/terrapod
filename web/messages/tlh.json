@@ -2972,7 +2972,9 @@
       "online": "'Ijwl' yIntaH",
       "offline": "pagh 'Ijwl' yIntaH",
       "offlineWarning": "pagh 'Ijwl' rarlu' ghommeyvaD: {pools}. ghommeyvamvaD ngeHbogh QaptaHghachmey qaSbe'; leStaH neH.",
-      "count": "{count} 'Ijwl'"
+      "count": "{count} 'Ijwl'",
+      "countWithPods": "{count, plural, other {# ‘Ijwí’}} · {pods, plural, other {# pod}}",
+      "singlePod": "wa' pod"
     },
     "inbound": "jIHvo' laj",
     "inboundAwaiting": "ponglu', 'ach pegh Hutlh"

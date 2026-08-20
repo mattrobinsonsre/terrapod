@@ -2972,7 +2972,9 @@
       "online": "מאזין מקוון",
       "offline": "אין מאזין פעיל",
       "offlineWarning": "אין מאזין מחובר עבור: {pools}. הרצות שמנותבות למאגרים אלה ימתינו בתור במקום לרוץ.",
-      "count": "{count, plural, one {מאזין אחד} two {שני מאזינים} other {# מאזינים}}"
+      "count": "{count, plural, one {מאזין אחד} two {שני מאזינים} other {# מאזינים}}",
+      "countWithPods": "{count, plural, one {מאזין אחד} other {# מאזינים}} · {pods, plural, one {פוד אחד} other {# פודים}}",
+      "singlePod": "פוד יחיד"
     },
     "inbound": "מקבל מהעמית",
     "inboundAwaiting": "נקוב בשם, ללא סוד"

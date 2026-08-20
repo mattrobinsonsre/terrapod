@@ -2972,7 +2972,9 @@
       "online": "Dinleyici çevrimiçi",
       "offline": "Canlı dinleyici yok",
       "offlineWarning": "Şu havuzlar için bağlı dinleyici yok: {pools}. Bu havuzlara yönlendirilen çalıştırmalar yürütülmek yerine kuyrukta bekler.",
-      "count": "{count} dinleyici"
+      "count": "{count} dinleyici",
+      "countWithPods": "{count, plural, one {# dinleyici} other {# dinleyici}} · {pods, plural, one {# pod} other {# pod}}",
+      "singlePod": "Tek pod"
     },
     "inbound": "Eşten kabul eder",
     "inboundAwaiting": "Adlandırılmış, gizli anahtar yok"

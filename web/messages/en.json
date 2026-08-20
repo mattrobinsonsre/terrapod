@@ -2972,7 +2972,9 @@
       "online": "Listener online",
       "offline": "No live listener",
       "offlineWarning": "No listener is connected for: {pools}. Runs routed to these pools will queue rather than execute.",
-      "count": "{count, plural, one {# listener} other {# listeners}}"
+      "count": "{count, plural, one {# listener} other {# listeners}}",
+      "countWithPods": "{count, plural, one {# listener} other {# listeners}} · {pods, plural, one {# pod} other {# pods}}",
+      "singlePod": "Single pod"
     },
     "inbound": "Accepts from peer",
     "inboundAwaiting": "Named, no secret"

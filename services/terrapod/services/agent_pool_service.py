@@ -636,6 +636,32 @@ async def heartbeat_listener(
     await pipe.execute()
 
 
+async def count_listener_replicas_bulk(listener_ids: set[str]) -> dict[str, int]:
+    """Pod counts for many listeners in ONE scan.
+
+    `count_listener_replicas` scans the keyspace per listener, which is fine for
+    a single listener detail view and wrong for a list: a pools list would then
+    issue one SCAN per listener per request, and SCAN walks the whole keyspace
+    whatever the match pattern. That is the same O(N)-per-request shape that
+    made the workspace list the scalability bottleneck (#1056), so the list path
+    gets a single pass that buckets by listener id instead.
+
+    Ids absent from the result have no live pod keys; the caller decides whether
+    that means zero or unknown, since only it knows if the listener tracks pods.
+    """
+    redis = get_redis_client()
+    counts: dict[str, int] = {}
+    async for key in redis.scan_iter(match=f"{_LISTENER_POD_PREFIX}*", count=200):
+        # tp:listener_pod:{listener_id}:{pod_name} — pod names contain no ":",
+        # but listener ids are UUIDs, so split off the known prefix and take the
+        # first remaining segment rather than assuming a field count.
+        rest = (key if isinstance(key, str) else key.decode()).removeprefix(_LISTENER_POD_PREFIX)
+        listener_id = rest.split(":", 1)[0]
+        if listener_id in listener_ids:
+            counts[listener_id] = counts.get(listener_id, 0) + 1
+    return counts
+
+
 async def count_listener_replicas(listener_id: str) -> int:
     """Return the number of pods currently heartbeating for this listener.
 

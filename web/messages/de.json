@@ -2972,7 +2972,9 @@
       "online": "Listener online",
       "offline": "Kein aktiver Listener",
       "offlineWarning": "Für Folgendes ist kein Listener verbunden: {pools}. Läufe für diese Pools warten in der Warteschlange, statt ausgeführt zu werden.",
-      "count": "{count, plural, one {# Listener} other {# Listener}}"
+      "count": "{count, plural, one {# Listener} other {# Listener}}",
+      "countWithPods": "{count, plural, one {# Listener} other {# Listener}} · {pods, plural, one {# Pod} other {# Pods}}",
+      "singlePod": "Einzelner Pod"
     },
     "inbound": "Akzeptiert vom Partner",
     "inboundAwaiting": "Benannt, kein Secret"
