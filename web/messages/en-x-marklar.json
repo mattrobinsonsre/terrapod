@@ -6,7 +6,7 @@
     "modules": "Marklars",
     "providers": "Marklars",
     "catalog": "Marklar",
-    "agentPools": "Marklar Marklars",
+    "agentPools": "Marklars",
     "admin": "Marklar",
     "users": "Marklars",
     "roles": "Marklars",
@@ -32,7 +32,8 @@
     "openAccountMenu": "Open marklar marklar",
     "closeMenu": "Close marklar",
     "ha": "High marklar",
-    "deletedWorkspaces": "Deleted marklars"
+    "deletedWorkspaces": "Deleted marklars",
+    "version": "Marklar {version}"
   },
   "switcher": {
     "language": "Marklar",

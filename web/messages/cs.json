@@ -6,7 +6,7 @@
     "modules": "Moduly",
     "providers": "Provideři",
     "catalog": "Katalog",
-    "agentPools": "Fondy agentů",
+    "agentPools": "Agenti",
     "admin": "Správa",
     "users": "Uživatelé",
     "roles": "Role",
@@ -32,7 +32,8 @@
     "openAccountMenu": "Otevřít nabídku účtu",
     "closeMenu": "Zavřít nabídku",
     "ha": "Vysoká dostupnost",
-    "deletedWorkspaces": "Smazané pracovní prostory"
+    "deletedWorkspaces": "Smazané pracovní prostory",
+    "version": "Verze {version}"
   },
   "switcher": {
     "language": "Jazyk",

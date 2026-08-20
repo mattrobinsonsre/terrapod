@@ -6,8 +6,8 @@
     "modules": "Módulos",
     "providers": "Providers",
     "catalog": "Catálogo",
-    "agentPools": "Agent Pools",
-    "admin": "Administração",
+    "agentPools": "Agentes",
+    "admin": "Admin",
     "users": "Utilizadores",
     "roles": "Funções",
     "vcsConnections": "Ligações VCS",
@@ -32,7 +32,8 @@
     "openAccountMenu": "Abrir menu da conta",
     "closeMenu": "Fechar menu",
     "ha": "Alta disponibilidade",
-    "deletedWorkspaces": "Workspaces eliminados"
+    "deletedWorkspaces": "Workspaces eliminados",
+    "version": "Versão {version}"
   },
   "switcher": {
     "language": "Idioma",

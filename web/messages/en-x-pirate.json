@@ -6,7 +6,7 @@
     "modules": "Modules",
     "providers": "Providers",
     "catalog": "Catalog",
-    "agentPools": "Agent Crews",
+    "agentPools": "Crew",
     "admin": "Admin",
     "users": "Crew",
     "roles": "Roles",
@@ -32,7 +32,8 @@
     "openAccountMenu": "Open yer account menu",
     "closeMenu": "Batten th'' menu",
     "ha": "Ever-Afloat",
-    "deletedWorkspaces": "Scuttled work-decks"
+    "deletedWorkspaces": "Scuttled work-decks",
+    "version": "Ship's mark {version}"
   },
   "switcher": {
     "language": "Tongue",

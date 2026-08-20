@@ -6,7 +6,7 @@
     "modules": "Moduls",
     "providers": "Providrs",
     "catalog": "Catalog",
-    "agentPools": "Agent Poolz",
+    "agentPools": "Agentz",
     "admin": "Admin",
     "users": "Userz",
     "roles": "Rolez",
@@ -32,7 +32,8 @@
     "openAccountMenu": "Opun akkount menu",
     "closeMenu": "Cloze menu",
     "ha": "Hai Availabilitee",
-    "deletedWorkspaces": "Deletd Werkspacez"
+    "deletedWorkspaces": "Deletd Werkspacez",
+    "version": "Vershun {version}"
   },
   "switcher": {
     "language": "Langwidge",

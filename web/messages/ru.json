@@ -6,7 +6,7 @@
     "modules": "Модули",
     "providers": "Провайдеры",
     "catalog": "Каталог",
-    "agentPools": "Пулы агентов",
+    "agentPools": "Агенты",
     "admin": "Администрирование",
     "users": "Пользователи",
     "roles": "Роли",
@@ -32,7 +32,8 @@
     "openAccountMenu": "Открыть меню учётной записи",
     "closeMenu": "Закрыть меню",
     "ha": "Высокая доступность",
-    "deletedWorkspaces": "Удалённые рабочие области"
+    "deletedWorkspaces": "Удалённые рабочие области",
+    "version": "Версия {version}"
   },
   "switcher": {
     "language": "Язык",

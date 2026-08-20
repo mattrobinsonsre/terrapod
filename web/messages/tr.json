@@ -6,7 +6,7 @@
     "modules": "Modüller",
     "providers": "Sağlayıcılar",
     "catalog": "Katalog",
-    "agentPools": "Agent Havuzları",
+    "agentPools": "Aracılar",
     "admin": "Yönetim",
     "users": "Kullanıcılar",
     "roles": "Roller",
@@ -32,7 +32,8 @@
     "openAccountMenu": "Hesap menüsünü aç",
     "closeMenu": "Menüyü kapat",
     "ha": "Yüksek erişilebilirlik",
-    "deletedWorkspaces": "Silinmiş çalışma alanları"
+    "deletedWorkspaces": "Silinmiş çalışma alanları",
+    "version": "Sürüm {version}"
   },
   "switcher": {
     "language": "Dil",

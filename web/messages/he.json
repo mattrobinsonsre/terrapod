@@ -6,7 +6,7 @@
     "modules": "מודולים",
     "providers": "ספקים",
     "catalog": "קטלוג",
-    "agentPools": "מאגרי סוכנים",
+    "agentPools": "סוכנים",
     "admin": "ניהול",
     "users": "משתמשים",
     "roles": "תפקידים",
@@ -32,7 +32,8 @@
     "openAccountMenu": "פתיחת תפריט חשבון",
     "closeMenu": "סגירת תפריט",
     "ha": "זמינות גבוהה",
-    "deletedWorkspaces": "סביבות עבודה שנמחקו"
+    "deletedWorkspaces": "סביבות עבודה שנמחקו",
+    "version": "גרסה {version}"
   },
   "switcher": {
     "language": "שפה",

@@ -6,7 +6,7 @@
     "modules": "الوحدات",
     "providers": "المزوّدون",
     "catalog": "الكتالوج",
-    "agentPools": "تجمّعات الوكلاء",
+    "agentPools": "الوكلاء",
     "admin": "الإدارة",
     "users": "المستخدمون",
     "roles": "الأدوار",
@@ -32,7 +32,8 @@
     "openAccountMenu": "فتح قائمة الحساب",
     "closeMenu": "إغلاق القائمة",
     "ha": "التوافر العالي",
-    "deletedWorkspaces": "مساحات العمل المحذوفة"
+    "deletedWorkspaces": "مساحات العمل المحذوفة",
+    "version": "الإصدار {version}"
   },
   "switcher": {
     "language": "اللغة",

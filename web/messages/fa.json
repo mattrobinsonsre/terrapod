@@ -6,7 +6,7 @@
     "modules": "ماژول‌ها",
     "providers": "ارائه‌دهندگان",
     "catalog": "کاتالوگ",
-    "agentPools": "استخرهای عامل",
+    "agentPools": "عامل‌ها",
     "admin": "مدیریت",
     "users": "کاربران",
     "roles": "نقش‌ها",
@@ -32,7 +32,8 @@
     "openAccountMenu": "باز کردن منوی حساب",
     "closeMenu": "بستن منو",
     "ha": "دسترس‌پذیری بالا",
-    "deletedWorkspaces": "فضاهای کاری حذف‌شده"
+    "deletedWorkspaces": "فضاهای کاری حذف‌شده",
+    "version": "نسخهٔ {version}"
   },
   "switcher": {
     "language": "زبان",

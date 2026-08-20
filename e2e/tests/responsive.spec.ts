@@ -503,10 +503,16 @@ test.describe('Responsive harness (phone viewport)', () => {
 test.describe('Tablet width (md–lg dead-zone, #839)', () => {
   test.use({ viewport: { width: 900, height: 900 }, isMobile: false });
 
-  test('nav stays a compact hamburger, no page h-scroll', async ({ page }) => {
+  test('nav shows the icon bar, not the hamburger, no page h-scroll', async ({ page }) => {
     await page.goto('/workspaces');
-    // Below lg the mobile hamburger is the nav; the desktop link row is hidden.
-    await expect(page.getByRole('button', { name: /open menu/i })).toBeVisible();
+    // #839 resolved this width by showing the hamburger; #1400 reversed that.
+    // The icon-only bar needs about 650px, so hiding it here hid a bar that
+    // fits. The nav now switches at md, where the rest of the UI switches to
+    // its phone treatment, so 900px is squarely desktop and gets the bar.
+    await expect(page.getByRole('button', { name: /open menu/i })).toBeHidden();
+    await expect(
+      page.getByRole('navigation').getByRole('link', { name: 'Workspaces', exact: true }),
+    ).toBeVisible();
     await expectNoHorizontalPageScroll(page);
   });
 

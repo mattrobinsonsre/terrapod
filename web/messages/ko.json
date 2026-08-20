@@ -6,7 +6,7 @@
     "modules": "모듈",
     "providers": "프로바이더",
     "catalog": "카탈로그",
-    "agentPools": "에이전트 풀",
+    "agentPools": "에이전트",
     "admin": "관리자",
     "users": "사용자",
     "roles": "역할",
@@ -32,7 +32,8 @@
     "openAccountMenu": "계정 메뉴 열기",
     "closeMenu": "메뉴 닫기",
     "ha": "고가용성",
-    "deletedWorkspaces": "삭제된 워크스페이스"
+    "deletedWorkspaces": "삭제된 워크스페이스",
+    "version": "버전 {version}"
   },
   "switcher": {
     "language": "언어",

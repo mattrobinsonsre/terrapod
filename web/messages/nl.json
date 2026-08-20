@@ -6,7 +6,7 @@
     "modules": "Modules",
     "providers": "Providers",
     "catalog": "Catalogus",
-    "agentPools": "Agent-pools",
+    "agentPools": "Agents",
     "admin": "Beheer",
     "users": "Gebruikers",
     "roles": "Rollen",
@@ -32,7 +32,8 @@
     "openAccountMenu": "Accountmenu openen",
     "closeMenu": "Menu sluiten",
     "ha": "Hoge beschikbaarheid",
-    "deletedWorkspaces": "Verwijderde workspaces"
+    "deletedWorkspaces": "Verwijderde workspaces",
+    "version": "Versie {version}"
   },
   "switcher": {
     "language": "Taal",

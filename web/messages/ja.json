@@ -6,7 +6,7 @@
     "modules": "モジュール",
     "providers": "プロバイダー",
     "catalog": "カタログ",
-    "agentPools": "エージェントプール",
+    "agentPools": "エージェント",
     "admin": "管理",
     "users": "ユーザー",
     "roles": "ロール",
@@ -32,7 +32,8 @@
     "openAccountMenu": "アカウントメニューを開く",
     "closeMenu": "メニューを閉じる",
     "ha": "高可用性",
-    "deletedWorkspaces": "削除されたワークスペース"
+    "deletedWorkspaces": "削除されたワークスペース",
+    "version": "バージョン {version}"
   },
   "switcher": {
     "language": "言語",
