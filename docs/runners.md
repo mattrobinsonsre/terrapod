@@ -230,7 +230,10 @@ Terraform/OpenTofu provider plugins can consume substantial memory — particula
 
 **Every run records its actual usage.** The runner entrypoint reads `/sys/fs/cgroup/memory.peak` (and `/sys/fs/cgroup/cpu.stat` for future use) at exit and POSTs them to `/api/terrapod/v1/runs/{run_id}/resource-profile`. The Run detail page renders a **Resource usage** panel showing peak memory **alongside the workspace's request and limit** — peak alone has no meaning, so it's always anchored. The memory bar turns amber at ≥80% of the limit and red at ≥95%, so high-water marks that are approaching the cliff are visible before they push a run over the edge.
 
-CPU is captured but not yet surfaced. `peak_cpu_usec` from cgroup v2 is *cumulative* core-time, not an instantaneous peak — comparing it to the cores-allocated limit requires dividing by phase wall-clock, and even then the resulting *average* utilisation can hide bursts that briefly peg the limit. A proper CPU panel needs instantaneous sampling rather than cumulative-counter math; tracked as a follow-up. The data is still recorded so it's available the moment the sampling layer lands.
+The profile also records `peak_cpu_usec` from cgroup v2, available through the
+resource-profile API. It is *cumulative* core-time rather than an instantaneous
+peak, so it answers "how much CPU did this run consume" rather than "did it hit
+the limit".
 
 **OOM-killed runs are tagged explicitly.** SIGKILL is uncatchable, so the runner's own EXIT trap doesn't fire on OOM. The complementary signal comes from the **listener**: when a Job fails, the listener queries the pod's `container.state.terminated` field and reports the `reason` (`OOMKilled`) and `exit_code` (`137`) back via the job-status endpoint. The reconciler maps that to a typed `runner_exit_status`:
 

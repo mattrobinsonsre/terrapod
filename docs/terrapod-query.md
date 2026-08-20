@@ -178,7 +178,9 @@ behaves exactly as before (raw config only).
 The `terrapod-query` engine (schema → query → import) is complete and shipped as
 a binary, and the platform integration that drives it — discovery sessions, D1
 schema introspection, runner-side query + `tofu plan -generate-config-out` +
-config cleanup, and the optional AI config polish above — is implemented. The
-remaining end-to-end step (an AI workflow that chooses what to query, iterates,
-and raises a reviewed VCS pull request behind the import-only plan gate) is
-tracked in [#824](https://github.com/mattrobinsonsre/terrapod/issues/824).
+config cleanup, and the optional AI config polish above — is implemented.
+
+Choosing what to import, and opening the pull request that brings it under
+management, stays with the operator: the generated config and `import {}`
+blocks are handed over for review, and the import itself runs behind the
+import-only plan gate.

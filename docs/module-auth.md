@@ -111,9 +111,9 @@ tokenless; nothing sensitive is ever passed as a command-line argument. Do not
 enable `GIT_TRACE` / `GIT_CURL_VERBOSE` in a workspace variable — those would make
 git print credential headers into the run log.
 
-## Not covered here (fast-follows)
+## Handled by workload identity
 
 External non-Terrapod registry tokens, `~/.netrc` HTTP-archive auth, and cloud
-object-store sources (`s3::`, `gcs::`) are handled by the runner's workload
-identity today and gain first-class credential kinds on the same framework in a
-follow-up.
+object-store sources (`s3::`, `gcs::`) resolve through the runner's workload
+identity — the same short-lived, no-stored-secret path the rest of a run's cloud
+access uses.

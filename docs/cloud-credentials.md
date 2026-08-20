@@ -762,7 +762,10 @@ postgresql:
 
 A common Vault use-case is **dynamic secrets** — a runner fetching short-lived, per-run cloud credentials with something like `vault read aws/creds/my-role` just before `init`. Terrapod supports this via [execution hooks](execution-hooks.md): define a `pre_init` hook whose script fetches the dynamic secret and exports it into the run environment, and associate it with the workspaces that need it. (Execution hooks supersede the earlier, never-fully-wired `setup_script`/`TP_SETUP_SCRIPT` runner slot.)
 
-**The supported way for runs to reach cloud APIs is workload identity** (IRSA/WIF/WI on the runner SA), documented above. A configurable runner setup script — the surface that would enable Vault dynamic secrets and other per-run credential fetching — is future work. This section will be updated if and when that configuration surface ships.
+**The way runs reach cloud APIs is workload identity** (IRSA/WIF/WI on the
+runner SA), documented above. Where a run needs to fetch a credential itself —
+Vault dynamic secrets being the usual case — the `pre_init` execution hook shown
+above is the mechanism, with per-workspace association and an audit trail.
 
 ---
 

@@ -123,8 +123,3 @@ discipline applies.
   exposes the risk level and findings as read-only data, e.g. to feed a policy
   check or a report.
 
-## Roadmap
-
-An **estate-wide** critique — reasoning over the cross-workspace topology graph
-(shared dependencies, cross-workspace SPOFs) — is planned as a follow-up. The
-per-workspace critique described here is the first step.

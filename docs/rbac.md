@@ -347,18 +347,18 @@ Keys and values must be strings.
 
 A small set of label keys are reserved as **virtual filter fields** in the workspace-list filter UI. A filter term like `status:errored` resolves against a workspace's derived status, not against a literal label called `status`. To keep that filter language unambiguous, these keys cannot be used as literal labels — the API rejects them on create and update with 422.
 
-| Reserved key | Maps to | Filter status |
+| Reserved key | Maps to | Usable as a filter |
 |---|---|---|
-| `status` | derived run status (`errored`, `needs-confirm`, `drifted`, `applied`, …) | implemented |
-| `pool` | `agent_pool_name` | reserved (planned virtual) |
-| `mode` | `execution_mode` (`local`/`agent`) | reserved (planned virtual) |
-| `backend` | `execution_backend` (`tofu`/`terraform`) | reserved (planned virtual) |
-| `owner` | `owner_email` | reserved (planned virtual) |
-| `drift` | `drift_status` (`drifted`/`in_sync`/`never_checked`) | reserved (planned virtual) |
-| `version` | `terraform_version` | reserved (planned virtual) |
-| `vcs` | `true`/`false` — has VCS connection | reserved (planned virtual) |
-| `locked` | `true`/`false` — currently locked | reserved (planned virtual) |
-| `branch` | `vcs_branch` | reserved (planned virtual) |
+| `status` | derived run status (`errored`, `needs-confirm`, `drifted`, `applied`, …) | yes |
+| `pool` | `agent_pool_name` | reserved |
+| `mode` | `execution_mode` (`local`/`agent`) | reserved |
+| `backend` | `execution_backend` (`tofu`/`terraform`) | reserved |
+| `owner` | `owner_email` | reserved |
+| `drift` | `drift_status` (`drifted`/`in_sync`/`never_checked`) | reserved |
+| `version` | `terraform_version` | reserved |
+| `vcs` | `true`/`false` — has VCS connection | reserved |
+| `locked` | `true`/`false` — currently locked | reserved |
+| `branch` | `vcs_branch` | reserved |
 
 The `status` field also accepts one **aggregate** value beyond the per-status values above: `status:unhealthy` matches any workspace with at least one active **health condition** (state diverged, no agent pool assigned, VCS polling error, drift detected, or drift-detection errored). It is the roll-up behind the **Health Issues** summary card on the workspace list — clicking the card when the count is non-zero toggles this filter so you can jump straight to the affected workspaces (and click again to clear). Because it rides the already-reserved `status` field, no additional label key is reserved for it. It is deliberately broader than any single status value: a workspace awaiting confirmation shows as `needs-confirm` even when its state has diverged, and the `no_agent_pool`/`drift_errored` conditions have no standalone status value at all — `status:unhealthy` catches all of them.
 
