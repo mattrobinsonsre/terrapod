@@ -2972,7 +2972,9 @@
       "online": "Marklar online",
       "offline": "No live marklar",
       "offlineWarning": "No marklar is connected for: {pools}. Marklars routed to these marklars will queue rather than execute.",
-      "count": "{count, plural, one {# marklar} other {# marklars}}"
+      "count": "{count, plural, one {# marklar} other {# marklars}}",
+      "countWithPods": "{count, plural, one {# marklar} other {# marklars}} · {pods, plural, one {# marklar} other {# marklars}}",
+      "singlePod": "Single marklar"
     },
     "inbound": "Accepts from marklar",
     "inboundAwaiting": "Named, no marklar"

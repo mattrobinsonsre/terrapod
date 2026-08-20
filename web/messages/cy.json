@@ -2972,7 +2972,9 @@
       "online": "Gwrandäwr ar-lein",
       "offline": "Dim gwrandäwr byw",
       "offlineWarning": "Nid oes gwrandäwr wedi'i gysylltu ar gyfer: {pools}. Bydd rhediadau a anfonir i'r pyllau hyn yn ciwio yn hytrach na rhedeg.",
-      "count": "{count, plural, one {# gwrandäwr} other {# gwrandäwr}}"
+      "count": "{count, plural, one {# gwrandäwr} other {# gwrandäwr}}",
+      "countWithPods": "{count, plural, one {# gwrandäwr} other {# gwrandawyr}} · {pods, plural, one {# pod} other {# pod}}",
+      "singlePod": "Un pod"
     },
     "inbound": "Derbyn gan y partner",
     "inboundAwaiting": "Wedi'i enwi, dim cyfrinach"

@@ -2972,7 +2972,9 @@
       "online": "Listener online",
       "offline": "Ingen levande listener",
       "offlineWarning": "Ingen listener är ansluten för: {pools}. Körningar till dessa pooler köas i stället för att köra.",
-      "count": "{count, plural, one {# listener} other {# listeners}}"
+      "count": "{count, plural, one {# listener} other {# listeners}}",
+      "countWithPods": "{count, plural, one {# lyssnare} other {# lyssnare}} · {pods, plural, one {# pod} other {# poddar}}",
+      "singlePod": "En enda pod"
     },
     "inbound": "Accepterar från peer",
     "inboundAwaiting": "Namngiven, ingen hemlighet"

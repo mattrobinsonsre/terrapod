@@ -2972,7 +2972,9 @@
       "online": "Listener online",
       "offline": "Ingen levende listener",
       "offlineWarning": "Ingen listener er forbundet for: {pools}. Kørsler til disse puljer sættes i kø i stedet for at køre.",
-      "count": "{count, plural, one {# listener} other {# listeners}}"
+      "count": "{count, plural, one {# listener} other {# listeners}}",
+      "countWithPods": "{count, plural, one {# listener} other {# listenere}} · {pods, plural, one {# pod} other {# pods}}",
+      "singlePod": "Enkelt pod"
     },
     "inbound": "Accepterer fra peer",
     "inboundAwaiting": "Navngivet, ingen hemmelighed"

@@ -2972,7 +2972,9 @@
       "online": "リスナー稼働中",
       "offline": "稼働中のリスナーなし",
       "offlineWarning": "次のプールにリスナーが接続されていません: {pools}。これらのプールに割り当てられた実行は待機したままになります。",
-      "count": "リスナー {count} 個"
+      "count": "リスナー {count} 個",
+      "countWithPods": "{count, plural, other {リスナー #}} · {pods, plural, other {ポッド #}}",
+      "singlePod": "単一ポッド"
     },
     "inbound": "ピアから受け入れ",
     "inboundAwaiting": "名前のみ、シークレット未設定"

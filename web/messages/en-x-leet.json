@@ -2972,7 +2972,9 @@
       "online": "L1573n3r 0nl1n3",
       "offline": "N0 l1v3 l1573n3r",
       "offlineWarning": "N0 l1573n3r 15 c0nn3c73d f0r: {pools}. Run5 r0u73d 70 7h353 p00l5 w1ll qu3u3 r47h3r 7h4n 3x3cu73.",
-      "count": "{count, plural, one {# l1573n3r} other {# l1573n3r5}}"
+      "count": "{count, plural, one {# l1573n3r} other {# l1573n3r5}}",
+      "countWithPods": "{count, plural, one {# l1573n3r} other {# l1573n3r5}} · {pods, plural, one {# p0d} other {# p0d5}}",
+      "singlePod": "51ng13 p0d"
     },
     "inbound": "4cc3p75 fr0m p33r",
     "inboundAwaiting": "N4m3d, n0 53cr37"

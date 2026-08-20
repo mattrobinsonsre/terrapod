@@ -93,6 +93,7 @@ def _pool_json(
     status: str | None = None,
     permission: str | None = None,
     listener_count: int | None = None,
+    listener_pod_count: int | None = None,
 ) -> dict:
     """Format an AgentPool as JSON:API.
 
@@ -106,6 +107,14 @@ def _pool_json(
     so counting it would inflate the number an operator is using to decide
     whether a pool has capacity. It rides along with `status` for free: both
     come from one already-fetched list, so no endpoint gains a round trip.
+
+    `listener-pod-count` (#1402) is how many PODS back those listeners. The two
+    differ, and the difference is the whole point: replicas of one Deployment
+    share a listener identity, so a redundant pair reports `listener-count: 1`.
+    Reading that as "one listener, therefore a single point of failure" is
+    exactly wrong, and it is the reading /ha invited. None means unknown rather
+    than zero — a listener on a pre-0.19.0 image does not report its pod name,
+    and guessing zero for it would invent an outage.
     """
     attrs: dict = {
         "name": pool.name,
@@ -119,6 +128,8 @@ def _pool_json(
         attrs["status"] = status
     if listener_count is not None:
         attrs["listener-count"] = listener_count
+    if listener_pod_count is not None:
+        attrs["listener-pod-count"] = listener_pod_count
     if permission is not None:
         attrs["permission"] = permission
     return {
@@ -208,6 +219,26 @@ def _live_listener_count(listeners: list[dict]) -> int:
     counting it would tell an operator they have capacity they do not have.
     """
     return sum(1 for item in listeners if _derive_listener_status(item) == "online")
+
+
+async def _live_listener_pod_count(listeners: list[dict]) -> int | None:
+    """Total pods backing the usable listeners of a pool.
+
+    Same predicate as `_live_listener_count`, so the pod figure and the listener
+    figure always describe the same set. Returns None when no usable listener
+    reports pod tracking — unknown, not zero: pre-0.19.0 images never send a pod
+    name, and showing them as zero pods would read as an outage that is not
+    happening.
+    """
+    tracking = {
+        item["id"]
+        for item in listeners
+        if _derive_listener_status(item) == "online" and item.get("tracks_pods") == "1"
+    }
+    if not tracking:
+        return None
+    counts = await agent_pool_service.count_listener_replicas_bulk(tracking)
+    return sum(counts.get(lid, 0) for lid in tracking)
 
 
 def _listener_json(listener: dict, replica_count: int | None = None) -> dict:
@@ -306,7 +337,7 @@ async def list_pools(
     pools = await agent_pool_service.list_pools(db)
     # Pre-fetch custom roles once to avoid N+1 queries
     custom_roles = await fetch_custom_roles(db, user.roles)
-    result = []
+    visible: list[tuple] = []
     for p in pools:
         caps = await resolve_pool_capabilities_for(
             db,
@@ -325,12 +356,35 @@ async def list_pools(
         # not enough — a listener with an expired cert keeps heartbeating but
         # 401s every authenticated call, so we cross-check cert expiry too.
         status = _derive_pool_status(listeners)
+        visible.append((p, perm, status, listeners))
+
+    # Pod counts for every visible pool in ONE scan. Calling the per-pool helper
+    # inside the loop above would issue a keyspace scan per pool, which is the
+    # O(N)-per-request shape this endpoint exists on the right side of.
+    tracking = {
+        item["id"]
+        for _, _, _, listeners in visible
+        for item in listeners
+        if _derive_listener_status(item) == "online" and item.get("tracks_pods") == "1"
+    }
+    pod_counts = await agent_pool_service.count_listener_replicas_bulk(tracking) if tracking else {}
+
+    result = []
+    for p, perm, status, listeners in visible:
+        ids = [
+            item["id"]
+            for item in listeners
+            if _derive_listener_status(item) == "online" and item.get("tracks_pods") == "1"
+        ]
         result.append(
             _pool_json(
                 p,
                 status=status,
                 permission=perm,
                 listener_count=_live_listener_count(listeners),
+                # None, not 0, when nothing in this pool tracks pods — unknown
+                # is not an outage.
+                listener_pod_count=(sum(pod_counts.get(i, 0) for i in ids) if ids else None),
             )
         )
     page_items, meta = paginate(result, request)
@@ -381,6 +435,7 @@ async def show_pool(
                 status=status,
                 permission=perm,
                 listener_count=_live_listener_count(listeners),
+                listener_pod_count=await _live_listener_pod_count(listeners),
             )
         }
     )

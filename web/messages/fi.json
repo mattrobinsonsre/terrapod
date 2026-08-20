@@ -2972,7 +2972,9 @@
       "online": "Kuuntelija verkossa",
       "offline": "Ei elävää kuuntelijaa",
       "offlineWarning": "Yhtään kuuntelijaa ei ole yhdistetty näille: {pools}. Näihin altaisiin ohjatut ajot jäävät jonoon suorittamisen sijaan.",
-      "count": "{count, plural, one {# kuuntelija} other {# kuuntelijaa}}"
+      "count": "{count, plural, one {# kuuntelija} other {# kuuntelijaa}}",
+      "countWithPods": "{count, plural, one {# kuuntelija} other {# kuuntelijaa}} · {pods, plural, one {# podi} other {# podia}}",
+      "singlePod": "Yksi podi"
     },
     "inbound": "Hyväksyy parilta",
     "inboundAwaiting": "Nimetty, ei salaisuutta"

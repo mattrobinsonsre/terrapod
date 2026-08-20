@@ -13,6 +13,7 @@ from terrapod.services.agent_pool_service import (
     _fingerprint_ttl,
     _register_fingerprint,
     count_listener_replicas,
+    count_listener_replicas_bulk,
     create_pool_token,
     generate_join_token,
     heartbeat_listener,
@@ -635,3 +636,60 @@ class TestFingerprintMigrationFallback:
             return_value=mock_redis,
         ):
             assert await is_fingerprint_valid("lid-x", "fp") is False
+
+
+class TestCountListenerReplicasBulk:
+    """Pod counts for many listeners in one scan (#1402).
+
+    The bulk path exists so a pools list does not issue a keyspace scan per
+    pool. These pin the two things that would silently break it: that it
+    buckets keys to the right listener, and that it ignores listeners the
+    caller did not ask about — a shared Redis holds pod keys for every
+    listener, so summing indiscriminately would inflate every pool's count.
+    """
+
+    @pytest.mark.asyncio
+    async def test_buckets_pods_by_listener(self):
+        keys = [
+            "tp:listener_pod:aaa:pod-1",
+            "tp:listener_pod:aaa:pod-2",
+            "tp:listener_pod:bbb:pod-1",
+        ]
+
+        async def fake_scan_iter(match=None, count=None):
+            for k in keys:
+                yield k
+
+        redis = MagicMock()
+        redis.scan_iter = fake_scan_iter
+        with patch("terrapod.services.agent_pool_service.get_redis_client", return_value=redis):
+            counts = await count_listener_replicas_bulk({"aaa", "bbb"})
+        assert counts == {"aaa": 2, "bbb": 1}
+
+    @pytest.mark.asyncio
+    async def test_ignores_listeners_not_asked_for(self):
+        # A listener belonging to a pool the caller cannot see, or simply not
+        # in this page, must not be added to anyone's total.
+        async def fake_scan_iter(match=None, count=None):
+            for k in ["tp:listener_pod:aaa:pod-1", "tp:listener_pod:zzz:pod-9"]:
+                yield k
+
+        redis = MagicMock()
+        redis.scan_iter = fake_scan_iter
+        with patch("terrapod.services.agent_pool_service.get_redis_client", return_value=redis):
+            counts = await count_listener_replicas_bulk({"aaa"})
+        assert counts == {"aaa": 1}
+        assert "zzz" not in counts
+
+    @pytest.mark.asyncio
+    async def test_pod_names_containing_colons_still_bucket(self):
+        # Pod names do not normally contain ":", but the parser must not depend
+        # on that — splitting on the wrong field would attribute pods to a
+        # listener id that does not exist, silently under-counting the real one.
+        async def fake_scan_iter(match=None, count=None):
+            yield "tp:listener_pod:aaa:pod:with:colons"
+
+        redis = MagicMock()
+        redis.scan_iter = fake_scan_iter
+        with patch("terrapod.services.agent_pool_service.get_redis_client", return_value=redis):
+            assert await count_listener_replicas_bulk({"aaa"}) == {"aaa": 1}

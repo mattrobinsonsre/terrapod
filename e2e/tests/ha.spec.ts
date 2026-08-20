@@ -163,7 +163,7 @@ test.describe('HA page — replication', () => {
 test.describe('HA page — runner readiness', () => {
   const pools = (
     page: Page,
-    list: Array<{ name: string; status: string; listeners?: number }>,
+    list: Array<{ name: string; status: string; listeners?: number; pods?: number }>,
   ) =>
     page.route('**/api/terrapod/v1/agent-pools*', (route: Route) =>
       route.fulfill({
@@ -176,6 +176,9 @@ test.describe('HA page — runner readiness', () => {
               name: p.name,
               status: p.status,
               'listener-count': p.listeners ?? (p.status === 'online' ? 1 : 0),
+              // Omitted when undefined, which is the real server's way of
+              // saying "unknown" for a listener too old to report its pod.
+              ...(p.pods === undefined ? {} : { 'listener-pod-count': p.pods }),
             },
           })),
           meta: {},
@@ -199,6 +202,41 @@ test.describe('HA page — runner readiness', () => {
     // materially different answers to "can I fail over onto this".
     await expect(page.getByText('3 listeners', { exact: true })).toBeVisible();
     await expect(page.getByText('No live listener', { exact: true })).toBeVisible();
+  });
+
+  test('pods are shown, so a redundant pair does not read as a single listener', async ({
+    page,
+  }) => {
+    // The defect this replaced (#1402): replicas of one Deployment share a
+    // listener identity, so a two-pod pool reports one listener. On the page
+    // whose job is finding single points of failure, that is the wrong answer
+    // to the only question being asked.
+    await mockHA(page, BASE_STATUS);
+    await pools(page, [
+      { name: 'redundant', status: 'online', listeners: 1, pods: 2 },
+      { name: 'lonely', status: 'online', listeners: 1, pods: 1 },
+    ]);
+    await page.goto('/ha');
+
+    await expect(page.getByText('1 listener · 2 pods', { exact: true })).toBeVisible();
+    await expect(page.getByText('1 listener · 1 pod', { exact: true })).toBeVisible();
+    // Exactly one warning: the one-pod pool earns it, the pair does not.
+    await expect(page.getByText('Single pod', { exact: true })).toHaveCount(1);
+  });
+
+  test('a listener that cannot report pods shows the listener count, not a false zero', async ({
+    page,
+  }) => {
+    // A pre-0.19.0 listener never sends its pod name. Rendering that as
+    // "0 pods" would invent an outage on a pool that is running fine — the
+    // same lie as the one above, pointing the other way.
+    await mockHA(page, BASE_STATUS);
+    await pools(page, [{ name: 'legacy', status: 'online', listeners: 2 }]);
+    await page.goto('/ha');
+
+    await expect(page.getByText('2 listeners', { exact: true })).toBeVisible();
+    await expect(page.getByText(/0 pods/)).toHaveCount(0);
+    await expect(page.getByText('Single pod', { exact: true })).toHaveCount(0);
   });
 
   test('all pools online raises nothing', async ({ page }) => {

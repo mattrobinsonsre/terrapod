@@ -2972,7 +2972,9 @@
       "online": "监听器在线",
       "offline": "无在线监听器",
       "offlineWarning": "以下资源池没有连接监听器：{pools}。分配到这些池的运行只会排队而不会执行。",
-      "count": "{count} 个监听器"
+      "count": "{count} 个监听器",
+      "countWithPods": "{count, plural, other {# 个监听器}} · {pods, plural, other {# 个 Pod}}",
+      "singlePod": "单个 Pod"
     },
     "inbound": "接受对端凭据",
     "inboundAwaiting": "已命名，未设密钥"

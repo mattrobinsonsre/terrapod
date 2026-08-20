@@ -2972,7 +2972,9 @@
       "online": "Listener online",
       "offline": "Brak żywego listenera",
       "offlineWarning": "Żaden listener nie jest podłączony do: {pools}. Uruchomienia kierowane do tych pul trafią do kolejki zamiast się wykonać.",
-      "count": "{count, plural, one {# listener} few {# listenery} many {# listenerów} other {# listenera}}"
+      "count": "{count, plural, one {# listener} few {# listenery} many {# listenerów} other {# listenera}}",
+      "countWithPods": "{count, plural, one {# listener} other {# listenery}} · {pods, plural, one {# pod} other {# pody}}",
+      "singlePod": "Jeden pod"
     },
     "inbound": "Akceptuje od partnera",
     "inboundAwaiting": "Nazwany, bez sekretu"

@@ -1237,3 +1237,74 @@ class TestListenerCount:
             assert (status == "online") == (count > 0), (
                 f"status {status!r} disagrees with count {count} for {listeners}"
             )
+
+
+class TestLiveListenerPodCount:
+    """Pods behind a pool's listeners (#1402).
+
+    `listener-count` counts listener identities, and replicas of one Deployment
+    share an identity — so a redundant pair reports one listener. On /ha, the
+    page whose job is finding single points of failure, that read as exactly
+    the failure it was not. These pin the distinction the fix rests on.
+    """
+
+    @staticmethod
+    def _listener(lid: str, *, tracks: bool = True, expired: bool = False) -> dict:
+        exp = datetime.now(UTC) + timedelta(days=-1 if expired else 30)
+        item = {
+            "id": lid,
+            "name": lid,
+            # The heartbeat writes this blindly; cert expiry is what downgrades
+            # it, which is the case the "expired" fixture below exercises.
+            "status": "online",
+            "last_heartbeat": datetime.now(UTC).isoformat(),
+            "certificate_expires_at": exp.isoformat(),
+        }
+        if tracks:
+            item["tracks_pods"] = "1"
+        return item
+
+    async def test_sums_pods_across_listeners(self):
+        from terrapod.api.routers.agent_pools import _live_listener_pod_count
+
+        listeners = [self._listener("aaa"), self._listener("bbb")]
+        with patch(
+            "terrapod.api.routers.agent_pools.agent_pool_service.count_listener_replicas_bulk",
+            AsyncMock(return_value={"aaa": 2, "bbb": 1}),
+        ):
+            assert await _live_listener_pod_count(listeners) == 3
+
+    async def test_unknown_not_zero_when_nothing_tracks_pods(self):
+        # A pre-0.19.0 listener never sends its pod name. Reporting it as zero
+        # pods would render as an outage on a pool that is running fine, which
+        # is the same lie in the opposite direction.
+        from terrapod.api.routers.agent_pools import _live_listener_pod_count
+
+        listeners = [self._listener("old", tracks=False)]
+        assert await _live_listener_pod_count(listeners) is None
+
+    async def test_excludes_listeners_that_cannot_take_work(self):
+        # Same predicate as the listener count, so the two figures always
+        # describe the same set. A cert-expired listener heartbeats but 401s
+        # every call, so its pods are not capacity.
+        from terrapod.api.routers.agent_pools import _live_listener_pod_count
+
+        listeners = [self._listener("good"), self._listener("dead", expired=True)]
+        with patch(
+            "terrapod.api.routers.agent_pools.agent_pool_service.count_listener_replicas_bulk",
+            AsyncMock(return_value={"good": 2}),
+        ) as bulk:
+            assert await _live_listener_pod_count(listeners) == 2
+        assert bulk.await_args.args[0] == {"good"}
+
+    async def test_zero_pods_is_reported_when_tracking(self):
+        # Tracking but no live pod keys IS meaningful: the listener hash is
+        # alive while every pod has stopped heartbeating. That is zero, not
+        # unknown, and the operator should see it.
+        from terrapod.api.routers.agent_pools import _live_listener_pod_count
+
+        with patch(
+            "terrapod.api.routers.agent_pools.agent_pool_service.count_listener_replicas_bulk",
+            AsyncMock(return_value={}),
+        ):
+            assert await _live_listener_pod_count([self._listener("aaa")]) == 0
