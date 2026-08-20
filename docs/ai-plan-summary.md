@@ -1,6 +1,6 @@
 # AI Plan Summary
 
-> Part of Terrapod's **AI-augmented review layer** design focus — see [Why Terrapod](../README.md#is-terrapod-for-you). Disabled by default; opt in per the configuration below.
+> Part of Terrapod's **AI-augmented review layer** design focus — see [Why Terrapod](../README.md#what-you-may-not-expect). Disabled by default; opt in per the configuration below.
 
 Terrapod can attach an AI-generated change summary and risk assessment
 to every plan, and an AI-generated failure analysis to every plan that
@@ -402,8 +402,6 @@ secrets into them.
    `plan_summaries` table.
 5. A `plan_summary_ready` SSE event is published on the per-workspace
    channel; the run-detail UI re-fetches.
-6. (For VCS-driven runs, future work) The summary is edited into the
-   PR/MR comment in place per head SHA.
 
 The handler is registered as a distributed task and only runs when
 `ai_summary.enabled` is true. Disabling the feature drops the trigger

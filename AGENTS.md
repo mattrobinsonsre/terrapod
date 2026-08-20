@@ -46,7 +46,7 @@ if a route is on that list it stays at `/api/v2/`; otherwise it goes under
 | `services/terrapod/` | API server (FastAPI) **and** the runner listener — one codebase, different entrypoints. Implicit namespace package (no `__init__.py`). | Python 3.13 |
 | `web/` | Next.js frontend + BFF (the single ingress; proxies `/api/*` to the API). | TypeScript / React |
 | `go-terrapod/` | Public, canonical Go SDK for the Terrapod API. Source of truth for the Go-side view of every endpoint. | Go |
-| `provider/` | `terraform-provider-terrapod` — the first-class **Terraform / OpenTofu provider for managing Terrapod itself as code** (25 `terrapod_*` resources + 7 data sources); a thin, typed wrapper over go-terrapod. See [`docs/terraform-provider.md`](docs/terraform-provider.md). | Go |
+| `provider/` | `terraform-provider-terrapod` — the first-class **Terraform / OpenTofu provider for managing Terrapod itself as code** (25 `terrapod_*` resources + 9 data sources); a thin, typed wrapper over go-terrapod. See [`docs/terraform-provider.md`](docs/terraform-provider.md). | Go |
 | `migrate/` | `terrapod-migrate` — TFE/HCP + Atlantis migration CLI. | Go |
 | `publish/` | `terrapod-publish` — registry publish CLI (client-signed provider/module uploads). | Go |
 | `query/` | `terrapod-query` — tofu-native discovery engine for onboarding existing resources (schema → filtered data-source query → `import {}` blocks; MPL, no BUSL). Standalone CLI + baked into the api/runner images. | Go |
@@ -134,7 +134,7 @@ Per-surface verification before you push (lint alone is **not** enough):
     compatibility.
 11. **Multi-replica safe, no leader election** — the API runs with multiple
     replicas behind a load balancer. All background work uses the distributed
-    scheduler (`services/scheduler.py`), which coordinates via Redis. Never use
+    scheduler (`services/terrapod/services/scheduler.py`), which coordinates via Redis. Never use
     in-process state (module globals, `asyncio.Event`, in-memory queues) for
     cross-replica coordination, and never use raw `asyncio.create_task()` for
     background work.
@@ -247,7 +247,7 @@ Routing rules of thumb:
   through an optional `meta`, every poll-cycle test omitted it, and the wrapper
   was never once executed through the caller that uses it.
 - A **new replicated entity class** (registered in
-  `services/replication_registry.py`) → the **full per-class test matrix**,
+  `services/terrapod/services/replication_registry.py`) → the **full per-class test matrix**,
   claimed with `@pytest.mark.replication_matrix("<class>", "<row>")`. Registering
   a class is one line and the outbox picks it up automatically, so it is easy to
   ship one that never converges — and the symptom appears at a failover, not in

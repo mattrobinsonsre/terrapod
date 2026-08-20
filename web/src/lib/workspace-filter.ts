@@ -38,8 +38,9 @@
 // literal label keys: the API rejects them at create/update time so the
 // filter language stays unambiguous. Today only `status:` is implemented
 // as a virtual term; the other reserved keys parse here as label terms
-// (which always miss because no workspace can have those labels) and
-// will gain virtual-term implementations as they're built out. See
+// (which always miss because no workspace can have those labels). They
+// are reserved so the filter language stays unambiguous, not staged for
+// a later implementation. See
 // `docs/rbac.md` § Reserved label keys for the user-facing list.
 
 export interface NameTerm {

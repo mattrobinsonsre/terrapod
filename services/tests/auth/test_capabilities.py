@@ -160,7 +160,7 @@ def test_grantable_is_full_preset_union_and_platform_free():
         )
     )
     assert set(cap.GRANTABLE_CAPABILITIES) == full
-    # ...and contains no platform:* token (those are #642, not yet grantable).
+    # ...and contains no platform:* token (informational only, never grantable).
     assert not (cap.GRANTABLE_CAPABILITIES & cap.PLATFORM_CAPABILITIES)
 
 

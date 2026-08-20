@@ -28,9 +28,17 @@ SCOPE (#585): capability enforcement covers the FOUR label-scoped axes that
 custom roles actually carry — workspace, pool, registry, catalog. The
 platform-admin gates (``require_admin`` / ``require_admin_or_audit``) stay
 role-name based; decomposing the monolithic platform admin into the scoped
-``platform:*`` capabilities below is a deliberate follow-up (#642), so those
-tokens are listed for honesty of the built-in ``admin`` capability set but are
-NOT independently grantable or enforced yet.
+``platform:*`` capabilities below is NOT planned, so those tokens are listed
+for honesty of the built-in ``admin`` capability set and are not independently
+grantable or enforced.
+
+Not planned rather than not-yet-done, deliberately. Two of the powers a split
+would expose — pools and the registry — already have their own label-scoped
+read/write/admin RBAC, so "run the pools without being a full admin" works
+today. What would be left (roles, VCS connections, variable sets, users) is
+admin-shaped work: anyone trusted to rotate a VCS credential or reset a
+password is someone you would trust with admin anyway. A middle tier there
+would add a permission axis to reason about and buy very little.
 """
 
 from __future__ import annotations
@@ -39,8 +47,8 @@ from __future__ import annotations
 # A capability is "<resource>:<verb>". Keep this list as the authoritative
 # enumeration; new endpoints map onto an existing capability or add one here
 # deliberately. Net-new capabilities that no legacy preset grants until an admin
-# opts in (state:read-outputs / state:read-sensitive tier; the scoped platform:*
-# split #642) are introduced by their own follow-ups.
+# opts in (the state:read-outputs / state:read-sensitive tier) are introduced by
+# their own follow-ups.
 
 # ── Workspace / runs — read tier ────────────────────────────────────────────
 # Per-resource read caps (each paired with a write/manage cap below, so an
@@ -94,11 +102,12 @@ CATALOG_READ = "catalog:read"  # browse catalog items + own instances
 CATALOG_USE = "catalog:use"  # provision / reconfigure / destroy an instance
 CATALOG_ADMIN = "catalog:admin"  # orphan-delete an instance (item authoring is platform)
 
-# ── Platform (informational only until #642 — NOT yet enforced/grantable) ────
-# The monolithic platform admin's constituent powers, grouped by the survey of
-# require_admin gates. Listed so capabilities_for_builtin("admin") is honest and
-# the scoped split (#642) has its target vocabulary; platform gates stay
-# role-name based in this feature.
+# ── Platform (informational only — NOT enforced or grantable, by decision) ───
+# The platform admin's constituent powers, grouped by the survey of
+# require_admin gates. They exist so capabilities_for_builtin("admin") is an
+# honest enumeration of what admin can actually do — not as a staging area for
+# a future split. Platform gates are role-name based and stay that way; see the
+# module docstring for why a scoped split is not planned.
 PLATFORM_ROLE_ADMIN = "platform:role-admin"  # roles + role assignments
 PLATFORM_VCS_ADMIN = "platform:vcs-admin"  # VCS connections
 PLATFORM_POOL_ADMIN = "platform:pool-admin"  # create agent pools, orphan-listener cleanup

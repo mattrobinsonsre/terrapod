@@ -715,6 +715,29 @@ jobs:
           fail-on-severity: high
           comment-summary-in-pr: on-failure
 
+  # ── Docs Audit ─────────────────────────────────────────
+  docs-audit:
+    name: Docs Audit
+    needs: prepare
+    if: needs.prepare.outputs.images_exist != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      # Pure-mechanism doc gates (#1389). No judgement, no network: a link
+      # either resolves or it does not, a count either matches the code or it
+      # does not. The failure mode they exist for is silent — a renamed heading
+      # or a grown registry leaves the docs confidently wrong.
+      - name: Cross-references resolve
+        run: python3 scripts/docs-audit/check_links.py
+      - name: Countable claims match the code
+        run: python3 scripts/docs-audit/check_counts.py
+      - name: Named targets, values and paths exist
+        run: python3 scripts/docs-audit/check_references.py
+      # Advisory: prints for human review, never fails. Telling a factual
+      # boundary from a put-down is a judgement call.
+      - name: Peer-fairness review list
+        run: python3 scripts/docs-audit/check_peer_fairness.py
+
   # ── Helm Lint ──────────────────────────────────────────
   helm-lint:
     name: Helm Lint
@@ -1925,6 +1948,7 @@ jobs:
       - pricegen-test
       - rescan-test
       - migration-check
+      - docs-audit
       - python-audit
       - npm-audit
       - secret-scan
@@ -1957,6 +1981,7 @@ jobs:
             pricegen-test=${{ needs.pricegen-test.result }}
             rescan-test=${{ needs.rescan-test.result }}
             migration-check=${{ needs.migration-check.result }}
+            docs-audit=${{ needs.docs-audit.result }}
             python-audit=${{ needs.python-audit.result }}
             npm-audit=${{ needs.npm-audit.result }}
             secret-scan=${{ needs.secret-scan.result }}
