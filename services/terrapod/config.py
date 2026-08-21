@@ -858,8 +858,19 @@ class OCIRegistryConfig(BaseModel):
         "from it, which is a server-side request forgery primitive. Empty means "
         "push-only, which is the correct setting for an air-gapped install. Note "
         "registry.cache_only seals upstream fetching across every cache including this "
-        "one, and takes precedence over anything listed here. Authenticated upstreams "
-        "are not yet supported — anonymous pulls only.",
+        "one, and takes precedence over anything listed here. An upstream needing "
+        "credentials carries a username plus a Secret-backed password (see the chart's "
+        "oci.upstreams[].existingSecret) — never a password in this file.",
+    )
+    upload_session_timeout_hours: int = Field(
+        default=24,
+        ge=1,
+        description="How long an in-progress blob upload may sit untouched before it is "
+        "reaped along with its chunks. The spec expects a server to time unfinished "
+        "uploads out; without it a client that starts a push and dies leaks its chunks "
+        "into object storage permanently, which any client with push access can do "
+        "repeatedly. Generous by default because a slow, resumed push over a poor link "
+        "is legitimate and reaping it mid-flight destroys real work.",
     )
 
 

@@ -31,10 +31,17 @@ from collections.abc import AsyncIterator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from terrapod.db.models import OCIBlob, OCIRepository, OCIRepositoryBlob, OCIUploadSession
+from terrapod.db.models import OCIBlob, OCIRepository, OCIRepositoryBlob, OCIUploadSession, now_utc
+from terrapod.logging_config import get_logger
 from terrapod.services.oci.names import Digest
 from terrapod.storage import keys
 from terrapod.storage.protocol import ObjectStore
+
+logger = get_logger(__name__)
+
+#: Sessions reaped per cycle. Bounded so a large backlog drains over several
+#: cycles instead of one transaction holding every stale row at once.
+_REAP_BATCH = 500
 
 #: Streamed in 1 MiB reads when concatenating. Large enough that a 500 MB layer
 #: is a few hundred iterations rather than tens of thousands, small enough that
@@ -218,3 +225,57 @@ async def discard_session(
             pass
     await db.delete(session)
     await db.flush()
+
+
+async def reap_abandoned_sessions() -> int:
+    """Delete upload sessions that have sat untouched past the timeout.
+
+    The spec asks a server to "eventually timeout unfinished uploads", and
+    without this an abandoned push leaks permanently: the session row stays, and
+    every chunk it wrote stays in object storage with nothing referencing it. A
+    client only needs push access to repeat that until the disk is full, so this
+    is a availability control as much as it is housekeeping.
+
+    Registered as a periodic task on the distributed scheduler, so exactly one
+    replica runs a cycle — never `asyncio.create_task` (principle 11).
+
+    Rows are claimed with ``FOR UPDATE SKIP LOCKED`` — the same primitive the run
+    dispatcher uses — so two overlapping cycles divide the backlog rather than
+    contend over it. The scheduler's mutual exclusion is a claim, not a lock, and
+    a cycle that overran can overlap the next one, so this path has to be correct
+    under concurrency in its own right.
+
+    Returns the number of sessions reaped, for the caller's log line.
+    """
+    from datetime import timedelta
+
+    from terrapod.config import settings
+    from terrapod.db.session import get_db_session
+    from terrapod.storage import get_storage
+
+    cutoff = now_utc() - timedelta(hours=settings.registry.oci.upload_session_timeout_hours)
+    storage = get_storage()
+    reaped = 0
+
+    async with get_db_session() as db:
+        stale = (
+            (
+                await db.execute(
+                    select(OCIUploadSession)
+                    .where(OCIUploadSession.updated_at < cutoff)
+                    # Bounded per cycle: a large backlog is drained over several
+                    # cycles rather than in one long transaction holding rows.
+                    .limit(_REAP_BATCH)
+                    .with_for_update(skip_locked=True)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        for session in stale:
+            await discard_session(db, storage, session)
+            reaped += 1
+
+    if reaped:
+        logger.info("Reaped abandoned OCI upload sessions", count=reaped)
+    return reaped

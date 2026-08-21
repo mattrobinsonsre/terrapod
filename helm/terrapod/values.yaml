@@ -297,6 +297,13 @@ api:
         #       username: robot
         #       existingSecret: terrapod-upstream-example
         #       existingSecretKey: password        # optional, defaults to "password"
+        # How long an in-progress blob upload may sit untouched before it is
+        # reaped along with its chunks. The spec expects a server to time
+        # unfinished uploads out; without it a push that starts and dies leaks
+        # its chunks into object storage permanently, which anyone with push
+        # access can repeat. Generous by default: a slow, resumed push over a
+        # poor link is legitimate, and reaping it mid-flight destroys real work.
+        upload_session_timeout_hours: 24
       provider_cache:
         enabled: true
         upstream_registries:

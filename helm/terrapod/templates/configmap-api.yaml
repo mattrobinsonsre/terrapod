@@ -196,6 +196,9 @@ data:
       {{- with .Values.api.config.registry.oci }}
       oci:
         enabled: {{ .enabled }}
+        {{- with .upload_session_timeout_hours }}
+        upload_session_timeout_hours: {{ . }}
+        {{- end }}
         {{- if .upstreams }}
         upstreams:
           {{- range .upstreams }}

@@ -1806,6 +1806,10 @@
                 "enabled": {
                   "type": "boolean"
                 },
+                "upload_session_timeout_hours": {
+                  "type": "integer",
+                  "minimum": 1
+                },
                 "upstreams": {
                   "type": "array",
                   "items": {
