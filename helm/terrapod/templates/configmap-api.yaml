@@ -193,6 +193,22 @@ data:
       {{- if hasKey .Values.api.config.registry "cache_only" }}
       cache_only: {{ .Values.api.config.registry.cache_only }}
       {{- end }}
+      {{- with .Values.api.config.registry.oci }}
+      oci:
+        enabled: {{ .enabled }}
+        {{- if .upstreams }}
+        upstreams:
+          {{- range .upstreams }}
+          - host: {{ .host | quote }}
+            {{- if .api_url }}
+            api_url: {{ .api_url | quote }}
+            {{- end }}
+            {{- if .username }}
+            username: {{ .username | quote }}
+            {{- end }}
+          {{- end }}
+        {{- end }}
+      {{- end }}
       {{- if .Values.api.config.registry.provider_cache }}
       provider_cache:
         enabled: {{ .Values.api.config.registry.provider_cache.enabled }}

@@ -919,6 +919,21 @@ jobs:
           echo "$inbound" | grep -q 'client_id: "peer-b"' || { echo "FAIL: ha.peer.inbound.client_id not rendered — the reconcile would have nothing to act on (#1169)"; exit 1; }
           echo "$inbound" | grep -q "TERRAPOD_HA__PEER__INBOUND__CLIENT_SECRET" || { echo "FAIL: the inbound secret must reach the pod by secretKeyRef, or declarative setup is impossible (#1169)"; exit 1; }
           if echo "$inbound" | grep -A6 "inbound:" | grep -q "client_secret"; then echo "FAIL: the inbound secret must never reach the ConfigMap — it is a credential (#1169)"; exit 1; fi
+          # OCI registry pull-through (#1408). Upstream credentials are per
+          # registry — registries are independent trust domains, so one shared
+          # Secret would hand every upstream's credential to whichever the client
+          # happens to name. Hosts and username belong in the ConfigMap; the
+          # password must only ever arrive by secretKeyRef.
+          oci=$(helm template ./helm/terrapod \
+            --set api.config.registry.oci.upstreams[0].host=quay.io \
+            --set api.config.registry.oci.upstreams[1].host=registry.example.com \
+            --set api.config.registry.oci.upstreams[1].username=robot \
+            --set api.config.registry.oci.upstreams[1].existingSecret=tp-upstream)
+          echo "$oci" | grep -q "oci:" || { echo "FAIL: registry.oci not rendered into config.yaml — the operator's values would be silently inert (#1408)"; exit 1; }
+          echo "$oci" | grep -q 'host: "quay.io"' || { echo "FAIL: registry.oci.upstreams not rendered — pull-through is an allow-list, so an unrendered entry means the upstream is unreachable (#1408)"; exit 1; }
+          echo "$oci" | grep -q "TERRAPOD_OCI_UPSTREAM_REGISTRY_EXAMPLE_COM_PASSWORD" || { echo "FAIL: the per-upstream password must reach the pod by secretKeyRef, or an authenticated upstream silently falls back to anonymous (#1408)"; exit 1; }
+          if echo "$oci" | grep -A12 "^ *oci:" | grep -qi "password"; then echo "FAIL: an upstream password must never reach the ConfigMap — it is a credential (#1408)"; exit 1; fi
+          if echo "$oci" | grep -q "TERRAPOD_OCI_UPSTREAM_QUAY_IO_PASSWORD"; then echo "FAIL: an anonymous upstream must not get a password env var (#1408)"; exit 1; fi
           echo "$out" | grep -q "component_status:" || { echo "FAIL: ha.component_status not rendered into config.yaml (#1122)"; exit 1; }
           echo "$out" | grep -q "kind: Role" || { echo "FAIL: the API component-status Role must render when enabled (#1122)"; exit 1; }
           echo "$out" | grep -A16 "name: .*-component-status" | grep -q 'resources: \["deployments"\]' || { echo "FAIL: the component-status Role needs Deployments for ready-vs-desired, not just pods (#1122)"; exit 1; }

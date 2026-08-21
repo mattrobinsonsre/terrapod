@@ -792,6 +792,77 @@ class ModuleInterfaceConfig(BaseModel):
     enabled: bool = Field(default=True)
 
 
+class OCIUpstreamConfig(BaseModel):
+    """One upstream container registry Terrapod may mirror from (#1408)."""
+
+    host: str = Field(
+        description="Registry host, e.g. 'quay.io' or 'ghcr.io'. Also the first "
+        "path component clients use: pulling terrapod.example.com/quay.io/ansible/awx-ee "
+        "mirrors quay.io/ansible/awx-ee."
+    )
+    api_url: str = Field(
+        default="",
+        description="Base URL for the registry API. Defaults to https://{host}. Set "
+        "explicitly only for a registry whose API is not served from its own hostname.",
+    )
+    username: str = Field(
+        default="",
+        description="Username for an upstream requiring authentication. The password is "
+        "never configured here — it arrives as TERRAPOD_OCI_UPSTREAM_{HOST}_PASSWORD from a "
+        "Secret, because a credential must not be rendered into a ConfigMap. Leave both "
+        "unset for anonymous pulls, which is the usual case for public registries.",
+    )
+
+    @property
+    def password_env_var(self) -> str:
+        """Name of the environment variable carrying this upstream's password.
+
+        Derived from the host so the Helm chart and the running code agree
+        without a second mapping to keep in step: non-alphanumeric characters
+        become underscores and the result is uppercased, so ``quay.io`` gives
+        ``TERRAPOD_OCI_UPSTREAM_QUAY_IO_PASSWORD``.
+        """
+        sanitised = "".join(c if c.isalnum() else "_" for c in self.host).upper()
+        return f"TERRAPOD_OCI_UPSTREAM_{sanitised}_PASSWORD"
+
+    @property
+    def password(self) -> str:
+        """The password, read from the environment at use time.
+
+        Read on each use rather than captured at startup so a rotated Secret
+        takes effect on the next pull once Kubernetes has refreshed the
+        projected value, without restarting the pod.
+        """
+        import os
+
+        return os.environ.get(self.password_env_var, "")
+
+
+class OCIRegistryConfig(BaseModel):
+    """Container image registry (#1408).
+
+    Serves execution environments and any other image, both pushed by operators
+    and mirrored from upstream. Mounted at /v2/ because the OCI distribution
+    spec mandates that prefix.
+    """
+
+    enabled: bool = Field(
+        default=True,
+        description="Serve the OCI registry at /v2/. Disabling it hides the surface "
+        "entirely; pushed images remain in storage and reappear if re-enabled.",
+    )
+    upstreams: list[OCIUpstreamConfig] = Field(
+        default_factory=list,
+        description="Registries Terrapod may pull through to. **An allow-list, not a "
+        "convenience**: without it a client could name any host and make Terrapod fetch "
+        "from it, which is a server-side request forgery primitive. Empty means "
+        "push-only, which is the correct setting for an air-gapped install. Note "
+        "registry.cache_only seals upstream fetching across every cache including this "
+        "one, and takes precedence over anything listed here. Authenticated upstreams "
+        "are not yet supported — anonymous pulls only.",
+    )
+
+
 class RegistryConfig(BaseModel):
     """Private registry and caching configuration."""
 
@@ -821,6 +892,7 @@ class RegistryConfig(BaseModel):
     binary_cache: BinaryCacheConfig = Field(default_factory=BinaryCacheConfig)
     platform_tools: PlatformToolsConfig = Field(default_factory=PlatformToolsConfig)
     module_interface: ModuleInterfaceConfig = Field(default_factory=ModuleInterfaceConfig)
+    oci: OCIRegistryConfig = Field(default_factory=OCIRegistryConfig)
 
 
 class CatalogConfig(BaseModel):

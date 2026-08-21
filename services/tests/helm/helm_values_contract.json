@@ -182,6 +182,8 @@
   "api.config.registry.cache_only",
   "api.config.registry.enabled",
   "api.config.registry.module_interface.enabled",
+  "api.config.registry.oci.enabled",
+  "api.config.registry.oci.upstreams",
   "api.config.registry.platform_tools.checkov_checksum_api_url",
   "api.config.registry.platform_tools.checkov_mirror_url",
   "api.config.registry.platform_tools.checkov_version",

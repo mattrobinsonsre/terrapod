@@ -36,7 +36,7 @@ from terrapod.api.dependencies import AuthenticatedUser, get_db
 from terrapod.auth import capabilities as cap
 from terrapod.auth.capabilities import has_capability
 from terrapod.db.models import OCIRepository
-from terrapod.services.oci import registry_service, upload_service
+from terrapod.services.oci import pullthrough_service, registry_service, upload_service
 from terrapod.services.oci.auth import BASIC_CHALLENGE, authenticate_oci
 from terrapod.services.oci.errors import (
     BLOB_UNKNOWN,
@@ -49,6 +49,7 @@ from terrapod.services.oci.errors import (
     NAME_INVALID,
     NAME_UNKNOWN,
     UNAUTHORIZED,
+    UNSUPPORTED,
     OCIError,
     oci_error_response,
 )
@@ -60,6 +61,7 @@ from terrapod.services.oci.names import (
 )
 from terrapod.services.registry_rbac_service import resolve_registry_capabilities_for
 from terrapod.storage import ObjectStore, get_storage
+from terrapod.storage import keys as storage_keys
 
 router = APIRouter(tags=["oci"])
 
@@ -107,7 +109,19 @@ async def _authorised_repository(
 
     repository = await registry_service.get_repository(db, name)
     if repository is None:
-        if not create:
+        # A name whose first component is a configured upstream becomes a
+        # mirror. The database is consulted first, so a repository someone has
+        # pushed to always shadows a mirror of the same name rather than being
+        # overwritten by upstream content.
+        upstream = pullthrough_service.resolve_upstream(name)
+        if upstream is not None and pullthrough_service.mirroring_allowed():
+            repository = await pullthrough_service.ensure_mirror_repository(db, name, upstream[0])
+            # Mirrors carry `access: everyone` so the existing everyone rule
+            # grants read. They have no owner and no team, so without it only a
+            # platform admin could pull public upstream content — reusing the
+            # label mechanism rather than special-casing mirrors in the resolver.
+            repository.labels = {"access": "everyone"}
+        elif not create:
             raise OCIError(NAME_UNKNOWN, detail={"name": name})
         repository = OCIRepository(name=name, owner_email=user.email or None, labels={})
         db.add(repository)
@@ -189,6 +203,8 @@ async def get_manifest(
         raise OCIError(MANIFEST_UNKNOWN, message=str(exc)) from exc
 
     manifest = await registry_service.resolve_manifest(db, repository, parsed)
+    if manifest is None and repository.upstream:
+        manifest = await _mirror_manifest(db, storage, repository, reference, parsed)
     if manifest is None:
         raise OCIError(MANIFEST_UNKNOWN, detail={"reference": reference})
 
@@ -229,6 +245,8 @@ async def get_blob(
         raise OCIError(BLOB_UNKNOWN, message=str(exc)) from exc
 
     blob = await registry_service.get_repository_blob(db, repository, str(parsed))
+    if blob is None and repository.upstream:
+        blob = await _mirror_blob(db, storage, repository, parsed)
     if blob is None:
         raise OCIError(BLOB_UNKNOWN, detail={"digest": digest})
 
@@ -544,3 +562,59 @@ async def put_manifest(
             "Docker-Content-Digest": computed,
         },
     )
+
+
+# ── pull-through ───────────────────────────────────────────────────────────
+#
+# Reached only on a miss in a repository that is a mirror. An upstream failure
+# is reported as UNSUPPORTED rather than as a 404, so a client can tell "this
+# image does not exist" from "the registry we mirror is down" — the second is
+# transient and worth retrying, the first is not.
+
+
+async def _mirror_manifest(db, storage, repository, reference: str, parsed):
+    """Fetch a manifest from upstream and record it."""
+    resolved = pullthrough_service.resolve_upstream(repository.name)
+    if resolved is None or not pullthrough_service.mirroring_allowed():
+        # The row says mirror but configuration no longer agrees — an operator
+        # removed the upstream, or sealed the deployment with cache_only. Serve
+        # what is cached and report a miss as a miss, rather than failing.
+        return None
+    host, upstream_repo = resolved
+    try:
+        body, media_type, digest = await pullthrough_service.fetch_manifest(
+            host, upstream_repo, reference
+        )
+    except pullthrough_service.UpstreamUnavailable as exc:
+        raise OCIError(UNSUPPORTED, message=str(exc)) from exc
+
+    manifest = await registry_service.store_manifest(
+        db, storage, repository, digest, media_type, body
+    )
+    # Only a tag needs recording: a digest reference is already the manifest's
+    # own identity and names nothing that can move.
+    if parsed.tag is not None:
+        await registry_service.set_tag(db, repository, parsed.tag, manifest)
+    return manifest
+
+
+async def _mirror_blob(db, storage, repository, parsed):
+    """Fetch a blob from upstream, verify it, and link it to this mirror."""
+    resolved = pullthrough_service.resolve_upstream(repository.name)
+    if resolved is None or not pullthrough_service.mirroring_allowed():
+        # The row says mirror but configuration no longer agrees — an operator
+        # removed the upstream, or sealed the deployment with cache_only. Serve
+        # what is cached and report a miss as a miss, rather than failing.
+        return None
+    host, upstream_repo = resolved
+    storage_key = storage_keys.oci_blob_key(parsed.storage_segment)
+    try:
+        size = await pullthrough_service.fetch_blob(
+            host, upstream_repo, parsed, storage, storage_key
+        )
+    except pullthrough_service.UpstreamUnavailable as exc:
+        raise OCIError(UNSUPPORTED, message=str(exc)) from exc
+
+    blob = await upload_service._upsert_blob(db, str(parsed), size, storage_key)
+    await upload_service.link_blob(db, repository, blob)
+    return blob

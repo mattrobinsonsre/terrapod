@@ -1798,6 +1798,43 @@
                   "type": "boolean"
                 }
               }
+            },
+            "oci": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "upstreams": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "host"
+                    ],
+                    "properties": {
+                      "host": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "api_url": {
+                        "type": "string"
+                      },
+                      "username": {
+                        "type": "string"
+                      },
+                      "existingSecret": {
+                        "type": "string"
+                      },
+                      "existingSecretKey": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
             }
           }
         },

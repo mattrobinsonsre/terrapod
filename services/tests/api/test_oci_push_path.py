@@ -43,6 +43,9 @@ def _repository(name=_REPO):
     repo.name = name
     repo.labels = {}
     repo.owner_email = "admin@example.com"
+    # Explicit: a MagicMock attribute is truthy, so leaving this unset would
+    # send every lookup down the pull-through path.
+    repo.upstream = None
     return repo
 
 
