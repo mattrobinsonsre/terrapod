@@ -64,6 +64,34 @@ test.describe('BFF proxy routing', () => {
     expect(res.status()).toBeLessThan(500);
   });
 
+  test('the OCI registry is proxied to the API', async ({ request }) => {
+    // `/v2/` is the registry's version check — the endpoint a container client
+    // uses to decide whether this host speaks the distribution API at all. The
+    // prefix is mandated by the spec, so it cannot be moved under /api, and a
+    // deployment routes every ingress path to the BFF: unproxied, `docker pull`
+    // against the deployment's own hostname reaches the web pod and gets an
+    // HTML 404 (#1408).
+    //
+    // Unauthenticated, so the API answers 401 — which still proves the request
+    // reached it, and proves the registry is not open to the world.
+    const res = await request.get('/v2/', { failOnStatusCode: false });
+    expect(res.status()).toBe(401);
+    expect(res.headers()['content-type'] ?? '').not.toContain('text/html');
+    // The spec's error envelope, so this is the registry answering and not some
+    // other 401 on the way.
+    expect((await res.json()).errors[0].code).toBe('UNAUTHORIZED');
+  });
+
+  test('/v2/ is not trailing-slash redirected', async ({ request }) => {
+    // Next normalises `/path/` to `/path` before rewrites run, which turned the
+    // registry handshake into a 308 to a path the spec does not define. Some
+    // clients drop credentials across a redirect, so this is a correctness
+    // requirement rather than a tidiness one.
+    const res = await request.get('/v2/', { maxRedirects: 0, failOnStatusCode: false });
+    expect(res.status()).not.toBe(308);
+    expect(res.status()).not.toBe(307);
+  });
+
   test('an unknown API path returns the API 404, not a Next page', async ({ request }) => {
     // Distinguishes "proxied, and the API said no such route" from "the BFF
     // never forwarded it". The latter renders HTML.

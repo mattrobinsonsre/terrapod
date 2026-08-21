@@ -33,6 +33,19 @@ const hstsValue = process.env.HSTS ?? HSTS_DEFAULT
 const nextConfig = {
   output: 'standalone',
   allowedDevOrigins: ['terrapod.local'],
+  // Do not redirect `/path/` to `/path` (#1408).
+  //
+  // Next normalises trailing slashes *before* rewrites, and the OCI
+  // distribution spec's version check is literally `GET /v2/` — so the one
+  // endpoint a registry client uses to decide whether this host speaks the API
+  // was answered with a 308 to `/v2`, which is not a path the spec defines. A
+  // redirect there is not a cosmetic difference: it is the handshake, and some
+  // clients drop credentials across one.
+  //
+  // The cost is that page URLs are no longer normalised, which is why this is
+  // the setting rather than `trailingSlash`: the app's own links carry no
+  // trailing slash, so nothing in the UI depends on the redirect existing.
+  skipTrailingSlashRedirect: true,
   // Route the BFF's non-/api prefixes onto the shared proxy Route Handler
   // (#1381). These are INTERNAL rewrites — they do not name the API, they name
   // a route in this process — so unlike a rewrite pointing at API_URL they are
@@ -55,6 +68,13 @@ const nextConfig = {
         { source: '/.well-known/:path*', destination: '/bff/.well-known/:path*' },
         { source: '/oauth/:path*', destination: '/bff/oauth/:path*' },
         { source: '/v1/:path*', destination: '/bff/v1/:path*' },
+        // The OCI registry (#1408). `/v2/` is not a path Terrapod chose — the
+        // distribution spec mandates that prefix — so it has to be proxied like
+        // any other API surface, or `docker pull` against the deployment's own
+        // hostname reaches the web pod and gets an HTML 404. It streams through
+        // the Route Handler, which matters more here than anywhere else: image
+        // layers are the largest bodies Terrapod moves.
+        { source: '/v2/:path*', destination: '/bff/v2/:path*' },
       ],
     }
   },

@@ -1,4 +1,4 @@
-// BFF proxy for /v1/*, /oauth/* and /.well-known/* (#1381).
+// BFF proxy for /v1/*, /oauth/*, /.well-known/* (#1381) and /v2/* (#1408).
 //
 // These reach here via internal rewrites in next.config.js, which is what lets
 // them share the one proxy implementation with /api/*. They used to be proxied
@@ -26,7 +26,7 @@ export const runtime = 'nodejs'
 // pinned to exactly the prefixes those rewrites feed it. Without this,
 // `/bff/<anything>` would proxy any path to the API — a wider surface than the
 // three prefixes we mean to expose, for no benefit.
-const ALLOWED = ['/v1/', '/oauth/', '/.well-known/']
+const ALLOWED = ['/v1/', '/oauth/', '/.well-known/', '/v2/']
 
 // A rewrite does NOT change the request URL: after `/v1/x` is rewritten here,
 // `request.url` is still `/v1/x`, and only a direct hit carries the `/bff`
