@@ -1008,6 +1008,16 @@ def create_application() -> FastAPI:
 
     app.include_router(provider_mirror_router)
 
+    # OCI Distribution registry (#1408). Root-mounted at /v2/ because the spec
+    # mandates that prefix; its exception handler is registered on the app so no
+    # route can accidentally answer a container client in the house error shape.
+    from terrapod.api.routers.oci import oci_error_handler
+    from terrapod.api.routers.oci import router as oci_router
+    from terrapod.services.oci.errors import OCIError
+
+    app.include_router(oci_router)
+    app.add_exception_handler(OCIError, oci_error_handler)
+
     from terrapod.api.routers.binary_cache import router as binary_cache_router
 
     include_terrapod(binary_cache_router)
