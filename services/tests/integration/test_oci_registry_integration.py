@@ -159,11 +159,13 @@ class TestReplicaSafeUploads:
         location = started.headers["Location"]
 
         async with _fresh_client(app) as c:
-            # 204, per the spec's "SHOULD be a 204 No Content".
-            assert (await c.delete(location, headers=auth)).status_code == 204
+            cancelled = await c.delete(location, headers=auth)
+        # 204, per the spec's "SHOULD be a 204 No Content".
+        assert cancelled.status_code == 204
 
         async with _fresh_client(app) as c:
-            assert (await c.get(location, headers=auth)).status_code == 404
+            gone = await c.get(location, headers=auth)
+        assert gone.status_code == 404
 
 
 class TestContentAddressedStorage:
@@ -413,7 +415,8 @@ class TestAbandonedUploadReaper:
         after = await storage.list_prefix(keys.oci_upload_prefix(session_id))
         assert after == []
         async with _fresh_client(app) as c:
-            assert (await c.get(location, headers=auth)).status_code == 404
+            gone = await c.get(location, headers=auth)
+        assert gone.status_code == 404
 
     async def test_an_active_session_is_left_alone(self, app) -> None:
         """The failure that would matter most: reaping a push in progress.

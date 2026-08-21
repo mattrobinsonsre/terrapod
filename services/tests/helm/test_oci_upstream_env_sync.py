@@ -26,15 +26,29 @@ import pytest
 from terrapod.config import OCIUpstreamConfig
 
 
+def _chart_file(relative: str) -> str:
+    """Read a chart template, wherever the chart happens to be.
+
+    The test image copies the chart to /app/helm; a local checkout has it three
+    levels up. One return and one skip, rather than a `for`/`else` — the latter
+    reads as though the caller might get `None` back, and a reader (or a static
+    analyser) then has to prove that `pytest.skip` raises to know it cannot.
+    """
+    found = [
+        candidate
+        for candidate in (
+            Path("/app/helm/terrapod/templates") / relative,
+            Path(__file__).resolve().parents[3] / "helm/terrapod/templates" / relative,
+        )
+        if candidate.exists()
+    ]
+    if not found:
+        pytest.skip(f"helm chart not available ({relative})")
+    return found[0].read_text()
+
+
 def _deployment_template() -> str:
-    """The chart lives at /app/helm in the test image and ../.. from here otherwise."""
-    for candidate in (
-        Path("/app/helm/terrapod/templates/deployment-api.yaml"),
-        Path(__file__).resolve().parents[3] / "helm/terrapod/templates/deployment-api.yaml",
-    ):
-        if candidate.exists():
-            return candidate.read_text()
-    pytest.skip("helm chart not available")
+    return _chart_file("deployment-api.yaml")
 
 
 def _chart_expression() -> str:
@@ -87,15 +101,7 @@ def test_the_chart_still_renders_the_variable_at_all() -> None:
 def test_the_password_is_never_rendered_into_the_configmap() -> None:
     """A credential in a ConfigMap is readable by anything that can read the
     ConfigMap, which is a far wider set than can read the Secret."""
-    for candidate in (
-        Path("/app/helm/terrapod/templates/configmap-api.yaml"),
-        Path(__file__).resolve().parents[3] / "helm/terrapod/templates/configmap-api.yaml",
-    ):
-        if candidate.exists():
-            configmap = candidate.read_text()
-            break
-    else:
-        pytest.skip("helm chart not available")
+    configmap = _chart_file("configmap-api.yaml")
 
     oci_block = re.search(r"^ *oci:.*?(?=^ *provider_cache:)", configmap, re.S | re.M)
     assert oci_block, "the oci block is no longer rendered into the ConfigMap"
