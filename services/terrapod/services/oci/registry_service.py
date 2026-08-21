@@ -8,15 +8,36 @@ it from an arbitrary repository.** Blobs are global and content-addressed, so
 every blob lookup goes through the repository link table. Skipping that would
 let anyone who learns a digest pull private layers by inventing a repository
 name they do have access to.
+
+Reads touch ``last_accessed_at``, because ``artifact_retention_service`` reaps
+cache entries on *access* rather than write time — deliberately, since expiring
+a heavily used artifact merely for being old evicts it and immediately re-fetches
+it. Without the touch, a constantly pulled image would look untouched and be
+reaped on schedule. Note the volume differs from the other caches: they are read
+a few times per run, where a blob is read once per layer per pull, so this is a
+place to look first if write load ever becomes a question.
 """
 
 from __future__ import annotations
+
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.db.models import OCIBlob, OCIManifest, OCIRepository, OCIRepositoryBlob, OCITag
 from terrapod.services.oci.names import Reference
+
+
+def _touch(entity):
+    """Mark an entity as accessed, so retention sees it as live.
+
+    Returns its argument so call sites stay one line. A no-op on ``None``,
+    which keeps every caller from having to guard.
+    """
+    if entity is not None:
+        entity.last_accessed_at = datetime.now(UTC)
+    return entity
 
 
 async def get_repository(db: AsyncSession, name: str) -> OCIRepository | None:
@@ -41,7 +62,7 @@ async def resolve_manifest(
                 OCIManifest.digest == str(reference.digest),
             )
         )
-        return result.scalar_one_or_none()
+        return _touch(result.scalar_one_or_none())
 
     # Tag → manifest, joined rather than fetched in two round trips because a
     # manifest GET is on the hot path of every image pull.
@@ -50,7 +71,7 @@ async def resolve_manifest(
         .join(OCITag, OCITag.manifest_id == OCIManifest.id)
         .where(OCITag.repository_id == repository.id, OCITag.name == reference.tag)
     )
-    return result.scalar_one_or_none()
+    return _touch(result.scalar_one_or_none())
 
 
 async def get_repository_blob(
@@ -66,7 +87,7 @@ async def get_repository_blob(
         .join(OCIRepositoryBlob, OCIRepositoryBlob.blob_id == OCIBlob.id)
         .where(OCIRepositoryBlob.repository_id == repository.id, OCIBlob.digest == digest)
     )
-    return result.scalar_one_or_none()
+    return _touch(result.scalar_one_or_none())
 
 
 async def list_tags(
@@ -89,3 +110,124 @@ async def list_tags(
         stmt = stmt.limit(limit)
     result = await db.execute(stmt)
     return list(result.scalars().all())
+
+
+def referenced_digests(document: dict) -> list[str]:
+    """Every digest a manifest or manifest list points at.
+
+    Handles both shapes because a multi-arch push sends an index whose entries
+    are *manifests*, not blobs — walking only ``layers`` would validate a
+    single-architecture image and wave the interesting case straight through.
+
+    Deliberately tolerant of shape: a malformed entry is skipped rather than
+    raising, because this feeds a validation check that reports its own error,
+    and a `TypeError` escaping here would surface to the client as a 500 where
+    ``MANIFEST_INVALID`` is the honest answer.
+    """
+    digests: list[str] = []
+
+    config = document.get("config")
+    if isinstance(config, dict) and isinstance(config.get("digest"), str):
+        digests.append(config["digest"])
+
+    for key in ("layers", "manifests"):
+        entries = document.get(key)
+        if not isinstance(entries, list):
+            continue
+        for entry in entries:
+            if isinstance(entry, dict) and isinstance(entry.get("digest"), str):
+                digests.append(entry["digest"])
+
+    return digests
+
+
+async def missing_referenced_blobs(
+    db: AsyncSession, repository: OCIRepository, document: dict
+) -> list[str]:
+    """Which of a manifest's referents this repository does not hold.
+
+    A manifest list's entries are other *manifests*, so both tables are
+    consulted — checking blobs alone would reject every multi-arch push.
+    """
+    referenced = referenced_digests(document)
+    if not referenced:
+        return []
+
+    blob_rows = await db.execute(
+        select(OCIBlob.digest)
+        .join(OCIRepositoryBlob, OCIRepositoryBlob.blob_id == OCIBlob.id)
+        .where(OCIRepositoryBlob.repository_id == repository.id, OCIBlob.digest.in_(referenced))
+    )
+    manifest_rows = await db.execute(
+        select(OCIManifest.digest).where(
+            OCIManifest.repository_id == repository.id, OCIManifest.digest.in_(referenced)
+        )
+    )
+    present = set(blob_rows.scalars().all()) | set(manifest_rows.scalars().all())
+    return [digest for digest in referenced if digest not in present]
+
+
+async def store_manifest(
+    db: AsyncSession,
+    storage,
+    repository: OCIRepository,
+    digest: str,
+    media_type: str,
+    body: bytes,
+) -> OCIManifest:
+    """Persist a manifest, tolerating a re-push of one already held.
+
+    Idempotent because a client retrying an interrupted push re-sends the
+    manifest, and because the same image may legitimately be pushed twice. The
+    bytes are identical by definition — the digest is computed from them — so an
+    existing row is returned rather than treated as a conflict.
+    """
+    existing = await db.execute(
+        select(OCIManifest).where(
+            OCIManifest.repository_id == repository.id, OCIManifest.digest == digest
+        )
+    )
+    found = existing.scalar_one_or_none()
+    if found is not None:
+        return found
+
+    from terrapod.services.oci.names import parse_digest
+    from terrapod.storage import keys
+
+    storage_key = keys.oci_manifest_key(parse_digest(digest).storage_segment)
+    await storage.put(storage_key, body, content_type=media_type)
+
+    manifest = OCIManifest(
+        repository_id=repository.id,
+        digest=digest,
+        media_type=media_type,
+        size=len(body),
+        storage_key=storage_key,
+    )
+    db.add(manifest)
+    await db.flush()
+    return manifest
+
+
+async def set_tag(
+    db: AsyncSession, repository: OCIRepository, name: str, manifest: OCIManifest
+) -> OCITag:
+    """Point a tag at a manifest, moving it if it already exists.
+
+    Tags are mutable by design — ``latest`` moving is the whole point — so this
+    updates in place rather than inserting, which also keeps the unique
+    constraint on (repository, name) from turning a normal re-tag into a 500.
+    """
+    result = await db.execute(
+        select(OCITag).where(OCITag.repository_id == repository.id, OCITag.name == name)
+    )
+    tag = result.scalar_one_or_none()
+    if tag is not None:
+        tag.manifest_id = manifest.id
+        await db.flush()
+        return tag
+
+    tag = OCITag(repository_id=repository.id, name=name, manifest_id=manifest.id)
+    db.add(tag)
+    await db.flush()
+    return tag

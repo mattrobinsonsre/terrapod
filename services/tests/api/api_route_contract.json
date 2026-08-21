@@ -37,6 +37,7 @@
   "DELETE /api/v2/varsets/{varset_id}/relationships/workspaces",
   "DELETE /api/v2/workspaces/{workspace_id}/relationships/tags",
   "DELETE /api/v2/workspaces/{workspace_id}/vars/{var_id}",
+  "DELETE /v2/{name:path}/blobs/uploads/{session_id}",
   "GET /.well-known/terraform.json",
   "GET /api/docs",
   "GET /api/openapi.json",
@@ -198,6 +199,7 @@
   "GET /v1/providers/{hostname}/{namespace}/{type}/index.json",
   "GET /v1/providers/{hostname}/{namespace}/{type}/{version}.json",
   "GET /v2/",
+  "GET /v2/{name:path}/blobs/uploads/{session_id}",
   "GET /v2/{name:path}/blobs/{digest}",
   "GET /v2/{name:path}/manifests/{reference}",
   "GET /v2/{name:path}/tags/list",
@@ -224,6 +226,7 @@
   "PATCH /api/v2/varsets/{varset_id}/relationships/vars/{var_id}",
   "PATCH /api/v2/workspaces/{workspace_id}",
   "PATCH /api/v2/workspaces/{workspace_id}/vars/{var_id}",
+  "PATCH /v2/{name:path}/blobs/uploads/{session_id}",
   "POST /api/terrapod/v1/admin/authentication-tokens/actions/revoke-all",
   "POST /api/terrapod/v1/admin/binary-cache/warm",
   "POST /api/terrapod/v1/admin/binary-cache/warm-bulk",
@@ -322,6 +325,7 @@
   "POST /api/v2/workspaces/{workspace_id}/state-versions",
   "POST /api/v2/workspaces/{workspace_id}/vars",
   "POST /oauth/token",
+  "POST /v2/{name:path}/blobs/uploads/",
   "PUT /api/terrapod/v1/listeners/{listener_id}/runs/{run_id}/log-stream ?phase",
   "PUT /api/terrapod/v1/registry-modules/private/default/{name}/{provider}/versions/{version}/upload",
   "PUT /api/terrapod/v1/registry-providers/private/default/{name}/versions/{version}/platforms/{os}/{arch}",
@@ -342,5 +346,7 @@
   "PUT /api/terrapod/v1/workspaces/{workspace_id}/remote-state-consumers",
   "PUT /api/v2/configuration-versions/{cv_id}/upload",
   "PUT /api/v2/state-versions/{state_version_id}/content",
-  "PUT /api/v2/state-versions/{state_version_id}/json-content"
+  "PUT /api/v2/state-versions/{state_version_id}/json-content",
+  "PUT /v2/{name:path}/blobs/uploads/{session_id}",
+  "PUT /v2/{name:path}/manifests/{reference}"
 ]
