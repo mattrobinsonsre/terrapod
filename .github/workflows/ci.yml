@@ -934,6 +934,7 @@ jobs:
           echo "$oci" | grep -q "TERRAPOD_OCI_UPSTREAM_REGISTRY_EXAMPLE_COM_PASSWORD" || { echo "FAIL: the per-upstream password must reach the pod by secretKeyRef, or an authenticated upstream silently falls back to anonymous (#1408)"; exit 1; }
           if echo "$oci" | grep -A12 "^ *oci:" | grep -qi "password"; then echo "FAIL: an upstream password must never reach the ConfigMap — it is a credential (#1408)"; exit 1; fi
           if echo "$oci" | grep -q "TERRAPOD_OCI_UPSTREAM_QUAY_IO_PASSWORD"; then echo "FAIL: an anonymous upstream must not get a password env var (#1408)"; exit 1; fi
+          echo "$oci" | grep -q "upload_session_timeout_hours:" || { echo "FAIL: registry.oci.upload_session_timeout_hours not rendered — the abandoned-upload reaper would silently use the code default and an operator's longer window would be ignored (#1408)"; exit 1; }
           echo "$out" | grep -q "component_status:" || { echo "FAIL: ha.component_status not rendered into config.yaml (#1122)"; exit 1; }
           echo "$out" | grep -q "kind: Role" || { echo "FAIL: the API component-status Role must render when enabled (#1122)"; exit 1; }
           echo "$out" | grep -A16 "name: .*-component-status" | grep -q 'resources: \["deployments"\]' || { echo "FAIL: the component-status Role needs Deployments for ready-vs-desired, not just pods (#1122)"; exit 1; }
@@ -1690,6 +1691,137 @@ jobs:
           path: e2e/blob-report/
           retention-days: 14
           if-no-files-found: ignore
+
+      - name: Tear down
+        if: always()
+        run: docker compose -f e2e/docker-compose.e2e.yml down -v
+
+  # ── OCI conformance ────────────────────────────────────
+  # The registry checked against the distribution spec rather than against the
+  # one client we happened to try. That distinction earned its place: every
+  # finding this suite produced during #1408 — a hardcoded digest algorithm, a
+  # missing OCI-Subject echo, foreign layers treated as missing blobs, referrers
+  # answering 404 instead of an empty index, and no Range support at all — left
+  # `docker push` and `docker pull` working perfectly.
+  #
+  # Run against the BFF, not the API, because that is the only address a
+  # deployment exposes. Testing the API directly skips a hop that has already
+  # broken pulls once (Content-Length stripped from a blob HEAD).
+  oci-conformance:
+    name: OCI Conformance
+    needs: [prepare, build-images-amd64]
+    if: |
+      always()
+      && needs.build-images-amd64.result == 'success'
+      && needs.prepare.outputs.images_exist != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Log in to GHCR
+        if: needs.prepare.outputs.is_pr != 'true'
+        uses: ./.github/actions/ghcr-login
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ github.actor }}
+
+      - name: Pull images (branch/tag)
+        if: needs.prepare.outputs.is_pr != 'true'
+        run: |
+          sha_short="${{ needs.prepare.outputs.sha_short }}"
+          for image in terrapod-api terrapod-web terrapod-migrations; do
+            docker pull "$REGISTRY/$image:sha-${sha_short}-amd64"
+            docker tag "$REGISTRY/$image:sha-${sha_short}-amd64" "$image:local"
+          done
+
+      - name: Download image artifacts (PR)
+        if: needs.prepare.outputs.is_pr == 'true'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          pattern: image-*-amd64
+          path: /tmp/images
+          merge-multiple: true
+
+      - name: Load images (PR)
+        if: needs.prepare.outputs.is_pr == 'true'
+        run: |
+          sha_short="${{ needs.prepare.outputs.sha_short }}"
+          for image in terrapod-api terrapod-web terrapod-migrations; do
+            gunzip -c "/tmp/images/$image-amd64.tar.gz" | docker load
+            docker tag "$REGISTRY/$image:sha-${sha_short}-amd64" "$image:local"
+          done
+
+      - name: Start stack
+        run: docker compose -f e2e/docker-compose.e2e.yml up -d
+
+      - name: Wait for stack health
+        run: |
+          timeout=120
+          elapsed=0
+          while ! curl -sf http://localhost:3000/ > /dev/null 2>&1; do
+            if (( elapsed >= timeout )); then
+              echo "Stack not healthy after ${timeout}s"
+              docker compose -f e2e/docker-compose.e2e.yml logs
+              exit 1
+            fi
+            sleep 2
+            elapsed=$((elapsed + 2))
+          done
+          echo "Stack healthy (${elapsed}s)"
+
+      - name: Run the conformance suite
+        run: scripts/oci-conformance.sh http://localhost:3000
+
+      # The three clients most people actually use. They exercise different
+      # parts of the protocol from each other and from the conformance suite —
+      # the Content-Length regression above was invisible to the suite and fatal
+      # to docker.
+      - name: Push and pull with real clients
+        run: |
+          set -euo pipefail
+          TOKEN="$(python3 scripts/mint-token.py --url http://localhost:3000 \
+                   --email admin@terrapod.local --password 'TestPassword123!')"
+          echo "$TOKEN" | docker login localhost:3000 -u tp --password-stdin
+
+          docker pull -q alpine:3.20
+          docker tag alpine:3.20 localhost:3000/smoke/app:v1
+          docker push -q localhost:3000/smoke/app:v1
+
+          # Remove every local copy, so the pull genuinely comes from Terrapod.
+          docker rmi -f localhost:3000/smoke/app:v1 alpine:3.20
+          docker pull -q localhost:3000/smoke/app:v1
+          # The strongest assertion available: the pulled image runs.
+          docker run --rm localhost:3000/smoke/app:v1 cat /etc/alpine-release
+
+          # crane and skopeo are stricter than docker about parts of the spec,
+          # and skopeo copy exercises pull and push in one operation.
+          crane_url=https://github.com/google/go-containerregistry/releases/download/v0.20.3/go-containerregistry_Linux_x86_64.tar.gz
+          curl -fsSL "$crane_url" | tar -xz -C /tmp crane
+          /tmp/crane auth login localhost:3000 -u tp -p "$TOKEN"
+          test "$(/tmp/crane ls localhost:3000/smoke/app)" = "v1"
+          /tmp/crane digest localhost:3000/smoke/app:v1
+
+          sudo apt-get update -qq && sudo apt-get install -y -qq skopeo
+          skopeo copy --src-tls-verify=false --dest-tls-verify=false \
+            --src-creds "tp:$TOKEN" --dest-creds "tp:$TOKEN" \
+            docker://localhost:3000/smoke/app:v1 \
+            docker://localhost:3000/smoke/copied:v2
+
+      - name: Registry rejects anonymous access
+        run: |
+          # A registry that mirrors upstreams must never be an open relay for
+          # anyone who finds it. Checked here rather than only in unit tests
+          # because this is the deployed path, through the real ingress.
+          status="$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/v2/)"
+          test "$status" = "401" || { echo "FAIL: /v2/ answered $status anonymously, expected 401"; exit 1; }
+
+      - name: Stack logs on failure
+        if: failure()
+        run: docker compose -f e2e/docker-compose.e2e.yml logs --tail=200
 
       - name: Tear down
         if: always()
@@ -2703,6 +2835,7 @@ jobs:
       - scan-images
       - e2e-test
       - e2e-report
+      - oci-conformance
       - create-manifests
       - release-create
       - release-images
@@ -2751,6 +2884,7 @@ jobs:
             "${{ needs.build-images-arm64.result }}"
             "${{ needs.scan-images.result }}"
             "${{ needs.e2e-test.result }}"
+            "${{ needs.oci-conformance.result }}"
             "${{ needs.e2e-report.result }}"
             "${{ needs.create-manifests.result }}"
             "${{ needs.release-create.result }}"
