@@ -8,11 +8,11 @@ Revises: f3e984cc98cf
 Create Date: 2026-03-18
 """
 
+import sqlalchemy as sa
+from alembic import op
+
 revision = "8529adc11ddb"
 down_revision = "f3e984cc98cf"
-
-from alembic import op
-import sqlalchemy as sa
 
 
 def upgrade() -> None:
