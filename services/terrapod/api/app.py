@@ -416,6 +416,24 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
             description="Clean up old artifacts from object storage",
         )
 
+    # Abandoned OCI upload reaper. Every started-then-forgotten `docker push`
+    # leaves a session row and its chunks behind, and only push access is needed
+    # to do that repeatedly — so this is a storage-exhaustion control, not just
+    # tidying. Hourly is ample against a timeout measured in hours.
+    if settings.registry.oci.enabled:
+
+        async def _oci_upload_reaper() -> None:
+            from terrapod.services.oci.upload_service import reap_abandoned_sessions
+
+            await reap_abandoned_sessions()
+
+        register_periodic_task(
+            "oci_upload_reaper",
+            interval_seconds=3600,
+            handler=_oci_upload_reaper,
+            description="Reap abandoned OCI blob uploads and their chunks",
+        )
+
     # Encryption DEK refresh — multi-replica DEK propagation (no leader election).
     # Lets a DEK rotated on one replica become usable on all replicas without a
     # restart. Cheap no-op when nothing changed. Only when encryption is enabled.
@@ -1007,6 +1025,16 @@ def create_application() -> FastAPI:
     from terrapod.api.routers.provider_mirror import router as provider_mirror_router
 
     app.include_router(provider_mirror_router)
+
+    # OCI Distribution registry (#1408). Root-mounted at /v2/ because the spec
+    # mandates that prefix; its exception handler is registered on the app so no
+    # route can accidentally answer a container client in the house error shape.
+    from terrapod.api.routers.oci import oci_error_handler
+    from terrapod.api.routers.oci import router as oci_router
+    from terrapod.services.oci.errors import OCIError
+
+    app.include_router(oci_router)
+    app.add_exception_handler(OCIError, oci_error_handler)
 
     from terrapod.api.routers.binary_cache import router as binary_cache_router
 

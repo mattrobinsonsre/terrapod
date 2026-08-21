@@ -81,8 +81,17 @@ test.describe('HA page — role', () => {
     await page.goto('/ha');
 
     await expect(body(page).getByText('Follower', { exact: true })).toBeVisible();
-    await expect(page.getByText(/originates nothing/)).toBeVisible();
-    await expect(page.getByText(/503/)).toBeVisible();
+
+    // Assert the status code inside the sentence that carries it, rather than
+    // anywhere on the page. `getByText(/503/)` matched any element containing
+    // those three digits, and the page also lists agent pools whose names are
+    // randomly generated per test — so whenever a name happened to contain
+    // "503" the locator resolved to three elements and strict mode failed the
+    // run. Intermittent, unrelated to the code under test, and invisible until
+    // the dice came up.
+    const consequence = page.getByText(/originates nothing/);
+    await expect(consequence).toBeVisible();
+    await expect(consequence).toContainText('503');
   });
 
   test('an unknown role renders as itself rather than crashing the page', async ({ page }) => {

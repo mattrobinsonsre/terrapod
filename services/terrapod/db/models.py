@@ -2851,3 +2851,206 @@ class ReplicationCursor(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=now_utc, onupdate=now_utc
     )
+
+
+# ── OCI Distribution registry (#1408) ──────────────────────────────────────
+
+
+class OCIRepository(Base):
+    """A container image repository, e.g. ``terrapod/ansible-ee``.
+
+    A row exists once anything has been pushed or pulled through under the name.
+    ``upstream`` distinguishes the two populations that share the surface: a
+    locally pushed repository (``None``) versus a pull-through mirror of an
+    upstream one, which records where its content came from. They differ in
+    lifecycle — pulled-through content expires on TTL like every other Terrapod
+    cache, while pushed content is operator-owned and only ever removed
+    deliberately.
+    """
+
+    __tablename__ = "oci_repositories"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=generate_uuid7
+    )
+    #: Full repository name. 255 is the spec's limit, not an arbitrary choice.
+    name: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+    #: Upstream registry host for a pull-through mirror; NULL for pushed content.
+    upstream: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    labels: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default="{}")
+    owner_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc, nullable=False
+    )
+
+    __table_args__ = (sa.Index("ix_oci_repositories_upstream", "upstream"),)
+
+
+class OCIBlob(Base):
+    """A content-addressed blob, shared across every repository that references it.
+
+    Global by digest rather than per-repository, which is what makes
+    cross-repository mount possible and stops two images with a common base
+    layer storing those bytes twice. Access is mediated by
+    :class:`OCIRepositoryBlob`, never by this row.
+    """
+
+    __tablename__ = "oci_blobs"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=generate_uuid7
+    )
+    #: ``algorithm:hex``. Long enough for sha512 (7 + 128) with room to spare.
+    digest: Mapped[str] = mapped_column(String(140), nullable=False, unique=True)
+    size: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    storage_key: Mapped[str] = mapped_column(String(500), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc, nullable=False
+    )
+    #: Drives TTL expiry of pulled-through content, and would inform a future
+    #: reference-walk GC's grace period for pushed content.
+    last_accessed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc, nullable=False
+    )
+
+
+class OCIRepositoryBlob(Base):
+    """Which repositories may serve which blobs.
+
+    The spec scopes blob reads per repository, so this decides access: a blob
+    existing is not permission to pull it from an arbitrary repository name.
+    It is also the edge set a reference-walk GC traverses, and what a
+    cross-repository mount writes rather than re-uploading bytes.
+    """
+
+    __tablename__ = "oci_repository_blobs"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=generate_uuid7
+    )
+    repository_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("oci_repositories.id", ondelete="CASCADE"), nullable=False
+    )
+    blob_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("oci_blobs.id", ondelete="CASCADE"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc, nullable=False
+    )
+
+    __table_args__ = (
+        sa.UniqueConstraint("repository_id", "blob_id", name="uq_oci_repo_blob"),
+        sa.Index("ix_oci_repository_blobs_blob_id", "blob_id"),
+    )
+
+
+class OCIManifest(Base):
+    """A manifest or manifest list, content-addressed within a repository.
+
+    Repository-scoped where blobs are global, because a manifest is only
+    meaningful alongside the layers of the repository that holds it, and because
+    deleting a repository should take its manifests with it while leaving shared
+    blobs for their other referents.
+    """
+
+    __tablename__ = "oci_manifests"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=generate_uuid7
+    )
+    repository_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("oci_repositories.id", ondelete="CASCADE"), nullable=False
+    )
+    digest: Mapped[str] = mapped_column(String(140), nullable=False)
+    #: Returned verbatim on GET — a client that receives the wrong media type
+    #: for a manifest list will fail to resolve the right architecture.
+    media_type: Mapped[str] = mapped_column(String(140), nullable=False)
+    size: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    storage_key: Mapped[str] = mapped_column(String(500), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc, nullable=False
+    )
+    last_accessed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc, nullable=False
+    )
+    #: The digest this manifest is attached to, when it declares a `subject` —
+    #: a signature, an SBOM, an attestation. Denormalised out of the manifest
+    #: body because the referrers API queries by it, and reading and parsing
+    #: every manifest in a repository to answer one lookup does not scale.
+    subject_digest: Mapped[str | None] = mapped_column(String(140), nullable=True)
+    #: What kind of artifact this is, for the referrers API's `artifactType`
+    #: filter. Taken from the manifest's own `artifactType`, falling back to
+    #: `config.mediaType` as the spec directs for an image manifest.
+    artifact_type: Mapped[str | None] = mapped_column(String(140), nullable=True)
+    #: The manifest's annotations, returned in each referrers descriptor so a
+    #: client can tell attachments apart without fetching every one of them.
+    annotations: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+
+    __table_args__ = (
+        sa.UniqueConstraint("repository_id", "digest", name="uq_oci_manifest_repo_digest"),
+        # The referrers API's only query shape. Without it, listing attachments
+        # is a scan of every manifest in the repository.
+        sa.Index("ix_oci_manifests_subject", "repository_id", "subject_digest"),
+    )
+
+
+class OCITag(Base):
+    """A mutable name pointing at a manifest digest.
+
+    Tags move; digests do not. Kept as its own row rather than a column on the
+    manifest because several tags may point at one manifest, and because
+    retagging must not disturb the manifest's own identity.
+    """
+
+    __tablename__ = "oci_tags"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=generate_uuid7
+    )
+    repository_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("oci_repositories.id", ondelete="CASCADE"), nullable=False
+    )
+    #: The spec caps tags at 128 characters.
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
+    manifest_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("oci_manifests.id", ondelete="CASCADE"), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False
+    )
+
+    __table_args__ = (sa.UniqueConstraint("repository_id", "name", name="uq_oci_tag_repo_name"),)
+
+
+class OCIUploadSession(Base):
+    """An in-progress chunked blob upload.
+
+    In Postgres rather than memory because the API is multi-replica with no
+    session affinity: `POST` opens the session on one replica and each `PATCH`
+    may land on another. Holding this in process state would work in every test
+    and fail in production under more than one replica — principle 11 applied to
+    a new surface, and the single most likely thing here to be got wrong.
+    """
+
+    __tablename__ = "oci_upload_sessions"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=generate_uuid7
+    )
+    repository_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    #: Bytes received so far. The spec requires each chunk's Content-Range to
+    #: begin exactly here, so this is the authority for accepting a chunk.
+    offset: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    #: Number of chunks written; also the next chunk's sequence number, which is
+    #: what makes a lexicographic listing the concatenation order.
+    chunk_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc, nullable=False
+    )
+    #: Abandoned sessions are reaped on this, so a client that starts a push and
+    #: disappears does not leak chunks into object storage indefinitely.
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False
+    )
+
+    __table_args__ = (sa.Index("ix_oci_upload_sessions_updated_at", "updated_at"),)

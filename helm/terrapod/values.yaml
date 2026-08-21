@@ -272,6 +272,38 @@ api:
       # the cache first (bulk-warm admin endpoint/UI, typically with cache_only
       # off pointing at an internal mirror), then seal. See docs/registry.md.
       cache_only: false
+      # Container image registry (#1408). Serves execution environments and any
+      # other image, both pushed by operators and mirrored from upstream, at /v2/.
+      oci:
+        enabled: true
+        # Registries Terrapod may pull through to. An ALLOW-LIST, not a
+        # convenience: clients name the upstream in the first path component
+        # (pulling <host>/quay.io/ansible/awx-ee mirrors quay.io/ansible/awx-ee),
+        # so without this a caller could name any host and make Terrapod fetch
+        # from it — a server-side request forgery primitive. Empty means
+        # push-only, which is the correct setting for an air-gapped install.
+        # Note registry.cache_only seals upstream fetching across every cache
+        # including this one, and takes precedence over anything listed here.
+        upstreams: []
+        # Example, including an authenticated upstream. The password is NEVER
+        # set here — it comes from a Secret as
+        # TERRAPOD_OCI_UPSTREAM_{HOST}_PASSWORD (host uppercased, non-alphanumeric
+        # characters replaced with underscores), because a credential must not be
+        # rendered into a ConfigMap:
+        #
+        #   upstreams:
+        #     - host: quay.io                      # anonymous
+        #     - host: registry.example.com         # authenticated
+        #       username: robot
+        #       existingSecret: terrapod-upstream-example
+        #       existingSecretKey: password        # optional, defaults to "password"
+        # How long an in-progress blob upload may sit untouched before it is
+        # reaped along with its chunks. The spec expects a server to time
+        # unfinished uploads out; without it a push that starts and dies leaks
+        # its chunks into object storage permanently, which anyone with push
+        # access can repeat. Generous by default: a slow, resumed push over a
+        # poor link is legitimate, and reaping it mid-flight destroys real work.
+        upload_session_timeout_hours: 24
       provider_cache:
         enabled: true
         upstream_registries:

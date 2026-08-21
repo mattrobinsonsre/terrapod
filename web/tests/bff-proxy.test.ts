@@ -12,7 +12,11 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { isRetryableTransportError, isRetryableRequest } from '../src/lib/bff-proxy.ts'
+import {
+  isRetryableTransportError,
+  isRetryableRequest,
+  forwardedContentLength,
+} from '../src/lib/bff-proxy.ts'
 
 function errno(message: string, code?: string): Error {
   const e: NodeJS.ErrnoException = new Error(message)
@@ -80,4 +84,39 @@ test('a request carrying a body is never retried', () => {
   // The body is a stream consumed by the first attempt — there is nothing left
   // to send on a second one, so a "retry" would forward a bodiless request.
   assert.equal(isRetryableRequest('GET', true), false)
+})
+
+// Which Content-Length reaches the client (#1408).
+//
+// The proxy strips response framing headers and lets undici re-derive them,
+// which is right for a body it may have decompressed and wrong for one it has
+// not. Getting this wrong is not subtle in effect: without the header, docker
+// refuses every blob HEAD and no image can be pulled through the BFF at all.
+
+test('an uncompressed response keeps its Content-Length', () => {
+  const headers = new Headers({ 'content-length': '4092319' })
+  assert.equal(forwardedContentLength(headers), '4092319')
+})
+
+test('an identity-encoded response keeps its Content-Length', () => {
+  const headers = new Headers({ 'content-length': '12', 'content-encoding': 'identity' })
+  assert.equal(forwardedContentLength(headers), '12')
+})
+
+test('a compressed response drops it — undici already decompressed the body', () => {
+  // Forwarding the compressed length here would describe the body we are
+  // sending as shorter than it is, and the client would truncate it.
+  const headers = new Headers({ 'content-length': '512', 'content-encoding': 'gzip' })
+  assert.equal(forwardedContentLength(headers), null)
+})
+
+test('the encoding check is case- and whitespace-insensitive', () => {
+  const headers = new Headers({ 'content-length': '512', 'content-encoding': ' GZIP ' })
+  assert.equal(forwardedContentLength(headers), null)
+})
+
+test('a response with no Content-Length stays without one', () => {
+  // A streamed response legitimately has no length; inventing one would be worse
+  // than omitting it.
+  assert.equal(forwardedContentLength(new Headers()), null)
 })

@@ -112,10 +112,23 @@ Per-surface verification before you push (lint alone is **not** enough):
    MB) and kills the proxied request with a `socket hang up` — a 500 with no run
    ever created, and it defeats the API's careful direct-to-storage streaming
    (rule 14 / #884). The route handler reads `process.env.API_URL` per request,
-   so it keeps runtime config too. The small-body prefixes (`/.well-known`,
-   `/oauth`, `/v1`) may stay on the middleware. Never raise the middleware body
-   cap as a "fix" — that still buffers the whole body in the web pod (OOM risk)
-   and doesn't stream.
+   so it keeps runtime config too. Never raise the middleware body cap as a
+   "fix" — that still buffers the whole body in the web pod (OOM risk) and
+   doesn't stream. The other proxied prefixes (`/.well-known`, `/oauth`, `/v1`,
+   and `/v2` for the container registry) reach the same handler through internal
+   rewrites in `next.config.js`, so failure handling and streaming apply to all
+   of them (#1381, #1408).
+   **Test a new surface through the BFF, never against the API directly.** An
+   API-only test is a tainted test: it skips the hop every client actually
+   takes, and that hop has its own failure modes. The OCI registry hit three at
+   once (#1408) — its `/v2/` prefix was not proxied at all, so `docker pull`
+   against the deployment's hostname got an HTML 404; Next's trailing-slash
+   normalisation turned the `GET /v2/` handshake into a 308 to a path the spec
+   does not define; and the proxy stripped `Content-Length` from every response,
+   which docker requires on a blob HEAD, so no image could be pulled. **Forward
+   `Content-Length` when the upstream response is uncompressed** — it is
+   stripped for compressed bodies because undici decompresses transparently, but
+   for an identity body the count is exact and some clients refuse without it.
 9. **Single organization (hard requirement)** — Terrapod does **not** support
    multiple organizations at any level. There is no `org_name` column
    anywhere. The literal organization name is always `default` — in code,

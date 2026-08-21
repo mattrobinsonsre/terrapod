@@ -119,6 +119,27 @@ export function isRetryableRequest(method: string, hasBody = false): boolean {
   return !hasBody && RETRYABLE_METHODS.has(method.toUpperCase())
 }
 
+/**
+ * The Content-Length to forward from an upstream response, or null to omit it.
+ *
+ * Content-Length is stripped wholesale above because undici's fetch
+ * decompresses transparently: for a gzipped response the upstream's count
+ * describes bytes we are no longer forwarding, so passing it on would describe
+ * the body wrongly. When the response carries no content-encoding the count is
+ * exact and must be kept, because some clients require it — docker's registry
+ * client rejects a blob HEAD without one ("missing content-length header for
+ * request") and every `docker pull` through the BFF fails. That is not a corner
+ * case: a HEAD carries no body, so this header is the only size information the
+ * client gets, and it is how it decides what to download.
+ *
+ * Exported for its unit test; the decision is the load-bearing part.
+ */
+export function forwardedContentLength(headers: Headers): string | null {
+  const encoding = (headers.get('content-encoding') ?? '').trim().toLowerCase()
+  if (encoding !== '' && encoding !== 'identity') return null
+  return headers.get('content-length')
+}
+
 function isClientAbort(err: unknown): boolean {
   return err instanceof Error && err.name === 'AbortError'
 }
@@ -204,6 +225,11 @@ export async function proxy(request: Request, stripPrefix?: string): Promise<Res
       responseHeaders.set(key, value)
     }
   })
+
+  const length = forwardedContentLength(upstream.headers)
+  if (length !== null) {
+    responseHeaders.set('content-length', length)
+  }
 
   // Stream the upstream body back unbuffered (preserves SSE + large downloads).
   return new Response(upstream.body, {

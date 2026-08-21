@@ -93,3 +93,9 @@ smoke-*
 # Claude Code session-local files (transient — do not commit)
 .claude/
 .helmrender/
+
+# OCI conformance suite: the cloned spec repo, plus the ginkgo HTML and JUnit
+# reports it writes to the working directory (scripts/oci-conformance.sh).
+.conformance/
+report.html
+junit.xml

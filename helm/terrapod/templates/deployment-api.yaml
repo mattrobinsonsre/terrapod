@@ -98,6 +98,23 @@ spec:
                   name: {{ .Values.api.config.ha.peer.inbound.existingSecret }}
                   key: {{ .Values.api.config.ha.peer.inbound.existingSecretKey | default "client_secret" }}
             {{- end }}
+            {{- range (.Values.api.config.registry).oci.upstreams }}
+            {{- if .existingSecret }}
+            # Pull-through credential for one upstream registry (#1408). Per
+            # upstream by design: registries are independent trust domains, so
+            # one Secret for all of them would hand every upstream's credential
+            # to whichever the client happens to name. The variable name is
+            # derived from the host the same way the code derives it — non
+            # alphanumerics to underscores, uppercased — so chart and runtime
+            # agree without a second mapping to keep in step. Never a ConfigMap
+            # value: it is a credential.
+            - name: TERRAPOD_OCI_UPSTREAM_{{ regexReplaceAll "[^a-zA-Z0-9]" .host "_" | upper }}_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .existingSecret }}
+                  key: {{ .existingSecretKey | default "password" }}
+            {{- end }}
+            {{- end }}
             {{- if (.Values.api.config.encryption).existingSecret }}
             # App-layer encryption at rest (#553) — KEK secrets via secretKeyRef.
             # optional:true so a single Secret can carry only the key the chosen
