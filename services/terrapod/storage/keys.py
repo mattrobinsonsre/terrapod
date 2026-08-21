@@ -228,3 +228,63 @@ def vcs_archive_key(
     `paths_hash` defaults to `"full"` for the legacy whole-repo case.
     """
     return f"vcs_archives/{connection_id}/{owner}/{repo}/{sha}-{paths_hash}.tar.gz"
+
+
+# ── OCI Distribution registry (#1408) ──────────────────────────────────────
+#
+# Blobs and manifests are **content-addressed and global**, not nested under a
+# repository. That is not a convenience — it is what the spec's cross-repository
+# blob mount depends on, and it means two images sharing a base layer share the
+# stored bytes rather than duplicating hundreds of MB per repository.
+#
+# Which repositories may *serve* a given blob is therefore a database question,
+# not a storage-layout one: the spec scopes blob reads per repository, so a link
+# table decides access, and the same table is what a future reference-walk GC
+# has to consult. Encoding that in the key path instead would make dedupe
+# impossible and mount unimplementable.
+#
+# The digest's algorithm becomes a path segment (`sha256/<hex>`) so blobs shard
+# rather than landing in one flat prefix — listing a prefix is a paged operation
+# on S3, Azure and GCS, and free on the filesystem, so there is no cost.
+
+
+def oci_blob_key(digest_segment: str) -> str:
+    """Key for a content-addressed blob.
+
+    ``digest_segment`` comes from :attr:`~terrapod.services.oci.names.Digest.storage_segment`
+    — already validated, so this never sees an unchecked string.
+    """
+    return f"oci/blobs/{digest_segment}"
+
+
+def oci_manifest_key(digest_segment: str) -> str:
+    """Key for a content-addressed manifest.
+
+    Stored separately from blobs despite also being content-addressed: manifests
+    are small, read on every pull, and are what a GC reference walk starts from,
+    so keeping them in their own prefix makes that walk a bounded listing rather
+    than a scan over every layer in the registry.
+    """
+    return f"oci/manifests/{digest_segment}"
+
+
+def oci_upload_chunk_key(session_id: str, sequence: int) -> str:
+    """Key for one chunk of an in-progress upload.
+
+    Chunks are stored individually and concatenated on completion because **no
+    object store supports append**, and because the API is multi-replica: a
+    chunked push can land on a different replica for each `PATCH`, so the
+    partial cannot live on a pod-local disk. The ephemeral PVC — which the
+    provider registry uses for streamed uploads — is unavailable here for
+    exactly that reason.
+
+    ``sequence`` is zero-padded so a lexicographic listing is also the
+    concatenation order; every backend lists lexicographically, and relying on
+    that avoids a second source of truth for ordering.
+    """
+    return f"oci/uploads/{session_id}/{sequence:08d}"
+
+
+def oci_upload_prefix(session_id: str) -> str:
+    """Prefix holding one upload session's chunks, for cleanup."""
+    return f"oci/uploads/{session_id}/"
