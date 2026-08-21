@@ -340,3 +340,92 @@ class TestTags:
 
         assert r.status_code == 200
         assert list_tags.call_args.kwargs["limit"] is None
+
+
+class TestPullThroughMirror:
+    """The mirror branch of repository resolution.
+
+    Added after a real `docker`/`curl` push exposed a bug that 1328 mocked tests
+    missed: the create block ran *after* the mirror branch rather than as an
+    alternative, so a mirror was created and then a second row with the same
+    name was inserted immediately, producing a unique-constraint 409 on every
+    pull-through request. Every existing router test set `upstream = None`, so
+    this path had no coverage at all.
+    """
+
+    @patch("terrapod.services.oci.pullthrough_service.mirroring_allowed", return_value=True)
+    @patch("terrapod.services.oci.pullthrough_service.resolve_upstream")
+    @patch("terrapod.services.oci.pullthrough_service.ensure_mirror_repository")
+    @patch("terrapod.api.routers.oci.resolve_registry_capabilities_for")
+    @patch("terrapod.services.oci.registry_service.resolve_manifest")
+    @patch("terrapod.services.oci.registry_service.get_repository")
+    async def test_a_mirror_is_created_exactly_once(
+        self, get_repo, resolve, caps, ensure_mirror, resolve_upstream, _allowed
+    ) -> None:
+        """One row, not two. The bug inserted a second with the same name."""
+        get_repo.return_value = None  # nothing local
+        resolve_upstream.return_value = ("quay.io", "prometheus/busybox")
+        mirror = _repository("quay.io/prometheus/busybox")
+        mirror.upstream = "quay.io"
+        ensure_mirror.return_value = mirror
+        resolve.return_value = _manifest()
+        caps.return_value = frozenset({"registry:read"})
+        storage = AsyncMock()
+        storage.get.return_value = b"{}"
+
+        db = AsyncMock()
+        app = create_app()
+        app.dependency_overrides[authenticate_oci] = lambda: _user()
+        app.dependency_overrides[get_db] = lambda: db
+        app.dependency_overrides[get_storage] = lambda: storage
+
+        async with await _client(app) as c:
+            r = await c.get("/v2/quay.io/prometheus/busybox/manifests/latest", headers=_BASIC)
+
+        assert r.status_code == 200
+        ensure_mirror.assert_awaited_once()
+        # The regression: no second repository row is added alongside the mirror.
+        assert db.add.call_count == 0
+
+    @patch("terrapod.services.oci.pullthrough_service.mirroring_allowed", return_value=True)
+    @patch("terrapod.services.oci.pullthrough_service.resolve_upstream")
+    @patch("terrapod.services.oci.pullthrough_service.ensure_mirror_repository")
+    @patch("terrapod.api.routers.oci.resolve_registry_capabilities_for")
+    @patch("terrapod.services.oci.registry_service.resolve_manifest")
+    @patch("terrapod.services.oci.registry_service.get_repository")
+    async def test_a_mirror_is_readable_without_an_owner(
+        self, get_repo, resolve, caps, ensure_mirror, resolve_upstream, _allowed
+    ) -> None:
+        """Mirrors have no owner, so they carry `access: everyone` — otherwise
+        only a platform admin could pull public upstream content."""
+        get_repo.return_value = None
+        resolve_upstream.return_value = ("quay.io", "prometheus/busybox")
+        mirror = _repository("quay.io/prometheus/busybox")
+        mirror.upstream = "quay.io"
+        mirror.owner_email = None
+        ensure_mirror.return_value = mirror
+        resolve.return_value = _manifest()
+        caps.return_value = frozenset({"registry:read"})
+        storage = AsyncMock()
+        storage.get.return_value = b"{}"
+
+        async with await _client(_make_app(storage=storage)) as c:
+            await c.get("/v2/quay.io/prometheus/busybox/manifests/latest", headers=_BASIC)
+
+        assert mirror.labels == {"access": "everyone"}
+
+    @patch("terrapod.services.oci.pullthrough_service.mirroring_allowed", return_value=False)
+    @patch("terrapod.services.oci.pullthrough_service.resolve_upstream")
+    @patch("terrapod.services.oci.registry_service.get_repository")
+    async def test_no_mirror_when_mirroring_is_not_allowed(
+        self, get_repo, resolve_upstream, _allowed
+    ) -> None:
+        """cache_only, or no configured upstreams: a miss is a miss."""
+        get_repo.return_value = None
+        resolve_upstream.return_value = ("quay.io", "prometheus/busybox")
+
+        async with await _client(_make_app()) as c:
+            r = await c.get("/v2/quay.io/prometheus/busybox/manifests/latest", headers=_BASIC)
+
+        assert r.status_code == 404
+        assert r.json()["errors"][0]["code"] == "NAME_UNKNOWN"

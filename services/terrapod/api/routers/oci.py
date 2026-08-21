@@ -121,14 +121,17 @@ async def _authorised_repository(
             # platform admin could pull public upstream content — reusing the
             # label mechanism rather than special-casing mirrors in the resolver.
             repository.labels = {"access": "everyone"}
-        elif not create:
+        elif create:
+            # The push path: docker push never asks for a repository to be
+            # created first, so the first push makes one, owned by the pusher.
+            # Freshly created and owned by this user, so the capability check
+            # below will pass — but it is left to run rather than
+            # short-circuited, so there is exactly one place deciding access.
+            repository = OCIRepository(name=name, owner_email=user.email or None, labels={})
+            db.add(repository)
+            await db.flush()
+        else:
             raise OCIError(NAME_UNKNOWN, detail={"name": name})
-        repository = OCIRepository(name=name, owner_email=user.email or None, labels={})
-        db.add(repository)
-        await db.flush()
-        # Freshly created and owned by this user, so the capability check below
-        # will pass — but it is left to run rather than short-circuited, so
-        # there is exactly one place that decides access.
 
     caps = await resolve_registry_capabilities_for(
         db, user, repository.name, repository.labels or {}, repository.owner_email
