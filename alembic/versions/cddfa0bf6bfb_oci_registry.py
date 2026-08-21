@@ -87,7 +87,16 @@ def upgrade() -> None:
         sa.Column("storage_key", sa.String(500), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("last_accessed_at", sa.DateTime(timezone=True), nullable=False),
+        # Referrers metadata, denormalised out of the manifest body: the
+        # referrers API queries by subject, and parsing every manifest in a
+        # repository to answer one lookup does not scale.
+        sa.Column("subject_digest", sa.String(140), nullable=True),
+        sa.Column("artifact_type", sa.String(140), nullable=True),
+        sa.Column("annotations", JSONB, nullable=True),
         sa.UniqueConstraint("repository_id", "digest", name="uq_oci_manifest_repo_digest"),
+    )
+    op.create_index(
+        "ix_oci_manifests_subject", "oci_manifests", ["repository_id", "subject_digest"]
     )
 
     op.create_table(
@@ -132,6 +141,7 @@ def downgrade() -> None:
     op.drop_index("ix_oci_upload_sessions_updated_at", table_name="oci_upload_sessions")
     op.drop_table("oci_upload_sessions")
     op.drop_table("oci_tags")
+    op.drop_index("ix_oci_manifests_subject", table_name="oci_manifests")
     op.drop_table("oci_manifests")
     op.drop_index("ix_oci_repository_blobs_blob_id", table_name="oci_repository_blobs")
     op.drop_table("oci_repository_blobs")

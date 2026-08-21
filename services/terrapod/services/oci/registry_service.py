@@ -20,6 +20,7 @@ place to look first if write load ever becomes a question.
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
 
 from sqlalchemy import select
@@ -27,6 +28,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.db.models import OCIBlob, OCIManifest, OCIRepository, OCIRepositoryBlob, OCITag
 from terrapod.services.oci.names import Reference
+
+#: Layer types the spec expects to be absent from the registry: they carry
+#: `urls` pointing elsewhere, because redistributing them is not permitted.
+NON_DISTRIBUTABLE_MEDIA_TYPES = frozenset(
+    {
+        "application/vnd.oci.image.layer.nondistributable.v1.tar",
+        "application/vnd.oci.image.layer.nondistributable.v1.tar+gzip",
+        "application/vnd.oci.image.layer.nondistributable.v1.tar+zstd",
+        "application/vnd.docker.image.rootfs.foreign.diff.tar.gzip",
+    }
+)
 
 
 def _touch(entity):
@@ -135,8 +147,15 @@ def referenced_digests(document: dict) -> list[str]:
         if not isinstance(entries, list):
             continue
         for entry in entries:
-            if isinstance(entry, dict) and isinstance(entry.get("digest"), str):
-                digests.append(entry["digest"])
+            if not isinstance(entry, dict) or not isinstance(entry.get("digest"), str):
+                continue
+            # Non-distributable (foreign) layers are referenced by digest but
+            # deliberately NOT uploaded — they are fetched from the `urls` in the
+            # descriptor, typically because their licence forbids redistribution.
+            # Demanding their presence would reject every Windows base image.
+            if entry.get("mediaType") in NON_DISTRIBUTABLE_MEDIA_TYPES:
+                continue
+            digests.append(entry["digest"])
 
     return digests
 
@@ -197,12 +216,17 @@ async def store_manifest(
     storage_key = keys.oci_manifest_key(parse_digest(digest).storage_segment)
     await storage.put(storage_key, body, content_type=media_type)
 
+    subject_digest, artifact_type, annotations = referrer_metadata(body)
+
     manifest = OCIManifest(
         repository_id=repository.id,
         digest=digest,
         media_type=media_type,
         size=len(body),
         storage_key=storage_key,
+        subject_digest=subject_digest,
+        artifact_type=artifact_type,
+        annotations=annotations,
     )
     db.add(manifest)
     await db.flush()
@@ -231,3 +255,65 @@ async def set_tag(
     db.add(tag)
     await db.flush()
     return tag
+
+
+def referrer_metadata(body: bytes) -> tuple[str | None, str | None, dict | None]:
+    """Pull the referrers fields out of a manifest body.
+
+    Denormalised at write time so the referrers API is an indexed lookup rather
+    than a scan that parses every manifest in the repository.
+
+    `artifactType` falls back to `config.mediaType`, which the spec directs for
+    an image manifest that does not declare one — and which is how most tools
+    actually mark an attachment's kind today, so omitting the fallback leaves
+    the filter matching almost nothing.
+
+    Never raises: a manifest whose shape is unexpected simply has no referrer
+    metadata, and refusing the push over it would reject valid content the
+    registry is otherwise happy to store.
+    """
+    try:
+        document = json.loads(body)
+    except ValueError:
+        return None, None, None
+    if not isinstance(document, dict):
+        return None, None, None
+
+    subject = document.get("subject")
+    subject_digest = None
+    if isinstance(subject, dict) and isinstance(subject.get("digest"), str):
+        subject_digest = subject["digest"]
+
+    artifact_type = document.get("artifactType")
+    if not isinstance(artifact_type, str):
+        config = document.get("config")
+        artifact_type = config.get("mediaType") if isinstance(config, dict) else None
+        if not isinstance(artifact_type, str):
+            artifact_type = None
+
+    annotations = document.get("annotations")
+    if not isinstance(annotations, dict):
+        annotations = None
+
+    return subject_digest, artifact_type, annotations
+
+
+async def list_referrers(
+    db: AsyncSession,
+    repository: OCIRepository,
+    subject_digest: str,
+    artifact_type: str | None = None,
+) -> list[OCIManifest]:
+    """Manifests in this repository attached to *subject_digest*.
+
+    Ordered by creation so a client paging through attachments sees a stable
+    sequence rather than whatever order the planner returns.
+    """
+    query = select(OCIManifest).where(
+        OCIManifest.repository_id == repository.id,
+        OCIManifest.subject_digest == subject_digest,
+    )
+    if artifact_type is not None:
+        query = query.where(OCIManifest.artifact_type == artifact_type)
+    result = await db.execute(query.order_by(OCIManifest.created_at))
+    return list(result.scalars().all())

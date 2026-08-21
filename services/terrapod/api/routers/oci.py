@@ -41,6 +41,7 @@ from terrapod.services.oci.auth import BASIC_CHALLENGE, authenticate_oci
 from terrapod.services.oci.errors import (
     BLOB_UNKNOWN,
     BLOB_UPLOAD_INVALID,
+    BLOB_UPLOAD_OUT_OF_ORDER,
     BLOB_UPLOAD_UNKNOWN,
     DIGEST_INVALID,
     MANIFEST_BLOB_UNKNOWN,
@@ -158,8 +159,8 @@ async def version_check(user: AuthenticatedUser = Depends(authenticate_oci)) -> 
 async def list_tags(
     name: str,
     request: Request,
-    db: AsyncSession = Depends(get_db),
     user: AuthenticatedUser = Depends(authenticate_oci),
+    db: AsyncSession = Depends(get_db),
 ) -> Response:
     """List a repository's tags, with the spec's cursor pagination."""
     repository = await _authorised_repository(db, user, name, cap.REGISTRY_READ)
@@ -187,8 +188,8 @@ async def get_manifest(
     name: str,
     reference: str,
     request: Request,
-    db: AsyncSession = Depends(get_db),
     user: AuthenticatedUser = Depends(authenticate_oci),
+    db: AsyncSession = Depends(get_db),
     storage: ObjectStore = Depends(get_storage),
 ) -> Response:
     """Fetch a manifest by tag or digest.
@@ -230,8 +231,8 @@ async def get_blob(
     name: str,
     digest: str,
     request: Request,
-    db: AsyncSession = Depends(get_db),
     user: AuthenticatedUser = Depends(authenticate_oci),
+    db: AsyncSession = Depends(get_db),
     storage: ObjectStore = Depends(get_storage),
 ) -> Response:
     """Fetch a blob, by redirect rather than by proxying its bytes.
@@ -290,8 +291,8 @@ def _upload_location(name: str, session_id) -> str:
 async def start_upload(
     name: str,
     request: Request,
-    db: AsyncSession = Depends(get_db),
     user: AuthenticatedUser = Depends(authenticate_oci),
+    db: AsyncSession = Depends(get_db),
     storage: ObjectStore = Depends(get_storage),
 ) -> Response:
     """Open an upload session, mount an existing blob, or accept a whole blob.
@@ -350,31 +351,15 @@ async def upload_chunk(
     name: str,
     session_id: str,
     request: Request,
-    db: AsyncSession = Depends(get_db),
     user: AuthenticatedUser = Depends(authenticate_oci),
+    db: AsyncSession = Depends(get_db),
     storage: ObjectStore = Depends(get_storage),
 ) -> Response:
     """Append a chunk to an open session."""
     await _authorised_repository(db, user, name, cap.REGISTRY_WRITE)
     session = await _open_session(db, session_id)
 
-    content_range = request.headers.get("content-range")
-    if content_range:
-        # The spec requires chunks to arrive in order and to start exactly where
-        # the last one ended. Enforced rather than trusted: accepting a gap
-        # would produce a blob that silently fails its digest much later, with
-        # nothing to point at the chunk that caused it.
-        try:
-            start_text, _, _ = content_range.partition("-")
-            start = int(start_text)
-        except ValueError:
-            raise OCIError(BLOB_UPLOAD_INVALID, message="malformed Content-Range") from None
-        if start != session.offset:
-            raise OCIError(
-                BLOB_UPLOAD_INVALID,
-                message=f"chunk starts at {start}, expected {session.offset}",
-                detail={"expected": session.offset, "received": start},
-            )
+    _check_content_range(request, session)
 
     offset = await upload_service.append_chunk(db, storage, session, request.stream())
     return Response(
@@ -394,8 +379,8 @@ async def finish_upload(
     name: str,
     session_id: str,
     request: Request,
-    db: AsyncSession = Depends(get_db),
     user: AuthenticatedUser = Depends(authenticate_oci),
+    db: AsyncSession = Depends(get_db),
     storage: ObjectStore = Depends(get_storage),
 ) -> Response:
     """Complete an upload, optionally with a final chunk in the body."""
@@ -406,6 +391,7 @@ async def finish_upload(
     if not digest_param:
         raise OCIError(DIGEST_INVALID, message="digest query parameter is required")
 
+    _check_content_range(request, session)
     return await _finish_upload(db, storage, session, repository, name, digest_param, request)
 
 
@@ -413,8 +399,8 @@ async def finish_upload(
 async def upload_status(
     name: str,
     session_id: str,
-    db: AsyncSession = Depends(get_db),
     user: AuthenticatedUser = Depends(authenticate_oci),
+    db: AsyncSession = Depends(get_db),
 ) -> Response:
     """How far an upload has got — what a client asks after a broken connection."""
     await _authorised_repository(db, user, name, cap.REGISTRY_WRITE)
@@ -434,8 +420,8 @@ async def upload_status(
 async def cancel_upload(
     name: str,
     session_id: str,
-    db: AsyncSession = Depends(get_db),
     user: AuthenticatedUser = Depends(authenticate_oci),
+    db: AsyncSession = Depends(get_db),
     storage: ObjectStore = Depends(get_storage),
 ) -> Response:
     """Abandon an upload and reclaim its chunks."""
@@ -443,6 +429,34 @@ async def cancel_upload(
     session = await _open_session(db, session_id)
     await upload_service.discard_session(db, storage, session)
     return Response(status_code=204, headers=dict(API_VERSION_HEADER))
+
+
+def _check_content_range(request: Request, session) -> None:
+    """Reject a chunk that does not begin where the last one ended.
+
+    The spec requires chunks in order, and enforcing it rather than trusting it
+    matters: accepting a gap produces a blob that fails its digest much later,
+    with nothing to point at the chunk responsible.
+
+    Applied to **PUT as well as PATCH**, because a client may deliver the final
+    chunk with the PUT that closes the upload — the conformance suite's
+    "chunked out-of-order and put chunk" case, which passed the PATCH check and
+    slipped through the PUT.
+    """
+    content_range = request.headers.get("content-range")
+    if not content_range:
+        return
+    try:
+        start_text, _, _ = content_range.partition("-")
+        start = int(start_text)
+    except ValueError:
+        raise OCIError(BLOB_UPLOAD_INVALID, message="malformed Content-Range") from None
+    if start != session.offset:
+        raise OCIError(
+            BLOB_UPLOAD_OUT_OF_ORDER,
+            message=f"chunk starts at {start}, expected {session.offset}",
+            detail={"expected": session.offset, "received": start},
+        )
 
 
 async def _open_session(db: AsyncSession, session_id: str):
@@ -496,8 +510,8 @@ async def put_manifest(
     name: str,
     reference: str,
     request: Request,
-    db: AsyncSession = Depends(get_db),
     user: AuthenticatedUser = Depends(authenticate_oci),
+    db: AsyncSession = Depends(get_db),
     storage: ObjectStore = Depends(get_storage),
 ) -> Response:
     """Store a manifest and, if the reference is a tag, point that tag at it.
@@ -533,7 +547,13 @@ async def put_manifest(
     if not isinstance(document, dict):
         raise OCIError(MANIFEST_INVALID, message="manifest must be a JSON object")
 
-    computed = f"sha256:{hashlib.sha256(body).hexdigest()}"
+    # Compute in the algorithm the client used, not always sha256. A manifest
+    # referenced by a sha512 digest must be hashed with sha512 or it can never
+    # match — the registry would reject every sha512 push as a mismatch while
+    # reporting a sha256 digest the client never asked about. A tag reference
+    # names no algorithm, so sha256 is the default.
+    algorithm = parsed_reference.digest.algorithm if parsed_reference.is_digest else "sha256"
+    computed = f"{algorithm}:{hashlib.new(algorithm, body).hexdigest()}"
     # A digest reference must agree with the content it names, or the client and
     # the registry disagree about what was just pushed.
     if parsed_reference.is_digest and str(parsed_reference.digest) != computed:
@@ -557,14 +577,21 @@ async def put_manifest(
     if parsed_reference.tag is not None:
         await registry_service.set_tag(db, repository, parsed_reference.tag, manifest)
 
-    return Response(
-        status_code=201,
-        headers={
-            **API_VERSION_HEADER,
-            "Location": f"/v2/{name}/manifests/{computed}",
-            "Docker-Content-Digest": computed,
-        },
-    )
+    headers = {
+        **API_VERSION_HEADER,
+        "Location": f"/v2/{name}/manifests/{computed}",
+        "Docker-Content-Digest": computed,
+    }
+    # A manifest may declare a `subject` it is attached to — a signature, an
+    # SBOM, an attestation. Echoing OCI-Subject is how the client learns the
+    # registry understood the association rather than storing an orphan; the
+    # spec requires it, and a client that does not see it assumes referrers are
+    # unsupported.
+    subject = document.get("subject")
+    if isinstance(subject, dict) and isinstance(subject.get("digest"), str):
+        headers["OCI-Subject"] = subject["digest"]
+
+    return Response(status_code=201, headers=headers)
 
 
 # ── pull-through ───────────────────────────────────────────────────────────
@@ -621,3 +648,78 @@ async def _mirror_blob(db, storage, repository, parsed):
     blob = await upload_service._upsert_blob(db, str(parsed), size, storage_key)
     await upload_service.link_blob(db, repository, blob)
     return blob
+
+
+@router.get("/v2/{name:path}/referrers/{digest}")
+async def list_referrers(
+    name: str,
+    digest: str,
+    request: Request,
+    user: AuthenticatedUser = Depends(authenticate_oci),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """List manifests that reference a subject digest.
+
+    The referrers API (spec 1.1) is how signatures, SBOMs and attestations are
+    attached to an image, which makes it load-bearing for an air-gapped estate:
+    it is the mechanism by which provenance travels with content into a network
+    that cannot reach out to check anything.
+
+    A subject with no referrers gets an **empty index, never a 404**. The
+    distinction is not pedantry — a 404 tells a client the endpoint is
+    unsupported and sends it down a legacy fallback path, while an empty index
+    says "supported, nothing attached", which is the truth. That holds for a
+    repository nobody has pushed to as well.
+    """
+    try:
+        validate_repository(name)
+        parse_digest(digest)
+    except InvalidName as exc:
+        raise OCIError(DIGEST_INVALID, message=str(exc)) from exc
+
+    # Deliberately not gated on the repository existing. The spec requires an
+    # empty index for a subject with no referrers, and a repository nobody has
+    # pushed to has none — answering 404 would tell the client the endpoint is
+    # unsupported and send it down a fallback path.
+    repository = await registry_service.get_repository(db, name)
+    descriptors: list[dict] = []
+    headers = dict(API_VERSION_HEADER)
+
+    # An `artifactType` filter is optional to honour, but a server that applies
+    # one MUST say so: without OCI-Filters-Applied a client cannot tell a
+    # filtered list from a registry that ignored the filter, so it has to filter
+    # again itself and can never trust the result.
+    artifact_type = request.query_params.get("artifactType")
+
+    if repository is not None:
+        caps = await resolve_registry_capabilities_for(
+            db, user, repository.name, repository.labels or {}, repository.owner_email
+        )
+        if not has_capability(caps, cap.REGISTRY_READ):
+            raise OCIError(NAME_UNKNOWN, detail={"name": name})
+
+        referrers = await registry_service.list_referrers(db, repository, digest, artifact_type)
+        descriptors = [
+            {
+                "mediaType": manifest.media_type,
+                "digest": manifest.digest,
+                "size": manifest.size,
+                **({"artifactType": manifest.artifact_type} if manifest.artifact_type else {}),
+                **({"annotations": manifest.annotations} if manifest.annotations else {}),
+            }
+            for manifest in referrers
+        ]
+        if artifact_type is not None:
+            headers["OCI-Filters-Applied"] = "artifactType"
+
+    return JSONResponse(
+        content={
+            "schemaVersion": 2,
+            "mediaType": "application/vnd.oci.image.index.v1+json",
+            "manifests": descriptors,
+        },
+        # The media type is checked by clients to decide whether the response is
+        # a real referrers index, so it must be the index type, not plain JSON.
+        media_type="application/vnd.oci.image.index.v1+json",
+        headers=headers,
+    )

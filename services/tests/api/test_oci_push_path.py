@@ -198,7 +198,11 @@ class TestChunks:
                 content=b"x",
             )
 
-        assert r.status_code == 400
+        # 416, not 400: the spec is specific here, and the distinction matters —
+        # the client is being told its byte range is wrong and where to resume,
+        # which is a different conversation from "this upload is malformed".
+        # Caught by the OCI conformance suite, which expects exactly 416.
+        assert r.status_code == 416
         assert r.json()["errors"][0]["code"] == "BLOB_UPLOAD_INVALID"
         append.assert_not_awaited()
 

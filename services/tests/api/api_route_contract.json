@@ -202,6 +202,7 @@
   "GET /v2/{name:path}/blobs/uploads/{session_id}",
   "GET /v2/{name:path}/blobs/{digest}",
   "GET /v2/{name:path}/manifests/{reference}",
+  "GET /v2/{name:path}/referrers/{digest}",
   "GET /v2/{name:path}/tags/list",
   "PATCH /api/terrapod/v1/agent-pools/{pool_id}",
   "PATCH /api/terrapod/v1/authentication-tokens/{token_id}",

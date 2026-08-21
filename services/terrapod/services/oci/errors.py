@@ -41,6 +41,15 @@ BLOB_UNKNOWN = OCIErrorCode("BLOB_UNKNOWN", status.HTTP_404_NOT_FOUND, "blob unk
 BLOB_UPLOAD_INVALID = OCIErrorCode(
     "BLOB_UPLOAD_INVALID", status.HTTP_400_BAD_REQUEST, "blob upload invalid"
 )
+#: A chunk that does not begin where the last one ended. Distinct from
+#: BLOB_UPLOAD_INVALID because the spec requires **416**, not 400: the client is
+#: being told its byte range is wrong and where to resume, which is a different
+#: conversation from "this upload is malformed".
+BLOB_UPLOAD_OUT_OF_ORDER = OCIErrorCode(
+    "BLOB_UPLOAD_INVALID",
+    416,  # Range Not Satisfiable — the literal; Starlette renamed its constant
+    "chunk does not begin at the expected offset",
+)
 BLOB_UPLOAD_UNKNOWN = OCIErrorCode(
     "BLOB_UPLOAD_UNKNOWN", status.HTTP_404_NOT_FOUND, "blob upload unknown to registry"
 )

@@ -2973,9 +2973,24 @@ class OCIManifest(Base):
     last_accessed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=now_utc, nullable=False
     )
+    #: The digest this manifest is attached to, when it declares a `subject` —
+    #: a signature, an SBOM, an attestation. Denormalised out of the manifest
+    #: body because the referrers API queries by it, and reading and parsing
+    #: every manifest in a repository to answer one lookup does not scale.
+    subject_digest: Mapped[str | None] = mapped_column(String(140), nullable=True)
+    #: What kind of artifact this is, for the referrers API's `artifactType`
+    #: filter. Taken from the manifest's own `artifactType`, falling back to
+    #: `config.mediaType` as the spec directs for an image manifest.
+    artifact_type: Mapped[str | None] = mapped_column(String(140), nullable=True)
+    #: The manifest's annotations, returned in each referrers descriptor so a
+    #: client can tell attachments apart without fetching every one of them.
+    annotations: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
     __table_args__ = (
         sa.UniqueConstraint("repository_id", "digest", name="uq_oci_manifest_repo_digest"),
+        # The referrers API's only query shape. Without it, listing attachments
+        # is a scan of every manifest in the repository.
+        sa.Index("ix_oci_manifests_subject", "repository_id", "subject_digest"),
     )
 
 
