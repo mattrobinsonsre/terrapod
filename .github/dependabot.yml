@@ -8,9 +8,12 @@ version: 2
 # concurrency ceiling with whatever real work is in flight. Four CI-action bumps
 # did exactly that and starved an unrelated PR down to two runners.
 #
-# MAJORS are deliberately left out of the groups. A breaking change deserves its
-# own PR and its own review, and burying one in a batch of eleven patches is how
-# it gets waved through. `update-types` on each group is what keeps them separate.
+# MAJORS get their own group, not their own PR each. Two different things were
+# being conflated: a breaking change must be separate from a batch of patches, so
+# it is not waved through — but it does not follow that five majors need five
+# PRs. Measured over eight weeks, 8 of 9 majors were GitHub Actions, which alone
+# was ~1 PR/week of churn that a monthly schedule could not touch. So each
+# ecosystem gets two groups, and at most two PRs per cycle.
 #
 # Security updates are also left ungrouped (a group without `applies-to` covers
 # version updates only). They should land individually and fast, not wait for
@@ -32,6 +35,9 @@ updates:
       python:
         patterns: ["*"]
         update-types: [minor, patch]
+      python-major:
+        patterns: ["*"]
+        update-types: [major]
     ignore:
       # fastapi 0.137 pulls starlette 1.x (major) — it refactors
       # include_router (the new _IncludedRouter matcher) and shifts
@@ -73,6 +79,9 @@ updates:
       web:
         patterns: ["*"]
         update-types: [minor, patch]
+      web-major:
+        patterns: ["*"]
+        update-types: [major]
     ignore:
       # eslint-plugin-react (via eslint-config-next) doesn't support ESLint 10 yet
       - dependency-name: eslint
@@ -109,6 +118,9 @@ updates:
       docker:
         patterns: ["*"]
         update-types: [minor, patch]
+      docker-major:
+        patterns: ["*"]
+        update-types: [major]
     ignore:
       - dependency-name: node
         versions: ["23.x", "25.x", "27.x", "29.x", "31.x"]
@@ -140,3 +152,6 @@ updates:
       actions:
         patterns: ["*"]
         update-types: [minor, patch]
+      actions-major:
+        patterns: ["*"]
+        update-types: [major]
