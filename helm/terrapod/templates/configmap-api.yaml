@@ -199,6 +199,13 @@ data:
         {{- with .upload_session_timeout_hours }}
         upload_session_timeout_hours: {{ . }}
         {{- end }}
+        {{- with .gc }}
+        gc:
+          enabled: {{ .enabled }}
+          {{- with .grace_hours }}
+          grace_hours: {{ . }}
+          {{- end }}
+        {{- end }}
         {{- if .upstreams }}
         upstreams:
           {{- range .upstreams }}

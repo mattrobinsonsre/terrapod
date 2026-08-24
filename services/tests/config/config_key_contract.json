@@ -243,6 +243,8 @@
   "registry.enabled",
   "registry.module_interface.enabled",
   "registry.oci.enabled",
+  "registry.oci.gc.enabled",
+  "registry.oci.gc.grace_hours",
   "registry.oci.upload_session_timeout_hours",
   "registry.oci.upstreams[].api_url",
   "registry.oci.upstreams[].host",

@@ -129,11 +129,95 @@ path.
 
 ## Deletion
 
-There is no API for deleting a blob or a manifest, and this is a decision rather
-than an omission. Deleting a manifest does not reclaim anything on its own —
-its layers may be shared with other images — so a delete endpoint gives an
-operator a button that appears to free space and does not. Reclaiming storage is
-a garbage collector's job, and it is tracked separately.
+**An image you pushed stays until you remove it.** A registry is not a cache for
+content you put in it: nothing here expires a pushed image because it has gone
+quiet, any more than a registry you pay for would. Reclaiming that space is a
+deliberate act, not a background sweep.
+
+Removing a pushed image is **not yet possible** — there is no delete API — so a
+pushed image is currently permanent. That is the honest position and it is
+tracked in [#1423](https://github.com/mattrobinsonsre/terrapod/issues/1423); the
+collector below is the half that already exists, and deletion is the half that
+will use it.
+
+Deleting a manifest reclaims nothing on its own, incidentally, because its layers
+are usually shared with other images. That is why the two are separate: deletion
+un-references content, and **garbage collection** frees whatever nothing points at
+any more. It runs hourly and needs no downtime.
+
+### What is collected, and what never is
+
+A blob is collected when no manifest references it any more. That is the only
+condition, and it is what makes the shared-layer case safe: a base layer two
+images share stays until the second of them goes.
+
+A layer becomes orphaned in exactly two ways, and both are consequences of
+something else rather than of a timer:
+
+1. **A pull-through cached image is refreshed from upstream.** The tag moves, the
+   superseded manifest stops referencing its layers, and any that no other image
+   still needs are now orphaned.
+2. **An image is removed from the private registry.** Same result, initiated by
+   an operator rather than by upstream.
+
+A layer is orphaned once **all** references to it from any image are gone — not
+some, and never because of its own age or when it was last served. Until then it
+belongs to something, whoever put it there and however long ago.
+
+Abandoned uploads are the third thing collected: blobs from a push that sent its
+layers and never its manifest, so they were never referenced at all.
+
+**An image you pushed is never expired by age.** It exists nowhere else, and a
+registry that quietly eats the images you put in it is not a registry. Only its
+genuinely unreferenced blobs are ever collected.
+
+**Nor is a mirrored one**, which is the opposite of what a disk-usage instinct
+suggests. Deleting a cached image on a schedule cannot make anything fresher —
+the next pull asks upstream regardless — and it discards the copy that keeps this
+cache answering at the moment upstream is unreachable. For a registry whose
+reason to exist is restricted networks, that is exactly backwards: a stale image
+that still runs beats a correct one you cannot fetch.
+
+Freshness is handled where it belongs, on the read path. A mirrored tag past its
+TTL is revalidated when somebody pulls it, replaced only once upstream confirms a
+new digest, and served stale if upstream cannot be reached. Nothing is deleted to
+achieve it — the superseded manifest simply stops being referenced.
+
+**And a layer is never evicted on its own terms.** It lives exactly as long as
+some manifest references it. Layers are shared by construction, so age or
+last-use would say nothing useful about one: the base image everything is built
+on is the most-served object in the store and is also reachable from images
+nobody has pulled in months. Removing it because it looked idle would break every
+image that needs it.
+
+**Signatures, SBOMs and attestations survive.** A referrer usually carries no tag
+of its own, so a naive "untagged means unreachable" sweep would destroy
+provenance while leaving the image it describes — the worst half to lose in an
+air-gapped estate, where nothing can fetch it again and the image still pulls, so
+the loss is silent. Referrers of a reachable image are treated as reachable.
+
+### A push in flight is safe
+
+Blobs are uploaded *before* the manifest that references them, so for a moment
+during every push there is content that nothing points at. Collection ignores
+anything that arrived within `registry.oci.gc.grace_hours` (24 by default), so a
+push in progress is never a candidate.
+
+Docker's own registry answers the same problem by requiring read-only mode during
+collection. A grace window costs nothing and needs no downtime. Raise it if
+pushes in your environment can legitimately take longer than a day.
+
+The window is measured from when content arrived **in that repository**, not from
+when the blob was first created — a cross-repository mount of a months-old layer
+is a push in flight too.
+
+### Watching it
+
+`terrapod_oci_gc_bytes_reclaimed_total` is the one to graph: a blob count tells
+you a collection ran, bytes tell you whether it helped.
+`terrapod_oci_gc_errors_total` counts repositories a cycle declined to collect
+because it could not read a manifest and therefore could not be sure what was
+reachable — erring toward keeping bytes.
 
 What *is* reaped automatically is abandoned uploads. A push that starts and dies
 leaves chunks in object storage, and anyone with push access could repeat that
@@ -149,6 +233,8 @@ mid-flight would destroy real work.
 | `api.config.registry.oci.enabled` | `true` | Serve the registry at `/v2/`. Disabling hides the surface; pushed images stay in storage and reappear if re-enabled. |
 | `api.config.registry.oci.upstreams` | `[]` | The pull-through allow-list. Empty means push-only. |
 | `api.config.registry.oci.upload_session_timeout_hours` | `24` | How long an in-progress upload may sit untouched before it is reaped with its chunks. |
+| `api.config.registry.oci.gc.enabled` | `true` | Collect unreferenced blobs. Off means the registry only ever grows — there is no delete API. |
+| `api.config.registry.oci.gc.grace_hours` | `24` | How long newly-arrived content is protected, so a push in flight is never collected. |
 | `api.config.registry.cache_only` | `false` | Seals upstream fetching for every cache, this one included. |
 
 ## Verifying a deployment

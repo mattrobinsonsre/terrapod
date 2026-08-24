@@ -304,6 +304,24 @@ api:
         # access can repeat. Generous by default: a slow, resumed push over a
         # poor link is legitimate, and reaping it mid-flight destroys real work.
         upload_session_timeout_hours: 24
+        # Reclaiming storage (#1419). There is no delete API — deleting a
+        # manifest reclaims nothing on its own, because its layers are usually
+        # shared — so space comes back only by collecting blobs that no manifest
+        # references any more.
+        #
+        # Nothing is deleted for being old — not a pushed image, not a mirrored
+        # one. Collection reclaims only blobs that no manifest references any
+        # more. Keeping a stale mirrored image is deliberate: it is what lets
+        # this cache go on answering when upstream is unreachable, and freshness
+        # is handled by revalidating a tag when someone pulls it, not by
+        # deleting it in the background.
+        gc:
+          enabled: true
+          # How old a blob must be before it can be collected. Blobs are uploaded
+          # BEFORE the manifest that references them, so a sweep landing between
+          # the two would delete the layers of a push still in progress. Raise it
+          # if pushes in your environment can legitimately take longer.
+          grace_hours: 24
       # Language package proxies (#1417). Point runners at these with
       # PIP_INDEX_URL and NPM_CONFIG_REGISTRY and a run resolves its dependency
       # closure with no upstream reach — which is the only way a Pulumi program

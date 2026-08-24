@@ -184,6 +184,8 @@
   "api.config.registry.enabled",
   "api.config.registry.module_interface.enabled",
   "api.config.registry.oci.enabled",
+  "api.config.registry.oci.gc.enabled",
+  "api.config.registry.oci.gc.grace_hours",
   "api.config.registry.oci.upload_session_timeout_hours",
   "api.config.registry.oci.upstreams",
   "api.config.registry.package_cache.enabled",

@@ -413,6 +413,19 @@ RETENTION_ERRORS = Counter(
     ["category"],
 )
 
+#: Blob counts answer "did it run"; bytes answer "did it help". A collection
+#: that removed 400 tiny manifests and one 2 GB layer is two very different
+#: events, and an operator watching disk pressure cares about the second.
+OCI_GC_BYTES_RECLAIMED = Counter(
+    "terrapod_oci_gc_bytes_reclaimed_total",
+    "Bytes freed by OCI garbage collection",
+)
+
+OCI_GC_ERRORS = Counter(
+    "terrapod_oci_gc_errors_total",
+    "Repositories a GC cycle declined to collect, because reachability was incomplete",
+)
+
 RETENTION_DURATION = Histogram(
     "terrapod_retention_duration_seconds",
     "Duration of retention cleanup cycle",

@@ -900,6 +900,23 @@ jobs:
             echo "FAIL: a join token rendered as a literal value instead of a secretKeyRef (#1411)"; exit 1
           fi
           echo "Multi-pool bootstrap renders with tokens by secretKeyRef OK"
+      - name: OCI garbage collection renders into config.yaml (#1419)
+        run: |
+          out=$(docker run --rm -v "$PWD:/chart" -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \
+            template terrapod helm/terrapod \
+              --namespace terrapod \
+              --set postgresql.url=postgresql+asyncpg://t:t@db:5432/terrapod \
+              --set redis.url=redis://redis:6379 \
+              --set api.config.registry.oci.gc.grace_hours=48)
+          echo "$out" | grep -q "grace_hours: 48" || { echo "FAIL: registry.oci.gc.grace_hours not rendered — the collector would use the code default and could sweep a push in flight in an environment with slower pushes (#1419)"; exit 1; }
+          # Nothing expires by age, so there is no retention key to assert. What
+          # must hold is the opposite: a mirrored image is NOT expired on a
+          # schedule, because it is the copy that keeps this cache answering when
+          # upstream is unreachable (#1419).
+          if echo "$out" | grep -q "oci_mirror_retention_days"; then
+            echo "FAIL: a scheduled mirror-expiry key is back. Deleting a cached image on a timer cannot make it fresher and discards the fallback needed when upstream is down (#1419)"; exit 1
+          fi
+          echo "OCI GC config renders OK"
       - name: Local dev values render
         run: |
           out=$(docker run --rm -v "$PWD:/chart" -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \
