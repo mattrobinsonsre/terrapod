@@ -151,9 +151,21 @@ A blob is collected when no manifest references it any more. That is the only
 condition, and it is what makes the shared-layer case safe: a base layer two
 images share stays until the second of them goes.
 
-In practice that means collection reclaims **superseded mirrored content** —
-layers left behind when a tag moved upstream — and **abandoned uploads**, blobs
-from a push that never sent its manifest.
+A layer becomes orphaned in exactly two ways, and both are consequences of
+something else rather than of a timer:
+
+1. **A pull-through cached image is refreshed from upstream.** The tag moves, the
+   superseded manifest stops referencing its layers, and any that no other image
+   still needs are now orphaned.
+2. **An image is removed from the private registry.** Same result, initiated by
+   an operator rather than by upstream.
+
+A layer is orphaned once **all** references to it from any image are gone — not
+some, and never because of its own age or when it was last served. Until then it
+belongs to something, whoever put it there and however long ago.
+
+Abandoned uploads are the third thing collected: blobs from a push that sent its
+layers and never its manifest, so they were never referenced at all.
 
 **An image you pushed is never expired by age.** It exists nowhere else, and a
 registry that quietly eats the images you put in it is not a registry. Only its

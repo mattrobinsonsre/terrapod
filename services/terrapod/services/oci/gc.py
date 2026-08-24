@@ -30,8 +30,12 @@ away the copy that keeps this cache answering at the exact moment upstream is
 unreachable, which for a registry whose reason to exist is restricted networks
 is precisely backwards.
 
-So a moved tag is what un-references an old mirrored manifest, and only then do
-its blobs become this collector's business.
+A layer becomes this collector's business in exactly two ways, both consequences
+of something else rather than of a timer: a **pull-through cached image is
+refreshed from upstream**, so the superseded manifest stops referencing its
+layers; or an **image is removed from the private registry** by an operator.
+Either way it is orphaned only once *all* references to it from any image are
+gone — not some, and never because of its own age.
 
 **A layer lives exactly as long as some manifest references it, and nothing
 else may enter into that.** Not its age, not when it was last served. A layer is
