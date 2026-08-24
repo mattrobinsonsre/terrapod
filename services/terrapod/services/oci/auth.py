@@ -22,65 +22,28 @@ one run — see #1407 §9.
 Bearer is accepted too, so ``curl`` and the Terrapod SDK can reach the surface
 with the header they already send.
 
+Header parsing lives in :mod:`terrapod.api.credentials`, shared with the
+package-cache proxies, which need Basic for pip and Bearer for npm (#1417). The
+*error shape* stays here and is not shared: this surface must answer in the
+distribution spec's error envelope with a Basic challenge, or clients report an
+unhelpful "unknown error".
+
 The resolution order below deliberately mirrors
-:func:`terrapod.api.dependencies.authenticate_request`. It is not shared code
-because the two differ in both credential encoding and error shape — this one
-must answer in the spec's error envelope with a Basic challenge, or clients
-report an unhelpful "unknown error" — but any change to the credential *types*
-Terrapod accepts has to land in both.
+:func:`terrapod.api.dependencies.authenticate_request`; any change to the
+credential *types* Terrapod accepts has to land in both.
 """
 
 from __future__ import annotations
 
-import base64
-import binascii
-
 from fastapi import Request
 
+from terrapod.api.credentials import extract_credential
 from terrapod.api.dependencies import AuthenticatedUser
 from terrapod.services.oci.errors import UNAUTHORIZED, OCIError
 
 #: Sent on a 401 so a client knows to retry with credentials. Docker will not
 #: prompt for, or send, credentials without a challenge it recognises.
 BASIC_CHALLENGE = 'Basic realm="terrapod"'
-
-
-def extract_credential(request: Request) -> str | None:
-    """Pull the bearer-equivalent credential out of an Authorization header.
-
-    Returns ``None`` when the header is absent or unusable, so the caller can
-    decide whether anonymous access is permitted for that route rather than
-    having the decision made here.
-    """
-    header = request.headers.get("authorization", "")
-    if not header:
-        return None
-
-    scheme, _, value = header.partition(" ")
-    scheme = scheme.lower()
-
-    if scheme == "bearer":
-        return value.strip() or None
-
-    if scheme == "basic":
-        try:
-            decoded = base64.b64decode(value.strip(), validate=True).decode("utf-8")
-        except (binascii.Error, UnicodeDecodeError, ValueError):
-            # Malformed base64 is indistinguishable from a wrong password as far
-            # as the client is concerned, and saying which would be a small
-            # oracle. Treated as "no credential".
-            return None
-        # Split on the FIRST colon. RFC 7617 forbids a colon in the userid and
-        # permits one in the password, so everything after the first separator
-        # is the password — which matters immediately: a runner token is
-        # `runtok:{run}:{ttl}:{ts}:{sig}` and splitting on the last colon would
-        # hand back only the signature.
-        _username, sep, password = decoded.partition(":")
-        if not sep:
-            return None
-        return password.strip() or None
-
-    return None
 
 
 async def authenticate_oci(request: Request) -> AuthenticatedUser:
