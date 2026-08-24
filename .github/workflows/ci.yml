@@ -935,6 +935,29 @@ jobs:
             echo "FAIL: a join token rendered as a literal value instead of a secretKeyRef (#1411)"; exit 1
           fi
           echo "Multi-pool bootstrap renders with tokens by secretKeyRef OK"
+      - name: Engine gates render, including false (#1429)
+        run: |
+          out=$(docker run --rm -v "$PWD:/chart" -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \
+            template terrapod helm/terrapod \
+              --namespace terrapod \
+              --set postgresql.url=postgresql+asyncpg://t:t@db:5432/terrapod \
+              --set redis.url=redis://redis:6379)
+          echo "$out" | grep -q "engines:" || { echo "FAIL: the engines block did not render — both gates would fall back to the code default and an operator could not switch Ansible or Pulumi off at all (#1429)"; exit 1; }
+          # `false` is the whole point of these keys, and Helm's `with` treats it
+          # as empty — a template using it drops the key silently, the code default
+          # (true) wins, and an operator who switched an engine off still has it.
+          off=$(docker run --rm -v "$PWD:/chart" -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \
+            template terrapod helm/terrapod \
+              --namespace terrapod \
+              --set postgresql.url=postgresql+asyncpg://t:t@db:5432/terrapod \
+              --set redis.url=redis://redis:6379 \
+              --set api.config.engines.ansible.enabled=false \
+              --set api.config.engines.pulumi.enabled=false)
+          echo "$off" | grep -qE "ansible:\s*$" || { echo "FAIL: engines.ansible did not render when set false (#1429)"; exit 1; }
+          echo "$off" | grep -A1 -E "ansible:\s*$" | grep -q "enabled: false" || { echo "FAIL: engines.ansible.enabled=false rendered as something other than false — 'off' would silently mean 'on' (#1429)"; exit 1; }
+          echo "$off" | grep -A1 -E "pulumi:\s*$" | grep -q "enabled: false" || { echo "FAIL: engines.pulumi.enabled=false rendered as something other than false (#1429)"; exit 1; }
+          echo "Engine gates render OK, including false"
+
       - name: OCI garbage collection renders into config.yaml (#1419)
         run: |
           out=$(docker run --rm -v "$PWD:/chart" -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \

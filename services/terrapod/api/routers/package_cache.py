@@ -33,6 +33,7 @@ from terrapod.api.dependencies import AuthenticatedUser
 from terrapod.config import settings
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
+from terrapod.services.engine_gating import capability_enabled
 from terrapod.services.package_cache import npm, pypi
 from terrapod.services.package_cache.substrate import (
     NotFoundUpstream,
@@ -49,7 +50,10 @@ from terrapod.services.package_cache.substrate import (
 from terrapod.storage import get_storage
 from terrapod.storage.protocol import ObjectStore
 
-router = APIRouter(prefix="/package-cache", tags=["package-cache"])
+#: Split by ecosystem so each can be left unmounted independently. See
+#: `build_router` — a disabled ecosystem is not registered at all.
+pypi_router = APIRouter()
+npm_router = APIRouter()
 logger = get_logger(__name__)
 
 #: pip has no bearer option — credentials come from the index URL or `.netrc` —
@@ -126,15 +130,6 @@ async def authenticate_package_request(request: Request) -> AuthenticatedUser:
     raise _unauthorised()
 
 
-def _require(ecosystem: str) -> None:
-    """404 an ecosystem that is switched off, rather than half-serving it."""
-    cache = settings.registry.package_cache
-    if not cache.enabled:
-        raise HTTPException(status_code=404, detail="Package cache is not enabled")
-    if not getattr(cache, ecosystem).enabled:
-        raise HTTPException(status_code=404, detail=f"{ecosystem} proxy is not enabled")
-
-
 def _upstream_failure(exc: Exception) -> HTTPException:
     """Map a fetch failure onto a status a client can act on.
 
@@ -157,7 +152,7 @@ def _upstream_failure(exc: Exception) -> HTTPException:
 # and therefore cannot be misconfigured into emitting links nobody can reach.
 
 
-@router.get("/pypi/simple/{project}/")
+@pypi_router.get("/pypi/simple/{project}/")
 async def pypi_index(
     project: str,
     request: Request,
@@ -165,7 +160,6 @@ async def pypi_index(
     db: AsyncSession = Depends(get_db),
 ) -> Response:
     """The simple index for a project, with file links pointed at us."""
-    _require("pypi")
     normalised = pypi.normalise(project)
 
     if sealed():
@@ -202,7 +196,7 @@ async def pypi_index(
     return Response(content=pypi.render_html(document), media_type="text/html")
 
 
-@router.get("/pypi/simple/{project}/{filename}")
+@pypi_router.get("/pypi/simple/{project}/{filename}")
 async def pypi_file(
     project: str,
     filename: str,
@@ -211,7 +205,6 @@ async def pypi_file(
     storage: ObjectStore = Depends(get_storage),
 ) -> Response:
     """Serve an artifact, caching it from upstream on a miss."""
-    _require("pypi")
     normalised = pypi.normalise(project)
 
     record = await lookup_present(db, storage, pypi.ECOSYSTEM, normalised, filename)
@@ -282,7 +275,7 @@ def _npm_base(request: Request) -> str:
     return f"{base.rstrip('/')}/api/terrapod/v1/package-cache/npm"
 
 
-@router.get("/npm/{package:path}/-/{filename}")
+@npm_router.get("/npm/{package:path}/-/{filename}")
 async def npm_tarball(
     package: str,
     filename: str,
@@ -296,7 +289,6 @@ async def npm_tarball(
     backtracks to the last matching suffix, so `@scope/pkg/-/pkg-1.0.0.tgz`
     resolves to package `@scope/pkg` and this filename.
     """
-    _require("npm")
     name = npm.normalise(package)
 
     record = await lookup_present(db, storage, npm.ECOSYSTEM, name, filename)
@@ -317,7 +309,7 @@ async def npm_tarball(
     return await _redirect_to_object(storage, record.storage_key)
 
 
-@router.get("/npm/{package:path}")
+@npm_router.get("/npm/{package:path}")
 async def npm_packument(
     package: str,
     request: Request,
@@ -326,7 +318,6 @@ async def npm_packument(
     storage: ObjectStore = Depends(get_storage),
 ) -> Response:
     """The packument for a package, with tarball URLs pointed at us."""
-    _require("npm")
     name = npm.normalise(package)
 
     if sealed():
@@ -378,3 +369,27 @@ async def _redirect_to_object(storage: ObjectStore, key: str) -> Response:
     """
     presigned = await storage.presigned_get_url(key)
     return RedirectResponse(url=presigned.url, status_code=302)
+
+
+def build_router() -> APIRouter | None:
+    """The package-cache routes for the ecosystems this deployment offers (#1429).
+
+    Returns None when none of them are, so the application mounts nothing at all —
+    the routes do not exist, rather than existing and refusing. That is the
+    difference between a surface an operator has switched off and one that answers
+    every request with a 404 while still appearing in the schema, and it is what
+    keeps a terraform-only install free of endpoints it has no use for.
+
+    A factory rather than mutating a module-level router, so building the
+    application twice in one process (which the tests do constantly) cannot
+    accumulate duplicate routes.
+    """
+    aggregate = APIRouter(prefix="/package-cache", tags=["package-cache"])
+    mounted = False
+    if capability_enabled("pypi"):
+        aggregate.include_router(pypi_router)
+        mounted = True
+    if capability_enabled("npm"):
+        aggregate.include_router(npm_router)
+        mounted = True
+    return aggregate if mounted else None
