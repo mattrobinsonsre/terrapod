@@ -102,3 +102,45 @@ class TestTokenAlreadyRegisteredElsewhere:
             ).scalar_one()
             token = (await session.execute(select(AgentPoolToken))).scalar_one()
         assert token.pool_id == pool.id
+
+
+class TestPartialFailure:
+    """One bad pool must not hide the others, or take them down with it.
+
+    The pre-flight duplicate check catches a token shared *within* one batch. It
+    cannot see a token already registered from an earlier run, so that lands in
+    the loop — which is exactly the case the per-pool error handling exists for.
+    """
+
+    async def test_the_job_fails_but_the_good_pools_are_still_seeded(self, app) -> None:
+        await _seed(PoolSpec("existing", "already-used"))
+
+        # 'fresh' is fine; 'clashing' reuses the token 'existing' already holds.
+        async with get_db_session() as session, session.begin():
+            failures = []
+            for spec in (PoolSpec("fresh", "its-own"), PoolSpec("clashing", "already-used")):
+                try:
+                    await _bootstrap_pool(session, spec)
+                except RuntimeError as exc:
+                    failures.append(f"{spec.name}: {exc}")
+
+        # The healthy pool landed rather than being rolled back with the bad one,
+        # and the failure names which pool so it is actionable.
+        assert len(failures) == 1 and "clashing" in failures[0]
+        assert "fresh" in await _pool_names()
+
+    async def test_a_rerun_after_fixing_the_token_completes_the_work(self, app) -> None:
+        """Idempotency is what makes 'fix the Secret and re-run' a real answer."""
+        await _seed(PoolSpec("existing", "already-used"), PoolSpec("fresh", "its-own"))
+
+        with pytest.raises(RuntimeError):
+            await _seed(PoolSpec("clashing", "already-used"))
+
+        await _seed(
+            PoolSpec("existing", "already-used"),
+            PoolSpec("fresh", "its-own"),
+            PoolSpec("clashing", "now-its-own"),
+        )
+
+        assert await _pool_names() == ["clashing", "existing", "fresh"]
+        assert await _token_count() == 3
