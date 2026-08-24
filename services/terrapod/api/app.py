@@ -440,6 +440,22 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     # leaves a session row and its chunks behind, and only push access is needed
     # to do that repeatedly — so this is a storage-exhaustion control, not just
     # tidying. Hourly is ample against a timeout measured in hours.
+    # Warm-ahead (#1420). Registered when anything is warmable, since one handler
+    # serves all three ecosystems and each item re-checks its own gate.
+    if any(capability_enabled(c) for c in ("oci", "pypi", "npm")):
+
+        async def _cache_warm(payload: dict) -> None:
+            from terrapod.services.warm_ahead import WarmItem, run_job
+
+            items = [WarmItem(**i) for i in payload.get("items", [])]
+            await run_job(payload["job_id"], items)
+
+        register_trigger_handler(
+            "cache_warm",
+            handler=_cache_warm,
+            description="Warm the package and container caches ahead of a seal",
+        )
+
     if capability_enabled("oci"):
 
         async def _oci_upload_reaper() -> None:
@@ -1072,6 +1088,13 @@ def create_application() -> FastAPI:
     from terrapod.api.routers.binary_cache import router as binary_cache_router
 
     include_terrapod(binary_cache_router)
+
+    # Warm-ahead submission + status (#1420). One router for all three caches so
+    # a job's status stays reachable regardless of which of them is enabled.
+    if any(capability_enabled(c) for c in ("oci", "pypi", "npm")):
+        from terrapod.api.routers.cache_warm import router as cache_warm_router
+
+        include_terrapod(cache_warm_router)
 
     # Language package proxies — PyPI and npm (#1417). Native surface rather than
     # a root mount: both clients take their registry URL as configuration, so

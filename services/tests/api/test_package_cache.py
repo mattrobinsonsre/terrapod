@@ -336,14 +336,35 @@ class TestAuthenticationIsRequired:
         app = create_app()
         return [route for route in app.routes if "/package-cache/" in getattr(route, "path", "")]
 
+    #: path → (method, url, json body). The method matters: warming is a POST
+    #: (#1420), and issuing a GET against it answers 405 without ever consulting
+    #: the auth dependency — which would have looked like a passing auth test
+    #: while proving nothing about it.
     SAMPLES = {
-        "/api/terrapod/v1/package-cache/pypi/simple/{project}/": f"{BASE}/pypi/simple/flask/",
-        "/api/terrapod/v1/package-cache/pypi/simple/{project}/{filename}": (
-            f"{BASE}/pypi/simple/flask/flask-3.0.0.whl"
+        "/api/terrapod/v1/package-cache/pypi/simple/{project}/": (
+            "GET",
+            f"{BASE}/pypi/simple/flask/",
+            None,
         ),
-        "/api/terrapod/v1/package-cache/npm/{package:path}": f"{BASE}/npm/left-pad",
+        "/api/terrapod/v1/package-cache/pypi/simple/{project}/{filename}": (
+            "GET",
+            f"{BASE}/pypi/simple/flask/flask-3.0.0.whl",
+            None,
+        ),
+        "/api/terrapod/v1/package-cache/npm/{package:path}": (
+            "GET",
+            f"{BASE}/npm/left-pad",
+            None,
+        ),
         "/api/terrapod/v1/package-cache/npm/{package:path}/-/{filename}": (
-            f"{BASE}/npm/left-pad/-/left-pad-1.3.0.tgz"
+            "GET",
+            f"{BASE}/npm/left-pad/-/left-pad-1.3.0.tgz",
+            None,
+        ),
+        "/api/terrapod/v1/admin/package-cache/warm": (
+            "POST",
+            "/api/terrapod/v1/admin/package-cache/warm",
+            {"packages": [{"ecosystem": "pypi", "name": "requests"}]},
         ),
     }
 
@@ -352,20 +373,33 @@ class TestAuthenticationIsRequired:
         missing = [r.path for r in self._routes() if r.path not in self.SAMPLES]
         assert not missing, f"add a sample request for: {missing}"
 
-    @pytest.mark.parametrize("path", sorted(SAMPLES.values()))
-    async def test_anonymous_is_rejected(self, path: str) -> None:
+    @pytest.mark.parametrize("sample", sorted(SAMPLES.values()))
+    async def test_anonymous_is_rejected(self, sample: tuple) -> None:
+        method, path, body = sample
         app = create_app()  # no auth override — the real dependency runs
+        # The admin route resolves a user before deciding, which needs a session.
+        # The proxy routes refuse before touching the database, so this changes
+        # nothing for them.
+        app.dependency_overrides[get_db] = lambda: AsyncMock()
         async with await _client(app) as c:
-            r = await c.get(path)
+            r = await c.request(method, path, json=body)
 
+        if method != "GET":
+            # An admin route answers 403 rather than the proxy's Basic challenge:
+            # it is not a route pip or npm ever calls, so there is nothing to
+            # challenge. What matters is that it refuses.
+            assert r.status_code in (401, 403)
+            return
         assert r.status_code == 401
         # pip has no bearer option, so the challenge must name Basic or it will
         # not retry with the credentials it was given.
         assert "Basic" in r.headers.get("www-authenticate", "")
 
-    @pytest.mark.parametrize("path", sorted(SAMPLES.values()))
-    async def test_a_bad_credential_is_rejected(self, path: str) -> None:
+    @pytest.mark.parametrize("sample", sorted(SAMPLES.values()))
+    async def test_a_bad_credential_is_rejected(self, sample: tuple) -> None:
+        method, path, body = sample
         app = create_app()
+        app.dependency_overrides[get_db] = lambda: AsyncMock()
         header = base64.b64encode(b"user:not-a-real-token").decode()
 
         @asynccontextmanager
@@ -381,9 +415,11 @@ class TestAuthenticationIsRequired:
             patch("terrapod.auth.sessions.get_session", new=AsyncMock(return_value=None)),
         ):
             async with await _client(app) as c:
-                r = await c.get(path, headers={"Authorization": f"Basic {header}"})
+                r = await c.request(
+                    method, path, json=body, headers={"Authorization": f"Basic {header}"}
+                )
 
-        assert r.status_code == 401
+        assert r.status_code in (401, 403)
 
 
 class TestSealed:
