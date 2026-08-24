@@ -60,10 +60,12 @@ export OCI_PASSWORD="$TOKEN"
 export OCI_TEST_PULL=1
 export OCI_TEST_PUSH=1
 export OCI_TEST_CONTENT_DISCOVERY=1
-# Content management (blob/manifest DELETE) is deliberately not implemented —
-# deletion is the garbage collector's job, not a client's. Enabling this would
-# report failures for a decision rather than a defect.
-export OCI_TEST_CONTENT_MANAGEMENT=0
+# Content management: manifest and tag deletion (#1423). Blob deletion is
+# declined with 405, which the suite accepts and accounts for — blobs here are
+# content-addressed and shared, so deleting one directly would break every
+# manifest still referencing those bytes. Deleting the manifest expresses the
+# same intent safely, and the collector reclaims what nothing needs.
+export OCI_TEST_CONTENT_MANAGEMENT=1
 export OCI_HIDE_SKIPPED_WORKFLOWS=1
 
 /tmp/oci-conformance.test
