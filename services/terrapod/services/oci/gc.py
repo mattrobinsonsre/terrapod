@@ -223,10 +223,17 @@ async def _sweep_repository(
     for link, blob in linked.all():
         if blob.digest in reachable:
             continue
-        # The in-flight push guard. Blobs land before the manifest that
-        # references them, so anything recent is presumed to belong to a push
-        # that has not finished rather than to no one.
-        if blob.cached_at > cutoff:
+        # The in-flight push guard, and it keys on the age of the **link**
+        # rather than of the blob.
+        #
+        # The hazard is content that has arrived in this repository but whose
+        # manifest has not landed yet, and a cross-repository mount produces
+        # exactly that with an old blob: the client mounts a layer that has
+        # existed for months, then pushes the manifest. Judging by blob age
+        # would leave that window unprotected and delete a layer out from
+        # under a push that is still running — the client then fails its
+        # manifest PUT for content the registry just confirmed it holds.
+        if link.created_at > cutoff:
             continue
         await db.delete(link)
         result.blobs_deleted += 1
