@@ -12,9 +12,29 @@ for every public surface below.
 
 | Bump | Meaning |
 |---|---|
-| **PATCH** (`0.58.0 → 0.58.1`) | Bug fixes and security fixes only. No new surface, no behaviour change beyond fixing the bug. Always safe to take. |
+| **PATCH** (`0.58.0 → 0.58.1`) | Bug fixes and security fixes, plus **opt-in configuration** that changes nothing until you set it. No behaviour change for an existing configuration, no new API surface, no schema migration. Always safe to take. |
 | **MINOR** (`0.58.0 → 0.59.0`) | New, **backward-compatible** features. Existing routes, response attributes, wire protocol, SDK methods, Helm values, and config keys keep working unchanged. Additive only. Safe to take without config changes. |
 | **MAJOR** (`0.x → 1.0`, `1.x → 2.0`) | The only release that may contain a **breaking change** to a stable surface — and only after the deprecation window below. Read the migration notes before upgrading. |
+
+> **What "opt-in configuration" means in a PATCH, and what it does not.** A patch
+> may add a Helm value, a config key or an environment variable **whose default
+> leaves the deployment behaving exactly as before**. The test is not whether a
+> release adds surface; it is whether taking it can change anything for an
+> operator who does not touch their values. An unset key cannot.
+>
+> This is narrower than it sounds, and the exclusions are the point. A patch
+> still may not add an API route or a response attribute (a consumer running an
+> older version would face a surface that appears and disappears across a patch),
+> change the runner or listener wire protocol, carry a schema migration, or alter
+> what any existing configuration does. Those remain MINOR.
+>
+> The earlier wording said "no new surface", which conflated *adding a key* with
+> *being risky to take* — and they are not the same thing. It also made the
+> honest fix for a gap in an older release line impossible to ship there: an
+> operator on the previous minor could be left with a mechanism that only works
+> for one of something, told the fix exists, and offered it only via a minor
+> carrying a release of unrelated features. Where the fix is a defaulted-off key,
+> that trade is not worth making.
 
 > **The one exception: closing a security hole.** A MINOR may *tighten* a
 > permission on a surface that was wrongly open, because leaving it open is
