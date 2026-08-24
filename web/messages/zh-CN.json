@@ -974,7 +974,8 @@
       "runTaskTemplates": "运行任务模板（在每个新工作区上创建）",
       "notificationTemplates": "通知模板（在每个新工作区上创建）",
       "saving": "正在保存...",
-      "previewTitle": "遍历仓库并预览此规则将会创建哪些工作区 — 不会持久化"
+      "previewTitle": "遍历仓库并预览此规则将会创建哪些工作区 — 不会持久化",
+      "parallelism": "并行度"
     },
     "table": {
       "name": "名称",
@@ -2290,7 +2291,9 @@
       "triggerPrefixesNone": "无（使用工作目录）",
       "driftIgnoreRules": "漂移忽略规则",
       "driftIgnoreRulesHint": "由漂移分类器抑制的、支持通配符的 Terraform 地址 + 属性路径。<star></star> 匹配零个或多个非 <dot></dot> 字符（跨越 <n></n> 个索引）；<starIdx></starIdx> 匹配任意方括号索引。没有属性后缀的裸地址会静默该资源的任何更改 — 包括销毁。仅影响漂移，不影响常规 plan/apply。完整语法见 <docs>drift-ignore-rules.md</docs>。",
-      "driftIgnoreRulesNone": "无（每个计划差异都计为漂移）"
+      "driftIgnoreRulesNone": "无（每个计划差异都计为漂移）",
+      "parallelism": "并行度",
+      "parallelismTitle": "同时执行的操作数 (1-256)。默认值为 10。"
     },
     "vcsWorkflowWarning": {
       "title": "授权已委托给您的 VCS 仓库。",

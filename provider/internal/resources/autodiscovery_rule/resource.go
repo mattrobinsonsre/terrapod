@@ -24,6 +24,7 @@
 //	"execution-backend"  -> execution_backend   (string, optional, default "tofu")
 //	"agent-pool-id"      -> agent_pool_id       (string, optional)
 //	"terraform-version"  -> terraform_version   (string, optional, default "1.11")
+//	"parallelism"        -> parallelism
 //	"resource-cpu"       -> resource_cpu        (string, optional, default "1")
 //	"resource-memory"    -> resource_memory     (string, optional, default "2Gi")
 //	"auto-apply"         -> auto_apply          (bool, optional, default false)
@@ -64,6 +65,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -96,6 +98,7 @@ type autodiscoveryRuleModel struct {
 	AgentPoolID       types.String `tfsdk:"agent_pool_id"`
 	TerraformVersion  types.String `tfsdk:"terraform_version"`
 	ResourceCPU       types.String `tfsdk:"resource_cpu"`
+	Parallelism       types.Int64  `tfsdk:"parallelism"`
 	ResourceMemory    types.String `tfsdk:"resource_memory"`
 	AutoApply         types.Bool   `tfsdk:"auto_apply"`
 	AutoApplyMode     types.String `tfsdk:"auto_apply_mode"`
@@ -234,6 +237,15 @@ func (r *autodiscoveryRuleResource) Schema(_ context.Context, _ resource.SchemaR
 				Optional:    true,
 				Computed:    true,
 				Default:     stringdefault.StaticString("1.11"),
+			},
+			"parallelism": schema.Int64Attribute{
+				Description: "How many operations the engine performs at once on " +
+					"workspaces this rule creates. Defaults to 10.",
+				Optional: true,
+				Computed: true,
+				PlanModifiers: []planmodifier.Int64{
+					int64planmodifier.UseStateForUnknown(),
+				},
 			},
 			"resource_cpu": schema.StringAttribute{
 				Description: "Default CPU request for runner Jobs in created workspaces. Defaults to \"1\".",
@@ -571,6 +583,9 @@ func buildAutodiscoveryRuleAttrs(m *autodiscoveryRuleModel) map[string]any {
 	if !m.TerraformVersion.IsNull() && !m.TerraformVersion.IsUnknown() {
 		attrs["terraform-version"] = m.TerraformVersion.ValueString()
 	}
+	if !m.Parallelism.IsNull() && !m.Parallelism.IsUnknown() {
+		attrs["parallelism"] = m.Parallelism.ValueInt64()
+	}
 	if !m.ResourceCPU.IsNull() && !m.ResourceCPU.IsUnknown() {
 		attrs["resource-cpu"] = m.ResourceCPU.ValueString()
 	}
@@ -730,6 +745,7 @@ func readAutodiscoveryRuleIntoModel(ctx context.Context, res *terrapod.Resource,
 	m.ExecutionBackend = types.StringValue(terrapod.GetStringAttr(res, "execution-backend"))
 	m.AgentPoolID = types.StringValue(terrapod.GetStringAttr(res, "agent-pool-id"))
 	m.TerraformVersion = types.StringValue(terrapod.GetStringAttr(res, "terraform-version"))
+	m.Parallelism = types.Int64Value(terrapod.GetIntAttr(res, "parallelism"))
 	m.ResourceCPU = types.StringValue(terrapod.GetStringAttr(res, "resource-cpu"))
 	m.ResourceMemory = types.StringValue(terrapod.GetStringAttr(res, "resource-memory"))
 	m.AutoApply = types.BoolValue(terrapod.GetBoolAttr(res, "auto-apply"))

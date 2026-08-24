@@ -761,6 +761,7 @@ class RunnerListener:
             execution_hooks=execution_hooks,
             git_auth=git_auth,
             resource_cpu=attrs.get("resource-cpu", "1"),
+            parallelism=attrs.get("parallelism", 10),
             resource_memory=attrs.get("resource-memory", "2Gi"),
             terraform_version=attrs.get("terraform-version", ""),
             execution_backend=attrs.get("execution-backend", "tofu"),

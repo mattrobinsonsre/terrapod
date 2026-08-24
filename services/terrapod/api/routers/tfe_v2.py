@@ -72,6 +72,7 @@ from terrapod.services import (
     pool_set,
     run_service,
 )
+from terrapod.services.parallelism import DEFAULT_PARALLELISM, validate_parallelism
 from terrapod.services.pool_rbac_service import resolve_pool_capabilities_for
 from terrapod.services.workspace_name import validate_workspace_name
 from terrapod.services.workspace_rbac_service import (
@@ -278,6 +279,14 @@ def _validate_workspace_name(name: str) -> str:
     """
     try:
         return validate_workspace_name(name)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+
+def _validate_parallelism(raw: object) -> int:
+    """HTTP wrapper over the canonical rule in `services.parallelism`."""
+    try:
+        return validate_parallelism(raw)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 
@@ -762,6 +771,7 @@ def _workspace_json(
                 "working-directory": ws.working_directory,
                 "locked": ws.locked,
                 "resource-cpu": ws.resource_cpu,
+                "parallelism": ws.parallelism,
                 "resource-memory": ws.resource_memory,
                 "vcs-repo-url": ws.vcs_repo_url,
                 "vcs-branch": ws.vcs_branch,
@@ -1269,6 +1279,7 @@ async def create_workspace(
         terragrunt_version=(attrs.get("terragrunt-version") or "1.0"),
         working_directory=_sanitize_working_directory(attrs.get("working-directory", "")),
         resource_cpu=attrs.get("resource-cpu", "1"),
+        parallelism=_validate_parallelism(attrs.get("parallelism", DEFAULT_PARALLELISM)),
         resource_memory=attrs.get("resource-memory", "2Gi"),
         labels=validate_labels(attrs.get("labels", {})),
         owner_email=user.email,
@@ -1765,6 +1776,8 @@ async def update_workspace(
         ws.terragrunt_version = attrs["terragrunt-version"] or "1.0"
     if "working-directory" in attrs:
         ws.working_directory = _sanitize_working_directory(attrs["working-directory"])
+    if "parallelism" in attrs:
+        ws.parallelism = _validate_parallelism(attrs["parallelism"])
     if "resource-cpu" in attrs:
         ws.resource_cpu = attrs["resource-cpu"]
     if "resource-memory" in attrs:

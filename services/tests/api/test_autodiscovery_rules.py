@@ -46,6 +46,7 @@ def _mock_rule(
     r.agent_pool_id = None
     r.terraform_version = "1.11"
     r.resource_cpu = "1"
+    r.parallelism = 10
     r.resource_memory = "2Gi"
     r.auto_apply = False
     r.on_directory_delete = "flag"

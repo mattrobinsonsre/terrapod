@@ -974,7 +974,8 @@
       "runTaskTemplates": "Plantillas de tareas de ejecución (creadas en cada nuevo espacio de trabajo)",
       "notificationTemplates": "Plantillas de notificación (creadas en cada nuevo espacio de trabajo)",
       "saving": "Guardando...",
-      "previewTitle": "Recorrer el repositorio y previsualizar qué espacios de trabajo CREARÍA esta regla — sin persistencia"
+      "previewTitle": "Recorrer el repositorio y previsualizar qué espacios de trabajo CREARÍA esta regla — sin persistencia",
+      "parallelism": "Paralelismo"
     },
     "table": {
       "name": "Nombre",
@@ -2290,7 +2291,9 @@
       "triggerPrefixesNone": "Ninguno (usa el directorio de trabajo)",
       "driftIgnoreRules": "Reglas de ignorar desviación",
       "driftIgnoreRulesHint": "Rutas de dirección de Terraform + atributo compatibles con globs, suprimidas por el clasificador de desviación. <star></star> coincide con cero o más caracteres que no sean <dot></dot> (abarca <n></n> índices); <starIdx></starIdx> coincide con cualquier índice entre corchetes. Una dirección simple sin sufijo de atributo silencia cualquier cambio en ese recurso — incluidas las destrucciones. Solo afecta a la desviación, no al plan/apply normal. Consulte <docs>drift-ignore-rules.md</docs> para la gramática completa.",
-      "driftIgnoreRulesNone": "Ninguna (cada diferencia del plan cuenta como desviación)"
+      "driftIgnoreRulesNone": "Ninguna (cada diferencia del plan cuenta como desviación)",
+      "parallelism": "Paralelismo",
+      "parallelismTitle": "Cuántas operaciones se ejecutan a la vez (1-256). Predeterminado: 10."
     },
     "vcsWorkflowWarning": {
       "title": "Autorización delegada a su repositorio VCS.",

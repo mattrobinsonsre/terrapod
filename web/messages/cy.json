@@ -974,7 +974,8 @@
       "runTaskTemplates": "Templedi tasg rhediad (crëir ar bob gweithfan newydd)",
       "notificationTemplates": "Templedi hysbysu (crëir ar bob gweithfan newydd)",
       "saving": "Wrthi'n cadw...",
-      "previewTitle": "Cerdded y storfa a rhagolygu pa weithfannau y BYDDAI'r rheol hon yn eu creu — dim cadw"
+      "previewTitle": "Cerdded y storfa a rhagolygu pa weithfannau y BYDDAI'r rheol hon yn eu creu — dim cadw",
+      "parallelism": "Cyfochredd"
     },
     "table": {
       "name": "Enw",
@@ -2290,7 +2291,9 @@
       "triggerPrefixesNone": "Dim (yn defnyddio'r cyfeiriadur gwaith)",
       "driftIgnoreRules": "Rheolau Anwybyddu Drifft",
       "driftIgnoreRulesHint": "Llwybrau cyfeiriad Terraform + priodwedd sy'n ymwybodol o globiau a atalir gan y dosbarthwr drifft. Mae <star></star> yn cyfateb i sero neu ragor o nodau nad ydynt yn <dot></dot> (yn rhychwantu <n></n> mynegai); mae <starIdx></starIdx> yn cyfateb i unrhyw fynegai mewn cromfachau. Mae cyfeiriad moel heb ôl-ddodiad priodwedd yn distewi unrhyw newid i'r adnodd hwnnw — gan gynnwys dinistriadau. Yn effeithio ar ddrifft yn unig, nid cynllun/gweithredu arferol. Gweler <docs>drift-ignore-rules.md</docs> am y gramadeg llawn.",
-      "driftIgnoreRulesNone": "Dim (mae pob gwahaniaeth cynllun yn cyfrif fel drifft)"
+      "driftIgnoreRulesNone": "Dim (mae pob gwahaniaeth cynllun yn cyfrif fel drifft)",
+      "parallelism": "Cyfochredd",
+      "parallelismTitle": "Sawl gweithred sy''n rhedeg ar yr un pryd (1-256). Rhagosodiad 10."
     },
     "vcsWorkflowWarning": {
       "title": "Awdurdodi wedi'i ddirprwyo i'ch storfa VCS.",

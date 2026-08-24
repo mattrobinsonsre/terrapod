@@ -38,6 +38,7 @@ interface AutodiscoveryRule {
     'agent-pool-id': string | null
     'terraform-version': string
     'resource-cpu': string
+    parallelism: number
     'resource-memory': string
     'auto-apply': boolean
     'auto-apply-mode'?: string
@@ -99,6 +100,7 @@ export default function AutodiscoveryPage() {
   const [executionBackend, setExecutionBackend] = useState<'tofu' | 'terraform'>('tofu')
   const [terraformVersion, setTerraformVersion] = useState('1.11')
   const [resourceCpu, setResourceCpu] = useState('1')
+  const [parallelism, setParallelism] = useState('10')
   const [resourceMemory, setResourceMemory] = useState('2Gi')
   const [autoApplyMode, setAutoApplyMode] = useState('never')
   const [onDirectoryDelete, setOnDirectoryDelete] = useState<'flag' | 'destroy'>('flag')
@@ -221,6 +223,7 @@ export default function AutodiscoveryPage() {
     setExecutionBackend((a['execution-backend'] as 'tofu' | 'terraform') || 'tofu')
     setTerraformVersion(a['terraform-version'])
     setResourceCpu(a['resource-cpu'])
+    setParallelism(String(a.parallelism ?? 10))
     setResourceMemory(a['resource-memory'])
     // Fall back to the boolean for a rule created before #1274.
     setAutoApplyMode(a['auto-apply-mode'] || (a['auto-apply'] ? 'always' : 'never'))
@@ -259,6 +262,7 @@ export default function AutodiscoveryPage() {
       'agent-pool-id': agentPoolId || null,
       'terraform-version': terraformVersion,
       'resource-cpu': resourceCpu,
+      parallelism: Number(parallelism),
       'resource-memory': resourceMemory,
       'auto-apply-mode': autoApplyMode,
       'on-directory-delete': onDirectoryDelete,
@@ -370,6 +374,7 @@ export default function AutodiscoveryPage() {
             'execution-backend': executionBackend,
             'terraform-version': terraformVersion,
             'resource-cpu': resourceCpu,
+      parallelism: Number(parallelism),
             'resource-memory': resourceMemory,
             'auto-apply-mode': autoApplyMode,
             labels,
@@ -596,6 +601,17 @@ export default function AutodiscoveryPage() {
                   <input
                     value={resourceCpu}
                     onChange={e => setResourceCpu(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-slate-300 mb-1">{t('form.parallelism')}</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={256}
+                    value={parallelism}
+                    onChange={e => setParallelism(e.target.value)}
                     className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
                   />
                 </div>

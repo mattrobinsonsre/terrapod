@@ -480,6 +480,7 @@ async def _check_unschedulable(db: AsyncSession, run: Run) -> None:
         run_id=str(run.id),
         status=run.status,
         resource_cpu=run.resource_cpu,
+        parallelism=run.parallelism,
         resource_memory=run.resource_memory,
     )
 

@@ -974,7 +974,8 @@
       "runTaskTemplates": "Modèles de tâches d'exécution (créés sur chaque nouvel espace de travail)",
       "notificationTemplates": "Modèles de notification (créés sur chaque nouvel espace de travail)",
       "saving": "Enregistrement...",
-      "previewTitle": "Parcourir le dépôt et prévisualiser quels espaces de travail cette règle CRÉERAIT — sans persistance"
+      "previewTitle": "Parcourir le dépôt et prévisualiser quels espaces de travail cette règle CRÉERAIT — sans persistance",
+      "parallelism": "Parallélisme"
     },
     "table": {
       "name": "Nom",
@@ -2290,7 +2291,9 @@
       "triggerPrefixesNone": "Aucun (utilise le répertoire de travail)",
       "driftIgnoreRules": "Règles d'ignorance de dérive",
       "driftIgnoreRulesHint": "Chemins d'adresses Terraform + attributs, avec prise en charge des globs, supprimés par le classificateur de dérive. <star></star> correspond à zéro ou plusieurs caractères non-<dot></dot> (couvre <n></n> indices) ; <starIdx></starIdx> correspond à tout indice entre crochets. Une adresse seule sans suffixe d'attribut fait taire toute modification de cette ressource — y compris les destructions. N'affecte que la dérive, pas le plan/apply normal. Voir <docs>drift-ignore-rules.md</docs> pour la grammaire complète.",
-      "driftIgnoreRulesNone": "Aucune (chaque écart de plan compte comme une dérive)"
+      "driftIgnoreRulesNone": "Aucune (chaque écart de plan compte comme une dérive)",
+      "parallelism": "Parallélisme",
+      "parallelismTitle": "Nombre d''opérations exécutées simultanément (1-256). Par défaut : 10."
     },
     "vcsWorkflowWarning": {
       "title": "Autorisation déléguée à votre dépôt VCS.",

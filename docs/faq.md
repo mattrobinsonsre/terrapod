@@ -163,7 +163,12 @@ so changing a workspace later doesn't disturb runs already in flight. A small
 workspace can run in a fraction of a CPU while a large, provider-heavy one gets
 several GB — you don't have to size a single shared worker for the worst case.
 If a run is OOM-killed, Terrapod surfaces the peak memory it reached and names
-the exact value to raise before retrying. See
+the exact value to raise before retrying.
+
+Each workspace also carries a `parallelism` setting (default `10`, terraform's own
+default), which is what turns that allocation into load — lower it to stay inside a
+provider's rate limit, or raise it for a large state on a well-resourced runner. It
+is one setting whichever engine the workspace runs. See
 [Per-workspace resources](architecture.md#per-workspace-resources).
 
 ## Does Terrapod estimate infrastructure costs?

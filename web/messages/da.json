@@ -974,7 +974,8 @@
       "runTaskTemplates": "Skabeloner for kørselsopgaver (oprettes på hvert nyt arbejdsområde)",
       "notificationTemplates": "Notifikationsskabeloner (oprettes på hvert nyt arbejdsområde)",
       "saving": "Gemmer...",
-      "previewTitle": "Gennemgå repoet og forhåndsvis, hvilke arbejdsområder denne regel VILLE oprette — ingen persistens"
+      "previewTitle": "Gennemgå repoet og forhåndsvis, hvilke arbejdsområder denne regel VILLE oprette — ingen persistens",
+      "parallelism": "Parallelitet"
     },
     "table": {
       "name": "Navn",
@@ -2290,7 +2291,9 @@
       "triggerPrefixesNone": "Ingen (bruger arbejdsmappe)",
       "driftIgnoreRules": "Regler for ignorering af afdrift",
       "driftIgnoreRulesHint": "Glob-bevidste Terraform-adresse- + attributstier, der undertrykkes af afdriftsklassificeringen. <star></star> matcher nul eller flere ikke-<dot></dot>-tegn (spænder over <n></n> indekser); <starIdx></starIdx> matcher ethvert indeks i firkantede parenteser. En bar adresse uden attributsuffiks lyddæmper enhver ændring af den ressource — inklusive nedrivninger. Påvirker kun afdrift, ikke almindelig plan/apply. Se <docs>drift-ignore-rules.md</docs> for den fulde grammatik.",
-      "driftIgnoreRulesNone": "Ingen (hver plan-diff tæller som afdrift)"
+      "driftIgnoreRulesNone": "Ingen (hver plan-diff tæller som afdrift)",
+      "parallelism": "Parallelitet",
+      "parallelismTitle": "Hvor mange handlinger der køres samtidigt (1-256). Standard 10."
     },
     "vcsWorkflowWarning": {
       "title": "Autorisation delegeret til dit VCS-repository.",

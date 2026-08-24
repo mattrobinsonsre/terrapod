@@ -48,6 +48,7 @@ def _mock_workspace(ws_id=None, **overrides):
     ws.locked = False
     ws.lock_id = None
     ws.resource_cpu = "1"
+    ws.parallelism = 10
     ws.resource_memory = "2Gi"
     ws.vcs_repo_url = ""
     ws.vcs_branch = ""

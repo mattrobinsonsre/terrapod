@@ -974,7 +974,8 @@
       "runTaskTemplates": "Run task templates (created on each new work-deck)",
       "notificationTemplates": "Notification templates (created on each new work-deck)",
       "saving": "Savin''...",
-      "previewTitle": "Walk th'' repo and preview which work-decks this rule WOULD create — nay persistence"
+      "previewTitle": "Walk th'' repo and preview which work-decks this rule WOULD create — nay persistence",
+      "parallelism": "Hands at Once"
     },
     "table": {
       "name": "Name",
@@ -2290,7 +2291,9 @@
       "triggerPrefixesNone": "None (uses workin'' directory)",
       "driftIgnoreRules": "Drift Ignore Rules",
       "driftIgnoreRulesHint": "Glob-aware Terraform address + attribute paths hushed by th'' drift classifier. <star></star> matches zero or more non-<dot></dot> chars (spans <n></n> indices); <starIdx></starIdx> matches any bracketed index. A bare address with no attribute suffix silences any change t'' that resource — includin'' sendin'' t'' Davy Jones. Affects drift only, not regular plan/apply. See <docs>drift-ignore-rules.md</docs> fer th'' full grammar.",
-      "driftIgnoreRulesNone": "None (every plan diff counts as drift)"
+      "driftIgnoreRulesNone": "None (every plan diff counts as drift)",
+      "parallelism": "Hands at Once",
+      "parallelismTitle": "How many deeds be done at once (1-256). Ten be the default, arr."
     },
     "vcsWorkflowWarning": {
       "title": "Authorization handed o''er t'' yer VCS repository.",

@@ -46,6 +46,7 @@ from terrapod.logging_config import get_logger
 from terrapod.services import pool_set, run_service
 from terrapod.services.capability_resolver import resolve_capabilities
 from terrapod.services.notification_service import VALID_TRIGGERS
+from terrapod.services.parallelism import validate_parallelism
 from terrapod.services.run_task_service import VALID_ENFORCEMENT_LEVELS, VALID_STAGES
 from terrapod.services.workspace_search_service import (
     WorkspaceFilterError,
@@ -69,6 +70,7 @@ _FIELD_MAP: dict[str, str] = {
     # NOTE: neither the agent-pool attributes nor `auto-apply-mode` are here —
     # each writes two columns from one input key, so they are validated
     # separately (_validate_pool_set / _validate_auto_apply below).
+    "parallelism": "parallelism",
     "resource-cpu": "resource_cpu",
     "resource-memory": "resource_memory",
     "var-files": "var_files",
@@ -295,6 +297,11 @@ def _validate_update_fields_for_test(update: dict) -> dict[str, Any]:
                 status_code=422,
                 detail="auto-apply must be true or false, not a string or number",
             )
+        if key == "parallelism":
+            try:
+                val = validate_parallelism(val)
+            except ValueError as e:
+                raise HTTPException(status_code=422, detail=str(e)) from e
         fields[attr] = val
     fields.update(_validate_auto_apply(update, fields))
     return fields
@@ -373,6 +380,11 @@ async def _validate_update(
         if key == "var-files":
             if not isinstance(val, list):
                 raise HTTPException(status_code=422, detail="var-files must be a list")
+        if key == "parallelism":
+            try:
+                val = validate_parallelism(val)
+            except ValueError as e:
+                raise HTTPException(status_code=422, detail=str(e)) from e
         fields[attr] = val
 
     fields.update(_validate_auto_apply(update, fields))

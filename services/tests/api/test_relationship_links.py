@@ -73,6 +73,7 @@ class TestAutodiscoveryRule:
             agent_pool_id=pool,
             terraform_version="1.12",
             resource_cpu="1",
+            parallelism=10,
             resource_memory="2Gi",
             auto_apply=False,
             on_directory_delete="flag",

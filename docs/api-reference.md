@@ -826,6 +826,7 @@ Run objects include peak resource usage + an abnormal-exit signal so the UI (and
 | Attribute | Type | Source | Description |
 |---|---|---|---|
 | `resource-cpu` | string | Workspace setting (snapshot) | CPU request applied to the Job (K8s quantity, e.g. `"1"`, `"500m"`). Limit is `2×` this |
+| `parallelism` | integer | Workspace setting (snapshot) | Concurrent operations the engine performs — `-parallelism` for terraform/tofu. Default `10`, minimum `1`, maximum `256` |
 | `resource-memory` | string | Workspace setting (snapshot) | Memory request applied to the Job (K8s quantity, e.g. `"2Gi"`). Limit is `2×` this |
 | `peak-memory-bytes` | integer or null | Runner (cgroup v2) | Peak resident memory observed during the run — `/sys/fs/cgroup/memory.peak` |
 | `peak-cpu-usec` | integer or null | Runner (cgroup v2) | Cumulative CPU time consumed by the run, microseconds — `usage_usec` from `/sys/fs/cgroup/cpu.stat`. **Captured but not surfaced in the UI** — see note below |

@@ -384,6 +384,7 @@ def _materialise_rule(**overrides):
         "execution_backend": "tofu",
         "terraform_version": "1.12",
         "resource_cpu": "1",
+        "parallelism": 10,
         "resource_memory": "2Gi",
         "auto_apply": True,
         "auto_apply_mode": "create_update",

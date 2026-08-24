@@ -974,7 +974,8 @@
       "runTaskTemplates": "実行タスクテンプレート（各新規ワークスペースに作成）",
       "notificationTemplates": "通知テンプレート（各新規ワークスペースに作成）",
       "saving": "保存中...",
-      "previewTitle": "リポジトリを走査し、このルールが作成するであろうワークスペースをプレビューします — 永続化なし"
+      "previewTitle": "リポジトリを走査し、このルールが作成するであろうワークスペースをプレビューします — 永続化なし",
+      "parallelism": "並列度"
     },
     "table": {
       "name": "名前",
@@ -2290,7 +2291,9 @@
       "triggerPrefixesNone": "なし（作業ディレクトリを使用）",
       "driftIgnoreRules": "ドリフト無視ルール",
       "driftIgnoreRulesHint": "ドリフト分類器によって抑制される、glob対応のTerraformアドレス + 属性パスです。<star></star>は非<dot></dot>文字の0個以上に一致します（<n></n>個のインデックスにまたがります）。<starIdx></starIdx>は任意の括弧付きインデックスに一致します。属性の接尾辞なしの単なるアドレスは、そのリソースへのあらゆる変更（破棄を含む）を抑制します。ドリフトのみに影響し、通常のplan/applyには影響しません。完全な文法については<docs>drift-ignore-rules.md</docs>を参照してください。",
-      "driftIgnoreRulesNone": "なし（すべてのプラン差分がドリフトとして扱われます）"
+      "driftIgnoreRulesNone": "なし（すべてのプラン差分がドリフトとして扱われます）",
+      "parallelism": "並列度",
+      "parallelismTitle": "同時に実行される操作の数 (1-256)。既定値は 10。"
     },
     "vcsWorkflowWarning": {
       "title": "認可はVCSリポジトリに委譲されます。",

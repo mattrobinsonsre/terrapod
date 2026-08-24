@@ -73,6 +73,7 @@ def build_job_spec(
     vars_secret_name: str = "",
     resource_cpu: str = "1",
     resource_memory: str = "2Gi",
+    parallelism: int = 10,
     timeout_minutes: int = 60,
     terraform_version: str = "",
     execution_backend: str = "",
@@ -112,6 +113,7 @@ def build_job_spec(
         terraform_vars: Terraform vars [{key, value, hcl}] — presence triggers
             the mounted tfvars volume; the entrypoint renders the file.
         resource_cpu: CPU request (e.g. "1", "500m").
+        parallelism: How many operations the engine runs at once (#1431).
         resource_memory: Memory request (e.g. "2Gi", "256Mi").
         timeout_minutes: Job timeout in minutes.
         terraform_version: Terraform/tofu version to use.
@@ -210,6 +212,10 @@ def build_job_spec(
         container_env.append({"name": "TP_ALLOW_EMPTY_APPLY", "value": "true"})
     if is_destroy:
         container_env.append({"name": "TP_DESTROY", "value": "true"})
+    # Always emitted, never only-when-non-default: the runner has no way to know
+    # the workspace's setting otherwise, and a default that drifts between API
+    # and runner across a version skew would be invisible (#1431).
+    container_env.append({"name": "TP_PARALLELISM", "value": str(parallelism)})
     # Cost estimation (#871). The runner defaults to enabled, so only emit the
     # env when the API instructs OFF; always ship the fallback region so a
     # resource whose region can't be resolved is priced consistently.

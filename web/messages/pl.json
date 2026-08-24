@@ -974,7 +974,8 @@
       "runTaskTemplates": "Szablony zadań przebiegu (tworzone na każdym nowym obszarze roboczym)",
       "notificationTemplates": "Szablony powiadomień (tworzone na każdym nowym obszarze roboczym)",
       "saving": "Zapisywanie...",
-      "previewTitle": "Przejdź przez repozytorium i wyświetl podgląd obszarów roboczych, które ta reguła BY utworzyła — bez zapisu"
+      "previewTitle": "Przejdź przez repozytorium i wyświetl podgląd obszarów roboczych, które ta reguła BY utworzyła — bez zapisu",
+      "parallelism": "Równoległość"
     },
     "table": {
       "name": "Nazwa",
@@ -2290,7 +2291,9 @@
       "triggerPrefixesNone": "Brak (używa katalogu roboczego)",
       "driftIgnoreRules": "Reguły ignorowania dryfu",
       "driftIgnoreRulesHint": "Ścieżki adresów Terraform + atrybutów obsługujące globy, tłumione przez klasyfikator dryfu. <star></star> dopasowuje zero lub więcej znaków innych niż <dot></dot> (obejmuje <n></n> indeksów); <starIdx></starIdx> dopasowuje dowolny indeks w nawiasach. Sam adres bez przyrostka atrybutu wycisza każdą zmianę tego zasobu — w tym niszczenie. Wpływa tylko na dryf, nie na zwykły plan/apply. Pełną gramatykę zobacz w <docs>drift-ignore-rules.md</docs>.",
-      "driftIgnoreRulesNone": "Brak (każda różnica planu liczy się jako dryf)"
+      "driftIgnoreRulesNone": "Brak (każda różnica planu liczy się jako dryf)",
+      "parallelism": "Równoległość",
+      "parallelismTitle": "Ile operacji wykonuje się jednocześnie (1-256). Domyślnie 10."
     },
     "vcsWorkflowWarning": {
       "title": "Autoryzacja delegowana do Twojego repozytorium VCS.",

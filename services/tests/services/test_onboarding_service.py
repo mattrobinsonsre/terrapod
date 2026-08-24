@@ -165,6 +165,7 @@ def _agent_ws():
         terragrunt_enabled=False,
         terragrunt_version="",
         resource_cpu="1",
+        parallelism=10,
         resource_memory="2Gi",
         name="ws",
     )

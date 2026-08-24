@@ -974,7 +974,8 @@
       "runTaskTemplates": "Ausführungsaufgaben-Vorlagen (auf jedem neuen Arbeitsbereich angelegt)",
       "notificationTemplates": "Benachrichtigungsvorlagen (auf jedem neuen Arbeitsbereich angelegt)",
       "saving": "Wird gespeichert...",
-      "previewTitle": "Das Repository durchlaufen und in der Vorschau zeigen, welche Arbeitsbereiche diese Regel anlegen WÜRDE — keine Persistenz"
+      "previewTitle": "Das Repository durchlaufen und in der Vorschau zeigen, welche Arbeitsbereiche diese Regel anlegen WÜRDE — keine Persistenz",
+      "parallelism": "Parallelität"
     },
     "table": {
       "name": "Name",
@@ -2290,7 +2291,9 @@
       "triggerPrefixesNone": "Keine (verwendet Arbeitsverzeichnis)",
       "driftIgnoreRules": "Drift-Ignore-Regeln",
       "driftIgnoreRulesHint": "Glob-fähige Terraform-Adress- und Attributpfade, die vom Drift-Klassifikator unterdrückt werden. <star></star> passt auf null oder mehr Zeichen außer <dot></dot> (umfasst <n></n>-Indizes); <starIdx></starIdx> passt auf jeden eingeklammerten Index. Eine bloße Adresse ohne Attributsuffix unterdrückt jede Änderung an dieser Ressource — einschließlich Löschungen. Betrifft nur den Drift, nicht das reguläre plan/apply. Die vollständige Grammatik finden Sie unter <docs>drift-ignore-rules.md</docs>.",
-      "driftIgnoreRulesNone": "Keine (jede Plan-Differenz zählt als Drift)"
+      "driftIgnoreRulesNone": "Keine (jede Plan-Differenz zählt als Drift)",
+      "parallelism": "Parallelität",
+      "parallelismTitle": "Wie viele Vorgänge gleichzeitig ausgeführt werden (1-256). Standard: 10."
     },
     "vcsWorkflowWarning": {
       "title": "Autorisierung an Ihr VCS-Repository delegiert.",

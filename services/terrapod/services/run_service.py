@@ -730,6 +730,7 @@ async def create_run(
         terragrunt_enabled=workspace.terragrunt_enabled,
         terragrunt_version=workspace.terragrunt_version,
         resource_cpu=workspace.resource_cpu,
+        parallelism=workspace.parallelism,
         resource_memory=workspace.resource_memory,
         pool_id=pool_id,
         pool_extra_ids=pool_extra_ids,

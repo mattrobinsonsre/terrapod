@@ -331,14 +331,31 @@ Pools are never auto-created. For initial deployment, the bootstrap job can opti
 
 ### Per-Workspace Resources
 
-Each workspace has `resource_cpu` and `resource_memory` columns:
+Each workspace has `resource_cpu`, `resource_memory` and `parallelism` columns:
 
 | Setting | Default | Description |
 |---|---|---|
 | `resource_cpu` | `1` | CPU request for runner Jobs |
 | `resource_memory` | `2Gi` | Memory request for runner Jobs |
+| `parallelism` | `10` | How many operations the engine performs at once |
 
-Limits are computed as 2x the requests automatically. Values are snapshotted to the `runs` table at run creation time so they remain stable even if the workspace is later modified.
+Limits are computed as 2x the requests automatically. All three are snapshotted to the `runs` table at run creation time so they remain stable even if the workspace is later modified.
+
+**Parallelism is the setting that turns the other two into load.** The CPU and memory above
+decide what a run is given; parallelism decides how hard it leans on it. A large state at high
+concurrency on a small runner is where runs go slow or get OOM-killed, and it is also the lever
+to reach for when a provider or upstream API rate-limits under concurrent calls — lowering it
+throttles the caller rather than resizing the machine.
+
+It is one setting for every engine, rendered into whichever flag applies: `-parallelism` for
+terraform/tofu, `--parallel` for Pulumi, `forks` for Ansible. The unit differs — the first two
+count concurrent resource operations, Ansible counts hosts — so read it as "how many things at
+once", and check the engine for which things.
+
+The default of 10 is terraform's own, chosen so that introducing the setting changed no existing
+workspace's behaviour. It is held explicitly rather than left to each engine because Pulumi
+derives its default from the CPU count: with CPU itself a per-workspace setting, resizing a
+runner would otherwise silently change concurrency with nothing in the configuration saying so.
 
 ---
 

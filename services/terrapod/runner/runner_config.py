@@ -64,6 +64,9 @@ class RunnerConfig:
     target_addrs: list[str]
     replace_addrs: list[str]
     var_files: list[str]
+    #: How many operations the engine runs at once (#1431). Set on every run
+    #: by the API, so the runner never has to know an engine's own default.
+    parallelism: int
     refresh: bool
     refresh_only: bool
     allow_empty_apply: bool
@@ -152,6 +155,7 @@ class RunnerConfig:
             replace_addrs=_json_list("TP_REPLACE_ADDRS"),
             var_files=_json_list("TP_VAR_FILES"),
             refresh=_bool("TP_REFRESH", default=True),
+            parallelism=_int("TP_PARALLELISM", 10),
             refresh_only=_bool("TP_REFRESH_ONLY"),
             allow_empty_apply=_bool("TP_ALLOW_EMPTY_APPLY"),
             destroy=_bool("TP_DESTROY"),

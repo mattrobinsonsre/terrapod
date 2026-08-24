@@ -296,6 +296,7 @@ field CreateWorkspaceRequest.ExecutionMode string `json:"execution-mode,omitempt
 field CreateWorkspaceRequest.Labels map[string]string `json:"labels,omitempty"`
 field CreateWorkspaceRequest.Name string `json:"name"`
 field CreateWorkspaceRequest.OwnerEmail string `json:"owner-email,omitempty"`
+field CreateWorkspaceRequest.Parallelism int64 `json:"parallelism,omitempty"`
 field CreateWorkspaceRequest.PlanExpirySeconds *int64 `json:"plan-expiry-seconds,omitempty"`
 field CreateWorkspaceRequest.ResourceCPU string `json:"resource-cpu,omitempty"`
 field CreateWorkspaceRequest.ResourceMemory string `json:"resource-memory,omitempty"`
@@ -635,6 +636,7 @@ field Run.ID string `json:"id"`
 field Run.IsDestroy bool `json:"is-destroy"`
 field Run.IsDriftDetection bool `json:"is-drift-detection"`
 field Run.Message string `json:"message,omitempty"`
+field Run.Parallelism int64 `json:"parallelism,omitempty"`
 field Run.PeakCPUUsec *int64 `json:"peak-cpu-usec,omitempty"`
 field Run.PeakMemoryBytes *int64 `json:"peak-memory-bytes,omitempty"`
 field Run.PlanOnly bool `json:"plan-only"`
@@ -836,6 +838,7 @@ field UpdateWorkspaceRequest.ExecutionBackend string `json:"execution-backend,om
 field UpdateWorkspaceRequest.ExecutionMode string `json:"execution-mode,omitempty"`
 field UpdateWorkspaceRequest.Labels map[string]string `json:"labels,omitempty"`
 field UpdateWorkspaceRequest.Name string `json:"name,omitempty"`
+field UpdateWorkspaceRequest.Parallelism int64 `json:"parallelism,omitempty"`
 field UpdateWorkspaceRequest.PlanExpirySeconds *int64 `json:"plan-expiry-seconds,omitempty"`
 field UpdateWorkspaceRequest.ResourceCPU string `json:"resource-cpu,omitempty"`
 field UpdateWorkspaceRequest.ResourceMemory string `json:"resource-memory,omitempty"`
@@ -971,6 +974,7 @@ field Workspace.LifecycleState string `json:"lifecycle-state,omitempty"`
 field Workspace.Locked bool `json:"locked"`
 field Workspace.Name string `json:"name"`
 field Workspace.OwnerEmail string `json:"owner-email,omitempty"`
+field Workspace.Parallelism int64 `json:"parallelism,omitempty"`
 field Workspace.PlanExpirySeconds *int64 `json:"plan-expiry-seconds,omitempty"`
 field Workspace.ResourceCPU string `json:"resource-cpu,omitempty"`
 field Workspace.ResourceMemory string `json:"resource-memory,omitempty"`

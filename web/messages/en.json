@@ -974,7 +974,8 @@
       "runTaskTemplates": "Run task templates (created on each new workspace)",
       "notificationTemplates": "Notification templates (created on each new workspace)",
       "saving": "Saving...",
-      "previewTitle": "Walk the repo and preview which workspaces this rule WOULD create — no persistence"
+      "previewTitle": "Walk the repo and preview which workspaces this rule WOULD create — no persistence",
+      "parallelism": "Parallelism"
     },
     "table": {
       "name": "Name",
@@ -2298,7 +2299,9 @@
       "triggerPrefixesNone": "None (uses working directory)",
       "driftIgnoreRules": "Drift Ignore Rules",
       "driftIgnoreRulesHint": "Glob-aware Terraform address + attribute paths suppressed by the drift classifier. <star></star> matches zero or more non-<dot></dot> chars (spans <n></n> indices); <starIdx></starIdx> matches any bracketed index. A bare address with no attribute suffix silences any change to that resource — including destroys. Affects drift only, not regular plan/apply. See <docs>drift-ignore-rules.md</docs> for the full grammar.",
-      "driftIgnoreRulesNone": "None (every plan diff counts as drift)"
+      "driftIgnoreRulesNone": "None (every plan diff counts as drift)",
+      "parallelism": "Parallelism",
+      "parallelismTitle": "How many operations run at once (1-256). Default 10."
     },
     "vcsWorkflowWarning": {
       "title": "Authorization delegated to your VCS repository.",

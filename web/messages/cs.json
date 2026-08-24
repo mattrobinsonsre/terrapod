@@ -974,7 +974,8 @@
       "runTaskTemplates": "Šablony run tasků (vytvořené na každém novém pracovním prostoru)",
       "notificationTemplates": "Šablony oznámení (vytvořené na každém novém pracovním prostoru)",
       "saving": "Ukládání...",
-      "previewTitle": "Projděte repozitář a zobrazte náhled, které pracovní prostory by toto pravidlo VYTVOŘILO — bez uložení"
+      "previewTitle": "Projděte repozitář a zobrazte náhled, které pracovní prostory by toto pravidlo VYTVOŘILO — bez uložení",
+      "parallelism": "Paralelismus"
     },
     "table": {
       "name": "Název",
@@ -2290,7 +2291,9 @@
       "triggerPrefixesNone": "Žádné (používá pracovní adresář)",
       "driftIgnoreRules": "Pravidla ignorování odchýlení",
       "driftIgnoreRulesHint": "Glob-aware cesty Terraform adres + atributů potlačené klasifikátorem odchýlení. <star></star> odpovídá nule nebo více ne-<dot></dot> znakům (překlenuje <n></n> indexů); <starIdx></starIdx> odpovídá jakémukoli indexu v hranatých závorkách. Holá adresa bez přípony atributu umlčí jakoukoli změnu tohoto prostředku — včetně zničení. Ovlivňuje pouze odchýlení, nikoli běžný plan/apply. Úplnou gramatiku viz <docs>drift-ignore-rules.md</docs>.",
-      "driftIgnoreRulesNone": "Žádná (každý rozdíl v plánu se počítá jako odchýlení)"
+      "driftIgnoreRulesNone": "Žádná (každý rozdíl v plánu se počítá jako odchýlení)",
+      "parallelism": "Paralelismus",
+      "parallelismTitle": "Kolik operací běží současně (1-256). Výchozí hodnota 10."
     },
     "vcsWorkflowWarning": {
       "title": "Autorizace delegována na váš VCS repozitář.",
