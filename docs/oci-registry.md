@@ -151,20 +151,32 @@ A blob is collected when no manifest references it any more. That is the only
 condition, and it is what makes the shared-layer case safe: a base layer two
 images share stays until the second of them goes.
 
-In practice that means collection reclaims **mirrored images past their retention
-window**, and **abandoned uploads** — blobs from a push that never sent its
-manifest. Pushed images are not reclaimed, because nothing un-references them
-(see above).
+In practice that means collection reclaims **superseded mirrored content** —
+layers left behind when a tag moved upstream — and **abandoned uploads**, blobs
+from a push that never sent its manifest.
 
 **An image you pushed is never expired by age.** It exists nowhere else, and a
 registry that quietly eats the images you put in it is not a registry. Only its
 genuinely unreferenced blobs are ever collected.
 
-**A mirrored image is**, on last access, after
-`artifact_retention.oci_mirror_retention_days` (30 by default) — it came from an
-upstream and can be fetched again, so it is a cache like any other. On a sealed
-node (`registry.cache_only`) nothing is expired at all, because nothing can be
-re-fetched.
+**Nor is a mirrored one**, which is the opposite of what a disk-usage instinct
+suggests. Deleting a cached image on a schedule cannot make anything fresher —
+the next pull asks upstream regardless — and it discards the copy that keeps this
+cache answering at the moment upstream is unreachable. For a registry whose
+reason to exist is restricted networks, that is exactly backwards: a stale image
+that still runs beats a correct one you cannot fetch.
+
+Freshness is handled where it belongs, on the read path. A mirrored tag past its
+TTL is revalidated when somebody pulls it, replaced only once upstream confirms a
+new digest, and served stale if upstream cannot be reached. Nothing is deleted to
+achieve it — the superseded manifest simply stops being referenced.
+
+**And a layer is never evicted on its own terms.** It lives exactly as long as
+some manifest references it. Layers are shared by construction, so age or
+last-use would say nothing useful about one: the base image everything is built
+on is the most-served object in the store and is also reachable from images
+nobody has pulled in months. Removing it because it looked idle would break every
+image that needs it.
 
 **Signatures, SBOMs and attestations survive.** A referrer usually carries no tag
 of its own, so a naive "untagged means unreachable" sweep would destroy
@@ -211,7 +223,6 @@ mid-flight would destroy real work.
 | `api.config.registry.oci.upload_session_timeout_hours` | `24` | How long an in-progress upload may sit untouched before it is reaped with its chunks. |
 | `api.config.registry.oci.gc.enabled` | `true` | Collect unreferenced blobs. Off means the registry only ever grows — there is no delete API. |
 | `api.config.registry.oci.gc.grace_hours` | `24` | How long newly-arrived content is protected, so a push in flight is never collected. |
-| `api.config.artifact_retention.oci_mirror_retention_days` | `30` | Days since last access before a **mirrored** image is removed. Pushed images are never expired by age. |
 | `api.config.registry.cache_only` | `false` | Seals upstream fetching for every cache, this one included. |
 
 ## Verifying a deployment

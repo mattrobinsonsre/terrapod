@@ -109,6 +109,27 @@ def _image(*layer_digests: str) -> dict:
     }
 
 
+async def _age_all_manifests(*, days: int) -> None:
+    """Make every manifest old, by both clocks, so neither could excuse a delete."""
+    async with get_db_session() as db:
+        await db.execute(
+            update(OCIManifest).values(
+                created_at=datetime.now(UTC) - timedelta(days=days),
+                last_accessed_at=datetime.now(UTC) - timedelta(days=days),
+            )
+        )
+
+
+async def _tagged_digest(repo_id: uuid.UUID) -> str:
+    async with get_db_session() as db:
+        row = await db.execute(
+            select(OCIManifest.digest)
+            .join(OCITag, OCITag.manifest_id == OCIManifest.id)
+            .where(OCITag.repository_id == repo_id)
+        )
+        return row.scalar_one()
+
+
 async def _blob_count() -> int:
     async with get_db_session() as db:
         return await db.scalar(select(func.count()).select_from(OCIBlob)) or 0
@@ -218,66 +239,91 @@ class TestPushInFlight:
         assert links == 1, "the mount was collected out from under the push"
 
 
-class TestPushedVersusMirrored:
-    async def test_a_pushed_image_is_never_expired_by_age(self, app) -> None:
-        """It exists nowhere else. A registry that eats your images is not one."""
+class TestNothingExpiresByAge:
+    """Neither pushed nor mirrored content is deleted for being old.
+
+    A pushed image exists nowhere else. A mirrored one is the copy that keeps
+    this cache answering when upstream is unreachable — deleting it on a
+    schedule cannot make anything fresher (the next pull asks upstream
+    regardless) and throws away the fallback at exactly the wrong moment.
+
+    Freshness is revalidation on access (#1425); this collector only reclaims
+    what nothing references.
+    """
+
+    async def test_an_old_pushed_image_is_kept(self, app) -> None:
         repo = await _repository("team/app")  # no upstream => pushed
         config = await _blob(repo, b"config")
         await _manifest(repo, _image(config), tag="v1")
+        await _age_all_manifests(days=400)
 
-        async with get_db_session() as db:
-            await db.execute(
-                update(OCIManifest).values(last_accessed_at=datetime.now(UTC) - timedelta(days=400))
-            )
+        await gc.collect()
 
-        result = await gc.collect()
-
-        assert result.manifests_expired == 0
         assert await _blob_count() == 1
 
-    async def test_a_mirrored_image_expires_on_last_access(self, app) -> None:
-        """Re-fetchable, so it is a cache like any other."""
+    async def test_an_old_mirrored_image_is_kept_too(self, app) -> None:
+        """The correction that matters: it is the fallback, not garbage."""
         repo = await _repository("quay.io/ansible/awx-ee", upstream="quay.io")
         config = await _blob(repo, b"config")
         await _manifest(repo, _image(config), tag="latest")
+        await _age_all_manifests(days=400)
+
+        await gc.collect()
+
+        assert await _blob_count() == 1
+
+    async def test_blobs_are_freed_once_a_moved_tag_un_references_them(self, app) -> None:
+        """How mirrored content is actually reclaimed.
+
+        A tag moving upstream is what leaves the old manifest unreferenced —
+        revalidation replaces it, and only then is its content this collector's
+        business. Simulated here by removing the superseded manifest, which is
+        what repointing the tag does.
+        """
+        repo = await _repository("quay.io/ansible/awx-ee", upstream="quay.io")
+        old_config = await _blob(repo, b"the-old-config")
+        new_config = await _blob(repo, b"the-new-config")
+        await _manifest(repo, _image(old_config))  # superseded, untagged
+        await _manifest(repo, _image(new_config), tag="latest")
 
         async with get_db_session() as db:
-            await db.execute(
-                update(OCIManifest).values(last_accessed_at=datetime.now(UTC) - timedelta(days=400))
+            superseded = (
+                (await db.execute(select(OCIManifest).where(OCIManifest.subject_digest.is_(None))))
+                .scalars()
+                .all()
             )
+            for manifest in superseded:
+                if manifest.digest != (await _tagged_digest(repo)):
+                    await db.delete(manifest)
 
         result = await gc.collect()
 
-        assert result.manifests_expired == 1
-        # Its blob goes too, once nothing references it.
-        assert await _blob_count() == 0
-
-    async def test_a_recently_used_mirror_is_kept(self, app) -> None:
-        repo = await _repository("quay.io/ansible/awx-ee", upstream="quay.io")
-        config = await _blob(repo, b"config")
-        await _manifest(repo, _image(config), tag="latest")
-
-        assert (await gc.collect()).manifests_expired == 0
+        assert result.blobs_deleted == 1
         assert await _blob_count() == 1
 
 
 class TestSealed:
-    async def test_nothing_is_expired_on_a_sealed_node(self, app, monkeypatch) -> None:
-        """Sealing means it cannot be fetched again, so expiry would lose it."""
+    async def test_a_sealed_node_still_only_collects_unreferenced_blobs(
+        self, app, monkeypatch
+    ) -> None:
+        """Sealing changes nothing here, because nothing was expiring anyway.
+
+        It mattered when mirrors expired on a schedule: on a sealed node an
+        evicted image could never be re-fetched. Now that nothing is deleted for
+        age, the sealed case is simply the ordinary one.
+        """
         from terrapod.config import settings
 
         repo = await _repository("quay.io/ansible/awx-ee", upstream="quay.io")
         config = await _blob(repo, b"config")
+        await _blob(repo, b"unreferenced")
         await _manifest(repo, _image(config), tag="latest")
-        async with get_db_session() as db:
-            await db.execute(
-                update(OCIManifest).values(last_accessed_at=datetime.now(UTC) - timedelta(days=400))
-            )
+        await _age_all_manifests(days=400)
 
         monkeypatch.setattr(settings.registry, "cache_only", True)
         result = await gc.collect()
 
-        assert result.manifests_expired == 0
+        assert result.blobs_deleted == 1  # the unreferenced one, and only it
         assert await _blob_count() == 1
 
 

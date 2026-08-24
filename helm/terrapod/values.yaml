@@ -309,10 +309,12 @@ api:
         # shared — so space comes back only by collecting blobs that no manifest
         # references any more.
         #
-        # An image you PUSHED is never expired by age: it exists nowhere else.
-        # Only genuinely unreferenced blobs are collected, plus mirrored images
-        # past artifact_retention.oci_mirror_retention_days, which can be fetched
-        # again. Nothing is expired at all on a sealed node.
+        # Nothing is deleted for being old — not a pushed image, not a mirrored
+        # one. Collection reclaims only blobs that no manifest references any
+        # more. Keeping a stale mirrored image is deliberate: it is what lets
+        # this cache go on answering when upstream is unreachable, and freshness
+        # is handled by revalidating a tag when someone pulls it, not by
+        # deleting it in the background.
         gc:
           enabled: true
           # How old a blob must be before it can be collected. Blobs are uploaded
@@ -1026,8 +1028,6 @@ api:
       provider_cache_retention_days: 30   # days since last access
       binary_cache_retention_days: 30     # days since last access
       package_cache_retention_days: 30    # days since last access (PyPI/npm artifacts)
-      oci_mirror_retention_days: 30       # days since last access; MIRRORED images only,
-                                          # never images you pushed
       module_overrides_retention_days: 14
       # Undelete window (#1253). State of a deleted workspace is kept this
       # long so an accidental deletion can be undone; 0 = keep forever.

@@ -14,9 +14,35 @@ manifests are therefore **never** expired by age — only their genuinely
 unreferenced blobs are ever collected, and a blob is unreferenced only when no
 manifest points at it.
 
-*Mirrored* content came from an upstream and can be fetched again, exactly like
-the provider and binary caches, so it expires on last access — and not at all on
-a sealed node, where re-fetching is precisely what is forbidden.
+*Mirrored* content is not expired here either, and that is deliberate. This
+collector reclaims what nothing references; it does not decide what is fresh.
+
+Those are separate mechanisms and conflating them is a mistake. **Freshness** is
+how long a cached entry is trusted, keyed on when it was fetched, and handled
+lazily on access: past its TTL a tag is revalidated against upstream, replaced
+only once a new digest is confirmed, and served stale if upstream cannot be
+reached (#1425). **Eviction** is reclaiming space, keyed on last use, driven by
+capacity.
+
+Deleting a mirrored image on a schedule serves neither. It cannot make anything
+fresher — the next pull fetches whatever upstream has regardless — and it throws
+away the copy that keeps this cache answering at the exact moment upstream is
+unreachable, which for a registry whose reason to exist is restricted networks
+is precisely backwards.
+
+So a moved tag is what un-references an old mirrored manifest, and only then do
+its blobs become this collector's business.
+
+**A layer lives exactly as long as some manifest references it, and nothing
+else may enter into that.** Not its age, not when it was last served. A layer is
+shared by construction — the base image everything is built on is the hottest
+object in the store and also the one most likely to be reachable from an image
+nobody has pulled this month. Evicting layers by age or by use would break
+registered images, which is corruption rather than eviction.
+
+If capacity ever has to be managed, the unit is the **image**: drop a manifest,
+which un-references its layers, and let reachability reclaim whatever nothing
+else needs. Never the layer directly.
 
 **The dangerous case is a push in flight.** Blobs are uploaded *before* the
 manifest that references them, so a sweep landing between the two deletes the
@@ -42,7 +68,7 @@ import json
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.config import settings
@@ -70,7 +96,6 @@ class SweepResult:
 
     blobs_deleted: int = 0
     bytes_reclaimed: int = 0
-    manifests_expired: int = 0
     repositories: int = 0
     skipped_reason: str = ""
     errors: list[str] = field(default_factory=list)
@@ -163,43 +188,6 @@ async def _reachable_digests(
         frontier.extend(referrers.scalars().all())
 
     return reachable
-
-
-async def _expire_mirrored_manifests(
-    db: AsyncSession, repository: OCIRepository, retention_days: int
-) -> int:
-    """Drop mirrored manifests not accessed within the retention window.
-
-    Only mirrors. A pushed manifest exists nowhere else, so age is never a reason
-    to delete it — the operator's own images are not a cache.
-
-    Untagged is not the test either: clients legitimately pull by digest, so an
-    untagged manifest may be in daily use. Last access is the honest signal, and
-    it is the same one the provider and binary caches use.
-    """
-    if repository.upstream is None or retention_days <= 0:
-        return 0
-
-    cutoff = datetime.now(UTC) - timedelta(days=retention_days)
-    stale = await db.execute(
-        select(OCIManifest)
-        .where(
-            OCIManifest.repository_id == repository.id,
-            OCIManifest.last_accessed_at < cutoff,
-        )
-        .limit(_BATCH)
-    )
-    expired = 0
-    for manifest in stale.scalars().all():
-        # A tag still pointing here means someone can still ask for it by name.
-        # The tag goes with the manifest; the blobs follow in the sweep below
-        # once nothing references them.
-        await db.execute(delete(OCITag).where(OCITag.manifest_id == manifest.id))
-        await db.delete(manifest)
-        expired += 1
-    if expired:
-        await db.flush()
-    return expired
 
 
 async def _sweep_repository(
@@ -296,17 +284,10 @@ async def collect() -> SweepResult:
 
     storage = get_storage()
     grace = timedelta(hours=cfg.grace_hours)
-    retention = settings.artifact_retention.oci_mirror_retention_days
-    # On a sealed node nothing can be re-fetched, so expiring a mirror loses it
-    # exactly as permanently as expiring a pushed image would.
-    if settings.registry.cache_only:
-        retention = 0
-
     total = SweepResult()
     async with get_db_session() as db:
         repositories = (await db.execute(select(OCIRepository))).scalars().all()
         for repository in repositories:
-            total.manifests_expired += await _expire_mirrored_manifests(db, repository, retention)
             swept = await _sweep_repository(db, storage, repository, grace)
             total.blobs_deleted += swept.blobs_deleted
             total.bytes_reclaimed += swept.bytes_reclaimed
@@ -329,17 +310,14 @@ async def collect() -> SweepResult:
     if total.blobs_deleted:
         RETENTION_DELETED.labels(category="oci_blobs").inc(total.blobs_deleted)
         OCI_GC_BYTES_RECLAIMED.inc(total.bytes_reclaimed)
-    if total.manifests_expired:
-        RETENTION_DELETED.labels(category="oci_mirrors").inc(total.manifests_expired)
     if total.errors:
         OCI_GC_ERRORS.inc(len(total.errors))
 
-    if total.blobs_deleted or total.manifests_expired or total.errors:
+    if total.blobs_deleted or total.errors:
         logger.info(
             "OCI garbage collection",
             blobs_deleted=total.blobs_deleted,
             bytes_reclaimed=total.bytes_reclaimed,
-            manifests_expired=total.manifests_expired,
             repositories=total.repositories,
             errors=len(total.errors),
         )

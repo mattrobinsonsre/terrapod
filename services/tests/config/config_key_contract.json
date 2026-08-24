@@ -102,7 +102,6 @@
   "artifact_retention.deleted_workspace_retention_days",
   "artifact_retention.enabled",
   "artifact_retention.module_overrides_retention_days",
-  "artifact_retention.oci_mirror_retention_days",
   "artifact_retention.package_cache_retention_days",
   "artifact_retention.poll_interval_seconds",
   "artifact_retention.provider_cache_retention_days",

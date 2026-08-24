@@ -56,7 +56,6 @@
   "api.config.artifact_retention.deleted_workspace_retention_days",
   "api.config.artifact_retention.enabled",
   "api.config.artifact_retention.module_overrides_retention_days",
-  "api.config.artifact_retention.oci_mirror_retention_days",
   "api.config.artifact_retention.package_cache_retention_days",
   "api.config.artifact_retention.poll_interval_seconds",
   "api.config.artifact_retention.provider_cache_retention_days",

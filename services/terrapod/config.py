@@ -1377,14 +1377,6 @@ class ArtifactRetentionConfig(BaseModel):
         default=30,
         description="Days since last access before cached CLI binaries are eligible for cleanup (0 = disabled)",
     )
-    oci_mirror_retention_days: int = Field(
-        default=30,
-        description="Days since last access before a MIRRORED container image is "
-        "eligible for removal (0 = disabled). Pull-through content only — an image "
-        "an operator PUSHED exists nowhere else and is never expired by age, "
-        "whatever this is set to. Ignored entirely on a sealed node, where nothing "
-        "can be re-fetched.",
-    )
     package_cache_retention_days: int = Field(
         default=30,
         description="Days since last access before cached PyPI/npm artifacts are eligible "
