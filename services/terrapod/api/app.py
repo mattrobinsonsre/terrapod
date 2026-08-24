@@ -1040,6 +1040,14 @@ def create_application() -> FastAPI:
 
     include_terrapod(binary_cache_router)
 
+    # Language package proxies — PyPI and npm (#1417). Native surface rather than
+    # a root mount: both clients take their registry URL as configuration, so
+    # unlike /v2/ there is no mandated prefix to honour, and the BFF's existing
+    # /api/* route proxies them with no further wiring.
+    from terrapod.api.routers.package_cache import router as package_cache_router
+
+    include_terrapod(package_cache_router)
+
     # Cost-estimation pricesheet cache (#871) — runner-facing download + admin.
     from terrapod.api.routers.cost_estimation import router as cost_estimation_router
 

@@ -997,6 +997,57 @@ class CachedBinary(Base):
     )
 
 
+class CachedPackageFile(Base):
+    """One cached artifact from a language package registry (#1417).
+
+    A single table for every ecosystem, because the differences between them live
+    in the *index* — PEP 503 HTML versus an npm packument — and not in the file.
+    A file is a name, a version, a filename and some bytes whatever registry it
+    came from, so a per-ecosystem table would be four copies of one shape.
+
+    The digest is **upstream's**, recorded rather than computed: it is what the
+    client checks our bytes against (npm's `dist.integrity`, PyPI's `#sha256=`
+    link fragment), so re-deriving it would only prove we hashed what we stored.
+    Kept so a purge decision or an audit can be made without fetching the object.
+    """
+
+    __tablename__ = "cached_package_files"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=generate_uuid7
+    )
+    #: "pypi" | "npm". Not an enum: a new ecosystem should be an adapter and a
+    #: row, never a migration.
+    ecosystem: Mapped[str] = mapped_column(String(20), nullable=False)
+    #: The package name as the ecosystem normalises it — PEP 503 normalisation
+    #: for PyPI, the literal (scope-bearing) name for npm. Normalised on the way
+    #: in so `Flask`, `flask` and `FLASK` are one cache entry rather than three.
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    version: Mapped[str] = mapped_column(String(100), nullable=False)
+    #: The artifact filename, which is what actually distinguishes one file from
+    #: another: a PyPI version has an sdist and many wheels, all the same version.
+    filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    storage_key: Mapped[str] = mapped_column(String(500), nullable=False)
+    size: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    #: Upstream's own digest, stored as the ecosystem expresses it
+    #: ("sha256:..." or an SRI "sha512-..."). Empty when upstream published none.
+    digest: Mapped[str] = mapped_column(String(200), nullable=False, default="")
+    cached_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc, nullable=False
+    )
+    #: Retention is access-based, never write-based: evicting an artifact every
+    #: run pulls merely for being old would re-fetch it immediately.
+    last_accessed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc, nullable=False
+    )
+
+    __table_args__ = (
+        sa.UniqueConstraint("ecosystem", "name", "filename", name="uq_cached_package_files"),
+        Index("ix_cached_package_files_lookup", "ecosystem", "name"),
+        Index("ix_cached_package_files_accessed", "last_accessed_at"),
+    )
+
+
 # --- Certificate Authority ---
 
 
