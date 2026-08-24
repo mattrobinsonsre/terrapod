@@ -565,6 +565,7 @@ def _mock_run(run_id=None, status="pending", ws_id=None):
     run.refresh = True
     run.allow_empty_apply = False
     run.resource_cpu = "1"
+    run.parallelism = 10
     run.resource_memory = "2Gi"
     run.configuration_version_id = None
     run.module_overrides = None

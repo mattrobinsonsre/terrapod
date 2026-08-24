@@ -274,6 +274,7 @@ async def find_or_autocreate_workspace(
         execution_backend=rule.execution_backend,
         terraform_version=rule.terraform_version,
         resource_cpu=rule.resource_cpu,
+        parallelism=rule.parallelism,
         resource_memory=rule.resource_memory,
         auto_apply=rule.auto_apply,
         # Inherit the rule's conditional mode too (#1274) — carrying only

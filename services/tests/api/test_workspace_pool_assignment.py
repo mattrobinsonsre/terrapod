@@ -48,6 +48,7 @@ def _mock_workspace(ws_id=None, pool_id=None, extra_pool_ids=None):
         )
     ]
     ws.resource_cpu = "1"
+    ws.parallelism = 10
     ws.resource_memory = "2Gi"
     ws.labels = {}
     ws.owner_email = "test@example.com"

@@ -974,7 +974,8 @@
       "runTaskTemplates": "Sar Qu' De'wI'mey (Qumwo' chu' Hoch chenmoHlu')",
       "notificationTemplates": "QIn De'wI'mey (Qumwo' chu' Hoch chenmoHlu')",
       "saving": "poltaH...",
-      "previewTitle": "repo yIt 'ej chut vam chenmoHlaHbogh Qumwo'mey tI'ang — polbe'lu'"
+      "previewTitle": "repo yIt 'ej chut vam chenmoHlaHbogh Qumwo'mey tI'ang — polbe'lu'",
+      "parallelism": "tay'' Qu''mey"
     },
     "table": {
       "name": "pong",
@@ -2290,7 +2291,9 @@
       "triggerPrefixesNone": "pagh (vum tetlh lo')",
       "driftIgnoreRules": "tlhotlh buSHa' chutmey",
       "driftIgnoreRulesHint": "glob-Sovbogh Terraform Sum + Sep Hemmey, tlhotlh chevwI' So'lu'. <star></star> pagh joq law' <dot></dot>-Hutlhbogh ghItlhmey rur (<n></n> Summey Suq); <starIdx></starIdx> HIvje' Sum vay' rur. Sep neH ghajbogh Sum tuHHa' Sep vaH Doch — Qaw'mey je. tlhotlh neH qaS, motlh nab/lo' qaSbe'. tlhegh naQ legh <docs>drift-ignore-rules.md</docs>.",
-      "driftIgnoreRulesNone": "pagh (Hoch nab pImmoH tlhotlh moj)"
+      "driftIgnoreRulesNone": "pagh (Hoch nab pImmoH tlhotlh moj)",
+      "parallelism": "tay'' Qu''mey",
+      "parallelismTitle": "wa'' poH Qu''mey mI''. 10 ''oH."
     },
     "vcsWorkflowWarning": {
       "title": "VCS repolIjDaq chaw'moH nobbogh.",

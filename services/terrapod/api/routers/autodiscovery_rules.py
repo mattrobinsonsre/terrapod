@@ -42,6 +42,7 @@ from terrapod.db.models import AgentPool, AutodiscoveryRule, VCSConnection
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services import run_service
+from terrapod.services.parallelism import DEFAULT_PARALLELISM, validate_parallelism
 
 router = APIRouter(tags=["autodiscovery-rules"])
 logger = get_logger(__name__)
@@ -75,6 +76,7 @@ def _rule_json(rule: AutodiscoveryRule) -> dict:
             "agent-pool-id": str(rule.agent_pool_id) if rule.agent_pool_id else None,
             "terraform-version": rule.terraform_version,
             "resource-cpu": rule.resource_cpu,
+            "parallelism": rule.parallelism,
             "resource-memory": rule.resource_memory,
             "auto-apply": rule.auto_apply,
             "auto-apply-mode": run_service.resolve_auto_apply_mode(rule),
@@ -232,6 +234,11 @@ def _coerce_attrs(attrs: dict, *, on_create: bool) -> dict[str, Any]:
                 raise HTTPException(status_code=422, detail="agent-pool-id is not a UUID") from e
     if "terraform-version" in attrs:
         out["terraform_version"] = str(attrs["terraform-version"])
+    if "parallelism" in attrs:
+        try:
+            out["parallelism"] = validate_parallelism(attrs["parallelism"])
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=str(e)) from e
     if "resource-cpu" in attrs:
         out["resource_cpu"] = str(attrs["resource-cpu"])
     if "resource-memory" in attrs:
@@ -503,6 +510,7 @@ def _build_transient_rule(fields: dict[str, Any], conn: VCSConnection) -> Autodi
         execution_backend=fields.get("execution_backend", "tofu"),
         terraform_version=fields.get("terraform_version", "1.12"),
         resource_cpu=fields.get("resource_cpu", "1"),
+        parallelism=fields.get("parallelism", DEFAULT_PARALLELISM),
         resource_memory=fields.get("resource_memory", "2Gi"),
         auto_apply=fields.get("auto_apply", False),
         auto_apply_mode=fields.get("auto_apply_mode", "never"),

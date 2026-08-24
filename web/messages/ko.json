@@ -974,7 +974,8 @@
       "runTaskTemplates": "실행 작업 템플릿 (각 새 워크스페이스에 생성됨)",
       "notificationTemplates": "알림 템플릿 (각 새 워크스페이스에 생성됨)",
       "saving": "저장 중...",
-      "previewTitle": "저장소를 탐색하여 이 규칙이 생성할 워크스페이스를 미리 봅니다 — 저장하지 않음"
+      "previewTitle": "저장소를 탐색하여 이 규칙이 생성할 워크스페이스를 미리 봅니다 — 저장하지 않음",
+      "parallelism": "병렬 처리 수"
     },
     "table": {
       "name": "이름",
@@ -2290,7 +2291,9 @@
       "triggerPrefixesNone": "없음 (작업 디렉터리 사용)",
       "driftIgnoreRules": "드리프트 무시 규칙",
       "driftIgnoreRulesHint": "드리프트 분류기가 억제하는 글롭 인식 Terraform 주소 + 속성 경로입니다. <star></star>는 0개 이상의 비-<dot></dot> 문자와 일치합니다(<n></n>개 인덱스에 걸침). <starIdx></starIdx>는 대괄호로 묶인 모든 인덱스와 일치합니다. 속성 접미사가 없는 순수 주소는 해당 리소스에 대한 모든 변경(삭제 포함)을 억제합니다. 일반 plan/apply가 아니라 드리프트에만 영향을 줍니다. 전체 문법은 <docs>drift-ignore-rules.md</docs>를 참조하세요.",
-      "driftIgnoreRulesNone": "없음 (모든 계획 차이가 드리프트로 계산됨)"
+      "driftIgnoreRulesNone": "없음 (모든 계획 차이가 드리프트로 계산됨)",
+      "parallelism": "병렬 처리 수",
+      "parallelismTitle": "동시에 실행되는 작업 수 (1-256). 기본값 10."
     },
     "vcsWorkflowWarning": {
       "title": "권한 부여가 VCS 저장소에 위임되었습니다.",

@@ -57,6 +57,7 @@ Rules are scoped to a single VCS connection + repo. A rule has:
 | `execution-backend` | enum | no | `tofu` or `terraform`. Default `tofu`. |
 | `terraform-version` | string | no | Default `1.12`. |
 | `resource-cpu` / `resource-memory` | string | no | Defaults `1` / `2Gi`. |
+| `parallelism` | integer | no | Concurrent engine operations on workspaces this rule creates. Default `10`. |
 | `auto-apply` | bool | no | Default `false`. Superseded by `auto-apply-mode` when that is set. |
 | `auto-apply-mode` | string | no | Conditional auto-apply templated onto created workspaces: `never`, `always`, `create`, `create_update`. `create`/`create_update` never auto-apply a plan that destroys or replaces a resource. Set this **or** `auto-apply`, not both (422). |
 | `on-directory-delete` | enum | no | `flag` (default — mark `pending_deletion`, require explicit operator action) or `destroy` (opt-in — real destroy run then archive). See the Lifecycle section (#314). |

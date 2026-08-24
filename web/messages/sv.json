@@ -974,7 +974,8 @@
       "runTaskTemplates": "Mallar för körningsuppgifter (skapas på varje ny arbetsyta)",
       "notificationTemplates": "Aviseringsmallar (skapas på varje ny arbetsyta)",
       "saving": "Sparar...",
-      "previewTitle": "Gå igenom repot och förhandsgranska vilka arbetsytor denna regel SKULLE skapa — ingen beständighet"
+      "previewTitle": "Gå igenom repot och förhandsgranska vilka arbetsytor denna regel SKULLE skapa — ingen beständighet",
+      "parallelism": "Parallellitet"
     },
     "table": {
       "name": "Namn",
@@ -2290,7 +2291,9 @@
       "triggerPrefixesNone": "Ingen (använder arbetskatalog)",
       "driftIgnoreRules": "Regler för att ignorera drift",
       "driftIgnoreRulesHint": "Glob-medvetna Terraform-adresser + attributsökvägar som undertrycks av driftklassificeraren. <star></star> matchar noll eller fler tecken som inte är <dot></dot> (spänner över <n></n> index); <starIdx></starIdx> matchar valfritt index inom hakparenteser. En ren adress utan attributsuffix tystar alla ändringar av den resursen — inklusive förstörelser. Påverkar endast drift, inte vanlig plan/apply. Se <docs>drift-ignore-rules.md</docs> för den fullständiga grammatiken.",
-      "driftIgnoreRulesNone": "Ingen (varje plandiff räknas som drift)"
+      "driftIgnoreRulesNone": "Ingen (varje plandiff räknas som drift)",
+      "parallelism": "Parallellitet",
+      "parallelismTitle": "Hur många åtgärder som körs samtidigt (1-256). Standard 10."
     },
     "vcsWorkflowWarning": {
       "title": "Auktorisering delegerad till ditt VCS-repositorie.",

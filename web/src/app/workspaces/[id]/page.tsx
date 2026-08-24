@@ -54,6 +54,7 @@ interface WorkspaceAttrs {
   'working-directory': string
   locked: boolean
   'resource-cpu': string
+  parallelism: number
   'resource-memory': string
   'agent-pool-id': string | null
   // The full pool set (#1085). Flat — a run is offered to every pool at once
@@ -273,6 +274,7 @@ function WorkspaceDetailContent() {
   const [nameChanged, setNameChanged] = useState(false)
   const [editCpu, setEditCpu] = useState('')
   const [editMemory, setEditMemory] = useState('')
+  const [editParallelism, setEditParallelism] = useState('10')
   // #1274: the four-value mode supersedes the old boolean. Rendered as its
   // raw enum value, matching `execution-mode` immediately above it — these
   // are API identifiers, not prose, so they are not translated.
@@ -1005,6 +1007,7 @@ function WorkspaceDetailContent() {
     setEditName(workspace.attributes.name)
     setNameChanged(false)
     setEditCpu(workspace.attributes['resource-cpu'])
+    setEditParallelism(String(workspace.attributes.parallelism ?? 10))
     setEditMemory(workspace.attributes['resource-memory'])
     setEditAutoApplyMode(workspace.attributes['auto-apply-mode'] || (workspace.attributes['auto-apply'] ? 'always' : 'never'))
     setEditExecMode(workspace.attributes['execution-mode'])
@@ -1068,6 +1071,7 @@ function WorkspaceDetailContent() {
             attributes: {
               name: editName,
               'resource-cpu': editCpu,
+              parallelism: Number(editParallelism),
               'resource-memory': editMemory,
               'auto-apply-mode': editAutoApplyMode,
               'execution-mode': editExecMode,
@@ -2002,6 +2006,17 @@ function WorkspaceDetailContent() {
                       className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500" />
                   ) : (
                     <dd className="mt-1 text-sm text-slate-200">{attrs['resource-memory']}</dd>
+                  )}
+                </div>
+                <div>
+                  <dt className="text-xs text-slate-500">{t('fields.parallelism')}</dt>
+                  {editing ? (
+                    <input type="number" min={1} max={256} value={editParallelism}
+                      onChange={(e) => setEditParallelism(e.target.value)}
+                      title={t('fields.parallelismTitle')}
+                      className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500" />
+                  ) : (
+                    <dd className="mt-1 text-sm text-slate-200">{attrs.parallelism ?? 10}</dd>
                   )}
                 </div>
                 <div>

@@ -296,6 +296,17 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
+			"parallelism": schema.Int64Attribute{
+				Description: "How many operations the engine performs at once " +
+					"(-parallelism for terraform/tofu). Defaults to 10, terraform's own " +
+					"default. Raise it for a large state on a well-resourced runner; lower " +
+					"it to stay inside a provider's rate limit.",
+				Optional: true,
+				Computed: true,
+				PlanModifiers: []planmodifier.Int64{
+					int64planmodifier.UseStateForUnknown(),
+				},
+			},
 			"resource_cpu": schema.StringAttribute{
 				Description: "CPU request for runner Jobs (K8s format, e.g. '1').",
 				Optional:    true,
@@ -817,6 +828,9 @@ func buildCreateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 	if !m.WorkingDirectory.IsNull() && !m.WorkingDirectory.IsUnknown() {
 		req.WorkingDirectory = m.WorkingDirectory.ValueString()
 	}
+	if !m.Parallelism.IsNull() && !m.Parallelism.IsUnknown() {
+		req.Parallelism = m.Parallelism.ValueInt64()
+	}
 	if !m.ResourceCPU.IsNull() && !m.ResourceCPU.IsUnknown() {
 		req.ResourceCPU = m.ResourceCPU.ValueString()
 	}
@@ -955,6 +969,9 @@ func buildUpdateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 	if !m.WorkingDirectory.IsNull() && !m.WorkingDirectory.IsUnknown() {
 		req.WorkingDirectory = m.WorkingDirectory.ValueString()
 	}
+	if !m.Parallelism.IsNull() && !m.Parallelism.IsUnknown() {
+		req.Parallelism = m.Parallelism.ValueInt64()
+	}
 	if !m.ResourceCPU.IsNull() && !m.ResourceCPU.IsUnknown() {
 		req.ResourceCPU = m.ResourceCPU.ValueString()
 	}
@@ -1068,6 +1085,7 @@ func readWorkspaceIntoModel(ctx context.Context, ws *terrapod.Workspace, m *work
 	m.ExecutionBackend = types.StringValue(ws.ExecutionBackend)
 	m.WorkingDirectory = types.StringValue(ws.WorkingDirectory)
 	m.ResourceCPU = types.StringValue(ws.ResourceCPU)
+	m.Parallelism = types.Int64Value(ws.Parallelism)
 	m.ResourceMemory = types.StringValue(ws.ResourceMemory)
 	m.VCSWorkflow = types.StringValue(ws.VCSWorkflow)
 	m.AutoMerge = types.BoolValue(ws.AutoMerge)

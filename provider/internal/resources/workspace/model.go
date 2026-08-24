@@ -19,6 +19,7 @@
 //	"execution-backend"                 → execution_backend   (string, optional, default "terraform")
 //	"terraform-version"                 → terraform_version   (string, optional)
 //	"working-directory"                 → working_directory   (string, optional)
+//	"parallelism"                       → parallelism
 //	"resource-cpu"                      → resource_cpu        (string, optional, default "1")
 //	"resource-memory"                   → resource_memory     (string, optional, default "2Gi")
 //	"labels"                            → labels              (map,    optional)
@@ -66,6 +67,7 @@ type workspaceModel struct {
 	TerragruntVersion             types.String `tfsdk:"terragrunt_version"`
 	WorkingDirectory              types.String `tfsdk:"working_directory"`
 	ResourceCPU                   types.String `tfsdk:"resource_cpu"`
+	Parallelism                   types.Int64  `tfsdk:"parallelism"`
 	ResourceMemory                types.String `tfsdk:"resource_memory"`
 	Labels                        types.Map    `tfsdk:"labels"`
 	VCSRepoURL                    types.String `tfsdk:"vcs_repo_url"`

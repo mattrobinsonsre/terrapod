@@ -36,6 +36,7 @@ type workspaceDataSourceModel struct {
 	TerragruntVersion             types.String `tfsdk:"terragrunt_version"`
 	WorkingDirectory              types.String `tfsdk:"working_directory"`
 	ResourceCPU                   types.String `tfsdk:"resource_cpu"`
+	Parallelism                   types.Int64  `tfsdk:"parallelism"`
 	ResourceMemory                types.String `tfsdk:"resource_memory"`
 	Labels                        types.Map    `tfsdk:"labels"`
 	VCSRepoURL                    types.String `tfsdk:"vcs_repo_url"`
@@ -97,6 +98,7 @@ func (d *workspaceDataSource) Schema(_ context.Context, _ datasource.SchemaReque
 			"terragrunt_enabled":               computedBool("Whether terragrunt wraps tofu/terraform for agent-mode runs."),
 			"terragrunt_version":               computedString("Terragrunt CLI version (when terragrunt_enabled)."),
 			"working_directory":                computedString("Working directory."),
+			"parallelism":                      computedInt64("How many operations the engine performs at once."),
 			"resource_cpu":                     computedString("CPU request."),
 			"resource_memory":                  computedString("Memory request."),
 			"labels":                           computedMap("Labels."),
@@ -187,6 +189,7 @@ func readDataSourceModel(ctx context.Context, res *terrapod.Resource, m *workspa
 	m.AutoApply = types.BoolValue(terrapod.GetBoolAttr(res, "auto-apply"))
 	m.ExecutionBackend = types.StringValue(terrapod.GetStringAttr(res, "execution-backend"))
 	m.WorkingDirectory = types.StringValue(terrapod.GetStringAttr(res, "working-directory"))
+	m.Parallelism = types.Int64Value(terrapod.GetIntAttr(res, "parallelism"))
 	m.ResourceCPU = types.StringValue(terrapod.GetStringAttr(res, "resource-cpu"))
 	m.ResourceMemory = types.StringValue(terrapod.GetStringAttr(res, "resource-memory"))
 	m.OwnerEmail = types.StringValue(terrapod.GetStringAttr(res, "owner-email"))

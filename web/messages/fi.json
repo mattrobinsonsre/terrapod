@@ -974,7 +974,8 @@
       "runTaskTemplates": "Ajotehtävämallit (luodaan jokaiseen uuteen työtilaan)",
       "notificationTemplates": "Ilmoitusmallit (luodaan jokaiseen uuteen työtilaan)",
       "saving": "Tallennetaan...",
-      "previewTitle": "Käy repo läpi ja esikatsele, mitkä työtilat tämä sääntö LUOISI — ei tallennusta"
+      "previewTitle": "Käy repo läpi ja esikatsele, mitkä työtilat tämä sääntö LUOISI — ei tallennusta",
+      "parallelism": "Rinnakkaisuus"
     },
     "table": {
       "name": "Nimi",
@@ -2290,7 +2291,9 @@
       "triggerPrefixesNone": "Ei mitään (käyttää työhakemistoa)",
       "driftIgnoreRules": "Ajautuman ohitussäännöt",
       "driftIgnoreRulesHint": "Glob-tietoiset Terraform-osoite- ja attribuuttipolut, jotka ajautumaluokitin vaimentaa. <star></star> vastaa nollaa tai useampaa ei-<dot></dot>-merkkiä (kattaa <n></n> indeksiä); <starIdx></starIdx> vastaa mitä tahansa hakasulkeissa olevaa indeksiä. Pelkkä osoite ilman attribuuttipäätettä vaimentaa minkä tahansa muutoksen kyseiseen resurssiin — mukaan lukien tuhot. Vaikuttaa vain ajautumaan, ei tavalliseen suunnitteluun/käyttöönottoon. Katso koko kielioppi kohdasta <docs>drift-ignore-rules.md</docs>.",
-      "driftIgnoreRulesNone": "Ei mitään (jokainen suunnitelmaero lasketaan ajautumaksi)"
+      "driftIgnoreRulesNone": "Ei mitään (jokainen suunnitelmaero lasketaan ajautumaksi)",
+      "parallelism": "Rinnakkaisuus",
+      "parallelismTitle": "Kuinka monta toimintoa suoritetaan samanaikaisesti (1-256). Oletus 10."
     },
     "vcsWorkflowWarning": {
       "title": "Valtuutus delegoitu VCS-repositoriollesi.",

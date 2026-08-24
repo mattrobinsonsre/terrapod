@@ -28,8 +28,21 @@ class _Result:
 
 class TestBuildPlanArgv:
     def test_minimal(self) -> None:
+        """`-parallelism` is present even at the default, deliberately (#1431).
+
+        The API sets it on every run, so the runner never has to carry a copy of
+        any engine's default — and the argv in the log says what the run actually
+        used rather than leaving the reader to know what terraform assumes.
+        """
         argv = plan_apply.build_plan_argv(_cfg(), binary="tofu", var_file_args=[])
-        assert argv == ["tofu", "plan", "-input=false", "-detailed-exitcode", "-out=tfplan"]
+        assert argv == [
+            "tofu",
+            "plan",
+            "-input=false",
+            "-detailed-exitcode",
+            "-out=tfplan",
+            "-parallelism=10",
+        ]
 
     def test_refresh_only(self) -> None:
         argv = plan_apply.build_plan_argv(
@@ -64,8 +77,10 @@ class TestBuildApplyArgv:
         argv = plan_apply.build_apply_argv(
             _cfg(), binary="tofu", var_file_args=["-var-file=x.tfvars"], has_plan_file=True
         )
-        # With a plan file, var-files MUST NOT be re-specified.
-        assert argv == ["tofu", "apply", "-input=false", "tfplan"]
+        # With a plan file, var-files MUST NOT be re-specified — but parallelism
+        # still must be, because it is a runtime concurrency limit rather than
+        # something the plan file records (#1431).
+        assert argv == ["tofu", "apply", "-input=false", "-parallelism=10", "tfplan"]
 
     def test_without_plan_file_uses_auto_approve(self) -> None:
         argv = plan_apply.build_apply_argv(
@@ -161,3 +176,33 @@ class TestRunPlanShowJson:
         ):
             ok = plan_apply.run_plan_show_json(binary="tofu", json_out=str(out))
         assert ok is False
+
+
+class TestParallelism:
+    """The setting reaches both phases, and apply is the one that matters.
+
+    A workspace throttled to protect a rate-limited provider is throttling the
+    calls, and it is apply that makes them. An implementation that reached only
+    plan would look right in a review and fail at the job it was added for.
+    """
+
+    def test_plan_carries_it(self) -> None:
+        argv = plan_apply.build_plan_argv(_cfg(TP_PARALLELISM="4"), binary="tofu", var_file_args=[])
+        assert "-parallelism=4" in argv
+
+    def test_apply_carries_it_even_with_a_saved_plan(self) -> None:
+        argv = plan_apply.build_apply_argv(
+            _cfg(TP_PARALLELISM="4"), binary="tofu", var_file_args=[], has_plan_file=True
+        )
+        assert "-parallelism=4" in argv
+
+    def test_apply_carries_it_without_a_plan_file(self) -> None:
+        argv = plan_apply.build_apply_argv(
+            _cfg(TP_PARALLELISM="4"), binary="tofu", var_file_args=[], has_plan_file=False
+        )
+        assert "-parallelism=4" in argv
+
+    def test_an_absent_env_falls_back_to_the_default(self) -> None:
+        """A runner older than the API sending it must still run sensibly."""
+        argv = plan_apply.build_plan_argv(_cfg(), binary="tofu", var_file_args=[])
+        assert "-parallelism=10" in argv

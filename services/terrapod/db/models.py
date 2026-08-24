@@ -317,6 +317,20 @@ class Workspace(Base):
     resource_cpu: Mapped[str] = mapped_column(String(20), nullable=False, default="1")
     resource_memory: Mapped[str] = mapped_column(String(20), nullable=False, default="2Gi")
 
+    #: How many operations the engine performs at once (#1431). One setting for
+    #: every engine: `-parallelism` for terraform/tofu, `--parallel` for Pulumi,
+    #: `forks` for Ansible. The unit differs — the first two count concurrent
+    #: resource operations, Ansible counts hosts — so the docs say which; what is
+    #: shared is that this is the knob converting the workspace's CPU and memory
+    #: allocation above into actual load.
+    #:
+    #: 10 because that is terraform's own default, so adding this column changed
+    #: no existing workspace's behaviour. Held explicitly rather than left to the
+    #: engine because Pulumi derives its default from the CPU count, and here CPU
+    #: is itself a per-workspace setting — so resizing a runner would otherwise
+    #: silently change concurrency, with nothing in the configuration saying so.
+    parallelism: Mapped[int] = mapped_column(Integer, nullable=False, default=10)
+
     # RBAC
     labels: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, nullable=False)
     owner_email: Mapped[str] = mapped_column(String(255), nullable=False, default="")
@@ -1208,6 +1222,10 @@ class AutodiscoveryRule(Base):
     terraform_version: Mapped[str] = mapped_column(String(50), nullable=False, default="1.12")
     resource_cpu: Mapped[str] = mapped_column(String(20), nullable=False, default="1")
     resource_memory: Mapped[str] = mapped_column(String(20), nullable=False, default="2Gi")
+    #: Templated onto workspaces this rule materialises (#1431), alongside the
+    #: resources above — a monorepo's directories are rarely uniform in weight, so
+    #: a rule that can size the runner should be able to say how hard to drive it.
+    parallelism: Mapped[int] = mapped_column(Integer, nullable=False, default=10)
     auto_apply: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     # Templated onto workspaces this rule materialises (#1274).
     auto_apply_mode: Mapped[str] = mapped_column(String(20), nullable=False, default="never")
@@ -1659,6 +1677,9 @@ class Run(Base):
     terragrunt_version: Mapped[str] = mapped_column(String(20), nullable=False, default="")
     resource_cpu: Mapped[str] = mapped_column(String(20), nullable=False, default="1")
     resource_memory: Mapped[str] = mapped_column(String(20), nullable=False, default="2Gi")
+    #: Snapshotted from the workspace at run creation, like the resources above,
+    #: so editing the workspace mid-flight cannot change a run already under way.
+    parallelism: Mapped[int] = mapped_column(Integer, nullable=False, default=10)
     # `pool_id` is the pool this run is currently associated with: at creation
     # it is element 0 of the workspace's pool set, and on claim it is rewritten
     # to the pool that actually took the run — so cancellation, job-status

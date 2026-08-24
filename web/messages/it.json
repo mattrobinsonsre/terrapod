@@ -974,7 +974,8 @@
       "runTaskTemplates": "Template di run task (creati su ogni nuovo workspace)",
       "notificationTemplates": "Template di notifica (creati su ogni nuovo workspace)",
       "saving": "Salvataggio in corso...",
-      "previewTitle": "Percorri il repository e visualizza in anteprima quali workspace questa regola CREEREBBE — nessuna persistenza"
+      "previewTitle": "Percorri il repository e visualizza in anteprima quali workspace questa regola CREEREBBE — nessuna persistenza",
+      "parallelism": "Parallelismo"
     },
     "table": {
       "name": "Nome",
@@ -2290,7 +2291,9 @@
       "triggerPrefixesNone": "Nessuno (usa la directory di lavoro)",
       "driftIgnoreRules": "Regole di ignoramento della deriva",
       "driftIgnoreRulesHint": "Percorsi di indirizzi Terraform + attributi con supporto glob soppressi dal classificatore di deriva. <star></star> corrisponde a zero o più caratteri diversi da <dot></dot> (copre <n></n> indici); <starIdx></starIdx> corrisponde a qualsiasi indice tra parentesi. Un indirizzo nudo senza suffisso di attributo silenzia qualsiasi modifica a quella risorsa — incluse le distruzioni. Riguarda solo la deriva, non il normale plan/apply. Consulta <docs>drift-ignore-rules.md</docs> per la grammatica completa.",
-      "driftIgnoreRulesNone": "Nessuna (ogni diff del plan conta come deriva)"
+      "driftIgnoreRulesNone": "Nessuna (ogni diff del plan conta come deriva)",
+      "parallelism": "Parallelismo",
+      "parallelismTitle": "Quante operazioni vengono eseguite contemporaneamente (1-256). Predefinito: 10."
     },
     "vcsWorkflowWarning": {
       "title": "Autorizzazione delegata al tuo repository VCS.",

@@ -974,7 +974,8 @@
       "runTaskTemplates": "Run task templatez (createded on each new workspace)",
       "notificationTemplates": "Notificashun templatez (createded on each new workspace)",
       "saving": "Savin...",
-      "previewTitle": "Walk teh repo an preview which workspaces dis rule WUD create — no persistence"
+      "previewTitle": "Walk teh repo an preview which workspaces dis rule WUD create — no persistence",
+      "parallelism": "Parallelizm"
     },
     "table": {
       "name": "Naym",
@@ -2290,7 +2291,9 @@
       "triggerPrefixesNone": "Noes (usez workin directory)",
       "driftIgnoreRules": "Drift Ignor Rulez",
       "driftIgnoreRulesHint": "Glob-aware Terraform addresz + attribyoot pathz supprest by teh drift classifiur. <star></star> matchez zero or moar non-<dot></dot> charz (spanz <n></n> indicez); <starIdx></starIdx> matchez any brackeded indeks. A bare addresz wif no attribyoot suffiks silencez any change ta dat resorce — includin destroyz. Affectz drift only, not regular plan/apply. See <docs>drift-ignore-rules.md</docs> fer teh full grammur.",
-      "driftIgnoreRulesNone": "Noes (evry plan diff countz az drift)"
+      "driftIgnoreRulesNone": "Noes (evry plan diff countz az drift)",
+      "parallelism": "Parallelizm",
+      "parallelismTitle": "How many fingz runz at teh same tiem (1-256). Defawlt 10. srsly"
     },
     "vcsWorkflowWarning": {
       "title": "Authorizashun delegayted ta ur VCS repozitory.",

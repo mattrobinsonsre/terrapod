@@ -974,7 +974,8 @@
       "runTaskTemplates": "Modelos de run task (criados em cada novo workspace)",
       "notificationTemplates": "Modelos de notificação (criados em cada novo workspace)",
       "saving": "Salvando...",
-      "previewTitle": "Percorra o repositório e veja uma prévia de quais workspaces esta regra CRIARIA — sem persistência"
+      "previewTitle": "Percorra o repositório e veja uma prévia de quais workspaces esta regra CRIARIA — sem persistência",
+      "parallelism": "Paralelismo"
     },
     "table": {
       "name": "Nome",
@@ -2290,7 +2291,9 @@
       "triggerPrefixesNone": "Nenhum (usa o diretório de trabalho)",
       "driftIgnoreRules": "Regras de Ignorar Drift",
       "driftIgnoreRulesHint": "Caminhos de endereço + atributo do Terraform com reconhecimento de glob, suprimidos pelo classificador de drift. <star></star> corresponde a zero ou mais caracteres não-<dot></dot> (abrange <n></n> índices); <starIdx></starIdx> corresponde a qualquer índice entre colchetes. Um endereço isolado, sem sufixo de atributo, silencia qualquer alteração naquele recurso — incluindo destroys. Afeta apenas o drift, não o plan/apply normal. Consulte <docs>drift-ignore-rules.md</docs> para a gramática completa.",
-      "driftIgnoreRulesNone": "Nenhuma (toda diferença de plano conta como drift)"
+      "driftIgnoreRulesNone": "Nenhuma (toda diferença de plano conta como drift)",
+      "parallelism": "Paralelismo",
+      "parallelismTitle": "Quantas operações são executadas ao mesmo tempo (1-256). Padrão: 10."
     },
     "vcsWorkflowWarning": {
       "title": "Autorização delegada ao seu repositório VCS.",

@@ -154,6 +154,7 @@ def _run_json(
                 "terragrunt-enabled": run.terragrunt_enabled,
                 "terragrunt-version": run.terragrunt_version,
                 "resource-cpu": run.resource_cpu,
+                "parallelism": run.parallelism,
                 "resource-memory": run.resource_memory,
                 # Which agent pool has this run (#1231). At creation this is
                 # element 0 of the workspace's pool set; on claim it is

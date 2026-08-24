@@ -47,6 +47,7 @@ from terrapod.crypto.state import decrypt_state_bytes, encrypt_state_bytes
 from terrapod.db.models import StateVersion, Variable, Workspace
 from terrapod.logging_config import get_logger
 from terrapod.services.label_validation import sanitize_labels
+from terrapod.services.parallelism import DEFAULT_PARALLELISM
 from terrapod.services.workspace_name import validate_workspace_name
 from terrapod.storage import get_storage
 from terrapod.storage.keys import (
@@ -95,6 +96,7 @@ def _settings_snapshot(ws: Workspace) -> dict[str, Any]:
         "working_directory": ws.working_directory,
         "var_files": list(ws.var_files or []),
         "resource_cpu": ws.resource_cpu,
+        "parallelism": ws.parallelism,
         "resource_memory": ws.resource_memory,
         "auto_apply": ws.auto_apply,
         # The boolean above is only a projection — it is true for `always`,
@@ -460,6 +462,7 @@ async def restore_workspace(
         working_directory=settings.get("working_directory") or "",
         var_files=list(settings.get("var_files") or []),
         resource_cpu=settings.get("resource_cpu") or "1",
+        parallelism=settings.get("parallelism") or DEFAULT_PARALLELISM,
         resource_memory=settings.get("resource_memory") or "2Gi",
         drift_ignore_rules=list(settings.get("drift_ignore_rules") or []),
         # Settings that only describe how a run is evaluated, and cannot start

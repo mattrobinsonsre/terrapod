@@ -78,6 +78,7 @@ data terrapod_workspace.lifecycle_state required=false optional=false computed=t
 data terrapod_workspace.locked required=false optional=false computed=true sensitive=false type=basetypes.BoolType
 data terrapod_workspace.name required=true optional=false computed=false sensitive=false type=basetypes.StringType
 data terrapod_workspace.owner_email required=false optional=false computed=true sensitive=false type=basetypes.StringType
+data terrapod_workspace.parallelism required=false optional=false computed=true sensitive=false type=basetypes.Int64Type
 data terrapod_workspace.plan_expiry_seconds required=false optional=false computed=true sensitive=false type=basetypes.Int64Type
 data terrapod_workspace.resource_cpu required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.resource_memory required=false optional=false computed=true sensitive=false type=basetypes.StringType
@@ -151,6 +152,7 @@ resource terrapod_autodiscovery_rule.name_template required=false optional=true 
 resource terrapod_autodiscovery_rule.notification_templates required=false optional=true computed=false sensitive=false type=types.ListType[types.ObjectType["destination_type":basetypes.StringType, "email_addresses":types.ListType[basetypes.StringType], "enabled":basetypes.BoolType, "name":basetypes.StringType, "token":basetypes.StringType, "triggers":types.ListType[basetypes.StringType], "url":basetypes.StringType]]
 resource terrapod_autodiscovery_rule.on_directory_delete required=false optional=true computed=false sensitive=false type=basetypes.StringType
 resource terrapod_autodiscovery_rule.owner_email required=false optional=true computed=true sensitive=false type=basetypes.StringType
+resource terrapod_autodiscovery_rule.parallelism required=false optional=true computed=true sensitive=false type=basetypes.Int64Type
 resource terrapod_autodiscovery_rule.pattern required=true optional=false computed=false sensitive=false type=basetypes.StringType
 resource terrapod_autodiscovery_rule.repo_url required=true optional=false computed=false sensitive=false type=basetypes.StringType
 resource terrapod_autodiscovery_rule.resource_cpu required=false optional=true computed=true sensitive=false type=basetypes.StringType
@@ -378,6 +380,7 @@ resource terrapod_workspace.lifecycle_state required=false optional=false comput
 resource terrapod_workspace.locked required=false optional=false computed=true sensitive=false type=basetypes.BoolType
 resource terrapod_workspace.name required=true optional=false computed=false sensitive=false type=basetypes.StringType
 resource terrapod_workspace.owner_email required=false optional=false computed=true sensitive=false type=basetypes.StringType
+resource terrapod_workspace.parallelism required=false optional=true computed=true sensitive=false type=basetypes.Int64Type
 resource terrapod_workspace.plan_expiry_seconds required=false optional=true computed=true sensitive=false type=basetypes.Int64Type
 resource terrapod_workspace.remote_state_consumers required=false optional=true computed=true sensitive=false type=types.SetType[basetypes.StringType]
 resource terrapod_workspace.resource_cpu required=false optional=true computed=true sensitive=false type=basetypes.StringType

@@ -974,7 +974,8 @@
       "runTaskTemplates": "Run 745k 73mpl4735 (cr3473d 0n 34ch n3w w0rk5p4c3)",
       "notificationTemplates": "N071f1c4710n 73mpl4735 (cr3473d 0n 34ch n3w w0rk5p4c3)",
       "saving": "54v1ng...",
-      "previewTitle": "W4lk 7h3 r3p0 4nd pr3v13w wh1ch w0rk5p4c35 7h15 rul3 W0ULD cr3473 — n0 p3r51573nc3"
+      "previewTitle": "W4lk 7h3 r3p0 4nd pr3v13w wh1ch w0rk5p4c35 7h15 rul3 W0ULD cr3473 — n0 p3r51573nc3",
+      "parallelism": "P4r4ll3l15m"
     },
     "table": {
       "name": "N4m3",
@@ -2290,7 +2291,9 @@
       "triggerPrefixesNone": "N0n3 (u535 w0rk1ng d1r3c70ry)",
       "driftIgnoreRules": "Dr1f7 1gn0r3 Rul35",
       "driftIgnoreRulesHint": "Gl0b-4w4r3 73rr4f0rm 4ddr355 + 477r1bu73 p47h5 5uppr3553d by 7h3 dr1f7 cl4551f13r. <star></star> m47ch35 z3r0 0r m0r3 n0n-<dot></dot> ch4r5 (5p4n5 <n></n> 1nd1c35); <starIdx></starIdx> m47ch35 4ny br4ck373d 1nd3x. 4 b4r3 4ddr355 w17h n0 477r1bu73 5uff1x 51l3nc35 4ny ch4ng3 70 7h47 r350urc3 — 1nclud1ng d357r0y5. 4ff3c75 dr1f7 0nly, n07 r3gul4r pl4n/4pply. 533 <docs>dr1f7-1gn0r3-rul35.md</docs> f0r 7h3 full gr4mm4r.",
-      "driftIgnoreRulesNone": "N0n3 (3v3ry pl4n d1ff c0un75 45 dr1f7)"
+      "driftIgnoreRulesNone": "N0n3 (3v3ry pl4n d1ff c0un75 45 dr1f7)",
+      "parallelism": "P4r4ll3l15m",
+      "parallelismTitle": "H0w m4ny 0p3r4710n5 run 47 0nc3 (1-256). D3f4ul7 10."
     },
     "vcsWorkflowWarning": {
       "title": "4u7h0r1z4710n d3l3g473d 70 y0ur VC5 r3p05170ry.",

@@ -39,6 +39,7 @@ type Workspace struct {
 	TerragruntVersion string            `json:"terragrunt-version,omitempty"`
 	WorkingDirectory  string            `json:"working-directory,omitempty"`
 	ResourceCPU       string            `json:"resource-cpu,omitempty"`
+	Parallelism       int64             `json:"parallelism,omitempty"`
 	ResourceMemory    string            `json:"resource-memory,omitempty"`
 	VCSRepoURL        string            `json:"vcs-repo-url,omitempty"`
 	VCSBranch         string            `json:"vcs-branch,omitempty"`
@@ -142,6 +143,7 @@ type CreateWorkspaceRequest struct {
 	TerragruntVersion             string            `json:"terragrunt-version,omitempty"`
 	WorkingDirectory              string            `json:"working-directory,omitempty"`
 	ResourceCPU                   string            `json:"resource-cpu,omitempty"`
+	Parallelism                   int64             `json:"parallelism,omitempty"`
 	ResourceMemory                string            `json:"resource-memory,omitempty"`
 	VCSRepoURL                    string            `json:"vcs-repo-url,omitempty"`
 	VCSBranch                     string            `json:"vcs-branch,omitempty"`
@@ -197,6 +199,7 @@ type UpdateWorkspaceRequest struct {
 	TerragruntVersion             string            `json:"terragrunt-version,omitempty"`
 	WorkingDirectory              string            `json:"working-directory,omitempty"`
 	ResourceCPU                   string            `json:"resource-cpu,omitempty"`
+	Parallelism                   int64             `json:"parallelism,omitempty"`
 	ResourceMemory                string            `json:"resource-memory,omitempty"`
 	VCSRepoURL                    string            `json:"vcs-repo-url,omitempty"`
 	VCSBranch                     string            `json:"vcs-branch,omitempty"`
@@ -443,6 +446,9 @@ func workspaceCreateAttrs(req CreateWorkspaceRequest) map[string]any {
 	if req.WorkingDirectory != "" {
 		attrs["working-directory"] = req.WorkingDirectory
 	}
+	if req.Parallelism != 0 {
+		attrs["parallelism"] = req.Parallelism
+	}
 	if req.ResourceCPU != "" {
 		attrs["resource-cpu"] = req.ResourceCPU
 	}
@@ -551,6 +557,9 @@ func workspaceUpdateAttrs(req UpdateWorkspaceRequest) map[string]any {
 	}
 	if req.WorkingDirectory != "" {
 		attrs["working-directory"] = req.WorkingDirectory
+	}
+	if req.Parallelism != 0 {
+		attrs["parallelism"] = req.Parallelism
 	}
 	if req.ResourceCPU != "" {
 		attrs["resource-cpu"] = req.ResourceCPU
@@ -668,6 +677,7 @@ func workspaceFromResource(res *Resource) *Workspace {
 		TerragruntVersion:             GetStringAttr(res, "terragrunt-version"),
 		WorkingDirectory:              GetStringAttr(res, "working-directory"),
 		ResourceCPU:                   GetStringAttr(res, "resource-cpu"),
+		Parallelism:                   GetIntAttr(res, "parallelism"),
 		ResourceMemory:                GetStringAttr(res, "resource-memory"),
 		VCSRepoURL:                    GetStringAttr(res, "vcs-repo-url"),
 		VCSBranch:                     GetStringAttr(res, "vcs-branch"),

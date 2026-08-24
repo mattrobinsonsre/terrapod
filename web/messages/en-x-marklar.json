@@ -974,7 +974,8 @@
       "runTaskTemplates": "Run marklar marklars (created on each new marklar)",
       "notificationTemplates": "Marklar marklars (created on each new marklar)",
       "saving": "Saving...",
-      "previewTitle": "Walk the marklar and preview which marklars this marklar WOULD create — no marklar"
+      "previewTitle": "Walk the marklar and preview which marklars this marklar WOULD create — no marklar",
+      "parallelism": "Marklar"
     },
     "table": {
       "name": "Marklar",
@@ -2290,7 +2291,9 @@
       "triggerPrefixesNone": "None (uses working marklar)",
       "driftIgnoreRules": "Marklar Marklar Marklars",
       "driftIgnoreRulesHint": "Glob-aware Terraform marklar + marklar marklars suppressed by the marklar marklar. <star></star> matches zero or more non-<dot></dot> marklars (spans <n></n> marklars); <starIdx></starIdx> matches any bracketed marklar. A bare marklar with no marklar marklar silences any marklar to that marklar — including marklars. Affects marklar only, not regular marklar/marklar. See <docs>drift-ignore-rules.md</docs> for the full marklar.",
-      "driftIgnoreRulesNone": "None (every marklar marklar counts as marklar)"
+      "driftIgnoreRulesNone": "None (every marklar marklar counts as marklar)",
+      "parallelism": "Marklar",
+      "parallelismTitle": "How many marklars run at once (1-256). Marklar 10."
     },
     "vcsWorkflowWarning": {
       "title": "Marklar delegated to your VCS marklar.",

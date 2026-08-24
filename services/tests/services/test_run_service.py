@@ -406,6 +406,7 @@ def _mock_workspace(**kwargs):
     ws.terragrunt_enabled = kwargs.get("terragrunt_enabled", False)
     ws.terragrunt_version = kwargs.get("terragrunt_version", "1.0")
     ws.resource_cpu = kwargs.get("resource_cpu", "1")
+    ws.parallelism = 10
     ws.resource_memory = kwargs.get("resource_memory", "2Gi")
     # Pool set is a relationship (#1087); a MagicMock here would not read back
     # as links, so it is always a real list.
@@ -462,6 +463,28 @@ class TestCreateRun:
         await create_run(db, ws)
         assert MockRun.call_args[1]["resource_cpu"] == "2"
         assert MockRun.call_args[1]["resource_memory"] == "4Gi"
+
+    @patch("terrapod.services.run_service.Run")
+    async def test_parallelism_snapshot_from_workspace(self, MockRun):
+        """Frozen at creation like the resources (#1431).
+
+        Otherwise raising a workspace's parallelism would change the concurrency
+        of a run already part-way through applying, which is the one moment a
+        change to it is least welcome.
+        """
+        db = AsyncMock(spec=AsyncSession)
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None
+        db.execute.return_value = mock_result
+
+        ws = _mock_workspace()
+        ws.parallelism = 3
+        instance = MockRun.return_value
+        instance.id = uuid.uuid4()
+        instance.status = "pending"
+
+        await create_run(db, ws)
+        assert MockRun.call_args[1]["parallelism"] == 3
 
     @patch("terrapod.services.run_service.Run")
     async def test_terragrunt_snapshot_from_workspace(self, MockRun):

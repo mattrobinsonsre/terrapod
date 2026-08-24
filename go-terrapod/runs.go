@@ -63,6 +63,7 @@ type Run struct {
 	TerragruntEnabled bool   `json:"terragrunt-enabled"`
 	TerragruntVersion string `json:"terragrunt-version,omitempty"`
 	ResourceCPU       string `json:"resource-cpu,omitempty"`
+	Parallelism       int64  `json:"parallelism,omitempty"`
 	ResourceMemory    string `json:"resource-memory,omitempty"`
 	// Resource profile — populated once the Job reports it. Nil until then.
 	PeakMemoryBytes  *int64 `json:"peak-memory-bytes,omitempty"`
@@ -334,6 +335,7 @@ func runFromResource(res *Resource) *Run {
 		TerragruntEnabled:       GetBoolAttr(res, "terragrunt-enabled"),
 		TerragruntVersion:       GetStringAttr(res, "terragrunt-version"),
 		ResourceCPU:             GetStringAttr(res, "resource-cpu"),
+		Parallelism:             GetIntAttr(res, "parallelism"),
 		ResourceMemory:          GetStringAttr(res, "resource-memory"),
 		RunnerExitReason:        GetStringAttr(res, "runner-exit-reason"),
 		RunnerExitStatus:        GetStringAttr(res, "runner-exit-status"),

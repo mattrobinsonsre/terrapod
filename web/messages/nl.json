@@ -974,7 +974,8 @@
       "runTaskTemplates": "Run-tasksjablonen (aangemaakt op elke nieuwe workspace)",
       "notificationTemplates": "Notificatiesjablonen (aangemaakt op elke nieuwe workspace)",
       "saving": "Bezig met opslaan...",
-      "previewTitle": "Doorloop de repo en bekijk welke workspaces deze regel ZOU aanmaken — zonder persistentie"
+      "previewTitle": "Doorloop de repo en bekijk welke workspaces deze regel ZOU aanmaken — zonder persistentie",
+      "parallelism": "Parallellisme"
     },
     "table": {
       "name": "Naam",
@@ -2290,7 +2291,9 @@
       "triggerPrefixesNone": "Geen (gebruikt werkmap)",
       "driftIgnoreRules": "Drift-negeerregels",
       "driftIgnoreRulesHint": "Glob-bewuste Terraform-adres- + attribuutpaden die door de drift-classificator worden onderdrukt. <star></star> komt overeen met nul of meer niet-<dot></dot>-tekens (overspant <n></n> indices); <starIdx></starIdx> komt overeen met elke index tussen haakjes. Een kaal adres zonder attribuutachtervoegsel dempt elke wijziging aan die resource — inclusief destroys. Beïnvloedt alleen drift, niet gewone plan/apply. Zie <docs>drift-ignore-rules.md</docs> voor de volledige grammatica.",
-      "driftIgnoreRulesNone": "Geen (elk planverschil telt als drift)"
+      "driftIgnoreRulesNone": "Geen (elk planverschil telt als drift)",
+      "parallelism": "Parallellisme",
+      "parallelismTitle": "Hoeveel bewerkingen tegelijk worden uitgevoerd (1-256). Standaard: 10."
     },
     "vcsWorkflowWarning": {
       "title": "Autorisatie gedelegeerd aan uw VCS-repository.",

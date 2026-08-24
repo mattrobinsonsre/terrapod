@@ -41,6 +41,8 @@ def build_plan_argv(
     plan_file: str = "tfplan",
 ) -> list[str]:
     argv = [binary, "plan", "-input=false", "-detailed-exitcode", f"-out={plan_file}"]
+    if cfg.parallelism:
+        argv.append(f"-parallelism={cfg.parallelism}")
     if cfg.refresh_only:
         argv.append("-refresh-only")
     if not cfg.refresh:
@@ -65,6 +67,12 @@ def build_apply_argv(
     plan_file: str = "tfplan",
 ) -> list[str]:
     argv = [binary, "apply", "-input=false"]
+    # Before the saved-plan branch below, deliberately. Unlike var-files and
+    # -target, parallelism is not baked into a plan file — it is a runtime
+    # concurrency limit, and apply is the phase that actually makes the provider
+    # calls a throttled workspace is trying to throttle (#1431).
+    if cfg.parallelism:
+        argv.append(f"-parallelism={cfg.parallelism}")
     if has_plan_file:
         # When the binary plan file is present, var-files / -target are
         # already baked in — re-specifying them would error.

@@ -974,7 +974,8 @@
       "runTaskTemplates": "Exemplaria munerum exsecutionis (in quolibet novo loco operis creata)",
       "notificationTemplates": "Exemplaria nuntiationum (in quolibet novo loco operis creata)",
       "saving": "Servatur...",
-      "previewTitle": "Repositorium perambula et praevide quae loca operis haec regula CREET — nulla persistentia"
+      "previewTitle": "Repositorium perambula et praevide quae loca operis haec regula CREET — nulla persistentia",
+      "parallelism": "Parallelismus"
     },
     "table": {
       "name": "Nomen",
@@ -2290,7 +2291,9 @@
       "triggerPrefixesNone": "Nulla (directorio operandi utitur)",
       "driftIgnoreRules": "Regulae Aberrationem Neglegendi",
       "driftIgnoreRulesHint": "Semitae inscriptionum et attributorum Terraform globi-gnarae a classificatore aberrationis suppressae. <star></star> zero aut plures characteres non-<dot></dot> convenit (spatium <n></n> indicum); <starIdx></starIdx> quemvis indicem uncinatum convenit. Inscriptio nuda sine suffixo attributi quamvis mutationem illius facultatis silet — destructiones inclusas. Solam aberrationem afficit, non normale plan/apply. Vide <docs>drift-ignore-rules.md</docs> pro grammatica plena.",
-      "driftIgnoreRulesNone": "Nulla (omnis differentia consilii ut aberratio numeratur)"
+      "driftIgnoreRulesNone": "Nulla (omnis differentia consilii ut aberratio numeratur)",
+      "parallelism": "Parallelismus",
+      "parallelismTitle": "Quot operationes simul exercentur (1-256). Praedefinitum 10."
     },
     "vcsWorkflowWarning": {
       "title": "Auctoritas repositorio VCS tuo delegata.",

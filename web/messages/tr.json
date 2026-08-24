@@ -974,7 +974,8 @@
       "runTaskTemplates": "Çalıştırma görevi şablonları (her yeni çalışma alanında oluşturulur)",
       "notificationTemplates": "Bildirim şablonları (her yeni çalışma alanında oluşturulur)",
       "saving": "Kaydediliyor...",
-      "previewTitle": "Repo''yu tarayın ve bu kuralın HANGİ çalışma alanlarını oluşturacağını önizleyin — kalıcılık yok"
+      "previewTitle": "Repo''yu tarayın ve bu kuralın HANGİ çalışma alanlarını oluşturacağını önizleyin — kalıcılık yok",
+      "parallelism": "Paralellik"
     },
     "table": {
       "name": "Ad",
@@ -2290,7 +2291,9 @@
       "triggerPrefixesNone": "Yok (çalışma dizinini kullanır)",
       "driftIgnoreRules": "Sürüklenme Yoksayma Kuralları",
       "driftIgnoreRulesHint": "Sürüklenme sınıflandırıcısı tarafından bastırılan glob duyarlı Terraform adres + öznitelik yolları. <star></star> sıfır veya daha fazla <dot></dot> olmayan karakterle eşleşir (<n></n> dizin boyunca yayılır); <starIdx></starIdx> herhangi bir köşeli parantezli dizinle eşleşir. Öznitelik son eki olmayan çıplak bir adres, o kaynağa yapılan her değişikliği — yok etmeler dahil — susturur. Yalnızca sürüklenmeyi etkiler, normal plan/apply''ı değil. Tam dilbilgisi için <docs>drift-ignore-rules.md</docs> bölümüne bakın.",
-      "driftIgnoreRulesNone": "Yok (her plan farkı sürüklenme sayılır)"
+      "driftIgnoreRulesNone": "Yok (her plan farkı sürüklenme sayılır)",
+      "parallelism": "Paralellik",
+      "parallelismTitle": "Aynı anda kaç işlemin çalıştırılacağı (1-256). Varsayılan 10."
     },
     "vcsWorkflowWarning": {
       "title": "Yetkilendirme VCS deponuza devredildi.",

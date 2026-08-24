@@ -778,6 +778,7 @@ class TestUnschedulable:
             plan_started_at=datetime.now(UTC) - timedelta(minutes=10),
         )
         run.resource_cpu = "1"
+        run.parallelism = 10
         run.resource_memory = "2Gi"
 
         await _check_unschedulable(db, run)

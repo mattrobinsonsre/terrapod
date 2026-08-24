@@ -17,6 +17,7 @@ def _mock_workspace(**overrides):
     ws.locked = False
     ws.lock_id = None
     ws.resource_cpu = "1"
+    ws.parallelism = 10
     ws.resource_memory = "2Gi"
     _pool = overrides.get("agent_pool_id", None)
     ws.agent_pool_links = (

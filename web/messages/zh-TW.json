@@ -974,7 +974,8 @@
       "runTaskTemplates": "執行任務模板（在每個新工作區上建立）",
       "notificationTemplates": "通知模板（在每個新工作區上建立）",
       "saving": "正在儲存...",
-      "previewTitle": "遍歷倉庫並預覽此規則將會建立哪些工作區 — 不會持久化"
+      "previewTitle": "遍歷倉庫並預覽此規則將會建立哪些工作區 — 不會持久化",
+      "parallelism": "平行度"
     },
     "table": {
       "name": "名稱",
@@ -2290,7 +2291,9 @@
       "triggerPrefixesNone": "無（使用工作目錄）",
       "driftIgnoreRules": "漂移忽略規則",
       "driftIgnoreRulesHint": "由漂移分類器抑制的、支援萬用字元的 Terraform 地址 + 屬性路徑。<star></star> 匹配零個或多個非 <dot></dot> 字元（跨越 <n></n> 個索引）；<starIdx></starIdx> 匹配任意方括號索引。沒有屬性字尾的裸地址會靜默該資源的任何更改 — 包括銷毀。僅影響漂移，不影響常規 plan/apply。完整語法見 <docs>drift-ignore-rules.md</docs>。",
-      "driftIgnoreRulesNone": "無（每個計畫差異都計為漂移）"
+      "driftIgnoreRulesNone": "無（每個計畫差異都計為漂移）",
+      "parallelism": "平行度",
+      "parallelismTitle": "同時執行的作業數 (1-256)。預設值為 10。"
     },
     "vcsWorkflowWarning": {
       "title": "授權已委託給您的 VCS 倉庫。",
