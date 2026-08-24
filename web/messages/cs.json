@@ -128,12 +128,13 @@
       "noMatch": "Tomuto filtru neodpovídají žádné pracovní prostory."
     },
     "group": {
-      "label": "Group",
-      "flat": "Flat",
-      "repo": "Repository",
-      "repoPath": "Repository + Path",
-      "collapseAll": "Collapse all",
-      "expandAll": "Expand all"
+      "label": "Seskupit",
+      "flat": "Ploché",
+      "repo": "Repozitář",
+      "repoPath": "Repozitář + Cesta",
+      "local": "Místní",
+      "collapseAll": "Sbalit vše",
+      "expandAll": "Rozbalit vše"
     }
   },
   "status": {

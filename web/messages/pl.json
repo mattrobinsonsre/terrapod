@@ -128,12 +128,13 @@
       "noMatch": "Żaden obszar roboczy nie pasuje do tego filtra."
     },
     "group": {
-      "label": "Group",
-      "flat": "Flat",
-      "repo": "Repository",
-      "repoPath": "Repository + Path",
-      "collapseAll": "Collapse all",
-      "expandAll": "Expand all"
+      "label": "Grupuj",
+      "flat": "Płaski",
+      "repo": "Repozytorium",
+      "repoPath": "Repozytorium + Ścieżka",
+      "local": "Lokalne",
+      "collapseAll": "Zwiń wszystko",
+      "expandAll": "Rozwiń wszystko"
     }
   },
   "status": {

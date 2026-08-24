@@ -128,12 +128,13 @@
       "noMatch": "Geen workspaces komen overeen met dit filter."
     },
     "group": {
-      "label": "Group",
-      "flat": "Flat",
+      "label": "Groeperen",
+      "flat": "Plat",
       "repo": "Repository",
-      "repoPath": "Repository + Path",
-      "collapseAll": "Collapse all",
-      "expandAll": "Expand all"
+      "repoPath": "Repository + Pad",
+      "local": "Lokaal",
+      "collapseAll": "Alles inklappen",
+      "expandAll": "Alles uitklappen"
     }
   },
   "status": {

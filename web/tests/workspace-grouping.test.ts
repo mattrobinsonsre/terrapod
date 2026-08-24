@@ -5,7 +5,8 @@ import {
   countWorkspaces,
   parseGroupParam,
   serializeGroupParam,
-} from '../workspace-grouping'
+  LOCAL_GROUP_KEY,
+} from '../src/lib/workspace-grouping.ts'
 
 function ws(id: string, name: string, vcsRepoUrl?: string, workingDir?: string) {
   return {
@@ -109,7 +110,9 @@ describe('buildWorkspaceTree', () => {
     const result = buildWorkspaceTree(workspaces, 'repo')
     assert.equal(result.length, 2)
     assert.equal(result[0].label, 'repo')
-    assert.equal(result[1].label, 'Local')
+    // The local bucket carries a stable marker key (translated at view time),
+    // never a display string in this module.
+    assert.equal(result[1].key, LOCAL_GROUP_KEY)
     assert.equal(result[1].workspaces[0].name, 'local-ws')
   })
 
@@ -130,6 +133,63 @@ describe('buildWorkspaceTree', () => {
     assert.equal(result.length, 2)
     const names = result.map(g => g.workspaces[0].name).sort()
     assert.deepEqual(names, ['org-a-infra', 'org-b-infra'])
+  })
+
+  it('disambiguates same-basename repos with owner/name labels, keeping unique ones short', () => {
+    const workspaces = [
+      ws('1', 'a-infra', 'https://github.com/org-a/infra.git'),
+      ws('2', 'b-infra', 'https://github.com/org-b/infra.git'),
+      ws('3', 'app-ws', 'https://github.com/org-a/app.git'),
+    ]
+    const result = buildWorkspaceTree(workspaces, 'repo')
+    const labels = result.map(g => g.label).sort()
+    // 'app' is unique so it stays a bare basename; the two 'infra' collide so
+    // they fall back to owner/name and render distinctly.
+    assert.deepEqual(labels, ['app', 'org-a/infra', 'org-b/infra'])
+  })
+
+  it('disambiguates colliding SSH-style repos by owner/name', () => {
+    const workspaces = [
+      ws('1', 'a', 'git@github.com:org-a/infra.git'),
+      ws('2', 'b', 'git@gitlab.com:org-b/infra.git'),
+    ]
+    const result = buildWorkspaceTree(workspaces, 'repo')
+    const labels = result.map(g => g.label).sort()
+    assert.deepEqual(labels, ['org-a/infra', 'org-b/infra'])
+  })
+
+  it('disambiguates the same owner/name on different hosts by including the host', () => {
+    const workspaces = [
+      ws('1', 'gh', 'https://github.com/org/infra.git'),
+      ws('2', 'gl', 'https://gitlab.com/org/infra.git'),
+    ]
+    const result = buildWorkspaceTree(workspaces, 'repo')
+    assert.equal(result.length, 2)
+    // owner/name (`org/infra`) collides too, so the label falls back to the
+    // full host/owner/name — the only thing that tells the two repos apart.
+    const labels = result.map(g => g.label).sort()
+    assert.deepEqual(labels, ['github.com/org/infra', 'gitlab.com/org/infra'])
+  })
+
+  it('merges repos differing only by case into one group with a stable label', () => {
+    const workspaces = [
+      ws('1', 'first', 'https://github.com/Org/Infra.git'),
+      ws('2', 'second', 'https://github.com/org/infra.git'),
+    ]
+    const result = buildWorkspaceTree(workspaces, 'repo')
+    // Same repo, different casing — one group. The label is derived from the
+    // normalised (lowercased) key, so it does not depend on insertion order.
+    assert.equal(result.length, 1)
+    assert.equal(result[0].label, 'infra')
+    assert.equal(result[0].workspaces.length, 2)
+  })
+
+  it('labels a repo with a trailing slash by its basename, not an empty string', () => {
+    const workspaces = [
+      ws('1', 'ws', 'https://github.com/org/infra/'),
+    ]
+    const result = buildWorkspaceTree(workspaces, 'repo')
+    assert.equal(result[0].label, 'infra')
   })
 
   it('sorts groups alphabetically and preserves workspace input order', () => {

@@ -132,8 +132,9 @@
       "flat": "Flat",
       "repo": "Repository",
       "repoPath": "Repository + Path",
-      "collapseAll": "Collapse all",
-      "expandAll": "Expand all"
+      "local": "Local",
+      "collapseAll": "Collapse all, you will",
+      "expandAll": "Expand all, you will"
     }
   },
   "status": {

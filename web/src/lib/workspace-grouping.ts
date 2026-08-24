@@ -13,6 +13,8 @@ export interface WorkspaceItem<T = unknown> {
 
 export type GroupMode = 'flat' | 'repo' | 'repo-path'
 
+export const LOCAL_GROUP_KEY = '__local__'
+
 export function parseGroupParam(param: string | null): GroupMode {
   if (param === 'repo') return 'repo'
   if (param === 'repo-path') return 'repo-path'
@@ -44,7 +46,7 @@ export function buildWorkspaceTree<T extends WsConstraint>(
   }
 
   if (localWorkspaces.length > 0) {
-    const local: WorkspaceGroup<T> = { key: '__local__', label: 'Local', workspaces: [], children: [] }
+    const local: WorkspaceGroup<T> = { key: LOCAL_GROUP_KEY, label: LOCAL_GROUP_KEY, workspaces: [], children: [] }
     for (const ws of localWorkspaces) {
       insertWorkspace(local, ws, mode === 'repo-path')
     }
@@ -63,28 +65,61 @@ function normalizeRepoUrl(url: string): string {
   return cleaned
 }
 
-function repoBasename(url: string): string {
-  if (!url) return ''
-  const cleaned = url.replace(/\.git$/, '')
-  const lastSep = Math.max(cleaned.lastIndexOf('/'), cleaned.lastIndexOf(':'))
-  return lastSep >= 0 ? cleaned.slice(lastSep + 1) : cleaned
+function keySegments(key: string): string[] {
+  return key.split('/').filter(Boolean)
+}
+
+function lastSegments(key: string, n: number): string {
+  const segments = keySegments(key)
+  return (n <= 0 ? segments : segments.slice(-n)).join('/')
+}
+
+// Label a repo group with the shortest suffix of its normalised key
+// (host/owner/name) that is unique across the whole result set. A lone repo
+// stays a bare basename; two repos sharing a basename fall back to owner/name;
+// the same owner/name on different hosts falls back to the full host/owner/name.
+// Working off the normalised key (not the raw first-seen URL) keeps the label
+// deterministic — case-, trailing-slash-, and .git-insensitive.
+function labelForKeys(keys: string[]): Map<string, string> {
+  const maxDepth = Math.max(1, ...keys.map(k => keySegments(k).length))
+  const labels = new Map<string, string>()
+  const pending = new Set(keys)
+
+  for (let depth = 1; depth <= maxDepth && pending.size > 0; depth++) {
+    const counts = new Map<string, number>()
+    for (const key of pending) {
+      const suffix = lastSegments(key, depth)
+      counts.set(suffix, (counts.get(suffix) ?? 0) + 1)
+    }
+    for (const key of [...pending]) {
+      const suffix = lastSegments(key, depth)
+      if (counts.get(suffix) === 1) {
+        labels.set(key, suffix)
+        pending.delete(key)
+      }
+    }
+  }
+  // Anything still colliding at full depth (identical keys shouldn't happen —
+  // they'd be the same group) gets the full key as a last resort.
+  for (const key of pending) labels.set(key, key)
+  return labels
 }
 
 function partitionByRepo<T extends WsConstraint>(workspaces: T[]) {
   const vcs = workspaces.filter(ws => ws.attributes['vcs-repo-url'])
   const local = workspaces.filter(ws => !ws.attributes['vcs-repo-url'])
 
-  const byRepo = new Map<string, { label: string; workspaces: T[] }>()
+  const byRepo = new Map<string, T[]>()
   for (const ws of vcs) {
-    const url = ws.attributes['vcs-repo-url']!
-    const key = normalizeRepoUrl(url)
-    if (!byRepo.has(key)) byRepo.set(key, { label: repoBasename(url), workspaces: [] })
-    byRepo.get(key)!.workspaces.push(ws)
+    const key = normalizeRepoUrl(ws.attributes['vcs-repo-url']!)
+    if (!byRepo.has(key)) byRepo.set(key, [])
+    byRepo.get(key)!.push(ws)
   }
 
+  const labels = labelForKeys([...byRepo.keys()])
   const repoGroups = Array.from(byRepo.entries())
-    .sort(([, a], [, b]) => a.label.localeCompare(b.label))
-    .map(([key, { label, workspaces: ws }]) => ({ key, label, workspaces: ws }))
+    .map(([key, ws]) => ({ key, label: labels.get(key) ?? key, workspaces: ws }))
+    .sort((a, b) => a.label.localeCompare(b.label))
 
   return { repoGroups, localWorkspaces: local }
 }

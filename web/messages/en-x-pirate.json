@@ -128,12 +128,13 @@
       "noMatch": "Nay work decks match this sift."
     },
     "group": {
-      "label": "Group",
+      "label": "Muster",
       "flat": "Flat",
-      "repo": "Repository",
-      "repoPath": "Repository + Path",
-      "collapseAll": "Collapse all",
-      "expandAll": "Expand all"
+      "repo": "Cargo hold",
+      "repoPath": "Cargo hold + Course",
+      "local": "Ashore",
+      "collapseAll": "Batten down all",
+      "expandAll": "Unfurl all"
     }
   },
   "status": {

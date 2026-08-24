@@ -128,12 +128,13 @@
       "noMatch": "没有工作区符合此筛选条件。"
     },
     "group": {
-      "label": "Group",
-      "flat": "Flat",
-      "repo": "Repository",
-      "repoPath": "Repository + Path",
-      "collapseAll": "Collapse all",
-      "expandAll": "Expand all"
+      "label": "分组",
+      "flat": "平铺",
+      "repo": "仓库",
+      "repoPath": "仓库 + 路径",
+      "local": "本地",
+      "collapseAll": "全部折叠",
+      "expandAll": "全部展开"
     }
   },
   "status": {

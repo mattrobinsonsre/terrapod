@@ -128,12 +128,13 @@
       "noMatch": "沒有工作區符合此篩選條件。"
     },
     "group": {
-      "label": "Group",
-      "flat": "Flat",
-      "repo": "Repository",
-      "repoPath": "Repository + Path",
-      "collapseAll": "Collapse all",
-      "expandAll": "Expand all"
+      "label": "分組",
+      "flat": "平鋪",
+      "repo": "儲存庫",
+      "repoPath": "儲存庫 + 路徑",
+      "local": "本機",
+      "collapseAll": "全部收合",
+      "expandAll": "全部展開"
     }
   },
   "status": {

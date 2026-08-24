@@ -128,12 +128,13 @@
       "noMatch": "No marklars match this filter."
     },
     "group": {
-      "label": "Group",
-      "flat": "Flat",
-      "repo": "Repository",
-      "repoPath": "Repository + Path",
-      "collapseAll": "Collapse all",
-      "expandAll": "Expand all"
+      "label": "Marklar",
+      "flat": "Marklar",
+      "repo": "Marklar",
+      "repoPath": "Marklar + Marklar",
+      "local": "Marklar",
+      "collapseAll": "Marklar all",
+      "expandAll": "Marklar all"
     }
   },
   "status": {

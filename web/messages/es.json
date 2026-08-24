@@ -128,12 +128,13 @@
       "noMatch": "Ningún espacio de trabajo coincide con este filtro."
     },
     "group": {
-      "label": "Group",
-      "flat": "Flat",
-      "repo": "Repository",
-      "repoPath": "Repository + Path",
-      "collapseAll": "Collapse all",
-      "expandAll": "Expand all"
+      "label": "Agrupar",
+      "flat": "Plano",
+      "repo": "Repositorio",
+      "repoPath": "Repositorio + Ruta",
+      "local": "Local",
+      "collapseAll": "Contraer todo",
+      "expandAll": "Expandir todo"
     }
   },
   "status": {

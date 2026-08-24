@@ -128,12 +128,13 @@
       "noMatch": "Keine Arbeitsbereiche entsprechen diesem Filter."
     },
     "group": {
-      "label": "Group",
-      "flat": "Flat",
+      "label": "Gruppieren",
+      "flat": "Flach",
       "repo": "Repository",
-      "repoPath": "Repository + Path",
-      "collapseAll": "Collapse all",
-      "expandAll": "Expand all"
+      "repoPath": "Repository + Pfad",
+      "local": "Lokal",
+      "collapseAll": "Alle einklappen",
+      "expandAll": "Alle ausklappen"
     }
   },
   "status": {

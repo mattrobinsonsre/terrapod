@@ -128,12 +128,13 @@
       "noMatch": "No wurkspaces match dis filter."
     },
     "group": {
-      "label": "Group",
+      "label": "Groupz",
       "flat": "Flat",
-      "repo": "Repository",
-      "repoPath": "Repository + Path",
-      "collapseAll": "Collapse all",
-      "expandAll": "Expand all"
+      "repo": "Reepo",
+      "repoPath": "Reepo + Path",
+      "local": "Lokal",
+      "collapseAll": "Collaps all teh thingz",
+      "expandAll": "Expand all teh thingz"
     }
   },
   "status": {

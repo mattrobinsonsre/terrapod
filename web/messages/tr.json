@@ -128,12 +128,13 @@
       "noMatch": "Bu filtreyle eşleşen çalışma alanı yok."
     },
     "group": {
-      "label": "Group",
-      "flat": "Flat",
-      "repo": "Repository",
-      "repoPath": "Repository + Path",
-      "collapseAll": "Collapse all",
-      "expandAll": "Expand all"
+      "label": "Grupla",
+      "flat": "Düz",
+      "repo": "Depo",
+      "repoPath": "Depo + Yol",
+      "local": "Yerel",
+      "collapseAll": "Tümünü daralt",
+      "expandAll": "Tümünü genişlet"
     }
   },
   "status": {

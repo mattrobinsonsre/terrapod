@@ -128,12 +128,13 @@
       "noMatch": "DarSeHvam rurbogh Qumwo' tu'be'lu'."
     },
     "group": {
-      "label": "Group",
-      "flat": "Flat",
-      "repo": "Repository",
-      "repoPath": "Repository + Path",
-      "collapseAll": "Collapse all",
-      "expandAll": "Expand all"
+      "label": "ghom",
+      "flat": "raQ",
+      "repo": "qawHaq",
+      "repoPath": "qawHaq + He",
+      "local": "naDev",
+      "collapseAll": "Hoch chIm",
+      "expandAll": "Hoch tetlh"
     }
   },
   "status": {

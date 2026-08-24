@@ -128,12 +128,13 @@
       "noMatch": "Жоден робочий простір не відповідає цьому фільтру."
     },
     "group": {
-      "label": "Group",
-      "flat": "Flat",
-      "repo": "Repository",
-      "repoPath": "Repository + Path",
-      "collapseAll": "Collapse all",
-      "expandAll": "Expand all"
+      "label": "Групувати",
+      "flat": "Плоский",
+      "repo": "Репозиторій",
+      "repoPath": "Репозиторій + Шлях",
+      "local": "Локальні",
+      "collapseAll": "Згорнути все",
+      "expandAll": "Розгорнути все"
     }
   },
   "status": {

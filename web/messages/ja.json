@@ -128,12 +128,13 @@
       "noMatch": "このフィルターに一致するワークスペースはありません。"
     },
     "group": {
-      "label": "Group",
-      "flat": "Flat",
-      "repo": "Repository",
-      "repoPath": "Repository + Path",
-      "collapseAll": "Collapse all",
-      "expandAll": "Expand all"
+      "label": "グループ化",
+      "flat": "フラット",
+      "repo": "リポジトリ",
+      "repoPath": "リポジトリ + パス",
+      "local": "ローカル",
+      "collapseAll": "すべて折りたたむ",
+      "expandAll": "すべて展開"
     }
   },
   "status": {

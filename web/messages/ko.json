@@ -128,12 +128,13 @@
       "noMatch": "이 필터와 일치하는 워크스페이스가 없습니다."
     },
     "group": {
-      "label": "Group",
-      "flat": "Flat",
-      "repo": "Repository",
-      "repoPath": "Repository + Path",
-      "collapseAll": "Collapse all",
-      "expandAll": "Expand all"
+      "label": "그룹화",
+      "flat": "평면",
+      "repo": "저장소",
+      "repoPath": "저장소 + 경로",
+      "local": "로컬",
+      "collapseAll": "모두 접기",
+      "expandAll": "모두 펼치기"
     }
   },
   "status": {

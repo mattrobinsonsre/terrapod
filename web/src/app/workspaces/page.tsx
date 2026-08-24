@@ -35,6 +35,7 @@ import { WORKSPACE_STATUSES, resolveStatus } from '@/lib/workspace-status'
 import {
   type GroupMode,
   type WorkspaceGroup,
+  LOCAL_GROUP_KEY,
   buildWorkspaceTree,
   countWorkspaces,
   parseGroupParam,
@@ -125,7 +126,7 @@ function WorkspaceGroupRows({
                   >
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
-                  <span className="text-sm text-slate-400">{group.label}/</span>
+                  <span className="text-sm text-slate-400">{group.key === LOCAL_GROUP_KEY ? t('group.local') : group.label}/</span>
                   <span className="text-xs text-slate-600 bg-slate-800 px-1.5 py-0.5 rounded-full">{count}</span>
                 </button>
               </td>
@@ -153,7 +154,7 @@ function WorkspaceGroupRows({
                                 key={`${k}=${v}`}
                                 type="button"
                                 onClick={() => setFilterInput(serializeFilter(toggleLabelTerm(filter, k, v)))}
-                                title={active ? 'Click to remove from filter' : 'Click to filter by this label'}
+                                title={active ? t('row.removeLabelFilter') : t('row.addLabelFilter')}
                                 className={
                                   'inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-mono transition-colors ' +
                                   (active
@@ -1353,7 +1354,7 @@ function WorkspacesPageInner() {
         ) : workspaces.length === 0 ? (
           <EmptyState message={t('empty.none')} />
         ) : filteredWorkspaces.length === 0 ? (
-          <EmptyState message="No workspaces match this filter." />
+          <EmptyState message={t('empty.noMatch')} />
         ) : groupMode !== 'flat' && workspaceTree.length > 0 ? (
           <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-hidden">
             <div className="flex items-center justify-end px-4 py-2 border-b border-slate-700/50">

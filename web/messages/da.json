@@ -128,12 +128,13 @@
       "noMatch": "Ingen arbejdsområder matcher dette filter."
     },
     "group": {
-      "label": "Group",
-      "flat": "Flat",
-      "repo": "Repository",
-      "repoPath": "Repository + Path",
-      "collapseAll": "Collapse all",
-      "expandAll": "Expand all"
+      "label": "Gruppér",
+      "flat": "Flad",
+      "repo": "Arkiv",
+      "repoPath": "Arkiv + Sti",
+      "local": "Lokal",
+      "collapseAll": "Fold alle sammen",
+      "expandAll": "Udvid alle"
     }
   },
   "status": {

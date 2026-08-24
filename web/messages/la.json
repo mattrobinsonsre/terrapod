@@ -128,12 +128,13 @@
       "noMatch": "Nulla loca operis huic cribro conveniunt."
     },
     "group": {
-      "label": "Group",
-      "flat": "Flat",
-      "repo": "Repository",
-      "repoPath": "Repository + Path",
-      "collapseAll": "Collapse all",
-      "expandAll": "Expand all"
+      "label": "Congregare",
+      "flat": "Planum",
+      "repo": "Promptuarium",
+      "repoPath": "Promptuarium + Semita",
+      "local": "Locale",
+      "collapseAll": "Omnia contrahere",
+      "expandAll": "Omnia extendere"
     }
   },
   "status": {
