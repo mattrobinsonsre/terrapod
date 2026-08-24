@@ -168,6 +168,22 @@ export async function proxy(request: Request, stripPrefix?: string): Promise<Res
     }
   })
 
+  // Tell the API what address the client actually used (#1417).
+  //
+  // `host` is stripped above because undici must set its own for the upstream
+  // connection — which leaves the API seeing only its internal service name. That
+  // is fine until something has to emit an absolute URL back to the client: an
+  // npm packument's `dist.tarball` must be absolute, and one built from the
+  // internal host sends the client somewhere it cannot resolve.
+  //
+  // Standard reverse-proxy behaviour, and only set when not already present, so
+  // an ingress or load balancer in front of us stays authoritative.
+  const forwardedHost = request.headers.get('x-forwarded-host') ?? incoming.host
+  if (forwardedHost) headers.set('x-forwarded-host', forwardedHost)
+  const forwardedProto =
+    request.headers.get('x-forwarded-proto') ?? incoming.protocol.replace(':', '')
+  if (forwardedProto) headers.set('x-forwarded-proto', forwardedProto)
+
   const method = request.method.toUpperCase()
   const hasBody = method !== 'GET' && method !== 'HEAD'
 
