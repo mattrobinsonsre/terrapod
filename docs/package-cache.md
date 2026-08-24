@@ -126,6 +126,44 @@ Go and .NET programs.
 An explicit "cache these packages" endpoint would make preparing an air-gapped
 deployment less of a rehearsal.
 
+## Warming ahead of a seal
+
+Warming by *running the thing you expect to need* is a rehearsal: you find out
+whether you guessed the set right only after sealing, which is the expensive
+moment to discover a gap.
+
+```sh
+curl -X POST -H "$AUTH" -H 'Content-Type: application/json' \
+  https://terrapod.example.com/api/terrapod/v1/admin/package-cache/warm \
+  -d '{"packages":[{"ecosystem":"pypi","name":"requests"},
+                   {"ecosystem":"npm","name":"left-pad","version":"1.3.0"}]}'
+# → 202 {"data": {"id": "warm-9f2c...", "links": {"self": "…/admin/warm-jobs/warm-9f2c…"}}}
+```
+
+Submission returns a job id rather than a result: a real dependency closure
+outlives an HTTP request, and a call that times out halfway leaves you unsure
+what landed. Poll the job for progress and **per-item outcomes** — being told
+"failed" across twenty packages is not something you can act on, and finding the
+specific gaps is the entire point.
+
+Omit `version` to warm the newest upstream offers. For PyPI, **every file for that
+version is cached**, not one wheel: which wheel pip selects depends on the
+interpreter and platform doing the installing. For npm the **packument is cached
+alongside the tarball** — a sealed node cannot serve an install without it, since
+the dependency ranges live there and nowhere else.
+
+Re-running is safe and is the intended way to recover from a transient upstream
+failure: anything already cached is skipped and only the rest is retried.
+
+**Warming a sealed node is refused with a 409** naming `cache_only`, rather than
+reporting zero successes — which would read as a set of missing packages rather
+than a configuration that forbids fetching at all.
+
+Container images warm the same way through `POST /api/terrapod/v1/admin/oci/warm`
+with `{"images": ["quay.io/ansible/awx-ee:24.6.1"]}`, pulling the manifest and
+every blob it references.
+
+
 ## Engine gating
 
 These proxies exist to serve Pulumi programs and Ansible collections. PyPI serves

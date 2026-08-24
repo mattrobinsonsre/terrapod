@@ -109,6 +109,19 @@
     "opa-version",
     "trivy-version"
   ],
+  "cache_warm._submit": [
+    "status",
+    "total"
+  ],
+  "cache_warm.warm_job_status": [
+    "completed",
+    "failed",
+    "outcomes",
+    "status",
+    "submitted-at",
+    "succeeded",
+    "total"
+  ],
   "catalog._instance_json": [
     "agent-pool-id",
     "catalog-item-id",
