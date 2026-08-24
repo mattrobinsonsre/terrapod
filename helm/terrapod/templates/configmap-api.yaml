@@ -199,6 +199,13 @@ data:
         {{- with .upload_session_timeout_hours }}
         upload_session_timeout_hours: {{ . }}
         {{- end }}
+        {{- with .gc }}
+        gc:
+          enabled: {{ .enabled }}
+          {{- with .grace_hours }}
+          grace_hours: {{ . }}
+          {{- end }}
+        {{- end }}
         {{- if .upstreams }}
         upstreams:
           {{- range .upstreams }}
@@ -482,6 +489,7 @@ data:
       provider_cache_retention_days: {{ .Values.api.config.artifact_retention.provider_cache_retention_days | default 30 }}
       binary_cache_retention_days: {{ .Values.api.config.artifact_retention.binary_cache_retention_days | default 30 }}
       package_cache_retention_days: {{ .Values.api.config.artifact_retention.package_cache_retention_days | default 30 }}
+      oci_mirror_retention_days: {{ .Values.api.config.artifact_retention.oci_mirror_retention_days | default 30 }}
       module_overrides_retention_days: {{ .Values.api.config.artifact_retention.module_overrides_retention_days | default 14 }}
       deleted_workspace_retention_days: {{ .Values.api.config.artifact_retention.deleted_workspace_retention_days | default 30 }}
     {{- end }}

@@ -304,6 +304,22 @@ api:
         # access can repeat. Generous by default: a slow, resumed push over a
         # poor link is legitimate, and reaping it mid-flight destroys real work.
         upload_session_timeout_hours: 24
+        # Reclaiming storage (#1419). There is no delete API — deleting a
+        # manifest reclaims nothing on its own, because its layers are usually
+        # shared — so space comes back only by collecting blobs that no manifest
+        # references any more.
+        #
+        # An image you PUSHED is never expired by age: it exists nowhere else.
+        # Only genuinely unreferenced blobs are collected, plus mirrored images
+        # past artifact_retention.oci_mirror_retention_days, which can be fetched
+        # again. Nothing is expired at all on a sealed node.
+        gc:
+          enabled: true
+          # How old a blob must be before it can be collected. Blobs are uploaded
+          # BEFORE the manifest that references them, so a sweep landing between
+          # the two would delete the layers of a push still in progress. Raise it
+          # if pushes in your environment can legitimately take longer.
+          grace_hours: 24
       # Language package proxies (#1417). Point runners at these with
       # PIP_INDEX_URL and NPM_CONFIG_REGISTRY and a run resolves its dependency
       # closure with no upstream reach — which is the only way a Pulumi program
@@ -1010,6 +1026,8 @@ api:
       provider_cache_retention_days: 30   # days since last access
       binary_cache_retention_days: 30     # days since last access
       package_cache_retention_days: 30    # days since last access (PyPI/npm artifacts)
+      oci_mirror_retention_days: 30       # days since last access; MIRRORED images only,
+                                          # never images you pushed
       module_overrides_retention_days: 14
       # Undelete window (#1253). State of a deleted workspace is kept this
       # long so an accidental deletion can be undone; 0 = keep forever.

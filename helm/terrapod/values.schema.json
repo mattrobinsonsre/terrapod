@@ -1852,6 +1852,14 @@
                   "type": "integer",
                   "minimum": 1
                 },
+                "gc": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "enabled": { "type": "boolean" },
+                    "grace_hours": { "type": "integer", "minimum": 1 }
+                  }
+                },
                 "upstreams": {
                   "type": "array",
                   "items": {
@@ -2469,6 +2477,10 @@
               "minimum": 0
             },
             "package_cache_retention_days": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "oci_mirror_retention_days": {
               "type": "integer",
               "minimum": 0
             },
