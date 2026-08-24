@@ -15,6 +15,7 @@ import os
 import secrets
 import time
 import urllib.parse
+import uuid
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from pathlib import Path
@@ -69,6 +70,37 @@ class FilesystemStore:
         """Convert a filesystem path back to a key."""
         return str(path.relative_to(self._root))
 
+    async def _write_atomically(self, path: Path, write) -> None:
+        """Write via a temporary file in the same directory, then rename.
+
+        Writing straight into the destination is not safe here, and not
+        theoretically: a reader that opens the file mid-write gets a partial
+        object, and `os.stat` reports a length that no longer matches by the time
+        the body is sent — which surfaces as `Response content shorter than
+        Content-Length` and an aborted download.
+
+        That is exactly what a package install produces. Clients fan out a dozen
+        or more parallel requests, two of them miss the same artifact at once,
+        both fetch it, and both write the same key while a third reads it.
+
+        `os.replace` is atomic within a filesystem, so a reader sees either the
+        previous object or the complete new one. The temporary file is created
+        beside the destination so the rename cannot cross a device boundary.
+        """
+        tmp_path = path.parent / f".{path.name}.{uuid.uuid4().hex}.tmp"
+        try:
+            async with aiofiles.open(tmp_path, "wb") as handle:
+                await write(handle)
+            await asyncio.to_thread(os.replace, tmp_path, path)
+        except BaseException:
+            # Never leave a partial temp file behind to be found later as a
+            # disk-full incident.
+            try:
+                await aiofiles.os.remove(tmp_path)
+            except OSError:
+                pass
+            raise
+
     async def put(
         self,
         key: str,
@@ -79,16 +111,21 @@ class FilesystemStore:
         path = self._full_path(key)
         path.parent.mkdir(parents=True, exist_ok=True)
 
-        async with aiofiles.open(path, "wb") as f:
-            await f.write(data)
+        async def _write(handle):
+            await handle.write(data)
+
+        await self._write_atomically(path, _write)
 
         # Store content type in a sidecar file
         meta_path = Path(str(path) + ".meta")
         meta_content = content_type
         if metadata:
             meta_content += "\n" + "\n".join(f"{k}={v}" for k, v in metadata.items())
-        async with aiofiles.open(meta_path, "w") as f:
-            await f.write(meta_content)
+
+        async def _write_meta(handle):
+            await handle.write(meta_content.encode())
+
+        await self._write_atomically(meta_path, _write_meta)
 
         stat = await aiofiles.os.stat(path)
         etag = await asyncio.to_thread(lambda: hashlib.md5(data).hexdigest())  # noqa: S324  # nosemgrep: insecure-hash-algorithm-md5
@@ -115,19 +152,25 @@ class FilesystemStore:
         md5_hasher = hashlib.md5()  # noqa: S324  # nosemgrep: insecure-hash-algorithm-md5
         total_size = 0
 
-        async with aiofiles.open(path, "wb") as f:
+        async def _write(handle):
+            nonlocal total_size
             async for chunk in chunks:
-                await f.write(chunk)
+                await handle.write(chunk)
                 md5_hasher.update(chunk)
                 total_size += len(chunk)
+
+        await self._write_atomically(path, _write)
 
         # Store content type in sidecar file
         meta_path = Path(str(path) + ".meta")
         meta_content = content_type
         if metadata:
             meta_content += "\n" + "\n".join(f"{k}={v}" for k, v in metadata.items())
-        async with aiofiles.open(meta_path, "w") as f:
-            await f.write(meta_content)
+
+        async def _write_meta(handle):
+            await handle.write(meta_content.encode())
+
+        await self._write_atomically(meta_path, _write_meta)
 
         stat = await aiofiles.os.stat(path)
         etag = md5_hasher.hexdigest()
