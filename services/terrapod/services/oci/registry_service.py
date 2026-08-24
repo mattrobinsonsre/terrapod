@@ -23,7 +23,7 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.db.models import OCIBlob, OCIManifest, OCIRepository, OCIRepositoryBlob, OCITag
@@ -354,3 +354,114 @@ async def get_tag(db: AsyncSession, repository: OCIRepository, name: str) -> OCI
         select(OCITag).where(OCITag.repository_id == repository.id, OCITag.name == name)
     )
     return result.scalar_one_or_none()
+
+
+async def delete_tag(db: AsyncSession, repository: OCIRepository, name: str) -> bool:
+    """Remove a tag, leaving the manifest it pointed at addressable by digest.
+
+    That asymmetry is the spec's, and it is the right one: a tag is a name, and
+    dropping a name should not destroy the thing named. The manifest becomes
+    untagged, which is a state the operator can see and act on rather than a
+    deletion they did not ask for.
+
+    Returns False when there was no such tag, so the caller can 404 rather than
+    reporting a success that deleted nothing.
+    """
+    result = await db.execute(
+        select(OCITag).where(OCITag.repository_id == repository.id, OCITag.name == name)
+    )
+    tag = result.scalar_one_or_none()
+    if tag is None:
+        return False
+    await db.delete(tag)
+    await db.flush()
+    return True
+
+
+async def delete_manifest(db: AsyncSession, repository: OCIRepository, digest: str) -> bool:
+    """Remove a manifest and any tags that pointed at it.
+
+    The tags go because a tag pointing at a manifest that no longer exists is a
+    pull that 404s from a name the registry still advertises — worse than the tag
+    being gone.
+
+    **Referrers are deliberately not cascaded.** A signature or SBOM attached via
+    `subject` survives its subject's deletion and stays addressable by digest.
+    Deleting an image should not silently destroy the record that it was ever
+    signed — that record is evidence, and may exist nowhere else. It becomes an
+    untagged manifest, which the untagged listing surfaces so an operator can
+    remove it deliberately if they want to.
+
+    No blob is touched here. Layers are shared, so what a manifest's removal makes
+    reclaimable is decided by whether anything *else* still references each blob —
+    which is the collector's job, on its own cycle, and not something a delete
+    request can answer correctly on its own.
+    """
+    result = await db.execute(
+        select(OCIManifest).where(
+            OCIManifest.repository_id == repository.id, OCIManifest.digest == digest
+        )
+    )
+    manifest = result.scalar_one_or_none()
+    if manifest is None:
+        return False
+
+    # The tags go with it via `oci_tags.manifest_id ON DELETE CASCADE`, rather
+    # than by iterating them here — one statement the database applies atomically,
+    # with no window in which a tag points at a manifest that has already gone.
+    await db.delete(manifest)
+    await db.flush()
+    return True
+
+
+async def list_untagged_manifests(db: AsyncSession, repository: OCIRepository) -> list[OCIManifest]:
+    """Manifests in this repository that no tag points at.
+
+    The case that quietly fills a registry: re-pushing `:latest` leaves the
+    previous manifest untagged and still holding its layers. Nothing collects it,
+    because it is a manifest rather than an orphaned blob — and an operator cannot
+    delete what they cannot see, so this is what makes that space accountable.
+
+    Referrers appear here too, which is intended: an SBOM whose subject has been
+    deleted is exactly something an operator should be shown.
+    """
+    tagged = select(OCITag.manifest_id).where(OCITag.repository_id == repository.id)
+    result = await db.execute(
+        select(OCIManifest)
+        .where(OCIManifest.repository_id == repository.id, OCIManifest.id.not_in(tagged))
+        .order_by(OCIManifest.created_at)
+    )
+    return list(result.scalars().all())
+
+
+async def delete_repository(db: AsyncSession, repository: OCIRepository) -> dict[str, int]:
+    """Remove a repository, its tags, its manifests and its blob links.
+
+    What an operator actually reaches for when clearing out a project, and not in
+    the distribution spec — which is why it lives on the native surface rather
+    than under `/v2/`.
+
+    Blob *rows* survive: they are content-addressed and shared across
+    repositories, so deleting them here would take content another repository is
+    still serving. Dropping this repository's links is what makes its blobs
+    reclaimable, and only for those nothing else references.
+    """
+    # Counted before the delete, because after it there is nothing left to count —
+    # every child FK is ON DELETE CASCADE, so removing the repository row takes its
+    # tags, manifests and blob links with it in one statement. Deleting them
+    # individually first would be the same outcome by a longer route, and would
+    # leave a window where the repository still exists with its contents gone.
+    counts = {}
+    for label, model, column in (
+        ("tags", OCITag, OCITag.repository_id),
+        ("manifests", OCIManifest, OCIManifest.repository_id),
+        ("blob_links", OCIRepositoryBlob, OCIRepositoryBlob.repository_id),
+    ):
+        result = await db.execute(
+            select(func.count()).select_from(model).where(column == repository.id)
+        )
+        counts[label] = int(result.scalar_one())
+
+    await db.delete(repository)
+    await db.flush()
+    return counts

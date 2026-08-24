@@ -52,6 +52,7 @@ from terrapod.services.oci.errors import (
     MANIFEST_UNKNOWN,
     NAME_INVALID,
     NAME_UNKNOWN,
+    NOT_ALLOWED,
     UNAUTHORIZED,
     UNSUPPORTED,
     OCIError,
@@ -512,6 +513,88 @@ async def _finish_upload(db, storage, session, repository, name: str, digest_par
             "Location": f"/v2/{name}/blobs/{blob.digest}",
             "Docker-Content-Digest": blob.digest,
         },
+    )
+
+
+@router.delete("/v2/{name:path}/manifests/{reference}")
+async def delete_manifest(
+    name: str,
+    reference: str,
+    user: AuthenticatedUser = Depends(authenticate_oci),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """Delete a tag or a manifest (spec `end-9`), returning 202.
+
+    Deleting **by tag** removes the name only; the manifest stays addressable by
+    digest and becomes untagged. Deleting **by digest** removes the manifest and
+    any tags pointing at it, because a tag naming a manifest that no longer
+    exists is worse than no tag at all.
+
+    Nothing frees storage here. Layers are shared, so whether a blob can go
+    depends on what *else* references it — a question only the collector can
+    answer, on its next cycle. `POST .../admin/oci/collect` runs it now for
+    someone who has just deleted something large and wants the space back.
+
+    **Deleting a mirrored image is a cache purge, not a deletion.** The next pull
+    fetches it again. That makes this the way to force a refresh, and it means an
+    operator cannot use deletion to keep upstream content out — the allow-list is
+    what does that.
+
+    Requires `registry:admin`: this destroys content that may exist nowhere else.
+    """
+    repository = await _authorised_repository(db, user, name, cap.REGISTRY_ADMIN)
+    parsed = parse_reference(reference)
+
+    if parsed.digest is not None:
+        # `str()`, because a parsed reference carries a Digest object and the
+        # column is a string — passing the object through reaches the driver as a
+        # type it cannot bind, which surfaces as a 500 rather than a 404.
+        removed = await registry_service.delete_manifest(db, repository, str(parsed.digest))
+    else:
+        removed = await registry_service.delete_tag(db, repository, parsed.tag or reference)
+    if not removed:
+        raise OCIError(MANIFEST_UNKNOWN, detail={"reference": reference})
+
+    await db.commit()
+    logger.info(
+        "Deleted from the registry",
+        repository=repository.name,
+        reference=reference,
+        by="digest" if parsed.digest else "tag",
+        actor=user.email,
+    )
+    return Response(status_code=202)
+
+
+@router.delete("/v2/{name:path}/blobs/{digest}")
+async def delete_blob(
+    name: str,
+    digest: str,
+    user: AuthenticatedUser = Depends(authenticate_oci),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """Refuse direct blob deletion (spec `end-10`), with 405.
+
+    The spec permits a registry to decline this, and the conformance suite treats
+    405 as a valid answer and skips the follow-up accordingly — so this is a
+    supported position rather than a gap.
+
+    Declining is the honest one for how blobs are stored here. They are
+    content-addressed and shared across every repository that references them, so
+    "delete this blob" has no safe meaning at the level a caller is asking it: do
+    it literally and the manifests still pointing at those bytes become
+    unpullable, in this repository and possibly others. Deleting the *manifest*
+    expresses the same intent without that risk, and the collector reclaims each
+    blob once genuinely nothing references it.
+    """
+    await _authorised_repository(db, user, name, cap.REGISTRY_ADMIN)
+    raise OCIError(
+        NOT_ALLOWED,
+        message=(
+            "Blobs are content-addressed and shared between repositories, so they "
+            "are not deleted directly. Delete the manifest that references them; "
+            "the collector reclaims any blob nothing else needs."
+        ),
     )
 
 

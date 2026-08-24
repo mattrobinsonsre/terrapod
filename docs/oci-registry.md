@@ -278,6 +278,53 @@ API directly. Terrapod routes all traffic through the frontend proxy, and a
 problem on that hop — a stripped header, a redirect — is invisible to a test
 that skips it.
 
+## Deleting content
+
+Collection frees blobs nothing references. Deletion is what stops referencing
+them — without it a pushed image was permanent, because nothing ever un-references
+content an operator put there deliberately.
+
+| Operation | Endpoint |
+|---|---|
+| Delete a tag | `DELETE /v2/{name}/manifests/{tag}` |
+| Delete a manifest | `DELETE /v2/{name}/manifests/{digest}` |
+| Delete a repository | `DELETE /api/terrapod/v1/oci/repositories/{name}` |
+| List untagged manifests | `GET /api/terrapod/v1/oci/repositories/{name}/untagged` |
+| Collect now | `POST /api/terrapod/v1/oci/collect` |
+
+All of it requires **`registry:admin`** on the repository and is audited. Deleting
+destroys content that may exist nowhere else.
+
+**Deleting a tag is not deleting an image.** The tag is a name; the manifest stays
+addressable by digest and becomes untagged. Deleting by digest removes the
+manifest and any tags pointing at it, because a tag naming a manifest that no
+longer exists is worse than no tag.
+
+**Nothing frees space immediately.** Layers are shared, so whether a blob can go
+depends on what else references it — a question only a collection cycle can
+answer. `POST .../oci/collect` runs one now rather than waiting for the hourly
+one, which is what you want after deleting something large to make room.
+
+**Blob deletion is declined with 405.** The spec permits this, and the conformance
+suite accounts for it. Blobs here are content-addressed and shared between every
+repository that references them, so deleting one directly would break every
+manifest still pointing at those bytes. Delete the manifest instead; the collector
+reclaims each blob once genuinely nothing needs it.
+
+**Deleting a mirrored image is a cache purge**, not a deletion — the next pull
+fetches it again. That makes it the way to force a refresh, and it means deletion
+cannot be used to keep upstream content out. The `upstreams` allow-list is what
+does that.
+
+**Untagged manifests are the ones that fill a registry.** Re-pushing `:latest`
+leaves the previous manifest untagged and still holding its layers, and nothing
+collects it — it is a manifest, not an orphaned blob. The untagged listing is how
+that space becomes visible, and an operator cannot delete what they cannot see.
+Referrers whose subject has been deleted appear there too: a signature or SBOM
+outlives its subject deliberately, because destroying the record that an image was
+signed is not something a delete should do quietly.
+
+
 ## Engine gating
 
 This registry exists to serve Ansible execution environments. If you do not run

@@ -1062,6 +1062,13 @@ def create_application() -> FastAPI:
         app.include_router(oci_router)
         app.add_exception_handler(OCIError, oci_error_handler)
 
+        # The operator surface — repository deletion, untagged listing, collect
+        # now (#1423). Native rather than /v2/, and mounted under the same gate:
+        # it exists only for the registry, so it goes when the registry does.
+        from terrapod.api.routers.oci_admin import router as oci_admin_router
+
+        include_terrapod(oci_admin_router)
+
     from terrapod.api.routers.binary_cache import router as binary_cache_router
 
     include_terrapod(binary_cache_router)

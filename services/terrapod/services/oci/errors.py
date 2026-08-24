@@ -76,6 +76,14 @@ UNAUTHORIZED = OCIErrorCode("UNAUTHORIZED", status.HTTP_401_UNAUTHORIZED, "authe
 DENIED = OCIErrorCode(
     "DENIED", status.HTTP_403_FORBIDDEN, "requested access to the resource is denied"
 )
+#: The same spec code at 405, for an operation this registry declines outright
+#: rather than one it rejected for its arguments. Split for the same reason as
+#: BLOB_UPLOAD_OUT_OF_ORDER above: the code says what went wrong, the status says
+#: what the client should do about it, and 400 would invite a retry that can
+#: never succeed.
+NOT_ALLOWED = OCIErrorCode(
+    "UNSUPPORTED", status.HTTP_405_METHOD_NOT_ALLOWED, "the operation is not supported"
+)
 UNSUPPORTED = OCIErrorCode(
     "UNSUPPORTED", status.HTTP_400_BAD_REQUEST, "the operation is unsupported"
 )

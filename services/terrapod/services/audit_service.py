@@ -32,6 +32,12 @@ _RESOURCE_PATTERN = re.compile(
 )
 
 
+#: A registry path names its repository across a variable number of segments
+#: (`team/app/manifests/v1`), so the repository is everything before the verb
+#: rather than a fixed position.
+_OCI_PATTERN = re.compile(r"^/v2/(.+?)/(?:manifests|blobs|tags|referrers)(?:/|$)")
+
+
 def should_audit(path: str) -> bool:
     """Return True if this path should be audited."""
     return not path.startswith(_EXCLUDED_PREFIXES)
@@ -46,11 +52,20 @@ def parse_resource(path: str) -> tuple[str, str]:
         /api/terrapod/v1/admin/audit-log → ("audit-log", "")
         /api/terrapod/v1/users/admin@example.com → ("users", "admin@example.com")
         /oauth/authorize → ("oauth", "")
+        /v2/team/app/manifests/v1 → ("oci-repositories", "team/app")
 
     Both /api/v2 (the permanent TFE V2 CLI surface) and
     /api/terrapod/v1 (the Terrapod-native surface) prefixes are
     recognised so mutations on either are attributed in the audit log.
+
+    The container registry sits at /v2/ rather than under /api/, so without its
+    own branch every registry request — including a delete — was audited with an
+    empty resource. "Someone issued a DELETE" is not an audit trail; which
+    repository is the part worth keeping (#1423).
     """
+    oci = _OCI_PATTERN.match(path)
+    if oci:
+        return "oci-repositories", oci.group(1)
     m = _RESOURCE_PATTERN.match(path)
     if m:
         return m.group(1), m.group(2) or ""

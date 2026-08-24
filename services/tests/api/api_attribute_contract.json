@@ -275,6 +275,21 @@
     "status",
     "success"
   ],
+  "oci_admin.collect_now": [
+    "blobs-deleted",
+    "bytes-reclaimed",
+    "errors",
+    "repositories",
+    "skipped-reason"
+  ],
+  "oci_admin.list_untagged": [
+    "artifact-type",
+    "created-at",
+    "digest",
+    "media-type",
+    "size",
+    "subject-digest"
+  ],
   "onboarding._session_json": [
     "ai-assisted",
     "created-at",

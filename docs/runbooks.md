@@ -1609,3 +1609,50 @@ destroys" reading of a plan is not the same thing.
 
 The next run with a qualifying plan auto-applies without intervention, and a run
 that is held shows a reason explaining which action stopped it.
+
+## The container registry is filling up
+
+A registry only ever grows unless someone deletes from it. Mirrored content
+expires on its own; content an operator **pushed** does not, deliberately — a
+registry is not a cache for images you put in it, and nothing should expire them
+for going quiet.
+
+**Find what is actually holding the space first.** The usual answer is not the
+images you can see:
+
+```sh
+curl -H "Authorization: Basic $(printf 'x:%s' "$TOKEN" | base64)" \
+  https://terrapod.example.com/api/terrapod/v1/oci/repositories/team/app/untagged
+```
+
+Every re-push of `:latest` leaves the previous manifest untagged and still holding
+its layers. Nothing collects those — they are manifests, not orphaned blobs — so
+after a year of CI they are often most of the repository.
+
+**Then delete, and collect.**
+
+```sh
+# A specific manifest (its tags go with it)
+curl -X DELETE -H "$AUTH" https://…/v2/team/app/manifests/sha256:…
+
+# Or the whole repository
+curl -X DELETE -H "$AUTH" https://…/api/terrapod/v1/oci/repositories/team/app
+
+# Reclaim now rather than waiting for the hourly cycle
+curl -X POST -H "$AUTH" https://…/api/terrapod/v1/oci/collect
+```
+
+**Space does not come back at the moment you delete.** Deleting un-references
+content; the collector frees whatever is left unreferenced, and a layer shared
+with an image you kept is correctly not freed at all. If a collection reports
+fewer bytes than you expected, that is usually the reason rather than a fault.
+
+**Blob deletion returns 405 and that is deliberate.** Blobs are content-addressed
+and shared, so deleting one directly would break every manifest still referencing
+those bytes. Delete the manifest.
+
+**Deleting a mirrored image only purges the local copy** — the next pull fetches
+it again. To stop mirroring something, take it out of `registry.oci.upstreams`;
+deletion will not hold the line.
+
+Requires `registry:admin` on the repository, and every deletion is audited.
