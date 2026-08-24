@@ -132,8 +132,55 @@ path.
 There is no API for deleting a blob or a manifest, and this is a decision rather
 than an omission. Deleting a manifest does not reclaim anything on its own —
 its layers may be shared with other images — so a delete endpoint gives an
-operator a button that appears to free space and does not. Reclaiming storage is
-a garbage collector's job, and it is tracked separately.
+operator a button that appears to free space and does not.
+
+Space is reclaimed by **garbage collection** instead, which runs hourly and needs
+no downtime.
+
+### What is collected, and what never is
+
+A blob is collected when no manifest references it any more. That is the only
+condition, and it is what makes the shared-layer case safe: a base layer two
+images share stays until the second of them goes.
+
+**An image you pushed is never expired by age.** It exists nowhere else, and a
+registry that quietly eats the images you put in it is not a registry. Only its
+genuinely unreferenced blobs are ever collected.
+
+**A mirrored image is**, on last access, after
+`artifact_retention.oci_mirror_retention_days` (30 by default) — it came from an
+upstream and can be fetched again, so it is a cache like any other. On a sealed
+node (`registry.cache_only`) nothing is expired at all, because nothing can be
+re-fetched.
+
+**Signatures, SBOMs and attestations survive.** A referrer usually carries no tag
+of its own, so a naive "untagged means unreachable" sweep would destroy
+provenance while leaving the image it describes — the worst half to lose in an
+air-gapped estate, where nothing can fetch it again and the image still pulls, so
+the loss is silent. Referrers of a reachable image are treated as reachable.
+
+### A push in flight is safe
+
+Blobs are uploaded *before* the manifest that references them, so for a moment
+during every push there is content that nothing points at. Collection ignores
+anything that arrived within `registry.oci.gc.grace_hours` (24 by default), so a
+push in progress is never a candidate.
+
+Docker's own registry answers the same problem by requiring read-only mode during
+collection. A grace window costs nothing and needs no downtime. Raise it if
+pushes in your environment can legitimately take longer than a day.
+
+The window is measured from when content arrived **in that repository**, not from
+when the blob was first created — a cross-repository mount of a months-old layer
+is a push in flight too.
+
+### Watching it
+
+`terrapod_oci_gc_bytes_reclaimed_total` is the one to graph: a blob count tells
+you a collection ran, bytes tell you whether it helped.
+`terrapod_oci_gc_errors_total` counts repositories a cycle declined to collect
+because it could not read a manifest and therefore could not be sure what was
+reachable — erring toward keeping bytes.
 
 What *is* reaped automatically is abandoned uploads. A push that starts and dies
 leaves chunks in object storage, and anyone with push access could repeat that
@@ -149,6 +196,9 @@ mid-flight would destroy real work.
 | `api.config.registry.oci.enabled` | `true` | Serve the registry at `/v2/`. Disabling hides the surface; pushed images stay in storage and reappear if re-enabled. |
 | `api.config.registry.oci.upstreams` | `[]` | The pull-through allow-list. Empty means push-only. |
 | `api.config.registry.oci.upload_session_timeout_hours` | `24` | How long an in-progress upload may sit untouched before it is reaped with its chunks. |
+| `api.config.registry.oci.gc.enabled` | `true` | Collect unreferenced blobs. Off means the registry only ever grows — there is no delete API. |
+| `api.config.registry.oci.gc.grace_hours` | `24` | How long newly-arrived content is protected, so a push in flight is never collected. |
+| `api.config.artifact_retention.oci_mirror_retention_days` | `30` | Days since last access before a **mirrored** image is removed. Pushed images are never expired by age. |
 | `api.config.registry.cache_only` | `false` | Seals upstream fetching for every cache, this one included. |
 
 ## Verifying a deployment

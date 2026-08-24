@@ -320,6 +320,20 @@ async def collect() -> SweepResult:
     total.blobs_deleted = deleted
     total.bytes_reclaimed = reclaimed
 
+    from terrapod.api.metrics import (
+        OCI_GC_BYTES_RECLAIMED,
+        OCI_GC_ERRORS,
+        RETENTION_DELETED,
+    )
+
+    if total.blobs_deleted:
+        RETENTION_DELETED.labels(category="oci_blobs").inc(total.blobs_deleted)
+        OCI_GC_BYTES_RECLAIMED.inc(total.bytes_reclaimed)
+    if total.manifests_expired:
+        RETENTION_DELETED.labels(category="oci_mirrors").inc(total.manifests_expired)
+    if total.errors:
+        OCI_GC_ERRORS.inc(len(total.errors))
+
     if total.blobs_deleted or total.manifests_expired or total.errors:
         logger.info(
             "OCI garbage collection",
