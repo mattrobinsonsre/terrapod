@@ -308,7 +308,11 @@ async def _bootstrap_pool(session: AsyncSession, spec: PoolSpec) -> None:
             print(f"Generated join token: {raw_token}")  # noqa: T201 — intentional one-time credential output
             print("IMPORTANT: Save this token now. It will not be shown again.")  # noqa: T201
         else:
-            logger.info("Join token created from TERRAPOD_BOOTSTRAP_POOL_TOKEN")
+            # Deliberately does not name an env var: the token may have come
+            # from the indexed vars or the legacy pair, and a log line that
+            # names the wrong source is worse than one that names none when
+            # someone is working out where a token came from.
+            logger.info("Join token for pool '%s' registered from the supplied value", pool_name)
 
 
 async def _bootstrap_sample_workspace(
