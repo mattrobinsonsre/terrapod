@@ -242,8 +242,13 @@ test.describe('Responsive harness (phone viewport)', () => {
 
     // The repo group header renders, labelled by the unique repo basename;
     // below it the nested path segments are their own collapsible group rows.
-    await expect(page.getByRole('button', { name: new RegExp(slug) })).toBeVisible();
-    await expect(page.getByRole('button', { name: /environments/ })).toBeVisible();
+    // Match the header by its "<label>/" text (the trailing slash the tree
+    // renders) so the locator does not also catch the active filter pill,
+    // whose accessible name is "name: <slug>" (no trailing slash).
+    await expect(
+      page.getByRole('button', { name: new RegExp(`^${slug}/`) }),
+    ).toBeVisible();
+    await expect(page.getByRole('button', { name: /^environments\// })).toBeVisible();
 
     // The deep-nested workspace is reachable and carries its inline mobile
     // status indicator inside the grouped row (preserved under grouping).
