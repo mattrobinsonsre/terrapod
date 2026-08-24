@@ -385,13 +385,13 @@ class TestReconfigureInstance:
         mock_del.assert_awaited_once_with(db, old_var)
         created = {c.kwargs["key"]: c.kwargs for c in mock_create_var.await_args_list}
         assert set(created) == {"cidr", "ports"}
-        # Sensitive string → sensitive var, quoted (hcl=False).
+        # Sensitive string → sensitive var, quoted (structured=False).
         assert created["cidr"]["sensitive"] is True
-        assert created["cidr"]["hcl"] is False
+        assert created["cidr"]["structured"] is False
         assert created["cidr"]["value"] == "10.0.0.0/16"
         # Non-sensitive complex → hcl var carrying the JSON-encoded value.
         assert created["ports"]["sensitive"] is False
-        assert created["ports"]["hcl"] is True
+        assert created["ports"]["structured"] is True
         assert created["ports"]["value"] == "[80, 443]"
         # Only the NON-sensitive input is snapshotted in the plaintext
         # input-values column; the sensitive one is write-only.

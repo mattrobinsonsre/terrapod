@@ -269,6 +269,7 @@ field CreateVariableRequest.Description string `json:"description,omitempty"`
 field CreateVariableRequest.HCL bool `json:"hcl,omitempty"`
 field CreateVariableRequest.Key string `json:"key"`
 field CreateVariableRequest.Sensitive bool `json:"sensitive,omitempty"`
+field CreateVariableRequest.Structured bool `json:"structured,omitempty"`
 field CreateVariableRequest.Value string `json:"value"`
 field CreateVariableSetRequest.Description string
 field CreateVariableSetRequest.Global bool
@@ -279,6 +280,7 @@ field CreateVarsetVariableRequest.Description string
 field CreateVarsetVariableRequest.HCL bool
 field CreateVarsetVariableRequest.Key string
 field CreateVarsetVariableRequest.Sensitive bool
+field CreateVarsetVariableRequest.Structured bool
 field CreateVarsetVariableRequest.Value string
 field CreateWorkspaceRequest.AISummaryContext string `json:"ai-summary-context,omitempty"`
 field CreateWorkspaceRequest.AISummaryMode string `json:"ai-summary-mode,omitempty"`
@@ -812,6 +814,7 @@ field UpdateVariableRequest.Description *string `json:"description,omitempty"`
 field UpdateVariableRequest.HCL *bool `json:"hcl,omitempty"`
 field UpdateVariableRequest.Key string `json:"key,omitempty"`
 field UpdateVariableRequest.Sensitive *bool `json:"sensitive,omitempty"`
+field UpdateVariableRequest.Structured *bool `json:"structured,omitempty"`
 field UpdateVariableRequest.Value *string `json:"value,omitempty"`
 field UpdateVariableSetRequest.Description *string
 field UpdateVariableSetRequest.Global *bool
@@ -822,6 +825,7 @@ field UpdateVarsetVariableRequest.Description *string
 field UpdateVarsetVariableRequest.HCL *bool
 field UpdateVarsetVariableRequest.Key string
 field UpdateVarsetVariableRequest.Sensitive *bool
+field UpdateVarsetVariableRequest.Structured *bool
 field UpdateVarsetVariableRequest.Value *string
 field UpdateWorkspaceRequest.AISummaryContext *string `json:"ai-summary-context,omitempty"`
 field UpdateWorkspaceRequest.AISummaryMode string `json:"ai-summary-mode,omitempty"`
@@ -915,6 +919,7 @@ field Variable.HCL bool `json:"hcl"`
 field Variable.ID string `json:"id"`
 field Variable.Key string `json:"key"`
 field Variable.Sensitive bool `json:"sensitive"`
+field Variable.Structured bool `json:"structured"`
 field Variable.UpdatedAt string `json:"updated-at,omitempty"`
 field Variable.Value string `json:"value,omitempty"`
 field Variable.VersionID string `json:"version-id,omitempty"`
@@ -934,6 +939,7 @@ field VariableSetVariable.HCL bool `json:"hcl"`
 field VariableSetVariable.ID string `json:"id"`
 field VariableSetVariable.Key string `json:"key"`
 field VariableSetVariable.Sensitive bool `json:"sensitive"`
+field VariableSetVariable.Structured bool `json:"structured"`
 field VariableSetVariable.UpdatedAt string `json:"updated-at,omitempty"`
 field VariableSetVariable.Value string `json:"value,omitempty"`
 field VariableSetVariable.VersionID string `json:"version-id,omitempty"`

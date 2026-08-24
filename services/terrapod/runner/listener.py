@@ -694,7 +694,13 @@ class RunnerListener:
 
         env_vars = [{"key": v["key"], "value": v["value"]} for v in attrs.get("env-vars", [])]
         terraform_vars = [
-            {"key": v["key"], "value": v["value"], "hcl": bool(v.get("hcl"))}
+            # Either name, from either side of a version skew (#1435).
+            {
+                "key": v["key"],
+                "value": v["value"],
+                "structured": bool(v.get("structured", v.get("hcl"))),
+                "hcl": bool(v.get("structured", v.get("hcl"))),
+            }
             for v in attrs.get("terraform-vars", [])
         ]
         # Execution hooks (#619). The kill-switch (runners.hooks.enabled) is
@@ -1120,7 +1126,7 @@ class RunnerListener:
         ownerReference to the Job (cascade-GC'd with it, like the auth Secret).
 
         Data keys:
-          - `terraform.tfvars.json`: JSON blob [{key, value, hcl}] — mounted as
+          - `terraform.tfvars.json`: JSON blob [{key, value, structured}] — mounted as
             a file; the entrypoint renders terrapod.auto.tfvars from it.
           - `execution-hooks.json`: JSON blob [{hook_point, name, script}] (#619)
             — mounted as a file; the entrypoint runs each hook at its boundary.
@@ -1141,7 +1147,13 @@ class RunnerListener:
         if terraform_vars:
             string_data["terraform.tfvars.json"] = json.dumps(
                 [
-                    {"key": v["key"], "value": v["value"], "hcl": bool(v.get("hcl"))}
+                    # Either name, from either side of a version skew (#1435).
+                    {
+                        "key": v["key"],
+                        "value": v["value"],
+                        "structured": bool(v.get("structured", v.get("hcl"))),
+                        "hcl": bool(v.get("structured", v.get("hcl"))),
+                    }
                     for v in terraform_vars
                 ]
             )

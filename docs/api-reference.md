@@ -1651,7 +1651,15 @@ POST /api/v2/workspaces/{id}/vars
 }
 ```
 
-`category` is one of `terraform`, `env`, `git_http_auth`, or `git_ssh_auth`. In agent mode all are delivered to the runner Job via a per-run Kubernetes Secret (never plaintext in the Job spec): `terraform` vars are rendered into a generated `terrapod.auto.tfvars` from a Secret-mounted blob (honouring `hcl`), and `env` vars are injected via `secretKeyRef`. (In local execution mode the CLI handles variables itself.) The two `git_*_auth` categories carry credentials for private git module sources — the `key` is a host/URL pattern and the `value` a JSON credential; they are always forced `sensitive` and consumed by the runner's git-auth phase before `init` (see [Module Source Auth](module-auth.md)), not by terraform/tofu directly.
+`category` is one of `terraform`, `env`, `git_http_auth`, or `git_ssh_auth`. In agent mode all are delivered to the runner Job via a per-run Kubernetes Secret (never plaintext in the Job spec): `terraform` vars are rendered into a generated `terrapod.auto.tfvars` from a Secret-mounted blob (honouring `structured`), and `env` vars are injected via `secretKeyRef`. (In local execution mode the CLI handles variables itself.) The two `git_*_auth` categories carry credentials for private git module sources — the `key` is a host/URL pattern and the `value` a JSON credential; they are always forced `sensitive` and consumed by the runner's git-auth phase before `init` (see [Module Source Auth](module-auth.md)), not by terraform/tofu directly.
+
+`structured` marks a value as a typed expression rather than a plain string — for a
+`terraform` variable, a raw HCL expression (list, object, number, bool) rather than a
+quoted string. **`hcl` is the same flag under its original name and is accepted and
+returned indefinitely**, because `tfci` and `go-tfe` send and read it; responses carry
+both keys and they always agree. Supplying both with *different* values is a `422`
+rather than a silent precedence rule — a client that disagrees with itself about
+whether a value is typed has a bug worth surfacing.
 
 **Required permission:** `write` on the workspace.
 

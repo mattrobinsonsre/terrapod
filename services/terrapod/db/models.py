@@ -1355,7 +1355,15 @@ class Variable(Base):
     category: Mapped[str] = mapped_column(
         String(20), nullable=False, default="terraform"
     )  # "terraform" or "env"
-    hcl: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    #: Whether the value is a typed expression rather than a plain string
+    #: (#1435). Named for the question it answers rather than for HCL, because
+    #: the same question arises for every engine — structured config for Pulumi,
+    #: a list or dict rather than a string for Ansible extra vars — and only the
+    #: rendering differs.
+    #:
+    #: `/api/v2` still accepts and returns this as `hcl`, for ever: `tfci` and
+    #: `go-tfe` send and read that name. The translation lives in the router.
+    structured: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     sensitive: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     version_id: Mapped[str] = mapped_column(String(64), nullable=False, default="")
 
@@ -1421,7 +1429,8 @@ class VariableSetVariable(Base):
     value: Mapped[str] = mapped_column(EncryptedText, nullable=False, default="")
     description: Mapped[str] = mapped_column(Text, nullable=False, default="")
     category: Mapped[str] = mapped_column(String(20), nullable=False, default="terraform")
-    hcl: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    #: See `Variable.structured` (#1435).
+    structured: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     sensitive: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     version_id: Mapped[str] = mapped_column(String(64), nullable=False, default="")
 

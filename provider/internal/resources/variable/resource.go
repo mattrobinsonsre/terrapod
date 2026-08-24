@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -63,9 +64,21 @@ func (r *variableResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 				Required: true, Description: "Category: terraform, env, git_http_auth, or git_ssh_auth.",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
+			"structured": schema.BoolAttribute{
+				Optional: true, Computed: true,
+				Description: "Whether the value is a typed expression rather than a plain " +
+					"string. For a terraform variable that means a raw HCL expression — a " +
+					"list, object, number or bool rather than a quoted string.",
+				PlanModifiers: []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()},
+			},
 			"hcl": schema.BoolAttribute{
-				Optional: true, Computed: true, Default: booldefault.StaticBool(false),
-				Description: "Parse value as HCL.",
+				Optional: true, Computed: true,
+				Description: "Parse value as HCL. Superseded by `structured`, which is the " +
+					"same flag named for the question it answers.",
+				DeprecationMessage: "Use `structured` instead. `hcl` continues to work and " +
+					"the API will accept it indefinitely, since the terraform CLI tooling " +
+					"sends that name; only the provider attribute is deprecated.",
+				PlanModifiers: []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()},
 			},
 			"sensitive": schema.BoolAttribute{
 				Optional: true, Computed: true, Default: booldefault.StaticBool(false),
@@ -212,8 +225,12 @@ func buildCreateVariableRequest(m *variableModel) terrapod.CreateVariableRequest
 	if !m.Value.IsNull() {
 		req.Value = m.Value.ValueString()
 	}
-	if !m.HCL.IsNull() && !m.HCL.IsUnknown() {
-		req.HCL = m.HCL.ValueBool()
+	// `structured` wins when set; `hcl` is the same flag under its old name and
+	// keeps working for a config written before the rename (#1435).
+	if !m.Structured.IsNull() && !m.Structured.IsUnknown() {
+		req.Structured = m.Structured.ValueBool()
+	} else if !m.HCL.IsNull() && !m.HCL.IsUnknown() {
+		req.Structured = m.HCL.ValueBool()
 	}
 	if !m.Sensitive.IsNull() && !m.Sensitive.IsUnknown() {
 		req.Sensitive = m.Sensitive.ValueBool()
@@ -238,9 +255,12 @@ func buildUpdateVariableRequest(m *variableModel) terrapod.UpdateVariableRequest
 		v := m.Value.ValueString()
 		req.Value = &v
 	}
-	if !m.HCL.IsNull() && !m.HCL.IsUnknown() {
+	if !m.Structured.IsNull() && !m.Structured.IsUnknown() {
+		v := m.Structured.ValueBool()
+		req.Structured = &v
+	} else if !m.HCL.IsNull() && !m.HCL.IsUnknown() {
 		v := m.HCL.ValueBool()
-		req.HCL = &v
+		req.Structured = &v
 	}
 	if !m.Sensitive.IsNull() && !m.Sensitive.IsUnknown() {
 		v := m.Sensitive.ValueBool()
@@ -261,6 +281,7 @@ func readVariableIntoModel(v *terrapod.Variable, m *variableModel) {
 	m.ID = types.StringValue(v.ID)
 	m.Key = types.StringValue(v.Key)
 	m.Category = types.StringValue(v.Category)
+	m.Structured = types.BoolValue(v.Structured)
 	m.HCL = types.BoolValue(v.HCL)
 	m.Sensitive = types.BoolValue(v.Sensitive)
 	m.VersionID = types.StringValue(v.VersionID)
@@ -283,3 +304,36 @@ func readVariableIntoModel(v *terrapod.Variable, m *variableModel) {
 // JSON:API Resource). The old function was the last consumer of the
 // `client.Resource` / `client.GetXAttr` helpers from this file, so
 // deleting it cleans up the import surface too.
+
+// ValidateConfig rejects a config that sets both `structured` and `hcl` to
+// different values (#1435).
+//
+// They are one flag under two names, so a config that disagrees with itself has
+// a bug. The server refuses the pair too, but that is apply-time; catching it at
+// plan is the difference between an error before Terraform decides anything and
+// one after it has already planned a replacement.
+func (r *variableResource) ValidateConfig(
+	ctx context.Context,
+	req resource.ValidateConfigRequest,
+	resp *resource.ValidateConfigResponse,
+) {
+	var m variableModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &m)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	if m.Structured.IsNull() || m.Structured.IsUnknown() {
+		return
+	}
+	if m.HCL.IsNull() || m.HCL.IsUnknown() {
+		return
+	}
+	if m.Structured.ValueBool() != m.HCL.ValueBool() {
+		resp.Diagnostics.AddError(
+			"structured and hcl disagree",
+			"`structured` and `hcl` are the same flag under two names, and this "+
+				"configuration sets them to different values. Set only `structured` — "+
+				"`hcl` is its deprecated alias.",
+		)
+	}
+}

@@ -2021,7 +2021,9 @@ async def next_run(
     # there is no sensitivity split. See runner/phases/tfvars.py + the listener
     # vars Secret.
     terraform_vars = [
-        {"key": v.key, "value": v.value, "hcl": v.hcl}
+        # Both names on the wire (#1435): a runner up to N-2 minors behind
+        # reads `hcl` and knows nothing of `structured`.
+        {"key": v.key, "value": v.value, "structured": v.structured, "hcl": v.structured}
         for v in resolved
         if v.category == "terraform"
     ]

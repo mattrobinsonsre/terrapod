@@ -154,14 +154,15 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		Key         string `json:"key" jsonschema:"the variable key"`
 		Value       string `json:"value,omitempty" jsonschema:"the value (empty is legal, e.g. flag-shaped env vars)"`
 		Category    string `json:"category,omitempty" jsonschema:"terraform, env, git_http_auth, or git_ssh_auth (default terraform); the git_* categories carry private-git-module credentials as a JSON value and are always sensitive"`
-		HCL         *bool  `json:"hcl,omitempty" jsonschema:"the value is a raw HCL expression (lists/objects); default false"`
+		Structured  *bool  `json:"structured,omitempty" jsonschema:"the value is a typed expression rather than a plain string (lists/objects/numbers/bools); default false"`
+		HCL         *bool  `json:"hcl,omitempty" jsonschema:"deprecated alias for structured; both are the same flag"`
 		Sensitive   *bool  `json:"sensitive,omitempty" jsonschema:"mark sensitive — masked at rest and in responses; default false"`
 		Description string `json:"description,omitempty" jsonschema:"optional human description"`
 	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "terrapod_variable_set",
 		Description: "Set a workspace variable — creates it if the key is new, updates it in place if it exists (an upsert keyed on `key`). " +
-			"category defaults to terraform; set category=env for an environment variable, or git_http_auth/git_ssh_auth for private-git-module credentials (JSON value, always sensitive — see the module-auth docs). Set hcl=true for non-string values (lists/objects/numbers). Returns the variable.",
+			"category defaults to terraform; set category=env for an environment variable, or git_http_auth/git_ssh_auth for private-git-module credentials (JSON value, always sensitive — see the module-auth docs). Set structured=true for non-string values (lists/objects/numbers); `hcl` is its deprecated alias. Returns the variable.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in variableSetIn) (*mcp.CallToolResult, *terrapod.Variable, error) {
 		if in.WorkspaceID == "" || in.Key == "" {
 			return errText("workspace_id and key are required"), nil, nil
@@ -178,7 +179,7 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 			v, uerr := c.UpdateVariable(ctx, in.WorkspaceID, existing.ID, terrapod.UpdateVariableRequest{
 				Value:       &in.Value,
 				Category:    category,
-				HCL:         in.HCL,
+				Structured:  firstSet(in.Structured, in.HCL),
 				Sensitive:   in.Sensitive,
 				Description: strPtrOrNil(in.Description),
 			})
@@ -193,7 +194,7 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 			Key:         in.Key,
 			Value:       in.Value,
 			Category:    category,
-			HCL:         boolOrFalse(in.HCL),
+			Structured:  boolOrFalse(firstSet(in.Structured, in.HCL)),
 			Sensitive:   boolOrFalse(in.Sensitive),
 			Description: in.Description,
 		})
@@ -241,4 +242,13 @@ func strPtrOrNil(s string) *string {
 		return nil
 	}
 	return &s
+}
+
+// firstSet prefers the new name and falls back to its deprecated alias, so an
+// agent written against either keeps working (#1435).
+func firstSet(preferred, fallback *bool) *bool {
+	if preferred != nil {
+		return preferred
+	}
+	return fallback
 }

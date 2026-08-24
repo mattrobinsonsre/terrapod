@@ -19,6 +19,9 @@
     "alter_column(api_tokens, created_by)",
     "alter_column(api_tokens, user_email)"
   ],
+  "4408d25e7130_rename_hcl_to_structured": [
+    "alter_column(hcl)"
+  ],
   "598eb2329821_workspace_agent_pools": [
     "drop_column(workspaces, agent_pool_extra_ids)"
   ],

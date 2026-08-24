@@ -65,6 +65,7 @@
     "resource-memory",
     "run_id",
     "script",
+    "structured",
     "tail_lines",
     "target-addrs",
     "terraform-vars",
