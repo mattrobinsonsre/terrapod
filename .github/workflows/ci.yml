@@ -854,6 +854,41 @@ jobs:
             exit 1
           fi
 
+      - name: No config value renders in scientific notation (#1426)
+        run: |
+          # A values FILE yields float64, and Go renders a large float64 as
+          # `1e+06` — which Pydantic refuses as an integer, so the API will not
+          # boot. `--set` produces an int64 and cannot reproduce it, so this must
+          # go through a file.
+          #
+          # Asserted as a CLASS rather than per key: any numeric setting added
+          # later is covered without anyone remembering to extend this.
+          cat > /tmp/big-values.yaml <<'YAML'
+          api:
+            config:
+              artifact_retention:
+                binary_cache_retention_days: 1000000
+                provider_cache_retention_days: 1000000
+              auth:
+                api_token_max_ttl_hours: 1000000
+              agent_pools:
+                listener_cert_ttl_seconds: 1000000
+              registry:
+                oci:
+                  upload_session_timeout_hours: 1000000
+          YAML
+          out=$(docker run --rm -v "$PWD:/chart" -v /tmp/big-values.yaml:/tmp/big-values.yaml -w /chart \
+            "${HELM_IMAGE:-alpine/helm:3.17.2}" template terrapod helm/terrapod \
+              --namespace terrapod \
+              --set postgresql.url=postgresql+asyncpg://t:t@db:5432/terrapod \
+              --set redis.url=redis://redis:6379 \
+              -f /tmp/big-values.yaml)
+          if echo "$out" | grep -vE '^\s*#' | grep -qE ':\s*[0-9]+(\.[0-9]+)?e\+[0-9]+\s*$'; then
+            echo "FAIL: a config value rendered in scientific notation — the API will refuse it as an integer at startup. Wrap the render in | int64 (#1426):"
+            echo "$out" | grep -E ':\s*[0-9]+(\.[0-9]+)?e\+[0-9]+\s*$'
+            exit 1
+          fi
+          echo "No config value renders in scientific notation OK"
       - name: Stock install renders a working stack (web + Ingress + bootstrap)
         run: |
           out=$(docker run --rm -v "$PWD:/chart" -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \

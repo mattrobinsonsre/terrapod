@@ -42,7 +42,7 @@ data:
     credentials_secret_name: {{ include "terrapod.listenerCredentialsSecretName" . | quote }}
     health_port: {{ .Values.listener.healthPort | default 8081 }}
     public_api_url: {{ .Values.listener.publicApiUrl | default .Values.api.config.external_url | default "" | quote }}
-    listener_cert_ttl_seconds: {{ .Values.api.config.agent_pools.listener_cert_ttl_seconds | default 3600 }}
+    listener_cert_ttl_seconds: {{ .Values.api.config.agent_pools.listener_cert_ttl_seconds | default 3600 | int64 }}
     heartbeat_interval: {{ .Values.listener.heartbeatInterval | default 60 }}
     max_concurrent: {{ .Values.listener.maxConcurrent | default 3 }}
     poll_interval: {{ .Values.listener.pollInterval | default 30 }}
