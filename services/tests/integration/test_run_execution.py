@@ -376,9 +376,10 @@ class TestClaimRun:
         assert await _claim_run(client, listener_id) is None
 
     async def test_claim_run_delivers_vars_payload(self, app, client, setup):
-        """next_run returns terraform-vars carrying `hcl` (never `sensitive`) + env-vars.
+        """next_run returns terraform-vars carrying the typed flag under BOTH
+        names (never `sensitive`), plus env-vars.
 
-        The runner consumes `hcl` to render terrapod.auto.tfvars (raw expression
+        The runner consumes it to render terrapod.auto.tfvars (raw expression
         vs quoted string). Sensitivity is NOT part of the runner contract — all
         terraform vars, sensitive or not, are delivered uniformly via the per-run
         vars Secret — so `sensitive` must not leak into this payload, and the
@@ -388,7 +389,7 @@ class TestClaimRun:
         pool_id, listener_id = setup
         ws_id = await _create_remote_workspace(client, pool_id, "vars-payload-ws")
 
-        async def _add_var(key, value, category, *, sensitive=False, hcl=False):
+        async def _add_var(key, value, category, *, sensitive=False, structured=False):
             resp = await client.post(
                 f"/api/v2/workspaces/{ws_id}/vars",
                 json={
@@ -399,7 +400,9 @@ class TestClaimRun:
                             "value": value,
                             "category": category,
                             "sensitive": sensitive,
-                            "hcl": hcl,
+                            # Deliberately the OLD name: this doubles as proof
+                            # that an un-upgraded client still works (#1435).
+                            "hcl": structured,
                         },
                     }
                 },
@@ -407,7 +410,7 @@ class TestClaimRun:
             )
             assert resp.status_code == 201, resp.text
 
-        await _add_var("ports", "[80, 443]", "terraform", hcl=True)
+        await _add_var("ports", "[80, 443]", "terraform", structured=True)
         await _add_var("secret", "s3cr3t", "terraform", sensitive=True)
         await _add_var("MY_ENV", "envval", "env")
 
@@ -419,7 +422,10 @@ class TestClaimRun:
         tvars = {v["key"]: v for v in data["attributes"]["terraform-vars"]}
         assert set(tvars) == {"ports", "secret"}
         for v in tvars.values():
+            # Both names on the wire: a lagging runner reads `hcl` (#1435).
             assert "hcl" in v
+            assert "structured" in v
+            assert v["hcl"] == v["structured"]
             assert "sensitive" not in v  # dead field removed
         assert tvars["ports"]["hcl"] is True
         assert tvars["secret"]["hcl"] is False

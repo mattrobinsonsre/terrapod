@@ -64,7 +64,9 @@ def _var_json(var: Variable) -> dict:
             "value": None if var.sensitive else var.value,
             "sensitive": var.sensitive,
             "category": var.category,
-            "hcl": var.hcl,
+            # Both names, always equal. `hcl` is what go-tfe reads (#1435).
+            "structured": var.structured,
+            "hcl": var.structured,
             "description": var.description,
             "version-id": var.version_id,
             "created-at": _rfc3339(var.created_at),
@@ -91,6 +93,33 @@ async def _get_workspace(workspace_id: str, db: AsyncSession) -> Workspace:
 
 
 # ── Workspace Variables ──────────────────────────────────────────────────
+
+
+def _structured_from(attrs: dict, *, default: bool | None = None) -> bool | None:
+    """Read the flag under either name, preferring `structured` (#1435).
+
+    `hcl` is not deprecated here and never will be: this is `/api/v2`, and `tfci`
+    and `go-tfe` send it. Accepting both is permanent, not transitional.
+
+    Supplying both with different values is a 422 rather than a silent
+    precedence rule — a client that disagrees with itself about whether a value
+    is typed has a bug, and picking a winner would hide it.
+    """
+    has_structured = "structured" in attrs
+    has_hcl = "hcl" in attrs
+    if has_structured and has_hcl and bool(attrs["structured"]) != bool(attrs["hcl"]):
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "'structured' and 'hcl' are the same flag under two names and "
+                "disagree; send either one, or both with the same value"
+            ),
+        )
+    if has_structured:
+        return bool(attrs["structured"])
+    if has_hcl:
+        return bool(attrs["hcl"])
+    return default
 
 
 @router.get("/workspaces/{workspace_id}/vars")
@@ -141,7 +170,7 @@ async def create_workspace_var(
             value=attrs.get("value", ""),
             category=attrs.get("category", "terraform"),
             description=attrs.get("description", ""),
-            hcl=attrs.get("hcl", False),
+            structured=_structured_from(attrs, default=False),
             sensitive=attrs.get("sensitive", False),
         )
         await db.commit()
@@ -186,7 +215,7 @@ async def update_workspace_var(
             value=attrs.get("value"),
             category=attrs.get("category"),
             description=attrs.get("description"),
-            hcl=attrs.get("hcl"),
+            structured=_structured_from(attrs),
             sensitive=attrs.get("sensitive"),
         )
         await db.commit()
@@ -403,7 +432,8 @@ def _vsvar_json(vsv: VariableSetVariable, varset_id: str) -> dict:
             "value": None if vsv.sensitive else vsv.value,
             "sensitive": vsv.sensitive,
             "category": vsv.category,
-            "hcl": vsv.hcl,
+            "structured": vsv.structured,
+            "hcl": vsv.structured,
             "description": vsv.description,
             "version-id": vsv.version_id,
             "created-at": _rfc3339(vsv.created_at),
@@ -462,7 +492,7 @@ async def create_varset_var(
         value=value,
         description=attrs.get("description", ""),
         category=category,
-        hcl=attrs.get("hcl", False),
+        structured=_structured_from(attrs, default=False),
         sensitive=sensitive,
         version_id=variable_service._version_hash(key, value, category),
     )
@@ -505,8 +535,9 @@ async def update_varset_var(
             vsv.category = variable_service._validated_category(attrs["category"])
         except ValueError as e:
             raise HTTPException(status_code=422, detail=str(e)) from e
-    if "hcl" in attrs:
-        vsv.hcl = attrs["hcl"]
+    supplied = _structured_from(attrs)
+    if supplied is not None:
+        vsv.structured = supplied
     was_sensitive = vsv.sensitive
     if "value" in attrs:
         vsv.value = attrs["value"]

@@ -210,7 +210,7 @@ def render_wrapper_hcl(
     providers + output re-export); it bakes in **no values**. Every input value
     — sensitive and not — is supplied as an ordinary workspace **terraform
     variable**, which the runner renders into `terrapod.auto.tfvars` (honouring
-    `hcl`) and delivers via the per-run vars Secret (#540). Those values flow
+    `structured`) and delivers via the per-run vars Secret (#540). Those values flow
     structurally into the `any`-typed wrapper variables.
 
     ``var_decls`` is every wrapper variable (module inputs + provider params);
@@ -306,13 +306,13 @@ async def _single_chunk(data: bytes):
 
 
 def _input_var_repr(value: object) -> tuple[str, bool]:
-    """Map a resolved input value to ``(variable_value, hcl)`` for storage as a
+    """Map a resolved input value to ``(variable_value, structured)`` for storage as a
     workspace terraform variable.
 
-    Strings render quoted (``hcl=False``); everything else — lists, objects,
-    numbers, bools — is JSON-encoded and rendered as raw HCL (``hcl=True``),
+    Strings render quoted (``structured=False``); everything else — lists, objects,
+    numbers, bools — is JSON-encoded and rendered as raw HCL (``structured=True``),
     because JSON is valid HCL for those types and the runner's tfvars renderer
-    emits ``key = <raw>`` for hcl vars. This reproduces the structural typing the
+    emits ``key = <raw>`` for structured vars. This reproduces the structural typing the
     old baked ``terraform.auto.tfvars.json`` gave, but via the per-run vars
     Secret (#540) instead of the config version.
     """
@@ -460,19 +460,19 @@ async def _materialise(
     # sensitive and not — is stored as a workspace terraform variable; the runner
     # delivers them all via the per-run vars Secret (rendered into
     # terrapod.auto.tfvars), never plaintext in the Job spec (#540). Non-string
-    # values (lists/objects/numbers/bools) carry hcl=true so they render as raw
+    # values (lists/objects/numbers/bools) carry structured=true so they render as raw
     # HCL — json.dumps emits valid HCL for these; strings render quoted.
     for existing_var in await variable_service.list_variables(db, ws.id):
         await variable_service.delete_variable(db, existing_var)
     for vname in sorted(effective):
-        var_value, hcl = _input_var_repr(effective[vname])
+        var_value, structured = _input_var_repr(effective[vname])
         await variable_service.create_variable(
             db,
             workspace_id=ws.id,
             key=vname,
             value=var_value,
             category="terraform",
-            hcl=hcl,
+            structured=structured,
             sensitive=vname in sensitive_names,
         )
 

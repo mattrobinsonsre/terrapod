@@ -27,8 +27,8 @@ class ResolvedVariable:
 
     key: str
     value: str
-    category: str  # "terraform" or "env"
-    hcl: bool
+    category: str  # terraform | env | git_http_auth | git_ssh_auth
+    structured: bool
     sensitive: bool
 
 
@@ -61,7 +61,7 @@ async def create_variable(
     value: str,
     category: str = "terraform",
     description: str = "",
-    hcl: bool = False,
+    structured: bool = False,
     sensitive: bool = False,
 ) -> Variable:
     """Create a workspace variable."""
@@ -74,7 +74,7 @@ async def create_variable(
         value=value,
         description=description,
         category=category,
-        hcl=hcl,
+        structured=structured,
         sensitive=sensitive,
         version_id=_version_hash(key, value, category),
     )
@@ -90,7 +90,7 @@ async def update_variable(
     value: str | None = None,
     category: str | None = None,
     description: str | None = None,
-    hcl: bool | None = None,
+    structured: bool | None = None,
     sensitive: bool | None = None,
 ) -> Variable:
     """Update an existing variable."""
@@ -100,8 +100,8 @@ async def update_variable(
         var.description = description
     if category is not None:
         var.category = _validated_category(category)
-    if hcl is not None:
-        var.hcl = hcl
+    if structured is not None:
+        var.structured = structured
 
     was_sensitive = var.sensitive
 
@@ -177,7 +177,7 @@ async def resolve_variables(db: AsyncSession, workspace_id: uuid.UUID) -> list[R
                 key=vsv.key,
                 value=vsv.value,
                 category=vsv.category,
-                hcl=vsv.hcl,
+                structured=vsv.structured,
                 sensitive=vsv.sensitive,
             )
 
@@ -188,7 +188,7 @@ async def resolve_variables(db: AsyncSession, workspace_id: uuid.UUID) -> list[R
             key=var.key,
             value=var.value,
             category=var.category,
-            hcl=var.hcl,
+            structured=var.structured,
             sensitive=var.sensitive,
         )
 
@@ -200,7 +200,7 @@ async def resolve_variables(db: AsyncSession, workspace_id: uuid.UUID) -> list[R
                 key=vsv.key,
                 value=vsv.value,
                 category=vsv.category,
-                hcl=vsv.hcl,
+                structured=vsv.structured,
                 sensitive=vsv.sensitive,
             )
 

@@ -110,7 +110,7 @@ def build_job_spec(
             variable value is plaintext in the Job spec.
         env_vars: Workspace env vars [{key, value}] — keys referenced via
             secretKeyRef into vars_secret_name.
-        terraform_vars: Terraform vars [{key, value, hcl}] — presence triggers
+        terraform_vars: Terraform vars [{key, value, structured}] — presence triggers
             the mounted tfvars volume; the entrypoint renders the file.
         resource_cpu: CPU request (e.g. "1", "500m").
         parallelism: How many operations the engine runs at once (#1431).

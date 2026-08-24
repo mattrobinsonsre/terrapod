@@ -110,7 +110,7 @@ interface Variable {
     key: string
     value: string
     category: string
-    hcl: boolean
+    structured: boolean
     sensitive: boolean
     description: string
   }
@@ -1369,7 +1369,7 @@ function WorkspaceDetailContent() {
               value: isGitCat ? buildGitAuthValue() : varValue,
               category: varCategory,
               sensitive: isGitCat ? true : varSensitive,
-              hcl: varHcl,
+              structured: varHcl,
             },
           },
         }),
@@ -1527,7 +1527,7 @@ function WorkspaceDetailContent() {
     setEditVarValue(v.attributes.sensitive ? '' : v.attributes.value)
     setEditVarCategory(v.attributes.category)
     setEditVarSensitive(v.attributes.sensitive)
-    setEditVarHcl(v.attributes.hcl)
+    setEditVarHcl(v.attributes.structured)
   }
 
   async function handleSaveVar() {
@@ -1539,7 +1539,7 @@ function WorkspaceDetailContent() {
         key: editVarKey,
         category: editVarCategory,
         sensitive: editVarSensitive,
-        hcl: editVarHcl,
+        structured: editVarHcl,
       }
       if (editVarValue !== '') {
         attrs.value = editVarValue
@@ -2835,10 +2835,15 @@ function WorkspaceDetailContent() {
                         <input type="checkbox" checked={varSensitive} onChange={(e) => setVarSensitive(e.target.checked)} className="rounded border-slate-600 bg-slate-700 text-brand-600 focus:ring-brand-500" />
                         <span className="text-sm text-slate-300">{t('variables.sensitive')}</span>
                       </label>
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" checked={varHcl} onChange={(e) => setVarHcl(e.target.checked)} className="rounded border-slate-600 bg-slate-700 text-brand-600 focus:ring-brand-500" />
-                        <span className="text-sm text-slate-300">HCL</span>
-                      </label>
+                      {/* Only terraform variables can be typed: an environment
+                          variable is a string by definition, so offering the flag
+                          there was always meaningless (#1435). */}
+                      {varCategory === 'terraform' && (
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input type="checkbox" checked={varHcl} onChange={(e) => setVarHcl(e.target.checked)} className="rounded border-slate-600 bg-slate-700 text-brand-600 focus:ring-brand-500" />
+                          <span className="text-sm text-slate-300">HCL</span>
+                        </label>
+                      )}
                     </div>
                   </div>
                 )}
