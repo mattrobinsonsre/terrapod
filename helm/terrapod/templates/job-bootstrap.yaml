@@ -4,6 +4,24 @@
 {{- $dbAuthMode := (.Values.api.config.database).auth_mode | default "password" }}
 {{- $dbIam := or (eq $dbAuthMode "aws_iam") (eq $dbAuthMode "gcp_iam") (eq $dbAuthMode "azure_ad") }}
 {{- $dbCa := or .Values.api.databaseCA.inline .Values.api.databaseCA.existingConfigMap }}
+{{/*
+  Agent pools to seed (#1411). A join token is a credential, so it reaches the
+  Job by `secretKeyRef` and never appears in the Job spec — the same channel the
+  admin password uses, and what the config contract asks for. Names are not
+  secret and are passed as plain values, indexed to pair with their token.
+*/}}
+{{- if and .Values.bootstrap.pools .Values.bootstrap.poolName }}
+{{- fail "bootstrap: set either `pools` or the single-pool `poolName`, not both. Silently ignoring one is how a pool goes missing." }}
+{{- end }}
+{{- $pools := .Values.bootstrap.pools | default list }}
+{{- if and (not $pools) .Values.bootstrap.poolName .Values.bootstrap.poolTokenExistingSecret }}
+{{/* The single-pool form, Secret-backed: the same path as a one-element list. */}}
+{{- $pools = list (dict "name" .Values.bootstrap.poolName "existingSecret" .Values.bootstrap.poolTokenExistingSecret "tokenKey" .Values.bootstrap.poolTokenKey) }}
+{{- end }}
+{{- range $i, $p := $pools }}
+{{- if not $p.name }}{{ fail (printf "bootstrap.pools[%d] has no name" $i) }}{{ end }}
+{{- if not $p.existingSecret }}{{ fail (printf "bootstrap.pools[%d] (%s) has no existingSecret — a join token must come from a Secret, never from values" $i $p.name) }}{{ end }}
+{{- end }}
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -85,13 +103,32 @@ spec:
             - name: TERRAPOD_BOOTSTRAP_ADMIN_PASSWORD
               value: {{ .Values.bootstrap.adminPassword | quote }}
             {{- end }}
+            {{- if $pools }}
+            {{/* The count is declared so a hand-written Job cannot leave a gap
+                 in the indices and silently drop a pool; the CLI insists on
+                 finding exactly this many. */}}
+            - name: TERRAPOD_BOOTSTRAP_POOL_COUNT
+              value: {{ len $pools | quote }}
+            {{- range $i, $p := $pools }}
+            - name: {{ printf "TERRAPOD_BOOTSTRAP_POOL_%d_NAME" $i }}
+              value: {{ $p.name | quote }}
+            - name: {{ printf "TERRAPOD_BOOTSTRAP_POOL_%d_TOKEN" $i }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $p.existingSecret | quote }}
+                  key: {{ $p.tokenKey | default "join_token" | quote }}
+            {{- end }}
+            {{- else }}
             {{- if .Values.bootstrap.poolName }}
             - name: TERRAPOD_BOOTSTRAP_POOL_NAME
               value: {{ .Values.bootstrap.poolName | quote }}
             {{- end }}
             {{- if .Values.bootstrap.poolToken }}
+            {{/* Legacy inline token: kept working, but it renders into the Job
+                 spec. Prefer `pools` (or poolTokenExistingSecret), which do not. */}}
             - name: TERRAPOD_BOOTSTRAP_POOL_TOKEN
               value: {{ .Values.bootstrap.poolToken | quote }}
+            {{- end }}
             {{- end }}
             {{- if .Values.bootstrap.sampleWorkspace }}
             - name: TERRAPOD_BOOTSTRAP_SAMPLE_WORKSPACE

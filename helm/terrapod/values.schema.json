@@ -763,6 +763,25 @@
         "poolToken": {
           "type": "string"
         },
+        "poolTokenExistingSecret": {
+          "type": "string"
+        },
+        "poolTokenKey": {
+          "type": "string"
+        },
+        "pools": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "existingSecret"],
+            "properties": {
+              "name": { "type": "string", "minLength": 1 },
+              "existingSecret": { "type": "string", "minLength": 1 },
+              "tokenKey": { "type": "string" }
+            }
+          }
+        },
         "sampleWorkspace": {
           "type": "boolean"
         },

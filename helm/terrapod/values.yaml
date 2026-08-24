@@ -1669,7 +1669,29 @@ migrations:
 #   emailKey: email
 #   passwordKey: password
 #   poolName: ""       # Optional: auto-create an agent pool with this name
-#   poolToken: ""      # Optional: auto-create a join token for the pool
+#   poolToken: ""      # Optional: the pool's join token. Rendered into the Job
+#                      # spec as a literal, so prefer poolTokenExistingSecret
+#                      # (or `pools` below), which do not.
+#   poolTokenExistingSecret: ""  # Preferred: read poolName's join token from a
+#                                # Secret instead of from values.
+#   poolTokenKey: "join_token"   # Key within that Secret.
+#
+#   # Several pools (#1411). bootstrap writes directly to the database, so it is
+#   # the only way to register a pool with no API running yet — and the listener's
+#   # readiness probe does not pass until it has joined one, so on a green-field
+#   # install with `helm --wait` the pools have to exist before anything starts.
+#   #
+#   # Each token is delivered by secretKeyRef and never appears in the Job spec.
+#   # Give every pool its own token: two pools sharing one would leave the second
+#   # unjoinable, so the Job refuses to start rather than let that through.
+#   #
+#   # Mutually exclusive with poolName — setting both fails at template time.
+#   pools:
+#     - name: pool-a
+#       existingSecret: pool-a-token
+#       tokenKey: join_token     # optional, defaults to "join_token"
+#     - name: pool-b
+#       existingSecret: pool-b-token
 #   sampleWorkspace: false      # Eval only: seed a sample workspace + a completed
 #                               # plan-only run so the UI is populated on first login.
 #                               # Do NOT enable in production (it inserts demo data).
