@@ -1,4 +1,20 @@
 version: 2
+
+# Updates arrive GROUPED: one PR per ecosystem per cycle, not one per dependency.
+#
+# Ungrouped, a week's worth of routine bumps is several PRs against the same
+# file, and merging one puts the rest out of date — so each gets rebased, each
+# rebase fires a full CI run, and they compete for the account's 20-job
+# concurrency ceiling with whatever real work is in flight. Four CI-action bumps
+# did exactly that and starved an unrelated PR down to two runners.
+#
+# MAJORS are deliberately left out of the groups. A breaking change deserves its
+# own PR and its own review, and burying one in a batch of eleven patches is how
+# it gets waved through. `update-types` on each group is what keeps them separate.
+#
+# Security updates are also left ungrouped (a group without `applies-to` covers
+# version updates only). They should land individually and fast, not wait for
+# whatever else is in the batch.
 updates:
   - package-ecosystem: pip
     directory: /services
@@ -12,6 +28,10 @@ updates:
     labels: [dependencies, python]
     commit-message:
       prefix: "deps(python):"
+    groups:
+      python:
+        patterns: ["*"]
+        update-types: [minor, patch]
     ignore:
       # fastapi 0.137 pulls starlette 1.x (major) — it refactors
       # include_router (the new _IncludedRouter matcher) and shifts
@@ -49,6 +69,10 @@ updates:
     labels: [dependencies, web]
     commit-message:
       prefix: "deps(web):"
+    groups:
+      web:
+        patterns: ["*"]
+        update-types: [minor, patch]
     ignore:
       # eslint-plugin-react (via eslint-config-next) doesn't support ESLint 10 yet
       - dependency-name: eslint
@@ -81,6 +105,10 @@ updates:
     labels: [dependencies, docker]
     commit-message:
       prefix: "deps(docker):"
+    groups:
+      docker:
+        patterns: ["*"]
+        update-types: [minor, patch]
     ignore:
       - dependency-name: node
         versions: ["23.x", "25.x", "27.x", "29.x", "31.x"]
@@ -94,7 +122,12 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: weekly
+      # Monthly, not weekly. Action bumps are the noisiest and least urgent
+      # source of churn here — a pinned SHA moving a patch version changes
+      # nothing we depend on — and they are the ones that were re-firing CI.
+      # An action with an actual advisory still arrives as a security update,
+      # which is not governed by this schedule.
+      interval: monthly
       day: monday
     # Wait 7 days after a release before proposing it — lets freshly-published
     # (possibly compromised or broken) versions be caught/yanked upstream first.
@@ -103,3 +136,7 @@ updates:
     labels: [dependencies, ci]
     commit-message:
       prefix: "deps(ci):"
+    groups:
+      actions:
+        patterns: ["*"]
+        update-types: [minor, patch]
