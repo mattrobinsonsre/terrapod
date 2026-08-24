@@ -129,19 +129,32 @@ path.
 
 ## Deletion
 
-There is no API for deleting a blob or a manifest, and this is a decision rather
-than an omission. Deleting a manifest does not reclaim anything on its own —
-its layers may be shared with other images — so a delete endpoint gives an
-operator a button that appears to free space and does not.
+**An image you pushed stays until you remove it.** A registry is not a cache for
+content you put in it: nothing here expires a pushed image because it has gone
+quiet, any more than a registry you pay for would. Reclaiming that space is a
+deliberate act, not a background sweep.
 
-Space is reclaimed by **garbage collection** instead, which runs hourly and needs
-no downtime.
+Removing a pushed image is **not yet possible** — there is no delete API — so a
+pushed image is currently permanent. That is the honest position and it is
+tracked in [#1423](https://github.com/mattrobinsonsre/terrapod/issues/1423); the
+collector below is the half that already exists, and deletion is the half that
+will use it.
+
+Deleting a manifest reclaims nothing on its own, incidentally, because its layers
+are usually shared with other images. That is why the two are separate: deletion
+un-references content, and **garbage collection** frees whatever nothing points at
+any more. It runs hourly and needs no downtime.
 
 ### What is collected, and what never is
 
 A blob is collected when no manifest references it any more. That is the only
 condition, and it is what makes the shared-layer case safe: a base layer two
 images share stays until the second of them goes.
+
+In practice that means collection reclaims **mirrored images past their retention
+window**, and **abandoned uploads** — blobs from a push that never sent its
+manifest. Pushed images are not reclaimed, because nothing un-references them
+(see above).
 
 **An image you pushed is never expired by age.** It exists nowhere else, and a
 registry that quietly eats the images you put in it is not a registry. Only its
