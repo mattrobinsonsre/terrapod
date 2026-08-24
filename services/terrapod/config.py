@@ -838,6 +838,34 @@ class OCIUpstreamConfig(BaseModel):
         return os.environ.get(self.password_env_var, "")
 
 
+class OCIGarbageCollectionConfig(BaseModel):
+    """Reclaiming storage in the container registry (#1419).
+
+    Deleting a manifest reclaims nothing on its own — its layers are usually
+    shared — so space comes back only by finding blobs no manifest references.
+    """
+
+    enabled: bool = Field(
+        default=True,
+        description="Collect unreferenced blobs. On by default because the "
+        "alternative is a registry that only ever grows: there is no delete API, "
+        "so without this an operator's only recourse is manual SQL and object "
+        "deletion. Turn it off only to investigate an unexpected reclaim.",
+    )
+    grace_hours: int = Field(
+        default=24,
+        ge=1,
+        description="How old a blob must be before it can be collected. Blobs are "
+        "uploaded BEFORE the manifest that references them, so a sweep landing "
+        "between the two would delete the layers of a push still in progress — the "
+        "client then fails its manifest PUT for content it just uploaded. Anything "
+        "younger than this is presumed to belong to a push that has not finished. "
+        "Docker's own registry answers the same problem by requiring read-only mode "
+        "during collection; a generous window costs nothing and needs no downtime. "
+        "Raise it if pushes in your environment can legitimately take longer.",
+    )
+
+
 class OCIRegistryConfig(BaseModel):
     """Container image registry (#1408).
 
@@ -862,6 +890,7 @@ class OCIRegistryConfig(BaseModel):
         "credentials carries a username plus a Secret-backed password (see the chart's "
         "oci.upstreams[].existingSecret) — never a password in this file.",
     )
+    gc: OCIGarbageCollectionConfig = Field(default_factory=OCIGarbageCollectionConfig)
     upload_session_timeout_hours: int = Field(
         default=24,
         ge=1,
@@ -1347,6 +1376,14 @@ class ArtifactRetentionConfig(BaseModel):
     binary_cache_retention_days: int = Field(
         default=30,
         description="Days since last access before cached CLI binaries are eligible for cleanup (0 = disabled)",
+    )
+    oci_mirror_retention_days: int = Field(
+        default=30,
+        description="Days since last access before a MIRRORED container image is "
+        "eligible for removal (0 = disabled). Pull-through content only — an image "
+        "an operator PUSHED exists nowhere else and is never expired by age, "
+        "whatever this is set to. Ignored entirely on a sealed node, where nothing "
+        "can be re-fetched.",
     )
     package_cache_retention_days: int = Field(
         default=30,

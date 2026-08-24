@@ -416,6 +416,25 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
             description="Clean up old artifacts from object storage",
         )
 
+    # OCI garbage collection (#1419). Deletes data, so it runs on the
+    # distributed scheduler like everything else — exactly one replica per cycle,
+    # never `asyncio.create_task` (principle 11). Hourly: the grace period is
+    # measured in hours, so collecting more often only re-examines blobs that are
+    # still protected.
+    if settings.registry.oci.enabled and settings.registry.oci.gc.enabled:
+
+        async def _oci_gc() -> None:
+            from terrapod.services.oci.gc import collect
+
+            await collect()
+
+        register_periodic_task(
+            "oci_gc",
+            interval_seconds=3600,
+            handler=_oci_gc,
+            description="Collect unreferenced OCI blobs and expire mirrored images",
+        )
+
     # Abandoned OCI upload reaper. Every started-then-forgotten `docker push`
     # leaves a session row and its chunks behind, and only push access is needed
     # to do that repeatedly — so this is a storage-exhaustion control, not just
