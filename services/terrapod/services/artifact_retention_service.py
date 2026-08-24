@@ -70,6 +70,7 @@ async def artifact_retention_cycle() -> None:
             ),
             ("provider_cache", _cleanup_provider_cache, cfg.provider_cache_retention_days),
             ("binary_cache", _cleanup_binary_cache, cfg.binary_cache_retention_days),
+            ("package_cache", _cleanup_package_cache, cfg.package_cache_retention_days),
             ("module_overrides", _cleanup_module_overrides, cfg.module_overrides_retention_days),
             (
                 "vcs_archives",
@@ -86,7 +87,11 @@ async def artifact_retention_cycle() -> None:
         # Sealed (cache-only) mode: never evict the binary/provider caches — an
         # un-refetchable artifact would be lost permanently. Other categories
         # (state/run/config artifacts) are unaffected.
-        sealed_skip = {"provider_cache", "binary_cache"} if settings.registry.cache_only else set()
+        sealed_skip = (
+            {"provider_cache", "binary_cache", "package_cache"}
+            if settings.registry.cache_only
+            else set()
+        )
 
         for category, handler, threshold in categories:
             if threshold == 0:
@@ -475,6 +480,53 @@ async def _cleanup_binary_cache(
     if deleted:
         await db.commit()
         RETENTION_DELETED.labels(category="binary_cache").inc(deleted)
+
+    return deleted
+
+
+async def _cleanup_package_cache(
+    db: AsyncSession,
+    storage: ObjectStore,
+    retention_days: int,
+    batch_size: int,
+) -> int:
+    """Delete cached PyPI/npm artifacts not accessed within retention_days.
+
+    Access-based, like the other pull-through caches: a package every run
+    installs would otherwise be evicted for being old and re-fetched immediately,
+    which is worse than not expiring it at all.
+    """
+    from terrapod.api.metrics import RETENTION_DELETED
+    from terrapod.db.models import CachedPackageFile
+
+    cutoff = datetime.now(UTC) - timedelta(days=retention_days)
+    deleted = 0
+
+    result = await db.execute(
+        select(CachedPackageFile)
+        .where(CachedPackageFile.last_accessed_at < cutoff)
+        .limit(batch_size)
+    )
+    entries = list(result.scalars().all())
+
+    for entry in entries:
+        try:
+            await storage.delete(entry.storage_key)
+        except Exception:
+            # An object already gone is the row's problem, not a reason to keep
+            # the row: leaving it would make every later request a miss that
+            # re-fetches and then collides on the unique constraint.
+            logger.warning(
+                "Failed to delete cached package artifact from storage",
+                entry_id=str(entry.id),
+                exc_info=True,
+            )
+        await db.delete(entry)
+        deleted += 1
+
+    if deleted:
+        await db.commit()
+        RETENTION_DELETED.labels(category="package_cache").inc(deleted)
 
     return deleted
 

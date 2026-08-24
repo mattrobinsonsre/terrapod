@@ -304,6 +304,24 @@ api:
         # access can repeat. Generous by default: a slow, resumed push over a
         # poor link is legitimate, and reaping it mid-flight destroys real work.
         upload_session_timeout_hours: 24
+      # Language package proxies (#1417). Point runners at these with
+      # PIP_INDEX_URL and NPM_CONFIG_REGISTRY and a run resolves its dependency
+      # closure with no upstream reach — which is the only way a Pulumi program
+      # can work air-gapped, since its package.json/pyproject.toml belongs to the
+      # user and cannot be baked into a runner image.
+      #
+      # `upstream` is a single operator-set URL, not a client-chosen host: the
+      # client names a package, never a registry, so this is the whole of the
+      # request-forgery surface. Point it at an internal mirror to pull through
+      # that instead of the public registry.
+      package_cache:
+        enabled: true
+        pypi:
+          enabled: true
+          upstream: https://pypi.org
+        npm:
+          enabled: true
+          upstream: https://registry.npmjs.org
       provider_cache:
         enabled: true
         upstream_registries:
@@ -556,7 +574,7 @@ api:
         #                   registry_modules, registry_providers
         #   history       — run_logs, run_plans, run_vars,
         #                   deleted_workspace_markers
-        #   re-derivable  — provider_cache, binary_cache,
+        #   re-derivable  — provider_cache, binary_cache, package_cache,
         #                   platform_provider_cache, cost_pricesheet,
         #                   vcs_archives, module_overrides
         #
@@ -991,6 +1009,7 @@ api:
       config_versions_retention_days: 90
       provider_cache_retention_days: 30   # days since last access
       binary_cache_retention_days: 30     # days since last access
+      package_cache_retention_days: 30    # days since last access (PyPI/npm artifacts)
       module_overrides_retention_days: 14
       # Undelete window (#1253). State of a deleted workspace is kept this
       # long so an accidental deletion can be undone; 0 = keep forever.

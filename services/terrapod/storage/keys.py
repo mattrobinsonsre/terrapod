@@ -149,6 +149,23 @@ def provider_cache_key(
     return f"cache/providers/{hostname}/{namespace}/{type_}/{version}/{filename}"
 
 
+# --- Package Cache (language registries) ---
+
+
+def package_cache_key(ecosystem: str, name: str, filename: str) -> str:
+    """Key for a cached artifact from a language package registry (#1417).
+
+    Keyed by filename rather than by version, because a single version routinely
+    has many files — an sdist and a wheel per platform and Python ABI — and they
+    are not interchangeable.
+
+    The name is already ecosystem-normalised by the caller. npm scopes contain a
+    `/` (`@scope/pkg`), which is left intact: object stores treat it as a path
+    separator, which is exactly the grouping we would otherwise have to invent.
+    """
+    return f"cache/packages/{ecosystem}/{name}/{filename}"
+
+
 # --- Binary Cache ---
 
 

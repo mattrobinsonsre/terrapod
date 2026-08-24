@@ -874,6 +874,50 @@ class OCIRegistryConfig(BaseModel):
     )
 
 
+class PackageEcosystemConfig(BaseModel):
+    """One language registry Terrapod proxies."""
+
+    enabled: bool = Field(
+        default=True,
+        description="Serve this ecosystem's proxy. Disabling it 404s the endpoints; "
+        "already-cached artifacts stay in storage and reappear if re-enabled.",
+    )
+    upstream: str = Field(
+        description="Base URL of the registry to pull through to. A single URL, not a "
+        "list: unlike the container registry there is no client-chosen host here — the "
+        "client names a package and Terrapod decides where packages come from — so this "
+        "is the whole of the request-forgery surface and it is operator-set. Point it at "
+        "an internal mirror to pull through that instead of the public registry.",
+    )
+
+
+class PackageCacheConfig(BaseModel):
+    """Pull-through caching for language package registries (#1417).
+
+    A Pulumi program's dependencies belong to the user and vary per workspace, so
+    unlike engine binaries or Ansible collections they cannot be baked into a
+    runner image — `npm install` and `pip install` happen at run time and have to
+    reach a registry. These proxies are that registry, and are what let a run
+    resolve its dependency closure with no upstream reach.
+    """
+
+    enabled: bool = Field(
+        default=True,
+        description="Serve the language package proxies. Point runners at them with "
+        "PIP_INDEX_URL and NPM_CONFIG_REGISTRY.",
+    )
+    pypi: PackageEcosystemConfig = Field(
+        default_factory=lambda: PackageEcosystemConfig(upstream="https://pypi.org"),
+        description="PyPI (PEP 503/691 simple index). Serves Pulumi Python programs, "
+        "Ansible collections' Python dependencies, and execution-environment builds.",
+    )
+    npm: PackageEcosystemConfig = Field(
+        default_factory=lambda: PackageEcosystemConfig(upstream="https://registry.npmjs.org"),
+        description="npm registry (packuments and tarballs). Serves Pulumi TypeScript "
+        "and JavaScript programs.",
+    )
+
+
 class RegistryConfig(BaseModel):
     """Private registry and caching configuration."""
 
@@ -904,6 +948,7 @@ class RegistryConfig(BaseModel):
     platform_tools: PlatformToolsConfig = Field(default_factory=PlatformToolsConfig)
     module_interface: ModuleInterfaceConfig = Field(default_factory=ModuleInterfaceConfig)
     oci: OCIRegistryConfig = Field(default_factory=OCIRegistryConfig)
+    package_cache: PackageCacheConfig = Field(default_factory=PackageCacheConfig)
 
 
 class CatalogConfig(BaseModel):
@@ -1303,6 +1348,11 @@ class ArtifactRetentionConfig(BaseModel):
         default=30,
         description="Days since last access before cached CLI binaries are eligible for cleanup (0 = disabled)",
     )
+    package_cache_retention_days: int = Field(
+        default=30,
+        description="Days since last access before cached PyPI/npm artifacts are eligible "
+        "for cleanup (0 = disabled)",
+    )
     module_overrides_retention_days: int = Field(
         default=14,
         description="Days to keep module override tarballs for terminal runs (0 = disabled)",
@@ -1541,6 +1591,7 @@ BLOB_CLASS_NAMES: tuple[str, ...] = (
     "run_vars",
     "provider_cache",
     "binary_cache",
+    "package_cache",
     "platform_provider_cache",
     "cost_pricesheet",
     "vcs_archives",

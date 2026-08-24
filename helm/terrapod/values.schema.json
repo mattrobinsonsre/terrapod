@@ -1818,6 +1818,29 @@
                 }
               }
             },
+            "package_cache": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "pypi": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "enabled": { "type": "boolean" },
+                    "upstream": { "type": "string", "format": "uri" }
+                  }
+                },
+                "npm": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "enabled": { "type": "boolean" },
+                    "upstream": { "type": "string", "format": "uri" }
+                  }
+                }
+              }
+            },
             "oci": {
               "type": "object",
               "additionalProperties": false,
@@ -2445,6 +2468,10 @@
               "type": "integer",
               "minimum": 0
             },
+            "package_cache_retention_days": {
+              "type": "integer",
+              "minimum": 0
+            },
             "module_overrides_retention_days": {
               "type": "integer",
               "minimum": 0
@@ -2630,7 +2657,7 @@
                   "type": "object",
                   "additionalProperties": false,
                   "patternProperties": {
-                    "^(state|state_index|configuration_versions|registry_modules|registry_providers|deleted_workspace_markers|run_logs|run_plans|run_vars|provider_cache|binary_cache|platform_provider_cache|cost_pricesheet|vcs_archives|module_overrides)$": {
+                    "^(state|state_index|configuration_versions|registry_modules|registry_providers|deleted_workspace_markers|run_logs|run_plans|run_vars|provider_cache|binary_cache|package_cache|platform_provider_cache|cost_pricesheet|vcs_archives|module_overrides)$": {
                       "type": "string",
                       "enum": [
                         "off",
