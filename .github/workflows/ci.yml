@@ -876,6 +876,30 @@ jobs:
           # secret env is injected (no existingSecret) — config-channel contract.
           echo "$out" | grep -q "TERRAPOD_SLACK__" && { echo "FAIL: Slack secret env injected when disabled"; exit 1; }
           echo "Stock install renders web + Ingress + bootstrap + hooks_enabled OK"
+      - name: Bootstrap seeds several agent pools without exposing a token (#1411)
+        run: |
+          out=$(docker run --rm -v "$PWD:/chart" -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \
+            template terrapod helm/terrapod \
+              --namespace terrapod \
+              --set postgresql.url=postgresql+asyncpg://t:t@db:5432/terrapod \
+              --set redis.url=redis://redis:6379 \
+              --set bootstrap.adminEmail=admin@example.com \
+              --set bootstrap.adminPassword=changeme \
+              --set 'bootstrap.pools[0].name=pool-a' \
+              --set 'bootstrap.pools[0].existingSecret=pool-a-token' \
+              --set 'bootstrap.pools[1].name=pool-b' \
+              --set 'bootstrap.pools[1].existingSecret=pool-b-token' \
+              --set 'bootstrap.pools[1].tokenKey=custom_key')
+          echo "$out" | grep -q 'TERRAPOD_BOOTSTRAP_POOL_COUNT' || { echo "FAIL: pool count not rendered — the CLI would seed nothing (#1411)"; exit 1; }
+          echo "$out" | grep -q 'TERRAPOD_BOOTSTRAP_POOL_1_NAME' || { echo "FAIL: only one pool rendered (#1411)"; exit 1; }
+          echo "$out" | grep -q 'name: "pool-b-token"' || { echo "FAIL: the second pool's Secret is not referenced (#1411)"; exit 1; }
+          echo "$out" | grep -q 'key: "custom_key"' || { echo "FAIL: per-pool tokenKey ignored (#1411)"; exit 1; }
+          # The point of secretKeyRef: no join token may appear as a literal in
+          # the rendered Job, or it lands in the Helm release and in state.
+          if echo "$out" | grep -E 'TERRAPOD_BOOTSTRAP_POOL_[0-9]+_TOKEN' -A 1 | grep -q 'value:'; then
+            echo "FAIL: a join token rendered as a literal value instead of a secretKeyRef (#1411)"; exit 1
+          fi
+          echo "Multi-pool bootstrap renders with tokens by secretKeyRef OK"
       - name: Local dev values render
         run: |
           out=$(docker run --rm -v "$PWD:/chart" -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \

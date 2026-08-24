@@ -586,8 +586,42 @@ The chart supports up to three Ingresses. See [Split-networking deployments](dep
 | `bootstrap.adminEmail` | | Initial admin email |
 | `bootstrap.adminPassword` | | Initial admin password |
 | `bootstrap.existingSecret` | | K8s secret with admin credentials |
-| `bootstrap.poolName` | `""` | Optional: create an agent pool with this name |
-| `bootstrap.poolToken` | `""` | Optional: raw join token for the pool (generated if omitted) |
+| `bootstrap.poolName` | `""` | Optional: create a single agent pool with this name |
+| `bootstrap.poolToken` | `""` | Its join token, **as a literal in the Job spec** — prefer `poolTokenExistingSecret`. Generated and printed once if omitted |
+| `bootstrap.poolTokenExistingSecret` | `""` | Read `poolName`'s join token from a Secret instead of from values |
+| `bootstrap.poolTokenKey` | `join_token` | Key within that Secret |
+| `bootstrap.pools` | `[]` | Several pools at once — see below. Mutually exclusive with `poolName` |
+
+#### Seeding several agent pools
+
+`bootstrap` writes directly to the database, which makes it the only way to
+register a pool before an API is running. That matters on a green-field install:
+a listener's readiness probe does not pass until it has **joined** a pool, so
+with `helm --wait` the pools have to exist before anything rolls out.
+
+```yaml
+bootstrap:
+  existingSecret: terrapod-admin
+  pools:
+    - name: pool-a
+      existingSecret: pool-a-token   # the raw join token lives in this Secret
+      tokenKey: join_token           # optional, defaults to "join_token"
+    - name: pool-b
+      existingSecret: pool-b-token
+```
+
+Each token reaches the Job by `secretKeyRef`, so it never appears in the Job
+spec, the Helm release, or the state file of whatever applied it. Re-running is a
+no-op, so the Job is safe on every upgrade and you can add a pool to the list
+later without disturbing the others.
+
+**Give every pool its own token.** Join tokens are unique across all pools, so
+two pools sharing one would leave the second without a token at all — its
+listener would never join. The Job refuses to start rather than let that happen,
+naming both pools.
+
+Setting both `pools` and `poolName` fails at template time rather than silently
+ignoring one.
 
 **Security note:** The bootstrap admin credentials are used only for initial setup. After deploying, either change the admin password immediately or configure SSO (OIDC/SAML) and disable local auth (`auth.local_enabled: false`). For production, always use `bootstrap.existingSecret` with a Kubernetes Secret rather than plain-text values in Helm.
 
