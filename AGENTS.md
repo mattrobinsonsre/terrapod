@@ -757,16 +757,28 @@ git commit --allow-empty -m "chore: rebuild v1.1.x against a refreshed base imag
 - **Never merge `main`.** The point is the fix without the features; merging
   defeats it and turns a patch into an untested minor. Cherry-pick or write the
   minimal fix — see above — but never merge.
-- **Never merge the release branch back into `main`.** Its commits are already
-  there — that is where they were picked from. Keep the branch; it is where the
-  next patch on that line starts.
+- **Never *merge* the release branch into `main`** — in either direction of
+  travel. Keep the branch; it is where the next patch on that line starts.
+  - When the fix came from `main`, its commits are already there and there is
+    nothing to bring back.
+  - When the fix **originated on the release branch** — because the operators
+    who need it are on that line and the change is patch material — cherry-pick
+    it *into* `main` with `-x`, so the newer line does not regress it at the next
+    upgrade. Do this promptly: a fix that lives only on an older line is a
+    regression waiting for whoever upgrades.
 - **`-x` on every cherry-pick**, and an explicit note on every commit that is
   *not* one. When someone asks in six months whether a fix is in a line, the
   recorded origin is the answer — and where there is no origin to record, say
   so, or the absence reads as an oversight.
-- **A patch stays a patch.** If what you are picking needs a schema migration, a
-  config key, or anything else that changes a public surface, it is not patch
-  material — see [Versioning & support](docs/versioning-and-support.md).
+- **A patch stays a patch.** A schema migration, a new API route or response
+  attribute, a wire-protocol change, or anything that alters what an existing
+  configuration does is not patch material — see
+  [Versioning & support](docs/versioning-and-support.md). An **opt-in** Helm
+  value or config key whose default leaves the deployment behaving exactly as
+  before *is* allowed: the test is whether taking the release can change
+  anything for an operator who does not touch their values, and an unset key
+  cannot. Adding one still means regenerating the values/config contract
+  snapshot on the release branch, which is the usual additive-only check.
 - **Bring the accepted-risk register forward with the patch.**
   `pentest/trivy/.trivyignore` and the audit ignore files describe what we
   accept *now*, and both the release gate and the re-scan read them **from the

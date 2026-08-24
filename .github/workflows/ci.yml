@@ -876,6 +876,30 @@ jobs:
           # secret env is injected (no existingSecret) — config-channel contract.
           echo "$out" | grep -q "TERRAPOD_SLACK__" && { echo "FAIL: Slack secret env injected when disabled"; exit 1; }
           echo "Stock install renders web + Ingress + bootstrap + hooks_enabled OK"
+      - name: Bootstrap seeds several agent pools without exposing a token (#1411)
+        run: |
+          out=$(docker run --rm -v "$PWD:/chart" -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \
+            template terrapod helm/terrapod \
+              --namespace terrapod \
+              --set postgresql.url=postgresql+asyncpg://t:t@db:5432/terrapod \
+              --set redis.url=redis://redis:6379 \
+              --set bootstrap.adminEmail=admin@example.com \
+              --set bootstrap.adminPassword=changeme \
+              --set 'bootstrap.pools[0].name=pool-a' \
+              --set 'bootstrap.pools[0].existingSecret=pool-a-token' \
+              --set 'bootstrap.pools[1].name=pool-b' \
+              --set 'bootstrap.pools[1].existingSecret=pool-b-token' \
+              --set 'bootstrap.pools[1].tokenKey=custom_key')
+          echo "$out" | grep -q 'TERRAPOD_BOOTSTRAP_POOL_COUNT' || { echo "FAIL: pool count not rendered — the CLI would seed nothing (#1411)"; exit 1; }
+          echo "$out" | grep -q 'TERRAPOD_BOOTSTRAP_POOL_1_NAME' || { echo "FAIL: only one pool rendered (#1411)"; exit 1; }
+          echo "$out" | grep -q 'name: "pool-b-token"' || { echo "FAIL: the second pool's Secret is not referenced (#1411)"; exit 1; }
+          echo "$out" | grep -q 'key: "custom_key"' || { echo "FAIL: per-pool tokenKey ignored (#1411)"; exit 1; }
+          # The point of secretKeyRef: no join token may appear as a literal in
+          # the rendered Job, or it lands in the Helm release and in state.
+          if echo "$out" | grep -E 'TERRAPOD_BOOTSTRAP_POOL_[0-9]+_TOKEN' -A 1 | grep -q 'value:'; then
+            echo "FAIL: a join token rendered as a literal value instead of a secretKeyRef (#1411)"; exit 1
+          fi
+          echo "Multi-pool bootstrap renders with tokens by secretKeyRef OK"
       - name: Local dev values render
         run: |
           out=$(docker run --rm -v "$PWD:/chart" -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \
@@ -1831,6 +1855,16 @@ jobs:
   # Merges the per-shard Playwright blob reports into a single HTML report,
   # so a failure across 8 shards is triaged from one artifact. Runs even when
   # shards fail (always()) — that's exactly when the merged report is needed.
+  # Merges the shard blob reports into one HTML report for a human to read.
+  #
+  # Deliberately NOT part of `ci-pass`: it asserts nothing about the product. The
+  # test verdict lives in the eight `e2e-test` shards, which are gated. Having
+  # this in the gate meant a GitHub artifact-storage failure — no Terrapod code
+  # involved, artifacts intact per the API, `download-artifact` exhausting its own
+  # retries — could fail a release that was otherwise complete and correct, with
+  # no rerun able to clear it. That happened on v1.5.3.
+  #
+  # Losing the merge costs the pretty report and nothing else.
   e2e-report:
     name: E2E Report
     needs: [prepare, e2e-test]
@@ -1839,12 +1873,16 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Download blob reports
+        # Keep going if a shard's report cannot be fetched: a partial report is
+        # more useful than none, and this job is not a gate.
+        continue-on-error: true
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           pattern: blob-report-*
           path: all-blob-reports
           merge-multiple: true
       - name: Merge into HTML report
+        continue-on-error: true
         run: |
           docker run --rm \
             -v "${{ github.workspace }}/e2e:/work" \
@@ -2885,7 +2923,6 @@ jobs:
             "${{ needs.scan-images.result }}"
             "${{ needs.e2e-test.result }}"
             "${{ needs.oci-conformance.result }}"
-            "${{ needs.e2e-report.result }}"
             "${{ needs.create-manifests.result }}"
             "${{ needs.release-create.result }}"
             "${{ needs.release-images.result }}"
