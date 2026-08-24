@@ -187,6 +187,17 @@ data:
         {{- end }}
       {{- end }}
     {{- end }}
+    {{- with .Values.api.config.engines }}
+    engines:
+      {{- if hasKey . "ansible" }}
+      ansible:
+        enabled: {{ .ansible.enabled }}
+      {{- end }}
+      {{- if hasKey . "pulumi" }}
+      pulumi:
+        enabled: {{ .pulumi.enabled }}
+      {{- end }}
+    {{- end }}
     {{- if .Values.api.config.registry }}
     registry:
       enabled: {{ .Values.api.config.registry.enabled }}

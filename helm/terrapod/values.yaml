@@ -260,6 +260,32 @@ api:
         #   entity_id: "https://terrapod.example.com"
         #   role_prefixes: ["terrapod:", "terrapod-"]
 
+    # Engines beyond Terraform/OpenTofu (#1429).
+    #
+    # Terrapod carries surfaces that exist only for a particular engine — a
+    # container registry for Ansible execution environments, PyPI and npm proxies
+    # for Pulumi program dependencies. If you only run terraform/tofu, turn these
+    # two off and none of it is deployed: the routes are never registered, the
+    # background tasks never scheduled, and the UI never shows them.
+    #
+    # These outrank the per-capability flags under `registry` below. With
+    # `ansible.enabled: false` the container registry does not run even if
+    # `registry.oci.enabled` is left true, so switching an engine off is a single
+    # decision rather than a hunt for everything that belongs to it.
+    #
+    # Turning one off is never destructive. Stored images and cached artifacts
+    # stay exactly where they are and come back if you turn it on again.
+    #
+    # Terraform/OpenTofu is not listed. It is not optional — it is what Terrapod
+    # is, and its provider mirror, binary cache and module registry are unaffected
+    # by anything here.
+    engines:
+      ansible:
+        enabled: true
+      pulumi:
+        enabled: true
+
+
     # Private Registry & Caching
     registry:
       enabled: true

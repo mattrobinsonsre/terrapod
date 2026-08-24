@@ -277,3 +277,27 @@ It is worth running against the address your clients use rather than against the
 API directly. Terrapod routes all traffic through the frontend proxy, and a
 problem on that hop — a stripped header, a redirect — is invisible to a test
 that skips it.
+
+## Engine gating
+
+This registry exists to serve Ansible execution environments. If you do not run
+Ansible, set `api.config.engines.ansible.enabled: false` and it is not deployed
+at all — the `/v2/` routes are never registered, the collector and upload reaper
+never scheduled. Anything already pushed or mirrored stays in storage and returns
+if you re-enable it.
+
+The engine switches sit **above** the per-capability flags in `registry`. A
+capability serves only when its own flag is on *and* an engine that needs it is
+enabled, so `registry.oci.enabled: true` does not bring the registry back once
+Ansible is off. That is deliberate: switching an engine off should be one
+decision, not a hunt for every capability that belongs to it.
+
+| Capability | Needs |
+|---|---|
+| Container registry (`/v2/`) | `engines.ansible` |
+| PyPI proxy | `engines.ansible` **or** `engines.pulumi` |
+| npm proxy | `engines.pulumi` |
+
+Terraform and OpenTofu's own caches — the provider network mirror, the engine
+binary cache, the module registry — are not gateable and are unaffected by any of
+this.

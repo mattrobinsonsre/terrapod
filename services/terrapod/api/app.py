@@ -20,6 +20,7 @@ from terrapod.config import settings
 from terrapod.db.session import close_db, get_db_session, init_db
 from terrapod.logging_config import configure_logging, get_logger
 from terrapod.redis.client import close_redis, init_redis
+from terrapod.services.engine_gating import capability_enabled
 from terrapod.storage import close_storage, init_storage
 
 from .errors import UPSTREAM_FAILURE_HEADER
@@ -421,7 +422,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     # never `asyncio.create_task` (principle 11). Hourly: the grace period is
     # measured in hours, so collecting more often only re-examines blobs that are
     # still protected.
-    if settings.registry.oci.enabled and settings.registry.oci.gc.enabled:
+    if capability_enabled("oci") and settings.registry.oci.gc.enabled:
 
         async def _oci_gc() -> None:
             from terrapod.services.oci.gc import collect
@@ -439,7 +440,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     # leaves a session row and its chunks behind, and only push access is needed
     # to do that repeatedly — so this is a storage-exhaustion control, not just
     # tidying. Hourly is ample against a timeout measured in hours.
-    if settings.registry.oci.enabled:
+    if capability_enabled("oci"):
 
         async def _oci_upload_reaper() -> None:
             from terrapod.services.oci.upload_service import reap_abandoned_sessions
@@ -1048,12 +1049,18 @@ def create_application() -> FastAPI:
     # OCI Distribution registry (#1408). Root-mounted at /v2/ because the spec
     # mandates that prefix; its exception handler is registered on the app so no
     # route can accidentally answer a container client in the house error shape.
-    from terrapod.api.routers.oci import oci_error_handler
-    from terrapod.api.routers.oci import router as oci_router
-    from terrapod.services.oci.errors import OCIError
+    # Not mounted at all when the engine that needs it is switched off (#1429):
+    # the routes do not exist rather than existing and refusing, so a
+    # terraform-only deployment carries no registry, in its schema or anywhere
+    # else. `GET /v2/` then 404s as an ordinary unrouted path, which is precisely
+    # the "not a v2 registry" answer a container client probes for.
+    if capability_enabled("oci"):
+        from terrapod.api.routers.oci import oci_error_handler
+        from terrapod.api.routers.oci import router as oci_router
+        from terrapod.services.oci.errors import OCIError
 
-    app.include_router(oci_router)
-    app.add_exception_handler(OCIError, oci_error_handler)
+        app.include_router(oci_router)
+        app.add_exception_handler(OCIError, oci_error_handler)
 
     from terrapod.api.routers.binary_cache import router as binary_cache_router
 
@@ -1063,9 +1070,14 @@ def create_application() -> FastAPI:
     # a root mount: both clients take their registry URL as configuration, so
     # unlike /v2/ there is no mandated prefix to honour, and the BFF's existing
     # /api/* route proxies them with no further wiring.
-    from terrapod.api.routers.package_cache import router as package_cache_router
+    # Per ecosystem, for the same reason: PyPI serves both Pulumi and Ansible, npm
+    # only Pulumi, so the two are mounted independently and `build_router` returns
+    # nothing when neither engine wants them (#1429).
+    from terrapod.api.routers.package_cache import build_router as build_package_cache_router
 
-    include_terrapod(package_cache_router)
+    package_cache_router = build_package_cache_router()
+    if package_cache_router is not None:
+        include_terrapod(package_cache_router)
 
     # Cost-estimation pricesheet cache (#871) — runner-facing download + admin.
     from terrapod.api.routers.cost_estimation import router as cost_estimation_router

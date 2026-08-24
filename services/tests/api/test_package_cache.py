@@ -279,19 +279,44 @@ class TestNpm:
 
 
 class TestDisabled:
-    @patch("terrapod.api.routers.package_cache.settings")
-    async def test_a_disabled_ecosystem_is_404(self, mock_settings) -> None:
-        mock_settings.registry.package_cache.enabled = True
-        mock_settings.registry.package_cache.pypi.enabled = False
+    """A switched-off ecosystem is not mounted, so its routes do not exist.
+
+    Asserted by building the application *after* changing the setting, because
+    that is when the decision is now made: an ecosystem nobody wants is never
+    registered rather than registered and refusing (#1429). Patching the router
+    module's `settings` no longer has any effect — the decision moved to
+    `engine_gating`, which reads the real settings object.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _restore(self):
+        from terrapod.config import settings
+
+        before = (
+            settings.registry.package_cache.enabled,
+            settings.registry.package_cache.pypi.enabled,
+        )
+        yield
+        (
+            settings.registry.package_cache.enabled,
+            settings.registry.package_cache.pypi.enabled,
+        ) = before
+
+    async def test_a_disabled_ecosystem_is_404(self) -> None:
+        from terrapod.config import settings
+
+        settings.registry.package_cache.enabled = True
+        settings.registry.package_cache.pypi.enabled = False
 
         async with await _client(_app()) as c:
             r = await c.get(f"{BASE}/pypi/simple/flask/", headers=AUTH)
 
         assert r.status_code == 404
 
-    @patch("terrapod.api.routers.package_cache.settings")
-    async def test_the_whole_cache_can_be_switched_off(self, mock_settings) -> None:
-        mock_settings.registry.package_cache.enabled = False
+    async def test_the_whole_cache_can_be_switched_off(self) -> None:
+        from terrapod.config import settings
+
+        settings.registry.package_cache.enabled = False
 
         async with await _client(_app()) as c:
             r = await c.get(f"{BASE}/npm/left-pad", headers=AUTH)

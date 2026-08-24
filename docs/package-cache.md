@@ -125,3 +125,27 @@ Go and .NET programs.
 **A warm-ahead API.** Warming today means running the install you expect to need.
 An explicit "cache these packages" endpoint would make preparing an air-gapped
 deployment less of a rehearsal.
+
+## Engine gating
+
+These proxies exist to serve Pulumi programs and Ansible collections. PyPI serves
+both, npm serves Pulumi only, so npm goes away with
+`api.config.engines.pulumi.enabled: false` and PyPI only once *both* engines are
+off. Cached artifacts are never deleted by turning an engine off. See
+[engine gating](#engine-gating).
+
+The engine switches sit **above** the per-capability flags in `registry`. A
+capability serves only when its own flag is on *and* an engine that needs it is
+enabled, so `registry.oci.enabled: true` does not bring the registry back once
+Ansible is off. That is deliberate: switching an engine off should be one
+decision, not a hunt for every capability that belongs to it.
+
+| Capability | Needs |
+|---|---|
+| Container registry (`/v2/`) | `engines.ansible` |
+| PyPI proxy | `engines.ansible` **or** `engines.pulumi` |
+| npm proxy | `engines.pulumi` |
+
+Terraform and OpenTofu's own caches — the provider network mirror, the engine
+binary cache, the module registry — are not gateable and are unaffected by any of
+this.

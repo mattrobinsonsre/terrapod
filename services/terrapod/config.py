@@ -964,6 +964,40 @@ class PackageCacheConfig(BaseModel):
     )
 
 
+class EngineConfig(BaseModel):
+    """One non-Terraform engine Terrapod can support (#1429)."""
+
+    enabled: bool = Field(
+        default=True,
+        description="Whether this engine's functionality is available at all. Turning "
+        "it off is a master switch: every surface that exists only for this engine "
+        "stops serving, its background work stops running, and the UI hides it. "
+        "Nothing is deleted — stored images and cached artifacts stay exactly where "
+        "they are and reappear if it is turned back on.",
+    )
+
+
+class EnginesConfig(BaseModel):
+    """Which engines beyond Terraform/OpenTofu this deployment offers (#1429).
+
+    Terrapod grows surfaces that exist only for a particular engine — a container
+    registry for Ansible execution environments, PyPI and npm proxies for Pulumi
+    programs. An install that only runs terraform/tofu has no use for any of them,
+    and carrying them makes the product read as more complicated than it is.
+
+    These switches take it back to its traditional shape. They sit *above* the
+    per-capability flags in `registry`: a capability runs only when its own flag is
+    on AND an engine that needs it is enabled, so turning off an engine is decisive
+    and cannot be half-undone by a capability flag left on.
+
+    Terraform/OpenTofu is not listed because it is not optional — it is what
+    Terrapod is.
+    """
+
+    ansible: EngineConfig = Field(default_factory=EngineConfig)
+    pulumi: EngineConfig = Field(default_factory=EngineConfig)
+
+
 class RegistryConfig(BaseModel):
     """Private registry and caching configuration."""
 
@@ -2589,6 +2623,7 @@ class Settings(BaseSettings):
     audit: AuditConfig = Field(default_factory=AuditConfig)
 
     # Registry
+    engines: EnginesConfig = Field(default_factory=EnginesConfig)
     registry: RegistryConfig = Field(default_factory=RegistryConfig)
 
     # Service Catalog

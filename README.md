@@ -91,6 +91,17 @@ are the parts worth knowing about before you read that far:
 
 - **A reversible, dry-run-first migration** off TFE / HCP Terraform / Atlantis with [`terrapod-migrate`](docs/migration.md) — preview everything, apply, verify parity, and roll back cleanly.
 
+**Only interested in Terraform and OpenTofu?** Then say so, and none of the rest is
+deployed. The container registry and the PyPI and npm proxies are there to serve
+Ansible and Pulumi work; two Helm switches —
+`api.config.engines.ansible.enabled` and `api.config.engines.pulumi.enabled` —
+turn each off completely. Their routes are never registered, their background
+tasks never scheduled, and nothing appears in the UI or the API schema. Terraform
+and OpenTofu are unaffected either way: the provider mirror, the engine binary
+cache and the module registry are what Terrapod is, and are never gated. Turning
+one off is not destructive — anything already stored stays put and comes back if
+you turn it on again.
+
 The one hard requirement is Kubernetes, and that's a low bar: Terrapod is a single Helm release, a one-node [k3s](https://k3s.io/) VM is plenty to start, and `make eval` spins up a throwaway [k3d](https://k3d.io/)/kind cluster in one command.
 
 Three deliberate design foci set Terrapod apart, each with a doc to go deeper: **restricted-network & multi-cluster execution** (outbound-only runners + polling VCS + a self-contained provider mirror/binary cache with a sealed air-gap mode — see [network isolation](docs/deployment-network-isolation.md) and the [ARC execution model](docs/architecture.md#runner-architecture-arc-pattern)); an **AI-augmented review layer** (provider-agnostic via [LiteLLM](https://github.com/BerriAI/litellm), off by default — see [AI plan summary](docs/ai-plan-summary.md)); and a **low contribution barrier** (a Python platform core, AI-assisted contributions welcome — see [`llms.txt`](llms.txt) and [AGENTS.md](AGENTS.md)).

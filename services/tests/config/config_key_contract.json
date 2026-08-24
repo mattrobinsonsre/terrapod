@@ -177,6 +177,8 @@
   "encryption.vault_key_name",
   "encryption.vault_mount",
   "encryption.vault_namespace",
+  "engines.ansible.enabled",
+  "engines.pulumi.enabled",
   "external_url",
   "ha.blobs.classes",
   "ha.blobs.concurrency",

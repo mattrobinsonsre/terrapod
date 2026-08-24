@@ -1671,6 +1671,22 @@
             }
           }
         },
+        "engines": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "ansible": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": { "enabled": { "type": "boolean" } }
+            },
+            "pulumi": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": { "enabled": { "type": "boolean" } }
+            }
+          }
+        },
         "registry": {
           "type": "object",
           "additionalProperties": false,
