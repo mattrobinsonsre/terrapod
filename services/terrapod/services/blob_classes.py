@@ -268,6 +268,22 @@ async def _resolve_provider_cache(db: AsyncSession, limit: int | None) -> tuple[
     return total, [keys.provider_cache_key(h, ns, t, v, f) for h, ns, t, v, f in rows]
 
 
+async def _resolve_package_cache(db: AsyncSession, limit: int | None) -> tuple[int, list[str]]:
+    """Keys for cached PyPI/npm artifacts (#1417).
+
+    Reads the key the row recorded rather than re-deriving it, so a change to the
+    key layout cannot desynchronise the check from the object it checks.
+    """
+    from terrapod.db.models import CachedPackageFile
+
+    total = await db.scalar(select(func.count()).select_from(CachedPackageFile)) or 0
+    query = select(CachedPackageFile.storage_key).order_by(CachedPackageFile.cached_at)
+    if limit is not None:
+        query = query.limit(limit)
+    rows = (await db.execute(query)).scalars().all()
+    return total, list(rows)
+
+
 async def _resolve_binary_cache(db: AsyncSession, limit: int | None) -> tuple[int, list[str]]:
     """Cached terraform/tofu/terragrunt executables.
 
@@ -389,6 +405,16 @@ CLASSES: tuple[BlobClass, ...] = (
         tier=REDERIVABLE,
         prefixes=("cache/binaries/",),
         resolver=_resolve_binary_cache,
+        sealed_is_fatal=True,
+    ),
+    BlobClass(
+        name="package_cache",
+        tier=REDERIVABLE,
+        prefixes=("cache/packages/",),
+        resolver=_resolve_package_cache,
+        # A sealed node cannot re-warm a language dependency, so a promoted node
+        # with a cold package cache can never install anything again — the same
+        # reasoning that puts the provider and binary caches in this tier.
         sealed_is_fatal=True,
     ),
     BlobClass(

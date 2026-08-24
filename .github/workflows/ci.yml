@@ -959,6 +959,9 @@ jobs:
           if echo "$oci" | grep -A12 "^ *oci:" | grep -qi "password"; then echo "FAIL: an upstream password must never reach the ConfigMap — it is a credential (#1408)"; exit 1; fi
           if echo "$oci" | grep -q "TERRAPOD_OCI_UPSTREAM_QUAY_IO_PASSWORD"; then echo "FAIL: an anonymous upstream must not get a password env var (#1408)"; exit 1; fi
           echo "$oci" | grep -q "upload_session_timeout_hours:" || { echo "FAIL: registry.oci.upload_session_timeout_hours not rendered — the abandoned-upload reaper would silently use the code default and an operator's longer window would be ignored (#1408)"; exit 1; }
+          echo "$out" | grep -q "package_cache:" || { echo "FAIL: registry.package_cache not rendered into config.yaml — PIP_INDEX_URL/NPM_CONFIG_REGISTRY would point at a proxy running on code defaults, ignoring the operator's upstream (#1417)"; exit 1; }
+          echo "$out" | grep -q 'upstream: "https://pypi.org"' || { echo "FAIL: package_cache.pypi.upstream not rendered — an internal-mirror upstream would be silently ignored (#1417)"; exit 1; }
+          echo "$out" | grep -q "package_cache_retention_days:" || { echo "FAIL: artifact_retention.package_cache_retention_days not rendered — cached packages would expire on the code default (#1417)"; exit 1; }
           echo "$out" | grep -q "component_status:" || { echo "FAIL: ha.component_status not rendered into config.yaml (#1122)"; exit 1; }
           echo "$out" | grep -q "kind: Role" || { echo "FAIL: the API component-status Role must render when enabled (#1122)"; exit 1; }
           echo "$out" | grep -A16 "name: .*-component-status" | grep -q 'resources: \["deployments"\]' || { echo "FAIL: the component-status Role needs Deployments for ready-vs-desired, not just pods (#1122)"; exit 1; }

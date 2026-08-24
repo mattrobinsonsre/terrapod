@@ -212,6 +212,20 @@ data:
           {{- end }}
         {{- end }}
       {{- end }}
+      {{- with .Values.api.config.registry.package_cache }}
+      package_cache:
+        enabled: {{ .enabled }}
+        {{- with .pypi }}
+        pypi:
+          enabled: {{ .enabled }}
+          upstream: {{ .upstream | quote }}
+        {{- end }}
+        {{- with .npm }}
+        npm:
+          enabled: {{ .enabled }}
+          upstream: {{ .upstream | quote }}
+        {{- end }}
+      {{- end }}
       {{- if .Values.api.config.registry.provider_cache }}
       provider_cache:
         enabled: {{ .Values.api.config.registry.provider_cache.enabled }}
@@ -467,6 +481,7 @@ data:
       config_versions_retention_days: {{ .Values.api.config.artifact_retention.config_versions_retention_days | default 90 }}
       provider_cache_retention_days: {{ .Values.api.config.artifact_retention.provider_cache_retention_days | default 30 }}
       binary_cache_retention_days: {{ .Values.api.config.artifact_retention.binary_cache_retention_days | default 30 }}
+      package_cache_retention_days: {{ .Values.api.config.artifact_retention.package_cache_retention_days | default 30 }}
       module_overrides_retention_days: {{ .Values.api.config.artifact_retention.module_overrides_retention_days | default 14 }}
       deleted_workspace_retention_days: {{ .Values.api.config.artifact_retention.deleted_workspace_retention_days | default 30 }}
     {{- end }}
