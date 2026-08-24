@@ -195,3 +195,57 @@ async def ensure_mirror_repository(db, name: str, host: str) -> OCIRepository:
     await db.flush()
     logger.info("oci_mirror_created", repository=name, upstream=host)
     return repository
+
+
+async def current_upstream_digest(host: str, repository: str, tag: str) -> str | None:
+    """What upstream says this tag points at now, or None if it cannot be reached.
+
+    A `HEAD` returns `Docker-Content-Digest` without the body, so confirming an
+    unchanged tag — the common case by a wide margin — costs one small request
+    rather than a manifest download.
+
+    Returns None rather than raising on any failure. The caller's answer to "I
+    could not check" is to serve what it already has, so an unreachable upstream
+    is a normal outcome here rather than an error: a cache that stops answering
+    when the internet is unavailable has failed at its one job.
+
+    Deliberately short timeouts. This is an optimisation on the read path, and a
+    slow upstream must not make a pull that could be served locally slow too.
+    """
+    url = f"{_base_url(host)}/v2/{repository}/manifests/{tag}"
+    headers = {"Accept": MANIFEST_ACCEPT}
+    auth = _auth(host)
+    if auth:
+        headers["Authorization"] = auth
+
+    try:
+        async with httpx.AsyncClient(
+            follow_redirects=True,
+            timeout=httpx.Timeout(connect=3.0, read=10.0, write=10.0, pool=3.0),
+        ) as client:
+            response = await client.head(url, headers=headers)
+    except httpx.HTTPError as exc:
+        logger.info(
+            "Could not confirm mirrored tag with upstream; serving the cached image",
+            host=host,
+            repository=repository,
+            tag=tag,
+            error=str(exc),
+        )
+        return None
+
+    if response.status_code >= 400:
+        # Includes the tag having been deleted upstream (404). Keeping what we
+        # have is still right: it is the only copy on this side of the boundary,
+        # and disappearing content is not an improvement.
+        logger.info(
+            "Upstream did not confirm mirrored tag; serving the cached image",
+            host=host,
+            repository=repository,
+            tag=tag,
+            status=response.status_code,
+        )
+        return None
+
+    digest = response.headers.get("Docker-Content-Digest", "").strip()
+    return digest or None

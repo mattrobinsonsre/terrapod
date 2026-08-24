@@ -206,6 +206,17 @@ data:
           grace_hours: {{ . | int64 }}
           {{- end }}
         {{- end }}
+        {{/* hasKey, not `with`: 0 is a MEANINGFUL value here (never re-check)
+             and `with` treats it as empty, so the key would silently vanish and
+             the code default would win — turning "never expire" into "expire
+             daily", which is the opposite of what was asked for. */}}
+        {{- if hasKey . "mirror_tag_ttl_hours" }}
+        {{/* int64, because a values FILE yields float64 and a large number then
+             renders in scientific notation — 1000000 becomes 1e+06, which the
+             API rejects as an integer at startup. `--set` is unaffected, so this
+             only bites the way operators actually configure things. */}}
+        mirror_tag_ttl_hours: {{ int64 .mirror_tag_ttl_hours }}
+        {{- end }}
         {{- if .upstreams }}
         upstreams:
           {{- range .upstreams }}

@@ -891,6 +891,23 @@ class OCIRegistryConfig(BaseModel):
         "oci.upstreams[].existingSecret) — never a password in this file.",
     )
     gc: OCIGarbageCollectionConfig = Field(default_factory=OCIGarbageCollectionConfig)
+    mirror_tag_ttl_hours: int = Field(
+        default=24,
+        ge=0,
+        description="How many hours a pull-through cached image is served without "
+        "re-checking upstream. A tag is mutable — `latest` points somewhere different "
+        "over time — so unlike every other artifact Terrapod caches it can go stale. "
+        "Past this, the next pull confirms the tag against upstream BEFORE returning "
+        "the image, so the caller gets current content on that pull rather than the "
+        "next one. If upstream cannot be reached the cached image is served anyway: a "
+        "stale image that runs beats a correct one you cannot fetch, which is the whole "
+        "point of a pull-through cache in a restricted network. "
+        "**0 means never re-check** — pin every cached image at whatever digest it "
+        "first resolved to, which is what you want when reproducibility matters more "
+        "than currency, or on a deployment that will never reach upstream again. "
+        "Digests are never re-checked regardless (immutable by construction), and "
+        "nothing is checked when `cache_only` is set.",
+    )
     upload_session_timeout_hours: int = Field(
         default=24,
         ge=1,

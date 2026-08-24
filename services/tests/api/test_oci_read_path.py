@@ -67,11 +67,28 @@ def _blob(digest=_DIGEST):
     return b
 
 
+def _db_mock() -> AsyncMock:
+    """An AsyncMock session whose result accessors are SYNC, as the real ones are.
+
+    `AsyncMock` makes every child async, so
+    `(await db.execute(...)).scalar_one_or_none()` hands back a *coroutine*
+    rather than a row. Code that then reads an attribute off it fails with a
+    message about a coroutine, which reads as a bug in the code under test and is
+    a bug in the mock.
+    """
+    db = AsyncMock()
+    result = MagicMock()
+    result.scalar_one_or_none = MagicMock(return_value=None)
+    result.scalars = MagicMock(return_value=MagicMock(all=MagicMock(return_value=[])))
+    db.execute = AsyncMock(return_value=result)
+    return db
+
+
 def _make_app(user=_user(), storage=None):
     app = create_app()
     if user is not None:
         app.dependency_overrides[authenticate_oci] = lambda: user
-    app.dependency_overrides[get_db] = lambda: AsyncMock()
+    app.dependency_overrides[get_db] = lambda: _db_mock()
     app.dependency_overrides[get_storage] = lambda: storage or AsyncMock()
     return app
 
@@ -373,7 +390,7 @@ class TestPullThroughMirror:
         storage = AsyncMock()
         storage.get.return_value = b"{}"
 
-        db = AsyncMock()
+        db = _db_mock()
         app = create_app()
         app.dependency_overrides[authenticate_oci] = lambda: _user()
         app.dependency_overrides[get_db] = lambda: db

@@ -27,6 +27,7 @@ from __future__ import annotations
 import hashlib
 import json
 import uuid
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import JSONResponse, RedirectResponse
@@ -35,7 +36,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from terrapod.api.dependencies import AuthenticatedUser, get_db
 from terrapod.auth import capabilities as cap
 from terrapod.auth.capabilities import has_capability
+from terrapod.config import settings
 from terrapod.db.models import OCIRepository
+from terrapod.logging_config import get_logger
 from terrapod.services.oci import pullthrough_service, registry_service, upload_service
 from terrapod.services.oci.auth import BASIC_CHALLENGE, authenticate_oci
 from terrapod.services.oci.errors import (
@@ -63,6 +66,8 @@ from terrapod.services.oci.names import (
 from terrapod.services.registry_rbac_service import resolve_registry_capabilities_for
 from terrapod.storage import ObjectStore, get_storage
 from terrapod.storage import keys as storage_keys
+
+logger = get_logger(__name__)
 
 router = APIRouter(tags=["oci"])
 
@@ -209,6 +214,11 @@ async def get_manifest(
     manifest = await registry_service.resolve_manifest(db, repository, parsed)
     if manifest is None and repository.upstream:
         manifest = await _mirror_manifest(db, storage, repository, reference, parsed)
+    elif manifest is not None and repository.upstream and parsed.tag is not None:
+        # A cached mirrored TAG may have moved upstream since we resolved it.
+        # Confirmed here, before the image is handed back, so the caller gets
+        # current content on this pull rather than the next one.
+        manifest = await _revalidate_tag(db, storage, repository, parsed.tag, manifest)
     if manifest is None:
         raise OCIError(MANIFEST_UNKNOWN, detail={"reference": reference})
 
@@ -602,6 +612,77 @@ async def put_manifest(
 # transient and worth retrying, the first is not.
 
 
+async def _revalidate_tag(db, storage, repository, tag: str, cached):
+    """Confirm a cached mirrored tag against upstream, refreshing it if it moved.
+
+    A tag is the only mutable thing Terrapod caches. Every other artifact —
+    provider binaries, CLI binaries, wheels, npm tarballs, and blobs addressed by
+    digest — is pinned to a coordinate that cannot change upstream, which is why
+    none of them needs this and why it should not be generalised back to them.
+
+    **Whatever happens, an image comes back.** Upstream unreachable, upstream
+    returning an error, the tag deleted upstream — all resolve to serving what is
+    already cached. A pull-through cache that stops answering when it cannot
+    reach the internet has failed at the one thing it exists for, and in a
+    restricted network there is no second source to fall back to.
+
+    On failure the check timestamp is still moved forward. Retrying on every pull
+    while an upstream is down would add its timeout to each one, turning a
+    reachability problem into a latency problem for content we hold locally — and
+    the TTL is already the staleness we accepted.
+    """
+    ttl_hours = settings.registry.oci.mirror_tag_ttl_hours
+    if ttl_hours == 0:
+        # Explicitly pinned: every cached image stays at whatever digest it first
+        # resolved to. Chosen when reproducibility matters more than currency.
+        return cached
+    ttl = timedelta(hours=ttl_hours)
+    if settings.registry.cache_only:
+        # Sealed: reaching upstream is precisely what is forbidden.
+        return cached
+
+    tag_row = await registry_service.get_tag(db, repository, tag)
+    if tag_row is None:
+        return cached
+    checked = tag_row.revalidated_at
+    if checked is None:
+        # Pushed into a mirror repository rather than fetched into it. It names
+        # local content that upstream knows nothing about, and asking upstream
+        # about it risks replacing it with a same-named image from elsewhere.
+        return cached
+    if datetime.now(UTC) - checked < ttl:
+        return cached
+
+    resolved = pullthrough_service.resolve_upstream(repository.name)
+    if resolved is None or not pullthrough_service.mirroring_allowed():
+        return cached
+    host, upstream_repo = resolved
+
+    upstream_digest = await pullthrough_service.current_upstream_digest(host, upstream_repo, tag)
+    tag_row.revalidated_at = datetime.now(UTC)
+    await db.flush()
+
+    if upstream_digest is None or upstream_digest == cached.digest:
+        return cached
+
+    # It moved. Fetch what it points at now; the superseded manifest is left in
+    # place, un-referenced by this tag, for the collector to reclaim.
+    logger.info(
+        "Mirrored tag moved upstream; refreshing before serving",
+        repository=repository.name,
+        tag=tag,
+        was=cached.digest,
+        now=upstream_digest,
+    )
+    try:
+        refreshed = await _mirror_manifest(db, storage, repository, tag, parse_reference(tag))
+    except OCIError:
+        # Upstream confirmed a new digest and then would not serve it. The cached
+        # image is still a working answer.
+        return cached
+    return refreshed or cached
+
+
 async def _mirror_manifest(db, storage, repository, reference: str, parsed):
     """Fetch a manifest from upstream and record it."""
     resolved = pullthrough_service.resolve_upstream(repository.name)
@@ -624,7 +705,7 @@ async def _mirror_manifest(db, storage, repository, reference: str, parsed):
     # Only a tag needs recording: a digest reference is already the manifest's
     # own identity and names nothing that can move.
     if parsed.tag is not None:
-        await registry_service.set_tag(db, repository, parsed.tag, manifest)
+        await registry_service.set_tag(db, repository, parsed.tag, manifest, from_upstream=True)
     return manifest
 
 

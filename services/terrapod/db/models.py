@@ -3069,6 +3069,16 @@ class OCITag(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False
     )
+    #: When this tag was last confirmed against upstream (#1425). Distinct from
+    #: `updated_at`, which moves only when the tag is repointed: a tag confirmed
+    #: *unchanged* has been checked without having moved, and conflating the two
+    #: would make every successful revalidation look like a retag.
+    #:
+    #: NULL is load-bearing rather than merely unset — it marks a tag as locally
+    #: pushed, and locally pushed tags are never revalidated. A mirror repository
+    #: can hold both kinds at once, and without this an upstream image sharing a
+    #: name with a pushed one would replace it.
+    revalidated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (sa.UniqueConstraint("repository_id", "name", name="uq_oci_tag_repo_name"),)
 
