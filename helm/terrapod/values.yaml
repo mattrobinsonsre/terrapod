@@ -322,6 +322,23 @@ api:
           # the two would delete the layers of a push still in progress. Raise it
           # if pushes in your environment can legitimately take longer.
           grace_hours: 24
+        # How long a pull-through cached image is served before Terrapod
+        # re-checks upstream (#1425). A tag is mutable — `latest` points
+        # somewhere different over time — so it is the one cached thing here
+        # that can go stale.
+        #
+        # Past this, the next pull confirms the tag against upstream BEFORE
+        # returning the image, so the caller gets current content on that pull
+        # rather than the next one. If upstream cannot be reached the cached
+        # image is served anyway: a stale image that runs beats a correct one
+        # you cannot fetch.
+        #
+        # Lower it for a fast-moving tag; raise it to cut round trips. Every
+        # check is a request a purely local pull would not otherwise make.
+        # Ignored entirely when registry.cache_only is set.
+        # 0 means never re-check: every cached image stays pinned at the
+        # digest it first resolved to.
+        mirror_tag_ttl_hours: 24
       # Language package proxies (#1417). Point runners at these with
       # PIP_INDEX_URL and NPM_CONFIG_REGISTRY and a run resolves its dependency
       # closure with no upstream reach — which is the only way a Pulumi program

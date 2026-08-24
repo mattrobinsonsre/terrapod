@@ -234,13 +234,29 @@ async def store_manifest(
 
 
 async def set_tag(
-    db: AsyncSession, repository: OCIRepository, name: str, manifest: OCIManifest
+    db: AsyncSession,
+    repository: OCIRepository,
+    name: str,
+    manifest: OCIManifest,
+    *,
+    from_upstream: bool = False,
 ) -> OCITag:
     """Point a tag at a manifest, moving it if it already exists.
 
     Tags are mutable by design — ``latest`` moving is the whole point — so this
     updates in place rather than inserting, which also keeps the unique
     constraint on (repository, name) from turning a normal re-tag into a 500.
+
+    ``from_upstream`` records that this tag's content came from a mirror fetch,
+    by stamping ``revalidated_at``. It carries more weight than it looks: that
+    timestamp is what separates a mirrored tag from one a user pushed, and only a
+    mirrored tag is ever revalidated against upstream (#1425). A push into a
+    mirror repository leaves it NULL and is therefore left alone — otherwise
+    upstream's ``v1`` would quietly overwrite the ``v1`` someone deliberately
+    pushed here.
+
+    Stamping it at fetch time also starts the freshness window at the moment the
+    content was actually confirmed, rather than at the next read.
     """
     result = await db.execute(
         select(OCITag).where(OCITag.repository_id == repository.id, OCITag.name == name)
@@ -248,10 +264,17 @@ async def set_tag(
     tag = result.scalar_one_or_none()
     if tag is not None:
         tag.manifest_id = manifest.id
+        if from_upstream:
+            tag.revalidated_at = datetime.now(UTC)
         await db.flush()
         return tag
 
-    tag = OCITag(repository_id=repository.id, name=name, manifest_id=manifest.id)
+    tag = OCITag(
+        repository_id=repository.id,
+        name=name,
+        manifest_id=manifest.id,
+        revalidated_at=datetime.now(UTC) if from_upstream else None,
+    )
     db.add(tag)
     await db.flush()
     return tag
@@ -317,3 +340,17 @@ async def list_referrers(
         query = query.where(OCIManifest.artifact_type == artifact_type)
     result = await db.execute(query.order_by(OCIManifest.created_at))
     return list(result.scalars().all())
+
+
+async def get_tag(db: AsyncSession, repository: OCIRepository, name: str) -> OCITag | None:
+    """The tag row itself, rather than the manifest it points at.
+
+    `resolve_manifest` joins straight through to the manifest, which is what a
+    pull needs. Revalidation needs the tag: when it was last confirmed against
+    upstream lives there, not on the manifest, because several tags can point at
+    one manifest and each is checked on its own schedule.
+    """
+    result = await db.execute(
+        select(OCITag).where(OCITag.repository_id == repository.id, OCITag.name == name)
+    )
+    return result.scalar_one_or_none()

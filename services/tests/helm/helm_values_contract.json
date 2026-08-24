@@ -186,6 +186,7 @@
   "api.config.registry.oci.enabled",
   "api.config.registry.oci.gc.enabled",
   "api.config.registry.oci.gc.grace_hours",
+  "api.config.registry.oci.mirror_tag_ttl_hours",
   "api.config.registry.oci.upload_session_timeout_hours",
   "api.config.registry.oci.upstreams",
   "api.config.registry.package_cache.enabled",

@@ -127,6 +127,32 @@ A subject with nothing attached returns an **empty index**, never a 404 — a 40
 tells a client the endpoint is unsupported and sends it down a legacy fallback
 path.
 
+## How a cached image stays current
+
+A pull-through cached image is served for **a day** by default without asking
+upstream anything. Past that, the next pull confirms the tag against upstream
+**before returning the image**, so the caller gets current content on that pull
+rather than the next one:
+
+- **Unchanged** — the cached image is served and the clock resets. This is the
+  common case, and it costs one small `HEAD` rather than a download.
+- **Moved** — the new manifest is fetched and served. The superseded one stops
+  being referenced, and its layers become collectable once no other image needs
+  them.
+- **Upstream unreachable, erroring, or the tag deleted there** — the cached image
+  is served anyway. A pull-through cache that stops answering when it cannot
+  reach the internet has failed at the one thing it exists for, and inside a
+  restricted network there is no second source to fall back on.
+
+Tune it with `registry.oci.mirror_tag_ttl_hours`: lower for a fast-moving tag,
+higher to cut round trips. Every check is a request a purely local pull would not
+otherwise make.
+
+A **tag is the only thing here that can go stale.** Digests are never re-checked,
+because a digest is immutable by construction, and neither are pushed images —
+nothing moves under them. Nothing is checked at all when `cache_only` is set,
+since reaching upstream is exactly what sealing forbids.
+
 ## Deletion
 
 **An image you pushed stays until you remove it.** A registry is not a cache for
@@ -235,6 +261,7 @@ mid-flight would destroy real work.
 | `api.config.registry.oci.upload_session_timeout_hours` | `24` | How long an in-progress upload may sit untouched before it is reaped with its chunks. |
 | `api.config.registry.oci.gc.enabled` | `true` | Collect unreferenced blobs. Off means the registry only ever grows — there is no delete API. |
 | `api.config.registry.oci.gc.grace_hours` | `24` | How long newly-arrived content is protected, so a push in flight is never collected. |
+| `api.config.registry.oci.mirror_tag_ttl_hours` | `24` (one day) | How long a pull-through cached image is served before the next pull re-checks upstream. |
 | `api.config.registry.cache_only` | `false` | Seals upstream fetching for every cache, this one included. |
 
 ## Verifying a deployment

@@ -1860,6 +1860,10 @@
                     "grace_hours": { "type": "integer", "minimum": 1 }
                   }
                 },
+                "mirror_tag_ttl_hours": {
+                  "type": "integer",
+                  "minimum": 0
+                },
                 "upstreams": {
                   "type": "array",
                   "items": {

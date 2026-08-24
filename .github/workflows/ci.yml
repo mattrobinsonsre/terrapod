@@ -952,6 +952,26 @@ jobs:
             echo "FAIL: a scheduled mirror-expiry key is back. Deleting a cached image on a timer cannot make it fresher and discards the fallback needed when upstream is down (#1419)"; exit 1
           fi
           echo "OCI GC config renders OK"
+      - name: The cached-image staleness threshold is operator-settable (#1425)
+        run: |
+          out=$(docker run --rm -v "$PWD:/chart" -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \
+            template terrapod helm/terrapod \
+              --namespace terrapod \
+              --set postgresql.url=postgresql+asyncpg://t:t@db:5432/terrapod \
+              --set redis.url=redis://redis:6379 \
+              --set api.config.registry.oci.mirror_tag_ttl_hours=24)
+          echo "$out" | grep -q "mirror_tag_ttl_hours: 24" || { echo "FAIL: registry.oci.mirror_tag_ttl_hours not rendered — an operator lowering the staleness window for a fast-moving tag would be silently ignored and the code default would win (#1425)"; exit 1; }
+          # 0 means "never re-check", and Helm's `with` treats 0 as empty — so a
+          # template using it drops the key and the code default wins, turning
+          # "never expire" into "expire daily". Asserted because it is silent.
+          zero=$(docker run --rm -v "$PWD:/chart" -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \
+            template terrapod helm/terrapod \
+              --namespace terrapod \
+              --set postgresql.url=postgresql+asyncpg://t:t@db:5432/terrapod \
+              --set redis.url=redis://redis:6379 \
+              --set api.config.registry.oci.mirror_tag_ttl_hours=0)
+          echo "$zero" | grep -q "mirror_tag_ttl_hours: 0" || { echo "FAIL: mirror_tag_ttl_hours=0 did not render — 'never re-check' would silently become the code default (#1425)"; exit 1; }
+          echo "Cached-image staleness threshold renders OK, including 0"
       - name: Local dev values render
         run: |
           out=$(docker run --rm -v "$PWD:/chart" -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \
