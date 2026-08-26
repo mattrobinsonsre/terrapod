@@ -36,7 +36,7 @@ interface Variable {
     key: string
     value: string
     category: string
-    hcl: boolean
+    structured: boolean
     sensitive: boolean
     description: string
   }
@@ -236,7 +236,7 @@ export default function VariableSetDetailPage() {
               value: varValue,
               category: varCategory,
               sensitive: varSensitive,
-              hcl: varHcl,
+              structured: varHcl,
             },
           },
         }),
@@ -265,7 +265,7 @@ export default function VariableSetDetailPage() {
     setEditVarValue(v.attributes.sensitive ? '' : v.attributes.value)
     setEditVarCategory(v.attributes.category)
     setEditVarSensitive(v.attributes.sensitive)
-    setEditVarHcl(v.attributes.hcl)
+    setEditVarHcl(v.attributes.structured)
   }
 
   async function handleSaveVar() {
@@ -277,7 +277,7 @@ export default function VariableSetDetailPage() {
         key: editVarKey,
         category: editVarCategory,
         sensitive: editVarSensitive,
-        hcl: editVarHcl,
+        structured: editVarHcl,
       }
       if (editVarValue !== '') attrs.value = editVarValue
       const res = await apiFetch(`/api/v2/varsets/${varsetId}/relationships/vars/${editingVarId}`, {

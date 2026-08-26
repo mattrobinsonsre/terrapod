@@ -11,10 +11,13 @@ import (
 // /api/v2/varsets/{id}/relationships/vars. Sensitive variables have
 // Value redacted on the wire.
 type VariableSetVariable struct {
-	ID          string `json:"id"`
-	Key         string `json:"key"`
-	Value       string `json:"value,omitempty"`
-	Category    string `json:"category"`
+	ID       string `json:"id"`
+	Key      string `json:"key"`
+	Value    string `json:"value,omitempty"`
+	Category string `json:"category"`
+	// Structured is the name; HCL is the same flag as /api/v2 has always
+	// returned it. Both are populated and always agree (#1435).
+	Structured  bool   `json:"structured"`
 	HCL         bool   `json:"hcl"`
 	Sensitive   bool   `json:"sensitive"`
 	Description string `json:"description,omitempty"`
@@ -29,6 +32,7 @@ type CreateVarsetVariableRequest struct {
 	Key         string
 	Value       string
 	Category    string
+	Structured  bool
 	HCL         bool
 	Sensitive   bool
 	Description string
@@ -39,6 +43,7 @@ type UpdateVarsetVariableRequest struct {
 	Key         string
 	Value       *string
 	Category    string
+	Structured  *bool
 	HCL         *bool
 	Sensitive   *bool
 	Description *string
@@ -127,8 +132,8 @@ func varsetVarCreateAttrs(req CreateVarsetVariableRequest) map[string]any {
 	if req.Value != "" {
 		attrs["value"] = req.Value
 	}
-	if req.HCL {
-		attrs["hcl"] = true
+	if req.Structured || req.HCL {
+		attrs["structured"] = true
 	}
 	if req.Sensitive {
 		attrs["sensitive"] = true
@@ -150,8 +155,10 @@ func varsetVarUpdateAttrs(req UpdateVarsetVariableRequest) map[string]any {
 	if req.Value != nil {
 		attrs["value"] = *req.Value
 	}
-	if req.HCL != nil {
-		attrs["hcl"] = *req.HCL
+	if req.Structured != nil {
+		attrs["structured"] = *req.Structured
+	} else if req.HCL != nil {
+		attrs["structured"] = *req.HCL
 	}
 	if req.Sensitive != nil {
 		attrs["sensitive"] = *req.Sensitive
@@ -176,6 +183,7 @@ func varsetVarFromResource(res *Resource) *VariableSetVariable {
 		Key:         GetStringAttr(res, "key"),
 		Value:       GetStringAttr(res, "value"),
 		Category:    GetStringAttr(res, "category"),
+		Structured:  GetBoolAttr(res, "structured"),
 		HCL:         GetBoolAttr(res, "hcl"),
 		Sensitive:   GetBoolAttr(res, "sensitive"),
 		Description: GetStringAttr(res, "description"),

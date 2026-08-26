@@ -15,10 +15,14 @@ import (
 // provider's resource layer does this; the migration tool's report
 // flags every sensitive variable for operator re-entry.
 type Variable struct {
-	ID          string `json:"id"`
-	Key         string `json:"key"`
-	Value       string `json:"value,omitempty"`
-	Category    string `json:"category"` // "terraform" | "env" | "git_http_auth" | "git_ssh_auth"
+	ID       string `json:"id"`
+	Key      string `json:"key"`
+	Value    string `json:"value,omitempty"`
+	Category string `json:"category"` // "terraform" | "env" | "git_http_auth" | "git_ssh_auth"
+	// Structured reports whether the value is a typed expression rather than a
+	// plain string. HCL is the same flag under its original name — /api/v2
+	// returns both, always equal, because tfci and go-tfe read "hcl" (#1435).
+	Structured  bool   `json:"structured"`
 	HCL         bool   `json:"hcl"`
 	Sensitive   bool   `json:"sensitive"`
 	Description string `json:"description,omitempty"`
@@ -31,9 +35,12 @@ type Variable struct {
 // Key + Category are required. Value defaults to empty (legal — many
 // env vars are flag-shaped). Sensitive + HCL default to false.
 type CreateVariableRequest struct {
-	Key         string `json:"key"`
-	Value       string `json:"value"`
-	Category    string `json:"category"` // "terraform" | "env" | "git_http_auth" | "git_ssh_auth"
+	Key      string `json:"key"`
+	Value    string `json:"value"`
+	Category string `json:"category"` // "terraform" | "env" | "git_http_auth" | "git_ssh_auth"
+	// Set either; Structured is preferred. Setting both to different values is
+	// rejected by the server rather than silently resolved (#1435).
+	Structured  bool   `json:"structured,omitempty"`
 	HCL         bool   `json:"hcl,omitempty"`
 	Sensitive   bool   `json:"sensitive,omitempty"`
 	Description string `json:"description,omitempty"`
@@ -52,6 +59,7 @@ type UpdateVariableRequest struct {
 	Key         string  `json:"key,omitempty"`
 	Value       *string `json:"value,omitempty"`
 	Category    string  `json:"category,omitempty"`
+	Structured  *bool   `json:"structured,omitempty"`
 	HCL         *bool   `json:"hcl,omitempty"`
 	Sensitive   *bool   `json:"sensitive,omitempty"`
 	Description *string `json:"description,omitempty"`
@@ -210,8 +218,11 @@ func variableCreateAttrs(req CreateVariableRequest) map[string]any {
 		"value":    req.Value,
 		"category": req.Category,
 	}
-	if req.HCL {
-		attrs["hcl"] = true
+	if req.Structured || req.HCL {
+		// The new name only: the server accepts both but refuses a disagreeing
+		// pair, so sending one keeps a caller's mismatch from becoming a 422 the
+		// SDK manufactured (#1435).
+		attrs["structured"] = true
 	}
 	if req.Sensitive {
 		attrs["sensitive"] = true
@@ -233,8 +244,13 @@ func variableUpdateAttrs(req UpdateVariableRequest) map[string]any {
 	if req.Category != "" {
 		attrs["category"] = req.Category
 	}
-	if req.HCL != nil {
-		attrs["hcl"] = *req.HCL
+	if req.Structured != nil {
+		attrs["structured"] = *req.Structured
+	} else if req.HCL != nil {
+		// Only one is sent: the server refuses a disagreeing pair, and an SDK
+		// that forwarded both would turn a caller's typo into a 422 it did not
+		// ask for (#1435).
+		attrs["structured"] = *req.HCL
 	}
 	if req.Sensitive != nil {
 		attrs["sensitive"] = *req.Sensitive
@@ -259,6 +275,7 @@ func variableFromResource(res *Resource) *Variable {
 		Key:         GetStringAttr(res, "key"),
 		Value:       GetStringAttr(res, "value"),
 		Category:    GetStringAttr(res, "category"),
+		Structured:  GetBoolAttr(res, "structured"),
 		HCL:         GetBoolAttr(res, "hcl"),
 		Sensitive:   GetBoolAttr(res, "sensitive"),
 		Description: GetStringAttr(res, "description"),

@@ -856,6 +856,7 @@
     "hcl",
     "key",
     "sensitive",
+    "structured",
     "updated-at",
     "value",
     "version-id"
@@ -877,6 +878,7 @@
     "hcl",
     "key",
     "sensitive",
+    "structured",
     "updated-at",
     "value",
     "version-id"

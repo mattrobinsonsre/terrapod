@@ -44,7 +44,7 @@ def _mock_var(key="region", value="us-east-1", sensitive=False, ws_id=None, var_
     var.value = value
     var.sensitive = sensitive
     var.category = "terraform"
-    var.hcl = False
+    var.structured = False
     var.description = ""
     var.version_id = "abc123"
     var.created_at = datetime(2026, 1, 1, tzinfo=UTC)
@@ -399,7 +399,7 @@ def _mock_vsvar(key="db_pass", value="s3cr3t", sensitive=True):
     v.value = value
     v.sensitive = sensitive
     v.category = "terraform"
-    v.hcl = False
+    v.structured = False
     v.description = ""
     v.version_id = "old-hash"
     v.created_at = datetime(2026, 1, 1, tzinfo=UTC)
@@ -481,3 +481,102 @@ class TestVarsetVarSensitiveDowngrade:
             )
         assert resp.status_code == 200
         assert vsv.value == "keep-me"
+
+
+class TestBothNamesForTheTypedFlag:
+    """`structured` is the name; `hcl` keeps working for ever (#1435).
+
+    `hcl` is not deprecated and cannot be. Variables live on `/api/v2`, which
+    `tfci variable create` writes to and `go-tfe`'s `Variables.List` reads, so an
+    un-upgraded client of either must see exactly what it sees today. These are
+    permanent-compatibility tests, not transitional ones.
+    """
+
+    async def _create(self, mock_create, attrs: dict):
+        ws = _mock_workspace()
+        mock_create.return_value = _mock_var(ws_id=ws.id)
+        app, mock_db = _make_app(_user())
+        result = MagicMock()
+        result.scalar_one_or_none.return_value = ws
+        mock_db.execute.return_value = result
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            return await c.post(
+                f"/api/v2/workspaces/ws-{ws.id}/vars",
+                json={"data": {"attributes": {"key": "ports", "value": "[80]", **attrs}}},
+                headers=_AUTH,
+            )
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.variables.variable_service.create_variable")
+    @patch("terrapod.api.routers.variables.resolve_workspace_capabilities_for")
+    async def test_the_old_name_still_sets_the_flag(self, resolve, create, *mocks) -> None:
+        """The whole point: an un-upgraded `tfci` sends this."""
+        resolve.return_value = caps_for_level("write")
+        r = await self._create(create, {"hcl": True})
+
+        assert r.status_code == 201
+        assert create.call_args.kwargs["structured"] is True
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.variables.variable_service.create_variable")
+    @patch("terrapod.api.routers.variables.resolve_workspace_capabilities_for")
+    async def test_the_new_name_sets_it_too(self, resolve, create, *mocks) -> None:
+        resolve.return_value = caps_for_level("write")
+        r = await self._create(create, {"structured": True})
+
+        assert r.status_code == 201
+        assert create.call_args.kwargs["structured"] is True
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.variables.variable_service.create_variable")
+    @patch("terrapod.api.routers.variables.resolve_workspace_capabilities_for")
+    async def test_both_agreeing_is_fine(self, resolve, create, *mocks) -> None:
+        resolve.return_value = caps_for_level("write")
+        r = await self._create(create, {"hcl": True, "structured": True})
+
+        assert r.status_code == 201
+        assert create.call_args.kwargs["structured"] is True
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.variables.variable_service.create_variable")
+    @patch("terrapod.api.routers.variables.resolve_workspace_capabilities_for")
+    async def test_both_disagreeing_is_refused(self, resolve, create, *mocks) -> None:
+        """Not a precedence rule. A client that disagrees with itself about
+        whether a value is typed has a bug, and picking a winner hides it."""
+        resolve.return_value = caps_for_level("write")
+        r = await self._create(create, {"hcl": True, "structured": False})
+
+        assert r.status_code == 422
+        create.assert_not_called()
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.variables.resolve_workspace_capabilities_for")
+    async def test_the_response_carries_both_and_they_agree(self, resolve, *mocks) -> None:
+        """An un-upgraded reader looks for `hcl` and must still find it."""
+        resolve.return_value = caps_for_level("read")
+        ws = _mock_workspace()
+        var = _mock_var(ws_id=ws.id)
+        var.structured = True
+
+        app, mock_db = _make_app(_user())
+        ws_result, var_result = MagicMock(), MagicMock()
+        ws_result.scalar_one_or_none.return_value = ws
+        var_result.scalars.return_value.all.return_value = [var]
+        mock_db.execute.side_effect = [ws_result, var_result]
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            r = await c.get(f"/api/v2/workspaces/ws-{ws.id}/vars", headers=_AUTH)
+
+        attrs = r.json()["data"][0]["attributes"]
+        assert attrs["hcl"] is True
+        assert attrs["structured"] is True

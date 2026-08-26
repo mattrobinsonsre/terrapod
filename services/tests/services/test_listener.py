@@ -388,7 +388,11 @@ class TestCreateVarsSecret:
         import json as _json
 
         blob = _json.loads(sd["terraform.tfvars.json"])
-        assert {"key": "ports", "value": "[80, 443]", "hcl": True} in blob
+        # Both names, always equal: the vars Secret feeds a runner that may be
+        # older than this API and reads `hcl` (#1435).
+        ports = next(v for v in blob if v["key"] == "ports")
+        assert ports["value"] == "[80, 443]"
+        assert ports["structured"] is True and ports["hcl"] is True
         # ownerReference back to the Job (cascade GC).
         owner = body.metadata.owner_references[0]
         assert owner.kind == "Job" and owner.uid == "uid-1"

@@ -73,7 +73,7 @@ def _var(var_id=VAR_ID, **kw):
         "value": SECRET,
         "category": "env",
         "sensitive": True,
-        "hcl": False,
+        "structured": False,
         **_stamps(),
     }
     base.update(kw)
@@ -101,7 +101,7 @@ def _set_var(var_id=OTHER_ID, **kw):
         "value": "eu-west-1",
         "category": "terraform",
         "sensitive": False,
-        "hcl": False,
+        "structured": False,
         **_stamps(),
     }
     base.update(kw)
@@ -195,13 +195,13 @@ class TestSensitiveValuesTravelUnmasked:
 class TestVariables:
     @pytest.mark.replication_matrix("variables", "backfill-from-empty")
     async def test_backfill_carries_the_variable_and_its_flags(self):
-        db = _rows_db([_var(hcl=True, category="terraform")])
+        db = _rows_db([_var(structured=True, category="terraform")])
 
         page = await replication.read_backfill(db, VARIABLES)
 
         assert page[0]["key"] == "AWS_ACCESS_KEY_ID"
         assert page[0]["category"] == "terraform"
-        assert page[0]["hcl"] is True
+        assert page[0]["structured"] is True
         assert page[0]["workspace_id"] == WS_ID
 
     @pytest.mark.replication_matrix("variables", "delta-apply")

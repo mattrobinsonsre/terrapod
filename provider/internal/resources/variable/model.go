@@ -14,7 +14,8 @@
 //	"key"         → key         (string, required)
 //	"value"       → value       (string, optional, sensitive when sensitive=true)
 //	"category"    → category    (string, required: "terraform" or "env")
-//	"hcl"         → hcl         (bool, optional)
+//	"structured"  → structured  (bool, optional; `hcl` is its deprecated alias)
+//	"hcl"         → hcl         (bool, optional, deprecated)
 //	"sensitive"   → sensitive   (bool, optional)
 //	"description" → description (string, optional)
 //
@@ -41,6 +42,7 @@ type variableModel struct {
 	Key         types.String `tfsdk:"key"`
 	Value       types.String `tfsdk:"value"`
 	Category    types.String `tfsdk:"category"`
+	Structured  types.Bool   `tfsdk:"structured"`
 	HCL         types.Bool   `tfsdk:"hcl"`
 	Sensitive   types.Bool   `tfsdk:"sensitive"`
 	Description types.String `tfsdk:"description"`

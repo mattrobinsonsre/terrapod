@@ -497,7 +497,7 @@
           "type": "string"
         },
         "hcl": {
-          "description": "the value is a raw HCL expression (lists/objects); default false",
+          "description": "deprecated alias for structured; both are the same flag",
           "type": [
             "null",
             "boolean"
@@ -509,6 +509,13 @@
         },
         "sensitive": {
           "description": "mark sensitive — masked at rest and in responses; default false",
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "structured": {
+          "description": "the value is a typed expression rather than a plain string (lists/objects/numbers/bools); default false",
           "type": [
             "null",
             "boolean"

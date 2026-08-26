@@ -57,7 +57,7 @@ func TestCreateVariable_Happy(t *testing.T) {
 	if v.ID != "var-a" || v.Key != "region" || v.Value != "eu-west-1" || v.Category != "terraform" {
 		t.Errorf("variable: %+v", v)
 	}
-	// Request body shape — hcl/sensitive default to false, omitted
+	// Request body shape — structured/sensitive default to false, omitted
 	// from attributes when not set (omitempty on the JSON tags
 	// applies to outbound marshalling too).
 	var req struct {
@@ -98,8 +98,11 @@ func TestCreateVariable_SensitiveDefaultsOff(t *testing.T) {
 	if v, _ := req.Data.Attributes["sensitive"].(bool); !v {
 		t.Errorf("sensitive should be true in request: %+v", req.Data.Attributes)
 	}
-	if v, _ := req.Data.Attributes["hcl"].(bool); !v {
-		t.Errorf("hcl should be true in request: %+v", req.Data.Attributes)
+	// The SDK sends the new name only. The server accepts both, but refuses a
+	// pair that disagrees — so forwarding both would turn a caller's mismatch
+	// into a 422 the SDK manufactured (#1435).
+	if v, _ := req.Data.Attributes["structured"].(bool); !v {
+		t.Errorf("structured should be true in request: %+v", req.Data.Attributes)
 	}
 }
 
@@ -316,5 +319,40 @@ func TestListAllVariables_LoopsAllPages(t *testing.T) {
 	}
 	if len(requested) != 3 {
 		t.Errorf("requested pages %v, want exactly 3", requested)
+	}
+}
+
+// TestVariableCarriesBothNamesForTheTypedFlag pins the compatibility that makes
+// the rename safe (#1435): /api/v2 returns the typed flag under both names,
+// because tfci and go-tfe read "hcl" and an SDK consumer may read either.
+//
+// Its sibling is TestCreateVariable_SensitiveDefaultsOff above, which passes the
+// OLD name on the way in and asserts the flag still lands — the two directions
+// together are what a caller written before the rename depends on.
+func TestVariableCarriesBothNamesForTheTypedFlag(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"data":{"id":"var-a","type":"vars","attributes":{` +
+			`"key":"ports","value":"[80]","category":"terraform",` +
+			`"structured":true,"hcl":true,"sensitive":false}}}`))
+	}))
+	defer srv.Close()
+
+	c, err := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	v, err := c.CreateVariable(t.Context(), "ws-aaa", CreateVariableRequest{
+		Key: "ports", Value: "[80]", Category: "terraform", Structured: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !v.Structured {
+		t.Error("Structured should be true")
+	}
+	if !v.HCL {
+		t.Error("HCL should be true — a consumer reading the old name must still work")
 	}
 }
