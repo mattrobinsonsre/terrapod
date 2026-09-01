@@ -354,3 +354,44 @@ class TestFailuresAreNotSilent:
         ).stdout
         assert "credential.helper" in listed
         assert "tok" not in listed, "the token must not live in gitconfig"
+
+
+class TestSshOnlyCredentialsAreNotBrokenByVerification:
+    """A workspace whose credentials are all `git_ssh_auth` writes a
+    `core.sshCommand` and no `credential.helper` — that key exists only for HTTP.
+
+    An earlier draft of the verification required it, which would have failed
+    every SSH-credential run. Caught before release; this pins it.
+    """
+
+    def test_an_ssh_only_workspace_succeeds(self, tmp_path, monkeypatch) -> None:
+        key = (
+            "-----BEGIN OPENSSH PRIVATE KEY-----\n"
+            "b3BlbnNzaC1rZXktdjEAAAAA\n"
+            "-----END OPENSSH PRIVATE KEY-----\n"
+        )
+        entries = [
+            {
+                "category": "git_ssh_auth",
+                "key": "github.com",
+                "value": json.dumps(
+                    {"private_key": key, "known_hosts": "github.com ssh-ed25519 AAAA"}
+                ),
+            }
+        ]
+        monkeypatch.setattr(git_auth, "_load", lambda: entries)
+
+        env = git_auth.run(base_dir=tmp_path / "gitauth")
+
+        assert env["GIT_CONFIG_GLOBAL"], "ssh-only credentials must still configure git"
+        listed = subprocess.run(
+            ["git", "config", "--global", "--list"],
+            env={**os.environ, **env},
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+        assert "core.sshcommand" in listed.lower()
+        assert "credential.helper" not in listed, (
+            "precondition: ssh-only writes no helper — which is why the check must not require one"
+        )
