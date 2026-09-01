@@ -588,3 +588,49 @@ class TestCostEstimationEnv:
         env = self._spec_env(cost_estimation=False, cost_default_region="us-east-1")
         assert env["TP_COST_ESTIMATION"] == "false"
         assert "TP_COST_DEFAULT_REGION" not in env
+
+
+class TestHomeIsWritable:
+    """The image sets HOME=/home/runner and calls it writable; the pod runs
+    `readOnlyRootFilesystem` with nothing mounted there, so every write to $HOME
+    failed EROFS (#1442).
+
+    That silently broke private-git-module auth, whose config lands under $HOME,
+    and equally affects anything else that consults it — helm's repository
+    cache, kubectl's, the AWS CLI's config.
+    """
+
+    def test_a_writable_volume_is_mounted_at_home(self):
+        from terrapod.runner.job_template import build_job_spec
+
+        spec = build_job_spec(
+            run_id="abc123",
+            phase="plan",
+            runner_config=_runner_config(),
+            auth_secret_name="tprun-abc12345-auth",
+            env_vars=[],
+            terraform_vars=[],
+        )
+        pod = spec["spec"]["template"]["spec"]
+        mounts = pod["containers"][0]["volumeMounts"]
+
+        home = [m for m in mounts if m["mountPath"] == "/home/runner"]
+        assert home, "nothing is mounted at $HOME, so writes to it fail EROFS"
+
+        volume = [v for v in pod["volumes"] if v["name"] == home[0]["name"]]
+        assert volume and "emptyDir" in volume[0]
+
+    def test_the_root_filesystem_is_still_read_only(self):
+        """The mount must not have been bought by relaxing the hardening."""
+        from terrapod.runner.job_template import build_job_spec
+
+        spec = build_job_spec(
+            run_id="abc123",
+            phase="plan",
+            runner_config=_runner_config(),
+            auth_secret_name="tprun-abc12345-auth",
+            env_vars=[],
+            terraform_vars=[],
+        )
+        sc = spec["spec"]["template"]["spec"]["containers"][0]["securityContext"]
+        assert sc["readOnlyRootFilesystem"] is True

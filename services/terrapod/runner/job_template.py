@@ -384,6 +384,14 @@ def build_job_spec(
                     "volumes": [
                         {"name": "workspace", "emptyDir": {}},
                         {"name": "tmp", "emptyDir": {}},
+                        # $HOME. The image sets HOME=/home/runner and describes it
+                        # as writable, but `readOnlyRootFilesystem` below makes it
+                        # read-only unless something is mounted there — so every
+                        # write to $HOME failed EROFS (#1442). That silently broke
+                        # private-git-module auth, whose config lands under $HOME,
+                        # and equally affects anything else consulting it: helm's
+                        # repository cache, kubectl's, the AWS CLI's config.
+                        {"name": "home", "emptyDir": {}},
                     ],
                     "containers": [
                         {
@@ -413,6 +421,7 @@ def build_job_spec(
                             "volumeMounts": [
                                 {"name": "workspace", "mountPath": "/workspace"},
                                 {"name": "tmp", "mountPath": "/tmp"},
+                                {"name": "home", "mountPath": "/home/runner"},
                             ],
                         }
                     ],
