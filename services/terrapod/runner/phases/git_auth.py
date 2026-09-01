@@ -289,7 +289,15 @@ def _verify_git_reads_config(env: dict[str, str]) -> None:
         timeout=30,
         check=False,
     )
-    if probe.returncode != 0 or "credential.helper" not in probe.stdout:
+    # Non-empty output, not a specific key. GIT_CONFIG_GLOBAL *replaces* the
+    # global config, so this lists exactly the file we wrote and nothing else —
+    # empty means git did not read it.
+    #
+    # Deliberately not checking for `credential.helper`: that key is written only
+    # for HTTP credentials, so requiring it would fail every run whose
+    # credentials are all `git_ssh_auth` — which configure a `core.sshCommand`
+    # and no helper at all.
+    if probe.returncode != 0 or not probe.stdout.strip():
         raise GitAuthUnavailable(
             f"git does not read the configuration written to "
             f"{env.get('GIT_CONFIG_GLOBAL', '<unset>')}. Credentials would be "
