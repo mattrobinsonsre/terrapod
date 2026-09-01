@@ -699,6 +699,39 @@ async def delete_varset_var(
 # ── Variable Set Workspace Assignments ───────────────────────────────────
 
 
+@native_router.get("/vault/availability")
+async def vault_availability(
+    user: AuthenticatedUser = Depends(get_current_user),
+) -> JSONResponse:
+    """Whether the Vault value source is configured, and which instances exist.
+
+    So the UI can offer the option only where it will work — presenting a source
+    a deployment has not configured produces a variable that fails its first run.
+
+    Names only. Addresses and credentials are infrastructure detail the person
+    choosing a secret has no need for, and anyone who can write a variable needs
+    to be able to pick an instance, so this is not admin-gated.
+    """
+    from terrapod.config import settings as _settings
+
+    cfg = _settings.vault
+    return JSONResponse(
+        content={
+            "data": {
+                "type": "vault-availability",
+                "id": "vault",
+                "attributes": {
+                    "enabled": cfg.enabled,
+                    "instances": [i.name for i in cfg.instances] if cfg.enabled else [],
+                    "default-instance": next((i.name for i in cfg.instances if i.default), "")
+                    if cfg.enabled
+                    else "",
+                },
+            }
+        }
+    )
+
+
 @native_router.get("/varsets/{varset_id}/relationships/workspaces")
 async def list_varset_workspaces(
     varset_id: str,
