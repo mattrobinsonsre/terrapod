@@ -910,7 +910,35 @@
         "deleteVar": "Kunne ikke slette variabel",
         "addWorkspace": "Kunne ikke tilføje arbejdsområde",
         "removeWorkspace": "Kunne ikke fjerne arbejdsområde"
-      }
+      },
+      "assignedBy": "Tildelt af",
+      "managedByRule": "Styret af regel",
+      "assignmentRule": "Tildelingsregel",
+      "assignmentRuleNone": "Ingen regel. Workspaces tildeles enkeltvis.",
+      "assignmentRuleDescription": "Workspaces, der matcher denne regel, får sættet automatisk; det revurderes ved hver kørsel.",
+      "source": {
+        "explicit": "Tildelt",
+        "global": "Global",
+        "rule": "Regel"
+      },
+      "ruleLabels": "Labels",
+      "ruleNamePrefix": "Navnepræfiks",
+      "ruleNameGlob": "Navnemønster",
+      "ruleExecutionBackend": "Eksekveringsmotor",
+      "ruleExecutionMode": "Eksekveringstilstand",
+      "ruleTerraformVersion": "Version",
+      "ruleOwnerEmail": "Ejer",
+      "ruleAgentPoolId": "Agentpulje",
+      "ruleVcsConnectionId": "VCS-forbindelse",
+      "ruleDriftStatus": "Drift-status",
+      "ruleLocked": "Låst",
+      "ruleHasVcs": "VCS-forbundet",
+      "ruleAny": "Enhver",
+      "ruleEmpty": "Tilføj mindst ét filter — en tom regel matcher intet.",
+      "rulePreview": "{count, plural, =0 {Matcher ingen workspaces} one {Matcher # workspace} other {Matcher # workspaces}}",
+      "rulePreviewLoading": "Kontrollerer, hvilke workspaces der matcher …",
+      "rulePreviewInvalid": "Denne regel kunne ikke kontrolleres. Gem viser det præcise problem.",
+      "ruleConflictsWithGlobal": "Et globalt sæt gælder allerede for alle workspaces, så en regel kan ikke bruges sammen med det."
     }
   },
   "adminAutodiscovery": {
@@ -2628,6 +2656,18 @@
       "architecture": "Arkitektur",
       "runTasks": "Opgaver",
       "runTriggers": "Triggere"
+    },
+    "applicableVarsets": {
+      "title": "Variabelsæt",
+      "description": "Variabelsæt, der gælder for dette workspace. Administrer dem fra selve variabelsættet.",
+      "loadError": "Kunne ikke indlæse variabelsæt",
+      "priority": "Prioritet",
+      "variableCount": "{count, plural, one {# variabel} other {# variabler}}",
+      "source": {
+        "explicit": "Tildelt",
+        "global": "Global",
+        "rule": "Matchet af regel"
+      }
     }
   },
   "graphs": {

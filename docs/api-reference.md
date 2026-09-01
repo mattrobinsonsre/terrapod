@@ -1702,6 +1702,57 @@ POST   /api/v2/varsets/{varset_id}/relationships/workspaces
 DELETE /api/v2/varsets/{varset_id}/relationships/workspaces
 ```
 
+**Required permission:** Platform `admin`.
+
+### Assignment Rules
+
+A variable set can select workspaces by their attributes instead of being bound
+to each one by hand. Set `assignment-rule` on create or update:
+
+```json
+{
+  "data": {
+    "attributes": {
+      "name": "prod-credentials",
+      "assignment-rule": { "labels": { "env": "prod" } }
+    }
+  }
+}
+```
+
+The rule accepts the same dimensions as the workspace bulk-update selector --
+`workspace_ids`, `labels`, `name_prefix`, `name_glob`, `execution_backend`,
+`execution_mode`, `terraform_version`, `agent_pool_id`, `vcs_connection_id`,
+`owner_email`, `drift_status`, `locked`, `has_vcs` -- all AND-combined.
+Membership is re-evaluated on every run, so a workspace that later matches picks
+the set up without being touched, and one that stops matching stops receiving it.
+
+Rejected with `422`: an unparseable rule, a non-object rule, `all: true` (use
+`global` instead, which already means every workspace), and a rule on a set that
+is already `global`.
+
+A rule that no longer parses matches **nothing** rather than everything, so a
+filter dimension removed in a later version cannot silently widen a scoped
+credential set to the whole estate.
+
+### Association Views
+
+Read-only views of which workspaces a set reaches, and which sets reach a
+workspace. Both report *how* each association arose -- `explicit`, `global`, or
+`rule` -- because only an explicit one can be unbound.
+
+```
+GET /api/terrapod/v1/varsets/{varset_id}/relationships/workspaces
+GET /api/terrapod/v1/workspaces/{workspace_id}/varsets
+```
+
+`workspace-count` on the variable set itself counts only explicitly-assigned
+workspaces; for a global or rule-based set it is not the whole answer, and these
+views are.
+
+**Required permission:** platform `admin` for the varset-side view;
+`workspace:read` for the workspace-side view.
+
 ---
 
 ## Registry -- Modules

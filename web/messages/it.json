@@ -910,7 +910,35 @@
         "deleteVar": "Impossibile eliminare la variabile",
         "addWorkspace": "Impossibile aggiungere il workspace",
         "removeWorkspace": "Impossibile rimuovere il workspace"
-      }
+      },
+      "assignedBy": "Assegnato da",
+      "managedByRule": "Gestito da regola",
+      "assignmentRule": "Regola di assegnazione",
+      "assignmentRuleNone": "Nessuna regola. I workspace vengono assegnati uno a uno.",
+      "assignmentRuleDescription": "I workspace che corrispondono a questa regola ricevono il set automaticamente, rivalutato a ogni esecuzione.",
+      "source": {
+        "explicit": "Assegnato",
+        "global": "Globale",
+        "rule": "Regola"
+      },
+      "ruleLabels": "Etichette",
+      "ruleNamePrefix": "Prefisso del nome",
+      "ruleNameGlob": "Modello del nome",
+      "ruleExecutionBackend": "Backend di esecuzione",
+      "ruleExecutionMode": "Modalità di esecuzione",
+      "ruleTerraformVersion": "Versione",
+      "ruleOwnerEmail": "Proprietario",
+      "ruleAgentPoolId": "Pool di agenti",
+      "ruleVcsConnectionId": "Connessione VCS",
+      "ruleDriftStatus": "Stato di deriva",
+      "ruleLocked": "Bloccato",
+      "ruleHasVcs": "Collegato al VCS",
+      "ruleAny": "Qualsiasi",
+      "ruleEmpty": "Aggiungi almeno un filtro: una regola vuota non corrisponde a nulla.",
+      "rulePreview": "{count, plural, =0 {Non corrisponde ad alcun workspace} one {Corrisponde a # workspace} other {Corrisponde a # workspace}}",
+      "rulePreviewLoading": "Verifica dei workspace corrispondenti…",
+      "rulePreviewInvalid": "Impossibile verificare questa regola. Il salvataggio segnalerà il problema esatto.",
+      "ruleConflictsWithGlobal": "Un set globale si applica già a ogni workspace, quindi non può avere una regola."
     }
   },
   "adminAutodiscovery": {
@@ -2628,6 +2656,18 @@
       "architecture": "Architettura",
       "runTasks": "Task",
       "runTriggers": "Trigger"
+    },
+    "applicableVarsets": {
+      "title": "Set di variabili",
+      "description": "Set di variabili applicati a questo workspace. Gestiscili dal set stesso.",
+      "loadError": "Impossibile caricare i set di variabili",
+      "priority": "Priorità",
+      "variableCount": "{count, plural, one {# variabile} other {# variabili}}",
+      "source": {
+        "explicit": "Assegnato",
+        "global": "Globale",
+        "rule": "Corrisponde a una regola"
+      }
     }
   },
   "graphs": {

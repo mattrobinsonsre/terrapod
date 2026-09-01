@@ -769,5 +769,22 @@
       ],
       "type": "object"
     }
+  },
+  {
+    "name": "terrapod_workspace_varsets",
+    "read_only": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "workspace_id": {
+          "description": "the workspace id (ws-...) whose variable sets to list",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_id"
+      ],
+      "type": "object"
+    }
   }
 ]

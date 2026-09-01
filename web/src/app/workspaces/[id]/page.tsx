@@ -22,6 +22,7 @@ import { ArchitectureCritiquePanel } from '@/components/architecture-critique-pa
 import { useIsTouch } from '@/lib/use-media-query'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch, fetchAllPages } from '@/lib/api'
+import { ApplicableVarsets } from '@/components/applicable-varsets'
 import { useSortable } from '@/lib/use-sortable'
 import { useRunEvents } from '@/lib/use-run-events'
 
@@ -2778,6 +2779,11 @@ function WorkspaceDetailContent() {
         {/* Variables Tab */}
         {activeTab === 'variables' && (
           <div>
+            {/* Which variable sets reach this workspace, and why (#1440).
+                Read-only: the binding is managed on the set, and a rule-derived
+                one is not bound per-workspace at all. */}
+            <ApplicableVarsets workspaceId={workspaceId} />
+
             {perms['can-update-variable'] && (
               <div className="flex justify-end mb-4">
                 <button

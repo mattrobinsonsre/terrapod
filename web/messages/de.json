@@ -910,7 +910,35 @@
         "deleteVar": "Variable konnte nicht gelöscht werden",
         "addWorkspace": "Arbeitsbereich konnte nicht hinzugefügt werden",
         "removeWorkspace": "Arbeitsbereich konnte nicht entfernt werden"
-      }
+      },
+      "assignedBy": "Zugewiesen durch",
+      "managedByRule": "Über Regel verwaltet",
+      "assignmentRule": "Zuweisungsregel",
+      "assignmentRuleNone": "Keine Regel. Workspaces werden einzeln zugewiesen.",
+      "assignmentRuleDescription": "Workspaces, die dieser Regel entsprechen, erhalten den Satz automatisch; die Regel wird bei jedem Lauf neu ausgewertet.",
+      "source": {
+        "explicit": "Zugewiesen",
+        "global": "Global",
+        "rule": "Regel"
+      },
+      "ruleLabels": "Labels",
+      "ruleNamePrefix": "Namenspräfix",
+      "ruleNameGlob": "Namensmuster",
+      "ruleExecutionBackend": "Ausführungs-Backend",
+      "ruleExecutionMode": "Ausführungsmodus",
+      "ruleTerraformVersion": "Version",
+      "ruleOwnerEmail": "Eigentümer",
+      "ruleAgentPoolId": "Agent-Pool",
+      "ruleVcsConnectionId": "VCS-Verbindung",
+      "ruleDriftStatus": "Drift-Status",
+      "ruleLocked": "Gesperrt",
+      "ruleHasVcs": "Mit VCS verbunden",
+      "ruleAny": "Beliebig",
+      "ruleEmpty": "Fügen Sie mindestens einen Filter hinzu — eine leere Regel trifft auf nichts zu.",
+      "rulePreview": "{count, plural, =0 {Trifft auf keine Workspaces zu} one {Trifft auf # Workspace zu} other {Trifft auf # Workspaces zu}}",
+      "rulePreviewLoading": "Prüfe, welche Workspaces zutreffen …",
+      "rulePreviewInvalid": "Diese Regel konnte nicht geprüft werden. Beim Speichern wird das genaue Problem gemeldet.",
+      "ruleConflictsWithGlobal": "Ein globaler Satz gilt bereits für alle Workspaces; eine Regel kann damit nicht kombiniert werden."
     }
   },
   "adminAutodiscovery": {
@@ -2628,6 +2656,18 @@
       "architecture": "Architektur",
       "runTasks": "Aufgaben",
       "runTriggers": "Auslöser"
+    },
+    "applicableVarsets": {
+      "title": "Variablensätze",
+      "description": "Variablensätze, die für diesen Workspace gelten. Verwalten Sie sie im Variablensatz selbst.",
+      "loadError": "Variablensätze konnten nicht geladen werden",
+      "priority": "Priorität",
+      "variableCount": "{count, plural, one {# Variable} other {# Variablen}}",
+      "source": {
+        "explicit": "Zugewiesen",
+        "global": "Global",
+        "rule": "Über Regel zugeordnet"
+      }
     }
   },
   "graphs": {

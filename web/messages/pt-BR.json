@@ -910,7 +910,35 @@
         "deleteVar": "Falha ao excluir a variável",
         "addWorkspace": "Falha ao adicionar o workspace",
         "removeWorkspace": "Falha ao remover o workspace"
-      }
+      },
+      "assignedBy": "Atribuído por",
+      "managedByRule": "Gerenciado por regra",
+      "assignmentRule": "Regra de atribuição",
+      "assignmentRuleNone": "Sem regra. Os workspaces são atribuídos um a um.",
+      "assignmentRuleDescription": "Os workspaces que correspondem a esta regra recebem o conjunto automaticamente, reavaliado a cada execução.",
+      "source": {
+        "explicit": "Atribuído",
+        "global": "Global",
+        "rule": "Regra"
+      },
+      "ruleLabels": "Rótulos",
+      "ruleNamePrefix": "Prefixo do nome",
+      "ruleNameGlob": "Padrão do nome",
+      "ruleExecutionBackend": "Backend de execução",
+      "ruleExecutionMode": "Modo de execução",
+      "ruleTerraformVersion": "Versão",
+      "ruleOwnerEmail": "Proprietário",
+      "ruleAgentPoolId": "Pool de agentes",
+      "ruleVcsConnectionId": "Conexão VCS",
+      "ruleDriftStatus": "Status de drift",
+      "ruleLocked": "Bloqueado",
+      "ruleHasVcs": "Conectado ao VCS",
+      "ruleAny": "Qualquer",
+      "ruleEmpty": "Adicione ao menos um filtro — uma regra vazia não corresponde a nada.",
+      "rulePreview": "{count, plural, =0 {Não corresponde a nenhum workspace} one {Corresponde a # workspace} other {Corresponde a # workspaces}}",
+      "rulePreviewLoading": "Verificando quais workspaces correspondem…",
+      "rulePreviewInvalid": "Não foi possível verificar esta regra. Ao salvar, o problema exato será informado.",
+      "ruleConflictsWithGlobal": "Um conjunto global já se aplica a todos os workspaces, então não aceita uma regra."
     }
   },
   "adminAutodiscovery": {
@@ -2628,6 +2656,18 @@
       "architecture": "Arquitetura",
       "runTasks": "Tarefas",
       "runTriggers": "Gatilhos"
+    },
+    "applicableVarsets": {
+      "title": "Conjuntos de variáveis",
+      "description": "Conjuntos de variáveis aplicados a este workspace. Gerencie-os no próprio conjunto.",
+      "loadError": "Falha ao carregar os conjuntos de variáveis",
+      "priority": "Prioridade",
+      "variableCount": "{count, plural, one {# variável} other {# variáveis}}",
+      "source": {
+        "explicit": "Atribuído",
+        "global": "Global",
+        "rule": "Correspondeu à regra"
+      }
     }
   },
   "graphs": {

@@ -23,6 +23,37 @@ const API_URL = process.env.API_URL || 'http://localhost:8000';
  */
 
 test.describe('Responsive harness (phone viewport)', () => {
+  test('workspace variable sets panel adapts to mobile (#1440)', async ({ page }) => {
+    // Seeded rather than asserted on an empty page: with no set applying, the
+    // panel renders nothing at all and the assertion would pass however the
+    // layout is written.
+    const token = getStoredToken()
+    const wsName = uniqueName('e2erespvs')
+    const wsId = await createWorkspace(token, wsName, { labels: { e2erespvs: wsName } })
+    const res = await fetch(`${API_URL}/api/v2/organizations/default/varsets`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/vnd.api+json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        data: {
+          attributes: {
+            name: uniqueName('e2erespset'),
+            'assignment-rule': { labels: { e2erespvs: wsName } },
+          },
+        },
+      }),
+    })
+    expect(res.status).toBe(201)
+    const vsName = (await res.json()).data.attributes.name
+
+    await page.goto(`/workspaces/${wsId}?tab=variables`)
+    const entry = page.locator('li').filter({ hasText: vsName })
+    await expect(entry).toBeVisible({ timeout: 15_000 })
+    // The set name and its source badge both have to survive at phone width —
+    // the source is the primary signal here, not decoration.
+    await expect(entry.getByText('Matched by rule')).toBeVisible()
+    await expectNoHorizontalPageScroll(page)
+  })
+
   test('deleted-workspaces admin page adapts to mobile (#1253)', async ({ page }) => {
     // Seed a real deleted workspace first. Asserting the table is hidden on an
     // EMPTY page proves nothing — with no rows the component renders an empty

@@ -910,7 +910,35 @@
         "deleteVar": "choHlaH Qaw'meH lujpu'",
         "addWorkspace": "Qumwo' chelmeH lujpu'",
         "removeWorkspace": "Qumwo' teqmeH lujpu'"
-      }
+      },
+      "assignedBy": "ch'amwI'",
+      "managedByRule": "chutmo' SeHlu'",
+      "assignmentRule": "ch'am chut",
+      "assignmentRuleNone": "chut tu'lu'be'. wa'logh wa'logh Qumwo' ch'amlu'.",
+      "assignmentRuleDescription": "chutvam rurbogh Qumwo'mey choHlaH Segh Suqchu'. QaptaHvIS Hoch nughHom nuqneH qelqa'lu'.",
+      "source": {
+        "explicit": "ch'amlu'pu'",
+        "global": "Hoch",
+        "rule": "chut"
+      },
+      "ruleLabels": "per",
+      "ruleNamePrefix": "pong wa'DIch",
+      "ruleNameGlob": "pong Segh",
+      "ruleExecutionBackend": "Qap patlh",
+      "ruleExecutionMode": "Qap mIw",
+      "ruleTerraformVersion": "mI'",
+      "ruleOwnerEmail": "ghajwI'",
+      "ruleAgentPoolId": "raSHom",
+      "ruleVcsConnectionId": "VCS rar",
+      "ruleDriftStatus": "chIch Doch",
+      "ruleLocked": "ngaQ",
+      "ruleHasVcs": "VCS rarlu'",
+      "ruleAny": "vay'",
+      "ruleEmpty": "wa' waw' yIchel — chut chIm Doch rurbe'.",
+      "rulePreview": "{count, plural, =0 {pagh Qumwo' rur} one {# Qumwo'' rur} other {# Qumwo''mey rur}}",
+      "rulePreviewLoading": "Qumwo' rurbogh wInejtaH…",
+      "rulePreviewInvalid": "chutvam wInoHlaHbe'. DaQaw'DI' Qagh Sovlu'.",
+      "ruleConflictsWithGlobal": "Hoch Qumwo'vaD Segh Hoch lo'lu'chugh, chut lo'laHbe'."
     }
   },
   "adminAutodiscovery": {
@@ -2628,6 +2656,18 @@
       "architecture": "qach",
       "runTasks": "Qu'mey",
       "runTriggers": "taghwI'mey"
+    },
+    "applicableVarsets": {
+      "title": "choHlaH Segh",
+      "description": "Qumwo'vaD lo'lu'bogh choHlaH Segh. choHlaH SeghDaq DaSeH.",
+      "loadError": "choHlaH Segh laDlu'laHbe'",
+      "priority": "potlh",
+      "variableCount": "{count, plural, one {# choHlaH} other {# choHlaHmey}}",
+      "source": {
+        "explicit": "ch'amlu'pu'",
+        "global": "Hoch",
+        "rule": "chutmo' rurlu'"
+      }
     }
   },
   "graphs": {

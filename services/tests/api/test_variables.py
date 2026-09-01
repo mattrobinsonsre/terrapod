@@ -324,6 +324,7 @@ def _mock_varset(name="my-varset", vs_id=None):
     vs.priority = False
     vs.created_at = datetime(2026, 1, 1, tzinfo=UTC)
     vs.updated_at = datetime(2026, 1, 1, tzinfo=UTC)
+    vs.assignment_rule = None
     return vs
 
 
@@ -481,3 +482,84 @@ class TestVarsetVarSensitiveDowngrade:
             )
         assert resp.status_code == 200
         assert vsv.value == "keep-me"
+
+
+class TestVarsetAssignmentRuleValidation:
+    """Write-path validation for assignment rules (#1440).
+
+    A rule that does not parse matches nothing, so accepting one silently leaves
+    an operator with a set that applies to no workspace and nothing to tell them
+    why. These assert the API rejects it at the point of writing instead.
+    """
+
+    async def _post(self, attrs: dict):
+        app, mock_db = _make_app(_user(roles=["admin"]))
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            return await c.post(
+                "/api/v2/organizations/default/varsets",
+                json={"data": {"attributes": attrs}},
+                headers=_AUTH,
+            )
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_unknown_filter_key_is_rejected(self, *mocks):
+        resp = await self._post({"name": "x", "assignment-rule": {"nonsense": 1}})
+        assert resp.status_code == 422
+        assert "assignment-rule" in resp.json()["detail"]
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_global_plus_rule_is_rejected(self, *mocks):
+        """Global already means every workspace, so a rule alongside it is a
+        contradiction rather than a narrowing — neither field silently wins."""
+        resp = await self._post(
+            {"name": "x", "global": True, "assignment-rule": {"labels": {"env": "prod"}}}
+        )
+        assert resp.status_code == 422
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_a_non_object_rule_is_rejected(self, *mocks):
+        resp = await self._post({"name": "x", "assignment-rule": "env=prod"})
+        assert resp.status_code == 422
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_a_valid_rule_is_accepted(self, *mocks):
+        """The negative cases above are only meaningful if a good rule passes."""
+        resp = await self._post({"name": "x", "assignment-rule": {"labels": {"env": "prod"}}})
+        assert resp.status_code == 201
+        assert resp.json()["data"]["attributes"]["assignment-rule"] == {"labels": {"env": "prod"}}
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_all_true_in_a_rule_is_rejected(self, *mocks):
+        """`all: true` is the one rule shape that silently covers everything.
+
+        It duplicates `global`, which the API already expresses properly and
+        which a reader recognises at a glance — so reject the second spelling
+        rather than let a scoped set quietly become estate-wide.
+        """
+        resp = await self._post({"name": "x", "assignment-rule": {"all": True}})
+        assert resp.status_code == 422
+        assert "global" in resp.json()["detail"]
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_workspace_ids_in_a_rule_is_rejected(self, *mocks):
+        """A literal id list is explicit assignment, not a rule.
+
+        Allowing it would give one outcome two mechanisms, and produce a "rule"
+        whose membership can never re-evaluate — the property that makes rules
+        worth having.
+        """
+        resp = await self._post({"name": "x", "assignment-rule": {"workspace_ids": ["ws-1"]}})
+        assert resp.status_code == 422
+        assert "explicitly" in resp.json()["detail"]

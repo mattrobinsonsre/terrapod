@@ -15,6 +15,7 @@ from terrapod.db.models import (
     Variable,
     VariableSet,
     VariableSetWorkspace,
+    Workspace,
 )
 from terrapod.logging_config import get_logger
 
@@ -207,34 +208,149 @@ async def resolve_variables(db: AsyncSession, workspace_id: uuid.UUID) -> list[R
     return list(resolved.values())
 
 
+#: How a variable set came to apply to a workspace. Surfaced to the UI so an
+#: operator can tell what they may edit — an explicit assignment is theirs to
+#: remove, a global or rule-derived one is not (#1440).
+ASSIGNMENT_EXPLICIT = "explicit"
+ASSIGNMENT_GLOBAL = "global"
+ASSIGNMENT_RULE = "rule"
+
+
+async def applicable_varsets(
+    db: AsyncSession, workspace_id: uuid.UUID, priority: bool | None = None
+) -> list[tuple[VariableSet, str]]:
+    """Variable sets applying to a workspace, each with how it came to apply.
+
+    The single source of truth for that question. Both variable *resolution* and
+    the read-only association views go through here, so what an operator is shown
+    cannot drift from what is actually injected — a UI that confidently lists a
+    different set of workspaces from the one receiving a credential is worse than
+    no UI, because it will be believed.
+
+    `priority=None` returns both tiers, which is what the association views want;
+    resolution asks for one tier at a time because precedence differs.
+    """
+    seen: dict[uuid.UUID, tuple[VariableSet, str]] = {}
+
+    def _tier(q):
+        return q if priority is None else q.where(VariableSet.priority.is_(priority))
+
+    # Explicit assignment first: it is the strongest claim and the only one an
+    # operator can act on directly, so it wins the label if a set also matches a
+    # rule.
+    assigned = await db.execute(
+        _tier(
+            select(VariableSet)
+            .join(VariableSetWorkspace, VariableSet.id == VariableSetWorkspace.variable_set_id)
+            .where(
+                VariableSetWorkspace.workspace_id == workspace_id,
+                VariableSet.global_set.is_(False),
+            )
+        )
+    )
+    for vs in assigned.scalars().all():
+        seen[vs.id] = (vs, ASSIGNMENT_EXPLICIT)
+
+    global_sets = await db.execute(
+        _tier(select(VariableSet).where(VariableSet.global_set.is_(True)))
+    )
+    for vs in global_sets.scalars().all():
+        seen.setdefault(vs.id, (vs, ASSIGNMENT_GLOBAL))
+
+    # Rule-based (#1440). Each rule is evaluated by handing it back to the same
+    # SQL selector the bulk-update surface uses, narrowed to this one workspace.
+    # A second matcher written in Python would drift from that one, and the two
+    # disagreeing about who receives a credential is the failure worth avoiding.
+    ruled = await db.execute(
+        _tier(
+            select(VariableSet).where(
+                VariableSet.global_set.is_(False),
+                VariableSet.assignment_rule.is_not(None),
+            )
+        )
+    )
+    for vs in ruled.scalars().all():
+        if vs.id in seen:
+            continue
+        if await _rule_matches(db, vs.assignment_rule, workspace_id):
+            seen[vs.id] = (vs, ASSIGNMENT_RULE)
+
+    out = list(seen.values())
+    for vs, _ in out:
+        await db.refresh(vs, ["variables"])
+    return out
+
+
+async def workspaces_for_varset(
+    db: AsyncSession, varset: VariableSet
+) -> list[tuple[Workspace, str]]:
+    """Workspaces this variable set applies to, and how each came to apply.
+
+    The inverse of :func:`applicable_varsets`, and the blast-radius view: for a
+    set carrying a credential, "who currently receives this" must be answerable
+    without reading the rule and simulating it by hand.
+
+    Global sets apply everywhere, so the answer is every workspace — reported
+    honestly rather than as an empty list, because "applies to nothing" would be
+    the opposite of the truth.
+    """
+    from terrapod.services import workspace_search_service as wss
+
+    if varset.global_set:
+        rows = await db.execute(select(Workspace).order_by(Workspace.name))
+        return [(ws, ASSIGNMENT_GLOBAL) for ws in rows.scalars().all()]
+
+    seen: dict[uuid.UUID, tuple[Workspace, str]] = {}
+
+    explicit = await db.execute(
+        select(Workspace)
+        .join(VariableSetWorkspace, Workspace.id == VariableSetWorkspace.workspace_id)
+        .where(VariableSetWorkspace.variable_set_id == varset.id)
+        .order_by(Workspace.name)
+    )
+    for ws in explicit.scalars().all():
+        seen[ws.id] = (ws, ASSIGNMENT_EXPLICIT)
+
+    if varset.assignment_rule:
+        try:
+            parsed = wss.parse_filter(varset.assignment_rule)
+        except Exception:
+            logger.warning(
+                "variable set has an unparseable assignment rule; matching nothing",
+                varset_id=str(varset.id),
+            )
+        else:
+            matched = await db.execute(wss.build_workspace_query(parsed).order_by(Workspace.name))
+            for ws in matched.scalars().all():
+                seen.setdefault(ws.id, (ws, ASSIGNMENT_RULE))
+
+    return sorted(seen.values(), key=lambda row: row[0].name)
+
+
+async def _rule_matches(db: AsyncSession, rule: dict | None, workspace_id: uuid.UUID) -> bool:
+    """Whether a workspace satisfies an assignment rule.
+
+    A malformed rule matches nothing rather than everything. A stored rule that
+    no longer parses — a filter key removed in some later version, say — must not
+    silently become "all workspaces" and hand a credential to the estate.
+    """
+    from terrapod.services import workspace_search_service as wss
+
+    if not rule:
+        return False
+    try:
+        parsed = wss.parse_filter(rule)
+    except Exception:
+        logger.warning("variable set has an unparseable assignment rule; matching nothing")
+        return False
+
+    q = wss.build_workspace_query(parsed).where(Workspace.id == workspace_id)
+    found = await db.execute(select(q.exists()))
+    return bool(found.scalar())
+
+
 async def _get_applicable_varsets(
     db: AsyncSession, workspace_id: uuid.UUID, priority: bool
 ) -> list[VariableSet]:
-    """Get variable sets applicable to a workspace."""
-    # Global sets
-    global_q = select(VariableSet).where(
-        VariableSet.global_set.is_(True),
-        VariableSet.priority.is_(priority),
-    )
-
-    # Assigned sets
-    assigned_q = (
-        select(VariableSet)
-        .join(VariableSetWorkspace, VariableSet.id == VariableSetWorkspace.variable_set_id)
-        .where(
-            VariableSetWorkspace.workspace_id == workspace_id,
-            VariableSet.global_set.is_(False),
-            VariableSet.priority.is_(priority),
-        )
-    )
-
-    global_result = await db.execute(global_q)
-    assigned_result = await db.execute(assigned_q)
-
-    varsets = list(global_result.scalars().all()) + list(assigned_result.scalars().all())
-
-    # Eagerly load variables for each set
-    for vs in varsets:
-        await db.refresh(vs, ["variables"])
-
-    return varsets
+    """Variable sets applicable to a workspace, for one precedence tier."""
+    return [vs for vs, _ in await applicable_varsets(db, workspace_id, priority=priority)]

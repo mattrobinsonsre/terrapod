@@ -910,7 +910,35 @@
         "deleteVar": "Failz ta delete variable",
         "addWorkspace": "Failz ta add wurkspace",
         "removeWorkspace": "Failz ta remoov wurkspace"
-      }
+      },
+      "assignedBy": "Assignd by",
+      "managedByRule": "Manijd by rool",
+      "assignmentRule": "Assinment Rool",
+      "assignmentRuleNone": "No rool. Werkspacez iz assignd wun by wun.",
+      "assignmentRuleDescription": "Werkspacez wot match dis rool getz da set awtomaticly, re-chekd on evry run.",
+      "source": {
+        "explicit": "Assignd",
+        "global": "Globul",
+        "rule": "Rool"
+      },
+      "ruleLabels": "Labelz",
+      "ruleNamePrefix": "Naym prefix",
+      "ruleNameGlob": "Naym patturn",
+      "ruleExecutionBackend": "Ekzekushun bakend",
+      "ruleExecutionMode": "Ekzekushun moad",
+      "ruleTerraformVersion": "Vershun",
+      "ruleOwnerEmail": "Ownr",
+      "ruleAgentPoolId": "Ajent pool",
+      "ruleVcsConnectionId": "VCS konekshun",
+      "ruleDriftStatus": "Drift statuz",
+      "ruleLocked": "Lokd",
+      "ruleHasVcs": "VCS-konektd",
+      "ruleAny": "Enny",
+      "ruleEmpty": "Add at leest wun filtr — a empty rool matchez nuffin.",
+      "rulePreview": "{count, plural, =0 {Matchez no werkspacez} one {Matchez # werkspace} other {Matchez # werkspacez}}",
+      "rulePreviewLoading": "Chekin wich werkspacez match…",
+      "rulePreviewInvalid": "Dis rool coudnt be chekd. Sayvin wil tel u wots rong.",
+      "ruleConflictsWithGlobal": "A globul set alreddy applyz ta evry werkspace, so u cant uze a rool wif it."
     }
   },
   "adminAutodiscovery": {
@@ -2628,6 +2656,18 @@
       "architecture": "Architeksher",
       "runTasks": "Taskz",
       "runTriggers": "Triggerz"
+    },
+    "applicableVarsets": {
+      "title": "Variabul Setz",
+      "description": "Variabul setz wot apply ta dis werkspace. Manij dem from da variabul set itselfs.",
+      "loadError": "Coudnt loed da variabul setz",
+      "priority": "Prioritee",
+      "variableCount": "{count, plural, one {# variabul} other {# variabulz}}",
+      "source": {
+        "explicit": "Assignd",
+        "global": "Globul",
+        "rule": "Matchd by rool"
+      }
     }
   },
   "graphs": {

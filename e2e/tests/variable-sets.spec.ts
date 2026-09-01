@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { getStoredToken, createWorkspace, uniqueName } from '../helpers/api';
 
 test.describe('Variable Sets', () => {
   test('variable set list page loads', async ({ page }) => {
@@ -103,3 +104,71 @@ test.describe('Variable Sets', () => {
     await expect(page.locator(`text=${name}`)).not.toBeVisible({ timeout: 5_000 });
   });
 });
+
+test.describe('Variable set assignment rules (#1440)', () => {
+  const API_URL = process.env.API_URL || 'http://localhost:8000'
+
+  async function createRuleVarset(token: string, name: string, rule: Record<string, unknown>) {
+    const res = await fetch(`${API_URL}/api/v2/organizations/default/varsets`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/vnd.api+json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ data: { attributes: { name, 'assignment-rule': rule } } }),
+    })
+    expect(res.status).toBe(201)
+    return (await res.json()).data.id as string
+  }
+
+  test('a workspace shows the sets that reach it, and why', async ({ page }) => {
+    // The gap this closes: the association is managed from the variable set, so
+    // from the workspace there was previously no way to see which sets apply —
+    // and with a rule there may be no explicit binding to look up at all.
+    const token = getStoredToken()
+    const wsName = uniqueName('e2erulews')
+    const wsId = await createWorkspace(token, wsName, { labels: { e2erule: wsName } })
+    const vsName = uniqueName('e2erulevs')
+    await createRuleVarset(token, vsName, { labels: { e2erule: wsName } })
+
+    await page.goto(`/workspaces/${wsId}?tab=variables`)
+    const entry = page.locator('li').filter({ hasText: vsName })
+    await expect(entry).toBeVisible({ timeout: 10_000 })
+    // The source is the point: "someone bound this" and "it matches a rule"
+    // call for completely different actions.
+    await expect(entry.getByText('Matched by rule')).toBeVisible()
+  })
+
+  test('the set lists the workspaces its rule reaches, without offering a remove', async ({ page }) => {
+    // A rule-matched workspace has no binding row to delete, so a Remove button
+    // there would silently do nothing.
+    const token = getStoredToken()
+    const wsName = uniqueName('e2eruleblast')
+    await createWorkspace(token, wsName, { labels: { e2eblast: wsName } })
+    const vsName = uniqueName('e2eblastvs')
+    const vsId = await createRuleVarset(token, vsName, { labels: { e2eblast: wsName } })
+
+    await page.goto(`/admin/variable-sets/${vsId}?tab=workspaces`)
+    const row = page.locator('tr').filter({ hasText: wsName })
+    await expect(row).toBeVisible({ timeout: 10_000 })
+    // Exact match: "Rule" is a substring of "Managed by rule" in the same row,
+    // so a loose text match resolves to several elements and asserts nothing in
+    // particular.
+    await expect(row.getByText('Rule', { exact: true })).toBeVisible()
+    await expect(row.getByText('Managed by rule', { exact: true })).toBeVisible()
+    // The point of the row: no unbind control, because there is no explicit
+    // binding to remove.
+    await expect(row.getByRole('button', { name: 'Remove' })).toHaveCount(0)
+  })
+
+  test('an unparseable rule is refused at write time', async () => {
+    // Failing closed matters here: a rule that does not parse matches nothing,
+    // so accepting it would leave a set that silently applies to no workspace.
+    const token = getStoredToken()
+    const res = await fetch(`${API_URL}/api/v2/organizations/default/varsets`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/vnd.api+json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        data: { attributes: { name: uniqueName('e2ebad'), 'assignment-rule': { nope: 1 } } },
+      }),
+    })
+    expect(res.status).toBe(422)
+  })
+})

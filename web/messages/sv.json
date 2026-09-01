@@ -910,7 +910,35 @@
         "deleteVar": "Det gick inte att ta bort variabeln",
         "addWorkspace": "Det gick inte att lägga till arbetsytan",
         "removeWorkspace": "Det gick inte att ta bort arbetsytan"
-      }
+      },
+      "assignedBy": "Tilldelad av",
+      "managedByRule": "Hanteras av regel",
+      "assignmentRule": "Tilldelningsregel",
+      "assignmentRuleNone": "Ingen regel. Arbetsytor tilldelas en i taget.",
+      "assignmentRuleDescription": "Arbetsytor som matchar denna regel får uppsättningen automatiskt, omvärderad vid varje körning.",
+      "source": {
+        "explicit": "Tilldelad",
+        "global": "Global",
+        "rule": "Regel"
+      },
+      "ruleLabels": "Etiketter",
+      "ruleNamePrefix": "Namnprefix",
+      "ruleNameGlob": "Namnmönster",
+      "ruleExecutionBackend": "Exekveringsmotor",
+      "ruleExecutionMode": "Exekveringsläge",
+      "ruleTerraformVersion": "Version",
+      "ruleOwnerEmail": "Ägare",
+      "ruleAgentPoolId": "Agentpool",
+      "ruleVcsConnectionId": "VCS-anslutning",
+      "ruleDriftStatus": "Driftstatus",
+      "ruleLocked": "Låst",
+      "ruleHasVcs": "VCS-ansluten",
+      "ruleAny": "Alla",
+      "ruleEmpty": "Lägg till minst ett filter — en tom regel matchar ingenting.",
+      "rulePreview": "{count, plural, =0 {Matchar inga arbetsytor} one {Matchar # arbetsyta} other {Matchar # arbetsytor}}",
+      "rulePreviewLoading": "Kontrollerar vilka arbetsytor som matchar …",
+      "rulePreviewInvalid": "Den här regeln kunde inte kontrolleras. Sparande visar det exakta problemet.",
+      "ruleConflictsWithGlobal": "En global uppsättning gäller redan alla arbetsytor, så en regel kan inte användas med den."
     }
   },
   "adminAutodiscovery": {
@@ -2628,6 +2656,18 @@
       "architecture": "Arkitektur",
       "runTasks": "Uppgifter",
       "runTriggers": "Utlösare"
+    },
+    "applicableVarsets": {
+      "title": "Variabeluppsättningar",
+      "description": "Variabeluppsättningar som gäller för denna arbetsyta. Hantera dem från uppsättningen själv.",
+      "loadError": "Det gick inte att läsa in variabeluppsättningar",
+      "priority": "Prioritet",
+      "variableCount": "{count, plural, one {# variabel} other {# variabler}}",
+      "source": {
+        "explicit": "Tilldelad",
+        "global": "Global",
+        "rule": "Matchad av regel"
+      }
     }
   },
   "graphs": {

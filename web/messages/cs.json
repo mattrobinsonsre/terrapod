@@ -910,7 +910,35 @@
         "deleteVar": "Nepodařilo se smazat proměnnou",
         "addWorkspace": "Nepodařilo se přidat pracovní prostor",
         "removeWorkspace": "Nepodařilo se odebrat pracovní prostor"
-      }
+      },
+      "assignedBy": "Přiřazeno podle",
+      "managedByRule": "Spravováno pravidlem",
+      "assignmentRule": "Pravidlo přiřazení",
+      "assignmentRuleNone": "Žádné pravidlo. Pracovní prostory se přiřazují jednotlivě.",
+      "assignmentRuleDescription": "Pracovní prostory odpovídající tomuto pravidlu obdrží sadu automaticky; pravidlo se vyhodnocuje při každém běhu.",
+      "source": {
+        "explicit": "Přiřazeno",
+        "global": "Globální",
+        "rule": "Pravidlo"
+      },
+      "ruleLabels": "Štítky",
+      "ruleNamePrefix": "Předpona názvu",
+      "ruleNameGlob": "Vzor názvu",
+      "ruleExecutionBackend": "Spouštěcí backend",
+      "ruleExecutionMode": "Režim spuštění",
+      "ruleTerraformVersion": "Verze",
+      "ruleOwnerEmail": "Vlastník",
+      "ruleAgentPoolId": "Fond agentů",
+      "ruleVcsConnectionId": "Připojení VCS",
+      "ruleDriftStatus": "Stav odchylky",
+      "ruleLocked": "Uzamčeno",
+      "ruleHasVcs": "Připojeno k VCS",
+      "ruleAny": "Libovolné",
+      "ruleEmpty": "Přidejte alespoň jeden filtr — prázdné pravidlo neodpovídá ničemu.",
+      "rulePreview": "{count, plural, =0 {Neodpovídá žádnému pracovnímu prostoru} one {Odpovídá # pracovnímu prostoru} few {Odpovídá # pracovním prostorům} many {Odpovídá # pracovního prostoru} other {Odpovídá # pracovním prostorům}}",
+      "rulePreviewLoading": "Zjišťuji, které pracovní prostory odpovídají…",
+      "rulePreviewInvalid": "Toto pravidlo nešlo ověřit. Uložení nahlásí přesný problém.",
+      "ruleConflictsWithGlobal": "Globální sada už platí pro všechny pracovní prostory, takže s ní nelze použít pravidlo."
     }
   },
   "adminAutodiscovery": {
@@ -2628,6 +2656,18 @@
       "architecture": "Architektura",
       "runTasks": "Úkoly",
       "runTriggers": "Triggery"
+    },
+    "applicableVarsets": {
+      "title": "Sady proměnných",
+      "description": "Sady proměnných platné pro tento pracovní prostor. Spravujte je přímo v sadě.",
+      "loadError": "Nepodařilo se načíst sady proměnných",
+      "priority": "Priorita",
+      "variableCount": "{count, plural, one {# proměnná} few {# proměnné} many {# proměnné} other {# proměnných}}",
+      "source": {
+        "explicit": "Přiřazeno",
+        "global": "Globální",
+        "rule": "Odpovídá pravidlu"
+      }
     }
   },
   "graphs": {
