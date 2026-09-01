@@ -1,5 +1,5 @@
-import { test, expect } from '@playwright/test';
-import { createWorkspace } from '../helpers/api.js';
+import { test, expect, type Page, type Route } from '@playwright/test';
+import { createWorkspace, getStoredToken, uniqueName } from '../helpers/api.js';
 
 test.describe('Variables', () => {
   let workspaceId: string;
@@ -144,3 +144,131 @@ test.describe('Variables', () => {
     await expect(row).not.toBeVisible({ timeout: 10_000 });
   });
 });
+
+test.describe('Vault value source (#1439)', () => {
+  const API_URL = process.env.API_URL || 'http://localhost:8000'
+
+  /** Pretend the deployment has Vault configured. The e2e stack deliberately
+   *  does not, which is what makes the "not offered" test below real. */
+  async function withVault(page: Page, instances = ['default'], defaultInstance = 'default') {
+    await page.route('**/api/terrapod/v1/vault/availability', (route: Route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            type: 'vault-availability',
+            id: 'vault',
+            attributes: {
+              enabled: true,
+              instances,
+              'default-instance': defaultInstance,
+            },
+          },
+        }),
+      }),
+    )
+  }
+
+  test('the source picker is not offered when Vault is not configured', async ({ page }) => {
+    // Unstubbed: the stack really has no Vault, so this asserts the gate rather
+    // than a mock of it. Offering a source that cannot work would produce a
+    // variable that fails its first run.
+    const token = getStoredToken()
+    const wsId = await createWorkspace(token, uniqueName('e2enovault'))
+
+    await page.goto(`/workspaces/${wsId}?tab=variables`)
+    await page.getByRole('button', { name: 'Add Variable' }).click()
+    await expect(page.locator('#var-key')).toBeVisible()
+    await expect(page.locator('#var-source')).toHaveCount(0)
+  })
+
+  test('choosing Vault swaps the value box for the reference builder', async ({ page }) => {
+    const token = getStoredToken()
+    const wsId = await createWorkspace(token, uniqueName('e2evaultform'))
+    await withVault(page)
+
+    await page.goto(`/workspaces/${wsId}?tab=variables`)
+    await page.getByRole('button', { name: 'Add Variable' }).click()
+    await expect(page.locator('#var-val')).toBeVisible()
+
+    await page.locator('#var-source').selectOption('vault')
+
+    // The value box gives way to coordinates — you cannot type a literal into a
+    // variable whose value lives in Vault.
+    await expect(page.locator('#var-val')).toHaveCount(0)
+    await expect(page.locator('#add-mount')).toBeVisible()
+    await expect(page.locator('#add-path')).toBeVisible()
+    await expect(page.locator('#add-field')).toBeVisible()
+    // Always shown, even with one instance: which Vault a credential comes from
+    // is the thing worth being explicit about.
+    await expect(page.locator('#add-vault')).toBeVisible()
+  })
+
+  test('a reference is built, saved, and shown as coordinates not asterisks', async ({ page }) => {
+    const token = getStoredToken()
+    const wsId = await createWorkspace(token, uniqueName('e2evaultsave'))
+    await withVault(page)
+
+    await page.goto(`/workspaces/${wsId}?tab=variables`)
+    await page.getByRole('button', { name: 'Add Variable' }).click()
+    await page.locator('#var-key').fill('NETBOX_TOKEN')
+    await page.locator('#var-cat').selectOption('env')
+    await page.locator('#var-source').selectOption('vault')
+    await page.locator('#add-mount').fill('secret')
+    await page.locator('#add-path').fill('apps/netbox')
+    await page.locator('#add-field').fill('apitoken')
+    await page.getByRole('button', { name: 'Add Variable', exact: true }).last().click()
+
+    const row = page.locator('tr').filter({ hasText: 'NETBOX_TOKEN' })
+    await expect(row).toBeVisible({ timeout: 10_000 })
+    // The stored value is a path, not a secret — masking it would hide
+    // configuration while concealing nothing.
+    await expect(row.getByText('secret/apps/netbox')).toBeVisible()
+    await expect(row.getByText('***')).toHaveCount(0)
+  })
+
+  test('a saved reference can be edited — the fields come back populated', async ({ page }) => {
+    // The defect this guards: editing was value-only, so a vault-backed
+    // variable could be created and then never corrected.
+    const token = getStoredToken()
+    const wsId = await createWorkspace(token, uniqueName('e2evaultedit'))
+    await withVault(page)
+
+    const res = await fetch(`${API_URL}/api/v2/workspaces/${wsId}/vars`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/vnd.api+json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        data: {
+          type: 'vars',
+          attributes: {
+            key: 'EDIT_ME',
+            category: 'env',
+            'value-source': 'vault',
+            value: JSON.stringify({
+              source: 'vault', mount: 'secret', path: 'apps/original', field: 'token',
+            }),
+          },
+        },
+      }),
+    })
+    expect(res.status).toBe(201)
+
+    await page.goto(`/workspaces/${wsId}?tab=variables`)
+    const row = page.locator('tr').filter({ hasText: 'EDIT_ME' })
+    await expect(row).toBeVisible({ timeout: 10_000 })
+    await row.getByRole('button', { name: 'Edit' }).click()
+
+    // Populated from the stored reference, not blanked the way a sensitive
+    // value is — otherwise every edit would rebuild it from nothing.
+    const mount = page.locator('[id$="-mount"]').first()
+    await expect(mount).toHaveValue('secret')
+    await expect(page.locator('[id$="-path"]').first()).toHaveValue('apps/original')
+
+    await page.locator('[id$="-path"]').first().fill('apps/changed')
+    await page.getByRole('button', { name: 'Save' }).click()
+
+    await expect(page.locator('tr').filter({ hasText: 'EDIT_ME' })
+      .getByText('secret/apps/changed')).toBeVisible({ timeout: 10_000 })
+  })
+})

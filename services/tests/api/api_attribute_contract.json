@@ -827,6 +827,7 @@
     "sensitive",
     "updated-at",
     "value",
+    "value-source",
     "version-id"
   ],
   "variables._varset_json": [
@@ -860,6 +861,11 @@
     "name",
     "priority",
     "variable-count"
+  ],
+  "variables.vault_availability": [
+    "default-instance",
+    "enabled",
+    "instances"
   ],
   "vcs_connections._connection_json": [
     "budget-window-seconds",
