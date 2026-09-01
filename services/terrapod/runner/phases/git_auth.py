@@ -42,6 +42,7 @@ from __future__ import annotations
 import json
 import os
 import stat
+import subprocess
 from pathlib import Path
 
 import structlog
@@ -225,10 +226,29 @@ def configure(entries: list[dict], *, base_dir: Path) -> dict[str, str]:
     return env
 
 
+class GitAuthUnavailable(RuntimeError):
+    """Credentials were configured for this run and could not be applied.
+
+    Raised rather than warned, because the alternative is what #1442 reported:
+    materialisation failed on a read-only ``$HOME``, was logged at warning, and
+    the run continued with no credentials at all. `init` then failed several
+    minutes later against a private module source with an authentication error
+    that named neither the credential nor the cause — and the log line above it
+    said auth had been configured.
+
+    An operator who declared a credential expects it to be used. Failing here
+    attributes the problem to the thing that is actually wrong.
+    """
+
+
 def run(*, base_dir: Path | None = None) -> dict[str, str]:
-    """Load the mounted git-auth blob and materialize it. Returns env overrides
-    for ``os.environ`` (empty when there's nothing to do). Never raises — bad
-    input is skipped so a malformed entry can't fail an otherwise-fine run."""
+    """Load the mounted git-auth blob and materialize it.
+
+    Returns env overrides for ``os.environ``, empty when there is nothing to do.
+    Raises `GitAuthUnavailable` when entries exist but cannot be applied — a
+    malformed *individual* entry is still skipped inside `configure`, so one bad
+    credential cannot fail a run that does not depend on it.
+    """
     entries = _load()
     if not entries:
         return {}
@@ -236,8 +256,43 @@ def run(*, base_dir: Path | None = None) -> dict[str, str]:
     try:
         env = configure(entries, base_dir=base)
     except OSError as exc:
-        logger.warning("failed to materialize git auth", error=str(exc))
+        raise GitAuthUnavailable(
+            f"{len(entries)} git credential(s) are configured for this workspace but could "
+            f"not be written to {base}: {exc}. The run would otherwise continue without "
+            f"them and fail later against a private module source."
+        ) from exc
+
+    if not env:
         return {}
-    if env:
-        logger.info("git module auth configured", entries=len(entries))
+
+    # "Wrote a file" is not "git can read it" — the distinction #1442 was
+    # reported on. Ask git itself, through the same GIT_CONFIG_GLOBAL the init
+    # subprocess will inherit, so a path git does not consult is caught here
+    # rather than as an authentication failure minutes later.
+    _verify_git_reads_config(env)
+    logger.info("git module auth configured", entries=len(entries))
     return env
+
+
+def _verify_git_reads_config(env: dict[str, str]) -> None:
+    """Confirm git actually loads the config we just wrote.
+
+    Reads back a tokenless key. Nothing secret is logged or compared — the
+    credentials live in a separate store file, and the check only asks whether
+    git sees the configuration at all.
+    """
+    probe = subprocess.run(  # noqa: S603 — fixed argv
+        ["git", "config", "--global", "--list"],
+        env={**os.environ, **env},
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    if probe.returncode != 0 or "credential.helper" not in probe.stdout:
+        raise GitAuthUnavailable(
+            f"git does not read the configuration written to "
+            f"{env.get('GIT_CONFIG_GLOBAL', '<unset>')}. Credentials would be "
+            f"silently ignored and the run would fail later against a private "
+            f"module source."
+        )
