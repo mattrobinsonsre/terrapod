@@ -910,7 +910,35 @@
         "deleteVar": "Nie udało się usunąć zmiennej",
         "addWorkspace": "Nie udało się dodać obszaru roboczego",
         "removeWorkspace": "Nie udało się usunąć obszaru roboczego"
-      }
+      },
+      "assignedBy": "Przypisane przez",
+      "managedByRule": "Zarządzane regułą",
+      "assignmentRule": "Reguła przypisania",
+      "assignmentRuleNone": "Brak reguły. Przestrzenie robocze są przypisywane pojedynczo.",
+      "assignmentRuleDescription": "Przestrzenie robocze pasujące do tej reguły otrzymują zestaw automatycznie, z ponowną oceną przy każdym uruchomieniu.",
+      "source": {
+        "explicit": "Przypisany",
+        "global": "Globalny",
+        "rule": "Reguła"
+      },
+      "ruleLabels": "Etykiety",
+      "ruleNamePrefix": "Prefiks nazwy",
+      "ruleNameGlob": "Wzorzec nazwy",
+      "ruleExecutionBackend": "Silnik wykonawczy",
+      "ruleExecutionMode": "Tryb wykonania",
+      "ruleTerraformVersion": "Wersja",
+      "ruleOwnerEmail": "Właściciel",
+      "ruleAgentPoolId": "Pula agentów",
+      "ruleVcsConnectionId": "Połączenie VCS",
+      "ruleDriftStatus": "Status dryfu",
+      "ruleLocked": "Zablokowany",
+      "ruleHasVcs": "Połączony z VCS",
+      "ruleAny": "Dowolny",
+      "ruleEmpty": "Dodaj co najmniej jeden filtr — pusta reguła niczego nie dopasowuje.",
+      "rulePreview": "{count, plural, =0 {Nie pasuje do żadnej przestrzeni roboczej} one {Pasuje do # przestrzeni roboczej} few {Pasuje do # przestrzeni roboczych} many {Pasuje do # przestrzeni roboczych} other {Pasuje do # przestrzeni roboczej}}",
+      "rulePreviewLoading": "Sprawdzanie pasujących przestrzeni roboczych…",
+      "rulePreviewInvalid": "Nie udało się sprawdzić tej reguły. Zapis wskaże dokładny problem.",
+      "ruleConflictsWithGlobal": "Zestaw globalny już obejmuje wszystkie przestrzenie robocze, więc nie można użyć z nim reguły."
     }
   },
   "adminAutodiscovery": {
@@ -2631,6 +2659,18 @@
       "architecture": "Architektura",
       "runTasks": "Zadania",
       "runTriggers": "Wyzwalacze"
+    },
+    "applicableVarsets": {
+      "title": "Zestawy zmiennych",
+      "description": "Zestawy zmiennych stosowane do tej przestrzeni roboczej. Zarządzaj nimi z poziomu zestawu.",
+      "loadError": "Nie udało się wczytać zestawów zmiennych",
+      "priority": "Priorytet",
+      "variableCount": "{count, plural, one {# zmienna} few {# zmienne} many {# zmiennych} other {# zmiennej}}",
+      "source": {
+        "explicit": "Przypisany",
+        "global": "Globalny",
+        "rule": "Dopasowany regułą"
+      }
     }
   },
   "graphs": {

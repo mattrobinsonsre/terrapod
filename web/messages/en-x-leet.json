@@ -910,7 +910,35 @@
         "deleteVar": "F41l3d 70 d3l373 v4r14bl3",
         "addWorkspace": "F41l3d 70 4dd w0rk5p4c3",
         "removeWorkspace": "F41l3d 70 r3m0v3 w0rk5p4c3"
-      }
+      },
+      "assignedBy": "4551gn3d by",
+      "managedByRule": "M4n4g3d by rul3",
+      "assignmentRule": "4551gnm3n7 rul3",
+      "assignmentRuleNone": "N0 rul3. W0rk5p4c35 4r3 4551gn3d 0n3 by 0n3.",
+      "assignmentRuleDescription": "W0rk5p4c35 m47ch1ng 7h15 rul3 r3c31v3 7h3 537 4u70m471c4lly, r3-3v4lu473d 0n 3v3ry run.",
+      "source": {
+        "explicit": "4551gn3d",
+        "global": "Gl0b4l",
+        "rule": "Rul3"
+      },
+      "ruleLabels": "L4b3l5",
+      "ruleNamePrefix": "N4m3 pr3f1x",
+      "ruleNameGlob": "N4m3 p4773rn",
+      "ruleExecutionBackend": "3x3cu710n b4ck3nd",
+      "ruleExecutionMode": "3x3cu710n m0d3",
+      "ruleTerraformVersion": "V3r510n",
+      "ruleOwnerEmail": "0wn3r",
+      "ruleAgentPoolId": "4g3n7 p00l",
+      "ruleVcsConnectionId": "VC5 c0nn3c710n",
+      "ruleDriftStatus": "Dr1f7 5747u5",
+      "ruleLocked": "L0ck3d",
+      "ruleHasVcs": "VC5-c0nn3c73d",
+      "ruleAny": "4ny",
+      "ruleEmpty": "4dd 47 l3457 0n3 f1l73r — 4n 3mp7y rul3 m47ch35 n07h1ng.",
+      "rulePreview": "{count, plural, =0 {Matches no workspaces} one {Matches # workspace} other {Matches # workspaces}}",
+      "rulePreviewLoading": "Ch3ck1ng wh1ch w0rk5p4c35 m47ch…",
+      "rulePreviewInvalid": "7h15 rul3 c0uld n07 b3 ch3ck3d. 54v3 w1ll r3p0r7 7h3 3x4c7 pr0bl3m.",
+      "ruleConflictsWithGlobal": "4 gl0b4l 537 4lr34dy 4ppl135 70 3v3ry w0rk5p4c3, 50 4 rul3 c4nn07 b3 u53d w17h 17."
     }
   },
   "adminAutodiscovery": {
@@ -2631,6 +2659,18 @@
       "architecture": "4rch173c7ur3",
       "runTasks": "745k5",
       "runTriggers": "7r1gg3r5"
+    },
+    "applicableVarsets": {
+      "title": "V4r14bl3 5375",
+      "description": "V4r14bl3 5375 7h47 4pply 70 7h15 w0rk5p4c3. M4n4g3 7h3m fr0m 7h3 v4r14bl3 537 1753lf.",
+      "loadError": "F41l3d 70 l04d v4r14bl3 5375",
+      "priority": "Pr10r17y",
+      "variableCount": "{count, plural, one {# variable} other {# variables}}",
+      "source": {
+        "explicit": "4551gn3d",
+        "global": "Gl0b4l",
+        "rule": "M47ch3d by rul3"
+      }
     }
   },
   "graphs": {

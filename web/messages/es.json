@@ -910,7 +910,35 @@
         "deleteVar": "No se pudo eliminar la variable",
         "addWorkspace": "No se pudo añadir el espacio de trabajo",
         "removeWorkspace": "No se pudo quitar el espacio de trabajo"
-      }
+      },
+      "assignedBy": "Asignado por",
+      "managedByRule": "Gestionado por regla",
+      "assignmentRule": "Regla de asignación",
+      "assignmentRuleNone": "Sin regla. Los espacios de trabajo se asignan uno por uno.",
+      "assignmentRuleDescription": "Los espacios de trabajo que coinciden con esta regla reciben el conjunto automáticamente, reevaluado en cada ejecución.",
+      "source": {
+        "explicit": "Asignado",
+        "global": "Global",
+        "rule": "Regla"
+      },
+      "ruleLabels": "Etiquetas",
+      "ruleNamePrefix": "Prefijo del nombre",
+      "ruleNameGlob": "Patrón del nombre",
+      "ruleExecutionBackend": "Motor de ejecución",
+      "ruleExecutionMode": "Modo de ejecución",
+      "ruleTerraformVersion": "Versión",
+      "ruleOwnerEmail": "Propietario",
+      "ruleAgentPoolId": "Grupo de agentes",
+      "ruleVcsConnectionId": "Conexión VCS",
+      "ruleDriftStatus": "Estado de desviación",
+      "ruleLocked": "Bloqueado",
+      "ruleHasVcs": "Conectado a VCS",
+      "ruleAny": "Cualquiera",
+      "ruleEmpty": "Añada al menos un filtro: una regla vacía no coincide con nada.",
+      "rulePreview": "{count, plural, =0 {No coincide con ningún espacio de trabajo} one {Coincide con # espacio de trabajo} other {Coincide con # espacios de trabajo}}",
+      "rulePreviewLoading": "Comprobando qué espacios de trabajo coinciden…",
+      "rulePreviewInvalid": "No se pudo comprobar esta regla. Al guardar se indicará el problema exacto.",
+      "ruleConflictsWithGlobal": "Un conjunto global ya se aplica a todos los espacios de trabajo, por lo que no admite una regla."
     }
   },
   "adminAutodiscovery": {
@@ -2631,6 +2659,18 @@
       "architecture": "Arquitectura",
       "runTasks": "Tareas",
       "runTriggers": "Disparadores"
+    },
+    "applicableVarsets": {
+      "title": "Conjuntos de variables",
+      "description": "Conjuntos de variables que se aplican a este espacio de trabajo. Gestiónelos desde el propio conjunto.",
+      "loadError": "Error al cargar los conjuntos de variables",
+      "priority": "Prioridad",
+      "variableCount": "{count, plural, one {# variable} other {# variables}}",
+      "source": {
+        "explicit": "Asignado",
+        "global": "Global",
+        "rule": "Coincide con la regla"
+      }
     }
   },
   "graphs": {

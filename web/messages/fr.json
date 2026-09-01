@@ -910,7 +910,35 @@
         "deleteVar": "Échec de la suppression de la variable",
         "addWorkspace": "Échec de l'ajout de l'espace de travail",
         "removeWorkspace": "Échec du retrait de l'espace de travail"
-      }
+      },
+      "assignedBy": "Attribué par",
+      "managedByRule": "Géré par règle",
+      "assignmentRule": "Règle d'attribution",
+      "assignmentRuleNone": "Aucune règle. Les espaces de travail sont attribués un par un.",
+      "assignmentRuleDescription": "Les espaces de travail correspondant à cette règle reçoivent l'ensemble automatiquement, réévalué à chaque exécution.",
+      "source": {
+        "explicit": "Attribué",
+        "global": "Global",
+        "rule": "Règle"
+      },
+      "ruleLabels": "Étiquettes",
+      "ruleNamePrefix": "Préfixe du nom",
+      "ruleNameGlob": "Motif du nom",
+      "ruleExecutionBackend": "Moteur d'exécution",
+      "ruleExecutionMode": "Mode d'exécution",
+      "ruleTerraformVersion": "Version",
+      "ruleOwnerEmail": "Propriétaire",
+      "ruleAgentPoolId": "Pool d'agents",
+      "ruleVcsConnectionId": "Connexion VCS",
+      "ruleDriftStatus": "État de dérive",
+      "ruleLocked": "Verrouillé",
+      "ruleHasVcs": "Connecté au VCS",
+      "ruleAny": "Indifférent",
+      "ruleEmpty": "Ajoutez au moins un filtre — une règle vide ne correspond à rien.",
+      "rulePreview": "{count, plural, =0 {Ne correspond à aucun espace de travail} one {Correspond à # espace de travail} other {Correspond à # espaces de travail}}",
+      "rulePreviewLoading": "Vérification des espaces de travail correspondants…",
+      "rulePreviewInvalid": "Cette règle n'a pas pu être vérifiée. L'enregistrement indiquera le problème exact.",
+      "ruleConflictsWithGlobal": "Un ensemble global s'applique déjà à tous les espaces de travail ; une règle ne peut y être associée."
     }
   },
   "adminAutodiscovery": {
@@ -2631,6 +2659,18 @@
       "architecture": "Architecture",
       "runTasks": "Tâches",
       "runTriggers": "Déclencheurs"
+    },
+    "applicableVarsets": {
+      "title": "Ensembles de variables",
+      "description": "Ensembles de variables qui s'appliquent à cet espace de travail. Gérez-les depuis l'ensemble lui-même.",
+      "loadError": "Échec du chargement des ensembles de variables",
+      "priority": "Priorité",
+      "variableCount": "{count, plural, one {# variable} other {# variables}}",
+      "source": {
+        "explicit": "Attribué",
+        "global": "Global",
+        "rule": "Correspond à une règle"
+      }
     }
   },
   "graphs": {

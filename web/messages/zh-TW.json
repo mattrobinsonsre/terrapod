@@ -910,7 +910,35 @@
         "deleteVar": "刪除變數失敗",
         "addWorkspace": "新增工作區失敗",
         "removeWorkspace": "移除工作區失敗"
-      }
+      },
+      "assignedBy": "指派方式",
+      "managedByRule": "由規則管理",
+      "assignmentRule": "指派規則",
+      "assignmentRuleNone": "沒有規則。工作區逐一指派。",
+      "assignmentRuleDescription": "符合此規則的工作區會自動取得該變數集，並在每次執行時重新評估。",
+      "source": {
+        "explicit": "已指派",
+        "global": "全域",
+        "rule": "規則"
+      },
+      "ruleLabels": "標籤",
+      "ruleNamePrefix": "名稱前綴",
+      "ruleNameGlob": "名稱比對樣式",
+      "ruleExecutionBackend": "執行引擎",
+      "ruleExecutionMode": "執行模式",
+      "ruleTerraformVersion": "版本",
+      "ruleOwnerEmail": "擁有者",
+      "ruleAgentPoolId": "代理集區",
+      "ruleVcsConnectionId": "VCS 連線",
+      "ruleDriftStatus": "偏移狀態",
+      "ruleLocked": "已鎖定",
+      "ruleHasVcs": "已連線 VCS",
+      "ruleAny": "任意",
+      "ruleEmpty": "請至少新增一個篩選條件——空規則不會比對到任何工作區。",
+      "rulePreview": "{count, plural, =0 {未比對到任何工作區} other {比對到 # 個工作區}}",
+      "rulePreviewLoading": "正在檢查符合的工作區…",
+      "rulePreviewInvalid": "無法檢查此規則。儲存時會回報確切問題。",
+      "ruleConflictsWithGlobal": "全域變數集已套用至所有工作區，因此無法同時使用規則。"
     }
   },
   "adminAutodiscovery": {
@@ -2631,6 +2659,18 @@
       "architecture": "架構",
       "runTasks": "任務",
       "runTriggers": "觸發器"
+    },
+    "applicableVarsets": {
+      "title": "變數集",
+      "description": "套用至此工作區的變數集。請在變數集中管理它們。",
+      "loadError": "載入變數集失敗",
+      "priority": "優先",
+      "variableCount": "{count, plural, other {# 個變數}}",
+      "source": {
+        "explicit": "已指派",
+        "global": "全域",
+        "rule": "依規則比對"
+      }
     }
   },
   "graphs": {

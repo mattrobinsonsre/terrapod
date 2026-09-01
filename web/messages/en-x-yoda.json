@@ -910,7 +910,35 @@
         "deleteVar": "Delete the variable, it did not",
         "addWorkspace": "Add the workspace, it did not",
         "removeWorkspace": "Remove the workspace, it did not"
-      }
+      },
+      "assignedBy": "By, assigned",
+      "managedByRule": "By rule, managed",
+      "assignmentRule": "Rule, assignment",
+      "assignmentRuleNone": "No rule, there is. One by one, assigned the workspaces are.",
+      "assignmentRuleDescription": "Receive the set automatically, workspaces matching this rule do. On every run, re-evaluated it is.",
+      "source": {
+        "explicit": "Assigned",
+        "global": "Global",
+        "rule": "Rule"
+      },
+      "ruleLabels": "Labels",
+      "ruleNamePrefix": "Prefix, name",
+      "ruleNameGlob": "Pattern, name",
+      "ruleExecutionBackend": "Backend, execution",
+      "ruleExecutionMode": "Mode, execution",
+      "ruleTerraformVersion": "Version",
+      "ruleOwnerEmail": "Owner",
+      "ruleAgentPoolId": "Pool, agent",
+      "ruleVcsConnectionId": "Connection, VCS",
+      "ruleDriftStatus": "Status, drift",
+      "ruleLocked": "Locked",
+      "ruleHasVcs": "VCS-connected",
+      "ruleAny": "Any",
+      "ruleEmpty": "At least one filter, add you must — match nothing, an empty rule does.",
+      "rulePreview": "{count, plural, =0 {No workspaces, this matches} one {# workspace, this matches} other {# workspaces, this matches}}",
+      "rulePreviewLoading": "Which workspaces match, checking I am…",
+      "rulePreviewInvalid": "Checked, this rule could not be. Report the exact problem, saving will.",
+      "ruleConflictsWithGlobal": "To every workspace, a global set already applies. Used with it, a rule cannot be."
     }
   },
   "adminAutodiscovery": {
@@ -2631,6 +2659,18 @@
       "architecture": "Architecture",
       "runTasks": "Tasks",
       "runTriggers": "Triggers"
+    },
+    "applicableVarsets": {
+      "title": "Sets, variable",
+      "description": "Apply to this workspace, these variable sets do. From the variable set itself, manage them you must.",
+      "loadError": "Load the variable sets, failed it did",
+      "priority": "Priority",
+      "variableCount": "{count, plural, one {# variable} other {# variables}}",
+      "source": {
+        "explicit": "Assigned",
+        "global": "Global",
+        "rule": "By rule, matched"
+      }
     }
   },
   "graphs": {

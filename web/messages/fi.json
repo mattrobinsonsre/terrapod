@@ -910,7 +910,35 @@
         "deleteVar": "Muuttujan poistaminen epäonnistui",
         "addWorkspace": "Työtilan lisääminen epäonnistui",
         "removeWorkspace": "Työtilan poistaminen epäonnistui"
-      }
+      },
+      "assignedBy": "Määrittänyt",
+      "managedByRule": "Säännön hallinnoima",
+      "assignmentRule": "Määrityssääntö",
+      "assignmentRuleNone": "Ei sääntöä. Työtilat määritetään yksitellen.",
+      "assignmentRuleDescription": "Tätä sääntöä vastaavat työtilat saavat joukon automaattisesti, ja se arvioidaan uudelleen joka ajolla.",
+      "source": {
+        "explicit": "Määritetty",
+        "global": "Yleinen",
+        "rule": "Sääntö"
+      },
+      "ruleLabels": "Tunnisteet",
+      "ruleNamePrefix": "Nimen etuliite",
+      "ruleNameGlob": "Nimen kuvio",
+      "ruleExecutionBackend": "Suoritustausta",
+      "ruleExecutionMode": "Suoritustila",
+      "ruleTerraformVersion": "Versio",
+      "ruleOwnerEmail": "Omistaja",
+      "ruleAgentPoolId": "Agenttivaranto",
+      "ruleVcsConnectionId": "VCS-yhteys",
+      "ruleDriftStatus": "Poikkeaman tila",
+      "ruleLocked": "Lukittu",
+      "ruleHasVcs": "VCS-yhteydessä",
+      "ruleAny": "Mikä tahansa",
+      "ruleEmpty": "Lisää vähintään yksi suodatin — tyhjä sääntö ei vastaa mitään.",
+      "rulePreview": "{count, plural, =0 {Ei vastaa yhtään työtilaa} one {Vastaa # työtilaa} other {Vastaa # työtilaa}}",
+      "rulePreviewLoading": "Tarkistetaan, mitkä työtilat vastaavat…",
+      "rulePreviewInvalid": "Tätä sääntöä ei voitu tarkistaa. Tallennus kertoo tarkan ongelman.",
+      "ruleConflictsWithGlobal": "Yleinen joukko koskee jo kaikkia työtiloja, joten sen kanssa ei voi käyttää sääntöä."
     }
   },
   "adminAutodiscovery": {
@@ -2631,6 +2659,18 @@
       "architecture": "Arkkitehtuuri",
       "runTasks": "Tehtävät",
       "runTriggers": "Käynnistimet"
+    },
+    "applicableVarsets": {
+      "title": "Muuttujajoukot",
+      "description": "Tähän työtilaan sovellettavat muuttujajoukot. Hallinnoi niitä itse joukosta.",
+      "loadError": "Muuttujajoukkojen lataaminen epäonnistui",
+      "priority": "Prioriteetti",
+      "variableCount": "{count, plural, one {# muuttuja} other {# muuttujaa}}",
+      "source": {
+        "explicit": "Määritetty",
+        "global": "Yleinen",
+        "rule": "Vastaa sääntöä"
+      }
     }
   },
   "graphs": {

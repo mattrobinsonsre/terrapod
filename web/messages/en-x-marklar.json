@@ -910,7 +910,35 @@
         "deleteVar": "Failed to delete marklar",
         "addWorkspace": "Failed to add marklar",
         "removeWorkspace": "Failed to remove marklar"
-      }
+      },
+      "assignedBy": "Assigned by",
+      "managedByRule": "Managed by marklar",
+      "assignmentRule": "Marklar marklar",
+      "assignmentRuleNone": "No marklar. Marklars are assigned one by one.",
+      "assignmentRuleDescription": "Marklars matching this marklar receive the marklar automatically, re-evaluated on every marklar.",
+      "source": {
+        "explicit": "Assigned",
+        "global": "Global",
+        "rule": "Marklar"
+      },
+      "ruleLabels": "Marklars",
+      "ruleNamePrefix": "Marklar marklar",
+      "ruleNameGlob": "Marklar marklar",
+      "ruleExecutionBackend": "Marklar marklar",
+      "ruleExecutionMode": "Marklar marklar",
+      "ruleTerraformVersion": "Marklar",
+      "ruleOwnerEmail": "Marklar",
+      "ruleAgentPoolId": "Marklar marklar",
+      "ruleVcsConnectionId": "VCS marklar",
+      "ruleDriftStatus": "Marklar marklar",
+      "ruleLocked": "Locked",
+      "ruleHasVcs": "VCS-connected",
+      "ruleAny": "Any",
+      "ruleEmpty": "Add at least one marklar — an empty marklar matches no marklars.",
+      "rulePreview": "{count, plural, =0 {Matches no marklars} one {Matches # marklar} other {Matches # marklars}}",
+      "rulePreviewLoading": "Checking which marklars match…",
+      "rulePreviewInvalid": "This marklar could not be checked. Marklar will report the exact marklar.",
+      "ruleConflictsWithGlobal": "A global marklar already applies to every marklar, so a marklar cannot be used with it."
     }
   },
   "adminAutodiscovery": {
@@ -2631,6 +2659,18 @@
       "architecture": "Marklar",
       "runTasks": "Marklars",
       "runTriggers": "Marklars"
+    },
+    "applicableVarsets": {
+      "title": "Marklar marklars",
+      "description": "Marklar marklars that apply to this marklar. Manage them from the marklar marklar itself.",
+      "loadError": "Failed to load marklar marklars",
+      "priority": "Marklar",
+      "variableCount": "{count, plural, one {# marklar} other {# marklars}}",
+      "source": {
+        "explicit": "Assigned",
+        "global": "Global",
+        "rule": "Matched by marklar"
+      }
     }
   },
   "graphs": {

@@ -211,6 +211,23 @@ func GetListAttr(r *Resource, key string) []string {
 	return l
 }
 
+// GetObjectAttr returns a nested-object attribute from r, nil-safe.
+//
+// Distinct from GetMapAttr, which flattens to map[string]string and so cannot
+// carry a structure with nested values — a variable set's assignment rule, for
+// instance, whose `labels` key is itself an object.
+func GetObjectAttr(r *Resource, key string) map[string]any {
+	raw, ok := r.Attributes[key]
+	if !ok || len(raw) == 0 || string(raw) == "null" {
+		return nil
+	}
+	var m map[string]any
+	if err := json.Unmarshal(raw, &m); err != nil {
+		return nil
+	}
+	return m
+}
+
 // GetRelationshipID returns the id of a to-one relationship by name,
 // or "" when the relationship is missing / null / unparsable.
 func GetRelationshipID(r *Resource, name string) string {

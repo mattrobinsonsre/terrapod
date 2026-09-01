@@ -1,3 +1,6 @@
+const AssignmentExplicit
+const AssignmentGlobal
+const AssignmentRuleBased
 const DiscoveryPath
 const VersionField
 field APIError.Body string
@@ -271,6 +274,7 @@ field CreateVariableRequest.Key string `json:"key"`
 field CreateVariableRequest.Sensitive bool `json:"sensitive,omitempty"`
 field CreateVariableRequest.Structured bool `json:"structured,omitempty"`
 field CreateVariableRequest.Value string `json:"value"`
+field CreateVariableSetRequest.AssignmentRule map[string]any
 field CreateVariableSetRequest.Description string
 field CreateVariableSetRequest.Global bool
 field CreateVariableSetRequest.Name string
@@ -816,6 +820,7 @@ field UpdateVariableRequest.Key string `json:"key,omitempty"`
 field UpdateVariableRequest.Sensitive *bool `json:"sensitive,omitempty"`
 field UpdateVariableRequest.Structured *bool `json:"structured,omitempty"`
 field UpdateVariableRequest.Value *string `json:"value,omitempty"`
+field UpdateVariableSetRequest.AssignmentRule *map[string]any
 field UpdateVariableSetRequest.Description *string
 field UpdateVariableSetRequest.Global *bool
 field UpdateVariableSetRequest.Name string
@@ -923,6 +928,7 @@ field Variable.Structured bool `json:"structured"`
 field Variable.UpdatedAt string `json:"updated-at,omitempty"`
 field Variable.Value string `json:"value,omitempty"`
 field Variable.VersionID string `json:"version-id,omitempty"`
+field VariableSet.AssignmentRule map[string]any `json:"assignment-rule,omitempty"`
 field VariableSet.CreatedAt string `json:"created-at,omitempty"`
 field VariableSet.Description string `json:"description,omitempty"`
 field VariableSet.Global bool `json:"global"`
@@ -943,6 +949,9 @@ field VariableSetVariable.Structured bool `json:"structured"`
 field VariableSetVariable.UpdatedAt string `json:"updated-at,omitempty"`
 field VariableSetVariable.Value string `json:"value,omitempty"`
 field VariableSetVariable.VersionID string `json:"version-id,omitempty"`
+field VarsetWorkspace.AssignmentSource string `json:"assignment-source"`
+field VarsetWorkspace.ID string `json:"id"`
+field VarsetWorkspace.Name string `json:"name"`
 field WarmBinaryEntry.Platforms []WarmPlatform `json:"platforms,omitempty"`
 field WarmBinaryEntry.Tool string `json:"tool,omitempty"`
 field WarmBinaryEntry.Version string `json:"version"`
@@ -1046,12 +1055,18 @@ field WorkspaceSummary.ID string `json:"id"`
 field WorkspaceSummary.Labels map[string]string `json:"labels"`
 field WorkspaceSummary.Name string `json:"name"`
 field WorkspaceSummary.TerraformVersion string `json:"terraform-version"`
+field WorkspaceVarset.AssignmentSource string `json:"assignment-source"`
+field WorkspaceVarset.ID string `json:"id"`
+field WorkspaceVarset.Name string `json:"name"`
+field WorkspaceVarset.Priority bool `json:"priority"`
+field WorkspaceVarset.VariableCount int64 `json:"variable-count"`
 func AddPrefix(id, prefix string) string
 func GetBoolAttr(r *Resource, key string) bool
 func GetFloat64Attr(r *Resource, key string) float64
 func GetIntAttr(r *Resource, key string) int64
 func GetListAttr(r *Resource, key string) []string
 func GetMapAttr(r *Resource, key string) map[string]string
+func GetObjectAttr(r *Resource, key string) map[string]any
 func GetRelationshipID(r *Resource, name string) string
 func GetStringAttr(r *Resource, key string) string
 func IsAuth(err error) bool
@@ -1224,7 +1239,9 @@ method (*Client) ListVCSConnections(ctx context.Context) ([]VCSConnection, error
 method (*Client) ListVariableSets(ctx context.Context) ([]VariableSet, error)
 method (*Client) ListVariables(ctx context.Context, workspaceID string) ([]Variable, error)
 method (*Client) ListVarsetVariables(ctx context.Context, varsetID string) ([]VariableSetVariable, error)
+method (*Client) ListVarsetWorkspaces(ctx context.Context, varsetID string) ([]VarsetWorkspace, error)
 method (*Client) ListWorkspaceRuns(ctx context.Context, workspaceID string, pageNumber, pageSize int) ([]Run, error)
+method (*Client) ListWorkspaceVarsets(ctx context.Context, workspaceID string) ([]WorkspaceVarset, error)
 method (*Client) ListWorkspaces(ctx context.Context, opts WorkspaceListOptions) (*WorkspaceList, error)
 method (*Client) OrphanCatalogInstance(ctx context.Context, wsID string) error
 method (*Client) OverrideRunSecurityScan(ctx context.Context, runID string) (*SecurityScan, error)
@@ -1425,6 +1442,7 @@ type ValidationError struct
 type Variable struct
 type VariableSet struct
 type VariableSetVariable struct
+type VarsetWorkspace struct
 type WarmBinaryEntry struct
 type WarmPlatform struct
 type WarmProviderEntry struct
@@ -1436,6 +1454,7 @@ type WorkspaceFilter struct
 type WorkspaceList struct
 type WorkspaceListOptions struct
 type WorkspaceSummary struct
+type WorkspaceVarset struct
 var ErrVersionMismatch
 var ErrVersionUnreported
 var SDKVersion

@@ -910,7 +910,35 @@
         "deleteVar": "Variabilis deleri non potuit",
         "addWorkspace": "Locus operis addi non potuit",
         "removeWorkspace": "Locus operis removeri non potuit"
-      }
+      },
+      "assignedBy": "Assignatum per",
+      "managedByRule": "Regula administratum",
+      "assignmentRule": "Regula assignationis",
+      "assignmentRuleNone": "Nulla regula. Loca operis singillatim assignantur.",
+      "assignmentRuleDescription": "Loca operis huic regulae congruentia copiam automatice accipiunt, in singulis cursibus retractatam.",
+      "source": {
+        "explicit": "Assignatum",
+        "global": "Globalis",
+        "rule": "Regula"
+      },
+      "ruleLabels": "Notae",
+      "ruleNamePrefix": "Praefixum nominis",
+      "ruleNameGlob": "Forma nominis",
+      "ruleExecutionBackend": "Machina exsecutionis",
+      "ruleExecutionMode": "Modus exsecutionis",
+      "ruleTerraformVersion": "Versio",
+      "ruleOwnerEmail": "Dominus",
+      "ruleAgentPoolId": "Congeries agentium",
+      "ruleVcsConnectionId": "Nexus VCS",
+      "ruleDriftStatus": "Status aberrationis",
+      "ruleLocked": "Clausum",
+      "ruleHasVcs": "VCS coniunctum",
+      "ruleAny": "Quilibet",
+      "ruleEmpty": "Adde saltem unum filtrum — regula vacua nihil congruit.",
+      "rulePreview": "{count, plural, =0 {Nullis locis operis congruit} one {# loco operis congruit} other {# locis operis congruit}}",
+      "rulePreviewLoading": "Inquiritur quae loca operis congruant…",
+      "rulePreviewInvalid": "Haec regula probari non potuit. Servatio problema exactum nuntiabit.",
+      "ruleConflictsWithGlobal": "Copia globalis iam omnibus locis operis applicatur, ideo regula cum ea adhiberi non potest."
     }
   },
   "adminAutodiscovery": {
@@ -2631,6 +2659,18 @@
       "architecture": "Architectura",
       "runTasks": "Munera",
       "runTriggers": "Concitatores"
+    },
+    "applicableVarsets": {
+      "title": "Copiae Variabilium",
+      "description": "Copiae variabilium quae huic loco operis applicantur. Eas in ipsa copia administra.",
+      "loadError": "Copiae variabilium onerari non potuerunt",
+      "priority": "Prioritas",
+      "variableCount": "{count, plural, one {# variabile} other {# variabilia}}",
+      "source": {
+        "explicit": "Assignatum",
+        "global": "Globalis",
+        "rule": "Regula congruens"
+      }
     }
   },
   "graphs": {

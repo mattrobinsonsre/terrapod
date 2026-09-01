@@ -148,6 +148,32 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		return nil, variableListOut{Count: len(vars), Variables: vars}, nil
 	})
 
+	// ── terrapod_workspace_varsets ───────────────────────────────────
+	type workspaceVarsetsIn struct {
+		WorkspaceID string `json:"workspace_id" jsonschema:"the workspace id (ws-...) whose variable sets to list"`
+	}
+	type workspaceVarsetsOut struct {
+		Count   int                        `json:"count"`
+		Varsets []terrapod.WorkspaceVarset `json:"varsets"`
+	}
+	mcp.AddTool(s, &mcp.Tool{
+		Name: "terrapod_workspace_varsets",
+		Description: "List the variable sets applying to a workspace, and how each one came to apply " +
+			"(explicit assignment, global, or matched by an assignment rule). " +
+			"terrapod_variable_list shows only the workspace's own variables, so when a run sees a " +
+			"variable that is not among them, it came from one of these sets.",
+		Annotations: readOnly,
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in workspaceVarsetsIn) (*mcp.CallToolResult, workspaceVarsetsOut, error) {
+		if in.WorkspaceID == "" {
+			return errText("workspace_id is required"), workspaceVarsetsOut{}, nil
+		}
+		sets, err := c.ListWorkspaceVarsets(ctx, in.WorkspaceID)
+		if err != nil {
+			return errResult(err), workspaceVarsetsOut{}, nil
+		}
+		return nil, workspaceVarsetsOut{Count: len(sets), Varsets: sets}, nil
+	})
+
 	// ── terrapod_variable_set ────────────────────────────────────────
 	type variableSetIn struct {
 		WorkspaceID string `json:"workspace_id" jsonschema:"the workspace id (ws-...)"`

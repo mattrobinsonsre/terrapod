@@ -39,12 +39,17 @@ from terrapod.db.models import (
 )
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
-from terrapod.services import variable_service
+from terrapod.services import variable_service, workspace_search_service
 from terrapod.services.workspace_rbac_service import (
     resolve_workspace_capabilities_for,
 )
 
 router = APIRouter(prefix="/api/v2", tags=["variables"])
+
+#: The association views (#1440) are Terrapod-native, not part of the TFE V2
+#: surface `tfci` consumes, so they are mounted at `/api/terrapod/v1/` by the app
+#: factory rather than sitting alongside the CLI-contract routes above.
+native_router = APIRouter(tags=["variables"])
 logger = get_logger(__name__)
 
 
@@ -302,6 +307,12 @@ def _varset_json(vs: VariableSet) -> dict:
             "priority": vs.priority,
             "var-count": var_count,
             "workspace-count": ws_count,
+            # #1440. Null means the set uses explicit assignment (or is global);
+            # a filter means membership is derived per run from workspace
+            # attributes, so `workspace-count` above — which counts only explicit
+            # rows — is not the whole answer. The association views
+            # (`/varsets/{id}/relationships/workspaces`) are.
+            "assignment-rule": vs.assignment_rule,
             "created-at": _rfc3339(vs.created_at),
             "updated-at": _rfc3339(vs.updated_at),
         },
@@ -330,6 +341,65 @@ async def list_varsets(
     return JSONResponse(content={"data": page_items, "meta": meta})
 
 
+def _validated_assignment_rule(attrs: dict) -> dict | None:
+    """Validate an assignment rule at write time (#1440).
+
+    Parsed here rather than only at evaluation because a rule that does not
+    parse matches nothing — which would leave an operator staring at a set that
+    silently applies to no workspace, with nothing to tell them why. Rejecting
+    it at the point of writing turns a silent no-op into an error they can act
+    on.
+
+    A rule and `global` together is contradictory rather than additive: global
+    already means every workspace, so a filter alongside it could only ever
+    narrow nothing. Reject rather than pick a winner.
+    """
+    if "assignment-rule" not in attrs:
+        return None
+    rule = attrs["assignment-rule"]
+    if rule in (None, {}):
+        return None
+    if not isinstance(rule, dict):
+        raise HTTPException(status_code=422, detail="assignment-rule must be an object")
+    if attrs.get("global"):
+        raise HTTPException(
+            status_code=422,
+            detail="A global variable set already applies to every workspace; "
+            "it cannot also carry an assignment-rule",
+        )
+    if rule.get("workspace_ids"):
+        # A literal list of ids is not a rule — it is explicit assignment, which
+        # the relationships endpoint already does and the UI already surfaces as
+        # its own tab. Allowing both would mean two mechanisms for one thing, and
+        # a rule whose membership never actually re-evaluates.
+        raise HTTPException(
+            status_code=422,
+            detail="assignment-rule cannot use 'workspace_ids'; assign those "
+            "workspaces explicitly instead. A rule selects by attributes so that "
+            "membership re-evaluates as workspaces change.",
+        )
+    if rule.get("all"):
+        # `all: true` inside a rule is the one shape that silently widens a
+        # scoped credential set to the entire estate, and it duplicates a thing
+        # the API already expresses properly. Point at `global` rather than
+        # quietly accepting a second spelling of it.
+        raise HTTPException(
+            status_code=422,
+            detail="assignment-rule cannot use 'all'; set the variable set to "
+            "global instead if it should apply to every workspace",
+        )
+    # A falsy `all` is harmless but storable, and anything storable that a
+    # typed consumer (the Terraform provider) does not model comes back as
+    # perpetual plan drift. Drop it so the stored shape is exactly the set of
+    # scoping dimensions, and the provider can model that set completely.
+    rule = {k: v for k, v in rule.items() if k != "all"}
+    try:
+        workspace_search_service.parse_filter(rule)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=f"Invalid assignment-rule: {e}") from e
+    return rule
+
+
 @router.post("/organizations/default/varsets", status_code=201)
 async def create_varset(
     body: dict = Body(...),
@@ -348,6 +418,7 @@ async def create_varset(
         description=attrs.get("description", ""),
         global_set=attrs.get("global", False),
         priority=attrs.get("priority", False),
+        assignment_rule=_validated_assignment_rule(attrs),
     )
     db.add(vs)
     await db.commit()
@@ -401,6 +472,18 @@ async def update_varset(
         vs.global_set = attrs["global"]
     if "priority" in attrs:
         vs.priority = attrs["priority"]
+    if "assignment-rule" in attrs:
+        vs.assignment_rule = _validated_assignment_rule(attrs)
+
+    # Validate the *resulting* state, not just the patch: a PATCH that only sets
+    # `global` on a set that already carries a rule reaches the contradiction
+    # without either field being newly invalid on its own.
+    if vs.global_set and vs.assignment_rule:
+        raise HTTPException(
+            status_code=422,
+            detail="A global variable set already applies to every workspace; "
+            "it cannot also carry an assignment-rule",
+        )
 
     await db.commit()
     await db.refresh(vs)
@@ -588,6 +671,79 @@ async def delete_varset_var(
 
 
 # ── Variable Set Workspace Assignments ───────────────────────────────────
+
+
+@native_router.get("/varsets/{varset_id}/relationships/workspaces")
+async def list_varset_workspaces(
+    varset_id: str,
+    request: Request,
+    user: AuthenticatedUser = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Which workspaces this variable set currently applies to, and why (#1440).
+
+    Read-only by design. An explicit assignment is edited through the existing
+    relationship endpoints; a global or rule-derived one has no per-workspace
+    thing to edit, and offering a delete that silently did nothing would be
+    worse than showing none.
+
+    This is the blast-radius view: for a set carrying a credential, "who
+    receives this" is a question an operator must be able to answer without
+    reading the rule and simulating it in their head. Before this there was no
+    GET on the relationship at all.
+    """
+    vs = await _get_varset(varset_id, db)
+
+    rows = await variable_service.workspaces_for_varset(db, vs)
+    items = [
+        {
+            "type": "workspaces",
+            "id": f"ws-{ws.id}",
+            "attributes": {"name": ws.name, "assignment-source": source},
+        }
+        for ws, source in rows
+    ]
+    page_items, meta = paginate(items, request)
+    return JSONResponse(content={"data": page_items, "meta": meta})
+
+
+@native_router.get("/workspaces/{workspace_id}/varsets")
+async def list_workspace_varsets(
+    workspace_id: str,
+    request: Request,
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Which variable sets apply to this workspace, and why (#1440).
+
+    The other half of the same question, and the one that answers "where did
+    this variable come from" — previously unanswerable from the workspace at
+    all.
+
+    Uses the same resolver as injection, so what is listed here is what the run
+    will actually receive.
+    """
+    ws = await _get_workspace(workspace_id, db)
+    caps = await resolve_workspace_capabilities_for(db, user, ws)
+    if not has_capability(caps, cap.WORKSPACE_READ):
+        raise HTTPException(status_code=404, detail="Workspace not found")
+
+    rows = await variable_service.applicable_varsets(db, ws.id)
+    items = [
+        {
+            "type": "varsets",
+            "id": f"varset-{vs.id}",
+            "attributes": {
+                "name": vs.name,
+                "priority": vs.priority,
+                "assignment-source": source,
+                "variable-count": len(vs.variables),
+            },
+        }
+        for vs, source in rows
+    ]
+    page_items, meta = paginate(items, request)
+    return JSONResponse(content={"data": page_items, "meta": meta})
 
 
 @router.post("/varsets/{varset_id}/relationships/workspaces", status_code=204)

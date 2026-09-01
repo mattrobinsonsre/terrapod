@@ -1394,6 +1394,15 @@ class VariableSet(Base):
     description: Mapped[str] = mapped_column(Text, nullable=False, default="")
     global_set: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     priority: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    #: Dynamic assignment (#1440): a `WorkspaceFilter` selecting which workspaces
+    #: this set applies to, evaluated per run, so a workspace created later is
+    #: picked up without anyone editing the set.
+    #:
+    #: NULL means the set uses explicit assignment or `global_set` — the two modes
+    #: that existed before. A set with only those could be assigned one workspace
+    #: at a time or to every workspace, and nothing in between, which pushed
+    #: operators toward `global_set` for convenience and widened blast radius.
+    assignment_rule: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=now_utc, nullable=False

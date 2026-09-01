@@ -910,7 +910,35 @@
         "deleteVar": "変数の削除に失敗しました",
         "addWorkspace": "ワークスペースの追加に失敗しました",
         "removeWorkspace": "ワークスペースの削除に失敗しました"
-      }
+      },
+      "assignedBy": "割り当て元",
+      "managedByRule": "ルールで管理",
+      "assignmentRule": "割り当てルール",
+      "assignmentRuleNone": "ルールはありません。ワークスペースは個別に割り当てられます。",
+      "assignmentRuleDescription": "このルールに一致するワークスペースはセットを自動的に受け取り、実行ごとに再評価されます。",
+      "source": {
+        "explicit": "割り当て済み",
+        "global": "グローバル",
+        "rule": "ルール"
+      },
+      "ruleLabels": "ラベル",
+      "ruleNamePrefix": "名前のプレフィックス",
+      "ruleNameGlob": "名前のパターン",
+      "ruleExecutionBackend": "実行バックエンド",
+      "ruleExecutionMode": "実行モード",
+      "ruleTerraformVersion": "バージョン",
+      "ruleOwnerEmail": "オーナー",
+      "ruleAgentPoolId": "エージェントプール",
+      "ruleVcsConnectionId": "VCS 接続",
+      "ruleDriftStatus": "ドリフト状態",
+      "ruleLocked": "ロック中",
+      "ruleHasVcs": "VCS 接続あり",
+      "ruleAny": "指定なし",
+      "ruleEmpty": "フィルターを 1 つ以上追加してください。空のルールは何にも一致しません。",
+      "rulePreview": "{count, plural, =0 {一致するワークスペースはありません} other {# 個のワークスペースに一致}}",
+      "rulePreviewLoading": "一致するワークスペースを確認しています…",
+      "rulePreviewInvalid": "このルールは確認できませんでした。保存時に具体的な問題が表示されます。",
+      "ruleConflictsWithGlobal": "グローバルの変数セットはすでに全ワークスペースに適用されるため、ルールは併用できません。"
     }
   },
   "adminAutodiscovery": {
@@ -2631,6 +2659,18 @@
       "architecture": "アーキテクチャ",
       "runTasks": "タスク",
       "runTriggers": "トリガー"
+    },
+    "applicableVarsets": {
+      "title": "変数セット",
+      "description": "このワークスペースに適用される変数セット。変数セット側で管理します。",
+      "loadError": "変数セットの読み込みに失敗しました",
+      "priority": "優先",
+      "variableCount": "{count, plural, other {# 個の変数}}",
+      "source": {
+        "explicit": "割り当て済み",
+        "global": "グローバル",
+        "rule": "ルールで一致"
+      }
     }
   },
   "graphs": {
