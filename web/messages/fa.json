@@ -910,7 +910,35 @@
         "deleteVar": "حذف متغیر ناموفق بود",
         "addWorkspace": "افزودن فضای کاری ناموفق بود",
         "removeWorkspace": "حذف فضای کاری ناموفق بود"
-      }
+      },
+      "assignedBy": "اختصاص‌یافته توسط",
+      "managedByRule": "مدیریت‌شده با قاعده",
+      "assignmentRule": "قاعده اختصاص",
+      "assignmentRuleNone": "قاعده‌ای وجود ندارد. فضاهای کاری یکی‌یکی اختصاص می‌یابند.",
+      "assignmentRuleDescription": "فضاهای کاری منطبق با این قاعده مجموعه را به‌طور خودکار دریافت می‌کنند و در هر اجرا دوباره ارزیابی می‌شود.",
+      "source": {
+        "explicit": "اختصاص‌یافته",
+        "global": "سراسری",
+        "rule": "قاعده"
+      },
+      "ruleLabels": "برچسب‌ها",
+      "ruleNamePrefix": "پیشوند نام",
+      "ruleNameGlob": "الگوی نام",
+      "ruleExecutionBackend": "موتور اجرا",
+      "ruleExecutionMode": "حالت اجرا",
+      "ruleTerraformVersion": "نسخه",
+      "ruleOwnerEmail": "مالک",
+      "ruleAgentPoolId": "استخر عامل",
+      "ruleVcsConnectionId": "اتصال VCS",
+      "ruleDriftStatus": "وضعیت انحراف",
+      "ruleLocked": "قفل‌شده",
+      "ruleHasVcs": "متصل به VCS",
+      "ruleAny": "هر کدام",
+      "ruleEmpty": "حداقل یک فیلتر اضافه کنید — قاعده خالی با چیزی مطابقت ندارد.",
+      "rulePreview": "{count, plural, =0 {با هیچ فضای کاری مطابقت ندارد} other {با # فضای کاری مطابقت دارد}}",
+      "rulePreviewLoading": "در حال بررسی فضاهای کاری منطبق…",
+      "rulePreviewInvalid": "بررسی این قاعده ممکن نبود. ذخیره‌سازی مشکل دقیق را گزارش می‌دهد.",
+      "ruleConflictsWithGlobal": "مجموعه سراسری از پیش بر همه فضاهای کاری اعمال می‌شود، بنابراین نمی‌توان قاعده‌ای با آن به‌کار برد."
     }
   },
   "adminAutodiscovery": {
@@ -2631,6 +2659,18 @@
       "architecture": "معماری",
       "runTasks": "وظایف",
       "runTriggers": "محرک‌ها"
+    },
+    "applicableVarsets": {
+      "title": "مجموعه‌های متغیر",
+      "description": "مجموعه‌های متغیری که بر این فضای کاری اعمال می‌شوند. آن‌ها را از خود مجموعه مدیریت کنید.",
+      "loadError": "بارگذاری مجموعه‌های متغیر ناموفق بود",
+      "priority": "اولویت",
+      "variableCount": "{count, plural, one {# متغیر} other {# متغیر}}",
+      "source": {
+        "explicit": "اختصاص‌یافته",
+        "global": "سراسری",
+        "rule": "مطابق قاعده"
+      }
     }
   },
   "graphs": {

@@ -910,7 +910,35 @@
         "deleteVar": "Falha ao eliminar a variável",
         "addWorkspace": "Falha ao adicionar o workspace",
         "removeWorkspace": "Falha ao remover o workspace"
-      }
+      },
+      "assignedBy": "Atribuído por",
+      "managedByRule": "Gerido por regra",
+      "assignmentRule": "Regra de atribuição",
+      "assignmentRuleNone": "Sem regra. As áreas de trabalho são atribuídas uma a uma.",
+      "assignmentRuleDescription": "As áreas de trabalho que correspondem a esta regra recebem o conjunto automaticamente, reavaliado em cada execução.",
+      "source": {
+        "explicit": "Atribuído",
+        "global": "Global",
+        "rule": "Regra"
+      },
+      "ruleLabels": "Etiquetas",
+      "ruleNamePrefix": "Prefixo do nome",
+      "ruleNameGlob": "Padrão do nome",
+      "ruleExecutionBackend": "Backend de execução",
+      "ruleExecutionMode": "Modo de execução",
+      "ruleTerraformVersion": "Versão",
+      "ruleOwnerEmail": "Proprietário",
+      "ruleAgentPoolId": "Conjunto de agentes",
+      "ruleVcsConnectionId": "Ligação VCS",
+      "ruleDriftStatus": "Estado de desvio",
+      "ruleLocked": "Bloqueado",
+      "ruleHasVcs": "Ligado ao VCS",
+      "ruleAny": "Qualquer",
+      "ruleEmpty": "Adicione pelo menos um filtro — uma regra vazia não corresponde a nada.",
+      "rulePreview": "{count, plural, =0 {Não corresponde a nenhuma área de trabalho} one {Corresponde a # área de trabalho} other {Corresponde a # áreas de trabalho}}",
+      "rulePreviewLoading": "A verificar que áreas de trabalho correspondem…",
+      "rulePreviewInvalid": "Não foi possível verificar esta regra. Ao guardar, o problema exato será indicado.",
+      "ruleConflictsWithGlobal": "Um conjunto global já se aplica a todas as áreas de trabalho, pelo que não aceita uma regra."
     }
   },
   "adminAutodiscovery": {
@@ -2631,6 +2659,18 @@
       "architecture": "Arquitetura",
       "runTasks": "Tarefas",
       "runTriggers": "Gatilhos"
+    },
+    "applicableVarsets": {
+      "title": "Conjuntos de variáveis",
+      "description": "Conjuntos de variáveis aplicados a esta área de trabalho. Faça a gestão no próprio conjunto.",
+      "loadError": "Falha ao carregar os conjuntos de variáveis",
+      "priority": "Prioridade",
+      "variableCount": "{count, plural, one {# variável} other {# variáveis}}",
+      "source": {
+        "explicit": "Atribuído",
+        "global": "Global",
+        "rule": "Correspondeu à regra"
+      }
     }
   },
   "graphs": {

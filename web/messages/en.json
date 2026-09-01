@@ -910,7 +910,35 @@
         "deleteVar": "Failed to delete variable",
         "addWorkspace": "Failed to add workspace",
         "removeWorkspace": "Failed to remove workspace"
-      }
+      },
+      "assignedBy": "Assigned by",
+      "managedByRule": "Managed by rule",
+      "assignmentRule": "Assignment rule",
+      "assignmentRuleNone": "No rule. Workspaces are assigned one by one.",
+      "assignmentRuleDescription": "Workspaces matching this rule receive the set automatically, re-evaluated on every run.",
+      "source": {
+        "explicit": "Assigned",
+        "global": "Global",
+        "rule": "Rule"
+      },
+      "ruleLabels": "Labels",
+      "ruleNamePrefix": "Name prefix",
+      "ruleNameGlob": "Name pattern",
+      "ruleExecutionBackend": "Execution backend",
+      "ruleExecutionMode": "Execution mode",
+      "ruleTerraformVersion": "Version",
+      "ruleOwnerEmail": "Owner",
+      "ruleAgentPoolId": "Agent pool",
+      "ruleVcsConnectionId": "VCS connection",
+      "ruleDriftStatus": "Drift status",
+      "ruleLocked": "Locked",
+      "ruleHasVcs": "VCS-connected",
+      "ruleAny": "Any",
+      "ruleEmpty": "Add at least one filter — an empty rule matches nothing.",
+      "rulePreview": "{count, plural, =0 {Matches no workspaces} one {Matches # workspace} other {Matches # workspaces}}",
+      "rulePreviewLoading": "Checking which workspaces match…",
+      "rulePreviewInvalid": "This rule could not be checked. Save will report the exact problem.",
+      "ruleConflictsWithGlobal": "A global set already applies to every workspace, so a rule cannot be used with it."
     }
   },
   "adminAutodiscovery": {
@@ -2631,6 +2659,18 @@
       "stateActionFailed": "State action failed",
       "uploadState": "Failed to upload state",
       "uploadStateFile": "Failed to upload state file"
+    },
+    "applicableVarsets": {
+      "title": "Variable sets",
+      "description": "Variable sets that apply to this workspace. Manage them from the variable set itself.",
+      "loadError": "Failed to load variable sets",
+      "priority": "Priority",
+      "variableCount": "{count, plural, one {# variable} other {# variables}}",
+      "source": {
+        "explicit": "Assigned",
+        "global": "Global",
+        "rule": "Matched by rule"
+      }
     }
   },
   "graphs": {

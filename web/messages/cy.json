@@ -910,7 +910,35 @@
         "deleteVar": "Methwyd dileu'r newidyn",
         "addWorkspace": "Methwyd ychwanegu'r weithfan",
         "removeWorkspace": "Methwyd tynnu'r weithfan"
-      }
+      },
+      "assignedBy": "Neilltuwyd gan",
+      "managedByRule": "Rheolir gan reol",
+      "assignmentRule": "Rheol neilltuo",
+      "assignmentRuleNone": "Dim rheol. Neilltuir gweithfannau fesul un.",
+      "assignmentRuleDescription": "Mae gweithfannau sy'n cydweddu â'r rheol hon yn cael y set yn awtomatig, wedi'i hailasesu ym mhob rhediad.",
+      "source": {
+        "explicit": "Neilltuwyd",
+        "global": "Byd-eang",
+        "rule": "Rheol"
+      },
+      "ruleLabels": "Labeli",
+      "ruleNamePrefix": "Rhagddodiad enw",
+      "ruleNameGlob": "Patrwm enw",
+      "ruleExecutionBackend": "Peiriant gweithredu",
+      "ruleExecutionMode": "Modd gweithredu",
+      "ruleTerraformVersion": "Fersiwn",
+      "ruleOwnerEmail": "Perchennog",
+      "ruleAgentPoolId": "Pwll asiantau",
+      "ruleVcsConnectionId": "Cysylltiad VCS",
+      "ruleDriftStatus": "Statws drifft",
+      "ruleLocked": "Wedi'i gloi",
+      "ruleHasVcs": "Cysylltiedig â VCS",
+      "ruleAny": "Unrhyw",
+      "ruleEmpty": "Ychwanegwch o leiaf un hidlydd — nid yw rheol wag yn cydweddu â dim.",
+      "rulePreview": "{count, plural, =0 {Nid yw'n cydweddu ag unrhyw weithfan} one {Yn cydweddu â # gweithfan} two {Yn cydweddu â # weithfan} few {Yn cydweddu â # gweithfan} many {Yn cydweddu â # gweithfan} other {Yn cydweddu â # gweithfan}}",
+      "rulePreviewLoading": "Yn gwirio pa weithfannau sy'n cydweddu…",
+      "rulePreviewInvalid": "Ni ellid gwirio'r rheol hon. Bydd cadw yn nodi'r union broblem.",
+      "ruleConflictsWithGlobal": "Mae set fyd-eang eisoes yn berthnasol i bob gweithfan, felly ni ellir defnyddio rheol gyda hi."
     }
   },
   "adminAutodiscovery": {
@@ -2631,6 +2659,18 @@
       "architecture": "Pensaernïaeth",
       "runTasks": "Tasgau",
       "runTriggers": "Sbardunau"
+    },
+    "applicableVarsets": {
+      "title": "Setiau Newidynnau",
+      "description": "Setiau newidynnau sy'n berthnasol i'r gweithfan hwn. Rheolwch nhw o'r set ei hun.",
+      "loadError": "Methwyd â llwytho'r setiau newidynnau",
+      "priority": "Blaenoriaeth",
+      "variableCount": "{count, plural, one {# newidyn} two {# newidyn} few {# newidyn} many {# newidyn} other {# newidyn}}",
+      "source": {
+        "explicit": "Neilltuwyd",
+        "global": "Byd-eang",
+        "rule": "Cydweddu yn ôl rheol"
+      }
     }
   },
   "graphs": {

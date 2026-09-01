@@ -910,7 +910,35 @@
         "deleteVar": "فشل حذف المتغير",
         "addWorkspace": "فشل إضافة مساحة العمل",
         "removeWorkspace": "فشل إزالة مساحة العمل"
-      }
+      },
+      "assignedBy": "مُعيَّن بواسطة",
+      "managedByRule": "يُدار بواسطة قاعدة",
+      "assignmentRule": "قاعدة التعيين",
+      "assignmentRuleNone": "لا توجد قاعدة. تُعيَّن مساحات العمل واحدة تلو الأخرى.",
+      "assignmentRuleDescription": "تتلقى مساحات العمل المطابقة لهذه القاعدة المجموعة تلقائيًا، ويُعاد تقييمها في كل تشغيل.",
+      "source": {
+        "explicit": "مُعيَّن",
+        "global": "عام",
+        "rule": "قاعدة"
+      },
+      "ruleLabels": "التسميات",
+      "ruleNamePrefix": "بادئة الاسم",
+      "ruleNameGlob": "نمط الاسم",
+      "ruleExecutionBackend": "محرك التنفيذ",
+      "ruleExecutionMode": "وضع التنفيذ",
+      "ruleTerraformVersion": "الإصدار",
+      "ruleOwnerEmail": "المالك",
+      "ruleAgentPoolId": "مجموعة الوكلاء",
+      "ruleVcsConnectionId": "اتصال VCS",
+      "ruleDriftStatus": "حالة الانحراف",
+      "ruleLocked": "مقفل",
+      "ruleHasVcs": "متصل بـ VCS",
+      "ruleAny": "أي",
+      "ruleEmpty": "أضف مرشحًا واحدًا على الأقل — القاعدة الفارغة لا تطابق شيئًا.",
+      "rulePreview": "{count, plural, =0 {لا يطابق أي مساحة عمل} one {يطابق مساحة عمل واحدة} two {يطابق مساحتي عمل} few {يطابق # مساحات عمل} many {يطابق # مساحة عمل} other {يطابق # مساحة عمل}}",
+      "rulePreviewLoading": "جارٍ التحقق من مساحات العمل المطابقة…",
+      "rulePreviewInvalid": "تعذر التحقق من هذه القاعدة. سيبلغ الحفظ عن المشكلة بدقة.",
+      "ruleConflictsWithGlobal": "تنطبق المجموعة العامة بالفعل على كل مساحات العمل، لذا لا يمكن استخدام قاعدة معها."
     }
   },
   "adminAutodiscovery": {
@@ -2631,6 +2659,18 @@
       "architecture": "المعمارية",
       "runTasks": "المهام",
       "runTriggers": "المُشغّلات"
+    },
+    "applicableVarsets": {
+      "title": "مجموعات المتغيرات",
+      "description": "مجموعات المتغيرات التي تنطبق على مساحة العمل هذه. أدرها من المجموعة نفسها.",
+      "loadError": "فشل تحميل مجموعات المتغيرات",
+      "priority": "الأولوية",
+      "variableCount": "{count, plural, zero {# متغير} one {متغير واحد} two {متغيران} few {# متغيرات} many {# متغيرًا} other {# متغير}}",
+      "source": {
+        "explicit": "مُعيَّن",
+        "global": "عام",
+        "rule": "مطابق للقاعدة"
+      }
     }
   },
   "graphs": {

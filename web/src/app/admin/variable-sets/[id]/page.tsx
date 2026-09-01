@@ -1,12 +1,13 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { useRouter, useParams } from 'next/navigation'
+import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import Link from 'next/link'
 import NavBar from '@/components/nav-bar'
 import { PageHeader } from '@/components/page-header'
 import { LoadingSpinner } from '@/components/loading-spinner'
+import { AssignmentRuleEditor, AssignmentRuleSummary, type AssignmentRule } from '@/components/assignment-rule-editor'
 import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
 import { SensitiveValueInput } from '@/components/sensitive-value-input'
@@ -23,6 +24,8 @@ interface VarsetAttrs {
   'var-count': number
   'workspace-count': number
   'created-at': string
+  /** Workspace selector (#1440). Null when membership is assigned by hand. */
+  'assignment-rule'?: Record<string, unknown> | null
 }
 
 interface Varset {
@@ -46,10 +49,13 @@ interface WorkspaceRef {
   id: string
   attributes: {
     name: string
+    /** How the set came to apply (#1440). Only 'explicit' is unbindable here. */
+    'assignment-source'?: 'explicit' | 'global' | 'rule'
   }
 }
 
 type Tab = 'settings' | 'variables' | 'workspaces'
+const VALID_TABS: Set<string> = new Set(['settings', 'variables', 'workspaces'])
 
 export default function VariableSetDetailPage() {
   const router = useRouter()
@@ -62,7 +68,16 @@ export default function VariableSetDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
-  const [activeTab, setActiveTab] = useState<Tab>('settings')
+  // Tab state lives in the URL, not component state, so a tab survives reload,
+  // back, and a shared deep link. It was `useState`-only, which silently sent
+  // every `?tab=` link to Settings (#1440).
+  const searchParams = useSearchParams()
+  const tabParam = searchParams.get('tab') || 'settings'
+  const activeTab: Tab = VALID_TABS.has(tabParam) ? (tabParam as Tab) : 'settings'
+
+  function setActiveTab(tab: Tab) {
+    router.replace(`?tab=${tab}`, { scroll: false })
+  }
 
   // Settings editing
   const [editing, setEditing] = useState(false)
@@ -70,6 +85,7 @@ export default function VariableSetDetailPage() {
   const [editDesc, setEditDesc] = useState('')
   const [editGlobal, setEditGlobal] = useState(false)
   const [editPriority, setEditPriority] = useState(false)
+  const [editRule, setEditRule] = useState<AssignmentRule | null>(null)
   const [saving, setSaving] = useState(false)
 
   // Delete varset
@@ -145,12 +161,20 @@ export default function VariableSetDetailPage() {
   async function loadWorkspaces() {
     setWsLoading(true)
     try {
-      // Varset show response may include workspace relationships
-      // Re-fetch varset to get workspace list
-      const res = await apiFetch(`/api/v2/varsets/${varsetId}`)
-      if (!res.ok) throw new Error(t('detail.errors.loadWorkspaces'))
-      const data = await res.json()
-      setWorkspaces(data.data?.relationships?.workspaces?.data || [])
+      // The association view (#1440), not the varset's own relationships block.
+      // The latter carries only explicitly-assigned rows, so a rule-based set
+      // rendered as "no workspaces" — the opposite of the truth. A global set
+      // is skipped because the banner above already states the complete answer,
+      // and listing an entire estate to repeat it is not worth the round trips.
+      if (varset?.attributes.global) {
+        setWorkspaces([])
+        return
+      }
+      setWorkspaces(
+        await fetchAllPages<WorkspaceRef>(
+          `/api/terrapod/v1/varsets/${varsetId}/relationships/workspaces`,
+        ),
+      )
     } catch (err) {
       setError(err instanceof Error ? err.message : t('detail.errors.loadWorkspaces'))
     } finally {
@@ -173,6 +197,7 @@ export default function VariableSetDetailPage() {
     setEditDesc(varset.attributes.description || '')
     setEditGlobal(varset.attributes.global)
     setEditPriority(varset.attributes.priority)
+    setEditRule((varset.attributes['assignment-rule'] as AssignmentRule) ?? null)
     setEditing(true)
   }
 
@@ -196,7 +221,12 @@ export default function VariableSetDetailPage() {
           },
         }),
       })
-      if (!res.ok) throw new Error(t('detail.errors.update'))
+      if (!res.ok) {
+        // The rule validation messages say exactly what is wrong with a filter;
+        // replacing them with a generic "update failed" would waste them.
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.detail || t('detail.errors.update'))
+      }
       const data = await res.json()
       setVarset(data.data)
       setEditing(false)
@@ -468,6 +498,30 @@ export default function VariableSetDetailPage() {
                   )}
                 </div>
               </dl>
+
+              {/* The rule (#1440): editable in edit mode, read-only otherwise.
+                  A global set applies everywhere already, so a rule alongside it
+                  is a contradiction the server rejects — the editor is disabled
+                  rather than offering a combination that cannot be saved. */}
+              {editing ? (
+                <AssignmentRuleEditor
+                  rule={editRule}
+                  onChange={setEditRule}
+                  disabled={editGlobal}
+                />
+              ) : (
+                <div className="mt-4 pt-4 border-t border-slate-700/50">
+                  <dt className="text-xs text-slate-500">{t('detail.assignmentRule')}</dt>
+                  {varset.attributes['assignment-rule'] ? (
+                    <>
+                      <p className="mt-1 text-xs text-slate-500">{t('detail.assignmentRuleDescription')}</p>
+                      <AssignmentRuleSummary rule={varset.attributes['assignment-rule'] as AssignmentRule} />
+                    </>
+                  ) : (
+                    <dd className="mt-1 text-sm text-slate-400">{t('detail.assignmentRuleNone')}</dd>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="bg-slate-800/50 rounded-lg border border-red-900/30 p-6">
@@ -690,6 +744,7 @@ export default function VariableSetDetailPage() {
                   <thead>
                     <tr className="border-b border-slate-700/50">
                       <th className="px-4 py-3 text-start text-xs font-medium text-slate-400 uppercase tracking-wider">{t('detail.workspace')}</th>
+                      <th className="px-4 py-3 text-start text-xs font-medium text-slate-400 uppercase tracking-wider">{t('detail.assignedBy')}</th>
                       <th className="px-4 py-3 text-end text-xs font-medium text-slate-400 uppercase tracking-wider">{t('detail.actions')}</th>
                     </tr>
                   </thead>
@@ -701,8 +756,25 @@ export default function VariableSetDetailPage() {
                             {ws.attributes?.name || ws.id}
                           </Link>
                         </td>
+                        <td className="px-4 py-3">
+                          <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                            (ws.attributes?.['assignment-source'] ?? 'explicit') === 'rule'
+                              ? 'bg-violet-900/40 text-violet-300'
+                              : 'bg-slate-700 text-slate-200'
+                          }`}>
+                            {t(`detail.source.${ws.attributes?.['assignment-source'] ?? 'explicit'}`)}
+                          </span>
+                        </td>
                         <td className="px-4 py-3 text-end">
-                          <button onClick={() => handleRemoveWorkspace(ws.id)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300 transition-colors">{t('detail.remove')}</button>
+                          {/* Only an explicit binding can be removed here. A
+                              rule-matched workspace has no row to delete — the
+                              rule is edited on the Settings tab — so offering a
+                              Remove that silently did nothing would mislead. */}
+                          {(ws.attributes?.['assignment-source'] ?? 'explicit') === 'explicit' ? (
+                            <button onClick={() => handleRemoveWorkspace(ws.id)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300 transition-colors">{t('detail.remove')}</button>
+                          ) : (
+                            <span className="text-xs text-slate-500">{t('detail.managedByRule')}</span>
+                          )}
                         </td>
                       </tr>
                     ))}

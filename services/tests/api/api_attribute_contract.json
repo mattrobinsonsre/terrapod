@@ -862,6 +862,7 @@
     "version-id"
   ],
   "variables._varset_json": [
+    "assignment-rule",
     "created-at",
     "description",
     "global",
@@ -882,6 +883,16 @@
     "updated-at",
     "value",
     "version-id"
+  ],
+  "variables.list_varset_workspaces": [
+    "assignment-source",
+    "name"
+  ],
+  "variables.list_workspace_varsets": [
+    "assignment-source",
+    "name",
+    "priority",
+    "variable-count"
   ],
   "vcs_connections._connection_json": [
     "budget-window-seconds",

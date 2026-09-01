@@ -1,6 +1,7 @@
 package terrapod
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -157,5 +158,160 @@ func TestDeleteVariableSet(t *testing.T) {
 	c, _ := newVarsetFixture(t)
 	if err := c.DeleteVariableSet(t.Context(), "varset-aaa"); err != nil {
 		t.Error(err)
+	}
+}
+
+// ── Association views (#1440) ────────────────────────────────────────
+
+func TestListVarsetWorkspacesCarriesTheSource(t *testing.T) {
+	// The source is the point of the endpoint, not decoration: it tells a
+	// consumer which rows it may offer to unbind and which are derived.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/terrapod/v1/varsets/varset-1/relationships/workspaces" {
+			t.Errorf("unexpected path %q", r.URL.Path)
+		}
+		_, _ = w.Write([]byte(`{"data":[
+			{"id":"ws-a","type":"workspaces","attributes":{"name":"alpha","assignment-source":"explicit"}},
+			{"id":"ws-b","type":"workspaces","attributes":{"name":"beta","assignment-source":"rule"}}
+		]}`))
+	}))
+	defer srv.Close()
+
+	got, err := mustClient(t, srv).ListVarsetWorkspaces(context.Background(), "varset-1")
+	if err != nil {
+		t.Fatalf("ListVarsetWorkspaces: %v", err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("want 2 workspaces, got %d", len(got))
+	}
+	if got[0].AssignmentSource != AssignmentExplicit || got[1].AssignmentSource != AssignmentRuleBased {
+		t.Errorf("sources not carried through: %+v", got)
+	}
+	if got[1].Name != "beta" {
+		t.Errorf("name not carried through: %+v", got[1])
+	}
+}
+
+func TestListWorkspaceVarsetsCarriesTheSource(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/terrapod/v1/workspaces/ws-1/varsets" {
+			t.Errorf("unexpected path %q", r.URL.Path)
+		}
+		_, _ = w.Write([]byte(`{"data":[
+			{"id":"varset-x","type":"varsets","attributes":{
+				"name":"prod-creds","priority":true,"variable-count":3,"assignment-source":"global"}}
+		]}`))
+	}))
+	defer srv.Close()
+
+	got, err := mustClient(t, srv).ListWorkspaceVarsets(context.Background(), "ws-1")
+	if err != nil {
+		t.Fatalf("ListWorkspaceVarsets: %v", err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("want 1 varset, got %d", len(got))
+	}
+	if got[0].AssignmentSource != AssignmentGlobal || got[0].VariableCount != 3 || !got[0].Priority {
+		t.Errorf("attributes not carried through: %+v", got[0])
+	}
+}
+
+func TestVariableSetParsesANestedAssignmentRule(t *testing.T) {
+	// A rule is a nested object, which the flat map[string]string accessor
+	// cannot represent — so this would silently come back nil if the wrong
+	// accessor were used, and the set would look unassigned.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"data":{"id":"varset-1","type":"varsets","attributes":{
+			"name":"prod","assignment-rule":{"labels":{"env":"prod"}}}}}`))
+	}))
+	defer srv.Close()
+
+	vs, err := mustClient(t, srv).GetVariableSet(context.Background(), "varset-1")
+	if err != nil {
+		t.Fatalf("GetVariableSet: %v", err)
+	}
+	labels, ok := vs.AssignmentRule["labels"].(map[string]any)
+	if !ok || labels["env"] != "prod" {
+		t.Fatalf("nested rule lost in parsing: %#v", vs.AssignmentRule)
+	}
+}
+
+func mustClient(t *testing.T, srv *httptest.Server) *Client {
+	t.Helper()
+	c, err := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+	return c
+}
+
+func TestUpdateAttrsDistinguishesLeaveAloneFromClear(t *testing.T) {
+	// The pointer indirection is the whole mechanism: nil means "do not touch
+	// the rule", a pointer to a nil map means "remove it". Collapsing the two
+	// would make a rule impossible to clear once set — it would silently keep
+	// matching workspaces after the operator removed it.
+	if attrs := varsetUpdateAttrs(UpdateVariableSetRequest{Name: "x"}); attrs["assignment-rule"] != nil {
+		t.Errorf("an omitted rule must not appear in the payload at all: %v", attrs)
+	}
+	if _, present := varsetUpdateAttrs(UpdateVariableSetRequest{Name: "x"})["assignment-rule"]; present {
+		t.Error("an omitted rule must be absent, not present-and-null")
+	}
+
+	var cleared map[string]any
+	attrs := varsetUpdateAttrs(UpdateVariableSetRequest{Name: "x", AssignmentRule: &cleared})
+	if _, present := attrs["assignment-rule"]; !present {
+		t.Fatal("clearing must send the key so the server removes the rule")
+	}
+	// Asserted on the encoded body rather than the in-process value: a nil map
+	// is a non-nil `any` holding nil, so a Go nil-check here would fail while
+	// the wire — the only thing the server sees — is correct.
+	body, err := json.Marshal(attrs)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if !strings.Contains(string(body), `"assignment-rule":null`) {
+		t.Errorf("clearing must serialise to null, got %s", body)
+	}
+
+	set := map[string]any{"labels": map[string]string{"env": "prod"}}
+	attrs = varsetUpdateAttrs(UpdateVariableSetRequest{Name: "x", AssignmentRule: &set})
+	if attrs["assignment-rule"] == nil {
+		t.Error("a supplied rule must reach the payload")
+	}
+}
+
+func TestAssociationViewsSurfaceServerErrors(t *testing.T) {
+	// A failure here must not read as "this set reaches no workspaces" — that is
+	// the answer an operator would act on, and it would be the opposite of
+	// unknown.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`{"errors":[{"detail":"nope"}]}`))
+	}))
+	defer srv.Close()
+	c := mustClient(t, srv)
+
+	if _, err := c.ListVarsetWorkspaces(context.Background(), "varset-1"); err == nil {
+		t.Error("ListVarsetWorkspaces swallowed a 403")
+	}
+	if _, err := c.ListWorkspaceVarsets(context.Background(), "ws-1"); err == nil {
+		t.Error("ListWorkspaceVarsets swallowed a 403")
+	}
+}
+
+func TestGetObjectAttrIsNilSafe(t *testing.T) {
+	r := &Resource{Attributes: map[string]json.RawMessage{
+		"missing-is-nil": nil,
+		"null":           json.RawMessage(`null`),
+		"not-an-object":  json.RawMessage(`"a string"`),
+		"ok":             json.RawMessage(`{"a":1}`),
+	}}
+	for _, key := range []string{"absent", "missing-is-nil", "null", "not-an-object"} {
+		if got := GetObjectAttr(r, key); got != nil {
+			t.Errorf("%s: want nil, got %v", key, got)
+		}
+	}
+	if got := GetObjectAttr(r, "ok"); got == nil || got["a"] != float64(1) {
+		t.Errorf("ok: want the parsed object, got %v", got)
 	}
 }

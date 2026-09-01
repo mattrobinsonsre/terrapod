@@ -910,7 +910,35 @@
         "deleteVar": "Kan variabele niet verwijderen",
         "addWorkspace": "Kan workspace niet toevoegen",
         "removeWorkspace": "Kan workspace niet verwijderen"
-      }
+      },
+      "assignedBy": "Toegewezen door",
+      "managedByRule": "Beheerd via regel",
+      "assignmentRule": "Toewijzingsregel",
+      "assignmentRuleNone": "Geen regel. Workspaces worden één voor één toegewezen.",
+      "assignmentRuleDescription": "Workspaces die aan deze regel voldoen krijgen de set automatisch; dit wordt bij elke run opnieuw bepaald.",
+      "source": {
+        "explicit": "Toegewezen",
+        "global": "Globaal",
+        "rule": "Regel"
+      },
+      "ruleLabels": "Labels",
+      "ruleNamePrefix": "Naamprefix",
+      "ruleNameGlob": "Naampatroon",
+      "ruleExecutionBackend": "Uitvoeringsbackend",
+      "ruleExecutionMode": "Uitvoeringsmodus",
+      "ruleTerraformVersion": "Versie",
+      "ruleOwnerEmail": "Eigenaar",
+      "ruleAgentPoolId": "Agentpool",
+      "ruleVcsConnectionId": "VCS-verbinding",
+      "ruleDriftStatus": "Driftstatus",
+      "ruleLocked": "Vergrendeld",
+      "ruleHasVcs": "Met VCS verbonden",
+      "ruleAny": "Alle",
+      "ruleEmpty": "Voeg minstens één filter toe — een lege regel komt met niets overeen.",
+      "rulePreview": "{count, plural, =0 {Komt met geen enkele workspace overeen} one {Komt overeen met # workspace} other {Komt overeen met # workspaces}}",
+      "rulePreviewLoading": "Controleren welke workspaces overeenkomen…",
+      "rulePreviewInvalid": "Deze regel kon niet worden gecontroleerd. Bij opslaan wordt het precieze probleem gemeld.",
+      "ruleConflictsWithGlobal": "Een globale set geldt al voor elke workspace, dus een regel kan er niet bij."
     }
   },
   "adminAutodiscovery": {
@@ -2631,6 +2659,18 @@
       "architecture": "Architectuur",
       "runTasks": "Taken",
       "runTriggers": "Triggers"
+    },
+    "applicableVarsets": {
+      "title": "Variabelesets",
+      "description": "Variabelesets die op deze workspace van toepassing zijn. Beheer ze vanuit de set zelf.",
+      "loadError": "Laden van variabelesets mislukt",
+      "priority": "Prioriteit",
+      "variableCount": "{count, plural, one {# variabele} other {# variabelen}}",
+      "source": {
+        "explicit": "Toegewezen",
+        "global": "Globaal",
+        "rule": "Via regel gekoppeld"
+      }
     }
   },
   "graphs": {

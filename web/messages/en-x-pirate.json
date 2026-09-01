@@ -910,7 +910,35 @@
         "deleteVar": "Failed t'' send variable t'' Davy Jones",
         "addWorkspace": "Failed t'' add work-deck",
         "removeWorkspace": "Failed t'' remove work-deck"
-      }
+      },
+      "assignedBy": "Assigned by",
+      "managedByRule": "Commanded by the code",
+      "assignmentRule": "Assignment code",
+      "assignmentRuleNone": "No code. Work-decks be assigned one by one.",
+      "assignmentRuleDescription": "Work-decks matchin'' this code be given the set automatic-like, weighed anew on every voyage.",
+      "source": {
+        "explicit": "Assigned",
+        "global": "Global",
+        "rule": "Code"
+      },
+      "ruleLabels": "Markings",
+      "ruleNamePrefix": "Name prefix",
+      "ruleNameGlob": "Name pattern",
+      "ruleExecutionBackend": "Execution engine",
+      "ruleExecutionMode": "Execution mode",
+      "ruleTerraformVersion": "Version",
+      "ruleOwnerEmail": "Owner",
+      "ruleAgentPoolId": "Crew pool",
+      "ruleVcsConnectionId": "VCS mooring",
+      "ruleDriftStatus": "Drift status",
+      "ruleLocked": "Battened down",
+      "ruleHasVcs": "VCS-moored",
+      "ruleAny": "Any",
+      "ruleEmpty": "Add at least one filter — an empty code matches naught.",
+      "rulePreview": "{count, plural, =0 {Matches naught a work-deck} one {Matches # work-deck} other {Matches # work-decks}}",
+      "rulePreviewLoading": "Searchin'' which work-decks match…",
+      "rulePreviewInvalid": "This code could not be checked. Savin'' will report the exact trouble.",
+      "ruleConflictsWithGlobal": "A global set already applies t'' every work-deck, so no code can sail with it."
     }
   },
   "adminAutodiscovery": {
@@ -2631,6 +2659,18 @@
       "architecture": "Architecture",
       "runTasks": "Tasks",
       "runTriggers": "Triggers"
+    },
+    "applicableVarsets": {
+      "title": "Variable sets",
+      "description": "Variable sets that apply t'' this work-deck. Command 'em from the variable set itself.",
+      "loadError": "Failed t'' haul aboard the variable sets",
+      "priority": "Priority",
+      "variableCount": "{count, plural, one {# variable} other {# variables}}",
+      "source": {
+        "explicit": "Assigned",
+        "global": "Global",
+        "rule": "Matched by the code"
+      }
     }
   },
   "graphs": {

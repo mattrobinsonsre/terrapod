@@ -910,7 +910,35 @@
         "deleteVar": "删除变量失败",
         "addWorkspace": "添加工作区失败",
         "removeWorkspace": "移除工作区失败"
-      }
+      },
+      "assignedBy": "分配方式",
+      "managedByRule": "由规则管理",
+      "assignmentRule": "分配规则",
+      "assignmentRuleNone": "没有规则。工作区逐个分配。",
+      "assignmentRuleDescription": "匹配此规则的工作区会自动获得该变量集，并在每次运行时重新评估。",
+      "source": {
+        "explicit": "已分配",
+        "global": "全局",
+        "rule": "规则"
+      },
+      "ruleLabels": "标签",
+      "ruleNamePrefix": "名称前缀",
+      "ruleNameGlob": "名称匹配模式",
+      "ruleExecutionBackend": "执行引擎",
+      "ruleExecutionMode": "执行模式",
+      "ruleTerraformVersion": "版本",
+      "ruleOwnerEmail": "负责人",
+      "ruleAgentPoolId": "代理池",
+      "ruleVcsConnectionId": "VCS 连接",
+      "ruleDriftStatus": "漂移状态",
+      "ruleLocked": "已锁定",
+      "ruleHasVcs": "已连接 VCS",
+      "ruleAny": "任意",
+      "ruleEmpty": "请至少添加一个筛选条件——空规则不匹配任何工作区。",
+      "rulePreview": "{count, plural, =0 {未匹配任何工作区} other {匹配 # 个工作区}}",
+      "rulePreviewLoading": "正在检查匹配的工作区…",
+      "rulePreviewInvalid": "无法检查此规则。保存时会报告具体问题。",
+      "ruleConflictsWithGlobal": "全局变量集已应用于所有工作区，因此不能同时使用规则。"
     }
   },
   "adminAutodiscovery": {
@@ -2631,6 +2659,18 @@
       "architecture": "架构",
       "runTasks": "任务",
       "runTriggers": "触发器"
+    },
+    "applicableVarsets": {
+      "title": "变量集",
+      "description": "应用于此工作区的变量集。请在变量集中管理它们。",
+      "loadError": "加载变量集失败",
+      "priority": "优先",
+      "variableCount": "{count, plural, other {# 个变量}}",
+      "source": {
+        "explicit": "已分配",
+        "global": "全局",
+        "rule": "按规则匹配"
+      }
     }
   },
   "graphs": {

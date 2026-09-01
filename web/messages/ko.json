@@ -910,7 +910,35 @@
         "deleteVar": "변수를 삭제하지 못했습니다",
         "addWorkspace": "워크스페이스를 추가하지 못했습니다",
         "removeWorkspace": "워크스페이스를 제거하지 못했습니다"
-      }
+      },
+      "assignedBy": "할당 방식",
+      "managedByRule": "규칙으로 관리",
+      "assignmentRule": "할당 규칙",
+      "assignmentRuleNone": "규칙이 없습니다. 워크스페이스를 하나씩 할당합니다.",
+      "assignmentRuleDescription": "이 규칙과 일치하는 워크스페이스는 세트를 자동으로 받으며, 실행할 때마다 다시 평가됩니다.",
+      "source": {
+        "explicit": "할당됨",
+        "global": "전역",
+        "rule": "규칙"
+      },
+      "ruleLabels": "레이블",
+      "ruleNamePrefix": "이름 접두사",
+      "ruleNameGlob": "이름 패턴",
+      "ruleExecutionBackend": "실행 백엔드",
+      "ruleExecutionMode": "실행 모드",
+      "ruleTerraformVersion": "버전",
+      "ruleOwnerEmail": "소유자",
+      "ruleAgentPoolId": "에이전트 풀",
+      "ruleVcsConnectionId": "VCS 연결",
+      "ruleDriftStatus": "드리프트 상태",
+      "ruleLocked": "잠김",
+      "ruleHasVcs": "VCS 연결됨",
+      "ruleAny": "모두",
+      "ruleEmpty": "필터를 하나 이상 추가하세요. 빈 규칙은 아무것도 일치하지 않습니다.",
+      "rulePreview": "{count, plural, =0 {일치하는 워크스페이스가 없습니다} other {워크스페이스 #개와 일치}}",
+      "rulePreviewLoading": "일치하는 워크스페이스를 확인하는 중…",
+      "rulePreviewInvalid": "이 규칙을 확인할 수 없습니다. 저장하면 정확한 문제가 표시됩니다.",
+      "ruleConflictsWithGlobal": "전역 세트는 이미 모든 워크스페이스에 적용되므로 규칙과 함께 사용할 수 없습니다."
     }
   },
   "adminAutodiscovery": {
@@ -2631,6 +2659,18 @@
       "architecture": "아키텍처",
       "runTasks": "작업",
       "runTriggers": "트리거"
+    },
+    "applicableVarsets": {
+      "title": "변수 세트",
+      "description": "이 워크스페이스에 적용되는 변수 세트입니다. 변수 세트에서 관리하세요.",
+      "loadError": "변수 세트를 불러오지 못했습니다",
+      "priority": "우선순위",
+      "variableCount": "{count, plural, other {변수 #개}}",
+      "source": {
+        "explicit": "할당됨",
+        "global": "전역",
+        "rule": "규칙으로 일치"
+      }
     }
   },
   "graphs": {

@@ -22,14 +22,47 @@ type VariableSet struct {
 	WorkspaceCount int64  `json:"workspace-count"`
 	CreatedAt      string `json:"created-at,omitempty"`
 	UpdatedAt      string `json:"updated-at,omitempty"`
+
+	// AssignmentRule selects workspaces by their attributes rather than by
+	// explicit assignment (#1440). Nil means the set uses explicit assignment,
+	// or is Global. When set, WorkspaceCount above counts only the explicit
+	// rows and is not the whole picture — ListVarsetWorkspaces is.
+	AssignmentRule map[string]any `json:"assignment-rule,omitempty"`
+}
+
+// VarsetAssignmentSource records how a variable set came to apply to a
+// workspace. Only AssignmentExplicit is editable; the other two are derived, so
+// a consumer should present them read-only rather than offer an unbind that
+// would silently do nothing.
+const (
+	AssignmentExplicit  = "explicit"
+	AssignmentGlobal    = "global"
+	AssignmentRuleBased = "rule"
+)
+
+// VarsetWorkspace is one workspace a variable set applies to, with the reason.
+type VarsetWorkspace struct {
+	ID               string `json:"id"`
+	Name             string `json:"name"`
+	AssignmentSource string `json:"assignment-source"`
+}
+
+// WorkspaceVarset is one variable set applying to a workspace, with the reason.
+type WorkspaceVarset struct {
+	ID               string `json:"id"`
+	Name             string `json:"name"`
+	Priority         bool   `json:"priority"`
+	VariableCount    int64  `json:"variable-count"`
+	AssignmentSource string `json:"assignment-source"`
 }
 
 // CreateVariableSetRequest is the input shape for CreateVariableSet.
 type CreateVariableSetRequest struct {
-	Name        string
-	Description string
-	Global      bool
-	Priority    bool
+	Name           string
+	Description    string
+	Global         bool
+	Priority       bool
+	AssignmentRule map[string]any
 }
 
 // UpdateVariableSetRequest is the partial-update shape.
@@ -38,6 +71,9 @@ type UpdateVariableSetRequest struct {
 	Description *string
 	Global      *bool
 	Priority    *bool
+	// AssignmentRule is a pointer so a caller can distinguish "leave it alone"
+	// (nil) from "clear it" (a pointer to a nil map).
+	AssignmentRule *map[string]any
 }
 
 // CreateVariableSet creates a new variable set under the single
@@ -178,6 +214,9 @@ func varsetCreateAttrs(req CreateVariableSetRequest) map[string]any {
 	if req.Description != "" {
 		attrs["description"] = req.Description
 	}
+	if req.AssignmentRule != nil {
+		attrs["assignment-rule"] = req.AssignmentRule
+	}
 	return attrs
 }
 
@@ -194,6 +233,11 @@ func varsetUpdateAttrs(req UpdateVariableSetRequest) map[string]any {
 	}
 	if req.Priority != nil {
 		attrs["priority"] = *req.Priority
+	}
+	if req.AssignmentRule != nil {
+		// A pointer to a nil map clears the rule; the API reads JSON null as
+		// "no rule" rather than rejecting it.
+		attrs["assignment-rule"] = *req.AssignmentRule
 	}
 	return attrs
 }
@@ -217,5 +261,62 @@ func variableSetFromResource(res *Resource) *VariableSet {
 		WorkspaceCount: GetIntAttr(res, "workspace-count"),
 		CreatedAt:      GetStringAttr(res, "created-at"),
 		UpdatedAt:      GetStringAttr(res, "updated-at"),
+		AssignmentRule: GetObjectAttr(res, "assignment-rule"),
 	}
+}
+
+// ── Association views (read-only, #1440) ─────────────────────────────
+
+// ListVarsetWorkspaces returns every workspace a variable set currently applies
+// to, and how each came to apply.
+//
+// This is the blast-radius question — for a set carrying a credential, "who
+// receives this" — and it is not answerable from WorkspaceCount alone, which
+// counts only explicitly-assigned rows. A global or rule-based set applies to
+// workspaces that appear in no assignment table at all.
+func (c *Client) ListVarsetWorkspaces(ctx context.Context, varsetID string) ([]VarsetWorkspace, error) {
+	data, err := c.Get(ctx, fmt.Sprintf(
+		"/api/terrapod/v1/varsets/%s/relationships/workspaces", url.PathEscape(varsetID)))
+	if err != nil {
+		return nil, err
+	}
+	resources, err := ParseResourceList(data)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]VarsetWorkspace, 0, len(resources))
+	for i := range resources {
+		out = append(out, VarsetWorkspace{
+			ID:               resources[i].ID,
+			Name:             GetStringAttr(&resources[i], "name"),
+			AssignmentSource: GetStringAttr(&resources[i], "assignment-source"),
+		})
+	}
+	return out, nil
+}
+
+// ListWorkspaceVarsets returns every variable set applying to a workspace, and
+// how each came to apply — the inverse view, and the one that answers "where
+// did this variable come from" from the workspace's own side.
+func (c *Client) ListWorkspaceVarsets(ctx context.Context, workspaceID string) ([]WorkspaceVarset, error) {
+	data, err := c.Get(ctx, fmt.Sprintf(
+		"/api/terrapod/v1/workspaces/%s/varsets", url.PathEscape(workspaceID)))
+	if err != nil {
+		return nil, err
+	}
+	resources, err := ParseResourceList(data)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]WorkspaceVarset, 0, len(resources))
+	for i := range resources {
+		out = append(out, WorkspaceVarset{
+			ID:               resources[i].ID,
+			Name:             GetStringAttr(&resources[i], "name"),
+			Priority:         GetBoolAttr(&resources[i], "priority"),
+			VariableCount:    GetIntAttr(&resources[i], "variable-count"),
+			AssignmentSource: GetStringAttr(&resources[i], "assignment-source"),
+		})
+	}
+	return out, nil
 }

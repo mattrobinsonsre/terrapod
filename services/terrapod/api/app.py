@@ -1115,9 +1115,11 @@ def create_application() -> FastAPI:
     include_terrapod(cost_estimation_router)
 
     # Variable endpoints
+    from terrapod.api.routers.variables import native_router as variables_native_router
     from terrapod.api.routers.variables import router as variables_router
 
     app.include_router(variables_router)
+    include_terrapod(variables_native_router)
 
     # Agent pool endpoints — Terrapod-native management (pool CRUD,
     # token CRUD, listener-protocol). The CLI never manages pools, so
