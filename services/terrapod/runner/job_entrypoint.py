@@ -674,10 +674,17 @@ def _run_body(cfg: RunnerConfig, work_dir: Path) -> int:
     # per-run Secret into git config BEFORE init fetches modules — and before the
     # pre_init hooks, so operator hooks see them too. Log-safe by construction;
     # the returned env (GIT_CONFIG_GLOBAL, sshCommand) flows into init's environment
-    # since init_phase inherits os.environ. Advisory — a bad cred never fails a run.
+    # since init_phase inherits os.environ. A single malformed credential is still
+    # skipped, but credentials that cannot be applied at all fail the run (#1442).
     try:
         for _k, _v in git_auth.run().items():
             os.environ[_k] = _v
+    except git_auth.GitAuthUnavailable:
+        # Not advisory. Credentials were declared for this workspace and could
+        # not be applied, so init would fail later against a private module
+        # source with an error naming neither the credential nor the cause
+        # (#1442). Fail here, where the message is about the actual problem.
+        raise
     except Exception as exc:  # noqa: BLE001
         log.warning("git module auth setup skipped", error=str(exc))
 

@@ -16,6 +16,7 @@ import re
 import shutil
 import stat
 import subprocess
+from unittest.mock import patch
 
 import pytest
 
@@ -270,3 +271,86 @@ def test_load_absent_file_returns_empty(tmp_path):
 def test_run_no_file_is_noop(tmp_path, monkeypatch):
     monkeypatch.setattr(git_auth, "_GIT_AUTH_FILE", tmp_path / "absent.json")
     assert git_auth.run(base_dir=tmp_path / "cfg") == {}
+
+
+class TestFailuresAreNotSilent:
+    """#1442: materialisation failed on a read-only `$HOME`, was logged at
+    warning, and the run continued with no credentials at all.
+
+    `init` then failed minutes later against a private module source with an
+    error naming neither the credential nor the cause — and the log line above
+    it claimed auth had been configured. Every test here is about that gap
+    between "wrote a file" and "the run can authenticate".
+    """
+
+    def test_an_unwritable_base_dir_fails_the_run(self, tmp_path, monkeypatch) -> None:
+        """The exact reported failure: $HOME read-only under
+        `readOnlyRootFilesystem`, so nothing can be written."""
+        entries = [
+            {
+                "category": "git_http_auth",
+                "key": "github.com",
+                "value": '{"username":"x","token":"t"}',
+            }
+        ]
+        monkeypatch.setattr(git_auth, "_load", lambda: entries)
+
+        unwritable = tmp_path / "ro" / "nested"
+        with patch.object(git_auth, "configure", side_effect=OSError("Read-only file system")):
+            with pytest.raises(git_auth.GitAuthUnavailable) as e:
+                git_auth.run(base_dir=unwritable)
+
+        # The message must name the credential count and the path, or an
+        # operator is back to guessing.
+        assert "1 git credential" in str(e.value)
+        assert str(unwritable) in str(e.value)
+
+    def test_config_git_cannot_read_fails_the_run(self, tmp_path, monkeypatch) -> None:
+        """ "Wrote a file" is not "git reads it".
+
+        The original report's second symptom: a materially perfect gitconfig on
+        disk at a path git never consults.
+        """
+        entries = [
+            {
+                "category": "git_http_auth",
+                "key": "github.com",
+                "value": '{"username":"x","token":"t"}',
+            }
+        ]
+        monkeypatch.setattr(git_auth, "_load", lambda: entries)
+        monkeypatch.setattr(
+            git_auth, "configure", lambda e, base_dir: {"GIT_CONFIG_GLOBAL": "/nowhere/gitconfig"}
+        )
+
+        with pytest.raises(git_auth.GitAuthUnavailable, match="does not read"):
+            git_auth.run(base_dir=tmp_path)
+
+    def test_no_entries_is_still_silent(self, monkeypatch) -> None:
+        """A workspace declaring no credentials must be entirely unaffected."""
+        monkeypatch.setattr(git_auth, "_load", lambda: [])
+        assert git_auth.run() == {}
+
+    def test_a_real_write_verifies_end_to_end(self, tmp_path, monkeypatch) -> None:
+        """The happy path, through real git: config written, and git reads it."""
+        entries = [
+            {
+                "category": "git_http_auth",
+                "key": "github.com",
+                "value": '{"username":"x-access-token","token":"tok"}',
+            }
+        ]
+        monkeypatch.setattr(git_auth, "_load", lambda: entries)
+
+        env = git_auth.run(base_dir=tmp_path / "gitauth")
+
+        assert env["GIT_CONFIG_GLOBAL"]
+        listed = subprocess.run(
+            ["git", "config", "--global", "--list"],
+            env={**os.environ, **env},
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+        assert "credential.helper" in listed
+        assert "tok" not in listed, "the token must not live in gitconfig"
