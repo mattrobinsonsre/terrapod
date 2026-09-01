@@ -45,6 +45,7 @@ def _mock_var(key="region", value="us-east-1", sensitive=False, ws_id=None, var_
     var.sensitive = sensitive
     var.category = "terraform"
     var.hcl = False
+    var.value_source = "static"
     var.description = ""
     var.version_id = "abc123"
     var.created_at = datetime(2026, 1, 1, tzinfo=UTC)

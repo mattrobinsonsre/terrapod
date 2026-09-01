@@ -1287,6 +1287,11 @@ class Variable(Base):
         String(20), nullable=False, default="terraform"
     )  # "terraform" or "env"
     hcl: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    #: Where this variable's value comes from (#1439): "static" (the literal in
+    #: `value`) or "vault" (a reference resolved server-side at next_run). Kept
+    #: orthogonal to `category` so a Vault-backed variable stays an ordinary env
+    #: or terraform variable and inherits sets, scoping and precedence unchanged.
+    value_source: Mapped[str] = mapped_column(String(20), nullable=False, default="static")
     sensitive: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     version_id: Mapped[str] = mapped_column(String(64), nullable=False, default="")
 
@@ -1362,6 +1367,11 @@ class VariableSetVariable(Base):
     description: Mapped[str] = mapped_column(Text, nullable=False, default="")
     category: Mapped[str] = mapped_column(String(20), nullable=False, default="terraform")
     hcl: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    #: Where this variable's value comes from (#1439): "static" (the literal in
+    #: `value`) or "vault" (a reference resolved server-side at next_run). Kept
+    #: orthogonal to `category` so a Vault-backed variable stays an ordinary env
+    #: or terraform variable and inherits sets, scoping and precedence unchanged.
+    value_source: Mapped[str] = mapped_column(String(20), nullable=False, default="static")
     sensitive: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     version_id: Mapped[str] = mapped_column(String(64), nullable=False, default="")
 

@@ -40,6 +40,11 @@ from terrapod.db.models import (
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services import variable_service, workspace_search_service
+from terrapod.services.vault_source_service import (
+    VALUE_SOURCES,
+    VaultSourceError,
+    parse_reference,
+)
 from terrapod.services.workspace_rbac_service import (
     resolve_workspace_capabilities_for,
 )
@@ -59,6 +64,47 @@ def _rfc3339(dt) -> str:
     return dt.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def _visible_value(var) -> str | None:
+    """The value the API may return: masked when secret, shown when a reference."""
+    if var.value_source == "vault":
+        return var.value
+    return None if var.sensitive else var.value
+
+
+def _validated_value_source(attrs: dict, current: str = "static") -> str:
+    """Validate `value-source`, and the reference that must accompany `vault`.
+
+    Validated at write time rather than at run time so a malformed reference is
+    an error the operator sees now, not a run that fails hours later.
+    """
+    if "value-source" not in attrs:
+        return current
+    src = attrs["value-source"] or "static"
+    if src not in VALUE_SOURCES:
+        raise HTTPException(
+            status_code=422, detail=f"value-source must be one of {sorted(VALUE_SOURCES)}"
+        )
+    return src
+
+
+def _apply_value_source(attrs: dict, current: str = "static") -> tuple[str, bool]:
+    """Resolve `value-source` for a write and validate its reference.
+
+    Returns ``(value_source, force_sensitive)``. A vault-sourced variable is
+    always sensitive: what it resolves to is a secret, even though the reference
+    itself is not.
+    """
+    src = _validated_value_source(attrs, current)
+    if src != "vault":
+        return src, False
+    if "value" in attrs:
+        try:
+            parse_reference(attrs.get("value") or "", key=attrs.get("key", "<variable>"))
+        except VaultSourceError as e:
+            raise HTTPException(status_code=422, detail=str(e)) from e
+    return src, True
+
+
 def _var_json(var: Variable) -> dict:
     """Serialize a Variable to TFE V2 JSON:API format."""
     return {
@@ -66,10 +112,16 @@ def _var_json(var: Variable) -> dict:
         "type": "vars",
         "attributes": {
             "key": var.key,
-            "value": None if var.sensitive else var.value,
+            # A vault-sourced value is a *reference*, not a secret — the path you
+            # configured, which you need to be able to see. The secret it points
+            # at is resolved at run time and never persisted, returned or logged
+            # (#1439). Masking the reference would make the variable unreadable
+            # without hiding anything that is actually sensitive.
+            "value": _visible_value(var),
             "sensitive": var.sensitive,
             "category": var.category,
             "hcl": var.hcl,
+            "value-source": var.value_source,
             "description": var.description,
             "version-id": var.version_id,
             "created-at": _rfc3339(var.created_at),
@@ -138,6 +190,8 @@ async def create_workspace_var(
     if not key:
         raise HTTPException(status_code=422, detail="Variable key is required")
 
+    value_source, force_sensitive = _apply_value_source(attrs)
+
     try:
         var = await variable_service.create_variable(
             db,
@@ -147,7 +201,8 @@ async def create_workspace_var(
             category=attrs.get("category", "terraform"),
             description=attrs.get("description", ""),
             hcl=attrs.get("hcl", False),
-            sensitive=attrs.get("sensitive", False),
+            sensitive=force_sensitive or attrs.get("sensitive", False),
+            value_source=value_source,
         )
         await db.commit()
     except ValueError as e:
@@ -184,6 +239,7 @@ async def update_workspace_var(
     attrs = body.get("data", {}).get("attributes", {})
 
     try:
+        value_source, _force = _apply_value_source(attrs, var.value_source)
         var = await variable_service.update_variable(
             db,
             var,
@@ -193,6 +249,7 @@ async def update_workspace_var(
             description=attrs.get("description"),
             hcl=attrs.get("hcl"),
             sensitive=attrs.get("sensitive"),
+            value_source=value_source,
         )
         await db.commit()
     except ValueError as e:
