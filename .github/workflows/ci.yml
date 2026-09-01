@@ -2793,7 +2793,7 @@ jobs:
 
   release-finalize:
     name: Release — Finalize (notes + chart + SBOMs)
-    needs: [prepare, release-create, release-images, release-provider, release-migrate, release-publish, release-query, release-mcp]
+    needs: [prepare, helm-eval-boot, release-create, release-images, release-provider, release-migrate, release-publish, release-query, release-mcp]
     if: |
       always()
       && needs.prepare.outputs.is_tag == 'true'
@@ -2804,6 +2804,7 @@ jobs:
       && needs.release-publish.result == 'success'
       && needs.release-query.result == 'success'
       && needs.release-mcp.result == 'success'
+      && (needs.helm-eval-boot.result == 'success' || needs.helm-eval-boot.result == 'skipped')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -2910,11 +2911,11 @@ jobs:
   # ── Cleanup Tag on Failure ─────────────────────────────
   cleanup-tag:
     name: Cleanup Tag
-    needs: [prepare, quality-gate, build-images-amd64, build-images-arm64, build-query, scan-images, create-manifests, release-create, release-images, release-provider, release-migrate, release-publish, release-query, release-mcp, release-finalize]
+    needs: [prepare, quality-gate, helm-eval-boot, build-images-amd64, build-images-arm64, build-query, scan-images, create-manifests, release-create, release-images, release-provider, release-migrate, release-publish, release-query, release-mcp, release-finalize]
     if: |
       always()
       && needs.prepare.outputs.is_tag == 'true'
-      && (needs.quality-gate.result == 'failure' || needs.build-images-amd64.result == 'failure' || needs.build-images-arm64.result == 'failure' || needs.build-query.result == 'failure' || needs.scan-images.result == 'failure' || needs.create-manifests.result == 'failure' || needs.release-create.result == 'failure' || needs.release-images.result == 'failure' || needs.release-provider.result == 'failure' || needs.release-migrate.result == 'failure' || needs.release-publish.result == 'failure' || needs.release-query.result == 'failure' || needs.release-mcp.result == 'failure' || needs.release-finalize.result == 'failure')
+      && (needs.quality-gate.result == 'failure' || needs.helm-eval-boot.result == 'failure' || needs.build-images-amd64.result == 'failure' || needs.build-images-arm64.result == 'failure' || needs.build-query.result == 'failure' || needs.scan-images.result == 'failure' || needs.create-manifests.result == 'failure' || needs.release-create.result == 'failure' || needs.release-images.result == 'failure' || needs.release-provider.result == 'failure' || needs.release-migrate.result == 'failure' || needs.release-publish.result == 'failure' || needs.release-query.result == 'failure' || needs.release-mcp.result == 'failure' || needs.release-finalize.result == 'failure')
     runs-on: ubuntu-latest
     permissions:
       contents: write
