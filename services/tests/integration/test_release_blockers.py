@@ -9,15 +9,81 @@ and none of these was visible to any contract snapshot.
 
 import json
 import uuid
+from unittest.mock import AsyncMock, patch
 
 import pytest
+from sqlalchemy import select
 
-from terrapod.db.models import VariableSet, VariableSetWorkspace
+from terrapod.db.models import (
+    ConfigurationVersion,
+    Run,
+    VariableSet,
+    VariableSetWorkspace,
+    Workspace,
+)
 from terrapod.db.session import get_db_session
 from terrapod.services import variable_service
-from tests.integration.conftest import AUTH, admin_user, set_auth
+from tests.integration.conftest import AUTH, admin_user, set_auth, set_listener_auth
 
 pytestmark = pytest.mark.integration
+
+
+async def _pool_with_listener(client, tag: str):
+    """A real pool + join token + joined listener via the actual endpoints."""
+    resp = await client.post(
+        "/api/terrapod/v1/agent-pools",
+        json={"data": {"type": "agent-pools", "attributes": {"name": f"blk-pool-{tag}"}}},
+        headers=AUTH,
+    )
+    pool_id = resp.json()["data"]["id"]
+    tok = await client.post(
+        f"/api/terrapod/v1/agent-pools/{pool_id}/tokens",
+        json={"data": {"attributes": {"description": "t"}}},
+        headers=AUTH,
+    )
+    joined = await client.post(
+        f"/api/terrapod/v1/agent-pools/{pool_id}/listeners/join",
+        json={"join_token": tok.json()["data"]["attributes"]["token"], "name": f"l-{tag}"},
+    )
+    return pool_id, joined.json()["data"]["listener_id"]
+
+
+async def _agent_run_with_vault_var(client, tag: str, pool_id: str):
+    """An agent workspace with a vault variable, a CV, and a queued run."""
+    from terrapod.services import pool_set, run_service
+
+    ws_id = await _ws(client, f"blk-{tag}", **{"execution-mode": "agent"})
+    ref = json.dumps({"mount": "secret", "path": "apps/x", "field": "token"})
+    await client.post(
+        f"/api/v2/workspaces/{ws_id}/vars",
+        json={
+            "data": {
+                "type": "vars",
+                "attributes": {
+                    "key": "TOK",
+                    "category": "env",
+                    "value-source": "vault",
+                    "value": ref,
+                },
+            }
+        },
+        headers=AUTH,
+    )
+    async with get_db_session() as db:
+        ws = (
+            await db.execute(
+                select(Workspace).where(Workspace.id == uuid.UUID(ws_id.removeprefix("ws-")))
+            )
+        ).scalar_one()
+        pool_set.set_workspace_pools(ws, [uuid.UUID(pool_id.removeprefix("apool-"))])
+        cv = ConfigurationVersion(workspace_id=ws.id, status="uploaded", source="tfe-api")
+        db.add(cv)
+        await db.flush()
+        run = await run_service.create_run(db, ws, configuration_version_id=cv.id)
+        run = await run_service.transition_run(db, run, "queued")
+        await db.commit()
+        return ws_id, cv.id, run.id
+
 
 WS_ENDPOINT = "/api/v2/organizations/default/workspaces"
 VARSET_ENDPOINT = "/api/v2/organizations/default/varsets"
@@ -660,3 +726,255 @@ class TestTheSelectorNarrowingIsScoped:
         assert resp.status_code == 422, (
             f"{blank} builds no WHERE clause — on bulk-update it would mutate the estate"
         )
+
+
+class TestATransientVaultFailureDoesNotDestroyTheRun:
+    """A 30-second Vault restart and a malformed reference are not the same
+    thing, and were being treated identically.
+
+    Erroring the run on a connection-class failure means an operator re-queues
+    by hand after every Vault blip — and because the listener stops its drain
+    pass on the 204, one broken run took the rest of the batch with it.
+    """
+
+    async def test_an_unreachable_vault_leaves_the_run_queued(self, app, client):
+        from terrapod.config import VaultInstanceConfig, settings
+        from terrapod.services.vault_client import VaultUnavailable
+
+        set_auth(app, admin_user())
+        tag = uuid.uuid4().hex[:8]
+        pool_id, listener_id = await _pool_with_listener(client, tag)
+        ws_id, cv_id, run_id = await _agent_run_with_vault_var(client, tag, pool_id)
+        set_listener_auth(app, listener_id, pool_id.removeprefix("apool-"))
+
+        prior = (settings.vault.enabled, settings.vault.instances)
+        settings.vault.enabled = True
+        settings.vault.instances = [
+            VaultInstanceConfig(name="default", default=True, address="https://vault.test:8200")
+        ]
+        try:
+            with patch(
+                "terrapod.services.vault_source_service.read_secret",
+                new=AsyncMock(side_effect=VaultUnavailable("connection refused")),
+            ):
+                resp = await client.get(f"/api/terrapod/v1/listeners/{listener_id}/runs/next")
+        finally:
+            settings.vault.enabled, settings.vault.instances = prior
+
+        assert resp.status_code == 204, resp.text
+        async with get_db_session() as db:
+            final = (await db.execute(select(Run).where(Run.id == run_id))).scalar_one()
+        assert final.status == "queued", (
+            f"a transient Vault failure destroyed the run (status={final.status}); "
+            "it should wait for the next claim"
+        )
+
+    async def test_a_permanent_failure_still_errors_the_run(self, app, client):
+        """The relaxation must not swallow a reference that will never resolve."""
+        from terrapod.config import VaultInstanceConfig, settings
+        from terrapod.services.vault_client import VaultError
+
+        set_auth(app, admin_user())
+        tag = uuid.uuid4().hex[:8]
+        pool_id, listener_id = await _pool_with_listener(client, tag)
+        ws_id, cv_id, run_id = await _agent_run_with_vault_var(client, tag, pool_id)
+        set_listener_auth(app, listener_id, pool_id.removeprefix("apool-"))
+
+        prior = (settings.vault.enabled, settings.vault.instances)
+        settings.vault.enabled = True
+        settings.vault.instances = [
+            VaultInstanceConfig(name="default", default=True, address="https://vault.test:8200")
+        ]
+        try:
+            with patch(
+                "terrapod.services.vault_source_service.read_secret",
+                new=AsyncMock(side_effect=VaultError("Vault denied 'secret/apps/x'")),
+            ):
+                resp = await client.get(f"/api/terrapod/v1/listeners/{listener_id}/runs/next")
+        finally:
+            settings.vault.enabled, settings.vault.instances = prior
+
+        assert resp.status_code == 204
+        async with get_db_session() as db:
+            final = (await db.execute(select(Run).where(Run.id == run_id))).scalar_one()
+        assert final.status == "errored"
+
+
+class TestFlippingAwayFromVault:
+    """A vault→static flip left the JSON reference in place as the literal
+    value, and the runner then delivered `{"mount":...}` to terraform as the
+    credential. Silent, and symmetric with the flip the other way."""
+
+    async def test_flipping_to_static_requires_a_replacement_value(self, app, client):
+        set_auth(app, admin_user())
+        tag = uuid.uuid4().hex[:8]
+        ws_id = await _ws(client, f"unflip-{tag}", **{"execution-mode": "agent"})
+        ref = json.dumps({"mount": "secret", "path": "apps/x", "field": "token"})
+        created = await client.post(
+            f"/api/v2/workspaces/{ws_id}/vars",
+            json={
+                "data": {
+                    "type": "vars",
+                    "attributes": {
+                        "key": "TOK",
+                        "category": "env",
+                        "value-source": "vault",
+                        "value": ref,
+                    },
+                }
+            },
+            headers=AUTH,
+        )
+        var_id = created.json()["data"]["id"]
+
+        resp = await client.patch(
+            f"/api/v2/workspaces/{ws_id}/vars/{var_id}",
+            json={"data": {"type": "vars", "attributes": {"value-source": "static"}}},
+            headers=AUTH,
+        )
+        assert resp.status_code == 422, (
+            "the reference would have been delivered to terraform as the value"
+        )
+
+    async def test_flipping_to_static_with_a_value_works(self, app, client):
+        set_auth(app, admin_user())
+        tag = uuid.uuid4().hex[:8]
+        ws_id = await _ws(client, f"unflip2-{tag}", **{"execution-mode": "agent"})
+        ref = json.dumps({"mount": "secret", "path": "apps/x", "field": "token"})
+        created = await client.post(
+            f"/api/v2/workspaces/{ws_id}/vars",
+            json={
+                "data": {
+                    "type": "vars",
+                    "attributes": {
+                        "key": "TOK",
+                        "category": "env",
+                        "value-source": "vault",
+                        "value": ref,
+                    },
+                }
+            },
+            headers=AUTH,
+        )
+        resp = await client.patch(
+            f"/api/v2/workspaces/{ws_id}/vars/{created.json()['data']['id']}",
+            json={
+                "data": {
+                    "type": "vars",
+                    "attributes": {"value-source": "static", "value": "a-real-value"},
+                }
+            },
+            headers=AUTH,
+        )
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["data"]["attributes"]["value-source"] == "static"
+
+
+class TestSwitchingAWorkspaceToLocalExecution:
+    """The create-time refusal was bypassable by creating on agent and then
+    switching the workspace to local."""
+
+    async def test_it_is_refused_while_vault_variables_exist(self, app, client):
+        set_auth(app, admin_user())
+        tag = uuid.uuid4().hex[:8]
+        ws_id = await _ws(client, f"switch-{tag}", **{"execution-mode": "agent"})
+        ref = json.dumps({"mount": "secret", "path": "apps/x", "field": "token"})
+        await client.post(
+            f"/api/v2/workspaces/{ws_id}/vars",
+            json={
+                "data": {
+                    "type": "vars",
+                    "attributes": {
+                        "key": "TOK",
+                        "category": "env",
+                        "value-source": "vault",
+                        "value": ref,
+                    },
+                }
+            },
+            headers=AUTH,
+        )
+
+        resp = await client.patch(
+            f"/api/v2/workspaces/{ws_id}",
+            json={"data": {"type": "workspaces", "attributes": {"execution-mode": "local"}}},
+            headers=AUTH,
+        )
+        assert resp.status_code == 422, "switching to local silently strands the vault variable"
+        assert "vault" in resp.json()["detail"].lower()
+
+
+class TestNarrowedLabelReservations:
+    """Seven reservations were released in v1.6.0 (#1450).
+
+    They were held on the reasoning that reserving costs nothing — but only
+    `status` was ever implemented as a virtual filter term, so the rest refused
+    the label *and* gave the filter nothing in return. These are the words
+    people reach for when labelling a workspace.
+    """
+
+    @pytest.mark.parametrize(
+        "key",
+        ["pool", "mode", "backend", "drift", "version", "vcs", "locked", "branch"],
+    )
+    async def test_a_released_key_is_usable_as_a_label(self, app, client, key):
+        set_auth(app, admin_user())
+        resp = await client.post(
+            WS_ENDPOINT,
+            json={
+                "data": {
+                    "type": "workspaces",
+                    "attributes": {
+                        "name": f"rel-{key}-{uuid.uuid4().hex[:8]}",
+                        "labels": {key: "x"},
+                    },
+                }
+            },
+            headers=AUTH,
+        )
+        assert resp.status_code == 201, resp.text
+        assert resp.json()["data"]["attributes"]["labels"][key] == "x"
+
+    @pytest.mark.parametrize("key", ["status", "owner"])
+    async def test_the_remaining_reservations_still_hold(self, app, client, key):
+        """Both survivors mislead about a real decision if used as a label:
+        `status` is the sole built-in filter term (`status:errored` would be
+        ambiguous), and `owner` maps to `owner_email`, which grants admin."""
+        set_auth(app, admin_user())
+        resp = await client.post(
+            WS_ENDPOINT,
+            json={
+                "data": {
+                    "type": "workspaces",
+                    "attributes": {
+                        "name": f"res-{key}-{uuid.uuid4().hex[:8]}",
+                        "labels": {key: "x"},
+                    },
+                }
+            },
+            headers=AUTH,
+        )
+        assert resp.status_code == 422, resp.text
+
+    async def test_a_released_key_works_in_an_assignment_rule(self, app, client):
+        """The point of releasing them: they become usable for the label-based
+        targeting that is Terrapod's answer to grouping."""
+        set_auth(app, admin_user())
+        tag = uuid.uuid4().hex[:8]
+        ws_id = await _ws(client, f"relrule-{tag}", labels={"version": tag})
+        vs = await client.post(
+            VARSET_ENDPOINT,
+            json={
+                "data": {
+                    "type": "varsets",
+                    "attributes": {
+                        "name": f"relvs-{tag}",
+                        "assignment-rule": {"labels": {"version": tag}},
+                    },
+                }
+            },
+            headers=AUTH,
+        )
+        assert vs.status_code == 201, vs.text
+        resp = await client.get(f"/api/terrapod/v1/workspaces/{ws_id}/varsets", headers=AUTH)
+        assert vs.json()["data"]["id"] in {v["id"] for v in resp.json()["data"]}
