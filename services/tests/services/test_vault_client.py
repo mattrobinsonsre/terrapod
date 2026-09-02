@@ -395,3 +395,37 @@ class TestErrorsDoNotEchoVaultResponseBodies:
             await read_secret(_inst(), mount="kvv2", path="a", field="k", static_token="t")
         assert "nobody should relay" not in str(e.value)
         assert "500" in str(e.value), "the status is still needed to diagnose it"
+
+
+class TestTraversalGuardCoversEncodedForms:
+    """A raw segment check misses `%2e%2e`, which is decoded downstream — the
+    same check-one-path-send-another mismatch by another spelling."""
+
+    @pytest.mark.parametrize(
+        ("mount", "path"),
+        [
+            ("kvv2", "apps/%2e%2e/sys"),  # encoded ..
+            ("kvv2", "apps/..%2fsys"),  # encoded separator
+            ("kv%2fv2", "apps/x"),  # encoding in the MOUNT half
+            ("kvv2", "apps/x#frag"),
+            ("kvv2", "apps/x?a=b"),
+        ],
+    )
+    @pytest.mark.asyncio
+    async def test_encoded_and_illegal_forms_never_reach_vault(self, mount, path):
+        rec = _Recorder([])
+        with _patched(rec), pytest.raises(VaultError, match="traversal|illegal"):
+            await read_secret(_inst(), mount=mount, path=path, field="k", static_token="t")
+        assert rec.seen == [], "a malformed reference reached Vault"
+
+    @pytest.mark.asyncio
+    async def test_an_ordinary_path_is_untouched(self):
+        """The guard must not reject the paths people actually use."""
+        rec = _Recorder([(200, {"data": {"data": {"k": "v"}}})])
+        with _patched(rec):
+            assert (
+                await read_secret(
+                    _inst(), mount="kvv2", path="apps/team-a/netbox_v2", field="k", static_token="t"
+                )
+                == "v"
+            )

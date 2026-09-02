@@ -28,6 +28,7 @@ from __future__ import annotations
 import asyncio
 import time
 from pathlib import Path
+from urllib.parse import unquote
 
 import httpx
 import structlog
@@ -156,24 +157,35 @@ async def _login(inst: VaultInstanceConfig, static_token: str | None) -> str:
 
 
 def _reject_traversal(mount: str, path: str) -> None:
-    """Refuse dot segments and anything that could re-target the request.
+    """Refuse anything that could re-target the request.
 
     httpx resolves ``..`` when it builds the URL, so a reference of
     ``apps/../../sys/mounts`` is checked as one path and sent as another — the
-    allow-list would be guarding a path Vault never receives. Rejected whether
-    or not an allow-list is configured, because a traversal reference is
+    allow-list would be guarding a path Vault never receives.
+
+    Checked on the decoded form too: a percent-encoded ``%2e%2e`` survives a raw
+    segment check untouched and is decoded downstream, which is the same
+    mismatch by another spelling. Percent signs are refused outright rather than
+    decoded-and-hoped-about, because a literal ``%`` has no place in a mount or
+    path and allowing it means reasoning about double-encoding.
+
+    Applied whether or not an allow-list is configured: a traversal reference is
     malformed regardless, and the default configuration must not be the
     permissive one.
     """
+    illegal = ("?", "#", "%", "\\")
     for part in (mount, path):
-        segments = part.split("/")
-        if any(seg in (".", "..") for seg in segments):
-            raise VaultError(
-                f"vault reference {mount}/{path!r} contains a path traversal "
-                "segment; give the literal mount and path"
-            )
-        if any(c in part for c in ("?", "#", "\\")):
-            raise VaultError(f"vault reference {mount}/{path!r} contains an illegal character")
+        for candidate in (part, unquote(part)):
+            if any(seg in (".", "..") for seg in candidate.split("/")):
+                raise VaultError(
+                    f"vault reference {mount}/{path!r} contains a path traversal "
+                    "segment; give the literal mount and path"
+                )
+            if any(c in candidate for c in illegal):
+                raise VaultError(
+                    f"vault reference {mount}/{path!r} contains an illegal "
+                    "character; give the literal mount and path"
+                )
 
 
 def _check_allowed(inst: VaultInstanceConfig, read_path: str) -> None:
@@ -190,7 +202,13 @@ def _check_allowed(inst: VaultInstanceConfig, read_path: str) -> None:
         return
     target = read_path.strip("/").split("/")
     for prefix in inst.paths:
-        want = prefix.strip("/").split("/")
+        stripped = prefix.strip("/")
+        if not stripped:
+            # "" and "/" meant "no restriction" before segment matching, and an
+            # operator who wrote `paths: ["/"]` to mean that would otherwise
+            # find every Vault read in the deployment refused after upgrading.
+            return
+        want = stripped.split("/")
         if target[: len(want)] == want:
             return
     raise VaultError(

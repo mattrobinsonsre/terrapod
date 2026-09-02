@@ -118,21 +118,29 @@ def _apply_value_source(attrs: dict, current: str = "static") -> tuple[str, bool
     src = _validated_value_source(attrs, current)
     if src != "vault":
         return src, False
-    if "value" not in attrs:
-        # A value-less flip to vault left the previous literal in place, and the
-        # reference-is-not-a-secret display rule then returned it — so a write
-        # capability became a read-back of a stored secret. Requiring the
-        # reference closes that and is what the operator meant anyway.
+    if "value" in attrs:
+        # Whenever a value is supplied on a vault-sourced variable it must be a
+        # valid reference — including on an existing one, or a PATCH could
+        # replace a good reference with anything.
+        try:
+            parse_reference(attrs.get("value") or "", key=attrs.get("key", "<variable>"))
+        except VaultSourceError as e:
+            raise HTTPException(status_code=422, detail=str(e)) from e
+    elif current != "vault":
+        # A *transition* to vault must carry the reference. Without this, a
+        # value-less flip left the previous literal in place and the
+        # reference-is-not-a-secret display rule then returned it — a write
+        # capability became a read-back of a stored secret.
+        #
+        # Only on the transition: a variable already sourced from vault is
+        # edited for its key, description or category without resupplying the
+        # reference, and requiring one there broke every partial update.
         raise HTTPException(
             status_code=422,
             detail="value-source 'vault' requires a reference in `value` "
             '(for example {"mount":"secret","path":"apps/x","field":"token"}); '
             "supply one rather than converting an existing value in place",
         )
-    try:
-        parse_reference(attrs.get("value") or "", key=attrs.get("key", "<variable>"))
-    except VaultSourceError as e:
-        raise HTTPException(status_code=422, detail=str(e)) from e
     return src, True
 
 
@@ -730,16 +738,21 @@ async def update_varset_var(
     supplied = _structured_from(attrs)
     if supplied is not None:
         vsv.structured = supplied
-    if "value-source" in attrs:
-        vsv.value_source, force_sensitive = _apply_value_source(attrs, vsv.value_source)
-        if force_sensitive:
-            vsv.sensitive = True
+    # Always run it, not only when the caller sends `value-source`: a PATCH that
+    # supplies a new `value` on an existing vault variable must still have that
+    # value validated as a reference.
+    vsv.value_source, _vault_forced = _apply_value_source(attrs, vsv.value_source)
     was_sensitive = vsv.sensitive
     if "value" in attrs:
         vsv.value = attrs["value"]
         vsv.version_id = variable_service._version_hash(vsv.key, attrs["value"], vsv.category)
     # git-auth categories are always secret and can never be downgraded.
-    force_sensitive = vsv.category in variable_service.GIT_AUTH_CATEGORIES
+    # `or value_source == "vault"` matches variable_service.update_variable.
+    # Omitting it let a PATCH carrying `sensitive: false` downgrade a
+    # vault-sourced varset variable, whose resolved value is always a secret.
+    force_sensitive = (
+        vsv.category in variable_service.GIT_AUTH_CATEGORIES or vsv.value_source == "vault"
+    )
     if force_sensitive:
         vsv.sensitive = True
     elif "sensitive" in attrs:
