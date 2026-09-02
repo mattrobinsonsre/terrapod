@@ -28,7 +28,7 @@ import json
 import structlog
 
 from terrapod.config import Settings
-from terrapod.services.vault_client import read_secret
+from terrapod.services.vault_client import VaultUnavailable, read_secret
 
 logger = structlog.get_logger("vault_source")
 
@@ -39,6 +39,15 @@ VALUE_SOURCES = {VALUE_SOURCE_STATIC, VALUE_SOURCE_VAULT}
 
 class VaultSourceError(RuntimeError):
     """A vault-sourced variable could not be resolved. Fails the run."""
+
+
+class VaultTransient(VaultSourceError):
+    """Vault was unreachable. The run is left queued rather than failed.
+
+    A subclass so a caller that only knows about VaultSourceError still behaves
+    safely — it fails the run, which is the conservative outcome — while a
+    caller that knows the difference can wait instead.
+    """
 
 
 def parse_reference(raw: str, *, key: str) -> dict:
@@ -118,6 +127,16 @@ async def resolve_vault_variables(resolved: list, settings: Settings) -> dict[st
                 timeout=cfg.timeout_seconds,
                 static_token=_secret_for(inst.name),
             )
+        except VaultUnavailable as e:
+            # Transient: the reference is fine, Vault is not answering. Signal
+            # it distinctly so the caller can leave the run queued rather than
+            # destroy it over a restart.
+            logger.warning(
+                "vault is unavailable; leaving the run for a later claim",
+                key=v.key,
+                instance=inst.name,
+            )
+            raise VaultTransient(f"variable {v.key!r}: {e}") from e
         except Exception as e:
             # Deliberately broad. VaultError is the expected shape, but anything
             # escaping here reaches the run dispatcher as a 500 and leaves the
