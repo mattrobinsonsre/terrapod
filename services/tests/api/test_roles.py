@@ -981,3 +981,78 @@ class TestCapabilityAuthoring:
         assert cap.WORKSPACE_DELETE not in caps
         # Workspace axis stays non-preset → derived summary is "custom".
         assert attrs["workspace-permission"] == "custom"
+
+
+# ── Role reach preview (#1456) ─────────────────────────────────────────
+
+
+class TestRoleReachPreviewGate:
+    """The router-tier contract for the preview endpoints: who may call them,
+    and what a bad request gets. The reach calculation itself is exercised
+    against a real database in tests/integration/test_role_reach.py — it turns
+    on JSONB containment, which a mocked session cannot prove anything about.
+    """
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_unsaved_preview_refuses_a_non_admin_non_audit(self, *mocks):
+        user = _user(roles=["everyone"])
+        app, _ = _make_app(user)
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/terrapod/v1/roles/preview",
+                json={"data": {"attributes": {"name": "x", "allow-labels": {"env": ["prod"]}}}},
+                headers=_AUTH,
+            )
+        assert resp.status_code == 403
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_saved_preview_refuses_a_non_admin_non_audit(self, *mocks):
+        user = _user(roles=["everyone"])
+        app, _ = _make_app(user)
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get("/api/terrapod/v1/roles/anything/preview", headers=_AUTH)
+        assert resp.status_code == 403
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_a_builtin_role_is_refused_before_any_query(self, *mocks):
+        """422 rather than an answer: `admin` grants through the platform path
+        on every workspace, so a label-reach figure for it would be true and
+        misleading. Refused ahead of the DB lookup, so it holds even though
+        built-ins have no row."""
+        user = _user(roles=["admin"])
+        app, _ = _make_app(user)
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get("/api/terrapod/v1/roles/admin/preview", headers=_AUTH)
+        assert resp.status_code == 422
+        assert "built-in" in resp.json()["detail"]
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_audit_may_preview(self, *mocks):
+        """Read-only: the result reveals nothing a role listing plus a workspace
+        listing would not, so it carries the same gate as viewing roles."""
+        user = _user(roles=["audit"])
+        app, mock_db = _make_app(user)
+        mock_db.scalar = AsyncMock(return_value=0)
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.all.return_value = []
+        mock_db.execute.return_value = mock_result
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/terrapod/v1/roles/preview",
+                json={"data": {"attributes": {"name": "x", "allow-labels": {"env": ["prod"]}}}},
+                headers=_AUTH,
+            )
+        assert resp.status_code == 200
+        assert resp.json()["data"]["attributes"]["granted-count"] == 0

@@ -24,7 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from terrapod.auth import capabilities as cap
 from terrapod.auth.builtin_roles import BUILTIN_ROLE_NAMES
 from terrapod.db.models import Role
-from terrapod.services.rbac_service import matches_labels, merge_labels
+from terrapod.services.rbac_service import first_matching_label, merge_labels
 
 if TYPE_CHECKING:
     from terrapod.api.dependencies import AuthenticatedUser
@@ -37,6 +37,49 @@ def role_effective_capabilities(role: Role) -> frozenset[str]:
     of truth; the migration back-fills it and create/update expand the level
     shorthand into it). Normalised (aliases upgraded)."""
     return frozenset(cap.normalize_capabilities(role.capabilities))
+
+
+#: Verdicts from ``role_match_verdict``. A role either has no rule reaching the
+#: resource, is excluded by a deny rule, or is allowed.
+MATCH_NONE = "none"
+MATCH_DENIED = "denied"
+MATCH_ALLOWED = "allowed"
+
+
+def role_match_verdict(
+    role: Role, resource_name: str, resource_labels: dict, *, unscoped: bool = False
+) -> tuple[str, str]:
+    """The deny-then-allow gate, with the reason it landed where it did.
+
+    Returns ``(verdict, reason)`` where verdict is one of MATCH_NONE /
+    MATCH_DENIED / MATCH_ALLOWED and reason is a short machine-readable string
+    naming the rule responsible (``deny-name``, ``allow-label:env=prod``, …) or
+    ``""`` when nothing matched.
+
+    ``_role_matches`` is a thin wrapper over this, so enforcement and the
+    role-reach preview cannot disagree: there is one gate, and the preview
+    reads its reasoning rather than recomputing it.
+
+    See ``_role_matches`` for the meaning of ``unscoped``.
+    """
+    deny_labels: dict[str, set[str]] = {}
+    merge_labels(deny_labels, role.deny_labels)
+    if resource_name in set(role.deny_names):
+        return MATCH_DENIED, "deny-name"
+    hit = first_matching_label(resource_labels, deny_labels)
+    if hit is not None:
+        return MATCH_DENIED, f"deny-label:{hit[0]}={hit[1]}"
+
+    allow_labels: dict[str, set[str]] = {}
+    merge_labels(allow_labels, role.allow_labels)
+    if resource_name in set(role.allow_names):
+        return MATCH_ALLOWED, "allow-name"
+    hit = first_matching_label(resource_labels, allow_labels)
+    if hit is not None:
+        return MATCH_ALLOWED, f"allow-label:{hit[0]}={hit[1]}"
+    if unscoped and not role.allow_names and not allow_labels:
+        return MATCH_ALLOWED, "unscoped"
+    return MATCH_NONE, ""
 
 
 def _role_matches(
@@ -65,20 +108,8 @@ def _role_matches(
     That is why the unscoped grant is deliberately narrow: it is all-or-nothing
     by construction.
     """
-    deny_labels: dict[str, set[str]] = {}
-    merge_labels(deny_labels, role.deny_labels)
-    if resource_name in set(role.deny_names):
-        return False
-    if matches_labels(resource_labels, deny_labels):
-        return False
-
-    allow_labels: dict[str, set[str]] = {}
-    merge_labels(allow_labels, role.allow_labels)
-    if resource_name in set(role.allow_names):
-        return True
-    if matches_labels(resource_labels, allow_labels):
-        return True
-    return unscoped and not role.allow_names and not allow_labels
+    verdict, _ = role_match_verdict(role, resource_name, resource_labels, unscoped=unscoped)
+    return verdict == MATCH_ALLOWED
 
 
 async def resolve_capabilities(

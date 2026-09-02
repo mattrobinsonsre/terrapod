@@ -125,6 +125,25 @@ def merge_labels(target: dict[str, set[str]], source: dict) -> None:
             target[key].add(values)
 
 
+def first_matching_label(
+    resource_labels: dict, permission_labels: dict[str, set[str]]
+) -> tuple[str, str] | None:
+    """The first (key, value) pair by which a resource matches a label rule,
+    or None if it does not match.
+
+    Exists so a caller that must EXPLAIN a match (the role-reach preview) reads
+    the same pass/fail as the caller that merely enforces it. A second matcher
+    written for the explanation would be free to drift from this one, and a
+    permissions view that disagrees with enforcement is worse than no view.
+    """
+    for perm_key, perm_values in permission_labels.items():
+        if perm_key in resource_labels:
+            resource_value = resource_labels[perm_key]
+            if resource_value in perm_values:
+                return perm_key, resource_value
+    return None
+
+
 def matches_labels(resource_labels: dict, permission_labels: dict[str, set[str]]) -> bool:
     """
     Check if resource labels match any permission label pattern.
@@ -132,12 +151,7 @@ def matches_labels(resource_labels: dict, permission_labels: dict[str, set[str]]
     A match occurs when any permission label key exists in resource labels
     and the resource's value for that key is in the permission's allowed values.
     """
-    for perm_key, perm_values in permission_labels.items():
-        if perm_key in resource_labels:
-            resource_value = resource_labels[perm_key]
-            if resource_value in perm_values:
-                return True
-    return False
+    return first_matching_label(resource_labels, permission_labels) is not None
 
 
 # Keep underscore aliases for backwards compatibility within this module

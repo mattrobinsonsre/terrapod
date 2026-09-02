@@ -11,6 +11,8 @@ Endpoints:
     GET    /api/terrapod/v1/roles/{name}        — show role
     PATCH  /api/terrapod/v1/roles/{name}        — update custom role
     DELETE /api/terrapod/v1/roles/{name}        — delete custom role
+    POST   /api/terrapod/v1/roles/preview       — reach of an UNSAVED role body
+    GET    /api/terrapod/v1/roles/{name}/preview — reach of a saved role
 """
 
 from datetime import UTC
@@ -35,6 +37,7 @@ from terrapod.auth.capabilities import (
 from terrapod.db.models import Role
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
+from terrapod.services import role_reach_service
 
 router = APIRouter(tags=["roles"])
 logger = get_logger(__name__)
@@ -312,3 +315,105 @@ async def delete_role(
     await db.commit()
 
     logger.info("Role deleted", role=role_name)
+
+
+def _role_from_attrs(attrs: dict) -> Role:
+    """A transient Role from a request body, for previewing an UNSAVED rule.
+
+    Never added to the session. Built through the same validation the create
+    path uses, so a preview cannot accept a rule that a save would reject —
+    otherwise the preview would be answering about a role that cannot exist.
+    """
+    capabilities = (
+        _validate_capabilities(attrs["capabilities"])
+        if "capabilities" in attrs
+        else _caps_from_level_input(attrs)
+    )
+    return Role(
+        name=attrs.get("name", "") or "(unsaved)",
+        description=attrs.get("description", ""),
+        allow_labels=attrs.get("allow-labels", {}) or {},
+        allow_names=attrs.get("allow-names", []) or [],
+        deny_labels=attrs.get("deny-labels", {}) or {},
+        deny_names=attrs.get("deny-names", []) or [],
+        capabilities=capabilities,
+    )
+
+
+def _preview_page(request: Request) -> tuple[int, int]:
+    """`page[size]` / `page[number]` off the raw request, matching the shared
+    pagination convention (no declared Query params, so the route contract is
+    untouched). Capped: a preview is for reading, and an unbounded page would
+    reintroduce the fleet-sized response this feature exists to avoid."""
+    params = request.query_params
+    try:
+        size = int(params.get("page[size]", "25") or 25)
+    except ValueError:
+        size = 25
+    try:
+        number = int(params.get("page[number]", "1") or 1)
+    except ValueError:
+        number = 1
+    size = max(1, min(size, 100))
+    number = max(1, number)
+    return size, (number - 1) * size
+
+
+def _preview_json(role_name: str, result: dict) -> dict:
+    return {
+        "data": {
+            "type": "role-previews",
+            "id": role_name,
+            "attributes": result,
+        }
+    }
+
+
+@router.post("/roles/preview")
+async def preview_unsaved_role(
+    request: Request,
+    body: dict = Body(...),
+    user: AuthenticatedUser = Depends(require_admin_or_audit),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Which workspaces an UNSAVED role body would reach.
+
+    The point of the unsaved form: the allow/deny interaction is where rules go
+    wrong, and seeing "matched 47, denied 3" while typing is what makes a deny
+    rule safe to write. Read-only — nothing is persisted, and the same
+    admin/audit gate as viewing roles applies, since the result reveals nothing
+    a role listing plus a workspace listing would not.
+    """
+    attrs = body.get("data", {}).get("attributes", {})
+    role = _role_from_attrs(attrs)
+    limit, offset = _preview_page(request)
+    result = await role_reach_service.preview_role_reach(db, role, limit=limit, offset=offset)
+    return JSONResponse(content=_preview_json(role.name, result))
+
+
+@router.get("/roles/{role_name}/preview")
+async def preview_saved_role(
+    request: Request,
+    role_name: str = Path(...),
+    user: AuthenticatedUser = Depends(require_admin_or_audit),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Which workspaces a saved role currently reaches.
+
+    Built-in roles are rejected rather than answered: `admin` and `audit` grant
+    through the platform path on every workspace regardless of label rules, so a
+    label-reach answer for them would be true and deeply misleading.
+    """
+    if is_builtin_role(role_name):
+        raise HTTPException(
+            status_code=422,
+            detail=f"'{role_name}' is a built-in role granted through the platform path on "
+            "every workspace, so it has no label-based reach to preview.",
+        )
+    result = await db.execute(select(Role).where(Role.name == role_name))
+    role = result.scalar_one_or_none()
+    if role is None:
+        raise HTTPException(status_code=404, detail=f"Role '{role_name}' not found")
+    limit, offset = _preview_page(request)
+    reach = await role_reach_service.preview_role_reach(db, role, limit=limit, offset=offset)
+    return JSONResponse(content=_preview_json(role.name, reach))
