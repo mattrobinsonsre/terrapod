@@ -5,7 +5,12 @@ on:
     branches: [main]
     tags: ['v[0-9]+.[0-9]+.[0-9]+']
   pull_request:
-    branches: [main]
+    # Release branches too, not just main. A release line is where patches and
+    # release-targeted features land, and those are the changes people are
+    # about to run — a PR into one arriving with no checks at all is the wrong
+    # way round. The tag push still runs the full set; this makes the failure
+    # visible at review time rather than at release time.
+    branches: [main, 'release/**']
     # Include `ready_for_review` so a PR opened in draft (which suppresses
     # the default `opened`/`synchronize` events) starts CI when it's
     # marked ready. Without this, draft-first PRs need a close+reopen to
