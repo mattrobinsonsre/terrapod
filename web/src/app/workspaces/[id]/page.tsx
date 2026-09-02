@@ -361,6 +361,13 @@ function WorkspaceDetailContent() {
   const [vaultAvailable, setVaultAvailable] = useState(false)
   const [vaultInstances, setVaultInstances] = useState<string[]>([])
   const [vaultDefaultInstance, setVaultDefaultInstance] = useState('')
+  // ...and only on an agent workspace. A vault reference is resolved on the
+  // listener claim path, so under local execution it would deliver nothing —
+  // the API refuses to store one (`_reject_vault_on_local`). Offering the
+  // source anyway means filling in the whole reference builder and then
+  // meeting a 422 on save, so it is not offered at all.
+  const vaultOfferable =
+    vaultAvailable && workspace?.attributes['execution-mode'] === 'agent'
 
   const [editVarSource, setEditVarSource] = useState<'static' | 'vault'>('static')
   const [editVaultInstance, setEditVaultInstance] = useState('')
@@ -2953,7 +2960,7 @@ function WorkspaceDetailContent() {
                   </div>
                 </div>
 
-                {!isGitCat && vaultAvailable && (
+                {!isGitCat && vaultOfferable && (
                   <div>
                     <label htmlFor="var-source" className="block text-sm font-medium text-slate-300 mb-1">{t('variables.valueSource')}</label>
                     <select id="var-source" value={varSource} onChange={(e) => setVarSource(e.target.value as 'static' | 'vault')} className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
@@ -3102,7 +3109,7 @@ function WorkspaceDetailContent() {
                               idPrefix={`edit-${v.id}`}
                               state={editPanelState}
                               onChange={patchEditPanel}
-                              vaultAvailable={vaultAvailable}
+                              vaultAvailable={vaultOfferable}
                               vaultInstances={vaultInstances}
                               vaultDefaultInstance={vaultDefaultInstance}
                               saving={savingVar}
@@ -3153,7 +3160,7 @@ function WorkspaceDetailContent() {
                           idPrefix={`medit-${v.id}`}
                           state={editPanelState}
                           onChange={patchEditPanel}
-                          vaultAvailable={vaultAvailable}
+                          vaultAvailable={vaultOfferable}
                           vaultInstances={vaultInstances}
                           vaultDefaultInstance={vaultDefaultInstance}
                           saving={savingVar}
