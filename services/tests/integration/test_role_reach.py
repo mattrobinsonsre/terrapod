@@ -421,3 +421,98 @@ class TestViewerMustAlreadySeeTheEstate:
                 await role_reach_service.resolve_resource_access(
                     db, ws, axis="workspace", kind="workspaces", viewer_roles=["everyone"]
                 )
+
+
+class TestAllowAll:
+    """The estate-wide grant. Label and name rules are exact-match, so before
+    this the only way to cover the estate was a shared label on every
+    workspace — which fails in the dangerous direction, since a workspace
+    created without the label silently falls outside the role.
+    """
+
+    async def test_it_reaches_every_workspace_including_unlabelled_ones(self, app, client):
+        tag = uuid.uuid4().hex[:8]
+        await _ws(client, f"aa-labelled-{tag}", labels={"env": tag})
+        await _ws(client, f"aa-bare-{tag}")  # no labels at all
+        await _role(
+            client, f"aa-role-{tag}", **{"allow-all": True, "workspace-permission": "write"}
+        )
+
+        resp = await client.get(f"/api/terrapod/v1/roles/aa-role-{tag}/preview", headers=AUTH)
+        a = resp.json()["data"]["attributes"]
+        names = [w["name"] for w in a["axes"]["workspace"]["resources"]]
+        assert f"aa-labelled-{tag}" in names
+        assert f"aa-bare-{tag}" in names, "an unlabelled workspace must still be reached"
+        assert a["axes"]["workspace"]["resources"][0]["reason"] == "allow-all"
+
+    async def test_deny_still_wins_so_all_except_is_expressible(self, app, client):
+        tag = uuid.uuid4().hex[:8]
+        await _ws(client, f"aad-keep-{tag}", labels={"grp": tag})
+        await _ws(client, f"aad-drop-{tag}", labels={"grp": tag, "sealed": "yes"})
+        await _role(
+            client,
+            f"aad-role-{tag}",
+            **{
+                "allow-all": True,
+                "deny-labels": {"sealed": ["yes"]},
+                "workspace-permission": "admin",
+            },
+        )
+        resp = await client.get(f"/api/terrapod/v1/roles/aad-role-{tag}/preview", headers=AUTH)
+        a = resp.json()["data"]["attributes"]
+        granted = [w["name"] for w in a["axes"]["workspace"]["resources"]]
+        denied = [w["name"] for w in a["axes"]["workspace"]["denied"]]
+        assert f"aad-keep-{tag}" in granted
+        assert f"aad-drop-{tag}" not in granted
+        assert f"aad-drop-{tag}" in denied
+
+    async def test_it_does_not_raise_the_roles_capabilities(self, app, client):
+        """allow_all widens WHERE a role applies, never WHAT it grants."""
+        tag = uuid.uuid4().hex[:8]
+        await _ws(client, f"aac-{tag}")
+        await _role(
+            client, f"aac-role-{tag}", **{"allow-all": True, "workspace-permission": "read"}
+        )
+        resp = await client.get(f"/api/terrapod/v1/roles/aac-role-{tag}/preview", headers=AUTH)
+        caps = resp.json()["data"]["attributes"]["axes"]["workspace"]["resources"][0][
+            "capabilities"
+        ]
+        assert "run:apply" not in caps, caps
+        assert any(c.endswith(":read") or c == "workspace:read" for c in caps), caps
+
+    async def test_enforcement_agrees_with_the_preview(self, app, client):
+        """The estate-wide grant must be honoured by the gate that actually
+        authorises, not only by the panel that advertises it."""
+        from terrapod.services.capability_resolver import _role_matches
+
+        tag = uuid.uuid4().hex[:8]
+        await _role(
+            client, f"aae-role-{tag}", **{"allow-all": True, "workspace-permission": "read"}
+        )
+        async with get_db_session() as db:
+            role = await db.get(Role, f"aae-role-{tag}")
+            assert _role_matches(role, "any-name-at-all", {})
+            assert _role_matches(role, "", {"unrelated": "label"})
+
+    async def test_it_round_trips_through_the_api(self, app, client):
+        tag = uuid.uuid4().hex[:8]
+        await _role(
+            client, f"aar-role-{tag}", **{"allow-all": True, "workspace-permission": "read"}
+        )
+        got = await client.get(f"/api/terrapod/v1/roles/aar-role-{tag}", headers=AUTH)
+        assert got.json()["data"]["attributes"]["allow-all"] is True
+
+        patched = await client.patch(
+            f"/api/terrapod/v1/roles/aar-role-{tag}",
+            json={"data": {"attributes": {"allow-all": False}}},
+            headers=AUTH,
+        )
+        assert patched.json()["data"]["attributes"]["allow-all"] is False
+
+    async def test_existing_roles_default_to_false(self, app, client):
+        """Additive: every role that predates the column keeps exactly the
+        reach it had."""
+        tag = uuid.uuid4().hex[:8]
+        await _role(client, f"aan-role-{tag}", **{"workspace-permission": "read"})
+        got = await client.get(f"/api/terrapod/v1/roles/aan-role-{tag}", headers=AUTH)
+        assert got.json()["data"]["attributes"]["allow-all"] is False

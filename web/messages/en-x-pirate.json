@@ -643,7 +643,9 @@
       "allowLabelsShort": "Allow Labels",
       "allowNamesShort": "Allow Names",
       "denyLabelsShort": "Deny Labels",
-      "denyNamesShort": "Deny Names"
+      "denyNamesShort": "Deny Names",
+      "allowAll": "Grant on everythin''",
+      "allowAllHelp": "Matches every prize, including those taken later. Deny articles still hold. Use this rather than marking every work-deck — a deck raised without the mark would quietly fall outside the rank."
     },
     "assignForm": {
       "provider": "Provider",
@@ -714,7 +716,8 @@
       "deleteRole": "Failed t'' send role t'' Davy Jones",
       "setAssignment": "Failed t'' set assignment",
       "setAssignmentStatus": "Failed t'' set assignment ({status})",
-      "deleteAssignment": "Failed t'' send assignment t'' Davy Jones"
+      "deleteAssignment": "Failed t'' send assignment t'' Davy Jones",
+      "conflictingLabelKeys": "{keys} be given more than one value. A marking rule holds one value per key, so the last would quietly replace them afore it. Matching several values for one key be supported by the API but cannot yet be set here."
     }
   },
   "adminVcs": {
@@ -2255,7 +2258,8 @@
       "cost": "Booty",
       "architecture": "Architecture",
       "insights": "Insights",
-      "automation": "Automation"
+      "automation": "Automation",
+      "access": "Boarding"
     },
     "lifecycle": {
       "pendingDeletion": "Pendin'' send t'' Davy Jones",
@@ -3087,6 +3091,33 @@
       "catalogClamped": "Commanded by the catalog — held t'' lookin'' only",
       "everyoneFloor": "Readable by all hands",
       "hasOwner": "The owner already holds command"
+    },
+    "reachesNothing": "This rule reaches naught.",
+    "allowAllBanner": "Grants on every prize. Deny articles still hold.",
+    "axis": {
+      "workspace": "Work-decks",
+      "pool": "Crew pools",
+      "registry": "Ledger",
+      "catalog": "Catalog wares"
+    }
+  },
+  "resourceAccess": {
+    "title": "Who can board this",
+    "subtitle": "Ranks whose articles match this work-deck, an'' the hands holding them.",
+    "loading": "Loadin''…",
+    "failed": "Could not reckon who can board this.",
+    "forbidden": "This answer spans the whole fleet, so it be shown only to quartermasters an'' auditors.",
+    "noRoles": "No rank''s articles match this work-deck.",
+    "deniedRoles": "Matched, then cast out by a deny article",
+    "alsoReachable": "Also boardable without any rank",
+    "heldBy": "In the hands o'' {who}",
+    "heldByNobody": "Held by nobody — grants naught in practice",
+    "path": {
+      "platformAdmin": "Quartermasters reach every prize",
+      "platformAudit": "Auditors may read every prize",
+      "owner": "The owner holds command here",
+      "everyoneFloor": "Marked access: everyone — readable by all hands",
+      "catalogClamped": "Commanded by the catalog — every non-command grant be held to lookin'' only"
     }
   }
 }

@@ -643,7 +643,9 @@
       "allowLabelsShort": "Etiquetas permitidas",
       "allowNamesShort": "Nombres permitidos",
       "denyLabelsShort": "Etiquetas denegadas",
-      "denyNamesShort": "Nombres denegados"
+      "denyNamesShort": "Nombres denegados",
+      "allowAll": "Conceder en todo",
+      "allowAllHelp": "Coincide con todos los recursos, incluidos los creados después. Las reglas de denegación siguen aplicándose. Use esto en lugar de etiquetar cada espacio de trabajo: uno creado sin la etiqueta quedaría fuera del rol sin avisar."
     },
     "assignForm": {
       "provider": "Proveedor",
@@ -714,7 +716,8 @@
       "deleteRole": "No se pudo eliminar el rol",
       "setAssignment": "No se pudo establecer la asignación",
       "setAssignmentStatus": "No se pudo establecer la asignación ({status})",
-      "deleteAssignment": "No se pudo eliminar la asignación"
+      "deleteAssignment": "No se pudo eliminar la asignación",
+      "conflictingLabelKeys": "{keys} tiene más de un valor. Una regla de etiqueta admite un valor por clave, así que el último sustituiría a los anteriores sin avisar. La API admite varios valores por clave, pero aún no se pueden definir aquí."
     }
   },
   "adminVcs": {
@@ -2255,7 +2258,8 @@
       "cost": "Coste",
       "architecture": "Arquitectura",
       "insights": "Perspectivas",
-      "automation": "Automatización"
+      "automation": "Automatización",
+      "access": "Acceso"
     },
     "lifecycle": {
       "pendingDeletion": "Pendiente de eliminación",
@@ -3087,6 +3091,33 @@
       "catalogClamped": "Gestionado por el catálogo: limitado a lectura",
       "everyoneFloor": "Legible por todos",
       "hasOwner": "El propietario ya tiene administración"
+    },
+    "reachesNothing": "Esta regla no alcanza nada.",
+    "allowAllBanner": "Concede en todos los recursos. Las reglas de denegación siguen aplicándose.",
+    "axis": {
+      "workspace": "Espacios de trabajo",
+      "pool": "Grupos de agentes",
+      "registry": "Registro",
+      "catalog": "Elementos del catálogo"
+    }
+  },
+  "resourceAccess": {
+    "title": "Quién puede acceder",
+    "subtitle": "Roles cuyas reglas coinciden con este espacio de trabajo, y quién los tiene.",
+    "loading": "Cargando…",
+    "failed": "No se ha podido determinar quién puede acceder.",
+    "forbidden": "Esta respuesta abarca todo el conjunto, por lo que solo se muestra a administradores y auditores de la plataforma.",
+    "noRoles": "Ninguna regla de rol coincide con este espacio de trabajo.",
+    "deniedRoles": "Coincidente, luego excluido por una regla de denegación",
+    "alsoReachable": "También accesible sin ningún rol",
+    "heldBy": "En manos de {who}",
+    "heldByNobody": "En manos de nadie: en la práctica no concede nada",
+    "path": {
+      "platformAdmin": "Los administradores de la plataforma alcanzan todos los recursos",
+      "platformAudit": "Los auditores de la plataforma pueden leer todos los recursos",
+      "owner": "El propietario tiene administración aquí",
+      "everyoneFloor": "Etiquetado access: everyone: legible por todos",
+      "catalogClamped": "Gestionado por el catálogo: toda concesión no administrativa se limita a lectura"
     }
   }
 }

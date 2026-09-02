@@ -70,6 +70,16 @@ def role_match_verdict(
     if hit is not None:
         return MATCH_DENIED, f"deny-label:{hit[0]}={hit[1]}"
 
+    # Estate-wide grant, checked AFTER deny so "everything except the sealed
+    # ones" stays expressible. It grants the role's capabilities everywhere; it
+    # does not raise them.
+    # Read the column directly rather than getattr(..., False): a test double
+    # that forgets the attribute should fail loudly, not silently match
+    # everything — an unset MagicMock attr is truthy, which would turn every
+    # role into an estate-wide grant.
+    if role.allow_all:
+        return MATCH_ALLOWED, "allow-all"
+
     allow_labels: dict[str, set[str]] = {}
     merge_labels(allow_labels, role.allow_labels)
     if resource_name in set(role.allow_names):

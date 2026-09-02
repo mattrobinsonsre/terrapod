@@ -468,3 +468,67 @@ func TestGetResourceAccess(t *testing.T) {
 		t.Errorf("platform paths: %+v", acc.PlatformPaths)
 	}
 }
+
+func TestRole_AllowAll_RoundTrips(t *testing.T) {
+	var sent []byte
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		sent, _ = io.ReadAll(r.Body)
+		_, _ = w.Write([]byte(`{"data":{"name":"platform","attributes":{
+			"allow-all": true, "workspace-permission":"write"}}}`))
+	}))
+	defer srv.Close()
+	c, err := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, err := c.CreateRole(t.Context(), CreateRoleRequest{
+		Name: "platform", AllowAll: true, WorkspacePermission: "write",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var body map[string]any
+	if err := json.Unmarshal(sent, &body); err != nil {
+		t.Fatal(err)
+	}
+	attrs := body["data"].(map[string]any)["attributes"].(map[string]any)
+	if attrs["allow-all"] != true {
+		t.Errorf("allow-all not sent: %v", attrs)
+	}
+	// An estate-wide grant that decodes as false would make a role reaching
+	// everything look like one reaching nothing.
+	if !r.AllowAll {
+		t.Errorf("allow-all not decoded: %+v", r)
+	}
+}
+
+func TestRole_AllowAll_UpdateLeaveAlone(t *testing.T) {
+	var sent []byte
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		sent, _ = io.ReadAll(r.Body)
+		_, _ = w.Write([]byte(`{"data":{"name":"x","attributes":{}}}`))
+	}))
+	defer srv.Close()
+	c, _ := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+
+	// nil means leave alone — a rename must not silently revoke an
+	// estate-wide grant, nor silently confer one.
+	if _, err := c.UpdateRole(t.Context(), "x", UpdateRoleRequest{}); err != nil {
+		t.Fatal(err)
+	}
+	var body map[string]any
+	_ = json.Unmarshal(sent, &body)
+	if _, present := body["data"].(map[string]any)["attributes"].(map[string]any)["allow-all"]; present {
+		t.Error("allow-all must be absent when the pointer is nil")
+	}
+
+	off := false
+	if _, err := c.UpdateRole(t.Context(), "x", UpdateRoleRequest{AllowAll: &off}); err != nil {
+		t.Fatal(err)
+	}
+	_ = json.Unmarshal(sent, &body)
+	attrs := body["data"].(map[string]any)["attributes"].(map[string]any)
+	if attrs["allow-all"] != false {
+		t.Errorf("explicit false must be sent: %v", attrs)
+	}
+}

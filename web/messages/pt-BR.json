@@ -643,7 +643,9 @@
       "allowLabelsShort": "Permitir Rótulos",
       "allowNamesShort": "Permitir Nomes",
       "denyLabelsShort": "Negar Rótulos",
-      "denyNamesShort": "Negar Nomes"
+      "denyNamesShort": "Negar Nomes",
+      "allowAll": "Conceder em tudo",
+      "allowAllHelp": "Corresponde a todos os recursos, inclusive os criados depois. As regras de negação continuam valendo. Use isto em vez de rotular cada workspace: um criado sem o rótulo ficaria fora da função sem aviso."
     },
     "assignForm": {
       "provider": "Provedor",
@@ -714,7 +716,8 @@
       "deleteRole": "Falha ao excluir a função",
       "setAssignment": "Falha ao definir a atribuição",
       "setAssignmentStatus": "Falha ao definir a atribuição ({status})",
-      "deleteAssignment": "Falha ao excluir a atribuição"
+      "deleteAssignment": "Falha ao excluir a atribuição",
+      "conflictingLabelKeys": "{keys} recebeu mais de um valor. Uma regra de rótulo guarda um valor por chave, então o último substituiria os anteriores sem aviso. Vários valores por chave são aceitos pela API, mas ainda não podem ser definidos aqui."
     }
   },
   "adminVcs": {
@@ -2255,7 +2258,8 @@
       "cost": "Custo",
       "architecture": "Arquitetura",
       "insights": "Perspectivas",
-      "automation": "Automação"
+      "automation": "Automação",
+      "access": "Acesso"
     },
     "lifecycle": {
       "pendingDeletion": "Exclusão pendente",
@@ -3087,6 +3091,33 @@
       "catalogClamped": "Gerenciado pelo catálogo — limitado a leitura",
       "everyoneFloor": "Legível por todos",
       "hasOwner": "O proprietário já tem administração"
+    },
+    "reachesNothing": "Esta regra não alcança nada.",
+    "allowAllBanner": "Concede em todos os recursos. As regras de negação continuam valendo.",
+    "axis": {
+      "workspace": "Workspaces",
+      "pool": "Pools de agentes",
+      "registry": "Registro",
+      "catalog": "Itens do catálogo"
+    }
+  },
+  "resourceAccess": {
+    "title": "Quem pode alcançar isto",
+    "subtitle": "Funções cujas regras correspondem a este workspace, e quem as possui.",
+    "loading": "Carregando…",
+    "failed": "Não foi possível determinar quem pode alcançar isto.",
+    "forbidden": "Esta resposta abrange todo o parque, então é mostrada apenas a administradores e auditores da plataforma.",
+    "noRoles": "Nenhuma regra de função corresponde a este workspace.",
+    "deniedRoles": "Correspondeu e depois foi excluído por uma regra de negação",
+    "alsoReachable": "Também alcançável sem função alguma",
+    "heldBy": "Possuída por {who}",
+    "heldByNobody": "Possuída por ninguém — na prática não concede nada",
+    "path": {
+      "platformAdmin": "Administradores da plataforma alcançam todos os recursos",
+      "platformAudit": "Auditores da plataforma podem ler todos os recursos",
+      "owner": "O proprietário tem administração aqui",
+      "everyoneFloor": "Rotulado access: everyone — legível por todos",
+      "catalogClamped": "Gerenciado pelo catálogo — toda concessão não administrativa é limitada a leitura"
     }
   }
 }

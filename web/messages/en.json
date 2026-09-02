@@ -643,7 +643,9 @@
       "allowLabelsShort": "Allow Labels",
       "allowNamesShort": "Allow Names",
       "denyLabelsShort": "Deny Labels",
-      "denyNamesShort": "Deny Names"
+      "denyNamesShort": "Deny Names",
+      "allowAll": "Grant on everything",
+      "allowAllHelp": "Matches every resource, including ones created later. Deny rules still apply. Use this rather than labelling every workspace — a workspace created without the label would silently fall outside the role."
     },
     "assignForm": {
       "provider": "Provider",
@@ -714,7 +716,8 @@
       "deleteRole": "Failed to delete role",
       "setAssignment": "Failed to set assignment",
       "setAssignmentStatus": "Failed to set assignment ({status})",
-      "deleteAssignment": "Failed to delete assignment"
+      "deleteAssignment": "Failed to delete assignment",
+      "conflictingLabelKeys": "{keys} is given more than one value. A label rule holds one value per key, so the last would silently replace the earlier ones. Matching several values for one key is supported by the API but cannot yet be set here."
     }
   },
   "adminVcs": {
@@ -2255,7 +2258,8 @@
       "configuration": "Configuration",
       "versions": "Versions",
       "insights": "Insights",
-      "automation": "Automation"
+      "automation": "Automation",
+      "access": "Access"
     },
     "subtabs": {
       "state": "State",
@@ -3087,6 +3091,33 @@
       "catalogClamped": "Catalog-managed — capped at read",
       "everyoneFloor": "Readable by everyone",
       "hasOwner": "Owner already has admin"
+    },
+    "reachesNothing": "This rule reaches nothing.",
+    "allowAllBanner": "Grants on every resource. Deny rules still apply.",
+    "axis": {
+      "workspace": "Workspaces",
+      "pool": "Agent pools",
+      "registry": "Registry",
+      "catalog": "Catalog items"
+    }
+  },
+  "resourceAccess": {
+    "title": "Who can reach this",
+    "subtitle": "Roles whose rules match this workspace, and the people holding them.",
+    "loading": "Loading…",
+    "failed": "Could not work out who can reach this.",
+    "forbidden": "This answer spans the whole estate, so it is shown only to platform admins and auditors.",
+    "noRoles": "No role's rules match this workspace.",
+    "deniedRoles": "Matched, then excluded by a deny rule",
+    "alsoReachable": "Also reachable without any role",
+    "heldBy": "Held by {who}",
+    "heldByNobody": "Held by nobody — grants nothing in practice",
+    "path": {
+      "platformAdmin": "Platform admins reach every resource",
+      "platformAudit": "Platform auditors can read every resource",
+      "owner": "The owner holds admin here",
+      "everyoneFloor": "Labelled access: everyone — readable by anyone",
+      "catalogClamped": "Catalog-managed — every non-admin grant is capped at read"
     }
   }
 }

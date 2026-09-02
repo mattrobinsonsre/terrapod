@@ -643,7 +643,9 @@
       "allowLabelsShort": "허용 라벨",
       "allowNamesShort": "허용 이름",
       "denyLabelsShort": "거부 라벨",
-      "denyNamesShort": "거부 이름"
+      "denyNamesShort": "거부 이름",
+      "allowAll": "모두에 부여",
+      "allowAllHelp": "나중에 생성된 것을 포함해 모든 리소스와 일치합니다. 거부 규칙은 계속 적용됩니다. 모든 워크스페이스에 레이블을 붙이는 대신 이것을 사용하세요. 레이블 없이 생성된 워크스페이스는 조용히 역할 범위 밖으로 벗어납니다."
     },
     "assignForm": {
       "provider": "프로바이더",
@@ -714,7 +716,8 @@
       "deleteRole": "역할을 삭제하지 못했습니다",
       "setAssignment": "할당을 설정하지 못했습니다",
       "setAssignmentStatus": "할당을 설정하지 못했습니다 ({status})",
-      "deleteAssignment": "할당을 삭제하지 못했습니다"
+      "deleteAssignment": "할당을 삭제하지 못했습니다",
+      "conflictingLabelKeys": "{keys}에 값이 두 개 이상 지정되었습니다. 레이블 규칙은 키당 하나의 값만 보유하므로 마지막 값이 이전 값을 조용히 대체합니다. 하나의 키에 여러 값을 지정하는 것은 API에서 지원하지만 아직 여기서는 설정할 수 없습니다."
     }
   },
   "adminVcs": {
@@ -2255,7 +2258,8 @@
       "cost": "비용",
       "architecture": "아키텍처",
       "insights": "인사이트",
-      "automation": "자동화"
+      "automation": "자동화",
+      "access": "액세스"
     },
     "lifecycle": {
       "pendingDeletion": "삭제 대기 중",
@@ -3087,6 +3091,33 @@
       "catalogClamped": "카탈로그 관리 — 읽기로 제한",
       "everyoneFloor": "모두 읽기 가능",
       "hasOwner": "소유자에게 이미 관리자 권한 있음"
+    },
+    "reachesNothing": "이 규칙은 아무것도 적용되지 않습니다.",
+    "allowAllBanner": "모든 리소스에 부여합니다. 거부 규칙은 계속 적용됩니다.",
+    "axis": {
+      "workspace": "워크스페이스",
+      "pool": "에이전트 풀",
+      "registry": "레지스트리",
+      "catalog": "카탈로그 항목"
+    }
+  },
+  "resourceAccess": {
+    "title": "누가 접근할 수 있는가",
+    "subtitle": "이 워크스페이스와 일치하는 규칙을 가진 역할과 보유자.",
+    "loading": "불러오는 중…",
+    "failed": "누가 접근할 수 있는지 확인할 수 없습니다.",
+    "forbidden": "이 답변은 전체 환경에 걸쳐 있으므로 플랫폼 관리자와 감사자에게만 표시됩니다.",
+    "noRoles": "이 워크스페이스와 일치하는 역할 규칙이 없습니다.",
+    "deniedRoles": "일치한 뒤 거부 규칙으로 제외됨",
+    "alsoReachable": "역할 없이도 접근 가능",
+    "heldBy": "{who} 보유",
+    "heldByNobody": "보유자 없음 — 실질적으로 아무것도 부여하지 않음",
+    "path": {
+      "platformAdmin": "플랫폼 관리자는 모든 리소스에 도달합니다",
+      "platformAudit": "플랫폼 감사자는 모든 리소스를 읽을 수 있습니다",
+      "owner": "소유자가 여기서 관리자 권한을 가집니다",
+      "everyoneFloor": "access: everyone 레이블 — 누구나 읽기 가능",
+      "catalogClamped": "카탈로그 관리 — 관리자가 아닌 모든 부여는 읽기로 제한"
     }
   }
 }

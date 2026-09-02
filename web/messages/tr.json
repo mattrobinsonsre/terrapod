@@ -643,7 +643,9 @@
       "allowLabelsShort": "İzin Verilen Etiketler",
       "allowNamesShort": "İzin Verilen Adlar",
       "denyLabelsShort": "Reddedilen Etiketler",
-      "denyNamesShort": "Reddedilen Adlar"
+      "denyNamesShort": "Reddedilen Adlar",
+      "allowAll": "Her şeyde yetki ver",
+      "allowAllHelp": "Sonradan oluşturulanlar dâhil her kaynakla eşleşir. Ret kuralları yine de geçerlidir. Her çalışma alanını etiketlemek yerine bunu kullanın — etiketsiz oluşturulan bir çalışma alanı sessizce rolün dışında kalırdı."
     },
     "assignForm": {
       "provider": "Sağlayıcı",
@@ -714,7 +716,8 @@
       "deleteRole": "Rol silinemedi",
       "setAssignment": "Atama ayarlanamadı",
       "setAssignmentStatus": "Atama ayarlanamadı ({status})",
-      "deleteAssignment": "Atama silinemedi"
+      "deleteAssignment": "Atama silinemedi",
+      "conflictingLabelKeys": "{keys} birden fazla değer aldı. Bir etiket kuralı anahtar başına tek değer tutar, bu yüzden sonuncusu öncekileri sessizce değiştirirdi. Bir anahtar için birden çok değeri API destekler, ancak burada henüz ayarlanamaz."
     }
   },
   "adminVcs": {
@@ -2255,7 +2258,8 @@
       "cost": "Maliyet",
       "architecture": "Mimari",
       "insights": "İçgörüler",
-      "automation": "Otomasyon"
+      "automation": "Otomasyon",
+      "access": "Erişim"
     },
     "lifecycle": {
       "pendingDeletion": "Silinmeyi bekliyor",
@@ -3087,6 +3091,33 @@
       "catalogClamped": "Katalog tarafından yönetiliyor — okumayla sınırlı",
       "everyoneFloor": "Herkes tarafından okunabilir",
       "hasOwner": "Sahibi zaten yönetici yetkisine sahip"
+    },
+    "reachesNothing": "Bu kural hiçbir şeyi kapsamıyor.",
+    "allowAllBanner": "Tüm kaynaklarda yetki verir. Ret kuralları yine de geçerlidir.",
+    "axis": {
+      "workspace": "Çalışma alanları",
+      "pool": "Aracı havuzları",
+      "registry": "Kayıt defteri",
+      "catalog": "Katalog öğeleri"
+    }
+  },
+  "resourceAccess": {
+    "title": "Buraya kim erişebilir",
+    "subtitle": "Kuralları bu çalışma alanıyla eşleşen roller ve bunlara sahip kişiler.",
+    "loading": "Yükleniyor…",
+    "failed": "Buraya kimin erişebileceği belirlenemedi.",
+    "forbidden": "Bu yanıt tüm ortamı kapsar, bu nedenle yalnızca platform yöneticilerine ve denetçilerine gösterilir.",
+    "noRoles": "Hiçbir rol kuralı bu çalışma alanıyla eşleşmiyor.",
+    "deniedRoles": "Eşleşti, ardından bir ret kuralıyla dışlandı",
+    "alsoReachable": "Herhangi bir rol olmadan da erişilebilir",
+    "heldBy": "{who} tarafından tutuluyor",
+    "heldByNobody": "Kimse tutmuyor — pratikte hiçbir şey vermiyor",
+    "path": {
+      "platformAdmin": "Platform yöneticileri her kaynağa erişir",
+      "platformAudit": "Platform denetçileri her kaynağı okuyabilir",
+      "owner": "Sahibi burada yönetici yetkisine sahip",
+      "everyoneFloor": "access: everyone etiketli — herkes tarafından okunabilir",
+      "catalogClamped": "Katalog tarafından yönetiliyor — yönetici olmayan her yetki okumayla sınırlı"
     }
   }
 }

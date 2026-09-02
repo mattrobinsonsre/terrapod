@@ -37,6 +37,9 @@ def _mock_role(name="dev-team", ws_perm="read", reg_perm="read", catalog_perm="n
     role.allow_names = []
     role.deny_labels = {}
     role.deny_names = []
+    # Real bool, not an unset MagicMock attr, or the response fails to
+    # serialise — the same reason `capabilities` is set below.
+    role.allow_all = False
     role.workspace_permission = ws_perm
     role.pool_permission = "read"
     role.registry_permission = reg_perm

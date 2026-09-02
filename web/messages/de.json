@@ -643,7 +643,9 @@
       "allowLabelsShort": "Zulassen-Beschriftungen",
       "allowNamesShort": "Zulassen-Namen",
       "denyLabelsShort": "Verweigern-Beschriftungen",
-      "denyNamesShort": "Verweigern-Namen"
+      "denyNamesShort": "Verweigern-Namen",
+      "allowAll": "Auf alles gewähren",
+      "allowAllHelp": "Erfasst jede Ressource, auch später erstellte. Deny-Regeln gelten weiterhin. Verwenden Sie dies, statt jeden Workspace zu labeln — ein ohne das Label erstellter Workspace fiele stillschweigend aus der Rolle heraus."
     },
     "assignForm": {
       "provider": "Anbieter",
@@ -714,7 +716,8 @@
       "deleteRole": "Rolle konnte nicht gelöscht werden",
       "setAssignment": "Zuweisung konnte nicht festgelegt werden",
       "setAssignmentStatus": "Zuweisung konnte nicht festgelegt werden ({status})",
-      "deleteAssignment": "Zuweisung konnte nicht gelöscht werden"
+      "deleteAssignment": "Zuweisung konnte nicht gelöscht werden",
+      "conflictingLabelKeys": "{keys} hat mehr als einen Wert. Eine Label-Regel hält einen Wert pro Schlüssel, der letzte würde die früheren stillschweigend ersetzen. Mehrere Werte für einen Schlüssel unterstützt die API, hier aber noch nicht einstellbar."
     }
   },
   "adminVcs": {
@@ -2255,7 +2258,8 @@
       "cost": "Kosten",
       "architecture": "Architektur",
       "insights": "Einblicke",
-      "automation": "Automatisierung"
+      "automation": "Automatisierung",
+      "access": "Zugriff"
     },
     "lifecycle": {
       "pendingDeletion": "Löschung ausstehend",
@@ -3087,6 +3091,33 @@
       "catalogClamped": "Katalogverwaltet — auf Lesen begrenzt",
       "everyoneFloor": "Für alle lesbar",
       "hasOwner": "Eigentümer hat bereits Admin"
+    },
+    "reachesNothing": "Diese Regel erreicht nichts.",
+    "allowAllBanner": "Gewährt auf allen Ressourcen. Deny-Regeln gelten weiterhin.",
+    "axis": {
+      "workspace": "Workspaces",
+      "pool": "Agent-Pools",
+      "registry": "Registry",
+      "catalog": "Katalogeinträge"
+    }
+  },
+  "resourceAccess": {
+    "title": "Wer dies erreichen kann",
+    "subtitle": "Rollen, deren Regeln auf diesen Workspace passen, und wer sie hält.",
+    "loading": "Wird geladen…",
+    "failed": "Es konnte nicht ermittelt werden, wer dies erreichen kann.",
+    "forbidden": "Diese Antwort umfasst den gesamten Bestand und wird daher nur Plattform-Admins und Auditoren gezeigt.",
+    "noRoles": "Keine Rollenregel passt auf diesen Workspace.",
+    "deniedRoles": "Erfasst, dann durch eine Deny-Regel ausgeschlossen",
+    "alsoReachable": "Auch ohne jede Rolle erreichbar",
+    "heldBy": "Gehalten von {who}",
+    "heldByNobody": "Von niemandem gehalten — gewährt praktisch nichts",
+    "path": {
+      "platformAdmin": "Plattform-Admins erreichen jede Ressource",
+      "platformAudit": "Plattform-Auditoren können jede Ressource lesen",
+      "owner": "Der Eigentümer hat hier Admin",
+      "everyoneFloor": "Gelabelt access: everyone — für alle lesbar",
+      "catalogClamped": "Katalogverwaltet — jede Nicht-Admin-Gewährung ist auf Lesen begrenzt"
     }
   }
 }

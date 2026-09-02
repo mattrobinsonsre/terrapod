@@ -643,7 +643,9 @@
       "allowLabelsShort": "允許標籤",
       "allowNamesShort": "允許名稱",
       "denyLabelsShort": "拒絕標籤",
-      "denyNamesShort": "拒絕名稱"
+      "denyNamesShort": "拒絕名稱",
+      "allowAll": "在所有內容上授予",
+      "allowAllHelp": "符合所有資源，包括之後建立的。拒絕規則仍然適用。請使用此選項，而不是為每個工作區加上標籤——未加標籤建立的工作區會悄悄落在角色範圍之外。"
     },
     "assignForm": {
       "provider": "提供者",
@@ -714,7 +716,8 @@
       "deleteRole": "刪除角色失敗",
       "setAssignment": "設定分配失敗",
       "setAssignmentStatus": "設定分配失敗（{status}）",
-      "deleteAssignment": "刪除分配失敗"
+      "deleteAssignment": "刪除分配失敗",
+      "conflictingLabelKeys": "{keys} 被指定了多個值。標籤規則每個索引鍵只保留一個值，因此最後一個會悄悄取代先前的值。API 支援一個索引鍵對應多個值，但此處尚不能設定。"
     }
   },
   "adminVcs": {
@@ -2255,7 +2258,8 @@
       "cost": "成本",
       "architecture": "架構",
       "insights": "洞察",
-      "automation": "自動化"
+      "automation": "自動化",
+      "access": "存取"
     },
     "lifecycle": {
       "pendingDeletion": "待刪除",
@@ -3087,6 +3091,33 @@
       "catalogClamped": "目錄託管 — 限制為唯讀",
       "everyoneFloor": "所有人可讀",
       "hasOwner": "擁有者已具有管理員權限"
+    },
+    "reachesNothing": "此規則不涵蓋任何內容。",
+    "allowAllBanner": "在所有資源上授予。拒絕規則仍然適用。",
+    "axis": {
+      "workspace": "工作區",
+      "pool": "代理集區",
+      "registry": "登錄檔",
+      "catalog": "目錄項目"
+    }
+  },
+  "resourceAccess": {
+    "title": "誰可以存取",
+    "subtitle": "規則與此工作區相符的角色，以及持有這些角色的人。",
+    "loading": "載入中…",
+    "failed": "無法判斷誰可以存取。",
+    "forbidden": "此答案涵蓋整個環境，因此僅向平台管理員和稽核員顯示。",
+    "noRoles": "沒有角色規則與此工作區相符。",
+    "deniedRoles": "已符合，隨後被拒絕規則排除",
+    "alsoReachable": "無需任何角色也可存取",
+    "heldBy": "由 {who} 持有",
+    "heldByNobody": "無人持有 — 實際上不授予任何權限",
+    "path": {
+      "platformAdmin": "平台管理員可存取所有資源",
+      "platformAudit": "平台稽核員可讀取所有資源",
+      "owner": "擁有者在此擁有管理員權限",
+      "everyoneFloor": "標記為 access: everyone — 所有人可讀",
+      "catalogClamped": "目錄託管 — 所有非管理員授權均限制為唯讀"
     }
   }
 }

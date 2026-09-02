@@ -27,6 +27,17 @@ type Role struct {
 	DenyLabels  map[string]string `json:"deny-labels,omitempty"`
 	DenyNames   []string          `json:"deny-names,omitempty"`
 
+	// AllowAll is an estate-wide grant: the allow side matches EVERY resource
+	// on every axis. Deny rules still win over it, so "everything except the
+	// sealed ones" stays expressible, and it does NOT raise the role's
+	// capabilities — a role granting read still grants read, just everywhere.
+	//
+	// It exists because label and name rules are exact-match (no wildcards),
+	// so covering the estate otherwise meant a shared label on every
+	// workspace, which fails in the dangerous direction: a workspace created
+	// without the label silently falls outside the role.
+	AllowAll bool `json:"allow-all"`
+
 	WorkspacePermission string `json:"workspace-permission"` // read | plan | write | admin
 	PoolPermission      string `json:"pool-permission,omitempty"`
 	RegistryPermission  string `json:"registry-permission,omitempty"` // read | write | admin (modules + providers)
@@ -59,6 +70,9 @@ type CreateRoleRequest struct {
 	DenyLabels  map[string]string
 	DenyNames   []string
 
+	// AllowAll grants estate-wide. See Role.AllowAll.
+	AllowAll bool
+
 	WorkspacePermission string
 	PoolPermission      string
 	RegistryPermission  string
@@ -78,6 +92,8 @@ type CreateRoleRequest struct {
 type UpdateRoleRequest struct {
 	Description *string
 
+	// AllowAll grants estate-wide; nil leaves it unchanged. See Role.AllowAll.
+	AllowAll    *bool
 	AllowLabels *map[string]string
 	AllowNames  *[]string
 	DenyLabels  *map[string]string
@@ -151,6 +167,9 @@ func roleCreateAttrs(req CreateRoleRequest) map[string]any {
 	attrs := map[string]any{
 		"workspace-permission": req.WorkspacePermission,
 	}
+	if req.AllowAll {
+		attrs["allow-all"] = true
+	}
 	if req.PoolPermission != "" {
 		attrs["pool-permission"] = req.PoolPermission
 	}
@@ -177,6 +196,9 @@ func roleCreateAttrs(req CreateRoleRequest) map[string]any {
 
 func roleUpdateAttrs(req UpdateRoleRequest) map[string]any {
 	attrs := map[string]any{}
+	if req.AllowAll != nil {
+		attrs["allow-all"] = *req.AllowAll
+	}
 	if req.WorkspacePermission != "" {
 		attrs["workspace-permission"] = req.WorkspacePermission
 	}
@@ -279,6 +301,7 @@ func parseRoleList(body []byte) ([]Role, error) {
 func roleFromItem(item *roleDataItem) (*Role, error) {
 	var attrs struct {
 		Description         string            `json:"description"`
+		AllowAll            bool              `json:"allow-all"`
 		AllowLabels         map[string]string `json:"allow-labels"`
 		AllowNames          []string          `json:"allow-names"`
 		DenyLabels          map[string]string `json:"deny-labels"`
@@ -298,6 +321,7 @@ func roleFromItem(item *roleDataItem) (*Role, error) {
 		}
 	}
 	return &Role{
+		AllowAll:            attrs.AllowAll,
 		Name:                item.Name,
 		Description:         attrs.Description,
 		AllowLabels:         attrs.AllowLabels,

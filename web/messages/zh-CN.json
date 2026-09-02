@@ -643,7 +643,9 @@
       "allowLabelsShort": "允许标签",
       "allowNamesShort": "允许名称",
       "denyLabelsShort": "拒绝标签",
-      "denyNamesShort": "拒绝名称"
+      "denyNamesShort": "拒绝名称",
+      "allowAll": "在所有内容上授予",
+      "allowAllHelp": "匹配所有资源，包括之后创建的。拒绝规则仍然适用。请使用此选项，而不是给每个工作区打标签——未打标签创建的工作区会悄悄落在角色范围之外。"
     },
     "assignForm": {
       "provider": "提供程序",
@@ -714,7 +716,8 @@
       "deleteRole": "删除角色失败",
       "setAssignment": "设置分配失败",
       "setAssignmentStatus": "设置分配失败（{status}）",
-      "deleteAssignment": "删除分配失败"
+      "deleteAssignment": "删除分配失败",
+      "conflictingLabelKeys": "{keys} 被指定了多个值。标签规则每个键只保留一个值，因此最后一个会悄悄替换先前的值。API 支持一个键对应多个值，但此处尚不能设置。"
     }
   },
   "adminVcs": {
@@ -2255,7 +2258,8 @@
       "cost": "成本",
       "architecture": "架构",
       "insights": "洞察",
-      "automation": "自动化"
+      "automation": "自动化",
+      "access": "访问"
     },
     "lifecycle": {
       "pendingDeletion": "待删除",
@@ -3087,6 +3091,33 @@
       "catalogClamped": "目录托管 — 限制为只读",
       "everyoneFloor": "所有人可读",
       "hasOwner": "所有者已具有管理员权限"
+    },
+    "reachesNothing": "此规则不涵盖任何内容。",
+    "allowAllBanner": "在所有资源上授予。拒绝规则仍然适用。",
+    "axis": {
+      "workspace": "工作区",
+      "pool": "代理池",
+      "registry": "注册表",
+      "catalog": "目录项"
+    }
+  },
+  "resourceAccess": {
+    "title": "谁可以访问",
+    "subtitle": "规则与此工作区匹配的角色，以及持有这些角色的人。",
+    "loading": "加载中…",
+    "failed": "无法确定谁可以访问。",
+    "forbidden": "此答案涵盖整个环境，因此仅向平台管理员和审计员显示。",
+    "noRoles": "没有角色规则与此工作区匹配。",
+    "deniedRoles": "已匹配，随后被拒绝规则排除",
+    "alsoReachable": "无需任何角色也可访问",
+    "heldBy": "由 {who} 持有",
+    "heldByNobody": "无人持有 — 实际上不授予任何权限",
+    "path": {
+      "platformAdmin": "平台管理员可访问所有资源",
+      "platformAudit": "平台审计员可读取所有资源",
+      "owner": "所有者在此拥有管理员权限",
+      "everyoneFloor": "标记为 access: everyone — 所有人可读",
+      "catalogClamped": "目录托管 — 所有非管理员授权均限制为只读"
     }
   }
 }

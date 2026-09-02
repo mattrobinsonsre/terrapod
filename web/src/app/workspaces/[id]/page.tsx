@@ -18,6 +18,7 @@ import { SensitiveValueInput } from '@/components/sensitive-value-input'
 import { MobileCardList, MobileCard } from '@/components/mobile-card-list'
 import { StateGraphTab } from '@/components/state-graph-tab'
 import { CostPanel } from '@/components/cost-panel'
+import { ResourceAccessPanel } from '@/components/resource-access-panel'
 import { ArchitectureCritiquePanel } from '@/components/architecture-critique-panel'
 import { useIsTouch } from '@/lib/use-media-query'
 import { getAuthState, isAdmin } from '@/lib/auth'
@@ -234,9 +235,9 @@ const ALL_TRIGGERS = [
 const ALL_STAGES = ['pre_plan', 'post_plan', 'pre_apply'] as const
 const ALL_ENFORCEMENT_LEVELS = ['mandatory', 'advisory'] as const
 
-type Tab = 'configuration' | 'variables' | 'runs' | 'state' | 'state-graph' | 'cost' | 'architecture' | 'versions' | 'notifications' | 'run-tasks' | 'run-triggers' | 'sharing'
+type Tab = 'configuration' | 'variables' | 'runs' | 'state' | 'state-graph' | 'cost' | 'architecture' | 'versions' | 'notifications' | 'run-tasks' | 'run-triggers' | 'sharing' | 'access'
 
-const VALID_TABS: Set<string> = new Set(['configuration', 'variables', 'runs', 'state', 'state-graph', 'cost', 'architecture', 'versions', 'notifications', 'run-tasks', 'run-triggers', 'sharing'])
+const VALID_TABS: Set<string> = new Set(['configuration', 'variables', 'runs', 'state', 'state-graph', 'cost', 'architecture', 'versions', 'notifications', 'run-tasks', 'run-triggers', 'sharing', 'access'])
 
 
 /** Mode value -> i18n key. The API value is snake_case; the key is camel. */
@@ -1822,6 +1823,7 @@ function WorkspaceDetailContent() {
     { key: 'notifications', label: t('tabs.notifications'), members: ['notifications'] },
     { key: 'run-tasks', label: t('tabs.automation'), members: ['run-tasks', 'run-triggers'] },
     { key: 'sharing', label: t('tabs.sharing'), members: ['sharing'] },
+    { key: 'access', label: t('tabs.access'), members: ['access'] },
   ]
   const activeGroup = tabGroups.find((g) => g.members.includes(activeTab)) ?? tabGroups[0]
   const subTabLabel = (tab: Tab): string =>
@@ -4399,6 +4401,12 @@ function WorkspaceDetailContent() {
         )}
 
         {/* Sharing Tab — cross-workspace remote-state allowlist (#344, #349) */}
+        {activeTab === 'access' && (
+          <div>
+            <ResourceAccessPanel kind="workspaces" id={workspaceId} />
+          </div>
+        )}
+
         {activeTab === 'sharing' && (
           <div>
             <div className="flex items-baseline justify-between mb-1">

@@ -35,7 +35,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy import ColumnElement, Select, false, func, or_, select
+from sqlalchemy import ColumnElement, Select, false, func, or_, select, true
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.auth import capabilities as cap
@@ -114,9 +114,19 @@ AXIS_MODELS: dict[str, list[tuple[str, Any]]] = {
 }
 
 
+def _allow_clause(role: Role, model) -> ColumnElement[bool] | None:
+    """The allow side as SQL. `allow_all` matches every row; otherwise the
+    name/label rules do, exactly (there are no wildcards — see
+    `first_matching_label`; if globbing is ever added to role rules, THIS is
+    the place that would silently under-match)."""
+    if role.allow_all:
+        return true()
+    return _rule_clause(model, role.allow_names, role.allow_labels)
+
+
 def granted_query(role: Role, model) -> Select:
     """Resources of `model` this role reaches: allow-matched and not denied."""
-    allow = _rule_clause(model, role.allow_names, role.allow_labels)
+    allow = _allow_clause(role, model)
     if allow is None:
         # No allow rules: the role reaches nothing by label RBAC. A
         # match-nothing query keeps every caller on one code path.
@@ -135,7 +145,7 @@ def denied_query(role: Role, model) -> Select:
     that makes a deny rule safe to write, and someone who cannot see what a deny
     removed cannot tell an intended exclusion from a typo.
     """
-    allow = _rule_clause(model, role.allow_names, role.allow_labels)
+    allow = _allow_clause(role, model)
     deny = _rule_clause(model, role.deny_names, role.deny_labels)
     if allow is None or deny is None:
         return select(model).where(false())

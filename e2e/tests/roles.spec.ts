@@ -200,3 +200,23 @@ test.describe('Role reach preview (#1456)', () => {
     await expect(panel).toContainText(/allow/i);
   });
 });
+
+test.describe('Estate-wide grant (#1456)', () => {
+  test('allow_all reaches every workspace, and the panel says so', async ({ page }) => {
+    await page.goto('/admin/roles');
+    await page.click('button:has-text("Create Role")');
+
+    const panel = page.getByTestId('role-reach');
+    await expect(panel).toBeVisible();
+
+    // With no allow rule at all there is nothing to reach...
+    await expect(panel).toContainText(/allow/i);
+
+    // ...but allow-all needs no rule, and must announce itself: a role that
+    // reaches everything looking like one that reaches nothing is the failure
+    // this panel exists to prevent.
+    await page.check('#r-allow-all');
+    await expect(panel.getByText(/every resource/i)).toBeVisible({ timeout: 15_000 });
+    await expect(panel.getByText(/granted/i).first()).toBeVisible({ timeout: 15_000 });
+  });
+});
