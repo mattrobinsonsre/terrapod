@@ -474,7 +474,11 @@ data:
     vault:
       enabled: {{ .Values.api.config.vault.enabled | default false }}
       timeout_seconds: {{ .Values.api.config.vault.timeout_seconds | default 10 }}
-      instances:
+      {{- /* An empty range emits the key with nothing after it, which YAML
+             reads as null rather than an empty list — and the config model then
+             rejects the default configuration. Caught by the config-channel
+             contract, not by rendering a populated example. */}}
+      instances: {{ if not .Values.api.config.vault.instances }}[]{{ end }}
       {{- range .Values.api.config.vault.instances }}
         - name: {{ .name | quote }}
           default: {{ .default | default false }}
@@ -485,7 +489,7 @@ data:
             mount: {{ (.auth).mount | default "kubernetes" | quote }}
             role: {{ (.auth).role | default "terrapod" | quote }}
           tls_skip_verify: {{ .tls_skip_verify | default false }}
-          paths:
+          paths: {{ if not .paths }}[]{{ end }}
           {{- range .paths }}
             - {{ . | quote }}
           {{- end }}
