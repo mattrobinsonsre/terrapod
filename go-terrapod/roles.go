@@ -314,3 +314,132 @@ func roleFromItem(item *roleDataItem) (*Role, error) {
 		UpdatedAt:           attrs.UpdatedAt,
 	}, nil
 }
+
+// ── Role reach preview (#1456) ─────────────────────────────────────────
+
+// Role-reach verdicts, as returned per workspace.
+const (
+	RoleReachAllowed = "allowed"
+	RoleReachDenied  = "denied"
+	RoleReachNone    = "none"
+)
+
+// Per-workspace notes on a reach result. Each names a path to access that
+// exists INDEPENDENTLY of the role being previewed, so a reader is not misled
+// into thinking the role is the only thing granting there.
+const (
+	// RoleReachNoteCatalogClamped: the workspace is catalog-managed, so every
+	// non-platform-admin grant is capped at the read floor — a role granting
+	// write here does not actually give write.
+	RoleReachNoteCatalogClamped = "catalog-clamped"
+	// RoleReachNoteEveryoneFloor: labelled access=everyone, so it is readable
+	// regardless of this role.
+	RoleReachNoteEveryoneFloor = "everyone-floor"
+	// RoleReachNoteHasOwner: it has an owner, and an owner holds admin
+	// regardless of this role.
+	RoleReachNoteHasOwner = "has-owner"
+)
+
+// RoleReachWorkspace is one workspace in a reach result, with the reason the
+// role's rules landed where they did (e.g. "allow-label:env=prod",
+// "deny-name") and the capabilities the role resolves to there.
+type RoleReachWorkspace struct {
+	ID           string            `json:"id"`
+	Name         string            `json:"name"`
+	Labels       map[string]string `json:"labels,omitempty"`
+	OwnerEmail   string            `json:"owner-email,omitempty"`
+	Verdict      string            `json:"verdict"`
+	Reason       string            `json:"reason,omitempty"`
+	Capabilities []string          `json:"capabilities,omitempty"`
+	Notes        []string          `json:"notes,omitempty"`
+}
+
+// RoleReach is which workspaces a role grants on.
+//
+// The counts are aggregates over the whole fleet, not over the returned page —
+// an operator needs "this rule reaches 4,200 workspaces" to be true rather than
+// truncated to whatever fitted. Workspaces holds one page of the granted set;
+// Denied holds a bounded sample of what a deny rule removed, which is what
+// makes a deny rule safe to write.
+type RoleReach struct {
+	GrantedCount    int                  `json:"granted-count"`
+	DeniedCount     int                  `json:"denied-count"`
+	MatchedCount    int                  `json:"matched-count"`
+	Workspaces      []RoleReachWorkspace `json:"workspaces"`
+	Denied          []RoleReachWorkspace `json:"denied,omitempty"`
+	DeniedTruncated bool                 `json:"denied-truncated"`
+}
+
+// RoleReachOptions pages the granted set. Zero values mean the server default
+// (25 per page, first page); PageSize is capped server-side at 100.
+type RoleReachOptions struct {
+	PageSize   int
+	PageNumber int
+}
+
+func (o *RoleReachOptions) query() string {
+	if o == nil {
+		return ""
+	}
+	q := url.Values{}
+	if o.PageSize > 0 {
+		q.Set("page[size]", fmt.Sprintf("%d", o.PageSize))
+	}
+	if o.PageNumber > 0 {
+		q.Set("page[number]", fmt.Sprintf("%d", o.PageNumber))
+	}
+	if len(q) == 0 {
+		return ""
+	}
+	return "?" + q.Encode()
+}
+
+type roleReachEnvelope struct {
+	Data struct {
+		Attributes RoleReach `json:"attributes"`
+	} `json:"data"`
+}
+
+func parseRoleReach(body []byte) (*RoleReach, error) {
+	var doc roleReachEnvelope
+	if err := json.Unmarshal(body, &doc); err != nil {
+		return nil, fmt.Errorf("parse role reach response: %w", err)
+	}
+	return &doc.Data.Attributes, nil
+}
+
+// PreviewRoleReach returns which workspaces a SAVED role currently grants on.
+//
+// Built-in roles are rejected by the server (422): admin and audit grant
+// through the platform path on every workspace, so a label-reach figure for
+// them would be true and deeply misleading.
+func (c *Client) PreviewRoleReach(ctx context.Context, name string, opts *RoleReachOptions) (*RoleReach, error) {
+	data, err := c.Get(ctx, "/api/terrapod/v1/roles/"+url.PathEscape(name)+"/preview"+opts.query())
+	if err != nil {
+		return nil, err
+	}
+	return parseRoleReach(data)
+}
+
+// PreviewUnsavedRoleReach returns which workspaces a role WOULD grant on, for a
+// role that does not exist yet. Nothing is persisted.
+//
+// This is the authoring case: the allow/deny interaction is where rules go
+// wrong, and seeing the match before saving is what makes a deny rule safe to
+// write. The body goes through the same validation a create does, so a preview
+// cannot succeed for a role that could not be saved.
+func (c *Client) PreviewUnsavedRoleReach(ctx context.Context, req CreateRoleRequest, opts *RoleReachOptions) (*RoleReach, error) {
+	attrs := roleCreateAttrs(req)
+	attrs["name"] = req.Name
+	body, err := json.Marshal(map[string]any{
+		"data": map[string]any{"type": "roles", "attributes": attrs},
+	})
+	if err != nil {
+		return nil, err
+	}
+	data, err := c.Post(ctx, "/api/terrapod/v1/roles/preview"+opts.query(), body)
+	if err != nil {
+		return nil, err
+	}
+	return parseRoleReach(data)
+}
