@@ -2566,6 +2566,69 @@ DELETE /api/terrapod/v1/roles/{name}
 
 Built-in roles cannot be deleted.
 
+### Preview Role Reach
+
+```
+POST /api/terrapod/v1/roles/preview
+GET  /api/terrapod/v1/roles/{name}/preview
+```
+
+Which workspaces a role grants on, and why. `admin` or `audit`; read-only.
+
+`POST` previews an **unsaved** role body — the same attributes a create takes
+(`allow-labels`, `allow-names`, `deny-labels`, `deny-names`, and either
+`capabilities` or the level shorthand) — so the admin UI can show the match
+while a rule is being typed. Nothing is persisted, and a body a create would
+reject is rejected here too (`422`).
+
+`GET` previews a saved role. A built-in role returns `422`: `admin` and `audit`
+grant through the platform path on every workspace, so a label-reach figure for
+them would be misleading rather than useful.
+
+Paged with `page[size]` (default 25, max 100) and `page[number]`. **The counts
+span the whole fleet, not the returned page.**
+
+```json
+{
+  "data": {
+    "type": "role-previews",
+    "id": "sre",
+    "attributes": {
+      "granted-count": 47,
+      "denied-count": 3,
+      "matched-count": 50,
+      "denied-truncated": false,
+      "workspaces": [
+        {
+          "id": "ws-...",
+          "name": "prod-api",
+          "labels": {"env": "prod"},
+          "owner-email": "team@example.com",
+          "verdict": "allowed",
+          "reason": "allow-label:env=prod",
+          "capabilities": ["run:apply", "run:plan", "..."],
+          "notes": ["has-owner"]
+        }
+      ],
+      "denied": [
+        {
+          "id": "ws-...",
+          "name": "prod-locked",
+          "verdict": "denied",
+          "reason": "deny-label:sealed=yes",
+          "capabilities": []
+        }
+      ]
+    }
+  }
+}
+```
+
+`verdict` is `allowed` or `denied`; `reason` names the responsible rule.
+`notes` name access paths independent of this role — `has-owner`,
+`everyone-floor`, `catalog-clamped` — see
+[`rbac.md` → Seeing What a Role Reaches](rbac.md#seeing-what-a-role-reaches).
+
 ---
 
 ## Role Assignments

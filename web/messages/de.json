@@ -3063,5 +3063,27 @@
     "restoreConfirm": "Den State von „{name}“ wiederherstellen?\n\nDabei entsteht ein NEUER Workspace — das Original kommt nicht zurück. Er startet ohne Auto-Apply, ohne Drift-Erkennung und ohne VCS-Verbindung; Variablen und Run-Historie kehren nicht zurück. Nur der State wird gerettet.",
     "restoreDone": "{versions, plural, one {# State-Version} other {# State-Versionen}} in den neuen Workspace „{name}“ übernommen. Prüfen Sie die Einstellungen, bevor Sie Auto-Apply oder VCS aktivieren.",
     "restoreAgainConfirm": "„{name}“ wurde bereits wiederhergestellt, nach {existing}.\n\nEine erneute Wiederherstellung erzeugt einen ZWEITEN Workspace mit derselben State-Lineage über derselben Infrastruktur. Ein Apply in einem der beiden lässt den nächsten Plan des anderen dann wie kompletter Drift aussehen.\n\nNur fortfahren, wenn der zuvor wiederhergestellte Workspace nicht mehr existiert."
+  },
+  "roleReach": {
+    "title": "Workspaces, die dies erreicht",
+    "checking": "Wird geprüft…",
+    "failed": "Die Reichweite dieser Regel konnte nicht ermittelt werden.",
+    "noAllowRules": "Fügen Sie ein Allow-Label oder einen Allow-Namen hinzu, um zu sehen, welche Workspaces diese Rolle erreichen würde.",
+    "granted": "gewährt",
+    "deniedCount": "verweigert",
+    "matched": "{count} von den Allow-Regeln erfasst",
+    "andMore": "…und {count} weitere",
+    "excludedByDeny": "Durch die Deny-Regeln ausgeschlossen",
+    "reason": {
+      "allowName": "namentlich",
+      "denyName": "namentlich verweigert",
+      "allowLabel": "entspricht {rule}",
+      "denyLabel": "verweigert durch {rule}"
+    },
+    "note": {
+      "catalogClamped": "Katalogverwaltet — auf Lesen begrenzt",
+      "everyoneFloor": "Für alle lesbar",
+      "hasOwner": "Eigentümer hat bereits Admin"
+    }
   }
 }

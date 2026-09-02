@@ -3063,5 +3063,27 @@
     "restoreConfirm": "Ripristinare lo stato di «{name}»?\n\nQuesto crea un NUOVO workspace: l''originale non torna. Torna senza auto-apply, senza rilevamento del drift e senza connessione VCS; variabili e cronologia delle esecuzioni non tornano. Viene recuperato solo lo stato.",
     "restoreDone": "{versions, plural, one {# versione di stato recuperata} other {# versioni di stato recuperate}} nel nuovo workspace «{name}». Controlla le impostazioni prima di attivare auto-apply o VCS.",
     "restoreAgainConfirm": "«{name}» è già stato ripristinato, in {existing}.\n\nRipristinarlo di nuovo crea un SECONDO workspace con lo stesso lignaggio di stato sulla stessa infrastruttura. Un apply in uno dei due farà poi sembrare il piano successivo dell''altro un drift totale.\n\nProsegui solo se il workspace ripristinato in precedenza non esiste più."
+  },
+  "roleReach": {
+    "title": "Spazi di lavoro raggiunti",
+    "checking": "Verifica in corso…",
+    "failed": "Impossibile determinare la portata di questa regola.",
+    "noAllowRules": "Aggiungi un''etichetta o un nome di autorizzazione per vedere quali spazi di lavoro raggiungerebbe questo ruolo.",
+    "granted": "concessi",
+    "deniedCount": "negati",
+    "matched": "{count} corrispondenti alle regole di autorizzazione",
+    "andMore": "…e altri {count}",
+    "excludedByDeny": "Esclusi dalle regole di negazione",
+    "reason": {
+      "allowName": "per nome",
+      "denyName": "negato per nome",
+      "allowLabel": "corrisponde a {rule}",
+      "denyLabel": "negato da {rule}"
+    },
+    "note": {
+      "catalogClamped": "Gestito dal catalogo — limitato alla lettura",
+      "everyoneFloor": "Leggibile da tutti",
+      "hasOwner": "Il proprietario ha già i diritti di amministrazione"
+    }
   }
 }

@@ -3063,5 +3063,27 @@
     "restoreConfirm": "\"{name}\"의 상태를 복원할까요?\n\n새 워크스페이스가 만들어집니다. 원본은 돌아오지 않습니다. 자동 적용과 드리프트 감지가 꺼진 채, VCS 연결 없이 복원되며 변수와 실행 기록은 돌아오지 않습니다. 복구되는 것은 상태뿐입니다.",
     "restoreDone": "{versions, plural, other {상태 버전 #개}}를 새 워크스페이스 \"{name}\"에 복구했습니다. 자동 적용이나 VCS를 켜기 전에 설정을 확인하세요.",
     "restoreAgainConfirm": "\"{name}\"은(는) 이미 {existing}(으)로 복원되었습니다.\n\n다시 복원하면 동일한 인프라 위에 동일한 state 계보를 가진 두 번째 워크스페이스가 만들어집니다. 둘 중 하나에서 apply하면 다른 쪽의 다음 플랜이 전면적인 드리프트처럼 보이게 됩니다.\n\n이전에 복원한 워크스페이스가 사라진 경우에만 계속하십시오."
+  },
+  "roleReach": {
+    "title": "적용되는 워크스페이스",
+    "checking": "확인 중…",
+    "failed": "이 규칙의 적용 범위를 확인할 수 없습니다.",
+    "noAllowRules": "허용 레이블 또는 허용 이름을 추가하면 이 역할이 적용되는 워크스페이스를 볼 수 있습니다.",
+    "granted": "허용됨",
+    "deniedCount": "거부됨",
+    "matched": "허용 규칙과 일치: {count}개",
+    "andMore": "…외 {count}개",
+    "excludedByDeny": "거부 규칙으로 제외됨",
+    "reason": {
+      "allowName": "이름 지정",
+      "denyName": "이름으로 거부됨",
+      "allowLabel": "{rule} 일치",
+      "denyLabel": "{rule}에 의해 거부됨"
+    },
+    "note": {
+      "catalogClamped": "카탈로그 관리 — 읽기로 제한",
+      "everyoneFloor": "모두 읽기 가능",
+      "hasOwner": "소유자에게 이미 관리자 권한 있음"
+    }
   }
 }

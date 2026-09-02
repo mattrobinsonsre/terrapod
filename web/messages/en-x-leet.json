@@ -3063,5 +3063,27 @@
     "restoreConfirm": "R3570r3 7h3 57473 0f \"{name}\"?\n\n7h15 cr34735 4 N3W w0rk5p4c3 — 7h3 0r1g1n4l 15 n07 br0ugh7 b4ck. 17 r37urn5 w17h 4u70-4pply 4nd dr1f7 d373c710n 0ff 4nd n0 VC5 c0nn3c710n, 4nd 175 v4r14bl35 4nd run h1570ry d0 n07 c0m3 b4ck. 0nly 7h3 57473 15 r3c0v3r3d.",
     "restoreDone": "R3c0v3r3d {versions, plural, one {# state version} other {# state versions}} 1n70 7h3 n3w w0rk5p4c3 \"{name}\". Ch3ck 175 53771ng5 b3f0r3 3n4bl1ng 4u70-4pply 0r VC5.",
     "restoreAgainConfirm": "\"{name}\" h45 4lr34dy b33n r3570r3d, 1n70 {existing}.\n\nR3570r1ng 17 4g41n cr34735 4 53C0ND w0rk5p4c3 h0ld1ng 7h3 54m3 57473 l1n34g3 0v3r 7h3 54m3 1nfr457ruc7ur3. Applying 1n 317h3r w1ll 7h3n m4k3 7h3 07h3r''5 n3x7 pl4n l00k l1k3 wh0l3s4l3 dr1f7.\n\n0nly c0n71nu3 1f 7h3 34rl13r r3570r3d w0rk5p4c3 15 g0n3."
+  },
+  "roleReach": {
+    "title": "W0rk5p4c35 7h15 r34ch35",
+    "checking": "Ch3ck1ng…",
+    "failed": "C0uld n07 w0rk 0u7 wh47 7h15 rul3 r34ch35.",
+    "noAllowRules": "4dd 4n 4ll0w l4b3l 0r 4n 4ll0w n4m3 70 533 wh1ch w0rk5p4c35 7h15 r0l3 w0uld r34ch.",
+    "granted": "gr4n73d",
+    "deniedCount": "d3n13d",
+    "matched": "{count} m47ch3d by 7h3 4ll0w rul35",
+    "andMore": "…4nd {count} m0r3",
+    "excludedByDeny": "3xclud3d by 7h3 d3ny rul35",
+    "reason": {
+      "allowName": "n4m3d",
+      "denyName": "d3n13d by n4m3",
+      "allowLabel": "m47ch35 {rule}",
+      "denyLabel": "d3n13d by {rule}"
+    },
+    "note": {
+      "catalogClamped": "C474l0g-m4n4g3d — c4pp3d 47 r34d",
+      "everyoneFloor": "R34d4bl3 by 3v3ry0n3",
+      "hasOwner": "0wn3r 4lr34dy h45 4dm1n"
+    }
   }
 }

@@ -3063,5 +3063,27 @@
     "restoreConfirm": "Restaurer l''état de « {name} » ?\n\nCela crée un NOUVEAU workspace — l''original n''est pas rétabli. Il revient sans auto-apply, sans détection de dérive et sans connexion VCS ; les variables et l''historique des exécutions ne reviennent pas. Seul l''état est récupéré.",
     "restoreDone": "{versions, plural, one {# version d''état récupérée} other {# versions d''état récupérées}} dans le nouveau workspace « {name} ». Vérifiez ses paramètres avant d''activer l''auto-apply ou le VCS.",
     "restoreAgainConfirm": "« {name} » a déjà été restauré, vers {existing}.\n\nLe restaurer à nouveau crée un SECOND workspace portant le même lignage d''état sur la même infrastructure. Un apply dans l''un fera alors ressembler le prochain plan de l''autre à une dérive totale.\n\nNe continuez que si le workspace restauré précédemment a disparu."
+  },
+  "roleReach": {
+    "title": "Espaces de travail concernés",
+    "checking": "Vérification…",
+    "failed": "Impossible de déterminer la portée de cette règle.",
+    "noAllowRules": "Ajoutez un label ou un nom d''autorisation pour voir quels espaces de travail ce rôle atteindrait.",
+    "granted": "accordé",
+    "deniedCount": "refusé",
+    "matched": "{count} correspondant aux règles d''autorisation",
+    "andMore": "…et {count} de plus",
+    "excludedByDeny": "Exclus par les règles de refus",
+    "reason": {
+      "allowName": "par nom",
+      "denyName": "refusé par nom",
+      "allowLabel": "correspond à {rule}",
+      "denyLabel": "refusé par {rule}"
+    },
+    "note": {
+      "catalogClamped": "Géré par le catalogue — limité à la lecture",
+      "everyoneFloor": "Lisible par tous",
+      "hasOwner": "Le propriétaire a déjà les droits d''administration"
+    }
   }
 }

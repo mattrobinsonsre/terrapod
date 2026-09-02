@@ -3063,5 +3063,27 @@
     "restoreConfirm": "Restoar da state ov \"{name}\"?\n\nDis makez a NEW werkspace — da orijinal duz not come bak. It cumz bak wif auto-apply an drift detekshun offs an no VCS, an itz variablez an run histry duz not come bak. Only da state getz savd.",
     "restoreDone": "Savd {versions, plural, one {# state verzhun} other {# state verzhunz}} intoo da new werkspace \"{name}\". Chek itz settingz b4 u turn on auto-apply or VCS. kthxbai",
     "restoreAgainConfirm": "\"{name}\" haz alreddy been restord, into {existing}.\n\nRestorin it agin makez a SEKOND wurkspace holdin teh same state lineage ovar teh same infrastrukchur. Applyin in eithr will den makez teh othr''s next plan look liek wholesale drift. OH NOES.\n\nOnly continoo if teh earlier restord wurkspace iz gon."
+  },
+  "roleReach": {
+    "title": "Werkspacez dis reachez",
+    "checking": "Chekin…",
+    "failed": "Coud not figger out wat dis rool reachez.",
+    "noAllowRules": "Add an allow labul or an allow naym 2 see wich werkspacez dis role wud reach.",
+    "granted": "grantd",
+    "deniedCount": "denyd",
+    "matched": "{count} matchd by teh allow roolz",
+    "andMore": "…an {count} moar",
+    "excludedByDeny": "Excludd by teh deny roolz",
+    "reason": {
+      "allowName": "namd",
+      "denyName": "denyd by naym",
+      "allowLabel": "matchez {rule}",
+      "denyLabel": "denyd by {rule}"
+    },
+    "note": {
+      "catalogClamped": "Catalog-manijd — capd at reed",
+      "everyoneFloor": "Readabul by everywun",
+      "hasOwner": "Ownur alreddy haz admin"
+    }
   }
 }

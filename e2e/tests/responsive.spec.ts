@@ -595,3 +595,20 @@ test.describe('Tablet width (md–lg dead-zone, #839)', () => {
   });
 
 })
+
+test.describe('Role reach panel (#1456)', () => {
+  test('the reach panel fits a phone without scrolling the page sideways', async ({ page }) => {
+    await page.goto('/admin/roles');
+    await expectNoHorizontalPageScroll(page);
+
+    await page.getByRole('button', { name: /create role/i }).click();
+    const panel = page.getByTestId('role-reach');
+    await expect(panel).toBeVisible();
+
+    // Workspace names and label rules are both unbounded strings, so this is
+    // the panel most likely to push a phone layout sideways.
+    await page.fill('#r-allow-labels', 'env=production-eu-west-1-primary');
+    await expectNoHorizontalPageScroll(page);
+    await expect(panel).toBeVisible();
+  });
+});

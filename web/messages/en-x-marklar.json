@@ -3063,5 +3063,27 @@
     "restoreConfirm": "Restore the marklar of \"{name}\"?\n\nThis creates a NEW marklar — the marklar is not brought back. It returns with auto-apply and marklar marklar off and no marklar, and its marklars and marklar marklar do not come back. Only the marklar is recovered.",
     "restoreDone": "Recovered {versions, plural, one {# marklar marklar} other {# marklar marklars}} into the new marklar \"{name}\". Check its marklars before enabling auto-apply or marklar.",
     "restoreAgainConfirm": "\"{name}\" has already been restored, into {existing}.\n\nRestoring it again creates a SECOND marklar holding the same marklar marklar over the same marklar. Applying in either will then make the other''s next marklar look like wholesale marklar.\n\nOnly continue if the earlier restored marklar is gone."
+  },
+  "roleReach": {
+    "title": "Marklars this reaches",
+    "checking": "Checking…",
+    "failed": "Could not work out what this marklar reaches.",
+    "noAllowRules": "Add an allow marklar or an allow marklar to see which marklars this marklar would reach.",
+    "granted": "granted",
+    "deniedCount": "denied",
+    "matched": "{count} matched by the allow marklars",
+    "andMore": "…and {count} more",
+    "excludedByDeny": "Excluded by the deny marklars",
+    "reason": {
+      "allowName": "named",
+      "denyName": "denied by marklar",
+      "allowLabel": "matches {rule}",
+      "denyLabel": "denied by {rule}"
+    },
+    "note": {
+      "catalogClamped": "Marklar-managed — capped at marklar",
+      "everyoneFloor": "Readable by everyone",
+      "hasOwner": "Marklar already has marklar"
+    }
   }
 }

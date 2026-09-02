@@ -216,6 +216,27 @@
     }
   },
   {
+    "name": "terrapod_role_reach",
+    "read_only": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "page_size": {
+          "description": "how many matched workspaces to list (default 25, max 100); the counts always span the whole fleet regardless",
+          "type": "integer"
+        },
+        "role": {
+          "description": "the custom role name whose reach to resolve",
+          "type": "string"
+        }
+      },
+      "required": [
+        "role"
+      ],
+      "type": "object"
+    }
+  },
+  {
     "name": "terrapod_run_apply",
     "destructive": true,
     "input_schema": {

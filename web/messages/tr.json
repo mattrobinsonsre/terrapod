@@ -3063,5 +3063,27 @@
     "restoreConfirm": "\"{name}\" state''i geri yüklensin mi?\n\nBu YENİ bir çalışma alanı oluşturur — orijinali geri gelmez. Otomatik uygulama ve drift algılama kapalı, VCS bağlantısı olmadan döner; değişkenler ve çalıştırma geçmişi geri gelmez. Yalnızca state kurtarılır.",
     "restoreDone": "{versions, plural, other {# state sürümü}} yeni \"{name}\" çalışma alanına kurtarıldı. Otomatik uygulamayı veya VCS''yi açmadan önce ayarlarını kontrol edin.",
     "restoreAgainConfirm": "“{name}” zaten geri yüklendi, {existing} içine.\n\nTekrar geri yüklemek, aynı altyapının üzerinde aynı state soyunu taşıyan İKİNCİ bir workspace oluşturur. Herhangi birinde apply çalıştırmak, diğerinin bir sonraki planını tümüyle drift gibi gösterir.\n\nYalnızca daha önce geri yüklenen workspace ortadan kalktıysa devam edin."
+  },
+  "roleReach": {
+    "title": "Bu kuralın kapsadığı çalışma alanları",
+    "checking": "Denetleniyor…",
+    "failed": "Bu kuralın kapsamı belirlenemedi.",
+    "noAllowRules": "Bu rolün hangi çalışma alanlarını kapsayacağını görmek için bir izin etiketi veya adı ekleyin.",
+    "granted": "verildi",
+    "deniedCount": "reddedildi",
+    "matched": "{count} izin kurallarıyla eşleşiyor",
+    "andMore": "…ve {count} tane daha",
+    "excludedByDeny": "Ret kurallarıyla dışlandı",
+    "reason": {
+      "allowName": "ada göre",
+      "denyName": "ada göre reddedildi",
+      "allowLabel": "{rule} ile eşleşiyor",
+      "denyLabel": "{rule} tarafından reddedildi"
+    },
+    "note": {
+      "catalogClamped": "Katalog tarafından yönetiliyor — okumayla sınırlı",
+      "everyoneFloor": "Herkes tarafından okunabilir",
+      "hasOwner": "Sahibi zaten yönetici yetkisine sahip"
+    }
   }
 }

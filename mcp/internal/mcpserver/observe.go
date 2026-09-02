@@ -304,6 +304,30 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 		return nil, st, nil
 	})
 
+	// ── terrapod_role_reach ──────────────────────────────────────────
+	type roleReachIn struct {
+		Role     string `json:"role" jsonschema:"the custom role name whose reach to resolve"`
+		PageSize int    `json:"page_size,omitempty" jsonschema:"how many matched workspaces to list (default 25, max 100); the counts always span the whole fleet regardless"`
+	}
+	mcp.AddTool(s, &mcp.Tool{
+		Name:        "terrapod_role_reach",
+		Description: "Resolve which workspaces a custom RBAC role actually grants on, and WHY. Terrapod has no teams or groups: access comes from a role's allow/deny label and name rules matched against workspace labels, which means 'who can touch this' is not readable from the role definition alone once an estate is large. Use this before changing a role, and to answer 'what would this role reach' without reading every workspace. `granted-count`/`denied-count` are aggregates over the WHOLE fleet, not over the returned page, so trust them even when `workspaces` is a short list. Each entry carries `reason` naming the rule responsible (`allow-label:env=prod`, `deny-name`, …) and `capabilities`, the capability set the role resolves to THERE. `denied` lists what an allow rule matched and a deny rule then removed — the difference between an intended exclusion and a typo. Read `notes` before concluding the role is the only thing granting access: `has-owner` means the workspace owner holds admin regardless, `everyone-floor` means it is readable by anyone, and `catalog-clamped` means the workspace is catalog-managed so every non-platform-admin grant is capped at read (a role granting write there does NOT give write). Built-in roles are rejected: `admin` and `audit` grant through the platform path on every workspace, so a label-reach figure for them would be true and misleading. Read-only.",
+		Annotations: readOnly,
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in roleReachIn) (*mcp.CallToolResult, *terrapod.RoleReach, error) {
+		if in.Role == "" {
+			return errText("role is required"), nil, nil
+		}
+		var opts *terrapod.RoleReachOptions
+		if in.PageSize > 0 {
+			opts = &terrapod.RoleReachOptions{PageSize: in.PageSize}
+		}
+		reach, err := c.PreviewRoleReach(ctx, in.Role, opts)
+		if err != nil {
+			return errResult(err), nil, nil
+		}
+		return nil, reach, nil
+	})
+
 	// ── terrapod_workspace_architecture_critique ─────────────────────
 	type wsCritiqueIn struct {
 		WorkspaceID string `json:"workspace_id" jsonschema:"the workspace id (ws-...) whose current-state architecture critique to fetch"`

@@ -3063,5 +3063,27 @@
     "restoreConfirm": "De state van ''{name}'' herstellen?\n\nDit maakt een NIEUWE workspace — het origineel komt niet terug. Hij komt terug zonder auto-apply, zonder driftdetectie en zonder VCS-verbinding; variabelen en runhistorie komen niet terug. Alleen de state wordt gered.",
     "restoreDone": "{versions, plural, one {# state-versie} other {# state-versies}} hersteld in de nieuwe workspace ''{name}''. Controleer de instellingen voordat je auto-apply of VCS inschakelt.",
     "restoreAgainConfirm": "“{name}” is al hersteld, naar {existing}.\n\nOpnieuw herstellen maakt een TWEEDE workspace met dezelfde state-lijn over dezelfde infrastructuur. Een apply in een van beide laat het volgende plan van de ander er dan uitzien als volledige drift.\n\nGa alleen verder als de eerder herstelde workspace verdwenen is."
+  },
+  "roleReach": {
+    "title": "Workspaces die dit bereikt",
+    "checking": "Bezig met controleren…",
+    "failed": "Kon niet bepalen wat deze regel bereikt.",
+    "noAllowRules": "Voeg een toegestaan label of een toegestane naam toe om te zien welke workspaces deze rol zou bereiken.",
+    "granted": "toegekend",
+    "deniedCount": "geweigerd",
+    "matched": "{count} overeenkomend met de toegestane regels",
+    "andMore": "…en nog {count}",
+    "excludedByDeny": "Uitgesloten door de weigerregels",
+    "reason": {
+      "allowName": "op naam",
+      "denyName": "geweigerd op naam",
+      "allowLabel": "komt overeen met {rule}",
+      "denyLabel": "geweigerd door {rule}"
+    },
+    "note": {
+      "catalogClamped": "Catalogusbeheerd — beperkt tot lezen",
+      "everyoneFloor": "Leesbaar voor iedereen",
+      "hasOwner": "Eigenaar heeft al beheerrechten"
+    }
   }
 }

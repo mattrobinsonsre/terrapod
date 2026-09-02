@@ -3063,5 +3063,27 @@
     "restoreConfirm": "Palautetaanko kohteen ”{name}” tila?\n\nTämä luo UUDEN työtilan — alkuperäinen ei palaa. Se palaa automaattinen käyttöönotto ja poikkeamien tunnistus pois päältä eikä siinä ole VCS-yhteyttä; muuttujat ja ajohistoria eivät palaa. Vain tila pelastetaan.",
     "restoreDone": "Palautettiin {versions, plural, one {# tilaversio} other {# tilaversiota}} uuteen työtilaan ”{name}”. Tarkista asetukset ennen automaattisen käyttöönoton tai VCS:n kytkemistä.",
     "restoreAgainConfirm": "”{name}” on jo palautettu, kohteeseen {existing}.\n\nUusi palautus luo TOISEN workspacen, jolla on sama state-sukulinja saman infrastruktuurin päällä. Apply kummassa tahansa saa toisen seuraavan suunnitelman näyttämään täydeltä ajautumiselta.\n\nJatka vain, jos aiemmin palautettu workspace on poissa."
+  },
+  "roleReach": {
+    "title": "Työtilat, joihin tämä ulottuu",
+    "checking": "Tarkistetaan…",
+    "failed": "Säännön kattavuutta ei voitu selvittää.",
+    "noAllowRules": "Lisää salliva tunniste tai nimi nähdäksesi, mihin työtiloihin tämä rooli ulottuisi.",
+    "granted": "myönnetty",
+    "deniedCount": "evätty",
+    "matched": "{count} vastaa sallivia sääntöjä",
+    "andMore": "…ja {count} muuta",
+    "excludedByDeny": "Estosääntöjen sulkemat pois",
+    "reason": {
+      "allowName": "nimellä",
+      "denyName": "evätty nimellä",
+      "allowLabel": "vastaa sääntöä {rule}",
+      "denyLabel": "evätty säännöllä {rule}"
+    },
+    "note": {
+      "catalogClamped": "Luettelon hallinnoima — rajattu lukuoikeuteen",
+      "everyoneFloor": "Kaikkien luettavissa",
+      "hasOwner": "Omistajalla on jo järjestelmänvalvojan oikeudet"
+    }
   }
 }

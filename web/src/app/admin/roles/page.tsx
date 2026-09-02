@@ -9,6 +9,7 @@ import { LoadingSpinner } from '@/components/loading-spinner'
 import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
 import { SortableHeader } from '@/components/sortable-header'
+import { RoleReachPanel, type RoleRule } from '@/components/role-reach-panel'
 import { useSortable } from '@/lib/use-sortable'
 import { useConfirm } from '@/lib/use-confirm'
 import { getAuthState, isAdmin } from '@/lib/auth'
@@ -328,6 +329,26 @@ export default function RolesPage() {
       setError(err instanceof Error ? err.message : t('errors.loadAssignments'))
     } finally {
       setAssignmentsLoading(false)
+    }
+  }
+
+  /** The free-text boxes as the structured rule the preview endpoint takes.
+   *  Rebuilt on every render so the panel re-previews as the operator types;
+   *  the panel debounces and serialises the rule to decide whether it changed. */
+  function ruleFrom(
+    allowLabels: string,
+    allowNames: string,
+    denyLabels: string,
+    denyNames: string,
+    caps: Set<string>,
+  ): RoleRule {
+    const names = (v: string) => v.split(',').map((x) => x.trim()).filter(Boolean)
+    return {
+      allowLabels: parseLabels(allowLabels),
+      allowNames: names(allowNames),
+      denyLabels: parseLabels(denyLabels),
+      denyNames: names(denyNames),
+      capabilities: [...caps],
     }
   }
 
@@ -755,6 +776,9 @@ export default function RolesPage() {
                       className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
                   </div>
                 </div>
+                <RoleReachPanel
+                  rule={ruleFrom(roleAllowLabels, roleAllowNames, roleDenyLabels, roleDenyNames, roleCaps)}
+                />
                 <button type="submit" disabled={creatingRole}
                   className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors">
                   {creatingRole ? t('actions.creating') : t('actions.createRole')}
@@ -859,6 +883,9 @@ export default function RolesPage() {
                               <CapabilityMatrix selected={editRoleCaps} onToggle={toggleEditCap} custom={editRoleCapsCustom} idPrefix={`edit-${role.name}`} />
                             )}
                           </div>
+                          <RoleReachPanel
+                            rule={ruleFrom(editRoleAllowLabels, editRoleAllowNames, editRoleDenyLabels, editRoleDenyNames, editRoleCaps)}
+                          />
                         </div>
                       ) : (
                         <div className="flex items-start justify-between">
