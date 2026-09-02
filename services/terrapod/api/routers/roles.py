@@ -387,7 +387,9 @@ async def preview_unsaved_role(
     attrs = body.get("data", {}).get("attributes", {})
     role = _role_from_attrs(attrs)
     limit, offset = _preview_page(request)
-    result = await role_reach_service.preview_role_reach(db, role, limit=limit, offset=offset)
+    result = await role_reach_service.preview_role_reach(
+        db, role, limit=limit, offset=offset, viewer_roles=user.roles
+    )
     return JSONResponse(content=_preview_json(role.name, result))
 
 
@@ -415,5 +417,121 @@ async def preview_saved_role(
     if role is None:
         raise HTTPException(status_code=404, detail=f"Role '{role_name}' not found")
     limit, offset = _preview_page(request)
-    reach = await role_reach_service.preview_role_reach(db, role, limit=limit, offset=offset)
+    reach = await role_reach_service.preview_role_reach(
+        db, role, limit=limit, offset=offset, viewer_roles=user.roles
+    )
     return JSONResponse(content=_preview_json(role.name, reach))
+
+
+# ── The reverse view: who can reach a given resource (#1456) ──────────
+
+#: The resource kinds an access view is offered for, and how to load one.
+#: Keyed by the URL segment so the routes stay honest about what they serve.
+_ACCESS_KINDS: dict[str, tuple[str, str, str]] = {
+    # url segment      -> (axis, model attribute name, id prefix to strip)
+    "workspaces": ("workspace", "Workspace", "ws-"),
+    "agent-pools": ("pool", "AgentPool", "apool-"),
+    "registry-modules": ("registry", "RegistryModule", ""),
+    "registry-providers": ("registry", "RegistryProvider", ""),
+    "catalog-items": ("catalog", "CatalogItem", ""),
+}
+
+
+async def _resource_access(
+    db, resource_kind: str, resource_id: str, viewer_roles: list[str]
+) -> JSONResponse:
+    """Shared body for the per-kind access routes below."""
+    import uuid as _uuid
+
+    from terrapod.db import models as _models
+    from terrapod.services import role_reach_service
+
+    axis, model_name, prefix = _ACCESS_KINDS[resource_kind]
+    model = getattr(_models, model_name)
+    try:
+        pk = _uuid.UUID(resource_id.removeprefix(prefix))
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=f"{resource_id!r} is not a valid id") from e
+
+    obj = await db.get(model, pk)
+    if obj is None:
+        raise HTTPException(status_code=404, detail=f"{resource_kind} {resource_id} not found")
+
+    result = await role_reach_service.resolve_resource_access(
+        db, obj, axis=axis, kind=resource_kind, viewer_roles=viewer_roles
+    )
+    return JSONResponse(
+        content={
+            "data": {
+                "type": "resource-access",
+                "id": result["resource"]["id"],
+                "attributes": result,
+            }
+        }
+    )
+
+
+_ACCESS_DOC = """Which roles reach this resource, at what capability, and who holds them.
+
+    The inverse of the role preview, and the question asked when looking at one
+    thing rather than at one role: *who can touch this?* Roles are few, so this
+    evaluates every role against one resource — no pagination is needed.
+
+    `platform-paths` is not decoration. A list of roles reads as the complete
+    answer when it is not: a platform admin reaches everything, an owner holds
+    admin on their own resource, and an `access: everyone` label makes a thing
+    readable with no role involved at all. Answering "who can reach this" while
+    omitting those would be worse than not answering it.
+    """
+
+
+@router.get("/workspaces/{resource_id}/access")
+async def workspace_access(
+    resource_id: str = Path(...),
+    user: AuthenticatedUser = Depends(require_admin_or_audit),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    return await _resource_access(db, "workspaces", resource_id, user.roles)
+
+
+@router.get("/agent-pools/{resource_id}/access")
+async def agent_pool_access(
+    resource_id: str = Path(...),
+    user: AuthenticatedUser = Depends(require_admin_or_audit),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    return await _resource_access(db, "agent-pools", resource_id, user.roles)
+
+
+@router.get("/registry-modules/{resource_id}/access")
+async def registry_module_access(
+    resource_id: str = Path(...),
+    user: AuthenticatedUser = Depends(require_admin_or_audit),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    return await _resource_access(db, "registry-modules", resource_id, user.roles)
+
+
+@router.get("/registry-providers/{resource_id}/access")
+async def registry_provider_access(
+    resource_id: str = Path(...),
+    user: AuthenticatedUser = Depends(require_admin_or_audit),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    return await _resource_access(db, "registry-providers", resource_id, user.roles)
+
+
+@router.get("/catalog-items/{resource_id}/access")
+async def catalog_item_access(
+    resource_id: str = Path(...),
+    user: AuthenticatedUser = Depends(require_admin_or_audit),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    return await _resource_access(db, "catalog-items", resource_id, user.roles)
+
+
+workspace_access.__doc__ = _ACCESS_DOC
+agent_pool_access.__doc__ = _ACCESS_DOC
+registry_module_access.__doc__ = _ACCESS_DOC
+registry_provider_access.__doc__ = _ACCESS_DOC
+catalog_item_access.__doc__ = _ACCESS_DOC

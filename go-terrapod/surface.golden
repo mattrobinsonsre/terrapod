@@ -601,6 +601,18 @@ field Resource.Attributes map[string]json.RawMessage `json:"attributes"`
 field Resource.ID string `json:"id"`
 field Resource.Relationships map[string]Relationship `json:"relationships,omitempty"`
 field Resource.Type string `json:"type"`
+field ResourceAccess.Axis string `json:"axis"`
+field ResourceAccess.DeniedRoles []ResourceAccessRole `json:"denied-roles,omitempty"`
+field ResourceAccess.PlatformPaths []string `json:"platform-paths,omitempty"`
+field ResourceAccess.Resource struct { ID string `json:"id"` Kind string `json:"kind"` Name string `json:"name"` Labels map[string]string `json:"labels,omitempty"` OwnerEmail string `json:"owner-email,omitempty"` } `json:"resource"`
+field ResourceAccess.RoleCount int `json:"role-count"`
+field ResourceAccess.Roles []ResourceAccessRole `json:"roles"`
+field ResourceAccessRole.Capabilities []string `json:"capabilities,omitempty"`
+field ResourceAccessRole.HeldBy []string `json:"held-by,omitempty"`
+field ResourceAccessRole.Notes []string `json:"notes,omitempty"`
+field ResourceAccessRole.Reason string `json:"reason,omitempty"`
+field ResourceAccessRole.Role string `json:"role"`
+field ResourceAccessRole.Verdict string `json:"verdict"`
 field RestoreOptions.Force bool
 field RestoreOptions.Name string
 field RestoredWorkspace.DroppedReferences []map[string]any `json:"dropped-references"`
@@ -628,16 +640,24 @@ field RoleAssignment.CreatedAt string `json:"created-at,omitempty"`
 field RoleAssignment.Email string `json:"email"`
 field RoleAssignment.ProviderName string `json:"provider-name"`
 field RoleAssignment.RoleName string `json:"role-name"`
+field RoleReach.Axes map[string]RoleReachAxis `json:"axes,omitempty"`
 field RoleReach.Denied []RoleReachWorkspace `json:"denied,omitempty"`
 field RoleReach.DeniedCount int `json:"denied-count"`
 field RoleReach.DeniedTruncated bool `json:"denied-truncated"`
 field RoleReach.GrantedCount int `json:"granted-count"`
 field RoleReach.MatchedCount int `json:"matched-count"`
 field RoleReach.Workspaces []RoleReachWorkspace `json:"workspaces"`
+field RoleReachAxis.Denied []RoleReachWorkspace `json:"denied,omitempty"`
+field RoleReachAxis.DeniedCount int `json:"denied-count"`
+field RoleReachAxis.DeniedTruncated bool `json:"denied-truncated"`
+field RoleReachAxis.GrantedCount int `json:"granted-count"`
+field RoleReachAxis.MatchedCount int `json:"matched-count"`
+field RoleReachAxis.Resources []RoleReachWorkspace `json:"resources"`
 field RoleReachOptions.PageNumber int
 field RoleReachOptions.PageSize int
 field RoleReachWorkspace.Capabilities []string `json:"capabilities,omitempty"`
 field RoleReachWorkspace.ID string `json:"id"`
+field RoleReachWorkspace.Kind string `json:"kind,omitempty"`
 field RoleReachWorkspace.Labels map[string]string `json:"labels,omitempty"`
 field RoleReachWorkspace.Name string `json:"name"`
 field RoleReachWorkspace.Notes []string `json:"notes,omitempty"`
@@ -1204,6 +1224,7 @@ method (*Client) GetProviderTemplate(ctx context.Context, id string) (*ProviderT
 method (*Client) GetRegistryModule(ctx context.Context, name, providerName string) (*RegistryModule, error)
 method (*Client) GetRegistryProvider(ctx context.Context, name string) (*RegistryProvider, error)
 method (*Client) GetRemoteStateConsumer(ctx context.Context, id string) (*RemoteStateConsumer, error)
+method (*Client) GetResourceAccess(ctx context.Context, kind, id string) (*ResourceAccess, error)
 method (*Client) GetRole(ctx context.Context, name string) (*Role, error)
 method (*Client) GetRoleAssignment(ctx context.Context, providerName, email, roleName string) (*RoleAssignment, error)
 method (*Client) GetRun(ctx context.Context, runID string) (*Run, error)
@@ -1429,11 +1450,14 @@ type Relationship struct
 type RelationshipResource struct
 type RemoteStateConsumer struct
 type Resource struct
+type ResourceAccess struct
+type ResourceAccessRole struct
 type RestoreOptions struct
 type RestoredWorkspace struct
 type Role struct
 type RoleAssignment struct
 type RoleReach struct
+type RoleReachAxis struct
 type RoleReachOptions struct
 type RoleReachWorkspace struct
 type Run struct
