@@ -291,7 +291,13 @@ async def applicable_varsets(
         if await _rule_matches(db, vs.assignment_rule, workspace_id):
             seen[vs.id] = (vs, ASSIGNMENT_RULE)
 
-    out = list(seen.values())
+    # Order matters and is not the same question as the label above.
+    # `resolve_variables` applies a tier last-write-wins, so whatever comes last
+    # wins a key collision. v1.5.4 returned globals first and explicit second,
+    # making an explicit assignment beat a global — reordering this list would
+    # invert that silently on upgrade, for workspaces nobody touched.
+    rank = {ASSIGNMENT_GLOBAL: 0, ASSIGNMENT_RULE: 1, ASSIGNMENT_EXPLICIT: 2}
+    out = sorted(seen.values(), key=lambda row: rank[row[1]])
     for vs, _ in out:
         await db.refresh(vs, ["variables"])
     return out
@@ -355,12 +361,21 @@ async def _rule_matches(db: AsyncSession, rule: dict | None, workspace_id: uuid.
     if not rule:
         return False
     try:
+        # build_workspace_query must be inside the guard, not only parse_filter:
+        # it is where the "at least one selector" check lives, so a rule that
+        # parses but selects nothing raises HERE. This walks every rule-bearing
+        # set for every workspace, so an escape is not one broken workspace — it
+        # is every run in the deployment failing to dispatch.
         parsed = wss.parse_filter(rule)
+        base = wss.build_workspace_query(parsed)
     except Exception:
-        logger.warning("variable set has an unparseable assignment rule; matching nothing")
+        logger.warning(
+            "variable set has an unusable assignment rule; matching nothing",
+            rule_keys=sorted(rule) if isinstance(rule, dict) else None,
+        )
         return False
 
-    q = wss.build_workspace_query(parsed).where(Workspace.id == workspace_id)
+    q = base.where(Workspace.id == workspace_id)
     found = await db.execute(select(q.exists()))
     return bool(found.scalar())
 

@@ -287,6 +287,7 @@ field CreateVarsetVariableRequest.Key string
 field CreateVarsetVariableRequest.Sensitive bool
 field CreateVarsetVariableRequest.Structured bool
 field CreateVarsetVariableRequest.Value string
+field CreateVarsetVariableRequest.ValueSource string
 field CreateWorkspaceRequest.AISummaryContext string `json:"ai-summary-context,omitempty"`
 field CreateWorkspaceRequest.AISummaryMode string `json:"ai-summary-mode,omitempty"`
 field CreateWorkspaceRequest.AgentPoolID string `json:"agent-pool-id,omitempty"`
@@ -834,6 +835,7 @@ field UpdateVarsetVariableRequest.Key string
 field UpdateVarsetVariableRequest.Sensitive *bool
 field UpdateVarsetVariableRequest.Structured *bool
 field UpdateVarsetVariableRequest.Value *string
+field UpdateVarsetVariableRequest.ValueSource *string
 field UpdateWorkspaceRequest.AISummaryContext *string `json:"ai-summary-context,omitempty"`
 field UpdateWorkspaceRequest.AISummaryMode string `json:"ai-summary-mode,omitempty"`
 field UpdateWorkspaceRequest.AgentPoolID string `json:"agent-pool-id,omitempty"`
@@ -951,6 +953,7 @@ field VariableSetVariable.Sensitive bool `json:"sensitive"`
 field VariableSetVariable.Structured bool `json:"structured"`
 field VariableSetVariable.UpdatedAt string `json:"updated-at,omitempty"`
 field VariableSetVariable.Value string `json:"value,omitempty"`
+field VariableSetVariable.ValueSource string `json:"value-source,omitempty"`
 field VariableSetVariable.VersionID string `json:"version-id,omitempty"`
 field VarsetWorkspace.AssignmentSource string `json:"assignment-source"`
 field VarsetWorkspace.ID string `json:"id"`

@@ -883,6 +883,7 @@
     "structured",
     "updated-at",
     "value",
+    "value-source",
     "version-id"
   ],
   "variables.list_varset_workspaces": [

@@ -2035,6 +2035,17 @@ async def next_run(
         await run_service.transition_run(db, run, "errored", error_message=str(e))
         await db.commit()
         return Response(status_code=204)
+    except Exception as e:  # noqa: BLE001 - backstop, see below
+        # The resolver converts everything it can, but the run is already
+        # claimed by the time we get here: an escape means a 500 to the listener
+        # and a run wedged in `planning`. Failing the run is always better than
+        # stranding it, so this catches what the resolver did not.
+        logger.exception("unexpected failure resolving vault variables")
+        await run_service.transition_run(
+            db, run, "errored", error_message=f"Vault variable resolution failed: {e}"
+        )
+        await db.commit()
+        return Response(status_code=204)
 
     if vault_values:
         for v in resolved:

@@ -217,6 +217,11 @@ export default function VariableSetDetailPage() {
               description: editDesc,
               global: editGlobal,
               priority: editPriority,
+              // Always sent, including as null, so clearing the rule actually
+              // clears it. Omitting this made the whole editor inert: it
+              // rendered, previewed a live match count, reported success, and
+              // saved nothing.
+              'assignment-rule': editGlobal ? null : editRule,
             },
           },
         }),

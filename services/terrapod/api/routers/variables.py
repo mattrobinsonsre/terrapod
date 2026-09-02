@@ -87,6 +87,27 @@ def _validated_value_source(attrs: dict, current: str = "static") -> str:
     return src
 
 
+def _reject_vault_on_local(ws, value_source: str) -> None:
+    """A vault reference only resolves on the agent path.
+
+    `resolve_vault_variables` runs in the listener claim endpoint, so a
+    local-execution workspace would receive no value, no error and no failed
+    run — the one outcome this feature is built to prevent. Refuse it at the
+    point of writing rather than fail silently at run time.
+    """
+    if value_source != "vault":
+        return
+    if getattr(ws, "execution_mode", "agent") == "local":
+        raise HTTPException(
+            status_code=422,
+            detail="A Vault-sourced variable needs agent execution: Terrapod "
+            "resolves the reference server-side when a runner claims the run, "
+            "and a local-execution workspace runs terraform on your own machine "
+            "where that never happens. Switch the workspace to agent execution, "
+            "or supply the value another way.",
+        )
+
+
 def _apply_value_source(attrs: dict, current: str = "static") -> tuple[str, bool]:
     """Resolve `value-source` for a write and validate its reference.
 
@@ -97,11 +118,21 @@ def _apply_value_source(attrs: dict, current: str = "static") -> tuple[str, bool
     src = _validated_value_source(attrs, current)
     if src != "vault":
         return src, False
-    if "value" in attrs:
-        try:
-            parse_reference(attrs.get("value") or "", key=attrs.get("key", "<variable>"))
-        except VaultSourceError as e:
-            raise HTTPException(status_code=422, detail=str(e)) from e
+    if "value" not in attrs:
+        # A value-less flip to vault left the previous literal in place, and the
+        # reference-is-not-a-secret display rule then returned it — so a write
+        # capability became a read-back of a stored secret. Requiring the
+        # reference closes that and is what the operator meant anyway.
+        raise HTTPException(
+            status_code=422,
+            detail="value-source 'vault' requires a reference in `value` "
+            '(for example {"mount":"secret","path":"apps/x","field":"token"}); '
+            "supply one rather than converting an existing value in place",
+        )
+    try:
+        parse_reference(attrs.get("value") or "", key=attrs.get("key", "<variable>"))
+    except VaultSourceError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
     return src, True
 
 
@@ -220,6 +251,7 @@ async def create_workspace_var(
         raise HTTPException(status_code=422, detail="Variable key is required")
 
     value_source, force_sensitive = _apply_value_source(attrs)
+    _reject_vault_on_local(ws, value_source)
 
     try:
         var = await variable_service.create_variable(
@@ -269,6 +301,7 @@ async def update_workspace_var(
 
     try:
         value_source, _force = _apply_value_source(attrs, var.value_source)
+        _reject_vault_on_local(ws, value_source)
         var = await variable_service.update_variable(
             db,
             var,
@@ -424,7 +457,11 @@ def _validated_assignment_rule(attrs: dict) -> dict | None:
             detail="A global variable set already applies to every workspace; "
             "it cannot also carry an assignment-rule",
         )
-    if rule.get("workspace_ids"):
+    # Normalise first: parse_filter accepts hyphens, so an underscore-only guard
+    # below would be decorative — `workspace-ids` sailed straight past it.
+    rule = {str(k).replace("-", "_"): v for k, v in rule.items()}
+
+    if "workspace_ids" in rule:
         # A literal list of ids is not a rule — it is explicit assignment, which
         # the relationships endpoint already does and the UI already surfaces as
         # its own tab. Allowing both would mean two mechanisms for one thing, and
@@ -451,7 +488,14 @@ def _validated_assignment_rule(attrs: dict) -> dict | None:
     # scoping dimensions, and the provider can model that set completely.
     rule = {k: v for k, v in rule.items() if k != "all"}
     try:
-        workspace_search_service.parse_filter(rule)
+        parsed = workspace_search_service.parse_filter(rule)
+        # Build the query too, not just parse. The "at least one selector" check
+        # lives in the builder, so parsing alone accepted rules that select
+        # nothing — and a blank string counted as a dimension while the builder
+        # skipped it, so `{"name_prefix": ""}` produced a query with no WHERE
+        # clause and matched EVERY workspace. Validating with the same builder
+        # resolution uses is the only way these cannot diverge.
+        workspace_search_service.build_workspace_query(parsed)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=f"Invalid assignment-rule: {e}") from e
     return rule
@@ -569,11 +613,14 @@ def _vsvar_json(vsv: VariableSetVariable, varset_id: str) -> dict:
         "type": "vars",
         "attributes": {
             "key": vsv.key,
-            "value": None if vsv.sensitive else vsv.value,
+            # Same rule as a workspace variable: a vault reference is a path,
+            # not a secret, so it is shown rather than masked (#1439).
+            "value": _visible_value(vsv),
             "sensitive": vsv.sensitive,
             "category": vsv.category,
             "structured": vsv.structured,
             "hcl": vsv.structured,
+            "value-source": vsv.value_source,
             "description": vsv.description,
             "version-id": vsv.version_id,
             "created-at": _rfc3339(vsv.created_at),
@@ -626,8 +673,13 @@ async def create_varset_var(
     if category in variable_service.GIT_AUTH_CATEGORIES:
         sensitive = True  # git-auth values are always secret
 
+    value_source, force_sensitive = _apply_value_source(attrs)
+    if force_sensitive:
+        sensitive = True
+
     vsv = VariableSetVariable(
         variable_set_id=vs.id,
+        value_source=value_source,
         key=key,
         value=value,
         description=attrs.get("description", ""),
@@ -678,6 +730,10 @@ async def update_varset_var(
     supplied = _structured_from(attrs)
     if supplied is not None:
         vsv.structured = supplied
+    if "value-source" in attrs:
+        vsv.value_source, force_sensitive = _apply_value_source(attrs, vsv.value_source)
+        if force_sensitive:
+            vsv.sensitive = True
     was_sensitive = vsv.sensitive
     if "value" in attrs:
         vsv.value = attrs["value"]
