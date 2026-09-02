@@ -803,6 +803,69 @@ jobs:
           fi
           echo "all third-party images are overridable, and every mirror ref is listed"
 
+      - name: The Vault value source reaches the pod, and its credential never does
+        run: |
+          # Two halves of the config-channel contract for #1439.
+          #
+          # First: the instance list must render into the ConfigMap. A Vault an
+          # operator configures but the pod never sees is a variable that fails
+          # its first run, with nothing to explain why.
+          #
+          # Second, and specific to this feature: the approle/token credential
+          # must reach the pod as a secretKeyRef and must NEVER appear in the
+          # ConfigMap. It is a credential; a ConfigMap is world-readable to
+          # anything with namespace read.
+          cat > /tmp/vault-values.yaml <<'EOF'
+          api:
+            config:
+              vault:
+                enabled: true
+                instances:
+                  - name: with-approle
+                    address: https://vault.example:8200
+                    auth: { method: approle, mount: approle, role: rid }
+                    existingSecret: vault-approle
+                    existingSecretKey: secret_id
+                  - name: kube
+                    default: true
+                    address: https://vault2.example:8200
+                    auth: { method: kubernetes, mount: kubernetes, role: terrapod }
+                    paths: ["secret/apps"]
+          EOF
+          docker run --rm -v "$PWD:/chart" -v /tmp:/tmp -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \
+            template terrapod helm/terrapod \
+            --set postgresql.url=postgresql+asyncpg://t:t@db:5432/terrapod \
+            --set redis.url=redis://redis:6379 \
+            -f /tmp/vault-values.yaml > /tmp/rendered-vault.yaml
+
+          for want in 'vault:' 'with-approle' 'kube' 'secret/apps' 'mount: "approle"' 'role: "terrapod"'; do
+            grep -q "$want" /tmp/rendered-vault.yaml || {
+              echo "vault config never reaches the pod — missing from the rendered ConfigMap: $want"
+              echo "add a render line to templates/configmap-api.yaml"
+              exit 1
+            }
+          done
+
+          # The env var name is a contract between the chart and
+          # vault_source_service._secret_for(). If they disagree the credential
+          # is silently absent and approle auth fails with a confusing error.
+          grep -q 'TERRAPOD_VAULT_WITH_APPROLE_SECRET' /tmp/rendered-vault.yaml || {
+            echo "the approle credential is not injected, or the env var name changed."
+            echo "the chart and vault_source_service._secret_for() must derive the same name."
+            exit 1
+          }
+          # Kubernetes auth stores no credential, so it must mint no env var.
+          grep -q 'TERRAPOD_VAULT_KUBE_SECRET' /tmp/rendered-vault.yaml && {
+            echo "kubernetes auth needs no stored credential but an env var was rendered"
+            exit 1
+          }
+          # And the credential itself must never be in the ConfigMap.
+          awk '/^kind: ConfigMap/,/^---/' /tmp/rendered-vault.yaml | grep -q 'existingSecret\|secret_id' && {
+            echo "a Vault credential reference leaked into the ConfigMap"
+            exit 1
+          }
+          echo "vault config renders; credential is secretKeyRef-only"
+
       - name: Every retention key in values.yaml reaches the rendered ConfigMap
         run: |
           # Leg 3 of the config-channel contract. A key can be in values.yaml

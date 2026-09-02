@@ -314,5 +314,20 @@ this path.
 - **No file materialization yet.** Values are delivered as environment or
   Terraform variables. A provider that insists on reading a credential from a
   file path still needs the sidecar.
-- **`approle` and `token` auth** are supported in configuration but are less
-  well trodden than `kubernetes`, which needs no stored credential.
+- **`approle` and `token` auth** work but are less well trodden than
+  `kubernetes`, which needs no stored credential. Supply the secret_id or token
+  with `existingSecret` on the instance:
+
+  ```yaml
+        - name: prod-vault
+          address: https://vault.internal:8200
+          auth:
+            method: approle
+            mount: approle
+            role: <role-id>        # AppRole role_id
+          existingSecret: my-vault-approle
+          existingSecretKey: secret_id    # defaults to "secret"
+  ```
+
+  The chart injects it as `TERRAPOD_VAULT_<NAME>_SECRET` via `secretKeyRef`,
+  never through the ConfigMap. Kubernetes auth ignores all of this.
