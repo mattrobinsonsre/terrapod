@@ -17,6 +17,7 @@
 //	"hcl"         → hcl         (bool, optional)
 //	"sensitive"   → sensitive   (bool, optional)
 //	"description" → description (string, optional)
+//	"value-source"→ value_source(string, optional: "static" or "vault")
 //
 // Read-only:
 //
@@ -26,6 +27,11 @@
 //
 // Note: When sensitive=true, the API returns value=null. The provider stores
 // the configured value in state and never reads it back from the API.
+//
+// A value_source of "vault" makes `value` a JSON *reference* rather than a
+// literal (#1439), which the API returns rather than masking — a path is not a
+// secret. Terrapod forces sensitive=true on such a variable, so the provider
+// treats sensitive as Computed there rather than fighting the server over it.
 //
 // Import: workspace_id/variable_id
 package variable
@@ -44,6 +50,7 @@ type variableModel struct {
 	HCL         types.Bool   `tfsdk:"hcl"`
 	Sensitive   types.Bool   `tfsdk:"sensitive"`
 	Description types.String `tfsdk:"description"`
+	ValueSource types.String `tfsdk:"value_source"`
 
 	VersionID types.String `tfsdk:"version_id"`
 	CreatedAt types.String `tfsdk:"created_at"`

@@ -183,11 +183,13 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		HCL         *bool  `json:"hcl,omitempty" jsonschema:"the value is a raw HCL expression (lists/objects); default false"`
 		Sensitive   *bool  `json:"sensitive,omitempty" jsonschema:"mark sensitive — masked at rest and in responses; default false"`
 		Description string `json:"description,omitempty" jsonschema:"optional human description"`
+		ValueSource string `json:"value_source,omitempty" jsonschema:"static (default — value is the literal) or vault, where value is a JSON reference {\"mount\":…,\"path\":…,\"field\":…} that Terrapod reads from HashiCorp Vault at run time; a vault-sourced variable is always sensitive and the secret is never stored in Terrapod"`
 	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "terrapod_variable_set",
 		Description: "Set a workspace variable — creates it if the key is new, updates it in place if it exists (an upsert keyed on `key`). " +
-			"category defaults to terraform; set category=env for an environment variable, or git_http_auth/git_ssh_auth for private-git-module credentials (JSON value, always sensitive — see the module-auth docs). Set hcl=true for non-string values (lists/objects/numbers). Returns the variable.",
+			"category defaults to terraform; set category=env for an environment variable, or git_http_auth/git_ssh_auth for private-git-module credentials (JSON value, always sensitive — see the module-auth docs). Set hcl=true for non-string values (lists/objects/numbers). " +
+			"Set value_source=vault to store a Vault reference instead of a literal, so the secret stays in Vault and is read per run — an unresolvable reference fails the run rather than delivering nothing. Returns the variable.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in variableSetIn) (*mcp.CallToolResult, *terrapod.Variable, error) {
 		if in.WorkspaceID == "" || in.Key == "" {
 			return errText("workspace_id and key are required"), nil, nil
@@ -207,6 +209,7 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 				HCL:         in.HCL,
 				Sensitive:   in.Sensitive,
 				Description: strPtrOrNil(in.Description),
+				ValueSource: strPtrOrNil(in.ValueSource),
 			})
 			if uerr != nil {
 				return errResult(uerr), nil, nil
@@ -222,6 +225,7 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 			HCL:         boolOrFalse(in.HCL),
 			Sensitive:   boolOrFalse(in.Sensitive),
 			Description: in.Description,
+			ValueSource: in.ValueSource,
 		})
 		if cerr != nil {
 			return errResult(cerr), nil, nil
