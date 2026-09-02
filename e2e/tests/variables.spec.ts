@@ -175,7 +175,29 @@ test.describe('Vault value source (#1439)', () => {
     // than a mock of it. Offering a source that cannot work would produce a
     // variable that fails its first run.
     const token = getStoredToken()
-    const wsId = await createWorkspace(token, uniqueName('e2enovault'))
+    // Agent mode deliberately: the picker is also hidden under local
+    // execution, so a local workspace would pass this for the wrong reason
+    // and stop testing the Vault-not-configured gate at all.
+    const wsId = await createWorkspace(token, uniqueName('e2enovault'), {
+      'execution-mode': 'agent',
+    })
+
+    await page.goto(`/workspaces/${wsId}?tab=variables`)
+    await page.getByRole('button', { name: 'Add Variable' }).click()
+    await expect(page.locator('#var-key')).toBeVisible()
+    await expect(page.locator('#var-source')).toHaveCount(0)
+  })
+
+  test('the source picker is not offered on a local workspace, even with Vault configured', async ({ page }) => {
+    // The other direction of the same gate: Vault is available here, but a
+    // reference is resolved on the listener claim path, so under local
+    // execution it would deliver nothing and the API refuses to store it.
+    // Offering the source would mean filling in the builder to meet a 422.
+    const token = getStoredToken()
+    const wsId = await createWorkspace(token, uniqueName('e2evaultlocal'), {
+      'execution-mode': 'local',
+    })
+    await withVault(page)
 
     await page.goto(`/workspaces/${wsId}?tab=variables`)
     await page.getByRole('button', { name: 'Add Variable' }).click()
@@ -185,7 +207,9 @@ test.describe('Vault value source (#1439)', () => {
 
   test('choosing Vault swaps the value box for the reference builder', async ({ page }) => {
     const token = getStoredToken()
-    const wsId = await createWorkspace(token, uniqueName('e2evaultform'))
+    const wsId = await createWorkspace(token, uniqueName('e2evaultform'), {
+      'execution-mode': 'agent',
+    })
     await withVault(page)
 
     await page.goto(`/workspaces/${wsId}?tab=variables`)
@@ -207,7 +231,11 @@ test.describe('Vault value source (#1439)', () => {
 
   test('a reference is built, saved, and shown as coordinates not asterisks', async ({ page }) => {
     const token = getStoredToken()
-    const wsId = await createWorkspace(token, uniqueName('e2evaultsave'))
+    // Vault references only resolve under agent execution, so the API
+    // refuses to store one on a local workspace (_reject_vault_on_local).
+    const wsId = await createWorkspace(token, uniqueName('e2evaultsave'), {
+      'execution-mode': 'agent',
+    })
     await withVault(page)
 
     await page.goto(`/workspaces/${wsId}?tab=variables`)
@@ -232,7 +260,9 @@ test.describe('Vault value source (#1439)', () => {
     // The defect this guards: editing was value-only, so a vault-backed
     // variable could be created and then never corrected.
     const token = getStoredToken()
-    const wsId = await createWorkspace(token, uniqueName('e2evaultedit'))
+    const wsId = await createWorkspace(token, uniqueName('e2evaultedit'), {
+      'execution-mode': 'agent',
+    })
     await withVault(page)
 
     const res = await fetch(`${API_URL}/api/v2/workspaces/${wsId}/vars`, {
