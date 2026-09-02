@@ -3066,5 +3066,27 @@
     "restoreConfirm": "Gjenopprette state for «{name}»?\n\nDette lager et NYTT arbeidsområde — originalen kommer ikke tilbake. Det kommer tilbake med auto-apply og driftdeteksjon av og uten VCS-tilkobling; variabler og kjørehistorikk kommer ikke tilbake. Bare state reddes.",
     "restoreDone": "Gjenopprettet {versions, plural, one {# state-versjon} other {# state-versjoner}} til det nye arbeidsområdet «{name}». Sjekk innstillingene før du slår på auto-apply eller VCS.",
     "restoreAgainConfirm": "«{name}» er allerede gjenopprettet, til {existing}.\n\nÅ gjenopprette på nytt lager et ANDRE workspace med samme state-slektslinje over samme infrastruktur. En apply i det ene får da det andres neste plan til å se ut som omfattende drift.\n\nFortsett bare hvis det tidligere gjenopprettede workspacet er borte."
+  },
+  "roleReach": {
+    "title": "Arbeidsområder dette omfatter",
+    "checking": "Kontrollerer…",
+    "failed": "Kunne ikke fastslå hva denne regelen omfatter.",
+    "noAllowRules": "Legg til en tillatt etikett eller et tillatt navn for å se hvilke arbeidsområder denne rollen ville omfatte.",
+    "granted": "innvilget",
+    "deniedCount": "nektet",
+    "matched": "{count} samsvarer med tillatelsesreglene",
+    "andMore": "…og {count} til",
+    "excludedByDeny": "Ekskludert av nektereglene",
+    "reason": {
+      "allowName": "ved navn",
+      "denyName": "nektet ved navn",
+      "allowLabel": "samsvarer med {rule}",
+      "denyLabel": "nektet av {rule}"
+    },
+    "note": {
+      "catalogClamped": "Katalogstyrt — begrenset til lesing",
+      "everyoneFloor": "Lesbar for alle",
+      "hasOwner": "Eieren har allerede administratorrettigheter"
+    }
   }
 }

@@ -3066,5 +3066,27 @@
     "restoreConfirm": "Obnovit stav „{name}“?\n\nVytvoří se NOVÝ pracovní prostor — původní se nevrátí. Vrátí se s vypnutým auto-apply i detekcí driftu a bez připojení VCS; proměnné ani historie běhů se nevrátí. Obnoví se pouze stav.",
     "restoreDone": "Obnoveno {versions, plural, one {# verze stavu} few {# verze stavu} many {# verze stavu} other {# verzí stavu}} do nového pracovního prostoru „{name}“. Před zapnutím auto-apply nebo VCS zkontrolujte nastavení.",
     "restoreAgainConfirm": "„{name}“ už byl obnoven, do {existing}.\n\nDalší obnovení vytvoří DRUHÝ workspace se stejnou linií stavu nad stejnou infrastrukturou. Apply v kterémkoli z nich pak způsobí, že další plán toho druhého bude vypadat jako rozsáhlý drift.\n\nPokračujte jen tehdy, pokud dříve obnovený workspace už neexistuje."
+  },
+  "roleReach": {
+    "title": "Pracovní prostory v dosahu",
+    "checking": "Ověřování…",
+    "failed": "Nepodařilo se zjistit dosah tohoto pravidla.",
+    "noAllowRules": "Přidejte povolující štítek nebo název, abyste viděli, které pracovní prostory by tato role zasáhla.",
+    "granted": "uděleno",
+    "deniedCount": "odepřeno",
+    "matched": "{count} odpovídá povolujícím pravidlům",
+    "andMore": "…a {count} dalších",
+    "excludedByDeny": "Vyloučeno pravidly odepření",
+    "reason": {
+      "allowName": "podle názvu",
+      "denyName": "odepřeno podle názvu",
+      "allowLabel": "odpovídá {rule}",
+      "denyLabel": "odepřeno pravidlem {rule}"
+    },
+    "note": {
+      "catalogClamped": "Spravováno katalogem — omezeno na čtení",
+      "everyoneFloor": "Čitelné pro všechny",
+      "hasOwner": "Vlastník už má práva správce"
+    }
   }
 }

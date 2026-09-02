@@ -74,5 +74,10 @@
         "none": "Nothing (single colour)"
       }
     }
+  },
+  "roleReach": {
+    "note": {
+      "catalogClamped": "Catalogue-managed — capped at read"
+    }
   }
 }

@@ -3066,5 +3066,27 @@
     "restoreConfirm": "Adfer cyflwr „{name}”?\n\nMae hyn yn creu gweithfan NEWYDD — nid yw''r un wreiddiol yn dod yn ôl. Daw''n ôl heb awto-osod, heb ganfod drifft a heb gysylltiad VCS; nid yw''r newidynnau na''r hanes rhedeg yn dod yn ôl. Dim ond y cyflwr a achubir.",
     "restoreDone": "Adferwyd {versions, plural, one {# fersiwn cyflwr} other {# fersiwn cyflwr}} i''r weithfan newydd „{name}”. Gwiriwch ei gosodiadau cyn galluogi awto-osod neu VCS.",
     "restoreAgainConfirm": "Mae „{name}” wedi''i adfer eisoes, i {existing}.\n\nMae ei adfer eto''n creu AIL weithle sy''n dal yr un llinach cyflwr dros yr un seilwaith. Bydd apply yn y naill neu''r llall wedyn yn gwneud i gynllun nesaf y llall edrych fel drifft llwyr.\n\nParhewch dim ond os yw''r gweithle a adferwyd yn gynharach wedi mynd."
+  },
+  "roleReach": {
+    "title": "Gweithfannau y mae hyn yn eu cyrraedd",
+    "checking": "Yn gwirio…",
+    "failed": "Methwyd â phennu beth mae''r rheol hon yn ei gyrraedd.",
+    "noAllowRules": "Ychwanegwch label neu enw a ganiateir i weld pa weithfannau y byddai''r rôl hon yn eu cyrraedd.",
+    "granted": "wedi''u caniatáu",
+    "deniedCount": "wedi''u gwrthod",
+    "matched": "{count} yn cyfateb i''r rheolau caniatáu",
+    "andMore": "…a {count} arall",
+    "excludedByDeny": "Wedi''u heithrio gan y rheolau gwrthod",
+    "reason": {
+      "allowName": "wrth enw",
+      "denyName": "wedi''i wrthod wrth enw",
+      "allowLabel": "yn cyfateb i {rule}",
+      "denyLabel": "wedi''i wrthod gan {rule}"
+    },
+    "note": {
+      "catalogClamped": "Wedi''i reoli gan y catalog — wedi''i gyfyngu i ddarllen",
+      "everyoneFloor": "Darllenadwy gan bawb",
+      "hasOwner": "Mae gan y perchennog hawliau gweinyddu eisoes"
+    }
   }
 }

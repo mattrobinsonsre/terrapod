@@ -3066,5 +3066,27 @@
     "restoreConfirm": "Gendan state for ”{name}”?\n\nDette opretter et NYT arbejdsområde — originalen kommer ikke tilbage. Det kommer tilbage med auto-apply og driftregistrering slået fra og uden VCS-forbindelse; variabler og kørselshistorik kommer ikke tilbage. Kun state reddes.",
     "restoreDone": "Gendannede {versions, plural, one {# state-version} other {# state-versioner}} til det nye arbejdsområde ”{name}”. Tjek indstillingerne, før du slår auto-apply eller VCS til.",
     "restoreAgainConfirm": "“{name}” er allerede gendannet, til {existing}.\n\nAt gendanne igen opretter et ANDET workspace med den samme state-slægt over den samme infrastruktur. En apply i det ene får så det andets næste plan til at se ud som omfattende drift.\n\nFortsæt kun, hvis det tidligere gendannede workspace er væk."
+  },
+  "roleReach": {
+    "title": "Workspaces dette omfatter",
+    "checking": "Kontrollerer…",
+    "failed": "Kunne ikke afgøre, hvad denne regel omfatter.",
+    "noAllowRules": "Tilføj et tilladt label eller navn for at se, hvilke workspaces denne rolle ville omfatte.",
+    "granted": "tildelt",
+    "deniedCount": "nægtet",
+    "matched": "{count} matcher tilladelsesreglerne",
+    "andMore": "…og {count} mere",
+    "excludedByDeny": "Udelukket af nægtelsesreglerne",
+    "reason": {
+      "allowName": "ved navn",
+      "denyName": "nægtet ved navn",
+      "allowLabel": "matcher {rule}",
+      "denyLabel": "nægtet af {rule}"
+    },
+    "note": {
+      "catalogClamped": "Katalogstyret — begrænset til læsning",
+      "everyoneFloor": "Læsbar for alle",
+      "hasOwner": "Ejeren har allerede administratorrettigheder"
+    }
   }
 }

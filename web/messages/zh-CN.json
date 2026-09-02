@@ -3066,5 +3066,27 @@
     "restoreConfirm": "要恢复“{name}”的状态吗？\n\n这会创建一个新的工作区——原工作区不会回来。它恢复后自动应用与漂移检测均为关闭，且没有 VCS 连接；变量和运行历史不会恢复。只有状态会被抢救回来。",
     "restoreDone": "已将 {versions, plural, other {# 个状态版本}} 恢复到新工作区“{name}”。启用自动应用或 VCS 之前请检查其设置。",
     "restoreAgainConfirm": "“{name}”已经恢复过一次，恢复到了 {existing}。\n\n再次恢复会创建第二个工作区，它在同一套基础设施之上持有相同的 state 血统。此后在任一工作区执行 apply，都会让另一个的下一次计划看起来像是全面漂移。\n\n只有在先前恢复的工作区已经不存在时才继续。"
+  },
+  "roleReach": {
+    "title": "此规则涵盖的工作区",
+    "checking": "正在检查…",
+    "failed": "无法确定此规则的涵盖范围。",
+    "noAllowRules": "添加允许标签或允许名称，即可查看此角色将涵盖哪些工作区。",
+    "granted": "已授予",
+    "deniedCount": "已拒绝",
+    "matched": "{count} 个与允许规则匹配",
+    "andMore": "…另有 {count} 个",
+    "excludedByDeny": "被拒绝规则排除",
+    "reason": {
+      "allowName": "按名称",
+      "denyName": "按名称拒绝",
+      "allowLabel": "匹配 {rule}",
+      "denyLabel": "被 {rule} 拒绝"
+    },
+    "note": {
+      "catalogClamped": "目录托管 — 限制为只读",
+      "everyoneFloor": "所有人可读",
+      "hasOwner": "所有者已具有管理员权限"
+    }
   }
 }

@@ -241,6 +241,63 @@ Built-in roles (`admin`, `audit`, `everyone`) cannot be deleted.
 
 ---
 
+## Seeing What a Role Reaches
+
+Label-based RBAC scales as a mechanism, but not as something you can verify by
+eye. At a few hundred workspaces you can tell at a glance who `env:prod`
+reaches; at ten thousand you cannot — which pushes people towards broad rules
+they can reason about, and away from deny rules, whose interaction with allow
+rules is exactly where mistakes hide.
+
+Two endpoints answer the question directly:
+
+```
+POST /api/terrapod/v1/roles/preview          # an UNSAVED role body
+GET  /api/terrapod/v1/roles/{name}/preview   # a saved role
+```
+
+Both are read-only and carry the same `admin`/`audit` gate as viewing roles.
+The **unsaved** form is the one that matters while authoring: the role does not
+have to exist yet, so the admin UI shows the match updating as you type, and you
+see the outcome of a deny rule *before* saving it.
+
+The response reports:
+
+| Field | Meaning |
+|---|---|
+| `granted-count` | Workspaces the role grants on — **counted across the whole fleet**, not the returned page |
+| `denied-count` | Workspaces an allow rule matched and a deny rule then removed |
+| `matched-count` | The two added together: everything the allow rules touched |
+| `workspaces` | One page of the granted set |
+| `denied` | A bounded sample of what the deny rules excluded |
+
+Each workspace carries a `reason` naming the rule responsible
+(`allow-label:env=prod`, `deny-name`, …), the `capabilities` the role resolves
+to *there*, and `notes`.
+
+**Read the notes before concluding the role is the only thing granting access.**
+Each names a path that exists independently of the role:
+
+| Note | Meaning |
+|---|---|
+| `has-owner` | The workspace has an owner, and an owner holds `admin` regardless of this role |
+| `everyone-floor` | Labelled `access: everyone`, so it is readable by anyone |
+| `catalog-clamped` | Catalog-managed, so every non-platform-admin grant is capped at read — a role granting write here does **not** give write |
+
+Denied workspaces are reported rather than silently omitted, because someone who
+cannot see what a deny rule removed cannot tell an intended exclusion from a
+typo.
+
+Built-in roles are **refused** (422) rather than answered: `admin` and `audit`
+grant through the platform path on every workspace, so a label-reach figure for
+them would be true and deeply misleading.
+
+The preview resolves through the same gate that authorises requests, so it
+cannot drift from enforcement — a permissions view that disagrees with the
+enforcement path would be worse than no view at all.
+
+---
+
 ## Role Assignments
 
 Role assignments bind a user (identified by provider + email) to a role.

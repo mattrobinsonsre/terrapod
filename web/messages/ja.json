@@ -3066,5 +3066,27 @@
     "restoreConfirm": "「{name}」のステートを復元しますか？\n\n新しいワークスペースが作成されます。元のワークスペースは戻りません。自動適用とドリフト検出は無効、VCS 接続もない状態で復元され、変数と実行履歴は戻りません。復旧されるのはステートのみです。",
     "restoreDone": "{versions, plural, other {# 件のステートバージョン}}を新しいワークスペース「{name}」に復旧しました。自動適用や VCS を有効にする前に設定を確認してください。",
     "restoreAgainConfirm": "「{name}」はすでに {existing} に復元されています。\n\nもう一度復元すると、同じインフラの上に同じ state リネージを持つ 2 つ目のワークスペースができます。どちらかで apply すると、もう一方の次のプランが全面的なドリフトのように見えます。\n\n以前に復元したワークスペースがすでに存在しない場合にのみ続行してください。"
+  },
+  "roleReach": {
+    "title": "対象となるワークスペース",
+    "checking": "確認中…",
+    "failed": "このルールの適用範囲を判断できませんでした。",
+    "noAllowRules": "許可ラベルまたは許可名を追加すると、このロールが対象とするワークスペースが表示されます。",
+    "granted": "許可",
+    "deniedCount": "拒否",
+    "matched": "許可ルールに一致: {count} 件",
+    "andMore": "…他 {count} 件",
+    "excludedByDeny": "拒否ルールによる除外",
+    "reason": {
+      "allowName": "名前指定",
+      "denyName": "名前で拒否",
+      "allowLabel": "{rule} に一致",
+      "denyLabel": "{rule} により拒否"
+    },
+    "note": {
+      "catalogClamped": "カタログ管理 — 読み取りに制限",
+      "everyoneFloor": "全員が読み取り可能",
+      "hasOwner": "所有者はすでに管理者権限を保持"
+    }
   }
 }

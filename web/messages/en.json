@@ -3066,5 +3066,27 @@
     "restoreConfirm": "Restore the state of \"{name}\"?\n\nThis creates a NEW workspace — the original is not brought back. It returns with auto-apply and drift detection off and no VCS connection, and its variables and run history do not come back. Only the state is recovered.",
     "restoreDone": "Recovered {versions, plural, one {# state version} other {# state versions}} into the new workspace \"{name}\". Check its settings before enabling auto-apply or VCS.",
     "restoreAgainConfirm": "\"{name}\" has already been restored, into {existing}.\n\nRestoring it again creates a SECOND workspace holding the same state lineage over the same infrastructure. Applying in either will then make the other's next plan look like wholesale drift.\n\nOnly continue if the earlier restored workspace is gone."
+  },
+  "roleReach": {
+    "title": "Workspaces this reaches",
+    "checking": "Checking…",
+    "failed": "Could not work out what this rule reaches.",
+    "noAllowRules": "Add an allow label or an allow name to see which workspaces this role would reach.",
+    "granted": "granted",
+    "deniedCount": "denied",
+    "matched": "{count} matched by the allow rules",
+    "andMore": "…and {count} more",
+    "excludedByDeny": "Excluded by the deny rules",
+    "reason": {
+      "allowName": "named",
+      "denyName": "denied by name",
+      "allowLabel": "matches {rule}",
+      "denyLabel": "denied by {rule}"
+    },
+    "note": {
+      "catalogClamped": "Catalog-managed — capped at read",
+      "everyoneFloor": "Readable by everyone",
+      "hasOwner": "Owner already has admin"
+    }
   }
 }

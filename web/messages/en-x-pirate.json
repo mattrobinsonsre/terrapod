@@ -3066,5 +3066,27 @@
     "restoreConfirm": "Salvage the state o'' \"{name}\"?\n\nThis builds a NEW work-deck — the old one be gone to the depths for good. She comes up with auto-apply and drift-watch doused and nary a VCS line; her variables and voyage log do not come back. Only the state be salvaged.",
     "restoreDone": "Salvaged {versions, plural, one {# state version} other {# state versions}} into the new work-deck \"{name}\". Inspect her riggin'' afore ye hoist auto-apply or VCS.",
     "restoreAgainConfirm": "\"{name}\" has already been hauled back from the deep, into {existing}.\n\nHaulin'' her back again spawns a SECOND vessel carryin'' the same state lineage over the same waters. An apply aboard either will then make the other''s next plan read like the whole fleet has drifted.\n\nOnly sail on if the earlier salvaged vessel be sunk."
+  },
+  "roleReach": {
+    "title": "Work-decks this rule be reachin''",
+    "checking": "Searchin''…",
+    "failed": "Could not reckon what this rule be reachin''.",
+    "noAllowRules": "Add an allow label or an allow name t'' spy which work-decks this rank would reach.",
+    "granted": "granted",
+    "deniedCount": "refused",
+    "matched": "{count} matched by the allow articles",
+    "andMore": "…an'' {count} more",
+    "excludedByDeny": "Cast out by the deny articles",
+    "reason": {
+      "allowName": "by name",
+      "denyName": "refused by name",
+      "allowLabel": "matches {rule}",
+      "denyLabel": "refused by {rule}"
+    },
+    "note": {
+      "catalogClamped": "Commanded by the catalog — held t'' lookin'' only",
+      "everyoneFloor": "Readable by all hands",
+      "hasOwner": "The owner already holds command"
+    }
   }
 }

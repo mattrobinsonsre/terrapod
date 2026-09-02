@@ -145,3 +145,58 @@ test.describe('Roles & Assignments', () => {
     await expect(page.locator(`h3:has-text("${roleName}")`)).not.toBeVisible({ timeout: 10_000 });
   });
 });
+
+test.describe('Role reach preview (#1456)', () => {
+  test('the panel reports what an unsaved rule reaches, and what a deny removes', async ({
+    page,
+  }) => {
+    const tag = `reach${Date.now()}`;
+    const token = await page.evaluate(() => JSON.parse(localStorage.getItem('terrapod_auth') || '{}').token);
+
+    // Two workspaces sharing an allow label; one also carries the label the
+    // deny rule will exclude. Created through the API so the test is about the
+    // panel, not about workspace creation.
+    for (const [name, labels] of [
+      [`${tag}-keep`, { squad: tag }],
+      [`${tag}-drop`, { squad: tag, sealed: 'yes' }],
+    ] as [string, Record<string, string>][]) {
+      const res = await page.request.post('/api/v2/organizations/default/workspaces', {
+        headers: { 'Content-Type': 'application/vnd.api+json', Authorization: `Bearer ${token}` },
+        data: { data: { type: 'workspaces', attributes: { name, labels } } },
+      });
+      expect(res.status()).toBe(201);
+    }
+
+    await page.goto('/admin/roles');
+    await page.click('button:has-text("Create Role")');
+
+    const panel = page.getByTestId('role-reach');
+    // Before any allow rule there is nothing to reach, and the panel says so
+    // rather than showing a misleading zero.
+    await expect(panel).toBeVisible();
+
+    await page.fill('#r-allow-labels', `squad=${tag}`);
+    // Both workspaces match the allow rule.
+    await expect(panel.getByText('2', { exact: false })).toBeVisible({ timeout: 15_000 });
+    await expect(panel.getByText(`${tag}-keep`)).toBeVisible({ timeout: 15_000 });
+    await expect(panel.getByText(`${tag}-drop`)).toBeVisible();
+
+    // Adding the deny rule moves one of them into the excluded list — the
+    // feedback that makes a deny rule safe to write.
+    await page.fill('#r-deny-labels', 'sealed=yes');
+    await expect(panel.getByText(`${tag}-drop`)).toBeVisible({ timeout: 15_000 });
+    await expect(panel.getByText(/denied/i).first()).toBeVisible();
+    // The kept one is still granted.
+    await expect(panel.getByText(`${tag}-keep`)).toBeVisible();
+  });
+
+  test('a rule with no allow side is reported as reaching nothing', async ({ page }) => {
+    await page.goto('/admin/roles');
+    await page.click('button:has-text("Create Role")');
+    const panel = page.getByTestId('role-reach');
+    await expect(panel).toBeVisible();
+    // Deny alone grants nothing, so the panel must not imply a reach.
+    await page.fill('#r-deny-labels', 'env=prod');
+    await expect(panel).toContainText(/allow/i);
+  });
+});

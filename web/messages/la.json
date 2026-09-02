@@ -3066,5 +3066,27 @@
     "restoreConfirm": "Statum „{name}” restituere?\n\nHoc locum operis NOVUM creat — pristinum non redit. Redit sine applicatione automatica, sine deprehensione erroris et sine nexu VCS; variabiles et historia cursuum non redeunt. Solus status servatur.",
     "restoreDone": "{versions, plural, one {# versio status} other {# versiones status}} in locum operis novum „{name}” restituta. Optiones inspice antequam applicationem automaticam vel VCS permittas.",
     "restoreAgainConfirm": "«{name}» iam restitutum est, in {existing}.\n\nIterum restituere SECUNDUM workspace creat, idem status genus super eandem infrastructuram tenens. Apply in alterutro deinde efficiet ut alterius consilium proximum velut universa aberratio appareat.\n\nSolum perge si workspace prius restitutum abiit."
+  },
+  "roleReach": {
+    "title": "Loca operis quae haec regula attingit",
+    "checking": "Inspicitur…",
+    "failed": "Quantum haec regula attingat determinari non potuit.",
+    "noAllowRules": "Adde titulum vel nomen permissum ut videas quae loca operis haec persona attingat.",
+    "granted": "concessa",
+    "deniedCount": "negata",
+    "matched": "{count} regulis permissionis congruunt",
+    "andMore": "…et {count} alia",
+    "excludedByDeny": "Regulis negationis exclusa",
+    "reason": {
+      "allowName": "nomine",
+      "denyName": "nomine negatum",
+      "allowLabel": "congruit cum {rule}",
+      "denyLabel": "negatum per {rule}"
+    },
+    "note": {
+      "catalogClamped": "Catalogo administratum — ad lectionem tantum",
+      "everyoneFloor": "Ab omnibus legibile",
+      "hasOwner": "Dominus iam potestatem administrandi habet"
+    }
   }
 }

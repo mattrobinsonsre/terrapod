@@ -3066,5 +3066,27 @@
     "restoreConfirm": "¿Restaurar el estado de «{name}»?\n\nEsto crea un workspace NUEVO: el original no vuelve. Vuelve sin auto-apply, sin detección de deriva y sin conexión VCS; las variables y el historial de ejecuciones no vuelven. Solo se recupera el estado.",
     "restoreDone": "{versions, plural, one {# versión de estado recuperada} other {# versiones de estado recuperadas}} en el nuevo workspace «{name}». Revisa su configuración antes de activar auto-apply o VCS.",
     "restoreAgainConfirm": "«{name}» ya se restauró, en {existing}.\n\nRestaurarlo otra vez crea un SEGUNDO workspace con el mismo linaje de estado sobre la misma infraestructura. Un apply en cualquiera de los dos hará que el siguiente plan del otro parezca una deriva total.\n\nContinúa solo si el workspace restaurado anteriormente ya no existe."
+  },
+  "roleReach": {
+    "title": "Espacios de trabajo alcanzados",
+    "checking": "Comprobando…",
+    "failed": "No se ha podido determinar el alcance de esta regla.",
+    "noAllowRules": "Añada una etiqueta o un nombre de permiso para ver qué espacios de trabajo alcanzaría este rol.",
+    "granted": "concedido",
+    "deniedCount": "denegado",
+    "matched": "{count} coincidentes con las reglas de permiso",
+    "andMore": "…y {count} más",
+    "excludedByDeny": "Excluidos por las reglas de denegación",
+    "reason": {
+      "allowName": "por nombre",
+      "denyName": "denegado por nombre",
+      "allowLabel": "coincide con {rule}",
+      "denyLabel": "denegado por {rule}"
+    },
+    "note": {
+      "catalogClamped": "Gestionado por el catálogo: limitado a lectura",
+      "everyoneFloor": "Legible por todos",
+      "hasOwner": "El propietario ya tiene administración"
+    }
   }
 }
