@@ -643,7 +643,9 @@
       "allowLabelsShort": "Salli tunnisteet",
       "allowNamesShort": "Salli nimet",
       "denyLabelsShort": "Estä tunnisteet",
-      "denyNamesShort": "Estä nimet"
+      "denyNamesShort": "Estä nimet",
+      "allowAll": "Myönnä kaikkeen",
+      "allowAllHelp": "Vastaa jokaista resurssia, myös myöhemmin luotuja. Estosäännöt ovat yhä voimassa. Käytä tätä sen sijaan, että merkitsisit jokaisen työtilan — ilman merkintää luotu työtila jäisi hiljaisesti roolin ulkopuolelle."
     },
     "assignForm": {
       "provider": "Palveluntarjoaja",
@@ -714,7 +716,8 @@
       "deleteRole": "Roolin poistaminen epäonnistui",
       "setAssignment": "Määrityksen asettaminen epäonnistui",
       "setAssignmentStatus": "Määrityksen asettaminen epäonnistui ({status})",
-      "deleteAssignment": "Määrityksen poistaminen epäonnistui"
+      "deleteAssignment": "Määrityksen poistaminen epäonnistui",
+      "conflictingLabelKeys": "{keys} sai useamman kuin yhden arvon. Tunnistesääntö pitää yhden arvon avainta kohden, joten viimeinen korvaisi aiemmat huomaamatta. API tukee useaa arvoa avainta kohden, mutta sitä ei voi vielä asettaa täällä."
     }
   },
   "adminVcs": {
@@ -2254,7 +2257,8 @@
       "cost": "Kustannukset",
       "architecture": "Arkkitehtuuri",
       "insights": "Näkemykset",
-      "automation": "Automaatio"
+      "automation": "Automaatio",
+      "access": "Käyttöoikeus"
     },
     "lifecycle": {
       "pendingDeletion": "Odottaa poistoa",
@@ -3084,6 +3088,33 @@
       "catalogClamped": "Luettelon hallinnoima — rajattu lukuoikeuteen",
       "everyoneFloor": "Kaikkien luettavissa",
       "hasOwner": "Omistajalla on jo järjestelmänvalvojan oikeudet"
+    },
+    "reachesNothing": "Tämä sääntö ei ulotu mihinkään.",
+    "allowAllBanner": "Myöntää kaikkiin resursseihin. Estosäännöt ovat yhä voimassa.",
+    "axis": {
+      "workspace": "Työtilat",
+      "pool": "Agenttiryhmät",
+      "registry": "Rekisteri",
+      "catalog": "Luettelon kohteet"
+    }
+  },
+  "resourceAccess": {
+    "title": "Kuka voi päästä tähän",
+    "subtitle": "Roolit, joiden säännöt vastaavat tätä työtilaa, ja keillä ne ovat.",
+    "loading": "Ladataan…",
+    "failed": "Ei voitu selvittää, kuka voi päästä tähän.",
+    "forbidden": "Tämä vastaus kattaa koko ympäristön, joten se näytetään vain alustan järjestelmänvalvojille ja tarkastajille.",
+    "noRoles": "Mikään roolisääntö ei vastaa tätä työtilaa.",
+    "deniedRoles": "Vastasi, mutta estosääntö sulki pois",
+    "alsoReachable": "Saavutettavissa myös ilman mitään roolia",
+    "heldBy": "Haltijana {who}",
+    "heldByNobody": "Ei kenelläkään — ei käytännössä myönnä mitään",
+    "path": {
+      "platformAdmin": "Alustan järjestelmänvalvojat ulottuvat jokaiseen resurssiin",
+      "platformAudit": "Alustan tarkastajat voivat lukea jokaisen resurssin",
+      "owner": "Omistajalla on täällä järjestelmänvalvojan oikeudet",
+      "everyoneFloor": "Merkitty access: everyone — kaikkien luettavissa",
+      "catalogClamped": "Luettelon hallinnoima — jokainen ei-järjestelmänvalvojan myönnös rajataan lukuoikeuteen"
     }
   }
 }

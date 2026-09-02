@@ -643,7 +643,9 @@
       "allowLabelsShort": "Tillad labels",
       "allowNamesShort": "Tillad navne",
       "denyLabelsShort": "Afvis labels",
-      "denyNamesShort": "Afvis navne"
+      "denyNamesShort": "Afvis navne",
+      "allowAll": "Giv adgang til alt",
+      "allowAllHelp": "Matcher alle ressourcer, også dem der oprettes senere. Nægtelsesregler gælder stadig. Brug dette i stedet for at mærke hvert workspace — et workspace oprettet uden mærket ville stiltiende falde uden for rollen."
     },
     "assignForm": {
       "provider": "Provider",
@@ -714,7 +716,8 @@
       "deleteRole": "Kunne ikke slette rolle",
       "setAssignment": "Kunne ikke angive tildeling",
       "setAssignmentStatus": "Kunne ikke angive tildeling ({status})",
-      "deleteAssignment": "Kunne ikke slette tildeling"
+      "deleteAssignment": "Kunne ikke slette tildeling",
+      "conflictingLabelKeys": "{keys} har fået mere end én værdi. En mærkeregel rummer én værdi pr. nøgle, så den sidste ville stiltiende erstatte de tidligere. Flere værdier pr. nøgle understøttes af API''et, men kan endnu ikke sættes her."
     }
   },
   "adminVcs": {
@@ -2254,7 +2257,8 @@
       "cost": "Omkostning",
       "architecture": "Arkitektur",
       "insights": "Indsigter",
-      "automation": "Automatisering"
+      "automation": "Automatisering",
+      "access": "Adgang"
     },
     "lifecycle": {
       "pendingDeletion": "Afventer sletning",
@@ -3084,6 +3088,33 @@
       "catalogClamped": "Katalogstyret — begrænset til læsning",
       "everyoneFloor": "Læsbar for alle",
       "hasOwner": "Ejeren har allerede administratorrettigheder"
+    },
+    "reachesNothing": "Denne regel omfatter intet.",
+    "allowAllBanner": "Giver adgang til alle ressourcer. Nægtelsesregler gælder stadig.",
+    "axis": {
+      "workspace": "Workspaces",
+      "pool": "Agentpuljer",
+      "registry": "Registry",
+      "catalog": "Katalogelementer"
+    }
+  },
+  "resourceAccess": {
+    "title": "Hvem kan nå dette",
+    "subtitle": "Roller hvis regler matcher dette workspace, og hvem der har dem.",
+    "loading": "Indlæser…",
+    "failed": "Kunne ikke afgøre, hvem der kan nå dette.",
+    "forbidden": "Dette svar dækker hele miljøet og vises derfor kun til platformadministratorer og revisorer.",
+    "noRoles": "Ingen rolleregel matcher dette workspace.",
+    "deniedRoles": "Matchede og blev derefter udelukket af en nægtelsesregel",
+    "alsoReachable": "Kan også nås uden nogen rolle",
+    "heldBy": "Indehaves af {who}",
+    "heldByNobody": "Indehaves af ingen — giver i praksis intet",
+    "path": {
+      "platformAdmin": "Platformadministratorer når alle ressourcer",
+      "platformAudit": "Platformrevisorer kan læse alle ressourcer",
+      "owner": "Ejeren har administratorrettigheder her",
+      "everyoneFloor": "Mærket access: everyone — læsbar for alle",
+      "catalogClamped": "Katalogstyret — enhver ikke-administrativ tildeling er begrænset til læsning"
     }
   }
 }

@@ -125,6 +125,10 @@ def _role_json(role: Role) -> dict:
             "allow-names": role.allow_names,
             "deny-labels": role.deny_labels,
             "deny-names": role.deny_names,
+            # An estate-wide grant must be visible wherever the role is: a
+            # role that reaches everything and looks like one that reaches
+            # nothing is the failure this attribute exists to prevent.
+            "allow-all": role.allow_all,
             # Derived, read-only summary of the capabilities (not persisted).
             "workspace-permission": summary["workspace_permission"],
             "pool-permission": summary["pool_permission"],
@@ -146,6 +150,7 @@ def _builtin_role_json(name: str, info: dict) -> dict:
         "attributes": {
             "description": info.get("description", ""),
             "allow-labels": info.get("allow_labels", {}),
+            "allow-all": False,
             "allow-names": [],
             "deny-labels": {},
             "deny-names": [],
@@ -218,6 +223,7 @@ async def create_role(
     role = Role(
         name=name,
         description=attrs.get("description", ""),
+        allow_all=bool(attrs.get("allow-all", False)),
         allow_labels=attrs.get("allow-labels", {}),
         allow_names=attrs.get("allow-names", []),
         deny_labels=attrs.get("deny-labels", {}),
@@ -271,6 +277,8 @@ async def update_role(
     attrs = body.get("data", {}).get("attributes", {})
     if "description" in attrs:
         role.description = attrs["description"]
+    if "allow-all" in attrs:
+        role.allow_all = bool(attrs["allow-all"])
     if "allow-labels" in attrs:
         role.allow_labels = attrs["allow-labels"]
     if "allow-names" in attrs:
@@ -332,6 +340,7 @@ def _role_from_attrs(attrs: dict) -> Role:
     return Role(
         name=attrs.get("name", "") or "(unsaved)",
         description=attrs.get("description", ""),
+        allow_all=bool(attrs.get("allow-all", False)),
         allow_labels=attrs.get("allow-labels", {}) or {},
         allow_names=attrs.get("allow-names", []) or [],
         deny_labels=attrs.get("deny-labels", {}) or {},

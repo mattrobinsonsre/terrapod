@@ -225,6 +225,7 @@ field CreateRegistryProviderRequest.Labels map[string]string
 field CreateRegistryProviderRequest.Name string
 field CreateRemoteStateConsumerRequest.ConsumerWorkspaceID string
 field CreateRemoteStateConsumerRequest.ProducerWorkspaceID string
+field CreateRoleRequest.AllowAll bool
 field CreateRoleRequest.AllowLabels map[string]string
 field CreateRoleRequest.AllowNames []string
 field CreateRoleRequest.Capabilities []string
@@ -619,6 +620,7 @@ field RestoredWorkspace.RestoredFrom string `json:"restored-from"`
 field RestoredWorkspace.StateVersionsRestored int `json:"state-versions-restored"`
 field RestoredWorkspace.StateVersionsSkipped []map[string]any `json:"state-versions-skipped"`
 field RestoredWorkspace.Suppressed []string `json:"suppressed"`
+field Role.AllowAll bool `json:"allow-all"`
 field Role.AllowLabels map[string]string `json:"allow-labels,omitempty"`
 field Role.AllowNames []string `json:"allow-names,omitempty"`
 field Role.BuiltIn bool `json:"built-in"`
@@ -827,6 +829,7 @@ field UpdateRegistryModuleRequest.VCSConnectionID *string
 field UpdateRegistryModuleRequest.VCSRepoURL *string
 field UpdateRegistryModuleRequest.VCSTagPattern *string
 field UpdateRegistryProviderRequest.Labels *map[string]string
+field UpdateRoleRequest.AllowAll *bool
 field UpdateRoleRequest.AllowLabels *map[string]string
 field UpdateRoleRequest.AllowNames *[]string
 field UpdateRoleRequest.Capabilities []string

@@ -241,6 +241,34 @@ Built-in roles (`admin`, `audit`, `everyone`) cannot be deleted.
 
 ---
 
+## Granting on Everything
+
+Label and name rules are **exact-match** — there are no wildcards. So before
+v1.6.0 the only way to give a role reach over the whole estate was to put a
+shared label on every workspace and allow on that, which **fails in the
+dangerous direction**: a workspace created without the label silently falls
+outside the role, and nothing tells you. You believe you have coverage you do
+not have.
+
+Set `allow-all` instead:
+
+```json
+{"data": {"attributes": {"allow-all": true, "workspace-permission": "write"}}}
+```
+
+- It matches **every resource on every axis**, including ones created later.
+- **Deny rules still win**, so `allow-all` plus `deny-labels` is how you say
+  "everything except the sealed ones".
+- It does **not** raise the role's permission level. A role granting read still
+  grants read — just everywhere. `allow-all` widens *where* a role applies,
+  never *what* it grants.
+
+An explicit boolean was chosen over treating `"*"` as a wildcard value
+deliberately: a resource can legitimately be *named* `*`, and a magic string in
+an allow-list is how a deployment ends up with coverage nobody intended.
+
+---
+
 ## Seeing What a Role Reaches
 
 Label-based RBAC scales as a mechanism, but not as something you can verify by
@@ -271,7 +299,14 @@ The response reports:
 | `workspaces` | One page of the granted set |
 | `denied` | A bounded sample of what the deny rules excluded |
 
-Each workspace carries a `reason` naming the rule responsible
+The answer covers **every axis a role's rules govern** — workspaces, agent
+pools, registry modules and providers, and catalog items — under `axes`,
+because `_role_matches` compares a name and labels and so is axis-agnostic: the
+same rule that selects workspaces selects all the rest. Capabilities in each
+block are sliced to that axis, so a role granting `registry:admin` and
+`workspace:read` reports admin against a module and read against a workspace.
+
+Each resource carries a `reason` naming the rule responsible
 (`allow-label:env=prod`, `deny-name`, …), the `capabilities` the role resolves
 to *there*, and `notes`.
 
@@ -295,6 +330,41 @@ them would be true and deeply misleading.
 The preview resolves through the same gate that authorises requests, so it
 cannot drift from enforcement — a permissions view that disagrees with the
 enforcement path would be worse than no view at all.
+
+### The other direction: who can reach a resource
+
+```
+GET /api/terrapod/v1/workspaces/{id}/access
+GET /api/terrapod/v1/agent-pools/{id}/access
+GET /api/terrapod/v1/registry-modules/{id}/access
+GET /api/terrapod/v1/registry-providers/{id}/access
+GET /api/terrapod/v1/catalog-items/{id}/access
+```
+
+Looking at one resource rather than one role: *who can touch this?* Returns
+every role whose rules match, with the reason, the capabilities it resolves to
+there, and **who actually holds it** — a role nobody holds reaches nothing in
+practice, and that is frequently the finding. Roles are few, so it is unpaged.
+
+**Read `platform-paths` before treating the role list as the whole answer**,
+because it is not:
+
+| Path | Meaning |
+|---|---|
+| `platform-admin` | Platform admins reach every resource, role or no role |
+| `platform-audit` | Platform auditors can read every resource |
+| `owner` | The owner holds `admin` here regardless of any role |
+| `everyone-floor` | Labelled `access: everyone`, so readable by anyone |
+| `catalog-clamped` | Catalog-managed, so every non-admin grant is capped at read |
+
+In the UI this is the workspace's **Access** tab.
+
+Both directions are offered only to platform `admin`/`audit`. That is not
+incidental: the answer names every matching resource across the estate
+regardless of what the caller can see, so it is safe precisely because those
+principals can already see all of it. The service enforces that coupling
+explicitly and fails closed — loosening the gate without first writing
+per-viewer filtering raises rather than quietly disclosing the estate.
 
 ---
 

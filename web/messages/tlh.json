@@ -643,7 +643,9 @@
       "allowLabelsShort": "chaw' permey",
       "allowNamesShort": "chaw' pongmey",
       "denyLabelsShort": "tuH permey",
-      "denyNamesShort": "tuH pongmey"
+      "denyNamesShort": "tuH pongmey",
+      "allowAll": "Hoch nob",
+      "allowAllHelp": "Hoch Doch rur, chu'bogh je. chut tlhoO'bogh lujqu'be'. Hoch Qumwo' yIper net rap qaSbe'meH vam yIlo' — per Hutlhbogh Qumwo' chu' patlh HopmoHlu'."
     },
     "assignForm": {
       "provider": "nobwI'",
@@ -714,7 +716,8 @@
       "deleteRole": "patlh Qaw'meH lujpu'",
       "setAssignment": "ch'am choqmeH lujpu'",
       "setAssignmentStatus": "ch'am choqmeH lujpu' ({status})",
-      "deleteAssignment": "ch'am Qaw'meH lujpu'"
+      "deleteAssignment": "ch'am Qaw'meH lujpu'",
+      "conflictingLabelKeys": "wa' law' qenvo' ghaj {keys}. wa' qen neH ghaj per chut, vaj Qav qenmey wa'Dich lonmoH tam. wa' ngaqvaD qen law' Sup API, 'ach naDev DaSaHlaHbe' DaH."
     }
   },
   "adminVcs": {
@@ -2254,7 +2257,8 @@
       "cost": "wagh",
       "architecture": "qach",
       "insights": "Sovmey",
-      "automation": "SeHmeH pat"
+      "automation": "SeHmeH pat",
+      "access": "chaw'"
     },
     "lifecycle": {
       "pendingDeletion": "Qaw' loStaH",
@@ -3084,6 +3088,33 @@
       "catalogClamped": "tetlhmo' SeHlu' — laDmeH neH",
       "everyoneFloor": "Hoch laHlaH",
       "hasOwner": "che'wI' ghaj ghajwI'"
+    },
+    "reachesNothing": "pagh SanID chutvam.",
+    "allowAllBanner": "Hoch Doch nob. chut tlhoO'bogh lujqu'be'.",
+    "axis": {
+      "workspace": "Qumwo'mey",
+      "pool": "Duy ghom",
+      "registry": "tetlh'a'",
+      "catalog": "tetlh Dochmey"
+    }
+  },
+  "resourceAccess": {
+    "title": "SanIDlaHbogh nuv",
+    "subtitle": "Qumwo'vam rurbogh chut ghajbogh patlhmey, ghajwI'pu'chaj je.",
+    "loading": "polHa'taH…",
+    "failed": "SanIDlaHbogh nuv SovlaHbe'lu'.",
+    "forbidden": "Hoch yoS SanID jangwI'vam, vaj che'wI'pu' 'ej ngoQwI'pu' neH 'aghlu'.",
+    "noRoles": "Qumwo'vam rurbogh patlh chut tu'be'lu'.",
+    "deniedRoles": "rurpu', ghIq chut tlhoO'bogh lughIm",
+    "alsoReachable": "patlh Hutlhbogh je SanIDlaH",
+    "heldBy": "{who} ghaj",
+    "heldByNobody": "pagh ghaj — teH pagh nob",
+    "path": {
+      "platformAdmin": "Hoch Doch SanID che'wI'pu'",
+      "platformAudit": "Hoch Doch laD ngoQwI'pu'",
+      "owner": "naDev che'wI' ghaj ghajwI'",
+      "everyoneFloor": "per access: everyone — Hoch laHlaH",
+      "catalogClamped": "tetlhmo' SeHlu' — che'wI' Hutlhbogh nob Hoch laDmeH neH"
     }
   }
 }

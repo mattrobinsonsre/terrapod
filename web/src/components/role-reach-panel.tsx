@@ -17,16 +17,33 @@ interface ReachWorkspace {
   notes?: string[]
 }
 
+interface ReachAxis {
+  'granted-count': number
+  'denied-count': number
+  'matched-count': number
+  resources: ReachWorkspace[]
+  denied?: ReachWorkspace[]
+}
+
 interface Reach {
   'granted-count': number
   'denied-count': number
   'matched-count': number
-  workspaces: ReachWorkspace[]
-  denied?: ReachWorkspace[]
-  'denied-truncated'?: boolean
+  /** Per-axis breakdown. A role's allow/deny rules are matched the same way
+   *  whatever they are matched against, so one rule reaches agent pools,
+   *  registry modules and providers, and catalog items as readily as
+   *  workspaces — showing only workspaces would answer a quarter of it. */
+  axes?: Record<string, ReachAxis>
 }
 
+/** Rendered in this order, and only when the axis has matches — a role that
+ *  grants nothing on the registry should not show an empty Registry heading. */
+const AXIS_ORDER = ['workspace', 'pool', 'registry', 'catalog'] as const
+
 export interface RoleRule {
+  /** Estate-wide grant: matches every resource on every axis. Deny rules
+   *  still win, so the preview can still show exclusions. */
+  allowAll?: boolean
   allowLabels: Record<string, string>
   allowNames: string[]
   denyLabels: Record<string, string>
@@ -38,6 +55,7 @@ export interface RoleRule {
  *  point asking the server — and an empty result reads better than a spinner
  *  that resolves to zero every keystroke while someone is still typing. */
 function reachesNothing(rule: RoleRule): boolean {
+  if (rule.allowAll) return false
   return Object.keys(rule.allowLabels).length === 0 && rule.allowNames.length === 0
 }
 
@@ -143,6 +161,7 @@ export function RoleReachPanel({ rule }: { rule: RoleRule }) {
             type: 'roles',
             attributes: {
               name: '(preview)',
+              'allow-all': parsed.allowAll ?? false,
               'allow-labels': parsed.allowLabels,
               'allow-names': parsed.allowNames,
               'deny-labels': parsed.denyLabels,
@@ -190,6 +209,14 @@ export function RoleReachPanel({ rule }: { rule: RoleRule }) {
         {loading && <span className="text-xs text-slate-500">{t('checking')}</span>}
       </div>
 
+      {rule.allowAll && (
+        /* An estate-wide grant must be impossible to miss: a role reaching
+           everything that looks like one reaching a handful is the failure
+           this whole panel exists to prevent. */
+        <p className="mb-2 px-2 py-1 rounded text-xs bg-amber-900/30 text-amber-200">
+          {t('allowAllBanner')}
+        </p>
+      )}
       {empty ? (
         <p className="text-xs text-slate-500">{t('noAllowRules')}</p>
       ) : error ? (
@@ -212,30 +239,53 @@ export function RoleReachPanel({ rule }: { rule: RoleRule }) {
             </span>
           </div>
 
-          {reach.workspaces.length > 0 && (
-            <ul className="mb-2">
-              {reach.workspaces.map((w) => (
-                <WorkspaceRow key={w.id} ws={w} />
-              ))}
-            </ul>
-          )}
-          {reach['granted-count'] > reach.workspaces.length && (
-            <p className="text-xs text-slate-500">
-              {t('andMore', { count: reach['granted-count'] - reach.workspaces.length })}
-            </p>
-          )}
-
-          {reach.denied && reach.denied.length > 0 && (
-            <div className="mt-3 pt-2 border-t border-slate-700/50">
-              {/* Shown rather than silently omitted: someone who cannot see what
-                  a deny removed cannot tell an intended exclusion from a typo. */}
-              <h5 className="text-xs font-medium text-red-300 mb-1">{t('excludedByDeny')}</h5>
-              <ul>
-                {reach.denied.map((w) => (
-                  <WorkspaceRow key={w.id} ws={w} />
-                ))}
-              </ul>
-            </div>
+          {reach['matched-count'] === 0 ? (
+            <p className="text-xs text-slate-500">{t('reachesNothing')}</p>
+          ) : (
+            AXIS_ORDER.filter((axis) => (reach.axes?.[axis]?.['matched-count'] ?? 0) > 0).map(
+              (axis) => {
+                const block = reach.axes![axis]
+                return (
+                  <div key={axis} className="mb-3 last:mb-0">
+                    <h5 className="text-xs font-medium text-slate-400 mb-1">
+                      {t(`axis.${axis}`)}{' '}
+                      <span className="text-slate-500 tabular-nums">
+                        ({block['granted-count']})
+                      </span>
+                    </h5>
+                    {block.resources.length > 0 && (
+                      <ul>
+                        {block.resources.map((w) => (
+                          <WorkspaceRow key={w.id} ws={w} />
+                        ))}
+                      </ul>
+                    )}
+                    {block['granted-count'] > block.resources.length && (
+                      <p className="text-xs text-slate-500">
+                        {t('andMore', {
+                          count: block['granted-count'] - block.resources.length,
+                        })}
+                      </p>
+                    )}
+                    {block.denied && block.denied.length > 0 && (
+                      <div className="mt-2 pt-2 border-t border-slate-700/50">
+                        {/* Shown rather than silently omitted: someone who cannot
+                            see what a deny removed cannot tell an intended
+                            exclusion from a typo. */}
+                        <h6 className="text-xs font-medium text-red-300 mb-1">
+                          {t('excludedByDeny')}
+                        </h6>
+                        <ul>
+                          {block.denied.map((w) => (
+                            <WorkspaceRow key={w.id} ws={w} />
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )
+              },
+            )
           )}
         </>
       ) : (

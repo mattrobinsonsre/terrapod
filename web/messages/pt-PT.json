@@ -643,7 +643,9 @@
       "allowLabelsShort": "Permitir Etiquetas",
       "allowNamesShort": "Permitir Nomes",
       "denyLabelsShort": "Negar Etiquetas",
-      "denyNamesShort": "Negar Nomes"
+      "denyNamesShort": "Negar Nomes",
+      "allowAll": "Conceder em tudo",
+      "allowAllHelp": "Corresponde a todos os recursos, incluindo os criados depois. As regras de negação continuam a aplicar-se. Use isto em vez de etiquetar cada área de trabalho: uma criada sem a etiqueta ficaria fora da função sem aviso."
     },
     "assignForm": {
       "provider": "Fornecedor",
@@ -714,7 +716,8 @@
       "deleteRole": "Falha ao eliminar a função",
       "setAssignment": "Falha ao definir a atribuição",
       "setAssignmentStatus": "Falha ao definir a atribuição ({status})",
-      "deleteAssignment": "Falha ao eliminar a atribuição"
+      "deleteAssignment": "Falha ao eliminar a atribuição",
+      "conflictingLabelKeys": "{keys} recebeu mais do que um valor. Uma regra de etiqueta guarda um valor por chave, pelo que o último substituiria os anteriores sem aviso. Vários valores por chave são aceites pela API, mas ainda não podem ser definidos aqui."
     }
   },
   "adminVcs": {
@@ -2254,7 +2257,8 @@
       "cost": "Custo",
       "architecture": "Arquitetura",
       "insights": "Perspetivas",
-      "automation": "Automação"
+      "automation": "Automação",
+      "access": "Acesso"
     },
     "lifecycle": {
       "pendingDeletion": "Eliminação pendente",
@@ -3084,6 +3088,33 @@
       "catalogClamped": "Gerido pelo catálogo — limitado a leitura",
       "everyoneFloor": "Legível por todos",
       "hasOwner": "O proprietário já tem administração"
+    },
+    "reachesNothing": "Esta regra não alcança nada.",
+    "allowAllBanner": "Concede em todos os recursos. As regras de negação continuam a aplicar-se.",
+    "axis": {
+      "workspace": "Áreas de trabalho",
+      "pool": "Conjuntos de agentes",
+      "registry": "Registo",
+      "catalog": "Itens do catálogo"
+    }
+  },
+  "resourceAccess": {
+    "title": "Quem pode alcançar isto",
+    "subtitle": "Funções cujas regras correspondem a esta área de trabalho, e quem as detém.",
+    "loading": "A carregar…",
+    "failed": "Não foi possível determinar quem pode alcançar isto.",
+    "forbidden": "Esta resposta abrange todo o parque, pelo que é mostrada apenas a administradores e auditores da plataforma.",
+    "noRoles": "Nenhuma regra de função corresponde a esta área de trabalho.",
+    "deniedRoles": "Correspondeu e depois foi excluído por uma regra de negação",
+    "alsoReachable": "Também alcançável sem qualquer função",
+    "heldBy": "Detida por {who}",
+    "heldByNobody": "Detida por ninguém — na prática não concede nada",
+    "path": {
+      "platformAdmin": "Os administradores da plataforma alcançam todos os recursos",
+      "platformAudit": "Os auditores da plataforma podem ler todos os recursos",
+      "owner": "O proprietário tem administração aqui",
+      "everyoneFloor": "Etiquetado access: everyone — legível por todos",
+      "catalogClamped": "Gerido pelo catálogo — toda a concessão não administrativa é limitada a leitura"
     }
   }
 }

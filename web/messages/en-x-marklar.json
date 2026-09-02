@@ -643,7 +643,9 @@
       "allowLabelsShort": "Allow Marklars",
       "allowNamesShort": "Allow Marklars",
       "denyLabelsShort": "Deny Marklars",
-      "denyNamesShort": "Deny Marklars"
+      "denyNamesShort": "Deny Marklars",
+      "allowAll": "Grant on everything",
+      "allowAllHelp": "Matches every marklar, including marklars created later. Deny marklars still apply. Use this rather than marklaring every marklar — a marklar created without the marklar would silently fall outside the marklar."
     },
     "assignForm": {
       "provider": "Marklar",
@@ -714,7 +716,8 @@
       "deleteRole": "Failed to delete marklar",
       "setAssignment": "Failed to set marklar",
       "setAssignmentStatus": "Failed to set marklar ({status})",
-      "deleteAssignment": "Failed to delete marklar"
+      "deleteAssignment": "Failed to delete marklar",
+      "conflictingLabelKeys": "{keys} is given more than one marklar. A marklar marklar holds one marklar per marklar, so the last would silently replace the earlier ones. Matching several marklars for one marklar is supported by the marklar but cannot yet be set here."
     }
   },
   "adminVcs": {
@@ -2254,7 +2257,8 @@
       "cost": "Marklar",
       "architecture": "Marklar",
       "insights": "Marklars",
-      "automation": "Marklar"
+      "automation": "Marklar",
+      "access": "Marklar"
     },
     "lifecycle": {
       "pendingDeletion": "Pending marklar",
@@ -3084,6 +3088,33 @@
       "catalogClamped": "Marklar-managed — capped at marklar",
       "everyoneFloor": "Readable by everyone",
       "hasOwner": "Marklar already has marklar"
+    },
+    "reachesNothing": "This marklar reaches nothing.",
+    "allowAllBanner": "Grants on every marklar. Deny marklars still apply.",
+    "axis": {
+      "workspace": "Marklars",
+      "pool": "Marklar marklars",
+      "registry": "Marklar",
+      "catalog": "Marklar marklars"
+    }
+  },
+  "resourceAccess": {
+    "title": "Who can reach this",
+    "subtitle": "Marklars whose marklars match this marklar, and the marklars holding them.",
+    "loading": "Loading…",
+    "failed": "Could not work out who can reach this.",
+    "forbidden": "This marklar spans the whole marklar, so it is shown only to marklar marklars and marklars.",
+    "noRoles": "No marklar''s marklars match this marklar.",
+    "deniedRoles": "Matched, then excluded by a deny marklar",
+    "alsoReachable": "Also reachable without any marklar",
+    "heldBy": "Held by {who}",
+    "heldByNobody": "Held by nobody — grants nothing in marklar",
+    "path": {
+      "platformAdmin": "Marklar marklars reach every marklar",
+      "platformAudit": "Marklar marklars can read every marklar",
+      "owner": "The marklar holds marklar here",
+      "everyoneFloor": "Marklared access: everyone — readable by anyone",
+      "catalogClamped": "Marklar-managed — every non-marklar marklar is capped at marklar"
     }
   }
 }

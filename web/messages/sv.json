@@ -643,7 +643,9 @@
       "allowLabelsShort": "Tillåt etiketter",
       "allowNamesShort": "Tillåt namn",
       "denyLabelsShort": "Neka etiketter",
-      "denyNamesShort": "Neka namn"
+      "denyNamesShort": "Neka namn",
+      "allowAll": "Ge behörighet till allt",
+      "allowAllHelp": "Matchar alla resurser, även sådana som skapas senare. Nekanderegler gäller fortfarande. Använd detta i stället för att märka varje arbetsyta — en arbetsyta som skapas utan märkningen skulle tyst hamna utanför rollen."
     },
     "assignForm": {
       "provider": "Leverantör",
@@ -714,7 +716,8 @@
       "deleteRole": "Det gick inte att ta bort rollen",
       "setAssignment": "Det gick inte att ange tilldelningen",
       "setAssignmentStatus": "Det gick inte att ange tilldelningen ({status})",
-      "deleteAssignment": "Det gick inte att ta bort tilldelningen"
+      "deleteAssignment": "Det gick inte att ta bort tilldelningen",
+      "conflictingLabelKeys": "{keys} har fått mer än ett värde. En märkningsregel rymmer ett värde per nyckel, så det sista skulle tyst ersätta de tidigare. Flera värden per nyckel stöds av API:et men kan ännu inte anges här."
     }
   },
   "adminVcs": {
@@ -2254,7 +2257,8 @@
       "cost": "Kostnad",
       "architecture": "Arkitektur",
       "insights": "Insikter",
-      "automation": "Automatisering"
+      "automation": "Automatisering",
+      "access": "Åtkomst"
     },
     "lifecycle": {
       "pendingDeletion": "Väntar på borttagning",
@@ -3084,6 +3088,33 @@
       "catalogClamped": "Kataloghanterad — begränsad till läsning",
       "everyoneFloor": "Läsbar för alla",
       "hasOwner": "Ägaren har redan administratörsbehörighet"
+    },
+    "reachesNothing": "Den här regeln omfattar ingenting.",
+    "allowAllBanner": "Ger behörighet till alla resurser. Nekanderegler gäller fortfarande.",
+    "axis": {
+      "workspace": "Arbetsytor",
+      "pool": "Agentpooler",
+      "registry": "Register",
+      "catalog": "Katalogobjekt"
+    }
+  },
+  "resourceAccess": {
+    "title": "Vem som kan nå detta",
+    "subtitle": "Roller vars regler matchar den här arbetsytan, och vilka som har dem.",
+    "loading": "Läser in…",
+    "failed": "Det gick inte att avgöra vem som kan nå detta.",
+    "forbidden": "Det här svaret omfattar hela miljön och visas därför bara för plattformsadministratörer och revisorer.",
+    "noRoles": "Ingen rollregel matchar den här arbetsytan.",
+    "deniedRoles": "Matchade och uteslöts sedan av en nekanderegel",
+    "alsoReachable": "Kan även nås utan någon roll",
+    "heldBy": "Innehas av {who}",
+    "heldByNobody": "Innehas av ingen — ger i praktiken ingenting",
+    "path": {
+      "platformAdmin": "Plattformsadministratörer når alla resurser",
+      "platformAudit": "Plattformsrevisorer kan läsa alla resurser",
+      "owner": "Ägaren har administratörsbehörighet här",
+      "everyoneFloor": "Märkt access: everyone — läsbar för alla",
+      "catalogClamped": "Kataloghanterad — varje icke-administrativ behörighet begränsas till läsning"
     }
   }
 }

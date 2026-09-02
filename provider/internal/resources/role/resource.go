@@ -43,6 +43,7 @@ type roleModel struct {
 
 	Name                types.String `tfsdk:"name"`
 	Description         types.String `tfsdk:"description"`
+	AllowAll            types.Bool   `tfsdk:"allow_all"`
 	AllowLabels         types.Map    `tfsdk:"allow_labels"`
 	AllowNames          types.List   `tfsdk:"allow_names"`
 	DenyLabels          types.Map    `tfsdk:"deny_labels"`
@@ -92,6 +93,11 @@ func (r *roleResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 			"description": schema.StringAttribute{
 				Description: "Human-readable description of the role.",
 				Optional:    true,
+			},
+			"allow_all": schema.BoolAttribute{
+				Description: "An estate-wide grant: this role's allow side matches EVERY resource on every axis. Deny rules still take precedence, so 'everything except the sealed ones' remains expressible, and it does not raise the role's permission level -- a role granting read still grants read, just everywhere. Use it instead of putting a shared label on every workspace: label and name rules are exact-match, so a workspace created without that label would silently fall outside the role. Defaults to false.",
+				Optional:    true,
+				Computed:    true,
 			},
 			"allow_labels": schema.MapAttribute{
 				Description: "Labels that grant this role's permission to matching workspaces.",
@@ -323,6 +329,9 @@ func buildCreateRoleRequest(m *roleModel) terrapod.CreateRoleRequest {
 	if !m.Description.IsNull() {
 		req.Description = m.Description.ValueString()
 	}
+	if !m.AllowAll.IsNull() && !m.AllowAll.IsUnknown() {
+		req.AllowAll = m.AllowAll.ValueBool()
+	}
 	if !m.AllowLabels.IsNull() && !m.AllowLabels.IsUnknown() {
 		req.AllowLabels = mapFromTFMap(m.AllowLabels)
 	}
@@ -369,6 +378,8 @@ func buildUpdateRoleRequest(m *roleModel) terrapod.UpdateRoleRequest {
 	// pointer to the materialised value. This matches the old
 	// behaviour where the resource always wrote allow/deny to the API
 	// (omitting allow_labels in HCL cleared them on the server).
+	allowAll := m.AllowAll.ValueBool()
+	req.AllowAll = &allowAll
 	allowLabels := mapFromTFMapOrEmpty(m.AllowLabels)
 	req.AllowLabels = &allowLabels
 	allowNames := sliceFromTFListOrEmpty(m.AllowNames)
@@ -425,6 +436,9 @@ func readRoleFromSDK(ctx context.Context, role *terrapod.Role, m *roleModel) dia
 		m.Description = types.StringNull()
 	}
 
+	// Optional+Computed: always set from the server, so a config that omits it
+	// takes the server's false rather than drifting forever (#684).
+	m.AllowAll = types.BoolValue(role.AllowAll)
 	if len(role.AllowLabels) > 0 {
 		val, d := types.MapValueFrom(ctx, types.StringType, role.AllowLabels)
 		diags.Append(d...)

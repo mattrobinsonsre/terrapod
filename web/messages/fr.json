@@ -643,7 +643,9 @@
       "allowLabelsShort": "Labels autorisés",
       "allowNamesShort": "Noms autorisés",
       "denyLabelsShort": "Labels refusés",
-      "denyNamesShort": "Noms refusés"
+      "denyNamesShort": "Noms refusés",
+      "allowAll": "Accorder sur tout",
+      "allowAllHelp": "Correspond à toutes les ressources, y compris celles créées ultérieurement. Les règles de refus s''appliquent toujours. Préférez ceci à l''étiquetage de chaque espace de travail — un espace créé sans l''étiquette sortirait silencieusement du rôle."
     },
     "assignForm": {
       "provider": "Fournisseur",
@@ -714,7 +716,8 @@
       "deleteRole": "Échec de la suppression du rôle",
       "setAssignment": "Échec de la définition de l'attribution",
       "setAssignmentStatus": "Échec de la définition de l'attribution ({status})",
-      "deleteAssignment": "Échec de la suppression de l'attribution"
+      "deleteAssignment": "Échec de la suppression de l'attribution",
+      "conflictingLabelKeys": "{keys} reçoit plusieurs valeurs. Une règle d''étiquette ne retient qu''une valeur par clé ; la dernière remplacerait silencieusement les précédentes. Plusieurs valeurs pour une clé sont acceptées par l''API mais pas encore configurables ici."
     }
   },
   "adminVcs": {
@@ -2254,7 +2257,8 @@
       "cost": "Coût",
       "architecture": "Architecture",
       "insights": "Perspectives",
-      "automation": "Automatisation"
+      "automation": "Automatisation",
+      "access": "Accès"
     },
     "lifecycle": {
       "pendingDeletion": "Suppression en attente",
@@ -3084,6 +3088,33 @@
       "catalogClamped": "Géré par le catalogue — limité à la lecture",
       "everyoneFloor": "Lisible par tous",
       "hasOwner": "Le propriétaire a déjà les droits d''administration"
+    },
+    "reachesNothing": "Cette règle ne concerne rien.",
+    "allowAllBanner": "Accorde sur toutes les ressources. Les règles de refus s''appliquent toujours.",
+    "axis": {
+      "workspace": "Espaces de travail",
+      "pool": "Pools d''agents",
+      "registry": "Registre",
+      "catalog": "Éléments du catalogue"
+    }
+  },
+  "resourceAccess": {
+    "title": "Qui peut y accéder",
+    "subtitle": "Rôles dont les règles correspondent à cet espace de travail, et qui les détient.",
+    "loading": "Chargement…",
+    "failed": "Impossible de déterminer qui peut y accéder.",
+    "forbidden": "Cette réponse couvre l''ensemble du parc ; elle n''est donc montrée qu''aux administrateurs et auditeurs de la plateforme.",
+    "noRoles": "Aucune règle de rôle ne correspond à cet espace de travail.",
+    "deniedRoles": "Correspondant, puis exclu par une règle de refus",
+    "alsoReachable": "Également accessible sans aucun rôle",
+    "heldBy": "Détenu par {who}",
+    "heldByNobody": "Détenu par personne — n''accorde rien en pratique",
+    "path": {
+      "platformAdmin": "Les administrateurs de la plateforme atteignent toutes les ressources",
+      "platformAudit": "Les auditeurs de la plateforme peuvent lire toutes les ressources",
+      "owner": "Le propriétaire y détient les droits d''administration",
+      "everyoneFloor": "Étiqueté access: everyone — lisible par tous",
+      "catalogClamped": "Géré par le catalogue — toute attribution non-admin est limitée à la lecture"
     }
   }
 }

@@ -2566,6 +2566,59 @@ DELETE /api/terrapod/v1/roles/{name}
 
 Built-in roles cannot be deleted.
 
+### Role attribute: `allow-all`
+
+`allow-all: true` makes the role's allow side match **every resource on every
+axis**, including ones created later. Deny rules still take precedence, and it
+does not raise the role's permission level. It exists because label and name
+rules are exact-match (no wildcards), so the alternative was a shared label on
+every workspace — where a workspace created without it silently falls outside
+the role. Defaults to `false`; every pre-existing role keeps exactly the reach
+it had.
+
+### Resource Access (who can reach this)
+
+```
+GET /api/terrapod/v1/workspaces/{id}/access
+GET /api/terrapod/v1/agent-pools/{id}/access
+GET /api/terrapod/v1/registry-modules/{id}/access
+GET /api/terrapod/v1/registry-providers/{id}/access
+GET /api/terrapod/v1/catalog-items/{id}/access
+```
+
+The inverse of the role preview. `admin` or `audit`; read-only and unpaged
+(roles are few).
+
+```json
+{
+  "data": {
+    "type": "resource-access",
+    "id": "ws-...",
+    "attributes": {
+      "resource": {"id": "ws-...", "kind": "workspaces", "name": "prod-api",
+                   "labels": {"env": "prod"}, "owner-email": "team@example.com"},
+      "axis": "workspace",
+      "role-count": 1,
+      "roles": [
+        {"role": "sre", "verdict": "allowed", "reason": "allow-label:env=prod",
+         "capabilities": ["run:apply", "..."], "notes": ["has-owner"],
+         "held-by": ["alice@example.com"]}
+      ],
+      "denied-roles": [
+        {"role": "contractors", "verdict": "denied", "reason": "deny-name",
+         "capabilities": []}
+      ],
+      "platform-paths": ["platform-admin", "platform-audit", "owner"]
+    }
+  }
+}
+```
+
+`platform-paths` names access that exists **independently of any role** —
+`platform-admin`, `platform-audit`, `owner`, `everyone-floor`,
+`catalog-clamped`. A caller that reports only `roles` will understate who can
+reach the resource.
+
 ### Preview Role Reach
 
 ```
@@ -2587,6 +2640,13 @@ them would be misleading rather than useful.
 
 Paged with `page[size]` (default 25, max 100) and `page[number]`. **The counts
 span the whole fleet, not the returned page.**
+
+The response carries an `axes` block keyed `workspace` / `pool` / `registry` /
+`catalog`: a role's rules are matched the same way whatever they are matched
+against, so one rule reaches agent pools, registry modules and providers, and
+catalog items as readily as workspaces. Capabilities in each block are sliced
+to that axis. The workspace axis is also promoted to the top level as
+`workspaces` / `denied`, since it is what most callers want.
 
 ```json
 {
