@@ -243,3 +243,138 @@ func TestRole_CapabilitiesRoundTrip(t *testing.T) {
 		t.Errorf("derived level should be custom: %q", r.WorkspacePermission)
 	}
 }
+
+// ── Role reach preview (#1456) ─────────────────────────────────────────
+
+func newReachFixture(t *testing.T) (*Client, *http.Request, *[]byte) {
+	t.Helper()
+	var gotReq *http.Request
+	var gotBody []byte
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotReq = r.Clone(r.Context())
+		gotBody, _ = io.ReadAll(r.Body)
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_, _ = w.Write([]byte(`{"data":{"type":"role-previews","id":"sre","attributes":{
+			"granted-count": 47,
+			"denied-count": 3,
+			"matched-count": 50,
+			"denied-truncated": false,
+			"workspaces": [{
+				"id":"ws-1","name":"prod-api","labels":{"env":"prod"},
+				"owner-email":"a@b.c","verdict":"allowed",
+				"reason":"allow-label:env=prod",
+				"capabilities":["run:apply","run:plan"],
+				"notes":["has-owner"]
+			}],
+			"denied": [{
+				"id":"ws-2","name":"prod-locked","verdict":"denied",
+				"reason":"deny-label:locked-down=yes","capabilities":[]
+			}]
+		}}}`))
+	}))
+	t.Cleanup(srv.Close)
+	c, err := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return c, gotReq, &gotBody
+}
+
+func TestPreviewRoleReach(t *testing.T) {
+	c, _, _ := newReachFixture(t)
+	reach, err := c.PreviewRoleReach(t.Context(), "sre", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Counts are fleet-wide, not page-wide — the whole point of the feature.
+	if reach.GrantedCount != 47 || reach.DeniedCount != 3 || reach.MatchedCount != 50 {
+		t.Errorf("counts: %+v", reach)
+	}
+	if len(reach.Workspaces) != 1 || reach.Workspaces[0].Name != "prod-api" {
+		t.Fatalf("workspaces: %+v", reach.Workspaces)
+	}
+	// The reason is the thing that makes the answer reviewable rather than
+	// merely correct.
+	if reach.Workspaces[0].Reason != "allow-label:env=prod" {
+		t.Errorf("reason: %q", reach.Workspaces[0].Reason)
+	}
+	if reach.Workspaces[0].Verdict != RoleReachAllowed {
+		t.Errorf("verdict: %q", reach.Workspaces[0].Verdict)
+	}
+	if len(reach.Workspaces[0].Notes) != 1 || reach.Workspaces[0].Notes[0] != RoleReachNoteHasOwner {
+		t.Errorf("notes: %+v", reach.Workspaces[0].Notes)
+	}
+	// Denied is populated, not silently folded away.
+	if len(reach.Denied) != 1 || reach.Denied[0].Reason != "deny-label:locked-down=yes" {
+		t.Errorf("denied: %+v", reach.Denied)
+	}
+}
+
+func TestPreviewRoleReach_Paging(t *testing.T) {
+	var path string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path = r.URL.RequestURI()
+		_, _ = w.Write([]byte(`{"data":{"attributes":{"granted-count":0,"workspaces":[]}}}`))
+	}))
+	defer srv.Close()
+	c, err := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.PreviewRoleReach(t.Context(), "sre", &RoleReachOptions{PageSize: 5, PageNumber: 3}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(path, "page%5Bsize%5D=5") || !strings.Contains(path, "page%5Bnumber%5D=3") {
+		t.Errorf("paging not sent: %s", path)
+	}
+}
+
+func TestPreviewUnsavedRoleReach_SendsTheRuleAndPersistsNothing(t *testing.T) {
+	c, _, bodyp := newReachFixture(t)
+	reach, err := c.PreviewUnsavedRoleReach(t.Context(), CreateRoleRequest{
+		Name:                "draft",
+		AllowLabels:         map[string]string{"env": "prod"},
+		DenyNames:           []string{"prod-locked"},
+		WorkspacePermission: "write",
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reach.GrantedCount != 47 {
+		t.Errorf("reach: %+v", reach)
+	}
+	// The rule must reach the server, including the name, or the preview is of
+	// a different role than the one being authored.
+	var sent map[string]any
+	if err := json.Unmarshal(*bodyp, &sent); err != nil {
+		t.Fatal(err)
+	}
+	attrs := sent["data"].(map[string]any)["attributes"].(map[string]any)
+	if attrs["name"] != "draft" {
+		t.Errorf("name not sent: %v", attrs)
+	}
+	if attrs["workspace-permission"] != "write" {
+		t.Errorf("permission not sent: %v", attrs)
+	}
+	if _, ok := attrs["allow-labels"]; !ok {
+		t.Errorf("allow-labels not sent: %v", attrs)
+	}
+	if _, ok := attrs["deny-names"]; !ok {
+		t.Errorf("deny-names not sent: %v", attrs)
+	}
+}
+
+func TestPreviewRoleReach_BuiltinIsServerRejected(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(422)
+		_, _ = w.Write([]byte(`{"detail":"'admin' is a built-in role"}`))
+	}))
+	defer srv.Close()
+	c, err := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.PreviewRoleReach(t.Context(), "admin", nil); err == nil {
+		t.Fatal("expected an error for a built-in role")
+	}
+}

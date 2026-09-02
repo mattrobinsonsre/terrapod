@@ -2,6 +2,12 @@ const AssignmentExplicit
 const AssignmentGlobal
 const AssignmentRuleBased
 const DiscoveryPath
+const RoleReachAllowed
+const RoleReachDenied
+const RoleReachNone
+const RoleReachNoteCatalogClamped
+const RoleReachNoteEveryoneFloor
+const RoleReachNoteHasOwner
 const VersionField
 field APIError.Body string
 field APIError.StatusCode int
@@ -622,6 +628,22 @@ field RoleAssignment.CreatedAt string `json:"created-at,omitempty"`
 field RoleAssignment.Email string `json:"email"`
 field RoleAssignment.ProviderName string `json:"provider-name"`
 field RoleAssignment.RoleName string `json:"role-name"`
+field RoleReach.Denied []RoleReachWorkspace `json:"denied,omitempty"`
+field RoleReach.DeniedCount int `json:"denied-count"`
+field RoleReach.DeniedTruncated bool `json:"denied-truncated"`
+field RoleReach.GrantedCount int `json:"granted-count"`
+field RoleReach.MatchedCount int `json:"matched-count"`
+field RoleReach.Workspaces []RoleReachWorkspace `json:"workspaces"`
+field RoleReachOptions.PageNumber int
+field RoleReachOptions.PageSize int
+field RoleReachWorkspace.Capabilities []string `json:"capabilities,omitempty"`
+field RoleReachWorkspace.ID string `json:"id"`
+field RoleReachWorkspace.Labels map[string]string `json:"labels,omitempty"`
+field RoleReachWorkspace.Name string `json:"name"`
+field RoleReachWorkspace.Notes []string `json:"notes,omitempty"`
+field RoleReachWorkspace.OwnerEmail string `json:"owner-email,omitempty"`
+field RoleReachWorkspace.Reason string `json:"reason,omitempty"`
+field RoleReachWorkspace.Verdict string `json:"verdict"`
 field Run.Actions RunActions `json:"actions"`
 field Run.AgentPoolID string `json:"agent-pool-id,omitempty"`
 field Run.AllowEmptyApply bool `json:"allow-empty-apply"`
@@ -1256,6 +1278,8 @@ method (*Client) Post(ctx context.Context, path string, payload []byte) ([]byte,
 method (*Client) PostArchitectureCritiqueMessage( ctx context.Context, workspaceID, content string, ) (*ArchitectureCritiqueMessage, error)
 method (*Client) PostPlanSummaryMessage(ctx context.Context, runID, content string) (*PlanSummaryMessage, error)
 method (*Client) PostRunCostSummaryMessage(ctx context.Context, runID, content string) (*CostSummaryMessage, error)
+method (*Client) PreviewRoleReach(ctx context.Context, name string, opts *RoleReachOptions) (*RoleReach, error)
+method (*Client) PreviewUnsavedRoleReach(ctx context.Context, req CreateRoleRequest, opts *RoleReachOptions) (*RoleReach, error)
 method (*Client) ProvisionCatalogItem(ctx context.Context, itemID string, attrs map[string]any) (*CatalogInstance, error)
 method (*Client) Put(ctx context.Context, path string, payload []byte) ([]byte, error)
 method (*Client) PutRaw(ctx context.Context, path, contentType string, payload []byte) ([]byte, error)
@@ -1409,6 +1433,9 @@ type RestoreOptions struct
 type RestoredWorkspace struct
 type Role struct
 type RoleAssignment struct
+type RoleReach struct
+type RoleReachOptions struct
+type RoleReachWorkspace struct
 type Run struct
 type RunActions struct
 type RunStatusTimestamps struct
