@@ -248,7 +248,10 @@ what your workspaces need, and prefer several instances with narrow policies
 over one instance with a broad one.
 
 As a second line, an instance may declare an allow-list of path prefixes that
-Terrapod will refuse to read outside, whatever the policy permits:
+Terrapod will refuse to read outside. Prefixes match on **path segments**, so
+`secret/apps` permits `secret/apps/netbox` but not `secret/apps-admin`, and a
+reference containing `.` or `..` segments is refused outright — otherwise the
+URL Terrapod checks and the one Vault receives would differ:
 
 ```yaml
         - name: default
@@ -269,7 +272,7 @@ operator who gets it slightly wrong otherwise has no second line.
 | **Stored in Terrapod** | The reference (mount, path, field). Never the secret. |
 | **Returned by the API** | The reference. A path is not a secret, and masking it would hide configuration while concealing nothing. |
 | **In run logs** | Nothing. The value is delivered through the per-run Kubernetes Secret, never a command line or the Job spec. |
-| **On failure** | The variable name, the instance, and the coordinates — never a response body or a partial value. |
+| **On failure** | The variable name, the instance, the coordinates and the HTTP status — never Vault's response body or a partial value. |
 
 ---
 
@@ -309,6 +312,10 @@ this path.
 
 ## Limits
 
+- **Agent execution only.** The reference is resolved server-side when a runner
+  claims the run, so a local-execution workspace has no point at which it could
+  happen. Creating a Vault-sourced variable on one is refused rather than
+  silently resolving to nothing.
 - **Leases are not renewed or revoked.** A dynamic credential is minted per run
   and left to expire. Set the Vault role's TTL to suit your run durations.
 - **No file materialization yet.** Values are delivered as environment or

@@ -17,6 +17,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from sqlalchemy import select
 
+from terrapod.config import VaultInstanceConfig
 from terrapod.db.models import ConfigurationVersion, Run, Variable, Workspace
 from terrapod.db.session import get_db_session
 from terrapod.services import pool_set, run_service, variable_service
@@ -168,16 +169,26 @@ class TestAnUnresolvableReferenceErrorsTheRun:
 
         set_listener_auth(app, listener_id, pool_id.removeprefix("apool-"))
 
-        prior = settings.vault.enabled
+        # An instance must be configured, or resolution errors on instance
+        # SELECTION and never reaches the read — which is how this test used to
+        # pass without exercising the failure path it names.
+        prior = (settings.vault.enabled, settings.vault.instances)
         settings.vault.enabled = True
+        settings.vault.instances = [
+            VaultInstanceConfig(name="default", default=True, address="https://vault.test:8200")
+        ]
         try:
+            # Patch where it is USED, not where it is defined: the resolver does
+            # `from ... import read_secret`, binding the name at import, so
+            # patching the client module was a no-op and this test passed on an
+            # unrelated instance-selection error.
             with patch(
-                "terrapod.services.vault_client.read_secret",
+                "terrapod.services.vault_source_service.read_secret",
                 new=AsyncMock(side_effect=VaultError("Vault denied 'kvv2/apps/x'")),
             ):
                 resp = await client.get(f"/api/terrapod/v1/listeners/{listener_id}/runs/next")
         finally:
-            settings.vault.enabled = prior
+            settings.vault.enabled, settings.vault.instances = prior
 
         # 204, not 500: the listener is told there is nothing to run rather than
         # handed an error with the run left claimed and going nowhere.

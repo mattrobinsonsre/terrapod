@@ -1764,16 +1764,19 @@ to each one by hand. Set `assignment-rule` on create or update:
 }
 ```
 
-The rule accepts the same dimensions as the workspace bulk-update selector --
-`workspace_ids`, `labels`, `name_prefix`, `name_glob`, `execution_backend`,
+The rule accepts the workspace bulk-update selector's *attribute* dimensions --
+`labels`, `name_prefix`, `name_glob`, `execution_backend`,
 `execution_mode`, `terraform_version`, `agent_pool_id`, `vcs_connection_id`,
 `owner_email`, `drift_status`, `locked`, `has_vcs` -- all AND-combined.
 Membership is re-evaluated on every run, so a workspace that later matches picks
 the set up without being touched, and one that stops matching stops receiving it.
 
-Rejected with `422`: an unparseable rule, a non-object rule, `all: true` (use
-`global` instead, which already means every workspace), and a rule on a set that
-is already `global`.
+Rejected with `422`: an unparseable rule; a non-object rule; `all: true` (use
+`global`, which already means every workspace); `workspace_ids` (that is
+explicit assignment, and would produce a rule whose membership never
+re-evaluates); a rule on a set that is already `global`; and a rule whose
+dimensions are all blank -- `{"name_prefix": ""}` selects nothing meaningful and
+would otherwise match every workspace.
 
 A rule that no longer parses matches **nothing** rather than everything, so a
 filter dimension removed in a later version cannot silently widen a scoped

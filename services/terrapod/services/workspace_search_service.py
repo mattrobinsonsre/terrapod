@@ -93,7 +93,13 @@ class WorkspaceFilter(BaseModel):
                 "locked",
                 "has_vcs",
             )
-            if getattr(self, k) not in (None, [], {})
+            # An empty string is NOT a dimension. The query builders skip a
+            # blank value (`if f.name_prefix:`), so counting it here produced a
+            # filter that passed the "at least one selector" check and then
+            # built a query with no WHERE clause — matching every workspace.
+            # `{"name_prefix": ""}` is a blank form field or a typo, never an
+            # instruction to select the estate; that is what `all: true` is for.
+            if getattr(self, k) not in (None, [], {}, "")
         ]
 
 

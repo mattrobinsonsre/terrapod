@@ -18,9 +18,15 @@ type VariableSetVariable struct {
 	HCL         bool   `json:"hcl"`
 	Sensitive   bool   `json:"sensitive"`
 	Description string `json:"description,omitempty"`
-	VersionID   string `json:"version-id,omitempty"`
-	CreatedAt   string `json:"created-at,omitempty"`
-	UpdatedAt   string `json:"updated-at,omitempty"`
+
+	// ValueSource is "static" or "vault" (#1439) — the same reference model as
+	// a workspace variable, so a Vault-backed credential can be defined once in
+	// a set and applied to many workspaces.
+	ValueSource string `json:"value-source,omitempty"`
+
+	VersionID string `json:"version-id,omitempty"`
+	CreatedAt string `json:"created-at,omitempty"`
+	UpdatedAt string `json:"updated-at,omitempty"`
 }
 
 // CreateVarsetVariableRequest is the input shape for adding a
@@ -32,6 +38,7 @@ type CreateVarsetVariableRequest struct {
 	HCL         bool
 	Sensitive   bool
 	Description string
+	ValueSource string
 }
 
 // UpdateVarsetVariableRequest is the partial-update shape.
@@ -42,6 +49,7 @@ type UpdateVarsetVariableRequest struct {
 	HCL         *bool
 	Sensitive   *bool
 	Description *string
+	ValueSource *string
 }
 
 // CreateVarsetVariable adds a variable to a varset.
@@ -136,6 +144,9 @@ func varsetVarCreateAttrs(req CreateVarsetVariableRequest) map[string]any {
 	if req.Description != "" {
 		attrs["description"] = req.Description
 	}
+	if req.ValueSource != "" {
+		attrs["value-source"] = req.ValueSource
+	}
 	return attrs
 }
 
@@ -159,6 +170,9 @@ func varsetVarUpdateAttrs(req UpdateVarsetVariableRequest) map[string]any {
 	if req.Description != nil {
 		attrs["description"] = *req.Description
 	}
+	if req.ValueSource != nil {
+		attrs["value-source"] = *req.ValueSource
+	}
 	return attrs
 }
 
@@ -179,6 +193,7 @@ func varsetVarFromResource(res *Resource) *VariableSetVariable {
 		HCL:         GetBoolAttr(res, "hcl"),
 		Sensitive:   GetBoolAttr(res, "sensitive"),
 		Description: GetStringAttr(res, "description"),
+		ValueSource: GetStringAttr(res, "value-source"),
 		VersionID:   GetStringAttr(res, "version-id"),
 		CreatedAt:   GetStringAttr(res, "created-at"),
 		UpdatedAt:   GetStringAttr(res, "updated-at"),

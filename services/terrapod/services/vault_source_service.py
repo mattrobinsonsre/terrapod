@@ -28,7 +28,7 @@ import json
 import structlog
 
 from terrapod.config import Settings
-from terrapod.services.vault_client import VaultError, read_secret
+from terrapod.services.vault_client import read_secret
 
 logger = structlog.get_logger("vault_source")
 
@@ -118,7 +118,12 @@ async def resolve_vault_variables(resolved: list, settings: Settings) -> dict[st
                 timeout=cfg.timeout_seconds,
                 static_token=_secret_for(inst.name),
             )
-        except VaultError as e:
+        except Exception as e:
+            # Deliberately broad. VaultError is the expected shape, but anything
+            # escaping here reaches the run dispatcher as a 500 and leaves the
+            # run claimed in `planning` until the hour-long stale sweep — so one
+            # brief Vault outage strands every queued run in the estate. Every
+            # failure must become a failed run carrying a cause instead.
             # Deliberately not logging the reference's field value or any part of
             # a response body — only the coordinates and the cause.
             logger.error(

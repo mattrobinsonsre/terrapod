@@ -45,6 +45,22 @@ SA_TOKEN_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 _EXPIRY_MARGIN = 30.0
 
 
+def _as_vault_error(exc: Exception, what: str, inst_name: str) -> VaultError:
+    """Convert a transport or decode failure into a VaultError.
+
+    Callers upstream catch VaultError only. A bare httpx error escaped both the
+    resolver and the run dispatcher, 500'd the listener, and left the run
+    claimed in `planning` until the hour-long stale sweep — so a brief Vault
+    outage stranded every queued run in the estate, not just the one that
+    needed a secret.
+    """
+    return VaultError(
+        f"Vault {what} on instance {inst_name!r} failed: "
+        f"{type(exc).__name__} — {exc}. Vault may be unreachable, slow, or "
+        "behind a proxy returning a non-JSON error."
+    )
+
+
 class VaultError(RuntimeError):
     """A Vault read or login failed.
 
@@ -114,15 +130,21 @@ async def _login(inst: VaultInstanceConfig, static_token: str | None) -> str:
     else:  # pragma: no cover - the config validator rejects anything else
         raise VaultError(f"unsupported vault auth method {method!r}")
 
-    async with httpx.AsyncClient(timeout=15.0, verify=not inst.tls_skip_verify) as c:
-        resp = await arequest_with_retry(c, "POST", url, headers=_headers(inst), json=payload)
+    try:
+        async with httpx.AsyncClient(timeout=15.0, verify=not inst.tls_skip_verify) as c:
+            resp = await arequest_with_retry(c, "POST", url, headers=_headers(inst), json=payload)
+    except (httpx.HTTPError, OSError) as e:
+        raise _as_vault_error(e, "login", inst.name) from e
     if resp.status_code != 200:
         raise VaultError(
             f"Vault login failed for instance {inst.name!r} "
             f"({method} auth, mount {inst.auth.mount!r}, role {inst.auth.role!r}): "
-            f"HTTP {resp.status_code} {resp.text[:200]}"
+            f"HTTP {resp.status_code}"
         )
-    auth = resp.json().get("auth") or {}
+    try:
+        auth = resp.json().get("auth") or {}
+    except ValueError as e:
+        raise _as_vault_error(e, "login", inst.name) from e
     token = auth.get("client_token")
     if not token:
         raise VaultError(f"Vault login for {inst.name!r} returned no client_token")
@@ -133,19 +155,47 @@ async def _login(inst: VaultInstanceConfig, static_token: str | None) -> str:
     return token
 
 
+def _reject_traversal(mount: str, path: str) -> None:
+    """Refuse dot segments and anything that could re-target the request.
+
+    httpx resolves ``..`` when it builds the URL, so a reference of
+    ``apps/../../sys/mounts`` is checked as one path and sent as another — the
+    allow-list would be guarding a path Vault never receives. Rejected whether
+    or not an allow-list is configured, because a traversal reference is
+    malformed regardless, and the default configuration must not be the
+    permissive one.
+    """
+    for part in (mount, path):
+        segments = part.split("/")
+        if any(seg in (".", "..") for seg in segments):
+            raise VaultError(
+                f"vault reference {mount}/{path!r} contains a path traversal "
+                "segment; give the literal mount and path"
+            )
+        if any(c in part for c in ("?", "#", "\\")):
+            raise VaultError(f"vault reference {mount}/{path!r} contains an illegal character")
+
+
 def _check_allowed(inst: VaultInstanceConfig, read_path: str) -> None:
     """Enforce the per-instance path allow-list.
 
     Second line behind the Vault policy, for an operator whose role is slightly
     wider than they meant. Empty means unrestricted.
+
+    Matching is on SEGMENT boundaries: a bare string prefix let ``secret/app``
+    grant ``secret/apple-root-keys``, which is the opposite of what an operator
+    writing a prefix intends.
     """
     if not inst.paths:
         return
-    if not any(read_path.startswith(prefix.strip("/")) for prefix in inst.paths):
-        raise VaultError(
-            f"path {read_path!r} is not in the allow-list configured for vault "
-            f"instance {inst.name!r}"
-        )
+    target = read_path.strip("/").split("/")
+    for prefix in inst.paths:
+        want = prefix.strip("/").split("/")
+        if target[: len(want)] == want:
+            return
+    raise VaultError(
+        f"path {read_path!r} is not in the allow-list configured for vault instance {inst.name!r}"
+    )
 
 
 async def read_secret(
@@ -165,6 +215,7 @@ async def read_secret(
     if not mount_s or not path_s:
         raise VaultError("a vault reference needs both a mount and a path")
 
+    _reject_traversal(mount_s, path_s)
     read_path = f"{mount_s}/{path_s}"
     _check_allowed(inst, read_path)
 
@@ -176,14 +227,17 @@ async def read_secret(
     if engine == "kv2":
         verb = "GET"  # kv-v2 reads are always a GET, whatever the reference says
 
-    async with httpx.AsyncClient(timeout=timeout, verify=not inst.tls_skip_verify) as c:
-        resp = await arequest_with_retry(
-            c,
-            verb,
-            url,
-            headers=_headers(inst, token),
-            **({"json": data or {}} if verb == "POST" else {}),
-        )
+    try:
+        async with httpx.AsyncClient(timeout=timeout, verify=not inst.tls_skip_verify) as c:
+            resp = await arequest_with_retry(
+                c,
+                verb,
+                url,
+                headers=_headers(inst, token),
+                **({"json": data or {}} if verb == "POST" else {}),
+            )
+    except (httpx.HTTPError, OSError) as e:
+        raise _as_vault_error(e, f"read of {read_path!r}", inst.name) from e
 
     if resp.status_code == 403:
         raise VaultError(
@@ -193,11 +247,19 @@ async def read_secret(
     if resp.status_code == 404:
         raise VaultError(f"Vault has no secret at {read_path!r} on instance {inst.name!r}")
     if resp.status_code != 200:
+        # Deliberately NOT echoing resp.text: this message becomes the run's
+        # error_message, readable by anyone with run-read, and a third party's
+        # response body is not ours to forward there. The status and the path
+        # are what diagnose it.
         raise VaultError(
-            f"Vault read of {read_path!r} failed: HTTP {resp.status_code} {resp.text[:200]}"
+            f"Vault read of {read_path!r} on instance {inst.name!r} failed with "
+            f"HTTP {resp.status_code}"
         )
 
-    body = resp.json().get("data") or {}
+    try:
+        body = resp.json().get("data") or {}
+    except ValueError as e:
+        raise _as_vault_error(e, f"read of {read_path!r}", inst.name) from e
     # kv-v2 nests the secret under data.data; the dynamic engines do not.
     data = body.get("data") if engine == "kv2" else body
     if not isinstance(data, dict) or field not in data:
