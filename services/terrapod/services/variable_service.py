@@ -335,14 +335,20 @@ async def workspaces_for_varset(
 
     if varset.assignment_rule:
         try:
+            # build_workspace_query inside the guard, exactly as _rule_matches
+            # does: it holds the "at least one selector" check, so a rule that
+            # parses but selects nothing raises here. Unguarded, the one screen
+            # that answers "who currently receives this credential" 500s on the
+            # very rule it exists to help you find.
             parsed = wss.parse_filter(varset.assignment_rule)
+            query = wss.build_workspace_query(parsed)
         except Exception:
             logger.warning(
-                "variable set has an unparseable assignment rule; matching nothing",
+                "variable set has an unusable assignment rule; matching nothing",
                 varset_id=str(varset.id),
             )
         else:
-            matched = await db.execute(wss.build_workspace_query(parsed).order_by(Workspace.name))
+            matched = await db.execute(query.order_by(Workspace.name))
             for ws in matched.scalars().all():
                 seen.setdefault(ws.id, (ws, ASSIGNMENT_RULE))
 

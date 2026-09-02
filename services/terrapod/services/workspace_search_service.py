@@ -55,6 +55,12 @@ def _glob_to_like(pattern: str) -> str:
     return "".join(out)
 
 
+#: Dimensions whose query clause is gated on truthiness rather than
+#: `is not None` — a blank value contributes no WHERE clause, so counting it as
+#: a selector lets an otherwise-empty filter match the whole estate.
+_BLANK_IS_NOT_A_SELECTOR = {"name_prefix", "name_glob"}
+
+
 class WorkspaceFilter(BaseModel):
     """Structured workspace selector. All present dimensions are
     AND-combined unless `all` is true.
@@ -93,13 +99,19 @@ class WorkspaceFilter(BaseModel):
                 "locked",
                 "has_vcs",
             )
-            # An empty string is NOT a dimension. The query builders skip a
-            # blank value (`if f.name_prefix:`), so counting it here produced a
-            # filter that passed the "at least one selector" check and then
-            # built a query with no WHERE clause — matching every workspace.
-            # `{"name_prefix": ""}` is a blank form field or a typo, never an
-            # instruction to select the estate; that is what `all: true` is for.
-            if getattr(self, k) not in (None, [], {}, "")
+            # A blank value counts as a dimension ONLY where the builder still
+            # emits a clause for it. `name_prefix` and `name_glob` are gated on
+            # truthiness (`if f.name_prefix:`), so a blank one produced a filter
+            # that passed the "at least one selector" check and then built a
+            # query with NO WHERE clause — matching every workspace.
+            #
+            # The rest are gated on `is not None`, and a blank value is a real
+            # selector there: `owner_email` is NOT NULL defaulting to "", so
+            # `{"owner_email": ""}` is the only way to select unowned
+            # workspaces. Excluding it wholesale would have rejected a payload
+            # that worked before — a breaking change to the bulk-update API.
+            if getattr(self, k) not in (None, [], {})
+            and not (k in _BLANK_IS_NOT_A_SELECTOR and getattr(self, k) == "")
         ]
 
 

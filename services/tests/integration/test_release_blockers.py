@@ -149,7 +149,11 @@ class TestAnEmptyDimensionCannotMatchEveryWorkspace:
     whole estate — the exact outcome the `all` guard exists to prevent.
     """
 
-    @pytest.mark.parametrize("rule", [{"name_prefix": ""}, {"name_glob": ""}, {"owner_email": ""}])
+    # owner_email is deliberately NOT here: its builder clause is gated on
+    # `is not None`, so a blank value is a real selector (unowned workspaces),
+    # not a missing one. Only the truthiness-gated dimensions can produce a
+    # WHERE-less query.
+    @pytest.mark.parametrize("rule", [{"name_prefix": ""}, {"name_glob": ""}])
     async def test_a_blank_dimension_is_refused(self, app, client, rule):
         set_auth(app, admin_user())
         resp = await client.post(
@@ -200,7 +204,10 @@ class TestAValueSourceFlipCannotDiscloseASecret:
     async def test_patching_to_vault_without_a_reference_is_refused(self, app, client):
         set_auth(app, admin_user())
         tag = uuid.uuid4().hex[:8]
-        ws_id = await _ws(client, f"disclose-{tag}")
+        # agent mode deliberately: on a local workspace the local-execution
+        # guard raises the same 422 and this test would pass without the
+        # missing-reference guard it exists to pin.
+        ws_id = await _ws(client, f"disclose-{tag}", **{"execution-mode": "agent"})
 
         resp = await client.post(
             f"/api/v2/workspaces/{ws_id}/vars",
@@ -406,3 +413,250 @@ class TestVaultBackedVariableSetVariables:
         by_key = {v.key: v for v in resolved}
         assert "RULED_TOKEN" in by_key, "rule-matched varset variable never reached the run"
         assert by_key["RULED_TOKEN"].value_source == "vault"
+
+
+class TestTheFixesDidNotBreakOrdinaryEditing:
+    """The missing-reference guard must fire on a *transition* only.
+
+    Requiring a reference on every write broke every partial update of an
+    existing vault variable — a description or key edit 422'd. Fixing a
+    disclosure by making the feature unusable is not a fix.
+    """
+
+    async def _vault_var(self, client, tag):
+        ws_id = await _ws(client, f"edit-{tag}", **{"execution-mode": "agent"})
+        ref = json.dumps({"mount": "secret", "path": "apps/x", "field": "token"})
+        created = await client.post(
+            f"/api/v2/workspaces/{ws_id}/vars",
+            json={
+                "data": {
+                    "type": "vars",
+                    "attributes": {
+                        "key": "TOK",
+                        "category": "env",
+                        "value-source": "vault",
+                        "value": ref,
+                    },
+                }
+            },
+            headers=AUTH,
+        )
+        assert created.status_code == 201, created.text
+        return ws_id, created.json()["data"]["id"], ref
+
+    @pytest.mark.parametrize(
+        "patch_attrs",
+        [
+            {"description": "a note"},
+            {"key": "RENAMED"},
+            {"hcl": True},
+        ],
+    )
+    async def test_a_partial_edit_of_a_vault_variable_still_works(self, app, client, patch_attrs):
+        set_auth(app, admin_user())
+        ws_id, var_id, ref = await self._vault_var(client, uuid.uuid4().hex[:8])
+        resp = await client.patch(
+            f"/api/v2/workspaces/{ws_id}/vars/{var_id}",
+            json={"data": {"type": "vars", "attributes": patch_attrs}},
+            headers=AUTH,
+        )
+        assert resp.status_code == 200, resp.text
+        # And the reference survived untouched.
+        assert resp.json()["data"]["attributes"]["value"] == ref
+
+    async def test_replacing_the_reference_is_still_validated(self, app, client):
+        """The relaxation must not let junk replace a good reference."""
+        set_auth(app, admin_user())
+        ws_id, var_id, _ = await self._vault_var(client, uuid.uuid4().hex[:8])
+        resp = await client.patch(
+            f"/api/v2/workspaces/{ws_id}/vars/{var_id}",
+            json={"data": {"type": "vars", "attributes": {"value": "not-a-reference"}}},
+            headers=AUTH,
+        )
+        assert resp.status_code == 422, resp.text
+
+
+class TestVarsetVaultInvariants:
+    """The varset write path must match the workspace one; it was a near-copy
+    that dropped the vault clause."""
+
+    async def _varset(self, client, tag):
+        vs = await client.post(
+            VARSET_ENDPOINT,
+            json={"data": {"type": "varsets", "attributes": {"name": f"vsinv-{tag}"}}},
+            headers=AUTH,
+        )
+        return vs.json()["data"]["id"]
+
+    async def test_sensitive_cannot_be_downgraded_on_a_vault_varset_variable(self, app, client):
+        set_auth(app, admin_user())
+        vs_id = await self._varset(client, uuid.uuid4().hex[:8])
+        ref = json.dumps({"mount": "secret", "path": "apps/x", "field": "token"})
+        created = await client.post(
+            f"/api/v2/varsets/{vs_id}/relationships/vars",
+            json={
+                "data": {
+                    "type": "vars",
+                    "attributes": {
+                        "key": "K",
+                        "category": "env",
+                        "value-source": "vault",
+                        "value": ref,
+                    },
+                }
+            },
+            headers=AUTH,
+        )
+        var_id = created.json()["data"]["id"]
+
+        resp = await client.patch(
+            f"/api/v2/varsets/{vs_id}/relationships/vars/{var_id}",
+            json={"data": {"type": "vars", "attributes": {"sensitive": False}}},
+            headers=AUTH,
+        )
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["data"]["attributes"]["sensitive"] is True, (
+            "a vault reference resolves to a secret; sensitive must not be downgradable"
+        )
+
+    async def test_a_junk_value_cannot_replace_a_varset_reference(self, app, client):
+        set_auth(app, admin_user())
+        vs_id = await self._varset(client, uuid.uuid4().hex[:8])
+        ref = json.dumps({"mount": "secret", "path": "apps/x", "field": "token"})
+        created = await client.post(
+            f"/api/v2/varsets/{vs_id}/relationships/vars",
+            json={
+                "data": {
+                    "type": "vars",
+                    "attributes": {
+                        "key": "K",
+                        "category": "env",
+                        "value-source": "vault",
+                        "value": ref,
+                    },
+                }
+            },
+            headers=AUTH,
+        )
+        resp = await client.patch(
+            f"/api/v2/varsets/{vs_id}/relationships/vars/{created.json()['data']['id']}",
+            json={"data": {"type": "vars", "attributes": {"value": "not-json"}}},
+            headers=AUTH,
+        )
+        assert resp.status_code == 422, resp.text
+
+
+class TestRulePrecedenceIsPinned:
+    """The fix introduced a total order: global < rule < explicit.
+
+    Only global-vs-explicit was covered. The other two comparisons are new
+    behaviour, so they are pinned here — reordering `rank` would otherwise
+    silently change which credential a rule-matched workspace receives.
+    """
+
+    async def _set_with_var(self, client, name, value, **attrs):
+        vs = await client.post(
+            VARSET_ENDPOINT,
+            json={"data": {"type": "varsets", "attributes": {"name": name, **attrs}}},
+            headers=AUTH,
+        )
+        vs_id = vs.json()["data"]["id"]
+        await client.post(
+            f"/api/v2/varsets/{vs_id}/relationships/vars",
+            json={
+                "data": {
+                    "type": "vars",
+                    "attributes": {"key": "WHO_WINS", "value": value, "category": "env"},
+                }
+            },
+            headers=AUTH,
+        )
+        return vs_id
+
+    async def _winner(self, ws_id):
+        async with get_db_session() as db:
+            resolved = await variable_service.resolve_variables(
+                db, uuid.UUID(ws_id.removeprefix("ws-"))
+            )
+        return {v.key: v.value for v in resolved}.get("WHO_WINS")
+
+    async def test_a_rule_matched_set_beats_a_global_one(self, app, client):
+        """A rule is a deliberate targeting decision; global is the fallback."""
+        set_auth(app, admin_user())
+        tag = uuid.uuid4().hex[:8]
+        ws_id = await _ws(client, f"rvg-{tag}", labels={"rvg": tag})
+        await self._set_with_var(client, f"g-{tag}", "from-global", **{"global": True})
+        await self._set_with_var(
+            client, f"r-{tag}", "from-rule", **{"assignment-rule": {"labels": {"rvg": tag}}}
+        )
+        assert await self._winner(ws_id) == "from-rule"
+
+    async def test_an_explicit_assignment_beats_a_rule_matched_set(self, app, client):
+        """Explicit is the most specific statement of intent there is."""
+        set_auth(app, admin_user())
+        tag = uuid.uuid4().hex[:8]
+        ws_id = await _ws(client, f"rve-{tag}", labels={"rve": tag})
+        await self._set_with_var(
+            client, f"r-{tag}", "from-rule", **{"assignment-rule": {"labels": {"rve": tag}}}
+        )
+        expl = await self._set_with_var(client, f"e-{tag}", "from-explicit")
+        await client.post(
+            f"/api/v2/varsets/{expl}/relationships/workspaces",
+            json={"data": [{"id": ws_id, "type": "workspaces"}]},
+            headers=AUTH,
+        )
+        assert await self._winner(ws_id) == "from-explicit"
+
+
+class TestTheBlastRadiusViewSurvivesABadRule:
+    """`_rule_matches` was guarded and its sibling was not.
+
+    The association view is the screen that answers "who currently receives
+    this credential" — the one thing that must not 500 on the bad rule you are
+    trying to find.
+    """
+
+    async def test_the_varset_view_does_not_500_on_an_unusable_rule(self, app, client):
+        set_auth(app, admin_user())
+        tag = uuid.uuid4().hex[:8]
+        async with get_db_session() as db:
+            # Stored directly: such a rule is refused at write time now, but one
+            # saved on an earlier build is exactly the case this must survive.
+            vs = VariableSet(name=f"badview-{tag}", assignment_rule={"labels": {}})
+            db.add(vs)
+            await db.commit()
+            vs_id = vs.id
+
+        resp = await client.get(
+            f"/api/terrapod/v1/varsets/varset-{vs_id}/relationships/workspaces", headers=AUTH
+        )
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["data"] == [], "an unusable rule must match nothing, not raise"
+
+
+class TestTheSelectorNarrowingIsScoped:
+    """Excluding blank values wholesale was a breaking change.
+
+    `owner_email` is NOT NULL defaulting to "", so `{"owner_email": ""}` is the
+    only way to select unowned workspaces and worked before — its builder
+    clause is gated on `is not None`, not truthiness.
+    """
+
+    async def test_a_blank_owner_email_still_selects(self, app, client):
+        set_auth(app, admin_user())
+        resp = await client.post(
+            "/api/terrapod/v1/workspaces/actions/search",
+            json={"filter": {"owner_email": ""}},
+            headers=AUTH,
+        )
+        assert resp.status_code == 200, resp.text
+
+    @pytest.mark.parametrize("blank", [{"name_prefix": ""}, {"name_glob": ""}])
+    async def test_a_blank_truthiness_gated_dimension_is_still_refused(self, app, client, blank):
+        set_auth(app, admin_user())
+        resp = await client.post(
+            "/api/terrapod/v1/workspaces/actions/search", json={"filter": blank}, headers=AUTH
+        )
+        assert resp.status_code == 422, (
+            f"{blank} builds no WHERE clause — on bulk-update it would mutate the estate"
+        )
