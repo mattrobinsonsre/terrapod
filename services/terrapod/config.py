@@ -1494,6 +1494,126 @@ class MetricsConfig(BaseModel):
     )
 
 
+VAULT_AUTH_METHODS = {"kubernetes", "approle", "token"}
+
+
+class VaultAuthConfig(BaseModel):
+    """How Terrapod authenticates to one Vault instance (#1439)."""
+
+    method: str = Field(
+        default="kubernetes",
+        description="kubernetes | approle | token. `kubernetes` is the default "
+        "because it stores no credential at all — Terrapod presents the API pod's "
+        "own ServiceAccount token and Vault validates it.",
+    )
+    mount: str = Field(
+        default="kubernetes",
+        description="Auth mount path as enabled in Vault (`vault auth enable "
+        "-path=<mount> kubernetes`). Only the path, not a full URL.",
+    )
+    role: str = Field(
+        default="terrapod",
+        description="Vault role bound to Terrapod's ServiceAccount and namespace. "
+        "The policy attached to this role is the real access boundary for every "
+        "secret this feature can read — see docs/vault.md.",
+    )
+
+    @field_validator("method")
+    @classmethod
+    def _valid_method(cls, v: str) -> str:
+        if v not in VAULT_AUTH_METHODS:
+            raise ValueError(f"vault auth method must be one of {sorted(VAULT_AUTH_METHODS)}")
+        return v
+
+
+class VaultInstanceConfig(BaseModel):
+    """One Vault a variable may draw its value from (#1439)."""
+
+    name: str = Field(description='Identifier a variable reference uses (`"vault": "<name>"`).')
+    default: bool = Field(
+        default=False,
+        description="Resolve references that omit `vault` to this instance. Without "
+        "a default, an omitted name resolves only when exactly one instance is "
+        "configured, and is otherwise an error — reading a credential from the "
+        "wrong Vault silently is the failure worth engineering against.",
+    )
+    address: str = Field(default="", description="Vault address, e.g. https://vault:8200")
+    namespace: str = Field(default="", description="Vault namespace (Enterprise; optional)")
+    auth: VaultAuthConfig = Field(default_factory=VaultAuthConfig)
+    paths: list[str] = Field(
+        default_factory=list,
+        description="Optional allow-list of path prefixes Terrapod will read from "
+        "this instance (empty = no restriction). Defence in depth *over* a scoped "
+        "Vault policy, not instead of one: anyone who can set a workspace variable "
+        "can ask Terrapod to read any path its role reaches, so this is the second "
+        "line for an operator whose policy is slightly wider than they intended.",
+    )
+    tls_skip_verify: bool = Field(
+        default=False,
+        description="Skip TLS verification for this instance. For a lab only; a "
+        "credential broker that does not verify its peer is not one.",
+    )
+
+    @field_validator("name")
+    @classmethod
+    def _valid_name(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("vault instance name is required")
+        return v.strip()
+
+
+class VaultConfig(BaseModel):
+    """Vault as a first-class variable value source (#1439).
+
+    OFF by default. A variable may carry a *reference* instead of a literal
+    (`value_source: vault`), resolved server-side at `next_run` and delivered
+    through the per-run Secret — so Vault stays the source of truth and nothing
+    is copied into Terrapod's database.
+
+    A collection from the outset rather than a scalar address: config keys are a
+    gated surface, so a scalar could never be removed later and a move to
+    multi-Vault would mean carrying both spellings for ever.
+    """
+
+    enabled: bool = Field(default=False, description="Enable the Vault variable value source.")
+    instances: list[VaultInstanceConfig] = Field(
+        default_factory=list, description="Vault instances a variable may reference."
+    )
+    timeout_seconds: float = Field(
+        default=10.0, gt=0, description="Per-request timeout when talking to Vault."
+    )
+
+    @model_validator(mode="after")
+    def _check(self):
+        if not self.enabled:
+            return self
+        names = [i.name for i in self.instances]
+        if not names:
+            raise ValueError("vault.enabled is true but no vault.instances are configured")
+        dupes = {n for n in names if names.count(n) > 1}
+        if dupes:
+            raise ValueError(f"duplicate vault instance name(s): {sorted(dupes)}")
+        if sum(1 for i in self.instances if i.default) > 1:
+            raise ValueError("at most one vault instance may set default: true")
+        for inst in self.instances:
+            if not inst.address:
+                raise ValueError(f"vault instance {inst.name!r} requires an address")
+        return self
+
+    def resolve_instance(self, name: str | None) -> VaultInstanceConfig | None:
+        """The instance a reference means, or None when it cannot be decided.
+
+        Deliberately not "first wins": picking the wrong Vault for a credential
+        is silent and wrong, so an ambiguous reference is refused instead.
+        """
+        if name:
+            return next((i for i in self.instances if i.name == name), None)
+        marked = [i for i in self.instances if i.default]
+        if marked:
+            return marked[0]
+        return self.instances[0] if len(self.instances) == 1 else None
+
+
 class EncryptionConfig(BaseModel):
     """Optional application-layer encryption at rest (#553).
 
@@ -2668,6 +2788,7 @@ class Settings(BaseSettings):
 
     # Optional app-layer encryption at rest (#553; off by default)
     encryption: EncryptionConfig = Field(default_factory=EncryptionConfig)
+    vault: VaultConfig = Field(default_factory=VaultConfig)
 
     # Runner artifact upload limits (API-side enforcement)
     runner_artifacts: RunnerArtifactsConfig = Field(default_factory=RunnerArtifactsConfig)

@@ -525,6 +525,10 @@
           "description": "the value (empty is legal, e.g. flag-shaped env vars)",
           "type": "string"
         },
+        "value_source": {
+          "description": "static (default — value is the literal) or vault, where value is a JSON reference {\"mount\":…,\"path\":…,\"field\":…} that Terrapod reads from HashiCorp Vault at run time; a vault-sourced variable is always sensitive and the secret is never stored in Terrapod",
+          "type": "string"
+        },
         "workspace_id": {
           "description": "the workspace id (ws-...)",
           "type": "string"

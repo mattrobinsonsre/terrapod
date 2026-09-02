@@ -155,6 +155,7 @@
   "GET /api/terrapod/v1/users/{email}",
   "GET /api/terrapod/v1/users/{user_id}/authentication-tokens",
   "GET /api/terrapod/v1/varsets/{varset_id}/relationships/workspaces",
+  "GET /api/terrapod/v1/vault/availability",
   "GET /api/terrapod/v1/vcs-connections",
   "GET /api/terrapod/v1/vcs-connections/{connection_id}",
   "GET /api/terrapod/v1/workspace-events",

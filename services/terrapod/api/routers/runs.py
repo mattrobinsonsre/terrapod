@@ -2013,6 +2013,34 @@ async def next_run(
     from terrapod.services.variable_service import resolve_variables
 
     resolved = await resolve_variables(db, run.workspace_id)
+
+    # Vault value source (#1439): a variable whose `value_source` is "vault"
+    # holds a reference, not a literal. Resolve it here — before delivery — so
+    # the runner receives an ordinary variable and never learns where it came
+    # from, exactly as git-auth does above.
+    #
+    # Unlike git-auth, a failure here is FATAL rather than dropped. A silently
+    # absent credential leaves terraform to fail somewhere confusing, or to fall
+    # back to another identity and act with credentials nobody chose. The run is
+    # errored with the cause so the operator sees what to fix, instead of the
+    # listener getting a 500 and the run hanging claimed.
+    from terrapod.services.vault_source_service import (
+        VaultSourceError,
+        resolve_vault_variables,
+    )
+
+    try:
+        vault_values = await resolve_vault_variables(resolved, settings)
+    except VaultSourceError as e:
+        await run_service.transition_run(db, run, "errored", error_message=str(e))
+        await db.commit()
+        return Response(status_code=204)
+
+    if vault_values:
+        for v in resolved:
+            if v.key in vault_values:
+                v.value = vault_values[v.key]
+
     env_vars = [{"key": v.key, "value": v.value} for v in resolved if v.category == "env"]
     # `hcl` is forwarded so the runner renders the value correctly into the
     # generated terrapod.auto.tfvars (raw HCL expression vs quoted string). All

@@ -32,7 +32,7 @@ Beyond broad TFE compatibility, Terrapod is built with three deliberate design f
 | **Conditional auto-apply** | Per-workspace `auto_apply_mode` — apply automatically only when the plan is within a declared safety standard (`create`, `create_update`); anything that destroys or replaces stops for a human |
 | **Workspace undelete** | Deleting a workspace leaves its state behind a delete marker; an admin can salvage it into a new workspace within the retention window. See [runbooks.md](runbooks.md#i-deleted-a-workspace-by-mistake) |
 | **VCS Workflows** | Default merge-then-apply (TFE standard) plus opt-in apply-then-merge mode (Atlantis-style: PR comments drive applies, `terrapod apply` from a PR comment, auto-merge after apply) |
-| **Variables & Secrets** | Per-workspace env and Terraform variables; sensitive values protected by database encryption-at-rest; variable sets, assignable by rule (labels/globs) as well as one by one |
+| **Variables & Secrets** | Per-workspace env and Terraform variables; sensitive values protected by database encryption-at-rest; variable sets, assignable by rule (labels/globs) as well as one by one; values can be [read from Vault](vault.md) at run time, including dynamic secrets |
 | **Private Module Source Auth** | First-class auth for private `git::https://` / `git::ssh://` module sources — a scoped `git_http_auth` / `git_ssh_auth` variable (static token or minted from a VCS connection), ssh↔https protocol rewrite, log-safe per-run-Secret delivery ([module-auth.md](module-auth.md)) |
 | **RBAC** | Label-based role system with hierarchical workspace permissions (read/plan/write/admin) |
 | **Private Registry** | Publish, version, and share modules and providers internally with pull-through caching |

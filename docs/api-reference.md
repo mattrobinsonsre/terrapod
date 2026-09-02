@@ -1713,6 +1713,50 @@ DELETE /api/v2/varsets/{varset_id}/relationships/workspaces
 
 **Required permission:** Platform `admin`.
 
+### Vault Value Source
+
+A variable's `value-source` is `static` (the default — `value` is the literal)
+or `vault`, where `value` holds a JSON reference resolved at run time:
+
+```json
+{
+  "data": {
+    "type": "vars",
+    "attributes": {
+      "key": "NETBOX_TOKEN",
+      "category": "env",
+      "value-source": "vault",
+      "value": "{\"mount\":\"secret\",\"path\":\"apps/netbox\",\"field\":\"apitoken\"}"
+    }
+  }
+}
+```
+
+The reference takes `mount`, `path` and `field`; optionally `vault` (which
+configured instance), `engine` (`kv2` default, or `dynamic`), `method` (`GET`
+default, or `POST`) and `data` (a body for `POST` engines). The `path` omits
+kv-v2's `data/` segment — Terrapod adds it.
+
+A vault-sourced variable is **always sensitive**, but the API returns its
+`value` rather than masking it: the stored value is a path, not a secret. The
+secret it points at is resolved per run and never persisted, returned or
+logged. A malformed reference is rejected at write time with `422`; one that
+cannot be resolved **fails the run** rather than delivering nothing.
+
+Applies to variable-set variables too, so a Vault-backed credential can be
+defined once and applied to many workspaces.
+
+```
+GET /api/terrapod/v1/vault/availability
+```
+
+Reports whether the value source is configured and which instances exist, so a
+client can offer it only where it will work. Returns instance **names** only —
+never addresses, namespaces or auth configuration. Any authenticated user may
+call it, since anyone who can write a variable needs to pick an instance.
+
+Full setup, including the Vault-side policy and role: [Vault](vault.md).
+
 ### Assignment Rules
 
 A variable set can select workspaces by their attributes instead of being bound

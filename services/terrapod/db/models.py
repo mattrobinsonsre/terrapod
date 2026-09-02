@@ -1364,6 +1364,11 @@ class Variable(Base):
     #: `/api/v2` still accepts and returns this as `hcl`, for ever: `tfci` and
     #: `go-tfe` send and read that name. The translation lives in the router.
     structured: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    #: Where this variable's value comes from (#1439): "static" (the literal in
+    #: `value`) or "vault" (a reference resolved server-side at next_run). Kept
+    #: orthogonal to `category` so a Vault-backed variable stays an ordinary env
+    #: or terraform variable and inherits sets, scoping and precedence unchanged.
+    value_source: Mapped[str] = mapped_column(String(20), nullable=False, default="static")
     sensitive: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     version_id: Mapped[str] = mapped_column(String(64), nullable=False, default="")
 
@@ -1440,6 +1445,11 @@ class VariableSetVariable(Base):
     category: Mapped[str] = mapped_column(String(20), nullable=False, default="terraform")
     #: See `Variable.structured` (#1435).
     structured: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    #: Where this variable's value comes from (#1439): "static" (the literal in
+    #: `value`) or "vault" (a reference resolved server-side at next_run). Kept
+    #: orthogonal to `category` so a Vault-backed variable stays an ordinary env
+    #: or terraform variable and inherits sets, scoping and precedence unchanged.
+    value_source: Mapped[str] = mapped_column(String(20), nullable=False, default="static")
     sensitive: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     version_id: Mapped[str] = mapped_column(String(64), nullable=False, default="")
 

@@ -774,11 +774,22 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["name", "existingSecret"],
+            "required": [
+              "name",
+              "existingSecret"
+            ],
             "properties": {
-              "name": { "type": "string", "minLength": 1 },
-              "existingSecret": { "type": "string", "minLength": 1 },
-              "tokenKey": { "type": "string" }
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "existingSecret": {
+                "type": "string",
+                "minLength": 1
+              },
+              "tokenKey": {
+                "type": "string"
+              }
             }
           }
         },
@@ -2709,6 +2720,79 @@
               "additionalProperties": {
                 "type": "integer",
                 "minimum": 1
+              }
+            }
+          }
+        },
+        "vault": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "timeout_seconds": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "instances": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "name"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "default": {
+                    "type": "boolean"
+                  },
+                  "address": {
+                    "type": "string"
+                  },
+                  "namespace": {
+                    "type": "string"
+                  },
+                  "auth": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "method": {
+                        "type": "string",
+                        "enum": [
+                          "kubernetes",
+                          "approle",
+                          "token"
+                        ]
+                      },
+                      "mount": {
+                        "type": "string"
+                      },
+                      "role": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "paths": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "tls_skip_verify": {
+                    "type": "boolean"
+                  },
+                  "existingSecret": {
+                    "type": "string"
+                  },
+                  "existingSecretKey": {
+                    "type": "string"
+                  }
+                }
               }
             }
           }

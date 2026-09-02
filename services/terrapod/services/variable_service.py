@@ -31,6 +31,10 @@ class ResolvedVariable:
     category: str  # terraform | env | git_http_auth | git_ssh_auth
     structured: bool
     sensitive: bool
+    #: "static" (value is the literal) or "vault" (value is a reference resolved
+    #: at next_run, #1439). Carried through precedence so a workspace variable can
+    #: override a vault-sourced set variable, and vice versa, like any other.
+    value_source: str = "static"
 
 
 def _version_hash(key: str, value: str, category: str) -> str:
@@ -64,11 +68,14 @@ async def create_variable(
     description: str = "",
     structured: bool = False,
     sensitive: bool = False,
+    value_source: str = "static",
 ) -> Variable:
     """Create a workspace variable."""
     category = _validated_category(category)
     if category in GIT_AUTH_CATEGORIES:
         sensitive = True  # git-auth values are always secret
+    if value_source == "vault":
+        sensitive = True  # what the reference resolves to is always a secret
     var = Variable(
         workspace_id=workspace_id,
         key=key,
@@ -77,6 +84,7 @@ async def create_variable(
         category=category,
         structured=structured,
         sensitive=sensitive,
+        value_source=value_source,
         version_id=_version_hash(key, value, category),
     )
     db.add(var)
@@ -93,8 +101,11 @@ async def update_variable(
     description: str | None = None,
     structured: bool | None = None,
     sensitive: bool | None = None,
+    value_source: str | None = None,
 ) -> Variable:
     """Update an existing variable."""
+    if value_source is not None:
+        var.value_source = value_source
     if key is not None:
         var.key = key
     if description is not None:
@@ -110,8 +121,10 @@ async def update_variable(
         var.value = value
         var.version_id = _version_hash(var.key, value, var.category)
 
-    # git-auth categories are always secret and can never be downgraded.
-    force_sensitive = var.category in GIT_AUTH_CATEGORIES
+    # git-auth categories are always secret and can never be downgraded, and
+    # neither can a vault reference — what it resolves to is a secret however the
+    # request describes it.
+    force_sensitive = var.category in GIT_AUTH_CATEGORIES or var.value_source == "vault"
     if force_sensitive:
         var.sensitive = True
     elif sensitive is not None:
@@ -180,6 +193,7 @@ async def resolve_variables(db: AsyncSession, workspace_id: uuid.UUID) -> list[R
                 category=vsv.category,
                 structured=vsv.structured,
                 sensitive=vsv.sensitive,
+                value_source=vsv.value_source,
             )
 
     # Layer 2: Workspace variables (override non-priority sets)
@@ -191,6 +205,7 @@ async def resolve_variables(db: AsyncSession, workspace_id: uuid.UUID) -> list[R
             category=var.category,
             structured=var.structured,
             sensitive=var.sensitive,
+            value_source=var.value_source,
         )
 
     # Layer 3: Priority variable sets (override everything)
@@ -203,6 +218,7 @@ async def resolve_variables(db: AsyncSession, workspace_id: uuid.UUID) -> list[R
                 category=vsv.category,
                 structured=vsv.structured,
                 sensitive=vsv.sensitive,
+                value_source=vsv.value_source,
             )
 
     return list(resolved.values())

@@ -1,6 +1,7 @@
 package terrapod
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -355,4 +356,83 @@ func TestVariableCarriesBothNamesForTheTypedFlag(t *testing.T) {
 	if !v.HCL {
 		t.Error("HCL should be true — a consumer reading the old name must still work")
 	}
+}
+
+// ── Vault value source (#1439) ───────────────────────────────────────
+
+func TestVariableCarriesTheValueSource(t *testing.T) {
+	// The reference comes back in `value` rather than masked, because a path is
+	// not a secret. A consumer that assumed masking would show nothing useful.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"data":[{"id":"var-1","type":"vars","attributes":{
+			"key":"NETBOX_TOKEN","category":"env","sensitive":true,
+			"value-source":"vault",
+			"value":"{\"mount\":\"secret\",\"path\":\"apps/netbox\",\"field\":\"apitoken\"}"}}]}`))
+	}))
+	defer srv.Close()
+
+	v, err := mustVarClient(t, srv).GetVariable(context.Background(), "ws-1", "var-1")
+	if err != nil {
+		t.Fatalf("GetVariable: %v", err)
+	}
+	if v.ValueSource != "vault" {
+		t.Errorf("value source lost: %q", v.ValueSource)
+	}
+	if !strings.Contains(v.Value, "apps/netbox") {
+		t.Errorf("the reference should be returned, got %q", v.Value)
+	}
+}
+
+func TestAnOrdinaryVariableReportsNoValueSource(t *testing.T) {
+	// Omitted rather than "static" on the wire, so an older server that does not
+	// send the attribute is indistinguishable from a static variable — which is
+	// exactly right, since that is what it is.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"data":[{"id":"var-1","type":"vars","attributes":{
+			"key":"AWS_REGION","category":"env","value":"eu-west-1"}}]}`))
+	}))
+	defer srv.Close()
+
+	v, err := mustVarClient(t, srv).GetVariable(context.Background(), "ws-1", "var-1")
+	if err != nil {
+		t.Fatalf("GetVariable: %v", err)
+	}
+	if v.ValueSource != "" {
+		t.Errorf("want empty for a server that sends no value-source, got %q", v.ValueSource)
+	}
+}
+
+func TestCreateSendsTheValueSourceOnlyWhenSet(t *testing.T) {
+	// An unset source must not appear at all: sending "static" explicitly would
+	// be a needless write for every ordinary variable.
+	if attrs := variableCreateAttrs(CreateVariableRequest{Key: "K", Category: "env"}); attrs["value-source"] != nil {
+		t.Errorf("value-source leaked into an ordinary create: %v", attrs)
+	}
+	attrs := variableCreateAttrs(CreateVariableRequest{Key: "K", Category: "env", ValueSource: "vault"})
+	if attrs["value-source"] != "vault" {
+		t.Errorf("value-source not sent: %v", attrs)
+	}
+}
+
+func TestUpdateDistinguishesLeaveAloneFromConvert(t *testing.T) {
+	// nil means "do not touch the source"; a pointer converts the variable.
+	// Collapsing them would make it impossible to edit a vault variable's other
+	// fields without silently reverting it to static.
+	if attrs := variableUpdateAttrs(UpdateVariableRequest{Key: "K"}); attrs["value-source"] != nil {
+		t.Errorf("an omitted source must not appear: %v", attrs)
+	}
+	static := "static"
+	attrs := variableUpdateAttrs(UpdateVariableRequest{ValueSource: &static})
+	if attrs["value-source"] != "static" {
+		t.Errorf("converting back to static must be expressible: %v", attrs)
+	}
+}
+
+func mustVarClient(t *testing.T, srv *httptest.Server) *Client {
+	t.Helper()
+	c, err := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+	return c
 }

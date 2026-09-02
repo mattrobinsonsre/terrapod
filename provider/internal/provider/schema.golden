@@ -315,6 +315,7 @@ resource terrapod_variable.sensitive required=false optional=true computed=true 
 resource terrapod_variable.structured required=false optional=true computed=true sensitive=false type=basetypes.BoolType
 resource terrapod_variable.updated_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_variable.value required=false optional=true computed=false sensitive=true type=basetypes.StringType
+resource terrapod_variable.value_source required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_variable.version_id required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_variable.workspace_id required=true optional=false computed=false sensitive=false type=basetypes.StringType
 resource terrapod_variable_set.assignment_rule required=false optional=true computed=false sensitive=false type=types.ObjectType["agent_pool_id":basetypes.StringType, "drift_status":basetypes.StringType, "execution_backend":basetypes.StringType, "execution_mode":basetypes.StringType, "has_vcs":basetypes.BoolType, "labels":types.MapType[basetypes.StringType], "locked":basetypes.BoolType, "name_glob":basetypes.StringType, "name_prefix":basetypes.StringType, "owner_email":basetypes.StringType, "terraform_version":basetypes.StringType, "vcs_connection_id":basetypes.StringType]

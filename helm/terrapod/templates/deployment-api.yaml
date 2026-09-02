@@ -160,6 +160,23 @@ spec:
                   name: {{ .existingSecret | default (printf "%s-%s" (include "terrapod.fullname" $) .name) }}
                   key: {{ .existingSecretKey | default "client_secret" }}
             {{- end }}
+            {{- range .Values.api.config.vault.instances }}
+            {{- if .existingSecret }}
+            # Vault approle secret_id / static token (#1439). A credential, so
+            # it is injected from a Secret and never rendered into the
+            # ConfigMap. Kubernetes auth — the default — needs none of this:
+            # Terrapod presents the API pod's own ServiceAccount token.
+            #
+            # The name is derived from the instance name, so several Vaults each
+            # carry their own credential. Underscores because an env var cannot
+            # contain a dash.
+            - name: TERRAPOD_VAULT_{{ .name | upper | replace "-" "_" }}_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .existingSecret }}
+                  key: {{ .existingSecretKey | default "secret" }}
+            {{- end }}
+            {{- end }}
             {{- if .Values.api.config.vcs.github.existingSecret }}
             - name: TERRAPOD_VCS__GITHUB__WEBHOOK_SECRET
               valueFrom:
