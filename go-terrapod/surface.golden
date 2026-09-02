@@ -273,6 +273,7 @@ field CreateVariableRequest.HCL bool `json:"hcl,omitempty"`
 field CreateVariableRequest.Key string `json:"key"`
 field CreateVariableRequest.Sensitive bool `json:"sensitive,omitempty"`
 field CreateVariableRequest.Value string `json:"value"`
+field CreateVariableRequest.ValueSource string `json:"value-source,omitempty"`
 field CreateVariableSetRequest.AssignmentRule map[string]any
 field CreateVariableSetRequest.Description string
 field CreateVariableSetRequest.Global bool
@@ -815,6 +816,7 @@ field UpdateVariableRequest.HCL *bool `json:"hcl,omitempty"`
 field UpdateVariableRequest.Key string `json:"key,omitempty"`
 field UpdateVariableRequest.Sensitive *bool `json:"sensitive,omitempty"`
 field UpdateVariableRequest.Value *string `json:"value,omitempty"`
+field UpdateVariableRequest.ValueSource *string `json:"value-source,omitempty"`
 field UpdateVariableSetRequest.AssignmentRule *map[string]any
 field UpdateVariableSetRequest.Description *string
 field UpdateVariableSetRequest.Global *bool
@@ -919,6 +921,7 @@ field Variable.Key string `json:"key"`
 field Variable.Sensitive bool `json:"sensitive"`
 field Variable.UpdatedAt string `json:"updated-at,omitempty"`
 field Variable.Value string `json:"value,omitempty"`
+field Variable.ValueSource string `json:"value-source,omitempty"`
 field Variable.VersionID string `json:"version-id,omitempty"`
 field VariableSet.AssignmentRule map[string]any `json:"assignment-rule,omitempty"`
 field VariableSet.CreatedAt string `json:"created-at,omitempty"`

@@ -23,6 +23,41 @@ const API_URL = process.env.API_URL || 'http://localhost:8000';
  */
 
 test.describe('Responsive harness (phone viewport)', () => {
+  test('the Vault reference builder is usable at phone width (#1439)', async ({ page }) => {
+    // The desktop defect this guards against in the other direction: five
+    // fields crammed into a narrow container truncated the path and field
+    // inputs to unreadable stubs. The same component renders in the mobile
+    // card, so it has to hold up here too.
+    const token = getStoredToken()
+    const wsId = await createWorkspace(token, uniqueName('e2erespvault'))
+
+    await page.route('**/api/terrapod/v1/vault/availability', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            type: 'vault-availability',
+            id: 'vault',
+            attributes: { enabled: true, instances: ['default'], 'default-instance': 'default' },
+          },
+        }),
+      }),
+    )
+
+    await page.goto(`/workspaces/${wsId}?tab=variables`)
+    await page.getByRole('button', { name: 'Add Variable' }).click()
+    await page.locator('#var-source').selectOption('vault')
+
+    // Every coordinate field must be reachable and typable, not clipped.
+    for (const id of ['#add-mount', '#add-path', '#add-field']) {
+      await expect(page.locator(id)).toBeVisible()
+    }
+    await page.locator('#add-path').fill('apps/some/deeper/path')
+    await expect(page.locator('#add-path')).toHaveValue('apps/some/deeper/path')
+    await expectNoHorizontalPageScroll(page)
+  })
+
   test('workspace variable sets panel adapts to mobile (#1440)', async ({ page }) => {
     // Seeded rather than asserted on an empty page: with no set applying, the
     // panel renders nothing at all and the assertion would pass however the

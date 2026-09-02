@@ -927,6 +927,38 @@ api:
     # KEK durability is the backend's job — and for `static` it is YOURS: losing
     # the master key makes encrypted data unrecoverable. See
     # docs/encryption-at-rest.md before enabling.
+    # Vault as a first-class variable value source (#1439). A variable may hold a
+    # *reference* instead of a literal; Terrapod resolves it server-side at run
+    # time and delivers the result through the per-run Secret, so Vault stays the
+    # source of truth and nothing is copied into Terrapod's database.
+    #
+    # A LIST from the outset, not a single address: config keys are a stability-
+    # gated surface, so a scalar could never be removed later.
+    #
+    # IMPORTANT: the policy attached to the Vault role below is the real access
+    # boundary. Anyone who can set a workspace variable can ask Terrapod to read
+    # any path that role reaches. Scope it tightly; see docs/vault.md.
+    vault:
+      enabled: false
+      timeout_seconds: 10
+      instances: []
+      # - name: default
+      #   default: true            # used when a reference omits `vault`
+      #   address: https://vault.internal:8200
+      #   namespace: ""            # Vault Enterprise only
+      #   auth:
+      #     method: kubernetes     # kubernetes | approle | token
+      #     mount: kubernetes      # the auth mount path you enabled in Vault
+      #     role: terrapod         # role bound to Terrapod's ServiceAccount
+      #   # Optional second line behind the Vault policy: prefixes Terrapod will
+      #   # refuse to read outside of, whatever the policy permits.
+      #   paths: []
+      #   tls_skip_verify: false
+      #   # approle/token only — never kubernetes, which stores no credential.
+      #   # Injected as TERRAPOD_VAULT_<NAME>_SECRET via secretKeyRef.
+      #   existingSecret: ""
+      #   existingSecretKey: secret
+
     encryption:
       enabled: false
       # static (operator-held key, works anywhere) | vault_transit (CSP-agnostic,
