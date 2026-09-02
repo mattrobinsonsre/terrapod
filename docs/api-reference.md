@@ -2340,7 +2340,7 @@ POST /api/terrapod/v1/autodiscovery-rules
 
 Returns `201` with the created rule, or `409` if a rule with that name already exists for the connection.
 
-> **Reserved label keys:** `labels` is validated like any other label write — reserved keys (`status`, `pool`, `mode`, `backend`, `owner`, `drift`, `version`, `vcs`, `locked`, `branch`) are rejected with `422`. This is enforced at rule create/update so the rule can't materialise workspaces that later become uneditable.
+> **Reserved label keys:** `labels` is validated like any other label write — reserved keys (`status`, `owner`) are rejected with `422`. This is enforced at rule create/update so the rule can't materialise workspaces that later become uneditable.
 
 ### Show Rule
 

@@ -33,15 +33,16 @@
 // is matched on the same `health-conditions` array the "Health Issues"
 // indicator counts, so the filter can never drift from that indicator.
 //
-// `status` (and the other reserved keys — see `RESERVED_LABEL_KEYS` in
-// `services/terrapod/services/label_validation.py`) cannot be used as
-// literal label keys: the API rejects them at create/update time so the
-// filter language stays unambiguous. Today only `status:` is implemented
-// as a virtual term; the other reserved keys parse here as label terms
-// (which always miss because no workspace can have those labels). They
-// are reserved so the filter language stays unambiguous, not staged for
-// a later implementation. See
-// `docs/rbac.md` § Reserved label keys for the user-facing list.
+// `status` is the only reserved key THIS PARSER needs — it is the sole key
+// special-cased below, so a literal `status` label would make `status:errored`
+// ambiguous. `owner` is also reserved, but for an unrelated reason (it maps to
+// `owner_email`, which grants workspace admin); it parses here as an ordinary
+// label term. See `RESERVED_LABEL_KEYS` in
+// `services/terrapod/services/label_validation.py`.
+//
+// The set was narrowed from ten keys to those two in v1.6.0 (#1450): the other
+// eight were never built-in terms here, so each refused a label while giving
+// the filter nothing in return. See `docs/rbac.md` § Reserved label keys.
 
 export interface NameTerm {
   kind: 'name'
