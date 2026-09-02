@@ -323,7 +323,10 @@ class TestResourceAccessView:
             f"acc-role-{tag}",
             **{"allow-labels": {"env": [f"prod{tag}"]}, "workspace-permission": "write"},
         )
-        await client.post(
+        # PUT, not POST — and the status is asserted: the first version of this
+        # test POSTed, got a silent 405, and still passed because nothing
+        # checked that the assignment had landed.
+        assigned = await client.put(
             "/api/terrapod/v1/role-assignments",
             json={
                 "data": {
@@ -336,6 +339,7 @@ class TestResourceAccessView:
             },
             headers=AUTH,
         )
+        assert assigned.status_code in (200, 201), assigned.text
 
         resp = await client.get(f"/api/terrapod/v1/workspaces/{ws_id}/access", headers=AUTH)
         assert resp.status_code == 200, resp.text
@@ -346,6 +350,9 @@ class TestResourceAccessView:
         entry = next(r for r in a["roles"] if r["role"] == f"acc-role-{tag}")
         assert entry["reason"] == f"allow-label:env=prod{tag}"
         assert "run:apply" in entry["capabilities"]
+        # Who holds the role is the actionable half; a role nobody holds
+        # reaches nothing in practice.
+        assert entry["held-by"] == [f"alice-{tag}@example.com"], entry
 
         # Platform paths must be reported: a list of roles alone reads as the
         # complete answer when a platform admin reaches everything anyway.
