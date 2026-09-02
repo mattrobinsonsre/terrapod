@@ -1656,3 +1656,103 @@ it again. To stop mirroring something, take it out of `registry.oci.upstreams`;
 deletion will not hold the line.
 
 Requires `registry:admin` on the repository, and every deletion is audited.
+## Runs are failing on a Vault variable
+
+A variable whose value source is `vault` holds a reference, not a value.
+Terrapod reads the secret at run time, and **if it cannot, the run fails** — it
+does not proceed with the variable missing. That is deliberate: a silently
+absent credential leaves Terraform to fail somewhere confusing, or to fall back
+to another identity and act with credentials nobody chose.
+
+### Diagnosis
+
+The run's error names the variable and the cause. Match it against the table
+below; each row is a different thing to fix, and they are easy to confuse
+because Vault reports two of them the same way.
+
+| Error | Cause |
+|---|---|
+| `Vault login failed … (kubernetes auth, mount 'X', role 'Y')` | The role does not exist, or its `bound_service_account_names` / `bound_service_account_namespaces` do not match the ServiceAccount the API pods run as. |
+| `permission denied` **on login** | Vault cannot call the Kubernetes TokenReview API. Its own ServiceAccount is missing the `system:auth-delegator` ClusterRoleBinding. |
+| `Vault denied '<path>' … policy attached to role` | Login succeeded; the policy does not grant `read` on that path. Note kv-v2 policies include a `data/` segment that the reference omits. |
+| `Vault has no secret at '<path>'` | Wrong mount or path. |
+| `field '<x>' is not present at '<path>' (available: …)` | Right secret, wrong key — the message lists what is there. |
+| `path '<x>' is not in the allow-list configured for vault instance` | Terrapod's own `paths` allow-list refused it before contacting Vault. Widen the list or correct the reference. |
+| `variable(s) reference Vault but the Vault value source is disabled` | `api.config.vault.enabled` is `false` while variables still point at it. |
+| `omits 'vault' but several instances are configured` | Mark one instance `default: true`, or name the instance in the reference. |
+
+Confirm which ServiceAccount the API actually runs as rather than assuming:
+
+```sh
+kubectl -n <ns> get pod -l app.kubernetes.io/component=api \
+  -o jsonpath='{.items[0].spec.serviceAccountName}'
+```
+
+### Resolution
+
+Fix the cause the table identifies, in Vault or in the reference — see
+[Vault](vault.md) for the full setup. No Terrapod restart is needed: the token
+is re-obtained per run, and configuration changes take effect on the next
+`helm upgrade`.
+
+If runs must proceed **now** and the secret can be supplied another way, change
+the variable's value source back to `static` and set a literal value. That
+stops Vault being the source of truth, so treat it as an incident measure and
+revert it.
+
+### Verification
+
+Queue a plan-only run on the affected workspace. It reaching `planned` means
+the reference resolved; the value itself never appears in the log.
+
+---
+
+## A variable set is applying to workspaces I did not expect
+
+A variable set with an **assignment rule** selects workspaces by their
+attributes, and membership is re-evaluated on every run. A workspace that later
+matches picks the set up without anyone touching it — which is the point, and
+also the failure mode when the rule is wider than intended. For a set carrying
+credentials, that is a disclosure.
+
+### Diagnosis
+
+Ask the set who it currently reaches. This is the blast radius, and it is not
+the same as `workspace-count`, which counts only explicitly-assigned rows:
+
+```sh
+curl -sH "Authorization: Bearer $TOKEN" \
+  "$TERRAPOD/api/terrapod/v1/varsets/<varset-id>/relationships/workspaces"
+```
+
+Each entry reports how it arrived — `explicit`, `global`, or `rule`. From the
+other side, a workspace lists every set that applies to it, which answers
+"where did this variable come from":
+
+```sh
+curl -sH "Authorization: Bearer $TOKEN" \
+  "$TERRAPOD/api/terrapod/v1/workspaces/<workspace-id>/varsets"
+```
+
+In the UI these are the Workspaces tab of the variable set, and the Variables
+tab of the workspace.
+
+### Resolution
+
+Narrow the rule on the set's Settings tab; the editor shows a live count of
+matching workspaces as you type, so you can confirm the new scope **before**
+saving. Removing the rule entirely leaves only explicit assignments.
+
+A workspace matched by a rule has no per-workspace binding to delete — that is
+why the Workspaces tab offers no Remove for those rows. Narrow the rule
+instead.
+
+**If the set carried a credential**, treat the over-broad match as exposure and
+rotate it. Membership was evaluated per run, so check the affected workspaces'
+run history for the window in which the rule was too wide.
+
+### Verification
+
+Re-read the association endpoint above and confirm only the intended
+workspaces are listed. The next run on a workspace that no longer matches will
+not receive the set's variables.

@@ -464,9 +464,9 @@ api:
       # They are fetched lazily and only when needed: opa when a policy set
       # applies to a run, trivy only when it is the selected scan engine.
       platform_tools:
-        opa_version: "1.19.0"
+        opa_version: "1.20.1"
         trivy_version: "0.74.0"
-        checkov_version: "3.3.9"
+        checkov_version: "3.3.16"
         opa_mirror_url: "https://github.com/open-policy-agent/opa/releases/download"
         trivy_mirror_url: "https://github.com/aquasecurity/trivy/releases/download"
         checkov_mirror_url: "https://github.com/bridgecrewio/checkov/releases/download"
