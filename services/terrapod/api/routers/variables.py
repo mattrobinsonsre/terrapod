@@ -117,6 +117,16 @@ def _apply_value_source(attrs: dict, current: str = "static") -> tuple[str, bool
     """
     src = _validated_value_source(attrs, current)
     if src != "vault":
+        if current == "vault" and "value" not in attrs:
+            # Symmetric with the flip the other way. Without this the JSON
+            # reference stayed as the literal value and the runner delivered
+            # `{"mount":...}` to terraform as the credential — silently.
+            raise HTTPException(
+                status_code=422,
+                detail="changing value-source away from 'vault' requires a "
+                "replacement `value`; the stored reference is not a usable "
+                "literal and would be delivered to the run as one",
+            )
         return src, False
     if "value" in attrs:
         # Whenever a value is supplied on a vault-sourced variable it must be a

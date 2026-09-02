@@ -46,7 +46,28 @@ SA_TOKEN_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 _EXPIRY_MARGIN = 30.0
 
 
-def _as_vault_error(exc: Exception, what: str, inst_name: str) -> VaultError:
+class VaultError(RuntimeError):
+    """A Vault read or login failed.
+
+    Raised rather than swallowed: an unresolvable credential must fail the run.
+    A missing value would leave Terraform to fail somewhere confusing, or to
+    fall back to another identity and act with credentials nobody chose.
+    """
+
+
+class VaultUnavailable(VaultError):
+    """Vault could not be reached or did not answer usefully.
+
+    Distinct from VaultError because the right response differs. A malformed
+    reference will never resolve, so the run must fail. A Vault that is
+    restarting will answer in thirty seconds, and erroring every queued run in
+    the estate for that — leaving an operator to re-queue each by hand — turns a
+    brief blip into an incident. A transient failure leaves the run queued for
+    the next claim instead.
+    """
+
+
+def _as_vault_error(exc: Exception, what: str, inst_name: str) -> VaultUnavailable:
     """Convert a transport or decode failure into a VaultError.
 
     Callers upstream catch VaultError only. A bare httpx error escaped both the
@@ -55,20 +76,11 @@ def _as_vault_error(exc: Exception, what: str, inst_name: str) -> VaultError:
     outage stranded every queued run in the estate, not just the one that
     needed a secret.
     """
-    return VaultError(
+    return VaultUnavailable(
         f"Vault {what} on instance {inst_name!r} failed: "
         f"{type(exc).__name__} — {exc}. Vault may be unreachable, slow, or "
         "behind a proxy returning a non-JSON error."
     )
-
-
-class VaultError(RuntimeError):
-    """A Vault read or login failed.
-
-    Raised rather than swallowed: an unresolvable credential must fail the run.
-    A missing value would leave Terraform to fail somewhere confusing, or to
-    fall back to another identity and act with credentials nobody chose.
-    """
 
 
 _token_cache: dict[str, tuple[str, float]] = {}
