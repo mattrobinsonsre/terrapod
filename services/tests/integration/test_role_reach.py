@@ -104,7 +104,9 @@ class TestReachMatchesEnforcement:
 
         async with get_db_session() as db:
             role = await db.get(Role, f"agree-role-{tag}")
-            result = await role_reach_service.preview_role_reach(db, role, limit=100)
+            result = await role_reach_service.preview_role_reach(
+                db, role, limit=100, viewer_roles=["admin"]
+            )
             from sqlalchemy import select
 
             from terrapod.db.models import Workspace
@@ -263,3 +265,159 @@ class TestPaging:
             headers=AUTH,
         )
         assert len(resp2.json()["data"]["attributes"]["workspaces"]) == 1
+
+
+class TestAxisCoverage:
+    """A role's rules are matched the same way whatever they are matched
+    against, so the preview must cover every axis they govern. Reporting only
+    workspaces would answer a quarter of the question while looking complete.
+    """
+
+    async def test_one_rule_reaches_pools_and_registry_too(self, app, client):
+        tag = uuid.uuid4().hex[:8]
+        await _ws(client, f"ax-ws-{tag}", labels={"squad": tag})
+        pool = await client.post(
+            "/api/terrapod/v1/agent-pools",
+            json={
+                "data": {
+                    "type": "agent-pools",
+                    "attributes": {"name": f"ax-pool-{tag}", "labels": {"squad": tag}},
+                }
+            },
+            headers=AUTH,
+        )
+        assert pool.status_code == 201, pool.text
+
+        await _role(
+            client,
+            f"ax-role-{tag}",
+            **{
+                "allow-labels": {"squad": tag},
+                "workspace-permission": "write",
+                "pool-permission": "admin",
+            },
+        )
+        resp = await client.get(f"/api/terrapod/v1/roles/ax-role-{tag}/preview", headers=AUTH)
+        axes = resp.json()["data"]["attributes"]["axes"]
+
+        assert axes["workspace"]["granted-count"] == 1
+        assert axes["pool"]["granted-count"] == 1, "the pool axis was not covered"
+
+        # Capabilities are sliced PER AXIS: the same role reports workspace caps
+        # against the workspace and pool caps against the pool, not one
+        # undifferentiated set that is wrong on both.
+        ws_caps = axes["workspace"]["resources"][0]["capabilities"]
+        pool_caps = axes["pool"]["resources"][0]["capabilities"]
+        assert all(c.split(":")[0] != "pool" for c in ws_caps), ws_caps
+        assert all(c.startswith(("pool:", "agent-pool:")) for c in pool_caps), pool_caps
+
+
+class TestResourceAccessView:
+    """The reverse question: looking at one resource, who can reach it."""
+
+    async def test_lists_the_roles_that_reach_a_workspace_and_who_holds_them(self, app, client):
+        tag = uuid.uuid4().hex[:8]
+        ws_id = await _ws(client, f"acc-{tag}", labels={"env": f"prod{tag}"})
+        await _role(
+            client,
+            f"acc-role-{tag}",
+            **{"allow-labels": {"env": [f"prod{tag}"]}, "workspace-permission": "write"},
+        )
+        await client.post(
+            "/api/terrapod/v1/role-assignments",
+            json={
+                "data": {
+                    "attributes": {
+                        "provider-name": "local",
+                        "email": f"alice-{tag}@example.com",
+                        "roles": [f"acc-role-{tag}"],
+                    }
+                }
+            },
+            headers=AUTH,
+        )
+
+        resp = await client.get(f"/api/terrapod/v1/workspaces/{ws_id}/access", headers=AUTH)
+        assert resp.status_code == 200, resp.text
+        a = resp.json()["data"]["attributes"]
+
+        names = [r["role"] for r in a["roles"]]
+        assert f"acc-role-{tag}" in names
+        entry = next(r for r in a["roles"] if r["role"] == f"acc-role-{tag}")
+        assert entry["reason"] == f"allow-label:env=prod{tag}"
+        assert "run:apply" in entry["capabilities"]
+
+        # Platform paths must be reported: a list of roles alone reads as the
+        # complete answer when a platform admin reaches everything anyway.
+        assert "platform-admin" in a["platform-paths"]
+        assert "owner" in a["platform-paths"]
+
+    async def test_a_denied_role_is_listed_separately_not_as_granting(self, app, client):
+        tag = uuid.uuid4().hex[:8]
+        ws_id = await _ws(client, f"accd-{tag}", labels={"env": f"prod{tag}", "sealed": "yes"})
+        await _role(
+            client,
+            f"accd-role-{tag}",
+            **{
+                "allow-labels": {"env": [f"prod{tag}"]},
+                "deny-labels": {"sealed": ["yes"]},
+                "workspace-permission": "admin",
+            },
+        )
+        resp = await client.get(f"/api/terrapod/v1/workspaces/{ws_id}/access", headers=AUTH)
+        a = resp.json()["data"]["attributes"]
+        assert [r["role"] for r in a["roles"]] == []
+        assert [r["role"] for r in a["denied-roles"]] == [f"accd-role-{tag}"]
+
+    async def test_unknown_workspace_404s_and_a_bad_id_422s(self, app, client):
+        assert (
+            await client.get(f"/api/terrapod/v1/workspaces/ws-{uuid.uuid4()}/access", headers=AUTH)
+        ).status_code == 404
+        assert (
+            await client.get("/api/terrapod/v1/workspaces/not-a-uuid/access", headers=AUTH)
+        ).status_code == 422
+
+
+class TestViewerMustAlreadySeeTheEstate:
+    """The reach answer names every matching resource across the estate,
+    regardless of what the caller can see. That is safe only because the
+    endpoints are gated on platform admin/audit, who already see everything --
+    so the coupling is explicit and fails CLOSED rather than resting on the
+    gate staying as it is.
+    """
+
+    async def test_a_narrower_principal_is_refused_at_the_service(self, app, client):
+        tag = uuid.uuid4().hex[:8]
+        await _ws(client, f"vis-{tag}", labels={"env": tag})
+        await _role(
+            client,
+            f"vis-role-{tag}",
+            **{"allow-labels": {"env": [tag]}, "workspace-permission": "read"},
+        )
+        async with get_db_session() as db:
+            role = await db.get(Role, f"vis-role-{tag}")
+            for roles in ([], ["everyone"], ["some-team-lead"]):
+                with pytest.raises(role_reach_service.ViewerNotPermitted):
+                    await role_reach_service.preview_role_reach(db, role, viewer_roles=roles)
+
+    async def test_platform_audit_is_permitted(self, app, client):
+        """Audit resolves to the read floor on every axis, so it already sees
+        what the answer would disclose."""
+        tag = uuid.uuid4().hex[:8]
+        await _role(client, f"aud-role-{tag}", **{"workspace-permission": "read"})
+        async with get_db_session() as db:
+            role = await db.get(Role, f"aud-role-{tag}")
+            out = await role_reach_service.preview_role_reach(db, role, viewer_roles=["audit"])
+            assert out["granted-count"] == 0
+
+    async def test_the_access_view_is_guarded_too(self, app, client):
+        tag = uuid.uuid4().hex[:8]
+        ws_id = await _ws(client, f"visa-{tag}", labels={"env": tag})
+        async with get_db_session() as db:
+            from terrapod.db.models import Workspace
+
+            ws = await db.get(Workspace, uuid.UUID(ws_id.removeprefix("ws-")))
+            with pytest.raises(role_reach_service.ViewerNotPermitted):
+                await role_reach_service.resolve_resource_access(
+                    db, ws, axis="workspace", kind="workspaces", viewer_roles=["everyone"]
+                )

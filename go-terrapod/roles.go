@@ -344,7 +344,11 @@ const (
 // role's rules landed where they did (e.g. "allow-label:env=prod",
 // "deny-name") and the capabilities the role resolves to there.
 type RoleReachWorkspace struct {
-	ID           string            `json:"id"`
+	ID string `json:"id"`
+	// Kind names the resource type ("workspaces", "agent-pools",
+	// "registry-modules", "registry-providers", "catalog-items"). Empty on the
+	// promoted workspace lists, where it is implied.
+	Kind         string            `json:"kind,omitempty"`
 	Name         string            `json:"name"`
 	Labels       map[string]string `json:"labels,omitempty"`
 	OwnerEmail   string            `json:"owner-email,omitempty"`
@@ -362,10 +366,32 @@ type RoleReachWorkspace struct {
 // Denied holds a bounded sample of what a deny rule removed, which is what
 // makes a deny rule safe to write.
 type RoleReach struct {
+	// Totals across EVERY axis the role's rules govern, not workspaces alone.
+	GrantedCount int `json:"granted-count"`
+	DeniedCount  int `json:"denied-count"`
+	MatchedCount int `json:"matched-count"`
+
+	// Axes is the breakdown, keyed "workspace" | "pool" | "registry" |
+	// "catalog". A role's allow/deny rules are matched the same way whatever
+	// they are matched against, so one rule reaches agent pools, registry
+	// modules and providers, and catalog items as readily as workspaces --
+	// reading only the workspace numbers answers a quarter of the question.
+	// Capabilities in each block are sliced to that axis.
+	Axes map[string]RoleReachAxis `json:"axes,omitempty"`
+
+	// Workspaces/Denied promote the workspace axis to the top level, since it
+	// is what most callers want. Equivalent to Axes["workspace"].
+	Workspaces      []RoleReachWorkspace `json:"workspaces"`
+	Denied          []RoleReachWorkspace `json:"denied,omitempty"`
+	DeniedTruncated bool                 `json:"denied-truncated"`
+}
+
+// RoleReachAxis is what a role reaches on one capability axis.
+type RoleReachAxis struct {
 	GrantedCount    int                  `json:"granted-count"`
 	DeniedCount     int                  `json:"denied-count"`
 	MatchedCount    int                  `json:"matched-count"`
-	Workspaces      []RoleReachWorkspace `json:"workspaces"`
+	Resources       []RoleReachWorkspace `json:"resources"`
 	Denied          []RoleReachWorkspace `json:"denied,omitempty"`
 	DeniedTruncated bool                 `json:"denied-truncated"`
 }
@@ -442,4 +468,62 @@ func (c *Client) PreviewUnsavedRoleReach(ctx context.Context, req CreateRoleRequ
 		return nil, err
 	}
 	return parseRoleReach(data)
+}
+
+// ── The reverse view: who can reach a resource (#1456) ────────────────
+
+// ResourceAccessRole is one role's grant on a resource, with the rule
+// responsible and the identities holding the role.
+type ResourceAccessRole struct {
+	Role         string   `json:"role"`
+	Verdict      string   `json:"verdict"`
+	Reason       string   `json:"reason,omitempty"`
+	Capabilities []string `json:"capabilities,omitempty"`
+	Notes        []string `json:"notes,omitempty"`
+	HeldBy       []string `json:"held-by,omitempty"`
+}
+
+// ResourceAccess answers "who can reach this?" for one resource.
+//
+// Read PlatformPaths before treating Roles as the whole answer. A list of roles
+// reads as complete when it is not: a platform admin reaches everything, an
+// owner holds admin on their own resource, and an `access: everyone` label
+// makes a thing readable with no role involved at all.
+type ResourceAccess struct {
+	Resource struct {
+		ID         string            `json:"id"`
+		Kind       string            `json:"kind"`
+		Name       string            `json:"name"`
+		Labels     map[string]string `json:"labels,omitempty"`
+		OwnerEmail string            `json:"owner-email,omitempty"`
+	} `json:"resource"`
+	Axis          string               `json:"axis"`
+	Roles         []ResourceAccessRole `json:"roles"`
+	DeniedRoles   []ResourceAccessRole `json:"denied-roles,omitempty"`
+	RoleCount     int                  `json:"role-count"`
+	PlatformPaths []string             `json:"platform-paths,omitempty"`
+}
+
+type resourceAccessEnvelope struct {
+	Data struct {
+		Attributes ResourceAccess `json:"attributes"`
+	} `json:"data"`
+}
+
+// GetResourceAccess reports which roles reach one resource, at what capability,
+// and who holds them — the inverse of PreviewRoleReach.
+//
+// kind is the URL segment for the resource type: "workspaces", "agent-pools",
+// "registry-modules", "registry-providers" or "catalog-items". Roles are few,
+// so this is unpaged by design.
+func (c *Client) GetResourceAccess(ctx context.Context, kind, id string) (*ResourceAccess, error) {
+	data, err := c.Get(ctx, "/api/terrapod/v1/"+url.PathEscape(kind)+"/"+url.PathEscape(id)+"/access")
+	if err != nil {
+		return nil, err
+	}
+	var doc resourceAccessEnvelope
+	if err := json.Unmarshal(data, &doc); err != nil {
+		return nil, fmt.Errorf("parse resource access response: %w", err)
+	}
+	return &doc.Data.Attributes, nil
 }

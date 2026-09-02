@@ -378,3 +378,93 @@ func TestPreviewRoleReach_BuiltinIsServerRejected(t *testing.T) {
 		t.Fatal("expected an error for a built-in role")
 	}
 }
+
+func TestPreviewRoleReach_AxisBreakdown(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"data":{"attributes":{
+			"granted-count": 4, "denied-count": 0, "matched-count": 4,
+			"axes": {
+				"workspace": {"granted-count":2,"resources":[
+					{"id":"ws-1","kind":"workspaces","name":"prod-api","verdict":"allowed","capabilities":["run:apply"]}]},
+				"pool":      {"granted-count":1,"resources":[
+					{"id":"apool-1","kind":"agent-pools","name":"eu-runners","verdict":"allowed","capabilities":["pool:update"]}]},
+				"registry":  {"granted-count":1,"resources":[
+					{"id":"m1","kind":"registry-modules","name":"vpc","verdict":"allowed","capabilities":["registry:publish"]}]},
+				"catalog":   {"granted-count":0,"resources":[]}
+			},
+			"workspaces": [{"id":"ws-1","name":"prod-api","verdict":"allowed"}]
+		}}}`))
+	}))
+	defer srv.Close()
+	c, err := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	reach, err := c.PreviewRoleReach(t.Context(), "sre", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The whole point: one rule reaches more than workspaces, and a caller
+	// reading only the workspace numbers gets a quarter of the answer.
+	if reach.GrantedCount != 4 {
+		t.Errorf("total should span every axis, got %d", reach.GrantedCount)
+	}
+	if reach.Axes["pool"].GrantedCount != 1 || reach.Axes["registry"].GrantedCount != 1 {
+		t.Errorf("axes: %+v", reach.Axes)
+	}
+	// Capabilities are sliced per axis.
+	if got := reach.Axes["pool"].Resources[0].Capabilities; len(got) != 1 || got[0] != "pool:update" {
+		t.Errorf("pool caps: %v", got)
+	}
+	if reach.Axes["registry"].Resources[0].Kind != "registry-modules" {
+		t.Errorf("kind not carried: %+v", reach.Axes["registry"].Resources[0])
+	}
+	// The promoted workspace list still works for callers that only want it.
+	if len(reach.Workspaces) != 1 || reach.Workspaces[0].Name != "prod-api" {
+		t.Errorf("promoted workspaces: %+v", reach.Workspaces)
+	}
+}
+
+func TestGetResourceAccess(t *testing.T) {
+	var path string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path = r.URL.Path
+		_, _ = w.Write([]byte(`{"data":{"type":"resource-access","id":"ws-1","attributes":{
+			"resource": {"id":"ws-1","kind":"workspaces","name":"prod-api","owner-email":"a@b.c"},
+			"axis": "workspace",
+			"role-count": 1,
+			"roles": [{"role":"sre","verdict":"allowed","reason":"allow-label:env=prod",
+			           "capabilities":["run:apply"],"held-by":["alice@example.com"]}],
+			"denied-roles": [{"role":"contractors","verdict":"denied","reason":"deny-name"}],
+			"platform-paths": ["platform-admin","platform-audit","owner"]
+		}}}`))
+	}))
+	defer srv.Close()
+	c, err := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	acc, err := c.GetResourceAccess(t.Context(), "workspaces", "ws-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if path != "/api/terrapod/v1/workspaces/ws-1/access" {
+		t.Errorf("path: %s", path)
+	}
+	if len(acc.Roles) != 1 || acc.Roles[0].Role != "sre" {
+		t.Fatalf("roles: %+v", acc.Roles)
+	}
+	// Who holds the role is the actionable half — a role nobody holds reaches
+	// nothing in practice.
+	if len(acc.Roles[0].HeldBy) != 1 || acc.Roles[0].HeldBy[0] != "alice@example.com" {
+		t.Errorf("held-by: %+v", acc.Roles[0].HeldBy)
+	}
+	if len(acc.DeniedRoles) != 1 || acc.DeniedRoles[0].Reason != "deny-name" {
+		t.Errorf("denied: %+v", acc.DeniedRoles)
+	}
+	// Platform paths must survive decode: omitting them makes a partial answer
+	// look complete.
+	if len(acc.PlatformPaths) != 3 {
+		t.Errorf("platform paths: %+v", acc.PlatformPaths)
+	}
+}
