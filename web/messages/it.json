@@ -643,7 +643,9 @@
       "allowLabelsShort": "Etichette consentite",
       "allowNamesShort": "Nomi consentiti",
       "denyLabelsShort": "Etichette negate",
-      "denyNamesShort": "Nomi negati"
+      "denyNamesShort": "Nomi negati",
+      "allowAll": "Concedi su tutto",
+      "allowAllHelp": "Corrisponde a ogni risorsa, comprese quelle create in seguito. Le regole di negazione restano valide. Usa questo invece di etichettare ogni spazio di lavoro: uno creato senza l''etichetta resterebbe fuori dal ruolo senza avvisi."
     },
     "assignForm": {
       "provider": "Provider",
@@ -714,7 +716,8 @@
       "deleteRole": "Impossibile eliminare il ruolo",
       "setAssignment": "Impossibile impostare l''assegnazione",
       "setAssignmentStatus": "Impossibile impostare l''assegnazione ({status})",
-      "deleteAssignment": "Impossibile eliminare l''assegnazione"
+      "deleteAssignment": "Impossibile eliminare l''assegnazione",
+      "conflictingLabelKeys": "{keys} ha più di un valore. Una regola di etichetta tiene un valore per chiave, quindi l''ultimo sostituirebbe silenziosamente i precedenti. Più valori per una chiave sono supportati dall''API ma non ancora impostabili qui."
     }
   },
   "adminVcs": {
@@ -938,7 +941,11 @@
       "rulePreview": "{count, plural, =0 {Non corrisponde ad alcun workspace} one {Corrisponde a # workspace} other {Corrisponde a # workspace}}",
       "rulePreviewLoading": "Verifica dei workspace corrispondenti…",
       "rulePreviewInvalid": "Impossibile verificare questa regola. Il salvataggio segnalerà il problema esatto.",
-      "ruleConflictsWithGlobal": "Un set globale si applica già a ogni workspace, quindi non può avere una regola."
+      "ruleConflictsWithGlobal": "Un set globale si applica già a ogni workspace, quindi non può avere una regola.",
+      "valueSource": "Origine del valore",
+      "valueSourceStatic": "Inserisci un valore",
+      "valueSourceVault": "Leggi da Vault",
+      "vaultHint": "Terrapod legge il segreto da Vault in fase di esecuzione. Qui non viene memorizzato nulla."
     }
   },
   "adminAutodiscovery": {
@@ -2255,7 +2262,8 @@
       "cost": "Costo",
       "architecture": "Architettura",
       "insights": "Approfondimenti",
-      "automation": "Automazione"
+      "automation": "Automazione",
+      "access": "Accesso"
     },
     "lifecycle": {
       "pendingDeletion": "Eliminazione in attesa",
@@ -2433,7 +2441,24 @@
       "gitRewrite": "Protocol rewrite",
       "gitRewriteNone": "None",
       "gitRewriteToHttps": "Rewrite ssh:// sources to https:// (use this token)",
-      "gitRewriteToSsh": "Rewrite https:// sources to ssh:// (use this key)"
+      "gitRewriteToSsh": "Rewrite https:// sources to ssh:// (use this key)",
+      "valueSource": "Origine del valore",
+      "sourceStatic": "Inserisci un valore",
+      "sourceVault": "Leggi da Vault",
+      "sourceStaticHelp": "Il valore è memorizzato in Terrapod e consegnato all'esecuzione.",
+      "sourceVaultHelp": "Terrapod legge il segreto da Vault in fase di esecuzione. Qui non viene memorizzato nulla.",
+      "vaultMount": "Mount",
+      "vaultPath": "Percorso",
+      "vaultField": "Campo",
+      "vaultEngine": "Motore dei segreti",
+      "vaultEngineKv2": "Statico (kv-v2)",
+      "vaultEngineDynamic": "Dinamico (generato a ogni esecuzione)",
+      "vaultInstance": "Vault",
+      "vaultInstanceDefault": "Predefinito",
+      "vaultSecretNeverStored": "Viene salvato il percorso, mai il segreto. La policy Vault di Terrapod controlla cosa può leggere.",
+      "sourceVaultBadge": "Vault",
+      "vaultReferenceUnreadable": "Riferimento Vault illeggibile",
+      "vaultInstanceDefaultNamed": "Predefinito ({name})"
     },
     "runs": {
       "options": "Opzioni",
@@ -3049,5 +3074,54 @@
     "restoreConfirm": "Ripristinare lo stato di «{name}»?\n\nQuesto crea un NUOVO workspace: l''originale non torna. Torna senza auto-apply, senza rilevamento del drift e senza connessione VCS; variabili e cronologia delle esecuzioni non tornano. Viene recuperato solo lo stato.",
     "restoreDone": "{versions, plural, one {# versione di stato recuperata} other {# versioni di stato recuperate}} nel nuovo workspace «{name}». Controlla le impostazioni prima di attivare auto-apply o VCS.",
     "restoreAgainConfirm": "«{name}» è già stato ripristinato, in {existing}.\n\nRipristinarlo di nuovo crea un SECONDO workspace con lo stesso lignaggio di stato sulla stessa infrastruttura. Un apply in uno dei due farà poi sembrare il piano successivo dell''altro un drift totale.\n\nProsegui solo se il workspace ripristinato in precedenza non esiste più."
+  },
+  "roleReach": {
+    "title": "Ciò che questo ruolo raggiunge",
+    "checking": "Verifica in corso…",
+    "failed": "Impossibile determinare la portata di questa regola.",
+    "noAllowRules": "Aggiungi un''etichetta o un nome di autorizzazione per vedere quali spazi di lavoro raggiungerebbe questo ruolo.",
+    "granted": "concessi",
+    "deniedCount": "negati",
+    "matched": "{count} corrispondenti alle regole di autorizzazione",
+    "andMore": "…e altri {count}",
+    "excludedByDeny": "Esclusi dalle regole di negazione",
+    "reason": {
+      "allowName": "per nome",
+      "denyName": "negato per nome",
+      "allowLabel": "corrisponde a {rule}",
+      "denyLabel": "negato da {rule}"
+    },
+    "note": {
+      "catalogClamped": "Gestito dal catalogo — limitato alla lettura",
+      "everyoneFloor": "Leggibile da tutti",
+      "hasOwner": "Il proprietario ha già i diritti di amministrazione"
+    },
+    "reachesNothing": "Questa regola non raggiunge nulla.",
+    "allowAllBanner": "Concede su tutte le risorse. Le regole di negazione restano valide.",
+    "axis": {
+      "workspace": "Spazi di lavoro",
+      "pool": "Pool di agenti",
+      "registry": "Registro",
+      "catalog": "Elementi del catalogo"
+    }
+  },
+  "resourceAccess": {
+    "title": "Chi può raggiungerlo",
+    "subtitle": "Ruoli le cui regole corrispondono a questo spazio di lavoro, e chi li detiene.",
+    "loading": "Caricamento…",
+    "failed": "Impossibile determinare chi può raggiungerlo.",
+    "forbidden": "Questa risposta copre l''intero parco, quindi è mostrata solo ad amministratori e auditor della piattaforma.",
+    "noRoles": "Nessuna regola di ruolo corrisponde a questo spazio di lavoro.",
+    "deniedRoles": "Corrispondente, poi escluso da una regola di negazione",
+    "alsoReachable": "Raggiungibile anche senza alcun ruolo",
+    "heldBy": "Detenuto da {who}",
+    "heldByNobody": "Detenuto da nessuno — in pratica non concede nulla",
+    "path": {
+      "platformAdmin": "Gli amministratori della piattaforma raggiungono ogni risorsa",
+      "platformAudit": "Gli auditor della piattaforma possono leggere ogni risorsa",
+      "owner": "Il proprietario ha qui i diritti di amministrazione",
+      "everyoneFloor": "Etichettato access: everyone — leggibile da tutti",
+      "catalogClamped": "Gestito dal catalogo — ogni concessione non amministrativa è limitata alla lettura"
+    }
   }
 }

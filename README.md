@@ -178,7 +178,7 @@ Everything below is implemented and shipped today.
 | VCS integration | GitHub App + GitLab token; inbound webhooks supported (GitHub HMAC + GitLab token) for instant triggers, with outbound polling as the resilient default — so webhooks are optional, never required |
 | Workspace autodiscovery | Atlantis-style monorepo autodiscovery — pattern-matched rules auto-create workspaces on PRs to new directories |
 | Terragrunt | Per-workspace Terragrunt for agent-mode runs (a flag + pinned version, pull-through binary cache, local-backend reconciliation so Terrapod still owns state); CLI-driven runs need no extra config |
-| Variables & secrets | Per-workspace env and Terraform variables; sensitive values protected by database encryption-at-rest; variable sets, assignable by rule (labels/globs) as well as one by one |
+| Variables & secrets | Per-workspace env and Terraform variables; sensitive values protected by database encryption-at-rest; variable sets, assignable by rule (labels/globs) as well as one by one; values can be [read from HashiCorp Vault](docs/vault.md) at run time, including dynamic secrets |
 | Private module source auth | First-class auth for private `git::https://` / `git::ssh://` module sources — a scoped `git_http_auth` / `git_ssh_auth` variable (static token or minted from a VCS connection), with ssh↔https protocol rewriting; credentials are log-safe and delivered only via the per-run Secret ([module-auth.md](docs/module-auth.md)) |
 | Drift detection | Scheduled plan-only runs to detect out-of-band changes, with a per-workspace ignore allowlist |
 | Notifications | Webhook (HMAC-SHA512), Slack (Block Kit), and email alerts on run events |

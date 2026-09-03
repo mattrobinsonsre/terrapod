@@ -99,3 +99,7 @@ smoke-*
 .conformance/
 report.html
 junit.xml
+
+# `tilt dump api-docs` output. Root-anchored: a bare `api/` would also match
+# services/terrapod/api/, which is source.
+/api/

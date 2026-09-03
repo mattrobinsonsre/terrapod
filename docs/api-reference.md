@@ -1713,6 +1713,50 @@ DELETE /api/v2/varsets/{varset_id}/relationships/workspaces
 
 **Required permission:** Platform `admin`.
 
+### Vault Value Source
+
+A variable's `value-source` is `static` (the default — `value` is the literal)
+or `vault`, where `value` holds a JSON reference resolved at run time:
+
+```json
+{
+  "data": {
+    "type": "vars",
+    "attributes": {
+      "key": "NETBOX_TOKEN",
+      "category": "env",
+      "value-source": "vault",
+      "value": "{\"mount\":\"secret\",\"path\":\"apps/netbox\",\"field\":\"apitoken\"}"
+    }
+  }
+}
+```
+
+The reference takes `mount`, `path` and `field`; optionally `vault` (which
+configured instance), `engine` (`kv2` default, or `dynamic`), `method` (`GET`
+default, or `POST`) and `data` (a body for `POST` engines). The `path` omits
+kv-v2's `data/` segment — Terrapod adds it.
+
+A vault-sourced variable is **always sensitive**, but the API returns its
+`value` rather than masking it: the stored value is a path, not a secret. The
+secret it points at is resolved per run and never persisted, returned or
+logged. A malformed reference is rejected at write time with `422`; one that
+cannot be resolved **fails the run** rather than delivering nothing.
+
+Applies to variable-set variables too, so a Vault-backed credential can be
+defined once and applied to many workspaces.
+
+```
+GET /api/terrapod/v1/vault/availability
+```
+
+Reports whether the value source is configured and which instances exist, so a
+client can offer it only where it will work. Returns instance **names** only —
+never addresses, namespaces or auth configuration. Any authenticated user may
+call it, since anyone who can write a variable needs to pick an instance.
+
+Full setup, including the Vault-side policy and role: [Vault](vault.md).
+
 ### Assignment Rules
 
 A variable set can select workspaces by their attributes instead of being bound
@@ -1729,16 +1773,19 @@ to each one by hand. Set `assignment-rule` on create or update:
 }
 ```
 
-The rule accepts the same dimensions as the workspace bulk-update selector --
-`workspace_ids`, `labels`, `name_prefix`, `name_glob`, `execution_backend`,
+The rule accepts the workspace bulk-update selector's *attribute* dimensions --
+`labels`, `name_prefix`, `name_glob`, `execution_backend`,
 `execution_mode`, `terraform_version`, `agent_pool_id`, `vcs_connection_id`,
 `owner_email`, `drift_status`, `locked`, `has_vcs` -- all AND-combined.
 Membership is re-evaluated on every run, so a workspace that later matches picks
 the set up without being touched, and one that stops matching stops receiving it.
 
-Rejected with `422`: an unparseable rule, a non-object rule, `all: true` (use
-`global` instead, which already means every workspace), and a rule on a set that
-is already `global`.
+Rejected with `422`: an unparseable rule; a non-object rule; `all: true` (use
+`global`, which already means every workspace); `workspace_ids` (that is
+explicit assignment, and would produce a rule whose membership never
+re-evaluates); a rule on a set that is already `global`; and a rule whose
+dimensions are all blank -- `{"name_prefix": ""}` selects nothing meaningful and
+would otherwise match every workspace.
 
 A rule that no longer parses matches **nothing** rather than everything, so a
 filter dimension removed in a later version cannot silently widen a scoped
@@ -2302,7 +2349,7 @@ POST /api/terrapod/v1/autodiscovery-rules
 
 Returns `201` with the created rule, or `409` if a rule with that name already exists for the connection.
 
-> **Reserved label keys:** `labels` is validated like any other label write — reserved keys (`status`, `pool`, `mode`, `backend`, `owner`, `drift`, `version`, `vcs`, `locked`, `branch`) are rejected with `422`. This is enforced at rule create/update so the rule can't materialise workspaces that later become uneditable.
+> **Reserved label keys:** `labels` is validated like any other label write — reserved keys (`status`, `owner`) are rejected with `422`. This is enforced at rule create/update so the rule can't materialise workspaces that later become uneditable.
 
 ### Show Rule
 
@@ -2527,6 +2574,129 @@ DELETE /api/terrapod/v1/roles/{name}
 ```
 
 Built-in roles cannot be deleted.
+
+### Role attribute: `allow-all`
+
+`allow-all: true` makes the role's allow side match **every resource on every
+axis**, including ones created later. Deny rules still take precedence, and it
+does not raise the role's permission level. It exists because label and name
+rules are exact-match (no wildcards), so the alternative was a shared label on
+every workspace — where a workspace created without it silently falls outside
+the role. Defaults to `false`; every pre-existing role keeps exactly the reach
+it had.
+
+### Resource Access (who can reach this)
+
+```
+GET /api/terrapod/v1/workspaces/{id}/access
+GET /api/terrapod/v1/agent-pools/{id}/access
+GET /api/terrapod/v1/registry-modules/{id}/access
+GET /api/terrapod/v1/registry-providers/{id}/access
+GET /api/terrapod/v1/catalog-items/{id}/access
+```
+
+The inverse of the role preview. `admin` or `audit`; read-only and unpaged
+(roles are few).
+
+```json
+{
+  "data": {
+    "type": "resource-access",
+    "id": "ws-...",
+    "attributes": {
+      "resource": {"id": "ws-...", "kind": "workspaces", "name": "prod-api",
+                   "labels": {"env": "prod"}, "owner-email": "team@example.com"},
+      "axis": "workspace",
+      "role-count": 1,
+      "roles": [
+        {"role": "sre", "verdict": "allowed", "reason": "allow-label:env=prod",
+         "capabilities": ["run:apply", "..."], "notes": ["has-owner"],
+         "held-by": ["alice@example.com"]}
+      ],
+      "denied-roles": [
+        {"role": "contractors", "verdict": "denied", "reason": "deny-name",
+         "capabilities": []}
+      ],
+      "platform-paths": ["platform-admin", "platform-audit", "owner"]
+    }
+  }
+}
+```
+
+`platform-paths` names access that exists **independently of any role** —
+`platform-admin`, `platform-audit`, `owner`, `everyone-floor`,
+`catalog-clamped`. A caller that reports only `roles` will understate who can
+reach the resource.
+
+### Preview Role Reach
+
+```
+POST /api/terrapod/v1/roles/preview
+GET  /api/terrapod/v1/roles/{name}/preview
+```
+
+Which workspaces a role grants on, and why. `admin` or `audit`; read-only.
+
+`POST` previews an **unsaved** role body — the same attributes a create takes
+(`allow-labels`, `allow-names`, `deny-labels`, `deny-names`, and either
+`capabilities` or the level shorthand) — so the admin UI can show the match
+while a rule is being typed. Nothing is persisted, and a body a create would
+reject is rejected here too (`422`).
+
+`GET` previews a saved role. A built-in role returns `422`: `admin` and `audit`
+grant through the platform path on every workspace, so a label-reach figure for
+them would be misleading rather than useful.
+
+Paged with `page[size]` (default 25, max 100) and `page[number]`. **The counts
+span the whole fleet, not the returned page.**
+
+The response carries an `axes` block keyed `workspace` / `pool` / `registry` /
+`catalog`: a role's rules are matched the same way whatever they are matched
+against, so one rule reaches agent pools, registry modules and providers, and
+catalog items as readily as workspaces. Capabilities in each block are sliced
+to that axis. The workspace axis is also promoted to the top level as
+`workspaces` / `denied`, since it is what most callers want.
+
+```json
+{
+  "data": {
+    "type": "role-previews",
+    "id": "sre",
+    "attributes": {
+      "granted-count": 47,
+      "denied-count": 3,
+      "matched-count": 50,
+      "denied-truncated": false,
+      "workspaces": [
+        {
+          "id": "ws-...",
+          "name": "prod-api",
+          "labels": {"env": "prod"},
+          "owner-email": "team@example.com",
+          "verdict": "allowed",
+          "reason": "allow-label:env=prod",
+          "capabilities": ["run:apply", "run:plan", "..."],
+          "notes": ["has-owner"]
+        }
+      ],
+      "denied": [
+        {
+          "id": "ws-...",
+          "name": "prod-locked",
+          "verdict": "denied",
+          "reason": "deny-label:sealed=yes",
+          "capabilities": []
+        }
+      ]
+    }
+  }
+}
+```
+
+`verdict` is `allowed` or `denied`; `reason` names the responsible rule.
+`notes` name access paths independent of this role — `has-owner`,
+`everyone-floor`, `catalog-clamped` — see
+[`rbac.md` → Seeing What a Role Reaches](rbac.md#seeing-what-a-role-reaches).
 
 ---
 

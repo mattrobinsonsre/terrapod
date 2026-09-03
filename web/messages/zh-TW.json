@@ -643,7 +643,9 @@
       "allowLabelsShort": "允許標籤",
       "allowNamesShort": "允許名稱",
       "denyLabelsShort": "拒絕標籤",
-      "denyNamesShort": "拒絕名稱"
+      "denyNamesShort": "拒絕名稱",
+      "allowAll": "在所有內容上授予",
+      "allowAllHelp": "符合所有資源，包括之後建立的。拒絕規則仍然適用。請使用此選項，而不是為每個工作區加上標籤——未加標籤建立的工作區會悄悄落在角色範圍之外。"
     },
     "assignForm": {
       "provider": "提供者",
@@ -714,7 +716,8 @@
       "deleteRole": "刪除角色失敗",
       "setAssignment": "設定分配失敗",
       "setAssignmentStatus": "設定分配失敗（{status}）",
-      "deleteAssignment": "刪除分配失敗"
+      "deleteAssignment": "刪除分配失敗",
+      "conflictingLabelKeys": "{keys} 被指定了多個值。標籤規則每個索引鍵只保留一個值，因此最後一個會悄悄取代先前的值。API 支援一個索引鍵對應多個值，但此處尚不能設定。"
     }
   },
   "adminVcs": {
@@ -938,7 +941,11 @@
       "rulePreview": "{count, plural, =0 {未比對到任何工作區} other {比對到 # 個工作區}}",
       "rulePreviewLoading": "正在檢查符合的工作區…",
       "rulePreviewInvalid": "無法檢查此規則。儲存時會回報確切問題。",
-      "ruleConflictsWithGlobal": "全域變數集已套用至所有工作區，因此無法同時使用規則。"
+      "ruleConflictsWithGlobal": "全域變數集已套用至所有工作區，因此無法同時使用規則。",
+      "valueSource": "值來源",
+      "valueSourceStatic": "直接輸入值",
+      "valueSourceVault": "從 Vault 讀取",
+      "vaultHint": "Terrapod 於執行時從 Vault 讀取密鑰，此處不會儲存任何內容。"
     }
   },
   "adminAutodiscovery": {
@@ -2255,7 +2262,8 @@
       "cost": "成本",
       "architecture": "架構",
       "insights": "洞察",
-      "automation": "自動化"
+      "automation": "自動化",
+      "access": "存取"
     },
     "lifecycle": {
       "pendingDeletion": "待刪除",
@@ -2433,7 +2441,24 @@
       "gitRewrite": "Protocol rewrite",
       "gitRewriteNone": "None",
       "gitRewriteToHttps": "Rewrite ssh:// sources to https:// (use this token)",
-      "gitRewriteToSsh": "Rewrite https:// sources to ssh:// (use this key)"
+      "gitRewriteToSsh": "Rewrite https:// sources to ssh:// (use this key)",
+      "valueSource": "值來源",
+      "sourceStatic": "直接輸入值",
+      "sourceVault": "從 Vault 讀取",
+      "sourceStaticHelp": "該值儲存於 Terrapod 中並於執行時提供。",
+      "sourceVaultHelp": "Terrapod 於執行時從 Vault 讀取密鑰，此處不會儲存任何內容。",
+      "vaultMount": "掛載點",
+      "vaultPath": "路徑",
+      "vaultField": "欄位",
+      "vaultEngine": "密鑰引擎",
+      "vaultEngineKv2": "靜態 (kv-v2)",
+      "vaultEngineDynamic": "動態（每次執行新建）",
+      "vaultInstance": "Vault",
+      "vaultInstanceDefault": "預設",
+      "vaultSecretNeverStored": "儲存的是路徑，絕非密鑰。Terrapod 的 Vault 政策決定它能讀取什麼。",
+      "sourceVaultBadge": "Vault",
+      "vaultReferenceUnreadable": "無法解析的 Vault 參照",
+      "vaultInstanceDefaultNamed": "預設（{name}）"
     },
     "runs": {
       "options": "選項",
@@ -3049,5 +3074,54 @@
     "restoreConfirm": "要還原「{name}」的狀態嗎？\n\n這會建立一個新的工作區——原工作區不會回來。還原後自動套用與漂移偵測皆為關閉，且沒有 VCS 連線；變數和執行紀錄不會回來。只有狀態會被搶救回來。",
     "restoreDone": "已將 {versions, plural, other {# 個狀態版本}} 還原至新工作區「{name}」。啟用自動套用或 VCS 之前請檢查其設定。",
     "restoreAgainConfirm": "「{name}」已經還原過一次，還原到了 {existing}。\n\n再次還原會建立第二個工作區，它在同一套基礎設施之上持有相同的 state 血統。之後在任一工作區執行 apply，都會讓另一個的下一次計畫看起來像是全面漂移。\n\n只有在先前還原的工作區已經不存在時才繼續。"
+  },
+  "roleReach": {
+    "title": "此角色涵蓋的內容",
+    "checking": "正在檢查…",
+    "failed": "無法判斷此規則的涵蓋範圍。",
+    "noAllowRules": "新增允許標籤或允許名稱，即可查看此角色將涵蓋哪些工作區。",
+    "granted": "已授予",
+    "deniedCount": "已拒絕",
+    "matched": "{count} 個符合允許規則",
+    "andMore": "…另有 {count} 個",
+    "excludedByDeny": "被拒絕規則排除",
+    "reason": {
+      "allowName": "依名稱",
+      "denyName": "依名稱拒絕",
+      "allowLabel": "符合 {rule}",
+      "denyLabel": "被 {rule} 拒絕"
+    },
+    "note": {
+      "catalogClamped": "目錄託管 — 限制為唯讀",
+      "everyoneFloor": "所有人可讀",
+      "hasOwner": "擁有者已具有管理員權限"
+    },
+    "reachesNothing": "此規則不涵蓋任何內容。",
+    "allowAllBanner": "在所有資源上授予。拒絕規則仍然適用。",
+    "axis": {
+      "workspace": "工作區",
+      "pool": "代理集區",
+      "registry": "登錄檔",
+      "catalog": "目錄項目"
+    }
+  },
+  "resourceAccess": {
+    "title": "誰可以存取",
+    "subtitle": "規則與此工作區相符的角色，以及持有這些角色的人。",
+    "loading": "載入中…",
+    "failed": "無法判斷誰可以存取。",
+    "forbidden": "此答案涵蓋整個環境，因此僅向平台管理員和稽核員顯示。",
+    "noRoles": "沒有角色規則與此工作區相符。",
+    "deniedRoles": "已符合，隨後被拒絕規則排除",
+    "alsoReachable": "無需任何角色也可存取",
+    "heldBy": "由 {who} 持有",
+    "heldByNobody": "無人持有 — 實際上不授予任何權限",
+    "path": {
+      "platformAdmin": "平台管理員可存取所有資源",
+      "platformAudit": "平台稽核員可讀取所有資源",
+      "owner": "擁有者在此擁有管理員權限",
+      "everyoneFloor": "標記為 access: everyone — 所有人可讀",
+      "catalogClamped": "目錄託管 — 所有非管理員授權均限制為唯讀"
+    }
   }
 }

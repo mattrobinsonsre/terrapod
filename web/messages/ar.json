@@ -643,7 +643,9 @@
       "allowLabelsShort": "السماح بالتسميات",
       "allowNamesShort": "السماح بالأسماء",
       "denyLabelsShort": "منع التسميات",
-      "denyNamesShort": "منع الأسماء"
+      "denyNamesShort": "منع الأسماء",
+      "allowAll": "المنح على كل شيء",
+      "allowAllHelp": "تطابق كل مورد، بما في ذلك ما يُنشأ لاحقًا. قواعد الرفض تظل سارية. استخدم هذا بدلًا من وسم كل مساحة عمل — فمساحة تُنشأ بدون الوسم ستقع خارج الدور دون تنبيه."
     },
     "assignForm": {
       "provider": "المزوّد",
@@ -714,7 +716,8 @@
       "deleteRole": "فشل حذف الدور",
       "setAssignment": "فشل تعيين التعيين",
       "setAssignmentStatus": "فشل تعيين التعيين ({status})",
-      "deleteAssignment": "فشل حذف التعيين"
+      "deleteAssignment": "فشل حذف التعيين",
+      "conflictingLabelKeys": "{keys} أُعطي أكثر من قيمة. قاعدة الوسم تحمل قيمة واحدة لكل مفتاح، فالأخيرة ستحل محل السابقة دون تنبيه. تعدد القيم لمفتاح واحد تدعمه الواجهة البرمجية لكن لا يمكن ضبطه هنا بعد."
     }
   },
   "adminVcs": {
@@ -938,7 +941,11 @@
       "rulePreview": "{count, plural, =0 {لا يطابق أي مساحة عمل} one {يطابق مساحة عمل واحدة} two {يطابق مساحتي عمل} few {يطابق # مساحات عمل} many {يطابق # مساحة عمل} other {يطابق # مساحة عمل}}",
       "rulePreviewLoading": "جارٍ التحقق من مساحات العمل المطابقة…",
       "rulePreviewInvalid": "تعذر التحقق من هذه القاعدة. سيبلغ الحفظ عن المشكلة بدقة.",
-      "ruleConflictsWithGlobal": "تنطبق المجموعة العامة بالفعل على كل مساحات العمل، لذا لا يمكن استخدام قاعدة معها."
+      "ruleConflictsWithGlobal": "تنطبق المجموعة العامة بالفعل على كل مساحات العمل، لذا لا يمكن استخدام قاعدة معها.",
+      "valueSource": "مصدر القيمة",
+      "valueSourceStatic": "إدخال قيمة",
+      "valueSourceVault": "القراءة من Vault",
+      "vaultHint": "يقرأ Terrapod السر من Vault وقت التشغيل. لا يُخزَّن شيء هنا."
     }
   },
   "adminAutodiscovery": {
@@ -2255,7 +2262,8 @@
       "cost": "التكلفة",
       "architecture": "المعمارية",
       "insights": "رؤى",
-      "automation": "الأتمتة"
+      "automation": "الأتمتة",
+      "access": "الوصول"
     },
     "lifecycle": {
       "pendingDeletion": "بانتظار الحذف",
@@ -2433,7 +2441,24 @@
       "gitRewrite": "Protocol rewrite",
       "gitRewriteNone": "None",
       "gitRewriteToHttps": "Rewrite ssh:// sources to https:// (use this token)",
-      "gitRewriteToSsh": "Rewrite https:// sources to ssh:// (use this key)"
+      "gitRewriteToSsh": "Rewrite https:// sources to ssh:// (use this key)",
+      "valueSource": "مصدر القيمة",
+      "sourceStatic": "إدخال قيمة",
+      "sourceVault": "القراءة من Vault",
+      "sourceStaticHelp": "تُخزَّن القيمة في Terrapod وتُسلَّم إلى التشغيل.",
+      "sourceVaultHelp": "يقرأ Terrapod السر من Vault وقت التشغيل. لا يُخزَّن شيء هنا.",
+      "vaultMount": "نقطة التحميل",
+      "vaultPath": "المسار",
+      "vaultField": "الحقل",
+      "vaultEngine": "محرك الأسرار",
+      "vaultEngineKv2": "ثابت (kv-v2)",
+      "vaultEngineDynamic": "ديناميكي (يُنشأ لكل تشغيل)",
+      "vaultInstance": "Vault",
+      "vaultInstanceDefault": "افتراضي",
+      "vaultSecretNeverStored": "يُخزَّن المسار وليس السر. سياسة Vault الخاصة بـ Terrapod تحدد ما يمكنه قراءته.",
+      "sourceVaultBadge": "Vault",
+      "vaultReferenceUnreadable": "مرجع Vault غير قابل للقراءة",
+      "vaultInstanceDefaultNamed": "افتراضي ({name})"
     },
     "runs": {
       "options": "الخيارات",
@@ -3049,5 +3074,54 @@
     "restoreConfirm": "هل تريد استرجاع حالة «{name}»؟\n\nسيؤدي ذلك إلى إنشاء مساحة عمل جديدة — لن تعود الأصلية. ستعود بالتطبيق التلقائي وكشف الانحراف معطَّلين وبدون اتصال VCS، ولن تعود المتغيرات ولا سجل التشغيل. الحالة وحدها هي ما يُنقَذ.",
     "restoreDone": "تم استرجاع {versions, plural, zero {# إصدار حالة} one {إصدار حالة واحد} two {إصداري حالة} few {# إصدارات حالة} many {# إصدار حالة} other {# إصدار حالة}} إلى مساحة العمل الجديدة «{name}». راجع الإعدادات قبل تفعيل التطبيق التلقائي أو VCS.",
     "restoreAgainConfirm": "تمت استعادة «{name}» بالفعل، إلى {existing}.\n\nاستعادته مرة أخرى تُنشئ مساحة عمل ثانية تحمل نفس سلالة الحالة فوق نفس البنية التحتية. عندئذٍ سيجعل أي تطبيق في إحداهما خطة الأخرى التالية تبدو وكأنها انحراف شامل.\n\nتابع فقط إذا كانت مساحة العمل المستعادة سابقًا قد اختفت."
+  },
+  "roleReach": {
+    "title": "ما يشمله هذا الدور",
+    "checking": "جارٍ التحقق…",
+    "failed": "تعذّر تحديد نطاق هذه القاعدة.",
+    "noAllowRules": "أضف تسمية أو اسمًا مسموحًا به لمعرفة مساحات العمل التي سيشملها هذا الدور.",
+    "granted": "ممنوح",
+    "deniedCount": "مرفوض",
+    "matched": "{count} مطابقة لقواعد السماح",
+    "andMore": "…و{count} أخرى",
+    "excludedByDeny": "مستبعدة بقواعد الرفض",
+    "reason": {
+      "allowName": "بالاسم",
+      "denyName": "مرفوض بالاسم",
+      "allowLabel": "يطابق {rule}",
+      "denyLabel": "مرفوض بواسطة {rule}"
+    },
+    "note": {
+      "catalogClamped": "مُدار بالكتالوج — مقيّد بالقراءة",
+      "everyoneFloor": "قابل للقراءة من الجميع",
+      "hasOwner": "المالك لديه صلاحيات المسؤول بالفعل"
+    },
+    "reachesNothing": "هذه القاعدة لا تشمل شيئًا.",
+    "allowAllBanner": "تمنح على جميع الموارد. قواعد الرفض تظل سارية.",
+    "axis": {
+      "workspace": "مساحات العمل",
+      "pool": "مجموعات الوكلاء",
+      "registry": "السجل",
+      "catalog": "عناصر الكتالوج"
+    }
+  },
+  "resourceAccess": {
+    "title": "من يمكنه الوصول",
+    "subtitle": "الأدوار التي تطابق قواعدها مساحة العمل هذه، ومن يملكها.",
+    "loading": "جارٍ التحميل…",
+    "failed": "تعذّر تحديد من يمكنه الوصول.",
+    "forbidden": "تشمل هذه الإجابة البيئة بأكملها، لذا تُعرض فقط لمسؤولي ومدققي المنصة.",
+    "noRoles": "لا توجد قاعدة دور تطابق مساحة العمل هذه.",
+    "deniedRoles": "طابقت ثم استُبعدت بقاعدة رفض",
+    "alsoReachable": "يمكن الوصول إليها أيضًا بدون أي دور",
+    "heldBy": "بحوزة {who}",
+    "heldByNobody": "ليست بحوزة أحد — لا تمنح شيئًا عمليًا",
+    "path": {
+      "platformAdmin": "مسؤولو المنصة يصلون إلى كل مورد",
+      "platformAudit": "مدققو المنصة يمكنهم قراءة كل مورد",
+      "owner": "المالك لديه صلاحيات المسؤول هنا",
+      "everyoneFloor": "موسومة access: everyone — قابلة للقراءة من الجميع",
+      "catalogClamped": "مُدارة بالكتالوج — كل منح لغير المسؤول مقيّد بالقراءة"
+    }
   }
 }

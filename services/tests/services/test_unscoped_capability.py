@@ -32,6 +32,7 @@ def _role(name, *, allow_names=None, allow_labels=None, level="admin"):
     r.name = name
     r.allow_names = allow_names or []
     r.deny_names = []
+    r.allow_all = False
     r.allow_labels = allow_labels or {}
     r.deny_labels = {}
     r.capabilities = sorted(
@@ -131,6 +132,7 @@ class TestScopedResolutionIsUnchanged:
     @pytest.mark.parametrize("axis", ["workspace", "pool", "catalog"])
     async def test_other_axes_are_untouched_by_the_default(self, axis):
         role = MagicMock()
+        role.allow_all = False
         role.name = "broad"
         role.allow_names = []
         role.deny_names = []

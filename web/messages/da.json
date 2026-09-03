@@ -643,7 +643,9 @@
       "allowLabelsShort": "Tillad labels",
       "allowNamesShort": "Tillad navne",
       "denyLabelsShort": "Afvis labels",
-      "denyNamesShort": "Afvis navne"
+      "denyNamesShort": "Afvis navne",
+      "allowAll": "Giv adgang til alt",
+      "allowAllHelp": "Matcher alle ressourcer, også dem der oprettes senere. Nægtelsesregler gælder stadig. Brug dette i stedet for at mærke hvert workspace — et workspace oprettet uden mærket ville stiltiende falde uden for rollen."
     },
     "assignForm": {
       "provider": "Provider",
@@ -714,7 +716,8 @@
       "deleteRole": "Kunne ikke slette rolle",
       "setAssignment": "Kunne ikke angive tildeling",
       "setAssignmentStatus": "Kunne ikke angive tildeling ({status})",
-      "deleteAssignment": "Kunne ikke slette tildeling"
+      "deleteAssignment": "Kunne ikke slette tildeling",
+      "conflictingLabelKeys": "{keys} har fået mere end én værdi. En mærkeregel rummer én værdi pr. nøgle, så den sidste ville stiltiende erstatte de tidligere. Flere værdier pr. nøgle understøttes af API''et, men kan endnu ikke sættes her."
     }
   },
   "adminVcs": {
@@ -938,7 +941,11 @@
       "rulePreview": "{count, plural, =0 {Matcher ingen workspaces} one {Matcher # workspace} other {Matcher # workspaces}}",
       "rulePreviewLoading": "Kontrollerer, hvilke workspaces der matcher …",
       "rulePreviewInvalid": "Denne regel kunne ikke kontrolleres. Gem viser det præcise problem.",
-      "ruleConflictsWithGlobal": "Et globalt sæt gælder allerede for alle workspaces, så en regel kan ikke bruges sammen med det."
+      "ruleConflictsWithGlobal": "Et globalt sæt gælder allerede for alle workspaces, så en regel kan ikke bruges sammen med det.",
+      "valueSource": "Værdikilde",
+      "valueSourceStatic": "Indtast en værdi",
+      "valueSourceVault": "Læs fra Vault",
+      "vaultHint": "Terrapod læser hemmeligheden fra Vault ved kørsel. Intet gemmes her."
     }
   },
   "adminAutodiscovery": {
@@ -2255,7 +2262,8 @@
       "cost": "Omkostning",
       "architecture": "Arkitektur",
       "insights": "Indsigter",
-      "automation": "Automatisering"
+      "automation": "Automatisering",
+      "access": "Adgang"
     },
     "lifecycle": {
       "pendingDeletion": "Afventer sletning",
@@ -2433,7 +2441,24 @@
       "gitRewrite": "Protocol rewrite",
       "gitRewriteNone": "None",
       "gitRewriteToHttps": "Rewrite ssh:// sources to https:// (use this token)",
-      "gitRewriteToSsh": "Rewrite https:// sources to ssh:// (use this key)"
+      "gitRewriteToSsh": "Rewrite https:// sources to ssh:// (use this key)",
+      "valueSource": "Værdikilde",
+      "sourceStatic": "Indtast en værdi",
+      "sourceVault": "Læs fra Vault",
+      "sourceStaticHelp": "Værdien gemmes i Terrapod og leveres til kørslen.",
+      "sourceVaultHelp": "Terrapod læser hemmeligheden fra Vault ved kørsel. Intet gemmes her.",
+      "vaultMount": "Mount",
+      "vaultPath": "Sti",
+      "vaultField": "Felt",
+      "vaultEngine": "Secret-motor",
+      "vaultEngineKv2": "Statisk (kv-v2)",
+      "vaultEngineDynamic": "Dynamisk (oprettet pr. kørsel)",
+      "vaultInstance": "Vault",
+      "vaultInstanceDefault": "Standard",
+      "vaultSecretNeverStored": "Stien gemmes, aldrig hemmeligheden. Terrapods Vault-politik styrer, hvad der kan læses.",
+      "sourceVaultBadge": "Vault",
+      "vaultReferenceUnreadable": "Ulæselig Vault-reference",
+      "vaultInstanceDefaultNamed": "Standard ({name})"
     },
     "runs": {
       "options": "Indstillinger",
@@ -3049,5 +3074,54 @@
     "restoreConfirm": "Gendan state for ”{name}”?\n\nDette opretter et NYT arbejdsområde — originalen kommer ikke tilbage. Det kommer tilbage med auto-apply og driftregistrering slået fra og uden VCS-forbindelse; variabler og kørselshistorik kommer ikke tilbage. Kun state reddes.",
     "restoreDone": "Gendannede {versions, plural, one {# state-version} other {# state-versioner}} til det nye arbejdsområde ”{name}”. Tjek indstillingerne, før du slår auto-apply eller VCS til.",
     "restoreAgainConfirm": "“{name}” er allerede gendannet, til {existing}.\n\nAt gendanne igen opretter et ANDET workspace med den samme state-slægt over den samme infrastruktur. En apply i det ene får så det andets næste plan til at se ud som omfattende drift.\n\nFortsæt kun, hvis det tidligere gendannede workspace er væk."
+  },
+  "roleReach": {
+    "title": "Hvad denne rolle omfatter",
+    "checking": "Kontrollerer…",
+    "failed": "Kunne ikke afgøre, hvad denne regel omfatter.",
+    "noAllowRules": "Tilføj et tilladt label eller navn for at se, hvilke workspaces denne rolle ville omfatte.",
+    "granted": "tildelt",
+    "deniedCount": "nægtet",
+    "matched": "{count} matcher tilladelsesreglerne",
+    "andMore": "…og {count} mere",
+    "excludedByDeny": "Udelukket af nægtelsesreglerne",
+    "reason": {
+      "allowName": "ved navn",
+      "denyName": "nægtet ved navn",
+      "allowLabel": "matcher {rule}",
+      "denyLabel": "nægtet af {rule}"
+    },
+    "note": {
+      "catalogClamped": "Katalogstyret — begrænset til læsning",
+      "everyoneFloor": "Læsbar for alle",
+      "hasOwner": "Ejeren har allerede administratorrettigheder"
+    },
+    "reachesNothing": "Denne regel omfatter intet.",
+    "allowAllBanner": "Giver adgang til alle ressourcer. Nægtelsesregler gælder stadig.",
+    "axis": {
+      "workspace": "Workspaces",
+      "pool": "Agentpuljer",
+      "registry": "Registry",
+      "catalog": "Katalogelementer"
+    }
+  },
+  "resourceAccess": {
+    "title": "Hvem kan nå dette",
+    "subtitle": "Roller hvis regler matcher dette workspace, og hvem der har dem.",
+    "loading": "Indlæser…",
+    "failed": "Kunne ikke afgøre, hvem der kan nå dette.",
+    "forbidden": "Dette svar dækker hele miljøet og vises derfor kun til platformadministratorer og revisorer.",
+    "noRoles": "Ingen rolleregel matcher dette workspace.",
+    "deniedRoles": "Matchede og blev derefter udelukket af en nægtelsesregel",
+    "alsoReachable": "Kan også nås uden nogen rolle",
+    "heldBy": "Indehaves af {who}",
+    "heldByNobody": "Indehaves af ingen — giver i praksis intet",
+    "path": {
+      "platformAdmin": "Platformadministratorer når alle ressourcer",
+      "platformAudit": "Platformrevisorer kan læse alle ressourcer",
+      "owner": "Ejeren har administratorrettigheder her",
+      "everyoneFloor": "Mærket access: everyone — læsbar for alle",
+      "catalogClamped": "Katalogstyret — enhver ikke-administrativ tildeling er begrænset til læsning"
+    }
   }
 }

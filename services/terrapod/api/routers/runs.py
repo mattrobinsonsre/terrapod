@@ -2013,6 +2013,53 @@ async def next_run(
     from terrapod.services.variable_service import resolve_variables
 
     resolved = await resolve_variables(db, run.workspace_id)
+
+    # Vault value source (#1439): a variable whose `value_source` is "vault"
+    # holds a reference, not a literal. Resolve it here — before delivery — so
+    # the runner receives an ordinary variable and never learns where it came
+    # from, exactly as git-auth does above.
+    #
+    # Unlike git-auth, a failure here is FATAL rather than dropped. A silently
+    # absent credential leaves terraform to fail somewhere confusing, or to fall
+    # back to another identity and act with credentials nobody chose. The run is
+    # errored with the cause so the operator sees what to fix, instead of the
+    # listener getting a 500 and the run hanging claimed.
+    from terrapod.services.vault_source_service import (
+        VaultSourceError,
+        VaultTransient,
+        resolve_vault_variables,
+    )
+
+    try:
+        vault_values = await resolve_vault_variables(resolved, settings)
+    except VaultTransient:
+        # Vault is down, not misconfigured. Put the run back so the next claim
+        # picks it up, rather than erroring every queued run in the estate over
+        # a restart and leaving an operator to re-queue each by hand.
+        await run_service.transition_run(db, run, "queued")
+        await db.commit()
+        return Response(status_code=204)
+    except VaultSourceError as e:
+        await run_service.transition_run(db, run, "errored", error_message=str(e))
+        await db.commit()
+        return Response(status_code=204)
+    except Exception as e:  # noqa: BLE001 - backstop, see below
+        # The resolver converts everything it can, but the run is already
+        # claimed by the time we get here: an escape means a 500 to the listener
+        # and a run wedged in `planning`. Failing the run is always better than
+        # stranding it, so this catches what the resolver did not.
+        logger.exception("unexpected failure resolving vault variables")
+        await run_service.transition_run(
+            db, run, "errored", error_message=f"Vault variable resolution failed: {e}"
+        )
+        await db.commit()
+        return Response(status_code=204)
+
+    if vault_values:
+        for v in resolved:
+            if v.key in vault_values:
+                v.value = vault_values[v.key]
+
     env_vars = [{"key": v.key, "value": v.value} for v in resolved if v.category == "env"]
     # `hcl` is forwarded so the runner renders the value correctly into the
     # generated terrapod.auto.tfvars (raw HCL expression vs quoted string). All

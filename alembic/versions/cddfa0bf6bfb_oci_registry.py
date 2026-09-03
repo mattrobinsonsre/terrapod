@@ -14,7 +14,12 @@ from alembic import op
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 
 revision = "cddfa0bf6bfb"
-down_revision = "e1bf96919d09"
+# Ordered so that release/v1.6's chain is a PREFIX of main's: a v1.6
+# deployment upgrading to a main-based release must find its own head
+# partway down this chain with main's extra work still ahead of it. If
+# these two lines are "tidied" back, `alembic upgrade head` on such a
+# database runs NOTHING and silently skips main's OCI/package-cache work.
+down_revision = "8c02c0a6b39b"
 branch_labels = None
 depends_on = None
 

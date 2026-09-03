@@ -457,6 +457,7 @@
     "role-name"
   ],
   "roles._builtin_role_json": [
+    "allow-all",
     "allow-labels",
     "allow-names",
     "built-in",
@@ -472,6 +473,7 @@
     "workspace-permission"
   ],
   "roles._role_json": [
+    "allow-all",
     "allow-labels",
     "allow-names",
     "built-in",
@@ -684,6 +686,7 @@
     "agent-pool-id",
     "agent-pool-ids",
     "agent-pool-name",
+    "agent-pool-names",
     "ai-summary-context",
     "ai-summary-mode",
     "auto-apply",
@@ -859,6 +862,7 @@
     "structured",
     "updated-at",
     "value",
+    "value-source",
     "version-id"
   ],
   "variables._varset_json": [
@@ -882,6 +886,7 @@
     "structured",
     "updated-at",
     "value",
+    "value-source",
     "version-id"
   ],
   "variables.list_varset_workspaces": [
@@ -893,6 +898,11 @@
     "name",
     "priority",
     "variable-count"
+  ],
+  "variables.vault_availability": [
+    "default-instance",
+    "enabled",
+    "instances"
   ],
   "vcs_connections._connection_json": [
     "budget-window-seconds",

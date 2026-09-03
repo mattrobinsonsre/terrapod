@@ -57,14 +57,21 @@ def test_http_writes_credential_store_and_tokenless_rewrite(tmp_path):
     # GIT_CONFIG_GLOBAL isolates our config.
     assert env["GIT_CONFIG_GLOBAL"] == str(tmp_path / "gitconfig")
 
-    creds = (tmp_path / "git-credentials").read_text().splitlines()
-    assert creds == ["https://x-access-token:ghp_SECRETTOKEN@github.com/myorg"]
-    assert _mode(tmp_path / "git-credentials") == 0o600  # secret file, owner-only
+    # One store file per entry; the LINE is keyed to the bare host and the
+    # org scoping is done by the `[credential "<url>"]` section that selects
+    # this store (#1449 — a path-keyed line plus useHttpPath can never match a
+    # real repo path).
+    store = tmp_path / "git-credentials-0"
+    assert store.read_text().splitlines() == ["https://x-access-token:ghp_SECRETTOKEN@github.com"]
+    assert _mode(store) == 0o600  # secret file, owner-only
 
     cfg = (tmp_path / "gitconfig").read_text()
-    # store helper wired to the creds file; path-scoped (host/org).
+    assert 'credential "https://github.com/myorg"' in cfg
     assert "helper = store --file=" in cfg
-    assert "useHttpPath = true" in cfg
+    # useHttpPath is the bug, not the mechanism: with it on, credential-store
+    # matches only an EXACT path, so an org-keyed credential never serves
+    # `org/repo.git`.
+    assert "useHttpPath" not in cfg
     # ssh→https rewrite is present, TOKENLESS, and PATH-SCOPED to the org (the
     # pattern names one) so it can't hijack another org's ssh source on the host.
     assert 'url "https://github.com/myorg/"' in cfg
@@ -74,14 +81,15 @@ def test_http_writes_credential_store_and_tokenless_rewrite(tmp_path):
 
 def test_http_default_username_is_x_access_token(tmp_path):
     git_auth.configure([_http("github.com", username=None)], base_dir=tmp_path)
-    creds = (tmp_path / "git-credentials").read_text().splitlines()
+    creds = (tmp_path / "git-credentials-0").read_text().splitlines()
     assert creds == ["https://x-access-token:ghp_SECRETTOKEN@github.com"]
 
 
 def test_http_bare_host_is_not_path_scoped(tmp_path):
     git_auth.configure([_http("github.com", rewrite="none")], base_dir=tmp_path)
     cfg = (tmp_path / "gitconfig").read_text()
-    assert "useHttpPath = true" not in cfg  # bare host → host-level match
+    assert "useHttpPath" not in cfg
+    assert 'credential "https://github.com"' in cfg  # bare host → host-level section
     assert "insteadOf" not in cfg  # rewrite none
 
 
@@ -90,11 +98,32 @@ def test_multiple_orgs_same_host_get_distinct_credential_lines(tmp_path):
         [_http("github.com/orgA", token="TOKEN_A"), _http("github.com/orgB", token="TOKEN_B")],
         base_dir=tmp_path,
     )
-    lines = (tmp_path / "git-credentials").read_text().splitlines()
-    # exact line membership (not substring-in-blob) — one distinct token per org.
-    assert "https://x-access-token:TOKEN_A@github.com/orgA" in lines
-    assert "https://x-access-token:TOKEN_B@github.com/orgB" in lines
-    assert "useHttpPath = true" in (tmp_path / "gitconfig").read_text()
+    # A store file each, and a section each: the section discriminates by org,
+    # the store simply hands over its one host-keyed line.
+    stores = sorted(f.read_text().strip() for f in tmp_path.glob("git-credentials-*"))
+    assert stores == [
+        "https://x-access-token:TOKEN_A@github.com",
+        "https://x-access-token:TOKEN_B@github.com",
+    ]
+    cfg = (tmp_path / "gitconfig").read_text()
+    assert 'credential "https://github.com/orgA"' in cfg
+    assert 'credential "https://github.com/orgB"' in cfg
+    assert "useHttpPath" not in cfg
+
+
+def test_path_scoped_sections_are_declared_before_a_bare_host_one(tmp_path):
+    """git consults matching credential helpers in CONFIG ORDER and takes the
+    first that answers — it does NOT prefer the more specific section. A
+    bare-host entry declared first would serve every org on that host with the
+    wrong token."""
+    git_auth.configure(
+        [_http("github.com", token="TOKEN_HOST"), _http("github.com/orgA", token="TOKEN_A")],
+        base_dir=tmp_path,
+    )
+    cfg = (tmp_path / "gitconfig").read_text()
+    assert cfg.index('credential "https://github.com/orgA"]') < cfg.index(
+        'credential "https://github.com"]'
+    ), "the org-scoped section must come first or the bare host hijacks it"
 
 
 # --- ssh ---------------------------------------------------------------------
@@ -115,6 +144,73 @@ def test_ssh_writes_key_known_hosts_and_config(tmp_path):
     # https→ssh rewrite.
     assert "insteadOf = https://gitlab.example.com/" in cfg
     assert env["GIT_CONFIG_GLOBAL"] == str(tmp_path / "gitconfig")
+
+
+# --- real-git CREDENTIAL lookup (git's own credential engine) ----------------
+# The string tests above prove we emit the right sections; these prove git
+# actually RESOLVES a credential with them. This is the class of test whose
+# absence let #1449 ship: every existing test asserted on the emitted config,
+# and the config looked perfectly reasonable — it was git's matching semantics
+# that differed from what the code assumed.
+
+
+def _credential_for(env, path):
+    """Ask git which credential it would use for a URL, with no network I/O.
+
+    GIT_CONFIG_NOSYSTEM stops a developer machine's system gitconfig (macOS
+    ships credential.helper=osxkeychain) from answering instead and making the
+    test pass for the wrong reason.
+    """
+    r = subprocess.run(
+        ["git", "credential", "fill"],
+        input=f"protocol=https\nhost={_H}\npath={path}\n\n",
+        env={**os.environ, **env, "GIT_CONFIG_NOSYSTEM": "1"},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    for line in r.stdout.splitlines():
+        if line.startswith("password="):
+            return line.removeprefix("password=")
+    return None
+
+
+_H = "gitauth-test.invalid"
+
+
+@pytest.mark.skipif(not _HAS_GIT, reason="git binary required")
+def test_an_org_scoped_credential_serves_a_repo_UNDER_that_org(tmp_path):
+    """#1449: the credential is keyed to the org, but every real fetch asks for
+    a path including the REPO. Under the old `useHttpPath` scheme
+    credential-store required an exact path match, so this could never resolve
+    and git fell through to prompting for a username."""
+    env = git_auth.configure([_http(f"{_H}/org-a", token="TOKEN_A")], base_dir=tmp_path)
+    assert _credential_for(env, "org-a/some-repo.git") == "TOKEN_A"
+
+
+@pytest.mark.skipif(not _HAS_GIT, reason="git binary required")
+def test_two_orgs_on_one_host_resolve_to_their_own_token(tmp_path):
+    """The multi-org, least-privilege case the framework exists to support."""
+    env = git_auth.configure(
+        [_http(f"{_H}/org-a", token="TOKEN_A"), _http(f"{_H}/org-b", token="TOKEN_B")],
+        base_dir=tmp_path,
+    )
+    assert _credential_for(env, "org-a/some-repo.git") == "TOKEN_A"
+    assert _credential_for(env, "org-b/other-repo.git") == "TOKEN_B"
+
+
+@pytest.mark.skipif(not _HAS_GIT, reason="git binary required")
+def test_a_bare_host_entry_does_not_hijack_an_org_scoped_one(tmp_path):
+    """git consults matching helpers in CONFIG ORDER and takes the first that
+    answers — it does not prefer the more specific section. Emitted in the
+    wrong order, the host-wide token would be handed out for every org."""
+    env = git_auth.configure(
+        [_http(_H, token="TOKEN_HOST"), _http(f"{_H}/org-a", token="TOKEN_A")],
+        base_dir=tmp_path,
+    )
+    assert _credential_for(env, "org-a/some-repo.git") == "TOKEN_A"
+    # ...and the bare-host entry still serves everything else on that host.
+    assert _credential_for(env, "unscoped-org/repo.git") == "TOKEN_HOST"
 
 
 # --- real-git rewrite semantics (git's own insteadOf engine) -----------------
@@ -219,8 +315,8 @@ def test_non_dict_entry_is_skipped_not_raised(tmp_path):
         {"category": "git_http_auth", "key": "github.com", "value": '{"token":"ghp_X"}'},
     ]
     git_auth.configure(entries, base_dir=tmp_path)  # must not raise
-    creds = (tmp_path / "git-credentials").read_text().splitlines()
-    assert creds == ["https://x-access-token:ghp_X@github.com"]  # only the good entry
+    stores = sorted(f.read_text().strip() for f in tmp_path.glob("git-credentials-*"))
+    assert stores == ["https://x-access-token:ghp_X@github.com"]  # only the good entry
 
 
 # --- HARD log-safety invariant ----------------------------------------------
@@ -259,9 +355,9 @@ def test_malformed_value_is_skipped(tmp_path):
         _http("gitlab.com"),
     ]
     git_auth.configure(entries, base_dir=tmp_path)
-    creds = (tmp_path / "git-credentials").read_text().splitlines()
-    # exactly one line — the malformed github entry produced none, the good one did.
-    assert creds == ["https://x-access-token:ghp_SECRETTOKEN@gitlab.com"]
+    stores = sorted(f.read_text().strip() for f in tmp_path.glob("git-credentials-*"))
+    # exactly one store — the malformed github entry produced none, the good one did.
+    assert stores == ["https://x-access-token:ghp_SECRETTOKEN@gitlab.com"]
 
 
 def test_load_absent_file_returns_empty(tmp_path):
@@ -352,7 +448,10 @@ class TestFailuresAreNotSilent:
             text=True,
             check=True,
         ).stdout
-        assert "credential.helper" in listed
+        # The helper key is namespaced per credential URL now
+        # (`credential.https://host.helper`), not a bare `credential.helper` —
+        # that is what makes the org scoping work (#1449).
+        assert ".helper=store --file=" in listed
         assert "tok" not in listed, "the token must not live in gitconfig"
 
 

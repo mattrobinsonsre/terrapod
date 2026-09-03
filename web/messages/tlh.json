@@ -643,7 +643,9 @@
       "allowLabelsShort": "chaw' permey",
       "allowNamesShort": "chaw' pongmey",
       "denyLabelsShort": "tuH permey",
-      "denyNamesShort": "tuH pongmey"
+      "denyNamesShort": "tuH pongmey",
+      "allowAll": "Hoch nob",
+      "allowAllHelp": "Hoch Doch rur, chu'bogh je. chut tlhoO'bogh lujqu'be'. Hoch Qumwo' yIper net rap qaSbe'meH vam yIlo' — per Hutlhbogh Qumwo' chu' patlh HopmoHlu'."
     },
     "assignForm": {
       "provider": "nobwI'",
@@ -714,7 +716,8 @@
       "deleteRole": "patlh Qaw'meH lujpu'",
       "setAssignment": "ch'am choqmeH lujpu'",
       "setAssignmentStatus": "ch'am choqmeH lujpu' ({status})",
-      "deleteAssignment": "ch'am Qaw'meH lujpu'"
+      "deleteAssignment": "ch'am Qaw'meH lujpu'",
+      "conflictingLabelKeys": "wa' law' qenvo' ghaj {keys}. wa' qen neH ghaj per chut, vaj Qav qenmey wa'Dich lonmoH tam. wa' ngaqvaD qen law' Sup API, 'ach naDev DaSaHlaHbe' DaH."
     }
   },
   "adminVcs": {
@@ -938,7 +941,11 @@
       "rulePreview": "{count, plural, =0 {pagh Qumwo' rur} one {# Qumwo'' rur} other {# Qumwo''mey rur}}",
       "rulePreviewLoading": "Qumwo' rurbogh wInejtaH…",
       "rulePreviewInvalid": "chutvam wInoHlaHbe'. DaQaw'DI' Qagh Sovlu'.",
-      "ruleConflictsWithGlobal": "Hoch Qumwo'vaD Segh Hoch lo'lu'chugh, chut lo'laHbe'."
+      "ruleConflictsWithGlobal": "Hoch Qumwo'vaD Segh Hoch lo'lu'chugh, chut lo'laHbe'.",
+      "valueSource": "qach Dat",
+      "valueSourceStatic": "qach yIQtIv",
+      "valueSourceVault": "Vault-vo' yIlaD",
+      "vaultHint": "QaptaHvIS Vault-vo' pegh laD Terrapod. naDev pagh pollu'."
     }
   },
   "adminAutodiscovery": {
@@ -2255,7 +2262,8 @@
       "cost": "wagh",
       "architecture": "qach",
       "insights": "Sovmey",
-      "automation": "SeHmeH pat"
+      "automation": "SeHmeH pat",
+      "access": "chaw'"
     },
     "lifecycle": {
       "pendingDeletion": "Qaw' loStaH",
@@ -2433,7 +2441,24 @@
       "gitRewrite": "Protocol rewrite",
       "gitRewriteNone": "None",
       "gitRewriteToHttps": "Rewrite ssh:// sources to https:// (use this token)",
-      "gitRewriteToSsh": "Rewrite https:// sources to ssh:// (use this key)"
+      "gitRewriteToSsh": "Rewrite https:// sources to ssh:// (use this key)",
+      "valueSource": "qach Dat",
+      "sourceStatic": "qach yIQtIv",
+      "sourceVault": "Vault-vo' yIlaD",
+      "sourceStaticHelp": "Terrapod-Daq qach pollu' 'ej QaptaHvIS nobbe'lu'.",
+      "sourceVaultHelp": "QaptaHvIS Vault-vo' pegh laD Terrapod. naDev pagh pollu'.",
+      "vaultMount": "qojmI'",
+      "vaultPath": "He",
+      "vaultField": "Say'",
+      "vaultEngine": "pegh patlh",
+      "vaultEngineKv2": "taHtaH (kv-v2)",
+      "vaultEngineDynamic": "choHlaH (QaptaHvIS chenmoHlu')",
+      "vaultInstance": "Vault",
+      "vaultInstanceDefault": "motlh",
+      "vaultSecretNeverStored": "He pollu', pegh pollu'be'. Terrapod Vault chut 'e' Sov.",
+      "sourceVaultBadge": "Vault",
+      "vaultReferenceUnreadable": "Vault ngoQ laDlaHbe'",
+      "vaultInstanceDefaultNamed": "motlh ({name})"
     },
     "runs": {
       "options": "wIvmey",
@@ -3049,5 +3074,54 @@
     "restoreConfirm": "«{name}» Dotlh DacheghmoH''a''?\n\nQumwo' CHU' chenlu' — Qumwo' Qaw'lu'ta'bogh cheghbe'. chegh 'ach auto-apply drift je chu'Ha'lu', VCS Hutlh; mI'mey qunmeyDaj je cheghbe'. Dotlh neH cheghlu'.",
     "restoreDone": "{versions, plural, one {# Dotlh mI''} other {# Dotlh mI'mey}} Qumwo' chu' «{name}» chegh. auto-apply VCS joq Dachu'pa' DuHmey yIlegh.",
     "restoreAgainConfirm": "\"{name}\" chochoHta''bogh {existing} Daq.\n\nlatlh chochoH ''e'' chenmoHlu''chugh, cha''DIch workspace chenlu'', rap state tlhegh, rap infrastructure Daq. wa'' Daq apply Dalo''chugh, latlh nab veb Dalegh ''ej Hoch drift rur.\n\nvaj taH neH wej workspace chochoHta''bogh Hegh''a''."
+  },
+  "roleReach": {
+    "title": "SanIDbogh Dochmey patlhvam",
+    "checking": "wInejtaH…",
+    "failed": "chutvam SanID SovlaHbe'lu'.",
+    "noAllowRules": "per pagh pong chaw'bogh yIchel, Qumwo'mey SanIDbogh patlhvam DaleghmeH.",
+    "granted": "nobpu'",
+    "deniedCount": "tlhoO'pu'",
+    "matched": "chut chaw'bogh rur {count}",
+    "andMore": "…je {count} latlh",
+    "excludedByDeny": "chut tlhoO'bogh lughIm",
+    "reason": {
+      "allowName": "pongmo'",
+      "denyName": "pongmo' tlhoO'pu'",
+      "allowLabel": "{rule} rur",
+      "denyLabel": "{rule} tlhoO'pu'"
+    },
+    "note": {
+      "catalogClamped": "tetlhmo' SeHlu' — laDmeH neH",
+      "everyoneFloor": "Hoch laHlaH",
+      "hasOwner": "che'wI' ghaj ghajwI'"
+    },
+    "reachesNothing": "pagh SanID chutvam.",
+    "allowAllBanner": "Hoch Doch nob. chut tlhoO'bogh lujqu'be'.",
+    "axis": {
+      "workspace": "Qumwo'mey",
+      "pool": "Duy ghom",
+      "registry": "tetlh'a'",
+      "catalog": "tetlh Dochmey"
+    }
+  },
+  "resourceAccess": {
+    "title": "SanIDlaHbogh nuv",
+    "subtitle": "Qumwo'vam rurbogh chut ghajbogh patlhmey, ghajwI'pu'chaj je.",
+    "loading": "polHa'taH…",
+    "failed": "SanIDlaHbogh nuv SovlaHbe'lu'.",
+    "forbidden": "Hoch yoS SanID jangwI'vam, vaj che'wI'pu' 'ej ngoQwI'pu' neH 'aghlu'.",
+    "noRoles": "Qumwo'vam rurbogh patlh chut tu'be'lu'.",
+    "deniedRoles": "rurpu', ghIq chut tlhoO'bogh lughIm",
+    "alsoReachable": "patlh Hutlhbogh je SanIDlaH",
+    "heldBy": "{who} ghaj",
+    "heldByNobody": "pagh ghaj — teH pagh nob",
+    "path": {
+      "platformAdmin": "Hoch Doch SanID che'wI'pu'",
+      "platformAudit": "Hoch Doch laD ngoQwI'pu'",
+      "owner": "naDev che'wI' ghaj ghajwI'",
+      "everyoneFloor": "per access: everyone — Hoch laHlaH",
+      "catalogClamped": "tetlhmo' SeHlu' — che'wI' Hutlhbogh nob Hoch laDmeH neH"
+    }
   }
 }

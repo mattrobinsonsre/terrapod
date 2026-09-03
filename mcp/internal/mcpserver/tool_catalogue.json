@@ -216,6 +216,49 @@
     }
   },
   {
+    "name": "terrapod_resource_access",
+    "read_only": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "description": "the resource id (ws-..., apool-..., or a bare uuid for registry and catalog items)",
+          "type": "string"
+        },
+        "kind": {
+          "description": "the resource type: workspaces, agent-pools, registry-modules, registry-providers or catalog-items",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "id"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_role_reach",
+    "read_only": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "page_size": {
+          "description": "how many matched workspaces to list (default 25, max 100); the counts always span the whole fleet regardless",
+          "type": "integer"
+        },
+        "role": {
+          "description": "the custom role name whose reach to resolve",
+          "type": "string"
+        }
+      },
+      "required": [
+        "role"
+      ],
+      "type": "object"
+    }
+  },
+  {
     "name": "terrapod_run_apply",
     "destructive": true,
     "input_schema": {
@@ -523,6 +566,10 @@
         },
         "value": {
           "description": "the value (empty is legal, e.g. flag-shaped env vars)",
+          "type": "string"
+        },
+        "value_source": {
+          "description": "static (default — value is the literal) or vault, where value is a JSON reference {\"mount\":…,\"path\":…,\"field\":…} that Terrapod reads from HashiCorp Vault at run time; a vault-sourced variable is always sensitive and the secret is never stored in Terrapod",
           "type": "string"
         },
         "workspace_id": {

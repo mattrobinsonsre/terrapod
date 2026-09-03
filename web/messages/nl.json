@@ -643,7 +643,9 @@
       "allowLabelsShort": "Labels toestaan",
       "allowNamesShort": "Namen toestaan",
       "denyLabelsShort": "Labels weigeren",
-      "denyNamesShort": "Namen weigeren"
+      "denyNamesShort": "Namen weigeren",
+      "allowAll": "Op alles verlenen",
+      "allowAllHelp": "Komt overeen met elke resource, ook later aangemaakte. Weigerregels blijven gelden. Gebruik dit in plaats van elke workspace te labelen — een workspace die zonder het label wordt aangemaakt zou stilzwijgend buiten de rol vallen."
     },
     "assignForm": {
       "provider": "Provider",
@@ -714,7 +716,8 @@
       "deleteRole": "Kan rol niet verwijderen",
       "setAssignment": "Kan toewijzing niet instellen",
       "setAssignmentStatus": "Kan toewijzing niet instellen ({status})",
-      "deleteAssignment": "Kan toewijzing niet verwijderen"
+      "deleteAssignment": "Kan toewijzing niet verwijderen",
+      "conflictingLabelKeys": "{keys} heeft meer dan één waarde. Een labelregel houdt één waarde per sleutel, dus de laatste zou de eerdere stilzwijgend vervangen. Meerdere waarden per sleutel worden door de API ondersteund maar zijn hier nog niet in te stellen."
     }
   },
   "adminVcs": {
@@ -938,7 +941,11 @@
       "rulePreview": "{count, plural, =0 {Komt met geen enkele workspace overeen} one {Komt overeen met # workspace} other {Komt overeen met # workspaces}}",
       "rulePreviewLoading": "Controleren welke workspaces overeenkomen…",
       "rulePreviewInvalid": "Deze regel kon niet worden gecontroleerd. Bij opslaan wordt het precieze probleem gemeld.",
-      "ruleConflictsWithGlobal": "Een globale set geldt al voor elke workspace, dus een regel kan er niet bij."
+      "ruleConflictsWithGlobal": "Een globale set geldt al voor elke workspace, dus een regel kan er niet bij.",
+      "valueSource": "Waardebron",
+      "valueSourceStatic": "Waarde invoeren",
+      "valueSourceVault": "Uit Vault lezen",
+      "vaultHint": "Terrapod leest het geheim tijdens de run uit Vault. Hier wordt niets opgeslagen."
     }
   },
   "adminAutodiscovery": {
@@ -2255,7 +2262,8 @@
       "cost": "Kosten",
       "architecture": "Architectuur",
       "insights": "Inzichten",
-      "automation": "Automatisering"
+      "automation": "Automatisering",
+      "access": "Toegang"
     },
     "lifecycle": {
       "pendingDeletion": "In afwachting van verwijdering",
@@ -2433,7 +2441,24 @@
       "gitRewrite": "Protocol rewrite",
       "gitRewriteNone": "None",
       "gitRewriteToHttps": "Rewrite ssh:// sources to https:// (use this token)",
-      "gitRewriteToSsh": "Rewrite https:// sources to ssh:// (use this key)"
+      "gitRewriteToSsh": "Rewrite https:// sources to ssh:// (use this key)",
+      "valueSource": "Waardebron",
+      "sourceStatic": "Waarde invoeren",
+      "sourceVault": "Uit Vault lezen",
+      "sourceStaticHelp": "De waarde wordt in Terrapod opgeslagen en aan de run geleverd.",
+      "sourceVaultHelp": "Terrapod leest het geheim tijdens de run uit Vault. Hier wordt niets opgeslagen.",
+      "vaultMount": "Mount",
+      "vaultPath": "Pad",
+      "vaultField": "Veld",
+      "vaultEngine": "Secret-engine",
+      "vaultEngineKv2": "Statisch (kv-v2)",
+      "vaultEngineDynamic": "Dynamisch (per run aangemaakt)",
+      "vaultInstance": "Vault",
+      "vaultInstanceDefault": "Standaard",
+      "vaultSecretNeverStored": "Het pad wordt opgeslagen, nooit het geheim. Het Vault-beleid van Terrapod bepaalt wat het mag lezen.",
+      "sourceVaultBadge": "Vault",
+      "vaultReferenceUnreadable": "Onleesbare Vault-verwijzing",
+      "vaultInstanceDefaultNamed": "Standaard ({name})"
     },
     "runs": {
       "options": "Opties",
@@ -3049,5 +3074,54 @@
     "restoreConfirm": "De state van ''{name}'' herstellen?\n\nDit maakt een NIEUWE workspace — het origineel komt niet terug. Hij komt terug zonder auto-apply, zonder driftdetectie en zonder VCS-verbinding; variabelen en runhistorie komen niet terug. Alleen de state wordt gered.",
     "restoreDone": "{versions, plural, one {# state-versie} other {# state-versies}} hersteld in de nieuwe workspace ''{name}''. Controleer de instellingen voordat je auto-apply of VCS inschakelt.",
     "restoreAgainConfirm": "“{name}” is al hersteld, naar {existing}.\n\nOpnieuw herstellen maakt een TWEEDE workspace met dezelfde state-lijn over dezelfde infrastructuur. Een apply in een van beide laat het volgende plan van de ander er dan uitzien als volledige drift.\n\nGa alleen verder als de eerder herstelde workspace verdwenen is."
+  },
+  "roleReach": {
+    "title": "Wat deze rol bereikt",
+    "checking": "Bezig met controleren…",
+    "failed": "Kon niet bepalen wat deze regel bereikt.",
+    "noAllowRules": "Voeg een toegestaan label of een toegestane naam toe om te zien welke workspaces deze rol zou bereiken.",
+    "granted": "toegekend",
+    "deniedCount": "geweigerd",
+    "matched": "{count} overeenkomend met de toegestane regels",
+    "andMore": "…en nog {count}",
+    "excludedByDeny": "Uitgesloten door de weigerregels",
+    "reason": {
+      "allowName": "op naam",
+      "denyName": "geweigerd op naam",
+      "allowLabel": "komt overeen met {rule}",
+      "denyLabel": "geweigerd door {rule}"
+    },
+    "note": {
+      "catalogClamped": "Catalogusbeheerd — beperkt tot lezen",
+      "everyoneFloor": "Leesbaar voor iedereen",
+      "hasOwner": "Eigenaar heeft al beheerrechten"
+    },
+    "reachesNothing": "Deze regel bereikt niets.",
+    "allowAllBanner": "Verleent op alle resources. Weigerregels blijven gelden.",
+    "axis": {
+      "workspace": "Workspaces",
+      "pool": "Agentpools",
+      "registry": "Registry",
+      "catalog": "Catalogusitems"
+    }
+  },
+  "resourceAccess": {
+    "title": "Wie dit kan bereiken",
+    "subtitle": "Rollen waarvan de regels op deze workspace passen, en wie ze heeft.",
+    "loading": "Laden…",
+    "failed": "Kon niet bepalen wie dit kan bereiken.",
+    "forbidden": "Dit antwoord beslaat de hele omgeving en wordt daarom alleen aan platformbeheerders en auditors getoond.",
+    "noRoles": "Geen enkele rolregel past op deze workspace.",
+    "deniedRoles": "Kwam overeen, daarna uitgesloten door een weigerregel",
+    "alsoReachable": "Ook bereikbaar zonder enige rol",
+    "heldBy": "In handen van {who}",
+    "heldByNobody": "In handen van niemand — verleent in de praktijk niets",
+    "path": {
+      "platformAdmin": "Platformbeheerders bereiken elke resource",
+      "platformAudit": "Platformauditors kunnen elke resource lezen",
+      "owner": "De eigenaar heeft hier beheerrechten",
+      "everyoneFloor": "Gelabeld access: everyone — leesbaar voor iedereen",
+      "catalogClamped": "Catalogusbeheerd — elke niet-beheerderstoekenning is beperkt tot lezen"
+    }
   }
 }

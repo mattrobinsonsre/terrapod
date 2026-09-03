@@ -12,11 +12,13 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	terrapod "github.com/mattrobinsonsre/terrapod/go-terrapod"
 	"github.com/mattrobinsonsre/terrapod/provider/internal/client"
+	"github.com/mattrobinsonsre/terrapod/provider/internal/planmods"
 )
 
 var (
@@ -82,10 +84,19 @@ func (r *variableResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 			},
 			"sensitive": schema.BoolAttribute{
 				Optional: true, Computed: true, Default: booldefault.StaticBool(false),
-				Description: "Mark as sensitive (value will not be returned by API).",
+				Description:   "Mark as sensitive (value will not be returned by API).",
+				PlanModifiers: []planmodifier.Bool{planmods.SensitiveForSecretBearingVariable()},
 			},
 			"description": schema.StringAttribute{
 				Optional: true, Description: "Description.",
+			},
+			"value_source": schema.StringAttribute{
+				Optional: true, Computed: true, Default: stringdefault.StaticString("static"),
+				Description: "Where the value comes from: `static` (the default — `value` is the " +
+					"literal) or `vault`, where `value` holds a JSON reference " +
+					"(`{\"mount\":…,\"path\":…,\"field\":…}`) that Terrapod resolves from " +
+					"HashiCorp Vault at run time. A vault-sourced variable is always sensitive, " +
+					"and the secret is never stored in Terrapod.",
 			},
 			"version_id": schema.StringAttribute{
 				Computed: true, Description: "Version identifier.",
@@ -238,6 +249,9 @@ func buildCreateVariableRequest(m *variableModel) terrapod.CreateVariableRequest
 	if !m.Description.IsNull() {
 		req.Description = m.Description.ValueString()
 	}
+	if !m.ValueSource.IsNull() && !m.ValueSource.IsUnknown() {
+		req.ValueSource = m.ValueSource.ValueString()
+	}
 	return req
 }
 
@@ -266,6 +280,10 @@ func buildUpdateVariableRequest(m *variableModel) terrapod.UpdateVariableRequest
 		v := m.Sensitive.ValueBool()
 		req.Sensitive = &v
 	}
+	if !m.ValueSource.IsNull() && !m.ValueSource.IsUnknown() {
+		v := m.ValueSource.ValueString()
+		req.ValueSource = &v
+	}
 	if !m.Description.IsNull() {
 		v := m.Description.ValueString()
 		req.Description = &v
@@ -292,9 +310,25 @@ func readVariableIntoModel(v *terrapod.Variable, m *variableModel) {
 	} else {
 		m.Description = types.StringNull()
 	}
+	if v.ValueSource != "" {
+		m.ValueSource = types.StringValue(v.ValueSource)
+	} else {
+		m.ValueSource = types.StringValue("static")
+	}
+
 	// Don't touch Value on a Sensitive read — server returns empty,
 	// the model's existing value (from plan) is the source of truth.
-	if !v.Sensitive && v.Value != "" {
+	//
+	// A vault-sourced variable is the exception: it is always sensitive, but
+	// what comes back is the *reference*, not a secret. Skipping it here would
+	// leave the reference unread on every refresh, so a rule edited outside
+	// Terraform would never be detected — and one edited in Terraform would
+	// look permanently unapplied.
+	if v.ValueSource == "vault" {
+		if v.Value != "" {
+			m.Value = types.StringValue(v.Value)
+		}
+	} else if !v.Sensitive && v.Value != "" {
 		m.Value = types.StringValue(v.Value)
 	}
 }

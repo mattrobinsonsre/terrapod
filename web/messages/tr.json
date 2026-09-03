@@ -643,7 +643,9 @@
       "allowLabelsShort": "İzin Verilen Etiketler",
       "allowNamesShort": "İzin Verilen Adlar",
       "denyLabelsShort": "Reddedilen Etiketler",
-      "denyNamesShort": "Reddedilen Adlar"
+      "denyNamesShort": "Reddedilen Adlar",
+      "allowAll": "Her şeyde yetki ver",
+      "allowAllHelp": "Sonradan oluşturulanlar dâhil her kaynakla eşleşir. Ret kuralları yine de geçerlidir. Her çalışma alanını etiketlemek yerine bunu kullanın — etiketsiz oluşturulan bir çalışma alanı sessizce rolün dışında kalırdı."
     },
     "assignForm": {
       "provider": "Sağlayıcı",
@@ -714,7 +716,8 @@
       "deleteRole": "Rol silinemedi",
       "setAssignment": "Atama ayarlanamadı",
       "setAssignmentStatus": "Atama ayarlanamadı ({status})",
-      "deleteAssignment": "Atama silinemedi"
+      "deleteAssignment": "Atama silinemedi",
+      "conflictingLabelKeys": "{keys} birden fazla değer aldı. Bir etiket kuralı anahtar başına tek değer tutar, bu yüzden sonuncusu öncekileri sessizce değiştirirdi. Bir anahtar için birden çok değeri API destekler, ancak burada henüz ayarlanamaz."
     }
   },
   "adminVcs": {
@@ -938,7 +941,11 @@
       "rulePreview": "{count, plural, =0 {Hiçbir çalışma alanıyla eşleşmiyor} other {# çalışma alanıyla eşleşiyor}}",
       "rulePreviewLoading": "Hangi çalışma alanlarının eşleştiği kontrol ediliyor…",
       "rulePreviewInvalid": "Bu kural denetlenemedi. Kaydettiğinizde sorun tam olarak bildirilecek.",
-      "ruleConflictsWithGlobal": "Genel bir küme zaten tüm çalışma alanlarına uygulanır; bu nedenle kuralla birlikte kullanılamaz."
+      "ruleConflictsWithGlobal": "Genel bir küme zaten tüm çalışma alanlarına uygulanır; bu nedenle kuralla birlikte kullanılamaz.",
+      "valueSource": "Değer kaynağı",
+      "valueSourceStatic": "Bir değer girin",
+      "valueSourceVault": "Vault'tan oku",
+      "vaultHint": "Terrapod gizli değeri çalıştırma sırasında Vault'tan okur. Burada hiçbir şey saklanmaz."
     }
   },
   "adminAutodiscovery": {
@@ -2255,7 +2262,8 @@
       "cost": "Maliyet",
       "architecture": "Mimari",
       "insights": "İçgörüler",
-      "automation": "Otomasyon"
+      "automation": "Otomasyon",
+      "access": "Erişim"
     },
     "lifecycle": {
       "pendingDeletion": "Silinmeyi bekliyor",
@@ -2433,7 +2441,24 @@
       "gitRewrite": "Protocol rewrite",
       "gitRewriteNone": "None",
       "gitRewriteToHttps": "Rewrite ssh:// sources to https:// (use this token)",
-      "gitRewriteToSsh": "Rewrite https:// sources to ssh:// (use this key)"
+      "gitRewriteToSsh": "Rewrite https:// sources to ssh:// (use this key)",
+      "valueSource": "Değer kaynağı",
+      "sourceStatic": "Bir değer girin",
+      "sourceVault": "Vault'tan oku",
+      "sourceStaticHelp": "Değer Terrapod'da saklanır ve çalıştırmaya iletilir.",
+      "sourceVaultHelp": "Terrapod gizli değeri çalıştırma sırasında Vault'tan okur. Burada hiçbir şey saklanmaz.",
+      "vaultMount": "Bağlama",
+      "vaultPath": "Yol",
+      "vaultField": "Alan",
+      "vaultEngine": "Gizli motoru",
+      "vaultEngineKv2": "Statik (kv-v2)",
+      "vaultEngineDynamic": "Dinamik (her çalıştırmada üretilir)",
+      "vaultInstance": "Vault",
+      "vaultInstanceDefault": "Varsayılan",
+      "vaultSecretNeverStored": "Yol saklanır, gizli değer asla. Terrapod'un Vault ilkesi neyi okuyabileceğini belirler.",
+      "sourceVaultBadge": "Vault",
+      "vaultReferenceUnreadable": "Okunamayan Vault referansı",
+      "vaultInstanceDefaultNamed": "Varsayılan ({name})"
     },
     "runs": {
       "options": "Seçenekler",
@@ -3049,5 +3074,54 @@
     "restoreConfirm": "\"{name}\" state''i geri yüklensin mi?\n\nBu YENİ bir çalışma alanı oluşturur — orijinali geri gelmez. Otomatik uygulama ve drift algılama kapalı, VCS bağlantısı olmadan döner; değişkenler ve çalıştırma geçmişi geri gelmez. Yalnızca state kurtarılır.",
     "restoreDone": "{versions, plural, other {# state sürümü}} yeni \"{name}\" çalışma alanına kurtarıldı. Otomatik uygulamayı veya VCS''yi açmadan önce ayarlarını kontrol edin.",
     "restoreAgainConfirm": "“{name}” zaten geri yüklendi, {existing} içine.\n\nTekrar geri yüklemek, aynı altyapının üzerinde aynı state soyunu taşıyan İKİNCİ bir workspace oluşturur. Herhangi birinde apply çalıştırmak, diğerinin bir sonraki planını tümüyle drift gibi gösterir.\n\nYalnızca daha önce geri yüklenen workspace ortadan kalktıysa devam edin."
+  },
+  "roleReach": {
+    "title": "Bu rolün kapsadıkları",
+    "checking": "Denetleniyor…",
+    "failed": "Bu kuralın kapsamı belirlenemedi.",
+    "noAllowRules": "Bu rolün hangi çalışma alanlarını kapsayacağını görmek için bir izin etiketi veya adı ekleyin.",
+    "granted": "verildi",
+    "deniedCount": "reddedildi",
+    "matched": "{count} izin kurallarıyla eşleşiyor",
+    "andMore": "…ve {count} tane daha",
+    "excludedByDeny": "Ret kurallarıyla dışlandı",
+    "reason": {
+      "allowName": "ada göre",
+      "denyName": "ada göre reddedildi",
+      "allowLabel": "{rule} ile eşleşiyor",
+      "denyLabel": "{rule} tarafından reddedildi"
+    },
+    "note": {
+      "catalogClamped": "Katalog tarafından yönetiliyor — okumayla sınırlı",
+      "everyoneFloor": "Herkes tarafından okunabilir",
+      "hasOwner": "Sahibi zaten yönetici yetkisine sahip"
+    },
+    "reachesNothing": "Bu kural hiçbir şeyi kapsamıyor.",
+    "allowAllBanner": "Tüm kaynaklarda yetki verir. Ret kuralları yine de geçerlidir.",
+    "axis": {
+      "workspace": "Çalışma alanları",
+      "pool": "Aracı havuzları",
+      "registry": "Kayıt defteri",
+      "catalog": "Katalog öğeleri"
+    }
+  },
+  "resourceAccess": {
+    "title": "Buraya kim erişebilir",
+    "subtitle": "Kuralları bu çalışma alanıyla eşleşen roller ve bunlara sahip kişiler.",
+    "loading": "Yükleniyor…",
+    "failed": "Buraya kimin erişebileceği belirlenemedi.",
+    "forbidden": "Bu yanıt tüm ortamı kapsar, bu nedenle yalnızca platform yöneticilerine ve denetçilerine gösterilir.",
+    "noRoles": "Hiçbir rol kuralı bu çalışma alanıyla eşleşmiyor.",
+    "deniedRoles": "Eşleşti, ardından bir ret kuralıyla dışlandı",
+    "alsoReachable": "Herhangi bir rol olmadan da erişilebilir",
+    "heldBy": "{who} tarafından tutuluyor",
+    "heldByNobody": "Kimse tutmuyor — pratikte hiçbir şey vermiyor",
+    "path": {
+      "platformAdmin": "Platform yöneticileri her kaynağa erişir",
+      "platformAudit": "Platform denetçileri her kaynağı okuyabilir",
+      "owner": "Sahibi burada yönetici yetkisine sahip",
+      "everyoneFloor": "access: everyone etiketli — herkes tarafından okunabilir",
+      "catalogClamped": "Katalog tarafından yönetiliyor — yönetici olmayan her yetki okumayla sınırlı"
+    }
   }
 }

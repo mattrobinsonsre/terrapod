@@ -643,7 +643,9 @@
       "allowLabelsShort": "許可ラベル",
       "allowNamesShort": "許可名",
       "denyLabelsShort": "拒否ラベル",
-      "denyNamesShort": "拒否名"
+      "denyNamesShort": "拒否名",
+      "allowAll": "すべてに付与",
+      "allowAllHelp": "後から作成されたものも含め、すべてのリソースに一致します。拒否ルールは引き続き適用されます。各ワークスペースにラベルを付ける代わりにこれを使用してください。ラベルなしで作成されたワークスペースは、気づかれないままロールの対象外になります。"
     },
     "assignForm": {
       "provider": "プロバイダー",
@@ -714,7 +716,8 @@
       "deleteRole": "ロールの削除に失敗しました",
       "setAssignment": "割り当ての設定に失敗しました",
       "setAssignmentStatus": "割り当ての設定に失敗しました（{status}）",
-      "deleteAssignment": "割り当ての削除に失敗しました"
+      "deleteAssignment": "割り当ての削除に失敗しました",
+      "conflictingLabelKeys": "{keys} に複数の値が指定されています。ラベルルールはキーごとに 1 つの値しか保持しないため、最後の値が以前の値を暗黙的に置き換えます。1 つのキーに複数の値を指定することは API では可能ですが、ここではまだ設定できません。"
     }
   },
   "adminVcs": {
@@ -938,7 +941,11 @@
       "rulePreview": "{count, plural, =0 {一致するワークスペースはありません} other {# 個のワークスペースに一致}}",
       "rulePreviewLoading": "一致するワークスペースを確認しています…",
       "rulePreviewInvalid": "このルールは確認できませんでした。保存時に具体的な問題が表示されます。",
-      "ruleConflictsWithGlobal": "グローバルの変数セットはすでに全ワークスペースに適用されるため、ルールは併用できません。"
+      "ruleConflictsWithGlobal": "グローバルの変数セットはすでに全ワークスペースに適用されるため、ルールは併用できません。",
+      "valueSource": "値のソース",
+      "valueSourceStatic": "値を入力",
+      "valueSourceVault": "Vault から読み取る",
+      "vaultHint": "Terrapod は実行時に Vault からシークレットを読み取ります。ここには保存されません。"
     }
   },
   "adminAutodiscovery": {
@@ -2255,7 +2262,8 @@
       "cost": "コスト",
       "architecture": "アーキテクチャ",
       "insights": "インサイト",
-      "automation": "自動化"
+      "automation": "自動化",
+      "access": "アクセス"
     },
     "lifecycle": {
       "pendingDeletion": "削除保留中",
@@ -2433,7 +2441,24 @@
       "gitRewrite": "Protocol rewrite",
       "gitRewriteNone": "None",
       "gitRewriteToHttps": "Rewrite ssh:// sources to https:// (use this token)",
-      "gitRewriteToSsh": "Rewrite https:// sources to ssh:// (use this key)"
+      "gitRewriteToSsh": "Rewrite https:// sources to ssh:// (use this key)",
+      "valueSource": "値のソース",
+      "sourceStatic": "値を入力",
+      "sourceVault": "Vault から読み取る",
+      "sourceStaticHelp": "値は Terrapod に保存され、実行に渡されます。",
+      "sourceVaultHelp": "Terrapod は実行時に Vault からシークレットを読み取ります。ここには保存されません。",
+      "vaultMount": "マウント",
+      "vaultPath": "パス",
+      "vaultField": "フィールド",
+      "vaultEngine": "シークレットエンジン",
+      "vaultEngineKv2": "静的 (kv-v2)",
+      "vaultEngineDynamic": "動的（実行ごとに発行）",
+      "vaultInstance": "Vault",
+      "vaultInstanceDefault": "既定",
+      "vaultSecretNeverStored": "保存されるのはパスであり、シークレットではありません。読み取れる範囲は Terrapod の Vault ポリシーが決めます。",
+      "sourceVaultBadge": "Vault",
+      "vaultReferenceUnreadable": "解析できない Vault 参照",
+      "vaultInstanceDefaultNamed": "既定 ({name})"
     },
     "runs": {
       "options": "オプション",
@@ -3049,5 +3074,54 @@
     "restoreConfirm": "「{name}」のステートを復元しますか？\n\n新しいワークスペースが作成されます。元のワークスペースは戻りません。自動適用とドリフト検出は無効、VCS 接続もない状態で復元され、変数と実行履歴は戻りません。復旧されるのはステートのみです。",
     "restoreDone": "{versions, plural, other {# 件のステートバージョン}}を新しいワークスペース「{name}」に復旧しました。自動適用や VCS を有効にする前に設定を確認してください。",
     "restoreAgainConfirm": "「{name}」はすでに {existing} に復元されています。\n\nもう一度復元すると、同じインフラの上に同じ state リネージを持つ 2 つ目のワークスペースができます。どちらかで apply すると、もう一方の次のプランが全面的なドリフトのように見えます。\n\n以前に復元したワークスペースがすでに存在しない場合にのみ続行してください。"
+  },
+  "roleReach": {
+    "title": "このロールの対象範囲",
+    "checking": "確認中…",
+    "failed": "このルールの適用範囲を判断できませんでした。",
+    "noAllowRules": "許可ラベルまたは許可名を追加すると、このロールが対象とするワークスペースが表示されます。",
+    "granted": "許可",
+    "deniedCount": "拒否",
+    "matched": "許可ルールに一致: {count} 件",
+    "andMore": "…他 {count} 件",
+    "excludedByDeny": "拒否ルールによる除外",
+    "reason": {
+      "allowName": "名前指定",
+      "denyName": "名前で拒否",
+      "allowLabel": "{rule} に一致",
+      "denyLabel": "{rule} により拒否"
+    },
+    "note": {
+      "catalogClamped": "カタログ管理 — 読み取りに制限",
+      "everyoneFloor": "全員が読み取り可能",
+      "hasOwner": "所有者はすでに管理者権限を保持"
+    },
+    "reachesNothing": "このルールは何も対象としません。",
+    "allowAllBanner": "すべてのリソースに付与します。拒否ルールは引き続き適用されます。",
+    "axis": {
+      "workspace": "ワークスペース",
+      "pool": "エージェントプール",
+      "registry": "レジストリ",
+      "catalog": "カタログ項目"
+    }
+  },
+  "resourceAccess": {
+    "title": "アクセスできるユーザー",
+    "subtitle": "このワークスペースに一致するルールを持つロールと、その保有者。",
+    "loading": "読み込み中…",
+    "failed": "誰がアクセスできるかを判断できませんでした。",
+    "forbidden": "この回答は環境全体に及ぶため、プラットフォーム管理者と監査者にのみ表示されます。",
+    "noRoles": "このワークスペースに一致するロールルールはありません。",
+    "deniedRoles": "一致後、拒否ルールにより除外",
+    "alsoReachable": "ロールなしでも到達可能",
+    "heldBy": "保有者: {who}",
+    "heldByNobody": "保有者なし — 実質的に何も付与しません",
+    "path": {
+      "platformAdmin": "プラットフォーム管理者はすべてのリソースに到達します",
+      "platformAudit": "プラットフォーム監査者はすべてのリソースを読み取れます",
+      "owner": "所有者はここで管理者権限を持ちます",
+      "everyoneFloor": "access: everyone のラベル付き — 全員が読み取り可能",
+      "catalogClamped": "カタログ管理 — 管理者以外への付与はすべて読み取りに制限"
+    }
   }
 }

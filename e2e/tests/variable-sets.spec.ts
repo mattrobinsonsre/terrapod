@@ -1,5 +1,7 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page, type Route } from '@playwright/test';
 import { getStoredToken, createWorkspace, uniqueName } from '../helpers/api';
+
+const API_URL = process.env.API_URL || 'http://localhost:8000';
 
 test.describe('Variable Sets', () => {
   test('variable set list page loads', async ({ page }) => {
@@ -75,8 +77,10 @@ test.describe('Variable Sets', () => {
     await page.fill('#var-val', 'test-value');
     await page.click('form button:has-text("Add Variable")');
 
-    // Variable should appear in the table
-    await expect(page.locator(`text=${varKey}`)).toBeVisible({ timeout: 10_000 });
+    // Scoped to the table row: the page renders the variable twice — the
+    // desktop row and the mobile card are both in the DOM, one hidden by CSS —
+    // so a bare text= locator is a strict-mode violation.
+    await expect(page.locator(`tr:has-text("${varKey}")`)).toBeVisible({ timeout: 10_000 });
   });
 
   test('delete variable set from detail page', async ({ page }) => {
@@ -106,7 +110,6 @@ test.describe('Variable Sets', () => {
 });
 
 test.describe('Variable set assignment rules (#1440)', () => {
-  const API_URL = process.env.API_URL || 'http://localhost:8000'
 
   async function createRuleVarset(token: string, name: string, rule: Record<string, unknown>) {
     const res = await fetch(`${API_URL}/api/v2/organizations/default/varsets`, {
@@ -170,5 +173,112 @@ test.describe('Variable set assignment rules (#1440)', () => {
       }),
     })
     expect(res.status).toBe(422)
+  })
+})
+
+test.describe('Assignment rule editor (regression for the inert-save bug)', () => {
+  test('a rule created through the editor is actually saved', async ({ page }) => {
+    // Every other #1440 spec creates rules via the API and asserts on rendering.
+    // That is why a PATCH body missing `assignment-rule` shipped: the editor
+    // rendered, previewed a live match count, reported success, and saved
+    // nothing. This drives the form.
+    const token = getStoredToken()
+    const wsName = uniqueName('e2eeditorws')
+    await createWorkspace(token, wsName, { labels: { e2eeditor: wsName } })
+
+    const vsName = uniqueName('e2eeditorvs')
+    const res = await fetch(`${API_URL}/api/v2/organizations/default/varsets`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/vnd.api+json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ data: { attributes: { name: vsName } } }),
+    })
+    expect(res.status).toBe(201)
+    const vsId = (await res.json()).data.id
+
+    await page.goto(`/admin/variable-sets/${vsId}?tab=settings`)
+    await page.getByRole('button', { name: 'Edit' }).click()
+    await page.getByRole('checkbox', { name: /assignment rule/i }).check()
+
+    // Add the label through the editor's own controls.
+    await page.getByPlaceholder('key').last().fill('e2eeditor')
+    await page.getByPlaceholder('value').last().fill(wsName)
+    await page.getByRole('button', { name: 'Add' }).last().click()
+
+    await page.getByRole('button', { name: 'Save' }).click()
+
+    // The assertion that matters: re-read from the server, not the optimistic
+    // client state the old code was quietly showing.
+    await expect(async () => {
+      const check = await fetch(`${API_URL}/api/v2/varsets/${vsId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const rule = (await check.json()).data.attributes['assignment-rule']
+      expect(rule).not.toBeNull()
+      expect(rule.labels.e2eeditor).toBe(wsName)
+    }).toPass({ timeout: 10_000 })
+  })
+
+})
+
+test.describe('Variable set Vault source (#1439)', () => {
+  /** Pretend the deployment has Vault configured. The e2e stack deliberately
+   *  does not — TERRAPOD_VAULT__ENABLED is unset and the config default is
+   *  False — which is what makes the "not offered" test below real, and what
+   *  made an unstubbed version of this suite fail deterministically. */
+  async function withVault(page: Page, instances = ['default'], defaultInstance = 'default') {
+    await page.route('**/api/terrapod/v1/vault/availability', (route: Route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            type: 'vault-availability',
+            id: 'vault',
+            attributes: {
+              enabled: true,
+              instances,
+              'default-instance': defaultInstance,
+            },
+          },
+        }),
+      }),
+    )
+  }
+
+  async function makeVarset(page: Page): Promise<string> {
+    const token = getStoredToken()
+    const res = await page.request.post(`${API_URL}/api/v2/organizations/default/varsets`, {
+      headers: { 'Content-Type': 'application/vnd.api+json', Authorization: `Bearer ${token}` },
+      data: { data: { attributes: { name: uniqueName('e2e-vault-vs') } } },
+    })
+    expect(res.status()).toBe(201)
+    return (await res.json()).data.id
+  }
+
+  test('the source picker is not offered when Vault is not configured', async ({ page }) => {
+    // Unstubbed: the stack really has no Vault, so this asserts the gate rather
+    // than a mock of it. Offering a source that cannot resolve would let an
+    // operator save a reference that silently produces nothing at run time.
+    const vsId = await makeVarset(page)
+    await page.goto(`/admin/variable-sets/${vsId}?tab=variables`)
+    await page.click('button:has-text("Add Variable")')
+
+    await expect(page.locator('#var-val')).toBeVisible()
+    await expect(page.locator('#var-source')).toHaveCount(0)
+  })
+
+  test('a variable set offers the Vault source when Vault is enabled', async ({ page }) => {
+    // The "define once, apply to many" path: a Vault-backed credential set on a
+    // variable SET, reachable from the UI (not only via the API/SDK).
+    const vsId = await makeVarset(page)
+    await withVault(page)
+
+    await page.goto(`/admin/variable-sets/${vsId}?tab=variables`)
+    await page.click('button:has-text("Add Variable")')
+
+    // Choosing the source swaps the value box for the reference builder.
+    await page.locator('#var-source').selectOption('vault')
+    await expect(page.locator('#add-mount')).toBeVisible()
+    await expect(page.locator('#var-val')).toHaveCount(0)
   })
 })

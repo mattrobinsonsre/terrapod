@@ -26,9 +26,16 @@ type Variable struct {
 	HCL         bool   `json:"hcl"`
 	Sensitive   bool   `json:"sensitive"`
 	Description string `json:"description,omitempty"`
-	VersionID   string `json:"version-id,omitempty"`
-	CreatedAt   string `json:"created-at,omitempty"`
-	UpdatedAt   string `json:"updated-at,omitempty"`
+
+	// ValueSource is "static" (Value is the literal) or "vault" (Value is a
+	// reference Terrapod resolves server-side at run time, #1439). For a vault
+	// source the API returns the reference rather than masking it — a path is
+	// not a secret, and the secret it points at is never stored or returned.
+	ValueSource string `json:"value-source,omitempty"`
+
+	VersionID string `json:"version-id,omitempty"`
+	CreatedAt string `json:"created-at,omitempty"`
+	UpdatedAt string `json:"updated-at,omitempty"`
 }
 
 // CreateVariableRequest is the input shape for Client.CreateVariable.
@@ -44,6 +51,9 @@ type CreateVariableRequest struct {
 	HCL         bool   `json:"hcl,omitempty"`
 	Sensitive   bool   `json:"sensitive,omitempty"`
 	Description string `json:"description,omitempty"`
+	// ValueSource defaults to "static" when empty. Set "vault" and put the
+	// JSON reference in Value; Terrapod forces Sensitive on either way.
+	ValueSource string `json:"value-source,omitempty"`
 }
 
 // UpdateVariableRequest is the partial-update shape. Pointer fields
@@ -63,6 +73,7 @@ type UpdateVariableRequest struct {
 	HCL         *bool   `json:"hcl,omitempty"`
 	Sensitive   *bool   `json:"sensitive,omitempty"`
 	Description *string `json:"description,omitempty"`
+	ValueSource *string `json:"value-source,omitempty"`
 }
 
 // CreateVariable creates a variable scoped to a workspace.
@@ -230,6 +241,9 @@ func variableCreateAttrs(req CreateVariableRequest) map[string]any {
 	if req.Description != "" {
 		attrs["description"] = req.Description
 	}
+	if req.ValueSource != "" {
+		attrs["value-source"] = req.ValueSource
+	}
 	return attrs
 }
 
@@ -258,6 +272,9 @@ func variableUpdateAttrs(req UpdateVariableRequest) map[string]any {
 	if req.Description != nil {
 		attrs["description"] = *req.Description
 	}
+	if req.ValueSource != nil {
+		attrs["value-source"] = *req.ValueSource
+	}
 	return attrs
 }
 
@@ -279,6 +296,7 @@ func variableFromResource(res *Resource) *Variable {
 		HCL:         GetBoolAttr(res, "hcl"),
 		Sensitive:   GetBoolAttr(res, "sensitive"),
 		Description: GetStringAttr(res, "description"),
+		ValueSource: GetStringAttr(res, "value-source"),
 		VersionID:   GetStringAttr(res, "version-id"),
 		CreatedAt:   GetStringAttr(res, "created-at"),
 		UpdatedAt:   GetStringAttr(res, "updated-at"),

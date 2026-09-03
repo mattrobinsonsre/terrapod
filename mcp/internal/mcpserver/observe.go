@@ -304,6 +304,50 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 		return nil, st, nil
 	})
 
+	// ── terrapod_role_reach ──────────────────────────────────────────
+	type roleReachIn struct {
+		Role     string `json:"role" jsonschema:"the custom role name whose reach to resolve"`
+		PageSize int    `json:"page_size,omitempty" jsonschema:"how many matched workspaces to list (default 25, max 100); the counts always span the whole fleet regardless"`
+	}
+	mcp.AddTool(s, &mcp.Tool{
+		Name:        "terrapod_role_reach",
+		Description: "Resolve which workspaces a custom RBAC role actually grants on, and WHY. Terrapod has no teams or groups: access comes from a role's allow/deny label and name rules matched against workspace labels, which means 'who can touch this' is not readable from the role definition alone once an estate is large. Use this before changing a role, and to answer 'what would this role reach' without reading every workspace. `granted-count`/`denied-count` are aggregates over the WHOLE fleet, not over the returned page, so trust them even when `workspaces` is a short list. Each entry carries `reason` naming the rule responsible (`allow-label:env=prod`, `deny-name`, …) and `capabilities`, the capability set the role resolves to THERE. `denied` lists what an allow rule matched and a deny rule then removed — the difference between an intended exclusion and a typo. Read `notes` before concluding the role is the only thing granting access: `has-owner` means the workspace owner holds admin regardless, `everyone-floor` means it is readable by anyone, and `catalog-clamped` means the workspace is catalog-managed so every non-platform-admin grant is capped at read (a role granting write there does NOT give write). Built-in roles are rejected: `admin` and `audit` grant through the platform path on every workspace, so a label-reach figure for them would be true and misleading. `axes` breaks the answer down by capability axis — workspace, pool, registry (modules and providers), catalog — because one rule reaches all of them, and reading only the workspace numbers answers a quarter of the question. A role with `allow-all` set grants estate-wide (reason `allow-all`); deny rules still apply to it. Read-only.",
+		Annotations: readOnly,
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in roleReachIn) (*mcp.CallToolResult, *terrapod.RoleReach, error) {
+		if in.Role == "" {
+			return errText("role is required"), nil, nil
+		}
+		var opts *terrapod.RoleReachOptions
+		if in.PageSize > 0 {
+			opts = &terrapod.RoleReachOptions{PageSize: in.PageSize}
+		}
+		reach, err := c.PreviewRoleReach(ctx, in.Role, opts)
+		if err != nil {
+			return errResult(err), nil, nil
+		}
+		return nil, reach, nil
+	})
+
+	// ── terrapod_resource_access ─────────────────────────────────────
+	type resourceAccessIn struct {
+		Kind string `json:"kind" jsonschema:"the resource type: workspaces, agent-pools, registry-modules, registry-providers or catalog-items"`
+		ID   string `json:"id" jsonschema:"the resource id (ws-..., apool-..., or a bare uuid for registry and catalog items)"`
+	}
+	mcp.AddTool(s, &mcp.Tool{
+		Name:        "terrapod_resource_access",
+		Description: "Answer 'who can reach THIS?' for one resource — the inverse of terrapod_role_reach. Terrapod has no teams or groups: access comes from each role's allow/deny label and name rules matched against the resource, so the answer is not readable from the resource itself. Returns every role whose rules match, with `reason` naming the responsible rule, `capabilities` the role resolves to there, and `held-by`, the identities actually holding it — a role nobody holds reaches nothing in practice, and that is often the finding. `denied-roles` are roles an allow rule matched and a deny rule then removed, which distinguishes an intended exclusion from a typo. CRITICAL: read `platform-paths` before treating `roles` as the whole answer. A list of roles reads as complete when it is not — `platform-admin` reaches everything, `owner` means the resource owner holds admin regardless of any role, `everyone-floor` means an access:everyone label makes it readable by anyone, and `catalog-clamped` means a catalog-managed workspace caps every non-platform-admin grant at read. Reporting only the roles would understate who can touch it. Unpaged (roles are few). Read-only; requires platform admin or audit, since the answer draws on the whole role set.",
+		Annotations: readOnly,
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in resourceAccessIn) (*mcp.CallToolResult, *terrapod.ResourceAccess, error) {
+		if in.Kind == "" || in.ID == "" {
+			return errText("kind and id are required"), nil, nil
+		}
+		acc, err := c.GetResourceAccess(ctx, in.Kind, in.ID)
+		if err != nil {
+			return errResult(err), nil, nil
+		}
+		return nil, acc, nil
+	})
+
 	// ── terrapod_workspace_architecture_critique ─────────────────────
 	type wsCritiqueIn struct {
 		WorkspaceID string `json:"workspace_id" jsonschema:"the workspace id (ws-...) whose current-state architecture critique to fetch"`

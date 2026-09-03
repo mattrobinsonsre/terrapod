@@ -374,6 +374,11 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
+			"agent_pool_names": schema.ListAttribute{
+				Description: "Read-only. The pools' names, positionally matching `agent_pool_ids` — served so a consumer can render a pool without fetching the whole pool list just to turn ids into labels.",
+				Computed:    true,
+				ElementType: types.StringType,
+			},
 			"agent_pool_ids": schema.ListAttribute{
 				Description: "Agent pools this workspace's runs may execute on (#1085). The set is flat: a queued run is offered to every pool at once and whichever pool has a live listener claims it first, so losing one pool does not stop the workspace. There is no primary and no ordering preference. `agent_pool_id` reads back as element 0. Conflicts with `agent_pool_id`. Omitting this attribute leaves any existing server-side value untouched — it does not clear it; set `agent_pool_ids = []` to clear.",
 				// Optional + Computed with UseStateForUnknown — same rationale as
@@ -1133,6 +1138,13 @@ func readWorkspaceIntoModel(ctx context.Context, ws *terrapod.Workspace, m *work
 		diags.Append(apDiag...)
 		m.AgentPoolIDs = apVal
 	}
+	// Computed-only, so it must ALWAYS be set from the server: leaving it
+	// unknown after apply trips the framework's "inconsistent result after
+	// apply" check (#684). Empty list rather than null when the workspace has
+	// no pools, so the type is stable across reads.
+	apnVal, apnDiag := types.ListValueFrom(ctx, types.StringType, ws.AgentPoolNames)
+	diags.Append(apnDiag...)
+	m.AgentPoolNames = apnVal
 	if ws.VCSConnectionID != "" {
 		m.VCSConnectionID = types.StringValue(ws.VCSConnectionID)
 	} else {

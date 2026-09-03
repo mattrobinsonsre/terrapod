@@ -643,7 +643,9 @@
       "allowLabelsShort": "4ll0w L4b3l5",
       "allowNamesShort": "4ll0w N4m35",
       "denyLabelsShort": "D3ny L4b3l5",
-      "denyNamesShort": "D3ny N4m35"
+      "denyNamesShort": "D3ny N4m35",
+      "allowAll": "Gr4n7 0n 3v3ry7h1ng",
+      "allowAllHelp": "M47ch35 3v3ry r350urc3, 1nclud1ng 0n35 cr3473d l473r. D3ny rul35 571ll 4pply. U53 7h15 r47h3r 7h4n l4b3ll1ng 3v3ry w0rk5p4c3 — 4 w0rk5p4c3 cr3473d w17h0u7 7h3 l4b3l w0uld 51l3n7ly f4ll 0u751d3 7h3 r0l3."
     },
     "assignForm": {
       "provider": "Pr0v1d3r",
@@ -714,7 +716,8 @@
       "deleteRole": "F41l3d 70 d3l373 r0l3",
       "setAssignment": "F41l3d 70 537 4551gnm3n7",
       "setAssignmentStatus": "F41l3d 70 537 4551gnm3n7 ({status})",
-      "deleteAssignment": "F41l3d 70 d3l373 4551gnm3n7"
+      "deleteAssignment": "F41l3d 70 d3l373 4551gnm3n7",
+      "conflictingLabelKeys": "{keys} 15 g1v3n m0r3 7h4n 0n3 v4lu3. 4 l4b3l rul3 h0ld5 0n3 v4lu3 p3r k3y, 50 7h3 l457 w0uld 51l3n7ly r3pl4c3 7h3 34rl13r 0n35. M47ch1ng 53v3r4l v4lu35 f0r 0n3 k3y 15 5upp0r73d by 7h3 4P1 bu7 c4nn07 y37 b3 537 h3r3."
     }
   },
   "adminVcs": {
@@ -938,7 +941,11 @@
       "rulePreview": "{count, plural, =0 {Matches no workspaces} one {Matches # workspace} other {Matches # workspaces}}",
       "rulePreviewLoading": "Ch3ck1ng wh1ch w0rk5p4c35 m47ch…",
       "rulePreviewInvalid": "7h15 rul3 c0uld n07 b3 ch3ck3d. 54v3 w1ll r3p0r7 7h3 3x4c7 pr0bl3m.",
-      "ruleConflictsWithGlobal": "4 gl0b4l 537 4lr34dy 4ppl135 70 3v3ry w0rk5p4c3, 50 4 rul3 c4nn07 b3 u53d w17h 17."
+      "ruleConflictsWithGlobal": "4 gl0b4l 537 4lr34dy 4ppl135 70 3v3ry w0rk5p4c3, 50 4 rul3 c4nn07 b3 u53d w17h 17.",
+      "valueSource": "V4lu3 50urc3",
+      "valueSourceStatic": "3n73r 4 v4lu3",
+      "valueSourceVault": "R34d fr0m V4ul7",
+      "vaultHint": "73rr4p0d r34d5 7h3 53cr37 fr0m V4ul7 47 run 71m3. N07h1ng 15 570r3d h3r3."
     }
   },
   "adminAutodiscovery": {
@@ -2255,7 +2262,8 @@
       "cost": "C057",
       "architecture": "4rch173c7ur3",
       "insights": "1n51gh75",
-      "automation": "4u70m4710n"
+      "automation": "4u70m4710n",
+      "access": "4cc355"
     },
     "lifecycle": {
       "pendingDeletion": "P3nd1ng d3l3710n",
@@ -2433,7 +2441,24 @@
       "gitRewrite": "Protocol rewrite",
       "gitRewriteNone": "None",
       "gitRewriteToHttps": "Rewrite ssh:// sources to https:// (use this token)",
-      "gitRewriteToSsh": "Rewrite https:// sources to ssh:// (use this key)"
+      "gitRewriteToSsh": "Rewrite https:// sources to ssh:// (use this key)",
+      "valueSource": "V4lu3 50urc3",
+      "sourceStatic": "3n73r 4 v4lu3",
+      "sourceVault": "R34d fr0m V4ul7",
+      "sourceStaticHelp": "7h3 v4lu3 15 570r3d 1n 73rr4p0d 4nd d3l1v3r3d 70 7h3 run.",
+      "sourceVaultHelp": "73rr4p0d r34d5 7h3 53cr37 fr0m V4ul7 47 run 71m3. N07h1ng 15 570r3d h3r3.",
+      "vaultMount": "M0un7",
+      "vaultPath": "P47h",
+      "vaultField": "F13ld",
+      "vaultEngine": "53cr37 3ng1n3",
+      "vaultEngineKv2": "57471c (kv-v2)",
+      "vaultEngineDynamic": "Dyn4m1c (m1n73d p3r run)",
+      "vaultInstance": "V4ul7",
+      "vaultInstanceDefault": "D3f4ul7",
+      "vaultSecretNeverStored": "7h3 p47h 15 570r3d, n3v3r 7h3 53cr37. 73rr4p0d'5 V4ul7 p0l1cy c0n7r0l5 wh47 17 c4n r34d.",
+      "sourceVaultBadge": "V4ul7",
+      "vaultReferenceUnreadable": "Unr34d4bl3 V4ul7 r3f3r3nc3",
+      "vaultInstanceDefaultNamed": "D3f4ul7 ({name})"
     },
     "runs": {
       "options": "0p710n5",
@@ -3049,5 +3074,54 @@
     "restoreConfirm": "R3570r3 7h3 57473 0f \"{name}\"?\n\n7h15 cr34735 4 N3W w0rk5p4c3 — 7h3 0r1g1n4l 15 n07 br0ugh7 b4ck. 17 r37urn5 w17h 4u70-4pply 4nd dr1f7 d373c710n 0ff 4nd n0 VC5 c0nn3c710n, 4nd 175 v4r14bl35 4nd run h1570ry d0 n07 c0m3 b4ck. 0nly 7h3 57473 15 r3c0v3r3d.",
     "restoreDone": "R3c0v3r3d {versions, plural, one {# state version} other {# state versions}} 1n70 7h3 n3w w0rk5p4c3 \"{name}\". Ch3ck 175 53771ng5 b3f0r3 3n4bl1ng 4u70-4pply 0r VC5.",
     "restoreAgainConfirm": "\"{name}\" h45 4lr34dy b33n r3570r3d, 1n70 {existing}.\n\nR3570r1ng 17 4g41n cr34735 4 53C0ND w0rk5p4c3 h0ld1ng 7h3 54m3 57473 l1n34g3 0v3r 7h3 54m3 1nfr457ruc7ur3. Applying 1n 317h3r w1ll 7h3n m4k3 7h3 07h3r''5 n3x7 pl4n l00k l1k3 wh0l3s4l3 dr1f7.\n\n0nly c0n71nu3 1f 7h3 34rl13r r3570r3d w0rk5p4c3 15 g0n3."
+  },
+  "roleReach": {
+    "title": "Wh47 7h15 r0l3 r34ch35",
+    "checking": "Ch3ck1ng…",
+    "failed": "C0uld n07 w0rk 0u7 wh47 7h15 rul3 r34ch35.",
+    "noAllowRules": "4dd 4n 4ll0w l4b3l 0r 4n 4ll0w n4m3 70 533 wh1ch w0rk5p4c35 7h15 r0l3 w0uld r34ch.",
+    "granted": "gr4n73d",
+    "deniedCount": "d3n13d",
+    "matched": "{count} m47ch3d by 7h3 4ll0w rul35",
+    "andMore": "…4nd {count} m0r3",
+    "excludedByDeny": "3xclud3d by 7h3 d3ny rul35",
+    "reason": {
+      "allowName": "n4m3d",
+      "denyName": "d3n13d by n4m3",
+      "allowLabel": "m47ch35 {rule}",
+      "denyLabel": "d3n13d by {rule}"
+    },
+    "note": {
+      "catalogClamped": "C474l0g-m4n4g3d — c4pp3d 47 r34d",
+      "everyoneFloor": "R34d4bl3 by 3v3ry0n3",
+      "hasOwner": "0wn3r 4lr34dy h45 4dm1n"
+    },
+    "reachesNothing": "7h15 rul3 r34ch35 n07h1ng.",
+    "allowAllBanner": "Gr4n75 0n 3v3ry r350urc3. D3ny rul35 571ll 4pply.",
+    "axis": {
+      "workspace": "W0rk5p4c35",
+      "pool": "4g3n7 p00l5",
+      "registry": "R3g157ry",
+      "catalog": "C474l0g 173m5"
+    }
+  },
+  "resourceAccess": {
+    "title": "Wh0 c4n r34ch 7h15",
+    "subtitle": "R0l35 wh053 rul35 m47ch 7h15 w0rk5p4c3, 4nd 7h3 p30pl3 h0ld1ng 7h3m.",
+    "loading": "L04d1ng…",
+    "failed": "C0uld n07 w0rk 0u7 wh0 c4n r34ch 7h15.",
+    "forbidden": "7h15 4n5w3r 5p4n5 7h3 wh0l3 357473, 50 17 15 5h0wn 0nly 70 pl47f0rm 4dm1n5 4nd 4ud170r5.",
+    "noRoles": "N0 r0l3'5 rul35 m47ch 7h15 w0rk5p4c3.",
+    "deniedRoles": "M47ch3d, 7h3n 3xclud3d by 4 d3ny rul3",
+    "alsoReachable": "4l50 r34ch4bl3 w17h0u7 4ny r0l3",
+    "heldBy": "H3ld by {who}",
+    "heldByNobody": "H3ld by n0b0dy — gr4n75 n07h1ng 1n pr4c71c3",
+    "path": {
+      "platformAdmin": "Pl47f0rm 4dm1n5 r34ch 3v3ry r350urc3",
+      "platformAudit": "Pl47f0rm 4ud170r5 c4n r34d 3v3ry r350urc3",
+      "owner": "7h3 0wn3r h0ld5 4dm1n h3r3",
+      "everyoneFloor": "L4b3ll3d 4cc355: 3v3ry0n3 — r34d4bl3 by 4ny0n3",
+      "catalogClamped": "C474l0g-m4n4g3d — 3v3ry n0n-4dm1n gr4n7 15 c4pp3d 47 r34d"
+    }
   }
 }

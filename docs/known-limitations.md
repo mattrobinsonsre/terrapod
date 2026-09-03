@@ -98,7 +98,6 @@ deliberately does not attempt:
 - **Sentinel** (proprietary policy language) and **Terraform Stacks**
   (proprietary orchestration runtime with no local-execution path).
 - **Terraform Cloud Business-tier**. SaaS features.
-- A **built-in Vault** — configure Vault externally if you need it.
 - **Non-Kubernetes** deployment of any kind.
 
 ---
