@@ -4,12 +4,43 @@
 # Safety: Only allow local Kubernetes contexts. Never deploy to production.
 allow_k8s_contexts([
     'rancher-desktop',
+    'k3d-local',
     'minikube',
     'docker-desktop',
     'kind-kind',
     'colima',
     'orbstack',
 ])
+
+# Image delivery.
+#
+# On a nested cluster (k3d/kind) the host's image store and the cluster's are
+# SEPARATE, so an image built locally is invisible to pods until it is actively
+# delivered. Rancher Desktop shared one store via cri-dockerd and needed none of
+# this; it was the outlier, and on this workstation it is gone.
+#
+# Only applied on the k3d context, so a Docker/Rancher/minikube setup is
+# untouched and keeps working exactly as before.
+#
+# Delivered through a local registry rather than `k3d image import`, measured on
+# a 775 MB image after a one-line source change:
+#
+#     registry push   0.20s
+#     k3d import     11.5s
+#
+# The import is flat because it copies the whole image every time; the push
+# moves only the changed layer. That is paid on every edit, times five images.
+#
+# The one-off cluster/registry setup this expects is NOT created automatically —
+# see "Nested clusters (k3d / kind)" in docs/local-development.md.
+_k3d = k8s_context().startswith('k3d-')
+if _k3d:
+    # Tilt pushes to localhost:5111 from the host; the cluster pulls the
+    # rewritten name, which is how the NODE resolves the same registry.
+    default_registry(
+        'localhost:5111',
+        host_from_cluster='k3d-tp-registry:5111',
+    )
 
 # Opt-in horizontal-scale profile (#1056): `tilt up -- --scale` layers
 # helm/terrapod/values-scale.yaml on top of the dev overrides — API/web/listener
@@ -97,7 +128,10 @@ docker_build(
     'terrapod-api',
     context='.',
     dockerfile='docker/Dockerfile.api',
-    cache_from=['terrapod-api:latest'],
+    # podman's build endpoint rejects a TAGGED reference in `cachefrom`
+    # ("repository must contain neither a tag nor digest") and Tilt passes
+    # it verbatim, so the hint is dropped there. Docker keeps it.
+    cache_from=[] if _k3d else ['terrapod-api:latest'],
     live_update=[
         sync('./services/terrapod', '/app/terrapod'),
         sync('./alembic', '/app/alembic'),
@@ -127,12 +161,28 @@ docker_build(
 
 # Runner Job image (python:3.13-slim, pure-Python orchestrator).
 # Built as a local_resource (not docker_build) because the runner image is
-# referenced in the runners.yaml ConfigMap, not in a pod spec — Tilt's image
-# injection doesn't apply.  values-local.yaml sets terrapod-runner:local with
-# pullPolicy: Never so K8s Jobs find it in the local Docker daemon.
+# referenced in the runners.yaml ConfigMap, not in a pod spec — so Tilt does not
+# track it and `default_registry` above does NOT apply to it. It therefore has to
+# push itself, or runner Jobs fail ErrImageNeverPull: the k3d node's image store
+# is separate from podman's, and nothing crosses between them by itself.
+#
+# The helm `set` block at the bottom of this file points the runner image at
+# k3d-tp-registry:5111, which is how the NODE resolves the registry; the push
+# below targets localhost:5111, which is how the HOST reaches the same thing.
+# values-local.yaml is left alone on purpose — it is shared, and must not
+# hard-code any one workstation's registry.
+_RUNNER_TAG = 'localhost:5111/terrapod-runner:local' if _k3d else 'terrapod-runner:local'
+_RUNNER_BUILD = ' && docker build -f docker/Dockerfile.runner -t ' + _RUNNER_TAG + ' .'
+if _k3d:
+    _RUNNER_BUILD = _RUNNER_BUILD + ' && docker push ' + _RUNNER_TAG
+
 local_resource(
     'build-runner-image',
-    cmd=QUERY_BUILD + ' && docker build -f docker/Dockerfile.runner -t terrapod-runner:local .',
+    # On k3d the runner image must be pushed: it is referenced from the
+    # runners.yaml ConfigMap rather than a pod spec, so Tilt does not track it
+    # and `default_registry` does not apply. Elsewhere a plain local build is
+    # all that is needed, exactly as before.
+    cmd=QUERY_BUILD + _RUNNER_BUILD,
     deps=[
         'docker/Dockerfile.runner',
         'query/cmd',
@@ -245,7 +295,12 @@ k8s_yaml(helm(
         'web.image.pullPolicy=Never',
         'web.enabled=true',
         'ingress.enabled=true',
-    ],
+    ] + ([
+        # The registry as the NODE resolves it. Set here rather than in
+        # values-local.yaml, which is shared and must not hard-code one
+        # workstation's registry.
+        'runners.image.repository=k3d-tp-registry:5111/terrapod-runner',
+    ] if _k3d else []),
 ))
 
 # ─────────────────────────────────────────────────────────────────────────────

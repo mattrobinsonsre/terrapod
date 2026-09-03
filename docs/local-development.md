@@ -59,6 +59,54 @@ From there the workflow is the same as a real deployment — see
 [Getting Started](getting-started.md) for creating a workspace and running your
 first plan/apply (substitute `terrapod.local` for the hostname).
 
+## Nested clusters (k3d / kind)
+
+**Skip this if your cluster shares an image store with your local builds** —
+Rancher Desktop, Docker Desktop and minikube's Docker driver all do, and an
+image you build is immediately visible to pods.
+
+k3d and kind run the cluster *inside* a container with its own containerd, so
+**the host's image store and the cluster's are separate**. An image built
+locally is invisible to pods until it is actively delivered, and because the
+chart runs the local images with `imagePullPolicy: Never`, a missing image is a
+hard `ErrImageNeverPull` rather than a pull from a registry. Confirm which store
+an image is in:
+
+```zsh
+docker images | grep terrapod                         # the HOST's store
+docker exec k3d-local-server-0 crictl images | grep terrapod   # the CLUSTER's
+```
+
+The Tiltfile handles delivery automatically on a `k3d-*` context by pushing
+through a registry, which needs a one-off setup. Delivery via a registry rather
+than `k3d image import` is a deliberate choice — measured on a 775 MB image
+after a one-line source change, a push moves only the changed layer (~0.2s)
+while an import copies the whole image every time (~11.5s), and that cost is
+paid on every edit across five images.
+
+```zsh
+k3d registry create tp-registry --port 5111
+
+k3d cluster create local --no-lb --api-port 6443 \
+  --registry-use k3d-tp-registry:5111 \
+  -p "80:80@server:0:direct" -p "443:443@server:0:direct"
+```
+
+Two details in that command are load-bearing if you recreate the cluster:
+
+- **`--no-lb`** drops k3d's load balancer, whose nginx resolves upstreams once
+  at startup and so caches a stale server IP across a cluster restart.
+- **`:direct`** on the port mappings is then required — without the load
+  balancer a plain `@server:0` mapping is rejected as a proxy-type mapping.
+
+The Tiltfile pushes to `localhost:5111` (how the **host** reaches the registry)
+and rewrites image references to `k3d-tp-registry:5111` (how the **node**
+resolves the same registry). Nothing here applies on any other context, so a
+Docker/Rancher/minikube setup is untouched.
+
+kind shares the two-store problem but not the fix: `kind load docker-image` is
+reliable, so use that rather than a registry.
+
 ## Day-to-day
 
 - **Live reload** — `tilt up` live-syncs `services/terrapod` and `web/src` into

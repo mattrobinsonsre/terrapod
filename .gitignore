@@ -93,3 +93,10 @@ smoke-*
 # Claude Code session-local files (transient — do not commit)
 .claude/
 .helmrender/
+
+# OCI distribution-spec conformance suite clone (scripts/oci-conformance.sh)
+/.conformance/
+
+# `tilt dump api-docs` output. Root-anchored: a bare `api/` would also match
+# services/terrapod/api/, which is source.
+/api/
