@@ -29,7 +29,11 @@ test.describe('Responsive harness (phone viewport)', () => {
     // inputs to unreadable stubs. The same component renders in the mobile
     // card, so it has to hold up here too.
     const token = getStoredToken()
-    const wsId = await createWorkspace(token, uniqueName('e2erespvault'))
+    // Agent mode: a vault reference only resolves on the listener claim path,
+    // so the source picker is not offered on a local workspace.
+    const wsId = await createWorkspace(token, uniqueName('e2erespvault'), {
+      'execution-mode': 'agent',
+    })
 
     await page.route('**/api/terrapod/v1/vault/availability', (route) =>
       route.fulfill({

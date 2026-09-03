@@ -314,8 +314,9 @@ test.describe('Workspaces', () => {
 
 test.describe('Workspace access tab (#1456)', () => {
   test('shows who can reach the workspace, including the role-free paths', async ({ page }) => {
-    const token = await page.evaluate(() =>
-      JSON.parse(localStorage.getItem('terrapod_auth') || '{}').token);
+    // From the stored auth state, not page.evaluate: before the first goto
+    // the page is about:blank, where reading localStorage is a SecurityError.
+    const token = getStoredToken();
     const name = `acctab${Date.now()}`;
     const res = await page.request.post('/api/v2/organizations/default/workspaces', {
       headers: { 'Content-Type': 'application/vnd.api+json', Authorization: `Bearer ${token}` },
