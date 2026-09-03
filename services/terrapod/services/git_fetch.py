@@ -203,15 +203,28 @@ async def _run_git(
     *,
     cwd: str | None = None,
     auth_header: str | None = None,
+    auth_host: str | None = None,
+    extra_config: list[str] | None = None,
     timeout: float = 300.0,
 ) -> None:
     """Run `git <args>` and raise if it exits non-zero.
 
-    `auth_header` is injected via `-c http.extraheader=...`. We use the
-    inline `-c` flag rather than `git config` so the credential is
-    only ever in this process's memory and a transient command-line
-    argument list — never written to `.git/config` on disk where a
+    `auth_header` is injected via `-c http.<base>.extraheader=...`, scoped to
+    `auth_host`. We use the inline `-c` flag rather than `git config` so the
+    credential is only ever in this process's memory and a transient
+    command-line argument list — never written to `.git/config` on disk where a
     later log scrape might find it.
+
+    The scoping is load-bearing, not tidiness. A bare `http.extraheader`
+    applies to EVERY HTTP request the invocation makes, which was safe only
+    while each invocation talked to exactly one host. A fetch that recurses
+    into submodules does not: `.gitmodules` is repository content, so anyone who
+    can open a pull request could name a host and be sent the connection's
+    token. Scoping to the connection's own host makes that structurally
+    impossible rather than merely unlikely (#1437).
+
+    `extra_config` passes further `-c key=value` entries verbatim, for the
+    `url.<base>.insteadOf` rewrites the submodule fetch needs.
 
     stdout is discarded (git status is communicated via exit code);
     stderr is captured and included in the exception message on failure
@@ -219,12 +232,16 @@ async def _run_git(
     """
     cmd: list[str] = ["git"]
     if auth_header is not None:
+        if not auth_host:
+            raise ValueError("auth_header requires auth_host so the credential can be scoped")
         # `-c key=value` injects a single config entry for the duration
         # of this command. The value is a single argv element; argv is
         # not visible in `ps` for other users in any modern Linux, but
         # the parent process can still read it. Acceptable for our
         # single-tenant API server.
-        cmd += ["-c", f"http.extraheader=Authorization: {auth_header}"]
+        cmd += ["-c", f"http.https://{auth_host}/.extraheader=Authorization: {auth_header}"]
+    for entry in extra_config or []:
+        cmd += ["-c", entry]
     cmd += args
     proc = await asyncio.create_subprocess_exec(
         *cmd,
@@ -308,6 +325,7 @@ async def sparse_archive_to_storage(
             sha,
         ],
         auth_header=auth_header,
+        auth_host=host,
     )
 
     # Step 3: configure sparse-checkout BEFORE checkout. Cone mode
@@ -325,6 +343,7 @@ async def sparse_archive_to_storage(
     await _run_git(
         ["-C", clone_dir, "checkout", "--quiet", sha],
         auth_header=auth_header,
+        auth_host=host,
     )
 
     # Step 5: tar the working tree (excluding .git) and stream to storage.
