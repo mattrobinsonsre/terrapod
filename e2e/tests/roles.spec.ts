@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test';
 
+import { getStoredToken } from '../helpers/api';
+
 test.describe('Roles & Assignments', () => {
   test('roles tab shows built-in roles', async ({ page }) => {
     await page.goto('/admin/roles');
@@ -151,7 +153,9 @@ test.describe('Role reach preview (#1456)', () => {
     page,
   }) => {
     const tag = `reach${Date.now()}`;
-    const token = await page.evaluate(() => JSON.parse(localStorage.getItem('terrapod_auth') || '{}').token);
+    // From the stored auth state, not page.evaluate: before the first goto
+    // the page is about:blank, where reading localStorage is a SecurityError.
+    const token = getStoredToken();
 
     // Two workspaces sharing an allow label; one also carries the label the
     // deny rule will exclude. Created through the API so the test is about the
