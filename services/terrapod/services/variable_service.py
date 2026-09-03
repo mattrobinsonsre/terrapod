@@ -404,10 +404,10 @@ async def count_vault_workspace_variables(db, workspace_id) -> int:
     mode — the local CLI path has no server-side resolution step — so the guard
     must live at every write that can set `execution_mode = local`.
 
-    Counts only the workspace's own `Variable` rows. Vault-sourced *variable-set*
-    variables reaching the workspace are a documented limitation (a varset is
-    workspace-agnostic, and rule-based assignment re-evaluates dynamically, so
-    there is no clean write-time chokepoint) — see docs/vault.md.
+    Counts only the workspace's own `Variable` rows. For the ones arriving through
+    a variable set see :func:`count_vault_varset_variables`; a caller guarding a
+    switch to local execution wants :func:`count_vault_variables_reaching`, which
+    is both.
     """
     from sqlalchemy import func, select
 
@@ -420,3 +420,56 @@ async def count_vault_workspace_variables(db, workspace_id) -> int:
             .where(Variable.workspace_id == workspace_id, Variable.value_source == "vault")
         )
     ) or 0
+
+
+async def count_vault_varset_variables(db, workspace_id) -> int:
+    """Vault-sourced variables reaching a workspace through variable SETS.
+
+    Built on :func:`applicable_varsets` rather than re-deriving which sets apply,
+    so this cannot disagree with what resolution actually injects. A guard that
+    answers a slightly different question from the resolver is worse than no
+    guard: it refuses the wrong writes and permits the ones that matter.
+    """
+    from sqlalchemy import func, select
+
+    from terrapod.db.models import VariableSetVariable
+
+    applicable = await applicable_varsets(db, workspace_id)
+    if not applicable:
+        return 0
+    return (
+        await db.scalar(
+            select(func.count())
+            .select_from(VariableSetVariable)
+            .where(
+                VariableSetVariable.variable_set_id.in_([vs.id for vs, _ in applicable]),
+                VariableSetVariable.value_source == "vault",
+            )
+        )
+    ) or 0
+
+
+async def count_vault_variables_reaching(db, workspace_id) -> int:
+    """Every Vault-sourced variable a workspace would receive, from either source.
+
+    What a switch to local execution has to check: the workspace's own variables
+    AND the ones a variable set delivers. Guarding only the first was #1463 — a
+    set carrying a credential to a local workspace resolved to nothing, silently.
+    """
+    own = await count_vault_workspace_variables(db, workspace_id)
+    return own + await count_vault_varset_variables(db, workspace_id)
+
+
+async def local_workspaces_for_varset(db, varset) -> list:
+    """The local-execution workspaces this set currently reaches.
+
+    A Vault reference cannot resolve on any of them, so writing one into the set
+    is refused while it does. Uses :func:`workspaces_for_varset`, the same
+    blast-radius view the UI shows, so a refusal names workspaces the operator
+    can actually see listed against the set.
+    """
+    return [
+        ws
+        for ws, _how in await workspaces_for_varset(db, varset)
+        if getattr(ws, "execution_mode", "agent") == "local"
+    ]
