@@ -101,3 +101,51 @@ def test_slack_config_defaults_and_nested_env(monkeypatch):
     monkeypatch.setenv("TERRAPOD_SLACK__BOT_TOKEN", "xoxb-from-env")
     s2 = Settings()
     assert s2.slack.bot_token == "xoxb-from-env"
+
+
+@pytest.mark.asyncio
+async def test_a_connect_that_never_returns_is_abandoned(monkeypatch):
+    """`start_slack` is awaited from the API lifespan BEFORE `yield`, so
+    anything that blocks in it stops uvicorn ever binding its port.
+
+    An invalid or expired app token does exactly that: slack_sdk retries
+    internally, so `connect()` neither returns nor raises and the try/except
+    cannot see it. The symptom is a dead port with no error at all — the only
+    clue is slack_sdk's retry logging. The assertion here is simply that
+    `start_slack` RETURNS.
+    """
+    import asyncio
+
+    started = asyncio.Event()
+
+    async def _hangs_forever():
+        started.set()
+        await asyncio.Event().wait()  # never completes, never raises
+
+    client = MagicMock()
+    client.connect = _hangs_forever
+    client.socket_mode_request_listeners = []
+
+    monkeypatch.setattr(slack_service, "_CONNECT_TIMEOUT_SECONDS", 0.05)
+    slack_service._socket_client = None
+
+    mod = MagicMock()
+    mod.SocketModeClient = MagicMock(return_value=client)
+    web = MagicMock()
+    web.AsyncWebClient = MagicMock(return_value=MagicMock())
+    with patch.dict(
+        sys.modules,
+        {
+            "slack_sdk.socket_mode.aiohttp": mod,
+            "slack_sdk.web.async_client": web,
+        },
+    ):
+        await asyncio.wait_for(
+            slack_service.start_slack(
+                _settings(enabled=True, app_token="xapp-x", bot_token="xoxb-x")
+            ),
+            timeout=5,
+        )
+
+    assert started.is_set(), "the connect should have been attempted"
+    assert slack_service._socket_client is None, "a timed-out client must not be left installed"
