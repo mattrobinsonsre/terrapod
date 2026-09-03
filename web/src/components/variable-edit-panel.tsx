@@ -53,7 +53,12 @@ export function VariableEditPanel({
 }) {
   const t = useTranslations('workspaceDetail.variables')
   const tc = useTranslations('workspaceDetail.actions')
-  const isVault = state.source === 'vault'
+  // A git credential is a JSON envelope; a Vault reference resolves to a single
+  // field, so the pair cannot work and the API refuses it (#1439). The category
+  // is editable inside this panel, so the exclusion has to live here rather
+  // than only in the caller's gate.
+  const isGitCat = state.category === 'git_http_auth' || state.category === 'git_ssh_auth'
+  const isVault = state.source === 'vault' && !isGitCat
 
   return (
     <div className="space-y-4">
@@ -84,7 +89,7 @@ export function VariableEditPanel({
             <option value="git_ssh_auth">Git SSH credential{/* i18n-ignore: category value */}</option>
           </select>
         </div>
-        {vaultAvailable && (
+        {vaultAvailable && !isGitCat && (
           <div>
             <label htmlFor={`${idPrefix}-src`} className={LABEL}>{t('valueSource')}</label>
             <select
