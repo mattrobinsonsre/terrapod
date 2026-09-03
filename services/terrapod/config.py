@@ -171,6 +171,21 @@ class RunnerConfig(BaseSettings):
     image_pull_secrets: list[str] = Field(default_factory=list)
     extra_env: list[dict] = Field(default_factory=list)
     extra_env_from: list[dict] = Field(default_factory=list)
+    #: Static /etc/hosts entries for runner pods (#1459). Runners sometimes must
+    #: resolve an internal hostname that cluster DNS does not serve — an admin
+    #: endpoint reachable only by IP, for instance. Pass-through to the PodSpec
+    #: field, same shape Kubernetes takes.
+    host_aliases: list[dict] = Field(default_factory=list)
+    #: Extra volumes and mounts for runner Jobs (#1458), mirroring the api/web/
+    #: listener deployments. Runner Jobs could previously receive secrets only as
+    #: environment variables, but Terraform commonly reads a credential, CA
+    #: bundle or keypair from a FILE — `file("/path/to/token")` in a provider
+    #: block. Without this the workaround is to expose the secret as an env var
+    #: and write it back out in a pre_init hook, which puts the value in the
+    #: process environment (readable via /proc) when a file was all that was
+    #: wanted, and round-trips awkwardly for multiline PEM material.
+    extra_volumes: list[dict] = Field(default_factory=list)
+    extra_volume_mounts: list[dict] = Field(default_factory=list)
     # Forward proxy + custom CA trust bundle (#592). Rendered into runners.yaml
     # by the chart from top-level .Values.proxy / .Values.caBundle. The listener
     # forwards these into every runner Job: proxy env vars (so terraform init can

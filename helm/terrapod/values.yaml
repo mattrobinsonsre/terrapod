@@ -1439,6 +1439,20 @@ runners:
   priorityClassName: ""
   topologySpreadConstraints: []
   podSecurityContext: {}
+  # Static /etc/hosts entries for runner pods (#1459). For an internal hostname
+  # cluster DNS does not serve — an admin endpoint reachable only by IP, say.
+  #   hostAliases:
+  #     - ip: "10.0.0.1"
+  #       hostnames: ["admin.example.internal"]
+  hostAliases: []
+  # Extra volumes/mounts for runner Jobs (#1458), mirroring api/web/listener.
+  # Runner Jobs could otherwise receive secrets only as environment variables,
+  # but Terraform commonly reads a credential, CA bundle or keypair from a FILE
+  # (`file("/path/to/token")` in a provider block). Mounting avoids exposing the
+  # value in the process environment purely to write it back out in a hook.
+  # APPENDED to the volumes the Job already builds, never replacing them.
+  extraVolumes: []
+  extraVolumeMounts: []
   ttlSecondsAfterFinished: 600  # Clean up completed Jobs after 10 min
   terminationGracePeriodSeconds: 120  # Time budget for graceful shutdown + artifact uploads
   tokenTTLSeconds: 3600         # Runner token TTL (default 1 hour)
