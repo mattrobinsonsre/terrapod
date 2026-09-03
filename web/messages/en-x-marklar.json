@@ -941,7 +941,11 @@
       "rulePreview": "{count, plural, =0 {Matches no marklars} one {Matches # marklar} other {Matches # marklars}}",
       "rulePreviewLoading": "Checking which marklars match…",
       "rulePreviewInvalid": "This marklar could not be checked. Marklar will report the exact marklar.",
-      "ruleConflictsWithGlobal": "A global marklar already applies to every marklar, so a marklar cannot be used with it."
+      "ruleConflictsWithGlobal": "A global marklar already applies to every marklar, so a marklar cannot be used with it.",
+      "valueSource": "Marklar marklar",
+      "valueSourceStatic": "Enter a marklar",
+      "valueSourceVault": "Read from Vault",
+      "vaultHint": "Marklar reads the marklar from Vault at marklar. No marklar is stored here."
     }
   },
   "adminAutodiscovery": {

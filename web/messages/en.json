@@ -941,7 +941,11 @@
       "rulePreview": "{count, plural, =0 {Matches no workspaces} one {Matches # workspace} other {Matches # workspaces}}",
       "rulePreviewLoading": "Checking which workspaces match…",
       "rulePreviewInvalid": "This rule could not be checked. Save will report the exact problem.",
-      "ruleConflictsWithGlobal": "A global set already applies to every workspace, so a rule cannot be used with it."
+      "ruleConflictsWithGlobal": "A global set already applies to every workspace, so a rule cannot be used with it.",
+      "valueSource": "Value source",
+      "valueSourceStatic": "Enter a value",
+      "valueSourceVault": "Read from Vault",
+      "vaultHint": "Terrapod reads the secret from Vault at run time. Nothing is stored here."
     }
   },
   "adminAutodiscovery": {

@@ -941,7 +941,11 @@
       "rulePreview": "{count, plural, =0 {Nullis locis operis congruit} one {# loco operis congruit} other {# locis operis congruit}}",
       "rulePreviewLoading": "Inquiritur quae loca operis congruant…",
       "rulePreviewInvalid": "Haec regula probari non potuit. Servatio problema exactum nuntiabit.",
-      "ruleConflictsWithGlobal": "Copia globalis iam omnibus locis operis applicatur, ideo regula cum ea adhiberi non potest."
+      "ruleConflictsWithGlobal": "Copia globalis iam omnibus locis operis applicatur, ideo regula cum ea adhiberi non potest.",
+      "valueSource": "Fons valoris",
+      "valueSourceStatic": "Valorem inserere",
+      "valueSourceVault": "Ex Vault legere",
+      "vaultHint": "Terrapod arcanum ex Vault tempore cursus legit. Nihil hic servatur."
     }
   },
   "adminAutodiscovery": {

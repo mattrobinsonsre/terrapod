@@ -941,7 +941,11 @@
       "rulePreview": "{count, plural, =0 {Nie pasuje do żadnej przestrzeni roboczej} one {Pasuje do # przestrzeni roboczej} few {Pasuje do # przestrzeni roboczych} many {Pasuje do # przestrzeni roboczych} other {Pasuje do # przestrzeni roboczej}}",
       "rulePreviewLoading": "Sprawdzanie pasujących przestrzeni roboczych…",
       "rulePreviewInvalid": "Nie udało się sprawdzić tej reguły. Zapis wskaże dokładny problem.",
-      "ruleConflictsWithGlobal": "Zestaw globalny już obejmuje wszystkie przestrzenie robocze, więc nie można użyć z nim reguły."
+      "ruleConflictsWithGlobal": "Zestaw globalny już obejmuje wszystkie przestrzenie robocze, więc nie można użyć z nim reguły.",
+      "valueSource": "Źródło wartości",
+      "valueSourceStatic": "Wprowadź wartość",
+      "valueSourceVault": "Odczytaj z Vault",
+      "vaultHint": "Terrapod odczytuje sekret z Vault podczas uruchomienia. Nic nie jest tu przechowywane."
     }
   },
   "adminAutodiscovery": {

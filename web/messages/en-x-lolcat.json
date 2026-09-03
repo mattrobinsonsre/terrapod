@@ -941,7 +941,11 @@
       "rulePreview": "{count, plural, =0 {Matchez no werkspacez} one {Matchez # werkspace} other {Matchez # werkspacez}}",
       "rulePreviewLoading": "Chekin wich werkspacez match…",
       "rulePreviewInvalid": "Dis rool coudnt be chekd. Sayvin wil tel u wots rong.",
-      "ruleConflictsWithGlobal": "A globul set alreddy applyz ta evry werkspace, so u cant uze a rool wif it."
+      "ruleConflictsWithGlobal": "A globul set alreddy applyz ta evry werkspace, so u cant uze a rool wif it.",
+      "valueSource": "Valyoo Sors",
+      "valueSourceStatic": "Typ a valyoo",
+      "valueSourceVault": "Reed frum Vault",
+      "vaultHint": "Terrapod reedz da sekrit frum Vault at run tiem. Nuffin iz kept heer."
     }
   },
   "adminAutodiscovery": {

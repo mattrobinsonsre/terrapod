@@ -941,7 +941,11 @@
       "rulePreview": "{count, plural, =0 {با هیچ فضای کاری مطابقت ندارد} other {با # فضای کاری مطابقت دارد}}",
       "rulePreviewLoading": "در حال بررسی فضاهای کاری منطبق…",
       "rulePreviewInvalid": "بررسی این قاعده ممکن نبود. ذخیره‌سازی مشکل دقیق را گزارش می‌دهد.",
-      "ruleConflictsWithGlobal": "مجموعه سراسری از پیش بر همه فضاهای کاری اعمال می‌شود، بنابراین نمی‌توان قاعده‌ای با آن به‌کار برد."
+      "ruleConflictsWithGlobal": "مجموعه سراسری از پیش بر همه فضاهای کاری اعمال می‌شود، بنابراین نمی‌توان قاعده‌ای با آن به‌کار برد.",
+      "valueSource": "منبع مقدار",
+      "valueSourceStatic": "یک مقدار وارد کنید",
+      "valueSourceVault": "خواندن از Vault",
+      "vaultHint": "Terrapod راز را هنگام اجرا از Vault می‌خواند. چیزی اینجا ذخیره نمی‌شود."
     }
   },
   "adminAutodiscovery": {

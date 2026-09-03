@@ -87,5 +87,8 @@
     "path": {
       "catalogClamped": "Catalogue-managed — every non-admin grant is capped at read"
     }
+  },
+  "adminVariableSets": {
+    "detail": {}
   }
 }

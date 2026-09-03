@@ -11,6 +11,8 @@ import { AssignmentRuleEditor, AssignmentRuleSummary, type AssignmentRule } from
 import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
 import { SensitiveValueInput } from '@/components/sensitive-value-input'
+import { VaultReferenceFields, type VaultReferenceValue } from '@/components/vault-reference-fields'
+import { VaultValueDisplay } from '@/components/vault-value-display'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { useConfirm } from '@/lib/use-confirm'
 import { apiFetch, fetchAllPages } from '@/lib/api'
@@ -39,6 +41,7 @@ interface Variable {
     key: string
     value: string
     category: string
+    'value-source'?: string
     hcl: boolean
     sensitive: boolean
     description: string
@@ -102,6 +105,11 @@ export default function VariableSetDetailPage() {
   const [varSensitive, setVarSensitive] = useState(false)
   const [varHcl, setVarHcl] = useState(false)
   const [addingVar, setAddingVar] = useState(false)
+  const [varSource, setVarSource] = useState<'static' | 'vault'>('static')
+  const [varVault, setVarVault] = useState<VaultReferenceValue>({ instance: '', mount: '', path: '', field: '', engine: 'kv2' })
+  const [vaultAvailable, setVaultAvailable] = useState(false)
+  const [vaultInstances, setVaultInstances] = useState<string[]>([])
+  const [vaultDefaultInstance, setVaultDefaultInstance] = useState('')
 
   // Variable editing
   const [editingVarId, setEditingVarId] = useState<string | null>(null)
@@ -111,6 +119,8 @@ export default function VariableSetDetailPage() {
   const [editVarSensitive, setEditVarSensitive] = useState(false)
   const [editVarHcl, setEditVarHcl] = useState(false)
   const [savingVar, setSavingVar] = useState(false)
+  const [editVarSource, setEditVarSource] = useState<'static' | 'vault'>('static')
+  const [editVarVault, setEditVarVault] = useState<VaultReferenceValue>({ instance: '', mount: '', path: '', field: '', engine: 'kv2' })
 
   // Workspaces
   const [workspaces, setWorkspaces] = useState<WorkspaceRef[]>([])
@@ -133,11 +143,27 @@ export default function VariableSetDetailPage() {
     }
   }, [varsetId, t])
 
+  // Vault availability drives whether the source picker is offered — an
+  // affordance, not a gate: a failed probe just hides the option (#1439).
+  const loadVaultAvailability = useCallback(async () => {
+    try {
+      const res = await apiFetch('/api/terrapod/v1/vault/availability')
+      if (!res.ok) return
+      const a = (await res.json()).data?.attributes ?? {}
+      setVaultAvailable(Boolean(a.enabled))
+      setVaultInstances(a.instances ?? [])
+      setVaultDefaultInstance(a['default-instance'] ?? '')
+    } catch {
+      // ignore — the picker simply isn't offered
+    }
+  }, [])
+
   useEffect(() => {
     if (!getAuthState()) { router.push('/login'); return }
     if (!isAdmin()) { router.push('/'); return }
     loadVarset()
-  }, [router, loadVarset])
+    loadVaultAvailability()
+  }, [router, loadVarset, loadVaultAvailability])
 
   usePollingInterval(!loading, 60_000, loadVarset)
 
@@ -147,6 +173,34 @@ export default function VariableSetDetailPage() {
     if (activeTab === 'workspaces') { loadWorkspaces(); loadAllWorkspaces() }
   // eslint-disable-next-line react-hooks/exhaustive-deps -- initial mount load; the loader is a hoisted function declaration recreated each render, so depending on it would re-fetch on every render
   }, [activeTab, varset])
+
+
+  function buildVaultRef(v: VaultReferenceValue): string {
+    const ref: Record<string, string> = {
+      source: 'vault',
+      mount: v.mount.trim(),
+      path: v.path.trim(),
+      field: v.field.trim(),
+    }
+    if (v.instance.trim()) ref.vault = v.instance.trim()
+    if (v.engine !== 'kv2') ref.engine = v.engine
+    return JSON.stringify(ref)
+  }
+
+  function parseVaultRef(value: string): VaultReferenceValue {
+    try {
+      const r = JSON.parse(value)
+      return {
+        instance: r.vault ?? '',
+        mount: r.mount ?? '',
+        path: r.path ?? '',
+        field: r.field ?? '',
+        engine: r.engine === 'dynamic' ? 'dynamic' : 'kv2',
+      }
+    } catch {
+      return { instance: '', mount: '', path: '', field: '', engine: 'kv2' }
+    }
+  }
 
   async function loadVariables() {
     try {
@@ -268,10 +322,13 @@ export default function VariableSetDetailPage() {
             type: 'vars',
             attributes: {
               key: varKey,
-              value: varValue,
+              value: varSource === 'vault' ? buildVaultRef(varVault) : varValue,
               category: varCategory,
-              sensitive: varSensitive,
+              // Vault-sourced is always sensitive (its reference resolves to a
+              // secret); otherwise honour the checkbox.
+              sensitive: varSource === 'vault' ? true : varSensitive,
               hcl: varHcl,
+              'value-source': varSource,
             },
           },
         }),
@@ -285,6 +342,8 @@ export default function VariableSetDetailPage() {
       setVarCategory('terraform')
       setVarSensitive(false)
       setVarHcl(false)
+      setVarSource('static')
+      setVarVault({ instance: '', mount: '', path: '', field: '', engine: 'kv2' })
       setShowAddVar(false)
       await loadVariables()
     } catch (err) {
@@ -297,7 +356,14 @@ export default function VariableSetDetailPage() {
   function startEditingVar(v: Variable) {
     setEditingVarId(v.id)
     setEditVarKey(v.attributes.key)
-    setEditVarValue(v.attributes.sensitive ? '' : v.attributes.value)
+    const src = v.attributes['value-source'] === 'vault' ? 'vault' : 'static'
+    setEditVarSource(src)
+    if (src === 'vault') {
+      setEditVarVault(parseVaultRef(v.attributes.value))
+      setEditVarValue('')
+    } else {
+      setEditVarValue(v.attributes.sensitive ? '' : v.attributes.value)
+    }
     setEditVarCategory(v.attributes.category)
     setEditVarSensitive(v.attributes.sensitive)
     setEditVarHcl(v.attributes.hcl)
@@ -308,13 +374,19 @@ export default function VariableSetDetailPage() {
     setSavingVar(true)
     setError('')
     try {
-      const attrs: Record<string, unknown> = {
+      const isEditVault = editVarSource === 'vault'
+        const attrs: Record<string, unknown> = {
         key: editVarKey,
         category: editVarCategory,
-        sensitive: editVarSensitive,
+        sensitive: isEditVault ? true : editVarSensitive,
         hcl: editVarHcl,
+        'value-source': editVarSource,
       }
-      if (editVarValue !== '') attrs.value = editVarValue
+      if (isEditVault) {
+        attrs.value = buildVaultRef(editVarVault)
+      } else if (editVarValue !== '') {
+        attrs.value = editVarValue
+      }
       const res = await apiFetch(`/api/v2/varsets/${varsetId}/relationships/vars/${editingVarId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/vnd.api+json' },
@@ -574,11 +646,29 @@ export default function VariableSetDetailPage() {
                     <input id="var-key" type="text" value={varKey} onChange={(e) => setVarKey(e.target.value)} required placeholder="AWS_REGION"
                       className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
                   </div>
-                  <div>
-                    <label htmlFor="var-val" className="block text-sm font-medium text-slate-300 mb-1">{t('detail.varValue')}</label>
-                    <SensitiveValueInput id="var-val" value={varValue} onChange={setVarValue} sensitive={varSensitive} placeholder="us-east-1"
-                      rows={2} className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent resize-y" />
-                  </div>
+                  {vaultAvailable && (
+                    <div>
+                      <label htmlFor="var-source" className="block text-sm font-medium text-slate-300 mb-1">{t('detail.valueSource')}</label>
+                      <select id="var-source" value={varSource} onChange={(e) => setVarSource(e.target.value as 'static' | 'vault')}
+                        className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+                        <option value="static">{t('detail.valueSourceStatic')}</option>
+                        <option value="vault">{t('detail.valueSourceVault')}</option>
+                      </select>
+                    </div>
+                  )}
+                  {varSource === 'vault' ? (
+                    <div>
+                      <p className="text-xs text-slate-500 mb-2">{t('detail.vaultHint')}</p>
+                      <VaultReferenceFields idPrefix="add" value={varVault} onChange={setVarVault}
+                        instances={vaultInstances} defaultInstance={vaultDefaultInstance} />
+                    </div>
+                  ) : (
+                    <div>
+                      <label htmlFor="var-val" className="block text-sm font-medium text-slate-300 mb-1">{t('detail.varValue')}</label>
+                      <SensitiveValueInput id="var-val" value={varValue} onChange={setVarValue} sensitive={varSensitive} placeholder="us-east-1"
+                        rows={2} className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent resize-y" />
+                    </div>
+                  )}
                   <div>
                     <label htmlFor="var-cat" className="block text-sm font-medium text-slate-300 mb-1">{t('detail.varCategory')}</label>
                     <select id="var-cat" value={varCategory} onChange={(e) => setVarCategory(e.target.value)}
@@ -633,11 +723,16 @@ export default function VariableSetDetailPage() {
                               className="w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 font-mono focus:outline-none focus:ring-1 focus:ring-brand-500" />
                           </td>
                           <td className="px-4 py-3">
-                            <SensitiveValueInput value={editVarValue} onChange={setEditVarValue}
-                              sensitive={editVarSensitive}
-                              placeholder={editVarSensitive ? t('detail.enterNewValue') : ''}
-                              rows={2}
-                              className="w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 font-mono focus:outline-none focus:ring-1 focus:ring-brand-500 resize-y" />
+                            {editVarSource === 'vault' ? (
+                              <VaultReferenceFields idPrefix={`edit-${editingVarId}`} value={editVarVault} onChange={setEditVarVault}
+                                instances={vaultInstances} defaultInstance={vaultDefaultInstance} />
+                            ) : (
+                              <SensitiveValueInput value={editVarValue} onChange={setEditVarValue}
+                                sensitive={editVarSensitive}
+                                placeholder={editVarSensitive ? t('detail.enterNewValue') : ''}
+                                rows={2}
+                                className="w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 font-mono focus:outline-none focus:ring-1 focus:ring-brand-500 resize-y" />
+                            )}
                           </td>
                           <td className="px-4 py-3 hidden sm:table-cell">
                             <div className="flex items-center gap-3">
@@ -673,7 +768,9 @@ export default function VariableSetDetailPage() {
                         <tr key={v.id} className="hover:bg-slate-700/20 transition-colors">
                           <td className="px-4 py-3 text-sm text-slate-200 font-mono">{v.attributes.key}</td>
                           <td className="px-4 py-3 text-sm text-slate-400 font-mono">
-                            {v.attributes.sensitive ? '***' : (v.attributes.value || <span className="text-slate-600 italic">{t('detail.empty')}</span>)}
+                            {v.attributes['value-source'] === 'vault'
+                                ? <VaultValueDisplay value={v.attributes.value} />
+                                : v.attributes.sensitive ? '***' : (v.attributes.value || <span className="text-slate-600 italic">{t('detail.empty')}</span>)}
                           </td>
                           <td className="px-4 py-3 text-xs text-slate-400 hidden sm:table-cell">
                             <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${

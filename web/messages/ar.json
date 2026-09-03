@@ -941,7 +941,11 @@
       "rulePreview": "{count, plural, =0 {لا يطابق أي مساحة عمل} one {يطابق مساحة عمل واحدة} two {يطابق مساحتي عمل} few {يطابق # مساحات عمل} many {يطابق # مساحة عمل} other {يطابق # مساحة عمل}}",
       "rulePreviewLoading": "جارٍ التحقق من مساحات العمل المطابقة…",
       "rulePreviewInvalid": "تعذر التحقق من هذه القاعدة. سيبلغ الحفظ عن المشكلة بدقة.",
-      "ruleConflictsWithGlobal": "تنطبق المجموعة العامة بالفعل على كل مساحات العمل، لذا لا يمكن استخدام قاعدة معها."
+      "ruleConflictsWithGlobal": "تنطبق المجموعة العامة بالفعل على كل مساحات العمل، لذا لا يمكن استخدام قاعدة معها.",
+      "valueSource": "مصدر القيمة",
+      "valueSourceStatic": "إدخال قيمة",
+      "valueSourceVault": "القراءة من Vault",
+      "vaultHint": "يقرأ Terrapod السر من Vault وقت التشغيل. لا يُخزَّن شيء هنا."
     }
   },
   "adminAutodiscovery": {

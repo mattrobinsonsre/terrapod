@@ -941,7 +941,11 @@
       "rulePreview": "{count, plural, =0 {No coincide con ningún espacio de trabajo} one {Coincide con # espacio de trabajo} other {Coincide con # espacios de trabajo}}",
       "rulePreviewLoading": "Comprobando qué espacios de trabajo coinciden…",
       "rulePreviewInvalid": "No se pudo comprobar esta regla. Al guardar se indicará el problema exacto.",
-      "ruleConflictsWithGlobal": "Un conjunto global ya se aplica a todos los espacios de trabajo, por lo que no admite una regla."
+      "ruleConflictsWithGlobal": "Un conjunto global ya se aplica a todos los espacios de trabajo, por lo que no admite una regla.",
+      "valueSource": "Origen del valor",
+      "valueSourceStatic": "Introducir un valor",
+      "valueSourceVault": "Leer desde Vault",
+      "vaultHint": "Terrapod lee el secreto de Vault en tiempo de ejecución. Aquí no se almacena nada."
     }
   },
   "adminAutodiscovery": {

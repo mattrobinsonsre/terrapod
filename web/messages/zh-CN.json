@@ -941,7 +941,11 @@
       "rulePreview": "{count, plural, =0 {未匹配任何工作区} other {匹配 # 个工作区}}",
       "rulePreviewLoading": "正在检查匹配的工作区…",
       "rulePreviewInvalid": "无法检查此规则。保存时会报告具体问题。",
-      "ruleConflictsWithGlobal": "全局变量集已应用于所有工作区，因此不能同时使用规则。"
+      "ruleConflictsWithGlobal": "全局变量集已应用于所有工作区，因此不能同时使用规则。",
+      "valueSource": "取值来源",
+      "valueSourceStatic": "直接输入值",
+      "valueSourceVault": "从 Vault 读取",
+      "vaultHint": "Terrapod 在运行时从 Vault 读取密钥，此处不存储任何内容。"
     }
   },
   "adminAutodiscovery": {

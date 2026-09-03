@@ -941,7 +941,11 @@
       "rulePreview": "{count, plural, =0 {Matches no workspaces} one {Matches # workspace} other {Matches # workspaces}}",
       "rulePreviewLoading": "Ch3ck1ng wh1ch w0rk5p4c35 m47ch…",
       "rulePreviewInvalid": "7h15 rul3 c0uld n07 b3 ch3ck3d. 54v3 w1ll r3p0r7 7h3 3x4c7 pr0bl3m.",
-      "ruleConflictsWithGlobal": "4 gl0b4l 537 4lr34dy 4ppl135 70 3v3ry w0rk5p4c3, 50 4 rul3 c4nn07 b3 u53d w17h 17."
+      "ruleConflictsWithGlobal": "4 gl0b4l 537 4lr34dy 4ppl135 70 3v3ry w0rk5p4c3, 50 4 rul3 c4nn07 b3 u53d w17h 17.",
+      "valueSource": "V4lu3 50urc3",
+      "valueSourceStatic": "3n73r 4 v4lu3",
+      "valueSourceVault": "R34d fr0m V4ul7",
+      "vaultHint": "73rr4p0d r34d5 7h3 53cr37 fr0m V4ul7 47 run 71m3. N07h1ng 15 570r3d h3r3."
     }
   },
   "adminAutodiscovery": {

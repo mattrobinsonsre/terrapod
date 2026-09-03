@@ -941,7 +941,11 @@
       "rulePreview": "{count, plural, =0 {לא תואם לאף סביבת עבודה} one {תואם לסביבת עבודה אחת} two {תואם ל-# סביבות עבודה} many {תואם ל-# סביבות עבודה} other {תואם ל-# סביבות עבודה}}",
       "rulePreviewLoading": "בודק אילו סביבות עבודה תואמות…",
       "rulePreviewInvalid": "לא ניתן היה לבדוק כלל זה. השמירה תדווח על הבעיה המדויקת.",
-      "ruleConflictsWithGlobal": "ערכה גלובלית כבר חלה על כל סביבות העבודה, ולכן לא ניתן להשתמש בה עם כלל."
+      "ruleConflictsWithGlobal": "ערכה גלובלית כבר חלה על כל סביבות העבודה, ולכן לא ניתן להשתמש בה עם כלל.",
+      "valueSource": "מקור הערך",
+      "valueSourceStatic": "הזן ערך",
+      "valueSourceVault": "קרא מ-Vault",
+      "vaultHint": "Terrapod קורא את הסוד מ-Vault בזמן ההרצה. דבר אינו נשמר כאן."
     }
   },
   "adminAutodiscovery": {

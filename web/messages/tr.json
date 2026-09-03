@@ -941,7 +941,11 @@
       "rulePreview": "{count, plural, =0 {Hiçbir çalışma alanıyla eşleşmiyor} other {# çalışma alanıyla eşleşiyor}}",
       "rulePreviewLoading": "Hangi çalışma alanlarının eşleştiği kontrol ediliyor…",
       "rulePreviewInvalid": "Bu kural denetlenemedi. Kaydettiğinizde sorun tam olarak bildirilecek.",
-      "ruleConflictsWithGlobal": "Genel bir küme zaten tüm çalışma alanlarına uygulanır; bu nedenle kuralla birlikte kullanılamaz."
+      "ruleConflictsWithGlobal": "Genel bir küme zaten tüm çalışma alanlarına uygulanır; bu nedenle kuralla birlikte kullanılamaz.",
+      "valueSource": "Değer kaynağı",
+      "valueSourceStatic": "Bir değer girin",
+      "valueSourceVault": "Vault'tan oku",
+      "vaultHint": "Terrapod gizli değeri çalıştırma sırasında Vault'tan okur. Burada hiçbir şey saklanmaz."
     }
   },
   "adminAutodiscovery": {

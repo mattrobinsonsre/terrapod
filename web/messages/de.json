@@ -941,7 +941,11 @@
       "rulePreview": "{count, plural, =0 {Trifft auf keine Workspaces zu} one {Trifft auf # Workspace zu} other {Trifft auf # Workspaces zu}}",
       "rulePreviewLoading": "Prüfe, welche Workspaces zutreffen …",
       "rulePreviewInvalid": "Diese Regel konnte nicht geprüft werden. Beim Speichern wird das genaue Problem gemeldet.",
-      "ruleConflictsWithGlobal": "Ein globaler Satz gilt bereits für alle Workspaces; eine Regel kann damit nicht kombiniert werden."
+      "ruleConflictsWithGlobal": "Ein globaler Satz gilt bereits für alle Workspaces; eine Regel kann damit nicht kombiniert werden.",
+      "valueSource": "Wertquelle",
+      "valueSourceStatic": "Wert eingeben",
+      "valueSourceVault": "Aus Vault lesen",
+      "vaultHint": "Terrapod liest das Secret zur Laufzeit aus Vault. Hier wird nichts gespeichert."
     }
   },
   "adminAutodiscovery": {
