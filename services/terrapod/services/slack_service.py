@@ -94,6 +94,14 @@ async def start_slack(settings) -> None:
             seconds=_CONNECT_TIMEOUT_SECONDS,
             hint="check the app-level token; the API continues without Slack",
         )
+        # asyncio.wait_for cancels only the connect() coroutine; slack_sdk may
+        # have started a background reconnect task and an aiohttp session that
+        # are NOT tied to it and would leak (and keep retrying) if we merely drop
+        # the reference. Disconnect explicitly before nulling.
+        try:
+            await _socket_client.disconnect()
+        except Exception:  # noqa: BLE001 - best-effort cleanup on an already-bad connect
+            pass
         _socket_client = None
         return
     except Exception as exc:  # noqa: BLE001

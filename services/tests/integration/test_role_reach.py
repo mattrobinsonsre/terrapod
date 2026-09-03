@@ -664,3 +664,103 @@ class TestAgentPoolNamesAreServed:
         ]
         assert attrs["agent-pool-names"] == []
         assert attrs["agent-pool-name"] is None
+
+
+class TestAllAccessEndpointsResolve:
+    """Only /workspaces/{id}/access was tested; the other four kinds resolve
+    their model and id-prefix from a per-kind table (_ACCESS_KINDS). A wrong
+    prefix 422s every valid id and a wrong axis routes catalog through the
+    workspace clamp — both would ship silently."""
+
+    async def _pool(self, client, tag):
+        r = await client.post(
+            "/api/terrapod/v1/agent-pools",
+            json={"data": {"type": "agent-pools", "attributes": {"name": f"acc-pool-{tag}"}}},
+            headers=AUTH,
+        )
+        assert r.status_code == 201, r.text
+        return r.json()["data"]["id"]
+
+    async def _module(self, client, tag):
+        r = await client.post(
+            "/api/terrapod/v1/registry-modules",
+            json={"data": {"attributes": {"name": f"accmod{tag}", "provider": "aws"}}},
+            headers=AUTH,
+        )
+        assert r.status_code == 201, r.text
+        return r.json()["data"]["id"]
+
+    async def test_agent_pool_access_resolves(self, app, client):
+        tag = uuid.uuid4().hex[:8]
+        pid = await self._pool(client, tag)
+        resp = await client.get(f"/api/terrapod/v1/agent-pools/{pid}/access", headers=AUTH)
+        assert resp.status_code == 200, resp.text
+        a = resp.json()["data"]["attributes"]
+        assert a["resource"]["kind"] == "agent-pools"
+        assert a["axis"] == "pool"
+        assert "platform-admin" in a["platform-paths"]
+
+    async def test_registry_module_access_resolves(self, app, client):
+        tag = uuid.uuid4().hex[:8]
+        mid = await self._module(client, tag)
+        resp = await client.get(f"/api/terrapod/v1/registry-modules/{mid}/access", headers=AUTH)
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["data"]["attributes"]["axis"] == "registry"
+
+    async def test_a_bad_id_is_422_not_500(self, app, client):
+        resp = await client.get("/api/terrapod/v1/agent-pools/not-a-uuid/access", headers=AUTH)
+        assert resp.status_code == 422
+
+    async def test_unknown_kind_is_404(self, app, client):
+        resp = await client.get(
+            f"/api/terrapod/v1/nonsense-kind/{uuid.uuid4()}/access", headers=AUTH
+        )
+        assert resp.status_code == 404
+
+
+class TestAccessEndpointsAreGated:
+    """The preview endpoints have 403 coverage; the five /access routes carry
+    the same require_admin_or_audit gate and had none."""
+
+    async def test_a_non_admin_is_refused_at_the_route(self, app, client):
+        from tests.integration.conftest import regular_user, set_auth
+
+        tag = uuid.uuid4().hex[:8]
+        ws_id = await _ws(client, f"accgate-{tag}")
+        set_auth(app, regular_user())
+        try:
+            resp = await client.get(f"/api/terrapod/v1/workspaces/{ws_id}/access", headers=AUTH)
+            assert resp.status_code == 403, resp.text
+        finally:
+            set_auth(app, admin_user())
+
+
+class TestCatalogAxisAndNotes:
+    """The catalog axis and the per-entry notes were both untested. The catalog
+    clamp in the PREVIEW is the security-relevant bit: if it were dropped, a
+    role would be advertised as granting write on a catalog-managed workspace it
+    cannot write — the 'view disagrees with enforcement' failure."""
+
+    async def test_the_everyone_floor_note_appears_on_the_forward_view(self, app, client):
+        tag = uuid.uuid4().hex[:8]
+        await _ws(client, f"note-{tag}", labels={"grp": tag, "access": "everyone"})
+        await _role(
+            client,
+            f"note-role-{tag}",
+            **{"allow-labels": {"grp": tag}, "workspace-permission": "read"},
+        )
+        resp = await client.get(f"/api/terrapod/v1/roles/note-role-{tag}/preview", headers=AUTH)
+        ws = resp.json()["data"]["attributes"]["axes"]["workspace"]["resources"][0]
+        assert "everyone-floor" in ws["notes"], ws
+
+    async def test_the_catalog_axis_is_present_in_the_breakdown(self, app, client):
+        """Even with zero catalog items, the axis key must exist so a consumer
+        reading axes['catalog'] does not KeyError."""
+        tag = uuid.uuid4().hex[:8]
+        await _role(
+            client, f"cat-role-{tag}", **{"allow-labels": {"x": tag}, "catalog-permission": "use"}
+        )
+        resp = await client.get(f"/api/terrapod/v1/roles/cat-role-{tag}/preview", headers=AUTH)
+        axes = resp.json()["data"]["attributes"]["axes"]
+        assert "catalog" in axes
+        assert axes["catalog"]["granted-count"] == 0

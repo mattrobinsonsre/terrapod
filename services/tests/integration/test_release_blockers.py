@@ -1023,3 +1023,65 @@ class TestTheVaultValueActuallyReachesTheRunner:
         body = resp.text
         assert '"mount"' not in body, "the vault reference was delivered instead of the secret"
         assert "apps/x" not in body
+
+
+class TestBulkSwitchToLocalHonoursTheVaultGuard:
+    """B1: the single-workspace PATCH refuses switching an agent workspace with
+    Vault-sourced variables to local (they resolve only on the agent claim path
+    and would silently deliver nothing). The bulk-update path was the way round
+    that guard — a third bypass after the two the first pass closed."""
+
+    async def test_bulk_switch_to_local_is_refused_when_a_vault_var_is_present(self, app, client):
+        set_auth(app, admin_user())
+        tag = uuid.uuid4().hex[:8]
+        ws_id = await _ws(
+            client, f"blkvault-{tag}", labels={"grp": tag}, **{"execution-mode": "agent"}
+        )
+        ref = json.dumps({"mount": "secret", "path": "apps/x", "field": "token"})
+        made = await client.post(
+            f"/api/v2/workspaces/{ws_id}/vars",
+            json={
+                "data": {
+                    "type": "vars",
+                    "attributes": {
+                        "key": "TOK",
+                        "category": "env",
+                        "value-source": "vault",
+                        "value": ref,
+                    },
+                }
+            },
+            headers=AUTH,
+        )
+        assert made.status_code == 201, made.text
+
+        resp = await client.post(
+            "/api/terrapod/v1/workspaces/actions/bulk-update",
+            json={
+                "dry_run": False,
+                "filter": {"labels": {"grp": tag}},
+                "update": {"execution-mode": "local"},
+            },
+            headers=AUTH,
+        )
+        assert resp.status_code == 422, resp.text
+        assert f"blkvault-{tag}" in resp.json()["detail"]
+
+        # And the workspace was NOT switched (all-or-nothing).
+        got = await client.get(f"/api/v2/workspaces/{ws_id}", headers=AUTH)
+        assert got.json()["data"]["attributes"]["execution-mode"] == "agent"
+
+    async def test_bulk_switch_to_local_is_fine_without_vault_vars(self, app, client):
+        set_auth(app, admin_user())
+        tag = uuid.uuid4().hex[:8]
+        await _ws(client, f"blkplain-{tag}", labels={"grp": tag}, **{"execution-mode": "agent"})
+        resp = await client.post(
+            "/api/terrapod/v1/workspaces/actions/bulk-update",
+            json={
+                "dry_run": False,
+                "filter": {"labels": {"grp": tag}},
+                "update": {"execution-mode": "local"},
+            },
+            headers=AUTH,
+        )
+        assert resp.status_code == 200, resp.text

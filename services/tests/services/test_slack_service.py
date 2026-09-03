@@ -124,6 +124,7 @@ async def test_a_connect_that_never_returns_is_abandoned(monkeypatch):
 
     client = MagicMock()
     client.connect = _hangs_forever
+    client.disconnect = AsyncMock()
     client.socket_mode_request_listeners = []
 
     monkeypatch.setattr(slack_service, "_CONNECT_TIMEOUT_SECONDS", 0.05)
@@ -149,3 +150,7 @@ async def test_a_connect_that_never_returns_is_abandoned(monkeypatch):
 
     assert started.is_set(), "the connect should have been attempted"
     assert slack_service._socket_client is None, "a timed-out client must not be left installed"
+    # The orphaned-session leak (S3): the timed-out client must be disconnected,
+    # not merely dropped — asyncio.wait_for cancels only connect(), leaving
+    # slack_sdk's background reconnect + aiohttp session running otherwise.
+    client.disconnect.assert_awaited()

@@ -306,9 +306,14 @@ async def preview_role_reach(
     only workspaces would answer a quarter of the question while looking
     complete.
 
-    Counts are aggregates over the whole estate rather than over the returned
-    page: an operator needs "this rule reaches 4,200 workspaces" to be true,
-    not truncated to whatever fitted.
+    The three top-level counts (`granted-count` / `denied-count` /
+    `matched-count`) are CROSS-AXIS totals — summed over workspaces, pools,
+    registry and catalog — and over the whole estate, not the returned page.
+    The per-axis figures live under `axes`. `workspaces` / `denied` /
+    `denied-truncated` at the top level are the WORKSPACE axis promoted for
+    convenience (what the editor leads with); they are NOT the denominator of
+    the cross-axis counts. A consumer wanting the workspace count reads
+    `axes["workspace"]["granted-count"]`.
     """
     assert_viewer_sees_everything(viewer_roles)
     axes = {

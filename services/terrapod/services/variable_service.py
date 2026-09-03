@@ -391,3 +391,32 @@ async def _get_applicable_varsets(
 ) -> list[VariableSet]:
     """Variable sets applicable to a workspace, for one precedence tier."""
     return [vs for vs, _ in await applicable_varsets(db, workspace_id, priority=priority)]
+
+
+async def count_vault_workspace_variables(db, workspace_id) -> int:
+    """How many of a workspace's OWN variables read from Vault.
+
+    Used by every path that switches a workspace to `local` execution to refuse
+    the switch: Vault references resolve only on the agent claim path
+    (`resolve_vault_variables` in `next_run`), and a local run never resolves
+    variables server-side at all, so a Vault-sourced variable on a local
+    workspace silently delivers nothing. There is no runtime backstop for local
+    mode — the local CLI path has no server-side resolution step — so the guard
+    must live at every write that can set `execution_mode = local`.
+
+    Counts only the workspace's own `Variable` rows. Vault-sourced *variable-set*
+    variables reaching the workspace are a documented limitation (a varset is
+    workspace-agnostic, and rule-based assignment re-evaluates dynamically, so
+    there is no clean write-time chokepoint) — see docs/vault.md.
+    """
+    from sqlalchemy import func, select
+
+    from terrapod.db.models import Variable
+
+    return (
+        await db.scalar(
+            select(func.count())
+            .select_from(Variable)
+            .where(Variable.workspace_id == workspace_id, Variable.value_source == "vault")
+        )
+    ) or 0

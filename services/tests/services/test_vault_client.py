@@ -445,7 +445,7 @@ class TestASealedVaultIsTransientNotFatal:
     """
 
     @pytest.mark.asyncio
-    @pytest.mark.parametrize("status", [500, 502, 503, 504, 429, 473])
+    @pytest.mark.parametrize("status", [500, 502, 503, 504, 429, 473, 412])
     async def test_a_transient_status_raises_VaultUnavailable(self, status):
         rec = _Recorder([(status, {})])
         with _patched(rec), pytest.raises(VaultUnavailable):
