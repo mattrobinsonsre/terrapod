@@ -20,6 +20,7 @@ import (
 
 	terrapod "github.com/mattrobinsonsre/terrapod/go-terrapod"
 	"github.com/mattrobinsonsre/terrapod/provider/internal/client"
+	"github.com/mattrobinsonsre/terrapod/provider/internal/planmods"
 )
 
 type variableSetVariableModel struct {
@@ -77,7 +78,7 @@ func (r *variableSetVariableResource) Schema(_ context.Context, _ resource.Schem
 					"only the provider attribute is deprecated.",
 				PlanModifiers: []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()},
 			},
-			"sensitive":   schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(false), Description: "Mark as sensitive (value will not be returned by API)."},
+			"sensitive":   schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(false), Description: "Mark as sensitive (value will not be returned by API).", PlanModifiers: []planmodifier.Bool{planmods.SensitiveForSecretBearingVariable()}},
 			"description": schema.StringAttribute{Optional: true, Description: "Description."},
 			"value_source": schema.StringAttribute{
 				Optional: true, Computed: true, Default: stringdefault.StaticString("static"),
