@@ -697,6 +697,19 @@ test.describe('Tablet width (md–lg dead-zone, #839)', () => {
 })
 
 test.describe('Role reach panel (#1456)', () => {
+  test('the reverse access view fits a phone without scrolling the page sideways', async ({ page }) => {
+    // The other half of #1456: "who can reach this workspace", rendered on the
+    // workspace access tab. New surface in this release, so it carries a guard
+    // like the forward panel does.
+    const token = getStoredToken()
+    const wsId = await createWorkspace(token, uniqueName('e2erespaccess'))
+
+    await page.goto(`/workspaces/${wsId}?tab=access`)
+    const panel = page.getByTestId('resource-access')
+    await expect(panel).toBeVisible({ timeout: 15_000 })
+    await expectNoHorizontalPageScroll(page)
+  })
+
   test('the reach panel fits a phone without scrolling the page sideways', async ({ page }) => {
     await page.goto('/admin/roles');
     await expectNoHorizontalPageScroll(page);
