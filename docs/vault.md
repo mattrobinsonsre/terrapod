@@ -360,8 +360,17 @@ this path.
 
 - **Agent execution only.** The reference is resolved server-side when a runner
   claims the run, so a local-execution workspace has no point at which it could
-  happen. Creating a Vault-sourced variable on one is refused rather than
-  silently resolving to nothing.
+  happen. Creating a Vault-sourced **workspace** variable on one is refused
+  rather than silently resolving to nothing, and switching a workspace that
+  holds one to local execution is refused for the same reason.
+
+  A **variable set** cannot be checked the same way: a set is not bound to a
+  workspace — it may have no assignments yet, or reach many workspaces through a
+  label rule — so there is no workspace to test at the point of writing. A set
+  carrying a Vault reference that reaches a local-execution workspace therefore
+  resolves to nothing *on that workspace*, silently. Agent-mode workspaces in
+  the same set are unaffected. Enforcement at assignment time is tracked in
+  #1463.
 - **Leases are not renewed or revoked.** A dynamic credential is minted per run
   and left to expire. Set the Vault role's TTL to suit your run durations.
 - **No file materialization yet.** Values are delivered as environment or
