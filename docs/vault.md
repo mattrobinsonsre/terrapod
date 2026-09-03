@@ -230,9 +230,29 @@ resource "terrapod_variable" "netbox_token" {
 }
 ```
 
-Put it in a `terrapod_variable_set` instead to define it once and apply it to
-many workspaces — with an [assignment rule](api-reference.md#assignment-rules)
-it can target them by label rather than one by one.
+The same `value_source` works on a variable inside a **variable set**, which is
+how you define a reference once and apply it to many workspaces. Note the
+attribute is on `terrapod_variable_set_variable` — the variable *within* the set
+— not on `terrapod_variable_set` itself:
+
+```hcl
+resource "terrapod_variable_set_variable" "netbox_token" {
+  varset_id    = terrapod_variable_set.shared.id
+  key          = "NETBOX_TOKEN"
+  category     = "env"
+  value_source = "vault"
+  value = jsonencode({
+    mount = "secret"
+    path  = "apps/netbox"
+    field = "apitoken"
+  })
+}
+```
+
+With an [assignment rule](api-reference.md#assignment-rules) the set can target
+workspaces by label rather than one by one, so a single reference covers a whole
+population. Resolution happens per run, per workspace, exactly as it does for a
+workspace variable — the set is only how the reference is distributed.
 
 ---
 
