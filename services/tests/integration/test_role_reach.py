@@ -523,3 +523,105 @@ class TestAllowAll:
         await _role(client, f"aan-role-{tag}", **{"workspace-permission": "read"})
         got = await client.get(f"/api/terrapod/v1/roles/aan-role-{tag}", headers=AUTH)
         assert got.json()["data"]["attributes"]["allow-all"] is False
+
+
+class TestAllowAllIsHonouredByEnforcement:
+    """The preview advertises estate-wide reach; the gate must actually grant
+    it, and must still refuse a denied resource. Both directions matter: the
+    first is the feature, the second is the safety property."""
+
+    async def test_the_gate_grants_on_an_unrelated_resource(self, app, client):
+        from terrapod.services.capability_resolver import MATCH_ALLOWED, role_match_verdict
+
+        tag = uuid.uuid4().hex[:8]
+        await _role(client, f"aag-{tag}", **{"allow-all": True, "workspace-permission": "read"})
+        async with get_db_session() as db:
+            role = await db.get(Role, f"aag-{tag}")
+            verdict, reason = role_match_verdict(role, "some-unrelated-name", {"any": "labels"})
+            assert (verdict, reason) == (MATCH_ALLOWED, "allow-all")
+
+    async def test_deny_beats_allow_all_AT_THE_GATE_not_just_in_the_sql(self, app, client):
+        """The ordering invariant is a comment in `role_match_verdict`; the
+        SQL-level test cannot see it, because `granted_query` computes deny
+        independently. Move the allow_all check above the deny block and only
+        this test notices."""
+        from terrapod.services.capability_resolver import MATCH_DENIED, role_match_verdict
+
+        tag = uuid.uuid4().hex[:8]
+        await _role(
+            client,
+            f"aad2-{tag}",
+            **{
+                "allow-all": True,
+                "deny-labels": {"sealed": ["yes"]},
+                "workspace-permission": "admin",
+            },
+        )
+        async with get_db_session() as db:
+            role = await db.get(Role, f"aad2-{tag}")
+            verdict, reason = role_match_verdict(role, "anything", {"sealed": "yes"})
+            assert verdict == MATCH_DENIED, "deny must win over an estate-wide grant"
+            assert reason == "deny-label:sealed=yes"
+
+    async def test_a_holder_actually_resolves_capabilities_everywhere(self, app, client):
+        """End of the chain: a principal holding an allow_all role resolves real
+        capabilities on a workspace whose labels match nothing."""
+        from terrapod.api.dependencies import AuthenticatedUser
+        from terrapod.db.models import Workspace
+        from terrapod.services.workspace_rbac_service import resolve_workspace_capabilities_for
+
+        tag = uuid.uuid4().hex[:8]
+        ws_id = await _ws(client, f"aacap-{tag}")  # no labels at all
+        await _role(client, f"aacap-{tag}", **{"allow-all": True, "workspace-permission": "write"})
+        user = AuthenticatedUser(
+            email=f"holder-{tag}@example.com",
+            display_name="Holder",
+            roles=[f"aacap-{tag}"],
+            provider_name="local",
+            auth_method="session",
+        )
+        async with get_db_session() as db:
+            ws = await db.get(Workspace, uuid.UUID(ws_id.removeprefix("ws-")))
+            caps = await resolve_workspace_capabilities_for(db, user, ws)
+        assert "run:apply" in caps, caps
+
+
+class TestRegistryAxisPaging:
+    """The registry axis spans two models. Paging them independently returned
+    up to twice the page size while skipping rows."""
+
+    async def test_a_page_never_exceeds_its_size_across_two_models(self, app, client):
+        tag = uuid.uuid4().hex[:8]
+        for i in range(3):
+            for kind in ("modules", "providers"):
+                made = await client.post(
+                    f"/api/terrapod/v1/registry-{kind}",
+                    json={
+                        "data": {
+                            "attributes": {
+                                "name": f"rp-{kind[:3]}-{tag}-{i}",
+                                "provider": "aws",
+                                "labels": {"grp": tag},
+                            }
+                        }
+                    },
+                    headers=AUTH,
+                )
+                # Asserted: without it a failed create leaves nothing to page
+                # and the size assertion below passes vacuously.
+                assert made.status_code == 201, made.text
+        await _role(
+            client,
+            f"regpage-{tag}",
+            **{"allow-labels": {"grp": tag}, "registry-permission": "read"},
+        )
+        resp = await client.get(
+            f"/api/terrapod/v1/roles/regpage-{tag}/preview?page[size]=2", headers=AUTH
+        )
+        reg = resp.json()["data"]["attributes"]["axes"]["registry"]
+        # The count must span both models, or the page assertion is meaningless.
+        assert reg["granted-count"] == 6, reg
+        assert len(reg["resources"]) <= 2, (
+            f"page[size]=2 returned {len(reg['resources'])} — the two registry models "
+            "were paged independently"
+        )

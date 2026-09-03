@@ -3072,7 +3072,7 @@
     "restoreAgainConfirm": "\"{name}\" has already been hauled back from the deep, into {existing}.\n\nHaulin'' her back again spawns a SECOND vessel carryin'' the same state lineage over the same waters. An apply aboard either will then make the other''s next plan read like the whole fleet has drifted.\n\nOnly sail on if the earlier salvaged vessel be sunk."
   },
   "roleReach": {
-    "title": "Work-decks this rule be reachin''",
+    "title": "What this rank be reachin''",
     "checking": "Searchin''…",
     "failed": "Could not reckon what this rule be reachin''.",
     "noAllowRules": "Add an allow label or an allow name t'' spy which work-decks this rank would reach.",

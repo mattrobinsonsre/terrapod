@@ -3072,7 +3072,7 @@
     "restoreAgainConfirm": "«{name}» iam restitutum est, in {existing}.\n\nIterum restituere SECUNDUM workspace creat, idem status genus super eandem infrastructuram tenens. Apply in alterutro deinde efficiet ut alterius consilium proximum velut universa aberratio appareat.\n\nSolum perge si workspace prius restitutum abiit."
   },
   "roleReach": {
-    "title": "Loca operis quae haec regula attingit",
+    "title": "Quae haec persona attingit",
     "checking": "Inspicitur…",
     "failed": "Quantum haec regula attingat determinari non potuit.",
     "noAllowRules": "Adde titulum vel nomen permissum ut videas quae loca operis haec persona attingat.",

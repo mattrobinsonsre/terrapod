@@ -225,12 +225,22 @@ export function RoleReachPanel({ rule }: { rule: RoleRule }) {
         <>
           <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 mb-3">
             <span className="text-sm text-slate-200">
-              <span className="text-lg font-semibold tabular-nums">{reach['granted-count']}</span>{' '}
+              <span
+                data-testid="reach-granted-count"
+                className="text-lg font-semibold tabular-nums"
+              >
+                {reach['granted-count']}
+              </span>{' '}
               {t('granted')}
             </span>
             {reach['denied-count'] > 0 && (
               <span className="text-sm text-red-300">
-                <span className="text-lg font-semibold tabular-nums">{reach['denied-count']}</span>{' '}
+                <span
+                  data-testid="reach-denied-count"
+                  className="text-lg font-semibold tabular-nums"
+                >
+                  {reach['denied-count']}
+                </span>{' '}
                 {t('deniedCount')}
               </span>
             )}
@@ -254,7 +264,7 @@ export function RoleReachPanel({ rule }: { rule: RoleRule }) {
                       </span>
                     </h5>
                     {block.resources.length > 0 && (
-                      <ul>
+                      <ul data-testid="reach-granted-list">
                         {block.resources.map((w) => (
                           <WorkspaceRow key={w.id} ws={w} />
                         ))}
@@ -275,7 +285,7 @@ export function RoleReachPanel({ rule }: { rule: RoleRule }) {
                         <h6 className="text-xs font-medium text-red-300 mb-1">
                           {t('excludedByDeny')}
                         </h6>
-                        <ul>
+                        <ul data-testid="reach-denied-list">
                           {block.denied.map((w) => (
                             <WorkspaceRow key={w.id} ws={w} />
                           ))}

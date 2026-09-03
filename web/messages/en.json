@@ -3072,7 +3072,7 @@
     "restoreAgainConfirm": "\"{name}\" has already been restored, into {existing}.\n\nRestoring it again creates a SECOND workspace holding the same state lineage over the same infrastructure. Applying in either will then make the other's next plan look like wholesale drift.\n\nOnly continue if the earlier restored workspace is gone."
   },
   "roleReach": {
-    "title": "Workspaces this reaches",
+    "title": "What this role reaches",
     "checking": "Checking…",
     "failed": "Could not work out what this rule reaches.",
     "noAllowRules": "Add an allow label or an allow name to see which workspaces this role would reach.",

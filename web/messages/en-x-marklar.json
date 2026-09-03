@@ -3072,7 +3072,7 @@
     "restoreAgainConfirm": "\"{name}\" has already been restored, into {existing}.\n\nRestoring it again creates a SECOND marklar holding the same marklar marklar over the same marklar. Applying in either will then make the other''s next marklar look like wholesale marklar.\n\nOnly continue if the earlier restored marklar is gone."
   },
   "roleReach": {
-    "title": "Marklars this reaches",
+    "title": "What this marklar reaches",
     "checking": "Checking…",
     "failed": "Could not work out what this marklar reaches.",
     "noAllowRules": "Add an allow marklar or an allow marklar to see which marklars this marklar would reach.",

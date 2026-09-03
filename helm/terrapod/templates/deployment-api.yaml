@@ -160,6 +160,7 @@ spec:
                   name: {{ .existingSecret | default (printf "%s-%s" (include "terrapod.fullname" $) .name) }}
                   key: {{ .existingSecretKey | default "client_secret" }}
             {{- end }}
+            {{- if .Values.api.config.vault }}
             {{- range .Values.api.config.vault.instances }}
             {{- if .existingSecret }}
             # Vault approle secret_id / static token (#1439). A credential, so
@@ -175,6 +176,7 @@ spec:
                 secretKeyRef:
                   name: {{ .existingSecret }}
                   key: {{ .existingSecretKey | default "secret" }}
+            {{- end }}
             {{- end }}
             {{- end }}
             {{- if .Values.api.config.vcs.github.existingSecret }}

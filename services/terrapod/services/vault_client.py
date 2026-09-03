@@ -67,6 +67,28 @@ class VaultUnavailable(VaultError):
     """
 
 
+#: HTTP statuses that mean "Vault cannot answer right now", as opposed to
+#: "Vault has answered and the answer is no".
+#:
+#: A SEALED Vault replies 503 to everything, and a restarting or unsealing one
+#: does the same — which is the single most common transient case there is, and
+#: the one the whole VaultUnavailable/VaultTransient path was built for. Until
+#: this classifier existed only TRANSPORT failures were treated as transient, so
+#: `vault operator seal` still errored every queued run in the estate: the design
+#: worked for a Vault that was unreachable and not for one that was merely shut.
+#:
+#: 501 is an uninitialised Vault, 429/473 a standby or performance-standby node
+#: — all of them answer properly once the cluster settles.
+#:
+#: Everything else (403 denied, 404 missing, other 4xx) is a real answer and
+#: stays permanent: retrying it forever would hide a misconfigured reference.
+_TRANSIENT_STATUSES = frozenset({429, 473})
+
+
+def _is_transient_status(status: int) -> bool:
+    return status >= 500 or status in _TRANSIENT_STATUSES
+
+
 def _as_vault_error(exc: Exception, what: str, inst_name: str) -> VaultUnavailable:
     """Convert a transport or decode failure into a VaultError.
 
@@ -149,11 +171,14 @@ async def _login(inst: VaultInstanceConfig, static_token: str | None) -> str:
     except (httpx.HTTPError, OSError) as e:
         raise _as_vault_error(e, "login", inst.name) from e
     if resp.status_code != 200:
-        raise VaultError(
+        detail = (
             f"Vault login failed for instance {inst.name!r} "
             f"({method} auth, mount {inst.auth.mount!r}, role {inst.auth.role!r}): "
             f"HTTP {resp.status_code}"
         )
+        if _is_transient_status(resp.status_code):
+            raise VaultUnavailable(detail)
+        raise VaultError(detail)
     try:
         auth = resp.json().get("auth") or {}
     except ValueError as e:
@@ -281,10 +306,13 @@ async def read_secret(
         # error_message, readable by anyone with run-read, and a third party's
         # response body is not ours to forward there. The status and the path
         # are what diagnose it.
-        raise VaultError(
+        detail = (
             f"Vault read of {read_path!r} on instance {inst.name!r} failed with "
             f"HTTP {resp.status_code}"
         )
+        if _is_transient_status(resp.status_code):
+            raise VaultUnavailable(detail)
+        raise VaultError(detail)
 
     try:
         body = resp.json().get("data") or {}

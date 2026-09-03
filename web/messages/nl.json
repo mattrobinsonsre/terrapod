@@ -3072,7 +3072,7 @@
     "restoreAgainConfirm": "“{name}” is al hersteld, naar {existing}.\n\nOpnieuw herstellen maakt een TWEEDE workspace met dezelfde state-lijn over dezelfde infrastructuur. Een apply in een van beide laat het volgende plan van de ander er dan uitzien als volledige drift.\n\nGa alleen verder als de eerder herstelde workspace verdwenen is."
   },
   "roleReach": {
-    "title": "Workspaces die dit bereikt",
+    "title": "Wat deze rol bereikt",
     "checking": "Bezig met controleren…",
     "failed": "Kon niet bepalen wat deze regel bereikt.",
     "noAllowRules": "Voeg een toegestaan label of een toegestane naam toe om te zien welke workspaces deze rol zou bereiken.",

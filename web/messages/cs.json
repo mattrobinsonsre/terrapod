@@ -3072,7 +3072,7 @@
     "restoreAgainConfirm": "„{name}“ už byl obnoven, do {existing}.\n\nDalší obnovení vytvoří DRUHÝ workspace se stejnou linií stavu nad stejnou infrastrukturou. Apply v kterémkoli z nich pak způsobí, že další plán toho druhého bude vypadat jako rozsáhlý drift.\n\nPokračujte jen tehdy, pokud dříve obnovený workspace už neexistuje."
   },
   "roleReach": {
-    "title": "Pracovní prostory v dosahu",
+    "title": "Co tato role zasahuje",
     "checking": "Ověřování…",
     "failed": "Nepodařilo se zjistit dosah tohoto pravidla.",
     "noAllowRules": "Přidejte povolující štítek nebo název, abyste viděli, které pracovní prostory by tato role zasáhla.",

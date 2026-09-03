@@ -180,18 +180,22 @@ test.describe('Role reach preview (#1456)', () => {
     await expect(panel).toBeVisible();
 
     await page.fill('#r-allow-labels', `squad=${tag}`);
-    // Both workspaces match the allow rule.
-    await expect(panel.getByText('2', { exact: false })).toBeVisible({ timeout: 15_000 });
-    await expect(panel.getByText(`${tag}-keep`)).toBeVisible({ timeout: 15_000 });
-    await expect(panel.getByText(`${tag}-drop`)).toBeVisible();
+    // Assert the COUNT element, not a loose text match: `tag` is a timestamp,
+    // so getByText('2') matched a digit in a workspace name and proved nothing.
+    await expect(panel.getByTestId('reach-granted-count')).toHaveText('2', { timeout: 15_000 });
+    const granted = panel.getByTestId('reach-granted-list');
+    await expect(granted.getByText(`${tag}-keep`)).toBeVisible();
+    await expect(granted.getByText(`${tag}-drop`)).toBeVisible();
 
-    // Adding the deny rule moves one of them into the excluded list — the
-    // feedback that makes a deny rule safe to write.
+    // Adding the deny rule must MOVE one of them, so assert both sides: it left
+    // the granted list and arrived in the denied one. Asserting only that it is
+    // still visible somewhere passes even if the deny rule is ignored entirely.
     await page.fill('#r-deny-labels', 'sealed=yes');
-    await expect(panel.getByText(`${tag}-drop`)).toBeVisible({ timeout: 15_000 });
-    await expect(panel.getByText(/denied/i).first()).toBeVisible();
-    // The kept one is still granted.
-    await expect(panel.getByText(`${tag}-keep`)).toBeVisible();
+    await expect(panel.getByTestId('reach-granted-count')).toHaveText('1', { timeout: 15_000 });
+    await expect(panel.getByTestId('reach-denied-count')).toHaveText('1');
+    await expect(granted.getByText(`${tag}-drop`)).toHaveCount(0);
+    await expect(granted.getByText(`${tag}-keep`)).toBeVisible();
+    await expect(panel.getByTestId('reach-denied-list').getByText(`${tag}-drop`)).toBeVisible();
   });
 
   test('a rule with no allow side is reported as reaching nothing', async ({ page }) => {
@@ -199,9 +203,12 @@ test.describe('Role reach preview (#1456)', () => {
     await page.click('button:has-text("Create Role")');
     const panel = page.getByTestId('role-reach');
     await expect(panel).toBeVisible();
-    // Deny alone grants nothing, so the panel must not imply a reach.
+    // Deny alone grants nothing, so the panel must not imply a reach. Assert
+    // the ABSENCE of a count rather than the presence of the word "allow",
+    // which appears in the panel's static labels whatever the state.
     await page.fill('#r-deny-labels', 'env=prod');
-    await expect(panel).toContainText(/allow/i);
+    await expect(panel.getByTestId('reach-granted-count')).toHaveCount(0);
+    await expect(panel.getByTestId('reach-granted-list')).toHaveCount(0);
   });
 });
 
@@ -213,8 +220,9 @@ test.describe('Estate-wide grant (#1456)', () => {
     const panel = page.getByTestId('role-reach');
     await expect(panel).toBeVisible();
 
-    // With no allow rule at all there is nothing to reach...
-    await expect(panel).toContainText(/allow/i);
+    // With no allow rule at all there is nothing to reach — asserted as the
+    // absence of a count, not the presence of the word "allow".
+    await expect(panel.getByTestId('reach-granted-count')).toHaveCount(0);
 
     // ...but allow-all needs no rule, and must announce itself: a role that
     // reaches everything looking like one that reaches nothing is the failure

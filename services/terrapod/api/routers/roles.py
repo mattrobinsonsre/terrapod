@@ -22,7 +22,12 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from terrapod.api.dependencies import AuthenticatedUser, require_admin, require_admin_or_audit
+from terrapod.api.dependencies import (
+    AuthenticatedUser,
+    effective_platform_roles,
+    require_admin,
+    require_admin_or_audit,
+)
 from terrapod.api.pagination import paginate
 from terrapod.auth.builtin_roles import BUILTIN_ROLES, is_builtin_role
 from terrapod.auth.capabilities import (
@@ -397,7 +402,7 @@ async def preview_unsaved_role(
     role = _role_from_attrs(attrs)
     limit, offset = _preview_page(request)
     result = await role_reach_service.preview_role_reach(
-        db, role, limit=limit, offset=offset, viewer_roles=user.roles
+        db, role, limit=limit, offset=offset, viewer_roles=sorted(effective_platform_roles(user))
     )
     return JSONResponse(content=_preview_json(role.name, result))
 
@@ -427,7 +432,7 @@ async def preview_saved_role(
         raise HTTPException(status_code=404, detail=f"Role '{role_name}' not found")
     limit, offset = _preview_page(request)
     reach = await role_reach_service.preview_role_reach(
-        db, role, limit=limit, offset=offset, viewer_roles=user.roles
+        db, role, limit=limit, offset=offset, viewer_roles=sorted(effective_platform_roles(user))
     )
     return JSONResponse(content=_preview_json(role.name, reach))
 
@@ -500,7 +505,9 @@ async def workspace_access(
     user: AuthenticatedUser = Depends(require_admin_or_audit),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
-    return await _resource_access(db, "workspaces", resource_id, user.roles)
+    return await _resource_access(
+        db, "workspaces", resource_id, sorted(effective_platform_roles(user))
+    )
 
 
 @router.get("/agent-pools/{resource_id}/access")
@@ -509,7 +516,9 @@ async def agent_pool_access(
     user: AuthenticatedUser = Depends(require_admin_or_audit),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
-    return await _resource_access(db, "agent-pools", resource_id, user.roles)
+    return await _resource_access(
+        db, "agent-pools", resource_id, sorted(effective_platform_roles(user))
+    )
 
 
 @router.get("/registry-modules/{resource_id}/access")
@@ -518,7 +527,9 @@ async def registry_module_access(
     user: AuthenticatedUser = Depends(require_admin_or_audit),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
-    return await _resource_access(db, "registry-modules", resource_id, user.roles)
+    return await _resource_access(
+        db, "registry-modules", resource_id, sorted(effective_platform_roles(user))
+    )
 
 
 @router.get("/registry-providers/{resource_id}/access")
@@ -527,7 +538,9 @@ async def registry_provider_access(
     user: AuthenticatedUser = Depends(require_admin_or_audit),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
-    return await _resource_access(db, "registry-providers", resource_id, user.roles)
+    return await _resource_access(
+        db, "registry-providers", resource_id, sorted(effective_platform_roles(user))
+    )
 
 
 @router.get("/catalog-items/{resource_id}/access")
@@ -536,7 +549,9 @@ async def catalog_item_access(
     user: AuthenticatedUser = Depends(require_admin_or_audit),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
-    return await _resource_access(db, "catalog-items", resource_id, user.roles)
+    return await _resource_access(
+        db, "catalog-items", resource_id, sorted(effective_platform_roles(user))
+    )
 
 
 workspace_access.__doc__ = _ACCESS_DOC

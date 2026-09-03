@@ -3072,7 +3072,7 @@
     "restoreAgainConfirm": "\"{name}\" chochoHta''bogh {existing} Daq.\n\nlatlh chochoH ''e'' chenmoHlu''chugh, cha''DIch workspace chenlu'', rap state tlhegh, rap infrastructure Daq. wa'' Daq apply Dalo''chugh, latlh nab veb Dalegh ''ej Hoch drift rur.\n\nvaj taH neH wej workspace chochoHta''bogh Hegh''a''."
   },
   "roleReach": {
-    "title": "Qumwo'mey SanID",
+    "title": "SanIDbogh Dochmey patlhvam",
     "checking": "wInejtaH…",
     "failed": "chutvam SanID SovlaHbe'lu'.",
     "noAllowRules": "per pagh pong chaw'bogh yIchel, Qumwo'mey SanIDbogh patlhvam DaleghmeH.",

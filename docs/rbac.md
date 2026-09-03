@@ -293,8 +293,8 @@ The response reports:
 
 | Field | Meaning |
 |---|---|
-| `granted-count` | Workspaces the role grants on — **counted across the whole fleet**, not the returned page |
-| `denied-count` | Workspaces an allow rule matched and a deny rule then removed |
+| `granted-count` | Resources the role grants on, **summed across every axis** (workspaces, agent pools, registry items, catalog items) and counted over the whole estate, not the returned page. Per-axis figures are under `axes` |
+| `denied-count` | Resources an allow rule matched and a deny rule then removed, likewise summed across axes |
 | `matched-count` | The two added together: everything the allow rules touched |
 | `workspaces` | One page of the granted set |
 | `denied` | A bounded sample of what the deny rules excluded |
@@ -487,7 +487,7 @@ The eight released keys — `pool`, `mode`, `backend`, `drift`, `version`, `vcs`
 
 **Those eight are now usable as ordinary labels.** The change is additive — no label that worked before stops working — and it lets label-based targeting, which is Terrapod's answer to grouping workspaces, use the vocabulary you actually reach for. Should a released key ever warrant a virtual filter term, it will take a distinct name (`pool-name:`) rather than break labels already in use; the house convention is that a new facet rides `status:` as a *value*, as `status:locked` and `status:unhealthy` both do.
 
-If you have an existing label with one of the reserved keys, reads and existing rows continue to work, but the next create or update of that resource that includes the reserved key in its `labels` field will be rejected with a 422 that names the offending key. Migrate by renaming — for example, swap `version: 1.11` for `tf-version: 1.11` (or drop it if the same data is already on `terraform_version`).
+If you have an existing label with one of the reserved keys, reads and existing rows continue to work, but the next create or update of that resource that includes the reserved key in its `labels` field will be rejected with a 422 that names the offending key. Migrate by renaming — for example, swap `status: live` for `state: live`. (Earlier releases suggested renaming `version`; that key is no longer reserved, so it needs no change.)
 
 The list lives in `terrapod.services.label_validation.RESERVED_LABEL_KEYS`. Adding to it is a behaviour change for any deployment with existing labels using the new key — update both the constant and this table together.
 
