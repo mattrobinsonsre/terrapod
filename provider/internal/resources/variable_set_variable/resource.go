@@ -19,6 +19,7 @@ import (
 
 	terrapod "github.com/mattrobinsonsre/terrapod/go-terrapod"
 	"github.com/mattrobinsonsre/terrapod/provider/internal/client"
+	"github.com/mattrobinsonsre/terrapod/provider/internal/planmods"
 )
 
 type variableSetVariableModel struct {
@@ -64,7 +65,7 @@ func (r *variableSetVariableResource) Schema(_ context.Context, _ resource.Schem
 			"value":       schema.StringAttribute{Optional: true, Sensitive: true, Description: "Variable value. Sensitive variables are write-only."},
 			"category":    schema.StringAttribute{Required: true, Description: "Category: terraform, env, git_http_auth, or git_ssh_auth.", PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
 			"hcl":         schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(false), Description: "Parse value as HCL."},
-			"sensitive":   schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(false), Description: "Mark as sensitive (value will not be returned by API)."},
+			"sensitive":   schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(false), Description: "Mark as sensitive (value will not be returned by API).", PlanModifiers: []planmodifier.Bool{planmods.SensitiveForSecretBearingVariable()}},
 			"description": schema.StringAttribute{Optional: true, Description: "Description."},
 			"value_source": schema.StringAttribute{
 				Optional: true, Computed: true, Default: stringdefault.StaticString("static"),

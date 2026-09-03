@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page, type Route } from '@playwright/test';
 import { getStoredToken, createWorkspace, uniqueName } from '../helpers/api';
 
 const API_URL = process.env.API_URL || 'http://localhost:8000';
@@ -216,23 +216,65 @@ test.describe('Assignment rule editor (regression for the inert-save bug)', () =
     }).toPass({ timeout: 10_000 })
   })
 
-  test('a variable set offers the Vault source when Vault is enabled (#1439)', async ({ page }) => {
-    // The "define once, apply to many" path: a Vault-backed credential set on a
-    // variable SET, reachable from the UI (not only via the API/SDK).
+})
+
+test.describe('Variable set Vault source (#1439)', () => {
+  /** Pretend the deployment has Vault configured. The e2e stack deliberately
+   *  does not — TERRAPOD_VAULT__ENABLED is unset and the config default is
+   *  False — which is what makes the "not offered" test below real, and what
+   *  made an unstubbed version of this suite fail deterministically. */
+  async function withVault(page: Page, instances = ['default'], defaultInstance = 'default') {
+    await page.route('**/api/terrapod/v1/vault/availability', (route: Route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            type: 'vault-availability',
+            id: 'vault',
+            attributes: {
+              enabled: true,
+              instances,
+              'default-instance': defaultInstance,
+            },
+          },
+        }),
+      }),
+    )
+  }
+
+  async function makeVarset(page: Page): Promise<string> {
     const token = getStoredToken()
-    const vsName = uniqueName('e2e-vault-vs')
     const res = await page.request.post(`${API_URL}/api/v2/organizations/default/varsets`, {
       headers: { 'Content-Type': 'application/vnd.api+json', Authorization: `Bearer ${token}` },
-      data: { data: { attributes: { name: vsName } } },
+      data: { data: { attributes: { name: uniqueName('e2e-vault-vs') } } },
     })
     expect(res.status()).toBe(201)
-    const vsId = (await res.json()).data.id
+    return (await res.json()).data.id
+  }
+
+  test('the source picker is not offered when Vault is not configured', async ({ page }) => {
+    // Unstubbed: the stack really has no Vault, so this asserts the gate rather
+    // than a mock of it. Offering a source that cannot resolve would let an
+    // operator save a reference that silently produces nothing at run time.
+    const vsId = await makeVarset(page)
+    await page.goto(`/admin/variable-sets/${vsId}?tab=variables`)
+    await page.click('button:has-text("Add Variable")')
+
+    await expect(page.locator('#var-val')).toBeVisible()
+    await expect(page.locator('#var-source')).toHaveCount(0)
+  })
+
+  test('a variable set offers the Vault source when Vault is enabled', async ({ page }) => {
+    // The "define once, apply to many" path: a Vault-backed credential set on a
+    // variable SET, reachable from the UI (not only via the API/SDK).
+    const vsId = await makeVarset(page)
+    await withVault(page)
 
     await page.goto(`/admin/variable-sets/${vsId}?tab=variables`)
     await page.click('button:has-text("Add Variable")')
 
-    // The source picker is offered because the local stack has Vault enabled;
-    // choosing it swaps the value box for the reference builder.
+    // Choosing the source swaps the value box for the reference builder.
     await page.locator('#var-source').selectOption('vault')
     await expect(page.locator('#add-mount')).toBeVisible()
     await expect(page.locator('#var-val')).toHaveCount(0)
