@@ -126,8 +126,10 @@ test.describe('Responsive harness (phone viewport)', () => {
     // category column lives, so the card has to carry key, value AND category.
     await expect(card.getByText('resp-value')).toBeVisible()
     await expect(card.getByText('env')).toBeVisible()
-    // The desktop table must not be the thing rendering at this width.
-    await expect(page.locator('table')).toHaveCount(0)
+    // The desktop table must not be the thing rendering at this width. It is
+    // still in the DOM — `hidden md:block` hides it with CSS rather than
+    // unmounting it — so this counts VISIBLE tables, not elements.
+    await expect(page.locator('table:visible')).toHaveCount(0)
     await expectNoHorizontalPageScroll(page)
   })
 
