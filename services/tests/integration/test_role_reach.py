@@ -625,3 +625,42 @@ class TestRegistryAxisPaging:
             f"page[size]=2 returned {len(reg['resources'])} — the two registry models "
             "were paged independently"
         )
+
+
+class TestAgentPoolNamesAreServed:
+    """A workspace's pools must be renderable without fetching the pool list.
+
+    The web read-only view resolved names only from a list it fetched when
+    entering EDIT mode, so before that every pool rendered as a bare
+    `apool-<uuid>` — a UUID as the default thing an operator sees on the
+    configuration tab. The server already had the names.
+    """
+
+    async def test_the_workspace_serializer_emits_names_matching_the_ids(self, app, client):
+        tag = uuid.uuid4().hex[:8]
+        pool = await client.post(
+            "/api/terrapod/v1/agent-pools",
+            json={"data": {"type": "agent-pools", "attributes": {"name": f"named-pool-{tag}"}}},
+            headers=AUTH,
+        )
+        assert pool.status_code == 201, pool.text
+        pool_id = pool.json()["data"]["id"]
+
+        ws_id = await _ws(client, f"poolname-{tag}", **{"agent-pool-ids": [pool_id]})
+        got = await client.get(f"/api/v2/workspaces/{ws_id}", headers=AUTH)
+        attrs = got.json()["data"]["attributes"]
+
+        assert attrs["agent-pool-ids"] == [pool_id]
+        # Positional: the Nth name describes the Nth id.
+        assert attrs["agent-pool-names"] == [f"named-pool-{tag}"], attrs["agent-pool-names"]
+        # The singular back-compat projection still describes element 0.
+        assert attrs["agent-pool-name"] == f"named-pool-{tag}"
+
+    async def test_a_workspace_with_no_pool_gets_an_empty_list_not_null(self, app, client):
+        tag = uuid.uuid4().hex[:8]
+        ws_id = await _ws(client, f"nopool-{tag}")
+        attrs = (await client.get(f"/api/v2/workspaces/{ws_id}", headers=AUTH)).json()["data"][
+            "attributes"
+        ]
+        assert attrs["agent-pool-names"] == []
+        assert attrs["agent-pool-name"] is None

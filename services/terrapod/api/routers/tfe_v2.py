@@ -813,6 +813,17 @@ def _workspace_json(
                 "agent-pool-id": f"apool-{ws_pools[0]}" if ws_pools else None,
                 "agent-pool-ids": [f"apool-{p}" for p in ws_pools],
                 "agent-pool-name": (ws_pool_names[0] if ws_pool_names else None),
+                # Names for the WHOLE set, positionally matching
+                # `agent-pool-ids`. `agent-pool-name` above is the singular
+                # back-compat projection and only ever describes element 0.
+                #
+                # Emitted because the alternative is every consumer fetching
+                # the entire pool list purely to turn ids into labels — which
+                # the web UI did only when entering edit mode, so the read-only
+                # view rendered raw `apool-<uuid>` and nothing else. The names
+                # are already resolved here; withholding them made a UUID the
+                # default thing an operator sees.
+                "agent-pool-names": list(ws_pool_names),
                 "vcs-connection-name": ws.vcs_connection.name if ws.vcs_connection else None,
                 "labels": ws.labels or {},
                 # `tag-names` is what OpenTofu/Terraform's cloud backend

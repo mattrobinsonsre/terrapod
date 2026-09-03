@@ -76,6 +76,7 @@ type workspaceModel struct {
 	AutoMergeStrategy             types.String `tfsdk:"auto_merge_strategy"`
 	AgentPoolID                   types.String `tfsdk:"agent_pool_id"`
 	AgentPoolIDs                  types.List   `tfsdk:"agent_pool_ids"`
+	AgentPoolNames                types.List   `tfsdk:"agent_pool_names"`
 	VarFiles                      types.List   `tfsdk:"var_files"`
 	TriggerPrefixes               types.List   `tfsdk:"trigger_prefixes"`
 	DriftIgnoreRules              types.List   `tfsdk:"drift_ignore_rules"`
