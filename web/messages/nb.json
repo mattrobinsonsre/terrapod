@@ -941,7 +941,11 @@
       "rulePreview": "{count, plural, =0 {Treffer ingen arbeidsområder} one {Treffer # arbeidsområde} other {Treffer # arbeidsområder}}",
       "rulePreviewLoading": "Sjekker hvilke arbeidsområder som treffer …",
       "rulePreviewInvalid": "Denne regelen kunne ikke sjekkes. Lagring viser det nøyaktige problemet.",
-      "ruleConflictsWithGlobal": "Et globalt sett gjelder allerede for alle arbeidsområder, så en regel kan ikke brukes sammen med det."
+      "ruleConflictsWithGlobal": "Et globalt sett gjelder allerede for alle arbeidsområder, så en regel kan ikke brukes sammen med det.",
+      "valueSource": "Verdikilde",
+      "valueSourceStatic": "Skriv inn en verdi",
+      "valueSourceVault": "Les fra Vault",
+      "vaultHint": "Terrapod leser hemmeligheten fra Vault ved kjøring. Ingenting lagres her."
     }
   },
   "adminAutodiscovery": {

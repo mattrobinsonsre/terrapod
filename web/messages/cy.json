@@ -941,7 +941,11 @@
       "rulePreview": "{count, plural, =0 {Nid yw'n cydweddu ag unrhyw weithfan} one {Yn cydweddu â # gweithfan} two {Yn cydweddu â # weithfan} few {Yn cydweddu â # gweithfan} many {Yn cydweddu â # gweithfan} other {Yn cydweddu â # gweithfan}}",
       "rulePreviewLoading": "Yn gwirio pa weithfannau sy'n cydweddu…",
       "rulePreviewInvalid": "Ni ellid gwirio'r rheol hon. Bydd cadw yn nodi'r union broblem.",
-      "ruleConflictsWithGlobal": "Mae set fyd-eang eisoes yn berthnasol i bob gweithfan, felly ni ellir defnyddio rheol gyda hi."
+      "ruleConflictsWithGlobal": "Mae set fyd-eang eisoes yn berthnasol i bob gweithfan, felly ni ellir defnyddio rheol gyda hi.",
+      "valueSource": "Ffynhonnell gwerth",
+      "valueSourceStatic": "Rhowch werth",
+      "valueSourceVault": "Darllen o Vault",
+      "vaultHint": "Mae Terrapod yn darllen y gyfrinach o Vault adeg rhedeg. Ni chedwir dim yma."
     }
   },
   "adminAutodiscovery": {

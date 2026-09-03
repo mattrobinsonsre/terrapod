@@ -941,7 +941,11 @@
       "rulePreview": "{count, plural, =0 {一致するワークスペースはありません} other {# 個のワークスペースに一致}}",
       "rulePreviewLoading": "一致するワークスペースを確認しています…",
       "rulePreviewInvalid": "このルールは確認できませんでした。保存時に具体的な問題が表示されます。",
-      "ruleConflictsWithGlobal": "グローバルの変数セットはすでに全ワークスペースに適用されるため、ルールは併用できません。"
+      "ruleConflictsWithGlobal": "グローバルの変数セットはすでに全ワークスペースに適用されるため、ルールは併用できません。",
+      "valueSource": "値のソース",
+      "valueSourceStatic": "値を入力",
+      "valueSourceVault": "Vault から読み取る",
+      "vaultHint": "Terrapod は実行時に Vault からシークレットを読み取ります。ここには保存されません。"
     }
   },
   "adminAutodiscovery": {

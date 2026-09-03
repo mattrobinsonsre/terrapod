@@ -941,7 +941,11 @@
       "rulePreview": "{count, plural, =0 {Não corresponde a nenhuma área de trabalho} one {Corresponde a # área de trabalho} other {Corresponde a # áreas de trabalho}}",
       "rulePreviewLoading": "A verificar que áreas de trabalho correspondem…",
       "rulePreviewInvalid": "Não foi possível verificar esta regra. Ao guardar, o problema exato será indicado.",
-      "ruleConflictsWithGlobal": "Um conjunto global já se aplica a todas as áreas de trabalho, pelo que não aceita uma regra."
+      "ruleConflictsWithGlobal": "Um conjunto global já se aplica a todas as áreas de trabalho, pelo que não aceita uma regra.",
+      "valueSource": "Origem do valor",
+      "valueSourceStatic": "Introduzir um valor",
+      "valueSourceVault": "Ler do Vault",
+      "vaultHint": "O Terrapod lê o segredo do Vault durante a execução. Nada é armazenado aqui."
     }
   },
   "adminAutodiscovery": {

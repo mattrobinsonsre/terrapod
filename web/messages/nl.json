@@ -941,7 +941,11 @@
       "rulePreview": "{count, plural, =0 {Komt met geen enkele workspace overeen} one {Komt overeen met # workspace} other {Komt overeen met # workspaces}}",
       "rulePreviewLoading": "Controleren welke workspaces overeenkomen…",
       "rulePreviewInvalid": "Deze regel kon niet worden gecontroleerd. Bij opslaan wordt het precieze probleem gemeld.",
-      "ruleConflictsWithGlobal": "Een globale set geldt al voor elke workspace, dus een regel kan er niet bij."
+      "ruleConflictsWithGlobal": "Een globale set geldt al voor elke workspace, dus een regel kan er niet bij.",
+      "valueSource": "Waardebron",
+      "valueSourceStatic": "Waarde invoeren",
+      "valueSourceVault": "Uit Vault lezen",
+      "vaultHint": "Terrapod leest het geheim tijdens de run uit Vault. Hier wordt niets opgeslagen."
     }
   },
   "adminAutodiscovery": {

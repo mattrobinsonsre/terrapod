@@ -941,7 +941,11 @@
       "rulePreview": "{count, plural, =0 {pagh Qumwo' rur} one {# Qumwo'' rur} other {# Qumwo''mey rur}}",
       "rulePreviewLoading": "Qumwo' rurbogh wInejtaH…",
       "rulePreviewInvalid": "chutvam wInoHlaHbe'. DaQaw'DI' Qagh Sovlu'.",
-      "ruleConflictsWithGlobal": "Hoch Qumwo'vaD Segh Hoch lo'lu'chugh, chut lo'laHbe'."
+      "ruleConflictsWithGlobal": "Hoch Qumwo'vaD Segh Hoch lo'lu'chugh, chut lo'laHbe'.",
+      "valueSource": "qach Dat",
+      "valueSourceStatic": "qach yIQtIv",
+      "valueSourceVault": "Vault-vo' yIlaD",
+      "vaultHint": "QaptaHvIS Vault-vo' pegh laD Terrapod. naDev pagh pollu'."
     }
   },
   "adminAutodiscovery": {

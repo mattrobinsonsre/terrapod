@@ -215,4 +215,26 @@ test.describe('Assignment rule editor (regression for the inert-save bug)', () =
       expect(rule.labels.e2eeditor).toBe(wsName)
     }).toPass({ timeout: 10_000 })
   })
+
+  test('a variable set offers the Vault source when Vault is enabled (#1439)', async ({ page }) => {
+    // The "define once, apply to many" path: a Vault-backed credential set on a
+    // variable SET, reachable from the UI (not only via the API/SDK).
+    const token = getStoredToken()
+    const vsName = uniqueName('e2e-vault-vs')
+    const res = await page.request.post(`${API_URL}/api/v2/organizations/default/varsets`, {
+      headers: { 'Content-Type': 'application/vnd.api+json', Authorization: `Bearer ${token}` },
+      data: { data: { attributes: { name: vsName } } },
+    })
+    expect(res.status()).toBe(201)
+    const vsId = (await res.json()).data.id
+
+    await page.goto(`/admin/variable-sets/${vsId}?tab=variables`)
+    await page.click('button:has-text("Add Variable")')
+
+    // The source picker is offered because the local stack has Vault enabled;
+    // choosing it swaps the value box for the reference builder.
+    await page.locator('#var-source').selectOption('vault')
+    await expect(page.locator('#add-mount')).toBeVisible()
+    await expect(page.locator('#var-val')).toHaveCount(0)
+  })
 })

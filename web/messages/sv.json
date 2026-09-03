@@ -941,7 +941,11 @@
       "rulePreview": "{count, plural, =0 {Matchar inga arbetsytor} one {Matchar # arbetsyta} other {Matchar # arbetsytor}}",
       "rulePreviewLoading": "Kontrollerar vilka arbetsytor som matchar …",
       "rulePreviewInvalid": "Den här regeln kunde inte kontrolleras. Sparande visar det exakta problemet.",
-      "ruleConflictsWithGlobal": "En global uppsättning gäller redan alla arbetsytor, så en regel kan inte användas med den."
+      "ruleConflictsWithGlobal": "En global uppsättning gäller redan alla arbetsytor, så en regel kan inte användas med den.",
+      "valueSource": "Värdekälla",
+      "valueSourceStatic": "Ange ett värde",
+      "valueSourceVault": "Läs från Vault",
+      "vaultHint": "Terrapod läser hemligheten från Vault vid körning. Inget lagras här."
     }
   },
   "adminAutodiscovery": {

@@ -341,6 +341,7 @@ resource terrapod_variable_set_variable.sensitive required=false optional=true c
 resource terrapod_variable_set_variable.structured required=false optional=true computed=true sensitive=false type=basetypes.BoolType
 resource terrapod_variable_set_variable.updated_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_variable_set_variable.value required=false optional=true computed=false sensitive=true type=basetypes.StringType
+resource terrapod_variable_set_variable.value_source required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_variable_set_variable.varset_id required=true optional=false computed=false sensitive=false type=basetypes.StringType
 resource terrapod_variable_set_variable.version_id required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_variable_set_workspace.id required=false optional=false computed=true sensitive=false type=basetypes.StringType

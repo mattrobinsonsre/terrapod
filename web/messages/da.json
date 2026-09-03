@@ -941,7 +941,11 @@
       "rulePreview": "{count, plural, =0 {Matcher ingen workspaces} one {Matcher # workspace} other {Matcher # workspaces}}",
       "rulePreviewLoading": "Kontrollerer, hvilke workspaces der matcher …",
       "rulePreviewInvalid": "Denne regel kunne ikke kontrolleres. Gem viser det præcise problem.",
-      "ruleConflictsWithGlobal": "Et globalt sæt gælder allerede for alle workspaces, så en regel kan ikke bruges sammen med det."
+      "ruleConflictsWithGlobal": "Et globalt sæt gælder allerede for alle workspaces, så en regel kan ikke bruges sammen med det.",
+      "valueSource": "Værdikilde",
+      "valueSourceStatic": "Indtast en værdi",
+      "valueSourceVault": "Læs fra Vault",
+      "vaultHint": "Terrapod læser hemmeligheden fra Vault ved kørsel. Intet gemmes her."
     }
   },
   "adminAutodiscovery": {

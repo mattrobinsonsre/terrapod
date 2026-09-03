@@ -941,7 +941,11 @@
       "rulePreview": "{count, plural, =0 {Ei vastaa yhtään työtilaa} one {Vastaa # työtilaa} other {Vastaa # työtilaa}}",
       "rulePreviewLoading": "Tarkistetaan, mitkä työtilat vastaavat…",
       "rulePreviewInvalid": "Tätä sääntöä ei voitu tarkistaa. Tallennus kertoo tarkan ongelman.",
-      "ruleConflictsWithGlobal": "Yleinen joukko koskee jo kaikkia työtiloja, joten sen kanssa ei voi käyttää sääntöä."
+      "ruleConflictsWithGlobal": "Yleinen joukko koskee jo kaikkia työtiloja, joten sen kanssa ei voi käyttää sääntöä.",
+      "valueSource": "Arvon lähde",
+      "valueSourceStatic": "Syötä arvo",
+      "valueSourceVault": "Lue Vaultista",
+      "vaultHint": "Terrapod lukee salaisuuden Vaultista ajon aikana. Mitään ei tallenneta tänne."
     }
   },
   "adminAutodiscovery": {
