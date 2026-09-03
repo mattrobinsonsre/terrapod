@@ -643,7 +643,9 @@
       "allowLabelsShort": "Labels, Allow",
       "allowNamesShort": "Names, Allow",
       "denyLabelsShort": "Labels, Deny",
-      "denyNamesShort": "Names, Deny"
+      "denyNamesShort": "Names, Deny",
+      "allowAll": "On everything, grant",
+      "allowAllHelp": "Every resource it matches, ones created later included. Apply still, deny rules do. Rather than labelling every workspace, use this — outside the role a workspace created without the label would silently fall."
     },
     "assignForm": {
       "provider": "Provider",
@@ -714,7 +716,8 @@
       "deleteRole": "Delete the role, it did not",
       "setAssignment": "Set the assignment, it did not",
       "setAssignmentStatus": "Set the assignment, it did not ({status})",
-      "deleteAssignment": "Delete the assignment, it did not"
+      "deleteAssignment": "Delete the assignment, it did not",
+      "conflictingLabelKeys": "More than one value, {keys} is given. One value per key a label rule holds, so silently replace the earlier ones the last would. Supported by the API, several values for one key are, but set here yet they cannot be."
     }
   },
   "adminVcs": {
@@ -938,7 +941,11 @@
       "rulePreview": "{count, plural, =0 {No workspaces, this matches} one {# workspace, this matches} other {# workspaces, this matches}}",
       "rulePreviewLoading": "Which workspaces match, checking I am…",
       "rulePreviewInvalid": "Checked, this rule could not be. Report the exact problem, saving will.",
-      "ruleConflictsWithGlobal": "To every workspace, a global set already applies. Used with it, a rule cannot be."
+      "ruleConflictsWithGlobal": "To every workspace, a global set already applies. Used with it, a rule cannot be.",
+      "valueSource": "Source, value",
+      "valueSourceStatic": "A value, enter",
+      "valueSourceVault": "From Vault, read",
+      "vaultHint": "From Vault at run time, the secret Terrapod reads. Stored here, nothing is."
     }
   },
   "adminAutodiscovery": {
@@ -2254,7 +2261,8 @@
       "cost": "Cost",
       "architecture": "Architecture",
       "insights": "Insights",
-      "automation": "Automation"
+      "automation": "Automation",
+      "access": "Access"
     },
     "lifecycle": {
       "pendingDeletion": "Deletion, pending",
@@ -3063,5 +3071,54 @@
     "restoreConfirm": "The state of \"{name}\", restore you would?\n\nA NEW workspace, this creates — back the original comes not. With auto-apply and drift detection off it returns, and no VCS connection; back its variables and run history come not. Only the state, recovered is.",
     "restoreDone": "Into the new workspace \"{name}\", {versions, plural, one {# state version} other {# state versions}} recovered were. Before auto-apply or VCS you enable, its settings check you must.",
     "restoreAgainConfirm": "Already restored, \"{name}\" has been — into {existing}.\n\nA SECOND workspace, restoring it again creates; the same state lineage over the same infrastructure, it holds. Look like wholesale drift, the other''s next plan then will, if apply in either you do.\n\nOnly if gone the earlier restored workspace is, continue you should."
+  },
+  "roleReach": {
+    "title": "Reaches, what this role",
+    "checking": "Checking, I am…",
+    "failed": "What this rule reaches, work out I could not.",
+    "noAllowRules": "An allow label or an allow name, add you must — which workspaces this role would reach, to see.",
+    "granted": "granted",
+    "deniedCount": "denied",
+    "matched": "By the allow rules, {count} matched",
+    "andMore": "…and more, {count}",
+    "excludedByDeny": "By the deny rules, excluded",
+    "reason": {
+      "allowName": "named",
+      "denyName": "By name, denied",
+      "allowLabel": "{rule}, matches it",
+      "denyLabel": "By {rule}, denied"
+    },
+    "note": {
+      "catalogClamped": "Catalog-managed — at read, capped",
+      "everyoneFloor": "By everyone, readable",
+      "hasOwner": "Admin, already the owner has"
+    },
+    "reachesNothing": "Nothing, this rule reaches.",
+    "allowAllBanner": "On every resource, grants. Apply still, deny rules do.",
+    "axis": {
+      "workspace": "Workspaces",
+      "pool": "Agent pools",
+      "registry": "Registry",
+      "catalog": "Catalog items"
+    }
+  },
+  "resourceAccess": {
+    "title": "Reach this, who can",
+    "subtitle": "Roles whose rules match this workspace, and holding them, the people.",
+    "loading": "Loading…",
+    "failed": "Who can reach this, work out I could not.",
+    "forbidden": "The whole estate this answer spans, so only to platform admins and auditors is it shown.",
+    "noRoles": "This workspace, no role''s rules match.",
+    "deniedRoles": "Matched, then by a deny rule excluded",
+    "alsoReachable": "Without any role, reachable also",
+    "heldBy": "By {who}, held",
+    "heldByNobody": "By nobody held — in practice nothing grants",
+    "path": {
+      "platformAdmin": "Every resource, platform admins reach",
+      "platformAudit": "Every resource, platform auditors can read",
+      "owner": "Admin here, the owner holds",
+      "everyoneFloor": "access: everyone, labelled — by anyone readable",
+      "catalogClamped": "Catalog-managed — at read, every non-admin grant is capped"
+    }
   }
 }

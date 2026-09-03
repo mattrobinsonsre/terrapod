@@ -15,7 +15,12 @@ import pytest
 
 from terrapod.config import VaultInstanceConfig
 from terrapod.services import vault_client
-from terrapod.services.vault_client import VaultError, read_secret, reset_token_cache
+from terrapod.services.vault_client import (
+    VaultError,
+    VaultUnavailable,
+    read_secret,
+    reset_token_cache,
+)
 
 
 def _inst(**kw) -> VaultInstanceConfig:
@@ -37,7 +42,12 @@ class _Recorder:
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
         self.seen.append(request)
-        status, body = self.replies.pop(0) if self.replies else (200, {})
+        # Sticky on the last scripted reply rather than falling back to 200.
+        # The retry helper re-issues on 5xx, and a synthetic success after the
+        # script ran out made a failure test pass for the wrong reason.
+        if self.replies:
+            self._last = self.replies.pop(0)
+        status, body = getattr(self, "_last", (200, {}))
         return httpx.Response(status, json=body)
 
 
@@ -267,3 +277,202 @@ class TestKubernetesAuth:
         ):
             with pytest.raises(VaultError, match="only works when Terrapod runs in-cluster"):
                 await read_secret(inst, mount="kvv2", path="a", field="k")
+
+
+class TestTheAllowListCannotBeWalkedOutOf:
+    """The allow-list is documented as refusing reads outside its prefixes
+    *whatever the policy permits*. It was bypassable two ways, and the person
+    who writes the reference is anyone with write on one workspace."""
+
+    @pytest.mark.parametrize(
+        "path",
+        [
+            "apps/../../../sys/mounts",  # httpx normalises the dots away
+            "apps/../secrets/prod",
+            "apps/./../../sys/policy/root",
+        ],
+    )
+    @pytest.mark.asyncio
+    async def test_dot_segments_are_refused_before_any_request(self, path):
+        # httpx resolves `..` when it builds the URL, so a check on the raw
+        # string guards a path Vault never sees.
+        rec = _Recorder([])
+        with _patched(rec), pytest.raises(VaultError):
+            await read_secret(
+                _inst(paths=["kvv2/apps"]), mount="kvv2", path=path, field="k", static_token="t"
+            )
+        assert rec.seen == [], "a traversal reference reached Vault"
+
+    @pytest.mark.asyncio
+    async def test_dot_segments_are_refused_even_with_no_allow_list(self):
+        """Traversal is malformed regardless of whether an allow-list is set —
+        otherwise the default configuration is the permissive one."""
+        rec = _Recorder([])
+        with _patched(rec), pytest.raises(VaultError):
+            await read_secret(
+                _inst(), mount="kvv2", path="apps/../../sys/mounts", field="k", static_token="t"
+            )
+        assert rec.seen == []
+
+    @pytest.mark.asyncio
+    async def test_a_prefix_must_match_on_a_path_segment(self):
+        """`kvv2/apps` must not grant `kvv2/apps-secret` — a bare string prefix
+        silently widens the allow-list to sibling paths."""
+        rec = _Recorder([])
+        for path in ("apps-secret/prod", "appsomething", "apps-admin"):
+            with _patched(rec), pytest.raises(VaultError, match="allow-list"):
+                await read_secret(
+                    _inst(paths=["kvv2/apps"]),
+                    mount="kvv2",
+                    path=path,
+                    field="k",
+                    static_token="t",
+                )
+        assert rec.seen == []
+
+    @pytest.mark.asyncio
+    async def test_the_intended_subtree_still_works(self):
+        """The refusals above are worthless if they also break the real case."""
+        rec = _Recorder([(200, {"data": {"data": {"k": "v"}}})])
+        with _patched(rec):
+            got = await read_secret(
+                _inst(paths=["kvv2/apps"]),
+                mount="kvv2",
+                path="apps/netbox",
+                field="k",
+                static_token="t",
+            )
+        assert got == "v"
+
+
+class TestATransportFailureIsAVaultError:
+    """Only VaultError is caught upstream. A bare httpx error escaped both
+    handlers, 500'd the listener, and left the run claimed in `planning` until
+    the hour-long stale sweep — so a brief Vault outage stranded every queued
+    run in the estate."""
+
+    @pytest.mark.asyncio
+    async def test_a_connection_failure_becomes_a_vault_error(self):
+        def boom(request):
+            raise httpx.ConnectError("connection refused", request=request)
+
+        with _patched(boom), pytest.raises(VaultError, match="unreachable|connect"):
+            await read_secret(_inst(), mount="kvv2", path="a", field="k", static_token="t")
+
+    @pytest.mark.asyncio
+    async def test_a_timeout_becomes_a_vault_error(self):
+        def boom(request):
+            raise httpx.ReadTimeout("too slow", request=request)
+
+        with _patched(boom), pytest.raises(VaultError):
+            await read_secret(_inst(), mount="kvv2", path="a", field="k", static_token="t")
+
+    @pytest.mark.asyncio
+    async def test_a_non_json_body_becomes_a_vault_error(self):
+        """A proxy or ingress returning an HTML error page must not raise a raw
+        JSONDecodeError out of the resolver."""
+
+        def html(request):
+            return httpx.Response(200, text="<html>502 Bad Gateway</html>")
+
+        with _patched(html), pytest.raises(VaultError):
+            await read_secret(_inst(), mount="kvv2", path="a", field="k", static_token="t")
+
+    @pytest.mark.asyncio
+    async def test_a_login_transport_failure_becomes_a_vault_error(self):
+        def boom(request):
+            raise httpx.ConnectError("no route to host", request=request)
+
+        inst = _inst(auth={"method": "kubernetes", "mount": "kubernetes", "role": "r"})
+        with _patched(boom), patch.object(vault_client, "_read_sa_token", return_value="jwt"):
+            with pytest.raises(VaultError):
+                await read_secret(inst, mount="kvv2", path="a", field="k")
+
+
+class TestErrorsDoNotEchoVaultResponseBodies:
+    """The message becomes the run's `error_message`, readable by anyone with
+    run-read. A third party's response body is not ours to forward there."""
+
+    @pytest.mark.asyncio
+    async def test_a_server_error_body_is_not_echoed(self):
+        rec = _Recorder([(500, {"errors": ["internal detail nobody should relay"]})])
+        with _patched(rec), pytest.raises(VaultError) as e:
+            await read_secret(_inst(), mount="kvv2", path="a", field="k", static_token="t")
+        assert "nobody should relay" not in str(e.value)
+        assert "500" in str(e.value), "the status is still needed to diagnose it"
+
+
+class TestTraversalGuardCoversEncodedForms:
+    """A raw segment check misses `%2e%2e`, which is decoded downstream — the
+    same check-one-path-send-another mismatch by another spelling."""
+
+    @pytest.mark.parametrize(
+        ("mount", "path"),
+        [
+            ("kvv2", "apps/%2e%2e/sys"),  # encoded ..
+            ("kvv2", "apps/..%2fsys"),  # encoded separator
+            ("kv%2fv2", "apps/x"),  # encoding in the MOUNT half
+            ("kvv2", "apps/x#frag"),
+            ("kvv2", "apps/x?a=b"),
+        ],
+    )
+    @pytest.mark.asyncio
+    async def test_encoded_and_illegal_forms_never_reach_vault(self, mount, path):
+        rec = _Recorder([])
+        with _patched(rec), pytest.raises(VaultError, match="traversal|illegal"):
+            await read_secret(_inst(), mount=mount, path=path, field="k", static_token="t")
+        assert rec.seen == [], "a malformed reference reached Vault"
+
+    @pytest.mark.asyncio
+    async def test_an_ordinary_path_is_untouched(self):
+        """The guard must not reject the paths people actually use."""
+        rec = _Recorder([(200, {"data": {"data": {"k": "v"}}})])
+        with _patched(rec):
+            assert (
+                await read_secret(
+                    _inst(), mount="kvv2", path="apps/team-a/netbox_v2", field="k", static_token="t"
+                )
+                == "v"
+            )
+
+
+class TestASealedVaultIsTransientNotFatal:
+    """A sealed Vault answers 503 to everything, and a restarting or unsealing
+    one does the same. Before this classifier only TRANSPORT failures were
+    transient, so `vault operator seal` errored every queued run in the estate —
+    the design worked for a Vault that was unreachable, and not for one that was
+    merely shut, which is by far the more common case.
+    """
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("status", [500, 502, 503, 504, 429, 473, 412])
+    async def test_a_transient_status_raises_VaultUnavailable(self, status):
+        rec = _Recorder([(status, {})])
+        with _patched(rec), pytest.raises(VaultUnavailable):
+            await read_secret(_inst(), mount="kvv2", path="a", field="k", static_token="t")
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("status", [400, 403, 405, 422])
+    async def test_a_definitive_status_stays_fatal(self, status):
+        """A real answer, even a refusal, must NOT be retried forever — that
+        would hide a misconfigured reference behind an endless re-queue."""
+        rec = _Recorder([(status, {})])
+        with _patched(rec), pytest.raises(VaultError) as e:
+            await read_secret(_inst(), mount="kvv2", path="a", field="k", static_token="t")
+        assert not isinstance(e.value, VaultUnavailable), (
+            f"HTTP {status} is a definitive answer and must not be treated as transient"
+        )
+
+    @pytest.mark.asyncio
+    async def test_a_sealed_vault_on_LOGIN_is_transient_too(self):
+        """Login is what a sealed Vault turns away first, and the transport
+        layer does not retry POST — so an unclassified 503 there errored the run
+        on the very first attempt."""
+        rec = _Recorder([(503, {})])
+        inst = _inst(auth={"method": "kubernetes", "mount": "kubernetes", "role": "r"})
+        with (
+            _patched(rec),
+            patch.object(vault_client, "_read_sa_token", return_value="jwt"),
+            pytest.raises(VaultUnavailable),
+        ):
+            await read_secret(inst, mount="kvv2", path="a", field="k")

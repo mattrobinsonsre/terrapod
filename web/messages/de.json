@@ -643,7 +643,9 @@
       "allowLabelsShort": "Zulassen-Beschriftungen",
       "allowNamesShort": "Zulassen-Namen",
       "denyLabelsShort": "Verweigern-Beschriftungen",
-      "denyNamesShort": "Verweigern-Namen"
+      "denyNamesShort": "Verweigern-Namen",
+      "allowAll": "Auf alles gewähren",
+      "allowAllHelp": "Erfasst jede Ressource, auch später erstellte. Deny-Regeln gelten weiterhin. Verwenden Sie dies, statt jeden Workspace zu labeln — ein ohne das Label erstellter Workspace fiele stillschweigend aus der Rolle heraus."
     },
     "assignForm": {
       "provider": "Anbieter",
@@ -714,7 +716,8 @@
       "deleteRole": "Rolle konnte nicht gelöscht werden",
       "setAssignment": "Zuweisung konnte nicht festgelegt werden",
       "setAssignmentStatus": "Zuweisung konnte nicht festgelegt werden ({status})",
-      "deleteAssignment": "Zuweisung konnte nicht gelöscht werden"
+      "deleteAssignment": "Zuweisung konnte nicht gelöscht werden",
+      "conflictingLabelKeys": "{keys} hat mehr als einen Wert. Eine Label-Regel hält einen Wert pro Schlüssel, der letzte würde die früheren stillschweigend ersetzen. Mehrere Werte für einen Schlüssel unterstützt die API, hier aber noch nicht einstellbar."
     }
   },
   "adminVcs": {
@@ -938,7 +941,11 @@
       "rulePreview": "{count, plural, =0 {Trifft auf keine Workspaces zu} one {Trifft auf # Workspace zu} other {Trifft auf # Workspaces zu}}",
       "rulePreviewLoading": "Prüfe, welche Workspaces zutreffen …",
       "rulePreviewInvalid": "Diese Regel konnte nicht geprüft werden. Beim Speichern wird das genaue Problem gemeldet.",
-      "ruleConflictsWithGlobal": "Ein globaler Satz gilt bereits für alle Workspaces; eine Regel kann damit nicht kombiniert werden."
+      "ruleConflictsWithGlobal": "Ein globaler Satz gilt bereits für alle Workspaces; eine Regel kann damit nicht kombiniert werden.",
+      "valueSource": "Wertquelle",
+      "valueSourceStatic": "Wert eingeben",
+      "valueSourceVault": "Aus Vault lesen",
+      "vaultHint": "Terrapod liest das Secret zur Laufzeit aus Vault. Hier wird nichts gespeichert."
     }
   },
   "adminAutodiscovery": {
@@ -2254,7 +2261,8 @@
       "cost": "Kosten",
       "architecture": "Architektur",
       "insights": "Einblicke",
-      "automation": "Automatisierung"
+      "automation": "Automatisierung",
+      "access": "Zugriff"
     },
     "lifecycle": {
       "pendingDeletion": "Löschung ausstehend",
@@ -3063,5 +3071,54 @@
     "restoreConfirm": "Den State von „{name}“ wiederherstellen?\n\nDabei entsteht ein NEUER Workspace — das Original kommt nicht zurück. Er startet ohne Auto-Apply, ohne Drift-Erkennung und ohne VCS-Verbindung; Variablen und Run-Historie kehren nicht zurück. Nur der State wird gerettet.",
     "restoreDone": "{versions, plural, one {# State-Version} other {# State-Versionen}} in den neuen Workspace „{name}“ übernommen. Prüfen Sie die Einstellungen, bevor Sie Auto-Apply oder VCS aktivieren.",
     "restoreAgainConfirm": "„{name}“ wurde bereits wiederhergestellt, nach {existing}.\n\nEine erneute Wiederherstellung erzeugt einen ZWEITEN Workspace mit derselben State-Lineage über derselben Infrastruktur. Ein Apply in einem der beiden lässt den nächsten Plan des anderen dann wie kompletter Drift aussehen.\n\nNur fortfahren, wenn der zuvor wiederhergestellte Workspace nicht mehr existiert."
+  },
+  "roleReach": {
+    "title": "Worauf diese Rolle zugreift",
+    "checking": "Wird geprüft…",
+    "failed": "Die Reichweite dieser Regel konnte nicht ermittelt werden.",
+    "noAllowRules": "Fügen Sie ein Allow-Label oder einen Allow-Namen hinzu, um zu sehen, welche Workspaces diese Rolle erreichen würde.",
+    "granted": "gewährt",
+    "deniedCount": "verweigert",
+    "matched": "{count} von den Allow-Regeln erfasst",
+    "andMore": "…und {count} weitere",
+    "excludedByDeny": "Durch die Deny-Regeln ausgeschlossen",
+    "reason": {
+      "allowName": "namentlich",
+      "denyName": "namentlich verweigert",
+      "allowLabel": "entspricht {rule}",
+      "denyLabel": "verweigert durch {rule}"
+    },
+    "note": {
+      "catalogClamped": "Katalogverwaltet — auf Lesen begrenzt",
+      "everyoneFloor": "Für alle lesbar",
+      "hasOwner": "Eigentümer hat bereits Admin"
+    },
+    "reachesNothing": "Diese Regel erreicht nichts.",
+    "allowAllBanner": "Gewährt auf allen Ressourcen. Deny-Regeln gelten weiterhin.",
+    "axis": {
+      "workspace": "Workspaces",
+      "pool": "Agent-Pools",
+      "registry": "Registry",
+      "catalog": "Katalogeinträge"
+    }
+  },
+  "resourceAccess": {
+    "title": "Wer dies erreichen kann",
+    "subtitle": "Rollen, deren Regeln auf diesen Workspace passen, und wer sie hält.",
+    "loading": "Wird geladen…",
+    "failed": "Es konnte nicht ermittelt werden, wer dies erreichen kann.",
+    "forbidden": "Diese Antwort umfasst den gesamten Bestand und wird daher nur Plattform-Admins und Auditoren gezeigt.",
+    "noRoles": "Keine Rollenregel passt auf diesen Workspace.",
+    "deniedRoles": "Erfasst, dann durch eine Deny-Regel ausgeschlossen",
+    "alsoReachable": "Auch ohne jede Rolle erreichbar",
+    "heldBy": "Gehalten von {who}",
+    "heldByNobody": "Von niemandem gehalten — gewährt praktisch nichts",
+    "path": {
+      "platformAdmin": "Plattform-Admins erreichen jede Ressource",
+      "platformAudit": "Plattform-Auditoren können jede Ressource lesen",
+      "owner": "Der Eigentümer hat hier Admin",
+      "everyoneFloor": "Gelabelt access: everyone — für alle lesbar",
+      "catalogClamped": "Katalogverwaltet — jede Nicht-Admin-Gewährung ist auf Lesen begrenzt"
+    }
   }
 }

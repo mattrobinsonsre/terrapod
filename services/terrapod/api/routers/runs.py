@@ -2025,13 +2025,32 @@ async def next_run(
     # listener getting a 500 and the run hanging claimed.
     from terrapod.services.vault_source_service import (
         VaultSourceError,
+        VaultTransient,
         resolve_vault_variables,
     )
 
     try:
         vault_values = await resolve_vault_variables(resolved, settings)
+    except VaultTransient:
+        # Vault is down, not misconfigured. Put the run back so the next claim
+        # picks it up, rather than erroring every queued run in the estate over
+        # a restart and leaving an operator to re-queue each by hand.
+        await run_service.transition_run(db, run, "queued")
+        await db.commit()
+        return Response(status_code=204)
     except VaultSourceError as e:
         await run_service.transition_run(db, run, "errored", error_message=str(e))
+        await db.commit()
+        return Response(status_code=204)
+    except Exception as e:  # noqa: BLE001 - backstop, see below
+        # The resolver converts everything it can, but the run is already
+        # claimed by the time we get here: an escape means a 500 to the listener
+        # and a run wedged in `planning`. Failing the run is always better than
+        # stranding it, so this catches what the resolver did not.
+        logger.exception("unexpected failure resolving vault variables")
+        await run_service.transition_run(
+            db, run, "errored", error_message=f"Vault variable resolution failed: {e}"
+        )
         await db.commit()
         return Response(status_code=204)
 

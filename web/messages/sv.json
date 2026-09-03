@@ -643,7 +643,9 @@
       "allowLabelsShort": "Tillåt etiketter",
       "allowNamesShort": "Tillåt namn",
       "denyLabelsShort": "Neka etiketter",
-      "denyNamesShort": "Neka namn"
+      "denyNamesShort": "Neka namn",
+      "allowAll": "Ge behörighet till allt",
+      "allowAllHelp": "Matchar alla resurser, även sådana som skapas senare. Nekanderegler gäller fortfarande. Använd detta i stället för att märka varje arbetsyta — en arbetsyta som skapas utan märkningen skulle tyst hamna utanför rollen."
     },
     "assignForm": {
       "provider": "Leverantör",
@@ -714,7 +716,8 @@
       "deleteRole": "Det gick inte att ta bort rollen",
       "setAssignment": "Det gick inte att ange tilldelningen",
       "setAssignmentStatus": "Det gick inte att ange tilldelningen ({status})",
-      "deleteAssignment": "Det gick inte att ta bort tilldelningen"
+      "deleteAssignment": "Det gick inte att ta bort tilldelningen",
+      "conflictingLabelKeys": "{keys} har fått mer än ett värde. En märkningsregel rymmer ett värde per nyckel, så det sista skulle tyst ersätta de tidigare. Flera värden per nyckel stöds av API:et men kan ännu inte anges här."
     }
   },
   "adminVcs": {
@@ -938,7 +941,11 @@
       "rulePreview": "{count, plural, =0 {Matchar inga arbetsytor} one {Matchar # arbetsyta} other {Matchar # arbetsytor}}",
       "rulePreviewLoading": "Kontrollerar vilka arbetsytor som matchar …",
       "rulePreviewInvalid": "Den här regeln kunde inte kontrolleras. Sparande visar det exakta problemet.",
-      "ruleConflictsWithGlobal": "En global uppsättning gäller redan alla arbetsytor, så en regel kan inte användas med den."
+      "ruleConflictsWithGlobal": "En global uppsättning gäller redan alla arbetsytor, så en regel kan inte användas med den.",
+      "valueSource": "Värdekälla",
+      "valueSourceStatic": "Ange ett värde",
+      "valueSourceVault": "Läs från Vault",
+      "vaultHint": "Terrapod läser hemligheten från Vault vid körning. Inget lagras här."
     }
   },
   "adminAutodiscovery": {
@@ -2254,7 +2261,8 @@
       "cost": "Kostnad",
       "architecture": "Arkitektur",
       "insights": "Insikter",
-      "automation": "Automatisering"
+      "automation": "Automatisering",
+      "access": "Åtkomst"
     },
     "lifecycle": {
       "pendingDeletion": "Väntar på borttagning",
@@ -3063,5 +3071,54 @@
     "restoreConfirm": "Återställa statet för ”{name}”?\n\nDetta skapar en NY arbetsyta — originalet kommer inte tillbaka. Den kommer tillbaka med auto-apply och driftdetektering avstängda och utan VCS-anslutning; variabler och körhistorik kommer inte tillbaka. Endast statet räddas.",
     "restoreDone": "Återskapade {versions, plural, one {# state-version} other {# state-versioner}} till den nya arbetsytan ”{name}”. Kontrollera inställningarna innan du slår på auto-apply eller VCS.",
     "restoreAgainConfirm": "”{name}” har redan återställts, till {existing}.\n\nAtt återställa igen skapar ett ANDRA workspace med samma state-härstamning över samma infrastruktur. En apply i något av dem får då den andras nästa plan att se ut som total drift.\n\nFortsätt bara om det tidigare återställda workspacet är borta."
+  },
+  "roleReach": {
+    "title": "Vad den här rollen omfattar",
+    "checking": "Kontrollerar…",
+    "failed": "Det gick inte att avgöra vad den här regeln omfattar.",
+    "noAllowRules": "Lägg till en tillåten etikett eller ett tillåtet namn för att se vilka arbetsytor den här rollen skulle omfatta.",
+    "granted": "beviljade",
+    "deniedCount": "nekade",
+    "matched": "{count} matchar tillåtelsereglerna",
+    "andMore": "…och {count} till",
+    "excludedByDeny": "Uteslutna av nekandereglerna",
+    "reason": {
+      "allowName": "med namn",
+      "denyName": "nekad med namn",
+      "allowLabel": "matchar {rule}",
+      "denyLabel": "nekad av {rule}"
+    },
+    "note": {
+      "catalogClamped": "Kataloghanterad — begränsad till läsning",
+      "everyoneFloor": "Läsbar för alla",
+      "hasOwner": "Ägaren har redan administratörsbehörighet"
+    },
+    "reachesNothing": "Den här regeln omfattar ingenting.",
+    "allowAllBanner": "Ger behörighet till alla resurser. Nekanderegler gäller fortfarande.",
+    "axis": {
+      "workspace": "Arbetsytor",
+      "pool": "Agentpooler",
+      "registry": "Register",
+      "catalog": "Katalogobjekt"
+    }
+  },
+  "resourceAccess": {
+    "title": "Vem som kan nå detta",
+    "subtitle": "Roller vars regler matchar den här arbetsytan, och vilka som har dem.",
+    "loading": "Läser in…",
+    "failed": "Det gick inte att avgöra vem som kan nå detta.",
+    "forbidden": "Det här svaret omfattar hela miljön och visas därför bara för plattformsadministratörer och revisorer.",
+    "noRoles": "Ingen rollregel matchar den här arbetsytan.",
+    "deniedRoles": "Matchade och uteslöts sedan av en nekanderegel",
+    "alsoReachable": "Kan även nås utan någon roll",
+    "heldBy": "Innehas av {who}",
+    "heldByNobody": "Innehas av ingen — ger i praktiken ingenting",
+    "path": {
+      "platformAdmin": "Plattformsadministratörer når alla resurser",
+      "platformAudit": "Plattformsrevisorer kan läsa alla resurser",
+      "owner": "Ägaren har administratörsbehörighet här",
+      "everyoneFloor": "Märkt access: everyone — läsbar för alla",
+      "catalogClamped": "Kataloghanterad — varje icke-administrativ behörighet begränsas till läsning"
+    }
   }
 }

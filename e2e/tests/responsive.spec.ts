@@ -29,7 +29,11 @@ test.describe('Responsive harness (phone viewport)', () => {
     // inputs to unreadable stubs. The same component renders in the mobile
     // card, so it has to hold up here too.
     const token = getStoredToken()
-    const wsId = await createWorkspace(token, uniqueName('e2erespvault'))
+    // Agent mode: a vault reference only resolves on the listener claim path,
+    // so the source picker is not offered on a local workspace.
+    const wsId = await createWorkspace(token, uniqueName('e2erespvault'), {
+      'execution-mode': 'agent',
+    })
 
     await page.route('**/api/terrapod/v1/vault/availability', (route) =>
       route.fulfill({
@@ -86,6 +90,104 @@ test.describe('Responsive harness (phone viewport)', () => {
     // The set name and its source badge both have to survive at phone width —
     // the source is the primary signal here, not decoration.
     await expect(entry.getByText('Matched by rule')).toBeVisible()
+    await expectNoHorizontalPageScroll(page)
+  })
+
+  test('variable-set variables adapt to mobile (#1439)', async ({ page }) => {
+    // Seeded with a real variable: on an empty set the page renders an empty
+    // state and there is no table in the DOM at all, so the assertion would
+    // pass however the breakpoints are written.
+    const token = getStoredToken()
+    const res = await fetch(`${API_URL}/api/v2/organizations/default/varsets`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/vnd.api+json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ data: { attributes: { name: uniqueName('e2erespvsv') } } }),
+    })
+    expect(res.status).toBe(201)
+    const vsId = (await res.json()).data.id
+
+    const varRes = await fetch(`${API_URL}/api/v2/varsets/${vsId}/relationships/vars`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/vnd.api+json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        data: {
+          type: 'vars',
+          attributes: { key: 'RESP_KEY', category: 'env', value: 'resp-value' },
+        },
+      }),
+    })
+    expect(varRes.status).toBe(201)
+
+    await page.goto(`/admin/variable-sets/${vsId}?tab=variables`)
+
+    const card = page.locator('li').filter({ hasText: 'RESP_KEY' })
+    await expect(card).toBeVisible({ timeout: 15_000 })
+    // Nothing is dropped on the phone: the desktop table is the only place the
+    // category column lives, so the card has to carry key, value AND category.
+    await expect(card.getByText('resp-value')).toBeVisible()
+    await expect(card.getByText('env')).toBeVisible()
+    // The desktop table must not be the thing rendering at this width. It is
+    // still in the DOM — `hidden md:block` hides it with CSS rather than
+    // unmounting it — so this counts VISIBLE tables, not elements.
+    await expect(page.locator('table:visible')).toHaveCount(0)
+    await expectNoHorizontalPageScroll(page)
+  })
+
+  test('the variable-set Vault edit panel is usable at phone width (#1439)', async ({ page }) => {
+    // The edit state used to be a set of table cells, which truncated the five
+    // reference fields. Both breakpoints now share VariableEditPanel, so the
+    // builder has to be reachable and typable from the mobile card.
+    const token = getStoredToken()
+    const res = await fetch(`${API_URL}/api/v2/organizations/default/varsets`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/vnd.api+json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ data: { attributes: { name: uniqueName('e2erespvsedit') } } }),
+    })
+    expect(res.status).toBe(201)
+    const vsId = (await res.json()).data.id
+
+    const ref = JSON.stringify({ mount: 'secret', path: 'apps/thing', field: 'token' })
+    const varRes = await fetch(`${API_URL}/api/v2/varsets/${vsId}/relationships/vars`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/vnd.api+json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        data: {
+          type: 'vars',
+          attributes: { key: 'RESP_VAULT', category: 'env', 'value-source': 'vault', value: ref },
+        },
+      }),
+    })
+    expect(varRes.status).toBe(201)
+    const varId = (await varRes.json()).data.id
+
+    // The stack deliberately has no Vault, so the panel would not offer the
+    // source without this.
+    await page.route('**/api/terrapod/v1/vault/availability', (route: Route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            type: 'vault-availability',
+            id: 'vault',
+            attributes: { enabled: true, instances: ['default'], 'default-instance': 'default' },
+          },
+        }),
+      }),
+    )
+
+    await page.goto(`/admin/variable-sets/${vsId}?tab=variables`)
+    const card = page.locator('li').filter({ hasText: 'RESP_VAULT' })
+    await expect(card).toBeVisible({ timeout: 15_000 })
+    await card.getByRole('button', { name: 'Edit' }).click()
+
+    // `medit-` is the mobile card's panel prefix; the desktop row uses `edit-`,
+    // so this also proves the mobile branch is what rendered.
+    for (const id of [`#medit-${varId}-mount`, `#medit-${varId}-path`, `#medit-${varId}-field`]) {
+      await expect(page.locator(id)).toBeVisible()
+    }
+    await page.locator(`#medit-${varId}-path`).fill('apps/some/deeper/path')
+    await expect(page.locator(`#medit-${varId}-path`)).toHaveValue('apps/some/deeper/path')
     await expectNoHorizontalPageScroll(page)
   })
 
@@ -595,3 +697,33 @@ test.describe('Tablet width (md–lg dead-zone, #839)', () => {
   });
 
 })
+
+test.describe('Role reach panel (#1456)', () => {
+  test('the reverse access view fits a phone without scrolling the page sideways', async ({ page }) => {
+    // The other half of #1456: "who can reach this workspace", rendered on the
+    // workspace access tab. New surface in this release, so it carries a guard
+    // like the forward panel does.
+    const token = getStoredToken()
+    const wsId = await createWorkspace(token, uniqueName('e2erespaccess'))
+
+    await page.goto(`/workspaces/${wsId}?tab=access`)
+    const panel = page.getByTestId('resource-access')
+    await expect(panel).toBeVisible({ timeout: 15_000 })
+    await expectNoHorizontalPageScroll(page)
+  })
+
+  test('the reach panel fits a phone without scrolling the page sideways', async ({ page }) => {
+    await page.goto('/admin/roles');
+    await expectNoHorizontalPageScroll(page);
+
+    await page.getByRole('button', { name: /create role/i }).click();
+    const panel = page.getByTestId('role-reach');
+    await expect(panel).toBeVisible();
+
+    // Workspace names and label rules are both unbounded strings, so this is
+    // the panel most likely to push a phone layout sideways.
+    await page.fill('#r-allow-labels', 'env=production-eu-west-1-primary');
+    await expectNoHorizontalPageScroll(page);
+    await expect(panel).toBeVisible();
+  });
+});

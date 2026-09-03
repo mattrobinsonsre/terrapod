@@ -403,6 +403,7 @@ def _mock_vsvar(key="db_pass", value="s3cr3t", sensitive=True):
     v.sensitive = sensitive
     v.category = "terraform"
     v.hcl = False
+    v.value_source = "static"
     v.description = ""
     v.version_id = "old-hash"
     v.created_at = datetime(2026, 1, 1, tzinfo=UTC)

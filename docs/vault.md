@@ -230,9 +230,29 @@ resource "terrapod_variable" "netbox_token" {
 }
 ```
 
-Put it in a `terrapod_variable_set` instead to define it once and apply it to
-many workspaces — with an [assignment rule](api-reference.md#assignment-rules)
-it can target them by label rather than one by one.
+The same `value_source` works on a variable inside a **variable set**, which is
+how you define a reference once and apply it to many workspaces. Note the
+attribute is on `terrapod_variable_set_variable` — the variable *within* the set
+— not on `terrapod_variable_set` itself:
+
+```hcl
+resource "terrapod_variable_set_variable" "netbox_token" {
+  varset_id    = terrapod_variable_set.shared.id
+  key          = "NETBOX_TOKEN"
+  category     = "env"
+  value_source = "vault"
+  value = jsonencode({
+    mount = "secret"
+    path  = "apps/netbox"
+    field = "apitoken"
+  })
+}
+```
+
+With an [assignment rule](api-reference.md#assignment-rules) the set can target
+workspaces by label rather than one by one, so a single reference covers a whole
+population. Resolution happens per run, per workspace, exactly as it does for a
+workspace variable — the set is only how the reference is distributed.
 
 ---
 
@@ -248,7 +268,10 @@ what your workspaces need, and prefer several instances with narrow policies
 over one instance with a broad one.
 
 As a second line, an instance may declare an allow-list of path prefixes that
-Terrapod will refuse to read outside, whatever the policy permits:
+Terrapod will refuse to read outside. Prefixes match on **path segments**, so
+`secret/apps` permits `secret/apps/netbox` but not `secret/apps-admin`, and a
+reference containing `.` or `..` segments is refused outright — otherwise the
+URL Terrapod checks and the one Vault receives would differ:
 
 ```yaml
         - name: default
@@ -269,21 +292,47 @@ operator who gets it slightly wrong otherwise has no second line.
 | **Stored in Terrapod** | The reference (mount, path, field). Never the secret. |
 | **Returned by the API** | The reference. A path is not a secret, and masking it would hide configuration while concealing nothing. |
 | **In run logs** | Nothing. The value is delivered through the per-run Kubernetes Secret, never a command line or the Job spec. |
-| **On failure** | The variable name, the instance, and the coordinates — never a response body or a partial value. |
+| **On failure** | The variable name, the instance, the coordinates and the HTTP status — never Vault's response body or a partial value. |
 
 ---
 
 ## When a reference cannot be resolved
 
-**The run fails.** It does not proceed with the variable missing.
+Terrapod never proceeds with the variable missing. A missing secret is worse
+than a failed run — Terraform either fails somewhere confusing, or falls back to
+another identity and acts with credentials nobody chose. (This differs from
+private-git-module credentials, which are dropped with a warning so one bad
+credential cannot fail everything.)
 
-This is deliberate, and differs from how private-git-module credentials behave:
-those are dropped with a warning so one bad credential cannot fail everything.
-A missing secret is worse than a failed run — Terraform either fails somewhere
-confusing, or falls back to another identity and acts with credentials nobody
-chose.
+What happens next depends on **which kind of failure it is**, and the difference
+matters when you are diagnosing one:
 
-The run is errored with the cause, naming the variable:
+| Vault's answer | What it means | What Terrapod does |
+|---|---|---|
+| `403`, `404`, other 4xx | A real answer: denied, or nothing at that path | **The run is errored**, naming the variable and the cause |
+| Unreachable, DNS failure, TLS failure, timeout | Vault cannot be contacted | **The run returns to `queued`** and waits for the next claim |
+| `503` (sealed), `501`, `429`/`473` (standby), other 5xx | Vault is up but cannot answer yet | **The run returns to `queued`** and waits |
+
+A misconfigured reference will never resolve, so retrying it would only hide the
+fault. A Vault that is sealed, restarting or briefly unreachable *will* answer in
+a moment — and erroring every queued run in the estate for that turns a blip into
+an incident someone has to clean up by hand.
+
+**The waiting case is quiet, and you should know its shape.** A run held this way
+shows no error: it simply sits in `queued` and is re-claimed periodically. If
+Vault never comes back — a wrong `address`, a blocked egress rule, a certificate
+the API pod does not trust — the run waits indefinitely rather than failing. The
+signal is in the API pod log:
+
+```
+vault is unavailable; leaving the run for a later claim
+```
+
+If runs are not starting and that line is repeating, treat it as a connectivity
+problem between the API pods and Vault, not as a problem with the run. See
+[the runbook](runbooks.md).
+
+For the errored case, the run carries the cause, naming the variable:
 
 ```
 variable 'NETBOX_TOKEN': Vault denied 'secret/apps/netbox' on instance
@@ -309,6 +358,26 @@ this path.
 
 ## Limits
 
+- **Agent execution only.** The reference is resolved server-side when a runner
+  claims the run, so a local-execution workspace has no point at which it could
+  happen. Creating a Vault-sourced **workspace** variable on one is refused
+  rather than silently resolving to nothing, and switching a workspace that
+  holds one to local execution is refused for the same reason.
+
+  A **variable set** is checked at the points where the pairing can actually be
+  created, since a set is not bound to a workspace and there is no single write
+  to test. All three are refused: assigning a workspace to a set that carries a
+  Vault reference, writing a Vault reference into a set that already reaches a
+  local-execution workspace, and switching a workspace to local while a set
+  delivers one to it (the workspace's own variables and the set's are counted
+  together).
+
+  One gap remains by design: a set assigned by an **assignment rule** whose match
+  set widens later — a label edit, or a new local workspace matching the rule —
+  is not a write against either side, so there is nothing to refuse at. On such a
+  workspace the reference resolves to nothing while agent-mode workspaces in the
+  same set are unaffected. Prefer agent execution for any workspace a
+  Vault-bearing set can reach.
 - **Leases are not renewed or revoked.** A dynamic credential is minted per run
   and left to expire. Set the Vault role's TTL to suit your run durations.
 - **No file materialization yet.** Values are delivered as environment or

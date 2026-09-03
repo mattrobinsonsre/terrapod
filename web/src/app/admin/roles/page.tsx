@@ -9,6 +9,7 @@ import { LoadingSpinner } from '@/components/loading-spinner'
 import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
 import { SortableHeader } from '@/components/sortable-header'
+import { RoleReachPanel, type RoleRule } from '@/components/role-reach-panel'
 import { useSortable } from '@/lib/use-sortable'
 import { useConfirm } from '@/lib/use-confirm'
 import { getAuthState, isAdmin } from '@/lib/auth'
@@ -27,6 +28,7 @@ interface Role {
     'registry-permission': string | null
     'catalog-permission': string | null
     capabilities?: string[]
+    'allow-all'?: boolean
     'allow-labels': Record<string, string>
     'allow-names': string[]
     'deny-labels': Record<string, string>
@@ -229,6 +231,7 @@ export default function RolesPage() {
   const [roleName, setRoleName] = useState('')
   const [roleDesc, setRoleDesc] = useState('')
   const [rolePermission, setRolePermission] = useState('read')
+  const [roleAllowAll, setRoleAllowAll] = useState(false)
   const [roleAllowLabels, setRoleAllowLabels] = useState('')
   const [roleAllowNames, setRoleAllowNames] = useState('')
   const [roleDenyLabels, setRoleDenyLabels] = useState('')
@@ -247,6 +250,7 @@ export default function RolesPage() {
   const [editingRole, setEditingRole] = useState<string | null>(null)
   const [editRoleDesc, setEditRoleDesc] = useState('')
   const [editRolePermission, setEditRolePermission] = useState('read')
+  const [editRoleAllowAll, setEditRoleAllowAll] = useState(false)
   const [editRoleAllowLabels, setEditRoleAllowLabels] = useState('')
   const [editRoleAllowNames, setEditRoleAllowNames] = useState('')
   const [editRoleDenyLabels, setEditRoleDenyLabels] = useState('')
@@ -331,6 +335,28 @@ export default function RolesPage() {
     }
   }
 
+  /** The free-text boxes as the structured rule the preview endpoint takes.
+   *  Rebuilt on every render so the panel re-previews as the operator types;
+   *  the panel debounces and serialises the rule to decide whether it changed. */
+  function ruleFrom(
+    allowLabels: string,
+    allowNames: string,
+    denyLabels: string,
+    denyNames: string,
+    caps: Set<string>,
+    allowAll = false,
+  ): RoleRule {
+    const names = (v: string) => v.split(',').map((x) => x.trim()).filter(Boolean)
+    return {
+      allowAll,
+      allowLabels: parseLabels(allowLabels),
+      allowNames: names(allowNames),
+      denyLabels: parseLabels(denyLabels),
+      denyNames: names(denyNames),
+      capabilities: [...caps],
+    }
+  }
+
   function parseLabels(s: string): Record<string, string> {
     const result: Record<string, string> = {}
     if (!s.trim()) return result
@@ -339,6 +365,27 @@ export default function RolesPage() {
       if (k) result[k] = v || ''
     })
     return result
+  }
+
+  /** Keys given two DIFFERENT values in one box, e.g. `env=prod, env=stg`.
+   *
+   *  A label rule is a map, so the second value silently overwrote the first
+   *  and the role quietly did something other than what was typed. The server
+   *  can express "env is prod or stg" ({"env": ["prod","stg"]}) but no client
+   *  can yet author it, so rather than let the collapse pass unseen the form
+   *  refuses it and says where the capability does live. Repeating a key with
+   *  the SAME value is harmless and not flagged. */
+  function conflictingLabelKeys(s: string): string[] {
+    const seen = new Map<string, string>()
+    const bad = new Set<string>()
+    for (const pair of s.split(',')) {
+      const [k, v] = pair.split('=').map((x) => x.trim())
+      if (!k) continue
+      const value = v || ''
+      if (seen.has(k) && seen.get(k) !== value) bad.add(k)
+      else seen.set(k, value)
+    }
+    return [...bad]
   }
 
   function formatLabels(labels: Record<string, string>): string {
@@ -404,6 +451,14 @@ export default function RolesPage() {
 
   async function handleCreateRole(e: React.FormEvent) {
     e.preventDefault()
+    const clash = [
+      ...conflictingLabelKeys(roleAllowLabels),
+      ...conflictingLabelKeys(roleDenyLabels),
+    ]
+    if (clash.length) {
+      setError(t('errors.conflictingLabelKeys', { keys: clash.join(', ') }))
+      return
+    }
     setCreatingRole(true)
     setError('')
     setSuccess('')
@@ -422,6 +477,7 @@ export default function RolesPage() {
         attrs['registry-permission'] = roleRegistryPermission
         attrs['catalog-permission'] = roleCatalogPermission
       }
+      if (roleAllowAll) attrs['allow-all'] = true
       if (roleAllowLabels.trim()) attrs['allow-labels'] = parseLabels(roleAllowLabels)
       if (roleAllowNames.trim()) attrs['allow-names'] = roleAllowNames.split(',').map((s) => s.trim()).filter(Boolean)
       if (roleDenyLabels.trim()) attrs['deny-labels'] = parseLabels(roleDenyLabels)
@@ -485,6 +541,7 @@ export default function RolesPage() {
     setEditRoleCaps(isCustom ? effective : presetCaps)
     setEditRoleCapsCustom(isCustom)
     setShowEditCaps(isCustom)
+    setEditRoleAllowAll(Boolean(a['allow-all']))
     setEditRoleAllowLabels(formatLabels(a['allow-labels'] || {}))
     setEditRoleAllowNames((a['allow-names'] || []).join(', '))
     setEditRoleDenyLabels(formatLabels(a['deny-labels'] || {}))
@@ -492,6 +549,14 @@ export default function RolesPage() {
   }
 
   async function handleSaveRole() {
+    const clash = [
+      ...conflictingLabelKeys(editRoleAllowLabels),
+      ...conflictingLabelKeys(editRoleDenyLabels),
+    ]
+    if (clash.length) {
+      setError(t('errors.conflictingLabelKeys', { keys: clash.join(', ') }))
+      return
+    }
     if (!editingRole) return
     setSavingRole(true)
     setError('')
@@ -499,6 +564,7 @@ export default function RolesPage() {
     try {
       const attrs: Record<string, unknown> = {
         description: editRoleDesc,
+        'allow-all': editRoleAllowAll,
         'allow-labels': parseLabels(editRoleAllowLabels),
         'allow-names': editRoleAllowNames.split(',').map((s) => s.trim()).filter(Boolean),
         'deny-labels': parseLabels(editRoleDenyLabels),
@@ -733,6 +799,15 @@ export default function RolesPage() {
                   <input id="r-desc" type="text" value={roleDesc} onChange={(e) => setRoleDesc(e.target.value)} placeholder={t('form.descriptionPlaceholder')}
                     className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
                 </div>
+                <label className="flex items-start gap-2 p-2 rounded-lg bg-slate-900/40 border border-slate-700/50">
+                  <input id="r-allow-all" type="checkbox" checked={roleAllowAll}
+                    onChange={(e) => setRoleAllowAll(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 rounded border-slate-600 bg-slate-700" />
+                  <span>
+                    <span className="block text-sm font-medium text-slate-300">{t('form.allowAll')}</span>
+                    <span className="block text-xs text-slate-500">{t('form.allowAllHelp')}</span>
+                  </span>
+                </label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label htmlFor="r-allow-labels" className="block text-sm font-medium text-slate-300 mb-1">{t('form.allowLabels')}</label>
@@ -755,6 +830,9 @@ export default function RolesPage() {
                       className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
                   </div>
                 </div>
+                <RoleReachPanel
+                  rule={ruleFrom(roleAllowLabels, roleAllowNames, roleDenyLabels, roleDenyNames, roleCaps, roleAllowAll)}
+                />
                 <button type="submit" disabled={creatingRole}
                   className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors">
                   {creatingRole ? t('actions.creating') : t('actions.createRole')}
@@ -859,6 +937,9 @@ export default function RolesPage() {
                               <CapabilityMatrix selected={editRoleCaps} onToggle={toggleEditCap} custom={editRoleCapsCustom} idPrefix={`edit-${role.name}`} />
                             )}
                           </div>
+                          <RoleReachPanel
+                            rule={ruleFrom(editRoleAllowLabels, editRoleAllowNames, editRoleDenyLabels, editRoleDenyNames, editRoleCaps, editRoleAllowAll)}
+                          />
                         </div>
                       ) : (
                         <div className="flex items-start justify-between">

@@ -135,6 +135,13 @@ Apply with `helm upgrade` (or your GitOps flow).
 
 If all three are true, the connection is live.
 
+**Slack fails open.** If the connection can't be established — a wrong or expired
+app-level token, say — Terrapod does **not** hang or refuse to start (it did, once,
+before v1.6.0). The connect attempt is bounded (15s); on timeout the API logs
+`slack.socket_mode_connect_timeout` and **starts normally with Slack disabled**.
+An API that is up but silent on Slack is the signal to check that log line and the
+app-level token — the rest of Terrapod is unaffected.
+
 ---
 
 ## Account linking (`/terrapod`)
@@ -279,6 +286,7 @@ api:
 | Messages post but the plan `.txt` never attaches | The app is missing the **`files:write`** bot scope. Add it under **OAuth & Permissions → Scopes**, then **Reinstall** the app (scope changes require reinstall). Apps created from the current manifest already include it. |
 | `not_in_channel` / `channel_not_found` in logs | Invite the bot to the channel, or use a channel the bot can post to (`chat:write.public` covers public channels). |
 | `invalid_auth` in logs | Bot token wrong or revoked — reinstall the app and update the Secret. |
+| API is up but Slack never connects; log shows `slack.socket_mode_connect_timeout` | The `xapp-` app-level token is wrong/expired or the socket wasn't reachable within 15s. The API starts anyway with Slack disabled (v1.6.0+); fix the token and restart. |
 | Log shows tokens missing while `enabled: true` | The Secret isn't wired: check `existingSecret` and that the Secret has all three keys. |
 
 ---

@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test';
 
+import { getStoredToken } from '../helpers/api';
+
 test.describe('Roles & Assignments', () => {
   test('roles tab shows built-in roles', async ({ page }) => {
     await page.goto('/admin/roles');
@@ -143,5 +145,90 @@ test.describe('Roles & Assignments', () => {
 
     // Role should be gone
     await expect(page.locator(`h3:has-text("${roleName}")`)).not.toBeVisible({ timeout: 10_000 });
+  });
+});
+
+test.describe('Role reach preview (#1456)', () => {
+  test('the panel reports what an unsaved rule reaches, and what a deny removes', async ({
+    page,
+  }) => {
+    const tag = `reach${Date.now()}`;
+    // From the stored auth state, not page.evaluate: before the first goto
+    // the page is about:blank, where reading localStorage is a SecurityError.
+    const token = getStoredToken();
+
+    // Two workspaces sharing an allow label; one also carries the label the
+    // deny rule will exclude. Created through the API so the test is about the
+    // panel, not about workspace creation.
+    for (const [name, labels] of [
+      [`${tag}-keep`, { squad: tag }],
+      [`${tag}-drop`, { squad: tag, sealed: 'yes' }],
+    ] as [string, Record<string, string>][]) {
+      const res = await page.request.post('/api/v2/organizations/default/workspaces', {
+        headers: { 'Content-Type': 'application/vnd.api+json', Authorization: `Bearer ${token}` },
+        data: { data: { type: 'workspaces', attributes: { name, labels } } },
+      });
+      expect(res.status()).toBe(201);
+    }
+
+    await page.goto('/admin/roles');
+    await page.click('button:has-text("Create Role")');
+
+    const panel = page.getByTestId('role-reach');
+    // Before any allow rule there is nothing to reach, and the panel says so
+    // rather than showing a misleading zero.
+    await expect(panel).toBeVisible();
+
+    await page.fill('#r-allow-labels', `squad=${tag}`);
+    // Assert the COUNT element, not a loose text match: `tag` is a timestamp,
+    // so getByText('2') matched a digit in a workspace name and proved nothing.
+    await expect(panel.getByTestId('reach-granted-count')).toHaveText('2', { timeout: 15_000 });
+    const granted = panel.getByTestId('reach-granted-list');
+    await expect(granted.getByText(`${tag}-keep`)).toBeVisible();
+    await expect(granted.getByText(`${tag}-drop`)).toBeVisible();
+
+    // Adding the deny rule must MOVE one of them, so assert both sides: it left
+    // the granted list and arrived in the denied one. Asserting only that it is
+    // still visible somewhere passes even if the deny rule is ignored entirely.
+    await page.fill('#r-deny-labels', 'sealed=yes');
+    await expect(panel.getByTestId('reach-granted-count')).toHaveText('1', { timeout: 15_000 });
+    await expect(panel.getByTestId('reach-denied-count')).toHaveText('1');
+    await expect(granted.getByText(`${tag}-drop`)).toHaveCount(0);
+    await expect(granted.getByText(`${tag}-keep`)).toBeVisible();
+    await expect(panel.getByTestId('reach-denied-list').getByText(`${tag}-drop`)).toBeVisible();
+  });
+
+  test('a rule with no allow side is reported as reaching nothing', async ({ page }) => {
+    await page.goto('/admin/roles');
+    await page.click('button:has-text("Create Role")');
+    const panel = page.getByTestId('role-reach');
+    await expect(panel).toBeVisible();
+    // Deny alone grants nothing, so the panel must not imply a reach. Assert
+    // the ABSENCE of a count rather than the presence of the word "allow",
+    // which appears in the panel's static labels whatever the state.
+    await page.fill('#r-deny-labels', 'env=prod');
+    await expect(panel.getByTestId('reach-granted-count')).toHaveCount(0);
+    await expect(panel.getByTestId('reach-granted-list')).toHaveCount(0);
+  });
+});
+
+test.describe('Estate-wide grant (#1456)', () => {
+  test('allow_all reaches every workspace, and the panel says so', async ({ page }) => {
+    await page.goto('/admin/roles');
+    await page.click('button:has-text("Create Role")');
+
+    const panel = page.getByTestId('role-reach');
+    await expect(panel).toBeVisible();
+
+    // With no allow rule at all there is nothing to reach — asserted as the
+    // absence of a count, not the presence of the word "allow".
+    await expect(panel.getByTestId('reach-granted-count')).toHaveCount(0);
+
+    // ...but allow-all needs no rule, and must announce itself: a role that
+    // reaches everything looking like one that reaches nothing is the failure
+    // this panel exists to prevent.
+    await page.check('#r-allow-all');
+    await expect(panel.getByText(/every resource/i)).toBeVisible({ timeout: 15_000 });
+    await expect(panel.getByText(/granted/i).first()).toBeVisible({ timeout: 15_000 });
   });
 });

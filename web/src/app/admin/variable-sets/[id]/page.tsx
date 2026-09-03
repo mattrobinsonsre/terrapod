@@ -11,6 +11,9 @@ import { AssignmentRuleEditor, AssignmentRuleSummary, type AssignmentRule } from
 import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
 import { SensitiveValueInput } from '@/components/sensitive-value-input'
+import { VariableEditPanel, type VariableEditState } from '@/components/variable-edit-panel'
+import { VaultReferenceFields, type VaultReferenceValue } from '@/components/vault-reference-fields'
+import { VaultValueDisplay } from '@/components/vault-value-display'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { useConfirm } from '@/lib/use-confirm'
 import { apiFetch, fetchAllPages } from '@/lib/api'
@@ -39,6 +42,7 @@ interface Variable {
     key: string
     value: string
     category: string
+    'value-source'?: string
     hcl: boolean
     sensitive: boolean
     description: string
@@ -102,6 +106,16 @@ export default function VariableSetDetailPage() {
   const [varSensitive, setVarSensitive] = useState(false)
   const [varHcl, setVarHcl] = useState(false)
   const [addingVar, setAddingVar] = useState(false)
+  const [varSource, setVarSource] = useState<'static' | 'vault'>('static')
+  const [varVault, setVarVault] = useState<VaultReferenceValue>({ instance: '', mount: '', path: '', field: '', engine: 'kv2' })
+  // A git credential is a JSON envelope; a Vault reference resolves to a single
+  // field, so the pair cannot work and the API refuses it (#1439). Mirrors the
+  // workspace page: don't offer the source, and don't send it.
+  const isGitCat = varCategory === 'git_http_auth' || varCategory === 'git_ssh_auth'
+  const isVaultSource = varSource === 'vault' && !isGitCat
+  const [vaultAvailable, setVaultAvailable] = useState(false)
+  const [vaultInstances, setVaultInstances] = useState<string[]>([])
+  const [vaultDefaultInstance, setVaultDefaultInstance] = useState('')
 
   // Variable editing
   const [editingVarId, setEditingVarId] = useState<string | null>(null)
@@ -111,6 +125,32 @@ export default function VariableSetDetailPage() {
   const [editVarSensitive, setEditVarSensitive] = useState(false)
   const [editVarHcl, setEditVarHcl] = useState(false)
   const [savingVar, setSavingVar] = useState(false)
+  const [editVarSource, setEditVarSource] = useState<'static' | 'vault'>('static')
+  const [editVarVault, setEditVarVault] = useState<VaultReferenceValue>({ instance: '', mount: '', path: '', field: '', engine: 'kv2' })
+  const isEditGitCat = editVarCategory === 'git_http_auth' || editVarCategory === 'git_ssh_auth'
+
+  // The panel takes one object; this page keeps a field per input. Bridge the
+  // two rather than refactoring the state, so the desktop row and the mobile
+  // card are guaranteed to be editing the same thing.
+  const editPanelState: VariableEditState = {
+    key: editVarKey,
+    value: editVarValue,
+    category: editVarCategory,
+    sensitive: editVarSensitive,
+    hcl: editVarHcl,
+    source: editVarSource,
+    vault: editVarVault,
+  }
+
+  function patchEditPanel(patch: Partial<VariableEditState>) {
+    if (patch.key !== undefined) setEditVarKey(patch.key)
+    if (patch.value !== undefined) setEditVarValue(patch.value)
+    if (patch.category !== undefined) setEditVarCategory(patch.category)
+    if (patch.sensitive !== undefined) setEditVarSensitive(patch.sensitive)
+    if (patch.hcl !== undefined) setEditVarHcl(patch.hcl)
+    if (patch.source !== undefined) setEditVarSource(patch.source)
+    if (patch.vault !== undefined) setEditVarVault(patch.vault)
+  }
 
   // Workspaces
   const [workspaces, setWorkspaces] = useState<WorkspaceRef[]>([])
@@ -133,11 +173,27 @@ export default function VariableSetDetailPage() {
     }
   }, [varsetId, t])
 
+  // Vault availability drives whether the source picker is offered — an
+  // affordance, not a gate: a failed probe just hides the option (#1439).
+  const loadVaultAvailability = useCallback(async () => {
+    try {
+      const res = await apiFetch('/api/terrapod/v1/vault/availability')
+      if (!res.ok) return
+      const a = (await res.json()).data?.attributes ?? {}
+      setVaultAvailable(Boolean(a.enabled))
+      setVaultInstances(a.instances ?? [])
+      setVaultDefaultInstance(a['default-instance'] ?? '')
+    } catch {
+      // ignore — the picker simply isn't offered
+    }
+  }, [])
+
   useEffect(() => {
     if (!getAuthState()) { router.push('/login'); return }
     if (!isAdmin()) { router.push('/'); return }
     loadVarset()
-  }, [router, loadVarset])
+    loadVaultAvailability()
+  }, [router, loadVarset, loadVaultAvailability])
 
   usePollingInterval(!loading, 60_000, loadVarset)
 
@@ -147,6 +203,34 @@ export default function VariableSetDetailPage() {
     if (activeTab === 'workspaces') { loadWorkspaces(); loadAllWorkspaces() }
   // eslint-disable-next-line react-hooks/exhaustive-deps -- initial mount load; the loader is a hoisted function declaration recreated each render, so depending on it would re-fetch on every render
   }, [activeTab, varset])
+
+
+  function buildVaultRef(v: VaultReferenceValue): string {
+    const ref: Record<string, string> = {
+      source: 'vault',
+      mount: v.mount.trim(),
+      path: v.path.trim(),
+      field: v.field.trim(),
+    }
+    if (v.instance.trim()) ref.vault = v.instance.trim()
+    if (v.engine !== 'kv2') ref.engine = v.engine
+    return JSON.stringify(ref)
+  }
+
+  function parseVaultRef(value: string): VaultReferenceValue {
+    try {
+      const r = JSON.parse(value)
+      return {
+        instance: r.vault ?? '',
+        mount: r.mount ?? '',
+        path: r.path ?? '',
+        field: r.field ?? '',
+        engine: r.engine === 'dynamic' ? 'dynamic' : 'kv2',
+      }
+    } catch {
+      return { instance: '', mount: '', path: '', field: '', engine: 'kv2' }
+    }
+  }
 
   async function loadVariables() {
     try {
@@ -217,6 +301,11 @@ export default function VariableSetDetailPage() {
               description: editDesc,
               global: editGlobal,
               priority: editPriority,
+              // Always sent, including as null, so clearing the rule actually
+              // clears it. Omitting this made the whole editor inert: it
+              // rendered, previewed a live match count, reported success, and
+              // saved nothing.
+              'assignment-rule': editGlobal ? null : editRule,
             },
           },
         }),
@@ -263,10 +352,13 @@ export default function VariableSetDetailPage() {
             type: 'vars',
             attributes: {
               key: varKey,
-              value: varValue,
+              value: isVaultSource ? buildVaultRef(varVault) : varValue,
               category: varCategory,
-              sensitive: varSensitive,
+              // Vault-sourced is always sensitive (its reference resolves to a
+              // secret); otherwise honour the checkbox.
+              sensitive: isVaultSource ? true : varSensitive,
               hcl: varHcl,
+              'value-source': isVaultSource ? 'vault' : 'static',
             },
           },
         }),
@@ -280,6 +372,8 @@ export default function VariableSetDetailPage() {
       setVarCategory('terraform')
       setVarSensitive(false)
       setVarHcl(false)
+      setVarSource('static')
+      setVarVault({ instance: '', mount: '', path: '', field: '', engine: 'kv2' })
       setShowAddVar(false)
       await loadVariables()
     } catch (err) {
@@ -292,7 +386,14 @@ export default function VariableSetDetailPage() {
   function startEditingVar(v: Variable) {
     setEditingVarId(v.id)
     setEditVarKey(v.attributes.key)
-    setEditVarValue(v.attributes.sensitive ? '' : v.attributes.value)
+    const src = v.attributes['value-source'] === 'vault' ? 'vault' : 'static'
+    setEditVarSource(src)
+    if (src === 'vault') {
+      setEditVarVault(parseVaultRef(v.attributes.value))
+      setEditVarValue('')
+    } else {
+      setEditVarValue(v.attributes.sensitive ? '' : v.attributes.value)
+    }
     setEditVarCategory(v.attributes.category)
     setEditVarSensitive(v.attributes.sensitive)
     setEditVarHcl(v.attributes.hcl)
@@ -303,13 +404,20 @@ export default function VariableSetDetailPage() {
     setSavingVar(true)
     setError('')
     try {
+      // Same rule as the create form: a git credential cannot be vault-sourced.
+      const isEditVault = editVarSource === 'vault' && !isEditGitCat
       const attrs: Record<string, unknown> = {
         key: editVarKey,
         category: editVarCategory,
-        sensitive: editVarSensitive,
+        sensitive: isEditVault ? true : editVarSensitive,
         hcl: editVarHcl,
+        'value-source': isEditVault ? 'vault' : 'static',
       }
-      if (editVarValue !== '') attrs.value = editVarValue
+      if (isEditVault) {
+        attrs.value = buildVaultRef(editVarVault)
+      } else if (editVarValue !== '') {
+        attrs.value = editVarValue
+      }
       const res = await apiFetch(`/api/v2/varsets/${varsetId}/relationships/vars/${editingVarId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/vnd.api+json' },
@@ -569,11 +677,29 @@ export default function VariableSetDetailPage() {
                     <input id="var-key" type="text" value={varKey} onChange={(e) => setVarKey(e.target.value)} required placeholder="AWS_REGION"
                       className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
                   </div>
-                  <div>
-                    <label htmlFor="var-val" className="block text-sm font-medium text-slate-300 mb-1">{t('detail.varValue')}</label>
-                    <SensitiveValueInput id="var-val" value={varValue} onChange={setVarValue} sensitive={varSensitive} placeholder="us-east-1"
-                      rows={2} className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent resize-y" />
-                  </div>
+                  {vaultAvailable && !isGitCat && (
+                    <div>
+                      <label htmlFor="var-source" className="block text-sm font-medium text-slate-300 mb-1">{t('detail.valueSource')}</label>
+                      <select id="var-source" value={varSource} onChange={(e) => setVarSource(e.target.value as 'static' | 'vault')}
+                        className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+                        <option value="static">{t('detail.valueSourceStatic')}</option>
+                        <option value="vault">{t('detail.valueSourceVault')}</option>
+                      </select>
+                    </div>
+                  )}
+                  {isVaultSource ? (
+                    <div>
+                      <p className="text-xs text-slate-500 mb-2">{t('detail.vaultHint')}</p>
+                      <VaultReferenceFields idPrefix="add" value={varVault} onChange={setVarVault}
+                        instances={vaultInstances} defaultInstance={vaultDefaultInstance} />
+                    </div>
+                  ) : (
+                    <div>
+                      <label htmlFor="var-val" className="block text-sm font-medium text-slate-300 mb-1">{t('detail.varValue')}</label>
+                      <SensitiveValueInput id="var-val" value={varValue} onChange={setVarValue} sensitive={varSensitive} placeholder="us-east-1"
+                        rows={2} className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent resize-y" />
+                    </div>
+                  )}
                   <div>
                     <label htmlFor="var-cat" className="block text-sm font-medium text-slate-300 mb-1">{t('detail.varCategory')}</label>
                     <select id="var-cat" value={varCategory} onChange={(e) => setVarCategory(e.target.value)}
@@ -609,13 +735,17 @@ export default function VariableSetDetailPage() {
             ) : variables.length === 0 ? (
               <EmptyState message={t('detail.emptyVars')} />
             ) : (
-              <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-x-auto">
+              <>
+              {/* Desktop (>= md): the table. The edit state is ONE full-width
+                  cell — the Vault reference builder needs five fields, and the
+                  VALUE column truncated them to unreadable stubs (#1439). */}
+              <div className="hidden md:block bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-x-auto">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-slate-700/50">
                       <th className="px-4 py-3 text-start text-xs font-medium text-slate-400 uppercase tracking-wider">{t('detail.varKey')}</th>
                       <th className="px-4 py-3 text-start text-xs font-medium text-slate-400 uppercase tracking-wider">{t('detail.varValue')}</th>
-                      <th className="px-4 py-3 text-start text-xs font-medium text-slate-400 uppercase tracking-wider hidden sm:table-cell">{t('detail.varCategory')}</th>
+                      <th className="px-4 py-3 text-start text-xs font-medium text-slate-400 uppercase tracking-wider">{t('detail.varCategory')}</th>
                       <th className="px-4 py-3 text-end text-xs font-medium text-slate-400 uppercase tracking-wider">{t('detail.actions')}</th>
                     </tr>
                   </thead>
@@ -623,54 +753,29 @@ export default function VariableSetDetailPage() {
                     {variables.map((v) =>
                       editingVarId === v.id ? (
                         <tr key={v.id} className="bg-slate-700/20">
-                          <td className="px-4 py-3">
-                            <input type="text" value={editVarKey} onChange={(e) => setEditVarKey(e.target.value)}
-                              className="w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 font-mono focus:outline-none focus:ring-1 focus:ring-brand-500" />
-                          </td>
-                          <td className="px-4 py-3">
-                            <SensitiveValueInput value={editVarValue} onChange={setEditVarValue}
-                              sensitive={editVarSensitive}
-                              placeholder={editVarSensitive ? t('detail.enterNewValue') : ''}
-                              rows={2}
-                              className="w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 font-mono focus:outline-none focus:ring-1 focus:ring-brand-500 resize-y" />
-                          </td>
-                          <td className="px-4 py-3 hidden sm:table-cell">
-                            <div className="flex items-center gap-3">
-                              <select value={editVarCategory} onChange={(e) => setEditVarCategory(e.target.value)}
-                                className="px-2 py-1 text-xs border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500">
-                                <option value="terraform">terraform</option>
-                                <option value="env">env</option>
-                                <option value="git_http_auth">Git HTTPS credential</option>
-                                <option value="git_ssh_auth">Git SSH credential</option>
-                              </select>
-                              <label className="flex items-center gap-1 cursor-pointer">
-                                <input type="checkbox" checked={editVarSensitive} onChange={(e) => setEditVarSensitive(e.target.checked)}
-                                  className="rounded border-slate-600 bg-slate-700 text-brand-600" />
-                                <span className="text-xs text-slate-400">{t('detail.sensAbbr')}</span>
-                              </label>
-                              <label className="flex items-center gap-1 cursor-pointer">
-                                <input type="checkbox" checked={editVarHcl} onChange={(e) => setEditVarHcl(e.target.checked)}
-                                  className="rounded border-slate-600 bg-slate-700 text-brand-600" />
-                                <span className="text-xs text-slate-400">HCL</span>
-                              </label>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 text-end">
-                            <div className="flex justify-end gap-2">
-                              <button onClick={() => setEditingVarId(null)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors">{t('detail.cancel')}</button>
-                              <button onClick={handleSaveVar} disabled={savingVar} className="px-2.5 py-1 rounded-md text-xs font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors disabled:opacity-50">
-                                {savingVar ? t('detail.saving') : t('detail.save')}
-                              </button>
-                            </div>
+                          <td colSpan={4} className="px-4 py-4">
+                            <VariableEditPanel
+                              idPrefix={`edit-${v.id}`}
+                              state={editPanelState}
+                              onChange={patchEditPanel}
+                              vaultAvailable={vaultAvailable}
+                              vaultInstances={vaultInstances}
+                              vaultDefaultInstance={vaultDefaultInstance}
+                              saving={savingVar}
+                              onSave={handleSaveVar}
+                              onCancel={() => setEditingVarId(null)}
+                            />
                           </td>
                         </tr>
                       ) : (
                         <tr key={v.id} className="hover:bg-slate-700/20 transition-colors">
                           <td className="px-4 py-3 text-sm text-slate-200 font-mono">{v.attributes.key}</td>
                           <td className="px-4 py-3 text-sm text-slate-400 font-mono">
-                            {v.attributes.sensitive ? '***' : (v.attributes.value || <span className="text-slate-600 italic">{t('detail.empty')}</span>)}
+                            {v.attributes['value-source'] === 'vault'
+                              ? <VaultValueDisplay value={v.attributes.value} />
+                              : v.attributes.sensitive ? '***' : (v.attributes.value || <span className="text-slate-600 italic">{t('detail.empty')}</span>)}
                           </td>
-                          <td className="px-4 py-3 text-xs text-slate-400 hidden sm:table-cell">
+                          <td className="px-4 py-3 text-xs text-slate-400">
                             <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                               v.attributes.category === 'terraform' ? 'bg-purple-900/50 text-purple-300' : 'bg-cyan-900/50 text-cyan-300'
                             }`}>
@@ -689,6 +794,50 @@ export default function VariableSetDetailPage() {
                   </tbody>
                 </table>
               </div>
+
+              {/* Mobile (< md): the same data as stacked cards, sharing the
+                  edit panel so the two cannot drift. Nothing is dropped — key,
+                  value and category all stay on screen. */}
+              <ul className="md:hidden space-y-2">
+                {variables.map((v) => (
+                  <li key={v.id} className="rounded-lg border border-slate-700/50 bg-slate-800/50 p-3">
+                    {editingVarId === v.id ? (
+                            <VariableEditPanel
+                              idPrefix={`medit-${v.id}`}
+                              state={editPanelState}
+                              onChange={patchEditPanel}
+                              vaultAvailable={vaultAvailable}
+                              vaultInstances={vaultInstances}
+                              vaultDefaultInstance={vaultDefaultInstance}
+                              saving={savingVar}
+                              onSave={handleSaveVar}
+                              onCancel={() => setEditingVarId(null)}
+                            />
+                    ) : (
+                      <>
+                        <div className="flex items-start justify-between gap-2 mb-1.5">
+                          <span className="text-sm font-mono font-medium text-slate-200 break-all">{v.attributes.key}</span>
+                          <span className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                            v.attributes.category === 'terraform' ? 'bg-purple-900/50 text-purple-300' : 'bg-cyan-900/50 text-cyan-300'
+                          }`}>
+                            {v.attributes.category}
+                          </span>
+                        </div>
+                        <div className="mb-2 text-sm text-slate-400 font-mono break-all">
+                          {v.attributes['value-source'] === 'vault'
+                            ? <VaultValueDisplay value={v.attributes.value} />
+                            : v.attributes.sensitive ? '***' : (v.attributes.value || <span className="text-slate-600 italic">{t('detail.empty')}</span>)}
+                        </div>
+                        <div className="flex gap-2">
+                          <button onClick={() => startEditingVar(v)} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200">{t('detail.edit')}</button>
+                          <button onClick={() => handleDeleteVariable(v.id)} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300">{t('detail.delete')}</button>
+                        </div>
+                      </>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              </>
             )}
           </div>
         )}

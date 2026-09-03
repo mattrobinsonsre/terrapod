@@ -101,6 +101,20 @@ class Role(Base):
     allow_names: Mapped[list[str]] = mapped_column(JSONB, default=list, nullable=False)
     deny_labels: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, nullable=False)
     deny_names: Mapped[list[str]] = mapped_column(JSONB, default=list, nullable=False)
+    #: Estate-wide grant: the allow side matches EVERY resource on every axis.
+    #: Deny rules still win over it, so "everything except the sealed ones"
+    #: stays expressible. It does NOT raise the role's capabilities — a role
+    #: granting read still grants read, just everywhere.
+    #:
+    #: Exists because label and name rules are exact-match (no wildcards), so
+    #: the only way to cover the estate was a shared label on every workspace —
+    #: which fails in the dangerous direction: a workspace created without the
+    #: label silently falls outside the role, so an operator believes they have
+    #: coverage they do not. An explicit boolean cannot be granted by accident,
+    #: which a magic "*" value could — a resource can legitimately be NAMED "*".
+    allow_all: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=sa.false()
+    )
 
     # The role's grant is its explicit capability set (#585) — the SINGLE
     # persisted source of truth for enforcement. The legacy hierarchical

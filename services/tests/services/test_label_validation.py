@@ -83,21 +83,16 @@ class TestReservedKeys:
 
     def test_reserved_keys_locked_in(self):
         """The set is documented in rbac.md and depended on by the frontend
-        filter parser. Lock it to flag any drift in review."""
-        assert RESERVED_LABEL_KEYS == frozenset(
-            {
-                "status",
-                "pool",
-                "mode",
-                "backend",
-                "owner",
-                "drift",
-                "version",
-                "vcs",
-                "locked",
-                "branch",
-            }
-        )
+        filter parser. Lock it to flag any drift in review.
+
+        Narrowed from ten keys to two in v1.6.0 (#1450). A key is reserved only
+        where using it as a label would mislead about a decision the system
+        actually makes: `status` (the sole built-in filter term) and `owner`
+        (maps to `owner_email`, which grants workspace admin). The other eight
+        were mere descriptive overlap with a column and refused a label while
+        giving the filter nothing in return.
+        """
+        assert RESERVED_LABEL_KEYS == frozenset({"status", "owner"})
 
     def test_clean_keys_alongside_reserved_still_rejected(self):
         """Mixed input with one reserved key still rejects — no partial accept."""

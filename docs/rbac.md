@@ -241,6 +241,133 @@ Built-in roles (`admin`, `audit`, `everyone`) cannot be deleted.
 
 ---
 
+## Granting on Everything
+
+Label and name rules are **exact-match** — there are no wildcards. So before
+v1.6.0 the only way to give a role reach over the whole estate was to put a
+shared label on every workspace and allow on that, which **fails in the
+dangerous direction**: a workspace created without the label silently falls
+outside the role, and nothing tells you. You believe you have coverage you do
+not have.
+
+Set `allow-all` instead:
+
+```json
+{"data": {"attributes": {"allow-all": true, "workspace-permission": "write"}}}
+```
+
+- It matches **every resource on every axis**, including ones created later.
+- **Deny rules still win**, so `allow-all` plus `deny-labels` is how you say
+  "everything except the sealed ones".
+- It does **not** raise the role's permission level. A role granting read still
+  grants read — just everywhere. `allow-all` widens *where* a role applies,
+  never *what* it grants.
+
+An explicit boolean was chosen over treating `"*"` as a wildcard value
+deliberately: a resource can legitimately be *named* `*`, and a magic string in
+an allow-list is how a deployment ends up with coverage nobody intended.
+
+---
+
+## Seeing What a Role Reaches
+
+Label-based RBAC scales as a mechanism, but not as something you can verify by
+eye. At a few hundred workspaces you can tell at a glance who `env:prod`
+reaches; at ten thousand you cannot — which pushes people towards broad rules
+they can reason about, and away from deny rules, whose interaction with allow
+rules is exactly where mistakes hide.
+
+Two endpoints answer the question directly:
+
+```
+POST /api/terrapod/v1/roles/preview          # an UNSAVED role body
+GET  /api/terrapod/v1/roles/{name}/preview   # a saved role
+```
+
+Both are read-only and carry the same `admin`/`audit` gate as viewing roles.
+The **unsaved** form is the one that matters while authoring: the role does not
+have to exist yet, so the admin UI shows the match updating as you type, and you
+see the outcome of a deny rule *before* saving it.
+
+The response reports:
+
+| Field | Meaning |
+|---|---|
+| `granted-count` | Resources the role grants on, **summed across every axis** (workspaces, agent pools, registry items, catalog items) and counted over the whole estate, not the returned page. Per-axis figures are under `axes` |
+| `denied-count` | Resources an allow rule matched and a deny rule then removed, likewise summed across axes |
+| `matched-count` | The two added together: everything the allow rules touched |
+| `workspaces` | One page of the granted set |
+| `denied` | A bounded sample of what the deny rules excluded |
+
+The answer covers **every axis a role's rules govern** — workspaces, agent
+pools, registry modules and providers, and catalog items — under `axes`,
+because `_role_matches` compares a name and labels and so is axis-agnostic: the
+same rule that selects workspaces selects all the rest. Capabilities in each
+block are sliced to that axis, so a role granting `registry:admin` and
+`workspace:read` reports admin against a module and read against a workspace.
+
+Each resource carries a `reason` naming the rule responsible
+(`allow-label:env=prod`, `deny-name`, …), the `capabilities` the role resolves
+to *there*, and `notes`.
+
+**Read the notes before concluding the role is the only thing granting access.**
+Each names a path that exists independently of the role:
+
+| Note | Meaning |
+|---|---|
+| `has-owner` | The workspace has an owner, and an owner holds `admin` regardless of this role |
+| `everyone-floor` | Labelled `access: everyone`, so it is readable by anyone |
+| `catalog-clamped` | Catalog-managed, so every non-platform-admin grant is capped at read — a role granting write here does **not** give write |
+
+Denied workspaces are reported rather than silently omitted, because someone who
+cannot see what a deny rule removed cannot tell an intended exclusion from a
+typo.
+
+Built-in roles are **refused** (422) rather than answered: `admin` and `audit`
+grant through the platform path on every workspace, so a label-reach figure for
+them would be true and deeply misleading.
+
+The preview resolves through the same gate that authorises requests, so it
+cannot drift from enforcement — a permissions view that disagrees with the
+enforcement path would be worse than no view at all.
+
+### The other direction: who can reach a resource
+
+```
+GET /api/terrapod/v1/workspaces/{id}/access
+GET /api/terrapod/v1/agent-pools/{id}/access
+GET /api/terrapod/v1/registry-modules/{id}/access
+GET /api/terrapod/v1/registry-providers/{id}/access
+GET /api/terrapod/v1/catalog-items/{id}/access
+```
+
+Looking at one resource rather than one role: *who can touch this?* Returns
+every role whose rules match, with the reason, the capabilities it resolves to
+there, and **who actually holds it** — a role nobody holds reaches nothing in
+practice, and that is frequently the finding. Roles are few, so it is unpaged.
+
+**Read `platform-paths` before treating the role list as the whole answer**,
+because it is not:
+
+| Path | Meaning |
+|---|---|
+| `platform-admin` | Platform admins reach every resource, role or no role |
+| `platform-audit` | Platform auditors can read every resource |
+| `owner` | The owner holds `admin` here regardless of any role |
+| `everyone-floor` | Labelled `access: everyone`, so readable by anyone |
+| `catalog-clamped` | Catalog-managed, so every non-admin grant is capped at read |
+
+In the UI this is the workspace's **Access** tab.
+
+Both directions are offered only to platform `admin`/`audit`. That is not
+incidental: the answer names every matching resource across the estate
+regardless of what the caller can see, so it is safe precisely because those
+principals can already see all of it. The service enforces that coupling
+explicitly and fails closed — loosening the gate without first writing
+per-viewer filtering raises rather than quietly disclosing the estate.
+
+---
+
 ## Role Assignments
 
 Role assignments bind a user (identified by provider + email) to a role.
@@ -347,24 +474,20 @@ Keys and values must be strings.
 
 A small set of label keys are reserved as **virtual filter fields** in the workspace-list filter UI. A filter term like `status:errored` resolves against a workspace's derived status, not against a literal label called `status`. To keep that filter language unambiguous, these keys cannot be used as literal labels — the API rejects them on create and update with 422.
 
-| Reserved key | Maps to | Usable as a filter |
+| Reserved key | Maps to | Why it is reserved |
 |---|---|---|
-| `status` | derived run status (`errored`, `needs-confirm`, `drifted`, `applied`, …) | yes |
-| `pool` | `agent_pool_name` | reserved |
-| `mode` | `execution_mode` (`local`/`agent`) | reserved |
-| `backend` | `execution_backend` (`tofu`/`terraform`) | reserved |
-| `owner` | `owner_email` | reserved |
-| `drift` | `drift_status` (`drifted`/`in_sync`/`never_checked`) | reserved |
-| `version` | `terraform_version` | reserved |
-| `vcs` | `true`/`false` — has VCS connection | reserved |
-| `locked` | `true`/`false` — currently locked | reserved |
-| `branch` | `vcs_branch` | reserved |
+| `status` | derived run status (`errored`, `needs-confirm`, `drifted`, `applied`, …) | **Parsing** — the only built-in filter term, so a literal `status` label would make `status:errored` ambiguous |
+| `owner` | `owner_email`, which grants workspace **admin** | **Authorization** — a label `owner: alice` grants alice nothing, and believing otherwise is a security-shaped mistake |
 
 The `status` field also accepts one **aggregate** value beyond the per-status values above: `status:unhealthy` matches any workspace with at least one active **health condition** (state diverged, no agent pool assigned, VCS polling error, drift detected, or drift-detection errored). It is the roll-up behind the **Health Issues** summary card on the workspace list — clicking the card when the count is non-zero toggles this filter so you can jump straight to the affected workspaces (and click again to clear). Because it rides the already-reserved `status` field, no additional label key is reserved for it. It is deliberately broader than any single status value: a workspace awaiting confirmation shows as `needs-confirm` even when its state has diverged, and the `no_agent_pool`/`drift_errored` conditions have no standalone status value at all — `status:unhealthy` catches all of them.
 
-The set is intentionally aggressive: reserving a key today is near-zero cost (no virtual implementation required), but adding a reservation later — once the key is in customer use as a literal label — is a migration.
+**This set was narrowed from ten keys to two in v1.6.0.** A key is now reserved only when using it as a label would **mislead about a decision Terrapod actually makes** — parsing (`status`) or authorization (`owner`). Descriptive overlap with a workspace field is not enough on its own.
 
-If you have an existing label with one of the reserved keys, reads and existing rows continue to work, but the next create or update of that resource that includes the reserved key in its `labels` field will be rejected with a 422 that names the offending key. Migrate by renaming — for example, swap `version: 1.11` for `tf-version: 1.11` (or drop it if the same data is already on `terraform_version`).
+The eight released keys — `pool`, `mode`, `backend`, `drift`, `version`, `vcs`, `locked`, `branch` — were reserved for that weaker reason. None was ever a built-in filter term, so each refused your label *and* gave the filter nothing in return, and they are common words: `version` legitimately means an application or module version, not only the workspace's `terraform_version`. `drift` and `locked` are answerable as `status:drifted` and `status:locked` regardless.
+
+**Those eight are now usable as ordinary labels.** The change is additive — no label that worked before stops working — and it lets label-based targeting, which is Terrapod's answer to grouping workspaces, use the vocabulary you actually reach for. Should a released key ever warrant a virtual filter term, it will take a distinct name (`pool-name:`) rather than break labels already in use; the house convention is that a new facet rides `status:` as a *value*, as `status:locked` and `status:unhealthy` both do.
+
+If you have an existing label with one of the reserved keys, reads and existing rows continue to work, but the next create or update of that resource that includes the reserved key in its `labels` field will be rejected with a 422 that names the offending key. Migrate by renaming — for example, swap `status: live` for `state: live`. (Earlier releases suggested renaming `version`; that key is no longer reserved, so it needs no change.)
 
 The list lives in `terrapod.services.label_validation.RESERVED_LABEL_KEYS`. Adding to it is a behaviour change for any deployment with existing labels using the new key — update both the constant and this table together.
 

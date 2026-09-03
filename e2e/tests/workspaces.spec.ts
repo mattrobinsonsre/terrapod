@@ -311,3 +311,26 @@ test.describe('Workspaces', () => {
     await expect(healthyRow).toBeVisible({ timeout: 10_000 });
   });
 });
+
+test.describe('Workspace access tab (#1456)', () => {
+  test('shows who can reach the workspace, including the role-free paths', async ({ page }) => {
+    // From the stored auth state, not page.evaluate: before the first goto
+    // the page is about:blank, where reading localStorage is a SecurityError.
+    const token = getStoredToken();
+    const name = `acctab${Date.now()}`;
+    const res = await page.request.post('/api/v2/organizations/default/workspaces', {
+      headers: { 'Content-Type': 'application/vnd.api+json', Authorization: `Bearer ${token}` },
+      data: { data: { type: 'workspaces', attributes: { name, labels: { env: 'prod' } } } },
+    });
+    expect(res.status()).toBe(201);
+    const wsId = (await res.json()).data.id;
+
+    await page.goto(`/workspaces/${wsId}?tab=access`);
+    const panel = page.getByTestId('resource-access');
+    await expect(panel).toBeVisible({ timeout: 15_000 });
+
+    // The platform paths must be present: a role list alone reads as the
+    // complete answer when a platform admin reaches everything anyway.
+    await expect(panel.getByText(/platform admins/i)).toBeVisible({ timeout: 15_000 });
+  });
+});

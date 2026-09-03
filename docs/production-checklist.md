@@ -26,6 +26,7 @@ A step-by-step checklist for preparing a Terrapod instance for production use. E
 - [ ] **Local auth is disabled** (if SSO is the sole provider) -- Set `auth.local_enabled: false` to prevent password-based login. See [Security Hardening: Authentication](security-hardening.md#authentication-hardening).
 - [ ] **API token TTL is appropriate** -- Review `auth.api_token_max_ttl_hours` (default: 8760 = 1 year). Shorter TTLs reduce blast radius of leaked tokens. See [Security Hardening: Authentication](security-hardening.md#authentication-hardening).
 - [ ] **RBAC roles are defined** -- Custom roles with label-based allow/deny rules for workspace access. Review the built-in roles (`admin`, `audit`, `everyone`) and create project-specific roles. See [RBAC](rbac.md).
+- [ ] **No role sets `allow-all` unintentionally** — it grants on every resource on every axis, including ones created later. Verify each role's real reach with `GET /api/terrapod/v1/roles/{name}/preview`, which reports it across all axes and names the rule responsible for each match.
 - [ ] **Admin accounts are minimised** -- Only operators who need full platform access should hold the `admin` role. Use `audit` for read-only compliance access.
 
 ---

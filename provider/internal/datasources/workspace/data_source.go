@@ -43,6 +43,7 @@ type workspaceDataSourceModel struct {
 	VCSConnectionID               types.String `tfsdk:"vcs_connection_id"`
 	AgentPoolID                   types.String `tfsdk:"agent_pool_id"`
 	AgentPoolIDs                  types.List   `tfsdk:"agent_pool_ids"`
+	AgentPoolNames                types.List   `tfsdk:"agent_pool_names"`
 	VarFiles                      types.List   `tfsdk:"var_files"`
 	TriggerPrefixes               types.List   `tfsdk:"trigger_prefixes"`
 	DriftIgnoreRules              types.List   `tfsdk:"drift_ignore_rules"`
@@ -104,6 +105,7 @@ func (d *workspaceDataSource) Schema(_ context.Context, _ datasource.SchemaReque
 			"vcs_branch":                       computedString("VCS branch."),
 			"vcs_connection_id":                computedString("VCS connection ID."),
 			"agent_pool_id":                    computedString("Agent pool ID — element 0 of `agent_pool_ids`, kept for callers written before multi-pool routing."),
+			"agent_pool_names":                 computedList("Read-only. The pools' names, positionally matching `agent_pool_ids` — served so a consumer can render a pool without fetching the whole pool list just to turn ids into labels."),
 			"agent_pool_ids":                   computedList("Agent pools this workspace's runs may execute on (#1085). Flat set: a queued run is offered to every pool at once and whichever has a live listener claims it, so losing one pool does not stop the workspace."),
 			"var_files":                        computedList("Var files for -var-file arguments."),
 			"trigger_prefixes":                 computedList("Repo-root-relative paths the VCS sparse-checkout must include in addition to working_directory (e.g. sibling modules referenced via `source = \"../foo\"`)."),
@@ -220,6 +222,13 @@ func readDataSourceModel(ctx context.Context, res *terrapod.Resource, m *workspa
 		m.AgentPoolIDs = val
 	} else {
 		m.AgentPoolIDs = types.ListNull(types.StringType)
+	}
+	if poolNames := terrapod.GetListAttr(res, "agent-pool-names"); len(poolNames) > 0 {
+		val, d := types.ListValueFrom(ctx, types.StringType, poolNames)
+		diags.Append(d...)
+		m.AgentPoolNames = val
+	} else {
+		m.AgentPoolNames = types.ListNull(types.StringType)
 	}
 	setOptionalString(&m.DriftStatus, terrapod.GetStringAttr(res, "drift-status"))
 	setOptionalString(&m.DriftLastCheckedAt, terrapod.GetStringAttr(res, "drift-last-checked-at"))

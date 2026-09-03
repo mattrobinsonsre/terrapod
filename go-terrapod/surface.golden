@@ -2,6 +2,12 @@ const AssignmentExplicit
 const AssignmentGlobal
 const AssignmentRuleBased
 const DiscoveryPath
+const RoleReachAllowed
+const RoleReachDenied
+const RoleReachNone
+const RoleReachNoteCatalogClamped
+const RoleReachNoteEveryoneFloor
+const RoleReachNoteHasOwner
 const VersionField
 field APIError.Body string
 field APIError.StatusCode int
@@ -219,6 +225,7 @@ field CreateRegistryProviderRequest.Labels map[string]string
 field CreateRegistryProviderRequest.Name string
 field CreateRemoteStateConsumerRequest.ConsumerWorkspaceID string
 field CreateRemoteStateConsumerRequest.ProducerWorkspaceID string
+field CreateRoleRequest.AllowAll bool
 field CreateRoleRequest.AllowLabels map[string]string
 field CreateRoleRequest.AllowNames []string
 field CreateRoleRequest.Capabilities []string
@@ -285,6 +292,7 @@ field CreateVarsetVariableRequest.HCL bool
 field CreateVarsetVariableRequest.Key string
 field CreateVarsetVariableRequest.Sensitive bool
 field CreateVarsetVariableRequest.Value string
+field CreateVarsetVariableRequest.ValueSource string
 field CreateWorkspaceRequest.AISummaryContext string `json:"ai-summary-context,omitempty"`
 field CreateWorkspaceRequest.AISummaryMode string `json:"ai-summary-mode,omitempty"`
 field CreateWorkspaceRequest.AgentPoolID string `json:"agent-pool-id,omitempty"`
@@ -591,6 +599,18 @@ field Resource.Attributes map[string]json.RawMessage `json:"attributes"`
 field Resource.ID string `json:"id"`
 field Resource.Relationships map[string]Relationship `json:"relationships,omitempty"`
 field Resource.Type string `json:"type"`
+field ResourceAccess.Axis string `json:"axis"`
+field ResourceAccess.DeniedRoles []ResourceAccessRole `json:"denied-roles,omitempty"`
+field ResourceAccess.PlatformPaths []string `json:"platform-paths,omitempty"`
+field ResourceAccess.Resource struct { ID string `json:"id"` Kind string `json:"kind"` Name string `json:"name"` Labels map[string]string `json:"labels,omitempty"` OwnerEmail string `json:"owner-email,omitempty"` } `json:"resource"`
+field ResourceAccess.RoleCount int `json:"role-count"`
+field ResourceAccess.Roles []ResourceAccessRole `json:"roles"`
+field ResourceAccessRole.Capabilities []string `json:"capabilities,omitempty"`
+field ResourceAccessRole.HeldBy []string `json:"held-by,omitempty"`
+field ResourceAccessRole.Notes []string `json:"notes,omitempty"`
+field ResourceAccessRole.Reason string `json:"reason,omitempty"`
+field ResourceAccessRole.Role string `json:"role"`
+field ResourceAccessRole.Verdict string `json:"verdict"`
 field RestoreOptions.Force bool
 field RestoreOptions.Name string
 field RestoredWorkspace.DroppedReferences []map[string]any `json:"dropped-references"`
@@ -600,6 +620,7 @@ field RestoredWorkspace.RestoredFrom string `json:"restored-from"`
 field RestoredWorkspace.StateVersionsRestored int `json:"state-versions-restored"`
 field RestoredWorkspace.StateVersionsSkipped []map[string]any `json:"state-versions-skipped"`
 field RestoredWorkspace.Suppressed []string `json:"suppressed"`
+field Role.AllowAll bool `json:"allow-all"`
 field Role.AllowLabels map[string]string `json:"allow-labels,omitempty"`
 field Role.AllowNames []string `json:"allow-names,omitempty"`
 field Role.BuiltIn bool `json:"built-in"`
@@ -618,6 +639,30 @@ field RoleAssignment.CreatedAt string `json:"created-at,omitempty"`
 field RoleAssignment.Email string `json:"email"`
 field RoleAssignment.ProviderName string `json:"provider-name"`
 field RoleAssignment.RoleName string `json:"role-name"`
+field RoleReach.Axes map[string]RoleReachAxis `json:"axes,omitempty"`
+field RoleReach.Denied []RoleReachWorkspace `json:"denied,omitempty"`
+field RoleReach.DeniedCount int `json:"denied-count"`
+field RoleReach.DeniedTruncated bool `json:"denied-truncated"`
+field RoleReach.GrantedCount int `json:"granted-count"`
+field RoleReach.MatchedCount int `json:"matched-count"`
+field RoleReach.Workspaces []RoleReachWorkspace `json:"workspaces"`
+field RoleReachAxis.Denied []RoleReachWorkspace `json:"denied,omitempty"`
+field RoleReachAxis.DeniedCount int `json:"denied-count"`
+field RoleReachAxis.DeniedTruncated bool `json:"denied-truncated"`
+field RoleReachAxis.GrantedCount int `json:"granted-count"`
+field RoleReachAxis.MatchedCount int `json:"matched-count"`
+field RoleReachAxis.Resources []RoleReachWorkspace `json:"resources"`
+field RoleReachOptions.PageNumber int
+field RoleReachOptions.PageSize int
+field RoleReachWorkspace.Capabilities []string `json:"capabilities,omitempty"`
+field RoleReachWorkspace.ID string `json:"id"`
+field RoleReachWorkspace.Kind string `json:"kind,omitempty"`
+field RoleReachWorkspace.Labels map[string]string `json:"labels,omitempty"`
+field RoleReachWorkspace.Name string `json:"name"`
+field RoleReachWorkspace.Notes []string `json:"notes,omitempty"`
+field RoleReachWorkspace.OwnerEmail string `json:"owner-email,omitempty"`
+field RoleReachWorkspace.Reason string `json:"reason,omitempty"`
+field RoleReachWorkspace.Verdict string `json:"verdict"`
 field Run.Actions RunActions `json:"actions"`
 field Run.AgentPoolID string `json:"agent-pool-id,omitempty"`
 field Run.AllowEmptyApply bool `json:"allow-empty-apply"`
@@ -784,6 +829,7 @@ field UpdateRegistryModuleRequest.VCSConnectionID *string
 field UpdateRegistryModuleRequest.VCSRepoURL *string
 field UpdateRegistryModuleRequest.VCSTagPattern *string
 field UpdateRegistryProviderRequest.Labels *map[string]string
+field UpdateRoleRequest.AllowAll *bool
 field UpdateRoleRequest.AllowLabels *map[string]string
 field UpdateRoleRequest.AllowNames *[]string
 field UpdateRoleRequest.Capabilities []string
@@ -828,6 +874,7 @@ field UpdateVarsetVariableRequest.HCL *bool
 field UpdateVarsetVariableRequest.Key string
 field UpdateVarsetVariableRequest.Sensitive *bool
 field UpdateVarsetVariableRequest.Value *string
+field UpdateVarsetVariableRequest.ValueSource *string
 field UpdateWorkspaceRequest.AISummaryContext *string `json:"ai-summary-context,omitempty"`
 field UpdateWorkspaceRequest.AISummaryMode string `json:"ai-summary-mode,omitempty"`
 field UpdateWorkspaceRequest.AgentPoolID string `json:"agent-pool-id,omitempty"`
@@ -942,6 +989,7 @@ field VariableSetVariable.Key string `json:"key"`
 field VariableSetVariable.Sensitive bool `json:"sensitive"`
 field VariableSetVariable.UpdatedAt string `json:"updated-at,omitempty"`
 field VariableSetVariable.Value string `json:"value,omitempty"`
+field VariableSetVariable.ValueSource string `json:"value-source,omitempty"`
 field VariableSetVariable.VersionID string `json:"version-id,omitempty"`
 field VarsetWorkspace.AssignmentSource string `json:"assignment-source"`
 field VarsetWorkspace.ID string `json:"id"`
@@ -963,6 +1011,7 @@ field Workspace.AISummaryMode string `json:"ai-summary-mode,omitempty"`
 field Workspace.AgentPoolID string `json:"agent-pool-id,omitempty"`
 field Workspace.AgentPoolIDs []string `json:"agent-pool-ids,omitempty"`
 field Workspace.AgentPoolName string `json:"agent-pool-name,omitempty"`
+field Workspace.AgentPoolNames []string `json:"agent-pool-names,omitempty"`
 field Workspace.AutoApply bool `json:"auto-apply"`
 field Workspace.AutoApplyMode string `json:"auto-apply-mode"`
 field Workspace.AutoMerge bool `json:"auto-merge"`
@@ -1169,6 +1218,7 @@ method (*Client) GetProviderTemplate(ctx context.Context, id string) (*ProviderT
 method (*Client) GetRegistryModule(ctx context.Context, name, providerName string) (*RegistryModule, error)
 method (*Client) GetRegistryProvider(ctx context.Context, name string) (*RegistryProvider, error)
 method (*Client) GetRemoteStateConsumer(ctx context.Context, id string) (*RemoteStateConsumer, error)
+method (*Client) GetResourceAccess(ctx context.Context, kind, id string) (*ResourceAccess, error)
 method (*Client) GetRole(ctx context.Context, name string) (*Role, error)
 method (*Client) GetRoleAssignment(ctx context.Context, providerName, email, roleName string) (*RoleAssignment, error)
 method (*Client) GetRun(ctx context.Context, runID string) (*Run, error)
@@ -1243,6 +1293,8 @@ method (*Client) Post(ctx context.Context, path string, payload []byte) ([]byte,
 method (*Client) PostArchitectureCritiqueMessage( ctx context.Context, workspaceID, content string, ) (*ArchitectureCritiqueMessage, error)
 method (*Client) PostPlanSummaryMessage(ctx context.Context, runID, content string) (*PlanSummaryMessage, error)
 method (*Client) PostRunCostSummaryMessage(ctx context.Context, runID, content string) (*CostSummaryMessage, error)
+method (*Client) PreviewRoleReach(ctx context.Context, name string, opts *RoleReachOptions) (*RoleReach, error)
+method (*Client) PreviewUnsavedRoleReach(ctx context.Context, req CreateRoleRequest, opts *RoleReachOptions) (*RoleReach, error)
 method (*Client) ProvisionCatalogItem(ctx context.Context, itemID string, attrs map[string]any) (*CatalogInstance, error)
 method (*Client) Put(ctx context.Context, path string, payload []byte) ([]byte, error)
 method (*Client) PutRaw(ctx context.Context, path, contentType string, payload []byte) ([]byte, error)
@@ -1392,10 +1444,16 @@ type Relationship struct
 type RelationshipResource struct
 type RemoteStateConsumer struct
 type Resource struct
+type ResourceAccess struct
+type ResourceAccessRole struct
 type RestoreOptions struct
 type RestoredWorkspace struct
 type Role struct
 type RoleAssignment struct
+type RoleReach struct
+type RoleReachAxis struct
+type RoleReachOptions struct
+type RoleReachWorkspace struct
 type Run struct
 type RunActions struct
 type RunStatusTimestamps struct

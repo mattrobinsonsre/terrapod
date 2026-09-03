@@ -87,7 +87,79 @@ def _validated_value_source(attrs: dict, current: str = "static") -> str:
     return src
 
 
-def _apply_value_source(attrs: dict, current: str = "static") -> tuple[str, bool]:
+def _reject_vault_on_local(ws, value_source: str) -> None:
+    """A vault reference only resolves on the agent path.
+
+    `resolve_vault_variables` runs in the listener claim endpoint, so a
+    local-execution workspace would receive no value, no error and no failed
+    run — the one outcome this feature is built to prevent. Refuse it at the
+    point of writing rather than fail silently at run time.
+    """
+    if value_source != "vault":
+        return
+    if getattr(ws, "execution_mode", "agent") == "local":
+        raise HTTPException(
+            status_code=422,
+            detail="A Vault-sourced variable needs agent execution: Terrapod "
+            "resolves the reference server-side when a runner claims the run, "
+            "and a local-execution workspace runs terraform on your own machine "
+            "where that never happens. Switch the workspace to agent execution, "
+            "or supply the value another way.",
+        )
+
+
+def _reject_vault_on_git_auth(value_source: str, category: str | None) -> None:
+    """A git-auth credential is a JSON envelope; a Vault field is one string.
+
+    `resolve_git_auth` json.loads a git-auth value and skips it when that fails,
+    so a vault-sourced one is dropped and the run fails to fetch its modules
+    with nothing pointing at why. `git_ssh_auth` is worse: the value is passed
+    through verbatim, handing the runner a bare secret where it expects
+    {private_key, known_hosts, rewrite}. The workspace UI already refuses the
+    pair; refuse it in the API too, for every write path.
+    """
+    if value_source != "vault":
+        return
+    if category in variable_service.GIT_AUTH_CATEGORIES:
+        raise HTTPException(
+            status_code=422,
+            detail=f"category '{category}' cannot use value-source 'vault': a "
+            "git credential is a JSON object, while a Vault reference resolves "
+            "to a single field. Put the credential's own secret fields in Vault "
+            "and reference them from a static git-auth value instead.",
+        )
+
+
+async def _reject_vault_varset_on_local(db, vs, *, when: str) -> None:
+    """A set carrying a Vault reference must not reach a local-execution workspace.
+
+    Vault resolves only on the agent claim path, so on a local workspace the
+    reference delivers nothing, silently — the outcome the workspace-level guard
+    exists to prevent, reached through a set instead (#1463).
+
+    Two write paths can create the pairing and both are checked: assigning a
+    workspace to the set, and writing a Vault variable into a set that already
+    reaches one. A rule whose match set widens *later* is not a write against
+    either, so it stays outside this guard — see docs/vault.md.
+    """
+    from terrapod.services.variable_service import local_workspaces_for_varset
+
+    local = await local_workspaces_for_varset(db, vs)
+    if not local:
+        return
+    names = ", ".join(sorted(ws.name for ws in local))
+    raise HTTPException(
+        status_code=422,
+        detail=f"{when}: this variable set reaches local-execution workspace(s) "
+        f"({names}), where a Vault reference resolves to nothing because "
+        "resolution happens only when a runner claims the run. Switch them to "
+        "agent execution, or unassign them from this set, first.",
+    )
+
+
+def _apply_value_source(
+    attrs: dict, current: str = "static", category: str | None = None
+) -> tuple[str, bool]:
     """Resolve `value-source` for a write and validate its reference.
 
     Returns ``(value_source, force_sensitive)``. A vault-sourced variable is
@@ -95,13 +167,42 @@ def _apply_value_source(attrs: dict, current: str = "static") -> tuple[str, bool
     itself is not.
     """
     src = _validated_value_source(attrs, current)
+    _reject_vault_on_git_auth(src, category)
     if src != "vault":
+        if current == "vault" and "value" not in attrs:
+            # Symmetric with the flip the other way. Without this the JSON
+            # reference stayed as the literal value and the runner delivered
+            # `{"mount":...}` to terraform as the credential — silently.
+            raise HTTPException(
+                status_code=422,
+                detail="changing value-source away from 'vault' requires a "
+                "replacement `value`; the stored reference is not a usable "
+                "literal and would be delivered to the run as one",
+            )
         return src, False
     if "value" in attrs:
+        # Whenever a value is supplied on a vault-sourced variable it must be a
+        # valid reference — including on an existing one, or a PATCH could
+        # replace a good reference with anything.
         try:
             parse_reference(attrs.get("value") or "", key=attrs.get("key", "<variable>"))
         except VaultSourceError as e:
             raise HTTPException(status_code=422, detail=str(e)) from e
+    elif current != "vault":
+        # A *transition* to vault must carry the reference. Without this, a
+        # value-less flip left the previous literal in place and the
+        # reference-is-not-a-secret display rule then returned it — a write
+        # capability became a read-back of a stored secret.
+        #
+        # Only on the transition: a variable already sourced from vault is
+        # edited for its key, description or category without resupplying the
+        # reference, and requiring one there broke every partial update.
+        raise HTTPException(
+            status_code=422,
+            detail="value-source 'vault' requires a reference in `value` "
+            '(for example {"mount":"secret","path":"apps/x","field":"token"}); '
+            "supply one rather than converting an existing value in place",
+        )
     return src, True
 
 
@@ -190,7 +291,10 @@ async def create_workspace_var(
     if not key:
         raise HTTPException(status_code=422, detail="Variable key is required")
 
-    value_source, force_sensitive = _apply_value_source(attrs)
+    value_source, force_sensitive = _apply_value_source(
+        attrs, category=attrs.get("category", "terraform")
+    )
+    _reject_vault_on_local(ws, value_source)
 
     try:
         var = await variable_service.create_variable(
@@ -239,7 +343,10 @@ async def update_workspace_var(
     attrs = body.get("data", {}).get("attributes", {})
 
     try:
-        value_source, _force = _apply_value_source(attrs, var.value_source)
+        value_source, _force = _apply_value_source(
+            attrs, var.value_source, category=attrs.get("category", var.category)
+        )
+        _reject_vault_on_local(ws, value_source)
         var = await variable_service.update_variable(
             db,
             var,
@@ -395,7 +502,11 @@ def _validated_assignment_rule(attrs: dict) -> dict | None:
             detail="A global variable set already applies to every workspace; "
             "it cannot also carry an assignment-rule",
         )
-    if rule.get("workspace_ids"):
+    # Normalise first: parse_filter accepts hyphens, so an underscore-only guard
+    # below would be decorative — `workspace-ids` sailed straight past it.
+    rule = {str(k).replace("-", "_"): v for k, v in rule.items()}
+
+    if "workspace_ids" in rule:
         # A literal list of ids is not a rule — it is explicit assignment, which
         # the relationships endpoint already does and the UI already surfaces as
         # its own tab. Allowing both would mean two mechanisms for one thing, and
@@ -422,7 +533,14 @@ def _validated_assignment_rule(attrs: dict) -> dict | None:
     # scoping dimensions, and the provider can model that set completely.
     rule = {k: v for k, v in rule.items() if k != "all"}
     try:
-        workspace_search_service.parse_filter(rule)
+        parsed = workspace_search_service.parse_filter(rule)
+        # Build the query too, not just parse. The "at least one selector" check
+        # lives in the builder, so parsing alone accepted rules that select
+        # nothing — and a blank string counted as a dimension while the builder
+        # skipped it, so `{"name_prefix": ""}` produced a query with no WHERE
+        # clause and matched EVERY workspace. Validating with the same builder
+        # resolution uses is the only way these cannot diverge.
+        workspace_search_service.build_workspace_query(parsed)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=f"Invalid assignment-rule: {e}") from e
     return rule
@@ -540,10 +658,13 @@ def _vsvar_json(vsv: VariableSetVariable, varset_id: str) -> dict:
         "type": "vars",
         "attributes": {
             "key": vsv.key,
-            "value": None if vsv.sensitive else vsv.value,
+            # Same rule as a workspace variable: a vault reference is a path,
+            # not a secret, so it is shown rather than masked (#1439).
+            "value": _visible_value(vsv),
             "sensitive": vsv.sensitive,
             "category": vsv.category,
             "hcl": vsv.hcl,
+            "value-source": vsv.value_source,
             "description": vsv.description,
             "version-id": vsv.version_id,
             "created-at": _rfc3339(vsv.created_at),
@@ -596,8 +717,15 @@ async def create_varset_var(
     if category in variable_service.GIT_AUTH_CATEGORIES:
         sensitive = True  # git-auth values are always secret
 
+    value_source, force_sensitive = _apply_value_source(attrs, category=category)
+    if value_source == "vault":
+        await _reject_vault_varset_on_local(db, vs, when="Cannot add a Vault-sourced variable")
+    if force_sensitive:
+        sensitive = True
+
     vsv = VariableSetVariable(
         variable_set_id=vs.id,
+        value_source=value_source,
         key=key,
         value=value,
         description=attrs.get("description", ""),
@@ -647,12 +775,25 @@ async def update_varset_var(
             raise HTTPException(status_code=422, detail=str(e)) from e
     if "hcl" in attrs:
         vsv.hcl = attrs["hcl"]
+    # Always run it, not only when the caller sends `value-source`: a PATCH that
+    # supplies a new `value` on an existing vault variable must still have that
+    # value validated as a reference.
+    vsv.value_source, _vault_forced = _apply_value_source(
+        attrs, vsv.value_source, category=attrs.get("category", vsv.category)
+    )
+    if vsv.value_source == "vault":
+        await _reject_vault_varset_on_local(db, vs, when="Cannot set a Vault source")
     was_sensitive = vsv.sensitive
     if "value" in attrs:
         vsv.value = attrs["value"]
         vsv.version_id = variable_service._version_hash(vsv.key, attrs["value"], vsv.category)
     # git-auth categories are always secret and can never be downgraded.
-    force_sensitive = vsv.category in variable_service.GIT_AUTH_CATEGORIES
+    # `or value_source == "vault"` matches variable_service.update_variable.
+    # Omitting it let a PATCH carrying `sensitive: false` downgrade a
+    # vault-sourced varset variable, whose resolved value is always a secret.
+    force_sensitive = (
+        vsv.category in variable_service.GIT_AUTH_CATEGORIES or vsv.value_source == "vault"
+    )
     if force_sensitive:
         vsv.sensitive = True
     elif "sensitive" in attrs:
@@ -815,6 +956,23 @@ async def add_varset_workspaces(
     """Assign workspaces to a variable set. Requires admin."""
     vs = await _get_varset(varset_id, db)
 
+    # A set carrying a Vault reference cannot be assigned to a local-execution
+    # workspace: resolution happens only when a runner claims the run, so the
+    # variable would deliver nothing there, silently (#1463). Counted once, up
+    # front, rather than per workspace.
+    from sqlalchemy import func as _func
+
+    vault_vars = (
+        await db.scalar(
+            select(_func.count())
+            .select_from(VariableSetVariable)
+            .where(
+                VariableSetVariable.variable_set_id == vs.id,
+                VariableSetVariable.value_source == "vault",
+            )
+        )
+    ) or 0
+
     data = body.get("data", [])
     for item in data:
         ws_id = item.get("id", "").removeprefix("ws-")
@@ -827,6 +985,16 @@ async def add_varset_workspaces(
         ws = await db.get(Workspace, ws_uuid)
         if ws is None:
             continue
+
+        if vault_vars and getattr(ws, "execution_mode", "agent") == "local":
+            raise HTTPException(
+                status_code=422,
+                detail=f"Cannot assign this variable set to '{ws.name}': the set has "
+                f"{vault_vars} Vault-sourced variable(s), which resolve only when a "
+                "runner claims the run, and that workspace uses local execution — "
+                "they would silently deliver nothing. Switch it to agent execution "
+                "first.",
+            )
 
         # Check not already assigned
         existing = await db.execute(

@@ -17,6 +17,7 @@ import (
 
 	terrapod "github.com/mattrobinsonsre/terrapod/go-terrapod"
 	"github.com/mattrobinsonsre/terrapod/provider/internal/client"
+	"github.com/mattrobinsonsre/terrapod/provider/internal/planmods"
 )
 
 var (
@@ -70,7 +71,8 @@ func (r *variableResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 			},
 			"sensitive": schema.BoolAttribute{
 				Optional: true, Computed: true, Default: booldefault.StaticBool(false),
-				Description: "Mark as sensitive (value will not be returned by API).",
+				Description:   "Mark as sensitive (value will not be returned by API).",
+				PlanModifiers: []planmodifier.Bool{planmods.SensitiveForSecretBearingVariable()},
 			},
 			"description": schema.StringAttribute{
 				Optional: true, Description: "Description.",

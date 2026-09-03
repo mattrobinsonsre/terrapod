@@ -643,7 +643,9 @@
       "allowLabelsShort": "Tillat etiketter",
       "allowNamesShort": "Tillat navn",
       "denyLabelsShort": "Nekt etiketter",
-      "denyNamesShort": "Nekt navn"
+      "denyNamesShort": "Nekt navn",
+      "allowAll": "Gi tilgang til alt",
+      "allowAllHelp": "Samsvarer med alle ressurser, også de som opprettes senere. Nekteregler gjelder fortsatt. Bruk dette i stedet for å merke hvert arbeidsområde — et arbeidsområde opprettet uten merket ville stille falle utenfor rollen."
     },
     "assignForm": {
       "provider": "Leverandør",
@@ -714,7 +716,8 @@
       "deleteRole": "Kunne ikke slette rolle",
       "setAssignment": "Kunne ikke angi tildeling",
       "setAssignmentStatus": "Kunne ikke angi tildeling ({status})",
-      "deleteAssignment": "Kunne ikke slette tildeling"
+      "deleteAssignment": "Kunne ikke slette tildeling",
+      "conflictingLabelKeys": "{keys} har fått mer enn én verdi. En merkeregel rommer én verdi per nøkkel, så den siste ville stille erstatte de tidligere. Flere verdier per nøkkel støttes av API-et, men kan ennå ikke settes her."
     }
   },
   "adminVcs": {
@@ -938,7 +941,11 @@
       "rulePreview": "{count, plural, =0 {Treffer ingen arbeidsområder} one {Treffer # arbeidsområde} other {Treffer # arbeidsområder}}",
       "rulePreviewLoading": "Sjekker hvilke arbeidsområder som treffer …",
       "rulePreviewInvalid": "Denne regelen kunne ikke sjekkes. Lagring viser det nøyaktige problemet.",
-      "ruleConflictsWithGlobal": "Et globalt sett gjelder allerede for alle arbeidsområder, så en regel kan ikke brukes sammen med det."
+      "ruleConflictsWithGlobal": "Et globalt sett gjelder allerede for alle arbeidsområder, så en regel kan ikke brukes sammen med det.",
+      "valueSource": "Verdikilde",
+      "valueSourceStatic": "Skriv inn en verdi",
+      "valueSourceVault": "Les fra Vault",
+      "vaultHint": "Terrapod leser hemmeligheten fra Vault ved kjøring. Ingenting lagres her."
     }
   },
   "adminAutodiscovery": {
@@ -2254,7 +2261,8 @@
       "cost": "Kostnad",
       "architecture": "Arkitektur",
       "insights": "Innsikt",
-      "automation": "Automatisering"
+      "automation": "Automatisering",
+      "access": "Tilgang"
     },
     "lifecycle": {
       "pendingDeletion": "Venter på sletting",
@@ -3063,5 +3071,54 @@
     "restoreConfirm": "Gjenopprette state for «{name}»?\n\nDette lager et NYTT arbeidsområde — originalen kommer ikke tilbake. Det kommer tilbake med auto-apply og driftdeteksjon av og uten VCS-tilkobling; variabler og kjørehistorikk kommer ikke tilbake. Bare state reddes.",
     "restoreDone": "Gjenopprettet {versions, plural, one {# state-versjon} other {# state-versjoner}} til det nye arbeidsområdet «{name}». Sjekk innstillingene før du slår på auto-apply eller VCS.",
     "restoreAgainConfirm": "«{name}» er allerede gjenopprettet, til {existing}.\n\nÅ gjenopprette på nytt lager et ANDRE workspace med samme state-slektslinje over samme infrastruktur. En apply i det ene får da det andres neste plan til å se ut som omfattende drift.\n\nFortsett bare hvis det tidligere gjenopprettede workspacet er borte."
+  },
+  "roleReach": {
+    "title": "Hva denne rollen omfatter",
+    "checking": "Kontrollerer…",
+    "failed": "Kunne ikke fastslå hva denne regelen omfatter.",
+    "noAllowRules": "Legg til en tillatt etikett eller et tillatt navn for å se hvilke arbeidsområder denne rollen ville omfatte.",
+    "granted": "innvilget",
+    "deniedCount": "nektet",
+    "matched": "{count} samsvarer med tillatelsesreglene",
+    "andMore": "…og {count} til",
+    "excludedByDeny": "Ekskludert av nektereglene",
+    "reason": {
+      "allowName": "ved navn",
+      "denyName": "nektet ved navn",
+      "allowLabel": "samsvarer med {rule}",
+      "denyLabel": "nektet av {rule}"
+    },
+    "note": {
+      "catalogClamped": "Katalogstyrt — begrenset til lesing",
+      "everyoneFloor": "Lesbar for alle",
+      "hasOwner": "Eieren har allerede administratorrettigheter"
+    },
+    "reachesNothing": "Denne regelen omfatter ingenting.",
+    "allowAllBanner": "Gir tilgang til alle ressurser. Nekteregler gjelder fortsatt.",
+    "axis": {
+      "workspace": "Arbeidsområder",
+      "pool": "Agentgrupper",
+      "registry": "Register",
+      "catalog": "Katalogelementer"
+    }
+  },
+  "resourceAccess": {
+    "title": "Hvem som kan nå dette",
+    "subtitle": "Roller hvis regler samsvarer med dette arbeidsområdet, og hvem som har dem.",
+    "loading": "Laster…",
+    "failed": "Kunne ikke fastslå hvem som kan nå dette.",
+    "forbidden": "Dette svaret dekker hele miljøet og vises derfor bare til plattformadministratorer og revisorer.",
+    "noRoles": "Ingen rolleregel samsvarer med dette arbeidsområdet.",
+    "deniedRoles": "Samsvarte, og ble deretter ekskludert av en nekteregel",
+    "alsoReachable": "Kan også nås uten noen rolle",
+    "heldBy": "Innehas av {who}",
+    "heldByNobody": "Innehas av ingen — gir i praksis ingenting",
+    "path": {
+      "platformAdmin": "Plattformadministratorer når alle ressurser",
+      "platformAudit": "Plattformrevisorer kan lese alle ressurser",
+      "owner": "Eieren har administratorrettigheter her",
+      "everyoneFloor": "Merket access: everyone — lesbar for alle",
+      "catalogClamped": "Katalogstyrt — enhver ikke-administrativ tildeling er begrenset til lesing"
+    }
   }
 }

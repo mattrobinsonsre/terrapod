@@ -28,6 +28,7 @@ from __future__ import annotations
 import asyncio
 import time
 from pathlib import Path
+from urllib.parse import unquote
 
 import httpx
 import structlog
@@ -52,6 +53,59 @@ class VaultError(RuntimeError):
     A missing value would leave Terraform to fail somewhere confusing, or to
     fall back to another identity and act with credentials nobody chose.
     """
+
+
+class VaultUnavailable(VaultError):
+    """Vault could not be reached or did not answer usefully.
+
+    Distinct from VaultError because the right response differs. A malformed
+    reference will never resolve, so the run must fail. A Vault that is
+    restarting will answer in thirty seconds, and erroring every queued run in
+    the estate for that — leaving an operator to re-queue each by hand — turns a
+    brief blip into an incident. A transient failure leaves the run queued for
+    the next claim instead.
+    """
+
+
+#: HTTP statuses that mean "Vault cannot answer right now", as opposed to
+#: "Vault has answered and the answer is no".
+#:
+#: A SEALED Vault replies 503 to everything, and a restarting or unsealing one
+#: does the same — which is the single most common transient case there is, and
+#: the one the whole VaultUnavailable/VaultTransient path was built for. Until
+#: this classifier existed only TRANSPORT failures were treated as transient, so
+#: `vault operator seal` still errored every queued run in the estate: the design
+#: worked for a Vault that was unreachable and not for one that was merely shut.
+#:
+#: 501 is an uninitialised Vault, 429/473 a standby or performance-standby node
+#: — all of them answer properly once the cluster settles.
+#:
+#: Everything else (403 denied, 404 missing, other 4xx) is a real answer and
+#: stays permanent: retrying it forever would hide a misconfigured reference.
+# 429/473 are standby/perf-standby; 412 is Vault's "missing required state" on a performance-replication or
+# consistency-gated node — all resolve once the node catches up, so they are
+# transient, not a real answer.
+_TRANSIENT_STATUSES = frozenset({412, 429, 473})
+
+
+def _is_transient_status(status: int) -> bool:
+    return status >= 500 or status in _TRANSIENT_STATUSES
+
+
+def _as_vault_error(exc: Exception, what: str, inst_name: str) -> VaultUnavailable:
+    """Convert a transport or decode failure into a VaultError.
+
+    Callers upstream catch VaultError only. A bare httpx error escaped both the
+    resolver and the run dispatcher, 500'd the listener, and left the run
+    claimed in `planning` until the hour-long stale sweep — so a brief Vault
+    outage stranded every queued run in the estate, not just the one that
+    needed a secret.
+    """
+    return VaultUnavailable(
+        f"Vault {what} on instance {inst_name!r} failed: "
+        f"{type(exc).__name__} — {exc}. Vault may be unreachable, slow, or "
+        "behind a proxy returning a non-JSON error."
+    )
 
 
 _token_cache: dict[str, tuple[str, float]] = {}
@@ -114,15 +168,24 @@ async def _login(inst: VaultInstanceConfig, static_token: str | None) -> str:
     else:  # pragma: no cover - the config validator rejects anything else
         raise VaultError(f"unsupported vault auth method {method!r}")
 
-    async with httpx.AsyncClient(timeout=15.0, verify=not inst.tls_skip_verify) as c:
-        resp = await arequest_with_retry(c, "POST", url, headers=_headers(inst), json=payload)
+    try:
+        async with httpx.AsyncClient(timeout=15.0, verify=not inst.tls_skip_verify) as c:
+            resp = await arequest_with_retry(c, "POST", url, headers=_headers(inst), json=payload)
+    except (httpx.HTTPError, OSError) as e:
+        raise _as_vault_error(e, "login", inst.name) from e
     if resp.status_code != 200:
-        raise VaultError(
+        detail = (
             f"Vault login failed for instance {inst.name!r} "
             f"({method} auth, mount {inst.auth.mount!r}, role {inst.auth.role!r}): "
-            f"HTTP {resp.status_code} {resp.text[:200]}"
+            f"HTTP {resp.status_code}"
         )
-    auth = resp.json().get("auth") or {}
+        if _is_transient_status(resp.status_code):
+            raise VaultUnavailable(detail)
+        raise VaultError(detail)
+    try:
+        auth = resp.json().get("auth") or {}
+    except ValueError as e:
+        raise _as_vault_error(e, "login", inst.name) from e
     token = auth.get("client_token")
     if not token:
         raise VaultError(f"Vault login for {inst.name!r} returned no client_token")
@@ -133,19 +196,64 @@ async def _login(inst: VaultInstanceConfig, static_token: str | None) -> str:
     return token
 
 
+def _reject_traversal(mount: str, path: str) -> None:
+    """Refuse anything that could re-target the request.
+
+    httpx resolves ``..`` when it builds the URL, so a reference of
+    ``apps/../../sys/mounts`` is checked as one path and sent as another — the
+    allow-list would be guarding a path Vault never receives.
+
+    Checked on the decoded form too: a percent-encoded ``%2e%2e`` survives a raw
+    segment check untouched and is decoded downstream, which is the same
+    mismatch by another spelling. Percent signs are refused outright rather than
+    decoded-and-hoped-about, because a literal ``%`` has no place in a mount or
+    path and allowing it means reasoning about double-encoding.
+
+    Applied whether or not an allow-list is configured: a traversal reference is
+    malformed regardless, and the default configuration must not be the
+    permissive one.
+    """
+    illegal = ("?", "#", "%", "\\")
+    for part in (mount, path):
+        for candidate in (part, unquote(part)):
+            if any(seg in (".", "..") for seg in candidate.split("/")):
+                raise VaultError(
+                    f"vault reference {mount}/{path!r} contains a path traversal "
+                    "segment; give the literal mount and path"
+                )
+            if any(c in candidate for c in illegal):
+                raise VaultError(
+                    f"vault reference {mount}/{path!r} contains an illegal "
+                    "character; give the literal mount and path"
+                )
+
+
 def _check_allowed(inst: VaultInstanceConfig, read_path: str) -> None:
     """Enforce the per-instance path allow-list.
 
     Second line behind the Vault policy, for an operator whose role is slightly
     wider than they meant. Empty means unrestricted.
+
+    Matching is on SEGMENT boundaries: a bare string prefix let ``secret/app``
+    grant ``secret/apple-root-keys``, which is the opposite of what an operator
+    writing a prefix intends.
     """
     if not inst.paths:
         return
-    if not any(read_path.startswith(prefix.strip("/")) for prefix in inst.paths):
-        raise VaultError(
-            f"path {read_path!r} is not in the allow-list configured for vault "
-            f"instance {inst.name!r}"
-        )
+    target = read_path.strip("/").split("/")
+    for prefix in inst.paths:
+        stripped = prefix.strip("/")
+        if not stripped:
+            # "" and "/" meant "no restriction" before segment matching, and an
+            # operator who wrote `paths: ["/"]` to mean that would otherwise
+            # find every Vault read in the deployment refused after upgrading.
+            return
+        want = stripped.split("/")
+        if target[: len(want)] == want:
+            return
+    raise VaultError(
+        f"path {read_path!r} is not in the allow-list configured for vault instance {inst.name!r}"
+    )
 
 
 async def read_secret(
@@ -165,6 +273,7 @@ async def read_secret(
     if not mount_s or not path_s:
         raise VaultError("a vault reference needs both a mount and a path")
 
+    _reject_traversal(mount_s, path_s)
     read_path = f"{mount_s}/{path_s}"
     _check_allowed(inst, read_path)
 
@@ -176,14 +285,17 @@ async def read_secret(
     if engine == "kv2":
         verb = "GET"  # kv-v2 reads are always a GET, whatever the reference says
 
-    async with httpx.AsyncClient(timeout=timeout, verify=not inst.tls_skip_verify) as c:
-        resp = await arequest_with_retry(
-            c,
-            verb,
-            url,
-            headers=_headers(inst, token),
-            **({"json": data or {}} if verb == "POST" else {}),
-        )
+    try:
+        async with httpx.AsyncClient(timeout=timeout, verify=not inst.tls_skip_verify) as c:
+            resp = await arequest_with_retry(
+                c,
+                verb,
+                url,
+                headers=_headers(inst, token),
+                **({"json": data or {}} if verb == "POST" else {}),
+            )
+    except (httpx.HTTPError, OSError) as e:
+        raise _as_vault_error(e, f"read of {read_path!r}", inst.name) from e
 
     if resp.status_code == 403:
         raise VaultError(
@@ -193,11 +305,22 @@ async def read_secret(
     if resp.status_code == 404:
         raise VaultError(f"Vault has no secret at {read_path!r} on instance {inst.name!r}")
     if resp.status_code != 200:
-        raise VaultError(
-            f"Vault read of {read_path!r} failed: HTTP {resp.status_code} {resp.text[:200]}"
+        # Deliberately NOT echoing resp.text: this message becomes the run's
+        # error_message, readable by anyone with run-read, and a third party's
+        # response body is not ours to forward there. The status and the path
+        # are what diagnose it.
+        detail = (
+            f"Vault read of {read_path!r} on instance {inst.name!r} failed with "
+            f"HTTP {resp.status_code}"
         )
+        if _is_transient_status(resp.status_code):
+            raise VaultUnavailable(detail)
+        raise VaultError(detail)
 
-    body = resp.json().get("data") or {}
+    try:
+        body = resp.json().get("data") or {}
+    except ValueError as e:
+        raise _as_vault_error(e, f"read of {read_path!r}", inst.name) from e
     # kv-v2 nests the secret under data.data; the dynamic engines do not.
     data = body.get("data") if engine == "kv2" else body
     if not isinstance(data, dict) or field not in data:

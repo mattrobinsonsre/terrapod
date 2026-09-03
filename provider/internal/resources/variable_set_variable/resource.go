@@ -13,11 +13,13 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	terrapod "github.com/mattrobinsonsre/terrapod/go-terrapod"
 	"github.com/mattrobinsonsre/terrapod/provider/internal/client"
+	"github.com/mattrobinsonsre/terrapod/provider/internal/planmods"
 )
 
 type variableSetVariableModel struct {
@@ -30,6 +32,7 @@ type variableSetVariableModel struct {
 	HCL         types.Bool   `tfsdk:"hcl"`
 	Sensitive   types.Bool   `tfsdk:"sensitive"`
 	Description types.String `tfsdk:"description"`
+	ValueSource types.String `tfsdk:"value_source"`
 
 	VersionID types.String `tfsdk:"version_id"`
 	CreatedAt types.String `tfsdk:"created_at"`
@@ -62,11 +65,20 @@ func (r *variableSetVariableResource) Schema(_ context.Context, _ resource.Schem
 			"value":       schema.StringAttribute{Optional: true, Sensitive: true, Description: "Variable value. Sensitive variables are write-only."},
 			"category":    schema.StringAttribute{Required: true, Description: "Category: terraform, env, git_http_auth, or git_ssh_auth.", PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
 			"hcl":         schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(false), Description: "Parse value as HCL."},
-			"sensitive":   schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(false), Description: "Mark as sensitive (value will not be returned by API)."},
+			"sensitive":   schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(false), Description: "Mark as sensitive (value will not be returned by API).", PlanModifiers: []planmodifier.Bool{planmods.SensitiveForSecretBearingVariable()}},
 			"description": schema.StringAttribute{Optional: true, Description: "Description."},
-			"version_id":  schema.StringAttribute{Computed: true, Description: "Version identifier."},
-			"created_at":  schema.StringAttribute{Computed: true, Description: "Creation timestamp.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
-			"updated_at":  schema.StringAttribute{Computed: true, Description: "Update timestamp."},
+			"value_source": schema.StringAttribute{
+				Optional: true, Computed: true, Default: stringdefault.StaticString("static"),
+				Description: "Where the value comes from: `static` (the default — `value` is the " +
+					"literal) or `vault`, where `value` holds a JSON reference " +
+					"(`{\"mount\":…,\"path\":…,\"field\":…}`) that Terrapod resolves from " +
+					"HashiCorp Vault at run time — so a Vault-backed credential can be defined " +
+					"once in a variable set and applied to many workspaces. A vault-sourced " +
+					"variable is always sensitive, and the secret is never stored in Terrapod.",
+			},
+			"version_id": schema.StringAttribute{Computed: true, Description: "Version identifier."},
+			"created_at": schema.StringAttribute{Computed: true, Description: "Creation timestamp.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
+			"updated_at": schema.StringAttribute{Computed: true, Description: "Update timestamp."},
 		},
 	}
 }
@@ -190,6 +202,9 @@ func buildCreateVSVRequest(m *variableSetVariableModel) terrapod.CreateVarsetVar
 	if !m.Description.IsNull() {
 		req.Description = m.Description.ValueString()
 	}
+	if !m.ValueSource.IsNull() && !m.ValueSource.IsUnknown() {
+		req.ValueSource = m.ValueSource.ValueString()
+	}
 	return req
 }
 
@@ -214,6 +229,10 @@ func buildUpdateVSVRequest(m *variableSetVariableModel) terrapod.UpdateVarsetVar
 		v := m.Description.ValueString()
 		req.Description = &v
 	}
+	if !m.ValueSource.IsNull() && !m.ValueSource.IsUnknown() {
+		v := m.ValueSource.ValueString()
+		req.ValueSource = &v
+	}
 	return req
 }
 
@@ -231,7 +250,19 @@ func readVSVFromSDK(v *terrapod.VariableSetVariable, m *variableSetVariableModel
 	} else {
 		m.Description = types.StringNull()
 	}
-	if !v.Sensitive && v.Value != "" {
+	if v.ValueSource != "" {
+		m.ValueSource = types.StringValue(v.ValueSource)
+	} else {
+		m.ValueSource = types.StringValue("static")
+	}
+	// A vault-sourced variable is always sensitive, but what comes back is the
+	// *reference*, not a secret — read it so a rule edited outside Terraform is
+	// detected and one edited in Terraform doesn't look permanently unapplied.
+	if v.ValueSource == "vault" {
+		if v.Value != "" {
+			m.Value = types.StringValue(v.Value)
+		}
+	} else if !v.Sensitive && v.Value != "" {
 		m.Value = types.StringValue(v.Value)
 	}
 }

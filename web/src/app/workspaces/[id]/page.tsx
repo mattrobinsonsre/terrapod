@@ -18,6 +18,7 @@ import { SensitiveValueInput } from '@/components/sensitive-value-input'
 import { MobileCardList, MobileCard } from '@/components/mobile-card-list'
 import { StateGraphTab } from '@/components/state-graph-tab'
 import { CostPanel } from '@/components/cost-panel'
+import { ResourceAccessPanel } from '@/components/resource-access-panel'
 import { ArchitectureCritiquePanel } from '@/components/architecture-critique-panel'
 import { useIsTouch } from '@/lib/use-media-query'
 import { getAuthState, isAdmin } from '@/lib/auth'
@@ -64,6 +65,8 @@ interface WorkspaceAttrs {
   // and whichever has a live runner claims it first.
   'agent-pool-ids': string[]
   'agent-pool-name': string | null
+  /** Names for the whole set, positionally matching `agent-pool-ids`. */
+  'agent-pool-names'?: string[]
   labels: Record<string, string>
   'owner-email': string
   'var-files': string[]
@@ -233,9 +236,9 @@ const ALL_TRIGGERS = [
 const ALL_STAGES = ['pre_plan', 'post_plan', 'pre_apply'] as const
 const ALL_ENFORCEMENT_LEVELS = ['mandatory', 'advisory'] as const
 
-type Tab = 'configuration' | 'variables' | 'runs' | 'state' | 'state-graph' | 'cost' | 'architecture' | 'versions' | 'notifications' | 'run-tasks' | 'run-triggers' | 'sharing'
+type Tab = 'configuration' | 'variables' | 'runs' | 'state' | 'state-graph' | 'cost' | 'architecture' | 'versions' | 'notifications' | 'run-tasks' | 'run-triggers' | 'sharing' | 'access'
 
-const VALID_TABS: Set<string> = new Set(['configuration', 'variables', 'runs', 'state', 'state-graph', 'cost', 'architecture', 'versions', 'notifications', 'run-tasks', 'run-triggers', 'sharing'])
+const VALID_TABS: Set<string> = new Set(['configuration', 'variables', 'runs', 'state', 'state-graph', 'cost', 'architecture', 'versions', 'notifications', 'run-tasks', 'run-triggers', 'sharing', 'access'])
 
 
 /** Mode value -> i18n key. The API value is snake_case; the key is camel. */
@@ -361,6 +364,13 @@ function WorkspaceDetailContent() {
   const [vaultAvailable, setVaultAvailable] = useState(false)
   const [vaultInstances, setVaultInstances] = useState<string[]>([])
   const [vaultDefaultInstance, setVaultDefaultInstance] = useState('')
+  // ...and only on an agent workspace. A vault reference is resolved on the
+  // listener claim path, so under local execution it would deliver nothing —
+  // the API refuses to store one (`_reject_vault_on_local`). Offering the
+  // source anyway means filling in the whole reference builder and then
+  // meeting a 422 on save, so it is not offered at all.
+  const vaultOfferable =
+    vaultAvailable && workspace?.attributes['execution-mode'] === 'agent'
 
   const [editVarSource, setEditVarSource] = useState<'static' | 'vault'>('static')
   const [editVaultInstance, setEditVaultInstance] = useState('')
@@ -1811,6 +1821,7 @@ function WorkspaceDetailContent() {
     { key: 'notifications', label: t('tabs.notifications'), members: ['notifications'] },
     { key: 'run-tasks', label: t('tabs.automation'), members: ['run-tasks', 'run-triggers'] },
     { key: 'sharing', label: t('tabs.sharing'), members: ['sharing'] },
+    { key: 'access', label: t('tabs.access'), members: ['access'] },
   ]
   const activeGroup = tabGroups.find((g) => g.members.includes(activeTab)) ?? tabGroups[0]
   const subTabLabel = (tab: Tab): string =>
@@ -1914,6 +1925,21 @@ function WorkspaceDetailContent() {
     (!attrs['vcs-last-polled-at'] ||
       new Date(attrs['vcs-last-attempted-at']) > new Date(attrs['vcs-last-polled-at']))
 
+  /** A pool's display name: from the server's positional `agent-pool-names`
+   *  first, then the fetched pool list, and only then the raw id.
+   *
+   *  The server list is what makes the READ-ONLY view work: the pool list is
+   *  fetched on entering edit mode, so before that `visiblePools` is empty and
+   *  every pool rendered as a bare `apool-<uuid>`. It also covers a caller who
+   *  can read the workspace but not list pools. */
+  function poolLabel(id: string): string {
+    const ids = attrs['agent-pool-ids'] || []
+    const names = attrs['agent-pool-names'] || []
+    const i = ids.indexOf(id)
+    if (i >= 0 && names[i]) return names[i]
+    return visiblePools.find((p) => p.id === id)?.attributes.name ?? id
+  }
+
   // Rows for the pool-set editor: everything the caller may assign, PLUS any
   // pool already on the workspace that they may not. Without the second half a
   // caller lacking pool:assign on one of the pools would silently drop it just
@@ -1924,7 +1950,7 @@ function WorkspaceDetailContent() {
       .filter((id) => !agentPools.some((p) => p.id === id))
       .map((id) => ({
         id,
-        name: visiblePools.find((p) => p.id === id)?.attributes.name ?? id,
+        name: poolLabel(id),
         assignable: false,
       })),
   ]
@@ -2258,7 +2284,7 @@ function WorkspaceDetailContent() {
                               key={id}
                               className="rounded bg-slate-700 px-2 py-0.5 text-xs text-slate-200"
                             >
-                              {visiblePools.find((p) => p.id === id)?.attributes.name ?? id}
+                              {poolLabel(id)}
                             </span>
                           ))}
                     </dd>
@@ -2953,7 +2979,7 @@ function WorkspaceDetailContent() {
                   </div>
                 </div>
 
-                {!isGitCat && vaultAvailable && (
+                {!isGitCat && vaultOfferable && (
                   <div>
                     <label htmlFor="var-source" className="block text-sm font-medium text-slate-300 mb-1">{t('variables.valueSource')}</label>
                     <select id="var-source" value={varSource} onChange={(e) => setVarSource(e.target.value as 'static' | 'vault')} className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
@@ -3102,7 +3128,7 @@ function WorkspaceDetailContent() {
                               idPrefix={`edit-${v.id}`}
                               state={editPanelState}
                               onChange={patchEditPanel}
-                              vaultAvailable={vaultAvailable}
+                              vaultAvailable={vaultOfferable}
                               vaultInstances={vaultInstances}
                               vaultDefaultInstance={vaultDefaultInstance}
                               saving={savingVar}
@@ -3153,7 +3179,7 @@ function WorkspaceDetailContent() {
                           idPrefix={`medit-${v.id}`}
                           state={editPanelState}
                           onChange={patchEditPanel}
-                          vaultAvailable={vaultAvailable}
+                          vaultAvailable={vaultOfferable}
                           vaultInstances={vaultInstances}
                           vaultDefaultInstance={vaultDefaultInstance}
                           saving={savingVar}
@@ -4372,6 +4398,12 @@ function WorkspaceDetailContent() {
         )}
 
         {/* Sharing Tab — cross-workspace remote-state allowlist (#344, #349) */}
+        {activeTab === 'access' && (
+          <div>
+            <ResourceAccessPanel kind="workspaces" id={workspaceId} />
+          </div>
+        )}
+
         {activeTab === 'sharing' && (
           <div>
             <div className="flex items-baseline justify-between mb-1">

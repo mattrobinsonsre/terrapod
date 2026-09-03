@@ -134,6 +134,39 @@ kubectl -n terrapod-runners create secret generic aws-credentials \
 
 Helm-injected env vars apply to **all** runner Jobs globally. Use workspace variables when different workspaces need different credentials.
 
+### Mounting secrets as files
+
+Some configuration wants a **path**, not an environment variable — `file("/path/to/token")` in a provider block, a CA bundle a provider must trust by path, or a PEM keypair passed to a module. Mount it:
+
+```yaml
+runners:
+  extraVolumes:
+    - name: provider-creds
+      secret:
+        secretName: my-provider-creds
+  extraVolumeMounts:
+    - name: provider-creds
+      mountPath: /etc/terrapod/creds
+      readOnly: true
+```
+
+Prefer this over the env-var round-trip (expose the secret as an env var, then write it back out to a file in a `pre_init` hook). That workaround puts the value in the runner's **process environment** — readable via `/proc` and `env` — when a file was all that was ever wanted, and it handles multiline material like PEM keys and CA bundles awkwardly.
+
+These are **appended** to the volumes each Job already builds (workspace, variables, auth), never replacing them.
+
+### Resolving hostnames cluster DNS does not serve
+
+When a runner must reach an internal name that is not in cluster DNS — an admin or API endpoint reachable only by IP — add static `/etc/hosts` entries:
+
+```yaml
+runners:
+  hostAliases:
+    - ip: "10.0.0.1"
+      hostnames: ["admin.example.internal"]
+```
+
+This is a straight pass-through to the pod's `hostAliases`, so it takes the shape Kubernetes documents.
+
 ---
 
 ## Job Configuration
@@ -148,6 +181,9 @@ All runner Jobs inherit the following settings from `runners.*` in Helm values:
 | `runners.imagePullSecrets` | `[]` | Pull secrets for private registries |
 | `runners.extraEnv` | `[]` | Extra env vars for all runner Jobs |
 | `runners.extraEnvFrom` | `[]` | Inject env vars from Secrets/ConfigMaps |
+| `runners.extraVolumes` | Extra volumes for the Job pod — appended to the ones it already builds |
+| `runners.extraVolumeMounts` | Extra mounts for the runner container |
+| `runners.hostAliases` | Static `/etc/hosts` entries, for names cluster DNS does not serve |
 | `runners.nodeSelector` | `{}` | Node selector for Job pods |
 | `runners.tolerations` | `[]` | Tolerations for Job pods |
 | `runners.affinity` | `{}` | Affinity rules for Job pods |

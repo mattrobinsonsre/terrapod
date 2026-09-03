@@ -643,7 +643,9 @@
       "allowLabelsShort": "Allow Labelz",
       "allowNamesShort": "Allow Namez",
       "denyLabelsShort": "Deny Labelz",
-      "denyNamesShort": "Deny Namez"
+      "denyNamesShort": "Deny Namez",
+      "allowAll": "Grant on evrythin",
+      "allowAllHelp": "Matchez evry resorse, includin wunz maed layter. Deny roolz still applai. Uze dis insted ov labulin evry werkspace — a werkspace maed wifout teh labul wud kwietly fall owtsyde teh role."
     },
     "assignForm": {
       "provider": "Providr",
@@ -714,7 +716,8 @@
       "deleteRole": "Failz ta delete role",
       "setAssignment": "Failz ta set assignment",
       "setAssignmentStatus": "Failz ta set assignment ({status})",
-      "deleteAssignment": "Failz ta delete assignment"
+      "deleteAssignment": "Failz ta delete assignment",
+      "conflictingLabelKeys": "{keys} haz moar dan wun valyoo. A labul rool holdz wun valyoo per key, so teh last wud kwietly replase teh erlier wunz. Matchin several valyooz for wun key iz supportd by teh API but cant be set heer yet."
     }
   },
   "adminVcs": {
@@ -938,7 +941,11 @@
       "rulePreview": "{count, plural, =0 {Matchez no werkspacez} one {Matchez # werkspace} other {Matchez # werkspacez}}",
       "rulePreviewLoading": "Chekin wich werkspacez match…",
       "rulePreviewInvalid": "Dis rool coudnt be chekd. Sayvin wil tel u wots rong.",
-      "ruleConflictsWithGlobal": "A globul set alreddy applyz ta evry werkspace, so u cant uze a rool wif it."
+      "ruleConflictsWithGlobal": "A globul set alreddy applyz ta evry werkspace, so u cant uze a rool wif it.",
+      "valueSource": "Valyoo Sors",
+      "valueSourceStatic": "Typ a valyoo",
+      "valueSourceVault": "Reed frum Vault",
+      "vaultHint": "Terrapod reedz da sekrit frum Vault at run tiem. Nuffin iz kept heer."
     }
   },
   "adminAutodiscovery": {
@@ -2254,7 +2261,8 @@
       "cost": "Cost",
       "architecture": "Architeksher",
       "insights": "Insightz",
-      "automation": "Awtomashun"
+      "automation": "Awtomashun",
+      "access": "Akses"
     },
     "lifecycle": {
       "pendingDeletion": "Pendin deleshun",
@@ -3063,5 +3071,54 @@
     "restoreConfirm": "Restoar da state ov \"{name}\"?\n\nDis makez a NEW werkspace — da orijinal duz not come bak. It cumz bak wif auto-apply an drift detekshun offs an no VCS, an itz variablez an run histry duz not come bak. Only da state getz savd.",
     "restoreDone": "Savd {versions, plural, one {# state verzhun} other {# state verzhunz}} intoo da new werkspace \"{name}\". Chek itz settingz b4 u turn on auto-apply or VCS. kthxbai",
     "restoreAgainConfirm": "\"{name}\" haz alreddy been restord, into {existing}.\n\nRestorin it agin makez a SEKOND wurkspace holdin teh same state lineage ovar teh same infrastrukchur. Applyin in eithr will den makez teh othr''s next plan look liek wholesale drift. OH NOES.\n\nOnly continoo if teh earlier restord wurkspace iz gon."
+  },
+  "roleReach": {
+    "title": "Wat dis role reachez",
+    "checking": "Chekin…",
+    "failed": "Coud not figger out wat dis rool reachez.",
+    "noAllowRules": "Add an allow labul or an allow naym 2 see wich werkspacez dis role wud reach.",
+    "granted": "grantd",
+    "deniedCount": "denyd",
+    "matched": "{count} matchd by teh allow roolz",
+    "andMore": "…an {count} moar",
+    "excludedByDeny": "Excludd by teh deny roolz",
+    "reason": {
+      "allowName": "namd",
+      "denyName": "denyd by naym",
+      "allowLabel": "matchez {rule}",
+      "denyLabel": "denyd by {rule}"
+    },
+    "note": {
+      "catalogClamped": "Catalog-manijd — capd at reed",
+      "everyoneFloor": "Readabul by everywun",
+      "hasOwner": "Ownur alreddy haz admin"
+    },
+    "reachesNothing": "Dis rool reachez nuffin.",
+    "allowAllBanner": "Grantz on evry resorse. Deny roolz still applai.",
+    "axis": {
+      "workspace": "Werkspacez",
+      "pool": "Agent poolz",
+      "registry": "Registree",
+      "catalog": "Catalog itemz"
+    }
+  },
+  "resourceAccess": {
+    "title": "Hoo can reech dis",
+    "subtitle": "Rolez whoze roolz match dis werkspace, an teh peeps holdin dem.",
+    "loading": "Loadin…",
+    "failed": "Coud not figger out hoo can reech dis.",
+    "forbidden": "Dis ansur spanz teh whole estayt, so itz shown only 2 platform adminz an auditurz.",
+    "noRoles": "No role''z roolz match dis werkspace.",
+    "deniedRoles": "Matchd, den excludd by a deny rool",
+    "alsoReachable": "Also reechabul wifout enny role",
+    "heldBy": "Helt by {who}",
+    "heldByNobody": "Held by nobuddy — grantz nuffin in practis",
+    "path": {
+      "platformAdmin": "Platform adminz reech evry resorse",
+      "platformAudit": "Platform auditurz can reed evry resorse",
+      "owner": "Teh ownur holdz admin heer",
+      "everyoneFloor": "Labuld access: everyone — reedabul by ennywun",
+      "catalogClamped": "Catalog-manijd — evry non-admin grant iz capd at reed"
+    }
   }
 }

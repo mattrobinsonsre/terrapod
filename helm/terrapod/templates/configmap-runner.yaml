@@ -81,6 +81,18 @@ data:
     pod_security_context:
       {{- toYaml . | nindent 6 }}
     {{- end }}
+    {{- with .Values.runners.hostAliases }}
+    host_aliases:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- with .Values.runners.extraVolumes }}
+    extra_volumes:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- with .Values.runners.extraVolumeMounts }}
+    extra_volume_mounts:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
     {{- with .Values.runners.extraEnv }}
     extra_env:
       {{- toYaml . | nindent 6 }}
