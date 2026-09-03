@@ -77,8 +77,10 @@ test.describe('Variable Sets', () => {
     await page.fill('#var-val', 'test-value');
     await page.click('form button:has-text("Add Variable")');
 
-    // Variable should appear in the table
-    await expect(page.locator(`text=${varKey}`)).toBeVisible({ timeout: 10_000 });
+    // Scoped to the table row: the page renders the variable twice — the
+    // desktop row and the mobile card are both in the DOM, one hidden by CSS —
+    // so a bare text= locator is a strict-mode violation.
+    await expect(page.locator(`tr:has-text("${varKey}")`)).toBeVisible({ timeout: 10_000 });
   });
 
   test('delete variable set from detail page', async ({ page }) => {
