@@ -107,6 +107,11 @@ export default function VariableSetDetailPage() {
   const [addingVar, setAddingVar] = useState(false)
   const [varSource, setVarSource] = useState<'static' | 'vault'>('static')
   const [varVault, setVarVault] = useState<VaultReferenceValue>({ instance: '', mount: '', path: '', field: '', engine: 'kv2' })
+  // A git credential is a JSON envelope; a Vault reference resolves to a single
+  // field, so the pair cannot work and the API refuses it (#1439). Mirrors the
+  // workspace page: don't offer the source, and don't send it.
+  const isGitCat = varCategory === 'git_http_auth' || varCategory === 'git_ssh_auth'
+  const isVaultSource = varSource === 'vault' && !isGitCat
   const [vaultAvailable, setVaultAvailable] = useState(false)
   const [vaultInstances, setVaultInstances] = useState<string[]>([])
   const [vaultDefaultInstance, setVaultDefaultInstance] = useState('')
@@ -322,13 +327,13 @@ export default function VariableSetDetailPage() {
             type: 'vars',
             attributes: {
               key: varKey,
-              value: varSource === 'vault' ? buildVaultRef(varVault) : varValue,
+              value: isVaultSource ? buildVaultRef(varVault) : varValue,
               category: varCategory,
               // Vault-sourced is always sensitive (its reference resolves to a
               // secret); otherwise honour the checkbox.
-              sensitive: varSource === 'vault' ? true : varSensitive,
+              sensitive: isVaultSource ? true : varSensitive,
               hcl: varHcl,
-              'value-source': varSource,
+              'value-source': isVaultSource ? 'vault' : 'static',
             },
           },
         }),
@@ -646,7 +651,7 @@ export default function VariableSetDetailPage() {
                     <input id="var-key" type="text" value={varKey} onChange={(e) => setVarKey(e.target.value)} required placeholder="AWS_REGION"
                       className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
                   </div>
-                  {vaultAvailable && (
+                  {vaultAvailable && !isGitCat && (
                     <div>
                       <label htmlFor="var-source" className="block text-sm font-medium text-slate-300 mb-1">{t('detail.valueSource')}</label>
                       <select id="var-source" value={varSource} onChange={(e) => setVarSource(e.target.value as 'static' | 'vault')}
@@ -656,7 +661,7 @@ export default function VariableSetDetailPage() {
                       </select>
                     </div>
                   )}
-                  {varSource === 'vault' ? (
+                  {isVaultSource ? (
                     <div>
                       <p className="text-xs text-slate-500 mb-2">{t('detail.vaultHint')}</p>
                       <VaultReferenceFields idPrefix="add" value={varVault} onChange={setVarVault}

@@ -108,7 +108,31 @@ def _reject_vault_on_local(ws, value_source: str) -> None:
         )
 
 
-def _apply_value_source(attrs: dict, current: str = "static") -> tuple[str, bool]:
+def _reject_vault_on_git_auth(value_source: str, category: str | None) -> None:
+    """A git-auth credential is a JSON envelope; a Vault field is one string.
+
+    `resolve_git_auth` json.loads a git-auth value and skips it when that fails,
+    so a vault-sourced one is dropped and the run fails to fetch its modules
+    with nothing pointing at why. `git_ssh_auth` is worse: the value is passed
+    through verbatim, handing the runner a bare secret where it expects
+    {private_key, known_hosts, rewrite}. The workspace UI already refuses the
+    pair; refuse it in the API too, for every write path.
+    """
+    if value_source != "vault":
+        return
+    if category in variable_service.GIT_AUTH_CATEGORIES:
+        raise HTTPException(
+            status_code=422,
+            detail=f"category '{category}' cannot use value-source 'vault': a "
+            "git credential is a JSON object, while a Vault reference resolves "
+            "to a single field. Put the credential's own secret fields in Vault "
+            "and reference them from a static git-auth value instead.",
+        )
+
+
+def _apply_value_source(
+    attrs: dict, current: str = "static", category: str | None = None
+) -> tuple[str, bool]:
     """Resolve `value-source` for a write and validate its reference.
 
     Returns ``(value_source, force_sensitive)``. A vault-sourced variable is
@@ -116,6 +140,7 @@ def _apply_value_source(attrs: dict, current: str = "static") -> tuple[str, bool
     itself is not.
     """
     src = _validated_value_source(attrs, current)
+    _reject_vault_on_git_auth(src, category)
     if src != "vault":
         if current == "vault" and "value" not in attrs:
             # Symmetric with the flip the other way. Without this the JSON
@@ -239,7 +264,9 @@ async def create_workspace_var(
     if not key:
         raise HTTPException(status_code=422, detail="Variable key is required")
 
-    value_source, force_sensitive = _apply_value_source(attrs)
+    value_source, force_sensitive = _apply_value_source(
+        attrs, category=attrs.get("category", "terraform")
+    )
     _reject_vault_on_local(ws, value_source)
 
     try:
@@ -289,7 +316,9 @@ async def update_workspace_var(
     attrs = body.get("data", {}).get("attributes", {})
 
     try:
-        value_source, _force = _apply_value_source(attrs, var.value_source)
+        value_source, _force = _apply_value_source(
+            attrs, var.value_source, category=attrs.get("category", var.category)
+        )
         _reject_vault_on_local(ws, value_source)
         var = await variable_service.update_variable(
             db,
@@ -661,7 +690,7 @@ async def create_varset_var(
     if category in variable_service.GIT_AUTH_CATEGORIES:
         sensitive = True  # git-auth values are always secret
 
-    value_source, force_sensitive = _apply_value_source(attrs)
+    value_source, force_sensitive = _apply_value_source(attrs, category=category)
     if force_sensitive:
         sensitive = True
 
@@ -720,7 +749,9 @@ async def update_varset_var(
     # Always run it, not only when the caller sends `value-source`: a PATCH that
     # supplies a new `value` on an existing vault variable must still have that
     # value validated as a reference.
-    vsv.value_source, _vault_forced = _apply_value_source(attrs, vsv.value_source)
+    vsv.value_source, _vault_forced = _apply_value_source(
+        attrs, vsv.value_source, category=attrs.get("category", vsv.category)
+    )
     was_sensitive = vsv.sensitive
     if "value" in attrs:
         vsv.value = attrs["value"]

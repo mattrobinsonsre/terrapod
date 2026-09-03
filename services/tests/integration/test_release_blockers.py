@@ -542,6 +542,148 @@ class TestTheFixesDidNotBreakOrdinaryEditing:
         assert resp.status_code == 422, resp.text
 
 
+class TestVaultIsRefusedOnGitAuthCategories:
+    """A git credential is a JSON envelope; a Vault field resolves to a string.
+
+    resolve_git_auth json.loads a git-auth value and *skips* it when that fails,
+    so a vault-sourced one was dropped and the run failed to fetch its private
+    modules with nothing pointing at why. git_ssh_auth was worse — the value is
+    passed through verbatim, handing the runner a bare secret where it expects
+    {private_key, known_hosts, rewrite}. The workspace UI refused the pair; the
+    API did not, so the varset form and every SDK/provider caller could make it.
+    """
+
+    REF = json.dumps({"mount": "secret", "path": "apps/x", "field": "token"})
+
+    async def _workspace(self, client, tag):
+        ws = await client.post(
+            WS_ENDPOINT,
+            json={
+                "data": {
+                    "type": "workspaces",
+                    "attributes": {"name": f"gitvault-{tag}", "execution-mode": "agent"},
+                }
+            },
+            headers=AUTH,
+        )
+        return ws.json()["data"]["id"]
+
+    async def _varset(self, client, tag):
+        vs = await client.post(
+            VARSET_ENDPOINT,
+            json={"data": {"type": "varsets", "attributes": {"name": f"gitvault-{tag}"}}},
+            headers=AUTH,
+        )
+        return vs.json()["data"]["id"]
+
+    @pytest.mark.parametrize("category", ["git_http_auth", "git_ssh_auth"])
+    async def test_creating_a_vault_git_auth_workspace_variable_is_refused(
+        self, app, client, category
+    ):
+        set_auth(app, admin_user())
+        ws_id = await self._workspace(client, uuid.uuid4().hex[:8])
+
+        res = await client.post(
+            f"/api/v2/workspaces/{ws_id}/vars",
+            json={
+                "data": {
+                    "type": "vars",
+                    "attributes": {
+                        "key": "GIT_CRED",
+                        "category": category,
+                        "value-source": "vault",
+                        "value": self.REF,
+                    },
+                }
+            },
+            headers=AUTH,
+        )
+        assert res.status_code == 422, res.text
+        assert "vault" in res.text.lower()
+
+    @pytest.mark.parametrize("category", ["git_http_auth", "git_ssh_auth"])
+    async def test_creating_a_vault_git_auth_varset_variable_is_refused(
+        self, app, client, category
+    ):
+        set_auth(app, admin_user())
+        vs_id = await self._varset(client, uuid.uuid4().hex[:8])
+
+        res = await client.post(
+            f"/api/v2/varsets/{vs_id}/relationships/vars",
+            json={
+                "data": {
+                    "type": "vars",
+                    "attributes": {
+                        "key": "GIT_CRED",
+                        "category": category,
+                        "value-source": "vault",
+                        "value": self.REF,
+                    },
+                }
+            },
+            headers=AUTH,
+        )
+        assert res.status_code == 422, res.text
+        assert "vault" in res.text.lower()
+
+    async def test_patching_a_static_git_auth_variable_to_vault_is_refused(self, app, client):
+        """The category is already stored, so the guard must read it from the row
+        rather than only from the incoming attributes."""
+        set_auth(app, admin_user())
+        vs_id = await self._varset(client, uuid.uuid4().hex[:8])
+
+        created = await client.post(
+            f"/api/v2/varsets/{vs_id}/relationships/vars",
+            json={
+                "data": {
+                    "type": "vars",
+                    "attributes": {
+                        "key": "GIT_CRED",
+                        "category": "git_http_auth",
+                        "value": json.dumps({"source": "static", "username": "u", "token": "t"}),
+                    },
+                }
+            },
+            headers=AUTH,
+        )
+        assert created.status_code == 201, created.text
+        var_id = created.json()["data"]["id"]
+
+        res = await client.patch(
+            f"/api/v2/varsets/{vs_id}/relationships/vars/{var_id}",
+            json={
+                "data": {
+                    "type": "vars",
+                    "attributes": {"value-source": "vault", "value": self.REF},
+                }
+            },
+            headers=AUTH,
+        )
+        assert res.status_code == 422, res.text
+
+    async def test_an_ordinary_env_variable_still_accepts_vault(self, app, client):
+        """The negative path's negative: the guard must not over-reach."""
+        set_auth(app, admin_user())
+        vs_id = await self._varset(client, uuid.uuid4().hex[:8])
+
+        res = await client.post(
+            f"/api/v2/varsets/{vs_id}/relationships/vars",
+            json={
+                "data": {
+                    "type": "vars",
+                    "attributes": {
+                        "key": "SHARED_TOKEN",
+                        "category": "env",
+                        "value-source": "vault",
+                        "value": self.REF,
+                    },
+                }
+            },
+            headers=AUTH,
+        )
+        assert res.status_code == 201, res.text
+
+
 class TestVarsetVaultInvariants:
     """The varset write path must match the workspace one; it was a near-copy
     that dropped the vault clause."""
