@@ -364,13 +364,20 @@ this path.
   rather than silently resolving to nothing, and switching a workspace that
   holds one to local execution is refused for the same reason.
 
-  A **variable set** cannot be checked the same way: a set is not bound to a
-  workspace — it may have no assignments yet, or reach many workspaces through a
-  label rule — so there is no workspace to test at the point of writing. A set
-  carrying a Vault reference that reaches a local-execution workspace therefore
-  resolves to nothing *on that workspace*, silently. Agent-mode workspaces in
-  the same set are unaffected. Enforcement at assignment time is tracked in
-  #1463.
+  A **variable set** is checked at the points where the pairing can actually be
+  created, since a set is not bound to a workspace and there is no single write
+  to test. All three are refused: assigning a workspace to a set that carries a
+  Vault reference, writing a Vault reference into a set that already reaches a
+  local-execution workspace, and switching a workspace to local while a set
+  delivers one to it (the workspace's own variables and the set's are counted
+  together).
+
+  One gap remains by design: a set assigned by an **assignment rule** whose match
+  set widens later — a label edit, or a new local workspace matching the rule —
+  is not a write against either side, so there is nothing to refuse at. On such a
+  workspace the reference resolves to nothing while agent-mode workspaces in the
+  same set are unaffected. Prefer agent execution for any workspace a
+  Vault-bearing set can reach.
 - **Leases are not renewed or revoked.** A dynamic credential is minted per run
   and left to expire. Set the Vault role's TTL to suit your run durations.
 - **No file materialization yet.** Values are delivered as environment or

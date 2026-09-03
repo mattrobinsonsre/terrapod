@@ -458,21 +458,22 @@ async def _apply(
     # path was the way round it (#B1). Checked up front so the all-or-nothing
     # batch fails cleanly, naming every affected workspace, before any mutation.
     if plan["fields"].get("execution_mode") == "local":
-        from terrapod.services.variable_service import count_vault_workspace_variables
+        from terrapod.services.variable_service import count_vault_variables_reaching
 
         blocked = [
             ws.name
             for ws in workspaces
-            if ws.execution_mode != "local" and await count_vault_workspace_variables(db, ws.id)
+            if ws.execution_mode != "local" and await count_vault_variables_reaching(db, ws.id)
         ]
         if blocked:
             raise HTTPException(
                 status_code=422,
                 detail=(
                     "Refusing to switch these workspaces to local execution — they "
-                    "have Vault-sourced variables that only resolve under agent "
-                    f"execution and would silently deliver nothing: {', '.join(sorted(blocked))}. "
-                    "Remove or convert those variables first."
+                    "receive Vault-sourced variables, from their own variables or a "
+                    "variable set, that only resolve under agent execution and would "
+                    f"silently deliver nothing: {', '.join(sorted(blocked))}. "
+                    "Remove or convert those variables first, or unassign the set."
                 ),
             )
 

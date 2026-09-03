@@ -1227,3 +1227,151 @@ class TestBulkSwitchToLocalHonoursTheVaultGuard:
             headers=AUTH,
         )
         assert resp.status_code == 200, resp.text
+
+
+class TestVaultVarsetsCannotReachALocalWorkspace:
+    """#1463: the workspace-level guard refuses a Vault variable on a local
+    workspace, but a variable SET delivered one anyway — same silent outcome,
+    reached from the other side. Vault resolves only when a runner claims the
+    run, so on a local workspace the reference produces nothing at all.
+
+    Three write paths can create the pairing; all three are refused. A rule whose
+    match set widens later is not a write against either side and stays out of
+    scope — see docs/vault.md.
+    """
+
+    REF = json.dumps({"mount": "secret", "path": "apps/x", "field": "token"})
+
+    async def _varset(self, client, tag):
+        vs = await client.post(
+            VARSET_ENDPOINT,
+            json={"data": {"type": "varsets", "attributes": {"name": f"vsloc-{tag}"}}},
+            headers=AUTH,
+        )
+        assert vs.status_code == 201, vs.text
+        return vs.json()["data"]["id"]
+
+    async def _vault_var(self, client, vs_id, key="TOK"):
+        return await client.post(
+            f"/api/v2/varsets/{vs_id}/relationships/vars",
+            json={
+                "data": {
+                    "type": "vars",
+                    "attributes": {
+                        "key": key,
+                        "category": "env",
+                        "value-source": "vault",
+                        "value": self.REF,
+                    },
+                }
+            },
+            headers=AUTH,
+        )
+
+    async def _assign(self, client, vs_id, ws_id):
+        return await client.post(
+            f"/api/v2/varsets/{vs_id}/relationships/workspaces",
+            json={"data": [{"type": "workspaces", "id": ws_id}]},
+            headers=AUTH,
+        )
+
+    async def test_assigning_a_vault_set_to_a_local_workspace_is_refused(self, app, client):
+        set_auth(app, admin_user())
+        tag = uuid.uuid4().hex[:8]
+        vs_id = await self._varset(client, tag)
+        assert (await self._vault_var(client, vs_id)).status_code == 201
+
+        ws_id = await _ws(client, f"vsloc-{tag}", **{"execution-mode": "local"})
+        resp = await self._assign(client, vs_id, ws_id)
+        assert resp.status_code == 422, resp.text
+        assert f"vsloc-{tag}" in resp.text
+
+    async def test_assigning_a_vault_set_to_an_agent_workspace_is_fine(self, app, client):
+        """The guard must not over-reach: agent execution is exactly where a
+        Vault reference does work."""
+        set_auth(app, admin_user())
+        tag = uuid.uuid4().hex[:8]
+        vs_id = await self._varset(client, tag)
+        assert (await self._vault_var(client, vs_id)).status_code == 201
+
+        ws_id = await _ws(client, f"vsagent-{tag}", **{"execution-mode": "agent"})
+        resp = await self._assign(client, vs_id, ws_id)
+        assert resp.status_code == 204, resp.text
+
+    async def test_adding_a_vault_var_to_a_set_on_a_local_workspace_is_refused(self, app, client):
+        """The other order: assign first, then try to write the reference in."""
+        set_auth(app, admin_user())
+        tag = uuid.uuid4().hex[:8]
+        vs_id = await self._varset(client, tag)
+        ws_id = await _ws(client, f"vsloc2-{tag}", **{"execution-mode": "local"})
+        assert (await self._assign(client, vs_id, ws_id)).status_code == 204
+
+        resp = await self._vault_var(client, vs_id)
+        assert resp.status_code == 422, resp.text
+        assert f"vsloc2-{tag}" in resp.text
+
+    async def test_a_static_var_on_a_local_workspace_set_is_still_fine(self, app, client):
+        set_auth(app, admin_user())
+        tag = uuid.uuid4().hex[:8]
+        vs_id = await self._varset(client, tag)
+        ws_id = await _ws(client, f"vsloc3-{tag}", **{"execution-mode": "local"})
+        assert (await self._assign(client, vs_id, ws_id)).status_code == 204
+
+        resp = await client.post(
+            f"/api/v2/varsets/{vs_id}/relationships/vars",
+            json={
+                "data": {
+                    "type": "vars",
+                    "attributes": {"key": "PLAIN", "category": "env", "value": "v"},
+                }
+            },
+            headers=AUTH,
+        )
+        assert resp.status_code == 201, resp.text
+
+    async def test_switching_to_local_is_refused_when_a_SET_delivers_the_vault_var(
+        self, app, client
+    ):
+        """The guard counted the workspace's own variables only, so a set-delivered
+        reference let the switch through — the hole this issue names."""
+        set_auth(app, admin_user())
+        tag = uuid.uuid4().hex[:8]
+        vs_id = await self._varset(client, tag)
+        assert (await self._vault_var(client, vs_id)).status_code == 201
+
+        ws_id = await _ws(client, f"vsswitch-{tag}", **{"execution-mode": "agent"})
+        assert (await self._assign(client, vs_id, ws_id)).status_code == 204
+
+        resp = await client.patch(
+            f"/api/v2/workspaces/{ws_id}",
+            json={"data": {"type": "workspaces", "attributes": {"execution-mode": "local"}}},
+            headers=AUTH,
+        )
+        assert resp.status_code == 422, resp.text
+
+        got = await client.get(f"/api/v2/workspaces/{ws_id}", headers=AUTH)
+        assert got.json()["data"]["attributes"]["execution-mode"] == "agent"
+
+    async def test_bulk_switch_is_refused_when_a_SET_delivers_the_vault_var(self, app, client):
+        """And the bulk path, which was the documented way round the single one."""
+        set_auth(app, admin_user())
+        tag = uuid.uuid4().hex[:8]
+        vs_id = await self._varset(client, tag)
+        assert (await self._vault_var(client, vs_id)).status_code == 201
+
+        ws_id = await _ws(
+            client, f"vsbulk-{tag}", labels={"grp": tag}, **{"execution-mode": "agent"}
+        )
+        assert (await self._assign(client, vs_id, ws_id)).status_code == 204
+
+        resp = await client.post(
+            "/api/terrapod/v1/workspaces/actions/bulk-update",
+            json={
+                "dry_run": False,
+                "filter": {"labels": {"grp": tag}},
+                "update": {"execution-mode": "local"},
+            },
+            headers=AUTH,
+        )
+        assert resp.status_code == 422, resp.text
+        assert f"vsbulk-{tag}" in resp.json()["detail"]

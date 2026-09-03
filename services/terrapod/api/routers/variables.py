@@ -130,6 +130,33 @@ def _reject_vault_on_git_auth(value_source: str, category: str | None) -> None:
         )
 
 
+async def _reject_vault_varset_on_local(db, vs, *, when: str) -> None:
+    """A set carrying a Vault reference must not reach a local-execution workspace.
+
+    Vault resolves only on the agent claim path, so on a local workspace the
+    reference delivers nothing, silently — the outcome the workspace-level guard
+    exists to prevent, reached through a set instead (#1463).
+
+    Two write paths can create the pairing and both are checked: assigning a
+    workspace to the set, and writing a Vault variable into a set that already
+    reaches one. A rule whose match set widens *later* is not a write against
+    either, so it stays outside this guard — see docs/vault.md.
+    """
+    from terrapod.services.variable_service import local_workspaces_for_varset
+
+    local = await local_workspaces_for_varset(db, vs)
+    if not local:
+        return
+    names = ", ".join(sorted(ws.name for ws in local))
+    raise HTTPException(
+        status_code=422,
+        detail=f"{when}: this variable set reaches local-execution workspace(s) "
+        f"({names}), where a Vault reference resolves to nothing because "
+        "resolution happens only when a runner claims the run. Switch them to "
+        "agent execution, or unassign them from this set, first.",
+    )
+
+
 def _apply_value_source(
     attrs: dict, current: str = "static", category: str | None = None
 ) -> tuple[str, bool]:
@@ -691,6 +718,8 @@ async def create_varset_var(
         sensitive = True  # git-auth values are always secret
 
     value_source, force_sensitive = _apply_value_source(attrs, category=category)
+    if value_source == "vault":
+        await _reject_vault_varset_on_local(db, vs, when="Cannot add a Vault-sourced variable")
     if force_sensitive:
         sensitive = True
 
@@ -752,6 +781,8 @@ async def update_varset_var(
     vsv.value_source, _vault_forced = _apply_value_source(
         attrs, vsv.value_source, category=attrs.get("category", vsv.category)
     )
+    if vsv.value_source == "vault":
+        await _reject_vault_varset_on_local(db, vs, when="Cannot set a Vault source")
     was_sensitive = vsv.sensitive
     if "value" in attrs:
         vsv.value = attrs["value"]
@@ -925,6 +956,23 @@ async def add_varset_workspaces(
     """Assign workspaces to a variable set. Requires admin."""
     vs = await _get_varset(varset_id, db)
 
+    # A set carrying a Vault reference cannot be assigned to a local-execution
+    # workspace: resolution happens only when a runner claims the run, so the
+    # variable would deliver nothing there, silently (#1463). Counted once, up
+    # front, rather than per workspace.
+    from sqlalchemy import func as _func
+
+    vault_vars = (
+        await db.scalar(
+            select(_func.count())
+            .select_from(VariableSetVariable)
+            .where(
+                VariableSetVariable.variable_set_id == vs.id,
+                VariableSetVariable.value_source == "vault",
+            )
+        )
+    ) or 0
+
     data = body.get("data", [])
     for item in data:
         ws_id = item.get("id", "").removeprefix("ws-")
@@ -937,6 +985,16 @@ async def add_varset_workspaces(
         ws = await db.get(Workspace, ws_uuid)
         if ws is None:
             continue
+
+        if vault_vars and getattr(ws, "execution_mode", "agent") == "local":
+            raise HTTPException(
+                status_code=422,
+                detail=f"Cannot assign this variable set to '{ws.name}': the set has "
+                f"{vault_vars} Vault-sourced variable(s), which resolve only when a "
+                "runner claims the run, and that workspace uses local execution — "
+                "they would silently deliver nothing. Switch it to agent execution "
+                "first.",
+            )
 
         # Check not already assigned
         existing = await db.execute(

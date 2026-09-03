@@ -1653,15 +1653,19 @@ async def update_workspace(
             # Vault references resolve only on the agent claim path, so a local
             # workspace would silently deliver nothing. Shared with the bulk
             # switch (workspace_bulk) so the two paths cannot diverge.
-            from terrapod.services.variable_service import count_vault_workspace_variables
+            # Counts variables arriving through a variable SET as well as the
+            # workspace's own (#1463) — a set delivers them just the same, and
+            # guarding only the workspace's own left the hole open.
+            from terrapod.services.variable_service import count_vault_variables_reaching
 
-            n = await count_vault_workspace_variables(db, ws.id)
+            n = await count_vault_variables_reaching(db, ws.id)
             if n:
                 raise HTTPException(
                     status_code=422,
-                    detail=f"This workspace has {n} Vault-sourced variable(s), which "
-                    "only resolve under agent execution. Switching to local would "
-                    "leave them delivering nothing. Remove or convert them first.",
+                    detail=f"This workspace receives {n} Vault-sourced variable(s), from "
+                    "its own variables or a variable set, which only resolve under agent "
+                    "execution. Switching to local would leave them delivering nothing. "
+                    "Remove or convert them first, or unassign the variable set.",
                 )
         ws.execution_mode = attrs["execution-mode"]
     if "auto-apply" in attrs and "auto-apply-mode" in attrs:
