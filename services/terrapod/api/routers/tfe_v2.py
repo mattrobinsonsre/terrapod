@@ -1650,22 +1650,12 @@ async def update_workspace(
                 detail="execution-mode must be 'local' or 'agent'",
             )
         if attrs["execution-mode"] == "local" and ws.execution_mode != "local":
-            # Vault references are resolved on the listener claim path, so a
-            # local workspace would silently deliver nothing. Creating one on a
-            # local workspace is already refused; switching an agent workspace
-            # to local was the way round that guard.
-            from sqlalchemy import func as _func
+            # Vault references resolve only on the agent claim path, so a local
+            # workspace would silently deliver nothing. Shared with the bulk
+            # switch (workspace_bulk) so the two paths cannot diverge.
+            from terrapod.services.variable_service import count_vault_workspace_variables
 
-            from terrapod.db.models import Variable
-
-            n = await db.scalar(
-                select(_func.count())
-                .select_from(Variable)
-                .where(
-                    Variable.workspace_id == ws.id,
-                    Variable.value_source == "vault",
-                )
-            )
+            n = await count_vault_workspace_variables(db, ws.id)
             if n:
                 raise HTTPException(
                     status_code=422,

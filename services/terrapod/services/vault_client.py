@@ -82,7 +82,10 @@ class VaultUnavailable(VaultError):
 #:
 #: Everything else (403 denied, 404 missing, other 4xx) is a real answer and
 #: stays permanent: retrying it forever would hide a misconfigured reference.
-_TRANSIENT_STATUSES = frozenset({429, 473})
+# 429/473 are standby/perf-standby; 412 is Vault's "missing required state" on a performance-replication or
+# consistency-gated node — all resolve once the node catches up, so they are
+# transient, not a real answer.
+_TRANSIENT_STATUSES = frozenset({412, 429, 473})
 
 
 def _is_transient_status(status: int) -> bool:

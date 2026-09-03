@@ -390,7 +390,10 @@ type RoleReachWorkspace struct {
 // Denied holds a bounded sample of what a deny rule removed, which is what
 // makes a deny rule safe to write.
 type RoleReach struct {
-	// Totals across EVERY axis the role's rules govern, not workspaces alone.
+	// Totals across EVERY axis the role's rules govern (workspaces + pools +
+	// registry + catalog), not workspaces alone. These are NOT the denominator
+	// of the Workspaces/Denied lists below, which are the workspace axis only —
+	// read Axes["workspace"].GrantedCount for the workspace count.
 	GrantedCount int `json:"granted-count"`
 	DeniedCount  int `json:"denied-count"`
 	MatchedCount int `json:"matched-count"`
