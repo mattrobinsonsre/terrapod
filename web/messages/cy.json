@@ -3069,7 +3069,7 @@
     "restoreAgainConfirm": "Mae „{name}” wedi''i adfer eisoes, i {existing}.\n\nMae ei adfer eto''n creu AIL weithle sy''n dal yr un llinach cyflwr dros yr un seilwaith. Bydd apply yn y naill neu''r llall wedyn yn gwneud i gynllun nesaf y llall edrych fel drifft llwyr.\n\nParhewch dim ond os yw''r gweithle a adferwyd yn gynharach wedi mynd."
   },
   "roleReach": {
-    "title": "Gweithfannau y mae hyn yn eu cyrraedd",
+    "title": "Yr hyn y mae''r rôl hon yn ei gyrraedd",
     "checking": "Yn gwirio…",
     "failed": "Methwyd â phennu beth mae''r rheol hon yn ei gyrraedd.",
     "noAllowRules": "Ychwanegwch label neu enw a ganiateir i weld pa weithfannau y byddai''r rôl hon yn eu cyrraedd.",

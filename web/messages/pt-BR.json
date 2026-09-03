@@ -3069,7 +3069,7 @@
     "restoreAgainConfirm": "“{name}” já foi restaurado, para {existing}.\n\nRestaurar de novo cria um SEGUNDO workspace com a mesma linhagem de state sobre a mesma infraestrutura. Um apply em qualquer um deles fará o próximo plano do outro parecer um drift total.\n\nContinue apenas se o workspace restaurado antes não existir mais."
   },
   "roleReach": {
-    "title": "Workspaces alcançados",
+    "title": "O que esta função alcança",
     "checking": "Verificando…",
     "failed": "Não foi possível determinar o alcance desta regra.",
     "noAllowRules": "Adicione um rótulo ou nome de permissão para ver quais workspaces esta função alcançaria.",

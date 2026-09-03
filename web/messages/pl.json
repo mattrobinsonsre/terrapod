@@ -3069,7 +3069,7 @@
     "restoreAgainConfirm": "„{name}” został już przywrócony, do {existing}.\n\nPonowne przywrócenie tworzy DRUGI workspace z tą samą linią stanu nad tą samą infrastrukturą. Apply w którymkolwiek z nich sprawi wtedy, że kolejny plan drugiego będzie wyglądał jak całkowity drift.\n\nKontynuuj tylko, jeśli wcześniej przywrócony workspace już nie istnieje."
   },
   "roleReach": {
-    "title": "Przestrzenie robocze objęte regułą",
+    "title": "Co obejmuje ta rola",
     "checking": "Sprawdzanie…",
     "failed": "Nie udało się ustalić zakresu tej reguły.",
     "noAllowRules": "Dodaj etykietę lub nazwę zezwolenia, aby zobaczyć, które przestrzenie robocze obejmie ta rola.",

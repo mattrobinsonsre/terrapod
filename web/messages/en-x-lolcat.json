@@ -3069,7 +3069,7 @@
     "restoreAgainConfirm": "\"{name}\" haz alreddy been restord, into {existing}.\n\nRestorin it agin makez a SEKOND wurkspace holdin teh same state lineage ovar teh same infrastrukchur. Applyin in eithr will den makez teh othr''s next plan look liek wholesale drift. OH NOES.\n\nOnly continoo if teh earlier restord wurkspace iz gon."
   },
   "roleReach": {
-    "title": "Werkspacez dis reachez",
+    "title": "Wat dis role reachez",
     "checking": "Chekin…",
     "failed": "Coud not figger out wat dis rool reachez.",
     "noAllowRules": "Add an allow labul or an allow naym 2 see wich werkspacez dis role wud reach.",

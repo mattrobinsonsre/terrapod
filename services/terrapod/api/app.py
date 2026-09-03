@@ -774,6 +774,7 @@ def create_application() -> FastAPI:
 
     from terrapod.api.errors import jsonapi_error_response
     from terrapod.services.ha_role import NotLeaderError
+    from terrapod.services.role_reach_service import ViewerNotPermitted
 
     # JSON:API house style (#1063): every error body carries a JSON:API
     # `errors` array AND the legacy top-level `detail`. Purely additive — old
@@ -813,6 +814,16 @@ def create_application() -> FastAPI:
         """
         logger.info("Write refused: not the leader", action=exc.action, path=request.url.path)
         return jsonapi_error_response(str(exc), 503)
+
+    @app.exception_handler(ViewerNotPermitted)
+    async def viewer_not_permitted_handler(
+        request: Request, exc: ViewerNotPermitted
+    ) -> JSONResponse:
+        """The estate-disclosure backstop refuses — that is an authorization
+        outcome, so it must read as one. Without this it fell through to the
+        generic handler and became a 500 "Internal server error", which tells
+        the caller nothing and looks like a fault rather than a refusal."""
+        return jsonapi_error_response(str(exc), 403)
 
     @app.exception_handler(IntegrityError)
     async def integrity_error_handler(request: Request, exc: IntegrityError) -> JSONResponse:

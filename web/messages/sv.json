@@ -3069,7 +3069,7 @@
     "restoreAgainConfirm": "”{name}” har redan återställts, till {existing}.\n\nAtt återställa igen skapar ett ANDRA workspace med samma state-härstamning över samma infrastruktur. En apply i något av dem får då den andras nästa plan att se ut som total drift.\n\nFortsätt bara om det tidigare återställda workspacet är borta."
   },
   "roleReach": {
-    "title": "Arbetsytor som omfattas",
+    "title": "Vad den här rollen omfattar",
     "checking": "Kontrollerar…",
     "failed": "Det gick inte att avgöra vad den här regeln omfattar.",
     "noAllowRules": "Lägg till en tillåten etikett eller ett tillåtet namn för att se vilka arbetsytor den här rollen skulle omfatta.",

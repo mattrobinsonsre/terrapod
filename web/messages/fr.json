@@ -3069,7 +3069,7 @@
     "restoreAgainConfirm": "« {name} » a déjà été restauré, vers {existing}.\n\nLe restaurer à nouveau crée un SECOND workspace portant le même lignage d''état sur la même infrastructure. Un apply dans l''un fera alors ressembler le prochain plan de l''autre à une dérive totale.\n\nNe continuez que si le workspace restauré précédemment a disparu."
   },
   "roleReach": {
-    "title": "Espaces de travail concernés",
+    "title": "Ce que ce rôle atteint",
     "checking": "Vérification…",
     "failed": "Impossible de déterminer la portée de cette règle.",
     "noAllowRules": "Ajoutez un label ou un nom d''autorisation pour voir quels espaces de travail ce rôle atteindrait.",

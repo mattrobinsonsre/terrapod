@@ -3069,7 +3069,7 @@
     "restoreAgainConfirm": "”{name}” on jo palautettu, kohteeseen {existing}.\n\nUusi palautus luo TOISEN workspacen, jolla on sama state-sukulinja saman infrastruktuurin päällä. Apply kummassa tahansa saa toisen seuraavan suunnitelman näyttämään täydeltä ajautumiselta.\n\nJatka vain, jos aiemmin palautettu workspace on poissa."
   },
   "roleReach": {
-    "title": "Työtilat, joihin tämä ulottuu",
+    "title": "Mihin tämä rooli ulottuu",
     "checking": "Tarkistetaan…",
     "failed": "Säännön kattavuutta ei voitu selvittää.",
     "noAllowRules": "Lisää salliva tunniste tai nimi nähdäksesi, mihin työtiloihin tämä rooli ulottuisi.",

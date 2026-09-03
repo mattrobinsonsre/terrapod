@@ -3069,7 +3069,7 @@
     "restoreAgainConfirm": "“{name}” zaten geri yüklendi, {existing} içine.\n\nTekrar geri yüklemek, aynı altyapının üzerinde aynı state soyunu taşıyan İKİNCİ bir workspace oluşturur. Herhangi birinde apply çalıştırmak, diğerinin bir sonraki planını tümüyle drift gibi gösterir.\n\nYalnızca daha önce geri yüklenen workspace ortadan kalktıysa devam edin."
   },
   "roleReach": {
-    "title": "Bu kuralın kapsadığı çalışma alanları",
+    "title": "Bu rolün kapsadıkları",
     "checking": "Denetleniyor…",
     "failed": "Bu kuralın kapsamı belirlenemedi.",
     "noAllowRules": "Bu rolün hangi çalışma alanlarını kapsayacağını görmek için bir izin etiketi veya adı ekleyin.",

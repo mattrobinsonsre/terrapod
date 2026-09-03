@@ -15,7 +15,12 @@ import pytest
 
 from terrapod.config import VaultInstanceConfig
 from terrapod.services import vault_client
-from terrapod.services.vault_client import VaultError, read_secret, reset_token_cache
+from terrapod.services.vault_client import (
+    VaultError,
+    VaultUnavailable,
+    read_secret,
+    reset_token_cache,
+)
 
 
 def _inst(**kw) -> VaultInstanceConfig:
@@ -429,3 +434,45 @@ class TestTraversalGuardCoversEncodedForms:
                 )
                 == "v"
             )
+
+
+class TestASealedVaultIsTransientNotFatal:
+    """A sealed Vault answers 503 to everything, and a restarting or unsealing
+    one does the same. Before this classifier only TRANSPORT failures were
+    transient, so `vault operator seal` errored every queued run in the estate —
+    the design worked for a Vault that was unreachable, and not for one that was
+    merely shut, which is by far the more common case.
+    """
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("status", [500, 502, 503, 504, 429, 473])
+    async def test_a_transient_status_raises_VaultUnavailable(self, status):
+        rec = _Recorder([(status, {})])
+        with _patched(rec), pytest.raises(VaultUnavailable):
+            await read_secret(_inst(), mount="kvv2", path="a", field="k", static_token="t")
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("status", [400, 403, 405, 422])
+    async def test_a_definitive_status_stays_fatal(self, status):
+        """A real answer, even a refusal, must NOT be retried forever — that
+        would hide a misconfigured reference behind an endless re-queue."""
+        rec = _Recorder([(status, {})])
+        with _patched(rec), pytest.raises(VaultError) as e:
+            await read_secret(_inst(), mount="kvv2", path="a", field="k", static_token="t")
+        assert not isinstance(e.value, VaultUnavailable), (
+            f"HTTP {status} is a definitive answer and must not be treated as transient"
+        )
+
+    @pytest.mark.asyncio
+    async def test_a_sealed_vault_on_LOGIN_is_transient_too(self):
+        """Login is what a sealed Vault turns away first, and the transport
+        layer does not retry POST — so an unclassified 503 there errored the run
+        on the very first attempt."""
+        rec = _Recorder([(503, {})])
+        inst = _inst(auth={"method": "kubernetes", "mount": "kubernetes", "role": "r"})
+        with (
+            _patched(rec),
+            patch.object(vault_client, "_read_sa_token", return_value="jwt"),
+            pytest.raises(VaultUnavailable),
+        ):
+            await read_secret(inst, mount="kvv2", path="a", field="k")

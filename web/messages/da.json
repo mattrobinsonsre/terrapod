@@ -3069,7 +3069,7 @@
     "restoreAgainConfirm": "“{name}” er allerede gendannet, til {existing}.\n\nAt gendanne igen opretter et ANDET workspace med den samme state-slægt over den samme infrastruktur. En apply i det ene får så det andets næste plan til at se ud som omfattende drift.\n\nFortsæt kun, hvis det tidligere gendannede workspace er væk."
   },
   "roleReach": {
-    "title": "Workspaces dette omfatter",
+    "title": "Hvad denne rolle omfatter",
     "checking": "Kontrollerer…",
     "failed": "Kunne ikke afgøre, hvad denne regel omfatter.",
     "noAllowRules": "Tilføj et tilladt label eller navn for at se, hvilke workspaces denne rolle ville omfatte.",

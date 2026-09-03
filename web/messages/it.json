@@ -3069,7 +3069,7 @@
     "restoreAgainConfirm": "«{name}» è già stato ripristinato, in {existing}.\n\nRipristinarlo di nuovo crea un SECONDO workspace con lo stesso lignaggio di stato sulla stessa infrastruttura. Un apply in uno dei due farà poi sembrare il piano successivo dell''altro un drift totale.\n\nProsegui solo se il workspace ripristinato in precedenza non esiste più."
   },
   "roleReach": {
-    "title": "Spazi di lavoro raggiunti",
+    "title": "Ciò che questo ruolo raggiunge",
     "checking": "Verifica in corso…",
     "failed": "Impossibile determinare la portata di questa regola.",
     "noAllowRules": "Aggiungi un''etichetta o un nome di autorizzazione per vedere quali spazi di lavoro raggiungerebbe questo ruolo.",

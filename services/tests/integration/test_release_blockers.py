@@ -978,3 +978,48 @@ class TestNarrowedLabelReservations:
         assert vs.status_code == 201, vs.text
         resp = await client.get(f"/api/terrapod/v1/workspaces/{ws_id}/varsets", headers=AUTH)
         assert vs.json()["data"]["id"] in {v["id"] for v in resp.json()["data"]}
+
+
+class TestTheVaultValueActuallyReachesTheRunner:
+    """The whole point of #1439, and it had NO test.
+
+    Every vault test in the release mocked `read_secret` with a raised
+    exception, so the failure paths were well covered and the success path was
+    not covered at all. Deleting the substitution loop in `runs.py` left the
+    entire suite green while the runner was handed the JSON reference
+    `{"mount":...,"path":...,"field":...}` as the credential — the identical
+    failure that `TestFlippingAwayFromVault` exists to catch on the write path.
+    """
+
+    async def test_a_resolved_secret_replaces_the_reference_in_env_vars(self, app, client):
+        from terrapod.config import VaultInstanceConfig, settings
+
+        set_auth(app, admin_user())
+        tag = uuid.uuid4().hex[:8]
+        pool_id, listener_id = await _pool_with_listener(client, tag)
+        ws_id, cv_id, run_id = await _agent_run_with_vault_var(client, tag, pool_id)
+        set_listener_auth(app, listener_id, pool_id.removeprefix("apool-"))
+
+        prior = (settings.vault.enabled, settings.vault.instances)
+        settings.vault.enabled = True
+        settings.vault.instances = [
+            VaultInstanceConfig(name="default", default=True, address="https://vault.test:8200")
+        ]
+        try:
+            with patch(
+                "terrapod.services.vault_source_service.read_secret",
+                new=AsyncMock(return_value="s3cr3t-from-vault"),
+            ):
+                resp = await client.get(f"/api/terrapod/v1/listeners/{listener_id}/runs/next")
+        finally:
+            settings.vault.enabled, settings.vault.instances = prior
+
+        assert resp.status_code == 200, resp.text
+        env = {e["key"]: e["value"] for e in resp.json()["data"]["attributes"]["env-vars"]}
+        assert env.get("TOK") == "s3cr3t-from-vault", env
+
+        # And the reference itself must be gone — handing the runner the JSON
+        # coordinates as the credential is the failure mode, not a lesser one.
+        body = resp.text
+        assert '"mount"' not in body, "the vault reference was delivered instead of the secret"
+        assert "apps/x" not in body

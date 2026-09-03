@@ -216,11 +216,27 @@ async def _reach_for_axis(
         d = denied_query(role, model)
         granted_total += await db.scalar(select(func.count()).select_from(g.subquery())) or 0
         denied_total += await db.scalar(select(func.count()).select_from(d.subquery())) or 0
-        for obj in (await db.execute(g.limit(limit).offset(offset))).scalars().all():
+        # Fetch offset+limit from EACH model rather than applying the offset per
+        # model: the registry axis spans two (modules and providers), and paging
+        # them independently returned up to 2x the page size while skipping rows
+        # — page 2 of 25 gave modules 26-50 AND providers 26-50 against a count
+        # that described the union. The first (offset+limit) rows of the union
+        # are always contained in the union of each model's first
+        # (offset+limit), so this window is sufficient; it is sorted and sliced
+        # below.
+        window = offset + limit
+        for obj in (await db.execute(g.limit(window))).scalars().all():
             entries.append(_entry(role, axis, kind, obj))
         if include_denied:
-            for obj in (await db.execute(d.limit(limit))).scalars().all():
+            for obj in (await db.execute(d.limit(window))).scalars().all():
                 denied_entries.append(_entry(role, axis, kind, obj))
+
+    # Order across the whole axis, then take the page. Single-model axes are
+    # unaffected (already ordered by name in SQL); multi-model ones need it.
+    entries.sort(key=lambda e: (e["kind"], e["name"]))
+    denied_entries.sort(key=lambda e: (e["kind"], e["name"]))
+    entries = entries[offset : offset + limit]
+    denied_entries = denied_entries[:limit]
 
     return {
         "granted-count": granted_total,
@@ -259,6 +275,12 @@ def assert_viewer_sees_everything(viewer_roles: list[str] | None) -> None:
     because it reintroduces the per-request O(fleet) resolution that #1056
     removed, and it must be designed rather than bolted on.
     """
+    # NOTE: callers must pass the EFFECTIVE platform roles
+    # (`dependencies.effective_platform_roles(user)`), not `user.roles`. A
+    # service-token principal's raw list is wider than what the gate honours —
+    # `service_bound` is live ∩ pinned and `service_detached` is pinned only —
+    # so checking the raw list would make this backstop inert for exactly the
+    # token kinds attenuation exists for.
     if not {"admin", "audit"} & set(viewer_roles or []):
         raise ViewerNotPermitted(
             "role reach is reported across the whole estate, so it is offered only to "
@@ -304,6 +326,10 @@ async def preview_role_reach(
         # editor leads with, and by far the most asked-about.
         "workspaces": axes["workspace"]["resources"],
         "denied": axes["workspace"]["denied"],
+        # Promoted with them, or a caller reading the top-level `denied` list
+        # would treat a truncated sample as the complete set — the field was
+        # declared in the SDK and never emitted here, so it always read false.
+        "denied-truncated": axes["workspace"]["denied-truncated"],
     }
 
 

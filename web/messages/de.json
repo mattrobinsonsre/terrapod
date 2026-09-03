@@ -3069,7 +3069,7 @@
     "restoreAgainConfirm": "„{name}“ wurde bereits wiederhergestellt, nach {existing}.\n\nEine erneute Wiederherstellung erzeugt einen ZWEITEN Workspace mit derselben State-Lineage über derselben Infrastruktur. Ein Apply in einem der beiden lässt den nächsten Plan des anderen dann wie kompletter Drift aussehen.\n\nNur fortfahren, wenn der zuvor wiederhergestellte Workspace nicht mehr existiert."
   },
   "roleReach": {
-    "title": "Workspaces, die dies erreicht",
+    "title": "Worauf diese Rolle zugreift",
     "checking": "Wird geprüft…",
     "failed": "Die Reichweite dieser Regel konnte nicht ermittelt werden.",
     "noAllowRules": "Fügen Sie ein Allow-Label oder einen Allow-Namen hinzu, um zu sehen, welche Workspaces diese Rolle erreichen würde.",

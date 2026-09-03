@@ -278,15 +278,41 @@ operator who gets it slightly wrong otherwise has no second line.
 
 ## When a reference cannot be resolved
 
-**The run fails.** It does not proceed with the variable missing.
+Terrapod never proceeds with the variable missing. A missing secret is worse
+than a failed run — Terraform either fails somewhere confusing, or falls back to
+another identity and acts with credentials nobody chose. (This differs from
+private-git-module credentials, which are dropped with a warning so one bad
+credential cannot fail everything.)
 
-This is deliberate, and differs from how private-git-module credentials behave:
-those are dropped with a warning so one bad credential cannot fail everything.
-A missing secret is worse than a failed run — Terraform either fails somewhere
-confusing, or falls back to another identity and acts with credentials nobody
-chose.
+What happens next depends on **which kind of failure it is**, and the difference
+matters when you are diagnosing one:
 
-The run is errored with the cause, naming the variable:
+| Vault's answer | What it means | What Terrapod does |
+|---|---|---|
+| `403`, `404`, other 4xx | A real answer: denied, or nothing at that path | **The run is errored**, naming the variable and the cause |
+| Unreachable, DNS failure, TLS failure, timeout | Vault cannot be contacted | **The run returns to `queued`** and waits for the next claim |
+| `503` (sealed), `501`, `429`/`473` (standby), other 5xx | Vault is up but cannot answer yet | **The run returns to `queued`** and waits |
+
+A misconfigured reference will never resolve, so retrying it would only hide the
+fault. A Vault that is sealed, restarting or briefly unreachable *will* answer in
+a moment — and erroring every queued run in the estate for that turns a blip into
+an incident someone has to clean up by hand.
+
+**The waiting case is quiet, and you should know its shape.** A run held this way
+shows no error: it simply sits in `queued` and is re-claimed periodically. If
+Vault never comes back — a wrong `address`, a blocked egress rule, a certificate
+the API pod does not trust — the run waits indefinitely rather than failing. The
+signal is in the API pod log:
+
+```
+vault is unavailable; leaving the run for a later claim
+```
+
+If runs are not starting and that line is repeating, treat it as a connectivity
+problem between the API pods and Vault, not as a problem with the run. See
+[the runbook](runbooks.md).
+
+For the errored case, the run carries the cause, naming the variable:
 
 ```
 variable 'NETBOX_TOKEN': Vault denied 'secret/apps/netbox' on instance

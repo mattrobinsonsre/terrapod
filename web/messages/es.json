@@ -3069,7 +3069,7 @@
     "restoreAgainConfirm": "«{name}» ya se restauró, en {existing}.\n\nRestaurarlo otra vez crea un SEGUNDO workspace con el mismo linaje de estado sobre la misma infraestructura. Un apply en cualquiera de los dos hará que el siguiente plan del otro parezca una deriva total.\n\nContinúa solo si el workspace restaurado anteriormente ya no existe."
   },
   "roleReach": {
-    "title": "Espacios de trabajo alcanzados",
+    "title": "Lo que este rol alcanza",
     "checking": "Comprobando…",
     "failed": "No se ha podido determinar el alcance de esta regla.",
     "noAllowRules": "Añada una etiqueta o un nombre de permiso para ver qué espacios de trabajo alcanzaría este rol.",
