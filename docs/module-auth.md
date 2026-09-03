@@ -29,6 +29,17 @@ many workspaces (define-once, assign-many, least-privilege). Multiple entries
 Values are always sensitive: the API forces `sensitive=true` for these categories
 and never returns the stored value.
 
+### Which entry is used
+
+An entry keyed to `host/org` covers every repository **under** that org —
+`host/org/anything.git` — not just the org path itself. A bare-host entry
+(`host`, no `/org`) covers everything on that host.
+
+When both exist, **the more specific one wins**: an entry for `github.com/org-a`
+serves that org and the bare `github.com` entry serves the rest. You do not have
+to order them; Terrapod emits the scoped entries first so the host-wide one
+cannot shadow them.
+
 ## Protocol rewriting (ssh ↔ https)
 
 Module `source` URLs become **protocol-agnostic** — Terrapod routes each fetch
