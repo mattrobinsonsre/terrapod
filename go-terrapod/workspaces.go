@@ -35,18 +35,22 @@ type Workspace struct {
 	// TerragruntEnabled wraps tofu/terraform with terragrunt for agent-mode
 	// runs; TerragruntVersion pins the terragrunt CLI version (partial like
 	// "1.0" allowed — the binary cache resolves it). See docs/terragrunt.md.
-	TerragruntEnabled bool              `json:"terragrunt-enabled"`
-	TerragruntVersion string            `json:"terragrunt-version,omitempty"`
-	WorkingDirectory  string            `json:"working-directory,omitempty"`
-	ResourceCPU       string            `json:"resource-cpu,omitempty"`
-	Parallelism       int64             `json:"parallelism,omitempty"`
-	ResourceMemory    string            `json:"resource-memory,omitempty"`
-	VCSRepoURL        string            `json:"vcs-repo-url,omitempty"`
-	VCSBranch         string            `json:"vcs-branch,omitempty"`
-	VCSWorkflow       string            `json:"vcs-workflow,omitempty"`
-	VCSConnectionID   string            `json:"vcs-connection-id,omitempty"` // resolved from `vcs-connection` relationship
-	AgentPoolID       string            `json:"agent-pool-id,omitempty"`
-	AgentPoolIDs      []string          `json:"agent-pool-ids,omitempty"` // flat pool set (#1085); AgentPoolID is element 0
+	TerragruntEnabled bool     `json:"terragrunt-enabled"`
+	TerragruntVersion string   `json:"terragrunt-version,omitempty"`
+	WorkingDirectory  string   `json:"working-directory,omitempty"`
+	ResourceCPU       string   `json:"resource-cpu,omitempty"`
+	Parallelism       int64    `json:"parallelism,omitempty"`
+	ResourceMemory    string   `json:"resource-memory,omitempty"`
+	VCSRepoURL        string   `json:"vcs-repo-url,omitempty"`
+	VCSBranch         string   `json:"vcs-branch,omitempty"`
+	VCSWorkflow       string   `json:"vcs-workflow,omitempty"`
+	VCSConnectionID   string   `json:"vcs-connection-id,omitempty"` // resolved from `vcs-connection` relationship
+	AgentPoolID       string   `json:"agent-pool-id,omitempty"`
+	AgentPoolIDs      []string `json:"agent-pool-ids,omitempty"` // flat pool set (#1085); AgentPoolID is element 0
+	// AgentPoolNames is read-only: the pools' names, positionally matching
+	// AgentPoolIDs. Served so a consumer can render a pool without fetching the
+	// whole pool list purely to turn ids into labels.
+	AgentPoolNames    []string          `json:"agent-pool-names,omitempty"`
 	AutoMerge         bool              `json:"auto-merge"`
 	AutoMergeStrategy string            `json:"auto-merge-strategy,omitempty"`
 	OwnerEmail        string            `json:"owner-email,omitempty"`
@@ -685,6 +689,7 @@ func workspaceFromResource(res *Resource) *Workspace {
 		VCSConnectionID:               GetRelationshipID(res, "vcs-connection"),
 		AgentPoolID:                   GetStringAttr(res, "agent-pool-id"),
 		AgentPoolIDs:                  GetListAttr(res, "agent-pool-ids"),
+		AgentPoolNames:                GetListAttr(res, "agent-pool-names"),
 		AutoMerge:                     GetBoolAttr(res, "auto-merge"),
 		AutoMergeStrategy:             GetStringAttr(res, "auto-merge-strategy"),
 		OwnerEmail:                    GetStringAttr(res, "owner-email"),

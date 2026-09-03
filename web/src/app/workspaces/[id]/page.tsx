@@ -66,6 +66,8 @@ interface WorkspaceAttrs {
   // and whichever has a live runner claims it first.
   'agent-pool-ids': string[]
   'agent-pool-name': string | null
+  /** Names for the whole set, positionally matching `agent-pool-ids`. */
+  'agent-pool-names'?: string[]
   labels: Record<string, string>
   'owner-email': string
   'var-files': string[]
@@ -1927,6 +1929,21 @@ function WorkspaceDetailContent() {
     (!attrs['vcs-last-polled-at'] ||
       new Date(attrs['vcs-last-attempted-at']) > new Date(attrs['vcs-last-polled-at']))
 
+  /** A pool's display name: from the server's positional `agent-pool-names`
+   *  first, then the fetched pool list, and only then the raw id.
+   *
+   *  The server list is what makes the READ-ONLY view work: the pool list is
+   *  fetched on entering edit mode, so before that `visiblePools` is empty and
+   *  every pool rendered as a bare `apool-<uuid>`. It also covers a caller who
+   *  can read the workspace but not list pools. */
+  function poolLabel(id: string): string {
+    const ids = attrs['agent-pool-ids'] || []
+    const names = attrs['agent-pool-names'] || []
+    const i = ids.indexOf(id)
+    if (i >= 0 && names[i]) return names[i]
+    return visiblePools.find((p) => p.id === id)?.attributes.name ?? id
+  }
+
   // Rows for the pool-set editor: everything the caller may assign, PLUS any
   // pool already on the workspace that they may not. Without the second half a
   // caller lacking pool:assign on one of the pools would silently drop it just
@@ -1937,7 +1954,7 @@ function WorkspaceDetailContent() {
       .filter((id) => !agentPools.some((p) => p.id === id))
       .map((id) => ({
         id,
-        name: visiblePools.find((p) => p.id === id)?.attributes.name ?? id,
+        name: poolLabel(id),
         assignable: false,
       })),
   ]
@@ -2282,7 +2299,7 @@ function WorkspaceDetailContent() {
                               key={id}
                               className="rounded bg-slate-700 px-2 py-0.5 text-xs text-slate-200"
                             >
-                              {visiblePools.find((p) => p.id === id)?.attributes.name ?? id}
+                              {poolLabel(id)}
                             </span>
                           ))}
                     </dd>

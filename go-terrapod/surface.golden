@@ -1020,6 +1020,7 @@ field Workspace.AISummaryMode string `json:"ai-summary-mode,omitempty"`
 field Workspace.AgentPoolID string `json:"agent-pool-id,omitempty"`
 field Workspace.AgentPoolIDs []string `json:"agent-pool-ids,omitempty"`
 field Workspace.AgentPoolName string `json:"agent-pool-name,omitempty"`
+field Workspace.AgentPoolNames []string `json:"agent-pool-names,omitempty"`
 field Workspace.AutoApply bool `json:"auto-apply"`
 field Workspace.AutoApplyMode string `json:"auto-apply-mode"`
 field Workspace.AutoMerge bool `json:"auto-merge"`

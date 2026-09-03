@@ -686,6 +686,7 @@
     "agent-pool-id",
     "agent-pool-ids",
     "agent-pool-name",
+    "agent-pool-names",
     "ai-summary-context",
     "ai-summary-mode",
     "auto-apply",
