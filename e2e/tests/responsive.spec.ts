@@ -93,6 +93,102 @@ test.describe('Responsive harness (phone viewport)', () => {
     await expectNoHorizontalPageScroll(page)
   })
 
+  test('variable-set variables adapt to mobile (#1439)', async ({ page }) => {
+    // Seeded with a real variable: on an empty set the page renders an empty
+    // state and there is no table in the DOM at all, so the assertion would
+    // pass however the breakpoints are written.
+    const token = getStoredToken()
+    const res = await fetch(`${API_URL}/api/v2/organizations/default/varsets`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/vnd.api+json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ data: { attributes: { name: uniqueName('e2erespvsv') } } }),
+    })
+    expect(res.status).toBe(201)
+    const vsId = (await res.json()).data.id
+
+    const varRes = await fetch(`${API_URL}/api/v2/varsets/${vsId}/relationships/vars`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/vnd.api+json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        data: {
+          type: 'vars',
+          attributes: { key: 'RESP_KEY', category: 'env', value: 'resp-value' },
+        },
+      }),
+    })
+    expect(varRes.status).toBe(201)
+
+    await page.goto(`/admin/variable-sets/${vsId}?tab=variables`)
+
+    const card = page.locator('li').filter({ hasText: 'RESP_KEY' })
+    await expect(card).toBeVisible({ timeout: 15_000 })
+    // Nothing is dropped on the phone: the desktop table is the only place the
+    // category column lives, so the card has to carry key, value AND category.
+    await expect(card.getByText('resp-value')).toBeVisible()
+    await expect(card.getByText('env')).toBeVisible()
+    // The desktop table must not be the thing rendering at this width.
+    await expect(page.locator('table')).toHaveCount(0)
+    await expectNoHorizontalPageScroll(page)
+  })
+
+  test('the variable-set Vault edit panel is usable at phone width (#1439)', async ({ page }) => {
+    // The edit state used to be a set of table cells, which truncated the five
+    // reference fields. Both breakpoints now share VariableEditPanel, so the
+    // builder has to be reachable and typable from the mobile card.
+    const token = getStoredToken()
+    const res = await fetch(`${API_URL}/api/v2/organizations/default/varsets`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/vnd.api+json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ data: { attributes: { name: uniqueName('e2erespvsedit') } } }),
+    })
+    expect(res.status).toBe(201)
+    const vsId = (await res.json()).data.id
+
+    const ref = JSON.stringify({ mount: 'secret', path: 'apps/thing', field: 'token' })
+    const varRes = await fetch(`${API_URL}/api/v2/varsets/${vsId}/relationships/vars`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/vnd.api+json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        data: {
+          type: 'vars',
+          attributes: { key: 'RESP_VAULT', category: 'env', 'value-source': 'vault', value: ref },
+        },
+      }),
+    })
+    expect(varRes.status).toBe(201)
+    const varId = (await varRes.json()).data.id
+
+    // The stack deliberately has no Vault, so the panel would not offer the
+    // source without this.
+    await page.route('**/api/terrapod/v1/vault/availability', (route: Route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            type: 'vault-availability',
+            id: 'vault',
+            attributes: { enabled: true, instances: ['default'], 'default-instance': 'default' },
+          },
+        }),
+      }),
+    )
+
+    await page.goto(`/admin/variable-sets/${vsId}?tab=variables`)
+    const card = page.locator('li').filter({ hasText: 'RESP_VAULT' })
+    await expect(card).toBeVisible({ timeout: 15_000 })
+    await card.getByRole('button', { name: 'Edit' }).click()
+
+    // `medit-` is the mobile card's panel prefix; the desktop row uses `edit-`,
+    // so this also proves the mobile branch is what rendered.
+    for (const id of [`#medit-${varId}-mount`, `#medit-${varId}-path`, `#medit-${varId}-field`]) {
+      await expect(page.locator(id)).toBeVisible()
+    }
+    await page.locator(`#medit-${varId}-path`).fill('apps/some/deeper/path')
+    await expect(page.locator(`#medit-${varId}-path`)).toHaveValue('apps/some/deeper/path')
+    await expectNoHorizontalPageScroll(page)
+  })
+
   test('deleted-workspaces admin page adapts to mobile (#1253)', async ({ page }) => {
     // Seed a real deleted workspace first. Asserting the table is hidden on an
     // EMPTY page proves nothing — with no rows the component renders an empty
