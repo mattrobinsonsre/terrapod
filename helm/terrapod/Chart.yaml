@@ -2,11 +2,19 @@ apiVersion: v2
 name: terrapod
 description: Terrapod - Open-source Terraform Enterprise replacement
 type: application
-# 1.27 is the floor the project actually tests against; the README states the
-# same number. It was previously declared as 1.23, which let the chart install
-# happily on versions nobody has ever exercised — a promise made by accident
-# rather than on purpose (#1387).
-kubeVersion: ">= 1.27.0-0"
+# 1.29 is the floor, and the eval-boot CI job's kind leg is pinned to it so it
+# is genuinely exercised rather than merely declared — k3d stays on current, so
+# the two legs cover both ends of the supported range (#1486). 1.27 went out of
+# upstream support in June 2024 and no managed provider sells it any more, so
+# the old floor described a version nobody could run.
+#
+# The number is stated in the README, docs/getting-started.md and
+# docs/deployment.md; move all four together. It was 1.23 before #1387, which
+# let the chart install happily on versions nobody had ever exercised — a
+# promise made by accident rather than on purpose. Raising the declaration
+# without raising what CI boots would recreate exactly that, which is why the
+# kind pin is part of this change and not a follow-up.
+kubeVersion: ">= 1.29.0-0"
 version: 0.0.0
 appVersion: "0.0.0"
 

@@ -8,7 +8,7 @@ Terrapod is deployed exclusively via Helm chart on Kubernetes. This guide covers
 
 ## Prerequisites
 
-- Kubernetes 1.27+
+- Kubernetes 1.29+
 - Helm 3.x
 - PostgreSQL 14+ and Redis 7+ — **external, managed** for production. For evaluation/dev the chart can run both in-cluster (`postgresql.deploy=true` / `redis.deploy=true`, single-replica, no HA or backups — **not** for production); see [Database Setup](#database-setup).
 - Object storage (S3, Azure Blob, GCS) or PVC-backed filesystem

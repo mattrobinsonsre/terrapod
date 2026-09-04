@@ -52,6 +52,10 @@ env:
   SEMGREP_IMAGE: ghcr.io/mattrobinsonsre/mirror/semgrep-semgrep:1.117
   BUILDKIT_IMAGE: ghcr.io/mattrobinsonsre/mirror/moby-buildkit:buildx-stable-1
   K3D_REGISTRY_IMAGE: ghcr.io/mattrobinsonsre/mirror/registry:2
+  # The chart's declared floor (Chart.yaml kubeVersion). The eval-boot kind leg
+  # boots exactly this, so the floor is tested rather than asserted — move the two
+  # together.
+  KIND_NODE_IMAGE_TAG: v1.29.14
 
 jobs:
   # ── Prepare ────────────────────────────────────────────
@@ -1491,7 +1495,13 @@ jobs:
             imgs="$imgs $REGISTRY/$i:sha-${sha}-amd64"
           done
           if [ "${{ matrix.tool }}" = "kind" ]; then
-            kind create cluster --name terrapod-eval --wait 120s
+            # Pinned to the chart's declared floor (Chart.yaml kubeVersion, #1486).
+            # Unpinned, kind boots whatever its own default is — current Kubernetes —
+            # so the floor was a claim nothing tested, which is the shape of accidental
+            # promise #1387 set out to fix. The k3d leg stays unpinned on current, so
+            # between them the two legs cover both ends of the supported range.
+            kind create cluster --name terrapod-eval --wait 120s \
+              --image "kindest/node:${KIND_NODE_IMAGE_TAG}"
             if [ "${{ needs.prepare.outputs.is_pr }}" = "true" ]; then
               # Import the build artifacts straight into the node. `kind load
               # docker-image` has to docker-save each image back out of the
