@@ -361,6 +361,34 @@ class TestAuthenticationIsRequired:
             f"{BASE}/npm/left-pad/-/left-pad-1.3.0.tgz",
             None,
         ),
+        "/api/terrapod/v1/package-cache/galaxy/": (
+            "GET",
+            f"{BASE}/galaxy/",
+            None,
+        ),
+        "/api/terrapod/v1/package-cache/galaxy/v3/collections/{namespace}/{name}/": (
+            "GET",
+            f"{BASE}/galaxy/v3/collections/community/general/",
+            None,
+        ),
+        "/api/terrapod/v1/package-cache/galaxy/v3/collections/{namespace}/{name}/versions/": (
+            "GET",
+            f"{BASE}/galaxy/v3/collections/community/general/versions/",
+            None,
+        ),
+        "/api/terrapod/v1/package-cache/galaxy/v3/collections/{namespace}/{name}"
+        "/versions/{version}/": (
+            "GET",
+            f"{BASE}/galaxy/v3/collections/community/general/versions/9.0.0/",
+            None,
+        ),
+        "/api/terrapod/v1/package-cache/galaxy/v3/collections/{namespace}/{name}"
+        "/versions/{version}/download/{filename}": (
+            "GET",
+            f"{BASE}/galaxy/v3/collections/community/general/versions/9.0.0/download/"
+            "community-general-9.0.0.tar.gz",
+            None,
+        ),
         "/api/terrapod/v1/admin/package-cache/warm": (
             "POST",
             "/api/terrapod/v1/admin/package-cache/warm",

@@ -34,8 +34,9 @@ from terrapod.config import settings
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services.engine_gating import capability_enabled
-from terrapod.services.package_cache import npm, pypi
+from terrapod.services.package_cache import galaxy, npm, pypi
 from terrapod.services.package_cache.substrate import (
+    Artifact,
     NotFoundUpstream,
     SealedError,
     UpstreamError,
@@ -54,6 +55,7 @@ from terrapod.storage.protocol import ObjectStore
 #: `build_router` — a disabled ecosystem is not registered at all.
 pypi_router = APIRouter()
 npm_router = APIRouter()
+galaxy_router = APIRouter()
 logger = get_logger(__name__)
 
 #: pip has no bearer option — credentials come from the index URL or `.netrc` —
@@ -80,7 +82,10 @@ async def authenticate_package_request(request: Request) -> AuthenticatedUser:
             headers={"WWW-Authenticate": _CHALLENGE},
         )
 
-    token = extract_credential(request)
+    # ansible-galaxy sends `Token <value>`; pip sends Basic and npm Bearer. All
+    # three carry the same credential, so all three are accepted here — and only
+    # here, since the OCI surface deliberately does not honour `Token` (#1482).
+    token = extract_credential(request, allow_token_scheme=True)
     if not token:
         raise _unauthorised()
 
@@ -360,6 +365,277 @@ async def npm_packument(
     return JSONResponse(content=npm.rewrite(packument, _npm_base(request)))
 
 
+# ── Ansible Galaxy ──────────────────────────────────────────────────────────
+
+
+def _galaxy_base(request: Request) -> str:
+    """The absolute base URL for rewritten Galaxy links.
+
+    Same three sources, same precedence and same caveat as :func:`_npm_base` —
+    `external_url` first, then the forwarded headers, then the request's own base
+    — because ansible-galaxy resolves nothing relative to the document either.
+
+    Unlike npm's packument these documents ARE cached, so a forged
+    `X-Forwarded-Host` could in principle be stored. It cannot: only upstream's
+    document is cached, and rewriting happens on the way out, per request.
+    """
+    configured = (settings.external_url or "").strip().rstrip("/")
+    if configured:
+        base = configured
+    else:
+        host = request.headers.get("x-forwarded-host")
+        if host:
+            proto = request.headers.get("x-forwarded-proto", request.url.scheme)
+            base = f"{proto}://{host}"
+        else:
+            base = str(request.base_url).rstrip("/")
+    return f"{base.rstrip('/')}/api/terrapod/v1/package-cache/galaxy"
+
+
+def _galaxy_names(namespace: str, name: str) -> None:
+    """Reject anything that is not a plain collection name segment.
+
+    These are interpolated into an upstream URL, so the check is a boundary and
+    not a nicety: `..` or a scheme here would let a caller choose where we fetch
+    from, which is the request-forgery hole the single configured upstream exists
+    to close.
+    """
+    if not galaxy.valid_segment(namespace) or not galaxy.valid_segment(name):
+        raise HTTPException(status_code=404, detail="Not found")
+
+
+@galaxy_router.get("/galaxy/")
+async def galaxy_root(
+    user: AuthenticatedUser = Depends(authenticate_package_request),
+) -> Response:
+    """Version discovery — the first request ansible-galaxy makes.
+
+    Served rather than proxied: it advertises which API versions *this* server
+    offers, and we offer v3 whatever upstream happens to say.
+    """
+    return JSONResponse(content={"description": "Terrapod", "available_versions": {"v3": "v3/"}})
+
+
+@galaxy_router.get("/galaxy/v3/collections/{namespace}/{name}/")
+async def galaxy_collection(
+    namespace: str,
+    name: str,
+    request: Request,
+    user: AuthenticatedUser = Depends(authenticate_package_request),
+    db: AsyncSession = Depends(get_db),
+    storage: ObjectStore = Depends(get_storage),
+) -> Response:
+    """Collection detail, with every link pointed back at us."""
+    _galaxy_names(namespace, name)
+    key = galaxy.collection_key(namespace, name)
+    base = _galaxy_base(request)
+
+    if sealed():
+        raw = await load_document(db, storage, galaxy.ECOSYSTEM, key, galaxy.COLLECTION_DOC)
+        if raw is None:
+            raise HTTPException(
+                status_code=404,
+                detail=(
+                    f"{key} is not cached and this node is sealed "
+                    f"(registry.cache_only). Warm it before sealing."
+                ),
+            )
+        document = json.loads(raw)
+    else:
+        try:
+            document = await galaxy.fetch_collection(namespace, name)
+        except (NotFoundUpstream, UpstreamError) as exc:
+            raise _upstream_failure(exc) from exc
+        # Keep a copy so the collection stays installable once sealed.
+        # Best-effort: failing to cache must not fail a request about to succeed.
+        try:
+            await store_document(
+                db,
+                storage,
+                Artifact(
+                    ecosystem=galaxy.ECOSYSTEM,
+                    name=key,
+                    version="",
+                    filename=galaxy.COLLECTION_DOC,
+                    upstream_url="",
+                    content_type="application/json",
+                ),
+                json.dumps(document).encode(),
+            )
+        except Exception:
+            logger.warning("Could not cache collection detail", collection=key, exc_info=True)
+
+    return JSONResponse(content=galaxy.rewrite_collection(document, base, namespace, name))
+
+
+@galaxy_router.get("/galaxy/v3/collections/{namespace}/{name}/versions/")
+async def galaxy_versions(
+    namespace: str,
+    name: str,
+    request: Request,
+    user: AuthenticatedUser = Depends(authenticate_package_request),
+    db: AsyncSession = Depends(get_db),
+    storage: ObjectStore = Depends(get_storage),
+) -> Response:
+    """Every version of a collection, as one page.
+
+    Sealed, the list is narrowed to versions whose artifact we actually hold: a
+    node that advertises a version it cannot serve sends the client down a path
+    that 404s after it has already resolved, when it could have been offered the
+    newest version that does exist here.
+    """
+    _galaxy_names(namespace, name)
+    key = galaxy.collection_key(namespace, name)
+    base = _galaxy_base(request)
+
+    if sealed():
+        raw = await load_document(db, storage, galaxy.ECOSYSTEM, key, galaxy.VERSIONS_DOC)
+        if raw is None:
+            raise HTTPException(
+                status_code=404,
+                detail=(
+                    f"{key} is not cached and this node is sealed "
+                    f"(registry.cache_only). Warm it before sealing."
+                ),
+            )
+        held = galaxy.versions_held(
+            await cached_filenames(db, galaxy.ECOSYSTEM, key), namespace, name
+        )
+        document = galaxy.restrict_to_cached(json.loads(raw), held)
+    else:
+        try:
+            document = await galaxy.fetch_versions(namespace, name)
+        except (NotFoundUpstream, UpstreamError) as exc:
+            raise _upstream_failure(exc) from exc
+        try:
+            await store_document(
+                db,
+                storage,
+                Artifact(
+                    ecosystem=galaxy.ECOSYSTEM,
+                    name=key,
+                    version="",
+                    filename=galaxy.VERSIONS_DOC,
+                    upstream_url="",
+                    content_type="application/json",
+                ),
+                json.dumps(document).encode(),
+            )
+        except Exception:
+            logger.warning("Could not cache version list", collection=key, exc_info=True)
+
+    return JSONResponse(content=galaxy.rewrite_versions(document, base, namespace, name))
+
+
+@galaxy_router.get("/galaxy/v3/collections/{namespace}/{name}/versions/{version}/")
+async def galaxy_version(
+    namespace: str,
+    name: str,
+    version: str,
+    request: Request,
+    user: AuthenticatedUser = Depends(authenticate_package_request),
+    db: AsyncSession = Depends(get_db),
+    storage: ObjectStore = Depends(get_storage),
+) -> Response:
+    """Version detail — where the client learns how to fetch and how to check.
+
+    `download_url` is rewritten to us. Leaving it as upstream's would produce an
+    install that resolves through Terrapod and then downloads from the internet,
+    which looks identical to working until someone has no route out.
+    """
+    _galaxy_names(namespace, name)
+    if not galaxy.valid_version(version):
+        raise HTTPException(status_code=404, detail="Not found")
+    key = galaxy.collection_key(namespace, name)
+    base = _galaxy_base(request)
+
+    if sealed():
+        raw = await load_document(db, storage, galaxy.ECOSYSTEM, key, galaxy.version_doc(version))
+        if raw is None:
+            raise HTTPException(
+                status_code=404,
+                detail=(
+                    f"{key}:{version} is not cached and this node is sealed "
+                    f"(registry.cache_only). Warm it before sealing."
+                ),
+            )
+        document = json.loads(raw)
+    else:
+        try:
+            document = await galaxy.fetch_version(namespace, name, version)
+        except (NotFoundUpstream, UpstreamError) as exc:
+            raise _upstream_failure(exc) from exc
+        try:
+            await store_document(
+                db,
+                storage,
+                Artifact(
+                    ecosystem=galaxy.ECOSYSTEM,
+                    name=key,
+                    version=version,
+                    filename=galaxy.version_doc(version),
+                    upstream_url="",
+                    content_type="application/json",
+                ),
+                json.dumps(document).encode(),
+            )
+        except Exception:
+            logger.warning(
+                "Could not cache version detail", collection=key, version=version, exc_info=True
+            )
+
+    return JSONResponse(content=galaxy.rewrite_version(document, base, namespace, name, version))
+
+
+@galaxy_router.get(
+    "/galaxy/v3/collections/{namespace}/{name}/versions/{version}/download/{filename}"
+)
+async def galaxy_download(
+    namespace: str,
+    name: str,
+    version: str,
+    filename: str,
+    user: AuthenticatedUser = Depends(authenticate_package_request),
+    db: AsyncSession = Depends(get_db),
+    storage: ObjectStore = Depends(get_storage),
+) -> Response:
+    """The collection artifact.
+
+    The filename in the path is checked against the one this coordinate implies
+    rather than trusted — it is decoration for the client's benefit, and treating
+    it as an input would let it name a file other than the collection requested.
+
+    A cold artifact is resolved by re-reading the version detail from the
+    *configured* upstream and using the `download_url` it gives, never a URL a
+    client supplied.
+    """
+    _galaxy_names(namespace, name)
+    if not galaxy.valid_version(version):
+        raise HTTPException(status_code=404, detail="Not found")
+    if filename != galaxy.artifact_filename(namespace, name, version):
+        raise HTTPException(status_code=404, detail="Not found")
+
+    key = galaxy.collection_key(namespace, name)
+    record = await lookup_present(db, storage, galaxy.ECOSYSTEM, key, filename)
+    if record is None:
+        if sealed():
+            raise _upstream_failure(
+                SealedError(
+                    f"{key}:{version} is not cached and this node is sealed "
+                    f"(registry.cache_only). Warm it before sealing."
+                )
+            )
+        try:
+            detail = await galaxy.fetch_version(namespace, name, version)
+            record = await get_or_fetch(
+                db, storage, galaxy.artifact_for(namespace, name, version, detail)
+            )
+        except (SealedError, NotFoundUpstream, UpstreamError) as exc:
+            raise _upstream_failure(exc) from exc
+
+    return await _redirect_to_object(storage, record.storage_key)
+
+
 async def _redirect_to_object(storage: ObjectStore, key: str) -> Response:
     """302 to a presigned URL for the stored artifact.
 
@@ -391,5 +667,8 @@ def build_router() -> APIRouter | None:
         mounted = True
     if capability_enabled("npm"):
         aggregate.include_router(npm_router)
+        mounted = True
+    if capability_enabled("galaxy"):
+        aggregate.include_router(galaxy_router)
         mounted = True
     return aggregate if mounted else None

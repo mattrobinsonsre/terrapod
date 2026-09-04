@@ -1883,6 +1883,14 @@
                     "enabled": { "type": "boolean" },
                     "upstream": { "type": "string", "format": "uri" }
                   }
+                },
+                "galaxy": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "enabled": { "type": "boolean" },
+                    "upstream": { "type": "string", "format": "uri" }
+                  }
                 }
               }
             },

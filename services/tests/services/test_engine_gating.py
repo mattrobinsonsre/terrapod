@@ -54,7 +54,7 @@ class TestDefaults:
         """Upgrading must not silently switch a working capability off."""
         assert engine_enabled("ansible")
         assert engine_enabled("pulumi")
-        assert gated_capabilities() == {"oci": True, "pypi": True, "npm": True}
+        assert gated_capabilities() == {"oci": True, "pypi": True, "npm": True, "galaxy": True}
 
 
 class TestTheEngineGateOutranksTheCapabilityFlag:
@@ -110,7 +110,12 @@ class TestTheTraditionalShape:
         """What an operator who only writes HCL should end up with."""
         _engines(ansible=False, pulumi=False)
 
-        assert gated_capabilities() == {"oci": False, "pypi": False, "npm": False}
+        assert gated_capabilities() == {
+            "oci": False,
+            "pypi": False,
+            "npm": False,
+            "galaxy": False,
+        }
 
     def test_terraform_s_own_caches_are_not_gateable(self) -> None:
         """The provider mirror, binary cache and module registry are not optional.

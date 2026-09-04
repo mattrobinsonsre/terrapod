@@ -190,6 +190,47 @@ class TestThePackageProxies:
         )
         assert detail != "pypi proxy is not enabled"
 
+    async def test_ansible_off_silences_galaxy(self) -> None:
+        """Both directions matter, and this is the one that is easy to forget.
+
+        Galaxy is Ansible-only — nothing else installs a collection — so with
+        Ansible off none of its five endpoints should answer, including the
+        discovery document a client asks for first.
+        """
+        settings.engines.ansible.enabled = False
+
+        async with AsyncClient(transport=ASGITransport(app=_app()), base_url=_BASE) as client:
+            for path in (
+                "/api/terrapod/v1/package-cache/galaxy/",
+                "/api/terrapod/v1/package-cache/galaxy/v3/collections/community/general/",
+                "/api/terrapod/v1/package-cache/galaxy/v3/collections/community/general/versions/",
+                "/api/terrapod/v1/package-cache/galaxy/v3/collections/community/general/versions/1.0.0/",
+            ):
+                response = await client.get(path, headers=_BASIC)
+                assert response.status_code == 404, f"{path} answered {response.status_code}"
+
+    def test_galaxy_routes_do_not_exist_with_ansible_off(self) -> None:
+        """Unmounted, not mounted-and-refusing — the #1429 requirement."""
+        settings.engines.ansible.enabled = False
+
+        assert not [r for r in _app().routes if "package-cache/galaxy" in r.path]
+
+    async def test_galaxy_survives_with_pulumi_off(self, _sealed) -> None:
+        """The other direction: a Pulumi-less deployment still serves collections.
+
+        Asserted on getting past the gate rather than on a status — a sealed node
+        answers an uncached collection its own way, which is not this test's
+        business.
+        """
+        settings.engines.ansible.enabled = True
+        settings.engines.pulumi.enabled = False
+
+        async with AsyncClient(transport=ASGITransport(app=_app()), base_url=_BASE) as client:
+            response = await client.get("/api/terrapod/v1/package-cache/galaxy/", headers=_BASIC)
+
+        assert response.status_code == 200
+        assert response.json()["available_versions"] == {"v3": "v3/"}
+
     async def test_both_engines_off_silences_pypi(self) -> None:
         settings.engines.ansible.enabled = False
         settings.engines.pulumi.enabled = False

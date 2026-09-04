@@ -254,6 +254,11 @@ data:
           enabled: {{ .enabled }}
           upstream: {{ .upstream | quote }}
         {{- end }}
+        {{- with .galaxy }}
+        galaxy:
+          enabled: {{ .enabled }}
+          upstream: {{ .upstream | quote }}
+        {{- end }}
       {{- end }}
       {{- if .Values.api.config.registry.provider_cache }}
       provider_cache:

@@ -256,6 +256,8 @@
   "registry.oci.upstreams[].host",
   "registry.oci.upstreams[].username",
   "registry.package_cache.enabled",
+  "registry.package_cache.galaxy.enabled",
+  "registry.package_cache.galaxy.upstream",
   "registry.package_cache.npm.enabled",
   "registry.package_cache.npm.upstream",
   "registry.package_cache.pypi.enabled",
