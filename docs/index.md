@@ -173,6 +173,7 @@ See [Architecture](architecture.md) for the full breakdown.
 | [Security Hardening](security-hardening.md) | TLS, secrets management, network policies, rate limiting |
 | [CVE Policy](cve-policy.md) | How Terrapod's own images are gated on HIGH/CRITICAL CVEs, what `ignore-unfixed` does and does not guarantee, and the reasoning behind every accepted-risk suppression |
 | [Versioning & Support](versioning-and-support.md) | What each version bump guarantees, the stable surfaces + their CI gates, component version-skew support, the deprecation window, and the support matrix |
+| [Upgrading to 2.0](upgrading-to-2.0.md) | Every 2.0 change that needs action on your side, with the exact edit for each, and what explicitly does not break |
 | [Deprecations](deprecations.md) | The authoritative list of deprecated surfaces and their sunset dates, plus how to read the API's `Deprecation`/`Sunset` headers |
 | [Known Limitations](known-limitations.md) | What Terrapod does not (yet) do — deployment, scope, and feature constraints, stated plainly |
 | [Production Checklist](production-checklist.md) | Step-by-step checklist for go-live readiness |

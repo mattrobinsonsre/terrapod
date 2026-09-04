@@ -11,6 +11,7 @@ import { EmptyState } from '@/components/empty-state'
 import { SortableHeader } from '@/components/sortable-header'
 import { RoleReachPanel, type RoleRule } from '@/components/role-reach-panel'
 import { useSortable } from '@/lib/use-sortable'
+import { parseLabelRule, formatLabelRule } from '@/lib/label-rules'
 import { useConfirm } from '@/lib/use-confirm'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch, fetchAllPages } from '@/lib/api'
@@ -349,49 +350,16 @@ export default function RolesPage() {
     const names = (v: string) => v.split(',').map((x) => x.trim()).filter(Boolean)
     return {
       allowAll,
-      allowLabels: parseLabels(allowLabels),
+      allowLabels: parseLabelRule(allowLabels),
       allowNames: names(allowNames),
-      denyLabels: parseLabels(denyLabels),
+      denyLabels: parseLabelRule(denyLabels),
       denyNames: names(denyNames),
       capabilities: [...caps],
     }
   }
 
-  /** `env=prod, env=stg` accumulates into {env: ['prod', 'stg']} — "env is
-   *  prod OR stg" — rather than the second value overwriting the first.
-   *
-   *  The server has always stored and enforced this shape. Until 2.0 no client
-   *  could carry it, so the form refused a repeated key outright rather than
-   *  let the collapse pass unseen; now that the SDK and provider express it,
-   *  refusing would be wrong and that guard is gone (#1457).
-   *
-   *  A key repeated with the same value stays one value: it is a typo, not a
-   *  request for a duplicate clause. */
-  function parseLabels(s: string): Record<string, string[]> {
-    const result: Record<string, string[]> = {}
-    if (!s.trim()) return result
-    s.split(',').forEach((pair) => {
-      const [k, v] = pair.split('=').map((x) => x.trim())
-      if (!k) return
-      const value = v || ''
-      const existing = result[k]
-      if (!existing) result[k] = [value]
-      else if (!existing.includes(value)) existing.push(value)
-    })
-    return result
-  }
 
 
-  /** Inverse of parseLabels: a key with several values becomes several
-   *  `key=value` pairs, which is what the operator typed to create it. */
-  function formatLabels(labels: Record<string, string[] | string>): string {
-    return Object.entries(labels)
-      .flatMap(([k, v]) => {
-        const values = Array.isArray(v) ? v : [v]
-        return values.map((one) => (one ? `${k}=${one}` : k))
-      })
-      .join(', ')
-  }
 
   // ── Create-form capability matrix helpers ─────────────────────────────────
   // Changing a preset dropdown re-derives the matrix from all four presets and
@@ -471,9 +439,9 @@ export default function RolesPage() {
         attrs['catalog-permission'] = roleCatalogPermission
       }
       if (roleAllowAll) attrs['allow-all'] = true
-      if (roleAllowLabels.trim()) attrs['allow-labels'] = parseLabels(roleAllowLabels)
+      if (roleAllowLabels.trim()) attrs['allow-labels'] = parseLabelRule(roleAllowLabels)
       if (roleAllowNames.trim()) attrs['allow-names'] = roleAllowNames.split(',').map((s) => s.trim()).filter(Boolean)
-      if (roleDenyLabels.trim()) attrs['deny-labels'] = parseLabels(roleDenyLabels)
+      if (roleDenyLabels.trim()) attrs['deny-labels'] = parseLabelRule(roleDenyLabels)
       if (roleDenyNames.trim()) attrs['deny-names'] = roleDenyNames.split(',').map((s) => s.trim()).filter(Boolean)
 
       const res = await apiFetch('/api/terrapod/v1/roles', {
@@ -535,9 +503,9 @@ export default function RolesPage() {
     setEditRoleCapsCustom(isCustom)
     setShowEditCaps(isCustom)
     setEditRoleAllowAll(Boolean(a['allow-all']))
-    setEditRoleAllowLabels(formatLabels(a['allow-labels'] || {}))
+    setEditRoleAllowLabels(formatLabelRule(a['allow-labels'] || {}))
     setEditRoleAllowNames((a['allow-names'] || []).join(', '))
-    setEditRoleDenyLabels(formatLabels(a['deny-labels'] || {}))
+    setEditRoleDenyLabels(formatLabelRule(a['deny-labels'] || {}))
     setEditRoleDenyNames((a['deny-names'] || []).join(', '))
   }
 
@@ -550,9 +518,9 @@ export default function RolesPage() {
       const attrs: Record<string, unknown> = {
         description: editRoleDesc,
         'allow-all': editRoleAllowAll,
-        'allow-labels': parseLabels(editRoleAllowLabels),
+        'allow-labels': parseLabelRule(editRoleAllowLabels),
         'allow-names': editRoleAllowNames.split(',').map((s) => s.trim()).filter(Boolean),
-        'deny-labels': parseLabels(editRoleDenyLabels),
+        'deny-labels': parseLabelRule(editRoleDenyLabels),
         'deny-names': editRoleDenyNames.split(',').map((s) => s.trim()).filter(Boolean),
       }
       // Custom matrix → author by explicit capabilities (server derives the level
@@ -977,13 +945,13 @@ export default function RolesPage() {
                             )}
                             <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
                               {Object.keys(a['allow-labels'] || {}).length > 0 && (
-                                <span>{t('display.allow', { value: formatLabels(a['allow-labels']) })}</span>
+                                <span>{t('display.allow', { value: formatLabelRule(a['allow-labels']) })}</span>
                               )}
                               {(a['allow-names'] || []).length > 0 && (
                                 <span>{t('display.allowNames', { value: a['allow-names'].join(', ') })}</span>
                               )}
                               {Object.keys(a['deny-labels'] || {}).length > 0 && (
-                                <span>{t('display.deny', { value: formatLabels(a['deny-labels']) })}</span>
+                                <span>{t('display.deny', { value: formatLabelRule(a['deny-labels']) })}</span>
                               )}
                               {(a['deny-names'] || []).length > 0 && (
                                 <span>{t('display.denyNames', { value: a['deny-names'].join(', ') })}</span>

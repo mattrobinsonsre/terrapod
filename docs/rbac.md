@@ -190,14 +190,14 @@ curl -X POST https://terrapod.example.com/api/terrapod/v1/roles \
 | `capabilities` | array | The role's grant — a list of `resource:verb` tokens (e.g. `run:plan`, `run:apply`, `workspace:delete`). The single stored source of truth for enforcement (#585). On write, sending `capabilities` takes precedence over the level fields; on read it is always returned. See [Capability-based RBAC](rbac-capabilities.md). |
 | `workspace-permission` | string | Authoring shorthand + derived summary. One of: `read`, `plan`, `write`, `admin`, or `custom` (read-only, when the capabilities match no preset) |
 | `pool-permission` | string | Authoring shorthand + derived summary. One of: `read`, `write`, `admin` (default: `read`), or `custom` |
-| `allow-labels` | object | Label key-value pairs that grant access |
+| `allow-labels` | object | Labels that grant access. Each key maps to a **list** of accepted values — `{"env": ["dev", "stg"]}` reads as "env is dev or stg". A bare string is accepted and read back as a one-element list |
 | `allow-names` | array | Explicit workspace names that grant access |
-| `deny-labels` | object | Label key-value pairs that deny access (overrides allow) |
+| `deny-labels` | object | Labels that deny access, same shape as `allow-labels` (overrides allow) |
 | `deny-names` | array | Explicit workspace names that deny access (overrides allow) |
 
 ### Label Matching Rules
 
-- **Allow labels**: A workspace matches if ANY specified label key-value pair matches (OR across keys)
+- **Allow labels**: A workspace matches if ANY specified label key-value pair matches — OR across keys, **and OR within a key's values**. So `{"env": ["dev", "stg"], "team": ["platform"]}` matches a workspace labelled `env=dev`, one labelled `env=stg`, and one labelled `team=platform`.
 - **Allow names**: A workspace name must appear in the list to match
 - **A workspace matches if it matches allow-labels OR allow-names**
 - **Deny labels**: If a workspace has ANY specified deny label, access is denied regardless of allow rules
@@ -722,6 +722,20 @@ A user with roles `dev-writer` and `staging-planner` can:
 - Read, plan, and write to `my-app-dev`
 - Read and plan on `my-app-staging`
 - No access to `my-app-prod`
+
+Where the permission is the same across several environments, one role can name
+them all rather than needing one role per value:
+
+```
+Role: "non-prod-writer"
+  workspace-permission: write
+  allow-labels: { "env": ["dev", "staging"] }
+```
+
+That grants write on `my-app-dev` and `my-app-staging`, and nothing on
+`my-app-prod`. It is the same matcher — a key is satisfied by any one of its
+values — so it composes with the rest of the rules unchanged: a `deny-labels`
+entry still overrides it, and adding a second key still ORs with the first.
 
 ### Team-Based Access with Production Exclusion
 

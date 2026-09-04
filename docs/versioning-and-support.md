@@ -14,7 +14,7 @@ for every public surface below.
 |---|---|
 | **PATCH** (`0.58.0 → 0.58.1`) | Bug fixes and security fixes, plus **opt-in configuration** that changes nothing until you set it. No behaviour change for an existing configuration, no new API surface, no schema migration. Always safe to take. |
 | **MINOR** (`0.58.0 → 0.59.0`) | New, **backward-compatible** features. Existing routes, response attributes, wire protocol, SDK methods, Helm values, and config keys keep working unchanged. Additive only. Safe to take without config changes. |
-| **MAJOR** (`0.x → 1.0`, `1.x → 2.0`) | The only release that may contain a **breaking change** to a stable surface — and only after the deprecation window below. Read the migration notes before upgrading. |
+| **MAJOR** (`0.x → 1.0`, `1.x → 2.0`) | The only release that may contain a **breaking change** to a stable surface — and only after the deprecation window below. Read the migration notes before upgrading — for the next one, [Upgrading to 2.0](upgrading-to-2.0.md). |
 
 > **What "opt-in configuration" means in a PATCH, and what it does not.** A patch
 > may add a Helm value, a config key or an environment variable **whose default
