@@ -198,7 +198,7 @@ class OIDCConnector(SSOConnector):
         if id_token_exp is not None:
             try:
                 id_token_expires_at = datetime.fromtimestamp(int(id_token_exp), tz=UTC)
-            except (ValueError, TypeError, OSError):
+            except ValueError, TypeError, OSError:
                 logger.warning(
                     "Failed to parse id_token exp claim", provider=self.name, exp=id_token_exp
                 )

@@ -5,7 +5,7 @@
 # Docker Hub, whose anonymous pull limit is shared across GitHub runners and
 # turns unrelated PRs red (#1186). The default is the upstream reference, so a
 # local build needs no mirror access and behaves exactly as before.
-ARG BASE_IMAGE=python:3.13-slim
+ARG BASE_IMAGE=python:3.14-slim
 FROM ${BASE_IMAGE}
 
 RUN apt-get update && apt-get install -y --no-install-recommends \

@@ -70,7 +70,7 @@ def verify_callback_token(token: str) -> uuid.UUID | None:
     try:
         result_id = uuid.UUID(result_id_str)
         ts = int(ts_str)
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return None
 
     # Check expiry

@@ -1992,7 +1992,7 @@ class HAConfig(BaseModel):
         return v
 
     @model_validator(mode="after")
-    def _auto_needs_a_probe_url(self) -> "HAConfig":
+    def _auto_needs_a_probe_url(self) -> HAConfig:
         # `auto` with nowhere to probe is incoherent, not a state to fail
         # passive into — catching it here beats going silently inert.
         if self.role == "auto" and not (self.probe_url.internal or self.probe_url.external):
@@ -2006,7 +2006,7 @@ class HAConfig(BaseModel):
         return self
 
     @model_validator(mode="after")
-    def _replication_needs_a_peer(self) -> "HAConfig":
+    def _replication_needs_a_peer(self) -> HAConfig:
         # Enabled-but-unreachable would look configured while replicating
         # nothing, and the operator would find out at promotion.
         if self.replication.enabled:
@@ -2675,7 +2675,7 @@ class RedisConfig(BaseModel):
     )
 
     @model_validator(mode="after")
-    def _require_iam_fields(self) -> "RedisConfig":
+    def _require_iam_fields(self) -> RedisConfig:
         """Fail fast on misconfigured IAM auth instead of an opaque connect error."""
         if self.auth_mode in ("aws_iam", "gcp_iam", "azure_ad") and not self.username:
             raise ValueError(f"redis.username is required for auth_mode={self.auth_mode!r}")
@@ -2739,14 +2739,14 @@ class Settings(BaseSettings):
         default="postgresql+asyncpg://terrapod:terrapod@localhost:5432/terrapod",
         description="PostgreSQL connection URL",
     )
-    database: "DatabaseConfig" = Field(default_factory=lambda: DatabaseConfig())
+    database: DatabaseConfig = Field(default_factory=lambda: DatabaseConfig())
 
     # Redis
     redis_url: RedisDsn = Field(
         default="redis://localhost:6379",
         description="Redis connection URL",
     )
-    redis: "RedisConfig" = Field(default_factory=lambda: RedisConfig())
+    redis: RedisConfig = Field(default_factory=lambda: RedisConfig())
 
     # Storage
     storage: StorageConfig = Field(default_factory=StorageConfig)

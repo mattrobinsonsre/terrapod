@@ -152,7 +152,7 @@ def decode_entity_id(spec: ReplicatedClass, entity_id: str) -> list[str] | None:
     try:
         padded = entity_id + "=" * (-len(entity_id) % 4)
         parts = json.loads(base64.urlsafe_b64decode(padded.encode()))
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return None
     if not isinstance(parts, list) or len(parts) != len(spec.pk_attrs):
         return None

@@ -85,6 +85,24 @@ is an addition, not a break.
   instead of refusing it, and the policy-set form already supported several values
   per key.
 
+### The Python floor moves to 3.14
+
+**Affects:** anyone who builds Terrapod's images themselves, overrides `BASE_IMAGE`,
+or derives an image from one of ours. It does **not** affect operators deploying the
+published images or Helm chart — those carry their own interpreter, and nothing about
+the API, wire protocol, config, Helm values, or database schema changes.
+
+Every image moves from `python:3.13-slim` to `python:3.14-slim`. If you build with a
+`BASE_IMAGE` override, move it to a 3.14 base; if you derive an image and install
+Python packages into it, note that site-packages is now
+`/usr/local/lib/python3.14/site-packages`.
+
+The 3.13 floor was never a preference — it was one dependency. `litellm` declared
+`requires_python = <3.14` from 1.83.11, which pinned the whole project. That cap is
+gone as of 1.99.0, so the floor moved with it, and 3.14 brings
+[PEP 649](https://peps.python.org/pep-0649/) deferred annotation evaluation to a
+codebase that leans heavily on typed models.
+
 ## Before you upgrade
 
 1. Read the sections above and make the edits they name.

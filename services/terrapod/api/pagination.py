@@ -43,7 +43,7 @@ def parse_page_params(request: Request | None) -> tuple[int, int | None]:
         raw = request.query_params.get(key) if request is not None else None
         try:
             return int(raw) if raw is not None else None
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
 
     size = _int("page[size]")

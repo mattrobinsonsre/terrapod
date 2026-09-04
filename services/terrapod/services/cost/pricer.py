@@ -270,7 +270,7 @@ def _apply_size_tier(entry: Entry, products: list[Product], resource_ms: MatchSe
         return products
     try:
         size = float(found[1])
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return products
     candidates: list[tuple[float, Product]] = []
     for p in products:
@@ -279,7 +279,7 @@ def _apply_size_tier(entry: Entry, products: list[Product], resource_ms: MatchSe
             continue
         try:
             cap = float(tm[1])
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             continue
         if cap >= size:
             candidates.append((cap, p))
@@ -364,7 +364,7 @@ def _cost_band(
 
     try:
         return (_at(int(lo)), _at(int(ty)), _at(int(hi)))
-    except (ResourceMissingAttr, AssertionError):
+    except ResourceMissingAttr, AssertionError:
         return None
 
 
@@ -401,7 +401,7 @@ def _count_factor(entry: Entry, resource_ms: MatchSet) -> float:
         # count of 0 means the component contributes nothing. Absent/unparseable
         # still fall back to ``default`` above.
         return max(0.0, float(raw) / divisor)
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return default
 
 
@@ -464,7 +464,7 @@ def price(
             entry = entry_by_key[key]
             try:
                 group_pps = _quote_group(resource_ms, entry, group_products)
-            except (ResourceMissingAttr, AssertionError):
+            except ResourceMissingAttr, AssertionError:
                 # Pathological product/usage combo — treat this resource as
                 # unpriced rather than crashing the whole estimate.
                 continue

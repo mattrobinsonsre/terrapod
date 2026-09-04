@@ -98,7 +98,7 @@ def _as_count(v: Any, default: float = 1.0) -> float:
     try:
         n = float(v)
         return n if n >= 0 else default
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return default
 
 

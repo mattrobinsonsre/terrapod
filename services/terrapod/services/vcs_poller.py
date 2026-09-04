@@ -1020,7 +1020,7 @@ async def _poll_workspace(
     ws: Workspace,
     cache: VCSArchiveCache | None = None,
     meta: VCSMetadataCache | None = None,
-    paths_unions: "PathsUnionMap | None" = None,
+    paths_unions: PathsUnionMap | None = None,
 ) -> None:
     """Poll a single workspace: check branch for pushes and PRs for speculative plans.
 
@@ -1148,7 +1148,7 @@ async def _poll_workspace_owned(
     semaphore: asyncio.Semaphore,
     cache: VCSArchiveCache | None = None,
     meta: VCSMetadataCache | None = None,
-    paths_unions: "PathsUnionMap | None" = None,
+    paths_unions: PathsUnionMap | None = None,
 ) -> None:
     """Poll a single workspace in its own DB session, bounded by a semaphore.
 

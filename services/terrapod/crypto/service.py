@@ -171,7 +171,7 @@ async def init_encryption(db: AsyncSession) -> None:
     )
 
 
-async def _load_keys_into(svc: "EncryptionService", provider, db: AsyncSession, rows: list) -> None:  # type: ignore[no-untyped-def]
+async def _load_keys_into(svc: EncryptionService, provider, db: AsyncSession, rows: list) -> None:  # type: ignore[no-untyped-def]
     """Mint-on-first-enable, unwrap every DEK into ``svc``, verify the canary.
 
     Shared by init_encryption and refresh_keys. Raises on any provider failure so

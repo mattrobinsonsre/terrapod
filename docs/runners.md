@@ -1,6 +1,6 @@
 # Runners
 
-Runners are ephemeral Kubernetes Jobs that execute `terraform` or `tofu` plan and apply operations. The default runner image is a slim Debian (`python:3.13-slim`) container with `git`, `openssh-client` and `ca-certificates` -- no terraform/tofu binary baked in, and since #1208 no `opa`, `trivy` or `checkov` either. Every one of them is downloaded at runtime from the [binary cache](registry.md). The whole runner orchestrator is Python; nothing from the bash era survives.
+Runners are ephemeral Kubernetes Jobs that execute `terraform` or `tofu` plan and apply operations. The default runner image is a slim Debian (`python:3.14-slim`) container with `git`, `openssh-client` and `ca-certificates` -- no terraform/tofu binary baked in, and since #1208 no `opa`, `trivy` or `checkov` either. Every one of them is downloaded at runtime from the [binary cache](registry.md). The whole runner orchestrator is Python; nothing from the bash era survives.
 
 ---
 

@@ -636,7 +636,7 @@ async def get_consumption(connection_id: object, snapshot: object | None) -> Con
         for v in values or []:
             try:
                 calls += int(v)
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 continue
     except Exception:
         return None

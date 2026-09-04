@@ -327,7 +327,7 @@ def _parse_plan_expiry(value) -> int | None:
         return None
     try:
         seconds = int(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         raise HTTPException(
             status_code=422, detail="plan-expiry-seconds must be an integer"
         ) from None
@@ -1230,7 +1230,7 @@ async def create_workspace(
     # canonical and wins when both are present.
     import uuid as _uuid
 
-    def _parse_conn_id(raw: object) -> "_uuid.UUID | None":
+    def _parse_conn_id(raw: object) -> _uuid.UUID | None:
         if raw in (None, ""):
             return None
         try:
@@ -1410,7 +1410,7 @@ async def _runner_state_read_allowed(
         return False
     try:
         run_uuid = uuid.UUID(user.run_id)
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return False
     row = (await db.execute(select(Run.workspace_id).where(Run.id == run_uuid))).first()
     if row is None:
@@ -2576,7 +2576,7 @@ async def lock_workspace(
     try:
         raw = await request.body()
         lock_info = json_mod.loads(raw) if raw else {}
-    except (json_mod.JSONDecodeError, ValueError):
+    except json_mod.JSONDecodeError, ValueError:
         lock_info = {}
 
     lock_id = lock_info.get("ID", f"lock-{user.email}")

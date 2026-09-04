@@ -48,6 +48,6 @@ def init_supports_var_file(binary: str) -> bool:
             text=True,
             timeout=10,
         )
-    except (FileNotFoundError, subprocess.TimeoutExpired):
+    except FileNotFoundError, subprocess.TimeoutExpired:
         return False
     return "-var-file" in (result.stdout + result.stderr)

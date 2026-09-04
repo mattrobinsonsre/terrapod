@@ -89,7 +89,7 @@ async def get_cached_surface(
         return None
     try:
         return json.loads(raw)
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return None
 
 

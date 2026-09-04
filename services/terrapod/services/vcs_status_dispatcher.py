@@ -129,7 +129,7 @@ def _build_comment_body(
     plan_only: bool,
     has_changes: bool | None,
     run_url: str,
-    ai_summary: "PlanSummary | None" = None,
+    ai_summary: PlanSummary | None = None,
 ) -> str:
     """Build the markdown body for a PR/MR comment.
 
@@ -163,7 +163,7 @@ def _build_comment_body(
     return "\n".join(parts)
 
 
-def _render_ai_summary_section(s: "PlanSummary") -> str:
+def _render_ai_summary_section(s: PlanSummary) -> str:
     """Render one PlanSummary as a collapsible PR-comment section (#401).
 
     Both GitHub and GitLab support raw HTML inside Markdown comments;

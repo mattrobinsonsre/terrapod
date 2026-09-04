@@ -74,12 +74,12 @@ class LogCapture:
             # block buffer if PYTHONUNBUFFERED isn't set in the env.
             try:
                 sys.stdout.flush()
-            except (BrokenPipeError, OSError, ValueError):
+            except BrokenPipeError, OSError, ValueError:
                 pass
             try:
                 self._fh.write(s.encode("utf-8", errors="replace"))  # type: ignore[union-attr]
                 self._fh.flush()  # type: ignore[union-attr]
-            except (OSError, AttributeError):
+            except OSError, AttributeError:
                 pass
             return n
 
@@ -87,12 +87,12 @@ class LogCapture:
             n = self._orig_stderr_write(s)
             try:
                 sys.stderr.flush()
-            except (BrokenPipeError, OSError, ValueError):
+            except BrokenPipeError, OSError, ValueError:
                 pass
             try:
                 self._fh.write(s.encode("utf-8", errors="replace"))  # type: ignore[union-attr]
                 self._fh.flush()  # type: ignore[union-attr]
-            except (OSError, AttributeError):
+            except OSError, AttributeError:
                 pass
             return n
 

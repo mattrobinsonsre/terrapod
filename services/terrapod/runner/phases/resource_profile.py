@@ -25,7 +25,7 @@ logger = structlog.get_logger("runner.resource_profile")
 def _read_int(path: Path) -> int | None:
     try:
         return int(path.read_text().strip())
-    except (FileNotFoundError, OSError, ValueError):
+    except FileNotFoundError, OSError, ValueError:
         return None
 
 
@@ -33,13 +33,13 @@ def _read_cpu_usage_usec(stat_path: Path) -> int | None:
     """Parse `usage_usec` from /sys/fs/cgroup/cpu.stat."""
     try:
         text = stat_path.read_text()
-    except (FileNotFoundError, OSError):
+    except FileNotFoundError, OSError:
         return None
     for line in text.splitlines():
         if line.startswith("usage_usec "):
             try:
                 return int(line.split(maxsplit=1)[1])
-            except (IndexError, ValueError):
+            except IndexError, ValueError:
                 return None
     return None
 

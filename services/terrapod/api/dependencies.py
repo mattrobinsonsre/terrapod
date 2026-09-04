@@ -300,7 +300,7 @@ async def authenticate_request(request: Request) -> AuthenticatedUser:
     )
 
 
-async def authenticate_listener(request: Request) -> "ListenerIdentity":
+async def authenticate_listener(request: Request) -> ListenerIdentity:
     """Authenticate a listener via certificate, looking up identity in Redis.
 
     Like authenticate_request but for certificate-based listener auth.
@@ -335,7 +335,7 @@ async def authenticate_listener(request: Request) -> "ListenerIdentity":
     ca = get_ca()
     try:
         ca.ca_cert.public_key().verify(cert.signature, cert.tbs_certificate_bytes)
-    except (InvalidSignature, Exception):
+    except InvalidSignature, Exception:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Certificate not signed by this CA",
@@ -532,7 +532,7 @@ async def get_listener_identity(
             cert.signature,
             cert.tbs_certificate_bytes,
         )
-    except (InvalidSignature, Exception):
+    except InvalidSignature, Exception:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Certificate not signed by this CA",

@@ -307,7 +307,7 @@ async def translate_summary(
 
     try:
         payload = json.loads(cached)
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return None
 
     tf = payload.get("factors", [])
@@ -382,7 +382,7 @@ async def translate_cost_summary(
 
     try:
         payload = json.loads(cached)
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return None
 
     te = payload.get("estimated", [])
@@ -484,7 +484,7 @@ async def translate_architecture_critique(
 
     try:
         payload = json.loads(cached)
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return None
 
     out_arch = dict(arch)

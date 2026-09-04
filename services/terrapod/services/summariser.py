@@ -159,7 +159,7 @@ def _fit_plan_json(data: bytes, max_bytes: int) -> str:
         return data.decode("utf-8", errors="replace")
     try:
         plan = json.loads(data)
-    except (json.JSONDecodeError, ValueError):
+    except json.JSONDecodeError, ValueError:
         return data[:max_bytes].decode("utf-8", errors="replace") + "\n[... truncated ...]"
     if not isinstance(plan, dict):
         return data[:max_bytes].decode("utf-8", errors="replace") + "\n[... truncated ...]"
@@ -1325,7 +1325,7 @@ async def _summarise_one(payload: dict, _slack: dict) -> None:
 
     try:
         run_id = uuid.UUID(payload["run_id"])
-    except (KeyError, ValueError):
+    except KeyError, ValueError:
         logger.warning("Invalid ai_plan_summary payload", payload=payload)
         return
 

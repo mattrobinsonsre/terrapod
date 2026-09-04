@@ -52,7 +52,7 @@ async def resolve_git_auth(db: AsyncSession, resolved: list) -> list[dict]:
             continue
         try:
             cred = json.loads(v.value)
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             logger.warning("git-auth variable has a non-JSON value; skipping", key=v.key)
             continue
 

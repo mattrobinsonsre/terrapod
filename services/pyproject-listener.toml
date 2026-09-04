@@ -1,7 +1,7 @@
 [project]
 name = "terrapod-listener"
 version = "0.1.0"
-requires-python = ">=3.13"
+requires-python = ">=3.14"
 dependencies = [
     "cryptography>=50.0.0,<51.0.0",
     "httpx>=0.28",

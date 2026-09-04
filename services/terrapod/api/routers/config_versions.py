@@ -315,7 +315,7 @@ async def mint_download_ticket(
     requested_ttl = attrs.get("ttl-seconds", download_tickets.DEFAULT_TTL_SECONDS)
     try:
         requested_ttl = int(requested_ttl)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         requested_ttl = download_tickets.DEFAULT_TTL_SECONDS
 
     ticket = download_tickets.mint_ticket(

@@ -209,7 +209,7 @@ async def handle_ai_cost_summary(payload: dict) -> None:
 
     try:
         run_id = uuid.UUID(payload["run_id"])
-    except (KeyError, ValueError):
+    except KeyError, ValueError:
         logger.warning("Invalid ai_cost_summary payload", payload=payload)
         return
 

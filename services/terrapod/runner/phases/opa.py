@@ -85,7 +85,7 @@ def _extract_deny_warn(opa_output: str) -> tuple[list[str], list[str]]:
     """
     try:
         parsed = json.loads(opa_output)
-    except (json.JSONDecodeError, TypeError):
+    except json.JSONDecodeError, TypeError:
         return [], []
     results = parsed.get("result") or []
     if not results:

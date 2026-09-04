@@ -166,7 +166,7 @@ def _should_refresh_session(session: Session) -> bool:
     try:
         last_active = datetime.fromisoformat(session.last_active_at)
         return (now_utc() - last_active).total_seconds() > SESSION_REFRESH_INTERVAL
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return True  # If we can't parse, refresh to be safe
 
 

@@ -270,7 +270,7 @@ async def derive_state_graph(
 
     try:
         graph = await asyncio.to_thread(_parse_and_build, data)
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         logger.warning("state_graph_parse_failed", state_version_id=str(target.id))
         return _empty(sv_meta)
 

@@ -241,7 +241,7 @@ class PricesheetIndex:
                     price=_parse_price_type(price_type, float(price)),
                     ccy=ccy,
                 )
-            except (EmptyMatchSet, ValueError):
+            except EmptyMatchSet, ValueError:
                 continue
 
     def close(self) -> None:

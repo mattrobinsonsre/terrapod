@@ -61,7 +61,7 @@ def verify_runner_token(token: str) -> str | None:
     try:
         ttl = int(ttl_str)
         ts = int(ts_str)
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return None
 
     # Check expiry
