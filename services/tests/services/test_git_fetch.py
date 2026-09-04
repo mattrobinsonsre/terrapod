@@ -476,3 +476,277 @@ class TestProducerThreadPipeSemantics:
         assert isinstance(results[0], RuntimeError)
         # Consumer completed cleanly because the producer closed the fd.
         assert results[1] is None
+
+
+# ── submodules (#1437) ─────────────────────────────────────────────────
+
+
+def _git_env(home) -> dict:
+    return {
+        "GIT_AUTHOR_NAME": "t",
+        "GIT_AUTHOR_EMAIL": "t@t",
+        "GIT_COMMITTER_NAME": "t",
+        "GIT_COMMITTER_EMAIL": "t@t",
+        "HOME": str(home),
+        "PATH": "/usr/bin:/bin:/usr/local/bin",
+        "GIT_CONFIG_NOSYSTEM": "1",
+        # file:// submodules are refused by default since CVE-2022-39253.
+        # The production path uses https, so this is a test-harness concern only.
+        "GIT_ALLOW_PROTOCOL": "file",
+    }
+
+
+@pytest.fixture
+def superproject_with_submodule(tmp_path):
+    """A superproject whose `infra/vendored` is a real submodule.
+
+    Returns (superproject_worktree, submodule_sha). The worktree stands in for
+    the clone `_init_submodules` operates on, which is what the production code
+    hands it.
+    """
+    env = _git_env(tmp_path)
+
+    def run(cwd, *args):
+        subprocess.run(
+            ["git", *args],
+            cwd=str(cwd),
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            env=env,
+        )
+
+    # The repository that becomes the submodule.
+    sub = tmp_path / "sub"
+    sub.mkdir()
+    run(sub, "init", "--quiet", "-b", "main")
+    (sub / "module.tf").write_text("# vendored module\n")
+    run(sub, "add", "module.tf")
+    run(sub, "commit", "--quiet", "-m", "sub")
+
+    # The superproject, with the submodule under infra/.
+    top = tmp_path / "top"
+    top.mkdir()
+    run(top, "init", "--quiet", "-b", "main")
+    (top / "top.tf").write_text("# top\n")
+    run(top, "add", "top.tf")
+    run(
+        top,
+        "-c",
+        "protocol.file.allow=always",
+        "submodule",
+        "add",
+        "--quiet",
+        f"file://{sub}",
+        "infra/vendored",
+    )
+    run(top, "commit", "--quiet", "-m", "add submodule")
+
+    # Put the superproject into the state a FRESH CLONE is actually in, which
+    # is what production hands `_init_submodules`: the gitlink is recorded, the
+    # working tree is empty, and `.git/config` carries no submodule entry.
+    # `submodule add` registers that entry, and while it is present git reads
+    # the URL from there rather than from `.gitmodules` — so a test that edits
+    # `.gitmodules` would have no effect at all.
+    run(top, "submodule", "deinit", "-f", "infra/vendored")
+    # deinit leaves the submodule's objects in .git/modules, and `update --init`
+    # will happily re-checkout from those without contacting the URL at all —
+    # which would make a broken-URL test pass for the wrong reason.
+    shutil.rmtree(top / ".git" / "modules", ignore_errors=True)
+    return top
+
+
+@pytestmark_git
+class TestInitSubmodules:
+    """A submodule has no working-tree content of its own, so packing the tree
+    without initialising it produced empty directories and an `init` failure on
+    a path that visibly exists in the repository (#1437)."""
+
+    def _conn(self):
+        conn = MagicMock()
+        conn.name = "test-conn"
+        conn.provider = "github"
+        return conn
+
+    @pytest.mark.asyncio
+    async def test_content_is_materialised_for_a_needed_path(
+        self, superproject_with_submodule, monkeypatch
+    ):
+        top = superproject_with_submodule
+        monkeypatch.setenv("GIT_ALLOW_PROTOCOL", "file")
+        assert not (top / "infra" / "vendored" / "module.tf").exists(), "precondition"
+
+        await git_fetch._init_submodules(
+            str(top), ["infra"], auth_header=None, host="github.com", conn=self._conn()
+        )
+
+        # The whole point: the packed tarball now carries the file, instead of
+        # an empty directory that fails `init` later.
+        assert (top / "infra" / "vendored" / "module.tf").read_text() == "# vendored module\n"
+
+    @pytest.mark.asyncio
+    async def test_a_narrowed_out_submodule_is_not_fetched(
+        self, superproject_with_submodule, monkeypatch
+    ):
+        """A workspace using two directories must not pull every submodule in
+        the repository."""
+        top = superproject_with_submodule
+        monkeypatch.setenv("GIT_ALLOW_PROTOCOL", "file")
+
+        # Must be a clean no-op, not a failure: `submodule update -- <path>`
+        # errors when the pathspec matches nothing, so a repository whose
+        # narrowed paths contain no submodule would otherwise fail the fetch.
+        await git_fetch._init_submodules(
+            str(top), ["modules"], auth_header=None, host="github.com", conn=self._conn()
+        )
+
+        assert not (top / "infra" / "vendored" / "module.tf").exists()
+
+    @pytest.mark.asyncio
+    async def test_no_gitmodules_runs_no_git_at_all(self, tmp_path, monkeypatch):
+        """Byte-identical behaviour for the repositories that have no
+        submodules, which is almost all of them."""
+        calls = []
+
+        async def spy(*args, **kwargs):
+            calls.append(args)
+
+        monkeypatch.setattr(git_fetch, "_run_git", spy)
+        await git_fetch._init_submodules(
+            str(tmp_path), ["infra"], auth_header=None, host="github.com", conn=self._conn()
+        )
+        assert calls == []
+
+    @pytest.mark.asyncio
+    async def test_the_git_invocation_is_blobless_scoped_and_never_remote(
+        self, superproject_with_submodule, monkeypatch
+    ):
+        """Pin the flags rather than the transfer size: --remote is the one that
+        would silently convert a pinned dependency into a floating one, and
+        dropping --filter makes `submodule update` a deep clone of every
+        submodule's full history."""
+        seen = {}
+
+        async def spy(args, **kwargs):
+            seen["args"] = args
+            seen["kwargs"] = kwargs
+
+        monkeypatch.setattr(git_fetch, "_run_git", spy)
+        await git_fetch._init_submodules(
+            str(superproject_with_submodule),
+            ["infra"],
+            auth_header="Basic xxx",
+            host="github.com",
+            conn=self._conn(),
+        )
+
+        args = seen["args"]
+        assert "--filter=blob:none" in args
+        assert "--init" in args and "--recursive" in args
+        assert "--remote" not in args, "would fetch the branch tip, not the pinned commit"
+        # Scoped to the submodules that actually live under the sparse set,
+        # not to the sparse paths themselves — `submodule update -- <path>`
+        # errors when a pathspec matches no submodule.
+        assert args[-2:] == ["--", "infra/vendored"]
+        # The credential is scoped to the connection's host, and the SSH
+        # rewrites are host-scoped too.
+        assert seen["kwargs"]["auth_host"] == "github.com"
+        assert seen["kwargs"]["extra_config"] == [
+            "url.https://github.com/.insteadOf=git@github.com:",
+            "url.https://github.com/.insteadOf=ssh://git@github.com/",
+        ]
+
+    @pytest.mark.asyncio
+    async def test_an_unfetchable_submodule_fails_with_a_useful_message(
+        self, superproject_with_submodule, monkeypatch
+    ):
+        """Git's own failure is a 404 that reads as "this repository does not
+        exist", which sends people to look in the wrong place."""
+        top = superproject_with_submodule
+        # Point the submodule at a URL that cannot resolve.
+        (top / ".gitmodules").write_text(
+            '[submodule "infra/vendored"]\n'
+            "\tpath = infra/vendored\n"
+            "\turl = file:///nonexistent/nope.git\n"
+        )
+        monkeypatch.setenv("GIT_ALLOW_PROTOCOL", "file")
+
+        with pytest.raises(RuntimeError) as e:
+            await git_fetch._init_submodules(
+                str(top), ["infra"], auth_header=None, host="github.com", conn=self._conn()
+            )
+
+        msg = str(e.value)
+        # The four things the operator needs: which submodule, which URL, which
+        # connection, and what to do about it.
+        assert "infra/vendored" in msg
+        assert "nonexistent/nope.git" in msg
+        assert "test-conn" in msg
+        assert "same credential" in msg.lower()
+
+    @pytest.mark.asyncio
+    async def test_the_failure_never_packs_empty_directories(
+        self, superproject_with_submodule, monkeypatch
+    ):
+        """It fails the fetch rather than silently shipping the empty directory,
+        which is the bug being fixed."""
+        top = superproject_with_submodule
+        (top / ".gitmodules").write_text(
+            '[submodule "infra/vendored"]\n'
+            "\tpath = infra/vendored\n"
+            "\turl = file:///nonexistent/nope.git\n"
+        )
+        monkeypatch.setenv("GIT_ALLOW_PROTOCOL", "file")
+
+        with pytest.raises(RuntimeError):
+            await git_fetch._init_submodules(
+                str(top), ["infra"], auth_header=None, host="github.com", conn=self._conn()
+            )
+
+
+class TestSubmoduleStepIsWiredIntoTheFetch:
+    """The tests above drive `_init_submodules` directly, which proves the helper
+    works and proves nothing about whether the fetch calls it. Deleting the call
+    site leaves every one of them green — the exact shape of #1244, where a
+    wrapper reached through an optional argument was never executed by the
+    caller that matters. This drives the real entry point instead.
+    """
+
+    @pytest.mark.asyncio
+    async def test_the_fetch_initialises_submodules_after_checkout(self, tmp_path, monkeypatch):
+        clone_dir = tmp_path / "clone"
+        clone_dir.mkdir()
+        # A repository that declares a submodule under the sparse path.
+        (clone_dir / ".gitmodules").write_text(
+            '[submodule "infra/vendored"]\n\tpath = infra/vendored\n\turl = https://x/y.git\n'
+        )
+
+        calls: list[list[str]] = []
+
+        async def spy_run_git(args, **kwargs):  # noqa: ARG001
+            calls.append(list(args))
+
+        async def fake_auth(_conn):
+            return "Basic xxx"
+
+        monkeypatch.setattr(git_fetch, "_run_git", spy_run_git)
+        monkeypatch.setattr(git_fetch, "_resolve_auth", fake_auth)
+        monkeypatch.setattr(git_fetch, "get_storage", lambda: _fake_storage([]))
+
+        conn = MagicMock()
+        conn.provider = "github"
+        conn.server_url = None
+        conn.name = "c"
+
+        await git_fetch.sparse_archive_to_storage(
+            conn, "org", "repo", "a" * 40, ["infra"], "key", clone_dir=str(clone_dir)
+        )
+
+        verbs = [c for c in calls if "submodule" in c]
+        assert verbs, "the fetch never initialised submodules — the call site is gone"
+
+        # And it must happen AFTER checkout: before it, the gitlink has not been
+        # resolved and there is nothing for git to update.
+        checkout_at = next(i for i, c in enumerate(calls) if "checkout" in c)
+        submodule_at = next(i for i, c in enumerate(calls) if "submodule" in c)
+        assert submodule_at > checkout_at
