@@ -7,12 +7,15 @@ not implement the rest of the Galaxy or Automation Hub API, for the same reason
 it implements only the TFE V2 subset the `terraform` CLI consumes — the client
 is the contract, not the vendor's full product surface.
 
+**Implemented so far: the install path** (pull-through). The publish path below
+is captured and documented but not yet served; it follows, against this list.
+
 Everything below was **captured from a real client**, not read from
 documentation. `ansible-galaxy` was pointed at a request-logging stub and driven
-through install, publish and verify; the tables record what it asked for. Three
+through install, publish and verify; the tables record what it asked for. Four
 of the findings contradict the obvious reading of the docs, and each is called
-out where it appears — the collection path, the publish `task` field, and a
-`href` key that looks decorative and is load-bearing.
+out where it appears — the collection path, the publish `task` field, a `href`
+key that looks decorative and is load-bearing, and the `Token` auth scheme.
 
 Re-run the capture with `python3 scripts/galaxy-capture.py`, which is committed
 for exactly that purpose.
@@ -32,7 +35,18 @@ a `galaxy_server` entry whose `url` ends in `/api/`.
 | 4 | `GET /api/v3/collections/{ns}/{name}/versions/{version}/` | Version detail — carries `download_url` and `artifact.sha256`. |
 | 5 | `GET <download_url>` | The artifact. An absolute URL of our choosing; the client follows it verbatim. |
 
-Every request carries `Authorization` when the server entry has a `token`.
+**The credential scheme is `Token`, not `Bearer` or `Basic`.** Every request
+carries `Authorization: Token <value>` when the server entry has a `token`.
+
+This one cost a working feature: the endpoints were built, 61 unit tests passed,
+and every single request 401'd against a server that accepted only Bearer and
+Basic. It is invisible to any test that supplies its own authenticated client,
+and obvious the moment a real `ansible-galaxy` is pointed at the thing.
+
+Terrapod accepts it via `extract_credential(..., allow_token_scheme=True)` —
+opt-in per caller rather than universal, because the OCI surface has a
+spec-defined auth flow and a test already pins that it does *not* honour `Token`
+"just because Terrapod will speak it elsewhere".
 
 **The path is `/api/v3/collections/…`, not the `plugin/ansible/content/published`
 form.** Galaxy NG serves collections under
@@ -124,6 +138,23 @@ registry: **the publisher owns the signature and the server verifies it against
 a public key already registered with the platform, never re-signing**. That
 invariant carries over unchanged — see
 [`registry-publishing.md`](registry-publishing.md).
+
+## What is rewritten, and what is not
+
+Every URL the client **follows** is rewritten to point at Terrapod:
+`download_url`, `versions_url`, and every `href` including those nested in a
+version-list entry and in `highest_version`. Upstream's `links.next` is dropped
+rather than passed through — it is a URL we have not rewritten, and forwarding
+it would hand the client an escape straight to the internet on page two of a
+long version list.
+
+The **descriptive** metadata beside them is deliberately left alone. A real
+version detail carries `repository`, `documentation`, `homepage` and `issues`
+from the collection's own `galaxy.yml`; the client never fetches them, and
+rewriting a project's GitHub link to point at Terrapod would simply be false.
+
+`artifact.sha256` is passed through untouched. The client checking our bytes
+against upstream's digest is the whole security model of a pull-through cache.
 
 ## Deliberately not implemented
 

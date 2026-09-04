@@ -164,12 +164,56 @@ with `{"images": ["quay.io/ansible/awx-ee:24.6.1"]}`, pulling the manifest and
 every blob it references.
 
 
+## Ansible Galaxy
+
+`ansible-galaxy` resolves collections from `galaxy.ansible.com` at install time,
+so an estate that cannot reach it cannot install a collection at all. Point the
+client at Terrapod with a `galaxy_server` entry:
+
+```ini
+# ansible.cfg
+[galaxy]
+server_list = terrapod
+
+[galaxy_server.terrapod]
+url = https://terrapod.example.com/api/terrapod/v1/package-cache/galaxy/
+token = <a Terrapod API token>
+```
+
+`ansible-galaxy collection install community.general` then resolves and downloads
+entirely through Terrapod, and installs again with no route to the internet once
+the collection is cached.
+
+The endpoints served are the ones the client actually calls, catalogued in
+[the Galaxy CLI surface](galaxy-cli-surface.md) — captured from a real client
+rather than read from documentation, which is how four of that document's
+statements came to contradict the obvious reading of the docs.
+
+**Only pull-through, for now.** Publishing a private collection
+(`ansible-galaxy collection publish`) and signature verification are tracked
+separately; this half is what makes a public collection installable offline.
+
+**What is and is not rewritten.** Every URL the client follows —
+`download_url`, `versions_url`, every `href` — points back at Terrapod, and
+upstream's pagination cursors are dropped rather than forwarded. A collection's
+own `repository` and `documentation` links are left exactly as published: the
+client never fetches them, and rewriting them would simply be untrue.
+`artifact.sha256` passes through untouched, because the client checking our
+bytes against upstream's digest is the whole security model here.
+
+**Sealed** (`registry.cache_only: true`), a cached collection still installs and
+an uncached one fails with a message naming the setting, rather than quietly
+reaching upstream. The version list is narrowed to versions actually held, so the
+client is never offered one that would 404 after it has resolved.
+
+
 ## Engine gating
 
 These proxies exist to serve Pulumi programs and Ansible collections. PyPI serves
-both, npm serves Pulumi only, so npm goes away with
-`api.config.engines.pulumi.enabled: false` and PyPI only once *both* engines are
-off. Cached artifacts are never deleted by turning an engine off. See
+both, npm serves Pulumi only and Galaxy Ansible only — so npm goes away with
+`api.config.engines.pulumi.enabled: false`, Galaxy with
+`api.config.engines.ansible.enabled: false`, and PyPI only once *both* engines
+are off. Cached artifacts are never deleted by turning an engine off. See
 [engine gating](#engine-gating).
 
 The engine switches sit **above** the per-capability flags in `registry`. A
@@ -183,6 +227,7 @@ decision, not a hunt for every capability that belongs to it.
 | Container registry (`/v2/`) | `engines.ansible` |
 | PyPI proxy | `engines.ansible` **or** `engines.pulumi` |
 | npm proxy | `engines.pulumi` |
+| Galaxy proxy | `engines.ansible` |
 
 Terraform and OpenTofu's own caches — the provider network mirror, the engine
 binary cache, the module registry — are not gateable and are unaffected by any of

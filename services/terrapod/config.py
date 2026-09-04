@@ -977,6 +977,12 @@ class PackageCacheConfig(BaseModel):
         description="npm registry (packuments and tarballs). Serves Pulumi TypeScript "
         "and JavaScript programs.",
     )
+    galaxy: PackageEcosystemConfig = Field(
+        default_factory=lambda: PackageEcosystemConfig(upstream="https://galaxy.ansible.com"),
+        description="Ansible Galaxy v3 (collections). Point ansible-galaxy at it with a "
+        "galaxy_server entry whose url is this proxy's base; an install then resolves and "
+        "downloads without reaching galaxy.ansible.com.",
+    )
 
 
 class EngineConfig(BaseModel):

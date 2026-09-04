@@ -383,6 +383,12 @@ api:
         npm:
           enabled: true
           upstream: https://registry.npmjs.org
+        # Ansible Galaxy v3 (collections). Ansible-only, so it disappears
+        # entirely with engines.ansible.enabled: false. Point ansible-galaxy at
+        # it with a galaxy_server entry whose url is this proxy's base.
+        galaxy:
+          enabled: true
+          upstream: https://galaxy.ansible.com
       provider_cache:
         enabled: true
         upstream_registries:

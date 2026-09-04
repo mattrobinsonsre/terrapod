@@ -192,6 +192,8 @@
   "api.config.registry.oci.upload_session_timeout_hours",
   "api.config.registry.oci.upstreams",
   "api.config.registry.package_cache.enabled",
+  "api.config.registry.package_cache.galaxy.enabled",
+  "api.config.registry.package_cache.galaxy.upstream",
   "api.config.registry.package_cache.npm.enabled",
   "api.config.registry.package_cache.npm.upstream",
   "api.config.registry.package_cache.pypi.enabled",

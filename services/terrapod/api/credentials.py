@@ -9,6 +9,11 @@ places that absorb that difference kept multiplying.
   `imagePullSecret` is a username and a password and nothing else (#1408).
 * **pip** sends Basic too — credentials go in the index URL or `.netrc`, and
   there is no bearer option — while **npm** sends Bearer via `_authToken`.
+* **ansible-galaxy** sends `Token <value>` for a `galaxy_server` with a `token`
+  (#1482) — neither Bearer nor Basic. Captured from the client rather than read
+  from documentation, after every request 401'd against a Bearer-only server.
+  That one is opt-in per caller (`allow_token_scheme`) rather than universal;
+  see :func:`extract_credential`.
 
 So the *encoding* varies and the credential does not. This module owns the
 encoding, and nothing else: each surface still maps a failure to its own error
@@ -26,12 +31,20 @@ import binascii
 from starlette.requests import Request
 
 
-def extract_credential(request: Request) -> str | None:
+def extract_credential(request: Request, *, allow_token_scheme: bool = False) -> str | None:
     """The bearer-equivalent credential in a request, or None.
 
     Returns None rather than raising when the header is absent or unusable, so
     the caller decides whether anonymous access is permitted for that route
     instead of having the decision made here.
+
+    `allow_token_scheme` additionally accepts `Authorization: Token <value>`,
+    which is what `ansible-galaxy` sends for a `galaxy_server` carrying a
+    `token` (#1482). It is opt-in rather than universal on purpose: the OCI
+    surface has a spec-defined auth flow, and there is an existing test pinning
+    that `Token` is *not* honoured there "just because Terrapod will speak it
+    elsewhere". Widening every surface to suit one client would quietly overrule
+    that decision, so the caller that needs it asks.
     """
     header = request.headers.get("authorization", "")
     if not header:
@@ -40,7 +53,7 @@ def extract_credential(request: Request) -> str | None:
     scheme, _, value = header.partition(" ")
     scheme = scheme.lower()
 
-    if scheme == "bearer":
+    if scheme == "bearer" or (allow_token_scheme and scheme == "token"):
         return value.strip() or None
 
     if scheme == "basic":

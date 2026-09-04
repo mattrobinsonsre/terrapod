@@ -41,6 +41,8 @@ _CAPABILITY_ENGINES: dict[str, frozenset[str]] = {
     "pypi": frozenset({"ansible", "pulumi"}),
     # Pulumi TypeScript programs.
     "npm": frozenset({"pulumi"}),
+    # Ansible collections. Ansible only — nothing else installs a collection.
+    "galaxy": frozenset({"ansible"}),
 }
 
 
