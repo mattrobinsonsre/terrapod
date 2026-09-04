@@ -1460,12 +1460,26 @@ jobs:
           pattern: image-*-amd64
           path: /tmp/images
           merge-multiple: true
-      - name: Load images into docker (PR)
-        if: needs.prepare.outputs.is_pr == 'true'
+      # k3d only: it needs the images in the local daemon so they can be tagged
+      # and pushed to the eval registry. kind loads the archives straight into
+      # the node below and never involves the daemon at all.
+      #
+      # Parallel because gunzip is single-threaded and CPU-bound while the runner
+      # has four cores; serially this was 73s, the largest step in the k3d job.
+      # Statuses are collected explicitly — backgrounding must not turn a failed
+      # load into a green step.
+      - name: Load images into docker (PR, k3d)
+        if: needs.prepare.outputs.is_pr == 'true' && matrix.tool == 'k3d'
         run: |
+          set -euo pipefail
+          pids=()
           for i in terrapod-api terrapod-web terrapod-migrations terrapod-listener terrapod-runner; do
-            gunzip -c "/tmp/images/$i-amd64.tar.gz" | docker load
+            ( set -o pipefail; gunzip -c "/tmp/images/$i-amd64.tar.gz" | docker load ) &
+            pids+=("$!")
           done
+          rc=0
+          for pid in "${pids[@]}"; do wait "$pid" || rc=1; done
+          [ "$rc" -eq 0 ] || { echo "at least one image failed to load" >&2; exit 1; }
       # ── Create the cluster + load the images into it, then install ───────────
       # eval.sh reuses an existing cluster, so we create it here (kind load /
       # k3d image import need the cluster to exist first) and let eval.sh install.
@@ -1478,7 +1492,32 @@ jobs:
           done
           if [ "${{ matrix.tool }}" = "kind" ]; then
             kind create cluster --name terrapod-eval --wait 120s
-            for img in $imgs; do kind load docker-image "$img" --name terrapod-eval; done
+            if [ "${{ needs.prepare.outputs.is_pr }}" = "true" ]; then
+              # Import the build artifacts straight into the node. `kind load
+              # docker-image` has to docker-save each image back out of the
+              # daemon first, so routing through the daemon paid for the same
+              # bytes three times — gunzip, load, save. Those two steps
+              # together were 125s of a 224s job.
+              #
+              # image-archive wants an uncompressed tar, so decompress in
+              # parallel (CPU-bound, four cores) and import serially: kind
+              # writes into the node's containerd, which is not worth racing.
+              pids=()
+              for i in terrapod-api terrapod-web terrapod-migrations terrapod-listener terrapod-runner; do
+                gunzip -c "/tmp/images/$i-amd64.tar.gz" > "/tmp/images/$i.tar" &
+                pids+=("$!")
+              done
+              rc=0
+              for pid in "${pids[@]}"; do wait "$pid" || rc=1; done
+              [ "$rc" -eq 0 ] || { echo "failed to decompress an image archive" >&2; exit 1; }
+              for i in terrapod-api terrapod-web terrapod-migrations terrapod-listener terrapod-runner; do
+                kind load image-archive "/tmp/images/$i.tar" --name terrapod-eval
+              done
+            else
+              # Branch/tag builds pulled the images from GHCR into the daemon,
+              # so there is no archive on disk to import from.
+              for img in $imgs; do kind load docker-image "$img" --name terrapod-eval; done
+            fi
           else
             # A k3d-managed local registry, NOT `k3d image import`. The import
             # reports "Successfully imported" but leaves images unresolvable by
@@ -1493,6 +1532,9 @@ jobs:
             k3d cluster create terrapod-eval \
               --registry-use "k3d-eval-registry.localhost:${reg_port}" \
               --wait --timeout 120s
+            # Tag serially (metadata only, cheap), push in parallel — five
+            # independent pushes to a local registry, 70s serially.
+            pids=()
             for i in terrapod-api terrapod-web terrapod-migrations terrapod-listener terrapod-runner; do
               # Push over localhost:PORT (docker auto-treats localhost as an
               # insecure registry — no daemon config needed); pods pull the same
@@ -1500,8 +1542,12 @@ jobs:
               # the chart's global.imageRegistry override points them at.
               dst="localhost:${reg_port}/mattrobinsonsre/${i}:sha-${sha}-amd64"
               docker tag "$REGISTRY/${i}:sha-${sha}-amd64" "$dst"
-              docker push "$dst"
+              docker push "$dst" &
+              pids+=("$!")
             done
+            rc=0
+            for pid in "${pids[@]}"; do wait "$pid" || rc=1; done
+            [ "$rc" -eq 0 ] || { echo "at least one push to the eval registry failed" >&2; exit 1; }
           fi
       - name: make eval (install into the cluster)
         # Bounded below the job's own timeout so an install that will not
