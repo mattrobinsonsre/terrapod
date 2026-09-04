@@ -3039,7 +3039,17 @@ jobs:
       - build-images-arm64
       - scan-images
       - e2e-test
-      - e2e-report
+      # `e2e-report` is deliberately absent, and must stay absent. It is already
+      # excluded from the `results=()` verdict below (see the reasoning on the
+      # job itself: an artifact-storage failure with no Terrapod code involved
+      # failed a correct release on v1.5.3). Listing it here anyway made
+      # `ci-pass` WAIT for a job whose result it then ignored — 5m35s of a PR
+      # run with one job on the machine and nineteen slots idle, because the
+      # report merges eight Playwright blobs behind a ~2GB image pull.
+      #
+      # The workflow run still finishes it; the required status check no longer
+      # waits for it. Re-adding this line reintroduces the stall silently, since
+      # nothing about the verdict changes (#1468).
       - oci-conformance
       - create-manifests
       - release-create
