@@ -3109,6 +3109,29 @@ jobs:
             --latest="$latest" \
             --notes-file /tmp/release-notes.md
 
+          # Declining the badge is NOT the same as handing it to someone else.
+          # `make_latest=false` only says "do not force THIS one"; it elects no
+          # replacement, so GitHub falls back to picking by publish date — and the
+          # patch just published is the most recent, so it takes the badge back.
+          #
+          # Observed on v1.5.5: this step logged "v1.5.5 is not the newest release
+          # (v1.6.0 is)", passed --latest=false, ran last of all the release jobs,
+          # and /releases/latest still returned v1.5.5 until it was corrected by
+          # hand (#1466).
+          #
+          # So promote the highest release positively. A no-op when it already holds
+          # the badge, which keeps the ordinary case quiet.
+          if [ "$latest" != "true" ]; then
+            echo "::notice::re-electing $highest as the latest release"
+            # Warn rather than fail. A failure here would fail release-finalize,
+            # and Cleanup Tag would then DELETE the tag — losing a complete,
+            # correct release over a badge. The release is already published and
+            # sound at this point; a wrong badge is visible and fixable by hand,
+            # a deleted tag is not.
+            gh release edit "$highest" --latest=true \
+              || echo "::warning::could not re-elect $highest as latest; $version may hold the badge — fix with: gh release edit $highest --latest=true"
+          fi
+
           gh release upload "$version" \
             dist/terrapod-${chart_version}.tgz \
             dist/sbom-terrapod-api.spdx.json \
