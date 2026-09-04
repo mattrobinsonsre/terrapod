@@ -1886,6 +1886,27 @@ jobs:
       # Image tag MUST track the pinned `@playwright/test` version in
       # e2e/package-lock.json — version skew between client and bundled
       # browsers causes runtime failures.
+      # `npm ci` for this tree is FOUR packages and was taking two minutes — 51%
+      # of the job, against 22s for the tests themselves. The container starts
+      # with an empty npm cache every run, so playwright-core and typescript are
+      # refetched cold each time. Measured at 125.8s here and 54s for the same
+      # command in node:24-alpine; neither is a sane figure for four packages.
+      #
+      # The step below mounts ${{ github.workspace }}/e2e into the container, so
+      # `npm ci` writes node_modules into the RUNNER's workspace — which is what
+      # makes it cacheable from out here at all.
+      #
+      # Keyed on the lockfile hash, so a Playwright bump changes the key and a
+      # stale node_modules can never be restored against a new lockfile. No
+      # restore-keys, deliberately: a partial match is exactly the silent
+      # staleness this must not have.
+      - name: Cache e2e node_modules
+        id: e2e-modules
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: e2e/node_modules
+          key: e2e-node-modules-${{ runner.os }}-${{ hashFiles('e2e/package-lock.json') }}
+
       - name: Run Playwright tests
         run: |
           docker run --rm \
@@ -1896,10 +1917,10 @@ jobs:
             -e CI=true \
             -e HOME=/tmp \
             ${PLAYWRIGHT_IMAGE:-mcr.microsoft.com/playwright:v1.58.2-noble} \
-            sh -c "npm ci --ignore-scripts && npx playwright test --shard=${{ matrix.shard }}/${{ strategy.job-total }}"
-        # Playwright has per-test timeouts of its own; this is the
-        # outer safety net. npm ci inside the container is ~10 s for
-        # this tree (only @playwright/test + typescript).
+            sh -c "${{ steps.e2e-modules.outputs.cache-hit == 'true' && 'true' || 'npm ci --ignore-scripts' }} && npx playwright test --shard=${{ matrix.shard }}/${{ strategy.job-total }}"
+        # Playwright has per-test timeouts of its own; this is the outer
+        # safety net. (This comment used to say npm ci was "~10 s for this
+        # tree" — it was two minutes, and that claim is why nobody looked.)
         timeout-minutes: 10
 
       # Per-shard blob report → merged into one HTML report by `e2e-report`.
@@ -2093,11 +2114,21 @@ jobs:
       # shards ran — blob format is version-sensitive, so deriving it from the
       # lockfile rather than a second hard-coded tag is what stops the two
       # drifting apart.
+      # Same four packages, same 54s. This job runs IN the node container
+      # rather than mounting into one, so node_modules lands at e2e/node_modules
+      # in the workspace either way and the same cache key serves both.
+      - name: Cache e2e node_modules
+        id: e2e-modules
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: e2e/node_modules
+          key: e2e-node-modules-${{ runner.os }}-${{ hashFiles('e2e/package-lock.json') }}
+
       - name: Merge into HTML report
         continue-on-error: true
         working-directory: e2e
         run: |
-          npm ci --ignore-scripts
+          [ "${{ steps.e2e-modules.outputs.cache-hit }}" = "true" ] || npm ci --ignore-scripts
           npx playwright merge-reports --reporter html ../all-blob-reports
       - name: Upload merged HTML report
         if: always()
