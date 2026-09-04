@@ -72,6 +72,9 @@ dev:                ## Start Tilt development environment (port 10352)
 dev-down:           ## Stop Tilt
 	tilt down --port 10352
 
+doctor:             ## Report container-store health (orphaned layers, free space)
+	@./scripts/doctor.sh
+
 # ── Evaluation (one-command kind/k3d quickstart) ─────────
 eval:               ## Stand up a throwaway Terrapod for evaluation (kind/k3d)
 	scripts/eval.sh up
