@@ -35,7 +35,7 @@ plan/apply) is off in the eval to keep it small; create an agent pool and set
 
 | Need | Notes |
 |---|---|
-| A Kubernetes cluster (1.27+) | Any conformant cluster. No cluster? Spin up [k3s](https://k3s.io/) on a single VM (below). |
+| A Kubernetes cluster (1.29+) | Any conformant cluster. No cluster? Spin up [k3s](https://k3s.io/) on a single VM (below). |
 | Helm 3.x | `brew install helm` |
 | PostgreSQL 14+ and Redis 7+ | **External** — the chart does not bundle them. Provide a connection URL for each (a managed service, or run them on the cluster/VM). See [Deployment → Database Setup](deployment.md#database-setup). |
 | Storage | Defaults to a PVC-backed filesystem (no extra setup). For S3/Azure/GCS see [Deployment → Storage Backend Setup](deployment.md#storage-backend-setup). |

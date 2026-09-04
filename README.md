@@ -281,7 +281,7 @@ Terrapod runs **only on Kubernetes** (the runner uses the Jobs API). Deploy it o
 
 ### Prerequisites
 
-- A Kubernetes cluster (1.27+). No cluster? `curl -sfL https://get.k3s.io | sh -` gives you one on a single VM, with an ingress controller (Traefik) and storage included.
+- A Kubernetes cluster (1.29+). No cluster? `curl -sfL https://get.k3s.io | sh -` gives you one on a single VM, with an ingress controller (Traefik) and storage included.
 - Helm 3.x
 - **External** PostgreSQL 14+ and Redis 7+ (the chart does not bundle a production-grade datastore; it can deploy in-cluster Postgres/Redis via `postgresql.deploy`/`redis.deploy` for eval/dev only) — use a managed service or run them on the cluster/VM.
 
