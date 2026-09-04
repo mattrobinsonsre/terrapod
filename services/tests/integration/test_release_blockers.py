@@ -886,7 +886,7 @@ class TestATransientVaultFailureDoesNotDestroyTheRun:
         set_auth(app, admin_user())
         tag = uuid.uuid4().hex[:8]
         pool_id, listener_id = await _pool_with_listener(client, tag)
-        ws_id, cv_id, run_id = await _agent_run_with_vault_var(client, tag, pool_id)
+        _, _, run_id = await _agent_run_with_vault_var(client, tag, pool_id)
         set_listener_auth(app, listener_id, pool_id.removeprefix("apool-"))
 
         prior = (settings.vault.enabled, settings.vault.instances)
@@ -919,7 +919,7 @@ class TestATransientVaultFailureDoesNotDestroyTheRun:
         set_auth(app, admin_user())
         tag = uuid.uuid4().hex[:8]
         pool_id, listener_id = await _pool_with_listener(client, tag)
-        ws_id, cv_id, run_id = await _agent_run_with_vault_var(client, tag, pool_id)
+        _, _, run_id = await _agent_run_with_vault_var(client, tag, pool_id)
         set_listener_auth(app, listener_id, pool_id.removeprefix("apool-"))
 
         prior = (settings.vault.enabled, settings.vault.instances)
@@ -1139,7 +1139,9 @@ class TestTheVaultValueActuallyReachesTheRunner:
         set_auth(app, admin_user())
         tag = uuid.uuid4().hex[:8]
         pool_id, listener_id = await _pool_with_listener(client, tag)
-        ws_id, cv_id, run_id = await _agent_run_with_vault_var(client, tag, pool_id)
+        # Called for its side effect — the run it creates is claimed below
+        # via the listener, so none of the returned ids are needed here.
+        await _agent_run_with_vault_var(client, tag, pool_id)
         set_listener_auth(app, listener_id, pool_id.removeprefix("apool-"))
 
         prior = (settings.vault.enabled, settings.vault.instances)
