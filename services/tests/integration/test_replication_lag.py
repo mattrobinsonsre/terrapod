@@ -18,24 +18,33 @@ from terrapod.db.session import get_db_session
 from terrapod.services import replication
 
 
-async def _seed(count: int, *, first_age_minutes: int = 0) -> None:
+async def _seed(count: int, *, first_age_minutes: int = 0) -> int:
+    """Insert `count` events; return the id of the newest.
+
+    Returning the id matters. The conftest truncates between tests with
+    `CASCADE` but not `RESTART IDENTITY`, so rows are cleared while the sequence
+    keeps climbing — meaning a test cannot know what id its first row will get,
+    and one that hard-codes it is asserting something it does not own (#1493).
+    """
     async with get_db_session() as db:
         base = datetime.now(UTC) - timedelta(minutes=first_age_minutes)
-        for i in range(count):
-            db.add(
-                ReplicationEvent(
-                    entity_class="workspaces",
-                    entity_id=f"ws-{i}",
-                    op="upsert",
-                    occurred_at=base + timedelta(seconds=i),
-                )
+        events = [
+            ReplicationEvent(
+                entity_class="workspaces",
+                entity_id=f"ws-{i}",
+                op="upsert",
+                occurred_at=base + timedelta(seconds=i),
             )
+            for i in range(count)
+        ]
+        db.add_all(events)
         await db.commit()
+        return max(event.id for event in events)
 
 
 class TestTheLeaderSaysWhereItsStreamEnds:
     async def test_a_capped_page_still_reports_the_newest_event_id(self, app):
-        await _seed(5)
+        newest = await _seed(5)
 
         async with get_db_session() as db:
             page = await replication.read_events(db, after=0, limit=2)
@@ -44,7 +53,7 @@ class TestTheLeaderSaysWhereItsStreamEnds:
         assert page.cursor < page.latest_id, (
             "the cursor alone cannot say how far behind; that is why latest_id exists"
         )
-        assert page.latest_id == 5
+        assert page.latest_id == newest
 
     async def test_the_oldest_unapplied_timestamp_is_the_first_row_handed_back(self, app):
         await _seed(3, first_age_minutes=10)
