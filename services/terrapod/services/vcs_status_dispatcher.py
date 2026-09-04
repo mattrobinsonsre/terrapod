@@ -143,7 +143,7 @@ def _build_comment_body(
     (pending / skipped / errored) are skipped — the comment shouldn't
     advertise empty or error rows to PR readers.
     """
-    github_state, _, description = _resolve_status(run_status, plan_only, has_changes)
+    _, _, description = _resolve_status(run_status, plan_only, has_changes)
     emoji = _STATUS_EMOJI.get(run_status, ":grey_question:")
 
     now = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
