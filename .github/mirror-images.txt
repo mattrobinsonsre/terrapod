@@ -29,3 +29,10 @@ alpine/helm:3.17.2
 semgrep/semgrep:1.117
 localstack/localstack:4
 moby/buildkit:buildx-stable-1
+
+# Not on Docker Hub — the source registry is part of the reference. The eight
+# E2E shards each pull this, and at 0.91GB compressed that is the largest single
+# thing CI fetches. Playwright publishes no browser-specific variant (18,570
+# tags, none Chromium-only), so this mirrors the image as published rather than
+# trimming it; a smaller image would have to be one we build and own.
+mcr.microsoft.com/playwright:v1.58.2-noble
