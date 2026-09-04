@@ -2100,7 +2100,23 @@ jobs:
   # is why each entry is written to be read by someone outside the
   # project.
   scan-images:
-    name: Scan ${{ matrix.image }} (${{ matrix.arch }})
+    # One job per IMAGE, scanning both arches, rather than one per image+arch.
+    #
+    # As 5x2 this was ten jobs that all became eligible at the same instant as
+    # the eight E2E shards, two helm-eval-boot jobs and oci-conformance — 21 jobs
+    # for 20 concurrent slots. The E2E shards lost 27s, 44s and 57s of queue wait
+    # to it, and the shard that waited 44s was the straggler gating E2E Report,
+    # so the contention sat directly on the critical path (#1468).
+    #
+    # Five jobs scan the same images with the same settings and free five slots
+    # at exactly the contended moment. Each takes roughly twice as long (~52-172s
+    # against 26-86s), which is well inside the slack before create-manifests.
+    #
+    # Deliberately NOT solved with `needs: [e2e-test]`. That works today only
+    # because create-manifests is gated behind python-test; once the integration
+    # shard is split, that slack disappears and deferred scans become the new
+    # critical path.
+    name: Scan ${{ matrix.image }}
     needs: [prepare, build-images-amd64, build-images-arm64]
     if: |
       always()
@@ -2115,15 +2131,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch: [amd64, arm64]
         image: [terrapod-api, terrapod-web, terrapod-runner, terrapod-listener, terrapod-migrations]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      # On branch/tag builds the image lives in GHCR — log in and let Trivy
-      # pull the per-arch tag. On PRs nothing was pushed; the image arrives as
-      # a per-arch artifact from build-images-<arch> and is loaded into the
-      # local daemon below, where Trivy finds it by the same tag.
+      # On branch/tag builds the image lives in GHCR — log in and let Trivy pull
+      # the per-arch tag. On PRs nothing was pushed; the image arrives as a
+      # per-arch artifact from build-images-<arch> and is loaded into the local
+      # daemon below, where Trivy finds it by the same tag.
       - name: Log in to GHCR
         if: needs.prepare.outputs.is_pr != 'true'
         uses: ./.github/actions/ghcr-login
@@ -2131,62 +2146,117 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           username: ${{ github.actor }}
 
-      - name: Download image artifact (PR)
+      # ── amd64 ──
+      - name: Download image artifact (amd64, PR)
         if: needs.prepare.outputs.is_pr == 'true'
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
-          name: image-${{ matrix.image }}-${{ matrix.arch }}
+          name: image-${{ matrix.image }}-amd64
           path: /tmp
 
-      - name: Load image (PR)
+      - name: Load image (amd64, PR)
         if: needs.prepare.outputs.is_pr == 'true'
-        run: gunzip -c "/tmp/${{ matrix.image }}-${{ matrix.arch }}.tar.gz" | docker load
+        run: gunzip -c "/tmp/${{ matrix.image }}-amd64.tar.gz" | docker load
 
-      # Human-readable findings step. Always prints the table of CVEs
-      # Trivy would gate on to the action log — so a failure in the
-      # gating step below can be diagnosed without downloading SARIF or
-      # re-running Trivy locally. exit-code: '0' keeps this informational.
-      - name: Trivy findings (table, informational)
+      # Human-readable findings step. Always prints the table of CVEs Trivy would
+      # gate on to the action log — so a failure in the gating step below can be
+      # diagnosed without downloading SARIF or re-running Trivy locally.
+      # exit-code: '0' keeps this informational.
+      - name: Trivy findings (amd64, table, informational)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         env:
-          # The per-arch tag (sha-XXX-arm64) is an OCI index whose only child
-          # is the matrix arch. Without this, Trivy defaults to the runner's
-          # platform (linux/amd64) when pulling the image from GHCR on branch/
-          # tag builds and fails with "no child with platform linux/amd64".
-          # (PR builds load the image into the local daemon, so they never hit
-          # the remote-pull default — which is why this only broke on main.)
-          # Trivy reads TRIVY_PLATFORM as the --platform flag.
-          TRIVY_PLATFORM: linux/${{ matrix.arch }}
+          # The per-arch tag (sha-XXX-amd64) is an OCI index whose only child is
+          # that arch. Without this, Trivy defaults to the runner's platform when
+          # pulling from GHCR on branch/tag builds and fails with "no child with
+          # platform linux/amd64". Trivy reads TRIVY_PLATFORM as --platform.
+          TRIVY_PLATFORM: linux/amd64
         with:
-          image-ref: ghcr.io/mattrobinsonsre/${{ matrix.image }}:sha-${{ needs.prepare.outputs.sha_short }}-${{ matrix.arch }}
+          image-ref: ghcr.io/mattrobinsonsre/${{ matrix.image }}:sha-${{ needs.prepare.outputs.sha_short }}-amd64
           format: table
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           trivyignores: pentest/trivy/.trivyignore
           exit-code: '0'
 
-      - name: Scan with Trivy
+      - name: Scan with Trivy (amd64)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         env:
-          # See the note on the informational step above — pin the pulled
-          # platform to the matrix arch so the arm64 scan resolves its child.
-          TRIVY_PLATFORM: linux/${{ matrix.arch }}
+          TRIVY_PLATFORM: linux/amd64
         with:
-          image-ref: ghcr.io/mattrobinsonsre/${{ matrix.image }}:sha-${{ needs.prepare.outputs.sha_short }}-${{ matrix.arch }}
+          image-ref: ghcr.io/mattrobinsonsre/${{ matrix.image }}:sha-${{ needs.prepare.outputs.sha_short }}-amd64
           format: sarif
-          output: trivy-${{ matrix.image }}-${{ matrix.arch }}.sarif
+          output: trivy-${{ matrix.image }}-amd64.sarif
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           trivyignores: pentest/trivy/.trivyignore
           exit-code: '1'
           limit-severities-for-sarif: true
 
-      - name: Upload SARIF
+      # The category MUST stay distinct per image AND arch: code scanning keys
+      # results on it, so a shared category would have one arch silently
+      # overwrite the other's findings.
+      - name: Upload SARIF (amd64)
         if: always()
         uses: github/codeql-action/upload-sarif@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v4
         with:
-          sarif_file: trivy-${{ matrix.image }}-${{ matrix.arch }}.sarif
-          category: trivy-${{ matrix.image }}-${{ matrix.arch }}
+          sarif_file: trivy-${{ matrix.image }}-amd64.sarif
+          category: trivy-${{ matrix.image }}-amd64
+
+      # ── arm64 ──
+      - name: Download image artifact (arm64, PR)
+        if: needs.prepare.outputs.is_pr == 'true'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: image-${{ matrix.image }}-arm64
+          path: /tmp
+
+      - name: Load image (arm64, PR)
+        if: needs.prepare.outputs.is_pr == 'true'
+        run: gunzip -c "/tmp/${{ matrix.image }}-arm64.tar.gz" | docker load
+
+      # Human-readable findings step. Always prints the table of CVEs Trivy would
+      # gate on to the action log — so a failure in the gating step below can be
+      # diagnosed without downloading SARIF or re-running Trivy locally.
+      # exit-code: '0' keeps this informational.
+      - name: Trivy findings (arm64, table, informational)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        env:
+          # The per-arch tag (sha-XXX-arm64) is an OCI index whose only child is
+          # that arch. Without this, Trivy defaults to the runner's platform when
+          # pulling from GHCR on branch/tag builds and fails with "no child with
+          # platform linux/amd64". Trivy reads TRIVY_PLATFORM as --platform.
+          TRIVY_PLATFORM: linux/arm64
+        with:
+          image-ref: ghcr.io/mattrobinsonsre/${{ matrix.image }}:sha-${{ needs.prepare.outputs.sha_short }}-arm64
+          format: table
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          trivyignores: pentest/trivy/.trivyignore
+          exit-code: '0'
+
+      - name: Scan with Trivy (arm64)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        env:
+          TRIVY_PLATFORM: linux/arm64
+        with:
+          image-ref: ghcr.io/mattrobinsonsre/${{ matrix.image }}:sha-${{ needs.prepare.outputs.sha_short }}-arm64
+          format: sarif
+          output: trivy-${{ matrix.image }}-arm64.sarif
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          trivyignores: pentest/trivy/.trivyignore
+          exit-code: '1'
+          limit-severities-for-sarif: true
+
+      # The category MUST stay distinct per image AND arch: code scanning keys
+      # results on it, so a shared category would have one arch silently
+      # overwrite the other's findings.
+      - name: Upload SARIF (arm64)
+        if: always()
+        uses: github/codeql-action/upload-sarif@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v4
+        with:
+          sarif_file: trivy-${{ matrix.image }}-arm64.sarif
+          category: trivy-${{ matrix.image }}-arm64
 
   # ── Create Multi-Arch Manifests ────────────────────────
   create-manifests:
