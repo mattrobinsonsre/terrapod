@@ -43,6 +43,12 @@ CREDENTIAL_HINTS = (
 EXPECTED_PLAINTEXT = {
     ("crypto_keys", "wrapped_dek"),
     ("task_stage_results", "callback_token"),
+    # A GPG key *id* is a public identifier, not a key — we hand it to clients
+    # as `pubkey_fingerprint` so they know which registered key to verify a
+    # collection's signature with (#1482). Encrypting it would hide a value
+    # whose whole purpose is to be published, and the column matches here only
+    # because its name contains "key".
+    ("registry_collection_versions", "signing_key_id"),
 }
 
 
@@ -110,6 +116,7 @@ class TestCredentialColumnsAreEncrypted:
         assert EXPECTED_PLAINTEXT == {
             ("crypto_keys", "wrapped_dek"),
             ("task_stage_results", "callback_token"),
+            ("registry_collection_versions", "signing_key_id"),
         }
 
     def test_the_exceptions_still_exist(self):

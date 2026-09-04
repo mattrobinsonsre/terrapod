@@ -15,11 +15,12 @@ this — they stream `request.stream()` straight into `storage.put_stream`.
 """
 
 import asyncio
+import base64
 import os
 import tempfile
 from collections.abc import AsyncIterator
 
-from fastapi import HTTPException, Request
+from fastapi import HTTPException, Request, UploadFile
 
 from terrapod.config import settings
 
@@ -100,6 +101,83 @@ async def stream_to_tempfile(
         if not f.closed:
             try:
                 await asyncio.to_thread(f.close)
+            except OSError:
+                pass
+        try:
+            await asyncio.to_thread(os.unlink, tmp_path)
+        except OSError:
+            pass
+        raise
+
+
+async def stream_upload_to_tempfile(
+    upload: UploadFile,
+    *,
+    suffix: str,
+    max_bytes: int = DEFAULT_UPLOAD_MAX_BYTES,
+) -> tuple[str, int]:
+    """Stream a multipart file part to a capped tempfile on the ephemeral PVC.
+
+    The multipart sibling of :func:`stream_to_tempfile`, for clients that upload
+    as a form rather than a raw body — `ansible-galaxy collection publish` is
+    one (#1482).
+
+    Starlette's ``UploadFile`` is a ``SpooledTemporaryFile``: small parts stay in
+    memory, and past its threshold it rolls over to ``tempfile.gettempdir()``.
+    On the API pod that is the RAM-backed ``/tmp``, which is exactly what rule 14
+    exists to keep large uploads out of. Re-streaming the part here in bounded
+    chunks puts the bytes on the PVC instead, and caps them.
+    """
+    # `ansible-galaxy collection publish` sends the file part as
+    # `Content-Transfer-Encoding: base64` (#1482). Starlette's multipart parser
+    # does not decode that — it hands back the encoded text — so a part that
+    # declares it has to be decoded here or the caller receives base64 where it
+    # expected an archive. Captured from the real client; curl does not do this,
+    # which is exactly why it went unnoticed until one was pointed at the
+    # endpoint.
+    encoding = (upload.headers.get("content-transfer-encoding") or "").strip().lower()
+    decode_base64 = encoding == "base64"
+
+    tmpdir = resolve_ephemeral_tmpdir()
+    fd, tmp_path = await asyncio.to_thread(tempfile.mkstemp, suffix=suffix, dir=tmpdir)
+    handle = await asyncio.to_thread(os.fdopen, fd, "wb")
+    received = 0
+    pending = b""
+    try:
+        while True:
+            chunk = await upload.read(1024 * 1024)
+            if not chunk:
+                break
+            received += len(chunk)
+            if received > max_bytes:
+                raise HTTPException(
+                    status_code=413,
+                    detail=f"upload exceeded the {max_bytes}-byte cap after {received} bytes",
+                )
+            if decode_base64:
+                # Base64 is line-wrapped and a chunk boundary can land mid-quad,
+                # so whitespace is stripped and only whole 4-character groups are
+                # decoded; the remainder carries into the next chunk. Decoding
+                # per chunk rather than buffering the whole part keeps the
+                # constant-memory guarantee this helper exists for.
+                pending += b"".join(chunk.split())
+                usable = len(pending) - (len(pending) % 4)
+                if usable:
+                    chunk, pending = base64.b64decode(pending[:usable]), pending[usable:]
+                else:
+                    continue
+            await asyncio.to_thread(handle.write, chunk)
+        if decode_base64 and pending:
+            # A trailing group short of four characters means the client sent
+            # truncated base64; b64decode says so rather than silently padding.
+            await asyncio.to_thread(handle.write, base64.b64decode(pending))
+        await asyncio.to_thread(handle.flush)
+        await asyncio.to_thread(handle.close)
+        return tmp_path, received
+    except BaseException:
+        if not handle.closed:
+            try:
+                await asyncio.to_thread(handle.close)
             except OSError:
                 pass
         try:

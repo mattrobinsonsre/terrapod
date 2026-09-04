@@ -7,15 +7,16 @@ not implement the rest of the Galaxy or Automation Hub API, for the same reason
 it implements only the TFE V2 subset the `terraform` CLI consumes — the client
 is the contract, not the vendor's full product surface.
 
-**Implemented so far: the install path** (pull-through). The publish path below
-is captured and documented but not yet served; it follows, against this list.
+Install (pull-through and from Terrapod's own registry), publish, and signature
+verification are all implemented.
 
 Everything below was **captured from a real client**, not read from
 documentation. `ansible-galaxy` was pointed at a request-logging stub and driven
-through install, publish and verify; the tables record what it asked for. Four
-of the findings contradict the obvious reading of the docs, and each is called
+through install, publish and verify; the tables record what it asked for. **Five
+of the findings contradict the obvious reading of the docs**, and each is called
 out where it appears — the collection path, the publish `task` field, a `href`
-key that looks decorative and is load-bearing, and the `Token` auth scheme.
+key that looks decorative and is load-bearing, the `Token` auth scheme, and a
+file part that arrives base64-encoded.
 
 Re-run the capture with `python3 scripts/galaxy-capture.py`, which is committed
 for exactly that purpose.
@@ -116,6 +117,19 @@ Proven by returning a task URL sharing no shape with the poll path —
 the poll endpoint must exist at that fixed path regardless of what the publish
 response says.
 
+**The file part arrives base64-encoded.** The multipart body carries
+`Content-Transfer-Encoding: base64` on the `file` part, and Starlette's parser
+does not decode it — it hands back the encoded text.
+
+This one is invisible to every obvious test. `curl -F file=@collection.tar.gz`
+sends the part raw and works perfectly; so does a hand-built multipart body. Only
+the real client encodes, so publish was broken for every actual user while the
+endpoint answered a synthetic request correctly.
+
+The body carries a second part, `sha256`, alongside the file. Terrapod ignores it
+and computes the digest from what it stored: a digest the uploader asserts
+describes what they meant to send, not necessarily what arrived.
+
 `--no-wait` stops after step 2. The default waits, so step 3 is required.
 
 The import status response needs a `state` field; `completed` ends the poll
@@ -133,11 +147,28 @@ Version detail may carry a `signatures` array of `{signature,
 pubkey_fingerprint, …}`. The client engages its verification path when
 `--keyring` is supplied, checking the detached signature over `MANIFEST.json`.
 
-This is the same trust shape Terrapod already implements for the provider
-registry: **the publisher owns the signature and the server verifies it against
-a public key already registered with the platform, never re-signing**. That
-invariant carries over unchanged — see
-[`registry-publishing.md`](registry-publishing.md).
+**There is nowhere in the publish protocol to put one.** `collection publish`
+sends the tarball and nothing else, so signing cannot ride along with it — which
+is why Galaxy NG gets signatures from a separate signing service rather than
+from the publish call.
+
+Terrapod therefore takes them on a native endpoint, outside this surface:
+
+```
+PUT /api/terrapod/v1/package-cache/galaxy/v3/collections/{ns}/{name}/versions/{version}/signature
+```
+
+The body is the ASCII-armored detached signature over the collection's
+`MANIFEST.json` — read back out of the *stored* artifact, so what is verified is
+what a client will download, and read as raw bytes rather than a re-serialised
+copy of the parsed manifest, which would be a different byte string.
+
+The trust shape is the provider registry's, unchanged: **the publisher owns the
+signature and the server verifies it against a public key already registered
+with the platform, never re-signing**. A signature from an unregistered key is
+refused with 422 and named, rather than stored unverified — advertising a
+signature the registry cannot itself vouch for is worse than advertising none.
+See [`registry-publishing.md`](registry-publishing.md).
 
 ## What is rewritten, and what is not
 

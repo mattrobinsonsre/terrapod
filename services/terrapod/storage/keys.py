@@ -124,6 +124,16 @@ def module_tarball_key(namespace: str, name: str, provider: str, version: str) -
 # --- Provider Registry ---
 
 
+def collection_tarball_key(namespace: str, name: str, version: str) -> str:
+    """Where a published Ansible collection's artifact lives (#1482).
+
+    Under `registry/` rather than `cache/`, because it is owned content rather
+    than a copy of something upstream — the retention sweep only walks the cache
+    prefixes, and a published collection must never be reaped.
+    """
+    return f"registry/collections/{namespace}/{name}/{version}.tar.gz"
+
+
 def provider_binary_key(namespace: str, name: str, version: str, os_: str, arch: str) -> str:
     """Key for a provider binary zip."""
     return f"registry/providers/{namespace}/{name}/{version}/{name}_{version}_{os_}_{arch}.zip"

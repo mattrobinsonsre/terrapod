@@ -389,6 +389,22 @@ class TestAuthenticationIsRequired:
             "community-general-9.0.0.tar.gz",
             None,
         ),
+        "/api/terrapod/v1/package-cache/galaxy/v3/artifacts/collections/": (
+            "POST",
+            f"{BASE}/galaxy/v3/artifacts/collections/",
+            None,
+        ),
+        "/api/terrapod/v1/package-cache/galaxy/v3/imports/collections/{import_id}/": (
+            "GET",
+            f"{BASE}/galaxy/v3/imports/collections/01a06dfc-9451-798c-bed0-348d71a4ac26/",
+            None,
+        ),
+        "/api/terrapod/v1/package-cache/galaxy/v3/collections/{namespace}/{name}"
+        "/versions/{version}/signature": (
+            "PUT",
+            f"{BASE}/galaxy/v3/collections/acme/widgets/versions/1.0.0/signature",
+            None,
+        ),
         "/api/terrapod/v1/admin/package-cache/warm": (
             "POST",
             "/api/terrapod/v1/admin/package-cache/warm",
