@@ -263,6 +263,163 @@ async def _run_git(
         raise RuntimeError(f"git {' '.join(args)} failed (exit {proc.returncode}): {msg}")
 
 
+def _declared_submodules(clone_dir: str) -> list[tuple[str, str]]:
+    """`(path, url)` for each submodule declared in `.gitmodules`.
+
+    Used to decide which of OUR sparse paths to pass as a pathspec, and to name
+    submodules in a failure. NEVER to decide a URL to fetch or a credential to
+    use — that is git's job, and doing it here is the security hole described in
+    `_init_submodules`.
+    """
+    out: list[tuple[str, str]] = []
+    try:
+        with open(os.path.join(clone_dir, ".gitmodules"), encoding="utf-8", errors="replace") as fh:
+            path = url = None
+            for line in fh:
+                line = line.strip()
+                if line.startswith("[submodule"):
+                    path = url = None
+                elif line.startswith("path"):
+                    path = line.split("=", 1)[-1].strip()
+                elif line.startswith("url"):
+                    url = line.split("=", 1)[-1].strip()
+                if path and url:
+                    out.append((path, url))
+                    path = url = None
+    except OSError:  # pragma: no cover - never mask the caller's error
+        pass
+    return out
+
+
+def _submodules_under(clone_dir: str, norm_paths: list[str]) -> list[str]:
+    """Declared submodule paths that fall inside the sparse set.
+
+    Cone semantics, matching sparse-checkout: a path is included when it equals
+    a sparse path or sits beneath one.
+    """
+    declared = [path for path, _url in _declared_submodules(clone_dir)]
+    if not norm_paths:
+        return declared
+    return [
+        sub
+        for sub in declared
+        if any(sub == p or sub.startswith(p.rstrip("/") + "/") for p in norm_paths)
+    ]
+
+
+async def _init_submodules(
+    clone_dir: str,
+    norm_paths: list[str],
+    *,
+    auth_header: str | None,
+    host: str,
+    conn: VCSConnection,
+) -> None:
+    """Fetch submodule content for the paths we are packing.
+
+    Let git resolve submodules; do not reimplement it. Parsing `.gitmodules`
+    ourselves would mean owning relative URLs (`../other.git`, resolved against
+    the superproject's remote and common in GitLab group layouts), nested
+    submodules, fetching a specific commit — which needs
+    `uploadpack.allowReachableSHA1InWant`, not guaranteed on the self-hosted GHE
+    and GitLab instances we support — and gitlinks whose `.gitmodules` entry was
+    deleted and so have no URL at all. Git has handled all four for twenty
+    years; `submodule update --init` gets them for free.
+
+    The only credential used is the workspace's own VCS connection, the same one
+    that fetched the parent. That is a security property, not a simplification:
+    `.gitmodules` is repository content, so submodule URLs are controlled by
+    anyone who can open a pull request, and selecting a credential by matching
+    those URLs would let a repository name a host and have Terrapod fetch it
+    with a credential the workspace was never granted. Fixing the credential
+    before any repository content is read makes that impossible. `_run_git`
+    scopes the header to `host`, so a submodule on another host gets no token.
+    """
+    # No .gitmodules means no submodules: byte-identical behaviour to before,
+    # and no extra git invocation.
+    if not os.path.exists(os.path.join(clone_dir, ".gitmodules")):
+        return
+
+    # Pass a pathspec of submodules that actually exist under the sparse set.
+    # `submodule update -- <path>` FAILS outright when the pathspec matches
+    # nothing ("did not match any file(s) known to git"), so passing the sparse
+    # paths verbatim would fail the fetch for the overwhelming majority of
+    # repositories — the ones whose narrowed paths contain no submodule at all.
+    wanted = _submodules_under(clone_dir, norm_paths)
+    if not wanted:
+        return
+
+    # Submodule URLs are overwhelmingly SSH, and a token cannot authenticate
+    # SSH. Rewrite to HTTPS for the connection's host only, so git recurses over
+    # a transport the header can authenticate. Relative URLs inherit the
+    # parent's transport and need nothing.
+    rewrites = [
+        f"url.https://{host}/.insteadOf=git@{host}:",
+        f"url.https://{host}/.insteadOf=ssh://git@{host}/",
+    ]
+
+    args = [
+        "-C",
+        clone_dir,
+        "submodule",
+        "update",
+        "--init",
+        # Nested submodules under a needed path are recursed. Scope comes from
+        # the trailing pathspec, not from withholding --recursive.
+        "--recursive",
+        # Matches the parent fetch. `submodule update` is otherwise DEEP — a
+        # full clone of every submodule including all history. Not shallow:
+        # a shallow fetch takes the branch tip, and a recorded gitlink is
+        # frequently not the tip, which would then depend on
+        # `uploadpack.allowReachableSHA1InWant`. A blobless partial clone keeps
+        # commit and tree metadata and fetches blobs lazily while checking out
+        # the pinned commit, so there is no tip assumption and no dependence on
+        # a server capability.
+        "--filter=blob:none",
+    ]
+    # Only the sparse set. A workspace using two directories must not pull every
+    # submodule in the repository. An empty path list means the whole repo, and
+    # `--` with no pathspec is the same as omitting it.
+    #
+    # Never `--remote`: a `branch = …` key in .gitmodules does not change what
+    # the superproject records, and --remote would fetch the branch tip instead,
+    # silently converting a pinned dependency into a floating one.
+    if norm_paths:
+        args += ["--", *wanted]
+
+    try:
+        await _run_git(args, auth_header=auth_header, auth_host=host, extra_config=rewrites)
+    except RuntimeError as e:
+        raise RuntimeError(_submodule_failure_message(clone_dir, host, conn, e)) from e
+
+
+def _submodule_failure_message(
+    clone_dir: str, host: str, conn: VCSConnection, err: Exception
+) -> str:
+    """Explain a submodule failure in terms of the thing to go and fix.
+
+    Git's failure for a repository outside the credential's scope is a 404
+    reading as "this repository does not exist", which sends people to look in
+    the wrong place — a GitHub App installed on *selected repositories*
+    produces exactly that for a submodule outside the selection.
+
+    `.gitmodules` is parsed HERE and only here, for diagnostics. It is never
+    used to decide what to fetch or which credential to use.
+    """
+    declared = [f"{path} -> {url}" for path, url in _declared_submodules(clone_dir)]
+    listed = "; ".join(declared) if declared else "none parsed"
+    return (
+        f"failed to fetch submodules for this commit using the '{conn.name}' "
+        f"{conn.provider} connection (host {host}). Submodules declared: {listed}. "
+        "Submodules are fetched with the SAME credential as the repository that "
+        "declares them, so this usually means the submodule is outside that "
+        "credential's scope — for a GitHub App installed on selected "
+        "repositories, grant it the submodule's repository. A submodule on a "
+        "different host is fetched without credentials and so must be public. "
+        f"Underlying git error: {err}"
+    )
+
+
 async def sparse_archive_to_storage(
     conn: VCSConnection,
     owner: str,
@@ -345,6 +502,17 @@ async def sparse_archive_to_storage(
         auth_header=auth_header,
         auth_host=host,
     )
+
+    # Step 4b: initialise submodules inside the sparse set.
+    #
+    # A submodule has no working-tree content of its own: the superproject
+    # records a commit as a mode-160000 gitlink and the directory stays empty
+    # until something fetches that commit. We pack the working TREE, so without
+    # this the tarball contains empty directories and `init` fails on a path
+    # that visibly exists in the repository (#1437). The pinned SHAs live in the
+    # tree object and are not represented in an archive, so this is the only
+    # point at which the information still exists.
+    await _init_submodules(clone_dir, norm_paths, auth_header=auth_header, host=host, conn=conn)
 
     # Step 5: tar the working tree (excluding .git) and stream to storage.
     storage = get_storage()

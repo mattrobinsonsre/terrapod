@@ -725,6 +725,56 @@ modules, so the rollup shows which slice of the connection each team is using.
 
 ---
 
+## Git Submodules
+
+Repositories whose modules or roles come from **git submodules** are fetched
+with their submodule content included. Nothing needs configuring.
+
+A submodule has no working-tree content of its own — the superproject records a
+commit as a gitlink and the directory stays empty until something fetches that
+commit. Terrapod resolves them during the VCS fetch, so the configuration
+version contains the submodule files as ordinary files and the runner extracts
+one tarball as it always has.
+
+Only submodules **inside the workspace's working directory** are fetched, so a
+workspace narrowed to one directory does not pull every submodule in the
+repository. Nested submodules beneath a needed path are followed.
+
+The recorded commit is what gets fetched. A `branch = …` key in `.gitmodules`
+does not change that, so `vcs_commit_sha` still identifies everything a run
+executed and a pinned dependency cannot silently float.
+
+### Credentials
+
+**Submodules are fetched with the same credential as the repository that
+declares them** — the workspace's own VCS connection, and nothing else.
+
+This is a security property rather than a simplification. `.gitmodules` is
+repository content, so submodule URLs are controlled by anyone who can open a
+pull request. Choosing a credential by matching those URLs would let a
+repository name a host and have Terrapod fetch it with a credential the
+workspace was never granted.
+
+SSH submodule URLs (`git@host:org/repo.git`) are rewritten to HTTPS for the
+connection's host, so the usual SSH-style `.gitmodules` entries work with no
+operator input and no deploy keys.
+
+| Submodule location | Outcome |
+|---|---|
+| Relative URL (`../other.git`) | Works — inherits the parent's host and credential |
+| Same host, within the connection's scope | Works, no operator input |
+| Same host, outside a GitHub App's *selected repositories* | Fails — grant the App that repository |
+| A different host, public | Works — no credential is sent, and none is needed |
+| A different host, private | Fails — deliberate; see the credential rule above |
+
+A submodule that cannot be fetched **fails the run** rather than silently
+producing an empty directory, and the error names the submodule path, its URL
+and the connection used.
+
+Configuration versions uploaded from the CLI are unaffected: they are a tar of
+your working directory, so any submodule content you had checked out is already
+in them.
+
 ## Module Registry VCS Publishing
 
 VCS connections are also used for **automatic module publishing** in the private module registry. When a module is connected to a VCS repository, Terrapod watches for new git tags and publishes matching versions automatically.
