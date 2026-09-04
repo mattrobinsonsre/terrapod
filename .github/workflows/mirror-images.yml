@@ -93,7 +93,15 @@ jobs:
             flat="${repo//\//-}"
             dst="ghcr.io/${OWNER,,}/mirror/${flat}:${tag}"
             echo "::group::$src -> $dst"
-            if docker buildx imagetools create --tag "$dst" "docker.io/${src}"; then
+            # A source may name its registry (mcr.microsoft.com/...). Docker Hub
+            # references do not, and must keep their explicit docker.io prefix
+            # rather than relying on the daemon's default. The test is whether
+            # the first path segment looks like a host — it contains a dot.
+            case "${src%%/*}" in
+              *.*) full="$src" ;;
+              *)   full="docker.io/${src}" ;;
+            esac
+            if docker buildx imagetools create --tag "$dst" "$full"; then
               docker buildx imagetools inspect "$dst" --format '{{json .Manifest.Digest}}'
             else
               # One image failing must not hide the rest — report them all, then
