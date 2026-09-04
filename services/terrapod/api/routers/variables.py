@@ -809,7 +809,9 @@ async def update_varset_var(
     # Always run it, not only when the caller sends `value-source`: a PATCH that
     # supplies a new `value` on an existing vault variable must still have that
     # value validated as a reference.
-    vsv.value_source, _vault_forced = _apply_value_source(
+    # The sensitive-forcing half is recomputed below from the stored row, so
+    # only the resolved source is wanted here.
+    vsv.value_source, _ = _apply_value_source(
         attrs, vsv.value_source, category=attrs.get("category", vsv.category)
     )
     if vsv.value_source == "vault":

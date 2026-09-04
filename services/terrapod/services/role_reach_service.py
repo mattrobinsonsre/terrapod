@@ -382,7 +382,9 @@ async def resolve_resource_access(
     granted: list[dict[str, Any]] = []
     denied: list[dict[str, Any]] = []
     for role in roles:
-        verdict, reason = role_match_verdict(role, obj.name, obj.labels or {})
+        # `_entry` recomputes the verdict and carries the reason, which is what
+        # line ~392 reads; only the early-continue needs the verdict here.
+        verdict, _ = role_match_verdict(role, obj.name, obj.labels or {})
         if verdict == MATCH_NONE:
             continue
         entry = _entry(role, axis, kind, obj)
