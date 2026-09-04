@@ -126,6 +126,15 @@
     "empty": {
       "none": "Henüz çalışma alanı yok. Başlamak için bir tane oluşturun.",
       "noMatch": "Bu filtreyle eşleşen çalışma alanı yok."
+    },
+    "group": {
+      "label": "Grupla",
+      "flat": "Düz",
+      "repo": "Depo",
+      "repoPath": "Depo + Yol",
+      "local": "Yerel",
+      "collapseAll": "Tümünü daralt",
+      "expandAll": "Tümünü genişlet"
     }
   },
   "status": {

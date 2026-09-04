@@ -126,6 +126,15 @@
     "empty": {
       "none": "Ei vielä työtiloja. Luo yksi aloittaaksesi.",
       "noMatch": "Yksikään työtila ei vastaa tätä suodatinta."
+    },
+    "group": {
+      "label": "Ryhmittele",
+      "flat": "Tasainen",
+      "repo": "Tietovarasto",
+      "repoPath": "Tietovarasto + Polku",
+      "local": "Paikallinen",
+      "collapseAll": "Tiivistä kaikki",
+      "expandAll": "Laajenna kaikki"
     }
   },
   "status": {

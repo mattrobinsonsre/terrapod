@@ -126,6 +126,15 @@
     "empty": {
       "none": "暫無工作區。建立一個以開始使用。",
       "noMatch": "沒有工作區符合此篩選條件。"
+    },
+    "group": {
+      "label": "分組",
+      "flat": "平鋪",
+      "repo": "儲存庫",
+      "repoPath": "儲存庫 + 路徑",
+      "local": "本機",
+      "collapseAll": "全部收合",
+      "expandAll": "全部展開"
     }
   },
   "status": {

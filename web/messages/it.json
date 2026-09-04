@@ -126,6 +126,15 @@
     "empty": {
       "none": "Nessun workspace ancora. Creane uno per iniziare.",
       "noMatch": "Nessun workspace corrisponde a questo filtro."
+    },
+    "group": {
+      "label": "Raggruppa",
+      "flat": "Piatto",
+      "repo": "Repository",
+      "repoPath": "Repository + Percorso",
+      "local": "Locale",
+      "collapseAll": "Comprimi tutto",
+      "expandAll": "Espandi tutto"
     }
   },
   "status": {

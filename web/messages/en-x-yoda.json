@@ -126,6 +126,15 @@
     "empty": {
       "none": "No workspaces yet, there are. Create one to begin, you must.",
       "noMatch": "This filter, no workspaces match."
+    },
+    "group": {
+      "label": "Group",
+      "flat": "Flat",
+      "repo": "Repository",
+      "repoPath": "Repository + Path",
+      "local": "Local",
+      "collapseAll": "Collapse all, you will",
+      "expandAll": "Expand all, you will"
     }
   },
   "status": {
