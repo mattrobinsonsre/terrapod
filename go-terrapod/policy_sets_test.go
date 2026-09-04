@@ -157,3 +157,65 @@ func TestSyncPolicySet(t *testing.T) {
 		t.Errorf("VCSLastCommitSHA = %q", ps.VCSLastCommitSHA)
 	}
 }
+
+// #1457: scoping was settable through Create/Update and never read back, so a
+// caller could scope a policy set and then not see the scoping it had applied.
+// Policy-set scoping is not merely similar to a role's — it is the same
+// matcher, reused deliberately (policy_set_service._labels_match).
+func TestPolicySetReadsBackItsScoping(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_, _ = w.Write([]byte(`{"data":{"type":"policy-sets","id":"ps-1","attributes":{
+			"name":"prod-guardrails",
+			"allow-labels":{"env":["prod","stg"],"team":"sre"},
+			"deny-labels":{"tier":["scratch"]}
+		}}}`))
+	}))
+	defer srv.Close()
+
+	c, err := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ps, err := c.GetPolicySet(t.Context(), "ps-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got := ps.AllowLabels["env"]; len(got) != 2 || got[0] != "prod" || got[1] != "stg" {
+		t.Errorf("allow-labels env = %v, want [prod stg]", got)
+	}
+	// A scalar normalises the same way it does for a role, so callers have one
+	// shape to handle rather than two.
+	if got := ps.AllowLabels["team"]; len(got) != 1 || got[0] != "sre" {
+		t.Errorf("allow-labels team = %v, want [sre]", got)
+	}
+	if got := ps.DenyLabels["tier"]; len(got) != 1 || got[0] != "scratch" {
+		t.Errorf("deny-labels tier = %v, want [scratch]", got)
+	}
+}
+
+func TestPolicySetWithNoScopingReadsBackEmpty(t *testing.T) {
+	// Global sets carry no labels; absent must be nil rather than an empty map
+	// that reads as "scoped to nothing".
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_, _ = w.Write([]byte(`{"data":{"type":"policy-sets","id":"ps-2","attributes":{"name":"all","global-scope":true,"allow-labels":{}}}}`))
+	}))
+	defer srv.Close()
+
+	c, err := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ps, err := c.GetPolicySet(t.Context(), "ps-2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ps.AllowLabels != nil {
+		t.Errorf("empty scoping should decode as nil, got %v", ps.AllowLabels)
+	}
+	if !ps.GlobalScope {
+		t.Error("global-scope lost")
+	}
+}

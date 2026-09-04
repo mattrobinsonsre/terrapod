@@ -645,9 +645,9 @@
       "catalogPermission": "Caniatâd Catalog",
       "descriptionLabel": "Disgrifiad",
       "descriptionPlaceholder": "Mynediad datblygwr",
-      "allowLabels": "Caniatáu Labeli (allwedd=gwerth, wedi'u gwahanu â choma)",
+      "allowLabels": "Labeli a Ganiateir (allwedd=gwerth, wedi'u gwahanu gan atalnodau; ailadroddwch allwedd i gyfateb 'naill ai')",
       "allowNames": "Caniatáu Enwau (wedi'u gwahanu â choma)",
-      "denyLabels": "Gwrthod Labeli (allwedd=gwerth, wedi'u gwahanu â choma)",
+      "denyLabels": "Labeli a Wrthodir (allwedd=gwerth, wedi'u gwahanu gan atalnodau; ailadroddwch allwedd i gyfateb 'naill ai')",
       "denyNames": "Gwrthod Enwau (wedi'u gwahanu â choma)",
       "allowLabelsShort": "Caniatáu Labeli",
       "allowNamesShort": "Caniatáu Enwau",
@@ -725,8 +725,7 @@
       "deleteRole": "Methwyd dileu'r rôl",
       "setAssignment": "Methwyd gosod y neilltuad",
       "setAssignmentStatus": "Methwyd gosod y neilltuad ({status})",
-      "deleteAssignment": "Methwyd dileu'r neilltuad",
-      "conflictingLabelKeys": "Rhoddwyd mwy nag un gwerth i {keys}. Mae rheol label yn dal un gwerth fesul allwedd, felly byddai''r olaf yn disodli''r rhai cynharach yn dawel. Mae sawl gwerth i un allwedd yn cael ei gefnogi gan yr API ond ni ellir ei osod yma eto."
+      "deleteAssignment": "Methwyd dileu'r neilltuad"
     }
   },
   "adminVcs": {

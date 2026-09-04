@@ -22,13 +22,13 @@ data terrapod_catalog_instances.catalog_item_id required=true optional=false com
 data terrapod_catalog_instances.instances required=false optional=false computed=true sensitive=false type=types.ListType[types.ObjectType["agent_pool_id":basetypes.StringType, "id":basetypes.StringType, "name":basetypes.StringType, "version_pin":basetypes.StringType]]
 data terrapod_catalog_instances.name_contains required=false optional=true computed=false sensitive=false type=basetypes.StringType
 data terrapod_role.allow_all required=false optional=false computed=true sensitive=false type=basetypes.BoolType
-data terrapod_role.allow_labels required=false optional=false computed=true sensitive=false type=types.MapType[basetypes.StringType]
+data terrapod_role.allow_labels required=false optional=false computed=true sensitive=false type=types.MapType[types.ListType[basetypes.StringType]]
 data terrapod_role.allow_names required=false optional=false computed=true sensitive=false type=types.ListType[basetypes.StringType]
 data terrapod_role.built_in required=false optional=false computed=true sensitive=false type=basetypes.BoolType
 data terrapod_role.capabilities required=false optional=false computed=true sensitive=false type=types.SetType[basetypes.StringType]
 data terrapod_role.catalog_permission required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_role.created_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
-data terrapod_role.deny_labels required=false optional=false computed=true sensitive=false type=types.MapType[basetypes.StringType]
+data terrapod_role.deny_labels required=false optional=false computed=true sensitive=false type=types.MapType[types.ListType[basetypes.StringType]]
 data terrapod_role.deny_names required=false optional=false computed=true sensitive=false type=types.ListType[basetypes.StringType]
 data terrapod_role.description required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_role.name required=true optional=false computed=false sensitive=false type=basetypes.StringType
@@ -262,13 +262,13 @@ resource terrapod_remote_state_consumer.id required=false optional=false compute
 resource terrapod_remote_state_consumer.producer_workspace_id required=true optional=false computed=false sensitive=false type=basetypes.StringType
 resource terrapod_remote_state_consumer.producer_workspace_name required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_role.allow_all required=false optional=true computed=true sensitive=false type=basetypes.BoolType
-resource terrapod_role.allow_labels required=false optional=true computed=false sensitive=false type=types.MapType[basetypes.StringType]
+resource terrapod_role.allow_labels required=false optional=true computed=false sensitive=false type=types.MapType[types.ListType[basetypes.StringType]]
 resource terrapod_role.allow_names required=false optional=true computed=false sensitive=false type=types.ListType[basetypes.StringType]
 resource terrapod_role.built_in required=false optional=false computed=true sensitive=false type=basetypes.BoolType
 resource terrapod_role.capabilities required=false optional=true computed=true sensitive=false type=types.SetType[basetypes.StringType]
 resource terrapod_role.catalog_permission required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_role.created_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
-resource terrapod_role.deny_labels required=false optional=true computed=false sensitive=false type=types.MapType[basetypes.StringType]
+resource terrapod_role.deny_labels required=false optional=true computed=false sensitive=false type=types.MapType[types.ListType[basetypes.StringType]]
 resource terrapod_role.deny_names required=false optional=true computed=false sensitive=false type=types.ListType[basetypes.StringType]
 resource terrapod_role.description required=false optional=true computed=false sensitive=false type=basetypes.StringType
 resource terrapod_role.id required=false optional=false computed=true sensitive=false type=basetypes.StringType

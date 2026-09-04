@@ -645,9 +645,9 @@
       "catalogPermission": "Permissão de Catálogo",
       "descriptionLabel": "Descrição",
       "descriptionPlaceholder": "Acesso de desenvolvedor",
-      "allowLabels": "Permitir Rótulos (chave=valor, separados por vírgula)",
+      "allowLabels": "Rótulos permitidos (key=value, separados por vírgulas; repita uma chave para «ou»)",
       "allowNames": "Permitir Nomes (separados por vírgula)",
-      "denyLabels": "Negar Rótulos (chave=valor, separados por vírgula)",
+      "denyLabels": "Rótulos negados (key=value, separados por vírgulas; repita uma chave para «ou»)",
       "denyNames": "Negar Nomes (separados por vírgula)",
       "allowLabelsShort": "Permitir Rótulos",
       "allowNamesShort": "Permitir Nomes",
@@ -725,8 +725,7 @@
       "deleteRole": "Falha ao excluir a função",
       "setAssignment": "Falha ao definir a atribuição",
       "setAssignmentStatus": "Falha ao definir a atribuição ({status})",
-      "deleteAssignment": "Falha ao excluir a atribuição",
-      "conflictingLabelKeys": "{keys} recebeu mais de um valor. Uma regra de rótulo guarda um valor por chave, então o último substituiria os anteriores sem aviso. Vários valores por chave são aceitos pela API, mas ainda não podem ser definidos aqui."
+      "deleteAssignment": "Falha ao excluir a atribuição"
     }
   },
   "adminVcs": {

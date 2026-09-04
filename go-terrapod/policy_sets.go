@@ -2,6 +2,7 @@ package terrapod
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/url"
 )
@@ -16,6 +17,17 @@ type PolicySet struct {
 	Enabled          bool   `json:"enabled"`
 	GlobalScope      bool   `json:"global-scope"`
 	PolicyCount      int64  `json:"policy-count"`
+
+	// AllowLabels/DenyLabels scope the set to workspaces, using the SAME
+	// matcher as a role — policy_set_service._labels_match, whose docstring
+	// says so explicitly. Each key binds to the values that satisfy it, so
+	// {"env": {"prod", "stg"}} reads as "env is prod OR stg".
+	//
+	// These were settable through Create/Update and never read back, so a
+	// caller could scope a policy set and then not see the scoping it had just
+	// applied. The server serialises both (#1457).
+	AllowLabels map[string][]string `json:"allow-labels,omitempty"`
+	DenyLabels  map[string][]string `json:"deny-labels,omitempty"`
 
 	// Source discriminator: "inline" (default) or "vcs".
 	Source string `json:"source"`
@@ -42,9 +54,9 @@ type CreatePolicySetRequest struct {
 	EnforcementLevel string
 	Enabled          bool
 	GlobalScope      bool
-	AllowLabels      map[string]string
+	AllowLabels      map[string][]string
 	AllowNames       []string
-	DenyLabels       map[string]string
+	DenyLabels       map[string][]string
 	DenyNames        []string
 
 	// VCS fields (set Source to "vcs" to create a VCS-backed set).
@@ -62,9 +74,9 @@ type UpdatePolicySetRequest struct {
 	EnforcementLevel *string
 	Enabled          *bool
 	GlobalScope      *bool
-	AllowLabels      map[string]string
+	AllowLabels      map[string][]string
 	AllowNames       []string
-	DenyLabels       map[string]string
+	DenyLabels       map[string][]string
 	DenyNames        []string
 	VCSRepoURL       *string
 	VCSBranch        *string
@@ -231,6 +243,25 @@ func parsePolicySet(body []byte) (*PolicySet, error) {
 	return policySetFromResource(res), nil
 }
 
+// labelRuleAttr reads a label rule off a JSON:API resource, reusing the same
+// scalar-or-list normalisation roleFromItem applies. One implementation for
+// both, because it is one matcher: policy-set scoping deliberately reuses the
+// label-RBAC allow/deny model rather than resembling it.
+func labelRuleAttr(res *Resource, name string) map[string][]string {
+	raw, ok := res.Attributes[name]
+	if !ok || len(raw) == 0 {
+		return nil
+	}
+	var rule labelRule
+	if err := json.Unmarshal(raw, &rule); err != nil {
+		return nil
+	}
+	if len(rule) == 0 {
+		return nil
+	}
+	return rule
+}
+
 func policySetFromResource(res *Resource) *PolicySet {
 	return &PolicySet{
 		ID:               res.ID,
@@ -240,6 +271,8 @@ func policySetFromResource(res *Resource) *PolicySet {
 		Enabled:          GetBoolAttr(res, "enabled"),
 		GlobalScope:      GetBoolAttr(res, "global-scope"),
 		PolicyCount:      GetIntAttr(res, "policy-count"),
+		AllowLabels:      labelRuleAttr(res, "allow-labels"),
+		DenyLabels:       labelRuleAttr(res, "deny-labels"),
 		Source:           GetStringAttr(res, "source"),
 		VCSConnectionID:  GetStringAttr(res, "vcs-connection-id"),
 		VCSRepoURL:       GetStringAttr(res, "vcs-repo-url"),

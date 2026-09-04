@@ -645,9 +645,9 @@
       "catalogPermission": "Autorisation sur le catalogue",
       "descriptionLabel": "Description",
       "descriptionPlaceholder": "Accès développeur",
-      "allowLabels": "Labels autorisés (clé=valeur, séparés par des virgules)",
+      "allowLabels": "Labels autorisés (clé=valeur, séparés par des virgules ; répétez une clé pour « ou »)",
       "allowNames": "Noms autorisés (séparés par des virgules)",
-      "denyLabels": "Labels refusés (clé=valeur, séparés par des virgules)",
+      "denyLabels": "Labels refusés (clé=valeur, séparés par des virgules ; répétez une clé pour « ou »)",
       "denyNames": "Noms refusés (séparés par des virgules)",
       "allowLabelsShort": "Labels autorisés",
       "allowNamesShort": "Noms autorisés",
@@ -725,8 +725,7 @@
       "deleteRole": "Échec de la suppression du rôle",
       "setAssignment": "Échec de la définition de l'attribution",
       "setAssignmentStatus": "Échec de la définition de l'attribution ({status})",
-      "deleteAssignment": "Échec de la suppression de l'attribution",
-      "conflictingLabelKeys": "{keys} reçoit plusieurs valeurs. Une règle d''étiquette ne retient qu''une valeur par clé ; la dernière remplacerait silencieusement les précédentes. Plusieurs valeurs pour une clé sont acceptées par l''API mais pas encore configurables ici."
+      "deleteAssignment": "Échec de la suppression de l'attribution"
     }
   },
   "adminVcs": {

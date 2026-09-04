@@ -645,9 +645,9 @@
       "catalogPermission": "Katalogbehörighet",
       "descriptionLabel": "Beskrivning",
       "descriptionPlaceholder": "Utvecklaråtkomst",
-      "allowLabels": "Tillåt etiketter (key=value, kommaseparerat)",
+      "allowLabels": "Tillåtna etiketter (nyckel=värde, kommaseparerade; upprepa en nyckel för ”eller”)",
       "allowNames": "Tillåt namn (kommaseparerat)",
-      "denyLabels": "Neka etiketter (key=value, kommaseparerat)",
+      "denyLabels": "Nekade etiketter (nyckel=värde, kommaseparerade; upprepa en nyckel för ”eller”)",
       "denyNames": "Neka namn (kommaseparerat)",
       "allowLabelsShort": "Tillåt etiketter",
       "allowNamesShort": "Tillåt namn",
@@ -725,8 +725,7 @@
       "deleteRole": "Det gick inte att ta bort rollen",
       "setAssignment": "Det gick inte att ange tilldelningen",
       "setAssignmentStatus": "Det gick inte att ange tilldelningen ({status})",
-      "deleteAssignment": "Det gick inte att ta bort tilldelningen",
-      "conflictingLabelKeys": "{keys} har fått mer än ett värde. En märkningsregel rymmer ett värde per nyckel, så det sista skulle tyst ersätta de tidigare. Flera värden per nyckel stöds av API:et men kan ännu inte anges här."
+      "deleteAssignment": "Det gick inte att ta bort tilldelningen"
     }
   },
   "adminVcs": {

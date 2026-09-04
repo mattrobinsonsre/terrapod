@@ -645,9 +645,9 @@
       "catalogPermission": "カタログ権限",
       "descriptionLabel": "説明",
       "descriptionPlaceholder": "開発者アクセス",
-      "allowLabels": "許可ラベル（key=value、カンマ区切り）",
+      "allowLabels": "許可ラベル（key=value、カンマ区切り。同じキーを繰り返すと「いずれか」で一致）",
       "allowNames": "許可名（カンマ区切り）",
-      "denyLabels": "拒否ラベル（key=value、カンマ区切り）",
+      "denyLabels": "拒否ラベル（key=value、カンマ区切り。同じキーを繰り返すと「いずれか」で一致）",
       "denyNames": "拒否名（カンマ区切り）",
       "allowLabelsShort": "許可ラベル",
       "allowNamesShort": "許可名",
@@ -725,8 +725,7 @@
       "deleteRole": "ロールの削除に失敗しました",
       "setAssignment": "割り当ての設定に失敗しました",
       "setAssignmentStatus": "割り当ての設定に失敗しました（{status}）",
-      "deleteAssignment": "割り当ての削除に失敗しました",
-      "conflictingLabelKeys": "{keys} に複数の値が指定されています。ラベルルールはキーごとに 1 つの値しか保持しないため、最後の値が以前の値を暗黙的に置き換えます。1 つのキーに複数の値を指定することは API では可能ですが、ここではまだ設定できません。"
+      "deleteAssignment": "割り当ての削除に失敗しました"
     }
   },
   "adminVcs": {

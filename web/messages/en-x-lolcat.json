@@ -645,9 +645,9 @@
       "catalogPermission": "Catalog Permishun",
       "descriptionLabel": "Descripshun",
       "descriptionPlaceholder": "Developr akcess",
-      "allowLabels": "Allow Labelz (key=value, comma-separayted)",
+      "allowLabels": "Allow Labelz (key=value, comma-separayted; sez teh key twice for eifer)",
       "allowNames": "Allow Namez (comma-separayted)",
-      "denyLabels": "Deny Labelz (key=value, comma-separayted)",
+      "denyLabels": "Deny Labelz (key=value, comma-separayted; sez teh key twice for eifer)",
       "denyNames": "Deny Namez (comma-separayted)",
       "allowLabelsShort": "Allow Labelz",
       "allowNamesShort": "Allow Namez",
@@ -725,8 +725,7 @@
       "deleteRole": "Failz ta delete role",
       "setAssignment": "Failz ta set assignment",
       "setAssignmentStatus": "Failz ta set assignment ({status})",
-      "deleteAssignment": "Failz ta delete assignment",
-      "conflictingLabelKeys": "{keys} haz moar dan wun valyoo. A labul rool holdz wun valyoo per key, so teh last wud kwietly replase teh erlier wunz. Matchin several valyooz for wun key iz supportd by teh API but cant be set heer yet."
+      "deleteAssignment": "Failz ta delete assignment"
     }
   },
   "adminVcs": {

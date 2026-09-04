@@ -645,9 +645,9 @@
       "catalogPermission": "Uprawnienie do katalogu",
       "descriptionLabel": "Opis",
       "descriptionPlaceholder": "Dostęp programisty",
-      "allowLabels": "Etykiety zezwalające (klucz=wartość, oddzielone przecinkami)",
+      "allowLabels": "Dozwolone etykiety (klucz=wartość, rozdzielone przecinkami; powtórz klucz, aby dopasować „lub”)",
       "allowNames": "Nazwy zezwalające (oddzielone przecinkami)",
-      "denyLabels": "Etykiety odmawiające (klucz=wartość, oddzielone przecinkami)",
+      "denyLabels": "Zabronione etykiety (klucz=wartość, rozdzielone przecinkami; powtórz klucz, aby dopasować „lub”)",
       "denyNames": "Nazwy odmawiające (oddzielone przecinkami)",
       "allowLabelsShort": "Etykiety zezwalające",
       "allowNamesShort": "Nazwy zezwalające",
@@ -725,8 +725,7 @@
       "deleteRole": "Nie udało się usunąć roli",
       "setAssignment": "Nie udało się ustawić przypisania",
       "setAssignmentStatus": "Nie udało się ustawić przypisania ({status})",
-      "deleteAssignment": "Nie udało się usunąć przypisania",
-      "conflictingLabelKeys": "{keys} otrzymał więcej niż jedną wartość. Reguła etykiety przechowuje jedną wartość na klucz, więc ostatnia po cichu zastąpiłaby wcześniejsze. API obsługuje wiele wartości dla jednego klucza, ale nie można ich jeszcze ustawić tutaj."
+      "deleteAssignment": "Nie udało się usunąć przypisania"
     }
   },
   "adminVcs": {

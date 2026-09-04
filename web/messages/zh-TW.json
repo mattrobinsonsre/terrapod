@@ -645,9 +645,9 @@
       "catalogPermission": "目錄權限",
       "descriptionLabel": "描述",
       "descriptionPlaceholder": "開發者訪問權限",
-      "allowLabels": "允許標籤（key=value，逗號分隔）",
+      "allowLabels": "允許標籤（key=value，逗號分隔；重複同一個鍵表示「或」比對）",
       "allowNames": "允許名稱（逗號分隔）",
-      "denyLabels": "拒絕標籤（key=value，逗號分隔）",
+      "denyLabels": "拒絕標籤（key=value，逗號分隔；重複同一個鍵表示「或」比對）",
       "denyNames": "拒絕名稱（逗號分隔）",
       "allowLabelsShort": "允許標籤",
       "allowNamesShort": "允許名稱",
@@ -725,8 +725,7 @@
       "deleteRole": "刪除角色失敗",
       "setAssignment": "設定分配失敗",
       "setAssignmentStatus": "設定分配失敗（{status}）",
-      "deleteAssignment": "刪除分配失敗",
-      "conflictingLabelKeys": "{keys} 被指定了多個值。標籤規則每個索引鍵只保留一個值，因此最後一個會悄悄取代先前的值。API 支援一個索引鍵對應多個值，但此處尚不能設定。"
+      "deleteAssignment": "刪除分配失敗"
     }
   },
   "adminVcs": {

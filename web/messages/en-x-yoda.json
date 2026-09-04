@@ -645,9 +645,9 @@
       "catalogPermission": "Permission, Catalog",
       "descriptionLabel": "Description",
       "descriptionPlaceholder": "Developer access",
-      "allowLabels": "Labels, Allow (key=value, comma-separated)",
+      "allowLabels": "Labels, Allow (key=value, comma-separated; repeat a key you must, to match either)",
       "allowNames": "Names, Allow (comma-separated)",
-      "denyLabels": "Labels, Deny (key=value, comma-separated)",
+      "denyLabels": "Labels, Deny (key=value, comma-separated; repeat a key you must, to match either)",
       "denyNames": "Names, Deny (comma-separated)",
       "allowLabelsShort": "Labels, Allow",
       "allowNamesShort": "Names, Allow",
@@ -725,8 +725,7 @@
       "deleteRole": "Delete the role, it did not",
       "setAssignment": "Set the assignment, it did not",
       "setAssignmentStatus": "Set the assignment, it did not ({status})",
-      "deleteAssignment": "Delete the assignment, it did not",
-      "conflictingLabelKeys": "More than one value, {keys} is given. One value per key a label rule holds, so silently replace the earlier ones the last would. Supported by the API, several values for one key are, but set here yet they cannot be."
+      "deleteAssignment": "Delete the assignment, it did not"
     }
   },
   "adminVcs": {

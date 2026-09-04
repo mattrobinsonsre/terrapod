@@ -645,9 +645,9 @@
       "catalogPermission": "Marklar Marklar",
       "descriptionLabel": "Description",
       "descriptionPlaceholder": "Marklar marklar",
-      "allowLabels": "Allow Marklars (marklar=marklar, comma-separated)",
+      "allowLabels": "Allow Marklars (marklar=marklar, comma-separated; repeat a marklar to match either)",
       "allowNames": "Allow Marklars (comma-separated)",
-      "denyLabels": "Deny Marklars (marklar=marklar, comma-separated)",
+      "denyLabels": "Deny Marklars (marklar=marklar, comma-separated; repeat a marklar to match either)",
       "denyNames": "Deny Marklars (comma-separated)",
       "allowLabelsShort": "Allow Marklars",
       "allowNamesShort": "Allow Marklars",
@@ -725,8 +725,7 @@
       "deleteRole": "Failed to delete marklar",
       "setAssignment": "Failed to set marklar",
       "setAssignmentStatus": "Failed to set marklar ({status})",
-      "deleteAssignment": "Failed to delete marklar",
-      "conflictingLabelKeys": "{keys} is given more than one marklar. A marklar marklar holds one marklar per marklar, so the last would silently replace the earlier ones. Matching several marklars for one marklar is supported by the marklar but cannot yet be set here."
+      "deleteAssignment": "Failed to delete marklar"
     }
   },
   "adminVcs": {

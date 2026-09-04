@@ -645,9 +645,9 @@
       "catalogPermission": "Dienstleistungskatalog-Berechtigung",
       "descriptionLabel": "Beschreibung",
       "descriptionPlaceholder": "Entwicklerzugriff",
-      "allowLabels": "Zulassen-Beschriftungen (Schlüssel=Wert, kommagetrennt)",
+      "allowLabels": "Zulassen-Beschriftungen (Schlüssel=Wert, kommagetrennt; Schlüssel wiederholen für „oder“)",
       "allowNames": "Zulassen-Namen (kommagetrennt)",
-      "denyLabels": "Verweigern-Beschriftungen (Schlüssel=Wert, kommagetrennt)",
+      "denyLabels": "Verweigern-Beschriftungen (Schlüssel=Wert, kommagetrennt; Schlüssel wiederholen für „oder“)",
       "denyNames": "Verweigern-Namen (kommagetrennt)",
       "allowLabelsShort": "Zulassen-Beschriftungen",
       "allowNamesShort": "Zulassen-Namen",
@@ -725,8 +725,7 @@
       "deleteRole": "Rolle konnte nicht gelöscht werden",
       "setAssignment": "Zuweisung konnte nicht festgelegt werden",
       "setAssignmentStatus": "Zuweisung konnte nicht festgelegt werden ({status})",
-      "deleteAssignment": "Zuweisung konnte nicht gelöscht werden",
-      "conflictingLabelKeys": "{keys} hat mehr als einen Wert. Eine Label-Regel hält einen Wert pro Schlüssel, der letzte würde die früheren stillschweigend ersetzen. Mehrere Werte für einen Schlüssel unterstützt die API, hier aber noch nicht einstellbar."
+      "deleteAssignment": "Zuweisung konnte nicht gelöscht werden"
     }
   },
   "adminVcs": {

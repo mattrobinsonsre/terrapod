@@ -645,9 +645,9 @@
       "catalogPermission": "Katalogtilladelse",
       "descriptionLabel": "Beskrivelse",
       "descriptionPlaceholder": "Udvikleradgang",
-      "allowLabels": "Tillad labels (nøgle=værdi, kommasepareret)",
+      "allowLabels": "Tilladte labels (nøgle=værdi, kommasepareret; gentag en nøgle for »eller«)",
       "allowNames": "Tillad navne (kommasepareret)",
-      "denyLabels": "Afvis labels (nøgle=værdi, kommasepareret)",
+      "denyLabels": "Afviste labels (nøgle=værdi, kommasepareret; gentag en nøgle for »eller«)",
       "denyNames": "Afvis navne (kommasepareret)",
       "allowLabelsShort": "Tillad labels",
       "allowNamesShort": "Tillad navne",
@@ -725,8 +725,7 @@
       "deleteRole": "Kunne ikke slette rolle",
       "setAssignment": "Kunne ikke angive tildeling",
       "setAssignmentStatus": "Kunne ikke angive tildeling ({status})",
-      "deleteAssignment": "Kunne ikke slette tildeling",
-      "conflictingLabelKeys": "{keys} har fået mere end én værdi. En mærkeregel rummer én værdi pr. nøgle, så den sidste ville stiltiende erstatte de tidligere. Flere værdier pr. nøgle understøttes af API''et, men kan endnu ikke sættes her."
+      "deleteAssignment": "Kunne ikke slette tildeling"
     }
   },
   "adminVcs": {

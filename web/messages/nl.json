@@ -645,9 +645,9 @@
       "catalogPermission": "Catalogus-machtiging",
       "descriptionLabel": "Beschrijving",
       "descriptionPlaceholder": "Ontwikkelaarstoegang",
-      "allowLabels": "Labels toestaan (key=value, kommagescheiden)",
+      "allowLabels": "Toegestane labels (sleutel=waarde, kommagescheiden; herhaal een sleutel voor 'of')",
       "allowNames": "Namen toestaan (kommagescheiden)",
-      "denyLabels": "Labels weigeren (key=value, kommagescheiden)",
+      "denyLabels": "Geweigerde labels (sleutel=waarde, kommagescheiden; herhaal een sleutel voor 'of')",
       "denyNames": "Namen weigeren (kommagescheiden)",
       "allowLabelsShort": "Labels toestaan",
       "allowNamesShort": "Namen toestaan",
@@ -725,8 +725,7 @@
       "deleteRole": "Kan rol niet verwijderen",
       "setAssignment": "Kan toewijzing niet instellen",
       "setAssignmentStatus": "Kan toewijzing niet instellen ({status})",
-      "deleteAssignment": "Kan toewijzing niet verwijderen",
-      "conflictingLabelKeys": "{keys} heeft meer dan één waarde. Een labelregel houdt één waarde per sleutel, dus de laatste zou de eerdere stilzwijgend vervangen. Meerdere waarden per sleutel worden door de API ondersteund maar zijn hier nog niet in te stellen."
+      "deleteAssignment": "Kan toewijzing niet verwijderen"
     }
   },
   "adminVcs": {

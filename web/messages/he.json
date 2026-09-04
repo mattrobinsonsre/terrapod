@@ -645,9 +645,9 @@
       "catalogPermission": "הרשאת קטלוג",
       "descriptionLabel": "תיאור",
       "descriptionPlaceholder": "גישת מפתח",
-      "allowLabels": "תוויות מותרות (key=value, מופרד בפסיקים)",
+      "allowLabels": "תוויות מותרות (מפתח=ערך, מופרדות בפסיקים; חזרו על מפתח עבור «או»)",
       "allowNames": "שמות מותרים (מופרד בפסיקים)",
-      "denyLabels": "תוויות אסורות (key=value, מופרד בפסיקים)",
+      "denyLabels": "תוויות אסורות (מפתח=ערך, מופרדות בפסיקים; חזרו על מפתח עבור «או»)",
       "denyNames": "שמות אסורים (מופרד בפסיקים)",
       "allowLabelsShort": "תוויות מותרות",
       "allowNamesShort": "שמות מותרים",
@@ -725,8 +725,7 @@
       "deleteRole": "מחיקת התפקיד נכשלה",
       "setAssignment": "הגדרת ההקצאה נכשלה",
       "setAssignmentStatus": "הגדרת ההקצאה נכשלה ({status})",
-      "deleteAssignment": "מחיקת ההקצאה נכשלה",
-      "conflictingLabelKeys": "ל-{keys} ניתן יותר מערך אחד. כלל תווית מחזיק ערך אחד לכל מפתח, ולכן האחרון יחליף בשקט את הקודמים. ריבוי ערכים למפתח אחד נתמך ב-API אך עדיין לא ניתן להגדרה כאן."
+      "deleteAssignment": "מחיקת ההקצאה נכשלה"
     }
   },
   "adminVcs": {

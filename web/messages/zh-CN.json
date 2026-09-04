@@ -645,9 +645,9 @@
       "catalogPermission": "目录权限",
       "descriptionLabel": "描述",
       "descriptionPlaceholder": "开发者访问权限",
-      "allowLabels": "允许标签（key=value，逗号分隔）",
+      "allowLabels": "允许标签（key=value，逗号分隔；重复同一个键表示“或”匹配）",
       "allowNames": "允许名称（逗号分隔）",
-      "denyLabels": "拒绝标签（key=value，逗号分隔）",
+      "denyLabels": "拒绝标签（key=value，逗号分隔；重复同一个键表示“或”匹配）",
       "denyNames": "拒绝名称（逗号分隔）",
       "allowLabelsShort": "允许标签",
       "allowNamesShort": "允许名称",
@@ -725,8 +725,7 @@
       "deleteRole": "删除角色失败",
       "setAssignment": "设置分配失败",
       "setAssignmentStatus": "设置分配失败（{status}）",
-      "deleteAssignment": "删除分配失败",
-      "conflictingLabelKeys": "{keys} 被指定了多个值。标签规则每个键只保留一个值，因此最后一个会悄悄替换先前的值。API 支持一个键对应多个值，但此处尚不能设置。"
+      "deleteAssignment": "删除分配失败"
     }
   },
   "adminVcs": {

@@ -645,9 +645,9 @@
       "catalogPermission": "Oprávnění katalogu",
       "descriptionLabel": "Popis",
       "descriptionPlaceholder": "Přístup vývojáře",
-      "allowLabels": "Povolit štítky (key=value, oddělené čárkou)",
+      "allowLabels": "Povolené štítky (klíč=hodnota, oddělené čárkami; opakujte klíč pro „nebo“)",
       "allowNames": "Povolit názvy (oddělené čárkou)",
-      "denyLabels": "Zakázat štítky (key=value, oddělené čárkou)",
+      "denyLabels": "Zakázané štítky (klíč=hodnota, oddělené čárkami; opakujte klíč pro „nebo“)",
       "denyNames": "Zakázat názvy (oddělené čárkou)",
       "allowLabelsShort": "Povolit štítky",
       "allowNamesShort": "Povolit názvy",
@@ -725,8 +725,7 @@
       "deleteRole": "Nepodařilo se smazat roli",
       "setAssignment": "Nepodařilo se nastavit přiřazení",
       "setAssignmentStatus": "Nepodařilo se nastavit přiřazení ({status})",
-      "deleteAssignment": "Nepodařilo se smazat přiřazení",
-      "conflictingLabelKeys": "{keys} má více než jednu hodnotu. Pravidlo štítku drží jednu hodnotu na klíč, takže poslední by tiše nahradila předchozí. Více hodnot pro jeden klíč API podporuje, ale zde je zatím nastavit nelze."
+      "deleteAssignment": "Nepodařilo se smazat přiřazení"
     }
   },
   "adminVcs": {

@@ -645,9 +645,9 @@
       "catalogPermission": "Katalog İzni",
       "descriptionLabel": "Açıklama",
       "descriptionPlaceholder": "Geliştirici erişimi",
-      "allowLabels": "İzin Verilen Etiketler (anahtar=değer, virgülle ayrılmış)",
+      "allowLabels": "İzin verilen etiketler (anahtar=değer, virgülle ayrılmış; «veya» için anahtarı tekrarlayın)",
       "allowNames": "İzin Verilen Adlar (virgülle ayrılmış)",
-      "denyLabels": "Reddedilen Etiketler (anahtar=değer, virgülle ayrılmış)",
+      "denyLabels": "Reddedilen etiketler (anahtar=değer, virgülle ayrılmış; «veya» için anahtarı tekrarlayın)",
       "denyNames": "Reddedilen Adlar (virgülle ayrılmış)",
       "allowLabelsShort": "İzin Verilen Etiketler",
       "allowNamesShort": "İzin Verilen Adlar",
@@ -725,8 +725,7 @@
       "deleteRole": "Rol silinemedi",
       "setAssignment": "Atama ayarlanamadı",
       "setAssignmentStatus": "Atama ayarlanamadı ({status})",
-      "deleteAssignment": "Atama silinemedi",
-      "conflictingLabelKeys": "{keys} birden fazla değer aldı. Bir etiket kuralı anahtar başına tek değer tutar, bu yüzden sonuncusu öncekileri sessizce değiştirirdi. Bir anahtar için birden çok değeri API destekler, ancak burada henüz ayarlanamaz."
+      "deleteAssignment": "Atama silinemedi"
     }
   },
   "adminVcs": {

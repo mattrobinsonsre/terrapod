@@ -764,3 +764,64 @@ class TestCatalogAxisAndNotes:
         axes = resp.json()["data"]["attributes"]["axes"]
         assert "catalog" in axes
         assert axes["catalog"]["granted-count"] == 0
+
+
+class TestAListValuedRuleReachesTheUnionOfItsValues:
+    """#1457: a rule may bind several accepted values to one key —
+    {"env": ["prod", "stg"]} meaning "env is prod OR stg".
+
+    ``merge_labels`` has always enforced this, and ``_label_pairs`` flattens it
+    for the preview, but no client could author one so nothing pinned the
+    behaviour end to end. Pinned here because the preview is what an operator
+    reads to decide whether a grant is right: if it under-reported, someone
+    would widen a role that was already wide enough.
+    """
+
+    async def _preview(self, client, allow_labels):
+        return await client.post(
+            "/api/terrapod/v1/roles/preview",
+            json={
+                "data": {
+                    "attributes": {
+                        "name": f"lv-{uuid.uuid4().hex[:8]}",
+                        "allow-labels": allow_labels,
+                        "workspace-permission": "read",
+                    }
+                }
+            },
+            headers=AUTH,
+        )
+
+    async def test_both_values_are_reached_not_just_one(self, app, client):
+        set_auth(app, admin_user())
+        tag = uuid.uuid4().hex[:8]
+        await _ws(client, f"lv-prod-{tag}", labels={"env": f"prod{tag}"})
+        await _ws(client, f"lv-stg-{tag}", labels={"env": f"stg{tag}"})
+        await _ws(client, f"lv-dev-{tag}", labels={"env": f"dev{tag}"})
+
+        resp = await self._preview(client, {"env": [f"prod{tag}", f"stg{tag}"]})
+        assert resp.status_code == 200, resp.text
+
+        attrs = resp.json()["data"]["attributes"]
+        reached = {w["name"] for w in attrs["workspaces"]}
+        assert f"lv-prod-{tag}" in reached, "the first value of the list was not reached"
+        assert f"lv-stg-{tag}" in reached, "the second value of the list was not reached"
+        assert f"lv-dev-{tag}" not in reached, "a value outside the list must not match"
+        assert attrs["granted-count"] == 2
+
+    async def test_a_scalar_rule_still_reaches_only_its_one_value(self, app, client):
+        """The negative: widening to lists must not make a scalar rule
+        promiscuous."""
+        set_auth(app, admin_user())
+        tag = uuid.uuid4().hex[:8]
+        await _ws(client, f"sv-prod-{tag}", labels={"env": f"prod{tag}"})
+        await _ws(client, f"sv-stg-{tag}", labels={"env": f"stg{tag}"})
+
+        resp = await self._preview(client, {"env": f"prod{tag}"})
+        assert resp.status_code == 200, resp.text
+
+        attrs = resp.json()["data"]["attributes"]
+        reached = {w["name"] for w in attrs["workspaces"]}
+        assert f"sv-prod-{tag}" in reached
+        assert f"sv-stg-{tag}" not in reached
+        assert attrs["granted-count"] == 1

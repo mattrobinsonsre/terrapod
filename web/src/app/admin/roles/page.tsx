@@ -11,6 +11,7 @@ import { EmptyState } from '@/components/empty-state'
 import { SortableHeader } from '@/components/sortable-header'
 import { RoleReachPanel, type RoleRule } from '@/components/role-reach-panel'
 import { useSortable } from '@/lib/use-sortable'
+import { parseLabelRule, formatLabelRule } from '@/lib/label-rules'
 import { useConfirm } from '@/lib/use-confirm'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch, fetchAllPages } from '@/lib/api'
@@ -349,48 +350,16 @@ export default function RolesPage() {
     const names = (v: string) => v.split(',').map((x) => x.trim()).filter(Boolean)
     return {
       allowAll,
-      allowLabels: parseLabels(allowLabels),
+      allowLabels: parseLabelRule(allowLabels),
       allowNames: names(allowNames),
-      denyLabels: parseLabels(denyLabels),
+      denyLabels: parseLabelRule(denyLabels),
       denyNames: names(denyNames),
       capabilities: [...caps],
     }
   }
 
-  function parseLabels(s: string): Record<string, string> {
-    const result: Record<string, string> = {}
-    if (!s.trim()) return result
-    s.split(',').forEach((pair) => {
-      const [k, v] = pair.split('=').map((x) => x.trim())
-      if (k) result[k] = v || ''
-    })
-    return result
-  }
 
-  /** Keys given two DIFFERENT values in one box, e.g. `env=prod, env=stg`.
-   *
-   *  A label rule is a map, so the second value silently overwrote the first
-   *  and the role quietly did something other than what was typed. The server
-   *  can express "env is prod or stg" ({"env": ["prod","stg"]}) but no client
-   *  can yet author it, so rather than let the collapse pass unseen the form
-   *  refuses it and says where the capability does live. Repeating a key with
-   *  the SAME value is harmless and not flagged. */
-  function conflictingLabelKeys(s: string): string[] {
-    const seen = new Map<string, string>()
-    const bad = new Set<string>()
-    for (const pair of s.split(',')) {
-      const [k, v] = pair.split('=').map((x) => x.trim())
-      if (!k) continue
-      const value = v || ''
-      if (seen.has(k) && seen.get(k) !== value) bad.add(k)
-      else seen.set(k, value)
-    }
-    return [...bad]
-  }
 
-  function formatLabels(labels: Record<string, string>): string {
-    return Object.entries(labels).map(([k, v]) => v ? `${k}=${v}` : k).join(', ')
-  }
 
   // ── Create-form capability matrix helpers ─────────────────────────────────
   // Changing a preset dropdown re-derives the matrix from all four presets and
@@ -451,14 +420,6 @@ export default function RolesPage() {
 
   async function handleCreateRole(e: React.FormEvent) {
     e.preventDefault()
-    const clash = [
-      ...conflictingLabelKeys(roleAllowLabels),
-      ...conflictingLabelKeys(roleDenyLabels),
-    ]
-    if (clash.length) {
-      setError(t('errors.conflictingLabelKeys', { keys: clash.join(', ') }))
-      return
-    }
     setCreatingRole(true)
     setError('')
     setSuccess('')
@@ -478,9 +439,9 @@ export default function RolesPage() {
         attrs['catalog-permission'] = roleCatalogPermission
       }
       if (roleAllowAll) attrs['allow-all'] = true
-      if (roleAllowLabels.trim()) attrs['allow-labels'] = parseLabels(roleAllowLabels)
+      if (roleAllowLabels.trim()) attrs['allow-labels'] = parseLabelRule(roleAllowLabels)
       if (roleAllowNames.trim()) attrs['allow-names'] = roleAllowNames.split(',').map((s) => s.trim()).filter(Boolean)
-      if (roleDenyLabels.trim()) attrs['deny-labels'] = parseLabels(roleDenyLabels)
+      if (roleDenyLabels.trim()) attrs['deny-labels'] = parseLabelRule(roleDenyLabels)
       if (roleDenyNames.trim()) attrs['deny-names'] = roleDenyNames.split(',').map((s) => s.trim()).filter(Boolean)
 
       const res = await apiFetch('/api/terrapod/v1/roles', {
@@ -542,21 +503,13 @@ export default function RolesPage() {
     setEditRoleCapsCustom(isCustom)
     setShowEditCaps(isCustom)
     setEditRoleAllowAll(Boolean(a['allow-all']))
-    setEditRoleAllowLabels(formatLabels(a['allow-labels'] || {}))
+    setEditRoleAllowLabels(formatLabelRule(a['allow-labels'] || {}))
     setEditRoleAllowNames((a['allow-names'] || []).join(', '))
-    setEditRoleDenyLabels(formatLabels(a['deny-labels'] || {}))
+    setEditRoleDenyLabels(formatLabelRule(a['deny-labels'] || {}))
     setEditRoleDenyNames((a['deny-names'] || []).join(', '))
   }
 
   async function handleSaveRole() {
-    const clash = [
-      ...conflictingLabelKeys(editRoleAllowLabels),
-      ...conflictingLabelKeys(editRoleDenyLabels),
-    ]
-    if (clash.length) {
-      setError(t('errors.conflictingLabelKeys', { keys: clash.join(', ') }))
-      return
-    }
     if (!editingRole) return
     setSavingRole(true)
     setError('')
@@ -565,9 +518,9 @@ export default function RolesPage() {
       const attrs: Record<string, unknown> = {
         description: editRoleDesc,
         'allow-all': editRoleAllowAll,
-        'allow-labels': parseLabels(editRoleAllowLabels),
+        'allow-labels': parseLabelRule(editRoleAllowLabels),
         'allow-names': editRoleAllowNames.split(',').map((s) => s.trim()).filter(Boolean),
-        'deny-labels': parseLabels(editRoleDenyLabels),
+        'deny-labels': parseLabelRule(editRoleDenyLabels),
         'deny-names': editRoleDenyNames.split(',').map((s) => s.trim()).filter(Boolean),
       }
       // Custom matrix → author by explicit capabilities (server derives the level
@@ -992,13 +945,13 @@ export default function RolesPage() {
                             )}
                             <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
                               {Object.keys(a['allow-labels'] || {}).length > 0 && (
-                                <span>{t('display.allow', { value: formatLabels(a['allow-labels']) })}</span>
+                                <span>{t('display.allow', { value: formatLabelRule(a['allow-labels']) })}</span>
                               )}
                               {(a['allow-names'] || []).length > 0 && (
                                 <span>{t('display.allowNames', { value: a['allow-names'].join(', ') })}</span>
                               )}
                               {Object.keys(a['deny-labels'] || {}).length > 0 && (
-                                <span>{t('display.deny', { value: formatLabels(a['deny-labels']) })}</span>
+                                <span>{t('display.deny', { value: formatLabelRule(a['deny-labels']) })}</span>
                               )}
                               {(a['deny-names'] || []).length > 0 && (
                                 <span>{t('display.denyNames', { value: a['deny-names'].join(', ') })}</span>

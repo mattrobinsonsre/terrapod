@@ -645,9 +645,9 @@
       "catalogPermission": "C474l0g P3rm15510n",
       "descriptionLabel": "D35cr1p710n",
       "descriptionPlaceholder": "D3v3l0p3r 4cc355",
-      "allowLabels": "4ll0w L4b3l5 (k3y=v4lu3, c0mm4-53p4r473d)",
+      "allowLabels": "4ll0w L4b3l5 (k3y=v4lu3, c0mm4-53p4r473d; r3p347 4 k3y 70 m47ch 3i7h3r)",
       "allowNames": "4ll0w N4m35 (c0mm4-53p4r473d)",
-      "denyLabels": "D3ny L4b3l5 (k3y=v4lu3, c0mm4-53p4r473d)",
+      "denyLabels": "D3ny L4b3l5 (k3y=v4lu3, c0mm4-53p4r473d; r3p347 4 k3y 70 m47ch 3i7h3r)",
       "denyNames": "D3ny N4m35 (c0mm4-53p4r473d)",
       "allowLabelsShort": "4ll0w L4b3l5",
       "allowNamesShort": "4ll0w N4m35",
@@ -725,8 +725,7 @@
       "deleteRole": "F41l3d 70 d3l373 r0l3",
       "setAssignment": "F41l3d 70 537 4551gnm3n7",
       "setAssignmentStatus": "F41l3d 70 537 4551gnm3n7 ({status})",
-      "deleteAssignment": "F41l3d 70 d3l373 4551gnm3n7",
-      "conflictingLabelKeys": "{keys} 15 g1v3n m0r3 7h4n 0n3 v4lu3. 4 l4b3l rul3 h0ld5 0n3 v4lu3 p3r k3y, 50 7h3 l457 w0uld 51l3n7ly r3pl4c3 7h3 34rl13r 0n35. M47ch1ng 53v3r4l v4lu35 f0r 0n3 k3y 15 5upp0r73d by 7h3 4P1 bu7 c4nn07 y37 b3 537 h3r3."
+      "deleteAssignment": "F41l3d 70 d3l373 4551gnm3n7"
     }
   },
   "adminVcs": {

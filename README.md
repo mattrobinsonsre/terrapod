@@ -392,6 +392,7 @@ machine-readable map for AI assistants. The ones most people want:
 | [RBAC](docs/rbac.md) | Permission model, label-based access control, custom roles |
 | [API Reference](docs/api-reference.md) | All API endpoints with examples |
 | [Deployment](docs/deployment.md) | Production Helm deployment, storage backends, scaling |
+| [Upgrading to 2.0](docs/upgrading-to-2.0.md) | The 2.0 migration notes — what needs an edit, the exact edit, and what does not break |
 | [Versioning & Support](docs/versioning-and-support.md) | SemVer contract per surface, version-skew support, deprecation window, support matrix |
 | [Known Limitations](docs/known-limitations.md) | What Terrapod does not (yet) do — deployment, scope, and feature constraints, stated plainly |
 | [Production Checklist](docs/production-checklist.md) | Pre-go-live checklist for a production deployment |

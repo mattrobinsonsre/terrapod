@@ -645,9 +645,9 @@
       "catalogPermission": "tetlh chaw'",
       "descriptionLabel": "QIj",
       "descriptionPlaceholder": "chenmoHwI' chaw'",
-      "allowLabels": "chaw'lu'bogh permey (key=value, HIvje' chevlu')",
+      "allowLabels": "chaw'lu'bogh permey (key=value, HIvje' chevlu'; ngIq per qaSmoHqa' «ghap» ngu'meH)",
       "allowNames": "chaw'lu'bogh pongmey (HIvje' chevlu')",
-      "denyLabels": "tuHlu'bogh permey (key=value, HIvje' chevlu')",
+      "denyLabels": "tuchlu'bogh permey (key=value, HIvje' chevlu'; ngIq per qaSmoHqa' «ghap» ngu'meH)",
       "denyNames": "tuHlu'bogh pongmey (HIvje' chevlu')",
       "allowLabelsShort": "chaw' permey",
       "allowNamesShort": "chaw' pongmey",
@@ -725,8 +725,7 @@
       "deleteRole": "patlh Qaw'meH lujpu'",
       "setAssignment": "ch'am choqmeH lujpu'",
       "setAssignmentStatus": "ch'am choqmeH lujpu' ({status})",
-      "deleteAssignment": "ch'am Qaw'meH lujpu'",
-      "conflictingLabelKeys": "wa' law' qenvo' ghaj {keys}. wa' qen neH ghaj per chut, vaj Qav qenmey wa'Dich lonmoH tam. wa' ngaqvaD qen law' Sup API, 'ach naDev DaSaHlaHbe' DaH."
+      "deleteAssignment": "ch'am Qaw'meH lujpu'"
     }
   },
   "adminVcs": {
