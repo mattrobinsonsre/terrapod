@@ -725,8 +725,7 @@
       "deleteRole": "Falha ao excluir a função",
       "setAssignment": "Falha ao definir a atribuição",
       "setAssignmentStatus": "Falha ao definir a atribuição ({status})",
-      "deleteAssignment": "Falha ao excluir a atribuição",
-      "conflictingLabelKeys": "{keys} recebeu mais de um valor. Uma regra de rótulo guarda um valor por chave, então o último substituiria os anteriores sem aviso. Vários valores por chave são aceitos pela API, mas ainda não podem ser definidos aqui."
+      "deleteAssignment": "Falha ao excluir a atribuição"
     }
   },
   "adminVcs": {

@@ -725,8 +725,7 @@
       "deleteRole": "역할을 삭제하지 못했습니다",
       "setAssignment": "할당을 설정하지 못했습니다",
       "setAssignmentStatus": "할당을 설정하지 못했습니다 ({status})",
-      "deleteAssignment": "할당을 삭제하지 못했습니다",
-      "conflictingLabelKeys": "{keys}에 값이 두 개 이상 지정되었습니다. 레이블 규칙은 키당 하나의 값만 보유하므로 마지막 값이 이전 값을 조용히 대체합니다. 하나의 키에 여러 값을 지정하는 것은 API에서 지원하지만 아직 여기서는 설정할 수 없습니다."
+      "deleteAssignment": "할당을 삭제하지 못했습니다"
     }
   },
   "adminVcs": {

@@ -725,8 +725,7 @@
       "deleteRole": "Failed t'' send role t'' Davy Jones",
       "setAssignment": "Failed t'' set assignment",
       "setAssignmentStatus": "Failed t'' set assignment ({status})",
-      "deleteAssignment": "Failed t'' send assignment t'' Davy Jones",
-      "conflictingLabelKeys": "{keys} be given more than one value. A marking rule holds one value per key, so the last would quietly replace them afore it. Matching several values for one key be supported by the API but cannot yet be set here."
+      "deleteAssignment": "Failed t'' send assignment t'' Davy Jones"
     }
   },
   "adminVcs": {

@@ -53,9 +53,9 @@ func (d *roleDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, r
 			"name":                 schema.StringAttribute{Required: true, Description: "Role name."},
 			"description":          schema.StringAttribute{Computed: true, Description: "Description."},
 			"allow_all":            schema.BoolAttribute{Computed: true, Description: "An estate-wide grant: this role's allow side matches EVERY resource on every axis. Deny rules still take precedence, so 'everything except the sealed ones' remains expressible, and it does not raise the role's permission level -- a role granting read still grants read, just everywhere. Use it instead of putting a shared label on every workspace: label and name rules are exact-match, so a workspace created without that label would silently fall outside the role. Defaults to false."},
-			"allow_labels":         schema.MapAttribute{Computed: true, ElementType: types.StringType, Description: "Allow labels."},
+			"allow_labels":         schema.MapAttribute{Computed: true, ElementType: types.ListType{ElemType: types.StringType}, Description: "Allow labels. Each key maps to a list of accepted values, matched as OR."},
 			"allow_names":          schema.ListAttribute{Computed: true, ElementType: types.StringType, Description: "Allow name patterns."},
-			"deny_labels":          schema.MapAttribute{Computed: true, ElementType: types.StringType, Description: "Deny labels."},
+			"deny_labels":          schema.MapAttribute{Computed: true, ElementType: types.ListType{ElemType: types.StringType}, Description: "Deny labels. Each key maps to a list of values, matched as OR."},
 			"deny_names":           schema.ListAttribute{Computed: true, ElementType: types.StringType, Description: "Deny name patterns."},
 			"workspace_permission": schema.StringAttribute{Computed: true, Description: "Permission level."},
 			"pool_permission":      schema.StringAttribute{Computed: true, Description: "Agent pool permission level: read, write, or admin."},
@@ -122,18 +122,18 @@ func (d *roleDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 
 	config.AllowAll = types.BoolValue(role.AllowAll)
 	if len(role.AllowLabels) > 0 {
-		val, dl := types.MapValueFrom(ctx, types.StringType, role.AllowLabels)
+		val, dl := types.MapValueFrom(ctx, types.ListType{ElemType: types.StringType}, role.AllowLabels)
 		resp.Diagnostics.Append(dl...)
 		config.AllowLabels = val
 	} else {
-		config.AllowLabels = types.MapNull(types.StringType)
+		config.AllowLabels = types.MapNull(types.ListType{ElemType: types.StringType})
 	}
 	if len(role.DenyLabels) > 0 {
-		val, dl := types.MapValueFrom(ctx, types.StringType, role.DenyLabels)
+		val, dl := types.MapValueFrom(ctx, types.ListType{ElemType: types.StringType}, role.DenyLabels)
 		resp.Diagnostics.Append(dl...)
 		config.DenyLabels = val
 	} else {
-		config.DenyLabels = types.MapNull(types.StringType)
+		config.DenyLabels = types.MapNull(types.ListType{ElemType: types.StringType})
 	}
 	if len(role.AllowNames) > 0 {
 		val, dl := types.ListValueFrom(ctx, types.StringType, role.AllowNames)

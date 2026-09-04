@@ -725,8 +725,7 @@
       "deleteRole": "Échec de la suppression du rôle",
       "setAssignment": "Échec de la définition de l'attribution",
       "setAssignmentStatus": "Échec de la définition de l'attribution ({status})",
-      "deleteAssignment": "Échec de la suppression de l'attribution",
-      "conflictingLabelKeys": "{keys} reçoit plusieurs valeurs. Une règle d''étiquette ne retient qu''une valeur par clé ; la dernière remplacerait silencieusement les précédentes. Plusieurs valeurs pour une clé sont acceptées par l''API mais pas encore configurables ici."
+      "deleteAssignment": "Échec de la suppression de l'attribution"
     }
   },
   "adminVcs": {

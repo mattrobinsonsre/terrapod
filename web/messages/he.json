@@ -725,8 +725,7 @@
       "deleteRole": "מחיקת התפקיד נכשלה",
       "setAssignment": "הגדרת ההקצאה נכשלה",
       "setAssignmentStatus": "הגדרת ההקצאה נכשלה ({status})",
-      "deleteAssignment": "מחיקת ההקצאה נכשלה",
-      "conflictingLabelKeys": "ל-{keys} ניתן יותר מערך אחד. כלל תווית מחזיק ערך אחד לכל מפתח, ולכן האחרון יחליף בשקט את הקודמים. ריבוי ערכים למפתח אחד נתמך ב-API אך עדיין לא ניתן להגדרה כאן."
+      "deleteAssignment": "מחיקת ההקצאה נכשלה"
     }
   },
   "adminVcs": {

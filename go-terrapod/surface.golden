@@ -200,9 +200,9 @@ field CreateNotificationConfigurationRequest.URL string
 field CreateOnboardingSessionRequest.Provider string
 field CreateOnboardingSessionRequest.ProviderVersion string
 field CreateOnboardingSessionRequest.WorkspaceID string
-field CreatePolicySetRequest.AllowLabels map[string]string
+field CreatePolicySetRequest.AllowLabels map[string][]string
 field CreatePolicySetRequest.AllowNames []string
-field CreatePolicySetRequest.DenyLabels map[string]string
+field CreatePolicySetRequest.DenyLabels map[string][]string
 field CreatePolicySetRequest.DenyNames []string
 field CreatePolicySetRequest.Description string
 field CreatePolicySetRequest.Enabled bool
@@ -226,11 +226,11 @@ field CreateRegistryProviderRequest.Name string
 field CreateRemoteStateConsumerRequest.ConsumerWorkspaceID string
 field CreateRemoteStateConsumerRequest.ProducerWorkspaceID string
 field CreateRoleRequest.AllowAll bool
-field CreateRoleRequest.AllowLabels map[string]string
+field CreateRoleRequest.AllowLabels map[string][]string
 field CreateRoleRequest.AllowNames []string
 field CreateRoleRequest.Capabilities []string
 field CreateRoleRequest.CatalogPermission string
-field CreateRoleRequest.DenyLabels map[string]string
+field CreateRoleRequest.DenyLabels map[string][]string
 field CreateRoleRequest.DenyNames []string
 field CreateRoleRequest.Description string
 field CreateRoleRequest.Name string
@@ -546,7 +546,9 @@ field Policy.Name string `json:"name"`
 field Policy.PolicySetID string `json:"policy-set-id"`
 field Policy.Rego string `json:"rego"`
 field Policy.UpdatedAt string `json:"updated-at,omitempty"`
+field PolicySet.AllowLabels map[string][]string `json:"allow-labels,omitempty"`
 field PolicySet.CreatedAt string `json:"created-at,omitempty"`
+field PolicySet.DenyLabels map[string][]string `json:"deny-labels,omitempty"`
 field PolicySet.Description string `json:"description,omitempty"`
 field PolicySet.Enabled bool `json:"enabled"`
 field PolicySet.EnforcementLevel string `json:"enforcement-level"`
@@ -624,13 +626,13 @@ field RestoredWorkspace.StateVersionsRestored int `json:"state-versions-restored
 field RestoredWorkspace.StateVersionsSkipped []map[string]any `json:"state-versions-skipped"`
 field RestoredWorkspace.Suppressed []string `json:"suppressed"`
 field Role.AllowAll bool `json:"allow-all"`
-field Role.AllowLabels map[string]string `json:"allow-labels,omitempty"`
+field Role.AllowLabels map[string][]string `json:"allow-labels,omitempty"`
 field Role.AllowNames []string `json:"allow-names,omitempty"`
 field Role.BuiltIn bool `json:"built-in"`
 field Role.Capabilities []string `json:"capabilities,omitempty"`
 field Role.CatalogPermission string `json:"catalog-permission,omitempty"`
 field Role.CreatedAt string `json:"created-at,omitempty"`
-field Role.DenyLabels map[string]string `json:"deny-labels,omitempty"`
+field Role.DenyLabels map[string][]string `json:"deny-labels,omitempty"`
 field Role.DenyNames []string `json:"deny-names,omitempty"`
 field Role.Description string `json:"description,omitempty"`
 field Role.Name string `json:"name"`
@@ -815,9 +817,9 @@ field UpdateNotificationConfigurationRequest.URL *string
 field UpdatePolicyRequest.Description *string
 field UpdatePolicyRequest.Name *string
 field UpdatePolicyRequest.Rego *string
-field UpdatePolicySetRequest.AllowLabels map[string]string
+field UpdatePolicySetRequest.AllowLabels map[string][]string
 field UpdatePolicySetRequest.AllowNames []string
-field UpdatePolicySetRequest.DenyLabels map[string]string
+field UpdatePolicySetRequest.DenyLabels map[string][]string
 field UpdatePolicySetRequest.DenyNames []string
 field UpdatePolicySetRequest.Description *string
 field UpdatePolicySetRequest.Enabled *bool
@@ -834,11 +836,11 @@ field UpdateRegistryModuleRequest.VCSRepoURL *string
 field UpdateRegistryModuleRequest.VCSTagPattern *string
 field UpdateRegistryProviderRequest.Labels *map[string]string
 field UpdateRoleRequest.AllowAll *bool
-field UpdateRoleRequest.AllowLabels *map[string]string
+field UpdateRoleRequest.AllowLabels *map[string][]string
 field UpdateRoleRequest.AllowNames *[]string
 field UpdateRoleRequest.Capabilities []string
 field UpdateRoleRequest.CatalogPermission string
-field UpdateRoleRequest.DenyLabels *map[string]string
+field UpdateRoleRequest.DenyLabels *map[string][]string
 field UpdateRoleRequest.DenyNames *[]string
 field UpdateRoleRequest.Description *string
 field UpdateRoleRequest.PoolPermission string

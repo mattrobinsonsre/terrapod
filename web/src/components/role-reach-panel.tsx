@@ -44,9 +44,12 @@ export interface RoleRule {
   /** Estate-wide grant: matches every resource on every axis. Deny rules
    *  still win, so the preview can still show exclusions. */
   allowAll?: boolean
-  allowLabels: Record<string, string>
+  /** Each key binds to the values that satisfy it, so {env: ['prod','stg']}
+   *  reads as "env is prod OR stg" — the shape the server has always enforced
+   *  (#1457). */
+  allowLabels: Record<string, string[]>
   allowNames: string[]
-  denyLabels: Record<string, string>
+  denyLabels: Record<string, string[]>
   denyNames: string[]
   capabilities: string[]
 }

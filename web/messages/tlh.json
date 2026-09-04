@@ -725,8 +725,7 @@
       "deleteRole": "patlh Qaw'meH lujpu'",
       "setAssignment": "ch'am choqmeH lujpu'",
       "setAssignmentStatus": "ch'am choqmeH lujpu' ({status})",
-      "deleteAssignment": "ch'am Qaw'meH lujpu'",
-      "conflictingLabelKeys": "wa' law' qenvo' ghaj {keys}. wa' qen neH ghaj per chut, vaj Qav qenmey wa'Dich lonmoH tam. wa' ngaqvaD qen law' Sup API, 'ach naDev DaSaHlaHbe' DaH."
+      "deleteAssignment": "ch'am Qaw'meH lujpu'"
     }
   },
   "adminVcs": {

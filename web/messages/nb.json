@@ -725,8 +725,7 @@
       "deleteRole": "Kunne ikke slette rolle",
       "setAssignment": "Kunne ikke angi tildeling",
       "setAssignmentStatus": "Kunne ikke angi tildeling ({status})",
-      "deleteAssignment": "Kunne ikke slette tildeling",
-      "conflictingLabelKeys": "{keys} har fått mer enn én verdi. En merkeregel rommer én verdi per nøkkel, så den siste ville stille erstatte de tidligere. Flere verdier per nøkkel støttes av API-et, men kan ennå ikke settes her."
+      "deleteAssignment": "Kunne ikke slette tildeling"
     }
   },
   "adminVcs": {

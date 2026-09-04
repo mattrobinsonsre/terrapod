@@ -725,8 +725,7 @@
       "deleteRole": "刪除角色失敗",
       "setAssignment": "設定分配失敗",
       "setAssignmentStatus": "設定分配失敗（{status}）",
-      "deleteAssignment": "刪除分配失敗",
-      "conflictingLabelKeys": "{keys} 被指定了多個值。標籤規則每個索引鍵只保留一個值，因此最後一個會悄悄取代先前的值。API 支援一個索引鍵對應多個值，但此處尚不能設定。"
+      "deleteAssignment": "刪除分配失敗"
     }
   },
   "adminVcs": {

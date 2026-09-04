@@ -725,8 +725,7 @@
       "deleteRole": "Impossibile eliminare il ruolo",
       "setAssignment": "Impossibile impostare l''assegnazione",
       "setAssignmentStatus": "Impossibile impostare l''assegnazione ({status})",
-      "deleteAssignment": "Impossibile eliminare l''assegnazione",
-      "conflictingLabelKeys": "{keys} ha più di un valore. Una regola di etichetta tiene un valore per chiave, quindi l''ultimo sostituirebbe silenziosamente i precedenti. Più valori per una chiave sono supportati dall''API ma non ancora impostabili qui."
+      "deleteAssignment": "Impossibile eliminare l''assegnazione"
     }
   },
   "adminVcs": {

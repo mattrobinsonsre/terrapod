@@ -725,8 +725,7 @@
       "deleteRole": "Pars deleri non potuit",
       "setAssignment": "Attributio poni non potuit",
       "setAssignmentStatus": "Attributio poni non potuit ({status})",
-      "deleteAssignment": "Attributio deleri non potuit",
-      "conflictingLabelKeys": "{keys} plus quam unum valorem accepit. Regula tituli unum valorem per clavem tenet, itaque ultimus priores tacite substitueret. Plures valores unius clavis ab API sustinentur sed hic nondum poni possunt."
+      "deleteAssignment": "Attributio deleri non potuit"
     }
   },
   "adminVcs": {

@@ -725,8 +725,7 @@
       "deleteRole": "ロールの削除に失敗しました",
       "setAssignment": "割り当ての設定に失敗しました",
       "setAssignmentStatus": "割り当ての設定に失敗しました（{status}）",
-      "deleteAssignment": "割り当ての削除に失敗しました",
-      "conflictingLabelKeys": "{keys} に複数の値が指定されています。ラベルルールはキーごとに 1 つの値しか保持しないため、最後の値が以前の値を暗黙的に置き換えます。1 つのキーに複数の値を指定することは API では可能ですが、ここではまだ設定できません。"
+      "deleteAssignment": "割り当ての削除に失敗しました"
     }
   },
   "adminVcs": {

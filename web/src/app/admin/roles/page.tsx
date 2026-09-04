@@ -357,39 +357,40 @@ export default function RolesPage() {
     }
   }
 
-  function parseLabels(s: string): Record<string, string> {
-    const result: Record<string, string> = {}
+  /** `env=prod, env=stg` accumulates into {env: ['prod', 'stg']} — "env is
+   *  prod OR stg" — rather than the second value overwriting the first.
+   *
+   *  The server has always stored and enforced this shape. Until 2.0 no client
+   *  could carry it, so the form refused a repeated key outright rather than
+   *  let the collapse pass unseen; now that the SDK and provider express it,
+   *  refusing would be wrong and that guard is gone (#1457).
+   *
+   *  A key repeated with the same value stays one value: it is a typo, not a
+   *  request for a duplicate clause. */
+  function parseLabels(s: string): Record<string, string[]> {
+    const result: Record<string, string[]> = {}
     if (!s.trim()) return result
     s.split(',').forEach((pair) => {
       const [k, v] = pair.split('=').map((x) => x.trim())
-      if (k) result[k] = v || ''
+      if (!k) return
+      const value = v || ''
+      const existing = result[k]
+      if (!existing) result[k] = [value]
+      else if (!existing.includes(value)) existing.push(value)
     })
     return result
   }
 
-  /** Keys given two DIFFERENT values in one box, e.g. `env=prod, env=stg`.
-   *
-   *  A label rule is a map, so the second value silently overwrote the first
-   *  and the role quietly did something other than what was typed. The server
-   *  can express "env is prod or stg" ({"env": ["prod","stg"]}) but no client
-   *  can yet author it, so rather than let the collapse pass unseen the form
-   *  refuses it and says where the capability does live. Repeating a key with
-   *  the SAME value is harmless and not flagged. */
-  function conflictingLabelKeys(s: string): string[] {
-    const seen = new Map<string, string>()
-    const bad = new Set<string>()
-    for (const pair of s.split(',')) {
-      const [k, v] = pair.split('=').map((x) => x.trim())
-      if (!k) continue
-      const value = v || ''
-      if (seen.has(k) && seen.get(k) !== value) bad.add(k)
-      else seen.set(k, value)
-    }
-    return [...bad]
-  }
 
-  function formatLabels(labels: Record<string, string>): string {
-    return Object.entries(labels).map(([k, v]) => v ? `${k}=${v}` : k).join(', ')
+  /** Inverse of parseLabels: a key with several values becomes several
+   *  `key=value` pairs, which is what the operator typed to create it. */
+  function formatLabels(labels: Record<string, string[] | string>): string {
+    return Object.entries(labels)
+      .flatMap(([k, v]) => {
+        const values = Array.isArray(v) ? v : [v]
+        return values.map((one) => (one ? `${k}=${one}` : k))
+      })
+      .join(', ')
   }
 
   // ── Create-form capability matrix helpers ─────────────────────────────────
@@ -451,14 +452,6 @@ export default function RolesPage() {
 
   async function handleCreateRole(e: React.FormEvent) {
     e.preventDefault()
-    const clash = [
-      ...conflictingLabelKeys(roleAllowLabels),
-      ...conflictingLabelKeys(roleDenyLabels),
-    ]
-    if (clash.length) {
-      setError(t('errors.conflictingLabelKeys', { keys: clash.join(', ') }))
-      return
-    }
     setCreatingRole(true)
     setError('')
     setSuccess('')
@@ -549,14 +542,6 @@ export default function RolesPage() {
   }
 
   async function handleSaveRole() {
-    const clash = [
-      ...conflictingLabelKeys(editRoleAllowLabels),
-      ...conflictingLabelKeys(editRoleDenyLabels),
-    ]
-    if (clash.length) {
-      setError(t('errors.conflictingLabelKeys', { keys: clash.join(', ') }))
-      return
-    }
     if (!editingRole) return
     setSavingRole(true)
     setError('')

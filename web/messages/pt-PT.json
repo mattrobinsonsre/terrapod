@@ -725,8 +725,7 @@
       "deleteRole": "Falha ao eliminar a função",
       "setAssignment": "Falha ao definir a atribuição",
       "setAssignmentStatus": "Falha ao definir a atribuição ({status})",
-      "deleteAssignment": "Falha ao eliminar a atribuição",
-      "conflictingLabelKeys": "{keys} recebeu mais do que um valor. Uma regra de etiqueta guarda um valor por chave, pelo que o último substituiria os anteriores sem aviso. Vários valores por chave são aceites pela API, mas ainda não podem ser definidos aqui."
+      "deleteAssignment": "Falha ao eliminar a atribuição"
     }
   },
   "adminVcs": {

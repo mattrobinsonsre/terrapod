@@ -66,13 +66,14 @@ func TestCreateRole_FullShape(t *testing.T) {
 		WorkspacePermission: "admin",
 		PoolPermission:      "admin",
 		RegistryPermission:  "write",
-		AllowLabels:         map[string]string{"team": "sre"},
+		AllowLabels:         map[string][]string{"team": {"sre"}},
 		AllowNames:          []string{"prod-*"},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if r.Name != "sre" || r.AllowLabels["team"] != "sre" || r.WorkspacePermission != "admin" {
+	if r.Name != "sre" || len(r.AllowLabels["team"]) != 1 || r.AllowLabels["team"][0] != "sre" ||
+		r.WorkspacePermission != "admin" {
 		t.Errorf("role: %+v", r)
 	}
 	if r.RegistryPermission != "write" {
@@ -129,7 +130,7 @@ func TestGetRole(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if r.AllowLabels["team"] != "sre" {
+	if len(r.AllowLabels["team"]) != 1 || r.AllowLabels["team"][0] != "sre" {
 		t.Errorf("role: %+v", r)
 	}
 }
@@ -173,7 +174,7 @@ func TestUpdateRole_LeaveAllowAlone(t *testing.T) {
 
 func TestUpdateRole_ClearAllow(t *testing.T) {
 	c, lastBody := newRoleFixture(t)
-	empty := map[string]string{}
+	empty := map[string][]string{}
 	_, err := c.UpdateRole(t.Context(), "sre", UpdateRoleRequest{
 		AllowLabels: &empty,
 	})
@@ -333,7 +334,7 @@ func TestPreviewUnsavedRoleReach_SendsTheRuleAndPersistsNothing(t *testing.T) {
 	c, _, bodyp := newReachFixture(t)
 	reach, err := c.PreviewUnsavedRoleReach(t.Context(), CreateRoleRequest{
 		Name:                "draft",
-		AllowLabels:         map[string]string{"env": "prod"},
+		AllowLabels:         map[string][]string{"env": {"prod"}},
 		DenyNames:           []string{"prod-locked"},
 		WorkspacePermission: "write",
 	}, nil)

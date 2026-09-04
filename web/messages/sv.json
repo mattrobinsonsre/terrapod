@@ -725,8 +725,7 @@
       "deleteRole": "Det gick inte att ta bort rollen",
       "setAssignment": "Det gick inte att ange tilldelningen",
       "setAssignmentStatus": "Det gick inte att ange tilldelningen ({status})",
-      "deleteAssignment": "Det gick inte att ta bort tilldelningen",
-      "conflictingLabelKeys": "{keys} har fått mer än ett värde. En märkningsregel rymmer ett värde per nyckel, så det sista skulle tyst ersätta de tidigare. Flera värden per nyckel stöds av API:et men kan ännu inte anges här."
+      "deleteAssignment": "Det gick inte att ta bort tilldelningen"
     }
   },
   "adminVcs": {

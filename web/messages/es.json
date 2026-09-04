@@ -725,8 +725,7 @@
       "deleteRole": "No se pudo eliminar el rol",
       "setAssignment": "No se pudo establecer la asignación",
       "setAssignmentStatus": "No se pudo establecer la asignación ({status})",
-      "deleteAssignment": "No se pudo eliminar la asignación",
-      "conflictingLabelKeys": "{keys} tiene más de un valor. Una regla de etiqueta admite un valor por clave, así que el último sustituiría a los anteriores sin avisar. La API admite varios valores por clave, pero aún no se pueden definir aquí."
+      "deleteAssignment": "No se pudo eliminar la asignación"
     }
   },
   "adminVcs": {

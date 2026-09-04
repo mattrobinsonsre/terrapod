@@ -99,10 +99,16 @@ func (r *roleResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 				Optional:    true,
 				Computed:    true,
 			},
+			// A map of LISTS: several accepted values may bind to one key, so
+			// { env = ["prod", "stg"] } reads as "env is prod OR stg". The
+			// server has always enforced that shape; this was a map of plain
+			// strings until 2.0, which could neither express it nor read a role
+			// that used it (#1457).
 			"allow_labels": schema.MapAttribute{
-				Description: "Labels that grant this role's permission to matching workspaces.",
+				Description: "Labels that grant this role's permission to matching workspaces. " +
+					"Each key maps to a list of accepted values, matched as OR.",
 				Optional:    true,
-				ElementType: types.StringType,
+				ElementType: types.ListType{ElemType: types.StringType},
 			},
 			"allow_names": schema.ListAttribute{
 				Description: "Workspace names that this role grants access to.",
@@ -110,9 +116,10 @@ func (r *roleResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 				ElementType: types.StringType,
 			},
 			"deny_labels": schema.MapAttribute{
-				Description: "Labels that deny this role's permission from matching workspaces.",
+				Description: "Labels that deny this role's permission from matching workspaces. " +
+					"Each key maps to a list of values, matched as OR.",
 				Optional:    true,
-				ElementType: types.StringType,
+				ElementType: types.ListType{ElemType: types.StringType},
 			},
 			"deny_names": schema.ListAttribute{
 				Description: "Workspace names that this role denies access to.",
@@ -440,11 +447,11 @@ func readRoleFromSDK(ctx context.Context, role *terrapod.Role, m *roleModel) dia
 	// takes the server's false rather than drifting forever (#684).
 	m.AllowAll = types.BoolValue(role.AllowAll)
 	if len(role.AllowLabels) > 0 {
-		val, d := types.MapValueFrom(ctx, types.StringType, role.AllowLabels)
+		val, d := types.MapValueFrom(ctx, types.ListType{ElemType: types.StringType}, role.AllowLabels)
 		diags.Append(d...)
 		m.AllowLabels = val
 	} else {
-		m.AllowLabels = types.MapNull(types.StringType)
+		m.AllowLabels = types.MapNull(types.ListType{ElemType: types.StringType})
 	}
 	if len(role.AllowNames) > 0 {
 		val, d := types.ListValueFrom(ctx, types.StringType, role.AllowNames)
@@ -454,11 +461,11 @@ func readRoleFromSDK(ctx context.Context, role *terrapod.Role, m *roleModel) dia
 		m.AllowNames = types.ListNull(types.StringType)
 	}
 	if len(role.DenyLabels) > 0 {
-		val, d := types.MapValueFrom(ctx, types.StringType, role.DenyLabels)
+		val, d := types.MapValueFrom(ctx, types.ListType{ElemType: types.StringType}, role.DenyLabels)
 		diags.Append(d...)
 		m.DenyLabels = val
 	} else {
-		m.DenyLabels = types.MapNull(types.StringType)
+		m.DenyLabels = types.MapNull(types.ListType{ElemType: types.StringType})
 	}
 	if len(role.DenyNames) > 0 {
 		val, d := types.ListValueFrom(ctx, types.StringType, role.DenyNames)
@@ -473,10 +480,18 @@ func readRoleFromSDK(ctx context.Context, role *terrapod.Role, m *roleModel) dia
 
 // mapFromTFMap projects a Terraform Map into a Go map[string]string.
 // Caller is responsible for guarding against IsNull/IsUnknown.
-func mapFromTFMap(m types.Map) map[string]string {
-	out := map[string]string{}
+func mapFromTFMap(m types.Map) map[string][]string {
+	out := map[string][]string{}
 	for k, v := range m.Elements() {
-		out[k] = v.(types.String).ValueString()
+		list, ok := v.(types.List)
+		if !ok {
+			continue
+		}
+		vals := make([]string, 0, len(list.Elements()))
+		for _, e := range list.Elements() {
+			vals = append(vals, e.(types.String).ValueString())
+		}
+		out[k] = vals
 	}
 	return out
 }
@@ -484,9 +499,9 @@ func mapFromTFMap(m types.Map) map[string]string {
 // mapFromTFMapOrEmpty returns the projected map or an empty map when
 // the Terraform Map is null/unknown. Used by Update where "no labels
 // in HCL" means "clear labels on the server".
-func mapFromTFMapOrEmpty(m types.Map) map[string]string {
+func mapFromTFMapOrEmpty(m types.Map) map[string][]string {
 	if m.IsNull() || m.IsUnknown() {
-		return map[string]string{}
+		return map[string][]string{}
 	}
 	return mapFromTFMap(m)
 }

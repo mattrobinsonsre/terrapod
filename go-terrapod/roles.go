@@ -22,10 +22,16 @@ type Role struct {
 	Name        string `json:"name"`
 	Description string `json:"description,omitempty"`
 
-	AllowLabels map[string]string `json:"allow-labels,omitempty"`
-	AllowNames  []string          `json:"allow-names,omitempty"`
-	DenyLabels  map[string]string `json:"deny-labels,omitempty"`
-	DenyNames   []string          `json:"deny-names,omitempty"`
+	// AllowLabels/DenyLabels bind each key to the values that satisfy it, so
+	// {"env": {"prod", "stg"}} reads as "env is prod OR stg". The server has
+	// always stored and enforced this shape; these were map[string]string
+	// until 2.0, which meant a rule with several values per key could not be
+	// decoded at all and took the provider and migration tool down with it
+	// (#1457). A scalar from the server normalises to a one-element slice.
+	AllowLabels map[string][]string `json:"allow-labels,omitempty"`
+	AllowNames  []string            `json:"allow-names,omitempty"`
+	DenyLabels  map[string][]string `json:"deny-labels,omitempty"`
+	DenyNames   []string            `json:"deny-names,omitempty"`
 
 	// AllowAll is an estate-wide grant: the allow side matches EVERY resource
 	// on every axis. Deny rules still win over it, so "everything except the
@@ -65,9 +71,9 @@ type CreateRoleRequest struct {
 	Name        string
 	Description string
 
-	AllowLabels map[string]string
+	AllowLabels map[string][]string
 	AllowNames  []string
-	DenyLabels  map[string]string
+	DenyLabels  map[string][]string
 	DenyNames   []string
 
 	// AllowAll grants estate-wide. See Role.AllowAll.
@@ -94,9 +100,9 @@ type UpdateRoleRequest struct {
 
 	// AllowAll grants estate-wide; nil leaves it unchanged. See Role.AllowAll.
 	AllowAll    *bool
-	AllowLabels *map[string]string
+	AllowLabels *map[string][]string
 	AllowNames  *[]string
-	DenyLabels  *map[string]string
+	DenyLabels  *map[string][]string
 	DenyNames   *[]string
 
 	WorkspacePermission string
@@ -232,11 +238,43 @@ func roleUpdateAttrs(req UpdateRoleRequest) map[string]any {
 	return attrs
 }
 
-func mapOrEmpty(m map[string]string) map[string]string {
+func mapOrEmpty(m map[string][]string) map[string][]string {
 	if m == nil {
-		return map[string]string{}
+		return map[string][]string{}
 	}
 	return m
+}
+
+// labelRule decodes a label rule from the server, which stores JSONB and may
+// give a key either a single value or a list of them. Both normalise to a
+// slice here so callers have one shape to handle rather than two.
+//
+// This is the whole of the #1457 fix on the read side: the previous
+// map[string]string failed to decode a list-valued rule outright, and because
+// listing roles decodes them all, one such role made every role unreadable —
+// taking the Terraform provider and the migration tool with it.
+type labelRule map[string][]string
+
+func (l *labelRule) UnmarshalJSON(b []byte) error {
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(b, &raw); err != nil {
+		return err
+	}
+	out := make(labelRule, len(raw))
+	for key, v := range raw {
+		var one string
+		if err := json.Unmarshal(v, &one); err == nil {
+			out[key] = []string{one}
+			continue
+		}
+		var many []string
+		if err := json.Unmarshal(v, &many); err != nil {
+			return fmt.Errorf("label %q: want a string or a list of strings", key)
+		}
+		out[key] = many
+	}
+	*l = out
+	return nil
 }
 
 func sliceOrEmpty(s []string) []string {
@@ -300,20 +338,20 @@ func parseRoleList(body []byte) ([]Role, error) {
 
 func roleFromItem(item *roleDataItem) (*Role, error) {
 	var attrs struct {
-		Description         string            `json:"description"`
-		AllowAll            bool              `json:"allow-all"`
-		AllowLabels         map[string]string `json:"allow-labels"`
-		AllowNames          []string          `json:"allow-names"`
-		DenyLabels          map[string]string `json:"deny-labels"`
-		DenyNames           []string          `json:"deny-names"`
-		WorkspacePermission string            `json:"workspace-permission"`
-		PoolPermission      string            `json:"pool-permission"`
-		RegistryPermission  string            `json:"registry-permission"`
-		CatalogPermission   string            `json:"catalog-permission"`
-		Capabilities        []string          `json:"capabilities"`
-		BuiltIn             bool              `json:"built-in"`
-		CreatedAt           string            `json:"created-at"`
-		UpdatedAt           string            `json:"updated-at"`
+		Description         string    `json:"description"`
+		AllowAll            bool      `json:"allow-all"`
+		AllowLabels         labelRule `json:"allow-labels"`
+		AllowNames          []string  `json:"allow-names"`
+		DenyLabels          labelRule `json:"deny-labels"`
+		DenyNames           []string  `json:"deny-names"`
+		WorkspacePermission string    `json:"workspace-permission"`
+		PoolPermission      string    `json:"pool-permission"`
+		RegistryPermission  string    `json:"registry-permission"`
+		CatalogPermission   string    `json:"catalog-permission"`
+		Capabilities        []string  `json:"capabilities"`
+		BuiltIn             bool      `json:"built-in"`
+		CreatedAt           string    `json:"created-at"`
+		UpdatedAt           string    `json:"updated-at"`
 	}
 	if len(item.Attributes) > 0 {
 		if err := json.Unmarshal(item.Attributes, &attrs); err != nil {
