@@ -770,64 +770,58 @@ class TestAListValuedRuleReachesTheUnionOfItsValues:
     """#1457: a rule may bind several accepted values to one key —
     {"env": ["prod", "stg"]} meaning "env is prod OR stg".
 
-    The server has always enforced this (``merge_labels`` branches on
-    ``isinstance(values, list)``), but no client could carry it, so no test
-    exercised it. Pinned here because the reach preview is what an operator
+    ``merge_labels`` has always enforced this, and ``_label_pairs`` flattens it
+    for the preview, but no client could author one so nothing pinned the
+    behaviour end to end. Pinned here because the preview is what an operator
     reads to decide whether a grant is right: if it under-reported, someone
     would widen a role that was already wide enough.
     """
 
+    async def _preview(self, client, allow_labels):
+        return await client.post(
+            "/api/terrapod/v1/roles/preview",
+            json={
+                "data": {
+                    "attributes": {
+                        "name": f"lv-{uuid.uuid4().hex[:8]}",
+                        "allow-labels": allow_labels,
+                        "workspace-permission": "read",
+                    }
+                }
+            },
+            headers=AUTH,
+        )
+
     async def test_both_values_are_reached_not_just_one(self, app, client):
         set_auth(app, admin_user())
         tag = uuid.uuid4().hex[:8]
+        await _ws(client, f"lv-prod-{tag}", labels={"env": f"prod{tag}"})
+        await _ws(client, f"lv-stg-{tag}", labels={"env": f"stg{tag}"})
+        await _ws(client, f"lv-dev-{tag}", labels={"env": f"dev{tag}"})
 
-        prod = await _ws(client, f"lv-prod-{tag}", labels={"env": "prod", "grp": tag})
-        stg = await _ws(client, f"lv-stg-{tag}", labels={"env": "stg", "grp": tag})
-        dev = await _ws(client, f"lv-dev-{tag}", labels={"env": "dev", "grp": tag})
-
-        resp = await client.post(
-            "/api/terrapod/v1/roles/preview",
-            json={
-                "data": {
-                    "type": "role-previews",
-                    "attributes": {
-                        "allow-labels": {"env": ["prod", "stg"]},
-                        "capabilities": ["workspace:read"],
-                    },
-                }
-            },
-            headers=AUTH,
-        )
+        resp = await self._preview(client, {"env": [f"prod{tag}", f"stg{tag}"]})
         assert resp.status_code == 200, resp.text
 
-        granted = {e["name"] for e in resp.json()["data"]["attributes"]["granted"]}
-        assert f"lv-prod-{tag}" in granted, "the first value of the list was not reached"
-        assert f"lv-stg-{tag}" in granted, "the second value of the list was not reached"
-        assert f"lv-dev-{tag}" not in granted, "a value outside the list must not match"
-        assert prod and stg and dev  # ids unused; the names are what the preview reports
+        attrs = resp.json()["data"]["attributes"]
+        reached = {w["name"] for w in attrs["workspaces"]}
+        assert f"lv-prod-{tag}" in reached, "the first value of the list was not reached"
+        assert f"lv-stg-{tag}" in reached, "the second value of the list was not reached"
+        assert f"lv-dev-{tag}" not in reached, "a value outside the list must not match"
+        assert attrs["granted-count"] == 2
 
     async def test_a_scalar_rule_still_reaches_only_its_one_value(self, app, client):
-        """The negative: widening to lists must not make a scalar rule promiscuous."""
+        """The negative: widening to lists must not make a scalar rule
+        promiscuous."""
         set_auth(app, admin_user())
         tag = uuid.uuid4().hex[:8]
-        await _ws(client, f"sv-prod-{tag}", labels={"env": "prod", "grp": tag})
-        await _ws(client, f"sv-stg-{tag}", labels={"env": "stg", "grp": tag})
+        await _ws(client, f"sv-prod-{tag}", labels={"env": f"prod{tag}"})
+        await _ws(client, f"sv-stg-{tag}", labels={"env": f"stg{tag}"})
 
-        resp = await client.post(
-            "/api/terrapod/v1/roles/preview",
-            json={
-                "data": {
-                    "type": "role-previews",
-                    "attributes": {
-                        "allow-labels": {"env": "prod"},
-                        "capabilities": ["workspace:read"],
-                    },
-                }
-            },
-            headers=AUTH,
-        )
+        resp = await self._preview(client, {"env": f"prod{tag}"})
         assert resp.status_code == 200, resp.text
 
-        granted = {e["name"] for e in resp.json()["data"]["attributes"]["granted"]}
-        assert f"sv-prod-{tag}" in granted
-        assert f"sv-stg-{tag}" not in granted
+        attrs = resp.json()["data"]["attributes"]
+        reached = {w["name"] for w in attrs["workspaces"]}
+        assert f"sv-prod-{tag}" in reached
+        assert f"sv-stg-{tag}" not in reached
+        assert attrs["granted-count"] == 1
