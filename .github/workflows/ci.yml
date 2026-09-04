@@ -2056,6 +2056,9 @@ jobs:
     needs: [prepare, e2e-test]
     if: always() && needs.prepare.outputs.images_exist != 'true'
     runs-on: ubuntu-latest
+    # Literal, not ${{ env.* }}: the env context is NOT available in a job's
+    # `container:`. Same mirrored image the lint jobs use.
+    container: ghcr.io/mattrobinsonsre/mirror/node:24-alpine
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Download blob reports
@@ -2067,16 +2070,25 @@ jobs:
           pattern: blob-report-*
           path: all-blob-reports
           merge-multiple: true
+      # Merging blob reports is pure Node — it reads the shards' blob files and
+      # renders HTML. It needs the @playwright/test PACKAGE, not browsers, and
+      # `--ignore-scripts` already skipped Playwright's browser-download
+      # postinstall — so the ~2GB mcr.microsoft.com/playwright image this used to
+      # pull supplied browsers that were never installed and never used. That
+      # pull was most of the job's 257-335s.
+      #
+      # The mirrored node image is the same one the lint jobs use (~50MB), and
+      # the install is six packages / 14MB. Version fidelity comes from
+      # e2e/package-lock.json, which pins @playwright/test to the same 1.58.2 the
+      # shards ran — blob format is version-sensitive, so deriving it from the
+      # lockfile rather than a second hard-coded tag is what stops the two
+      # drifting apart.
       - name: Merge into HTML report
         continue-on-error: true
+        working-directory: e2e
         run: |
-          docker run --rm \
-            -v "${{ github.workspace }}/e2e:/work" \
-            -v "${{ github.workspace }}/all-blob-reports:/work/all-blob-reports" \
-            -w /work \
-            -e HOME=/tmp \
-            mcr.microsoft.com/playwright:v1.58.2-noble \
-            sh -c "npm ci --ignore-scripts && npx playwright merge-reports --reporter html ./all-blob-reports"
+          npm ci --ignore-scripts
+          npx playwright merge-reports --reporter html ../all-blob-reports
       - name: Upload merged HTML report
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
