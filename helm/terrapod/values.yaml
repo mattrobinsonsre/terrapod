@@ -464,9 +464,9 @@ api:
       # They are fetched lazily and only when needed: opa when a policy set
       # applies to a run, trivy only when it is the selected scan engine.
       platform_tools:
-        opa_version: "1.19.0"
+        opa_version: "1.20.1"
         trivy_version: "0.74.0"
-        checkov_version: "3.3.9"
+        checkov_version: "3.3.16"
         opa_mirror_url: "https://github.com/open-policy-agent/opa/releases/download"
         trivy_mirror_url: "https://github.com/aquasecurity/trivy/releases/download"
         checkov_mirror_url: "https://github.com/bridgecrewio/checkov/releases/download"
@@ -1038,6 +1038,38 @@ api:
     # KEK durability is the backend's job — and for `static` it is YOURS: losing
     # the master key makes encrypted data unrecoverable. See
     # docs/encryption-at-rest.md before enabling.
+    # Vault as a first-class variable value source (#1439). A variable may hold a
+    # *reference* instead of a literal; Terrapod resolves it server-side at run
+    # time and delivers the result through the per-run Secret, so Vault stays the
+    # source of truth and nothing is copied into Terrapod's database.
+    #
+    # A LIST from the outset, not a single address: config keys are a stability-
+    # gated surface, so a scalar could never be removed later.
+    #
+    # IMPORTANT: the policy attached to the Vault role below is the real access
+    # boundary. Anyone who can set a workspace variable can ask Terrapod to read
+    # any path that role reaches. Scope it tightly; see docs/vault.md.
+    vault:
+      enabled: false
+      timeout_seconds: 10
+      instances: []
+      # - name: default
+      #   default: true            # used when a reference omits `vault`
+      #   address: https://vault.internal:8200
+      #   namespace: ""            # Vault Enterprise only
+      #   auth:
+      #     method: kubernetes     # kubernetes | approle | token
+      #     mount: kubernetes      # the auth mount path you enabled in Vault
+      #     role: terrapod         # role bound to Terrapod's ServiceAccount
+      #   # Optional second line behind the Vault policy: prefixes Terrapod will
+      #   # refuse to read outside of, whatever the policy permits.
+      #   paths: []
+      #   tls_skip_verify: false
+      #   # approle/token only — never kubernetes, which stores no credential.
+      #   # Injected as TERRAPOD_VAULT_<NAME>_SECRET via secretKeyRef.
+      #   existingSecret: ""
+      #   existingSecretKey: secret
+
     encryption:
       enabled: false
       # static (operator-held key, works anywhere) | vault_transit (CSP-agnostic,
@@ -1407,6 +1439,20 @@ runners:
   priorityClassName: ""
   topologySpreadConstraints: []
   podSecurityContext: {}
+  # Static /etc/hosts entries for runner pods (#1459). For an internal hostname
+  # cluster DNS does not serve — an admin endpoint reachable only by IP, say.
+  #   hostAliases:
+  #     - ip: "10.0.0.1"
+  #       hostnames: ["admin.example.internal"]
+  hostAliases: []
+  # Extra volumes/mounts for runner Jobs (#1458), mirroring api/web/listener.
+  # Runner Jobs could otherwise receive secrets only as environment variables,
+  # but Terraform commonly reads a credential, CA bundle or keypair from a FILE
+  # (`file("/path/to/token")` in a provider block). Mounting avoids exposing the
+  # value in the process environment purely to write it back out in a hook.
+  # APPENDED to the volumes the Job already builds, never replacing them.
+  extraVolumes: []
+  extraVolumeMounts: []
   ttlSecondsAfterFinished: 600  # Clean up completed Jobs after 10 min
   terminationGracePeriodSeconds: 120  # Time budget for graceful shutdown + artifact uploads
   tokenTTLSeconds: 3600         # Runner token TTL (default 1 hour)

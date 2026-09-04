@@ -21,6 +21,7 @@ data terrapod_architecture_critique.workspace_id required=true optional=false co
 data terrapod_catalog_instances.catalog_item_id required=true optional=false computed=false sensitive=false type=basetypes.StringType
 data terrapod_catalog_instances.instances required=false optional=false computed=true sensitive=false type=types.ListType[types.ObjectType["agent_pool_id":basetypes.StringType, "id":basetypes.StringType, "name":basetypes.StringType, "version_pin":basetypes.StringType]]
 data terrapod_catalog_instances.name_contains required=false optional=true computed=false sensitive=false type=basetypes.StringType
+data terrapod_role.allow_all required=false optional=false computed=true sensitive=false type=basetypes.BoolType
 data terrapod_role.allow_labels required=false optional=false computed=true sensitive=false type=types.MapType[basetypes.StringType]
 data terrapod_role.allow_names required=false optional=false computed=true sensitive=false type=types.ListType[basetypes.StringType]
 data terrapod_role.built_in required=false optional=false computed=true sensitive=false type=basetypes.BoolType
@@ -58,6 +59,7 @@ data terrapod_vcs_connection.vcs_provider required=false optional=false computed
 data terrapod_workspace.agent_pool_id required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.agent_pool_ids required=false optional=false computed=true sensitive=false type=types.ListType[basetypes.StringType]
 data terrapod_workspace.agent_pool_name required=false optional=false computed=true sensitive=false type=basetypes.StringType
+data terrapod_workspace.agent_pool_names required=false optional=false computed=true sensitive=false type=types.ListType[basetypes.StringType]
 data terrapod_workspace.ai_summary_context required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.ai_summary_mode required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.auto_apply required=false optional=false computed=true sensitive=false type=basetypes.BoolType
@@ -259,6 +261,7 @@ resource terrapod_remote_state_consumer.created_by required=false optional=false
 resource terrapod_remote_state_consumer.id required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_remote_state_consumer.producer_workspace_id required=true optional=false computed=false sensitive=false type=basetypes.StringType
 resource terrapod_remote_state_consumer.producer_workspace_name required=false optional=false computed=true sensitive=false type=basetypes.StringType
+resource terrapod_role.allow_all required=false optional=true computed=true sensitive=false type=basetypes.BoolType
 resource terrapod_role.allow_labels required=false optional=true computed=false sensitive=false type=types.MapType[basetypes.StringType]
 resource terrapod_role.allow_names required=false optional=true computed=false sensitive=false type=types.ListType[basetypes.StringType]
 resource terrapod_role.built_in required=false optional=false computed=true sensitive=false type=basetypes.BoolType
@@ -315,8 +318,10 @@ resource terrapod_variable.sensitive required=false optional=true computed=true 
 resource terrapod_variable.structured required=false optional=true computed=true sensitive=false type=basetypes.BoolType
 resource terrapod_variable.updated_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_variable.value required=false optional=true computed=false sensitive=true type=basetypes.StringType
+resource terrapod_variable.value_source required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_variable.version_id required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_variable.workspace_id required=true optional=false computed=false sensitive=false type=basetypes.StringType
+resource terrapod_variable_set.assignment_rule required=false optional=true computed=false sensitive=false type=types.ObjectType["agent_pool_id":basetypes.StringType, "drift_status":basetypes.StringType, "execution_backend":basetypes.StringType, "execution_mode":basetypes.StringType, "has_vcs":basetypes.BoolType, "labels":types.MapType[basetypes.StringType], "locked":basetypes.BoolType, "name_glob":basetypes.StringType, "name_prefix":basetypes.StringType, "owner_email":basetypes.StringType, "terraform_version":basetypes.StringType, "vcs_connection_id":basetypes.StringType]
 resource terrapod_variable_set.created_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_variable_set.description required=false optional=true computed=false sensitive=false type=basetypes.StringType
 resource terrapod_variable_set.global required=false optional=true computed=true sensitive=false type=basetypes.BoolType
@@ -336,6 +341,7 @@ resource terrapod_variable_set_variable.sensitive required=false optional=true c
 resource terrapod_variable_set_variable.structured required=false optional=true computed=true sensitive=false type=basetypes.BoolType
 resource terrapod_variable_set_variable.updated_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_variable_set_variable.value required=false optional=true computed=false sensitive=true type=basetypes.StringType
+resource terrapod_variable_set_variable.value_source required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_variable_set_variable.varset_id required=true optional=false computed=false sensitive=false type=basetypes.StringType
 resource terrapod_variable_set_variable.version_id required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_variable_set_workspace.id required=false optional=false computed=true sensitive=false type=basetypes.StringType
@@ -360,6 +366,7 @@ resource terrapod_vcs_connection.webhook_secret required=false optional=true com
 resource terrapod_workspace.agent_pool_id required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.agent_pool_ids required=false optional=true computed=true sensitive=false type=types.ListType[basetypes.StringType]
 resource terrapod_workspace.agent_pool_name required=false optional=false computed=true sensitive=false type=basetypes.StringType
+resource terrapod_workspace.agent_pool_names required=false optional=false computed=true sensitive=false type=types.ListType[basetypes.StringType]
 resource terrapod_workspace.ai_summary_context required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.ai_summary_mode required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.auto_apply required=false optional=true computed=true sensitive=false type=basetypes.BoolType

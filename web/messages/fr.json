@@ -652,7 +652,9 @@
       "allowLabelsShort": "Labels autorisés",
       "allowNamesShort": "Noms autorisés",
       "denyLabelsShort": "Labels refusés",
-      "denyNamesShort": "Noms refusés"
+      "denyNamesShort": "Noms refusés",
+      "allowAll": "Accorder sur tout",
+      "allowAllHelp": "Correspond à toutes les ressources, y compris celles créées ultérieurement. Les règles de refus s''appliquent toujours. Préférez ceci à l''étiquetage de chaque espace de travail — un espace créé sans l''étiquette sortirait silencieusement du rôle."
     },
     "assignForm": {
       "provider": "Fournisseur",
@@ -723,7 +725,8 @@
       "deleteRole": "Échec de la suppression du rôle",
       "setAssignment": "Échec de la définition de l'attribution",
       "setAssignmentStatus": "Échec de la définition de l'attribution ({status})",
-      "deleteAssignment": "Échec de la suppression de l'attribution"
+      "deleteAssignment": "Échec de la suppression de l'attribution",
+      "conflictingLabelKeys": "{keys} reçoit plusieurs valeurs. Une règle d''étiquette ne retient qu''une valeur par clé ; la dernière remplacerait silencieusement les précédentes. Plusieurs valeurs pour une clé sont acceptées par l''API mais pas encore configurables ici."
     }
   },
   "adminVcs": {
@@ -919,7 +922,39 @@
         "deleteVar": "Échec de la suppression de la variable",
         "addWorkspace": "Échec de l'ajout de l'espace de travail",
         "removeWorkspace": "Échec du retrait de l'espace de travail"
-      }
+      },
+      "assignedBy": "Attribué par",
+      "managedByRule": "Géré par règle",
+      "assignmentRule": "Règle d'attribution",
+      "assignmentRuleNone": "Aucune règle. Les espaces de travail sont attribués un par un.",
+      "assignmentRuleDescription": "Les espaces de travail correspondant à cette règle reçoivent l'ensemble automatiquement, réévalué à chaque exécution.",
+      "source": {
+        "explicit": "Attribué",
+        "global": "Global",
+        "rule": "Règle"
+      },
+      "ruleLabels": "Étiquettes",
+      "ruleNamePrefix": "Préfixe du nom",
+      "ruleNameGlob": "Motif du nom",
+      "ruleExecutionBackend": "Moteur d'exécution",
+      "ruleExecutionMode": "Mode d'exécution",
+      "ruleTerraformVersion": "Version",
+      "ruleOwnerEmail": "Propriétaire",
+      "ruleAgentPoolId": "Pool d'agents",
+      "ruleVcsConnectionId": "Connexion VCS",
+      "ruleDriftStatus": "État de dérive",
+      "ruleLocked": "Verrouillé",
+      "ruleHasVcs": "Connecté au VCS",
+      "ruleAny": "Indifférent",
+      "ruleEmpty": "Ajoutez au moins un filtre — une règle vide ne correspond à rien.",
+      "rulePreview": "{count, plural, =0 {Ne correspond à aucun espace de travail} one {Correspond à # espace de travail} other {Correspond à # espaces de travail}}",
+      "rulePreviewLoading": "Vérification des espaces de travail correspondants…",
+      "rulePreviewInvalid": "Cette règle n'a pas pu être vérifiée. L'enregistrement indiquera le problème exact.",
+      "ruleConflictsWithGlobal": "Un ensemble global s'applique déjà à tous les espaces de travail ; une règle ne peut y être associée.",
+      "valueSource": "Source de la valeur",
+      "valueSourceStatic": "Saisir une valeur",
+      "valueSourceVault": "Lire depuis Vault",
+      "vaultHint": "Terrapod lit le secret depuis Vault au moment de l'exécution. Rien n'est stocké ici."
     }
   },
   "adminAutodiscovery": {
@@ -2236,7 +2271,8 @@
       "cost": "Coût",
       "architecture": "Architecture",
       "insights": "Perspectives",
-      "automation": "Automatisation"
+      "automation": "Automatisation",
+      "access": "Accès"
     },
     "lifecycle": {
       "pendingDeletion": "Suppression en attente",
@@ -2414,7 +2450,24 @@
       "gitRewrite": "Protocol rewrite",
       "gitRewriteNone": "None",
       "gitRewriteToHttps": "Rewrite ssh:// sources to https:// (use this token)",
-      "gitRewriteToSsh": "Rewrite https:// sources to ssh:// (use this key)"
+      "gitRewriteToSsh": "Rewrite https:// sources to ssh:// (use this key)",
+      "valueSource": "Source de la valeur",
+      "sourceStatic": "Saisir une valeur",
+      "sourceVault": "Lire depuis Vault",
+      "sourceStaticHelp": "La valeur est stockée dans Terrapod et transmise à l'exécution.",
+      "sourceVaultHelp": "Terrapod lit le secret depuis Vault au moment de l'exécution. Rien n'est stocké ici.",
+      "vaultMount": "Point de montage",
+      "vaultPath": "Chemin",
+      "vaultField": "Champ",
+      "vaultEngine": "Moteur de secrets",
+      "vaultEngineKv2": "Statique (kv-v2)",
+      "vaultEngineDynamic": "Dynamique (généré à chaque exécution)",
+      "vaultInstance": "Vault",
+      "vaultInstanceDefault": "Par défaut",
+      "vaultSecretNeverStored": "Le chemin est enregistré, jamais le secret. La politique Vault de Terrapod détermine ce qu'il peut lire.",
+      "sourceVaultBadge": "Vault",
+      "vaultReferenceUnreadable": "Référence Vault illisible",
+      "vaultInstanceDefaultNamed": "Par défaut ({name})"
     },
     "runs": {
       "options": "Options",
@@ -2640,6 +2693,18 @@
       "architecture": "Architecture",
       "runTasks": "Tâches",
       "runTriggers": "Déclencheurs"
+    },
+    "applicableVarsets": {
+      "title": "Ensembles de variables",
+      "description": "Ensembles de variables qui s'appliquent à cet espace de travail. Gérez-les depuis l'ensemble lui-même.",
+      "loadError": "Échec du chargement des ensembles de variables",
+      "priority": "Priorité",
+      "variableCount": "{count, plural, one {# variable} other {# variables}}",
+      "source": {
+        "explicit": "Attribué",
+        "global": "Global",
+        "rule": "Correspond à une règle"
+      }
     }
   },
   "graphs": {
@@ -3018,5 +3083,54 @@
     "restoreConfirm": "Restaurer l''état de « {name} » ?\n\nCela crée un NOUVEAU workspace — l''original n''est pas rétabli. Il revient sans auto-apply, sans détection de dérive et sans connexion VCS ; les variables et l''historique des exécutions ne reviennent pas. Seul l''état est récupéré.",
     "restoreDone": "{versions, plural, one {# version d''état récupérée} other {# versions d''état récupérées}} dans le nouveau workspace « {name} ». Vérifiez ses paramètres avant d''activer l''auto-apply ou le VCS.",
     "restoreAgainConfirm": "« {name} » a déjà été restauré, vers {existing}.\n\nLe restaurer à nouveau crée un SECOND workspace portant le même lignage d''état sur la même infrastructure. Un apply dans l''un fera alors ressembler le prochain plan de l''autre à une dérive totale.\n\nNe continuez que si le workspace restauré précédemment a disparu."
+  },
+  "roleReach": {
+    "title": "Ce que ce rôle atteint",
+    "checking": "Vérification…",
+    "failed": "Impossible de déterminer la portée de cette règle.",
+    "noAllowRules": "Ajoutez un label ou un nom d''autorisation pour voir quels espaces de travail ce rôle atteindrait.",
+    "granted": "accordé",
+    "deniedCount": "refusé",
+    "matched": "{count} correspondant aux règles d''autorisation",
+    "andMore": "…et {count} de plus",
+    "excludedByDeny": "Exclus par les règles de refus",
+    "reason": {
+      "allowName": "par nom",
+      "denyName": "refusé par nom",
+      "allowLabel": "correspond à {rule}",
+      "denyLabel": "refusé par {rule}"
+    },
+    "note": {
+      "catalogClamped": "Géré par le catalogue — limité à la lecture",
+      "everyoneFloor": "Lisible par tous",
+      "hasOwner": "Le propriétaire a déjà les droits d''administration"
+    },
+    "reachesNothing": "Cette règle ne concerne rien.",
+    "allowAllBanner": "Accorde sur toutes les ressources. Les règles de refus s''appliquent toujours.",
+    "axis": {
+      "workspace": "Espaces de travail",
+      "pool": "Pools d''agents",
+      "registry": "Registre",
+      "catalog": "Éléments du catalogue"
+    }
+  },
+  "resourceAccess": {
+    "title": "Qui peut y accéder",
+    "subtitle": "Rôles dont les règles correspondent à cet espace de travail, et qui les détient.",
+    "loading": "Chargement…",
+    "failed": "Impossible de déterminer qui peut y accéder.",
+    "forbidden": "Cette réponse couvre l''ensemble du parc ; elle n''est donc montrée qu''aux administrateurs et auditeurs de la plateforme.",
+    "noRoles": "Aucune règle de rôle ne correspond à cet espace de travail.",
+    "deniedRoles": "Correspondant, puis exclu par une règle de refus",
+    "alsoReachable": "Également accessible sans aucun rôle",
+    "heldBy": "Détenu par {who}",
+    "heldByNobody": "Détenu par personne — n''accorde rien en pratique",
+    "path": {
+      "platformAdmin": "Les administrateurs de la plateforme atteignent toutes les ressources",
+      "platformAudit": "Les auditeurs de la plateforme peuvent lire toutes les ressources",
+      "owner": "Le propriétaire y détient les droits d''administration",
+      "everyoneFloor": "Étiqueté access: everyone — lisible par tous",
+      "catalogClamped": "Géré par le catalogue — toute attribution non-admin est limitée à la lecture"
+    }
   }
 }

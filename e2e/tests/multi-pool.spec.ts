@@ -24,8 +24,10 @@ test.describe('Multi-pool workspace routing', () => {
 
   test('a workspace renders every pool in its set, not just the first', async ({ page }) => {
     const token = getStoredToken('admin.json');
-    const poolA = await createAgentPool(token, uniqueName('e2e-pool-a'));
-    const poolB = await createAgentPool(token, uniqueName('e2e-pool-b'));
+    const nameA = uniqueName('e2e-pool-a');
+    const nameB = uniqueName('e2e-pool-b');
+    const poolA = await createAgentPool(token, nameA);
+    const poolB = await createAgentPool(token, nameB);
     const wsId = await createWorkspace(token, uniqueName('e2e-multipool'), {
       'execution-mode': 'agent',
       'agent-pool-ids': [poolA, poolB],
@@ -37,9 +39,16 @@ test.describe('Multi-pool workspace routing', () => {
     // first would look correct while hiding half the set.
     const pools = page.getByText('Agent pools', { exact: true });
     await expect(pools).toBeVisible({ timeout: 10_000 });
+    // By NAME, not by a slice of the UUID. This previously asserted the first 8
+    // characters of the pool id, which pinned the very defect it now guards
+    // against: the read-only view rendered `apool-<uuid>` because names were
+    // resolved from a pool list fetched only on entering edit mode.
+    for (const name of [nameA, nameB]) {
+      await expect(page.getByText(name, { exact: false }).first()).toBeVisible();
+    }
+    // And the raw id must NOT be on the page.
     for (const id of [poolA, poolB]) {
-      await expect(page.getByText(id.replace(/^apool-/, '').slice(0, 8), { exact: false }).first())
-        .toBeVisible();
+      await expect(page.getByText(id, { exact: false })).toHaveCount(0);
     }
   });
 

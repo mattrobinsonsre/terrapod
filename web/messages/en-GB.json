@@ -74,5 +74,21 @@
         "none": "Nothing (single colour)"
       }
     }
+  },
+  "roleReach": {
+    "note": {
+      "catalogClamped": "Catalogue-managed — capped at read"
+    },
+    "axis": {
+      "catalog": "Catalogue items"
+    }
+  },
+  "resourceAccess": {
+    "path": {
+      "catalogClamped": "Catalogue-managed — every non-admin grant is capped at read"
+    }
+  },
+  "adminVariableSets": {
+    "detail": {}
   }
 }

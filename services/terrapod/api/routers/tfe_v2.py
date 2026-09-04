@@ -823,6 +823,17 @@ def _workspace_json(
                 "agent-pool-id": f"apool-{ws_pools[0]}" if ws_pools else None,
                 "agent-pool-ids": [f"apool-{p}" for p in ws_pools],
                 "agent-pool-name": (ws_pool_names[0] if ws_pool_names else None),
+                # Names for the WHOLE set, positionally matching
+                # `agent-pool-ids`. `agent-pool-name` above is the singular
+                # back-compat projection and only ever describes element 0.
+                #
+                # Emitted because the alternative is every consumer fetching
+                # the entire pool list purely to turn ids into labels — which
+                # the web UI did only when entering edit mode, so the read-only
+                # view rendered raw `apool-<uuid>` and nothing else. The names
+                # are already resolved here; withholding them made a UUID the
+                # default thing an operator sees.
+                "agent-pool-names": list(ws_pool_names),
                 "vcs-connection-name": ws.vcs_connection.name if ws.vcs_connection else None,
                 "labels": ws.labels or {},
                 # `tag-names` is what OpenTofu/Terraform's cloud backend
@@ -1649,6 +1660,24 @@ async def update_workspace(
                 status_code=422,
                 detail="execution-mode must be 'local' or 'agent'",
             )
+        if attrs["execution-mode"] == "local" and ws.execution_mode != "local":
+            # Vault references resolve only on the agent claim path, so a local
+            # workspace would silently deliver nothing. Shared with the bulk
+            # switch (workspace_bulk) so the two paths cannot diverge.
+            # Counts variables arriving through a variable SET as well as the
+            # workspace's own (#1463) — a set delivers them just the same, and
+            # guarding only the workspace's own left the hole open.
+            from terrapod.services.variable_service import count_vault_variables_reaching
+
+            n = await count_vault_variables_reaching(db, ws.id)
+            if n:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"This workspace receives {n} Vault-sourced variable(s), from "
+                    "its own variables or a variable set, which only resolve under agent "
+                    "execution. Switching to local would leave them delivering nothing. "
+                    "Remove or convert them first, or unassign the variable set.",
+                )
         ws.execution_mode = attrs["execution-mode"]
     if "auto-apply" in attrs and "auto-apply-mode" in attrs:
         raise HTTPException(

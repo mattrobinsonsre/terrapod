@@ -465,6 +465,30 @@ async def _apply(
     """
     changed: list[dict] = []
     unchanged: list[dict] = []
+    # Switching to local strands Vault-sourced variables (they resolve only on
+    # the agent claim path). The single-workspace PATCH refuses this; the bulk
+    # path was the way round it (#B1). Checked up front so the all-or-nothing
+    # batch fails cleanly, naming every affected workspace, before any mutation.
+    if plan["fields"].get("execution_mode") == "local":
+        from terrapod.services.variable_service import count_vault_variables_reaching
+
+        blocked = [
+            ws.name
+            for ws in workspaces
+            if ws.execution_mode != "local" and await count_vault_variables_reaching(db, ws.id)
+        ]
+        if blocked:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "Refusing to switch these workspaces to local execution — they "
+                    "receive Vault-sourced variables, from their own variables or a "
+                    "variable set, that only resolve under agent execution and would "
+                    f"silently deliver nothing: {', '.join(sorted(blocked))}. "
+                    "Remove or convert those variables first, or unassign the set."
+                ),
+            )
+
     for ws in workspaces:
         diff = _diff_for(ws, plan)
 

@@ -652,7 +652,9 @@
       "allowLabelsShort": "Povolit štítky",
       "allowNamesShort": "Povolit názvy",
       "denyLabelsShort": "Zakázat štítky",
-      "denyNamesShort": "Zakázat názvy"
+      "denyNamesShort": "Zakázat názvy",
+      "allowAll": "Udělit na všem",
+      "allowAllHelp": "Odpovídá každému zdroji, včetně později vytvořených. Pravidla odepření stále platí. Použijte to místo označování každého pracovního prostoru — prostor vytvořený bez štítku by tiše vypadl z role."
     },
     "assignForm": {
       "provider": "Poskytovatel",
@@ -723,7 +725,8 @@
       "deleteRole": "Nepodařilo se smazat roli",
       "setAssignment": "Nepodařilo se nastavit přiřazení",
       "setAssignmentStatus": "Nepodařilo se nastavit přiřazení ({status})",
-      "deleteAssignment": "Nepodařilo se smazat přiřazení"
+      "deleteAssignment": "Nepodařilo se smazat přiřazení",
+      "conflictingLabelKeys": "{keys} má více než jednu hodnotu. Pravidlo štítku drží jednu hodnotu na klíč, takže poslední by tiše nahradila předchozí. Více hodnot pro jeden klíč API podporuje, ale zde je zatím nastavit nelze."
     }
   },
   "adminVcs": {
@@ -919,7 +922,39 @@
         "deleteVar": "Nepodařilo se smazat proměnnou",
         "addWorkspace": "Nepodařilo se přidat pracovní prostor",
         "removeWorkspace": "Nepodařilo se odebrat pracovní prostor"
-      }
+      },
+      "assignedBy": "Přiřazeno podle",
+      "managedByRule": "Spravováno pravidlem",
+      "assignmentRule": "Pravidlo přiřazení",
+      "assignmentRuleNone": "Žádné pravidlo. Pracovní prostory se přiřazují jednotlivě.",
+      "assignmentRuleDescription": "Pracovní prostory odpovídající tomuto pravidlu obdrží sadu automaticky; pravidlo se vyhodnocuje při každém běhu.",
+      "source": {
+        "explicit": "Přiřazeno",
+        "global": "Globální",
+        "rule": "Pravidlo"
+      },
+      "ruleLabels": "Štítky",
+      "ruleNamePrefix": "Předpona názvu",
+      "ruleNameGlob": "Vzor názvu",
+      "ruleExecutionBackend": "Spouštěcí backend",
+      "ruleExecutionMode": "Režim spuštění",
+      "ruleTerraformVersion": "Verze",
+      "ruleOwnerEmail": "Vlastník",
+      "ruleAgentPoolId": "Fond agentů",
+      "ruleVcsConnectionId": "Připojení VCS",
+      "ruleDriftStatus": "Stav odchylky",
+      "ruleLocked": "Uzamčeno",
+      "ruleHasVcs": "Připojeno k VCS",
+      "ruleAny": "Libovolné",
+      "ruleEmpty": "Přidejte alespoň jeden filtr — prázdné pravidlo neodpovídá ničemu.",
+      "rulePreview": "{count, plural, =0 {Neodpovídá žádnému pracovnímu prostoru} one {Odpovídá # pracovnímu prostoru} few {Odpovídá # pracovním prostorům} many {Odpovídá # pracovního prostoru} other {Odpovídá # pracovním prostorům}}",
+      "rulePreviewLoading": "Zjišťuji, které pracovní prostory odpovídají…",
+      "rulePreviewInvalid": "Toto pravidlo nešlo ověřit. Uložení nahlásí přesný problém.",
+      "ruleConflictsWithGlobal": "Globální sada už platí pro všechny pracovní prostory, takže s ní nelze použít pravidlo.",
+      "valueSource": "Zdroj hodnoty",
+      "valueSourceStatic": "Zadat hodnotu",
+      "valueSourceVault": "Načíst z Vaultu",
+      "vaultHint": "Terrapod načte tajemství z Vaultu při běhu. Zde se nic neukládá."
     }
   },
   "adminAutodiscovery": {
@@ -2236,7 +2271,8 @@
       "cost": "Náklady",
       "architecture": "Architektura",
       "insights": "Přehledy",
-      "automation": "Automatizace"
+      "automation": "Automatizace",
+      "access": "Přístup"
     },
     "lifecycle": {
       "pendingDeletion": "Čeká na smazání",
@@ -2414,7 +2450,24 @@
       "gitRewrite": "Protocol rewrite",
       "gitRewriteNone": "None",
       "gitRewriteToHttps": "Rewrite ssh:// sources to https:// (use this token)",
-      "gitRewriteToSsh": "Rewrite https:// sources to ssh:// (use this key)"
+      "gitRewriteToSsh": "Rewrite https:// sources to ssh:// (use this key)",
+      "valueSource": "Zdroj hodnoty",
+      "sourceStatic": "Zadat hodnotu",
+      "sourceVault": "Načíst z Vaultu",
+      "sourceStaticHelp": "Hodnota se uloží v Terrapodu a předá se běhu.",
+      "sourceVaultHelp": "Terrapod načte tajemství z Vaultu při běhu. Zde se nic neukládá.",
+      "vaultMount": "Přípojka",
+      "vaultPath": "Cesta",
+      "vaultField": "Pole",
+      "vaultEngine": "Engine tajemství",
+      "vaultEngineKv2": "Statické (kv-v2)",
+      "vaultEngineDynamic": "Dynamické (vytvořeno pro každý běh)",
+      "vaultInstance": "Vault",
+      "vaultInstanceDefault": "Výchozí",
+      "vaultSecretNeverStored": "Ukládá se cesta, nikdy tajemství. Co lze číst, určuje politika Vaultu pro Terrapod.",
+      "sourceVaultBadge": "Vault",
+      "vaultReferenceUnreadable": "Nečitelný odkaz na Vault",
+      "vaultInstanceDefaultNamed": "Výchozí ({name})"
     },
     "runs": {
       "options": "Možnosti",
@@ -2640,6 +2693,18 @@
       "architecture": "Architektura",
       "runTasks": "Úkoly",
       "runTriggers": "Triggery"
+    },
+    "applicableVarsets": {
+      "title": "Sady proměnných",
+      "description": "Sady proměnných platné pro tento pracovní prostor. Spravujte je přímo v sadě.",
+      "loadError": "Nepodařilo se načíst sady proměnných",
+      "priority": "Priorita",
+      "variableCount": "{count, plural, one {# proměnná} few {# proměnné} many {# proměnné} other {# proměnných}}",
+      "source": {
+        "explicit": "Přiřazeno",
+        "global": "Globální",
+        "rule": "Odpovídá pravidlu"
+      }
     }
   },
   "graphs": {
@@ -3018,5 +3083,54 @@
     "restoreConfirm": "Obnovit stav „{name}“?\n\nVytvoří se NOVÝ pracovní prostor — původní se nevrátí. Vrátí se s vypnutým auto-apply i detekcí driftu a bez připojení VCS; proměnné ani historie běhů se nevrátí. Obnoví se pouze stav.",
     "restoreDone": "Obnoveno {versions, plural, one {# verze stavu} few {# verze stavu} many {# verze stavu} other {# verzí stavu}} do nového pracovního prostoru „{name}“. Před zapnutím auto-apply nebo VCS zkontrolujte nastavení.",
     "restoreAgainConfirm": "„{name}“ už byl obnoven, do {existing}.\n\nDalší obnovení vytvoří DRUHÝ workspace se stejnou linií stavu nad stejnou infrastrukturou. Apply v kterémkoli z nich pak způsobí, že další plán toho druhého bude vypadat jako rozsáhlý drift.\n\nPokračujte jen tehdy, pokud dříve obnovený workspace už neexistuje."
+  },
+  "roleReach": {
+    "title": "Co tato role zasahuje",
+    "checking": "Ověřování…",
+    "failed": "Nepodařilo se zjistit dosah tohoto pravidla.",
+    "noAllowRules": "Přidejte povolující štítek nebo název, abyste viděli, které pracovní prostory by tato role zasáhla.",
+    "granted": "uděleno",
+    "deniedCount": "odepřeno",
+    "matched": "{count} odpovídá povolujícím pravidlům",
+    "andMore": "…a {count} dalších",
+    "excludedByDeny": "Vyloučeno pravidly odepření",
+    "reason": {
+      "allowName": "podle názvu",
+      "denyName": "odepřeno podle názvu",
+      "allowLabel": "odpovídá {rule}",
+      "denyLabel": "odepřeno pravidlem {rule}"
+    },
+    "note": {
+      "catalogClamped": "Spravováno katalogem — omezeno na čtení",
+      "everyoneFloor": "Čitelné pro všechny",
+      "hasOwner": "Vlastník už má práva správce"
+    },
+    "reachesNothing": "Toto pravidlo nic nezasahuje.",
+    "allowAllBanner": "Uděluje na všech zdrojích. Pravidla odepření stále platí.",
+    "axis": {
+      "workspace": "Pracovní prostory",
+      "pool": "Skupiny agentů",
+      "registry": "Registr",
+      "catalog": "Položky katalogu"
+    }
+  },
+  "resourceAccess": {
+    "title": "Kdo sem má přístup",
+    "subtitle": "Role, jejichž pravidla odpovídají tomuto pracovnímu prostoru, a kdo je drží.",
+    "loading": "Načítání…",
+    "failed": "Nepodařilo se zjistit, kdo sem má přístup.",
+    "forbidden": "Tato odpověď zahrnuje celé prostředí, proto se zobrazuje pouze správcům a auditorům platformy.",
+    "noRoles": "Žádné pravidlo role neodpovídá tomuto pracovnímu prostoru.",
+    "deniedRoles": "Odpovídalo, poté vyloučeno pravidlem odepření",
+    "alsoReachable": "Dostupné i bez jakékoli role",
+    "heldBy": "Drží {who}",
+    "heldByNobody": "Nedrží nikdo — prakticky nic neuděluje",
+    "path": {
+      "platformAdmin": "Správci platformy dosáhnou na každý zdroj",
+      "platformAudit": "Auditoři platformy mohou číst každý zdroj",
+      "owner": "Vlastník zde má práva správce",
+      "everyoneFloor": "Označeno access: everyone — čitelné pro všechny",
+      "catalogClamped": "Spravováno katalogem — každé nesprávcovské udělení je omezeno na čtení"
+    }
   }
 }

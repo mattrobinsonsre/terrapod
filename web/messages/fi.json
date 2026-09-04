@@ -652,7 +652,9 @@
       "allowLabelsShort": "Salli tunnisteet",
       "allowNamesShort": "Salli nimet",
       "denyLabelsShort": "Estä tunnisteet",
-      "denyNamesShort": "Estä nimet"
+      "denyNamesShort": "Estä nimet",
+      "allowAll": "Myönnä kaikkeen",
+      "allowAllHelp": "Vastaa jokaista resurssia, myös myöhemmin luotuja. Estosäännöt ovat yhä voimassa. Käytä tätä sen sijaan, että merkitsisit jokaisen työtilan — ilman merkintää luotu työtila jäisi hiljaisesti roolin ulkopuolelle."
     },
     "assignForm": {
       "provider": "Palveluntarjoaja",
@@ -723,7 +725,8 @@
       "deleteRole": "Roolin poistaminen epäonnistui",
       "setAssignment": "Määrityksen asettaminen epäonnistui",
       "setAssignmentStatus": "Määrityksen asettaminen epäonnistui ({status})",
-      "deleteAssignment": "Määrityksen poistaminen epäonnistui"
+      "deleteAssignment": "Määrityksen poistaminen epäonnistui",
+      "conflictingLabelKeys": "{keys} sai useamman kuin yhden arvon. Tunnistesääntö pitää yhden arvon avainta kohden, joten viimeinen korvaisi aiemmat huomaamatta. API tukee useaa arvoa avainta kohden, mutta sitä ei voi vielä asettaa täällä."
     }
   },
   "adminVcs": {
@@ -919,7 +922,39 @@
         "deleteVar": "Muuttujan poistaminen epäonnistui",
         "addWorkspace": "Työtilan lisääminen epäonnistui",
         "removeWorkspace": "Työtilan poistaminen epäonnistui"
-      }
+      },
+      "assignedBy": "Määrittänyt",
+      "managedByRule": "Säännön hallinnoima",
+      "assignmentRule": "Määrityssääntö",
+      "assignmentRuleNone": "Ei sääntöä. Työtilat määritetään yksitellen.",
+      "assignmentRuleDescription": "Tätä sääntöä vastaavat työtilat saavat joukon automaattisesti, ja se arvioidaan uudelleen joka ajolla.",
+      "source": {
+        "explicit": "Määritetty",
+        "global": "Yleinen",
+        "rule": "Sääntö"
+      },
+      "ruleLabels": "Tunnisteet",
+      "ruleNamePrefix": "Nimen etuliite",
+      "ruleNameGlob": "Nimen kuvio",
+      "ruleExecutionBackend": "Suoritustausta",
+      "ruleExecutionMode": "Suoritustila",
+      "ruleTerraformVersion": "Versio",
+      "ruleOwnerEmail": "Omistaja",
+      "ruleAgentPoolId": "Agenttivaranto",
+      "ruleVcsConnectionId": "VCS-yhteys",
+      "ruleDriftStatus": "Poikkeaman tila",
+      "ruleLocked": "Lukittu",
+      "ruleHasVcs": "VCS-yhteydessä",
+      "ruleAny": "Mikä tahansa",
+      "ruleEmpty": "Lisää vähintään yksi suodatin — tyhjä sääntö ei vastaa mitään.",
+      "rulePreview": "{count, plural, =0 {Ei vastaa yhtään työtilaa} one {Vastaa # työtilaa} other {Vastaa # työtilaa}}",
+      "rulePreviewLoading": "Tarkistetaan, mitkä työtilat vastaavat…",
+      "rulePreviewInvalid": "Tätä sääntöä ei voitu tarkistaa. Tallennus kertoo tarkan ongelman.",
+      "ruleConflictsWithGlobal": "Yleinen joukko koskee jo kaikkia työtiloja, joten sen kanssa ei voi käyttää sääntöä.",
+      "valueSource": "Arvon lähde",
+      "valueSourceStatic": "Syötä arvo",
+      "valueSourceVault": "Lue Vaultista",
+      "vaultHint": "Terrapod lukee salaisuuden Vaultista ajon aikana. Mitään ei tallenneta tänne."
     }
   },
   "adminAutodiscovery": {
@@ -2236,7 +2271,8 @@
       "cost": "Kustannukset",
       "architecture": "Arkkitehtuuri",
       "insights": "Näkemykset",
-      "automation": "Automaatio"
+      "automation": "Automaatio",
+      "access": "Käyttöoikeus"
     },
     "lifecycle": {
       "pendingDeletion": "Odottaa poistoa",
@@ -2414,7 +2450,24 @@
       "gitRewrite": "Protocol rewrite",
       "gitRewriteNone": "None",
       "gitRewriteToHttps": "Rewrite ssh:// sources to https:// (use this token)",
-      "gitRewriteToSsh": "Rewrite https:// sources to ssh:// (use this key)"
+      "gitRewriteToSsh": "Rewrite https:// sources to ssh:// (use this key)",
+      "valueSource": "Arvon lähde",
+      "sourceStatic": "Syötä arvo",
+      "sourceVault": "Lue Vaultista",
+      "sourceStaticHelp": "Arvo tallennetaan Terrapodiin ja toimitetaan ajolle.",
+      "sourceVaultHelp": "Terrapod lukee salaisuuden Vaultista ajon aikana. Mitään ei tallenneta tänne.",
+      "vaultMount": "Liitos",
+      "vaultPath": "Polku",
+      "vaultField": "Kenttä",
+      "vaultEngine": "Salaisuusmoottori",
+      "vaultEngineKv2": "Staattinen (kv-v2)",
+      "vaultEngineDynamic": "Dynaaminen (luodaan ajokohtaisesti)",
+      "vaultInstance": "Vault",
+      "vaultInstanceDefault": "Oletus",
+      "vaultSecretNeverStored": "Polku tallennetaan, ei koskaan salaisuutta. Terrapodin Vault-käytäntö määrää, mitä se voi lukea.",
+      "sourceVaultBadge": "Vault",
+      "vaultReferenceUnreadable": "Lukukelvoton Vault-viittaus",
+      "vaultInstanceDefaultNamed": "Oletus ({name})"
     },
     "runs": {
       "options": "Vaihtoehdot",
@@ -2640,6 +2693,18 @@
       "architecture": "Arkkitehtuuri",
       "runTasks": "Tehtävät",
       "runTriggers": "Käynnistimet"
+    },
+    "applicableVarsets": {
+      "title": "Muuttujajoukot",
+      "description": "Tähän työtilaan sovellettavat muuttujajoukot. Hallinnoi niitä itse joukosta.",
+      "loadError": "Muuttujajoukkojen lataaminen epäonnistui",
+      "priority": "Prioriteetti",
+      "variableCount": "{count, plural, one {# muuttuja} other {# muuttujaa}}",
+      "source": {
+        "explicit": "Määritetty",
+        "global": "Yleinen",
+        "rule": "Vastaa sääntöä"
+      }
     }
   },
   "graphs": {
@@ -3018,5 +3083,54 @@
     "restoreConfirm": "Palautetaanko kohteen ”{name}” tila?\n\nTämä luo UUDEN työtilan — alkuperäinen ei palaa. Se palaa automaattinen käyttöönotto ja poikkeamien tunnistus pois päältä eikä siinä ole VCS-yhteyttä; muuttujat ja ajohistoria eivät palaa. Vain tila pelastetaan.",
     "restoreDone": "Palautettiin {versions, plural, one {# tilaversio} other {# tilaversiota}} uuteen työtilaan ”{name}”. Tarkista asetukset ennen automaattisen käyttöönoton tai VCS:n kytkemistä.",
     "restoreAgainConfirm": "”{name}” on jo palautettu, kohteeseen {existing}.\n\nUusi palautus luo TOISEN workspacen, jolla on sama state-sukulinja saman infrastruktuurin päällä. Apply kummassa tahansa saa toisen seuraavan suunnitelman näyttämään täydeltä ajautumiselta.\n\nJatka vain, jos aiemmin palautettu workspace on poissa."
+  },
+  "roleReach": {
+    "title": "Mihin tämä rooli ulottuu",
+    "checking": "Tarkistetaan…",
+    "failed": "Säännön kattavuutta ei voitu selvittää.",
+    "noAllowRules": "Lisää salliva tunniste tai nimi nähdäksesi, mihin työtiloihin tämä rooli ulottuisi.",
+    "granted": "myönnetty",
+    "deniedCount": "evätty",
+    "matched": "{count} vastaa sallivia sääntöjä",
+    "andMore": "…ja {count} muuta",
+    "excludedByDeny": "Estosääntöjen sulkemat pois",
+    "reason": {
+      "allowName": "nimellä",
+      "denyName": "evätty nimellä",
+      "allowLabel": "vastaa sääntöä {rule}",
+      "denyLabel": "evätty säännöllä {rule}"
+    },
+    "note": {
+      "catalogClamped": "Luettelon hallinnoima — rajattu lukuoikeuteen",
+      "everyoneFloor": "Kaikkien luettavissa",
+      "hasOwner": "Omistajalla on jo järjestelmänvalvojan oikeudet"
+    },
+    "reachesNothing": "Tämä sääntö ei ulotu mihinkään.",
+    "allowAllBanner": "Myöntää kaikkiin resursseihin. Estosäännöt ovat yhä voimassa.",
+    "axis": {
+      "workspace": "Työtilat",
+      "pool": "Agenttiryhmät",
+      "registry": "Rekisteri",
+      "catalog": "Luettelon kohteet"
+    }
+  },
+  "resourceAccess": {
+    "title": "Kuka voi päästä tähän",
+    "subtitle": "Roolit, joiden säännöt vastaavat tätä työtilaa, ja keillä ne ovat.",
+    "loading": "Ladataan…",
+    "failed": "Ei voitu selvittää, kuka voi päästä tähän.",
+    "forbidden": "Tämä vastaus kattaa koko ympäristön, joten se näytetään vain alustan järjestelmänvalvojille ja tarkastajille.",
+    "noRoles": "Mikään roolisääntö ei vastaa tätä työtilaa.",
+    "deniedRoles": "Vastasi, mutta estosääntö sulki pois",
+    "alsoReachable": "Saavutettavissa myös ilman mitään roolia",
+    "heldBy": "Haltijana {who}",
+    "heldByNobody": "Ei kenelläkään — ei käytännössä myönnä mitään",
+    "path": {
+      "platformAdmin": "Alustan järjestelmänvalvojat ulottuvat jokaiseen resurssiin",
+      "platformAudit": "Alustan tarkastajat voivat lukea jokaisen resurssin",
+      "owner": "Omistajalla on täällä järjestelmänvalvojan oikeudet",
+      "everyoneFloor": "Merkitty access: everyone — kaikkien luettavissa",
+      "catalogClamped": "Luettelon hallinnoima — jokainen ei-järjestelmänvalvojan myönnös rajataan lukuoikeuteen"
+    }
   }
 }

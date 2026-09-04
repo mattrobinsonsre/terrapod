@@ -23,6 +23,7 @@ type roleDataSource struct {
 type roleDataSourceModel struct {
 	Name                types.String `tfsdk:"name"`
 	Description         types.String `tfsdk:"description"`
+	AllowAll            types.Bool   `tfsdk:"allow_all"`
 	AllowLabels         types.Map    `tfsdk:"allow_labels"`
 	AllowNames          types.List   `tfsdk:"allow_names"`
 	DenyLabels          types.Map    `tfsdk:"deny_labels"`
@@ -51,6 +52,7 @@ func (d *roleDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, r
 		Attributes: map[string]schema.Attribute{
 			"name":                 schema.StringAttribute{Required: true, Description: "Role name."},
 			"description":          schema.StringAttribute{Computed: true, Description: "Description."},
+			"allow_all":            schema.BoolAttribute{Computed: true, Description: "An estate-wide grant: this role's allow side matches EVERY resource on every axis. Deny rules still take precedence, so 'everything except the sealed ones' remains expressible, and it does not raise the role's permission level -- a role granting read still grants read, just everywhere. Use it instead of putting a shared label on every workspace: label and name rules are exact-match, so a workspace created without that label would silently fall outside the role. Defaults to false."},
 			"allow_labels":         schema.MapAttribute{Computed: true, ElementType: types.StringType, Description: "Allow labels."},
 			"allow_names":          schema.ListAttribute{Computed: true, ElementType: types.StringType, Description: "Allow name patterns."},
 			"deny_labels":          schema.MapAttribute{Computed: true, ElementType: types.StringType, Description: "Deny labels."},
@@ -118,6 +120,7 @@ func (d *roleDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 	config.CreatedAt = types.StringValue(role.CreatedAt)
 	config.UpdatedAt = types.StringValue(role.UpdatedAt)
 
+	config.AllowAll = types.BoolValue(role.AllowAll)
 	if len(role.AllowLabels) > 0 {
 		val, dl := types.MapValueFrom(ctx, types.StringType, role.AllowLabels)
 		resp.Diagnostics.Append(dl...)

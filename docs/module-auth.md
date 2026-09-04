@@ -29,6 +29,17 @@ many workspaces (define-once, assign-many, least-privilege). Multiple entries
 Values are always sensitive: the API forces `sensitive=true` for these categories
 and never returns the stored value.
 
+### Which entry is used
+
+An entry keyed to `host/org` covers every repository **under** that org —
+`host/org/anything.git` — not just the org path itself. A bare-host entry
+(`host`, no `/org`) covers everything on that host.
+
+When both exist, **the more specific one wins**: an entry for `github.com/org-a`
+serves that org and the bare `github.com` entry serves the rest. You do not have
+to order them; Terrapod emits the scoped entries first so the host-wide one
+cannot shadow them.
+
 ## Protocol rewriting (ssh ↔ https)
 
 Module `source` URLs become **protocol-agnostic** — Terrapod routes each fetch
@@ -117,3 +128,22 @@ External non-Terrapod registry tokens, `~/.netrc` HTTP-archive auth, and cloud
 object-store sources (`s3::`, `gcs::`) resolve through the runner's workload
 identity — the same short-lived, no-stored-secret path the rest of a run's cloud
 access uses.
+
+## If credentials appear configured but `init` still fails
+
+Before v1.5.4 the runner's `$HOME` sat on the read-only root filesystem, so the
+git configuration could not be written at all. The failure was logged at
+*warning* and the run continued without credentials, so `init` failed later
+against a private module source with an error naming neither the credential nor
+the cause — while the line above it said auth had been configured (#1442).
+
+Two things changed. `$HOME` is now a writable volume in the runner Job, and a
+credential that cannot be applied **fails the run** with a message naming the
+count and the path, rather than being skipped. Terrapod also asks git whether it
+actually reads the configuration, because writing a file and git consulting it
+are different claims.
+
+If you worked around this with `HOME` or `GIT_CONFIG_GLOBAL` in
+`runner_extra_env`, both can be removed after upgrading. Leaving them set is
+harmless.
+

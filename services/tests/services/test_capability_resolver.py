@@ -36,6 +36,9 @@ def _role(name, *, ws="read", pool="read", reg="read", cat="none", caps=None, **
     return SimpleNamespace(
         name=name,
         capabilities=caps,
+        # Explicit: `role_match_verdict` reads the column directly so a double
+        # that omits it fails loudly rather than matching everything.
+        allow_all=kw.get("allow_all", False),
         allow_labels=kw.get("allow_labels", {}),
         allow_names=kw.get("allow_names", []),
         deny_labels=kw.get("deny_labels", {}),

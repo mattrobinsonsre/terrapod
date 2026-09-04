@@ -652,7 +652,9 @@
       "allowLabelsShort": "Allow Labels",
       "allowNamesShort": "Allow Names",
       "denyLabelsShort": "Deny Labels",
-      "denyNamesShort": "Deny Names"
+      "denyNamesShort": "Deny Names",
+      "allowAll": "Grant on everythin''",
+      "allowAllHelp": "Matches every prize, including those taken later. Deny articles still hold. Use this rather than marking every work-deck — a deck raised without the mark would quietly fall outside the rank."
     },
     "assignForm": {
       "provider": "Provider",
@@ -723,7 +725,8 @@
       "deleteRole": "Failed t'' send role t'' Davy Jones",
       "setAssignment": "Failed t'' set assignment",
       "setAssignmentStatus": "Failed t'' set assignment ({status})",
-      "deleteAssignment": "Failed t'' send assignment t'' Davy Jones"
+      "deleteAssignment": "Failed t'' send assignment t'' Davy Jones",
+      "conflictingLabelKeys": "{keys} be given more than one value. A marking rule holds one value per key, so the last would quietly replace them afore it. Matching several values for one key be supported by the API but cannot yet be set here."
     }
   },
   "adminVcs": {
@@ -919,7 +922,39 @@
         "deleteVar": "Failed t'' send variable t'' Davy Jones",
         "addWorkspace": "Failed t'' add work-deck",
         "removeWorkspace": "Failed t'' remove work-deck"
-      }
+      },
+      "assignedBy": "Assigned by",
+      "managedByRule": "Commanded by the code",
+      "assignmentRule": "Assignment code",
+      "assignmentRuleNone": "No code. Work-decks be assigned one by one.",
+      "assignmentRuleDescription": "Work-decks matchin'' this code be given the set automatic-like, weighed anew on every voyage.",
+      "source": {
+        "explicit": "Assigned",
+        "global": "Global",
+        "rule": "Code"
+      },
+      "ruleLabels": "Markings",
+      "ruleNamePrefix": "Name prefix",
+      "ruleNameGlob": "Name pattern",
+      "ruleExecutionBackend": "Execution engine",
+      "ruleExecutionMode": "Execution mode",
+      "ruleTerraformVersion": "Version",
+      "ruleOwnerEmail": "Owner",
+      "ruleAgentPoolId": "Crew pool",
+      "ruleVcsConnectionId": "VCS mooring",
+      "ruleDriftStatus": "Drift status",
+      "ruleLocked": "Battened down",
+      "ruleHasVcs": "VCS-moored",
+      "ruleAny": "Any",
+      "ruleEmpty": "Add at least one filter — an empty code matches naught.",
+      "rulePreview": "{count, plural, =0 {Matches naught a work-deck} one {Matches # work-deck} other {Matches # work-decks}}",
+      "rulePreviewLoading": "Searchin'' which work-decks match…",
+      "rulePreviewInvalid": "This code could not be checked. Savin'' will report the exact trouble.",
+      "ruleConflictsWithGlobal": "A global set already applies t'' every work-deck, so no code can sail with it.",
+      "valueSource": "Value source",
+      "valueSourceStatic": "Enter a value",
+      "valueSourceVault": "Fetch from Vault",
+      "vaultHint": "Terrapod fetches the secret from Vault when the voyage sails. Naught be stowed here."
     }
   },
   "adminAutodiscovery": {
@@ -2236,7 +2271,8 @@
       "cost": "Booty",
       "architecture": "Architecture",
       "insights": "Insights",
-      "automation": "Automation"
+      "automation": "Automation",
+      "access": "Boarding"
     },
     "lifecycle": {
       "pendingDeletion": "Pendin'' send t'' Davy Jones",
@@ -2414,7 +2450,24 @@
       "gitRewrite": "Protocol rewrite",
       "gitRewriteNone": "None",
       "gitRewriteToHttps": "Rewrite ssh:// sources to https:// (use this token)",
-      "gitRewriteToSsh": "Rewrite https:// sources to ssh:// (use this key)"
+      "gitRewriteToSsh": "Rewrite https:// sources to ssh:// (use this key)",
+      "valueSource": "Value source",
+      "sourceStatic": "Enter a value",
+      "sourceVault": "Fetch from Vault",
+      "sourceStaticHelp": "The value be stowed in Terrapod an'' handed t'' the voyage.",
+      "sourceVaultHelp": "Terrapod fetches the secret from Vault when the voyage sails. Naught be stowed here.",
+      "vaultMount": "Mount",
+      "vaultPath": "Course",
+      "vaultField": "Field",
+      "vaultEngine": "Secret engine",
+      "vaultEngineKv2": "Static (kv-v2)",
+      "vaultEngineDynamic": "Dynamic (minted each voyage)",
+      "vaultInstance": "Vault",
+      "vaultInstanceDefault": "Default",
+      "vaultSecretNeverStored": "The course be stowed, never the secret. Terrapod's Vault articles govern what it may read.",
+      "sourceVaultBadge": "Vault",
+      "vaultReferenceUnreadable": "Unreadable Vault reference",
+      "vaultInstanceDefaultNamed": "Default ({name})"
     },
     "runs": {
       "options": "Options",
@@ -2640,6 +2693,18 @@
       "architecture": "Architecture",
       "runTasks": "Tasks",
       "runTriggers": "Triggers"
+    },
+    "applicableVarsets": {
+      "title": "Variable sets",
+      "description": "Variable sets that apply t'' this work-deck. Command 'em from the variable set itself.",
+      "loadError": "Failed t'' haul aboard the variable sets",
+      "priority": "Priority",
+      "variableCount": "{count, plural, one {# variable} other {# variables}}",
+      "source": {
+        "explicit": "Assigned",
+        "global": "Global",
+        "rule": "Matched by the code"
+      }
     }
   },
   "graphs": {
@@ -3018,5 +3083,54 @@
     "restoreConfirm": "Salvage the state o'' \"{name}\"?\n\nThis builds a NEW work-deck — the old one be gone to the depths for good. She comes up with auto-apply and drift-watch doused and nary a VCS line; her variables and voyage log do not come back. Only the state be salvaged.",
     "restoreDone": "Salvaged {versions, plural, one {# state version} other {# state versions}} into the new work-deck \"{name}\". Inspect her riggin'' afore ye hoist auto-apply or VCS.",
     "restoreAgainConfirm": "\"{name}\" has already been hauled back from the deep, into {existing}.\n\nHaulin'' her back again spawns a SECOND vessel carryin'' the same state lineage over the same waters. An apply aboard either will then make the other''s next plan read like the whole fleet has drifted.\n\nOnly sail on if the earlier salvaged vessel be sunk."
+  },
+  "roleReach": {
+    "title": "What this rank be reachin''",
+    "checking": "Searchin''…",
+    "failed": "Could not reckon what this rule be reachin''.",
+    "noAllowRules": "Add an allow label or an allow name t'' spy which work-decks this rank would reach.",
+    "granted": "granted",
+    "deniedCount": "refused",
+    "matched": "{count} matched by the allow articles",
+    "andMore": "…an'' {count} more",
+    "excludedByDeny": "Cast out by the deny articles",
+    "reason": {
+      "allowName": "by name",
+      "denyName": "refused by name",
+      "allowLabel": "matches {rule}",
+      "denyLabel": "refused by {rule}"
+    },
+    "note": {
+      "catalogClamped": "Commanded by the catalog — held t'' lookin'' only",
+      "everyoneFloor": "Readable by all hands",
+      "hasOwner": "The owner already holds command"
+    },
+    "reachesNothing": "This rule reaches naught.",
+    "allowAllBanner": "Grants on every prize. Deny articles still hold.",
+    "axis": {
+      "workspace": "Work-decks",
+      "pool": "Crew pools",
+      "registry": "Ledger",
+      "catalog": "Catalog wares"
+    }
+  },
+  "resourceAccess": {
+    "title": "Who can board this",
+    "subtitle": "Ranks whose articles match this work-deck, an'' the hands holding them.",
+    "loading": "Loadin''…",
+    "failed": "Could not reckon who can board this.",
+    "forbidden": "This answer spans the whole fleet, so it be shown only to quartermasters an'' auditors.",
+    "noRoles": "No rank''s articles match this work-deck.",
+    "deniedRoles": "Matched, then cast out by a deny article",
+    "alsoReachable": "Also boardable without any rank",
+    "heldBy": "In the hands o'' {who}",
+    "heldByNobody": "Held by nobody — grants naught in practice",
+    "path": {
+      "platformAdmin": "Quartermasters reach every prize",
+      "platformAudit": "Auditors may read every prize",
+      "owner": "The owner holds command here",
+      "everyoneFloor": "Marked access: everyone — readable by all hands",
+      "catalogClamped": "Commanded by the catalog — every non-command grant be held to lookin'' only"
+    }
   }
 }

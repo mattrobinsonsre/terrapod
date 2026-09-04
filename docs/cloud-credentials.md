@@ -710,7 +710,21 @@ On Azure Cache for Redis with Microsoft Entra authentication, Terrapod mints an 
 
 ## External secret managers (Vault via ESO / Vault Agent)
 
-Terrapod has **no built-in Vault integration** — that is deliberately out of scope. The supported pattern is an **external** secret manager (e.g. HashiCorp Vault) feeding Terrapod's existing Kubernetes Secrets, using either:
+> **Workspace variables can now come from Vault directly.** Terrapod reads the
+> secret at run time and never stores it — see [Vault](vault.md). This section
+> covers the other half: **platform** secrets (database URL, OIDC client
+> secrets, signing keys) which are read from Kubernetes Secrets and are still
+> sourced externally.
+>
+> This page previously stated that built-in Vault integration was out of scope.
+> That is no longer true, and the reasoning behind it had expired: the argument
+> was that Vault could be configured externally, which assumed the external
+> route was the same capability under another name. For workspace variables it
+> is not — a sidecar delivers secrets out of band, invisible to workspaces,
+> variable sets and RBAC, and scoped per agent pool rather than per workspace.
+
+For **platform** secrets, the pattern is an external secret manager feeding
+Terrapod's Kubernetes Secrets, using either:
 
 - **External Secrets Operator (ESO)** with the Vault backend — ESO syncs a Vault path into a native K8s Secret, which Terrapod then reads via `secretKeyRef`; or
 - **Vault Agent injector** — Vault Agent renders secrets into the pod, which you point the chart's `existingSecret` references at.

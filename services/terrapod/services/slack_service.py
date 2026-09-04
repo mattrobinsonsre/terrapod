@@ -21,12 +21,20 @@ See docs/slack-integration.md for operator setup.
 
 from __future__ import annotations
 
+import asyncio
+
 import structlog
 
 logger = structlog.get_logger(__name__)
 
 # Module-global handle so the lifespan can disconnect cleanly on shutdown.
 _socket_client = None
+
+
+#: How long to wait for the Socket Mode connection before giving up and
+#: letting the API start without Slack. Generous for a healthy connect,
+#: which returns in well under a second.
+_CONNECT_TIMEOUT_SECONDS = 15.0
 
 
 async def start_slack(settings) -> None:
@@ -69,8 +77,33 @@ async def start_slack(settings) -> None:
 
     _socket_client.socket_mode_request_listeners.append(handle_socket_request)
 
+    # BOUNDED. `connect()` is not merely "might raise": with an invalid or
+    # expired app token slack_sdk enters its own retry loop and never returns
+    # AND never raises, so the try/except below cannot see it. This is awaited
+    # from the API lifespan before `yield`, so an unbounded wait means uvicorn
+    # never binds its port: no error, no listener, just a dead port with the
+    # only clue buried in slack_sdk's retry logging.
+    #
+    # A best-effort optional integration must not be able to hold the whole API
+    # hostage, so the wait is capped and failure is non-fatal either way.
     try:
-        await _socket_client.connect()
+        await asyncio.wait_for(_socket_client.connect(), timeout=_CONNECT_TIMEOUT_SECONDS)
+    except TimeoutError:
+        logger.error(
+            "slack.socket_mode_connect_timeout",
+            seconds=_CONNECT_TIMEOUT_SECONDS,
+            hint="check the app-level token; the API continues without Slack",
+        )
+        # asyncio.wait_for cancels only the connect() coroutine; slack_sdk may
+        # have started a background reconnect task and an aiohttp session that
+        # are NOT tied to it and would leak (and keep retrying) if we merely drop
+        # the reference. Disconnect explicitly before nulling.
+        try:
+            await _socket_client.disconnect()
+        except Exception:  # noqa: BLE001 - best-effort cleanup on an already-bad connect
+            pass
+        _socket_client = None
+        return
     except Exception as exc:  # noqa: BLE001
         logger.error("slack.socket_mode_connect_failed", err=str(exc))
         _socket_client = None

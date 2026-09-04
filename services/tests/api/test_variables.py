@@ -1,5 +1,6 @@
 """Tests for variable and variable set CRUD endpoints with RBAC."""
 
+import json
 import uuid
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -45,6 +46,7 @@ def _mock_var(key="region", value="us-east-1", sensitive=False, ws_id=None, var_
     var.sensitive = sensitive
     var.category = "terraform"
     var.structured = False
+    var.value_source = "static"
     var.description = ""
     var.version_id = "abc123"
     var.created_at = datetime(2026, 1, 1, tzinfo=UTC)
@@ -324,6 +326,7 @@ def _mock_varset(name="my-varset", vs_id=None):
     vs.priority = False
     vs.created_at = datetime(2026, 1, 1, tzinfo=UTC)
     vs.updated_at = datetime(2026, 1, 1, tzinfo=UTC)
+    vs.assignment_rule = None
     return vs
 
 
@@ -400,6 +403,7 @@ def _mock_vsvar(key="db_pass", value="s3cr3t", sensitive=True):
     v.sensitive = sensitive
     v.category = "terraform"
     v.structured = False
+    v.value_source = "static"
     v.description = ""
     v.version_id = "old-hash"
     v.created_at = datetime(2026, 1, 1, tzinfo=UTC)
@@ -580,3 +584,254 @@ class TestBothNamesForTheTypedFlag:
         attrs = r.json()["data"][0]["attributes"]
         assert attrs["hcl"] is True
         assert attrs["structured"] is True
+
+
+class TestVarsetAssignmentRuleValidation:
+    """Write-path validation for assignment rules (#1440).
+
+    A rule that does not parse matches nothing, so accepting one silently leaves
+    an operator with a set that applies to no workspace and nothing to tell them
+    why. These assert the API rejects it at the point of writing instead.
+    """
+
+    async def _post(self, attrs: dict):
+        app, mock_db = _make_app(_user(roles=["admin"]))
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            return await c.post(
+                "/api/v2/organizations/default/varsets",
+                json={"data": {"attributes": attrs}},
+                headers=_AUTH,
+            )
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_unknown_filter_key_is_rejected(self, *mocks):
+        resp = await self._post({"name": "x", "assignment-rule": {"nonsense": 1}})
+        assert resp.status_code == 422
+        assert "assignment-rule" in resp.json()["detail"]
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_global_plus_rule_is_rejected(self, *mocks):
+        """Global already means every workspace, so a rule alongside it is a
+        contradiction rather than a narrowing — neither field silently wins."""
+        resp = await self._post(
+            {"name": "x", "global": True, "assignment-rule": {"labels": {"env": "prod"}}}
+        )
+        assert resp.status_code == 422
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_a_non_object_rule_is_rejected(self, *mocks):
+        resp = await self._post({"name": "x", "assignment-rule": "env=prod"})
+        assert resp.status_code == 422
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_a_valid_rule_is_accepted(self, *mocks):
+        """The negative cases above are only meaningful if a good rule passes."""
+        resp = await self._post({"name": "x", "assignment-rule": {"labels": {"env": "prod"}}})
+        assert resp.status_code == 201
+        assert resp.json()["data"]["attributes"]["assignment-rule"] == {"labels": {"env": "prod"}}
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_all_true_in_a_rule_is_rejected(self, *mocks):
+        """`all: true` is the one rule shape that silently covers everything.
+
+        It duplicates `global`, which the API already expresses properly and
+        which a reader recognises at a glance — so reject the second spelling
+        rather than let a scoped set quietly become estate-wide.
+        """
+        resp = await self._post({"name": "x", "assignment-rule": {"all": True}})
+        assert resp.status_code == 422
+        assert "global" in resp.json()["detail"]
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_workspace_ids_in_a_rule_is_rejected(self, *mocks):
+        """A literal id list is explicit assignment, not a rule.
+
+        Allowing it would give one outcome two mechanisms, and produce a "rule"
+        whose membership can never re-evaluate — the property that makes rules
+        worth having.
+        """
+        resp = await self._post({"name": "x", "assignment-rule": {"workspace_ids": ["ws-1"]}})
+        assert resp.status_code == 422
+        assert "explicitly" in resp.json()["detail"]
+
+
+class TestVaultValueSource:
+    """Write-time validation for the Vault value source (#1439).
+
+    Validated here rather than only at run time so a malformed reference is an
+    error the operator sees while saving, not a run that fails hours later.
+    """
+
+    async def _post(self, attrs: dict, ws_id=None):
+        user = _user(roles=["admin"])
+        app, mock_db = _make_app(user)
+        ws = MagicMock()
+        ws.id = ws_id or uuid.uuid4()
+        with (
+            patch(
+                "terrapod.api.routers.variables._get_workspace",
+                new_callable=AsyncMock,
+                return_value=ws,
+            ),
+            patch(
+                "terrapod.api.routers.variables.resolve_workspace_capabilities_for",
+                new_callable=AsyncMock,
+                return_value=caps_for_level("admin"),
+            ),
+            patch(
+                "terrapod.api.routers.variables.variable_service.create_variable",
+                new_callable=AsyncMock,
+                return_value=_mock_var(),
+            ),
+        ):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+                return await c.post(
+                    f"/api/v2/workspaces/ws-{ws.id}/vars",
+                    json={"data": {"attributes": attrs}},
+                    headers=_AUTH,
+                )
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_an_unknown_value_source_is_rejected(self, *mocks):
+        resp = await self._post({"key": "T", "value": "x", "value-source": "s3"})
+        assert resp.status_code == 422
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_a_vault_source_with_a_malformed_reference_is_rejected(self, *mocks):
+        resp = await self._post({"key": "T", "value": "not json", "value-source": "vault"})
+        assert resp.status_code == 422
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_a_vault_reference_missing_coordinates_is_rejected(self, *mocks):
+        resp = await self._post(
+            {"key": "T", "value": json.dumps({"mount": "kvv2"}), "value-source": "vault"}
+        )
+        assert resp.status_code == 422
+        assert "path" in resp.json()["detail"]
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_a_valid_reference_is_accepted(self, *mocks):
+        """The rejections above only mean something if a good reference passes."""
+        ref = json.dumps({"mount": "kvv2", "path": "apps/netbox", "field": "apitoken"})
+        resp = await self._post({"key": "T", "value": ref, "value-source": "vault"})
+        assert resp.status_code == 201
+
+    def test_a_vault_reference_is_shown_not_masked(self):
+        """The stored value is a path, not a secret. Masking it would hide
+        configuration the operator needs to see while concealing nothing."""
+        var = _mock_var(sensitive=True)
+        var.value_source = "vault"
+        var.value = '{"mount":"kvv2","path":"apps/netbox","field":"apitoken"}'
+        from terrapod.api.routers.variables import _var_json
+
+        assert _var_json(var)["attributes"]["value"] == var.value
+        assert _var_json(var)["attributes"]["value-source"] == "vault"
+
+    def test_an_ordinary_sensitive_value_is_still_masked(self):
+        var = _mock_var(sensitive=True, value="a-real-secret")
+        var.value_source = "static"
+        from terrapod.api.routers.variables import _var_json
+
+        assert _var_json(var)["attributes"]["value"] is None
+
+
+class TestVaultAvailability:
+    """The probe the UI gates its Vault option on (#1439).
+
+    It decides whether an operator is offered a source at all, so a wrong answer
+    either hides a configured feature or offers one that cannot work.
+    """
+
+    async def _get(self):
+        app, _ = _make_app(_user())
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            return await c.get("/api/terrapod/v1/vault/availability", headers=_AUTH)
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_disabled_reports_no_instances(self, *mocks):
+        """Names must not leak out of a disabled config — and an empty list is
+        what makes the UI hide the option rather than offer a broken one."""
+        from terrapod.config import VaultConfig, settings
+
+        prior = settings.vault
+        settings.vault = VaultConfig(enabled=False)
+        try:
+            resp = await self._get()
+        finally:
+            settings.vault = prior
+        assert resp.status_code == 200
+        attrs = resp.json()["data"]["attributes"]
+        assert attrs["enabled"] is False
+        assert attrs["instances"] == []
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_enabled_reports_names_and_the_default(self, *mocks):
+        from terrapod.config import VaultConfig, settings
+
+        prior = settings.vault
+        settings.vault = VaultConfig(
+            enabled=True,
+            instances=[
+                {"name": "a", "address": "https://a"},
+                {"name": "b", "address": "https://b", "default": True},
+            ],
+        )
+        try:
+            resp = await self._get()
+        finally:
+            settings.vault = prior
+        attrs = resp.json()["data"]["attributes"]
+        assert attrs["enabled"] is True
+        assert attrs["instances"] == ["a", "b"]
+        assert attrs["default-instance"] == "b"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_it_never_exposes_addresses_or_credentials(self, *mocks):
+        """Anyone who can write a variable can call this, so it carries only
+        what choosing an instance requires."""
+        from terrapod.config import VaultConfig, settings
+
+        prior = settings.vault
+        settings.vault = VaultConfig(
+            enabled=True,
+            instances=[
+                {
+                    "name": "a",
+                    "address": "https://vault.internal:8200",
+                    "namespace": "team-a",
+                    "auth": {"method": "kubernetes", "mount": "kubernetes", "role": "terrapod"},
+                }
+            ],
+        )
+        try:
+            body = (await self._get()).text
+        finally:
+            settings.vault = prior
+        for leaked in ("vault.internal", "8200", "team-a", "terrapod-role", "kubernetes"):
+            assert leaked not in body, f"{leaked!r} leaked from the availability probe"

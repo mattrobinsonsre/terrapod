@@ -652,7 +652,9 @@
       "allowLabelsShort": "允许标签",
       "allowNamesShort": "允许名称",
       "denyLabelsShort": "拒绝标签",
-      "denyNamesShort": "拒绝名称"
+      "denyNamesShort": "拒绝名称",
+      "allowAll": "在所有内容上授予",
+      "allowAllHelp": "匹配所有资源，包括之后创建的。拒绝规则仍然适用。请使用此选项，而不是给每个工作区打标签——未打标签创建的工作区会悄悄落在角色范围之外。"
     },
     "assignForm": {
       "provider": "提供程序",
@@ -723,7 +725,8 @@
       "deleteRole": "删除角色失败",
       "setAssignment": "设置分配失败",
       "setAssignmentStatus": "设置分配失败（{status}）",
-      "deleteAssignment": "删除分配失败"
+      "deleteAssignment": "删除分配失败",
+      "conflictingLabelKeys": "{keys} 被指定了多个值。标签规则每个键只保留一个值，因此最后一个会悄悄替换先前的值。API 支持一个键对应多个值，但此处尚不能设置。"
     }
   },
   "adminVcs": {
@@ -919,7 +922,39 @@
         "deleteVar": "删除变量失败",
         "addWorkspace": "添加工作区失败",
         "removeWorkspace": "移除工作区失败"
-      }
+      },
+      "assignedBy": "分配方式",
+      "managedByRule": "由规则管理",
+      "assignmentRule": "分配规则",
+      "assignmentRuleNone": "没有规则。工作区逐个分配。",
+      "assignmentRuleDescription": "匹配此规则的工作区会自动获得该变量集，并在每次运行时重新评估。",
+      "source": {
+        "explicit": "已分配",
+        "global": "全局",
+        "rule": "规则"
+      },
+      "ruleLabels": "标签",
+      "ruleNamePrefix": "名称前缀",
+      "ruleNameGlob": "名称匹配模式",
+      "ruleExecutionBackend": "执行引擎",
+      "ruleExecutionMode": "执行模式",
+      "ruleTerraformVersion": "版本",
+      "ruleOwnerEmail": "负责人",
+      "ruleAgentPoolId": "代理池",
+      "ruleVcsConnectionId": "VCS 连接",
+      "ruleDriftStatus": "漂移状态",
+      "ruleLocked": "已锁定",
+      "ruleHasVcs": "已连接 VCS",
+      "ruleAny": "任意",
+      "ruleEmpty": "请至少添加一个筛选条件——空规则不匹配任何工作区。",
+      "rulePreview": "{count, plural, =0 {未匹配任何工作区} other {匹配 # 个工作区}}",
+      "rulePreviewLoading": "正在检查匹配的工作区…",
+      "rulePreviewInvalid": "无法检查此规则。保存时会报告具体问题。",
+      "ruleConflictsWithGlobal": "全局变量集已应用于所有工作区，因此不能同时使用规则。",
+      "valueSource": "取值来源",
+      "valueSourceStatic": "直接输入值",
+      "valueSourceVault": "从 Vault 读取",
+      "vaultHint": "Terrapod 在运行时从 Vault 读取密钥，此处不存储任何内容。"
     }
   },
   "adminAutodiscovery": {
@@ -2236,7 +2271,8 @@
       "cost": "成本",
       "architecture": "架构",
       "insights": "洞察",
-      "automation": "自动化"
+      "automation": "自动化",
+      "access": "访问"
     },
     "lifecycle": {
       "pendingDeletion": "待删除",
@@ -2414,7 +2450,24 @@
       "gitRewrite": "Protocol rewrite",
       "gitRewriteNone": "None",
       "gitRewriteToHttps": "Rewrite ssh:// sources to https:// (use this token)",
-      "gitRewriteToSsh": "Rewrite https:// sources to ssh:// (use this key)"
+      "gitRewriteToSsh": "Rewrite https:// sources to ssh:// (use this key)",
+      "valueSource": "取值来源",
+      "sourceStatic": "直接输入值",
+      "sourceVault": "从 Vault 读取",
+      "sourceStaticHelp": "该值存储在 Terrapod 中并在运行时提供。",
+      "sourceVaultHelp": "Terrapod 在运行时从 Vault 读取密钥，此处不存储任何内容。",
+      "vaultMount": "挂载点",
+      "vaultPath": "路径",
+      "vaultField": "字段",
+      "vaultEngine": "密钥引擎",
+      "vaultEngineKv2": "静态 (kv-v2)",
+      "vaultEngineDynamic": "动态（每次运行新建）",
+      "vaultInstance": "Vault",
+      "vaultInstanceDefault": "默认",
+      "vaultSecretNeverStored": "存储的是路径，绝不是密钥。Terrapod 的 Vault 策略决定它能读取什么。",
+      "sourceVaultBadge": "Vault",
+      "vaultReferenceUnreadable": "无法解析的 Vault 引用",
+      "vaultInstanceDefaultNamed": "默认（{name}）"
     },
     "runs": {
       "options": "选项",
@@ -2640,6 +2693,18 @@
       "architecture": "架构",
       "runTasks": "任务",
       "runTriggers": "触发器"
+    },
+    "applicableVarsets": {
+      "title": "变量集",
+      "description": "应用于此工作区的变量集。请在变量集中管理它们。",
+      "loadError": "加载变量集失败",
+      "priority": "优先",
+      "variableCount": "{count, plural, other {# 个变量}}",
+      "source": {
+        "explicit": "已分配",
+        "global": "全局",
+        "rule": "按规则匹配"
+      }
     }
   },
   "graphs": {
@@ -3018,5 +3083,54 @@
     "restoreConfirm": "要恢复“{name}”的状态吗？\n\n这会创建一个新的工作区——原工作区不会回来。它恢复后自动应用与漂移检测均为关闭，且没有 VCS 连接；变量和运行历史不会恢复。只有状态会被抢救回来。",
     "restoreDone": "已将 {versions, plural, other {# 个状态版本}} 恢复到新工作区“{name}”。启用自动应用或 VCS 之前请检查其设置。",
     "restoreAgainConfirm": "“{name}”已经恢复过一次，恢复到了 {existing}。\n\n再次恢复会创建第二个工作区，它在同一套基础设施之上持有相同的 state 血统。此后在任一工作区执行 apply，都会让另一个的下一次计划看起来像是全面漂移。\n\n只有在先前恢复的工作区已经不存在时才继续。"
+  },
+  "roleReach": {
+    "title": "此角色涵盖的内容",
+    "checking": "正在检查…",
+    "failed": "无法确定此规则的涵盖范围。",
+    "noAllowRules": "添加允许标签或允许名称，即可查看此角色将涵盖哪些工作区。",
+    "granted": "已授予",
+    "deniedCount": "已拒绝",
+    "matched": "{count} 个与允许规则匹配",
+    "andMore": "…另有 {count} 个",
+    "excludedByDeny": "被拒绝规则排除",
+    "reason": {
+      "allowName": "按名称",
+      "denyName": "按名称拒绝",
+      "allowLabel": "匹配 {rule}",
+      "denyLabel": "被 {rule} 拒绝"
+    },
+    "note": {
+      "catalogClamped": "目录托管 — 限制为只读",
+      "everyoneFloor": "所有人可读",
+      "hasOwner": "所有者已具有管理员权限"
+    },
+    "reachesNothing": "此规则不涵盖任何内容。",
+    "allowAllBanner": "在所有资源上授予。拒绝规则仍然适用。",
+    "axis": {
+      "workspace": "工作区",
+      "pool": "代理池",
+      "registry": "注册表",
+      "catalog": "目录项"
+    }
+  },
+  "resourceAccess": {
+    "title": "谁可以访问",
+    "subtitle": "规则与此工作区匹配的角色，以及持有这些角色的人。",
+    "loading": "加载中…",
+    "failed": "无法确定谁可以访问。",
+    "forbidden": "此答案涵盖整个环境，因此仅向平台管理员和审计员显示。",
+    "noRoles": "没有角色规则与此工作区匹配。",
+    "deniedRoles": "已匹配，随后被拒绝规则排除",
+    "alsoReachable": "无需任何角色也可访问",
+    "heldBy": "由 {who} 持有",
+    "heldByNobody": "无人持有 — 实际上不授予任何权限",
+    "path": {
+      "platformAdmin": "平台管理员可访问所有资源",
+      "platformAudit": "平台审计员可读取所有资源",
+      "owner": "所有者在此拥有管理员权限",
+      "everyoneFloor": "标记为 access: everyone — 所有人可读",
+      "catalogClamped": "目录托管 — 所有非管理员授权均限制为只读"
+    }
   }
 }

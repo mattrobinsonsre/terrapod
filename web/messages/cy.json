@@ -652,7 +652,9 @@
       "allowLabelsShort": "Caniatáu Labeli",
       "allowNamesShort": "Caniatáu Enwau",
       "denyLabelsShort": "Gwrthod Labeli",
-      "denyNamesShort": "Gwrthod Enwau"
+      "denyNamesShort": "Gwrthod Enwau",
+      "allowAll": "Caniatáu ar bopeth",
+      "allowAllHelp": "Yn cyfateb i bob adnodd, gan gynnwys rhai a grëir yn ddiweddarach. Mae rheolau gwrthod yn dal i fod yn berthnasol. Defnyddiwch hyn yn lle labelu pob gweithfan — byddai gweithfan a grëwyd heb y label yn disgyn y tu allan i''r rôl yn dawel."
     },
     "assignForm": {
       "provider": "Darparwr",
@@ -723,7 +725,8 @@
       "deleteRole": "Methwyd dileu'r rôl",
       "setAssignment": "Methwyd gosod y neilltuad",
       "setAssignmentStatus": "Methwyd gosod y neilltuad ({status})",
-      "deleteAssignment": "Methwyd dileu'r neilltuad"
+      "deleteAssignment": "Methwyd dileu'r neilltuad",
+      "conflictingLabelKeys": "Rhoddwyd mwy nag un gwerth i {keys}. Mae rheol label yn dal un gwerth fesul allwedd, felly byddai''r olaf yn disodli''r rhai cynharach yn dawel. Mae sawl gwerth i un allwedd yn cael ei gefnogi gan yr API ond ni ellir ei osod yma eto."
     }
   },
   "adminVcs": {
@@ -919,7 +922,39 @@
         "deleteVar": "Methwyd dileu'r newidyn",
         "addWorkspace": "Methwyd ychwanegu'r weithfan",
         "removeWorkspace": "Methwyd tynnu'r weithfan"
-      }
+      },
+      "assignedBy": "Neilltuwyd gan",
+      "managedByRule": "Rheolir gan reol",
+      "assignmentRule": "Rheol neilltuo",
+      "assignmentRuleNone": "Dim rheol. Neilltuir gweithfannau fesul un.",
+      "assignmentRuleDescription": "Mae gweithfannau sy'n cydweddu â'r rheol hon yn cael y set yn awtomatig, wedi'i hailasesu ym mhob rhediad.",
+      "source": {
+        "explicit": "Neilltuwyd",
+        "global": "Byd-eang",
+        "rule": "Rheol"
+      },
+      "ruleLabels": "Labeli",
+      "ruleNamePrefix": "Rhagddodiad enw",
+      "ruleNameGlob": "Patrwm enw",
+      "ruleExecutionBackend": "Peiriant gweithredu",
+      "ruleExecutionMode": "Modd gweithredu",
+      "ruleTerraformVersion": "Fersiwn",
+      "ruleOwnerEmail": "Perchennog",
+      "ruleAgentPoolId": "Pwll asiantau",
+      "ruleVcsConnectionId": "Cysylltiad VCS",
+      "ruleDriftStatus": "Statws drifft",
+      "ruleLocked": "Wedi'i gloi",
+      "ruleHasVcs": "Cysylltiedig â VCS",
+      "ruleAny": "Unrhyw",
+      "ruleEmpty": "Ychwanegwch o leiaf un hidlydd — nid yw rheol wag yn cydweddu â dim.",
+      "rulePreview": "{count, plural, =0 {Nid yw'n cydweddu ag unrhyw weithfan} one {Yn cydweddu â # gweithfan} two {Yn cydweddu â # weithfan} few {Yn cydweddu â # gweithfan} many {Yn cydweddu â # gweithfan} other {Yn cydweddu â # gweithfan}}",
+      "rulePreviewLoading": "Yn gwirio pa weithfannau sy'n cydweddu…",
+      "rulePreviewInvalid": "Ni ellid gwirio'r rheol hon. Bydd cadw yn nodi'r union broblem.",
+      "ruleConflictsWithGlobal": "Mae set fyd-eang eisoes yn berthnasol i bob gweithfan, felly ni ellir defnyddio rheol gyda hi.",
+      "valueSource": "Ffynhonnell gwerth",
+      "valueSourceStatic": "Rhowch werth",
+      "valueSourceVault": "Darllen o Vault",
+      "vaultHint": "Mae Terrapod yn darllen y gyfrinach o Vault adeg rhedeg. Ni chedwir dim yma."
     }
   },
   "adminAutodiscovery": {
@@ -2236,7 +2271,8 @@
       "cost": "Cost",
       "architecture": "Pensaernïaeth",
       "insights": "Mewnwelediadau",
-      "automation": "Awtomeiddio"
+      "automation": "Awtomeiddio",
+      "access": "Mynediad"
     },
     "lifecycle": {
       "pendingDeletion": "Yn aros i'w ddileu",
@@ -2414,7 +2450,24 @@
       "gitRewrite": "Protocol rewrite",
       "gitRewriteNone": "None",
       "gitRewriteToHttps": "Rewrite ssh:// sources to https:// (use this token)",
-      "gitRewriteToSsh": "Rewrite https:// sources to ssh:// (use this key)"
+      "gitRewriteToSsh": "Rewrite https:// sources to ssh:// (use this key)",
+      "valueSource": "Ffynhonnell gwerth",
+      "sourceStatic": "Rhowch werth",
+      "sourceVault": "Darllen o Vault",
+      "sourceStaticHelp": "Cedwir y gwerth yn Terrapod a'i ddanfon i'r rhediad.",
+      "sourceVaultHelp": "Mae Terrapod yn darllen y gyfrinach o Vault adeg rhedeg. Ni chedwir dim yma.",
+      "vaultMount": "Mownt",
+      "vaultPath": "Llwybr",
+      "vaultField": "Maes",
+      "vaultEngine": "Peiriant cyfrinachau",
+      "vaultEngineKv2": "Statig (kv-v2)",
+      "vaultEngineDynamic": "Deinamig (bathu fesul rhediad)",
+      "vaultInstance": "Vault",
+      "vaultInstanceDefault": "Rhagosodiad",
+      "vaultSecretNeverStored": "Cedwir y llwybr, byth y gyfrinach. Polisi Vault Terrapod sy'n rheoli beth y gall ei ddarllen.",
+      "sourceVaultBadge": "Vault",
+      "vaultReferenceUnreadable": "Cyfeirnod Vault annarllenadwy",
+      "vaultInstanceDefaultNamed": "Rhagosodiad ({name})"
     },
     "runs": {
       "options": "Opsiynau",
@@ -2640,6 +2693,18 @@
       "architecture": "Pensaernïaeth",
       "runTasks": "Tasgau",
       "runTriggers": "Sbardunau"
+    },
+    "applicableVarsets": {
+      "title": "Setiau Newidynnau",
+      "description": "Setiau newidynnau sy'n berthnasol i'r gweithfan hwn. Rheolwch nhw o'r set ei hun.",
+      "loadError": "Methwyd â llwytho'r setiau newidynnau",
+      "priority": "Blaenoriaeth",
+      "variableCount": "{count, plural, one {# newidyn} two {# newidyn} few {# newidyn} many {# newidyn} other {# newidyn}}",
+      "source": {
+        "explicit": "Neilltuwyd",
+        "global": "Byd-eang",
+        "rule": "Cydweddu yn ôl rheol"
+      }
     }
   },
   "graphs": {
@@ -3018,5 +3083,54 @@
     "restoreConfirm": "Adfer cyflwr „{name}”?\n\nMae hyn yn creu gweithfan NEWYDD — nid yw''r un wreiddiol yn dod yn ôl. Daw''n ôl heb awto-osod, heb ganfod drifft a heb gysylltiad VCS; nid yw''r newidynnau na''r hanes rhedeg yn dod yn ôl. Dim ond y cyflwr a achubir.",
     "restoreDone": "Adferwyd {versions, plural, one {# fersiwn cyflwr} other {# fersiwn cyflwr}} i''r weithfan newydd „{name}”. Gwiriwch ei gosodiadau cyn galluogi awto-osod neu VCS.",
     "restoreAgainConfirm": "Mae „{name}” wedi''i adfer eisoes, i {existing}.\n\nMae ei adfer eto''n creu AIL weithle sy''n dal yr un llinach cyflwr dros yr un seilwaith. Bydd apply yn y naill neu''r llall wedyn yn gwneud i gynllun nesaf y llall edrych fel drifft llwyr.\n\nParhewch dim ond os yw''r gweithle a adferwyd yn gynharach wedi mynd."
+  },
+  "roleReach": {
+    "title": "Yr hyn y mae''r rôl hon yn ei gyrraedd",
+    "checking": "Yn gwirio…",
+    "failed": "Methwyd â phennu beth mae''r rheol hon yn ei gyrraedd.",
+    "noAllowRules": "Ychwanegwch label neu enw a ganiateir i weld pa weithfannau y byddai''r rôl hon yn eu cyrraedd.",
+    "granted": "wedi''u caniatáu",
+    "deniedCount": "wedi''u gwrthod",
+    "matched": "{count} yn cyfateb i''r rheolau caniatáu",
+    "andMore": "…a {count} arall",
+    "excludedByDeny": "Wedi''u heithrio gan y rheolau gwrthod",
+    "reason": {
+      "allowName": "wrth enw",
+      "denyName": "wedi''i wrthod wrth enw",
+      "allowLabel": "yn cyfateb i {rule}",
+      "denyLabel": "wedi''i wrthod gan {rule}"
+    },
+    "note": {
+      "catalogClamped": "Wedi''i reoli gan y catalog — wedi''i gyfyngu i ddarllen",
+      "everyoneFloor": "Darllenadwy gan bawb",
+      "hasOwner": "Mae gan y perchennog hawliau gweinyddu eisoes"
+    },
+    "reachesNothing": "Nid yw''r rheol hon yn cyrraedd dim.",
+    "allowAllBanner": "Yn caniatáu ar bob adnodd. Mae rheolau gwrthod yn dal i fod yn berthnasol.",
+    "axis": {
+      "workspace": "Gweithfannau",
+      "pool": "Pyllau asiant",
+      "registry": "Cofrestrfa",
+      "catalog": "Eitemau catalog"
+    }
+  },
+  "resourceAccess": {
+    "title": "Pwy all gyrraedd hwn",
+    "subtitle": "Rolau y mae eu rheolau''n cyfateb i''r gweithfan hon, a phwy sy''n eu dal.",
+    "loading": "Yn llwytho…",
+    "failed": "Methwyd â phennu pwy all gyrraedd hwn.",
+    "forbidden": "Mae''r ateb hwn yn rhychwantu''r ystad gyfan, felly dim ond i weinyddwyr ac archwilwyr y platfform y''i dangosir.",
+    "noRoles": "Nid oes rheol rôl yn cyfateb i''r gweithfan hon.",
+    "deniedRoles": "Cyfatebodd, yna ei eithrio gan reol wrthod",
+    "alsoReachable": "Cyraeddadwy hefyd heb unrhyw rôl",
+    "heldBy": "Yn nwylo {who}",
+    "heldByNobody": "Yn nwylo neb — nid yw''n caniatáu dim yn ymarferol",
+    "path": {
+      "platformAdmin": "Mae gweinyddwyr y platfform yn cyrraedd pob adnodd",
+      "platformAudit": "Gall archwilwyr y platfform ddarllen pob adnodd",
+      "owner": "Mae gan y perchennog hawliau gweinyddu yma",
+      "everyoneFloor": "Wedi''i labelu access: everyone — darllenadwy gan bawb",
+      "catalogClamped": "Wedi''i reoli gan y catalog — mae pob caniatâd nad yw''n weinyddol wedi''i gyfyngu i ddarllen"
+    }
   }
 }

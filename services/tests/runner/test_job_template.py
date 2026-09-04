@@ -22,6 +22,12 @@ def _runner_config():
     cfg.topology_spread_constraints = []
     cfg.pod_security_context = {}
     cfg.pod_annotations = {}
+    # Empty by default for the same reason as the proxy fields below: a
+    # MagicMock attribute is truthy, so leaving these unset would inject
+    # phantom hostAliases and volumes into every test's Job spec.
+    cfg.host_aliases = []
+    cfg.extra_volumes = []
+    cfg.extra_volume_mounts = []
     # Proxy + CA off by default (#592) — explicit None/False so the truthy
     # MagicMock defaults don't inject phantom proxy env into every test.
     cfg.proxy = None
@@ -588,3 +594,105 @@ class TestCostEstimationEnv:
         env = self._spec_env(cost_estimation=False, cost_default_region="us-east-1")
         assert env["TP_COST_ESTIMATION"] == "false"
         assert "TP_COST_DEFAULT_REGION" not in env
+
+
+class TestHomeIsWritable:
+    """The image sets HOME=/home/runner and calls it writable; the pod runs
+    `readOnlyRootFilesystem` with nothing mounted there, so every write to $HOME
+    failed EROFS (#1442).
+
+    That silently broke private-git-module auth, whose config lands under $HOME,
+    and equally affects anything else that consults it — helm's repository
+    cache, kubectl's, the AWS CLI's config.
+    """
+
+    def test_a_writable_volume_is_mounted_at_home(self):
+        from terrapod.runner.job_template import build_job_spec
+
+        spec = build_job_spec(
+            run_id="abc123",
+            phase="plan",
+            runner_config=_runner_config(),
+            auth_secret_name="tprun-abc12345-auth",
+            env_vars=[],
+            terraform_vars=[],
+        )
+        pod = spec["spec"]["template"]["spec"]
+        mounts = pod["containers"][0]["volumeMounts"]
+
+        home = [m for m in mounts if m["mountPath"] == "/home/runner"]
+        assert home, "nothing is mounted at $HOME, so writes to it fail EROFS"
+
+        volume = [v for v in pod["volumes"] if v["name"] == home[0]["name"]]
+        assert volume and "emptyDir" in volume[0]
+
+    def test_the_root_filesystem_is_still_read_only(self):
+        """The mount must not have been bought by relaxing the hardening."""
+        from terrapod.runner.job_template import build_job_spec
+
+        spec = build_job_spec(
+            run_id="abc123",
+            phase="plan",
+            runner_config=_runner_config(),
+            auth_secret_name="tprun-abc12345-auth",
+            env_vars=[],
+            terraform_vars=[],
+        )
+        sc = spec["spec"]["template"]["spec"]["containers"][0]["securityContext"]
+        assert sc["readOnlyRootFilesystem"] is True
+
+
+class TestHostAliasesAndExtraVolumes:
+    """#1459 and #1458 — two pass-throughs to the runner Job pod spec.
+
+    Runner Jobs could previously receive secrets only as environment variables,
+    but Terraform commonly reads a credential, CA bundle or keypair from a FILE.
+    The workaround was to expose the secret as an env var and write it back out
+    in a pre_init hook, which puts the value in the process environment when a
+    file was all that was wanted.
+    """
+
+    def _spec(self, cfg):
+        from terrapod.runner.job_template import build_job_spec
+
+        return build_job_spec(
+            run_id="abc123",
+            phase="plan",
+            runner_config=cfg,
+            auth_secret_name="tprun-abc12345-auth",
+            env_vars=[],
+            terraform_vars=[],
+        )["spec"]["template"]["spec"]
+
+    def test_host_aliases_reach_the_pod_spec(self):
+        cfg = _runner_config()
+        cfg.host_aliases = [{"ip": "10.0.0.1", "hostnames": ["admin.example.internal"]}]
+        assert self._spec(cfg)["hostAliases"] == cfg.host_aliases
+
+    def test_absent_by_default(self):
+        """An unset pass-through must not appear at all — a stray empty
+        hostAliases is a diff on every Job for no reason."""
+        assert "hostAliases" not in self._spec(_runner_config())
+
+    def test_extra_volumes_are_APPENDED_not_substituted(self):
+        """The pod already carries the workspace, vars and auth volumes.
+        Assigning rather than appending would drop them and break every run, so
+        this asserts the originals SURVIVE — not merely that the new one
+        arrived, which a substituting implementation would also satisfy."""
+        before = self._spec(_runner_config())
+        original_volumes = {v["name"] for v in before["volumes"]}
+        original_mounts = {m["name"] for m in before["containers"][0]["volumeMounts"]}
+        assert original_volumes, "fixture should already have volumes to protect"
+
+        cfg = _runner_config()
+        cfg.extra_volumes = [{"name": "creds", "secret": {"secretName": "my-creds"}}]
+        cfg.extra_volume_mounts = [{"name": "creds", "mountPath": "/etc/creds"}]
+        spec = self._spec(cfg)
+
+        names = {v["name"] for v in spec["volumes"]}
+        assert original_volumes <= names, f"dropped: {original_volumes - names}"
+        assert "creds" in names
+
+        mounts = {m["name"] for m in spec["containers"][0]["volumeMounts"]}
+        assert original_mounts <= mounts, f"dropped mounts: {original_mounts - mounts}"
+        assert "creds" in mounts

@@ -118,7 +118,12 @@ def describe_plan_shape(run: Run) -> str:
 VALID_TRANSITIONS: dict[str, set[str]] = {
     "pending": {"queued", "canceled", "errored"},
     "queued": {"planning", "canceled", "errored"},
-    "planning": {"planned", "errored", "canceled"},
+    # `planning → queued` is the UNCLAIM: a listener claimed the run but the
+    # API could not hand it a working environment — today, only a Vault that is
+    # unreachable rather than misconfigured. Erroring instead would destroy
+    # every queued run in the estate over a restart and leave an operator to
+    # re-queue each by hand. The run goes back to the pool for the next claim.
+    "planning": {"planned", "errored", "canceled", "queued"},
     # `planned → applied` is the no-op apply: when the plan reports
     # has_changes=False there is nothing for an apply Job to do and
     # no new state version to upload (tofu doesn't bump serial on a

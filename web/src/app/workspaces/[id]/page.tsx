@@ -18,10 +18,15 @@ import { SensitiveValueInput } from '@/components/sensitive-value-input'
 import { MobileCardList, MobileCard } from '@/components/mobile-card-list'
 import { StateGraphTab } from '@/components/state-graph-tab'
 import { CostPanel } from '@/components/cost-panel'
+import { ResourceAccessPanel } from '@/components/resource-access-panel'
 import { ArchitectureCritiquePanel } from '@/components/architecture-critique-panel'
 import { useIsTouch } from '@/lib/use-media-query'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch, fetchAllPages } from '@/lib/api'
+import { VaultValueDisplay } from '@/components/vault-value-display'
+import { VaultReferenceFields } from '@/components/vault-reference-fields'
+import { VariableEditPanel } from '@/components/variable-edit-panel'
+import { ApplicableVarsets } from '@/components/applicable-varsets'
 import { useSortable } from '@/lib/use-sortable'
 import { useRunEvents } from '@/lib/use-run-events'
 
@@ -61,6 +66,8 @@ interface WorkspaceAttrs {
   // and whichever has a live runner claims it first.
   'agent-pool-ids': string[]
   'agent-pool-name': string | null
+  /** Names for the whole set, positionally matching `agent-pool-ids`. */
+  'agent-pool-names'?: string[]
   labels: Record<string, string>
   'owner-email': string
   'var-files': string[]
@@ -113,6 +120,8 @@ interface Variable {
     structured: boolean
     sensitive: boolean
     description: string
+    /** "static" or "vault" (#1439). */
+    'value-source'?: string
   }
 }
 
@@ -228,9 +237,9 @@ const ALL_TRIGGERS = [
 const ALL_STAGES = ['pre_plan', 'post_plan', 'pre_apply'] as const
 const ALL_ENFORCEMENT_LEVELS = ['mandatory', 'advisory'] as const
 
-type Tab = 'configuration' | 'variables' | 'runs' | 'state' | 'state-graph' | 'cost' | 'architecture' | 'versions' | 'notifications' | 'run-tasks' | 'run-triggers' | 'sharing'
+type Tab = 'configuration' | 'variables' | 'runs' | 'state' | 'state-graph' | 'cost' | 'architecture' | 'versions' | 'notifications' | 'run-tasks' | 'run-triggers' | 'sharing' | 'access'
 
-const VALID_TABS: Set<string> = new Set(['configuration', 'variables', 'runs', 'state', 'state-graph', 'cost', 'architecture', 'versions', 'notifications', 'run-tasks', 'run-triggers', 'sharing'])
+const VALID_TABS: Set<string> = new Set(['configuration', 'variables', 'runs', 'state', 'state-graph', 'cost', 'architecture', 'versions', 'notifications', 'run-tasks', 'run-triggers', 'sharing', 'access'])
 
 
 /** Mode value -> i18n key. The API value is snake_case; the key is camel. */
@@ -342,6 +351,35 @@ function WorkspaceDetailContent() {
   const [gitKnownHosts, setGitKnownHosts] = useState('')
   const [gitRewrite, setGitRewrite] = useState<'none' | 'to_https' | 'to_ssh'>('none')
   const isGitCat = varCategory === 'git_http_auth' || varCategory === 'git_ssh_auth'
+
+  // Vault value source (#1439): the variable holds a *reference*, resolved
+  // server-side at run time. Discrete fields, never raw JSON.
+  const [varSource, setVarSource] = useState<'static' | 'vault'>('static')
+  const [vaultInstance, setVaultInstance] = useState('')
+  const [vaultMount, setVaultMount] = useState('')
+  const [vaultPath, setVaultPath] = useState('')
+  const [vaultField, setVaultField] = useState('')
+  const [vaultEngine, setVaultEngine] = useState<'kv2' | 'dynamic'>('kv2')
+  const isVaultSource = varSource === 'vault' && !isGitCat
+  // Offered only where the deployment has Vault configured — presenting a
+  // source that is not set up produces a variable that fails its first run.
+  const [vaultAvailable, setVaultAvailable] = useState(false)
+  const [vaultInstances, setVaultInstances] = useState<string[]>([])
+  const [vaultDefaultInstance, setVaultDefaultInstance] = useState('')
+  // ...and only on an agent workspace. A vault reference is resolved on the
+  // listener claim path, so under local execution it would deliver nothing —
+  // the API refuses to store one (`_reject_vault_on_local`). Offering the
+  // source anyway means filling in the whole reference builder and then
+  // meeting a 422 on save, so it is not offered at all.
+  const vaultOfferable =
+    vaultAvailable && workspace?.attributes['execution-mode'] === 'agent'
+
+  const [editVarSource, setEditVarSource] = useState<'static' | 'vault'>('static')
+  const [editVaultInstance, setEditVaultInstance] = useState('')
+  const [editVaultMount, setEditVaultMount] = useState('')
+  const [editVaultPath, setEditVaultPath] = useState('')
+  const [editVaultField, setEditVaultField] = useState('')
+  const [editVaultEngine, setEditVaultEngine] = useState<'kv2' | 'dynamic'>('kv2')
   const [addingVar, setAddingVar] = useState(false)
 
   const isTouch = useIsTouch()
@@ -1353,6 +1391,78 @@ function WorkspaceDetailContent() {
     return JSON.stringify({ private_key: gitPrivateKey, known_hosts: gitKnownHosts, rewrite: gitRewrite })
   }
 
+  async function ensureVaultAvailability() {
+    if (vaultAvailable || vaultInstances.length) return
+    try {
+      const res = await apiFetch('/api/terrapod/v1/vault/availability')
+      if (!res.ok) return
+      const attrs = (await res.json()).data?.attributes ?? {}
+      setVaultAvailable(Boolean(attrs.enabled))
+      setVaultInstances(attrs.instances ?? [])
+      setVaultDefaultInstance(attrs['default-instance'] ?? '')
+    } catch {
+      // An affordance, not a gate: a failed probe just means the option is not
+      // offered, never a broken form.
+    }
+  }
+
+  function buildVaultReference(): string {
+    const ref: Record<string, string> = {
+      source: 'vault',
+      mount: vaultMount.trim(),
+      path: vaultPath.trim(),
+      field: vaultField.trim(),
+    }
+    if (vaultInstance.trim()) ref.vault = vaultInstance.trim()
+    if (vaultEngine !== 'kv2') ref.engine = vaultEngine
+    return JSON.stringify(ref)
+  }
+
+  // Flat edit state, shaped for the shared edit panel.
+  const editPanelState = {
+    key: editVarKey,
+    value: editVarValue,
+    category: editVarCategory,
+    sensitive: editVarSensitive,
+    hcl: editVarHcl,
+    source: editVarSource,
+    vault: {
+      instance: editVaultInstance,
+      mount: editVaultMount,
+      path: editVaultPath,
+      field: editVaultField,
+      engine: editVaultEngine,
+    },
+  }
+
+  function patchEditPanel(patch: Partial<typeof editPanelState>) {
+    if (patch.key !== undefined) setEditVarKey(patch.key)
+    if (patch.value !== undefined) setEditVarValue(patch.value)
+    if (patch.category !== undefined) setEditVarCategory(patch.category)
+    if (patch.sensitive !== undefined) setEditVarSensitive(patch.sensitive)
+    if (patch.hcl !== undefined) setEditVarHcl(patch.hcl)
+    if (patch.source !== undefined) setEditVarSource(patch.source)
+    if (patch.vault) {
+      setEditVaultInstance(patch.vault.instance)
+      setEditVaultMount(patch.vault.mount)
+      setEditVaultPath(patch.vault.path)
+      setEditVaultField(patch.vault.field)
+      setEditVaultEngine(patch.vault.engine)
+    }
+  }
+
+  function buildEditVaultReference(): string {
+    const ref: Record<string, string> = {
+      source: 'vault',
+      mount: editVaultMount.trim(),
+      path: editVaultPath.trim(),
+      field: editVaultField.trim(),
+    }
+    if (editVaultInstance.trim()) ref.vault = editVaultInstance.trim()
+    if (editVaultEngine !== 'kv2') ref.engine = editVaultEngine
+    return JSON.stringify(ref)
+  }
+
   async function handleAddVariable(e: React.FormEvent) {
     e.preventDefault()
     setAddingVar(true)
@@ -1366,10 +1476,15 @@ function WorkspaceDetailContent() {
             type: 'vars',
             attributes: {
               key: varKey,
-              value: isGitCat ? buildGitAuthValue() : varValue,
+              value: isGitCat
+                ? buildGitAuthValue()
+                : isVaultSource
+                  ? buildVaultReference()
+                  : varValue,
               category: varCategory,
-              sensitive: isGitCat ? true : varSensitive,
-              structured: varHcl,
+              sensitive: isGitCat || isVaultSource ? true : varSensitive,
+              hcl: varHcl,
+              'value-source': isVaultSource ? 'vault' : 'static',
             },
           },
         }),
@@ -1390,6 +1505,12 @@ function WorkspaceDetailContent() {
       setGitPrivateKey('')
       setGitKnownHosts('')
       setGitRewrite('none')
+      setVarSource('static')
+      setVaultInstance('')
+      setVaultMount('')
+      setVaultPath('')
+      setVaultField('')
+      setVaultEngine('kv2')
       setShowAddVar(false)
       await loadVariables()
     } catch (err) {
@@ -1524,10 +1645,32 @@ function WorkspaceDetailContent() {
   function startEditingVar(v: Variable) {
     setEditingVarId(v.id)
     setEditVarKey(v.attributes.key)
-    setEditVarValue(v.attributes.sensitive ? '' : v.attributes.value)
     setEditVarCategory(v.attributes.category)
     setEditVarSensitive(v.attributes.sensitive)
     setEditVarHcl(v.attributes.structured)
+    ensureVaultAvailability()
+
+    const source = v.attributes['value-source'] === 'vault' ? 'vault' : 'static'
+    setEditVarSource(source)
+    if (source === 'vault') {
+      // The reference is not a secret, so it is loaded back into the fields
+      // rather than blanked like a sensitive value — otherwise every edit would
+      // silently rebuild it from nothing.
+      let ref: Record<string, string> = {}
+      try {
+        ref = JSON.parse(v.attributes.value || '{}')
+      } catch {
+        ref = {}
+      }
+      setEditVaultInstance(ref.vault ?? '')
+      setEditVaultMount(ref.mount ?? '')
+      setEditVaultPath(ref.path ?? '')
+      setEditVaultField(ref.field ?? '')
+      setEditVaultEngine(ref.engine === 'dynamic' ? 'dynamic' : 'kv2')
+      setEditVarValue('')
+    } else {
+      setEditVarValue(v.attributes.sensitive ? '' : v.attributes.value)
+    }
   }
 
   async function handleSaveVar() {
@@ -1535,13 +1678,19 @@ function WorkspaceDetailContent() {
     setSavingVar(true)
     setError('')
     try {
+      const isEditVault = editVarSource === 'vault'
       const attrs: Record<string, unknown> = {
         key: editVarKey,
         category: editVarCategory,
-        sensitive: editVarSensitive,
-        structured: editVarHcl,
+        sensitive: isEditVault ? true : editVarSensitive,
+        hcl: editVarHcl,
+        'value-source': isEditVault ? 'vault' : 'static',
       }
-      if (editVarValue !== '') {
+      if (isEditVault) {
+        // Always sent: the reference is rebuilt from the fields on screen, so
+        // omitting it when unchanged would drop the edit just made.
+        attrs.value = buildEditVaultReference()
+      } else if (editVarValue !== '') {
         attrs.value = editVarValue
       }
       const res = await apiFetch(`/api/v2/workspaces/${workspaceId}/vars/${editingVarId}`, {
@@ -1676,6 +1825,7 @@ function WorkspaceDetailContent() {
     { key: 'notifications', label: t('tabs.notifications'), members: ['notifications'] },
     { key: 'run-tasks', label: t('tabs.automation'), members: ['run-tasks', 'run-triggers'] },
     { key: 'sharing', label: t('tabs.sharing'), members: ['sharing'] },
+    { key: 'access', label: t('tabs.access'), members: ['access'] },
   ]
   const activeGroup = tabGroups.find((g) => g.members.includes(activeTab)) ?? tabGroups[0]
   const subTabLabel = (tab: Tab): string =>
@@ -1779,6 +1929,21 @@ function WorkspaceDetailContent() {
     (!attrs['vcs-last-polled-at'] ||
       new Date(attrs['vcs-last-attempted-at']) > new Date(attrs['vcs-last-polled-at']))
 
+  /** A pool's display name: from the server's positional `agent-pool-names`
+   *  first, then the fetched pool list, and only then the raw id.
+   *
+   *  The server list is what makes the READ-ONLY view work: the pool list is
+   *  fetched on entering edit mode, so before that `visiblePools` is empty and
+   *  every pool rendered as a bare `apool-<uuid>`. It also covers a caller who
+   *  can read the workspace but not list pools. */
+  function poolLabel(id: string): string {
+    const ids = attrs['agent-pool-ids'] || []
+    const names = attrs['agent-pool-names'] || []
+    const i = ids.indexOf(id)
+    if (i >= 0 && names[i]) return names[i]
+    return visiblePools.find((p) => p.id === id)?.attributes.name ?? id
+  }
+
   // Rows for the pool-set editor: everything the caller may assign, PLUS any
   // pool already on the workspace that they may not. Without the second half a
   // caller lacking pool:assign on one of the pools would silently drop it just
@@ -1789,7 +1954,7 @@ function WorkspaceDetailContent() {
       .filter((id) => !agentPools.some((p) => p.id === id))
       .map((id) => ({
         id,
-        name: visiblePools.find((p) => p.id === id)?.attributes.name ?? id,
+        name: poolLabel(id),
         assignable: false,
       })),
   ]
@@ -2134,7 +2299,7 @@ function WorkspaceDetailContent() {
                               key={id}
                               className="rounded bg-slate-700 px-2 py-0.5 text-xs text-slate-200"
                             >
-                              {visiblePools.find((p) => p.id === id)?.attributes.name ?? id}
+                              {poolLabel(id)}
                             </span>
                           ))}
                     </dd>
@@ -2793,10 +2958,15 @@ function WorkspaceDetailContent() {
         {/* Variables Tab */}
         {activeTab === 'variables' && (
           <div>
+            {/* Which variable sets reach this workspace, and why (#1440).
+                Read-only: the binding is managed on the set, and a rule-derived
+                one is not bound per-workspace at all. */}
+            <ApplicableVarsets workspaceId={workspaceId} />
+
             {perms['can-update-variable'] && (
               <div className="flex justify-end mb-4">
                 <button
-                  onClick={() => setShowAddVar(!showAddVar)}
+                  onClick={() => { setShowAddVar(!showAddVar); ensureVaultAvailability() }}
                   className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors"
                 >
                   {showAddVar ? t('actions.cancel') : t('variables.addVariable')}
@@ -2824,7 +2994,36 @@ function WorkspaceDetailContent() {
                   </div>
                 </div>
 
-                {!isGitCat && (
+                {!isGitCat && vaultOfferable && (
+                  <div>
+                    <label htmlFor="var-source" className="block text-sm font-medium text-slate-300 mb-1">{t('variables.valueSource')}</label>
+                    <select id="var-source" value={varSource} onChange={(e) => setVarSource(e.target.value as 'static' | 'vault')} className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+                      <option value="static">{t('variables.sourceStatic')}</option>
+                      <option value="vault">{t('variables.sourceVault')}</option>
+                    </select>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {varSource === 'vault' ? t('variables.sourceVaultHelp') : t('variables.sourceStaticHelp')}
+                    </p>
+                  </div>
+                )}
+
+                {isVaultSource && (
+                  <VaultReferenceFields
+                    idPrefix="add"
+                    instances={vaultInstances}
+                    defaultInstance={vaultDefaultInstance}
+                    value={{ instance: vaultInstance, mount: vaultMount, path: vaultPath, field: vaultField, engine: vaultEngine }}
+                    onChange={(v) => {
+                      setVaultInstance(v.instance)
+                      setVaultMount(v.mount)
+                      setVaultPath(v.path)
+                      setVaultField(v.field)
+                      setVaultEngine(v.engine)
+                    }}
+                  />
+                )}
+
+                {!isGitCat && !isVaultSource && (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label htmlFor="var-val" className="block text-sm font-medium text-slate-300 mb-1">{t('variables.value')}</label>
@@ -2941,52 +3140,30 @@ function WorkspaceDetailContent() {
                     {sortedVars.map((v) =>
                       editingVarId === v.id ? (
                         <tr key={v.id} className="bg-slate-700/20">
-                          <td className="px-4 py-3">
-                            <input type="text" value={editVarKey} onChange={(e) => setEditVarKey(e.target.value)}
-                              className="w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 font-mono focus:outline-none focus:ring-1 focus:ring-brand-500" />
-                          </td>
-                          <td className="px-4 py-3">
-                            <SensitiveValueInput value={editVarValue} onChange={setEditVarValue}
-                              sensitive={editVarSensitive}
-                              placeholder={editVarSensitive ? t('variables.enterNewValue') : ''}
-                              rows={2}
-                              className="w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 font-mono focus:outline-none focus:ring-1 focus:ring-brand-500 resize-y" />
-                          </td>
-                          <td className="px-4 py-3 hidden sm:table-cell">
-                            <div className="flex items-center gap-3">
-                              <select value={editVarCategory} onChange={(e) => setEditVarCategory(e.target.value)}
-                                className="px-2 py-1 text-xs border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500">
-                                <option value="terraform">terraform</option>
-                                <option value="env">env</option>
-                                <option value="git_http_auth">Git HTTPS credential</option>
-                                <option value="git_ssh_auth">Git SSH credential</option>
-                              </select>
-                              <label className="flex items-center gap-1 cursor-pointer">
-                                <input type="checkbox" checked={editVarSensitive} onChange={(e) => setEditVarSensitive(e.target.checked)}
-                                  className="rounded border-slate-600 bg-slate-700 text-brand-600" />
-                                <span className="text-xs text-slate-400">{t('variables.sensitive')}</span>
-                              </label>
-                              <label className="flex items-center gap-1 cursor-pointer">
-                                <input type="checkbox" checked={editVarHcl} onChange={(e) => setEditVarHcl(e.target.checked)}
-                                  className="rounded border-slate-600 bg-slate-700 text-brand-600" />
-                                <span className="text-xs text-slate-400">HCL</span>
-                              </label>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 text-end">
-                            <div className="flex justify-end gap-2">
-                              <button onClick={() => setEditingVarId(null)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200">{t('actions.cancel')}</button>
-                              <button onClick={handleSaveVar} disabled={savingVar} className="px-2.5 py-1 rounded-md text-xs font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white">
-                                {savingVar ? t('actions.savingEllipsis') : t('actions.save')}
-                              </button>
-                            </div>
+                          {/* One full-width cell. The Vault reference builder
+                              needs five fields and the VALUE column truncated
+                              them to unreadable stubs (#1439). */}
+                          <td colSpan={4} className="px-4 py-4">
+                            <VariableEditPanel
+                              idPrefix={`edit-${v.id}`}
+                              state={editPanelState}
+                              onChange={patchEditPanel}
+                              vaultAvailable={vaultOfferable}
+                              vaultInstances={vaultInstances}
+                              vaultDefaultInstance={vaultDefaultInstance}
+                              saving={savingVar}
+                              onSave={handleSaveVar}
+                              onCancel={() => setEditingVarId(null)}
+                            />
                           </td>
                         </tr>
                       ) : (
                         <tr key={v.id} className="hover:bg-slate-700/20 transition-colors">
                           <td className="px-4 py-3 text-sm text-slate-200 font-mono">{v.attributes.key}</td>
                           <td className="px-4 py-3 text-sm text-slate-400 font-mono">
-                            {v.attributes.sensitive ? '***' : (v.attributes.value || <span className="text-slate-600 italic">{t('variables.emptyValue')}</span>)}
+                            {v.attributes['value-source'] === 'vault'
+                            ? <VaultValueDisplay value={v.attributes.value} />
+                            : v.attributes.sensitive ? '***' : (v.attributes.value || <span className="text-slate-600 italic">{t('variables.emptyValue')}</span>)}
                           </td>
                           <td className="px-4 py-3 text-xs text-slate-400 hidden sm:table-cell">
                             <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
@@ -3018,49 +3195,17 @@ function WorkspaceDetailContent() {
                 {sortedVars.map((v) => (
                   <li key={v.id} className="rounded-lg border border-slate-700/50 bg-slate-800/50 p-3">
                     {editingVarId === v.id ? (
-                      <div className="space-y-2">
-                        <input
-                          type="text"
-                          value={editVarKey}
-                          onChange={(e) => setEditVarKey(e.target.value)}
-                          placeholder={t('variables.key')}
-                          className="w-full px-2 py-1.5 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 font-mono focus:outline-none focus:ring-1 focus:ring-brand-500"
+                      <VariableEditPanel
+                          idPrefix={`medit-${v.id}`}
+                          state={editPanelState}
+                          onChange={patchEditPanel}
+                          vaultAvailable={vaultOfferable}
+                          vaultInstances={vaultInstances}
+                          vaultDefaultInstance={vaultDefaultInstance}
+                          saving={savingVar}
+                          onSave={handleSaveVar}
+                          onCancel={() => setEditingVarId(null)}
                         />
-                        <SensitiveValueInput
-                          value={editVarValue}
-                          onChange={setEditVarValue}
-                          sensitive={editVarSensitive}
-                          placeholder={editVarSensitive ? t('variables.enterNewValue') : ''}
-                          rows={2}
-                          className="w-full px-2 py-1.5 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 font-mono focus:outline-none focus:ring-1 focus:ring-brand-500 resize-y"
-                        />
-                        <div className="flex flex-wrap items-center gap-3">
-                          <select
-                            value={editVarCategory}
-                            onChange={(e) => setEditVarCategory(e.target.value)}
-                            className="px-2 py-1 text-xs border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                          >
-                            <option value="terraform">terraform</option>
-                            <option value="env">env</option>
-                            <option value="git_http_auth">Git HTTPS credential</option>
-                            <option value="git_ssh_auth">Git SSH credential</option>
-                          </select>
-                          <label className="flex items-center gap-1 cursor-pointer">
-                            <input type="checkbox" checked={editVarSensitive} onChange={(e) => setEditVarSensitive(e.target.checked)} className="rounded border-slate-600 bg-slate-700 text-brand-600" />
-                            <span className="text-xs text-slate-400">{t('variables.sensitive')}</span>
-                          </label>
-                          <label className="flex items-center gap-1 cursor-pointer">
-                            <input type="checkbox" checked={editVarHcl} onChange={(e) => setEditVarHcl(e.target.checked)} className="rounded border-slate-600 bg-slate-700 text-brand-600" />
-                            <span className="text-xs text-slate-400">HCL</span>
-                          </label>
-                        </div>
-                        <div className="flex gap-2 pt-1">
-                          <button onClick={() => setEditingVarId(null)} className="px-3 py-1.5 rounded-lg text-sm font-medium bg-slate-700 hover:bg-slate-600 text-slate-200">{t('actions.cancel')}</button>
-                          <button onClick={handleSaveVar} disabled={savingVar} className="px-3 py-1.5 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white">
-                            {savingVar ? t('actions.saving') : t('actions.save')}
-                          </button>
-                        </div>
-                      </div>
                     ) : (
                       <>
                         <div className="flex items-start justify-between gap-2 mb-1.5">
@@ -3072,7 +3217,9 @@ function WorkspaceDetailContent() {
                           </span>
                         </div>
                         <div className="mb-2 text-sm text-slate-400 font-mono break-all">
-                          {v.attributes.sensitive ? '***' : (v.attributes.value || <span className="text-slate-600 italic">{t('variables.emptyValue')}</span>)}
+                          {v.attributes['value-source'] === 'vault'
+                            ? <VaultValueDisplay value={v.attributes.value} />
+                            : v.attributes.sensitive ? '***' : (v.attributes.value || <span className="text-slate-600 italic">{t('variables.emptyValue')}</span>)}
                         </div>
                         {perms['can-update-variable'] && (
                           <div className="flex gap-2">
@@ -4271,6 +4418,12 @@ function WorkspaceDetailContent() {
         )}
 
         {/* Sharing Tab — cross-workspace remote-state allowlist (#344, #349) */}
+        {activeTab === 'access' && (
+          <div>
+            <ResourceAccessPanel kind="workspaces" id={workspaceId} />
+          </div>
+        )}
+
         {activeTab === 'sharing' && (
           <div>
             <div className="flex items-baseline justify-between mb-1">

@@ -652,7 +652,9 @@
       "allowLabelsShort": "Etykiety zezwalające",
       "allowNamesShort": "Nazwy zezwalające",
       "denyLabelsShort": "Etykiety odmawiające",
-      "denyNamesShort": "Nazwy odmawiające"
+      "denyNamesShort": "Nazwy odmawiające",
+      "allowAll": "Przyznaj na wszystkim",
+      "allowAllHelp": "Pasuje do każdego zasobu, także utworzonego później. Reguły odmowy nadal obowiązują. Użyj tego zamiast etykietowania każdej przestrzeni roboczej — przestrzeń utworzona bez etykiety po cichu wypadłaby poza rolę."
     },
     "assignForm": {
       "provider": "Dostawca",
@@ -723,7 +725,8 @@
       "deleteRole": "Nie udało się usunąć roli",
       "setAssignment": "Nie udało się ustawić przypisania",
       "setAssignmentStatus": "Nie udało się ustawić przypisania ({status})",
-      "deleteAssignment": "Nie udało się usunąć przypisania"
+      "deleteAssignment": "Nie udało się usunąć przypisania",
+      "conflictingLabelKeys": "{keys} otrzymał więcej niż jedną wartość. Reguła etykiety przechowuje jedną wartość na klucz, więc ostatnia po cichu zastąpiłaby wcześniejsze. API obsługuje wiele wartości dla jednego klucza, ale nie można ich jeszcze ustawić tutaj."
     }
   },
   "adminVcs": {
@@ -919,7 +922,39 @@
         "deleteVar": "Nie udało się usunąć zmiennej",
         "addWorkspace": "Nie udało się dodać obszaru roboczego",
         "removeWorkspace": "Nie udało się usunąć obszaru roboczego"
-      }
+      },
+      "assignedBy": "Przypisane przez",
+      "managedByRule": "Zarządzane regułą",
+      "assignmentRule": "Reguła przypisania",
+      "assignmentRuleNone": "Brak reguły. Przestrzenie robocze są przypisywane pojedynczo.",
+      "assignmentRuleDescription": "Przestrzenie robocze pasujące do tej reguły otrzymują zestaw automatycznie, z ponowną oceną przy każdym uruchomieniu.",
+      "source": {
+        "explicit": "Przypisany",
+        "global": "Globalny",
+        "rule": "Reguła"
+      },
+      "ruleLabels": "Etykiety",
+      "ruleNamePrefix": "Prefiks nazwy",
+      "ruleNameGlob": "Wzorzec nazwy",
+      "ruleExecutionBackend": "Silnik wykonawczy",
+      "ruleExecutionMode": "Tryb wykonania",
+      "ruleTerraformVersion": "Wersja",
+      "ruleOwnerEmail": "Właściciel",
+      "ruleAgentPoolId": "Pula agentów",
+      "ruleVcsConnectionId": "Połączenie VCS",
+      "ruleDriftStatus": "Status dryfu",
+      "ruleLocked": "Zablokowany",
+      "ruleHasVcs": "Połączony z VCS",
+      "ruleAny": "Dowolny",
+      "ruleEmpty": "Dodaj co najmniej jeden filtr — pusta reguła niczego nie dopasowuje.",
+      "rulePreview": "{count, plural, =0 {Nie pasuje do żadnej przestrzeni roboczej} one {Pasuje do # przestrzeni roboczej} few {Pasuje do # przestrzeni roboczych} many {Pasuje do # przestrzeni roboczych} other {Pasuje do # przestrzeni roboczej}}",
+      "rulePreviewLoading": "Sprawdzanie pasujących przestrzeni roboczych…",
+      "rulePreviewInvalid": "Nie udało się sprawdzić tej reguły. Zapis wskaże dokładny problem.",
+      "ruleConflictsWithGlobal": "Zestaw globalny już obejmuje wszystkie przestrzenie robocze, więc nie można użyć z nim reguły.",
+      "valueSource": "Źródło wartości",
+      "valueSourceStatic": "Wprowadź wartość",
+      "valueSourceVault": "Odczytaj z Vault",
+      "vaultHint": "Terrapod odczytuje sekret z Vault podczas uruchomienia. Nic nie jest tu przechowywane."
     }
   },
   "adminAutodiscovery": {
@@ -2236,7 +2271,8 @@
       "cost": "Koszt",
       "architecture": "Architektura",
       "insights": "Analizy",
-      "automation": "Automatyzacja"
+      "automation": "Automatyzacja",
+      "access": "Dostęp"
     },
     "lifecycle": {
       "pendingDeletion": "Oczekuje na usunięcie",
@@ -2414,7 +2450,24 @@
       "gitRewrite": "Protocol rewrite",
       "gitRewriteNone": "None",
       "gitRewriteToHttps": "Rewrite ssh:// sources to https:// (use this token)",
-      "gitRewriteToSsh": "Rewrite https:// sources to ssh:// (use this key)"
+      "gitRewriteToSsh": "Rewrite https:// sources to ssh:// (use this key)",
+      "valueSource": "Źródło wartości",
+      "sourceStatic": "Wprowadź wartość",
+      "sourceVault": "Odczytaj z Vault",
+      "sourceStaticHelp": "Wartość jest przechowywana w Terrapodzie i przekazywana do uruchomienia.",
+      "sourceVaultHelp": "Terrapod odczytuje sekret z Vault podczas uruchomienia. Nic nie jest tu przechowywane.",
+      "vaultMount": "Punkt montowania",
+      "vaultPath": "Ścieżka",
+      "vaultField": "Pole",
+      "vaultEngine": "Silnik sekretów",
+      "vaultEngineKv2": "Statyczny (kv-v2)",
+      "vaultEngineDynamic": "Dynamiczny (tworzony na każde uruchomienie)",
+      "vaultInstance": "Vault",
+      "vaultInstanceDefault": "Domyślny",
+      "vaultSecretNeverStored": "Przechowywana jest ścieżka, nigdy sekret. Polityka Vault Terrapoda decyduje, co może odczytać.",
+      "sourceVaultBadge": "Vault",
+      "vaultReferenceUnreadable": "Nieczytelne odwołanie do Vault",
+      "vaultInstanceDefaultNamed": "Domyślny ({name})"
     },
     "runs": {
       "options": "Opcje",
@@ -2640,6 +2693,18 @@
       "architecture": "Architektura",
       "runTasks": "Zadania",
       "runTriggers": "Wyzwalacze"
+    },
+    "applicableVarsets": {
+      "title": "Zestawy zmiennych",
+      "description": "Zestawy zmiennych stosowane do tej przestrzeni roboczej. Zarządzaj nimi z poziomu zestawu.",
+      "loadError": "Nie udało się wczytać zestawów zmiennych",
+      "priority": "Priorytet",
+      "variableCount": "{count, plural, one {# zmienna} few {# zmienne} many {# zmiennych} other {# zmiennej}}",
+      "source": {
+        "explicit": "Przypisany",
+        "global": "Globalny",
+        "rule": "Dopasowany regułą"
+      }
     }
   },
   "graphs": {
@@ -3018,5 +3083,54 @@
     "restoreConfirm": "Przywrócić stan „{name}”?\n\nZostanie utworzona NOWA przestrzeń robocza — oryginał nie wraca. Wraca z wyłączonym auto-apply i wykrywaniem dryfu oraz bez połączenia VCS; zmienne i historia uruchomień nie wracają. Odzyskiwany jest tylko stan.",
     "restoreDone": "Odzyskano {versions, plural, one {# wersję stanu} few {# wersje stanu} many {# wersji stanu} other {# wersji stanu}} do nowej przestrzeni roboczej „{name}”. Sprawdź ustawienia przed włączeniem auto-apply lub VCS.",
     "restoreAgainConfirm": "„{name}” został już przywrócony, do {existing}.\n\nPonowne przywrócenie tworzy DRUGI workspace z tą samą linią stanu nad tą samą infrastrukturą. Apply w którymkolwiek z nich sprawi wtedy, że kolejny plan drugiego będzie wyglądał jak całkowity drift.\n\nKontynuuj tylko, jeśli wcześniej przywrócony workspace już nie istnieje."
+  },
+  "roleReach": {
+    "title": "Co obejmuje ta rola",
+    "checking": "Sprawdzanie…",
+    "failed": "Nie udało się ustalić zakresu tej reguły.",
+    "noAllowRules": "Dodaj etykietę lub nazwę zezwolenia, aby zobaczyć, które przestrzenie robocze obejmie ta rola.",
+    "granted": "przyznane",
+    "deniedCount": "odrzucone",
+    "matched": "{count} pasuje do reguł zezwolenia",
+    "andMore": "…i {count} więcej",
+    "excludedByDeny": "Wykluczone przez reguły odmowy",
+    "reason": {
+      "allowName": "po nazwie",
+      "denyName": "odrzucone po nazwie",
+      "allowLabel": "pasuje do {rule}",
+      "denyLabel": "odrzucone przez {rule}"
+    },
+    "note": {
+      "catalogClamped": "Zarządzane przez katalog — ograniczone do odczytu",
+      "everyoneFloor": "Czytelne dla wszystkich",
+      "hasOwner": "Właściciel ma już uprawnienia administratora"
+    },
+    "reachesNothing": "Ta reguła niczego nie obejmuje.",
+    "allowAllBanner": "Przyznaje na wszystkich zasobach. Reguły odmowy nadal obowiązują.",
+    "axis": {
+      "workspace": "Przestrzenie robocze",
+      "pool": "Pule agentów",
+      "registry": "Rejestr",
+      "catalog": "Elementy katalogu"
+    }
+  },
+  "resourceAccess": {
+    "title": "Kto ma tu dostęp",
+    "subtitle": "Role, których reguły pasują do tej przestrzeni roboczej, i kto je posiada.",
+    "loading": "Ładowanie…",
+    "failed": "Nie udało się ustalić, kto ma tu dostęp.",
+    "forbidden": "Ta odpowiedź obejmuje całe środowisko, więc pokazywana jest tylko administratorom i audytorom platformy.",
+    "noRoles": "Żadna reguła roli nie pasuje do tej przestrzeni roboczej.",
+    "deniedRoles": "Dopasowane, a następnie wykluczone przez regułę odmowy",
+    "alsoReachable": "Dostępne również bez żadnej roli",
+    "heldBy": "Posiadane przez {who}",
+    "heldByNobody": "Nieposiadane przez nikogo — w praktyce nic nie przyznaje",
+    "path": {
+      "platformAdmin": "Administratorzy platformy sięgają każdego zasobu",
+      "platformAudit": "Audytorzy platformy mogą czytać każdy zasób",
+      "owner": "Właściciel ma tu uprawnienia administratora",
+      "everyoneFloor": "Oznaczone access: everyone — czytelne dla wszystkich",
+      "catalogClamped": "Zarządzane przez katalog — każde nieadministracyjne uprawnienie ograniczone do odczytu"
+    }
   }
 }

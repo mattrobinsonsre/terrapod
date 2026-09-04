@@ -617,9 +617,10 @@ multi-language implementation ships in the same PR**:
   native route.
 - **Reserved label keys are validated at every write path (hard requirement).**
   `RESERVED_LABEL_KEYS` in `services/terrapod/services/label_validation.py`
-  (`status`, `pool`, `mode`, `backend`, `owner`, `drift`, `version`, `vcs`,
-  `locked`, `branch`) are *virtual* filter terms and must never be persisted as
-  real labels. **Every path that writes `labels` to a labelled entity**
+  (`status` and `owner` — narrowed from ten in v1.6.0 (#1450): `status` is the
+  only key implemented as a virtual filter term, and `owner` maps to
+  `owner_email` which grants workspace admin, so a label of that name would
+  read as a permission it is not) must never be persisted as real labels. **Every path that writes `labels` to a labelled entity**
   (workspace, autodiscovery rule, registry module/provider, agent pool) must run
   them through `validate_labels` and reject with HTTP 422 — on **create** as well
   as update. A create path that skips the guard lets a reserved key in, and the

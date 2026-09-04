@@ -652,7 +652,9 @@
       "allowLabelsShort": "برچسب‌های مجاز",
       "allowNamesShort": "نام‌های مجاز",
       "denyLabelsShort": "برچسب‌های ممنوع",
-      "denyNamesShort": "نام‌های ممنوع"
+      "denyNamesShort": "نام‌های ممنوع",
+      "allowAll": "اعطا روی همه چیز",
+      "allowAllHelp": "با هر منبعی مطابقت دارد، از جمله مواردی که بعداً ساخته می‌شوند. قوانین رد همچنان اعمال می‌شوند. به جای برچسب‌گذاری هر فضای کاری از این استفاده کنید — فضایی که بدون برچسب ساخته شود بی‌صدا خارج از نقش می‌ماند."
     },
     "assignForm": {
       "provider": "ارائه‌دهنده",
@@ -723,7 +725,8 @@
       "deleteRole": "حذف نقش ناموفق بود",
       "setAssignment": "تنظیم انتساب ناموفق بود",
       "setAssignmentStatus": "تنظیم انتساب ناموفق بود ({status})",
-      "deleteAssignment": "حذف انتساب ناموفق بود"
+      "deleteAssignment": "حذف انتساب ناموفق بود",
+      "conflictingLabelKeys": "به {keys} بیش از یک مقدار داده شده است. قانون برچسب برای هر کلید یک مقدار نگه می‌دارد، بنابراین آخرین مقدار بی‌صدا جایگزین قبلی‌ها می‌شود. چند مقدار برای یک کلید در API پشتیبانی می‌شود اما هنوز اینجا قابل تنظیم نیست."
     }
   },
   "adminVcs": {
@@ -919,7 +922,39 @@
         "deleteVar": "حذف متغیر ناموفق بود",
         "addWorkspace": "افزودن فضای کاری ناموفق بود",
         "removeWorkspace": "حذف فضای کاری ناموفق بود"
-      }
+      },
+      "assignedBy": "اختصاص‌یافته توسط",
+      "managedByRule": "مدیریت‌شده با قاعده",
+      "assignmentRule": "قاعده اختصاص",
+      "assignmentRuleNone": "قاعده‌ای وجود ندارد. فضاهای کاری یکی‌یکی اختصاص می‌یابند.",
+      "assignmentRuleDescription": "فضاهای کاری منطبق با این قاعده مجموعه را به‌طور خودکار دریافت می‌کنند و در هر اجرا دوباره ارزیابی می‌شود.",
+      "source": {
+        "explicit": "اختصاص‌یافته",
+        "global": "سراسری",
+        "rule": "قاعده"
+      },
+      "ruleLabels": "برچسب‌ها",
+      "ruleNamePrefix": "پیشوند نام",
+      "ruleNameGlob": "الگوی نام",
+      "ruleExecutionBackend": "موتور اجرا",
+      "ruleExecutionMode": "حالت اجرا",
+      "ruleTerraformVersion": "نسخه",
+      "ruleOwnerEmail": "مالک",
+      "ruleAgentPoolId": "استخر عامل",
+      "ruleVcsConnectionId": "اتصال VCS",
+      "ruleDriftStatus": "وضعیت انحراف",
+      "ruleLocked": "قفل‌شده",
+      "ruleHasVcs": "متصل به VCS",
+      "ruleAny": "هر کدام",
+      "ruleEmpty": "حداقل یک فیلتر اضافه کنید — قاعده خالی با چیزی مطابقت ندارد.",
+      "rulePreview": "{count, plural, =0 {با هیچ فضای کاری مطابقت ندارد} other {با # فضای کاری مطابقت دارد}}",
+      "rulePreviewLoading": "در حال بررسی فضاهای کاری منطبق…",
+      "rulePreviewInvalid": "بررسی این قاعده ممکن نبود. ذخیره‌سازی مشکل دقیق را گزارش می‌دهد.",
+      "ruleConflictsWithGlobal": "مجموعه سراسری از پیش بر همه فضاهای کاری اعمال می‌شود، بنابراین نمی‌توان قاعده‌ای با آن به‌کار برد.",
+      "valueSource": "منبع مقدار",
+      "valueSourceStatic": "یک مقدار وارد کنید",
+      "valueSourceVault": "خواندن از Vault",
+      "vaultHint": "Terrapod راز را هنگام اجرا از Vault می‌خواند. چیزی اینجا ذخیره نمی‌شود."
     }
   },
   "adminAutodiscovery": {
@@ -2236,7 +2271,8 @@
       "cost": "هزینه",
       "architecture": "معماری",
       "insights": "بینش‌ها",
-      "automation": "خودکارسازی"
+      "automation": "خودکارسازی",
+      "access": "دسترسی"
     },
     "lifecycle": {
       "pendingDeletion": "در انتظار حذف",
@@ -2414,7 +2450,24 @@
       "gitRewrite": "Protocol rewrite",
       "gitRewriteNone": "None",
       "gitRewriteToHttps": "Rewrite ssh:// sources to https:// (use this token)",
-      "gitRewriteToSsh": "Rewrite https:// sources to ssh:// (use this key)"
+      "gitRewriteToSsh": "Rewrite https:// sources to ssh:// (use this key)",
+      "valueSource": "منبع مقدار",
+      "sourceStatic": "یک مقدار وارد کنید",
+      "sourceVault": "خواندن از Vault",
+      "sourceStaticHelp": "مقدار در Terrapod ذخیره و به اجرا تحویل داده می‌شود.",
+      "sourceVaultHelp": "Terrapod راز را هنگام اجرا از Vault می‌خواند. چیزی اینجا ذخیره نمی‌شود.",
+      "vaultMount": "نقطه اتصال",
+      "vaultPath": "مسیر",
+      "vaultField": "فیلد",
+      "vaultEngine": "موتور رازها",
+      "vaultEngineKv2": "ایستا (kv-v2)",
+      "vaultEngineDynamic": "پویا (در هر اجرا ساخته می‌شود)",
+      "vaultInstance": "Vault",
+      "vaultInstanceDefault": "پیش‌فرض",
+      "vaultSecretNeverStored": "مسیر ذخیره می‌شود، نه راز. سیاست Vault مربوط به Terrapod تعیین می‌کند چه چیزی خوانده شود.",
+      "sourceVaultBadge": "Vault",
+      "vaultReferenceUnreadable": "ارجاع ناخوانای Vault",
+      "vaultInstanceDefaultNamed": "پیش‌فرض ({name})"
     },
     "runs": {
       "options": "گزینه‌ها",
@@ -2640,6 +2693,18 @@
       "architecture": "معماری",
       "runTasks": "وظایف",
       "runTriggers": "محرک‌ها"
+    },
+    "applicableVarsets": {
+      "title": "مجموعه‌های متغیر",
+      "description": "مجموعه‌های متغیری که بر این فضای کاری اعمال می‌شوند. آن‌ها را از خود مجموعه مدیریت کنید.",
+      "loadError": "بارگذاری مجموعه‌های متغیر ناموفق بود",
+      "priority": "اولویت",
+      "variableCount": "{count, plural, one {# متغیر} other {# متغیر}}",
+      "source": {
+        "explicit": "اختصاص‌یافته",
+        "global": "سراسری",
+        "rule": "مطابق قاعده"
+      }
     }
   },
   "graphs": {
@@ -3018,5 +3083,54 @@
     "restoreConfirm": "وضعیت «{name}» بازیابی شود؟\n\nاین کار یک فضای کاری جدید می‌سازد — نسخه اصلی بازنمی‌گردد. با اعمال خودکار و تشخیص انحراف خاموش و بدون اتصال VCS بازمی‌گردد؛ متغیرها و تاریخچه اجراها بازنمی‌گردند. تنها وضعیت نجات می‌یابد.",
     "restoreDone": "{versions, plural, one {# نسخه وضعیت} other {# نسخه وضعیت}} به فضای کاری جدید «{name}» بازیابی شد. پیش از فعال‌کردن اعمال خودکار یا VCS تنظیمات آن را بررسی کنید.",
     "restoreAgainConfirm": "«{name}» قبلاً بازیابی شده است، در {existing}.\n\nبازیابی دوباره‌ی آن یک فضای کاری دوم می‌سازد که همان دودمان state را روی همان زیرساخت نگه می‌دارد. آنگاه اجرای apply در هر یک، برنامه‌ی بعدی دیگری را مانند دریفت کامل نشان می‌دهد.\n\nتنها در صورتی ادامه دهید که فضای کاری بازیابی‌شده‌ی قبلی از بین رفته باشد."
+  },
+  "roleReach": {
+    "title": "آنچه این نقش در بر می‌گیرد",
+    "checking": "در حال بررسی…",
+    "failed": "دامنهٔ این قانون قابل تعیین نبود.",
+    "noAllowRules": "یک برچسب یا نام مجاز اضافه کنید تا ببینید این نقش چه فضاهای کاری را در بر می‌گیرد.",
+    "granted": "اعطا شده",
+    "deniedCount": "رد شده",
+    "matched": "{count} مورد با قوانین مجاز مطابقت دارد",
+    "andMore": "…و {count} مورد دیگر",
+    "excludedByDeny": "کنارگذاشته‌شده با قوانین رد",
+    "reason": {
+      "allowName": "بر اساس نام",
+      "denyName": "رد شده بر اساس نام",
+      "allowLabel": "مطابق با {rule}",
+      "denyLabel": "رد شده توسط {rule}"
+    },
+    "note": {
+      "catalogClamped": "مدیریت‌شده با کاتالوگ — محدود به خواندن",
+      "everyoneFloor": "قابل خواندن برای همه",
+      "hasOwner": "مالک از قبل دسترسی مدیریت دارد"
+    },
+    "reachesNothing": "این قانون به چیزی نمی‌رسد.",
+    "allowAllBanner": "روی همهٔ منابع اعطا می‌کند. قوانین رد همچنان اعمال می‌شوند.",
+    "axis": {
+      "workspace": "فضاهای کاری",
+      "pool": "استخرهای عامل",
+      "registry": "رجیستری",
+      "catalog": "اقلام کاتالوگ"
+    }
+  },
+  "resourceAccess": {
+    "title": "چه کسی می‌تواند به این دسترسی داشته باشد",
+    "subtitle": "نقش‌هایی که قوانینشان با این فضای کاری مطابقت دارد و دارندگان آن‌ها.",
+    "loading": "در حال بارگذاری…",
+    "failed": "نمی‌توان تعیین کرد چه کسی می‌تواند به این دسترسی داشته باشد.",
+    "forbidden": "این پاسخ کل محیط را در بر می‌گیرد، بنابراین فقط به مدیران و ممیزان سکو نشان داده می‌شود.",
+    "noRoles": "هیچ قانون نقشی با این فضای کاری مطابقت ندارد.",
+    "deniedRoles": "مطابقت یافت و سپس با قانون رد کنار گذاشته شد",
+    "alsoReachable": "بدون هیچ نقشی نیز قابل دسترسی است",
+    "heldBy": "در اختیار {who}",
+    "heldByNobody": "در اختیار هیچ‌کس — عملاً چیزی اعطا نمی‌کند",
+    "path": {
+      "platformAdmin": "مدیران سکو به هر منبعی می‌رسند",
+      "platformAudit": "ممیزان سکو می‌توانند هر منبعی را بخوانند",
+      "owner": "مالک اینجا دسترسی مدیریت دارد",
+      "everyoneFloor": "برچسب access: everyone — برای همه قابل خواندن",
+      "catalogClamped": "مدیریت‌شده با کاتالوگ — هر اعطای غیرمدیریتی محدود به خواندن است"
+    }
   }
 }

@@ -652,7 +652,9 @@
       "allowLabelsShort": "Permitir Rótulos",
       "allowNamesShort": "Permitir Nomes",
       "denyLabelsShort": "Negar Rótulos",
-      "denyNamesShort": "Negar Nomes"
+      "denyNamesShort": "Negar Nomes",
+      "allowAll": "Conceder em tudo",
+      "allowAllHelp": "Corresponde a todos os recursos, inclusive os criados depois. As regras de negação continuam valendo. Use isto em vez de rotular cada workspace: um criado sem o rótulo ficaria fora da função sem aviso."
     },
     "assignForm": {
       "provider": "Provedor",
@@ -723,7 +725,8 @@
       "deleteRole": "Falha ao excluir a função",
       "setAssignment": "Falha ao definir a atribuição",
       "setAssignmentStatus": "Falha ao definir a atribuição ({status})",
-      "deleteAssignment": "Falha ao excluir a atribuição"
+      "deleteAssignment": "Falha ao excluir a atribuição",
+      "conflictingLabelKeys": "{keys} recebeu mais de um valor. Uma regra de rótulo guarda um valor por chave, então o último substituiria os anteriores sem aviso. Vários valores por chave são aceitos pela API, mas ainda não podem ser definidos aqui."
     }
   },
   "adminVcs": {
@@ -919,7 +922,39 @@
         "deleteVar": "Falha ao excluir a variável",
         "addWorkspace": "Falha ao adicionar o workspace",
         "removeWorkspace": "Falha ao remover o workspace"
-      }
+      },
+      "assignedBy": "Atribuído por",
+      "managedByRule": "Gerenciado por regra",
+      "assignmentRule": "Regra de atribuição",
+      "assignmentRuleNone": "Sem regra. Os workspaces são atribuídos um a um.",
+      "assignmentRuleDescription": "Os workspaces que correspondem a esta regra recebem o conjunto automaticamente, reavaliado a cada execução.",
+      "source": {
+        "explicit": "Atribuído",
+        "global": "Global",
+        "rule": "Regra"
+      },
+      "ruleLabels": "Rótulos",
+      "ruleNamePrefix": "Prefixo do nome",
+      "ruleNameGlob": "Padrão do nome",
+      "ruleExecutionBackend": "Backend de execução",
+      "ruleExecutionMode": "Modo de execução",
+      "ruleTerraformVersion": "Versão",
+      "ruleOwnerEmail": "Proprietário",
+      "ruleAgentPoolId": "Pool de agentes",
+      "ruleVcsConnectionId": "Conexão VCS",
+      "ruleDriftStatus": "Status de drift",
+      "ruleLocked": "Bloqueado",
+      "ruleHasVcs": "Conectado ao VCS",
+      "ruleAny": "Qualquer",
+      "ruleEmpty": "Adicione ao menos um filtro — uma regra vazia não corresponde a nada.",
+      "rulePreview": "{count, plural, =0 {Não corresponde a nenhum workspace} one {Corresponde a # workspace} other {Corresponde a # workspaces}}",
+      "rulePreviewLoading": "Verificando quais workspaces correspondem…",
+      "rulePreviewInvalid": "Não foi possível verificar esta regra. Ao salvar, o problema exato será informado.",
+      "ruleConflictsWithGlobal": "Um conjunto global já se aplica a todos os workspaces, então não aceita uma regra.",
+      "valueSource": "Origem do valor",
+      "valueSourceStatic": "Inserir um valor",
+      "valueSourceVault": "Ler do Vault",
+      "vaultHint": "O Terrapod lê o segredo do Vault durante a execução. Nada é armazenado aqui."
     }
   },
   "adminAutodiscovery": {
@@ -2236,7 +2271,8 @@
       "cost": "Custo",
       "architecture": "Arquitetura",
       "insights": "Perspectivas",
-      "automation": "Automação"
+      "automation": "Automação",
+      "access": "Acesso"
     },
     "lifecycle": {
       "pendingDeletion": "Exclusão pendente",
@@ -2414,7 +2450,24 @@
       "gitRewrite": "Protocol rewrite",
       "gitRewriteNone": "None",
       "gitRewriteToHttps": "Rewrite ssh:// sources to https:// (use this token)",
-      "gitRewriteToSsh": "Rewrite https:// sources to ssh:// (use this key)"
+      "gitRewriteToSsh": "Rewrite https:// sources to ssh:// (use this key)",
+      "valueSource": "Origem do valor",
+      "sourceStatic": "Inserir um valor",
+      "sourceVault": "Ler do Vault",
+      "sourceStaticHelp": "O valor é armazenado no Terrapod e entregue à execução.",
+      "sourceVaultHelp": "O Terrapod lê o segredo do Vault durante a execução. Nada é armazenado aqui.",
+      "vaultMount": "Mount",
+      "vaultPath": "Caminho",
+      "vaultField": "Campo",
+      "vaultEngine": "Mecanismo de segredos",
+      "vaultEngineKv2": "Estático (kv-v2)",
+      "vaultEngineDynamic": "Dinâmico (gerado a cada execução)",
+      "vaultInstance": "Vault",
+      "vaultInstanceDefault": "Padrão",
+      "vaultSecretNeverStored": "O caminho é armazenado, nunca o segredo. A política do Vault do Terrapod controla o que ele pode ler.",
+      "sourceVaultBadge": "Vault",
+      "vaultReferenceUnreadable": "Referência do Vault ilegível",
+      "vaultInstanceDefaultNamed": "Padrão ({name})"
     },
     "runs": {
       "options": "Opções",
@@ -2640,6 +2693,18 @@
       "architecture": "Arquitetura",
       "runTasks": "Tarefas",
       "runTriggers": "Gatilhos"
+    },
+    "applicableVarsets": {
+      "title": "Conjuntos de variáveis",
+      "description": "Conjuntos de variáveis aplicados a este workspace. Gerencie-os no próprio conjunto.",
+      "loadError": "Falha ao carregar os conjuntos de variáveis",
+      "priority": "Prioridade",
+      "variableCount": "{count, plural, one {# variável} other {# variáveis}}",
+      "source": {
+        "explicit": "Atribuído",
+        "global": "Global",
+        "rule": "Correspondeu à regra"
+      }
     }
   },
   "graphs": {
@@ -3018,5 +3083,54 @@
     "restoreConfirm": "Restaurar o estado de \"{name}\"?\n\nIsto cria um NOVO workspace — o original não volta. Ele volta sem auto-apply, sem detecção de drift e sem conexão VCS; variáveis e histórico de execuções não voltam. Apenas o estado é recuperado.",
     "restoreDone": "{versions, plural, one {# versão de estado recuperada} other {# versões de estado recuperadas}} no novo workspace \"{name}\". Confira as configurações antes de ativar auto-apply ou VCS.",
     "restoreAgainConfirm": "“{name}” já foi restaurado, para {existing}.\n\nRestaurar de novo cria um SEGUNDO workspace com a mesma linhagem de state sobre a mesma infraestrutura. Um apply em qualquer um deles fará o próximo plano do outro parecer um drift total.\n\nContinue apenas se o workspace restaurado antes não existir mais."
+  },
+  "roleReach": {
+    "title": "O que esta função alcança",
+    "checking": "Verificando…",
+    "failed": "Não foi possível determinar o alcance desta regra.",
+    "noAllowRules": "Adicione um rótulo ou nome de permissão para ver quais workspaces esta função alcançaria.",
+    "granted": "concedidos",
+    "deniedCount": "negados",
+    "matched": "{count} correspondentes às regras de permissão",
+    "andMore": "…e mais {count}",
+    "excludedByDeny": "Excluídos pelas regras de negação",
+    "reason": {
+      "allowName": "por nome",
+      "denyName": "negado por nome",
+      "allowLabel": "corresponde a {rule}",
+      "denyLabel": "negado por {rule}"
+    },
+    "note": {
+      "catalogClamped": "Gerenciado pelo catálogo — limitado a leitura",
+      "everyoneFloor": "Legível por todos",
+      "hasOwner": "O proprietário já tem administração"
+    },
+    "reachesNothing": "Esta regra não alcança nada.",
+    "allowAllBanner": "Concede em todos os recursos. As regras de negação continuam valendo.",
+    "axis": {
+      "workspace": "Workspaces",
+      "pool": "Pools de agentes",
+      "registry": "Registro",
+      "catalog": "Itens do catálogo"
+    }
+  },
+  "resourceAccess": {
+    "title": "Quem pode alcançar isto",
+    "subtitle": "Funções cujas regras correspondem a este workspace, e quem as possui.",
+    "loading": "Carregando…",
+    "failed": "Não foi possível determinar quem pode alcançar isto.",
+    "forbidden": "Esta resposta abrange todo o parque, então é mostrada apenas a administradores e auditores da plataforma.",
+    "noRoles": "Nenhuma regra de função corresponde a este workspace.",
+    "deniedRoles": "Correspondeu e depois foi excluído por uma regra de negação",
+    "alsoReachable": "Também alcançável sem função alguma",
+    "heldBy": "Possuída por {who}",
+    "heldByNobody": "Possuída por ninguém — na prática não concede nada",
+    "path": {
+      "platformAdmin": "Administradores da plataforma alcançam todos os recursos",
+      "platformAudit": "Auditores da plataforma podem ler todos os recursos",
+      "owner": "O proprietário tem administração aqui",
+      "everyoneFloor": "Rotulado access: everyone — legível por todos",
+      "catalogClamped": "Gerenciado pelo catálogo — toda concessão não administrativa é limitada a leitura"
+    }
   }
 }

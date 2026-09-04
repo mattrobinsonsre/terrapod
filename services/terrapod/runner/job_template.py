@@ -390,6 +390,14 @@ def build_job_spec(
                     "volumes": [
                         {"name": "workspace", "emptyDir": {}},
                         {"name": "tmp", "emptyDir": {}},
+                        # $HOME. The image sets HOME=/home/runner and describes it
+                        # as writable, but `readOnlyRootFilesystem` below makes it
+                        # read-only unless something is mounted there — so every
+                        # write to $HOME failed EROFS (#1442). That silently broke
+                        # private-git-module auth, whose config lands under $HOME,
+                        # and equally affects anything else consulting it: helm's
+                        # repository cache, kubectl's, the AWS CLI's config.
+                        {"name": "home", "emptyDir": {}},
                     ],
                     "containers": [
                         {
@@ -419,6 +427,7 @@ def build_job_spec(
                             "volumeMounts": [
                                 {"name": "workspace", "mountPath": "/workspace"},
                                 {"name": "tmp", "mountPath": "/tmp"},
+                                {"name": "home", "mountPath": "/home/runner"},
                             ],
                         }
                     ],
@@ -532,6 +541,19 @@ def build_job_spec(
         pod_spec["topologySpreadConstraints"] = runner_config.topology_spread_constraints
     if runner_config.pod_security_context:
         pod_spec["securityContext"] = runner_config.pod_security_context
+    if runner_config.host_aliases:
+        # Static /etc/hosts entries (#1459), for an internal name cluster DNS
+        # does not serve.
+        pod_spec["hostAliases"] = runner_config.host_aliases
+    if runner_config.extra_volumes:
+        # Appended, never assigned: the pod already carries the workspace,
+        # vars and CA volumes built above, and replacing the list would drop
+        # them and break every run.
+        pod_spec.setdefault("volumes", []).extend(runner_config.extra_volumes)
+    if runner_config.extra_volume_mounts:
+        pod_spec["containers"][0].setdefault("volumeMounts", []).extend(
+            runner_config.extra_volume_mounts
+        )
     if runner_config.pod_annotations:
         pod_meta = job_spec["spec"]["template"]["metadata"]
         pod_meta["annotations"] = runner_config.pod_annotations

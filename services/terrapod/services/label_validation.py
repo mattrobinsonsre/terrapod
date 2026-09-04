@@ -22,29 +22,41 @@ MAX_LABELS = 50
 MAX_LABEL_KEY_LEN = 63
 MAX_LABEL_VALUE_LEN = 255
 
-# Reserved label keys: derived workspace attributes that are (or will be)
-# exposed as virtual filter fields. We're aggressive about reservations
-# because the cost of reserving a key today is near-zero (no virtual
-# implementation required) but the cost of NOT reserving and later wanting
-# the key as a virtual is a migration. Boolean predicates (`vcs`, `locked`)
-# will resolve as `key:true` / `key:false` when implemented; `version` will
-# match against `terraform_version` once we have a value comparison plan.
+# Reserved label keys. Two, and the line between them and the rest is
+# deliberate: a key is reserved when using it as a label would MISLEAD ABOUT A
+# DECISION THE SYSTEM ACTUALLY MAKES.
+#
+#   `status` — parsing. It is the only key the workspace filter bar treats as a
+#     built-in virtual term (`parseFilterQuery` in
+#     `web/src/lib/workspace-filter.ts` special-cases exactly this one), so a
+#     literal `status` label would make `status:errored` ambiguous.
+#   `owner`  — authorization. `workspace_rbac_service` passes `labels` and
+#     `owner_email` into the SAME permission call as adjacent inputs, and
+#     ownership grants `admin`. An operator writing `owner: alice` could
+#     reasonably believe they had granted alice admin. They have not. That is a
+#     security-shaped misunderstanding, and it is the only one in the set.
+#
+# This set held ten keys until v1.6.0 (#1450). The other eight — `pool`, `mode`,
+# `backend`, `drift`, `version`, `vcs`, `locked`, `branch` — were reserved for
+# merely DESCRIPTIVE overlap with a column, which is not enough to take a common
+# word away from operators: `version` legitimately means an app or module
+# version, not only `terraform_version`, and none of the eight was ever a
+# built-in filter term, so each refused a label AND gave the filter nothing in
+# return. `drift` and `locked` are answerable as `status:drifted` /
+# `status:locked` anyway.
+#
+# The house convention for a NEW virtual facet is to ride `status:` as a value
+# (`status:locked`, `status:unhealthy` both did) precisely so no new key has to
+# be reserved. If one ever genuinely needs its own key it takes a distinct name
+# (`pool-name:`) rather than breaking labels already in use.
 #
 # CHANGE-CONTROL: adding to this set is a behaviour change for any deployment
-# that already has labels with the new key. Update `docs/rbac.md` and the
-# frontend filter parser comment when extending.
+# already using the key as a label — removing from it is additive and safe.
+# Update `docs/rbac.md` and the frontend filter parser comment either way.
 RESERVED_LABEL_KEYS: frozenset[str] = frozenset(
     {
-        "status",  # derived run status (errored, needs-confirm, drifted, …)
-        "pool",  # agent_pool_name
-        "mode",  # execution_mode (local/agent)
-        "backend",  # execution_backend (tofu/terraform)
-        "owner",  # owner_email
-        "drift",  # drift_status
-        "version",  # terraform_version
-        "vcs",  # has VCS connection
-        "locked",  # locked boolean
-        "branch",  # vcs_branch
+        "status",  # virtual filter term (errored, needs-confirm, drifted, locked, …)
+        "owner",  # real app concept: `owner_email`, which grants workspace admin
     }
 )
 

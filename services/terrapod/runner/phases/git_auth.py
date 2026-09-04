@@ -42,6 +42,7 @@ from __future__ import annotations
 import json
 import os
 import stat
+import subprocess
 from pathlib import Path
 
 import structlog
@@ -67,6 +68,52 @@ def _load(path: Path = _GIT_AUTH_FILE) -> list[dict]:
         logger.warning("failed to read git-auth file", error=str(exc))
         return []
     return data if isinstance(data, list) else []
+
+
+def _credential_sections(http_creds: list[tuple[str, str]], base_dir: Path) -> list[str]:
+    """Wire each HTTP credential to its own store file via a
+    ``[credential "<url>"]`` section, and return the config lines.
+
+    WHY NOT one shared store with ``credential.useHttpPath = true`` (#1449):
+    with ``useHttpPath`` on, git's ``credential-store`` backend matches a
+    stored line only when the stored path equals the requested path EXACTLY —
+    it does not prefix-match. The credential is keyed to the org
+    (``host/org-a``) but every real fetch asks for a path that includes the
+    repository (``host/org-a/some-repo.git``), so the lookup could never
+    match. git then sent the request unauthenticated, took a 401, and failed
+    with "could not read Username" — with the rewrite having fired correctly,
+    which made it look like an auth-source problem rather than a lookup one.
+
+    That broke the org-scoped model outright: any single entry naming an org
+    turned the flag on, so the documented one-variable-set-per-org pattern
+    could not authenticate against a real repository at all.
+
+    ``[credential "<url>"]`` sections match differently — by host AND path
+    PREFIX — so a section for ``https://host/org-a`` does serve
+    ``org-a/some-repo.git``. Each section names its own store file whose line
+    is keyed to the bare host, so the section decides which credential is
+    consulted and the store simply hands it over.
+
+    ORDER MATTERS, and not in the way you would guess: git consults matching
+    helpers in CONFIG ORDER and takes the first that answers — it does not
+    prefer the more specific section. A bare-host entry declared before an
+    org-scoped one on the same host would therefore serve every org on it,
+    silently handing out the wrong token. Path-scoped sections are emitted
+    first for exactly that reason.
+    """
+    lines: list[str] = []
+    # Longest scope first: `host/org` before a bare `host`, so the specific
+    # section is consulted before the catch-all.
+    for i, (scope, store_line) in enumerate(
+        sorted(http_creds, key=lambda c: c[0].count("/"), reverse=True)
+    ):
+        store = base_dir / f"git-credentials-{i}"
+        _write_private(store, store_line + "\n")
+        lines += [
+            f'[credential "https://{scope.rstrip("/")}"]\n',
+            f"\thelper = store --file={store}\n",
+        ]
+    return lines
 
 
 def _host_of(pattern: str) -> str:
@@ -104,9 +151,11 @@ def configure(entries: list[dict], *, base_dir: Path) -> dict[str, str]:
     credentials, keys), isolated via ``GIT_CONFIG_GLOBAL``. Returns ``{}`` when
     there are no usable entries.
     """
-    creds_lines: list[str] = []  # git-credentials store lines (secret; 0600 file)
+    # One store FILE per HTTP entry, each wired to a `[credential "<url>"]`
+    # section. See `_credential_sections` for why a single shared store with
+    # `useHttpPath` cannot work.
+    http_creds: list[tuple[str, str]] = []  # (scope "host[/org]", store line)
     config: list[str] = []  # gitconfig sections (NO secrets — tokenless)
-    use_http_path = False
     ssh_hosts: list[tuple[str, Path, Path]] = []  # (host, key_path, known_hosts_path)
 
     for entry in entries:
@@ -136,9 +185,11 @@ def configure(entries: list[dict], *, base_dir: Path) -> dict[str, str]:
             # Path-scoped when the pattern names an org (host/org) so two orgs on
             # one host can carry distinct tokens (git matches on the leading path).
             scope = pattern.split("://", 1)[-1].split("@", 1)[-1]  # host[/org]
-            if "/" in scope:
-                use_http_path = True
-            creds_lines.append(f"https://{username}:{token}@{scope}")
+            # The store line is keyed to the bare HOST, never the org path: the
+            # org scoping is done by the `[credential "<url>"]` section that
+            # selects this store, not by the line inside it (see
+            # `_credential_sections`).
+            http_creds.append((scope, f"https://{username}:{token}@{host}"))
             if rewrite == "to_https":
                 # Tokenless rewrite (the store helper supplies the token per matched
                 # URL). SCOPE it to the org path when the pattern names one, so a
@@ -178,17 +229,11 @@ def configure(entries: list[dict], *, base_dir: Path) -> dict[str, str]:
         else:
             continue
 
-    if not creds_lines and not config and not ssh_hosts:
+    if not http_creds and not config and not ssh_hosts:
         return {}
 
-    # git-credentials store file (secret; 0600) + the store helper wired to it.
-    creds_path = base_dir / "git-credentials"
-    if creds_lines:
-        _write_private(creds_path, "\n".join(creds_lines) + "\n")
-        header = ["[credential]\n", f"\thelper = store --file={creds_path}\n"]
-        if use_http_path:
-            header.append("\tuseHttpPath = true\n")
-        config = header + config
+    if http_creds:
+        config = _credential_sections(http_creds, base_dir) + config
 
     # SSH: an ssh config with per-host IdentityFile/known_hosts, wired via
     # core.sshCommand (env, not argv). Keys/known_hosts are the 0600 files above.
@@ -225,10 +270,29 @@ def configure(entries: list[dict], *, base_dir: Path) -> dict[str, str]:
     return env
 
 
+class GitAuthUnavailable(RuntimeError):
+    """Credentials were configured for this run and could not be applied.
+
+    Raised rather than warned, because the alternative is what #1442 reported:
+    materialisation failed on a read-only ``$HOME``, was logged at warning, and
+    the run continued with no credentials at all. `init` then failed several
+    minutes later against a private module source with an authentication error
+    that named neither the credential nor the cause — and the log line above it
+    said auth had been configured.
+
+    An operator who declared a credential expects it to be used. Failing here
+    attributes the problem to the thing that is actually wrong.
+    """
+
+
 def run(*, base_dir: Path | None = None) -> dict[str, str]:
-    """Load the mounted git-auth blob and materialize it. Returns env overrides
-    for ``os.environ`` (empty when there's nothing to do). Never raises — bad
-    input is skipped so a malformed entry can't fail an otherwise-fine run."""
+    """Load the mounted git-auth blob and materialize it.
+
+    Returns env overrides for ``os.environ``, empty when there is nothing to do.
+    Raises `GitAuthUnavailable` when entries exist but cannot be applied — a
+    malformed *individual* entry is still skipped inside `configure`, so one bad
+    credential cannot fail a run that does not depend on it.
+    """
     entries = _load()
     if not entries:
         return {}
@@ -236,8 +300,51 @@ def run(*, base_dir: Path | None = None) -> dict[str, str]:
     try:
         env = configure(entries, base_dir=base)
     except OSError as exc:
-        logger.warning("failed to materialize git auth", error=str(exc))
+        raise GitAuthUnavailable(
+            f"{len(entries)} git credential(s) are configured for this workspace but could "
+            f"not be written to {base}: {exc}. The run would otherwise continue without "
+            f"them and fail later against a private module source."
+        ) from exc
+
+    if not env:
         return {}
-    if env:
-        logger.info("git module auth configured", entries=len(entries))
+
+    # "Wrote a file" is not "git can read it" — the distinction #1442 was
+    # reported on. Ask git itself, through the same GIT_CONFIG_GLOBAL the init
+    # subprocess will inherit, so a path git does not consult is caught here
+    # rather than as an authentication failure minutes later.
+    _verify_git_reads_config(env)
+    logger.info("git module auth configured", entries=len(entries))
     return env
+
+
+def _verify_git_reads_config(env: dict[str, str]) -> None:
+    """Confirm git actually loads the config we just wrote.
+
+    Reads back a tokenless key. Nothing secret is logged or compared — the
+    credentials live in a separate store file, and the check only asks whether
+    git sees the configuration at all.
+    """
+    probe = subprocess.run(  # noqa: S603 — fixed argv
+        ["git", "config", "--global", "--list"],
+        env={**os.environ, **env},
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    # Non-empty output, not a specific key. GIT_CONFIG_GLOBAL *replaces* the
+    # global config, so this lists exactly the file we wrote and nothing else —
+    # empty means git did not read it.
+    #
+    # Deliberately not checking for `credential.helper`: that key is written only
+    # for HTTP credentials, so requiring it would fail every run whose
+    # credentials are all `git_ssh_auth` — which configure a `core.sshCommand`
+    # and no helper at all.
+    if probe.returncode != 0 or not probe.stdout.strip():
+        raise GitAuthUnavailable(
+            f"git does not read the configuration written to "
+            f"{env.get('GIT_CONFIG_GLOBAL', '<unset>')}. Credentials would be "
+            f"silently ignored and the run would fail later against a private "
+            f"module source."
+        )

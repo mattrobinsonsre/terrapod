@@ -652,7 +652,9 @@
       "allowLabelsShort": "허용 라벨",
       "allowNamesShort": "허용 이름",
       "denyLabelsShort": "거부 라벨",
-      "denyNamesShort": "거부 이름"
+      "denyNamesShort": "거부 이름",
+      "allowAll": "모두에 부여",
+      "allowAllHelp": "나중에 생성된 것을 포함해 모든 리소스와 일치합니다. 거부 규칙은 계속 적용됩니다. 모든 워크스페이스에 레이블을 붙이는 대신 이것을 사용하세요. 레이블 없이 생성된 워크스페이스는 조용히 역할 범위 밖으로 벗어납니다."
     },
     "assignForm": {
       "provider": "프로바이더",
@@ -723,7 +725,8 @@
       "deleteRole": "역할을 삭제하지 못했습니다",
       "setAssignment": "할당을 설정하지 못했습니다",
       "setAssignmentStatus": "할당을 설정하지 못했습니다 ({status})",
-      "deleteAssignment": "할당을 삭제하지 못했습니다"
+      "deleteAssignment": "할당을 삭제하지 못했습니다",
+      "conflictingLabelKeys": "{keys}에 값이 두 개 이상 지정되었습니다. 레이블 규칙은 키당 하나의 값만 보유하므로 마지막 값이 이전 값을 조용히 대체합니다. 하나의 키에 여러 값을 지정하는 것은 API에서 지원하지만 아직 여기서는 설정할 수 없습니다."
     }
   },
   "adminVcs": {
@@ -919,7 +922,39 @@
         "deleteVar": "변수를 삭제하지 못했습니다",
         "addWorkspace": "워크스페이스를 추가하지 못했습니다",
         "removeWorkspace": "워크스페이스를 제거하지 못했습니다"
-      }
+      },
+      "assignedBy": "할당 방식",
+      "managedByRule": "규칙으로 관리",
+      "assignmentRule": "할당 규칙",
+      "assignmentRuleNone": "규칙이 없습니다. 워크스페이스를 하나씩 할당합니다.",
+      "assignmentRuleDescription": "이 규칙과 일치하는 워크스페이스는 세트를 자동으로 받으며, 실행할 때마다 다시 평가됩니다.",
+      "source": {
+        "explicit": "할당됨",
+        "global": "전역",
+        "rule": "규칙"
+      },
+      "ruleLabels": "레이블",
+      "ruleNamePrefix": "이름 접두사",
+      "ruleNameGlob": "이름 패턴",
+      "ruleExecutionBackend": "실행 백엔드",
+      "ruleExecutionMode": "실행 모드",
+      "ruleTerraformVersion": "버전",
+      "ruleOwnerEmail": "소유자",
+      "ruleAgentPoolId": "에이전트 풀",
+      "ruleVcsConnectionId": "VCS 연결",
+      "ruleDriftStatus": "드리프트 상태",
+      "ruleLocked": "잠김",
+      "ruleHasVcs": "VCS 연결됨",
+      "ruleAny": "모두",
+      "ruleEmpty": "필터를 하나 이상 추가하세요. 빈 규칙은 아무것도 일치하지 않습니다.",
+      "rulePreview": "{count, plural, =0 {일치하는 워크스페이스가 없습니다} other {워크스페이스 #개와 일치}}",
+      "rulePreviewLoading": "일치하는 워크스페이스를 확인하는 중…",
+      "rulePreviewInvalid": "이 규칙을 확인할 수 없습니다. 저장하면 정확한 문제가 표시됩니다.",
+      "ruleConflictsWithGlobal": "전역 세트는 이미 모든 워크스페이스에 적용되므로 규칙과 함께 사용할 수 없습니다.",
+      "valueSource": "값 출처",
+      "valueSourceStatic": "값 입력",
+      "valueSourceVault": "Vault에서 읽기",
+      "vaultHint": "Terrapod가 실행 시 Vault에서 시크릿을 읽습니다. 여기에는 저장되지 않습니다."
     }
   },
   "adminAutodiscovery": {
@@ -2236,7 +2271,8 @@
       "cost": "비용",
       "architecture": "아키텍처",
       "insights": "인사이트",
-      "automation": "자동화"
+      "automation": "자동화",
+      "access": "액세스"
     },
     "lifecycle": {
       "pendingDeletion": "삭제 대기 중",
@@ -2414,7 +2450,24 @@
       "gitRewrite": "Protocol rewrite",
       "gitRewriteNone": "None",
       "gitRewriteToHttps": "Rewrite ssh:// sources to https:// (use this token)",
-      "gitRewriteToSsh": "Rewrite https:// sources to ssh:// (use this key)"
+      "gitRewriteToSsh": "Rewrite https:// sources to ssh:// (use this key)",
+      "valueSource": "값 출처",
+      "sourceStatic": "값 입력",
+      "sourceVault": "Vault에서 읽기",
+      "sourceStaticHelp": "값은 Terrapod에 저장되어 실행에 전달됩니다.",
+      "sourceVaultHelp": "Terrapod가 실행 시 Vault에서 시크릿을 읽습니다. 여기에는 저장되지 않습니다.",
+      "vaultMount": "마운트",
+      "vaultPath": "경로",
+      "vaultField": "필드",
+      "vaultEngine": "시크릿 엔진",
+      "vaultEngineKv2": "정적 (kv-v2)",
+      "vaultEngineDynamic": "동적 (실행마다 발급)",
+      "vaultInstance": "Vault",
+      "vaultInstanceDefault": "기본값",
+      "vaultSecretNeverStored": "저장되는 것은 경로이며 시크릿이 아닙니다. 읽을 수 있는 범위는 Terrapod의 Vault 정책이 결정합니다.",
+      "sourceVaultBadge": "Vault",
+      "vaultReferenceUnreadable": "읽을 수 없는 Vault 참조",
+      "vaultInstanceDefaultNamed": "기본값 ({name})"
     },
     "runs": {
       "options": "옵션",
@@ -2640,6 +2693,18 @@
       "architecture": "아키텍처",
       "runTasks": "작업",
       "runTriggers": "트리거"
+    },
+    "applicableVarsets": {
+      "title": "변수 세트",
+      "description": "이 워크스페이스에 적용되는 변수 세트입니다. 변수 세트에서 관리하세요.",
+      "loadError": "변수 세트를 불러오지 못했습니다",
+      "priority": "우선순위",
+      "variableCount": "{count, plural, other {변수 #개}}",
+      "source": {
+        "explicit": "할당됨",
+        "global": "전역",
+        "rule": "규칙으로 일치"
+      }
     }
   },
   "graphs": {
@@ -3018,5 +3083,54 @@
     "restoreConfirm": "\"{name}\"의 상태를 복원할까요?\n\n새 워크스페이스가 만들어집니다. 원본은 돌아오지 않습니다. 자동 적용과 드리프트 감지가 꺼진 채, VCS 연결 없이 복원되며 변수와 실행 기록은 돌아오지 않습니다. 복구되는 것은 상태뿐입니다.",
     "restoreDone": "{versions, plural, other {상태 버전 #개}}를 새 워크스페이스 \"{name}\"에 복구했습니다. 자동 적용이나 VCS를 켜기 전에 설정을 확인하세요.",
     "restoreAgainConfirm": "\"{name}\"은(는) 이미 {existing}(으)로 복원되었습니다.\n\n다시 복원하면 동일한 인프라 위에 동일한 state 계보를 가진 두 번째 워크스페이스가 만들어집니다. 둘 중 하나에서 apply하면 다른 쪽의 다음 플랜이 전면적인 드리프트처럼 보이게 됩니다.\n\n이전에 복원한 워크스페이스가 사라진 경우에만 계속하십시오."
+  },
+  "roleReach": {
+    "title": "이 역할의 적용 범위",
+    "checking": "확인 중…",
+    "failed": "이 규칙의 적용 범위를 확인할 수 없습니다.",
+    "noAllowRules": "허용 레이블 또는 허용 이름을 추가하면 이 역할이 적용되는 워크스페이스를 볼 수 있습니다.",
+    "granted": "허용됨",
+    "deniedCount": "거부됨",
+    "matched": "허용 규칙과 일치: {count}개",
+    "andMore": "…외 {count}개",
+    "excludedByDeny": "거부 규칙으로 제외됨",
+    "reason": {
+      "allowName": "이름 지정",
+      "denyName": "이름으로 거부됨",
+      "allowLabel": "{rule} 일치",
+      "denyLabel": "{rule}에 의해 거부됨"
+    },
+    "note": {
+      "catalogClamped": "카탈로그 관리 — 읽기로 제한",
+      "everyoneFloor": "모두 읽기 가능",
+      "hasOwner": "소유자에게 이미 관리자 권한 있음"
+    },
+    "reachesNothing": "이 규칙은 아무것도 적용되지 않습니다.",
+    "allowAllBanner": "모든 리소스에 부여합니다. 거부 규칙은 계속 적용됩니다.",
+    "axis": {
+      "workspace": "워크스페이스",
+      "pool": "에이전트 풀",
+      "registry": "레지스트리",
+      "catalog": "카탈로그 항목"
+    }
+  },
+  "resourceAccess": {
+    "title": "누가 접근할 수 있는가",
+    "subtitle": "이 워크스페이스와 일치하는 규칙을 가진 역할과 보유자.",
+    "loading": "불러오는 중…",
+    "failed": "누가 접근할 수 있는지 확인할 수 없습니다.",
+    "forbidden": "이 답변은 전체 환경에 걸쳐 있으므로 플랫폼 관리자와 감사자에게만 표시됩니다.",
+    "noRoles": "이 워크스페이스와 일치하는 역할 규칙이 없습니다.",
+    "deniedRoles": "일치한 뒤 거부 규칙으로 제외됨",
+    "alsoReachable": "역할 없이도 접근 가능",
+    "heldBy": "{who} 보유",
+    "heldByNobody": "보유자 없음 — 실질적으로 아무것도 부여하지 않음",
+    "path": {
+      "platformAdmin": "플랫폼 관리자는 모든 리소스에 도달합니다",
+      "platformAudit": "플랫폼 감사자는 모든 리소스를 읽을 수 있습니다",
+      "owner": "소유자가 여기서 관리자 권한을 가집니다",
+      "everyoneFloor": "access: everyone 레이블 — 누구나 읽기 가능",
+      "catalogClamped": "카탈로그 관리 — 관리자가 아닌 모든 부여는 읽기로 제한"
+    }
   }
 }

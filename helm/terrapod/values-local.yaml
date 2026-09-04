@@ -47,6 +47,17 @@ api:
       memory: 1Gi
 
   config:
+    vault:
+      enabled: true
+      instances:
+        - name: default
+          default: true
+          address: http://vault:8200
+          auth:
+            method: kubernetes
+            mount: kubernetes
+            role: terrapod
+          paths: ["secret/apps", "totp/code"]
     log_level: debug
     external_url: "https://terrapod.local"
     storage:

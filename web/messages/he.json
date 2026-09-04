@@ -652,7 +652,9 @@
       "allowLabelsShort": "תוויות מותרות",
       "allowNamesShort": "שמות מותרים",
       "denyLabelsShort": "תוויות אסורות",
-      "denyNamesShort": "שמות אסורים"
+      "denyNamesShort": "שמות אסורים",
+      "allowAll": "הענקה על הכול",
+      "allowAllHelp": "תואם לכל משאב, כולל כאלה שייווצרו בהמשך. כללי דחייה עדיין חלים. השתמש בזה במקום לתייג כל סביבת עבודה — סביבה שנוצרה ללא התווית תיפול בשקט מחוץ לתפקיד."
     },
     "assignForm": {
       "provider": "ספק",
@@ -723,7 +725,8 @@
       "deleteRole": "מחיקת התפקיד נכשלה",
       "setAssignment": "הגדרת ההקצאה נכשלה",
       "setAssignmentStatus": "הגדרת ההקצאה נכשלה ({status})",
-      "deleteAssignment": "מחיקת ההקצאה נכשלה"
+      "deleteAssignment": "מחיקת ההקצאה נכשלה",
+      "conflictingLabelKeys": "ל-{keys} ניתן יותר מערך אחד. כלל תווית מחזיק ערך אחד לכל מפתח, ולכן האחרון יחליף בשקט את הקודמים. ריבוי ערכים למפתח אחד נתמך ב-API אך עדיין לא ניתן להגדרה כאן."
     }
   },
   "adminVcs": {
@@ -919,7 +922,39 @@
         "deleteVar": "מחיקת המשתנה נכשלה",
         "addWorkspace": "הוספת סביבת העבודה נכשלה",
         "removeWorkspace": "הסרת סביבת העבודה נכשלה"
-      }
+      },
+      "assignedBy": "שויך על ידי",
+      "managedByRule": "מנוהל לפי כלל",
+      "assignmentRule": "כלל שיוך",
+      "assignmentRuleNone": "אין כלל. סביבות עבודה משויכות אחת אחת.",
+      "assignmentRuleDescription": "סביבות עבודה התואמות לכלל זה מקבלות את הערכה אוטומטית, בהערכה מחדש בכל הרצה.",
+      "source": {
+        "explicit": "משויך",
+        "global": "גלובלי",
+        "rule": "כלל"
+      },
+      "ruleLabels": "תוויות",
+      "ruleNamePrefix": "קידומת שם",
+      "ruleNameGlob": "תבנית שם",
+      "ruleExecutionBackend": "מנוע הרצה",
+      "ruleExecutionMode": "מצב הרצה",
+      "ruleTerraformVersion": "גרסה",
+      "ruleOwnerEmail": "בעלים",
+      "ruleAgentPoolId": "מאגר סוכנים",
+      "ruleVcsConnectionId": "חיבור VCS",
+      "ruleDriftStatus": "מצב סטייה",
+      "ruleLocked": "נעול",
+      "ruleHasVcs": "מחובר ל-VCS",
+      "ruleAny": "הכול",
+      "ruleEmpty": "הוסף לפחות מסנן אחד — כלל ריק אינו תואם דבר.",
+      "rulePreview": "{count, plural, =0 {לא תואם לאף סביבת עבודה} one {תואם לסביבת עבודה אחת} two {תואם ל-# סביבות עבודה} many {תואם ל-# סביבות עבודה} other {תואם ל-# סביבות עבודה}}",
+      "rulePreviewLoading": "בודק אילו סביבות עבודה תואמות…",
+      "rulePreviewInvalid": "לא ניתן היה לבדוק כלל זה. השמירה תדווח על הבעיה המדויקת.",
+      "ruleConflictsWithGlobal": "ערכה גלובלית כבר חלה על כל סביבות העבודה, ולכן לא ניתן להשתמש בה עם כלל.",
+      "valueSource": "מקור הערך",
+      "valueSourceStatic": "הזן ערך",
+      "valueSourceVault": "קרא מ-Vault",
+      "vaultHint": "Terrapod קורא את הסוד מ-Vault בזמן ההרצה. דבר אינו נשמר כאן."
     }
   },
   "adminAutodiscovery": {
@@ -2236,7 +2271,8 @@
       "cost": "עלות",
       "architecture": "ארכיטקטורה",
       "insights": "תובנות",
-      "automation": "אוטומציה"
+      "automation": "אוטומציה",
+      "access": "גישה"
     },
     "lifecycle": {
       "pendingDeletion": "ממתין למחיקה",
@@ -2414,7 +2450,24 @@
       "gitRewrite": "Protocol rewrite",
       "gitRewriteNone": "None",
       "gitRewriteToHttps": "Rewrite ssh:// sources to https:// (use this token)",
-      "gitRewriteToSsh": "Rewrite https:// sources to ssh:// (use this key)"
+      "gitRewriteToSsh": "Rewrite https:// sources to ssh:// (use this key)",
+      "valueSource": "מקור הערך",
+      "sourceStatic": "הזן ערך",
+      "sourceVault": "קרא מ-Vault",
+      "sourceStaticHelp": "הערך נשמר ב-Terrapod ומועבר להרצה.",
+      "sourceVaultHelp": "Terrapod קורא את הסוד מ-Vault בזמן ההרצה. דבר אינו נשמר כאן.",
+      "vaultMount": "נקודת עיגון",
+      "vaultPath": "נתיב",
+      "vaultField": "שדה",
+      "vaultEngine": "מנוע סודות",
+      "vaultEngineKv2": "סטטי (kv-v2)",
+      "vaultEngineDynamic": "דינמי (נוצר בכל הרצה)",
+      "vaultInstance": "Vault",
+      "vaultInstanceDefault": "ברירת מחדל",
+      "vaultSecretNeverStored": "הנתיב נשמר, לעולם לא הסוד. מדיניות ה-Vault של Terrapod קובעת מה מותר לו לקרוא.",
+      "sourceVaultBadge": "Vault",
+      "vaultReferenceUnreadable": "הפניית Vault בלתי קריאה",
+      "vaultInstanceDefaultNamed": "ברירת מחדל ({name})"
     },
     "runs": {
       "options": "אפשרויות",
@@ -2640,6 +2693,18 @@
       "architecture": "ארכיטקטורה",
       "runTasks": "משימות",
       "runTriggers": "טריגרים"
+    },
+    "applicableVarsets": {
+      "title": "ערכות משתנים",
+      "description": "ערכות משתנים החלות על סביבת עבודה זו. נהל אותן מתוך הערכה עצמה.",
+      "loadError": "טעינת ערכות המשתנים נכשלה",
+      "priority": "עדיפות",
+      "variableCount": "{count, plural, one {משתנה #} two {# משתנים} many {# משתנים} other {# משתנים}}",
+      "source": {
+        "explicit": "משויך",
+        "global": "גלובלי",
+        "rule": "מותאם לפי כלל"
+      }
     }
   },
   "graphs": {
@@ -3018,5 +3083,54 @@
     "restoreConfirm": "לשחזר את ה-state של \"{name}\"?\n\nפעולה זו יוצרת סביבת עבודה חדשה — המקורית לא חוזרת. היא חוזרת עם החלה אוטומטית וזיהוי סטייה כבויים וללא חיבור VCS; המשתנים והיסטוריית ההרצות אינם חוזרים. רק ה-state ניצל.",
     "restoreDone": "שוחזרו {versions, plural, one {גרסת state אחת} two {שתי גרסאות state} many {# גרסאות state} other {# גרסאות state}} לסביבת העבודה החדשה \"{name}\". בדוק את ההגדרות לפני הפעלת החלה אוטומטית או VCS.",
     "restoreAgainConfirm": "‏„{name}” כבר שוחזר, אל {existing}.\n\nשחזור נוסף יוצר סביבת עבודה שנייה הנושאת את אותו שושלת state מעל אותה תשתית. apply באחת מהן יגרום לתוכנית הבאה של השנייה להיראות כסטייה מלאה.\n\nהמשיכו רק אם סביבת העבודה ששוחזרה קודם כבר איננה."
+  },
+  "roleReach": {
+    "title": "למה תפקיד זה מגיע",
+    "checking": "בודק…",
+    "failed": "לא ניתן היה לקבוע את טווח הכלל הזה.",
+    "noAllowRules": "הוסף תווית או שם מורשים כדי לראות אילו סביבות עבודה תפקיד זה יכלול.",
+    "granted": "הוענק",
+    "deniedCount": "נדחה",
+    "matched": "{count} תואמים לכללי ההרשאה",
+    "andMore": "…ועוד {count}",
+    "excludedByDeny": "הוחרגו על ידי כללי הדחייה",
+    "reason": {
+      "allowName": "לפי שם",
+      "denyName": "נדחה לפי שם",
+      "allowLabel": "תואם ל-{rule}",
+      "denyLabel": "נדחה על ידי {rule}"
+    },
+    "note": {
+      "catalogClamped": "מנוהל על ידי הקטלוג — מוגבל לקריאה",
+      "everyoneFloor": "קריא לכולם",
+      "hasOwner": "לבעלים כבר יש הרשאות ניהול"
+    },
+    "reachesNothing": "כלל זה אינו מגיע לדבר.",
+    "allowAllBanner": "מעניק בכל המשאבים. כללי דחייה עדיין חלים.",
+    "axis": {
+      "workspace": "סביבות עבודה",
+      "pool": "מאגרי סוכנים",
+      "registry": "רישום",
+      "catalog": "פריטי קטלוג"
+    }
+  },
+  "resourceAccess": {
+    "title": "מי יכול להגיע לכאן",
+    "subtitle": "תפקידים שכלליהם תואמים לסביבת עבודה זו, ומי מחזיק בהם.",
+    "loading": "טוען…",
+    "failed": "לא ניתן היה לקבוע מי יכול להגיע לכאן.",
+    "forbidden": "תשובה זו משתרעת על כל הסביבה, ולכן מוצגת רק למנהלי ומבקרי הפלטפורמה.",
+    "noRoles": "אף כלל תפקיד אינו תואם לסביבת עבודה זו.",
+    "deniedRoles": "תאם, ואז הוחרג על ידי כלל דחייה",
+    "alsoReachable": "נגיש גם ללא כל תפקיד",
+    "heldBy": "מוחזק על ידי {who}",
+    "heldByNobody": "לא מוחזק על ידי איש — למעשה אינו מעניק דבר",
+    "path": {
+      "platformAdmin": "מנהלי הפלטפורמה מגיעים לכל משאב",
+      "platformAudit": "מבקרי הפלטפורמה יכולים לקרוא כל משאב",
+      "owner": "לבעלים יש כאן הרשאות ניהול",
+      "everyoneFloor": "מתויג access: everyone — קריא לכולם",
+      "catalogClamped": "מנוהל על ידי הקטלוג — כל הענקה שאינה ניהולית מוגבלת לקריאה"
+    }
   }
 }
