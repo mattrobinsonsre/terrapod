@@ -957,6 +957,87 @@ class RegistryProviderPlatform(Base):
 # --- Cache Models ---
 
 
+class RegistryCollection(Base):
+    """An Ansible collection published to Terrapod's own registry (#1482).
+
+    Deliberately NOT a `CachedPackageFile`. A cached artifact is a copy of
+    something upstream still has, so the retention sweep may evict it by
+    `last_accessed_at` and refetch on demand. A *published* collection is the
+    only copy there is — reaping it thirty days after someone last installed it
+    would be silent data loss, so it lives in its own table alongside the module
+    and provider registries, which are governed the same way.
+    """
+
+    __tablename__ = "registry_collections"
+    __table_args__ = (sa.UniqueConstraint("namespace", "name", name="uq_registry_collections"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=generate_uuid7
+    )
+    #: Galaxy names are `^[a-z0-9_]+$`; 63 matches the module registry's segments.
+    namespace: Mapped[str] = mapped_column(String(63), nullable=False)
+    name: Mapped[str] = mapped_column(String(63), nullable=False)
+    #: Label RBAC, exactly as modules and providers use it.
+    labels: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, nullable=False)
+    owner_email: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False
+    )
+
+    versions: Mapped[list[RegistryCollectionVersion]] = relationship(
+        back_populates="collection", cascade="all, delete-orphan"
+    )
+
+
+class RegistryCollectionVersion(Base):
+    """One published version of a collection.
+
+    `artifact_sha256` is the digest of the stored tarball and is what the
+    version-detail response advertises. `ansible-galaxy` checks the bytes it
+    receives against it, so it must be computed from what was actually stored
+    rather than copied from anything the client asserted.
+    """
+
+    __tablename__ = "registry_collection_versions"
+    __table_args__ = (
+        sa.UniqueConstraint("collection_id", "version", name="uq_registry_collection_versions"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=generate_uuid7
+    )
+    collection_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("registry_collections.id", ondelete="CASCADE")
+    )
+    version: Mapped[str] = mapped_column(String(63), nullable=False)
+    artifact_sha256: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    size: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    #: `collection_info` out of the tarball's MANIFEST.json. Dependency
+    #: resolution reads `dependencies` from here, so a published collection
+    #: without it resolves as though it had none.
+    manifest: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    #: A detached OpenPGP signature over the collection's MANIFEST.json,
+    #: ASCII-armored, exactly as the publisher produced it. Empty until one is
+    #: attached. The server verifies it against a key already registered with
+    #: the platform and never re-signs — the same trust shape as the provider
+    #: registry, where the publisher owns the signature.
+    signature: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    #: The registered GPG key the signature verified against. Advertised to the
+    #: client as `pubkey_fingerprint` so it knows which key to check with.
+    signing_key_id: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False
+    )
+
+    collection: Mapped[RegistryCollection] = relationship(back_populates="versions")
+
+
 class CachedProviderPackage(Base):
     """Cached upstream provider binary from a public registry."""
 

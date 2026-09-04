@@ -205,9 +205,26 @@ class TestThePackageProxies:
                 "/api/terrapod/v1/package-cache/galaxy/v3/collections/community/general/",
                 "/api/terrapod/v1/package-cache/galaxy/v3/collections/community/general/versions/",
                 "/api/terrapod/v1/package-cache/galaxy/v3/collections/community/general/versions/1.0.0/",
+                # Publishing too: a write refused while reads still work is not
+                # "disabled", and it still consumes the storage an operator was
+                # trying to stop using.
+                "/api/terrapod/v1/package-cache/galaxy/v3/imports/collections/x/",
             ):
                 response = await client.get(path, headers=_BASIC)
                 assert response.status_code == 404, f"{path} answered {response.status_code}"
+
+            for method, path in (
+                ("POST", "/api/terrapod/v1/package-cache/galaxy/v3/artifacts/collections/"),
+                (
+                    "PUT",
+                    "/api/terrapod/v1/package-cache/galaxy/v3/collections/acme/widgets"
+                    "/versions/1.0.0/signature",
+                ),
+            ):
+                response = await client.request(method, path, headers=_BASIC)
+                assert response.status_code == 404, (
+                    f"{method} {path} answered {response.status_code}"
+                )
 
     def test_galaxy_routes_do_not_exist_with_ansible_off(self) -> None:
         """Unmounted, not mounted-and-refusing — the #1429 requirement."""

@@ -22,9 +22,11 @@ request and turn this into a server-side request forgery primitive.
 
 from __future__ import annotations
 
+import asyncio
 import json
+import os
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile, status
 from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -33,6 +35,7 @@ from terrapod.api.dependencies import AuthenticatedUser
 from terrapod.config import settings
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
+from terrapod.services import registry_collection_service as collections
 from terrapod.services.engine_gating import capability_enabled
 from terrapod.services.package_cache import galaxy, npm, pypi
 from terrapod.services.package_cache.substrate import (
@@ -48,7 +51,7 @@ from terrapod.services.package_cache.substrate import (
     sealed,
     store_document,
 )
-from terrapod.storage import get_storage
+from terrapod.storage import get_storage, keys
 from terrapod.storage.protocol import ObjectStore
 
 #: Split by ecosystem so each can be left unmounted independently. See
@@ -430,6 +433,26 @@ async def galaxy_collection(
     key = galaxy.collection_key(namespace, name)
     base = _galaxy_base(request)
 
+    # A published collection is answered from our own registry and never proxied.
+    # Checking first also means a private name cannot be shadowed by an upstream
+    # one that happens to match.
+    published = await collections.list_versions(db, namespace, name)
+    if published:
+        newest = published[-1].version
+        return JSONResponse(
+            content={
+                "href": f"{base}/v3/collections/{namespace}/{name}/",
+                "namespace": namespace,
+                "name": name,
+                "deprecated": False,
+                "versions_url": f"{base}/v3/collections/{namespace}/{name}/versions/",
+                "highest_version": {
+                    "version": newest,
+                    "href": f"{base}/v3/collections/{namespace}/{name}/versions/{newest}/",
+                },
+            }
+        )
+
     if sealed():
         raw = await load_document(db, storage, galaxy.ECOSYSTEM, key, galaxy.COLLECTION_DOC)
         if raw is None:
@@ -487,6 +510,25 @@ async def galaxy_versions(
     _galaxy_names(namespace, name)
     key = galaxy.collection_key(namespace, name)
     base = _galaxy_base(request)
+
+    published = await collections.list_versions(db, namespace, name)
+    if published:
+        prefix = f"{base}/v3/collections/{namespace}/{name}/versions"
+        return JSONResponse(
+            content={
+                "meta": {"count": len(published)},
+                "links": {
+                    "first": f"{prefix}/",
+                    "previous": None,
+                    "next": None,
+                    "last": f"{prefix}/",
+                },
+                "data": [
+                    {"version": row.version, "href": f"{prefix}/{row.version}/"}
+                    for row in published
+                ],
+            }
+        )
 
     if sealed():
         raw = await load_document(db, storage, galaxy.ECOSYSTEM, key, galaxy.VERSIONS_DOC)
@@ -548,6 +590,10 @@ async def galaxy_version(
         raise HTTPException(status_code=404, detail="Not found")
     key = galaxy.collection_key(namespace, name)
     base = _galaxy_base(request)
+
+    row = await collections.get_version(db, namespace, name, version)
+    if row is not None:
+        return JSONResponse(content=_published_version_json(row, base, namespace, name, version))
 
     if sealed():
         raw = await load_document(db, storage, galaxy.ECOSYSTEM, key, galaxy.version_doc(version))
@@ -615,6 +661,12 @@ async def galaxy_download(
     if filename != galaxy.artifact_filename(namespace, name, version):
         raise HTTPException(status_code=404, detail="Not found")
 
+    published = await collections.get_version(db, namespace, name, version)
+    if published is not None:
+        return await _redirect_to_object(
+            storage, keys.collection_tarball_key(namespace, name, version)
+        )
+
     key = galaxy.collection_key(namespace, name)
     record = await lookup_present(db, storage, galaxy.ECOSYSTEM, key, filename)
     if record is None:
@@ -634,6 +686,182 @@ async def galaxy_download(
             raise _upstream_failure(exc) from exc
 
     return await _redirect_to_object(storage, record.storage_key)
+
+
+# ── Ansible Galaxy: publishing ──────────────────────────────────────────────
+
+
+def _published_version_json(row, base: str, namespace: str, name: str, version: str) -> dict:
+    """A published version rendered in the shape the client expects.
+
+    Built to the same contract as a proxied one — `href`, `download_url` and
+    `artifact.sha256` all present and all ours — so the installer cannot tell
+    the two apart, which is the point: a private collection installs exactly
+    like a public one.
+    """
+    manifest = row.manifest or {}
+    return {
+        "version": version,
+        "href": f"{base}/v3/collections/{namespace}/{name}/versions/{version}/",
+        "namespace": {"name": namespace},
+        "collection": {"name": name},
+        "artifact": {
+            "filename": galaxy.artifact_filename(namespace, name, version),
+            "sha256": row.artifact_sha256,
+            "size": row.size,
+        },
+        "download_url": (
+            f"{base}/v3/collections/{namespace}/{name}/versions/{version}/download/"
+            f"{galaxy.artifact_filename(namespace, name, version)}"
+        ),
+        # Straight from the archive's MANIFEST.json. Dependency resolution reads
+        # this, so a published collection whose dependencies were dropped would
+        # resolve as though it had none — a wrong answer rather than an error.
+        "metadata": {
+            "dependencies": manifest.get("dependencies") or {},
+            "tags": manifest.get("tags") or [],
+            "description": manifest.get("description") or "",
+        },
+        "requires_ansible": manifest.get("requires_ansible") or "",
+        # Advertised only once a signature has been verified against a
+        # registered key. An empty list is the honest answer for an unsigned
+        # collection — the client then installs it unless `--keyring` demands
+        # otherwise, rather than failing against a signature we cannot vouch for.
+        "signatures": (
+            [
+                {
+                    "signature": row.signature,
+                    "pubkey_fingerprint": row.signing_key_id,
+                    "signing_service": None,
+                }
+            ]
+            if row.signature
+            else []
+        ),
+    }
+
+
+@galaxy_router.post("/galaxy/v3/artifacts/collections/", status_code=202)
+async def galaxy_publish(
+    request: Request,
+    file: UploadFile = File(...),
+    user: AuthenticatedUser = Depends(authenticate_package_request),
+    db: AsyncSession = Depends(get_db),
+    storage: ObjectStore = Depends(get_storage),
+) -> Response:
+    """Accept `ansible-galaxy collection publish`.
+
+    The client sends one multipart POST carrying only the tarball, so every fact
+    about the collection is read out of the archive rather than taken from the
+    request — there is nowhere else for it to come from, and trusting a
+    client-supplied coordinate would let one publisher write into another's
+    namespace.
+
+    The part is re-streamed to the ephemeral PVC rather than read into memory:
+    Starlette rolls a large multipart part over to the RAM-backed `/tmp`, which
+    is what rule 14 exists to avoid.
+
+    Responds 202 with a task URL. The client does not follow that URL — it takes
+    its last path segment as an import id and polls a fixed path (see
+    `docs/galaxy-cli-surface.md`), so the segment is the version's own id.
+    """
+    from terrapod.api.upload_stream import stream_upload_to_tempfile
+
+    tmp_path, size = await stream_upload_to_tempfile(file, suffix=".collection.tar.gz")
+    try:
+        if size == 0:
+            raise HTTPException(status_code=400, detail="Empty upload")
+        try:
+            row = await collections.publish(db, storage, tmp_path, owner_email=user.email or "")
+        except collections.PublishError as exc:
+            # 400 with the archive's own problem named: the client prints this,
+            # and "invalid request" would send someone to look at their command
+            # rather than their tarball.
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        await db.commit()
+    finally:
+        try:
+            await asyncio.to_thread(os.unlink, tmp_path)
+        except OSError:
+            pass
+
+    base = _galaxy_base(request)
+    return JSONResponse(
+        status_code=202,
+        content={"task": f"{base}/v3/imports/collections/{row.id}/"},
+    )
+
+
+@galaxy_router.put("/galaxy/v3/collections/{namespace}/{name}/versions/{version}/signature")
+async def galaxy_attach_signature(
+    namespace: str,
+    name: str,
+    version: str,
+    request: Request,
+    user: AuthenticatedUser = Depends(authenticate_package_request),
+    db: AsyncSession = Depends(get_db),
+    storage: ObjectStore = Depends(get_storage),
+) -> Response:
+    """Attach a detached signature to a published collection. Terrapod-native.
+
+    Not part of the surface `ansible-galaxy` drives: `collection publish` sends
+    the tarball and nothing else, so there is nowhere in that protocol to put a
+    signature (see `docs/galaxy-cli-surface.md`). Signing is therefore a second,
+    deliberate step here — as it is in Galaxy NG, where signatures come from a
+    signing service rather than the publish call.
+
+    The body is the ASCII-armored detached signature over the collection's
+    `MANIFEST.json`. It is verified against a key already registered with this
+    platform and refused with 422 otherwise; the server never re-signs.
+    """
+    _galaxy_names(namespace, name)
+    if not galaxy.valid_version(version):
+        raise HTTPException(status_code=404, detail="Not found")
+
+    sig_bytes = await request.body()
+    if not sig_bytes:
+        raise HTTPException(status_code=400, detail="Empty signature")
+
+    try:
+        row = await collections.attach_signature(db, storage, namespace, name, version, sig_bytes)
+    except collections.SignatureError as exc:
+        # 422, matching the provider registry: the request was well-formed and
+        # the content is what we decline to vouch for.
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    await db.commit()
+
+    return JSONResponse(
+        content={
+            "namespace": namespace,
+            "name": name,
+            "version": version,
+            "pubkey_fingerprint": row.signing_key_id,
+        }
+    )
+
+
+@galaxy_router.get("/galaxy/v3/imports/collections/{import_id}/")
+async def galaxy_import_status(
+    import_id: str,
+    user: AuthenticatedUser = Depends(authenticate_package_request),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """The import poll `ansible-galaxy` makes after publishing.
+
+    Publishing here is synchronous — the archive is validated and stored inside
+    the POST — so by the time this is reachable the import has either happened
+    or the POST already failed. The row existing IS the completed state, which
+    is why nothing extra is stored or expired to answer this.
+    """
+    row = await collections.get_version_by_id(db, import_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Not found")
+    return JSONResponse(
+        content={
+            "state": "completed",
+            "finished_at": row.created_at.isoformat().replace("+00:00", "Z"),
+        }
+    )
 
 
 async def _redirect_to_object(storage: ObjectStore, key: str) -> Response:

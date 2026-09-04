@@ -189,9 +189,42 @@ The endpoints served are the ones the client actually calls, catalogued in
 rather than read from documentation, which is how four of that document's
 statements came to contradict the obvious reading of the docs.
 
-**Only pull-through, for now.** Publishing a private collection
-(`ansible-galaxy collection publish`) and signature verification are tracked
-separately; this half is what makes a public collection installable offline.
+### Publishing a private collection
+
+`ansible-galaxy collection publish acme-widgets-1.0.0.tar.gz` publishes to the
+same server entry. Terrapod reads the coordinates, dependencies and digest out
+of the archive's own `MANIFEST.json` — the client sends nothing else — and the
+collection then installs exactly like a public one, because the version detail
+it serves is the same shape.
+
+A published version is **immutable**: republishing the same version is refused
+rather than replacing it, since a client that has already resolved it and cached
+its digest would otherwise receive different bytes under the same name.
+
+Published collections are **not** cache entries and are never evicted by the
+retention sweep. A cached artifact is a copy of something upstream still has; a
+published one is the only copy there is.
+
+### Signing a published collection
+
+`collection publish` sends only the tarball, so there is nowhere in that
+protocol to put a signature. Attach one afterwards:
+
+```sh
+curl -X PUT \
+  -H "Authorization: Bearer $TERRAPOD_TOKEN" \
+  --data-binary @manifest.sig \
+  "$TERRAPOD/api/terrapod/v1/package-cache/galaxy/v3/collections/acme/widgets/versions/1.0.0/signature"
+```
+
+The body is a detached OpenPGP signature over the collection's `MANIFEST.json`.
+Terrapod verifies it against a **public key already registered** with the
+platform (`/api/terrapod/v1/gpg-keys`) and refuses a signature from an
+unregistered key with 422, naming the key. The server never re-signs — the
+publisher owns the signature, exactly as in the provider registry.
+
+Once verified, the signature appears in the version detail, so
+`ansible-galaxy collection install --keyring …` can check it.
 
 **What is and is not rewritten.** Every URL the client follows —
 `download_url`, `versions_url`, every `href` — points back at Terrapod, and
