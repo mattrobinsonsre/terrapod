@@ -107,6 +107,50 @@ Docker/Rancher/minikube setup is untouched.
 kind shares the two-store problem but not the fix: `kind load docker-image` is
 reliable, so use that rather than a registry.
 
+## When the container store fills up
+
+`make doctor` reports the health of the local container store. Run it if builds
+start failing oddly, and occasionally regardless.
+
+It exists because of a failure mode that is invisible until it is expensive.
+`podman build` writes a layer's content to disk and then commits its metadata.
+Interrupt it in between — a killed build, a step that times out, a full disk —
+and the layer stays on disk with nothing referencing it.
+
+**Nothing reclaims those layers.** `podman system prune` only removes objects
+podman has metadata for, and `podman system check --repair` cannot see a layer
+it has no record of either; it reports zero orphans even at `--max 1m`. The
+space is unrecoverable short of a full storage reset.
+
+It also accelerates. As the disk fills, metadata writes begin to fail, which
+orphans layers that would otherwise have committed cleanly — so the problem
+feeds itself, and every individual symptom looks like an ordinary build failure.
+
+One workstation reached **9,415 orphaned layers holding roughly 85 GB** before
+anyone noticed, on a 120 GB store that `podman system df` was cheerfully
+reporting as 19 GB of images.
+
+Two guards exist:
+
+- `scripts/lib.sh` refuses to build the test image below
+  `CONTAINER_STORE_MIN_FREE_GB` (default 10). Failing loudly beats filling the
+  store silently. Skipped in CI, where the runner is disposable.
+- `make doctor` compares layer directories on disk against
+  `overlay-layers/layers.json`. That difference is the number that matters, and
+  it is the one no built-in command shows you.
+
+If you are already deep in it, the only complete fix is:
+
+```zsh
+podman system reset      # destroys ALL images, containers and volumes
+```
+
+That includes your k3d cluster, so recreate it with the commands in *Nested
+clusters (k3d / kind)* above, then `make dev`.
+
+Damaged *tracked* layers are a different and much smaller problem — those do
+have metadata, so `podman system check --repair` genuinely fixes them.
+
 ## Day-to-day
 
 - **Live reload** — `tilt up` live-syncs `services/terrapod` and `web/src` into
