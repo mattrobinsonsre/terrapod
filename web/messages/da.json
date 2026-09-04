@@ -126,6 +126,15 @@
     "empty": {
       "none": "Ingen arbejdsområder endnu. Opret et for at komme i gang.",
       "noMatch": "Ingen arbejdsområder matcher dette filter."
+    },
+    "group": {
+      "label": "Gruppér",
+      "flat": "Flad",
+      "repo": "Arkiv",
+      "repoPath": "Arkiv + Sti",
+      "local": "Lokal",
+      "collapseAll": "Fold alle sammen",
+      "expandAll": "Udvid alle"
     }
   },
   "status": {

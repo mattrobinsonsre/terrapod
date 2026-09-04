@@ -126,6 +126,15 @@
     "empty": {
       "none": "Ainda não há workspaces. Crie um para começar.",
       "noMatch": "Nenhum workspace corresponde a este filtro."
+    },
+    "group": {
+      "label": "Agrupar",
+      "flat": "Plano",
+      "repo": "Repositório",
+      "repoPath": "Repositório + Caminho",
+      "local": "Local",
+      "collapseAll": "Recolher tudo",
+      "expandAll": "Expandir tudo"
     }
   },
   "status": {

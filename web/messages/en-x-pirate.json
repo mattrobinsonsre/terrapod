@@ -124,8 +124,17 @@
       "resourcesValue": "{cpu} CPU / {memory}"
     },
     "empty": {
-      "none": "No work-decks yet, matey. Create one t'' set sail.",
-      "noMatch": "No work-decks match this filter."
+      "none": "Nay work decks yet. Forge one to set sail.",
+      "noMatch": "Nay work decks match this sift."
+    },
+    "group": {
+      "label": "Muster",
+      "flat": "Flat",
+      "repo": "Cargo hold",
+      "repoPath": "Cargo hold + Course",
+      "local": "Ashore",
+      "collapseAll": "Batten down all",
+      "expandAll": "Unfurl all"
     }
   },
   "status": {

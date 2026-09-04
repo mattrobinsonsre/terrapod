@@ -126,6 +126,15 @@
     "empty": {
       "none": "Zatím žádné pracovní prostory. Vytvořte jeden a začněte.",
       "noMatch": "Tomuto filtru neodpovídají žádné pracovní prostory."
+    },
+    "group": {
+      "label": "Seskupit",
+      "flat": "Ploché",
+      "repo": "Repozitář",
+      "repoPath": "Repozitář + Cesta",
+      "local": "Místní",
+      "collapseAll": "Sbalit vše",
+      "expandAll": "Rozbalit vše"
     }
   },
   "status": {

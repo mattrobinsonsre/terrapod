@@ -126,6 +126,15 @@
     "empty": {
       "none": "Dim gweithfannau eto. Crëwch un i ddechrau.",
       "noMatch": "Nid oes gweithfannau'n cyfateb i'r hidlydd hwn."
+    },
+    "group": {
+      "label": "Grwpio",
+      "flat": "Gwastad",
+      "repo": "Ystorfa",
+      "repoPath": "Ystorfa + Llwybr",
+      "local": "Lleol",
+      "collapseAll": "Crebachu popeth",
+      "expandAll": "Ehangu popeth"
     }
   },
   "status": {

@@ -126,6 +126,15 @@
     "empty": {
       "none": "Noch keine Arbeitsbereiche. Erstellen Sie einen, um zu beginnen.",
       "noMatch": "Keine Arbeitsbereiche entsprechen diesem Filter."
+    },
+    "group": {
+      "label": "Gruppieren",
+      "flat": "Flach",
+      "repo": "Repository",
+      "repoPath": "Repository + Pfad",
+      "local": "Lokal",
+      "collapseAll": "Alle einklappen",
+      "expandAll": "Alle ausklappen"
     }
   },
   "status": {
