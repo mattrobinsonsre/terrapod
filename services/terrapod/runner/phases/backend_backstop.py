@@ -34,7 +34,7 @@ def verify_local_backend(strip_dir: Path) -> str:
         with state_path.open() as f:
             data = json.load(f)
         backend_type = data.get("backend", {}).get("type") or "MISSING"
-    except (FileNotFoundError, OSError, json.JSONDecodeError):
+    except FileNotFoundError, OSError, json.JSONDecodeError:
         backend_type = "MISSING"
 
     if backend_type != "local":

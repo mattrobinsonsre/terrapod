@@ -38,7 +38,7 @@ async def fetch_custom_roles(
 
 async def resolve_workspace_capabilities_for(
     db: AsyncSession,
-    user: "AuthenticatedUser",
+    user: AuthenticatedUser,
     workspace: Workspace,
     *,
     preloaded_roles: list[Role] | None = None,

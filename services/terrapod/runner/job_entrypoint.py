@@ -96,7 +96,7 @@ def _configure_stdio() -> None:
     for stream in (sys.stdout, sys.stderr):
         try:
             stream.reconfigure(line_buffering=True)  # type: ignore[attr-defined]
-        except (AttributeError, OSError):
+        except AttributeError, OSError:
             # Wrapped (e.g. pytest capture) — best-effort only.
             pass
 
@@ -107,7 +107,7 @@ def _flush_stdio() -> None:
     for stream in (sys.stdout, sys.stderr):
         try:
             stream.flush()
-        except (BrokenPipeError, OSError, ValueError):
+        except BrokenPipeError, OSError, ValueError:
             pass
 
 
@@ -145,7 +145,7 @@ def _install_signal_logger() -> None:
     for s in (signal.SIGTERM, signal.SIGQUIT):
         try:
             signal.signal(s, _handle)
-        except (ValueError, OSError):
+        except ValueError, OSError:
             pass
 
 

@@ -457,7 +457,7 @@ def _summarize_cost_file(path: str) -> tuple[str | None, float | None, float | N
             float(total["min"]) if total.get("min") is not None else None,
             float(total["max"]) if total.get("max") is not None else None,
         )
-    except (OSError, ValueError, KeyError, TypeError):
+    except OSError, ValueError, KeyError, TypeError:
         return None
 
 
@@ -1035,7 +1035,7 @@ async def post_onboarding_query_results(
     session = await _get_onboarding_session_for_run(run_id, db)
     try:
         payload = await request.json()
-    except (ValueError, UnicodeDecodeError):
+    except ValueError, UnicodeDecodeError:
         raise HTTPException(status_code=422, detail="body must be JSON") from None
     if not isinstance(payload, dict):
         raise HTTPException(status_code=422, detail="body must be a JSON object")

@@ -46,15 +46,15 @@ class _Check:
         self.ok: bool | None = None
         self.detail = ""
 
-    def passed(self, detail: str) -> "_Check":
+    def passed(self, detail: str) -> _Check:
         self.ok, self.detail = True, detail
         return self
 
-    def failed(self, detail: str) -> "_Check":
+    def failed(self, detail: str) -> _Check:
         self.ok, self.detail = False, detail
         return self
 
-    def skipped(self, detail: str) -> "_Check":
+    def skipped(self, detail: str) -> _Check:
         self.ok, self.detail = None, detail
         return self
 

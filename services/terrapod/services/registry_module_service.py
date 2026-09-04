@@ -286,7 +286,7 @@ async def get_module_download_url(
 
         try:
             run = await db.get(Run, uuid.UUID(run_id))
-        except (ValueError, AttributeError):
+        except ValueError, AttributeError:
             run = None
         if run and run.module_overrides:
             coord = f"{namespace}/{name}/{provider}"

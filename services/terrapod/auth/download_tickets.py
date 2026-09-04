@@ -130,7 +130,7 @@ def verify_ticket(ticket: str) -> TicketPayload | None:
     try:
         ttl = int(ttl_str)
         ts = int(ts_str)
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return None
 
     expires_at = ts + ttl
@@ -144,7 +144,7 @@ def verify_ticket(ticket: str) -> TicketPayload | None:
 
     try:
         email = _b64decode(email_b64)
-    except (ValueError, UnicodeDecodeError):
+    except ValueError, UnicodeDecodeError:
         # Bogus email blob — the HMAC said it was authentic, but the
         # encoding is junk. Treat as a malformed ticket.
         return None

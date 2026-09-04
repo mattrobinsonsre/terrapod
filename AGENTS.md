@@ -43,7 +43,7 @@ if a route is on that list it stays at `/api/v2/`; otherwise it goes under
 
 | Path | What it is | Language |
 |---|---|---|
-| `services/terrapod/` | API server (FastAPI) **and** the runner listener — one codebase, different entrypoints. Implicit namespace package (no `__init__.py`). | Python 3.13 |
+| `services/terrapod/` | API server (FastAPI) **and** the runner listener — one codebase, different entrypoints. Implicit namespace package (no `__init__.py`). | Python 3.14 |
 | `web/` | Next.js frontend + BFF (the single ingress; proxies `/api/*` to the API). | TypeScript / React |
 | `go-terrapod/` | Public, canonical Go SDK for the Terrapod API. Source of truth for the Go-side view of every endpoint. | Go |
 | `provider/` | `terraform-provider-terrapod` — the first-class **Terraform / OpenTofu provider for managing Terrapod itself as code** (25 `terrapod_*` resources + 9 data sources); a thin, typed wrapper over go-terrapod. See [`docs/terraform-provider.md`](docs/terraform-provider.md). | Go |

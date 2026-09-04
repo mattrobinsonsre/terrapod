@@ -7,7 +7,7 @@ license = "MPL-2.0"
 packages = [{include = "terrapod"}]
 
 [tool.poetry.dependencies]
-python = ">=3.13,<3.14"
+python = ">=3.14,<3.15"
 fastapi = ">=0.135.2,!=0.136.3,<0.137.0"
 # Pin starlette directly even though it is fastapi's dependency. fastapi
 # only declares a FLOOR (`starlette>=0.46`, no ceiling), so without our own
@@ -82,9 +82,12 @@ standard-imghdr = "^3.13"
 # never started) — and relaxes the aiohttp pin from ==3.13.5 to
 # <4.0,>=3.10, which lets aiohttp resolve to 3.14+ and clears
 # GHSA-hg6j-4rv6-33pg + GHSA-jg22-mg44-37j8 + CVE-2026-34993 +
-# CVE-2026-47265. Reachable only on Python 3.13 — litellm 1.83.11+
-# requires_python = <3.14. The 3.13 floor stays until litellm
-# restores 3.14 compatibility.
+# CVE-2026-47265.
+#
+# litellm was what set the interpreter floor: 1.83.11+ declared
+# requires_python = <3.14, so the whole project was pinned to 3.13 by
+# one dependency. That cap is gone as of 1.99.0 (<3.15,>=3.10), which
+# is what let the floor move to 3.14 in 2.0 (#1461).
 litellm = ">=1.87,<2.0"
 # Required at RUNTIME by litellm's completion() path: litellm 1.9x lazily imports
 # litellm.responses.mcp -> litellm.proxy.common_utils.http_parsing_utils, which
@@ -113,7 +116,7 @@ requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.ruff]
-target-version = "py313"
+target-version = "py314"
 line-length = 100
 # Alembic migrations are auto-generated with the conventional revision-vars-
 # before-imports layout (E402) and are not hand-linted. (They're now present in
@@ -148,7 +151,7 @@ markers = [
 ]
 
 [tool.mypy]
-python_version = "3.13"
+python_version = "3.14"
 strict = true
 warn_return_any = true
 warn_unused_ignores = true

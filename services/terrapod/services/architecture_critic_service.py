@@ -353,7 +353,7 @@ async def _load_state_compact(sv: StateVersion) -> tuple[list[dict], list[dict],
 
     try:
         return await asyncio.to_thread(_parse, data)
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         logger.warning("architecture critic: state parse failed", state_version_id=str(sv.id))
         return None
 
@@ -662,7 +662,7 @@ async def handle_architecture_critique(payload: dict) -> None:
         # prefix, so strip it first — otherwise a normal ws-… regenerate
         # would silently no-op here.
         workspace_id = uuid.UUID(str(payload["workspace_id"]).removeprefix("ws-"))
-    except (KeyError, ValueError):
+    except KeyError, ValueError:
         logger.warning("invalid architecture_critique payload", payload=payload)
         return
     await generate_critique(workspace_id, force=bool(payload.get("force")))

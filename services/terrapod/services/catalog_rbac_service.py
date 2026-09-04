@@ -44,7 +44,7 @@ async def fetch_custom_roles(
 
 async def resolve_catalog_capabilities_for(
     db: AsyncSession,
-    user: "AuthenticatedUser",
+    user: AuthenticatedUser,
     resource_name: str,
     resource_labels: dict,
     owner_email: str,

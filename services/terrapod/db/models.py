@@ -242,9 +242,7 @@ class AgentPool(Base):
         DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False
     )
 
-    tokens: Mapped[list["AgentPoolToken"]] = relationship(
-        back_populates="pool", passive_deletes=True
-    )
+    tokens: Mapped[list[AgentPoolToken]] = relationship(back_populates="pool", passive_deletes=True)
 
 
 class AgentPoolToken(Base):
@@ -274,7 +272,7 @@ class AgentPoolToken(Base):
     )
     created_by: Mapped[str] = mapped_column(String(255), nullable=False)
 
-    pool: Mapped["AgentPool"] = relationship(back_populates="tokens")
+    pool: Mapped[AgentPool] = relationship(back_populates="tokens")
 
     __table_args__ = (Index("ix_agent_pool_tokens_pool_id", "pool_id"),)
 
@@ -323,7 +321,7 @@ class Workspace(Base):
     # keys: deleting a pool detaches it from every workspace by CASCADE, with no
     # application-side sweeping to forget. Resolve via
     # `pool_set.workspace_pool_ids()` rather than walking the links by hand.
-    agent_pool_links: Mapped[list["WorkspaceAgentPool"]] = relationship(
+    agent_pool_links: Mapped[list[WorkspaceAgentPool]] = relationship(
         cascade="all, delete-orphan",
         lazy="selectin",
         order_by="WorkspaceAgentPool.ordinal",
@@ -355,7 +353,7 @@ class Workspace(Base):
         ForeignKey("vcs_connections.id", ondelete="SET NULL"),
         nullable=True,
     )
-    vcs_connection: Mapped["VCSConnection | None"] = relationship(
+    vcs_connection: Mapped[VCSConnection | None] = relationship(
         "VCSConnection", foreign_keys=[vcs_connection_id], lazy="joined"
     )
     vcs_repo_url: Mapped[str] = mapped_column(String(500), nullable=False, default="")
@@ -551,15 +549,13 @@ class Workspace(Base):
         DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False
     )
 
-    state_versions: Mapped[list["StateVersion"]] = relationship(
+    state_versions: Mapped[list[StateVersion]] = relationship(
         back_populates="workspace", cascade="all, delete-orphan"
     )
-    variables: Mapped[list["Variable"]] = relationship(
+    variables: Mapped[list[Variable]] = relationship(
         back_populates="workspace", cascade="all, delete-orphan"
     )
-    runs: Mapped[list["Run"]] = relationship(
-        back_populates="workspace", cascade="all, delete-orphan"
-    )
+    runs: Mapped[list[Run]] = relationship(back_populates="workspace", cascade="all, delete-orphan")
 
     __table_args__ = (sa.UniqueConstraint("name", name="uq_workspaces"),)
 
@@ -602,7 +598,7 @@ class StateVersion(Base):
         DateTime(timezone=True), default=now_utc, nullable=False
     )
 
-    workspace: Mapped["Workspace"] = relationship(back_populates="state_versions")
+    workspace: Mapped[Workspace] = relationship(back_populates="state_versions")
 
     __table_args__ = (
         sa.UniqueConstraint("workspace_id", "serial", name="uq_state_versions"),
@@ -652,10 +648,10 @@ class RegistryModule(Base):
         DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False
     )
 
-    versions: Mapped[list["RegistryModuleVersion"]] = relationship(
+    versions: Mapped[list[RegistryModuleVersion]] = relationship(
         back_populates="module", cascade="all, delete-orphan"
     )
-    workspace_links: Mapped[list["ModuleWorkspaceLink"]] = relationship(
+    workspace_links: Mapped[list[ModuleWorkspaceLink]] = relationship(
         back_populates="module", cascade="all, delete-orphan"
     )
 
@@ -692,7 +688,7 @@ class RegistryModuleVersion(Base):
         DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False
     )
 
-    module: Mapped["RegistryModule"] = relationship(back_populates="versions")
+    module: Mapped[RegistryModule] = relationship(back_populates="versions")
 
     __table_args__ = (
         sa.UniqueConstraint("module_id", "version", name="uq_registry_module_versions"),
@@ -727,8 +723,8 @@ class ModuleWorkspaceLink(Base):
     )
     created_by: Mapped[str] = mapped_column(Text, nullable=False)
 
-    module: Mapped["RegistryModule"] = relationship(back_populates="workspace_links")
-    workspace: Mapped["Workspace"] = relationship(lazy="joined")
+    module: Mapped[RegistryModule] = relationship(back_populates="workspace_links")
+    workspace: Mapped[Workspace] = relationship(lazy="joined")
 
     __table_args__ = (
         sa.UniqueConstraint("module_id", "workspace_id", name="uq_module_workspace_links"),
@@ -819,7 +815,7 @@ class CatalogItem(Base):
         DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False
     )
 
-    module: Mapped["RegistryModule"] = relationship(lazy="joined")
+    module: Mapped[RegistryModule] = relationship(lazy="joined")
 
     __table_args__ = (
         sa.UniqueConstraint("name", name="uq_catalog_items"),
@@ -847,7 +843,7 @@ class RegistryProvider(Base):
         DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False
     )
 
-    versions: Mapped[list["RegistryProviderVersion"]] = relationship(
+    versions: Mapped[list[RegistryProviderVersion]] = relationship(
         back_populates="provider", cascade="all, delete-orphan"
     )
 
@@ -916,11 +912,11 @@ class RegistryProviderVersion(Base):
         DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False
     )
 
-    provider: Mapped["RegistryProvider"] = relationship(back_populates="versions")
-    platforms: Mapped[list["RegistryProviderPlatform"]] = relationship(
+    provider: Mapped[RegistryProvider] = relationship(back_populates="versions")
+    platforms: Mapped[list[RegistryProviderPlatform]] = relationship(
         back_populates="version", cascade="all, delete-orphan"
     )
-    gpg_key: Mapped["GPGKey | None"] = relationship()
+    gpg_key: Mapped[GPGKey | None] = relationship()
 
     __table_args__ = (
         sa.UniqueConstraint("provider_id", "version", name="uq_registry_provider_versions"),
@@ -951,7 +947,7 @@ class RegistryProviderPlatform(Base):
         DateTime(timezone=True), default=now_utc, nullable=False
     )
 
-    version: Mapped["RegistryProviderVersion"] = relationship(back_populates="platforms")
+    version: Mapped[RegistryProviderVersion] = relationship(back_populates="platforms")
 
     __table_args__ = (
         sa.UniqueConstraint("version_id", "os", "arch", name="uq_registry_provider_platforms"),
@@ -1210,7 +1206,7 @@ class AutodiscoveryRule(Base):
         ForeignKey("vcs_connections.id", ondelete="CASCADE"),
         nullable=False,
     )
-    vcs_connection: Mapped["VCSConnection"] = relationship(
+    vcs_connection: Mapped[VCSConnection] = relationship(
         "VCSConnection", foreign_keys=[vcs_connection_id], lazy="joined"
     )
     repo_url: Mapped[str] = mapped_column(String(2048), nullable=False)
@@ -1308,7 +1304,7 @@ class PRSession(Base):
         ForeignKey("vcs_connections.id", ondelete="CASCADE"),
         nullable=False,
     )
-    vcs_connection: Mapped["VCSConnection"] = relationship(
+    vcs_connection: Mapped[VCSConnection] = relationship(
         "VCSConnection", foreign_keys=[vcs_connection_id], lazy="joined"
     )
     repo: Mapped[str] = mapped_column(String(500), nullable=False)  # owner/name
@@ -1393,7 +1389,7 @@ class Variable(Base):
         DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False
     )
 
-    workspace: Mapped["Workspace"] = relationship(back_populates="variables")
+    workspace: Mapped[Workspace] = relationship(back_populates="variables")
 
     __table_args__ = (
         sa.UniqueConstraint("workspace_id", "key", name="uq_variables_workspace_key"),
@@ -1430,10 +1426,10 @@ class VariableSet(Base):
         DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False
     )
 
-    variables: Mapped[list["VariableSetVariable"]] = relationship(
+    variables: Mapped[list[VariableSetVariable]] = relationship(
         back_populates="variable_set", cascade="all, delete-orphan"
     )
-    workspace_assignments: Mapped[list["VariableSetWorkspace"]] = relationship(
+    workspace_assignments: Mapped[list[VariableSetWorkspace]] = relationship(
         cascade="all, delete-orphan"
     )
 
@@ -1474,7 +1470,7 @@ class VariableSetVariable(Base):
         DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False
     )
 
-    variable_set: Mapped["VariableSet"] = relationship(back_populates="variables")
+    variable_set: Mapped[VariableSet] = relationship(back_populates="variables")
 
     __table_args__ = (
         sa.UniqueConstraint("variable_set_id", "key", name="uq_variable_set_variables"),
@@ -1510,7 +1506,7 @@ class WorkspaceAgentPool(Base):
     )
     ordinal: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
-    agent_pool: Mapped["AgentPool"] = relationship(lazy="joined")
+    agent_pool: Mapped[AgentPool] = relationship(lazy="joined")
 
 
 class VariableSetWorkspace(Base):
@@ -1529,7 +1525,7 @@ class VariableSetWorkspace(Base):
         primary_key=True,
     )
 
-    workspace: Mapped["Workspace"] = relationship(lazy="joined")
+    workspace: Mapped[Workspace] = relationship(lazy="joined")
 
 
 # --- Execution Hooks (#619) ---
@@ -1581,7 +1577,7 @@ class ExecutionHook(Base):
         DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False
     )
 
-    workspace_assignments: Mapped[list["ExecutionHookWorkspace"]] = relationship(
+    workspace_assignments: Mapped[list[ExecutionHookWorkspace]] = relationship(
         cascade="all, delete-orphan"
     )
 
@@ -1604,7 +1600,7 @@ class ExecutionHookWorkspace(Base):
         primary_key=True,
     )
 
-    workspace: Mapped["Workspace"] = relationship(lazy="joined")
+    workspace: Mapped[Workspace] = relationship(lazy="joined")
 
 
 # --- Slack identity linking (#556) ---
@@ -1846,7 +1842,7 @@ class Run(Base):
         DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False
     )
 
-    workspace: Mapped["Workspace"] = relationship(back_populates="runs")
+    workspace: Mapped[Workspace] = relationship(back_populates="runs")
 
     __table_args__ = (
         Index("ix_runs_workspace_id", "workspace_id"),
@@ -1943,8 +1939,8 @@ class RunTrigger(Base):
         DateTime(timezone=True), default=now_utc, nullable=False
     )
 
-    workspace: Mapped["Workspace"] = relationship(foreign_keys=[workspace_id])
-    source_workspace: Mapped["Workspace"] = relationship(foreign_keys=[source_workspace_id])
+    workspace: Mapped[Workspace] = relationship(foreign_keys=[workspace_id])
+    source_workspace: Mapped[Workspace] = relationship(foreign_keys=[source_workspace_id])
 
     __table_args__ = (
         sa.UniqueConstraint("workspace_id", "source_workspace_id", name="uq_run_triggers"),
@@ -1988,8 +1984,8 @@ class WorkspaceRemoteStateConsumer(Base):
     )
     created_by: Mapped[str] = mapped_column(String(255), nullable=False, default="")
 
-    producer_workspace: Mapped["Workspace"] = relationship(foreign_keys=[producer_workspace_id])
-    consumer_workspace: Mapped["Workspace"] = relationship(foreign_keys=[consumer_workspace_id])
+    producer_workspace: Mapped[Workspace] = relationship(foreign_keys=[producer_workspace_id])
+    consumer_workspace: Mapped[Workspace] = relationship(foreign_keys=[consumer_workspace_id])
 
     __table_args__ = (
         sa.UniqueConstraint(
@@ -2040,7 +2036,7 @@ class NotificationConfiguration(Base):
         DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False
     )
 
-    workspace: Mapped["Workspace"] = relationship()
+    workspace: Mapped[Workspace] = relationship()
 
     __table_args__ = (Index("ix_notification_configurations_workspace_id", "workspace_id"),)
 
@@ -2086,7 +2082,7 @@ class RunTask(Base):
         DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False
     )
 
-    workspace: Mapped["Workspace"] = relationship()
+    workspace: Mapped[Workspace] = relationship()
 
     __table_args__ = (Index("ix_run_tasks_workspace_id", "workspace_id"),)
 
@@ -2120,7 +2116,7 @@ class TaskStage(Base):
         DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False
     )
 
-    results: Mapped[list["TaskStageResult"]] = relationship(
+    results: Mapped[list[TaskStageResult]] = relationship(
         back_populates="task_stage", cascade="all, delete-orphan"
     )
 
@@ -2169,8 +2165,8 @@ class TaskStageResult(Base):
         DateTime(timezone=True), default=now_utc, nullable=False
     )
 
-    task_stage: Mapped["TaskStage"] = relationship(back_populates="results")
-    run_task: Mapped["RunTask | None"] = relationship()
+    task_stage: Mapped[TaskStage] = relationship(back_populates="results")
+    run_task: Mapped[RunTask | None] = relationship()
 
     __table_args__ = (Index("ix_task_stage_results_task_stage_id", "task_stage_id"),)
 
@@ -2219,7 +2215,7 @@ class PolicySet(Base):
         ForeignKey("vcs_connections.id", ondelete="SET NULL"),
         nullable=True,
     )
-    vcs_connection: Mapped["VCSConnection | None"] = relationship(
+    vcs_connection: Mapped[VCSConnection | None] = relationship(
         "VCSConnection", foreign_keys=[vcs_connection_id], lazy="joined"
     )
     vcs_repo_url: Mapped[str] = mapped_column(String(500), nullable=False, default="")
@@ -2239,7 +2235,7 @@ class PolicySet(Base):
         DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False
     )
 
-    policies: Mapped[list["Policy"]] = relationship(
+    policies: Mapped[list[Policy]] = relationship(
         back_populates="policy_set", cascade="all, delete-orphan"
     )
 
@@ -2274,7 +2270,7 @@ class Policy(Base):
         DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False
     )
 
-    policy_set: Mapped["PolicySet"] = relationship(back_populates="policies")
+    policy_set: Mapped[PolicySet] = relationship(back_populates="policies")
 
     __table_args__ = (
         sa.UniqueConstraint("policy_set_id", "name", name="uq_policies_set_name"),

@@ -159,7 +159,7 @@ docker_build(
     dockerfile='docker/Dockerfile.migrations',
 )
 
-# Runner Job image (python:3.13-slim, pure-Python orchestrator).
+# Runner Job image (python:3.14-slim, pure-Python orchestrator).
 # Built as a local_resource (not docker_build) because the runner image is
 # referenced in the runners.yaml ConfigMap, not in a pod spec — so Tilt does not
 # track it and `default_registry` above does NOT apply to it. It therefore has to

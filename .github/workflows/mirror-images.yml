@@ -14,7 +14,7 @@ on:
     # and picking up rebuilt-in-place tags, not about chasing new versions.
     #
     # Daily rather than weekly because that second purpose is a security path
-    # (#1367). `python:3.13-slim` is rebuilt in place with refreshed contents,
+    # (#1367). `python:3.14-slim` is rebuilt in place with refreshed contents,
     # and our copy only moves when this runs — so anything embedded in the base
     # that apt does not manage rides this schedule. pip is the case in point:
     # `pip/_vendor` pins its own msgpack/setuptools, and `apt-get upgrade` will

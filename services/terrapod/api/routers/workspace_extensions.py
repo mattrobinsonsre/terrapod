@@ -477,7 +477,7 @@ async def post_architecture_critique_message(
         attrs = body["data"]["attributes"]
         content = str(attrs["content"] or "").strip()
         locale = str(attrs["locale"]) if attrs.get("locale") else None
-    except (KeyError, TypeError, ValueError):
+    except KeyError, TypeError, ValueError:
         raise HTTPException(status_code=400, detail="malformed body") from None
     if not content:
         raise HTTPException(status_code=422, detail="content is required")

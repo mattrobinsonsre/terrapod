@@ -169,7 +169,7 @@ def run(
                 try:
                     sys.stdout.buffer.write(chunk)
                     sys.stdout.buffer.flush()
-                except (BrokenPipeError, OSError):
+                except BrokenPipeError, OSError:
                     pass
     finally:
         if log_fh is not None:

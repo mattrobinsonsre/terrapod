@@ -112,7 +112,7 @@ def _coerce_default(raw: object) -> object:
     if isinstance(raw, str):
         try:
             return json.loads(raw)
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             return raw
     return raw
 

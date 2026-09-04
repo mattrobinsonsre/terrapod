@@ -114,7 +114,7 @@ def fetch_versions(cfg: RunnerConfig, *, client: httpx.Client | None = None) -> 
                 f"(HTTP {resp.status_code})"
             )
         attrs = (resp.json().get("data") or {}).get("attributes") or {}
-    except (PlatformToolError, PlatformToolsUnsupported):
+    except PlatformToolError, PlatformToolsUnsupported:
         raise
     except Exception as exc:  # noqa: BLE001 — network/JSON, all equally fatal here
         raise PlatformToolError(f"could not read the pinned platform-tool versions: {exc}") from exc

@@ -31,7 +31,7 @@ env:
   # is unaffected and needs no access to these packages; only CI overrides.
   # Refreshed by .github/workflows/mirror-images.yml from .github/mirror-images.txt.
   MIRROR: ghcr.io/mattrobinsonsre/mirror
-  PYTHON_BASE_IMAGE: ghcr.io/mattrobinsonsre/mirror/python:3.13-slim
+  PYTHON_BASE_IMAGE: ghcr.io/mattrobinsonsre/mirror/python:3.14-slim
   NODE_BASE_IMAGE: ghcr.io/mattrobinsonsre/mirror/node:26-alpine
   NODE_IMAGE: ghcr.io/mattrobinsonsre/mirror/node:24-alpine
   POSTGRES_IMAGE: ghcr.io/mattrobinsonsre/mirror/postgres:16-alpine
@@ -48,7 +48,7 @@ env:
   PLAYWRIGHT_IMAGE: ghcr.io/mattrobinsonsre/mirror/mcr.microsoft.com-playwright:v1.58.2-noble
   LOCALSTACK_IMAGE: ghcr.io/mattrobinsonsre/mirror/localstack-localstack:4
   HELM_IMAGE: ghcr.io/mattrobinsonsre/mirror/alpine-helm:3.17.2
-  PY_IMAGE: ghcr.io/mattrobinsonsre/mirror/python:3.13-slim
+  PY_IMAGE: ghcr.io/mattrobinsonsre/mirror/python:3.14-slim
   SEMGREP_IMAGE: ghcr.io/mattrobinsonsre/mirror/semgrep-semgrep:1.117
   BUILDKIT_IMAGE: ghcr.io/mattrobinsonsre/mirror/moby-buildkit:buildx-stable-1
   K3D_REGISTRY_IMAGE: ghcr.io/mattrobinsonsre/mirror/registry:2
@@ -536,7 +536,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          python-version: "3.13"
+          python-version: "3.14"
       - run: pip install pyyaml ijson pytest
       - name: Run pricegen unit tests
         run: python -m pytest pricegen/tests -v
@@ -560,7 +560,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          python-version: "3.13"
+          python-version: "3.14"
       - run: pip install pytest
       - name: Run the re-scan and register-review script tests
         run: python -m pytest scripts/tests -v
@@ -614,7 +614,7 @@ jobs:
     # Literal, not ${{ env.* }}: the env context is NOT available in a job's
     # `container:` or in `services:` — using it there makes the whole workflow
     # invalid, which GitHub reports as NO checks rather than a failing one.
-    container: ghcr.io/mattrobinsonsre/mirror/python:3.13-slim
+    container: ghcr.io/mattrobinsonsre/mirror/python:3.14-slim
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Install Poetry and export plugin

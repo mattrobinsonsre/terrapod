@@ -230,7 +230,7 @@ async def handle_onboarding_polish(payload: dict) -> None:
 
     try:
         session_id = uuid.UUID(payload["session_id"])
-    except (KeyError, ValueError):
+    except KeyError, ValueError:
         logger.warning("invalid onboarding_polish payload", payload=payload)
         return
 

@@ -36,7 +36,7 @@ def _coerce(value: Any) -> uuid.UUID | None:
         return value
     try:
         return uuid.UUID(str(value).removeprefix("apool-"))
-    except (ValueError, AttributeError):
+    except ValueError, AttributeError:
         return None
 
 
