@@ -126,6 +126,15 @@
     "empty": {
       "none": "Qumwo' tu'be'lu'. wa' chenmoH 'ej taghlaH.",
       "noMatch": "DarSeHvam rurbogh Qumwo' tu'be'lu'."
+    },
+    "group": {
+      "label": "ghom",
+      "flat": "raQ",
+      "repo": "qawHaq",
+      "repoPath": "qawHaq + He",
+      "local": "naDev",
+      "collapseAll": "Hoch chIm",
+      "expandAll": "Hoch tetlh"
     }
   },
   "status": {

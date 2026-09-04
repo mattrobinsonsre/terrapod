@@ -125,7 +125,16 @@
     },
     "empty": {
       "none": "No marklars yet. Create one to get started.",
-      "noMatch": "No marklars match this marklar."
+      "noMatch": "No marklars match this filter."
+    },
+    "group": {
+      "label": "Marklar",
+      "flat": "Marklar",
+      "repo": "Marklar",
+      "repoPath": "Marklar + Marklar",
+      "local": "Marklar",
+      "collapseAll": "Marklar all",
+      "expandAll": "Marklar all"
     }
   },
   "status": {

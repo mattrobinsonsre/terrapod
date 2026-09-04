@@ -123,6 +123,15 @@
       "created": "Created",
       "resourcesValue": "{cpu} CPU / {memory}"
     },
+    "group": {
+      "label": "Group",
+      "flat": "Flat",
+      "repo": "Repository",
+      "repoPath": "Repository + Path",
+      "local": "Local",
+      "collapseAll": "Collapse all",
+      "expandAll": "Expand all"
+    },
     "empty": {
       "none": "No workspaces yet. Create one to get started.",
       "noMatch": "No workspaces match this filter."
