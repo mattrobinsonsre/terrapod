@@ -470,23 +470,43 @@ jobs:
           # shards. Local bench (Apple M-series; CI ~50-60% of this):
           #   unit         90s serial → 13s parallel (1495 → 492 tests)
           #   services-api 138s serial → 30s parallel
-          # The integration shard stays serial — its
+          # The integration shards stay serial WITHIN a job: the
           # session-scoped Postgres table-creation fixture races
-          # under xdist workers (each worker would try to create
-          # the same tables) and the suite is small enough that
-          # serial is fine.
+          # under xdist workers, which share one database. That
+          # objection does not apply ACROSS runners — each shard
+          # gets its own compose stack, exactly as the two slices
+          # above already do — so the split is runner-level.
           - name: unit
             # Root-level tests/*.py are NOT auto-collected by the directory
             # shards below — each must be listed here explicitly, or it silently
             # never runs in CI. All of these are pure-unit (no Postgres/Redis/S3).
-            paths: tests/auth tests/runner tests/storage tests/ai_eval tests/config tests/db tests/helm tests/oci tests/test_logging_config.py tests/test_dependency_pins.py tests/test_api_sdk_contract.py tests/test_schema_version.py tests/test_gpg_verify.py tests/test_http_retry.py tests/test_db_iam_auth.py tests/test_redis_iam_auth.py
+            paths: tests/auth tests/meta tests/runner tests/storage tests/ai_eval tests/config tests/db tests/helm tests/oci tests/test_logging_config.py tests/test_dependency_pins.py tests/test_api_sdk_contract.py tests/test_schema_version.py tests/test_gpg_verify.py tests/test_http_retry.py tests/test_db_iam_auth.py tests/test_redis_iam_auth.py
             pytest_args: -n auto
           - name: services-api
             paths: tests/services tests/api
             pytest_args: -n auto
-          - name: integration
+          # Three runner-level shards, balanced on collected test count by
+          # `--shard` (services/tests/shard_plan.py). Measured across five CI
+          # runs: per-test cost is uniform at 0.58-1.07s — the work is fixture
+          # setup and teardown, which every test pays equally — so a file's
+          # duration is its test count times a constant, and counting balances it.
+          #
+          # Three, not more: ~100s of every job is fixed cost (checkout, image,
+          # compose stack, collection), measured at 95s and 112s on real runs. A
+          # fourth shard buys 20-50s of wall-clock for another ~100s of runner
+          # time.
+          #
+          # The split happens after collection, so a new test file is assigned
+          # automatically and cannot be silently missed (#1468).
+          - name: integration-1
             paths: tests/integration
-            pytest_args: ""
+            pytest_args: "--shard 1/3"
+          - name: integration-2
+            paths: tests/integration
+            pytest_args: "--shard 2/3"
+          - name: integration-3
+            paths: tests/integration
+            pytest_args: "--shard 3/3"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - run: scripts/test.sh python -- ${{ matrix.slice.pytest_args }} ${{ matrix.slice.paths }}
@@ -2036,6 +2056,9 @@ jobs:
     needs: [prepare, e2e-test]
     if: always() && needs.prepare.outputs.images_exist != 'true'
     runs-on: ubuntu-latest
+    # Literal, not ${{ env.* }}: the env context is NOT available in a job's
+    # `container:`. Same mirrored image the lint jobs use.
+    container: ghcr.io/mattrobinsonsre/mirror/node:24-alpine
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Download blob reports
@@ -2047,16 +2070,25 @@ jobs:
           pattern: blob-report-*
           path: all-blob-reports
           merge-multiple: true
+      # Merging blob reports is pure Node — it reads the shards' blob files and
+      # renders HTML. It needs the @playwright/test PACKAGE, not browsers, and
+      # `--ignore-scripts` already skipped Playwright's browser-download
+      # postinstall — so the ~2GB mcr.microsoft.com/playwright image this used to
+      # pull supplied browsers that were never installed and never used. That
+      # pull was most of the job's 257-335s.
+      #
+      # The mirrored node image is the same one the lint jobs use (~50MB), and
+      # the install is six packages / 14MB. Version fidelity comes from
+      # e2e/package-lock.json, which pins @playwright/test to the same 1.58.2 the
+      # shards ran — blob format is version-sensitive, so deriving it from the
+      # lockfile rather than a second hard-coded tag is what stops the two
+      # drifting apart.
       - name: Merge into HTML report
         continue-on-error: true
+        working-directory: e2e
         run: |
-          docker run --rm \
-            -v "${{ github.workspace }}/e2e:/work" \
-            -v "${{ github.workspace }}/all-blob-reports:/work/all-blob-reports" \
-            -w /work \
-            -e HOME=/tmp \
-            mcr.microsoft.com/playwright:v1.58.2-noble \
-            sh -c "npm ci --ignore-scripts && npx playwright merge-reports --reporter html ./all-blob-reports"
+          npm ci --ignore-scripts
+          npx playwright merge-reports --reporter html ../all-blob-reports
       - name: Upload merged HTML report
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -2100,7 +2132,23 @@ jobs:
   # is why each entry is written to be read by someone outside the
   # project.
   scan-images:
-    name: Scan ${{ matrix.image }} (${{ matrix.arch }})
+    # One job per IMAGE, scanning both arches, rather than one per image+arch.
+    #
+    # As 5x2 this was ten jobs that all became eligible at the same instant as
+    # the eight E2E shards, two helm-eval-boot jobs and oci-conformance — 21 jobs
+    # for 20 concurrent slots. The E2E shards lost 27s, 44s and 57s of queue wait
+    # to it, and the shard that waited 44s was the straggler gating E2E Report,
+    # so the contention sat directly on the critical path (#1468).
+    #
+    # Five jobs scan the same images with the same settings and free five slots
+    # at exactly the contended moment. Each takes roughly twice as long (~52-172s
+    # against 26-86s), which is well inside the slack before create-manifests.
+    #
+    # Deliberately NOT solved with `needs: [e2e-test]`. That works today only
+    # because create-manifests is gated behind python-test; once the integration
+    # shard is split, that slack disappears and deferred scans become the new
+    # critical path.
+    name: Scan ${{ matrix.image }}
     needs: [prepare, build-images-amd64, build-images-arm64]
     if: |
       always()
@@ -2115,15 +2163,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch: [amd64, arm64]
         image: [terrapod-api, terrapod-web, terrapod-runner, terrapod-listener, terrapod-migrations]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      # On branch/tag builds the image lives in GHCR — log in and let Trivy
-      # pull the per-arch tag. On PRs nothing was pushed; the image arrives as
-      # a per-arch artifact from build-images-<arch> and is loaded into the
-      # local daemon below, where Trivy finds it by the same tag.
+      # On branch/tag builds the image lives in GHCR — log in and let Trivy pull
+      # the per-arch tag. On PRs nothing was pushed; the image arrives as a
+      # per-arch artifact from build-images-<arch> and is loaded into the local
+      # daemon below, where Trivy finds it by the same tag.
       - name: Log in to GHCR
         if: needs.prepare.outputs.is_pr != 'true'
         uses: ./.github/actions/ghcr-login
@@ -2131,62 +2178,117 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           username: ${{ github.actor }}
 
-      - name: Download image artifact (PR)
+      # ── amd64 ──
+      - name: Download image artifact (amd64, PR)
         if: needs.prepare.outputs.is_pr == 'true'
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
-          name: image-${{ matrix.image }}-${{ matrix.arch }}
+          name: image-${{ matrix.image }}-amd64
           path: /tmp
 
-      - name: Load image (PR)
+      - name: Load image (amd64, PR)
         if: needs.prepare.outputs.is_pr == 'true'
-        run: gunzip -c "/tmp/${{ matrix.image }}-${{ matrix.arch }}.tar.gz" | docker load
+        run: gunzip -c "/tmp/${{ matrix.image }}-amd64.tar.gz" | docker load
 
-      # Human-readable findings step. Always prints the table of CVEs
-      # Trivy would gate on to the action log — so a failure in the
-      # gating step below can be diagnosed without downloading SARIF or
-      # re-running Trivy locally. exit-code: '0' keeps this informational.
-      - name: Trivy findings (table, informational)
+      # Human-readable findings step. Always prints the table of CVEs Trivy would
+      # gate on to the action log — so a failure in the gating step below can be
+      # diagnosed without downloading SARIF or re-running Trivy locally.
+      # exit-code: '0' keeps this informational.
+      - name: Trivy findings (amd64, table, informational)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         env:
-          # The per-arch tag (sha-XXX-arm64) is an OCI index whose only child
-          # is the matrix arch. Without this, Trivy defaults to the runner's
-          # platform (linux/amd64) when pulling the image from GHCR on branch/
-          # tag builds and fails with "no child with platform linux/amd64".
-          # (PR builds load the image into the local daemon, so they never hit
-          # the remote-pull default — which is why this only broke on main.)
-          # Trivy reads TRIVY_PLATFORM as the --platform flag.
-          TRIVY_PLATFORM: linux/${{ matrix.arch }}
+          # The per-arch tag (sha-XXX-amd64) is an OCI index whose only child is
+          # that arch. Without this, Trivy defaults to the runner's platform when
+          # pulling from GHCR on branch/tag builds and fails with "no child with
+          # platform linux/amd64". Trivy reads TRIVY_PLATFORM as --platform.
+          TRIVY_PLATFORM: linux/amd64
         with:
-          image-ref: ghcr.io/mattrobinsonsre/${{ matrix.image }}:sha-${{ needs.prepare.outputs.sha_short }}-${{ matrix.arch }}
+          image-ref: ghcr.io/mattrobinsonsre/${{ matrix.image }}:sha-${{ needs.prepare.outputs.sha_short }}-amd64
           format: table
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           trivyignores: pentest/trivy/.trivyignore
           exit-code: '0'
 
-      - name: Scan with Trivy
+      - name: Scan with Trivy (amd64)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         env:
-          # See the note on the informational step above — pin the pulled
-          # platform to the matrix arch so the arm64 scan resolves its child.
-          TRIVY_PLATFORM: linux/${{ matrix.arch }}
+          TRIVY_PLATFORM: linux/amd64
         with:
-          image-ref: ghcr.io/mattrobinsonsre/${{ matrix.image }}:sha-${{ needs.prepare.outputs.sha_short }}-${{ matrix.arch }}
+          image-ref: ghcr.io/mattrobinsonsre/${{ matrix.image }}:sha-${{ needs.prepare.outputs.sha_short }}-amd64
           format: sarif
-          output: trivy-${{ matrix.image }}-${{ matrix.arch }}.sarif
+          output: trivy-${{ matrix.image }}-amd64.sarif
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           trivyignores: pentest/trivy/.trivyignore
           exit-code: '1'
           limit-severities-for-sarif: true
 
-      - name: Upload SARIF
+      # The category MUST stay distinct per image AND arch: code scanning keys
+      # results on it, so a shared category would have one arch silently
+      # overwrite the other's findings.
+      - name: Upload SARIF (amd64)
         if: always()
         uses: github/codeql-action/upload-sarif@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v4
         with:
-          sarif_file: trivy-${{ matrix.image }}-${{ matrix.arch }}.sarif
-          category: trivy-${{ matrix.image }}-${{ matrix.arch }}
+          sarif_file: trivy-${{ matrix.image }}-amd64.sarif
+          category: trivy-${{ matrix.image }}-amd64
+
+      # ── arm64 ──
+      - name: Download image artifact (arm64, PR)
+        if: needs.prepare.outputs.is_pr == 'true'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: image-${{ matrix.image }}-arm64
+          path: /tmp
+
+      - name: Load image (arm64, PR)
+        if: needs.prepare.outputs.is_pr == 'true'
+        run: gunzip -c "/tmp/${{ matrix.image }}-arm64.tar.gz" | docker load
+
+      # Human-readable findings step. Always prints the table of CVEs Trivy would
+      # gate on to the action log — so a failure in the gating step below can be
+      # diagnosed without downloading SARIF or re-running Trivy locally.
+      # exit-code: '0' keeps this informational.
+      - name: Trivy findings (arm64, table, informational)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        env:
+          # The per-arch tag (sha-XXX-arm64) is an OCI index whose only child is
+          # that arch. Without this, Trivy defaults to the runner's platform when
+          # pulling from GHCR on branch/tag builds and fails with "no child with
+          # platform linux/amd64". Trivy reads TRIVY_PLATFORM as --platform.
+          TRIVY_PLATFORM: linux/arm64
+        with:
+          image-ref: ghcr.io/mattrobinsonsre/${{ matrix.image }}:sha-${{ needs.prepare.outputs.sha_short }}-arm64
+          format: table
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          trivyignores: pentest/trivy/.trivyignore
+          exit-code: '0'
+
+      - name: Scan with Trivy (arm64)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        env:
+          TRIVY_PLATFORM: linux/arm64
+        with:
+          image-ref: ghcr.io/mattrobinsonsre/${{ matrix.image }}:sha-${{ needs.prepare.outputs.sha_short }}-arm64
+          format: sarif
+          output: trivy-${{ matrix.image }}-arm64.sarif
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          trivyignores: pentest/trivy/.trivyignore
+          exit-code: '1'
+          limit-severities-for-sarif: true
+
+      # The category MUST stay distinct per image AND arch: code scanning keys
+      # results on it, so a shared category would have one arch silently
+      # overwrite the other's findings.
+      - name: Upload SARIF (arm64)
+        if: always()
+        uses: github/codeql-action/upload-sarif@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v4
+        with:
+          sarif_file: trivy-${{ matrix.image }}-arm64.sarif
+          category: trivy-${{ matrix.image }}-arm64
 
   # ── Create Multi-Arch Manifests ────────────────────────
   create-manifests:
@@ -3039,7 +3141,17 @@ jobs:
       - build-images-arm64
       - scan-images
       - e2e-test
-      - e2e-report
+      # `e2e-report` is deliberately absent, and must stay absent. It is already
+      # excluded from the `results=()` verdict below (see the reasoning on the
+      # job itself: an artifact-storage failure with no Terrapod code involved
+      # failed a correct release on v1.5.3). Listing it here anyway made
+      # `ci-pass` WAIT for a job whose result it then ignored — 5m35s of a PR
+      # run with one job on the machine and nineteen slots idle, because the
+      # report merges eight Playwright blobs behind a ~2GB image pull.
+      #
+      # The workflow run still finishes it; the required status check no longer
+      # waits for it. Re-adding this line reintroduces the stall silently, since
+      # nothing about the verdict changes (#1468).
       - oci-conformance
       - create-manifests
       - release-create
