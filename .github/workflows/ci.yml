@@ -36,6 +36,16 @@ env:
   NODE_IMAGE: ghcr.io/mattrobinsonsre/mirror/node:24-alpine
   POSTGRES_IMAGE: ghcr.io/mattrobinsonsre/mirror/postgres:16-alpine
   REDIS_IMAGE: ghcr.io/mattrobinsonsre/mirror/redis:7-alpine
+  # The largest single thing CI pulls: 0.91GB compressed, fetched by each of the
+  # eight E2E shards. Mirrored in #1475 for the same reason as the rest — CI
+  # should not depend on a third-party registry being reachable.
+  #
+  # This tag must stay in step with e2e/package-lock.json, which pins
+  # @playwright/test to the version these browsers belong to. A mismatch fails
+  # loudly (Playwright refuses a browser revision it does not expect) rather
+  # than silently, but the two are still written down twice and that is the
+  # thing to watch when bumping either.
+  PLAYWRIGHT_IMAGE: ghcr.io/mattrobinsonsre/mirror/mcr.microsoft.com-playwright:v1.58.2-noble
   LOCALSTACK_IMAGE: ghcr.io/mattrobinsonsre/mirror/localstack-localstack:4
   HELM_IMAGE: ghcr.io/mattrobinsonsre/mirror/alpine-helm:3.17.2
   PY_IMAGE: ghcr.io/mattrobinsonsre/mirror/python:3.13-slim
@@ -1885,7 +1895,7 @@ jobs:
             -w /work \
             -e CI=true \
             -e HOME=/tmp \
-            mcr.microsoft.com/playwright:v1.58.2-noble \
+            ${PLAYWRIGHT_IMAGE:-mcr.microsoft.com/playwright:v1.58.2-noble} \
             sh -c "npm ci --ignore-scripts && npx playwright test --shard=${{ matrix.shard }}/${{ strategy.job-total }}"
         # Playwright has per-test timeouts of its own; this is the
         # outer safety net. npm ci inside the container is ~10 s for
