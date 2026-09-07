@@ -1,8 +1,14 @@
-# The plugin surface the Pulumi CLI consumes
+# The surfaces the Pulumi CLI consumes
 
 The Pulumi-side counterpart to [`galaxy-cli-surface.md`](galaxy-cli-surface.md)
-and [`tfe-cli-surface.md`](tfe-cli-surface.md): what the `pulumi` CLI asks a
-plugin download server for, and nothing else.
+and [`tfe-cli-surface.md`](tfe-cli-surface.md). Two surfaces, captured
+separately:
+
+1. **the plugin download surface** — what the CLI asks a plugin server for
+   (below);
+2. **the service surface** — what it asks a *state backend* for once you
+   `pulumi login <https-url>`, which is the analogue of Terraform's `cloud {}`
+   block. That is [its own section](#the-service-surface).
 
 Captured from a real client rather than read from documentation
 (`scripts/pulumi-capture.py`), for the reason the Galaxy work established —
@@ -109,3 +115,126 @@ python3 scripts/pulumi-capture.py [path-to-pulumi]
 
 Set `PULUMI_HOME` to a fresh directory when testing by hand, or an
 already-installed plugin makes the capture look shorter than it is.
+
+---
+
+# The service surface
+
+What `pulumi` asks a state backend for after `pulumi login <https-url>` — the
+analogue of Terraform's `cloud {}` block, and the surface #1407 §2 scopes to
+"only the slice the CLI consumes".
+
+Captured with `scripts/pulumi-service-capture.py` against **pulumi v3.261.0**,
+by pointing the real CLI at a request-logging stub and answering it until a full
+`up` completed: **106 requests, 19 distinct endpoints**. A stub that 404s teaches
+only that the client gave up, so each response was filled in until the CLI walked
+further — the same method as the four protocol captures before it.
+
+## The endpoints
+
+`{stack}` below is always the triple `{org}/{project}/{stack}`.
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/api/user` | login + `whoami`; returns the org list |
+| GET | `/api/user/organizations/{org}` | org lookup; called constantly |
+| GET | `/api/capabilities` | feature negotiation; `{"capabilities": []}` is accepted |
+| GET | `/api/user/stacks?project=` | `stack ls` |
+| POST | `/api/stacks/{org}/{project}` | `stack init` — body `{"stackName", "tags"}` |
+| GET | `/api/stacks/{stack}` | stack lookup; 404 means "does not exist" |
+| DELETE | `/api/stacks/{stack}` | `stack rm` |
+| GET | `/api/stacks/{stack}/export` | **read state** |
+| POST | `/api/stacks/{stack}/import` | **write state wholesale**; gzipped; async |
+| POST | `/api/stacks/{stack}/encrypt` | **encrypt a secret** — body `{"plaintext"}` |
+| POST | `/api/stacks/{stack}/decrypt` | decrypt one |
+| POST | `/api/stacks/{stack}/batch-decrypt` | decrypt many |
+| POST | `/api/stacks/{stack}/preview` | begin a preview |
+| POST | `/api/stacks/{stack}/update` | begin an update |
+| POST | `/api/stacks/{stack}/refresh` | begin a refresh |
+| POST | `/api/stacks/{stack}/destroy` | begin a destroy |
+| POST | `/api/stacks/{stack}/update/{updateID}` | **start** it; must return a lease token |
+| GET | `/api/stacks/{stack}/update/{updateID}` | poll status (used by `stack import`) |
+| PATCH | `/api/stacks/{stack}/update/{updateID}/checkpoint` | **write state**; gzipped |
+| POST | `/api/stacks/{stack}/update/{updateID}/events/batch` | engine events; gzipped |
+| POST | `/api/stacks/{stack}/update/{updateID}/complete` | end it — `{"status":"succeeded"}` |
+| POST | `/api/stacks/{stack}/update/{updateID}/renew_lease` | extend the lease |
+
+**Three of those rows were not exercised by the capture** and are listed from the
+CLI's behaviour rather than observed traffic — treat their shapes as unconfirmed:
+
+* `renew_lease` — the runs were too short to need it, but the CLI holds a lease
+  for the life of an update.
+* `decrypt` and `batch-decrypt` — the captured program had no secret *config* to
+  read back. `encrypt` was called six times during an ordinary `up`, so the
+  provider obligation itself is confirmed; only the read direction is not.
+
+## Findings
+
+**Auth is `token <value>`, and it changes mid-run.** Not `Bearer`. Everything
+addressed at a stack uses `Authorization: token <api-token>` — but the three
+calls made *during* an update (`checkpoint`, `events/batch`, `complete`) use
+`Authorization: update-token <lease>` instead, with the lease handed out when the
+update is started. Two schemes on one surface, and the second is invisible to any
+test that supplies its own authenticated client.
+
+**The service is the stack's secrets provider.** `POST .../encrypt` is not
+optional colour: in `httpstate` mode the CLI delegates secret encryption to the
+backend and calls it during a plain `up`. This is a real obligation that "state
+backend" does not imply — Terrapod would have to run an encrypt/decrypt oracle
+per stack, and own the key that makes stack state readable.
+
+**State is a whole document, not a delta.** It is read with `GET .../export` and
+written with `PATCH .../update/{id}/checkpoint`, each carrying the entire
+deployment. Terrapod's existing state-version storage therefore fits without a
+new merge model. Checkpoint and event bodies are **gzipped**
+(`Content-Encoding: gzip`), so a handler must decompress rather than parse the
+raw body.
+
+**A preview is an update.** `preview` creates an update and then starts it via
+`POST .../update/{updateID}` — the same path an `up` uses. There is no separate
+preview lifecycle, and the start call **must return a lease token**: without one
+the CLI aborts with `fatal: An assertion has failed: persisted actions require a
+token`.
+
+**An update has an explicit begin and end**, so a run that dies mid-update leaves
+the stack with a started-but-never-completed update — which is exactly what the
+lease exists to time out.
+
+**Concurrency is enforced by refusing to start.** There is no lock endpoint. A
+`409` on the begin call ends the CLI immediately — exit 1, no retry, no wait —
+and the service's `message` field is printed verbatim:
+
+```
+error: [0] another update is currently in progress
+```
+
+So Terrapod's existing per-workspace run serialisation maps onto this directly:
+refuse the begin, and put the explanation in `message`.
+
+**An empty stack's deployment is `null`.** `{"version": 3, "deployment": null}`.
+A synthetic empty deployment (`{}`, or a manifest with no resources) fails the
+CLI's snapshot integrity check.
+
+**The surface does not have to sit at the root.** The CLI appends `/api/...` to
+whatever base URL it was given, path prefix included — verified by logging in to
+`http://host/api/terrapod/v1/pulumi` and watching it request
+`/api/terrapod/v1/pulumi/api/user`, then serving it successfully from there. This
+is the question #1484 had to settle for NuGet and it lands the opposite way:
+Terrapod can mount this natively rather than at the root, which it reserves for
+the two surfaces genuinely forced there (`/v2/` and `/.well-known/terraform.json`).
+
+## Nothing from the management surface was required
+
+A full `login → stack init → stack ls → preview → up → refresh → export →
+destroy → stack rm` cycle completed without touching Deployments, Policy Packs,
+Insights, Environments/ESC, Webhooks, Registry or organisation management —
+confirming the §2 scope. `/api/capabilities` returning an empty list is accepted.
+
+## Reproducing the service capture
+
+```sh
+python3 scripts/pulumi-service-capture.py
+```
+
+Requires Docker. Re-run it against a new CLI rather than assuming this still
+holds; that is what the script is for.
