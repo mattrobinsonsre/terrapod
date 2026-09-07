@@ -259,6 +259,16 @@ data:
           enabled: {{ .enabled }}
           upstream: {{ .upstream | quote }}
         {{- end }}
+        {{- with .go }}
+        go:
+          enabled: {{ .enabled }}
+          upstream: {{ .upstream | quote }}
+        {{- end }}
+        {{- with .nuget }}
+        nuget:
+          enabled: {{ .enabled }}
+          upstream: {{ .upstream | quote }}
+        {{- end }}
         {{- with .galaxy }}
         galaxy:
           enabled: {{ .enabled }}
