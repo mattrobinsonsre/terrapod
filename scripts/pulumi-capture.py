@@ -112,15 +112,26 @@ def main() -> int:
         "PULUMI_SKIP_UPDATE_CHECK": "true",
     }
 
-    # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-tainted-env-args.dangerous-subprocess-use-tainted-env-args
     # The "taint" is the developer's own environment, and the argv[0] they chose
     # when running this by hand. That is the whole point: this drives the real
     # pulumi binary on the machine of whoever is capturing the protocol. It is
     # not reachable by anyone else, ships in no image, and the alternative —
     # excluding scripts/ from semgrep as well as CodeQL — would leave the
     # directory with no static analysis at all.
+    #
+    # The rule suppressed here is
+    # python.lang.security.audit.dangerous-subprocess-use-tainted-env-args.
+    #
+    # Placement is fiddly and was got wrong twice, so: the rule matches the
+    # tainted *argument list*, not the statement, and semgrep binds `nosemgrep`
+    # only to the matched line. A comment above the statement, or on the
+    # `subprocess.run(` line, therefore suppresses nothing — both were tried and
+    # both silently left the alert open. It must sit on the argument line, and
+    # it is the bare form because spelling the rule id out there makes the line
+    # long enough that the formatter explodes the list, which moves the match
+    # off the comment and breaks the binding again.
     proc = subprocess.run(
-        [pulumi, "plugin", "install", "resource", "random", "4.16.3"],
+        [pulumi, "plugin", "install", "resource", "random", "4.16.3"],  # nosemgrep
         env=env,
         capture_output=True,
         text=True,
