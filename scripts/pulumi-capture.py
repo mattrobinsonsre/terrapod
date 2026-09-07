@@ -112,6 +112,13 @@ def main() -> int:
         "PULUMI_SKIP_UPDATE_CHECK": "true",
     }
 
+    # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-tainted-env-args.dangerous-subprocess-use-tainted-env-args
+    # The "taint" is the developer's own environment, and the argv[0] they chose
+    # when running this by hand. That is the whole point: this drives the real
+    # pulumi binary on the machine of whoever is capturing the protocol. It is
+    # not reachable by anyone else, ships in no image, and the alternative —
+    # excluding scripts/ from semgrep as well as CodeQL — would leave the
+    # directory with no static analysis at all.
     proc = subprocess.run(
         [pulumi, "plugin", "install", "resource", "random", "4.16.3"],
         env=env,
@@ -130,7 +137,9 @@ def main() -> int:
             print(f"  ! {line}")
     shutil.rmtree(work, ignore_errors=True)
 
-    print("\nCompare against docs/pulumi-cli-surface.md; update it if the client has moved.")
+    print(
+        "\nCompare against docs/pulumi-cli-surface.md; update it if the client has moved."
+    )
     return 0 if LOG else 1
 
 

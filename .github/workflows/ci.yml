@@ -725,7 +725,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v4
+        uses: github/codeql-action/init@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
@@ -733,7 +733,7 @@ jobs:
           config-file: .github/codeql/codeql-config.yml
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v4
+        uses: github/codeql-action/analyze@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4
         with:
           category: codeql-${{ matrix.language }}
 
@@ -1670,7 +1670,7 @@ jobs:
 
       - name: Upload SARIF
         if: always()
-        uses: github/codeql-action/upload-sarif@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v4
+        uses: github/codeql-action/upload-sarif@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4
         with:
           sarif_file: semgrep-results.sarif
           category: semgrep
@@ -2330,7 +2330,7 @@ jobs:
       # overwrite the other's findings.
       - name: Upload SARIF (amd64)
         if: always()
-        uses: github/codeql-action/upload-sarif@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v4
+        uses: github/codeql-action/upload-sarif@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4
         with:
           sarif_file: trivy-${{ matrix.image }}-amd64.sarif
           category: trivy-${{ matrix.image }}-amd64
@@ -2386,7 +2386,7 @@ jobs:
       # overwrite the other's findings.
       - name: Upload SARIF (arm64)
         if: always()
-        uses: github/codeql-action/upload-sarif@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v4
+        uses: github/codeql-action/upload-sarif@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4
         with:
           sarif_file: trivy-${{ matrix.image }}-arm64.sarif
           category: trivy-${{ matrix.image }}-arm64
