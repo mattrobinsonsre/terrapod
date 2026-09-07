@@ -232,6 +232,31 @@ class TestThePackageProxies:
 
         assert not [r for r in _app().routes if "package-cache/galaxy" in r.path]
 
+    async def test_pulumi_off_silences_the_plugin_proxy(self) -> None:
+        """Pulumi-only: nothing else installs a Pulumi plugin."""
+        settings.engines.pulumi.enabled = False
+
+        async with AsyncClient(transport=ASGITransport(app=_app()), base_url=_BASE) as client:
+            response = await client.get(
+                "/api/terrapod/v1/package-cache/pulumi/"
+                "pulumi-resource-random-v4.16.3-linux-amd64.tar.gz",
+                headers=_BASIC,
+            )
+
+        assert response.status_code == 404
+
+    def test_pulumi_plugin_routes_do_not_exist_with_pulumi_off(self) -> None:
+        settings.engines.pulumi.enabled = False
+
+        assert not [r for r in _app().routes if "package-cache/pulumi" in r.path]
+
+    async def test_the_plugin_proxy_survives_with_ansible_off(self, _sealed) -> None:
+        """The other direction: an Ansible-less deployment still serves plugins."""
+        settings.engines.ansible.enabled = False
+        settings.engines.pulumi.enabled = True
+
+        assert [r for r in _app().routes if "package-cache/pulumi" in r.path]
+
     async def test_galaxy_survives_with_pulumi_off(self, _sealed) -> None:
         """The other direction: a Pulumi-less deployment still serves collections.
 

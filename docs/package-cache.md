@@ -240,6 +240,37 @@ reaching upstream. The version list is narrowed to versions actually held, so th
 client is never offered one that would 404 after it has resolved.
 
 
+## Pulumi plugins
+
+`pulumi up` downloads a resource plugin per provider on first use, from
+`get.pulumi.com`. Point the CLI at Terrapod instead:
+
+```sh
+export PULUMI_PLUGIN_DOWNLOAD_URL_OVERRIDES=".*=https://x:$TERRAPOD_TOKEN@terrapod.example.com/api/terrapod/v1/package-cache/pulumi"
+```
+
+Credentials go in the URL because the CLI sends no `Authorization` header of its
+own; userinfo becomes Basic auth, and the username is ignored.
+
+**Do not anchor the pattern.** `^random$` never matches, and a pattern that
+matches nothing makes the CLI fall back to `get.pulumi.com` **silently** — the
+install succeeds, and the failure only appears once someone has no route out.
+Use `.*`, or a bare unanchored plugin name. The measured behaviour is in
+[the Pulumi CLI surface](pulumi-cli-surface.md).
+
+The whole protocol is a single request for one well-known filename, so unlike
+the other proxies there is no version list here and nothing that needs a TTL —
+a plugin at a version is immutable.
+
+**Pin your plugin versions.** An unpinned program first resolves what "latest"
+means, and that resolution does not go through the download URL, so it still
+needs upstream. Pinning is good practice in a restricted estate regardless.
+
+**No digest is recorded**, because upstream publishes none alongside the
+tarball. That is weaker than the PyPI and npm proxies, where the client verifies
+our bytes against a published digest.
+
+
 ## Engine gating
 
 These proxies exist to serve Pulumi programs and Ansible collections. PyPI serves
@@ -261,6 +292,7 @@ decision, not a hunt for every capability that belongs to it.
 | PyPI proxy | `engines.ansible` **or** `engines.pulumi` |
 | npm proxy | `engines.pulumi` |
 | Galaxy proxy | `engines.ansible` |
+| Pulumi plugin proxy | `engines.pulumi` |
 
 Terraform and OpenTofu's own caches — the provider network mirror, the engine
 binary cache, the module registry — are not gateable and are unaffected by any of

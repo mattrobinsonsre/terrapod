@@ -260,6 +260,8 @@
   "registry.package_cache.galaxy.upstream",
   "registry.package_cache.npm.enabled",
   "registry.package_cache.npm.upstream",
+  "registry.package_cache.pulumi.enabled",
+  "registry.package_cache.pulumi.upstream",
   "registry.package_cache.pypi.enabled",
   "registry.package_cache.pypi.upstream",
   "registry.platform_tools.checkov_checksum_api_url",

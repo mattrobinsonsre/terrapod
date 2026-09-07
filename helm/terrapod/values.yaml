@@ -386,6 +386,12 @@ api:
         # Ansible Galaxy v3 (collections). Ansible-only, so it disappears
         # entirely with engines.ansible.enabled: false. Point ansible-galaxy at
         # it with a galaxy_server entry whose url is this proxy's base.
+        # Pulumi resource and language plugins. Pulumi-only, so it disappears
+        # entirely with engines.pulumi.enabled: false. Point the CLI at it with
+        # PULUMI_PLUGIN_DOWNLOAD_URL_OVERRIDES.
+        pulumi:
+          enabled: true
+          upstream: https://get.pulumi.com/releases/plugins
         galaxy:
           enabled: true
           upstream: https://galaxy.ansible.com

@@ -405,6 +405,11 @@ class TestAuthenticationIsRequired:
             f"{BASE}/galaxy/v3/collections/acme/widgets/versions/1.0.0/signature",
             None,
         ),
+        "/api/terrapod/v1/package-cache/pulumi/{filename}": (
+            "GET",
+            f"{BASE}/pulumi/pulumi-resource-random-v4.16.3-linux-amd64.tar.gz",
+            None,
+        ),
         "/api/terrapod/v1/admin/package-cache/warm": (
             "POST",
             "/api/terrapod/v1/admin/package-cache/warm",
