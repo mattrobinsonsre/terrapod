@@ -179,6 +179,115 @@ def test_aws_token_still_mints_after_the_session_could_be_collected(monkeypatch)
     assert "X-Amz-Signature=" in second
 
 
+class TestMintLocking:
+    """Each cloud's lock covers exactly what its SDK requires (#1510).
+
+    These assert on `Lock.locked()` observed from inside the call being made,
+    which is the only way to distinguish "the lock is held across this" from
+    "the lock is held somewhere in this function" — and that distinction is the
+    whole point of the change.
+    """
+
+    def test_aws_signing_does_not_hold_a_lock(self, monkeypatch):
+        """The reported hazard: signing can trigger a blocking STS/IMDS refresh.
+
+        Held under a lock, one such refresh stalls every other concurrent mint —
+        each of which occupies an `asyncio.to_thread` worker. botocore's
+        RefreshableCredentials guards its own refresh, so ours is not needed
+        here and its absence is what stops a reconnect storm queueing up.
+        """
+        observed = {}
+
+        class _Probe:
+            def generate_presigned_url(self, *_a, **_kw):
+                observed["aws_locked"] = iam_auth._aws_lock.locked()
+                return "https://my-cache/?X-Amz-Signature=abc"
+
+        monkeypatch.setattr(iam_auth, "_aws_signer", lambda _region: _Probe())
+
+        iam_auth.mint_aws_elasticache_token(cache_name="my-cache", user="u", region="r")
+
+        assert observed["aws_locked"] is False
+
+    def test_aws_cache_construction_does_hold_the_lock(self, monkeypatch):
+        """Building the session resolves the credential chain, which can do I/O.
+
+        That part must still be serialised, or every connection in a storm
+        builds its own session.
+        """
+        _fake_aws_env(monkeypatch)
+        observed = {}
+        real = __import__("botocore.session", fromlist=["get_session"]).get_session
+
+        def _watched():
+            observed["locked_while_building"] = iam_auth._aws_lock.locked()
+            return real()
+
+        monkeypatch.setattr("botocore.session.get_session", _watched)
+        iam_auth._aws_signer("us-east-1")
+
+        assert observed["locked_while_building"] is True
+
+    def test_gcp_refresh_holds_its_own_lock(self, monkeypatch):
+        """google-auth has no internal lock and refresh() mutates in place."""
+        observed = {}
+
+        class _Creds:
+            valid = False
+            token = "GCP"
+
+            def refresh(self, _request):
+                observed["gcp_locked"] = iam_auth._gcp_lock.locked()
+                observed["aws_lock_free"] = not iam_auth._aws_lock.locked()
+
+        monkeypatch.setattr(iam_auth, "_gcp_state", {"creds": _Creds(), "request": object()})
+
+        assert iam_auth.mint_gcp_access_token() == "GCP"
+        assert observed["gcp_locked"] is True
+        # And it does not take a lock another cloud's mints depend on.
+        assert observed["aws_lock_free"] is True
+
+    def test_the_three_locks_are_distinct(self):
+        locks = {id(iam_auth._aws_lock), id(iam_auth._gcp_lock), id(iam_auth._azure_lock)}
+        assert len(locks) == 3
+
+
+def test_a_session_without_credentials_is_not_cached(monkeypatch):
+    """botocore returns None rather than raising when the chain yields nothing.
+
+    Cached, that entry would fail every future mint for the life of the process
+    — including after credentials became available — and report
+    `NoCredentialsError`, which names the symptom rather than the cause.
+    """
+    from botocore.exceptions import NoCredentialsError
+
+    _fake_aws_env(monkeypatch)
+
+    class _Empty:
+        def get_credentials(self):
+            return None
+
+        def get_config_variable(self, _name):
+            return "us-east-1"
+
+        def get_component(self, _name):
+            raise AssertionError("must fail before building the signer")
+
+    monkeypatch.setattr("botocore.session.get_session", _Empty)
+
+    with pytest.raises(NoCredentialsError):
+        iam_auth._aws_signer("us-east-1")
+
+    # The cache is left clean, so a later attempt can still succeed.
+    assert iam_auth._aws_signers == {}
+
+    monkeypatch.undo()
+    _fake_aws_env(monkeypatch)
+    assert "X-Amz-Signature=" in iam_auth.mint_aws_elasticache_token(
+        cache_name="my-cache", user="terrapod", region="us-east-1"
+    )
+
+
 # ── credential provider dispatch ──────────────────────────────────────
 
 
