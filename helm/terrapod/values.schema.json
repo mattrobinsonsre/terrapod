@@ -1884,6 +1884,30 @@
                     "upstream": { "type": "string", "format": "uri" }
                   }
                 },
+                "pulumi": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "enabled": { "type": "boolean" },
+                    "upstream": { "type": "string", "format": "uri" }
+                  }
+                },
+                "go": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "enabled": { "type": "boolean" },
+                    "upstream": { "type": "string", "format": "uri" }
+                  }
+                },
+                "nuget": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "enabled": { "type": "boolean" },
+                    "upstream": { "type": "string", "format": "uri" }
+                  }
+                },
                 "galaxy": {
                   "type": "object",
                   "additionalProperties": false,

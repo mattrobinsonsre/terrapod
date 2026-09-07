@@ -240,6 +240,103 @@ reaching upstream. The version list is narrowed to versions actually held, so th
 client is never offered one that would 404 after it has resolved.
 
 
+## Pulumi plugins
+
+`pulumi up` downloads a resource plugin per provider on first use, from
+`get.pulumi.com`. Point the CLI at Terrapod instead:
+
+```sh
+export PULUMI_PLUGIN_DOWNLOAD_URL_OVERRIDES=".*=https://x:$TERRAPOD_TOKEN@terrapod.example.com/api/terrapod/v1/package-cache/pulumi"
+```
+
+Credentials go in the URL because the CLI sends no `Authorization` header of its
+own; userinfo becomes Basic auth, and the username is ignored.
+
+**Do not anchor the pattern.** `^random$` never matches, and a pattern that
+matches nothing makes the CLI fall back to `get.pulumi.com` **silently** — the
+install succeeds, and the failure only appears once someone has no route out.
+Use `.*`, or a bare unanchored plugin name. The measured behaviour is in
+[the Pulumi CLI surface](pulumi-cli-surface.md).
+
+The whole protocol is a single request for one well-known filename, so unlike
+the other proxies there is no version list here and nothing that needs a TTL —
+a plugin at a version is immutable.
+
+**Pin your plugin versions.** An unpinned program first resolves what "latest"
+means, and that resolution does not go through the download URL, so it still
+needs upstream. Pinning is good practice in a restricted estate regardless.
+
+**No digest is recorded**, because upstream publishes none alongside the
+tarball. That is weaker than the PyPI and npm proxies, where the client verifies
+our bytes against a published digest.
+
+
+## Go modules
+
+A Pulumi program written in Go resolves its dependencies from
+`proxy.golang.org`. Point the toolchain at Terrapod instead:
+
+```sh
+export GOPROXY="https://x:$TERRAPOD_TOKEN@terrapod.example.com/api/terrapod/v1/package-cache/go"
+```
+
+**This must be HTTPS.** The Go toolchain refuses to send credentials to a plain
+HTTP URL — `refusing to pass credentials to insecure URL` — and neither
+`GOINSECURE` nor `.netrc` lifts that. Every real deployment terminates TLS, so
+this only bites a plain-HTTP development setup.
+
+Five paths, and the split between them is the design: `@v/list` and `@latest`
+say what exists and are **mutable**, so they are bounded; `@v/{version}.info`,
+`.mod` and `.zip` are **immutable** and need no TTL at all, because a module
+version's bytes cannot change — which is what Go's checksum database exists to
+guarantee.
+
+Uppercase in a module path is escaped — `github.com/BurntSushi/toml` is fetched
+as `github.com/!burnt!sushi/toml` — and Terrapod passes that form through
+unchanged, because upstream expects it too.
+
+The toolchain **probes parent prefixes** while resolving, asking about
+`example.com`, `example.com/a` and `example.com/a/b` in turn to find the module
+root. Most of those are misses by design, so a miss is a plain 404 rather than
+an error; anything else would break resolution for any module path with more
+than one segment.
+
+## NuGet
+
+A Pulumi program written in C# resolves from `nuget.org`. Add Terrapod as a
+package source:
+
+```xml
+<!-- nuget.config -->
+<configuration>
+  <packageSources>
+    <clear/>
+    <add key="terrapod"
+         value="https://terrapod.example.com/api/terrapod/v1/package-cache/nuget/index.json" />
+  </packageSources>
+  <packageSourceCredentials>
+    <terrapod>
+      <add key="Username" value="x" />
+      <add key="ClearTextPassword" value="%TERRAPOD_TOKEN%" />
+    </terrapod>
+  </packageSourceCredentials>
+</configuration>
+```
+
+The **service index** is built per request rather than stored, because it
+advertises absolute URLs the client then follows verbatim. Those must carry this
+deployment's external base and this proxy's path prefix — set `external_url` and
+they are correct however many proxies sit in front. A stored index would pin
+whatever host fetched it first and hand that to everyone afterwards.
+
+Package ids are lowercased in every path, so `Newtonsoft.Json` and
+`newtonsoft.json` are one cache entry. The versions document is **mutable** and
+bounded; a `.nupkg` at a version is **immutable** and needs no TTL.
+
+`dotnet restore` warns (NU1803) against an HTTP source. Production is HTTPS, so
+this only appears in local testing.
+
+
 ## Engine gating
 
 These proxies exist to serve Pulumi programs and Ansible collections. PyPI serves
@@ -261,6 +358,9 @@ decision, not a hunt for every capability that belongs to it.
 | PyPI proxy | `engines.ansible` **or** `engines.pulumi` |
 | npm proxy | `engines.pulumi` |
 | Galaxy proxy | `engines.ansible` |
+| Pulumi plugin proxy | `engines.pulumi` |
+| Go module proxy | `engines.pulumi` |
+| NuGet proxy | `engines.pulumi` |
 
 Terraform and OpenTofu's own caches — the provider network mirror, the engine
 binary cache, the module registry — are not gateable and are unaffected by any of

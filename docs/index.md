@@ -51,7 +51,7 @@ Beyond broad TFE compatibility, Terrapod is built with three deliberate design f
 | **IaC Security Scanning** | Checkov/Trivy misconfiguration scanning of the plan JSON; per-workspace advisory or enforced, severity threshold, skip rules |
 | **Drift Detection** | Scheduled plan-only runs to detect out-of-band infrastructure changes |
 | **Workspace Health** | Per-workspace health conditions with status indicators on workspace list |
-| **Cloud Credentials** | Dynamic provider credentials via Kubernetes workload identity (AWS IRSA, GCP WIF, Azure WI) |
+| **Cloud Credentials** | Dynamic provider credentials via Kubernetes workload identity (AWS EKS Pod Identity or IRSA, GCP WIF, Azure WI) |
 | **Binary Caching** | Pull-through cache for terraform/tofu/terragrunt CLI binaries; download base + version-index sources are operator-overridable to an internal mirror (restricted-network / air-gapped) and honour the forward proxy/CA |
 | **Supply-chain Verification** | Cached binaries + provider archives verified against the publisher's GPG-signed SHA256SUMS with pinned keys; the runner re-verifies the executable (visible in the run log) before running it |
 | **Terragrunt** | Per-workspace Terragrunt for agent-mode runs (flag + version, pull-through binary cache, local-backend reconciliation); CLI-driven runs work with zero config |
@@ -155,7 +155,7 @@ See [Architecture](architecture.md) for the full breakdown.
 | [Audit Logging](audit-logging.md) | Immutable event log, query API, retention |
 | [Artifact Retention](artifact-retention.md) | Automated cleanup of old state versions, run logs, cache entries |
 | [Runners](runners.md) | Custom runner images, private registries, Job configuration |
-| [Cloud Credentials](cloud-credentials.md) | Zero static cloud credentials, end to end — runs and the platform reach cloud APIs via Kubernetes workload identity (AWS IRSA, GCP WIF, Azure WI). Beginner primer, decision tree, a preflight doctor (`make preflight-identity` / opt-in Helm hook) that verifies SA→role + object-store access before the first run, troubleshooting, passwordless **database** + **Redis/Valkey** IAM auth (AWS/GCP/Azure), and Vault/ESO patterns |
+| [Cloud Credentials](cloud-credentials.md) | Zero static cloud credentials, end to end — runs and the platform reach cloud APIs via Kubernetes workload identity (AWS EKS Pod Identity or IRSA, GCP WIF, Azure WI). Beginner primer, decision tree, a preflight doctor (`make preflight-identity` / opt-in Helm hook) that verifies SA→role + object-store access before the first run, troubleshooting, passwordless **database** + **Redis/Valkey** IAM auth (AWS/GCP/Azure), and Vault/ESO patterns |
 | [Registry](registry.md) | Private module/provider registry, caching layers |
 | [Vault](vault.md) | HashiCorp Vault as a variable value source: a variable holds a reference resolved at run time, so Vault stays the source of truth and nothing is stored in Terrapod. Static kv-v2 and dynamic engines (a fresh credential per run); Kubernetes auth by default; multiple Vaults; per-instance path allow-list |
 | [Module Source Auth](module-auth.md) | First-class auth for private, non-registry git module sources (`git::https`/`git::ssh`): sensitive `git_http_auth`/`git_ssh_auth` variables scoped by URL pattern, static or VCS-connection-minted tokens, ssh↔https rewrite, log-safe |

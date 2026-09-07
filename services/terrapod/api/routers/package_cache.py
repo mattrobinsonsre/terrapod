@@ -37,7 +37,14 @@ from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services import registry_collection_service as collections
 from terrapod.services.engine_gating import capability_enabled
-from terrapod.services.package_cache import galaxy, npm, pypi
+from terrapod.services.package_cache import (
+    galaxy,
+    goproxy,
+    npm,
+    nuget,
+    pulumi_plugins,
+    pypi,
+)
 from terrapod.services.package_cache.substrate import (
     Artifact,
     NotFoundUpstream,
@@ -59,6 +66,9 @@ from terrapod.storage.protocol import ObjectStore
 pypi_router = APIRouter()
 npm_router = APIRouter()
 galaxy_router = APIRouter()
+pulumi_router = APIRouter()
+go_router = APIRouter()
+nuget_router = APIRouter()
 logger = get_logger(__name__)
 
 #: pip has no bearer option — credentials come from the index URL or `.netrc` —
@@ -864,6 +874,238 @@ async def galaxy_import_status(
     )
 
 
+# ── Pulumi plugins ──────────────────────────────────────────────────────────
+
+
+@pulumi_router.get("/pulumi/{filename}")
+async def pulumi_plugin(
+    filename: str,
+    user: AuthenticatedUser = Depends(authenticate_package_request),
+    db: AsyncSession = Depends(get_db),
+    storage: ObjectStore = Depends(get_storage),
+) -> Response:
+    """One plugin tarball. The whole protocol.
+
+    `PULUMI_PLUGIN_DOWNLOAD_URL_OVERRIDES` points the CLI here, and it asks for
+    a single well-known filename — it already knows the kind, name, version, OS
+    and architecture, so there is no index and no metadata call to serve.
+
+    The filename is parsed rather than trusted: it is client input that would
+    otherwise reach an upstream URL and a storage key, and the shape check is
+    the whole of the request-forgery surface. Anything that is not a plugin
+    filename is a 404, because it names nothing this proxy has.
+    """
+    parts = pulumi_plugins.parse_filename(filename)
+    if parts is None:
+        raise HTTPException(status_code=404, detail="Not found")
+
+    artifact = pulumi_plugins.artifact_for(filename, parts)
+    try:
+        record = await get_or_fetch(db, storage, artifact)
+    except (SealedError, NotFoundUpstream, UpstreamError) as exc:
+        raise _upstream_failure(exc) from exc
+
+    return await _redirect_to_object(storage, record.storage_key)
+
+
+# ── Go modules ──────────────────────────────────────────────────────────────
+
+
+async def _go_document(module: str, doc: str, db: AsyncSession, storage: ObjectStore) -> Response:
+    """Serve one of the two mutable Go documents, cached for sealed operation.
+
+    A miss is a plain 404 rather than an error, because the toolchain probes
+    parent prefixes to find where a module root is and most of those probes are
+    misses by design. Turning a normal probe into a 5xx breaks resolution for
+    every module whose path has more than one segment.
+    """
+    if sealed():
+        raw = await load_document(db, storage, goproxy.ECOSYSTEM, goproxy.cache_name(module), doc)
+        if raw is None:
+            raise HTTPException(status_code=404, detail="Not found")
+        return Response(content=raw, media_type="text/plain; charset=UTF-8")
+
+    try:
+        raw = await goproxy.fetch_document(module, doc)
+    except NotFoundUpstream:
+        raise HTTPException(status_code=404, detail="Not found") from None
+    except UpstreamError as exc:
+        raise _upstream_failure(exc) from exc
+
+    # Best-effort: failing to cache must not fail a request about to succeed.
+    try:
+        await store_document(db, storage, goproxy.document_artifact(module, doc), raw)
+    except Exception:
+        logger.warning("Could not cache Go document", module=module, doc=doc, exc_info=True)
+
+    return Response(content=raw, media_type="text/plain; charset=UTF-8")
+
+
+@go_router.get("/go/{module:path}/@v/list")
+async def go_version_list(
+    module: str,
+    user: AuthenticatedUser = Depends(authenticate_package_request),
+    db: AsyncSession = Depends(get_db),
+    storage: ObjectStore = Depends(get_storage),
+) -> Response:
+    """What versions of a module exist. Mutable, so it is bounded, not pinned."""
+    if not goproxy.valid_module(module):
+        raise HTTPException(status_code=404, detail="Not found")
+    return await _go_document(module, goproxy.LIST_DOC, db, storage)
+
+
+@go_router.get("/go/{module:path}/@latest")
+async def go_latest(
+    module: str,
+    user: AuthenticatedUser = Depends(authenticate_package_request),
+    db: AsyncSession = Depends(get_db),
+    storage: ObjectStore = Depends(get_storage),
+) -> Response:
+    if not goproxy.valid_module(module):
+        raise HTTPException(status_code=404, detail="Not found")
+    return await _go_document(module, goproxy.LATEST_DOC, db, storage)
+
+
+@go_router.get("/go/{module:path}/@v/{file}")
+async def go_module_file(
+    module: str,
+    file: str,
+    user: AuthenticatedUser = Depends(authenticate_package_request),
+    db: AsyncSession = Depends(get_db),
+    storage: ObjectStore = Depends(get_storage),
+) -> Response:
+    """`{version}.info`, `.mod` or `.zip` — immutable, so no TTL applies.
+
+    The module path arrives in its escaped form (`!burnt!sushi`) and is passed
+    upstream that way, because that is what upstream expects too; decoding and
+    re-encoding would be two chances to get a very common module wrong.
+    """
+    if not goproxy.valid_module(module):
+        raise HTTPException(status_code=404, detail="Not found")
+
+    suffix = next((s for s in goproxy.SUFFIXES if file.endswith(s)), None)
+    if suffix is None:
+        raise HTTPException(status_code=404, detail="Not found")
+    version = file[: -len(suffix)]
+    if not goproxy.valid_version(version):
+        raise HTTPException(status_code=404, detail="Not found")
+
+    try:
+        record = await get_or_fetch(db, storage, goproxy.artifact_for(module, version, suffix))
+    except (SealedError, NotFoundUpstream, UpstreamError) as exc:
+        raise _upstream_failure(exc) from exc
+
+    return await _redirect_to_object(storage, record.storage_key)
+
+
+# ── NuGet ───────────────────────────────────────────────────────────────────
+
+
+def _nuget_base(request: Request) -> str:
+    """This proxy's own absolute base, resolved per request.
+
+    Same three sources and precedence as `_npm_base` and `_galaxy_base`. It
+    matters more here than anywhere else: the service index advertises absolute
+    URLs the client follows verbatim, so a base that is wrong — or that drops
+    the path prefix this proxy is mounted under — sends `dotnet restore` to
+    somewhere it cannot reach. That is not hypothetical; it is what the protocol
+    capture showed happening.
+    """
+    configured = (settings.external_url or "").strip().rstrip("/")
+    if configured:
+        base = configured
+    else:
+        host = request.headers.get("x-forwarded-host")
+        if host:
+            proto = request.headers.get("x-forwarded-proto", request.url.scheme)
+            base = f"{proto}://{host}"
+        else:
+            base = str(request.base_url).rstrip("/")
+    return f"{base.rstrip('/')}/api/terrapod/v1/package-cache/nuget"
+
+
+@nuget_router.get("/nuget/index.json")
+async def nuget_service_index(
+    request: Request,
+    user: AuthenticatedUser = Depends(authenticate_package_request),
+) -> Response:
+    """The service index — built for the caller, never stored.
+
+    A stored index would pin whatever host fetched it first and hand that to
+    everyone afterwards.
+    """
+    return JSONResponse(content=nuget.service_index(_nuget_base(request)))
+
+
+@nuget_router.get("/nuget/flat/{package_id}/index.json")
+async def nuget_versions(
+    package_id: str,
+    user: AuthenticatedUser = Depends(authenticate_package_request),
+    db: AsyncSession = Depends(get_db),
+    storage: ObjectStore = Depends(get_storage),
+) -> Response:
+    """What versions of a package exist. Mutable, so it is bounded."""
+    if not nuget.valid_id(package_id):
+        raise HTTPException(status_code=404, detail="Not found")
+    lower = nuget.normalise(package_id)
+
+    if sealed():
+        raw = await load_document(db, storage, nuget.ECOSYSTEM, lower, nuget.VERSIONS_DOC)
+        if raw is None:
+            raise HTTPException(
+                status_code=404,
+                detail=(
+                    f"{package_id} is not cached and this node is sealed "
+                    f"(registry.cache_only). Warm it before sealing."
+                ),
+            )
+        return Response(content=raw, media_type="application/json")
+
+    try:
+        raw = await nuget.fetch_versions(package_id)
+    except NotFoundUpstream:
+        raise HTTPException(status_code=404, detail="Not found") from None
+    except UpstreamError as exc:
+        raise _upstream_failure(exc) from exc
+
+    try:
+        await store_document(db, storage, nuget.versions_artifact(package_id), raw)
+    except Exception:
+        logger.warning("Could not cache NuGet versions", package=lower, exc_info=True)
+
+    return Response(content=raw, media_type="application/json")
+
+
+@nuget_router.get("/nuget/flat/{package_id}/{version}/{filename}")
+async def nuget_package(
+    package_id: str,
+    version: str,
+    filename: str,
+    user: AuthenticatedUser = Depends(authenticate_package_request),
+    db: AsyncSession = Depends(get_db),
+    storage: ObjectStore = Depends(get_storage),
+) -> Response:
+    """One `.nupkg`. Immutable, so no TTL applies.
+
+    The filename is checked against the one this coordinate implies rather than
+    trusted — it is decoration for the client's benefit, and treating it as an
+    input would let it name a file other than the package requested.
+    """
+    if not nuget.valid_id(package_id) or not nuget.valid_version(version):
+        raise HTTPException(status_code=404, detail="Not found")
+
+    artifact = nuget.package_artifact(package_id, version)
+    if filename.lower() != artifact.filename:
+        raise HTTPException(status_code=404, detail="Not found")
+
+    try:
+        record = await get_or_fetch(db, storage, artifact)
+    except (SealedError, NotFoundUpstream, UpstreamError) as exc:
+        raise _upstream_failure(exc) from exc
+
+    return await _redirect_to_object(storage, record.storage_key)
+
+
 async def _redirect_to_object(storage: ObjectStore, key: str) -> Response:
     """302 to a presigned URL for the stored artifact.
 
@@ -898,5 +1140,14 @@ def build_router() -> APIRouter | None:
         mounted = True
     if capability_enabled("galaxy"):
         aggregate.include_router(galaxy_router)
+        mounted = True
+    if capability_enabled("pulumi"):
+        aggregate.include_router(pulumi_router)
+        mounted = True
+    if capability_enabled("go"):
+        aggregate.include_router(go_router)
+        mounted = True
+    if capability_enabled("nuget"):
+        aggregate.include_router(nuget_router)
         mounted = True
     return aggregate if mounted else None

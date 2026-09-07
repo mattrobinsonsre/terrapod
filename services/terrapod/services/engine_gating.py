@@ -43,6 +43,13 @@ _CAPABILITY_ENGINES: dict[str, frozenset[str]] = {
     "npm": frozenset({"pulumi"}),
     # Ansible collections. Ansible only — nothing else installs a collection.
     "galaxy": frozenset({"ansible"}),
+    # Pulumi resource and language plugins. Pulumi only, for the same reason.
+    "pulumi": frozenset({"pulumi"}),
+    # A Pulumi program is written in a real language, so its dependencies come
+    # from that language's registry. Go and C# are the two SDK languages #1417
+    # did not already cover with PyPI and npm.
+    "go": frozenset({"pulumi"}),
+    "nuget": frozenset({"pulumi"}),
 }
 
 

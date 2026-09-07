@@ -232,6 +232,56 @@ class TestThePackageProxies:
 
         assert not [r for r in _app().routes if "package-cache/galaxy" in r.path]
 
+    async def test_pulumi_off_silences_the_plugin_proxy(self) -> None:
+        """Pulumi-only: nothing else installs a Pulumi plugin."""
+        settings.engines.pulumi.enabled = False
+
+        async with AsyncClient(transport=ASGITransport(app=_app()), base_url=_BASE) as client:
+            response = await client.get(
+                "/api/terrapod/v1/package-cache/pulumi/"
+                "pulumi-resource-random-v4.16.3-linux-amd64.tar.gz",
+                headers=_BASIC,
+            )
+
+        assert response.status_code == 404
+
+    def test_pulumi_plugin_routes_do_not_exist_with_pulumi_off(self) -> None:
+        settings.engines.pulumi.enabled = False
+
+        assert not [r for r in _app().routes if "package-cache/pulumi" in r.path]
+
+    async def test_the_plugin_proxy_survives_with_ansible_off(self, _sealed) -> None:
+        """The other direction: an Ansible-less deployment still serves plugins."""
+        settings.engines.ansible.enabled = False
+        settings.engines.pulumi.enabled = True
+
+        assert [r for r in _app().routes if "package-cache/pulumi" in r.path]
+
+    async def test_pulumi_off_silences_go_and_nuget(self) -> None:
+        """Both serve Pulumi's Go and C# SDKs, so both go with the engine."""
+        settings.engines.pulumi.enabled = False
+
+        app = _app()
+        assert not [r for r in app.routes if "package-cache/go" in r.path]
+        assert not [r for r in app.routes if "package-cache/nuget" in r.path]
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            for path in (
+                "/api/terrapod/v1/package-cache/go/example.com/m/@v/list",
+                "/api/terrapod/v1/package-cache/nuget/index.json",
+            ):
+                response = await client.get(path, headers=_BASIC)
+                assert response.status_code == 404, f"{path} answered {response.status_code}"
+
+    async def test_go_and_nuget_survive_with_ansible_off(self) -> None:
+        """The other direction: an Ansible-less deployment still serves them."""
+        settings.engines.ansible.enabled = False
+        settings.engines.pulumi.enabled = True
+
+        app = _app()
+        assert [r for r in app.routes if "package-cache/go" in r.path]
+        assert [r for r in app.routes if "package-cache/nuget" in r.path]
+
     async def test_galaxy_survives_with_pulumi_off(self, _sealed) -> None:
         """The other direction: a Pulumi-less deployment still serves collections.
 

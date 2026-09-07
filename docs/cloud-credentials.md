@@ -38,7 +38,10 @@ Terraform's `aws`, `google`, and `azurerm` providers all pick these credentials 
 ```
 Where does the pod run?
 │
-├─ Amazon EKS ─────────────► AWS IRSA
+├─ Amazon EKS ─────────────► EKS Pod Identity (preferred)
+│                            (no SA annotation; an association binds
+│                             cluster + namespace + SA to the role)
+│                        or ► AWS IRSA
 │                            (SA annotation: eks.amazonaws.com/role-arn)
 │
 ├─ Google GKE ─────────────► GCP Workload Identity Federation
@@ -125,11 +128,15 @@ runners:
   serviceAccount:
     create: true
     name: "terrapod-runner"
+    # IRSA. Under EKS Pod Identity there is no annotation — the association
+    # binds the role to this ServiceAccount. See AWS EKS Pod Identity Setup.
     annotations:
       eks.amazonaws.com/role-arn: "arn:aws:iam::123456789012:role/terrapod-runner-my-cluster"
 ```
 
 The runner SA is only created when `listener.enabled: true` (i.e. on clusters that actually run Jobs).
+
+Runner Jobs run in `listener.runnerNamespace`, which defaults to the release namespace. Where it is set to something else, that is the namespace a Pod Identity association must name — and the namespace an IRSA trust policy's `sub` condition must carry.
 
 For multi-cloud or multi-account setups, deploy separate listener Deployments (agent pools) in different clusters or namespaces, each with their own Helm-configured ServiceAccount.
 
@@ -281,6 +288,151 @@ spec:
 ```
 
 The `adopt-or-create` annotation allows ACK to adopt existing IAM resources or create new ones. See the [ACK IAM controller documentation](https://aws-controllers-k8s.github.io/community/reference/iam/v1alpha1/role/) for full reference.
+
+---
+
+## AWS EKS Pod Identity Setup
+
+Pod Identity is AWS's newer mechanism and the simpler of the two on EKS. It
+replaces the ServiceAccount annotation and the per-cluster OIDC federation with
+an **association** — a record in EKS binding *cluster + namespace + ServiceAccount*
+to a role.
+
+**Terrapod needs no configuration for it.** The chart's ServiceAccount
+annotations are optional, so a runner ServiceAccount created with none is
+already the association target. What changes is entirely on the AWS side.
+
+### Which to choose
+
+| | Pod Identity | IRSA |
+|---|---|---|
+| ServiceAccount annotation | none | `eks.amazonaws.com/role-arn` |
+| Cluster prerequisite | Pod Identity Agent add-on | IAM OIDC provider |
+| Trust principal | `pods.eks.amazonaws.com` | the cluster's federated OIDC provider |
+| Binding expressed by | an association, in EKS | the `sub` condition in the trust policy |
+| Role reuse across clusters | yes — associate the same role again | needs each cluster's OIDC provider in the trust policy |
+| Works off EKS | no | yes, wherever the OIDC issuer is reachable |
+
+Prefer **Pod Identity** on EKS: one role can serve many clusters without its
+trust policy growing a stanza per cluster, and there is no annotation to drift
+out of step with the role it names.
+
+Choose **IRSA** when the cluster is not EKS, or when something else already
+depends on the OIDC federation.
+
+### 1. Install the Pod Identity Agent
+
+```sh
+aws eks create-addon --cluster-name my-cluster --addon-name eks-pod-identity-agent
+```
+
+It runs as a DaemonSet. Without it, associations exist but no pod ever receives
+credentials — and the failure looks like a missing role rather than a missing
+add-on.
+
+### 2. Create the IAM roles
+
+The trust policy differs from IRSA's in two ways, and the second one is easy to
+miss:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Sid": "EKSPodIdentity",
+    "Effect": "Allow",
+    "Principal": { "Service": "pods.eks.amazonaws.com" },
+    "Action": ["sts:AssumeRole", "sts:TagSession"]
+  }]
+}
+```
+
+There is **no ServiceAccount condition** — the association is what binds the
+role to a ServiceAccount, so the trust policy has nothing to key on. And
+**`sts:TagSession` is mandatory**: EKS stamps the session with the cluster name,
+namespace and ServiceAccount, and the assume fails outright without permission
+to set those tags. A trust policy carrying only `sts:AssumeRole` produces an
+`AccessDenied` that names neither the missing action nor the tags.
+
+Attach the same permission policies you would under IRSA — the split between an
+API role (object storage, and the database or cache if using IAM auth) and a
+runner role (whatever the Terraform code provisions) is unchanged. See
+[Separate Roles for API and Runners](#separate-roles-for-api-and-runners).
+
+### 3. Associate the roles with the ServiceAccounts
+
+```sh
+# The API pod
+aws eks create-pod-identity-association \
+  --cluster-name my-cluster \
+  --namespace terrapod \
+  --service-account terrapod \
+  --role-arn arn:aws:iam::123456789012:role/terrapod-api
+
+# The runner Jobs
+aws eks create-pod-identity-association \
+  --cluster-name my-cluster \
+  --namespace terrapod-runners \
+  --service-account terrapod-runner \
+  --role-arn arn:aws:iam::123456789012:role/terrapod-runner
+```
+
+**Use the namespace the pods actually run in.** Runner Jobs are created in
+`listener.runnerNamespace`, which defaults to the release namespace but is
+frequently set to a separate one — associating the release namespace in that
+case silently grants nothing to the Jobs. Confirm what the chart renders rather
+than assuming:
+
+```sh
+helm template my-release ./terrapod -f values-aws.yaml \
+  | yq 'select(.kind == "ServiceAccount") | [.metadata.namespace, .metadata.name]'
+```
+
+Associations can also be managed declaratively with the ACK EKS controller, in
+the same style as the IAM resources in
+[Managing IAM with AWS Controllers for Kubernetes (ACK)](#managing-iam-with-aws-controllers-for-kubernetes-ack).
+
+### 4. Configure Helm
+
+```yaml
+# values-aws.yaml
+serviceAccount:
+  create: true
+  name: "terrapod"
+  # No annotations. Under Pod Identity the association does the binding.
+
+listener:
+  enabled: true
+  runnerNamespace: "terrapod-runners"
+
+runners:
+  serviceAccount:
+    create: true
+    name: "terrapod-runner"
+```
+
+That is the whole Terrapod-side change: the same values as IRSA with the
+`eks.amazonaws.com/role-arn` annotations removed.
+
+### Do not configure both
+
+If a ServiceAccount carries `eks.amazonaws.com/role-arn` *and* has a Pod
+Identity association, **Pod Identity wins** — it sits ahead of IRSA in the AWS
+SDK credential chain. The annotation then names a role that is silently not the
+one in use, so permissions appear to come from a role you can read while
+actually coming from one you may not have looked at.
+
+Nothing errors. Migrating from IRSA therefore means removing the annotations in
+the same change that creates the associations, not afterwards.
+
+Terrapod cannot detect this for you: from inside the pod both mechanisms look
+like ambient credentials. If a role's permissions seem not to apply, check
+whether an association exists for that ServiceAccount:
+
+```sh
+aws eks list-pod-identity-associations --cluster-name my-cluster \
+  --namespace terrapod-runners
+```
 
 ---
 

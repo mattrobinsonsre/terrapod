@@ -58,7 +58,7 @@ CLI-driven runs and CI/CD point at Terrapod unchanged. Where the *models* differ
 | Hosting | Vendor SaaS, or a self-managed distribution | Self-hosted on your own Kubernetes |
 | Licensing & cost | Proprietary (BUSL), priced by managed resources | Free and open source (MPL-2.0) |
 | Where state + secrets live | On the vendor / self-managed control plane | Never leave your boundary (your Postgres + object store) |
-| Cloud credentials | Vendor-stored or dynamic | K8s workload identity (IRSA / WIF / Azure WI) — nothing long-lived |
+| Cloud credentials | Vendor-stored or dynamic | K8s workload identity (EKS Pod Identity or IRSA / WIF / Azure WI) — nothing long-lived |
 | Policy engine | Sentinel (proprietary) | OPA / Rego (open) — advisory or mandatory |
 | Restricted-network / air-gap execution | SaaS-dependent by default | First-class — outbound-only runners, polling VCS, pull-through mirror + sealed cache-only mode |
 | Private registry · RBAC · SSO · Audit | Yes | Yes — self-hosted equivalents (label RBAC; OIDC/SAML; immutable audit) |
@@ -80,7 +80,7 @@ RBAC and OPA policy — and the [feature table](#features) lists it in full. The
 are the parts worth knowing about before you read that far:
 
 - **Runs anywhere your network is awkward.** Runners dial *out* and create Kubernetes Jobs locally, so the control plane never needs inbound reach into an execution cluster — isolated VPCs, other regions, on-prem, or behind egress-only firewalls. VCS is polled outbound, and a pull-through provider mirror + binary cache (with an air-gap sealed mode) lets runners resolve providers and binaries with no upstream internet for cached platforms. (The API itself still needs an outbound path to fill those caches — internal mirrors and a forward proxy both work; see [network isolation](docs/deployment-network-isolation.md).)
-- **Zero static cloud credentials.** Runs and the platform reach cloud APIs through Kubernetes workload identity (AWS IRSA, GCP WIF, Azure WI) — nothing long-lived to store, leak, or rotate.
+- **Zero static cloud credentials.** Runs and the platform reach cloud APIs through Kubernetes workload identity (AWS EKS Pod Identity or IRSA, GCP WIF, Azure WI) — nothing long-lived to store, leak, or rotate.
 - **Cost visibility built in** — no third-party service. See the monthly cost of your managed infrastructure right in the run and workspace: the monthly *total* and the *change this run introduces* on every run, and the current total on each workspace, priced by a native engine over Terrapod's own self-generated pricesheet (AWS, Azure, GCP; air-gap-friendly). On by default; an optional AI layer estimates what the engine can't price and answers a grounded [cost chat](docs/cost-estimation.md).
 - **A container registry in the box.** Terrapod serves an OCI registry at `/v2/`, so the images your runs need live where your state, modules and providers already do — same auth, same storage, same network boundary, no second system to deploy and keep alive. Push and pull with docker, skopeo or crane; a Kubernetes `imagePullSecret` works with an ordinary Terrapod token. It mirrors upstream registries pull-through behind an explicit allow-list, or runs push-only for an air-gapped install. Nothing is anonymous, reads included. [Container registry](docs/oci-registry.md).
 - **Your dependencies, cached too.** Terrapod proxies PyPI and npm alongside providers, engine binaries and container images, so a run resolves its whole dependency closure without reaching the internet — point it at `PIP_INDEX_URL` and `NPM_CONFIG_REGISTRY` and seal the network. Upstream's integrity hashes are passed through untouched, so your client still verifies against the package author's digest. [Package proxies](docs/package-cache.md).
@@ -154,7 +154,7 @@ Everything below is implemented and shipped today.
 | IaC security scanning | Checkov/Trivy misconfiguration scanning of the plan JSON with maintained rule catalogues — per-workspace `off`/`advisory`/`enforced`, severity threshold, skip rules; enforced holds the run at the gate on a failed finding, with admin override |
 | SSO (OIDC / SAML) | Pluggable identity providers (Auth0, Okta, Azure AD, any standards-compliant IdP) |
 | Audit logging | Immutable event log with configurable retention |
-| Cloud credentials | Zero static keys — dynamic credentials via K8s workload identity (AWS IRSA, GCP WIF, Azure WI); passwordless DB and Redis IAM auth |
+| Cloud credentials | Zero static keys — dynamic credentials via K8s workload identity (AWS EKS Pod Identity or IRSA, GCP WIF, Azure WI); passwordless DB and Redis IAM auth |
 | Supply-chain verification | Cached binaries + provider archives verified against the publisher's GPG-signed SHA256SUMS (pinned keys); the runner re-verifies the executable before running it |
 | Signed releases | Every release image + the Helm chart is keyless-signed with cosign, with per-image SBOM (SPDX) + SLSA build-provenance attestations — verifiable with `cosign verify` / `gh attestation verify` |
 

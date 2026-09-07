@@ -977,6 +977,28 @@ class PackageCacheConfig(BaseModel):
         description="npm registry (packuments and tarballs). Serves Pulumi TypeScript "
         "and JavaScript programs.",
     )
+    pulumi: PackageEcosystemConfig = Field(
+        default_factory=lambda: PackageEcosystemConfig(
+            upstream="https://get.pulumi.com/releases/plugins"
+        ),
+        description="Pulumi resource and language plugins. Point the CLI at it with "
+        "PULUMI_PLUGIN_DOWNLOAD_URL_OVERRIDES; a `pulumi up` then resolves its plugins "
+        "without reaching get.pulumi.com.",
+    )
+    go: PackageEcosystemConfig = Field(
+        default_factory=lambda: PackageEcosystemConfig(upstream="https://proxy.golang.org"),
+        description="Go module proxy. Point the toolchain at it with GOPROXY; a "
+        "`go mod download` then resolves without reaching proxy.golang.org. Serves "
+        "Pulumi programs written in Go.",
+    )
+    nuget: PackageEcosystemConfig = Field(
+        default_factory=lambda: PackageEcosystemConfig(
+            upstream="https://api.nuget.org/v3-flatcontainer"
+        ),
+        description="NuGet V3 flat container. Point a nuget.config packageSource at this "
+        "proxy's index.json; `dotnet restore` then resolves without reaching nuget.org. "
+        "Serves Pulumi programs written in C#.",
+    )
     galaxy: PackageEcosystemConfig = Field(
         default_factory=lambda: PackageEcosystemConfig(upstream="https://galaxy.ansible.com"),
         description="Ansible Galaxy v3 (collections). Point ansible-galaxy at it with a "
