@@ -33,11 +33,16 @@ from __future__ import annotations
 
 import asyncio
 import threading
+from typing import TYPE_CHECKING
 from urllib.parse import urlencode, urlsplit, urlunsplit
 
 import structlog
 
 from redis.credentials import CredentialProvider
+
+if TYPE_CHECKING:  # imported lazily at runtime — the cloud SDKs are optional
+    from botocore.session import Session
+    from botocore.signers import RequestSigner
 
 logger = structlog.get_logger(__name__)
 
@@ -45,16 +50,36 @@ _TOKEN_TTL_SECONDS = 900  # ElastiCache presigned-token validity (15 min)
 _GCP_SCOPE = "https://www.googleapis.com/auth/cloud-platform"
 _AZURE_REDIS_SCOPE = "https://redis.azure.com/.default"
 
-# One lock serialises every token mint/refresh so concurrent (re)connects can't
-# race a shared credential object (google-auth Credentials.refresh mutates in
-# place and is not thread-safe).
-_lock = threading.Lock()
+# One lock per cloud, and each covers only what its SDK actually requires
+# (#1510). This was a single global lock held across the whole mint, which meant
+# every concurrent (re)connect serialised behind whichever call happened to be
+# refreshing credentials — a refresh that, for a workload identity, is a
+# blocking STS or IMDS round trip under botocore's retry policy. Since each mint
+# runs on an `asyncio.to_thread` worker, a reconnect storm could tie up the
+# loop's shared executor waiting on one refresh.
+#
+# What each SDK needs was checked rather than assumed:
+#   AWS   — botocore's RefreshableCredentials takes its own `_refresh_lock` in
+#           `get_frozen_credentials`, so signing is already thread-safe and
+#           needs no lock from us. Ours now covers the cache only.
+#   GCP   — google-auth has no internal lock and `refresh()` mutates the
+#           credentials in place, so the refresh must stay inside the lock.
+#   Azure — azure-identity's GetTokenMixin has no internal lock either, so
+#           `get_token` stays inside the lock too.
+#
+# Only one auth_mode is ever active in a deployment, so splitting them is not
+# about cross-cloud contention; it is so each cloud's locking says what that
+# cloud requires, instead of all three inheriting a rule that describes GCP.
+_aws_lock = threading.Lock()
+_gcp_lock = threading.Lock()
+_azure_lock = threading.Lock()
+
 #: Per-region ``(session, signer)``. Both halves are required: see
 #: ``_aws_signer`` for why the session must outlive the call that built it. They
 #: are stored as one entry so the coupling is structural — holding the session
 #: in a second dict would leave a mapping nothing ever reads, which is an
 #: invitation to delete it and silently reintroduce #1509.
-_aws_signers: dict[str, tuple[object, object]] = {}
+_aws_signers: dict[str, tuple[Session, RequestSigner]] = {}
 _gcp_state: dict[str, object] = {}
 _azure_state: dict[str, object] = {}
 
@@ -78,7 +103,7 @@ def strip_url_credentials(redis_url: str) -> str:
 # ── AWS ElastiCache IAM ───────────────────────────────────────────────
 
 
-def _aws_signer(region: str):
+def _aws_signer(region: str) -> RequestSigner:
     # The RequestSigner holds the session's *refreshable* credentials object
     # (botocore freezes them at sign time via get_frozen_credentials), so the
     # cached per-region signer auto-renews across credential rotation — do NOT
@@ -96,39 +121,58 @@ def _aws_signer(region: str):
     # first connection signs fine, and auth only dies once a collection happens
     # to run.
     key = region or "default"
-    cached = _aws_signers.get(key)
-    if cached is None:
-        import botocore.session
-        from botocore.model import ServiceId
-        from botocore.signers import RequestSigner
+    # The lock covers the cache, not the signing (#1510). Building the session
+    # resolves the credential chain, which can itself do I/O, so it is
+    # serialised — once per region — rather than raced by every connection.
+    with _aws_lock:
+        cached = _aws_signers.get(key)
+        if cached is None:
+            import botocore.session
+            from botocore.exceptions import NoCredentialsError
+            from botocore.model import ServiceId
+            from botocore.signers import RequestSigner
 
-        session = botocore.session.get_session()
-        signer = RequestSigner(
-            ServiceId("elasticache"),
-            region or session.get_config_variable("region"),
-            "elasticache",
-            "v4",
-            session.get_credentials(),
-            session.get_component("event_emitter"),
-        )
-        cached = (session, signer)
-        _aws_signers[key] = cached
-    return cached[1]
+            session = botocore.session.get_session()
+            credentials = session.get_credentials()
+            if credentials is None:
+                # The chain yielded nothing. botocore returns None here rather
+                # than raising, so caching this entry would poison the cache for
+                # the life of the process: every later mint would fail with
+                # NoCredentialsError even once credentials became available.
+                # Fail now instead, and leave the cache empty so a later attempt
+                # can succeed. (A provider that *raises* never reached the store
+                # anyway; only the silent-empty-chain case could poison it.)
+                raise NoCredentialsError()
+
+            signer = RequestSigner(
+                ServiceId("elasticache"),
+                region or session.get_config_variable("region"),
+                "elasticache",
+                "v4",
+                credentials,
+                session.get_component("event_emitter"),
+            )
+            cached = (session, signer)
+            _aws_signers[key] = cached
+        return cached[1]
 
 
 def mint_aws_elasticache_token(*, cache_name: str, user: str, region: str) -> str:
     """SigV4-presigned ElastiCache ``connect`` token (local signing, no I/O)."""
-    with _lock:
-        signer = _aws_signer(region)
-        url = f"https://{cache_name}/?{urlencode({'Action': 'connect', 'User': user})}"
-        signed = signer.generate_presigned_url(  # type: ignore[attr-defined]
-            {"method": "GET", "url": url, "body": {}, "headers": {}, "context": {}},
-            operation_name="connect",
-            expires_in=_TOKEN_TTL_SECONDS,
-            region_name=region or None,
-        )
-        # The IAM auth token is the presigned URL without the scheme.
-        return signed.removeprefix("https://")
+    # Deliberately outside any lock of ours (#1510): botocore's
+    # RefreshableCredentials guards its own refresh, so concurrent mints do not
+    # need to queue behind one another — and if a refresh is needed, botocore
+    # coordinates it without stalling every other connection.
+    signer = _aws_signer(region)
+    url = f"https://{cache_name}/?{urlencode({'Action': 'connect', 'User': user})}"
+    signed = signer.generate_presigned_url(
+        {"method": "GET", "url": url, "body": {}, "headers": {}, "context": {}},
+        operation_name="connect",
+        expires_in=_TOKEN_TTL_SECONDS,
+        region_name=region or None,
+    )
+    # The IAM auth token is the presigned URL without the scheme.
+    return signed.removeprefix("https://")
 
 
 # ── GCP Memorystore IAM ───────────────────────────────────────────────
@@ -139,7 +183,10 @@ def mint_gcp_access_token() -> str:
     import google.auth
     import google.auth.transport.requests
 
-    with _lock:
+    # The refresh stays inside the lock: google-auth has no internal locking and
+    # `refresh()` mutates the credentials in place, so concurrent refreshes of
+    # one shared object would race (#1510).
+    with _gcp_lock:
         creds = _gcp_state.get("creds")
         if creds is None:
             creds, _ = google.auth.default(scopes=[_GCP_SCOPE])
@@ -155,7 +202,10 @@ def mint_gcp_access_token() -> str:
 
 def mint_azure_redis_token() -> str:
     """Microsoft Entra access token for Azure Cache for Redis."""
-    with _lock:
+    # `get_token` stays inside the lock: azure-identity's GetTokenMixin carries
+    # no internal locking, so its cached-token refresh is not guaranteed safe
+    # under concurrent callers (#1510).
+    with _azure_lock:
         cred = _azure_state.get("cred")
         if cred is None:
             from azure.identity import DefaultAzureCredential
