@@ -59,7 +59,7 @@ def extract_credential(request: Request, *, allow_token_scheme: bool = False) ->
     if scheme == "basic":
         try:
             decoded = base64.b64decode(value.strip(), validate=True).decode("utf-8")
-        except binascii.Error, UnicodeDecodeError, ValueError:
+        except (binascii.Error, UnicodeDecodeError, ValueError):
             # Malformed base64 is indistinguishable from a wrong password as far
             # as the client is concerned, and saying which would be a small
             # oracle. Treated as "no credential".
