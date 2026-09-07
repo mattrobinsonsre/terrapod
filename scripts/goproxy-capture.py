@@ -82,15 +82,20 @@ class Handler(BaseHTTPRequestHandler):
         path = self.path
 
         if path.endswith("/@v/list"):
-            return self._send(STATE["list"], "text/plain")
+            self._send(STATE["list"], "text/plain")
+            return
         if path.endswith("/@latest"):
-            return self._send(STATE["info"], "application/json")
+            self._send(STATE["info"], "application/json")
+            return
         if path.endswith(f"/@v/{VERSION}.info"):
-            return self._send(STATE["info"], "application/json")
+            self._send(STATE["info"], "application/json")
+            return
         if path.endswith(f"/@v/{VERSION}.mod"):
-            return self._send(STATE["mod"], "text/plain")
+            self._send(STATE["mod"], "text/plain")
+            return
         if path.endswith(f"/@v/{VERSION}.zip"):
-            return self._send(STATE["zip"], "application/zip")
+            self._send(STATE["zip"], "application/zip")
+            return
 
         self.send_response(404)
         self.send_header("Content-Length", "0")

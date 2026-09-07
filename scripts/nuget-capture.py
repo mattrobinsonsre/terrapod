@@ -97,11 +97,14 @@ class Handler(BaseHTTPRequestHandler):
                     {"@id": f"{BASE}/flat/", "@type": "PackageBaseAddress/3.0.0"}
                 ],
             }
-            return send(json.dumps(index).encode(), "application/json")
+            send(json.dumps(index).encode(), "application/json")
+            return
         if path == f"{PREFIX}/flat/{lower}/index.json":
-            return send(json.dumps({"versions": [VER]}).encode(), "application/json")
+            send(json.dumps({"versions": [VER]}).encode(), "application/json")
+            return
         if path == f"{PREFIX}/flat/{lower}/{VER}/{lower}.{VER}.nupkg":
-            return send(NUPKG, "application/octet-stream")
+            send(NUPKG, "application/octet-stream")
+            return
 
         self.send_response(404)
         self.send_header("Content-Length", "0")
