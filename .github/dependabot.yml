@@ -62,6 +62,19 @@ updates:
       # Lift together with the fastapi hold above, as one migration.
       - dependency-name: starlette
         versions: [">=1.4"]
+      # python-hcl2 8.x changes the shape of what it parses, and the module
+      # registry reads that shape. Block labels and string values come back
+      # with their surrounding quotes where 7.x gave them bare, and blocks
+      # carry a `__is_block__` marker. Module interface extraction reads
+      # variable names and descriptions straight out of that structure, so
+      # v8 breaks it — the parser tests caught it (#1497, closed unmerged).
+      #
+      # Supporting v8 is work rather than a wall: strip the quotes, ignore
+      # the marker. Nothing needs it today, and a widened range would take
+      # v8 silently on the next resolve. Version-scoped so 7.x patches
+      # still arrive.
+      - dependency-name: python-hcl2
+        versions: [">=8"]
 
   - package-ecosystem: npm
     directory: /web

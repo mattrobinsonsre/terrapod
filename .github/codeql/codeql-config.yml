@@ -31,6 +31,15 @@ paths-ignore:
   # so the AI risk-analysis prompt has something to flag). Not product code,
   # never deployed — excluded from code scanning entirely (see also .semgrepignore).
   - services/ai_eval
+  # scripts/ is build, CI and developer tooling — linting, the eval stack, the
+  # release re-scan, and the protocol captures that drive real clients at a
+  # logging stub. No Dockerfile COPYs it, so none of it ships in an image or is
+  # reachable by anyone but whoever runs it. Alerts here are about a throwaway
+  # stub's return style, not about anything a deployment exposes, and they crowd
+  # out the product findings the tab exists to surface.
+  #
+  # Semgrep still scans it (see .semgrepignore, which excludes only ai_eval), so
+  # this narrows one tool's noise rather than leaving the directory unanalysed.
 
 query-filters:
   - exclude:

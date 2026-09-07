@@ -116,7 +116,26 @@ requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.ruff]
-target-version = "py314"
+# Deliberately behind the interpreter floor, which is 3.14 since #1461.
+#
+# At py314 ruff's formatter emits PEP 758 — `except (A, B):` becomes
+# `except A, B:` — and **CodeQL cannot parse that**. It reads the Python 2
+# meaning, where the second name is a binding target, and reports
+# `py/uninitialized-local-variable` against a local it thinks was invented.
+# Two of those landed on `api/dependencies.py`, at error severity, on the
+# authentication path. The code is correct; the scanner cannot read it.
+#
+# The alternative was excluding `py/uninitialized-local-variable` in
+# codeql-config.yml. That is worse: the rule catches genuine use-before-
+# assignment across all product code, and turning it off repo-wide to work
+# around a parser gap trades a real safety net for a syntax preference.
+#
+# So ruff keeps emitting syntax every tool in the chain can read. Raise this
+# when CodeQL supports PEP 758 — the interpreter floor is not what is holding
+# it back. (This is NOT the backport argument that was made and rejected when
+# the floor moved; that one did not survive scrutiny. This is about the
+# scanner.)
+target-version = "py313"
 line-length = 100
 # Alembic migrations are auto-generated with the conventional revision-vars-
 # before-imports layout (E402) and are not hand-linted. (They're now present in

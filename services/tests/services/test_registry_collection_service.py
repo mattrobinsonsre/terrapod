@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import io
 import json
+import pathlib
 import tarfile
 
 import pytest
@@ -155,7 +156,7 @@ class TestTheDigestDescribesWhatWasStored:
 
         path = _archive(tmp_path, manifest=_info())
         sha, size = collections._digest_and_size(path)
-        raw = open(path, "rb").read()
+        raw = pathlib.Path(path).read_bytes()
         assert sha == hashlib.sha256(raw).hexdigest()
         assert size == len(raw)
 
