@@ -49,7 +49,12 @@ _AZURE_REDIS_SCOPE = "https://redis.azure.com/.default"
 # race a shared credential object (google-auth Credentials.refresh mutates in
 # place and is not thread-safe).
 _lock = threading.Lock()
-_aws_signers: dict[str, object] = {}
+#: Per-region ``(session, signer)``. Both halves are required: see
+#: ``_aws_signer`` for why the session must outlive the call that built it. They
+#: are stored as one entry so the coupling is structural — holding the session
+#: in a second dict would leave a mapping nothing ever reads, which is an
+#: invitation to delete it and silently reintroduce #1509.
+_aws_signers: dict[str, tuple[object, object]] = {}
 _gcp_state: dict[str, object] = {}
 _azure_state: dict[str, object] = {}
 
@@ -76,11 +81,23 @@ def strip_url_credentials(redis_url: str) -> str:
 def _aws_signer(region: str):
     # The RequestSigner holds the session's *refreshable* credentials object
     # (botocore freezes them at sign time via get_frozen_credentials), so the
-    # cached per-region signer auto-renews across IRSA credential rotation — do
-    # NOT "fix" this by rebuilding the signer each call.
+    # cached per-region signer auto-renews across credential rotation — do NOT
+    # "fix" this by rebuilding the signer each call.
+    #
+    # The session must be cached alongside it (#1509). RequestSigner keeps the
+    # event emitter as a `weakref.proxy`, and the session is what holds the
+    # emitter strongly — so a session left to go out of scope here is freed, and
+    # every subsequent signing raises
+    # `ReferenceError: weakly-referenced object no longer exists`.
+    #
+    # It is freed by the *cyclic* collector rather than by refcounting, because
+    # a botocore Session contains reference cycles. That is precisely why the
+    # symptom read as intermittent: the session outlives this function, the
+    # first connection signs fine, and auth only dies once a collection happens
+    # to run.
     key = region or "default"
-    signer = _aws_signers.get(key)
-    if signer is None:
+    cached = _aws_signers.get(key)
+    if cached is None:
         import botocore.session
         from botocore.model import ServiceId
         from botocore.signers import RequestSigner
@@ -94,8 +111,9 @@ def _aws_signer(region: str):
             session.get_credentials(),
             session.get_component("event_emitter"),
         )
-        _aws_signers[key] = signer
-    return signer
+        cached = (session, signer)
+        _aws_signers[key] = cached
+    return cached[1]
 
 
 def mint_aws_elasticache_token(*, cache_name: str, user: str, region: str) -> str:

@@ -11,6 +11,7 @@ static auth string.
 from __future__ import annotations
 
 import asyncio
+import gc
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -76,6 +77,106 @@ def test_mint_aws_elasticache_token_signs_and_strips_scheme(monkeypatch):
     assert args.kwargs["operation_name"] == "connect"
     assert "Action=connect" in args.args[0]["url"]
     assert "User=terrapod" in args.args[0]["url"]
+
+
+def _fake_aws_env(monkeypatch):
+    """Isolate the two AWS tests below that build a **real** botocore signer.
+
+    Signing is local arithmetic — nothing here reaches AWS, and the credentials
+    are never validated — but botocore still needs *some* credentials to sign
+    with. Every ambient source is cleared so the result does not depend on
+    whether the machine running the tests happens to have AWS config: with a key
+    and secret in the environment botocore's ``EnvProvider`` wins its resolution
+    chain outright, so it never consults the filesystem, ECS or IMDS.
+    """
+    for var in (
+        "AWS_PROFILE",
+        "AWS_DEFAULT_PROFILE",
+        "AWS_SESSION_TOKEN",
+        "AWS_SECURITY_TOKEN",
+        # Left set, botocore's EnvProvider hands back RefreshableCredentials
+        # whose refresher re-reads this same stale value, and signing dies with
+        # "credentials are still expired". `aws configure export-credentials`
+        # emits it, so a developer can easily have one exported.
+        "AWS_CREDENTIAL_EXPIRATION",
+        "AWS_CONFIG_FILE",
+        "AWS_SHARED_CREDENTIALS_FILE",
+    ):
+        monkeypatch.delenv(var, raising=False)
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "AKIAIOSFODNN7EXAMPLE")
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY")
+    monkeypatch.setenv("AWS_DEFAULT_REGION", "us-east-1")
+    monkeypatch.setattr(iam_auth, "_aws_signers", {})  # isolate the module cache
+
+
+def test_the_signer_is_cached_per_region(monkeypatch):
+    """The cache itself is load-bearing, and was otherwise unguarded (#1509).
+
+    `_aws_signer` states twice that the signer must not be rebuilt per call, but
+    nothing tested it: removing the cache outright left every other test in this
+    file green, because a signer used inside the call that built it never
+    outlives its session. That the session is *retained* is proved by
+    ``test_aws_token_still_mints_after_the_session_could_be_collected`` — an
+    assertion here that the cached session is still reachable would be vacuous,
+    since the cache holds it strongly for the whole test either way.
+    """
+    _fake_aws_env(monkeypatch)
+
+    # Cached, not rebuilt per connection: a Redis reconnect must not pay for a
+    # fresh botocore session, and the retained signer is what carries
+    # refreshable credentials across rotation.
+    assert iam_auth._aws_signer("us-east-1") is iam_auth._aws_signer("us-east-1")
+    # Keyed by region, so two regions do not share one signer.
+    assert iam_auth._aws_signer("us-east-1") is not iam_auth._aws_signer("eu-west-1")
+
+
+def test_aws_token_mints_when_the_region_is_left_unset(monkeypatch):
+    """`redis.aws_iam_region: ""` is a supported (and reported) configuration.
+
+    It takes the other branch of `_aws_signer` — the region comes from the
+    session's own config and the cache key becomes "default" — so it is the
+    branch a deployment that omits the setting actually runs.
+    """
+    _fake_aws_env(monkeypatch)
+
+    token = iam_auth.mint_aws_elasticache_token(cache_name="my-cache", user="terrapod", region="")
+
+    assert token.startswith("my-cache/?")
+    assert "X-Amz-Signature=" in token
+    assert set(iam_auth._aws_signers) == {"default"}
+
+
+def test_aws_token_still_mints_after_the_session_could_be_collected(monkeypatch):
+    """The signer must outlive the botocore session that built it (#1509).
+
+    This is the one AWS test that builds a **real** ``RequestSigner`` rather
+    than mocking ``_aws_signer``. That mocking is why the bug shipped: every
+    other test replaces the very construction that was wrong.
+
+    ``RequestSigner`` keeps the event emitter as a ``weakref.proxy`` and the
+    session is what holds it strongly, so a session dropped on return is
+    collected and later signing raises ``ReferenceError``. In production the
+    first connection succeeded (it beat the collector) and everything after it
+    failed, which read as an intermittent auth fault.
+
+    The explicit ``gc.collect()`` is load-bearing: without it this passes
+    against the broken code too, because the session simply hadn't been
+    collected yet.
+    """
+    _fake_aws_env(monkeypatch)
+
+    first = iam_auth.mint_aws_elasticache_token(
+        cache_name="my-cache", user="terrapod", region="us-east-1"
+    )
+    assert "X-Amz-Signature=" in first
+
+    gc.collect()
+
+    second = iam_auth.mint_aws_elasticache_token(
+        cache_name="my-cache", user="terrapod", region="us-east-1"
+    )
+    assert second.startswith("my-cache/?")
+    assert "X-Amz-Signature=" in second
 
 
 # ── credential provider dispatch ──────────────────────────────────────
