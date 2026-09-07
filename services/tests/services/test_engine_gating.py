@@ -60,6 +60,8 @@ class TestDefaults:
             "npm": True,
             "galaxy": True,
             "pulumi": True,
+            "go": True,
+            "nuget": True,
         }
 
 
@@ -122,6 +124,8 @@ class TestTheTraditionalShape:
             "npm": False,
             "galaxy": False,
             "pulumi": False,
+            "go": False,
+            "nuget": False,
         }
 
     def test_terraform_s_own_caches_are_not_gateable(self) -> None:
@@ -141,8 +145,15 @@ class TestUnknownNames:
     """A typo must fail loudly rather than silently reading as disabled."""
 
     def test_an_unknown_capability_raises(self) -> None:
+        """Deliberately not a plausible ecosystem name.
+
+        This used to ask about "nuget", which stopped being unknown the moment
+        the NuGet proxy shipped (#1484) — so the test failed for a reason that
+        had nothing to do with what it was checking. A name nothing will ever
+        implement keeps it testing the resolver rather than the roadmap.
+        """
         with pytest.raises(ValueError, match="unknown gated capability"):
-            capability_enabled("nuget")
+            capability_enabled("not-a-real-capability")
 
     def test_an_unknown_engine_raises(self) -> None:
         with pytest.raises(ValueError, match="unknown engine"):

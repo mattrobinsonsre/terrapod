@@ -392,6 +392,16 @@ api:
         pulumi:
           enabled: true
           upstream: https://get.pulumi.com/releases/plugins
+        # Go module proxy. Pulumi-only (Go SDK programs), so it disappears with
+        # engines.pulumi.enabled: false. Point the toolchain at it with GOPROXY.
+        go:
+          enabled: true
+          upstream: https://proxy.golang.org
+        # NuGet V3 flat container. Pulumi-only (C# SDK programs). Point a
+        # nuget.config packageSource at this proxy's index.json.
+        nuget:
+          enabled: true
+          upstream: https://api.nuget.org/v3-flatcontainer
         galaxy:
           enabled: true
           upstream: https://galaxy.ansible.com

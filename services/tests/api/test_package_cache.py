@@ -410,6 +410,36 @@ class TestAuthenticationIsRequired:
             f"{BASE}/pulumi/pulumi-resource-random-v4.16.3-linux-amd64.tar.gz",
             None,
         ),
+        "/api/terrapod/v1/package-cache/go/{module:path}/@v/list": (
+            "GET",
+            f"{BASE}/go/example.com/m/@v/list",
+            None,
+        ),
+        "/api/terrapod/v1/package-cache/go/{module:path}/@latest": (
+            "GET",
+            f"{BASE}/go/example.com/m/@latest",
+            None,
+        ),
+        "/api/terrapod/v1/package-cache/go/{module:path}/@v/{file}": (
+            "GET",
+            f"{BASE}/go/example.com/m/@v/v1.0.0.info",
+            None,
+        ),
+        "/api/terrapod/v1/package-cache/nuget/index.json": (
+            "GET",
+            f"{BASE}/nuget/index.json",
+            None,
+        ),
+        "/api/terrapod/v1/package-cache/nuget/flat/{package_id}/index.json": (
+            "GET",
+            f"{BASE}/nuget/flat/newtonsoft.json/index.json",
+            None,
+        ),
+        "/api/terrapod/v1/package-cache/nuget/flat/{package_id}/{version}/{filename}": (
+            "GET",
+            f"{BASE}/nuget/flat/newtonsoft.json/13.0.3/newtonsoft.json.13.0.3.nupkg",
+            None,
+        ),
         "/api/terrapod/v1/admin/package-cache/warm": (
             "POST",
             "/api/terrapod/v1/admin/package-cache/warm",
