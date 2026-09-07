@@ -977,6 +977,14 @@ class PackageCacheConfig(BaseModel):
         description="npm registry (packuments and tarballs). Serves Pulumi TypeScript "
         "and JavaScript programs.",
     )
+    pulumi: PackageEcosystemConfig = Field(
+        default_factory=lambda: PackageEcosystemConfig(
+            upstream="https://get.pulumi.com/releases/plugins"
+        ),
+        description="Pulumi resource and language plugins. Point the CLI at it with "
+        "PULUMI_PLUGIN_DOWNLOAD_URL_OVERRIDES; a `pulumi up` then resolves its plugins "
+        "without reaching get.pulumi.com.",
+    )
     galaxy: PackageEcosystemConfig = Field(
         default_factory=lambda: PackageEcosystemConfig(upstream="https://galaxy.ansible.com"),
         description="Ansible Galaxy v3 (collections). Point ansible-galaxy at it with a "

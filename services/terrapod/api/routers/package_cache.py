@@ -37,7 +37,7 @@ from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services import registry_collection_service as collections
 from terrapod.services.engine_gating import capability_enabled
-from terrapod.services.package_cache import galaxy, npm, pypi
+from terrapod.services.package_cache import galaxy, npm, pulumi_plugins, pypi
 from terrapod.services.package_cache.substrate import (
     Artifact,
     NotFoundUpstream,
@@ -59,6 +59,7 @@ from terrapod.storage.protocol import ObjectStore
 pypi_router = APIRouter()
 npm_router = APIRouter()
 galaxy_router = APIRouter()
+pulumi_router = APIRouter()
 logger = get_logger(__name__)
 
 #: pip has no bearer option — credentials come from the index URL or `.netrc` —
@@ -864,6 +865,40 @@ async def galaxy_import_status(
     )
 
 
+# ── Pulumi plugins ──────────────────────────────────────────────────────────
+
+
+@pulumi_router.get("/pulumi/{filename}")
+async def pulumi_plugin(
+    filename: str,
+    user: AuthenticatedUser = Depends(authenticate_package_request),
+    db: AsyncSession = Depends(get_db),
+    storage: ObjectStore = Depends(get_storage),
+) -> Response:
+    """One plugin tarball. The whole protocol.
+
+    `PULUMI_PLUGIN_DOWNLOAD_URL_OVERRIDES` points the CLI here, and it asks for
+    a single well-known filename — it already knows the kind, name, version, OS
+    and architecture, so there is no index and no metadata call to serve.
+
+    The filename is parsed rather than trusted: it is client input that would
+    otherwise reach an upstream URL and a storage key, and the shape check is
+    the whole of the request-forgery surface. Anything that is not a plugin
+    filename is a 404, because it names nothing this proxy has.
+    """
+    parts = pulumi_plugins.parse_filename(filename)
+    if parts is None:
+        raise HTTPException(status_code=404, detail="Not found")
+
+    artifact = pulumi_plugins.artifact_for(filename, parts)
+    try:
+        record = await get_or_fetch(db, storage, artifact)
+    except (SealedError, NotFoundUpstream, UpstreamError) as exc:
+        raise _upstream_failure(exc) from exc
+
+    return await _redirect_to_object(storage, record.storage_key)
+
+
 async def _redirect_to_object(storage: ObjectStore, key: str) -> Response:
     """302 to a presigned URL for the stored artifact.
 
@@ -898,5 +933,8 @@ def build_router() -> APIRouter | None:
         mounted = True
     if capability_enabled("galaxy"):
         aggregate.include_router(galaxy_router)
+        mounted = True
+    if capability_enabled("pulumi"):
+        aggregate.include_router(pulumi_router)
         mounted = True
     return aggregate if mounted else None

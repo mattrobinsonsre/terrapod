@@ -254,6 +254,11 @@ data:
           enabled: {{ .enabled }}
           upstream: {{ .upstream | quote }}
         {{- end }}
+        {{- with .pulumi }}
+        pulumi:
+          enabled: {{ .enabled }}
+          upstream: {{ .upstream | quote }}
+        {{- end }}
         {{- with .galaxy }}
         galaxy:
           enabled: {{ .enabled }}

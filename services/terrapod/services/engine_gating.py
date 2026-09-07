@@ -43,6 +43,8 @@ _CAPABILITY_ENGINES: dict[str, frozenset[str]] = {
     "npm": frozenset({"pulumi"}),
     # Ansible collections. Ansible only — nothing else installs a collection.
     "galaxy": frozenset({"ansible"}),
+    # Pulumi resource and language plugins. Pulumi only, for the same reason.
+    "pulumi": frozenset({"pulumi"}),
 }
 
 

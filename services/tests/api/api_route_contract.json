@@ -117,6 +117,7 @@
   "GET /api/terrapod/v1/package-cache/galaxy/v3/imports/collections/{import_id}/",
   "GET /api/terrapod/v1/package-cache/npm/{package:path}",
   "GET /api/terrapod/v1/package-cache/npm/{package:path}/-/{filename}",
+  "GET /api/terrapod/v1/package-cache/pulumi/{filename}",
   "GET /api/terrapod/v1/package-cache/pypi/simple/{project}/",
   "GET /api/terrapod/v1/package-cache/pypi/simple/{project}/{filename}",
   "GET /api/terrapod/v1/platform-tools",

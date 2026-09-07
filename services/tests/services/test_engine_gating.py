@@ -54,7 +54,13 @@ class TestDefaults:
         """Upgrading must not silently switch a working capability off."""
         assert engine_enabled("ansible")
         assert engine_enabled("pulumi")
-        assert gated_capabilities() == {"oci": True, "pypi": True, "npm": True, "galaxy": True}
+        assert gated_capabilities() == {
+            "oci": True,
+            "pypi": True,
+            "npm": True,
+            "galaxy": True,
+            "pulumi": True,
+        }
 
 
 class TestTheEngineGateOutranksTheCapabilityFlag:
@@ -115,6 +121,7 @@ class TestTheTraditionalShape:
             "pypi": False,
             "npm": False,
             "galaxy": False,
+            "pulumi": False,
         }
 
     def test_terraform_s_own_caches_are_not_gateable(self) -> None:
