@@ -165,14 +165,14 @@ Outcome:
 
 ## API
 
-Admin-only CRUD at `/api/terrapod/v1/autodiscovery-rules`:
+Admin-only CRUD at `/api/v1/autodiscovery-rules`:
 
 ```
-GET    /api/terrapod/v1/autodiscovery-rules
-POST   /api/terrapod/v1/autodiscovery-rules
-GET    /api/terrapod/v1/autodiscovery-rules/{id}
-PATCH  /api/terrapod/v1/autodiscovery-rules/{id}
-DELETE /api/terrapod/v1/autodiscovery-rules/{id}
+GET    /api/v1/autodiscovery-rules
+POST   /api/v1/autodiscovery-rules
+GET    /api/v1/autodiscovery-rules/{id}
+PATCH  /api/v1/autodiscovery-rules/{id}
+DELETE /api/v1/autodiscovery-rules/{id}
 ```
 
 ### Preview and on-demand scan
@@ -180,9 +180,9 @@ DELETE /api/terrapod/v1/autodiscovery-rules/{id}
 Beyond passively waiting for the poller, you can dry-run a rule and provision on demand:
 
 ```
-GET  /api/terrapod/v1/autodiscovery-rules/{id}/preview   # what a saved rule would create — no side effects
-POST /api/terrapod/v1/autodiscovery-rules/preview        # same, for an unsaved rule (Create body) — iterate before saving
-POST /api/terrapod/v1/autodiscovery-rules/{id}/scan      # walk now and actually create the workspaces (idempotent)
+GET  /api/v1/autodiscovery-rules/{id}/preview   # what a saved rule would create — no side effects
+POST /api/v1/autodiscovery-rules/preview        # same, for an unsaved rule (Create body) — iterate before saving
+POST /api/v1/autodiscovery-rules/{id}/scan      # walk now and actually create the workspaces (idempotent)
 ```
 
 Preview walks the tracked branch and returns, per directory: `workspace_name`, `working_directory`, `collision` (would no-op — a workspace is already bound to that directory, or the derived name is taken), and `existing_autodiscovered` (the no-op is a reuse of a workspace this same rule already made). The admin UI surfaces this as a per-row badge (Create / Skip already-discovered / Skip name-collision) and a "Provision N workspaces" confirm whose count is exactly the non-colliding rows. A `413` means the provider truncated the repo tree (too large to scan in one pass). `scan` force-enables the rule for the call so an explicit operator action doesn't silently no-op on a disabled rule.

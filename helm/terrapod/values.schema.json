@@ -1563,6 +1563,9 @@
             "callback_base_url": {
               "type": "string"
             },
+            "legacy_callback_url": {
+              "type": "boolean"
+            },
             "session_ttl_hours": {
               "type": "integer",
               "minimum": 1

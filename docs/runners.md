@@ -264,7 +264,7 @@ Each listener pod runs at most `listener.maxConcurrent` runner Jobs at once (def
 
 Terraform/OpenTofu provider plugins can consume substantial memory — particularly the AWS provider when refreshing thousands of resources, or any provider that pulls a large module tarball into memory. If a runner Job hits its memory limit (`2 × resource_memory`), Kubernetes OOM-kills the container. Without explicit surfacing, the symptom is just a "Job failed" with no signal that memory was the cause — leaving an operator to guess + incrementally bump the limit. Terrapod surfaces it explicitly.
 
-**Every run records its actual usage.** The runner entrypoint reads `/sys/fs/cgroup/memory.peak` (and `/sys/fs/cgroup/cpu.stat` for future use) at exit and POSTs them to `/api/terrapod/v1/runs/{run_id}/resource-profile`. The Run detail page renders a **Resource usage** panel showing peak memory **alongside the workspace's request and limit** — peak alone has no meaning, so it's always anchored. The memory bar turns amber at ≥80% of the limit and red at ≥95%, so high-water marks that are approaching the cliff are visible before they push a run over the edge.
+**Every run records its actual usage.** The runner entrypoint reads `/sys/fs/cgroup/memory.peak` (and `/sys/fs/cgroup/cpu.stat` for future use) at exit and POSTs them to `/api/v1/runs/{run_id}/resource-profile`. The Run detail page renders a **Resource usage** panel showing peak memory **alongside the workspace's request and limit** — peak alone has no meaning, so it's always anchored. The memory bar turns amber at ≥80% of the limit and red at ≥95%, so high-water marks that are approaching the cliff are visible before they push a run over the edge.
 
 The profile also records `peak_cpu_usec` from cgroup v2, available through the
 resource-profile API. It is *cumulative* core-time rather than an instantaneous
@@ -376,9 +376,9 @@ Sequence inside the Python runner orchestrator (`services/terrapod/runner/job_en
 
 1. `plan_apply.run_plan_show_json` runs `tofu show -json tfplan` and writes `/tmp/plan.json` — the JSON form used by both OPA and the `plan-json-output` artifact.
 2. `phases.opa.evaluate_policies`:
-   - `GET /api/terrapod/v1/runs/{id}/policy-bundle` — fetches the policy sets in scope for this workspace, plus the run/workspace context. Bounded retries (3 attempts, 3s backoff); a persistent fetch failure is **fatal** to the run, never silently skipped.
+   - `GET /api/v1/runs/{id}/policy-bundle` — fetches the policy sets in scope for this workspace, plus the run/workspace context. Bounded retries (3 attempts, 3s backoff); a persistent fetch failure is **fatal** to the run, never silently skipped.
    - For each applicable set, for each policy: `opa eval --format json --stdin-input --data <rego> --data <context> 'data.terrapod' < /tmp/plan.json`. Parses `deny` / `warn` from the OPA output with defensive coercion (a misauthored `deny := "msg"` scalar is not allowed to silently pass). One eval per policy preserves per-policy attribution in the UI.
-   - `POST /api/terrapod/v1/runs/{id}/policy-results` — uploads the aggregated results. Persisted via Postgres `ON CONFLICT DO NOTHING` on `(run_id, policy_set_id)` so retries are idempotent.
+   - `POST /api/v1/runs/{id}/policy-results` — uploads the aggregated results. Persisted via Postgres `ON CONFLICT DO NOTHING` on `(run_id, policy_set_id)` so retries are idempotent.
 3. The runner posts `plan-result`. The API's post-plan gate is now a pure DB query — by this point the policy_evaluation rows already exist (or there were no applicable sets, which is the right answer too).
 
 If `tofu show -json` failed but the plan succeeded, the runner records an `errored` outcome for every applicable set (fail-closed for mandatory sets). The OPA binary is **not in the runner image** (#1208). It is pulled through the binary cache and checksum-verified against the sibling `.sha256` OPA publishes, and its version is an ordinary Helm value — `api.config.registry.platform_tools.opa_version` — so bumping it is a `helm upgrade`, not a Terrapod release. The fetch happens **only when a policy set actually applies to the run**, so a deployment with no policies never downloads it, and a fetch failure is **fatal to the run** rather than a silently skipped gate. Rego must be **v1 syntax** (`package … if {}` form).
@@ -454,7 +454,7 @@ This is intentional: scaling the Deployment must not require new join tokens or 
 On startup each pod runs the same flow:
 
 1. Read the credentials Secret (name supplied via `TERRAPOD_CREDENTIALS_SECRET_NAME`, set by Helm to the Deployment fullname + `-credentials`). If it exists and has a valid cert/key/listener-id, adopt that identity and skip everything below.
-2. If no Secret, call `POST /api/terrapod/v1/agent-pools/join` with `TERRAPOD_JOIN_TOKEN`. The API issues a short-lived cert and returns the full identity.
+2. If no Secret, call `POST /api/v1/agent-pools/join` with `TERRAPOD_JOIN_TOKEN`. The API issues a short-lived cert and returns the full identity.
 3. Try to `create` the credentials Secret with that identity. On `409 AlreadyExists` another pod won the race — re-read the Secret and adopt the winner's identity instead. The cert this pod was just issued is silently dropped.
 4. If the join token is exhausted (`401`/`403`) before this pod gets a chance, the pod backs off (1, 2, 4, ... up to 30s, ~3 min total budget) and re-reads the Secret. As soon as a peer pod's bootstrap completes, the loser adopts that identity. This is why the default `max_uses: 2` is enough even for large replica counts — only the first two pods ever consume token uses, the rest discover the Secret.
 
@@ -466,7 +466,7 @@ Each pod independently runs a renewal loop:
 
 - The renewal threshold is `cert_validity_seconds / 2 + pod_splay_seconds`, where `pod_splay_seconds` is a deterministic SHA-256 hash of `POD_NAME` in the range `[0, 30)`. The splay desynchronises pods that started in lockstep so they don't all hit `/renew` simultaneously.
 - When a pod reaches its threshold, it **re-reads the Secret first**. If the cert in the Secret still has more remaining lifetime than this pod's threshold (plus a 30s skew margin), another pod has already renewed it — adopt and reset the timer.
-- Otherwise call `POST /api/terrapod/v1/listeners/{id}/renew` with up to 3 attempts (exponential backoff on 5xx / network errors; immediate failure on 401/403).
+- Otherwise call `POST /api/v1/listeners/{id}/renew` with up to 3 attempts (exponential backoff on 5xx / network errors; immediate failure on 401/403).
 - On success, write the Secret with `resourceVersion` CAS. If another pod beat us to it (`409 Conflict`), re-read and adopt the peer's cert.
 - On `401`/`403` from `/renew`, the cert is rejected (revoked, listener deleted, etc.) — clear the Secret and fall back to the join-token bootstrap flow.
 

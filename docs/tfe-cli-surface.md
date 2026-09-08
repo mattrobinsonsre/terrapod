@@ -2,7 +2,7 @@
 
 This file enumerates the **exact** set of TFE V2 API endpoints that the `terraform` (HashiCorp) and `tofu` (OpenTofu) CLIs consume — directly or via `go-tfe` — when configured with a `cloud` block (or the legacy `remote` backend) pointing at a TFE-compatible server.
 
-**This list is the contract for `/api/v2/` in Terrapod.** A route on this list MUST be served at `/api/v2/...` so the CLI can find it via service discovery. A route NOT on this list — even one defined in the public TFE V2 spec — belongs at `/api/terrapod/v1/...`. The cleanup rule:
+**This list is the contract for `/api/v2/` in Terrapod.** A route on this list MUST be served at `/api/v2/...` so the CLI can find it via service discovery. A route NOT on this list — even one defined in the public TFE V2 spec — belongs at `/api/v1/...`. The cleanup rule:
 
 > If `terraform`/`tofu` doesn't call it, the route is Terrapod-native, regardless of TFE-V2 lineage.
 
@@ -85,7 +85,7 @@ The `upload-url` and `download-url` returned in JSON:API attributes can be absol
 | GET | `/api/v2/configuration-versions/{id}` | `ConfigurationVersions.Read` | `cloud/backend_plan.go:199`, `remote/backend_plan.go:270` |
 | PUT | `/api/v2/configuration-versions/{id}/upload` | (raw upload to `upload-url`) | `cloud/backend_plan.go:186`, `remote/backend_plan.go:257` — **no Authorization header** |
 
-Terrapod-only management on the configuration-versions surface (list, download, diff, ticket-based download) lives at `/api/terrapod/v1/configuration-versions/...`.
+Terrapod-only management on the configuration-versions surface (list, download, diff, ticket-based download) lives at `/api/v1/configuration-versions/...`.
 
 ## Runs / Plans / Applies
 
@@ -112,13 +112,13 @@ These are CLI-aware (run progress display branches on relationships) but only ex
 | GET | `/api/v2/task-stages/{id}` | `TaskStages.Read` | `cloud/backend_taskStages.go:66, 96` |
 | POST | `/api/v2/task-stages/{id}/actions/override` | `TaskStages.Override` | `cloud/backend_taskStages.go:186` |
 
-The run-task management surface (`/run-tasks/*`, `/workspaces/{id}/run-tasks`, callback endpoints) is Terrapod-native and lives at `/api/terrapod/v1/`.
+The run-task management surface (`/run-tasks/*`, `/workspaces/{id}/run-tasks`, callback endpoints) is Terrapod-native and lives at `/api/v1/`.
 
 ## tfci / tfc-workflows-github
 
 [`tfci`](https://github.com/hashicorp/tfc-workflows-tooling) is HashiCorp's CI binary; [`tfc-workflows-github`](https://github.com/hashicorp/tfc-workflows-github) wraps it for GitHub Actions. It is in widespread use for TFE/HCP-Terraform CI flows. Most of what it calls overlaps with the CLI surface above (workspace lookup, lock/unlock, configuration-version create+upload, run create/apply/discard/cancel/read, plan read+log+JSON output). The one extension beyond the `terraform`/`tofu` CLI surface is **variable management** — `tfci variable …` and `tfci variable-set …` commands.
 
-We extend the "stays at `/api/v2/`" set to cover those calls. The rule is unchanged: anything `terraform`, `tofu`, or `tfci` calls stays at `/api/v2/`; everything else is `/api/terrapod/v1/`.
+We extend the "stays at `/api/v2/`" set to cover those calls. The rule is unchanged: anything `terraform`, `tofu`, or `tfci` calls stays at `/api/v2/`; everything else is `/api/v1/`.
 
 | Method | Path | go-tfe method | Caller |
 |---|---|---|---|
@@ -171,4 +171,4 @@ When OpenTofu adds new go-tfe call sites in `internal/cloud/*` or `internal/back
 3. For each match, find the go-tfe method's `client.NewRequest(...)` line in https://github.com/hashicorp/go-tfe to extract the path
 4. Add to the relevant table above
 
-Endpoints **not** verified by this process belong at `/api/terrapod/v1/`, regardless of go-tfe lineage.
+Endpoints **not** verified by this process belong at `/api/v1/`, regardless of go-tfe lineage.

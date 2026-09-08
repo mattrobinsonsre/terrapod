@@ -13,6 +13,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
 
+from terrapod.api.prefixes import NATIVE_PREFIX, canonical_path
 from terrapod.auth.runner_tokens import verify_runner_token
 from terrapod.logging_config import get_logger
 
@@ -22,10 +23,10 @@ logger = get_logger(__name__)
 _EXEMPT_PATHS = frozenset({"/health", "/ready", "/metrics"})
 
 # Auth endpoint prefixes (lower rate limit). Auth is Terrapod-native:
-# canonical /api/terrapod/v1/auth/* (the OAuth/SAML callback included —
-# its URL is built from terrapod_prefix as of #278) plus the /oauth/*
+# canonical /api/v1/auth/* (the OAuth/SAML callback included —
+# its URL is built via _sso_url_prefix(), #1529) plus the /oauth/*
 # terraform-login flow.
-_AUTH_PREFIXES = ("/api/terrapod/v1/auth/", "/oauth/")
+_AUTH_PREFIXES = (f"{NATIVE_PREFIX}/auth/", "/oauth/")
 
 # ...except the token endpoint. `auth_requests_per_minute` (10/min) exists to
 # slow password guessing against the LOGIN endpoints. `/oauth/token` is not that:
@@ -39,7 +40,15 @@ _AUTH_PREFIX_EXCEPTIONS = ("/oauth/token",)
 
 
 def _is_auth_path(path: str) -> bool:
-    """Whether a path belongs to the strict login bucket."""
+    """Whether a path belongs to the strict login bucket.
+
+    The path is normalised onto the canonical native prefix first (#1529), so a
+    login attempt via the deprecated `/api/terrapod/v1` alias gets the same
+    strict limit. Matching the literal canonical prefix alone would leave the
+    alias on the general limit — a silent weakening of the control that exists
+    to slow password guessing.
+    """
+    path = canonical_path(path)
     if any(path.startswith(p) for p in _AUTH_PREFIX_EXCEPTIONS):
         return False
     return any(path.startswith(p) for p in _AUTH_PREFIXES)
@@ -121,7 +130,8 @@ class RateLimitMiddleware:
       Interactive users and API-token automation rarely approach this, but
       it stops one noisy client taking the pool.
     - Unauthenticated: base limit (`requests_per_minute`), IP-keyed.
-    - Auth endpoints (`/api/terrapod/v1/auth/*`, `/oauth/*`): always `auth_requests_per_minute`
+    - Auth endpoints (`/api/v1/auth/*` and its deprecated alias, `/oauth/*`):
+      always `auth_requests_per_minute`
       regardless of who's calling — brute-force defence on login.
     """
 

@@ -64,7 +64,7 @@ it comes from.
 The tab is backed by a Terrapod-native endpoint:
 
 ```
-GET /api/terrapod/v1/workspaces/{workspace_id}/state-graph[?state_version=sv-...]
+GET /api/v1/workspaces/{workspace_id}/state-graph[?state_version=sv-...]
 ```
 
 See [api-reference.md → State Graph](api-reference.md#state-graph) for the

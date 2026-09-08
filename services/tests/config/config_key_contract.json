@@ -114,6 +114,7 @@
   "auth.api_token_max_ttl_hours",
   "auth.bound_token_idle_days",
   "auth.callback_base_url",
+  "auth.legacy_callback_url",
   "auth.local_enabled",
   "auth.login_token_ttl_hours",
   "auth.peer_token_ttl_hours",

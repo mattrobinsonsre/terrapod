@@ -177,7 +177,7 @@ resource/data source uses `vcs_provider` for the provider-kind attribute
   resources and import them (complements managing new ones with this provider).
 - [Migration](migration.md) — `terrapod-migrate` moves existing TFE/HCP or
   Atlantis estates onto Terrapod.
-- [API reference](api-reference.md) — the underlying `/api/terrapod/v1` surface
+- [API reference](api-reference.md) — the underlying `/api/v1` surface
   the provider drives via `go-terrapod`.
 
 

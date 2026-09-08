@@ -35,8 +35,8 @@ api:
 ## How it works
 
 1. On each agent-mode run, the API tells the runner (per-run, via the listener) whether to estimate cost. The runner fetches the cached pricesheet and runs the engine over the plan JSON, uploading a `cost_estimate.json` artifact (best-effort — a costing failure never fails the run).
-2. The **run** Cost tab reads that artifact via `GET /api/terrapod/v1/runs/{run_id}/cost-estimate`.
-3. The **workspace** Cost tab prices the latest state version server-side (`GET /api/terrapod/v1/workspaces/{id}/cost-estimate`), gated on `state:read`.
+2. The **run** Cost tab reads that artifact via `GET /api/v1/runs/{run_id}/cost-estimate`.
+3. The **workspace** Cost tab prices the latest state version server-side (`GET /api/v1/workspaces/{id}/cost-estimate`), gated on `state:read`.
 
 Full request/response shapes are in the [API reference](api-reference.md#cost-estimation).
 

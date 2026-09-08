@@ -46,7 +46,7 @@ This still requires admin/write on the *producer* workspace to apply — a consu
 curl -X POST \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
-  "https://terrapod.example.com/api/terrapod/v1/workspaces/ws-PRODUCER/remote-state-consumers" \
+  "https://terrapod.example.com/api/v1/workspaces/ws-PRODUCER/remote-state-consumers" \
   -d '{"data": {"relationships": {"consumer": {"data": {"id": "ws-CONSUMER", "type": "workspaces"}}}}}'
 ```
 

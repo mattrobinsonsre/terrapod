@@ -67,7 +67,7 @@ def _trigger_json(trigger: RunTrigger) -> dict:
             },
         },
         "links": {
-            "self": f"/api/terrapod/v1/run-triggers/{trigger_id}",
+            "self": f"/api/v1/run-triggers/{trigger_id}",
         },
     }
 

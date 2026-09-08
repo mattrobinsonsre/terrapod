@@ -1115,6 +1115,21 @@ jobs:
           echo "$out" | grep -q "cost_estimation:" || { echo "FAIL: cost_estimation config not rendered into config.yaml (#871)"; exit 1; }
           echo "$out" | grep -q "prices_url:" || { echo "FAIL: cost_estimation.prices_url not rendered (#871)"; exit 1; }
           echo "$out" | grep -q "default_region:" || { echo "FAIL: cost_estimation.default_region not rendered (#871)"; exit 1; }
+          # SSO callback prefix (#1529): the switch that decides which prefix the
+          # IdP-facing callback/ACS URLs are built on. A missing render line leaves
+          # it inert — and because those URLs are validated by the IdP against its
+          # own allow-list, an operator who set it to false would keep sending the
+          # old URL and never learn the value was dropped.
+          echo "$out" | grep -q "legacy_callback_url:" || { echo "FAIL: auth.legacy_callback_url not rendered into config.yaml (#1529)"; exit 1; }
+          # Split webhook Ingress (#1529): its `paths` is an ALLOW-LIST, and
+          # run-task callback URLs are generated on the canonical prefix. If the
+          # default stops covering both, an operator on the default silently loses
+          # either already-registered webhooks or every run-task callback — a 404 at
+          # the sender, never in Terrapod's logs.
+          hook=$(helm template ./helm/terrapod --set webhookIngress.enabled=true --set webhookIngress.hostname=hooks.example.com)
+          echo "$hook" | grep -q "path: /api/v1/vcs-events" || { echo "FAIL: webhookIngress missing canonical vcs-events path (#1529)"; exit 1; }
+          echo "$hook" | grep -q "path: /api/v1/task-stage-results" || { echo "FAIL: webhookIngress missing canonical task-stage-results path (#1529)"; exit 1; }
+          echo "$hook" | grep -q "path: /api/terrapod/v1/vcs-events" || { echo "FAIL: webhookIngress dropped the deprecated alias path — already-registered webhooks would stop routing (#1529)"; exit 1; }
           # Platform tools (#1208): opa/trivy/checkov are no longer baked into the
           # images, so these versions are the ONLY thing telling a runner what to
           # fetch. A missing render line leaves the value inert and the code default

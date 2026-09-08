@@ -74,7 +74,7 @@ resource "terrapod_workspace" "tg" {
 ### How it works
 
 1. **Binary cache.** The runner fetches the terragrunt binary from Terrapod's
-   pull-through binary cache (`/api/terrapod/v1/binary-cache/terragrunt/{version}/{os}/{arch}`),
+   pull-through binary cache (`/api/v1/binary-cache/terragrunt/{version}/{os}/{arch}`),
    the same mechanism used for `tofu`/`terraform`. Terragrunt ships a bare
    per-platform binary, which the cache serves directly. Partial versions
    (`1.0`) resolve to the latest matching release.

@@ -32,12 +32,34 @@ cloud-block run lifecycle, variable + variable-set management, and the module
 else — workspace/role/registry management, agent pools, **policy sets
 (OPA/Rego — the open-source equivalent of TFE's Sentinel)**, notifications,
 run tasks, drift detection, the SSE streams, and the runner protocol — is
-Terrapod-native and lives at `/api/terrapod/v1/`.
+Terrapod-native and lives at `/api/v1/`.
 
 The verified CLI-consumed endpoints are catalogued in
 [`docs/tfe-cli-surface.md`](docs/tfe-cli-surface.md). When extending the API:
 if a route is on that list it stays at `/api/v2/`; otherwise it goes under
-`/api/terrapod/v1/`.
+`/api/v1/`.
+
+**`/api/v1` is canonical; `/api/terrapod/v1` is a deprecated alias** kept for the
+support window (#1529, sunset in [`docs/deprecations.md`](docs/deprecations.md)).
+Both are mounted from one helper — `include_terrapod()` in `api/app.py` — so a new
+endpoint appears at both automatically. **Never mount a router at the prefix
+directly**; that serves the canonical path alone and silently drops the alias,
+which is a removal for a lagging runner. A guard test enforces this.
+
+Two consequences worth knowing before you write path-matching code:
+
+- **Code that *decides* something from a path must handle both prefixes.** Rate
+  limiting and the follower gate normalise with `canonical_path()` from
+  `api/prefixes.py`; audit attribution matches all three prefixes in its own
+  regex; the metrics `path_template` label normalises so one endpoint stays one
+  series. Each fails *silently* if it knows only one prefix — a weakened login rate limit, a misrouted follower request, an audit
+  entry attributed to nothing.
+- **An alias only rescues *inbound* requests.** A URL we hand a client to follow is
+  fine on either prefix. A URL a third party *validates against its own list* is
+  not: the SSO callback is registered with the IdP, so it is governed by the
+  explicit `auth.legacy_callback_url` switch rather than moving with the routes.
+  Peer-to-peer HA calls are the same shape — they use `PEER_PREFIX`, pinned to the
+  alias, because a peer mid-rolling-upgrade may not serve the canonical path yet.
 
 ## Repository layout
 
@@ -194,7 +216,7 @@ that surfaces the changed thing has been carried along with it.
 The workflow when extending the API:
 
 1. Add the endpoint to the appropriate router (`/api/v2/` only if it's on the
-   CLI-surface list; otherwise `/api/terrapod/v1/`).
+   CLI-surface list; otherwise `/api/v1/`).
 2. Add a typed method to **go-terrapod** + a test (the shape matches the
    JSON:API response).
 3. Add the consumer code for **every** surface the change touches — directly or
@@ -443,7 +465,8 @@ multi-language implementation ships in the same PR**:
   `tests/api/test_route_contract.py` fails CI on any diff. Removing or renaming
   a route is a **breaking change** for a consumer that lags the server across
   version skew (the `terraform`/`tofu` `cloud` backend + `go-tfe` on `/api/v2/`,
-  or a runner/listener on `/api/terrapod/v1/`) — it requires a MAJOR bump or a
+  or a runner/listener on `/api/terrapod/v1/`, which is where our own images
+  still call) — it requires a MAJOR bump or a
   documented deprecation, **not** a snapshot regen. **Adding** a route is
   additive: accept it by regenerating the snapshot in the same PR —
   `UPDATE_API_CONTRACT=1 pytest tests/api/test_route_contract.py` — a conscious,
@@ -463,7 +486,7 @@ multi-language implementation ships in the same PR**:
   - **Always emit `meta.pagination`** with Terrapod's four keys —
     `current-page`, `page-size`, `total-count`, `total-pages`. This is
     **Terrapod's own shape, used uniformly on both `/api/v2` and
-    `/api/terrapod/v1`** — do not model non-TFE endpoints on TFE's key set
+    `/api/v1`** — do not model non-TFE endpoints on TFE's key set
     (no `prev-page`/`next-page`). On `/api/v2` the shape still matches what a
     `go-tfe` client parses; that compatibility is incidental, not a constraint
     the native surface bends to.
@@ -488,7 +511,7 @@ multi-language implementation ships in the same PR**:
     filters client-side (**no page-through UX**), fetches via `fetchAllPages()`
     in `web/src/lib/api.ts`.
 - **The API house style is JSON:API (convention)** — the API has **one** house
-  style, and both surfaces (`/api/v2` + `/api/terrapod/v1`) follow it. A new or
+  style, and both surfaces (`/api/v2` + `/api/v1`) follow it. A new or
   changed endpoint conforms to all of it:
   - **`data` envelope** — a resource is `{"data": {"type", "id", "attributes",
     "relationships"?}}`; a collection is `{"data": [...], "meta": {...}}`.
@@ -610,7 +633,7 @@ multi-language implementation ships in the same PR**:
   extensions, and (b) TFE-V2 endpoints that exist in `go-tfe` but that the CLI
   never calls (workspace CRUD by id, variables, variable sets, run tasks, run
   triggers, notifications, registry *management*, token admin, …). Both go in a
-  dedicated router under `/api/terrapod/v1/`. Response *attributes* may include
+  dedicated router under `/api/v1/`. Response *attributes* may include
   Terrapod-specific fields (TFE clients ignore unknown attributes); it is the
   endpoint **paths** in this file that must be on the CLI-surface list. Before
   adding a route here, check it appears in that doc — if it doesn't, it's a

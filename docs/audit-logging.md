@@ -44,7 +44,7 @@ Apply-then-merge workflows delegate authorization to the VCS provider (see [VCS 
 ## Query API
 
 ```
-GET /api/terrapod/v1/admin/audit-log
+GET /api/v1/admin/audit-log
 ```
 
 Requires `admin` or `audit` role.
@@ -72,7 +72,7 @@ All filters are optional and use JSON:API query parameter syntax:
 
 ```bash
 # Last 50 POST requests by a specific user
-curl "https://terrapod.local/api/terrapod/v1/admin/audit-log?\
+curl "https://terrapod.local/api/v1/admin/audit-log?\
 filter[actor]=admin@example.com&\
 filter[action]=POST&\
 page[size]=50" \

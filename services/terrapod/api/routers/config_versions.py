@@ -344,7 +344,7 @@ async def mint_download_ticket(
                 "type": "download-tickets",
                 "attributes": {
                     "ticket": ticket,
-                    "url": f"/api/terrapod/v1/configuration-versions/download-by-ticket/{ticket}",
+                    "url": f"/api/v1/configuration-versions/download-by-ticket/{ticket}",
                     "expires-at": expires_iso,
                 },
             }

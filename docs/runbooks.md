@@ -39,7 +39,7 @@ A run is marked "stale" by the reconciler when it has been in `planning` or `app
    ```bash
    # Via API
    curl -H "Authorization: Bearer $TOKEN" \
-     https://<terrapod>/api/terrapod/v1/agent-pools/<pool-id>/listeners
+     https://<terrapod>/api/v1/agent-pools/<pool-id>/listeners
    ```
    If no listeners, see [Listener Offline](#listener-offline).
 
@@ -361,7 +361,7 @@ When no listener is available in a pool, runs cannot be claimed or executed. Que
    Listener logs will show "certificate expired" if the certificate wasn't renewed. The renewal happens at 50% of validity.
 
 5. **Check SSE connectivity:**
-   Listener connects to `GET /api/terrapod/v1/listeners/{id}/events` via SSE. If the connection is being dropped:
+   Listener connects to `GET /api/v1/listeners/{id}/events` via SSE. If the connection is being dropped:
    ```logql
    {namespace="<ns>", pod=~"terrapod-listener.*"} |= "SSE" |= "disconnect"
    ```
@@ -384,7 +384,7 @@ When no listener is available in a pool, runs cannot be claimed or executed. Que
 
 ### Verification
 
-- Listener appears in `GET /api/terrapod/v1/agent-pools/<pool-id>/listeners`
+- Listener appears in `GET /api/v1/agent-pools/<pool-id>/listeners`
 - `terrapod_listener_heartbeats_total{pool_id="..."}` incrementing
 - `terrapod_listener_identity_ready` gauge is 1
 - Queued runs start being claimed
@@ -406,13 +406,13 @@ Runs are accumulating in `pending` or `queued` status faster than they can be pr
 1. **Count queued runs:**
    ```bash
    curl -H "Authorization: Bearer $TOKEN" \
-     "https://<terrapod>/api/terrapod/v1/admin/runs?filter[status]=queued" | jq '.meta.pagination.total-count'
+     "https://<terrapod>/api/v1/admin/runs?filter[status]=queued" | jq '.meta.pagination.total-count'
    ```
 
 2. **Check listener capacity:**
    ```bash
    curl -H "Authorization: Bearer $TOKEN" \
-     https://<terrapod>/api/terrapod/v1/agent-pools/<pool-id>/listeners | \
+     https://<terrapod>/api/v1/agent-pools/<pool-id>/listeners | \
      jq '.data[] | {name: .attributes.name, active: .attributes["active-runs"], capacity: .attributes.capacity}'
    ```
 
@@ -667,7 +667,7 @@ Walk the rule evaluation logic from the outside in:
 1. **Is the rule enabled?**
    ```sh
    curl -sk -H "Authorization: Bearer $TOKEN" \
-     https://<terrapod>/api/terrapod/v1/autodiscovery-rules \
+     https://<terrapod>/api/v1/autodiscovery-rules \
      | jq '.data[] | {name: .attributes.name, enabled: .attributes.enabled, repo: .attributes."repo-url"}'
    ```
 
@@ -727,7 +727,7 @@ After fixing the rule:
 
 ## Reverting (or recovering from) a bad bulk-update
 
-**Symptom**: a fleet `POST /api/terrapod/v1/workspaces/actions/bulk-update` applied an unintended change across many workspaces.
+**Symptom**: a fleet `POST /api/v1/workspaces/actions/bulk-update` applied an unintended change across many workspaces.
 
 ### Diagnosis
 
@@ -755,7 +755,7 @@ After fixing the rule:
 
 1. Confirm the consumer is in agent mode — local-mode CLI runs use the user's token and a 403 there means the user lacks `plan` on the producer (label-RBAC), not the allowlist.
 2. Identify the producer workspace from the consumer's `terraform_remote_state` config (`workspaces.name`).
-3. List the producer's current consumers: `GET /api/terrapod/v1/workspaces/ws-PRODUCER/remote-state-consumers?filter[remote-state-consumer][type]=outbound`. If the consumer isn't there, that's the cause.
+3. List the producer's current consumers: `GET /api/v1/workspaces/ws-PRODUCER/remote-state-consumers?filter[remote-state-consumer][type]=outbound`. If the consumer isn't there, that's the cause.
 
 ### Resolution
 
@@ -763,7 +763,7 @@ Have the **producer's admin** authorize the consumer — via the Terrapod provid
 
 ### Verification
 
-- `GET /api/terrapod/v1/workspaces/ws-PRODUCER/remote-state-consumers?filter[remote-state-consumer][type]=outbound` lists the consumer
+- `GET /api/v1/workspaces/ws-PRODUCER/remote-state-consumers?filter[remote-state-consumer][type]=outbound` lists the consumer
 - The consumer's next agent-mode plan proceeds past the `data "terraform_remote_state"` data source and resolves the outputs
 
 ### Producer deleted or archived
@@ -781,21 +781,21 @@ If the producer workspace was deleted, the grant rows cascade-deleted automatica
 ### Diagnosis
 
 1. Open a blocked run's Policy Checks panel — it names the failing policy set and the specific `deny` messages.
-2. Identify the set: `GET /api/terrapod/v1/policy-sets` — look for `enforcement-level: mandatory` and a broad scope (`global-scope: true` or wide allow-labels).
+2. Identify the set: `GET /api/v1/policy-sets` — look for `enforcement-level: mandatory` and a broad scope (`global-scope: true` or wide allow-labels).
 3. Decide whether the policy is correct-but-the-infra-is-wrong (fix the Terraform), or the policy itself is wrong/too broad.
 
 ### Resolution
 
 Pick the least-disruptive option that fits:
 
-- **Policy is wrong** — fix the Rego (`PATCH /api/terrapod/v1/policies/{id}`) or delete the offending policy. The next reconciler tick re-evaluates held runs automatically.
-- **Set is too broadly scoped** — narrow its allow-labels, or set `enabled: false` on the set (`PATCH /api/terrapod/v1/policy-sets/{id}`) to stop it being evaluated. Disabling does not delete it.
+- **Policy is wrong** — fix the Rego (`PATCH /api/v1/policies/{id}`) or delete the offending policy. The next reconciler tick re-evaluates held runs automatically.
+- **Set is too broadly scoped** — narrow its allow-labels, or set `enabled: false` on the set (`PATCH /api/v1/policy-sets/{id}`) to stop it being evaluated. Disabling does not delete it.
 - **Demote to advisory** — `PATCH` the set's `enforcement-level` to `advisory`; runs then proceed with a warning instead of a block. Note the enforcement level is *snapshotted per evaluation*, so already-recorded blocks are cleared by re-evaluation, not by the edit alone — held runs re-evaluate on the next tick.
 - **Single urgent run** — a workspace admin can override one run from its Policy Checks panel ("Override & Continue").
 
 ### Verification
 
-- `GET /api/terrapod/v1/runs/{id}/policy-evaluations` for a previously-blocked run shows the mandatory set now `passed` (or `overridden`).
+- `GET /api/v1/runs/{id}/policy-evaluations` for a previously-blocked run shows the mandatory set now `passed` (or `overridden`).
 - Held runs advance out of `planning` within one reconciler tick (~10s).
 
 ---
@@ -840,7 +840,7 @@ calls per hour = (3600 / poll_interval_seconds) x 2 x distinct repo+branch pairs
 ### Diagnosis
 
 1. **Read what Terrapod recorded** — `vcs-last-error` / `vcs-last-error-at` on the workspace (`GET /api/v2/workspaces/{id}`), or the `vcs_error` health condition in the UI.
-2. **Read the connection's saturation verdict** on **Admin → VCS connections** (or `GET /api/terrapod/v1/vcs-connections`). It reports the consumption rate as a share of the budget and when it runs out. **Read the verdict, not `rate-limit-remaining`**: the budget refills on a fixed window, so the remaining count reads healthy right after a reset however fast it is being spent — that is precisely how a connection consuming twice its budget looks fine for part of every hour. (If you want the provider's own view: GitHub `GET /rate_limit`, GitLab the `RateLimit-Remaining` header. Terrapod's budget reading comes from the same headers, observed on calls it was making anyway.)
+2. **Read the connection's saturation verdict** on **Admin → VCS connections** (or `GET /api/v1/vcs-connections`). It reports the consumption rate as a share of the budget and when it runs out. **Read the verdict, not `rate-limit-remaining`**: the budget refills on a fixed window, so the remaining count reads healthy right after a reset however fast it is being spent — that is precisely how a connection consuming twice its budget looks fine for part of every hour. (If you want the provider's own view: GitHub `GET /rate_limit`, GitLab the `RateLimit-Remaining` header. Terrapod's budget reading comes from the same headers, observed on calls it was making anyway.)
 
    **What is counted.** The consumption rate and the consumer breakdown are Terrapod's own tally of the calls it makes, so they work even where the server reports no budget at all — a self-managed GitLab with rate limiting off still shows you how hard it is being polled. Every REST call Terrapod makes to either provider is counted — poll-cycle lookups, PR/MR reads, repository archive downloads, and the comment and merge writes. Sparse `git` fetches are the exception, and deliberately so: they go over the git transport, which the providers meter separately from the REST allowance the verdict is about. Where the provider reports no budget you get the rate and **no verdict** — there is nothing to classify it against, and a verdict there would be invented.
 3. **Expand the breakdown to find the cause.** The top consumers name the repositories, workspaces and modules actually spending, so you can go and fix the one that is misconfigured rather than lengthening every interval. One workspace among hundreds is invisible in a total, which is why this exists.
@@ -1018,7 +1018,7 @@ When a person leaves or must be cut off from Terrapod, their **personal (`intera
 1. **List the user's bound tokens** (admin):
    ```bash
    curl -s -H "Authorization: Bearer $ADMIN_TOKEN" \
-     "https://<terrapod>/api/terrapod/v1/admin/authentication-tokens" \
+     "https://<terrapod>/api/v1/admin/authentication-tokens" \
    | jq '.data[] | select(.attributes."bound-to"=="<email>") | {id, kind, "expires-at": .attributes."expires-at"}'
    ```
 2. **Check their last login** — bound tokens are auto-rejected after the idle window:
@@ -1037,7 +1037,7 @@ When a person leaves or must be cut off from Terrapod, their **personal (`intera
 ```bash
 curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
-  "https://<terrapod>/api/terrapod/v1/admin/authentication-tokens/actions/revoke-all" \
+  "https://<terrapod>/api/v1/admin/authentication-tokens/actions/revoke-all" \
   -d '{"email": "<email>"}'
 # -> {"data": {"email": "<email>", "revoked": N}}
 ```
@@ -1046,7 +1046,7 @@ This deletes all bound tokens immediately and busts the user's cached role resol
 
 ```bash
 curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" \
-  "https://<terrapod>/api/terrapod/v1/authentication-tokens/<token-id>/actions/rotate"
+  "https://<terrapod>/api/v1/authentication-tokens/<token-id>/actions/rotate"
 ```
 
 ### Verification
@@ -1060,7 +1060,7 @@ curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" \
 
 ## Service Catalog — instance lifecycle incidents
 
-The catalog provisions **and** destroys real infrastructure on behalf of self-service users, so its failure modes touch live infra. A catalog instance is an ordinary agent-mode workspace stamped with `catalog_item_id`; manage it through the catalog surface (`/api/terrapod/v1/catalog-instances/...`), not the raw workspace API (which 409s on catalog workspaces).
+The catalog provisions **and** destroys real infrastructure on behalf of self-service users, so its failure modes touch live infra. A catalog instance is an ordinary agent-mode workspace stamped with `catalog_item_id`; manage it through the catalog surface (`/api/v1/catalog-instances/...`), not the raw workspace API (which 409s on catalog workspaces).
 
 ### Destroy failed and exhausted its retries (instance stuck `errored`)
 
@@ -1071,7 +1071,7 @@ The catalog provisions **and** destroys real infrastructure on behalf of self-se
    kubectl logs deploy/terrapod-api --tail=3000 | grep -E "Lifecycle destroy retry|catalog-lifecycle"
    ```
    `Lifecycle destroy retry queued attempt=N/M` shows the attempts; `skipped: no uploaded configuration version` means the config version is gone (see below).
-2. **Decide if it's transient.** Most destroy failures are ordering/eventual-consistency (an ENI still attached, a bucket not empty, an LB draining). If so, re-trigger the destroy once the dependency clears: `POST /api/terrapod/v1/catalog-instances/{id}/destroy` with `auto-apply: true` (catalog `use`). On success the workspace archives.
+2. **Decide if it's transient.** Most destroy failures are ordering/eventual-consistency (an ENI still attached, a bucket not empty, an LB draining). If so, re-trigger the destroy once the dependency clears: `POST /api/v1/catalog-instances/{id}/destroy` with `auto-apply: true` (catalog `use`). On success the workspace archives.
 3. **If it's a real blocker** (a `prevent_destroy` lifecycle, a protected resource, a permission gap), fix the underlying cause, then re-destroy. The retry budget resets each "episode" (consecutive errored lifecycle destroys), so a fresh destroy after a successful intervening run starts clean.
 4. **No config version** (`get_latest_uploaded_cv` is None): the retry intentionally skips (a config-less destroy can't target anything). Re-publish/reconfigure the instance (`PATCH .../catalog-instances/{id}`) to regenerate a config version, then destroy.
 
@@ -1081,7 +1081,7 @@ The catalog provisions **and** destroys real infrastructure on behalf of self-se
 
 **Symptom**: someone used the discouraged **Orphan** escape hatch (`DELETE /catalog-instances/{id}?orphan=true`, or the admin-only UI action) — the catalog record is gone but the cloud resources are still running, now unmanaged.
 
-1. **Confirm via audit.** The orphan is audit-logged (`Catalog instance orphaned: workspace deleted, infrastructure abandoned`, with workspace name + actor) and captured by the audit middleware (`/api/terrapod/v1/admin/audit-log?filter[action]=DELETE`).
+1. **Confirm via audit.** The orphan is audit-logged (`Catalog instance orphaned: workspace deleted, infrastructure abandoned`, with workspace name + actor) and captured by the audit middleware (`/api/v1/admin/audit-log?filter[action]=DELETE`).
 2. **Reclaim the infra.** There is no Terrapod state for it anymore — adopt it back under IaC: re-provision the same catalog item (or a plain workspace) and `terraform import` the live resources, or tear it down directly in the cloud console. Prefer `destroy` over `orphan` next time so this doesn't recur.
 
 ### Stuck provision (run never progresses)
@@ -1112,14 +1112,14 @@ This is **by design** — sealed mode guarantees no upstream fetch ever happens,
 
 - Confirm sealed mode is on: `registry.cache_only` in the API ConfigMap (`helm get values` / the rendered `config.yaml`).
 - Identify the missing artifact from the 404 detail (tool+version+os/arch, or provider `host/ns/type@version`).
-- List what IS cached: `GET /api/terrapod/v1/admin/binary-cache` and `GET /api/terrapod/v1/admin/provider-cache` (admin), or the `/admin/binary-cache` UI.
+- List what IS cached: `GET /api/v1/admin/binary-cache` and `GET /api/v1/admin/provider-cache` (admin), or the `/admin/binary-cache` UI.
 - Remember partial versions resolve **only against the cache** when sealed — a workspace pinned to `terraform_version = "1.12"` needs a cached `1.12.x`; if none is cached the resolve itself 404s.
 - The **platform Terrapod provider** (`<host>/default/terrapod`) and the **SHA256SUMS** used for runner re-verification are subject to the same gate — they must be cached too (SHA256SUMS are persisted when the binary is warmed under `verify=signature`).
 
 ### Resolution
 
 1. **Preferred — warm the missing artifacts, keep sealed.** Sealed mode refuses to fetch, so warm from a path that *can* reach the source:
-   - Temporarily set `registry.cache_only: false` (optionally with the upstream overrides pointing at an internal mirror), bulk-warm the needed entries via `POST /api/terrapod/v1/admin/binary-cache/warm-bulk` or the **Warm cache** UI panel, confirm they appear in the cache lists, then set `cache_only: true` again. See [Cache pre-population](registry.md#cache-pre-population).
+   - Temporarily set `registry.cache_only: false` (optionally with the upstream overrides pointing at an internal mirror), bulk-warm the needed entries via `POST /api/v1/admin/binary-cache/warm-bulk` or the **Warm cache** UI panel, confirm they appear in the cache lists, then set `cache_only: true` again. See [Cache pre-population](registry.md#cache-pre-population).
    - Or warm a staging Terrapod that shares/replicates the same object store + DB, so the sealed instance sees the artifacts.
 2. **Escape hatch — unseal.** Set `registry.cache_only: false` to re-allow upstream fall-through (only viable if the instance actually has egress to upstream or an internal mirror).
 
@@ -1263,7 +1263,7 @@ Fires from `TerrapodHighBinaryCacheMissRate` (info): the terraform/tofu binary c
 
 ### Resolution
 
-- **Pre-warm** the versions your fleet pins via `POST /api/terrapod/v1/admin/binary-cache/warm-bulk` or the **Warm cache** UI panel ([Cache pre-population](registry.md#cache-pre-population)).
+- **Pre-warm** the versions your fleet pins via `POST /api/v1/admin/binary-cache/warm-bulk` or the **Warm cache** UI panel ([Cache pre-population](registry.md#cache-pre-population)).
 - **Raise** `api.config.artifact_retention.binary_cache_retention_days` if eviction is the cause.
 - **Consolidate** on fewer tool versions where practical.
 
@@ -1319,7 +1319,7 @@ App-layer encryption at rest (#553) failed its decryptability check. **This is p
 
 ### Symptoms
 
-- `GET /api/terrapod/v1/admin/encryption` returns `decryptable: false` (or `canary_ok: false`).
+- `GET /api/v1/admin/encryption` returns `decryptable: false` (or `canary_ok: false`).
 - `python -m terrapod.cli.encryption_doctor` exits non-zero with `unwrap failed` / `canary did not decrypt`.
 - The API **fails to start** with `encryption canary mismatch — refusing to start` (it fails closed rather than serving/writing unreadable data).
 
@@ -1346,7 +1346,7 @@ Map the failure to the provider:
 ### Verification
 
 - `python -m terrapod.cli.encryption_doctor` exits 0: "all encrypted data is decryptable".
-- `GET /api/terrapod/v1/admin/encryption` shows `decryptable: true`.
+- `GET /api/v1/admin/encryption` shows `decryptable: true`.
 
 ### Prevention
 
@@ -1383,12 +1383,12 @@ The log line gives you both numbers. Decide which explanation fits:
 
 1. **The database is not the one that owns this bucket.** Check that
    `DATABASE_URL` points where you think, and that a `GET
-   /api/terrapod/v1/workspaces` returns roughly the workspace count you expect.
+   /api/v1/workspaces` returns roughly the workspace count you expect.
    A recent restore, failover, or migration is the usual cause.
 2. **The database is right and a genuinely large deletion happened.** Confirm
    from the audit log that the deletions were deliberate:
    ```
-   GET /api/terrapod/v1/audit?action=delete&resource_type=workspace
+   GET /api/v1/audit?action=delete&resource_type=workspace
    ```
 3. **The bucket is shared.** Two deployments pointed at one object store makes
    each other's workspaces look orphaned to both. They must not share a prefix.
@@ -1403,7 +1403,7 @@ The log line gives you both numbers. Decide which explanation fits:
   back into range — either as more workspaces are created, or as you delete the
   orphaned state deliberately. To reclaim it now, list the orphan prefixes and
   remove them with your object-store tooling, having first confirmed each id is
-  absent from `GET /api/terrapod/v1/deleted-workspaces` **and** that you do not
+  absent from `GET /api/v1/deleted-workspaces` **and** that you do not
   want it restorable. That deletion is irreversible.
 
 Do not "fix" this by disabling retention: `deleted_workspace_retention_days: 0`
@@ -1443,7 +1443,7 @@ left to recover.
 
    UI: **Admin → Deleted workspaces**. API:
    ```
-   GET /api/terrapod/v1/deleted-workspaces
+   GET /api/v1/deleted-workspaces
    ```
    Check `restorable-until` before anything else. `state-versions-available` is
    counted from storage at request time, so it tells you what is actually
@@ -1451,7 +1451,7 @@ left to recover.
 
 2. Restore it.
    ```
-   POST /api/terrapod/v1/deleted-workspaces/{workspace_id}/restore
+   POST /api/v1/deleted-workspaces/{workspace_id}/restore
    ```
    Optionally `{"data":{"attributes":{"name":"..."}}}` to name it.
 
@@ -1622,7 +1622,7 @@ images you can see:
 
 ```sh
 curl -H "Authorization: Basic $(printf 'x:%s' "$TOKEN" | base64)" \
-  https://terrapod.example.com/api/terrapod/v1/oci/repositories/team/app/untagged
+  https://terrapod.example.com/api/v1/oci/repositories/team/app/untagged
 ```
 
 Every re-push of `:latest` leaves the previous manifest untagged and still holding
@@ -1636,10 +1636,10 @@ after a year of CI they are often most of the repository.
 curl -X DELETE -H "$AUTH" https://…/v2/team/app/manifests/sha256:…
 
 # Or the whole repository
-curl -X DELETE -H "$AUTH" https://…/api/terrapod/v1/oci/repositories/team/app
+curl -X DELETE -H "$AUTH" https://…/api/v1/oci/repositories/team/app
 
 # Reclaim now rather than waiting for the hourly cycle
-curl -X POST -H "$AUTH" https://…/api/terrapod/v1/oci/collect
+curl -X POST -H "$AUTH" https://…/api/v1/oci/collect
 ```
 
 **Space does not come back at the moment you delete.** Deleting un-references
@@ -1665,8 +1665,8 @@ answerable by eye.
 **Establish the blast radius.** Two views, and you usually want both:
 
 ```
-GET /api/terrapod/v1/roles/{name}/preview     # what this role reaches
-GET /api/terrapod/v1/workspaces/{id}/access   # who can reach this workspace
+GET /api/v1/roles/{name}/preview     # what this role reaches
+GET /api/v1/workspaces/{id}/access   # who can reach this workspace
 ```
 
 The first reports counts across **every** axis — workspaces, agent pools,
@@ -1679,7 +1679,7 @@ resource on every axis, including ones created later, so its reach will not
 correspond to any label you can see:
 
 ```
-GET /api/terrapod/v1/roles          # then look for "allow-all": true
+GET /api/v1/roles          # then look for "allow-all": true
 ```
 
 It is the fastest explanation for "this role reaches things nothing in its rules
@@ -1806,7 +1806,7 @@ the same as `workspace-count`, which counts only explicitly-assigned rows:
 
 ```sh
 curl -sH "Authorization: Bearer $TOKEN" \
-  "$TERRAPOD/api/terrapod/v1/varsets/<varset-id>/relationships/workspaces"
+  "$TERRAPOD/api/v1/varsets/<varset-id>/relationships/workspaces"
 ```
 
 Each entry reports how it arrived — `explicit`, `global`, or `rule`. From the
@@ -1815,7 +1815,7 @@ other side, a workspace lists every set that applies to it, which answers
 
 ```sh
 curl -sH "Authorization: Bearer $TOKEN" \
-  "$TERRAPOD/api/terrapod/v1/workspaces/<workspace-id>/varsets"
+  "$TERRAPOD/api/v1/workspaces/<workspace-id>/varsets"
 ```
 
 In the UI these are the Workspaces tab of the variable set, and the Variables

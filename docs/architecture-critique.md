@@ -114,7 +114,7 @@ discipline applies.
   the risk level, and findings grouped by category, with a *Regenerate* action.
   It updates live over the workspace SSE channel
   (`architecture_critique_{pending,ready}`).
-- **API** — `GET /api/terrapod/v1/workspaces/{id}/architecture-critique` and
+- **API** — `GET /api/v1/workspaces/{id}/architecture-critique` and
   `POST .../regenerate`. See [api-reference.md](api-reference.md#ai-architecture-critique-terrapod-extension).
 - **go-terrapod** — `GetArchitectureCritique` / `RegenerateArchitectureCritique`.
 - **MCP** — the `terrapod_workspace_architecture_critique` tool lets an AI agent

@@ -159,9 +159,40 @@ class TestFilesystemRoutes:
         """
         test_app = FastAPI()
         set_filesystem_store(fs_store)
+        # Mirrors production (#1529): canonical, the deprecated alias, and the
+        # TFE surface. The canonical mount matters here because presigned URLs
+        # are generated with that prefix — mounting only the alias would 404 on
+        # a URL the store had just handed out.
+        test_app.include_router(router, prefix="/api/v1")
         test_app.include_router(router, prefix="/api/terrapod/v1")
         test_app.include_router(router, prefix="/api/v2")
         return test_app
+
+    async def test_presigned_urls_stay_on_the_prefix_runners_recognise(
+        self, fs_store: FilesystemStore
+    ) -> None:
+        """Deliberately NOT the canonical prefix (#1529).
+
+        These URLs are consumed by a runner Job, which matches them against a
+        literal compiled into the image it was built with (runner/download.py) to
+        decide whether to rewrite the host to the in-cluster API. Runners are
+        expected to lag the API, so one in the field has the old matcher —
+        emitting the canonical prefix makes it follow the deployment's PUBLIC
+        hostname from inside the cluster.
+
+        The failure is silent: an unmatched URL is followed verbatim rather than
+        raising, so the first symptom is a run that cannot fetch its config.
+
+        Flips with LAGGING_CONSUMER_PREFIX once the support window closes;
+        tests/runner/test_download.py asserts the matcher accepts whatever this
+        emits, so the two cannot drift apart meanwhile.
+        """
+        from terrapod.api.prefixes import LAGGING_CONSUMER_PREFIX
+
+        put_url = await fs_store.presigned_put_url("prefix-check.txt")
+        get_url = await fs_store.presigned_get_url("prefix-check.txt")
+        assert f"{LAGGING_CONSUMER_PREFIX}/storage/put/" in put_url.url, put_url.url
+        assert f"{LAGGING_CONSUMER_PREFIX}/storage/get/" in get_url.url, get_url.url
 
     async def test_put_and_get_via_routes(self, app: FastAPI, fs_store: FilesystemStore) -> None:
         async with httpx.AsyncClient(

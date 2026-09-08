@@ -86,24 +86,23 @@ const nextConfig = {
   // SSE endpoints are all Terrapod-native at /api/terrapod/v1. The
   // transitional /api/v2 aliases (#269) were removed in v0.24.0 (#278).
   async headers() {
-    const headers = [
-      {
-        source: '/api/terrapod/v1/listeners/:path*',
-        headers: [{ key: 'Content-Encoding', value: 'none' }],
-      },
-      {
-        source: '/api/terrapod/v1/workspaces/:path*/runs/events',
-        headers: [{ key: 'Content-Encoding', value: 'none' }],
-      },
-      {
-        source: '/api/terrapod/v1/workspace-events',
-        headers: [{ key: 'Content-Encoding', value: 'none' }],
-      },
-      {
-        source: '/api/terrapod/v1/agent-pools/:path*/events',
-        headers: [{ key: 'Content-Encoding', value: 'none' }],
-      },
-    ]
+      // Derived rather than listed per prefix, so a new SSE endpoint cannot be
+      // added to one and forgotten on the other. An SSE path missing this header
+      // does not error — it simply never delivers events, which is invisible
+      // until someone notices the UI has stopped updating.
+      const SSE_PATHS = [
+        '/listeners/:path*',
+        '/workspaces/:path*/runs/events',
+        '/workspace-events',
+        '/agent-pools/:path*/events',
+      ]
+      const API_PREFIXES = ['/api/v1', '/api/terrapod/v1']
+      const headers = API_PREFIXES.flatMap((prefix) =>
+        SSE_PATHS.map((path) => ({
+          source: `${prefix}${path}`,
+          headers: [{ key: 'Content-Encoding', value: 'none' }],
+        })),
+      )
     if (hstsValue) {
       headers.push({
         source: '/:path*',

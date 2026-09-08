@@ -16,7 +16,7 @@ already understands:
 
 Call ``mark_deprecated(response, ...)`` from any handler being wound down. It only
 *adds* headers — it never changes the response body or status — so a lagging client
-keeps working through the whole deprecation window (>= 2 minor releases) and simply
+keeps working through the whole deprecation window (>= 2 minor releases AND >= 8 weeks) and simply
 sees the warning. Removal happens only in a MAJOR, after the ``Sunset`` date has
 passed and the window is complete.
 """
@@ -54,7 +54,8 @@ def mark_deprecated(
         response: the FastAPI ``Response`` the handler will return (inject it as a
             handler parameter — FastAPI populates it).
         sunset: the date on/after which the endpoint may stop working. MUST be at
-            least two minor releases out per the deprecation policy.
+            least two minor releases AND eight weeks out, whichever is later,
+            per the deprecation policy.
         link: URL explaining the deprecation and the replacement; defaults to the
             project deprecations page.
     """

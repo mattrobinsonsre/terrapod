@@ -65,6 +65,7 @@
   "api.config.auth.api_token_max_ttl_hours",
   "api.config.auth.bound_token_idle_days",
   "api.config.auth.callback_base_url",
+  "api.config.auth.legacy_callback_url",
   "api.config.auth.local_enabled",
   "api.config.auth.login_token_ttl_hours",
   "api.config.auth.require_external_sso_for_roles",

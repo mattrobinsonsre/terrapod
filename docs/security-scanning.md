@@ -88,7 +88,7 @@ resource "terrapod_workspace" "prod" {
 When an `enforced` scan holds a run, a **workspace admin** can override it:
 
 ```
-POST /api/terrapod/v1/runs/{run_id}/actions/override-security-scan
+POST /api/v1/runs/{run_id}/actions/override-security-scan
 ```
 
 The run is re-driven immediately (it doesn't wait for the next reconciler tick).
@@ -102,7 +102,7 @@ the caller's RBAC.
 
 ## Reading results
 
-- **API:** `GET /api/terrapod/v1/runs/{run_id}/security-scan` returns the result
+- **API:** `GET /api/v1/runs/{run_id}/security-scan` returns the result
   (or `null` when the workspace has scanning off or the run wasn't scanned).
 - **go-terrapod:** `Client.GetRunSecurityScan(ctx, runID)` /
   `Client.OverrideRunSecurityScan(ctx, runID)`.

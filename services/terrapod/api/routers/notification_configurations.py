@@ -75,7 +75,7 @@ def _nc_json(nc: NotificationConfiguration) -> dict:
             },
         },
         "links": {
-            "self": f"/api/terrapod/v1/notification-configurations/{nc_id}",
+            "self": f"/api/v1/notification-configurations/{nc_id}",
         },
     }
 

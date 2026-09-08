@@ -46,13 +46,13 @@ All endpoints use JSON:API format.
 ### Create Trigger
 
 ```
-POST /api/terrapod/v1/workspaces/{workspace_id}/run-triggers
+POST /api/v1/workspaces/{workspace_id}/run-triggers
 ```
 
 Requires `admin` permission on the destination workspace.
 
 ```bash
-curl -X POST https://terrapod.local/api/terrapod/v1/workspaces/ws-dest-id/run-triggers \
+curl -X POST https://terrapod.local/api/v1/workspaces/ws-dest-id/run-triggers \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
   -d '{
@@ -96,7 +96,7 @@ Response (201):
 ### List Triggers
 
 ```
-GET /api/terrapod/v1/workspaces/{workspace_id}/run-triggers?filter[run-trigger][type]={inbound|outbound}
+GET /api/v1/workspaces/{workspace_id}/run-triggers?filter[run-trigger][type]={inbound|outbound}
 ```
 
 Requires `read` permission. The `filter[run-trigger][type]` parameter is required:
@@ -107,7 +107,7 @@ Requires `read` permission. The `filter[run-trigger][type]` parameter is require
 ### Show Trigger
 
 ```
-GET /api/terrapod/v1/run-triggers/{run_trigger_id}
+GET /api/v1/run-triggers/{run_trigger_id}
 ```
 
 Requires `read` permission on the destination workspace.
@@ -115,7 +115,7 @@ Requires `read` permission on the destination workspace.
 ### Delete Trigger
 
 ```
-DELETE /api/terrapod/v1/run-triggers/{run_trigger_id}
+DELETE /api/v1/run-triggers/{run_trigger_id}
 ```
 
 Requires `admin` permission on the destination workspace. Returns 204 No Content.

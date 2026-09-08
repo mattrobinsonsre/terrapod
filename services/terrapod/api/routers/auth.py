@@ -30,6 +30,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from terrapod.api.prefixes import NATIVE_LEGACY_PREFIX, NATIVE_PREFIX
 from terrapod.auth.auth_state import (
     AuthCode,
     AuthState,
@@ -55,6 +56,30 @@ from terrapod.config import settings
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services.sso_service import process_login
+
+
+def _sso_url_prefix() -> str:
+    """Prefix for URLs we hand to the identity provider.
+
+    Not the same question as "which prefix do we serve". These URLs are
+    *registered* with the IdP, which validates what we send against its own
+    allow-list — so the deprecated alias serving `/api/terrapod/v1/auth/callback`
+    does not make it safe to start asserting `/api/v1/auth/callback`. The
+    request is refused at the IdP, before it ever reaches us.
+
+    Hence an explicit operator switch rather than a silent follow-on from the
+    routing change: register the new URLs with your IdP, then flip
+    `auth.legacy_callback_url` to false. See docs/upgrading-to-2.0.md.
+    """
+    # An explicitly-set `terrapod_prefix` still wins. It used to build these
+    # URLs directly, so an operator may have set it to move the callback; going
+    # silent on it would be the exact failure the config-channel contract exists
+    # to prevent — a knob that looks set and does nothing.
+    configured = settings.terrapod_prefix
+    if configured and configured not in (NATIVE_PREFIX, NATIVE_LEGACY_PREFIX):
+        return configured
+    return NATIVE_LEGACY_PREFIX if settings.auth.legacy_callback_url else NATIVE_PREFIX
+
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 logger = get_logger(__name__)
@@ -175,7 +200,7 @@ async def authorize(
     idp_state = generate_state()
 
     # Build callback URL for the IDP
-    callback_url = f"{settings.auth.callback_base_url}{settings.terrapod_prefix}/auth/callback"
+    callback_url = f"{settings.auth.callback_base_url}{_sso_url_prefix()}/auth/callback"
 
     # Build authorization request to the provider
     auth_request = await connector.build_authorization_request(
@@ -362,7 +387,7 @@ async def cli_sso_redirect(
         )
 
     idp_state = generate_state()
-    callback_url = f"{settings.auth.callback_base_url}{settings.terrapod_prefix}/auth/callback"
+    callback_url = f"{settings.auth.callback_base_url}{_sso_url_prefix()}/auth/callback"
 
     auth_request = await connector.build_authorization_request(
         callback_url=callback_url,
@@ -412,7 +437,7 @@ async def callback(
             detail=f"Provider {auth_state.provider_name} no longer configured",
         )
 
-    callback_url = f"{settings.auth.callback_base_url}{settings.terrapod_prefix}/auth/callback"
+    callback_url = f"{settings.auth.callback_base_url}{_sso_url_prefix()}/auth/callback"
 
     try:
         identity = await connector.handle_callback(
@@ -498,7 +523,7 @@ async def saml_acs(
             detail=f"Provider {auth_state.provider_name} no longer configured",
         )
 
-    acs_url = f"{settings.auth.callback_base_url}{settings.terrapod_prefix}/auth/saml/acs"
+    acs_url = f"{settings.auth.callback_base_url}{_sso_url_prefix()}/auth/saml/acs"
 
     try:
         identity = await connector.handle_callback(

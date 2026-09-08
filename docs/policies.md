@@ -95,7 +95,7 @@ no JSON-wait timing, and no concurrent-eval CPU load on the API:
 
 1. The runner finishes the plan and runs `tofu show -json tfplan`.
 2. The runner fetches the applicable policy bundle from the API
-   (`GET /api/terrapod/v1/runs/{id}/policy-bundle`). The API answers
+   (`GET /api/v1/runs/{id}/policy-bundle`). The API answers
    that one question — which sets apply to this workspace — using the
    label-scope model above. An empty bundle means no policy sets in
    scope; the runner skips evaluation entirely.
@@ -103,7 +103,7 @@ no JSON-wait timing, and no concurrent-eval CPU load on the API:
    against the local plan JSON, building a per-policy result with
    violation messages.
 4. The runner POSTs all results to
-   `POST /api/terrapod/v1/runs/{id}/policy-results`, **before** posting
+   `POST /api/v1/runs/{id}/policy-results`, **before** posting
    plan-result. One `policy_evaluation` row is recorded per set.
 5. The runner posts plan-result. The API's post-plan gate is now just
    a database query — "is there a mandatory unoverridden failure for

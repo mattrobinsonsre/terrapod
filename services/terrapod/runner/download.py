@@ -39,11 +39,27 @@ class DownloadResult:
     body_preview: str = ""
 
 
+#: The prefixes the filesystem storage backend may emit presigned URLs on.
+#:
+#: Duplicated literals rather than an import: the runner image ships only
+#: `terrapod/runner/` (see docker/Dockerfile.runner), so `api/prefixes.py` is not
+#: importable here. `tests/runner/test_download.py` binds these to what
+#: `FilesystemStore` actually produces, so the two cannot drift apart silently.
+#:
+#: Both are listed because a runner is expected to lag the API by minors: it must
+#: recognise a URL from an API older or newer than itself.
+_STORAGE_PREFIXES = ("/api/terrapod/v1/storage/", "/api/v1/storage/")
+
+
 def _is_filesystem_storage_path(path: str) -> bool:
     """True for the storage backend's filesystem path pattern. Cloud
     storage URLs (*.amazonaws.com et al.) don't match — they're left
-    untouched so the runner follows them directly."""
-    return path.startswith("/api/terrapod/v1/storage/")
+    untouched so the runner follows them directly.
+
+    A path that fails this check is followed VERBATIM, so a missed match is not
+    an error — it is the runner quietly trying to reach the deployment's public
+    hostname from inside the execution cluster."""
+    return path.startswith(_STORAGE_PREFIXES)
 
 
 def _maybe_rewrite_redirect(
@@ -58,8 +74,8 @@ def _maybe_rewrite_redirect(
     to the deployment's public hostname (terrapod.local in dev), which
     may not resolve from inside the cluster — rewrite to TP_API_URL.
 
-    Signature for filesystem: redirect path starts with
-    /api/terrapod/v1/storage/.
+    Signature for filesystem: redirect path starts with one of
+    _STORAGE_PREFIXES.
     """
     if not api_url:
         return location

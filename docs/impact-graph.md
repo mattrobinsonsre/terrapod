@@ -69,7 +69,7 @@ keeps it fast and works uniformly through the BFF in every storage backend.
 The tab is backed by a Terrapod-native endpoint:
 
 ```
-GET /api/terrapod/v1/runs/{run_id}/impact-graph
+GET /api/v1/runs/{run_id}/impact-graph
 ```
 
 See [api-reference.md → Impact Graph](api-reference.md#impact-graph) for the

@@ -194,7 +194,7 @@ api:
       auth_requests_per_minute: 10
 ```
 
-Auth endpoints (`/api/terrapod/v1/auth/*`, `/oauth/*`) have a separate, lower limit to protect against credential stuffing. Health, readiness, and metrics endpoints are exempt.
+Auth endpoints (`/api/v1/auth/*`, `/oauth/*`) have a separate, lower limit to protect against credential stuffing. Health, readiness, and metrics endpoints are exempt.
 
 Rate limiting uses Redis for distributed counting across replicas and fails open if Redis is unavailable.
 
@@ -217,7 +217,7 @@ Query the audit log API and forward events to your SIEM:
 
 ```bash
 curl -H "Authorization: Bearer $TOKEN" \
-  "https://terrapod.example.com/api/terrapod/v1/admin/audit-log?page[size]=100"
+  "https://terrapod.example.com/api/v1/admin/audit-log?page[size]=100"
 ```
 
 Integrate with your log aggregator (Elasticsearch, Splunk, Datadog) by polling this endpoint periodically.

@@ -33,6 +33,7 @@ import time
 
 import httpx
 
+from terrapod.api.prefixes import PEER_PREFIX
 from terrapod.config import settings
 from terrapod.logging_config import get_logger
 from terrapod.redis.client import get_redis_client
@@ -105,7 +106,7 @@ async def _observe() -> str | None:
     try:
         async with httpx.AsyncClient(timeout=_PROBE_TIMEOUT_SECONDS) as client:
             resp = await client.get(
-                f"{url}/api/terrapod/v1/ha/whoami",
+                f"{url}{PEER_PREFIX}/ha/whoami",
                 headers={"Cache-Control": "no-store"},
             )
             resp.raise_for_status()

@@ -47,4 +47,52 @@ test.describe('SSE live update', () => {
     // event re-fetching the list. No reload.
     await expect(page.locator(`text=${name}`)).toBeVisible({ timeout: 20_000 });
   });
+  test('SSE headers survive the BFF on both API prefixes', async ({ page }) => {
+    // #1529 serves the native API at /api/v1 as well as the deprecated
+    // /api/terrapod/v1. The BFF sets `Content-Encoding: none` per path
+    // (next.config.js); without it the stream is buffered and delivers nothing
+    // while still answering 200 — invisible until someone notices the UI has
+    // stopped updating.
+    //
+    // Uses fetch() from the page rather than Playwright's request context: an
+    // APIRequestContext call awaits the whole body, and an SSE response never
+    // ends, so it would hang to timeout instead of asserting anything. fetch()
+    // resolves as soon as headers arrive, and the request is aborted immediately
+    // so no stream is left open.
+    //
+    // The `Content-Encoding: none` header itself is asserted in
+    // web/tests/sse-headers.test.ts, not here: a browser strips that header
+    // after decoding, so checking it through `fetch` would be unreliable. This
+    // spec covers the half the unit test cannot — that the path is actually
+    // routed and streams through the real proxy chain on both prefixes.
+    const token = getStoredToken('admin.json');
+    await page.goto('/workspaces');
+
+    for (const prefix of ['/api/v1', '/api/terrapod/v1']) {
+      const result = await page.evaluate(async ([p, bearer]) => {
+        const controller = new AbortController();
+        try {
+          // SSE endpoints authenticate with a Bearer token, not a cookie —
+          // EventSource cannot set headers, so the app uses fetch + a manual
+          // reader (web/src/lib/use-sse.ts) and so must this.
+          const res = await fetch(`${p}/workspace-events`, {
+            headers: { Accept: 'text/event-stream', Authorization: `Bearer ${bearer}` },
+            signal: controller.signal,
+          });
+          return {
+            status: res.status,
+            contentType: res.headers.get('content-type'),
+          };
+        } finally {
+          controller.abort();
+        }
+      }, [prefix, token] as const);
+
+      expect(result.status, `${prefix}/workspace-events should be served`).toBe(200);
+      expect(
+        result.contentType,
+        `${prefix}/workspace-events should be an event stream`,
+      ).toContain('text/event-stream');
+    }
+  });
 });

@@ -18,6 +18,8 @@ from prometheus_client import (
     generate_latest,
 )
 
+from terrapod.api.prefixes import canonical_path
+
 # ---------------------------------------------------------------------------
 # HTTP request metrics
 # ---------------------------------------------------------------------------
@@ -444,11 +446,19 @@ RETENTION_ORPHAN_REAP_BLOCKED = Gauge(
 
 
 def _get_path_template(request: Request) -> str:
-    """Extract the FastAPI route pattern to avoid high-cardinality raw paths."""
+    """Extract the FastAPI route pattern to avoid high-cardinality raw paths.
+
+    Normalised onto the canonical native prefix (#1529). The same endpoint is
+    served at `/api/v1` and the deprecated `/api/terrapod/v1`, so without this
+    every native route reports as two separate series: existing dashboards and
+    alerts keep matching only one of them and silently under-report by however
+    much traffic uses the other, and label cardinality doubles. Neither shows up
+    as an error — the graph just goes quiet.
+    """
     route = request.scope.get("route")
     if route and hasattr(route, "path"):
-        return route.path
-    return request.url.path
+        return canonical_path(route.path)
+    return canonical_path(request.url.path)
 
 
 async def metrics_middleware(request: Request, call_next):  # type: ignore[no-untyped-def]

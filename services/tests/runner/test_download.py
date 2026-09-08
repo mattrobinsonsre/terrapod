@@ -231,3 +231,48 @@ class TestRedirectRewrite:
     def test_empty_api_url_passes_through(self) -> None:
         loc = "https://terrapod.local/api/terrapod/v1/storage/abc"
         assert dl._maybe_rewrite_redirect(loc, "https://x", "") == loc
+
+
+class TestTheEmitterAndTheMatcherAgree:
+    """The runner must recognise the URL the store actually produces (#1529).
+
+    This is the binding that was missing when the presigned-URL prefix moved:
+    `FilesystemStore` emitted one prefix while `download.py` matched another, and
+    every test on both sides passed because each restated its own literal. So
+    this imports BOTH and compares them — the only shape that cannot drift.
+
+    The consequence of a mismatch is not an error. `_maybe_rewrite_redirect`
+    follows an unmatched URL verbatim, so the runner silently tries the
+    deployment's public hostname from inside the execution cluster.
+    """
+
+    async def test_the_matcher_accepts_what_the_store_emits(self, tmp_path) -> None:
+        from urllib.parse import urlparse
+
+        from terrapod.runner.download import _is_filesystem_storage_path
+        from terrapod.storage.filesystem import FilesystemStore
+
+        store = FilesystemStore(
+            root_dir=str(tmp_path), base_url="https://terrapod.example.com", hmac_secret="s"
+        )
+        for url in (
+            (await store.presigned_get_url("state/ws-1")).url,
+            (await store.presigned_put_url("state/ws-1")).url,
+        ):
+            path = urlparse(url).path
+            assert _is_filesystem_storage_path(path), (
+                f"the store emits {path!r} but the runner does not recognise it — "
+                "the redirect host would not be rewritten and the runner would try "
+                "the deployment's public hostname from inside the cluster"
+            )
+
+    def test_both_prefixes_are_recognised(self) -> None:
+        """A runner outlives the API version that built its URLs, in both
+        directions, so it has to accept either prefix."""
+        from terrapod.runner.download import _is_filesystem_storage_path
+
+        assert _is_filesystem_storage_path("/api/v1/storage/get/k")
+        assert _is_filesystem_storage_path("/api/terrapod/v1/storage/get/k")
+        # Cloud-backend redirects must still be left alone.
+        assert not _is_filesystem_storage_path("/some-bucket/state/ws-1")
+        assert not _is_filesystem_storage_path("/api/v1/runs/run-1/artifacts/config")
