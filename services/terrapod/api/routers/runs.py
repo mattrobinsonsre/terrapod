@@ -2105,6 +2105,12 @@ async def next_run(
     await db.commit()
 
     run_data = _run_json(run)
+    # Which engine this run belongs to (#1407 phase 1). Sent on the runner wire
+    # only, not on the public run serializer: nothing outside the listener has a
+    # use for it yet, and adding it here keeps the attribute contract still.
+    # A listener too old to read it is unaffected — it ignores unknown keys, and
+    # its absence resolves to terraform on the far side.
+    run_data["data"]["attributes"]["engine"] = run.engine
     run_data["data"]["attributes"]["env-vars"] = env_vars
     run_data["data"]["attributes"]["terraform-vars"] = terraform_vars
     run_data["data"]["attributes"]["execution-hooks"] = execution_hooks

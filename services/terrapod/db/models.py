@@ -560,6 +560,14 @@ class Workspace(Base):
     runs: Mapped[list["Run"]] = relationship(
         back_populates="workspace", cascade="all, delete-orphan"
     )
+    #: Which IaC engine this belongs to (#1407). NOT `execution_backend`, which
+    #: picks the *binary* within the Terraform family (tofu vs terraform); this
+    #: names the family itself. A server default means every pre-existing row is
+    #: correct with no backfill, and an older replica mid-rollout never reads a
+    #: value it cannot interpret.
+    engine: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="terraform", server_default="terraform"
+    )
 
     __table_args__ = (sa.UniqueConstraint("name", name="uq_workspaces"),)
 
@@ -1746,6 +1754,14 @@ class ConfigurationVersion(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=now_utc, nullable=False
     )
+    #: Which IaC engine this belongs to (#1407). NOT `execution_backend`, which
+    #: picks the *binary* within the Terraform family (tofu vs terraform); this
+    #: names the family itself. A server default means every pre-existing row is
+    #: correct with no backfill, and an older replica mid-rollout never reads a
+    #: value it cannot interpret.
+    engine: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="terraform", server_default="terraform"
+    )
 
     __table_args__ = (Index("ix_configuration_versions_workspace_id", "workspace_id"),)
 
@@ -1928,6 +1944,14 @@ class Run(Base):
     )
 
     workspace: Mapped[Workspace] = relationship(back_populates="runs")
+    #: Which IaC engine this belongs to (#1407). NOT `execution_backend`, which
+    #: picks the *binary* within the Terraform family (tofu vs terraform); this
+    #: names the family itself. A server default means every pre-existing row is
+    #: correct with no backfill, and an older replica mid-rollout never reads a
+    #: value it cannot interpret.
+    engine: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="terraform", server_default="terraform"
+    )
 
     __table_args__ = (
         Index("ix_runs_workspace_id", "workspace_id"),

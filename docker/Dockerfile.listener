@@ -80,10 +80,15 @@ RUN rm -rf /usr/local/lib/python3.14/site-packages/pip \
            /usr/local/lib/python3.14/site-packages/pip-*.dist-info \
            /usr/local/bin/pip /usr/local/bin/pip3 /usr/local/bin/pip3.14
 
-# Only the modules the listener imports: config, logging_config, http_retry, runner/
+# Only the modules the listener imports: config, logging_config, http_retry,
+# engines/ and runner/
 COPY services/terrapod/config.py ./terrapod/config.py
 COPY services/terrapod/logging_config.py ./terrapod/logging_config.py
 COPY services/terrapod/http_retry.py ./terrapod/http_retry.py
+# The engine strategy (#1407 phase 1). The listener builds its Job spec through
+# it, so the image must carry it. Deliberately dependency-light — it pulls in
+# no DB or SQLAlchemy — which is what makes it safe to ship here.
+COPY services/terrapod/engines/ ./terrapod/engines/
 COPY services/terrapod/runner/ ./terrapod/runner/
 
 # Create non-root user and data directories

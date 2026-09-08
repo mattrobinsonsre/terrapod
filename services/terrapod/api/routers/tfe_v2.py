@@ -65,6 +65,7 @@ from terrapod.db.models import (
     generate_uuid7,
 )
 from terrapod.db.session import get_db
+from terrapod.engines import TERRAFORM
 from terrapod.logging_config import get_logger
 from terrapod.services import agent_pool_service as _agent_pool_service
 from terrapod.services import (
@@ -97,6 +98,26 @@ X_TFE_VERSION = (
     "v202301-1"  # TFE monthly format; pre-202302 disables structured run output (unsupported)
 )
 TERRAPOD_VERSION = os.environ.get("TERRAPOD_VERSION", "dev")
+
+
+def _engine_filter(model):
+    """Restrict a query to Terraform rows (#1407 §2, #1487).
+
+    The TFE-compatible surface never learns about other engines. This has to hold
+    even while Terraform is the only one that exists, because the moment a second
+    appears a missing filter hands a Pulumi workspace to a `terraform` CLI that
+    cannot parse it — and that is a silent wrong answer, not an error.
+
+    Kept separate from `_primary_run_filter` deliberately: that one is about
+    auxiliary runs and folding two unrelated meanings into one helper is how a
+    filter later gets removed for the wrong reason.
+
+    Name-uniqueness guards must NOT use this. `workspaces.name` is unique
+    globally, across engines, so a guard that filtered by engine would decide a
+    name was free and then hit an IntegrityError — turning a clean 422 into a 500.
+    The introspection test knows about that exception by name.
+    """
+    return model.engine == TERRAFORM
 
 
 def _primary_run_filter():
@@ -987,7 +1008,7 @@ async def _latest_runs_for(ws_ids: list, db: AsyncSession) -> dict:
     if ws_ids:
         latest_run_q = (
             select(Run)
-            .where(Run.workspace_id.in_(ws_ids), _primary_run_filter())
+            .where(Run.workspace_id.in_(ws_ids), _primary_run_filter(), _engine_filter(Run))
             .order_by(Run.workspace_id, Run.created_at.desc())
             .distinct(Run.workspace_id)
         )
@@ -1005,7 +1026,7 @@ async def list_workspaces(
 ) -> JSONResponse:
     """List all workspaces (filtered by user permissions)."""
 
-    query = select(Workspace).order_by(Workspace.name)
+    query = select(Workspace).where(_engine_filter(Workspace)).order_by(Workspace.name)
 
     # Support ?search[name]= filter
     search_name = request.query_params.get("search[name]", "") if request else ""
@@ -1092,7 +1113,9 @@ async def show_workspace(
 ) -> JSONResponse:
     """Show a workspace by organization and name."""
 
-    result = await db.execute(select(Workspace).where(Workspace.name == workspace_name))
+    result = await db.execute(
+        select(Workspace).where(Workspace.name == workspace_name, _engine_filter(Workspace))
+    )
     ws = result.scalar_one_or_none()
     if ws is None:
         raise HTTPException(status_code=404, detail="Workspace not found")
@@ -1113,7 +1136,7 @@ async def show_workspace(
     # Load latest primary run for this workspace (excludes module-test / speculative PR runs)
     run_result = await db.execute(
         select(Run)
-        .where(Run.workspace_id == ws.id, _primary_run_filter())
+        .where(Run.workspace_id == ws.id, _primary_run_filter(), _engine_filter(Run))
         .order_by(Run.created_at.desc())
         .limit(1)
     )
@@ -1363,7 +1386,9 @@ async def _get_workspace_by_id(workspace_id: str, db: AsyncSession) -> Workspace
         _uuid.UUID(ws_uuid)
     except ValueError:
         raise HTTPException(status_code=404, detail="Workspace not found") from None
-    result = await db.execute(select(Workspace).where(Workspace.id == ws_uuid))
+    result = await db.execute(
+        select(Workspace).where(Workspace.id == ws_uuid, _engine_filter(Workspace))
+    )
     ws = result.scalar_one_or_none()
     if ws is None:
         raise HTTPException(status_code=404, detail="Workspace not found")
@@ -1488,7 +1513,7 @@ async def show_workspace_by_id(
     # Load latest primary run for this workspace (excludes module-test / speculative PR runs)
     run_result = await db.execute(
         select(Run)
-        .where(Run.workspace_id == ws.id, _primary_run_filter())
+        .where(Run.workspace_id == ws.id, _primary_run_filter(), _engine_filter(Run))
         .order_by(Run.created_at.desc())
         .limit(1)
     )
