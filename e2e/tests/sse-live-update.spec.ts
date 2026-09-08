@@ -65,14 +65,18 @@ test.describe('SSE live update', () => {
     // after decoding, so checking it through `fetch` would be unreliable. This
     // spec covers the half the unit test cannot — that the path is actually
     // routed and streams through the real proxy chain on both prefixes.
+    const token = getStoredToken('admin.json');
     await page.goto('/workspaces');
 
     for (const prefix of ['/api/v1', '/api/terrapod/v1']) {
-      const result = await page.evaluate(async (p) => {
+      const result = await page.evaluate(async ([p, bearer]) => {
         const controller = new AbortController();
         try {
+          // SSE endpoints authenticate with a Bearer token, not a cookie —
+          // EventSource cannot set headers, so the app uses fetch + a manual
+          // reader (web/src/lib/use-sse.ts) and so must this.
           const res = await fetch(`${p}/workspace-events`, {
-            headers: { Accept: 'text/event-stream' },
+            headers: { Accept: 'text/event-stream', Authorization: `Bearer ${bearer}` },
             signal: controller.signal,
           });
           return {
@@ -82,7 +86,7 @@ test.describe('SSE live update', () => {
         } finally {
           controller.abort();
         }
-      }, prefix);
+      }, [prefix, token] as const);
 
       expect(result.status, `${prefix}/workspace-events should be served`).toBe(200);
       expect(
