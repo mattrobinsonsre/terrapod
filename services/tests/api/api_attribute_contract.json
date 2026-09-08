@@ -213,13 +213,6 @@
   "encryption.rotate_data_encryption_key": [
     "rotated_to_version"
   ],
-  "engines._engine_json": [
-    "default-execution-backend",
-    "name",
-    "phases",
-    "status-phases",
-    "vocabulary"
-  ],
   "execution_hooks._hook_json": [
     "created-at",
     "description",

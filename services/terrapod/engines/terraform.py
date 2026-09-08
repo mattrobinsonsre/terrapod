@@ -86,19 +86,6 @@ class TerraformStrategy:
     #: what they say.
     vocabulary = "terraform"
 
-    #: Which of this engine's phases each internal run status belongs to.
-    #:
-    #: The status names are the platform's and never change — a run is `planning`
-    #: whatever engine it belongs to. This says what `planning` *is* for this
-    #: engine, so an API consumer can report "previewing" for a Pulumi run
-    #: without having to know by convention that `planning` means preview there.
-    status_phases = {
-        "planning": "plan",
-        "planned": "plan",
-        "applying": "apply",
-        "applied": "apply",
-    }
-
     def container_env(
         self, options: TerraformRunOptions, runner_config: RunnerConfig
     ) -> list[dict[str, Any]]:

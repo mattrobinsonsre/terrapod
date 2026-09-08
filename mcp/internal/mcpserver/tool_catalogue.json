@@ -32,14 +32,6 @@
     }
   },
   {
-    "name": "terrapod_engine_list",
-    "read_only": true,
-    "input_schema": {
-      "additionalProperties": false,
-      "type": "object"
-    }
-  },
-  {
     "name": "terrapod_ha_status",
     "read_only": true,
     "input_schema": {

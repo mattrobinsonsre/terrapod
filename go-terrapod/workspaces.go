@@ -28,8 +28,11 @@ type Workspace struct {
 
 	// Engine is the execution engine family this workspace belongs to —
 	// "terraform" today. Distinct from ExecutionBackend, which picks the
-	// binary *within* the Terraform engine (tofu or terraform). See
-	// Client.ListEngines for what a run's status means for a given engine.
+	// binary *within* the Terraform engine (tofu or terraform).
+	//
+	// The TFE-compatible /api/v2 surface is filtered to Terraform, so a
+	// workspace on another engine is never visible to a terraform/tofu
+	// client and its responses are free to use that engine's own vocabulary.
 	Engine    string `json:"engine,omitempty"`
 	AutoApply bool   `json:"auto-apply"`
 	// AutoApplyMode is the conditional auto-apply setting (#1274):
