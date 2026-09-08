@@ -32,6 +32,7 @@ from dataclasses import dataclass, field
 import httpx
 import structlog
 
+from terrapod.api.prefixes import PEER_PREFIX
 from terrapod.config import settings
 from terrapod.http_retry import arequest_with_retry
 from terrapod.services import blob_classes
@@ -154,7 +155,7 @@ async def _copy_one(
 
     async with client.stream(
         "GET",
-        f"{base}/api/terrapod/v1/ha/replication/blobs/{cls_name}/content",
+        f"{base}{PEER_PREFIX}/ha/replication/blobs/{cls_name}/content",
         params={"key": key},
         headers={"Authorization": f"Bearer {token}"},
         timeout=_CONTENT_TIMEOUT,
@@ -216,7 +217,7 @@ async def _sync_class(
         resp = await arequest_with_retry(
             client,
             "GET",
-            f"{base}/api/terrapod/v1/ha/replication/blobs/{cls.name}",
+            f"{base}{PEER_PREFIX}/ha/replication/blobs/{cls.name}",
             idempotent=True,
             params={"after": cursor, "limit": _PAGE},
             headers={"Authorization": f"Bearer {token}"},

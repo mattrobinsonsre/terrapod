@@ -97,7 +97,7 @@ Resolution order mirrors the other axes: platform admin → platform audit (read
 
 ### Granting catalog access
 
-`catalog_permission` is set on a **custom role**, exactly like `workspace_permission` / `pool_permission` / `registry_permission` — via the admin **Roles** page, the API (`catalog-permission` attribute on `POST/PATCH /api/terrapod/v1/roles`), the `terrapod_role` provider resource (`catalog_permission`), or `go-terrapod`'s `CatalogPermission` field. Assign the role to a user/group, scope it with the role's allow/deny labels, and that user can browse (`read`) or self-serve (`use`) the matching catalog items. Until a role grants it, only platform `admin` (and an item's owner) can reach the catalog.
+`catalog_permission` is set on a **custom role**, exactly like `workspace_permission` / `pool_permission` / `registry_permission` — via the admin **Roles** page, the API (`catalog-permission` attribute on `POST/PATCH /api/v1/roles`), the `terrapod_role` provider resource (`catalog_permission`), or `go-terrapod`'s `CatalogPermission` field. Assign the role to a user/group, scope it with the role's allow/deny labels, and that user can browse (`read`) or self-serve (`use`) the matching catalog items. Until a role grants it, only platform `admin` (and an item's owner) can reach the catalog.
 
 ## Catalog-managed workspace guardrails
 
@@ -209,10 +209,10 @@ provision ──▶ reconfigure ──▶ ... ──▶ destroy ──▶ archiv
 
 A catalog instance is something you **provisioned**, so its teardown **reclaims the infrastructure** — unlike a plain workspace, where deleting the workspace record deliberately leaves the real infrastructure running for an operator to manage elsewhere.
 
-- **Destroy (recommended).** `POST /api/terrapod/v1/catalog-instances/{id}/destroy` runs `terraform destroy` and archives the workspace **on a successful apply**. If the destroy fails, the instance stays — the record is never removed while infrastructure might still exist. This is the catalog teardown.
+- **Destroy (recommended).** `POST /api/v1/catalog-instances/{id}/destroy` runs `terraform destroy` and archives the workspace **on a successful apply**. If the destroy fails, the instance stays — the record is never removed while infrastructure might still exist. This is the catalog teardown.
   - **Auto-retry.** `terraform destroy` is commonly transiently flaky (dependency-release ordering, eventual consistency, draining LBs / releasing ENIs / emptying buckets), so a failed catalog destroy is automatically retried a bounded number of times (`runners.lifecycleDestroyRetries`, default **2** → 3 attempts, with `runners.lifecycleDestroyRetryBackoffSeconds` between tries). Re-running is safe — destroy is incremental — and the workspace is still archived only on a *successful* destroy, so retries never lose data. After the cap the instance stays `errored` for an operator. Set the retry count to `0` to disable.
-- **The plain workspace delete is blocked.** `DELETE /api/terrapod/v1/workspaces/{id}` returns **409** for a catalog-managed workspace — deleting it there would silently orphan the provisioned infrastructure. There is no way to orphan a catalog instance by accident.
-- **Orphan (explicit, discouraged escape hatch).** `DELETE /api/terrapod/v1/catalog-instances/{id}?orphan=true` deletes the workspace record and **abandons** the infrastructure (it keeps running, untracked). It requires catalog **`admin`** on the item and the explicit `orphan=true` flag, and is audit-logged. Use it only when the infrastructure is already gone or is owned elsewhere. In the UI it's an admin-only **Orphan…** action on the instance row that opens a confirmation requiring you to type the instance name — deliberately more friction than Destroy. The Terraform provider's `terrapod_catalog_instance` always **destroys** (reclaims) on `terraform destroy`; there is no orphan-on-destroy mode.
+- **The plain workspace delete is blocked.** `DELETE /api/v1/workspaces/{id}` returns **409** for a catalog-managed workspace — deleting it there would silently orphan the provisioned infrastructure. There is no way to orphan a catalog instance by accident.
+- **Orphan (explicit, discouraged escape hatch).** `DELETE /api/v1/catalog-instances/{id}?orphan=true` deletes the workspace record and **abandons** the infrastructure (it keeps running, untracked). It requires catalog **`admin`** on the item and the explicit `orphan=true` flag, and is audit-logged. Use it only when the infrastructure is already gone or is owned elsewhere. In the UI it's an admin-only **Orphan…** action on the instance row that opens a confirmation requiring you to type the instance name — deliberately more friction than Destroy. The Terraform provider's `terrapod_catalog_instance` always **destroys** (reclaims) on `terraform destroy`; there is no orphan-on-destroy mode.
 
 **Deleting a catalog item is blocked (`409`) while it still has instances.** Destroy or migrate the instances first; only then can the item be removed. This prevents orphaning live infrastructure whose definition you've thrown away.
 
@@ -249,32 +249,32 @@ This means the platform team manages the *definitions* in one repo, and either l
 
 ## API
 
-All endpoints are under `/api/terrapod/v1`, JSON:API, and gated on `catalog.enabled` (they return `404` when the catalog is off). See [Service Catalog](api-reference.md#service-catalog) in the API reference for the full request/response shapes. In brief:
+All endpoints are under `/api/v1`, JSON:API, and gated on `catalog.enabled` (they return `404` when the catalog is off). See [Service Catalog](api-reference.md#service-catalog) in the API reference for the full request/response shapes. In brief:
 
 ```
 # Provider templates (admin write; admin/audit read)
-GET    /api/terrapod/v1/provider-templates
-POST   /api/terrapod/v1/provider-templates
-GET    /api/terrapod/v1/provider-templates/{id}
-PATCH  /api/terrapod/v1/provider-templates/{id}
-DELETE /api/terrapod/v1/provider-templates/{id}
+GET    /api/v1/provider-templates
+POST   /api/v1/provider-templates
+GET    /api/v1/provider-templates/{id}
+PATCH  /api/v1/provider-templates/{id}
+DELETE /api/v1/provider-templates/{id}
 
 # Catalog items (admin write; list/show require catalog read, filtered per item)
-GET    /api/terrapod/v1/catalog-items
-POST   /api/terrapod/v1/catalog-items
-GET    /api/terrapod/v1/catalog-items/{id}
-PATCH  /api/terrapod/v1/catalog-items/{id}
-DELETE /api/terrapod/v1/catalog-items/{id}          # 409 while instances exist
-GET    /api/terrapod/v1/catalog-items/{id}/form      # resolved provision form
-GET    /api/terrapod/v1/catalog-items/{id}/instances
-POST   /api/terrapod/v1/catalog-items/{id}/provision # catalog use + pool write
+GET    /api/v1/catalog-items
+POST   /api/v1/catalog-items
+GET    /api/v1/catalog-items/{id}
+PATCH  /api/v1/catalog-items/{id}
+DELETE /api/v1/catalog-items/{id}          # 409 while instances exist
+GET    /api/v1/catalog-items/{id}/form      # resolved provision form
+GET    /api/v1/catalog-items/{id}/instances
+POST   /api/v1/catalog-items/{id}/provision # catalog use + pool write
 
 # Catalog instances (the workspace id is the instance id)
-GET    /api/terrapod/v1/catalog-instances/{wsId}
-PATCH  /api/terrapod/v1/catalog-instances/{wsId}          # reconfigure (catalog use)
-POST   /api/terrapod/v1/catalog-instances/{wsId}/destroy  # destroy (catalog use)
-POST   /api/terrapod/v1/catalog-instances/{wsId}/confirm  # apply a planned run (catalog use)
-POST   /api/terrapod/v1/catalog-instances/{wsId}/discard  # discard a planned run (catalog use)
+GET    /api/v1/catalog-instances/{wsId}
+PATCH  /api/v1/catalog-instances/{wsId}          # reconfigure (catalog use)
+POST   /api/v1/catalog-instances/{wsId}/destroy  # destroy (catalog use)
+POST   /api/v1/catalog-instances/{wsId}/confirm  # apply a planned run (catalog use)
+POST   /api/v1/catalog-instances/{wsId}/discard  # discard a planned run (catalog use)
 ```
 
 Runs created by the catalog carry distinct sources: **`catalog`** for provision and reconfigure runs, and **`catalog-lifecycle`** for the destroy→archive run.

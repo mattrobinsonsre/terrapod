@@ -102,7 +102,7 @@ def _template_json(t: ProviderTemplate) -> dict:
             "created-at": _rfc3339(t.created_at),
             "updated-at": _rfc3339(t.updated_at),
         },
-        "links": {"self": f"/api/terrapod/v1/provider-templates/{t.id}"},
+        "links": {"self": f"/api/v1/provider-templates/{t.id}"},
     }
 
 
@@ -132,7 +132,7 @@ def _item_json(item: CatalogItem) -> dict:
             "created-at": _rfc3339(item.created_at),
             "updated-at": _rfc3339(item.updated_at),
         },
-        "links": {"self": f"/api/terrapod/v1/catalog-items/{item.id}"},
+        "links": {"self": f"/api/v1/catalog-items/{item.id}"},
     }
 
 
@@ -177,7 +177,7 @@ def _instance_json(ws: Workspace) -> dict:
             ),
             "workspace": {"data": {"id": f"ws-{ws.id}", "type": "workspaces"}},
         },
-        "links": {"self": f"/api/terrapod/v1/workspaces/ws-{ws.id}"},
+        "links": {"self": f"/api/v1/workspaces/ws-{ws.id}"},
     }
 
 
@@ -704,7 +704,7 @@ def _run_ref(run) -> dict:
         "id": f"run-{run.id}",
         "type": "runs",
         "attributes": {"status": run.status, "is-destroy": run.is_destroy},
-        "links": {"self": f"/api/terrapod/v1/runs/run-{run.id}"},
+        "links": {"self": f"/api/v1/runs/run-{run.id}"},
     }
 
 
@@ -761,7 +761,7 @@ async def show_catalog_instance(
                 "id": str(ws.id),
                 "type": "catalog-instances",
                 "attributes": attrs,
-                "links": {"self": f"/api/terrapod/v1/catalog-instances/{ws.id}"},
+                "links": {"self": f"/api/v1/catalog-instances/{ws.id}"},
             }
         }
     )

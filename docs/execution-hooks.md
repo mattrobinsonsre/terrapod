@@ -93,7 +93,7 @@ Hooks are managed three ways, all over the same API:
   }
   ```
 
-- **API** — `POST /api/terrapod/v1/execution-hooks` and
+- **API** — `POST /api/v1/execution-hooks` and
   `.../relationships/workspaces`. See the
   [API Reference](api-reference.md#execution-hooks).
 

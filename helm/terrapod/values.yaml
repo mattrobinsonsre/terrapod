@@ -207,8 +207,24 @@ api:
 
       # Public callback URL for SSO redirects. Required when SSO is enabled.
       # Must be the externally-reachable URL of your Terrapod instance.
-      # The IDP callback lands at {callback_base_url}/api/terrapod/v1/auth/callback.
+      # The IDP callback lands at {callback_base_url}{prefix}/auth/callback,
+      # where {prefix} is set by legacy_callback_url below.
       callback_base_url: ""
+
+      # Build the SSO callback and SAML ACS URLs on the deprecated
+      # /api/terrapod/v1 prefix rather than the canonical /api/v1 (#1529).
+      #
+      # Defaults to true, and deliberately so: these URLs are REGISTERED with
+      # your identity provider, which validates what Terrapod sends against its
+      # own allow-list. Terrapod serving both prefixes does NOT make the switch
+      # safe — an unregistered redirect_uri is refused at the IdP, before the
+      # request ever reaches us, and every SSO login fails.
+      #
+      # To move: add {callback_base_url}/api/v1/auth/callback (and
+      # /api/v1/auth/saml/acs for SAML) to your IdP's allowed URLs FIRST, then
+      # set this to false. The default flips in 2.0.0 — see
+      # docs/upgrading-to-2.0.md.
+      legacy_callback_url: true
 
       session_ttl_hours: 12
       api_token_max_ttl_hours: 8760  # 1 year; upper bound on any token. 0 = no limit
@@ -1759,9 +1775,18 @@ webhookIngress:
   # routing to the web Service (the BFF). Defaults to the full set of
   # inbound-from-public-internet endpoints Terrapod exposes; operators
   # who don't use external run tasks can trim that out.
+  # BOTH prefixes are listed because this is an ALLOW-LIST: a path absent
+  # here is not routed publicly, and that shows up as a 404 at the SENDER
+  # (a VCS provider, or an external run-task service) rather than anywhere
+  # in Terrapod's own logs. The /api/v1 entries are what run-task callbacks
+  # now use and where a re-registered webhook points; the /api/terrapod/v1
+  # entries keep already-registered webhooks working. Drop the legacy pair
+  # once every sender has been re-pointed — see docs/deprecations.md.
   paths:
-    - /api/terrapod/v1/vcs-events       # GitHub / GitLab webhook receivers
-    - /api/terrapod/v1/task-stage-results # external run-task callback receiver
+    - /api/v1/vcs-events                  # GitHub / GitLab webhook receivers
+    - /api/v1/task-stage-results          # external run-task callback receiver
+    - /api/terrapod/v1/vcs-events         # deprecated alias — already-registered webhooks
+    - /api/terrapod/v1/task-stage-results # deprecated alias
 
 # ── Internal Ingress (optional) ─────────────────────────────────────────────
 # Optional THIRD Ingress for the internal-only surface: listener pods

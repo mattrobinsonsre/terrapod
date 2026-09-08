@@ -128,7 +128,7 @@ Signature verification honors OpenPGP **key revocation** (pure Python, no `gpg`
 binary): a signing key that carries a valid self-revocation stops verifying
 everything and fails closed. For a **private-registry** provider key, an operator
 applies the owner's revocation certificate (the armored output of
-`gpg --gen-revoke`) via `POST /api/terrapod/v1/gpg-keys/{id}/revoke` — the key
+`gpg --gen-revoke`) via `POST /api/v1/gpg-keys/{id}/revoke` — the key
 stays registered but every signature it made now fails, including
 already-published artifacts. See the [API reference](api-reference.md#gpg-keys).
 

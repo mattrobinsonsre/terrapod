@@ -25,6 +25,7 @@ import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from terrapod.api.prefixes import PEER_PREFIX
 from terrapod.config import settings
 from terrapod.db.models import ReplicationCursor
 from terrapod.http_retry import arequest_with_retry
@@ -152,7 +153,7 @@ async def _apply_event(
     resp = await arequest_with_retry(
         client,
         "GET",
-        f"{base}/api/terrapod/v1/ha/replication/entities/{entity_class}/{entity_id}",
+        f"{base}{PEER_PREFIX}/ha/replication/entities/{entity_class}/{entity_id}",
         idempotent=True,
         headers={"Authorization": f"Bearer {token}"},
     )
@@ -247,7 +248,7 @@ async def backfill_class(
         resp = await arequest_with_retry(
             client,
             "GET",
-            f"{base}/api/terrapod/v1/ha/replication/backfill/{entity_class}",
+            f"{base}{PEER_PREFIX}/ha/replication/backfill/{entity_class}",
             idempotent=True,
             params={"after": after, "limit": 200},
             headers={"Authorization": f"Bearer {token}"},
@@ -401,7 +402,7 @@ async def sync_cycle() -> None:
             resp = await arequest_with_retry(
                 client,
                 "GET",
-                f"{base}/api/terrapod/v1/ha/replication/events",
+                f"{base}{PEER_PREFIX}/ha/replication/events",
                 idempotent=True,
                 params={"after": after, "limit": cfg.batch_size},
                 headers={"Authorization": f"Bearer {token}"},

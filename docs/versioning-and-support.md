@@ -66,14 +66,19 @@ so a breaking change cannot merge by accident.
 | Surface | What's frozen | CI gate |
 |---|---|---|
 | **`/api/v2/` CLI API** | The routes + response attributes the `terraform`/`tofu` `cloud` backend and `go-tfe` consume ([`tfe-cli-surface.md`](tfe-cli-surface.md)) | route + attribute snapshots |
-| **`/api/terrapod/v1/` runner + listener wire protocol** | Every route, the `runs/next` attributes, the SSE event names, and the runner artifact/body keys (`has_changes`, `policy-results`, `job-status`, …) | route + attribute snapshots |
+| **`/api/v1/` runner + listener wire protocol** | Every route, the `runs/next` attributes, the SSE event names, and the runner artifact/body keys (`has_changes`, `policy-results`, `job-status`, …) | route + attribute snapshots |
 | **go-terrapod SDK** | Exported methods + struct JSON tags | SDK ↔ server contract test |
 | **terraform-provider-terrapod** | Resource/data-source attribute schema | provider schema |
 | **Helm values** | `values.yaml` keys | schema (`additionalProperties: false`) + removal snapshot |
 | **Config keys** | Every `Settings` key (`config.yaml` / `TERRAPOD_*`) | config-key snapshot |
 | **Database schema** | Reversible + **expand/contract**-safe migrations | migration contract gate |
 
-The **rest** of the `/api/terrapod/v1/` management API (beyond the runner/listener
+> `/api/v1/` is canonical. The former prefix `/api/terrapod/v1/` is still served
+> for the deprecation window and carries `Deprecation` / `Sunset` headers; it is
+> covered by the same stability guarantees until its published sunset. See
+> [deprecations.md](deprecations.md).
+
+The **rest** of the `/api/v1/` management API (beyond the runner/listener
 wire subset) is Terrapod-native and evolves more freely, but still follows the
 deprecation window below for any removal.
 
@@ -113,8 +118,18 @@ anything:
 1. **Announce** — mark it deprecated in the release notes, list it in
    [`deprecations.md`](deprecations.md), and (for API responses) emit
    `Deprecation` / `Sunset` / `Link` HTTP headers; keep the old behaviour working.
-2. **Grace period** — leave the deprecated surface in place for at least **2
-   minor releases** (or until the next MAJOR, whichever is longer).
+2. **Grace period** — leave the deprecated surface in place until **both** of the
+   following have passed, whichever is later:
+
+   - **2 minor releases**, and
+   - **8 weeks** of wall-clock time from the release that announced it.
+
+   The wall-clock floor matters because minors can land quickly: two of them may
+   elapse in under three weeks, which is not long enough for an operator to
+   notice a deprecation, schedule the work, and redeploy. A deprecation window
+   measured only in releases shrinks whenever we ship faster, which is exactly
+   backwards.
+
 3. **Remove** — only in a MAJOR release, on or after the published `Sunset` date,
    with the removal listed in the migration notes.
 

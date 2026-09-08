@@ -159,7 +159,7 @@ the key is gone, encrypted rows can't be converted back.
 ## Key rotation
 
 - **DEK rotation** — mint a new active data-encryption key via
-  `POST /api/terrapod/v1/admin/encryption/rotate-dek` (admin). Prior DEK versions
+  `POST /api/v1/admin/encryption/rotate-dek` (admin). Prior DEK versions
   are **retained** so existing ciphertext stays decryptable; new writes use the
   new key. To re-encrypt old rows under the new key, run
   `encryption_migrate encrypt` afterwards. The new key is wrapped **and unwrapped
@@ -184,7 +184,7 @@ the key is gone, encrypted rows can't be converted back.
 Losing decryptability is data loss, so treat "can we still decrypt?" as a
 first-class health signal, the same way you'd treat a backup you've never tested.
 
-- **Status endpoint** (admin): `GET /api/terrapod/v1/admin/encryption` returns
+- **Status endpoint** (admin): `GET /api/v1/admin/encryption` returns
   `{enabled, provider, active_version, dek_versions, canary_ok, decryptable}`.
   `decryptable: false` means the platform is running but can't read the canary
   back — page on it.

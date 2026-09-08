@@ -42,7 +42,7 @@ by the same path.
 list:
 
 ```sh
-export PULUMI_PLUGIN_DOWNLOAD_URL_OVERRIDES=".*=https://x:$TERRAPOD_TOKEN@terrapod.example.com/api/terrapod/v1/package-cache/pulumi"
+export PULUMI_PLUGIN_DOWNLOAD_URL_OVERRIDES=".*=https://x:$TERRAPOD_TOKEN@terrapod.example.com/api/v1/package-cache/pulumi"
 ```
 
 ### Two traps, both captured
@@ -217,8 +217,8 @@ CLI's snapshot integrity check.
 
 **The surface does not have to sit at the root.** The CLI appends `/api/...` to
 whatever base URL it was given, path prefix included — verified by logging in to
-`http://host/api/terrapod/v1/pulumi` and watching it request
-`/api/terrapod/v1/pulumi/api/user`, then serving it successfully from there. This
+`http://host/api/v1/pulumi` and watching it request
+`/api/v1/pulumi/api/user`, then serving it successfully from there. This
 is the question #1484 had to settle for NuGet and it lands the opposite way:
 Terrapod can mount this natively rather than at the root, which it reserves for
 the two surfaces genuinely forced there (`/v2/` and `/.well-known/terraform.json`).

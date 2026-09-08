@@ -1,13 +1,13 @@
 """Tests for the Terrapod-native vs TFE-CLI API namespace split.
 
-Post-#278 there is no dual-mount: Terrapod-native routes live *only*
-at /api/terrapod/v1/. /api/v2/ is the permanent TFE V2 CLI-contract
-surface (terraform / tofu / tfci / go-tfe) and is unaffected.
+Terrapod-native routes are canonical at /api/v1/ and also served at the
+deprecated /api/terrapod/v1/ alias (#1529). /api/v2/ is the permanent TFE V2
+CLI-contract surface (terraform / tofu / tfci / go-tfe) and is unaffected — the
+#278 guard below still holds: native routes never reappear under /api/v2/.
 
-These assert: canonical Terrapod paths are in the schema and routable;
-the CLI surface stays at /api/v2/; the Terrapod surface never carries
-an /organizations/default/ segment; and the old /api/v2/ aliases of
-moved routes are well and truly gone (the #278 regression guard).
+The alias is deliberately absent from the OpenAPI schema. It is a real, routable
+path — the route contract pins it — but documenting both would double /api/docs
+and leave a reader unsure which to use.
 """
 
 from __future__ import annotations
@@ -19,13 +19,27 @@ class TestOpenAPIVisibility:
     def test_canonical_paths_in_schema(self) -> None:
         schema = app.openapi()
         for path in (
-            "/api/terrapod/v1/labels",
-            "/api/terrapod/v1/auth/providers",
-            "/api/terrapod/v1/listeners/{listener_id}/heartbeat",
-            "/api/terrapod/v1/gpg-keys",
-            "/api/terrapod/v1/admin/audit-log",
+            "/api/v1/labels",
+            "/api/v1/auth/providers",
+            "/api/v1/listeners/{listener_id}/heartbeat",
+            "/api/v1/gpg-keys",
+            "/api/v1/admin/audit-log",
         ):
             assert path in schema["paths"], f"canonical path {path} missing from OpenAPI"
+
+    def test_the_deprecated_alias_is_routable_but_undocumented(self) -> None:
+        """Served, but not shown in /api/docs (#1529).
+
+        Both halves matter. Absent from the schema, so a reader is not offered two
+        paths for one endpoint and left guessing which is current; present in
+        `app.routes`, because a lagging runner still calls it and dropping it
+        would be a removal.
+        """
+        schema = app.openapi()
+        routes = {getattr(r, "path", "") for r in app.routes}
+        for path in ("/api/terrapod/v1/labels", "/api/terrapod/v1/gpg-keys"):
+            assert path not in schema["paths"], f"{path} should not be documented"
+            assert path in routes, f"{path} must still be served"
 
     def test_cli_surface_stays_at_v2_in_schema(self) -> None:
         """CLI/tfci-consumed paths are at /api/v2/ in the schema, not under /api/terrapod/v1/."""
@@ -39,10 +53,13 @@ class TestOpenAPIVisibility:
             "/api/v2/varsets/{varset_id}",
         ):
             assert path in schema["paths"], f"CLI surface path {path} missing from OpenAPI"
+        # These are CLI-surface paths; they must not also appear on the native
+        # surface. Checked at the canonical prefix, since that is what the schema
+        # documents post-#1529.
         for path in (
-            "/api/terrapod/v1/runs",
-            "/api/terrapod/v1/varsets/{varset_id}",
-            "/api/terrapod/v1/registry/modules/{namespace}/{name}/{provider}/versions",
+            "/api/v1/runs",
+            "/api/v1/varsets/{varset_id}",
+            "/api/v1/registry/modules/{namespace}/{name}/{provider}/versions",
         ):
             assert path not in schema["paths"], f"{path} should not exist"
 

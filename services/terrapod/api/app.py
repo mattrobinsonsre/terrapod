@@ -15,6 +15,8 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 
+from terrapod.api.deprecation import mark_deprecated
+from terrapod.api.prefixes import NATIVE_ALIAS_SUNSET
 from terrapod.auth.connectors import init_connectors
 from terrapod.config import settings
 from terrapod.db.session import close_db, get_db_session, init_db
@@ -955,26 +957,54 @@ def create_application() -> FastAPI:
     # The legacy `/api/v2/` aliases for Terrapod-only routes (the
     # transitional dual-mount #269 introduced and the v0.23.x release
     # window kept) were removed in v0.24.0 — see #278. Terrapod-native
-    # endpoints are served *only* at `/api/terrapod/v1/`. `/api/v2/`
+    # endpoints are served at `/api/v1/` (canonical) and `/api/terrapod/v1/` (alias). `/api/v2/`
     # remains the permanent home for the TFE V2 CLI surface that
     # `terraform` / `tofu` / `tfci` consume (see docs/tfe-cli-surface.md);
     # that is not deprecated and is unaffected by #278.
-    TERRAPOD_PREFIX = "/api/terrapod/v1"
+    # `/api/v1` is the canonical Terrapod-native API (#1529). `/api/terrapod/v1`
+    # is a deprecated alias kept for the support window, because our own runner
+    # and listener images construct it directly and are expected to lag the API
+    # by minors — see docs/deprecations.md for the sunset date.
+    TERRAPOD_PREFIX = "/api/v1"
+    TERRAPOD_LEGACY_PREFIX = "/api/terrapod/v1"
 
     def include_terrapod(router) -> None:
-        """Mount a Terrapod-native router at the canonical
-        `/api/terrapod/v1/` prefix. Any prefix on the router itself
-        stacks (e.g. audit's own `prefix="/admin"` becomes
-        `/api/terrapod/v1/admin/...`).
+        """Mount a Terrapod-native router at `/api/v1/` and, for the support
+        window, at the deprecated `/api/terrapod/v1/` alias.
+
+        Any prefix on the router itself stacks (e.g. audit's own
+        `prefix="/admin"` becomes `/api/v1/admin/...`).
+
+        Both mounts come from this one helper so they cannot drift: a new
+        endpoint appears at both prefixes automatically, and there is no way to
+        add one to the canonical path and forget the alias. The alias is
+        excluded from the OpenAPI schema so `/api/docs` documents the canonical
+        path only — it is still a real route, and the route contract walks
+        `app.routes`, so both remain pinned.
         """
         app.include_router(router, prefix=TERRAPOD_PREFIX)
+        app.include_router(router, prefix=TERRAPOD_LEGACY_PREFIX, include_in_schema=False)
+
+    # The machine-readable half of the deprecation (#1529). docs/deprecations.md
+    # tells automated clients to watch for these headers, and until now nothing
+    # emitted them — the first real deprecation would have shipped with the
+    # signal its own policy promises. Applied by middleware rather than
+    # per-handler because the alias is 302 routes; marking them by hand would
+    # miss some, and the ones missed would be invisible.
+    @app.middleware("http")
+    async def _signal_legacy_prefix_deprecation(request, call_next):
+        response = await call_next(request)
+        path = request.scope.get("path", "")
+        if path == TERRAPOD_LEGACY_PREFIX or path.startswith(TERRAPOD_LEGACY_PREFIX + "/"):
+            mark_deprecated(response, sunset=NATIVE_ALIAS_SUNSET)
+        return response
 
     # Health endpoints (no prefix)
     app.include_router(health_router)
 
     # Filesystem storage routes (presigned URL handlers) — Terrapod-only
-    # dev backend. Canonical at /api/terrapod/v1; filesystem.py emits
-    # presigned URLs under that prefix.
+    # dev backend. filesystem.py emits presigned URLs under the canonical
+    # /api/v1 prefix; the deprecated alias serves them too.
     from terrapod.storage.filesystem_routes import router as fs_router
 
     include_terrapod(fs_router)
@@ -1143,7 +1173,7 @@ def create_application() -> FastAPI:
         router as agent_pools_router,
     )
 
-    app.include_router(agent_pools_router, prefix=TERRAPOD_PREFIX)
+    include_terrapod(agent_pools_router)
     include_terrapod(listener_protocol_router)
 
     # Read-only labels browser (cross-entity: workspaces, pools, modules, providers).
@@ -1188,7 +1218,7 @@ def create_application() -> FastAPI:
         router as vcs_connections_router,
     )
 
-    app.include_router(vcs_connections_router, prefix=TERRAPOD_PREFIX)
+    include_terrapod(vcs_connections_router)
 
     # Autodiscovery rules — Terrapod-native, introduced in v0.24 (#283).
     # No legacy alias: this surface didn't exist in v0.22, so /api/v2 has
@@ -1197,27 +1227,27 @@ def create_application() -> FastAPI:
         router as autodiscovery_rules_router,
     )
 
-    app.include_router(autodiscovery_rules_router, prefix=TERRAPOD_PREFIX)
+    include_terrapod(autodiscovery_rules_router)
 
     # Bulk workspace operations — Terrapod-native admin (#318): search +
     # all-or-nothing bulk-update of fields/run-tasks/notifications.
     from terrapod.api.routers.workspace_bulk import router as workspace_bulk_router
 
-    app.include_router(workspace_bulk_router, prefix=TERRAPOD_PREFIX)
+    include_terrapod(workspace_bulk_router)
 
     # Service catalog (#535): provider-template + catalog-item management +
     # provision flow. The router self-gates on settings.catalog.enabled (404
     # when disabled), so it is always mounted.
     from terrapod.api.routers.catalog import router as catalog_router
 
-    app.include_router(catalog_router, prefix=TERRAPOD_PREFIX)
+    include_terrapod(catalog_router)
 
     # AI onboarding (#824) — discover existing resources → copy-pasteable
     # resource + import blocks. Self-gates on settings.ai_onboarding.enabled
     # (404 when disabled), so it is always mounted.
     from terrapod.api.routers.onboarding import router as onboarding_router
 
-    app.include_router(onboarding_router, prefix=TERRAPOD_PREFIX)
+    include_terrapod(onboarding_router)
 
     # VCS webhook event receiver — Terrapod-specific.
     from terrapod.api.routers.vcs_events import router as vcs_events_router
@@ -1311,7 +1341,7 @@ def create_application() -> FastAPI:
         router as users_router,
     )
 
-    app.include_router(users_router, prefix=TERRAPOD_PREFIX)
+    include_terrapod(users_router)
 
     # Notification configuration endpoints — Terrapod-native management.
     from terrapod.api.routers.notification_configurations import (

@@ -162,7 +162,7 @@ Custom roles define access using allow/deny rules on labels and workspace names.
 ### Creating a Custom Role
 
 ```zsh
-curl -X POST https://terrapod.example.com/api/terrapod/v1/roles \
+curl -X POST https://terrapod.example.com/api/v1/roles \
   -H "Authorization: Bearer $TERRAPOD_TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
   -d '{
@@ -207,7 +207,7 @@ curl -X POST https://terrapod.example.com/api/terrapod/v1/roles \
 ### Listing Roles
 
 ```zsh
-curl https://terrapod.example.com/api/terrapod/v1/roles \
+curl https://terrapod.example.com/api/v1/roles \
   -H "Authorization: Bearer $TERRAPOD_TOKEN"
 ```
 
@@ -216,7 +216,7 @@ Returns both built-in and custom roles.
 ### Updating a Role
 
 ```zsh
-curl -X PATCH https://terrapod.example.com/api/terrapod/v1/roles/developer \
+curl -X PATCH https://terrapod.example.com/api/v1/roles/developer \
   -H "Authorization: Bearer $TERRAPOD_TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
   -d '{
@@ -233,7 +233,7 @@ curl -X PATCH https://terrapod.example.com/api/terrapod/v1/roles/developer \
 ### Deleting a Role
 
 ```zsh
-curl -X DELETE https://terrapod.example.com/api/terrapod/v1/roles/developer \
+curl -X DELETE https://terrapod.example.com/api/v1/roles/developer \
   -H "Authorization: Bearer $TERRAPOD_TOKEN"
 ```
 
@@ -280,8 +280,8 @@ rules is exactly where mistakes hide.
 Two endpoints answer the question directly:
 
 ```
-POST /api/terrapod/v1/roles/preview          # an UNSAVED role body
-GET  /api/terrapod/v1/roles/{name}/preview   # a saved role
+POST /api/v1/roles/preview          # an UNSAVED role body
+GET  /api/v1/roles/{name}/preview   # a saved role
 ```
 
 Both are read-only and carry the same `admin`/`audit` gate as viewing roles.
@@ -334,11 +334,11 @@ enforcement path would be worse than no view at all.
 ### The other direction: who can reach a resource
 
 ```
-GET /api/terrapod/v1/workspaces/{id}/access
-GET /api/terrapod/v1/agent-pools/{id}/access
-GET /api/terrapod/v1/registry-modules/{id}/access
-GET /api/terrapod/v1/registry-providers/{id}/access
-GET /api/terrapod/v1/catalog-items/{id}/access
+GET /api/v1/workspaces/{id}/access
+GET /api/v1/agent-pools/{id}/access
+GET /api/v1/registry-modules/{id}/access
+GET /api/v1/registry-providers/{id}/access
+GET /api/v1/catalog-items/{id}/access
 ```
 
 Looking at one resource rather than one role: *who can touch this?* Returns
@@ -375,7 +375,7 @@ Role assignments bind a user (identified by provider + email) to a role.
 ### Setting Roles for a User
 
 ```zsh
-curl -X PUT https://terrapod.example.com/api/terrapod/v1/role-assignments \
+curl -X PUT https://terrapod.example.com/api/v1/role-assignments \
   -H "Authorization: Bearer $TERRAPOD_TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
   -d '{
@@ -393,7 +393,7 @@ curl -X PUT https://terrapod.example.com/api/terrapod/v1/role-assignments \
 For platform roles (admin, audit):
 
 ```zsh
-curl -X PUT https://terrapod.example.com/api/terrapod/v1/role-assignments \
+curl -X PUT https://terrapod.example.com/api/v1/role-assignments \
   -H "Authorization: Bearer $TERRAPOD_TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
   -d '{
@@ -411,14 +411,14 @@ curl -X PUT https://terrapod.example.com/api/terrapod/v1/role-assignments \
 ### Listing All Assignments
 
 ```zsh
-curl https://terrapod.example.com/api/terrapod/v1/role-assignments \
+curl https://terrapod.example.com/api/v1/role-assignments \
   -H "Authorization: Bearer $TERRAPOD_TOKEN"
 ```
 
 ### Removing a Single Assignment
 
 ```zsh
-curl -X DELETE https://terrapod.example.com/api/terrapod/v1/role-assignments/local/alice@example.com/developer \
+curl -X DELETE https://terrapod.example.com/api/v1/role-assignments/local/alice@example.com/developer \
   -H "Authorization: Bearer $TERRAPOD_TOKEN"
 ```
 
@@ -524,7 +524,7 @@ The web UI displays this field as **"Labels (tags)"** to make the dual purpose e
 
 ### Labels Browser
 
-Labels are also queryable as a first-class navigation surface via the **Labels** page in the web UI (and the `GET /api/terrapod/v1/labels[/{key}[/{value}]]` endpoints — see [API Reference](api-reference.md#labels)). It lists every key in use, drills into the values for a key, and from a value lists every entity carrying it — workspaces, modules, providers, and pools.
+Labels are also queryable as a first-class navigation surface via the **Labels** page in the web UI (and the `GET /api/v1/labels[/{key}[/{value}]]` endpoints — see [API Reference](api-reference.md#labels)). It lists every key in use, drills into the values for a key, and from a value lists every entity carrying it — workspaces, modules, providers, and pools.
 
 ![Labels Browser](images/labels-browser.png)
 

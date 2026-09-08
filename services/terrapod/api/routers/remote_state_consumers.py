@@ -81,7 +81,7 @@ def _consumer_json(row: WorkspaceRemoteStateConsumer) -> dict:
             },
         },
         "links": {
-            "self": f"/api/terrapod/v1/remote-state-consumers/{edge_id}",
+            "self": f"/api/v1/remote-state-consumers/{edge_id}",
         },
     }
 

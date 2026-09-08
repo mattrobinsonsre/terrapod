@@ -84,7 +84,7 @@ def _run_task_json(rt: RunTask) -> dict:
             },
         },
         "links": {
-            "self": f"/api/terrapod/v1/run-tasks/{rt_id}",
+            "self": f"/api/v1/run-tasks/{rt_id}",
         },
     }
 

@@ -71,7 +71,7 @@ Passwords are hashed with PBKDF2-SHA256 and validated with [zxcvbn](https://gith
 ### Login Flow
 
 ```
-POST /api/terrapod/v1/auth/local/authorize
+POST /api/v1/auth/local/authorize
   email=admin@example.com
   password=xxx
     |
@@ -86,6 +86,18 @@ Return session token + redirect URL
 ```
 
 ---
+
+> **Register BOTH callback URLs.** Terrapod serves its API at `/api/v1` and, for
+> the deprecation window, at `/api/terrapod/v1`. Which one it *sends* your IdP as
+> the `redirect_uri` is set by `api.config.auth.legacy_callback_url`, which
+> **defaults to `true`** (the `/api/terrapod/v1` form) so that upgrading cannot
+> break an existing deployment.
+>
+> Your IdP validates that value against its own allow-list, so Terrapod serving
+> both prefixes does not help — an unregistered `redirect_uri` is refused **at the
+> IdP**, before the request reaches Terrapod, and every login fails with nothing
+> in Terrapod's logs. Registering both URLs now costs nothing and makes the 2.0
+> default flip a no-op. See [deprecations.md](deprecations.md).
 
 ## OIDC Authentication
 
@@ -129,7 +141,7 @@ The environment variable name follows the pattern `TERRAPOD_{UPPERCASE_NAME}_CLI
 | Setting | Value |
 |---|---|
 | Application Type | Regular Web Application |
-| Allowed Callback URLs | `https://terrapod.example.com/api/terrapod/v1/auth/callback` |
+| Allowed Callback URLs | `https://terrapod.example.com/api/terrapod/v1/auth/callback` (and `/api/v1/auth/callback` — register both, see the note below) |
 | Allowed Logout URLs | `https://terrapod.example.com` |
 
 ### Okta Example
@@ -165,7 +177,7 @@ TERRAPOD_OKTA_CLIENT_SECRET="your-client-secret"
 |---|---|
 | Sign-in method | OIDC - OpenID Connect |
 | Application type | Web Application |
-| Sign-in redirect URI | `https://terrapod.example.com/api/terrapod/v1/auth/callback` |
+| Sign-in redirect URI | `https://terrapod.example.com/api/terrapod/v1/auth/callback` (and `/api/v1/auth/callback` — register both, see the note below) |
 | Assignments | Assign to users/groups as needed |
 
 ### Azure AD (Entra ID) Example
@@ -195,7 +207,7 @@ TERRAPOD_AZURE_AD_CLIENT_SECRET="your-client-secret"
 
 | Setting | Value |
 |---|---|
-| Redirect URI | `https://terrapod.example.com/api/terrapod/v1/auth/callback` (Web platform) |
+| Redirect URI | `https://terrapod.example.com/api/terrapod/v1/auth/callback` (and `/api/v1/auth/callback` — register both, see the note below) (Web platform) |
 | Token configuration | Add optional claim: `groups` |
 | API permissions | `openid`, `profile`, `email` |
 
@@ -246,7 +258,7 @@ api:
             display_name: "Azure AD (SAML)"
             metadata_url: "https://login.microsoftonline.com/{tenant-id}/federationmetadata/2007-06/federationmetadata.xml?appid={app-id}"
             entity_id: "https://terrapod.example.com"
-            acs_url: "https://terrapod.example.com/api/terrapod/v1/auth/callback"
+            acs_url: "https://terrapod.example.com/api/terrapod/v1/auth/saml/acs"
             role_prefixes: ["terrapod:"]
             claims_to_roles:
               - claim: "http://schemas.microsoft.com/ws/2008/06/identity/claims/groups"
@@ -259,7 +271,7 @@ api:
 | Setting | Value |
 |---|---|
 | Identifier (Entity ID) | `https://terrapod.example.com` |
-| Reply URL (ACS URL) | `https://terrapod.example.com/api/terrapod/v1/auth/callback` |
+| Reply URL (ACS URL) | `https://terrapod.example.com/api/terrapod/v1/auth/saml/acs` (and `/api/v1/auth/saml/acs` — register both, see the note below) |
 | Sign on URL | `https://terrapod.example.com/login` |
 | Claims | Name ID (email), groups |
 
@@ -374,7 +386,7 @@ api:
 Rotate a token to swap its secret without re-wiring its identity or scope:
 
 ```zsh
-curl -X POST https://terrapod.example.com/api/terrapod/v1/authentication-tokens/{token-id}/actions/rotate \
+curl -X POST https://terrapod.example.com/api/v1/authentication-tokens/{token-id}/actions/rotate \
   -H "Authorization: Bearer $TERRAPOD_TOKEN"
 ```
 
@@ -383,7 +395,7 @@ The response carries the new secret in `attributes.token` (shown once); the old 
 ### Creating Tokens via API
 
 ```zsh
-curl -X POST https://terrapod.example.com/api/terrapod/v1/users/{user_id}/authentication-tokens \
+curl -X POST https://terrapod.example.com/api/v1/users/{user_id}/authentication-tokens \
   -H "Authorization: Bearer $TERRAPOD_TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
   -d '{
@@ -401,7 +413,7 @@ The response includes the raw token value in `attributes.token`. Store it secure
 To create a **detached** service token (admin only) scoped to specific roles:
 
 ```zsh
-curl -X POST https://terrapod.example.com/api/terrapod/v1/users/{admin_user}/authentication-tokens \
+curl -X POST https://terrapod.example.com/api/v1/users/{admin_user}/authentication-tokens \
   -H "Authorization: Bearer $TERRAPOD_TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
   -d '{
@@ -432,21 +444,21 @@ The token comes back with `"bound-to": null` and the pinned roles as its absolut
 List your own tokens:
 
 ```zsh
-curl https://terrapod.example.com/api/terrapod/v1/users/{user_id}/authentication-tokens \
+curl https://terrapod.example.com/api/v1/users/{user_id}/authentication-tokens \
   -H "Authorization: Bearer $TERRAPOD_TOKEN"
 ```
 
 Admins can list all tokens across users (optionally filtered by `?kind=`):
 
 ```zsh
-curl https://terrapod.example.com/api/terrapod/v1/admin/authentication-tokens \
+curl https://terrapod.example.com/api/v1/admin/authentication-tokens \
   -H "Authorization: Bearer $TERRAPOD_TOKEN"
 ```
 
 ### Deleting Tokens
 
 ```zsh
-curl -X DELETE https://terrapod.example.com/api/terrapod/v1/authentication-tokens/{token-id} \
+curl -X DELETE https://terrapod.example.com/api/v1/authentication-tokens/{token-id} \
   -H "Authorization: Bearer $TERRAPOD_TOKEN"
 ```
 
@@ -495,14 +507,14 @@ Via the web UI: **Settings > Sessions**
 Via the API:
 
 ```zsh
-curl https://terrapod.example.com/api/terrapod/v1/auth/sessions \
+curl https://terrapod.example.com/api/v1/auth/sessions \
   -H "Authorization: Bearer $TERRAPOD_TOKEN"
 ```
 
 ### Logging Out
 
 ```zsh
-curl -X POST https://terrapod.example.com/api/terrapod/v1/auth/logout \
+curl -X POST https://terrapod.example.com/api/v1/auth/logout \
   -H "Authorization: Bearer $TERRAPOD_TOKEN"
 ```
 

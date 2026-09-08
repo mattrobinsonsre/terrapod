@@ -127,7 +127,7 @@ api:
 
 **Before you ever fail over, check the second data plane.** The dangerous state
 is *rows present, blobs absent* — a promoted node that lists four hundred
-workspaces and cannot serve one. `GET /api/terrapod/v1/ha/blob-readiness` checks
+workspaces and cannot serve one. `GET /api/v1/ha/blob-readiness` checks
 that the objects its rows name are actually there, and names
 `irreplaceable-missing` as the list that should stop a failover. It is worth
 running **even under provider-native bucket replication**, where it catches a

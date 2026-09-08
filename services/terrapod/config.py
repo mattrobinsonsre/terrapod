@@ -478,6 +478,18 @@ class AuthConfig(BaseSettings):
         default="http://localhost:8000",
         description="Base URL for IDP callbacks (externally-reachable URL)",
     )
+    legacy_callback_url: bool = Field(
+        default=True,
+        description=(
+            "Build the SSO callback and SAML ACS URLs on the deprecated "
+            "/api/terrapod/v1 prefix instead of the canonical /api/v1 (#1529). "
+            "Defaults to true so upgrading cannot break SSO: these URLs are "
+            "registered with your identity provider, which validates them "
+            "against its own allow-list, so serving both prefixes does NOT "
+            "make the switch safe on its own. Register the /api/v1 URLs with "
+            "your IdP first, then set this to false. The default flips in 2.0.0."
+        ),
+    )
     sso: SSOConfig = Field(default_factory=SSOConfig)
     session_ttl_hours: int = Field(
         default=12,

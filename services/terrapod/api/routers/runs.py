@@ -305,10 +305,10 @@ def _run_json(
                     "data": {"id": f"apply-{run.id}", "type": "applies"},
                 },
                 "task-stages": {
-                    "links": {"related": f"/api/terrapod/v1/runs/{run_id}/task-stages"},
+                    "links": {"related": f"/api/v1/runs/{run_id}/task-stages"},
                 },
                 "policy-checks": {
-                    "links": {"related": f"/api/terrapod/v1/runs/{run_id}/policy-evaluations"},
+                    "links": {"related": f"/api/v1/runs/{run_id}/policy-evaluations"},
                 },
                 "created-state-version": {
                     "data": (
@@ -935,7 +935,7 @@ def _plan_json(run: Run) -> dict:
     # entirely when the feature is globally disabled so the UI
     # doesn't make a doomed fetch for every page load (#463 phase 7).
     if settings.ai_summary.enabled:
-        attrs["ai-summary-url"] = f"{base}/api/terrapod/v1/runs/{run.id}/plan-summary"
+        attrs["ai-summary-url"] = f"{base}/api/v1/runs/{run.id}/plan-summary"
     return {
         "data": {
             "id": f"plan-{run.id}",
@@ -1116,7 +1116,7 @@ async def show_cost_estimate(
     # mirroring how `ai-summary-url` gates the plan summary. AI is polish only;
     # the figures above stay authoritative regardless.
     if settings.ai_summary.enabled:
-        estimate = {**estimate, "ai-summary-url": f"/api/terrapod/v1/runs/{run.id}/cost-summary"}
+        estimate = {**estimate, "ai-summary-url": f"/api/v1/runs/{run.id}/cost-summary"}
 
     return JSONResponse(
         content={

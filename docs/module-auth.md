@@ -87,7 +87,7 @@ Nothing to enable — it's on by default. Create the credential like any variabl
 ### Via the API / SDK
 
 ```jsonc
-// POST /api/terrapod/v1/workspaces/{id}/vars
+// POST /api/v1/workspaces/{id}/vars
 { "data": { "attributes": {
   "key": "github.com/myorg",
   "category": "git_http_auth",

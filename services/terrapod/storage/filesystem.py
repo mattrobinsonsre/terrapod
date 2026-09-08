@@ -23,6 +23,7 @@ from pathlib import Path
 import aiofiles
 import aiofiles.os
 
+from terrapod.api.prefixes import LAGGING_CONSUMER_PREFIX
 from terrapod.logging_config import get_logger
 from terrapod.storage.protocol import (
     ObjectMeta,
@@ -325,7 +326,17 @@ class FilesystemStore:
         sig = self._sign("GET", key, expires)
 
         encoded_key = urllib.parse.quote(key, safe="")
-        url = f"{self._base_url}/api/terrapod/v1/storage/get/{encoded_key}?expires={expires}&sig={sig}"
+        # Deliberately the LEGACY prefix (#1529). This URL is consumed by a
+        # runner Job, which matches it against a literal in the image it was
+        # built with (runner/download.py) to decide whether to rewrite the host
+        # to the in-cluster API. A runner that lags the API — which they are
+        # designed to — has the old matcher, so emitting the canonical prefix
+        # makes it follow the deployment's PUBLIC hostname from inside the
+        # cluster and fail to fetch its config.
+        url = (
+            f"{self._base_url}{LAGGING_CONSUMER_PREFIX}/storage/get/{encoded_key}"
+            f"?expires={expires}&sig={sig}"
+        )
 
         return PresignedURL(
             url=url,
@@ -344,7 +355,7 @@ class FilesystemStore:
 
         encoded_key = urllib.parse.quote(key, safe="")
         url = (
-            f"{self._base_url}/api/terrapod/v1/storage/put/{encoded_key}"
+            f"{self._base_url}{LAGGING_CONSUMER_PREFIX}/storage/put/{encoded_key}"
             f"?expires={expires}&sig={sig}&content_type={urllib.parse.quote(content_type)}"
         )
 

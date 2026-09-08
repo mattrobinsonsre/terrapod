@@ -288,9 +288,9 @@ content an operator put there deliberately.
 |---|---|
 | Delete a tag | `DELETE /v2/{name}/manifests/{tag}` |
 | Delete a manifest | `DELETE /v2/{name}/manifests/{digest}` |
-| Delete a repository | `DELETE /api/terrapod/v1/oci/repositories/{name}` |
-| List untagged manifests | `GET /api/terrapod/v1/oci/repositories/{name}/untagged` |
-| Collect now | `POST /api/terrapod/v1/oci/collect` |
+| Delete a repository | `DELETE /api/v1/oci/repositories/{name}` |
+| List untagged manifests | `GET /api/v1/oci/repositories/{name}/untagged` |
+| Collect now | `POST /api/v1/oci/collect` |
 
 All of it requires **`registry:admin`** on the repository and is audited. Deleting
 destroys content that may exist nowhere else.

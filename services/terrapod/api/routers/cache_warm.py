@@ -86,7 +86,7 @@ async def _submit(items: list[WarmItem], user: AuthenticatedUser) -> dict:
             "type": "warm-jobs",
             "id": job.job_id,
             "attributes": {"status": job.status, "total": job.total},
-            "links": {"self": f"/api/terrapod/v1/admin/warm-jobs/{job.job_id}"},
+            "links": {"self": f"/api/v1/admin/warm-jobs/{job.job_id}"},
         }
     }
 

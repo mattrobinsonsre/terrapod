@@ -1,6 +1,6 @@
 # API Reference
 
-Terrapod implements the subset of the TFE V2 API that the `terraform`/`tofu` `cloud` backend consumes (over the `go-tfe` protocol) — a stable contract mounted at `/api/v2/` and catalogued in [`tfe-cli-surface.md`](tfe-cli-surface.md). It is **not** a reimplementation of the full TFE V2 API: everything beyond that CLI-consumed slice is Terrapod's own native API at `/api/terrapod/v1/`. All endpoints use JSON:API format.
+Terrapod implements the subset of the TFE V2 API that the `terraform`/`tofu` `cloud` backend consumes (over the `go-tfe` protocol) — a stable contract mounted at `/api/v2/` and catalogued in [`tfe-cli-surface.md`](tfe-cli-surface.md). It is **not** a reimplementation of the full TFE V2 API: everything beyond that CLI-consumed slice is Terrapod's own native API at `/api/v1/`. All endpoints use JSON:API format.
 
 The interactive API documentation is also available in the web UI under **API** in the navigation bar, offering both ReDoc and Swagger UI views.
 
@@ -25,7 +25,7 @@ The Terrapod API has four distinct consumer classes. Every API change must updat
 
 ### Endpoint coverage
 
-go-terrapod targets the full Terrapod API surface — both the TFE-V2-compatible (`/api/v2/`) and Terrapod-native (`/api/terrapod/v1/`) prefixes. The migration tool is a heavy consumer of the API-only routers (config-versions, state-management, registry endpoints) that the UI doesn't surface; the provider mostly consumes the frontend-also routers. Both can rely on the same typed surface in go-terrapod.
+go-terrapod targets the full Terrapod API surface — both the TFE-V2-compatible (`/api/v2/`) and Terrapod-native (`/api/v1/`) prefixes. The migration tool is a heavy consumer of the API-only routers (config-versions, state-management, registry endpoints) that the UI doesn't surface; the provider mostly consumes the frontend-also routers. Both can rely on the same typed surface in go-terrapod.
 
 ### Version contract
 
@@ -37,12 +37,13 @@ go-terrapod pins to a specific Terrapod API version at build time via the `SDKVe
 
 ### Base URL
 
-Terrapod exposes two API surfaces:
+Terrapod exposes two API surfaces, plus a deprecated alias for one of them:
 
 | Prefix | Contract | Audience |
 |---|---|---|
 | `/api/v2/` | **Stable** TFE V2 subset consumed by `terraform`, `tofu`, and `tfci`. Documented in [`docs/tfe-cli-surface.md`](tfe-cli-surface.md). |  Terraform/OpenTofu CLI, `tfci`, `go-tfe`-based clients that stay within this subset |
-| `/api/terrapod/v1/` | Terrapod-native management API (workspaces management, runs, registry CRUD, agent pools, audit, etc.) | Web UI, the Terraform provider for Terrapod, automation |
+| `/api/v1/` | Terrapod-native management API (workspaces management, runs, registry CRUD, agent pools, audit, etc.) | Web UI, the Terraform provider for Terrapod, automation |
+| `/api/terrapod/v1/` | **Deprecated alias** for the above — every route, identical responses. Kept for the support window; see [`deprecations.md`](deprecations.md). | Existing integrations, and Terrapod's own runner/listener images until they are upgraded |
 
 Example:
 
@@ -51,10 +52,17 @@ Example:
 https://terrapod.example.com/api/v2/organizations/default/workspaces
 
 # Terrapod-native management
-https://terrapod.example.com/api/terrapod/v1/workspaces
+https://terrapod.example.com/api/v1/workspaces
 ```
 
 A handful of endpoints (e.g. `/health`, `/ready`, `/.well-known/terraform.json`, OAuth flows, `/v1/...` registry CLI protocol) live at the root for protocol-compatibility reasons.
+
+> **`/api/terrapod/v1/` still works.** It serves the same routes as `/api/v1/`,
+> from the same code, so nothing breaks if you have not migrated. Prefer
+> `/api/v1/` in anything new. The one place the alias does **not** apply is the
+> SSO callback URL, which your identity provider validates against its own
+> allow-list — that is governed by `auth.legacy_callback_url` and explained in
+> [`deprecations.md`](deprecations.md).
 
 ### Authentication
 
@@ -227,7 +235,7 @@ Returns the authenticated user's information.
 ### Show Organization
 
 ```
-GET /api/terrapod/v1/organizations/default
+GET /api/v1/organizations/default
 ```
 
 Returns organization details. Only `default` is valid.
@@ -299,7 +307,7 @@ in-flight run decides), and `auto-apply-declined-reason` says why a conditional
 mode refused this plan — for example `2 destroys, 1 replace`. It is null unless
 the run was actually held.
 
-The bulk-update endpoint (`POST /api/terrapod/v1/workspaces/actions/bulk-update`)
+The bulk-update endpoint (`POST /api/v1/workspaces/actions/bulk-update`)
 and the autodiscovery rule template both accept `auto-apply-mode` under the same
 either/or rule.
 
@@ -429,7 +437,7 @@ All workspace responses (show and list) include a `permissions` object reflectin
 ### Delete Workspace
 
 ```
-DELETE /api/terrapod/v1/workspaces/{id}
+DELETE /api/v1/workspaces/{id}
 ```
 
 **Deleting does not delete the state.** The state blobs stay in object storage
@@ -562,7 +570,7 @@ Workspaces also expose a read-only `state-diverged` boolean. It is set to `true`
 ### List VCS Refs (Terrapod Extension)
 
 ```
-GET /api/terrapod/v1/workspaces/{id}/vcs-refs
+GET /api/v1/workspaces/{id}/vcs-refs
 ```
 
 Returns branches, tags, and the default branch for a VCS-connected workspace. Used by the UI to populate the VCS ref picker when queueing runs.
@@ -692,7 +700,7 @@ State version responses include a `created-by` attribute (email of the user who 
 ### Delete State Version (Terrapod Extension)
 
 ```
-DELETE /api/terrapod/v1/state-versions/{id}/manage
+DELETE /api/v1/state-versions/{id}/manage
 ```
 
 Deletes a non-current state version. The current (highest serial) version cannot be deleted.
@@ -704,7 +712,7 @@ Returns 204 on success, 409 if attempting to delete the current version.
 ### Rollback State Version (Terrapod Extension)
 
 ```
-POST /api/terrapod/v1/state-versions/{id}/actions/rollback
+POST /api/v1/state-versions/{id}/actions/rollback
 ```
 
 Creates a new state version with the content of the specified older version. The new version gets serial = max existing + 1. This is a "copy forward" rollback — no versions are deleted, history is preserved.
@@ -716,7 +724,7 @@ Returns 201 with the new state version.
 ### Upload State Manually (Terrapod Extension)
 
 ```
-POST /api/terrapod/v1/workspaces/{id}/state-versions/actions/upload
+POST /api/v1/workspaces/{id}/state-versions/actions/upload
 ```
 
 Upload a raw state JSON file. Serial is auto-assigned (max existing + 1). Useful for state surgery workflows.
@@ -838,7 +846,7 @@ Run objects include peak resource usage + an abnormal-exit signal so the UI (and
 
 Two independent capture paths feed these fields:
 
-- **Runner path** — `POST /api/terrapod/v1/runs/{run_id}/resource-profile` from the runner's EXIT trap with `peak_memory_bytes` / `peak_cpu_usec` / `exit_code`. Fires for any catchable exit (success, plan errored, OPA failed, SIGTERM during apply).
+- **Runner path** — `POST /api/v1/runs/{run_id}/resource-profile` from the runner's EXIT trap with `peak_memory_bytes` / `peak_cpu_usec` / `exit_code`. Fires for any catchable exit (success, plan errored, OPA failed, SIGTERM during apply).
 - **Listener path** — when a Job fails, the listener reads `container.state.terminated.{reason, exit_code}` and POSTs them on the job-status report. The reconciler maps them to `runner_exit_status`.
 
 OOM (`exit 137 + reason "OOMKilled"`) is uncatchable, so the runner path never fires on OOM — the listener path is the only signal. Both paths converge on the same five DB columns; whichever signal arrives wins. `runner-exit-status` is set **only** by the reconciler (single source of truth for typed bucketing) and is what drives the UI's OOM badge + the typed error message ("Runner OOM-killed (peak memory N.NN Gi). Workspace resource_memory is …. Increase resource_memory + retry.").
@@ -908,7 +916,7 @@ POST /api/v2/runs/{run_id}/actions/cancel
 ### Retry Run
 
 ```
-POST /api/terrapod/v1/runs/{run_id}/actions/retry
+POST /api/v1/runs/{run_id}/actions/retry
 ```
 
 Creates a new run from a terminal run (applied, errored, canceled, discarded) using the same workspace, configuration version, VCS metadata, and settings. Returns a 409 if the run is not in a terminal state.
@@ -918,7 +926,7 @@ Creates a new run from a terminal run (applied, errored, canceled, discarded) us
 ### Workspace Events (SSE)
 
 ```
-GET /api/terrapod/v1/workspaces/{workspace_id}/runs/events
+GET /api/v1/workspaces/{workspace_id}/runs/events
 ```
 
 Server-Sent Events stream for real-time workspace updates. The stream emits events whenever a run changes state, the workspace is locked/unlocked, workspace settings are updated, or a new state version is created. Used by the web UI workspace detail page for live updates without polling.
@@ -944,7 +952,7 @@ The stream sends `: keepalive` comments every ~1 second. Events are JSON-encoded
 ### Workspace List Events (SSE) (Terrapod Extension)
 
 ```
-GET /api/terrapod/v1/workspace-events
+GET /api/v1/workspace-events
 ```
 
 Server-Sent Events stream for the workspace list page. Emits events whenever any workspace changes (run status, lock, settings, state). The web UI uses this to refresh the workspace list without polling.
@@ -954,7 +962,7 @@ Server-Sent Events stream for the workspace list page. Emits events whenever any
 ### Plan Details
 
 ```
-GET /api/terrapod/v1/runs/{run_id}/plan
+GET /api/v1/runs/{run_id}/plan
 ```
 
 Returns plan metadata and log download URL. When the runner has uploaded a structured plan (`-out=tfplan` → `terraform show -json tfplan`), the response also carries a `json-output` attribute pointing at `/api/v2/plans/{run_id}/json-output`.
@@ -972,7 +980,7 @@ The endpoint is mounted at `/api/v2/` because `go-tfe` and Terraform's `cloud` b
 ### Impact Graph
 
 ```
-GET /api/terrapod/v1/runs/{run_id}/impact-graph
+GET /api/v1/runs/{run_id}/impact-graph
 ```
 
 Returns a compact plan **dependency + blast-radius graph** derived server-side from the run's stored JSON plan output — the data behind the run page's **Impact graph** tab. Nodes are the resources in the plan (coloured by planned action: create / update / replace / delete / no-op); edges are the dependencies between them, reconstructed by walking the plan's configuration module tree with cross-module `var`/output binding (so edges span module boundaries, and per-instance `for_each` fan-out is captured). Each node carries its module path so the UI can cluster and label by module.
@@ -988,8 +996,8 @@ Deriving the graph on the server (rather than shipping the raw, possibly multi-M
 The deterministic Checkov/Trivy IaC security-scan result for a run — the structural twin of the OPA policy endpoints. See [security-scanning.md](security-scanning.md) for the feature guide; the per-workspace config attributes (`security-scan-*`) are documented in the workspace attributes table above.
 
 ```
-GET  /api/terrapod/v1/runs/{run_id}/security-scan                     # read the result (workspace read)
-POST /api/terrapod/v1/runs/{run_id}/actions/override-security-scan    # override a blocking scan (workspace admin)
+GET  /api/v1/runs/{run_id}/security-scan                     # read the result (workspace read)
+POST /api/v1/runs/{run_id}/actions/override-security-scan    # override a blocking scan (workspace admin)
 ```
 
 **GET** returns `{"data": <resource>|null, "meta": {"summary": {...}}}`. `data` is `null` when the workspace has scanning off or the run wasn't scanned. The resource `attributes` are: `engine`, `enforcement-level`, `severity-threshold`, `outcome` (`passed`/`failed`/`errored`), `findings` (list of `{engine, rule_id, severity, title, resource, file, line, guideline}`), `summary` (`{total, blocking, by_severity, …}`), `error`, `overridden-by`, `overridden-at`, `created-at`. `meta.summary` carries a compact `{status, outcome, engine, total, blocking}` for the badge (`status` = `blocked` | `advisory-failed` | `passed`). Requires `read` on the workspace.
@@ -1001,7 +1009,7 @@ The runner protocol (runner-token, run_id-scoped) — `GET .../security-scan-con
 ### Estate Graph
 
 ```
-GET /api/terrapod/v1/estate-graph
+GET /api/v1/estate-graph
 ```
 
 Returns the **whole-estate topology graph** behind the [Estate topology](estate-topology.md) page: every workspace the caller can read (nodes of kind `workspace`, carrying their raw `labels`, `pool`, and in-degree) plus the registry `module` nodes they use, wired by three edge kinds — `remote-state` (consumer → producer), `run-trigger` (source → destination), and `uses-module` (module → workspace).
@@ -1015,7 +1023,7 @@ The result is **RBAC-filtered**: only workspaces the caller can read appear, and
 ### State Graph
 
 ```
-GET /api/terrapod/v1/workspaces/{workspace_id}/state-graph[?state_version=sv-...]
+GET /api/v1/workspaces/{workspace_id}/state-graph[?state_version=sv-...]
 ```
 
 Returns the **single-workspace resource dependency graph** behind the [State Resource Graph](state-resource-graph.md) tab: one `resource` node per resource address in the workspace's Terraform state (each carrying `type`, `mode` (`managed`/`data`), `module`, `provider`, and in-degree), wired by `depends-on` edges derived from the `dependencies` Terraform records per resource. Defaults to the workspace's current (highest-serial) state version; `?state_version=sv-...` renders an older one.
@@ -1031,8 +1039,8 @@ Returns the **single-workspace resource dependency graph** behind the [State Res
 State-based, whole-system critique (#1036 Part 2). Reviews the workspace's deployed system **as it exists** — inferred from its current Terraform state (+ the resource graph, the deterministic cost estimate, and the deterministic security-scan findings) and critiqued across resilience / security / cost / well-architected. Distinct from the per-run [Plan Summary](#plan-summary), which reviews a *change*. Enabled by the independent `ai_architecture` config (off by default).
 
 ```
-GET  /api/terrapod/v1/workspaces/{workspace_id}/architecture-critique
-POST /api/terrapod/v1/workspaces/{workspace_id}/architecture-critique/regenerate
+GET  /api/v1/workspaces/{workspace_id}/architecture-critique
+POST /api/v1/workspaces/{workspace_id}/architecture-critique/regenerate
 ```
 
 `GET` returns the critique for the workspace's current state version: `{"data": {"type": "architecture-critiques", "attributes": {"status": "ready|pending|skipped|errored", "risk-level": "low|medium|high|critical", "architecture": {...}, "findings": [{"severity", "category", "title", "detail", "resource-address"|"resource_address", "recommendation", "grounded_in"}], "deferred": [...], "state-serial": N, ...}}}`. Returns **404** when the feature is disabled, the workspace has no state, or no critique has been generated for the current state yet. `POST .../regenerate` queues a fresh critique (202) and mutates no infrastructure.
@@ -1048,7 +1056,7 @@ POST /api/terrapod/v1/workspaces/{workspace_id}/architecture-critique/regenerate
 ### Plan Summary
 
 ```
-GET /api/terrapod/v1/runs/{run_id}/plan-summary
+GET /api/v1/runs/{run_id}/plan-summary
 ```
 
 Returns the AI-generated plan summary (or failure analysis on errored plans) when the optional `ai_summary` feature is enabled and a summary has been produced for the run. See [docs/ai-plan-summary.md](ai-plan-summary.md) for the operator-side setup.
@@ -1109,7 +1117,7 @@ Returns the AI-generated plan summary (or failure analysis on errored plans) whe
 | `input-tokens` / `output-tokens` | integer | Telemetry counts reported by the upstream provider. |
 | `error-message` | string | Populated only for `status=errored` or `status=skipped`. Empty for `ready`. |
 
-**Real-time updates:** the per-workspace SSE channel (`GET /api/terrapod/v1/workspaces/{id}/runs/events`) emits one of five lifecycle events as the summary progresses (#463):
+**Real-time updates:** the per-workspace SSE channel (`GET /api/v1/workspaces/{id}/runs/events`) emits one of five lifecycle events as the summary progresses (#463):
 
 | Event | Fires when |
 |---|---|
@@ -1128,7 +1136,7 @@ When the workspace has security scanning and/or cost estimation enabled, the sam
 ### Regenerate Plan Summary
 
 ```
-POST /api/terrapod/v1/runs/{run_id}/plan-summary/regenerate
+POST /api/v1/runs/{run_id}/plan-summary/regenerate
 ```
 
 Re-fires the AI summary handler for a run. Anyone with workspace `read` can regenerate — the call doesn't mutate infrastructure. Bypasses the 5-minute auto-dedup so operator clicks always go through; budget gating still applies handler-side.
@@ -1143,7 +1151,7 @@ Re-fires the AI summary handler for a run. Anyone with workspace `read` can rege
 ### List Plan-Summary Chat Messages
 
 ```
-GET /api/terrapod/v1/runs/{run_id}/plan-summary/messages
+GET /api/v1/runs/{run_id}/plan-summary/messages
 ```
 
 Full transcript of the AI plan-summary chat thread in chronological order. The initial structured summary lives on the parent `PlanSummary` row (`description` + `risk-factors`); this endpoint returns ONLY the conversational follow-ups. The UI renders `message[0]` from the parent summary and appends these.
@@ -1192,7 +1200,7 @@ Full transcript of the AI plan-summary chat thread in chronological order. The i
 ### Post Plan-Summary Chat Message
 
 ```
-POST /api/terrapod/v1/runs/{run_id}/plan-summary/messages
+POST /api/v1/runs/{run_id}/plan-summary/messages
 Content-Type: application/vnd.api+json
 
 { "data": { "attributes": { "content": "..." } } }
@@ -1215,7 +1223,7 @@ The model call uses the same cacheable prefix as the initial summary (provider p
 ### Apply Details
 
 ```
-GET /api/terrapod/v1/runs/{run_id}/apply
+GET /api/v1/runs/{run_id}/apply
 ```
 
 Returns apply metadata and log download URL.
@@ -1231,7 +1239,7 @@ When a runner-token principal (agent-mode run) hits `/api/v2/workspaces/{id}/cur
 ### List Consumers
 
 ```
-GET /api/terrapod/v1/workspaces/{id}/remote-state-consumers?filter[remote-state-consumer][type]=outbound
+GET /api/v1/workspaces/{id}/remote-state-consumers?filter[remote-state-consumer][type]=outbound
 ```
 
 `outbound` (default) — workspaces this workspace shares its state to (this workspace is the producer).
@@ -1242,7 +1250,7 @@ GET /api/terrapod/v1/workspaces/{id}/remote-state-consumers?filter[remote-state-
 ### Authorize a Consumer
 
 ```
-POST /api/terrapod/v1/workspaces/{producer_id}/remote-state-consumers
+POST /api/v1/workspaces/{producer_id}/remote-state-consumers
 ```
 
 **Request body:**
@@ -1263,7 +1271,7 @@ Errors: `422` self-reference; `409` already authorized; `422` over the per-produ
 ### Replace Consumer Set (Declarative)
 
 ```
-PUT /api/terrapod/v1/workspaces/{producer_id}/remote-state-consumers
+PUT /api/v1/workspaces/{producer_id}/remote-state-consumers
 ```
 
 Idempotent declarative replace of the producer's full consumer set in one atomic transaction. Supports the Terrapod provider's set-valued attribute. Body: `{"data": [{"type": "workspaces", "id": "ws-..."}, ...]}`.
@@ -1273,7 +1281,7 @@ Idempotent declarative replace of the producer's full consumer set in one atomic
 ### Show Consumer Grant
 
 ```
-GET /api/terrapod/v1/remote-state-consumers/{id}
+GET /api/v1/remote-state-consumers/{id}
 ```
 
 **Required permission:** `read` on the producer.
@@ -1281,7 +1289,7 @@ GET /api/terrapod/v1/remote-state-consumers/{id}
 ### Revoke a Consumer Grant
 
 ```
-DELETE /api/terrapod/v1/remote-state-consumers/{id}
+DELETE /api/v1/remote-state-consumers/{id}
 ```
 
 **Required permission:** `admin` on the producer. A consumer cannot self-revoke.
@@ -1306,7 +1314,7 @@ Run triggers create cross-workspace dependency chains. When a source workspace c
 ### Create Run Trigger
 
 ```
-POST /api/terrapod/v1/workspaces/{id}/run-triggers
+POST /api/v1/workspaces/{id}/run-triggers
 ```
 
 **Request body:**
@@ -1338,7 +1346,7 @@ curl -s \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
   -X POST \
-  https://terrapod.example.com/api/terrapod/v1/workspaces/ws-abc123/run-triggers \
+  https://terrapod.example.com/api/v1/workspaces/ws-abc123/run-triggers \
   -d '{
     "data": {
       "relationships": {
@@ -1353,7 +1361,7 @@ curl -s \
 ### List Run Triggers
 
 ```
-GET /api/terrapod/v1/workspaces/{id}/run-triggers?filter[run-trigger][type]=inbound|outbound
+GET /api/v1/workspaces/{id}/run-triggers?filter[run-trigger][type]=inbound|outbound
 ```
 
 - `inbound`: triggers where this workspace is the destination (what triggers runs here?)
@@ -1367,13 +1375,13 @@ The `filter[run-trigger][type]` parameter is required (422 if missing).
 ```bash
 curl -s \
   -H "Authorization: Bearer $TOKEN" \
-  "https://terrapod.example.com/api/terrapod/v1/workspaces/ws-abc123/run-triggers?filter[run-trigger][type]=inbound"
+  "https://terrapod.example.com/api/v1/workspaces/ws-abc123/run-triggers?filter[run-trigger][type]=inbound"
 ```
 
 ### Show Run Trigger
 
 ```
-GET /api/terrapod/v1/run-triggers/{id}
+GET /api/v1/run-triggers/{id}
 ```
 
 **Required permission:** `read` on the destination workspace.
@@ -1381,7 +1389,7 @@ GET /api/terrapod/v1/run-triggers/{id}
 ### Delete Run Trigger
 
 ```
-DELETE /api/terrapod/v1/run-triggers/{id}
+DELETE /api/v1/run-triggers/{id}
 ```
 
 **Required permission:** `admin` on the destination workspace.
@@ -1391,7 +1399,7 @@ DELETE /api/terrapod/v1/run-triggers/{id}
 curl -s \
   -H "Authorization: Bearer $TOKEN" \
   -X DELETE \
-  https://terrapod.example.com/api/terrapod/v1/run-triggers/rt-abc123
+  https://terrapod.example.com/api/v1/run-triggers/rt-abc123
 ```
 
 ---
@@ -1458,7 +1466,7 @@ Newest first. Supports `page[size]` (default 20, max 100) and `page[number]`.
 ### Download Configuration Version (Terrapod extension)
 
 ```
-GET /api/terrapod/v1/configuration-versions/{cv_id}/download
+GET /api/v1/configuration-versions/{cv_id}/download
 ```
 
 Streams the tarball bytes back as `application/x-tar` with a `Content-Disposition: attachment` header. Bearer auth.
@@ -1474,7 +1482,7 @@ Streams the tarball bytes back as `application/x-tar` with a `Content-Dispositio
 ### Mint Download Ticket (Terrapod extension)
 
 ```
-POST /api/terrapod/v1/configuration-versions/{cv_id}/download-ticket
+POST /api/v1/configuration-versions/{cv_id}/download-ticket
 ```
 
 Mints a short-lived, single-resource HMAC ticket the browser can paste into a plain `<a href>` to stream a download natively to the user's save dialog. **Opt-in** — the default download path above is the simple Bearer-auth flow; tickets exist because plain navigation can't carry an `Authorization` header.
@@ -1493,7 +1501,7 @@ TTL defaults to 300 s, hard-capped at 1800 s. Negative or zero values fall back 
     "type": "download-tickets",
     "attributes": {
       "ticket": "dlticket:cv:{uuid}:...",
-      "url": "/api/terrapod/v1/configuration-versions/download-by-ticket/dlticket:cv:...",
+      "url": "/api/v1/configuration-versions/download-by-ticket/dlticket:cv:...",
       "expires-at": "2026-05-07T12:34:56Z"
     }
   }
@@ -1505,7 +1513,7 @@ TTL defaults to 300 s, hard-capped at 1800 s. Negative or zero values fall back 
 ### Download by Ticket (Terrapod extension)
 
 ```
-GET /api/terrapod/v1/configuration-versions/download-by-ticket/{ticket}
+GET /api/v1/configuration-versions/download-by-ticket/{ticket}
 ```
 
 Streams the tarball — no `Authorization` header. The ticket is the auth: HMAC-SHA256 over the resource id, expiry, and minter email, signed with the same key class as runner tokens. Single-resource (a CV-X ticket cannot fetch CV-Y); short TTL bounds replay.
@@ -1518,7 +1526,7 @@ Streams the tarball — no `Authorization` header. The ticket is the auth: HMAC-
 ### Diff Configuration Versions (Terrapod extension)
 
 ```
-POST /api/terrapod/v1/configuration-versions/diff
+POST /api/v1/configuration-versions/diff
 ```
 
 Compares two CVs in the same workspace and returns per-file unified diffs.
@@ -1577,7 +1585,7 @@ Read-only labels browser (Terrapod extension). All endpoints are RBAC-filtered: 
 ### List Label Keys
 
 ```
-GET /api/terrapod/v1/labels
+GET /api/v1/labels
 ```
 
 Returns all label keys in use across readable workspaces, modules, providers, and pools, with per-type counts.
@@ -1594,7 +1602,7 @@ Returns all label keys in use across readable workspaces, modules, providers, an
 ### List Values for a Key
 
 ```
-GET /api/terrapod/v1/labels/{key}
+GET /api/v1/labels/{key}
 ```
 
 Returns distinct values for `key`, each with per-type counts. Empty `data` is a valid response.
@@ -1602,7 +1610,7 @@ Returns distinct values for `key`, each with per-type counts. Empty `data` is a 
 ### List Entities for a Label
 
 ```
-GET /api/terrapod/v1/labels/{key}/{value}
+GET /api/v1/labels/{key}/{value}
 ```
 
 Returns entities tagged with exactly `key=value`, grouped by type.
@@ -1749,7 +1757,7 @@ Applies to variable-set variables too, so a Vault-backed credential can be
 defined once and applied to many workspaces.
 
 ```
-GET /api/terrapod/v1/vault/availability
+GET /api/v1/vault/availability
 ```
 
 Reports whether the value source is configured and which instances exist, so a
@@ -1800,8 +1808,8 @@ workspace. Both report *how* each association arose -- `explicit`, `global`, or
 `rule` -- because only an explicit one can be unbound.
 
 ```
-GET /api/terrapod/v1/varsets/{varset_id}/relationships/workspaces
-GET /api/terrapod/v1/workspaces/{workspace_id}/varsets
+GET /api/v1/varsets/{varset_id}/relationships/workspaces
+GET /api/v1/workspaces/{workspace_id}/varsets
 ```
 
 `workspace-count` on the variable set itself counts only explicitly-assigned
@@ -1825,18 +1833,18 @@ GET /api/v2/registry/modules/{namespace}/{name}/{provider}/{version}/download
 ### Terrapod-native Management API
 
 ```
-GET  /api/terrapod/v1/registry-modules
-POST /api/terrapod/v1/registry-modules
-GET  /api/terrapod/v1/registry-modules/private/default/{name}/{provider}
-DELETE /api/terrapod/v1/registry-modules/private/default/{name}/{provider}
-PUT  /api/terrapod/v1/registry-modules/private/default/{name}/{provider}/versions/{version}/upload
-DELETE /api/terrapod/v1/registry-modules/private/default/{name}/{provider}/versions/{version}
+GET  /api/v1/registry-modules
+POST /api/v1/registry-modules
+GET  /api/v1/registry-modules/private/default/{name}/{provider}
+DELETE /api/v1/registry-modules/private/default/{name}/{provider}
+PUT  /api/v1/registry-modules/private/default/{name}/{provider}/versions/{version}/upload
+DELETE /api/v1/registry-modules/private/default/{name}/{provider}/versions/{version}
 ```
 
 ### Update Module
 
 ```
-PATCH /api/terrapod/v1/registry-modules/private/default/{name}/{provider}
+PATCH /api/v1/registry-modules/private/default/{name}/{provider}
 ```
 
 **Required permission:** `admin` on the module.
@@ -1860,7 +1868,7 @@ All module responses (show and list) include a `permissions` object:
 ### Version Upload (Streamed)
 
 ```
-PUT /api/terrapod/v1/registry-modules/private/default/{name}/{provider}/versions/{version}/upload
+PUT /api/v1/registry-modules/private/default/{name}/{provider}/versions/{version}/upload
 ```
 
 A single streamed `PUT` of the gzipped module source tarball. The version
@@ -1882,9 +1890,9 @@ the source directory and performs this upload.
 ### Workspace Links (Module Impact Analysis)
 
 ```
-GET    /api/terrapod/v1/registry-modules/private/default/{name}/{provider}/workspace-links
-POST   /api/terrapod/v1/registry-modules/private/default/{name}/{provider}/workspace-links
-DELETE /api/terrapod/v1/registry-modules/private/default/{name}/{provider}/workspace-links/{link_id}
+GET    /api/v1/registry-modules/private/default/{name}/{provider}/workspace-links
+POST   /api/v1/registry-modules/private/default/{name}/{provider}/workspace-links
+DELETE /api/v1/registry-modules/private/default/{name}/{provider}/workspace-links/{link_id}
 ```
 
 **Required permission:** `admin` on the module (create/delete), `read` on the module (list).
@@ -1910,12 +1918,12 @@ publish time (see [Publishing a Version](#publishing-a-version-client-signed)).
 ### Terrapod-native Management API
 
 ```
-GET  /api/terrapod/v1/registry-providers
-POST /api/terrapod/v1/registry-providers
-GET  /api/terrapod/v1/registry-providers/private/default/{name}
-DELETE /api/terrapod/v1/registry-providers/private/default/{name}
-GET  /api/terrapod/v1/registry-providers/private/default/{name}/versions
-DELETE /api/terrapod/v1/registry-providers/private/default/{name}/versions/{version}
+GET  /api/v1/registry-providers
+POST /api/v1/registry-providers
+GET  /api/v1/registry-providers/private/default/{name}
+DELETE /api/v1/registry-providers/private/default/{name}
+GET  /api/v1/registry-providers/private/default/{name}/versions
+DELETE /api/v1/registry-providers/private/default/{name}/versions/{version}
 ```
 
 ### Publishing a Version (Client-Signed)
@@ -1930,9 +1938,9 @@ or finalize step.
 Uploads must happen in this exact order:
 
 ```
-PUT /api/terrapod/v1/registry-providers/private/default/{name}/versions/{version}/shasums
-PUT /api/terrapod/v1/registry-providers/private/default/{name}/versions/{version}/shasums.sig
-PUT /api/terrapod/v1/registry-providers/private/default/{name}/versions/{version}/platforms/{os}/{arch}
+PUT /api/v1/registry-providers/private/default/{name}/versions/{version}/shasums
+PUT /api/v1/registry-providers/private/default/{name}/versions/{version}/shasums.sig
+PUT /api/v1/registry-providers/private/default/{name}/versions/{version}/platforms/{os}/{arch}
 ```
 
 1. **`PUT .../shasums`** — the raw `SHA256SUMS` manifest (one
@@ -1964,7 +1972,7 @@ publisher's own public key in `signing_keys.gpg_public_keys`.
 ### Update Provider
 
 ```
-PATCH /api/terrapod/v1/registry-providers/private/default/{name}
+PATCH /api/v1/registry-providers/private/default/{name}
 ```
 
 **Required permission:** `admin` on the provider.
@@ -1989,11 +1997,11 @@ All provider responses (show and list) include a `permissions` object:
 
 | Endpoint | Permission |
 |---|---|
-| `GET /api/terrapod/v1/gpg-keys` | Any authenticated caller |
-| `GET /api/terrapod/v1/gpg-keys/{id}` | Any authenticated caller |
-| `POST /api/terrapod/v1/gpg-keys` | `registry:admin` |
-| `POST /api/terrapod/v1/gpg-keys/{id}/revoke` | `registry:admin` |
-| `DELETE /api/terrapod/v1/gpg-keys/{id}` | `registry:admin` |
+| `GET /api/v1/gpg-keys` | Any authenticated caller |
+| `GET /api/v1/gpg-keys/{id}` | Any authenticated caller |
+| `POST /api/v1/gpg-keys` | `registry:admin` |
+| `POST /api/v1/gpg-keys/{id}/revoke` | `registry:admin` |
+| `DELETE /api/v1/gpg-keys/{id}` | `registry:admin` |
 
 **The read/write split is deliberate.** The reads return public key material —
 the same bytes `terraform init` receives in every provider download response —
@@ -2049,13 +2057,13 @@ omitted from create/update responses, which do not fetch listeners.
 ### List Pools
 
 ```
-GET /api/terrapod/v1/agent-pools
+GET /api/v1/agent-pools
 ```
 
 ### Create Pool
 
 ```
-POST /api/terrapod/v1/agent-pools
+POST /api/v1/agent-pools
 ```
 
 **Request body:**
@@ -2076,26 +2084,26 @@ POST /api/terrapod/v1/agent-pools
 ### Show Pool
 
 ```
-GET /api/terrapod/v1/agent-pools/{id}
+GET /api/v1/agent-pools/{id}
 ```
 
 ### Delete Pool
 
 ```
-DELETE /api/terrapod/v1/agent-pools/{id}
+DELETE /api/v1/agent-pools/{id}
 ```
 
 ### Pool Tokens
 
 ```
-POST /api/terrapod/v1/agent-pools/{id}/authentication-tokens
-GET  /api/terrapod/v1/agent-pools/{id}/authentication-tokens
+POST /api/v1/agent-pools/{id}/authentication-tokens
+GET  /api/v1/agent-pools/{id}/authentication-tokens
 ```
 
 ### Listener Join
 
 ```
-POST /api/terrapod/v1/agent-pools/join
+POST /api/v1/agent-pools/join
 ```
 
 Registers a listener using a join token. The token identifies the pool — no pool ID needed in the URL. No Bearer auth required; the join token in the body IS the credential.
@@ -2114,25 +2122,25 @@ If a listener with the same name already exists, its certificate is reissued (ha
 
 **Legacy endpoint** (still supported):
 ```
-POST /api/terrapod/v1/agent-pools/{pool_id}/listeners/join
+POST /api/v1/agent-pools/{pool_id}/listeners/join
 ```
 
 ### Listener Heartbeat
 
 ```
-POST /api/terrapod/v1/listeners/{id}/heartbeat
+POST /api/v1/listeners/{id}/heartbeat
 ```
 
 ### Listener Certificate Renewal
 
 ```
-POST /api/terrapod/v1/listeners/{id}/renew
+POST /api/v1/listeners/{id}/renew
 ```
 
 ### Listener Run Polling
 
 ```
-GET /api/terrapod/v1/listeners/{id}/runs/next
+GET /api/v1/listeners/{id}/runs/next
 ```
 
 Returns the next queued run for this listener.
@@ -2140,7 +2148,7 @@ Returns the next queued run for this listener.
 ### Listener Runner Token
 
 ```
-POST /api/terrapod/v1/listeners/{id}/runs/{run_id}/runner-token
+POST /api/v1/listeners/{id}/runs/{run_id}/runner-token
 ```
 
 Generates a short-lived HMAC-signed runner token scoped to the specified run. Called by the listener after claiming a run.
@@ -2169,7 +2177,7 @@ Generates a short-lived HMAC-signed runner token scoped to the specified run. Ca
 ### Listener Status Update
 
 ```
-PATCH /api/terrapod/v1/listeners/{id}/runs/{run_id}
+PATCH /api/v1/listeners/{id}/runs/{run_id}
 ```
 
 Reports run status changes (planning, planned, applying, applied, errored).
@@ -2181,13 +2189,13 @@ Reports run status changes (planning, planned, applying, applied, errored).
 ### List Connections
 
 ```
-GET /api/terrapod/v1/vcs-connections
+GET /api/v1/vcs-connections
 ```
 
 ### Create Connection
 
 ```
-POST /api/terrapod/v1/vcs-connections
+POST /api/v1/vcs-connections
 ```
 
 **GitHub example:**
@@ -2237,7 +2245,7 @@ POST /api/terrapod/v1/vcs-connections
 ### Show Connection
 
 ```
-GET /api/terrapod/v1/vcs-connections/{id}
+GET /api/v1/vcs-connections/{id}
 ```
 
 #### API budget and consumption attributes
@@ -2273,7 +2281,7 @@ spend over the rest of the window against what is actually left. See
 ### Update Connection
 
 ```
-PATCH /api/terrapod/v1/vcs-connections/{id}
+PATCH /api/v1/vcs-connections/{id}
 ```
 
 Partial update — only the attributes you include are changed. Notes:
@@ -2296,7 +2304,7 @@ Partial update — only the attributes you include are changed. Notes:
 ### Delete Connection
 
 ```
-DELETE /api/terrapod/v1/vcs-connections/{id}
+DELETE /api/v1/vcs-connections/{id}
 ```
 
 ---
@@ -2310,13 +2318,13 @@ All endpoints require `admin` role.
 ### List Rules
 
 ```
-GET /api/terrapod/v1/autodiscovery-rules
+GET /api/v1/autodiscovery-rules
 ```
 
 ### Create Rule
 
 ```
-POST /api/terrapod/v1/autodiscovery-rules
+POST /api/v1/autodiscovery-rules
 ```
 
 **Request body** (every attribute except `name`, `vcs-connection-id`, `repo-url`, `pattern` is optional):
@@ -2356,13 +2364,13 @@ Returns `201` with the created rule, or `409` if a rule with that name already e
 ### Show Rule
 
 ```
-GET /api/terrapod/v1/autodiscovery-rules/{id}
+GET /api/v1/autodiscovery-rules/{id}
 ```
 
 ### Update Rule
 
 ```
-PATCH /api/terrapod/v1/autodiscovery-rules/{id}
+PATCH /api/v1/autodiscovery-rules/{id}
 ```
 
 Same body shape as create; only the attributes you include are updated.
@@ -2370,7 +2378,7 @@ Same body shape as create; only the attributes you include are updated.
 ### Delete Rule
 
 ```
-DELETE /api/terrapod/v1/autodiscovery-rules/{id}
+DELETE /api/v1/autodiscovery-rules/{id}
 ```
 
 Workspaces auto-created by this rule keep working — their `autodiscovery-rule-id` foreign key is set to NULL.
@@ -2380,8 +2388,8 @@ Workspaces auto-created by this rule keep working — their `autodiscovery-rule-
 Walk the repo and return exactly which workspaces a rule *would* create against the current state of the tracked branch, with no side effects. Used by the admin UI's "Preview" modal.
 
 ```
-GET  /api/terrapod/v1/autodiscovery-rules/{id}/preview      # preview a saved rule
-POST /api/terrapod/v1/autodiscovery-rules/preview           # preview an unsaved rule (same attributes body as Create)
+GET  /api/v1/autodiscovery-rules/{id}/preview      # preview a saved rule
+POST /api/v1/autodiscovery-rules/preview           # preview an unsaved rule (same attributes body as Create)
 ```
 
 Each entry reports `workspace_name`, `working_directory`, `collision` (the row would no-op — a workspace is already bound to that directory or the derived name is taken), and `existing_autodiscovered` (the no-op is a reuse of a workspace this same rule already materialised). Returns `413` if the VCS provider truncated the repo tree (repo too large to scan in one pass).
@@ -2389,7 +2397,7 @@ Each entry reports `workspace_name`, `working_directory`, `collision` (the row w
 ### Scan (on-demand materialise)
 
 ```
-POST /api/terrapod/v1/autodiscovery-rules/{id}/scan
+POST /api/v1/autodiscovery-rules/{id}/scan
 ```
 
 Runs the same walk as Preview but actually creates the workspaces (idempotent, collision-safe). Force-enables the rule for the duration of the call so an explicit operator action doesn't silently no-op on a disabled rule. New workspaces are seeded with the tracked-branch HEAD as their last-seen commit, so the first real plan+apply fires when the branch next advances (e.g. the PR merge) — not immediately against a branch where the directory doesn't exist yet.
@@ -2414,7 +2422,7 @@ Terrapod-native, **admin only**. Server-side selection + atomic fleet updates (#
 ### Search
 
 ```
-POST /api/terrapod/v1/workspaces/actions/search
+POST /api/v1/workspaces/actions/search
 ```
 
 Resolve a structured filter to the matching workspaces — no side effects (the discovery half of the bulk workflow).
@@ -2435,7 +2443,7 @@ Dimensions are **AND-combined** (narrower = safer). An empty/omitted `filter` is
 ### Bulk Update
 
 ```
-POST /api/terrapod/v1/workspaces/actions/bulk-update
+POST /api/v1/workspaces/actions/bulk-update
 ```
 
 Apply `update` to every workspace matching `filter`, in a **single all-or-nothing transaction**.
@@ -2480,7 +2488,7 @@ Response: dry-run `{dry_run:true, matched, would_change:[{id,name,diff}], unchan
 ### GitHub Webhook Receiver
 
 ```
-POST /api/terrapod/v1/vcs-events/github
+POST /api/v1/vcs-events/github
 ```
 
 Validates HMAC-SHA256 signature and triggers an immediate poll cycle. The webhook secret must match the connection's own `webhook-secret`, falling back to the global `TERRAPOD_VCS__GITHUB__WEBHOOK_SECRET`.
@@ -2488,7 +2496,7 @@ Validates HMAC-SHA256 signature and triggers an immediate poll cycle. The webhoo
 ### GitLab Webhook Receiver
 
 ```
-POST /api/terrapod/v1/vcs-events/gitlab
+POST /api/v1/vcs-events/gitlab
 ```
 
 Validates the `X-Gitlab-Token` header (timing-safe comparison against the connection's `webhook-secret`) and triggers an immediate poll cycle. Handles `Push Hook`, `Tag Push Hook`, and `Merge Request Hook` events; other event types are acknowledged and ignored. A `Tag Push Hook` additionally triggers an immediate **module tag** poll, so a new module version publishes within seconds rather than waiting for `vcs.module_poll_interval_seconds`. Like GitHub, webhooks are an **optional accelerator** — the background poller still picks up changes within `vcs.poll_interval_seconds` if no webhook is configured.
@@ -2500,7 +2508,7 @@ Validates the `X-Gitlab-Token` header (timing-safe comparison against the connec
 ### List Roles
 
 ```
-GET /api/terrapod/v1/roles
+GET /api/v1/roles
 ```
 
 Returns built-in and custom roles.
@@ -2510,7 +2518,7 @@ Returns built-in and custom roles.
 ### Create Role
 
 ```
-POST /api/terrapod/v1/roles
+POST /api/v1/roles
 ```
 
 **Request body (capability authoring — recommended):**
@@ -2560,19 +2568,19 @@ A role's grant is its **`capabilities`** set — a list of `resource:verb` token
 ### Show Role
 
 ```
-GET /api/terrapod/v1/roles/{name}
+GET /api/v1/roles/{name}
 ```
 
 ### Update Role
 
 ```
-PATCH /api/terrapod/v1/roles/{name}
+PATCH /api/v1/roles/{name}
 ```
 
 ### Delete Role
 
 ```
-DELETE /api/terrapod/v1/roles/{name}
+DELETE /api/v1/roles/{name}
 ```
 
 Built-in roles cannot be deleted.
@@ -2590,11 +2598,11 @@ it had.
 ### Resource Access (who can reach this)
 
 ```
-GET /api/terrapod/v1/workspaces/{id}/access
-GET /api/terrapod/v1/agent-pools/{id}/access
-GET /api/terrapod/v1/registry-modules/{id}/access
-GET /api/terrapod/v1/registry-providers/{id}/access
-GET /api/terrapod/v1/catalog-items/{id}/access
+GET /api/v1/workspaces/{id}/access
+GET /api/v1/agent-pools/{id}/access
+GET /api/v1/registry-modules/{id}/access
+GET /api/v1/registry-providers/{id}/access
+GET /api/v1/catalog-items/{id}/access
 ```
 
 The inverse of the role preview. `admin` or `audit`; read-only and unpaged
@@ -2633,8 +2641,8 @@ reach the resource.
 ### Preview Role Reach
 
 ```
-POST /api/terrapod/v1/roles/preview
-GET  /api/terrapod/v1/roles/{name}/preview
+POST /api/v1/roles/preview
+GET  /api/v1/roles/{name}/preview
 ```
 
 Which workspaces a role grants on, and why. `admin` or `audit`; read-only.
@@ -2707,7 +2715,7 @@ to that axis. The workspace axis is also promoted to the top level as
 ### List Assignments
 
 ```
-GET /api/terrapod/v1/role-assignments
+GET /api/v1/role-assignments
 ```
 
 **Required permission:** Platform `admin` or `audit`.
@@ -2715,7 +2723,7 @@ GET /api/terrapod/v1/role-assignments
 ### Set Roles for User
 
 ```
-PUT /api/terrapod/v1/role-assignments
+PUT /api/v1/role-assignments
 ```
 
 **Request body:**
@@ -2737,7 +2745,7 @@ PUT /api/terrapod/v1/role-assignments
 ### Remove Single Assignment
 
 ```
-DELETE /api/terrapod/v1/role-assignments/{provider}/{email}/{role}
+DELETE /api/v1/role-assignments/{provider}/{email}/{role}
 ```
 
 ---
@@ -2759,7 +2767,7 @@ A `service_bound` token can never exceed its owner's access (the intersection ca
 ### Create Token
 
 ```
-POST /api/terrapod/v1/users/{user_id}/authentication-tokens
+POST /api/v1/users/{user_id}/authentication-tokens
 ```
 
 Request attributes: `description`, `kind` (default `interactive`), `lifespan_hours`, `pinned_roles` (service kinds). `service_detached` is admin-only (`403` otherwise) and is created unbound regardless of `{user_id}`.
@@ -2767,7 +2775,7 @@ Request attributes: `description`, `kind` (default `interactive`), `lifespan_hou
 ### List Own Tokens
 
 ```
-GET /api/terrapod/v1/users/{user_id}/authentication-tokens
+GET /api/v1/users/{user_id}/authentication-tokens
 ```
 
 Never includes detached tokens (they are unbound).
@@ -2775,7 +2783,7 @@ Never includes detached tokens (they are unbound).
 ### List All Tokens (admin)
 
 ```
-GET /api/terrapod/v1/admin/authentication-tokens[?kind={kind}]
+GET /api/v1/admin/authentication-tokens[?kind={kind}]
 ```
 
 Admin-only. Optional `kind` filter (`interactive` / `service_bound` / `service_detached`); a valid-but-empty kind returns `[]`, not an error.
@@ -2783,13 +2791,13 @@ Admin-only. Optional `kind` filter (`interactive` / `service_bound` / `service_d
 ### Show Token
 
 ```
-GET /api/terrapod/v1/authentication-tokens/{id}
+GET /api/v1/authentication-tokens/{id}
 ```
 
 ### Re-tag Token (change kind)
 
 ```
-PATCH /api/terrapod/v1/authentication-tokens/{id}
+PATCH /api/v1/authentication-tokens/{id}
 ```
 
 `interactive` ↔ `service_bound` is owner-or-admin. Converting **to/from** `service_detached` is admin-only and unbinds/rebinds the token. Request attributes: `kind`, `pinned_roles`.
@@ -2797,7 +2805,7 @@ PATCH /api/terrapod/v1/authentication-tokens/{id}
 ### Rotate Token
 
 ```
-POST /api/terrapod/v1/authentication-tokens/{id}/actions/rotate
+POST /api/v1/authentication-tokens/{id}/actions/rotate
 ```
 
 Mints a fresh secret (returned once in `token`) and resets the expiry clock; the old secret stops working immediately. Surfaced as a "Rotate" action on service tokens in the UI.
@@ -2805,7 +2813,7 @@ Mints a fresh secret (returned once in `token`) and resets the expiry clock; the
 ### List Expiring Service Tokens
 
 ```
-GET /api/terrapod/v1/authentication-tokens/expiring
+GET /api/v1/authentication-tokens/expiring
 ```
 
 Service tokens within `auth.token_expiry_warning_days` (default 14) of expiry, **scoped to the caller**: own bound service tokens for everyone, plus all detached tokens for admins. Drives the in-app expiry banner — no user is warned about another user's bound tokens.
@@ -2813,7 +2821,7 @@ Service tokens within `auth.token_expiry_warning_days` (default 14) of expiry, *
 ### Revoke All Tokens for a User (admin)
 
 ```
-POST /api/terrapod/v1/admin/authentication-tokens/actions/revoke-all
+POST /api/v1/admin/authentication-tokens/actions/revoke-all
 ```
 
 Admin-only urgent-offboarding lever. Body `{"email": "..."}`; revokes every token bound to that identity and returns `{"data": {"email": ..., "revoked": N}}`. Detached tokens are unbound and unaffected.
@@ -2821,7 +2829,7 @@ Admin-only urgent-offboarding lever. Body `{"email": "..."}`; revokes every toke
 ### Delete Token
 
 ```
-DELETE /api/terrapod/v1/authentication-tokens/{id}
+DELETE /api/v1/authentication-tokens/{id}
 ```
 
 ---
@@ -2833,7 +2841,7 @@ Authenticated endpoints for runner Jobs to download inputs and upload outputs. A
 ### Download Config Archive
 
 ```
-GET /api/terrapod/v1/runs/{run_id}/artifacts/config
+GET /api/v1/runs/{run_id}/artifacts/config
 ```
 
 Returns 302 redirect to presigned storage URL for the configuration tarball.
@@ -2841,7 +2849,7 @@ Returns 302 redirect to presigned storage URL for the configuration tarball.
 ### Download State
 
 ```
-GET /api/terrapod/v1/runs/{run_id}/artifacts/state
+GET /api/v1/runs/{run_id}/artifacts/state
 ```
 
 Returns 302 redirect to presigned storage URL for the current workspace state.
@@ -2849,7 +2857,7 @@ Returns 302 redirect to presigned storage URL for the current workspace state.
 ### Download Plan File
 
 ```
-GET /api/terrapod/v1/runs/{run_id}/artifacts/plan-file
+GET /api/v1/runs/{run_id}/artifacts/plan-file
 ```
 
 Returns 302 redirect to presigned storage URL for the plan binary file.
@@ -2857,7 +2865,7 @@ Returns 302 redirect to presigned storage URL for the plan binary file.
 ### Upload Plan Log
 
 ```
-PUT /api/terrapod/v1/runs/{run_id}/artifacts/plan-log
+PUT /api/v1/runs/{run_id}/artifacts/plan-log
 Content-Type: application/octet-stream
 ```
 
@@ -2866,7 +2874,7 @@ Upload raw plan log bytes. Returns 204 on success.
 ### Upload Plan File
 
 ```
-PUT /api/terrapod/v1/runs/{run_id}/artifacts/plan-file
+PUT /api/v1/runs/{run_id}/artifacts/plan-file
 Content-Type: application/octet-stream
 ```
 
@@ -2875,7 +2883,7 @@ Upload plan binary file. Returns 204 on success.
 ### Upload Apply Log
 
 ```
-PUT /api/terrapod/v1/runs/{run_id}/artifacts/apply-log
+PUT /api/v1/runs/{run_id}/artifacts/apply-log
 Content-Type: application/octet-stream
 ```
 
@@ -2884,7 +2892,7 @@ Upload raw apply log bytes. Returns 204 on success.
 ### Upload State
 
 ```
-PUT /api/terrapod/v1/runs/{run_id}/artifacts/state
+PUT /api/v1/runs/{run_id}/artifacts/state
 Content-Type: application/octet-stream
 ```
 
@@ -2893,7 +2901,7 @@ Upload new state after apply. Returns 204 on success.
 ### Download Plan Artifacts
 
 ```
-GET /api/terrapod/v1/runs/{run_id}/artifacts/plan-artifacts
+GET /api/v1/runs/{run_id}/artifacts/plan-artifacts
 ```
 
 Returns 302 redirect to presigned storage URL for the plan-phase workspace-diff tarball. Used by the apply phase to restore files generated during plan (e.g. `data.archive_file` outputs, `null_resource` local-exec scratch) into the apply Job's fresh workspace. Returns 404 if the run was produced by a pre-v0.34.0 runner (no plan-artifacts uploaded). The apply phase tolerates 404 — it logs an error and proceeds.
@@ -2901,7 +2909,7 @@ Returns 302 redirect to presigned storage URL for the plan-phase workspace-diff 
 ### Upload Plan Artifacts
 
 ```
-PUT /api/terrapod/v1/runs/{run_id}/artifacts/plan-artifacts
+PUT /api/v1/runs/{run_id}/artifacts/plan-artifacts
 Content-Type: application/x-tar
 Content-Length: <bytes>
 ```
@@ -2915,7 +2923,7 @@ Returns 204 on success.
 ### Record Resource Profile
 
 ```
-POST /api/terrapod/v1/runs/{run_id}/resource-profile
+POST /api/v1/runs/{run_id}/resource-profile
 Content-Type: application/json
 ```
 
@@ -2948,7 +2956,7 @@ Returns 204 on success.
 ### Download Binary
 
 ```
-GET /api/terrapod/v1/binary-cache/{tool}/{version}/{os}/{arch}
+GET /api/v1/binary-cache/{tool}/{version}/{os}/{arch}
 ```
 
 Returns a 302 redirect to a presigned URL for the binary. `tool` is `terraform` or `tofu`.
@@ -2958,13 +2966,13 @@ Returns a 302 redirect to a presigned URL for the binary. `tool` is `terraform` 
 ### List Cached Binaries (Admin)
 
 ```
-GET /api/terrapod/v1/admin/binary-cache
+GET /api/v1/admin/binary-cache
 ```
 
 ### Warm Cache (Admin)
 
 ```
-POST /api/terrapod/v1/admin/binary-cache/warm
+POST /api/v1/admin/binary-cache/warm
 ```
 
 Pre-cache a specific tool version.
@@ -2972,7 +2980,7 @@ Pre-cache a specific tool version.
 ### Bulk Warm Cache (Admin)
 
 ```
-POST /api/terrapod/v1/admin/binary-cache/warm-bulk
+POST /api/v1/admin/binary-cache/warm-bulk
 ```
 
 Pre-cache many binaries and/or provider platforms in one call. Request body:
@@ -3002,7 +3010,7 @@ See [Cache pre-population](registry.md#cache-pre-population).
 ### Purge Cache (Admin)
 
 ```
-DELETE /api/terrapod/v1/admin/binary-cache/{tool}/{version}
+DELETE /api/v1/admin/binary-cache/{tool}/{version}
 ```
 
 ---
@@ -3016,7 +3024,7 @@ endpoints require platform `admin`.
 ### Status
 
 ```
-GET /api/terrapod/v1/admin/encryption
+GET /api/v1/admin/encryption
 ```
 
 Reports encryption-at-rest health. `decryptable` is the headline durability
@@ -3037,7 +3045,7 @@ back (page on it). Always returns 200 (even when encryption is disabled).
 ### Rotate DEK
 
 ```
-POST /api/terrapod/v1/admin/encryption/rotate-dek
+POST /api/v1/admin/encryption/rotate-dek
 ```
 
 Mints a new active data-encryption key. Prior DEK versions are **retained** so
@@ -3055,7 +3063,7 @@ same status shape as above. **409** when encryption is disabled.
 ## Agent Pool Events (SSE)
 
 ```
-GET /api/terrapod/v1/agent-pools/{pool_id}/events
+GET /api/v1/agent-pools/{pool_id}/events
 ```
 
 Server-Sent Events stream for real-time agent pool updates. Emits events when listeners heartbeat or join the pool. Used by the agent pool detail page for live listener status updates.
@@ -3096,32 +3104,32 @@ Returns platform-specific download URLs with `zh:` (zip hash) checksums.
 ### List Auth Providers
 
 ```
-GET /api/terrapod/v1/auth/providers
+GET /api/v1/auth/providers
 ```
 
 ### Authorize (Start Login)
 
 ```
-GET /api/terrapod/v1/auth/authorize
+GET /api/v1/auth/authorize
 ```
 
 ### Callback (IDP Return)
 
 ```
-GET /api/terrapod/v1/auth/callback
-POST /api/terrapod/v1/auth/callback
+GET /api/v1/auth/callback
+POST /api/v1/auth/callback
 ```
 
 ### Active Sessions
 
 ```
-GET /api/terrapod/v1/auth/sessions
+GET /api/v1/auth/sessions
 ```
 
 ### Session Status
 
 ```
-GET /api/terrapod/v1/auth/session
+GET /api/v1/auth/session
 ```
 
 Returns the caller's live web-session status for the expiry-warning banner
@@ -3136,7 +3144,7 @@ signal (session auth only; API-token callers get `401` here).
 ### Logout
 
 ```
-POST /api/terrapod/v1/auth/logout
+POST /api/v1/auth/logout
 ```
 
 ---
@@ -3164,7 +3172,7 @@ Immutable record of API requests. Requires `admin` or `audit` role.
 ### List Audit Log Entries
 
 ```
-GET /api/terrapod/v1/admin/audit-log
+GET /api/v1/admin/audit-log
 ```
 
 **Query Parameters:**
@@ -3184,7 +3192,7 @@ GET /api/terrapod/v1/admin/audit-log
 **Example:**
 
 ```zsh
-curl "https://terrapod.example.com/api/terrapod/v1/admin/audit-log?filter[actor]=admin@example.com&page[size]=10" \
+curl "https://terrapod.example.com/api/v1/admin/audit-log?filter[actor]=admin@example.com&page[size]=10" \
   -H "Authorization: Bearer $TERRAPOD_TOKEN"
 ```
 
@@ -3197,7 +3205,7 @@ User management endpoints. List and show require `admin` or `audit` role. Update
 ### List Users
 
 ```
-GET /api/terrapod/v1/users
+GET /api/v1/users
 ```
 
 **Query Parameters:**
@@ -3211,13 +3219,13 @@ GET /api/terrapod/v1/users
 ### Show User
 
 ```
-GET /api/terrapod/v1/users/{email}
+GET /api/v1/users/{email}
 ```
 
 ### Update User
 
 ```
-PATCH /api/terrapod/v1/users/{email}
+PATCH /api/v1/users/{email}
 ```
 
 **Updatable attributes:** `is-active`, `display-name`.
@@ -3227,7 +3235,7 @@ When `is-active` is set to `false`, all sessions for that user are revoked immed
 ### Delete User
 
 ```
-DELETE /api/terrapod/v1/users/{email}
+DELETE /api/v1/users/{email}
 ```
 
 Cascades: revokes all sessions, deletes all role assignments.
@@ -3241,7 +3249,7 @@ Workspace-scoped notifications that fire on run lifecycle events. Three destinat
 ### Create Notification Configuration
 
 ```
-POST /api/terrapod/v1/workspaces/{id}/notification-configurations
+POST /api/v1/workspaces/{id}/notification-configurations
 ```
 
 **Request body:**
@@ -3276,7 +3284,7 @@ POST /api/terrapod/v1/workspaces/{id}/notification-configurations
 ### List Notification Configurations
 
 ```
-GET /api/terrapod/v1/workspaces/{id}/notification-configurations
+GET /api/v1/workspaces/{id}/notification-configurations
 ```
 
 **Required permission:** `read` on the workspace.
@@ -3284,7 +3292,7 @@ GET /api/terrapod/v1/workspaces/{id}/notification-configurations
 ### Show Notification Configuration
 
 ```
-GET /api/terrapod/v1/notification-configurations/{id}
+GET /api/v1/notification-configurations/{id}
 ```
 
 **Required permission:** `read` on the associated workspace.
@@ -3292,7 +3300,7 @@ GET /api/terrapod/v1/notification-configurations/{id}
 ### Update Notification Configuration
 
 ```
-PATCH /api/terrapod/v1/notification-configurations/{id}
+PATCH /api/v1/notification-configurations/{id}
 ```
 
 Same body format as create. Only include attributes to change. Token is never returned in responses — only `has-token: true/false`.
@@ -3302,7 +3310,7 @@ Same body format as create. Only include attributes to change. Token is never re
 ### Delete Notification Configuration
 
 ```
-DELETE /api/terrapod/v1/notification-configurations/{id}
+DELETE /api/v1/notification-configurations/{id}
 ```
 
 **Required permission:** `admin` on the workspace.
@@ -3310,7 +3318,7 @@ DELETE /api/terrapod/v1/notification-configurations/{id}
 ### Verify Notification Configuration
 
 ```
-POST /api/terrapod/v1/notification-configurations/{id}/actions/verify
+POST /api/v1/notification-configurations/{id}/actions/verify
 ```
 
 Sends a test payload to the configured destination and returns the delivery response.
@@ -3330,7 +3338,7 @@ entitlement — RBAC is re-checked live on each action. See
 ### Preview link
 
 ```
-POST /api/terrapod/v1/slack/link/preview
+POST /api/v1/slack/link/preview
 ```
 
 Body `{"state": "<signed-state>"}`. Requires an authenticated Terrapod user.
@@ -3344,7 +3352,7 @@ on `POST /slack/link`.
 ### Link account
 
 ```
-POST /api/terrapod/v1/slack/link
+POST /api/v1/slack/link
 ```
 
 Body `{"state": "<signed-state>"}`. Requires an authenticated Terrapod user;
@@ -3355,7 +3363,7 @@ state. `422` if the state is missing, `400` if it is invalid/expired/already use
 ### List my Slack links
 
 ```
-GET /api/terrapod/v1/slack/links
+GET /api/v1/slack/links
 ```
 
 Returns the current user's Slack identity links.
@@ -3363,7 +3371,7 @@ Returns the current user's Slack identity links.
 ### Unlink
 
 ```
-DELETE /api/terrapod/v1/slack/links/{link_id}
+DELETE /api/v1/slack/links/{link_id}
 ```
 
 Removes one of the current user's own links (`404` if it isn't theirs).
@@ -3380,7 +3388,7 @@ guide. Delivery is gated by the platform kill-switch `runners.hooksEnabled`
 ### Create Execution Hook
 
 ```
-POST /api/terrapod/v1/execution-hooks
+POST /api/v1/execution-hooks
 ```
 
 **Request body:**
@@ -3407,7 +3415,7 @@ POST /api/terrapod/v1/execution-hooks
 ### List Execution Hooks
 
 ```
-GET /api/terrapod/v1/execution-hooks
+GET /api/v1/execution-hooks
 ```
 
 **Required permission:** `admin`.
@@ -3415,7 +3423,7 @@ GET /api/terrapod/v1/execution-hooks
 ### Show Execution Hook
 
 ```
-GET /api/terrapod/v1/execution-hooks/{id}
+GET /api/v1/execution-hooks/{id}
 ```
 
 **Required permission:** `admin`.
@@ -3423,7 +3431,7 @@ GET /api/terrapod/v1/execution-hooks/{id}
 ### Update Execution Hook
 
 ```
-PATCH /api/terrapod/v1/execution-hooks/{id}
+PATCH /api/v1/execution-hooks/{id}
 ```
 
 Same body format as create; include only the attributes to change.
@@ -3433,7 +3441,7 @@ Same body format as create; include only the attributes to change.
 ### Delete Execution Hook
 
 ```
-DELETE /api/terrapod/v1/execution-hooks/{id}
+DELETE /api/v1/execution-hooks/{id}
 ```
 
 Removes the hook and all its workspace associations.
@@ -3443,8 +3451,8 @@ Removes the hook and all its workspace associations.
 ### Associate / Dissociate Workspaces
 
 ```
-POST   /api/terrapod/v1/execution-hooks/{id}/relationships/workspaces
-DELETE /api/terrapod/v1/execution-hooks/{id}/relationships/workspaces
+POST   /api/v1/execution-hooks/{id}/relationships/workspaces
+DELETE /api/v1/execution-hooks/{id}/relationships/workspaces
 ```
 
 **Request body** (both verbs, idempotent):
@@ -3463,7 +3471,7 @@ OPA policy-as-code enforcement. Policy sets and their policies are admin-managed
 ### List Policy Sets
 
 ```
-GET /api/terrapod/v1/policy-sets
+GET /api/v1/policy-sets
 ```
 
 Returns all policy sets. **Required permission:** `admin` or `audit`.
@@ -3471,7 +3479,7 @@ Returns all policy sets. **Required permission:** `admin` or `audit`.
 ### Create Policy Set
 
 ```
-POST /api/terrapod/v1/policy-sets
+POST /api/v1/policy-sets
 ```
 
 ```json
@@ -3531,7 +3539,7 @@ When `source=vcs`, inline policy CRUD is rejected with **409 Conflict** — poli
 ### Sync VCS Policy Set
 
 ```
-POST /api/terrapod/v1/policy-sets/{id}/actions/sync
+POST /api/v1/policy-sets/{id}/actions/sync
 ```
 
 Triggers an immediate sync of a VCS-sourced policy set. Returns **202 Accepted** with the current policy set state; the actual sync runs asynchronously. Returns **409 Conflict** if the policy set has `source=inline`. **Required permission:** `admin`.
@@ -3539,9 +3547,9 @@ Triggers an immediate sync of a VCS-sourced policy set. Returns **202 Accepted**
 ### Show / Update / Delete Policy Set
 
 ```
-GET    /api/terrapod/v1/policy-sets/{id}     # policies embedded
-PATCH  /api/terrapod/v1/policy-sets/{id}     # partial update
-DELETE /api/terrapod/v1/policy-sets/{id}
+GET    /api/v1/policy-sets/{id}     # policies embedded
+PATCH  /api/v1/policy-sets/{id}     # partial update
+DELETE /api/v1/policy-sets/{id}
 ```
 
 Deleting a set removes its policies; recorded run evaluations are kept (set reference nulled, name snapshot retained). **Required permission:** `admin` (`admin`/`audit` for show).
@@ -3549,9 +3557,9 @@ Deleting a set removes its policies; recorded run evaluations are kept (set refe
 ### Manage Policies
 
 ```
-POST   /api/terrapod/v1/policy-sets/{id}/policies   # add a policy
-PATCH  /api/terrapod/v1/policies/{id}               # update
-DELETE /api/terrapod/v1/policies/{id}
+POST   /api/v1/policy-sets/{id}/policies   # add a policy
+PATCH  /api/v1/policies/{id}               # update
+DELETE /api/v1/policies/{id}
 ```
 
 ```json
@@ -3571,7 +3579,7 @@ The Rego is validated with `opa check` on create/update — broken Rego, or Rego
 ### List Run Policy Evaluations
 
 ```
-GET /api/terrapod/v1/runs/{run_id}/policy-evaluations
+GET /api/v1/runs/{run_id}/policy-evaluations
 ```
 
 Returns the policy evaluations recorded for a run, plus a `meta.summary` (`status`: `passed` / `advisory-failed` / `blocked`, and counts). Each evaluation's `result` carries the per-policy violations/warnings. This is the endpoint behind the run's `policy-checks` relationship link. **Required permission:** `read` on the run's workspace.
@@ -3579,7 +3587,7 @@ Returns the policy evaluations recorded for a run, plus a `meta.summary` (`statu
 ### Override Run Policy
 
 ```
-POST /api/terrapod/v1/runs/{run_id}/actions/override-policy
+POST /api/v1/runs/{run_id}/actions/override-policy
 ```
 
 Overrides every failed/errored policy evaluation of a run and immediately re-drives a run held at the post-plan policy gate. **Required permission:** `admin` on the run's workspace.
@@ -3587,7 +3595,7 @@ Overrides every failed/errored policy evaluation of a run and immediately re-dri
 ### Runner protocol — Policy Bundle
 
 ```
-GET /api/terrapod/v1/runs/{run_id}/policy-bundle
+GET /api/v1/runs/{run_id}/policy-bundle
 ```
 
 Returns the applicable policy sets + run/workspace context for a run. Used by the runner during the plan phase to drive OPA evaluation locally. A persistent fetch failure on the runner is **fatal** to the run (see [`docs/runners.md` — OPA Policy Evaluation](runners.md)) — there is no silent skip. Response shape is a flat JSON document (not JSON:API — the runner is the only consumer):
@@ -3616,7 +3624,7 @@ Returns the applicable policy sets + run/workspace context for a run. Used by th
 ### Runner protocol — Policy Results
 
 ```
-POST /api/terrapod/v1/runs/{run_id}/policy-results
+POST /api/v1/runs/{run_id}/policy-results
 ```
 
 ```json
@@ -3651,7 +3659,7 @@ Onboarding has **no feature flag** — it is gated per workspace by the `workspa
 ### Availability Probe
 
 ```
-GET /api/terrapod/v1/onboarding
+GET /api/v1/onboarding
 ```
 
 Any authenticated user. Reports whether the optional AI mode is available, so the UI can offer the conversational path when it is configured. Onboarding itself is always present — actual access is decided per-workspace by the `workspace:onboard` capability on the real endpoints.
@@ -3677,7 +3685,7 @@ Any authenticated user. Reports whether the optional AI mode is available, so th
 ### Create Onboarding Session
 
 ```
-POST /api/terrapod/v1/workspaces/{id}/onboarding-sessions
+POST /api/v1/workspaces/{id}/onboarding-sessions
 ```
 
 Requires `workspace:onboard`. Starts a session and kicks off credential-less D1 schema discovery on a scheduler trigger (off the request thread). The client polls the session (below) until `status == "schema_ready"`, then reads the discovery surface and selects the data-source types to query.
@@ -3705,7 +3713,7 @@ Returns `201` with the serialized session (below).
 ### List Onboarding Sessions
 
 ```
-GET /api/terrapod/v1/workspaces/{id}/onboarding-sessions
+GET /api/v1/workspaces/{id}/onboarding-sessions
 ```
 
 Requires `workspace:onboard`. Returns the workspace's sessions. The (large, per-session) discovery surface is **omitted** from the list — fetch a single session for it.
@@ -3713,7 +3721,7 @@ Requires `workspace:onboard`. Returns the workspace's sessions. The (large, per-
 ### Show Onboarding Session
 
 ```
-GET /api/terrapod/v1/onboarding-sessions/{id}
+GET /api/v1/onboarding-sessions/{id}
 ```
 
 Requires `workspace:onboard` on the session's workspace. Returns the session **including** its `discovery-surface` (served from a time-limited Redis cache — never persisted per-session; an expired session simply re-runs discovery). Once `status == "config_ready"`, the generated config and import blocks are present.
@@ -3721,7 +3729,7 @@ Requires `workspace:onboard` on the session's workspace. Returns the session **i
 ### Start Discovery (D2/D3)
 
 ```
-POST /api/terrapod/v1/onboarding-sessions/{id}/discover
+POST /api/v1/onboarding-sessions/{id}/discover
 ```
 
 Requires `workspace:onboard`. Dispatches the runner discovery run for a `schema_ready` session, querying the selected subset of the session's discovery surface. A session not in `schema_ready` → `422`.
@@ -3778,17 +3786,17 @@ The `onboarding-sessions` JSON:API resource the UI consumes:
 The runner discovery Job uploads its generated artifacts to these endpoints. Auth is a **runner token scoped to the discovery run** — each endpoint resolves the owning session via its `discovery_run_id` (== this run), so a Job can only ever write to its own session. Bodies are capped (`413` if too large).
 
 ```
-PUT  /api/terrapod/v1/runs/{run_id}/artifacts/onboarding-config
+PUT  /api/v1/runs/{run_id}/artifacts/onboarding-config
 ```
 The cleaned, import-only generated `resource {}` config (D3 + clean). Body is `.tf` text; stored on the session's `generated-config`. Returns `204`.
 
 ```
-PUT  /api/terrapod/v1/runs/{run_id}/artifacts/onboarding-imports
+PUT  /api/v1/runs/{run_id}/artifacts/onboarding-imports
 ```
 The candidate `import {}` blocks (D3). Body is `.tf` text; stored on the session's `import-blocks`. Returns `204`.
 
 ```
-POST /api/terrapod/v1/runs/{run_id}/artifacts/onboarding-query-results
+POST /api/v1/runs/{run_id}/artifacts/onboarding-query-results
 ```
 The raw D2 query results + the import-only verdict (JSON object; non-JSON or non-object → `422`). Stored on the session. Returns `204`.
 
@@ -3807,7 +3815,7 @@ There are two cost views: a **run** view (the monthly cost *delta* a plan introd
 ### Show Run Cost Estimate
 
 ```
-GET /api/terrapod/v1/runs/{run_id}/cost-estimate
+GET /api/v1/runs/{run_id}/cost-estimate
 ```
 
 Requires `run:read` on the run's workspace. Returns the runner-produced estimate of the plan's monthly cost delta (`404` when the run produced no estimate — errored before plan, cost estimation disabled, or the artifact aged out).
@@ -3848,7 +3856,7 @@ Requires `run:read` on the run's workspace. Returns the runner-produced estimate
 ### Show Workspace Cost Estimate
 
 ```
-GET /api/terrapod/v1/workspaces/{id}/cost-estimate
+GET /api/v1/workspaces/{id}/cost-estimate
 ```
 
 Requires `state:read` on the workspace (the estimate is derived server-side from the secret-bearing state blob, though only non-sensitive aggregates are returned). Runs the workspace's **latest state version** through the cost engine to report the current monthly cost of its managed infrastructure — the state analogue of the run delta above. Because state carries no change, every resource is a `noop`, `diff` is zero, and `total` is the current monthly spend.
@@ -3882,9 +3890,9 @@ The attributes match the run estimate, plus `state-version` naming the priced ve
 ### Pricesheet (runner + admin)
 
 ```
-GET  /api/terrapod/v1/cost-estimation/pricesheet             # 302 → presigned cached pricesheet (gzipped YAML) (any authenticated caller; consumed by runner Jobs)
-GET  /api/terrapod/v1/cost-estimation/pricesheet/status      # admin: enabled + cached?
-POST /api/terrapod/v1/cost-estimation/pricesheet/refresh     # admin: force re-fetch from upstream
+GET  /api/v1/cost-estimation/pricesheet             # 302 → presigned cached pricesheet (gzipped YAML) (any authenticated caller; consumed by runner Jobs)
+GET  /api/v1/cost-estimation/pricesheet/status      # admin: enabled + cached?
+POST /api/v1/cost-estimation/pricesheet/refresh     # admin: force re-fetch from upstream
 ```
 
 The download endpoint is pull-through: a cold or stale cache is fetched from `cost_estimation.prices_url` on demand, and a stale copy is served if a refresh fails (a transient upstream outage never breaks a run). `404` when cost estimation is disabled or nothing is cached; the returned presigned URL needs no auth. `refresh` returns `502` on an upstream/decompress failure.
@@ -3894,8 +3902,8 @@ The download endpoint is pull-through: a cold or stale cache is fetched from `co
 The optional AI layer over the data-only estimate (rides `ai_summary.enabled` + the per-workspace mode). Its **primary** output is estimates for the resources the pricesheet couldn't price; secondary are savings advisories and a short narrative. Every dollar figure is tagged `source: "ai-estimate"`, shown separately from the authoritative deterministic total and never summed into it.
 
 ```
-GET  /api/terrapod/v1/runs/{run_id}/cost-summary[?locale=<code>]
-POST /api/terrapod/v1/runs/{run_id}/cost-summary/regenerate
+GET  /api/v1/runs/{run_id}/cost-summary[?locale=<code>]
+POST /api/v1/runs/{run_id}/cost-summary/regenerate
 ```
 
 `GET` returns the summary; `404` until one has been generated (a `pending` row means "in flight"). With `?locale=` set to a real language different from the deployment's `ai_summary.summary_language`, the narrative + each estimate's `basis` + each advisory's `title`/`detail` are translated on view (best-effort, Redis-cached), and `translated`/`language` reflect that. `POST .../regenerate` re-fires it and returns `202` with a `pending` row (`409` when the run has no cost estimate; `503` when AI is globally disabled).
@@ -3931,8 +3939,8 @@ POST /api/terrapod/v1/runs/{run_id}/cost-summary/regenerate
 A follow-up Q&A thread grounded in the estimate (the cost analogue of the [plan-summary chat](#list-plan-summary-chat-messages)), one shared thread per run.
 
 ```
-GET  /api/terrapod/v1/runs/{run_id}/cost-summary/messages[?locale=<code>]
-POST /api/terrapod/v1/runs/{run_id}/cost-summary/messages
+GET  /api/v1/runs/{run_id}/cost-summary/messages[?locale=<code>]
+POST /api/v1/runs/{run_id}/cost-summary/messages
 ```
 
 `GET` returns the transcript (`cost-summary-messages`, chronological; each message translated on view when `?locale=` is set, with a per-message `translated` flag). `POST` a body of `{"data": {"attributes": {"content": "…", "locale": "de"}}}` to ask a question and get the synchronous assistant reply (`201`). Read-on-workspace auth. Error mapping mirrors the plan chat: `409` (per-run message cap hit, or the summary isn't `ready`), `429` (daily token budget hit), `503` (chat disabled), `400` (empty/oversize body), `502` (model failure — the user turn is still recorded). The model answers from the estimate only and keeps computed-vs-estimated figures distinct.
@@ -3952,13 +3960,13 @@ Admin-managed parameterised provider configs rendered into the generated `provid
 #### List Provider Templates
 
 ```
-GET /api/terrapod/v1/provider-templates
+GET /api/v1/provider-templates
 ```
 
 #### Create Provider Template
 
 ```
-POST /api/terrapod/v1/provider-templates
+POST /api/v1/provider-templates
 ```
 
 **Request body:**
@@ -3991,9 +3999,9 @@ POST /api/terrapod/v1/provider-templates
 #### Show / Update / Delete Provider Template
 
 ```
-GET    /api/terrapod/v1/provider-templates/{id}
-PATCH  /api/terrapod/v1/provider-templates/{id}
-DELETE /api/terrapod/v1/provider-templates/{id}
+GET    /api/v1/provider-templates/{id}
+PATCH  /api/v1/provider-templates/{id}
+DELETE /api/v1/provider-templates/{id}
 ```
 
 ### Catalog Items
@@ -4003,7 +4011,7 @@ A blessed designation over a registry module. **Write** (create/update/delete) r
 #### List Catalog Items
 
 ```
-GET /api/terrapod/v1/catalog-items
+GET /api/v1/catalog-items
 ```
 
 Returns only items the caller's `catalog-permission` matches.
@@ -4011,7 +4019,7 @@ Returns only items the caller's `catalog-permission` matches.
 #### Create Catalog Item
 
 ```
-POST /api/terrapod/v1/catalog-items
+POST /api/v1/catalog-items
 ```
 
 **Request body:**
@@ -4055,9 +4063,9 @@ POST /api/terrapod/v1/catalog-items
 #### Show / Update / Delete Catalog Item
 
 ```
-GET    /api/terrapod/v1/catalog-items/{id}
-PATCH  /api/terrapod/v1/catalog-items/{id}
-DELETE /api/terrapod/v1/catalog-items/{id}
+GET    /api/v1/catalog-items/{id}
+PATCH  /api/v1/catalog-items/{id}
+DELETE /api/v1/catalog-items/{id}
 ```
 
 Delete returns `409` while the item has any instances — destroy or migrate them first.
@@ -4065,7 +4073,7 @@ Delete returns `409` while the item has any instances — destroy or migrate the
 #### Provision Form
 
 ```
-GET /api/terrapod/v1/catalog-items/{id}/form
+GET /api/v1/catalog-items/{id}/form
 ```
 
 Returns the resolved provision form: `resolved-version` (per the item's version policy) and `fields[]` — one field per resolved input (the module's curated variables plus every parameter from the item's provider templates), with type, description, default, sensitivity, and any enum choices. **Required permission:** catalog `read`.
@@ -4073,7 +4081,7 @@ Returns the resolved provision form: `resolved-version` (per the item's version 
 #### List Item Instances
 
 ```
-GET /api/terrapod/v1/catalog-items/{id}/instances
+GET /api/v1/catalog-items/{id}/instances
 ```
 
 **Required permission:** catalog `read`.
@@ -4081,7 +4089,7 @@ GET /api/terrapod/v1/catalog-items/{id}/instances
 #### Provision an Instance
 
 ```
-POST /api/terrapod/v1/catalog-items/{id}/provision
+POST /api/v1/catalog-items/{id}/provision
 ```
 
 Creates a catalog-managed, agent-mode, non-VCS workspace, materialises the inputs as Terraform variables, generates the wrapper, and queues the first run (source `catalog`).
@@ -4129,7 +4137,7 @@ A provisioned instance, addressed by its workspace id (`wsId`).
 #### Show Instance
 
 ```
-GET /api/terrapod/v1/catalog-instances/{wsId}
+GET /api/v1/catalog-instances/{wsId}
 ```
 
 **Required permission:** catalog `read`.
@@ -4137,7 +4145,7 @@ GET /api/terrapod/v1/catalog-instances/{wsId}
 #### Reconfigure Instance
 
 ```
-PATCH /api/terrapod/v1/catalog-instances/{wsId}
+PATCH /api/v1/catalog-instances/{wsId}
 ```
 
 Update the instance's inputs and/or version pin, regenerate the wrapper, and queue a new run (source `catalog`). This is the only supported way to change a catalog instance's configuration — direct configuration-version uploads and custom-CV runs on a catalog-managed workspace are rejected with `409`.
@@ -4167,7 +4175,7 @@ Returns a reference to the queued run. **Required permission:** catalog `use`.
 #### Destroy Instance
 
 ```
-POST /api/terrapod/v1/catalog-instances/{wsId}/destroy
+POST /api/v1/catalog-instances/{wsId}/destroy
 ```
 
 Queues an `is_destroy` run with source **`catalog-lifecycle`**. On a **successful apply** of that run the workspace is **archived** (soft delete — state is retained). Nothing is hard-deleted.
@@ -4184,8 +4192,8 @@ Returns a reference to the queued destroy run. **Required permission:** catalog 
 ### Confirm / Discard a Catalog Instance Run
 
 ```
-POST /api/terrapod/v1/catalog-instances/{wsId}/confirm
-POST /api/terrapod/v1/catalog-instances/{wsId}/discard
+POST /api/v1/catalog-instances/{wsId}/confirm
+POST /api/v1/catalog-instances/{wsId}/discard
 ```
 
 Confirm (apply) or discard the instance's pending **planned** run. These are the catalog-surface counterparts of the workspace run API: the catalog-managed workspace clamp gives the provisioner only `read` on the workspace, so a non-auto-apply provision / reconfigure / destroy is confirmed here rather than via `/api/v2/runs/{id}/actions/confirm` (which would require a platform admin). Returns the run reference. `409` if there's no planned run awaiting action. **Required permission:** catalog `use`.
@@ -4193,7 +4201,7 @@ Confirm (apply) or discard the instance's pending **planned** run. These are the
 ### Orphan Catalog Instance (discouraged)
 
 ```
-DELETE /api/terrapod/v1/catalog-instances/{wsId}?orphan=true
+DELETE /api/v1/catalog-instances/{wsId}?orphan=true
 ```
 
 Deletes the catalog instance's workspace record **without** destroying its infrastructure — the provisioned resources keep running, untracked. This is the explicit, **discouraged** escape hatch; the recommended teardown is `POST .../destroy`, which reclaims the infrastructure. The `orphan=true` flag is **required** — without it the call returns **409** and points at destroy, so an instance can never be orphaned by accident. The plain `DELETE /workspaces/{id}` also returns **409** for a catalog-managed workspace. **Required permission:** catalog `admin`. Audit-logged. Returns `204`.
@@ -4204,7 +4212,7 @@ Deletes the catalog instance's workspace record **without** destroying its infra
 
 Leader/follower pair endpoints (#960). See [High availability](high-availability.md).
 
-### `GET /api/terrapod/v1/ha/whoami`
+### `GET /api/v1/ha/whoami`
 
 **Unauthenticated by necessity** — this is what a node probes against the shared
 DNS name to discover whether it owns that name, and the probe runs before any
@@ -4223,7 +4231,7 @@ external name cannot pin leadership to a stale answer.
 > including one bearing a credential left behind by a pairing that was torn down.
 > Withdrawing the configuration withdraws the capability.
 
-### `GET /api/terrapod/v1/ha/status`
+### `GET /api/v1/ha/status`
 
 **Requires authentication; the in-cluster half additionally requires `admin` or
 `audit`.** Whether this node is converging with its peer — the question to
@@ -4275,7 +4283,7 @@ better: a single-node cluster cannot spread replicas and a single-zone one
 cannot spread zones, so neither is reported as a gap. See
 [High availability](high-availability.md#findings-disruption-budgets-and-placement).
 
-### `GET /api/terrapod/v1/ha/blob-readiness`
+### `GET /api/v1/ha/blob-readiness`
 
 **Requires `admin` or `audit`.** Are the objects this node's rows name actually in
 its object store? Replication carries database rows; the object store is a second
@@ -4322,7 +4330,7 @@ See [High availability](high-availability.md#the-other-data-plane-is-the-object-
 
 ### Peer-only endpoints
 
-`GET /api/terrapod/v1/ha/replication/blobs/{class}` lists an object-store class's
+`GET /api/v1/ha/replication/blobs/{class}` lists an object-store class's
 objects (key, size, etag) in key order with `after`/`limit` paging, and
 `GET .../blobs/{class}/content?key=…` streams one object. Both are how a follower
 copies the object store (see [High availability](high-availability.md#choosing-verify-or-copy-per-class)).
@@ -4334,7 +4342,7 @@ more than a user's, so this must not become an arbitrary-read primitive — and
 what survived the ownership filter, so a page thinned by the filter is a short
 page rather than the end of the class.
 
-`/api/terrapod/v1/ha/replication/*` are consumed **by the peer node**, not by
+`/api/v1/ha/replication/*` are consumed **by the peer node**, not by
 users or tooling. They accept a `peer` token and nothing else, and no other
 endpoint accepts one — a peer can read entities an ordinary user cannot, so that
 visibility is deliberately not expressible as roles somebody could be granted.
@@ -4359,7 +4367,7 @@ delegate to; it fails closed to admin.
 ### List Deleted Workspaces
 
 ```
-GET /api/terrapod/v1/deleted-workspaces
+GET /api/v1/deleted-workspaces
 ```
 
 Newest deletion first. Supports the standard `page[number]` / `page[size]`.
@@ -4384,7 +4392,7 @@ Notable attributes:
 ### Show Deleted Workspace
 
 ```
-GET /api/terrapod/v1/deleted-workspaces/{workspace_id}
+GET /api/v1/deleted-workspaces/{workspace_id}
 ```
 
 `{workspace_id}` is accepted both bare (`0192f3a1-…`, as the list emits it) and
@@ -4393,7 +4401,7 @@ GET /api/terrapod/v1/deleted-workspaces/{workspace_id}
 ### Restore a Deleted Workspace
 
 ```
-POST /api/terrapod/v1/deleted-workspaces/{workspace_id}/restore
+POST /api/v1/deleted-workspaces/{workspace_id}/restore
 ```
 
 Optional body: `{"data": {"attributes": {"name": "...", "force": false}}}`.

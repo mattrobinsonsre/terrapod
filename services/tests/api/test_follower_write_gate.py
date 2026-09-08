@@ -30,13 +30,13 @@ from terrapod.api.follower_gate import (
 )
 
 MANAGEMENT_WRITES = [
-    ("POST", "/api/terrapod/v1/workspaces"),
-    ("PATCH", "/api/terrapod/v1/workspaces/ws-1"),
-    ("DELETE", "/api/terrapod/v1/workspaces/ws-1"),
-    ("POST", "/api/terrapod/v1/roles"),
-    ("POST", "/api/terrapod/v1/agent-pools"),
-    ("PATCH", "/api/terrapod/v1/vcs-connections/vcs-1"),
-    ("POST", "/api/terrapod/v1/catalog-items"),
+    ("POST", "/api/v1/workspaces"),
+    ("PATCH", "/api/v1/workspaces/ws-1"),
+    ("DELETE", "/api/v1/workspaces/ws-1"),
+    ("POST", "/api/v1/roles"),
+    ("POST", "/api/v1/agent-pools"),
+    ("PATCH", "/api/v1/vcs-connections/vcs-1"),
+    ("POST", "/api/v1/catalog-items"),
     ("PUT", "/api/v2/state-versions/sv-1/content"),
     ("POST", "/oauth/token"),
 ]
@@ -60,7 +60,7 @@ def _app() -> FastAPI:
     for path in sorted(FOLLOWER_WRITABLE_PATHS):
         app.add_api_route(path, ok, methods=["POST"])
     app.add_api_route(FOLLOWER_WRITABLE_PREFIXES[0] + "{email}", ok, methods=["DELETE", "POST"])
-    app.add_api_route("/api/terrapod/v1/workspaces", ok, methods=["GET"])
+    app.add_api_route("/api/v1/workspaces", ok, methods=["GET"])
     return app
 
 
@@ -81,21 +81,21 @@ class TestAFollowerRefusesWrites:
     async def test_the_refusal_says_where_to_retry(self):
         """A 503 with no explanation sends the operator to the logs. The point
         of the message is that the next step is on the other node."""
-        resp = await _request("POST", "/api/terrapod/v1/workspaces", leader=False)
+        resp = await _request("POST", "/api/v1/workspaces", leader=False)
 
         assert "not the leader" in resp.json()["detail"]
         assert "shared name" in resp.json()["detail"]
 
     async def test_the_refusal_carries_the_jsonapi_envelope(self):
         """House style (#1063): both keys, so neither client shape breaks."""
-        body = (await _request("POST", "/api/terrapod/v1/workspaces", leader=False)).json()
+        body = (await _request("POST", "/api/v1/workspaces", leader=False)).json()
 
         assert body["errors"][0]["status"] == "503"
         assert "detail" in body
 
     async def test_reads_are_untouched(self):
         """The whole point of a warm standby is that you can look at it."""
-        resp = await _request("GET", "/api/terrapod/v1/workspaces", leader=False)
+        resp = await _request("GET", "/api/v1/workspaces", leader=False)
 
         assert resp.status_code == 200
 
@@ -122,7 +122,7 @@ class TestAFollowerStaysUsable:
         """It only ever removes access, and only on this node."""
         resp = await _request(
             "DELETE",
-            "/api/terrapod/v1/auth/sessions/user/someone@example.com",
+            "/api/v1/auth/sessions/user/someone@example.com",
             leader=False,
         )
 
@@ -148,7 +148,7 @@ class TestALeaderIsUnaffected:
         assert settings.ha.role == "leader", "the shipped default must stay leader"
 
         with patch("terrapod.services.ha_role.get_redis_client") as redis:
-            resp = await _request("POST", "/api/terrapod/v1/workspaces", leader=True)
+            resp = await _request("POST", "/api/v1/workspaces", leader=True)
 
         assert resp.status_code == 200
         redis.assert_not_called()
@@ -161,13 +161,13 @@ class TestTheAllowListIsPinned:
 
     def test_the_allow_list_is_exactly_this(self):
         assert FOLLOWER_WRITABLE_PATHS == {
-            "/api/terrapod/v1/auth/local/authorize",
-            "/api/terrapod/v1/auth/local/login",
-            "/api/terrapod/v1/auth/saml/acs",
-            "/api/terrapod/v1/auth/token",
-            "/api/terrapod/v1/auth/logout",
-            "/api/terrapod/v1/auth/logout/all",
-            "/api/terrapod/v1/agent-pools/join",
+            "/api/v1/auth/local/authorize",
+            "/api/v1/auth/local/login",
+            "/api/v1/auth/saml/acs",
+            "/api/v1/auth/token",
+            "/api/v1/auth/logout",
+            "/api/v1/auth/logout/all",
+            "/api/v1/agent-pools/join",
         }, (
             "The follower allow-list changed. Every entry must be something that "
             "RECORDS or REDUCES access on this node — never something that changes "
@@ -185,16 +185,16 @@ class TestTheAllowListIsPinned:
         gains the listener nothing until promotion, because a follower hands
         out no work (#1191).
         """
-        allowed_roots = ("/api/terrapod/v1/auth/", "/api/terrapod/v1/agent-pools/")
+        allowed_roots = ("/api/v1/auth/", "/api/v1/agent-pools/")
         for path in FOLLOWER_WRITABLE_PATHS:
             assert path.startswith(allowed_roots), path
 
     def test_a_listener_can_enrol_and_stay_alive_on_a_follower(self):
         """The listener protocol must not depend on which node it reached."""
-        assert is_follower_writable("/api/terrapod/v1/agent-pools/join")
-        assert is_follower_writable("/api/terrapod/v1/agent-pools/pool-1/listeners/join")
-        assert is_follower_writable("/api/terrapod/v1/listeners/listener-1/heartbeat")
-        assert is_follower_writable("/api/terrapod/v1/listeners/listener-1/renew")
+        assert is_follower_writable("/api/v1/agent-pools/join")
+        assert is_follower_writable("/api/v1/agent-pools/pool-1/listeners/join")
+        assert is_follower_writable("/api/v1/listeners/listener-1/heartbeat")
+        assert is_follower_writable("/api/v1/listeners/listener-1/renew")
 
     def test_the_keepalive_constant_is_what_drives_the_predicate(self):
         """`_LISTENER_KEEPALIVE` reads as the allow-list and carries the comment
@@ -210,9 +210,9 @@ class TestTheAllowListIsPinned:
             assert is_follower_writable(template.replace("{id}", "listener-1")), template
 
         # Adding a template admits exactly that path and nothing adjacent to it.
-        assert not is_follower_writable("/api/terrapod/v1/listeners/listener-1/heartbeat/x")
-        assert not is_follower_writable("/api/terrapod/v1/listeners/heartbeat")
-        assert not is_follower_writable("/api/terrapod/v1/other/listener-1/heartbeat")
+        assert not is_follower_writable("/api/v1/listeners/listener-1/heartbeat/x")
+        assert not is_follower_writable("/api/v1/listeners/heartbeat")
+        assert not is_follower_writable("/api/v1/other/listener-1/heartbeat")
 
     def test_the_run_lifecycle_calls_stay_refused(self):
         """Enrolment is node-local; reporting on a run is not.
@@ -221,7 +221,7 @@ class TestTheAllowListIsPinned:
         nothing to refuse: a follower dispatches no work, so a listener
         attached to one never has a run to report on in the first place.
         """
-        base = "/api/terrapod/v1/listeners/listener-1/runs"
+        base = "/api/v1/listeners/listener-1/runs"
         assert not is_follower_writable(f"{base}/run-1/job-launched")
         assert not is_follower_writable(f"{base}/run-1/job-status")
         assert not is_follower_writable(f"{base}/run-1/runner-token")
@@ -234,17 +234,17 @@ class TestTheAllowListIsPinned:
         Creating a pool or minting a join token IS platform state, and a
         follower cannot carry it anywhere.
         """
-        assert not is_follower_writable("/api/terrapod/v1/agent-pools")
-        assert not is_follower_writable("/api/terrapod/v1/agent-pools/pool-1")
-        assert not is_follower_writable("/api/terrapod/v1/agent-pools/pool-1/tokens")
+        assert not is_follower_writable("/api/v1/agent-pools")
+        assert not is_follower_writable("/api/v1/agent-pools/pool-1")
+        assert not is_follower_writable("/api/v1/agent-pools/pool-1/tokens")
 
     def test_the_gate_covers_every_mutating_method(self):
         assert WRITE_METHODS == {"POST", "PUT", "PATCH", "DELETE"}
 
     def test_an_unlisted_auth_path_is_not_allowed_by_accident(self):
         """The prefix rule must not widen into the whole auth surface."""
-        assert not is_follower_writable("/api/terrapod/v1/auth/sessions")
-        assert not is_follower_writable("/api/terrapod/v1/auth/local/register")
+        assert not is_follower_writable("/api/v1/auth/sessions")
+        assert not is_follower_writable("/api/v1/auth/local/register")
 
 
 class TestTheGateIsWiredIn:
@@ -273,3 +273,29 @@ class TestTheGateIsWiredIn:
         assert names[-1] == "follower_write_gate", (
             f"the gate must be the innermost user middleware, stack is {names}"
         )
+
+
+class TestTheDeprecatedAliasReachesTheSameVerdict:
+    """#1529 serves the native API at both prefixes.
+
+    A listener that enrolled through `/api/terrapod/v1` must not be refused by a
+    follower simply because the gate's literals were canonicalised — and, the
+    direction that matters more, the alias must not become a way *around* the
+    gate. Both are asserted, because only checking the allow half would let a
+    normalisation bug open the node up silently.
+    """
+
+    ALIAS = "/api/terrapod/v1"
+
+    def test_allowed_paths_are_allowed_via_the_alias(self):
+        assert is_follower_writable(f"{self.ALIAS}/auth/local/login")
+        assert is_follower_writable(f"{self.ALIAS}/agent-pools/join")
+        assert is_follower_writable(f"{self.ALIAS}/agent-pools/pool-1/listeners/join")
+        assert is_follower_writable(f"{self.ALIAS}/listeners/listener-1/heartbeat")
+        assert is_follower_writable(f"{self.ALIAS}/listeners/listener-1/renew")
+
+    def test_refused_paths_are_still_refused_via_the_alias(self):
+        assert not is_follower_writable(f"{self.ALIAS}/workspaces")
+        assert not is_follower_writable(f"{self.ALIAS}/agent-pools")
+        assert not is_follower_writable(f"{self.ALIAS}/roles")
+        assert not is_follower_writable(f"{self.ALIAS}/vcs-connections")

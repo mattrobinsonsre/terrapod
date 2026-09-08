@@ -32,6 +32,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.api.credentials import extract_credential
 from terrapod.api.dependencies import AuthenticatedUser
+from terrapod.api.prefixes import prefix_of
 from terrapod.config import settings
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
@@ -290,7 +291,11 @@ def _npm_base(request: Request) -> str:
             base = f"{proto}://{host}"
         else:
             base = str(request.base_url).rstrip("/")
-    return f"{base.rstrip('/')}/api/terrapod/v1/package-cache/npm"
+    # Mirrors the prefix the caller used (#1529) — npm resolves
+    # `_authToken` by request path and NuGet matches credentials by
+    # source URI, so rewriting this to canonical would strip the
+    # client's own auth from every follow-up fetch.
+    return f"{base.rstrip('/')}{prefix_of(request.url.path)}/package-cache/npm"
 
 
 @npm_router.get("/npm/{package:path}/-/{filename}")
@@ -402,7 +407,11 @@ def _galaxy_base(request: Request) -> str:
             base = f"{proto}://{host}"
         else:
             base = str(request.base_url).rstrip("/")
-    return f"{base.rstrip('/')}/api/terrapod/v1/package-cache/galaxy"
+    # Mirrors the prefix the caller used (#1529) — npm resolves
+    # `_authToken` by request path and NuGet matches credentials by
+    # source URI, so rewriting this to canonical would strip the
+    # client's own auth from every follow-up fetch.
+    return f"{base.rstrip('/')}{prefix_of(request.url.path)}/package-cache/galaxy"
 
 
 def _galaxy_names(namespace: str, name: str) -> None:
@@ -1021,7 +1030,11 @@ def _nuget_base(request: Request) -> str:
             base = f"{proto}://{host}"
         else:
             base = str(request.base_url).rstrip("/")
-    return f"{base.rstrip('/')}/api/terrapod/v1/package-cache/nuget"
+    # Mirrors the prefix the caller used (#1529) — npm resolves
+    # `_authToken` by request path and NuGet matches credentials by
+    # source URI, so rewriting this to canonical would strip the
+    # client's own auth from every follow-up fetch.
+    return f"{base.rstrip('/')}{prefix_of(request.url.path)}/package-cache/nuget"
 
 
 @nuget_router.get("/nuget/index.json")

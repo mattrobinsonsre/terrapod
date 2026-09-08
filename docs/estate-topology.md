@@ -47,7 +47,7 @@ correspondingly smaller graph.
 The page is backed by a Terrapod-native endpoint:
 
 ```
-GET /api/terrapod/v1/estate-graph
+GET /api/v1/estate-graph
 ```
 
 See [api-reference.md → Estate Graph](api-reference.md#estate-graph) for the

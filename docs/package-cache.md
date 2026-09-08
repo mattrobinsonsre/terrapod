@@ -6,8 +6,8 @@ and `npm install` work inside a sealed network.
 
 ```yaml
 # The runner's environment
-PIP_INDEX_URL: https://terrapod.example.com/api/terrapod/v1/package-cache/pypi/simple
-NPM_CONFIG_REGISTRY: https://terrapod.example.com/api/terrapod/v1/package-cache/npm/
+PIP_INDEX_URL: https://terrapod.example.com/api/v1/package-cache/pypi/simple
+NPM_CONFIG_REGISTRY: https://terrapod.example.com/api/v1/package-cache/npm/
 ```
 
 ## Why this exists
@@ -32,14 +32,14 @@ credential works.
 **pip** sends Basic auth, so the credential goes in the index URL or `.netrc`:
 
 ```sh
-pip install --index-url "https://any:$TERRAPOD_TOKEN@terrapod.example.com/api/terrapod/v1/package-cache/pypi/simple" flask
+pip install --index-url "https://any:$TERRAPOD_TOKEN@terrapod.example.com/api/v1/package-cache/pypi/simple" flask
 ```
 
 **npm** sends a bearer token, configured in `.npmrc`:
 
 ```ini
-registry=https://terrapod.example.com/api/terrapod/v1/package-cache/npm/
-//terrapod.example.com/api/terrapod/v1/package-cache/npm/:_authToken=${TERRAPOD_TOKEN}
+registry=https://terrapod.example.com/api/v1/package-cache/npm/
+//terrapod.example.com/api/v1/package-cache/npm/:_authToken=${TERRAPOD_TOKEN}
 ```
 
 A runner's own short-lived token works for both, so a run authenticates as
@@ -134,7 +134,7 @@ moment to discover a gap.
 
 ```sh
 curl -X POST -H "$AUTH" -H 'Content-Type: application/json' \
-  https://terrapod.example.com/api/terrapod/v1/admin/package-cache/warm \
+  https://terrapod.example.com/api/v1/admin/package-cache/warm \
   -d '{"packages":[{"ecosystem":"pypi","name":"requests"},
                    {"ecosystem":"npm","name":"left-pad","version":"1.3.0"}]}'
 # → 202 {"data": {"id": "warm-9f2c...", "links": {"self": "…/admin/warm-jobs/warm-9f2c…"}}}
@@ -159,7 +159,7 @@ failure: anything already cached is skipped and only the rest is retried.
 reporting zero successes — which would read as a set of missing packages rather
 than a configuration that forbids fetching at all.
 
-Container images warm the same way through `POST /api/terrapod/v1/admin/oci/warm`
+Container images warm the same way through `POST /api/v1/admin/oci/warm`
 with `{"images": ["quay.io/ansible/awx-ee:24.6.1"]}`, pulling the manifest and
 every blob it references.
 
@@ -176,7 +176,7 @@ client at Terrapod with a `galaxy_server` entry:
 server_list = terrapod
 
 [galaxy_server.terrapod]
-url = https://terrapod.example.com/api/terrapod/v1/package-cache/galaxy/
+url = https://terrapod.example.com/api/v1/package-cache/galaxy/
 token = <a Terrapod API token>
 ```
 
@@ -214,12 +214,12 @@ protocol to put a signature. Attach one afterwards:
 curl -X PUT \
   -H "Authorization: Bearer $TERRAPOD_TOKEN" \
   --data-binary @manifest.sig \
-  "$TERRAPOD/api/terrapod/v1/package-cache/galaxy/v3/collections/acme/widgets/versions/1.0.0/signature"
+  "$TERRAPOD/api/v1/package-cache/galaxy/v3/collections/acme/widgets/versions/1.0.0/signature"
 ```
 
 The body is a detached OpenPGP signature over the collection's `MANIFEST.json`.
 Terrapod verifies it against a **public key already registered** with the
-platform (`/api/terrapod/v1/gpg-keys`) and refuses a signature from an
+platform (`/api/v1/gpg-keys`) and refuses a signature from an
 unregistered key with 422, naming the key. The server never re-signs — the
 publisher owns the signature, exactly as in the provider registry.
 
@@ -246,7 +246,7 @@ client is never offered one that would 404 after it has resolved.
 `get.pulumi.com`. Point the CLI at Terrapod instead:
 
 ```sh
-export PULUMI_PLUGIN_DOWNLOAD_URL_OVERRIDES=".*=https://x:$TERRAPOD_TOKEN@terrapod.example.com/api/terrapod/v1/package-cache/pulumi"
+export PULUMI_PLUGIN_DOWNLOAD_URL_OVERRIDES=".*=https://x:$TERRAPOD_TOKEN@terrapod.example.com/api/v1/package-cache/pulumi"
 ```
 
 Credentials go in the URL because the CLI sends no `Authorization` header of its
@@ -277,7 +277,7 @@ A Pulumi program written in Go resolves its dependencies from
 `proxy.golang.org`. Point the toolchain at Terrapod instead:
 
 ```sh
-export GOPROXY="https://x:$TERRAPOD_TOKEN@terrapod.example.com/api/terrapod/v1/package-cache/go"
+export GOPROXY="https://x:$TERRAPOD_TOKEN@terrapod.example.com/api/v1/package-cache/go"
 ```
 
 **This must be HTTPS.** The Go toolchain refuses to send credentials to a plain
@@ -312,7 +312,7 @@ package source:
   <packageSources>
     <clear/>
     <add key="terrapod"
-         value="https://terrapod.example.com/api/terrapod/v1/package-cache/nuget/index.json" />
+         value="https://terrapod.example.com/api/v1/package-cache/nuget/index.json" />
   </packageSources>
   <packageSourceCredentials>
     <terrapod>

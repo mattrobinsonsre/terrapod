@@ -107,7 +107,7 @@ All endpoints use JSON:API format. Requires `admin` permission on the workspace 
 ### Create
 
 ```
-POST /api/terrapod/v1/workspaces/{id}/notification-configurations
+POST /api/v1/workspaces/{id}/notification-configurations
 ```
 
 ```json
@@ -127,31 +127,31 @@ POST /api/terrapod/v1/workspaces/{id}/notification-configurations
 ### List
 
 ```
-GET /api/terrapod/v1/workspaces/{id}/notification-configurations
+GET /api/v1/workspaces/{id}/notification-configurations
 ```
 
 ### Show
 
 ```
-GET /api/terrapod/v1/notification-configurations/{id}
+GET /api/v1/notification-configurations/{id}
 ```
 
 ### Update
 
 ```
-PATCH /api/terrapod/v1/notification-configurations/{id}
+PATCH /api/v1/notification-configurations/{id}
 ```
 
 ### Delete
 
 ```
-DELETE /api/terrapod/v1/notification-configurations/{id}
+DELETE /api/v1/notification-configurations/{id}
 ```
 
 ### Verify (Send Test)
 
 ```
-POST /api/terrapod/v1/notification-configurations/{id}/actions/verify
+POST /api/v1/notification-configurations/{id}/actions/verify
 ```
 
 Sends a test notification with a verification payload. Useful for confirming webhook URLs and Slack integration before enabling.

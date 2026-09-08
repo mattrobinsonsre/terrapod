@@ -63,7 +63,7 @@ api:
         internal: https://terrapod.example.com
 ```
 
-The node calls `GET /api/terrapod/v1/ha/whoami` against the probe URL and
+The node calls `GET /api/v1/ha/whoami` against the probe URL and
 compares the answer to its own `node_name`.
 
 Two details matter:
@@ -449,7 +449,7 @@ other data plane](#the-other-data-plane-is-the-object-store-actually-there)).
 
 ## Is the follower caught up?
 
-`GET /api/terrapod/v1/ha/status` (admin or audit), `terrapod_ha_status` over MCP,
+`GET /api/v1/ha/status` (admin or audit), `terrapod_ha_status` over MCP,
 or `GetHAStatus` in go-terrapod. Answered entirely from local state, so it still
 works when the peer is the thing that has broken — which is when you are reading
 it.
@@ -563,7 +563,7 @@ A node in that state looks entirely healthy. The workspace list renders, run
 history is there, the registry lists every module. Then somebody queues a run and
 `terraform init` 404s, several layers from the cause.
 
-`GET /api/terrapod/v1/ha/blob-readiness` detects it cheaply, because the database
+`GET /api/v1/ha/blob-readiness` detects it cheaply, because the database
 row already names the key — so the check is a HEAD:
 
 | Field | Meaning |
@@ -729,7 +729,7 @@ node, and the naming model you need right before you touch DNS — are in
 [HA operations](ha-operations.md). The short form:
 
 1. Confirm the standby is caught up (above).
-2. Check `GET /api/terrapod/v1/ha/blob-readiness` — `irreplaceable-missing` must
+2. Check `GET /api/v1/ha/blob-readiness` — `irreplaceable-missing` must
    be empty. Rows without blobs is the failure that looks like success. Read
    `irreplaceable-unchecked` in the same breath: it names any irreplaceable class
    the check made no claim about, which is what stops an empty

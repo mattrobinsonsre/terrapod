@@ -108,7 +108,7 @@ def _rule_json(rule: AutodiscoveryRule) -> dict:
                 else {}
             ),
         },
-        "links": {"self": f"/api/terrapod/v1/autodiscovery-rules/{rule.id}"},
+        "links": {"self": f"/api/v1/autodiscovery-rules/{rule.id}"},
     }
 
 

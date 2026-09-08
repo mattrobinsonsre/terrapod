@@ -10,12 +10,12 @@ Two endpoints have to accept connections from the public internet:
 
 | Endpoint | Caller | Auth on the request |
 |---|---|---|
-| `POST /api/terrapod/v1/vcs-events/github` and `.../gitlab` | github.com / gitlab.com webhook delivery | GitHub: HMAC-SHA256 with the connection's `webhook_secret`. GitLab: verbatim `X-Gitlab-Token` compared timing-safe |
-| `PATCH /api/terrapod/v1/task-stage-results/{id}/callback` | external run-task services (policy engines, scanners) | Short-lived HMAC-derived `access_token` bound to the specific result ID |
+| `POST /api/v1/vcs-events/github` and `.../gitlab` | github.com / gitlab.com webhook delivery | GitHub: HMAC-SHA256 with the connection's `webhook_secret`. GitLab: verbatim `X-Gitlab-Token` compared timing-safe |
+| `PATCH /api/v1/task-stage-results/{id}/callback` | external run-task services (policy engines, scanners) | Short-lived HMAC-derived `access_token` bound to the specific result ID |
 
 Everything else stays on the management ingress:
 - The whole web UI
-- All admin API (`/api/terrapod/v1/*` apart from the two routes above)
+- All admin API (`/api/v1/*` apart from the two routes above)
 - `terraform login` and CLI cloud-block (`/api/v2/*`, `/.well-known/terraform.json`)
 - OIDC / SAML callbacks — these run in the **operator's browser**, not server-to-server, so they don't need to be publicly reachable; the operator's browser already has access to the management plane (that's how they hit the login page)
 - State uploads, agent-pool joins, listener heartbeats, the whole runner protocol
@@ -36,9 +36,10 @@ webhookIngress:             # OPTIONAL — public-internet inbound surface
   hostname: terrapod-webhooks.example.com
   tls: true
   annotations: {}
-  # paths defaults to the full allow-list; trim if you don't run external
+  # paths defaults to the full allow-list (BOTH prefixes); trim if you skip external
   # run tasks:
   # paths:
+  #   - /api/v1/vcs-events
   #   - /api/terrapod/v1/vcs-events
 
 web:
@@ -72,8 +73,16 @@ webhookIngress:
   annotations:
     tailscale.com/funnel: "true"     # this hostname gets the public Funnel cert
   paths:
-    - /api/terrapod/v1/vcs-events     # trim out task-stage-results if unused
+    - /api/v1/vcs-events     # trim out task-stage-results if unused
+    - /api/terrapod/v1/vcs-events   # deprecated alias — where existing webhooks point
 ```
+
+> **If you have pinned `paths` in your own values.yaml**, add the `/api/v1`
+> entries when you upgrade. This is an allow-list: an unlisted path is not
+> routed, which surfaces as a 404 **at the sender** — the VCS provider or the
+> external run-task service — and never in Terrapod's own logs. Run-task
+> callback URLs are generated on the canonical prefix, so add that one first.
+> See [deprecations.md](deprecations.md).
 
 Prerequisites (operator-side, not chart-managed):
 - Tailscale Kubernetes Operator installed and watching `IngressClass: tailscale`.

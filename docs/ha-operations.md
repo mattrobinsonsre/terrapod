@@ -98,7 +98,7 @@ The rehearsed path. Everything here is checkable before you touch DNS.
 1. **Confirm the standby is caught up.** The HA page (`/ha`) shows replication
    age; the nav-bar indicator shows it on every page. Do not proceed on a
    follower that is behind.
-2. **Confirm the object store.** `GET /api/terrapod/v1/ha/blob-readiness` —
+2. **Confirm the object store.** `GET /api/v1/ha/blob-readiness` —
    `irreplaceable-missing` must be empty. Read `irreplaceable-unchecked` in the
    same breath: it names any irreplaceable class the check made no claim about,
    which is what stops an empty `irreplaceable-missing` being mistaken for a

@@ -11,11 +11,12 @@ from httpx import ASGITransport, AsyncClient
 
 from terrapod.api.app import create_application as create_app
 from terrapod.api.dependencies import AuthenticatedUser
+from terrapod.api.prefixes import canonical_path
 from terrapod.api.routers.package_cache import authenticate_package_request
 from terrapod.db.session import get_db
 from terrapod.storage import get_storage
 
-BASE = "/api/terrapod/v1/package-cache"
+BASE = "/api/v1/package-cache"
 AUTH = {"Authorization": "Bearer test-token"}
 
 PYPI_INDEX = {
@@ -341,120 +342,136 @@ class TestAuthenticationIsRequired:
     #: the auth dependency — which would have looked like a passing auth test
     #: while proving nothing about it.
     SAMPLES = {
-        "/api/terrapod/v1/package-cache/pypi/simple/{project}/": (
+        "/api/v1/package-cache/pypi/simple/{project}/": (
             "GET",
             f"{BASE}/pypi/simple/flask/",
             None,
         ),
-        "/api/terrapod/v1/package-cache/pypi/simple/{project}/{filename}": (
+        "/api/v1/package-cache/pypi/simple/{project}/{filename}": (
             "GET",
             f"{BASE}/pypi/simple/flask/flask-3.0.0.whl",
             None,
         ),
-        "/api/terrapod/v1/package-cache/npm/{package:path}": (
+        "/api/v1/package-cache/npm/{package:path}": (
             "GET",
             f"{BASE}/npm/left-pad",
             None,
         ),
-        "/api/terrapod/v1/package-cache/npm/{package:path}/-/{filename}": (
+        "/api/v1/package-cache/npm/{package:path}/-/{filename}": (
             "GET",
             f"{BASE}/npm/left-pad/-/left-pad-1.3.0.tgz",
             None,
         ),
-        "/api/terrapod/v1/package-cache/galaxy/": (
+        "/api/v1/package-cache/galaxy/": (
             "GET",
             f"{BASE}/galaxy/",
             None,
         ),
-        "/api/terrapod/v1/package-cache/galaxy/v3/collections/{namespace}/{name}/": (
+        "/api/v1/package-cache/galaxy/v3/collections/{namespace}/{name}/": (
             "GET",
             f"{BASE}/galaxy/v3/collections/community/general/",
             None,
         ),
-        "/api/terrapod/v1/package-cache/galaxy/v3/collections/{namespace}/{name}/versions/": (
+        "/api/v1/package-cache/galaxy/v3/collections/{namespace}/{name}/versions/": (
             "GET",
             f"{BASE}/galaxy/v3/collections/community/general/versions/",
             None,
         ),
-        "/api/terrapod/v1/package-cache/galaxy/v3/collections/{namespace}/{name}"
-        "/versions/{version}/": (
+        "/api/v1/package-cache/galaxy/v3/collections/{namespace}/{name}/versions/{version}/": (
             "GET",
             f"{BASE}/galaxy/v3/collections/community/general/versions/9.0.0/",
             None,
         ),
-        "/api/terrapod/v1/package-cache/galaxy/v3/collections/{namespace}/{name}"
+        "/api/v1/package-cache/galaxy/v3/collections/{namespace}/{name}"
         "/versions/{version}/download/{filename}": (
             "GET",
             f"{BASE}/galaxy/v3/collections/community/general/versions/9.0.0/download/"
             "community-general-9.0.0.tar.gz",
             None,
         ),
-        "/api/terrapod/v1/package-cache/galaxy/v3/artifacts/collections/": (
+        "/api/v1/package-cache/galaxy/v3/artifacts/collections/": (
             "POST",
             f"{BASE}/galaxy/v3/artifacts/collections/",
             None,
         ),
-        "/api/terrapod/v1/package-cache/galaxy/v3/imports/collections/{import_id}/": (
+        "/api/v1/package-cache/galaxy/v3/imports/collections/{import_id}/": (
             "GET",
             f"{BASE}/galaxy/v3/imports/collections/01a06dfc-9451-798c-bed0-348d71a4ac26/",
             None,
         ),
-        "/api/terrapod/v1/package-cache/galaxy/v3/collections/{namespace}/{name}"
+        "/api/v1/package-cache/galaxy/v3/collections/{namespace}/{name}"
         "/versions/{version}/signature": (
             "PUT",
             f"{BASE}/galaxy/v3/collections/acme/widgets/versions/1.0.0/signature",
             None,
         ),
-        "/api/terrapod/v1/package-cache/pulumi/{filename}": (
+        "/api/v1/package-cache/pulumi/{filename}": (
             "GET",
             f"{BASE}/pulumi/pulumi-resource-random-v4.16.3-linux-amd64.tar.gz",
             None,
         ),
-        "/api/terrapod/v1/package-cache/go/{module:path}/@v/list": (
+        "/api/v1/package-cache/go/{module:path}/@v/list": (
             "GET",
             f"{BASE}/go/example.com/m/@v/list",
             None,
         ),
-        "/api/terrapod/v1/package-cache/go/{module:path}/@latest": (
+        "/api/v1/package-cache/go/{module:path}/@latest": (
             "GET",
             f"{BASE}/go/example.com/m/@latest",
             None,
         ),
-        "/api/terrapod/v1/package-cache/go/{module:path}/@v/{file}": (
+        "/api/v1/package-cache/go/{module:path}/@v/{file}": (
             "GET",
             f"{BASE}/go/example.com/m/@v/v1.0.0.info",
             None,
         ),
-        "/api/terrapod/v1/package-cache/nuget/index.json": (
+        "/api/v1/package-cache/nuget/index.json": (
             "GET",
             f"{BASE}/nuget/index.json",
             None,
         ),
-        "/api/terrapod/v1/package-cache/nuget/flat/{package_id}/index.json": (
+        "/api/v1/package-cache/nuget/flat/{package_id}/index.json": (
             "GET",
             f"{BASE}/nuget/flat/newtonsoft.json/index.json",
             None,
         ),
-        "/api/terrapod/v1/package-cache/nuget/flat/{package_id}/{version}/{filename}": (
+        "/api/v1/package-cache/nuget/flat/{package_id}/{version}/{filename}": (
             "GET",
             f"{BASE}/nuget/flat/newtonsoft.json/13.0.3/newtonsoft.json.13.0.3.nupkg",
             None,
         ),
-        "/api/terrapod/v1/admin/package-cache/warm": (
+        "/api/v1/admin/package-cache/warm": (
             "POST",
-            "/api/terrapod/v1/admin/package-cache/warm",
+            "/api/v1/admin/package-cache/warm",
             {"packages": [{"ecosystem": "pypi", "name": "requests"}]},
         ),
     }
 
     def test_every_route_has_a_sample_request(self) -> None:
-        """Stops the walk below silently skipping a newly added endpoint."""
-        missing = [r.path for r in self._routes() if r.path not in self.SAMPLES]
+        """Stops the walk below silently skipping a newly added endpoint.
+
+        Paths are normalised onto the canonical prefix first (#1529): every route
+        is served at both `/api/v1` and the deprecated `/api/terrapod/v1`, and
+        requiring a duplicate sample for each alias would just be bookkeeping —
+        they resolve to the same handler. The alias IS exercised, by
+        `test_anonymous_is_rejected_on_both_prefixes` below, because "the same
+        handler" is a claim about auth worth checking rather than assuming.
+        """
+        missing = [r.path for r in self._routes() if canonical_path(r.path) not in self.SAMPLES]
         assert not missing, f"add a sample request for: {missing}"
 
+    @pytest.mark.parametrize("prefix", ["/api/v1", "/api/terrapod/v1"])
     @pytest.mark.parametrize("sample", sorted(SAMPLES.values()))
-    async def test_anonymous_is_rejected(self, sample: tuple) -> None:
+    async def test_anonymous_is_rejected_on_both_prefixes(self, sample: tuple, prefix: str) -> None:
+        """Dual-mounting must not create an unauthenticated way in.
+
+        The alias reaches the same handler, so this should hold by construction —
+        which is exactly why it is asserted rather than assumed: an auth
+        dependency wired per-mount, or a gate keyed on the literal canonical
+        prefix, would open a hole that nothing else would notice.
+        """
         method, path, body = sample
+        path = path.replace("/api/v1", prefix, 1)
         app = create_app()  # no auth override — the real dependency runs
         # The admin route resolves a user before deciding, which needs a session.
         # The proxy routes refuse before touching the database, so this changes

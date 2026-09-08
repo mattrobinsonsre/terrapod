@@ -155,7 +155,7 @@ from the publish call.
 Terrapod therefore takes them on a native endpoint, outside this surface:
 
 ```
-PUT /api/terrapod/v1/package-cache/galaxy/v3/collections/{ns}/{name}/versions/{version}/signature
+PUT /api/v1/package-cache/galaxy/v3/collections/{ns}/{name}/versions/{version}/signature
 ```
 
 The body is the ASCII-armored detached signature over the collection's

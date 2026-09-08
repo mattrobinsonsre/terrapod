@@ -106,7 +106,7 @@ Or directly against the API:
 curl -sS -X POST \
   -H "Authorization: Bearer $TERRAPOD_TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
-  https://terrapod.example.internal/api/terrapod/v1/gpg-keys \
+  https://terrapod.example.internal/api/v1/gpg-keys \
   -d @- <<'JSON'
 {
   "data": {
@@ -153,14 +153,14 @@ Or via the API:
 curl -sS -X POST \
   -H "Authorization: Bearer $TERRAPOD_TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
-  https://terrapod.example.internal/api/terrapod/v1/registry-providers \
+  https://terrapod.example.internal/api/v1/registry-providers \
   -d '{"data":{"type":"registry-providers","attributes":{"name":"example"}}}'
 
 # Module slot
 curl -sS -X POST \
   -H "Authorization: Bearer $TERRAPOD_TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
-  https://terrapod.example.internal/api/terrapod/v1/registry-modules \
+  https://terrapod.example.internal/api/v1/registry-modules \
   -d '{"data":{"type":"registry-modules","attributes":{"name":"vpc","provider":"aws"}}}'
 ```
 
@@ -175,7 +175,7 @@ way to get one is `terraform login terrapod.example.internal`, which
 stores the token in `~/.terraform.d/credentials.tfrc.json` — the CLI
 reads it from there automatically. For CI, create a long-lived token
 (`settings → tokens` in the UI, or
-`POST /api/terrapod/v1/users/{user_id}/authentication-tokens`)
+`POST /api/v1/users/{user_id}/authentication-tokens`)
 and pass it via `$TERRAPOD_TOKEN`. See [Auth resolution](#auth-resolution).
 
 ---
@@ -449,7 +449,7 @@ causes:
 - **Unregistered signing key.** The signature verified cryptographically
   but the key isn't registered with Terrapod, or the wrong key was used.
   Register the **public** half of your signing key
-  (`POST /api/terrapod/v1/gpg-keys` or the `terrapod_gpg_key` resource)
+  (`POST /api/v1/gpg-keys` or the `terrapod_gpg_key` resource)
   and confirm the `key_id` matches the key behind `--signing-key`.
 - **Signature doesn't verify.** The detached signature doesn't validate
   against the manifest. This usually means the manifest and signature came

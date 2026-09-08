@@ -32,6 +32,7 @@ from starlette.requests import Request
 from starlette.responses import Response
 
 from terrapod.api.errors import jsonapi_error_response
+from terrapod.api.prefixes import canonical_path
 from terrapod.logging_config import get_logger
 from terrapod.services.ha_role import NotLeaderError, is_leader
 
@@ -57,12 +58,12 @@ WRITE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 #: it, never the side that serves it.)
 FOLLOWER_WRITABLE_PATHS = frozenset(
     {
-        "/api/terrapod/v1/auth/local/authorize",
-        "/api/terrapod/v1/auth/local/login",
-        "/api/terrapod/v1/auth/saml/acs",
-        "/api/terrapod/v1/auth/token",
-        "/api/terrapod/v1/auth/logout",
-        "/api/terrapod/v1/auth/logout/all",
+        "/api/v1/auth/local/authorize",
+        "/api/v1/auth/local/login",
+        "/api/v1/auth/saml/acs",
+        "/api/v1/auth/token",
+        "/api/v1/auth/logout",
+        "/api/v1/auth/logout/all",
         # A listener must be able to enrol against whichever node it is pointed
         # at, and stay enrolled. It should not have to know, or care, whether
         # that node currently leads — a follower simply never sends it work
@@ -77,7 +78,7 @@ FOLLOWER_WRITABLE_PATHS = frozenset(
         #
         # Without this the whole listener protocol is refused on a follower, so
         # a standby's fleet can never be ready before promotion (#1191).
-        "/api/terrapod/v1/agent-pools/join",
+        "/api/v1/agent-pools/join",
     }
 )
 
@@ -96,13 +97,13 @@ FOLLOWER_WRITABLE_PATHS = frozenset(
 #: attached to one never has a run to report on — leaving them gated costs
 #: nothing and keeps the boundary where the replication story needs it.
 _LISTENER_KEEPALIVE = (
-    "/api/terrapod/v1/listeners/{id}/heartbeat",
-    "/api/terrapod/v1/listeners/{id}/renew",
+    "/api/v1/listeners/{id}/heartbeat",
+    "/api/v1/listeners/{id}/renew",
 )
 
 FOLLOWER_WRITABLE_PREFIXES: tuple[str, ...] = (
-    "/api/terrapod/v1/auth/sessions/user/",
-    "/api/terrapod/v1/agent-pools/",  # …/{pool_id}/listeners/join — see below
+    "/api/v1/auth/sessions/user/",
+    "/api/v1/agent-pools/",  # …/{pool_id}/listeners/join — see below
 )
 
 
@@ -131,11 +132,17 @@ def _is_listener_keepalive(path: str) -> bool:
 
 
 def is_follower_writable(path: str) -> bool:
+    # Normalise onto the canonical native prefix first (#1529), so the same
+    # decision is reached whether the caller used `/api/v1` or the deprecated
+    # `/api/terrapod/v1` alias. Matching only the canonical literals would make
+    # a follower refuse a listener that enrolled via the alias — and our own
+    # listener images still use it.
+    path = canonical_path(path)
     if path in FOLLOWER_WRITABLE_PATHS or _is_listener_keepalive(path):
         return True
     # The agent-pool prefix is deliberately narrow: only the pool-scoped join,
     # never pool or token administration, which changes platform state.
-    if path.startswith("/api/terrapod/v1/agent-pools/") and path.endswith("/listeners/join"):
+    if path.startswith("/api/v1/agent-pools/") and path.endswith("/listeners/join"):
         return True
     return path.startswith(FOLLOWER_WRITABLE_PREFIXES[:1])
 
