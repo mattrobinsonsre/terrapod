@@ -17,10 +17,29 @@ from terrapod.services.run_reconciler import (
 )
 
 
+def _outcome_for(run):
+    """The decision the reconciler would have obtained for this run.
+
+    Tests that drive `_handle_succeeded` directly are exercising the *execution*
+    of a decision, so they resolve it the same way production does rather than
+    hand-constructing one — otherwise they could pin an outcome the engine would
+    never actually produce.
+    """
+    from terrapod.engines import strategy_for
+
+    return strategy_for(run.engine).resolve_terminal(
+        run_status=run.status, run_source=run.source, job_status="succeeded"
+    )
+
+
 def _mock_run(**kwargs):
     run = MagicMock()
     run.id = kwargs.get("id", uuid.uuid4())
     run.status = kwargs.get("status", "planning")
+    # Matches the column default. A MagicMock here would reach `strategy_for`
+    # as an unknown engine and raise, which is the intended behaviour — a run
+    # whose engine cannot be resolved must not be executed as Terraform.
+    run.engine = kwargs.get("engine", "terraform")
     run.workspace_id = kwargs.get("workspace_id", uuid.uuid4())
     run.pool_id = kwargs.get("pool_id", uuid.uuid4())
     run.job_name = kwargs.get("job_name", "tprun-abc123-plan")
@@ -91,7 +110,12 @@ class TestReconcileOne:
 
         await _reconcile_one(db, run)
 
-        mock_handle.assert_called_once_with(db, run)
+        # Now carries the engine's decision as well as the run: the reconciler
+        # asks what a finished Job means before acting on it.
+        mock_handle.assert_called_once()
+        called_db, called_run, outcome = mock_handle.call_args.args
+        assert (called_db, called_run) == (db, run)
+        assert outcome.action == "complete_plan"
 
     @patch("terrapod.services.run_reconciler._handle_failed", new_callable=AsyncMock)
     @patch("terrapod.redis.client.get_job_status_from_redis", new_callable=AsyncMock)
@@ -160,7 +184,7 @@ class TestHandleSucceeded:
         mock_stage.return_value = None
         mock_transition.return_value = run
 
-        await _handle_succeeded(db, run)
+        await _handle_succeeded(db, run, _outcome_for(run))
 
         mock_transition.assert_called_once_with(db, run, "planned")
         mock_persist.assert_called_once_with(run, "plan")
@@ -182,7 +206,7 @@ class TestHandleSucceeded:
         confirmed_run = _mock_run(status="confirmed", auto_apply=True)
         mock_transition.side_effect = [planned_run, confirmed_run]
 
-        await _handle_succeeded(db, run)
+        await _handle_succeeded(db, run, _outcome_for(run))
 
         assert mock_transition.call_count == 2
         assert mock_transition.call_args_list[0].args[2] == "planned"
@@ -206,7 +230,7 @@ class TestHandleSucceeded:
         planned_run = _mock_run(status="planned", auto_apply=True, plan_only=False)
         mock_transition.side_effect = [planned_run]
 
-        await _handle_succeeded(db, run)
+        await _handle_succeeded(db, run, _outcome_for(run))
 
         # Only the planned transition fired — no auto-confirm past the lock.
         assert mock_transition.call_count == 1
@@ -240,7 +264,7 @@ class TestHandleSucceeded:
         ws.plan_expiry_seconds = None
         db.get.return_value = ws
 
-        await _handle_succeeded(db, run)
+        await _handle_succeeded(db, run, _outcome_for(run))
 
         # Two transitions: planning→planned, then planned→applied.
         # Critically, NO transition to "confirmed" — the apply Job is never queued.
@@ -272,7 +296,7 @@ class TestHandleSucceeded:
         mock_transition.side_effect = [planned_run, applied_run]
         db.get.return_value = MagicMock(locked=False, plan_expiry_seconds=None)
 
-        await _handle_succeeded(db, run)
+        await _handle_succeeded(db, run, _outcome_for(run))
 
         # Must be planned → applied, not planned → confirmed.
         assert mock_transition.call_args_list[1].args[2] == "applied"
@@ -294,7 +318,7 @@ class TestHandleSucceeded:
         ws.lock_id = "lock-123"
         db.get.return_value = ws
 
-        await _handle_succeeded(db, run)
+        await _handle_succeeded(db, run, _outcome_for(run))
 
         assert ws.locked is False
         assert ws.lock_id is None
@@ -310,7 +334,7 @@ class TestHandleSucceeded:
         ws.plan_expiry_seconds = None
         db.get.return_value = ws
 
-        await _handle_succeeded(db, run)
+        await _handle_succeeded(db, run, _outcome_for(run))
 
         mock_transition.assert_called_once_with(db, run, "applied")
         assert ws.locked is False
@@ -331,7 +355,7 @@ class TestHandleSucceeded:
         mock_resolve.return_value = "failed"
         mock_transition.return_value = run
 
-        await _handle_succeeded(db, run)
+        await _handle_succeeded(db, run, _outcome_for(run))
 
         mock_transition.assert_called_once_with(
             db, run, "errored", error_message="Post-plan task stage failed"
