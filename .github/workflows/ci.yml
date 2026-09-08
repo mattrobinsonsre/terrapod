@@ -2128,6 +2128,119 @@ jobs:
         if: always()
         run: docker compose -f e2e/docker-compose.e2e.yml down -v
 
+  # ── Air-gap gate (#1485, phase 0 of #1407) ──────────────
+  # #1407 §12 states the phase-0 acceptance in one sentence: *run each client with
+  # upstream network blocked*. Every surface met that by hand, once, when it was
+  # built. This makes it standing.
+  #
+  # A pull-through cache that has quietly started reaching upstream on a path
+  # nobody exercises looks identical to one that has not — right up until an
+  # air-gapped operator's runner hangs. That failure is invisible by construction,
+  # which is why it needs a machine watching rather than a memory of having checked.
+  airgap-gate:
+    name: Air-gap Gate
+    needs: [prepare, build-images-amd64]
+    if: |
+      always()
+      && needs.build-images-amd64.result == 'success'
+      && needs.prepare.outputs.images_exist != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Log in to GHCR
+        if: needs.prepare.outputs.is_pr != 'true'
+        uses: ./.github/actions/ghcr-login
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ github.actor }}
+
+      - name: Pull images (branch/tag)
+        if: needs.prepare.outputs.is_pr != 'true'
+        run: |
+          sha_short="${{ needs.prepare.outputs.sha_short }}"
+          for image in terrapod-api terrapod-web terrapod-migrations; do
+            docker pull "$REGISTRY/$image:sha-${sha_short}-amd64"
+            docker tag "$REGISTRY/$image:sha-${sha_short}-amd64" "$image:local"
+          done
+
+      - name: Download image artifacts (PR)
+        if: needs.prepare.outputs.is_pr == 'true'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          pattern: image-*-amd64
+          path: /tmp/images
+          merge-multiple: true
+
+      - name: Load images (PR)
+        if: needs.prepare.outputs.is_pr == 'true'
+        run: |
+          sha_short="${{ needs.prepare.outputs.sha_short }}"
+          for image in terrapod-api terrapod-web terrapod-migrations; do
+            gunzip -c "/tmp/images/$image-amd64.tar.gz" | docker load
+            docker tag "$REGISTRY/$image:sha-${sha_short}-amd64" "$image:local"
+          done
+
+      # Presigned filesystem URLs default to the api container's own address, so
+      # any other client following one gets connection refused. Pointed at the
+      # BFF here, which is also the hop the clients themselves use.
+      - name: Start stack
+        run: |
+          TERRAPOD_FS_BASE_URL=http://web:3000 \
+            docker compose -f e2e/docker-compose.e2e.yml up -d
+
+      - name: Wait for stack health
+        run: |
+          timeout=120
+          elapsed=0
+          while ! curl -sf http://localhost:3000/ > /dev/null 2>&1; do
+            if (( elapsed >= timeout )); then
+              echo "Stack not healthy after ${timeout}s"
+              docker compose -f e2e/docker-compose.e2e.yml logs
+              exit 1
+            fi
+            sleep 2
+            elapsed=$((elapsed + 2))
+          done
+          echo "Stack healthy (${elapsed}s)"
+
+      # Warm each client through Terrapod, then repeat every install on a network
+      # with no gateway. The script proves that network really is severed before
+      # asserting anything through it — without that self-check the whole job
+      # would pass while testing nothing.
+      - name: Real clients, with and without a route to the internet
+        run: scripts/airgap-gate.sh http://localhost:3000
+
+      # The other half of the engine gate (#1429): switched off, these surfaces
+      # are ABSENT rather than answering 404, while terraform's own provider
+      # mirror, module registry and binary cache still answer. Asserted per-PR in
+      # unit tests; asserting it against a running stack is what makes it true
+      # rather than believed.
+      - name: Restart with the ansible and pulumi engines disabled
+        run: |
+          TERRAPOD_FS_BASE_URL=http://web:3000 \
+          TERRAPOD_ENGINES_ANSIBLE=false TERRAPOD_ENGINES_PULUMI=false \
+            docker compose -f e2e/docker-compose.e2e.yml up -d
+          for _ in $(seq 1 30); do
+            curl -sf http://localhost:3000/ >/dev/null 2>&1 && break
+            sleep 4
+          done
+
+      - name: Gated-off surfaces are absent, terraform's still answer
+        run: scripts/airgap-gate.sh --gated-off http://localhost:3000
+
+      - name: Stack logs on failure
+        if: failure()
+        run: docker compose -f e2e/docker-compose.e2e.yml logs --tail=200
+
+      - name: Tear down
+        if: always()
+        run: docker compose -f e2e/docker-compose.e2e.yml down -v
+
   # ── E2E Report (merge shard blob reports) ──────────────
   # Merges the per-shard Playwright blob reports into a single HTML report,
   # so a failure across 8 shards is triaged from one artifact. Runs even when
@@ -3277,6 +3390,7 @@ jobs:
       # waits for it. Re-adding this line reintroduces the stall silently, since
       # nothing about the verdict changes (#1468).
       - oci-conformance
+      - airgap-gate
       - create-manifests
       - release-create
       - release-images
@@ -3326,6 +3440,7 @@ jobs:
             "${{ needs.scan-images.result }}"
             "${{ needs.e2e-test.result }}"
             "${{ needs.oci-conformance.result }}"
+            "${{ needs.airgap-gate.result }}"
             "${{ needs.create-manifests.result }}"
             "${{ needs.release-create.result }}"
             "${{ needs.release-images.result }}"

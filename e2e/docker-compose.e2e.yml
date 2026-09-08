@@ -49,6 +49,18 @@ services:
       TERRAPOD_REDIS_URL: redis://redis:6379
       TERRAPOD_STORAGE__BACKEND: filesystem
       TERRAPOD_STORAGE__FILESYSTEM__ROOT_DIR: /var/lib/terrapod/storage
+      # Presigned filesystem URLs are built from this and handed to whoever asked.
+      # The default (http://localhost:8000) is the api container's OWN address, so
+      # any other client following one gets connection refused — which is exactly
+      # what the air-gap gate hit on its first run. Overridable so that job can
+      # point it at the BFF; left unset, behaviour is identical to before.
+      TERRAPOD_STORAGE__FILESYSTEM__BASE_URL: ${TERRAPOD_FS_BASE_URL:-http://localhost:8000}
+      # Engine gate (#1429). Both default to true, matching the product default, so
+      # the normal e2e run is unchanged. The air-gap gate flips them off to assert
+      # the other half: that engine-specific surfaces go ABSENT rather than 404ing.
+      # Declared here because compose only forwards environment a service names.
+      TERRAPOD_ENGINES__ANSIBLE__ENABLED: ${TERRAPOD_ENGINES_ANSIBLE:-true}
+      TERRAPOD_ENGINES__PULUMI__ENABLED: ${TERRAPOD_ENGINES_PULUMI:-true}
       TERRAPOD_RATE_LIMIT__ENABLED: "false"
       # Service catalog (#535) is off by default; enable it so the catalog UI +
       # RBAC surfaces are exercised end-to-end.
