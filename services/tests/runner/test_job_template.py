@@ -48,16 +48,18 @@ def _runner_config():
 class TestVarFilesInjection:
     def test_var_files_env_var_set(self):
         """TP_VAR_FILES should be set when var_files is provided."""
-        from terrapod.runner.job_template import build_job_spec
+        from terrapod.engines.terraform import TerraformRunOptions, TerraformStrategy
 
-        spec = build_job_spec(
+        spec = TerraformStrategy().build_job_spec(
+            options=TerraformRunOptions(
+                var_files=["envs/dev.tfvars", "secrets.tfvars"],
+            ),
             run_id="abc123",
             phase="plan",
             runner_config=_runner_config(),
             auth_secret_name="tprun-abc12345-auth",
             env_vars=[],
             terraform_vars=[],
-            var_files=["envs/dev.tfvars", "secrets.tfvars"],
         )
 
         container = spec["spec"]["template"]["spec"]["containers"][0]
@@ -68,16 +70,18 @@ class TestVarFilesInjection:
 
     def test_no_var_files_env_var_when_empty(self):
         """TP_VAR_FILES should NOT be set when var_files is empty."""
-        from terrapod.runner.job_template import build_job_spec
+        from terrapod.engines.terraform import TerraformRunOptions, TerraformStrategy
 
-        spec = build_job_spec(
+        spec = TerraformStrategy().build_job_spec(
+            options=TerraformRunOptions(
+                var_files=[],
+            ),
             run_id="abc123",
             phase="plan",
             runner_config=_runner_config(),
             auth_secret_name="tprun-abc12345-auth",
             env_vars=[],
             terraform_vars=[],
-            var_files=[],
         )
 
         container = spec["spec"]["template"]["spec"]["containers"][0]
@@ -86,16 +90,18 @@ class TestVarFilesInjection:
 
     def test_no_var_files_env_var_when_none(self):
         """TP_VAR_FILES should NOT be set when var_files is None."""
-        from terrapod.runner.job_template import build_job_spec
+        from terrapod.engines.terraform import TerraformRunOptions, TerraformStrategy
 
-        spec = build_job_spec(
+        spec = TerraformStrategy().build_job_spec(
+            options=TerraformRunOptions(
+                var_files=None,
+            ),
             run_id="abc123",
             phase="plan",
             runner_config=_runner_config(),
             auth_secret_name="tprun-abc12345-auth",
             env_vars=[],
             terraform_vars=[],
-            var_files=None,
         )
 
         container = spec["spec"]["template"]["spec"]["containers"][0]
@@ -570,16 +576,27 @@ class TestCostEstimationEnv:
     """#871 — the API's per-run cost instruction reaches the Job env."""
 
     def _spec_env(self, **kw):
-        from terrapod.runner.job_template import build_job_spec
+        """Render through the strategy, splitting run options from neutral args.
 
-        spec = build_job_spec(
+        Cost estimation is an engine option after #1488, so it reaches the spec
+        via `TerraformRunOptions` rather than as a builder parameter. The split is
+        done from the dataclass's own fields so this helper cannot drift from it.
+        """
+        import dataclasses
+
+        from terrapod.engines.terraform import TerraformRunOptions, TerraformStrategy
+
+        fields = {f.name for f in dataclasses.fields(TerraformRunOptions)}
+        options = TerraformRunOptions(**{k: v for k, v in kw.items() if k in fields})
+        spec = TerraformStrategy().build_job_spec(
+            options=options,
             run_id="abc123",
             phase="plan",
             runner_config=_runner_config(),
             auth_secret_name="tprun-abc12345-auth",
             env_vars=[],
             terraform_vars=[],
-            **kw,
+            **{k: v for k, v in kw.items() if k not in fields},
         )
         container = spec["spec"]["template"]["spec"]["containers"][0]
         return {e["name"]: e.get("value") for e in container["env"] if "value" in e}

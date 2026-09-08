@@ -681,6 +681,7 @@ class RunnerListener:
         immediate signal at the API instead of a generic timeout 5 min later.
         """
         from terrapod.engines import strategy_for
+        from terrapod.engines.terraform import TerraformRunOptions
         from terrapod.runner.job_manager import create_job, get_job_uid
 
         phase = attrs.get("phase", "plan")
@@ -764,19 +765,10 @@ class RunnerListener:
         ca_pem = self._read_ca_bundle_pem()
         ca_secret_name = f"tprun-{run_short}-{phase}-ca" if ca_pem else ""
 
-        spec = engine.build_job_spec(
-            run_id=run_id,
-            phase=phase,
-            runner_config=self.runner_config,
-            auth_secret_name=auth_secret_name,
-            vars_secret_name=vars_secret_name,
-            env_vars=env_vars,
-            terraform_vars=terraform_vars,
-            execution_hooks=execution_hooks,
-            git_auth=git_auth,
-            resource_cpu=attrs.get("resource-cpu", "1"),
-            parallelism=attrs.get("parallelism", 10),
-            resource_memory=attrs.get("resource-memory", "2Gi"),
+        # The engine's run options as one typed object (#1407 phase 2), instead of
+        # twenty keyword arguments threaded through a general-purpose builder. The
+        # wire keys are unchanged — this is how they are carried, not what is sent.
+        options = TerraformRunOptions(
             terraform_version=attrs.get("terraform-version", ""),
             execution_backend=attrs.get("execution-backend", "tofu"),
             terragrunt_enabled=attrs.get("terragrunt-enabled", False),
@@ -789,17 +781,33 @@ class RunnerListener:
             refresh=attrs.get("refresh", True),
             allow_empty_apply=attrs.get("allow-empty-apply", False),
             is_destroy=attrs.get("is-destroy", False),
+            parallelism=attrs.get("parallelism", 10),
             # Cost estimation (#871): the API instructs per-run (fallback yes);
             # the listener only relays it, never self-configures.
             cost_estimation=attrs.get("cost-estimation", True),
             cost_default_region=attrs.get("cost-default-region", "us-east-1"),
             working_directory=attrs.get("working-directory", ""),
-            ca_secret_name=ca_secret_name,
             # Onboarding discovery (#824 P2): present only for discovery runs.
             onboard_session_id=attrs.get("onboard-session-id", ""),
             onboard_provider=attrs.get("onboard-provider", ""),
             onboard_provider_version=attrs.get("onboard-provider-version", ""),
             onboard_types=attrs.get("onboard-types", []),
+        )
+
+        spec = engine.build_job_spec(
+            options=options,
+            run_id=run_id,
+            phase=phase,
+            runner_config=self.runner_config,
+            auth_secret_name=auth_secret_name,
+            vars_secret_name=vars_secret_name,
+            env_vars=env_vars,
+            terraform_vars=terraform_vars,
+            execution_hooks=execution_hooks,
+            git_auth=git_auth,
+            resource_cpu=attrs.get("resource-cpu", "1"),
+            resource_memory=attrs.get("resource-memory", "2Gi"),
+            ca_secret_name=ca_secret_name,
         )
 
         namespace = self.runner_config.runner_namespace

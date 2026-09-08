@@ -1,9 +1,8 @@
 """Build K8s Job specs for terraform/tofu plan and apply phases."""
 
-import json
 import re
 
-from terrapod.config import RunnerConfig, settings
+from terrapod.config import RunnerConfig
 from terrapod.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -73,29 +72,13 @@ def build_job_spec(
     vars_secret_name: str = "",
     resource_cpu: str = "1",
     resource_memory: str = "2Gi",
-    parallelism: int = 10,
     timeout_minutes: int = 60,
-    terraform_version: str = "",
-    execution_backend: str = "",
-    terragrunt_enabled: bool = False,
-    terragrunt_version: str = "",
     namespace: str = "",
-    plan_only: bool = False,
-    var_files: list[str] | None = None,
-    target_addrs: list[str] | None = None,
-    replace_addrs: list[str] | None = None,
-    refresh_only: bool = False,
-    refresh: bool = True,
-    allow_empty_apply: bool = False,
-    is_destroy: bool = False,
-    cost_estimation: bool = True,
-    cost_default_region: str = "us-east-1",
-    working_directory: str = "",
     ca_secret_name: str = "",
-    onboard_session_id: str = "",
-    onboard_provider: str = "",
-    onboard_provider_version: str = "",
-    onboard_types: list[str] | None = None,
+    #: The engine's TP_* instructions, built by its strategy (#1407 phase 2).
+    #: Defaults to empty so a caller that supplies none renders a spec with no
+    #: engine env rather than failing — the neutral half stands on its own.
+    engine_env: list[dict] | None = None,
 ) -> dict:
     """Build a K8s Job spec for a run phase.
 
@@ -170,72 +153,13 @@ def build_job_spec(
     if public_api_url and public_api_url.rstrip("/") != api_url.rstrip("/"):
         container_env.append({"name": "TP_PUBLIC_API_URL", "value": public_api_url})
 
-    # Terraform version + backend
-    version = terraform_version or runner_config.default_terraform_version
-    backend = execution_backend or runner_config.default_execution_backend
-    container_env.append({"name": "TP_VERSION", "value": version})
-    container_env.append({"name": "TP_BACKEND", "value": backend})
-    # Runner-side executable verification level (#607): the runner re-verifies
-    # the terraform/tofu/terragrunt binary against the publisher's signed
-    # SHA256SUMS with its own pinned key before executing it. Mirrors the
-    # server's binary_cache.verify so operators control it in one place.
-    container_env.append(
-        {"name": "TP_VERIFY_BINARIES", "value": settings.registry.binary_cache.verify}
-    )
-    # Operator-overridden publisher keys (#607): propagate the configured trust
-    # set to the Job so runner-side verification uses the same keys as the API
-    # (set at Job-creation from config, not fetched at request time → not an
-    # attacker-controllable trust anchor). Empty (default) → runner uses bundled.
-    for _tool, _armor in settings.registry.binary_cache.signing_keys.items():
-        if _armor:
-            container_env.append({"name": f"TP_SIGNING_KEY_{_tool.upper()}", "value": _armor})
-    # Terragrunt (#534): the runner wraps tofu/terraform with terragrunt when
-    # enabled. Version is partial (e.g. "1.0") — the binary cache resolves it.
-    if terragrunt_enabled:
-        container_env.append({"name": "TP_TERRAGRUNT_ENABLED", "value": "true"})
-        container_env.append(
-            {"name": "TP_TERRAGRUNT_VERSION", "value": terragrunt_version or "1.0"}
-        )
-    if plan_only:
-        container_env.append({"name": "TP_PLAN_ONLY", "value": "true"})
-    if var_files:
-        container_env.append({"name": "TP_VAR_FILES", "value": json.dumps(var_files)})
-    if target_addrs:
-        container_env.append({"name": "TP_TARGET_ADDRS", "value": json.dumps(target_addrs)})
-    if replace_addrs:
-        container_env.append({"name": "TP_REPLACE_ADDRS", "value": json.dumps(replace_addrs)})
-    if refresh_only:
-        container_env.append({"name": "TP_REFRESH_ONLY", "value": "true"})
-    if not refresh:
-        container_env.append({"name": "TP_REFRESH", "value": "false"})
-    if allow_empty_apply:
-        container_env.append({"name": "TP_ALLOW_EMPTY_APPLY", "value": "true"})
-    if is_destroy:
-        container_env.append({"name": "TP_DESTROY", "value": "true"})
-    # Always emitted, never only-when-non-default: the runner has no way to know
-    # the workspace's setting otherwise, and a default that drifts between API
-    # and runner across a version skew would be invisible (#1431).
-    container_env.append({"name": "TP_PARALLELISM", "value": str(parallelism)})
-    # Cost estimation (#871). The runner defaults to enabled, so only emit the
-    # env when the API instructs OFF; always ship the fallback region so a
-    # resource whose region can't be resolved is priced consistently.
-    if not cost_estimation:
-        container_env.append({"name": "TP_COST_ESTIMATION", "value": "false"})
-    elif cost_default_region:
-        container_env.append({"name": "TP_COST_DEFAULT_REGION", "value": cost_default_region})
-    if working_directory:
-        container_env.append({"name": "TP_WORKING_DIR", "value": working_directory})
-
-    # Onboarding discovery (#824 P2): a non-empty session id makes the entrypoint
-    # run D2/D3 (terrapod-query) instead of a workspace plan. The run stays
-    # plan-phase for all infra (Job name / Redis keys / reconciler).
-    if onboard_session_id:
-        container_env.append({"name": "TP_ONBOARD_SESSION_ID", "value": onboard_session_id})
-        container_env.append({"name": "TP_ONBOARD_PROVIDER", "value": onboard_provider})
-        container_env.append(
-            {"name": "TP_ONBOARD_PROVIDER_VERSION", "value": onboard_provider_version}
-        )
-        container_env.append({"name": "TP_ONBOARD_TYPES", "value": json.dumps(onboard_types or [])})
+    # The engine's own instructions to its entrypoint (#1407 phase 2). Spliced in
+    # at exactly the position these lines occupied when they lived here, so the
+    # rendered env order is unchanged — the golden spec matrix pins that.
+    #
+    # This builder knows nothing about which engine it is serving; the strategy
+    # composed this list and passes it in.
+    container_env.extend(engine_env or [])
 
     # Termination grace period — passed to entrypoint for time-budgeted shutdown
     container_env.append(
