@@ -223,6 +223,25 @@ is the question #1484 had to settle for NuGet and it lands the opposite way:
 Terrapod can mount this natively rather than at the root, which it reserves for
 the two surfaces genuinely forced there (`/v2/` and `/.well-known/terraform.json`).
 
+## Remote execution is not on this surface — but it does exist
+
+Nothing above executes anything. The service is a state store, a secrets oracle and an
+event sink; the CLI runs the language host, the engine and the providers locally, and
+`events/batch` is the CLI *pushing* what it did rather than a remote run streamed back.
+The `preview` and `update` bodies carry the project's name, runtime, options and config —
+**never the program source** — so the service could not execute it even in principle.
+
+Do not read that as "Pulumi has no remote execution". It does:
+`pulumi deployment run <operation>` queues a job on Pulumi Cloud, takes
+`--agent-pool-id`, and can stream its logs back (`--suppress-stream-logs`, default true).
+That lives on the **Deployments** API, a separate surface from this one, which is why a
+capture of `login` / `preview` / `up` never touches it.
+
+It is also not the same shape as `terraform apply` against an agent. Terraform uploads
+the local working directory, so uncommitted edits execute remotely; `deployment run` is
+git-sourced (`--git-branch` / `--git-commit` / `--git-repo-dir` / `--git-auth-*`), so it
+deploys committed code and local edits do not participate.
+
 ## Nothing from the management surface was required
 
 A full `login → stack init → stack ls → preview → up → refresh → export →
