@@ -3131,5 +3131,23 @@
       "everyoneFloor": "標記為 access: everyone — 所有人可讀",
       "catalogClamped": "目錄託管 — 所有非管理員授權均限制為唯讀"
     }
+  },
+  "phases": {
+    "terraform": {
+      "activity": {
+        "planning": "正在執行 terraform plan",
+        "applying": "正在執行 terraform apply"
+      },
+      "runStatus": {
+        "planning": "正在計畫",
+        "planned": "已計畫",
+        "applying": "正在應用",
+        "applied": "已應用"
+      },
+      "status": {
+        "planning": "正在計畫",
+        "applying": "正在應用"
+      }
+    }
   }
 }

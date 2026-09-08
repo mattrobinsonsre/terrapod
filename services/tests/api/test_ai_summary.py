@@ -36,6 +36,9 @@ def _user(email="test@example.com", roles=None):
 
 def _mock_workspace(ws_id=None, **overrides):
     ws = MagicMock()
+    # The engine this belongs to (#1521) — set explicitly because a MagicMock
+    # attribute is not JSON-serialisable and the serializer now reports it.
+    ws.engine = "terraform"
     ws.id = ws_id or uuid.uuid4()
     ws.name = overrides.get("name", "test-ws")
     ws.auto_apply = False
@@ -90,6 +93,9 @@ def _mock_workspace(ws_id=None, **overrides):
 
 def _mock_run(ws_id=None, run_id=None, status="planned"):
     run = MagicMock()
+    # The engine this belongs to (#1521) — set explicitly because a MagicMock
+    # attribute is not JSON-serialisable and the serializer now reports it.
+    run.engine = "terraform"
     run.id = run_id or uuid.uuid4()
     run.workspace_id = ws_id or uuid.uuid4()
     run.status = status

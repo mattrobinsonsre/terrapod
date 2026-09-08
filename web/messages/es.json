@@ -3131,5 +3131,23 @@
       "everyoneFloor": "Etiquetado access: everyone: legible por todos",
       "catalogClamped": "Gestionado por el catálogo: toda concesión no administrativa se limita a lectura"
     }
+  },
+  "phases": {
+    "terraform": {
+      "activity": {
+        "planning": "Ejecutando terraform plan",
+        "applying": "Ejecutando terraform apply"
+      },
+      "runStatus": {
+        "planning": "Planificando",
+        "planned": "Planificado",
+        "applying": "Aplicando",
+        "applied": "Aplicado"
+      },
+      "status": {
+        "planning": "Planificando",
+        "applying": "Aplicando"
+      }
+    }
   }
 }

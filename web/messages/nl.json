@@ -3131,5 +3131,23 @@
       "everyoneFloor": "Gelabeld access: everyone — leesbaar voor iedereen",
       "catalogClamped": "Catalogusbeheerd — elke niet-beheerderstoekenning is beperkt tot lezen"
     }
+  },
+  "phases": {
+    "terraform": {
+      "activity": {
+        "planning": "terraform plan uitvoeren",
+        "applying": "terraform apply uitvoeren"
+      },
+      "runStatus": {
+        "planning": "Bezig met plannen",
+        "planned": "Gepland",
+        "applying": "Bezig met toepassen",
+        "applied": "Toegepast"
+      },
+      "status": {
+        "planning": "Bezig met plannen",
+        "applying": "Bezig met toepassen"
+      }
+    }
   }
 }

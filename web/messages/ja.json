@@ -3131,5 +3131,23 @@
       "everyoneFloor": "access: everyone のラベル付き — 全員が読み取り可能",
       "catalogClamped": "カタログ管理 — 管理者以外への付与はすべて読み取りに制限"
     }
+  },
+  "phases": {
+    "terraform": {
+      "activity": {
+        "planning": "terraform planを実行中",
+        "applying": "terraform applyを実行中"
+      },
+      "runStatus": {
+        "planning": "プラン実行中",
+        "planned": "プラン完了",
+        "applying": "適用中",
+        "applied": "適用済み"
+      },
+      "status": {
+        "planning": "プラン実行中",
+        "applying": "適用中"
+      }
+    }
   }
 }

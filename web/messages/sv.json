@@ -3131,5 +3131,23 @@
       "everyoneFloor": "Märkt access: everyone — läsbar för alla",
       "catalogClamped": "Kataloghanterad — varje icke-administrativ behörighet begränsas till läsning"
     }
+  },
+  "phases": {
+    "terraform": {
+      "activity": {
+        "planning": "Kör terraform plan",
+        "applying": "Kör terraform apply"
+      },
+      "runStatus": {
+        "planning": "Planerar",
+        "planned": "Planerad",
+        "applying": "Applicerar",
+        "applied": "Applicerad"
+      },
+      "status": {
+        "planning": "Planerar",
+        "applying": "Applicerar"
+      }
+    }
   }
 }

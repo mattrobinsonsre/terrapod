@@ -121,4 +121,43 @@ test.describe('Run lifecycle UI', () => {
       timeout: 15_000,
     });
   });
+  test('phase wording resolves rather than leaking a message key', async ({ page }) => {
+    // #1521 moved the run's phase words behind the engine's vocabulary
+    // namespace, so what the page renders now depends on the key
+    // `phases.<engine>.<group>.<state>` resolving. Get the namespace wrong and
+    // the label does not vanish or throw — it renders the raw key. Nothing else
+    // catches that: type-checking passes, the catalogue gate passes (the keys
+    // exist), and a page asserting only "no error banner" is happy.
+    const token = getStoredToken();
+    const wsId = await createWorkspace(token, uniqueName('e2e-phase-vocab'));
+    const runId = await seedRun(token, wsId);
+
+    await page.goto(`/workspaces/${wsId}/runs/${runId}`);
+    await expect(page.getByText(/Failed to load/i)).toHaveCount(0);
+
+    // A raw key anywhere on the page is the failure. Matching the prefix rather
+    // than one exact key keeps this honest whichever phase the seeded run is in.
+    await expect(page.getByText(/phases\.[a-z]+\.(runStatus|activity|status)\./)).toHaveCount(0);
+  });
+
+  test('the run page carries its engine through to the API response', async ({ page }) => {
+    // The wording is chosen from the run's own engine, so the attribute has to
+    // actually arrive — a serializer that dropped it would fall back to
+    // Terraform's words and look perfectly fine on a Terraform-only install,
+    // which is exactly where this would go unnoticed.
+    const token = getStoredToken();
+    const wsId = await createWorkspace(token, uniqueName('e2e-phase-engine'));
+    const runId = await seedRun(token, wsId);
+
+    let engine: unknown;
+    await page.route(`**/api/v2/runs/${runId}`, async (route: Route) => {
+      const response = await route.fetch();
+      const json = await response.json();
+      engine = json?.data?.attributes?.engine;
+      await route.fulfill({ response, json });
+    });
+
+    await page.goto(`/workspaces/${wsId}/runs/${runId}`);
+    await expect.poll(() => engine, { timeout: 15_000 }).toBe('terraform');
+  });
 });

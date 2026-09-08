@@ -1276,6 +1276,13 @@ def create_application() -> FastAPI:
 
     include_terrapod(security_scanning_router)
 
+    # Execution engines (#1407 §3, #1521): what each engine is and what a run's
+    # internal status *means* for it, so no consumer has to infer the vocabulary
+    # from the engine name by convention.
+    from terrapod.api.routers.engines import router as engines_router
+
+    include_terrapod(engines_router)
+
     # Audit log query endpoint — Terrapod-specific.
     from terrapod.api.routers.audit import router as audit_router
 

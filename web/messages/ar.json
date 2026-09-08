@@ -3131,5 +3131,23 @@
       "everyoneFloor": "موسومة access: everyone — قابلة للقراءة من الجميع",
       "catalogClamped": "مُدارة بالكتالوج — كل منح لغير المسؤول مقيّد بالقراءة"
     }
+  },
+  "phases": {
+    "terraform": {
+      "activity": {
+        "planning": "جارٍ تشغيل terraform plan",
+        "applying": "جارٍ تشغيل terraform apply"
+      },
+      "runStatus": {
+        "planning": "جارٍ التخطيط",
+        "planned": "تم التخطيط",
+        "applying": "جارٍ التطبيق",
+        "applied": "تم التطبيق"
+      },
+      "status": {
+        "planning": "جارٍ التخطيط",
+        "applying": "جارٍ التطبيق"
+      }
+    }
   }
 }

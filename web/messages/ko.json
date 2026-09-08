@@ -3131,5 +3131,23 @@
       "everyoneFloor": "access: everyone 레이블 — 누구나 읽기 가능",
       "catalogClamped": "카탈로그 관리 — 관리자가 아닌 모든 부여는 읽기로 제한"
     }
+  },
+  "phases": {
+    "terraform": {
+      "activity": {
+        "planning": "terraform plan 실행 중",
+        "applying": "terraform apply 실행 중"
+      },
+      "runStatus": {
+        "planning": "계획 중",
+        "planned": "계획됨",
+        "applying": "적용 중",
+        "applied": "적용됨"
+      },
+      "status": {
+        "planning": "계획 중",
+        "applying": "적용 중"
+      }
+    }
   }
 }

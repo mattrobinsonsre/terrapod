@@ -264,6 +264,15 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				Computed:    true,
 				Default:     stringdefault.StaticString("terraform"),
 			},
+			"engine": schema.StringAttribute{
+				Description: "The execution engine family this workspace belongs to " +
+					"(\"terraform\"). Read-only — distinct from execution_backend, which " +
+					"picks the binary within the Terraform engine.",
+				Computed: true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
 			"terraform_version": schema.StringAttribute{
 				Description: "The Terraform/OpenTofu version to use.",
 				Optional:    true,
@@ -1088,6 +1097,7 @@ func readWorkspaceIntoModel(ctx context.Context, ws *terrapod.Workspace, m *work
 	m.AutoApply = types.BoolValue(ws.AutoApply)
 	m.AutoApplyMode = types.StringValue(ws.AutoApplyMode)
 	m.ExecutionBackend = types.StringValue(ws.ExecutionBackend)
+	m.Engine = types.StringValue(ws.Engine)
 	m.WorkingDirectory = types.StringValue(ws.WorkingDirectory)
 	m.ResourceCPU = types.StringValue(ws.ResourceCPU)
 	m.Parallelism = types.Int64Value(ws.Parallelism)

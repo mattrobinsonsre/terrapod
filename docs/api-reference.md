@@ -242,6 +242,81 @@ Returns feature flags (all enabled for Terrapod).
 
 ---
 
+## Execution Engines
+
+Every workspace and run carries an **`engine`** — the family the work belongs to
+(`terraform` today; Pulumi and Ansible are planned). These endpoints say what each
+engine is, and — the part that matters for a client — **what a run's status means
+for it**.
+
+Run statuses are the platform's and never change: a run is `planning` whatever
+engine it belongs to. What that state *is* differs, because the engines do
+genuinely different things — Terraform **plans** and **applies**, Pulumi
+**previews** and **updates**, Ansible **checks** and **runs**. Reading `engine`
+alone would leave a client to map that by convention; `status-phases` publishes
+it, so every consumer resolves the same words from the same place.
+
+Everything served here is a **token, never prose**. Display strings are
+translated per locale, so they cannot come from an API response — a client maps
+these identifiers to its own wording. `vocabulary` names the message-catalogue
+namespace holding them.
+
+### List Engines
+
+```http
+GET /api/terrapod/v1/engines
+```
+
+Readable by any authenticated user — this describes the deployment's
+capabilities, not anybody's resources. An engine not served by this deployment is
+**absent** rather than listed and refused.
+
+**Response:**
+
+```json
+{
+  "data": [
+    {
+      "type": "engines",
+      "id": "terraform",
+      "attributes": {
+        "name": "terraform",
+        "phases": ["plan", "apply"],
+        "status-phases": {
+          "planning": "plan",
+          "planned": "plan",
+          "applying": "apply",
+          "applied": "apply"
+        },
+        "default-execution-backend": "tofu",
+        "vocabulary": "terraform"
+      }
+    }
+  ],
+  "meta": {"pagination": {"current-page": 1, "page-size": 1, "total-count": 1, "total-pages": 1}}
+}
+```
+
+| Attribute | Type | Description |
+|---|---|---|
+| `name` | string | The engine family |
+| `phases` | array | The engine's phases, in the order a run performs them |
+| `status-phases` | object | Internal run status → the phase **this engine** calls it. A terminal status (`errored`, `canceled`, `discarded`) belongs to no phase and is **absent** — reporting a failed run as a plan would be wrong, not merely imprecise |
+| `default-execution-backend` | string | The binary a workspace gets when it does not choose one. For Terraform this is the `tofu`/`terraform` split — a choice *within* the engine, not a different engine |
+| `vocabulary` | string | Message-catalogue namespace holding this engine's display words |
+
+### Get Engine
+
+```http
+GET /api/terrapod/v1/engines/{engine_name}
+```
+
+Returns **404** for an engine this deployment does not serve, so a client asking
+about Pulumi on a Terraform-only install is told plainly rather than left to
+interpret silence.
+
+---
+
 ## Workspaces
 
 ### List Workspaces
@@ -313,6 +388,7 @@ either/or rule.
       "auto-apply": false,
       "auto-apply-mode": "create_update",
       "execution-mode": "agent",
+      "engine": "terraform",
       "terraform-version": "1.9.8",
       "resource-cpu": "1",
       "resource-memory": "2Gi",
@@ -743,6 +819,7 @@ POST /api/v2/runs
     "type": "runs",
     "attributes": {
       "message": "Triggered from API",
+      "engine": "terraform",
       "is-destroy": false,
       "auto-apply": false,
       "plan-only": false,

@@ -17,6 +17,7 @@
 //	"execution-mode"                    → execution_mode      (string, optional, default "local")
 //	"auto-apply"                        → auto_apply          (bool,   optional, default false)
 //	"execution-backend"                 → execution_backend   (string, optional, default "terraform")
+//	"engine"                            → engine              (string, read-only)
 //	"terraform-version"                 → terraform_version   (string, optional)
 //	"working-directory"                 → working_directory   (string, optional)
 //	"parallelism"                       → parallelism
@@ -62,6 +63,7 @@ type workspaceModel struct {
 	AutoApply                     types.Bool   `tfsdk:"auto_apply"`
 	AutoApplyMode                 types.String `tfsdk:"auto_apply_mode"`
 	ExecutionBackend              types.String `tfsdk:"execution_backend"`
+	Engine                        types.String `tfsdk:"engine"`
 	TerraformVersion              types.String `tfsdk:"terraform_version"`
 	TerragruntEnabled             types.Bool   `tfsdk:"terragrunt_enabled"`
 	TerragruntVersion             types.String `tfsdk:"terragrunt_version"`

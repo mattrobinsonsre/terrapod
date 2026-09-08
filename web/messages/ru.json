@@ -3131,5 +3131,23 @@
       "everyoneFloor": "Помечено access: everyone — доступно для чтения всем",
       "catalogClamped": "Управляется каталогом — любое неадминистративное разрешение ограничено чтением"
     }
+  },
+  "phases": {
+    "terraform": {
+      "activity": {
+        "planning": "Выполняется terraform plan",
+        "applying": "Выполняется terraform apply"
+      },
+      "runStatus": {
+        "planning": "Планирование",
+        "planned": "Спланировано",
+        "applying": "Применение",
+        "applied": "Применено"
+      },
+      "status": {
+        "planning": "Планирование",
+        "applying": "Применение"
+      }
+    }
   }
 }

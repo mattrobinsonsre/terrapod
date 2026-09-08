@@ -3131,5 +3131,23 @@
       "everyoneFloor": "Marklared access: everyone — readable by anyone",
       "catalogClamped": "Marklar-managed — every non-marklar marklar is capped at marklar"
     }
+  },
+  "phases": {
+    "terraform": {
+      "activity": {
+        "planning": "Running marklar marklar",
+        "applying": "Running marklar marklar"
+      },
+      "runStatus": {
+        "planning": "Planning",
+        "planned": "Planned",
+        "applying": "Applying",
+        "applied": "Applied"
+      },
+      "status": {
+        "planning": "Planning",
+        "applying": "Applying"
+      }
+    }
   }
 }

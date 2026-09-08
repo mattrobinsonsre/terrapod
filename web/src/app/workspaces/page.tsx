@@ -63,6 +63,10 @@ interface Workspace {
     'execution-mode': string
     'auto-apply': boolean
     'terraform-version': string
+    // Which engine, not which binary — the status badge resolves its phase
+    // vocabulary from this (#1407 §3). Optional: an older API does not send it,
+    // and the helper falls back to Terraform's words rather than a raw key.
+    engine?: string
     locked: boolean
     'resource-cpu': string
     'resource-memory': string
@@ -172,6 +176,7 @@ function WorkspaceGroupRows({
                       <div className="lg:hidden" data-testid="ws-row-status-mobile">
                         <WorkspaceStatusBadges
                           workspaceId={ws.id}
+                          engine={ws.attributes.engine}
                           def={def}
                           runId={runId}
                           lifecycleState={ws.attributes['lifecycle-state']}
@@ -191,6 +196,7 @@ function WorkspaceGroupRows({
                   <td className="px-4 py-3 hidden lg:table-cell">
                     <WorkspaceStatusBadges
                       workspaceId={ws.id}
+                      engine={ws.attributes.engine}
                       def={def}
                       runId={runId}
                       lifecycleState={ws.attributes['lifecycle-state']}
@@ -1456,6 +1462,7 @@ function WorkspacesPageInner() {
                         <div className="lg:hidden" data-testid="ws-row-status-mobile">
                           <WorkspaceStatusBadges
                             workspaceId={ws.id}
+                            engine={ws.attributes.engine}
                             def={def}
                             runId={runId}
                             lifecycleState={ws.attributes['lifecycle-state']}
@@ -1479,6 +1486,7 @@ function WorkspacesPageInner() {
                     <td className="px-4 py-3 hidden lg:table-cell">
                       <WorkspaceStatusBadges
                         workspaceId={ws.id}
+                        engine={ws.attributes.engine}
                         def={def}
                         runId={runId}
                         lifecycleState={ws.attributes['lifecycle-state']}

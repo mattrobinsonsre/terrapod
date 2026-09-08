@@ -3131,5 +3131,23 @@
       "everyoneFloor": "per access: everyone — Hoch laHlaH",
       "catalogClamped": "tetlhmo' SeHlu' — che'wI' Hutlhbogh nob Hoch laDmeH neH"
     }
+  },
+  "phases": {
+    "terraform": {
+      "activity": {
+        "planning": "terraform plan vangtaH",
+        "applying": "terraform apply vangtaH"
+      },
+      "runStatus": {
+        "planning": "nabtaH",
+        "planned": "nabpu'",
+        "applying": "lo'taH",
+        "applied": "lo'pu'"
+      },
+      "status": {
+        "planning": "nabtaH",
+        "applying": "lo'taH"
+      }
+    }
   }
 }

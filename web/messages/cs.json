@@ -3131,5 +3131,23 @@
       "everyoneFloor": "Označeno access: everyone — čitelné pro všechny",
       "catalogClamped": "Spravováno katalogem — každé nesprávcovské udělení je omezeno na čtení"
     }
+  },
+  "phases": {
+    "terraform": {
+      "activity": {
+        "planning": "Spouští se terraform plan",
+        "applying": "Spouští se terraform apply"
+      },
+      "runStatus": {
+        "planning": "Plánování",
+        "planned": "Naplánováno",
+        "applying": "Aplikování",
+        "applied": "Aplikováno"
+      },
+      "status": {
+        "planning": "Plánování",
+        "applying": "Aplikování"
+      }
+    }
   }
 }

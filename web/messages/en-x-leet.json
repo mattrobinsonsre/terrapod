@@ -3131,5 +3131,23 @@
       "everyoneFloor": "L4b3ll3d 4cc355: 3v3ry0n3 — r34d4bl3 by 4ny0n3",
       "catalogClamped": "C474l0g-m4n4g3d — 3v3ry n0n-4dm1n gr4n7 15 c4pp3d 47 r34d"
     }
+  },
+  "phases": {
+    "terraform": {
+      "activity": {
+        "planning": "Runn1ng 73rr4f0rm pl4n",
+        "applying": "Runn1ng 73rr4f0rm 4pply"
+      },
+      "runStatus": {
+        "planning": "Pl4nn1ng",
+        "planned": "Pl4nn3d",
+        "applying": "4pply1ng",
+        "applied": "4ppl13d"
+      },
+      "status": {
+        "planning": "Pl4nn1ng",
+        "applying": "4pply1ng"
+      }
+    }
   }
 }

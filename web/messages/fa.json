@@ -3131,5 +3131,23 @@
       "everyoneFloor": "برچسب access: everyone — برای همه قابل خواندن",
       "catalogClamped": "مدیریت‌شده با کاتالوگ — هر اعطای غیرمدیریتی محدود به خواندن است"
     }
+  },
+  "phases": {
+    "terraform": {
+      "activity": {
+        "planning": "در حال اجرای terraform plan",
+        "applying": "در حال اجرای terraform apply"
+      },
+      "runStatus": {
+        "planning": "در حال برنامه‌ریزی",
+        "planned": "برنامه‌ریزی‌شده",
+        "applying": "در حال اعمال",
+        "applied": "اعمال‌شده"
+      },
+      "status": {
+        "planning": "در حال طرح‌ریزی",
+        "applying": "در حال اعمال"
+      }
+    }
   }
 }

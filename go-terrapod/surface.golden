@@ -363,6 +363,11 @@ field EncryptionStatus.DEKVersions []int `json:"dek_versions"`
 field EncryptionStatus.Decryptable bool `json:"decryptable"`
 field EncryptionStatus.Enabled bool `json:"enabled"`
 field EncryptionStatus.Provider string `json:"provider"`
+field Engine.DefaultExecutionBackend string `json:"default-execution-backend"`
+field Engine.Name string `json:"name"`
+field Engine.Phases []string `json:"phases"`
+field Engine.StatusPhases map[string]string `json:"status-phases"`
+field Engine.Vocabulary string `json:"vocabulary"`
 field ErrorObject.Detail string `json:"detail"`
 field ErrorObject.Status string `json:"status"`
 field ErrorObject.Title string `json:"title"`
@@ -1034,6 +1039,7 @@ field Workspace.DriftIgnoreRules []string `json:"drift-ignore-rules,omitempty"`
 field Workspace.DriftLastCheckedAt string `json:"drift-last-checked-at,omitempty"`
 field Workspace.DriftLatestRunID string `json:"drift-latest-run-id,omitempty"`
 field Workspace.DriftStatus string `json:"drift-status,omitempty"`
+field Workspace.Engine string `json:"engine,omitempty"`
 field Workspace.ExecutionBackend string `json:"execution-backend,omitempty"`
 field Workspace.ExecutionMode string `json:"execution-mode"`
 field Workspace.ID string `json:"id"`
@@ -1214,6 +1220,7 @@ method (*Client) GetCatalogItemForm(ctx context.Context, id string) (map[string]
 method (*Client) GetCurrentStateVersion(ctx context.Context, workspaceID string) (*StateVersion, error)
 method (*Client) GetDeletedWorkspace(ctx context.Context, workspaceID string) (*DeletedWorkspace, error)
 method (*Client) GetEncryptionStatus(ctx context.Context) (*EncryptionStatus, error)
+method (*Client) GetEngine(ctx context.Context, name string) (*Engine, error)
 method (*Client) GetEstateGraph(ctx context.Context) (*EstateGraph, error)
 method (*Client) GetExecutionHook(ctx context.Context, id string) (*ExecutionHook, error)
 method (*Client) GetGPGKey(ctx context.Context, id string) (*GPGKey, error)
@@ -1266,6 +1273,7 @@ method (*Client) ListArchitectureCritiqueMessages( ctx context.Context, workspac
 method (*Client) ListCatalogInstances(ctx context.Context, itemID string) ([]CatalogInstance, error)
 method (*Client) ListCatalogItems(ctx context.Context) ([]CatalogItem, error)
 method (*Client) ListDeletedWorkspaces(ctx context.Context, opts DeletedWorkspaceListOptions) (*DeletedWorkspaceList, error)
+method (*Client) ListEngines(ctx context.Context) ([]Engine, error)
 method (*Client) ListExecutionHooks(ctx context.Context) ([]ExecutionHook, error)
 method (*Client) ListExpiringAPITokens(ctx context.Context) ([]APIToken, error)
 method (*Client) ListGPGKeys(ctx context.Context) ([]GPGKey, error)
@@ -1355,6 +1363,7 @@ method (*Client) VersionCheck(ctx context.Context) error
 method (*Client) WarmCacheBulk(ctx context.Context, req BulkWarmRequest) (*BulkWarmResponse, error)
 method (*Client) WhoAmI(ctx context.Context) (*HANode, error)
 method (*ConflictError) Error() string
+method (*Engine) PhaseFor(status string) (string, bool)
 method (*NotFoundError) Error() string
 method (*ValidationError) Error() string
 type APIError struct
@@ -1416,6 +1425,7 @@ type DeletedWorkspaceVariable struct
 type DiscoverySurface struct
 type Document struct
 type EncryptionStatus struct
+type Engine struct
 type ErrorObject struct
 type ErrorResponse struct
 type EstateEdge struct

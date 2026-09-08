@@ -150,6 +150,10 @@ def _run_json(
                 "plan-only": run.plan_only,
                 "source": run.source,
                 "execution-backend": run.execution_backend,
+                # Which engine, not which binary (#1407). The UI resolves phase
+                # vocabulary from this — a run is `planning` internally whatever
+                # engine it is, but what a person is shown differs.
+                "engine": run.engine,
                 "terraform-version": run.terraform_version,
                 "terragrunt-enabled": run.terragrunt_enabled,
                 "terragrunt-version": run.terragrunt_version,
