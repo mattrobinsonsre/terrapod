@@ -174,6 +174,20 @@ else
   exit 1
 fi
 
+# The OCI row needs a shell *and* crane in one image, and the published crane
+# image is distroless. Built here, while there is still a route out — the blocked
+# phase could not fetch it.
+note "Client images"
+printf 'FROM alpine:3.20\nCOPY --from=gcr.io/go-containerregistry/crane:latest /ko-app/crane /usr/bin/crane\n' \
+  | docker build -q -t tp-airgap-crane:local - >/dev/null 2>&1 \
+  && echo "  built tp-airgap-crane:local" \
+  || echo "  could not build the crane client; the OCI row will report it"
+
+printf 'FROM python:3.12-slim\nRUN pip install --no-cache-dir --quiet ansible-core\n' \
+  | docker build -q -t tp-airgap-ansible:local - >/dev/null 2>&1 \
+  && echo "  built tp-airgap-ansible:local" \
+  || echo "  could not build the ansible client; the Galaxy row will report it"
+
 # ── surfaces ───────────────────────────────────────────────────────────
 #
 # Each surface runs warm then blocked. The blocked run is the assertion; the warm
@@ -205,6 +219,47 @@ surface() {
   fi
 }
 
+
+# Some rows cannot run the identical script twice. The OCI registry is the clear
+# case: an air-gapped install has an EMPTY upstream allow-list — push-only is the
+# documented correct setting — so the warm phase *pushes* the image and the
+# blocked phase *pulls* it. That is the real air-gapped shape, not a workaround.
+surface_split() {
+  local name="$1" image="$2" warm_script="$3" blocked_script="$4"
+  note "$name"
+  docker pull -q "$image" >/dev/null 2>&1 || true
+
+  local warm="$LOGS/${name// /-}.warm.log" blocked="$LOGS/${name// /-}.blocked.log"
+
+  if docker run --rm --network "$STACK_NET" "$image" sh -ec "$warm_script" >"$warm" 2>&1; then
+    ok "$name warm (through Terrapod, with internet)"
+  else
+    bad "$name warm — the row itself is broken, not the air gap"
+    tail -12 "$warm" | sed 's/^/        /'
+    return
+  fi
+
+  if docker run --rm --network "$NET" "$image" sh -ec "$blocked_script" >"$blocked" 2>&1; then
+    ok "$name blocked (no route to the internet)"
+  else
+    bad "$name blocked — it needs upstream"
+    tail -12 "$blocked" | sed 's/^/        /'
+  fi
+}
+
+surface_split "OCI registry" tp-airgap-crane:local "
+  crane auth login web:3000 -u tp -p '$TOKEN' --insecure
+  crane copy alpine:3.20 web:3000/airgap/app:v1 --insecure
+  crane digest web:3000/airgap/app:v1 --insecure
+" "
+  crane auth login web:3000 -u tp -p '$TOKEN' --insecure
+  # Pull only: with an empty upstream allow-list this is exactly what an
+  # air-gapped runner does to get its execution environment.
+  crane pull web:3000/airgap/app:v1 /tmp/img.tar --insecure
+  test -s /tmp/img.tar
+  crane digest web:3000/airgap/app:v1 --insecure
+"
+
 surface "PyPI" python:3.12-slim "
   pip install --no-cache-dir --quiet --disable-pip-version-check \
     --index-url 'http://tp:$TOKEN@web:3000$PREFIX/pypi/simple/' \
@@ -231,6 +286,58 @@ surface "npm" node:22-alpine "
 #   GOPROXY=...,direct     — falls through to upstream on a proxy miss, which is
 #                            exactly the hole this gate exists to find.
 # So GOPROXY names the proxy and nothing else, and GOPRIVATE stays unset.
+
+surface "Ansible Galaxy" tp-airgap-ansible:local "
+  mkdir -p /tmp/w && cd /tmp/w
+  printf '%s\n' '[galaxy]' 'server_list = terrapod' '' \
+    '[galaxy_server.terrapod]' \
+    'url = http://web:3000$PREFIX/galaxy/' \
+    'token = $TOKEN' > ansible.cfg
+  ANSIBLE_CONFIG=/tmp/w/ansible.cfg ansible-galaxy collection install ansible.posix \
+    -p /tmp/w/collections --force
+  test -d /tmp/w/collections/ansible_collections/ansible/posix
+"
+
+# The Pulumi row is the sharpest of these. An override pattern that matches
+# nothing makes the CLI fall back to get.pulumi.com SILENTLY — the install
+# succeeds and the failure only surfaces for someone with no route out, which is
+# exactly the shape this gate exists to catch. Hence '.*', never an anchored one.
+surface "Pulumi plugins" pulumi/pulumi-python:latest "
+  export PULUMI_HOME=/tmp/ph PULUMI_SKIP_UPDATE_CHECK=true
+  export PULUMI_PLUGIN_DOWNLOAD_URL_OVERRIDES='.*=http://x:$TOKEN@web:3000$PREFIX/pulumi'
+  pulumi plugin install resource random 4.16.3
+  pulumi plugin ls | grep -q random
+"
+
+surface "NuGet" mcr.microsoft.com/dotnet/sdk:8.0 "
+  mkdir -p /tmp/n && cd /tmp/n
+  cat > nuget.config <<'XML'
+<?xml version=\"1.0\" encoding=\"utf-8\"?>
+<configuration>
+  <packageSources>
+    <clear/>
+    <add key=\"terrapod\" value=\"http://web:3000$PREFIX/nuget/index.json\" />
+  </packageSources>
+  <packageSourceCredentials>
+    <terrapod>
+      <add key=\"Username\" value=\"tp\" />
+      <add key=\"ClearTextPassword\" value=\"$TOKEN\" />
+    </terrapod>
+  </packageSourceCredentials>
+</configuration>
+XML
+  cat > p.csproj <<'XML'
+<Project Sdk=\"Microsoft.NET.Sdk\">
+  <PropertyGroup><TargetFramework>netstandard2.0</TargetFramework>
+  <DisableImplicitNuGetFallbackFolder>true</DisableImplicitNuGetFallbackFolder></PropertyGroup>
+  <ItemGroup><PackageReference Include=\"Newtonsoft.Json\" Version=\"13.0.3\" /></ItemGroup>
+</Project>
+XML
+  # A dedicated packages dir, or a restore that never touched the proxy passes.
+  dotnet restore --packages /tmp/n/pkgs
+  test -d /tmp/n/pkgs/newtonsoft.json
+"
+
 if [ "${BASE#https://}" = "$BASE" ]; then
   skip "Go modules — needs HTTPS: the toolchain refuses to send credentials to a
         plain-HTTP URL ('refusing to pass credentials to insecure URL'), and
