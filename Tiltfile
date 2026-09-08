@@ -148,6 +148,7 @@ docker_build(
         sync('./services/terrapod/config.py', '/app/terrapod/config.py'),
         sync('./services/terrapod/logging_config.py', '/app/terrapod/logging_config.py'),
         sync('./services/terrapod/http_retry.py', '/app/terrapod/http_retry.py'),
+        sync('./services/terrapod/engines', '/app/terrapod/engines'),
         sync('./services/terrapod/runner', '/app/terrapod/runner'),
     ],
 )

@@ -72,6 +72,11 @@ COPY services/tests ./tests
 # Alembic migrations — the migration-reversibility + expand/contract contract
 # tests (tests/db) parse these; schema_version.py also resolves them at runtime.
 COPY alembic ./alembic
+
+# The image Dockerfiles themselves, so tests can assert what an image ships.
+# `engines/` must be COPYed into the listener image or the listener crashes on
+# import at startup — a failure no source-only test could see (#1487).
+COPY docker ./docker
 # AI-analysis evaluation harness (#602) — committed eval suite. Imported by
 # the offline corpus/rubric tests and run live (model sweep) on demand.
 COPY services/ai_eval ./ai_eval

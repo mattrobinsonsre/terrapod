@@ -89,6 +89,9 @@ def _settings_snapshot(ws: Workspace) -> dict[str, Any]:
         "labels": dict(ws.labels or {}),
         "owner_email": ws.owner_email,
         "execution_mode": ws.execution_mode,
+        # Which engine, not which binary — restoring without it would bring a
+        # workspace back as Terraform regardless of what it was (#1407).
+        "engine": ws.engine,
         "execution_backend": ws.execution_backend,
         "terraform_version": ws.terraform_version,
         "terragrunt_enabled": ws.terragrunt_enabled,

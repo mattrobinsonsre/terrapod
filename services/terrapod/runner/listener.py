@@ -680,10 +680,18 @@ class RunnerListener:
         backstop, but surfacing the actual error here gives operators an
         immediate signal at the API instead of a generic timeout 5 min later.
         """
+        from terrapod.engines import strategy_for
         from terrapod.runner.job_manager import create_job, get_job_uid
-        from terrapod.runner.job_template import build_job_spec
 
         phase = attrs.get("phase", "plan")
+
+        # The Job spec is built through the engine strategy rather than by calling
+        # the template directly (#1407 phase 1). Terraform is the only engine, and
+        # its strategy forwards to exactly the same builder, so nothing about the
+        # produced spec changes — the point is that the seam exists on the real
+        # path. An API too old to send `engine` yields None, which resolves to
+        # terraform, so a listener ahead of its API behaves identically.
+        engine = strategy_for(attrs.get("engine"))
 
         try:
             runner_token = await self._get_runner_token(run_id)
@@ -756,7 +764,7 @@ class RunnerListener:
         ca_pem = self._read_ca_bundle_pem()
         ca_secret_name = f"tprun-{run_short}-{phase}-ca" if ca_pem else ""
 
-        spec = build_job_spec(
+        spec = engine.build_job_spec(
             run_id=run_id,
             phase=phase,
             runner_config=self.runner_config,
