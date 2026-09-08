@@ -166,6 +166,8 @@ jobs:
         run: npm run i18n:check
       - name: i18n no-hardcoded-strings (no new untranslated JSX literals — #767)
         run: npm run i18n:lint
+      - name: Phase vocabulary (no engine's verb hardcoded in a component — #1521)
+        run: npm run i18n:phases
       - name: Unit tests (node:test — no test framework dependency)
         run: npm run test:unit
 

@@ -13,6 +13,31 @@ import (
 // input/output interface so the agent authors a valid `module` block instead of
 // guessing variable names. All read-only; bounded by the caller's registry RBAC.
 func registerGround(s *mcp.Server, c *terrapod.Client) {
+	// ── terrapod_engine_list ─────────────────────────────────────────
+	//
+	// The vocabulary tool. A run's `status` is the platform's name for the
+	// state and never changes — a run is "planning" whatever engine it belongs
+	// to. What that state *is* differs: Terraform plans, Pulumi previews,
+	// Ansible checks. Without this an agent reading a run would report a Pulumi
+	// preview as "planning", which is wrong rather than merely imprecise.
+	type engineListOut struct {
+		Count   int               `json:"count"`
+		Engines []terrapod.Engine `json:"engines"`
+	}
+	mcp.AddTool(s, &mcp.Tool{
+		Name: "terrapod_engine_list",
+		Description: "List the execution engines this instance serves, and what a run's internal status means for each. " +
+			"`status-phases` maps a run status (e.g. planning) onto the phase that engine calls it (e.g. plan for Terraform, preview for Pulumi). " +
+			"Use before describing a run's state, so the wording matches the engine the run actually belongs to.",
+		Annotations: readOnly,
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, engineListOut, error) {
+		engines, err := c.ListEngines(ctx)
+		if err != nil {
+			return errResult(err), engineListOut{}, nil
+		}
+		return nil, engineListOut{Count: len(engines), Engines: engines}, nil
+	})
+
 	// ── terrapod_registry_module_list ────────────────────────────────
 	type moduleListOut struct {
 		Count   int                       `json:"count"`

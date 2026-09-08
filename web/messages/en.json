@@ -3131,5 +3131,23 @@
       "everyoneFloor": "Labelled access: everyone — readable by anyone",
       "catalogClamped": "Catalog-managed — every non-admin grant is capped at read"
     }
+  },
+  "phases": {
+    "terraform": {
+      "activity": {
+        "planning": "Running terraform plan",
+        "applying": "Running terraform apply"
+      },
+      "runStatus": {
+        "planning": "Planning",
+        "planned": "Planned",
+        "applying": "Applying",
+        "applied": "Applied"
+      },
+      "status": {
+        "planning": "Planning",
+        "applying": "Applying"
+      }
+    }
   }
 }

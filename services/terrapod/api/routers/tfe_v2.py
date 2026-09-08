@@ -786,6 +786,11 @@ def _workspace_json(
                 "execution-mode": ws.execution_mode,
                 "operations": ws.execution_mode == "agent",
                 "execution-backend": ws.execution_backend,
+                # Which engine, not which binary (#1407). Always "terraform" on
+                # this surface — it is filtered to Terraform (#1487) — but the UI
+                # reads workspaces from here and resolves phase vocabulary from
+                # it, so serialising it beats the UI assuming.
+                "engine": ws.engine,
                 "terraform-version": ws.terraform_version or "",
                 "terragrunt-enabled": ws.terragrunt_enabled,
                 "terragrunt-version": ws.terragrunt_version or "",

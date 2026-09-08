@@ -3131,5 +3131,23 @@
       "everyoneFloor": "מתויג access: everyone — קריא לכולם",
       "catalogClamped": "מנוהל על ידי הקטלוג — כל הענקה שאינה ניהולית מוגבלת לקריאה"
     }
+  },
+  "phases": {
+    "terraform": {
+      "activity": {
+        "planning": "מריץ terraform plan",
+        "applying": "מריץ terraform apply"
+      },
+      "runStatus": {
+        "planning": "מתכנן",
+        "planned": "תוכנן",
+        "applying": "מיישם",
+        "applied": "יושם"
+      },
+      "status": {
+        "planning": "מתכנן",
+        "applying": "מחיל"
+      }
+    }
   }
 }

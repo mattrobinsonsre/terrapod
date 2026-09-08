@@ -3131,5 +3131,23 @@
       "everyoneFloor": "Merkitty access: everyone — kaikkien luettavissa",
       "catalogClamped": "Luettelon hallinnoima — jokainen ei-järjestelmänvalvojan myönnös rajataan lukuoikeuteen"
     }
+  },
+  "phases": {
+    "terraform": {
+      "activity": {
+        "planning": "Suoritetaan terraform plan",
+        "applying": "Suoritetaan terraform apply"
+      },
+      "runStatus": {
+        "planning": "Suunnitellaan",
+        "planned": "Suunniteltu",
+        "applying": "Otetaan käyttöön",
+        "applied": "Otettu käyttöön"
+      },
+      "status": {
+        "planning": "Suunnitellaan",
+        "applying": "Otetaan käyttöön"
+      }
+    }
   }
 }

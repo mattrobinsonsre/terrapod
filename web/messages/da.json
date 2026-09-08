@@ -3131,5 +3131,23 @@
       "everyoneFloor": "Mærket access: everyone — læsbar for alle",
       "catalogClamped": "Katalogstyret — enhver ikke-administrativ tildeling er begrænset til læsning"
     }
+  },
+  "phases": {
+    "terraform": {
+      "activity": {
+        "planning": "Kører terraform plan",
+        "applying": "Kører terraform apply"
+      },
+      "runStatus": {
+        "planning": "Planlægger",
+        "planned": "Planlagt",
+        "applying": "Anvender",
+        "applied": "Anvendt"
+      },
+      "status": {
+        "planning": "Planlægger",
+        "applying": "Anvender"
+      }
+    }
   }
 }

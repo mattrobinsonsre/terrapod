@@ -3131,5 +3131,23 @@
       "everyoneFloor": "Titulo access: everyone notatum — ab omnibus legibile",
       "catalogClamped": "Catalogo administratum — omnis concessio non administrantis ad lectionem restringitur"
     }
+  },
+  "phases": {
+    "terraform": {
+      "activity": {
+        "planning": "terraform plan curritur",
+        "applying": "terraform apply curritur"
+      },
+      "runStatus": {
+        "planning": "Consilium Fit",
+        "planned": "Consilium Factum",
+        "applying": "Applicatur",
+        "applied": "Applicatum"
+      },
+      "status": {
+        "planning": "Consilium Fit",
+        "applying": "Applicatur"
+      }
+    }
   }
 }

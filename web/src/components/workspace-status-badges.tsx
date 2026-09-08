@@ -2,6 +2,11 @@
 
 import Link from 'next/link'
 import { useTranslations } from 'next-intl'
+
+import { phaseKey } from '@/lib/phase-vocabulary'
+
+/** The status tokens that name a run *phase*, and so belong to the engine. */
+const PHASE_FILTERS = new Set(['planning', 'applying'])
 import type { WorkspaceStatusDef } from '@/lib/workspace-status'
 
 // Colour → Tailwind pill classes for the workspace status/lifecycle badges.
@@ -31,16 +36,25 @@ export function WorkspaceStatusBadges({
   def,
   runId,
   lifecycleState,
+  engine,
 }: {
   workspaceId: string
   def: WorkspaceStatusDef | null
   runId: string | null
   lifecycleState?: 'active' | 'pending_deletion' | 'archived'
+  engine?: string
 }) {
   // Status labels live in the `status` namespace keyed by the stable `filter`
   // token (state-diverged, errored, …), so the shared workspace-status.ts data
   // module stays i18n-free while the displayed text localizes (#767).
   const t = useTranslations('status')
+  // The phase statuses are the engine's vocabulary — a Pulumi workspace previews
+  // and updates where a Terraform one plans and applies (#1407 §3). The rest of
+  // this list (errored, drifted, archived…) is the platform's own and reads the
+  // same whatever engine produced it, so only the phase tokens are redirected.
+  const tPhase = useTranslations()
+  const label = (filter: string) =>
+    PHASE_FILTERS.has(filter) ? tPhase(phaseKey(engine, 'status', filter)) : t(filter)
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       {!def ? (
@@ -50,10 +64,10 @@ export function WorkspaceStatusBadges({
           href={`/workspaces/${workspaceId}/runs/${runId}`}
           className={`${pill} hover:opacity-80 transition-opacity ${badgeColors[def.color]}`}
         >
-          {t(def.filter)}
+          {label(def.filter)}
         </Link>
       ) : (
-        <span className={`${pill} ${badgeColors[def.color]}`}>{t(def.filter)}</span>
+        <span className={`${pill} ${badgeColors[def.color]}`}>{label(def.filter)}</span>
       )}
       {lifecycleState === 'pending_deletion' && (
         <span className={`${pill} ${badgeColors.amber}`}>{t('pendingDeletion')}</span>

@@ -20,6 +20,8 @@ import { useRunEvents } from '@/lib/use-run-events'
 import { useIsTouch } from '@/lib/use-media-query'
 import { ArrowDownToLine, RefreshCw, Download, Copy, Check, Palette } from 'lucide-react'
 
+import { phaseKey } from '@/lib/phase-vocabulary'
+
 // WebGL (three.js) — client-only, never SSR'd. Loaded on demand (#761).
 const ImpactGraph = dynamic(() => import('@/components/impact-graph').then((m) => m.ImpactGraph), {
   ssr: false,
@@ -50,6 +52,7 @@ interface RunAttrs {
   'discard-reason': string | null
   'error-message': string | null
   'execution-backend': string
+  engine?: string
   // Which pool actually ran it, and which could have (#1231).
   'agent-pool-id'?: string | null
   'candidate-agent-pool-ids'?: string[]
@@ -176,13 +179,22 @@ function RunActivityHeader({
   timestamps,
   planOnly,
   isConfirmable,
+  engine,
 }: {
   status: string
   timestamps: Record<string, string>
   planOnly: boolean
   isConfirmable: boolean
+  engine?: string
 }) {
   const t = useTranslations('runDetail')
+  // The four phase states are the engine's vocabulary, not the platform's: a
+  // Pulumi run previews and updates where Terraform plans and applies (#1407 §3).
+  // Everything else here — queued, errored, canceled — is the platform's own and
+  // reads the same whatever engine produced it.
+  const tPhase = useTranslations()
+  const phase = (group: 'runStatus' | 'activity', state: string) =>
+    tPhase(phaseKey(engine, group, state))
   const live = ['pending', 'queued', 'planning', 'confirmed', 'applying', 'canceling'].includes(status)
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
@@ -195,18 +207,18 @@ function RunActivityHeader({
   const map: Record<string, Info> = {
     pending: { label: t('status.pending'), activity: t('activity.pending'), dot: 'bg-slate-400', card: 'border-slate-700/50 bg-slate-800/40' },
     queued: { label: t('status.queued'), activity: t('activity.queued'), dot: 'bg-yellow-400', card: 'border-yellow-800/40 bg-yellow-900/10', sinceKey: 'queued-at' },
-    planning: { label: t('status.planning'), activity: t('activity.planning'), dot: 'bg-yellow-400', card: 'border-yellow-800/40 bg-yellow-900/10', sinceKey: 'planning-at' },
+    planning: { label: phase('runStatus', 'planning'), activity: phase('activity', 'planning'), dot: 'bg-yellow-400', card: 'border-yellow-800/40 bg-yellow-900/10', sinceKey: 'planning-at' },
     planned: {
-      label: t('status.planned'),
+      label: phase('runStatus', 'planned'),
       activity: isConfirmable ? t('activity.plannedConfirmable') : planOnly ? t('activity.plannedSpeculative') : t('activity.plannedComplete'),
       dot: 'bg-blue-400',
       card: isConfirmable ? 'border-blue-800/40 bg-blue-900/10' : 'border-slate-700/50 bg-slate-800/40',
       sinceKey: 'planned-at',
     },
     confirmed: { label: t('status.confirmed'), activity: t('activity.confirmed'), dot: 'bg-blue-400', card: 'border-blue-800/40 bg-blue-900/10', sinceKey: 'confirmed-at' },
-    applying: { label: t('status.applying'), activity: t('activity.applying'), dot: 'bg-yellow-400', card: 'border-yellow-800/40 bg-yellow-900/10', sinceKey: 'applying-at' },
+    applying: { label: phase('runStatus', 'applying'), activity: phase('activity', 'applying'), dot: 'bg-yellow-400', card: 'border-yellow-800/40 bg-yellow-900/10', sinceKey: 'applying-at' },
     canceling: { label: t('status.canceling'), activity: t('activity.canceling'), dot: 'bg-yellow-400', card: 'border-yellow-800/40 bg-yellow-900/10' },
-    applied: { label: t('status.applied'), activity: t('activity.applied'), dot: 'bg-green-400', card: 'border-green-800/40 bg-green-900/10', sinceKey: 'applied-at' },
+    applied: { label: phase('runStatus', 'applied'), activity: t('activity.applied'), dot: 'bg-green-400', card: 'border-green-800/40 bg-green-900/10', sinceKey: 'applied-at' },
     errored: { label: t('status.errored'), activity: t('activity.errored'), dot: 'bg-red-400', card: 'border-red-800/40 bg-red-900/10', sinceKey: 'errored-at' },
     canceled: { label: t('status.canceled'), activity: t('activity.canceled'), dot: 'bg-slate-400', card: 'border-slate-700/50 bg-slate-800/40', sinceKey: 'canceled-at' },
     discarded: { label: t('status.discarded'), activity: t('activity.discarded'), dot: 'bg-slate-400', card: 'border-slate-700/50 bg-slate-800/40', sinceKey: 'discarded-at' },
@@ -1399,6 +1411,7 @@ function RunDetailPageInner() {
         {/* Run status + live activity at a glance (#721). */}
         <RunActivityHeader
           status={attrs.status}
+          engine={attrs.engine}
           timestamps={timestamps}
           planOnly={attrs['plan-only']}
           isConfirmable={actions['is-confirmable']}

@@ -55,6 +55,22 @@ class EngineStrategy(Protocol):
     #: The binary used when a workspace expresses no preference.
     default_execution_backend: str
 
+    #: Which i18n namespace holds this engine's *display* vocabulary
+    #: (`phases.<vocabulary>.…`). Internal state names never change — a run is
+    #: `planning` whatever engine it belongs to — but what a person is shown does:
+    #: Terraform plans and applies, Pulumi previews and updates, Ansible checks
+    #: and runs. #1407 §3 requires that difference stay visible rather than be
+    #: smoothed over, and a key namespace is how it survives translation.
+    vocabulary: str
+
+    #: Which phase each internal run status belongs to, for this engine.
+    #:
+    #: The platform's status names are fixed; what they *mean* is the engine's.
+    #: Publishing the mapping is what keeps the API honest for a second engine —
+    #: without it, `status: "planning"` on a Pulumi run is only interpretable by
+    #: convention, which is the "smoothed over" outcome #1407 §3 forbids.
+    status_phases: dict[str, str]
+
     def build_job_spec(self, **kwargs: Any) -> dict:
         """Build the Kubernetes Job spec for one phase of a run."""
         ...

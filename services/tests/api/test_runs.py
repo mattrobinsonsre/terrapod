@@ -53,6 +53,10 @@ def _mock_run(
     run.plan_only = plan_only
     run.source = "tfe-api"
     run.terraform_version = "1.11"
+    # The engine the run belongs to (#1521). Set explicitly because a
+    # MagicMock attribute is not JSON-serialisable, and the serializer
+    # now reports it.
+    run.engine = "terraform"
     run.terragrunt_enabled = False
     run.terragrunt_version = ""
     run.error_message = ""
@@ -120,6 +124,7 @@ def _mock_workspace(ws_id=None, name="test-ws", catalog_item_id=None):
     ws.id = ws_id or uuid.uuid4()
     ws.name = name
     ws.vcs_connection_id = None
+    ws.engine = "terraform"
     ws.vcs_connection = None
     ws.vcs_repo_url = ""
     ws.vcs_last_polled_at = None

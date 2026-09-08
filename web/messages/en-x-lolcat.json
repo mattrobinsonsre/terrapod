@@ -3131,5 +3131,23 @@
       "everyoneFloor": "Labuld access: everyone — reedabul by ennywun",
       "catalogClamped": "Catalog-manijd — evry non-admin grant iz capd at reed"
     }
+  },
+  "phases": {
+    "terraform": {
+      "activity": {
+        "planning": "Runnin terraform plan",
+        "applying": "Runnin terraform apply"
+      },
+      "runStatus": {
+        "planning": "Plannin",
+        "planned": "Plannd",
+        "applying": "Applyin",
+        "applied": "Applyd"
+      },
+      "status": {
+        "planning": "Plannin",
+        "applying": "Applyin"
+      }
+    }
   }
 }

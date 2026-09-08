@@ -77,6 +77,15 @@ COPY alembic ./alembic
 # `engines/` must be COPYed into the listener image or the listener crashes on
 # import at startup — a failure no source-only test could see (#1487).
 COPY docker ./docker
+
+# The message catalogues, so a test can check that an engine's declared
+# vocabulary namespace actually exists in them (#1521). Just the JSON — the
+# component scan that needs web/src lives on the frontend side, where the
+# other .tsx linting already is.
+COPY web/messages ./web/messages
+# ...and the one frontend module that has to agree with the engine
+# registry, so the guard runs in CI rather than only on a laptop.
+COPY web/src/lib/phase-vocabulary.ts ./web/src/lib/phase-vocabulary.ts
 # AI-analysis evaluation harness (#602) — committed eval suite. Imported by
 # the offline corpus/rubric tests and run live (model sweep) on demand.
 COPY services/ai_eval ./ai_eval

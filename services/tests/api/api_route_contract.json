@@ -86,6 +86,8 @@
   "GET /api/terrapod/v1/cost-estimation/pricesheet/status",
   "GET /api/terrapod/v1/deleted-workspaces",
   "GET /api/terrapod/v1/deleted-workspaces/{workspace_id}",
+  "GET /api/terrapod/v1/engines",
+  "GET /api/terrapod/v1/engines/{engine_name}",
   "GET /api/terrapod/v1/estate-graph",
   "GET /api/terrapod/v1/execution-hooks",
   "GET /api/terrapod/v1/execution-hooks/{hook_id}",

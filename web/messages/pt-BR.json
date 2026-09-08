@@ -3131,5 +3131,23 @@
       "everyoneFloor": "Rotulado access: everyone — legível por todos",
       "catalogClamped": "Gerenciado pelo catálogo — toda concessão não administrativa é limitada a leitura"
     }
+  },
+  "phases": {
+    "terraform": {
+      "activity": {
+        "planning": "Executando terraform plan",
+        "applying": "Executando terraform apply"
+      },
+      "runStatus": {
+        "planning": "Planejando",
+        "planned": "Planejado",
+        "applying": "Aplicando",
+        "applied": "Aplicado"
+      },
+      "status": {
+        "planning": "Planejando",
+        "applying": "Aplicando"
+      }
+    }
   }
 }

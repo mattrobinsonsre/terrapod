@@ -3131,5 +3131,23 @@
       "everyoneFloor": "Marked access: everyone — readable by all hands",
       "catalogClamped": "Commanded by the catalog — every non-command grant be held to lookin'' only"
     }
+  },
+  "phases": {
+    "terraform": {
+      "activity": {
+        "planning": "Runnin'' terraform plan",
+        "applying": "Runnin'' terraform apply"
+      },
+      "runStatus": {
+        "planning": "Plannin''",
+        "planned": "Planned",
+        "applying": "Applyin''",
+        "applied": "Applied"
+      },
+      "status": {
+        "planning": "Plannin''",
+        "applying": "Applyin''"
+      }
+    }
   }
 }

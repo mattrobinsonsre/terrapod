@@ -28,6 +28,9 @@ def _user(email="test@example.com", roles=None):
 
 def _mock_workspace(ws_id=None, name="test-ws", **overrides):
     ws = MagicMock()
+    # The engine this belongs to (#1521) — set explicitly because a MagicMock
+    # attribute is not JSON-serialisable and the serializer now reports it.
+    ws.engine = "terraform"
     ws.id = ws_id or uuid.uuid4()
     ws.name = name
     ws.auto_apply = False
@@ -211,6 +214,9 @@ class TestRunDriftAttributes:
         run.auto_apply_declined_reason = None
         run.plan_only = True
         run.source = "drift-detection"
+        # The engine this run belongs to (#1521) — explicit because a MagicMock
+        # attribute is not JSON-serialisable and the serializer now reports it.
+        run.engine = "terraform"
         run.terraform_version = "1.11"
         run.terragrunt_enabled = False
         run.terragrunt_version = ""

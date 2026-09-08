@@ -3131,5 +3131,23 @@
       "everyoneFloor": "Wedi''i labelu access: everyone — darllenadwy gan bawb",
       "catalogClamped": "Wedi''i reoli gan y catalog — mae pob caniatâd nad yw''n weinyddol wedi''i gyfyngu i ddarllen"
     }
+  },
+  "phases": {
+    "terraform": {
+      "activity": {
+        "planning": "Wrthi'n rhedeg terraform plan",
+        "applying": "Wrthi'n rhedeg terraform apply"
+      },
+      "runStatus": {
+        "planning": "Cynllunio",
+        "planned": "Cynlluniwyd",
+        "applying": "Gweithredu",
+        "applied": "Gweithredwyd"
+      },
+      "status": {
+        "planning": "Cynllunio",
+        "applying": "Gweithredu"
+      }
+    }
   }
 }

@@ -25,7 +25,13 @@ type Workspace struct {
 	Name             string `json:"name"`
 	ExecutionMode    string `json:"execution-mode"`
 	ExecutionBackend string `json:"execution-backend,omitempty"`
-	AutoApply        bool   `json:"auto-apply"`
+
+	// Engine is the execution engine family this workspace belongs to —
+	// "terraform" today. Distinct from ExecutionBackend, which picks the
+	// binary *within* the Terraform engine (tofu or terraform). See
+	// Client.ListEngines for what a run's status means for a given engine.
+	Engine    string `json:"engine,omitempty"`
+	AutoApply bool   `json:"auto-apply"`
 	// AutoApplyMode is the conditional auto-apply setting (#1274):
 	// "never", "always", "create" or "create_update". AutoApply stays the
 	// boolean projection — true whenever the workspace applies unattended
@@ -673,6 +679,7 @@ func workspaceFromResource(res *Resource) *Workspace {
 		ID:                            res.ID,
 		Name:                          GetStringAttr(res, "name"),
 		ExecutionMode:                 GetStringAttr(res, "execution-mode"),
+		Engine:                        GetStringAttr(res, "engine"),
 		ExecutionBackend:              GetStringAttr(res, "execution-backend"),
 		AutoApply:                     GetBoolAttr(res, "auto-apply"),
 		AutoApplyMode:                 GetStringAttr(res, "auto-apply-mode"),

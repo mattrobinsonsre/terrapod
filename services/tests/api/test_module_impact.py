@@ -62,6 +62,9 @@ def _mock_module(module_id=None, name="eks", provider="aws", namespace="default"
 
 def _mock_workspace(ws_id=None, name="test-ws"):
     ws = MagicMock()
+    # The engine this belongs to (#1521) — set explicitly because a MagicMock
+    # attribute is not JSON-serialisable and the serializer now reports it.
+    ws.engine = "terraform"
     ws.id = ws_id or uuid.uuid4()
     ws.name = name
     ws.vcs_last_polled_at = None
@@ -92,6 +95,9 @@ def _mock_run(
     ws_id=None,
 ):
     run = MagicMock()
+    # The engine this belongs to (#1521) — set explicitly because a MagicMock
+    # attribute is not JSON-serialisable and the serializer now reports it.
+    run.engine = "terraform"
     run.id = run_id or uuid.uuid4()
     run.workspace_id = ws_id or uuid.uuid4()
     run.status = status

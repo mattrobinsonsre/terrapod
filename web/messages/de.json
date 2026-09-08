@@ -3131,5 +3131,23 @@
       "everyoneFloor": "Gelabelt access: everyone — für alle lesbar",
       "catalogClamped": "Katalogverwaltet — jede Nicht-Admin-Gewährung ist auf Lesen begrenzt"
     }
+  },
+  "phases": {
+    "terraform": {
+      "activity": {
+        "planning": "terraform plan wird ausgeführt",
+        "applying": "terraform apply wird ausgeführt"
+      },
+      "runStatus": {
+        "planning": "Plant",
+        "planned": "Geplant",
+        "applying": "Wendet an",
+        "applied": "Angewendet"
+      },
+      "status": {
+        "planning": "Wird geplant",
+        "applying": "Wird angewendet"
+      }
+    }
   }
 }

@@ -3131,5 +3131,23 @@
       "everyoneFloor": "access: everyone etiketli — herkes tarafından okunabilir",
       "catalogClamped": "Katalog tarafından yönetiliyor — yönetici olmayan her yetki okumayla sınırlı"
     }
+  },
+  "phases": {
+    "terraform": {
+      "activity": {
+        "planning": "terraform plan çalıştırılıyor",
+        "applying": "terraform apply çalıştırılıyor"
+      },
+      "runStatus": {
+        "planning": "Planlanıyor",
+        "planned": "Planlandı",
+        "applying": "Uygulanıyor",
+        "applied": "Uygulandı"
+      },
+      "status": {
+        "planning": "Planlanıyor",
+        "applying": "Uygulanıyor"
+      }
+    }
   }
 }
