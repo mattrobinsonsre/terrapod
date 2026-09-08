@@ -24,6 +24,11 @@ from typing import TYPE_CHECKING, Any
 
 from terrapod.config import settings
 
+#: Mirrors `db.models.ONBOARDING_DISCOVERY_SOURCE`. Duplicated as a literal rather
+#: than imported: this module is loaded by the listener image, which ships no DB
+#: layer, and a test pins the two in step.
+ONBOARDING_DISCOVERY_SOURCE = "onboarding-discovery"
+
 if TYPE_CHECKING:  # the listener image ships no DB layer — see tests/meta
     from terrapod.config import RunnerConfig
 
@@ -170,6 +175,42 @@ class TerraformStrategy:
 
         return env
 
+    def resolve_terminal(
+        self, *, run_status: str, run_source: str, job_status: str
+    ) -> TerminalOutcome:
+        """What a finished Job means for Terraform (#1407 phase 3).
+
+        The rules are today's, moved rather than rewritten:
+
+        * onboarding discovery settles the run and the session, skipping the plan
+          machinery entirely — there is no plan to complete;
+        * a succeeded Job completes the plan or the apply, chosen by which state
+          the run is in;
+        * a failed or deleted Job errors the run.
+
+        A second engine answers this differently and that is the point: a
+        non-zero exit means something else for a playbook with `ignore_errors`,
+        and Ansible has no artifact binding approval to application at all.
+        """
+        phase = "plan" if run_status == "planning" else "apply"
+
+        if job_status == "succeeded":
+            if run_source == ONBOARDING_DISCOVERY_SOURCE:
+                return TerminalOutcome(action="discovery_succeeded", phase="plan")
+            if run_status == "planning":
+                return TerminalOutcome(action="complete_plan", phase=phase)
+            if run_status == "applying":
+                return TerminalOutcome(action="complete_apply", phase=phase)
+            # Neither planning nor applying: the runner's own POST already drove
+            # the transition. The helpers are idempotent, but there is nothing
+            # left to complete, so say so rather than calling one anyway.
+            return TerminalOutcome(action="none", phase=phase)
+
+        if job_status in ("failed", "deleted"):
+            return TerminalOutcome(action="error", phase=phase)
+
+        return TerminalOutcome(action="none", phase=phase)
+
     def build_job_spec(
         self,
         *,
@@ -188,3 +229,28 @@ class TerraformStrategy:
         opts = options or TerraformRunOptions()
         runner_config = kwargs["runner_config"]
         return build_job_spec(engine_env=self.container_env(opts, runner_config), **kwargs)
+
+
+@dataclass(frozen=True)
+class TerminalOutcome:
+    """What a finished Job means, decided by the engine and executed by the caller.
+
+    Deliberately a *decision*, not the act. The reconciler owns the database
+    work — `run_service`, the onboarding session, unlocking the workspace — and
+    this says only which of those applies. Two reasons that split is the right
+    one, and neither is stylistic:
+
+    Terminal resolution is imported by the listener image, which ships no DB
+    layer (see `tests/meta/test_engines_stay_listener_safe.py`). A resolver that
+    took a `Run` would pull SQLAlchemy in, and the failure would be a
+    crash-looping listener in a deployment rather than a red test.
+
+    And a decision made from plain values is testable without a database, which
+    is what lets the rules be pinned exhaustively rather than sampled.
+    """
+
+    #: What the caller should do: complete_plan | complete_apply | error |
+    #: discovery_succeeded | discovery_failed | none.
+    action: str
+    #: Which phase's live log to persist before acting — the engine's vocabulary.
+    phase: str

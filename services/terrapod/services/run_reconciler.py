@@ -20,6 +20,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from terrapod.config import load_runner_config
 from terrapod.db.models import Run, Workspace
 from terrapod.db.session import get_db_session
+from terrapod.engines import strategy_for
+from terrapod.engines.terraform import TerminalOutcome
 from terrapod.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -298,9 +300,16 @@ async def _reconcile_one(db: AsyncSession, run: Run) -> None:
         await run_service.resolve_canceling_run(db, run, job_status=status)
         return
 
-    if status == "succeeded":
-        await _handle_succeeded(db, run)
-    elif status in ("failed", "deleted"):
+    # What a finished Job *means* is the engine's rule, not the reconciler's
+    # (#1407 phase 3). The strategy decides from plain values; the database work
+    # of acting on that decision stays here, which is what keeps the engine
+    # package free of the DB layer the listener image does not ship.
+    outcome = strategy_for(run.engine).resolve_terminal(
+        run_status=run.status, run_source=run.source, job_status=status
+    )
+    if outcome.action in ("complete_plan", "complete_apply", "discovery_succeeded"):
+        await _handle_succeeded(db, run, outcome)
+    elif outcome.action == "error":
         # Typed OOM message when the listener captured the K8s
         # terminated reason (#430). runner_exit_status is set by
         # report_job_status; we just read it here.
@@ -353,36 +362,34 @@ def _human_bytes(n: int) -> str:
     return f"{n} B"
 
 
-async def _handle_succeeded(db: AsyncSession, run: Run) -> None:
-    """Handle a succeeded Job.
+async def _handle_succeeded(db: AsyncSession, run: Run, outcome: TerminalOutcome) -> None:
+    """Carry out the engine's decision for a succeeded Job.
 
-    Thin wrapper around the shared `run_service.complete_plan` /
-    `complete_apply` helpers. Both helpers are idempotent — if the runner's
-    direct POST (`/plan-result` / `/apply-result`) already drove the
+    The *choice* between completing a plan, completing an apply, and settling an
+    onboarding-discovery run is the engine's (`resolve_terminal`); this performs
+    it. `run_service.complete_plan` / `complete_apply` are idempotent, so if the
+    runner's direct POST (`/plan-result` / `/apply-result`) already drove the
     transition, this is a no-op.
     """
-    from terrapod.db.models import ONBOARDING_DISCOVERY_SOURCE
     from terrapod.services import run_service
+
+    await _persist_live_log_if_missing(run, outcome.phase)
 
     # Onboarding discovery (#824 P2): the discovery Job uploaded its artifacts
     # directly to the session; there is no plan to complete. Settle the run
     # (planning → planned) and flip the session status, skipping the plan
     # machinery (supersede / auto-apply / notifications / plan artifacts).
-    if run.source == ONBOARDING_DISCOVERY_SOURCE:
+    if outcome.action == "discovery_succeeded":
         from terrapod.services import onboarding_service
 
-        await _persist_live_log_if_missing(run, "plan")
         if run.status == "planning":
             await run_service.transition_run(db, run, "planned")
         await onboarding_service.complete_discovery(db, run.id, success=True)
         return
 
-    phase = "plan" if run.status == "planning" else "apply"
-    await _persist_live_log_if_missing(run, phase)
-
-    if run.status == "planning":
+    if outcome.action == "complete_plan":
         await run_service.complete_plan(db, run)
-    elif run.status == "applying":
+    elif outcome.action == "complete_apply":
         await run_service.complete_apply(db, run)
 
 
