@@ -693,6 +693,51 @@ jobs:
             console.log("npm audit: clean (only allowlisted advisories remain — see step comment).");
           '
 
+  # ── Go dependency audit (#1542) ───────────────────────
+  go-audit:
+    name: Go Audit
+    needs: prepare
+    if: needs.prepare.outputs.images_exist != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Audit every Go module
+        # Six Go modules ship in every release and, until #1542, NOTHING scanned
+        # any of them. Trivy covers the images; `provider` and `migrate` are
+        # release *assets*, not image contents, so the image scan cannot see
+        # them. pip-audit and npm audit cover Python and JavaScript. Go had no
+        # equivalent, and a HIGH in grpc reached a tagged release because of it.
+        #
+        # Version-based, not `govulncheck`. govulncheck does reachability
+        # analysis and reported the grpc advisory as clean, because the
+        # vulnerable function is never called from our binaries — which is
+        # useful for triage and useless as a gate, since an operator scanning
+        # our released artifacts sees the version, not the call graph. This
+        # matches what Dependabot and their scanner will say.
+        #
+        # It also found two modules Dependabot missed entirely (`publish`,
+        # `query`), so it is not merely duplicating the alerts.
+        run: |
+          fail=0
+          for m in go-terrapod provider migrate publish query mcp; do
+            echo "── $m"
+            docker run --rm -v "$PWD:/src" -w /src \
+              "${TRIVY_IMAGE:-ghcr.io/aquasecurity/trivy:0.72.0}" \
+              fs --scanners vuln --severity HIGH,CRITICAL \
+              --ignorefile /src/pentest/trivy/.trivyignore \
+              --exit-code 1 --quiet "$m/go.mod" || fail=1
+          done
+          if [ "$fail" != "0" ]; then
+            echo
+            echo "High/critical advisories in a Go module. Bump the dependency:"
+            echo "  cd <module> && go get <pkg>@<fixed> && go mod tidy"
+            echo "Pin the FIXED version, never an older one — pinning a lower"
+            echo "version downgrades the whole module graph and can reintroduce"
+            echo "advisories elsewhere."
+            exit 1
+          fi
+          echo "all Go modules clean"
+
   # ── Secret Scanning (gitleaks) ────────────────────────
   secret-scan:
     name: Secret Scan
@@ -2563,7 +2608,7 @@ jobs:
   # ── Create Multi-Arch Manifests ────────────────────────
   create-manifests:
     name: Manifest ${{ matrix.image }}
-    needs: [prepare, build-images-amd64, build-images-arm64, python-lint, frontend-lint, python-test, python-audit, npm-audit, secret-scan, codeql, helm-lint, sast, scan-images]
+    needs: [prepare, build-images-amd64, build-images-arm64, python-lint, frontend-lint, python-test, python-audit, npm-audit, go-audit, secret-scan, codeql, helm-lint, sast, scan-images]
     if: |
       always()
       && needs.build-images-amd64.result == 'success'
@@ -2574,6 +2619,7 @@ jobs:
       && (needs.python-test.result == 'success' || needs.python-test.result == 'skipped')
       && (needs.python-audit.result == 'success' || needs.python-audit.result == 'skipped')
       && (needs.npm-audit.result == 'success' || needs.npm-audit.result == 'skipped')
+      && (needs.go-audit.result == 'success' || needs.go-audit.result == 'skipped')
       && (needs.secret-scan.result == 'success' || needs.secret-scan.result == 'skipped')
       && (needs.codeql.result == 'success' || needs.codeql.result == 'skipped')
       && (needs.helm-lint.result == 'success' || needs.helm-lint.result == 'skipped')
@@ -2674,6 +2720,7 @@ jobs:
       - docs-audit
       - python-audit
       - npm-audit
+      - go-audit
       - secret-scan
       - helm-lint
       - helm-smoke
@@ -2707,6 +2754,7 @@ jobs:
             docs-audit=${{ needs.docs-audit.result }}
             python-audit=${{ needs.python-audit.result }}
             npm-audit=${{ needs.npm-audit.result }}
+            go-audit=${{ needs.go-audit.result }}
             secret-scan=${{ needs.secret-scan.result }}
             helm-lint=${{ needs.helm-lint.result }}
             helm-smoke=${{ needs.helm-smoke.result }}
@@ -3422,6 +3470,7 @@ jobs:
       - migration-check
       - python-audit
       - npm-audit
+      - go-audit
       - secret-scan
       - codeql
       - dependency-review
@@ -3483,6 +3532,7 @@ jobs:
             "${{ needs.migration-check.result }}"
             "${{ needs.python-audit.result }}"
             "${{ needs.npm-audit.result }}"
+            "${{ needs.go-audit.result }}"
             "${{ needs.secret-scan.result }}"
             "${{ needs.codeql.result }}"
             "${{ needs.dependency-review.result }}"
