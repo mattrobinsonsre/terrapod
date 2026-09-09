@@ -1,0 +1,806 @@
+"""The Pulumi service surface — what `pulumi login <terrapod>` talks to (#1522).
+
+Implements the subset of Pulumi's service API that the CLI actually consumes, as
+catalogued in `docs/pulumi-cli-surface.md`. That document is not a reading of
+Pulumi's docs: #1502 drove a real `login → stack init → preview → up → refresh →
+export → import → destroy → stack rm` cycle against a request-logging stub and
+recorded the 19 endpoints and 101 requests it produced. This serves what the
+capture observed and nothing beyond it.
+
+**Scope.** Only what the CLI needs, exactly as the TFE surface is scoped. Pulumi
+Cloud's management surface — Deployments, Policy Packs, Insights, ESC, Webhooks,
+Registry, org management — is out; a full cycle completed without touching any
+of it.
+
+**Nothing here executes anything.** The CLI runs the language host, the engine
+and the providers locally. This is a state store, a secrets oracle and an event
+sink; `events/batch` is the CLI pushing what it already did.
+
+Four things the capture found that shape the code below, each of which would
+otherwise have been built wrong:
+
+1. **Auth is `token <value>`, not `Bearer` — and it changes mid-run.** Calls
+   addressed at a stack carry the user's API token; the three made *during* an
+   update (`checkpoint`, `events/batch`, `complete`) carry
+   `Authorization: update-token <lease>` instead. Two schemes on one surface, and
+   the second is invisible to any test that injects its own authenticated client.
+2. **The service is the stack's secrets provider.** `encrypt` is called during an
+   ordinary `up`, not only when someone writes a secret. Terrapod holds the key
+   that makes stack state readable — which is why the operator can decline that
+   role and keep a passphrase or KMS provider instead.
+3. **A preview is an update.** It is created, then started through the same
+   `POST .../update/{id}` an `up` uses, and that call **must** return a lease or
+   the CLI aborts with "persisted actions require a token".
+4. **Concurrency is refuse-to-start.** There is no lock endpoint: a 409 on the
+   begin call ends the CLI immediately and prints the service's `message`
+   verbatim. Terrapod's existing per-workspace serialisation maps straight onto
+   it.
+
+**Mounted natively, not at the root.** The CLI appends `/api/...` to whatever
+base URL it is given, path prefix included, so this lives under the Terrapod
+prefix. Root space is reserved for the two surfaces genuinely forced there — the
+OCI registry and the terraform discovery document.
+
+**Engine-gated (#1429).** The router is not mounted at all when the Pulumi engine
+is off: absent, not present-and-404ing. A surface that refuses every request is
+still in the schema, still carries its dependencies, and still reads to an
+auditor as something this deployment does.
+"""
+
+from __future__ import annotations
+
+import gzip
+import json
+import uuid
+from typing import Any
+
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from terrapod.api.dependencies import AuthenticatedUser, get_current_user
+from terrapod.db.models import Workspace
+from terrapod.db.session import get_db
+from terrapod.logging_config import get_logger
+
+router = APIRouter(prefix="/pulumi", tags=["pulumi-service"])
+logger = get_logger(__name__)
+
+#: Terrapod is single-organization; the CLI still addresses one by name.
+DEFAULT_ORG = "default"
+
+#: The engine discriminator a Pulumi-backed workspace carries (#1487).
+PULUMI_ENGINE = "pulumi"
+
+
+def _stack_workspace_name(project: str, stack: str) -> str:
+    """The workspace name backing a stack.
+
+    A Pulumi stack is identified by `{org}/{project}/{stack}` while a Terrapod
+    workspace has one flat name, so the two halves are joined. `Workspace.name`
+    is globally unique, which is what makes this addressable — and the separator
+    is a character neither Pulumi projects nor stacks admit, so the mapping
+    cannot collide with a name a user could otherwise choose.
+    """
+    return f"{project}::{stack}"
+
+
+def _split_stack_id(stack_id: str) -> tuple[str, str, str]:
+    """Split the CLI's `{org}/{project}/{stack}` path segment.
+
+    Raises 400 rather than 404 on a malformed id: the client sent something this
+    API cannot address at all, which is different from asking for a stack that
+    does not exist — and the CLI treats 404 as "create it".
+    """
+    parts = stack_id.split("/")
+    if len(parts) != 3 or not all(parts):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Malformed stack identifier: {stack_id!r}; expected org/project/stack",
+        )
+    return parts[0], parts[1], parts[2]
+
+
+async def _load_stack(db: AsyncSession, stack_id: str) -> Workspace:
+    """The workspace backing a stack, or 404.
+
+    404 is load-bearing here: `stack init` probes with a GET first and reads a
+    404 as "does not exist, safe to create".
+    """
+    _, project, stack = _split_stack_id(stack_id)
+    name = _stack_workspace_name(project, stack)
+    result = await db.execute(
+        select(Workspace).where(Workspace.name == name, Workspace.engine == PULUMI_ENGINE)
+    )
+    ws = result.scalar_one_or_none()
+    if ws is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Stack not found")
+    return ws
+
+
+async def read_body(request: Request) -> dict[str, Any]:
+    """Parse a request body, decompressing when the CLI gzipped it.
+
+    Checkpoint and event bodies arrive with `Content-Encoding: gzip` — the
+    capture found this, and a handler that parses the raw body sees binary and
+    fails on what looks like malformed JSON. Starlette does not decompress
+    request bodies, so it is done here.
+
+    Falls back to the raw bytes when the header is absent, so the same helper
+    serves every endpoint rather than each one guessing.
+    """
+    raw = await request.body()
+    if not raw:
+        return {}
+    if request.headers.get("content-encoding", "").lower() == "gzip":
+        try:
+            raw = gzip.decompress(raw)
+        except OSError as exc:  # a truncated or mislabelled body
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Body declared Content-Encoding: gzip but could not be decompressed: {exc}",
+            ) from exc
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=f"Malformed JSON body: {exc}"
+        ) from exc
+
+
+# ── identity ─────────────────────────────────────────────────────────────────
+# `pulumi login` calls /api/user and stops if it does not answer. The org list it
+# returns is what the CLI offers as the default backend organisation.
+
+
+@router.get("/api/user")
+async def whoami(user: AuthenticatedUser = Depends(get_current_user)) -> dict[str, Any]:
+    """`pulumi login` and `pulumi whoami`."""
+    return {
+        "id": user.email,
+        "githubLogin": user.email,
+        "name": user.display_name or user.email,
+        "email": user.email,
+        "organizations": [{"name": DEFAULT_ORG, "githubLogin": DEFAULT_ORG}],
+        # The CLI reads this to decide whether to offer org-scoped features.
+        "identities": [DEFAULT_ORG],
+    }
+
+
+@router.get("/api/capabilities")
+async def capabilities(
+    user: AuthenticatedUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    """Feature negotiation. An empty list is accepted and means "nothing extra".
+
+    Declaring capabilities Terrapod does not implement is how the CLI is led into
+    calling an endpoint that is not there, so this stays empty until a capability
+    is actually served.
+    """
+    return {"capabilities": []}
+
+
+@router.get("/api/user/organizations/{org}")
+async def get_organization(
+    org: str, user: AuthenticatedUser = Depends(get_current_user)
+) -> dict[str, Any]:
+    """Org lookup. Called constantly, so it stays cheap."""
+    if org != DEFAULT_ORG:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found")
+    return {"name": DEFAULT_ORG, "githubLogin": DEFAULT_ORG, "defaultStackName": ""}
+
+
+# ── stacks ───────────────────────────────────────────────────────────────────
+# A stack is a Terrapod workspace carrying the `pulumi` engine discriminator
+# (#1487), so it inherits state versioning, RBAC and run serialisation rather
+# than growing a parallel set of each.
+
+
+@router.get("/api/user/stacks")
+async def list_stacks(
+    project: str = "",
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """`pulumi stack ls`."""
+    query = select(Workspace).where(Workspace.engine == PULUMI_ENGINE).order_by(Workspace.name)
+    rows = (await db.execute(query)).scalars().all()
+
+    stacks = []
+    for ws in rows:
+        proj, _, stack = ws.name.partition("::")
+        if project and proj != project:
+            continue
+        stacks.append(
+            {
+                "orgName": DEFAULT_ORG,
+                "projectName": proj,
+                "stackName": stack,
+                "lastUpdate": int(ws.updated_at.timestamp()) if ws.updated_at else 0,
+                "resourceCount": 0,
+            }
+        )
+    return {"stacks": stacks}
+
+
+@router.post("/api/stacks/{org}/{project}", status_code=status.HTTP_200_OK)
+async def create_stack(
+    org: str,
+    project: str,
+    request: Request,
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """`pulumi stack init` — body `{"stackName", "tags"}`."""
+    if org != DEFAULT_ORG:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found")
+    body = await read_body(request)
+    stack = (body.get("stackName") or "").strip()
+    if not stack:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="stackName is required")
+
+    name = _stack_workspace_name(project, stack)
+    existing = (
+        await db.execute(select(Workspace).where(Workspace.name == name))
+    ).scalar_one_or_none()
+    if existing is not None:
+        # The CLI probes with GET first, so reaching here means a genuine race or
+        # a name already taken by another engine's workspace. 409 either way —
+        # silently adopting someone else's workspace would be worse.
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail=f"Stack {project}/{stack} already exists"
+        )
+
+    ws = Workspace(
+        id=uuid.uuid4(),
+        name=name,
+        engine=PULUMI_ENGINE,
+        # The CLI runs the engine and the providers itself; Terrapod stores state
+        # and brokers secrets. That is local execution by Terrapod's own
+        # definition, and saying so keeps the agent-mode machinery away from a
+        # workspace that has no runner Job to launch.
+        execution_mode="local",
+        owner_email=user.email,
+    )
+    db.add(ws)
+    await db.commit()
+    logger.info("pulumi_stack_created", stack=name, actor=user.email)
+    return {"orgName": org, "projectName": project, "stackName": stack}
+
+
+@router.get("/api/stacks/{org}/{project}/{stack}")
+async def get_stack(
+    org: str,
+    project: str,
+    stack: str,
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """Stack lookup. A 404 here is how the CLI decides a stack needs creating."""
+    ws = await _load_stack(db, f"{org}/{project}/{stack}")
+    return {
+        "orgName": org,
+        "projectName": project,
+        "stackName": stack,
+        "tags": ws.labels or {},
+    }
+
+
+@router.delete("/api/stacks/{org}/{project}/{stack}")
+async def delete_stack(
+    org: str,
+    project: str,
+    stack: str,
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """`pulumi stack rm`."""
+    ws = await _load_stack(db, f"{org}/{project}/{stack}")
+    await db.delete(ws)
+    await db.commit()
+    logger.info("pulumi_stack_deleted", stack=ws.name, actor=user.email)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# ── state ────────────────────────────────────────────────────────────────────
+# State is a whole document in both directions, so the existing state-version
+# storage fits with no merge model. An empty stack's deployment is `null`: a
+# synthetic empty one (`{}`, or a manifest with no resources) fails the CLI's
+# snapshot integrity check, which is the kind of thing only a real run finds.
+
+#: The deployment-schema version the CLI expects alongside a deployment body.
+DEPLOYMENT_VERSION = 3
+
+
+async def _read_deployment(ws: Workspace, db: AsyncSession) -> dict[str, Any] | None:
+    """The stack's current deployment, or None when it has never been written."""
+    from terrapod.crypto.state import decrypt_state_bytes
+    from terrapod.db.models import StateVersion
+    from terrapod.storage import get_storage
+    from terrapod.storage.keys import state_key
+
+    sv = (
+        await db.execute(
+            select(StateVersion)
+            .where(StateVersion.workspace_id == ws.id)
+            .order_by(StateVersion.serial.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    if sv is None:
+        return None
+
+    storage = get_storage()
+    try:
+        raw = await storage.get(state_key(str(ws.id), str(sv.id)))
+    except Exception:
+        return None
+    raw = await decrypt_state_bytes(raw)
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        return None
+
+
+async def _write_deployment(
+    ws: Workspace, db: AsyncSession, deployment: dict[str, Any] | None
+) -> None:
+    """Persist a deployment as the stack's next state version."""
+    from terrapod.crypto.state import encrypt_state_bytes
+    from terrapod.db.models import StateVersion
+    from terrapod.storage import get_storage
+    from terrapod.storage.keys import state_key
+
+    latest = (
+        await db.execute(
+            select(StateVersion)
+            .where(StateVersion.workspace_id == ws.id)
+            .order_by(StateVersion.serial.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    serial = (latest.serial + 1) if latest else 1
+
+    sv = StateVersion(id=uuid.uuid4(), workspace_id=ws.id, serial=serial)
+    db.add(sv)
+    await db.flush()
+
+    payload = json.dumps(deployment).encode()
+    storage = get_storage()
+    await storage.put(state_key(str(ws.id), str(sv.id)), await encrypt_state_bytes(payload))
+
+    # State moved underneath any plan that was already made against this
+    # workspace, so those plans are now stale (#647). Every site that writes a
+    # state version owes this call — a guard test enforces it, and it caught
+    # this one being missed. A Pulumi checkpoint is exactly the "state moved"
+    # case the hook was written for: the CLI applies locally and pushes the
+    # result, the same shape as a terraform CLI apply.
+    from terrapod.services.run_service import discard_stale_plans_for_state_change
+
+    await discard_stale_plans_for_state_change(db, ws.id, serial)
+    await db.commit()
+
+
+@router.get("/api/stacks/{org}/{project}/{stack}/export")
+async def export_stack(
+    org: str,
+    project: str,
+    stack: str,
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """`pulumi stack export`, and how the CLI reads state before an update.
+
+    A stack with no state answers `deployment: null` — NOT an empty object. The
+    capture found the CLI's snapshot integrity check rejects a synthetic empty
+    deployment, so "nothing yet" has to be expressed as null rather than as an
+    empty shape that looks tidier.
+    """
+    ws = await _load_stack(db, f"{org}/{project}/{stack}")
+    return {"version": DEPLOYMENT_VERSION, "deployment": await _read_deployment(ws, db)}
+
+
+@router.post("/api/stacks/{org}/{project}/{stack}/import")
+async def import_stack(
+    org: str,
+    project: str,
+    stack: str,
+    request: Request,
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """`pulumi stack import` — writes state wholesale. Body may be gzipped."""
+    ws = await _load_stack(db, f"{org}/{project}/{stack}")
+    body = await read_body(request)
+    await _write_deployment(ws, db, body.get("deployment"))
+    logger.info("pulumi_state_imported", stack=ws.name, actor=user.email)
+    # The CLI polls an update id after an import; answering with a completed one
+    # lets it finish rather than waiting on something that never appears.
+    return {"updateID": ""}
+
+
+# ── secrets ──────────────────────────────────────────────────────────────────
+# The capture's most consequential finding: in `httpstate` mode the CLI delegates
+# secret encryption to the backend and calls `encrypt` during an ordinary `up` —
+# six times in the captured run, with no secret config set. So this is not an
+# optional convenience; standing up the surface means becoming the thing that
+# holds the key making stack state readable.
+#
+# An operator who would rather Terrapod did not hold that key keeps a passphrase
+# or KMS provider instead (`pulumi stack init --secrets-provider=...`), in which
+# case the CLI encrypts locally and never calls these.
+
+
+@router.post("/api/stacks/{org}/{project}/{stack}/encrypt")
+async def encrypt_secret(
+    org: str,
+    project: str,
+    stack: str,
+    request: Request,
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """Encrypt one value for a stack — body `{"plaintext": "<base64>"}`.
+
+    Rides Terrapod's existing envelope encryption rather than introducing a
+    second scheme: the same DEK, the same rotation story, the same at-rest
+    guarantees the rest of the platform already has.
+    """
+    import base64
+
+    from terrapod.crypto.service import get_encryption
+
+    await _load_stack(db, f"{org}/{project}/{stack}")
+    body = await read_body(request)
+    plaintext = body.get("plaintext")
+    if plaintext is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="plaintext is required")
+
+    # The CLI sends and expects base64 on this surface.
+    raw = base64.b64decode(plaintext)
+    sealed = get_encryption().encrypt(raw.decode("utf-8", errors="surrogateescape"))
+    return {"ciphertext": base64.b64encode(sealed.encode()).decode()}
+
+
+@router.post("/api/stacks/{org}/{project}/{stack}/decrypt")
+async def decrypt_secret(
+    org: str,
+    project: str,
+    stack: str,
+    request: Request,
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """Decrypt one value.
+
+    Not exercised by the capture — the captured program had no secret *config* to
+    read back — so the shape here follows the CLI's own expectations and is
+    covered by the round-trip test rather than by observed traffic.
+    """
+    import base64
+
+    from terrapod.crypto.service import get_encryption
+
+    await _load_stack(db, f"{org}/{project}/{stack}")
+    body = await read_body(request)
+    ciphertext = body.get("ciphertext")
+    if ciphertext is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="ciphertext is required"
+        )
+    sealed = base64.b64decode(ciphertext).decode()
+    plaintext = get_encryption().decrypt(sealed)
+    return {"plaintext": base64.b64encode(plaintext.encode()).decode()}
+
+
+@router.post("/api/stacks/{org}/{project}/{stack}/batch-decrypt")
+async def batch_decrypt(
+    org: str,
+    project: str,
+    stack: str,
+    request: Request,
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """Decrypt many at once — the shape `pulumi config` uses on a stack with
+    several secrets, so it is one round trip rather than N."""
+    import base64
+
+    from terrapod.crypto.service import get_encryption
+
+    await _load_stack(db, f"{org}/{project}/{stack}")
+    body = await read_body(request)
+    svc = get_encryption()
+    out: dict[str, str] = {}
+    for ciphertext in body.get("ciphertexts") or []:
+        sealed = base64.b64decode(ciphertext).decode()
+        out[ciphertext] = base64.b64encode(svc.decrypt(sealed).encode()).decode()
+    return {"plaintexts": out}
+
+
+# ── the update lifecycle ─────────────────────────────────────────────────────
+# An update has an explicit begin and end. `preview`, `update`, `refresh` and
+# `destroy` all CREATE one; it is then STARTED through the same
+# `POST .../update/{id}`, which must hand back a lease token — without one the
+# CLI aborts with "persisted actions require a token".
+#
+# Leases live in Redis with a TTL rather than in a table, because expiry is the
+# point: a run that dies mid-update leaves a started-but-never-completed update,
+# and the lease timing out is what releases the stack. A row would need a sweeper
+# to do what a TTL does for free.
+
+#: How long a lease is good for before the update is considered abandoned.
+LEASE_TTL_SECONDS = 30 * 60
+
+
+#: Redis key holding one update's record.
+def _update_key(update_id: str) -> str:
+    return f"tp:pulumi:update:{update_id}"
+
+
+#: Redis key marking the stack as having an update in flight. Its presence is
+#: what makes a second begin a 409, and its TTL is what stops a dead run holding
+#: the stack forever.
+def _stack_lock_key(workspace_id: str) -> str:
+    return f"tp:pulumi:stack_active:{workspace_id}"
+
+
+async def _begin_update(ws: Workspace, kind: str, user: AuthenticatedUser) -> dict[str, Any]:
+    """Create an update, refusing if one is already in flight.
+
+    Concurrency on this surface is refuse-to-start: there is no lock endpoint,
+    and a 409 here ends the CLI immediately, printing `message` verbatim. So the
+    message is the whole of the user's explanation — it is worth writing for a
+    person rather than a log.
+    """
+    from terrapod.redis.client import get_redis_client
+
+    redis = get_redis_client()
+    update_id = str(uuid.uuid4())
+
+    # SET NX is the whole serialisation: the first begin wins, the rest are told
+    # why. Same pattern the scheduler uses for its periodic-task mutex.
+    acquired = await redis.set(
+        _stack_lock_key(str(ws.id)), update_id, nx=True, ex=LEASE_TTL_SECONDS
+    )
+    if not acquired:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="another update is currently in progress",
+        )
+
+    await redis.hset(
+        _update_key(update_id),
+        mapping={
+            "workspace_id": str(ws.id),
+            "kind": kind,
+            "status": "not-started",
+            "actor": user.email,
+        },
+    )
+    await redis.expire(_update_key(update_id), LEASE_TTL_SECONDS)
+    logger.info("pulumi_update_begun", stack=ws.name, kind=kind, update_id=update_id)
+    return {"updateID": update_id}
+
+
+async def _require_lease(request: Request, update_id: str) -> dict[str, str]:
+    """Authenticate an in-update call by its lease.
+
+    The second auth scheme, and the reason it needs its own dependency: these
+    three endpoints are called with `Authorization: update-token <lease>` rather
+    than the user's API token. A test that injects an authenticated client never
+    exercises this path, so the scheme would look fine and be wrong.
+    """
+    from terrapod.redis.client import get_redis_client
+
+    header = request.headers.get("authorization", "")
+    scheme, _, value = header.partition(" ")
+    if scheme.lower() != "update-token" or not value:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="This endpoint requires an update-token lease",
+        )
+
+    record = await get_redis_client().hgetall(_update_key(update_id))
+    record = {
+        (k.decode() if isinstance(k, bytes) else k): (v.decode() if isinstance(v, bytes) else v)
+        for k, v in (record or {}).items()
+    }
+    if not record:
+        # Expired or never existed — the same answer either way, because a lease
+        # that has timed out is exactly as invalid as one that was invented.
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Unknown or expired update"
+        )
+    if record.get("lease") != value:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid lease token")
+    return record
+
+
+@router.post("/api/stacks/{org}/{project}/{stack}/preview")
+async def begin_preview(
+    org: str,
+    project: str,
+    stack: str,
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """A preview IS an update — same creation, same start path, same lease."""
+    return await _begin_update(await _load_stack(db, f"{org}/{project}/{stack}"), "preview", user)
+
+
+@router.post("/api/stacks/{org}/{project}/{stack}/update")
+async def begin_up(
+    org: str,
+    project: str,
+    stack: str,
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    return await _begin_update(await _load_stack(db, f"{org}/{project}/{stack}"), "update", user)
+
+
+@router.post("/api/stacks/{org}/{project}/{stack}/refresh")
+async def begin_refresh(
+    org: str,
+    project: str,
+    stack: str,
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    return await _begin_update(await _load_stack(db, f"{org}/{project}/{stack}"), "refresh", user)
+
+
+@router.post("/api/stacks/{org}/{project}/{stack}/destroy")
+async def begin_destroy(
+    org: str,
+    project: str,
+    stack: str,
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    return await _begin_update(await _load_stack(db, f"{org}/{project}/{stack}"), "destroy", user)
+
+
+@router.post("/api/stacks/{org}/{project}/{stack}/update/{update_id}")
+async def start_update(
+    org: str,
+    project: str,
+    stack: str,
+    update_id: str,
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """Start a created update, and hand back the lease.
+
+    The token is not optional decoration: without it the CLI aborts with
+    `fatal: An assertion has failed: persisted actions require a token` before
+    doing any work. That failure mode is why this is asserted in its own test.
+    """
+    from terrapod.redis.client import get_redis_client
+
+    await _load_stack(db, f"{org}/{project}/{stack}")
+    redis = get_redis_client()
+    if not await redis.exists(_update_key(update_id)):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown update")
+
+    lease = str(uuid.uuid4())
+    await redis.hset(_update_key(update_id), mapping={"lease": lease, "status": "running"})
+    await redis.expire(_update_key(update_id), LEASE_TTL_SECONDS)
+    return {"token": lease}
+
+
+@router.get("/api/stacks/{org}/{project}/{stack}/update/{update_id}")
+async def get_update_status(
+    org: str,
+    project: str,
+    stack: str,
+    update_id: str,
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """Poll an update. `stack import` waits on this."""
+    from terrapod.redis.client import get_redis_client
+
+    await _load_stack(db, f"{org}/{project}/{stack}")
+    record = await get_redis_client().hgetall(_update_key(update_id))
+    if not record:
+        # A completed update's record is gone, and the CLI reads "succeeded" as
+        # done rather than erroring — which is the right answer for anything it
+        # is still polling after the fact.
+        return {"status": "succeeded"}
+    status_value = record.get(b"status") or record.get("status") or b"running"
+    if isinstance(status_value, bytes):
+        status_value = status_value.decode()
+    return {"status": status_value}
+
+
+@router.patch("/api/stacks/{org}/{project}/{stack}/update/{update_id}/checkpoint")
+async def write_checkpoint(
+    org: str,
+    project: str,
+    stack: str,
+    update_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """Write state mid-update. Lease-authenticated, and gzipped."""
+    await _require_lease(request, update_id)
+    ws = await _load_stack(db, f"{org}/{project}/{stack}")
+    body = await read_body(request)
+    await _write_deployment(ws, db, body.get("deployment"))
+    return {}
+
+
+@router.post("/api/stacks/{org}/{project}/{stack}/update/{update_id}/events/batch")
+async def post_events(
+    org: str,
+    project: str,
+    stack: str,
+    update_id: str,
+    request: Request,
+) -> dict[str, Any]:
+    """Engine events. Lease-authenticated, gzipped, and accepted-and-dropped.
+
+    The CLI pushes what it already did; nothing downstream consumes these yet, so
+    they are acknowledged rather than stored. Refusing them would fail the run
+    for no gain, and storing them without a reader would be storage nobody asked
+    for — worth revisiting when there is a run view to feed.
+    """
+    await _require_lease(request, update_id)
+    await read_body(request)
+    return {}
+
+
+@router.post("/api/stacks/{org}/{project}/{stack}/update/{update_id}/complete")
+async def complete_update(
+    org: str,
+    project: str,
+    stack: str,
+    update_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """End the update and release the stack."""
+    from terrapod.redis.client import get_redis_client
+
+    record = await _require_lease(request, update_id)
+    ws = await _load_stack(db, f"{org}/{project}/{stack}")
+    body = await read_body(request)
+
+    redis = get_redis_client()
+    await redis.delete(_update_key(update_id))
+    # Release only if this update still holds it: a lease that expired may have
+    # been replaced by a newer update, and deleting that one's lock would let a
+    # third start alongside it.
+    held = await redis.get(_stack_lock_key(str(ws.id)))
+    if held and (held.decode() if isinstance(held, bytes) else held) == update_id:
+        await redis.delete(_stack_lock_key(str(ws.id)))
+
+    logger.info(
+        "pulumi_update_completed",
+        stack=ws.name,
+        update_id=update_id,
+        status=body.get("status"),
+        kind=record.get("kind"),
+    )
+    return {}
+
+
+@router.post("/api/stacks/{org}/{project}/{stack}/update/{update_id}/renew_lease")
+async def renew_lease(
+    org: str,
+    project: str,
+    stack: str,
+    update_id: str,
+    request: Request,
+) -> dict[str, Any]:
+    """Extend a lease. Not exercised by the capture — the runs were too short to
+    need it — so the shape follows the CLI's expectations and is covered by test
+    rather than by observed traffic."""
+    from terrapod.redis.client import get_redis_client
+
+    await _require_lease(request, update_id)
+    redis = get_redis_client()
+    await redis.expire(_update_key(update_id), LEASE_TTL_SECONDS)
+    return {}

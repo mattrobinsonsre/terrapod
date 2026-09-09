@@ -1130,6 +1130,13 @@ jobs:
           echo "$hook" | grep -q "path: /api/v1/vcs-events" || { echo "FAIL: webhookIngress missing canonical vcs-events path (#1529)"; exit 1; }
           echo "$hook" | grep -q "path: /api/v1/task-stage-results" || { echo "FAIL: webhookIngress missing canonical task-stage-results path (#1529)"; exit 1; }
           echo "$hook" | grep -q "path: /api/terrapod/v1/vcs-events" || { echo "FAIL: webhookIngress dropped the deprecated alias path — already-registered webhooks would stop routing (#1529)"; exit 1; }
+          # Engine gating (#1429/#1522): the engine switches must reach the pod, or
+          # an operator who turned Pulumi off still gets its service surface mounted
+          # — the exact failure the OCI registry shipped with.
+          echo "$out" | grep -q "engines:" || { echo "FAIL: engines config not rendered into config.yaml (#1429)"; exit 1; }
+          off=$(helm template ./helm/terrapod --set api.config.engines.pulumi.enabled=false)
+          echo "$off" | grep -qE "pulumi:\s*$" || { echo "FAIL: engines.pulumi block missing when disabled (#1522)"; exit 1; }
+          echo "$off" | grep -q "enabled: false" || { echo "FAIL: engines.pulumi.enabled=false did not render (#1522)"; exit 1; }
           # Platform tools (#1208): opa/trivy/checkov are no longer baked into the
           # images, so these versions are the ONLY thing telling a runner what to
           # fetch. A missing render line leaves the value inert and the code default

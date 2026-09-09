@@ -1330,6 +1330,22 @@ def create_application() -> FastAPI:
 
     include_terrapod(security_scanning_router)
 
+    # The Pulumi service surface (#1522) — `pulumi login` and a stack's state,
+    # secrets and update lifecycle.
+    #
+    # Gated on the engine itself, not a capability flag: unlike the caches in
+    # engine_gating's table this surface has no separate `enabled` of its own —
+    # it exists exactly when the Pulumi engine does. And it is NOT MOUNTED when
+    # gated off rather than mounted-and-404ing: a surface that refuses every
+    # request is still in the schema, still carries its dependencies, and still
+    # reads to an auditor as something this deployment does (#1429).
+    from terrapod.services.engine_gating import engine_enabled
+
+    if engine_enabled("pulumi"):
+        from terrapod.api.routers.pulumi_service import router as pulumi_router
+
+        include_terrapod(pulumi_router)
+
     # Audit log query endpoint — Terrapod-specific.
     from terrapod.api.routers.audit import router as audit_router
 
