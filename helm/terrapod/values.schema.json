@@ -2900,6 +2900,27 @@
               }
             }
           }
+        },
+        "outbound_requests": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "block_private_addresses": {
+              "type": "boolean"
+            },
+            "allowed_hosts": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "allowed_cidrs": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
         }
       }
     }

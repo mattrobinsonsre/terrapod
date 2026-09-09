@@ -566,6 +566,45 @@ class SMTPConfig(BaseModel):
     use_tls: bool = True
 
 
+class OutboundRequestsConfig(BaseModel):
+    """Where Terrapod may send a request to a user-supplied URL (#1541).
+
+    Notification webhooks and run-task callbacks are addressed by ordinary
+    users, and the API server can reach the cluster's internals — so without a
+    bound this is a server-side request forgery primitive, and both callers
+    store part of the response where the same user can read it back
+    (GHSA-q5m2-x8wm-34q9).
+
+    Private space is refused by default, and that is a real behaviour change
+    rather than a free win: a self-hosted platform quite reasonably delivers
+    webhooks to an in-cluster service or an endpoint on RFC1918. The allow-lists
+    are how an operator says which of those are intended, which puts the
+    decision with the person who edits values rather than with any user who can
+    create a workspace.
+    """
+
+    #: Exact hostnames exempt from every check. The escape hatch for an operator
+    #: who means it — including for an address this module otherwise always
+    #: refuses. No wildcards: breadth should be visible.
+    allowed_hosts: list[str] = Field(default_factory=list)
+
+    #: Networks exempt from every check, in CIDR form.
+    allowed_cidrs: list[str] = Field(default_factory=list)
+
+    #: Also refuse RFC1918 and friends. **Off by default, deliberately.**
+    #:
+    #: Terrapod is self-hosted, and delivering a webhook to an in-cluster
+    #: service or an endpoint on the corporate network is the ordinary case
+    #: rather than the attack. Blocking it by default would import a threat
+    #: model from products whose tenants are strangers, and would break working
+    #: deployments on upgrade for no benefit an operator asked for.
+    #:
+    #: Turn it on where users are not trusted with the server's network
+    #: position. Loopback and link-local are refused either way — see
+    #: `outbound_url_guard`.
+    block_private_addresses: bool = False
+
+
 class NotificationsConfig(BaseModel):
     """Notification delivery configuration."""
 
@@ -2828,6 +2867,10 @@ class Settings(BaseSettings):
 
     # Notifications
     notifications: NotificationsConfig = Field(default_factory=NotificationsConfig)
+
+    # Where user-supplied URLs may point (#1541). Shared, because more than one
+    # subsystem sends a request to an address a user chose.
+    outbound_requests: OutboundRequestsConfig = Field(default_factory=OutboundRequestsConfig)
 
     # Drift Detection
     drift_detection: DriftDetectionConfig = Field(default_factory=DriftDetectionConfig)

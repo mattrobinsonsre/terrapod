@@ -158,6 +158,45 @@ Sends a test notification with a verification payload. Useful for confirming web
 
 ---
 
+## Where a webhook may point
+
+Terrapod refuses to deliver to two address ranges, whatever the URL says:
+
+- **loopback** (127.0.0.0/8, ::1) — the API server's own surfaces
+- **link-local** (169.254.0.0/16, fe80::/10) — where cloud instance metadata lives
+
+Neither has a legitimate webhook receiver on it, and the server sits inside your
+cluster, so a URL naming one reaches something the person configuring it may not
+otherwise be able to. The check resolves the hostname and judges every address it
+answers with, so a public-looking name pointing inward is refused too.
+
+**Private addresses are allowed by default.** Delivering to an in-cluster service
+or an endpoint on your corporate network is the ordinary case for a self-hosted
+platform, and refusing it would break far more than it protected.
+
+Tighten or loosen it in your values:
+
+```yaml
+api:
+  config:
+    outbound_requests:
+      # Also refuse RFC1918 and friends. For deployments where authenticated
+      # users are not trusted with the server's network position.
+      block_private_addresses: false
+      # Exempt from every check, including the always-refused ranges above.
+      # Exact hostnames, no wildcards.
+      allowed_hosts: []
+      # Same, by network.
+      allowed_cidrs: []
+```
+
+A refused delivery is recorded like any other failure, and the reason names the
+address and which allow-list would permit it — so an endpoint that stops working
+after an upgrade tells you what to add rather than failing silently.
+
+The same rules apply to [run task](run-tasks.md) callbacks.
+
+
 ## Delivery Responses
 
 Each notification configuration tracks its last 10 delivery responses:

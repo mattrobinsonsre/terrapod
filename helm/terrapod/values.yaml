@@ -972,6 +972,27 @@ api:
         appToken: app-token
         signingSecret: signing-secret
 
+    # Where Terrapod may send a request to a user-supplied URL — notification
+    # webhooks and run-task callbacks (#1541, GHSA-q5m2-x8wm-34q9).
+    #
+    # Loopback and link-local (169.254.0.0/16, where cloud instance metadata
+    # lives) are ALWAYS refused: no legitimate webhook targets either.
+    #
+    # Private space is allowed by default, deliberately. Terrapod is self-hosted
+    # and authenticated, and delivering to an in-cluster service or an RFC1918
+    # endpoint is the ordinary case — refusing it by default would break working
+    # deployments to prevent something a user who can already run infrastructure
+    # code here could largely do anyway.
+    outbound_requests:
+      # Also refuse RFC1918 and friends. Turn on where authenticated users are
+      # not trusted with the server's network position.
+      block_private_addresses: false
+      # Exact hostnames exempt from every check, including the always-refused
+      # ranges. For an operator who means it. No wildcards.
+      allowed_hosts: []
+      # Networks exempt from every check, in CIDR form.
+      allowed_cidrs: []
+
     # Notifications
     notifications:
       enabled: true

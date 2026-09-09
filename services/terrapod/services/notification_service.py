@@ -17,6 +17,7 @@ import httpx
 from terrapod.config import settings
 from terrapod.http_retry import arequest_with_retry
 from terrapod.logging_config import get_logger
+from terrapod.services.outbound_url_guard import validate_outbound_url
 
 logger = get_logger(__name__)
 
@@ -132,6 +133,13 @@ async def deliver_generic(
         headers["X-TFE-Notification-Signature"] = sig
 
     try:
+        # The URL comes from a user, and this server sits inside the cluster
+        # (#1541). Checked here rather than at configuration time because this
+        # is the moment that matters: a name's address can change after it was
+        # saved, and only the request itself is the thing worth stopping. A
+        # refusal raises, and the handler below records it as a failed delivery
+        # whose reason the operator can read.
+        await validate_outbound_url(url)
         async with httpx.AsyncClient(timeout=timeout) as client:
             # Non-idempotent webhook POST: the helper retries ONLY on
             # connection errors where the request never reached the
@@ -181,6 +189,10 @@ async def deliver_slack(
     slack_payload = {"blocks": blocks, "text": message}
 
     try:
+        # Also user-supplied (#1541). A "Slack" destination is a URL like any
+        # other — nothing verifies it points at Slack — so it gets the same
+        # check as the generic one rather than being trusted by its label.
+        await validate_outbound_url(url)
         async with httpx.AsyncClient(timeout=timeout) as client:
             # Non-idempotent webhook POST — retried only on connection-not-sent
             # errors, never on read-timeout/5xx (avoids a double Slack post).
