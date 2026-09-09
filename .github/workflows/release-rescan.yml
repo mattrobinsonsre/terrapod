@@ -14,7 +14,8 @@ name: Release Re-scan
 #
 # Two scan families:
 #   artifacts — Trivy against the published images, per architecture
-#   source    — pip-audit, npm audit and Semgrep against the source at the tag
+#   source    — pip-audit, npm audit, Trivy (Go modules) and Semgrep against
+#               the source at the tag
 #
 # Both apply TODAY'S suppressions and TODAY'S rules deliberately. The current
 # accepted-risk register is the reasoning we stand behind now: an entry we have
@@ -222,6 +223,32 @@ jobs:
           npm ci --ignore-scripts --no-audit --no-fund > /dev/null 2>&1 || true
           npm audit --audit-level=high --json > "$GITHUB_WORKSPACE/npm.json" || true
 
+      - name: Go module audit
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          # #1542. The source pass covered Python and JavaScript and not Go, so
+          # a Go advisory published after a release shipped was invisible here —
+          # which is the entire purpose of this workflow. The image scan cannot
+          # substitute: `provider` and `migrate` build release *assets*, not
+          # image contents.
+          #
+          # Version-based rather than govulncheck, matching what an operator
+          # scanning our published artifacts will see. govulncheck's
+          # reachability analysis reported the grpc advisory that prompted this
+          # as clean.
+          for m in go-terrapod provider migrate publish query mcp; do
+            [ -f "$GITHUB_WORKSPACE/release/$m/go.mod" ] || continue
+            docker run --rm \
+              -v "$GITHUB_WORKSPACE/release:/src" \
+              -v "$GITHUB_WORKSPACE/current/pentest:/rules" \
+              -w /src "${TRIVY_IMAGE:-ghcr.io/aquasecurity/trivy:0.72.0}" \
+              fs --scanners vuln --severity HIGH,CRITICAL \
+              --ignorefile /rules/trivy/.trivyignore \
+              --format json --quiet "$m/go.mod" \
+              > "$GITHUB_WORKSPACE/go-$m.json" 2>/dev/null || true
+          done
+
       - name: Semgrep
         continue-on-error: true
         run: |
@@ -275,6 +302,17 @@ jobs:
           python3 current/scripts/rescan_normalise.py npm-audit npm.json \
             "${{ matrix.tag }}" "source:frontend" "finding-npm.json" \
             current/pentest/npm-audit-allow.txt
+          # Go modules (#1542). Reuses the `trivy` normaliser — `fs` and
+          # `image` emit the same JSON shape — so a Go advisory reads like any
+          # other dependency finding in the report.
+          # One file per module, NOT concatenated: the report globs *.json and
+          # parses each, so appending several objects into one file would make
+          # it unparseable and the findings would be skipped in silence.
+          for m in go-terrapod provider migrate publish query mcp; do
+            [ -s "go-$m.json" ] || continue
+            python3 current/scripts/rescan_normalise.py trivy "go-$m.json" \
+              "${{ matrix.tag }}" "source:go ($m)" "finding-go-$m.json" || true
+          done
           # Count only — so the public report can say code findings exist and
           # point at code scanning, without publishing what they are.
           python3 current/scripts/rescan_normalise.py semgrep-count semgrep.sarif \
@@ -295,10 +333,11 @@ jobs:
         if: always()
         with:
           name: rescan-${{ matrix.tag }}-source
-          # finding-pip / finding-npm only. Never semgrep.sarif — see above.
+          # finding-pip / finding-npm / finding-go-* only. Never semgrep.sarif.
           path: |
             finding-pip.json
             finding-npm.json
+            finding-go-*.json
             codecount.json
           retention-days: 7
 
