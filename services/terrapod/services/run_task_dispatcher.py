@@ -14,6 +14,7 @@ from datetime import UTC
 from terrapod.db.models import Run, RunTask, TaskStage, TaskStageResult, Workspace
 from terrapod.db.session import get_db_session
 from terrapod.logging_config import get_logger
+from terrapod.services.outbound_url_guard import validate_outbound_url
 from terrapod.services.run_task_service import resolve_stage
 
 logger = get_logger(__name__)
@@ -154,6 +155,10 @@ async def handle_run_task_call(payload: dict) -> None:
             headers["X-TFE-Task-Signature"] = sig
 
         try:
+            # The other half of #1541. Structurally identical to the notification
+            # sink and reachable by the same principal, so fixing one and leaving
+            # this would just relocate the defect.
+            await validate_outbound_url(rt.url)
             async with httpx.AsyncClient(timeout=30) as client:
                 # Non-idempotent run-task webhook POST: retried only on
                 # connection-not-sent errors, never on read-timeout/5xx — a

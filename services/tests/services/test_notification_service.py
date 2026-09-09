@@ -2,8 +2,11 @@
 
 import hashlib
 import hmac
+import ipaddress
 import json
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from terrapod.services.notification_service import (
     VALID_TRIGGERS,
@@ -75,6 +78,22 @@ class TestSignPayload:
         sig1 = sign_payload(body, "token-a")
         sig2 = sign_payload(body, "token-b")
         assert sig1 != sig2
+
+
+@pytest.fixture(autouse=True)
+def _resolves_publicly():
+    """Keep delivery tests hermetic under the #1541 guard.
+
+    The guard resolves the host before requesting, so without this these tests
+    would depend on real DNS — on CI having a resolver, and on example.com
+    continuing to resolve. Stubbed to a public address so the guard passes and
+    each test exercises the delivery path it is actually about.
+    """
+    with patch(
+        "terrapod.services.outbound_url_guard._resolve",
+        new=AsyncMock(return_value=[ipaddress.ip_address("93.184.216.34")]),
+    ):
+        yield
 
 
 class TestDeliverGeneric:
