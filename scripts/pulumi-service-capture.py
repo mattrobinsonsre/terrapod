@@ -54,7 +54,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 PORT = 8810
 #: Deliberately not the host root: proving this surface can live under a prefix
 #: is a finding, not an assumption (it is the question #1484 settled for NuGet).
-PREFIX = "/api/terrapod/v1/pulumi"
+PREFIX = "/api/v1/pulumi"
 ORG = "spike"
 IMAGE = "pulumi/pulumi-python:latest"
 CONTAINER_HOST = "host.containers.internal"
@@ -229,11 +229,11 @@ SCRIPT = r"""
 set -u
 cd /work/proj
 export PULUMI_HOME=/work/home PULUMI_SKIP_UPDATE_CHECK=true
-export PULUMI_ACCESS_TOKEN=pul-spiketoken
+export PULUMI_ACCESS_TOKEN=${PULUMI_TOKEN:-pul-spiketoken}
 python -m venv /work/venv >/dev/null 2>&1
 export PATH=/work/venv/bin:$PATH
 /work/venv/bin/pip install -q pulumi pulumi-random >/dev/null 2>&1
-for c in "login $BACKEND" "whoami" "stack init spike/proj/dev" "stack ls" \
+for c in "login $BACKEND" "whoami" "stack init ${PULUMI_ORG:-spike}/proj/dev" "stack ls" \
          "preview" "up --yes" "refresh --yes"; do
   echo "=== pulumi $c ==="
   pulumi $c --non-interactive 2>&1 | tail -3
@@ -275,9 +275,29 @@ def main() -> int:
         print("docker is required (for the pulumi image)", file=sys.stderr)
         return 2
 
-    srv = HTTPServer(("0.0.0.0", PORT), Handler)
-    threading.Thread(target=srv.serve_forever, daemon=True).start()
-    time.sleep(0.3)
+    # `--backend URL --token TOKEN` drives the same cycle against a REAL
+    # Terrapod instead of the logging stub. That is the difference between
+    # knowing what the CLI asks for and knowing that what we built answers it —
+    # the stub agrees with whatever you write, so a capture against it can only
+    # ever confirm the capture.
+    import argparse
+
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--backend", default="", help="a live Terrapod base URL, e.g. http://host:3000")
+    ap.add_argument("--token", default="", help="a Terrapod API token for --backend")
+    args = ap.parse_args()
+
+    srv = None
+    if args.backend:
+        backend = args.backend.rstrip("/") + PREFIX
+        token = args.token
+        print(f"driving a real backend: {backend}")
+    else:
+        srv = HTTPServer(("0.0.0.0", PORT), Handler)
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        time.sleep(0.3)
+        backend = f"http://{CONTAINER_HOST}:{PORT}{PREFIX}"
+        token = "pul-spiketoken"
 
     work = pathlib.Path(tempfile.mkdtemp(prefix="pulumi-svc-capture-"))
     proj = work / "proj"
@@ -294,7 +314,11 @@ def main() -> int:
             "run",
             "--rm",
             "-e",
-            f"BACKEND=http://{CONTAINER_HOST}:{PORT}{PREFIX}",
+            f"BACKEND={backend}",
+            "-e",
+            f"PULUMI_TOKEN={token}",
+            "-e",
+            f"PULUMI_ORG={'default' if args.backend else 'spike'}",
             "-v",
             f"{work}:/work",
             "-w",
@@ -308,7 +332,8 @@ def main() -> int:
         timeout=1800,
         check=False,
     )
-    srv.shutdown()
+    if srv is not None:
+        srv.shutdown()
     print(proc.stdout)
 
     seen: dict[tuple[str, str], dict] = {}
