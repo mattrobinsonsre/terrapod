@@ -414,6 +414,59 @@ runners:
 That is the whole Terrapod-side change: the same values as IRSA with the
 `eks.amazonaws.com/role-arn` annotations removed.
 
+### Role chaining needs `sts:TagSession`
+
+If your Terraform assumes a *further* role — a cross-account `automation` role,
+say — Pod Identity changes what that requires, and the failure does not look
+like an identity problem:
+
+```
+User: arn:aws:sts::111122223333:assumed-role/terrapod-runner-prod/eks-my-cluster-...
+is not authorized to perform: sts:TagSession
+on resource: arn:aws:iam::444455556666:role/automation
+```
+
+It names **`sts:TagSession`**, not `sts:AssumeRole`, which is why it reads like
+something unrelated to credentials.
+
+Pod Identity attaches session tags to the pod's credentials — cluster, namespace,
+ServiceAccount — and marks them **transitive**, so they persist into any role
+the pod then assumes. A chained `AssumeRole` carrying transitive tags needs
+permission to set them. IRSA attaches no such tags, so the same policies work
+under IRSA and stop working the moment a deployment switches, with nothing in
+those policies having changed.
+
+**Both ends need it.** The runner's own policy, to make the call:
+
+```json
+{
+  "Effect": "Allow",
+  "Action": ["sts:AssumeRole", "sts:TagSession"],
+  "Resource": "arn:aws:iam::444455556666:role/automation"
+}
+```
+
+and the destination role's trust policy, to accept it:
+
+```json
+{
+  "Effect": "Allow",
+  "Principal": { "AWS": "arn:aws:iam::111122223333:role/terrapod-runner-prod" },
+  "Action": ["sts:AssumeRole", "sts:TagSession"]
+}
+```
+
+Where the trust policy names an account root rather than the role, the decision
+is delegated to the caller's own IAM policy — so the first block is what
+matters, and adding `sts:TagSession` only to the trust policy will not fix it.
+
+This bites unevenly across an estate: accounts whose trust policies happened to
+grant `sts:TagSession` already keep working, and the rest fail. That makes the
+switch look intermittent rather than systematic. Auditing every role your
+runners can assume is quicker than following the failures one at a time.
+
+Nothing in Terrapod needs changing for this — it is entirely IAM.
+
 ### Do not configure both
 
 If a ServiceAccount carries `eks.amazonaws.com/role-arn` *and* has a Pod

@@ -577,6 +577,51 @@ Redis is the backbone for sessions, the scheduler, listener data, and live log s
 
 ---
 
+## Plan fails with `sts:TagSession` after switching to EKS Pod Identity
+
+**Symptom.** Runs that assume a further role fail at plan time, and the error
+names an action nobody granted or asked for:
+
+```
+Error: Cannot assume IAM Role
+IAM Role (arn:aws:iam::444455556666:role/automation) cannot be assumed.
+
+Error: operation error STS: AssumeRole, https response error StatusCode: 403,
+api error AccessDenied: User:
+arn:aws:sts::111122223333:assumed-role/terrapod-runner-prod/eks-my-cluster-...
+is not authorized to perform: sts:TagSession
+on resource: arn:aws:iam::444455556666:role/automation
+```
+
+Two things identify it: the action is **`sts:TagSession`**, not `sts:AssumeRole`,
+and the session name begins **`eks-`**, which is Pod Identity's own naming. An
+IRSA session does not look like that.
+
+**Cause.** EKS Pod Identity attaches session tags to the pod's credentials and
+marks them transitive, so they persist into any role the pod subsequently
+assumes — and that chained call needs permission to set them. IRSA attaches no
+tags. So policies that were correct under IRSA start failing the moment a
+deployment switches, without anything in them changing.
+
+**It will look intermittent.** Accounts whose trust policies already granted
+`sts:TagSession` keep working; the rest fail. Expect a subset of workspaces to
+break rather than all of them, which is misleading when you are trying to work
+out what changed.
+
+**Fix.** Grant `sts:TagSession` alongside `sts:AssumeRole` at **both** ends —
+the runner's own policy and the destination role's trust policy. Full detail and
+the exact statements: [Role chaining needs `sts:TagSession`](cloud-credentials.md#role-chaining-needs-ststagsession).
+
+Where a trust policy names an account **root** rather than a role, the decision
+is delegated to the caller's IAM policy — so the runner-side grant is the one
+that matters and a trust-policy-only change will not fix it.
+
+**Check every role your runners can assume**, not just the one that failed. The
+failure is generic to every cross-account hop from a Pod Identity runner;
+fixing them one at a time as they surface just defers the next.
+
+Nothing in Terrapod changes for this — it is entirely IAM.
+
 ## Storage Errors
 
 Object storage (S3, Azure Blob, GCS, or filesystem) failures prevent state uploads, config downloads, log persistence, and cache operations.
