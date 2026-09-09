@@ -54,7 +54,7 @@ A run is marked "stale" by the reconciler when it has been in `planning` or `app
    ```bash
    curl -X POST -H "Authorization: Bearer $TOKEN" \
      -H "Content-Type: application/vnd.api+json" \
-     https://<terrapod>/api/v2/workspaces/<ws-id>/actions/force-unlock
+     https://<terrapod>/api/tfe/v2/workspaces/<ws-id>/actions/force-unlock
    ```
 
 2. **Clean up the orphaned Job** (if it still exists):
@@ -131,7 +131,7 @@ A runner Job was killed by Kubernetes because its container exceeded its memory 
 
 **For true OOMs (`oom` status):**
 
-1. Bump `resource_memory` on the workspace. UI: workspace settings. API: `PATCH /api/v2/workspaces/{id}` with `data.attributes.resource-memory`.
+1. Bump `resource_memory` on the workspace. UI: workspace settings. API: `PATCH /api/tfe/v2/workspaces/{id}` with `data.attributes.resource-memory`.
 2. The limit auto-derives as `2 × request`, so doubling the request doubles the limit.
 3. Re-queue the run (Retry button on the Run detail page).
 4. After the new run succeeds, re-check the Resource usage panel — the bar should be in amber (80–95%) or green (<80%). If it's still red, bump again.
@@ -166,7 +166,7 @@ The runner entrypoint marks a workspace as "state diverged" when an `apply` succ
 1. **Confirm the divergence:**
    ```bash
    curl -H "Authorization: Bearer $TOKEN" \
-     https://<terrapod>/api/v2/workspaces/<ws-id> | jq '.data.attributes["state-diverged"]'
+     https://<terrapod>/api/tfe/v2/workspaces/<ws-id> | jq '.data.attributes["state-diverged"]'
    ```
 
 2. **Check the runner Job logs:**
@@ -206,7 +206,7 @@ The runner entrypoint marks a workspace as "state diverged" when an `apply` succ
      curl -X POST -H "Authorization: Bearer $TOKEN" \
        -H "Content-Type: application/vnd.api+json" \
        -d '{"data":{"type":"state-versions","attributes":{"serial":<next-serial>,"md5":"<md5>","lineage":"<lineage>"}}}' \
-       https://<terrapod>/api/v2/workspaces/<ws-id>/state-versions
+       https://<terrapod>/api/tfe/v2/workspaces/<ws-id>/state-versions
      ```
    - Then upload the state content to the returned upload URL
 
@@ -229,7 +229,7 @@ A run sitting in `planned` (waiting for a confirm) was automatically moved to `d
 
 - A `planned` run flips to `discarded` without anyone clicking Discard.
 - The run carries a `discard-reason`, e.g. `state changed since plan (serial 6 → 7)` or `plan expired (older than 3600s)`.
-- A confirm attempt (`POST /api/v2/runs/{id}/actions/apply`) returns **409** with the same reason.
+- A confirm attempt (`POST /api/tfe/v2/runs/{id}/actions/apply`) returns **409** with the same reason.
 
 ### Diagnosis
 
@@ -466,7 +466,7 @@ The API server's SQLAlchemy connection pool is exhausted, causing requests to ti
 
 1. **Check health endpoint:**
    ```bash
-   curl https://<terrapod>/api/v2/ping
+   curl https://<terrapod>/api/tfe/v2/ping
    curl http://<api-pod-ip>:8000/health
    ```
 
@@ -747,7 +747,7 @@ After fixing the rule:
 
 ## Cross-workspace `terraform_remote_state` returns 403
 
-**Symptom**: an agent-mode plan errors during init/refresh on a `data "terraform_remote_state"` data source pointing at another Terrapod workspace, with a 403 from `/api/v2/workspaces/{id}/current-state-version` or `/api/v2/state-versions/{id}/download`.
+**Symptom**: an agent-mode plan errors during init/refresh on a `data "terraform_remote_state"` data source pointing at another Terrapod workspace, with a 403 from `/api/tfe/v2/workspaces/{id}/current-state-version` or `/api/tfe/v2/state-versions/{id}/download`.
 
 **Why**: cross-workspace state reads in agent mode are gated by the **producer's consumer allowlist** — the producer workspace explicitly lists which consumer workspaces may read its (secret-bearing) state. Default is empty. The runner token doesn't satisfy per-user RBAC for another workspace, so without an allowlist entry every cross-workspace read 403s. This is the security design — see [the composition guide](remote-state.md) and the [API reference](api-reference.md#cross-workspace-remote-state-consumers).
 
@@ -839,7 +839,7 @@ calls per hour = (3600 / poll_interval_seconds) x 2 x distinct repo+branch pairs
 
 ### Diagnosis
 
-1. **Read what Terrapod recorded** — `vcs-last-error` / `vcs-last-error-at` on the workspace (`GET /api/v2/workspaces/{id}`), or the `vcs_error` health condition in the UI.
+1. **Read what Terrapod recorded** — `vcs-last-error` / `vcs-last-error-at` on the workspace (`GET /api/tfe/v2/workspaces/{id}`), or the `vcs_error` health condition in the UI.
 2. **Read the connection's saturation verdict** on **Admin → VCS connections** (or `GET /api/v1/vcs-connections`). It reports the consumption rate as a share of the budget and when it runs out. **Read the verdict, not `rate-limit-remaining`**: the budget refills on a fixed window, so the remaining count reads healthy right after a reset however fast it is being spent — that is precisely how a connection consuming twice its budget looks fine for part of every hour. (If you want the provider's own view: GitHub `GET /rate_limit`, GitLab the `RateLimit-Remaining` header. Terrapod's budget reading comes from the same headers, observed on calls it was making anyway.)
 
    **What is counted.** The consumption rate and the consumer breakdown are Terrapod's own tally of the calls it makes, so they work even where the server reports no budget at all — a self-managed GitLab with rate limiting off still shows you how hard it is being polled. Every REST call Terrapod makes to either provider is counted — poll-cycle lookups, PR/MR reads, repository archive downloads, and the comment and merge writes. Sparse `git` fetches are the exception, and deliberately so: they go over the git transport, which the providers meter separately from the REST allowance the verdict is about. Where the provider reports no budget you get the rate and **no verdict** — there is nothing to classify it against, and a verdict there would be invented.
@@ -1569,7 +1569,7 @@ something the mode does not auto-apply. That is the feature working.
 Look at the run's `auto-apply-declined-reason`:
 
 ```
-GET /api/v2/runs/{run_id}
+GET /api/tfe/v2/runs/{run_id}
 ```
 
 - **A reason like `2 destroys, 1 replace`** — the plan contained an action the

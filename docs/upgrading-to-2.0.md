@@ -15,11 +15,27 @@ If a surface is not listed here, it did not change.
 
 ## Breaking changes
 
-### The `/api/terrapod/v1` alias is removed
+### The deprecated path aliases are removed
 
 **Affects:** anything still calling `/api/terrapod/v1/…` — your own scripts,
 dashboards, and any Terrapod runner/listener image, SDK or provider you have not
 upgraded.
+
+Three aliases go at 2.0:
+
+| removed | use |
+|---|---|
+| `/api/terrapod/v1/…` | `/api/v1/…` |
+| `/api/v2/…` | `/api/tfe/v2/…` |
+| `/v1/providers/…` | `/api/v1/provider-mirror/…` |
+
+`terraform` and `tofu` need nothing — they take the path from service
+discovery, which has advertised the new one since v1.7.0.
+
+**The Prometheus `path_template` label changes at the same time.** Until 2.0 it
+reports the OLD path for both prefixes, so dashboards keep working through the
+window; at 2.0 it reports the canonical one. Update any panel or alert that
+matches `/api/v2/` or `/api/terrapod/v1/` literally.
 
 `/api/v1` has been canonical since v1.7.0, with `/api/terrapod/v1` served
 alongside it and advertising `Deprecation` / `Sunset` headers. 2.0 removes the

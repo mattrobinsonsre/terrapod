@@ -113,7 +113,7 @@ resource "terrapod_workspace" "platform" {
 ### API (PATCH)
 
 ```bash
-curl -X PATCH "https://<host>/api/v2/workspaces/<id>" \
+curl -X PATCH "https://<host>/api/tfe/v2/workspaces/<id>" \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/vnd.api+json" \
   -d '{

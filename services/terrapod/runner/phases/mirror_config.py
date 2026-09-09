@@ -126,6 +126,12 @@ def write_terraform_rc(
             f'credentials "{public_host}" {{\n  token = "{auth_token}"\n}}\n'
             f'host "{public_host}" {{\n'
             "  services = {\n"
+            # Deliberately the LEGACY prefix (#1528). This block OVERRIDES service
+            # discovery for terraform inside the Job, so these are not discovered
+            # — they are literals compiled into whichever runner image is running,
+            # and a runner lags the API by design. Both prefixes are served, so
+            # the old paths keep working; they flip once runner images have
+            # propagated. See docs/deprecations.md.
             f'    "modules.v1"   = "{api_url}/api/v2/registry/modules/"\n'
             f'    "providers.v1" = "{api_url}/api/v2/registry/providers/"\n'
             # tfe.v2(.1|.2) point at the same /api/v2/ base; without

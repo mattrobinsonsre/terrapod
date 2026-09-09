@@ -44,7 +44,7 @@ from terrapod.storage import get_storage
 from terrapod.storage.keys import config_version_key
 from terrapod.storage.protocol import ObjectNotFoundError
 
-router = APIRouter(prefix="/api/v2", tags=["configuration-versions"])
+router = APIRouter(tags=["configuration-versions"])
 
 # Terrapod-only extensions on the configuration-versions surface
 # (download, download-ticket, download-by-ticket, diff). Dual-mounted

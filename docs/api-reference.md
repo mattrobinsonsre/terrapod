@@ -1,6 +1,6 @@
 # API Reference
 
-Terrapod implements the subset of the TFE V2 API that the `terraform`/`tofu` `cloud` backend consumes (over the `go-tfe` protocol) — a stable contract mounted at `/api/v2/` and catalogued in [`tfe-cli-surface.md`](tfe-cli-surface.md). It is **not** a reimplementation of the full TFE V2 API: everything beyond that CLI-consumed slice is Terrapod's own native API at `/api/v1/`. All endpoints use JSON:API format.
+Terrapod implements the subset of the TFE V2 API that the `terraform`/`tofu` `cloud` backend consumes (over the `go-tfe` protocol) — a stable contract mounted at `/api/tfe/v2/` and catalogued in [`tfe-cli-surface.md`](tfe-cli-surface.md). It is **not** a reimplementation of the full TFE V2 API: everything beyond that CLI-consumed slice is Terrapod's own native API at `/api/v1/`. All endpoints use JSON:API format.
 
 The interactive API documentation is also available in the web UI under **API** in the navigation bar, offering both ReDoc and Swagger UI views.
 
@@ -25,7 +25,7 @@ The Terrapod API has four distinct consumer classes. Every API change must updat
 
 ### Endpoint coverage
 
-go-terrapod targets the full Terrapod API surface — both the TFE-V2-compatible (`/api/v2/`) and Terrapod-native (`/api/v1/`) prefixes. The migration tool is a heavy consumer of the API-only routers (config-versions, state-management, registry endpoints) that the UI doesn't surface; the provider mostly consumes the frontend-also routers. Both can rely on the same typed surface in go-terrapod.
+go-terrapod targets the full Terrapod API surface — both the TFE-V2-compatible (`/api/tfe/v2/`) and Terrapod-native (`/api/v1/`) prefixes. The migration tool is a heavy consumer of the API-only routers (config-versions, state-management, registry endpoints) that the UI doesn't surface; the provider mostly consumes the frontend-also routers. Both can rely on the same typed surface in go-terrapod.
 
 ### Version contract
 
@@ -37,19 +37,21 @@ go-terrapod pins to a specific Terrapod API version at build time via the `SDKVe
 
 ### Base URL
 
-Terrapod exposes two API surfaces, plus a deprecated alias for one of them:
+Terrapod exposes two API surfaces, each with a deprecated alias:
 
 | Prefix | Contract | Audience |
 |---|---|---|
-| `/api/v2/` | **Stable** TFE V2 subset consumed by `terraform`, `tofu`, and `tfci`. Documented in [`docs/tfe-cli-surface.md`](tfe-cli-surface.md). |  Terraform/OpenTofu CLI, `tfci`, `go-tfe`-based clients that stay within this subset |
+| `/api/tfe/v2/` | **Stable** TFE V2 subset consumed by `terraform`, `tofu`, and `tfci`. Documented in [`docs/tfe-cli-surface.md`](tfe-cli-surface.md). |  Terraform/OpenTofu CLI, `tfci`, `go-tfe`-based clients that stay within this subset |
 | `/api/v1/` | Terrapod-native management API (workspaces management, runs, registry CRUD, agent pools, audit, etc.) | Web UI, the Terraform provider for Terrapod, automation |
 | `/api/terrapod/v1/` | **Deprecated alias** for the above — every route, identical responses. Kept for the support window; see [`deprecations.md`](deprecations.md). | Existing integrations, and Terrapod's own runner/listener images until they are upgraded |
+| `/api/tfe/v2/` | **Stable** TFE V2 subset consumed by `terraform`, `tofu` and `tfci`. Named for what it is: a compatibility layer for another product's protocol, kept out of Terrapod's own version namespace. | Terraform/OpenTofu CLI, `tfci`, `go-tfe` clients |
+| `/api/v2/` | **Deprecated alias** for the TFE surface — every route, identical responses. Advertised in service discovery until v1.7.0; still served. | Existing clients, and runner images until upgraded |
 
 Example:
 
 ```
 # CLI-contract (cloud-block, state, etc.)
-https://terrapod.example.com/api/v2/organizations/default/workspaces
+https://terrapod.example.com/api/tfe/v2/organizations/default/workspaces
 
 # Terrapod-native management
 https://terrapod.example.com/api/v1/workspaces
@@ -115,9 +117,9 @@ Every list response carries pagination metadata in Terrapod's four-key shape:
 
 Notes:
 
-- **Absent params → full list.** Omitting `page[size]` (or sending `page[size]=0`) returns every item, so a client that just wants the whole collection can ignore paging entirely. This is a deliberate Terrapod behaviour; on `/api/v2/` the `meta.pagination` shape still matches what a `go-tfe` client expects.
+- **Absent params → full list.** Omitting `page[size]` (or sending `page[size]=0`) returns every item, so a client that just wants the whole collection can ignore paging entirely. This is a deliberate Terrapod behaviour; on `/api/tfe/v2/` the `meta.pagination` shape still matches what a `go-tfe` client expects.
 - **To fetch everything robustly, page and loop** rather than relying on the absent-params default — request `page[size]=100`, then `page[number]=1,2,…` until `total-pages` is reached. go-terrapod exposes `ListAll*` helpers that do this; the web UI uses `fetchAllPages()`.
-- **Unbounded-history collections are the one exception:** the runs list (`GET /api/v2/workspaces/{id}/runs`) keeps a **bounded default page (20)** instead of returning all history, but still honours `page[size]` and emits `meta.pagination` so you can page the full history.
+- **Unbounded-history collections are the one exception:** the runs list (`GET /api/tfe/v2/workspaces/{id}/runs`) keeps a **bounded default page (20)** instead of returning all history, but still honours `page[size]` and emits `meta.pagination` so you can page the full history.
 - `total-count` is the size of the whole (RBAC-filtered) collection, not the returned page.
 
 ---
@@ -179,8 +181,8 @@ Returns service discovery document for `terraform login` and registry protocol.
     "token": "/oauth/token",
     "ports": [10000, 10010]
   },
-  "modules.v1": "/api/v2/registry/modules/",
-  "providers.v1": "/api/v2/registry/providers/"
+  "modules.v1": "/api/tfe/v2/registry/modules/",
+  "providers.v1": "/api/tfe/v2/registry/providers/"
 }
 ```
 
@@ -189,7 +191,7 @@ Returns service discovery document for `terraform login` and registry protocol.
 ## Ping
 
 ```
-GET /api/v2/ping
+GET /api/tfe/v2/ping
 ```
 
 API version handshake. Returns TFE-compatible version headers.
@@ -208,7 +210,7 @@ X-TFE-Version: v202301-1
 ### Current User Details
 
 ```
-GET /api/v2/account/details
+GET /api/tfe/v2/account/details
 ```
 
 Returns the authenticated user's information.
@@ -243,7 +245,7 @@ Returns organization details. Only `default` is valid.
 ### Entitlement Set
 
 ```
-GET /api/v2/organizations/default/entitlement-set
+GET /api/tfe/v2/organizations/default/entitlement-set
 ```
 
 Returns feature flags (all enabled for Terrapod).
@@ -255,7 +257,7 @@ Returns feature flags (all enabled for Terrapod).
 ### List Workspaces
 
 ```
-GET /api/v2/organizations/default/workspaces
+GET /api/tfe/v2/organizations/default/workspaces
 ```
 
 Supports optional [pagination](#pagination) (`page[size]`/`page[number]`; absent or `page[size]=0` returns the full list) and filtering by `search[name]` and cloud-block tags (`filter[tagged][...]`). Results are scoped to workspaces the caller can read.
@@ -263,19 +265,19 @@ Supports optional [pagination](#pagination) (`page[size]`/`page[number]`; absent
 ### Get Workspace by Name
 
 ```
-GET /api/v2/organizations/default/workspaces/{name}
+GET /api/tfe/v2/organizations/default/workspaces/{name}
 ```
 
 ### Get Workspace by ID
 
 ```
-GET /api/v2/workspaces/{id}
+GET /api/tfe/v2/workspaces/{id}
 ```
 
 ### Create Workspace
 
 ```
-POST /api/v2/organizations/default/workspaces
+POST /api/tfe/v2/organizations/default/workspaces
 ```
 
 **Auto-apply modes (`auto-apply-mode`)**
@@ -403,7 +405,7 @@ losing a single pool is now survivable.
 ### Update Workspace
 
 ```
-PATCH /api/v2/workspaces/{id}
+PATCH /api/tfe/v2/workspaces/{id}
 ```
 
 Same body format as create. Only include attributes to change.
@@ -457,17 +459,17 @@ old id needs repointing — it is a salvage operation, not an undo.
 ### Lock Workspace
 
 ```
-POST /api/v2/workspaces/{id}/actions/lock
+POST /api/tfe/v2/workspaces/{id}/actions/lock
 ```
 
 **Required permission:** `plan` on the workspace.
 
-A manual lock is the CLI/UI state lock **and** an operator gate on applies: while a workspace is locked, apply-capable (plan+apply) runs **will not start** and a confirm (`POST /api/v2/runs/{id}/actions/apply`) returns **409 Conflict**. Auto-apply runs settle in `planned` and wait for an unlock rather than applying. **Plan-only runs (speculative plans, drift checks) are not blocked** — they never mutate state. Returns 409 if the workspace is already locked.
+A manual lock is the CLI/UI state lock **and** an operator gate on applies: while a workspace is locked, apply-capable (plan+apply) runs **will not start** and a confirm (`POST /api/tfe/v2/runs/{id}/actions/apply`) returns **409 Conflict**. Auto-apply runs settle in `planned` and wait for an unlock rather than applying. **Plan-only runs (speculative plans, drift checks) are not blocked** — they never mutate state. Returns 409 if the workspace is already locked.
 
 ### Unlock Workspace
 
 ```
-POST /api/v2/workspaces/{id}/actions/unlock
+POST /api/tfe/v2/workspaces/{id}/actions/unlock
 ```
 
 **Required permission:** `plan` on the workspace (own locks only).
@@ -475,7 +477,7 @@ POST /api/v2/workspaces/{id}/actions/unlock
 ### Force-Unlock Workspace
 
 ```
-POST /api/v2/workspaces/{id}/actions/force-unlock
+POST /api/tfe/v2/workspaces/{id}/actions/force-unlock
 ```
 
 **Required permission:** `admin` on the workspace (the `workspace:force-unlock` capability).
@@ -600,7 +602,7 @@ Returns 422 if the workspace is not VCS-connected or the VCS connection is inact
 ### List State Versions
 
 ```
-GET /api/v2/workspaces/{id}/state-versions
+GET /api/tfe/v2/workspaces/{id}/state-versions
 ```
 
 **Required permission:** `read` on the workspace.
@@ -608,7 +610,7 @@ GET /api/v2/workspaces/{id}/state-versions
 ### Current State Version
 
 ```
-GET /api/v2/workspaces/{id}/current-state-version
+GET /api/tfe/v2/workspaces/{id}/current-state-version
 ```
 
 **Required permission:** `read` on the workspace.
@@ -618,7 +620,7 @@ For **agent-mode runs** reading another workspace's state via `data "terraform_r
 ### Create State Version
 
 ```
-POST /api/v2/workspaces/{id}/state-versions
+POST /api/tfe/v2/workspaces/{id}/state-versions
 ```
 
 **Request body:**
@@ -640,13 +642,13 @@ POST /api/v2/workspaces/{id}/state-versions
 ### Show State Version
 
 ```
-GET /api/v2/state-versions/{id}
+GET /api/tfe/v2/state-versions/{id}
 ```
 
 ### Download State
 
 ```
-GET /api/v2/state-versions/{id}/download
+GET /api/tfe/v2/state-versions/{id}/download
 ```
 
 Returns a redirect to a presigned URL for the raw state file.
@@ -658,7 +660,7 @@ For **agent-mode runs** reading another workspace's state via `data "terraform_r
 ### Upload State Content
 
 ```
-PUT /api/v2/state-versions/{id}/content
+PUT /api/tfe/v2/state-versions/{id}/content
 ```
 
 Binary upload of raw state bytes. No auth required (presigned-style -- the state version UUID acts as a capability token). This matches `go-tfe` behavior.
@@ -666,7 +668,7 @@ Binary upload of raw state bytes. No auth required (presigned-style -- the state
 ### Upload JSON State Content
 
 ```
-PUT /api/v2/state-versions/{id}/json-content
+PUT /api/tfe/v2/state-versions/{id}/json-content
 ```
 
 Accepted and discarded (placeholder for future use).
@@ -742,7 +744,7 @@ Returns 201 with the new state version.
 ### Create Run
 
 ```
-POST /api/v2/runs
+POST /api/tfe/v2/runs
 ```
 
 **Request body:**
@@ -878,13 +880,13 @@ link form; the attribute is kept alongside it.
 ### Show Run
 
 ```
-GET /api/v2/runs/{run_id}
+GET /api/tfe/v2/runs/{run_id}
 ```
 
 ### List Workspace Runs
 
 ```
-GET /api/v2/workspaces/{id}/runs
+GET /api/tfe/v2/workspaces/{id}/runs
 ```
 
 Newest first. Because run history grows without bound, this endpoint keeps a **bounded default page** (`page[size]` default 20, max 100) rather than returning everything — the one exception to the "absent → full list" [pagination](#pagination) convention. It honours `page[size]`/`page[number]` and always returns `meta.pagination`, so you can page the full history.
@@ -892,7 +894,7 @@ Newest first. Because run history grows without bound, this endpoint keeps a **b
 ### Confirm Run (Approve Apply)
 
 ```
-POST /api/v2/runs/{run_id}/actions/apply
+POST /api/tfe/v2/runs/{run_id}/actions/apply
 ```
 
 **Required permission:** `write` on the workspace.
@@ -900,7 +902,7 @@ POST /api/v2/runs/{run_id}/actions/apply
 ### Discard Run
 
 ```
-POST /api/v2/runs/{run_id}/actions/discard
+POST /api/tfe/v2/runs/{run_id}/actions/discard
 ```
 
 **Required permission:** `write` on the workspace.
@@ -908,7 +910,7 @@ POST /api/v2/runs/{run_id}/actions/discard
 ### Cancel Run
 
 ```
-POST /api/v2/runs/{run_id}/actions/cancel
+POST /api/tfe/v2/runs/{run_id}/actions/cancel
 ```
 
 **Required permission:** `write` on the workspace.
@@ -965,17 +967,17 @@ Server-Sent Events stream for the workspace list page. Emits events whenever any
 GET /api/v1/runs/{run_id}/plan
 ```
 
-Returns plan metadata and log download URL. When the runner has uploaded a structured plan (`-out=tfplan` → `terraform show -json tfplan`), the response also carries a `json-output` attribute pointing at `/api/v2/plans/{run_id}/json-output`.
+Returns plan metadata and log download URL. When the runner has uploaded a structured plan (`-out=tfplan` → `terraform show -json tfplan`), the response also carries a `json-output` attribute pointing at `/api/tfe/v2/plans/{run_id}/json-output`.
 
 ### Plan JSON Output
 
 ```
-GET /api/v2/plans/{plan_id}/json-output
+GET /api/tfe/v2/plans/{plan_id}/json-output
 ```
 
 Returns the structured JSON representation of the plan, as produced by `terraform show -json tfplan`. Useful for downstream tooling that wants to consume the resource changes without parsing the human-readable log. Responds **302** to a presigned object-storage URL.
 
-The endpoint is mounted at `/api/v2/` because `go-tfe` and Terraform's `cloud` block expect it there. Returns **404** if the runner never uploaded the JSON output (older runs, runs that errored before the plan completed).
+The endpoint is mounted at `/api/tfe/v2/` because `go-tfe` and Terraform's `cloud` block expect it there. Returns **404** if the runner never uploaded the JSON output (older runs, runs that errored before the plan completed).
 
 ### Impact Graph
 
@@ -1234,7 +1236,7 @@ Returns apply metadata and log download URL.
 
 Producer-controlled allowlist of workspaces authorized to read this workspace's state via `data "terraform_remote_state"`. Default is empty (not shared) — secure by default. All mutations require **admin/write on the producer** (the state owner). Independent of run triggers — see [the composition guide](remote-state.md).
 
-When a runner-token principal (agent-mode run) hits `/api/v2/workspaces/{id}/current-state-version` or `/api/v2/state-versions/{id}/download` for another workspace, authorization is by this allowlist instead of per-user RBAC. User / API-token principals (CLI, UI, automation) continue through the existing per-user RBAC path.
+When a runner-token principal (agent-mode run) hits `/api/tfe/v2/workspaces/{id}/current-state-version` or `/api/tfe/v2/state-versions/{id}/download` for another workspace, authorization is by this allowlist instead of per-user RBAC. User / API-token principals (CLI, UI, automation) continue through the existing per-user RBAC path.
 
 ### List Consumers
 
@@ -1413,7 +1415,7 @@ A workspace's uploaded source archives are also browsable from the UI — worksp
 ### Create Configuration Version
 
 ```
-POST /api/v2/workspaces/{id}/configuration-versions
+POST /api/tfe/v2/workspaces/{id}/configuration-versions
 ```
 
 **Request body:**
@@ -1446,7 +1448,7 @@ No auth required (presigned URL).
 ### Show Configuration Version
 
 ```
-GET /api/v2/configuration-versions/{cv_id}
+GET /api/tfe/v2/configuration-versions/{cv_id}
 ```
 
 Returns a single CV's metadata.
@@ -1454,7 +1456,7 @@ Returns a single CV's metadata.
 ### List Configuration Versions
 
 ```
-GET /api/v2/workspaces/{id}/configuration-versions
+GET /api/tfe/v2/workspaces/{id}/configuration-versions
 ```
 
 Newest first. Supports `page[size]` (default 20, max 100) and `page[number]`.
@@ -1634,7 +1636,7 @@ Returns entities tagged with exactly `key=value`, grouped by type.
 ### List Workspace Variables
 
 ```
-GET /api/v2/workspaces/{id}/vars
+GET /api/tfe/v2/workspaces/{id}/vars
 ```
 
 **Required permission:** `read` on the workspace. Sensitive values are never returned.
@@ -1642,7 +1644,7 @@ GET /api/v2/workspaces/{id}/vars
 ### Create Variable
 
 ```
-POST /api/v2/workspaces/{id}/vars
+POST /api/tfe/v2/workspaces/{id}/vars
 ```
 
 **Request body:**
@@ -1676,13 +1678,13 @@ whether a value is typed has a bug worth surfacing.
 ### Update Variable
 
 ```
-PATCH /api/v2/workspaces/{id}/vars/{var_id}
+PATCH /api/tfe/v2/workspaces/{id}/vars/{var_id}
 ```
 
 ### Delete Variable
 
 ```
-DELETE /api/v2/workspaces/{id}/vars/{var_id}
+DELETE /api/tfe/v2/workspaces/{id}/vars/{var_id}
 ```
 
 **Required permission:** `write` on the workspace.
@@ -1694,13 +1696,13 @@ DELETE /api/v2/workspaces/{id}/vars/{var_id}
 ### List Variable Sets
 
 ```
-GET /api/v2/organizations/default/varsets
+GET /api/tfe/v2/organizations/default/varsets
 ```
 
 ### Create Variable Set
 
 ```
-POST /api/v2/organizations/default/varsets
+POST /api/tfe/v2/organizations/default/varsets
 ```
 
 **Required permission:** Platform `admin`.
@@ -1708,17 +1710,17 @@ POST /api/v2/organizations/default/varsets
 ### Variable Set Variables
 
 ```
-GET    /api/v2/varsets/{varset_id}/relationships/vars
-POST   /api/v2/varsets/{varset_id}/relationships/vars
-PATCH  /api/v2/varsets/{varset_id}/relationships/vars/{var_id}
-DELETE /api/v2/varsets/{varset_id}/relationships/vars/{var_id}
+GET    /api/tfe/v2/varsets/{varset_id}/relationships/vars
+POST   /api/tfe/v2/varsets/{varset_id}/relationships/vars
+PATCH  /api/tfe/v2/varsets/{varset_id}/relationships/vars/{var_id}
+DELETE /api/tfe/v2/varsets/{varset_id}/relationships/vars/{var_id}
 ```
 
 ### Variable Set Workspace Assignments
 
 ```
-POST   /api/v2/varsets/{varset_id}/relationships/workspaces
-DELETE /api/v2/varsets/{varset_id}/relationships/workspaces
+POST   /api/tfe/v2/varsets/{varset_id}/relationships/workspaces
+DELETE /api/tfe/v2/varsets/{varset_id}/relationships/workspaces
 ```
 
 **Required permission:** Platform `admin`.
@@ -1826,8 +1828,8 @@ views are.
 ### CLI Protocol (for terraform init)
 
 ```
-GET /api/v2/registry/modules/{namespace}/{name}/{provider}/versions
-GET /api/v2/registry/modules/{namespace}/{name}/{provider}/{version}/download
+GET /api/tfe/v2/registry/modules/{namespace}/{name}/{provider}/versions
+GET /api/tfe/v2/registry/modules/{namespace}/{name}/{provider}/{version}/download
 ```
 
 ### Terrapod-native Management API
@@ -1906,8 +1908,8 @@ DELETE /api/v1/registry-modules/private/default/{name}/{provider}/workspace-link
 ### CLI Protocol (for terraform init)
 
 ```
-GET /api/v2/registry/providers/{namespace}/{type}/versions
-GET /api/v2/registry/providers/{namespace}/{type}/{version}/download/{os}/{arch}
+GET /api/tfe/v2/registry/providers/{namespace}/{type}/versions
+GET /api/tfe/v2/registry/providers/{namespace}/{type}/{version}/download/{os}/{arch}
 ```
 
 The download response advertises the **publisher's own** GPG public key
@@ -3086,13 +3088,13 @@ All provider mirror endpoints require authentication (runner token, API token, o
 ### Provider Version Index
 
 ```
-GET /v1/providers/{hostname}/{namespace}/{type}/index.json
+GET /api/v1/provider-mirror/{hostname}/{namespace}/{type}/index.json
 ```
 
 ### Provider Version Details
 
 ```
-GET /v1/providers/{hostname}/{namespace}/{type}/{version}.json
+GET /api/v1/provider-mirror/{hostname}/{namespace}/{type}/{version}.json
 ```
 
 Returns platform-specific download URLs with `zh:` (zip hash) checksums.
@@ -4196,7 +4198,7 @@ POST /api/v1/catalog-instances/{wsId}/confirm
 POST /api/v1/catalog-instances/{wsId}/discard
 ```
 
-Confirm (apply) or discard the instance's pending **planned** run. These are the catalog-surface counterparts of the workspace run API: the catalog-managed workspace clamp gives the provisioner only `read` on the workspace, so a non-auto-apply provision / reconfigure / destroy is confirmed here rather than via `/api/v2/runs/{id}/actions/confirm` (which would require a platform admin). Returns the run reference. `409` if there's no planned run awaiting action. **Required permission:** catalog `use`.
+Confirm (apply) or discard the instance's pending **planned** run. These are the catalog-surface counterparts of the workspace run API: the catalog-managed workspace clamp gives the provisioner only `read` on the workspace, so a non-auto-apply provision / reconfigure / destroy is confirmed here rather than via `/api/tfe/v2/runs/{id}/actions/confirm` (which would require a platform admin). Returns the run reference. `409` if there's no planned run awaiting action. **Required permission:** catalog `use`.
 
 ### Orphan Catalog Instance (discouraged)
 

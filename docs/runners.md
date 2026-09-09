@@ -288,7 +288,7 @@ The Run detail page surfaces an **OOM-killed / Killed (likely OOM)** badge when 
 
 1. Check the Run detail page — confirm the OOM badge + peak memory shown.
 2. The error message will name the current `resource_memory` value.
-3. Bump it (UI workspace settings, or API `PATCH /api/v2/workspaces/{id}`) and retry. The limit will be `2 × resource_memory` automatically.
+3. Bump it (UI workspace settings, or API `PATCH /api/tfe/v2/workspaces/{id}`) and retry. The limit will be `2 × resource_memory` automatically.
 4. After the next successful run, re-check the Resource usage panel — the memory bar should be in the amber or green band, not red.
 
 The peak data accumulates across runs (per-run snapshot on the row, plus visible on each Run detail page), so right-sizing the workspace is a matter of looking at a few representative runs' peaks and setting `resource_memory` to roughly half-again the typical peak. Anything tracking ≥95% (red) is one provider-schema change away from OOMing.

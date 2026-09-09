@@ -53,9 +53,9 @@ class TestTerraformServiceDiscovery:
         assert data["login.v1"]["authz"] == "/oauth/authorize"
         assert data["login.v1"]["token"] == "/oauth/token"
         assert data["login.v1"]["ports"] == [10000, 10010]
-        assert data["tfe.v2"] == "/api/v2/"
-        assert data["tfe.v2.1"] == "/api/v2/"
-        assert data["tfe.v2.2"] == "/api/v2/"
+        assert data["tfe.v2"] == "/api/tfe/v2/"
+        assert data["tfe.v2.1"] == "/api/tfe/v2/"
+        assert data["tfe.v2.2"] == "/api/tfe/v2/"
         # #550: the running version is advertised so go-terrapod/provider can
         # run a compatibility check (Client.VersionCheck) at startup.
         assert "terrapod-version" in data

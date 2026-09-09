@@ -120,7 +120,7 @@ tofu login terrapod.example.com
 ### Via the API
 
 ```zsh
-curl -s -X POST https://terrapod.example.com/api/v2/organizations/default/workspaces \
+curl -s -X POST https://terrapod.example.com/api/tfe/v2/organizations/default/workspaces \
   -H "Authorization: Bearer $TERRAPOD_TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
   -d '{
@@ -263,7 +263,7 @@ Agent workspaces support two workflows depending on whether VCS is connected:
 1. Set the workspace execution mode to `agent`:
 
 ```zsh
-curl -X PATCH https://terrapod.example.com/api/v2/workspaces/ws-{id} \
+curl -X PATCH https://terrapod.example.com/api/tfe/v2/workspaces/ws-{id} \
   -H "Authorization: Bearer $TERRAPOD_TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
   -d '{
@@ -280,7 +280,7 @@ curl -X PATCH https://terrapod.example.com/api/v2/workspaces/ws-{id} \
 
 ```zsh
 # Create configuration version
-CV_RESPONSE=$(curl -s -X POST https://terrapod.example.com/api/v2/workspaces/ws-{id}/configuration-versions \
+CV_RESPONSE=$(curl -s -X POST https://terrapod.example.com/api/tfe/v2/workspaces/ws-{id}/configuration-versions \
   -H "Authorization: Bearer $TERRAPOD_TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
   -d '{"data": {"type": "configuration-versions", "attributes": {"auto-queue-runs": true}}}')
@@ -298,7 +298,7 @@ curl -X PUT "$UPLOAD_URL" \
 3. A run is automatically queued (plan-only). Monitor it:
 
 ```zsh
-curl -s https://terrapod.example.com/api/v2/workspaces/ws-{id}/runs \
+curl -s https://terrapod.example.com/api/tfe/v2/workspaces/ws-{id}/runs \
   -H "Authorization: Bearer $TERRAPOD_TOKEN" | jq '.data[0].attributes.status'
 ```
 
@@ -313,7 +313,7 @@ Variables can be set per-workspace via the API or web UI.
 ### Terraform Variables
 
 ```zsh
-curl -X POST https://terrapod.example.com/api/v2/workspaces/ws-{id}/vars \
+curl -X POST https://terrapod.example.com/api/tfe/v2/workspaces/ws-{id}/vars \
   -H "Authorization: Bearer $TERRAPOD_TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
   -d '{
@@ -333,7 +333,7 @@ curl -X POST https://terrapod.example.com/api/v2/workspaces/ws-{id}/vars \
 ### Environment Variables
 
 ```zsh
-curl -X POST https://terrapod.example.com/api/v2/workspaces/ws-{id}/vars \
+curl -X POST https://terrapod.example.com/api/tfe/v2/workspaces/ws-{id}/vars \
   -H "Authorization: Bearer $TERRAPOD_TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
   -d '{
@@ -354,7 +354,7 @@ curl -X POST https://terrapod.example.com/api/v2/workspaces/ws-{id}/vars \
 Set `"sensitive": true` for secrets. The value is protected by database encryption-at-rest and never returned in API responses:
 
 ```zsh
-curl -X POST https://terrapod.example.com/api/v2/workspaces/ws-{id}/vars \
+curl -X POST https://terrapod.example.com/api/tfe/v2/workspaces/ws-{id}/vars \
   -H "Authorization: Bearer $TERRAPOD_TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
   -d '{

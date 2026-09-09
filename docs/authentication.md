@@ -317,7 +317,7 @@ terraform login terrapod.local
 # Verify
 terraform providers
 # or
-curl -s https://terrapod.local/api/v2/account/details \
+curl -s https://terrapod.local/api/tfe/v2/account/details \
   -H "Authorization: Bearer $(jq -r '.credentials["terrapod.local"].token' ~/.terraform.d/credentials.tfrc.json)"
 ```
 

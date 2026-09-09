@@ -77,7 +77,7 @@ from terrapod.storage.keys import (
 )
 from terrapod.storage.protocol import ObjectNotFoundError
 
-router = APIRouter(prefix="/api/v2", tags=["runs"])
+router = APIRouter(tags=["runs"])
 
 # Terrapod-only run endpoints — listener protocol (claim/launch/status/log
 # streaming), runner-driven completion (plan-result, apply-result), SSE

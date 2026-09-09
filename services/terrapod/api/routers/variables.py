@@ -49,7 +49,7 @@ from terrapod.services.workspace_rbac_service import (
     resolve_workspace_capabilities_for,
 )
 
-router = APIRouter(prefix="/api/v2", tags=["variables"])
+router = APIRouter(tags=["variables"])
 
 #: The association views (#1440) are Terrapod-native, not part of the TFE V2
 #: surface `tfci` consumes, so they are mounted at `/api/terrapod/v1/` by the app

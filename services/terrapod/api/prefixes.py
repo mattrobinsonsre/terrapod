@@ -48,6 +48,68 @@ NATIVE_LEGACY_PREFIX = "/api/terrapod/v1"
 #: source; a header promising a date the docs contradict is worse than none.
 NATIVE_ALIAS_SUNSET = date(2026, 11, 3)
 
+
+#: The TFE V2 compatibility surface — canonical (#1528).
+#:
+#: Named for what it is. `/api/v2` read as the API's main road when it is a
+#: compatibility layer for another product's protocol, and it sat inside
+#: Terrapod's own version namespace, which would have made `/api/v2` unusable
+#: for a future Terrapod v2. Foreign protocols live outside that namespace.
+TFE_PREFIX = "/api/tfe/v2"
+
+#: The former location, still served. Advertised in service discovery until the
+#: window closes, and the path every existing `terraform`/`tofu` client and every
+#: runner image in the field already holds.
+TFE_LEGACY_PREFIX = "/api/v2"
+
+#: The provider network mirror — canonical (#1528).
+#:
+#: A pull-through CACHE we serve, not a registry, so it belongs with
+#: `/api/v1/binary-cache` and `/api/v1/package-cache` rather than under the TFE
+#: prefix; TFE does not serve a network mirror at all. Moving it off the bare
+#: `/v1/` also ends the collision with `/api/v1`.
+MIRROR_PREFIX = f"{NATIVE_PREFIX}/provider-mirror"
+
+#: The former location, still served.
+MIRROR_LEGACY_PREFIX = "/v1/providers"
+
+
+def metric_path(path: str) -> str:
+    """Fold a path onto ONE stable label for the Prometheus `path_template`.
+
+    Two prefixes serve each endpoint, so without this every route reports as two
+    series: a dashboard filtering one sees a fraction of the traffic and says
+    nothing about it, and cardinality doubles.
+
+    It folds onto the **legacy** name, not the canonical one, and that is
+    deliberate. A dashboard or alert is a consumer holding a literal — the same
+    class as an IdP allow-list or a runner's compiled-in matcher — so renaming
+    the label mid-window would blank an operator's panels on an upgrade they did
+    not ask for. The canonical path is what clients should call; the metric label
+    is what someone's alerting already matches. They flip together at the major,
+    with the rename called out in the upgrade notes.
+    """
+    # Longest canonical first. `MIRROR_PREFIX` (`/api/v1/provider-mirror`) sits
+    # UNDER `NATIVE_PREFIX` (`/api/v1`), so checking the shorter one first would
+    # fold a mirror request onto the native label and quietly file it under the
+    # wrong series — which is exactly the confusion this function exists to
+    # prevent.
+    for canonical, legacy in sorted(
+        (
+            (NATIVE_PREFIX, NATIVE_LEGACY_PREFIX),
+            (TFE_PREFIX, TFE_LEGACY_PREFIX),
+            (MIRROR_PREFIX, MIRROR_LEGACY_PREFIX),
+        ),
+        key=lambda pair: len(pair[0]),
+        reverse=True,
+    ):
+        if path == canonical:
+            return legacy
+        if path.startswith(canonical + "/"):
+            return legacy + path[len(canonical) :]
+    return path
+
+
 #: Both, longest first — order matters when stripping, so that the longer prefix
 #: is tried before any prefix that is a prefix of it.
 NATIVE_PREFIXES: tuple[str, ...] = tuple(

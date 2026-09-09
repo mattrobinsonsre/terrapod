@@ -63,7 +63,7 @@ Terrapod is deliberately **single-organization**: there is exactly one implicit 
 | Component | Purpose | Implementation |
 |---|---|---|
 | **Next.js Web** | Single ingress entry point; serves UI pages and proxies API calls | Next.js 16, React 19, Tailwind CSS, Radix UI |
-| **FastAPI API** | All business logic, the TFE V2 CLI-surface subset (`/api/v2/`) + the Terrapod-native API (`/api/v1/`), auth, registry, VCS polling | Python 3.14+, FastAPI, SQLAlchemy async, Pydantic |
+| **FastAPI API** | All business logic, the TFE V2 CLI-surface subset (`/api/tfe/v2/`) + the Terrapod-native API (`/api/v1/`), auth, registry, VCS polling | Python 3.14+, FastAPI, SQLAlchemy async, Pydantic |
 | **Runner Listener** | Receives run events via SSE, creates K8s Jobs, reports status, streams logs | Same Python codebase as API, different entrypoint |
 | **Runner Jobs** | Ephemeral containers that execute `terraform` or `tofu` | Slim Debian image (`python:3.14-slim`) with git/openssh-client/opa; pure-Python orchestrator |
 | **PostgreSQL** | Relational data: users, workspaces, state metadata, runs, registry | PostgreSQL 14+ |
@@ -699,7 +699,7 @@ Exposed at `GET /metrics` on port 8000 (same FastAPI app). A middleware records 
 | `terrapod_http_requests_total` | Counter | method, path_template, status | Total HTTP requests |
 | `terrapod_http_request_duration_seconds` | Histogram | method, path_template, status | Request latency |
 
-Path templates use FastAPI route patterns (`/api/v2/workspaces/{workspace_id}`) to avoid high-cardinality raw paths. The `/metrics` endpoint itself is excluded from instrumentation. Built-in process metrics (CPU, memory, file descriptors, threads) are included automatically by `prometheus-client`.
+Path templates use FastAPI route patterns (`/api/tfe/v2/workspaces/{workspace_id}`) to avoid high-cardinality raw paths. The `/metrics` endpoint itself is excluded from instrumentation. Built-in process metrics (CPU, memory, file descriptors, threads) are included automatically by `prometheus-client`.
 
 When `metrics.enabled` is `false`, no middleware is registered and `/metrics` returns 404.
 

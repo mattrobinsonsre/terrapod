@@ -325,7 +325,7 @@ Full details and admission-time enforcement patterns: [Supply-chain Verification
 # Create an API token in the UI (Settings → API Tokens), or: tofu login terrapod.example.com
 export TERRAPOD_TOKEN="<your-api-token>"
 
-curl -X POST https://terrapod.example.com/api/v2/organizations/default/workspaces \
+curl -X POST https://terrapod.example.com/api/tfe/v2/organizations/default/workspaces \
   -H "Authorization: Bearer $TERRAPOD_TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
   -d '{

@@ -102,7 +102,7 @@ curl https://terrapod.example.com/api/v1/registry-modules \
 
 ```zsh
 # List versions (CLI protocol)
-curl https://terrapod.example.com/api/v2/registry/modules/default/vpc/aws/versions \
+curl https://terrapod.example.com/api/tfe/v2/registry/modules/default/vpc/aws/versions \
   -H "Authorization: Bearer $TERRAPOD_TOKEN"
 
 # Show module details (TFE V2 API)
@@ -573,7 +573,7 @@ The provider cache implements the Terraform network mirror protocol. Runner Jobs
    }
    provider_installation {
      network_mirror {
-       url = "https://terrapod.example.com/v1/providers/"
+       url = "https://terrapod.example.com/api/v1/provider-mirror/"
      }
    }
    ```
@@ -607,13 +607,13 @@ api:
 ### Network Mirror Endpoints
 
 ```
-GET /v1/providers/{hostname}/{namespace}/{type}/index.json
+GET /api/v1/provider-mirror/{hostname}/{namespace}/{type}/index.json
 ```
 
 Returns a version list for the provider.
 
 ```
-GET /v1/providers/{hostname}/{namespace}/{type}/{version}.json
+GET /api/v1/provider-mirror/{hostname}/{namespace}/{type}/{version}.json
 ```
 
 Returns platform-specific download info with `zh:` (zip hash) checksums. Cached platforms get presigned storage URLs; uncached platforms get proxy download URLs. Cached platforms additionally carry the precomputed `h1:` directory hash in their `hashes` array (see "Cross-arch lock-file extension" below).
@@ -634,7 +634,7 @@ Behaviour when `h1:` is absent from the mirror response depends on the operator'
 Operators don't need to configure anything for this — the lock-extender runs automatically during the plan phase whenever `.terraform.lock.hcl` exists and the runner detects a supported arch (`linux_amd64` or `linux_arm64`). Look for `runner.lock_extender` log lines in plan output to see hit/miss per provider.
 
 ```
-GET /v1/providers/{hostname}/{namespace}/{type}/{version}/download/{os}/{arch}
+GET /api/v1/provider-mirror/{hostname}/{namespace}/{type}/{version}/download/{os}/{arch}
 ```
 
 Download proxy — on cache hit, 302 redirects to presigned URL. On cache miss, fetches the single binary from upstream, caches it in object storage, then 302 redirects.
@@ -837,8 +837,8 @@ The `/.well-known/terraform.json` endpoint includes paths for both module and pr
 
 ```json
 {
-  "modules.v1": "/api/v2/registry/modules/",
-  "providers.v1": "/api/v2/registry/providers/"
+  "modules.v1": "/api/tfe/v2/registry/modules/",
+  "providers.v1": "/api/tfe/v2/registry/providers/"
 }
 ```
 

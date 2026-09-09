@@ -42,15 +42,19 @@ class TestOpenAPIVisibility:
             assert path in routes, f"{path} must still be served"
 
     def test_cli_surface_stays_at_v2_in_schema(self) -> None:
-        """CLI/tfci-consumed paths are at /api/v2/ in the schema, not under /api/terrapod/v1/."""
+        """CLI-consumed paths are documented at the canonical TFE prefix (#1528).
+
+        `/api/v2` still serves every one of them; it is excluded from the schema
+        so /api/docs shows one path per endpoint rather than two.
+        """
         schema = app.openapi()
         for path in (
-            "/api/v2/ping",
-            "/api/v2/runs",
-            "/api/v2/runs/{run_id}",
-            "/api/v2/state-versions/{state_version_id}/download",
-            "/api/v2/registry/modules/{namespace}/{name}/{provider}/versions",
-            "/api/v2/varsets/{varset_id}",
+            "/api/tfe/v2/ping",
+            "/api/tfe/v2/runs",
+            "/api/tfe/v2/runs/{run_id}",
+            "/api/tfe/v2/state-versions/{state_version_id}/download",
+            "/api/tfe/v2/registry/modules/{namespace}/{name}/{provider}/versions",
+            "/api/tfe/v2/varsets/{varset_id}",
         ):
             assert path in schema["paths"], f"CLI surface path {path} missing from OpenAPI"
         # These are CLI-surface paths; they must not also appear on the native

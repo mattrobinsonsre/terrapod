@@ -99,7 +99,7 @@ GET /api/v1/runs/{run_id}/task-stages
 #### Show Stage (with Results)
 
 ```
-GET /api/v2/task-stages/{id}
+GET /api/tfe/v2/task-stages/{id}
 ```
 
 Returns the stage and its results as included resources.
@@ -107,7 +107,7 @@ Returns the stage and its results as included resources.
 #### Override Failed Stage
 
 ```
-POST /api/v2/task-stages/{id}/actions/override
+POST /api/tfe/v2/task-stages/{id}/actions/override
 ```
 
 Requires `admin` permission. Only works on stages with `failed` status. Sets the stage to `overridden`, allowing the run to proceed.
@@ -217,7 +217,7 @@ Advisory failures do not block stage resolution.
 When a mandatory task fails, the run is blocked. An admin can override the failed stage:
 
 ```bash
-curl -X POST https://terrapod.local/api/v2/task-stages/ts-id/actions/override \
+curl -X POST https://terrapod.local/api/tfe/v2/task-stages/ts-id/actions/override \
   -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -280,10 +280,10 @@ def handle_task():
     # 2. Resolve the plan id from the run, then fetch the structured plan JSON.
     #    The plan-JSON endpoint 302-redirects to a presigned URL (httpx follows it).
     auth = {"Authorization": f"Bearer {TERRAPOD_TOKEN}"}
-    run = httpx.get(f"https://terrapod.local/api/v2/runs/{run_id}", headers=auth).json()
+    run = httpx.get(f"https://terrapod.local/api/tfe/v2/runs/{run_id}", headers=auth).json()
     plan_id = run["data"]["relationships"]["plan"]["data"]["id"]
     plan_resp = httpx.get(
-        f"https://terrapod.local/api/v2/plans/{plan_id}/json-output",
+        f"https://terrapod.local/api/tfe/v2/plans/{plan_id}/json-output",
         headers=auth,
         follow_redirects=True,
     )

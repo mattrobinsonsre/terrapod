@@ -64,7 +64,7 @@ Drift detection is **automatically enabled** when a workspace is created with a 
 Enable via the API:
 
 ```bash
-curl -X PATCH https://terrapod.local/api/v2/workspaces/ws-abc123 \
+curl -X PATCH https://terrapod.local/api/tfe/v2/workspaces/ws-abc123 \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
   -d '{

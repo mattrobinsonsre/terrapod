@@ -303,7 +303,7 @@ If the webhook can't reach Terrapod (e.g. the management plane is private), that
 Once you have a VCS connection, create (or update) a workspace with VCS settings. This is the same regardless of whether the connection is GitHub or GitLab.
 
 ```zsh
-curl -X POST https://terrapod.example.com/api/v2/organizations/default/workspaces \
+curl -X POST https://terrapod.example.com/api/tfe/v2/organizations/default/workspaces \
   -H "Authorization: Bearer $TERRAPOD_TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
   -d '{
@@ -365,7 +365,7 @@ repo/
 ```
 
 ```zsh
-curl -X PATCH https://terrapod.example.com/api/v2/workspaces/ws-XXXX \
+curl -X PATCH https://terrapod.example.com/api/tfe/v2/workspaces/ws-XXXX \
   -H "Authorization: Bearer $TERRAPOD_TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
   -d '{
@@ -456,7 +456,7 @@ Check deduplication: run exists for (workspace, PR#, head SHA)?
 3. Check the workspace runs:
 
 ```zsh
-curl https://terrapod.example.com/api/v2/workspaces/ws-{id}/runs \
+curl https://terrapod.example.com/api/tfe/v2/workspaces/ws-{id}/runs \
   -H "Authorization: Bearer $TERRAPOD_TOKEN"
 ```
 
@@ -815,7 +815,7 @@ curl -X DELETE https://terrapod.example.com/api/v1/vcs-connections/vcs-{id} \
 To stop VCS-driven runs for a workspace, clear the VCS connection:
 
 ```zsh
-curl -X PATCH https://terrapod.example.com/api/v2/workspaces/ws-{id} \
+curl -X PATCH https://terrapod.example.com/api/tfe/v2/workspaces/ws-{id} \
   -H "Authorization: Bearer $TERRAPOD_TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
   -d '{
@@ -880,7 +880,7 @@ Check what Terrapod recorded:
 
 ```bash
 curl -s -H "Authorization: Bearer $TOKEN" \
-  "$TERRAPOD_URL/api/v2/workspaces/$WS_ID" \
+  "$TERRAPOD_URL/api/tfe/v2/workspaces/$WS_ID" \
 | jq '.data.attributes | {vcs_last_error: ."vcs-last-error", at: ."vcs-last-error-at"}'
 ```
 
