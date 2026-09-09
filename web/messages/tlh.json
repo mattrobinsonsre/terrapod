@@ -78,7 +78,13 @@
       "vcsRepoUrlTitle": "HTTP joq HTTPS URL taHnIS",
       "vcsRepoUrlPlaceholder": "https://github.com/org/repo",
       "vcsBranch": "VCS paQ",
-      "vcsBranchPlaceholder": "main (motlh)"
+      "vcsBranchPlaceholder": "main (motlh)",
+      "engine": "QuQ",
+      "engineTerraform": "Terraform / OpenTofu",
+      "enginePulumi": "Pulumi",
+      "engineHelp": "Dochvam vangbogh QuQ. vangmeH mIw 'oHbe'.",
+      "namePatternPulumi": "cha' 'ay' '::' Sepbogh — project::stack. ghItlh mI' je neH; ghItlh mI' joq taghnIS 'ay' Hoch.",
+      "namePlaceholderPulumi": "my-project::dev"
     },
     "stats": {
       "total": "naQ",

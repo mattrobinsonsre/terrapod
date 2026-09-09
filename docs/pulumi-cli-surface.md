@@ -140,7 +140,7 @@ further — the same method as the four protocol captures before it.
 | GET | `/api/user/organizations/{org}` | org lookup; called constantly |
 | GET | `/api/capabilities` | feature negotiation; `{"capabilities": []}` is accepted |
 | GET | `/api/user/stacks?project=` | `stack ls` |
-| POST | `/api/stacks/{org}/{project}` | `stack init` — body `{"stackName", "tags"}` |
+| POST | `/api/stacks/{org}/{project}` | `stack init` — **always refuses**; see below |
 | GET | `/api/stacks/{stack}` | stack lookup; 404 means "does not exist" |
 | DELETE | `/api/stacks/{stack}` | `stack rm` |
 | GET | `/api/stacks/{stack}/export` | **read state** |
@@ -167,6 +167,41 @@ CLI's behaviour rather than observed traffic — treat their shapes as unconfirm
 * `decrypt` and `batch-decrypt` — the captured program had no secret *config* to
   read back. `encrypt` was called six times during an ordinary `up`, so the
   provider obligation itself is confirmed; only the read direction is not.
+
+## `stack init` does not create a stack
+
+`POST /api/stacks/{org}/{project}` is served, but it always refuses: a 404 whose
+message names where workspaces come from.
+
+Terrapod workspaces are created in the UI, with the Terraform provider, or via
+`POST /api/v1/workspaces` — never by an engine's own CLI. Terraform's CLI has
+never created one (`init` looks a workspace up and fails if it is absent), and a
+CLI that could would be bringing a platform resource into being with no RBAC
+review and no record of where it came from.
+
+So the flow is: create the workspace with `engine = "pulumi"`, then
+
+```sh
+pulumi stack select default/{project}/{stack}
+```
+
+**Name it `project::stack`.** A Pulumi stack is identified by
+`{org}/{project}/{stack}` and a workspace has one flat name, so the two halves
+are joined with `::` — a sequence neither a Pulumi project nor a stack admits.
+That composed name is what `stack select` resolves to, so a workspace named
+anything else is invisible to the CLI. Creating one with a single-part name is
+rejected, rather than accepted and then never found.
+
+```hcl
+resource "terrapod_workspace" "app_dev" {
+  name   = "app::dev"     # pulumi stack select default/app/dev
+  engine = "pulumi"
+}
+```
+
+The route stays mounted rather than being removed so the refusal can carry that
+instruction — the CLI prints the message verbatim, and an unmounted route would
+give the operator a bare 404 with nothing to act on.
 
 ## Findings
 
@@ -248,6 +283,10 @@ A full `login → stack init → stack ls → preview → up → refresh → exp
 destroy → stack rm` cycle completed without touching Deployments, Policy Packs,
 Insights, Environments/ESC, Webhooks, Registry or organisation management —
 confirming the §2 scope. `/api/capabilities` returning an empty list is accepted.
+
+That capture predates #1535: `stack init` now refuses, and the workspace is
+created in Terrapod first with `stack select` in its place. The rest of the
+cycle — which is what this section is about — is unchanged.
 
 ## Reproducing the service capture
 

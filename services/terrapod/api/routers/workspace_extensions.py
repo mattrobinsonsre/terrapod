@@ -13,12 +13,12 @@ import asyncio
 import json
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Path, Request, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sse_starlette.sse import EventSourceResponse
 
-from terrapod.api.dependencies import AuthenticatedUser, get_current_user
+from terrapod.api.dependencies import AuthenticatedUser, get_current_user, require_non_runner
 from terrapod.api.errors import vcs_unavailable
 from terrapod.auth import capabilities as cap
 from terrapod.auth.capabilities import has_capability
@@ -500,3 +500,53 @@ async def post_architecture_critique_message(
     except FollowupError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     return JSONResponse(content={"data": await _translated_message_json(assistant, locale)})
+
+
+# ── workspace creation (native surface) ──────────────────────────────────────
+# Creation lives here rather than on the TFE surface because only this surface
+# can express an `engine` (#1535). The TFE route pins Terraform, by design: it is
+# the CLI compatibility contract, and a client there could not see a workspace
+# belonging to another engine even if it could create one.
+
+
+@router.post("/workspaces", status_code=201)
+async def create_workspace(
+    body: dict = Body(...),
+    user: AuthenticatedUser = Depends(require_non_runner),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Create a workspace, for any engine this deployment enables.
+
+    **Workspaces are created here, by the UI, the provider or the API — never by
+    an engine's own CLI.** `terraform init` has always looked a workspace up and
+    failed if it was absent; this endpoint is what makes the same true of Pulumi,
+    whose `stack init` used to create one implicitly (#1535). A CLI creating a
+    platform resource means no RBAC review and no record of where it came from.
+
+    `engine` is validated against `known_engines()`, which is already filtered by
+    the engine gate — so an engine this deployment has turned off is *absent*
+    from the list rather than listed and then refused, and the error names what
+    is actually available. Omitting it yields Terraform, which is what every
+    existing caller sends, so this stays additive.
+    """
+    from terrapod.api.routers.tfe_v2 import _create_workspace_impl
+    from terrapod.engines import DEFAULT_ENGINE, known_engines
+
+    attrs = body.get("data", {}).get("attributes", {})
+    engine = (attrs.get("engine") or DEFAULT_ENGINE).strip().lower()
+
+    available = known_engines()
+    if engine not in available:
+        # One message for "never heard of it" and "turned off" would send an
+        # operator to the wrong fix, so say which engines this deployment offers
+        # and let the difference be visible.
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"engine must be one of: {', '.join(available)} "
+                f"(got {engine!r}; an engine that is installed but disabled is "
+                f"not listed — enable it with engines.{engine}.enabled)"
+            ),
+        )
+
+    return await _create_workspace_impl(body, user, db, engine=engine)

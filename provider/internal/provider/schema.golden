@@ -381,7 +381,7 @@ resource terrapod_workspace.drift_ignore_rules required=false optional=true comp
 resource terrapod_workspace.drift_last_checked_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.drift_latest_run_id required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.drift_status required=false optional=false computed=true sensitive=false type=basetypes.StringType
-resource terrapod_workspace.engine required=false optional=false computed=true sensitive=false type=basetypes.StringType
+resource terrapod_workspace.engine required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.execution_backend required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.execution_mode required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.id required=false optional=false computed=true sensitive=false type=basetypes.StringType

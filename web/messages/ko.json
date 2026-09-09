@@ -78,7 +78,13 @@
       "vcsRepoUrlTitle": "HTTP 또는 HTTPS URL이어야 합니다",
       "vcsRepoUrlPlaceholder": "https://github.com/org/repo",
       "vcsBranch": "VCS 브랜치",
-      "vcsBranchPlaceholder": "main (기본값)"
+      "vcsBranchPlaceholder": "main (기본값)",
+      "engine": "엔진",
+      "engineTerraform": "Terraform / OpenTofu",
+      "enginePulumi": "Pulumi",
+      "engineHelp": "이 워크스페이스를 실행하는 엔진입니다. Terraform 엔진 내에서 바이너리를 선택하는 실행 백엔드와는 다릅니다.",
+      "namePatternPulumi": "'::' 로 구분된 두 부분 — project::stack. 문자, 숫자, 하이픈, 밑줄만 사용할 수 있으며 각 부분은 문자 또는 숫자로 시작해야 합니다.",
+      "namePlaceholderPulumi": "my-project::dev"
     },
     "stats": {
       "total": "전체",

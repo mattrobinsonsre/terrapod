@@ -133,3 +133,34 @@ func TestUnmanagedCollectionsCoversEveryOptionalComputedCollection(t *testing.T)
 		}
 	}
 }
+
+// TestEngineIsSettableAndComputed guards the shape #1535 depends on.
+//
+// Optional so a Pulumi (or other non-Terraform) workspace can be declared in
+// HCL at all — before this it was Computed-only, and the sole way to create one
+// was `pulumi stack init`, which is exactly the CLI-creates-platform-resource
+// hole that issue closed. Computed so the overwhelming majority of configs,
+// which never mention an engine, keep getting the server's value from state
+// instead of planning it as null.
+//
+// Narrowing either half is a breaking change, not a golden regen: dropping
+// Optional makes every Pulumi workspace undeclarable, and dropping Computed
+// makes every existing config plan a spurious diff.
+func TestEngineIsSettableAndComputed(t *testing.T) {
+	var resp resource.SchemaResponse
+	NewResource().Schema(context.Background(), resource.SchemaRequest{}, &resp)
+	if resp.Diagnostics.HasError() {
+		t.Fatalf("schema build error: %v", resp.Diagnostics)
+	}
+
+	attr, ok := resp.Schema.Attributes["engine"]
+	if !ok {
+		t.Fatal("engine attribute is missing")
+	}
+	if !attr.IsOptional() {
+		t.Error("engine must be Optional — a non-Terraform workspace cannot be declared otherwise")
+	}
+	if !attr.IsComputed() {
+		t.Error("engine must be Computed — configs that omit it would plan a spurious diff")
+	}
+}

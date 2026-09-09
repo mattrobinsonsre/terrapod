@@ -78,7 +78,13 @@
       "vcsRepoUrlTitle": "Skal være en HTTP- eller HTTPS-URL",
       "vcsRepoUrlPlaceholder": "https://github.com/org/repo",
       "vcsBranch": "VCS-branch",
-      "vcsBranchPlaceholder": "main (standard)"
+      "vcsBranchPlaceholder": "main (standard)",
+      "engine": "Motor",
+      "engineTerraform": "Terraform / OpenTofu",
+      "enginePulumi": "Pulumi",
+      "engineHelp": "Hvilken motor der kører dette arbejdsområde. Ikke eksekverings-backend, som vælger binæren inden for Terraform-motoren.",
+      "namePatternPulumi": "To dele adskilt af '::' — project::stack. Kun bogstaver, tal, bindestreger og understregninger; hver del skal begynde med et bogstav eller tal.",
+      "namePlaceholderPulumi": "my-project::dev"
     },
     "stats": {
       "total": "I alt",

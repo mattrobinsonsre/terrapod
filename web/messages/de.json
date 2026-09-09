@@ -78,7 +78,13 @@
       "vcsRepoUrlTitle": "Muss eine HTTP- oder HTTPS-URL sein",
       "vcsRepoUrlPlaceholder": "https://github.com/org/repo",
       "vcsBranch": "VCS-Branch",
-      "vcsBranchPlaceholder": "main (Standard)"
+      "vcsBranchPlaceholder": "main (Standard)",
+      "engine": "Engine",
+      "engineTerraform": "Terraform / OpenTofu",
+      "enginePulumi": "Pulumi",
+      "engineHelp": "Welche Engine diesen Workspace ausführt. Nicht das Ausführungs-Backend, das die Binärdatei innerhalb der Terraform-Engine auswählt.",
+      "namePatternPulumi": "Zwei durch '::' getrennte Teile — project::stack. Nur Buchstaben, Zahlen, Bindestriche und Unterstriche; jeder Teil muss mit einem Buchstaben oder einer Zahl beginnen.",
+      "namePlaceholderPulumi": "my-project::dev"
     },
     "stats": {
       "total": "Gesamt",

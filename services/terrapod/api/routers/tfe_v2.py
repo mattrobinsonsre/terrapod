@@ -291,16 +291,19 @@ def _validate_scan_skip_rules(raw: object) -> list[str]:
     return out
 
 
-def _validate_workspace_name(name: str) -> str:
+def _validate_workspace_name(name: str, engine: str = TERRAFORM) -> str:
     """HTTP wrapper over the canonical rule in `services.workspace_name`.
 
     The rule itself moved out of this router (#1299) because more than one
     path creates a workspace and the newest of them — undelete/restore —
     was checking only "non-empty string". A validator only one caller uses
     is one the next caller forgets.
+
+    The engine is passed through because a Pulumi workspace is named
+    `project::stack`, which the plain rule rejects (#1535).
     """
     try:
-        return validate_workspace_name(name)
+        return validate_workspace_name(name, engine)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 
@@ -1240,10 +1243,34 @@ async def create_workspace(
     user: AuthenticatedUser = Depends(require_non_runner),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
-    """Create a workspace. Any authenticated user can create."""
+    """Create a workspace. Any authenticated user can create.
 
+    Always Terraform. This is the CLI compatibility surface, which never learns
+    about other engines (`_engine_filter` above); a workspace for another engine
+    is created on the native surface, which is where the `engine` attribute
+    lives. Pinning it here rather than reading it from the body is what keeps a
+    TFE client unable to express an engine it could not then see.
+    """
+    return await _create_workspace_impl(body, user, db, engine=TERRAFORM)
+
+
+async def _create_workspace_impl(
+    body: dict,
+    user: AuthenticatedUser,
+    db: AsyncSession,
+    *,
+    engine: str,
+) -> JSONResponse:
+    """The shared create, parameterised by engine (#1535).
+
+    Kept in this module because every validator it calls is private to it —
+    moving the body to a service would relocate a dozen helpers off the surface
+    they belong to, for no gain. The engine is a keyword argument with no
+    default so each caller states its intent: the route above pins Terraform,
+    and the native route validates against the engines this deployment enables.
+    """
     attrs = body.get("data", {}).get("attributes", {})
-    name = _validate_workspace_name(attrs.get("name", ""))
+    name = _validate_workspace_name(attrs.get("name", ""), engine)
 
     # Check for existing
     result = await db.execute(select(Workspace).where(Workspace.name == name))
@@ -1310,6 +1337,7 @@ async def create_workspace(
 
     ws = Workspace(
         name=name,
+        engine=engine,
         execution_mode=execution_mode,
         auto_apply=auto_apply_mode != "never",
         auto_apply_mode=auto_apply_mode,

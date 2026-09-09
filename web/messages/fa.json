@@ -78,7 +78,13 @@
       "vcsRepoUrlTitle": "باید یک نشانی HTTP یا HTTPS باشد",
       "vcsRepoUrlPlaceholder": "https://github.com/org/repo",
       "vcsBranch": "شاخهٔ VCS",
-      "vcsBranchPlaceholder": "main (پیش‌فرض)"
+      "vcsBranchPlaceholder": "main (پیش‌فرض)",
+      "engine": "موتور",
+      "engineTerraform": "Terraform / OpenTofu",
+      "enginePulumi": "Pulumi",
+      "engineHelp": "کدام موتور این فضای کاری را اجرا می‌کند. با بک‌اند اجرا که فایل باینری را درون موتور Terraform انتخاب می‌کند تفاوت دارد.",
+      "namePatternPulumi": "دو بخش جداشده با '::' — project::stack. فقط حروف، اعداد، خط تیره و زیرخط؛ هر بخش باید با یک حرف یا عدد آغاز شود.",
+      "namePlaceholderPulumi": "my-project::dev"
     },
     "stats": {
       "total": "کل",

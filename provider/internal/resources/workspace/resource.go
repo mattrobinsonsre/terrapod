@@ -266,10 +266,23 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 			},
 			"engine": schema.StringAttribute{
 				Description: "The execution engine family this workspace belongs to " +
-					"(\"terraform\"). Read-only — distinct from execution_backend, which " +
-					"picks the binary within the Terraform engine.",
+					"(\"terraform\" by default, or another engine the deployment " +
+					"enables). Distinct from execution_backend, which picks the " +
+					"binary within the Terraform engine. Changing it replaces the " +
+					"workspace.",
+				Optional: true,
 				Computed: true,
 				PlanModifiers: []planmodifier.String{
+					// Identity, not configuration: the engine decides which tool
+					// runs against real infrastructure, and no in-place update can
+					// carry a workspace's state from one engine to another.
+					//
+					// IfConfigured, not the bare RequiresReplace: the attribute is
+					// Optional+Computed, so on every workspace whose config omits
+					// it the value comes from state. A plain RequiresReplace can
+					// read that as a change and propose destroying live
+					// infrastructure for an attribute nobody set.
+					stringplanmodifier.RequiresReplaceIfConfigured(),
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
@@ -813,6 +826,12 @@ func buildCreateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 	var diags diag.Diagnostics
 	req := terrapod.CreateWorkspaceRequest{Name: m.Name.ValueString()}
 
+	// Only sent when the practitioner asked for one. Left empty the SDK keeps
+	// the long-standing compatibility path, so a config that never mentions an
+	// engine produces exactly the request it always did.
+	if !m.Engine.IsNull() && !m.Engine.IsUnknown() {
+		req.Engine = m.Engine.ValueString()
+	}
 	if !m.ExecutionMode.IsNull() && !m.ExecutionMode.IsUnknown() {
 		req.ExecutionMode = m.ExecutionMode.ValueString()
 	}

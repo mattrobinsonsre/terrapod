@@ -144,7 +144,16 @@ type Workspace struct {
 // than a free-form map so callers get type safety and the Terrapod
 // schema stays singular-sourced in this file.
 type CreateWorkspaceRequest struct {
-	Name             string `json:"name"`
+	Name string `json:"name"`
+	// Engine names the execution engine family — "terraform" (the default when
+	// empty) or another engine this deployment enables. Setting it sends the
+	// create to the native surface, which is the only one that can express an
+	// engine; the TFE-compatible surface is Terraform-only by design and a
+	// client there could not see a workspace belonging to another engine.
+	//
+	// Workspaces are created here, or in the UI, or with the Terraform provider
+	// — never by an engine's own CLI (#1535).
+	Engine           string `json:"engine,omitempty"`
 	ExecutionMode    string `json:"execution-mode,omitempty"`
 	ExecutionBackend string `json:"execution-backend,omitempty"`
 	AutoApply        *bool  `json:"auto-apply,omitempty"`
@@ -283,7 +292,15 @@ func (c *Client) CreateWorkspace(ctx context.Context, req CreateWorkspaceRequest
 	if err != nil {
 		return nil, fmt.Errorf("marshal create workspace: %w", err)
 	}
-	data, err := c.Post(ctx, "/api/v2/organizations/default/workspaces", body)
+	// Only an engine-bearing create needs the native route, and only a server
+	// new enough to serve it could honour the field anyway. Keeping the default
+	// on the long-standing path means existing callers are byte-identical and
+	// still work against a server that predates the native endpoint.
+	path := "/api/v2/organizations/default/workspaces"
+	if req.Engine != "" {
+		path = "/api/v1/workspaces"
+	}
+	data, err := c.Post(ctx, path, body)
 	if err != nil {
 		return nil, err
 	}
@@ -435,6 +452,9 @@ func (c *Client) ListAllWorkspaces(ctx context.Context, opts WorkspaceListOption
 // tags doesn't help with nested map marshaling.
 func workspaceCreateAttrs(req CreateWorkspaceRequest) map[string]any {
 	attrs := map[string]any{"name": req.Name}
+	if req.Engine != "" {
+		attrs["engine"] = req.Engine
+	}
 	if req.ExecutionMode != "" {
 		attrs["execution-mode"] = req.ExecutionMode
 	}

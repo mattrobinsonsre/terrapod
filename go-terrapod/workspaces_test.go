@@ -750,3 +750,59 @@ func TestWorkspace_SingularAgentPoolID_UnchangedWire(t *testing.T) {
 		t.Errorf("agent-pool-ids must be absent when unset: %+v", req.Data.Attributes)
 	}
 }
+
+// Workspaces are created by Terrapod, never by an engine's own CLI (#1535). The
+// engine can only be expressed on the native surface, so setting it has to move
+// the request there — and NOT setting it has to leave every existing caller on
+// the path it has always used, which is also the only one an older server
+// serves.
+func TestCreateWorkspace_EngineChoosesTheSurface(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		engine   string
+		wantPath string
+		wantAttr any
+	}{
+		{"default stays on the compatibility path", "", "/api/v2/organizations/default/workspaces", nil},
+		{"an engine moves it to the native path", "pulumi", "/api/v1/workspaces", "pulumi"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var gotPath string
+			var gotBody []byte
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				gotPath = r.URL.Path
+				gotBody, _ = io.ReadAll(r.Body)
+				w.WriteHeader(http.StatusCreated)
+				_, _ = w.Write([]byte(minimalWorkspaceBody("ws-aaa", "api-prod", nil)))
+			}))
+			defer srv.Close()
+
+			c, err := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+			if err != nil {
+				t.Fatalf("NewClient: %v", err)
+			}
+			if _, err := c.CreateWorkspace(t.Context(), CreateWorkspaceRequest{
+				Name:   "api-prod",
+				Engine: tc.engine,
+			}); err != nil {
+				t.Fatalf("CreateWorkspace: %v", err)
+			}
+
+			if gotPath != tc.wantPath {
+				t.Errorf("path = %q, want %q", gotPath, tc.wantPath)
+			}
+
+			var payload struct {
+				Data struct {
+					Attributes map[string]any `json:"attributes"`
+				} `json:"data"`
+			}
+			if err := json.Unmarshal(gotBody, &payload); err != nil {
+				t.Fatalf("unmarshal body: %v", err)
+			}
+			if got := payload.Data.Attributes["engine"]; got != tc.wantAttr {
+				t.Errorf("engine attribute = %v, want %v", got, tc.wantAttr)
+			}
+		})
+	}
+}

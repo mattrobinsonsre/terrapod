@@ -456,6 +456,10 @@ function WorkspacesPageInner() {
   // Create form
   const [showCreate, setShowCreate] = useState(false)
   const [newName, setNewName] = useState('')
+  // Which engine, not which binary — `newBackend` below picks tofu vs terraform
+  // *within* the Terraform engine. Workspaces are created here, with the
+  // provider, or via the API; never by an engine's own CLI (#1535).
+  const [newEngine, setNewEngine] = useState('terraform')
   const [newExecMode, setNewExecMode] = useState('local')
   // The mode, not the boolean (#1301). The API accepts `auto-apply-mode` on
   // POST, but this form only ever sent `auto-apply` — so a conditional mode
@@ -735,7 +739,11 @@ function WorkspacesPageInner() {
     setCreating(true)
     setError('')
     try {
-      const res = await apiFetch('/api/v2/organizations/default/workspaces', {
+      // The native surface, because it is the only one that can carry an engine
+      // — the TFE-compatible route is Terraform-only by design. The web UI ships
+      // in the same Helm release as the API, so there is no version skew to keep
+      // it on the older path for.
+      const res = await apiFetch('/api/v1/workspaces', {
         method: 'POST',
         headers: { 'Content-Type': 'application/vnd.api+json' },
         body: JSON.stringify({
@@ -743,6 +751,7 @@ function WorkspacesPageInner() {
             type: 'workspaces',
             attributes: {
               name: newName,
+              engine: newEngine,
               'execution-mode': newExecMode,
               'execution-backend': newBackend,
               'terraform-version': newVersion,
@@ -772,6 +781,7 @@ function WorkspacesPageInner() {
         throw new Error(data.detail || `${t('createFailed')} (${res.status})`)
       }
       setNewName('')
+      setNewEngine('terraform')
       setNewExecMode('local')
       setNewBackend('tofu')
       setNewVersion('1.11')
@@ -819,17 +829,36 @@ function WorkspacesPageInner() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               <div>
                 <label htmlFor="ws-name" className="block text-sm font-medium text-slate-300 mb-1">{t('form.name')}</label>
+                {/* A Pulumi workspace is named `project::stack` — the composed name
+                    `pulumi stack select` resolves to. Without widening the pattern the
+                    browser blocks the only valid name before the form can submit, so the
+                    engine would be uncreatable from the UI entirely (#1535). */}
                 <input
                   id="ws-name"
                   type="text"
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
                   required
-                  pattern="[a-zA-Z0-9][a-zA-Z0-9_\-]*"
-                  title={t('form.namePattern')}
-                  placeholder={t('form.namePlaceholder')}
+                  pattern={newEngine === 'pulumi'
+                    ? '[a-zA-Z0-9][a-zA-Z0-9_\\-]*::[a-zA-Z0-9][a-zA-Z0-9_\\-]*'
+                    : '[a-zA-Z0-9][a-zA-Z0-9_\\-]*'}
+                  title={newEngine === 'pulumi' ? t('form.namePatternPulumi') : t('form.namePattern')}
+                  placeholder={newEngine === 'pulumi' ? t('form.namePlaceholderPulumi') : t('form.namePlaceholder')}
                   className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                 />
+              </div>
+              <div>
+                <label htmlFor="ws-engine" className="block text-sm font-medium text-slate-300 mb-1">{t('form.engine')}</label>
+                <select
+                  id="ws-engine"
+                  value={newEngine}
+                  onChange={(e) => setNewEngine(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                >
+                  <option value="terraform">{t('form.engineTerraform')}</option>
+                  <option value="pulumi">{t('form.enginePulumi')}</option>
+                </select>
+                <p className="mt-1 text-xs text-slate-400">{t('form.engineHelp')}</p>
               </div>
               <div>
                 <label htmlFor="ws-exec" className="block text-sm font-medium text-slate-300 mb-1">{t('form.executionMode')}</label>

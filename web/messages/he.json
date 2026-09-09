@@ -78,7 +78,13 @@
       "vcsRepoUrlTitle": "חייבת להיות כתובת URL מסוג HTTP או HTTPS",
       "vcsRepoUrlPlaceholder": "https://github.com/org/repo",
       "vcsBranch": "ענף VCS",
-      "vcsBranchPlaceholder": "main (ברירת מחדל)"
+      "vcsBranchPlaceholder": "main (ברירת מחדל)",
+      "engine": "מנוע",
+      "engineTerraform": "Terraform / OpenTofu",
+      "enginePulumi": "Pulumi",
+      "engineHelp": "המנוע שמריץ סביבת עבודה זו. לא קצה העורף להרצה, שבוחר את הקובץ הבינארי בתוך מנוע Terraform.",
+      "namePatternPulumi": "שני חלקים המופרדים ב-'::' — project::stack. אותיות, ספרות, מקפים וקווים תחתונים בלבד; כל חלק חייב להתחיל באות או בספרה.",
+      "namePlaceholderPulumi": "my-project::dev"
     },
     "stats": {
       "total": "סה\"כ",

@@ -78,7 +78,13 @@
       "vcsRepoUrlTitle": "Must be an Marklar or Marklar URL",
       "vcsRepoUrlPlaceholder": "https://github.com/org/repo",
       "vcsBranch": "Marklar Marklar",
-      "vcsBranchPlaceholder": "main (default)"
+      "vcsBranchPlaceholder": "main (default)",
+      "engine": "Marklar",
+      "engineTerraform": "Terraform / OpenTofu",
+      "enginePulumi": "Pulumi",
+      "engineHelp": "Which marklar runs this marklar. Not the marklar marklar, which picks the marklar within the Terraform marklar.",
+      "namePatternPulumi": "Two marklars separated by '::' — marklar::marklar. Marklars, marklars, marklars and marklars only; each marklar must start with a marklar or marklar.",
+      "namePlaceholderPulumi": "my-project::dev"
     },
     "stats": {
       "total": "Total",

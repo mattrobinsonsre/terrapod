@@ -27,13 +27,39 @@ _WORKSPACE_NAME_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_-]*$")
 MAX_WORKSPACE_NAME_LENGTH = 90
 
 
-def validate_workspace_name(name: str) -> str:
-    """Return the cleaned name, or raise ValueError explaining why not."""
+#: The separator joining a Pulumi project and stack into one workspace name.
+#: Pulumi identifies a stack as `{org}/{project}/{stack}` while a workspace has
+#: one flat name, so the two halves are joined with a sequence neither a Pulumi
+#: project nor a stack admits. Kept beside the rule that has to accept it —
+#: `pulumi_service` composes names in exactly this shape, and a validator that
+#: rejected them would make every Pulumi workspace uncreatable (#1535).
+PULUMI_NAME_SEPARATOR = "::"
+
+
+def validate_workspace_name(name: str, engine: str = "terraform") -> str:
+    """Return the cleaned name, or raise ValueError explaining why not.
+
+    Pulumi workspaces are named `project::stack`, so each half is validated by
+    the ordinary rule and the separator is allowed between them. Every other
+    engine takes a single plain name.
+    """
     cleaned = (name or "").strip()
     if not cleaned:
         raise ValueError("Workspace name is required")
     if len(cleaned) > MAX_WORKSPACE_NAME_LENGTH:
         raise ValueError(f"Workspace name must be {MAX_WORKSPACE_NAME_LENGTH} characters or fewer")
+
+    if engine == "pulumi":
+        parts = cleaned.split(PULUMI_NAME_SEPARATOR)
+        if len(parts) != 2 or not all(_WORKSPACE_NAME_RE.match(p) for p in parts):
+            raise ValueError(
+                "A Pulumi workspace is named 'project::stack' — two parts separated "
+                "by '::', each starting with a letter or number and containing only "
+                "letters, numbers, hyphens, and underscores. This is the name "
+                "`pulumi stack select default/{project}/{stack}` resolves to."
+            )
+        return cleaned
+
     if not _WORKSPACE_NAME_RE.match(cleaned):
         raise ValueError(
             "Workspace name must start with a letter or number and contain only "

@@ -78,7 +78,13 @@
       "vcsRepoUrlTitle": "URL genere HTTP aut HTTPS esse debet",
       "vcsRepoUrlPlaceholder": "https://github.com/org/repo",
       "vcsBranch": "Ramus VCS",
-      "vcsBranchPlaceholder": "main (praedefinitum)"
+      "vcsBranchPlaceholder": "main (praedefinitum)",
+      "engine": "Machina",
+      "engineTerraform": "Terraform / OpenTofu",
+      "enginePulumi": "Pulumi",
+      "engineHelp": "Quae machina hoc spatium operis exsequitur. Non instrumentum exsecutionis, quod binarium intra machinam Terraform eligit.",
+      "namePatternPulumi": "Duae partes signo '::' divisae — project::stack. Tantum litterae, numeri, lineolae et lineolae subscriptae; utraque pars littera vel numero incipiat.",
+      "namePlaceholderPulumi": "my-project::dev"
     },
     "stats": {
       "total": "Summa",

@@ -306,6 +306,7 @@ field CreateWorkspaceRequest.AutoMergeStrategy string `json:"auto-merge-strategy
 field CreateWorkspaceRequest.DriftDetectionEnabled *bool `json:"drift-detection-enabled,omitempty"`
 field CreateWorkspaceRequest.DriftDetectionIntervalSeconds *int64 `json:"drift-detection-interval-seconds,omitempty"`
 field CreateWorkspaceRequest.DriftIgnoreRules []string `json:"drift-ignore-rules,omitempty"`
+field CreateWorkspaceRequest.Engine string `json:"engine,omitempty"`
 field CreateWorkspaceRequest.ExecutionBackend string `json:"execution-backend,omitempty"`
 field CreateWorkspaceRequest.ExecutionMode string `json:"execution-mode,omitempty"`
 field CreateWorkspaceRequest.Labels map[string]string `json:"labels,omitempty"`

@@ -78,7 +78,13 @@
       "vcsRepoUrlTitle": "HTTP veya HTTPS URL''si olmalıdır",
       "vcsRepoUrlPlaceholder": "https://github.com/org/repo",
       "vcsBranch": "VCS Dalı",
-      "vcsBranchPlaceholder": "main (varsayılan)"
+      "vcsBranchPlaceholder": "main (varsayılan)",
+      "engine": "Motor",
+      "engineTerraform": "Terraform / OpenTofu",
+      "enginePulumi": "Pulumi",
+      "engineHelp": "Bu çalışma alanını hangi motorun çalıştıracağı. Terraform motoru içindeki ikili dosyayı seçen yürütme arka ucu ile aynı şey değildir.",
+      "namePatternPulumi": "'::' ile ayrılmış iki bölüm — project::stack. Yalnızca harf, rakam, tire ve alt çizgi; her bölüm bir harf veya rakamla başlamalıdır.",
+      "namePlaceholderPulumi": "my-project::dev"
     },
     "stats": {
       "total": "Toplam",
