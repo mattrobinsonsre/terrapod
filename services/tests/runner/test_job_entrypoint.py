@@ -15,6 +15,7 @@ pin the orchestrator-level invariants:
 
 from __future__ import annotations
 
+import os
 from unittest.mock import patch
 
 from terrapod.runner import job_entrypoint
@@ -402,3 +403,122 @@ class TestPlanPhaseExecutionHooks:
 
         assert rc == 0
         assert points == ["pre_plan", "post_plan"]
+
+
+class TestThePulumiPhase:
+    """#1523. The Pulumi branch is short, but every line of it is a thing that
+    fails quietly when it is missing — a default backend, a default plugin host,
+    or a `pulumi` picked up from the image rather than the cache."""
+
+    def _cfg(self, monkeypatch):
+        _env(monkeypatch)
+        monkeypatch.setenv("TP_ENGINE", "pulumi")
+        monkeypatch.setenv("TP_PULUMI_PHASE", "preview")
+        from terrapod.runner.runner_config import RunnerConfig
+
+        return RunnerConfig.from_env()
+
+    def test_it_runs_the_binary_it_fetched(self, monkeypatch) -> None:
+        """Not a bare `pulumi` off PATH. The runner image ships none, and one
+        appearing there later would silently outrank the pinned version."""
+        cfg = self._cfg(monkeypatch)
+        with (
+            patch(
+                "terrapod.runner.phases.platform_tool.ensure_tool",
+                return_value="/cache/pulumi",
+            ),
+            patch("terrapod.runner.exec_subprocess.run") as run,
+        ):
+            run.return_value.exit_code = 0
+            assert job_entrypoint._run_pulumi_phase(cfg, child_grace=5) == 0
+
+        assert run.call_args[0][0][0] == "/cache/pulumi"
+
+    def test_it_fails_closed_when_the_binary_cannot_be_fetched(self, monkeypatch) -> None:
+        """There is nothing to fall back to, and falling back to the name would
+        either miss or run something unpinned."""
+        cfg = self._cfg(monkeypatch)
+        with (
+            patch(
+                "terrapod.runner.phases.platform_tool.ensure_tool",
+                side_effect=RuntimeError("cache is down"),
+            ),
+            patch("terrapod.runner.exec_subprocess.run") as run,
+        ):
+            assert job_entrypoint._run_pulumi_phase(cfg, child_grace=5) == 1
+
+        run.assert_not_called()
+
+    def test_it_exports_the_backend_and_the_plugin_override(self, monkeypatch) -> None:
+        """Both are read from the environment by the CLI, so the assertion is
+        that they are actually in it by the time the subprocess is spawned."""
+        cfg = self._cfg(monkeypatch)
+        monkeypatch.delenv("PULUMI_BACKEND_URL", raising=False)
+        monkeypatch.delenv("PULUMI_PLUGIN_DOWNLOAD_URL_OVERRIDES", raising=False)
+
+        seen = {}
+        with (
+            patch(
+                "terrapod.runner.phases.platform_tool.ensure_tool",
+                return_value="/cache/pulumi",
+            ),
+            patch("terrapod.runner.exec_subprocess.run") as run,
+        ):
+            run.side_effect = lambda *a, **k: seen.update(os.environ) or run.return_value
+            run.return_value.exit_code = 0
+            job_entrypoint._run_pulumi_phase(cfg, child_grace=5)
+
+        assert seen["PULUMI_BACKEND_URL"].endswith("/api/terrapod/v1/pulumi")
+        assert seen["PULUMI_PLUGIN_DOWNLOAD_URL_OVERRIDES"].startswith(".*=")
+
+    def test_an_unknown_phase_is_refused_without_fetching_anything(self, monkeypatch) -> None:
+        """The phase is checked first, so a bad one does not pay for a download
+        it will discard."""
+        cfg = self._cfg(monkeypatch)
+        monkeypatch.setenv("TP_PULUMI_PHASE", "nonesuch")
+        with patch("terrapod.runner.phases.platform_tool.ensure_tool") as ensure:
+            assert job_entrypoint._run_pulumi_phase(cfg, child_grace=5) == 1
+        ensure.assert_not_called()
+
+
+class TestPulumiSkipsTerraformsSetup:
+    """#1523. Where the Pulumi branch sits is load-bearing, not cosmetic.
+
+    It used to sit at step 11, below `init` and the backend backstop, with a
+    comment saying those steps "do not apply". They ran anyway, and the backstop
+    ended the run: it raises when `.terraform/terraform.tfstate` is MISSING,
+    which is what `tofu init` leaves in a directory holding a `Pulumi.yaml` and
+    no `.tf` files. The run died before reaching Pulumi, advising the operator to
+    remove a committed `override.tf` that did not exist.
+
+    Asserted on the source rather than by driving the orchestrator, because the
+    property is an ordering one and the alternative is mocking ten phases to
+    observe which of them ran.
+    """
+
+    def _body_source(self) -> str:
+        import inspect
+
+        return inspect.getsource(job_entrypoint)
+
+    def test_the_branch_precedes_init_and_the_backstop(self) -> None:
+        src = self._body_source()
+        branch = src.index('if os.environ.get("TP_ENGINE", "") == "pulumi":')
+
+        for marker in ("# 9. Init", "# 10. Backend backstop", "# 8. Build var-file"):
+            assert branch < src.index(marker), (
+                f"the Pulumi branch must come before {marker!r} — those steps are "
+                "Terraform's, and the backstop fails a Pulumi run outright"
+            )
+
+    def test_the_branch_follows_the_engine_neutral_setup(self) -> None:
+        """Config tarball, chdir and the operator's pre_init hooks are not
+        Terraform-specific, and a Pulumi run needs all three."""
+        src = self._body_source()
+        branch = src.index('if os.environ.get("TP_ENGINE", "") == "pulumi":')
+
+        for marker in ("# 2. Configuration tarball", "# 4. Chdir", "# 7. pre_init"):
+            assert branch > src.index(marker), (
+                f"the Pulumi branch must come after {marker!r} — it is engine-neutral "
+                "and Pulumi depends on it"
+            )

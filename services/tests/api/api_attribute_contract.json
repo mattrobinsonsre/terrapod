@@ -107,6 +107,7 @@
   "binary_cache.platform_tool_versions": [
     "checkov-version",
     "opa-version",
+    "pulumi-version",
     "trivy-version"
   ],
   "cache_warm._submit": [

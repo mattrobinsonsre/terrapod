@@ -32,6 +32,39 @@ from terrapod.logging_config import get_logger
 log = get_logger(__name__)
 
 
+#: The prefix the runner addresses the API by.
+#:
+#: The alias, not the canonical `/api/v1`, and deliberately: a runner image lags
+#: the API by design (the N-2 skew guarantee), so it may be talking to a server
+#: on either side of #1528 and only the alias is served by both. This mirrors
+#: `platform_tool.py`, which reaches the API the same way. The literal is
+#: repeated rather than imported because the runner image ships no `api/`
+#: package to import `prefixes` from.
+_API_PREFIX = "/api/terrapod/v1"
+
+
+def backend_env(api_url: str) -> dict[str, str]:
+    """Point the CLI at Terrapod as its state backend (#1523).
+
+    Pulumi resolves its backend from `pulumi login` or `PULUMI_BACKEND_URL`, and
+    a runner Job has no interactive login to perform — so the URL is handed to it
+    directly. Without this the CLI silently falls back to its default host: an
+    air-gapped deployment hangs, and one with egress talks to the wrong backend
+    entirely, which is the worse of the two because it looks like it worked.
+
+    The base is the service surface from #1522; the CLI appends its own `/api/...`
+    paths to whatever it is given, which is what lets that surface be mounted
+    inside Terrapod's API namespace instead of taking the root.
+
+    The token that authenticates against it is already set by
+    `plugin_override_env` — one credential serves both the backend and the plugin
+    proxy, because both are this same API.
+    """
+    if not api_url:
+        return {}
+    return {"PULUMI_BACKEND_URL": f"{api_url.rstrip('/')}{_API_PREFIX}/pulumi"}
+
+
 def plugin_override_env(api_url: str, token: str) -> dict[str, str]:
     """Point plugin downloads at Terrapod rather than get.pulumi.com.
 
@@ -43,7 +76,7 @@ def plugin_override_env(api_url: str, token: str) -> dict[str, str]:
     if not api_url:
         return {}
     base = api_url.rstrip("/")
-    env = {"PULUMI_PLUGIN_DOWNLOAD_URL_OVERRIDES": f".*={base}/api/v1/package-cache/pulumi"}
+    env = {"PULUMI_PLUGIN_DOWNLOAD_URL_OVERRIDES": f".*={base}{_API_PREFIX}/package-cache/pulumi"}
     if token:
         # The proxy authenticates like every other Terrapod cache; the runner's
         # own short-lived token is what it presents.
