@@ -506,6 +506,10 @@ For Tilt local development, `values-local.yaml` overrides `listener_cert_ttl_sec
 
 ---
 
+## Troubleshooting
+
+**`sts:TagSession` denied on a cross-account assume.** The deployment uses EKS Pod Identity and the workspace assumes a further role; both ends need that action granted. See the [runbook entry](runbooks.md#plan-fails-with-ststagsession-after-switching-to-eks-pod-identity).
+
 ## See Also
 
 - [Architecture](architecture.md) -- runner listener, reconciler, ARC pattern
