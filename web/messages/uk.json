@@ -3148,6 +3148,22 @@
         "planning": "Планування",
         "applying": "Застосування"
       }
+    },
+    "pulumi": {
+      "activity": {
+        "planning": "Виконання pulumi preview",
+        "applying": "Виконання pulumi up"
+      },
+      "runStatus": {
+        "planning": "Планування",
+        "planned": "Заплановано",
+        "applying": "Застосування",
+        "applied": "Застосовано"
+      },
+      "status": {
+        "planning": "Планування",
+        "applying": "Застосування"
+      }
     }
   }
 }

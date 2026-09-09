@@ -74,6 +74,7 @@ class TestFetchVersions:
                         "opa-version": "1.19.0",
                         "trivy-version": "0.72.0",
                         "checkov-version": "3.3.8",
+                        "pulumi-version": "3.208.0",
                     }
                 }
             },
@@ -82,6 +83,7 @@ class TestFetchVersions:
             "opa": "1.19.0",
             "trivy": "0.72.0",
             "checkov": "3.3.8",
+            "pulumi": "3.208.0",
         }
 
     def test_raises_on_a_non_200(self):

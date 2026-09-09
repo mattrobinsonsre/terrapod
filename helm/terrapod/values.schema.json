@@ -1710,12 +1710,20 @@
             "ansible": {
               "type": "object",
               "additionalProperties": false,
-              "properties": { "enabled": { "type": "boolean" } }
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                }
+              }
             },
             "pulumi": {
               "type": "object",
               "additionalProperties": false,
-              "properties": { "enabled": { "type": "boolean" } }
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                }
+              }
             }
           }
         },
@@ -1854,6 +1862,12 @@
                     "off",
                     "checksum"
                   ]
+                },
+                "pulumi_version": {
+                  "type": "string"
+                },
+                "pulumi_mirror_url": {
+                  "type": "string"
                 }
               }
             },
@@ -1870,53 +1884,85 @@
               "type": "object",
               "additionalProperties": false,
               "properties": {
-                "enabled": { "type": "boolean" },
+                "enabled": {
+                  "type": "boolean"
+                },
                 "pypi": {
                   "type": "object",
                   "additionalProperties": false,
                   "properties": {
-                    "enabled": { "type": "boolean" },
-                    "upstream": { "type": "string", "format": "uri" }
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "upstream": {
+                      "type": "string",
+                      "format": "uri"
+                    }
                   }
                 },
                 "npm": {
                   "type": "object",
                   "additionalProperties": false,
                   "properties": {
-                    "enabled": { "type": "boolean" },
-                    "upstream": { "type": "string", "format": "uri" }
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "upstream": {
+                      "type": "string",
+                      "format": "uri"
+                    }
                   }
                 },
                 "pulumi": {
                   "type": "object",
                   "additionalProperties": false,
                   "properties": {
-                    "enabled": { "type": "boolean" },
-                    "upstream": { "type": "string", "format": "uri" }
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "upstream": {
+                      "type": "string",
+                      "format": "uri"
+                    }
                   }
                 },
                 "go": {
                   "type": "object",
                   "additionalProperties": false,
                   "properties": {
-                    "enabled": { "type": "boolean" },
-                    "upstream": { "type": "string", "format": "uri" }
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "upstream": {
+                      "type": "string",
+                      "format": "uri"
+                    }
                   }
                 },
                 "nuget": {
                   "type": "object",
                   "additionalProperties": false,
                   "properties": {
-                    "enabled": { "type": "boolean" },
-                    "upstream": { "type": "string", "format": "uri" }
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "upstream": {
+                      "type": "string",
+                      "format": "uri"
+                    }
                   }
                 },
                 "galaxy": {
                   "type": "object",
                   "additionalProperties": false,
                   "properties": {
-                    "enabled": { "type": "boolean" },
-                    "upstream": { "type": "string", "format": "uri" }
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "upstream": {
+                      "type": "string",
+                      "format": "uri"
+                    }
                   }
                 }
               }
@@ -1936,8 +1982,13 @@
                   "type": "object",
                   "additionalProperties": false,
                   "properties": {
-                    "enabled": { "type": "boolean" },
-                    "grace_hours": { "type": "integer", "minimum": 1 }
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "grace_hours": {
+                      "type": "integer",
+                      "minimum": 1
+                    }
                   }
                 },
                 "mirror_tag_ttl_hours": {

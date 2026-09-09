@@ -68,6 +68,28 @@ class EngineStrategy(Protocol):
         ...
 
 
+def engine_enabled(engine: str) -> bool:
+    """Whether an engine is offered by this deployment (#1429).
+
+    Defined here rather than in `services/engine_gating.py` because the listener
+    image ships `engines/` and no `services/` — so a gate living there could not
+    be consulted by the strategy registry, and the registry is where gating a
+    *strategy* has to happen. `engine_gating` imports this rather than declaring
+    a second copy, so there is one answer to "is this engine on".
+
+    Terraform is always enabled: it is not an optional engine, it is what
+    Terrapod is.
+    """
+    if engine == DEFAULT_ENGINE:
+        return True
+    from terrapod.config import settings
+
+    config = getattr(settings.engines, engine, None)
+    if config is None:
+        raise ValueError(f"unknown engine: {engine}")
+    return bool(config.enabled)
+
+
 def strategy_for(engine: str | None) -> EngineStrategy:
     """Resolve the strategy for an engine value.
 
@@ -77,6 +99,14 @@ def strategy_for(engine: str | None) -> EngineStrategy:
     """
     key = (engine or DEFAULT_ENGINE).strip().lower()
     strategy = _REGISTRY.get(key)
+    if strategy is not None and not engine_enabled(key):
+        # Distinguished from "unknown" deliberately. An operator who turned the
+        # engine off wants to be told that, not that Terrapod has never heard of
+        # it — the two have completely different fixes.
+        raise ValueError(
+            f"engine {key!r} is not enabled on this deployment "
+            f"(set engines.{key}.enabled to turn it on)"
+        )
     if strategy is None:
         # Deliberately not a silent fallback. An unknown engine means a row was
         # written by a newer replica mid-rollout, or by hand; running it as
@@ -88,15 +118,26 @@ def strategy_for(engine: str | None) -> EngineStrategy:
 
 
 def known_engines() -> tuple[str, ...]:
-    """Every engine this build can run, for validation and error messages."""
-    return tuple(sorted(_REGISTRY))
+    """Every engine this deployment can run, for validation and error messages.
+
+    Filtered by the gate, so a gated-off engine is absent rather than listed and
+    then refused — the same rule the surfaces follow.
+    """
+    return tuple(sorted(name for name in _REGISTRY if engine_enabled(name)))
 
 
 def _build_registry() -> dict[str, EngineStrategy]:
+    """Every strategy this build CONTAINS, before gating.
+
+    Built once at import and filtered at resolve time. Reading config here
+    instead would freeze the answer for the life of the process, which no test
+    could vary and no operator could change without a restart.
+    """
+    from terrapod.engines.pulumi import PulumiStrategy
     from terrapod.engines.terraform import TerraformStrategy
 
-    terraform = TerraformStrategy()
-    return {terraform.name: terraform}
+    strategies: list[EngineStrategy] = [TerraformStrategy(), PulumiStrategy()]
+    return {s.name: s for s in strategies}
 
 
 _REGISTRY: dict[str, EngineStrategy] = _build_registry()

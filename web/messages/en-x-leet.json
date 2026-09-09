@@ -3148,6 +3148,22 @@
         "planning": "Pl4nn1ng",
         "applying": "4pply1ng"
       }
+    },
+    "pulumi": {
+      "activity": {
+        "planning": "Runn1ng pulum1 pr3v13w",
+        "applying": "Runn1ng pulum1 up"
+      },
+      "runStatus": {
+        "planning": "Pr3v13w1ng",
+        "planned": "Pr3v13w3d",
+        "applying": "Upd471ng",
+        "applied": "Upd473d"
+      },
+      "status": {
+        "planning": "Pr3v13w1ng",
+        "applying": "Upd471ng"
+      }
     }
   }
 }

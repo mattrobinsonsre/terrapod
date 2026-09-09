@@ -3148,6 +3148,22 @@
         "planning": "Planlegger",
         "applying": "Anvender"
       }
+    },
+    "pulumi": {
+      "activity": {
+        "planning": "Kjører pulumi preview",
+        "applying": "Kjører pulumi up"
+      },
+      "runStatus": {
+        "planning": "Previewlegger",
+        "planned": "Previewlagt",
+        "applying": "Anvender",
+        "applied": "Anvendt"
+      },
+      "status": {
+        "planning": "Previewlegger",
+        "applying": "Anvender"
+      }
     }
   }
 }

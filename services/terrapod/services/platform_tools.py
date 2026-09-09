@@ -47,7 +47,15 @@ from terrapod.services.artifact_verification import VerificationError
 
 logger = structlog.get_logger(__name__)
 
-PLATFORM_TOOLS = frozenset({"opa", "trivy", "checkov"})
+PLATFORM_TOOLS = frozenset({"opa", "trivy", "checkov", "pulumi"})
+
+#: Pulumi's own platform naming, which differs from Go's for amd64.
+_PULUMI_PLATFORM = {
+    ("linux", "amd64"): "linux-x64",
+    ("linux", "arm64"): "linux-arm64",
+    ("darwin", "amd64"): "darwin-x64",
+    ("darwin", "arm64"): "darwin-arm64",
+}
 
 #: How each tool names the platform in its asset filenames. Terrapod speaks
 #: Go-style os/arch throughout; upstream does not always agree (Trivy uses
@@ -87,6 +95,10 @@ SPECS: dict[str, PlatformToolSpec] = {
     # A tarball whose only interesting member is the binary itself.
     "trivy": PlatformToolSpec(archive="targz", member="trivy", content_type="application/gzip"),
     # A PyInstaller bundle: one ~60MB self-contained executable in a zip.
+    # The tarball unpacks to `pulumi/pulumi` plus the language plugins beside it.
+    "pulumi": PlatformToolSpec(
+        archive="targz", member="pulumi/pulumi", content_type="application/gzip"
+    ),
     "checkov": PlatformToolSpec(
         archive="zip", member="dist/checkov", content_type="application/zip"
     ),
@@ -99,6 +111,7 @@ def _mirror(tool: str) -> str:
         "opa": cfg.opa_mirror_url,
         "trivy": cfg.trivy_mirror_url,
         "checkov": cfg.checkov_mirror_url,
+        "pulumi": cfg.pulumi_mirror_url,
     }[tool].rstrip("/")
 
 
@@ -109,6 +122,7 @@ def configured_version(tool: str) -> str:
         "opa": cfg.opa_version,
         "trivy": cfg.trivy_version,
         "checkov": cfg.checkov_version,
+        "pulumi": cfg.pulumi_version,
     }[tool]
 
 
@@ -136,6 +150,11 @@ def download_url(tool: str, version: str, os_: str, arch: str) -> str:
         if plat is None:
             raise UnsupportedPlatformError(f"checkov publishes no asset for {os_}/{arch}")
         return f"{base}/{version}/checkov_{plat}.zip"
+    if tool == "pulumi":
+        plat = _PULUMI_PLATFORM.get((os_, arch))
+        if plat is None:
+            raise UnsupportedPlatformError(f"pulumi publishes no asset for {os_}/{arch}")
+        return f"{base}/v{version}/pulumi-v{version}-{plat}.tar.gz"
     raise ValueError(f"not a platform tool: {tool!r}")
 
 

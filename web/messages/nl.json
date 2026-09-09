@@ -3148,6 +3148,22 @@
         "planning": "Bezig met plannen",
         "applying": "Bezig met toepassen"
       }
+    },
+    "pulumi": {
+      "activity": {
+        "planning": "pulumi preview uitvoeren",
+        "applying": "pulumi up uitvoeren"
+      },
+      "runStatus": {
+        "planning": "Bezig met previewnen",
+        "planned": "Gepreviewd",
+        "applying": "Bezig met toepassen",
+        "applied": "Toegepast"
+      },
+      "status": {
+        "planning": "Bezig met previewnen",
+        "applying": "Bezig met toepassen"
+      }
     }
   }
 }

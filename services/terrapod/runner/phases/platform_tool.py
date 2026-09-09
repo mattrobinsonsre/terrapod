@@ -1,4 +1,4 @@
-"""Phase: fetch a platform tool (opa / trivy / checkov) from the binary cache (#1208).
+"""Phase: fetch a platform tool (opa / trivy / checkov / pulumi) from the binary cache (#1208, #1523).
 
 These three used to be baked into the runner image. They are now pulled through
 the same cache that serves terraform/tofu, so the version is an operator-set Helm
@@ -70,6 +70,8 @@ UNPACK: dict[str, _Unpack] = {
     "opa": _Unpack(kind="raw", member=""),
     "trivy": _Unpack(kind="targz", member="trivy"),
     "checkov": _Unpack(kind="zip", member="dist/checkov"),
+    # The tarball unpacks to `pulumi/pulumi` with the language plugins beside it.
+    "pulumi": _Unpack(kind="targz", member="pulumi/pulumi"),
 }
 
 
@@ -122,7 +124,9 @@ def fetch_versions(cfg: RunnerConfig, *, client: httpx.Client | None = None) -> 
         if own:
             c.close()
 
-    versions = {tool: attrs.get(f"{tool}-version", "") for tool in ("opa", "trivy", "checkov")}
+    versions = {
+        tool: attrs.get(f"{tool}-version", "") for tool in ("opa", "trivy", "checkov", "pulumi")
+    }
     if not any(versions.values()):
         raise PlatformToolError(
             "the API reported no platform-tool versions — the deployment's "

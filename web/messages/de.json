@@ -3148,6 +3148,22 @@
         "planning": "Wird geplant",
         "applying": "Wird angewendet"
       }
+    },
+    "pulumi": {
+      "activity": {
+        "planning": "pulumi preview wird ausgeführt",
+        "applying": "pulumi up wird ausgeführt"
+      },
+      "runStatus": {
+        "planning": "Previewt",
+        "planned": "Gepreviewt",
+        "applying": "Wendet an",
+        "applied": "Angewendet"
+      },
+      "status": {
+        "planning": "Wird gepreviewt",
+        "applying": "Wird angewendet"
+      }
     }
   }
 }

@@ -1137,6 +1137,11 @@ jobs:
           off=$(helm template ./helm/terrapod --set api.config.engines.pulumi.enabled=false)
           echo "$off" | grep -qE "pulumi:\s*$" || { echo "FAIL: engines.pulumi block missing when disabled (#1522)"; exit 1; }
           echo "$off" | grep -q "enabled: false" || { echo "FAIL: engines.pulumi.enabled=false did not render (#1522)"; exit 1; }
+          # The Pulumi CLI is a platform tool, not a baked-in binary (#1523): a
+          # Terraform-only deployment should not carry another engine's binary, and
+          # a missing render line leaves the version inert with the code default
+          # silently winning.
+          echo "$out" | grep -q "pulumi_version:" || { echo "FAIL: platform_tools.pulumi_version not rendered (#1523)"; exit 1; }
           # Platform tools (#1208): opa/trivy/checkov are no longer baked into the
           # images, so these versions are the ONLY thing telling a runner what to
           # fetch. A missing render line leaves the value inert and the code default

@@ -3148,6 +3148,22 @@
         "planning": "Plánování",
         "applying": "Aplikování"
       }
+    },
+    "pulumi": {
+      "activity": {
+        "planning": "Spouští se pulumi preview",
+        "applying": "Spouští se pulumi up"
+      },
+      "runStatus": {
+        "planning": "Plánování",
+        "planned": "Naplánováno",
+        "applying": "Aplikování",
+        "applied": "Aplikováno"
+      },
+      "status": {
+        "planning": "Plánování",
+        "applying": "Aplikování"
+      }
     }
   }
 }

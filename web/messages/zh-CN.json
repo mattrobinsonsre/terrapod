@@ -3148,6 +3148,22 @@
         "planning": "正在计划",
         "applying": "正在应用"
       }
+    },
+    "pulumi": {
+      "activity": {
+        "planning": "正在运行 pulumi preview",
+        "applying": "正在运行 pulumi up"
+      },
+      "runStatus": {
+        "planning": "正在计划",
+        "planned": "已计划",
+        "applying": "正在应用",
+        "applied": "已应用"
+      },
+      "status": {
+        "planning": "正在计划",
+        "applying": "正在应用"
+      }
     }
   }
 }
