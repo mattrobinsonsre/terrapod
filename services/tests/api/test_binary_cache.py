@@ -413,7 +413,36 @@ class TestPlatformToolVersions:
             "opa-version": cfg.opa_version,
             "trivy-version": cfg.trivy_version,
             "checkov-version": cfg.checkov_version,
+            "pulumi-version": cfg.pulumi_version,
         }
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_it_answers_every_tool_the_runner_asks_about(self, *mocks):
+        """The two ends of this endpoint drifted once, silently (#1523).
+
+        The runner has always read `pulumi-version` from this response, and the
+        response never carried it — so a Pulumi run asked the binary cache for
+        version "" and got nothing. Neither side's tests caught it: the runner's
+        assert the key is parsed out of a *mocked* body that did include it, and
+        this one asserted an exact three-key set that did not.
+
+        Pinning the endpoint to the runner's own list is what makes the next
+        tool impossible to half-wire — add one to `fetch_versions` without adding
+        it here and this fails.
+        """
+        from terrapod.runner.phases.platform_tool import TOOLS
+
+        app = _make_app(_user(roles=["everyone"]))
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get(self._URL, headers=_AUTH)
+
+        served = set(resp.json()["data"]["attributes"])
+        wanted = {f"{tool}-version" for tool in TOOLS}
+        assert wanted <= served, (
+            f"the runner asks for {sorted(wanted - served)} and is not answered"
+        )
 
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")

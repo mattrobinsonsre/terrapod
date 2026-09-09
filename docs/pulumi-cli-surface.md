@@ -277,6 +277,31 @@ the local working directory, so uncommitted edits execute remotely; `deployment 
 git-sourced (`--git-branch` / `--git-commit` / `--git-repo-dir` / `--git-auth-*`), so it
 deploys committed code and local edits do not participate.
 
+## How Terrapod runs Pulumi on an agent
+
+The section above is about what *Pulumi's own CLI* can drive remotely. Terrapod's
+agent execution is a different thing and does not use the Deployments API at all:
+a run is queued in Terrapod, a listener launches a Kubernetes Job, and the Job
+runs `pulumi preview` then `pulumi up` against the fetched configuration — the
+same shape as a Terraform run, and the same one an operator selects with
+`execution_mode = "agent"`. **The engine does not decide where a run executes.**
+
+Two things the Job arranges that are worth knowing about as an operator:
+
+**The binary is fetched, not baked in.** `pulumi` is pulled through the same
+cache that serves `tofu`/`terraform`, so the version is
+`registry.platform_tools.pulumi_version` in your values (default `3.208.0`) and
+an upstream fix reaches a deployment with a `helm upgrade` rather than a Terrapod
+release. If the cache cannot supply it the run fails rather than falling back to
+whatever `pulumi` might be on the image.
+
+**The backend is set for it.** The Job exports `PULUMI_BACKEND_URL` pointing at
+this deployment's service surface, plus the run's own short-lived token, so there
+is no `pulumi login` to perform inside the Job. Plugin downloads are redirected
+to Terrapod's package cache the same way. Both matter most in an air-gapped
+deployment, where the CLI's defaults would otherwise reach for
+`app.pulumi.com` and `get.pulumi.com` and simply hang.
+
 ## Nothing from the management surface was required
 
 A full `login → stack init → stack ls → preview → up → refresh → export →

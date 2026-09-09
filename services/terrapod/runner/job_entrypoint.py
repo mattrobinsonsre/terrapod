@@ -709,6 +709,26 @@ def _run_body(cfg: RunnerConfig, work_dir: Path) -> int:
         log.error("pre_init hook failed", hook=exc.name, rc=exc.exit_code)
         return exc.exit_code
 
+    # 7b. Pulumi runs here, above every Terraform-specific step that follows
+    # (#1523).
+    #
+    # It used to branch at step 11 with a comment saying the steps between "do
+    # not apply". They did not merely fail to apply — they ran, and step 10 ended
+    # the run: the backend backstop reads `.terraform/terraform.tfstate` and
+    # raises when it is MISSING, which is exactly what `tofu init` leaves behind
+    # in a directory holding a `Pulumi.yaml` and no `.tf` files. A Pulumi run died
+    # there, before reaching Pulumi, with a message about removing a committed
+    # `override.tf` — advice with nothing to act on.
+    #
+    # What it keeps by branching HERE rather than earlier: the configuration
+    # tarball, the chdir into the working directory, private-git-module auth, and
+    # the operator's `pre_init` hooks — all engine-neutral. What it skips is
+    # Terraform's alone: var-file argv, `init`, terragrunt relocation and the
+    # backstop. Pulumi's own state lives in the service surface (#1522), so there
+    # is no state file to place and no backend to neutralise.
+    if os.environ.get("TP_ENGINE", "") == "pulumi":
+        return _run_pulumi_phase(cfg, child_grace=_child_grace_seconds(cfg))
+
     # 8. Build var-file / target / replace argv pieces.
     var_file_argv = tf_args.var_file_args(cfg.var_files)
 
@@ -757,16 +777,7 @@ def _run_body(cfg: RunnerConfig, work_dir: Path) -> int:
         log.error("backend backstop failed", err=str(exc))
         return 1
 
-    # 11. Phase-specific execution.
-    #
-    # Pulumi branches before Terraform's phases rather than inside them (#1523):
-    # its two phases are `preview`/`update`, and the steps above — backend
-    # neutralisation, var-files, the lock file — are Terraform's own and do not
-    # apply. Terraform's path below is byte-for-byte what it was, which is what
-    # the golden Job-spec matrix asserts.
-    if os.environ.get("TP_ENGINE", "") == "pulumi":
-        return _run_pulumi_phase(cfg, child_grace=child_grace)
-
+    # 11. Phase-specific execution. Terraform only — Pulumi returned at 7b.
     if cfg.phase == "plan":
         return _run_plan_phase(
             cfg,
@@ -800,17 +811,20 @@ def _run_pulumi_phase(cfg, *, child_grace: int) -> int:  # type: ignore[no-untyp
     import structlog
 
     from terrapod.runner import exec_subprocess
-    from terrapod.runner.phases import pulumi_exec
+    from terrapod.runner.phases import platform_tool, pulumi_exec
 
     log = structlog.get_logger("runner.job_entrypoint")
     plan_file = os.environ.get("TP_PULUMI_PLAN_FILE", "/workspace/plan.json")
     phase = os.environ.get("TP_PULUMI_PHASE", cfg.phase)
 
-    # The CLI reads its plugin-download override from the environment, and
-    # `exec_subprocess.run` inherits this process's, so it is set here rather
-    # than passed.
+    # The CLI reads its plugin-download override and its backend from the
+    # environment, and `exec_subprocess.run` inherits this process's, so both are
+    # set here rather than passed.
     os.environ.update(pulumi_exec.plugin_override_env(cfg.api_url, cfg.auth_token))
+    os.environ.update(pulumi_exec.backend_env(cfg.api_url))
 
+    # Decide what to run before fetching what runs it, so an unrecognised phase
+    # costs nothing.
     if phase in ("preview", "plan"):
         argv = pulumi_exec.preview_argv(plan_file, cfg)
         log_file = str(_PLAN_LOG)
@@ -821,9 +835,24 @@ def _run_pulumi_phase(cfg, *, child_grace: int) -> int:  # type: ignore[no-untyp
         log.error("unknown pulumi phase", phase=phase)
         return 1
 
+    # The binary is pulled through the same cache that serves tofu/terraform,
+    # not baked into the image — so the version is an operator-set Helm value
+    # (`registry.platform_tools.pulumi_version`). Unlike opa and trivy there is
+    # no path past here that does not execute it, so it is fetched eagerly once
+    # the phase is known to be real.
+    #
+    # Fails closed: without the binary there is nothing to run, and a bare
+    # "pulumi" to fall back on would either miss entirely or silently pick up
+    # some other install in a future image.
+    try:
+        binary = str(platform_tool.ensure_tool(cfg, "pulumi"))
+    except Exception as exc:
+        log.error("could not obtain the pulumi binary", error=str(exc))
+        return 1
+
     log.info("running pulumi", phase=phase, argv=argv)
     result = exec_subprocess.run(
-        ["pulumi", *argv],
+        [binary, *argv],
         log_file=log_file,
         child_grace_seconds=float(child_grace),
         tee_to_stdout=True,

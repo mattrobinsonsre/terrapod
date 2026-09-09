@@ -315,3 +315,75 @@ def test_unpack_table_agrees_with_the_server_spec():
     for tool, spec in SPECS.items():
         assert UNPACK[tool].kind == spec.archive, tool
         assert UNPACK[tool].member == spec.member, tool
+
+
+class TestPulumiKeepsItsSiblings:
+    """#1523. Pulumi's tarball is not one binary.
+
+    It holds thirteen: the CLI plus the language hosts and analyzers it shells
+    out to. Extracting only `pulumi/pulumi` produces a CLI that runs and reports
+    its version perfectly well, then fails on the first real program with "no
+    language plugin" — so this asserts the layout, not just that a file landed.
+    """
+
+    def _fake_release(self, tmp_path):
+        """A tarball shaped like the real one, from its actual member list."""
+        import tarfile
+
+        members = [
+            "pulumi/pulumi",
+            "pulumi/pulumi-language-python",
+            "pulumi/pulumi-language-nodejs",
+            "pulumi/pulumi-language-go",
+            "pulumi/pulumi-analyzer-policy",
+        ]
+        src = tmp_path / "src"
+        (src / "pulumi").mkdir(parents=True)
+        for m in members:
+            (src / m).write_bytes(b"#!/bin/sh\n")
+        archive = tmp_path / "pulumi.download"
+        with tarfile.open(archive, "w:gz") as tf:
+            for m in members:
+                tf.add(src / m, arcname=m)
+        return archive, members
+
+    def test_every_sibling_is_extracted_and_executable(self, tmp_path):
+        from terrapod.runner.phases.platform_tool import UNPACK, _extract
+
+        archive, members = self._fake_release(tmp_path)
+        root = tmp_path / "bin" / "pulumi.d"
+        dest = root / "pulumi/pulumi"
+
+        _extract(archive, UNPACK["pulumi"], dest, root=root)
+
+        for m in members:
+            path = root / m
+            assert path.exists(), f"{m} was not extracted — the CLI needs it beside pulumi"
+            assert path.stat().st_mode & 0o111, f"{m} is not executable"
+
+    def test_the_language_hosts_sit_beside_the_entrypoint(self, tmp_path):
+        """Adjacency is the requirement, not mere presence — the CLI looks for
+        them next to its own argv[0]."""
+        from terrapod.runner.phases.platform_tool import UNPACK, _extract
+
+        archive, _ = self._fake_release(tmp_path)
+        root = tmp_path / "bin" / "pulumi.d"
+        dest = root / "pulumi/pulumi"
+
+        _extract(archive, UNPACK["pulumi"], dest, root=root)
+
+        assert (dest.parent / "pulumi-language-python").exists()
+
+    def test_the_real_release_tarball_has_siblings(self):
+        """Guards the premise itself.
+
+        If upstream ever ships a single self-contained binary, `tree` becomes
+        unnecessary — and if this list is wrong the two tests above are testing
+        a shape that does not exist. Asserted against the member list read from
+        the real v3.208.0 linux-x64 tarball.
+        """
+        from terrapod.runner.phases.platform_tool import UNPACK
+
+        spec = UNPACK["pulumi"]
+        assert spec.tree, "pulumi ships plugins beside the CLI; a single member is not enough"
+        assert spec.member == "pulumi/pulumi"

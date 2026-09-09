@@ -68,7 +68,7 @@ class WarmBinaryRequest(BaseModel):
 async def platform_tool_versions(
     current_user: AuthenticatedUser = Depends(get_current_user),
 ) -> JSONResponse:
-    """The opa/trivy/checkov versions this deployment pins (#1208).
+    """The opa/trivy/checkov/pulumi versions this deployment pins (#1208, #1523).
 
     The runner reads this to know what to ask the binary cache for. It is a
     platform-scoped setting, so there is one answer for the whole deployment and
@@ -90,6 +90,11 @@ async def platform_tool_versions(
                     "opa-version": cfg.opa_version,
                     "trivy-version": cfg.trivy_version,
                     "checkov-version": cfg.checkov_version,
+                    # The runner has always read this key here; until #1523 the
+                    # response never carried it, so it resolved to "" and a
+                    # Pulumi run asked the cache for no version at all. One side
+                    # asking and the other not answering is the whole bug.
+                    "pulumi-version": cfg.pulumi_version,
                 },
             }
         }

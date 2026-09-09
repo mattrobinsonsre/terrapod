@@ -39,6 +39,15 @@ from terrapod.runner.runner_config import RunnerConfig
 
 logger = structlog.get_logger("runner.phase.platform_tool")
 
+#: Every tool this runner will ask the API to pin a version for.
+#:
+#: Named rather than inlined so the API's `/platform-tools` response can be
+#: asserted against it. The two are declared separately — the endpoint cannot
+#: import this module — and they drifted once in exactly the way that invites:
+#: `pulumi` was added here and not there, so a Pulumi run asked the cache for
+#: version "" and no test on either side noticed (#1523).
+TOOLS = ("opa", "trivy", "checkov", "pulumi")
+
 
 class PlatformToolsUnsupported(Exception):
     """The API has no platform-tool cache endpoint (it predates the feature).
@@ -64,14 +73,23 @@ class _Unpack:
 
     kind: str  # "raw" | "targz" | "zip"
     member: str  # path within the archive ("" for raw)
+    #: Keep the whole archive, not just `member`.
+    #:
+    #: For a tool that is one self-contained binary, extracting the single
+    #: member is right and cheaper. Pulumi is not that: its release tarball
+    #: holds thirteen executables, and the CLI shells out to the siblings —
+    #: `pulumi-language-python`, `-nodejs`, `-go` and the rest — which must sit
+    #: beside it. Taking only `pulumi/pulumi` yields a CLI that runs, reports
+    #: its version happily, and then fails on the first real program with "no
+    #: language plugin". Verified against the v3.208.0 tarball (#1523).
+    tree: bool = False
 
 
 UNPACK: dict[str, _Unpack] = {
     "opa": _Unpack(kind="raw", member=""),
     "trivy": _Unpack(kind="targz", member="trivy"),
     "checkov": _Unpack(kind="zip", member="dist/checkov"),
-    # The tarball unpacks to `pulumi/pulumi` with the language plugins beside it.
-    "pulumi": _Unpack(kind="targz", member="pulumi/pulumi"),
+    "pulumi": _Unpack(kind="targz", member="pulumi/pulumi", tree=True),
 }
 
 
@@ -124,9 +142,7 @@ def fetch_versions(cfg: RunnerConfig, *, client: httpx.Client | None = None) -> 
         if own:
             c.close()
 
-    versions = {
-        tool: attrs.get(f"{tool}-version", "") for tool in ("opa", "trivy", "checkov", "pulumi")
-    }
+    versions = {tool: attrs.get(f"{tool}-version", "") for tool in TOOLS}
     if not any(versions.values()):
         raise PlatformToolError(
             "the API reported no platform-tool versions — the deployment's "
@@ -135,7 +151,7 @@ def fetch_versions(cfg: RunnerConfig, *, client: httpx.Client | None = None) -> 
     return versions
 
 
-def _extract(archive: Path, spec: _Unpack, dest: Path) -> None:
+def _extract(archive: Path, spec: _Unpack, dest: Path, root: Path | None = None) -> None:
     """Pull the executable out of whatever upstream shipped."""
     if spec.kind == "raw":
         archive.replace(dest)
@@ -144,6 +160,23 @@ def _extract(archive: Path, spec: _Unpack, dest: Path) -> None:
     if spec.kind == "targz":
         try:
             with tarfile.open(archive, "r:gz") as tf:
+                if spec.tree:
+                    assert root is not None  # set by ensure_tool for tree specs
+                    root.mkdir(parents=True, exist_ok=True)
+                    # `filter="data"` refuses absolute paths, `..` traversal and
+                    # device/setuid entries — the archive is fetched from our own
+                    # cache, but it originates upstream and is extracted as a
+                    # tree rather than a single read.
+                    tf.extractall(root, filter="data")
+                    if not dest.exists():
+                        raise PlatformToolError(f"{spec.member} not found in {archive.name}")
+                    # The siblings are executables too, and the data filter
+                    # normalises modes — so the language plugins the CLI shells
+                    # out to have to be made runnable, not just the entrypoint.
+                    for path in dest.parent.iterdir():
+                        if path.is_file():
+                            path.chmod(0o755)
+                    return
                 member = tf.extractfile(spec.member)
                 if member is None:
                     raise PlatformToolError(f"{spec.member} not found in {archive.name}")
@@ -178,7 +211,11 @@ def ensure_tool(
         raise PlatformToolError(f"not a platform tool: {tool!r}")
 
     bin_dir.mkdir(parents=True, exist_ok=True)
-    dest = bin_dir / tool
+    spec_for_dest = UNPACK[tool]
+    # A tree tool keeps its own directory so the siblings the CLI needs stay
+    # beside the entrypoint; everything else is one file directly in bin_dir.
+    tree_root = bin_dir / f"{tool}.d" if spec_for_dest.tree else None
+    dest = (tree_root / spec_for_dest.member) if tree_root else (bin_dir / tool)
     if dest.exists():
         return dest
 
@@ -226,7 +263,7 @@ def ensure_tool(
             f"the deployment is sealed."
         )
 
-    _extract(archive, spec, dest)
+    _extract(archive, spec, dest, root=tree_root)
     dest.chmod(0o755)
     try:
         archive.unlink()
