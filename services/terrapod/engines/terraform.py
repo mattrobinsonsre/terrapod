@@ -216,6 +216,43 @@ class TerraformStrategy:
 
         return TerminalOutcome(action="none", phase=phase)
 
+    def options_from_attrs(self, attrs: dict, phase: str) -> TerraformRunOptions:
+        """Build this engine's run options from the wire payload (#1523).
+
+        The listener used to construct `TerraformRunOptions` itself and hand it
+        to whichever strategy it had resolved — so a Pulumi run arrived with
+        Terraform's options object and died on `options.phase`, inside a
+        fire-and-forget task whose exception went to asyncio's "never retrieved"
+        handler rather than to the run. The Job was simply never created and the
+        run sat until the reconciler timed it out five minutes later with
+        "stuck pre-launch", which says nothing about the cause.
+
+        Reading the payload is per-engine work, so it belongs on the engine —
+        the same reasoning that moved terminal resolution here in #1489.
+        """
+        return TerraformRunOptions(
+            terraform_version=attrs.get("terraform-version", ""),
+            execution_backend=attrs.get("execution-backend", "tofu"),
+            terragrunt_enabled=attrs.get("terragrunt-enabled", False),
+            terragrunt_version=attrs.get("terragrunt-version", ""),
+            plan_only=attrs.get("plan-only", False),
+            var_files=attrs.get("var-files", []),
+            target_addrs=attrs.get("target-addrs"),
+            replace_addrs=attrs.get("replace-addrs"),
+            refresh_only=attrs.get("refresh-only", False),
+            refresh=attrs.get("refresh", True),
+            allow_empty_apply=attrs.get("allow-empty-apply", False),
+            is_destroy=attrs.get("is-destroy", False),
+            parallelism=attrs.get("parallelism", 10),
+            cost_estimation=attrs.get("cost-estimation", True),
+            cost_default_region=attrs.get("cost-default-region", "us-east-1"),
+            working_directory=attrs.get("working-directory", ""),
+            onboard_session_id=attrs.get("onboard-session-id", ""),
+            onboard_provider=attrs.get("onboard-provider", ""),
+            onboard_provider_version=attrs.get("onboard-provider-version", ""),
+            onboard_types=attrs.get("onboard-types", []),
+        )
+
     def build_job_spec(
         self,
         *,

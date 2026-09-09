@@ -2128,6 +2128,21 @@ async def next_run(
     run_data["data"]["attributes"]["var-files"] = ws.var_files if ws and ws.var_files else []
     run_data["data"]["attributes"]["working-directory"] = ws.working_directory if ws else ""
     run_data["data"]["attributes"]["phase"] = phase
+    # Which stack a Pulumi run operates on (#1523). The engine reads this into
+    # `--stack`; without it the CLI has nothing selected and every run fails with
+    # "no stack selected", after fetching its binary and its configuration.
+    #
+    # Derived from the workspace name rather than stored: a Pulumi workspace is
+    # named `{project}::{stack}` precisely so the two halves of Pulumi's
+    # `{org}/{project}/{stack}` can be recovered without Terrapod growing a
+    # `project` concept it deliberately does not have (see
+    # `pulumi_service._stack_workspace_name`). Emitted only for Pulumi runs, so
+    # the Terraform wire is byte-identical.
+    from terrapod.api.routers.pulumi_service import DEFAULT_ORG, PULUMI_ENGINE
+
+    if run.engine == PULUMI_ENGINE and ws is not None and "::" in ws.name:
+        project, _, stack = ws.name.partition("::")
+        run_data["data"]["attributes"]["pulumi-stack"] = f"{DEFAULT_ORG}/{project}/{stack}"
 
     # Onboarding discovery (#824 P2): surface the session's provider + selected
     # types so the Job can run terrapod-query. The run stays plan-phase; the

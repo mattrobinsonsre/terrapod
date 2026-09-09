@@ -301,6 +301,20 @@ k8s_yaml(helm(
         # values-local.yaml, which is shared and must not hard-code one
         # workstation's registry.
         'runners.image.repository=k3d-tp-registry:5111/terrapod-runner',
+        # ...and the policy has to permit the pull that repository implies.
+        # values-local.yaml says Never, which is right everywhere the image is
+        # built straight into the node's store. On k3d it is *pushed to a
+        # registry* instead (podman and the node keep separate stores), so Never
+        # forbids the only route the image has: the Job fails ErrImageNeverPull
+        # against an image that was built and pushed perfectly well.
+        #
+        # Always, not IfNotPresent: the tag is the mutable `:local`, rebuilt on
+        # every change to the runner sources. IfNotPresent would pull once and
+        # then serve that first image forever, so every subsequent edit would
+        # appear not to take — the same stale-image confusion as the layer cache,
+        # arriving through a different door. The registry is in-cluster, so the
+        # re-pull costs nothing worth saving.
+        'runners.image.pullPolicy=Always',
     ] if _k3d else []),
 ))
 

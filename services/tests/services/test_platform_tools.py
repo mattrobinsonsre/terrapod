@@ -156,6 +156,69 @@ class TestExpectedSha256:
                 await _expected_sha256(None, "trivy", "0.72.0", "linux", "amd64")
 
     @pytest.mark.asyncio
+    async def test_pulumi_finds_its_asset_in_the_release_manifest(self) -> None:
+        """Real manifest lines from the v3.208.0 release, trimmed to three."""
+        manifest = (
+            "ee2610  pulumi-v3.208.0-darwin-arm64.tar.gz\n"
+            "4e421b  pulumi-v3.208.0-linux-arm64.tar.gz\n"
+            "999999  pulumi-v3.208.0-linux-x64.tar.gz\n"
+        )
+        with patch(
+            "terrapod.services.platform_tools.arequest_with_retry",
+            AsyncMock(return_value=_resp(text=manifest)),
+        ) as req:
+            got = await _expected_sha256(None, "pulumi", "3.208.0", "linux", "arm64")
+        assert got == "4e421b"
+        # The tag carries a `v`, the manifest filename does not. Pinned because
+        # getting it wrong 404s, and a 404 here fails closed as "unverifiable
+        # artifact" rather than announcing itself as a URL typo.
+        assert req.await_args.args[2].endswith("/v3.208.0/pulumi-3.208.0-checksums.txt")
+
+    @pytest.mark.asyncio
+    async def test_pulumi_refuses_when_its_asset_is_absent_from_the_manifest(self) -> None:
+        with patch(
+            "terrapod.services.platform_tools.arequest_with_retry",
+            AsyncMock(return_value=_resp(text="1111  something_else.tar.gz\n")),
+        ):
+            with pytest.raises(VerificationError, match="not listed"):
+                await _expected_sha256(None, "pulumi", "3.208.0", "linux", "arm64")
+
+    @pytest.mark.asyncio
+    async def test_pulumi_refuses_when_the_manifest_cannot_be_fetched(self) -> None:
+        with patch(
+            "terrapod.services.platform_tools.arequest_with_retry",
+            AsyncMock(return_value=_resp(status=404)),
+        ):
+            with pytest.raises(VerificationError, match="could not fetch"):
+                await _expected_sha256(None, "pulumi", "3.208.0", "linux", "arm64")
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("tool", sorted(PLATFORM_TOOLS))
+    async def test_every_platform_tool_has_a_checksum_branch(self, tool: str) -> None:
+        """Membership of PLATFORM_TOOLS is not enough to be fetchable.
+
+        A tool needs three things and gains them in separate edits: an entry in
+        the frozenset, a `download_url` branch, and a `_expected_sha256` branch.
+        Pulumi shipped with the first two and not the third, so every Pulumi run
+        downloaded its CLI successfully and was then refused at verification with
+        "not a platform tool: 'pulumi'" — a message that reads like the frozenset
+        is wrong when in fact only this function was.
+
+        Asserting on that exact fall-through, rather than on success, is what
+        makes this independent of how any one publisher serves its checksums.
+        """
+        with patch(
+            "terrapod.services.platform_tools.arequest_with_retry",
+            AsyncMock(return_value=_resp(status=500)),
+        ):
+            with pytest.raises(VerificationError) as excinfo:
+                await _expected_sha256(None, tool, "1.0.0", "linux", "amd64")
+        assert "not a platform tool" not in str(excinfo.value), (
+            f"{tool} is in PLATFORM_TOOLS but _expected_sha256 has no branch for it, "
+            f"so it can be downloaded and never verified"
+        )
+
+    @pytest.mark.asyncio
     async def test_checkov_reads_the_release_api_digest(self) -> None:
         payload = json.dumps(
             {

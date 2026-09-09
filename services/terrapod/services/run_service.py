@@ -730,6 +730,13 @@ async def create_run(
         auto_apply_mode=auto_apply_mode,
         plan_only=plan_only,
         source=source,
+        # Which engine, not which binary (#1523). Without this every run
+        # defaults to terraform whatever its workspace is, so a Pulumi
+        # workspace's runs execute down the Terraform path — and succeed,
+        # because `tofu init` in a directory holding only a Pulumi.yaml plans
+        # nothing and applies nothing. The run reports "applied" having never
+        # invoked Pulumi, which is the failure mode this line prevents.
+        engine=workspace.engine,
         execution_backend=workspace.execution_backend,
         terraform_version=pinned_version,
         terragrunt_enabled=workspace.terragrunt_enabled,

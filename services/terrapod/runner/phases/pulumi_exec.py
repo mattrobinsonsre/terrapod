@@ -27,9 +27,16 @@ from __future__ import annotations
 import json
 import os
 
-from terrapod.logging_config import get_logger
+import structlog
 
-log = get_logger(__name__)
+# structlog directly, as every other phase module does — not
+# `terrapod.logging_config.get_logger`, which is a one-line wrapper around this
+# exact call and is *not* shipped in the runner image. Importing it cost nothing
+# in tests, where the whole package is importable, and crashed every Pulumi run
+# on `ModuleNotFoundError: No module named 'terrapod.logging_config'` the moment
+# the orchestrator reached the phase. The runner image copies a hand-listed set
+# of modules; anything outside it does not exist at runtime.
+log = structlog.get_logger("runner.pulumi_exec")
 
 
 #: The prefix the runner addresses the API by.
@@ -115,7 +122,16 @@ def update_argv(plan_file: str, cfg=None) -> list[str]:  # type: ignore[no-untyp
 
     A destroy takes no plan: there is nothing to preview into a file that
     `destroy` would read back, and passing one is rejected.
+
+    An empty `plan_file` drops `--plan` and lets `up` compute its own. That is
+    the same degradation the Terraform path makes when the plan artifact is
+    unavailable (`has_plan_file`): weaker, because the update is no longer
+    constrained to the operations the approved preview showed, but it still
+    applies the same configuration — where refusing would strand a run whose
+    preview succeeded. The caller logs when it takes this path.
     """
     if os.environ.get("TP_DESTROY", "").lower() == "true":
         return ["destroy", "--yes", *_common_argv(cfg)]
+    if not plan_file:
+        return ["up", "--yes", *_common_argv(cfg)]
     return ["up", "--yes", f"--plan={plan_file}", *_common_argv(cfg)]

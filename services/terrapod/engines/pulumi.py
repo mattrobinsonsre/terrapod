@@ -121,6 +121,30 @@ class PulumiStrategy:
             env.append({"name": "TP_PARALLELISM", "value": str(options.parallelism)})
         return env
 
+    def options_from_attrs(self, attrs: dict, phase: str) -> PulumiRunOptions:
+        """Build this engine's run options from the wire payload (#1523).
+
+        `phase` is the Terraform-shaped one the platform sends — `plan`/`apply`,
+        which is what the run status is called for every engine — translated
+        here into Pulumi's own words. That translation lives with the engine
+        rather than in the listener for the same reason the vocabulary does
+        (#1521): the platform's statuses stay engine-neutral and each engine
+        says what they mean to it.
+        """
+        return PulumiRunOptions(
+            phase="preview" if phase == "plan" else "update",
+            stack=attrs.get("pulumi-stack", ""),
+            pulumi_version=attrs.get("pulumi-version", ""),
+            working_directory=attrs.get("working-directory", ""),
+            is_destroy=attrs.get("is-destroy", False),
+            refresh=attrs.get("refresh", True),
+            target_urns=attrs.get("target-urns"),
+            resource_cpu=attrs.get("resource-cpu", ""),
+            resource_memory=attrs.get("resource-memory", ""),
+            parallelism=attrs.get("parallelism", 0),
+            timeout_minutes=attrs.get("timeout-minutes", 0),
+        )
+
     def build_job_spec(self, **kwargs: Any) -> dict:
         """Compose the neutral builder with this engine's env.
 
@@ -132,16 +156,33 @@ class PulumiStrategy:
         from terrapod.runner.job_template import build_job_spec as _build
 
         options: PulumiRunOptions = kwargs.pop("options")
-        runner_config = kwargs.get("runner_config")
-        return _build(
-            phase=options.phase,
-            engine_env=self.container_env(options, runner_config),
-            resource_cpu=options.resource_cpu or "",
-            resource_memory=options.resource_memory or "",
-            timeout_minutes=options.timeout_minutes or 0,
-            env_vars=options.env_vars,
-            **kwargs,
-        )
+        # Subscript, not `.get`, exactly as Terraform's strategy does: the
+        # listener always passes it, so a missing one is a bug worth raising on
+        # rather than a None to carry into the builder. It also keeps the key out
+        # of the wire-contract gate, which reads every `.get("...")` in this
+        # package as a payload key and would otherwise freeze an internal kwarg
+        # name into the runner protocol.
+        runner_config = kwargs["runner_config"]
+        # Everything except `engine_env` comes from the listener's kwargs, as it
+        # does for Terraform. Re-deriving those fields from `options` here was
+        # wrong four times over, and only the first was visible:
+        #
+        #   phase            `options.phase` is Pulumi's word ("preview"), but the
+        #                    builder's is the platform's ("plan") -- it names the
+        #                    Job `tprun-{short}-{phase}`, which must match the
+        #                    auth/vars Secrets the listener already named with the
+        #                    platform phase. Pulumi's verb reaches the entrypoint
+        #                    as TP_PULUMI_PHASE in `engine_env`, which is the whole
+        #                    point of the split.
+        #   env_vars         `options_from_attrs` never populates it, so this sent
+        #                    an empty list and discarded every real env var.
+        #   timeout_minutes  defaults to 0, overriding the builder's 60.
+        #   resource_*       default to "", overriding "1" / "2Gi".
+        #
+        # Passing them twice raised TypeError before any of the rest could bite,
+        # which is the only reason this was caught as a launch failure rather
+        # than as a Pulumi run that quietly had no environment.
+        return _build(engine_env=self.container_env(options, runner_config), **kwargs)
 
     def resolve_terminal(
         self, *, run_status: str, run_source: str, job_status: str

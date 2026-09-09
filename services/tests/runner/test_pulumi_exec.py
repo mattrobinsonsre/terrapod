@@ -111,6 +111,23 @@ class TestThePhaseArgv:
     def test_the_update_confirms_itself(self) -> None:
         assert "--yes" in pulumi_exec.update_argv("p", _cfg())
 
+    def test_an_absent_plan_degrades_to_an_unconstrained_up(self) -> None:
+        """The preview runs in a different pod from the update, so the saved plan
+        is an artifact that has to survive the hop. When it does not, `up` still
+        applies the same configuration — it is simply no longer constrained to
+        the operations the preview showed.
+
+        Refusing instead would strand a run whose preview had just succeeded,
+        which is the behaviour the Terraform path deliberately avoids via
+        `has_plan_file`.
+        """
+        argv = pulumi_exec.update_argv("", _cfg())
+        assert argv[0] == "up"
+        assert "--yes" in argv
+        assert not any(a.startswith("--plan=") for a in argv), (
+            "an empty plan path must drop the flag, not pass `--plan=` with no value"
+        )
+
     def test_a_destroy_takes_no_plan(self, monkeypatch) -> None:
         """`destroy` rejects a plan file — there is nothing to preview into one
         that it would read back."""
