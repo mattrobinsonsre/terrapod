@@ -127,6 +127,20 @@ def _stack_workspace_name(project: str, stack: str) -> str:
     is globally unique, which is what makes this addressable — and the separator
     is a character neither Pulumi projects nor stacks admit, so the mapping
     cannot collide with a name a user could otherwise choose.
+
+    **Do not "fix" this by adding `pulumi_project`/`pulumi_stack` columns.**
+    Terrapod has no projects, deliberately — the same call as single-org, for the
+    same reason (see the architecture docs). Pulumi requires one, because it
+    lives in `Pulumi.yaml` and the CLI will not address a stack without it, so
+    the platform has to accommodate the concept without adopting it. Folding it
+    into the name is that accommodation: it confines "project" to a string
+    convention inside this one engine's adapter, where columns would make it a
+    thing the core model knows about — letting a minority engine reintroduce
+    exactly the concept the model excludes, for every workspace of every engine.
+
+    The cost is real and is paid deliberately: the name validator has to know
+    this shape (`workspace_name.validate_workspace_name`), and so does restore.
+    Both are small and contained, which is the trade.
     """
     return f"{project}::{stack}"
 
@@ -277,7 +291,12 @@ async def create_stack(
     user: AuthenticatedUser = Depends(pulumi_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
-    """`pulumi stack init` — body `{"stackName", "tags"}`."""
+    """`pulumi stack init` — body `{"stackName", "tags"}`.
+
+    Always refuses. Kept as a route so the refusal carries a message naming where
+    workspaces come from; unmounting it would leave the CLI reporting a bare 404
+    from its own router, which tells the operator nothing about the fix.
+    """
     if org != DEFAULT_ORG:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found")
     body = await read_body(request)
@@ -297,21 +316,27 @@ async def create_stack(
             status_code=status.HTTP_409_CONFLICT, detail=f"Stack {project}/{stack} already exists"
         )
 
-    ws = Workspace(
-        id=uuid.uuid4(),
-        name=name,
-        engine=PULUMI_ENGINE,
-        # The CLI runs the engine and the providers itself; Terrapod stores state
-        # and brokers secrets. That is local execution by Terrapod's own
-        # definition, and saying so keeps the agent-mode machinery away from a
-        # workspace that has no runner Job to launch.
-        execution_mode="local",
-        owner_email=user.email,
+    # The stack does not exist, and this endpoint will not create it (#1535).
+    #
+    # Terraform's CLI has never created a workspace — `init` looks one up and
+    # fails if it is absent, and the operator creates it in Terrapod first. Doing
+    # otherwise for Pulumi would let a CLI bring a platform resource into being
+    # with no RBAC review and no record of where it came from, and would leave
+    # the two engines governed differently for no reason a user could see.
+    #
+    # 404 rather than 403: the CLI already treats a 404 from the stack lookup as
+    # "this stack is not here", so the shape is one it understands, and the
+    # message carries the part it cannot infer — where stacks come from instead.
+    logger.info("pulumi_stack_init_refused", stack=name, actor=user.email)
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail=(
+            f"Stack {project}/{stack} does not exist, and `pulumi stack init` cannot "
+            f"create it. Terrapod workspaces are created in the UI, with the Terrapod "
+            f"Terraform provider, or via the API — then select the stack with "
+            f"`pulumi stack select {org}/{project}/{stack}`."
+        ),
     )
-    db.add(ws)
-    await db.commit()
-    logger.info("pulumi_stack_created", stack=name, actor=user.email)
-    return {"orgName": org, "projectName": project, "stackName": stack}
 
 
 @router.get("/api/stacks/{org}/{project}/{stack}")

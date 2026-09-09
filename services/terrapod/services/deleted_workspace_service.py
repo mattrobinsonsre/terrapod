@@ -333,7 +333,7 @@ def _state_facts(plaintext: bytes) -> dict[str, Any]:
     }
 
 
-async def _unique_name(db: AsyncSession, wanted: str) -> str:
+async def _unique_name(db: AsyncSession, wanted: str, engine: str = "terraform") -> str:
     """A free, VALID workspace name, suffixed if `wanted` is taken.
 
     The original name is very often free — TFE semantics release it the moment
@@ -356,14 +356,18 @@ async def _unique_name(db: AsyncSession, wanted: str) -> str:
     the *supplied* name strictly, because that one a human can just retype.
     """
     try:
-        base = validate_workspace_name(wanted)[:80]
+        base = validate_workspace_name(wanted, engine)[:80]
     except ValueError as e:
         logger.warning(
             "Restore name unusable — falling back",
             wanted=wanted,
+            engine=engine,
             reason=str(e),
         )
-        base = "restored-workspace"
+        # The fallback has to satisfy the same rule it just failed, and for
+        # Pulumi that means two parts: a bare name would be rejected by the very
+        # validator above the next time anything checked it.
+        base = "restored::workspace" if engine == "pulumi" else "restored-workspace"
     taken = await db.execute(select(Workspace.id).where(Workspace.name == base).limit(1))
     if taken.scalar_one_or_none() is None:
         return base
@@ -452,9 +456,16 @@ async def restore_workspace(
     if stripped:
         report["dropped_references"].append({"field": "labels", "keys": stripped})
 
+    # Captured at delete time since #1407, but never applied here until #1535 —
+    # so every restore rebuilt the workspace as Terraform regardless of what it
+    # was, exactly as the comment at the capture site warns. It also decides
+    # what a valid name looks like: a Pulumi workspace is named `project::stack`.
+    engine = settings.get("engine") or "terraform"
+
     ws = Workspace(
         id=uuid_mod.uuid4(),
-        name=await _unique_name(db, name or marker.get("workspace_name") or ""),
+        name=await _unique_name(db, name or marker.get("workspace_name") or "", engine),
+        engine=engine,
         labels=labels,
         owner_email=settings.get("owner_email") or restored_by,
         execution_mode=settings.get("execution_mode") or "local",

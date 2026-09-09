@@ -78,7 +78,13 @@
       "vcsRepoUrlTitle": "Muzt be an HTTP or HTTPS URL",
       "vcsRepoUrlPlaceholder": "https://github.com/org/repo",
       "vcsBranch": "VCS Branch",
-      "vcsBranchPlaceholder": "main (defawlt)"
+      "vcsBranchPlaceholder": "main (defawlt)",
+      "engine": "Enginz",
+      "engineTerraform": "Terraformz / OpenTofuz",
+      "enginePulumi": "Pulumiz",
+      "engineHelp": "Wich enginz runz dis werkspace. Not teh execushun bakend, wich pikz teh binry insyde teh Terraform enginz.",
+      "namePatternPulumi": "Two partz separatd by '::' — projekt::stak. Letterz, numberz, hyfenz an underskorez only; each part gotta start wif a letter or number. KTHX",
+      "namePlaceholderPulumi": "mah-projekt::dev"
     },
     "stats": {
       "total": "Total",

@@ -19,6 +19,7 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 	// ── terrapod_workspace_create ────────────────────────────────────
 	type workspaceCreateIn struct {
 		Name             string            `json:"name" jsonschema:"the workspace name (unique within the org)"`
+		Engine           string            `json:"engine,omitempty" jsonschema:"the execution engine family: terraform (default) or another engine this deployment enables, such as pulumi. NOT execution_backend, which picks tofu vs terraform within the Terraform engine. Workspaces are created here, in the UI or with the Terraform provider — never by an engine's own CLI"`
 		ExecutionMode    string            `json:"execution_mode,omitempty" jsonschema:"local or agent (default: server default)"`
 		ExecutionBackend string            `json:"execution_backend,omitempty" jsonschema:"tofu or terraform (default: server default)"`
 		TerraformVersion string            `json:"terraform_version,omitempty" jsonschema:"partial version like 1.15 (means 1.15.*); no HCL operators"`
@@ -43,6 +44,7 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		}
 		ws, err := c.CreateWorkspace(ctx, terrapod.CreateWorkspaceRequest{
 			Name:             in.Name,
+			Engine:           in.Engine,
 			ExecutionMode:    in.ExecutionMode,
 			ExecutionBackend: in.ExecutionBackend,
 			TerraformVersion: in.TerraformVersion,

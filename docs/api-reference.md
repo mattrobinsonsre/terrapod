@@ -277,8 +277,32 @@ GET /api/tfe/v2/workspaces/{id}
 ### Create Workspace
 
 ```
-POST /api/tfe/v2/organizations/default/workspaces
+POST /api/v1/workspaces                              # native — carries `engine`
+POST /api/tfe/v2/organizations/default/workspaces    # TFE-compatible — Terraform only
 ```
+
+Both accept the same attributes and return the same workspace. They differ in
+one respect: only the native route accepts an **`engine`**.
+
+**Workspaces are created here, in the UI, or with the Terraform provider — never
+by an engine's own CLI.** `terraform init` has always looked a workspace up and
+failed if it was absent, and the same is true of `pulumi stack init`, which
+refuses and names this endpoint. A CLI that could create a workspace would be
+creating a platform resource with no RBAC review and no record of its origin.
+
+**`engine`** — the execution engine family: `terraform` (the default when
+omitted) or another engine the deployment enables. Distinct from
+`execution-backend`, which picks the binary *within* the Terraform engine (tofu
+or terraform). An engine that is disabled is refused with 422, and the message
+lists the engines this deployment offers.
+
+A **Pulumi** workspace is named `project::stack`, because that is what
+`pulumi stack select default/{project}/{stack}` resolves to; a single-part name
+is rejected rather than accepted and then never found by the CLI.
+
+The TFE-compatible route is Terraform-only by design and ignores an `engine`
+attribute: it is the CLI compatibility contract, and a client there cannot see a
+workspace belonging to another engine.
 
 **Auto-apply modes (`auto-apply-mode`)**
 

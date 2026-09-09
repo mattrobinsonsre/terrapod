@@ -78,7 +78,13 @@
       "vcsRepoUrlTitle": "Должен быть URL с HTTP или HTTPS",
       "vcsRepoUrlPlaceholder": "https://github.com/org/repo",
       "vcsBranch": "Ветка VCS",
-      "vcsBranchPlaceholder": "main (по умолчанию)"
+      "vcsBranchPlaceholder": "main (по умолчанию)",
+      "engine": "Движок",
+      "engineTerraform": "Terraform / OpenTofu",
+      "enginePulumi": "Pulumi",
+      "engineHelp": "Какой движок выполняет это рабочее пространство. Не бэкенд выполнения, который выбирает исполняемый файл внутри движка Terraform.",
+      "namePatternPulumi": "Две части, разделённые '::' — project::stack. Только буквы, цифры, дефисы и подчёркивания; каждая часть должна начинаться с буквы или цифры.",
+      "namePlaceholderPulumi": "my-project::dev"
     },
     "stats": {
       "total": "Всего",

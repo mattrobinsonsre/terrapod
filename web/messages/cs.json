@@ -78,7 +78,13 @@
       "vcsRepoUrlTitle": "Musí být URL adresa HTTP nebo HTTPS",
       "vcsRepoUrlPlaceholder": "https://github.com/org/repo",
       "vcsBranch": "VCS větev",
-      "vcsBranchPlaceholder": "main (výchozí)"
+      "vcsBranchPlaceholder": "main (výchozí)",
+      "engine": "Engine",
+      "engineTerraform": "Terraform / OpenTofu",
+      "enginePulumi": "Pulumi",
+      "engineHelp": "Který engine spouští tento pracovní prostor. Nikoli backend spouštění, který vybírá binárku v rámci enginu Terraform.",
+      "namePatternPulumi": "Dvě části oddělené '::' — project::stack. Pouze písmena, číslice, pomlčky a podtržítka; každá část musí začínat písmenem nebo číslicí.",
+      "namePlaceholderPulumi": "my-project::dev"
     },
     "stats": {
       "total": "Celkem",

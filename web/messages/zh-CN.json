@@ -78,7 +78,13 @@
       "vcsRepoUrlTitle": "必须是 HTTP 或 HTTPS URL",
       "vcsRepoUrlPlaceholder": "https://github.com/org/repo",
       "vcsBranch": "VCS 分支",
-      "vcsBranchPlaceholder": "main（默认）"
+      "vcsBranchPlaceholder": "main（默认）",
+      "engine": "引擎",
+      "engineTerraform": "Terraform / OpenTofu",
+      "enginePulumi": "Pulumi",
+      "engineHelp": "运行此工作区的引擎。不同于执行后端，后者用于在 Terraform 引擎内选择二进制文件。",
+      "namePatternPulumi": "由 '::' 分隔的两部分 — project::stack。仅限字母、数字、连字符和下划线；每部分必须以字母或数字开头。",
+      "namePlaceholderPulumi": "my-project::dev"
     },
     "stats": {
       "total": "总计",

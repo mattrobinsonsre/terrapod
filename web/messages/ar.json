@@ -78,7 +78,13 @@
       "vcsRepoUrlTitle": "يجب أن يكون عنوان URL بروتوكول HTTP أو HTTPS",
       "vcsRepoUrlPlaceholder": "https://github.com/org/repo",
       "vcsBranch": "فرع VCS",
-      "vcsBranchPlaceholder": "main (افتراضي)"
+      "vcsBranchPlaceholder": "main (افتراضي)",
+      "engine": "المحرك",
+      "engineTerraform": "Terraform / OpenTofu",
+      "enginePulumi": "Pulumi",
+      "engineHelp": "المحرك الذي يشغّل مساحة العمل هذه. وليس خلفية التنفيذ التي تختار الملف الثنائي داخل محرك Terraform.",
+      "namePatternPulumi": "جزآن يفصل بينهما '::' — project::stack. الحروف والأرقام والشرطات والشرطات السفلية فقط؛ ويجب أن يبدأ كل جزء بحرف أو رقم.",
+      "namePlaceholderPulumi": "my-project::dev"
     },
     "stats": {
       "total": "الإجمالي",

@@ -78,7 +78,13 @@
       "vcsRepoUrlTitle": "Oltava HTTP- tai HTTPS-URL",
       "vcsRepoUrlPlaceholder": "https://github.com/org/repo",
       "vcsBranch": "VCS-haara",
-      "vcsBranchPlaceholder": "main (oletus)"
+      "vcsBranchPlaceholder": "main (oletus)",
+      "engine": "Moottori",
+      "engineTerraform": "Terraform / OpenTofu",
+      "enginePulumi": "Pulumi",
+      "engineHelp": "Mikä moottori suorittaa tämän työtilan. Ei suoritustaustajärjestelmä, joka valitsee binäärin Terraform-moottorin sisällä.",
+      "namePatternPulumi": "Kaksi osaa erotettuna merkeillä '::' — project::stack. Vain kirjaimia, numeroita, väliviivoja ja alaviivoja; kummankin osan on alettava kirjaimella tai numerolla.",
+      "namePlaceholderPulumi": "my-project::dev"
     },
     "stats": {
       "total": "Yhteensä",

@@ -78,7 +78,13 @@
       "vcsRepoUrlTitle": "Mu57 b3 4n H77P 0r H77P5 URL",
       "vcsRepoUrlPlaceholder": "h77p5://g17hub.c0m/0rg/r3p0",
       "vcsBranch": "VC5 Br4nch",
-      "vcsBranchPlaceholder": "m41n (d3f4ul7)"
+      "vcsBranchPlaceholder": "m41n (d3f4ul7)",
+      "engine": "3ng1n3",
+      "engineTerraform": "73rr4f0rm / 0p3n70fu",
+      "enginePulumi": "Pulum1",
+      "engineHelp": "Wh1ch 3ng1n3 run5 7h15 w0rk5p4c3. N07 7h3 3x3cu710n b4ck3nd, wh1ch p1ck5 7h3 b1n4ry w17h1n 7h3 73rr4f0rm 3ng1n3.",
+      "namePatternPulumi": "7w0 p4r75 53p4r473d by '::' — pr0j3c7::574ck. L3773r5, numb3r5, hyph3n5 4nd und3r5c0r35 0nly; 34ch p4r7 mu57 574r7 w17h 4 l3773r 0r numb3r.",
+      "namePlaceholderPulumi": "my-pr0j3c7::d3v"
     },
     "stats": {
       "total": "7074l",

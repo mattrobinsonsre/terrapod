@@ -78,7 +78,13 @@
       "vcsRepoUrlTitle": "Musi być adresem URL HTTP lub HTTPS",
       "vcsRepoUrlPlaceholder": "https://github.com/org/repo",
       "vcsBranch": "Gałąź VCS",
-      "vcsBranchPlaceholder": "main (domyślnie)"
+      "vcsBranchPlaceholder": "main (domyślnie)",
+      "engine": "Silnik",
+      "engineTerraform": "Terraform / OpenTofu",
+      "enginePulumi": "Pulumi",
+      "engineHelp": "Który silnik uruchamia tę przestrzeń roboczą. Nie backend wykonawczy, który wybiera plik binarny w silniku Terraform.",
+      "namePatternPulumi": "Dwie części oddzielone '::' — project::stack. Tylko litery, cyfry, myślniki i podkreślenia; każda część musi zaczynać się od litery lub cyfry.",
+      "namePlaceholderPulumi": "my-project::dev"
     },
     "stats": {
       "total": "Łącznie",

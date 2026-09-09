@@ -78,7 +78,13 @@
       "vcsRepoUrlTitle": "Rhaid iddo fod yn URL HTTP neu HTTPS",
       "vcsRepoUrlPlaceholder": "https://github.com/org/repo",
       "vcsBranch": "Cangen VCS",
-      "vcsBranchPlaceholder": "main (rhagosodedig)"
+      "vcsBranchPlaceholder": "main (rhagosodedig)",
+      "engine": "Peiriant",
+      "engineTerraform": "Terraform / OpenTofu",
+      "enginePulumi": "Pulumi",
+      "engineHelp": "Pa beiriant sy'n rhedeg y gweithle hwn. Nid y backend gweithredu, sy'n dewis y ffeil ddeuaidd o fewn peiriant Terraform.",
+      "namePatternPulumi": "Dwy ran wedi'u gwahanu gan '::' — project::stack. Llythrennau, rhifau, cysylltnodau a thanlinellau yn unig; rhaid i bob rhan ddechrau â llythyren neu rif.",
+      "namePlaceholderPulumi": "my-project::dev"
     },
     "stats": {
       "total": "Cyfanswm",

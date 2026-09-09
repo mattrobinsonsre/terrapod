@@ -34,7 +34,12 @@ GUARDED = {"Workspace", "Run", "ConfigurationVersion"}
 #: enforces; scoping it to one engine would make it answer a different question
 #: from the one the constraint asks.
 UNSCOPED_BY_DESIGN = {
-    "create_workspace": "name-uniqueness guard against a globally unique constraint",
+    # The create body moved here when the native surface gained an `engine`
+    # (#1535); the route above it is now a thin wrapper holding no query. The
+    # reasoning is unchanged and is now more load-bearing, not less: this
+    # function creates workspaces for EVERY engine, so a name taken by a Pulumi
+    # workspace has to conflict here too.
+    "_create_workspace_impl": "name-uniqueness guard against a globally unique constraint",
     "update_workspace": "rename uniqueness guard against a globally unique constraint",
 }
 

@@ -153,10 +153,20 @@ async def restore_deleted_workspace(
             # this one came from a human who can simply retype it; the
             # marker-derived fallback sanitizes instead, so a corrupt marker
             # cannot make a recoverable workspace un-restorable.
+            #
+            # Accepted against either engine's rule, because the marker that
+            # says which engine this was has not been read yet and a second
+            # storage round-trip to find out is not worth it. The union is the
+            # right bar anyway: this only decides whether a human's typed name
+            # is well-formed, and a Pulumi workspace's `project::stack` is
+            # well-formed (#1535). The restore itself uses the marker's engine.
             try:
                 name = validate_workspace_name(raw)
-            except ValueError as e:
-                raise HTTPException(status_code=422, detail=str(e)) from e
+            except ValueError:
+                try:
+                    name = validate_workspace_name(raw, "pulumi")
+                except ValueError as e:
+                    raise HTTPException(status_code=422, detail=str(e)) from e
 
     if not force:
         # A repeat restore yields a SECOND live workspace holding the same

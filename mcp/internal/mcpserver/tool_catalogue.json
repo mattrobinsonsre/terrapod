@@ -651,6 +651,10 @@
             "string"
           ]
         },
+        "engine": {
+          "description": "the execution engine family: terraform (default) or another engine this deployment enables, such as pulumi. NOT execution_backend, which picks tofu vs terraform within the Terraform engine. Workspaces are created here, in the UI or with the Terraform provider — never by an engine's own CLI",
+          "type": "string"
+        },
         "execution_backend": {
           "description": "tofu or terraform (default: server default)",
           "type": "string"

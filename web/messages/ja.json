@@ -78,7 +78,13 @@
       "vcsRepoUrlTitle": "HTTPまたはHTTPSのURLである必要があります",
       "vcsRepoUrlPlaceholder": "https://github.com/org/repo",
       "vcsBranch": "VCSブランチ",
-      "vcsBranchPlaceholder": "main（デフォルト）"
+      "vcsBranchPlaceholder": "main（デフォルト）",
+      "engine": "エンジン",
+      "engineTerraform": "Terraform / OpenTofu",
+      "enginePulumi": "Pulumi",
+      "engineHelp": "このワークスペースを実行するエンジンです。Terraform エンジン内のバイナリを選ぶ実行バックエンドとは異なります。",
+      "namePatternPulumi": "'::' で区切られた 2 つの部分 — project::stack。使用できるのは英数字、ハイフン、アンダースコアのみで、各部分は英字または数字で始まる必要があります。",
+      "namePlaceholderPulumi": "my-project::dev"
     },
     "stats": {
       "total": "合計",
