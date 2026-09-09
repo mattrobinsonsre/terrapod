@@ -21,7 +21,7 @@ import pytest
 from fastapi import HTTPException
 from httpx import ASGITransport, AsyncClient
 
-from terrapod.api.dependencies import AuthenticatedUser, get_current_user
+from terrapod.api.dependencies import AuthenticatedUser
 from terrapod.db.session import get_db
 
 pytestmark = pytest.mark.asyncio
@@ -41,9 +41,15 @@ def _user() -> AuthenticatedUser:
 
 def _app(db=None):
     from terrapod.api.app import create_application
+    from terrapod.api.routers.pulumi_service import pulumi_user
 
     app = create_application()
-    app.dependency_overrides[get_current_user] = lambda: _user()
+    # Override the SURFACE's dependency, not the generic one. Overriding
+    # get_current_user here is what made these tests pass while the real CLI got
+    # 401 on every request: the endpoints depend on pulumi_user, which
+    # translates Pulumi's `token` scheme, and injecting past it skips exactly
+    # the code the CLI exercises. The scheme itself is tested below, unmocked.
+    app.dependency_overrides[pulumi_user] = lambda: _user()
     app.dependency_overrides[get_db] = lambda: db or AsyncMock()
     return app
 
@@ -333,3 +339,81 @@ class TestTheEngineGate:
         # db.delete appears once, in delete_stack — an explicit user action, not
         # a consequence of gating.
         assert src.count("db.delete(") == 1
+
+
+class TestTheAuthSchemeTheCliActuallySends:
+    """`Authorization: token <api-token>` — NOT Bearer.
+
+    This is the gap a live run found after 21 tests passed: the scheme was
+    documented in the module docstring and then not implemented, because every
+    test injected its own authenticated client and never sent the header. So
+    these exercise the dependency directly, with no override in the way.
+    """
+
+    async def test_the_token_scheme_is_accepted(self) -> None:
+        from terrapod.api.routers.pulumi_service import pulumi_user
+
+        request = MagicMock()
+        request.headers = {"authorization": "token an-api-token"}
+        resolved = AsyncMock(return_value=_user())
+        with patch("terrapod.api.dependencies.get_current_user", resolved):
+            out = await pulumi_user(request, AsyncMock())
+        assert out.email == "a@b.c"
+        # The value is handed on as a normal credential, so one place keeps
+        # resolving API tokens, sessions and roles.
+        assert resolved.await_args.args[1].credentials == "an-api-token"
+
+    async def test_bearer_is_also_accepted(self) -> None:
+        """An operator reaching for curl while debugging is reasonable, and
+        refusing it buys nothing."""
+        from terrapod.api.routers.pulumi_service import pulumi_user
+
+        request = MagicMock()
+        request.headers = {"authorization": "Bearer an-api-token"}
+        with patch("terrapod.api.dependencies.get_current_user", AsyncMock(return_value=_user())):
+            assert (await pulumi_user(request, AsyncMock())).email == "a@b.c"
+
+    async def test_no_credential_is_a_401_naming_the_scheme(self) -> None:
+        """The error has to say what the CLI should send; "unauthorized" alone
+        leaves an operator guessing at a scheme most tools do not use."""
+        from terrapod.api.routers.pulumi_service import pulumi_user
+
+        request = MagicMock()
+        request.headers = {}
+        with pytest.raises(HTTPException) as exc:
+            await pulumi_user(request, AsyncMock())
+        assert exc.value.status_code == 401
+        assert "token" in exc.value.detail
+
+
+class TestErrorsAreShapedForTheCli:
+    """The CLI reads `message` and prints it verbatim.
+
+    A live `pulumi stack init` against the house envelope produced
+    `error: could not create stack: [0] ` — a failure with no explanation. It
+    matters most on the 409, where refuse-to-start IS the concurrency model and
+    the message is all the operator gets.
+    """
+
+    async def test_an_error_carries_a_message_field(self) -> None:
+        # `execute()` is awaited and its RESULT is sync, so the result must be a
+        # MagicMock — a bare AsyncMock hands back a coroutine and the lookup
+        # never reaches its "not found" branch.
+        db = AsyncMock()
+        result = MagicMock()
+        result.scalar_one_or_none.return_value = None
+        db.execute.return_value = result
+
+        async with await _client(_app(db)) as c:
+            r = await c.get(f"{BASE}/stacks/default/nope/nope")
+        assert r.status_code == 404
+        body = r.json()
+        assert body["message"], f"the CLI would print an empty error: {body}"
+        assert body["code"] == 404
+
+    async def test_other_surfaces_keep_the_house_envelope(self) -> None:
+        """The branch is scoped to this surface; changing the envelope everywhere
+        would be a silent, repo-wide break."""
+        async with await _client(_app()) as c:
+            r = await c.get("/api/v1/workspaces/ws-does-not-exist")
+        assert "errors" in r.json() or "detail" in r.json()

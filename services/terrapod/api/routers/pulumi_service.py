@@ -58,13 +58,59 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from terrapod.api.dependencies import AuthenticatedUser, get_current_user
+from terrapod.api.dependencies import AuthenticatedUser
 from terrapod.db.models import Workspace
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 
+
+class PulumiError(HTTPException):
+    """An error in the shape the Pulumi CLI actually reads.
+
+    Terrapod's house envelope is `{"errors": [...], "detail": ...}`. The CLI reads
+    `message` and prints it verbatim — so a plain HTTPException here surfaces to
+    the user as `error: [0] ` with nothing after it, which is what a real run
+    produced before this existed.
+
+    That matters most for the 409: refuse-to-start is the whole concurrency
+    model, and the message is the entire explanation the operator gets.
+    """
+
+
 router = APIRouter(prefix="/pulumi", tags=["pulumi-service"])
 logger = get_logger(__name__)
+
+
+async def pulumi_user(request: Request, db: AsyncSession = Depends(get_db)) -> AuthenticatedUser:
+    """Authenticate a Pulumi CLI request.
+
+    The scheme is `Authorization: token <api-token>` — NOT `Bearer`. That is the
+    capture's first finding and it is easy to document and then not implement:
+    reaching for the standard dependency gives a surface that 401s every request
+    the CLI makes, while every test that injects its own client passes.
+
+    So the header is normalised and handed to the ordinary dependency, which
+    keeps one place resolving API tokens, sessions and roles. Bearer is accepted
+    too, because `curl` against this surface is a reasonable thing for an
+    operator to do while debugging and refusing it buys nothing.
+    """
+    from fastapi.security import HTTPAuthorizationCredentials
+
+    from terrapod.api.dependencies import get_current_user as _get_current_user
+
+    header = request.headers.get("authorization", "")
+    scheme, _, value = header.partition(" ")
+    if scheme.lower() not in ("token", "bearer") or not value:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Pulumi requests authenticate with `Authorization: token <api-token>`",
+        )
+    return await _get_current_user(
+        request,
+        HTTPAuthorizationCredentials(scheme="Bearer", credentials=value),
+        db,
+    )
+
 
 #: Terrapod is single-organization; the CLI still addresses one by name.
 DEFAULT_ORG = "default"
@@ -154,7 +200,7 @@ async def read_body(request: Request) -> dict[str, Any]:
 
 
 @router.get("/api/user")
-async def whoami(user: AuthenticatedUser = Depends(get_current_user)) -> dict[str, Any]:
+async def whoami(user: AuthenticatedUser = Depends(pulumi_user)) -> dict[str, Any]:
     """`pulumi login` and `pulumi whoami`."""
     return {
         "id": user.email,
@@ -169,7 +215,7 @@ async def whoami(user: AuthenticatedUser = Depends(get_current_user)) -> dict[st
 
 @router.get("/api/capabilities")
 async def capabilities(
-    user: AuthenticatedUser = Depends(get_current_user),
+    user: AuthenticatedUser = Depends(pulumi_user),
 ) -> dict[str, Any]:
     """Feature negotiation. An empty list is accepted and means "nothing extra".
 
@@ -182,7 +228,7 @@ async def capabilities(
 
 @router.get("/api/user/organizations/{org}")
 async def get_organization(
-    org: str, user: AuthenticatedUser = Depends(get_current_user)
+    org: str, user: AuthenticatedUser = Depends(pulumi_user)
 ) -> dict[str, Any]:
     """Org lookup. Called constantly, so it stays cheap."""
     if org != DEFAULT_ORG:
@@ -199,7 +245,7 @@ async def get_organization(
 @router.get("/api/user/stacks")
 async def list_stacks(
     project: str = "",
-    user: AuthenticatedUser = Depends(get_current_user),
+    user: AuthenticatedUser = Depends(pulumi_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """`pulumi stack ls`."""
@@ -228,7 +274,7 @@ async def create_stack(
     org: str,
     project: str,
     request: Request,
-    user: AuthenticatedUser = Depends(get_current_user),
+    user: AuthenticatedUser = Depends(pulumi_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """`pulumi stack init` — body `{"stackName", "tags"}`."""
@@ -273,7 +319,7 @@ async def get_stack(
     org: str,
     project: str,
     stack: str,
-    user: AuthenticatedUser = Depends(get_current_user),
+    user: AuthenticatedUser = Depends(pulumi_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """Stack lookup. A 404 here is how the CLI decides a stack needs creating."""
@@ -291,7 +337,7 @@ async def delete_stack(
     org: str,
     project: str,
     stack: str,
-    user: AuthenticatedUser = Depends(get_current_user),
+    user: AuthenticatedUser = Depends(pulumi_user),
     db: AsyncSession = Depends(get_db),
 ) -> Response:
     """`pulumi stack rm`."""
@@ -386,7 +432,7 @@ async def export_stack(
     org: str,
     project: str,
     stack: str,
-    user: AuthenticatedUser = Depends(get_current_user),
+    user: AuthenticatedUser = Depends(pulumi_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """`pulumi stack export`, and how the CLI reads state before an update.
@@ -406,7 +452,7 @@ async def import_stack(
     project: str,
     stack: str,
     request: Request,
-    user: AuthenticatedUser = Depends(get_current_user),
+    user: AuthenticatedUser = Depends(pulumi_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """`pulumi stack import` — writes state wholesale. Body may be gzipped."""
@@ -414,9 +460,14 @@ async def import_stack(
     body = await read_body(request)
     await _write_deployment(ws, db, body.get("deployment"))
     logger.info("pulumi_state_imported", stack=ws.name, actor=user.email)
-    # The CLI polls an update id after an import; answering with a completed one
-    # lets it finish rather than waiting on something that never appears.
-    return {"updateID": ""}
+    # `stack import` is asynchronous: the CLI takes this id and polls
+    # GET .../update/{id} until it reports a terminal status. The id must be
+    # non-empty — an empty one makes the poll URL `.../update/`, which matches no
+    # route and answers 405, and the CLI reports "waiting for import: [405]".
+    #
+    # The write above already happened synchronously, so any id works: the poll
+    # finds no record and reads that as succeeded, which is the honest answer.
+    return {"updateID": str(uuid.uuid4())}
 
 
 # ── secrets ──────────────────────────────────────────────────────────────────
@@ -437,7 +488,7 @@ async def encrypt_secret(
     project: str,
     stack: str,
     request: Request,
-    user: AuthenticatedUser = Depends(get_current_user),
+    user: AuthenticatedUser = Depends(pulumi_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """Encrypt one value for a stack — body `{"plaintext": "<base64>"}`.
@@ -468,7 +519,7 @@ async def decrypt_secret(
     project: str,
     stack: str,
     request: Request,
-    user: AuthenticatedUser = Depends(get_current_user),
+    user: AuthenticatedUser = Depends(pulumi_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """Decrypt one value.
@@ -499,7 +550,7 @@ async def batch_decrypt(
     project: str,
     stack: str,
     request: Request,
-    user: AuthenticatedUser = Depends(get_current_user),
+    user: AuthenticatedUser = Depends(pulumi_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """Decrypt many at once — the shape `pulumi config` uses on a stack with
@@ -622,7 +673,7 @@ async def begin_preview(
     org: str,
     project: str,
     stack: str,
-    user: AuthenticatedUser = Depends(get_current_user),
+    user: AuthenticatedUser = Depends(pulumi_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """A preview IS an update — same creation, same start path, same lease."""
@@ -634,7 +685,7 @@ async def begin_up(
     org: str,
     project: str,
     stack: str,
-    user: AuthenticatedUser = Depends(get_current_user),
+    user: AuthenticatedUser = Depends(pulumi_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     return await _begin_update(await _load_stack(db, f"{org}/{project}/{stack}"), "update", user)
@@ -645,7 +696,7 @@ async def begin_refresh(
     org: str,
     project: str,
     stack: str,
-    user: AuthenticatedUser = Depends(get_current_user),
+    user: AuthenticatedUser = Depends(pulumi_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     return await _begin_update(await _load_stack(db, f"{org}/{project}/{stack}"), "refresh", user)
@@ -656,7 +707,7 @@ async def begin_destroy(
     org: str,
     project: str,
     stack: str,
-    user: AuthenticatedUser = Depends(get_current_user),
+    user: AuthenticatedUser = Depends(pulumi_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     return await _begin_update(await _load_stack(db, f"{org}/{project}/{stack}"), "destroy", user)
@@ -668,7 +719,7 @@ async def start_update(
     project: str,
     stack: str,
     update_id: str,
-    user: AuthenticatedUser = Depends(get_current_user),
+    user: AuthenticatedUser = Depends(pulumi_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """Start a created update, and hand back the lease.
@@ -696,7 +747,7 @@ async def get_update_status(
     project: str,
     stack: str,
     update_id: str,
-    user: AuthenticatedUser = Depends(get_current_user),
+    user: AuthenticatedUser = Depends(pulumi_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """Poll an update. `stack import` waits on this."""

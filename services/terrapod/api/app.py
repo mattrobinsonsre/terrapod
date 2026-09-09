@@ -852,6 +852,17 @@ def create_application() -> FastAPI:
         # guard keeps this handler a strict superset of FastAPI's.
         if not is_body_allowed_for_status_code(exc.status_code):
             return Response(status_code=exc.status_code, headers=headers)
+        # The Pulumi CLI reads `message` and prints it verbatim; the house
+        # envelope surfaces to a user as `error: [0] ` with nothing after it,
+        # which is what a real `pulumi stack init` produced before this branch
+        # existed. It matters most for the 409 that refuses a concurrent update,
+        # where the message is the entire explanation the operator gets (#1522).
+        if "/pulumi/api/" in request.scope.get("path", ""):
+            return JSONResponse(
+                status_code=exc.status_code,
+                content={"code": exc.status_code, "message": exc.detail},
+                headers=headers,
+            )
         return jsonapi_error_response(exc.detail, exc.status_code, headers=headers)
 
     @app.exception_handler(RequestValidationError)
