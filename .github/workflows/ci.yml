@@ -977,6 +977,33 @@ jobs:
           fi
           echo "all retention keys render:" $keys
 
+      - name: The outbound-URL guard's settings reach the pod
+        run: |
+          # #1541. The guard decides where a user-supplied webhook may point, so
+          # a value that never reaches the ConfigMap means an operator who
+          # allow-lists their internal endpoint is silently ignored and their
+          # webhooks stay broken — or, with block_private_addresses, that they
+          # believe they tightened something they did not.
+          #
+          # Greps the RENDERED output, not the template, which is what catches a
+          # missing render line.
+          for k in block_private_addresses allowed_hosts allowed_cidrs; do
+            grep -q "^ *$k:" /tmp/rendered.yaml || {
+              echo "outbound_requests.$k never reaches the pod — add a render"
+              echo "line to templates/configmap-api.yaml"
+              exit 1
+            }
+          done
+          # And the shipped default stays permissive: refusing private space by
+          # default would break in-cluster webhook receivers, which is the
+          # ordinary self-hosted case.
+          grep -q "block_private_addresses: false" /tmp/rendered.yaml || {
+            echo "the shipped default for block_private_addresses is no longer"
+            echo "false — that breaks webhooks to in-cluster receivers"
+            exit 1
+          }
+          echo "outbound_requests renders, and stays permissive by default"
+
       - name: Two installs in one cluster cannot collide on a cluster-scoped name
         run: |
           # Terrapod is single-organization, so separating business units means
