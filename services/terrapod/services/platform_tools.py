@@ -201,6 +201,26 @@ async def _expected_sha256(
                 return parts[0].lower()
         raise VerificationError(f"{asset} is not listed in the trivy checksums manifest")
 
+    if tool == "pulumi":
+        # One manifest for the whole release, same "<hex>  <filename>" shape as
+        # Trivy's. Note the two spellings of the version in one URL: the release
+        # is tagged `v3.208.0` but the manifest inside it is named without the
+        # `v`. Getting that wrong 404s, which fails closed as an unverifiable
+        # artifact rather than as the typo it is.
+        resp = await arequest_with_retry(
+            client, "GET", f"{base}/v{version}/pulumi-{version}-checksums.txt"
+        )
+        if resp.status_code != 200:
+            raise VerificationError(
+                f"could not fetch the pulumi checksums manifest for {version} "
+                f"(HTTP {resp.status_code})"
+            )
+        for line in resp.text.splitlines():
+            parts = line.split()
+            if len(parts) >= 2 and parts[1].lstrip("*") == asset:
+                return parts[0].lower()
+        raise VerificationError(f"{asset} is not listed in the pulumi checksums manifest")
+
     if tool == "checkov":
         # No checksum file exists; the release API's per-asset digest is the
         # only material there is. Weaker, and documented as such.

@@ -34,10 +34,23 @@ import terrapod
 # use __path__ for the package directory.
 _ROOT = Path(next(iter(terrapod.__path__))).resolve()
 _LISTENER = _ROOT / "runner" / "listener.py"
+#: The engine strategies parse the same `runs/next` payload the listener used to
+#: parse inline (#1523): `options_from_attrs` moved the `attrs.get(...)` reads out
+#: of the listener and into each engine. The wire surface is unchanged by that —
+#: the same keys are read from the same payload — but a gate that looks only at
+#: listener.py sees twenty attributes vanish and calls a refactor a breaking
+#: change. Read both, so this measures what the far side consumes rather than
+#: which file consumes it.
+_ENGINES = sorted((_ROOT / "engines").glob("*.py"))
 _UPLOADS = _ROOT / "runner" / "phases" / "uploads.py"
 _RUN_SERVICE = _ROOT / "services" / "run_service.py"
 _RECONCILER = _ROOT / "services" / "run_reconciler.py"
 _SNAPSHOT = Path(__file__).parent / "api_wire_contract.json"
+
+
+def _wire_readers() -> str:
+    """Every source that parses the `runs/next` payload, concatenated."""
+    return "\n".join([_LISTENER.read_text(), *(p.read_text() for p in _ENGINES)])
 
 
 def _sse_event_names() -> set[str]:
@@ -47,8 +60,8 @@ def _sse_event_names() -> set[str]:
 
 
 def _runs_next_attributes() -> set[str]:
-    """The `runs/next` response attributes the listener reads (`attrs.get("...")`)."""
-    src = _LISTENER.read_text()
+    """The `runs/next` response attributes the far side reads (`attrs.get("...")`)."""
+    src = _wire_readers()
     return set(re.findall(r'attrs\.get\("([a-z][a-z0-9-]*)"', src))
 
 
@@ -61,7 +74,7 @@ def _listener_read_keys() -> set[str]:
     `tail_lines`, …). Renaming any of these is a runner/listener wire break the
     top-level attr freeze can't see. Restricted to lower-case-initial keys to skip
     env-var reads like `os.environ.get("POD_NAME")`."""
-    src = _LISTENER.read_text()
+    src = _wire_readers()
     return set(re.findall(r'\.get\("([a-z][a-z0-9_-]*)"', src))
 
 

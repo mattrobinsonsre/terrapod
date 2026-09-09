@@ -17,6 +17,8 @@ the live run did not.
 
 from __future__ import annotations
 
+from unittest.mock import MagicMock
+
 import pytest
 
 from terrapod.engines import strategy_for
@@ -76,3 +78,124 @@ class TestThePhaseTranslation:
         re-couple the two engines' option shapes."""
         opts = strategy_for("terraform").options_from_attrs(ATTRS, "plan")
         assert not hasattr(opts, "phase")
+
+
+def _runner_config():
+    """A minimal RunnerConfig, matching test_job_template's fixture.
+
+    Explicit empties matter: a bare MagicMock attribute is truthy, so leaving
+    these unset injects phantom volumes and proxy env into the rendered spec.
+    """
+    cfg = MagicMock()
+    cfg.image.repository = "ghcr.io/test/runner"
+    cfg.image.tag = "latest"
+    cfg.image.pull_policy = "IfNotPresent"
+    cfg.default = "default"
+    cfg.default_terraform_version = "1.11"
+    cfg.default_execution_backend = "tofu"
+    cfg.ttl_seconds_after_finished = 300
+    cfg.azure_workload_identity = False
+    cfg.node_selector = {}
+    cfg.tolerations = []
+    cfg.affinity = {}
+    cfg.priority_class_name = ""
+    cfg.topology_spread_constraints = []
+    cfg.pod_security_context = {}
+    cfg.pod_annotations = {}
+    cfg.host_aliases = []
+    cfg.extra_volumes = []
+    cfg.extra_volume_mounts = []
+    cfg.proxy = None
+    cfg.ca_bundle_enabled = False
+    cfg.server_url = "http://terrapod-api:8000"
+    cfg.public_api_url = ""
+    cfg.runner_namespace = "terrapod-runners"
+    default_def = MagicMock()
+    default_def.name = "default"
+    cfg.definitions = [default_def]
+    return cfg
+
+
+def _as_the_listener_calls_it(engine: str, phase: str) -> dict:
+    """Drive `build_job_spec` with exactly the kwargs the listener passes.
+
+    The point of going through the real call shape rather than a tidy subset:
+    the bug below was a *collision* between what the listener passes and what
+    the strategy re-derived, so any test that supplied fewer arguments could not
+    have seen it.
+    """
+    s = strategy_for(engine)
+    return s.build_job_spec(
+        options=s.options_from_attrs(ATTRS, phase),
+        run_id="01a0871a3dd773a8",
+        phase=phase,
+        runner_config=_runner_config(),
+        auth_secret_name="tprun-01a0871a3dd773a8-plan-auth",
+        vars_secret_name="tprun-01a0871a3dd773a8-plan-vars",
+        env_vars=[{"key": "TF_LOG", "value": "DEBUG"}],
+        terraform_vars=[],
+        execution_hooks=[],
+        git_auth=[],
+        resource_cpu="2",
+        resource_memory="4Gi",
+        ca_secret_name="",
+    )
+
+
+def _container(spec: dict) -> dict:
+    return spec["spec"]["template"]["spec"]["containers"][0]
+
+
+class TestTheStrategyDoesNotFightTheListener:
+    """A strategy adds `engine_env`; everything else is the listener's to pass.
+
+    Pulumi's `build_job_spec` re-derived five fields from its own options while
+    the listener was already passing them. `phase` collided first and raised
+    `TypeError: got multiple values for keyword argument 'phase'` — inside the
+    same fire-and-forget task as the original #1523 bug, so it presented
+    identically: no Job, no log, and "stuck pre-launch" five minutes later.
+
+    The TypeError was the lucky part. Behind it sat three overrides that would
+    not have raised at all, listed in the assertions below.
+    """
+
+    @pytest.mark.parametrize("engine", ["terraform", "pulumi"])
+    def test_the_listeners_call_shape_builds_a_spec(self, engine: str) -> None:
+        """Fails on the pre-fix code with the duplicate-kwarg TypeError."""
+        assert _as_the_listener_calls_it(engine, "plan")
+
+    def test_the_job_is_named_for_the_platform_phase_not_the_engines(self) -> None:
+        """`tprun-{short}-plan`, never `-preview`.
+
+        This is the one that would have hurt quietly. The listener names the
+        auth and vars Secrets with the platform phase before it ever calls the
+        strategy, so a Job named for Pulumi's verb would reference Secrets that
+        do not exist, and the ownerReference GC those Secrets rely on would have
+        nothing to hang from.
+        """
+        spec = _as_the_listener_calls_it("pulumi", "plan")
+        assert spec["metadata"]["name"].endswith("-plan")
+
+    def test_pulumis_own_verb_still_reaches_the_entrypoint(self) -> None:
+        """The translation is not lost by passing the platform phase through —
+        it travels as TP_PULUMI_PHASE, which is what the split is for."""
+        env = {
+            e["name"]: e.get("value")
+            for e in _container(_as_the_listener_calls_it("pulumi", "plan"))["env"]
+        }
+        assert env["TP_ENGINE"] == "pulumi"
+        assert env["TP_PULUMI_PHASE"] == "preview"
+        assert env["TP_PHASE"] == "plan"
+
+    def test_the_listeners_env_vars_survive(self) -> None:
+        """`options.env_vars` is never populated by `options_from_attrs`, so
+        forwarding it discarded every real env var the listener resolved."""
+        names = {e["name"] for e in _container(_as_the_listener_calls_it("pulumi", "plan"))["env"]}
+        assert "TF_LOG" in names, "the listener's env vars were dropped"
+
+    def test_the_listeners_resource_sizing_survives(self) -> None:
+        """`options.resource_*` default to "", which would have replaced the
+        workspace's sizing with an empty request."""
+        res = _container(_as_the_listener_calls_it("pulumi", "plan"))["resources"]
+        assert res["requests"]["cpu"] == "2"
+        assert res["requests"]["memory"] == "4Gi"

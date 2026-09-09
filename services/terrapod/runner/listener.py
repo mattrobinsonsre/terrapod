@@ -773,23 +773,43 @@ class RunnerListener:
         # `options.phase` — inside a fire-and-forget task, so the exception went
         # to asyncio rather than to the run, no Job was created, and the run sat
         # until the reconciler called it "stuck pre-launch" five minutes later.
-        options = engine.options_from_attrs(attrs, phase)
+        # Guarded for the same reason create_job below is. These two calls run
+        # inside a fire-and-forget task, so anything they raise goes to asyncio
+        # and nowhere else: no log line, no run error, and the run sits in
+        # `planning` until the reconciler calls it "stuck pre-launch" five
+        # minutes later. That is how the original engine-options bug presented,
+        # and leaving the replacement unguarded reproduces the same blindness
+        # for the next fault. An engine that cannot build its own options or
+        # Job spec should fail the run, saying so.
+        try:
+            options = engine.options_from_attrs(attrs, phase)
 
-        spec = engine.build_job_spec(
-            options=options,
-            run_id=run_id,
-            phase=phase,
-            runner_config=self.runner_config,
-            auth_secret_name=auth_secret_name,
-            vars_secret_name=vars_secret_name,
-            env_vars=env_vars,
-            terraform_vars=terraform_vars,
-            execution_hooks=execution_hooks,
-            git_auth=git_auth,
-            resource_cpu=attrs.get("resource-cpu", "1"),
-            resource_memory=attrs.get("resource-memory", "2Gi"),
-            ca_secret_name=ca_secret_name,
-        )
+            spec = engine.build_job_spec(
+                options=options,
+                run_id=run_id,
+                phase=phase,
+                runner_config=self.runner_config,
+                auth_secret_name=auth_secret_name,
+                vars_secret_name=vars_secret_name,
+                env_vars=env_vars,
+                terraform_vars=terraform_vars,
+                execution_hooks=execution_hooks,
+                git_auth=git_auth,
+                resource_cpu=attrs.get("resource-cpu", "1"),
+                resource_memory=attrs.get("resource-memory", "2Gi"),
+                ca_secret_name=ca_secret_name,
+            )
+        except Exception as e:
+            logger.error(
+                "Failed to build Job spec",
+                run_id=run_id,
+                engine=getattr(engine, "name", "?"),
+                phase=phase,
+                error=str(e),
+                exc_info=True,
+            )
+            await self._report_launch_failed(run_id, f"Failed to build {phase} Job spec: {e}")
+            return
 
         namespace = self.runner_config.runner_namespace
 

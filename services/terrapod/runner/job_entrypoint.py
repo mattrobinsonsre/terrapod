@@ -829,6 +829,18 @@ def _run_pulumi_phase(cfg, *, child_grace: int) -> int:  # type: ignore[no-untyp
         argv = pulumi_exec.preview_argv(plan_file, cfg)
         log_file = str(_PLAN_LOG)
     elif phase in ("update", "apply"):
+        # The preview ran in a *different pod*, so its `--save-plan` file is not
+        # on this filesystem. Fetch it back the way the Terraform apply fetches
+        # `tfplan`, or `up` fails outright with "open /workspace/plan.json: no
+        # such file or directory" — which is what happened before this, on a run
+        # whose preview had succeeded moments earlier.
+        if not _fetch_pulumi_plan(cfg, plan_file):
+            log.warning(
+                "pulumi plan file not available; update will compute its own. "
+                "The applied configuration is the same, but the update is no "
+                "longer constrained to the operations the approved preview showed",
+            )
+            plan_file = ""
         argv = pulumi_exec.update_argv(plan_file, cfg)
         log_file = str(_APPLY_LOG)
     else:
@@ -857,7 +869,57 @@ def _run_pulumi_phase(cfg, *, child_grace: int) -> int:  # type: ignore[no-untyp
         child_grace_seconds=float(child_grace),
         tee_to_stdout=True,
     )
+
+    # Hand the saved plan to the update phase, which runs in another pod. Skipped
+    # for plan-only runs (nothing will consume it) and when the preview failed
+    # (there is no plan worth keeping). Best-effort, like Terraform's: a failure
+    # here costs the plan-constraint, not the run.
+    if (
+        result.exit_code == 0
+        and phase in ("preview", "plan")
+        and not cfg.plan_only
+        and cfg.has_api
+        and plan_file
+        and Path(plan_file).exists()
+    ):
+        try:
+            from terrapod.runner.phases import uploads
+
+            uploads.upload_plan_file(cfg, Path(plan_file))
+        except Exception as exc:  # noqa: BLE001
+            log.warning("pulumi plan-file upload raised (non-fatal)", err=str(exc))
+
     return result.exit_code
+
+
+def _fetch_pulumi_plan(cfg, plan_file: str) -> bool:  # type: ignore[no-untyped-def]
+    """Download the preview's saved plan into `plan_file`.
+
+    Returns False when there is nothing to fetch — no API, or the artifact is
+    absent because the preview predates this being uploaded — so the caller can
+    fall back to an unconstrained `up` rather than failing the run.
+    """
+    if not cfg.has_api or not plan_file:
+        return False
+
+    from terrapod.runner.download import download_to_file as _download_to_file
+
+    dest = Path(plan_file)
+    headers = {"Authorization": f"Bearer {cfg.auth_token}"} if cfg.auth_token else {}
+    result = _download_to_file(
+        f"{cfg.api_url}/api/terrapod/v1/runs/{cfg.run_id}/artifacts/plan-file",
+        dest,
+        headers=headers,
+        api_url=cfg.api_url,
+        retries=cfg.download_retries,
+        retry_delay_seconds=cfg.download_retry_delay_seconds,
+    )
+    if result.ok and dest.exists() and dest.stat().st_size > 0:
+        return True
+    # A zero-byte or partial file would be worse than none: `up --plan` would
+    # read it and fail on malformed content instead of computing its own.
+    dest.unlink(missing_ok=True)
+    return False
 
 
 def main(argv: list[str] | None = None) -> int:
