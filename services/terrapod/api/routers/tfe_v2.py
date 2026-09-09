@@ -54,6 +54,7 @@ from terrapod.api.dependencies import (
 )
 from terrapod.api.labels import validate_labels
 from terrapod.api.pagination import MAX_PAGE_SIZE, build_meta, paginate, parse_page_params
+from terrapod.api.prefixes import TFE_PREFIX
 from terrapod.auth import capabilities as cap
 from terrapod.auth.capabilities import has_capability
 from terrapod.db.models import (
@@ -82,7 +83,7 @@ from terrapod.services.workspace_rbac_service import (
 from terrapod.storage import get_storage
 from terrapod.storage.keys import state_index_key, state_key
 
-router = APIRouter(prefix="/api/v2", tags=["tfe-v2"])
+router = APIRouter(tags=["tfe-v2"])
 
 # Workspace by-id DELETE is the one path on the workspaces resource that
 # the terraform/tofu CLI doesn't call (the legacy remote backend deletes
@@ -2297,9 +2298,16 @@ def _state_version_json(sv: StateVersion, request: Request | None = None) -> dic
                 "size": sv.state_size,
                 "created-at": _rfc3339(sv.created_at),
                 "created-by": sv.created_by,
-                "hosted-state-download-url": f"{base}/api/v2/state-versions/{sv_id}/download",
-                "hosted-state-upload-url": f"{base}/api/v2/state-versions/{sv_id}/content",
-                "hosted-json-state-upload-url": f"{base}/api/v2/state-versions/{sv_id}/json-content",
+                # Absolute URLs the client follows VERBATIM — service discovery
+                # does not govern them (proven in the #1528 spike: the client
+                # went straight past the advertised base to whatever these say).
+                # So they must move with the routes, or state upload silently
+                # keeps using the old path — and that is the endpoint that
+                # deliberately requires no auth, so it is the last one to leave
+                # drifting.
+                "hosted-state-download-url": f"{base}{TFE_PREFIX}/state-versions/{sv_id}/download",
+                "hosted-state-upload-url": f"{base}{TFE_PREFIX}/state-versions/{sv_id}/content",
+                "hosted-json-state-upload-url": f"{base}{TFE_PREFIX}/state-versions/{sv_id}/json-content",
             },
             "relationships": {
                 "run": {

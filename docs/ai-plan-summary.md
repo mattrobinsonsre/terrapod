@@ -235,7 +235,7 @@ Each workspace has two opt-in fields:
   causes a global outage") or domain knowledge.
 
 Set both via the workspace settings UI, the API (`PATCH
-/api/v2/workspaces/{id}`), or the `terrapod_workspace` Terraform resource
+/api/tfe/v2/workspaces/{id}`), or the `terrapod_workspace` Terraform resource
 attributes (`ai_summary_mode` and `ai_summary_context`).
 
 ## Prompt customisation

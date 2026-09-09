@@ -28,7 +28,7 @@ Terrapod targets **TFE V2 API compatibility for the surface that
 `terraform`, `tofu`, and `tfci` consume** — service discovery, the
 cloud-block run lifecycle, variable + variable-set management, and the module
 + provider registry CLI download protocols. That subset is mounted at
-`/api/v2/` and is treated as a stable contract for those clients. Everything
+`/api/tfe/v2/` and is treated as a stable contract for those clients. Everything
 else — workspace/role/registry management, agent pools, **policy sets
 (OPA/Rego — the open-source equivalent of TFE's Sentinel)**, notifications,
 run tasks, drift detection, the SSE streams, and the runner protocol — is
@@ -36,10 +36,11 @@ Terrapod-native and lives at `/api/v1/`.
 
 The verified CLI-consumed endpoints are catalogued in
 [`docs/tfe-cli-surface.md`](docs/tfe-cli-surface.md). When extending the API:
-if a route is on that list it stays at `/api/v2/`; otherwise it goes under
+if a route is on that list it stays at `/api/tfe/v2/`; otherwise it goes under
 `/api/v1/`.
 
-**`/api/v1` is canonical; `/api/terrapod/v1` is a deprecated alias** kept for the
+**`/api/v1` is canonical for the native API and `/api/tfe/v2` for the TFE
+compatibility surface; `/api/terrapod/v1` and `/api/v2` are deprecated aliases** kept for the
 support window (#1529, sunset in [`docs/deprecations.md`](docs/deprecations.md)).
 Both are mounted from one helper — `include_terrapod()` in `api/app.py` — so a new
 endpoint appears at both automatically. **Never mount a router at the prefix
@@ -215,7 +216,7 @@ that surfaces the changed thing has been carried along with it.
 
 The workflow when extending the API:
 
-1. Add the endpoint to the appropriate router (`/api/v2/` only if it's on the
+1. Add the endpoint to the appropriate router (`/api/tfe/v2/` only if it's on the
    CLI-surface list; otherwise `/api/v1/`).
 2. Add a typed method to **go-terrapod** + a test (the shape matches the
    JSON:API response).
@@ -464,7 +465,7 @@ multi-language implementation ships in the same PR**:
   in a committed snapshot (`services/tests/api/api_route_contract.json`), and
   `tests/api/test_route_contract.py` fails CI on any diff. Removing or renaming
   a route is a **breaking change** for a consumer that lags the server across
-  version skew (the `terraform`/`tofu` `cloud` backend + `go-tfe` on `/api/v2/`,
+  version skew (the `terraform`/`tofu` `cloud` backend + `go-tfe` on `/api/tfe/v2/`,
   or a runner/listener on `/api/terrapod/v1/`, which is where our own images
   still call) — it requires a MAJOR bump or a
   documented deprecation, **not** a snapshot regen. **Adding** a route is
@@ -485,9 +486,9 @@ multi-language implementation ships in the same PR**:
     adding pagination **additive / MINOR-safe** rather than breaking.
   - **Always emit `meta.pagination`** with Terrapod's four keys —
     `current-page`, `page-size`, `total-count`, `total-pages`. This is
-    **Terrapod's own shape, used uniformly on both `/api/v2` and
+    **Terrapod's own shape, used uniformly on both `/api/tfe/v2` and
     `/api/v1`** — do not model non-TFE endpoints on TFE's key set
-    (no `prev-page`/`next-page`). On `/api/v2` the shape still matches what a
+    (no `prev-page`/`next-page`). On `/api/tfe/v2` the shape still matches what a
     `go-tfe` client parses; that compatibility is incidental, not a constraint
     the native surface bends to.
   - **RBAC-filtered lists slice AFTER the permission filter** — pass the visible
@@ -511,7 +512,7 @@ multi-language implementation ships in the same PR**:
     filters client-side (**no page-through UX**), fetches via `fetchAllPages()`
     in `web/src/lib/api.ts`.
 - **The API house style is JSON:API (convention)** — the API has **one** house
-  style, and both surfaces (`/api/v2` + `/api/v1`) follow it. A new or
+  style, and both surfaces (`/api/tfe/v2` + `/api/v1`) follow it. A new or
   changed endpoint conforms to all of it:
   - **`data` envelope** — a resource is `{"data": {"type", "id", "attributes",
     "relationships"?}}`; a collection is `{"data": [...], "meta": {...}}`.

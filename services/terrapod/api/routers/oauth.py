@@ -17,6 +17,7 @@ from fastapi import APIRouter, Depends, Form, HTTPException, Query, status
 from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from terrapod.api.prefixes import TFE_PREFIX
 from terrapod.auth.api_tokens import create_api_token
 from terrapod.auth.auth_state import (
     AuthState,
@@ -63,11 +64,16 @@ async def terraform_service_discovery() -> JSONResponse:
                 "token": "/oauth/token",
                 "ports": [10000, 10010],
             },
-            "modules.v1": "/api/v2/registry/modules/",
-            "providers.v1": "/api/v2/registry/providers/",
-            "tfe.v2": "/api/v2/",
-            "tfe.v2.1": "/api/v2/",
-            "tfe.v2.2": "/api/v2/",
+            # The canonical paths (#1528). Verified empirically rather than
+            # assumed: a real `tofu`/`terraform` init + plan + apply against a
+            # relocated surface requested every path from here and never touched
+            # the old prefix. The old prefix keeps serving for clients that
+            # cache discovery or bypass it.
+            "modules.v1": f"{TFE_PREFIX}/registry/modules/",
+            "providers.v1": f"{TFE_PREFIX}/registry/providers/",
+            "tfe.v2": f"{TFE_PREFIX}/",
+            "tfe.v2.1": f"{TFE_PREFIX}/",
+            "tfe.v2.2": f"{TFE_PREFIX}/",
             # The running Terrapod version, so the go-terrapod SDK / provider can
             # run a compatibility check (Client.VersionCheck) at startup. Not
             # consumed by terraform/tofu/tfci — they ignore unknown keys.

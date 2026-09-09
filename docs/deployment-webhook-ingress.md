@@ -16,7 +16,7 @@ Two endpoints have to accept connections from the public internet:
 Everything else stays on the management ingress:
 - The whole web UI
 - All admin API (`/api/v1/*` apart from the two routes above)
-- `terraform login` and CLI cloud-block (`/api/v2/*`, `/.well-known/terraform.json`)
+- `terraform login` and CLI cloud-block (`/api/tfe/v2/*`, `/.well-known/terraform.json`)
 - OIDC / SAML callbacks — these run in the **operator's browser**, not server-to-server, so they don't need to be publicly reachable; the operator's browser already has access to the management plane (that's how they hit the login page)
 - State uploads, agent-pool joins, listener heartbeats, the whole runner protocol
 

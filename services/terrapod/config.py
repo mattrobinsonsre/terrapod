@@ -2869,7 +2869,16 @@ class Settings(BaseSettings):
     # (auth, admin, registry mgmt, etc.). The OAuth/SAML callback lives
     # on the Terrapod-native surface — see auth.py — so its URL is built
     # from `terrapod_prefix`, not `api_prefix`.
-    api_prefix: str = Field(default="/api/v2")
+    api_prefix: str = Field(
+        default="/api/v2",
+        description=(
+            "SUPERSEDED and not read (#1528). The TFE-compatibility surface is "
+            "served at /api/tfe/v2 and, for the deprecation window, at /api/v2 — "
+            "both from api/prefixes.py, which is the single source. Retained "
+            "because removing a public config key is a contraction requiring the "
+            "deprecation window; setting it has no effect."
+        ),
+    )
     terrapod_prefix: str = Field(default="/api/terrapod/v1")
 
     @classmethod

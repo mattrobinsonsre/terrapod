@@ -65,7 +65,7 @@ from terrapod.services.registry_rbac_service import (
 from terrapod.storage import get_storage
 from terrapod.storage.protocol import ObjectStore
 
-router = APIRouter(prefix="/api/v2", tags=["registry-modules"])
+router = APIRouter(tags=["registry-modules"])
 
 # Workspace-links — Terrapod extension on top of the TFE registry-modules
 # surface. Dual-mounted under /api/terrapod/v1 (canonical) and /api/v2

@@ -45,7 +45,7 @@ from terrapod.services.workspace_rbac_service import (
     resolve_workspace_capabilities_for,
 )
 
-router = APIRouter(prefix="/api/v2", tags=["run-tasks"])
+router = APIRouter(tags=["run-tasks"])
 
 # Terrapod-native run-task management — workspace-scoped task definitions
 # and the callback receiver. The CLI never touches these (it only reads

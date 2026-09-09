@@ -34,7 +34,7 @@ router = APIRouter(tags=["provider-mirror"])
 logger = get_logger(__name__)
 
 
-@router.get("/v1/providers/{hostname}/{namespace}/{type}/index.json")
+@router.get("/{hostname}/{namespace}/{type}/index.json")
 async def provider_versions_mirror(
     hostname: str,
     namespace: str,
@@ -57,7 +57,7 @@ async def provider_versions_mirror(
     return JSONResponse(content=result)
 
 
-@router.get("/v1/providers/{hostname}/{namespace}/{type}/{version}.json")
+@router.get("/{hostname}/{namespace}/{type}/{version}.json")
 async def provider_platforms_mirror(
     hostname: str,
     namespace: str,

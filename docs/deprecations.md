@@ -48,6 +48,32 @@ moment the header appears — it is advance notice.
 |---|---|---|---|---|
 | `/api/terrapod/v1/…` (the whole Terrapod-native surface) | v1.7.0 | v2.0.0 / 2026-11-03 (8-week floor; if two minors have not shipped by then, the later date governs) | `/api/v1/…` | Same routes, same responses — only the prefix changed. Both are served; nothing to do until you upgrade your consumers. |
 
+| `/api/v2/…` (TFE compatibility surface) | v1.7.0 | v2.0.0 / 2026-11-03 | `/api/tfe/v2/…` | Same routes, same responses. Service discovery advertises the new path and the CLI honours it, so `terraform`/`tofu` move by themselves. |
+| `/v1/providers/…` (provider network mirror) | v1.7.0 | v2.0.0 / 2026-11-03 | `/api/v1/provider-mirror/…` | The mirror joins the other pull-through caches. Runner images write the old URL into the Job's CLI config themselves and move when they are upgraded. |
+
+### `/api/v2/…` → `/api/tfe/v2/…` and `/v1/providers/…` → `/api/v1/provider-mirror/…`
+
+`/api/v2` was both the TFE compatibility layer *and* a path inside Terrapod's own
+version namespace, which would have made `/api/v2` unusable for a future Terrapod
+v2. `/api/tfe/v2` says what it is. The mirror is a pull-through cache, so it sits
+with `binary-cache` and `package-cache` rather than on a bare `/v1/`.
+
+**Nothing to do for `terraform` or `tofu`.** They read the path from
+`/.well-known/terraform.json`, and both honour it — verified with a real
+`init` / `plan` / `apply` against a relocated surface. The old paths keep serving
+for anything that caches discovery or bypasses it.
+
+**What to update, in your own time:** your own scripts and `curl` calls; any
+`go-terrapod`, provider or `terrapod-migrate` you pin directly; and Prometheus
+queries **only when the label changes** — it does not yet. The metric
+`path_template` deliberately keeps reporting the old path for both prefixes, so
+existing dashboards keep working; it flips at the major, called out in the
+upgrade notes.
+
+**Runner images** still write the old paths into each Job's CLI config, on
+purpose: those literals are compiled into the image and a runner lags the API by
+design. They move in a later 1.x minor, before the sunset.
+
 ### `/api/terrapod/v1/…` → `/api/v1/…`
 
 `/api/v1` is now the canonical Terrapod-native API. `/api/terrapod/v1` continues

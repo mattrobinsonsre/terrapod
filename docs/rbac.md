@@ -435,7 +435,7 @@ Labels are visible in the workspace overview and can be managed from the workspa
 Labels are key-value pairs set on workspace creation or update:
 
 ```zsh
-curl -X PATCH https://terrapod.example.com/api/v2/workspaces/ws-{id} \
+curl -X PATCH https://terrapod.example.com/api/tfe/v2/workspaces/ws-{id} \
   -H "Authorization: Bearer $TERRAPOD_TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
   -d '{
@@ -569,7 +569,7 @@ The lockout check only fires for users whose access comes from label-based role 
 To proceed despite the warning, include `"force": true` in the attributes:
 
 ```zsh
-curl -X PATCH https://terrapod.example.com/api/v2/workspaces/ws-{id} \
+curl -X PATCH https://terrapod.example.com/api/tfe/v2/workspaces/ws-{id} \
   -H "Authorization: Bearer $TERRAPOD_TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
   -d '{
@@ -769,7 +769,7 @@ Use the built-in `everyone` role with the `access: everyone` label:
 
 ```zsh
 # Set label on workspace
-curl -X PATCH https://terrapod.example.com/api/v2/workspaces/ws-{id} \
+curl -X PATCH https://terrapod.example.com/api/tfe/v2/workspaces/ws-{id} \
   -H "Authorization: Bearer $TERRAPOD_TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
   -d '{

@@ -16,7 +16,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from terrapod.api.deprecation import mark_deprecated
-from terrapod.api.prefixes import NATIVE_ALIAS_SUNSET
+from terrapod.api.prefixes import (
+    MIRROR_LEGACY_PREFIX,
+    MIRROR_PREFIX,
+    NATIVE_ALIAS_SUNSET,
+    TFE_LEGACY_PREFIX,
+    TFE_PREFIX,
+)
 from terrapod.auth.connectors import init_connectors
 from terrapod.config import settings
 from terrapod.db.session import close_db, get_db_session, init_db
@@ -985,6 +991,19 @@ def create_application() -> FastAPI:
         app.include_router(router, prefix=TERRAPOD_PREFIX)
         app.include_router(router, prefix=TERRAPOD_LEGACY_PREFIX, include_in_schema=False)
 
+    def include_tfe(router) -> None:
+        """Mount a TFE-compatibility router at `/api/tfe/v2/` and, for the
+        support window, at the deprecated `/api/v2/` alias (#1528).
+
+        Same shape as `include_terrapod` and for the same reason: both mounts
+        come from one place, so a route cannot appear on one prefix and not the
+        other. `/api/v2` is what every `terraform`/`tofu` client and every runner
+        image in the field already holds, so it keeps serving; the canonical path
+        is advertised in service discovery, which the CLI honours.
+        """
+        app.include_router(router, prefix=TFE_PREFIX)
+        app.include_router(router, prefix=TFE_LEGACY_PREFIX, include_in_schema=False)
+
     # The machine-readable half of the deprecation (#1529). docs/deprecations.md
     # tells automated clients to watch for these headers, and until now nothing
     # emitted them — the first real deprecation would have shipped with the
@@ -1046,7 +1065,7 @@ def create_application() -> FastAPI:
         router as tfe_v2_router,
     )
 
-    app.include_router(tfe_v2_router)
+    include_tfe(tfe_v2_router)
     include_terrapod(tfe_v2_extensions_router)
 
     # State management routes — Terrapod-specific (delete, rollback, upload).
@@ -1074,7 +1093,7 @@ def create_application() -> FastAPI:
         workspace_links_router as module_workspace_links_router,
     )
 
-    app.include_router(registry_modules_router)
+    include_tfe(registry_modules_router)
     include_terrapod(registry_modules_management_router)
     include_terrapod(module_workspace_links_router)
 
@@ -1087,7 +1106,7 @@ def create_application() -> FastAPI:
         router as registry_providers_router,
     )
 
-    app.include_router(registry_providers_router)
+    include_tfe(registry_providers_router)
     include_terrapod(registry_providers_management_router)
 
     # GPG keys — Terrapod-native (the CLI reads provider GPG keys from the
@@ -1101,7 +1120,12 @@ def create_application() -> FastAPI:
     # Caching routes (provider mirror, binary cache)
     from terrapod.api.routers.provider_mirror import router as provider_mirror_router
 
-    app.include_router(provider_mirror_router)
+    # The provider network mirror (#1528). Canonical under the native API with
+    # the other pull-through caches; `/v1/providers` stays for the window because
+    # runner images write that URL into the Job's CLI config themselves and are
+    # expected to lag the API.
+    app.include_router(provider_mirror_router, prefix=MIRROR_PREFIX)
+    app.include_router(provider_mirror_router, prefix=MIRROR_LEGACY_PREFIX, include_in_schema=False)
 
     # OCI Distribution registry (#1408). Root-mounted at /v2/ because the spec
     # mandates that prefix; its exception handler is registered on the app so no
@@ -1159,7 +1183,7 @@ def create_application() -> FastAPI:
     from terrapod.api.routers.variables import native_router as variables_native_router
     from terrapod.api.routers.variables import router as variables_router
 
-    app.include_router(variables_router)
+    include_tfe(variables_router)
     include_terrapod(variables_native_router)
 
     # Agent pool endpoints — Terrapod-native management (pool CRUD,
@@ -1191,7 +1215,7 @@ def create_application() -> FastAPI:
         router as runs_router,
     )
 
-    app.include_router(runs_router)
+    include_tfe(runs_router)
     include_terrapod(runs_extensions_router)
 
     # Run artifact endpoints (runner token auth) — Terrapod runner protocol.
@@ -1209,7 +1233,7 @@ def create_application() -> FastAPI:
         router as config_versions_router,
     )
 
-    app.include_router(config_versions_router)
+    include_tfe(config_versions_router)
     include_terrapod(config_version_extensions_router)
 
     # VCS connection endpoints — Terrapod-native. Canonical paths at
@@ -1361,7 +1385,7 @@ def create_application() -> FastAPI:
         router as run_tasks_router,
     )
 
-    app.include_router(run_tasks_router)
+    include_tfe(run_tasks_router)
     include_terrapod(run_tasks_extensions_router)
 
     return app

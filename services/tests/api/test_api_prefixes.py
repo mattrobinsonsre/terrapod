@@ -38,10 +38,18 @@ class TestBothPrefixesAreServed:
         """
         from terrapod.api.app import app
 
+        # The provider mirror is the one exception (#1528): it sits under
+        # /api/v1 canonically but its alias is /v1/providers, not
+        # /api/terrapod/v1/provider-mirror — it has its own pair, asserted in
+        # test_tfe_prefix.py. Comparing it here would report a difference that
+        # is the design.
+        from terrapod.api.prefixes import MIRROR_PREFIX
+
         canonical = {
             r.path[len(NATIVE_PREFIX) :]
             for r in app.routes
             if getattr(r, "path", "").startswith(NATIVE_PREFIX + "/")
+            and not getattr(r, "path", "").startswith(MIRROR_PREFIX)
         }
         legacy = {
             r.path[len(NATIVE_LEGACY_PREFIX) :]

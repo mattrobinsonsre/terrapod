@@ -94,8 +94,8 @@ credentials "terrapod.example.com" {
 }
 host "terrapod.example.com" {
   services = {
-    "modules.v1"   = "https://terrapod-internal.example.com/api/v2/registry/modules/"
-    "providers.v1" = "https://terrapod-internal.example.com/api/v2/registry/providers/"
+    "modules.v1"   = "https://terrapod-internal.example.com/api/tfe/v2/registry/modules/"
+    "providers.v1" = "https://terrapod-internal.example.com/api/tfe/v2/registry/providers/"
   }
 }
 ```

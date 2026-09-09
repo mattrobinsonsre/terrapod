@@ -28,7 +28,7 @@ _EXCLUDED_PREFIXES = (
 # Pattern: /api/{v2,terrapod/v1}/[organizations/default/]{resource_type}/{resource_id}/...
 # Terrapod is single-org; the only valid org segment is the literal "default".
 _RESOURCE_PATTERN = re.compile(
-    r"^/api/(?:v2|v1|terrapod/v1)/(?:organizations/default/)?([a-z_-]+?)(?:/([^/]+))?(?:/|$)"
+    r"^/api/(?:tfe/v2|v2|v1|terrapod/v1)/(?:organizations/default/)?([a-z_-]+?)(?:/([^/]+))?(?:/|$)"
 )
 
 
@@ -54,7 +54,8 @@ def parse_resource(path: str) -> tuple[str, str]:
         /oauth/authorize → ("oauth", "")
         /v2/team/app/manifests/v1 → ("oci-repositories", "team/app")
 
-    /api/v2 (the TFE V2 CLI surface), /api/v1 (the canonical Terrapod-native
+    /api/tfe/v2 (the TFE V2 CLI surface) and its /api/v2 alias, /api/v1 (the
+    canonical Terrapod-native
     surface) and /api/terrapod/v1 (its deprecated alias, #1529) are all
     recognised, so mutations are attributed however the caller reached us.
     Without the alias an audited request falls through to the first-segment

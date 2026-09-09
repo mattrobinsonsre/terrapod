@@ -85,7 +85,7 @@ from terrapod.services.registry_rbac_service import (
 from terrapod.storage import get_storage
 from terrapod.storage.protocol import ObjectStore
 
-router = APIRouter(prefix="/api/v2", tags=["registry-providers"])
+router = APIRouter(tags=["registry-providers"])
 
 # Terrapod-native provider-registry management — org-scoped CRUD on
 # private providers + their versions + per-platform binaries. The CLI
