@@ -30,9 +30,17 @@ test.describe('BFF proxy routing', () => {
     // a PATH, so `toHaveProperty('modules.v1')` looks for `body.modules.v1`,
     // and every key here legitimately contains a dot.
     const body = await res.json();
-    expect(body['tfe.v2']).toBe('/api/v2/');
-    expect(body['modules.v1']).toBe('/api/v2/registry/modules/');
-    expect(body['providers.v1']).toBe('/api/v2/registry/providers/');
+    // The CANONICAL paths (#1528). This is the mechanism that moves clients:
+    // terraform and tofu read these and derive every later request from them.
+    expect(body['tfe.v2']).toBe('/api/tfe/v2/');
+    expect(body['modules.v1']).toBe('/api/tfe/v2/registry/modules/');
+    expect(body['providers.v1']).toBe('/api/tfe/v2/registry/providers/');
+    // The deprecated alias must still route through the full proxy chain — it
+    // is what every terraform/tofu client and every runner image in the field
+    // still calls until they pick up the new discovery document.
+    const legacy = await request.get('/api/v2/ping');
+    expect(legacy.status(), '/api/v2 must keep serving').not.toBe(404);
+
     // `terraform login` reads its endpoints from here, and they are on another
     // of the prefixes this change moved.
     expect(body['login.v1']).toMatchObject({
