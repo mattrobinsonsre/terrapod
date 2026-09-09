@@ -121,6 +121,30 @@ class PulumiStrategy:
             env.append({"name": "TP_PARALLELISM", "value": str(options.parallelism)})
         return env
 
+    def options_from_attrs(self, attrs: dict, phase: str) -> PulumiRunOptions:
+        """Build this engine's run options from the wire payload (#1523).
+
+        `phase` is the Terraform-shaped one the platform sends — `plan`/`apply`,
+        which is what the run status is called for every engine — translated
+        here into Pulumi's own words. That translation lives with the engine
+        rather than in the listener for the same reason the vocabulary does
+        (#1521): the platform's statuses stay engine-neutral and each engine
+        says what they mean to it.
+        """
+        return PulumiRunOptions(
+            phase="preview" if phase == "plan" else "update",
+            stack=attrs.get("pulumi-stack", ""),
+            pulumi_version=attrs.get("pulumi-version", ""),
+            working_directory=attrs.get("working-directory", ""),
+            is_destroy=attrs.get("is-destroy", False),
+            refresh=attrs.get("refresh", True),
+            target_urns=attrs.get("target-urns"),
+            resource_cpu=attrs.get("resource-cpu", ""),
+            resource_memory=attrs.get("resource-memory", ""),
+            parallelism=attrs.get("parallelism", 0),
+            timeout_minutes=attrs.get("timeout-minutes", 0),
+        )
+
     def build_job_spec(self, **kwargs: Any) -> dict:
         """Compose the neutral builder with this engine's env.
 

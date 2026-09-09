@@ -681,7 +681,6 @@ class RunnerListener:
         immediate signal at the API instead of a generic timeout 5 min later.
         """
         from terrapod.engines import strategy_for
-        from terrapod.engines.terraform import TerraformRunOptions
         from terrapod.runner.job_manager import create_job, get_job_uid
 
         phase = attrs.get("phase", "plan")
@@ -768,31 +767,13 @@ class RunnerListener:
         # The engine's run options as one typed object (#1407 phase 2), instead of
         # twenty keyword arguments threaded through a general-purpose builder. The
         # wire keys are unchanged — this is how they are carried, not what is sent.
-        options = TerraformRunOptions(
-            terraform_version=attrs.get("terraform-version", ""),
-            execution_backend=attrs.get("execution-backend", "tofu"),
-            terragrunt_enabled=attrs.get("terragrunt-enabled", False),
-            terragrunt_version=attrs.get("terragrunt-version", ""),
-            plan_only=attrs.get("plan-only", False),
-            var_files=attrs.get("var-files", []),
-            target_addrs=attrs.get("target-addrs"),
-            replace_addrs=attrs.get("replace-addrs"),
-            refresh_only=attrs.get("refresh-only", False),
-            refresh=attrs.get("refresh", True),
-            allow_empty_apply=attrs.get("allow-empty-apply", False),
-            is_destroy=attrs.get("is-destroy", False),
-            parallelism=attrs.get("parallelism", 10),
-            # Cost estimation (#871): the API instructs per-run (fallback yes);
-            # the listener only relays it, never self-configures.
-            cost_estimation=attrs.get("cost-estimation", True),
-            cost_default_region=attrs.get("cost-default-region", "us-east-1"),
-            working_directory=attrs.get("working-directory", ""),
-            # Onboarding discovery (#824 P2): present only for discovery runs.
-            onboard_session_id=attrs.get("onboard-session-id", ""),
-            onboard_provider=attrs.get("onboard-provider", ""),
-            onboard_provider_version=attrs.get("onboard-provider-version", ""),
-            onboard_types=attrs.get("onboard-types", []),
-        )
+        # Each engine reads the payload itself (#1523). The listener used to
+        # build TerraformRunOptions here whatever the engine was, so a Pulumi run
+        # got Terraform's options object and raised AttributeError on
+        # `options.phase` — inside a fire-and-forget task, so the exception went
+        # to asyncio rather than to the run, no Job was created, and the run sat
+        # until the reconciler called it "stuck pre-launch" five minutes later.
+        options = engine.options_from_attrs(attrs, phase)
 
         spec = engine.build_job_spec(
             options=options,
