@@ -36,7 +36,7 @@ export const DEFAULT_ENGINE = 'terraform'
  * wrong wording, not like a broken page — and the i18n completeness gate is what
  * stops it staying wrong.
  */
-const KNOWN = new Set([DEFAULT_ENGINE])
+const KNOWN = new Set([DEFAULT_ENGINE, 'pulumi'])
 
 export function vocabularyFor(engine: Engine | null | undefined): string {
   const key = (engine ?? '').trim().toLowerCase()

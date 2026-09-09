@@ -344,6 +344,12 @@ data:
         {{- end }}
         {{- if .Values.api.config.registry.platform_tools.checkov_version }}
         checkov_version: {{ .Values.api.config.registry.platform_tools.checkov_version | quote }}
+        {{- if .Values.api.config.registry.platform_tools.pulumi_version }}
+        pulumi_version: {{ .Values.api.config.registry.platform_tools.pulumi_version | quote }}
+        {{- end }}
+        {{- if .Values.api.config.registry.platform_tools.pulumi_mirror_url }}
+        pulumi_mirror_url: {{ .Values.api.config.registry.platform_tools.pulumi_mirror_url | quote }}
+        {{- end }}
         {{- end }}
         {{- if .Values.api.config.registry.platform_tools.opa_mirror_url }}
         opa_mirror_url: {{ .Values.api.config.registry.platform_tools.opa_mirror_url | quote }}

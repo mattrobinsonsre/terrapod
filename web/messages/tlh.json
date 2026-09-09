@@ -3148,6 +3148,22 @@
         "planning": "nabtaH",
         "applying": "lo'taH"
       }
+    },
+    "pulumi": {
+      "activity": {
+        "planning": "pulumi preview vangtaH",
+        "applying": "pulumi up vangtaH"
+      },
+      "runStatus": {
+        "planning": "nabtaH",
+        "planned": "nabpu'",
+        "applying": "lo'taH",
+        "applied": "lo'pu'"
+      },
+      "status": {
+        "planning": "nabtaH",
+        "applying": "lo'taH"
+      }
     }
   }
 }

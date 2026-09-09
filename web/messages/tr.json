@@ -3148,6 +3148,22 @@
         "planning": "Planlanıyor",
         "applying": "Uygulanıyor"
       }
+    },
+    "pulumi": {
+      "activity": {
+        "planning": "pulumi preview çalıştırılıyor",
+        "applying": "pulumi up çalıştırılıyor"
+      },
+      "runStatus": {
+        "planning": "Previewlanıyor",
+        "planned": "Previewlandı",
+        "applying": "Uygulanıyor",
+        "applied": "Uygulandı"
+      },
+      "status": {
+        "planning": "Previewlanıyor",
+        "applying": "Uygulanıyor"
+      }
     }
   }
 }

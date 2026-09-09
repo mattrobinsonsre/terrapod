@@ -594,7 +594,9 @@ class WarmBinaryEntry(BaseModel):
     just {tool, version}.
     """
 
-    tool: Literal["terraform", "tofu", "terragrunt", "opa", "trivy", "checkov"] = "terraform"
+    tool: Literal["terraform", "tofu", "terragrunt", "opa", "trivy", "checkov", "pulumi"] = (
+        "terraform"
+    )
     version: str
     platforms: list[WarmPlatform] = Field(default_factory=list)
 
@@ -790,6 +792,17 @@ class PlatformToolsConfig(BaseModel):
         default="https://github.com/bridgecrewio/checkov/releases/download",
         description="Upstream download base for Checkov. Assets are per-platform "
         "zips containing a single self-contained dist/checkov executable.",
+    )
+    pulumi_version: str = Field(
+        default="3.208.0",
+        description="Pulumi CLI version fetched for engine=pulumi runs (#1523). Not "
+        "baked into the runner image: a Terraform-only deployment should not carry "
+        "another engine's binary, and an upstream fix reaches an operator through a "
+        "values change rather than a Terrapod release.",
+    )
+    pulumi_mirror_url: str = Field(
+        default="https://github.com/pulumi/pulumi/releases/download",
+        description="Where Pulumi CLI archives are fetched from before caching.",
     )
     checkov_checksum_api_url: str = Field(
         default="https://api.github.com/repos/bridgecrewio/checkov/releases/tags",

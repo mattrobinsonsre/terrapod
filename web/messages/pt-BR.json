@@ -3148,6 +3148,22 @@
         "planning": "Planejando",
         "applying": "Aplicando"
       }
+    },
+    "pulumi": {
+      "activity": {
+        "planning": "Executando pulumi preview",
+        "applying": "Executando pulumi up"
+      },
+      "runStatus": {
+        "planning": "Previewejando",
+        "planned": "Previewejado",
+        "applying": "Aplicando",
+        "applied": "Aplicado"
+      },
+      "status": {
+        "planning": "Previewejando",
+        "applying": "Aplicando"
+      }
     }
   }
 }

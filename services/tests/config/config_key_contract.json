@@ -274,6 +274,8 @@
   "registry.platform_tools.checkov_version",
   "registry.platform_tools.opa_mirror_url",
   "registry.platform_tools.opa_version",
+  "registry.platform_tools.pulumi_mirror_url",
+  "registry.platform_tools.pulumi_version",
   "registry.platform_tools.trivy_mirror_url",
   "registry.platform_tools.trivy_version",
   "registry.platform_tools.verify",

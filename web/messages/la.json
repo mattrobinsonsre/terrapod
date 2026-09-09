@@ -3148,6 +3148,22 @@
         "planning": "Consilium Fit",
         "applying": "Applicatur"
       }
+    },
+    "pulumi": {
+      "activity": {
+        "planning": "pulumi preview curritur",
+        "applying": "pulumi up curritur"
+      },
+      "runStatus": {
+        "planning": "Consilium Fit",
+        "planned": "Consilium Factum",
+        "applying": "Applicatur",
+        "applied": "Applicatum"
+      },
+      "status": {
+        "planning": "Consilium Fit",
+        "applying": "Applicatur"
+      }
     }
   }
 }

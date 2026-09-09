@@ -151,7 +151,7 @@ class TestPlatformToolDerivation:
 
     def test_derives_one_entry_per_platform_tool(self):
         entries = cache_warm_service.platform_tool_entries()
-        assert {e.tool for e in entries} == {"opa", "trivy", "checkov"}
+        assert {e.tool for e in entries} == {"opa", "trivy", "checkov", "pulumi"}
         assert all(e.version for e in entries)
 
     async def test_warms_platform_tools_without_being_asked(self):
@@ -161,9 +161,9 @@ class TestPlatformToolDerivation:
         ) as mock_warm:
             await warm_from_manifest(db, storage, [], [])
         warmed = {call.args[2] for call in mock_warm.await_args_list}
-        assert warmed == {"opa", "trivy", "checkov"}
-        # Three tools x the two default platforms.
-        assert mock_warm.await_count == 6
+        assert warmed == {"opa", "trivy", "checkov", "pulumi"}
+        # Four tools x the two default platforms.
+        assert mock_warm.await_count == 8
 
     async def test_opting_out_leaves_the_manifest_alone(self):
         db, storage = _db(), AsyncMock()
@@ -193,4 +193,4 @@ class TestPlatformToolDerivation:
                 db, storage, [WarmBinaryEntry(tool="tofu", version="1.9.0")], []
             )
         assert summary.failed == summary.total
-        assert summary.total == 8  # 3 platform tools + 1 listed entry, x2 platforms
+        assert summary.total == 10  # 4 platform tools + 1 listed entry, x2 platforms

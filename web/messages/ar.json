@@ -3148,6 +3148,22 @@
         "planning": "جارٍ التخطيط",
         "applying": "جارٍ التطبيق"
       }
+    },
+    "pulumi": {
+      "activity": {
+        "planning": "جارٍ تشغيل pulumi preview",
+        "applying": "جارٍ تشغيل pulumi up"
+      },
+      "runStatus": {
+        "planning": "جارٍ التخطيط",
+        "planned": "تم التخطيط",
+        "applying": "جارٍ التطبيق",
+        "applied": "تم التطبيق"
+      },
+      "status": {
+        "planning": "جارٍ التخطيط",
+        "applying": "جارٍ التطبيق"
+      }
     }
   }
 }

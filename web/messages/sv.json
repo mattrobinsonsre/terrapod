@@ -3148,6 +3148,22 @@
         "planning": "Planerar",
         "applying": "Applicerar"
       }
+    },
+    "pulumi": {
+      "activity": {
+        "planning": "Kör pulumi preview",
+        "applying": "Kör pulumi up"
+      },
+      "runStatus": {
+        "planning": "Previewerar",
+        "planned": "Previewerad",
+        "applying": "Applicerar",
+        "applied": "Applicerad"
+      },
+      "status": {
+        "planning": "Previewerar",
+        "applying": "Applicerar"
+      }
     }
   }
 }

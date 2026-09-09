@@ -3148,6 +3148,22 @@
         "planning": "Plannin",
         "applying": "Applyin"
       }
+    },
+    "pulumi": {
+      "activity": {
+        "planning": "Runnin pulumi preview",
+        "applying": "Runnin pulumi up"
+      },
+      "runStatus": {
+        "planning": "Previewnin",
+        "planned": "Previewnd",
+        "applying": "Upin",
+        "applied": "Upd"
+      },
+      "status": {
+        "planning": "Previewnin",
+        "applying": "Upin"
+      }
     }
   }
 }

@@ -3148,6 +3148,22 @@
         "planning": "プラン実行中",
         "applying": "適用中"
       }
+    },
+    "pulumi": {
+      "activity": {
+        "planning": "pulumi previewを実行中",
+        "applying": "pulumi upを実行中"
+      },
+      "runStatus": {
+        "planning": "プラン実行中",
+        "planned": "プラン完了",
+        "applying": "適用中",
+        "applied": "適用済み"
+      },
+      "status": {
+        "planning": "プラン実行中",
+        "applying": "適用中"
+      }
     }
   }
 }

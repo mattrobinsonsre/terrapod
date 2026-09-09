@@ -758,6 +758,15 @@ def _run_body(cfg: RunnerConfig, work_dir: Path) -> int:
         return 1
 
     # 11. Phase-specific execution.
+    #
+    # Pulumi branches before Terraform's phases rather than inside them (#1523):
+    # its two phases are `preview`/`update`, and the steps above — backend
+    # neutralisation, var-files, the lock file — are Terraform's own and do not
+    # apply. Terraform's path below is byte-for-byte what it was, which is what
+    # the golden Job-spec matrix asserts.
+    if os.environ.get("TP_ENGINE", "") == "pulumi":
+        return _run_pulumi_phase(cfg, child_grace=child_grace)
+
     if cfg.phase == "plan":
         return _run_plan_phase(
             cfg,
@@ -776,6 +785,50 @@ def _run_body(cfg: RunnerConfig, work_dir: Path) -> int:
         )
     log.error("unknown phase", phase=cfg.phase)
     return 1
+
+
+def _run_pulumi_phase(cfg, *, child_grace: int) -> int:  # type: ignore[no-untyped-def]
+    """Run one Pulumi phase.
+
+    `preview --save-plan` then `up --plan` — the saved plan is what makes an
+    approved preview and its update the same decision, exactly as Terraform gets
+    from `plan -out` / `apply <file>`.
+
+    Writes to the same per-phase log files the Terraform path uses, so the
+    upload/rollup at the end of the run needs no engine-specific handling.
+    """
+    import structlog
+
+    from terrapod.runner import exec_subprocess
+    from terrapod.runner.phases import pulumi_exec
+
+    log = structlog.get_logger("runner.job_entrypoint")
+    plan_file = os.environ.get("TP_PULUMI_PLAN_FILE", "/workspace/plan.json")
+    phase = os.environ.get("TP_PULUMI_PHASE", cfg.phase)
+
+    # The CLI reads its plugin-download override from the environment, and
+    # `exec_subprocess.run` inherits this process's, so it is set here rather
+    # than passed.
+    os.environ.update(pulumi_exec.plugin_override_env(cfg.api_url, cfg.auth_token))
+
+    if phase in ("preview", "plan"):
+        argv = pulumi_exec.preview_argv(plan_file, cfg)
+        log_file = str(_PLAN_LOG)
+    elif phase in ("update", "apply"):
+        argv = pulumi_exec.update_argv(plan_file, cfg)
+        log_file = str(_APPLY_LOG)
+    else:
+        log.error("unknown pulumi phase", phase=phase)
+        return 1
+
+    log.info("running pulumi", phase=phase, argv=argv)
+    result = exec_subprocess.run(
+        ["pulumi", *argv],
+        log_file=log_file,
+        child_grace_seconds=float(child_grace),
+        tee_to_stdout=True,
+    )
+    return result.exit_code
 
 
 def main(argv: list[str] | None = None) -> int:

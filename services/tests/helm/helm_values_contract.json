@@ -210,6 +210,8 @@
   "api.config.registry.platform_tools.checkov_version",
   "api.config.registry.platform_tools.opa_mirror_url",
   "api.config.registry.platform_tools.opa_version",
+  "api.config.registry.platform_tools.pulumi_mirror_url",
+  "api.config.registry.platform_tools.pulumi_version",
   "api.config.registry.platform_tools.trivy_mirror_url",
   "api.config.registry.platform_tools.trivy_version",
   "api.config.registry.platform_tools.verify",

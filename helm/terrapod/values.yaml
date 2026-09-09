@@ -505,9 +505,14 @@ api:
         opa_version: "1.20.1"
         trivy_version: "0.74.0"
         checkov_version: "3.3.16"
+        # Pulumi CLI for engine=pulumi runs (#1523). Fetched on demand like the
+        # tools above rather than baked in, so a Terraform-only deployment does
+        # not carry another engine's binary.
+        pulumi_version: "3.208.0"
         opa_mirror_url: "https://github.com/open-policy-agent/opa/releases/download"
         trivy_mirror_url: "https://github.com/aquasecurity/trivy/releases/download"
         checkov_mirror_url: "https://github.com/bridgecrewio/checkov/releases/download"
+        pulumi_mirror_url: "https://github.com/pulumi/pulumi/releases/download"
         # Checkov publishes NO checksum file next to its release assets, so the
         # only verification material available is the digest the GitHub release
         # API reports — registry-computed, not a publisher attestation, and

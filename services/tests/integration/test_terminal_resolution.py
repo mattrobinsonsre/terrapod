@@ -25,7 +25,7 @@ import pytest
 from sqlalchemy import select
 
 from terrapod.db.models import ONBOARDING_DISCOVERY_SOURCE, Run, Workspace
-from terrapod.engines import strategy_for
+from terrapod.engines import known_engines, strategy_for
 from terrapod.engines.terraform import TerraformStrategy
 
 pytestmark = pytest.mark.asyncio
@@ -226,6 +226,119 @@ class TestTheEngineColumnDrivesIt:
             assert strategy_for(run.engine).name == "terraform"
 
     async def test_an_unresolvable_engine_refuses_rather_than_defaulting(self):
-        """Running the wrong tool against real infrastructure beats no answer."""
+        """Running the wrong tool against real infrastructure beats no answer.
+
+        `pulumi` used to be the example of an unknown engine here; it is a known
+        one since #1523, so the case is made with an engine that genuinely is
+        not built rather than by weakening the assertion.
+        """
         with pytest.raises(ValueError, match="unknown engine"):
-            strategy_for("pulumi")
+            strategy_for("bicep")
+
+    async def test_a_gated_off_engine_is_refused_differently_from_an_unknown_one(self):
+        """The two have completely different fixes.
+
+        "Unknown" means a row was written by a newer replica or by hand.
+        "Not enabled" means an operator turned it off and the message should say
+        so — telling them Terrapod has never heard of Pulumi would send them
+        looking for a missing install.
+        """
+        from unittest.mock import patch
+
+        with patch("terrapod.engines.engine_enabled", side_effect=lambda e: e != "pulumi"):
+            with pytest.raises(ValueError, match="not enabled"):
+                strategy_for("pulumi")
+
+    async def test_terraform_is_unaffected_by_the_pulumi_switch(self):
+        """The whole point of the gate: multi-engine ambition costs a terraform
+        user nothing, in either position of the switch."""
+        from unittest.mock import patch
+
+        for pulumi_on in (True, False):
+            with patch(
+                "terrapod.engines.engine_enabled",
+                side_effect=lambda e, on=pulumi_on: True if e == "terraform" else on,
+            ):
+                assert strategy_for("terraform").name == "terraform"
+                assert strategy_for(None).name == "terraform"
+
+    async def test_pulumi_resolves_when_enabled(self):
+        assert strategy_for("pulumi").name == "pulumi"
+        assert "pulumi" in known_engines()
+
+    async def test_a_gated_off_engine_is_absent_from_known_engines(self):
+        """Absent, not listed-and-then-refused — the same rule the surfaces
+        follow, so a caller enumerating engines never offers one that cannot
+        run."""
+        from unittest.mock import patch
+
+        with patch("terrapod.engines.engine_enabled", side_effect=lambda e: e != "pulumi"):
+            assert "pulumi" not in known_engines()
+            assert "terraform" in known_engines()
+
+
+class TestPulumiTerminalRules:
+    """Pulumi's rules, recorded rather than merely implemented (#1523).
+
+    #1489 pinned Terraform's for exactly this moment: a second engine answers the
+    same question differently, and the only way to add one safely is to know what
+    the first does. These are the counterpart, in the same shape.
+    """
+
+    @pytest.mark.parametrize(
+        ("run_status", "job_status", "action", "phase"),
+        [
+            # Succeeded, and which completion applies is chosen by run state —
+            # the same shape as Terraform, in Pulumi's vocabulary.
+            ("planning", "succeeded", "complete_plan", "preview"),
+            ("applying", "succeeded", "complete_apply", "update"),
+            # Failed and deleted both error, in either phase.
+            ("planning", "failed", "error", "preview"),
+            ("applying", "failed", "error", "update"),
+            ("planning", "deleted", "error", "preview"),
+            ("applying", "deleted", "error", "update"),
+            # Already resolved. For Pulumi this is the COMMON case rather than a
+            # race: the checkpoint is pushed over the #1522 surface during the
+            # run, so state is durable before the Job exits and there is nothing
+            # to collect afterwards.
+            ("planned", "succeeded", "none", "update"),
+            ("applied", "succeeded", "none", "update"),
+        ],
+    )
+    async def test_rule(self, run_status, job_status, action, phase):
+        from terrapod.engines.pulumi import PulumiStrategy
+
+        outcome = PulumiStrategy().resolve_terminal(
+            run_status=run_status, run_source="tfe-api", job_status=job_status
+        )
+        assert (outcome.action, outcome.phase) == (action, phase)
+
+    async def test_an_unknown_job_status_does_nothing(self):
+        """Treating an unfamiliar status as success would apply infrastructure on
+        the strength of a signal nobody defined."""
+        from terrapod.engines.pulumi import PulumiStrategy
+
+        outcome = PulumiStrategy().resolve_terminal(
+            run_status="planning", run_source="tfe-api", job_status="something-new"
+        )
+        assert outcome.action == "none"
+
+    async def test_the_phases_are_pulumi_s_words_not_terraform_s(self):
+        """A run is `planning` whatever engine it belongs to; what the user is
+        SHOWN differs, and that difference must survive into the outcome (#1521).
+        """
+        from terrapod.engines.pulumi import PulumiStrategy
+
+        strategy = PulumiStrategy()
+        assert strategy.phases == ("preview", "update")
+        assert strategy.status_phases["planning"] == "preview"
+        assert strategy.status_phases["applying"] == "update"
+
+    async def test_terraform_still_answers_in_its_own_words(self):
+        """The two coexist; adding Pulumi must not have edited Terraform's."""
+        from terrapod.engines.terraform import TerraformStrategy
+
+        outcome = TerraformStrategy().resolve_terminal(
+            run_status="planning", run_source="tfe-api", job_status="succeeded"
+        )
+        assert (outcome.action, outcome.phase) == ("complete_plan", "plan")

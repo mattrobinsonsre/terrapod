@@ -54,11 +54,15 @@ _CAPABILITY_ENGINES: dict[str, frozenset[str]] = {
 
 
 def engine_enabled(engine: str) -> bool:
-    """Whether an engine is offered by this deployment."""
-    config = getattr(settings.engines, engine, None)
-    if config is None:
-        raise ValueError(f"unknown engine: {engine}")
-    return bool(config.enabled)
+    """Whether an engine is offered by this deployment.
+
+    Delegates to `terrapod.engines`, which owns the answer because the strategy
+    registry has to consult it and the listener image ships `engines/` but no
+    `services/` (#1523). Re-exported here so callers keep one import for gating.
+    """
+    from terrapod.engines import engine_enabled as _engine_enabled
+
+    return _engine_enabled(engine)
 
 
 def capability_enabled(capability: str) -> bool:
