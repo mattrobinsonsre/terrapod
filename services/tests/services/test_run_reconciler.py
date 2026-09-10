@@ -17,7 +17,7 @@ from terrapod.services.run_reconciler import (
 )
 
 
-def _outcome_for(run):
+def _outcome_for(run, engine="terraform"):
     """The decision the reconciler would have obtained for this run.
 
     Tests that drive `_handle_succeeded` directly are exercising the *execution*
@@ -27,7 +27,7 @@ def _outcome_for(run):
     """
     from terrapod.engines import strategy_for
 
-    return strategy_for(run.engine).resolve_terminal(
+    return strategy_for(engine).resolve_terminal(
         run_status=run.status, run_source=run.source, job_status="succeeded"
     )
 
@@ -36,10 +36,6 @@ def _mock_run(**kwargs):
     run = MagicMock()
     run.id = kwargs.get("id", uuid.uuid4())
     run.status = kwargs.get("status", "planning")
-    # Matches the column default. A MagicMock here would reach `strategy_for`
-    # as an unknown engine and raise, which is the intended behaviour — a run
-    # whose engine cannot be resolved must not be executed as Terraform.
-    run.engine = kwargs.get("engine", "terraform")
     run.workspace_id = kwargs.get("workspace_id", uuid.uuid4())
     run.pool_id = kwargs.get("pool_id", uuid.uuid4())
     run.job_name = kwargs.get("job_name", "tprun-abc123-plan")
@@ -74,7 +70,7 @@ class TestReconcileOne:
         run = _mock_run()
         mock_get_status.return_value = "running"
 
-        await _reconcile_one(db, run)
+        await _reconcile_one(db, run, "terraform")
 
         assert mock_publish.call_count == 2
         events = [call.args[1]["event"] for call in mock_publish.call_args_list]
@@ -93,7 +89,7 @@ class TestReconcileOne:
         run = _mock_run(status="applying")
         mock_get_status.return_value = "running"
 
-        await _reconcile_one(db, run)
+        await _reconcile_one(db, run, "terraform")
 
         for call in mock_publish.call_args_list:
             assert call.args[1]["phase"] == "apply"
@@ -108,7 +104,7 @@ class TestReconcileOne:
         run = _mock_run()
         mock_get_status.return_value = "succeeded"
 
-        await _reconcile_one(db, run)
+        await _reconcile_one(db, run, "terraform")
 
         # Now carries the engine's decision as well as the run: the reconciler
         # asks what a finished Job means before acting on it.
@@ -125,7 +121,7 @@ class TestReconcileOne:
         run = _mock_run()
         mock_get_status.return_value = "failed"
 
-        await _reconcile_one(db, run)
+        await _reconcile_one(db, run, "terraform")
 
         mock_handle.assert_called_once_with(db, run, "Job failed")
 
@@ -137,7 +133,7 @@ class TestReconcileOne:
         run = _mock_run()
         mock_get_status.return_value = None
 
-        await _reconcile_one(db, run)
+        await _reconcile_one(db, run, "terraform")
 
         mock_stale.assert_called_once_with(db, run)
 
@@ -149,7 +145,7 @@ class TestReconcileOne:
         run = _mock_run()
         mock_get_status.return_value = "running"
 
-        await _reconcile_one(db, run)
+        await _reconcile_one(db, run, "terraform")
 
         # No transition calls — just publish events and return
         assert mock_publish.call_count == 2
@@ -765,7 +761,7 @@ class TestReconcileOneWithoutJobName:
         db = AsyncMock()
         run = _mock_run(job_name=None)
 
-        await _reconcile_one(db, run)
+        await _reconcile_one(db, run, "terraform")
 
         mock_publish.assert_not_called()
         mock_status.assert_not_called()
@@ -786,7 +782,7 @@ class TestUnschedulable:
         run = _mock_run()
         mock_get_status.return_value = "unschedulable"
 
-        await _reconcile_one(db, run)
+        await _reconcile_one(db, run, "terraform")
 
         mock_unsched.assert_called_once_with(db, run)
 

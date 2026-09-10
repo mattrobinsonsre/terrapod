@@ -503,6 +503,7 @@ class TestRunDetailStateVersion:
 
         result = _run_json(
             _mock_run(run_id=run_id),
+            engine="terraform",
             workspace_has_vcs=False,
             state_version_id=f"sv-{sv_id}",
         )
@@ -524,6 +525,7 @@ class TestRunDetailStateVersion:
 
         result = _run_json(
             _mock_run(),
+            engine="terraform",
             workspace_has_vcs=False,
             state_version_id=None,
         )

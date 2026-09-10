@@ -125,9 +125,9 @@ class TestWhatTheRunActuallyBecomes:
             await session.commit()
             run_id = run.id
 
-            outcome = strategy_for(run.engine).resolve_terminal(
-                run_status=run.status, run_source=run.source, job_status="succeeded"
-            )
+            outcome = strategy_for(
+                (await session.get(Workspace, run.workspace_id)).engine
+            ).resolve_terminal(run_status=run.status, run_source=run.source, job_status="succeeded")
             assert outcome.action == "complete_plan"
             await run_reconciler._handle_succeeded(session, run, outcome)
             await session.commit()
@@ -198,9 +198,9 @@ class TestWhatTheRunActuallyBecomes:
             await session.commit()
             run_id = run.id
 
-            outcome = strategy_for(run.engine).resolve_terminal(
-                run_status=run.status, run_source=run.source, job_status="succeeded"
-            )
+            outcome = strategy_for(
+                (await session.get(Workspace, run.workspace_id)).engine
+            ).resolve_terminal(run_status=run.status, run_source=run.source, job_status="succeeded")
             assert outcome.action == "none"
             await session.commit()
 
@@ -220,10 +220,11 @@ class TestTheEngineColumnDrivesIt:
         from terrapod.db.session import get_db_session
 
         async with get_db_session() as session:
-            _, run = await _mk(session, status="planning")
+            ws, run = await _mk(session, status="planning")
             await session.commit()
-            assert run.engine == "terraform"
-            assert strategy_for(run.engine).name == "terraform"
+            # The run carries no engine (#1536); it resolves through its workspace's.
+            assert ws.engine == "terraform"
+            assert strategy_for(ws.engine).name == "terraform"
 
     async def test_an_unresolvable_engine_refuses_rather_than_defaulting(self):
         """Running the wrong tool against real infrastructure beats no answer.
