@@ -426,7 +426,19 @@ function LogPanel({
     return () => el.removeEventListener('scroll', onScroll)
   }, [isTouch, isAtBottom, pre])
 
-  if (loading) {
+  // While this phase is producing output, the pane is its final size from the
+  // first paint (#1547). It used to grow from nothing as the log arrived —
+  // reflowing on every chunk until it hit its cap, worst exactly when output
+  // was fastest — so there was nowhere to scroll to in anticipation of the
+  // tail. Now the box, and with it the page, is laid out before the first
+  // line, and you can park at the bottom and let the output come to you.
+  //
+  // Only while streaming. A finished short log shrinks to fit rather than
+  // sitting in a mostly empty 70vh box, and a phase that never runs (the apply
+  // tab of a plan-only run) keeps its one-line empty state.
+  const reserve = isStreaming
+
+  if (loading && !reserve) {
     return (
       <div className="bg-slate-900 rounded-lg border border-slate-700/50 p-6">
         <LoadingSpinner />
@@ -434,7 +446,7 @@ function LogPanel({
     )
   }
 
-  if (!log) {
+  if (!log && !reserve) {
     return (
       <div className="bg-slate-900 rounded-lg border border-slate-700/50 p-6 text-sm text-slate-500">
         {emptyMessage}
@@ -445,7 +457,10 @@ function LogPanel({
   const shortId = runId.replace(/^run-/, '').split('-').pop() ?? runId
 
   return (
-    <div className="bg-slate-900 rounded-lg border border-slate-700/50 overflow-hidden">
+    <div
+      data-testid={`log-pane-${phase}`}
+      className="bg-slate-900 rounded-lg border border-slate-700/50 overflow-hidden"
+    >
       <div className="flex items-center justify-between gap-2 flex-wrap px-4 py-2 border-b border-slate-700/50 bg-slate-800/50">
         <div className="flex items-center gap-2">
           {/* Single Color toggle (checkbox-style): on = ANSI colours, off =
@@ -499,7 +514,10 @@ function LogPanel({
             )}
             {/* One download button — the current Color/Plain mode decides what
                 it saves: colored (ANSI codes preserved) in Color mode, stripped
-                plain text in Plain mode. */}
+                plain text in Plain mode. Absent until there is a log to save, now
+                that the toolbar shows while a streaming phase is still waiting
+                for its first line. */}
+            {cleanLog && (
             <button
               onClick={() =>
                 colorMode
@@ -513,6 +531,7 @@ function LogPanel({
               <Download className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">{t('log.download')}</span>
             </button>
+            )}
           </div>
           {/* Scroll-nav group, divider-separated from the utilities. Both keep
               their text label at all widths so they never read as another icon. */}
@@ -561,22 +580,44 @@ function LogPanel({
           trap) — regardless of width, so a wide touch tablet is safe too. The
           `fine:` CSS variant matches `useIsTouch()`, so the CSS scroller and
           the JS tail-follow logic agree. */}
-      {colorMode ? (
-        <pre
-          ref={setPre}
-          data-testid={`log-pre-${phase}`}
-          className="p-4 text-sm text-slate-300 font-mono whitespace-pre-wrap break-words fine:max-h-[70vh] fine:overflow-y-auto"
-          dangerouslySetInnerHTML={{ __html: htmlContent }}
-        />
-      ) : (
-        <pre
-          ref={setPre}
-          data-testid={`log-pre-${phase}`}
-          className="p-4 text-sm text-slate-300 font-mono whitespace-pre-wrap break-words fine:max-h-[70vh] fine:overflow-y-auto"
-        >
-          {plainContent}
-        </pre>
-      )}
+      {/* The reserved height lives on this wrapper, not on the <pre>, and only
+          with a precise pointer — the same `fine:` gate as the inner scroll
+          (#1547). On touch the wrapper has no height of its own, so the page
+          stays the scroll container exactly as #722 made it.
+
+          Keeping it off the <pre> is deliberate: the <pre> still appears only
+          once there is output, so the callback ref and follow-mode below
+          attach exactly as they did (#1271) — nothing about when the scroll
+          listener registers has changed, only the box it sits in. */}
+      <div
+        data-testid={`log-reserve-${phase}`}
+        className={reserve ? 'fine:min-h-[70vh]' : undefined}
+      >
+        {!log ? (
+          loading ? (
+            <div className="p-6">
+              <LoadingSpinner />
+            </div>
+          ) : (
+            <div className="p-6 text-sm text-slate-500">{emptyMessage}</div>
+          )
+        ) : colorMode ? (
+          <pre
+            ref={setPre}
+            data-testid={`log-pre-${phase}`}
+            className="p-4 text-sm text-slate-300 font-mono whitespace-pre-wrap break-words fine:max-h-[70vh] fine:overflow-y-auto"
+            dangerouslySetInnerHTML={{ __html: htmlContent }}
+          />
+        ) : (
+          <pre
+            ref={setPre}
+            data-testid={`log-pre-${phase}`}
+            className="p-4 text-sm text-slate-300 font-mono whitespace-pre-wrap break-words fine:max-h-[70vh] fine:overflow-y-auto"
+          >
+            {plainContent}
+          </pre>
+        )}
+      </div>
 
     </div>
   )
