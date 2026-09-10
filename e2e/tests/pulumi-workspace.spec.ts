@@ -24,9 +24,12 @@ test.describe('Pulumi workspace', () => {
 
     // Edit a setting every engine has, and save it.
     await page.getByRole('button', { name: /^edit$/i }).first().click();
-    await page.getByPlaceholder('key', { exact: true }).fill('team');
+    // The page has several "Add" buttons; this one sits in the labels row,
+    // beside the key and value inputs.
+    const keyInput = page.getByPlaceholder('key', { exact: true });
+    await keyInput.fill('team');
     await page.getByPlaceholder('value', { exact: true }).fill('stacks');
-    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    await keyInput.locator('..').getByRole('button', { name: 'Add', exact: true }).click();
     await page.getByRole('button', { name: /save changes/i }).first().click();
 
     // The Edit button coming back is what proves the save round-tripped.

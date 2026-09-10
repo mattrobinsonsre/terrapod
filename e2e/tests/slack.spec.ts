@@ -22,10 +22,10 @@ test.describe('Slack workspace channel', () => {
     await expect(input).toHaveValue(''); // starts silent
 
     await input.fill(channel);
-    // Saves on blur → PATCH /api/v2/workspaces/{id}. Wait for the write.
+    // Saves on blur → PATCH /api/v1/workspaces/{id} (#1554). Wait for the write.
     const [resp] = await Promise.all([
       page.waitForResponse(
-        (r) => r.url().includes(`/api/v2/workspaces/${wsId}`) && r.request().method() === 'PATCH',
+        (r) => r.url().includes(`/api/v1/workspaces/${wsId}`) && r.request().method() === 'PATCH',
       ),
       input.blur(),
     ]);
