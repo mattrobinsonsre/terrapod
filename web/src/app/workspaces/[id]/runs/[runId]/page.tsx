@@ -808,7 +808,7 @@ function RunDetailPageInner() {
   // direction — never offer an apply we cannot stand behind.
   useEffect(() => {
     let cancelled = false
-    apiFetch(`/api/v2/workspaces/${workspaceId}`)
+    apiFetch(`/api/v1/workspaces/${workspaceId}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
         if (cancelled || !d?.data?.attributes) return

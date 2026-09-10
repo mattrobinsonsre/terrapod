@@ -6,7 +6,7 @@ import { createHash, randomBytes } from 'crypto';
 import fs from 'fs';
 import path from 'path';
 
-const API_URL = process.env.API_URL || 'http://localhost:8000';
+export const API_URL = process.env.API_URL || 'http://localhost:8000';
 const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
 
 /**
@@ -255,6 +255,20 @@ export async function createWorkspace(
 
   const data = await res.json();
   return data.data.id;
+}
+
+/**
+ * Create a Pulumi workspace through the native route (#1554). The TFE-compatible
+ * route pins Terraform, so it cannot. `name` must be `project::stack`.
+ */
+export async function createPulumiWorkspace(token: string, name: string): Promise<string> {
+  const res = await fetch(`${API_URL}/api/v1/workspaces`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/vnd.api+json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ data: { type: 'workspaces', attributes: { name, engine: 'pulumi' } } }),
+  });
+  if (!res.ok) throw new Error(`Create Pulumi workspace failed: ${res.status} ${await res.text()}`);
+  return (await res.json()).data.id;
 }
 
 /**

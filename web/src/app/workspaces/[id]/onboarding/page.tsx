@@ -95,7 +95,7 @@ export default function OnboardingPage() {
 
   const loadWorkspace = useCallback(async () => {
     try {
-      const res = await apiFetch(`/api/v2/workspaces/${workspaceId}`)
+      const res = await apiFetch(`/api/v1/workspaces/${workspaceId}`)
       if (res.ok) {
         const d = await res.json()
         setWsName(d?.data?.attributes?.name ?? '')

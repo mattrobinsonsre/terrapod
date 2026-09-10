@@ -550,3 +550,134 @@ async def create_workspace(
         )
 
     return await _create_workspace_impl(body, user, db, engine=engine)
+
+
+# ── workspace read, update and list (native surface, every engine) ───────────
+# The TFE surface is Terraform-only by design (#1487): a `terraform` CLI must never
+# be handed another engine's row, so a Pulumi workspace could be created here but
+# never read, listed or edited anywhere (#1554). These routes serve every engine
+# this deployment enables, through the TFE surface's own serializer, list body
+# and update body, so the two surfaces cannot drift. A workspace whose engine is
+# gated off is absent here as well — hidden, never deleted (#1429).
+
+
+async def _native_workspace(ref: str, db: AsyncSession):
+    """A workspace by id (`ws-…` or a bare uuid) or by name, for any enabled engine.
+
+    Names are accepted because a Pulumi workspace is addressed by its
+    `project::stack` name everywhere a person meets it. 404 for an unknown
+    workspace and for one whose engine is off — the same answer, deliberately.
+    """
+    import uuid as _uuid
+
+    from sqlalchemy import select
+
+    from terrapod.db.models import Workspace
+    from terrapod.engines import known_engines
+
+    try:
+        ws_id = _uuid.UUID(ref.removeprefix("ws-"))
+    except ValueError:
+        ws_id = None
+    match = Workspace.id == ws_id if ws_id is not None else Workspace.name == ref
+    result = await db.execute(select(Workspace).where(match, Workspace.engine.in_(known_engines())))
+    ws = result.scalar_one_or_none()
+    if ws is None:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+    return ws
+
+
+async def _latest_runs_any_engine(ws_ids: list, db: AsyncSession) -> dict:
+    """`workspace_id -> latest primary run`, whatever the run's engine."""
+    from sqlalchemy import select
+
+    from terrapod.api.routers.tfe_v2 import _primary_run_filter
+    from terrapod.db.models import Run
+
+    if not ws_ids:
+        return {}
+    result = await db.execute(
+        select(Run)
+        .where(Run.workspace_id.in_(ws_ids), _primary_run_filter())
+        .order_by(Run.workspace_id, Run.created_at.desc())
+        .distinct(Run.workspace_id)
+    )
+    return {run.workspace_id: run for run in result.scalars().all()}
+
+
+@router.get("/workspaces")
+async def list_workspaces(
+    request: Request,
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Every workspace the caller can read, for every enabled engine.
+
+    Takes the TFE list's parameters (`search[name]`, tag filters, paging) and
+    adds `filter[engine]`. An engine that is turned off yields nothing, not an
+    error: its workspaces are absent, the same as everywhere else.
+    """
+    from sqlalchemy import select
+
+    from terrapod.api.routers.tfe_v2 import _list_workspaces_impl
+    from terrapod.db.models import Workspace
+    from terrapod.engines import known_engines
+
+    query = select(Workspace).where(Workspace.engine.in_(known_engines()))
+    wanted = request.query_params.get("filter[engine]", "").strip().lower()
+    if wanted:
+        query = query.where(Workspace.engine == wanted)
+    query = query.order_by(Workspace.name)
+    return await _list_workspaces_impl(query, user, db, request, _latest_runs_any_engine)
+
+
+@router.get("/workspaces/{workspace_id}")
+async def show_workspace(
+    workspace_id: str = Path(...),
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """One workspace, by id or name, for any enabled engine.
+
+    A caller who cannot read it gets 404 rather than 403: a name lookup that
+    answered differently for "exists" and "absent" would reveal the names of
+    workspaces the caller has no access to.
+    """
+    from terrapod.api.routers.tfe_v2 import _resolve_live_pools, _workspace_json
+
+    ws = await _native_workspace(workspace_id, db)
+    caps = await resolve_workspace_capabilities_for(db, user, ws)
+    if not has_capability(caps, cap.WORKSPACE_READ):
+        raise HTTPException(status_code=404, detail="Workspace not found")
+    latest = await _latest_runs_any_engine([ws.id], db)
+    return JSONResponse(
+        content=_workspace_json(
+            ws, caps, latest_run=latest.get(ws.id), live_pool_ids=await _resolve_live_pools([ws])
+        )
+    )
+
+
+@router.patch("/workspaces/{workspace_id}")
+async def update_workspace(
+    workspace_id: str = Path(...),
+    body: dict = Body(...),
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Update a workspace's settings, for any enabled engine. Requires admin.
+
+    The body is the TFE surface's, shared, so every setting validates the same
+    way on both — including those that apply to one engine only.
+    """
+    from terrapod.api.routers import tfe_v2
+
+    ws = await _native_workspace(workspace_id, db)
+    caps = await resolve_workspace_capabilities_for(db, user, ws)
+    if not has_capability(caps, cap.WORKSPACE_READ):
+        raise HTTPException(status_code=404, detail="Workspace not found")
+    if not has_capability(caps, cap.WORKSPACE_SETTINGS):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Requires '{cap.WORKSPACE_SETTINGS}' capability on workspace",
+        )
+    return await tfe_v2.update_workspace(ws, caps, body, user, db)

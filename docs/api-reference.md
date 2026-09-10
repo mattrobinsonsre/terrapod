@@ -257,22 +257,31 @@ Returns feature flags (all enabled for Terrapod).
 ### List Workspaces
 
 ```
-GET /api/tfe/v2/organizations/default/workspaces
+GET /api/v1/workspaces                                # native — every enabled engine
+GET /api/tfe/v2/organizations/default/workspaces      # TFE-compatible — Terraform only
 ```
 
 Supports optional [pagination](#pagination) (`page[size]`/`page[number]`; absent or `page[size]=0` returns the full list) and filtering by `search[name]` and cloud-block tags (`filter[tagged][...]`). Results are scoped to workspaces the caller can read.
 
+The native list also takes `filter[engine]` (`terraform`, `pulumi`, …). A workspace whose engine is turned off on this deployment is absent from it, not listed and refused; turning the engine back on brings it back unchanged. The TFE-compatible list never returns a non-Terraform workspace — a `terraform` CLI cannot use one.
+
 ### Get Workspace by Name
 
 ```
+GET /api/v1/workspaces/{name}                         # native — every enabled engine
 GET /api/tfe/v2/organizations/default/workspaces/{name}
 ```
+
+A Pulumi workspace is named `project::stack` and is read the same way (`GET /api/v1/workspaces/proj::dev`).
 
 ### Get Workspace by ID
 
 ```
-GET /api/tfe/v2/workspaces/{id}
+GET /api/v1/workspaces/{id}                           # native — every enabled engine
+GET /api/tfe/v2/workspaces/{id}                       # TFE-compatible — Terraform only
 ```
+
+The native read answers **404** both for a workspace that does not exist and for one the caller cannot read, so a lookup by name reveals nothing about names the caller has no access to.
 
 ### Create Workspace
 
@@ -429,10 +438,11 @@ losing a single pool is now survivable.
 ### Update Workspace
 
 ```
-PATCH /api/tfe/v2/workspaces/{id}
+PATCH /api/v1/workspaces/{id-or-name}                 # native — every enabled engine
+PATCH /api/tfe/v2/workspaces/{id}                     # TFE-compatible — Terraform only
 ```
 
-Same body format as create. Only include attributes to change.
+Same body format as create. Only include attributes to change. Both routes run the same validation. A rename follows the workspace's own engine: a Pulumi workspace keeps the `project::stack` shape.
 
 **Required permission:** `admin` on the workspace.
 
