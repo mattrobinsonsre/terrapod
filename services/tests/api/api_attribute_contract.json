@@ -965,6 +965,9 @@
     "drift-last-checked-at",
     "drift-status"
   ],
+  "workspace_extensions.list_engines": [
+    "name"
+  ],
   "workspace_extensions.regenerate_architecture_critique": [
     "status"
   ]
